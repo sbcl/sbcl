@@ -59,16 +59,16 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @insertcopying
 
 @menu
-* Introduction::                
-* The Compiler::                
-* The Debugger::                
-* Efficiency::                  
-* Beyond The ANSI Standard::    
+* Introduction::
+* The Compiler::
+* The Debugger::
+* Efficiency::
+* Beyond The ANSI Standard::
 * The Foreign Function Interface::
-* Contributed Modules::    
+* Contributed Modules::
 * Concept Index::
-* Function Index::              
-* Variable Index::              
+* Function Index::
+* Variable Index::
 * Colophon::
 @end menu
 

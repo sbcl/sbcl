@@ -1,0 +1,18 @@
+@node sb-rotate-byte
+@section sb-rotate-byte
+@cindex Modular arithmetic
+@cindex Arithmetic, modular
+@cindex Arithmetic, hardware
+
+The @code{sb-rotate-byte} module offers an interface to bitwise
+rotation, with an efficient implementation for operations which can be
+performed directly using the platform's arithmetic routines.  It
+implements the specification at
+@uref{http://www.cliki.net/ROTATE-BYTE}.
+@comment except when someone scribbles all over it.  Hmm.
+
+Bitwise rotation is a component of various cryptographic or hashing
+algorithms: MD5, SHA-1, etc.; often these algorithms are specified on
+32-bit rings.  [cite cite cite].
+
+@comment would like to include ROTATE-BYTE's docstring

@@ -1,5 +1,7 @@
 @node sb-aclrepl
 @section sb-aclrepl
+@cindex Read-Eval-Print Loop
+@cindex REPL
 
 The @code{sb-aclrepl} module offers an AllegroCL style Read-Eval-Print
 Loop for SBCL. An AllegroCL style inspector is integrated. Adding an

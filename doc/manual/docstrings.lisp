@@ -116,7 +116,7 @@
              (package "package")
              (setf "setf-expander")
              (structure "struct")
-             (type (let ((class (ignore-errors (find-class symbol))))
+             (type (let ((class (find-class symbol nil))))
 		     (etypecase class
 		       (structure-class "struct")
 		       (standard-class "class")
@@ -139,7 +139,7 @@
     (package "@defvr Package")
     (setf "@deffn {Setf Expander}")
     (structure "@deftp Structure")
-    (type (let ((class (ignore-errors (find-class symbol))))
+    (type (let ((class (find-class symbol nil))))
 	    (etypecase class
 	      (structure-class "@deftp Structure")
 	      (standard-class "@deftp Class")

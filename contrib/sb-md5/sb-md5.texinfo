@@ -1,0 +1,21 @@
+@node sb-md5
+@section sb-md5
+@cindex Hashing, cryptographic
+
+The @code{sb-md5} module implements the RFC1321 MD5 Message Digest
+Algorithm.
+
+@comment entry points / docstrings
+
+@subsection Credits
+
+The implementation for CMUCL was largely done by Pierre Mai, with help
+from members of the @code{cmucl-help} mailing list.  Since CMUCL and
+SBCL are similar in many respects, it was not too difficult to extend
+the low-level implementation optimizations for CMUCL to SBCL.
+Following this, SBCL's compiler was extended to implement efficient
+compilation of modular arithmetic (@pxref{Modular arithmetic}), which
+enabled the implementation to be expressed in portable arithmetical
+terms, apart from the use of @code{rotate-byte} for bitwise rotation.
+@findex rotate-byte
+
