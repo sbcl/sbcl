@@ -2440,6 +2440,53 @@
      (logior (logand new mask)
 	     (logand int (lognot mask)))))
 
+;;; modular functions
+
+;;; Try to cut all uses of the continuation CONT to WIDTH bits.
+(defun cut-to-width (cont width)
+  (declare (type continuation cont) (type (integer 0) width))
+  (labels ((cut-node (node)
+             (when (and (combination-p node)
+                        (fun-info-p (basic-combination-kind node)))
+               (let* ((fun-ref (continuation-use (combination-fun node)))
+                      (fun-name (leaf-source-name (ref-leaf fun-ref)))
+                      (modular-fun-name (find-modular-version fun-name width)))
+                 (when modular-fun-name
+                   (change-ref-leaf fun-ref
+                                    (find-free-fun modular-fun-name
+                                                   "in a strange place"))
+                   (setf (combination-kind node) :full)
+                   (setf (node-derived-type node)
+                         (values-specifier-type `(values (unsigned-byte ,width)
+                                                         &optional)))
+                   (setf (continuation-%derived-type (node-cont node)) nil)
+                   (setf (node-reoptimize node) t)
+                   (setf (block-reoptimize (node-block node)) t)
+                   (setf (component-reoptimize (node-component node)) t)
+                   (dolist (arg (basic-combination-args node))
+                     (cut-continuation arg))))))
+           (cut-continuation (cont)
+             (do-uses (node cont)
+               (cut-node node))))
+    (cut-continuation cont)))
+
+(defoptimizer (logand optimizer) ((x y) node)
+  (let ((result-type (single-value-type (node-derived-type node))))
+    (when (numeric-type-p result-type)
+      (let ((low (numeric-type-low result-type))
+            (high (numeric-type-high result-type)))
+        (when (and (numberp low)
+                   (numberp high)
+                   (>= low 0))
+          (let ((width (integer-length high)))
+            (when (some (lambda (x) (<= width x))
+                        *modular-funs-widths*)
+              ;; FIXME: This should be (CUT-TO-WIDTH NODE WIDTH).
+              (cut-to-width x width)
+              (cut-to-width y width)
+              nil ; After fixing above, replace with T.
+              )))))))
+
 ;;; miscellanous numeric transforms
 
 ;;; If a constant appears as the first arg, swap the args.
@@ -2640,6 +2687,17 @@
   (def logior -1 -1)
   (def logxor -1 (lognot x))
   (def logxor 0 x))
+
+(deftransform logand ((x y) (* (constant-arg t)) *)
+  "fold identity operation"
+  (let ((y (continuation-value y)))
+    (unless (and (plusp y)
+                 (= y (1- (ash 1 (integer-length y)))))
+      (give-up-ir1-transform))
+    (unless (csubtypep (continuation-type x)
+                       (specifier-type `(integer 0 ,y)))
+      (give-up-ir1-transform))
+    'x))
 
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.

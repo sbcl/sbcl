@@ -149,3 +149,41 @@
 
 ;;; the maximum number of SCs in any implementation
 (def!constant sc-number-limit 32)
+
+;;; Modular functions
+
+;;; hash: name -> ({(width . fun)}*)
+(defvar *modular-funs*
+  (make-hash-table :test 'eq))
+
+;;; List of increasing widths
+(defvar *modular-funs-widths* nil)
+
+(defun find-modular-version (fun-name width)
+  (let ((info (gethash fun-name *modular-funs*)))
+    (cdr (find-if (lambda (item-width) (>= item-width width))
+                  info
+                  :key #'car))))
+
+(defun %define-modular-fun (name prototype width)
+  (let* ((list (gethash prototype *modular-funs*))
+         (entry (assoc width list)))
+    (if entry
+        (unless (eq name (cdr entry))
+          (setf (cdr entry) name)
+          (style-warn "Redefining modular version ~S of ~S for width ~S."
+                      name prototype width))
+        (setf (gethash prototype *modular-funs*)
+              (merge 'list (list (cons width name)) list #'<))))
+  (setq *modular-funs-widths*
+        (merge 'list (list width) *modular-funs-widths* #'<)))
+
+(defmacro define-modular-fun (name prototype width)
+  (check-type name symbol)
+  (check-type prototype symbol)
+  (check-type width unsigned-byte)
+  `(progn
+     (%define-modular-fun ',name ',prototype ,width)
+     (defknown ,name (integer integer) (unsigned-byte ,width)
+               (foldable flushable movable))
+     ))

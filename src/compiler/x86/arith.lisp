@@ -1389,3 +1389,29 @@
     (inst mov tmp y)
     (inst shr tmp 18)
     (inst xor y tmp)))
+
+;;; Modular functions
+(define-modular-fun +-mod32 + 32)
+
+(define-vop (fast-+-mod32/unsigned=>unsigned fast-safe-arith-op)
+  (:translate +-mod32)
+  (:args (x :scs (unsigned-reg) :target r
+	    :load-if (not (and (sc-is x unsigned-stack)
+			       (sc-is y unsigned-reg)
+			       (sc-is r unsigned-stack)
+			       (location= x r))))
+	 (y :scs (unsigned-reg unsigned-stack)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (r :scs (unsigned-reg) :from (:argument 0)
+	       :load-if (not (and (sc-is x unsigned-stack)
+				  (sc-is y unsigned-reg)
+				  (location= x r)))))
+  (:result-types unsigned-num)
+  (:note "inline (unsigned-byte 32) arithmetic")
+  (:generator 5
+    (cond ((and (sc-is x unsigned-reg) (sc-is y unsigned-reg) (sc-is r unsigned-reg)
+		(not (location= x r)))
+	   (inst lea r (make-ea :dword :base x :index y :scale 1)))
+	  (t
+	   (move r x)
+	   (inst add r y)))))

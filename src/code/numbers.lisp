@@ -1336,3 +1336,25 @@
   (def minusp "Is this real number strictly negative?")
   (def oddp "Is this integer odd?")
   (def evenp "Is this integer even?"))
+
+;;;; modular functions
+#.
+(collect ((forms))
+  (flet ((definition (name width pattern)
+           ;; We rely on (SUBTYPEP `(UNSIGNED-BYTE ,WIDTH)
+           ;;                      'BIGNUM-ELEMENT-TYPE)
+           `(defun ,name (x y)
+              (flet ((prepare-argument (x)
+                       (declare (integer x))
+                       (etypecase x
+                         ((unsigned-byte ,width) x)
+                         (bignum-element-type (logand x ,pattern))
+                         (fixnum (logand x ,pattern))
+                         (bignum (logand (%bignum-ref x 0) ,pattern)))))
+                (,name (prepare-argument x) (prepare-argument y))))))
+    (loop for info being each hash-value of sb!c::*modular-funs*
+          ;; FIXME: We need to process only "toplevel" functions
+          do (loop for (width . name) in info
+                   for pattern = (1- (ash 1 width))
+                   do (forms (definition name width pattern)))))
+  `(progn ,@(forms)))
