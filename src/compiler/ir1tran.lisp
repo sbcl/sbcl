@@ -1017,7 +1017,8 @@
   (let ((res (make-defined-fun
 	      :%source-name (leaf-source-name var)
 	      :where-from (leaf-where-from var)
-	      :type (if (eq inlinep :notinline)
+	      :type (if (and (eq inlinep :notinline)
+			     (not (eq (leaf-where-from var) :declared)))
 			(specifier-type 'function)
 			(leaf-type var))
 	      :inlinep inlinep)))

@@ -186,6 +186,16 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+# NOTINLINE on known functions shouldn't inhibit type inference
+# (spotted by APD sbcl-devel 2003-06-14)
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defun foo (x)
+      (declare (notinline list))
+      (1+ (list x)))
+EOF
+expect_failed_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 
