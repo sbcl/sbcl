@@ -22,12 +22,16 @@
   (declare (type function function))
   ;; The Lisp-level type FUNCTION can conceal a multitude of sins..
   (case (sb-kernel:get-type function)
-    (#.sb-vm:function-header-type (sb-kernel:%function-arglist function))
-    (#.sb-vm:closure-function-header-type (has-arglist-info-p
-					   (sb-kernel:%closure-function
-					    function)))
+    ((#.sb-vm:function-header-type #.sb-vm:closure-function-header-type)
+      (sb-kernel:%function-arglist function))
+    (#.sb-vm:closure-header-type (has-arglist-info-p
+                                  (sb-kernel:%closure-function
+                                   function)))
+    ;; in code/describe.lisp, ll. 227 (%describe-function), we use a scheme
+    ;; like above, and it seems to work. -- MNA 2001-06-12
+    ;;
     ;; (There might be other cases with arglist info also.
-    ;; FUNCTION-HEADER-TYPE and CLOSURE-FUNCTION-HEADER-TYPE just
+    ;; FUNCTION-HEADER-TYPE and CLOSURE-HEADER-TYPE just
     ;; happen to be the two case that I had my nose rubbed in when
     ;; debugging a GC problem caused by applying %FUNCTION-ARGLIST to
     ;; a closure. -- WHN 2001-06-05)
@@ -48,19 +52,7 @@
 	      ((sb-int:info :function :accessor-for ext-sym)
 	       (values))
 	      ((typep fun 'generic-function)
-	       ;; FIXME: Check the argument lists of generic functions,
-	       ;; instead of just punting like this. (DESCRIBE seems
-	       ;; to know how to do it, at least for #'DOCUMENTATION.)
-	       (values))
-	      (;; FIXME: CONDITION slot accessors (e.g.
-	       ;; PRINT-NOT-READABLE-OBJECT) fall into this category.
-	       ;; They seem to have argument lists -- since at least
-	       ;; DESCRIBE knows how to find them -- but I have
-	       ;; neither reverse engineered how it's finding them,
-	       ;; nor factored that into a function which can be
-	       ;; shared with the logic here..
-	       (= (sb-kernel:get-type fun) sb-vm:closure-header-type)
-	       (values)) ; ..so for now we just punt.
+                (sb-pcl::generic-function-pretty-arglist fun))
 	      (t
 	       (let ((fun (symbol-function ext-sym)))
 		 (unless (has-arglist-info-p fun)
