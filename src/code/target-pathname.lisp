@@ -282,7 +282,7 @@
 	    (,pathname (etypecase ,pd0
 			 (pathname ,pd0)
 			 (string (parse-namestring ,pd0))
-			 (stream (file-name ,pd0)))))
+			 (file-stream (file-name ,pd0)))))
        ,@body)))
 
 ;;; Convert the var, a host or string name for a host, into a

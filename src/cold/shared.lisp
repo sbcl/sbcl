@@ -151,16 +151,29 @@
     (when (probe-file obj)
       (delete-file obj))
 
-    ;; Work around a bug in CLISP 1999-01-08 #'COMPILE-FILE: CLISP
-    ;; mangles relative pathnames passed as :OUTPUT-FILE arguments,
-    ;; but works OK with absolute pathnames.
-    #+clisp
+    ;; Original comment:
+    ;;
+    ;;   Work around a bug in CLISP 1999-01-08 #'COMPILE-FILE: CLISP
+    ;;   mangles relative pathnames passed as :OUTPUT-FILE arguments,
+    ;;   but works OK with absolute pathnames.
+    ;;
+    ;; following discussion on cmucl-imp 2002-07
+    ;; "COMPILE-FILE-PATHNAME", it would seem safer to deal with
+    ;; absolute pathnames all the time; it is no longer clear that the
+    ;; original behaviour in CLISP was wrong or that the current
+    ;; behaviour is right; and in any case absolutifying the pathname
+    ;; insulates us against changes of behaviour. -- CSR, 2002-08-09
     (setf tmp-obj
 	  ;; (Note that this idiom is taken from the ANSI
 	  ;; documentation for TRUENAME.)
 	  (with-open-file (stream tmp-obj :direction :output)
 	    (close stream)
 	    (truename stream)))
+    ;; and some compilers (e.g. OpenMCL) will complain if they're
+    ;; asked to write over a file that exists already (and isn't
+    ;; recognizeably a fasl file), so
+    (when (probe-file tmp-obj)
+      (delete-file tmp-obj))
 
     ;; Try to use the compiler to generate a new temporary object file.
     (flet ((report-recompile-restart (stream)

@@ -275,5 +275,14 @@
 	 (setf (logical-pathname-translations "")
 	       (list '("**;*.*.*" "/**/*.*")))))
 
+;;; Not strictly pathname logic testing, but until sbcl-0.7.6.19 we
+;;; had difficulty with non-FILE-STREAM stream arguments to pathname
+;;; functions (they would cause memory protection errors).  Make sure
+;;; that those errors are gone:
+(assert (raises-error? (pathname (make-string-input-stream "FOO"))
+		       type-error))
+(assert (raises-error? (merge-pathnames (make-string-output-stream))
+		       type-error))
+
 ;;;; success
 (quit :unix-status 104)

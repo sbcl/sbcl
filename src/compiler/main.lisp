@@ -1551,7 +1551,7 @@
   #!+sb-doc
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
-  (pathname output-file))
+  (merge-pathnames output-file (merge-pathnames input-file)))
 
 ;;;; MAKE-LOAD-FORM stuff
 

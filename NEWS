@@ -1203,9 +1203,29 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
     or very deeply nested recursion) has changed.  Stack exhaustion
     detection is now done by write-protecting pages at the OS level
     and applies at all optimization settings; when found, a
-    SB-KERNEL:CONTROL-STACK_EXHAUSTED condition (subclass of
+    SB-KERNEL:CONTROL-STACK-EXHAUSTED condition (subclass of
     STORAGE-CONDITION) is signalled, so stack exhaustion can no longer
-    be caught using IGNORE-ERRORS
+    be caught using IGNORE-ERRORS.
+  * Bug 48a./b. fixed: SYMBOL-MACROLET now refuses to bind symbols
+    that are names of constants or global variables.
+  * Bug fix: DEFINE-ALIEN-ROUTINE now declaims the correct FTYPE for
+    alien routines with docstrings.
+  * Bug 184 fixed: Division of ratios by the integer 0 now signals an
+    error of type DIVISION-BY-ZERO. (thanks to Wolfhard Buss and
+    Raymond Toy)
+  * Bug fix: Errors in PARSE-INTEGER are now of type PARSE-ERROR.
+    (thanks to Eric Marsden)
+  * Bug fix: COERCE to (COMPLEX FLOAT) of rationals now returns an
+    object of type (COMPLEX FLOAT). (thanks to Wolfhard Buss)
+  * Bug fix: The SPARC backend can now compile functions involving
+    LOGAND and stack-allocated arguments. (thanks to Raymond Toy)
+  * Bug fix: We no longer segfault on passing a non-FILE-STREAM stream
+    to a functions expecting a PATHNAME-DESIGNATOR.
+  * Minor incompatible change: COMPILE-FILE-PATHNAME now merges its
+    OUTPUT-FILE argument with its INPUT-FILE argument, resulting in
+    behaviour analogous to RENAME-FILE.  This puts its behaviour more
+    in line with ANSI's wording on COMPILE-FILE-PATHNAME. (thanks to
+    Marco Antinotti)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
