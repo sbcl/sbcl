@@ -1073,9 +1073,11 @@
 					       compile-time-too))))))
         (if (atom form)
             #+sb-xc-host
-            ;; (There are no EVAL-WHEN issues in the ATOM case until
-            ;; SBCL gets smart enough to handle global
-            ;; DEFINE-SYMBOL-MACRO or SYMBOL-MACROLET.)
+            ;; (There are no xc EVAL-WHEN issues in the ATOM case until
+            ;; (1) SBCL gets smart enough to handle global
+            ;; DEFINE-SYMBOL-MACRO or SYMBOL-MACROLET and (2) SBCL
+	    ;; implementors start using symbol macros in a way which
+	    ;; interacts with SB-XC/CL distinction.)
             (convert-and-maybe-compile form path)
             #-sb-xc-host
             (default-processor form)

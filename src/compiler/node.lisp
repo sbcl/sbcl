@@ -221,7 +221,7 @@
 ;;;    is set when a continuation type assertion is strengthened.
 ;;;    TEST-MODIFIED is set whenever the test for the ending IF has
 ;;;    changed (may be true when there is no IF.)
-(def-boolean-attribute block
+(!def-boolean-attribute block
   reoptimize flush-p type-check delete-p type-asserted test-modified)
 
 ;;; FIXME: Tweak so that definitions of e.g. BLOCK-DELETE-P is

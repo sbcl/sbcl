@@ -25,7 +25,7 @@
 ;;; breakdown of side effects, since we do very little code motion on
 ;;; IR1. We are interested in some deeper semantic properties such as
 ;;; whether it is safe to pass stack closures to.
-(def-boolean-attribute ir1
+(!def-boolean-attribute ir1
   ;; may call functions that are passed as arguments. In order to
   ;; determine what other effects are present, we must find the
   ;; effects of all arguments that may be functions.

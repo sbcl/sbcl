@@ -172,7 +172,7 @@
 
 ;;;; structures/types used by the scheduler
 
-(sb!c:def-boolean-attribute instruction
+(!def-boolean-attribute instruction
   ;; This attribute is set if the scheduler can freely flush this
   ;; instruction if it thinks it is not needed. Examples are NOP and
   ;; instructions that have no side effect not described by the
@@ -1125,7 +1125,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; FIXME: The way this macro uses MACROEXPAND internally breaks my
 ;;; old assumptions about macros which are needed both in the host and
 ;;; the target. (This is more or less the same way that PUSH-IN,
-;;; DELETEF-IN, and DEF-BOOLEAN-ATTRIBUTE break my old assumptions,
+;;; DELETEF-IN, and !DEF-BOOLEAN-ATTRIBUTE break my old assumptions,
 ;;; except that they used GET-SETF-EXPANSION instead of MACROEXPAND to
 ;;; do the dirty deed.) The quick and dirty "solution" here is the
 ;;; same as there: use cut and paste to duplicate the defmacro in a

@@ -160,71 +160,80 @@
 ;;;
 ;;;    NAME-attributes attribute-name*
 ;;;      Return a set of the named attributes.
-;;;
-;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
-;;;   (DEF!MACRO FOO (..) .. CL:GET-SETF-EXPANSION ..)
-;;;   #+SB-XC-HOST
-;;;   (SB!XC:DEFMACRO FOO (..) .. SB!XC:GET-SETF-EXPANSION ..)
-;;; arrangement, in order to get it to work in cross-compilation. This
-;;; duplication should be removed, perhaps by rewriting the macro in a
-;;; more cross-compiler-friendly way, or perhaps just by using some
-;;; (MACROLET ((FROB ..)) .. FROB .. FROB) form, but I don't want to
-;;; do it now, because the system isn't running yet, so it'd be too
-;;; hard to check that my changes were correct -- WHN 19990806
-(def!macro def-boolean-attribute (name &rest attribute-names)
+#+sb-xc-host
+(progn 
+  (def!macro !def-boolean-attribute (name &rest attribute-names)
 
-  (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
-	(test-name (symbolicate name "-ATTRIBUTEP")))
-    (collect ((alist))
-      (do ((mask 1 (ash mask 1))
-	   (names attribute-names (cdr names)))
-	  ((null names))
-	(alist (cons (car names) mask)))
+    (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
+	  (test-name (symbolicate name "-ATTRIBUTEP")))
+      (collect ((alist))
+        (do ((mask 1 (ash mask 1))
+	     (names attribute-names (cdr names)))
+	    ((null names))
+	  (alist (cons (car names) mask)))
+	`(progn
+	   (eval-when (:compile-toplevel :load-toplevel :execute)
+	     (defparameter ,translations-name ',(alist)))
+	   (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
+	     "Automagically generated boolean attribute creation function.
+  See !DEF-BOOLEAN-ATTRIBUTE."
+	     (compute-attribute-mask attribute-names ,translations-name))
+	   (defmacro ,test-name (attributes &rest attribute-names)
+	     "Automagically generated boolean attribute test function.
+  See !DEF-BOOLEAN-ATTRIBUTE."
+	     `(logtest ,(compute-attribute-mask attribute-names
+						,translations-name)
+		       (the attributes ,attributes)))
+	   ;; This definition transforms strangely under UNCROSS, in a
+	   ;; way that DEF!MACRO doesn't understand, so we delegate it
+	   ;; to a submacro then define the submacro differently when
+	   ;; building the xc and when building the target compiler.
+	   (!def-boolean-attribute-setter ,test-name
+					  ,translations-name
+					  ,@attribute-names)))))
 
-      `(progn
-
-	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (defparameter ,translations-name ',(alist)))
-
-	 (defmacro ,test-name (attributes &rest attribute-names)
-	   "Automagically generated boolean attribute test function. See
-	    Def-Boolean-Attribute."
-	   `(logtest ,(compute-attribute-mask attribute-names
-					      ,translations-name)
-		     (the attributes ,attributes)))
-
-	 (define-setf-expander ,test-name (place &rest attributes
-						 &environment env)
-	   "Automagically generated boolean attribute setter. See
-	    Def-Boolean-Attribute."
-	   #-sb-xc-host (declare (type sb!c::lexenv env))
-	   ;; FIXME: It would be better if &ENVIRONMENT arguments
-	   ;; were automatically declared to have type LEXENV by the
-	   ;; hairy-argument-handling code.
-	   (multiple-value-bind (temps values stores set get)
-	       (get-setf-expansion place env)
-	     (when (cdr stores)
-	       (error "multiple store variables for ~S" place))
-	     (let ((newval (gensym))
-		   (n-place (gensym))
-		   (mask (compute-attribute-mask attributes
-						 ,translations-name)))
-	       (values `(,@temps ,n-place)
-		       `(,@values ,get)
-		       `(,newval)
-		       `(let ((,(first stores)
-			       (if ,newval
-				   (logior ,n-place ,mask)
-				   (logand ,n-place ,(lognot mask)))))
-			  ,set
-			  ,newval)
-		       `(,',test-name ,n-place ,@attributes)))))
-
-	 (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
-	   "Automagically generated boolean attribute creation function. See
-	    Def-Boolean-Attribute."
-	   (compute-attribute-mask attribute-names ,translations-name))))))
-;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
+  ;; It seems to be difficult to express in DEF!MACRO machinery what
+  ;; to do with target-vs-host GET-SETF-EXPANSION in here, so we just
+  ;; hack it by hand, passing a different GET-SETF-EXPANSION-FUN-NAME
+  ;; in the host DEFMACRO and target DEFMACRO-MUNDANELY cases.
+  (defun guts-of-!def-boolean-attribute-setter (test-name
+						translations-name
+						attribute-names
+						get-setf-expansion-fun-name)
+    `(define-setf-expander ,test-name (place &rest attributes
+					     &environment env)
+       "Automagically generated boolean attribute setter. See
+ !DEF-BOOLEAN-ATTRIBUTE."
+       #-sb-xc-host (declare (type sb!c::lexenv env))
+       ;; FIXME: It would be better if &ENVIRONMENT arguments were
+       ;; automatically declared to have type LEXENV by the
+       ;; hairy-argument-handling code.
+       (multiple-value-bind (temps values stores set get)
+	   (,get-setf-expansion-fun-name place env)
+	 (when (cdr stores)
+	   (error "multiple store variables for ~S" place))
+	 (let ((newval (gensym))
+	       (n-place (gensym))
+	       (mask (compute-attribute-mask attributes ,translations-name)))
+	   (values `(,@temps ,n-place)
+		   `(,@values ,get)
+		   `(,newval)
+		   `(let ((,(first stores)
+			   (if ,newval
+			       (logior ,n-place ,mask)
+			       (logand ,n-place ,(lognot mask)))))
+		      ,set
+		      ,newval)
+		   `(,',test-name ,n-place ,@attributes))))))
+  ;; We define the host version here, and the just-like-it-but-different
+  ;; target version later, after DEFMACRO-MUNDANELY has been defined.
+  (defmacro !def-boolean-attribute-setter (test-name
+					   translations-name
+					   &rest attribute-names)
+    (guts-of-!def-boolean-attribute-setter test-name
+					   translations-name
+					   attribute-names
+					   'get-setf-expansion)))
 
 ;;; And now for some gratuitous pseudo-abstraction...
 ;;;
@@ -234,9 +243,9 @@
 ;;; ATTRIBUTES-INTERSECTION
 ;;;   Return the intersection of all the sets of boolean attributes which
 ;;;   are its arguments.
-;;; ATTRIBUTES=
-;;;   True if the attributes present in Attr1 are identical to
-;;;   those in Attr2.
+;;; ATTRIBUTES
+;;;   True if the attributes present in ATTR1 are identical to
+;;;   those in ATTR2.
 (defmacro attributes-union (&rest attributes)
   `(the attributes
 	(logior ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
@@ -448,7 +457,7 @@
 ;;; type specifier for the function by wrapping (FUNCTION ...) around
 ;;; the ARG-TYPES and RESULT-TYPE. ATTRIBUTES is an unevaluated list
 ;;; of boolean attributes of the function. See their description in
-;;; (DEF-BOOLEAN-ATTRIBUTE IR1). NAME may also be a list of names, in
+;;; (!DEF-BOOLEAN-ATTRIBUTE IR1). NAME may also be a list of names, in
 ;;; which case the same information is given to all the names. The
 ;;; keywords specify the initial values for various optimizers that
 ;;; the function might have.

@@ -47,7 +47,7 @@
 
 ;;;; side effect classes
 
-(def-boolean-attribute vop
+(!def-boolean-attribute vop
   any)
 
 ;;;; move/coerce definition
