@@ -712,6 +712,39 @@
 			    sb!vm:n-byte-bits)))
      string1))
 
+(deftransform replace ((string1 string2 &key (start1 0) (start2 0)
+				end1 end2)
+		       ((simple-array character (*))
+			(simple-array character (*))
+			&rest t)
+		       *
+		       ;; FIXME: consider replacing this policy test
+		       ;; with some tests for the STARTx and ENDx
+		       ;; indices being valid, conditional on high
+		       ;; SAFETY code.
+		       ;;
+		       ;; FIXME: It turns out that this transform is
+		       ;; critical for the performance of string
+		       ;; streams.  Make this more explicit.
+		       :policy (< (max safety space) 3))
+  `(locally
+     (declare (optimize (safety 0)))
+     (bit-bash-copy string2
+		    (the index
+			 (+ (the index (* start2 sb!vm:n-byte-bits))
+			    ,vector-data-bit-offset))
+		    string1
+		    (the index
+			 (+ (the index (* start1 sb!vm:n-byte-bits))
+			    ,vector-data-bit-offset))
+		    (the index
+			 (* (min (the index (- (or end1 (length string1))
+					       start1))
+				 (the index (- (or end2 (length string2))
+					       start2)))
+			    sb!vm:n-byte-bits)))
+     string1))
+
 ;;; FIXME: this would be a valid transform for certain excluded cases:
 ;;;   * :TEST 'CHAR= or :TEST #'CHAR=
 ;;;   * :TEST 'EQL   or :TEST #'EQL
@@ -745,9 +778,10 @@
 ;;;
 ;;; FIXME: currently KLUDGEed because of bug 188
 (deftransform concatenate ((rtype &rest sequences)
-			   (t &rest (or simple-base-string
+			   (t &rest (or (simple-array character (*))
+					simple-base-string
 					(simple-array nil (*))))
-			   simple-base-string
+			   (simple-array character (*))
 			   :policy (< safety 3))
   (loop for rest-seqs on sequences
         for n-seq = (gensym "N-SEQ")

@@ -49,6 +49,7 @@
 	(give-up-ir1-transform)
 	`(etypecase string
 	  ((simple-array character (*)) (data-vector-ref string index))
+	  ((simple-array base-char (*)) (data-vector-ref string index))
 	  ((simple-array nil (*)) (data-vector-ref string index))))))
 
 (deftransform hairy-data-vector-ref ((array index) (array t) *)
@@ -98,6 +99,8 @@
 	(give-up-ir1-transform)
 	`(etypecase string
 	  ((simple-array character (*))
+	   (data-vector-set string index new-value))
+	  ((simple-array base-char (*))
 	   (data-vector-set string index new-value))
 	  ((simple-array nil (*))
 	   (data-vector-set string index new-value))))))

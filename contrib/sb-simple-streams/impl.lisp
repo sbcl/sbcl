@@ -173,7 +173,7 @@
 	   (index 0)			; current index in current buffer
 	   (total 0))			; total characters
       (declare (type simple-stream encap)
-	       (type simple-base-string cbuf)
+	       (type simple-string cbuf)
 	       (type cons bufs tail)
 	       (type sb-int:index index total))
       (loop
@@ -200,7 +200,7 @@
 		(do ((list bufs (cdr list)))
 		    ((eq list tail))
 		  (let ((buf (car list)))
-		    (declare (type simple-base-string buf))
+		    (declare (type simple-string buf))
 		    (replace cbuf buf :start1 idx)
 		    (incf idx (length buf)))))
 	      (return (values (sb-kernel:shrink-vector cbuf total)
@@ -210,7 +210,7 @@
 		  (index 0))
 	      (declare (type sb-int:index index))
 	      (dolist (buf bufs)
-		(declare (type simple-base-string buf))
+		(declare (type simple-string buf))
 		(replace string buf :start1 index)
 		(incf index (length buf)))
 	      (return  (values string (eq done :eof)))))

@@ -123,6 +123,16 @@
 	 :datum object
 	 :expected-type 'base-string))
 
+(deferr object-not-vector-nil-error (object)
+  (error 'type-error
+	 :datum object
+	 :expected-type '(vector nil)))
+
+(deferr object-not-character-string-error (object)
+  (error 'type-error
+	 :datum object
+	 :expected-type '(vector character)))
+
 (deferr object-not-bit-vector-error (object)
   (error 'type-error
 	 :datum object

@@ -159,10 +159,10 @@
 
 (defun stringify-name (name kind)
   (typecase name
-    (simple-base-string name)
-    (string (coerce name 'simple-base-string))
+    (simple-string name)
+    (string (coerce name 'simple-string))
     (symbol (symbol-name name))
-    (base-char (string name))
+    (character (string name))
     (t
      (error "bogus ~A name: ~S" kind name))))
 
@@ -173,11 +173,11 @@
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
 		    use imports interns exports implement lock doc-string)
-  (declare (type simple-base-string name)
+  (declare (type simple-string name)
 	   (type list nicknames shadows shadowing-imports
 		 imports interns exports)
 	   (type (or list (member :default)) use)
-	   (type (or simple-base-string null) doc-string)
+	   (type (or simple-string null) doc-string)
 	   #!-sb-package-locks
 	   (ignore implement lock))
   (let ((package (or (find-package name)

@@ -284,6 +284,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
 	case SIMPLE_ARRAY_WIDETAG:
 	case COMPLEX_BASE_STRING_WIDETAG:
+	case COMPLEX_CHARACTER_STRING_WIDETAG:
 	case COMPLEX_VECTOR_NIL_WIDETAG:
 	case COMPLEX_BIT_VECTOR_WIDETAG:
 	case COMPLEX_VECTOR_WIDETAG:
@@ -300,6 +301,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
 	case SIMPLE_ARRAY_NIL_WIDETAG:
 	case SIMPLE_BASE_STRING_WIDETAG:
+	case SIMPLE_CHARACTER_STRING_WIDETAG:
 	case SIMPLE_BIT_VECTOR_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
@@ -889,92 +891,96 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 {
     switch (widetag_of(header)) {
 	/* FIXME: this needs a reindent */
-      case BIGNUM_WIDETAG:
-      case SINGLE_FLOAT_WIDETAG:
-      case DOUBLE_FLOAT_WIDETAG:
+    case BIGNUM_WIDETAG:
+    case SINGLE_FLOAT_WIDETAG:
+    case DOUBLE_FLOAT_WIDETAG:
 #ifdef LONG_FLOAT_WIDETAG
-      case LONG_FLOAT_WIDETAG:
+    case LONG_FLOAT_WIDETAG:
 #endif
 #ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
-      case COMPLEX_SINGLE_FLOAT_WIDETAG:
+    case COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
 #ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
-      case COMPLEX_DOUBLE_FLOAT_WIDETAG:
+    case COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
 #ifdef COMPLEX_LONG_FLOAT_WIDETAG
-      case COMPLEX_LONG_FLOAT_WIDETAG:
+    case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-      case SAP_WIDETAG:
-	  return ptrans_unboxed(thing, header);
-
-      case RATIO_WIDETAG:
-      case COMPLEX_WIDETAG:
-      case SIMPLE_ARRAY_WIDETAG:
-      case COMPLEX_BASE_STRING_WIDETAG:
-      case COMPLEX_BIT_VECTOR_WIDETAG:
-      case COMPLEX_VECTOR_NIL_WIDETAG:
-      case COMPLEX_VECTOR_WIDETAG:
-      case COMPLEX_ARRAY_WIDETAG:
+    case SAP_WIDETAG:
+	return ptrans_unboxed(thing, header);
+	
+    case RATIO_WIDETAG:
+    case COMPLEX_WIDETAG:
+    case SIMPLE_ARRAY_WIDETAG:
+    case COMPLEX_BASE_STRING_WIDETAG:
+    case COMPLEX_CHARACTER_STRING_WIDETAG:
+    case COMPLEX_BIT_VECTOR_WIDETAG:
+    case COMPLEX_VECTOR_NIL_WIDETAG:
+    case COMPLEX_VECTOR_WIDETAG:
+    case COMPLEX_ARRAY_WIDETAG:
         return ptrans_boxed(thing, header, constant);
 	
-      case VALUE_CELL_HEADER_WIDETAG:
-      case WEAK_POINTER_WIDETAG:
+    case VALUE_CELL_HEADER_WIDETAG:
+    case WEAK_POINTER_WIDETAG:
         return ptrans_boxed(thing, header, 0);
-
-      case SYMBOL_HEADER_WIDETAG:
+	
+    case SYMBOL_HEADER_WIDETAG:
         return ptrans_boxed(thing, header, 0);
-
-      case SIMPLE_ARRAY_NIL_WIDETAG:
+	
+    case SIMPLE_ARRAY_NIL_WIDETAG:
         return ptrans_vector(thing, 0, 0, 0, constant);
-
-      case SIMPLE_BASE_STRING_WIDETAG:
+	
+    case SIMPLE_BASE_STRING_WIDETAG:
         return ptrans_vector(thing, 8, 1, 0, constant);
-
-      case SIMPLE_BIT_VECTOR_WIDETAG:
+	
+    case SIMPLE_CHARACTER_STRING_WIDETAG:
+	return ptrans_vector(thing, 8, 1, 0, constant);
+	
+    case SIMPLE_BIT_VECTOR_WIDETAG:
         return ptrans_vector(thing, 1, 0, 0, constant);
-
-      case SIMPLE_VECTOR_WIDETAG:
+	
+    case SIMPLE_VECTOR_WIDETAG:
         return ptrans_vector(thing, 32, 0, 1, constant);
-
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+	
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
         return ptrans_vector(thing, 2, 0, 0, constant);
-
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+	
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
         return ptrans_vector(thing, 4, 0, 0, constant);
-
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+	
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
-      case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
+    case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
 #endif
         return ptrans_vector(thing, 8, 0, 0, constant);
 
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
-      case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
+    case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 #endif
         return ptrans_vector(thing, 16, 0, 0, constant);
-
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+	
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
-      case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+    case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
-      case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
+    case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 #endif
         return ptrans_vector(thing, 32, 0, 0, constant);
-
-      case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+	
+    case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 32, 0, 0, constant);
-
-      case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+	
+    case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 64, 0, 0, constant);
-
+	
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
-      case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
+    case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #ifdef LISP_FEATURE_X86
         return ptrans_vector(thing, 96, 0, 0, constant);
 #endif
@@ -984,17 +990,17 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
 
 #ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
-      case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
+    case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 64, 0, 0, constant);
 #endif
 
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-      case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
+    case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 128, 0, 0, constant);
 #endif
 
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
-      case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
+    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #ifdef LISP_FEATURE_X86
         return ptrans_vector(thing, 192, 0, 0, constant);
 #endif
@@ -1003,16 +1009,16 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
 #endif
 
-      case CODE_HEADER_WIDETAG:
+    case CODE_HEADER_WIDETAG:
         return ptrans_code(thing);
 
-      case RETURN_PC_HEADER_WIDETAG:
+    case RETURN_PC_HEADER_WIDETAG:
         return ptrans_returnpc(thing, header);
 
-      case FDEFN_WIDETAG:
+    case FDEFN_WIDETAG:
 	return ptrans_fdefn(thing, header);
 
-      default:
+    default:
         /* Should only come across other pointers to the above stuff. */
         gc_abort();
 	return NIL;
@@ -1123,110 +1129,115 @@ pscav(lispobj *addr, int nwords, boolean constant)
             /* It's an other immediate. Maybe the header for an unboxed */
             /* object. */
             switch (widetag_of(thing)) {
-              case BIGNUM_WIDETAG:
-              case SINGLE_FLOAT_WIDETAG:
-              case DOUBLE_FLOAT_WIDETAG:
+	    case BIGNUM_WIDETAG:
+	    case SINGLE_FLOAT_WIDETAG:
+	    case DOUBLE_FLOAT_WIDETAG:
 #ifdef LONG_FLOAT_WIDETAG
-              case LONG_FLOAT_WIDETAG:
+	    case LONG_FLOAT_WIDETAG:
 #endif
-              case SAP_WIDETAG:
+	    case SAP_WIDETAG:
                 /* It's an unboxed simple object. */
                 count = HeaderValue(thing)+1;
                 break;
 
-              case SIMPLE_VECTOR_WIDETAG:
+	    case SIMPLE_VECTOR_WIDETAG:
 		  if (HeaderValue(thing) == subtype_VectorValidHashing) {
                     *addr = (subtype_VectorMustRehash << N_WIDETAG_BITS) |
                         SIMPLE_VECTOR_WIDETAG;
 		  }
                 count = 1;
                 break;
-
-	      case SIMPLE_ARRAY_NIL_WIDETAG:
+		
+	    case SIMPLE_ARRAY_NIL_WIDETAG:
 		count = 2;
 		break;
-
-              case SIMPLE_BASE_STRING_WIDETAG:
+		
+	    case SIMPLE_BASE_STRING_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length)+1,8)+2,2);
                 break;
 
-              case SIMPLE_BIT_VECTOR_WIDETAG:
+	    case SIMPLE_CHARACTER_STRING_WIDETAG:
+		vector = (struct vector *)addr;
+		count = CEILING(NWORDS(fixnum_value(vector->length)+1,8)+2,2);
+		break;
+
+	    case SIMPLE_BIT_VECTOR_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),1)+2,2);
                 break;
 
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),2)+2,2);
                 break;
 
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),4)+2,2);
                 break;
 
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
+	    case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),8)+2,2);
                 break;
-
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+		
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
+	    case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),16)+2,2);
                 break;
 
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
-  	      case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+	    case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
+	    case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),32)+2,2);
                 break;
 
 #if N_WORD_BITS == 64
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+	    case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+	    case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
+	    case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),64)+2,2);
                 break;
 #endif
 
-              case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+	    case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(fixnum_value(vector->length)+2,2);
                 break;
 
-              case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+	    case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
 #ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
-              case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
+	    case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = fixnum_value(vector->length)*2+2;
                 break;
 
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
-              case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
+	    case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
 #ifdef LISP_FEATURE_X86
                 count = fixnum_value(vector->length)*3+2;
@@ -1238,14 +1249,14 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #endif
 
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-              case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
+	    case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
                 count = fixnum_value(vector->length)*4+2;
                 break;
 #endif
 
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
-              case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
+	    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
 #ifdef LISP_FEATURE_X86
                 count = fixnum_value(vector->length)*6+2;
@@ -1256,7 +1267,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 break;
 #endif
 
-              case CODE_HEADER_WIDETAG:
+	    case CODE_HEADER_WIDETAG:
 #ifndef LISP_FEATURE_X86
                 gc_abort(); /* no code headers in static space */
 #else
@@ -1264,16 +1275,16 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #endif
                 break;
 
-              case SIMPLE_FUN_HEADER_WIDETAG:
-              case RETURN_PC_HEADER_WIDETAG:
+	    case SIMPLE_FUN_HEADER_WIDETAG:
+	    case RETURN_PC_HEADER_WIDETAG:
                 /* We should never hit any of these, 'cause they occur
                  * buried in the middle of code objects. */
                 gc_abort();
 		break;
 
 #ifdef LISP_FEATURE_X86
-	      case CLOSURE_HEADER_WIDETAG:
-	      case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+	    case CLOSURE_HEADER_WIDETAG:
+	    case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 		/* The function self pointer needs special care on the
 		 * x86 because it is the real entry point. */
 		{
@@ -1286,20 +1297,20 @@ pscav(lispobj *addr, int nwords, boolean constant)
 		break;
 #endif
 
-              case WEAK_POINTER_WIDETAG:
+	    case WEAK_POINTER_WIDETAG:
                 /* Weak pointers get preserved during purify, 'cause I
 		 * don't feel like figuring out how to break them. */
                 pscav(addr+1, 2, constant);
                 count = 4;
                 break;
 
-	      case FDEFN_WIDETAG:
+	    case FDEFN_WIDETAG:
 		/* We have to handle fdefn objects specially, so we
 		 * can fix up the raw function address. */
 		count = pscav_fdefn((struct fdefn *)addr);
 		break;
 
-              default:
+	    default:
                 count = 1;
                 break;
             }

@@ -122,6 +122,11 @@
 		      :kind :string
 		      :length 0))
 
+(setf (svref *meta-room-info* simple-character-string-widetag)
+      (make-room-info :name 'simple-character-string
+		      :kind :string
+		      :length 0))
+
 (setf (svref *meta-room-info* simple-array-nil-widetag)
       (make-room-info :name 'simple-array-nil
 		      :kind :fixed

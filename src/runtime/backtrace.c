@@ -244,6 +244,7 @@ backtrace(int nframes)
                         string = (struct vector *) object;
                         printf("%s, ", (char *) string->data);
                     } else
+			/* FIXME: broken from (VECTOR NIL) */
                         printf("(Not simple string??\?), ");
                 } else
                     printf("(Not other pointer??\?), ");

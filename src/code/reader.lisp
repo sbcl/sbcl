@@ -1432,8 +1432,7 @@
 		    (start start)
 		    (end (%check-vector-sequence-bounds string start end)))
     (unless *read-from-string-spares*
-      (push (internal-make-string-input-stream "" 0 0)
-	    *read-from-string-spares*))
+      (push (make-string-input-stream "" 0 0) *read-from-string-spares*))
     (let ((stream (pop *read-from-string-spares*)))
       (setf (string-input-stream-string stream) string)
       (setf (string-input-stream-current stream) start)

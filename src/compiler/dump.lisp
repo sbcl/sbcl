@@ -585,7 +585,9 @@
 	(t
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-normal-load file))
-	 (dump-simple-string (package-name pkg) file)
+	 (dump-simple-character-string
+	  (coerce (package-name pkg) '(simple-array character (*)))
+	  file)
 	 (dump-fop 'fop-package file)
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-maybe-cold-load file))
@@ -717,8 +719,15 @@
 			    x)))
     (typecase simple-version
       (simple-base-string
+       ;; FIXME: these EQUAL-CHECK-TABLE things are broken, because
+       ;; strings compare as EQUAL even if they have different
+       ;; ARRAY-ELEMENT-TYPEs
        (unless (equal-check-table x file)
-	 (dump-simple-string simple-version file)
+	 (dump-simple-base-string simple-version file)
+	 (equal-save-object x file)))
+      ((simple-array character (*))
+       (unless (equal-check-table x file)
+	 (dump-simple-character-string simple-version file)
 	 (equal-save-object x file)))
       (simple-vector
        (dump-simple-vector simple-version file)
@@ -875,18 +884,30 @@
   (dump-fop 'fop-short-character file)
   (dump-byte (char-code ch) file))
 
-;;; a helper function shared by DUMP-SIMPLE-STRING and DUMP-SYMBOL
-(defun dump-characters-of-string (s fasl-output)
-  (declare (type string s) (type fasl-output fasl-output))
+(defun dump-base-chars-of-string (s fasl-output)
+  (declare (type base-string s) (type fasl-output fasl-output))
   (dovector (c s)
     (dump-byte (char-code c) fasl-output))
   (values))
 
 ;;; Dump a SIMPLE-BASE-STRING.
-;;; FIXME: should be called DUMP-SIMPLE-BASE-STRING then
-(defun dump-simple-string (s file)
+(defun dump-simple-base-string (s file)
   (declare (type simple-base-string s))
-  (dump-fop* (length s) fop-small-string fop-string file)
+  (dump-fop* (length s) fop-small-base-string fop-base-string file)
+  (dump-base-chars-of-string s file)
+  (values))
+
+;;; a helper function shared by DUMP-SIMPLE-CHARACTER-STRING and DUMP-SYMBOL
+(defun dump-characters-of-string (s fasl-output)
+  (declare (type string s) (type fasl-output fasl-output))
+  (dovector (c s)
+    ;; DUMP-UNSIGNED-32 soon
+    (dump-byte (char-code c) fasl-output))
+  (values))
+
+(defun dump-simple-character-string (s file)
+  (declare (type (simple-array character (*)) s))
+  (dump-fop* (length s) fop-small-character-string fop-character-string file)
   (dump-characters-of-string s file)
   (values))
 

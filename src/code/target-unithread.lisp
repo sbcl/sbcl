@@ -37,7 +37,7 @@
 ;;;; the higher-level locking operations are based on waitqueues
 
 (defstruct waitqueue
-  (name nil :type (or null simple-base-string))
+  (name nil :type (or null simple-string))
   (lock 0)
   (data nil))
 

@@ -58,7 +58,7 @@
 (declaim (inline waitqueue-data-address mutex-value-address))
 
 (defstruct waitqueue
-  (name nil :type (or null simple-base-string))
+  (name nil :type (or null simple-string))
   (lock 0)
   (data nil))
 

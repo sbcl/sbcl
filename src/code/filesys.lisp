@@ -192,8 +192,9 @@
       (values absolute (pieces)))))
 
 (defun parse-unix-namestring (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
+  (setf namestr (coerce namestr 'simple-base-string))
   (multiple-value-bind (absolute pieces) (split-at-slashes namestr start end)
     (multiple-value-bind (name type version)
 	(let* ((tail (car (last pieces)))
@@ -445,6 +446,7 @@
 				   (follow-links t))
 			      &body body)
   `(block nil
+     (/show0 "about to call %ENUMERATE-MATCHES")
      (%enumerate-matches (pathname ,pathname)
 			 ,verify-existence
 			 ,follow-links
@@ -455,7 +457,7 @@
 
 ;;; Call FUNCTION on matches.
 (defun %enumerate-matches (pathname verify-existence follow-links function)
-  (/noshow0 "entering %ENUMERATE-MATCHES")
+  (/show0 "entering %ENUMERATE-MATCHES")
   (when (pathname-type pathname)
     (unless (pathname-name pathname)
       (error "cannot supply a type without a name:~%  ~S" pathname)))
@@ -463,16 +465,16 @@
 	     (member (pathname-type pathname) '(nil :unspecific)))
     (error "cannot supply a version without a type:~%  ~S" pathname))
   (let ((directory (pathname-directory pathname)))
-    (/noshow0 "computed DIRECTORY")
+    (/show0 "computed DIRECTORY")
     (if directory
 	(ecase (first directory)
 	  (:absolute
-	   (/noshow0 "absolute directory")
+	   (/show0 "absolute directory")
 	   (%enumerate-directories "/" (rest directory) pathname
 				   verify-existence follow-links
 				   nil function))
 	  (:relative
-	   (/noshow0 "relative directory")
+	   (/show0 "relative directory")
 	   (%enumerate-directories "" (rest directory) pathname
 				   verify-existence follow-links
 				   nil function)))
@@ -576,11 +578,11 @@
 ;;; Call FUNCTION on files.
 (defun %enumerate-files (directory pathname verify-existence function)
   (declare (simple-string directory))
-  (/noshow0 "entering %ENUMERATE-FILES")
+  (/show0 "entering %ENUMERATE-FILES")
   (let ((name (%pathname-name pathname))
 	(type (%pathname-type pathname))
 	(version (%pathname-version pathname)))
-    (/noshow0 "computed NAME, TYPE, and VERSION")
+    (/show0 "computed NAME, TYPE, and VERSION")
     (cond ((member name '(nil :unspecific))
 	   (/noshow0 "UNSPECIFIC, more or less")
 	   (when (or (not verify-existence)
@@ -613,20 +615,20 @@
 				       directory
 				       complete-filename))))))
 	  (t
-	   (/noshow0 "default case")
+	   (/show0 "default case")
 	   (let ((file (concatenate 'base-string directory name)))
-	     (/noshow "computed basic FILE")
+	     (/show0 "computed basic FILE")
 	     (unless (or (null type) (eq type :unspecific))
-	       (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
+	       (/show0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
 	       (setf file (concatenate 'base-string file "." type)))
 	     (unless (member version '(nil :newest :wild :unspecific))
-	       (/noshow0 "tweaking FILE for more-or-less-:WILD case")
+	       (/show0 "tweaking FILE for more-or-less-:WILD case")
 	       (setf file (concatenate 'base-string file "."
 				       (quick-integer-to-string version))))
-	     (/noshow0 "finished possibly tweaking FILE")
+	     (/show0 "finished possibly tweaking FILE")
 	     (when (or (not verify-existence)
 		       (sb!unix:unix-file-kind file t))
-	       (/noshow0 "calling FUNCTION on FILE")
+	       (/show0 "calling FUNCTION on FILE")
 	       (funcall function file)))))))
 
 (/noshow0 "filesys.lisp 603")
@@ -679,6 +681,7 @@
 ;;; Convert PATHNAME into a string that can be used with UNIX system
 ;;; calls, or return NIL if no match is found. Wild-cards are expanded.
 (defun unix-namestring (pathname-spec &optional (for-input t))
+  (/show0 "in UNIX-NAMESTRING")
   (let* ((namestring (physicalize-pathname (merge-pathnames pathname-spec)))
 	 (matches nil)) ; an accumulator for actual matches
     (when (wild-pathname-p namestring)
@@ -716,12 +719,16 @@
   #!+sb-doc
   "Return a pathname which is the truename of the file if it exists, or NIL
   otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
+  (/show0 "in PROBE-FILE")
   (let* ((defaulted-pathname (merge-pathnames
 			      pathname
 			      (sane-default-pathname-defaults)))
 	 (namestring (unix-namestring defaulted-pathname t)))
+    (/show0 "got NAMESTRING")
     (when (and namestring (sb!unix:unix-file-kind namestring t))
+      (/show0 "got FILE-KIND")
       (let ((trueishname (sb!unix:unix-resolve-links namestring)))
+	(/show0 "resolved links")
 	(when trueishname
 	  (let* ((*ignore-wildcards* t)
 		 (name (sb!unix:unix-simplify-pathname trueishname))) 
@@ -1040,7 +1047,7 @@
 			       :device (pathname-device pathname)
 			       :directory (subseq dir 0 i))))
 		 (unless (probe-file newpath)
-		   (let ((namestring (namestring newpath)))
+		   (let ((namestring (coerce (namestring newpath) 'base-string)))
 		     (when verbose
 		       (format *standard-output*
 			       "~&creating directory: ~A~%"

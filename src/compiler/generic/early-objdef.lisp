@@ -167,6 +167,7 @@
   simple-array-unsigned-byte-16     ; 10011110
   simple-array-nil                  ; 10100010
   simple-base-string                ; 10100110
+  simple-character-string
   simple-bit-vector                 ; 10101010
   simple-vector                     ; 10101110
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
@@ -195,16 +196,19 @@
   simple-array                      ; 11011110
   complex-vector-nil                ; 11100010
   complex-base-string               ; 11100110
+  complex-character-string
   complex-bit-vector                ; 11101010
   complex-vector                    ; 11101110
   complex-array                     ; 11110010
 
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused12                          ; 11110110
+  #|
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused13                          ; 11111010
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused14                          ; 11111110
+  |#
 )
 
 ;;; the different vector subtypes

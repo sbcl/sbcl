@@ -1233,13 +1233,18 @@
 	 (element-type (string-output-stream-element-type stream))
 	 (result 
 	  (case element-type
-	    ;; Overwhelmingly common case; can be inlined.
+	    ;; overwhelmingly common case: can be inlined
 	    ((character) (make-string length))
+	    ;; slightly less common cases: inline it anyway
+	    ((base-char standard-char)
+	     (make-string length :element-type 'base-char))
 	    (t (make-string length :element-type element-type)))))
     ;; For the benefit of the REPLACE transform, let's do this, so
     ;; that the common case isn't ludicrously expensive.
     (etypecase result 
       ((simple-array character (*)) 
+       (replace result (string-output-stream-string stream)))
+      (simple-base-string
        (replace result (string-output-stream-string stream)))
       ((simple-array nil (*))
        (replace result (string-output-stream-string stream))))
@@ -1525,7 +1530,7 @@
 
 (defun case-frob-upcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1550,7 +1555,7 @@
 
 (defun case-frob-downcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1583,7 +1588,7 @@
 
 (defun case-frob-capitalize-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1628,7 +1633,7 @@
 
 (defun case-frob-capitalize-aux-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1673,7 +1678,7 @@
 
 (defun case-frob-capitalize-first-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))

@@ -289,12 +289,12 @@
 (defun find-a-pty ()
   (dolist (char '(#\p #\q))
     (dotimes (digit 16)
-      (let* ((master-name (format nil "/dev/pty~C~X" char digit))
+      (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit) 'base-string))
 	     (master-fd (sb-unix:unix-open master-name
 					   sb-unix:o_rdwr
 					   #o666)))
 	(when master-fd
-	  (let* ((slave-name (format nil "/dev/tty~C~X" char digit))
+	  (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit) 'base-string))
 		 (slave-fd (sb-unix:unix-open slave-name
 					      sb-unix:o_rdwr
 					      #o666)))
@@ -382,6 +382,7 @@
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
 (defun unix-filename-is-executable-p (unix-filename)
   (declare (type simple-string unix-filename))
+  (setf unix-filename (coerce unix-filename 'base-string))
   (values (and (eq (sb-unix:unix-file-kind unix-filename) :file)
 	       (sb-unix:unix-access unix-filename sb-unix:x_ok))))
 
@@ -683,7 +684,7 @@
 	 ;; Use /dev/null.
 	 (multiple-value-bind
 	       (fd errno)
-	     (sb-unix:unix-open "/dev/null"
+	     (sb-unix:unix-open #.(coerce "/dev/null" 'base-string)
 				(case direction
 				  (:input sb-unix:o_rdonly)
 				  (:output sb-unix:o_wronly)
@@ -735,7 +736,7 @@
 	    (dotimes (count
 		       256
 		      (error "could not open a temporary file in /tmp"))
-	      (let* ((name (format nil "/tmp/.run-program-~D" count))
+	      (let* ((name (coerce (format nil "/tmp/.run-program-~D" count) 'base-string))
 		     (fd (sb-unix:unix-open name
 					    (logior sb-unix:o_rdwr
 						    sb-unix:o_creat

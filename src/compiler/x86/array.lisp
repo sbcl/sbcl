@@ -1283,7 +1283,7 @@
 	  value)
     (move result value)))
 
-(define-vop (data-vector-set/simple-base-string-c)
+(define-vop (data-vector-set-c/simple-base-string)
   (:translate data-vector-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -1298,6 +1298,20 @@
 			       other-pointer-lowtag))
 	 value)
    (move result value)))
+
+(define-vop (data-vector-ref/simple-character-string
+	     data-vector-ref/simple-base-string)
+  (:arg-types simple-character-string positive-fixnum))
+(define-vop (data-vector-ref-c/simple-character-string
+	     data-vector-ref-c/simple-base-string)
+  (:arg-types simple-character-string (:constant (signed-byte 30))))
+
+(define-vop (data-vector-set/simple-character-string
+	     data-vector-set/simple-base-string)
+  (:arg-types simple-character-string positive-fixnum character))
+(define-vop (data-vector-set-c/simple-character-string
+	     data-vector-set-c/simple-base-string)
+  (:arg-types simple-character-string (:constant (signed-byte 30)) character))
 
 ;;; signed-byte-8
 

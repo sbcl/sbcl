@@ -410,6 +410,7 @@
              (probe-init-files (explicitly-specified-init-file-name
 				&rest default-init-file-names)
                (declare (type list default-init-file-names))
+	       (/show0 "in PROBE-INIT-FILES")
 	       (if explicitly-specified-init-file-name
 		   (or (probe-file explicitly-specified-init-file-name)
                         (startup-error "The file ~S was not found."
@@ -420,6 +421,7 @@
 	     ;; shared idiom for creating default names for
 	     ;; SYSINITish and USERINITish files
 	     (init-file-name (maybe-dir-name basename)
+	       (/show0 "in INIT-FILE-NAME")
 	       (and maybe-dir-name
 		    (concatenate 'string maybe-dir-name "/" basename))))
         (let ((sysinit-truename

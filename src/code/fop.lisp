@@ -344,7 +344,13 @@
 
 ;;;; fops for loading arrays
 
-(define-cloned-fops (fop-string 37) (fop-small-string 38)
+(define-cloned-fops (fop-base-string 37) (fop-small-base-string 38)
+  (let* ((arg (clone-arg))
+	 (res (make-string arg :element-type 'base-char)))
+    (read-string-as-bytes *fasl-input-stream* res)
+    res))
+
+(define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
   (let* ((arg (clone-arg))
 	 (res (make-string arg)))
     (read-string-as-bytes *fasl-input-stream* res)

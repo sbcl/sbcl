@@ -91,8 +91,10 @@
     ;; and for all in any reasonable user programs.)
     ((t)
      (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
-    ((base-char standard-char character)
+    ((base-char standard-char)
      (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
+    ((character)
+     (values #.sb!vm:simple-character-string-widetag #.sb!vm:n-byte-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
@@ -110,8 +112,10 @@
     ;; Pick off some easy common cases.
     ((t)
      #.sb!vm:complex-vector-widetag)
-    ((base-char character)
+    ((base-char)
      #.sb!vm:complex-base-string-widetag)
+    ((character)
+     #.sb!vm:complex-character-string-widetag)
     ((nil)
      #.sb!vm:complex-vector-nil-widetag)
     ((bit)
@@ -120,7 +124,8 @@
     (t
      (pick-vector-type type
        (nil #.sb!vm:complex-vector-nil-widetag)
-       (character #.sb!vm:complex-base-string-widetag)
+       (base-char #.sb!vm:complex-base-string-widetag)
+       (character #.sb!vm:complex-character-string-widetag)
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
@@ -148,7 +153,8 @@
 		 (array (allocate-vector
 			 type
 			 length
-			 (ceiling (* (if (= type sb!vm:simple-base-string-widetag)
+			 (ceiling (* (if (or (= type sb!vm:simple-base-string-widetag)
+					     (= type sb!vm:simple-character-string-widetag))
 					 (1+ length)
 					 length)
 				     n-bits)
@@ -854,7 +860,8 @@
 	  ,@(map 'list
 		 (lambda (saetp)
 		   `((simple-array ,(sb!vm:saetp-specifier saetp) (*))
-		     ,(if (eq (sb!vm:saetp-specifier saetp) 'character)
+		     ,(if (or (eq (sb!vm:saetp-specifier saetp) 'character)
+			      (eq (sb!vm:saetp-specifier saetp) 'base-char))
 			  *default-init-char-form*
 			  (sb!vm:saetp-initial-element-default saetp))))
 		 (remove-if-not
