@@ -155,3 +155,7 @@
 			  (setf (aref a 2) #\c)
 			  a)))))
   (assert (= (length (funcall f)) 4)))
+
+(let ((x (make-array nil :initial-element 'foo)))
+  (adjust-array x nil)
+  (assert (eql (aref x) 'foo)))

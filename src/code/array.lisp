@@ -573,6 +573,10 @@
   "Return T if (ADJUST-ARRAY ARRAY...) would return an array identical
    to the argument, this happens for complex arrays."
   (declare (array array))
+  ;; Note that this appears not to be a fundamental limitation.
+  ;; non-vector SIMPLE-ARRAYs are in fact capable of being adjusted,
+  ;; but in practice we test using ADJUSTABLE-ARRAY-P in ADJUST-ARRAY.
+  ;; -- CSR, 2004-03-01.
   (not (typep array 'simple-array)))
 
 ;;;; fill pointer frobbing stuff
@@ -770,8 +774,15 @@
 				       new-data dimensions new-length
 				       element-type initial-element
 				       initial-element-p))
-		   (set-array-header array new-data new-length
-				     new-length 0 dimensions nil)))))))))
+		   (if (adjustable-array-p array)
+		       (set-array-header array new-data new-length
+					 new-length 0 dimensions nil)
+		       (let ((new-array
+			      (make-array-header
+			       sb!vm:simple-array-widetag array-rank)))
+			 (set-array-header new-array new-data new-length
+					   new-length 0 dimensions nil)))))))))))
+  
 
 (defun get-new-fill-pointer (old-array new-array-size fill-pointer)
   (cond ((not fill-pointer)
@@ -900,7 +911,7 @@
     (macrolet ((bump-index-list (index limits)
 		 `(do ((subscripts ,index (cdr subscripts))
 		       (limits ,limits (cdr limits)))
-		      ((null subscripts) nil)
+		      ((null subscripts) :eof)
 		    (cond ((< (the fixnum (car subscripts))
 			      (the fixnum (car limits)))
 			   (rplaca subscripts
@@ -909,7 +920,7 @@
 			  (t (rplaca subscripts 0))))))
       (do ((index (make-list (length old-dims) :initial-element 0)
 		  (bump-index-list index limits)))
-	  ((null index))
+	  ((eq index :eof))
 	(setf (aref new-data (row-major-index-from-dims index new-dims))
 	      (aref old-data
 		    (+ (the fixnum (row-major-index-from-dims index old-dims))

@@ -2319,6 +2319,10 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
     assembler and linker.  (thanks to Nikodemus Siivola)
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the PPC backend.
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** ADJUST-ARRAY now copies the datum in a zero rank array if
+       required.
+    ** ADJUST-ARRAY no longer adjusts non-adjustable arrays.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
