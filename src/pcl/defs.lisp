@@ -298,11 +298,11 @@
 	(push (list class-name symbol) *built-in-wrapper-symbols*)
 	symbol)))
 
-(pushnew '%class *variable-declarations*)
-(pushnew '%variable-rebinding *variable-declarations*)
+(pushnew '%class *var-declarations*)
+(pushnew '%variable-rebinding *var-declarations*)
 
 (defun variable-class (var env)
-  (caddr (variable-declaration 'class var env)))
+  (caddr (var-declaration 'class var env)))
 
 (defvar *name->class->slotd-table* (make-hash-table))
 

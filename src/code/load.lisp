@@ -57,7 +57,7 @@
       ((>= cnt n) res)))
 
 ;;; Like Fast-Read-U-Integer, but the size may be determined at run time.
-(defmacro fast-read-variable-u-integer (n)
+(defmacro fast-read-var-u-integer (n)
   (let ((n-pos (gensym))
 	(n-res (gensym))
 	(n-cnt (gensym)))

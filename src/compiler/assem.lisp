@@ -139,9 +139,9 @@
   ;; how many instructions follow the branch.
   branch
   ;; This attribute indicates that this ``instruction'' can be
-  ;; variable length, and therefore better never be used in a branch
-  ;; delay slot.
-  variable-length)
+  ;; variable length, and therefore had better never be used in a
+  ;; branch delay slot.
+  var-length)
 
 (defstruct (instruction
 	    (:include sset-element)
@@ -316,7 +316,7 @@
     (when countdown
       (decf countdown)
       (aver (not (instruction-attributep (inst-attributes inst)
-					 variable-length))))
+					 var-length))))
     (cond ((instruction-attributep (inst-attributes inst) branch)
 	   (unless countdown
 	     (setf countdown (inst-delay inst)))
@@ -529,7 +529,7 @@ p	    ;; the branch has two dependents and one of them dpends on
     (let ((inst (car remaining)))
       (unless (and delay-slot-p
 		   (instruction-attributep (inst-attributes inst)
-					   variable-length))
+					   var-length))
 	;; We've got us a live one here. Go for it.
 	#!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
 	;; Delete it from the list of insts.

@@ -540,7 +540,7 @@ bootstrapping.
 		  ;; These declarations seem to be used by PCL to pass
 		  ;; information to itself; when I tried to delete 'em
 		  ;; ca. 0.6.10 it didn't work. I'm not sure how
-		  ;; they work, but note the (VARIABLE-DECLARATION '%CLASS ..)
+		  ;; they work, but note the (VAR-DECLARATION '%CLASS ..)
 		  ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN 2000-12-30
 		  ,@(remove nil
 			    (mapcar (lambda (a s) (and (symbolp s)
@@ -2214,7 +2214,7 @@ bootstrapping.
 		`((declare (%variable-rebinding ,in ,instance)))))
        ,in
        (symbol-macrolet ,(mapcar #'(lambda (slot-entry)
-				     (let ((variable-name
+				     (let ((var-name
 					    (if (symbolp slot-entry)
 						slot-entry
 						(car slot-entry)))
@@ -2222,7 +2222,7 @@ bootstrapping.
 					    (if (symbolp slot-entry)
 						slot-entry
 						(cadr slot-entry))))
-				       `(,variable-name
+				       `(,var-name
 					  (slot-value ,in ',slot-name))))
 				 slots)
 			,@body))))
@@ -2238,9 +2238,8 @@ bootstrapping.
 		`((declare (%variable-rebinding ,in ,instance)))))
        ,in
        (symbol-macrolet ,(mapcar #'(lambda (slot-entry)
-				   (let ((variable-name (car slot-entry))
+				   (let ((var-name (car slot-entry))
 					 (accessor-name (cadr slot-entry)))
-				     `(,variable-name
-					(,accessor-name ,in))))
+				     `(,var-name (,accessor-name ,in))))
 			       slots)
 	  ,@body))))

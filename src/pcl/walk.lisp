@@ -244,7 +244,7 @@
 (defun note-lexical-binding (thing env)
   (push (list thing :lexical-var) (cadddr (env-lock env))))
 
-(defun variable-lexical-p (var env)
+(defun var-lexical-p (var env)
   (let ((entry (member var (env-lexical-variables env) :key #'car)))
     (when (eq (cadar entry) :lexical-var)
       entry)))
@@ -254,22 +254,22 @@
     (when (eq (cadar entry) :macro)
       entry)))
 
-(defvar *variable-declarations* '(special))
+(defvar *var-declarations* '(special))
 
-(defun variable-declaration (declaration var env)
-  (if (not (member declaration *variable-declarations*))
+(defun var-declaration (declaration var env)
+  (if (not (member declaration *var-declarations*))
       (error "~S is not a recognized variable declaration." declaration)
-      (let ((id (or (variable-lexical-p var env) var)))
+      (let ((id (or (var-lexical-p var env) var)))
 	(dolist (decl (env-declarations env))
 	  (when (and (eq (car decl) declaration)
 		     (eq (cadr decl) id))
 	    (return decl))))))
 
-(defun variable-special-p (var env)
-  (or (not (null (variable-declaration 'special var env)))
-      (variable-globally-special-p var)))
+(defun var-special-p (var env)
+  (or (not (null (var-declaration 'special var env)))
+      (var-globally-special-p var)))
 
-(defun variable-globally-special-p (symbol)
+(defun var-globally-special-p (symbol)
   (eq (info :variable :kind symbol) :special))
 
 ;;;; handling of special forms
@@ -588,9 +588,9 @@
 	   (let ((type (car declaration))
 		 (name (cadr declaration))
 		 (args (cddr declaration)))
-	     (if (member type *variable-declarations*)
+	     (if (member type *var-declarations*)
 		 (note-declaration `(,type
-				     ,(or (variable-lexical-p name env) name)
+				     ,(or (var-lexical-p name env) name)
 				     ,.args)
 				   env)
 		 (note-declaration declaration env))

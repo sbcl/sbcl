@@ -1,6 +1,14 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 
+;;;; FIXME: It'd be nice to get rid of all 750 lines of code in this
+;;;; file, plus miscellaneous cruft elsewhere (e.g. the definition of
+;;;; the SB-ITERATE package). There are only 20 calls to this ITERATE
+;;;; macro in the PCL code. (There's another ITERATE macro used in the
+;;;; classic CMU CL code, but that's different.) Most if not all of
+;;;; them would be easy to replace with ANSI LOOP or simpler standard
+;;;; iteration constructs.
+
 ;;;; This software is derived from software originally released by Xerox
 ;;;; Corporation. Copyright and release statements follow. Later modifications
 ;;;; to the software are in the public domain and are provided with
@@ -341,10 +349,12 @@
 			      (parse-declarations let-body locals)
 			   (cond ((setq specials (extract-special-bindings
 						  locals localdecls))
-				  (maybe-warn (cond ((find-if #'variable-globally-special-p
-							    specials)
-					       ; This could be the fault of a
-					       ; user proclamation.
+				  (maybe-warn (cond ((find-if
+						      #'var-globally-special-p
+						      specials)
+						     ;; This could be the
+						     ;; fault of a user
+						     ;; proclamation.
 						     :user)
 						    (t :definition))
 
@@ -402,61 +412,55 @@
 ;;; (ITERATE or ITERATE*), for purpose of error messages. On success, we
 ;;; return the transformed body; on failure, :ABORT.
 
-       (walk-form let-body iterate-env
-	      #'(lambda (form context env)
-		       (declare (ignore context))
+       (walk-form
+	let-body
+	iterate-env
+	(lambda (form context env)
+	  (declare (ignore context))
 
-		       ;; Need to substitute RENAMED-VARS, as well as turn
-		       ;; (FUNCALL finish-arg) into the finish form
-		       (cond ((symbolp form)
-			      (let (renaming)
-				   (cond ((and (eq form finish-arg)
-					       (variable-same-p form env
-						      iterate-env))
-					       ; An occurrence of the finish
-					       ; arg outside of FUNCALL
-					       ; context--I can't handle this
-					  (maybe-warn :definition "Couldn't optimize iterate form because generator ~S does something with its FINISH arg besides FUNCALL it."
-						 (second clause))
-					  (return-from iterate-transform-body
-						 :abort))
-					 ((and (setq renaming (assoc form
-								   renamed-vars
-								     ))
-					       (variable-same-p form env
-						      iterate-env))
-					       ; Reference to one of the vars
-					       ; we're renaming
-					  (cdr renaming))
-					 ((and (member form bound-vars)
-					       (variable-same-p form env
-						      iterate-env))
-					       ; FORM is a var that is bound
-					       ; in this same ITERATE, or
-					       ; bound later in this ITERATE*.
-					       ; This is a conflict.
-					  (maybe-warn :user "Couldn't optimize iterate form because generator ~S is closed over ~S, in conflict with a subsequent iteration variable."
-						 (second clause)
-						 form)
-					  (return-from iterate-transform-body
-						 :abort))
-					 (t form))))
-			     ((and (consp form)
-				   (eq (first form)
-				       'funcall)
-				   (eq (second form)
-				       finish-arg)
-				   (variable-same-p (second form)
-					  env iterate-env))
-					       ; (FUNCALL finish-arg) =>
-					       ; finish-form
-			      (unless (null (cddr form))
-				  (maybe-warn :definition
-	"Generator for ~S applied its finish arg to > 0 arguments ~S--ignored."
-					 (second clause)
-					 (cddr form)))
-			      finish-form)
-			     (t form)))))
+	  ;; We need to substitute RENAMED-VARS, as well as turn
+	  ;; (FUNCALL finish-arg) into the finish form.
+	  (cond ((symbolp form)
+		 (let (renaming)
+		   (cond ((and (eq form finish-arg)
+			       (var-same-p form env iterate-env))
+			  ;; an occurrence of the finish arg outside
+			  ;; of FUNCALL context: I can't handle this!
+			  (maybe-warn :definition "Couldn't optimize iterate form because generator ~S does something with its FINISH arg besides FUNCALL it."
+				      (second clause))
+			  (return-from iterate-transform-body
+			    :abort))
+			 ((and (setq renaming (assoc form renamed-vars))
+			       (var-same-p form env iterate-env))
+			  ;; Reference to one of the vars
+			  ;; we're renaming
+			  (cdr renaming))
+			 ((and (member form bound-vars)
+			       (var-same-p form env iterate-env))
+			  ;; FORM is a var that is bound in this same
+			  ;; ITERATE, or bound later in this ITERATE*.
+			  ;; This is a conflict.
+			  (maybe-warn :user "Couldn't optimize iterate form because generator ~S is closed over ~S, in conflict with a subsequent iteration variable."
+				      (second clause)
+				      form)
+			  (return-from iterate-transform-body
+			    :abort))
+			 (t form))))
+		((and (consp form)
+		      (eq (first form)
+			  'funcall)
+		      (eq (second form)
+			  finish-arg)
+		      (var-same-p (second form) env
+				  iterate-env))
+		 ;; (FUNCALL finish-arg) => finish-form
+		 (unless (null (cddr form))
+		   (maybe-warn :definition
+			       "Generator for ~S applied its finish arg to > 0 arguments ~S--ignored."
+			       (second clause)
+			       (cddr form)))
+		 finish-form)
+		(t form)))))
 
 (defun
  parse-declarations
@@ -509,7 +513,7 @@
 
        ;; Return the subset of VARS that are special, either globally or
        ;; because of a declaration in DECLS
-       (let ((specials (remove-if-not #'variable-globally-special-p vars)))
+       (let ((specials (remove-if-not #'var-globally-special-p vars)))
 	    (dolist (d decls)
 		(when (eq (car d)
 			  'special)
@@ -606,7 +610,7 @@
 		       (let (pair)
 			    (cond ((and (symbolp form)
 					(setq pair (assoc form alist))
-					(variable-same-p form subenv env))
+					(var-same-p form subenv env))
 				   (cdr pair))
 				  (t form))))))
 
@@ -656,9 +660,9 @@
   (t					   ; General case--I know nothing
      `(multiple-value-setq ,vars ,expr))))
 
-(defun variable-same-p (var env1 env2)
-       (eq (variable-lexical-p var env1)
-	   (variable-lexical-p var env2)))
+(defun var-same-p (var env1 env2)
+  (eq (var-lexical-p var env1)
+      (var-lexical-p var env2)))
 
 (defun maybe-warn (type &rest warn-args)
 
@@ -1009,8 +1013,7 @@
 			    (declare (ignore context))
 			    (let (pair)
 				 (cond ((or (not (symbolp form))
-					    (not (variable-same-p form subenv
-							env)))
+					    (not (var-same-p form subenv env)))
 					       ; non-variable or one that has
 					       ; been rebound
 					form)
@@ -1082,11 +1085,11 @@
 					,(second form)))
 			       (t	      ; FN = (lambda (value) ...)
 				  (dolist (s (third info))
-				      (unless (or (variable-same-p s env
-							 gathering-env)
-						  (and (variable-special-p
+				      (unless (or (var-same-p s env
+							      gathering-env)
+						  (and (var-special-p
 							s env)
-						       (variable-special-p
+						       (var-special-p
 							s gathering-env)))
 
 			  ;; Some var used free in the LAMBDA form has been
@@ -1108,7 +1111,7 @@
 				  (list fn (second form))))))
 		   ((and (setq info (member site *active-gatherers*))
 			 (or (eq site '*anonymous-gathering-site*)
-			     (variable-same-p site env (fourth info))))
+			     (var-same-p site env (fourth info))))
 					       ; Some other GATHERING will
 					       ; take care of this form, so
 					       ; pass it up for now.
@@ -1133,7 +1136,7 @@
 		      `(%orphaned-gather ,@(cdr form)))))
 		 ((and (symbolp form)
 		       (setq info (assoc form acc-info))
-		       (variable-same-p form env gathering-env))
+		       (var-same-p form env gathering-env))
 					       ; A variable reference to a
 					       ; gather binding from
 					       ; environment TEM
@@ -1198,10 +1201,10 @@
 	#'(lambda nil result))))
 
 (defmacro summing (&key (initial-value 0))
-       `(let ((sum ,initial-value))
-	     (values #'(lambda (value)
-			      (setq sum (+ sum value)))
-		    #'(lambda nil sum))))
+  `(let ((sum ,initial-value))
+     (values #'(lambda (value)
+		 (setq sum (+ sum value)))
+	     #'(lambda nil sum))))
 
 ;;; It's easier to read expanded code if PROG1 gets left alone.
 (define-walker-template prog1 (nil return sb-walker::repeat (eval)))

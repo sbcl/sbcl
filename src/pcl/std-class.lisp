@@ -709,10 +709,11 @@
 				  (unless (eq (car o) (car n)) (return t)))))
 		   owrapper)
 		  (t
-		   ;; This will initialize the new wrapper to have the same
-		   ;; state as the old wrapper. We will then have to change
-		   ;; that. This may seem like wasted work (it is), but the
-		   ;; spec requires that we call make-instances-obsolete.
+		   ;; This will initialize the new wrapper to have the
+		   ;; same state as the old wrapper. We will then have
+		   ;; to change that. This may seem like wasted work
+		   ;; (and it is), but the spec requires that we call
+		   ;; MAKE-INSTANCES-OBSOLETE.
 		   (make-instances-obsolete class)
 		   (class-wrapper class)))))
 
@@ -1185,8 +1186,8 @@
 	 (old-class-slots (wrapper-class-slots old-wrapper)))
 
     ;; "The values of local slots specified by both the class CTO and
-    ;; CFROM are retained. If such a local slot was unbound, it remains
-    ;; unbound."
+    ;; CFROM are retained. If such a local slot was unbound, it
+    ;; remains unbound."
     (iterate ((new-slot (list-elements new-layout))
 	      (new-position (interval :from 0)))
       (let ((old-position (posq new-slot old-layout)))

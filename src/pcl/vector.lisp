@@ -415,15 +415,13 @@
     ;; against 'THE scattered through the PCL code.
     (setq var (caddr var)))
   (when (symbolp var)
-    (let* ((rebound? (caddr (variable-declaration '%variable-rebinding
-						  var
-						  env)))
+    (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
 	   (parameter-or-nil (car (memq (or rebound? var)
 					required-parameters))))
       (when parameter-or-nil
-	(let* ((class-name (caddr (variable-declaration '%class
-							parameter-or-nil
-							env)))
+	(let* ((class-name (caddr (var-declaration '%class
+						   parameter-or-nil
+						   env)))
 	       (class (find-class class-name nil)))
 	  (when (or (not (eq *boot-state* 'complete))
 		    (and class (not (class-finalized-p class))))
@@ -574,12 +572,14 @@
 	     (eq (car form) 'the))
     (setq form (caddr form)))
   (or (and (symbolp form)
-	   (let* ((rebound? (caddr (variable-declaration '%variable-rebinding
-							 form env)))
+	   (let* ((rebound? (caddr (var-declaration '%variable-rebinding
+						    form
+						    env)))
 		  (parameter-or-nil (car (assq (or rebound? form) slots))))
 	     (when parameter-or-nil
-	       (let* ((class-name (caddr (variable-declaration
-					  'class parameter-or-nil env))))
+	       (let* ((class-name (caddr (var-declaration 'class
+							  parameter-or-nil
+							  env))))
 		 (when (and class-name (not (eq class-name t)))
 		   (position parameter-or-nil slots :key #'car))))))
       (if (constantp form)
@@ -892,7 +892,8 @@
 	       slot-vars pv-parameters))
 	,@body)))
 
-;;; This gets used only when the default MAKE-METHOD-LAMBDA is overridden.
+;;; This gets used only when the default MAKE-METHOD-LAMBDA is
+;;; overridden.
 (defmacro pv-env ((pv calls pv-table-symbol pv-parameters)
 		  &rest forms)
   `(let* ((.pv-table. ,pv-table-symbol)
@@ -906,7 +907,7 @@
      ,pv ,calls
      ,@forms))
 
-(defvar *non-variable-declarations*
+(defvar *non-var-declarations*
   ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but I
   ;; don't *think* CMU CL had, or SBCL has, VALUES declarations. If
   ;; SBCL doesn't have 'em, VALUES should probably be removed from
@@ -914,11 +915,11 @@
   '(values %method-name %method-lambda-list
     optimize ftype inline notinline))
 
-(defvar *variable-declarations-with-argument*
+(defvar *var-declarations-with-argument*
   '(%class
     type))
 
-(defvar *variable-declarations-without-argument*
+(defvar *var-declarations-without-argument*
   '(ignore
     ignorable special dynamic-extent
     ;; FIXME: Possibly this entire list and variable could go away.
@@ -946,20 +947,20 @@
 	  (dolist (form (cdr decl))
 	    (when (consp form)
 	      (let ((declaration-name (car form)))
-		(if (member declaration-name *non-variable-declarations*)
+		(if (member declaration-name *non-var-declarations*)
 		    (push `(declare ,form) outer-decls)
 		    (let ((arg-p
 			   (member declaration-name
-				   *variable-declarations-with-argument*))
+				   *var-declarations-with-argument*))
 			  (non-arg-p
 			   (member declaration-name
-				   *variable-declarations-without-argument*))
+				   *var-declarations-without-argument*))
 			  (dname (list (pop form)))
 			  (inners nil) (outers nil))
 		      (unless (or arg-p non-arg-p)
 			;; FIXME: This warning, and perhaps the
-			;; various *VARIABLE-DECLARATIONS-FOO* and/or
-			;; *NON-VARIABLE-DECLARATIONS* variables,
+			;; various *VAR-DECLARATIONS-FOO* and/or
+			;; *NON-VAR-DECLARATIONS* variables,
 			;; could probably go away now that we're not
 			;; trying to be portable between different
 			;; CLTL1 hosts the way PCL was. (Note that to
@@ -971,11 +972,11 @@
 			(Assuming it is a variable declaration without argument)."
 			      declaration-name 'split-declarations
 			      declaration-name
-			      '*non-variable-declarations*
-			      '*variable-declarations-with-argument*
-			      '*variable-declarations-without-argument*)
+			      '*non-var-declarations*
+			      '*var-declarations-with-argument*
+			      '*var-declarations-without-argument*)
 			(push declaration-name
-			      *variable-declarations-without-argument*))
+			      *var-declarations-without-argument*))
 		      (when arg-p
 			(setq dname (append dname (list (pop form)))))
 		      (dolist (var form)

@@ -868,7 +868,6 @@
 ;;; (INFO :FUNCTION :INLINE-EXPANSSION-DESIGNATOR ..)) for the reader
 ;;; and writer functions of the slot described by DSD.
 (defun accessor-inline-expansion-designators (dd dsd)
-  ;; ordinary tagged non-raw slot case
   (values (lambda ()
 	    `(lambda (instance)
 	       (declare (type ,(dd-name dd) instance))

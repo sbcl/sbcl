@@ -105,13 +105,13 @@
 		     (invalid-value-debug-var condition)
 		     (invalid-value-frame condition)))))
 
-(define-condition ambiguous-variable-name (debug-condition)
-  ((name :reader ambiguous-variable-name-name :initarg :name)
-   (frame :reader ambiguous-variable-name-frame :initarg :frame))
+(define-condition ambiguous-var-name (debug-condition)
+  ((name :reader ambiguous-var-name-name :initarg :name)
+   (frame :reader ambiguous-var-name-frame :initarg :frame))
   (:report (lambda (condition stream)
 	     (format stream "~&~S names more than one valid variable in ~S."
-		     (ambiguous-variable-name-name condition)
-		     (ambiguous-variable-name-frame condition)))))
+		     (ambiguous-var-name-name condition)
+		     (ambiguous-var-name-frame condition)))))
 
 ;;;; errors and DEBUG-SIGNAL
 
@@ -2704,7 +2704,7 @@
 ;;; The returned function takes the frame to get values from as its
 ;;; argument, and it returns the values of FORM. The returned function
 ;;; can signal the following conditions: INVALID-VALUE,
-;;; AMBIGUOUS-VARIABLE-NAME, and FRAME-FUN-MISMATCH.
+;;; AMBIGUOUS-VAR-NAME, and FRAME-FUN-MISMATCH.
 (defun preprocess-for-eval (form loc)
   (declare (type code-location loc))
   (let ((n-frame (gensym))
@@ -2728,10 +2728,12 @@
 	    (:valid
 	     (specs `(,name (debug-var-value ',var ,n-frame))))
 	    (:unknown
-	     (specs `(,name (debug-signal 'invalid-value :debug-var ',var
+	     (specs `(,name (debug-signal 'invalid-value
+					  :debug-var ',var
 					  :frame ,n-frame))))
 	    (:ambiguous
-	     (specs `(,name (debug-signal 'ambiguous-variable-name :name ',name
+	     (specs `(,name (debug-signal 'ambiguous-var-name
+					  :name ',name
 					  :frame ,n-frame)))))))
       (let ((res (coerce `(lambda (,n-frame)
 			    (declare (ignorable ,n-frame))
@@ -2900,8 +2902,9 @@
     (do ((frame frame (frame-down frame)))
 	((not frame) nil)
       (when (and (compiled-frame-p frame)
-		 (eq lra
-		     (get-context-value frame lra-save-offset lra-sc-offset)))
+                 (#-x86 eq #+x86 sap=
+		  lra
+		  (get-context-value frame lra-save-offset lra-sc-offset)))
 	(return t)))))
 
 ;;;; ACTIVATE-BREAKPOINT

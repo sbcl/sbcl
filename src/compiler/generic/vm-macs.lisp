@@ -50,7 +50,7 @@
   (options nil :type list)
   (slots nil :type list)
   (size 0 :type fixnum)
-  (variable-length nil :type (member t nil)))
+  (var-length nil :type (member t nil)))
 
 (defvar *primitive-objects* nil)
 
@@ -67,9 +67,9 @@
 	   &rest slot-specs)
   (collect ((slots) (exports) (constants) (forms) (inits))
     (let ((offset (if widetag 1 0))
-	  (variable-length nil))
+	  (var-length nil))
       (dolist (spec slot-specs)
-	(when variable-length
+	(when var-length
 	  (error "No more slots can follow a :rest-p slot."))
 	(destructuring-bind
 	    (slot-name &rest options
@@ -103,14 +103,14 @@
 	  (when init
 	    (inits (cons init offset)))
 	  (when rest-p
-	    (setf variable-length t))
+	    (setf var-length t))
 	  (incf offset length)))
-      (unless variable-length
+      (unless var-length
 	(let ((size (symbolicate name "-SIZE")))
 	  (constants `(defconstant ,size ,offset))
 	  (exports size)))
       (when alloc-trans
-	(forms `(def-alloc ,alloc-trans ,offset ,variable-length ,widetag
+	(forms `(def-alloc ,alloc-trans ,offset ,var-length ,widetag
 			   ,lowtag ',(inits))))
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -120,7 +120,7 @@
 				     :lowtag lowtag
 				     :slots (slots)
 				     :size offset
-				     :variable-length variable-length))
+				     :var-length var-length))
 	   ,@(constants))
 	 ,@(forms)))))
 
@@ -151,10 +151,10 @@
 (defmacro def-setter (name offset lowtag)
   `(%def-setter ',name ,offset ,lowtag))
 
-(defun %def-alloc (name words variable-length header lowtag inits)
+(defun %def-alloc (name words var-length header lowtag inits)
   (let ((info (function-info-or-lose name)))
     (setf (function-info-ir2-convert info)
-	  (if variable-length
+	  (if var-length
 	      #'(lambda (node block)
 		  (ir2-convert-variable-allocation node block name words header
 						   lowtag inits))
@@ -163,8 +163,8 @@
 						lowtag inits)))))
   name)
 
-(defmacro def-alloc (name words variable-length header lowtag inits)
-  `(%def-alloc ',name ,words ,variable-length ,header ,lowtag ,inits))
+(defmacro def-alloc (name words var-length header lowtag inits)
+  `(%def-alloc ',name ,words ,var-length ,header ,lowtag ,inits))
 
 ;;;; some general constant definitions
 
