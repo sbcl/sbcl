@@ -156,3 +156,8 @@ echo ')' >> $ltf
 # cp base-version.txt $versionfile
 # echo " (built `date -u` by `whoami`@`hostname`)" >> $versionfile
 # echo 'This is a machine-generated file and should not be edited by hand.' >> $versionfile
+
+# Make a unique ID for this build (to discourage people from
+# mismatching sbcl and *.core files).
+echo '"'`hostname -s`-`whoami`-`date +%F-%H-%M-%S`'"' > output/build-id.tmp
+

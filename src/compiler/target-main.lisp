@@ -61,6 +61,14 @@
 	     (*last-format-args* nil)
 	     (*last-message-count* 0)
 	     (*gensym-counter* 0)
+	     ;; KLUDGE: This rebinding of policy is necessary so that
+	     ;; forms such as LOCALLY at the REPL actually extend the
+	     ;; compilation policy correctly.  However, there is an
+	     ;; invariant that is potentially violated: future
+	     ;; refactoring must not allow this to be done in the file
+	     ;; compiler.  At the moment we're clearly alright, as we
+	     ;; call %COMPILE with a core-object, not a fasl-stream,
+	     ;; but caveat future maintainers. -- CSR, 2002-10-27
 	     (*policy* (lexenv-policy *lexenv*))
 	     ;; FIXME: ANSI doesn't say anything about CL:COMPILE
 	     ;; interacting with these variables, so we shouldn't. As

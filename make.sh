@@ -65,10 +65,6 @@ echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 # and target machines.
 sh make-config.sh || exit 1
 
-# Make a unique ID for this build (to discourage people from
-# mismatching sbcl and *.core files).
-echo '"'`hostname -s`-`whoami`-`date +%F-%H-%M-%S`'"' > output/build-id.tmp
-
 # The make-host-*.sh scripts are run on the cross-compilation host,
 # and the make-target-*.sh scripts are run on the target machine. In
 # ordinary compilation, we just do these phases consecutively on the
