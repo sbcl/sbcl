@@ -24,8 +24,8 @@ if [ ! -d output ] ; then mkdir output; fi
 ltf=`pwd`/local-target-features.lisp-expr
 echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
-echo ';;;; Please do not edit it by hand.' > $ltf
-echo ';;;; See make-config.sh.' > $ltf
+echo ';;;; Please do not edit it by hand.' >> $ltf
+echo ';;;; See make-config.sh.' >> $ltf
 echo -n '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
@@ -42,6 +42,7 @@ esac
 
 echo //setting up CPU-architecture-dependent information
 sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
+echo sbcl_arch=\"$sbcl_arch\"
 if [ "$sbcl_arch" = "" ] ; then
     echo "can't guess target SBCL architecture, need SBCL_ARCH environment var"
     exit 1

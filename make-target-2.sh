@@ -46,6 +46,8 @@ echo //doing warm init
 	;; not wanted by default after build is complete. (And if it's
 	;; wanted, it can easily be turned back on.)
 	#+sb-show (setf sb-int:*/show* nil)
-	(sb-ext:save-lisp-and-die "output/sbcl.core" :purify t)
-
+        ;; REMOVEME: This is supposed to be :PURIFY T, the :PURIFY NIL
+	;; is a hopefully-very-short-lived workaround for a bug in
+	;; sbcl-0.6.12.8.
+	(sb-ext:save-lisp-and-die "output/sbcl.core" :purify nil)
 	EOF

@@ -290,6 +290,8 @@
 (defun toplevel-init ()
 
   (/show0 "entering TOPLEVEL-INIT")
+  (%primitive print "//entering TOPLEVEL-INIT") ; REMOVEME
+
   
   (let ((sysinit nil)        ; value of --sysinit option
 	(userinit nil)       ; value of --userinit option

@@ -41,10 +41,15 @@ lispobj *dynamic_space_free_pointer;
 lispobj *current_auto_gc_trigger;
 #endif
 
-/* for copying GCs, this points to the start of the dynamic space
+/* For copying GCs, this points to the start of the dynamic space
  * currently in use (that will become the from_space when the next GC
- * is done).  For the GENCGC, it always points to DYNAMIC_0_SPACE_START */
-lispobj *current_dynamic_space;
+ * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
+lispobj *current_dynamic_space =
+#ifndef GENCGC
+    DYNAMIC_0_SPACE_START;
+#else
+    DYNAMIC_SPACE_START;
+#endif
 
 void globals_init(void)
 {
@@ -60,7 +65,7 @@ void globals_init(void)
     foreign_function_call_active = 1;
 
     /* Initialize the current Lisp state. */
-#ifndef __i386__
+#ifndef __i386__ /* if stack grows upward */
     current_control_stack_pointer = (lispobj *)CONTROL_STACK_START;
 #else
     current_control_stack_pointer = (lispobj *)CONTROL_STACK_END;

@@ -49,7 +49,8 @@
 
 /* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
 
-static void sigint_handler(int signal, siginfo_t *info, void *void_context)
+static void
+sigint_handler(int signal, siginfo_t *info, void *void_context)
 {
     printf("\nSIGINT hit at 0x%08lX\n", 
 	   (unsigned long) *os_context_pc_addr(void_context));
@@ -58,9 +59,12 @@ static void sigint_handler(int signal, siginfo_t *info, void *void_context)
 
 /* (This is not static, because we want to be able to call it from
  * Lisp land.) */
-void sigint_init(void)
+void
+sigint_init(void)
 {
+    SHOW("entering sigint_init()");
     install_handler(SIGINT, sigint_handler);
+    SHOW("leaving sigint_init()");
 }
 
 /*
@@ -254,6 +258,7 @@ More information on SBCL is available at <http://sbcl.sourceforge.net/>.
     if (initial_function == NIL) {
 	lose("couldn't find initial function");
     }
+    SHOW("freeing core");
     free(core);
 
 #if defined GENCGC
@@ -285,17 +290,20 @@ More information on SBCL is available at <http://sbcl.sourceforge.net/>.
 
 #ifdef PSEUDO_ATOMIC_ATOMIC
     /* Turn on pseudo atomic for when we call into Lisp. */
+    SHOW("turning on pseudo atomic");
     SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1));
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0));
 #endif
 
     /* Convert remaining argv values to something that Lisp can grok. */
+    SHOW("setting POSIX-ARGV symbol value");
     SetSymbolValue(POSIX_ARGV, alloc_string_list(argv));
 
     /* Install a handler to pick off SIGINT until the Lisp system gets
      * far enough along to install its own handler. */
     sigint_init();
 
+    FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
     funcall0(initial_function);
 
     /* initial_function() is not supposed to return. */

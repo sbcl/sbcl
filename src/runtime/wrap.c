@@ -111,25 +111,35 @@ typedef long my_dev_t;
 
 /* a representation of stat(2) results which doesn't depend on CPU or OS */
 struct stat_wrapper {
-    my_dev_t      st_dev;         /* device */
-    ino_t         st_ino;         /* inode */
-    mode_t        st_mode;        /* protection */
-    nlink_t       st_nlink;       /* number of hard links */
-    uid_t         st_uid;         /* user ID of owner */
-    gid_t         st_gid;         /* group ID of owner */
-    my_dev_t      st_rdev;        /* device type (if inode device) */
-    off_t         st_size;        /* total size, in bytes */
-    unsigned long st_blksize;     /* blocksize for filesystem I/O */
-    unsigned long st_blocks;      /* number of blocks allocated */
-    time_t        st_atime;       /* time of last access */
-    time_t        st_mtime;       /* time of last modification */
-    time_t        st_ctime;       /* time of last change */
+    /* KLUDGE: The verbose wrapped_st_ prefixes are to protect us from
+     * the C preprocessor as wielded by the fiends of OpenBSD, who do
+     * things like
+     *    #define st_atime        st_atimespec.tv_sec
+     * I remember when I was young and innocent, I read about how the
+     * C preprocessor isn't to be used to globally munge random
+     * lowercase symbols like this, because things like this could
+     * happen, and I nodded sagely. But now I know better.:-| This is
+     * another entry for Dan Barlow's ongoing episodic rant about C
+     * header files, I guess.. -- WHN 2001-05-10 */
+    my_dev_t      wrapped_st_dev;         /* device */
+    ino_t         wrapped_st_ino;         /* inode */
+    mode_t        wrapped_st_mode;        /* protection */
+    nlink_t       wrapped_st_nlink;       /* number of hard links */
+    uid_t         wrapped_st_uid;         /* user ID of owner */
+    gid_t         wrapped_st_gid;         /* group ID of owner */
+    my_dev_t      wrapped_st_rdev;        /* device type (if inode device) */
+    off_t         wrapped_st_size;        /* total size, in bytes */
+    unsigned long wrapped_st_blksize;     /* blocksize for filesystem I/O */
+    unsigned long wrapped_st_blocks;      /* number of blocks allocated */
+    time_t        wrapped_st_atime;       /* time_t of last access */
+    time_t        wrapped_st_mtime;       /* time_t of last modification */
+    time_t        wrapped_st_ctime;       /* time_t of last change */
 };
 
 static void 
 copy_to_stat_wrapper(struct stat_wrapper *to, struct stat *from)
 {
-#define FROB(stem) to->st_##stem = from->st_##stem
+#define FROB(stem) to->wrapped_st_##stem = from->st_##stem
     FROB(dev);
     FROB(ino);
     FROB(mode);

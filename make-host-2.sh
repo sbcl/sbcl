@@ -15,6 +15,12 @@
 
 echo //entering make-host-2.sh
 
+# In some cases, a debugging build of the system will creates a core
+# file output/after-xc.core in the next step. In cases where it
+# doesn't, it's confusing and basically useless to have any old copies
+# lying around, so delete:
+rm -f output/after-xc.core
+
 # In a fresh host Lisp invocation, load and run the cross-compiler to
 # create the target object files describing the target SBCL.
 #
@@ -97,54 +103,14 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
         ;; this can be a good time to run it. The resulting core isn't
 	;; used in the normal build, but can be handy for experimenting
 	;; with the system.
-	(when (find :sb-show *shebang-features*)
+        
+	;; REMOVEME: should be conditional on :SB-SHOW again
+	;;(when (find :sb-show *shebang-features*)
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
-          #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core"))
+          #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
+	  ;;)
 	EOF
 
-# Run GENESIS again in order to create cold-sbcl.core.
-#
-# In a fresh host Lisp invocation, load the cross-compiler (in order
-# to get various definitions that GENESIS needs, not in order to
-# cross-compile GENESIS, then load and run GENESIS. (We use a fresh
-# host Lisp invocation here for basically the same reasons we did
-# before when loading and running the cross-compiler.)
-#
-# (Why do we need this second invocation of GENESIS? In order to
-# create a .core file, as opposed to just a .h file, GENESIS needs
-# symbol table data on the C runtime. And we can get that symbol
-# data only after the C runtime has been built. Therefore, even
-# though we ran GENESIS earlier, we couldn't get it to make a .core
-# file at that time; but we needed to run it earlier in order to 
-# get to where we can write a .core file.)
-echo //loading and running GENESIS to create cold-sbcl.core
-$SBCL_XC_HOST <<-'EOF' || exit 1
-	(setf *print-level* 5 *print-length* 5)
-	(load "src/cold/shared.lisp")
-	(in-package "SB-COLD")
-	(setf *host-obj-prefix* "obj/from-host/"
-	      *target-obj-prefix* "obj/from-xc/")
-	(load "src/cold/set-up-cold-packages.lisp")
-	(load "src/cold/defun-load-or-cload-xcompiler.lisp")
-	(load-or-cload-xcompiler #'host-load-stem)
-	(defparameter *target-object-file-names*
-	  (with-open-file (s "output/object-filenames-for-genesis.lisp-expr"
-	                     :direction :input)
-	    (read s)))
-	(host-load-stem "src/compiler/generic/genesis")
-	(sb!vm:genesis :object-file-names *target-object-file-names*
-		       :c-header-file-name "output/sbcl2.h"
-		       :symbol-table-file-name "src/runtime/sbcl.nm"
-		       :core-file-name "output/cold-sbcl.core"
-		       ;; The map file is not needed by the system, but can
-		       ;; be very handy when debugging cold init problems.
-		       :map-file-name "output/cold-sbcl.map")
-	EOF
-
-echo //testing for consistency of first and second GENESIS passes
-if cmp src/runtime/sbcl.h output/sbcl2.h; then
-    echo //sbcl2.h matches sbcl.h -- good.
-else
-    echo error: sbcl2.h does not match sbcl.h.
-    exit 1
-fi
+# Run GENESIS (again) (The first time was before we ran the
+# cross-compiler.) in order to create cold-sbcl.core.
+sh make-genesis-2.sh

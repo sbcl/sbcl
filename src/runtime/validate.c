@@ -20,7 +20,8 @@
 #include "sbcl.h"
 #include "validate.h"
 
-static void ensure_space(lispobj *start, unsigned long size)
+static void
+ensure_space(lispobj *start, unsigned long size)
 {
     if (os_validate((os_vm_address_t)start,(os_vm_size_t)size)==NULL) {
 	fprintf(stderr,
@@ -35,7 +36,8 @@ static void ensure_space(lispobj *start, unsigned long size)
 
 static os_vm_address_t holes[] = HOLES;
 
-static void make_holes(void)
+static void
+make_holes(void)
 {
     int i;
 
@@ -52,7 +54,8 @@ static void make_holes(void)
 }
 #endif
 
-void validate(void)
+void
+validate(void)
 {
 #ifdef PRINTNOISE
 	printf("validating memory ...");
@@ -72,9 +75,6 @@ void validate(void)
 
 #ifdef HOLES
 	make_holes();
-#endif
-#ifndef GENCGC
-	current_dynamic_space = DYNAMIC_0_SPACE_START;
 #endif
 
 #ifdef PRINTNOISE

@@ -34,8 +34,7 @@ $gnumake all    || exit 1
 cd ../..
 
 # Use a little C program to grab stuff from the C header files and
-# smash it into Lisp source code, so that we won't get all stressed
-# and careworn like the CMU CL maintainers.
+# smash it into Lisp source code.
 cd tools-for-build
 $gnumake grovel_headers
 cd ..

@@ -194,35 +194,6 @@
     (ru-nvcsw long)		    ; voluntary context switches
     (ru-nivcsw long)))		    ; involuntary context switches
 
-
-;;;; runtime/stat-wrapper.h
-
-;;; this looks like "struct stat" according to stat(2).  It may not
-;;; correspond to the real in-memory stat structure that the syscall
-;;; uses, and if it doesn't, shouldn't.  Linux in particular is packed
-;;; full of stat macros, so we do this stuff in runtime/stat-wrapper.c
-
-;;; Note that st-dev is a long, not a dev-t.  This is because dev-t on
-;;; linux 32 bit archs is a 64 bit quantity, but alien doesn's support
-;;; those.  We don't actually access that field anywhere, though, so until
-;;; we can get 64 bit alien support it'll do
-
-(def-alien-type nil
-  (struct stat
-    (st-dev unsigned-long)              ;would be dev-t in a real stat
-    (st-ino ino-t)
-    (st-mode mode-t)
-    (st-nlink  nlink-t)
-    (st-uid  uid-t)
-    (st-gid  gid-t)
-    (st-rdev unsigned-long)             ;ditto
-    (st-size off-t)
-    (st-blksize unsigned-long)
-    (st-blocks unsigned-long)
-    (st-atime time-t)
-    (st-mtime time-t)
-    (st-ctime time-t)))
-
 ;;;; unistd.h
 
 ;;; Given a file path (a string) and one of four constant modes,
@@ -305,6 +276,11 @@
 (defun unix-chdir (path)
   (declare (type unix-pathname path))
   (void-syscall ("chdir" c-string) path))
+
+(defun unix-mkdir (name mode)
+  (declare (type unix-pathname name)
+	   (type unix-file-mode mode))
+  (void-syscall ("mkdir" c-string int) name mode))
 
 ;;; Return the current directory as a SIMPLE-STRING.
 (defun unix-current-directory ()
@@ -532,65 +508,89 @@
 
 ;;;; sys/stat.h
 
-;;; FIXME: This is only used in this file, and needn't be in target Lisp
-;;; runtime. It's also unclear why it needs to be a macro instead of a
-;;; function. Perhaps it should become a FLET.
-(defmacro extract-stat-results (buf)
-  `(values T                            ; result
-	   (slot ,buf 'st-dev)
-	   (slot ,buf 'st-ino)
-	   (slot ,buf 'st-mode)
-	   (slot ,buf 'st-nlink)
-	   (slot ,buf 'st-uid)
-	   (slot ,buf 'st-gid)
-	   (slot ,buf 'st-rdev)
-	   (slot ,buf 'st-size)
-           (slot ,buf 'st-atime)
-           (slot ,buf 'st-mtime)
-	   (slot ,buf 'st-ctime)
-	   (slot ,buf 'st-blksize)
-	   (slot ,buf 'st-blocks)))
+;;; This is a structure defined in src/runtime/wrap.c, to look
+;;; basically like "struct stat" according to stat(2). It may not
+;;; actually correspond to the real in-memory stat structure that the
+;;; syscall uses, and that's OK. Linux in particular is packed full of
+;;; stat macros, and trying to keep Lisp code in correspondence with
+;;; it is more pain than it's worth, so we just let our C runtime
+;;; synthesize a nice consistent structure for us.
+;;;
+;;; Note that st-dev is a long, not a dev-t. This is because dev-t on
+;;; linux 32 bit archs is a 64 bit quantity, but alien doesn's support
+;;; those. We don't actually access that field anywhere, though, so
+;;; until we can get 64 bit alien support it'll do.
+(def-alien-type nil
+  (struct wrapped_stat
+    (st-dev unsigned-long)              ;would be dev-t in a real stat
+    (st-ino ino-t)
+    (st-mode mode-t)
+    (st-nlink  nlink-t)
+    (st-uid  uid-t)
+    (st-gid  gid-t)
+    (st-rdev unsigned-long)             ;ditto
+    (st-size off-t)
+    (st-blksize unsigned-long)
+    (st-blocks unsigned-long)
+    (st-atime time-t)
+    (st-mtime time-t)
+    (st-ctime time-t)))
 
-;;; Retrieve information about the specified file returning them in
-;;; the form of multiple values. See the UNIX Programmer's Manual for
-;;; a description of the values returned. If the call fails, then NIL
-;;; and an error number is returned instead.
+;;; shared C-struct-to-multiple-VALUES conversion for the stat(2)
+;;; family of Unix system calls
+(defun %extract-stat-results (wrapped-stat)
+  (declare (type (alien (* (struct wrapped_stat)))))
+  (values t
+	  (slot wrapped-stat 'st-dev)
+	  (slot wrapped-stat 'st-ino)
+	  (slot wrapped-stat 'st-mode)
+	  (slot wrapped-stat 'st-nlink)
+	  (slot wrapped-stat 'st-uid)
+	  (slot wrapped-stat 'st-gid)
+	  (slot wrapped-stat 'st-rdev)
+	  ;; FIXME: OpenBSD has a 64-bit st_size slot, which is
+	  ;; basically a good thing, except that it is too
+	  ;; 21st-century for sbcl-0.6.12.8's FFI to handle. As a
+	  ;; quick kludgy workaround, we return a 0 placeholder from
+	  ;; this function, and downstream we stub out the FILE-LENGTH
+	  ;; operation (which is the only place that SBCL actually
+	  ;; uses the SIZE value returned from any UNIX-STAT-ish call).
+	  #!+openbsd 0
+	  #!-openbsd (slot wrapped-stat 'st-size)
+	  (slot wrapped-stat 'st-atime)
+	  (slot wrapped-stat 'st-mtime)
+	  (slot wrapped-stat 'st-ctime)
+	  (slot wrapped-stat 'st-blksize)
+	  (slot wrapped-stat 'st-blocks)))
 
+;;; The stat(2) family of Unix system calls are implemented as calls
+;;; to C-level wrapper functions which copies all the raw "struct
+;;; stat" slots into a system-independent format, so that we don't
+;;; need to mess around with tweaking the Lisp code to correspond to
+;;; different OS/CPU combinations.
+;;;    stat(2) <->  stat_wrapper()
+;;;   fstat(2) <-> fstat_wrapper()
+;;;   lstat(2) <-> lstat_wrapper()
+;;; Then this function is used to convert all the stat slots into
+;;; multiple return values.
 (defun unix-stat (name)
   (declare (type unix-pathname name))
-  (when (string= name "")
-    (setf name "."))
-  (with-alien ((buf (struct stat)))
-    (syscall ("stat_wrapper" c-string (* (struct stat)))
-	     (extract-stat-results buf)
+  (with-alien ((buf (struct wrapped_stat)))
+    (syscall ("stat_wrapper" c-string (* (struct wrapped_stat)))
+	     (%extract-stat-results buf)
 	     name (addr buf))))
-
 (defun unix-lstat (name)
-  #!+sb-doc
-  "Unix-lstat is identical to unix-stat, except if NAME is 
-   a symlink, in which case it returns information about the
-   link itself rather than dereferencing it."
   (declare (type unix-pathname name))
-  (with-alien ((buf (struct stat)))
-    (syscall ("lstat_wrapper" c-string (* (struct stat)))
-	     (extract-stat-results buf)
+  (with-alien ((buf (struct wrapped_stat)))
+    (syscall ("lstat_wrapper" c-string (* (struct wrapped_stat)))
+	     (%extract-stat-results buf)
 	     name (addr buf))))
-
-;;; like UNIX-STAT except the file is specified by the file descriptor FD
 (defun unix-fstat (fd)
   (declare (type unix-fd fd))
-  (with-alien ((buf (struct stat)))
-    (syscall ("fstat_wrapper" int (* (struct stat)))
-	     (extract-stat-results buf)
+  (with-alien ((buf (struct wrapped_stat)))
+    (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
+	     (%extract-stat-results buf)
 	     fd (addr buf))))
-
-
-;;; UNIX-MKDIR accepts a name and a mode and attempts to create the
-;;; corresponding directory with mode mode.
-(defun unix-mkdir (name mode)
-  (declare (type unix-pathname name)
-	   (type unix-file-mode mode))
-  (void-syscall ("mkdir" c-string int) name mode))
 
 ;;;; time.h
 
@@ -598,8 +598,8 @@
 ;; timeval' but has nanoseconds instead of microseconds.
 (def-alien-type nil
     (struct timespec
-	    (tv-sec long)   ;Seconds
-	    (tv-nsec long))) ;Nanoseconds
+	    (tv-sec long)   ; seconds
+	    (tv-nsec long))) ; nanoseconds
 
 ;; used by other time functions
 (def-alien-type nil

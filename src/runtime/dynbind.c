@@ -40,7 +40,8 @@ void bind_variable(lispobj symbol, lispobj value)
 	SetSymbolValue(symbol, value);
 }
 
-void unbind(void)
+void
+unbind(void)
 {
 	struct binding *binding;
 	lispobj symbol;
@@ -56,7 +57,8 @@ void unbind(void)
 	SetBSP(binding);
 }
 
-void unbind_to_here(lispobj *bsp)
+void
+unbind_to_here(lispobj *bsp)
 {
     struct binding *target = (struct binding *)bsp;
     struct binding *binding = GetBSP();

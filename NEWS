@@ -736,7 +736,9 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   support for (AND ..) types, among other things)
 
 changes in sbcl-0.6.13 relative to sbcl-0.6.12:
-* The system has now been ported to the Alpha CPU, thanks to Dan Barlow.
+* a port to the Alpha CPU, thanks to Dan Barlow
+* better error handling in CLOS method combination, thanks to 
+  Martin Atzmueller and Pierre Mai
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

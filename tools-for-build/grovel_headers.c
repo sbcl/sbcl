@@ -23,6 +23,7 @@
 #include <sys/times.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(def-alien-type "##lispname##" (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
@@ -64,7 +65,7 @@ main(int argc, char *argv[])
     DEFTYPE("time-t",  time_t);
     printf("\n");
 
-    printf(";;; fcntl.h\n");
+    printf(";;; fcntl.h (or unistd.h on OpenBSD)\n");
     defconstant("r_ok", R_OK);
     defconstant("w_ok", W_OK);
     defconstant("x_ok", X_OK);

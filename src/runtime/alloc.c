@@ -41,7 +41,8 @@
 #if defined(WANT_CGC) || defined(GENCGC)
 extern lispobj *alloc(int bytes);
 #else
-static lispobj *alloc(int bytes)
+static lispobj *
+alloc(int bytes)
 {
     lispobj *result;
 
@@ -60,7 +61,8 @@ static lispobj *alloc(int bytes)
 }
 #endif
 
-static lispobj *alloc_unboxed(int type, int words)
+static lispobj *
+alloc_unboxed(int type, int words)
 {
     lispobj *result;
 
@@ -69,7 +71,8 @@ static lispobj *alloc_unboxed(int type, int words)
     return result;
 }
 
-static lispobj alloc_vector(int type, int length, int size)
+static lispobj
+alloc_vector(int type, int length, int size)
 {
     struct vector *result;
 
@@ -82,7 +85,8 @@ static lispobj alloc_vector(int type, int length, int size)
     return ((lispobj)result)|type_OtherPointer;
 }
 
-lispobj alloc_cons(lispobj car, lispobj cdr)
+lispobj
+alloc_cons(lispobj car, lispobj cdr)
 {
     struct cons *ptr = (struct cons *)alloc(ALIGNED_SIZE(sizeof(struct cons)));
 
@@ -92,7 +96,8 @@ lispobj alloc_cons(lispobj car, lispobj cdr)
     return (lispobj)ptr | type_ListPointer;
 }
 
-lispobj alloc_number(long n)
+lispobj
+alloc_number(long n)
 {
     struct bignum *ptr;
 
@@ -107,7 +112,8 @@ lispobj alloc_number(long n)
     }
 }
 
-lispobj alloc_string(char *str)
+lispobj
+alloc_string(char *str)
 {
     int len = strlen(str);
     lispobj result = alloc_vector(type_SimpleString, len+1, 8);
@@ -119,12 +125,13 @@ lispobj alloc_string(char *str)
     return result;
 }
 
-lispobj alloc_sap(void *ptr)
+lispobj
+alloc_sap(void *ptr)
 {
-    struct sap *sap = (struct sap *)alloc_unboxed
-	((int)type_Sap, 
-	 ((sizeof (struct sap)) - (sizeof (lispobj))) /  (sizeof (u32)));
-
+    int n_words_to_alloc =
+	(sizeof(struct sap) - sizeof(lispobj)) / sizeof(u32);
+    struct sap *sap =
+	(struct sap *)alloc_unboxed ((int)type_Sap, n_words_to_alloc);
     sap->pointer = ptr;
     return (lispobj) sap | type_OtherPointer;
 }

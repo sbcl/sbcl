@@ -22,7 +22,15 @@ rm -rf obj/* output/* doc/user-manual \
 # distribution, we automatically clean up after it here in the 
 # standard clean.sh file.)
 
-# Within other directories, remove things which don't look like source
+# Ask some other directories to clean themselves up.
+pwd=`pwd`
+for d in tools-for-build; do
+    cd $d
+    make clean
+    cd $pwd
+done
+
+# Within all directories, remove things which don't look like source
 # files. Some explanations:
 #   (symlinks)
 #     are never in the sources; they must've been created
@@ -36,9 +44,21 @@ rm -rf obj/* output/* doc/user-manual \
 #   *.htm, *.html
 #     probably machine-generated translation of DocBook (*.sgml) files
 #   core
-#     probably a core dump -- not part of the sources anyway
+#     probably a Unix core dump -- not part of the sources anyway
+#   *.o, *.lib, *.nm
+#     results of C-style linking, assembling, etc.
+#   *.core, *.map
+#     looks like SBCL SAVE-LISP-AND-DIE or GENESIS output, and
+#     certainly not source
 #   *~, #*#, TAGS
 #     common names for editor temporary files
+#   *.htm, *.html
+#     The system doc sources are SGML, any HTML is automatically 
+#     generated output.
+#   depend
+#     made by "make depend" (or "gmake depend" or some such thing)
+#   *.x86f, *.axpf, *.lbytef, *.fasl
+#     typical extensions for fasl files
 find . \( \
 	-type l -or \
 	-name '*~' -or \
@@ -46,6 +66,7 @@ find . \( \
 	-name '?*.x86f' -or \
 	-name '?*.axpf' -or \
 	-name '?*.lbytef' -or \
+	-name '?*.fasl' -or \
 	-name 'core' -or \
 	-name '?*.core' -or \
 	-name '*.map' -or \

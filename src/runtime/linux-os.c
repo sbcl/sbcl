@@ -91,7 +91,7 @@ do_mmap(os_vm_address_t *addr, os_vm_size_t len, int flags)
     if (*addr == MAP_FAILED ||
 	((old_addr != NULL) && (*addr != old_addr))) {
         FSHOW((stderr,
-	       "error in allocating memory from the OS\n"
+	       "/error in allocating memory from the OS\n"
 	       "(addr=%lx, len=%lx, flags=%lx)\n",
 	       (long) addr,
 	       (long) len,
