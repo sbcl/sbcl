@@ -59,25 +59,25 @@
 	  (:class  (push slotd class-slotds))
 	  (otherwise (push slotd other-slotds))))
       (setq max-slot-name-length  (min (+ max-slot-name-length 3) 30))
-      (format stream "~%~S is an instance of class ~S." object class)
+      (format stream "~%~@<~S ~_is an instance of class ~S.~:>" object class)
 
       ;; Now that we know the width, we can print.
       (when instance-slotds
-	(format stream "~% The following slots have :INSTANCE allocation:")
+	(format stream "~%The following slots have :INSTANCE allocation:")
 	(dolist (slotd (nreverse instance-slotds))
 	  (describe-slot
 	   (slot-definition-name slotd)
 	   (slot-value-or-default object
 				  (slot-definition-name slotd)))))
       (when class-slotds
-	(format stream "~% The following slots have :CLASS allocation:")
+	(format stream "~%The following slots have :CLASS allocation:")
 	(dolist (slotd (nreverse class-slotds))
 	  (describe-slot
 	   (slot-definition-name slotd)
 	   (slot-value-or-default object
 				  (slot-definition-name slotd)))))
       (when other-slotds
-	(format stream "~% The following slots have allocation as shown:")
+	(format stream "~%The following slots have allocation as shown:")
 	(dolist (slotd (nreverse other-slotds))
 	  (describe-slot
 	   (slot-definition-name slotd)

@@ -491,6 +491,63 @@ bootstrapping.
   (declare (ignore proto-gf proto-method))
   (make-method-lambda-internal method-lambda env))
 
+;;; a helper function for creating Python-friendly type declarations
+;;; in DEFMETHOD forms
+(defun parameter-specializer-declaration-in-defmethod (parameter specializer)
+  (cond ((and (consp specializer)
+	      (eq (car specializer) 'eql))
+	 ;; KLUDGE: ANSI, in its wisdom, says that
+	 ;; EQL-SPECIALIZER-FORMs in EQL specializers are evaluated at
+	 ;; DEFMETHOD expansion time. Thus, although one might think
+	 ;; that in
+	 ;;   (DEFMETHOD FOO ((X PACKAGE)
+	 ;;                   (Y (EQL 12))
+	 ;;      ..))
+	 ;; the PACKAGE and (EQL 12) forms are both parallel type
+	 ;; names, they're not, as is made clear when you do
+	 ;;   (DEFMETHOD FOO ((X PACKAGE)
+	 ;;                   (Y (EQL 'BAR)))
+	 ;;     ..)
+	 ;; where Y needs to be a symbol named "BAR", not some cons
+	 ;; made by (CONS 'QUOTE 'BAR). I.e. when the
+	 ;; EQL-SPECIALIZER-FORM is (EQL 'X), it requires an argument
+	 ;; to be of type (EQL X). It'd be easy to transform one to
+	 ;; the other, but it'd be somewhat messier to do so while
+	 ;; ensuring that the EQL-SPECIALIZER-FORM is only EVAL'd
+	 ;; once. (The new code wouldn't be messy, but it'd require a
+	 ;; big transformation of the old code.) So instead we punt.
+	 ;; -- WHN 20000610
+	 '(ignorable))
+	((member specializer
+		 ;; KLUDGE: For some low-level implementation
+		 ;; classes, perhaps because of some problems related
+		 ;; to the incomplete integration of PCL into SBCL's
+		 ;; type system, some specializer classes can't be
+		 ;; declared as argument types. E.g.
+		 ;;   (DEFMETHOD FOO ((X SLOT-OBJECT))
+		 ;;     (DECLARE (TYPE SLOT-OBJECT X))
+		 ;;     ..)
+		 ;; loses when
+		 ;;   (DEFSTRUCT BAR A B)
+		 ;;   (FOO (MAKE-BAR))
+		 ;; perhaps because of the way that STRUCTURE-OBJECT
+		 ;; inherits both from SLOT-OBJECT and from
+		 ;; SB-KERNEL:INSTANCE. In an effort to sweep such
+		 ;; problems under the rug, we exclude these problem
+		 ;; cases by blacklisting them here. -- WHN 2001-01-19
+		 '(slot-object))
+	 '(ignorable))
+	((not (eq *boot-state* 'complete))
+	 ;; KLUDGE: PCL, in its wisdom, sometimes calls methods with
+	 ;; types which don't match their specializers. (Specifically,
+	 ;; it calls ENSURE-CLASS-USING-CLASS (T NULL) with a non-NULL
+	 ;; second argument.) Hopefully it only does this kind of
+	 ;; weirdness when bootstrapping.. -- WHN 20000610
+	 '(ignorable))
+	(t
+	 ;; Otherwise, we can make Python very happy.
+	 `(type ,specializer ,parameter))))
+
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
     (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
@@ -525,57 +582,15 @@ bootstrapping.
 				    parameters
 				    specializers))
 		  ;; These TYPE declarations weren't in the original
-		  ;; PCL code, but Python likes them a lot. (We're
-		  ;; telling the compiler about our knowledge of
-		  ;; specialized argument types so that it can avoid
-		  ;; run-time type overhead, which can be a big win
-		  ;; for Python.)
-		  ,@(mapcar (lambda (a s)
-			      (cond ((and (consp s)
-					  (eql (car s) 'eql))
-				     ;; KLUDGE: ANSI, in its wisdom, says
-				     ;; that EQL-SPECIALIZER-FORMs in EQL
-				     ;; specializers are evaluated at
-				     ;; DEFMETHOD expansion time. Thus,
-				     ;; although one might think that in
-				     ;;   (DEFMETHOD FOO ((X PACKAGE)
-				     ;;                   (Y (EQL 12))
-				     ;;      ..))
-				     ;; the PACKAGE and (EQL 12) forms are
-				     ;; both parallel type names, they're
-				     ;; not, as is made clear when you do
-				     ;;   (DEFMETHOD FOO ((X PACKAGE)
-				     ;;                   (Y (EQL 'BAR)))
-				     ;;     ..)
-				     ;; where Y needs to be a symbol
-				     ;; named "BAR", not some cons made by
-				     ;; (CONS 'QUOTE 'BAR). I.e. when
-				     ;; the EQL-SPECIALIZER-FORM is (EQL 'X),
-				     ;; it requires an argument to be of
-				     ;; type (EQL X). It'd be easy to transform
-				     ;; one to the other, but it'd be somewhat
-				     ;; messier to do so while ensuring that
-				     ;; the EQL-SPECIALIZER-FORM is only
-				     ;; EVAL'd once. (The new code wouldn't
-				     ;; be messy, but it'd require a big
-				     ;; transformation of the old code.)
-				     ;; So instead we punt. -- WHN 20000610
-				     '(ignorable))
-				    ((not (eq *boot-state* 'complete))
-				     ;; KLUDGE: PCL, in its wisdom, 
-				     ;; sometimes calls methods with
-				     ;; types which don't match their
-				     ;; specializers. (Specifically, it calls
-				     ;; ENSURE-CLASS-USING-CLASS (T NULL)
-				     ;; with a non-NULL second argument.)
-				     ;; Hopefully it only does this kind
-				     ;; of weirdness when bootstrapping..
-				     ;; -- WHN 20000610
-				     '(ignorable))
-				    (t
-				     ;; Otherwise, we can make Python
-				     ;; very happy.
-				     `(type ,s ,a))))
+		  ;; PCL code, but the Python compiler likes them a
+		  ;; lot. (We're telling the compiler about our
+		  ;; knowledge of specialized argument types so that
+		  ;; it can avoid run-time type dispatch overhead,
+		  ;; which can be a huge win for Python.)
+		  ;;
+		  ;; FIXME: Perhaps these belong in
+		  ;; ADD-METHOD-DECLARATIONS instead of here?
+		  ,@(mapcar #'parameter-specializer-declaration-in-defmethod
 			    parameters
 			    specializers)))
 	       (method-lambda

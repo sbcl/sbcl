@@ -47,4 +47,5 @@ echo //doing warm init
 	;; wanted, it can easily be turned back on.)
 	#+sb-show (setf sb-int:*/show* nil)
 	(sb-ext:save-lisp-and-die "output/sbcl.core" :purify t)
+
 	EOF
