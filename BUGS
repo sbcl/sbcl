@@ -1263,14 +1263,7 @@ WORKAROUND:
   to see that it should cause symbols to be interned in the CL package.)
 
 209: "DOCUMENTATION generic function has wrong argument precedence order"
-  The method from 
-    (DEFMETHOD DOCUMENTATION ((X (EQL '+)) Y) "WRONG!")
-  should not be executed in the call 
-    (DOCUMENTATION '+ 'FUNCTION),
-  as the DOCUMENTATION generic function has a different argument
-  precedence order (see its entry in the CLHS). However, despite a
-  correct generic function definition in the PCL source code, SBCL
-  returns "WRONG!" for the call.
+  (fixed in sbcl-0.7.8.39)
 
 210: "unsafe evaluation of DEFSTRUCT slot initforms in BOA constructors"
   (fixed in sbcl-0.7.8.35)

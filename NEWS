@@ -1316,7 +1316,9 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     ** SLOT-DEFINITION-ALLOCATION now returns :CLASS, not the class
        itself;
     ** GENERIC-FUNCTION-ARGUMENT-PRECEDENCE-ORDER is now implemented;
-    ** FINALIZE-INHERITANCE is now called on class finalization.
+    ** FINALIZE-INHERITANCE is now called on class finalization;
+    ** DOCUMENTATION and (SETF DOCUMENTATION) now have the correct
+       argument precedence order.
   * fixed bug 202: The compiler no longer fails on functions whose
     derived types contradict their declared type.
   * DEFMACRO is implemented via EVAL-WHEN instead of IR1 translation,

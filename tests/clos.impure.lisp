@@ -299,7 +299,14 @@
 			  (odd-key-args-checking 3)))
   (assert (= (odd-key-args-checking) 42))
   (assert (eq (odd-key-args-checking :key t) t)))
-
+
+;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
+;;; preserved through the bootstrap process until sbcl-0.7.8.39.
+;;; (thanks to Gerd Moellmann)
+(let ((answer (documentation '+ 'function)))
+  (assert (stringp answer))
+  (defmethod documentation ((x (eql '+)) y) "WRONG")
+  (assert (string= (documentation '+ 'function) answer)))
 
 ;;;; success
 

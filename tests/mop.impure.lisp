@@ -32,19 +32,11 @@
 (assert (equal
 	 (sb-pcl:generic-function-argument-precedence-order #'fn-with-odd-arg-precedence)
 	 '(b c a)))
-
-#||
-This is actually a test of vanilla CLOS, not the MOP; however, there isn't
-a terribly easy way of testing this without it (FIXME: one would have to
-construct a series of DOCUMENTATION methods, probably involving
-CALL-NEXT-METHOD). However, since we're actually getting this wrong
-currently, better put in a quick test in the hope that we can fix it soon:
-
+;;; Test for DOCUMENTATION's order, which was wrong until sbcl-0.7.8.39
 (assert (equal
 	 (sb-pcl:generic-function-argument-precedence-order #'documentation)
 	 (let ((ll (sb-pcl:generic-function-lambda-list #'documentation)))
-	   (list (nth ll 1) (nth ll 0)))))
-||#
+	   (list (nth 1 ll) (nth 0 ll)))))
 
 ;;; Readers for Slot Definition Metaobjects (pp. 221--224 of AMOP)
 
