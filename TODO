@@ -1,13 +1,9 @@
-for early 0.7.x:
+for late 0.7.x:
 
-* urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-	** made inlining DEFUN inside MACROLET work again
-	** (also, while working on INLINE anyway, it might be easy
-		to flush the old MAYBE-INLINE cruft entirely, 
-		including e.g. on the man page)
 * test file reworking
 	** non-x86 ports now pass irrat.pure.lisp
-	** sparc and ppc now pass bit-vector.impure-cload.lisp
+	** ports with less than 256Mb of heap (sparc, ppc and mips)
+		now don't fail bit-vector.impure-cload.lisp
 * faster bootstrapping (both make.sh and slam.sh)
 	** added mechanisms for automatically finding dead code, and
 		used them to remove dead code
@@ -30,24 +26,22 @@ for early 0.7.x:
 		they're structure slot accessors) won't be so
 		nasty in the debugger
 * outstanding embarrassments
-	** cut-and-pasted DEF-BOOLEAN-ATTRIBUTE (maybe easier to fix
-		now that EVAL-WHEN works correctly..)
 	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr. (It's
 		reasonable to support this as a crutch when initially
 		bootstrapping from balky xc hosts with their own
 		idiosyncratic ideas of what merits FAILURE-P, but it's
 		embarrassing to have to use it when bootstrapping 
 		under SBCL!),
-	** weird double-loading (first in GENESIS, then in warm init)
-		of src/assembly/target/*.lisp stuff, and the associated
-		weirdness of the half-baked state (compiler almost but
-		not quite ready for prime time..) of the system after
-		cold init
 * fixups now feasible because of pre7 changes
-	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE)
+	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE,
+		including e.g. on the man page)
 * miscellaneous simple refactoring
 	* belated renaming:
 		** renamed %PRIMITIVE to %VOP
+		** A few hundred things named FN and FCN should be
+			named FUN (but maybe not while dan_b is 
+			working on a threads branch and drichards is
+			working on a Windows port).
 	* These days ANSI C has inline functions, so..
 		** redid many cpp macros as inline functions: 
 			HeaderValue, Pointerp, CEILING, ALIGNED_SIZE,
