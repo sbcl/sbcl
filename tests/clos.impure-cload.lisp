@@ -129,6 +129,25 @@
     (ignore-errors (make-instance 'invalid-default-initargs :foo 1))
   (assert (null result))
   (assert (typep condition 'program-error)))
+;;; :DEFAULT-INITARGS not passed to INITIALIZE-INSTANCE or
+;;; SHARED-INITIALIZE :BEFORE methods.
+(defclass default-initargs-with-method ()
+  ((foo :initarg :valid-initarg))
+  (:default-initargs :valid-initarg 2))
+(defmethod shared-initialize :before ((thing default-initargs-with-method)
+				      slot-names &key valid-initarg)
+  (assert (= valid-initarg 2)))
+(make-instance 'default-initargs-with-method)
+;;; and a test with a non-constant initarg
+(defvar *d-i-w-m-2* 0)
+(defclass default-initargs-with-method2 ()
+  ((foo :initarg :valid-initarg))
+  (:default-initargs :valid-initarg (incf *d-i-w-m-2*)))
+(defmethod shared-initialize :before ((thing default-initargs-with-method2)
+				      slot-names &key valid-initarg)
+  (assert (= valid-initarg 1)))
+(make-instance 'default-initargs-with-method2)
+(assert (= *d-i-w-m-2* 1))
 
 ;;; from Axel Schairer on cmucl-imp 2004-08-05
 (defclass class-with-symbol-initarg ()

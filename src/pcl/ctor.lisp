@@ -421,25 +421,28 @@
 	(standard-sort-methods si-methods)
       (declare (ignore si-primary))
       (aver (and (null ii-around) (null si-around)))
-      (let ((initargs (ctor-initargs ctor))
-	    (slot-inits (slot-init-forms ctor (or ii-before si-before))))
+      (let ((initargs (ctor-initargs ctor)))
+        (multiple-value-bind (bindings vars defaulting-initargs body)
+	    (slot-init-forms ctor (or ii-before si-before))
 	(values
-	 `(let (,@(when (or ii-before ii-after)
-	           `((.ii-args.
-		      (list .instance. ,@(quote-plist-keys initargs)))))
-	        ,@(when (or si-before si-after)
-		   `((.si-args.
-		      (list .instance. t ,@(quote-plist-keys initargs))))))
+         `(let ,bindings
+           (declare (ignorable ,@vars))
+           (let (,@(when (or ii-before ii-after)
+                     `((.ii-args.
+                        (list .instance. ,@(quote-plist-keys initargs) ,@defaulting-initargs))))
+                 ,@(when (or si-before si-after)
+		     `((.si-args.
+                        (list .instance. t ,@(quote-plist-keys initargs) ,@defaulting-initargs)))))
 	    ,@(loop for method in ii-before
 		    collect `(invoke-method ,method .ii-args.))
 	    ,@(loop for method in si-before
 		    collect `(invoke-method ,method .si-args.))
-	    ,slot-inits
+	    ,@body
 	    ,@(loop for method in si-after
 		    collect `(invoke-method ,method .si-args.))
 	    ,@(loop for method in ii-after
-		    collect `(invoke-method ,method .ii-args.)))
-	 (or ii-before si-before))))))
+		    collect `(invoke-method ,method .ii-args.))))
+	 (or ii-before si-before)))))))
 
 ;;; Return four values from APPLICABLE-METHODS: around methods, before
 ;;; methods, the applicable primary method, and applicable after
@@ -475,6 +478,7 @@
 		      :initial-element nil))
 	 (class-inits ())
 	 (default-inits ())
+         (defaulting-initargs ())
 	 (default-initargs (class-default-initargs class))
 	 (initarg-locations
 	  (compute-initarg-locations
@@ -524,6 +528,13 @@
 	    unless (member key initkeys :test #'eq) do
 	    (let* ((type (if (constantp initform) 'constant 'var))
 		   (init (if (eq type 'var) initfn initform)))
+              (ecase type
+                (constant
+                 (push key defaulting-initargs)
+                 (push initform defaulting-initargs))
+                (var
+                 (push key defaulting-initargs)
+                 (push (default-init-var-name i) defaulting-initargs)))
 	      (when (eq type 'var)
 		(let ((init-var (default-init-var-name i)))
 		  (setq init init-var)
@@ -587,10 +598,14 @@
 		  collect var into vars
 		  collect `(,var (funcall ,initfn)) into bindings
 		  finally (return (values vars bindings)))
-	  `(let ,bindings
+          ;; FIXME: adjust comment above!
+          (values bindings vars (nreverse defaulting-initargs)
+                  `(,@(delete nil instance-init-forms)
+                    ,@class-init-forms)))))))
+#|	  `(let ,bindings
 	     (declare (ignorable ,@vars))
 	     ,@(delete nil instance-init-forms)
-	     ,@class-init-forms))))))
+	     ,@class-init-forms))))))|#
 
 ;;; Return an alist of lists (KEY LOCATION ...) telling, for each
 ;;; key in INITKEYS, which locations the initarg initializes.
