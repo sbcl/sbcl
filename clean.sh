@@ -97,4 +97,5 @@ find . \( \
 	-name '*.html' -o \
 	-name 'TAGS' -o \
 	-name 'tags' -o \
+	-name 'test-passed' -o \
 	-name 'local-target-features.lisp-expr' \) -print | xargs rm -f

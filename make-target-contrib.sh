@@ -17,7 +17,8 @@
 # build directory.  Right now, however, where there are dependencies
 # between contrib packages, we want the _uninstalled_ versions to be
 # found
-export SBCL_HOME=`pwd`/contrib
+SBCL_HOME=`pwd`/contrib
+export SBCL_HOME
 
 SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
 SBCL_BUILDING_CONTRIB=1

@@ -135,7 +135,7 @@ A fairly rudimentary test that connects to the syslog socket and sends a
 message.  Priority 7 is kern.debug; you'll probably want to look at
 /etc/syslog.conf or local equivalent to find out where the message ended up
 ||#
-
+#-sunos
 (deftest simple-local-client
     (let ((s (make-instance 'local-socket :type :datagram)))
       (format t "~A~%" s)
