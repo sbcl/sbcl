@@ -340,10 +340,9 @@
  ("src/code/late-type")
  ("src/code/deftypes-for-target")
 
- ;; The inline definition of TYPEP-TO-LAYOUT here needs inline
- ;; functions defined in classes.lisp, and is needed in turn by
- ;; the target version of "code/defstruct".
- ("src/code/target-defstruct" :not-host)
+
+ ;; REMOVEME: was here until sbcl-0.pre7.74
+ #+nil("src/code/target-defstruct" :not-host)
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
  ("src/compiler/knownfun")
@@ -359,6 +358,7 @@
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
  ("src/code/defstruct")
+ ("src/code/target-defstruct" :not-host)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
  ;; machinery) before we can set its superclasses here.

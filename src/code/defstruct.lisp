@@ -19,6 +19,7 @@
 ;;; Return the compiler layout for NAME. (The class referred to by
 ;;; NAME must be a structure-like class.)
 (defun compiler-layout-or-lose (name)
+  #+sb-xc (/show0 "entering COMPILER-LAYOUT-OR-LOSE")
   (let ((res (info :type :compiler-layout name)))
     (cond ((not res)
 	   (error "Class is not yet defined or was undefined: ~S" name))
@@ -27,8 +28,8 @@
 	  (t res))))
 
 ;;; Delay looking for compiler-layout until the constructor is being
-;;; compiled, since it doesn't exist until after the eval-when
-;;; (compile) is compiled.
+;;; compiled, since it doesn't exist until after the EVAL-WHEN (COMPILE)
+;;; is compiled.
 (sb!xc:defmacro %delayed-get-compiler-layout (name)
   `',(compiler-layout-or-lose name))
 
@@ -188,60 +189,6 @@
     (list 'list)
     (vector `(simple-array ,(dd-element-type defstruct) (*)))))
 
-;;;; checking structure types
-
-;;; Check that X is an instance of the named structure type.
-(defmacro %check-structure-type-from-name (x name)
-  `(%check-structure-type-from-layout ,x ,(compiler-layout-or-lose name)))
-
-;;; Check that X is a structure of the type described by DD.
-(defmacro %check-structure-type-from-dd (x dd)
-  (declare (type defstruct-description dd))
-  (let ((class-name (dd-name dd)))
-    (ecase (dd-type dd)
-      ((structure funcallable-instance)
-       `(%check-structure-type-from-layout
-	 ,x
-	 ,(compiler-layout-or-lose class-name)))
-      ((vector)
-       (let ((xx (gensym "X")))
-	 `(let ((,xx ,x))
-	    (declare (type vector ,xx))
-	    ,@(when (dd-named dd)
-		`((unless (eql (aref ,xx 0) ',class-name)
-		    (error
-		     'simple-type-error
-		     :datum (aref ,xx 0)
-		     :expected-type `(member ,class-name)
-		     :format-control
-		     "~@<missing name in instance of ~
-                      VECTOR-typed structure ~S: ~2I~_S~:>"
-		     :format-arguments (list ',class-name ,xx)))))))
-       (values))
-      ((list)
-       (let ((xx (gensym "X")))
-	 `(let ((,xx ,x))
-	    (declare (type list ,xx))
-	    ,@(when (dd-named dd)
-		`((unless (eql (first ,xx) ',class-name)
-		    (error
-		     'simple-type-error
-		     :datum (aref ,xx 0)
-		     :expected-type `(member ,class-name)
-		     :format-control
-		     "~@<missing name in instance of LIST-typed structure ~S: ~
-                      ~2I~_S~:>"
-		     :format-arguments (list ',class-name ,xx)))))
-	    (values)))))))
-
-;;; Check that X is an instance of the structure class with layout LAYOUT.
-(defun %check-structure-type-from-layout (x layout)
-  (unless (typep-to-layout x layout)
-    (error 'simple-type-error
-	   :datum x
-	   :expected-type (sb!xc:class-name (layout-class layout))))
-  (values))
-
 ;;;; shared machinery for inline and out-of-line slot accessor functions
 
 ;;; an alist mapping from raw slot type to the operator used to access
@@ -266,83 +213,101 @@
 
 ;;;; generating out-of-line slot accessor functions
 
-;;; code generators for cases of DEFUN SLOT-ACCESSOR-FUNS
-;;;
-;;; (caution: These macros are sleazily specialized for use only in
-;;; DEFUN SLOT-ACCESSOR-FUNS, not anywhere near fully parameterized:
-;;; they grab symbols like INSTANCE and DSD-FOO automatically.
-;;; Logically they probably belong in a MACROLET inside the DEFUN, but
-;;; separating them like this makes it easier to experiment with them
-;;; in the interpreter and reduces indentation hell.)
-;;;
 ;;; FIXME: Ideally, the presence of the type checks in the functions
 ;;; here would be conditional on the optimization policy at the point
 ;;; of expansion of DEFSTRUCT. (For now we're just doing the simpler
 ;;; thing, putting in the type checks unconditionally.)
-(eval-when (:compile-toplevel)
-
-  ;; code shared between funcallable instance case and the ordinary
-  ;; STRUCTURE-OBJECT case: Handle native structures with LAYOUTs and
-  ;; (possibly) raw slots.
-  (defmacro %native-slot-accessor-funs (dd-ref-fun-name)
-    (let ((instance-type-check-form '(%check-structure-type-from-layout
-				      instance layout)))
-      `(let ((layout (dd-layout-or-lose dd))
-	     (dsd-raw-type (dsd-raw-type dsd)))
-	 ;; Map over all the possible RAW-TYPEs, compiling a different
-	 ;; closure-function for each one, so that once the COND over
-	 ;; RAW-TYPEs happens (at the time closure is allocated) there
-	 ;; are no more decisions to be made and things execute
-	 ;; reasonably efficiently.
-	 (cond
-	  ;; nonraw slot case
-	  ((eql (dsd-raw-type dsd) t)
-	   (%slotplace-accessor-funs (,dd-ref-fun-name instance dsd-index)
-				     ,instance-type-check-form))
-	  ;; raw slot cases
-	  ,@(mapcar (lambda (raw-type-and-rawref-fun-name)
-		      (destructuring-bind (raw-type . rawref-fun-name)
-			  raw-type-and-rawref-fun-name
-			`((equal dsd-raw-type ',raw-type)
-			  (let ((raw-index (dd-raw-index dd)))
-			    (%slotplace-accessor-funs
-			     (,rawref-fun-name (,dd-ref-fun-name instance
-								 raw-index)
-					       dsd-index)
-			     ,instance-type-check-form)))))
-		    *raw-type->rawref-fun-name*)))))
-
-  ;; code shared between DEFSTRUCT :TYPE LIST and
-  ;; DEFSTRUCT :TYPE VECTOR cases: Handle the "typed structure" case,
-  ;; with no LAYOUTs and no raw slots.
-  (defmacro %colontyped-slot-accessor-funs () (error "stub")) 
-
-  ;; the common structure of the raw-slot and not-raw-slot cases,
-  ;; defined in terms of the writable SLOTPLACE. All possible flavors
-  ;; of slot access should be able to pass through here.
-  (defmacro %slotplace-accessor-funs (slotplace instance-type-check-form)
-    (cl-user:/show slotplace instance-type-check-form)
-    `(values (lambda (instance)
-	       ,instance-type-check-form
-	       ,slotplace)
-	     (let ((typecheckfun (typespec-typecheckfun dsd-type)))
-	       (lambda (new-value instance)
-		 ,instance-type-check-form
-		 (funcall typecheckfun new-value)
-		 (setf ,slotplace new-value))))))
 
 ;;; Return (VALUES SLOT-READER-FUN SLOT-WRITER-FUN).
 (defun slot-accessor-funs (dd dsd)
 
-  (let ((dsd-index (dsd-index dsd))
-	(dsd-type (dsd-type dsd)))
+  #+sb-xc (/show0 "entering SLOT-ACCESSOR-FUNS")
+
+  ;; various code generators
+  ;;
+  ;; Note: They're only minimally parameterized, and cavalierly grab
+  ;; things like INSTANCE and DSD-INDEX from the namespace they're
+  ;; expanded in.
+  (macrolet (;; code shared between funcallable instance case and the
+	     ;; ordinary STRUCTURE-OBJECT case: Handle native
+	     ;; structures with LAYOUTs and (possibly) raw slots.
+	     (%native-slot-accessor-funs (dd-ref-fun-name)
+	       (let ((instance-type-check-form
+		      '(%check-structure-type-from-layout instance layout)))
+		 (/show "macroexpanding %NATIVE-SLOT-ACCESSOR-FUNS" dd-ref-fun-name instance-type-check-form)
+		 `(let ((layout (dd-layout-or-lose dd))
+			(dsd-raw-type (dsd-raw-type dsd)))
+		    #+sb-xc (/show0 "in %NATIVE-SLOT-ACCESSOR-FUNS macroexpanded code")
+		    ;; Map over all the possible RAW-TYPEs, compiling
+		    ;; a different closure-function for each one, so
+		    ;; that once the COND over RAW-TYPEs happens (at
+		    ;; the time closure is allocated) there are no
+		    ;; more decisions to be made and things execute
+		    ;; reasonably efficiently.
+		    (cond
+		     ;; nonraw slot case
+		     ((eql dsd-raw-type t)
+		      #+sb-xc (/show0 "in nonraw slot case")
+		      (%slotplace-accessor-funs
+		       (,dd-ref-fun-name instance dsd-index)
+		       ,instance-type-check-form))
+		     ;; raw slot cases
+		     ,@(mapcar (lambda (raw-type-and-rawref-fun-name)
+				 (destructuring-bind (raw-type
+						      . rawref-fun-name)
+				     raw-type-and-rawref-fun-name
+				   `((equal dsd-raw-type ',raw-type)
+				     #+sb-xc (/show0 "in raw slot case")
+				     (let ((raw-index (dd-raw-index dd)))
+				       (%slotplace-accessor-funs
+					(,rawref-fun-name (,dd-ref-fun-name
+							   instance
+							   raw-index)
+							  dsd-index)
+					,instance-type-check-form)))))
+			       *raw-type->rawref-fun-name*)
+		     ;; oops
+		     (t
+		      (error "internal error: unexpected DSD-RAW-TYPE ~S"
+			     dsd-raw-type))))))
+	     ;; code shared between DEFSTRUCT :TYPE LIST and
+	     ;; DEFSTRUCT :TYPE VECTOR cases: Handle the "typed
+	     ;; structure" case, with no LAYOUTs and no raw slots.
+	     (%colontyped-slot-accessor-funs () (error "stub")) 
+	     ;; the common structure of the raw-slot and not-raw-slot
+	     ;; cases, defined in terms of the writable SLOTPLACE. All
+	     ;; possible flavors of slot access should be able to pass
+	     ;; through here.
+	     (%slotplace-accessor-funs (slotplace instance-type-check-form)
+	       (/show "macroexpanding %SLOTPLACE-ACCESSOR-FUNS" slotplace instance-type-check-form)
+	       `(values (lambda (instance)
+			  (/show0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
+			  ,instance-type-check-form
+			  (/show0 "back from INSTANCE-TYPE-CHECK-FORM")
+			  ,slotplace)
+			(let ((typecheckfun (typespec-typecheckfun dsd-type)))
+			  (lambda (new-value instance)
+			    (/show0 "in %SLOTPLACE-ACCESSOR-FUNS-defined writer")
+			    ,instance-type-check-form
+			    (/show0 "back from INSTANCE-TYPE-CHECK-FORM")
+			    (funcall typecheckfun new-value)
+			    (/show0 "back from TYPECHECKFUN")
+			    (setf ,slotplace new-value))))))
+
+    (let ((dsd-index (dsd-index dsd))
+	  (dsd-type (dsd-type dsd)))
 	    
+      #+sb-xc (/show0 "got DSD-TYPE=..")
+      #+sb-xc (/hexstr dsd-type)
       (ecase (dd-type dd)
 
 	;; native structures
-	(structure (%native-slot-accessor-funs %instance-ref))
-	(funcallable-structure (%native-slot-accessor-funs
-				%funcallable-instance-info))
+	(structure
+	 #+sb-xc (/show0 "case of DSD-TYPE = STRUCTURE")
+	 (%native-slot-accessor-funs %instance-ref))
+	(funcallable-structure
+	 #+sb-xc (/show0 "case of DSD-TYPE = FUNCALLABLE-STRUCTURE")
+	 (%native-slot-accessor-funs %funcallable-instance-info))
 				     
 	;; structures with the :TYPE option
 
@@ -352,13 +317,13 @@
         ;; layout completely, so that raw slots are impossible.
         (list
          (dd-type-slot-accessor-funs nth-but-with-sane-arg-order
-  	  			 `(%check-structure-type-from-dd
-  		  		 :maybe-raw-p nil))
+  	    			 `(%check-structure-type-from-dd
+    		  		 :maybe-raw-p nil))
         (vector
          (dd-type-slot-accessor-funs aref
-  				 :maybe-raw-p nil)))
+  	  			 :maybe-raw-p nil)))
         |#
-	)))
+	))))
 
 ;;;; REMOVEME: baby steps for the new out-of-line slot accessor functions
 
@@ -461,6 +426,7 @@
 	;; non-compact code. In this context, we'd rather have
 	;; compact, cold-loadable code. -- WHN 19990928
 	(declare (notinline sb!xc:find-class))
+	#+sb-xc (/show0 "beginning CLASS-METHOD-DEFINITIONS forms")
 	,@(let ((pf (dd-print-function defstruct))
 		(po (dd-print-object defstruct))
 		(x (gensym))
@@ -496,7 +462,8 @@
 	,@(let ((def-con (dd-default-constructor defstruct)))
 	    (when (and def-con (not (dd-alternate-metaclass defstruct)))
 	      `((setf (structure-class-constructor (sb!xc:find-class ',name))
-		      #',def-con))))))))
+		      #',def-con))))
+	#+sb-xc (/show0 "done with CLASS-METHOD-DEFINITIONS forms")))))
 ;;; FIXME: I really would like to make structure accessors less
 ;;; special, just ordinary inline functions. (Or perhaps inline
 ;;; functions with special compact implementations of their
@@ -517,9 +484,12 @@
        (if (dd-class-p dd)
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
+		(/show0 "beginning macroexpanded DEFSTRUCT code")
 		(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (%compiler-defstruct ',dd ',inherits))
+		(/show0 "back from %COMPILER-DEFSTRUCT")
 		(%defstruct ',dd ',inherits)
+		(/show0 "back from %DEFSTRUCT")
 		,@(unless expanding-into-code-for-xc-host-p
 		    (append (raw-accessor-definitions dd)
 			    (predicate-definitions dd)
@@ -529,8 +499,10 @@
 					;(copier-definition dd)
 			    (constructor-definitions dd)
 			    (class-method-definitions dd)))
+		(/show0 "done with macroexpanded DEFSTRUCT code")
 		',name))
 	   `(progn
+	      (/show0 "beginning macroexpanded typed DEFSTRUCT code")
 	      (eval-when (:compile-toplevel :load-toplevel :execute)
 		(setf (info :typed-structure :info ',name) ',dd))
 	      ,@(unless expanding-into-code-for-xc-host-p
@@ -538,6 +510,7 @@
 			  (typed-predicate-definitions dd)
 			  (typed-copier-definitions dd)
 			  (constructor-definitions dd)))
+	      (/show0 "done with macroexpanded typed DEFSTRUCT code")
 	      ',name)))))
 
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
@@ -579,16 +552,6 @@
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
-;;; Catch requests to mess up definitions in COMMON-LISP.
-#-sb-xc-host
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun protect-cl (symbol)
-    (when (and *cold-init-complete-p*
-	       (eq (symbol-package symbol) *cl-package*))
-      (cerror "Go ahead and patch the system."
-	      "attempting to modify a symbol in the COMMON-LISP package: ~S"
-	      symbol))))
-
 ;;; Return forms to define readers and writers for raw slots as inline
 ;;; functions.
 (defun raw-accessor-definitions (dd)
@@ -605,9 +568,13 @@
 	    ;; When accessor exists and is raw
 	    (when (and accessor-name
 		       (not (eq accessor-name '%instance-ref)))
+	      (res `(/show0 "doing one slot, ACCESSOR-NAME=.."))
+	      (res `(/hexstr accessor-name))
 	      (res `(declaim (inline ,accessor-name)))
+	      (res `(/show0 "done with reader DECLAIM INLINE"))
 	      (res `(declaim (ftype (function (,dtype) ,slot-type)
 				    ,accessor-name)))
+	      (res `(/show0 "done with reader DECLAIM FTYPE, doing DEFUN"))
 	      (res `(defun ,accessor-name (,argname)
 		      ;; Note: The DECLARE here might seem redundant
 		      ;; with the DECLAIM FTYPE above, but it's not:
@@ -617,17 +584,23 @@
 		      (declare (type ,dtype ,argname))
 		      (truly-the ,slot-type (,accessor ,data ,offset))))
 	      (unless (dsd-read-only slot)
+		(res `(/show0 "doing writer DECLAIM INLINE"))
 		(res `(declaim (inline (setf ,accessor-name))))
+		(res `(/show0 "doing writer DECLAIM FTYPE"))
 		(res `(declaim (ftype (function (,slot-type ,dtype) ,slot-type)
 				      (setf ,accessor-name))))
 		;; FIXME: I rewrote this somewhat from the CMU CL definition.
 		;; Do some basic tests to make sure that reading and writing
 		;; raw slots still works correctly.
+		(res `(/show0 "doing writer DEFUN"))
 		(res `(defun (setf ,accessor-name) (,nvname ,argname)
 			(declare (type ,dtype ,argname))
 			(setf (,accessor ,data ,offset) ,nvname)
-			,nvname)))))))
-      (res))))
+			,nvname)))
+	      (res `(/show0 "done with one slot"))))))
+      `((/show0 "beginning RAW-ACCESSOR-DEFINITIONS forms")
+	,@(res)
+	(/show0 "done with RAW-ACCESSOR-DEFINITIONS forms")))))
 
 ;;; Return a list of forms which create a predicate for an untyped DEFSTRUCT.
 (defun predicate-definitions (dd)
@@ -639,14 +612,18 @@
 	  ;; FUNCALLABLE-STRUCTURE? CMU CL did it, but without explanation.
 	  ;; Could we do without it? What breaks if we do? Or could we
 	  ;; perhaps get by with no predicates for funcallable structures?
-	  `((declaim (inline ,pred))
-	    (defun ,pred (,argname) (typep ,argname ',(dd-name dd))))
-	  `((protect-cl ',pred)
+	  `((/show0 "beginning PREDICATE-DEFINITIONS forms for FIN")
+	    (declaim (inline ,pred))
+	    (defun ,pred (,argname) (typep ,argname ',(dd-name dd)))
+	    (/show0 "done with PREDICATE-DEFINITIONS forms for FIN"))
+	  `((/show0 "beginning PREDICATE-DEFINITIONS forms")
+	    (protect-cl ',pred)
 	    (declaim (inline ,pred))
 	    (defun ,pred (,argname)
 	      (declare (optimize (speed 3) (safety 0)))
 	      (typep-to-layout ,argname
-			       (compile-time-find-layout ,(dd-name dd)))))))))
+			       (compile-time-find-layout ,(dd-name dd))))
+	    (/show0 "done with PREDICATE-DEFINITIONS forms"))))))
 
 ;;; Return a list of forms which create a predicate function for a typed
 ;;; DEFSTRUCT.
@@ -953,6 +930,7 @@
 ;;; yet for the raw data vector, then do it. Raw objects are aligned
 ;;; on the unit of their size.
 (defun allocate-1-slot (dd dsd)
+  #+sb-xc (/show0 "entering ALLOCATE-1-SLOT")
   (multiple-value-bind (raw? raw-type words)
       (if (eq (dd-type dd) 'structure)
 	  (structure-raw-slot-type-and-size (dsd-type dsd))
@@ -971,6 +949,7 @@
 	   (setf (dsd-raw-type dsd) raw-type)
 	   (setf (dsd-index dsd) (dd-raw-length dd))
 	   (incf (dd-raw-length dd) words))))
+  #+sb-xc (/show0 "leaving ALLOCATE-1-SLOT")
   (values))
 
 (defun typed-structure-info-or-lose (name)
@@ -1039,12 +1018,15 @@
 
 ;;; Do miscellaneous (LOAD EVAL) time actions for the structure
 ;;; described by DD. Create the class & LAYOUT, checking for
-;;; incompatible redefinition. Define setters, accessors, copier,
-;;; predicate, documentation, instantiate definition in load-time
-;;; environment.
+;;; incompatible redefinition. Define those functions which are
+;;; sufficiently stereotyped that we can implement them as standard
+;;; closures.
 (defun %defstruct (dd inherits)
   (declare (type defstruct-description dd))
-  (remhash (dd-name dd) *typecheckfuns*)
+
+  #+sb-xc (/show0 "entering %DEFSTRUCT")
+
+  ;; We set up LAYOUTs even in the cross-compilation host.
   (multiple-value-bind (class layout old-layout)
       (ensure-structure-class dd inherits "current" "new")
     (cond ((not old-layout)
@@ -1059,60 +1041,23 @@
 		   (fmakunbound `(setf ,(dsd-accessor-name slot)))))))
 	   (%redefine-defstruct class old-layout layout)
 	   (setq layout (class-layout class))))
-
     (setf (sb!xc:find-class (dd-name dd)) class)
 
-    ;; Set FDEFINITIONs for structure accessors, setters, predicates,
-    ;; and copiers.
+    ;; It doesn't make sense to do these in the cross-compilation host.
     #-sb-xc-host
-    (unless (eq (dd-type dd) 'funcallable-structure)
+    (progn
+      #+sb-xc (/show0 "doing #+SB-XC stuff in %DEFSTRUCT")
+      (remhash (dd-name dd) *typecheckfuns*)
+      (%target-defstruct dd layout)
+      (when (dd-doc dd)
+	(setf (fdocumentation (dd-name dd) 'type)
+	      (dd-doc dd)))
+      #+sb-xc (/show0 "done with #+SB-XC stuff in %DEFSTRUCT")
+      ))
 
-      (dolist (slot (dd-slots dd))
-	(let ((dsd slot))
-	  (when (and (dsd-accessor-name slot)
-		     (eq (dsd-raw-type slot) t))
-	    (protect-cl (dsd-accessor-name slot))
-	    (setf (symbol-function (dsd-accessor-name slot))
-		  (structure-slot-getter layout dsd))
-	    (unless (dsd-read-only slot)
-	      (setf (fdefinition `(setf ,(dsd-accessor-name slot)))
-		    (structure-slot-setter layout dsd))))))
-
-      ;; FIXME: Someday it'd probably be good to go back to using
-      ;; closures for the out-of-line forms of structure accessors.
-      #|
-      (when (dd-predicate dd)
-	(protect-cl (dd-predicate dd))
-	(setf (symbol-function (dd-predicate dd))
-	      #'(lambda (object)
-		  (declare (optimize (speed 3) (safety 0)))
-		  (typep-to-layout object layout))))
-      |#
-
-      (when (dd-copier-name dd)
-	(protect-cl (dd-copier-name dd))
-	(setf (symbol-function (dd-copier-name dd))
-	      #'(lambda (structure)
-		  (declare (optimize (speed 3) (safety 0)))
-		  (flet ((layout-test (structure)
-			   (typep-to-layout structure layout)))
-		    (unless (layout-test structure)
-		      (error 'simple-type-error
-			     :datum structure
-			     :expected-type '(satisfies layout-test)
-			     :format-control
-			     "Structure for copier is not a ~S:~% ~S"
-			     :format-arguments
-			     (list (sb!xc:class-name (layout-class layout))
-				   structure))))
-		  (copy-structure structure))))))
-
-  (when (dd-doc dd)
-    (setf (fdocumentation (dd-name dd) 'type)
-	  (dd-doc dd)))
-
+  #+sb-xc (/show0 "leaving %DEFSTRUCT")
   (values))
-
+
 ;;; Return a form describing the writable place used for this slot
 ;;; in the instance named INSTANCE-NAME.
 (defun %accessor-place-form (dd dsd instance-name)
@@ -1165,6 +1110,7 @@
 ;;; Do (COMPILE LOAD EVAL)-time actions for the defstruct described by DD.
 (defun %compiler-defstruct (dd inherits)
   (declare (type defstruct-description dd))
+  #+sb-xc (/show0 "entering %COMPILER-DEFSTRUCT")
   (multiple-value-bind (class layout old-layout)
       (multiple-value-bind (clayout clayout-p)
 	  (info :type :compiler-layout (dd-name dd))
@@ -1231,6 +1177,7 @@
 		      (info :function :inlinep setf-accessor-name)
 		      :inline))))))))
 
+  #+sb-xc (/show0 "leaving %COMPILER-DEFSTRUCT")
   (values))
 
 ;;;; redefinition stuff
@@ -1283,6 +1230,7 @@
 ;;; be used.
 (defun %redefine-defstruct (class old-layout new-layout)
   (declare (type sb!xc:class class) (type layout old-layout new-layout))
+  #+sb-xc (/show0 "entering %REDEFINE-DEFSTRUCT")
   (let ((name (class-proper-name class)))
     (restart-case
 	(error "redefining class ~S incompatibly with the current definition"
@@ -1298,6 +1246,7 @@
 	      name)
 	(register-layout new-layout :invalidate nil
 			 :destruct-layout old-layout))))
+  #+sb-xc (/show0 "leaving %REDEFINE-DEFSTRUCT")
   (values))
 
 ;;; This is called when we are about to define a structure class. It
@@ -1374,9 +1323,11 @@
 ;;; over this type, clearing the compiler structure type info, and
 ;;; undefining all the associated functions.
 (defun undefine-structure (class)
+  #+sb-xc (/show0 "entering UNDEFINE-STRUCTURE")
   (let ((info (layout-info (class-layout class))))
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
+	(remhash type *typecheckfuns*)
 	(setf (info :type :compiler-layout type) nil)
 	(undefine-fun-name (dd-copier-name info))
 	(undefine-fun-name (dd-predicate-name info))
@@ -1388,6 +1339,7 @@
       ;; Clear out the SPECIFIER-TYPE cache so that subsequent
       ;; references are unknown types.
       (values-specifier-type-cache-clear)))
+  #+sb-xc (/show0 "leaving UNDEFINE-STRUCTURE")
   (values))
 
 ;;; Return a list of pairs (name . index). Used for :TYPE'd
@@ -1465,11 +1417,11 @@
 ;;; These functions are called to actually make a constructor after we
 ;;; have processed the arglist. The correct variant (according to the
 ;;; DD-TYPE) should be called. The function is defined with the
-;;; specified name and arglist. Vars and Types are used for argument
-;;; type declarations. Values are the values for the slots (in order.)
+;;; specified name and arglist. VARS and TYPES are used for argument
+;;; type declarations. VALUES are the values for the slots (in order.)
 ;;;
 ;;; This is split four ways because:
-;;; 1] list & vector structures need "name" symbols stuck in at
+;;; 1] LIST & VECTOR structures need "name" symbols stuck in at
 ;;;    various weird places, whereas STRUCTURE structures have
 ;;;    a LAYOUT slot.
 ;;; 2] We really want to use LIST to make list structures, instead of
@@ -1478,75 +1430,71 @@
 ;;;    allocated and indirectly referenced. We use SLOT-ACCESSOR-FORM
 ;;;    to compute how to set the slots, which deals with raw slots.
 ;;; 4] Funcallable structures are weird.
-(defun create-vector-constructor
-       (defstruct cons-name arglist vars types values)
+(defun create-vector-constructor (dd cons-name arglist vars types values)
   (let ((temp (gensym))
-	(etype (dd-element-type defstruct)))
+	(etype (dd-element-type dd)))
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar #'(lambda (var type) `(type (and ,type ,etype) ,var))
 			  vars types))
-       (let ((,temp (make-array ,(dd-length defstruct)
-				:element-type ',(dd-element-type defstruct))))
+       (let ((,temp (make-array ,(dd-length dd)
+				:element-type ',(dd-element-type dd))))
 	 ,@(mapcar #'(lambda (x)
 		       `(setf (aref ,temp ,(cdr x))  ',(car x)))
-		   (find-name-indices defstruct))
+		   (find-name-indices dd))
 	 ,@(mapcar #'(lambda (dsd value)
 		       `(setf (aref ,temp ,(dsd-index dsd)) ,value))
-		   (dd-slots defstruct) values)
+		   (dd-slots dd) values)
 	 ,temp))))
-(defun create-list-constructor
-       (defstruct cons-name arglist vars types values)
-  (let ((vals (make-list (dd-length defstruct) :initial-element nil)))
-    (dolist (x (find-name-indices defstruct))
+(defun create-list-constructor (dd cons-name arglist vars types values)
+  (let ((vals (make-list (dd-length dd) :initial-element nil)))
+    (dolist (x (find-name-indices dd))
       (setf (elt vals (cdr x)) `',(car x)))
-    (loop for dsd in (dd-slots defstruct) and val in values do
+    (loop for dsd in (dd-slots dd) and val in values do
       (setf (elt vals (dsd-index dsd)) val))
 
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar #'(lambda (var type) `(type ,type ,var))
 			  vars types))
        (list ,@vals))))
-(defun create-structure-constructor
-       (defstruct cons-name arglist vars types values)
+(defun create-structure-constructor (dd cons-name arglist vars types values)
   (let* ((temp (gensym))
-	 (raw-index (dd-raw-index defstruct))
+	 (raw-index (dd-raw-index dd))
 	 (n-raw-data (when raw-index (gensym))))
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar #'(lambda (var type) `(type ,type ,var))
 			  vars types))
-       (let ((,temp (truly-the ,(dd-name defstruct)
-			       (%make-instance ,(dd-length defstruct))))
+       (let ((,temp (truly-the ,(dd-name dd)
+			       (%make-instance ,(dd-length dd))))
 	     ,@(when n-raw-data
 		 `((,n-raw-data
-		    (make-array ,(dd-raw-length defstruct)
+		    (make-array ,(dd-raw-length dd)
 				:element-type '(unsigned-byte 32))))))
 	 (setf (%instance-layout ,temp)
-	       (%delayed-get-compiler-layout ,(dd-name defstruct)))
+	       (%delayed-get-compiler-layout ,(dd-name dd)))
 	 ,@(when n-raw-data
 	     `((setf (%instance-ref ,temp ,raw-index) ,n-raw-data)))
 	 ,@(mapcar (lambda (dsd value)
 		     (multiple-value-bind (accessor index data)
-			 (slot-accessor-form defstruct dsd temp n-raw-data)
+			 (slot-accessor-form dd dsd temp n-raw-data)
 		       `(setf (,accessor ,data ,index) ,value)))
-		   (dd-slots defstruct)
+		   (dd-slots dd)
 		   values)
 	 ,temp))))
-(defun create-fin-constructor
-       (defstruct cons-name arglist vars types values)
+(defun create-fin-constructor (dd cons-name arglist vars types values)
   (let ((temp (gensym)))
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar #'(lambda (var type) `(type ,type ,var))
 			  vars types))
        (let ((,temp (truly-the
-		     ,(dd-name defstruct)
+		     ,(dd-name dd)
 		     (%make-funcallable-instance
-		      ,(dd-length defstruct)
-		      (%delayed-get-compiler-layout ,(dd-name defstruct))))))
+		      ,(dd-length dd)
+		      (%delayed-get-compiler-layout ,(dd-name dd))))))
 	 ,@(mapcar #'(lambda (dsd value)
 		       `(setf (%funcallable-instance-info
 			       ,temp ,(dsd-index dsd))
 			      ,value))
-		   (dd-slots defstruct) values)
+		   (dd-slots dd) values)
 	 ,temp))))
 
 ;;; Create a default (non-BOA) keyword constructor.
@@ -1679,7 +1627,9 @@
       (dolist (boa boas)
 	(res (create-boa-constructor defstruct boa creator)))
 
-      (res))))
+      `((/show0 "beginning CONSTRUCTOR-DEFINITIONS forms")
+	,@(res)
+	(/show0 "done with CONSTRUCTOR-DEFINITIONS forms")))))
 
 ;;;; finalizing bootstrapping
 

@@ -129,9 +129,7 @@
 ;;;
 ;;; The only loss is that if someone accesses the
 ;;; FUNCALLABLE-INSTANCE-FUN, then won't get a FIN back. This probably
-;;; doesn't matter, since PCL only sets the FIN function. And the only
-;;; reason that interpreted functions are FINs instead of bare
-;;; closures is for debuggability.
+;;; doesn't matter, since PCL only sets the FIN function.
 (defun (setf funcallable-instance-fun) (new-value fin)
   (setf (%funcallable-instance-fun fin)
 	(%closure-fun new-value))
@@ -139,6 +137,97 @@
 	(if (funcallable-instance-p new-value)
 	    (%funcallable-instance-lexenv new-value)
 	    new-value)))
+
+;;;; target-only parts of the DEFSTRUCT top-level code
+
+;;; Catch attempts to mess up definitions of symbols in the CL package.
+(defun protect-cl (symbol)
+  (/show0 "entering PROTECT-CL, SYMBOL=..")
+  (/hexstr symbol)
+  (when (and *cold-init-complete-p*
+	     (eq (symbol-package symbol) *cl-package*))
+    (cerror "Go ahead and patch the system."
+	    "attempting to modify a symbol in the COMMON-LISP package: ~S"
+	    symbol))
+  (/show0 "leaving PROTECT-CL")
+  (values))
+
+;;; the part of %DEFSTRUCT which sets up out-of-line implementations
+;;; of those structure functions which are sufficiently similar
+;;; between structures that they can be closures
+;;;
+;;; (The "static" in the name is because it needs to be done not only
+;;; in ordinary toplevel %DEFSTRUCT, but also in cold init as early as
+;;; possible, to simulate static linking of structure functions as
+;;; nearly as possible.)
+(defun %target-defstruct (dd layout)
+  (declare (type defstruct-description dd))
+  (declare (type layout layout))
+
+  (/show0 "entering %TARGET-DEFSTRUCT")
+
+  ;; (Constructors aren't set up here, because constructors are
+  ;; varied enough (possibly parsing any specified argument list)
+  ;; that we can't reasonably implement them as closures, and so
+  ;; implement them with DEFUN instead.)
+
+  ;; Set FDEFINITIONs for slot accessors.
+  (dolist (dsd (dd-slots dd))
+    (/show0 "doing FDEFINITION for slot accessor")
+    (let ((accessor-name (dsd-accessor-name dsd)))
+      (/show0 "ACCESSOR-NAME=..")
+      (/hexstr accessor-name)
+      (protect-cl accessor-name)
+      (/hexstr "getting READER-FUN and WRITER-FUN")
+      (multiple-value-bind (reader-fun writer-fun) (slot-accessor-funs dd dsd)
+	(declare (type function reader-fun writer-fun))
+	(/show0 "got READER-FUN and WRITER-FUN=..")
+	(/hexstr reader-fun)
+	(setf (symbol-function accessor-name) reader-fun)
+	(unless (dsd-read-only dsd)
+	  (/show0 "setting FDEFINITION for WRITER-FUN=..")
+	  (/hexstr writer-fun)
+	  (setf (fdefinition `(setf ,accessor-name)) writer-fun)))))
+
+  ;; Set FDEFINITION for copier.
+  (when (dd-copier-name dd)
+    (/show0 "doing FDEFINITION for copier")
+    (protect-cl (dd-copier-name dd))
+    ;; We can't use COPY-STRUCTURE for other kinds of objects, notably
+    ;; funcallable structures, since it returns a STRUCTURE-OBJECT.
+    ;; (And funcallable instances don't need copiers anyway.)
+    (aver (eql (dd-type dd) 'structure))
+    (setf (symbol-function (dd-copier-name dd))
+	  ;; FIXME: should use a closure which checks arg type before copying
+	  #'copy-structure))
+
+  ;; Set FDEFINITION for predicate.
+  (when (dd-predicate-name dd)
+    (/show0 "doing FDEFINITION for predicate")
+    (protect-cl (dd-predicate-name dd))
+    (setf (symbol-function (dd-predicate-name dd))
+	  (ecase (dd-type dd)
+	    ;; structures with LAYOUTs
+	    ((structure funcallable-structure)
+	     (/show0 "with-LAYOUT case")
+	     (lambda (object)
+	       (declare (optimize (speed 3) (safety 0)))
+	       (/noshow0 "in with-LAYOUT structure predicate closure, OBJECT,LAYOUT=..")
+	       (/nohexstr object)
+	       (/nohexstr layout)
+	       (typep-to-layout object layout)))
+	    ;; structures with no LAYOUT (i.e. :TYPE VECTOR or :TYPE LIST)
+	    ;;
+	    ;; FIXME: should handle the :NAMED T case in these cases
+	    (vector
+	     (/show0 ":TYPE VECTOR case")
+	     #'vectorp)
+	    (list
+	     (/show0 ":TYPE LIST case")
+	     #'listp))))
+
+  (/show0 "leaving %TARGET-DEFSTRUCT")
+  (values))
 
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
@@ -236,9 +325,11 @@
     (error "stub: MAKE-LOAD-FORM-SAVING-SLOTS :SLOT-NAMES not implemented") ; KLUDGE
     :just-dump-it-normally))
 
+;;;; testing structure types
+
 ;;; Return true if OBJ is an object of the structure type
 ;;; corresponding to LAYOUT. This is called by the accessor closures,
-;;; which have a handle on the type's layout.
+;;; which have a handle on the type's LAYOUT.
 ;;;
 ;;; FIXME: This is fairly big, so it should probably become
 ;;; MAYBE-INLINE instead of INLINE. Or else we could fix things up so
@@ -247,140 +338,87 @@
 #!-sb-fluid (declaim (inline typep-to-layout))
 (defun typep-to-layout (obj layout)
   (declare (type layout layout) (optimize (speed 3) (safety 0)))
+  (/noshow0 "entering TYPEP-TO-LAYOUT, OBJ,LAYOUT=..")
+  (/nohexstr obj)
+  (/nohexstr layout)
   (when (layout-invalid layout)
     (error "An obsolete structure accessor function was called."))
+  (/noshow0 "back from testing LAYOUT-INVALID LAYOUT")
   ;; FIXME: CMU CL used (%INSTANCEP OBJ) here. Check that
   ;; (TYPEP OBJ 'INSTANCE) is optimized to equally efficient code.
   (and (typep obj 'instance)
        (let ((obj-layout (%instance-layout obj)))
 	 (cond ((eq obj-layout layout)
+		;; (In this case OBJ-LAYOUT can't be invalid, because
+		;; we determined LAYOUT is valid in the test above.)
+		(/noshow0 "EQ case")
 		t)
-	       ;; FIXME: Does the test for LAYOUT-INVALID really belong
-	       ;; after the test for EQ LAYOUT? Either explain why this
-	       ;; is, or change the order.
 	       ((layout-invalid obj-layout)
+		(/noshow0 "LAYOUT-INVALID case")
 		(error 'layout-invalid
 		       :expected-type (layout-class obj-layout)
 		       :datum obj))
 	       (t
-                 (let ((depthoid (layout-depthoid layout)))
-                   (and (> (layout-depthoid obj-layout) depthoid)
-                        (eq (svref (layout-inherits obj-layout) depthoid)
-                            layout))))))))
+		(let ((depthoid (layout-depthoid layout)))
+		  (/noshow0 "DEPTHOID case, DEPTHOID,LAYOUT-INHERITS=..")
+		  (/nohexstr depthoid)
+		  (/nohexstr layout-inherits)
+		  (and (> (layout-depthoid obj-layout) depthoid)
+		       (eq (svref (layout-inherits obj-layout) depthoid)
+			   layout))))))))
 
-;;;; implementing structure slot accessors as closures
+;;;; checking structure types
 
-;;; In the normal case of structures that have a real type (i.e. no
-;;; :TYPE option was specified), we want to optimize things for space
-;;; as well as speed, since there can be thousands of defined slot
-;;; accessors.
-;;;
-;;; What we do is define the accessors and copier as closures over
-;;; general-case code. Since the compiler will normally open-code
-;;; accessors, the (minor) extra speed penalty for full calls is not a
-;;; concern.
-;;;
-;;; KLUDGE: This is a minor headache at cold init time, since genesis
-;;; doesn't know how to create the closures in the cold image, so the
-;;; function definitions aren't done until the appropriate top level
-;;; forms are executed, so any forward references to structure slots
-;;; (which are compiled into full calls) fail. The headache can be
-;;; treated by using SB!XC:DEFSTRUCT on the relevant structure at
-;;; build-the-cross-compiler time, so that the compiler is born
-;;; knowing how to inline accesses to the relevant structure, so no
-;;; full calls are made. This can be achieved by calling
-;;; SB!XC:DEFSTRUCT directly, or by using DEF!STRUCT, which (among
-;;; other things) calls SB!XC:DEFSTRUCT for you.
+;;; Check that X is an instance of the named structure type.
+(defmacro %check-structure-type-from-name (x name)
+  `(%check-structure-type-from-layout ,x ,(compiler-layout-or-lose name)))
 
-;;; Return closures to do slot access according to Layout and DSD. We check
-;;; types, then do the access. This is only used for normal slots, not raw
-;;; slots.
-(defun structure-slot-getter (layout dsd)
-  (let ((class (layout-class layout)))
-    (if (typep class 'basic-structure-class)
-	#'(lambda (structure)
-	    (declare (optimize (speed 3) (safety 0)))
-	    (flet ((structure-test (structure)
-		     (typep-to-layout structure layout)))
-	      (unless (structure-test structure)
-		(error 'simple-type-error
-		       :datum structure
-		       :expected-type (class-name (layout-class layout))
-		       :format-control
-		       "Structure for accessor ~S is not a ~S:~% ~S"
-		       :format-arguments
-		       (list (dsd-accessor-name dsd)
-			     (sb!xc:class-name (layout-class layout))
-			     structure))))
-	    (%instance-ref structure (dsd-index dsd)))
-	#'(lambda (structure)
-	    (declare (optimize (speed 3) (safety 0)))
-	    (unless (%typep structure class)
-	      (error 'simple-type-error
-		     :datum structure
-		     :expected-type 'class
+;;; Check that X is a structure of the type described by DD.
+(defmacro %check-structure-type-from-dd (x dd)
+  (declare (type defstruct-description dd))
+  (let ((class-name (dd-name dd)))
+    (ecase (dd-type dd)
+      ((structure funcallable-instance)
+       `(%check-structure-type-from-layout
+	 ,x
+	 ,(compiler-layout-or-lose class-name)))
+      ((vector)
+       (let ((xx (gensym "X")))
+	 `(let ((,xx ,x))
+	    (declare (type vector ,xx))
+	    ,@(when (dd-named dd)
+		`((unless (eql (aref ,xx 0) ',class-name)
+		    (error
+		     'simple-type-error
+		     :datum (aref ,xx 0)
+		     :expected-type `(member ,class-name)
 		     :format-control
-		     "The structure for accessor ~S is not a ~S:~% ~S"
-		     :format-arguments
-		     (list (dsd-accessor-name dsd) class
-			   structure)))
-	    (%instance-ref structure (dsd-index dsd))))))
-(defun structure-slot-setter (layout dsd)
-  (let ((class (layout-class layout)))
-    (if (typep class 'basic-structure-class)
-	#'(lambda (new-value structure)
-	    (declare (optimize (speed 3) (safety 0)))
-	    (flet ((structure-test (structure)
-		     (typep-to-layout structure layout))
-		   (typep-test (new-value)
-		     (%typep new-value (dsd-type dsd))))
-	      (unless (structure-test structure)
-		(error 'simple-type-error
-		       :datum structure
-		       :expected-type (class-name (layout-class layout))
-		       :format-control
-		       "The structure for setter ~S is not a ~S:~% ~S"
-		       :format-arguments
-		       (list `(setf ,(dsd-accessor-name dsd))
-			     (sb!xc:class-name (layout-class layout))
-			     structure)))
-	      (unless  (typep-test new-value)
-		(error 'simple-type-error
-		       :datum new-value
-		       :expected-type (class-name (layout-class layout))
-		       :format-control
-		       "The new value for setter ~S is not a ~S:~% ~S"
-		       :format-arguments
-		       (list `(setf ,(dsd-accessor-name dsd))
-			      (dsd-type dsd)
-			      new-value))))
-	    (setf (%instance-ref structure (dsd-index dsd)) new-value))
-	#'(lambda (new-value structure)
-	    (declare (optimize (speed 3) (safety 0)))
-	    (flet ((structure-test (structure)
-		     (sb!xc:typep structure class))
-		   (typep-test (new-value)
-		     (%typep new-value (dsd-type dsd))))
-	      (unless (structure-test structure)
-		(error 'simple-type-error
-		       :datum structure
-		       :expected-type (class-name (layout-class layout))
-		       :format-control
-		       "The structure for setter ~S is not a ~S:~% ~S"
-		       :format-arguments
-		       (list `(setf ,(dsd-accessor-name dsd))
-			     (sb!xc:class-name class)
-			     structure)))
-	      (unless  (typep-test new-value)
-		(error 'simple-type-error
-		       :datum new-value
-		       :expected-type (class-name (layout-class layout))
-		       :format-control
-		       "The new value for setter ~S is not a ~S:~% ~S"
-		       :format-arguments
-		       (list `(setf ,(dsd-accessor-name dsd))
-			     (dsd-type dsd)
-			     new-value))))
-	    (setf (%instance-ref structure (dsd-index dsd)) new-value)))))
+		     "~@<missing name in instance of ~
+                      VECTOR-typed structure ~S: ~2I~_S~:>"
+		     :format-arguments (list ',class-name ,xx)))))
+	    (values))))
+      ((list)
+       (let ((xx (gensym "X")))
+	 `(let ((,xx ,x))
+	    (declare (type list ,xx))
+	    ,@(when (dd-named dd)
+		`((unless (eql (first ,xx) ',class-name)
+		    (error
+		     'simple-type-error
+		     :datum (aref ,xx 0)
+		     :expected-type `(member ,class-name)
+		     :format-control
+		     "~@<missing name in instance of LIST-typed structure ~S: ~
+                      ~2I~_S~:>"
+		     :format-arguments (list ',class-name ,xx)))))
+	    (values)))))))
 
+;;; Check that X is an instance of the structure class with layout LAYOUT.
+(defun %check-structure-type-from-layout (x layout)
+  (unless (typep-to-layout x layout)
+    (error 'simple-type-error
+	   :datum x
+	   :expected-type (sb!xc:class-name (layout-class layout))))
+  (values))
+
 (/show0 "target-defstruct.lisp end of file")

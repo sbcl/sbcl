@@ -1195,8 +1195,18 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 128:
   READ-SEQUENCE doesn't work for Gray streams. (reported by Nathan
-  Froyd sbcl-devel 2001-10-15)
+  Froyd sbcl-devel 2001-10-15) As per subsequent discussion on the 
+  list, the Gray streams proposal doesn't mention READ-SEQUENCE and
+  WRITE-SEQUENCE because it predates them, generalizing it to 
+  cover them is an obvious extension, ACL does it, and there's a 
+  patch for for CMU CL which does it too.
 
+129:
+  insufficient syntax checking in MACROLET:
+   (defun foo (x)
+     (macrolet ((defmacro bar (z) `(+ z z)))
+       (bar x)))
+  shouldn't compile without error (because of the extra DEFMACRO symbol).
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
