@@ -134,6 +134,7 @@ them.")
   "Like EQUALP, but doesn't do case conversion of characters.
    Currently doesn't work on arrays of dimension > 2."
   (cond
+   ((eq x y) t)
    ((consp x)
     (and (consp y)
 	 (equalp-with-case (car x) (car y))

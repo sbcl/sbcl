@@ -170,29 +170,29 @@
 (def-elements-tests *circle-list5* 3 :dont-check #(0 1 :tail))
 
 (deftest circle-list1-components
-    (equalp (aref (elements-components *circle-list1*) 0) *circle-list1*) t)
+    (aref (elements-components *circle-list1*) 0) #.*circle-list1*)
 (deftest circle-list2-components.0
-    (equalp (aref (elements-components *circle-list2*) 0) 'b)  t)
+    (aref (elements-components *circle-list2*) 0) b)
 (deftest circle-list2-components.1
-    (equalp (aref (elements-components *circle-list2*) 1) *circle-list2*) t)
+    (aref (elements-components *circle-list2*) 1) #.*circle-list2*)
 (deftest circle-list3-components.0
-    (equalp (aref (elements-components *circle-list3*) 0) *circle-list3*)  t)
+    (aref (elements-components *circle-list3*) 0) #.*circle-list3*) 
 (deftest circle-list3-components.1
-    (equalp (aref (elements-components *circle-list3*) 1) 'b)  t)
+    (aref (elements-components *circle-list3*) 1) b) 
 (deftest circle-list3-components.2
-    (equalp (aref (elements-components *circle-list3*) 2) 'c)  t)
+    (aref (elements-components *circle-list3*) 2) c)
 (deftest circle-list4-components.0
-    (equalp (aref (elements-components *circle-list4*) 0) 'a)  t)
+    (aref (elements-components *circle-list4*) 0) a)
 (deftest circle-list4-components.1
-    (equalp (aref (elements-components *circle-list4*) 1) *circle-list4*)  t)
+    (aref (elements-components *circle-list4*) 1) #.*circle-list4*)
 (deftest circle-list4-components.2
-    (equalp (aref (elements-components *circle-list4*) 2) 'c)  t)
+    (aref (elements-components *circle-list4*) 2) c)
 (deftest circle-list5-components.0
-    (equalp (aref (elements-components *circle-list5*) 0) 'a)  t)
+    (aref (elements-components *circle-list5*) 0) a)
 (deftest circle-list5-components.1
-    (equalp (aref (elements-components *circle-list5*) 1) 'b)  t)
+    (aref (elements-components *circle-list5*) 1) b)
 (deftest circle-list5-components.2
-    (equalp (aref (elements-components *circle-list5*) 2) *circle-list5*)  t)
+    (aref (elements-components *circle-list5*) 2) #.*circle-list5*)
 
 (def-elements-tests *cons-pair* 2 #(#c(1 2) a-symbol)
 		#((0 . "car") (1 . "cdr"))) 
