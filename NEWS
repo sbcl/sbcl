@@ -13,6 +13,8 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * bug fix: division operators (MOD, TRUNCATE and the like) with
     constant zero divisors and integer dividends no longer generate
     left shifts.
+  * bug fix: provide default methods for INPUT-STREAM-P and
+    OUTPUT-STREAM-P specialized on SB-GRAY:FUNDAMENTAL-STREAM.
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of

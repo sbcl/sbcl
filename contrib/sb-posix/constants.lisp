@@ -5,13 +5,14 @@
 ;;; first, the headers necessary to find definitions of everything
 (#||#
  "sys/types.h"
- "unistd.h"
  "sys/stat.h"
  
  "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
- "netinet/ip.h" "net/if.h" "netdb.h" "errno.h" "netinet/tcp.h"
- "fcntl.h" "sys/mman.h"
+ "netinet/ip.h" "net/if.h" "netinet/tcp.h" "sys/mman.h" "sys/wait.h"
+ "fcntl.h" 
+ "netdb.h" "errno.h" 
  "dirent.h" "signal.h"
+ "unistd.h"
 
  "termios.h")
 
@@ -195,6 +196,10 @@
  (:integer enomedium "ENOMEDIUM" nil t)
  (:integer emediumtype "EMEDIUMTYPE" nil t)
  
+ ;; wait
+ (:integer wnohang "WNOHANG")
+ (:integer wuntraced "WUNTRACED")
+
  ;; mode_t
  (:type mode-t "mode_t")
  (:integer s-isuid "S_ISUID" nil t)

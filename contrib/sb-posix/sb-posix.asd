@@ -80,7 +80,8 @@
     :components ((:file "defpackage")
 		 (:file "designator" :depends-on ("defpackage"))
                  (:unix-dso "alien"
-			    :components ((:c-source-file "stat-macros")))
+			    :components ((:c-source-file "stat-macros")
+					 (:c-source-file "waitpid-macros")))
 		 (:file "macros" :depends-on ("designator"))
 		 (sb-grovel:grovel-constants-file
 		  "constants"

@@ -9,7 +9,7 @@ adding.
 
 FD_CLR FD_ISSET FD_SET FD_ZERO accept acct adjtime adjtimex bdflush
 bind break brk cacheflush capget capset chroot clone connect
-create_module delete_module execve exit flock fork
+create_module delete_module execve exit flock
 fstatfs ftime getcontext getdents getdomainname
 getdtablesize getgroups gethostid gethostname getitimer 
 getpeername getpriority getrlimit getrusage getsockname getsockopt
@@ -29,8 +29,8 @@ sigaction sigaltstack sigblock siggetmask sigmask signal sigpause
 sigpending sigprocmask sigreturn sigsetmask sigsuspend sigvec socket
 socketcall socketpair ssetmask statfs stime stty swapoff swapon
 syscalls sysctl sysfs sysinfo syslog time times
-ulimit umount uname ustat utime utimes vfork vhangup wait wait3
-wait4 waitpid write writev
+ulimit umount uname ustat utime utimes vfork vhangup wait3
+wait4 write writev
 
 4) In the spec but not implemented: 
 

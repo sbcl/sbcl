@@ -76,6 +76,7 @@
 (define-call "chmod" int minusp (pathname filename) (mode sb-posix::mode-t))
 (define-call "chown" int minusp (pathname filename)
 	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
+(define-call "chroot" int minusp (pathname filename))
 (define-call "close" int minusp (fd file-descriptor))
 (define-call "creat" int minusp (pathname filename) (mode sb-posix::mode-t))
 (define-call "dup" int minusp (oldfd file-descriptor))
@@ -166,6 +167,7 @@
 
 ;;; processes, signals
 (define-call "alarm" int never-fails (seconds unsigned))
+(define-call "fork" sb-posix::pid-t minusp)
 (define-call "getpgid" sb-posix::pid-t minusp (pid sb-posix::pid-t))
 (define-call "getpid" sb-posix::pid-t never-fails)
 (define-call "getppid" sb-posix::pid-t never-fails)
@@ -177,6 +179,43 @@
 (define-call "setpgid" int minusp
 	     (pid sb-posix::pid-t) (pgid sb-posix::pid-t))
 (define-call "setpgrp" int minusp)
+
+(export 'sb-posix::wait :sb-posix)
+(declaim (inline sb-posix::wait))
+(defun sb-posix::wait (&optional statusptr)
+  (declare (type (or null (simple-array (signed-byte 32) (1))) statusptr))
+  (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
+	 (pid (alien-funcall
+	       (extern-alien "wait" (function sb-posix::pid-t (* int)))
+	       (sb-sys:vector-sap ptr))))
+    (if (minusp pid)
+	(syscall-error)
+	(values pid (aref ptr 0)))))
+
+(export 'sb-posix::waitpid :sb-posix)
+(declaim (inline sb-posix::waitpid))
+(defun sb-posix::waitpid (pid options &optional statusptr)
+  (declare (type (sb-alien:alien sb-posix::pid-t) pid)
+	   (type (sb-alien:alien int) options)
+	   (type (or null (simple-array (signed-byte 32) (1))) statusptr))
+  (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
+	 (pid (alien-funcall
+	       (extern-alien "waitpid" (function sb-posix::pid-t
+						 sb-posix::pid-t (* int) int))
+			     pid (sb-sys:vector-sap ptr) options)))
+	 (if (minusp pid)
+	     (syscall-error)
+	     (values pid (aref ptr 0)))))
+
+;; waitpid macros
+(define-call "wifexited" boolean never-fails (status int))
+(define-call "wexitstatus" int never-fails (status int))
+(define-call "wifsignaled" boolean never-fails (status int))
+(define-call "wtermsig" int never-fails (status int))
+(define-call "wifstopped" boolean never-fails (status int))
+(define-call "wstopsig" int never-fails (status int))
+#+nil ; see alien/waitpid-macros.c
+(define-call "wifcontinued" boolean never-fails (status int))
 
 ;;; mmap, msync
 (define-call "mmap" sb-sys:system-area-pointer
