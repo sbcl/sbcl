@@ -26,7 +26,9 @@
 ;;; that they referred to special target-only *SHEBANG-FEATURES* values
 ;;; during cold init).
 (setf sb-cold:*shebang-features* *features*)
-
+;;; Just in case we want to play with the initial value of
+;;; backend-subfeatures
+(setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
 ;;; The nickname SB!XC now refers to the CL package.
 (rename-package "COMMON-LISP"
 		"COMMON-LISP"

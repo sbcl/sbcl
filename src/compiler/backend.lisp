@@ -263,8 +263,10 @@ yet an ideal interface, but it does allow for compile-time
 conditionalization.
 |#
 
-;;; The default value of NIL means use only unguarded VOPs.
-(defvar *backend-subfeatures* nil)
+;;; The default value of NIL means use only unguarded VOPs. The
+;;; initial value is customizeable via
+;;; customize-backend-subfeatures.lisp
+(defvar *backend-subfeatures* '#.sb-cold:*shebang-backend-subfeatures*)
 
 ;;; possible *BACKEND-SUBFEATURES* values:
 ;;;

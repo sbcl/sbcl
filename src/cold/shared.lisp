@@ -227,6 +227,21 @@
   (format t
 	  "target features *SHEBANG-FEATURES*=~@<~S~:>~%"
 	  *shebang-features*))
+
+(defvar *shebang-backend-subfeatures*
+  (let* ((default-subfeatures nil)
+	 (customizer-file-name "customize-backend-subfeatures.lisp")
+	 (customizer (if (probe-file customizer-file-name)
+			 (compile nil 
+				  (read-from-file customizer-file-name))
+			 #'identity)))
+    (funcall customizer default-subfeatures)))
+(export '*shebang-backend-subfeatures*)
+(let ((*print-length* nil)
+      (*print-level* nil))
+  (format t
+	  "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
+	  *shebang-backend-subfeatures*))
 
 ;;;; cold-init-related PACKAGE and SYMBOL tools
 
