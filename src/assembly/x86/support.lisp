@@ -9,7 +9,7 @@
 
 (in-package "SB!VM")
 
-(def-vm-support-routine generate-call-sequence (name style vop)
+(!def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
     (:raw
      (values
@@ -27,7 +27,7 @@
       `((inst jmp (make-fixup ',name :assembly-routine)))
       nil))))
 
-(def-vm-support-routine generate-return-sequence (style)
+(!def-vm-support-routine generate-return-sequence (style)
   (ecase style
     (:raw
      `(inst ret))

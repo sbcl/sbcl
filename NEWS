@@ -566,7 +566,8 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
      non-toplevel DEFCONSTANTs are uncommon.)
 * The core file version number and fasl file version number have been 
   incremented, because the old noncompliant DEFCONSTANT behavior involved
-  calling functions which no longer exist.
+  calling functions which no longer exist, and because I also took the
+  opportunity to chop an unsupported slot out of the DEBUG-SOURCE structure.
 * removed bug 21 from BUGS, since Martin Atzmueller points out that 
   it doesn't seem to affect SBCL after all
 * The system now recovers better from non-PACKAGE values of the *PACKAGE*

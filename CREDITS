@@ -477,6 +477,10 @@ whenever I got stuck.
 
 CREDITS SINCE THE RELEASE OF SBCL
 
+Martin Atzmueller:
+  He reported many bugs in SBCL, helped clean up various stale
+  bug data in SBCL, and ported many patches from CMU CL.
+
 Daniel Barlow:
   He contributed sblisp.lisp, a set of patches to make SBCL
   play nicely with ILISP. (Those patches have since disappeared from the
@@ -489,6 +493,19 @@ Cadabra, Inc.:
   including the implementation of EQUALP hash tables for CMU CL;
   then agreed to release the EQUALP code into the public domain,
   giving SBCL, and CMU CL, EQUALP hash tables.
+
+Douglas Crosher:
+  He continued to improve CMU CL after SBCL forked from it, creating 
+  many patches which were directly applicable to SBCL. Notable examples
+  include fixes for various compiler bugs, and a generalization
+  of the type system's handling of the CONS type to allow ANSI-style
+  (CONS FOO BAR) types.
+
+Robert MacLachlan:
+  He has continued to answer questions about, and contribute fixes to, 
+  the CMU CL project. Some of these fixes, especially for compiler
+  problems, has been invaluable to the CMU CL project and, by
+  porting, invaluable to the SBCL project as well.
 
 Peter Van Eynde:
   He wrestled the CLISP test suite into a portable test suite which 
@@ -504,3 +521,4 @@ Raymond Wiker:
   CMU CL support for FreeBSD and updating it for the changes made
   from FreeBSD version 3 to FreeBSD version 4. He also ported the
   CMU CL extension RUN-PROGRAM, and related code, to SBCL.
+

@@ -184,7 +184,7 @@
               "DEALLOC-NUMBER-STACK-SPACE" "DEF-BOOLEAN-ATTRIBUTE"
               "DEF-IR1-TRANSLATOR" "DEF-PRIMITIVE-TRANSLATOR"
               "DEF-PRIMITIVE-TYPE" "DEF-PRIMITIVE-TYPE-ALIAS"
-              "DEF-SOURCE-TRANSFORM" "DEF-VM-SUPPORT-ROUTINE"
+              "DEF-SOURCE-TRANSFORM" "!DEF-VM-SUPPORT-ROUTINE"
               "DEFINE-ASSEMBLY-ROUTINE" "DEFINE-MOVE-FUNCTION"
               "DEFINE-MOVE-VOP" "DEFINE-STORAGE-BASE"
               "DEFINE-STORAGE-CLASS" "DEFINE-VOP"
@@ -788,7 +788,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; without supporting them, at least not as publicly
              ;; accessible things with fixed interfaces.
              "DEFAULT-DIRECTORY"
-             "FILE-COMMENT"
              "GET-FLOATING-POINT-MODES" "SET-FLOATING-POINT-MODES"
              "WITH-FLOAT-TRAPS-MASKED"
              "DEFINE-HASH-TABLE-TEST"
