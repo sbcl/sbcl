@@ -58,6 +58,12 @@
      (values nil nil))
     (alien-type-type
      (values (alien-typep obj (alien-type-type-alien-type type)) t))
+    (negation-type
+     (multiple-value-bind (res win)
+	 (ctypep obj (negation-type-type type))
+       (if win
+	   (values (not res) t)
+	   (values nil nil))))
     (hairy-type
      ;; Now the tricky stuff.
      (let* ((hairy-spec (hairy-type-specifier type))

@@ -38,6 +38,18 @@
 (defstruct (unknown-type (:include hairy-type)
 			 (:copier nil)))
 
+(defstruct (negation-type (:include ctype
+				    (class-info (type-class-or-lose 'negation))
+				    ;; FIXME: is this right?  It's
+				    ;; what they had before, anyway
+				    (enumerable t)
+				    (might-contain-other-types-p t))
+			  (:copier nil)
+			  #!+cmu (:pure nil))
+  (type (missing-arg) :type ctype))
+
+(!define-type-class negation)
+
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
 (defstruct (args-type (:include ctype)

@@ -1084,220 +1084,39 @@
 (!define-type-method (hairy :simple-subtypep) (type1 type2)
   (let ((hairy-spec1 (hairy-type-specifier type1))
 	(hairy-spec2 (hairy-type-specifier type2)))
-    (cond ((and (consp hairy-spec1) (eq (car hairy-spec1) 'not)
-		(consp hairy-spec2) (eq (car hairy-spec2) 'not))
-	   (csubtypep (specifier-type (cadr hairy-spec2))
-		      (specifier-type (cadr hairy-spec1))))
-	  ((equal hairy-spec1 hairy-spec2)
+    (cond ((equal-but-no-car-recursion hairy-spec1 hairy-spec2)
 	   (values t t))
 	  (t
 	   (values nil nil)))))
 
 (!define-type-method (hairy :complex-subtypep-arg2) (type1 type2)
-  (let ((hairy-spec (hairy-type-specifier type2)))
-    (cond ((and (consp hairy-spec) (eq (car hairy-spec) 'not))
-	   (let* ((complement-type2 (specifier-type (cadr hairy-spec)))
-		  (intersection2 (type-intersection2 type1
-						     complement-type2)))
-	     (if intersection2
-		 (values (eq intersection2 *empty-type*) t)
-		 (invoke-complex-subtypep-arg1-method type1 type2))))
-	  (t
-	   (invoke-complex-subtypep-arg1-method type1 type2)))))
+  (invoke-complex-subtypep-arg1-method type1 type2))
 
 (!define-type-method (hairy :complex-subtypep-arg1) (type1 type2)
-  ;; "Incrementally extended heuristic algorithms tend inexorably toward the
-  ;; incomprehensible." -- http://www.unlambda.com/~james/lambda/lambda.txt
-  (let ((hairy-spec (hairy-type-specifier type1)))
-     (cond ((and (consp hairy-spec) (eq (car hairy-spec) 'not))
-	    ;; You may not believe this. I couldn't either. But then I
-	    ;; sat down and drew lots of Venn diagrams. Comments
-	    ;; involving a and b refer to the call (subtypep '(not a)
-	    ;; 'b) -- CSR, 2002-02-27.
-	    (block nil
-	      ;; (Several logical truths in this block are true as
-	      ;; long as b/=T. As of sbcl-0.7.1.28, it seems
-	      ;; impossible to construct a case with b=T where we
-	      ;; actually reach this type method, but we'll test for
-	      ;; and exclude this case anyway, since future
-	      ;; maintenance might make it possible for it to end up
-	      ;; in this code.)
-	      (multiple-value-bind (equal certain)
-		  (type= type2 (specifier-type t))
-		(unless certain
-		  (return (values nil nil)))
-		(when equal
-		  (return (values t t))))
-	      (let ((complement-type1 (specifier-type (cadr hairy-spec))))
-		;; Do the special cases first, in order to give us a
-		;; chance if subtype/supertype relationships are hairy.
-		(multiple-value-bind (equal certain) 
-		    (type= complement-type1 type2)
-		  ;; If a = b, ~a is not a subtype of b (unless b=T,
-		  ;; which was excluded above).
-		  (unless certain
-		    (return (values nil nil)))
-		  (when equal
-		    (return (values nil t))))
-		;; KLUDGE: ANSI requires that the SUBTYPEP result
-		;; between any two built-in atomic type specifiers
-		;; never be uncertain. This is hard to do cleanly for
-		;; the built-in types whose definitions include
-		;; (NOT FOO), i.e. CONS and RATIO. However, we can do
-		;; it with this hack, which uses our global knowledge
-		;; that our implementation of the type system uses
-		;; disjoint implementation types to represent disjoint
-		;; sets (except when types are contained in other types).
-		;; (This is a KLUDGE because it's fragile. Various
-		;; changes in internal representation in the type
-		;; system could make it start confidently returning
-		;; incorrect results.) -- WHN 2002-03-08
-		(unless (or (type-might-contain-other-types-p complement-type1)
-			    (type-might-contain-other-types-p type2))
-		  ;; Because of the way our types which don't contain
-		  ;; other types are disjoint subsets of the space of
-		  ;; possible values, (SUBTYPEP '(NOT AA) 'B)=NIL when
-		  ;; AA and B are simple (and B is not T, as checked above).
-		  (return (values nil t)))
-		;; The old (TYPE= TYPE1 TYPE2) branch would never be
-		;; taken, as TYPE1 and TYPE2 will only be equal if
-		;; they're both NOT types, and then the
-		;; :SIMPLE-SUBTYPEP method would be used instead.
-		;; But a CSUBTYPEP relationship might still hold:
-		(multiple-value-bind (equal certain)
-		    (csubtypep complement-type1 type2)
-		  ;; If a is a subtype of b, ~a is not a subtype of b
-		  ;; (unless b=T, which was excluded above).
-		  (unless certain
-		    (return (values nil nil)))
-		  (when equal
-		    (return (values nil t))))
-		(multiple-value-bind (equal certain)
-		    (csubtypep type2 complement-type1)
-		  ;; If b is a subtype of a, ~a is not a subtype of b.
-		  ;; (FIXME: That's not true if a=T. Do we know at
-		  ;; this point that a is not T?)
-		  (unless certain
-		    (return (values nil nil)))
-		  (when equal
-		    (return (values nil t))))
-		;; old CSR comment ca. 0.7.2, now obsoleted by the
-		;; SIMPLE-CTYPE? KLUDGE case above:
-		;;   Other cases here would rely on being able to catch
-		;;   all possible cases, which the fragility of this
-		;;   type system doesn't inspire me; for instance, if a
-		;;   is type= to ~b, then we want T, T; if this is not
-		;;   the case and the types are disjoint (have an
-		;;   intersection of *empty-type*) then we want NIL, T;
-		;;   else if the union of a and b is the
-		;;   *universal-type* then we want T, T. So currently we
-		;;   still claim to be unsure about e.g. (subtypep '(not
-		;;   fixnum) 'single-float).
-		)))
-	   (t
-	    (values nil nil)))))
+  (declare (ignore type1 type2))
+  (values nil nil))
 
 (!define-type-method (hairy :complex-=) (type1 type2)
   (declare (ignore type1 type2))
   (values nil nil))
 
-(!define-type-method (hairy :simple-intersection2) 
+(!define-type-method (hairy :simple-intersection2 :complex-intersection2) 
 		     (type1 type2)
   (if (type= type1 type2)
       type1
       nil))
 
-(!define-type-method (hairy :complex-intersection2)
-		     (type1 type2)
-  (aver (hairy-type-p type2))
-  (let ((hairy-type-spec (type-specifier type2)))
-    (if (and (consp hairy-type-spec)
-	     (eq (car hairy-type-spec) 'not))
-	(if (csubtypep type1 (specifier-type (cadr hairy-type-spec)))
-	    *empty-type*
-	    nil)
-	nil)))
-	
 (!define-type-method (hairy :simple-union2) 
 		     (type1 type2)
   (if (type= type1 type2)
       type1
       nil))
 
-(!define-type-method (hairy :complex-union2)
-		     (type1 type2)
-  (aver (hairy-type-p type2))
-  (let ((hairy-type-spec (type-specifier type2)))
-    (if (and (consp hairy-type-spec)
-	     (eq (car hairy-type-spec) 'not))
-	(if (csubtypep (specifier-type (cadr hairy-type-spec)) type1)
-	    *universal-type*
-	    nil)
-	nil)))
-
 (!define-type-method (hairy :simple-=) (type1 type2)
-  (if (equal (hairy-type-specifier type1)
-	     (hairy-type-specifier type2))
+  (if (equal-but-no-car-recursion (hairy-type-specifier type1)
+				  (hairy-type-specifier type2))
       (values t t)
       (values nil nil)))
-
-(!def-type-translator not (&whole whole type)
-  (declare (ignore type))
-  ;; Check legality of arguments.
-  (destructuring-bind (not typespec) whole
-    (declare (ignore not))
-    ;; must be legal typespec
-    (let* ((not-type (specifier-type typespec))
-	   (spec (type-specifier not-type)))
-      (cond
-	;; canonicalize (not (not foo))
-	((and (listp spec) (eq (car spec) 'not))
-	 (specifier-type (cadr spec)))
-	((eq not-type *empty-type*) *universal-type*)
-	((eq not-type *universal-type*) *empty-type*)
-	((and (numeric-type-p not-type)
-	      (null (numeric-type-low not-type))
-	      (null (numeric-type-high not-type)))
-	 (make-hairy-type :specifier whole))
-	;; FIXME: this is insufficiently general.  We need to
-	;; canonicalize over intersections and unions, too.  However,
-	;; this will probably suffice to get BIGNUM right, and more
-	;; code will be written when someone (probably Paul Dietz)
-	;; comes up with a test case that demonstrates a failure,
-	;; because right now I can't construct one.
-	((numeric-type-p not-type)
-	 (type-union
-	  ;; FIXME: so much effort for parsing?  This seems overly
-	  ;; compute-heavy.
-	  (specifier-type `(not ,(type-specifier
-				  (modified-numeric-type not-type
-							 :low nil
-							 :high nil))))
-	  (cond
-	    ((null (numeric-type-low not-type))
-	     (modified-numeric-type
-	      not-type
-	      :low (let ((h (numeric-type-high not-type)))
-		     (if (consp h) h (list h)))
-	      :high nil))
-	    ((null (numeric-type-high not-type))
-	     (modified-numeric-type
-	      not-type
-	      :low nil
-	      :high (let ((l (numeric-type-low not-type)))
-		      (if (consp l) l (list l)))))
-	    (t (type-union
-		(modified-numeric-type
-		 not-type
-		 :low nil
-		 :high (let ((l (numeric-type-low not-type)))
-			 (if (consp l) l (list l))))
-		(modified-numeric-type
-		 not-type
-		 :low (let ((h (numeric-type-high not-type)))
-			(if (consp h) h (list h)))
-		 :high nil))))))
-	(t (make-hairy-type :specifier whole))))))
 
 (!def-type-translator satisfies (&whole whole fun)
   (declare (ignore fun))
@@ -1312,6 +1131,212 @@
 	     :format-arguments (list predicate-name))))
   ;; Create object.
   (make-hairy-type :specifier whole))
+
+;;;; negation types
+
+(!define-type-method (negation :unparse) (x)
+  `(not ,(type-specifier (negation-type-type x))))
+
+(!define-type-method (negation :simple-subtypep) (type1 type2)
+  (csubtypep (negation-type-type type2) (negation-type-type type1)))
+
+(!define-type-method (negation :complex-subtypep-arg2) (type1 type2)
+  (let* ((complement-type2 (negation-type-type type2))
+	 (intersection2 (type-intersection2 type1
+					    complement-type2)))
+    (if intersection2
+	(values (eq intersection2 *empty-type*) t)
+	(invoke-complex-subtypep-arg1-method type1 type2))))
+
+(!define-type-method (negation :complex-subtypep-arg1) (type1 type2)
+  ;; "Incrementally extended heuristic algorithms tend inexorably toward the
+  ;; incomprehensible." -- http://www.unlambda.com/~james/lambda/lambda.txt
+  ;;
+  ;; You may not believe this. I couldn't either. But then I sat down
+  ;; and drew lots of Venn diagrams. Comments involving a and b refer
+  ;; to the call (subtypep '(not a) 'b) -- CSR, 2002-02-27.
+  (block nil
+    ;; (Several logical truths in this block are true as long as
+    ;; b/=T. As of sbcl-0.7.1.28, it seems impossible to construct a
+    ;; case with b=T where we actually reach this type method, but
+    ;; we'll test for and exclude this case anyway, since future
+    ;; maintenance might make it possible for it to end up in this
+    ;; code.)
+    (multiple-value-bind (equal certain)
+	(type= type2 *universal-type*)
+      (unless certain
+	(return (values nil nil)))
+      (when equal
+	(return (values t t))))
+    (let ((complement-type1 (negation-type-type type1)))
+      ;; Do the special cases first, in order to give us a chance if
+      ;; subtype/supertype relationships are hairy.
+      (multiple-value-bind (equal certain) 
+	  (type= complement-type1 type2)
+	;; If a = b, ~a is not a subtype of b (unless b=T, which was
+	;; excluded above).
+	(unless certain
+	  (return (values nil nil)))
+	(when equal
+	  (return (values nil t))))
+      ;; KLUDGE: ANSI requires that the SUBTYPEP result between any
+      ;; two built-in atomic type specifiers never be uncertain. This
+      ;; is hard to do cleanly for the built-in types whose
+      ;; definitions include (NOT FOO), i.e. CONS and RATIO. However,
+      ;; we can do it with this hack, which uses our global knowledge
+      ;; that our implementation of the type system uses disjoint
+      ;; implementation types to represent disjoint sets (except when
+      ;; types are contained in other types).  (This is a KLUDGE
+      ;; because it's fragile. Various changes in internal
+      ;; representation in the type system could make it start
+      ;; confidently returning incorrect results.) -- WHN 2002-03-08
+      (unless (or (type-might-contain-other-types-p complement-type1)
+		  (type-might-contain-other-types-p type2))
+	;; Because of the way our types which don't contain other
+	;; types are disjoint subsets of the space of possible values,
+	;; (SUBTYPEP '(NOT AA) 'B)=NIL when AA and B are simple (and B
+	;; is not T, as checked above).
+	(return (values nil t)))
+      ;; The old (TYPE= TYPE1 TYPE2) branch would never be taken, as
+      ;; TYPE1 and TYPE2 will only be equal if they're both NOT types,
+      ;; and then the :SIMPLE-SUBTYPEP method would be used instead.
+      ;; But a CSUBTYPEP relationship might still hold:
+      (multiple-value-bind (equal certain)
+	  (csubtypep complement-type1 type2)
+	;; If a is a subtype of b, ~a is not a subtype of b (unless
+	;; b=T, which was excluded above).
+	(unless certain
+	  (return (values nil nil)))
+	(when equal
+	  (return (values nil t))))
+      (multiple-value-bind (equal certain)
+	  (csubtypep type2 complement-type1)
+	;; If b is a subtype of a, ~a is not a subtype of b.  (FIXME:
+	;; That's not true if a=T. Do we know at this point that a is
+	;; not T?)
+	(unless certain
+	  (return (values nil nil)))
+	(when equal
+	  (return (values nil t))))
+      ;; old CSR comment ca. 0.7.2, now obsoleted by the SIMPLE-CTYPE?
+      ;; KLUDGE case above: Other cases here would rely on being able
+      ;; to catch all possible cases, which the fragility of this type
+      ;; system doesn't inspire me; for instance, if a is type= to ~b,
+      ;; then we want T, T; if this is not the case and the types are
+      ;; disjoint (have an intersection of *empty-type*) then we want
+      ;; NIL, T; else if the union of a and b is the *universal-type*
+      ;; then we want T, T. So currently we still claim to be unsure
+      ;; about e.g. (subtypep '(not fixnum) 'single-float).
+      ;;
+      ;; OTOH we might still get here:
+      (values nil nil))))
+
+(!define-type-method (negation :complex-=) (type1 type2)
+  ;; (NOT FOO) isn't equivalent to anything that's not a negation
+  ;; type, except possibly a hairy type.
+  (declare (ignore type2))
+  (if (hairy-type-p type1)
+      (values nil nil)
+      (values nil t)))
+
+(!define-type-method (negation :simple-intersection2) (type1 type2)
+  (let ((not1 (negation-type-type type1))
+	(not2 (negation-type-type type2)))
+    (cond
+      ((csubtypep not1 not2) type2)
+      ((csubtypep not2 not1) type1)
+      ;; Why no analagous clause to the disjoint in the SIMPLE-UNION2
+      ;; method, below?  The clause would read
+      ;;
+      ;; ((EQ (TYPE-UNION NOT1 NOT2) *UNIVERSAL-TYPE*) *EMPTY-TYPE*)
+      ;;
+      ;; but with proper canonicalization of negation types, there's
+      ;; no way of constructing two negation types with union of their
+      ;; negations being the universal type.
+      (t
+       (aver (not (eq (type-union not1 not2) *universal-type*)))
+       nil))))
+
+(!define-type-method (negation :complex-intersection2) (type1 type2)
+  (cond
+    ((csubtypep type1 (negation-type-type type2)) *empty-type*)
+    ((eq (type-intersection type1 (negation-type-type type2)) *empty-type*)
+     type1)
+    (t nil)))
+
+(!define-type-method (negation :simple-union2) (type1 type2)
+  (let ((not1 (negation-type-type type1))
+	(not2 (negation-type-type type2)))
+    (cond
+      ((csubtypep not1 not2) type1)
+      ((csubtypep not2 not1) type2)
+      ((eq (type-intersection not1 not2) *empty-type*)
+       *universal-type*)
+      (t nil))))
+
+(!define-type-method (negation :complex-union2) (type1 type2)
+  (cond
+    ((csubtypep (negation-type-type type2) type1) *universal-type*)
+    ((eq (type-intersection type1 (negation-type-type type2)) *empty-type*)
+     type2)
+    (t nil)))
+
+(!define-type-method (negation :simple-=) (type1 type2)
+  (type= (negation-type-type type1) (negation-type-type type2)))
+
+(!def-type-translator not (typespec)
+  (let* ((not-type (specifier-type typespec))
+	 (spec (type-specifier not-type)))
+    (cond
+      ;; canonicalize (NOT (NOT FOO))
+      ((and (listp spec) (eq (car spec) 'not))
+       (specifier-type (cadr spec)))
+      ;; canonicalize (NOT NIL) and (NOT T)
+      ((eq not-type *empty-type*) *universal-type*)
+      ((eq not-type *universal-type*) *empty-type*)
+      ((and (numeric-type-p not-type)
+	    (null (numeric-type-low not-type))
+	    (null (numeric-type-high not-type)))
+       (make-negation-type :type not-type))
+      ((numeric-type-p not-type)
+       (type-union
+	(make-negation-type
+	 :type (modified-numeric-type not-type :low nil :high nil))
+	(cond
+	  ((null (numeric-type-low not-type))
+	   (modified-numeric-type
+	    not-type
+	    :low (let ((h (numeric-type-high not-type)))
+		   (if (consp h) h (list h)))
+	    :high nil))
+	  ((null (numeric-type-high not-type))
+	   (modified-numeric-type
+	    not-type
+	    :low nil
+	    :high (let ((l (numeric-type-low not-type)))
+		    (if (consp l) l (list l)))))
+	  (t (type-union
+	      (modified-numeric-type
+	       not-type
+	       :low nil
+	       :high (let ((l (numeric-type-low not-type)))
+		       (if (consp l) l (list l))))
+	      (modified-numeric-type
+	       not-type
+	       :low (let ((h (numeric-type-high not-type)))
+		      (if (consp h) h (list h)))
+	       :high nil))))))
+      ((intersection-type-p not-type)
+       (apply #'type-union
+	      (mapcar #'(lambda (x)
+			  (specifier-type `(not ,(type-specifier x))))
+		      (intersection-type-types not-type))))
+      ((union-type-p not-type)
+       (apply #'type-intersection
+	      (mapcar #'(lambda (x)
+			  (specifier-type `(not ,(type-specifier x))))
+		      (union-type-types not-type))))
+      (t (make-negation-type :type not-type)))))
 
 ;;;; numeric types
 
@@ -2355,23 +2380,27 @@
 	 type1)
 	(t
 	 (let ((accumulator *universal-type*))
-	   (dolist (t2 (intersection-type-types type2) accumulator)
-	     (let ((union (type-union type1 t2)))
+	   (do ((t2s (intersection-type-types type2) (cdr t2s)))
+	       ((null t2s) accumulator)
+	     (let ((union (type-union type1 (car t2s))))
 	       (when (union-type-p union)
-		 ;; we give up here -- there are all sorts of ordering
-		 ;; worries, but it's better than before.  Doing
-		 ;; exactly the same as in the UNION
+		 ;; we have to give up here -- there are all sorts of
+		 ;; ordering worries, but it's better than before.
+		 ;; Doing exactly the same as in the UNION
 		 ;; :SIMPLE/:COMPLEX-INTERSECTION2 method causes stack
 		 ;; overflow with the mutual recursion never bottoming
 		 ;; out.
-		 (return nil))
+		 (if (and (eq accumulator *universal-type*)
+			  (null (cdr t2s)))
+		     ;; KLUDGE: if we get here, we have a partially
+		     ;; simplified result.  While this isn't by any
+		     ;; means a universal simplification, including
+		     ;; this logic here means that we can get (OR
+		     ;; KEYWORD (NOT KEYWORD)) canonicalized to T.
+		     (return union)
+		     (return nil)))
 	       (setf accumulator
-		     (type-intersection2 accumulator union))
-	       ;; When our result isn't simple any more (because
-	       ;; TYPE-INTERSECTION2 was unable to give us a simple
-	       ;; result)
-	       (unless accumulator
-		 (return nil))))))))
+		     (type-intersection accumulator union))))))))
 	 
 (!def-type-translator and (&whole whole &rest type-specifiers)
   (apply #'type-intersection
@@ -2531,12 +2560,8 @@
 	 (let ((accumulator *empty-type*))
 	   (dolist (t2 (union-type-types type2) accumulator)
 	     (setf accumulator
-		   (type-union2 accumulator
-				(type-intersection type1 t2)))
-	     ;; When our result isn't simple any more (because
-	     ;; TYPE-UNION2 was unable to give us a simple result)
-	     (unless accumulator
-	       (return nil)))))))
+		   (type-union accumulator
+			       (type-intersection type1 t2))))))))
 
 (!def-type-translator or (&rest type-specifiers)
   (apply #'type-union
