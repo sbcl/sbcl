@@ -243,7 +243,8 @@ WORKAROUND:
   E.g. compiling and loading
     (DECLAIM (OPTIMIZE (SAFETY 3)))
     (DEFUN FACTORIAL (X) (GAMMA (1+ X)))
-    (DECLAIM (FTYPE (FUNCTION (UNSIGNED-BYTE) FACTORIAL)))
+    (DEFUN GAMMA (X) X)
+    (DECLAIM (FTYPE (FUNCTION (UNSIGNED-BYTE)) FACTORIAL))
     (DEFUN FOO (X)
       (COND ((> (FACTORIAL X) 1.0E6)
              (FORMAT T "too big~%"))

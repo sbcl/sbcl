@@ -266,7 +266,8 @@
 ;;; Exactly the same as CONSTRAIN-INTEGER-TYPE, but for float numbers.
 (defun constrain-float-type (x y greater or-equal)
   (declare (type numeric-type x y))
-  (declare (ignorable x y)) ; for CROSS-FLOAT-INFINITY-KLUDGE
+  (declare (ignorable x y greater or-equal)) ; for CROSS-FLOAT-INFINITY-KLUDGE
+  
   (aver (eql (numeric-type-class x) 'float))
   (aver (eql (numeric-type-class y) 'float))
   #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)

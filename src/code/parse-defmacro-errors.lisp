@@ -20,6 +20,7 @@
 (defun do-arg-count-error (error-kind name arg lambda-list minimum maximum)
   (multiple-value-bind (fname sb!debug:*stack-top-hint*)
       (find-caller-name-and-frame)
+    (declare (ignorable fname))
     (error 'defmacro-ll-arg-count-error
 	   :kind error-kind
 	   :name name

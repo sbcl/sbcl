@@ -203,6 +203,7 @@ the usual naming convention (names like *FOO*) for special variables"
 		      ,body))))
 	`(sb!c::%define-compiler-macro ',name #',def ',lambda-list ,doc)))))
 (defun sb!c::%define-compiler-macro (name definition lambda-list doc)
+  (declare (ignore lambda-list))
   (sb!c::%%define-compiler-macro name definition doc))
 (defun sb!c::%%define-compiler-macro (name definition doc)
   (setf (sb!xc:compiler-macro-function name) definition)

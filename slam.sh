@@ -31,11 +31,10 @@ if [ "" != "$*" ]; then
 fi
 
 # We don't try to be general about this in this script the way we are
-# in make.sh, since (1) we use our command line args as names of files
-# to recompile, and (2) the idiosyncrasies of SBCL command line
-# argument order dependence, the meaninglessness of duplicate --core
-# arguments, and the SBCL-vs-CMUCL dependence of --core/-core argument
-# syntax make it too messy to try deal with arbitrary SBCL commands.
+# in make.sh, since the idiosyncrasies of SBCL command line argument
+# order dependence, the meaninglessness of duplicate --core arguments,
+# and the SBCL-vs-CMUCL dependence of --core/-core argument syntax
+# make it too messy to try deal with arbitrary SBCL_XC_HOST variants.
 # So you have no choice:
 export SBCL_XC_HOST='sbcl --noprogrammer'
 
@@ -47,7 +46,7 @@ sh make-target-1.sh || exit 1
 # Instead of doing the full make-host-2.sh, we (1) use after-xc.core
 # to rebuild only obviously-out-of-date Lisp files, then (2) run
 # GENESIS.
-sbcl --core output/after-xc.core <<'EOF' || exit 1
+sbcl --core output/after-xc.core --sysinit /dev/null --userinit /dev/null <<'EOF' || exit 1
   (load "src/cold/slam.lisp")
 EOF
 # (This ^ used to be

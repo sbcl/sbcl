@@ -2135,8 +2135,7 @@
 ;;; BACKEND-TEMPLATE-NAMES to BACKEND-VOPS, and rename %PRIMITIVE to
 ;;; VOP or %VOP.. -- WHN 2001-06-11
 ;;; FIXME: Look at doing this ^, it doesn't look too hard actually.
-(def-ir1-translator %primitive ((&whole form name &rest args) start cont)
-
+(def-ir1-translator %primitive ((name &rest args) start cont)
   (unless (symbolp name)
     (compiler-error "The primitive name ~S is not a symbol." name))
 

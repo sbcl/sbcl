@@ -1640,11 +1640,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 ;;;; master sequencer function
 
-(defun loop-sequencer (indexv indexv-type indexv-user-specified-p
-			  variable variable-type
-			  sequence-variable sequence-type
-			  step-hack default-top
-			  prep-phrases)
+(defun loop-sequencer (indexv indexv-type 
+		       variable variable-type
+		       sequence-variable sequence-type
+		       step-hack default-top
+		       prep-phrases)
    (let ((endform nil) ; Form (constant or variable) with limit value
 	 (sequencep nil) ; T if sequence arg has been provided
 	 (testfn nil) ; endtest function
@@ -1752,11 +1752,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 (defun loop-for-arithmetic (var val data-type kwd)
   (loop-sequencer
-    var (loop-check-data-type data-type 'real) t
-    nil nil nil nil nil nil
-    (loop-collect-prepositional-phrases
-      '((:from :upfrom :downfrom) (:to :upto :downto :above :below) (:by))
-      nil (list (list kwd val)))))
+   var (loop-check-data-type data-type 'real)
+   nil nil nil nil nil nil
+   (loop-collect-prepositional-phrases
+    '((:from :upfrom :downfrom) (:to :upto :downto :above :below) (:by))
+    nil (list (list kwd val)))))
 
 (defun loop-sequence-elements-path (variable data-type prep-phrases
 				    &key
@@ -1764,16 +1764,16 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 				    size-function
 				    sequence-type
 				    element-type)
-  (multiple-value-bind (indexv indexv-user-specified-p) (named-variable 'index)
+  (multiple-value-bind (indexv) (named-variable 'index)
     (let ((sequencev (named-variable 'sequence)))
       (list* nil nil				; dummy bindings and prologue
 	     (loop-sequencer
-	       indexv 'fixnum indexv-user-specified-p
-	       variable (or data-type element-type)
-	       sequencev sequence-type
-	       `(,fetch-function ,sequencev ,indexv)
-	       `(,size-function ,sequencev)
-	       prep-phrases)))))
+	      indexv 'fixnum 
+	      variable (or data-type element-type)
+	      sequencev sequence-type
+	      `(,fetch-function ,sequencev ,indexv)
+	      `(,size-function ,sequencev)
+	      prep-phrases)))))
 
 ;;;; builtin LOOP iteration paths
 
@@ -1797,11 +1797,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(post-steps nil))
     (multiple-value-bind (other-var other-p)
 	(named-variable (if (eq which 'hash-key) 'hash-value 'hash-key))
-      ;; @@@@ named-variable returns a second value of T if the name was
-      ;; actually specified, so clever code can throw away the gensym'ed up
-      ;; variable if it isn't really needed. The following is for those
-      ;; implementations in which we cannot put dummy NILs into
-      ;; multiple-value-setq variable lists.
+      ;; @@@@ NAMED-VARIABLE returns a second value of T if the name
+      ;; was actually specified, so clever code can throw away the
+      ;; GENSYM'ed-up variable if it isn't really needed. The
+      ;; following is for those implementations in which we cannot put
+      ;; dummy NILs into MULTIPLE-VALUE-SETQ variable lists.
       (setq other-p t
 	    dummy-predicate-var (loop-when-it-variable))
       (let ((key-var nil)

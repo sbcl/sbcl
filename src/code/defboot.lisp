@@ -166,7 +166,7 @@
   ;; Similarly, other things like FDEFINITION or DOCUMENTATION either
   ;; aren't ours to mess with or are meaningless to mess with. Thus,
   ;; we punt.
-  #+sb-xc-host (declare (ignore def))
+  #+sb-xc-host (declare (ignore def doc))
   #-sb-xc-host 
   (progn
     (when (fboundp name)

@@ -35,6 +35,7 @@
 ;;; still useful in the target interpreter, and in the
 ;;; cross-compilation host.
 (defun sb!c::%defmacro (name definition lambda-list doc)
+  (declare (ignore lambda-list))
   (sb!c::%%defmacro name definition doc))
 
 ;;; (called by SB!C::%DEFMACRO)
