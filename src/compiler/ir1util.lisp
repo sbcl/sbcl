@@ -469,7 +469,10 @@
 		      `(when (eq (,slot last) old)
 			 (setf (,slot last) new))))
 	   (frob if-consequent)
-	   (frob if-alternative))))
+	   (frob if-alternative)
+           (when (eq (if-consequent last)
+                     (if-alternative last))
+             (setf (component-reoptimize (block-component block)) t)))))
       (t
        (unless (member new (block-succ block) :test #'eq)
 	 (link-blocks block new)))))

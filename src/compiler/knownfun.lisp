@@ -49,15 +49,23 @@
   ;; mark these functions as foldable in this database.
   foldable
   ;; may be eliminated if value is unused. The function has no side
-  ;; effects except possibly CONS. If a function is defined to signal
-  ;; errors, then it is not flushable even if it is movable or
-  ;; foldable.
+  ;; effects except possibly cons. If a function might signal errors,
+  ;; then it is not flushable even if it is movable, foldable or
+  ;; unsafely-flushable. Implies UNSAFELY-FLUSHABLE.
   flushable
+  ;; unsafe call may be eliminated if value is unused. The function
+  ;; has no side effects except possibly cons and signalling an error
+  ;; in the safe code. If a function MUST signal errors, then it is
+  ;; not unsafely-flushable even if it is movable or foldable.
+  unsafely-flushable
   ;; may be moved with impunity. Has no side effects except possibly
   ;; consing, and is affected only by its arguments.
   movable
   ;; The function is a true predicate likely to be open-coded. Convert
-  ;; any non-conditional uses into (IF <pred> T NIL).
+  ;; any non-conditional uses into (IF <pred> T NIL). Not usually
+  ;; specified to DEFKNOWN, since this is implementation dependent,
+  ;; and is usually automatically set by the DEFINE-VOP :CONDITIONAL
+  ;; option.
   predicate
   ;; Inhibit any warning for compiling a recursive definition.
   ;; (Normally the compiler warns when compiling a recursive

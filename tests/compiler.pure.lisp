@@ -177,3 +177,19 @@
 (let ((f (compile nil '(lambda (x)
                         (make-array 1 :element-type '(0))))))
   (assert (null (ignore-errors (funcall f)))))
+
+;;; the following functions must not be flushable
+(dolist (form '((make-sequence 'fixnum 10)
+                (concatenate 'fixnum nil)
+                (map 'fixnum #'identity nil)
+                (merge 'fixnum nil nil #'<)))
+  (assert (not (eval `(locally (declare (optimize (safety 0)))
+                        (ignore-errors (progn ,form t)))))))
+
+(dolist (form '(#+nil(values-list '(1 . 2)) ; This case still fails
+                (fboundp '(set bet))
+                (atan #c(1 1) (car (list #c(2 2))))
+                (nthcdr (car (list (floor (cos 3)))) '(1 2 3 4 5))
+                (nthcdr (car (list 5)) '(1 2 . 3))))
+  (assert (not (eval `(locally (declare (optimize (safety 3)))
+                        (ignore-errors (progn ,form t)))))))

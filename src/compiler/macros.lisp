@@ -447,66 +447,28 @@
 ;;; Declare the function NAME to be a known function. We construct a
 ;;; type specifier for the function by wrapping (FUNCTION ...) around
 ;;; the ARG-TYPES and RESULT-TYPE. ATTRIBUTES is an unevaluated list
-;;; of boolean attributes of the function. These attributes are
-;;; meaningful here:
-;;;
-;;;     CALL
-;;;        May call functions that are passed as arguments. In order
-;;;        to determine what other effects are present, we must find
-;;;        the effects of all arguments that may be functions.
-;;;
-;;;     UNSAFE
-;;;        May incorporate arguments in the result or somehow pass
-;;;        them upward.
-;;;
-;;;     UNWIND
-;;;        May fail to return during correct execution. Errors
-;;;        are O.K.
-;;;
-;;;     ANY
-;;;        The (default) worst case. Includes all the other bad
-;;;        things, plus any other possible bad thing.
-;;;
-;;;     FOLDABLE
-;;;        May be constant-folded. The function has no side effects,
-;;;        but may be affected by side effects on the arguments. E.g.
-;;;        SVREF, MAPC.
-;;;
-;;;     FLUSHABLE
-;;;        May be eliminated if value is unused. The function has
-;;;        no side effects except possibly CONS. If a function is
-;;;        defined to signal errors, then it is not flushable even
-;;;        if it is movable or foldable.
-;;;
-;;;     MOVABLE
-;;;        May be moved with impunity. Has no side effects except
-;;;        possibly CONS, and is affected only by its arguments.
-;;;
-;;;     PREDICATE
-;;;         A true predicate likely to be open-coded. This is a
-;;;         hint to IR1 conversion that it should ensure calls always
-;;;         appear as an IF test. Not usually specified to DEFKNOWN,
-;;;         since this is implementation dependent, and is usually
-;;;         automatically set by the DEFINE-VOP :CONDITIONAL option.
-;;;
-;;; NAME may also be a list of names, in which case the same
-;;; information is given to all the names. The keywords specify the
-;;; initial values for various optimizers that the function might
-;;; have.
+;;; of boolean attributes of the function. See their description in
+;;; (DEF-BOOLEAN-ATTRIBUTE IR1). NAME may also be a list of names, in
+;;; which case the same information is given to all the names. The
+;;; keywords specify the initial values for various optimizers that
+;;; the function might have.
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
 			 &rest keys)
   (when (and (intersection attributes '(any call unwind))
 	     (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))
 
+  (when (member 'any attributes)
+    (setf attributes (union '(call unsafe unwind) attributes)))
+  (when (member 'flushable attributes)
+    (pushnew 'unsafely-flushable attributes))
+
   `(%defknown ',(if (and (consp name)
 			 (not (eq (car name) 'setf)))
 		    name
 		    (list name))
 	      '(function ,arg-types ,result-type)
-	      (ir1-attributes ,@(if (member 'any attributes)
-				    (union '(call unsafe unwind) attributes)
-				    attributes))
+	      (ir1-attributes ,@attributes)
 	      ,@keys))
 
 ;;; Create a function which parses combination args according to WHAT

@@ -48,7 +48,7 @@
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
 (defknown (upgraded-complex-part-type upgraded-array-element-type)
 	  (type-specifier) type-specifier
-  (flushable))
+  (unsafely-flushable))
 
 ;;;; from the "Predicates" chapter:
 
@@ -59,7 +59,6 @@
 ;;; this property should be protected by #-SB-XC-HOST? Perhaps we need
 ;;; 3-stage bootstrapping after all? (Ugh! It's *so* slow already!)
 (defknown typep (t type-specifier) t
-  (flushable
    ;; Unlike SUBTYPEP or UPGRADED-ARRAY-ELEMENT-TYPE and friends, this
    ;; seems to be FOLDABLE. Like SUBTYPEP, it's affected by type
    ;; definitions, but unlike SUBTYPEP, there should be no way to make
@@ -77,14 +76,14 @@
    ;;
    ;; (UPGRADED-ARRAY-ELEMENT-TYPE and UPGRADED-COMPLEX-PART-TYPE have
    ;; behavior like SUBTYPEP in this respect, not like TYPEP.)
-   foldable))
-(defknown subtypep (type-specifier type-specifier) (values boolean boolean) 
+   (foldable))
+(defknown subtypep (type-specifier type-specifier) (values boolean boolean)
   ;; This is not FOLDABLE because its value is affected by type
   ;; definitions.
   ;;
   ;; FIXME: Is it OK to fold this when the types have already been
   ;; defined? Does the code inherited from CMU CL already do this?
-  (flushable)) 
+  (unsafely-flushable))
 
 (defknown (null symbolp atom consp listp numberp integerp rationalp floatp
 		complexp characterp stringp bit-vector-p vectorp
@@ -113,10 +112,10 @@
 (defknown (symbol-value symbol-function) (symbol) t ())
 
 (defknown boundp (symbol) boolean (flushable))
-(defknown fboundp ((or symbol cons)) boolean (flushable explicit-check))
+(defknown fboundp ((or symbol cons)) boolean (unsafely-flushable explicit-check))
 (defknown special-operator-p (symbol) t
   ;; The set of special operators never changes.
-  (movable foldable flushable)) 
+  (movable foldable flushable))
 (defknown set (symbol t) t (unsafe)
   :derive-type #'result-type-last-arg)
 (defknown fdefinition ((or symbol cons)) function (unsafe explicit-check))
@@ -141,7 +140,7 @@
 ;;; it into VALUES. VALUES is not foldable, since MV constants are
 ;;; represented by a call to VALUES.
 (defknown values (&rest t) * (movable flushable unsafe))
-(defknown values-list (list) * (movable foldable flushable))
+(defknown values-list (list) * (movable foldable unsafely-flushable))
 
 ;;;; from the "Macros" chapter:
 
@@ -190,13 +189,13 @@
 (defknown find-package (package-designator) (or sb!xc:package null)
   (flushable))
 (defknown package-name (package-designator) (or simple-string null)
-  (flushable))
-(defknown package-nicknames (package-designator) list (flushable))
+  (unsafely-flushable))
+(defknown package-nicknames (package-designator) list (unsafely-flushable))
 (defknown rename-package (package-designator package-designator &optional list)
   sb!xc:package)
-(defknown package-use-list (package-designator) list (flushable))
-(defknown package-used-by-list (package-designator) list (flushable))
-(defknown package-shadowing-symbols (package-designator) list (flushable))
+(defknown package-use-list (package-designator) list (unsafely-flushable))
+(defknown package-used-by-list (package-designator) list (unsafely-flushable))
+(defknown package-shadowing-symbols (package-designator) list (unsafely-flushable))
 (defknown list-all-packages () list (flushable))
 (defknown intern (string &optional package-designator)
   (values symbol (member :internal :external :inherited nil))
@@ -280,7 +279,7 @@
 
 (defknown atan
   (number &optional real) irrational
-  (movable foldable flushable explicit-check recursive)
+  (movable foldable unsafely-flushable explicit-check recursive)
   :derive-type #'result-type-float-contagion)
 
 (defknown (tan sinh cosh tanh asinh)
@@ -296,7 +295,7 @@
 
 (defknown atan
   (number &optional real) irrational
-  (movable foldable flushable explicit-check recursive))
+  (movable foldable unsafely-flushable explicit-check recursive))
 
 (defknown (tan sinh cosh tanh asinh)
   (number) irrational (movable foldable flushable explicit-check recursive))
@@ -400,7 +399,7 @@
 		 char-lessp char-greaterp char-not-greaterp char-not-lessp)
   (character &rest character) boolean (movable foldable flushable))
 
-(defknown character (t) character (movable foldable flushable))
+(defknown character (t) character (movable foldable unsafely-flushable))
 (defknown char-code (character) char-code (movable foldable flushable))
 (defknown (char-upcase char-downcase) (character) character
   (movable foldable flushable))
@@ -423,7 +422,7 @@
 
 ;;;; from the "Sequences" chapter:
 
-(defknown elt (sequence index) t (foldable flushable))
+(defknown elt (sequence index) t (foldable unsafely-flushable))
 
 (defknown subseq (sequence index &optional sequence-end) consed-sequence
   (flushable)
@@ -444,16 +443,16 @@
 					&key
 					(:initial-element t))
   consed-sequence
-  (movable flushable unsafe)
+  (movable unsafe)
   :derive-type (result-type-specifier-nth-arg 1))
 
 (defknown concatenate (type-specifier &rest sequence) consed-sequence
-  (flushable)
+  ()
   :derive-type (result-type-specifier-nth-arg 1))
 
 (defknown (map %map) (type-specifier callable sequence &rest sequence)
   consed-sequence
-  (flushable call)
+  (call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
 (defknown %map-to-list-arity-1 (callable sequence) list (flushable call))
@@ -466,10 +465,10 @@
 
 ;;; returns the result from the predicate...
 (defknown some (callable sequence &rest sequence) t
-  (foldable flushable call))
+  (foldable unsafely-flushable call))
 
 (defknown (every notany notevery) (callable sequence &rest sequence) boolean
-  (foldable flushable call))
+  (foldable unsafely-flushable call))
 
 ;;; unsafe for :INITIAL-VALUE...
 (defknown reduce (callable
@@ -561,14 +560,14 @@
   (sequence &key (:test callable) (:test-not callable) (:start index)
 	    (:from-end t) (:end sequence-end) (:key callable))
   consed-sequence
-  (flushable call)
+  (unsafely-flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown delete-duplicates
   (sequence &key (:test callable) (:test-not callable) (:start index)
 	    (:from-end t) (:end sequence-end) (:key callable))
   sequence
-  (flushable call)
+  (unsafely-flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown find (t sequence &key (:test callable) (:test-not callable)
@@ -623,7 +622,7 @@
 (defknown merge (type-specifier sequence sequence callable
 				&key (:key callable))
   sequence
-  (flushable call)
+  (call)
   :derive-type (result-type-specifier-nth-arg 1))
 
 ;;; not FLUSHABLE, despite what CMU CL's DEFKNOWN said..
@@ -643,23 +642,28 @@
   :derive-type (sequence-result-nth-arg 1))
 
 ;;;; from the "Manipulating List Structure" chapter:
-(defknown (car cdr caar cadr cdar cddr
-	       caaar caadr cadar caddr cdaar cdadr cddar cdddr
-	       caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
-	       cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
-	       first second third fourth fifth sixth seventh eighth ninth tenth
-	       rest)
+(defknown (car cdr first rest)
   (list)
   t
   (foldable flushable))
+
+(defknown (caar cadr cdar cddr
+                caaar caadr cadar caddr cdaar cdadr cddar cdddr
+                caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
+                cdaaar cdaadr cdadar cdaddr cddaar cddadr cdddar cddddr
+                second third fourth fifth sixth seventh eighth ninth tenth)
+  (list)
+  t
+  (foldable unsafely-flushable))
 
 (defknown cons (t t) cons (movable flushable unsafe))
 
 (defknown tree-equal (t t &key (:test callable) (:test-not callable)) boolean
   (foldable flushable call))
-(defknown endp (t) boolean (foldable flushable movable))
-(defknown list-length (list) (or index null) (foldable flushable))
-(defknown (nth nthcdr) (index list) t (foldable flushable))
+(defknown endp (t) boolean (foldable unsafely-flushable movable))
+(defknown list-length (list) (or index null) (foldable unsafely-flushable))
+(defknown nth (index list) t (foldable flushable))
+(defknown nthcdr (index list) t (foldable unsafely-flushable))
 (defknown last (list &optional index) list (foldable flushable))
 (defknown list (&rest t) list (movable flushable unsafe))
 (defknown list* (t &rest t) t (movable flushable unsafe))
@@ -806,7 +810,7 @@
 
 (defknown array-has-fill-pointer-p (array) boolean
   (movable foldable flushable))
-(defknown fill-pointer (vector) index (foldable flushable))
+(defknown fill-pointer (vector) index (foldable unsafely-flushable))
 (defknown vector-push (t vector) (or index null) ())
 (defknown vector-push-extend (t vector &optional index) index ())
 (defknown vector-pop (vector) t ())
@@ -879,9 +883,9 @@
 ;;;; from the "Streams" chapter:
 
 (defknown make-synonym-stream (symbol) stream (flushable))
-(defknown make-broadcast-stream (&rest stream) stream (flushable))
-(defknown make-concatenated-stream (&rest stream) stream (flushable))
-(defknown make-two-way-stream (stream stream) stream (flushable))
+(defknown make-broadcast-stream (&rest stream) stream (unsafely-flushable))
+(defknown make-concatenated-stream (&rest stream) stream (unsafely-flushable))
+(defknown make-two-way-stream (stream stream) stream (unsafely-flushable))
 (defknown make-echo-stream (stream stream) stream (flushable))
 (defknown make-string-input-stream (string &optional index index) stream
   (flushable unsafe))
@@ -1047,7 +1051,7 @@
 (defknown load-logical-pathname-translations (string) t ())
 (defknown logical-pathname-translations (logical-host-designator) list ())
 
-(defknown pathname (pathname-designator) pathname ())
+(defknown pathname (pathname-designator) pathname (unsafely-flushable))
 (defknown truename (pathname-designator) pathname ())
 
 (defknown parse-namestring
@@ -1064,7 +1068,7 @@
 (defknown merge-pathnames
   (pathname-designator &optional pathname-designator pathname-version)
   pathname
-  ())
+  (unsafely-flushable))
 
 (defknown make-pathname
  (&key (:defaults pathname-designator)
@@ -1074,35 +1078,35 @@
        (:name (or pathname-name string (member :wild)))
        (:type (or pathname-type string (member :wild)))
        (:version pathname-version) (:case (member :local :common)))
-  pathname ())
+  pathname (unsafely-flushable))
 
 (defknown pathnamep (t) boolean (movable flushable))
 
 (defknown pathname-host (pathname-designator
 			 &key (:case (member :local :common)))
-  pathname-host ())
+  pathname-host (flushable))
 (defknown pathname-device (pathname-designator
 			   &key (:case (member :local :common)))
-  pathname-device ())
+  pathname-device (flushable))
 (defknown pathname-directory (pathname-designator
 			      &key (:case (member :local :common)))
-  pathname-directory ())
+  pathname-directory (flushable))
 (defknown pathname-name (pathname-designator
 			 &key (:case (member :local :common)))
-  pathname-name ())
+  pathname-name (flushable))
 (defknown pathname-type (pathname-designator
 			 &key (:case (member :local :common)))
-  pathname-type ())
+  pathname-type (flushable))
 (defknown pathname-version (pathname-designator)
-  pathname-version ())
+  pathname-version (flushable))
 
 (defknown (namestring file-namestring directory-namestring host-namestring)
   (pathname-designator) simple-string
-  ())
+  (unsafely-flushable))
 
 (defknown enough-namestring (pathname-designator &optional pathname-designator)
   simple-string
-  ())
+  (unsafely-flushable))
 
 (defknown user-homedir-pathname (&optional t) pathname (flushable))
 
@@ -1129,7 +1133,7 @@
 (defknown file-position (stream &optional
 				(or unsigned-byte (member :start :end)))
   (or unsigned-byte (member t nil)))
-(defknown file-length (stream) (or unsigned-byte null) (flushable))
+(defknown file-length (stream) (or unsigned-byte null) (unsafely-flushable))
 
 (defknown load
   ((or filename stream)

@@ -441,13 +441,25 @@
 	 (let ((info (combination-kind node)))
 	   (when (fun-info-p info)
 	     (let ((attr (fun-info-attributes info)))
-	       (when (and (ir1-attributep attr flushable)
+	       (when (and (not (ir1-attributep attr call))
 			  ;; ### For now, don't delete potentially
 			  ;; flushable calls when they have the CALL
 			  ;; attribute. Someday we should look at the
 			  ;; functional args to determine if they have
 			  ;; any side effects.
-			  (not (ir1-attributep attr call)))
+                          (if (policy node (= safety 3))
+                              (and (ir1-attributep attr flushable)
+                                   (every (lambda (arg)
+                                            (member (continuation-type-check arg)
+                                                    '(nil :deleted)))
+                                          (basic-combination-args node))
+                                   (valid-fun-use node
+                                                  (info :function :type
+                                                        (leaf-source-name (ref-leaf (continuation-use (basic-combination-fun node)))))
+                                                  :result-test #'always-subtypep
+                                                  :lossage-fun nil
+                                                  :unwinnage-fun nil))
+                              (ir1-attributep attr unsafely-flushable)))
 		 (flush-dest (combination-fun node))
 		 (dolist (arg (combination-args node))
 		   (flush-dest arg))

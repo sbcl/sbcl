@@ -1277,6 +1277,7 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     in several ways. (thanks to Alexey Dejneka)
   * fixed bug 181: compiler checks validity of user supplied type
     specifiers
+  * functions, which must signal errors, are no longer flushable
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
