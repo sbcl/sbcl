@@ -562,3 +562,12 @@
                     (fun (compile nil src))
                     (result (1+ (funcall (eval #'*) x real-zero))))
                (assert (eql result (funcall fun x)))))))
+
+;;; (SIGNED-BYTE 1) [ returned from the logxor derive-type optimizer ]
+;;; wasn't recognized as a good type specifier.
+(let ((fun (lambda (x y)
+	     (declare (type (integer -1 0) x y) (optimize speed))
+	     (logxor x y))))
+  (assert (= (funcall fun 0 0) 0))
+  (assert (= (funcall fun 0 -1) -1))
+  (assert (= (funcall fun -1 -1) 0)))
