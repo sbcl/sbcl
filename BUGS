@@ -1092,8 +1092,7 @@ WORKAROUND:
 
   uses generic arithmetic.
 
-  b. For the example above, the compiler does not issue a note.
-     (fixed in 0.8.3.6, but a test case would be good)
+  b. (fixed in 0.8.3.6)
 
 279: type propagation error -- correctly inferred type goes astray?
   In sbcl-0.8.3 and sbcl-0.8.1.47, the warning
