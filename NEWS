@@ -1223,11 +1223,17 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
     to a functions expecting a PATHNAME-DESIGNATOR.
   * Bug fix: DEFGENERIC now enforces the ANSI restrictions on its
     lambda lists. (thanks to Alexey Dejneka)
+  * Bug fix: changed encoding of PCL's internal MAKE-INSTANCE
+    functions so that EXPORTing the name of the class doesn't cause
+    MAKE-INSTANCE functions from earlier DEFCLASSes to get lost (thanks
+    to Antonio Martinez)
   * Minor incompatible change: COMPILE-FILE-PATHNAME now merges its
     OUTPUT-FILE argument with its INPUT-FILE argument, resulting in
     behaviour analogous to RENAME-FILE.  This puts its behaviour more
     in line with ANSI's wording on COMPILE-FILE-PATHNAME. (thanks to
     Marco Antinotti)
+  * The fasl file version number has changed again. (because of the
+    bug fix involving the names of PCL MAKE-INSTANCE functions)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

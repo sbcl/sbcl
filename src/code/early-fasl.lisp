@@ -38,11 +38,11 @@
 
 ;;; This value should be incremented when the system changes in such a
 ;;; way that it will no longer work reliably with old fasl files. In
-;;; practice, I (WHN) fairly often neglect to increment it for CVS
+;;; practice, I (WHN) fairly often forget to increment it for CVS
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 30)
+(def!constant +fasl-file-version+ 31)
 ;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.
@@ -58,6 +58,9 @@
 ;;; 30: (2002-07-26) deleted all references to %DETECT-STACK-EXHAUSTION, 
 ;;;     which was introduced in version 25, since now control stack
 ;;;     is checked using mmap() page protection
+;;; 31: (2002-08-14) changed encoding of PCL internal MAKE-INSTANCE
+;;;     function names so they're insensitive to whether the class name
+;;;     is currently external to its package
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

@@ -64,7 +64,7 @@
 	  ;;   1. Don't worry, I know what I'm doing.
 	  ;;   2. You and what army?
 	  ;;   3. If you were as smart as you think you are, you
-	  ;;      wouldn't be a copy.
+	  ;;      wouldn't be a cop.
 	  ;; This is case #1.:-) Even if SYM hasn't been defined yet,
 	  ;; it must be an implementation function, or we we wouldn't
 	  ;; have expanded into it. So declare SYM as defined, so that
@@ -128,8 +128,9 @@
 		(*print-case* :upcase)
 		(*print-pretty* nil))
 	    (intern (format nil
-			    "MAKE-INSTANCE ~S ~S ~S"
-			    class-name
+			    "MAKE-INSTANCE ~A::~A ~S ~S"
+			    (package-name (symbol-package class-name))
+			    (symbol-name class-name)
 			    keys
 			    allow-other-keys-p))))))))
 
