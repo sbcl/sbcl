@@ -144,7 +144,7 @@
     (maybe-return-history-cmd cmd cmd-args-string)))
 
 (defun maybe-return-history-cmd (cmd cmd-args-string)
-  (format *output* "~&~A" (user-cmd-input cmd))
+  (format *output* "~A~%" (user-cmd-input cmd))
   (let ((dont-redo
 	 (when (and (stringp cmd-args-string)
 		    (plusp (length cmd-args-string))
@@ -156,8 +156,8 @@
 		(when (string-equal line "N")
 		  t))
 	     (when line
-	       (format *output* "~&Type \"y\" for yes or \"n\" for no."))
-	     (format *output* "~&redo? [y] ")
+	       (format *output* "Type \"y\" for yes or \"n\" for no.~%"))
+	     (format *output* "redo? [y] ")
 	     (force-output *output*)))))
     (if dont-redo
 	*null-cmd*
@@ -815,7 +815,7 @@
 	  (error ()
 	    (format stream "~&Prompt error>  "))
 	  (:no-error (prompt)
-	    (format stream "~&~A" prompt))))))
+	    (format stream "~A" prompt))))))
   
 (defun process-cmd (user-cmd)
   ;; Processes a user command. Returns t if the user-cmd was a top-level
@@ -839,7 +839,7 @@
 	((functionp (user-cmd-func user-cmd))
 	 (add-to-history user-cmd)
 	 (apply (user-cmd-func user-cmd) (user-cmd-args user-cmd))
-	 (fresh-line)
+	 ;;(fresh-line)
 	 t)
 	(t
 	 (add-to-history user-cmd)

@@ -55,8 +55,10 @@
 	 (results (multiple-value-list (sb-impl::interactive-eval form))))
     (unless *noprint*
       (dolist (result results)
-	(fresh-line)
-	(prin1 result)))))
+	;; Don't fresh-line before a result, since newline was entered by user
+	;; in *repl-read-form-fun*
+	(prin1 result)
+	(fresh-line)))))
 
 (defun repl-fun (noprint)
   (repl :noprint noprint :break-level 0))
