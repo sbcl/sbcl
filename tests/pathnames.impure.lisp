@@ -111,9 +111,9 @@
 
 ;;; turning one logical pathname into another:
 (setf (logical-pathname-translations "foo")
-       '(("tohome;*.*.*" "home:*.*.*")))
-(assert (equal (namestring (translate-logical-pathname "foo:tohome;x.y"))
-               "home:x.y"))    
+       '(("todemo;*.*.*" "demo0:*.*.*")))
+(assert (equal (namestring (translate-logical-pathname "foo:todemo;x.y"))
+               (namestring (translate-logical-pathname "demo0:x.y"))))
 
 ;;; ANSI, in its wisdom, specifies that it's an error (specifically a
 ;;; TYPE-ERROR) to query the system about the translations of a string
@@ -121,6 +121,9 @@
 ;;; just return NIL in that case, but they make the rules..
 (let ((cond (grab-condition (logical-pathname-translations "unregistered-host"))))
   (assert (typep cond 'type-error)))
+
+(assert (not (string-equal (host-namestring (parse-namestring "OTHER-HOST:ILLEGAL/LPN")) "OTHER-HOST")))
+(assert (string-equal (pathname-name (parse-namestring "OTHER-HOST:ILLEGAL/LPN")) "LPN"))
 
 ;;; FIXME: A comment on this section up to sbcl-0.6.11.30 or so said
 ;;;   examples from CLHS: Section 19.4, LOGICAL-PATHNAME-TRANSLATIONS

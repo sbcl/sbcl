@@ -30,6 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pwd.h>
+#include <stdio.h>
 
 #include "runtime.h"
 #include "sbcl.h"
@@ -249,6 +250,33 @@ uid_username(int uid)
 	 * the next call to getpwuid(), so it'd be unsafe to return
 	 * p->pw_name without copying. */
 	return strdup(p->pw_name);
+    } else {
+	return 0;
+    }
+}
+
+char *
+uid_homedir(uid_t uid)
+{
+    struct passwd *p = getpwuid(uid);
+    if(p) {
+	/* Let's be careful about this, shall we? */
+	size_t len = strlen(p->pw_dir);
+	if (p->pw_dir[len-1] == '/') {
+	    return strdup(p->pw_dir);
+	} else {
+	    char *result = malloc(len + 2);
+	    if (result) {
+		int nchars = sprintf(result,"%s/",p->pw_dir);
+		if (nchars == len + 1) {
+		    return result;
+		} else {
+		    return 0;
+		}
+	    } else {
+		return 0;
+	    }
+	}
     } else {
 	return 0;
     }

@@ -215,100 +215,57 @@
 	  (setf start (1+ slash))))
       (values absolute (pieces)))))
 
-;;; the thing before a colon in a logical path
-(def!struct (logical-hostname (:make-load-form-fun
-			       (lambda (x)
-				 (values `(make-logical-hostname
-					   ,(logical-hostname-name x))
-					 nil)))
-			      (:copier nil)
-			      (:constructor make-logical-hostname (name)))
-  (name (missing-arg) :type simple-string))
-
-(defun maybe-extract-logical-hostname (namestr start end)
-  (declare (type simple-base-string namestr)
-	   (type index start end))
-  (let ((quoted nil))
-    (do ((index start (1+ index)))
-	((= index end)
-	 (values nil start))
-      (if quoted
-	  (setf quoted nil)
-	  (case (schar namestr index)
-	    (#\\
-	     (setf quoted t))
-	    (#\:
-	     (return (values (make-logical-hostname
-			      (remove-backslashes namestr start index))
-			     (1+ index)))))))))
-
 (defun parse-unix-namestring (namestr start end)
   (declare (type simple-base-string namestr)
            (type index start end))
   (multiple-value-bind (absolute pieces) (split-at-slashes namestr start end)
-    (let ((logical-hostname
-	   (if absolute
-	       nil
-	       (let ((first (car pieces)))
-		 (multiple-value-bind (logical-hostname new-start)
-		     (maybe-extract-logical-hostname namestr
-						     (car first)
-						     (cdr first))
-		   (when logical-hostname
-		     (setf absolute t)
-		     (setf (car first) new-start))
-		   logical-hostname)))))
-      (declare (type (or null logical-hostname) logical-hostname))
-      (multiple-value-bind (name type version)
-          (let* ((tail (car (last pieces)))
-                 (tail-start (car tail))
-                 (tail-end (cdr tail)))
-            (unless (= tail-start tail-end)
-              (setf pieces (butlast pieces))
-              (extract-name-type-and-version namestr tail-start tail-end)))
+    (multiple-value-bind (name type version)
+	(let* ((tail (car (last pieces)))
+	       (tail-start (car tail))
+	       (tail-end (cdr tail)))
+	  (unless (= tail-start tail-end)
+	    (setf pieces (butlast pieces))
+	    (extract-name-type-and-version namestr tail-start tail-end)))
 
-	(when (stringp name)
-	  (let ((position (position-if (lambda (char)
-					 (or (char= char (code-char 0))
-					     (char= char #\/)))
-				       name)))
-	    (when position
-	      (error 'namestring-parse-error
-		     :complaint "can't embed #\\Nul or #\\/ in Unix namestring"
-		     :namestring namestr
-		     :offset position))))
-        
-        ;; Now we have everything we want. So return it.
-        (values nil ; no host for Unix namestrings
-                nil ; no device for Unix namestrings
-                (collect ((dirs))
-                  (when logical-hostname
-                    (dirs logical-hostname))
-                  (dolist (piece pieces)
-                    (let ((piece-start (car piece))
-                          (piece-end (cdr piece)))
-                      (unless (= piece-start piece-end)
-                        (cond ((string= namestr ".."
-					:start1 piece-start
-                                        :end1 piece-end)
-                               (dirs :up))
-                              ((string= namestr "**"
-					:start1 piece-start
-                                        :end1 piece-end)
-                               (dirs :wild-inferiors))
-                              (t
-                               (dirs (maybe-make-pattern namestr
-                                                         piece-start
-                                                         piece-end)))))))
-                  (cond (absolute
-                         (cons :absolute (dirs)))
-                        ((dirs)
-                         (cons :relative (dirs)))
-                        (t
-                         nil)))
-                name
-                type
-                version)))))
+      (when (stringp name)
+	(let ((position (position-if (lambda (char)
+				       (or (char= char (code-char 0))
+					   (char= char #\/)))
+				     name)))
+	  (when position
+	    (error 'namestring-parse-error
+		   :complaint "can't embed #\\Nul or #\\/ in Unix namestring"
+		   :namestring namestr
+		   :offset position))))
+      ;; Now we have everything we want. So return it.
+      (values nil ; no host for Unix namestrings
+	      nil ; no device for Unix namestrings
+	      (collect ((dirs))
+ 	        (dolist (piece pieces)
+		  (let ((piece-start (car piece))
+			(piece-end (cdr piece)))
+		    (unless (= piece-start piece-end)
+		      (cond ((string= namestr ".."
+				      :start1 piece-start
+				      :end1 piece-end)
+			     (dirs :up))
+			    ((string= namestr "**"
+				      :start1 piece-start
+				      :end1 piece-end)
+			     (dirs :wild-inferiors))
+			    (t
+			     (dirs (maybe-make-pattern namestr
+						       piece-start
+						       piece-end)))))))
+		(cond (absolute
+		       (cons :absolute (dirs)))
+		      ((dirs)
+		       (cons :relative (dirs)))
+		      (t
+		       nil)))
+	      name
+	      type
+	      version))))
 
 (/show0 "filesys.lisp 300")
 
@@ -368,17 +325,7 @@
     (when directory
       (ecase (pop directory)
 	(:absolute
-	 (cond ((logical-hostname-p (car directory))
-		;; FIXME: The old CMU CL "search list" extension is
-		;; gone, but the old machinery is still being used
-		;; clumsily here and elsewhere, to represent anything
-		;; which belongs before a colon prefix in the ANSI
-		;; pathname machinery. This should be cleaned up,
-		;; using simpler machinery with more mnemonic names.
-		(pieces (logical-hostname-name (pop directory)))
-		(pieces ":"))
-	       (t
-		(pieces "/"))))
+	 (pieces "/"))
 	(:relative
 	 ;; nothing special
 	 ))
@@ -829,21 +776,10 @@
   t)
 
 ;;; (This is an ANSI Common Lisp function.) 
-;;;
-;;; This is obtained from the logical name \"home:\", which is set
-;;; up for us at initialization time.
 (defun user-homedir-pathname (&optional host)
   "Return the home directory of the user as a pathname."
   (declare (ignore host))
-  ;; Note: CMU CL did #P"home:" here instead of using a call to
-  ;; PATHNAME. Delaying construction of the pathname until we're
-  ;; running in a target Lisp lets us avoid figuring out how to dump
-  ;; cross-compilation host Lisp PATHNAME objects into a target Lisp
-  ;; object file. It also might have a small positive effect on
-  ;; efficiency, in that we don't allocate a PATHNAME we don't need,
-  ;; but it it could also have a larger negative effect. Hopefully
-  ;; it'll be OK. -- WHN 19990714
-  (pathname "home:"))
+  (pathname (sb!unix:uid-homedir (sb!unix:unix-getuid))))
 
 (defun file-write-date (file)
   #!+sb-doc

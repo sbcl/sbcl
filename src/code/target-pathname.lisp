@@ -605,6 +605,41 @@ a host-structure or string."
 
 ;;;; namestrings
 
+;;; Handle the case for PARSE-NAMESTRING parsing a potentially
+;;; syntactically valid logical namestring with an explicit host.
+;;;
+;;; This then isn't fully general -- we are relying on the fact that
+;;; we will only pass to parse-namestring namestring with an explicit
+;;; logical host, so that we can pass the host return from
+;;; parse-logical-namestring through to %PARSE-NAMESTRING as a truth
+;;; value. Yeah, this is probably a KLUDGE - CSR, 2002-04-18
+(defun parseable-logical-namestring-p (namestr start end)
+  (catch 'exit
+    (handler-bind
+	((namestring-parse-error (lambda (c)
+				   (declare (ignore c))
+				   (throw 'exit nil))))
+      (let ((colon (position #\: namestr :start start :end end)))
+	(when colon
+	  (let ((potential-host
+		 (logical-word-or-lose (subseq namestr start colon))))
+	    ;; depending on the outcome of CSR comp.lang.lisp post
+	    ;; "can PARSE-NAMESTRING create logical hosts, we may need
+	    ;; to do things with potential-host (create it
+	    ;; temporarily, parse the namestring and unintern the
+	    ;; logical host potential-host on failure.
+	    (declare (ignore potential-host))
+	    (let ((result
+		   (handler-bind
+		       ((simple-type-error (lambda (c)
+					     (declare (ignore c))
+					     (throw 'exit nil))))
+		     (parse-logical-namestring namestr start end))))
+	      ;; if we got this far, we should have an explicit host
+	      ;; (first return value of parse-logical-namestring)
+	      (aver result)
+	      result)))))))
+
 ;;; Handle the case where PARSE-NAMESTRING is actually parsing a
 ;;; namestring. We pick off the :JUNK-ALLOWED case then find a host to
 ;;; use for parsing, call the parser, then check whether the host matches.
@@ -618,16 +653,42 @@ a host-structure or string."
 	  (%parse-namestring namestr host defaults start end nil)
 	(namestring-parse-error (condition)
 	  (values nil (namestring-parse-error-offset condition))))
-      (let* ((end (or end (length namestr)))
-	     (parse-host (or host
-			     (extract-logical-host-prefix namestr start end)
-			     (pathname-host defaults))))
-	(unless parse-host
-	  (error "When no HOST argument is supplied, the DEFAULTS argument ~
-		  must have a non-null PATHNAME-HOST."))
-
+      (let* ((end (or end (length namestr))))
 	(multiple-value-bind (new-host device directory file type version)
-	    (funcall (host-parse parse-host) namestr start end)
+	    ;; Comments below are quotes from the HyperSpec
+	    ;; PARSE-NAMESTRING entry, reproduced here to demonstrate
+	    ;; that we actually have to do things this way rather than
+	    ;; some possibly more logical way. - CSR, 2002-04-18
+	    (cond
+	      ;; "If host is a logical host then thing is parsed as a
+	      ;; logical pathname namestring on the host."
+	      (host (funcall (host-parse host) namestr start end))
+	      ;; "If host is nil and thing is a syntactically valid
+	      ;; logical pathname namestring containing an explicit
+	      ;; host, then it is parsed as a logical pathname
+	      ;; namestring."
+	      ((parseable-logical-namestring-p namestr start end)
+	       (parse-logical-namestring namestr start end))
+	      ;; "If host is nil, default-pathname is a logical
+	      ;; pathname, and thing is a syntactically valid logical
+	      ;; pathname namestring without an explicit host, then it
+	      ;; is parsed as a logical pathname namestring on the
+	      ;; host that is the host component of default-pathname."
+	      ;;
+	      ;; "Otherwise, the parsing of thing is
+	      ;; implementation-defined."
+	      ;;
+	      ;; Both clauses are handled here, as the default
+	      ;; *DEFAULT-PATHNAME-DEFAULTS has a SB-IMPL::UNIX-HOST
+	      ;; for a host.
+	      ((pathname-host defaults)
+	       (funcall (host-parse (pathname-host defaults)) namestr start end))
+	      ;; I don't think we should ever get here, as the default
+	      ;; host will always have a non-null HOST, given that we
+	      ;; can't create a new pathname without going through
+	      ;; *DEFAULT-PATHNAME-DEFAULTS*, which has a non-null
+	      ;; host...
+	      (t (bug "Fallen through COND in %PARSE-NAMESTRING")))
 	  (when (and host new-host (not (eq new-host host)))
 	    (error 'simple-type-error
 		   :datum new-host
@@ -643,7 +704,7 @@ a host-structure or string."
 		   "The host in the namestring, ~S,~@
 		    does not match the explicit HOST argument, ~S."
 		   :format-arguments (list new-host host)))
-	  (let ((pn-host (or new-host parse-host)))
+	  (let ((pn-host (or new-host host (pathname-host defaults))))
 	    (values (%make-maybe-logical-pathname
 		     pn-host device directory file type version)
 		    end))))))

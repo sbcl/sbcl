@@ -1301,16 +1301,6 @@ WORKAROUND:
   (reported by Christophe Rhodes and Martin Atzmueller sbcl-devel
   2002-05-15)
 
-160:
-  USER-HOMEDIR-PATHNAME returns a pathname that SBCL can't do anything
-  with.  Probably we should return an absolute physical pathname
-  instead.  (Reported by Peter van Eynde sbcl-devel 2002-03-29)
-
-161:
-  Typep on certain SATISFIES types doesn't take account of the fact
-  that the function could cause an error; e.g. (TYPEP #\! '(SATISFIES
-  FBOUNDP)) raises an error when it should return NIL.
-
 162:
   (reported by Robert E. Brown 2002-04-16) 
   When a function is called with too few arguments, causing the
@@ -1330,6 +1320,11 @@ WORKAROUND:
   (Christophe Rhodes reports that this doesn't occur on the SPARC, which
   isn't too surprising since there are many differences in stack
   implementation and GC conservatism between the X86 and other ports.)
+
+163:
+  HOST-NAMESTRING on a Unix pathname returns "Unix", which isn't
+  treated as a valid host by anything else in the system. (Reported by
+  Erik Naggum on comp.lang.lisp 2002-04-18)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -1091,7 +1091,11 @@ changes in sbcl-0.7.3 relative to sbcl-0.7.2:
     sbcl-0.7.0, available as a patch against sbcl-0.7.0 at
       <http://designix.com.au/brian/SBCL/sbcl-0.7.0-unicode.p0.gz>.
   * Bugfix to GET-DISPATCH-MACRO-CHAR, now returning NIL for undefined
-    dispatch macro character combinations (thanks to Alexey Dejenka)
+    dispatch macro character combinations. (thanks to Alexey Dejenka)
+  * Bugfix in PARSE-NAMESTRING: we now correctly parse unix namestrings 
+    that superficially look like logical namestrings correctly.
+  * USER-HOMEDIR-PATHNAME now returns a (physical) pathname that SBCL
+    can deal with.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
