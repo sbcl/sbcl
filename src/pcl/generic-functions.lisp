@@ -400,6 +400,14 @@
 
 (defgeneric (setf class-slot-value) (nv class slot-name))
 
+;;; CMUCL comment (from Gerd Moellmann/Pierre Mai, 2002-10-19):
+;;;
+;;; According to AMOP, COMPUTE-EFFECTIVE-METHOD should return two
+;;; values.  Alas, the second value is only vaguely described in AMOP,
+;;; and, when asked on 2002-10-18, Gregor Kiczales said he couldn't
+;;; remember what the second value was supposed to be.  So, PCL's
+;;; COMPUTE-EFFECTIVE-METHOD returns one value as do Allegro and
+;;; Lispworks.
 (defgeneric compute-effective-method (generic-function
 				      combin
 				      applicable-methods))

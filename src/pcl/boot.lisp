@@ -1594,12 +1594,12 @@ bootstrapping.
 			       (early-method-lambda-list method)
 			       (method-lambda-list method)))
     (flet ((lose (string &rest args)
-	     (error
-	      "attempt to add the method ~S to the generic function ~S.~%~
-	       But ~A"
-	      method
-	      gf
-	      (apply #'format nil string args)))
+	     (error 'simple-program-error
+		    :format-control "attempt to add the method ~S ~
+                                     to the generic function ~S.~%~
+                                     But ~A"
+		    :format-arguments (list method gf
+					    (apply #'format nil string args))))
 	   (comparison-description (x y)
 	     (if (> x y) "more" "fewer")))
       (let ((gf-nreq (arg-info-number-required arg-info))
@@ -1615,8 +1615,8 @@ bootstrapping.
 	   "the method has ~A optional arguments than the generic function."
 	   (comparison-description nopt gf-nopt)))
 	(unless (eq (or keysp restp) gf-key/rest-p)
-	  (error
-	   "The method and generic function differ in whether they accept~%~
+	  (lose
+	   "the method and generic function differ in whether they accept~%~
 	    &REST or &KEY arguments."))
 	(when (consp gf-keywords)
 	  (unless (or (and restp (not keysp))

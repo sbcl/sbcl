@@ -1329,24 +1329,3 @@
     (otherwise 6)))
 
 (defvar *empty-cache* (make-cache)) ; for defstruct slot initial value forms
-
-;;; Pre-allocate generic function caches. The hope is that this will
-;;; put them nicely together in memory, and that that may be a win. Of
-;;; course the first GC copy will probably blow that out, this really
-;;; wants to be wrapped in something that declares the area static.
-;;;
-;;; This preallocation only creates about 25% more caches than PCL
-;;; itself uses. Some ports may want to preallocate some more of
-;;; these.
-;;;
-;;; KLUDGE: Isn't something very similar going on in precom1.lisp? Do
-;;; we need it both here and there? Why? -- WHN 19991203
-(eval-when (:load-toplevel)
-  (dolist (n-size '((1 513) (3 257) (3 129) (14 128) (6 65)
-		    (2 64) (7 33) (16 32) (16 17) (32 16)
-		    (64 9) (64 8) (6 5) (128 4) (35 2)))
-    (let ((n (car n-size))
-	  (size (cadr n-size)))
-      (mapcar #'free-cache-vector
-	      (mapcar #'get-cache-vector
-		      (make-list n :initial-element size))))))
