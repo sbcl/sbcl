@@ -21,15 +21,15 @@
 (deftype local-tn-vector () `(simple-vector ,local-tn-limit))
 (deftype local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
 
-;;; Type of an SC number.
+;;; type of an SC number
 (deftype sc-number () `(integer 0 (,sc-number-limit)))
 
-;;; Types for vectors indexed by SC numbers.
+;;; types for vectors indexed by SC numbers
 (deftype sc-vector () `(simple-vector ,sc-number-limit))
 (deftype sc-bit-vector () `(simple-bit-vector ,sc-number-limit))
 
-;;; The different policies we can use to determine the coding strategy.
-(deftype policies ()
+;;; the different policies we can use to determine the coding strategy
+(deftype ltn-policy ()
   '(member :safe :small :fast :fast-safe))
 
 ;;;; PRIMITIVE-TYPEs
@@ -527,16 +527,15 @@
 ;;; a known function.
 (def!struct (template (:constructor nil)
 		      #-sb-xc-host (:pure t))
-  ;; The symbol name of this VOP. This is used when printing the VOP
+  ;; the symbol name of this VOP. This is used when printing the VOP
   ;; and is also used to provide a handle for definition and
   ;; translation.
   (name nil :type symbol)
-  ;; A Function-Type describing the arg/result type restrictions. We
-  ;; compute this from the Primitive-Type restrictions to make life
-  ;; easier for IR1 phases that need to anticipate LTN's template
-  ;; selection.
+  ;; the arg/result type restrictions. We compute this from the
+  ;; PRIMITIVE-TYPE restrictions to make life easier for IR1 phases
+  ;; that need to anticipate LTN's template selection.
   (type (required-argument) :type function-type)
-  ;; Lists of restrictions on the argument and result types. A
+  ;; lists of restrictions on the argument and result types. A
   ;; restriction may take several forms:
   ;; -- The restriction * is no restriction at all.
   ;; -- A restriction (:OR <primitive-type>*) means that the operand 
@@ -549,13 +548,13 @@
   ;;    the type tested by the predicate, used when we want to represent
   ;;    the type constraint as a Lisp function type.
   ;;
-  ;; If Result-Types is :Conditional, then this is an IF-xxx style
+  ;; If RESULT-TYPES is :CONDITIONAL, then this is an IF-FOO style
   ;; conditional that yeilds its result as a control transfer. The
   ;; emit function takes two info arguments: the target label and a
   ;; boolean flag indicating whether to negate the sense of the test.
   (arg-types nil :type list)
   (result-types nil :type (or list (member :conditional)))
-  ;; The primitive type restriction applied to each extra argument or
+  ;; the primitive type restriction applied to each extra argument or
   ;; result following the fixed operands. If NIL, no extra
   ;; args/results are allowed. Otherwise, either * or a (:OR ...) list
   ;; as described for the {ARG,RESULT}-TYPES.
@@ -566,22 +565,22 @@
   ;; conditionally compile for different target hardware
   ;; configuarations (e.g. FP hardware.)
   (guard nil :type (or function null))
-  ;; The policy under which this template is the best translation.
+  ;; the policy under which this template is the best translation.
   ;; Note that LTN might use this template under other policies if it
-  ;; can't figure our anything better to do.
-  (policy (required-argument) :type policies)
-  ;; The base cost for this template, given optimistic assumptions
+  ;; can't figure out anything better to do.
+  (ltn-policy (required-argument) :type ltn-policy)
+  ;; the base cost for this template, given optimistic assumptions
   ;; such as no operand loading, etc.
   (cost (required-argument) :type index)
-  ;; If true, then a short noun-like phrase describing what this VOP
-  ;; "does", i.e. the implementation strategy. This is for use in
-  ;; efficiency notes.
+  ;; If true, then this is a short noun-like phrase describing what
+  ;; this VOP "does", i.e. the implementation strategy. This is for
+  ;; use in efficiency notes.
   (note nil :type (or string null))
   ;; The number of trailing arguments to VOP or %PRIMITIVE that we
   ;; bundle into a list and pass into the emit function. This provides
   ;; a way to pass uninterpreted stuff directly to the code generator.
   (info-arg-count 0 :type index)
-  ;; A function that emits the VOPs for this template. Arguments:
+  ;; a function that emits the VOPs for this template. Arguments:
   ;;  1] Node for source context.
   ;;  2] IR2-Block that we place the VOP in.
   ;;  3] This structure.
@@ -600,7 +599,7 @@
   result-types
   (more-args-type :test more-args-type :prin1 more-args-type)
   (more-results-type :test more-results-type :prin1 more-results-type)
-  policy
+  ltn-policy
   cost
   (note :test note)
   (info-arg-count :test (not (zerop info-arg-count))))
@@ -611,8 +610,8 @@
 (def!struct (vop-info
 	     (:include template)
 	     (:make-load-form-fun ignore-it))
-  ;; Side-effects of this VOP and side-effects that affect the value
-  ;; of this VOP.
+  ;; side-effects of this VOP and side-effects that affect the value
+  ;; of this VOP
   (effects (required-argument) :type attributes)
   (affected (required-argument) :type attributes)
   ;; If true, causes special casing of TNs live after this VOP that
@@ -627,7 +626,7 @@
   ;; -- If :Compute-Only, just compute the save set, don't do any saving.
   ;;    This is used to get the live variables for debug info.
   (save-p nil :type (member t nil :force-to-stack :compute-only))
-  ;; Info for automatic emission of move-arg VOPs by representation
+  ;; info for automatic emission of move-arg VOPs by representation
   ;; selection. If NIL, then do nothing special. If non-null, then
   ;; there must be a more arg. Each more arg is moved to its passing
   ;; location using the appropriate representation-specific
@@ -647,15 +646,15 @@
   ;; :KNOWN-RETURN
   ;;     If needed, the old NFP is computed using COMPUTE-OLD-NFP.
   (move-args nil :type (member nil :full-call :local-call :known-return))
-  ;; A list of sc-vectors representing the loading costs of each fixed
-  ;; argument and result.
+  ;; a list of sc-vectors representing the loading costs of each fixed
+  ;; argument and result
   (arg-costs nil :type list)
   (result-costs nil :type list)
-  ;; If true, sc-vectors representing the loading costs for any more
-  ;; args and results.
+  ;; if true, SC-VECTORs representing the loading costs for any more
+  ;; args and results
   (more-arg-costs nil :type (or sc-vector null))
   (more-result-costs nil :type (or sc-vector null))
-  ;; Lists of sc-vectors mapping each SC to the SCs that we can load
+  ;; lists of SC-VECTORs mapping each SC to the SCs that we can load
   ;; into. If a SC is directly acceptable to the VOP, then the entry
   ;; is T. Otherwise, it is a list of the SC numbers of all the SCs
   ;; that we can load into. This list will be empty if there is no
@@ -663,42 +662,32 @@
   ;; operand SC restriction.
   (arg-load-scs nil :type list)
   (result-load-scs nil :type list)
-  ;; If true, a function that is called with the VOP to do operand
+  ;; if true, a function that is called with the VOP to do operand
   ;; targeting. This is done by modifiying the TN-Ref-Target slots in
   ;; the TN-Refs so that they point to other TN-Refs in the same VOP.
   (target-function nil :type (or null function))
-  ;; A function that emits assembly code for a use of this VOP when it
+  ;; a function that emits assembly code for a use of this VOP when it
   ;; is called with the VOP structure. Null if this VOP has no
   ;; specified generator (i.e. it exists only to be inherited by other
   ;; VOPs.)
   (generator-function nil :type (or function null))
-  ;; A list of things that are used to parameterize an inherited
+  ;; a list of things that are used to parameterize an inherited
   ;; generator. This allows the same generator function to be used for
   ;; a group of VOPs with similar implementations.
   (variant nil :type list)
-  ;; The number of arguments and results. Each regular arg/result
+  ;; the number of arguments and results. Each regular arg/result
   ;; counts as one, and all the more args/results together count as 1.
   (num-args 0 :type index)
   (num-results 0 :type index)
-  ;; Vector of the temporaries the vop needs. See emit-generic-vop in
-  ;; vmdef for information on how the temps are encoded.
-  ;;
-  ;; (The SB-XC-HOST conditionalization on the type is there because
-  ;; it's difficult to dump specialized arrays portably, so on the
-  ;; cross-compilation host we punt by using unspecialized arrays
-  ;; instead.)
+  ;; a vector of the temporaries the vop needs. See EMIT-GENERIC-VOP
+  ;; in vmdef for information on how the temps are encoded.
   (temps nil :type (or null (specializable-vector (unsigned-byte 16))))
-  ;; The order all the refs for this vop should be put in. Each
+  ;; the order all the refs for this vop should be put in. Each
   ;; operand is assigned a number in the following ordering: args,
   ;; more-args, results, more-results, temps This vector represents
   ;; the order the operands should be put into in the next-ref link.
-  ;;
-  ;; (The SB-XC-HOST conditionalization on the type is there because
-  ;; it's difficult to dump specialized arrays portably, so on the
-  ;; cross-compilation host we punt by using unspecialized arrays
-  ;; instead.)
   (ref-ordering nil :type (or null (specializable-vector (unsigned-byte 8))))
-  ;; Array of the various targets that should be done. Each element
+  ;; a vector of the various targets that should be done. Each element
   ;; encodes the source ref (shifted 8) and the dest ref index.
   (targets nil :type (or null (specializable-vector (unsigned-byte 16)))))
 

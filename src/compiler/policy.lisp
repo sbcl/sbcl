@@ -71,9 +71,11 @@
 	  ;; behavior, and should probably become the exact behavior.
 	  ;; Perhaps INHIBIT-NOTES?
 	  inhibit-warnings))
+  #|
   (setf *policy-defaulting-qualities*
 	'((interface-speed . speed)
 	  (interface-safety . safety)))
+  |#
   (setf *default-policy*
 	(mapcar (lambda (name)
 		  ;; CMU CL didn't use 1 as the default for everything,
@@ -134,10 +136,8 @@
 	 (binds (mapcar (lambda (name)
 			  `(,name (policy-quality ,n-policy ',name)))
 			used-qualities)))
-    (/show "in compile-time POLICY" expr binds)
     `(let* ((,n-policy (lexenv-policy ,(if node
 					   `(node-lexenv ,node)
 					   '*lexenv*)))
 	    ,@binds)
-       ;;(/show "in run-time POLICY" ,@used-qualities)
        ,expr)))

@@ -1025,7 +1025,8 @@
       (dynamic-extent
        (when (policy nil (> speed inhibit-warnings))
 	 (compiler-note
-	  "The DYNAMIC-EXTENT declaration is not implemented (ignored)."))
+	  "compiler limitation:~
+           ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
        res)
       (t
        (unless (info :declaration :recognized (first spec))

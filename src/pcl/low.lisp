@@ -300,7 +300,7 @@
   (slots nil))
 
 ;;; Both of these operations "work" on structures, which allows the above
-;;; weakening of std-instance-p.
+;;; weakening of STD-INSTANCE-P.
 (defmacro std-instance-slots (x) `(sb-kernel:%instance-ref ,x 1))
 (defmacro std-instance-wrapper (x) `(sb-kernel:%instance-layout ,x))
 

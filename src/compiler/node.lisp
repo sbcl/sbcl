@@ -122,7 +122,7 @@
   ;;    called for, but it believes it has proven that the check won't
   ;;    be done for policy reasons or because a safe implementation
   ;;    will be used. In the latter case, LTN must ensure that a safe
-  ;;    implementation *is* be used.
+  ;;    implementation *is* used.
   ;;
   ;; :ERROR
   ;;    There is a compile-time type error in some use of this
@@ -960,14 +960,14 @@
 			(:constructor make-combination (fun))))
 (defprinter (combination)
   (fun :prin1 (continuation-use fun))
-  (args :prin1 (mapcar #'(lambda (x)
-			   (if x
-			       (continuation-use x)
-			       "<deleted>"))
+  (args :prin1 (mapcar (lambda (x)
+			 (if x
+			     (continuation-use x)
+			     "<deleted>"))
 		       args)))
 
-;;; An MV-Combination is to Multiple-Value-Call as a Combination is to
-;;; Funcall. This is used to implement all the multiple-value
+;;; An MV-COMBINATION is to MULTIPLE-VALUE-CALL as a COMBINATION is to
+;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
 (defstruct (mv-combination (:include basic-combination)
 			   (:constructor make-mv-combination (fun))))

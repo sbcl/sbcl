@@ -737,84 +737,7 @@
 	 (values (cdr ,n-res) t)
 	 (values nil nil))))
 
-;;; These functions are called by the expansion of the DEFPRINTER
-;;; macro to do the actual printing.
-(declaim (ftype (function (symbol t stream &optional t) (values))
-		defprinter-prin1 defprinter-princ))
-(defun defprinter-prin1 (name value stream &optional indent)
-  (declare (ignore indent))
-  (defprinter-prinx #'prin1 name value stream))
-(defun defprinter-princ (name value stream &optional indent)
-  (declare (ignore indent))
-  (defprinter-prinx #'princ name value stream))
-(defun defprinter-prinx (prinx name value stream)
-  (declare (type function prinx))
-  (write-char #\space stream)
-  (when *print-pretty*
-    (pprint-newline :linear stream))
-  (format stream ":~A " name)
-  (funcall prinx value stream)
-  (values))
-
-;; Define some kind of reasonable PRINT-OBJECT method for a STRUCTURE-OBJECT.
-;;
-;; NAME is the name of the structure class, and CONC-NAME is the same as in
-;; DEFSTRUCT.
-;;
-;; The SLOT-DESCS describe how each slot should be printed. Each SLOT-DESC can
-;; be a slot name, indicating that the slot should simply be printed. A
-;; SLOT-DESC may also be a list of a slot name and other stuff. The other stuff
-;; is composed of keywords followed by expressions. The expressions are
-;; evaluated with the variable which is the slot name bound to the value of the
-;; slot. These keywords are defined:
-;;
-;; :PRIN1    Print the value of the expression instead of the slot value.
-;; :PRINC    Like :PRIN1, only princ the value
-;; :TEST     Only print something if the test is true.
-;;
-;; If no printing thing is specified then the slot value is printed as PRIN1.
-;;
-;; The structure being printed is bound to STRUCTURE and the stream is bound to
-;; STREAM.
-(defmacro defprinter ((name &key (conc-name (concatenate 'simple-string
-							 (symbol-name name)
-							 "-")))
-		      &rest slot-descs)
-  (flet ((sref (slot-name)
-	   `(,(symbolicate conc-name slot-name) structure)))
-    (collect ((prints))
-      (dolist (slot-desc slot-descs)
-	(if (atom slot-desc)
-	  (prints `(defprinter-prin1 ',slot-desc ,(sref slot-desc) stream))
-	  (let ((sname (first slot-desc))
-		(test t))
-	    (collect ((stuff))
-	      (do ((option (rest slot-desc) (cddr option)))
-		  ((null option)
-		   (prints
-		    `(let ((,sname ,(sref sname)))
-		       (when ,test
-			 ,@(or (stuff)
-			       `((defprinter-prin1 ',sname ,sname
-				   stream)))))))
-		(case (first option)
-		  (:prin1
-		   (stuff `(defprinter-prin1 ',sname ,(second option)
-			     stream)))
-		  (:princ
-		   (stuff `(defprinter-princ ',sname ,(second option)
-			     stream)))
-		  (:test (setq test (second option)))
-		  (t
-		   (error "bad DEFPRINTER option: ~S" (first option)))))))))
-
-      `(def!method print-object ((structure ,name) stream)
-	 (print-unreadable-object (structure stream :type t)
-	   (pprint-logical-block (stream nil)
-	     ;;(pprint-indent :current 2 stream)
-	     ,@(prints)))))))
-
-;;;; the Event statistics/trace utility
+;;;; the EVENT statistics/trace utility
 
 ;;; FIXME: This seems to be useful for troubleshooting and
 ;;; experimentation, not for ordinary use, so it should probably

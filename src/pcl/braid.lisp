@@ -562,14 +562,6 @@
 				 symbol)))))
       (error "~S is not a legal structure class name." symbol)))
 
-(defun method-function-returning-nil (args next-methods)
-  (declare (ignore args next-methods))
-  nil)
-
-(defun method-function-returning-t (args next-methods)
-  (declare (ignore args next-methods))
-  t)
-
 (defun make-class-predicate (class name)
   (let* ((gf (ensure-generic-function name))
 	 (mlist (if (eq *boot-state* 'complete)
@@ -577,7 +569,7 @@
 		    (early-gf-methods gf))))
     (unless mlist
       (unless (eq class *the-class-t*)
-	(let* ((default-method-function #'method-function-returning-nil)
+	(let* ((default-method-function #'constantly-nil)
 	       (default-method-initargs (list :function
 					      default-method-function))
 	       (default-method (make-a-method 'standard-method
@@ -589,7 +581,7 @@
 	  (setf (method-function-get default-method-function :constant-value)
 		nil)
 	  (add-method gf default-method)))
-      (let* ((class-method-function #'method-function-returning-t)
+      (let* ((class-method-function #'constantly-t)
 	     (class-method-initargs (list :function
 					  class-method-function))
 	     (class-method (make-a-method 'standard-method

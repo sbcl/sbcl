@@ -760,8 +760,6 @@
     (inst and result #x0000ffff)
     (inst and temp #x0000ffff)
     (inst add result temp)))
-
-
 
 ;;;; binary conditional VOPs
 

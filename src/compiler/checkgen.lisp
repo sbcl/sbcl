@@ -249,7 +249,9 @@
 ;;; We must only return NIL when it is *certain* that a check will not
 ;;; be done, since if we pass up this chance to do the check, it will
 ;;; be too late. The penalty for being too conservative is duplicated
-;;; type checks.
+;;; type checks. The penalty for erring by being too speculative is
+;;; much nastier, e.g. falling through without ever being able to find
+;;; an appropriate VOP.
 ;;;
 ;;; If there is a compile-time type error, then we always return true
 ;;; unless the DEST is a full call. With a full call, the theory is
@@ -278,7 +280,7 @@
 		   ((function-info-ir2-convert kind) t)
 		   (t
 		    (dolist (template (function-info-templates kind) nil)
-		      (when (eq (template-policy template) :fast-safe)
+		      (when (eq (template-ltn-policy template) :fast-safe)
 			(multiple-value-bind (val win)
 			    (valid-function-use dest (template-type template))
 			  (when (or val (not win)) (return t)))))))))

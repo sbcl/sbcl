@@ -673,20 +673,32 @@ retained, possibly temporariliy, because it might be used internally."
              ;; rid of FDEFINITIONs entirely later.
              "*SETF-FDEFINITION-HOOK*"
 
-             ;; useful but non-standard user-level functions..
+             ;; non-standard but widely useful user-level functions..
              "ASSQ" "DELQ" "MEMQ"
 	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
              "SANE-PACKAGE"
              "CIRCULAR-LIST-P"
 
-	     ;; ..and macros
+	     ;; ..and macros..
              "COLLECT"
              "DO-ANONYMOUS" "DOHASH" "DOVECTOR"
              "ITERATE"
              "LETF" "LETF*"
              "ONCE-ONLY"
              "DEFENUM"
+             "DEFPRINTER"
              "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
+
+             ;; ..and DEFTYPEs..
+             "INDEX" 
+
+             ;; ..and type predicates
+             "INSTANCEP"
+             "DOUBLE-FLOATP"
+             "LOGICAL-PATHNAME-P"
+             "LONG-FLOATP"
+             "SHORT-FLOATP"
+             "SINGLE-FLOATP"
 
              ;; encapsulation
              "ARGUMENT-LIST"
@@ -697,17 +709,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; various CHAR-CODEs
              "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE" "FORM-FEED-CHAR-CODE"
              "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
-
-             ;; handy user-level/basically-portable DEFTYPEs
-             "INDEX" 
-
-             ;; nonstandard type predicates
-             "INSTANCEP"
-             "DOUBLE-FLOATP"
-             "LOGICAL-PATHNAME-P"
-             "LONG-FLOATP"
-             "SHORT-FLOATP"
-             "SINGLE-FLOATP"
 
              ;; symbol-hacking idioms
              "CONCAT-PNAMES" "KEYWORDICATE" "SYMBOLICATE"
@@ -724,7 +725,7 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; FIXME: Maybe this isn't used any more? And if it is,
              ;; it probably needs a better name, since SPECIAL things
-             ;; are so obnoxious in Common Lisp.
+             ;; are such a nice source of sneaky bugs.
              "E"
 
              ;; various internal defaults

@@ -476,7 +476,7 @@
   (declare (type combination call) (type continuation cont)
 	   (type template template) (list rtypes))
   (let* ((dtype (node-derived-type call))
-	 (type (if (and (or (eq (template-policy template) :safe)
+	 (type (if (and (or (eq (template-ltn-policy template) :safe)
 			    (policy call (= safety 0)))
 			(continuation-type-check cont))
 		   (values-type-intersection
@@ -904,6 +904,29 @@
 		  arg-locs nargs)))))
   (values))
 
+;;; stuff to check in CHECK-FULL-CALL
+;;;
+;;; There are some things which are intended always to be optimized
+;;; away by DEFTRANSFORMs and such, and so never compiled into full
+;;; calls. This has been a source of bugs so many times that it seems
+;;; worth listing some of them here so that we can check the list
+;;; whenever we compile a full call.
+;;;
+;;; FIXME: It might be better to represent this property by setting a
+;;; flag in DEFKNOWN, instead of representing it by membership in this
+;;; list.
+(defvar *always-optimized-away*
+  '(;; This should always be DEFTRANSFORMed away, but wasn't in a bug
+    ;; reported to cmucl-imp@cons.org 2000-06-20.
+    %instance-ref
+    ;; These should always turn into VOPs, but wasn't in a bug which
+    ;; appeared when LTN-POLICY stuff was being tweaked in
+    ;; sbcl-0.6.9.16. in sbcl-0.6.0
+    data-vector-set
+    data-vector-ref))
+
+;;; more stuff to check in CHECK-FULL-CALL
+;;;
 ;;; These came in handy when troubleshooting cold boot after making
 ;;; major changes in the package structure: various transforms and
 ;;; VOPs and stuff got attached to the wrong symbol, so that
@@ -914,13 +937,12 @@
 #!+sb-show (defvar *show-full-called-fnames-p* nil)
 #!+sb-show (defvar *full-called-fnames* (make-hash-table :test 'equal))
 
-;;; If the call is in a tail recursive position and the return
-;;; convention is standard, then do a tail full call. If one or fewer
-;;; values are desired, then use a single-value call, otherwise use a
-;;; multiple-values call.
-(defun ir2-convert-full-call (node block)
-  (declare (type combination node) (type ir2-block block))
-
+;;; Do some checks on a full call:
+;;;   * Is this a full call to something we have reason to know should
+;;;     never be full called?
+;;;   * Is this a full call to (SETF FOO) which might conflict with
+;;;     a DEFSETF or some such thing elsewhere in the program?
+(defun check-full-call (node)
   (let* ((cont (basic-combination-fun node))
 	 (fname (continuation-function-name cont t)))
     (declare (type (or symbol cons) fname))
@@ -930,6 +952,8 @@
     #!+sb-show (when *show-full-called-fnames-p*
 		 (/show "converting full call to named function" fname)
 		 (/show (basic-combination-args node))
+		 (/show (policy node speed) (policy node safety))
+		 (/show (policy node compilation-speed))
 		 (let ((arg-types (mapcar (lambda (maybe-continuation)
 					    (when maybe-continuation
 					      (type-specifier
@@ -938,11 +962,23 @@
 					  (basic-combination-args node))))
 		   (/show arg-types)))
 
+    (when (memq fname *always-optimized-away*)
+      (/show (policy node speed) (policy node safety))
+      (/show (policy node compilation-speed))
+      (error "internal error: full call to ~S" fname))
+
     (when (consp fname)
       (destructuring-bind (setf stem) fname
 	(assert (eq setf 'setf))
-	(setf (gethash stem *setf-assumed-fboundp*) t))))
+	(setf (gethash stem *setf-assumed-fboundp*) t)))))
 
+;;; If the call is in a tail recursive position and the return
+;;; convention is standard, then do a tail full call. If one or fewer
+;;; values are desired, then use a single-value call, otherwise use a
+;;; multiple-values call.
+(defun ir2-convert-full-call (node block)
+  (declare (type combination node) (type ir2-block block))
+  (check-full-call node)
   (let ((2cont (continuation-info (node-cont node))))
     (cond ((node-tail-p node)
 	   (ir2-convert-tail-full-call node block))
@@ -951,7 +987,6 @@
 	   (ir2-convert-multiple-full-call node block))
 	  (t
 	   (ir2-convert-fixed-full-call node block))))
-
   (values))
 
 ;;;; entering functions
@@ -1405,7 +1440,7 @@
 
 ;;;; n-argument functions
 
-(macrolet ((frob (name)
+(macrolet ((def-frob (name)
 	     `(defoptimizer (,name ir2-convert) ((&rest args) node block)
 		(let* ((refs (move-tail-full-call-args node block))
 		       (cont (node-cont node))
@@ -1415,8 +1450,8 @@
 		  (vop* ,name node block (refs) ((first res) nil)
 			(length args))
 		  (move-continuation-result node block res cont)))))
-  (frob list)
-  (frob list*))
+  (def-frob list)
+  (def-frob list*))
 
 ;;;; structure accessors
 ;;;;

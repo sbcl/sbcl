@@ -639,7 +639,7 @@
 #!+sb-show
 (defvar *show-transforms-p* nil)
 
-;;; Do IR1 optimizations on a Combination node.
+;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
   (when (continuation-reoptimize (basic-combination-fun node))

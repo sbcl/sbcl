@@ -72,9 +72,10 @@
      (macrolet ((clone-arg () '(read-arg 1)))
        (define-fop (,small-name ,small-code ,pushp) ,@forms))))
 
-;;; a helper function for reading string values from FASL files: sort of like
-;;; READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8), with an automatic
-;;; conversion from (UNSIGNED-BYTE 8) into CHARACTER for each element read
+;;; a helper function for reading string values from FASL files: sort
+;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
+;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
+;;; for each element read
 (declaim (ftype (function (stream simple-string &optional index) (values)) read-string-as-bytes))
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (dotimes (i length)
@@ -99,11 +100,12 @@
 #!+sb-show
 (defvar *show-fop-nop4-p* nil)
 
-;;; CMU CL had a single no-op fop, FOP-NOP, with fop code 0. Since 0 occurs
-;;; disproportionately often in fasl files for other reasons, FOP-NOP is less
-;;; than ideal for writing human-readable patterns into fasl files for
-;;; debugging purposes. There's no shortage of unused fop codes, so we add this
-;;; second NOP, which reads 4 arbitrary bytes and discards them.
+;;; CMU CL had a single no-op fop, FOP-NOP, with fop code 0. Since 0
+;;; occurs disproportionately often in fasl files for other reasons,
+;;; FOP-NOP is less than ideal for writing human-readable patterns
+;;; into fasl files for debugging purposes. There's no shortage of
+;;; unused fop codes, so we add this second NOP, which reads 4
+;;; arbitrary bytes and discards them.
 (define-fop (fop-nop4 137 :nope)
   (let ((arg (read-arg 4)))
     (declare (ignorable arg))

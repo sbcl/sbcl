@@ -298,7 +298,7 @@
   (:result-types single-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
+	   ;; Value is in ST0.
 	   (inst fst (make-ea :dword :base object :index index :scale 1
 			      :disp (- (* sb!vm:vector-data-offset
 					  sb!vm:word-bytes)
@@ -335,7 +335,7 @@
   (:result-types single-float)
   (:generator 4
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
+	   ;; Value is in ST0.
 	   (inst fst (make-ea :dword :base object
 			      :disp (- (+ (* sb!vm:vector-data-offset
 					     sb!vm:word-bytes)
@@ -405,7 +405,7 @@
   (:result-types double-float)
   (:generator 20
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
+	   ;; Value is in ST0.
 	   (inst fstd (make-ea :dword :base object :index index :scale 2
 			       :disp (- (* sb!vm:vector-data-offset
 					   sb!vm:word-bytes)
@@ -442,7 +442,7 @@
   (:result-types double-float)
   (:generator 19
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
+	   ;; Value is in ST0.
 	   (inst fstd (make-ea :dword :base object
 			       :disp (- (+ (* sb!vm:vector-data-offset
 					      sb!vm:word-bytes)
@@ -522,7 +522,7 @@
     ;; temp = 3 * index
     (inst lea temp (make-ea :dword :base index :index index :scale 2))
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
+	   ;; Value is in ST0.
 	   (store-long-float
 	    (make-ea :dword :base object :index temp :scale 1
 		     :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
@@ -559,7 +559,7 @@
   (:result-types long-float)
   (:generator 19
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
+	   ;; Value is in ST0.
 	   (store-long-float (make-ea :dword :base object
 				      :disp (- (+ (* sb!vm:vector-data-offset
 						     sb!vm:word-bytes)
@@ -700,7 +700,7 @@
     (let ((value-real (complex-single-reg-real-tn value))
 	  (result-real (complex-single-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0
+	     ;; Value is in ST0.
 	     (inst fst (make-ea :dword :base object
 				:disp (- (+ (* sb!vm:vector-data-offset
 					       sb!vm:word-bytes)
@@ -802,7 +802,7 @@
     (let ((value-real (complex-double-reg-real-tn value))
 	  (result-real (complex-double-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0
+	     ;; Value is in ST0.
 	     (inst fstd (make-ea :dword :base object :index index :scale 4
 				 :disp (- (* sb!vm:vector-data-offset
 					     sb!vm:word-bytes)
@@ -852,7 +852,7 @@
     (let ((value-real (complex-double-reg-real-tn value))
 	  (result-real (complex-double-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0
+	     ;; Value is in ST0.
 	     (inst fstd (make-ea :dword :base object
 				 :disp (- (+ (* sb!vm:vector-data-offset
 						sb!vm:word-bytes)
@@ -963,7 +963,7 @@
     (let ((value-real (complex-long-reg-real-tn value))
 	  (result-real (complex-long-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0
+	     ;; Value is in ST0.
 	     (store-long-float
 	      (make-ea :dword :base object :index temp :scale 2
 		       :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
@@ -1013,7 +1013,7 @@
     (let ((value-real (complex-long-reg-real-tn value))
 	  (result-real (complex-long-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0
+	     ;; Value is in ST0.
 	     (store-long-float
 	      (make-ea :dword :base object
 		       :disp (- (+ (* sb!vm:vector-data-offset
@@ -1057,10 +1057,7 @@
       (unless (location= value-imag result-imag)
 	(inst fstd result-imag))
       (inst fxch value-imag))))
-
 
-;;;; dtc expanded and fixed the following:
-
 ;;; unsigned-byte-8
 
 (define-vop (data-vector-ref/simple-array-unsigned-byte-8)

@@ -43,22 +43,23 @@
 ;;;   implementations, but I will leave it to the compiler to optimize
 ;;;   into calls to them.
 ;;;
-;;; FIXME: MEMQ, ASSQ, and DELQ are already defined in SBCL, and we should
-;;; use those. POSQ and NEQ aren't defined in SBCL, and are used too often
-;;; in PCL to make it appealing to hand expand all uses and then delete
-;;; the macros, so they should be boosted up to SBCL to stand by MEMQ,
-;;; ASSQ, and DELQ.
+;;; FIXME: MEMQ, ASSQ, and DELQ are already defined in SBCL, and we
+;;; should use those definitions. POSQ and NEQ aren't defined in SBCL,
+;;; and are used too often in PCL to make it appealing to hand expand
+;;; all uses and then delete the macros, so they should be boosted up
+;;; to SB-INT to stand by MEMQ, ASSQ, and DELQ.
 (defmacro memq (item list) `(member ,item ,list :test #'eq))
 (defmacro assq (item list) `(assoc ,item ,list :test #'eq))
 (defmacro delq (item list) `(delete ,item ,list :test #'eq))
 (defmacro posq (item list) `(position ,item ,list :test #'eq))
 (defmacro neq (x y) `(not (eq ,x ,y)))
-
-;;; FIXME: Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and
-;;; CONSTANTLY-0, and boost them up to SB-INT.
-(defun true (&rest ignore) (declare (ignore ignore)) t)
-(defun false (&rest ignore) (declare (ignore ignore)) nil)
-(defun zero (&rest ignore) (declare (ignore ignore)) 0)
+;;; FIXME: CONSTANTLY-FOO should be boosted up to SB-INT too.
+(macrolet ((def-constantly-fun (name constant-expr)
+	     `(setf (symbol-function ',name)
+		    (constantly ,constant-expr))))
+  (def-constantly-fun constantly-t t)
+  (def-constantly-fun constantly-nil nil)
+  (def-constantly-fun constantly-0 0))
 
 ;;; comment from original CMU CL PCL: ONCE-ONLY does the same thing as
 ;;; it does in zetalisp. I should have just lifted it from there but I
@@ -164,44 +165,14 @@
 		 (setq ,var (pop .dolist-carefully.))
 		 ,@body)
 	       (,improper-list-handler)))))
-
-;;; FIXME: Do we really need this? It seems to be used only
-;;; for class names. Why not just the default ALL-CAPS?
-(defun capitalize-words (string &optional (dashes-p t))
-  (let ((string (copy-seq (string string))))
-    (declare (string string))
-    (do* ((flag t flag)
-	  (length (length string) length)
-	  (char nil char)
-	  (i 0 (+ i 1)))
-	 ((= i length) string)
-      (setq char (elt string i))
-      (cond ((both-case-p char)
-	     (if flag
-		 (and (setq flag (lower-case-p char))
-		      (setf (elt string i) (char-upcase char)))
-		 (and (not flag) (setf (elt string i) (char-downcase char))))
-	     (setq flag nil))
-	    ((char-equal char #\-)
-	     (setq flag t)
-	     (unless dashes-p (setf (elt string i) #\space)))
-	    (t (setq flag nil))))))
 
 ;;;; FIND-CLASS
 ;;;;
-;;;; This is documented in the CLOS specification.
-;;;; KLUDGE: Except that SBCL deviates from the spec by having CL:FIND-CLASS
-;;;; distinct from PCL:FIND-CLASS, alas. -- WHN 19991203
+;;;; This is documented in the CLOS specification. FIXME: Except that
+;;;; SBCL deviates from the spec by having CL:FIND-CLASS distinct from
+;;;; PCL:FIND-CLASS, alas.
 
 (defvar *find-class* (make-hash-table :test 'eq))
-
-(defun function-returning-nil (x)
-  (declare (ignore x))
-  nil)
-
-(defun function-returning-t (x)
-  (declare (ignore x))
-  t)
 
 (defmacro find-class-cell-class (cell)
   `(car ,cell))
@@ -214,7 +185,7 @@
 
 (defmacro make-find-class-cell (class-name)
   (declare (ignore class-name))
-  '(list* nil #'function-returning-nil nil))
+  '(list* nil #'constantly-nil nil))
 
 (defun find-class-cell (symbol &optional dont-create-p)
   (or (gethash symbol *find-class*)

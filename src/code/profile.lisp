@@ -187,7 +187,7 @@
 ;;; CLEAR-STATS-FUN clears the statistics.
 ;;;
 ;;; (The reason for implementing this as coupled closures, with the
-;;; counts built into the lexical environment, is that we hopes this
+;;; counts built into the lexical environment, is that we hope this
 ;;; will minimize profiling overhead.)
 (defun profile-encapsulation-lambdas (encapsulated-fun)
   (declare (type function encapsulated-fun))
@@ -260,12 +260,18 @@
 
 ;;; interfaces
 
-;;; A symbol names a function, a string names all the functions named
-;;; by symbols in the named package.
+;;; A symbol or (SETF FOO) list names a function, a string names all
+;;; the functions named by symbols in the named package.
 (defun mapc-on-named-functions (function names)
   (dolist (name names)
     (etypecase name
       (symbol (funcall function name))
+      (list
+       ;; We call this just for the side effect of checking that
+       ;; NAME is a legal function name:
+       (function-name-block-name name)
+       ;; Then we map onto it.
+       (funcall function name))
       (string (let ((package (find-undeleted-package-or-lose name)))
 		(do-symbols (symbol package)
 		  (when (eq (symbol-package symbol) package)

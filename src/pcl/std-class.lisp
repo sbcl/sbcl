@@ -346,7 +346,7 @@
     class))
 
 (defmethod class-predicate-name ((class t))
-  'function-returning-nil)
+  'constantly-nil)
 
 (defun ensure-class-values (class args)
   (let* ((initargs (copy-list args))

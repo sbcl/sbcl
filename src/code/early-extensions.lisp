@@ -321,8 +321,8 @@
            (symbolp (cadr name))
            (null (cddr name)))))
 
-;;; Given a function name, return the name for the BLOCK which encloses its
-;;; body (e.g. in DEFUN, DEFINE-COMPILER-MACRO, or FLET).
+;;; Given a function name, return the name for the BLOCK which
+;;; encloses its body (e.g. in DEFUN, DEFINE-COMPILER-MACRO, or FLET).
 (declaim (ftype (function ((or symbol cons)) symbol) function-name-block-name))
 (defun function-name-block-name (function-name)
   (cond ((symbolp function-name)
@@ -367,6 +367,101 @@
 	;; a constant as long as the new value is EQL to the old
 	;; value.)
 	))
+
+;;;; DEFPRINTER
+
+;;; These functions are called by the expansion of the DEFPRINTER
+;;; macro to do the actual printing.
+(declaim (ftype (function (symbol t stream &optional t) (values))
+		defprinter-prin1 defprinter-princ))
+(defun defprinter-prin1 (name value stream &optional indent)
+  (declare (ignore indent))
+  (defprinter-prinx #'prin1 name value stream))
+(defun defprinter-princ (name value stream &optional indent)
+  (declare (ignore indent))
+  (defprinter-prinx #'princ name value stream))
+(defun defprinter-prinx (prinx name value stream)
+  (declare (type function prinx))
+  (when *print-pretty*
+    (pprint-newline :linear stream))
+  (format stream ":~A " name)
+  (funcall prinx value stream)
+  (values))
+(defun defprinter-print-space (stream)
+  (write-char #\space stream))
+
+;;; Define some kind of reasonable PRINT-OBJECT method for a
+;;; STRUCTURE-OBJECT class.
+;;;
+;;; NAME is the name of the structure class, and CONC-NAME is the same
+;;; as in DEFSTRUCT.
+;;;
+;;; The SLOT-DESCS describe how each slot should be printed. Each
+;;; SLOT-DESC can be a slot name, indicating that the slot should
+;;; simply be printed. A SLOT-DESC may also be a list of a slot name
+;;; and other stuff. The other stuff is composed of keywords followed
+;;; by expressions. The expressions are evaluated with the variable
+;;; which is the slot name bound to the value of the slot. These
+;;; keywords are defined:
+;;;
+;;; :PRIN1    Print the value of the expression instead of the slot value.
+;;; :PRINC    Like :PRIN1, only princ the value
+;;; :TEST     Only print something if the test is true.
+;;;
+;;; If no printing thing is specified then the slot value is printed
+;;; as if by PRIN1.
+;;;
+;;; The structure being printed is bound to STRUCTURE and the stream
+;;; is bound to STREAM.
+(defmacro defprinter ((name &key (conc-name (concatenate 'simple-string
+							 (symbol-name name)
+							 "-")))
+		      &rest slot-descs)
+  (let ((first? t)
+	maybe-print-space
+	(reversed-prints nil)
+	(stream (gensym "STREAM")))
+    (flet ((sref (slot-name)
+	     `(,(symbolicate conc-name slot-name) structure)))
+      (dolist (slot-desc slot-descs)
+	(if first?
+	    (setf maybe-print-space nil
+		  first? nil)
+	    (setf maybe-print-space `(defprinter-print-space ,stream)))
+	(cond ((atom slot-desc)
+	       (push maybe-print-space reversed-prints)
+	       (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) ,stream)
+		     reversed-prints))
+	      (t
+	       (let ((sname (first slot-desc))
+		     (test t))
+		 (collect ((stuff))
+		   (do ((option (rest slot-desc) (cddr option)))
+		       ((null option)
+			(push `(let ((,sname ,(sref sname)))
+				 (when ,test
+				   ,maybe-print-space
+				   ,@(or (stuff)
+					 `((defprinter-prin1
+					     ',sname ,sname ,stream)))))
+			      reversed-prints))
+		     (case (first option)
+		       (:prin1
+			(stuff `(defprinter-prin1
+				  ',sname ,(second option) ,stream)))
+		       (:princ
+			(stuff `(defprinter-princ
+				  ',sname ,(second option) ,stream)))
+		       (:test (setq test (second option)))
+		       (t
+			(error "bad option: ~S" (first option)))))))))))
+    `(def!method print-object ((structure ,name) ,stream)
+       ;; FIXME: should probably be byte-compiled
+       (pprint-logical-block (,stream nil)
+	 (print-unreadable-object (structure ,stream :type t)
+	   (when *print-pretty*
+	     (pprint-indent :block 2 ,stream))
+	   ,@(nreverse reversed-prints))))))
 
 #|
 ;;; REMOVEME when done testing byte cross-compiler

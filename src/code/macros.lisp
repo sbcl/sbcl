@@ -92,8 +92,8 @@
 
 (defmacro-mundanely defconstant (name value &optional documentation)
   #!+sb-doc
-  "For defining global constants. The DEFCONSTANT says that the value
-  is constant and may be compiled into code. If the variable already has
+  "For defining global constants. DEFCONSTANT says that the value is
+  constant and may be compiled into code. If the variable already has
   a value, and this is not EQL to the init, the code is not portable
   (undefined behavior). The third argument is an optional documentation
   string for the variable."
@@ -102,22 +102,20 @@
 
 ;;; the guts of DEFCONSTANT
 (defun sb!c::%defconstant (name value doc)
-  (/show "doing %DEFCONSTANT" name value doc)
   (unless (symbolp name)
     (error "constant name not a symbol: ~S" name))
   (about-to-modify name)
   (let ((kind (info :variable :kind name)))
     (case kind
       (:constant
-       ;; Note 1: This behavior (discouraging any non-EQL
-       ;; modification) is unpopular, but it is specified by ANSI
-       ;; (i.e. ANSI says a non-EQL change has undefined
-       ;; consequences). If people really want bindings which are
-       ;; constant in some sense other than EQL, I suggest either just
-       ;; using DEFVAR (which is usually appropriate, despite the
-       ;; un-mnemonic name), or defining something like
-       ;; SB-INT:DEFCONSTANT-EQX (which is occasionally more
-       ;; appropriate). -- WHN 2000-11-03
+       ;; Note: This behavior (discouraging any non-EQL modification)
+       ;; is unpopular, but it is specified by ANSI (i.e. ANSI says a
+       ;; non-EQL change has undefined consequences). If people really
+       ;; want bindings which are constant in some sense other than
+       ;; EQL, I suggest either just using DEFVAR (which is usually
+       ;; appropriate, despite the un-mnemonic name), or defining
+       ;; something like SB-INT:DEFCONSTANT-EQX (which is occasionally
+       ;; more appropriate). -- WHN 2000-11-03
        (unless (eql value
 		    (info :variable :constant-value name))
 	 (cerror "Go ahead and change the value."

@@ -2067,14 +2067,14 @@
 
       (coerce (cdr (res)) 'simple-vector))))
 
-;;; This variable maps minimal debug-info function maps to an unpacked
-;;; version thereof.
+;;; a map from minimal DEBUG-INFO function maps to unpacked
+;;; versions thereof
 (defvar *uncompacted-function-maps* (make-hash-table :test 'eq))
 
-;;; Return a function-map for a given compiled-debug-info object. If
+;;; Return a FUNCTION-MAP for a given COMPILED-DEBUG-info object. If
 ;;; the info is minimal, and has not been parsed, then parse it.
 ;;;
-;;; FIXME: Now that we no longer use the minimal-debug-function
+;;; FIXME: Now that we no longer use the MINIMAL-DEBUG-FUNCTION
 ;;; representation, calls to this function can be replaced by calls to
 ;;; the bare COMPILED-DEBUG-INFO-FUNCTION-MAP slot accessor function,
 ;;; and this function and everything it calls become dead code which
@@ -2090,17 +2090,14 @@
 
 ;;;; CODE-LOCATIONs
 
-;;; If we're sure of whether code-location is known, return t or nil.
-;;; If we're :unsure, then try to fill in the code-location's slots.
+;;; If we're sure of whether code-location is known, return T or NIL.
+;;; If we're :UNSURE, then try to fill in the code-location's slots.
 ;;; This determines whether there is any debug-block information, and
 ;;; if code-location is known.
 ;;;
 ;;; ??? IF this conses closures every time it's called, then break off the
-;;; :unsure part to get the HANDLER-CASE into another function.
+;;; :UNSURE part to get the HANDLER-CASE into another function.
 (defun code-location-unknown-p (basic-code-location)
-  #!+sb-doc
-  "Returns whether basic-code-location is unknown. It returns nil when the
-   code-location is known."
   (ecase (code-location-%unknown-p basic-code-location)
     ((t) t)
     ((nil) nil)
@@ -2109,11 +2106,10 @@
 	   (handler-case (not (fill-in-code-location basic-code-location))
 	     (no-debug-blocks () t))))))
 
+;;; Return the DEBUG-BLOCK containing code-location if it is available.
+;;; Some debug policies inhibit debug-block information, and if none
+;;; is available, then this signals a NO-DEBUG-BLOCKS condition.
 (defun code-location-debug-block (basic-code-location)
-  #!+sb-doc
-  "Returns the debug-block containing code-location if it is available. Some
-   debug policies inhibit debug-block information, and if none is available,
-   then this signals a no-debug-blocks condition."
   (let ((block (code-location-%debug-block basic-code-location)))
     (if (eq block :unparsed)
 	(etypecase basic-code-location
@@ -2126,10 +2122,10 @@
 		   (interpreted-code-location-ir1-node basic-code-location))))))
 	block)))
 
-;;; This stores and returns BASIC-CODE-LOCATION's debug-block. It
-;;; determines the correct one using the code-location's pc. This uses
+;;; Store and return BASIC-CODE-LOCATION's debug-block. We determines
+;;; the correct one using the code-location's pc. We use
 ;;; DEBUG-FUNCTION-DEBUG-BLOCKS to return the cached block information
-;;; or signal a 'no-debug-blocks condition. The blocks are sorted by
+;;; or signal a NO-DEBUG-BLOCKS condition. The blocks are sorted by
 ;;; their first code-location's pc, in ascending order. Therefore, as
 ;;; soon as we find a block that starts with a pc greater than
 ;;; basic-code-location's pc, we know the previous block contains the
@@ -2280,8 +2276,8 @@
       (let ((live-set (compiled-code-location-%live-set code-location)))
 	(cond ((eq live-set :unparsed)
 	       (unless (fill-in-code-location code-location)
-		 ;; This check should be unnecessary. We're missing debug info
-		 ;; the compiler should have dumped.
+		 ;; This check should be unnecessary. We're missing
+		 ;; debug info the compiler should have dumped.
 		 ;;
 		 ;; FIXME: This error and comment happen over and over again.
 		 ;; Make them a shared function.
@@ -2289,9 +2285,8 @@
 	       (compiled-code-location-%live-set code-location))
 	      (t live-set)))))
 
+;;; true if OBJ1 and OBJ2 are the same place in the code
 (defun code-location= (obj1 obj2)
-  #!+sb-doc
-  "Returns whether obj1 and obj2 are the same place in the code."
   (etypecase obj1
     (compiled-code-location
      (etypecase obj2
@@ -2312,7 +2307,7 @@
   (= (compiled-code-location-pc obj1)
      (compiled-code-location-pc obj2)))
 
-;;; This fills in CODE-LOCATION's :unparsed slots. It returns t or nil
+;;; Fill in CODE-LOCATION's :UNPARSED slots, returning T or NIL
 ;;; depending on whether the code-location was known in its
 ;;; debug-function's debug-block information. This may signal a
 ;;; NO-DEBUG-BLOCKS condition due to DEBUG-FUNCTION-DEBUG-BLOCKS, and

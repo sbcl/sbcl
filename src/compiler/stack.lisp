@@ -143,21 +143,21 @@
 
   (values))
 
-;;; Called when we discover that the stack-top unknown-values continuation
-;;; at the end of Block1 is different from that at the start of Block2 (its
-;;; successor.)
+;;; This is called when we discover that the stack-top unknown-values
+;;; continuation at the end of BLOCK1 is different from that at the
+;;; start of BLOCK2 (its successor).
 ;;;
-;;; We insert a call to a funny function in a new cleanup block introduced
-;;; between Block1 and Block2. Since control analysis and LTN have already
-;;; run, we must do make an IR2 block, then do ADD-TO-EMIT-ORDER and
-;;; LTN-ANALYZE-BLOCK on the new block. The new block is inserted after Block1
-;;; in the emit order.
+;;; We insert a call to a funny function in a new cleanup block
+;;; introduced between BLOCK1 and BLOCK2. Since control analysis and
+;;; LTN have already run, we must do make an IR2 block, then do
+;;; ADD-TO-EMIT-ORDER and LTN-ANALYZE-BELATED-BLOCK on the new block.
+;;; The new block is inserted after BLOCK1 in the emit order.
 ;;;
-;;; If the control transfer between Block1 and Block2 represents a
-;;; tail-recursive return (:Deleted IR2-continuation) or a non-local exit, then
-;;; the cleanup code will never actually be executed. It doesn't seem to be
-;;; worth the risk of trying to optimize this, since this rarely happens and
-;;; wastes only space.
+;;; If the control transfer between BLOCK1 and BLOCK2 represents a
+;;; tail-recursive return (:DELETED IR2-continuation) or a non-local
+;;; exit, then the cleanup code will never actually be executed. It
+;;; doesn't seem to be worth the risk of trying to optimize this,
+;;; since this rarely happens and wastes only space.
 (defun discard-unused-values (block1 block2)
   (declare (type cblock block1 block2))
   (let* ((block1-stack (ir2-block-end-stack (block-info block1)))
@@ -174,7 +174,7 @@
 	   (2block (make-ir2-block block)))
       (setf (block-info block) 2block)
       (add-to-emit-order 2block (block-info block1))
-      (ltn-analyze-block block)))
+      (ltn-analyze-belated-block block)))
 
   (values))
 

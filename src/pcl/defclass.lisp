@@ -40,21 +40,10 @@
 ;;; FIXME: It's not clear that this adds value any more. Couldn't
 ;;; we just use EVAL-WHEN?
 (defun make-top-level-form (name times form)
-  (flet ((definition-name ()
-	   (if (and (listp name)
-		    (memq (car name)
-			  '(defmethod defclass class
-			    method method-combination)))
-	       (format nil "~A~{ ~S~}"
-		       (capitalize-words (car name) ()) (cdr name))
-	       (format nil "~S" name))))
-    ;; FIXME: It appears that we're just consing up a string and then
-    ;; throwing it away?!
-    (definition-name)
-    (if (or (member 'compile times)
-	    (member ':compile-toplevel times))
-	`(eval-when ,times ,form)
-	form)))
+  (if (or (member 'compile times)
+	  (member ':compile-toplevel times))
+      `(eval-when ,times ,form)
+      form))
 
 (defun make-progn (&rest forms)
   (let ((progn-form nil))
@@ -162,13 +151,13 @@
   (declare (special *initfunctions*))
   (cond ((or (eq initform 't)
 	     (equal initform ''t))
-	 '(function true))
+	 '(function constantly-t))
 	((or (eq initform 'nil)
 	     (equal initform ''nil))
-	 '(function false))
+	 '(function constantly-nil))
 	((or (eql initform '0)
 	     (equal initform ''0))
-	 '(function zero))
+	 '(function constantly-0))
 	(t
 	 (let ((entry (assoc initform *initfunctions* :test #'equal)))
 	   (unless entry

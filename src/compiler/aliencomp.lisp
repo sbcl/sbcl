@@ -643,12 +643,12 @@
       (alien-function-type-result-type type)))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
-	      ((function type &rest args) node policy)
+	      ((function type &rest args) node ltn-policy)
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation function policy)
+  (annotate-ordinary-continuation function ltn-policy)
   (dolist (arg args)
-    (annotate-ordinary-continuation arg policy)))
+    (annotate-ordinary-continuation arg ltn-policy)))
 
 (defoptimizer (%alien-funcall ir2-convert)
 	      ((function type &rest args) call block)
