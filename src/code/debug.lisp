@@ -270,29 +270,44 @@ is how many frames to show."
 (legal-fun-name-p '(lambda ()))
 (defvar *show-entry-point-details* nil)
 
+(defun clean-xep (name args)
+  (values (second name)
+	  (if (consp args)
+	      (let ((count (first args))
+		    (real-args (rest args)))
+		(if (fixnump count)
+		    (subseq real-args 0 
+			    (min count (length real-args)))
+		    real-args))
+	      args)))
+
+(defun clean-&more-processor (name args)
+  (values (second name)
+	  (if (consp args)
+	      (let* ((more (last args 2))
+		     (context (first more))
+		     (count (second more)))		
+		(append
+		 (butlast args 2)
+		 (if (fixnump count)
+		     (multiple-value-list 
+		      (sb!c:%more-arg-values context 0 count))
+		     (list
+		      (make-unprintable-object "more unavailable arguments")))))
+	      args)))
+
 (defun frame-call (frame)
   (labels ((clean-name-and-args (name args)
              (if (and (consp name) (not *show-entry-point-details*))
+		 ;; FIXME: do we need to deal with
+		 ;; HAIRY-FUNCTION-ENTRY here? I can't make it or
+		 ;; &AUX-BINDINGS appear in backtraces, so they are
+		 ;; left alone for now. --NS 2005-02-28
                  (case (first name)
                    ((sb!c::xep sb!c::tl-xep)
-                    (clean-name-and-args 
-                     (second name)
-                     (let ((count (first args))
-                           (real-args (rest args)))
-                       (subseq real-args 0 (min count (length real-args))))))
+		    (clean-xep name args))
                    ((sb!c::&more-processor)
-                    (clean-name-and-args
-                     (second name)
-                     (let* ((more (last args 2))
-                            (context (first more))
-                            (count (second more)))
-                       (append (butlast args 2)
-                               (multiple-value-list 
-                                (sb!c:%more-arg-values context 0 count))))))
-                   ;; FIXME: do we need to deal with
-                   ;; HAIRY-FUNCTION-ENTRY here? I can't make it or
-                   ;; &AUX-BINDINGS appear in backtraces, so they are
-                   ;; left alone for now. --NS 2005-02-28
+		    (clean-&more-processor name args))
                    ((sb!c::hairy-arg-processor 
                      sb!c::varargs-entry sb!c::&optional-processor)
                     (clean-name-and-args (second name) args))
@@ -363,7 +378,7 @@ is how many frames to show."
 	(sb!di:debug-condition (ignore) 
           ignore)
 	(error (c) 
-          (format stream "error finding source: ~A" c))))))
+          (format stream "~&error finding source: ~A" c))))))
 
 ;;;; INVOKE-DEBUGGER
 

@@ -68,10 +68,10 @@
 ;;; and hasn't been cut off anywhere.
 (defun verify-backtrace (test-function frame-specs &key (allow-stunted nil))
   (labels ((args-equal (want real)
-             (cond ((endp want)
-                    (endp real))
-                   ((eq '&rest (car want))
+             (cond ((eq '&rest (car want))
                     t)
+                   ((endp want)
+                    (endp real))
                    ((or (eq '? (car want)) (equal (car want) (car real)))
                     (args-equal (cdr want) (cdr real)))
                    (t
@@ -195,20 +195,34 @@
 (defun oops ()
   (error "oops"))
 
-(defun bt.1 (&key key)
+(defmacro defbt (n ll &body body)
+  `(progn
+     ;; normal debug info
+     (defun ,(intern (format nil "BT.~A.1" n)) ,ll 
+       ,@body)
+     ;; no arguments saved
+     (defun ,(intern (format nil "BT.~A.2" n)) ,ll 
+       (declare (optimize (debug 1) (speed 3)))
+       ,@body)
+     ;; no lambda-list saved
+     (defun ,(intern (format nil "BT.~A.3" n)) ,ll 
+       (declare (optimize (debug 0)))
+       ,@body)))
+
+(defbt 1 (&key key)
   (list key))
 
-(defun bt.2 (x)
+(defbt 2 (x)
   (list x))
 
-(defun bt.3 (&key (key (oops)))
+(defbt 3 (&key (key (oops)))
   (list key))
 
 ;;; ERROR instead of OOPS so that tail call elimination doesn't happen
-(defun bt.4 (&optional opt)
+(defbt 4 (&optional opt)
   (list (error "error")))
 
-(defun bt.5 (&optional (opt (oops)))
+(defbt 5 (&optional (opt (oops)))
   (list opt))
 
 #-(and x86 linux)
@@ -216,23 +230,8 @@
              `(let ((sb-debug:*show-entry-point-details* ,bool))
                 ,@body)))
 
-  ;; &MORE-PROCESSOR
-  (with-details t
-    (assert (verify-backtrace (lambda () (bt.1 :key))
-                              '(((sb-c::&more-processor bt.1) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace (lambda () (bt.1 :key))
-                              '((bt.1 :key)))))
-
-  ;; XEP
-  (with-details t
-    (assert (verify-backtrace #'bt.2
-                              '(((sb-c::xep bt.2) 0 ?)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.2
-                              '((bt.2)))))
-
   ;; TL-XEP
+  (print :tl-xep)
   (with-details t
     (assert (verify-backtrace #'namestring
                               '(((sb-c::tl-xep namestring) 0 ?)))))
@@ -240,29 +239,90 @@
     (assert (verify-backtrace #'namestring
                               '((namestring)))))
 
-  ;; VARARGS-ENTRY
+
+  ;; &MORE-PROCESSOR
   (with-details t
-    (assert (verify-backtrace #'bt.3
-                             '(((sb-c::varargs-entry bt.3) :key nil)))))
+    (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                              '(((sb-c::&more-processor bt.1.1) &rest))))
+    (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                              '(((sb-c::&more-processor bt.1.2) &rest))))
+    (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                              '(((sb-c::&more-processor bt.1.3) &rest)))))
   (with-details nil
-    (assert (verify-backtrace #'bt.3
-                              '((bt.3 :key nil)))))
+    (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                              '((bt.1.1 :key))))
+    (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                              '((bt.1.2 &rest))))
+    (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                              '((bt.1.3 &rest)))))
+
+  ;; XEP
+  (print :xep)
+  (with-details t
+    (assert (verify-backtrace #'bt.2.1
+                              '(((sb-c::xep bt.2.1) 0 ?))))
+    (assert (verify-backtrace #'bt.2.2
+                              '(((sb-c::xep bt.2.2) &rest))))
+    (assert (verify-backtrace #'bt.2.3
+                              '(((sb-c::xep bt.2.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.2.1
+                              '((bt.2.1))))
+    (assert (verify-backtrace #'bt.2.2
+                              '((bt.2.2 &rest))))
+    (assert (verify-backtrace #'bt.2.3
+                              '((bt.2.3 &rest)))))
+
+  ;; VARARGS-ENTRY
+  (print :varargs-entry)
+  (with-details t
+    (assert (verify-backtrace #'bt.3.1
+                             '(((sb-c::varargs-entry bt.3.1) :key nil))))
+    (assert (verify-backtrace #'bt.3.2
+                             '(((sb-c::varargs-entry bt.3.2) :key ?))))
+    (assert (verify-backtrace #'bt.3.3
+                             '(((sb-c::varargs-entry bt.3.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.3.1
+                              '((bt.3.1 :key nil))))
+    (assert (verify-backtrace #'bt.3.2
+                              '((bt.3.2 :key ?))))
+    (assert (verify-backtrace #'bt.3.3
+                              '((bt.3.3 &rest)))))
 
   ;; HAIRY-ARG-PROCESSOR
+  (print :hairy-args-processor)
   (with-details t
-    (assert (verify-backtrace #'bt.4
-                              '(((sb-c::hairy-arg-processor bt.4) ?)))))
+    (assert (verify-backtrace #'bt.4.1
+                              '(((sb-c::hairy-arg-processor bt.4.1) ?))))
+    (assert (verify-backtrace #'bt.4.2
+                              '(((sb-c::hairy-arg-processor bt.4.2) ?))))
+    (assert (verify-backtrace #'bt.4.3
+                              '(((sb-c::hairy-arg-processor bt.4.3) &rest)))))
   (with-details nil
-    (assert (verify-backtrace #'bt.4
-                              '((bt.4 ?)))))
+    (assert (verify-backtrace #'bt.4.1
+                              '((bt.4.1 ?))))
+    (assert (verify-backtrace #'bt.4.2
+                              '((bt.4.2 ?))))
+    (assert (verify-backtrace #'bt.4.3
+                              '((bt.4.3 &rest)))))
 
   ;; &OPTIONAL-PROCESSOR
+  (print :optional-processor)
   (with-details t
-    (assert (verify-backtrace #'bt.5
-                              '(((sb-c::&optional-processor bt.5))))))
+    (assert (verify-backtrace #'bt.5.1
+                              '(((sb-c::&optional-processor bt.5.1)))))
+    (assert (verify-backtrace #'bt.5.2
+                              '(((sb-c::&optional-processor bt.5.2) &rest))))
+    (assert (verify-backtrace #'bt.5.3
+                              '(((sb-c::&optional-processor bt.5.3) &rest)))))
   (with-details nil
-    (assert (verify-backtrace #'bt.5
-                              '((bt.5))))))
+    (assert (verify-backtrace #'bt.5.1
+                              '((bt.5.1))))
+    (assert (verify-backtrace #'bt.5.2
+                              '((bt.5.2 &rest))))
+    (assert (verify-backtrace #'bt.5.3
+                              '((bt.5.3 &rest))))))
 
 ;;; success
 (quit :unix-status 104)
