@@ -1239,7 +1239,7 @@
 ;;;     structures can have arbitrary subtypes of VECTOR, not necessarily
 ;;;     SIMPLE-VECTOR.)
 ;;;   * STRUCTURE structures can have raw slots that must also be
-;;;     allocated and indirectly referenced. 
+;;;     allocated and indirectly referenced.
 (defun create-vector-constructor (dd cons-name arglist vars types values)
   (let ((temp (gensym))
 	(etype (dd-element-type dd)))
@@ -1252,7 +1252,8 @@
 		     `(setf (aref ,temp ,(cdr x))  ',(car x)))
 		   (find-name-indices dd))
 	 ,@(mapcar (lambda (dsd value)
-		     `(setf (aref ,temp ,(dsd-index dsd)) ,value))
+		     (unless (eq value '.do-not-initialize-slot.)
+                         `(setf (aref ,temp ,(dsd-index dsd)) ,value)))
 		   (dd-slots dd) values)
 	 ,temp))))
 (defun create-list-constructor (dd cons-name arglist vars types values)
@@ -1260,7 +1261,8 @@
     (dolist (x (find-name-indices dd))
       (setf (elt vals (cdr x)) `',(car x)))
     (loop for dsd in (dd-slots dd) and val in values do
-      (setf (elt vals (dsd-index dsd)) val))
+      (setf (elt vals (dsd-index dsd))
+            (if (eq val '.do-not-initialize-slot.) 0 val)))
 
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
@@ -1284,7 +1286,8 @@
 		     ;; because the slot might be :READ-ONLY, so we
 		     ;; whip up new LAMBDA representations of slot
 		     ;; setters for the occasion.)
-		     `(,(slot-setter-lambda-form dd dsd) ,value ,instance))
+                     (unless (eq value '.do-not-initialize-slot.)
+                       `(,(slot-setter-lambda-form dd dsd) ,value ,instance)))
 		   (dd-slots dd)
 		   values)
 	 ,instance))))
@@ -1313,7 +1316,8 @@
       (parse-lambda-list (second boa))
     (collect ((arglist)
 	      (vars)
-	      (types))
+	      (types)
+              (skipped-vars))
       (labels ((get-slot (name)
 		 (let ((res (find name (dd-slots defstruct)
 				  :test #'string=
@@ -1330,7 +1334,7 @@
 	  (arglist arg)
 	  (vars arg)
 	  (types (get-slot arg)))
-	
+
 	(when opt
 	  (arglist '&optional)
 	  (dolist (arg opt)
@@ -1383,18 +1387,21 @@
 	(when auxp
 	  (arglist '&aux)
 	  (dolist (arg aux)
-	    (let* ((arg (if (consp arg) arg (list arg)))
-		   (var (first arg)))
-	      (arglist arg)
-	      (vars var)
-	      (types (get-slot var))))))
+            (arglist arg)
+            (if (proper-list-of-length-p arg 2)
+              (let ((var (first arg)))
+                (vars var)
+                (types (get-slot var)))
+              (skipped-vars (if (consp arg) (first arg) arg))))))
 
       (funcall creator defstruct (first boa)
 	       (arglist) (vars) (types)
-	       (mapcar (lambda (slot)
-			 (or (find (dsd-name slot) (vars) :test #'string=)
-			     (dsd-default slot)))
-		       (dd-slots defstruct))))))
+               (loop for slot in (dd-slots defstruct)
+                     for name = (dsd-name slot)
+                     collect (if (find name (skipped-vars) :test #'string=)
+                                 '.do-not-initialize-slot.
+                                 (or (find (dsd-name slot) (vars) :test #'string=)
+                                     (dsd-default slot))))))))
 
 ;;; Grovel the constructor options, and decide what constructors (if
 ;;; any) to create.

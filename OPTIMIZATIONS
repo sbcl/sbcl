@@ -42,9 +42,6 @@
     (length v)))
 
 * IR1 does not optimize away (MAKE-LIST N).
-
-* IR1 thinks that the type of V in (LENGTH V) is (OR LIST SIMPLE-VECTOR), not
-  SIMPLE-VECTOR.
 --------------------------------------------------------------------------------
 (defun bar (v1 v2)
   (declare (optimize (speed 3) (safety 0) (space 2))
@@ -95,4 +92,46 @@ uses generic arithmetic
               (dotimes (f n)
                 (incf x)))))))
    (format t "~A~%" x)))
+--------------------------------------------------------------------------------
+(defun foo (x)
+  (declare (optimize speed (debug 0)))
+  (if (< x 0) x (foo (1- x))))
+
+SBCL generates a full call of FOO (but CMUCL does not).
+--------------------------------------------------------------------------------
+(defun foo (d)
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  (declare (type (double-float 0d0 1d0) d))
+  (loop for i fixnum from 1 to 5
+     for x1 double-float = (sin d) ;;; !!!
+     do (loop for j fixnum from 1 to 4
+             sum x1 double-float)))
+
+Without the marked declaration Python will use boxed representation for X1.
+
+This is equivalent to
+
+(let ((x nil))
+  (setq x 0d0)
+  ;; use of X as DOUBLE-FLOAT
+)
+
+The initial binding is effectless, and without it X is of type
+DOUBLE-FLOAT. Unhopefully, IR1 does not optimize away effectless
+SETs/bindings, and IR2 does not perform type inference.
+--------------------------------------------------------------------------------
+(defun foo (x)
+  (if (= (cond ((irgh x) 0)
+               ((buh x) 1)
+               (t 2))
+         0)
+      :yes
+      :no))
+
+This code could be optimized to
+
+(defun foo (x)
+  (cond ((irgh x) :yes)
+        ((buh x) :no)
+        (t :no)))
 --------------------------------------------------------------------------------

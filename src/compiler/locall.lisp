@@ -996,7 +996,7 @@
   ;; From the user's point of view, LET-converting something that
   ;; has a name is inlining it. (The user can't see what we're doing
   ;; with anonymous things, and suppressing inlining
-  ;; for such things can easily give Python acute indigestion, so 
+  ;; for such things can easily give Python acute indigestion, so
   ;; we don't.)
   (when (leaf-has-source-name-p clambda)
     ;; ANSI requires that explicit NOTINLINE be respected.

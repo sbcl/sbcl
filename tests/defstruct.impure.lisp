@@ -23,6 +23,19 @@
 (assert (raises-error? (setf (person-name (make-person :name "Q")) 1)
 		       type-error))
 
+;;; An &AUX variable in a boa-constructor without a default value
+;;; means "do not initialize slot" and does not cause type error
+(defstruct (boa-saux (:constructor make-boa-saux (&aux a (b 3) (c))))
+  (a #\! :type (integer 1 2))
+  (b #\? :type (integer 3 4))
+  (c #\# :type (integer 5 6)))
+(let ((s (make-boa-saux)))
+  (setf (boa-saux-a s) 1)
+  (setf (boa-saux-c s) 5)
+  (assert (eql (boa-saux-a s) 1))
+  (assert (eql (boa-saux-b s) 3))
+  (assert (eql (boa-saux-c s) 5)))
+
 ;;; basic inheritance
 (defstruct (astronaut (:include person)
 		      (:conc-name astro-))
@@ -40,7 +53,7 @@
 
 ;;; interaction of :TYPE and :INCLUDE and :INITIAL-OFFSET
 (defstruct (binop (:type list) :named (:initial-offset 2))
-  (operator '? :type symbol)   
+  (operator '? :type symbol)
   operand-1
   operand-2)
 (defstruct (annotated-binop (:type list)

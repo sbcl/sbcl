@@ -91,8 +91,12 @@
 (symbol-macrolet ((foo (symbol-macrolet-bar 1)))
   (defmacro symbol-macrolet-bar (x) `(+ ,x 1))
   (assert (= foo 2)))
+
+;;; Bug reported by Paul Dietz: CONSTANTP on a self-evaluating object
+;;; must return T
+
+(assert (constantp (find-class 'symbol)))
+(assert (constantp #p""))
 
 ;;; success
 (sb-ext:quit :unix-status 104)
-
-    

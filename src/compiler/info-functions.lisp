@@ -127,22 +127,17 @@
   #!+sb-doc
   "True of any Lisp object that has a constant value: types that eval to
   themselves, keywords, constants, and list whose car is QUOTE."
-  ;; FIXME: Should STRUCTURE-OBJECT and/or STANDARD-OBJECT be here?
-  ;; They eval to themselves..
-  ;;
   ;; FIXME: Someday it would be nice to make the code recognize foldable
   ;; functions and call itself recursively on their arguments, so that
   ;; more of the examples in the ANSI CL definition are recognized.
   ;; (e.g. (+ 3 2), (SQRT PI), and (LENGTH '(A B C)))
   (declare (ignore environment))
   (typecase object
-    (number t)
-    (character t)
-    (array t)
     ;; (Note that the following test on INFO catches KEYWORDs as well as
     ;; explicitly DEFCONSTANT symbols.)
     (symbol (eq (info :variable :kind object) :constant))
-    (list (eq (car object) 'quote))))
+    (list (eq (car object) 'quote))
+    (t t)))
 
 (declaim (ftype (function (symbol &optional (or null sb!c::lexenv))) sb!xc:macro-function))
 (defun sb!xc:macro-function (symbol &optional env)

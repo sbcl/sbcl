@@ -1494,9 +1494,12 @@ changes in sbcl-0.7.12 relative to sbcl-0.7.11:
   * fixed bug 62: constraints were not propagated into a loop.
   * fixed bug in embedded calls of SORT (reported and investigated by
     Wolfgang Jenkner).
-  * fixed bugs identified by Paul F. Dietz related to printing and
-    reading of arrays with some dimensions having length 0.  (thanks
-    to Gerd Moellmann)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** printing and reading of arrays with some dimensions having
+       length 0 (thanks to Gerd Moellmann);
+    ** BOA constructor with &AUX argument without a default value does
+       not cause a type error;
+    ** CONSTANTP now returns true for all self-evaluating objects.
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
