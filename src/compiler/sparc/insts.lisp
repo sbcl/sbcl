@@ -1213,12 +1213,12 @@ about function addresses and register values.")
 ;; registers.
 (define-instruction rdy (segment dst)
   (:declare (type tn dst))
-  (:printer format-3-immed ((op #b10) (op3 #b101000) (rs1 0) (immed 0))
+  (:printer format-3-reg ((op #b10) (op3 #b101000) (rs1 0) (immed 0))
             '('RD :tab '%Y ", " rd))
   (:dependencies (reads :y) (writes dst))
   (:delay 0)
-  (:emitter (emit-format-3-immed segment #b10 (reg-tn-encoding dst) #b101000
-				 0 0 0)))
+  (:emitter (emit-format-3-reg segment #b10 (reg-tn-encoding dst) #b101000
+			       0 0 0 0)))
 
 (defconstant-eqx wry-printer
   '('WR :tab rs1 (:unless (:constant 0) ", " (:choose immed rs2)) ", " '%Y)
