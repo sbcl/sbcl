@@ -268,3 +268,9 @@
 	x))
   (assert (null result))
   (assert (typep error 'program-error)))
+
+;;; COPY-SEQ should work on known-complex vectors:
+(assert (equalp #(1)
+		(let ((v (make-array 0 :fill-pointer 0)))
+		  (vector-push-extend 1 v)
+		  (copy-seq v))))

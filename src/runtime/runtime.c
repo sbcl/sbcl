@@ -148,10 +148,10 @@ main(int argc, char *argv[], char *envp[])
 		    lose("more than one core file specified");
 		} else {
 		    ++argi;
-		    core = copied_string(argv[argi]);
 		    if (argi >= argc) {
 			lose("missing filename for --core argument");
 		    }
+		    core = copied_string(argv[argi]);
 		    ++argi;
 		}
 	    } else if (0 == strcmp(arg, "--end-runtime-options")) {

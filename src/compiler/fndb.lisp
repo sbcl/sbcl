@@ -425,12 +425,12 @@
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown copy-seq (sequence) consed-sequence (flushable)
-  :derive-type #'result-type-first-arg)
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown length (sequence) index (foldable flushable))
 
 (defknown reverse (sequence) consed-sequence (flushable)
-  :derive-type #'result-type-first-arg)
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown nreverse (sequence) sequence ()
   :derive-type #'result-type-first-arg)

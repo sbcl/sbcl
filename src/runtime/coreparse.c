@@ -187,7 +187,7 @@ load_core_file(char *file)
 		    goto losing_build_id;
 		for (i = 0; i < remaining_len; ++i) {
 		    FSHOW((stderr, "ptr[%d] = char = %d, expected=%d\n",
-			   ptr[i], i, build_id[i]));
+			   i, ptr[i], build_id[i]));
 		    if (ptr[i] != build_id[i])
 			goto losing_build_id;
 		}
