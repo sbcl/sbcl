@@ -88,7 +88,7 @@
   (unless (constantp slot-name)
     (error "~S requires its slot-name argument to be a constant"
 	   'accessor-slot-boundp))
-  (let* ((slot-name (eval slot-name)))
+  (let ((slot-name (eval slot-name)))
     `(slot-boundp-normal ,object ',slot-name)))
 
 (defun structure-slot-boundp (object)

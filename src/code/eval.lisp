@@ -17,20 +17,20 @@
   (funcall (compile (gensym "EVAL-TMPFUN-")
 		    `(lambda ()
 
-		       ;; SPEED=0,DEBUG=1 => byte-compile
-		       (declare (optimize (speed 0) (debug 1))) 
+		       ;; The user can reasonably expect that the
+		       ;; interpreter will be safe.
+		       (declare (optimize (safety 3)))
 
-		       ;; Other than that, basically we care about
-		       ;; compilation speed, compilation speed, and
-		       ;; compilation speed. (There are cases where
-		       ;; the user wants something else, but we don't
-		       ;; know enough to guess that; and if he is
-		       ;; unhappy about our guessed emphasis, he
-		       ;; should explicitly compile his code, with
-		       ;; explicit declarations to tell us what to
-		       ;; emphasize.)
-		       (declare (optimize (space 1) (safety 1)))
-		       (declare (optimize (compilation-speed 3)))
+		       ;; It's also good if the interpreter doesn't
+		       ;; spend too long thinking about each input
+		       ;; form, since if the user'd wanted the
+		       ;; tradeoff to favor quality of compiled code
+		       ;; over compilation speed, he'd've explicitly
+		       ;; asked for compilation.
+		       (declare (optimize (compilation-speed 2)))
+
+		       ;; Other properties are relatively unimportant.
+		       (declare (optimize (speed 1) (debug 1) (space 1)))
 
 		       ,expr))))
 

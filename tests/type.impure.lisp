@@ -197,7 +197,8 @@
 						     'simple-condition))
 		    (mapcar #'sb-pcl:find-class
 			    '(simple-type-error simple-error
-						sb-int:simple-style-warning)))))
+                              sb-int:simple-file-error
+                              sb-int:simple-style-warning)))))
 
      ;; precedence lists
      (assert (equal (sb-pcl:class-precedence-list
