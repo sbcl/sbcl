@@ -128,6 +128,10 @@
   (etypecase object
     (list (list-to-bit-vector* object))
     (vector (vector-to-bit-vector* object))))
+(defun coerce-to-simple-vector (x)
+  (if (simple-vector-p x)
+      x
+      (replace (make-array (length x)) x)))
 (defun coerce-to-vector (object output-type-spec)
   (etypecase object
     (list (list-to-vector* object output-type-spec))

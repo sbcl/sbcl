@@ -98,7 +98,8 @@
 (sb!xc:deftype simple-bit-vector (&optional size)
   `(simple-array bit (,size)))
 
-;;;; some private types that we use in defining the standard functions
+;;;; some private types that we use in defining the standard functions,
+;;;; or implementing declarations in standard compiler transforms
 
 ;;; a type specifier
 (sb!xc:deftype type-specifier () '(or list symbol sb!xc:class))
@@ -124,6 +125,12 @@
   '(or string pathname stream))
 (sb!xc:deftype logical-host-designator ()
   '(or host string))
+
+;;; like INDEX, but augmented with -1 (useful when using the index
+;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
+;;; an implementation which terminates the loop by testing for the
+;;; index leaving the loop range)
+(sb!xc:deftype index-or-minus-1 () `(integer -1 ,(1- most-positive-fixnum)))
 
 ;;; a thing returned by the irrational functions. We assume that they
 ;;; never compute a rational result.

@@ -542,54 +542,23 @@
 
 ;;;; coercion
 
-;;; old working version
 (deftransform coerce ((x type) (* *) * :when :both)
   (unless (constant-continuation-p type)
     (give-up-ir1-transform))
   (let ((tspec (specifier-type (continuation-value type))))
     (if (csubtypep (continuation-type x) tspec)
 	'x
+	;; Note: The THE here makes sure that specifiers like
+	;; (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
 	`(the ,(continuation-value type)
-	      ,(cond ((csubtypep tspec (specifier-type 'double-float))
-		      '(%double-float x))	
-		     ;; FIXME: If LONG-FLOAT is to be supported, we
-		     ;; need to pick it off here before falling through
-		     ;; to %SINGLE-FLOAT.
-		     ((csubtypep tspec (specifier-type 'float))
-		      '(%single-float x))
-		     (t
-		      (give-up-ir1-transform)))))))
+	   ,(cond
+	     ((csubtypep tspec (specifier-type 'double-float))
+	      '(%double-float x))	
+	     ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
+	     ((csubtypep tspec (specifier-type 'float))
+	      '(%single-float x))
+	     ((csubtypep tspec (specifier-type 'simple-vector))
+	      '(coerce-to-simple-vector x))
+	     (t
+	      (give-up-ir1-transform)))))))
 
-;;; KLUDGE: new broken version -- 20000504
-;;; FIXME: should be fixed or deleted
-#+nil
-(deftransform coerce ((x type) (* *) * :when :both)
-  (unless (constant-continuation-p type)
-    (give-up-ir1-transform))
-  (let ((tspec (specifier-type (continuation-value type))))
-    (if (csubtypep (continuation-type x) tspec)
-	'x
-	`(if #+nil (typep x type) #-nil nil
-	     x
-	     (the ,(continuation-value type)
-		  ,(cond ((csubtypep tspec (specifier-type 'double-float))
-			  '(%double-float x))	
-			 ;; FIXME: If LONG-FLOAT is to be supported,
-			 ;; we need to pick it off here before falling
-			 ;; through to %SINGLE-FLOAT.
-			 ((csubtypep tspec (specifier-type 'float))
-			  '(%single-float x))
-			 #+nil
-			 ((csubtypep tspec (specifier-type 'list))
-			  '(coerce-to-list x))
-			 #+nil
-			 ((csubtypep tspec (specifier-type 'string))
-			  '(coerce-to-simple-string x))
-			 #+nil
-			 ((csubtypep tspec (specifier-type 'bit-vector))
-			  '(coerce-to-bit-vector x))
-			 #+nil
-			 ((csubtypep tspec (specifier-type 'vector))
-			  '(coerce-to-vector x type))
-			 (t
-			  (give-up-ir1-transform))))))))

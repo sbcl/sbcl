@@ -25,27 +25,8 @@
 
 (in-package "SB-C")
 
-(deftype index-or-minus-1 () `(integer -1 ,(1- most-positive-fixnum)))
-
 (declaim (optimize (speed 1) (space 2)))
 
-(deftransform fill ((seq item &key (start 0) (end (length seq)))
-		    (vector t &key (:start t) (:end index))
-		    *
-		    :policy (> speed space))
-  "open code"
-  (let ((element-type (upgraded-element-type-specifier-or-give-up seq)))
-    `(with-array-data ((data seq)
-		       (start start)
-		       (end end))
-       (declare (type (simple-array ,element-type 1) data))
-       (do ((i start (1+ i)))
-	   ((= i end) seq)
-	 (declare (type index i))
-	 ;; WITH-ARRAY-DATA does our range checks once and for all, so
-	 ;; it'd be wasteful to check again on every AREF.
-	 (declare (optimize (safety 0))) 
-	 (setf (aref data i) item)))))
 ;;; TO DO for DEFTRANSFORM FILL:
 ;;;   ?? This DEFTRANSFORM, and the old DEFTRANSFORMs, should only
 ;;;      apply when SPEED > SPACE.
@@ -101,31 +82,6 @@
 			     (aref seq index2))
 		       (incf index2))))))
        seq1)))
-
-(setf (function-info-transforms (info :function :info 'coerce)) nil)
-(deftransform coerce ((x type) (* *) * :when :both)
-  (unless (constant-continuation-p type)
-    (give-up-ir1-transform))
-  (let ((tspec (specifier-type (continuation-value type))))
-    (if (csubtypep (continuation-type x) tspec)
-	'x
-	;; Note: The THE here makes sure that specifiers like
-	;; (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
-	`(the ,(continuation-value type)
-	   ,(cond
-	     ((csubtypep tspec (specifier-type 'double-float))
-	      '(%double-float x))	
-	     ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
-	     ((csubtypep tspec (specifier-type 'float))
-	      '(%single-float x))
-	     ((csubtypep tspec (specifier-type 'simple-vector))
-	      '(coerce-to-simple-vector x)) ; FIXME: needs DEFKNOWN return type
-	     (t
-	      (give-up-ir1-transform)))))))
-(defun coerce-to-simple-vector (x)
-  (if (simple-vector-p x)
-      x
-      (replace (make-array (length x)) x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; setting up for POSITION/FIND stuff

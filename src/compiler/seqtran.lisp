@@ -296,12 +296,22 @@
 	   (T (setq splice x)))))
 
 (deftransform fill ((seq item &key (start 0) (end (length seq)))
-		    (simple-array t &key (:start t) (:end index)))
+		    (vector t &key (:start t) (:end index))
+		    *
+		    :policy (> speed space))
   "open code"
-  '(do ((i start (1+ i)))
-       ((= i end) seq)
-     (declare (type index i))
-     (setf (aref seq i) item)))
+  (let ((element-type (upgraded-element-type-specifier-or-give-up seq)))
+    `(with-array-data ((data seq)
+		       (start start)
+		       (end end))
+       (declare (type (simple-array ,element-type 1) data))
+       (do ((i start (1+ i)))
+	   ((= i end) seq)
+	 (declare (type index i))
+	 ;; WITH-ARRAY-DATA did our range checks once and for all, so
+	 ;; it'd be wasteful to check again on every AREF.
+	 (declare (optimize (safety 0))) 
+	 (setf (aref data i) item)))))
 
 (deftransform position ((item list &key (test #'eql)) (t list))
   "open code"
