@@ -587,13 +587,26 @@ bootstrapping.
 	 ;; weirdness when bootstrapping.. -- WHN 20000610
 	 '(ignorable))
 	(t
-	 ;; Otherwise, we can make Python very happy.
+	 ;; Otherwise, we can usually make Python very happy.
 	 (let ((type (info :type :kind specializer)))
 	   (ecase type
 	     ((:primitive :defined :instance :forthcoming-defclass-type)
 	      `(type ,specializer ,parameter))
 	     ((nil)
-	      `(type ,(class-name (find-class specializer)) ,parameter)))))))
+	      (let ((class (find-class specializer nil)))
+		(if class
+		    `(type ,(class-name class) ,parameter)
+		    (progn
+		      ;; we can get here, and still not have a failure
+		      ;; case, by doing MOP programming like (PROGN
+		      ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
+		      ;; ...)).  Best to let the user know we haven't
+		      ;; been able to extract enough information:
+		      (style-warn
+		       "~@<can't find type for presumed class ~S in ~S.~@:>"
+		       specializer
+		       'parameter-specializer-declaration-in-defmethod)
+		      '(ignorable))))))))))
 
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))

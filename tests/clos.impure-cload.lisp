@@ -62,6 +62,13 @@
 (defmethod baz ((x specializer2)) x)
 (defmethod baz ((x specializer1)) x)
 (assert (typep (baz (make-instance 'specializer1)) 'specializer1))
+
+;;; in a similar vein, we should be able to define methods on classes
+;;; that are effectively unknown to the type system:
+(sb-mop:ensure-class 'unknown-type)
+(defmethod method ((x unknown-type)) x)
+;;; (we can't call it without defining methods on allocate-instance
+;;; etc., but we should be able to define it).
 
 ;;; success
 (sb-ext:quit :unix-status 104)

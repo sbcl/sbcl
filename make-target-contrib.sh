@@ -26,6 +26,13 @@ export SBCL SBCL_BUILDING_CONTRIB
 
 gnumake=${GNUMAKE:-gmake}
 
+mkdir -p contrib/systems
+rm -f contrib/systems/*
+
+for i in contrib/*/*.asd; do
+    ln -sf ../../$i contrib/systems/
+done
+
 for i in contrib/*; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
