@@ -1220,6 +1220,18 @@ WORKAROUND:
   compiler gets its hands on the code needing compilation from the REPL,
   it has been macroexpanded several times.
 
+  A symptom of the same underlying problem, reported by Tony Martinez:
+    * (handler-case
+        (with-input-from-string (*query-io* "    no")
+          (yes-or-no-p))
+      (simple-type-error () 'error))
+    ; in: LAMBDA NIL
+    ;     (SB-KERNEL:FLOAT-WAIT)
+    ; 
+    ; note: deleting unreachable code
+    ; compilation unit finished
+    ;   printed 1 note
+
 241: "DEFCLASS mysteriously remembers uninterned accessor names."
   (from tonyms on #lisp IRC 2003-02-25)
   In sbcl-0.7.12.55, typing
@@ -1239,6 +1251,19 @@ WORKAROUND:
   (UNSIGNED-BYTE 8) will write to the stream one byte at a time,
   rather than writing the sequence in one go, leading to severe
   performance degradation.
+
+243: "STYLE-WARNING overenthusiasm for unused variables"
+  (observed from clx compilation)
+  In sbcl-0.7.14, in the presence of the macros
+    (DEFMACRO FOO (X) `(BAR ,X))
+    (DEFMACRO BAR (X) (DECLARE (IGNORABLE X)) 'NIL)
+  somewhat surprising style warnings are emitted for
+    (COMPILE NIL '(LAMBDA (Y) (FOO Y))):
+  ; in: LAMBDA (Y)
+  ;     (LAMBDA (Y) (FOO Y))
+  ; 
+  ; caught STYLE-WARNING:
+  ;   The variable Y is defined but never used.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
