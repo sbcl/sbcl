@@ -25,7 +25,7 @@
 (sb!xc:defmacro def-math-rtn (name num-args)
   (let ((function (symbolicate "%" (string-upcase name))))
     `(progn
-       (proclaim '(inline ,function))
+       (declaim (inline ,function))
        (sb!alien:define-alien-routine (,name ,function) double-float
          ,@(let ((results nil))
              (dotimes (i num-args (nreverse results))

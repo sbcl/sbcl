@@ -894,11 +894,11 @@
 ;;;     keep garbage from being collected.
 (macrolet ((def (counter vto vfrom fto ffrom)
 	     `(progn
+		(declaim (type hash-table ,vto ,vfrom))
 		(defvar ,vto (make-hash-table :test 'eq))
 		(defvar ,vfrom (make-hash-table :test 'eql))
-		(proclaim '(hash-table ,vto ,vfrom))
+		(declaim (type fixnum ,counter))
 		(defvar ,counter 0)
-		(proclaim '(fixnum ,counter))
 
 		(defun ,fto (x)
 		  (or (gethash x ,vto)
