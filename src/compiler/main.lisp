@@ -874,7 +874,11 @@
     (let* ((locall-fun (ir1-convert-lambda
                         definition
                         :debug-name (debug-namify "top level local call ~S"
-                                                  name)))
+                                                  name)
+			;; KLUDGE: we do this so that we get to have
+			;; nice debug returnness in functions defined
+			;; from the REPL
+			:allow-debug-catch-tag t))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
 				    :source-name (or name '.anonymous.)
 				    :debug-name (unless name

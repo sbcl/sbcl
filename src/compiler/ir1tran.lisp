@@ -48,6 +48,11 @@
   to optimize code which uses those definitions? Setting this true
   gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
   the efficiency of stable code.")
+
+;;; *ALLOW-DEBUG-CATCH-TAG* controls whether we should allow the
+;;; insertion a (CATCH ...) around code to allow the debugger RETURN
+;;; command to function.
+(defvar *allow-debug-catch-tag* t)
 
 ;;;; namespace management utilities
 
@@ -1960,33 +1965,34 @@
      "The lambda expression has a missing or non-list lambda list:~%  ~S"
      form))
 
-  (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
-      (make-lambda-vars (cadr form))
-    (multiple-value-bind (forms decls) (parse-body (cddr form))
-      (let* ((result-cont (make-continuation))
-	     (*lexenv* (process-decls decls
-				      (append aux-vars vars)
-				      nil result-cont))
-	     (forms (if (and allow-debug-catch-tag
-			     (policy *lexenv* (> debug (max speed space))))
-			`((catch (make-symbol "SB-DEBUG-CATCH-TAG")
-			    ,@forms))
-			forms))
-	     (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
-		      (ir1-convert-hairy-lambda forms vars keyp
-						allow-other-keys
-						aux-vars aux-vals result-cont
-						:source-name source-name
-						:debug-name debug-name)
-		      (ir1-convert-lambda-body forms vars
-					       :aux-vars aux-vars
-					       :aux-vals aux-vals
-					       :result result-cont
-					       :source-name source-name
-					       :debug-name debug-name))))
-	(setf (functional-inline-expansion res) form)
-	(setf (functional-arg-documentation res) (cadr form))
-	res))))
+  (let ((*allow-debug-catch-tag* (and *allow-debug-catch-tag* allow-debug-catch-tag)))
+    (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
+	(make-lambda-vars (cadr form))
+      (multiple-value-bind (forms decls) (parse-body (cddr form))
+	(let* ((result-cont (make-continuation))
+	       (*lexenv* (process-decls decls
+					(append aux-vars vars)
+					nil result-cont))
+	       (forms (if (and *allow-debug-catch-tag*
+			       (policy *lexenv* (> debug (max speed space))))
+			  `((catch (make-symbol "SB-DEBUG-CATCH-TAG")
+			      ,@forms))
+			  forms))
+	       (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
+			(ir1-convert-hairy-lambda forms vars keyp
+						  allow-other-keys
+						  aux-vars aux-vals result-cont
+						  :source-name source-name
+						  :debug-name debug-name)
+			(ir1-convert-lambda-body forms vars
+						 :aux-vars aux-vars
+						 :aux-vals aux-vals
+						 :result result-cont
+						 :source-name source-name
+						 :debug-name debug-name))))
+	  (setf (functional-inline-expansion res) form)
+	  (setf (functional-arg-documentation res) (cadr form))
+	  res)))))
 
 ;;;; defining global functions
 

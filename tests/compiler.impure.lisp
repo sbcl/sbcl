@@ -728,6 +728,29 @@ BUG 48c, not yet fixed:
   (coerce x '(values t)))
 (assert (null (ignore-errors (coerce-defopt 3))))
 
+;;; Oops.  In part of the (CATCH ..) implementation of DEBUG-RETURN,
+;;; it was possible to confuse the type deriver of the compiler
+;;; sufficiently that compiler invariants were broken (explained by
+;;; APD sbcl-devel 2003-01-11).
+
+;;; WHN's original report
+(defun debug-return-catch-break1 ()
+  (with-open-file (s "/tmp/foo"
+		     :direction :output
+		     :element-type (list
+				    'signed-byte
+				    (1+
+				     (integer-length most-positive-fixnum))))
+    (read-byte s)
+    (read-byte s)
+    (read-byte s)
+    (read-byte s)))
+
+;;; APD's simplified test case
+(defun debug-return-catch-break2 (x)
+  (declare (type (vector (unsigned-byte 8)) x))
+  (setq *y* (the (unsigned-byte 8) (aref x 4))))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 
