@@ -158,19 +158,18 @@
 ;;; Note that all the integer division functions are available for
 ;;; inline expansion.
 
-;;; FIXME: DEF-FROB instead of FROB
-(macrolet ((frob (fun)
+(macrolet ((deffrob (fun)
 	     `(def-source-transform ,fun (x &optional (y nil y-p))
 		(declare (ignore y))
 		(if y-p
 		    (values nil t)
 		    `(,',fun ,x 1)))))
-  (frob truncate)
-  (frob round)
+  (deffrob truncate)
+  (deffrob round)
   #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-  (frob floor)
+  (deffrob floor)
   #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-  (frob ceiling))
+  (deffrob ceiling))
 
 (def-source-transform lognand (x y) `(lognot (logand ,x ,y)))
 (def-source-transform lognor (x y) `(lognot (logior ,x ,y)))
@@ -217,9 +216,6 @@
 ;;;; have to create these new interval structures even though
 ;;;; numeric-type has everything we want to know. Reason 2 wins for
 ;;;; now.
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
 
 ;;; The basic interval type. It can handle open and closed intervals.
 ;;; A bound is open if it is a list containing a number, just like
@@ -629,9 +625,10 @@
 	    ((eq y-range '-)
 	     (interval-neg (interval-mul x (interval-neg y))))
 	    ((and (eq x-range '+) (eq y-range '+))
-	     ;; If we are here, X and Y are both positive
-	     (make-interval :low (bound-mul (interval-low x) (interval-low y))
-			    :high (bound-mul (interval-high x) (interval-high y))))
+	     ;; If we are here, X and Y are both positive.
+	     (make-interval
+	      :low (bound-mul (interval-low x) (interval-low y))
+	      :high (bound-mul (interval-high x) (interval-high y))))
 	    (t
 	     (error "This shouldn't happen!"))))))
 
@@ -678,9 +675,10 @@
 	     ;; sign of the result.
 	     (interval-neg (interval-div (interval-neg top) bot)))
 	    ((and (eq top-range '+) (eq bot-range '+))
-	     ;; The easy case
-	     (make-interval :low (bound-div (interval-low top) (interval-high bot) t)
-			    :high (bound-div (interval-high top) (interval-low bot) nil)))
+	     ;; the easy case
+	     (make-interval
+	      :low (bound-div (interval-low top) (interval-high bot) t)
+	      :high (bound-div (interval-high top) (interval-low bot) nil)))
 	    (t
 	     (error "This shouldn't happen!"))))))
 
@@ -745,9 +743,8 @@
 ;;; Compute the square of an interval.
 (defun interval-sqr (x)
   (declare (type interval x))
-  (interval-func #'(lambda (x) (* x x))
+  (interval-func (lambda (x) (* x x))
 		 (interval-abs x)))
-) ; PROGN
 
 ;;;; numeric DERIVE-TYPE methods
 
@@ -770,9 +767,6 @@
 			     :low low
 			     :high high))
 	(numeric-contagion x y))))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
 
 ;;; simple utility to flatten a list
 (defun flatten-list (x)
@@ -1162,8 +1156,6 @@
 	  (if (rest results)
 	      (make-canonical-union-type results)
 	      (first results)))))))
-
-) ; PROGN
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
@@ -1356,90 +1348,7 @@
 ;;; and it's hard to avoid that calculation in here.
 #-(and cmu sb-xc-host)
 (progn
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defoptimizer (ash derive-type) ((n shift))
-  ;; Large resulting bounds are easy to generate but are not
-  ;; particularly useful, so an open outer bound is returned for a
-  ;; shift greater than 64 - the largest word size of any of the ports.
-  ;; Large negative shifts are also problematic as the ASH
-  ;; implementation only accepts shifts greater than
-  ;; MOST-NEGATIVE-FIXNUM. These issues are handled by two local
-  ;; functions:
-  ;;   ASH-OUTER: Perform the shift when within an acceptable range,
-  ;;     otherwise return an open bound.
-  ;;   ASH-INNER: Perform the shift when within range, limited to a
-  ;;     maximum of 64, otherwise returns the inner limit.
-  ;;
-  ;; FIXME: The magic number 64 should be given a mnemonic name as a
-  ;; symbolic constant -- perhaps +MAX-REGISTER-SIZE+. And perhaps is
-  ;; should become an architecture-specific SB!VM:+MAX-REGISTER-SIZE+
-  ;; instead of trying to have a single magic number which covers
-  ;; all possible ports.
-  (flet ((ash-outer (n s)
-            (when (and (fixnump s)
-                       (<= s 64)
-                       (> s sb!vm:*target-most-negative-fixnum*))
-              (ash n s)))
-          (ash-inner (n s)
-            (if (and (fixnump s)
-                     (> s sb!vm:*target-most-negative-fixnum*))
-              (ash n (min s 64))
-              (if (minusp n) -1 0))))
-     (or (let ((n-type (continuation-type n)))
-           (when (numeric-type-p n-type)
-             (let ((n-low (numeric-type-low n-type))
-                   (n-high (numeric-type-high n-type)))
-               (if (constant-continuation-p shift)
-                 (let ((shift (continuation-value shift)))
-                   (make-numeric-type :class 'integer
-				      :complexp :real
-                                      :low (when n-low (ash n-low shift))
-                                      :high (when n-high (ash n-high shift))))
-                 (let ((s-type (continuation-type shift)))
-                   (when (numeric-type-p s-type)
-                     (let* ((s-low (numeric-type-low s-type))
-			    (s-high (numeric-type-high s-type))
-			    (low-slot (when n-low
-					(if (minusp n-low)
-					    (ash-outer n-low s-high)
-					    (ash-inner n-low s-low))))
-			    (high-slot (when n-high
-					 (if (minusp n-high)
-					     (ash-inner n-high s-low)
-					     (ash-outer n-high s-high)))))
-                       (make-numeric-type :class 'integer
-					  :complexp :real
-                                          :low low-slot
-                                          :high high-slot))))))))
-         *universal-type*))
-  (or (let ((n-type (continuation-type n)))
-	(when (numeric-type-p n-type)
-	  (let ((n-low (numeric-type-low n-type))
-		(n-high (numeric-type-high n-type)))
-	    (if (constant-continuation-p shift)
-		(let ((shift (continuation-value shift)))
-		  (make-numeric-type :class 'integer
-				     :complexp :real
-				     :low (when n-low (ash n-low shift))
-				     :high (when n-high (ash n-high shift))))
-		(let ((s-type (continuation-type shift)))
-		  (when (numeric-type-p s-type)
-		    (let ((s-low (numeric-type-low s-type))
-			  (s-high (numeric-type-high s-type)))
-		      (if (and s-low s-high (<= s-low 64) (<= s-high 64))
-			  (make-numeric-type :class 'integer
-					     :complexp :real
-					     :low (when n-low
-						    (min (ash n-low s-high)
-							 (ash n-low s-low)))
-					     :high (when n-high
-						     (max (ash n-high s-high)
-							  (ash n-high s-low))))
-			  (make-numeric-type :class 'integer
-					     :complexp :real)))))))))
-      *universal-type*))
 
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
   (flet ((ash-outer (n s)
@@ -1472,7 +1381,6 @@
                                             (ash-outer n-high s-high))))))
 	*universal-type*)))
 
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (ash derive-type) ((n shift))
   (two-arg-derive-type n shift #'ash-derive-type-aux #'ash))
 ) ; PROGN
@@ -1486,12 +1394,8 @@
 		    (values (if hi (,fun hi) nil) (if lo (,fun lo) nil))))))
 
   (defoptimizer (%negate derive-type) ((num))
-    (derive-integer-type num num (frob -)))
+    (derive-integer-type num num (frob -))))
 
-  (defoptimizer (lognot derive-type) ((int))
-    (derive-integer-type int int (frob lognot))))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (lognot derive-type) ((int))
   (derive-integer-type int int
 		       (lambda (type type2)
@@ -2232,7 +2136,7 @@
 (defoptimizer (random derive-type) ((bound &optional state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
 
-;;;; logical derive-type methods
+;;;; DERIVE-TYPE methods for LOGAND, LOGIOR, and friends
 
 ;;; Return the maximum number of bits an integer of the supplied type
 ;;; can take up, or NIL if it is unbounded. The second (third) value
@@ -2246,123 +2150,6 @@
 		(or (null max) (not (minusp max)))
 		(or (null min) (minusp min))))
       (values nil t t)))
-
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
-
-(defoptimizer (logand derive-type) ((x y))
-  (multiple-value-bind (x-len x-pos x-neg)
-      (integer-type-length (continuation-type x))
-    (declare (ignore x-pos))
-    (multiple-value-bind (y-len y-pos y-neg)
-	(integer-type-length (continuation-type y))
-      (declare (ignore y-pos))
-      (if (not x-neg)
-	  ;; X must be positive.
-	  (if (not y-neg)
-	      ;; The must both be positive.
-	      (cond ((or (null x-len) (null y-len))
-		     (specifier-type 'unsigned-byte))
-		    ((or (zerop x-len) (zerop y-len))
-		     (specifier-type '(integer 0 0)))
-		    (t
-		     (specifier-type `(unsigned-byte ,(min x-len y-len)))))
-	      ;; X is positive, but Y might be negative.
-	      (cond ((null x-len)
-		     (specifier-type 'unsigned-byte))
-		    ((zerop x-len)
-		     (specifier-type '(integer 0 0)))
-		    (t
-		     (specifier-type `(unsigned-byte ,x-len)))))
-	  ;; X might be negative.
-	  (if (not y-neg)
-	      ;; Y must be positive.
-	      (cond ((null y-len)
-		     (specifier-type 'unsigned-byte))
-		    ((zerop y-len)
-		     (specifier-type '(integer 0 0)))
-		    (t
-		     (specifier-type
-		      `(unsigned-byte ,y-len))))
-	      ;; Either might be negative.
-	      (if (and x-len y-len)
-		  ;; The result is bounded.
-		  (specifier-type `(signed-byte ,(1+ (max x-len y-len))))
-		  ;; We can't tell squat about the result.
-		  (specifier-type 'integer)))))))
-
-(defoptimizer (logior derive-type) ((x y))
-  (multiple-value-bind (x-len x-pos x-neg)
-      (integer-type-length (continuation-type x))
-    (multiple-value-bind (y-len y-pos y-neg)
-	(integer-type-length (continuation-type y))
-      (cond
-       ((and (not x-neg) (not y-neg))
-	;; Both are positive.
-	(specifier-type `(unsigned-byte ,(if (and x-len y-len)
-					     (max x-len y-len)
-					     '*))))
-       ((not x-pos)
-	;; X must be negative.
-	(if (not y-pos)
-	    ;; Both are negative. The result is going to be negative and be
-	    ;; the same length or shorter than the smaller.
-	    (if (and x-len y-len)
-		;; It's bounded.
-		(specifier-type `(integer ,(ash -1 (min x-len y-len)) -1))
-		;; It's unbounded.
-		(specifier-type '(integer * -1)))
-	    ;; X is negative, but we don't know about Y. The result will be
-	    ;; negative, but no more negative than X.
-	    (specifier-type
-	     `(integer ,(or (numeric-type-low (continuation-type x)) '*)
-		       -1))))
-       (t
-	;; X might be either positive or negative.
-	(if (not y-pos)
-	    ;; But Y is negative. The result will be negative.
-	    (specifier-type
-	     `(integer ,(or (numeric-type-low (continuation-type y)) '*)
-		       -1))
-	    ;; We don't know squat about either. It won't get any bigger.
-	    (if (and x-len y-len)
-		;; Bounded.
-		(specifier-type `(signed-byte ,(1+ (max x-len y-len))))
-		;; Unbounded.
-		(specifier-type 'integer))))))))
-
-(defoptimizer (logxor derive-type) ((x y))
-  (multiple-value-bind (x-len x-pos x-neg)
-      (integer-type-length (continuation-type x))
-    (multiple-value-bind (y-len y-pos y-neg)
-	(integer-type-length (continuation-type y))
-      (cond
-       ((or (and (not x-neg) (not y-neg))
-	    (and (not x-pos) (not y-pos)))
-	;; Either both are negative or both are positive. The result
-	;; will be positive, and as long as the longer.
-	(specifier-type `(unsigned-byte ,(if (and x-len y-len)
-					     (max x-len y-len)
-					     '*))))
-       ((or (and (not x-pos) (not y-neg))
-	    (and (not y-neg) (not y-pos)))
-	;; Either X is negative and Y is positive of vice-versa. The
-	;; result will be negative.
-	(specifier-type `(integer ,(if (and x-len y-len)
-				       (ash -1 (max x-len y-len))
-				       '*)
-				  -1)))
-       ;; We can't tell what the sign of the result is going to be.
-       ;; All we know is that we don't create new bits.
-       ((and x-len y-len)
-	(specifier-type `(signed-byte ,(1+ (max x-len y-len)))))
-       (t
-	(specifier-type 'integer))))))
-
-) ; PROGN
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
 
 (defun logand-derive-type-aux (x y &optional same-leaf)
   (declare (ignore same-leaf))
@@ -2461,7 +2248,7 @@
 					     '*)))))
        ((or (and (not x-pos) (not y-neg))
 	    (and (not y-neg) (not y-pos)))
-	;; Either X is negative and Y is positive of vice-verca. The
+	;; Either X is negative and Y is positive of vice-versa. The
 	;; result will be negative.
 	(specifier-type `(integer ,(if (and x-len y-len)
 				       (ash -1 (max x-len y-len))
@@ -2474,21 +2261,22 @@
        (t
 	(specifier-type 'integer))))))
 
-(macrolet ((frob (logfcn)
+(macrolet ((deffrob (logfcn)
 	     (let ((fcn-aux (symbolicate logfcn "-DERIVE-TYPE-AUX")))
 	     `(defoptimizer (,logfcn derive-type) ((x y))
 		(two-arg-derive-type x y #',fcn-aux #',logfcn)))))
-  ;; FIXME: DEF-FROB, not just FROB
-  (frob logand)
-  (frob logior)
-  (frob logxor))
+  (deffrob logand)
+  (deffrob logior)
+  (deffrob logxor))
+
+;;;; miscellaneous derive-type methods
 
 (defoptimizer (integer-length derive-type) ((x))
   (let ((x-type (continuation-type x)))
     (when (and (numeric-type-p x-type)
                (csubtypep x-type (specifier-type 'integer)))
-      ;; If the X is of type (INTEGER LO HI), then the integer-length
-      ;; of X is (INTEGER (min lo hi) (max lo hi), basically.  Be
+      ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
+      ;; of X is (INTEGER (MIN lo hi) (MAX lo hi), basically.  Be
       ;; careful about LO or HI being NIL, though.  Also, if 0 is
       ;; contained in X, the lower bound is obviously 0.
       (flet ((null-or-min (a b)
@@ -2504,9 +2292,6 @@
           (when (ctypep 0 x-type)
             (setf min-len 0))
           (specifier-type `(integer ,(or min-len '*) ,(or max-len '*))))))))
-) ; PROGN
-
-;;;; miscellaneous derive-type methods
 
 (defoptimizer (code-char derive-type) ((code))
   (specifier-type 'base-char))

@@ -355,7 +355,6 @@
 		      (let ((greater (if not-p (not greater) greater)))
 			(setq res
 			      (constrain-integer-type res y greater not-p)))))
-		   #!+sb-constrain-float-type
 		   ((and (float-type-p res) (float-type-p y))
 		    (let ((greater (eq kind '>)))
 		      (let ((greater (if not-p (not greater) greater)))
@@ -512,4 +511,3 @@
     (use-result-constraints block))
 
   (values))
-

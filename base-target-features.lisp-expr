@@ -160,11 +160,6 @@
  ;; affects a lot of floating point code.
  ; :negative-zero-is-not-zero
 
- ;; It's unclear to me what this does (but it was enabled in the code
- ;; that I picked up from Peter Van Eynde, called CONSTRAIN-FLOAT-TYPE
- ;; instead of SB-CONSTRAIN-FLOAT-TYPE). -- WHN 19990224
- :sb-constrain-float-type
-
  ;; This is set in classic CMU CL, and presumably there it means
  ;; that the floating point arithmetic implementation
  ;; conforms to IEEE's standard. Here it definitely means that the
