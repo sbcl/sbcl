@@ -213,8 +213,6 @@
 	    (type-specifier
 	     (fun-type-returns type)))))
 
-;;; Since all function types are equivalent to FUNCTION, they are all
-;;; subtypes of each other.
 (!define-type-method (function :simple-subtypep) (type1 type2)
    (flet ((fun-type-simple-p (type)
             (not (or (fun-type-rest type)
@@ -237,8 +235,8 @@
                            (if (and val1 val2)
                                (values t t)
                                (values nil (or win1 win2))))))))
-       (3and (csubtypep (fun-type-returns type1)
-                        (fun-type-returns type2))
+       (3and (values-subtypep (fun-type-returns type1)
+			      (fun-type-returns type2))
              (cond ((fun-type-wild-args type2)
                     (values t t))
                    ((fun-type-wild-args type1)

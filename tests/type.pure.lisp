@@ -156,3 +156,8 @@
     (format t "~&~S~%" type)
     (assert (not (sb-kernel:unknown-type-p (sb-kernel:specifier-type type))))
     (assert (atom (sb-kernel:type-specifier (sb-kernel:specifier-type type))))))
+
+;;; a bug underlying the reported bug #221: The SB-KERNEL type code
+;;; signalled an error on this expression.
+(subtypep '(function (fixnum) (values package boolean))
+	  '(function (t) (values package boolean)))

@@ -564,9 +564,15 @@ BUG 48c, not yet fixed:
     (etypecase x
       (character (write-char x s))
       (integer (write-byte x s)))))
-
 (bug217-1 #\1 *standard-output*)
 
+
+;;; bug 221: tried and died on CSUBTYPEP (not VALUES-SUBTYPEP) of the
+;;; function return types when inferring the type of the IF expression
+(declaim (ftype (function (fixnum) (values package boolean)) bug221f1))
+(declaim (ftype (function (t) (values package boolean)) bug221f2))
+(defun bug221 (b x)
+  (funcall (if b #'bug221f1 #'bug221f2) x))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
