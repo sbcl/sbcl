@@ -17,7 +17,7 @@
 # one of the tests below).
 SOMETHING_IN_THE_ENVIRONMENT='yes there is'
 export SOMETHING_IN_THE_ENVIRONMENT
-
+export PATH=/some/path/that/does/not/exist:${PATH}
 
 ${SBCL:-sbcl} <<EOF
   ;; test that $PATH is searched

@@ -394,11 +394,11 @@
 	while start
 	;; <Krystof> the truename of a file naming a directory is the
 	;; directory, at least until pfdietz comes along and says why
-	;; that's noncompliant
-	for fullpath = (merge-pathnames
-			pathname (truename
-				  (subseq search-path start end)))
-	when (unix-filename-is-executable-p (namestring fullpath))
+	;; that's noncompliant  -- CSR, c. 2003-08-10
+	for truename = (probe-file (subseq search-path start end))
+	for fullpath = (when truename (merge-pathnames pathname truename))
+	when (and fullpath
+		  (unix-filename-is-executable-p (namestring fullpath)))
 	return fullpath))
 
 ;;; FIXME: There shouldn't be two semiredundant versions of the

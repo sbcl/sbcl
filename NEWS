@@ -2011,6 +2011,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
   * bug fix: effective methods associated with a generic function are
     no longer cached over a change of that generic function's method
     combination.  (reported by Andreas Fuchs)
+  * bug fix: RUN-PROGRAM now does not fail if some element in $PATH
+    names a non-existent directory.  (thanks to Andreas Fuchs)
   * optimization: restored some effective method precomputation in
     CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.
