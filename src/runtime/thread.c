@@ -230,8 +230,11 @@ void add_thread_to_queue(int pid, lispobj mutex_p)
     struct mutex *mutex=(struct mutex *)native_pointer(mutex_p);
     struct cons *cons;
     sigemptyset(&newset);
-    sigaddset(&newset,SIGALRM);
-    sigprocmask(SIG_BLOCK, &newset, &oldset);
+    sigaddset(&newset,SIGCONT);
+    /* don't allow ourselves to receive SIGCONT while we're in the
+     * "ambiguous" state of being on the queue but not actually stopped.
+     */
+    sigprocmask(SIG_BLOCK, &newset, &oldset); 
     
     get_spinlock(&(mutex->queuelock),pid);
     /* we may get woken from our sleep by the garbage collector and

@@ -697,6 +697,98 @@
 	      (addr tz))))
 
 
+;; Type of the second argument to `getitimer' and
+;; the second and third arguments `setitimer'. 
+(define-alien-type nil
+  (struct itimerval
+    (it-interval (struct timeval))	; timer interval
+    (it-value (struct timeval))))	; current value
+
+(defconstant ITIMER-REAL 0)
+(defconstant ITIMER-VIRTUAL 1)
+(defconstant ITIMER-PROF 2)
+
+(defun unix-getitimer(which)
+  "Unix-getitimer returns the INTERVAL and VALUE slots of one of
+   three system timers (:real :virtual or :profile). On success,
+   unix-getitimer returns 5 values,
+   T, it-interval-secs, it-interval-usec, it-value-secs, it-value-usec."
+  (declare (type (member :real :virtual :profile) which)
+	   (values t
+		   (unsigned-byte 29) (mod 1000000)
+		   (unsigned-byte 29) (mod 1000000)))
+  (let ((which (ecase which
+		 (:real ITIMER-REAL)
+		 (:virtual ITIMER-VIRTUAL)
+		 (:profile ITIMER-PROF))))
+    (with-alien ((itv (struct itimerval)))
+      (syscall* ("getitimer" int (* (struct itimerval)))
+		(values T
+			(slot (slot itv 'it-interval) 'tv-sec)
+			(slot (slot itv 'it-interval) 'tv-usec)
+			(slot (slot itv 'it-value) 'tv-sec)
+			(slot (slot itv 'it-value) 'tv-usec))
+		which (alien-sap (addr itv))))))
+
+(defun unix-setitimer (which int-secs int-usec val-secs val-usec)
+  " Unix-setitimer sets the INTERVAL and VALUE slots of one of
+   three system timers (:real :virtual or :profile). A SIGALRM signal
+   will be delivered VALUE <seconds+microseconds> from now. INTERVAL,
+   when non-zero, is <seconds+microseconds> to be loaded each time
+   the timer expires. Setting INTERVAL and VALUE to zero disables
+   the timer. See the Unix man page for more details. On success,
+   unix-setitimer returns the old contents of the INTERVAL and VALUE
+   slots as in unix-getitimer."
+  (declare (type (member :real :virtual :profile) which)
+	   (type (unsigned-byte 29) int-secs val-secs)
+	   (type (integer 0 (1000000)) int-usec val-usec)
+	   (values t
+		   (unsigned-byte 29) (mod 1000000)
+		   (unsigned-byte 29) (mod 1000000)))
+  (let ((which (ecase which
+		 (:real ITIMER-REAL)
+		 (:virtual ITIMER-VIRTUAL)
+		 (:profile ITIMER-PROF))))
+    (with-alien ((itvn (struct itimerval))
+		 (itvo (struct itimerval)))
+      (setf (slot (slot itvn 'it-interval) 'tv-sec ) int-secs
+	    (slot (slot itvn 'it-interval) 'tv-usec) int-usec
+	    (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
+	    (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
+      (syscall* ("setitimer" int (* (struct timeval))(* (struct timeval)))
+		(values T
+			(slot (slot itvo 'it-interval) 'tv-sec)
+			(slot (slot itvo 'it-interval) 'tv-usec)
+			(slot (slot itvo 'it-value) 'tv-sec)
+			(slot (slot itvo 'it-value) 'tv-usec))
+		which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
+
+(defmacro with-timeout (expires &body body)
+  "Execute the body, interrupting it with a SIGALRM after at least
+EXPIRES seconds have passed.  Uses Unix setitimer(), restoring any
+previous timer after the body has finished executing"
+  (let ((saved-seconds (gensym "SAVED-SECONDS"))
+	(saved-useconds (gensym "SAVED-USECONDS"))
+	(s (gensym "S")) (u (gensym "U")))
+    `(let (- ,saved-seconds ,saved-useconds)
+      (multiple-value-setq (- - - ,saved-seconds ,saved-useconds)
+	(unix-getitimer :real))
+      (multiple-value-bind (,s ,u) (floor ,expires)
+	(setf ,u (floor (* ,u 1000000)))
+	(if (and (> ,expires 0)
+		 (or (and (zerop ,saved-seconds) (zerop ,saved-useconds))
+		     (> ,saved-seconds ,s)
+		     (and (= ,saved-seconds ,s)
+			  (> ,saved-useconds ,u))))
+	    (unwind-protect
+		 (progn
+		   (unix-setitimer :real 0 0 ,s ,u)
+		   ,@body)
+	      (unix-setitimer :real 0 0 ,saved-seconds ,saved-useconds))
+	    ,@body)))))
+
+
+
 (defconstant ENOENT 2) ; Unix error code, "No such file or directory"
 (defconstant EINTR 4) ; Unix error code, "Interrupted system call"
 (defconstant EIO 5) ; Unix error code, "I/O error"

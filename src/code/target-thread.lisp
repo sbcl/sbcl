@@ -27,8 +27,6 @@
 	       (funcall real-function))
 	     0))))))))
 
-
-
 (defun destroy-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigterm)
   ;; may have been stopped for some reason, so now wake it up to
@@ -78,10 +76,9 @@
   (loop until
 	(eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
 
-(defun get-mutex (lock &optional new-value  timeout)
+(defun get-mutex (lock &optional new-value (wait-p t))
   (declare (type mutex lock))
-  (let ((timeout (and timeout (+ (get-internal-real-time) timeout)))
-	(pid (current-thread-id)))
+  (let ((pid (current-thread-id)))
     (unless new-value (setf new-value pid))
     (loop
      (unless
@@ -94,6 +91,7 @@
 	 (setf (mutex-queue lock) (cdr (mutex-queue lock))))
        (setf (mutex-queuelock lock) 0)
        (return t))
+     (unless wait-p (return nil))
      (add-thread-to-queue
       pid (sb!sys:int-sap (sb!kernel:get-lisp-obj-address lock))))))
 
@@ -110,18 +108,23 @@
 		    (sb!vm::%instance-set-conditional lock 2 old-value new-value)))       
        (get-spinlock lock 3 pid)
        (when (mutex-queue lock)
-	 (sb!unix:unix-kill (car (mutex-queue lock)) :sigalrm))
+	 (sb!unix:unix-kill (car (mutex-queue lock)) :sigcont))
        (setf (mutex-queuelock lock) 0)
        (return t))
      (setf old-value t1))))
 
+(defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
+  (let ((block (gensym "NIL")))
+    `(unwind-protect
+      (block ,block
+	(unless (get-mutex ,mutex ,value ,wait-p) (return-from ,block nil))
+	,@body)
+      (release-mutex ,mutex))))
+
+
 ;;;; multiple independent listeners
 
 (defvar *session-lock* nil)
-
-
-
-
 
 (defun make-listener-thread (tty-name)  
   (assert (probe-file tty-name))
