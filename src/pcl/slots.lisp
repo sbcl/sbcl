@@ -267,7 +267,7 @@
        (error "~@<The slot ~S has neither :INSTANCE nor :CLASS allocation, ~
 	       so it can't be written by the default ~S method.~@:>"
 	      slotd 'slot-makunbound-using-class))))
-  nil)
+  object)
 
 (defmethod slot-value-using-class
     ((class structure-class)
