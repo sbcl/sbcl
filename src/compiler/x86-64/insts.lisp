@@ -492,6 +492,17 @@
   (accum :type 'word-accum)
   (imm))
 
+(sb!disassem:define-instruction-format (modrm-reg-no-width 24
+				     :default-printer '(:name :tab reg))
+  (rex   :field (byte 4 4)  :value #b0100)
+  (ff   :field (byte 8 8)  :value #b11111111)
+  (mod	 :field (byte 2 22))
+  (modrm-reg :field (byte 3 19))
+  (reg   :fields (list (byte 3 16) (byte 4 0)) :type 'word-reg)
+  ;; optional fields
+  (accum :type 'word-accum)
+  (imm))
+
 ;;; adds a width field to reg-no-width
 (sb!disassem:define-instruction-format (reg 8
 					:default-printer '(:name :tab reg))
@@ -714,6 +725,10 @@
 
 (sb!disassem:define-instruction-format (string-op 8
 				     :include 'simple
+				     :default-printer '(:name width)))
+
+(sb!disassem:define-instruction-format (rex-string-op 16
+				     :include 'rex-simple
 				     :default-printer '(:name width)))
 
 (sb!disassem:define-instruction-format (short-cond-jump 16)
@@ -1512,6 +1527,8 @@
   (:emitter (emit-random-arith-inst "CMP" segment dst src #b111 t)))
 
 (define-instruction inc (segment dst)
+  ;; Register
+  (:printer modrm-reg-no-width ((modrm-reg #b000)))
   ;; Register/Memory
   ;; (:printer rex-reg/mem ((op '(#b11111111 #b001))))
   (:printer reg/mem ((op '(#b1111111 #b000))))
@@ -1528,11 +1545,9 @@
 
 (define-instruction dec (segment dst)
   ;; Register.
-  ;; disabled, seems to overlap with other valid instructions
-  ;;  (:printer rex-reg-no-width ((op #b11111111) (mod #b11)))
+  (:printer modrm-reg-no-width ((modrm-reg #b001)))
   ;; Register/Memory
   (:printer reg/mem ((op '(#b1111111 #b001))))
-  (:printer rex-reg/mem ((op '(#b11111111 #b001))))
   (:emitter
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
@@ -1693,9 +1708,15 @@
   (defun shift-inst-printer-list (subop)
     `((reg/mem ((op (#b1101000 ,subop)))
 	       (:name :tab reg/mem ", 1"))
+      (rex-reg/mem ((op (#b1101000 ,subop)))
+		   (:name :tab reg/mem ", 1"))
       (reg/mem ((op (#b1101001 ,subop)))
 	       (:name :tab reg/mem ", " 'cl))
+      (rex-reg/mem ((op (#b1101001 ,subop)))
+	       (:name :tab reg/mem ", " 'cl))
       (reg/mem-imm ((op (#b1100000 ,subop))
+		    (imm nil :type signed-imm-byte)))
+      (rex-reg/mem-imm ((op (#b11000001 ,subop))
 		    (imm nil :type signed-imm-byte))))))
 
 (define-instruction rol (segment dst amount)
@@ -1840,6 +1861,7 @@
 
 (define-instruction cmps (segment size)
   (:printer string-op ((op #b1010011)))
+  (:printer rex-string-op ((op #b1010011)))
   (:emitter
    (maybe-emit-operand-size-prefix segment size)
    (maybe-emit-rex-prefix segment size nil nil nil)
@@ -1847,6 +1869,7 @@
 
 (define-instruction ins (segment acc)
   (:printer string-op ((op #b0110110)))
+  (:printer rex-string-op ((op #b0110110)))
   (:emitter
    (let ((size (operand-size acc)))
      (aver (accumulator-p acc))
@@ -1856,6 +1879,7 @@
 
 (define-instruction lods (segment acc)
   (:printer string-op ((op #b1010110)))
+  (:printer rex-string-op ((op #b1010110)))
   (:emitter
    (let ((size (operand-size acc)))
      (aver (accumulator-p acc))
@@ -1865,6 +1889,7 @@
 
 (define-instruction movs (segment size)
   (:printer string-op ((op #b1010010)))
+  (:printer rex-string-op ((op #b1010010)))
   (:emitter
    (maybe-emit-operand-size-prefix segment size)
    (maybe-emit-rex-prefix segment size nil nil nil)
@@ -1872,6 +1897,7 @@
 
 (define-instruction outs (segment acc)
   (:printer string-op ((op #b0110111)))
+  (:printer rex-string-op ((op #b0110111)))
   (:emitter
    (let ((size (operand-size acc)))
      (aver (accumulator-p acc))
@@ -1881,6 +1907,7 @@
 
 (define-instruction scas (segment acc)
   (:printer string-op ((op #b1010111)))
+  (:printer rex-string-op ((op #b1010111)))
   (:emitter
    (let ((size (operand-size acc)))
      (aver (accumulator-p acc))
@@ -1890,6 +1917,7 @@
 
 (define-instruction stos (segment acc)
   (:printer string-op ((op #b1010101)))
+  (:printer rex-string-op ((op #b1010101)))
   (:emitter
    (let ((size (operand-size acc)))
      (aver (accumulator-p acc))
