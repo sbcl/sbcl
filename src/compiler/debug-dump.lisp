@@ -479,8 +479,7 @@
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
     (make-compiled-debug-function
      :name (cond ((leaf-name fun))
-		 ((let ((ef (functional-entry-function
-			     fun)))
+		 ((let ((ef (functional-entry-function fun)))
 		    (and ef (leaf-name ef))))
 		 ((and main-p (leaf-name dispatch)))
 		 (t

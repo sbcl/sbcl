@@ -167,12 +167,20 @@
 		 (typep fcn 'generic-function)
 		 (eq (class-of fcn) *the-class-standard-generic-function*))
 	     (setf (sb-kernel:%funcallable-instance-info fcn 1) new-name)
+	     (error 'simple-type-error
+		    :datum fcn
+		    :expected-type 'generic-function
+		    :format-control "internal error: unexpected function type")
+	     ;; FIXME: byte compiler to go away completely
+	     #|
 	     (etypecase fcn
 	       (sb-kernel:byte-closure
 		(set-function-name (sb-kernel:byte-closure-function fcn)
 				   new-name))
 	       (sb-kernel:byte-function
-		(setf (sb-kernel:byte-function-name fcn) new-name))))
+		(setf (sb-kernel:byte-function-name fcn) new-name)))
+             |#
+	   )
 	 fcn)
 	(t
 	 ;; pw-- This seems wrong and causes trouble. Tests show

@@ -186,6 +186,8 @@
       (%describe-function-name name s (%function-type x))))
   (%describe-compiled-from (sb-kernel:function-code-header x) s))
 
+;;; FIXME: byte compiler to go away completely
+#|
 (defun %describe-function-byte-compiled (x s kind name)
   (declare (type stream s))
   (let ((name (or name (sb-c::byte-function-name x))))
@@ -193,6 +195,7 @@
     (unless (eq kind :macro)
       (%describe-function-name name s 'function)))
   (%describe-compiled-from (sb-c::byte-function-component x) s))
+|#
 
 ;;; Describe a function with the specified kind and name. The latter
 ;;; arguments provide some information about where the function came
@@ -218,6 +221,8 @@
      (%describe-function-compiled x s kind name))
     (#.sb-vm:funcallable-instance-header-type
      (typecase x
+       ;; FIXME: byte compiler to go away completely
+       #|
        (sb-kernel:byte-function
 	(%describe-function-byte-compiled x s kind name))
        (sb-kernel:byte-closure
@@ -229,6 +234,7 @@
 	  (let ((data (byte-closure-data x)))
 	    (dotimes (i (length data))
 	      (format s "~@:_~S: ~S" i (svref data i))))))
+       |#
        (standard-generic-function
 	;; There should be a special method for this case; we'll
 	;; delegate to that.

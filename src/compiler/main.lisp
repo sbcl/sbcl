@@ -30,13 +30,17 @@
 		  *last-source-form* *last-format-string* *last-format-args*
 		  *last-message-count* *lexenv*))
 
-(defvar *byte-compile-default* :maybe
+;;; FIXME: byte compiler to be removed completely
+(defvar *byte-compile-default* nil
   #!+sb-doc
   "the default value for the :BYTE-COMPILE argument to COMPILE-FILE")
 
 (defvar *byte-compile-top-level*
+  #|
   #-sb-xc-host t
   #+sb-xc-host nil ; since the byte compiler isn't supported in cross-compiler
+  |#
+  nil ; FIXME: byte compiler to be removed completely
   #!+sb-doc
   "Similar to *BYTE-COMPILE-DEFAULT*, but controls the compilation of top-level
    forms (evaluated at load-time) when the :BYTE-COMPILE argument is :MAYBE
@@ -44,13 +48,18 @@
 
 ;;; the value of the :BYTE-COMPILE argument which was passed to the
 ;;; compiler
-(defvar *byte-compile* :maybe)
+(defvar *byte-compile*
+  nil #|:maybe|#) ; FIXME: byte compiler to be removed completely
 
 ;;; Bound by COMPILE-COMPONENT to T when byte-compiling, and NIL when
 ;;; native compiling. During IR1 conversion this can also be :MAYBE,
 ;;; in which case we must look at the policy; see #'BYTE-COMPILING.
-(defvar *byte-compiling* :maybe)
-(declaim (type (member t nil :maybe) *byte-compile* *byte-compiling*
+(defvar *byte-compiling*
+  nil #|:maybe|#) ; FIXME: byte compiler to be removed completely
+
+(declaim (type (member t nil :maybe)
+	       *byte-compile*
+	       *byte-compiling*
 	       *byte-compile-default*))
 
 (defvar *check-consistency* nil)
@@ -470,9 +479,13 @@
   (values))
 
 (defun policy-byte-compile-p (thing)
+  nil
+  ;; FIXME: byte compiler to be removed completely
+  #|
   (policy thing
 	  (and (zerop speed)
-	       (<= debug 1))))
+	       (<= debug 1)))
+  |#)
 
 ;;; Return our best guess for whether we will byte compile code
 ;;; currently being IR1 converted. This is only a guess because the
@@ -481,10 +494,14 @@
 ;;; FIXME: This should be called something more mnemonic, e.g.
 ;;; PROBABLY-BYTE-COMPILING
 (defun byte-compiling ()
+  nil
+  ;; FIXME: byte compiler to be removed completely
+  #|
   (if (eq *byte-compiling* :maybe)
       (or (eq *byte-compile* t)
           (policy-byte-compile-p *lexenv*))
-      (and *byte-compile* *byte-compiling*)))
+      (and *byte-compile* *byte-compiling*))
+  |#)
 
 ;;; Delete components with no external entry points before we try to
 ;;; generate code. Unreachable closures can cause IR2 conversion to
@@ -504,11 +521,15 @@
 	 (return))))))
 
 (defun byte-compile-this-component-p (component)
+  nil
+  ;; FIXME: byte compiler to be removed completely
+  #|
   (ecase *byte-compile*
     ((t) t)
     ((nil) nil)
     ((:maybe)
-     (every #'policy-byte-compile-p (component-lambdas component)))))
+     (every #'policy-byte-compile-p (component-lambdas component))))
+  |#)
 
 (defun compile-component (component)
   (let* ((*component-being-compiled* component)
@@ -907,7 +928,7 @@
          (component (make-empty-component))
          (*current-component* component))
     (setf (component-name component)
-          (format nil "IR1-TOP-LEVEL-FOP-DEFUN ~S initial component" name))
+          (format nil "~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda definition
                                            (format nil "locall ~S" name)))
@@ -1490,7 +1511,8 @@
      ;; extensions
      (trace-file nil) 
      ((:block-compile *block-compile-argument*) nil)
-     ((:byte-compile *byte-compile*) *byte-compile-default*))
+     ;; FIXME: byte compiler to be removed completely
+     #+nil ((:byte-compile *byte-compile*) *byte-compile-default*))
 
   #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and returning
@@ -1500,14 +1522,6 @@
         If given, internal data structures are dumped to the specified
         file, or if a value of T is given, to a file of *.trace type
         derived from the input file name.
-     :BYTE-COMPILE {T | NIL | :MAYBE}
-        Determines whether to compile into interpreted byte code instead of
-        machine instructions. Byte code is several times smaller, but much
-        slower. If :MAYBE, then only byte-compile when SPEED is 0 and
-        DEBUG <= 1. The default is the value of SB-EXT:*BYTE-COMPILE-DEFAULT*,
-        which is initially :MAYBE. (This option will probably become
-        formally deprecated starting around sbcl-0.7.0, when various 
-        cleanups related to the byte interpreter are planned.)
    Also, as a workaround for vaguely-non-ANSI behavior, the :BLOCK-COMPILE
    argument is quasi-supported, to determine whether multiple
    functions are compiled together as a unit, resolving function

@@ -26,12 +26,12 @@
 	  (error "Can't find a definition for ~S." definition))
 	def)))
 
-;;; Find the function that is being compiled by COMPILE and bash its name to
-;;; NAME. We also substitute for any references to name so that recursive
-;;; calls will be compiled direct. Lambda is the top-level lambda for the
-;;; compilation. A REF for the real function is the only thing in the
-;;; top-level lambda other than the bind and return, so it isn't too hard to
-;;; find.
+;;; Find the function that is being compiled by COMPILE and bash its
+;;; name to NAME. We also substitute for any references to name so
+;;; that recursive calls will be compiled direct. LAMBDA is the
+;;; top-level lambda for the compilation. A REF for the real function
+;;; is the only thing in the top-level lambda other than the bind and
+;;; return, so it isn't too hard to find.
 (defun compile-fix-function-name (lambda name)
   (declare (type clambda lambda) (type (or symbol cons) name))
   (when name

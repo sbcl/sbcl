@@ -1445,7 +1445,7 @@
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
 	context
-	(let ((path (or *current-path*
+	(let ((path (or (and (boundp '*current-path*) *current-path*)
 			(if context
 			    (node-source-path context)
 			    nil))))

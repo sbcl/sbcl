@@ -209,7 +209,7 @@
       (change-ref-leaf ref (or (functional-entry-function fun)
 			       (make-external-entry-point fun))))))
 
-;;; Attempt to convert all references to Fun to local calls. The
+;;; Attempt to convert all references to FUN to local calls. The
 ;;; reference must be the function for a call, and the function
 ;;; continuation must be used only once, since otherwise we cannot be
 ;;; sure what function is to be called. The call continuation would be

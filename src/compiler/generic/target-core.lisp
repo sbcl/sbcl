@@ -106,6 +106,8 @@
 		      (fdefinition-object (cdr const) t))))))))))
   (values))
 
+;;; FIXME: byte compiler to go away completely
+#|
 (defun make-core-byte-component (segment length constants xeps object)
   (declare (type sb!assem:segment segment)
 	   (type index length)
@@ -166,4 +168,4 @@
 		  (setf (code-header-ref code-obj code-obj-index) xep))))))))))
 
   (values))
-
+|#

@@ -383,9 +383,9 @@
 	    (setf (lexenv-lambda lexenv) result-lambda))))
       (setf (block-component block) result-component))
 
-    ;; Splice the blocks into the new DFO, and unlink them from the old
-    ;; component head and tail. Non-return blocks that jump to the tail
-    ;; (NIL returning calls) are switched to go to the new tail.
+    ;; Splice the blocks into the new DFO, and unlink them from the
+    ;; old component head and tail. Non-return blocks that jump to the
+    ;; tail (NIL returning calls) are switched to go to the new tail.
     (let* ((head (component-head component))
 	   (first (block-next head))
 	   (tail (component-tail component))
@@ -415,9 +415,9 @@
       (link-blocks pred bind-block))
     (unlink-node bind)
 
-    ;; If there is a return, then delete it (making the preceding node the
-    ;; last node) and link the block to the result return. There is always a
-    ;; preceding REF NIL node in top-level lambdas.
+    ;; If there is a return, then delete it (making the preceding node
+    ;; the last node) and link the block to the result return. There
+    ;; is always a preceding REF NIL node in top-level lambdas.
     (let ((return (lambda-return lambda)))
       (when return
 	(let ((return-block (node-block return))
@@ -427,10 +427,10 @@
 	  (delete-continuation result)
 	  (link-blocks return-block result-return-block))))))
 
-;;; Given a non-empty list of top-level lambdas, smash them into a top-level
-;;; lambda and component, returning these as values. We use the first lambda
-;;; and its component, putting the other code in that component and deleting
-;;; the other lambdas.
+;;; Given a non-empty list of top-level LAMBDAs, smash them into a
+;;; top-level lambda and component, returning these as values. We use
+;;; the first lambda and its component, putting the other code in that
+;;; component and deleting the other lambdas.
 (defun merge-top-level-lambdas (lambdas)
   (declare (cons lambdas))
   (let* ((result-lambda (first lambdas))
@@ -438,8 +438,8 @@
     (cond
      (result-return
 
-      ;; Make sure the result's return node starts a block so that we can
-      ;; splice code in before it.
+      ;; Make sure the result's return node starts a block so that we
+      ;; can splice code in before it.
       (let ((prev (node-prev
 		   (continuation-use
 		    (return-result result-return)))))

@@ -104,6 +104,8 @@
 
 ;;;; dumping things which don't exist in portable ANSI Common Lisp
 
+;;; FIXME: byte compiler to go away completely
+#|
 ;;; Dump a BYTE-FUNCTION object. We dump the layout and
 ;;; funcallable-instance info, but rely on the loader setting up the
 ;;; correct funcallable-instance-function.
@@ -119,3 +121,4 @@
     (dump-fop 'fop-make-byte-compiled-function file)
     (dump-byte nslots file))
   (values))
+|#

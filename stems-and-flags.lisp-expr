@@ -574,10 +574,12 @@
  ;; host, because fundamental BYTE-FUNCTION-OR-CLOSURE types are
  ;; implemented as FUNCALLABLE-INSTANCEs, and it's not obvious how to
  ;; emulate those in a vanilla ANSI Common Lisp.
+ #| ; FIXME: byte compiler to go away completely
  ("src/code/byte-types" :not-host)
  ("src/compiler/byte-comp")
  ("src/compiler/target-byte-comp" :not-host)
  ("src/code/byte-interp" :not-host) ; needs byte-comp *SYSTEM-CONSTANT-CODES*
+ |#
 
  ;; defines SB!DI:DO-DEBUG-FUNCTION-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
