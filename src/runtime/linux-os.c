@@ -48,7 +48,7 @@
 size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_FUTEX
-#include <asm/unistd.h>
+#include <linux/unistd.h>
 #include <errno.h>
 
 /* values taken from the kernel's linux/futex.h.  This header file
