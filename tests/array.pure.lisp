@@ -138,6 +138,10 @@
   ;; dimensions that we promised.  Let's make sure that we can create
   ;; an array with more than 2^24 elements, since that was a symptom
   ;; from the CLISP and OpenMCL hosts.
-  (let ((big-array (opaque-identity 
+  (let ((big-array (opaque-identity
 		    (make-array (expt 2 26) :element-type 'bit))))
     (assert (= (length big-array) (expt 2 26)))))
+
+;;; Bug reported by Kalle Olavi Niemitalo for CMUCL through Debian BTS
+(let ((array (make-array nil :initial-contents nil)))
+  (assert (eql (aref array) nil)))

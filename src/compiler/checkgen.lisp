@@ -467,9 +467,9 @@
     (do-blocks (block component)
       (when (block-type-check block)
 	(do-nodes (node cont block)
-          (when (cast-p node)
-            (when (cast-type-check node)
-              (cast-check-uses node))
+          (when (and (cast-p node)
+                     (cast-type-check node))
+            (cast-check-uses node)
             (cond ((worth-type-check-p node)
                    (casts (cons node (not (probable-type-check-p node)))))
                   (t

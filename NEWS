@@ -1941,9 +1941,11 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
   * bug fix: WITH-OUTPUT-TO-STRING (and MAKE-STRING-OUTPUT-STREAM) now
     accept and act upon their :ELEMENT-TYPE keyword argument.
     (reported by Edi Weitz)
-  * bug fix: FILE-POSITION now accepts position designators up to 
-    ARRAY-DIMENSION-LIMIT or the extreme of the off_t range, whichever 
+  * bug fix: FILE-POSITION now accepts position designators up to
+    ARRAY-DIMENSION-LIMIT or the extreme of the off_t range, whichever
     is the greater.  (thanks to Patrik Nordebo)
+  * bug fix: MAKE-ARRAY ignored :INITIAL-CONTENTS NIL. (reported by
+    Kalle Olavi Niemitalo)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
