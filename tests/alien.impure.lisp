@@ -23,5 +23,10 @@
 (setf (sb-alien:extern-alien "current_control_stack_pointer" sb-alien:unsigned)
       (sb-alien:extern-alien "current_control_stack_pointer" sb-alien:unsigned))
 
+;;; bug 133, fixed in 0.7.0.5: Somewhere in 0.pre7.*, C void returns
+;;; were broken ("unable to use values types here") when
+;;; auto-PROCLAIM-of-return-value was added to DEFINE-ALIEN_ROUTINE.
+(sb-alien:define-alien-routine ("free" free) void (ptr (* t) :in))
+
 ;;; success
 (quit :unix-status 104)
