@@ -128,15 +128,6 @@ one-past-the-end"
       :interactive read-replacement-string
       (string s))))
 
-;;; overflow on caller-supplied-replacement condition
-
-(define-condition octet-buffer-overflow (condition)
-  ((replacement :initarg :replacement :accessor octet-buffer-overflow-replacement)))
-
-(defun overflow (s)
-  (with-simple-restart (continue "Keep processing, not invoking outer handlers.")
-    (signal 'octet-buffer-overflow :replacement s)))
-
 ;;; Utilities used in both to-string and to-octet conversions
 
 (defmacro instantiate-octets-definition (definer)
@@ -176,218 +167,99 @@ one-past-the-end"
     ;; then.
     (intern (concatenate 'string (symbol-name sym1) "-" (symbol-name sym2))
 	    (symbol-package sym1))))
-
-(defmacro define-replace-into-notseq (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'replace-into-notseq accessor)))
-    `(progn
-      (declaim (inline ,name))
-      (defun ,name (dest src dest-start)
-	(declare (optimize speed (safety 0)))
-	;; Known: all of SRC (which is a SEQ) fits into DEST
-	(if (listp src)
-	    (loop for srcobj in src
-		  for idx of-type array-range from dest-start
-		  do (setf (,accessor dest idx) srcobj))
-	    (loop for srcidx of-type array-range below (length src)
-		  for destidx of-type array-range from dest-start
-		  do (setf (,accessor dest destidx) (aref src srcidx))))
-	dest))))
-(instantiate-octets-definition define-replace-into-notseq)
-
-(defmacro define-vari-transcode (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'vari-transcode accessor)))
-    `(progn
-      (declaim (inline ,name))
-      (defun ,name
-	  (to to-start to-end from from-start from-end replacements getter elementp)
-	(declare (optimize speed (safety 0))
-		 (type array-range to-start to-end from-start from-end)
-		 (type function getter elementp))
-	;; convert from FROM to TO via the mapping function GETTER
-	;; which can return either a single element for TO or a
-	;; sequence of elments; in the latter case the sequence is
-	;; taken from the head of the (boxed) list REPLACEMENTS.
-	;; ELEMENTP tests to see which of the two return types was
-	;; received.
-	(let ((replacements-box (if replacements (cons nil replacements) nil)))
-	  (declare (dynamic-extent replacements-box))
-	  (varimap to to-start to-end
-		   from-start from-end
-		   (lambda (to-pos from-pos)
-		     (multiple-value-bind (element-or-vector used-from)
-			 (funcall getter from from-pos from-end replacements-box)
-		       (cond
-			 ((funcall elementp element-or-vector)
-			  (setf (,accessor to to-pos) element-or-vector)
-			  (values 1 used-from))
-			 ((> (+ to-pos (length element-or-vector)) to-end)
-			  (overflow element-or-vector)
-			  (return-from ,name (values to to-pos from-pos)))
-			 (t
-			  (,(make-od-name 'replace-into-notseq accessor) to element-or-vector to-pos)
-			  (values (length element-or-vector) used-from)))))))))))
-
-(instantiate-octets-definition define-vari-transcode)
 
 ;;;; to-octets conversions
 
 ;;; to latin (including ascii)
-(defmacro define-string->latin*% (accessor type)
-  (let ((name (make-od-name 'string->latin*% accessor)))
-    `(progn
-      (declaim (inline ,name))
-      (defun ,name (array astart aend string sstart send replacements get-bytes)
-	(declare (optimize speed (safety 0))
-		 (type simple-string string)
-		 (type ,type array))
-	(,(make-od-name 'vari-transcode accessor)
-	  array astart aend
-	  string sstart send
-	  replacements
-	  get-bytes
-	  #'numberp)))))
-(instantiate-octets-definition define-string->latin*%)
 
-(declaim (inline get-ascii-bytes))
-(defun get-ascii-bytes (string pos end replacements-box)
-  (declare (ignore end))
-  (let ((code (char-code (char string pos))))
-    (values (cond
-              ((< code 128) code)
-              ((null replacements-box)
-               (encoding-error :ascii string pos))
-              (t (pop (cdr replacements-box))))
-            1)))
+(defmacro define-unibyte-mapper (byte-char-name code-byte-name &rest exceptions)
+  `(progn
+    (declaim (inline ,byte-char-name ,code-byte-name))
+    (defun ,byte-char-name (byte)
+      (declare (optimize speed (safety 0))
+	       (type (unsigned-byte 8) byte))
+      (aref ,(make-array 256
+			 :initial-contents (loop for byte below 256
+						 collect
+						  (let ((exception (cadr (assoc byte exceptions))))
+						    (if exception
+							exception
+							byte))))
+	    byte))
+    (defun ,code-byte-name (code)
+      (declare (optimize speed (safety 0))
+	       (type char-code code))
+      (case code
+	(,(mapcar #'car exceptions) nil)
+	,@(mapcar (lambda (exception)
+		    (destructuring-bind (byte code) exception
+		      `(,code ,byte)))
+		  exceptions)
+	(otherwise code)))))
+
+#!+sb-unicode
+(define-unibyte-mapper
+    latin9->code-mapper
+    code->latin9-mapper
+  (#xA4 #x20AC)
+  (#xA6 #x0160)
+  (#xA8 #x0161)
+  (#xB4 #x017D)
+  (#xB8 #x017E)
+  (#xBC #x0152)
+  (#xBD #x0153)
+  (#xBE #x0178))
 
 (declaim (inline get-latin-bytes))
-(defun get-latin-bytes (mapper external-format string pos end replacements-box)
+(defun get-latin-bytes (mapper external-format string pos end)
   (declare (ignore end))
   (let ((code (funcall mapper (char-code (char string pos)))))
     (values (cond
-	      ((< code 256) code)
-	      ((null replacements-box)
-	       (encoding-error external-format string pos))
+	      ((and code (< code 256)) code)
 	      (t
-	       (pop (cdr replacements-box))))
+	       (encoding-error external-format string pos)))
 	    1)))
 
-#!+sb-unicode
-(progn
-  (declaim (inline code->latin9-mapper))
-  (defun code->latin9-mapper (code)
-    (declare (optimize speed (safety 0))
-             (type char-code code))
-    (case code
-      (#x20AC #xA4)
-      (#x0160 #xA6)
-      (#x0161 #xA8)
-      (#x017D #xB4)
-      (#x017E #xB8)
-      (#x0152 #xBC)
-      (#x0153 #xBD)
-      (#x0178 #xBE)
-      (otherwise code))))
+(declaim (inline code->ascii-mapper))
+(defun code->ascii-mapper (code)
+  (declare (optimize speed (safety 0))
+	   (type char-code code))
+  (if (> code 127)
+      nil
+      code))
 
-(defmacro define-string->ascii* (accessor type)
-  (let ((name (make-od-name 'string->ascii* accessor)))
-    `(defun ,name (array astart aend string sstart send)
-      (declare (optimize speed (safety 0))
-       (type ,type array)
-       (type simple-string string)
-       (type array-range astart aend sstart send))
-      (,(make-od-name 'string->latin*% accessor)
-	array astart aend
-	string sstart send
-	nil
-	#'get-ascii-bytes))))
-(instantiate-octets-definition define-string->ascii*)
-
-(declaim (inline get-latin1-bytes))
-(defun get-latin1-bytes (string pos end replacements)
+(declaim (inline get-ascii-bytes))
+(defun get-ascii-bytes (string pos end)
   (declare (optimize speed (safety 0))
 	   (type simple-string string)
 	   (type array-range pos end))
-  (get-latin-bytes #'identity :latin-1 string pos end replacements))
+  (get-latin-bytes #'code->ascii-mapper :ascii string pos end))
 
-(defmacro define-string->latin1* (accessor type)
-  (let ((name (make-od-name 'string->latin1* accessor)))
-    `(defun ,name (array astart aend string sstart send)
-      (declare (optimize speed (safety 0))
-	       (type ,type array)
-	       (type simple-string string)
-	       (type array-range astart aend sstart send))
-      (,(make-od-name 'string->latin*% accessor)
-	array astart aend
-	string sstart send
-	nil
-	#'get-latin1-bytes))))
-(instantiate-octets-definition define-string->latin1*)
+(declaim (inline get-latin1-bytes))
+(defun get-latin1-bytes (string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :latin-1 string pos end))
 
-#!-sb-unicode
+#!+sb-unicode
 (progn
   (declaim (inline get-latin9-bytes))
-  (defun get-latin9-bytes (string pos end replacements)
+  (defun get-latin9-bytes (string pos end)
     (declare (optimize speed (safety 0))
              (type simple-string string)
              (type array-range pos end))
-    (get-latin-bytes #'code->latin9-mapper :latin-9 string pos end replacements))
-
-  (defmacro define-string->latin9* (accessor type)
-    (let ((name (make-od-name 'string->latin9* accessor)))
-      `(defun ,name (array astart aend string sstart send)
-        (declare (optimize speed (safety 0))
-         (type ,type array)
-         (type simple-string string)
-         (type array-range astart aend sstart send))
-        (,(make-od-name 'string->latin*% accessor)
-         array astart aend
-         string sstart send
-         nil
-         #'get-latin9-bytes))))
-  (instantiate-octets-definition define-string->latin9*))
-
-(defun get-latin-length (string start end get-bytes)
-  ;; Returns the length and a list of replacements for bad characters
-  (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range start end)
-	   (type function get-bytes))
-  (let* ((length 0)
-	 (replacements-start (cons nil nil))
-	 (replacements-end replacements-start))
-    (declare (dynamic-extent replacements-start)
-	     (type array-range length))
-    (flet ((collect (replacement)
-	     (setf (cdr replacements-end) (cons replacement nil)
-		   replacements-end (cdr replacements-end))
-	     replacement))
-      (loop for src of-type fixnum from start below end
-	    do (let ((byte-or-bytes (funcall get-bytes string src end nil)))
-		 (declare (type (or (unsigned-byte 8) (simple-array (unsigned-byte 8) (*))) byte-or-bytes))
-		 (cond
-		   ((numberp byte-or-bytes)
-		    (incf length))
-		   (t
-		    (let* ((replacement-len (length byte-or-bytes))
-			   (total-length (+ length replacement-len)))
-		      (unless (< total-length #.sb!xc:array-dimension-limit)
-			(error "Replacement string too long"))
-		      (setf length total-length)
-		      (collect byte-or-bytes)))))))
-    (values length (cdr replacements-start))))
+    (get-latin-bytes #'code->latin9-mapper :latin-9 string pos end)))
 
 (declaim (inline string->latin%))
 (defun string->latin% (string sstart send get-bytes null-padding)
-  (declare (optimize speed); (safety 0))
+  (declare (optimize speed)
 	   (type simple-string string)
-	   (type array-range sstart)
-	   (type array-range send)
+	   (type array-range sstart send null-padding)
 	   (type function get-bytes))
   (let ((octets (make-array 0 :adjustable t :fill-pointer 0 :element-type '(unsigned-byte 8))))
     (loop for pos from sstart below send
-	  do (let ((byte-or-bytes (funcall get-bytes string pos send nil)))
+	  do (let ((byte-or-bytes (funcall get-bytes string pos send)))
 	       (declare (type (or (unsigned-byte 8) (simple-array (unsigned-byte 8) (*))) byte-or-bytes))
 	       (cond
 		 ((numberp byte-or-bytes)
@@ -421,125 +293,82 @@ one-past-the-end"
 ;;; to utf8
 
 (declaim (inline char-len-as-utf8))
-(defun char-len-as-utf8 (c)
+(defun char-len-as-utf8 (code)
   (declare (optimize speed (safety 0))
-	   (type character c))
-  (let ((code (char-code c)))
-    (cond ((< code 0) (bug "can't happen"))
-	  ((< code #x80) 1)
-	  ((< code #x800) 2)
-	  ((< code #x10000) 3)
-	  ((< code #x110000) 4)
-	  (t (bug "can't happen")))))
+	   (type (integer 0 (#.sb!xc:char-code-limit)) code))
+  (cond ((< code 0) (bug "can't happen"))
+	((< code #x80) 1)
+	((< code #x800) 2)
+	((< code #x10000) 3)
+	((< code #x110000) 4)
+	(t (bug "can't happen"))))
 
-(defmacro define-char->utf8 (accessor type)
-  (let ((name (make-od-name 'char->utf8 accessor)))
-    `(progn
-      ;;(declaim (inline ,name))
-      (defun ,name (char dest destpos maxdest)
-	(declare (optimize speed (safety 0))
-		 (type ,type dest)
-		 (type array-range destpos maxdest))
-	;; stores the character in the array DEST if there's room between
-	;; DESTPOS and MAXDEST.  Returns the number of bytes used on
-	;; success, or NIL on failure.
-	(let ((code (char-code char)))
-	  (flet (((setf cref) (c pos)
-		   (setf (,accessor dest (+ pos destpos)) c)))
-	    (declare (inline (setf cref)))
-	    (ecase (char-len-as-utf8 char)
-	      (1
-	       (cond ((>= destpos maxdest)
-		      nil)
-		     (t
-		      (setf (cref 0) code)
-		      1)))
-	      (2
-	       (cond ((>= (+ destpos 1) maxdest)
-		      nil)
-		     (t
-		      (setf (cref 0) (logior #b11000000 (ldb (byte 5 6) code))
-			    (cref 1) (logior #b10000000 (ldb (byte 6 0) code)))
-		      2)))
-	      (3
-	       (cond ((>= (+ destpos 2) maxdest)
-		      nil)
-		     (t
-		      (setf (cref 0) (logior #b11100000 (ldb (byte 4 12) code))
-			    (cref 1) (logior #b10000000 (ldb (byte 6 6) code))
-			    (cref 2) (logior #b10000000 (ldb (byte 6 0) code)))
-		      3)))
-	      (4
-	       (cond ((>= (+ destpos 3) maxdest)
-		      nil)
- 		     (t
-		      (setf (cref 0) (logior #b11110000 (ldb (byte 3 18) code))
-			    (cref 1) (logior #b10000000 (ldb (byte 6 12) code))
-			    (cref 2) (logior #b10000000 (ldb (byte 6 6) code))
-			    (cref 3) (logior #b10000000 (ldb (byte 6 0) code)))
-		      4))))))))))
-(instantiate-octets-definition define-char->utf8)
-
-(defmacro define-string->utf8* (accessor type)
-  (let ((name (make-od-name 'string->utf8* accessor)))
-    `(progn
-      (defun ,name (array astart aend string sstart send)
-	(declare (optimize speed (safety 0))
-		 (type simple-string string)
-		 (type ,type array)
-		 (type array-range astart aend sstart send))
-	(flet ((convert (spos apos)
-		 (let ((char-len (,(make-od-name 'char->utf8 accessor) (char string spos) array apos aend)))
-		   (when (not char-len)
-		     (return-from ,name (values array apos spos)))
-		   char-len)))
-	  (varimap array astart aend
-		   sstart send
-		   (lambda (apos spos)
-		     (values (convert spos apos) 1))))))))
-(instantiate-octets-definition define-string->utf8*)
+(declaim (inline char->utf8))
+(defun char->utf8 (char dest)
+  (declare (optimize speed (safety 0))
+	   (type (array (unsigned-byte 8) (*)) dest))
+  (let ((code (char-code char)))
+    (flet ((add-byte (b)
+	     (declare (type (unsigned-byte 8) b))
+	     (vector-push-extend b dest)))
+      (declare (inline add-byte))
+      (ecase (char-len-as-utf8 code)
+	(1
+	 (add-byte code))
+	(2
+	 (add-byte (logior #b11000000 (ldb (byte 5 6) code)))
+	 (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
+	(3
+	 (add-byte (logior #b11100000 (ldb (byte 4 12) code)))
+	 (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
+	 (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
+	(4
+	 (add-byte (logior #b11110000 (ldb (byte 3 18) code)))
+	 (add-byte (logior #b10000000 (ldb (byte 6 12) code)))
+	 (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
+	 (add-byte (logior #b10000000 (ldb (byte 6 0) code))))))))
 
 (defun string->utf8 (string sstart send additional-space)
   (declare (optimize speed (safety 0))
 	   (type simple-string string)
 	   (type array-range sstart send additional-space))
-  (let ((alen (+ (the (integer 0 #.(* 4 sb!xc:array-dimension-limit))
-		   (loop with result of-type array-range = 0
-			 for i of-type array-range from sstart below send
-			 do (incf result (char-len-as-utf8 (char string i)))
-			 finally (return result)))
-		 additional-space)))
-    (when (>= alen #.sb!xc:array-dimension-limit)
-      (error "string too long as utf8"))
-    (let ((array (make-array alen :element-type '(unsigned-byte 8))))
-      (when (plusp additional-space)
-	(fill array 0 :start (- alen additional-space)))
-      (values (string->utf8*-aref array 0 alen string sstart send)))))
+  (let ((array (make-array (+ additional-space (- send sstart))
+			   :element-type '(unsigned-byte 8)
+			   :adjustable t
+			   :fill-pointer 0)))
+    (loop for i from sstart below send
+	  do (char->utf8 (char string i) array))
+    (dotimes (i additional-space)
+      (vector-push-extend 0 array))
+    (coerce array '(simple-array (unsigned-byte 8) (*)))))
 
 ;;;; to-string conversions
 
 ;;; from latin (including ascii)
 
-(defmacro define-ascii->string* (accessor type)
-  (let ((name (make-od-name 'ascii->string* accessor)))
+(defmacro define-ascii->string (accessor type)
+  (let ((name (make-od-name 'ascii->string accessor)))
     `(progn
-      (declaim (inline ,name))
-      (defun ,name (string sstart send array astart aend)
-	(declare (optimize speed (safety 0))
-		 (type simple-string string)
+      (defun ,name (array astart aend)
+	(declare (optimize speed)
 		 (type ,type array)
-		 (type array-range sstart send astart aend))
-	(varimap string sstart send
-		 astart aend
-		 (lambda (spos apos)
-		   (setf (char string spos)
-                         (let ((code (,accessor array apos)))
-                           (if (< code 128)
-                               code
-                               (decoding-error array astart aend :ascii
-                                               'malformed-ascii apos))))
-		   (values 1 1)))))))
-(instantiate-octets-definition define-ascii->string*)
+		 (type array-range astart aend))
+	;; Since there is such a thing as a malformed ascii byte, a
+	;; simple "make the string, fill it in" won't do.
+	(let ((string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
+	  (loop for apos from astart below aend
+		do (let* ((code (,accessor array apos))
+			  (string-content
+			   (if (< code 128)
+			       (code-char code)
+			       (decoding-error array apos (1+ apos) :ascii
+					       'malformed-ascii apos))))
+		     (if (characterp string-content)
+			 (vector-push-extend string-content string)
+			 (loop for c across string-content
+			       do (vector-push-extend c string))))
+		finally (return (coerce string 'simple-string))))))))
+(instantiate-octets-definition define-ascii->string)
 
 (defmacro define-latin->string* (accessor type)
   (let ((name (make-od-name 'latin->string* accessor)))
@@ -558,23 +387,6 @@ one-past-the-end"
 		   (values 1 1)))))))
 (instantiate-octets-definition define-latin->string*)
 
-#!+sb-unicode
-(progn
-  (declaim (inline latin9->code-mapper))
-  (defun latin9->code-mapper (byte)
-    (declare (optimize speed (safety 0))
-             (type (unsigned-byte 8) byte))
-    (case byte
-      (#xA4 #x20AC)
-      (#xA6 #x0160)
-      (#xA8 #x0161)
-      (#xB4 #x017D)
-      (#xB8 #x017E)
-      (#xBC #x0152)
-      (#xBD #x0153)
-      (#xBE #x0178)
-      (otherwise byte))))
-
 (defmacro define-latin1->string* (accessor type)
   (declare (ignore type))
   (let ((name (make-od-name 'latin1->string* accessor)))
@@ -592,33 +404,35 @@ one-past-the-end"
         (defun ,name (string sstart send array astart aend)
           (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'latin9->code-mapper)))))
   (instantiate-octets-definition define-latin9->string*))
-  
-(declaim (inline ascii->string))
-(defun ascii->string (array astart aend)
-  (declare (optimize speed (safety 0))
-	   (type (simple-array (unsigned-byte 8) (*)) array)
-	   (type array-range astart aend))
-  (let ((length (the array-range (- aend astart))))
-    (values (ascii->string*-aref (make-string length) 0 length
-				 array astart aend))))
 
-(declaim (inline latin->string))
-(defun latin->string (array astart aend mapper)
-  (declare (optimize speed (safety 0))
-	   (type (simple-array (unsigned-byte 8) (*)) array)
-	   (type array-range astart aend)
-	   (type function mapper))
-  (let ((length (the array-range (- aend astart))))
-    (values (latin->string*-aref (make-string length) 0 length
-				 array astart aend
-				 mapper))))
+(defmacro define-latin->string (accessor type)
+  (let ((name (make-od-name 'latin->string accessor)))
+    `(progn
+      (declaim (inline latin->string))
+      (defun ,name (array astart aend mapper)
+	(declare (optimize speed (safety 0))
+		 (type ,type array)
+		 (type array-range astart aend)
+		 (type function mapper))
+	(let ((length (the array-range (- aend astart))))
+	  (values (,(make-od-name 'latin->string* accessor) (make-string length) 0 length
+		                                            array astart aend
+		                                            mapper)))))))
+(instantiate-octets-definition define-latin->string)
 
-(defun latin1->string (array astart aend)
-  (latin->string array astart aend #'identity))
+(defmacro define-latin1->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'latin1->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+(instantiate-octets-definition define-latin1->string)
 
 #!+sb-unicode
-(defun latin9->string (array astart aend)
-  (latin->string array astart aend #'latin9->code-mapper))
+(progn
+  (defmacro define-latin9->string (accessor type)
+    (declare (ignore type))
+    `(defun ,(make-od-name 'latin9->string accessor) (array astart aend)
+      (,(make-od-name 'latin->string accessor) array astart aend #'latin9->code-mapper)))
+  (instantiate-octets-definition define-latin9->string))
 
 ;;; from utf8
 
@@ -627,21 +441,21 @@ one-past-the-end"
     `(progn
       ;;(declaim (inline ,name))
       (let ((lexically-max
-             (string->utf8 (string (code-char (1- #.sb!xc:char-code-limit)))
+             (string->utf8 (string (code-char ,(1- sb!xc:char-code-limit)))
                            0 1 0)))
-	(defun ,name (array pos end replacements-box)
+	(declare (type (simple-array (unsigned-byte 8) (#!+sb-unicode 4 #!-sb-unicode 2)) lexically-max))
+	(defun ,name (array pos end)
 	  (declare (optimize speed (safety 0))
 		   (type ,type array)
 		   (type array-range pos end))
 	  ;; returns the number of bytes consumed and nil if it's a
 	  ;; valid character or the number of bytes consumed and a
-	  ;; replacement string if it's not.  If REPLACEMENTS is NIL,
-	  ;; signal a condition to get one, otherwise pop it off the
-	  ;; cdr of REPLACEMENTS.
+	  ;; replacement string if it's not.
 	  (let ((initial-byte (,accessor array pos))
-		(reject-reason 'no-error)
-		(reject-position pos))
-	    (declare (type array-range reject-position))
+		(reject-reason nil)
+		(reject-position pos)
+		(remaining-bytes (- end pos)))
+	    (declare (type array-range reject-position remaining-bytes))
 	    (labels ((valid-utf8-starter-byte-p (b)
 		       (declare (type (unsigned-byte 8) b))
 		       (let ((ok (cond
@@ -666,21 +480,25 @@ one-past-the-end"
 			 (unless ok
 			   (setf reject-reason 'end-of-input-in-character))
 			 ok))
-		     (valid-secondary-byte-p (b)
-		       (declare (type (unsigned-byte 8) b))
-		       (= (logand b #b11000000) #b10000000))
 		     (valid-secondary-p (x)
-		       (let* ((b (,accessor array (the array-range (+ pos x))))
-			      (ok (valid-secondary-byte-p b)))
+		       (let* ((idx (the array-range (+ pos x)))
+			      (b (,accessor array idx))
+			      (ok (= (logand b #b11000000) #b10000000)))
 			 (unless ok
 			   (setf reject-reason 'invalid-utf8-continuation-byte)
-			   (setf reject-position (+ pos x)))
+			   (setf reject-position idx))
 			 ok))
 		     (preliminary-ok-for-length (maybe-len len)
 		       (and (eql maybe-len len)
-			    (enough-bytes-left-p len)
-			    (loop for i from 1 below len
-				  always (valid-secondary-p i))))
+			    ;; Has to be done in this order so that
+			    ;; certain broken sequences (e.g., the
+			    ;; two-byte sequence `"initial (length 3)"
+			    ;; "non-continuation"' -- `#xef #x32')
+			    ;; signal only part of that sequence as
+			    ;; erronous.
+			    (loop for i from 1 below (min len remaining-bytes)
+				  always (valid-secondary-p i))
+			    (enough-bytes-left-p len)))
 		     (overlong-chk (x y)
 		       (let ((ok (or (/= initial-byte x)
 				     (/= (logior (,accessor array (the array-range (+ pos 1)))
@@ -690,20 +508,25 @@ one-past-the-end"
 			   (setf reject-reason 'overlong-utf8-sequence))
 			 ok))
 		     (character-below-char-code-limit-p ()
-		       ;; This is only called on a four-byte sequence to
-		       ;; ensure we don't go over SBCL's character limts.
+		       ;; This is only called on a four-byte sequence
+		       ;; (two in non-unicode builds) to ensure we
+		       ;; don't go over SBCL's character limts.
 		       (let ((ok (cond ((< (aref lexically-max 0) (,accessor array pos))
 					nil)
 				       ((> (aref lexically-max 0) (,accessor array pos))
 					t)
 				       ((< (aref lexically-max 1) (,accessor array (+ pos 1)))
 					nil)
+				       #!+sb-unicode
 				       ((> (aref lexically-max 1) (,accessor array (+ pos 1)))
 					t)
+				       #!+sb-unicode
 				       ((< (aref lexically-max 2) (,accessor array (+ pos 2)))
 					nil)
+				       #!+sb-unicode
 				       ((> (aref lexically-max 2) (,accessor array (+ pos 2)))
 					t)
+				       #!+sb-unicode
 				       ((< (aref lexically-max 3) (,accessor array (+ pos 3)))
 					nil)
 				       (t t))))
@@ -712,7 +535,6 @@ one-past-the-end"
 			 ok)))
 	      (declare (inline valid-utf8-starter-byte-p
 			       enough-bytes-left-p
-			       valid-secondary-byte-p
 			       valid-secondary-p
 			       preliminary-ok-for-length
 			       overlong-chk))
@@ -721,13 +543,16 @@ one-past-the-end"
 		       (values 1 nil))
 		      ((and (preliminary-ok-for-length maybe-len 2)
 			    (overlong-chk #b11000000 #b10111111)
-			    (overlong-chk #b11000001 #b10111111))
+			    (overlong-chk #b11000001 #b10111111)
+			    #!-sb-unicode (character-below-char-code-limit-p))
 		       (values 2 nil))
 		      ((and (preliminary-ok-for-length maybe-len 3)
-			    (overlong-chk #b11100000 #b10011111))
+			    (overlong-chk #b11100000 #b10011111)
+			    #!-sb-unicode (not (setf reject-reason 'character-out-of-range)))
 		       (values 3 nil))
 		      ((and (preliminary-ok-for-length maybe-len 4)
 			    (overlong-chk #b11110000 #b10001111)
+			    #!-sb-unicode (not (setf reject-reason 'character-out-of-range))
 			    (character-below-char-code-limit-p))
 		       (values 4 nil))
 		      ((and (preliminary-ok-for-length maybe-len 5)
@@ -750,10 +575,8 @@ one-past-the-end"
 					  (+ pos maybe-len))))
 			      (bad-len (- bad-end pos)))
 			 (declare (type array-range bad-end bad-len))
-			 (if replacements-box
-			     (values bad-len (pop (cdr replacements-box)))
-			     (let ((replacement (decoding-error array pos bad-end :utf-8 reject-reason reject-position)))
-			       (values bad-len replacement))))))))))))))
+			 (let ((replacement (decoding-error array pos bad-end :utf-8 reject-reason reject-position)))
+			   (values bad-len replacement)))))))))))))
 (instantiate-octets-definition define-bytes-per-utf8-character)
 
 (defmacro define-simple-get-utf8-char (accessor type)
@@ -781,80 +604,6 @@ one-past-the-end"
 				  (ldb (byte 6 0) (cref 3)))))))))))
 (instantiate-octets-definition define-simple-get-utf8-char)
 
-(defmacro define-get-utf8-character (accessor type)
-  (let ((name (make-od-name 'get-utf8-character accessor)))
-    `(progn
-      (declaim (inline ,name))
-      (defun ,name (array pos end replacements)
-	;; Returns the character (or nil) and the number of bytes consumed
-	(declare (optimize speed (safety 0))
-		 (type ,type array)
-		 (type array-range pos end))
-	(multiple-value-bind (bytes invalid) (,(make-od-name 'bytes-per-utf8-character accessor) array pos end replacements)
-	  (if (not invalid)
-	      (values (,(make-od-name 'simple-get-utf8-char accessor) array pos bytes)
-		      bytes)
-	      (values invalid bytes)))))))
-(instantiate-octets-definition define-get-utf8-character)
-
-(defmacro define-utf8->string% (accessor type)
-  (let ((name (make-od-name 'utf8->string% accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend replacements)
-	(declare (optimize speed (safety 0))
-		 (type simple-string string)
-		 (type ,type array)
-		 (type array-range sstart send astart aend))
-	(vari-transcode-aref ; dest is always a string
-	  string sstart send
-	  array astart aend
-	  replacements
-	  #',(make-od-name 'get-utf8-character accessor)
-	  #'characterp)))))
-(instantiate-octets-definition define-utf8->string%)
-
-(defmacro define-utf8->string* (accessor type)
-  (let ((name (make-od-name 'utf8->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-	(declare (optimize speed (safety 0))
-		 (type simple-string string)
-		 (type ,type array)
-		 (type array-range sstart send astart aend))
-	(,(make-od-name 'utf8->string% accessor) string sstart send array astart aend nil)))))
-(instantiate-octets-definition define-utf8->string*)
-
-(defmacro define-utf8-string-length (accessor type)
-  (let ((name (make-od-name 'utf8-string-length accessor)))
-    `(defun ,name (array start end)
-      ;; Returns the length and a list of replacements for bad characters
-      (declare (optimize speed (safety 0))
-	       (type ,type array)
-	       (type array-range start end))
-      (let* ((bytes 0)
-	     (length 0)
-	     (replacements-start (cons nil nil))
-	     (replacements-end replacements-start))
-	(declare (dynamic-extent replacements-start)
-		 (type array-range bytes length))
-	(flet ((collect (replacement)
-		   (setf (cdr replacements-end) (cons replacement nil)
-			 replacements-end (cdr replacements-end))
-		 replacement))
-	  (loop for src = start then (+ src bytes)
-		while (< src end)
-		do (multiple-value-bind (bytes-this-char invalid) (,(make-od-name 'bytes-per-utf8-character accessor) array src end nil)
-		     (declare (type (or null string) invalid))
-		     (setf bytes bytes-this-char)
-		     (let ((new-length (+ length (if invalid
-						     (length (collect invalid))
-						     1))))
-		       (unless (< new-length #.sb!xc:array-dimension-limit)
-			 (error "Replacement string too long"))
-		       (setf length new-length)))))
-	(values length (cdr replacements-start))))))
-(instantiate-octets-definition define-utf8-string-length)
-
 (defmacro define-utf8->string (accessor type)
   (let ((name (make-od-name 'utf8->string accessor)))
     `(progn
@@ -864,7 +613,8 @@ one-past-the-end"
 		 (type array-range astart aend))
 	(let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
 	  (loop with pos = astart
-		do (multiple-value-bind (bytes invalid) (,(make-od-name 'bytes-per-utf8-character accessor) array pos aend nil)
+		do (multiple-value-bind (bytes invalid)
+		       (,(make-od-name 'bytes-per-utf8-character accessor) array pos aend)
 		     (declare (type (or null string) invalid))
 		     (cond
 		       ((null invalid)
@@ -889,14 +639,14 @@ one-past-the-end"
 
 (defparameter *external-format-functions*
   '(((:ascii :us-ascii :ansi_x3.4-1968)
-     ascii->string ascii->string*-aref string->ascii string->ascii*-aref)
+     ascii->string-aref string->ascii)
     ((:latin1 :latin-1 :iso-8859-1)
-     latin1->string latin1->string*-aref string->latin1 string->latin1*-aref)
+     latin1->string-aref string->latin1)
     #!+sb-unicode
     ((:latin9 :latin-9 :iso-8859-15)
-     latin9->string latin9->string*-aref string->latin9 string->latin9*-aref)
+     latin9->string-aref string->latin9)
     ((:utf8 :utf-8)
-     utf8->string-aref utf8->string*-aref string->utf8 string->utf8*-aref)))
+     utf8->string-aref string->utf8)))
 
 (defun external-formats-funs (external-format)
   (when (eql external-format :default)
@@ -917,23 +667,6 @@ one-past-the-end"
     (funcall (symbol-function (first (external-formats-funs external-format)))
              vector start end)))
 
-(defun octets-to-string* (string vector &key (external-format :default)
-                          (start1 0) end1 (start2 0) end2)
-  (declare (type string string)
-           (type (vector (unsigned-byte 8)) vector))
-  (with-array-data
-      ((string string)
-       (start1 start1)
-       (end1 (%check-vector-sequence-bounds string start1 end1)))
-    (declare (type simple-string string))
-    (with-array-data
-        ((vector vector)
-         (start2 start2)
-         (end2 (%check-vector-sequence-bounds vector start2 end2)))
-      (declare (type (simple-array (unsigned-byte 8) (*)) vector))
-      (funcall (symbol-function (second (external-formats-funs external-format)))
-               string start1 end1 vector start2 end2))))
-
 (defun string-to-octets (string &key (external-format :default)
                          (start 0) end null-terminate)
   (declare (type string string))
@@ -941,25 +674,8 @@ one-past-the-end"
                     (start start)
                     (end (%check-vector-sequence-bounds string start end)))
     (declare (type simple-string string))
-    (funcall (symbol-function (third (external-formats-funs external-format)))
+    (funcall (symbol-function (second (external-formats-funs external-format)))
              string start end (if null-terminate 1 0))))
-
-(defun string-to-octets* (vector string &key (external-format :default)
-                          (start1 0) end1 (start2 0) end2)
-  (declare (type (vector (unsigned-byte 8)) vector)
-           (type string string))
-  (with-array-data
-      ((vector vector)
-       (start1 start1)
-       (end1 (%check-vector-sequence-bounds vector start1 end1)))
-    (declare (type (simple-array (unsigned-byte 8) (*)) vector))
-    (with-array-data
-        ((string string)
-         (start2 start2)
-         (end2 (%check-vector-sequence-bounds string start2 end2)))
-      (declare (type simple-string string))
-      (funcall (symbol-function (fourth (external-formats-funs external-format)))
-               vector start1 end1 string start2 end2))))
 
 #!+sb-unicode
 (defvar +unicode-replacement-character+ (string (code-char #xfffd)))
@@ -981,102 +697,3 @@ one-past-the-end"
 	((octet-decoding-error (lambda (c)
 				 (use-value ,cname c))))
       ,@body))))
-
-;;; debugging stuff
-#|
-(defmacro show-overflow (&body body)
-  `(handler-bind ((octet-buffer-overflow
-		   (lambda (c)
-		     (format t "Overflowed with ~S~%" (octet-buffer-overflow-replacement c))
-		     (finish-output))))
-    ,@body))
-
-(defun ub8 (len-or-seq)
-  (if (numberp len-or-seq)
-      (make-array len-or-seq :element-type '(unsigned-byte 8) :initial-element 0)
-      (coerce len-or-seq '(simple-array (unsigned-byte 8) (*)))))
-
-(defun ensure-roundtrip-utf8 ()
-  (let ((string (make-string char-code-limit))
-	(octets (make-array (* 4 char-code-limit) :element-type '(unsigned-byte 8)))
-	(string2 (make-string char-code-limit)))
-    (dotimes (i char-code-limit)
-      (setf (char string i) (code-char i)))
-    (multiple-value-bind (_ octets-length used-chars)
-	(string-to-octets* octets string :external-format :utf8)
-      (declare (ignore _))
-      (assert (= used-chars (length string)))
-      (multiple-value-bind (_ string-length used-octets)
-	  (octets-to-string* string2 octets :external-format :utf8 :end2 octets-length)
-	(declare (ignore _))
-	(assert (= used-octets octets-length))
-	(assert (= string-length (length string)))
-	(assert (string= string string2)))))
-  t)
-
-(defun ensure-roundtrip-utf8-2 ()
-  (let ((string (make-string char-code-limit)))
-    (dotimes (i char-code-limit)
-      (setf (char string i) (code-char i)))
-    (let ((string2
-	   (octets-to-string (string-to-octets string :external-format :utf8)
-			   :external-format :utf8)))
-      (assert (= (length string2) (length string)))
-      (assert (string= string string2))))
-  t)
-
-(defun ensure-roundtrip-latin (format)
-  (let ((octets (ub8 256))
-	(string (make-string 256))
-	(octets2 (ub8 256)))
-    (dotimes (i 256)
-      (setf (aref octets i) i))
-    (multiple-value-bind (_ string-length octets-used)
-	(octets-to-string* string octets :external-format format)
-      (declare (ignore _))
-      (assert (= string-length 256))
-      (assert (= octets-used 256)))
-    (multiple-value-bind (_ octet-length chars-used)
-	(string-to-octets* octets2 string :external-format format)
-      (declare (ignore _))
-      (assert (= octet-length 256))
-      (assert (= chars-used 256)))
-    (assert (every #'= octets octets2)))
-  t)
-
-(defun ensure-roundtrip-latin-2 (format)
-  (let ((octets (ub8 256)))
-    (dotimes (i 256)
-      (setf (aref octets i) i))
-    (let* ((str (octets-to-string octets :external-format format))
-	   (oct2 (string-to-octets str :external-format format)))
-      (assert (= (length octets) (length oct2)))
-      (assert (every #'= octets oct2))))
-  t)
-
-(defun ensure-roundtrip-latin1 ()
-  (ensure-roundtrip-latin :latin1))
-
-(defun ensure-roundtrip-latin9 ()
-  (ensure-roundtrip-latin :latin9))
-
-(defun ensure-roundtrip-latin1-2 ()
-  (ensure-roundtrip-latin-2 :latin1))
-
-(defun ensure-roundtrip-latin9-2 ()
-  (ensure-roundtrip-latin-2 :latin9))
-
-(defmacro i&c (form)
-  `(handler-case ,form
-    (error (c)
-     (format *trace-output* "~S: ~A~%" ',form c))))
-
-(defun test-octets ()
-  (i&c (ensure-roundtrip-utf8))
-  (i&c (ensure-roundtrip-utf8-2))
-  (i&c (ensure-roundtrip-latin1))
-  (i&c (ensure-roundtrip-latin1-2))
-  (i&c (ensure-roundtrip-latin9))
-  (i&c (ensure-roundtrip-latin9-2)))
-
-|#
