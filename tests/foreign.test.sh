@@ -24,6 +24,8 @@ ld -shared -o $testfilestem.so $testfilestem.o
 
 # Test interaction with the shared object file.
 ${SBCL:-sbcl} <<EOF
+  (define-alien-variable environ (* c-string))
+  (defvar *environ* environ)
   (handler-case 
       (load-foreign '("$testfilestem.so"))
     (sb-int:unsupported-operator ()
@@ -31,6 +33,11 @@ ${SBCL:-sbcl} <<EOF
      ;; on every OS. In that case, there's nothing to test, and we
      ;; can just fall through to success.
      (sb-ext:quit :unix-status 52))) ; success convention for Lisp program
+  ;; Test that loading an object file didn't screw up our records
+  ;; of variables visible in runtime. (This was a bug until 
+  ;; Nikodemus Siivola's patch in sbcl-0.8.5.50.)
+  (assert (= (sb-sys:sap-int (alien-sap *environ*))
+             (sb-sys:sap-int (alien-sap environ))))
   (define-alien-routine summish int (x int) (y int))
   (assert (= (summish 10 20) 31))
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program

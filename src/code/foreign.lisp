@@ -176,7 +176,7 @@
   ;; that the list isn't guaranteed to be in reverse order of loading,
   ;; at least not if a file is loaded more than once. Is this the
   ;; right thing? (In what cases does it matter?)
-  (dolist (handle *handles-from-dlopen*)
+  (dolist (handle (reverse *handles-from-dlopen*))
     ;; KLUDGE: We implicitly exclude the possibility that the variable
     ;; could actually be NULL, but the man page for dlsym(3) 
     ;; recommends doing a more careful test. -- WHN 20000825
