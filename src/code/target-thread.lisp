@@ -383,6 +383,7 @@ thread is not the foreground thread"
 (defun debugger-wait-until-foreground-thread (stream)
   "Returns T if thread had been running in background, NIL if it was
 interactive."
+  (declare (ignore stream))
   (prog1
       (with-mutex ((session-lock *session*))
 	(not (member (current-thread-id) 
