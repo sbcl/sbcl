@@ -213,7 +213,7 @@
 		  :format-control
 		  "~@<in DEFCLASS ~S, the slot specification ~S is invalid; ~
                    the probable intended meaning may be achieved by ~
-                   specifiying ~S instead."
+                   specifiying ~S instead.~>"
 		  :format-arguments
 		  (list class-name spec
 			`(,(car spec) :initform ,(cadr spec)))))

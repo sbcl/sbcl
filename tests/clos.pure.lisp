@@ -27,3 +27,15 @@
 			  :no-lambda-list)
 		  (push gf collect)))))
 	   (print (nreverse collect)))))
+
+;;; Regressing test for invalid slot specification error printing
+(multiple-value-bind (value err)    
+    (ignore-errors (macroexpand '(defclass foo () (frob (frob bar)))))
+  (declare (ignore value))
+  (assert (typep err 'simple-condition))
+  (multiple-value-bind (value format-err)
+      (ignore-errors (apply #'format nil 
+                            (simple-condition-format-control err)
+                            (simple-condition-format-arguments err)))
+    (declare (ignore value))
+    (assert (not format-err))))

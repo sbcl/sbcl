@@ -2403,6 +2403,8 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     SB-EXT:INHIBIT-WARNINGS OPTIMIZE quality.  See the manual for
     documentation on this feature.  The SB-EXT:INHIBIT-WARNINGS
     quality should be considered deprecated.
+  * fixed bug: Invalid slot specification errors now print correctly. 
+    (thanks to Zach Beane)
   * fixed bug 320: Shared to local slot value transfers in class 
     redefinitions now happen corrently from superclasses as
     well. (reported by Bruno Haible)
