@@ -325,8 +325,8 @@
  #s(sb-cold:package-data
     :name "SB!IMPL"
     :doc "private: a grab bag of implementation details"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!DEBUG" "SB!KERNEL" "SB!BIGNUM"
-          "SB!GRAY"))
+    :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!C-CALL" "SB!DEBUG" "SB!EXT"
+          "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
 
  ;; FIXME: It seems to me that this could go away, with its contents moved
  ;; into SB!KERNEL, like the implementation of the rest of the class system.
@@ -484,7 +484,7 @@ like *STACK-TOP-HINT*"
     :reexport ("LOAD-FOREIGN" "LOAD-1-FOREIGN" "WEAK-POINTER-P")
     :export (;; Information about how the program was invoked is
              ;; nonstandard but very useful.
-             "*POSIX-ARGV*" "POSIX-GETENV"
+             "*POSIX-ARGV*" "POSIX-GETENV" "POSIX-ENVIRON"
 
              ;; People have various good reasons to mess with the GC.
              "*AFTER-GC-HOOKS*" "*BEFORE-GC-HOOKS*"
@@ -794,6 +794,10 @@ retained, possibly temporariliy, because it might be used internally."
              "WITH-FLOAT-TRAPS-MASKED"
              "DEFINE-HASH-TABLE-TEST"
              "*GC-INHIBIT-HOOK*"
+
+             ;; compatibility hacks for old-style CMU CL data formats
+             "UNIX-ENVIRONMENT-CMUCL-FROM-SBCL"
+             "UNIX-ENVIRONMENT-SBCL-FROM-CMUCL"
 
              ;; not used any more, I think -- WHN 19991206
 	     #+nil
@@ -1429,7 +1433,7 @@ stable Unix interface suitable for the end user.
 This package only tries to implement what happens to be
 needed by the current implementation of SBCL, and makes
 no guarantees of interface stability."
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS" "SB!EXT" "SB!INT")
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!EXT" "SB!INT" "SB!SYS")
     :export ("CADDR-T" "D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN"
              "DADDR-T" "DEV-T" "DIRECT" "EXECGRP" "EXECOTH" "EXECOWN" "F-DUPFD"
              "F-GETFD" "F-GETFL" "F-GETOWN" "F-SETFD" "F-SETFL" "F-SETOWN"

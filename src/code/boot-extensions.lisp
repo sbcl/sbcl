@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!EXT")
+(in-package "SB!IMPL")
 
 ;;; Lots of code wants to get to the KEYWORD package or the
 ;;; COMMON-LISP package without a lot of fuss, so we cache them in

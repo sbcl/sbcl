@@ -15,7 +15,9 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!EXT")
+(in-package "SB!IMPL")
+
+;;;; miscellaneous I/O
 
 ;;; INDENTING-FURTHER is a user-level macro which may be used to locally
 ;;; increment the indentation of a stream.

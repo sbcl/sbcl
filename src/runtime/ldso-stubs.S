@@ -22,13 +22,13 @@ gcc2_compiled.:
         .text
 
 #define LDSO_STUBIFY(fct) \
-	.align 16 ;\
-.globl ldso_stub__ ## fct ;\
-	.type	 ldso_stub__ ## fct,@function ;\
-ldso_stub__ ## fct: ;\
-	jmp fct ;\
-.L ## fct ## e1: ;\
-	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct  ;
+	.align 16 ; \
+.globl ldso_stub__ ## fct ; \
+	.type	 ldso_stub__ ## fct,@function ; \
+ldso_stub__ ## fct: ; \
+	jmp fct ; \
+.L ## fct ## e1: ; \
+	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 
  LDSO_STUBIFY(accept)
  LDSO_STUBIFY(access)
@@ -259,7 +259,6 @@ ldso_stub__ ## fct: ;\
 /*  LDSO_STUBIFY(endspent) */
 /*  LDSO_STUBIFY(endusershell) */
 /*  LDSO_STUBIFY(endutent) */
-/*  LDSO_STUBIFY(environ) */
 /*  LDSO_STUBIFY(erand48) */
 /*  LDSO_STUBIFY(erf) */
 /*  LDSO_STUBIFY(erfc) */

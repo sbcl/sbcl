@@ -1,8 +1,9 @@
-;;;; This file contains Unix support that SBCL needs to implement itself. It's
-;;;; derived from Peter Van Eynde's unix-glibc2.lisp for CMU CL, which was
-;;;; derived from CMU CL unix.lisp 1.56. But those files aspired to be complete
-;;;; Unix interfaces exported to the end user, while this file aims to be as
-;;;; simple as possible and is not intended for the end user.
+;;;; This file contains Unix support that SBCL needs to implement
+;;;; itself. It's derived from Peter Van Eynde's unix-glibc2.lisp for
+;;;; CMU CL, which was derived from CMU CL unix.lisp 1.56. But those
+;;;; files aspired to be complete Unix interfaces exported to the end
+;;;; user, while this file aims to be as simple as possible and is not
+;;;; intended for the end user.
 ;;;;
 ;;;; FIXME: The old CMU CL unix.lisp code was implemented as hand
 ;;;; transcriptions from Unix headers into Lisp. It appears that this was as
@@ -98,9 +99,9 @@
 	 (values nil (get-errno))
 	 ,success-form)))
 
-;;; Like SYSCALL, but if it fails, signal an error instead of returning error
-;;; codes. Should only be used for syscalls that will never really get an
-;;; error.
+;;; This is like SYSCALL, but if it fails, signal an error instead of
+;;; returning error codes. Should only be used for syscalls that will
+;;; never really get an error.
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
   `(let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
 				,@args)))
@@ -116,9 +117,16 @@
 (defmacro int-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values result 0) ,@args))
 
-;;; from stdio.h
+;;;; hacking the Unix environment
 
-(/show0 "unix.lisp 124")
+(/show0 "unix.lisp 122")
+
+(def-alien-routine ("getenv" posix-getenv) c-string
+  "Return the environment string \"name=value\" which corresponds to NAME, or
+   NIL if there is none."
+  (name c-string))
+
+;;; from stdio.h
 
 (defun unix-rename (name1 name2)
   #!+sb-doc
@@ -127,16 +135,9 @@
   (declare (type unix-pathname name1 name2))
   (void-syscall ("rename" c-string c-string) name1 name2))
 
-;;; from stdlib.h
-
-(def-alien-routine ("getenv" posix-getenv) c-string
-  "Return the environment string \"name=value\" which corresponds to NAME, or
-   NIL if there is none."
-  (name c-string))
-
 ;;; from sys/types.h and gnu/types.h
 
-(/show0 "unix.lisp 144")
+(/show0 "unix.lisp 220")
 
 (defconstant +max-s-long+ 2147483647)
 (defconstant +max-u-long+ 4294967295)
@@ -157,14 +158,11 @@
 (def-alien-type uid-t unsigned-int)
 (def-alien-type ssize-t int)
 
-(/show0 "unix.lisp 163")
-
 ;;; FIXME: We shouldn't hand-copy types from header files into Lisp like this
 ;;; unless we have extreme provocation. Reading directories is not extreme
 ;;; enough, since it doesn't need to be blindingly fast: we can just implement
 ;;; those functions in C as a wrapper layer.
 (def-alien-type fd-mask unsigned-long)
-(/show0 "unix.lisp 171")
 
 ;;; FIXME: Isn't there some way to use a C wrapper to avoid this hand-copying?
 (def-alien-type dev-t
@@ -181,7 +179,7 @@
 (def-alien-type nlink-t
   #!+linux unsigned-int
   #!+bsd   unsigned-short)
-(/show0 "unix.lisp 190")
+(/show0 "unix.lisp 263")
 
 ;;; FIXME: We shouldn't hand-copy types from header files into Lisp like this
 ;;; unless we have extreme provocation. Reading directories is not extreme
@@ -192,15 +190,11 @@
   #!+linux long
   #!+bsd   quad-t)
 
-(/show0 "unix.lisp 195")
 (defconstant fd-setsize 1024)
-(/show0 "unix.lisp 217")
 
 (def-alien-type nil
   (struct fd-set
 	  (fds-bits (array fd-mask #.(/ fd-setsize 32)))))
-
-(/show0 "unix.lisp 223")
 
 ;;;; direntry.h
 
@@ -211,7 +205,7 @@
     (d-reclen unsigned-short)		; length of this record
     (d_type unsigned-char)
     (d-name (array char 256))))		; name must be no longer than this
-(/show0 "unix.lisp 241")
+(/show0 "unix.lisp 289")
 
 ;;;; dirent.h
 
@@ -226,13 +220,12 @@
 (defstruct directory
   name
   (dir-struct (required-argument) :type system-area-pointer))
-(/show0 "unix.lisp 258")
+(/show0 "unix.lisp 304")
 
 (def!method print-object ((dir directory) stream)
   (print-unreadable-object (dir stream :type t)
     (prin1 (directory-name dir) stream)))
 
-(/show0 "unix.lisp 264")
 (defun open-dir (pathname)
   (declare (type unix-pathname pathname))
   (when (string= pathname "")
@@ -252,7 +245,6 @@
        (values nil enoent))
       (t
        (values nil enotdir)))))
-(/show0 "unix.lisp 286")
 
 (defun read-dir (dir)
   (declare (type directory dir))
@@ -267,48 +259,31 @@
 	  (values (cast (slot direct 'd-name) c-string)
 		  (slot direct 'd-ino))))))
 
-(/show0 "unix.lisp 301")
 (defun close-dir (dir)
   (declare (type directory dir))
   (alien-funcall (extern-alien "closedir"
 			       (function void system-area-pointer))
 		 (directory-dir-struct dir))
   nil)
+
+;;;; fcntl.h
+;;;;
+;;;; POSIX Standard: 6.5 File Control Operations	<fcntl.h>
 
-;;; dlfcn.h -> in foreign.lisp
-
-;;; fcntl.h
-;;;
-;;; POSIX Standard: 6.5 File Control Operations	<fcntl.h>
-
-(/show0 "unix.lisp 318")
+(/show0 "unix.lisp 356")
 (defconstant r_ok 4 #!+sb-doc "Test for read permission")
 (defconstant w_ok 2 #!+sb-doc "Test for write permission")
 (defconstant x_ok 1 #!+sb-doc "Test for execute permission")
 (defconstant f_ok 0 #!+sb-doc "Test for presence of file")
 
-(/show0 "unix.lisp 352")
+;;; Open the file whose pathname is specified by PATH for reading
+;;; and/or writing as specified by the FLAGS argument. Various FLAGS
+;;; masks (O_RDONLY etc.) are defined in fcntlbits.h.
+;;;
+;;; If the O_CREAT flag is specified, then the file is created with a
+;;; permission of argument MODE if the file doesn't exist. An integer
+;;; file descriptor is returned by UNIX-OPEN.
 (defun unix-open (path flags mode)
-  #!+sb-doc
-  "Unix-open opens the file whose pathname is specified by path
-   for reading and/or writing as specified by the flags argument.
-   The flags argument can be:
-
-     o_rdonly	Read-only flag.
-     o_wronly	Write-only flag.
-     o_rdwr	  Read-and-write flag.
-     o_append	Append flag.
-     o_creat	 Create-if-nonexistent flag.
-     o_trunc	 Truncate-to-size-0 flag.
-     o_excl	  Error if the file allready exists
-     o_noctty	Don't assign controlling tty
-     o_ndelay	Non-blocking I/O
-     o_sync	  Synchronous I/O
-     o_async	 Asynchronous I/O
-
-   If the o_creat flag is specified, then the file is created with
-   a permission of argument mode if the file doesn't exist. An
-   integer file descriptor is returned by unix-open."
   (declare (type unix-pathname path)
 	   (type fixnum flags)
 	   (type unix-file-mode mode))
@@ -318,14 +293,10 @@
 ;;; associated with it.
 (/show0 "unix.lisp 391")
 (defun unix-close (fd)
-  #!+sb-doc
-  "Unix-close takes an integer file descriptor as an argument and
-   closes the file associated with it. T is returned upon successful
-   completion, otherwise NIL and an error number."
   (declare (type unix-fd fd))
   (void-syscall ("close" int) fd))
 
-;;; fcntlbits.h
+;;;; fcntlbits.h
 
 (/show0 "unix.lisp 337")
 (defconstant o_rdonly  0) ; read-only flag
@@ -369,7 +340,7 @@
   (struct rusage
     (ru-utime (struct timeval))		; user time used
     (ru-stime (struct timeval))		; system time used.
-    (ru-maxrss long)		    ; Maximum resident set size (in kilobytes)
+    (ru-maxrss long)		    ; maximum resident set size (in kilobytes)
     (ru-ixrss long)			; integral shared memory size
     (ru-idrss long)			; integral unshared data size
     (ru-isrss long)			; integral unshared stack size
@@ -893,15 +864,14 @@
 
 ;;;; time.h
 
-;; POSIX.4 structure for a time value. This is like a `struct timeval' but
-;; has nanoseconds instead of microseconds.
-
+;; the POSIX.4 structure for a time value. This is like a `struct
+;; timeval' but has nanoseconds instead of microseconds.
 (def-alien-type nil
     (struct timespec
 	    (tv-sec long)   ;Seconds
 	    (tv-nsec long))) ;Nanoseconds
 
-;; Used by other time functions.
+;; used by other time functions
 (def-alien-type nil
     (struct tm
 	    (tm-sec int)   ; Seconds.	[0-60] (1 leap second)

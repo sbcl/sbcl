@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!EXT")
+(in-package "SB!IMPL")
 
 (defvar *objects-pending-finalization* nil)
 

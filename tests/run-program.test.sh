@@ -13,14 +13,44 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+# Make sure that there's at least something in the environment (for
+# one of the tests below).
+export SOMETHING_IN_THE_ENVIRONMENT='yes there is'
+
 sbcl --noinform --noprint --sysinit /dev/null --userinit /dev/null <<EOF
   (let ((string (with-output-to-string (stream)
                   (sb-ext:run-program "/bin/echo"
                                       '("foo" "bar")
                                       :output stream))))
-    (when (string= string "foo bar
-")
-      (sb-ext:quit :unix-status 52)))
+    (assert (string= string "foo bar
+")))
+  ;; Unix environment strings are ordinarily passed with SBCL convention
+  ;; (instead of CMU CL alist-of-keywords convention).
+  (let ((string (with-output-to-string (stream)
+                  (sb-ext:run-program "/usr/bin/env" ()
+		                      :output stream
+				      :environment '("FEEFIE=foefum")))))
+    (assert (string= string "FEEFIE=foefum
+")))
+  ;; The default Unix environment for the subprocess is the same as
+  ;; for the parent process. (I.e., we behave like perl and lots of
+  ;; other programs, but not like CMU CL.)
+  (let ((string (with-output-to-string (stream)
+                  (sb-ext:run-program "/usr/bin/env" ()
+		                      :output stream)))
+	(expected (apply #'concatenate
+	                 'string
+			 (mapcar (lambda (environ-string)
+			           (concatenate 'string
+				                environ-string
+						(string #\newline)))
+                                 (sb-ext:posix-environ)))))
+    (assert (string= string expected)))
+  ;; That's not just because POSIX-ENVIRON is having a bad hair
+  ;; day and returning NIL, is it?
+  (assert (plusp (length (sb-ext:posix-environ))))
+  ;; success convention for this Lisp program run as part of a larger script
+  (sb-ext:quit :unix-status 52)))
 EOF
 if [ $? != 52 ]; then
     echo test failed: $?

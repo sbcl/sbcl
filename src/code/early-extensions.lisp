@@ -16,7 +16,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!EXT")
+(in-package "SB!IMPL")
 
 ;;; something not EQ to anything we might legitimately READ
 (defparameter *eof-object* (make-symbol "EOF-OBJECT"))

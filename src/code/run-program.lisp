@@ -10,7 +10,92 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-EXT")
+(in-package "SB-IMPL")
+
+;;;; hacking the Unix environment
+;;;;
+;;;; In the original CMU CL code that LOAD-FOREIGN is derived from, the
+;;;; Unix environment (as in "man environ") was represented as an
+;;;; alist from keywords to strings, so that e.g. the Unix environment
+;;;;   "SHELL=/bin/bash" "HOME=/root" "PAGER=less"
+;;;; was represented as
+;;;;   ((:SHELL . "/bin/bash") (:HOME . "/root") (:PAGER "less"))
+;;;; This had a few problems in principle: the mapping into
+;;;; keyword symbols smashed the case of environment
+;;;; variables, and the whole mapping depended on the presence of
+;;;; #\= characters in the environment strings. In practice these
+;;;; problems weren't hugely important, since conventionally environment
+;;;; variables are uppercase strings followed by #\= followed by
+;;;; arbitrary data. However, since it's so manifestly not The Right
+;;;; Thing to make code which breaks unnecessarily on input which
+;;;; doesn't follow what is, after all, only a tradition, we've switched
+;;;; formats in SBCL, so that the fundamental environment list
+;;;; is just a list of strings, with a one-to-one-correspondence
+;;;; to the C-level representation. I.e., in the example above,
+;;;; the SBCL representation is
+;;;;   '("SHELL=/bin/bash" "HOME=/root" "PAGER=less")
+;;;; CMU CL's implementation is currently supported to help with porting.
+;;;;
+;;;; It's not obvious that this code belongs here (instead of e.g. in
+;;;; unix.lisp), since it has only a weak logical connection with
+;;;; RUN-PROGRAM. However, physically it's convenient to put it here.
+;;;; It's not needed at cold init, so we *can* put it in this
+;;;; warm-loaded file. And by putting it in this warm-loaded file, we
+;;;; make it easy for it to get to the C-level 'environ' variable.
+;;;; which (at least in sbcl-0.6.10 on Red Hat Linux 6.2) is not
+;;;; visible at GENESIS time.
+
+(def-alien-variable "environ" (* c-string))
+
+(defun posix-environ ()
+  "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
+  (let ((reversed-result nil))
+    (dotimes (i most-positive-fixnum (error "can't happen"))
+      (declare (type index i))
+      (let ((env-item (deref environ i)))
+	(if env-item
+            (push env-item reversed-result)
+	    (return (nreverse reversed-result)))))))
+
+;;; Convert as best we can from a SBCL representation of a Unix
+;;; environment to a CMU CL representation.
+;;;
+;;; * (UNIX-ENVIRONMENT-CMUCL-FROM-SBCL '("Bletch=fub" "Noggin" "YES=No!"))
+;;; WARNING:
+;;;   smashing case of "Bletch=fub" in conversion to CMU-CL-style
+;;;     environment alist
+;;; WARNING:
+;;;   no #\= in "Noggin", eliding it in CMU-CL-style environment alist
+;;; ((:BLETCH . "fub") (:YES . "No!"))
+(defun unix-environment-cmucl-from-sbcl (sbcl)
+  (mapcan
+   (lambda (string)
+     (declare (type simple-string string))
+     (let ((=-pos (position #\= string :test #'equal)))
+       (if =-pos
+	   (list
+	    (let* ((key-as-string (subseq string 0 =-pos))
+		   (key-as-upcase-string (string-upcase key-as-string))
+		   (key (keywordicate key-as-upcase-string))
+		   (val (subseq string (1+ =-pos))))
+	      (unless (string= key-as-string key-as-upcase-string)
+		(warn "smashing case of ~S in conversion to CMU-CL-style ~
+                      environment alist"
+		      string))
+	      (cons key val)))
+	   (warn "no #\\= in ~S, eliding it in CMU-CL-style environment alist"
+		 string))))
+   sbcl))
+
+;;; Convert from a CMU CL representation of a Unix environment to a
+;;; SBCL representation.
+(defun unix-environment-sbcl-from-cmucl (cmucl)
+  (mapcar
+   (lambda (cons)
+     (destructuring-bind (key . val) cons
+       (declare (type keyword key) (type simple-string val))
+       (concatenate 'simple-string (symbol-name key) "=" val)))
+   cmucl))
 
 ;;;; Import wait3(2) from Unix.
 
@@ -349,6 +434,12 @@
   (stdout sb-c-call:int)
   (stderr sb-c-call:int))
 
+;;; FIXME: There shouldn't be two semiredundant versions of the
+;;; documentation. Since this is a public extension function, the
+;;; documentation should be in the doc string. So all information from
+;;; this comment should be merged into the doc string, and then this
+;;; comment can go away.
+;;;
 ;;; RUN-PROGRAM uses fork() and execve() to run a different program.
 ;;; Strange stuff happens to keep the Unix state of the world
 ;;; coherent.
@@ -387,21 +478,48 @@
 ;;; RUN-PROGRAM returns a PROCESS structure for the process if
 ;;; the fork worked, and NIL if it did not.
 (defun run-program (program args
-		    &key env (wait t) pty input
-		    if-input-does-not-exist output (if-output-exists :error)
-		    (error :output) (if-error-exists :error) status-hook)
-  "RUN-PROGRAM creates a new process and runs the unix progam in the
-   file specified by the simple-string program.  Args are the standard
-   arguments that can be passed to a Unix program, for no arguments
-   use NIL (which means just the name of the program is passed as arg 0).
+		    &key
+		    (env nil env-p)
+		    (environment (if env-p
+				     (unix-environment-sbcl-from-cmucl env)
+				     (posix-environ))
+				 environment-p)
+		    (wait t)
+		    pty
+		    input
+		    if-input-does-not-exist
+		    output
+		    (if-output-exists :error)
+		    (error :output)
+		    (if-error-exists :error)
+		    status-hook)
+  "RUN-PROGRAM creates a new Unix process running the Unix program found in
+   the file specified by the PROGRAM argument.  ARGS are the standard
+   arguments that can be passed to a Unix program. For no arguments, use NIL
+   (which means that just the name of the program is passed as arg 0).
 
    RUN-PROGRAM will either return NIL or a PROCESS structure.  See the CMU
    Common Lisp Users Manual for details about the PROCESS structure.
 
+   notes about Unix environments (as in the :ENVIRONMENT and :ENV args):
+     1. The SBCL implementation of RUN-PROGRAM, like Perl and many other
+        programs, but unlike the original CMU CL implementation, copies
+        the Unix environment by default.
+     2. Running Unix programs from a setuid process, or in any other
+        situation where the Unix environment is under the control of someone
+        else, is a mother lode of security problems. If you are contemplating
+        doing this, read about it first. (The Perl community has a lot of good
+        documentation about this and other security issues in script-like
+        programs.)
+
    The keyword arguments have the following meanings:
+     :ENVIRONMENT
+        a list of SIMPLE-STRINGs describing the new Unix environment (as
+        in \"man environ\"). The default is to copy the environment of
+        the current process.
      :ENV
-        An A-LIST mapping keyword environment variables to simple-string
-	values.
+        an alternative lossy representation of the new Unix environment,
+        for compatibility with CMU CL
      :WAIT
         If non-NIL (default), wait until the created process finishes.  If
         NIL, continue running Lisp until the program finishes.
@@ -443,6 +561,8 @@
         This is a function the system calls whenever the status of the
         process changes.  The function takes the process as an argument."
 
+  (when (and env-p environment-p)
+    (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   ;; Make sure that the interrupt handler is installed.
   (sb-sys:enable-interrupt sb-unix:sigchld #'sigchld-handler)
   ;; Make sure that all the args are okay.
@@ -450,25 +570,35 @@
     (error "All arguments to program must be simple strings: ~S" args))
   ;; Prepend the program to the argument list.
   (push (namestring program) args)
-  ;; Clear various specials used by GET-DESCRIPTOR-FOR to communicate
-  ;; cleanup info.  Also, establish proc at this level so we can
-  ;; return it.
-  (let (*close-on-error* *close-in-parent* *handlers-installed* proc)
+  (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
+	;; communicate cleanup info.
+	*close-on-error*
+	*close-in-parent*
+	*handlers-installed*
+	;; Establish PROC at this level so that we can return it.
+	proc)
     (unwind-protect
-	 (let ((pfile (unix-namestring (merge-pathnames program "path:") t t))
+	 (let (;; FIXME: The old code here used to do
+	       ;;   (MERGE-PATHNAMES PROGRAM "path:"),
+	       ;; which is the right idea (searching through the Unix
+	       ;; PATH). Unfortunately, there is no logical pathname
+	       ;; "path:" defined in sbcl-0.6.10. It would probably be 
+	       ;; reasonable to restore Unix PATH searching in SBCL, e.g.
+	       ;; with a function FIND-EXECUTABLE-FILE-IN-POSIX-PATH.
+	       ;; (I don't want to do it with search lists the way
+	       ;; that CMU CL did, because those are a non-ANSI
+	       ;; extension which I'd like to get rid of. -- WHN)
+	       (pfile (unix-namestring program t t))
 	       (cookie (list 0)))
 	   (unless pfile
 	     (error "no such program: ~S" program))
-	   (multiple-value-bind
-		 (stdin input-stream)
+	   (multiple-value-bind (stdin input-stream)
 	       (get-descriptor-for input cookie :direction :input
 				   :if-does-not-exist if-input-does-not-exist)
-	     (multiple-value-bind
-		   (stdout output-stream)
+	     (multiple-value-bind (stdout output-stream)
 		 (get-descriptor-for output cookie :direction :output
 				     :if-exists if-output-exists)
-	       (multiple-value-bind
-		     (stderr error-stream)
+	       (multiple-value-bind (stderr error-stream)
 		   (if (eq error :output)
 		       (values stdout output-stream)
 		       (get-descriptor-for error cookie :direction :output
@@ -479,18 +609,11 @@
 		   ;; death before we have installed the PROCESS
 		   ;; structure in *ACTIVE-PROCESSES*.
 		   (sb-sys:without-interrupts
-		    (with-c-strvec (argv args)
-		      (with-c-strvec
-			  (envp (mapcar #'(lambda (entry)
-					    (concatenate
-					     'string
-					     (symbol-name (car entry))
-					     "="
-					     (cdr entry)))
-					env))
+		    (with-c-strvec (args-vec args)
+		      (with-c-strvec (environment-vec environment)
 			(let ((child-pid
 			       (without-gcing
-				(spawn pfile argv envp pty-name
+				(spawn pfile args-vec environment-vec pty-name
 				       stdin stdout stderr))))
 			  (when (< child-pid 0)
 			    (error "could not fork child process: ~S"

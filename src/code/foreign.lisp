@@ -11,8 +11,6 @@
 
 (in-package "SB-SYS")
 
-;;; not needed until we implement full-blown LOAD-FOREIGN
-#|
 (defun pick-temporary-file-name (&optional
 				 ;; KLUDGE: There are various security
 				 ;; nastyisms associated with easily
@@ -45,7 +43,7 @@
 		 (return nil))
 		(t
 		 (incf code))))))))
-|#
+
 
 ;;; On any OS where we don't support foreign object file loading, any
 ;;; query of a foreign symbol value is answered with "no definition
@@ -96,11 +94,9 @@
 (push (lambda () (setq *tables-from-dlopen* nil))
       sb-int:*after-save-initializations*)
 
-;;; not needed until we implement full-blown LOAD-FOREIGN
-#|
 (defvar *dso-linker* "/usr/bin/ld")
 (defvar *dso-linker-options* '("-G" "-o"))
-|#
+
 
 (sb-alien:def-alien-routine dlopen system-area-pointer
   (file sb-c-call:c-string) (mode sb-c-call:int))
@@ -126,8 +122,8 @@
       (error "can't open global symbol table: ~S" (dlerror)))))
 
 (defun load-1-foreign (file)
-  "a primitive way to load a foreign object file. (LOAD-FOREIGN is
-  probably preferred, but as of SBCL 0.6.7 is not implemented..)
+  "the primitive upon which the more general LOAD-FOREIGN is built: load
+  a single foreign object file
 
   To use LOAD-1-FOREIGN, at the Unix command line do this:
     echo 'int summish(int x, int y) { return 1 + x + y; }' > /tmp/ffi-test.c
@@ -165,30 +161,44 @@
       (unless (zerop possible-result)
 	(return possible-result)))))
 
-;;; code partially ported from CMU CL to SBCL, but needs RUN-PROGRAM
-#|
-(defun load-foreign (files &key
-			   (libraries '("-lc"))
-			   (base-file nil)
-			   ;; Note: Since SBCL has no *ENVIRONMENT-LIST*
-			   ;; variable, if this code is ever restored,
-			   ;; the default should be taken from the alien
-			   ;; "environ" variable.
-			   ,, ; do it!
-			   (env sb-ext:*environment-list*))
+(defun load-foreign (files
+		     &key
+		     (libraries '("-lc"))
+		     ;; FIXME: The old documentation said
+		     ;;   The BASE-FILE argument is used to specify a
+		     ;;   file to use as the starting place for
+		     ;;   defined symbols. The default is the C start
+		     ;;   up code for Lisp.
+		     ;; But the code ignored the BASE-FILE argument.
+		     ;; The comment above
+		     ;;   (DECLARE (IGNORE BASE-FILE))
+		     ;; said
+		     ;;   dlopen() remembers the name of an object,
+		     ;;   when dlopen()ing the same name twice, the
+		     ;;   old object is reused.
+		     ;; So I deleted all reference to BASE-FILE,
+		     ;; including the now-bogus reference to the
+		     ;; BASE-FILE argument in the documentation. But
+		     ;; are there any other subtleties of the new code
+		     ;; which need to be documented in its place?
+		     (env nil env-p)
+		     (environment (if env-p
+				      (unix-environment-sbcl-from-cmu env)
+				      (posix-environ))
+				  environment-p))
   #+sb-doc
   "LOAD-FOREIGN loads a list of C object files into a running Lisp. The FILES
   argument should be a single file or a list of files. The files may be
   specified as namestrings or as pathnames. The libraries argument should be a
   list of library files as would be specified to ld. They will be searched in
   the order given. The default is just \"-lc\", i.e., the C library. The
-  base-file argument is used to specify a file to use as the starting place for
-  defined symbols. The default is the C start up code for Lisp. The ENV
-  argument is the Unix environment variable definitions for the invocation of
-  the linker. The default is the environment passed to Lisp."
-  ;; Note: dlopen() remembers the name of an object, when dlopen()ing
-  ;; the same name twice, the old object is reused.
-  (declare (ignore base-file))
+  ENVIRONMENT argument is a list of SIMPLE-STRINGs corresponding to the Unix
+  environment (\"man environ\") definitions for the invocation of the linker.
+  The default is the environment that Lisp is itself running in. Instead of
+  using the ENVIRONMENT argument, it is also possible to use the ENV argument,
+  using the alternate, lossy representation used by CMU CL."
+  (when (and env-p environment-p)
+    (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let ((output-file (pick-temporary-file-name
 		      (concatenate 'string "/tmp/~D~C" (string (gensym)))))
 	(error-output (make-string-output-stream)))
@@ -206,7 +216,7 @@
 						 (list files)
 					       files))
 				     libraries))
-		     :env env
+		     :environment environment
 		     :input nil
 		     :output error-output
 		     :error :output)))
@@ -219,6 +229,5 @@
 	  (load-1-foreign output-file))
       #-sb-show (sb-unix:unix-unlink output-file)
       #+sb-show (/show "not unlinking" output-file)))) ; so we can look at it
-|#
 
 ) ; PROGN

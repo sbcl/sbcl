@@ -853,6 +853,17 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   e-mail on cmucl-help@cons.org on 2001-01-16 and 2001-01-17 from WHN
   and Pierre Mai.)
 
+79:
+  as pointed out by Dan Barlow on sbcl-devel 2000-07-02:
+  The PICK-TEMPORARY-FILE-NAME utility used by LOAD-FOREIGN uses
+  an easily guessable temporary filename in a way which might open
+  applications using LOAD-FOREIGN to hijacking by malicious users
+  on the same machine. Incantations for doing this safely are
+  floating around the net in various "how to write secure programs
+  despite Unix" documents, and it would be good to (1) fix this in 
+  LOAD-FOREIGN, and (2) hunt for any other code which uses temporary
+  files and make it share the same new safe logic.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
