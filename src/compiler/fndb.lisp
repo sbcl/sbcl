@@ -922,8 +922,8 @@
   (character character callable &optional readtable) function
   (unsafe))
 (defknown get-dispatch-macro-character
-  (character character &optional (or readtable null)) callable
-  (flushable))
+  (character character &optional (or readtable null)) (or callable null)
+  ())
 
 ;;; may return any type due to eof-value...
 (defknown (read read-preserving-whitespace read-char-no-hang read-char)

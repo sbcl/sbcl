@@ -1307,15 +1307,20 @@
   #!+sb-doc
   "Return the macro character function for SUB-CHAR under DISP-CHAR
    or NIL if there is no associated function."
-  (unless (digit-char-p sub-char)
-    (let* ((sub-char (char-upcase sub-char))
-	   (rt (or rt *standard-readtable*))
-	   (dpair (find disp-char (dispatch-tables rt)
-			:test #'char= :key #'car)))
-      (if dpair
-	  (elt (the simple-vector (cdr dpair))
-	       (char-code sub-char))
-	  (error "~S is not a dispatch char." disp-char)))))
+  (let* ((sub-char (char-upcase sub-char))
+         (rt (or rt *standard-readtable*))
+         (dpair (find disp-char (dispatch-tables rt)
+                      :test #'char= :key #'car)))
+    (if dpair
+        (let ((dispatch-fun (elt (the simple-vector (cdr dpair))
+                                 (char-code sub-char))))
+	  ;; Digits are also initialized in a dispatch table to
+	  ;; #'dispatch-char-error; READ-DISPATCH-CHAR handles them
+	  ;; separately. - CSR, 2002-04-12
+          (if (eq dispatch-fun #'dispatch-char-error)
+              nil
+              dispatch-fun))
+        (error "~S is not a dispatch char." disp-char))))
 
 (defun read-dispatch-char (stream char)
   ;; Read some digits.

@@ -1234,13 +1234,6 @@ WORKAROUND:
   issues were cleaned up. As of sbcl-0.7.1.9, it occurs in 
   NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
 
-151:
-  From the ANSI description of GET-DISPATCH-MACRO-CHARACTER, it
-  should return NIL when there is no definition, e.g.
-    (GET-DISPATCH-MACRO-CHARACTER #\# #\{) => NIL
-  Instead, in sbcl-0.7.1.17 it returns
-    #<FUNCTION "top level local call SB!IMPL::DISPATCH-CHAR-ERROR">
-
 153:
   (essentially the same problem as a CMU CL bug reported by Martin
   Cracauer on cmucl-imp 2002-02-19)

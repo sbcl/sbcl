@@ -79,7 +79,9 @@
 ;;; (or just find a nicer way of expressing characters portably?) --
 ;;; WHN 19990713
 (defconstant bell-char-code 7)
+(defconstant backspace-char-code 8)
 (defconstant tab-char-code 9)
+(defconstant line-feed-char-code 10)
 (defconstant form-feed-char-code 12)
 (defconstant return-char-code 13)
 (defconstant escape-char-code 27)

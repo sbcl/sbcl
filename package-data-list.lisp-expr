@@ -762,7 +762,8 @@ retained, possibly temporariliy, because it might be used internally."
              "UNENCAPSULATE"
 
              ;; various CHAR-CODEs
-             "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE" "FORM-FEED-CHAR-CODE"
+             "BACKSPACE-CHAR-CODE" "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE"
+             "FORM-FEED-CHAR-CODE" "LINE-FEED-CHAR-CODE"
              "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
 
              ;; symbol-hacking idioms

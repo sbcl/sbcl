@@ -408,9 +408,9 @@
   (set-dispatch-macro-character #\# #\| #'sharp-vertical-bar)
   (set-dispatch-macro-character #\# #\p #'sharp-p)
   (set-dispatch-macro-character #\# #\P #'sharp-p)
-  (set-dispatch-macro-character #\# #\  #'sharp-illegal)
   (set-dispatch-macro-character #\# #\) #'sharp-illegal)
   (set-dispatch-macro-character #\# #\< #'sharp-illegal)
-  ;; FIXME: Should linefeed/newline go in this list too?
-  (dolist (cc '#.(list tab-char-code form-feed-char-code return-char-code))
+  (set-dispatch-macro-character #\# #\Space #'sharp-illegal)
+  (dolist (cc '#.(list tab-char-code form-feed-char-code return-char-code
+                       line-feed-char-code backspace-char-code))
     (set-dispatch-macro-character #\# (code-char cc) #'sharp-illegal)))

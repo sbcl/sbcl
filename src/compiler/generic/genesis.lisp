@@ -344,32 +344,6 @@
 ;;; pathname), or NIL if we're not currently cold loading any object file
 (defvar *cold-load-filename* nil)
 (declaim (type (or string null) *cold-load-filename*))
-
-;;; This is vestigial support for the CMU CL byte-swapping code. CMU
-;;; CL code tested for whether it needed to swap bytes in GENESIS by
-;;; comparing the byte order of *BACKEND* to the byte order of
-;;; *NATIVE-BACKEND*, a concept which doesn't exist in SBCL. Instead,
-;;; in SBCL byte order swapping would need to be explicitly requested
-;;; with a &KEY argument to GENESIS.
-;;;
-;;; I'm not sure whether this is a problem or not, and I don't have a
-;;; machine with different byte order to test to find out for sure.
-;;; The version of the system which is fed to the cross-compiler is
-;;; now written in a subset of Common Lisp which doesn't require
-;;; dumping a lot of things in such a way that machine byte order
-;;; matters. (Mostly this is a matter of not using any specialized
-;;; array type unless there's portable, high-level code to dump it.)
-;;; If it *is* a problem, and you're trying to resurrect this code,
-;;; please test particularly carefully, since I haven't had a chance
-;;; to test the byte-swapping code at all. -- WHN 19990816
-;;;
-;;; When this variable is non-NIL, byte-swapping is enabled wherever
-;;; classic GENESIS would have done it. I.e. the value of this variable
-;;; is the logical complement of
-;;;    (EQ (SB!C:BACKEND-BYTE-ORDER SB!C:*NATIVE-BACKEND*)
-;;;	(SB!C:BACKEND-BYTE-ORDER SB!C:*BACKEND*))
-;;; from CMU CL.
-(defvar *genesis-byte-order-swap-p*)
 
 ;;;; miscellaneous stuff to read and write the core memory
 
@@ -378,26 +352,6 @@
   #!+sb-doc
   "Push THING onto the given cold-load LIST."
   `(setq ,list (cold-cons ,thing ,list)))
-
-(defun maybe-byte-swap (word)
-  (declare (type (unsigned-byte 32) word))
-  (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:n-byte-bits 8))
-  (if (not *genesis-byte-order-swap-p*)
-      word
-      (logior (ash (ldb (byte 8 0) word) 24)
-	      (ash (ldb (byte 8 8) word) 16)
-	      (ash (ldb (byte 8 16) word) 8)
-	      (ldb (byte 8 24) word))))
-
-(defun maybe-byte-swap-short (short)
-  (declare (type (unsigned-byte 16) short))
-  (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:n-byte-bits 8))
-  (if (not *genesis-byte-order-swap-p*)
-      short
-      (logior (ash (ldb (byte 8 0) short) 8)
-	      (ldb (byte 8 8) short))))
 
 ;;; BYTE-VECTOR-REF-32 and friends.  These are like SAP-REF-n, except
 ;;; that instead of a SAP we use a byte vector
@@ -449,11 +403,7 @@
 	 (bytes (gspace-bytes gspace))
 	 (byte-index (ash (+ index (descriptor-word-offset address))
 			  sb!vm:word-shift))
-	 ;; KLUDGE: Do we really need to do byte swap here? It seems
-	 ;; as though we shouldn't.. (This attempts to be a literal
-	 ;; translation of CMU CL code, and I don't have a big-endian
-	 ;; machine to test it.) -- WHN 19990817
-	 (value (maybe-byte-swap (byte-vector-ref-32 bytes byte-index))))
+	 (value (byte-vector-ref-32 bytes byte-index)))
     (make-random-descriptor value)))
 
 (declaim (ftype (function (descriptor) descriptor) read-memory))
@@ -493,15 +443,11 @@
 						 sb!vm:lowtag-mask)
 				       (ash index sb!vm:word-shift))
 				    value)
-    ;; Note: There's a MAYBE-BYTE-SWAP in here in CMU CL, which I
-    ;; think is unnecessary now that we're doing the write
-    ;; byte-by-byte at high level. (I can't test this, though..) --
-    ;; WHN 19990817
     (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
 	   (byte-index (ash (+ index (descriptor-word-offset address))
 			       sb!vm:word-shift)))
       (setf (byte-vector-ref-32 bytes byte-index)
-	    (maybe-byte-swap (descriptor-bits value))))))
+	    (descriptor-bits value)))))
 
 (declaim (ftype (function (descriptor descriptor)) write-memory))
 (defun write-memory (address value)
@@ -2951,16 +2897,6 @@ initially undefined function references:~2%")
 ;;;     the executable which will load the core.
 ;;;   MAP-FILE-NAME gets (?) a map file. (dunno about this -- WHN 19990815)
 ;;;
-;;; other arguments:
-;;;   BYTE-ORDER-SWAP-P controls whether GENESIS tries to swap bytes
-;;;     in some places in the output. It's only appropriate when
-;;;     cross-compiling from a machine with one byte order to a
-;;;     machine with the opposite byte order, which is irrelevant in
-;;;     current (19990816) SBCL, since only the X86 architecture is
-;;;     supported. If you're trying to add support for more
-;;;     architectures, see the comments on DEFVAR
-;;;     *GENESIS-BYTE-ORDER-SWAP-P* for more information.
-;;;
 ;;; FIXME: GENESIS doesn't belong in SB!VM. Perhaps in %KERNEL for now,
 ;;; perhaps eventually in SB-LD or SB-BOOT.
 (defun sb!vm:genesis (&key
@@ -2968,8 +2904,7 @@ initially undefined function references:~2%")
 		      symbol-table-file-name
 		      core-file-name
 		      map-file-name
-		      c-header-file-name
-		      byte-order-swap-p)
+		      c-header-file-name)
 
   (when (and core-file-name
 	     (not symbol-table-file-name))
@@ -3011,7 +2946,6 @@ initially undefined function references:~2%")
 
     (let* ((*foreign-symbol-placeholder-value* (if core-file-name nil 0))
 	   (*load-time-value-counter* 0)
-	   (*genesis-byte-order-swap-p* byte-order-swap-p)
 	   (*cold-fdefn-objects* (make-hash-table :test 'equal))
 	   (*cold-symbols* (make-hash-table :test 'equal))
 	   (*cold-package-symbols* nil)
