@@ -186,13 +186,10 @@
 		(cons 'backq-list* thing))))
 	((eq flag 'vector)
 	 (list 'backq-vector thing))
-	(t (cons (cdr
-		  (assoc flag
-			 '((cons . backq-cons)
-			   (list . backq-list)
-			   (append . backq-append)
-			   (nconc . backq-nconc))
-			 :test #'equal))
+	(t (cons (ecase flag
+		   ((list) 'backq-list)
+		   ((append) 'backq-append)
+		   ((nconc) 'backq-nconc))
 		 thing))))
 
 ;;;; magic BACKQ- versions of builtin functions

@@ -49,18 +49,26 @@
 		   (backq-unparse (car tail) t)))
 	 (push (backq-unparse (car tail)) accum)))
       (backq-append
-       (mapcar (lambda (el) (backq-unparse el t))
-	       (cdr form)))
+       (apply #'append
+	      (mapcar (lambda (el) (backq-unparse el t))
+		      (cdr form))))
       (backq-nconc
-       (mapcar (lambda (el) (backq-unparse el :nconc))
-	       (cdr form)))
+       (apply #'append
+	      (mapcar (lambda (el) (backq-unparse el :nconc))
+		      (cdr form))))
       (backq-cons
        (cons (backq-unparse (cadr form) nil)
 	     (backq-unparse (caddr form) t)))
       (backq-vector
        (coerce (backq-unparse (cadr form)) 'vector))
       (quote
-       (cadr form))
+       (cond
+	 ((atom (cadr form)) (cadr form))
+	 ((and (consp (cadr form))
+	       (member (caadr form) *backq-tokens*))
+	  (backq-unparse-expr form splicing))
+	 (t (cons (backq-unparse `(quote ,(caadr form)))
+		  (backq-unparse `(quote ,(cdadr form)))))))
       (t
        (backq-unparse-expr form splicing))))))
 

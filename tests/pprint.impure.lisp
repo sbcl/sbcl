@@ -135,6 +135,25 @@
 	 (with-output-to-string (s)
 	   (write '`(lambda (,x)) :stream s :pretty t :readably t))
 	 "`(LAMBDA (,X))"))
+;;; more backquote printing brokenness, fixed quasi-randomly by CSR.
+;;; NOTE KLUDGE FIXME: because our backquote optimizes at read-time,
+;;; these assertions, like the ones above, are fragile.  Likewise, it
+;;; is very possible that at some point READABLY printing backquote
+;;; expressions will have to change to printing the low-level conses,
+;;; since the magical symbols are accessible though (car '`(,foo)) and
+;;; friends.  HATE HATE HATE.  -- CSR, 2004-06-10
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '``(foo ,@',@bar) :stream s :pretty t))
+	 "``(FOO ,@',@BAR)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '``(,,foo ,',foo foo) :stream s :pretty t))
+	 "``(,,FOO ,',FOO FOO)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '``(((,,foo) ,',foo) foo) :stream s :pretty t))
+	 "``(((,,FOO) ,',FOO) FOO)"))
 
 ;;; SET-PPRINT-DISPATCH should accept function name arguments, and not
 ;;; rush to coerce them to functions.

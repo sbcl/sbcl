@@ -414,15 +414,6 @@ WORKAROUND:
   forever, even when it is uninterned and all other references to it
   are lost.
 
-141: "pretty printing and backquote"
-  a.
-    * '``(FOO ,@',@S)
-    ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
-
-  c. (reported by Paul F. Dietz)
-     * '`(lambda ,x)
-     `(LAMBDA (SB-IMPL::BACKQ-COMMA X))
-
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately
   prominent SourceForge web/db bug tracking system, which is 

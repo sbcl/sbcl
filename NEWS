@@ -2527,8 +2527,11 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
     Peter van Eynde, Eric Marsden and Bruno Haible)
   * fixed bug 335: ATANH now computes the inverse hyperbolic tangent
     even for difficult arguments.  (reported by Peter Graves)
-  * fixed a bug in backquote printing: no more modification of the
-    form's list structure.  (reported by Brian Downing)
+  * fixed bug 141a: the backquote printer now descends quoted
+    structure.
+  * fixed another bug in backquote printing: no more destructive
+    modification of the form's list structure.  (reported by Brian
+    Downing)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
