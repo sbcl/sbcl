@@ -1165,7 +1165,7 @@
   (unless (symbolp name)
     (compiler-error "The lambda variable ~S is not a symbol." name))
   (when (member name names-so-far :test #'eq)
-    (compiler-error "The variable ~S occurs more than once in the lambda-list."
+    (compiler-error "The variable ~S occurs more than once in the lambda list."
 		    name))
   (let ((kind (info :variable :kind name)))
     (when (or (keywordp name) (eq kind :constant))
@@ -1197,7 +1197,7 @@
 		   (eq (arg-info-kind info) :keyword)
 		   (eq (arg-info-key info) key))
 	  (compiler-error
-	   "The keyword ~S appears more than once in the lambda-list."
+	   "The keyword ~S appears more than once in the lambda list."
 	   key))))
     key))
 

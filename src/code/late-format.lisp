@@ -73,10 +73,17 @@
 			:complaint "String ended before directive was found."
 			:control-string string
 			:offset start)
-		 (schar string posn))))
+		 (schar string posn)))
+	   (check-ordering ()
+	     (when (or colonp atsignp)
+	       (error 'format-error
+		      :complaint "parameters found after #\\: or #\\@ modifier"
+		      :control-string string
+		      :offset posn))))
       (loop
 	(let ((char (get-char)))
 	  (cond ((or (char<= #\0 char #\9) (char= char #\+) (char= char #\-))
+		 (check-ordering)
 		 (multiple-value-bind (param new-posn)
 		     (parse-integer string :start posn :junk-allowed t)
 		   (push (cons posn param) params)
@@ -87,7 +94,9 @@
 		      (decf posn))
 		     (t
 		      (return)))))
-		((or (char= char #\v) (char= char #\V))
+		((or (char= char #\v)
+		     (char= char #\V))
+		 (check-ordering)
 		 (push (cons posn :arg) params)
 		 (incf posn)
 		 (case (get-char)
@@ -97,6 +106,7 @@
 		   (t
 		    (return))))
 		((char= char #\#)
+		 (check-ordering)
 		 (push (cons posn :remaining) params)
 		 (incf posn)
 		 (case (get-char)
@@ -106,12 +116,14 @@
 		   (t
 		    (return))))
 		((char= char #\')
+		 (check-ordering)
 		 (incf posn)
 		 (push (cons posn (get-char)) params)
 		 (incf posn)
 		 (unless (char= (get-char) #\,)
 		   (decf posn)))
 		((char= char #\,)
+		 (check-ordering)
 		 (push (cons posn nil) params))
 		((char= char #\:)
 		 (if colonp
@@ -129,6 +141,7 @@
 		     (setf atsignp t)))
 		(t
 		 (when (char= (schar string (1- posn)) #\,)
+		   (check-ordering)
 		   (push (cons (1- posn) nil) params))
 		 (return))))
 	(incf posn))

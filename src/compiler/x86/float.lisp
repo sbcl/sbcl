@@ -4013,8 +4013,6 @@
   ;;   Perhaps this is OK because of the #!+LONG-FLOAT wrapped around
   ;;   an enormous PROGN above. Still, it would be probably be good to
   ;;   add some code to warn about redefining VOPs.
-  ;; FIXME 2: See comments on DEFINE-VOP FLOG1P :GUARD above.
-  (:guard #!+pentium nil #!-pentium t)
   (:note "inline log1p function")
   (:ignore temp)
   (:generator 5
@@ -4068,8 +4066,7 @@
   (:arg-types long-float)
   (:result-types long-float)
   (:policy :fast-safe)
-  ;; FIXME: See comments on DEFINE-VOP FLOG1P :GUARD above.
-  (:guard #!+pentium t #!-pentium)
+  (:guard (member :pentium-style-fyl2xp1 *backend-subfeatures*))
   (:note "inline log1p function")
   (:generator 5
      (sc-case x

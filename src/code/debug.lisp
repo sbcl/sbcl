@@ -722,7 +722,7 @@ reset to ~S."
 	   (dolist (restart restarts)
 	     (let ((name (restart-name restart)))
 	       (cond ((member name names-used)
-		      (format s "~& ~2D: ~@VT~A~%" count max-name-len restart))
+		      (format s "~& ~2D: ~V@T~A~%" count max-name-len restart))
 		     (t
 		      (format s "~& ~2D: [~VA] ~A~%"
 			      count (- max-name-len 3) name restart)
