@@ -83,10 +83,11 @@
 
 ;;; Concatenate together the names of some strings and symbols,
 ;;; producing a symbol in the current package.
-(defun symbolicate (&rest things)
-  (values (intern (apply #'concatenate
-			 'string
-			 (mapcar #'string things)))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun symbolicate (&rest things)
+    (values (intern (apply #'concatenate
+			   'string
+			   (mapcar #'string things))))))
 
 ;;; like SYMBOLICATE, but producing keywords
 (defun keywordicate (&rest things)
@@ -120,7 +121,7 @@
 		    :datum maybe-package
 		    :expected-type 'package
 		    :format-control
-		    "~S can't be a ~S:~%  ~S has been reset to ~S"
+		    "~@<~S can't be a ~S: ~2I~_~S has been reset to ~S.~:>"
 		    :format-arguments (list '*package* (type-of maybe-package)
 					    '*package* really-package)))))))
 
@@ -137,8 +138,6 @@
 	    (if (consp id)
 		(values (car id) (cdr id))
 		(values id nil))
-	  ;; (This could be SYMBOLICATE, except that due to
-	  ;; bogobootstrapping issues SYMBOLICATE isn't defined yet.)
 	  (push `(defconstant ,(symbolicate prefix root suffix)
 		   ,(+ start (* step index))
 		   ,@docs)

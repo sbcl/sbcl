@@ -681,6 +681,17 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
 * LOAD-FOREIGN (and LOAD-1-FOREIGN) now support logical pathnames,
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
 
+changes in sbcl-0.6.12 relative to sbcl-0.6.11:
+?? new fasl file format version number (because a disused byte code
+  opcode was removed, causing the other opcodes to change)
+* various tweaks to make the system easier to build under other
+  ANSI-conforming-but-different cross-compilation hosts (notably
+  Lispworks for Windows, following bug reports from Arthur Lemmens)
+?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE target features
+  are now enabled by default. Now the compiler can handle many
+  floating point and complex operations much less inefficiently.
+  (Thus e.g. you can implement a complex FFT without consing!)
+
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
   as you get deeper into recursive calls to the debugger command loop,

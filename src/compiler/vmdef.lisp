@@ -74,15 +74,15 @@
 
 ;;;; primitive type definition
 
-;;; Return the primitive type corresponding to the specified name, or die
-;;; trying.
+;;; Return the primitive type corresponding to the specified name, or
+;;; die trying.
 (defun primitive-type-or-lose (name)
   (the primitive-type
        (or (gethash name *backend-primitive-type-names*)
 	   (error "~S is not a defined primitive type." name))))
 
-;;; Return true if SC is either one of Ptype's SC's, or one of those SC's
-;;; alternate or constant SCs.
+;;; Return true if SC is either one of PTYPE's SC's, or one of those
+;;; SC's alternate or constant SCs.
 (defun sc-allowed-by-primitive-type (sc ptype)
   (declare (type sc sc) (type primitive-type ptype))
   (let ((scn (sc-number sc)))
@@ -96,7 +96,8 @@
 
 ;;;; generation of emit functions
 
-(defconstant max-vop-tn-refs 256)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant max-vop-tn-refs 256))
 
 (defvar *vop-tn-refs* (make-array max-vop-tn-refs :initial-element nil))
 (defvar *using-vop-tn-refs* nil)

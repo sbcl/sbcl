@@ -562,8 +562,6 @@
 				(minusp (float-sign arg-hi-val))
 				(plusp (float-sign arg-hi-val))))))))))
 
-;;; Elfun-Derive-Type-Simple
-;;;
 ;;; Handle monotonic functions of a single variable whose domain is
 ;;; possibly part of the real line. ARG is the variable, FCN is the
 ;;; function, and DOMAIN is a specifier that gives the (real) domain
@@ -1015,7 +1013,6 @@
 
 ;;; Make REALPART and IMAGPART return the appropriate types. This
 ;;; should help a lot in optimized code.
-
 (defun realpart-derive-type-aux (type)
   (let ((class (numeric-type-class type))
 	(format (numeric-type-format type)))
@@ -1036,11 +1033,9 @@
 			      :complexp :real
 			      :low (numeric-type-low type)
 			      :high (numeric-type-high type))))))
-
 #!+(or propagate-fun-type propagate-float-type)
 (defoptimizer (realpart derive-type) ((num))
   (one-arg-derive-type num #'realpart-derive-type-aux #'realpart))
-
 (defun imagpart-derive-type-aux (type)
   (let ((class (numeric-type-class type))
 	(format (numeric-type-format type)))
@@ -1062,7 +1057,6 @@
 			      :complexp :real
 			      :low (numeric-type-low type)
 			      :high (numeric-type-high type))))))
-
 #!+(or propagate-fun-type propagate-float-type)
 (defoptimizer (imagpart derive-type) ((num))
   (one-arg-derive-type num #'imagpart-derive-type-aux #'imagpart))

@@ -13,20 +13,23 @@
 
 ;;; FIXME: It's clever using :SUFFIX -TYPE for these things, but it's
 ;;; a pain for people just learning to find their way around the code
-;;; who want to figure out where things like EVEN-FIXNUM type are
-;;; defined. Remove the :SUFFIXes and just expand out the full names.
+;;; who want to use lexical search to figure out where things like
+;;; EVEN-FIXNUM type are defined. Remove the :SUFFIXes and just expand
+;;; out the full names. Or even define them in DEF-FROB EVEN-FIXNUM-TYPE
+;;; style so searches like 'def.*even-fixnum-type' can find them.
 
-;;; the main types. These types are represented by the low three bits of the
-;;; pointer or immeditate object.
-(defenum (:suffix -type)
-  even-fixnum
-  function-pointer
-  other-immediate-0
-  list-pointer
-  odd-fixnum
-  instance-pointer
-  other-immediate-1
-  other-pointer)
+;;; the main types. These types are represented by the low three bits
+;;; of the pointer or immediate object.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defenum (:suffix -type)
+    even-fixnum
+    function-pointer
+    other-immediate-0
+    list-pointer
+    odd-fixnum
+    instance-pointer
+    other-immediate-1
+    other-pointer))
 
 ;;; the heap types. Each of these types is in the header of objects in
 ;;; the heap.
