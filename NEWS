@@ -1644,6 +1644,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     compiled in by default: you need to add :SB-THREAD to the target
     features.  See the "Beyond ANSI" chapter of the manual for 
     details.
+  * sb-aclrepl module improvements: an integrated inspector, added
+    repl features, and a bug fix to :trace command.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;
