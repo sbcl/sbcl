@@ -91,7 +91,9 @@
 
 (defmethod describe-object ((fun standard-generic-function) stream)
   (format stream "~&~A is a generic function." fun)
-  (format stream "~&Its arguments are:~&  ~S"
+  (when (documentation fun t)
+    (format stream "~&  Function documentation: ~A" (documentation fun t)))
+  (format stream "~&Its lambda-list is:~&  ~S"
 	  (generic-function-pretty-arglist fun))
   (let ((methods (generic-function-methods fun)))
     (if (null methods)
@@ -99,13 +101,13 @@
 	(let ((gf-name (generic-function-name fun)))
 	  (format stream "~&Its methods are:")
 	  (dolist (method methods)
-	    (format stream "~2%    (~A ~{~S ~}~:S) =>"
+	    (format stream "~&  (~A ~{~S ~}~:S)~%"
 		    gf-name
 		    (method-qualifiers method)
 		    (unparse-specializers method))
-	    (describe (or (method-fast-function method)
-			  (method-function method))
-		      stream))))))
+	    (when (documentation method t)
+	      (format stream "~&    Method documentation: ~A"
+		      (documentation method t))))))))
 
 (defmethod describe-object ((class class) stream)
   (flet ((pretty-class (c) (or (class-name c) c)))

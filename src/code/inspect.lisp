@@ -202,7 +202,13 @@ evaluated expressions.
   (values (format nil "The object is a FUNCALLABLE-INSTANCE of type ~S.~%"
 		  (type-of object))
 	  t
-	  (inspected-structure-elements object)))
+	  (inspected-standard-object-elements object)))
+
+(defmethod inspected-parts ((object condition))
+  (values (format nil "The object is a CONDITION of type ~S.~%"
+		  (type-of object))
+	  t
+	  (inspected-standard-object-elements object)))
 
 (defmethod inspected-parts ((object function))
   (let* ((type (sb-kernel:widetag-of object))

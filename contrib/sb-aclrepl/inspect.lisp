@@ -781,7 +781,11 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object sb-kernel:funcallable-instance))
-  (let ((components (inspected-structure-parts object)))
+  (let ((components (inspected-standard-object-parts object)))
+    (list components (length components) :named nil)))
+
+(defmethod inspected-parts ((object condition))
+  (let ((components (inspected-standard-object-parts object)))
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object function))
