@@ -851,6 +851,21 @@
 	 ;; uncertain, since a subclass of both might be defined
 	 nil)))
 
+;;; KLUDGE: we need this because of the need to represent
+;;; intersections of two classes, even when empty at a given time, as
+;;; uncanonicalized intersections because of the possibility of later
+;;; defining a subclass of both classes.  The necessity for changing
+;;; the default return value from SUBTYPEP to NIL, T if no alternate
+;;; method is present comes about because, unlike the other places we
+;;; use INVOKE-COMPLEX-SUBTYPEP-ARG1-METHOD, in HAIRY methods and the
+;;; like, classes are in their own hierarchy with no possibility of
+;;; mixtures with other type classes.
+(!define-type-method (sb!xc:class :complex-subtypep-arg2) (type1 class2)
+  (if (and (intersection-type-p type1)
+	   (> (count-if #'class-p (intersection-type-types type1)) 1))
+      (values nil nil)
+      (invoke-complex-subtypep-arg1-method type1 class2 nil t)))
+
 (!define-type-method (sb!xc:class :unparse) (type)
   (class-proper-name type))
 

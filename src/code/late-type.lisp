@@ -1011,6 +1011,23 @@
   ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (eq type1 type2) t))
 
+(!define-type-method (named :complex-=) (type1 type2)
+  (cond
+    ((and (eq type2 *empty-type*)
+	  (intersection-type-p type1)
+	  ;; not allowed to be unsure on these... FIXME: keep the list
+	  ;; of CL types that are intersection types once and only
+	  ;; once.
+	  (not (or (type= type1 (specifier-type 'ratio))
+		   (type= type1 (specifier-type 'keyword)))))
+     ;; things like (AND (EQL 0) (SATISFIES ODDP)) or (AND FUNCTION
+     ;; STREAM) can get here.  In general, we can't really tell
+     ;; whether these are equal to NIL or not, so
+     (values nil nil))
+    ((type-might-contain-other-types-p type1)
+     (invoke-complex-=-other-method type1 type2))
+    (t (values nil t))))
+
 (!define-type-method (named :simple-subtypep) (type1 type2)
   (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (or (eq type1 *empty-type*) (eq type2 *wild-type*)) t))
@@ -1053,7 +1070,9 @@
   (aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond ((eq type2 *universal-type*)
 	 (values t t))
-	((hairy-type-p type1)
+	((type-might-contain-other-types-p type1)
+	 ;; those types can be *EMPTY-TYPE* or *UNIVERSAL-TYPE* in
+	 ;; disguise.  So we'd better delegate.
 	 (invoke-complex-subtypep-arg1-method type1 type2))
 	(t
 	 ;; FIXME: This seems to rely on there only being 2 or 3
@@ -2406,9 +2425,7 @@
 	     (intersection-type-types type2)))
 
 (defun %intersection-complex-subtypep-arg1 (type1 type2)
-  (any/type (swapped-args-fun #'csubtypep)
-	    type2
-	    (intersection-type-types type1)))
+  (type= type1 (type-intersection type1 type2)))
 
 (defun %intersection-simple-subtypep (type1 type2)
   (every/type #'%intersection-complex-subtypep-arg1
@@ -2542,8 +2559,7 @@
 
 (!define-type-method (union :complex-=) (type1 type2)
   (declare (ignore type1))
-  (if (some #'(lambda (x) (or (hairy-type-p x)
-			      (negation-type-p x)))
+  (if (some #'type-might-contain-other-types-p 
 	    (union-type-types type2))
       (values nil nil)
       (values nil t)))
