@@ -2975,19 +2975,49 @@
     (let ((kind (info :variable :kind name)))
       (case kind
 	(:constant
-	 ;; FIXME: ANSI says EQL, not EQUALP. Perhaps make a special
-	 ;; variant of this warning for the case where they're EQUALP,
-	 ;; since people seem to be confused about this.
-          
-          ;; MNA: re-defconstant patch
-          (when (or (and (listp newval)
-                         (or (null (list-length newval))
-                             (not (tree-equal newval
-                                              (info :variable
-                                                    :constant-value name)
-                                              :test #'equalp))))
-                    (not (equalp newval (info :variable
-                                              :constant-value name))))
+	 ;; Note: This behavior (disparaging any non-EQL modification)
+	 ;; is unpopular, but it is specified by ANSI (i.e. ANSI says
+	 ;; a non-EQL change has undefined consequences). I think it's
+	 ;; a bad idea to encourage nonconforming programming style
+	 ;; even if it's convenient. If people really want things
+	 ;; which are constant in some sense other than EQL, I suggest
+	 ;; either just using DEFVAR (which is what I generally do),
+	 ;; or defining something like this (untested) code:
+	 ;;   (DEFMACRO DEFCONSTANT-EQX (SYMBOL EXPR EQX &OPTIONAL DOC)
+	 ;;     "This macro is to be used instead of DEFCONSTANT for values  
+         ;;     which are appropriately compared using the function given by
+         ;;     the EQX argument instead of EQL."
+	 ;;     (LET ((EXPR-TMP (GENSYM "EXPR-TMP-")))
+         ;;       `(EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+	 ;;	     (LET ((,EXPR-TMP ,EXPR))
+	 ;;	       (UNLESS (AND (BOUNDP ,SYMBOL)
+	 ;;			    (CONSTANTP ,SYMBOL)
+	 ;;			    (FUNCALL ,EQX
+	 ;;                                  (SYMBOL-VALUE ,SYMBOL)
+	 ;;                                  ,EXPR-TMP))
+	 ;;		 (DEFCONSTANT ,SYMBOL ,EXPR ,@(WHEN DOC `(,DOC))))))))
+	 ;; I prefer using DEFVAR, though, first because it's trivial,
+	 ;; and second because using DEFCONSTANT lets the compiler
+	 ;; optimize code by removing indirection, copying the current
+	 ;; value of the constant directly into the code, and for
+	 ;; consed data structures, this optimization can become a
+	 ;; pessimization. (And consed data structures are exactly
+	 ;; where you'd be tempted to use DEFCONSTANT-EQX.) Why is
+	 ;; this a pessimization? It does remove a layer of
+	 ;; indirection, but it makes it hard for the system's
+	 ;; load/dump logic to see that all references to the consed
+	 ;; data structure refer to the same (EQ) object. If you use
+	 ;; something like DEFCONSTANT-EQX, you'll tend to get one
+	 ;; copy of the data structure bound to the symbol, and one
+	 ;; more copy for each file where code refers to the constant.
+	 ;; If you're moderately clever with MAKE-LOAD-FORM, you might
+	 ;; be able to make the copy bound to the symbol at load time
+	 ;; be EQ to the references in code in the same file, but it
+	 ;; seems to be rather tricky to force code in different files
+	 ;; to refer the same copy without doing the DEFVAR thing of
+	 ;; indirection through a symbol. -- WHN 2000-11-02
+	 (unless (eql newval
+		      (info :variable :constant-value name))
 	   (compiler-warning "redefining constant ~S as:~%  ~S" name newval)))
 	(:global)
 	(t
