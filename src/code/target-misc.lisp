@@ -223,3 +223,16 @@ the file system."
 
 (defun %byte-blt (src src-start dst dst-start dst-end)
   (%byte-blt src src-start dst dst-start dst-end))
+
+;;;; some *LOAD-FOO* variables
+
+(defvar *load-print* nil
+  #!+sb-doc
+  "the default for the :PRINT argument to LOAD")
+
+(defvar *load-verbose* nil
+  ;; Note that CMU CL's default for this was T, and ANSI says it's
+  ;; implementation-dependent. We choose NIL on the theory that it's
+  ;; a nicer default behavior for Unix programs.
+  #!+sb-doc
+  "the default for the :VERBOSE argument to LOAD")

@@ -695,13 +695,13 @@
 
     (when (losers)
       (collect ((messages)
-		(count 0 +))
+		(notes 0 +))
 	(flet ((lose1 (string &rest stuff)
 		 (messages string)
 		 (messages stuff)))
 	  (dolist (loser (losers))
 	    (when (and *efficiency-note-limit*
-		       (>= (count) *efficiency-note-limit*))
+		       (>= (notes) *efficiency-note-limit*))
 	      (lose1 "etc.")
 	      (return))
 	    (let* ((type (template-type loser))
@@ -720,7 +720,7 @@
 	       (t
 		(aver (ltn-policy-safe-p ltn-policy))
 		(lose1 "can't trust output type assertion under safe policy")))
-	      (count 1))))
+	      (notes 1))))
 
 	(let ((*compiler-error-context* call))
 	  (compiler-notify "~{~?~^~&~6T~}"
