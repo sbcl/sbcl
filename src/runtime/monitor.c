@@ -16,6 +16,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "runtime.h"
 #include "sbcl.h"
@@ -33,11 +34,22 @@
 #include "search.h"
 #include "purify.h"
 
-extern boolean isatty(int fd);
+/* When we need to do command input, we use this stream, which is not
+ * in general stdin, so that things will "work" (as well as being
+ * thrown into ldb can be considered "working":-) even in a process
+ * where standard input has been redirected to a file or pipe.
+ *
+ * (We could set up output to go to a special ldb_out stream for the
+ * same reason, but there's been no pressure for that so far.)
+ * 
+ * The enter-the-ldb-monitor function is responsible for setting up
+ * this stream. */
+static FILE *ldb_in = 0;
+static int ldb_in_fd = -1;
 
 typedef void cmd(char **ptr);
 
-static cmd call_cmd, dump_cmd, print_cmd, quit, help;
+static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, search_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
@@ -47,15 +59,15 @@ static cmd kill_cmd;
 static struct cmd {
     char *cmd, *help;
     void (*fn)(char **ptr);
-} Cmds[] = {
-    {"help", "Display this help information.", help},
-    {"?", "help", help},
+} supported_cmds[] = {
+    {"help", "Display this help information.", help_cmd},
+    {"?", "(an alias for help)", help_cmd},
     {"backtrace", "Backtrace up to N frames.", backtrace_cmd},
     {"call", "Call FUNCTION with ARG1, ARG2, ...", call_cmd},
     {"catchers", "Print a list of all the active catchers.", catchers_cmd},
     {"context", "Print interrupt context number I.", print_context_cmd},
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
-    {"d", "Alias for dump", dump_cmd},
+    {"d", "(an alias for dump)", dump_cmd},
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
     /* (Classic CMU CL had a "gc" command here, which seems like a
@@ -66,17 +78,18 @@ static struct cmd {
      kill_cmd},
     {"purify", "Purify. (Caveat purifier!)", purify_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
-    {"p", "Alias for print", print_cmd},
-    {"quit", "Quit.", quit},
-    {"regs", "Display current Lisp regs.", regs_cmd},
+    {"p", "(an alias for print)", print_cmd},
+    {"quit", "Quit.", quit_cmd},
+    {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search for TYPE starting at ADDRESS for a max of COUNT words.", search_cmd},
-    {"s", "search", search_cmd},
+    {"s", "(an alias for search)", search_cmd},
     {NULL, NULL, NULL}
 };
 
 static jmp_buf curbuf;
 
-static int visible(unsigned char c)
+static int
+visible(unsigned char c)
 {
     if (c < ' ' || c > '~')
         return ' ';
@@ -84,7 +97,8 @@ static int visible(unsigned char c)
         return c;
 }
 
-static void dump_cmd(char **ptr)
+static void
+dump_cmd(char **ptr)
 {
     static char *lastaddr = 0;
     static int lastcount = 20;
@@ -139,19 +153,22 @@ static void dump_cmd(char **ptr)
     lastaddr = addr;
 }
 
-static void print_cmd(char **ptr)
+static void
+print_cmd(char **ptr)
 {
     lispobj obj = parse_lispobj(ptr);
 
     print(obj);
 }
 
-static void kill_cmd(char **ptr)
+static void
+kill_cmd(char **ptr)
 {
     kill(getpid(), parse_number(ptr));
 }
 
-static void regs_cmd(char **ptr)
+static void
+regs_cmd(char **ptr)
 {
     printf("CSP\t=\t0x%08lX\n", (unsigned long)current_control_stack_pointer);
     printf("FP\t=\t0x%08lX\n", (unsigned long)current_control_frame_pointer);
@@ -184,7 +201,8 @@ static void regs_cmd(char **ptr)
 #endif
 }
 
-static void search_cmd(char **ptr)
+static void
+search_cmd(char **ptr)
 {
     static int lastval = 0, lastcount = 0;
     static lispobj *start = 0, *end = 0;
@@ -194,7 +212,7 @@ static void search_cmd(char **ptr)
     if (more_p(ptr)) {
         val = parse_number(ptr);
         if (val < 0 || val > 0xff) {
-            printf("Can only search for single bytes.\n");
+            printf("can only search for single bytes\n");
             return;
         }
         if (more_p(ptr)) {
@@ -203,18 +221,18 @@ static void search_cmd(char **ptr)
                 count = parse_number(ptr);
             }
             else {
-                /* Speced value and address, but no count. Only one. */
+                /* Specified value and address, but no count. Only one. */
                 count = -1;
             }
         }
         else {
-            /* Speced a value, but no address, so search same range. */
+            /* Specified a value, but no address, so search same range. */
             addr = start;
             count = lastcount;
         }
     }
     else {
-        /* Speced nothing, search again for val. */
+        /* Specified nothing, search again for val. */
         val = lastval;
         addr = end;
         count = lastcount;
@@ -242,7 +260,8 @@ static void search_cmd(char **ptr)
     }
 }
 
-static void call_cmd(char **ptr)
+static void
+call_cmd(char **ptr)
 {
     lispobj thing = parse_lispobj(ptr), function, result = 0, cons, args[3];
     int numargs;
@@ -287,7 +306,7 @@ static void call_cmd(char **ptr)
     numargs = 0;
     while (more_p(ptr)) {
 	if (numargs >= 3) {
-	    printf("too many arguments (no more than 3 allowed)\n");
+	    printf("too many arguments (no more than 3 supported)\n");
 	    return;
 	}
 	args[numargs++] = parse_lispobj(ptr);
@@ -307,50 +326,56 @@ static void call_cmd(char **ptr)
 	result = funcall3(function, args[0], args[1], args[2]);
 	break;
     default:
-	lose("unsupported argument count");
+	lose("unsupported arg count made it past validity check?!");
     }
 
     print(result);
 }
 
-static void flush_cmd(char **ptr)
+static void
+flush_cmd(char **ptr)
 {
     flush_vars();
 }
 
-static void quit(char **ptr)
+static void
+quit_cmd(char **ptr)
 {
     char buf[10];
 
     printf("Really quit? [y] ");
     fflush(stdout);
-    fgets(buf, sizeof(buf), stdin);
+    fgets(buf, sizeof(buf), ldb_in);
     if (buf[0] == 'y' || buf[0] == 'Y' || buf[0] == '\n')
         exit(0);
 }
 
-static void help(char **ptr)
+static void
+help_cmd(char **ptr)
 {
     struct cmd *cmd;
 
-    for (cmd = Cmds; cmd->cmd != NULL; cmd++)
+    for (cmd = supported_cmds; cmd->cmd != NULL; cmd++)
         if (cmd->help != NULL)
             printf("%s\t%s\n", cmd->cmd, cmd->help);
 }
 
 static int done;
 
-static void exit_cmd(char **ptr)
+static void
+exit_cmd(char **ptr)
 {
     done = 1;
 }
 
-static void purify_cmd(char **ptr)
+static void
+purify_cmd(char **ptr)
 {
     purify(NIL, NIL);
 }
 
-static void print_context(os_context_t *context)
+static void
+print_context(os_context_t *context)
 {
 	int i;
 
@@ -367,7 +392,8 @@ static void print_context(os_context_t *context)
 	       (unsigned long)(*os_context_pc_addr(context)));
 }
 
-static void print_context_cmd(char **ptr)
+static void
+print_context_cmd(char **ptr)
 {
 	int free;
 
@@ -380,7 +406,7 @@ static void print_context_cmd(char **ptr)
 
 		if ((index >= 0) && (index < free)) {
 			printf("There are %d interrupt contexts.\n", free);
-			printf("Printing context %d\n", index);
+			printf("printing context %d\n", index);
 			print_context(lisp_interrupt_contexts[index]);
 		} else {
 			printf("There aren't that many/few contexts.\n");
@@ -391,13 +417,14 @@ static void print_context_cmd(char **ptr)
 			printf("There are no interrupt contexts!\n");
 		else {
 			printf("There are %d interrupt contexts.\n", free);
-			printf("Printing context %d\n", free - 1);
+			printf("printing context %d\n", free - 1);
 			print_context(lisp_interrupt_contexts[free - 1]);
 		}
 	}
 }
 
-static void backtrace_cmd(char **ptr)
+static void
+backtrace_cmd(char **ptr)
 {
     void backtrace(int frames);
     int n;
@@ -411,7 +438,8 @@ static void backtrace_cmd(char **ptr)
     backtrace(n);
 }
 
-static void catchers_cmd(char **ptr)
+static void
+catchers_cmd(char **ptr)
 {
     struct catch_block *catch;
 
@@ -441,7 +469,8 @@ static void catchers_cmd(char **ptr)
     }
 }
 
-static void grab_sigs_cmd(char **ptr)
+static void
+grab_sigs_cmd(char **ptr)
 {
     extern void sigint_init(void);
 
@@ -449,26 +478,25 @@ static void grab_sigs_cmd(char **ptr)
     sigint_init();
 }
 
-static FILE *devtty;
-static int devttyfd=-1;
-
-static void sub_monitor(void)
+static void
+sub_monitor(void)
 {
     struct cmd *cmd, *found;
     char buf[256];
     char *line, *ptr, *token;
     int ambig;
 
-    if(devtty==0) {
-	devtty=fopen("/dev/tty","r+");
-	devttyfd=fileno(devtty);
+    if (!ldb_in) {
+	ldb_in = fopen("/dev/tty","r+");
+	ldb_in_fd = fileno(ldb_in);
     }
+
     while (!done) {
         printf("ldb> ");
         fflush(stdout);
-        line = fgets(buf, sizeof(buf), devtty);
+        line = fgets(buf, sizeof(buf), ldb_in);
         if (line == NULL) {
-	    if (isatty(devttyfd)) {
+	    if (isatty(ldb_in_fd)) {
 		putchar('\n');
 	        continue;
 	    }
@@ -482,7 +510,7 @@ static void sub_monitor(void)
             continue;
         ambig = 0;
         found = NULL;
-        for (cmd = Cmds; cmd->cmd != NULL; cmd++) {
+        for (cmd = supported_cmds; cmd->cmd != NULL; cmd++) {
             if (strcmp(token, cmd->cmd) == 0) {
                 found = cmd;
                 ambig = 0;
@@ -506,7 +534,8 @@ static void sub_monitor(void)
     }
 }
 
-void ldb_monitor()
+void
+ldb_monitor()
 {
     jmp_buf oldbuf;
 
@@ -523,7 +552,8 @@ void ldb_monitor()
     bcopy(oldbuf, curbuf, sizeof(curbuf));
 }
 
-void throw_to_monitor()
+void
+throw_to_monitor()
 {
     longjmp(curbuf, 1);
 }
