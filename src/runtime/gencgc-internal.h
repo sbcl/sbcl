@@ -22,6 +22,12 @@
 #include "gencgc-alloc-region.h"
 #include "genesis/code.h"
 
+/* Size of a page, in bytes. FIXME: needs to be conditionalized per
+ * architecture, preferably by someone with a clue as to what page
+ * sizes are on archs other than x86 and PPC - Patrik */
+#define PAGE_BYTES 4096
+
+
 void gc_free_heap(void);
 inline int find_page_index(void *);
 inline void *page_address(int);
@@ -76,7 +82,7 @@ struct page {
 
 
 /* the number of pages needed for the dynamic space - rounding up */
-#define NUM_PAGES ((DYNAMIC_SPACE_SIZE+4095)/4096)
+#define NUM_PAGES ((DYNAMIC_SPACE_SIZE+PAGE_BYTES-1)/PAGE_BYTES)
 extern struct page page_table[NUM_PAGES];
 
 
@@ -95,7 +101,8 @@ space_matches_p(lispobj obj, int space)
 {
     int page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
     return ((page_index >= 0)
-	    && ((page_index = ((unsigned int)page_index)/4096) < NUM_PAGES)
+	    && ((page_index =
+		 ((unsigned int)page_index)/PAGE_BYTES) < NUM_PAGES)
 	    && (page_table[page_index].gen == space));
 }
 

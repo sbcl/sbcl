@@ -15,9 +15,6 @@
 #include "target-arch-os.h"
 #include "os.h"
 #include "globals.h"
-#ifdef LISP_FEATURE_GENCGC
-#include "gencgc.h"
-#endif
 #include "dynbind.h"
 #include "genesis/cons.h"
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
