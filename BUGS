@@ -1280,6 +1280,19 @@ WORKAROUND:
   arguments, but it could be tricky to check result types of PROG1, IF
   etc.
 
+222: "environment problems in PCL"
+  Evaluating
+
+    (symbol-macrolet ((x 1))
+      (defmethod foo (z)
+        (macrolet ((ml (form) `(progn ,form ,x)))
+          (ml (print x)))))
+
+  causes
+
+    debugger invoked on condition of type UNBOUND-VARIABLE:
+      The variable X is unbound.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
