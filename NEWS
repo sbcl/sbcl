@@ -2008,6 +2008,9 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     support has been systematized, and now supports the methods
     specified by ANSI, along with a default method and a method for
     slot documentation.  (reported by Nathan Froyd)
+  * bug fix: effective methods associated with a generic function are
+    no longer cached over a change of that generic function's method
+    combination.  (reported by Andreas Fuchs)
   * optimization: restored some effective method precomputation in
     CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.

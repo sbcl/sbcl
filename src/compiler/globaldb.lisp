@@ -541,7 +541,20 @@
 ;;; Encache NAME in the compact environment ENV. HASH is the
 ;;; GLOBALDB-SXHASHOID of NAME.
 (defun compact-info-lookup (env name hash)
-  (declare (type compact-info-env env) (type index hash))
+  (declare (type compact-info-env env)
+	   ;; FIXME: this used to read (TYPE INDEX HASH), but that was
+	   ;; wrong, because HASH was a positive fixnum, not a (MOD
+	   ;; MOST-POSITIVE-FIXNUM).
+	   ;;
+	   ;; However, this, its replacement, is also wrong.  In the
+	   ;; cross-compiler, GLOBALDB-SXHASHOID is essentially
+	   ;; SXHASH.  But our host compiler could have any value at
+	   ;; all as its MOST-POSITIVE-FIXNUM, and so could in
+	   ;; principle return a value exceeding our target positive
+	   ;; fixnum range.
+	   ;;
+	   ;; My brain hurts.  -- CSR, 2003-08-28
+	   (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let* ((table (compact-info-env-table env))
 	 (len (length table))
 	 (len-2 (- len 2))
@@ -703,7 +716,9 @@
 
 ;;; Just like COMPACT-INFO-LOOKUP, only do it on a volatile environment.
 (defun volatile-info-lookup (env name hash)
-  (declare (type volatile-info-env env) (type index hash))
+  (declare (type volatile-info-env env)
+	   ;; FIXME: see comment in COMPACT-INFO-LOOKUP
+	   (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let ((table (volatile-info-env-table env)))
     (macrolet ((lookup (test)
 		 `(dolist (entry (svref table (mod hash (length table))) ())
@@ -714,7 +729,6 @@
 		(lookup eq)
 		(lookup equal)))
       (setf (volatile-info-env-cache-name env) name)))
-
   (values))
 
 ;;; Given a volatile environment ENV, bind TABLE-VAR the environment's table
