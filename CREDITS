@@ -565,6 +565,10 @@ Pierre Mai:
   patched code to SBCL to enable dynamic loading of object files 
   under OpenBSD.
 
+Eric Marsden:
+  Some of his fixes to CMU CL since the SBCL fork have been ported
+  to SBCL.
+
 Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
   under CLISP.

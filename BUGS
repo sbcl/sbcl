@@ -1301,7 +1301,7 @@ WORKAROUND:
   only sporadically reproducible.
 
 191: "Miscellaneous PCL deficiencies"
-  (reported by Alexey Dejenka sbcl-devel 2002-08-04)
+  (reported by Alexey Dejneka sbcl-devel 2002-08-04)
   a. DEFCLASS does not inform the compiler about generated
      functions. Compiling a file with
        (DEFCLASS A-CLASS ()

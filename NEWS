@@ -1192,7 +1192,7 @@ changes in sbcl-0.7.6 relative to sbcl-0.7.5:
 
 changes in sbcl-0.7.7 relative to sbcl-0.7.6:
   * An alpha-quality port to the parisc architecture running Linux,
-    based on the old CMUCL backend has been made.  This, even more so
+    based on the old CMUCL backend, has been made.  This, even more so
     than the other backends, should be considered still a work in
     progress; known problems include that the Linux kernel in 64-bit
     mode does not propagate the correct sigcontext structure to
@@ -1213,6 +1213,9 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
     SB-KERNEL:CONTROL-STACK-EXHAUSTED condition (subclass of
     STORAGE-CONDITION) is signalled, so stack exhaustion can no longer
     be caught using IGNORE-ERRORS.
+  * Bugs 65, 70, and 109 fixed: The compiler now preserves invariants
+    correctly when transforming recursive LABELS functions to LETs.
+    (thanks to Alexey Dejneka)
   * Bug 48a./b. fixed: SYMBOL-MACROLET now refuses to bind symbols
     that are names of constants or global variables.
   * Bug fix: DEFINE-ALIEN-ROUTINE now declaims the correct FTYPE for
