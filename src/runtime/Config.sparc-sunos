@@ -13,7 +13,7 @@ CFLAGS = -g -O3 -Wall -Dsparc -DSVR4
 ASFLAGS = -g -Wall -Dsparc -DSVR4
 LD = ld 
 LINKFLAGS = -v -g 
-NM = nm -p
+NM = nm -t x -p 
 
 ASSEM_SRC = sparc-assem.S 
 #ARCH_SRC = sparc-arch.c undefineds.c 

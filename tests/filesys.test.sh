@@ -12,7 +12,7 @@
 # more information.
 
 # Test DIRECTORY and TRUENAME.
-testdir=`pwd`"/filesys-test-$$"
+testdir=`/bin/pwd`"/filesys-test-$$"
 mkdir $testdir
 echo this is a test > $testdir/test-1.tmp
 echo this is a test > $testdir/test-2.tmp
