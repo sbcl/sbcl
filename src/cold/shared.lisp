@@ -72,17 +72,18 @@
 
 ;;;; some tools
 
-;;; Take the file named X and make it into a file named Y. Sorta like UNIX, and
-;;; unlike Common Lisp's bare RENAME-FILE, we don't allow information
-;;; from the original filename to influence the final filename. (The reason
-;;; that it's only sorta like UNIX is that in UNIX "mv foo bar/" will work,
-;;; but the analogous (RENAME-FILE-A-LA-UNIX "foo" "bar/") should fail.)
+;;; Take the file named X and make it into a file named Y. Sorta like
+;;; UNIX, and unlike Common Lisp's bare RENAME-FILE, we don't allow
+;;; information from the original filename to influence the final
+;;; filename. (The reason that it's only sorta like UNIX is that in
+;;; UNIX "mv foo bar/" will work, but the analogous
+;;; (RENAME-FILE-A-LA-UNIX "foo" "bar/") should fail.)
 ;;;
-;;; (This is a workaround for the weird behavior of Debian CMU CL 2.4.6, where
-;;; (RENAME-FILE "dir/x" "dir/y") tries to create a file called "dir/dir/y".
-;;; If that behavior goes away, then we should be able to get rid of this
-;;; function and use plain RENAME-FILE in the COMPILE-STEM function
-;;; above. -- WHN 19990321
+;;; (This is a workaround for the weird behavior of Debian CMU CL
+;;; 2.4.6, where (RENAME-FILE "dir/x" "dir/y") tries to create a file
+;;; called "dir/dir/y". If that behavior goes away, then we should be
+;;; able to get rid of this function and use plain RENAME-FILE in the
+;;; COMPILE-STEM function above. -- WHN 19990321
 (defun rename-file-a-la-unix (x y)
   (rename-file x
 	       ;; (Note that the TRUENAME expression here is lifted from an
@@ -189,17 +190,6 @@
    ;; nice friendly traditional return value
    (pathname obj)))
 (compile 'compile-stem)
-
-;;; basic tool for building other tools
-#+nil
-(defun tool-cload-stem (stem)
-  (load (compile-stem stem
-		      :src-prefix *src-prefix*
-		      :obj-prefix *host-obj-prefix*
-		      :obj-suffix *host-obj-suffix*
-		      :compile-file #'compile-file))
-  (values))
-#+nil (compile 'tool-cload-stem)
 
 ;;; other miscellaneous tools
 (load "src/cold/read-from-file.lisp")
@@ -349,7 +339,7 @@
 ;;; (This function is not used by the build process, but is intended
 ;;; for interactive use when experimenting with the system. It runs
 ;;; the cross-compiler on test files with arbitrary filenames, not
-;;; necessarily in the source tree, e.g. in "/tmp/".)
+;;; necessarily in the source tree, e.g. in "/tmp".)
 (defun target-compile-file (filename)
   (funcall *in-target-compilation-mode-fn*
 	   (lambda ()

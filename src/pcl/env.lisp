@@ -28,7 +28,7 @@
 ;;; FIXME: This stuff isn't part of the ANSI spec, and isn't even
 ;;; exported from PCL, but it looks as though it might be useful,
 ;;; so I don't want to just delete it. Perhaps it should go in
-;;; a contrib/ directory eventually?
+;;; a "contrib" directory eventually?
 
 #|
 ;;; TRACE-METHOD and UNTRACE-METHOD accept method specs as arguments. A

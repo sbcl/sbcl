@@ -56,7 +56,7 @@
 ;;; handle the following case exactly (otherwise we get an error:
 ;;; "#'IDENTITY CALLED WITH 2 ARGS."
 (setf (logical-pathname-translations "demo2")
-        '(("test;**;*.*" "/tmp/demo2/test/")))
+        '(("test;**;*.*" "/tmp/demo2/test")))
 (enough-namestring "demo2:test;foo.lisp")
 
 ;;; When a pathname comes from a logical host, it should be in upper

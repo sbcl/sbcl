@@ -13,10 +13,10 @@
 # this script (including "gmake clean" in the src/runtime directory)
 # several times in a row without failure.. so we leave the output/
 # directory in place.)
-rm -rf obj/* output/* doc/user-manual/ \
-  doc/user-manual.junk/ doc/DBTOHTML_OUTPUT_DIR*
-# (The doc/user-manual.junk/ and doc/DBTOHTML_OUTPUT_DIR* directories
-# are created when the Cygnus db2html script when it formats the the
+rm -rf obj/* output/* doc/user-manual \
+  doc/user-manual.junk doc/DBTOHTML_OUTPUT_DIR*
+# (The doc/user-manual.junk and doc/DBTOHTML_OUTPUT_DIR* directories
+# are created by the Cygnus db2html script when it formats the the
 # user manual, and since this db2html script is the one which is
 # currently used to format the manual for the standard binary
 # distribution, we automatically clean up after it here in the 

@@ -31,7 +31,7 @@
 ;;; FIXME: Perhaps now that a significant number of files are built
 ;;; in warm load instead of cold load, this file should now be called
 ;;; cold-stems-and-flags.lisp-expr? Also, perhaps this file should move
-;;; into the src/cold/ directory?
+;;; into the src/cold directory?
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous

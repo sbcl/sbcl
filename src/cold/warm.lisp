@@ -27,7 +27,7 @@
 ;;;; do belong in cold load and will hopefully make it back there reasonably
 ;;;; soon). -- WHN 19991207
 
-(dolist (stem '(;; FIXME: The files here from outside the src/pcl/ directory
+(dolist (stem '(;; FIXME: The files here from outside the src/pcl directory
 		;; probably belong in cold load instead of warm load. They
 		;; ended up here as a quick hack to work around the
 		;; consequences of my misunderstanding how ASSEMBLE-FILE works
