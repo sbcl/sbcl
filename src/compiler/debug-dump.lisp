@@ -316,7 +316,7 @@
 (defun dump-1-variable (fun var tn id minimal buffer)
   (declare (type lambda-var var) (type (or tn null) tn) (type index id)
 	   (type clambda fun))
-  (let* ((name (leaf-name var))
+  (let* ((name (leaf-debug-name var))
 	 (save-tn (and tn (tn-save-tn tn)))
 	 (kind (and tn (tn-kind tn)))
 	 (flags 0))
@@ -350,14 +350,14 @@
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARIABLES
 ;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
-;;; hashtable in which we enter the translation from LAMBDA-VARS to
+;;; hash table in which we enter the translation from LAMBDA-VARS to
 ;;; the relative position of that variable's location in the resulting
 ;;; vector.
 (defun compute-variables (fun level var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((vars))
     (labels ((frob-leaf (leaf tn gensym-p)
-	       (let ((name (leaf-name leaf)))
+	       (let ((name (leaf-debug-name leaf)))
 		 (when (and name (leaf-refs leaf) (tn-offset tn)
 			    (or gensym-p (symbol-package name)))
 		   (vars (cons leaf tn)))))
@@ -377,7 +377,7 @@
 
     (let ((sorted (sort (vars) #'string<
 			:key #'(lambda (x)
-				 (symbol-name (leaf-name (car x))))))
+				 (symbol-name (leaf-debug-name (car x))))))
 	  (prev-name nil)
 	  (id 0)
 	  (i 0)
@@ -386,7 +386,7 @@
 	       (type index id i))
       (dolist (x sorted)
 	(let* ((var (car x))
-	       (name (symbol-name (leaf-name var))))
+	       (name (symbol-name (leaf-debug-name var))))
 	  (cond ((and prev-name (string= prev-name name))
 		 (incf id))
 		(t
@@ -476,13 +476,7 @@
 	 (main-p (and dispatch
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
     (make-compiled-debug-fun
-     :name (cond ((leaf-name fun))
-		 ((let ((ef (functional-entry-function fun)))
-		    (and ef (leaf-name ef))))
-		 ((and main-p (leaf-name dispatch)))
-		 (t
-		  (component-name
-		   (block-component (node-block (lambda-bind fun))))))
+     :name (leaf-debug-name fun)
      :kind (if main-p nil (functional-kind fun))
      :return-pc (tn-sc-offset (ir2-physenv-return-pc 2env))
      :old-fp (tn-sc-offset (ir2-physenv-old-fp 2env))

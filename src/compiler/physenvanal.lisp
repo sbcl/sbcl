@@ -97,9 +97,12 @@
 ;;; mysterious reason here) it's important to set up bottomed-out-here
 ;;; environments before anything else. -- WHN 2001-09-30
 (defun preallocate-physenvs-for-toplevelish-lambdas (component)
+  (/show "entering PREALLOCATE-PHYSENVS-FOR-TOPLEVELISH-LAMDBAS" component)
   (dolist (clambda (component-lambdas component))
+    (/show clambda (lambda-vars clambda) (lambda-toplevelish-p clambda))
     (when (lambda-toplevelish-p clambda)
       (compute-closure clambda)))
+  (/show "leaving PREALLOCATE-PHYSENVS-FOR-TOPLEVELISH-LAMDBAS" component)
   (values))
 
 ;;; If CLAMBDA has a PHYSENV , return it, otherwise assign an empty one.
@@ -131,17 +134,16 @@
   (let ((old (lambda-physenv (lambda-home fun))))
     (cond (old
 	   (setf (physenv-closure old)
-		 (delete-if #'(lambda (x)
-				(and (lambda-var-p x)
-				     (null (leaf-refs x))))
+		 (delete-if (lambda (x)
+			      (and (lambda-var-p x)
+				   (null (leaf-refs x))))
 			    (physenv-closure old)))
 	   (flet ((clear (fun)
 		    (dolist (var (lambda-vars fun))
 		      (unless (lambda-var-sets var)
 			(setf (lambda-var-indirect var) nil)))))
 	     (clear fun)
-	     (dolist (let (lambda-lets fun))
-	       (clear let))))
+	     (map nil #'clear (lambda-lets fun))))
 	  (t
 	   (get-lambda-physenv fun))))
   (values))

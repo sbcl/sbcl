@@ -141,7 +141,8 @@
 		      "Return value count mismatch prevents known return ~
 		       from these functions:~
 		       ~{~%  ~A~}"
-		      (remove nil (mapcar #'leaf-name funs)))))
+		      (mapcar #'leaf-source-name
+			      (remove-if-not #'leaf-has-source-name-p funs)))))
 	(let ((ret (lambda-return fun)))
 	  (when ret
 	    (let ((rtype (return-result-type ret)))

@@ -59,9 +59,7 @@
 	  (not (null (physenv-closure (lambda-physenv fun)))))
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
-	  (let ((name (leaf-name internal-fun)))
-	    (or name
-		(component-name (block-component (node-block bind))))))
+	  (leaf-debug-name internal-fun))
     (when (policy bind (>= debug 1))
       (setf (entry-info-arguments info) (make-arg-names internal-fun))
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
@@ -90,10 +88,12 @@
 	(:external
 	 (unless (lambda-has-external-references-p lambda)
 	   (let* ((ef (functional-entry-function lambda))
-		  (new (make-functional :kind :toplevel-xep
-					:info (leaf-info lambda)
-					:name (leaf-name ef)
-					:lexenv (make-null-lexenv)))
+		  (new (make-functional
+			:kind :toplevel-xep
+			:info (leaf-info lambda)
+			:%source-name (functional-%source-name ef)
+			:%debug-name (functional-%debug-name ef)
+			:lexenv (make-null-lexenv)))
 		  (closure (physenv-closure
 			    (lambda-physenv (main-entry ef)))))
 	     (dolist (ref (leaf-refs lambda))

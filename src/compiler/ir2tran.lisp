@@ -109,7 +109,6 @@
   (declare (type ref node) (type ir2-block block))
   (let* ((cont (node-cont node))
 	 (leaf (ref-leaf node))
-	 (name (leaf-name leaf))
 	 (locs (continuation-result-tns
 		cont (list (primitive-type (leaf-type leaf)))))
 	 (res (first locs)))
@@ -122,14 +121,16 @@
       (constant
        (if (legal-immediate-constant-p leaf)
 	   (emit-move node block (constant-tn leaf) res)
-	   (let ((name-tn (emit-constant name)))
+	   (let* ((name (leaf-source-name leaf))
+		  (name-tn (emit-constant name)))
 	     (if (policy node (zerop safety))
 		 (vop fast-symbol-value node block name-tn res)
 		 (vop symbol-value node block name-tn res)))))
       (functional
        (ir2-convert-closure node block leaf res))
       (global-var
-       (let ((unsafe (policy node (zerop safety))))
+       (let ((unsafe (policy node (zerop safety)))
+	     (name (leaf-source-name leaf)))
 	 (ecase (global-var-kind leaf)
 	   ((:special :global)
 	    (aver (symbolp name))
@@ -207,8 +208,8 @@
       (global-var
        (ecase (global-var-kind leaf)
 	 ((:special :global)
-	  (aver (symbolp (leaf-name leaf)))
-	  (vop set node block (emit-constant (leaf-name leaf)) val)))))
+	  (aver (symbolp (leaf-source-name leaf)))
+	  (vop set node block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs
       (emit-move node block val (first locs))
       (move-continuation-result node block locs cont)))
@@ -1261,7 +1262,7 @@
 ;;; This is trivial, given our assumption of a shallow-binding
 ;;; implementation.
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
-  (let ((name (leaf-name (continuation-value var))))
+  (let ((name (leaf-source-name (continuation-value var))))
     (vop bind node block (continuation-tn node block value)
 	 (emit-constant name))))
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
@@ -1561,7 +1562,9 @@
 			  (eq (basic-combination-kind last) :full))
 		 (let* ((fun (basic-combination-fun last))
 			(use (continuation-use fun))
-			(name (and (ref-p use) (leaf-name (ref-leaf use)))))
+			(name (and (ref-p use)
+				   (leaf-has-source-name-p (ref-leaf use))
+				   (leaf-source-name (ref-leaf use)))))
 		   (unless (or (node-tail-p last)
 			       (info :function :info name)
 			       (policy last (zerop safety)))

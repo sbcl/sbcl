@@ -263,7 +263,8 @@
   (declare (type continuation cont))
   (let ((dest (continuation-dest cont)))
     (cond ((eq (continuation-type-check cont) :error)
-	   (if (and (combination-p dest) (eq (combination-kind dest) :error))
+	   (if (and (combination-p dest)
+		    (eq (combination-kind dest) :error))
 	       nil
 	       t))
 	  ((or (not dest)
@@ -416,7 +417,8 @@
 		   (format nil "~:[A possible~;The~] binding of ~S"
 			   (and (continuation-use cont)
 				(eq (functional-kind lambda) :let))
-			   (leaf-name (elt (lambda-vars lambda) pos)))))))
+			   (leaf-source-name (elt (lambda-vars lambda)
+						  pos)))))))
     (cond ((eq dtype *empty-type*))
 	  ((and (ref-p node) (constant-p (ref-leaf node)))
 	   (compiler-warning "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"

@@ -87,7 +87,7 @@
 ;;; whether the single argument is known to (not) be of the
 ;;; appropriate type, expanding to T or NIL as appropriate.
 (deftransform fold-type-predicate ((object) * * :node node :defun-only t)
-  (let ((ctype (gethash (leaf-name
+  (let ((ctype (gethash (leaf-source-name
 			 (ref-leaf
 			  (continuation-use
 			   (basic-combination-fun node))))

@@ -860,9 +860,13 @@
           (format nil "~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda definition
-					   (let ((*package* *keyword-package*))
-					     (format nil "locall ~S" name))))
-           (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
+					   :debug-name (debug-namify
+							"top level locall ~S"
+							name)))
+           (fun (ir1-convert-lambda (make-xep-lambda locall-fun)
+				    :source-name (or name '.anonymous.)
+				    :debug-name (or name "top level form"))))
+      (/show "in MAKE-FUNCTIONAL-FROM-TOP-LEVEL-LAMBDA" locall-fun fun component)
       (setf (functional-entry-function fun) locall-fun
             (functional-kind fun) :external
             (functional-has-external-references-p fun) t)
@@ -888,12 +892,14 @@
 		  ;; nice default for things where we don't have a
 		  ;; real source path (as in e.g. inside CL:COMPILE).
 		  '(original-source-start 0 0)))
+  (/show "entering %COMPILE" lambda-expression name)
   (unless (or (null name) (legal-fun-name-p name))
     (error "not a legal function name: ~S" name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
 						    :path path)))
+    (/show fun)
 
     ;; FIXME: The compile-it code from here on is sort of a
     ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
@@ -907,11 +913,13 @@
 
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
+      (/show components-from-dfo top-components hairy-top)
 
       (let ((*all-components* (append components-from-dfo top-components)))
 	(mapc #'preallocate-physenvs-for-toplevelish-lambdas
 	      (append hairy-top top-components))
         (dolist (component-from-dfo components-from-dfo)
+	  (/show component-from-dfo (component-lambdas component-from-dfo))
           (compile-component component-from-dfo)
           (replace-toplevel-xeps component-from-dfo)))
 
@@ -926,7 +934,8 @@
               (aver found-p)
               result))
         (mapc #'clear-ir1-info components-from-dfo)
-        (clear-stuff)))))
+        (clear-stuff)
+	(/show "returning from %COMPILE")))))
 
 (defun process-toplevel-cold-fset (name lambda-expression path)
   (unless (producing-fasl-file)
@@ -1123,7 +1132,6 @@
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))
 	  (lambda (ir1-toplevel form *current-path* for-value)))
-     (setf (leaf-name lambda) name)
      (compile-toplevel (list lambda) t)
      lambda)))
 
@@ -1137,7 +1145,7 @@
   (let* ((lambda (car lambdas))
 	 (component (block-component (node-block (lambda-bind lambda)))))
     (when (eql (component-kind component) :toplevel)
-      (setf (component-name component) (leaf-name lambda))
+      (setf (component-name component) (leaf-debug-name lambda))
       (compile-component component)
       (clear-ir1-info component))))
 

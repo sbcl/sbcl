@@ -57,36 +57,36 @@
 ;;; possibility that new references might be converted to it.
 (defun finalize-xep-definition (fun)
   (let* ((leaf (functional-entry-function fun))
-	 (name (leaf-name leaf))
 	 (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
-    (when (legal-fun-name-p name)
-      (let* ((where (info :function :where-from name))
-	     (*compiler-error-context* (lambda-bind (main-entry leaf)))
-	     (global-def (gethash name *free-functions*))
-	     (global-p (defined-fun-p global-def)))
-	(note-name-defined name :function)
-	(when global-p
-	  (remhash name *free-functions*))
-	(ecase where
-	  (:assumed
-	   (let ((approx-type (info :function :assumed-type name)))
-	     (when (and approx-type (fun-type-p defined-ftype))
-	       (valid-approximate-type approx-type defined-ftype))
-	     (setf (info :function :type name) defined-ftype)
-	     (setf (info :function :assumed-type name) nil))
-	   (setf (info :function :where-from name) :defined))
-	  (:declared
-	   (let ((declared-ftype (info :function :type name)))
-	     (unless (defined-ftype-matches-declared-ftype-p
-		       defined-ftype declared-ftype)
-	       (note-lossage "~@<The previously declared FTYPE~2I ~_~S~I ~_~
+    (when (leaf-has-source-name-p leaf)
+      (let ((source-name (leaf-source-name leaf)))
+	(let* ((where (info :function :where-from source-name))
+	       (*compiler-error-context* (lambda-bind (main-entry leaf)))
+	       (global-def (gethash source-name *free-functions*))
+	       (global-p (defined-fun-p global-def)))
+	  (note-name-defined source-name :function)
+	  (when global-p
+	    (remhash source-name *free-functions*))
+	  (ecase where
+	    (:assumed
+	     (let ((approx-type (info :function :assumed-type source-name)))
+	       (when (and approx-type (fun-type-p defined-ftype))
+		 (valid-approximate-type approx-type defined-ftype))
+	       (setf (info :function :type source-name) defined-ftype)
+	       (setf (info :function :assumed-type source-name) nil))
+	     (setf (info :function :where-from source-name) :defined))
+	    (:declared
+	     (let ((declared-ftype (info :function :type source-name)))
+	       (unless (defined-ftype-matches-declared-ftype-p
+			 defined-ftype declared-ftype)
+		 (note-lossage "~@<The previously declared FTYPE~2I ~_~S~I ~_~
                               conflicts with the definition type ~2I~_~S~:>"
-			     (type-specifier declared-ftype)
-			     (type-specifier defined-ftype)))))
-	  (:defined
-           (when global-p
-             (setf (info :function :type name) defined-ftype)))))))
+			       (type-specifier declared-ftype)
+			       (type-specifier defined-ftype)))))
+	    (:defined
+	     (when global-p
+	       (setf (info :function :type source-name) defined-ftype))))))))
   (values))
 
 ;;; Find all calls in COMPONENT to assumed functions and update the

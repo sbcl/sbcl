@@ -324,7 +324,8 @@
 	 (let ((leaf (ref-leaf use)))
 	   (and (global-var-p leaf)
 		(eq (global-var-kind leaf) :global-function)
-		(not (null (member (leaf-name leaf) names :test #'equal))))))))
+		(not (null (member (leaf-source-name leaf) names
+				   :test #'equal))))))))
 
 ;;; If CONT is a constant continuation, the return the constant value.
 ;;; If it is null, then return default, otherwise quietly give up the

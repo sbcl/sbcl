@@ -82,7 +82,8 @@
 	(push info (core-object-debug-info object))
 	(setf (%code-debug-info code-obj) info))
 
-      (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot) length)
+      (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot)
+	    length)
       (copy-to-system-area trace-table
 			   (* sb!vm:vector-data-offset sb!vm:n-word-bits)
 			   fill-ptr

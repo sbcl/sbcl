@@ -908,19 +908,12 @@
 (defun print-leaf (leaf &optional (stream *standard-output*))
   (declare (type leaf leaf) (type stream stream))
   (etypecase leaf
-    (lambda-var (prin1 (leaf-name leaf) stream))
+    (lambda-var (prin1 (leaf-debug-name leaf) stream))
     (constant (format stream "'~S" (constant-value leaf)))
     (global-var
-     (format stream "~S {~A}" (leaf-name leaf) (global-var-kind leaf)))
-    (clambda
-      (format stream "lambda ~S ~S" (leaf-name leaf)
-	      (mapcar #'leaf-name (lambda-vars leaf))))
-    (optional-dispatch
-     (format stream "optional-dispatch ~S" (leaf-name leaf)))
+     (format stream "~S {~A}" (leaf-debug-name leaf) (global-var-kind leaf)))
     (functional
-     (aver (eq (functional-kind leaf) :toplevel-xep))
-     (format stream "TL-XEP ~S"
-	     (entry-info-name (leaf-info leaf))))))
+     (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (function (t) cblock) block-or-lose))
@@ -945,8 +938,8 @@
   (format t " c~D" (cont-num cont))
   (values))
 
-;;; Print out the nodes in Block in a format oriented toward representing
-;;; what the code does.
+;;; Print out the nodes in BLOCK in a format oriented toward
+;;; representing what the code does.
 (defun print-nodes (block)
   (setq block (block-or-lose block))
   (format t "~%block start c~D" (cont-num (block-start block)))

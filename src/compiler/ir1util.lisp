@@ -603,7 +603,7 @@
 	  (unless (leaf-ever-used leaf)
 	    (let ((*compiler-error-context* bind))
 	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"
-			     (leaf-name leaf))))
+			     (leaf-debug-name leaf))))
 	  (unlink-blocks (component-head component) bind-block)
 	  (when return
 	    (unlink-blocks (node-block return) (component-tail component)))
@@ -884,7 +884,7 @@
 	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
 	  ;; requires this to be a STYLE-WARNING.
 	  (compiler-style-warning "The variable ~S is defined but never used."
-				  (leaf-name var)))
+				  (leaf-debug-name var)))
 	(setf (leaf-ever-used var) t))))
   (values))
 
@@ -1111,7 +1111,7 @@
 
 ;;;; leaf hackery
 
-;;; Change the Leaf that a Ref refers to.
+;;; Change the LEAF that a REF refers to.
 (defun change-ref-leaf (ref leaf)
   (declare (type ref ref) (type leaf leaf))
   (unless (eq (ref-leaf ref) leaf)
@@ -1144,19 +1144,21 @@
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in *CONSTANTS*, then we create a new constant
 ;;; LEAF and enter it.
-#!-sb-fluid (declaim (maybe-inline find-constant))
 (defun find-constant (object)
-  (if (typep object '(or symbol number character instance))
-    (or (gethash object *constants*)
-	(setf (gethash object *constants*)
-	      (make-constant :value object
-			     :name nil
-			     :type (ctype-of object)
-			     :where-from :defined)))
-    (make-constant :value object
-		   :name nil
-		   :type (ctype-of object)
-		   :where-from :defined)))
+  (if (typep object
+	     ;; FIXME: What is the significance of this test? ("things
+	     ;; that are worth uniquifying"?)
+	     '(or symbol number character instance))
+      (or (gethash object *constants*)
+	  (setf (gethash object *constants*)
+		(make-constant :value object
+			       :%source-name '.anonymous.
+			       :type (ctype-of object)
+			       :where-from :defined)))
+      (make-constant :value object
+		     :%source-name '.anonymous.
+		     :type (ctype-of object)
+		     :where-from :defined)))
 
 ;;; If there is a non-local exit noted in ENTRY's environment that
 ;;; exits to CONT in that entry, then return it, otherwise return NIL.
@@ -1216,7 +1218,7 @@
 		   (or (not (defined-fun-p leaf))
 		       (not (eq (defined-fun-inlinep leaf) :notinline))
 		       notinline-ok))
-	      (leaf-name leaf)
+	      (leaf-source-name leaf)
 	      nil))
 	nil)))
 

@@ -178,13 +178,31 @@
 ;;; Convert a source form to a string, suitably formatted for use in
 ;;; compiler warnings.
 (defun stringify-form (form &optional (pretty t))
-  (let ((*print-level* *compiler-error-print-level*)
-	(*print-length* *compiler-error-print-length*)
-	(*print-lines* *compiler-error-print-lines*)
-	(*print-pretty* pretty))
-    (if pretty
-	(format nil "~<~@;  ~S~:>" (list form))
-	(prin1-to-string form))))
+  (with-standard-io-syntax
+   (let ((*print-readably* nil)
+         (*print-pretty* pretty)
+         (*print-level* *compiler-error-print-level*)
+         (*print-length* *compiler-error-print-length*)
+         (*print-lines* *compiler-error-print-lines*))
+     (if pretty
+         (format nil "~<~@;  ~S~:>" (list form))
+         (prin1-to-string form)))))
+
+;;; shorthand for creating debug names from source names or other
+;;; stems, e.g.
+;;;   (DEBUG-NAMIFY "FLET ~S" SOURCE-NAME)
+;;;   (DEBUG-NAMIFY "top level form ~S" FORM)
+;;;
+;;; FIXME: This function seems to have a lot in common with
+;;; STRINGIFY-FORM, and perhaps there's some way to merge the two
+;;; functions.
+(defun debug-namify (format-string &rest format-arguments)
+  (with-standard-io-syntax
+   (let ((*print-readably* nil)
+         (*package* *cl-package*)
+         (*print-length* 3)
+         (*print-level* 2))
+     (apply #'format nil format-string format-arguments))))
 
 ;;; Return a COMPILER-ERROR-CONTEXT structure describing the current
 ;;; error context, or NIL if we can't figure anything out. ARGS is a

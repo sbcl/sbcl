@@ -78,7 +78,7 @@
 ;;; values cannot, since we must preserve EQLness.
 (defun legal-immediate-constant-p (leaf)
   (declare (type constant leaf))
-  (or (null (leaf-name leaf))
+  (or (not (leaf-has-source-name-p leaf))
       (typecase (constant-value leaf)
 	((or number character) t)
 	(symbol (symbol-package (constant-value leaf)))
@@ -895,14 +895,14 @@
       ;; to implement an out-of-line version in terms of inline
       ;; transforms or VOPs or whatever.
       (unless template
-	(when (and (eq (continuation-fun-name (combination-fun call))
-		       (leaf-name
-			(physenv-function
-			 (node-physenv call))))
-		   (let ((info (basic-combination-kind call)))
-		     (not (or (function-info-ir2-convert info)
-			      (ir1-attributep (function-info-attributes info)
-					      recursive)))))
+	(when (let ((funleaf (physenv-function (node-physenv call))))
+		(and (leaf-has-source-name-p funleaf)
+		     (eq (continuation-fun-name (combination-fun call))
+			 (leaf-source-name funleaf))
+		     (let ((info (basic-combination-kind call)))
+		       (not (or (function-info-ir2-convert info)
+				(ir1-attributep (function-info-attributes info)
+						recursive))))))
 	  (let ((*compiler-error-context* call))
 	    (compiler-warning "~@<recursion in known function definition~2I ~
                                ~_policy=~S ~_arg types=~S~:>"

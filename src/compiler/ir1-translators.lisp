@@ -323,13 +323,12 @@
       (compiler-error "Lisp error during evaluation of info args:~%~A"
 		      condition))))
 
-;;; If there is a primitive translator, then we expand the call.
-;;; Otherwise, we convert to the %%PRIMITIVE funny function. The first
-;;; argument is the template, the second is a list of the results of
-;;; any codegen-info args, and the remaining arguments are the runtime
+;;; Convert to the %%PRIMITIVE funny function. The first argument is
+;;; the template, the second is a list of the results of any
+;;; codegen-info args, and the remaining arguments are the runtime
 ;;; arguments.
 ;;;
-;;; We do a bunch of error checking now so that we don't bomb out with
+;;; We do various error checking now so that we don't bomb out with
 ;;; a fatal error during IR2 conversion.
 ;;;
 ;;; KLUDGE: It's confusing having multiple names floating around for
@@ -341,11 +340,10 @@
 ;;; FIXME: Look at doing this ^, it doesn't look too hard actually.
 (def-ir1-translator %primitive ((name &rest args) start cont)
   (unless (symbolp name)
-    (compiler-error "The primitive name ~S is not a symbol." name))
-
+    (compiler-error "internal error: Primitive name ~S is not a symbol." name))
   (let* ((template (or (gethash name *backend-template-names*)
 		       (compiler-error
-			"The primitive name ~A is not defined."
+			"internal error: Primitive name ~A is not defined."
 			name)))
 	 (required (length (template-arg-types template)))
 	 (info (template-info-arg-count template))
@@ -353,13 +351,15 @@
 	 (nargs (length args)))
     (if (template-more-args-type template)
 	(when (< nargs min)
-	  (compiler-error "Primitive ~A was called with ~R argument~:P, ~
+	  (compiler-error "internal error: Primitive ~A was called ~
+                           with ~R argument~:P, ~
 	    		   but wants at least ~R."
 			  name
 			  nargs
 			  min))
 	(unless (= nargs min)
-	  (compiler-error "Primitive ~A was called with ~R argument~:P, ~
+	  (compiler-error "internal error: Primitive ~A was called ~
+                           with ~R argument~:P, ~
 			   but wants exactly ~R."
 			  name
 			  nargs
@@ -397,13 +397,19 @@
   (if (consp thing)
       (case (car thing)
 	((lambda)
-	 (reference-leaf start cont (ir1-convert-lambda thing)))
+	 (reference-leaf start
+			 cont
+			 (ir1-convert-lambda thing
+					     :debug-name (debug-namify
+							  "#'~S" thing))))
 	((setf)
 	 (let ((var (find-lexically-apparent-function
 		     thing "as the argument to FUNCTION")))
 	   (reference-leaf start cont var)))
 	((instance-lambda)
-	 (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing)))))
+	 (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing))
+					:debug-name (debug-namify "#'~S"
+								  thing))))
 	   (setf (getf (functional-plist res) :fin-function) t)
 	   (reference-leaf start cont res)))
 	(t
@@ -501,7 +507,8 @@
     (multiple-value-bind (vars values) (extract-let-variables bindings 'let)
       (let* ((*lexenv* (process-decls decls vars nil cont))
 	     (fun-cont (make-continuation))
-	     (fun (ir1-convert-lambda-body forms vars)))
+	     (fun (ir1-convert-lambda-body
+		   forms vars :debug-name (debug-namify "LET ~S" bindings))))
 	(reference-leaf start fun-cont fun)
 	(ir1-convert-combination-args fun-cont cont values)))))
 
@@ -575,19 +582,16 @@
     (multiple-value-bind (names defs)
 	(extract-flet-variables definitions 'flet)
       (let* ((fvars (mapcar (lambda (n d)
-  			      (ir1-convert-lambda d n))
+  			      (ir1-convert-lambda d
+						  :source-name n
+						  :debug-name (debug-namify
+							       "FLET ~S" n)))
 			    names defs))
 	     (*lexenv* (make-lexenv
 			:default (process-decls decls nil fvars cont)
 			:functions (pairlis names fvars))))
 	(ir1-convert-progn-body start cont forms)))))
 
-;;; For LABELS, we have to create dummy function vars and add them to
-;;; the function namespace while converting the functions. We then
-;;; modify all the references to these leaves so that they point to
-;;; the real functional leaves. We also backpatch the FENV so that if
-;;; the lexical environment is used for inline expansion we will get
-;;; the right functions.
 (def-ir1-translator labels ((definitions &body body) start cont)
   #!+sb-doc
   "LABELS ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
@@ -597,36 +601,56 @@
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-variables definitions 'labels)
-      (let* ((new-fenv (loop for name in names
-			     collect (cons name (make-functional :name name))))
+      (let* (;; dummy LABELS function vars, to be used during
+             ;; conversion of real LABELS functions
+	     (placeholder-funs (mapcar (lambda (name)
+					 (make-functional
+					  :%source-name name
+					  :%debug-name (debug-namify
+							"LABELS placeholder ~S"
+							name)))
+				       names))
+	     (placeholder-fenv (pairlis names placeholder-funs))
+             ;; the real LABELS functions, compiled in a LEXENV which
+             ;; includes the dummy LABELS functions
 	     (real-funs
-	      (let ((*lexenv* (make-lexenv :functions new-fenv)))
+	      (let ((*lexenv* (make-lexenv :functions placeholder-fenv)))
 		(mapcar (lambda (n d)
-			  (ir1-convert-lambda d n))
+			  (ir1-convert-lambda d
+					      :source-name n
+					      :debug-name (debug-namify
+							   "LABELS ~S" n)))
 			names defs))))
 
-	(loop for real in real-funs and env in new-fenv do
-	      (let ((dum (cdr env)))
-		(substitute-leaf real dum)
-		(setf (cdr env) real)))
+        ;; Modify all the references to the dummy function leaves so
+        ;; that they point to the real function leaves.
+	(loop for real-fun in real-funs and envpair in placeholder-fenv do
+	      (let ((placeholder-fun (cdr envpair)))
+		(substitute-leaf real-fun placeholder-fun)
+		(setf (cdr envpair) real-fun)))
 
+        ;; Voila.
 	(let ((*lexenv* (make-lexenv
 			 :default (process-decls decls nil real-funs cont)
-			 :functions (pairlis names real-funs))))
+                         ;; Use a proper FENV here (not the
+                         ;; placeholder used earlier) so that if the
+                         ;; lexical environment is used for inline
+                         ;; expansion we'll get the right functions.
+                         :functions (pairlis names real-funs))))
 	  (ir1-convert-progn-body start cont forms))))))
 
-;;;; THE
+;;;; the THE special operator, and friends
 
 ;;; Do stuff to recognize a THE or VALUES declaration. CONT is the
 ;;; continuation that the assertion applies to, TYPE is the type
-;;; specifier and Lexenv is the current lexical environment. NAME is
+;;; specifier and LEXENV is the current lexical environment. NAME is
 ;;; the name of the declaration we are doing, for use in error
 ;;; messages.
 ;;;
 ;;; This is somewhat involved, since a type assertion may only be made
 ;;; on a continuation, not on a node. We can't just set the
 ;;; continuation asserted type and let it go at that, since there may
-;;; be parallel THE's for the same continuation, i.e.:
+;;; be parallel THE's for the same continuation, i.e.
 ;;;     (if ...
 ;;;	 (the foo ...)
 ;;;	 (the bar ...))
@@ -1017,9 +1041,9 @@
 	  (info :function :macro-function name) (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'defmacro))
-	   (fun (ir1-convert-lambda def name)))
-      (setf (leaf-name fun)
-	    (concatenate 'string "DEFMACRO " (symbol-name name)))
+	   (fun (ir1-convert-lambda def 
+				    :debug-name (debug-namify "DEFMACRO ~S"
+							      name))))
       (setf (functional-arg-documentation fun) (eval lambda-list))
 
       (ir1-convert start cont `(%%defmacro ',name ,fun ,doc)))
@@ -1058,10 +1082,10 @@
 	  (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'define-compiler-macro))
-	   (fun (ir1-convert-lambda def name)))
-      (setf (leaf-name fun)
-	    (let ((*print-case* :upcase))
-	      (format nil "DEFINE-COMPILER-MACRO ~S" name)))
+	   (fun (ir1-convert-lambda def 
+				    :debug-name (debug-namify
+						 "DEFINE-COMPILER-MACRO ~S"
+						 name))))
       (setf (functional-arg-documentation fun) (eval lambda-list))
 
       (ir1-convert start cont `(%%define-compiler-macro ',name ,fun ,doc)))

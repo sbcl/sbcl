@@ -68,7 +68,7 @@
 	       #-sb-xc-host (not (fboundp name)))
       (note-undefined-reference name :function))
     (make-global-var :kind :global-function
-		     :name name
+		     :%source-name name
 		     :type (if (or *derive-function-types*
 				   (eq where :declared))
 			       (info :function :type name)
@@ -90,7 +90,7 @@
     (unless slot
       (error "can't find slot ~S" type))
     (make-slot-accessor
-     :name name
+     :%source-name name
      :type (specifier-type
 	    (if (listp name)
 		`(function (,slot-type ,type) ,slot-type)
@@ -124,7 +124,7 @@
 	   (setf (gethash name *free-functions*)
 		 (if (or expansion inlinep)
 		     (make-defined-fun
-		      :name name
+		      :%source-name name
 		      :inline-expansion expansion
 		      :inlinep inlinep
 		      :where-from (info :function :where-from name)
@@ -167,12 +167,12 @@
 		(:constant
 		 (let ((value (info :variable :constant-value name)))
 		   (make-constant :value value
-				  :name name
+				  :%source-name name
 				  :type (ctype-of value)
 				  :where-from where-from)))
 		(t
 		 (make-global-var :kind kind
-				  :name name
+				  :%source-name name
 				  :type type
 				  :where-from where-from)))))))
 
@@ -343,11 +343,12 @@
     (setf (component-name component) "initial component")
     (setf (component-kind component) :initial)
     (let* ((forms (if for-value `(,form) `(,form nil)))
-	   (res (ir1-convert-lambda-body forms ())))
-      (setf (leaf-name res) "top level form") ; FIXME: would be nice to have form index in name here, or some other info to aid in BACKTRACE
-      (setf (functional-entry-function res) res)
-      (setf (functional-arg-documentation res) ())
-      (setf (functional-kind res) :toplevel)
+	   (res (ir1-convert-lambda-body
+		 forms ()
+		 :debug-name (debug-namify "top level form ~S" form))))
+      (setf (functional-entry-function res) res
+	    (functional-arg-documentation res) ()
+	    (functional-kind res) :toplevel)
       res)))
 
 ;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
@@ -435,32 +436,37 @@
 		   (reference-leaf start cont form))
 		  (t
 		   (reference-constant start cont form)))
-	    (let ((fun (car form)))
-	      (cond
-	       ((symbolp fun)
-		(let ((lexical-def (lexenv-find fun functions)))
-		  (typecase lexical-def
-		    (null (ir1-convert-global-functoid start cont form))
-		    (functional
-		     (ir1-convert-local-combination start
-						    cont
-						    form
-						    lexical-def))
-		    (global-var
-		     (ir1-convert-srctran start cont lexical-def form))
+	    (let ((opname (car form)))
+	      (cond ((symbolp opname)
+		     (let ((lexical-def (lexenv-find opname functions)))
+		       (typecase lexical-def
+			 (null (ir1-convert-global-functoid start cont form))
+			 (functional
+			  (ir1-convert-local-combination start
+							 cont
+							 form
+							 lexical-def))
+			 (global-var
+			  (ir1-convert-srctran start cont lexical-def form))
+			 (t
+			  (aver (and (consp lexical-def)
+				     (eq (car lexical-def) 'macro)))
+			  (ir1-convert start cont
+				       (careful-expand-macro (cdr lexical-def)
+							     form))))))
+		    ((or (atom opname) (not (eq (car opname) 'lambda)))
+		     (compiler-error "illegal function call"))
 		    (t
-		     (aver (and (consp lexical-def)
-				(eq (car lexical-def) 'macro)))
-		     (ir1-convert start cont
-				  (careful-expand-macro (cdr lexical-def)
-							form))))))
-	       ((or (atom fun) (not (eq (car fun) 'lambda)))
-		(compiler-error "illegal function call"))
-	       (t
-		(ir1-convert-combination start
-					 cont
-					 form
-					 (ir1-convert-lambda fun))))))))
+		     ;; implicitly #'(LAMBDA ..) because the LAMBDA
+		     ;; expression is the CAR of an executed form
+		     (ir1-convert-combination start
+					      cont
+					      form
+					      (ir1-convert-lambda
+					       opname
+					       :debug-name (debug-namify
+							    "LAMBDA CAR ~S"
+							    opname)))))))))
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf
@@ -471,8 +477,7 @@
     (declare (type continuation start cont)
 	     (inline find-constant))
     (ir1-error-bailout
-     (start cont value
-	    '(error "attempt to reference undumpable constant"))
+     (start cont value '(error "attempt to reference undumpable constant"))
      (when (producing-fasl-file)
        (maybe-emit-make-load-forms value))
      (let* ((leaf (find-constant value))
@@ -482,7 +487,7 @@
        (use-continuation res cont)))
     (values)))
 
-;;; Add Fun to the COMPONENT-REANALYZE-FUNCTIONS. Fun is returned.
+;;; Add FUN to the COMPONENT-REANALYZE-FUNCTIONS. FUN is returned.
  (defun maybe-reanalyze-function (fun)
   (declare (type functional fun))
   (when (typep fun '(or optional-dispatch clambda))
@@ -673,8 +678,9 @@
 
 ;;;; converting combinations
 
-;;; Convert a function call where the function (Fun) is a Leaf. We
-;;; return the Combination node so that we can poke at it if we want to.
+;;; Convert a function call where the function (i.e. the FUN argument)
+;;; is a LEAF. We return the COMBINATION node so that we can poke at
+;;; it if we want to.
 (declaim (ftype (function (continuation continuation list leaf) combination)
 		ir1-convert-combination))
 (defun ir1-convert-combination (start cont form fun)
@@ -682,10 +688,11 @@
     (reference-leaf start fun-cont fun)
     (ir1-convert-combination-args fun-cont cont (cdr form))))
 
-;;; Convert the arguments to a call and make the Combination node. Fun-Cont
-;;; is the continuation which yields the function to call. Form is the source
-;;; for the call. Args is the list of arguments for the call, which defaults
-;;; to the cdr of source. We return the Combination node.
+;;; Convert the arguments to a call and make the COMBINATION node.
+;;; FUN-CONT is the continuation which yields the function to call.
+;;; FORM is the source for the call. ARGS is the list of arguments for
+;;; the call, which defaults to the cdr of source. We return the
+;;; COMBINATION node.
 (defun ir1-convert-combination-args (fun-cont cont args)
   (declare (type continuation fun-cont cont) (list args))
   (let ((node (make-combination fun-cont)))
@@ -715,7 +722,9 @@
 		   (defined-fun-inlinep var))))
     (if (eq inlinep :notinline)
 	(ir1-convert-combination start cont form var)
-	(let ((transform (info :function :source-transform (leaf-name var))))
+	(let ((transform (info :function
+			       :source-transform
+			       (leaf-source-name var))))
 	  (if transform
 	      (multiple-value-bind (result pass) (funcall transform form)
 		(if pass
@@ -731,7 +740,7 @@
 ;;; IR1-CONVERT-COMBINATION-CHECKING-TYPE.
 (defun ir1-convert-maybe-predicate (start cont form var)
   (declare (type continuation start cont) (list form) (type global-var var))
-  (let ((info (info :function :info (leaf-name var))))
+  (let ((info (info :function :info (leaf-source-name var))))
     (if (and info
 	     (ir1-attributep (function-info-attributes info) predicate)
 	     (not (if-p (continuation-dest cont))))
@@ -761,7 +770,6 @@
       (setf (continuation-%derived-type fun-cont) type)
       (setf (continuation-reoptimize fun-cont) nil)
       (setf (continuation-%type-check fun-cont) nil)))
-
   (values))
 
 ;;; Convert a call to a local function. If the function has already
@@ -776,9 +784,9 @@
 
 ;;;; PROCESS-DECLS
 
-;;; Given a list of Lambda-Var structures and a variable name, return
-;;; the structure for that name, or NIL if it isn't found. We return
-;;; the *last* variable with that name, since LET* bindings may be
+;;; Given a list of LAMBDA-VARs and a variable name, return the
+;;; LAMBDA-VAR for that name, or NIL if it isn't found. We return the
+;;; *last* variable with that name, since LET* bindings may be
 ;;; duplicated, and declarations always apply to the last.
 (declaim (ftype (function (list symbol) (or lambda-var list))
 		find-in-bindings))
@@ -786,13 +794,13 @@
   (let ((found nil))
     (dolist (var vars)
       (cond ((leaf-p var)
-	     (when (eq (leaf-name var) name)
+	     (when (eq (leaf-source-name var) name)
 	       (setq found var))
 	     (let ((info (lambda-var-arg-info var)))
 	       (when info
 		 (let ((supplied-p (arg-info-supplied-p info)))
 		   (when (and supplied-p
-			      (eq (leaf-name supplied-p) name))
+			      (eq (leaf-source-name supplied-p) name))
 		     (setq found supplied-p))))))
 	    ((and (consp var) (eq (car var) name))
 	     (setf found (cdr var)))))
@@ -855,7 +863,9 @@
   (let ((type (specifier-type spec)))
     (collect ((res nil cons))
       (dolist (name names)
-	(let ((found (find name fvars :key #'leaf-name :test #'equal)))
+	(let ((found (find name fvars
+			   :key #'leaf-source-name
+			   :test #'equal)))
 	  (cond
 	   (found
 	    (setf (leaf-type found) type)
@@ -904,7 +914,7 @@
 (defun make-new-inlinep (var inlinep)
   (declare (type global-var var) (type inlinep inlinep))
   (let ((res (make-defined-fun
-	      :name (leaf-name var)
+	      :%source-name (leaf-source-name var)
 	      :where-from (leaf-where-from var)
 	      :type (leaf-type var)
 	      :inlinep inlinep)))
@@ -921,7 +931,9 @@
   (let ((sense (cdr (assoc (first spec) *inlinep-translations* :test #'eq)))
 	(new-fenv ()))
     (dolist (name (rest spec))
-      (let ((fvar (find name fvars :key #'leaf-name :test #'equal)))
+      (let ((fvar (find name fvars
+			:key #'leaf-source-name
+			:test #'equal)))
 	(if fvar
 	    (setf (functional-inlinep fvar) sense)
 	    (let ((found
@@ -949,7 +961,7 @@
 	(unless (eq wot 'function)
 	  (compiler-error "The function or variable name ~S is unrecognizable."
 			  name))
-	(find fn-name fvars :key #'leaf-name :test #'equal))
+	(find fn-name fvars :key #'leaf-source-name :test #'equal))
       (find-in-bindings vars name)))
 
 ;;; Process an ignore/ignorable declaration, checking for various losing
@@ -1069,7 +1081,7 @@
 	   found))
 	(t
 	 (make-global-var :kind :special
-			  :name name
+			  :%source-name name
 			  :where-from :declared))))
 
 ;;;; LAMBDA hackery
@@ -1097,13 +1109,13 @@
 		      name))
     (cond ((eq kind :special)
 	   (let ((specvar (find-free-variable name)))
-	     (make-lambda-var :name name
+	     (make-lambda-var :%source-name name
 			      :type (leaf-type specvar)
 			      :where-from (leaf-where-from specvar)
 			      :specvar specvar)))
 	  (t
 	   (note-lexical-binding name)
-	   (make-lambda-var :name name)))))
+	   (make-lambda-var :%source-name name)))))
 
 ;;; Make the default keyword for a &KEY arg, checking that the keyword
 ;;; isn't already used by one of the VARS. We also check that the
@@ -1267,7 +1279,10 @@
 	    (fun (ir1-convert-lambda-body body
 					  (list (first aux-vars))
 					  :aux-vars (rest aux-vars)
-					  :aux-vals (rest aux-vals))))
+					  :aux-vals (rest aux-vals)
+					  :debug-name (debug-namify
+						       "&AUX bindings ~S"
+						       aux-vars))))
 	(reference-leaf start fun-cont fun)
 	(ir1-convert-combination-args fun-cont cont
 				      (list (first aux-vals)))))
@@ -1322,12 +1337,31 @@
 ;;; AUX-VARS is a list of VAR structures for variables that are to be
 ;;; sequentially bound. Each AUX-VAL is a form that is to be evaluated
 ;;; to get the initial value for the corresponding AUX-VAR. 
-(defun ir1-convert-lambda-body (body vars &key aux-vars aux-vals result)
+(defun ir1-convert-lambda-body (body
+				vars
+				&key
+				aux-vars
+				aux-vals
+				result
+				(source-name '.anonymous.)
+				debug-name)
   (declare (list body vars aux-vars aux-vals)
 	   (type (or continuation null) result))
   (let* ((bind (make-bind))
-	 (lambda (make-lambda :vars vars :bind bind))
+	 (lambda (make-lambda :vars vars
+			      :bind bind
+			      :%source-name source-name
+			      :%debug-name debug-name))
 	 (result (or result (make-continuation))))
+
+    ;; This function should fail internal assertions if we didn't set
+    ;; up a valid debug name above.
+    ;;
+    ;; (In SBCL we try to make everything have a debug name, since we
+    ;; lack the omniscient perspective the original implementors used
+    ;; to decide which things didn't need one.)
+    (functional-debug-name lambda)
+
     (setf (lambda-home lambda) lambda)
     (collect ((svars)
 	      (new-venv nil cons))
@@ -1340,10 +1374,10 @@
 	(let ((specvar (lambda-var-specvar var)))
 	  (cond (specvar
 		 (svars var)
-		 (new-venv (cons (leaf-name specvar) specvar)))
+		 (new-venv (cons (leaf-source-name specvar) specvar)))
 		(t
-		 (note-lexical-binding (leaf-name var))
-		 (new-venv (cons (leaf-name var) var))))))
+		 (note-lexical-binding (leaf-source-name var))
+		 (new-venv (cons (leaf-source-name var) var))))))
 
       (let ((*lexenv* (make-lexenv :variables (new-venv)
 				   :lambda lambda
@@ -1390,18 +1424,18 @@
   (let* ((fvars (reverse vars))
 	 (arg-vars (mapcar (lambda (var)
 			     (unless (lambda-var-specvar var)
-			       (note-lexical-binding (leaf-name var)))
+			       (note-lexical-binding (leaf-source-name var)))
 			     (make-lambda-var
-			      :name (leaf-name var)
+			      :%source-name (leaf-source-name var)
 			      :type (leaf-type var)
 			      :where-from (leaf-where-from var)
 			      :specvar (lambda-var-specvar var)))
 			   fvars))
-	 (fun
-	  (ir1-convert-lambda-body `((%funcall ,fun
-					       ,@(reverse vals)
-					       ,@defaults))
-				   arg-vars)))
+	 (fun (ir1-convert-lambda-body `((%funcall ,fun
+						   ,@(reverse vals)
+						   ,@defaults))
+				       arg-vars
+				       :debug-name "&OPTIONAL processor")))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
 	      (setf (leaf-ever-used var) t)))
@@ -1423,14 +1457,14 @@
 		 aux-vars aux-vals)
 	   (type (or continuation null) cont))
   (let* ((arg (first vars))
-	 (arg-name (leaf-name arg))
+	 (arg-name (leaf-source-name arg))
 	 (info (lambda-var-arg-info arg))
 	 (supplied-p (arg-info-supplied-p info))
 	 (ep (if supplied-p
 		 (ir1-convert-hairy-args
 		  res
 		  (list* supplied-p arg default-vars)
-		  (list* (leaf-name supplied-p) arg-name default-vals)
+		  (list* (leaf-source-name supplied-p) arg-name default-vals)
 		  (cons arg entry-vars)
 		  (list* t arg-name entry-vals)
 		  (rest vars) t body aux-vars aux-vals cont)
@@ -1479,14 +1513,14 @@
 	    (body))
 
     (dolist (var (reverse entry-vars))
-      (arg-vars (make-lambda-var :name (leaf-name var)
+      (arg-vars (make-lambda-var :%source-name (leaf-source-name var)
 				 :type (leaf-type var)
 				 :where-from (leaf-where-from var))))
 
     (let* ((n-context (gensym "N-CONTEXT-"))
-	   (context-temp (make-lambda-var :name n-context))
+	   (context-temp (make-lambda-var :%source-name n-context))
 	   (n-count (gensym "N-COUNT-"))
-	   (count-temp (make-lambda-var :name n-count
+	   (count-temp (make-lambda-var :%source-name n-count
 					:type (specifier-type 'index))))
 
       (arg-vars context-temp count-temp)
@@ -1560,7 +1594,8 @@
 		     ,@(body)
 		     (%funcall ,(optional-dispatch-main-entry res)
 			       . ,(arg-vals)))) ; FIXME: What is the '.'? ,@?
-		 (arg-vars))))
+		 (arg-vars)
+		 :debug-name (debug-namify "~S processing" '&more))))
 	(setf (optional-dispatch-more-entry res) ep))))
 
   (values))
@@ -1609,10 +1644,10 @@
 	     (supplied-p (arg-info-supplied-p info))
 	     (n-val (make-symbol (format nil
 					 "~A-DEFAULTING-TEMP"
-					 (leaf-name key))))
+					 (leaf-source-name key))))
 	     (key-type (leaf-type key))
 	     (val-temp (make-lambda-var
-			:name n-val
+			:%source-name n-val
 			:type (if hairy-default
 				  (type-union key-type (specifier-type 'null))
 				  key-type))))
@@ -1620,7 +1655,8 @@
 	(bind-vars key)
 	(cond ((or hairy-default supplied-p)
 	       (let* ((n-supplied (gensym "N-SUPPLIED-"))
-		      (supplied-temp (make-lambda-var :name n-supplied)))
+		      (supplied-temp (make-lambda-var
+				      :%source-name n-supplied)))
 		 (unless supplied-p
 		   (setf (arg-info-supplied-p info) supplied-temp))
 		 (when hairy-default
@@ -1643,7 +1679,8 @@
 			body (main-vars)
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
-			:result cont))
+			:result cont
+			:debug-name (debug-namify "~S processor" '&more)))
 	   (last-entry (convert-optional-entry main-entry default-vars
 					       (main-vals) ())))
       (setf (optional-dispatch-main-entry res) main-entry)
@@ -1688,77 +1725,86 @@
 ;;; When we run into a &REST or &KEY arg, we punt out to
 ;;; IR1-CONVERT-MORE, which finishes for us in this case.
 (defun ir1-convert-hairy-args (res default-vars default-vals
-				   entry-vars entry-vals
-				   vars supplied-p-p body aux-vars
-				   aux-vals cont)
+                                   entry-vars entry-vals
+                                   vars supplied-p-p body aux-vars
+                                   aux-vals cont)
   (declare (type optional-dispatch res)
-	   (list default-vars default-vals entry-vars entry-vals vars body
-		 aux-vars aux-vals)
-	   (type (or continuation null) cont))
+           (list default-vars default-vals entry-vars entry-vals vars body
+                 aux-vars aux-vals)
+           (type (or continuation null) cont))
   (cond ((not vars)
-	 (if (optional-dispatch-keyp res)
-	     ;; Handle &KEY with no keys...
-	     (ir1-convert-more res default-vars default-vals
-			       entry-vars entry-vals
-			       nil nil nil vars supplied-p-p body aux-vars
-			       aux-vals cont)
-	     (let ((fun (ir1-convert-lambda-body body (reverse default-vars)
-						 :aux-vars aux-vars
-						 :aux-vals aux-vals
-						 :result cont)))
-	       (setf (optional-dispatch-main-entry res) fun)
-	       (push (if supplied-p-p
-			 (convert-optional-entry fun entry-vars entry-vals ())
-			 fun)
-		     (optional-dispatch-entry-points res))
-	       fun)))
-	((not (lambda-var-arg-info (first vars)))
-	 (let* ((arg (first vars))
-		(nvars (cons arg default-vars))
-		(nvals (cons (leaf-name arg) default-vals)))
-	   (ir1-convert-hairy-args res nvars nvals nvars nvals
-				   (rest vars) nil body aux-vars aux-vals
-				   cont)))
-	(t
-	 (let* ((arg (first vars))
-		(info (lambda-var-arg-info arg))
-		(kind (arg-info-kind info)))
-	   (ecase kind
-	     (:optional
-	      (let ((ep (generate-optional-default-entry
-			 res default-vars default-vals
-			 entry-vars entry-vals vars supplied-p-p body
-			 aux-vars aux-vals cont)))
-		(push (if supplied-p-p
-			  (convert-optional-entry ep entry-vars entry-vals ())
-			  ep)
-		      (optional-dispatch-entry-points res))
-		ep))
-	     (:rest
-	      (ir1-convert-more res default-vars default-vals
-				entry-vars entry-vals
-				arg nil nil (rest vars) supplied-p-p body
-				aux-vars aux-vals cont))
-	     (:more-context
-	      (ir1-convert-more res default-vars default-vals
-				entry-vars entry-vals
-				nil arg (second vars) (cddr vars) supplied-p-p
-				body aux-vars aux-vals cont))
-	     (:keyword
-	      (ir1-convert-more res default-vars default-vals
-				entry-vars entry-vals
-				nil nil nil vars supplied-p-p body aux-vars
-				aux-vals cont)))))))
+         (if (optional-dispatch-keyp res)
+             ;; Handle &KEY with no keys...
+             (ir1-convert-more res default-vars default-vals
+                               entry-vars entry-vals
+                               nil nil nil vars supplied-p-p body aux-vars
+                               aux-vals cont)
+             (let ((fun (ir1-convert-lambda-body
+			 body (reverse default-vars)
+			 :aux-vars aux-vars
+			 :aux-vals aux-vals
+			 :result cont
+			 :debug-name "hairy arg processor")))
+               (setf (optional-dispatch-main-entry res) fun)
+               (push (if supplied-p-p
+                         (convert-optional-entry fun entry-vars entry-vals ())
+                         fun)
+                     (optional-dispatch-entry-points res))
+               fun)))
+        ((not (lambda-var-arg-info (first vars)))
+         (let* ((arg (first vars))
+                (nvars (cons arg default-vars))
+                (nvals (cons (leaf-source-name arg) default-vals)))
+           (ir1-convert-hairy-args res nvars nvals nvars nvals
+                                   (rest vars) nil body aux-vars aux-vals
+                                   cont)))
+        (t
+         (let* ((arg (first vars))
+                (info (lambda-var-arg-info arg))
+                (kind (arg-info-kind info)))
+           (ecase kind
+             (:optional
+              (let ((ep (generate-optional-default-entry
+                         res default-vars default-vals
+                         entry-vars entry-vals vars supplied-p-p body
+                         aux-vars aux-vals cont)))
+                (push (if supplied-p-p
+                          (convert-optional-entry ep entry-vars entry-vals ())
+                          ep)
+                      (optional-dispatch-entry-points res))
+                ep))
+             (:rest
+              (ir1-convert-more res default-vars default-vals
+                                entry-vars entry-vals
+                                arg nil nil (rest vars) supplied-p-p body
+                                aux-vars aux-vals cont))
+             (:more-context
+              (ir1-convert-more res default-vars default-vals
+                                entry-vars entry-vals
+                                nil arg (second vars) (cddr vars) supplied-p-p
+                                body aux-vars aux-vals cont))
+             (:keyword
+              (ir1-convert-more res default-vars default-vals
+                                entry-vars entry-vals
+                                nil nil nil vars supplied-p-p body aux-vars
+                                aux-vals cont)))))))
 
 ;;; This function deals with the case where we have to make an
 ;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
 ;;; call IR1-CONVERT-HAIRY-ARGS to do the work. When it is done, we
 ;;; figure out the MIN-ARGS and MAX-ARGS.
-(defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont)
+(defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont
+				      &key
+				      (source-name '.anonymous.)
+				      (debug-name (debug-namify
+						   "OPTIONAL-DISPATCH ~S"
+						   vars)))
   (declare (list body vars aux-vars aux-vals) (type continuation cont))
   (let ((res (make-optional-dispatch :arglist vars
 				     :allowp allowp
-				     :keyp keyp))
+				     :keyp keyp
+				     :%source-name source-name
+				     :%debug-name debug-name))
 	(min (or (position-if #'lambda-var-arg-info vars) (length vars))))
     (push res (component-new-functions *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
@@ -1779,7 +1825,7 @@
     res))
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
-(defun ir1-convert-lambda (form &optional name)
+(defun ir1-convert-lambda (form &key (source-name '.anonymous.) debug-name)
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
 		    (type-of form)
@@ -1804,14 +1850,17 @@
 	     (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
 		      (ir1-convert-hairy-lambda forms vars keyp
 						allow-other-keys
-						aux-vars aux-vals cont)
+						aux-vars aux-vals cont
+						:source-name source-name
+						:debug-name debug-name)
 		      (ir1-convert-lambda-body forms vars
 					       :aux-vars aux-vars
 					       :aux-vals aux-vals
-					       :result cont))))
+					       :result cont
+					       :source-name source-name
+					       :debug-name debug-name))))
 	(setf (functional-inline-expansion res) form)
 	(setf (functional-arg-documentation res) (cadr form))
-	(setf (leaf-name res) name)
 	res))))
 
 ;;;; defining global functions
@@ -1820,7 +1869,9 @@
 ;;; current compilation policy. Note that FUN may be a
 ;;; LAMBDA-WITH-LEXENV, so we may have to augment the environment to
 ;;; reflect the state at the definition site.
-(defun ir1-convert-inline-lambda (fun &optional name)
+(defun ir1-convert-inline-lambda (fun &key
+				      (source-name '.anonymous.)
+				      debug-name)
   (destructuring-bind (decls macros symbol-macros &rest body)
 		      (if (eq (car fun) 'lambda-with-lexenv)
 			  (cdr fun)
@@ -1836,7 +1887,9 @@
 				 (macro . ,(coerce (cdr x) 'function))))
 			     macros)
 		     :policy (lexenv-policy *lexenv*))))
-      (ir1-convert-lambda `(lambda ,@body) name))))
+      (ir1-convert-lambda `(lambda ,@body)
+			  :source-name source-name
+			  :debug-name debug-name))))
 
 ;;; Get a DEFINED-FUN object for a function we are about to
 ;;; define. If the function has been forward referenced, then
@@ -1849,7 +1902,7 @@
 	   (aver (not (info :function :inlinep name)))
 	   (let* ((where-from (leaf-where-from found))
 		  (res (make-defined-fun
-			:name name
+			:%source-name name
 			:where-from (if (eq where-from :declared)
 					:declared :defined)
 			:type (leaf-type found))))
@@ -1871,7 +1924,7 @@
 (defun assert-new-definition (var fun)
   (let ((type (leaf-type var))
 	(for-real (eq (leaf-where-from var) :declared))
-	(info (info :function :info (leaf-name var))))
+	(info (info :function :info (leaf-source-name var))))
     (assert-definition-type
      fun type
      ;; KLUDGE: Common Lisp is such a dynamic language that in general
@@ -1909,8 +1962,8 @@
   (let ((var-expansion (defined-fun-inline-expansion var)))
     (unless (eq (defined-fun-inlinep var) :inline)
       (setf (defined-fun-inline-expansion var) nil))
-    (let* ((name (leaf-name var))
-	   (fun (funcall converter lambda name))
+    (let* ((name (leaf-source-name var))
+	   (fun (funcall converter lambda :source-name name))
 	   (function-info (info :function :info name)))
       (setf (functional-inlinep fun) (defined-fun-inlinep var))
       (assert-new-definition var fun)

@@ -27,23 +27,6 @@
 	  (error "can't find a definition for ~S" definition-designator))
 	definition)))
 
-;;; Find the function that is being compiled by COMPILE and bash its
-;;; name to NAME. We also substitute for any references to name so
-;;; that recursive calls will be compiled direct. LAMBDA is the
-;;; top level lambda for the compilation. A REF for the real function
-;;; is the only thing in the top level lambda other than the bind and
-;;; return, so it isn't too hard to find.
-(defun compile-fix-fun-name (lambda name)
-  (declare (type clambda lambda) (type (or symbol cons) name))
-  (when name
-    (let ((fun (ref-leaf
-		(continuation-next
-		 (node-cont (lambda-bind lambda))))))
-      (setf (leaf-name fun) name)
-      (let ((old (gethash name *free-functions*)))
-	(when old (substitute-leaf fun old)))
-      name)))
-
 ;;; Handle the nontrivial case of CL:COMPILE.
 (defun actually-compile (name definition)
   (with-compilation-values

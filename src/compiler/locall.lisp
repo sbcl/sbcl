@@ -179,7 +179,10 @@
   (declare (type functional fun))
   (aver (not (functional-entry-function fun)))
   (with-ir1-environment (lambda-bind (main-entry fun))
-    (let ((res (ir1-convert-lambda (make-xep-lambda fun))))
+    (let ((res (ir1-convert-lambda (make-xep-lambda fun)
+				   :debug-name (debug-namify
+						"XEP for ~A"
+						(leaf-debug-name fun)))))
       (setf (functional-kind res) :external
 	    (leaf-ever-used res) t
 	    (functional-entry-function res) fun
@@ -313,7 +316,7 @@
 	       (res (catch 'local-call-lossage
 		      (prog1
 			  (ir1-convert-lambda (functional-inline-expansion
-					       fun))
+					       :source-name fun))
 			(setq won t)))))
 	  (cond (won
 		 (change-ref-leaf ref res)
@@ -321,9 +324,9 @@
 		(t
 		 (let ((*compiler-error-context* call))
 		   (compiler-note "couldn't inline expand because expansion ~
-				   calls this let-converted local function:~
+				   calls this LET-converted local function:~
 				   ~%  ~S"
-				  (leaf-name res)))
+				  (leaf-debug-name res)))
 		 fun))))
       fun))
 
@@ -448,7 +451,7 @@
 	    call-args nargs)
 	   (setf (basic-combination-kind call) :error)))))
 
-;;;; optional, more and keyword calls
+;;;; &OPTIONAL, &MORE and &KEYWORD calls
 
 ;;; This is similar to CONVERT-LAMBDA-CALL, but deals with
 ;;; OPTIONAL-DISPATCHes. If only fixed args are supplied, then convert
@@ -912,7 +915,7 @@
 ;;; minimizes the likelyhood that we well let-convert a function which
 ;;; may have references added due to later local inline expansion
 (defun ok-initial-convert-p (fun)
-  (not (and (leaf-name fun)
+  (not (and (leaf-has-source-name-p fun)
 	    (eq (component-kind
 		 (block-component
 		  (node-block (lambda-bind fun))))
