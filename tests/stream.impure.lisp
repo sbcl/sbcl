@@ -55,5 +55,16 @@
                '(sb-impl::string-output-stream string-stream stream)))
 
 
+;;; improper buffering on (SIGNED-BYTE 8) streams (fixed by David Lichteblau):
+(let ((p "signed-byte-8-test.data"))
+  (with-open-file (s p
+		     :direction :output
+		     :element-type '(unsigned-byte 8)
+		     :if-exists :supersede)
+    (write-byte 255 s))
+  (with-open-file (s p :element-type '(signed-byte 8))
+    (assert (= (read-byte s) -1)))
+  (delete-file p))
+
 ;;; success
 (quit :unix-status 104)

@@ -1924,6 +1924,10 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     provide helpful disassembly notes.
   * SB-MOP:CLASS-PROTOTYPE on built-in-classes returns an instance of
     the class in more cases than previously.
+  * bug fix: FILE-POSITION now understands :START and :END for
+    STRING-INPUT-STREAMs.  (thanks to Nikodemus Siivola)
+  * bug fix: (SIGNED-BYTE 8) streams no longer return (UNSIGNED-BYTE
+    8) data.  (thanks to David Lichteblau)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
     ** condition slot accessors are methods.

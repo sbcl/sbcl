@@ -682,7 +682,13 @@
 		  (fd-stream-bin fd-stream) routine))
 	(when (eql size 1)
 	  (setf (fd-stream-n-bin fd-stream) #'fd-stream-read-n-bytes)
-	  (when buffer-p
+	  (when (and buffer-p
+		     ;; We only create this buffer for streams of type
+		     ;; (unsigned-byte 8).  Because there's no buffer, the
+		     ;; other element-types will dispatch to the appropriate
+		     ;; input (output) routine in fast-read-byte.
+		     (or (eq type 'unsigned-byte)
+			 (eq type :default)))
 	    (setf (ansi-stream-in-buffer fd-stream)
 		  (make-array +ansi-stream-in-buffer-length+
 			      :element-type '(unsigned-byte 8)))))
