@@ -66,6 +66,14 @@
   (assert (eql (mutex-lock l) 0)  nil "6")
   (describe l))
 
+;; test that SLEEP actually sleeps for at least the given time, even
+;; if interrupted by another thread exiting/a gc/anything
+(let ((start-time (get-universal-time)))
+  (make-thread (lambda () (sleep 1))) ; kid waits 1 then dies ->SIG_THREAD_EXIT
+  (sleep 5)
+  (assert (>= (get-universal-time) (+ 5 start-time))))
+
+
 (let ((queue (make-waitqueue :name "queue"))
       (lock (make-mutex :name "lock")))
   (labels ((in-new-thread ()

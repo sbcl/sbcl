@@ -1894,6 +1894,7 @@ needed by the current implementation of SBCL, and makes
 no guarantees of interface stability."
       :use ("CL" "SB!ALIEN" "SB!EXT" "SB!INT" "SB!SYS")
       :export (	;; wrappers around Unix stuff to give just what Lisp needs
+               "NANOSLEEP"
 	       "UID-USERNAME"
 	       "UID-HOMEDIR"
 

@@ -147,13 +147,13 @@ steppers to maintain contextual information.")
            :format-arguments (list n)
            :datum n
            :expected-type '(real 0)))
-  (multiple-value-bind (sec usec)
+  (multiple-value-bind (sec nsec)
       (if (integerp n)
 	  (values n 0)
 	  (multiple-value-bind (sec frac)
 	      (truncate n)
-	    (values sec (truncate frac 1e-6))))
-    (sb!unix:unix-select 0 0 0 0 sec usec))
+	    (values sec (truncate frac 1e-9))))
+    (sb!unix:nanosleep sec nsec))
   nil)
 
 ;;;; SCRUB-CONTROL-STACK

@@ -658,6 +658,18 @@
   (seconds-west sb!alien:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 
+(defun nanosleep (secs nsecs)
+  (with-alien ((req (struct timespec))
+               (rem (struct timespec)))
+    (setf (slot req 'tv-sec) secs)
+    (setf (slot req 'tv-nsec) nsecs)
+    (loop while (eql sb!unix:EINTR
+                     (nth-value 1
+                                (int-syscall ("nanosleep" (* (struct timespec))
+                                                          (* (struct timespec)))
+                                             (addr req) (addr rem))))
+       do (rotatef req rem))))
+
 (defun unix-get-seconds-west (secs)
   (multiple-value-bind (ignore seconds dst) (get-timezone secs)
     (declare (ignore ignore) (ignore dst))

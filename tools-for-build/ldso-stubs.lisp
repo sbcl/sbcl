@@ -206,6 +206,7 @@ ldso_stub__ ## fct: ;                  \\
                    "malloc"
                    "memmove"
                    "mkdir"
+		   "nanosleep"
                    "nl_langinfo"
                    "open"
                    "opendir"
