@@ -192,6 +192,12 @@ or
   ...)
 @end lisp
 
+@item
+Stack allocation of closures, defined with @code{flet} or
+@code{labels} with a bound declaration @code{dynamic-extent}.
+Closed-over variables, which are assigned (either inside or outside
+the closure), tags and blocks are still allocated on the heap.
+
 @end itemize
 
 Future plans include
