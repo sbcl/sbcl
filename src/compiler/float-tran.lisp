@@ -540,9 +540,7 @@
 
 ;;; Test whether the numeric-type ARG is within in domain specified by
 ;;; DOMAIN-LOW and DOMAIN-HIGH, consider negative and positive zero to
-;;; be distinct as for the :NEGATIVE-ZERO-IS-NOT-ZERO feature. With
-;;; the :NEGATIVE-ZERO-IS-NOT-ZERO feature this could be handled by
-;;; the numeric subtype code in type.lisp.
+;;; be distinct. 
 (defun domain-subtypep (arg domain-low domain-high)
   (declare (type numeric-type arg)
 	   (type (or real null) domain-low domain-high))
@@ -585,8 +583,7 @@
 ;;; result, which occurs for the parts of ARG not in the DOMAIN.
 ;;;
 ;;; Negative and positive zero are considered distinct within
-;;; DOMAIN-LOW and DOMAIN-HIGH, as for the :negative-zero-is-not-zero
-;;; feature.
+;;; DOMAIN-LOW and DOMAIN-HIGH.
 ;;;
 ;;; DEFAULT-LOW and DEFAULT-HIGH are the lower and upper bounds if we
 ;;; can't compute the bounds using FCN.

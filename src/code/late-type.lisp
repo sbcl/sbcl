@@ -1453,7 +1453,6 @@
 ;;;
 ;;; This is for comparing bounds of the same kind, e.g. upper and
 ;;; upper. Use NUMERIC-BOUND-TEST* for different kinds of bounds.
-#!-negative-zero-is-not-zero
 (defmacro numeric-bound-test (x y closed open)
   `(cond ((not ,y) t)
 	 ((not ,x) nil)
@@ -1466,32 +1465,12 @@
 	      (,open ,x (car ,y))
 	      (,closed ,x ,y)))))
 
-#!+negative-zero-is-not-zero
-(defmacro numeric-bound-test-zero (op x y)
-  `(if (and (zerop ,x) (zerop ,y) (floatp ,x) (floatp ,y))
-       (,op (float-sign ,x) (float-sign ,y))
-       (,op ,x ,y)))
-
-#!+negative-zero-is-not-zero
-(defmacro numeric-bound-test (x y closed open)
-  `(cond ((not ,y) t)
-	 ((not ,x) nil)
-	 ((consp ,x)
-	  (if (consp ,y)
-	      (numeric-bound-test-zero ,closed (car ,x) (car ,y))
-	      (numeric-bound-test-zero ,closed (car ,x) ,y)))
-	 (t
-	  (if (consp ,y)
-	      (numeric-bound-test-zero ,open ,x (car ,y))
-	      (numeric-bound-test-zero ,closed ,x ,y)))))
-
 ;;; This is used to compare upper and lower bounds. This is different
 ;;; from the same-bound case:
 ;;; -- Since X = NIL is -infinity, whereas y = NIL is +infinity, we
 ;;;    return true if *either* arg is NIL.
 ;;; -- an open inner bound is "greater" and also squeezes the interval,
 ;;;    causing us to use the OPEN test for those cases as well.
-#!-negative-zero-is-not-zero
 (defmacro numeric-bound-test* (x y closed open)
   `(cond ((not ,y) t)
 	 ((not ,x) t)
@@ -1503,19 +1482,6 @@
 	  (if (consp ,y)
 	      (,open ,x (car ,y))
 	      (,closed ,x ,y)))))
-
-#!+negative-zero-is-not-zero
-(defmacro numeric-bound-test* (x y closed open)
-  `(cond ((not ,y) t)
-	 ((not ,x) t)
-	 ((consp ,x)
-	  (if (consp ,y)
-	      (numeric-bound-test-zero ,open (car ,x) (car ,y))
-	      (numeric-bound-test-zero ,open (car ,x) ,y)))
-	 (t
-	  (if (consp ,y)
-	      (numeric-bound-test-zero ,open ,x (car ,y))
-	      (numeric-bound-test-zero ,closed ,x ,y)))))
 
 ;;; Return whichever of the numeric bounds X and Y is "maximal"
 ;;; according to the predicates CLOSED (e.g. >=) and OPEN (e.g. >).
@@ -1580,28 +1546,19 @@
     (cond ((not (and low-bound high-bound)) nil)
 	  ((and (consp low-bound) (consp high-bound)) nil)
 	  ((consp low-bound)
-	   #!-negative-zero-is-not-zero
 	   (let ((low-value (car low-bound)))
 	     (or (eql low-value high-bound)
 		 (and (eql low-value -0f0) (eql high-bound 0f0))
 		 (and (eql low-value 0f0) (eql high-bound -0f0))
 		 (and (eql low-value -0d0) (eql high-bound 0d0))
-		 (and (eql low-value 0d0) (eql high-bound -0d0))))
-	   #!+negative-zero-is-not-zero
-	   (eql (car low-bound) high-bound))
+		 (and (eql low-value 0d0) (eql high-bound -0d0)))))
 	  ((consp high-bound)
-	   #!-negative-zero-is-not-zero
 	   (let ((high-value (car high-bound)))
 	     (or (eql high-value low-bound)
 		 (and (eql high-value -0f0) (eql low-bound 0f0))
 		 (and (eql high-value 0f0) (eql low-bound -0f0))
 		 (and (eql high-value -0d0) (eql low-bound 0d0))
-		 (and (eql high-value 0d0) (eql low-bound -0d0))))
-	   #!+negative-zero-is-not-zero
-	   (eql (car high-bound) low-bound))
-	  #!+negative-zero-is-not-zero
-	  ((or (and (eql low-bound -0f0) (eql high-bound 0f0))
-	       (and (eql low-bound -0d0) (eql high-bound 0d0))))
+		 (and (eql high-value 0d0) (eql low-bound -0d0)))))
 	  ((and (eq (numeric-type-class low) 'integer)
 		(eq (numeric-type-class high) 'integer))
 	   (eql (1+ low-bound) high-bound))
@@ -2358,7 +2315,6 @@
       (let (ms numbers)
 	(dolist (m (remove-duplicates members))
 	  (typecase m
-	    #!-negative-zero-is-not-zero
 	    (float (if (zerop m)
 		       (push m ms)
 		       (push (ctype-of m) numbers)))

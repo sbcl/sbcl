@@ -165,10 +165,6 @@
  ;; to. It doesn't seem to be needed for X86 systems anyway.
  ; :32x16-divide
 
- ;; This is probably true for some processor types, but not X86. It
- ;; affects a lot of floating point code.
- ; :negative-zero-is-not-zero
-
  ;; This is set in classic CMU CL, and presumably there it means
  ;; that the floating point arithmetic implementation
  ;; conforms to IEEE's standard. Here it definitely means that the

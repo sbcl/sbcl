@@ -59,7 +59,6 @@
 		 (long-float (typep num 'long-float))
 		 ((nil) (floatp num))))
 	      ((nil) t)))
-	  #!-negative-zero-is-not-zero
 	  (flet ((bound-test (val)
 		   (let ((low (numeric-type-low type))
 			 (high (numeric-type-high type)))
@@ -69,37 +68,6 @@
 			  (cond ((null high) t)
 				((listp high) (< val (car high)))
 				(t (<= val high)))))))
-	    (ecase (numeric-type-complexp type)
-	      ((nil) t)
-	      (:complex
-	       (and (complexp object)
-		    (bound-test (realpart object))
-		    (bound-test (imagpart object))))
-	      (:real
-	       (and (not (complexp object))
-		    (bound-test object)))))
-	  #!+negative-zero-is-not-zero
-	  (labels ((signed-> (x y)
-		     (if (and (zerop x) (zerop y) (floatp x) (floatp y))
-			 (> (float-sign x) (float-sign y))
-			 (> x y)))
-		   (signed->= (x y)
-		     (if (and (zerop x) (zerop y) (floatp x) (floatp y))
-			 (>= (float-sign x) (float-sign y))
-			 (>= x y)))
-		   (bound-test (val)
-		     (let ((low (numeric-type-low type))
-			   (high (numeric-type-high type)))
-		       (and (cond ((null low) t)
-				  ((listp low)
-				   (signed-> val (car low)))
-				  (t
-				   (signed->= val low)))
-			    (cond ((null high) t)
-				  ((listp high)
-				   (signed-> (car high) val))
-				  (t
-				   (signed->= high val)))))))
 	    (ecase (numeric-type-complexp type)
 	      ((nil) t)
 	      (:complex

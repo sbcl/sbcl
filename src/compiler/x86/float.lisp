@@ -1528,79 +1528,52 @@
 (define-vop (=0/single-float float-test)
   (:translate =)
   (:args (x :scs (single-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types single-float (:constant (single-float -0f0 0f0)))
   (:variant #x40))
 (define-vop (=0/double-float float-test)
   (:translate =)
   (:args (x :scs (double-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types double-float (:constant (double-float -0d0 0d0)))
   (:variant #x40))
 #!+long-float
 (define-vop (=0/long-float float-test)
   (:translate =)
   (:args (x :scs (long-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types long-float (:constant (long-float 0l0 0l0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types long-float (:constant (long-float -0l0 0l0)))
   (:variant #x40))
 
 (define-vop (<0/single-float float-test)
   (:translate <)
   (:args (x :scs (single-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types single-float (:constant (single-float -0f0 0f0)))
   (:variant #x01))
 (define-vop (<0/double-float float-test)
   (:translate <)
   (:args (x :scs (double-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types double-float (:constant (double-float -0d0 0d0)))
   (:variant #x01))
 #!+long-float
 (define-vop (<0/long-float float-test)
   (:translate <)
   (:args (x :scs (long-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types long-float (:constant (long-float 0l0 0l0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types long-float (:constant (long-float -0l0 0l0)))
   (:variant #x01))
 
 (define-vop (>0/single-float float-test)
   (:translate >)
   (:args (x :scs (single-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types single-float (:constant (single-float -0f0 0f0)))
   (:variant #x00))
 (define-vop (>0/double-float float-test)
   (:translate >)
   (:args (x :scs (double-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types double-float (:constant (double-float -0d0 0d0)))
   (:variant #x00))
 #!+long-float
 (define-vop (>0/long-float float-test)
   (:translate >)
   (:args (x :scs (long-reg)))
-  #!-negative-zero-is-not-zero
   (:arg-types long-float (:constant (long-float 0l0 0l0)))
-  #!+negative-zero-is-not-zero
-  (:arg-types long-float (:constant (long-float -0l0 0l0)))
   (:variant #x00))
 
 #!+long-float

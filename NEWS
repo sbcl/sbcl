@@ -1709,6 +1709,10 @@ changes in sbcl-0.8alpha.0 relative to sbcl-0.7.14
     ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list.
 
 changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
+  * minor incompatible change: the :NEGATIVE-ZERO-IS-NOT-ZERO feature
+    no longer has any effect, as the code controlled by this feature
+    has been deleted.  (As far as we know, no-one has ever built using
+    this feature, and its semantics were confused in any case).
   * SB-MOP:DIRECT-SLOT-DEFINITION-CLASS and
     SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
     specified-by-AMOP lambda list of (CLASS &REST INITARGS).

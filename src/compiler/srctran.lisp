@@ -817,7 +817,6 @@
 ;;; are equal to an intermediate convention for which they are
 ;;; considered different which is more natural for some of the
 ;;; optimisers.
-#!-negative-zero-is-not-zero
 (defun convert-numeric-type (type)
   (declare (type numeric-type type))
   ;;; Only convert real float interval delimiters types.
@@ -850,7 +849,6 @@
 ;;; Convert back from the intermediate convention for which -0.0 and
 ;;; 0.0 are considered different to the standard type convention for
 ;;; which and equal.
-#!-negative-zero-is-not-zero
 (defun convert-back-numeric-type (type)
   (declare (type numeric-type type))
   ;;; Only convert real float interval delimiters types.
@@ -938,7 +936,6 @@
       type))
 
 ;;; Convert back a possible list of numeric types.
-#!-negative-zero-is-not-zero
 (defun convert-back-numeric-type-list (type-list)
   (typecase type-list
     (list
@@ -976,22 +973,13 @@
 	  (push type misc-types)))
     #!+long-float
     (when (null (set-difference '(-0l0 0l0) members))
-      #!-negative-zero-is-not-zero
       (push (specifier-type '(long-float 0l0 0l0)) misc-types)
-      #!+negative-zero-is-not-zero
-      (push (specifier-type '(long-float -0l0 0l0)) misc-types)
       (setf members (set-difference members '(-0l0 0l0))))
     (when (null (set-difference '(-0d0 0d0) members))
-      #!-negative-zero-is-not-zero
       (push (specifier-type '(double-float 0d0 0d0)) misc-types)
-      #!+negative-zero-is-not-zero
-      (push (specifier-type '(double-float -0d0 0d0)) misc-types)
       (setf members (set-difference members '(-0d0 0d0))))
     (when (null (set-difference '(-0f0 0f0) members))
-      #!-negative-zero-is-not-zero
       (push (specifier-type '(single-float 0f0 0f0)) misc-types)
-      #!+negative-zero-is-not-zero
-      (push (specifier-type '(single-float -0f0 0f0)) misc-types)
       (setf members (set-difference members '(-0f0 0f0))))
     (if members
 	(apply #'type-union (make-member-type :members members) misc-types)
@@ -1023,8 +1011,7 @@
 (defun one-arg-derive-type (arg derive-fcn member-fcn
 				&optional (convert-type t))
   (declare (type function derive-fcn)
-	   (type (or null function) member-fcn)
-	   #!+negative-zero-is-not-zero (ignore convert-type))
+	   (type (or null function) member-fcn))
   (let ((arg-list (prepare-arg-for-derive-type (continuation-type arg))))
     (when arg-list
       (flet ((deriver (x)
@@ -1040,20 +1027,14 @@
 		      ;; Otherwise convert to a numeric type.
 		      (let ((result-type-list
 			     (funcall derive-fcn (convert-member-type x))))
-			#!-negative-zero-is-not-zero
 			(if convert-type
 			    (convert-back-numeric-type-list result-type-list)
-			    result-type-list)
-			#!+negative-zero-is-not-zero
-			result-type-list)))
+			    result-type-list))))
 		 (numeric-type
-		  #!-negative-zero-is-not-zero
 		  (if convert-type
 		      (convert-back-numeric-type-list
 		       (funcall derive-fcn (convert-numeric-type x)))
-		      (funcall derive-fcn x))
-		  #!+negative-zero-is-not-zero
-		  (funcall derive-fcn x))
+		      (funcall derive-fcn x)))
 		 (t
 		  *universal-type*))))
 	;; Run down the list of args and derive the type of each one,
@@ -1077,10 +1058,7 @@
 (defun two-arg-derive-type (arg1 arg2 derive-fcn fcn
 				 &optional (convert-type t))
   (declare (type function derive-fcn fcn))
-  #!+negative-zero-is-not-zero
-  (declare (ignore convert-type))
-  (flet (#!-negative-zero-is-not-zero
-	 (deriver (x y same-arg)
+  (flet ((deriver (x y same-arg)
 	   (cond ((and (member-type-p x) (member-type-p y))
 		  (let* ((x (first (member-type-members x)))
 			 (y (first (member-type-members y)))
@@ -1116,26 +1094,6 @@
 		    (if convert-type
 			(convert-back-numeric-type-list result)
 			result)))
-		 (t
-		  *universal-type*)))
-	 #!+negative-zero-is-not-zero
-	 (deriver (x y same-arg)
-	   (cond ((and (member-type-p x) (member-type-p y))
-		  (let* ((x (first (member-type-members x)))
-			 (y (first (member-type-members y)))
-			 (result (with-float-traps-masked
-				     (:underflow :overflow :divide-by-zero)
-				   (funcall fcn x y))))
-		    (if result
-			(make-member-type :members (list result)))))
-		 ((and (member-type-p x) (numeric-type-p y))
-		  (let ((x (convert-member-type x)))
-		    (funcall derive-fcn x y same-arg)))
-		 ((and (numeric-type-p x) (member-type-p y))
-		  (let ((y (convert-member-type y)))
-		    (funcall derive-fcn x y same-arg)))
-		 ((and (numeric-type-p x) (numeric-type-p y))
-		  (funcall derive-fcn x y same-arg))
 		 (t
 		  *universal-type*))))
     (let ((same-arg (same-leaf-ref-p arg1 arg2))

@@ -260,22 +260,6 @@
 		     (if (consp high)
 			 (1- (type-bound-number high))
 			 high)))
-	    #!+negative-zero-is-not-zero
-	    (float
-	     ;; Canonicalize a low bound of (-0.0) to 0.0, and a high
-	     ;; bound of (+0.0) to -0.0.
-	     (values (if (and (consp low)
-			      (floatp (car low))
-			      (zerop (car low))
-			      (minusp (float-sign (car low))))
-			 (float 0.0 (car low))
-			 low)
-		     (if (and (consp high)
-			      (floatp (car high))
-			      (zerop (car high))
-			      (plusp (float-sign (car high))))
-			 (float -0.0 (car high))
-			 high)))
 	    (t 
 	     ;; no canonicalization necessary
 	     (values low high)))

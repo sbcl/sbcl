@@ -155,7 +155,6 @@
 ;;; binds specified by TYPE. BASE is the name of the base type, for
 ;;; declaration. We make SAFETY locally 0 to inhibit any checking of
 ;;; this assertion.
-#!-negative-zero-is-not-zero
 (defun transform-numeric-bound-test (n-object type base)
   (declare (type numeric-type type))
   (let ((low (numeric-type-low type))
@@ -170,49 +169,6 @@
 		(if (consp high)
 		    `((< (the ,base ,n-object) ,(car high)))
 		    `((<= (the ,base ,n-object) ,high))))))))
-
-#!+negative-zero-is-not-zero
-(defun transform-numeric-bound-test (n-object type base)
-  (declare (type numeric-type type))
-  (let ((low (numeric-type-low type))
-	(high (numeric-type-high type))
-	(float-type-p (csubtypep type (specifier-type 'float)))
-	(x (gensym))
-	(y (gensym)))
-    `(locally
-       (declare (optimize (safety 0)))
-       (and ,@(when low
-		(if (consp low)
-		    `((let ((,x (the ,base ,n-object))
-			    (,y ,(car low)))
-			,(if (not float-type-p)
-			    `(> ,x ,y)
-			    `(if (and (zerop ,x) (zerop ,y))
-				 (> (float-sign ,x) (float-sign ,y))
-				 (> ,x ,y)))))
-		    `((let ((,x (the ,base ,n-object))
-			    (,y ,low))
-			,(if (not float-type-p)
-			    `(>= ,x ,y)
-			    `(if (and (zerop ,x) (zerop ,y))
-				 (>= (float-sign ,x) (float-sign ,y))
-				 (>= ,x ,y)))))))
-	    ,@(when high
-		(if (consp high)
-		    `((let ((,x (the ,base ,n-object))
-			    (,y ,(car high)))
-			,(if (not float-type-p)
-			     `(< ,x ,y)
-			     `(if (and (zerop ,x) (zerop ,y))
-				  (< (float-sign ,x) (float-sign ,y))
-				  (< ,x ,y)))))
-		    `((let ((,x (the ,base ,n-object))
-			    (,y ,high))
-			,(if (not float-type-p)
-			     `(<= ,x ,y)
-			     `(if (and (zerop ,x) (zerop ,y))
-				  (<= (float-sign ,x) (float-sign ,y))
-				  (<= ,x ,y)))))))))))
 
 ;;; Do source transformation of a test of a known numeric type. We can
 ;;; assume that the type doesn't have a corresponding predicate, since
