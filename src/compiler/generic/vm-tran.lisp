@@ -54,19 +54,7 @@
     ;; to hand-expand it ourselves.)
     (let ((element-type-specifier (type-specifier element-ctype)))
       `(multiple-value-bind (array index)
-	   ;; FIXME: All this noise should move into a
-	   ;; %DATA-VECTOR-AND-INDEX function, and there should be
-	   ;; DEFTRANSFORMs for %DATA-VECTOR-AND-INDEX to optimize the
-	   ;; function call away when the array is known to be simple,
-	   ;; and to specialize to
-	   ;; %DATA-VECTOR-AND-INDEX-IN-VECTOR-CASE when the array is
-	   ;; known to have only one dimension.
-	   (if (array-header-p array)
-	       (%with-array-data array index nil)
-	       (let ((array array))
-		 (declare (type (simple-array ,element-type-specifier 1)
-				array))
-		 (values array index)))
+	   (%data-vector-and-index array index)
 	 (declare (type (simple-array ,element-type-specifier 1) array))
 	 (data-vector-ref array index)))))
 
@@ -99,21 +87,9 @@
        "Upgraded element type of array is not known at compile time."))
     (let ((element-type-specifier (type-specifier element-ctype)))
       `(multiple-value-bind (array index)
-	   ;; FIXME: All this noise should move into a
-	   ;; %DATA-VECTOR-AND-INDEX function, and there should be
-	   ;; DEFTRANSFORMs for %DATA-VECTOR-AND-INDEX to optimize the
-	   ;; function call away when the array is known to be simple,
-	   ;; and to specialize to
-	   ;; %DATA-VECTOR-AND-INDEX-IN-VECTOR-CASE when the array is
-	   ;; known to have only one dimension.
-	   (if (array-header-p array)
-	       (%with-array-data array index nil)
-	       (let ((array array))
-		 (declare (type (simple-array ,element-type-specifier 1)
-				array))
-		 (values array index)))
-	 (data-vector-set (truly-the (simple-array ,element-type-specifier 1)
-				     array)
+	   (%data-vector-and-index array index)
+	 (declare (type (simple-array ,element-type-specifier 1) array))
+	 (data-vector-set array
 			  index
 			  new-value)))))
 
@@ -134,6 +110,28 @@
                                      (%array-data-vector array))
                           index
                           new-value)))))
+
+(defoptimizer (%data-vector-and-index derive-type) ((array index))
+  (let ((atype (continuation-type array)))
+    (when (array-type-p atype)
+      (values-specifier-type
+       `(values (simple-array ,(type-specifier
+                                (array-type-specialized-element-type atype))
+                              (*))
+                index)))))
+
+(deftransform %data-vector-and-index ((array index)
+                                     (simple-array t)
+                                     *
+                                     :important t)
+  (let* ((atype (continuation-type array))
+        (eltype (array-type-specialized-element-type atype)))
+    (when (eq eltype *wild-type*)
+      (give-up-ir1-transform
+       "specialized array element type not known at compile-time"))
+    `(if (array-header-p array)
+         (values (%array-data-vector array) index)
+         (values array index))))
 
 ;;; transforms for getting at simple arrays of (UNSIGNED-BYTE N) when (< N 8)
 ;;;

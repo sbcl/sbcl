@@ -837,13 +837,13 @@
   (let* ((info (type-info-or-lose class type))
 	 (tin (type-info-number info)))
     (if env-list-p
-      (set-info-value name
-		      tin
-		      new-value
-		      (get-write-info-env env-list))
-      (set-info-value name
-		      tin
-		      new-value)))
+	(set-info-value name
+			tin
+			new-value
+			(get-write-info-env env-list))
+	(set-info-value name
+			tin
+			new-value)))
   new-value)
 ;;; FIXME: We'd like to do this, but Python doesn't support
 ;;; compiler macros and it's hard to change it so that it does.

@@ -198,15 +198,19 @@ main(int argc, char *argv[], char *envp[])
 	char *sbcl_home = getenv("SBCL_HOME");
 	if (sbcl_home) {
 	    char *lookhere;
-	    lookhere = (char *) calloc(strlen("/sbcl.core") + strlen(sbcl_home) + 1,
-					sizeof(char));
-	    sprintf(lookhere, "%s/sbcl.core", sbcl_home);
+	    char *stem = "/sbcl.core";
+	    lookhere = (char *) calloc(strlen(sbcl_home) +
+				       strlen(stem) +
+				       1,
+				       sizeof(char));
+	    sprintf(lookhere, "%s%s", sbcl_home, stem);
 	    core = copied_existing_filename_or_null(lookhere);
 	    free(lookhere);
 	} else {
 	    core = copied_existing_filename_or_null("/usr/lib/sbcl.core");
 	    if (!core) {
-		core = copied_existing_filename_or_null("/usr/local/lib/sbcl.core");
+		core =
+		    copied_existing_filename_or_null("/usr/local/lib/sbcl.core");
 	    }
 	}
 	if (!core) {

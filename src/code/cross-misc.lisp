@@ -68,10 +68,11 @@
     nil))
 
 ;;; This seems to be the portable Common Lisp type test which
-;;; corresponds to the effect of the target SBCL implementation test..
+;;; corresponds to the effect of the target SBCL implementation test...
 (defun sb!kernel:array-header-p (x)
-  (and (typep x 'simple-array)
-       (= 1 (array-rank x))))
+  (and (typep x 'array)
+       (or (not (typep x 'simple-array))
+	   (/= (array-rank x) 1))))
 
 ;;; GENESIS needs these at cross-compile time. The target
 ;;; implementation of these is reasonably efficient by virtue of its

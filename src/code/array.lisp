@@ -49,6 +49,11 @@
 (defun %with-array-data (array start end)
   (%with-array-data-macro array start end :fail-inline? t))
 
+(defun %data-vector-and-index (array index)
+  (if (array-header-p array)
+      (%with-array-data array index nil)
+      (values array index)))
+
 ;;; It'd waste space to expand copies of error handling in every
 ;;; inline %WITH-ARRAY-DATA, so we have them call this function
 ;;; instead. This is just a wrapper which is known never to return.

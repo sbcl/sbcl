@@ -306,3 +306,7 @@
 ;;;; mutator accessors
 
 (defknown mutator-self () system-area-pointer (flushable movable))
+
+(defknown %data-vector-and-index (array index)
+                                 (values (simple-array * (*)) index)
+				 (foldable flushable))
