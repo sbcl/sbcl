@@ -1299,6 +1299,25 @@ WORKAROUND:
   them as TYPE-ERRORs (reporting the problem as something not being
   coerceable to a function).
 
+153:
+  (essentially the same problem as a CMU CL bug reported by Martin
+  Cracauer on cmucl-imp 2002-02-19)
+  There is a hole in structure slot type checking. Compiling and LOADing
+    (declaim (optimize safety))
+    (defstruct foo
+      (bla 0 :type fixnum))
+    (defun f ()
+      (let ((foo (make-foo)))
+        (setf (foo-bla foo) '(1 . 1))
+        (format t "Is ~a of type ~a a cons? => ~a~%"
+                (foo-bla foo)
+                (type-of (foo-bla foo))
+                (consp (foo-bla foo)))))
+    (f)
+  should signal an error, but in sbcl-0.7.1.21 instead gives the output
+    Is (1 . 1) of type CONS a cons? => NIL
+  without signalling an error.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

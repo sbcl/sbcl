@@ -101,7 +101,7 @@
 ;;; link the block into the Current-Catch list.
 (define-vop (make-catch-block)
   (:args (tn)
-	 (tag :scs (descriptor-reg)))
+	 (tag :scs (any-reg descriptor-reg)))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)

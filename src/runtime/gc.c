@@ -28,9 +28,8 @@
 #include "interr.h"
 
 /* So you need to debug? */
-#define PRINTNOISE
-#define DEBUG_SPACE_PREDICATES
 #if 0
+#define PRINTNOISE
 #define DEBUG_SPACE_PREDICATES
 #define DEBUG_SCAVENGE_VERBOSE
 #define DEBUG_COPY_VERBOSE
@@ -511,7 +510,9 @@ scavenge_interrupt_context(os_context_t *context)
 #ifdef ARCH_HAS_NPC_REGISTER
 	unsigned long npc_code_offset;
 #endif
+#ifdef DEBUG_SCAVENGE_VERBOSE
 	fprintf(stderr, "Scavenging interrupt context at 0x%x\n",context);
+#endif
 	/* Find the LIP's register pair and calculate its offset */
 	/* before we scavenge the context. */
 #ifdef reg_LIP
@@ -603,7 +604,9 @@ void scavenge_interrupt_contexts(void)
 
     index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX));
 
+#ifdef DEBUG_SCAVENGE_VERBOSE
     fprintf(stderr, "%d interrupt contexts to scan\n",index);
+#endif
     for (i = 0; i < index; i++) {
 	context = lisp_interrupt_contexts[i];
 	scavenge_interrupt_context(context); 
