@@ -542,15 +542,16 @@
 			    
 			    ;; print any instruction bytes recognized by the prefilter which calls read-suffix
 			    ;; and updates next-offs
-			    (let ((suffix-len (- (dstate-next-offs dstate) orig-next)))
-			      (when (plusp suffix-len)
-				(print-inst suffix-len stream dstate :offset (inst-length inst) :trailing-space nil))
+			    (when stream
+			      (let ((suffix-len (- (dstate-next-offs dstate) orig-next)))
+				(when (plusp suffix-len)
+				  (print-inst suffix-len stream dstate :offset (inst-length inst) :trailing-space nil))
 			      (dotimes (i (- *disassem-inst-column-width* (* 2 (+ (inst-length inst) suffix-len))))
 				(write-char #\space stream)))
-			    (write-char #\space stream)
-			    
+			      (write-char #\space stream))
+			      
 			    (funcall function chunk inst)
-			    
+			      
 			    (setf prefix-p (null (inst-printer inst)))
 			    
 			    (when control
