@@ -402,8 +402,8 @@
 	      (emit-cleanups block1 block2)))))))
   (values))
 
-;;; Mark optimizable tail-recursive uses of function result continuations with
-;;; the corresponding TAIL-SET. 
+;;; Mark optimizable tail-recursive uses of function result
+;;; continuations with the corresponding TAIL-SET.
 (defun tail-annotate (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))

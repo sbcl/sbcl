@@ -136,7 +136,19 @@
 	  ,(if (policy *lexenv* (zerop safety))
 	       `(declare (ignore ,n-supplied))
 	       `(%verify-arg-count ,n-supplied ,nargs))
-	  (%funcall ,fun ,@temps))))
+	  (locally
+	    ;; KLUDGE: The intent here is to enable tail recursion
+	    ;; optimization, since leaving frames for wrapper
+	    ;; functions like this on the stack is actually more
+	    ;; annoying than helpful for debugging. Unfortunately
+	    ;; trying to express this by messing with the
+	    ;; ANSI-standard declarations is a little awkward, since
+	    ;; no matter how we do it we'll tend to have side-effects
+	    ;; on things like SPEED-vs.-SAFETY comparisons. Perhaps
+	    ;; it'd be better to define a new SB-EXT:TAIL-RECURSIVELY
+	    ;; declaration and use that? -- WHN 2002-07-08
+	    (declare (optimize (speed 2) (debug 1)))
+	    (%funcall ,fun ,@temps)))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
 	    (max (optional-dispatch-max-args fun))
@@ -162,7 +174,13 @@
 			   (n-count (gensym)))
 		       `(multiple-value-bind (,n-context ,n-count)
 			    (%more-arg-context ,n-supplied ,max)
-			  (%funcall ,more ,@temps ,n-context ,n-count))))))
+			  (locally
+			    ;; KLUDGE: As above, we're trying to
+			    ;; enable tail recursion optimization and
+			    ;; any other effects of this declaration
+			    ;; are accidental. -- WHN 2002-07-08
+			    (declare (optimize (speed 2) (debug 1)))
+			    (%funcall ,more ,@temps ,n-context ,n-count)))))))
 	     (t
 	      (%arg-count-error ,n-supplied)))))))))
 
