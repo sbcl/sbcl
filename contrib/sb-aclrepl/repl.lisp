@@ -777,12 +777,7 @@
 	(frame-number (when (and (plusp *break-level*)
 				 sb-debug::*current-frame*)
 			(sb-di::frame-number sb-debug::*current-frame*))))
-    #+sb-thread
-    (let ((lock sb-thread::*session-lock*))
-      (sb-thread::get-foreground)
-      (let ((stopped-threads (sb-thread::waitqueue-data lock)))
-	(when stopped-threads
-	  (format stream "~{~&Thread ~A suspended~}~%" stopped-threads))))
+    (sb-thread::get-foreground)
     (fresh-line stream)
     (if (functionp *prompt*)
 	(write-string (funcall *prompt*
