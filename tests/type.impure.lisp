@@ -149,6 +149,10 @@
      ;; structure type tests
      (assert (typep (make-structure-foo3) 'structure-foo2))
      (assert (not (typep (make-structure-foo1) 'structure-foo4)))
+     (assert (typep (nth-value 1
+			       (ignore-errors (structure-foo2-x
+					       (make-structure-foo1))))
+		    'type-error))
      (assert (null (ignore-errors
 		     (setf (structure-foo2-x (make-structure-foo1)) 11))))
 
@@ -196,7 +200,8 @@
 		    (sb-pcl:class-direct-subclasses (sb-pcl:find-class
 						     'simple-condition))
 		    (mapcar #'sb-pcl:find-class
-			    '(simple-type-error simple-error
+			    '(simple-type-error
+			      simple-error
                               sb-int:simple-file-error
                               sb-int:simple-style-warning)))))
 
