@@ -4,6 +4,8 @@
 
 (assert (equal (function-arglist 'cl-user::one)
 	       '(cl-user::a cl-user::b cl-user::c)))
+(assert (equal (function-arglist 'the)
+	       '(type sb-c::value)))
 
 (defun matchp (object form-number)
   (let ((ds (sb-introspect:find-definition-source object)))

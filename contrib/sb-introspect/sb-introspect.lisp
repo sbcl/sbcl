@@ -46,8 +46,8 @@
 
 (defun function-arglist (function)
   "Describe the lambda list for the function designator FUNCTION.
-Works for macros, simple functions and generic functions.  Signals error
-if not found"
+Works for special-operators, macros, simple functions and generic
+functions.  Signals error if not found"
   (cond ((valid-function-name-p function) 
          (function-arglist
 	  (or (macro-function function) (fdefinition function))))

@@ -45,9 +45,8 @@
 ;;; list. START-VAR, NEXT-VAR and RESULT-VAR are bound to the start and
 ;;; result continuations for the resulting IR1. KIND is the function
 ;;; kind to associate with NAME.
-(defmacro def-ir1-translator (name (lambda-list start-var next-var result-var
-						&key (kind :special-form))
-				   &body body)
+(defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
+			      &body body)
   (let ((fn-name (symbolicate "IR1-CONVERT-" name))
 	(n-form (gensym))
 	(n-env (gensym)))
@@ -69,18 +68,20 @@
 	 ;; FIXME: Evidently "there can only be one!" -- we overwrite any
 	 ;; other :IR1-CONVERT value. This deserves a warning, I think.
 	 (setf (info :function :ir1-convert ',name) #',fn-name)
-	 (setf (info :function :kind ',name) ,kind)
+	 ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
+	 ;; the 1990s?
+	 (setf (info :function :kind ',name) :special-form)
 	 ;; It's nice to do this for error checking in the target
 	 ;; SBCL, but it's not nice to do this when we're running in
 	 ;; the cross-compilation host Lisp, which owns the
 	 ;; SYMBOL-FUNCTION of its COMMON-LISP symbols.
 	 #-sb-xc-host
-	 ,@(when (eq kind :special-form)
-	     `((setf (symbol-function ',name)
-		     (lambda (&rest rest)
-		       (declare (ignore rest))
-		       (error 'special-form-function
-			      :name ',name)))))))))
+	 (let ((fun (lambda (&rest rest)
+		      (declare (ignore rest))
+		      (error 'special-form-function :name ',name))))
+	   (setf (%simple-fun-arglist fun) ',lambda-list)
+	   (setf (symbol-function ',name) fun))
+	 ',name))))
 
 ;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
 ;;; syntax is invalid.)
