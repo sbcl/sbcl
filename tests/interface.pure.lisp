@@ -132,3 +132,9 @@
 ;;; DISASSEMBLE shouldn't fail on purified functions
 (disassemble 'cl:+)
 (disassemble 'sb-ext:run-program)
+
+;;; minimal test of GC: see stress-gc.{sh,lisp} for a more
+;;; comprehensive test.
+(loop repeat 2
+      do (compile nil '(lambda (x) x))
+      do (sb-ext:gc :full t))
