@@ -105,5 +105,19 @@
 (assert (eq 'orig-initform
 	    (slot-value (make-instance 'shared-to-local-initform-sub) 'redefined)))
 
+(defgeneric no-ignored-warnings (x y))
+(handler-case
+    (eval '(defmethod no-ignored-warnings ((x t) (y t))
+	    (declare (ignore x y)) nil))
+  (style-warning (c) (error c)))
+(handler-case
+    (eval '(defmethod no-ignored-warnings ((x number) (y t))
+	    (declare (ignore x y)) (setq *print-level* nil)))
+  (style-warning (c) (error c)))
+(handler-case
+    (eval '(defmethod no-ignored-warnings ((x fixnum) (y t))
+	    (declare (ignore x)) (setq y 'foo)))
+  (style-warning (c) (error c)))
+
 ;;; success
 (sb-ext:quit :unix-status 104)

@@ -1252,6 +1252,14 @@ bootstrapping.
 		    (setq next-method-p-p t)
 		    form)
 		   ((eq (car form) 'setq)
+		    ;; FIXME: this is possibly a little strong as
+		    ;; conditions go.  Ideally we would want to detect
+		    ;; which, if any, of the method parameters are
+		    ;; being set, and communicate that information to
+		    ;; e.g. SPLIT-DECLARATIONS.  However, the brute
+		    ;; force method doesn't really cost much; a little
+		    ;; loss of discrimination over IGNORED variables
+		    ;; should be all.  -- CSR, 2004-07-01
 		    (setq setq-p t)
 		    form)
 		   ((and (eq (car form) 'function)

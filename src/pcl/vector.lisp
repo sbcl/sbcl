@@ -958,7 +958,7 @@
     simple-bit-vector simple-string simple-vector single-float standard-char
     stream string symbol t unsigned-byte vector))
 
-(defun split-declarations (body args calls-next-method-p)
+(defun split-declarations (body args maybe-reads-params-p)
   (let ((inner-decls nil)
 	(outer-decls nil)
 	decl)
@@ -1011,7 +1011,7 @@
 			       ;; involved, to prevent compiler
 			       ;; warnings about ignored args being
 			       ;; read.
-			       (unless (and calls-next-method-p
+			       (unless (and maybe-reads-params-p
 					    (eq (car dname) 'ignore))
 				 (push var outers))
 			       (push var inners)))
@@ -1083,7 +1083,8 @@
     (initargs body req-args lmf-params restp)
   (multiple-value-bind (outer-decls inner-decls body-sans-decls)
       (split-declarations
-       body req-args (getf (cdr lmf-params) :call-next-method-p))
+       body req-args (or (getf (cdr lmf-params) :call-next-method-p)
+			 (getf (cdr lmf-params) :setq-p)))
     (let* ((rest-arg (when restp '.rest-arg.))
 	   (args+rest-arg (if restp
 			      (append req-args (list rest-arg))
