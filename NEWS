@@ -1432,10 +1432,15 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
     SXHASH-related changes in the layout of CLOS data structures
 
 changes in sbcl-0.7.11 relative to sbcl-0.7.10:
-  * fixed some bugs shown by Paul Dietz' test suite:
+  * fixed some more bugs revealed by Paul Dietz' test suite:
     ** As required by ANSI, LOOP now disallows anonymous collection
        clauses such as COLLECT I in conjunction with aggregate boolean
        clauses such as THEREIS (= I 1);
+    ** LOOP now signals an error when any variable is reused in the
+       same loop (including the potentially useful construct analogous
+       to WITH A = 1 WITH A = (1+ A);
+    ** IT is only a special loop symbol within the first clause of a
+       conditional loop clause;
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

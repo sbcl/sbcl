@@ -147,3 +147,27 @@
       (loop for i in '(1 2 3) thereis (= i 3) collect i))
   (assert (null result))
   (assert (typep error 'program-error)))
+
+(multiple-value-bind (result error)
+    (ignore-errors
+      (loop with i = 1 for x from 1 to 3 collect x into i))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+(multiple-value-bind (result error)
+    ;; this one has a plausible interpretation in terms of LET*, but
+    ;; ANSI seems specifically to disallow it
+    (ignore-errors
+      (loop with i = 1 with i = (1+ i)
+	    for x from 1 to 3
+	    collect (+ x i)))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+
+(let ((it 'z))
+  (assert (equal
+	   ;; this one just seems weird.  Nevertheless...
+	   (loop for i in '(a b c d)
+		 when i
+		   collect it
+		   and collect it)
+	   '(a z b z c z d z))))

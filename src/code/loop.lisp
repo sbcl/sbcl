@@ -1013,6 +1013,13 @@ code to be loaded.
 	  *loop-desetq-crocks* nil
 	  *loop-wrappers* nil)))
 
+(defun loop-var-p (name)
+  (do ((entry *loop-bind-stack* (cdr entry)))
+      (nil)
+    (cond
+      ((null entry) (return nil))
+      ((assoc name (caar entry) :test #'eq) (return t)))))
+
 (defun loop-make-var (name initialization dtype &optional iteration-var-p)
   (cond ((null name)
 	 (cond ((not (null initialization))
@@ -1075,7 +1082,10 @@ code to be loaded.
       (loop-make-var (gensym "LOOP-BIND-") form data-type)))
 
 (defun loop-do-if (for negatep)
-  (let ((form (loop-get-form)) (*loop-inside-conditional* t) (it-p nil))
+  (let ((form (loop-get-form))
+	(*loop-inside-conditional* t)
+	(it-p nil)
+	(first-clause-p t))
     (flet ((get-clause (for)
 	     (do ((body nil)) (nil)
 	       (let ((key (car *loop-source-code*)) (*loop-body* nil) data)
@@ -1085,7 +1095,8 @@ code to be loaded.
 			  key for))
 		       (t (setq *loop-source-context* *loop-source-code*)
 			  (loop-pop-source)
-			  (when (loop-tequal (car *loop-source-code*) 'it)
+			  (when (and (loop-tequal (car *loop-source-code*) 'it)
+				     first-clause-p)
 			    (setq *loop-source-code*
 				  (cons (or it-p
 					    (setq it-p
@@ -1100,6 +1111,7 @@ code to be loaded.
 				   "~S does not introduce a LOOP clause that can follow ~S."
 				   key for))
 				(t (setq body (nreconc *loop-body* body)))))))
+	       (setq first-clause-p nil)
 	       (if (loop-tequal (car *loop-source-code*) :and)
 		   (loop-pop-source)
 		   (return (if (cdr body)
@@ -1169,6 +1181,8 @@ code to be loaded.
     (let ((cruft (find (the symbol name) *loop-collection-cruft*
 		       :key #'loop-collector-name)))
       (cond ((not cruft)
+	     (when (and name (loop-var-p name))
+	       (loop-error "Variable ~S in INTO clause is a duplicate" name))
 	     (push (setq cruft (make-loop-collector
 				 :name name :class class
 				 :history (list collector) :dtype dtype))
@@ -1304,6 +1318,8 @@ code to be loaded.
 		     (loop-pop-source)
 		     (loop-get-form))
 		    (t nil)))
+    (when (and var (loop-var-p var))
+      (loop-error "Variable ~S has already been used" var))
     (loop-make-var var val dtype)
     (if (loop-tequal (car *loop-source-code*) :and)
 	(loop-pop-source)
