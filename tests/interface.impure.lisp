@@ -38,4 +38,4 @@
 
 
 ;;;; success
-(sb-ext:quit :unix-code 104)
+(sb-ext:quit :unix-status 104)

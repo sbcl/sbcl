@@ -153,21 +153,23 @@
   "Atomically release LOCK and enqueue ourselves on QUEUE.  Another
 thread may subsequently notify us using CONDITION-NOTIFY, at which
 time we reacquire LOCK and return to the caller."
-  (unwind-protect
-       (progn
-	 (get-spinlock queue 2 (current-thread-id))
-	 (wait-on-queue queue lock))
-    ;; If we are interrupted while waiting, we should do these things
-    ;; before returning.  Ideally, in the case of an unhandled signal,
-    ;; we should do them before entering the debugger, but this is
-    ;; better than nothing.
-    (with-spinlock (queue)
-      (dequeue queue))
-    (get-mutex lock)))
+  (assert lock)
+  (let ((value (mutex-value lock)))
+    (unwind-protect
+	 (progn
+	   (get-spinlock queue 2 (current-thread-id))
+	   (wait-on-queue queue lock))
+      ;; If we are interrupted while waiting, we should do these things
+      ;; before returning.  Ideally, in the case of an unhandled signal,
+      ;; we should do them before entering the debugger, but this is
+      ;; better than nothing.
+      (with-spinlock (queue)
+	(dequeue queue))
+      (get-mutex lock value))))
 
 (defun condition-notify (queue)
   "Notify one of the processes waiting on QUEUE"
-  (signal-queue-head queue))
+  (with-spinlock (queue) (signal-queue-head queue)))
 
 
 ;;;; multiple independent listeners
