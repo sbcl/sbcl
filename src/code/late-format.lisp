@@ -1269,7 +1269,9 @@
 	     (let ((*default-format-error-offset*
 		    (1- (format-directive-end iteration))))
 	       (let* ((close (find-directive directives #\} nil))
-		      (posn (position close directives))
+		      (posn (or (position close directives)
+                                (error 'format-error
+                                       :complaint "no corresponding close brace")))
 		      (remaining (nthcdr (1+ posn) directives)))
 		 ;; FIXME: if POSN is zero, the next argument must be
 		 ;; a format control (either a function or a string).
@@ -1298,6 +1300,7 @@
 			 (unless (format-directive-colonp directive)
 			   (incf-both)))
 			((or (find c "IT%&|_();>") (char= c #\Newline)))
+                        ;; FIXME: check correspondence of ~( and ~)
 			((char= c #\<)
 			 (walk-complex-directive walk-justification))
 			((char= c #\[)

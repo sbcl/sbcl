@@ -1752,7 +1752,9 @@
                   (unless next-block
                     (when ctran (ensure-block-start ctran))
                     (setq next-block (first (block-succ (node-block cast))))
-                    (ensure-block-start (node-prev cast)))
+                    (ensure-block-start (node-prev cast))
+                    (reoptimize-lvar lvar)
+                    (setf (lvar-%derived-type value) nil))
                   (%delete-lvar-use use)
                   (add-lvar-use use lvar)
                   (unlink-blocks (node-block use) (node-block cast))

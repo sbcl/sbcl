@@ -213,5 +213,12 @@
     (let ((answer (write-to-string '(bar foo :boo 1) :pretty t :escape t)))
       (assert (string= answer "(?BAR? ?FOO? ?:BOO? ?1?)")))))
 
+;;; FORMAT string compile-time checker failure, reported by Thomas
+;;; F. Burdick
+(multiple-value-bind (f w-p f-p)
+    (compile nil '(lambda () (format nil "~{")))
+  (assert (and w-p f-p))
+  (assert (nth-value 1 (ignore-errors (funcall f)))))
+
 ;;; success
 (quit :unix-status 104)

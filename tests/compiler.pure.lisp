@@ -1329,3 +1329,21 @@
                 (debug 3) (compilation-speed 3)))
       (flet ((%f () (multiple-value-prog1 0 (return-from %f 0))))
         (complex (%f) 0)))))))
+
+;;; MISC.110A: CAST optimizer forgot to flush LVAR derived type
+(assert (zerop (funcall
+  (compile
+   nil
+   '(lambda (a c)
+     (declare (type (integer -1294746569 1640996137) a))
+     (declare (type (integer -807801310 3) c))
+     (declare (optimize (speed 3) (space 3) (safety 0) (debug 0) (compilation-speed 3)))
+     (catch 'ct7
+       (if
+        (logbitp 0
+                 (if (/= 0 a)
+                     c
+                     (ignore-errors
+                       (progn (if (ldb-test (byte 0 0) (rational (throw 'ct7 0))) 0 0) 0))))
+        0 0))))
+   391833530 -32785211)))

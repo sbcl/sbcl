@@ -2418,12 +2418,17 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     *PRINT-READABLY* is true, signal PRINT-NOT-READABLE if the string
     does not have array-element-type equal to the most general string
     type.
+  * fixed bug: SET-PPRINT-DISPATCH does not immediately resolve
+    function name. (thanks to Nikodemus Siivola)
+  * fixed bug:: compile-time format string checker failed on
+    non-closed ~{.  (reported by Thomas F Burdick)
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by
     approximately 10%.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** FILE-POSITION works as specified on BROADCAST-STREAMs.
+    ** CAST optimizer forgot to flush argument derived type.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -806,7 +806,7 @@
   ;; T iff one of the original entries.
   (initial-p *building-initial-table* :type (member t nil))
   ;; and the associated function
-  (fun (missing-arg) :type function))
+  (fun (missing-arg) :type callable))
 (def!method print-object ((entry pprint-dispatch-entry) stream)
   (print-unreadable-object (entry stream :type t)
     (format stream "type=~S, priority=~S~@[ [initial]~]"
@@ -924,37 +924,32 @@
   (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
   (/hexstr type)
   (if function
-      ;; KLUDGE: this impairs debuggability, and probably isn't even
-      ;; conforming -- maybe we should not coerce to function, but
-      ;; cater downstream (in PPRINT-DISPATCH-ENTRY) for having
-      ;; callables here.
-      (let ((function (%coerce-callable-to-fun function)))
-	(if (cons-type-specifier-p type)
-	    (setf (gethash (second (second type))
-			   (pprint-dispatch-table-cons-entries table))
-		  (make-pprint-dispatch-entry :type type
-					      :priority priority
-					      :fun function))
-	    (let ((list (delete type (pprint-dispatch-table-entries table)
-				:key #'pprint-dispatch-entry-type
-				:test #'equal))
-		  (entry (make-pprint-dispatch-entry
-			  :type type
-			  :test-fn (compute-test-fn type)
-			  :priority priority
-			  :fun function)))
-	      (do ((prev nil next)
-		   (next list (cdr next)))
-		  ((null next)
-		   (if prev
-		       (setf (cdr prev) (list entry))
-		       (setf list (list entry))))
-		(when (entry< (car next) entry)
-		  (if prev
-		      (setf (cdr prev) (cons entry next))
-		      (setf list (cons entry next)))
-		  (return)))
-	      (setf (pprint-dispatch-table-entries table) list))))
+      (if (cons-type-specifier-p type)
+	  (setf (gethash (second (second type))
+			 (pprint-dispatch-table-cons-entries table))
+		(make-pprint-dispatch-entry :type type
+					    :priority priority
+					    :fun function))
+	  (let ((list (delete type (pprint-dispatch-table-entries table)
+			      :key #'pprint-dispatch-entry-type
+			      :test #'equal))
+		(entry (make-pprint-dispatch-entry
+			:type type
+                        :test-fn (compute-test-fn type)
+                        :priority priority
+                        :fun function)))
+	    (do ((prev nil next)
+		 (next list (cdr next)))
+		((null next)
+		 (if prev
+                     (setf (cdr prev) (list entry))
+                     (setf list (list entry))))
+              (when (entry< (car next) entry)
+                (if prev
+                    (setf (cdr prev) (cons entry next))
+                    (setf list (cons entry next)))
+                (return)))
+	    (setf (pprint-dispatch-table-entries table) list)))
       (if (cons-type-specifier-p type)
 	  (remhash (second (second type))
 		   (pprint-dispatch-table-cons-entries table))

@@ -313,8 +313,7 @@
 	   (setf (node-tail-p call) nil))
 	  (t
 	   (setf (basic-combination-info call) :full)
-	   (annotate-fun-lvar (basic-combination-fun call)
-				      nil)
+	   (annotate-fun-lvar (basic-combination-fun call) nil)
 	   (dolist (arg (reverse args))
 	     (annotate-unknown-values-lvar arg))
 	   (flush-full-call-tail-transfer call))))

@@ -136,10 +136,11 @@
 	   (write '`(lambda (,x)) :stream s :pretty t :readably t))
 	 "`(LAMBDA (,X))"))
 
-;;; SET-PPRINT-DISPATCH should accept function name arguments
+;;; SET-PPRINT-DISPATCH should accept function name arguments, and not
+;;; rush to coerce them to functions.
+(set-pprint-dispatch '(cons (eql frob)) 'ppd-function-name)
 (defun ppd-function-name (s o)
   (print (length o) s))
-(set-pprint-dispatch '(cons (eql frob)) 'ppd-function-name)
 (let ((s (with-output-to-string (s)
 	   (pprint '(frob a b) s))))
   (assert (position #\3 s)))
