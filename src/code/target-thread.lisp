@@ -125,8 +125,7 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
      (setf (waitqueue-data queue)
 	   (delete pid (waitqueue-data queue))))))
 
-;;; this should probably only be called while holding the queue spinlock.
-;;; not sure
+;;; this should only be called while holding the queue spinlock.
 (defun signal-queue-head (queue)
   (let ((p (car (waitqueue-data queue))))
     (when p (sb!unix:unix-kill p  :sigcont))))
