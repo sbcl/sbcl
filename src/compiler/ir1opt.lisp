@@ -1527,19 +1527,16 @@
 ;;; vars.
 (defun ir1-optimize-mv-bind (node)
   (declare (type mv-combination node))
-  (let ((arg (first (basic-combination-args node)))
-	(vars (lambda-vars (combination-lambda node))))
-    (multiple-value-bind (types nvals)
-	(values-types (continuation-derived-type arg))
-      (unless (eq nvals :unknown)
-	(mapc (lambda (var type)
-		(if (basic-var-sets var)
-		    (propagate-from-sets var type)
-		    (propagate-to-refs var type)))
-	      vars
-              (adjust-list types
-                           (length vars)
-                           (specifier-type 'null)))))
+  (let* ((arg (first (basic-combination-args node)))
+         (vars (lambda-vars (combination-lambda node)))
+         (n-vars (length vars))
+         (types (values-type-in (continuation-derived-type arg)
+                                n-vars)))
+    (loop for var in vars
+          and type in types
+          do (if (basic-var-sets var)
+                 (propagate-from-sets var type)
+                 (propagate-to-refs var type)))
     (setf (continuation-reoptimize arg) nil))
   (values))
 

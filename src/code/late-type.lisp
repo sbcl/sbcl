@@ -470,8 +470,8 @@
               (cond ((args-type-rest type))
                     (t default-type)))))
 
-;;; If COUNT values are supplied, which types should they have?
-(defun values-type-start (type count)
+;;; types of values in (the <type> (values o_1 ... o_n))
+(defun values-type-out (type count)
   (declare (type ctype type) (type unsigned-byte count))
   (if (eq type *wild-type*)
       (make-list count :initial-element *universal-type*)
@@ -487,6 +487,29 @@
             (loop with rest = (the ctype (values-type-rest type))
                   repeat count
                   do (res rest))))
+        (res))))
+
+;;; types of variable in (m-v-bind (v_1 ... v_n) (the <type> ...
+(defun values-type-in (type count)
+  (declare (type ctype type) (type unsigned-byte count))
+  (if (eq type *wild-type*)
+      (make-list count :initial-element *universal-type*)
+      (collect ((res))
+        (let ((null-type (specifier-type 'null)))
+          (loop for type in (values-type-required type)
+             while (plusp count)
+             do (decf count)
+             do (res type))
+          (loop for type in (values-type-optional type)
+             while (plusp count)
+             do (decf count)
+             do (res (type-union type null-type)))
+          (when (plusp count)
+            (loop with rest = (acond ((values-type-rest type)
+                                      (type-union it null-type))
+                                     (t null-type))
+               repeat count
+               do (res rest))))
         (res))))
 
 ;;; Return a list of OPERATION applied to the types in TYPES1 and

@@ -269,8 +269,8 @@
                                        force-hairy)))
                 ((not (eq vcount :unknown))
                  (maybe-negate-check value
-                                     (values-type-start ctype vcount)
-                                     (values-type-start atype vcount)
+                                     (values-type-out ctype vcount)
+                                     (values-type-out atype vcount)
                                      t))
                 (t
                  (values :too-hairy nil))))))))
@@ -389,11 +389,11 @@
 			((= length 1)
                          (single-value-type atype))
                         (t
-			 (make-values-type :required 
-			                   (values-type-start atype length)))))
+			 (make-values-type
+                          :required (values-type-out atype length)))))
            (dtype (node-derived-type cast))
-           (dtype (make-values-type :required 
-	                            (values-type-start dtype length))))
+           (dtype (make-values-type
+                   :required (values-type-out dtype length))))
       (setf (cast-asserted-type cast) atype)
       (setf (node-derived-type cast) dtype)))
 
