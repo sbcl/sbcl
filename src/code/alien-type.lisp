@@ -60,7 +60,7 @@
   (if alien-type
       (let ((lisp-rep-type (compute-lisp-rep-type alien-type)))
 	(if lisp-rep-type
-	    (specifier-type lisp-rep-type)
+	    (single-value-specifier-type lisp-rep-type)
 	    (%make-alien-type-type alien-type)))
       *universal-type*))
 

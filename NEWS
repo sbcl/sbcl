@@ -1774,6 +1774,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** template selection based on unsafe type assertions (192c, 236);
     ** type checking in branches (194bc).
   * VALUES declaration is disabled.
+  * a short form of VALUES type specifier has ANSI meaning.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

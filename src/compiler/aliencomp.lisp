@@ -639,7 +639,7 @@
   (let ((type (continuation-value type)))
     (unless (alien-fun-type-p type)
       (error "Something is broken."))
-    (specifier-type
+    (values-specifier-type
      (compute-alien-rep-type
       (alien-fun-type-result-type type)))))
 

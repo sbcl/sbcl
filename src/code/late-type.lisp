@@ -150,7 +150,13 @@
   (error "SUBTYPEP is illegal on this type:~%  ~S" (type-specifier type2)))
 
 (!define-type-method (values :unparse) (type)
-  (cons 'values (unparse-args-types type)))
+  (cons 'values
+        (let ((unparsed (unparse-args-types type)))
+          (if (or (values-type-optional type)
+                  (values-type-rest type)
+                  (values-type-allowp type))
+              unparsed
+              (nconc unparsed '(&optional))))))
 
 ;;; Return true if LIST1 and LIST2 have the same elements in the same
 ;;; positions according to TYPE=. We return NIL, NIL if there is an
@@ -287,7 +293,7 @@
   (type= (constant-type-type type1) (constant-type-type type2)))
 
 (!def-type-translator constant-arg (type)
-  (make-constant-type :type (specifier-type type)))
+  (make-constant-type :type (single-value-specifier-type type)))
 
 ;;; Return the lambda-list-like type specification corresponding
 ;;; to an ARGS-TYPE.
@@ -972,10 +978,11 @@
 (defvar *empty-type*)
 (defvar *universal-type*)
 (defvar *universal-fun-type*)
+
 (!cold-init-forms
  (macrolet ((frob (name var)
 	      `(progn
-		 (setq ,var (make-named-type :name ',name))
+                 (setq ,var (make-named-type :name ',name))
 		 (setf (info :type :kind ',name)
 		       #+sb-xc-host :defined #-sb-xc-host :primitive)
 		 (setf (info :type :builtin ',name) ,var))))
@@ -2661,8 +2668,8 @@
 (!define-type-class cons)
 
 (!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
-  (let ((car-type (specifier-type car-type-spec))
-	(cdr-type (specifier-type cdr-type-spec)))
+  (let ((car-type (single-value-specifier-type car-type-spec))
+	(cdr-type (single-value-specifier-type cdr-type-spec)))
     (make-cons-type car-type cdr-type)))
  
 (!define-type-method (cons :unparse) (type)
@@ -2788,14 +2795,18 @@
   (specialize-array-type
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
                     :complexp :maybe
-		    :element-type (specifier-type element-type))))
+		    :element-type (if (eq element-type '*)
+                                      *wild-type*
+                                      (specifier-type element-type)))))
 
 (!def-type-translator simple-array (&optional (element-type '*)
 					      (dimensions '*))
   (specialize-array-type
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
                     :complexp nil
-		    :element-type (specifier-type element-type))))
+		    :element-type (if (eq element-type '*)
+                                      *wild-type*
+                                      (specifier-type element-type)))))
 
 ;;;; utilities shared between cross-compiler and target system
 

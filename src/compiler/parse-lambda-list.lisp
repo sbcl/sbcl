@@ -26,16 +26,21 @@
 ;;;  9. a list of the &AUX specifiers;
 ;;; 10. true if a &MORE arg was specified;
 ;;; 11. the &MORE context var;
-;;; 12. the &MORE count var.
+;;; 12. the &MORE count var;
+;;; 13. true if any lambda list keyword is present (only for
+;;;     PARSE-LAMBDA-LIST-LIKE-THING).
 ;;;
 ;;; The top level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
 ;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.
-(declaim (ftype (function (list)
-			  (values list list boolean t boolean list boolean
-				  boolean list boolean t t))
-		parse-lambda-list-like-thing
+(declaim (ftype (sfunction (list)
+                           (values list list boolean t boolean list boolean
+                                   boolean list boolean t t boolean))
+		parse-lambda-list-like-thing))
+(declaim (ftype (sfunction (list)
+                           (values list list boolean t boolean list boolean
+                                   boolean list boolean t t))
 		parse-lambda-list))
 (defun parse-lambda-list-like-thing (list)
   (collect ((required)
@@ -122,9 +127,10 @@
                                arg)))))
       (when (eq state :rest)
         (compiler-error "&REST without rest variable"))
-      
+
       (values (required) (optional) restp rest keyp (keys) allowp auxp (aux)
-              morep more-context more-count))))
+              morep more-context more-count
+              (neq state :required)))))
 
 ;;; like PARSE-LAMBDA-LIST-LIKE-THING, except our LAMBDA-LIST argument
 ;;; really *is* a lambda list, not just a "lambda-list-like thing", so

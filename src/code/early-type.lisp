@@ -86,9 +86,10 @@
 
 (defun args-types (lambda-list-like-thing)
   (multiple-value-bind
-	(required optional restp rest keyp keys allowp auxp aux)
+	(required optional restp rest keyp keys allowp auxp aux
+                  morep more-context more-count llk-p)
       (parse-lambda-list-like-thing lambda-list-like-thing)
-    (declare (ignore aux))
+    (declare (ignore aux morep more-context more-count))
     (when auxp
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list-like-thing))
     (let ((required (mapcar #'single-value-specifier-type required))
@@ -110,7 +111,7 @@
 	     (key-info))))
       (multiple-value-bind (required optional rest)
 	  (canonicalize-args-type-args required optional rest)
-	(values required optional rest keyp keywords allowp)))))
+	(values required optional rest keyp keywords allowp llk-p)))))
 
 (defstruct (values-type
 	    (:include args-type
@@ -145,16 +146,19 @@
   (if argsp
       (if (eq args '*)
 	  *wild-type*
-	  (multiple-value-bind (required optional rest keyp keywords allowp)
+	  (multiple-value-bind (required optional rest keyp keywords allowp
+                                llk-p)
 	      (args-types args)
             (declare (ignore keywords))
             (when keyp
               (error "&KEY appeared in a VALUES type specifier ~S."
                      `(values ,@args)))
-            (make-values-type :required required
-                              :optional optional
-                              :rest rest
-                              :allowp allowp)))
+            (if llk-p
+                (make-values-type :required required
+                                  :optional optional
+                                  :rest rest
+                                  :allowp allowp)
+                (make-short-values-type required))))
       (multiple-value-bind (required optional rest)
           (canonicalize-args-type-args required optional rest)
         (cond ((and (null required)
@@ -436,17 +440,8 @@
 ;;; A CONS-TYPE is used to represent a CONS type.
 (defstruct (cons-type (:include ctype (class-info (type-class-or-lose 'cons)))
 		      (:constructor
-		       ;; ANSI says that for CAR and CDR subtype
-		       ;; specifiers '* is equivalent to T. In order
-		       ;; to avoid special cases in SUBTYPEP and
-		       ;; possibly elsewhere, we slam all CONS-TYPE
-		       ;; objects into canonical form w.r.t. this
-		       ;; equivalence at creation time.
-		       %make-cons-type (car-raw-type
-					cdr-raw-type
-					&aux
-					(car-type (type-*-to-t car-raw-type))
-					(cdr-type (type-*-to-t cdr-raw-type))))
+		       %make-cons-type (car-type
+					cdr-type))
 		      (:copier nil))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   ;;
@@ -454,6 +449,8 @@
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
 (defun make-cons-type (car-type cdr-type)
+  (aver (not (or (eq car-type *wild-type*)
+                 (eq cdr-type *wild-type*))))
   (if (or (eq car-type *empty-type*)
 	  (eq cdr-type *empty-type*))
       *empty-type*
@@ -517,15 +514,17 @@
 ;;; never return a VALUES type.
 (defun specifier-type (x)
   (let ((res (values-specifier-type x)))
-    (when (values-type-p res)
+    (when (or (values-type-p res)
+              ;; bootstrap magic :-(
+              (and (named-type-p res)
+                   (eq (named-type-name res) '*)))
       (error "VALUES type illegal in this context:~%  ~S" x))
     res))
 
 (defun single-value-specifier-type (x)
-  (let ((res (specifier-type x)))
-    (if (eq res *wild-type*)
-        *universal-type*
-        res)))
+  (if (eq x '*)
+      *universal-type*
+      (specifier-type x)))
 
 ;;; Similar to MACROEXPAND, but expands DEFTYPEs. We don't bother
 ;;; returning a second value.
@@ -547,5 +546,6 @@
   (when (boundp 'sb!kernel::*values-specifier-type-cache-vector*)
     (values-specifier-type-cache-clear))
   (values))
+
 
 (!defun-from-collected-cold-init-forms !early-type-cold-init)

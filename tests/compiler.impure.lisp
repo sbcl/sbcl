@@ -589,9 +589,9 @@
                         `(lambda (f)
                            (declare (optimize (speed 2) (safety ,policy1)))
                            (multiple-value-list
-                            (the (values (integer 2 3) t)
+                            (the (values (integer 2 3) t &optional)
                               (locally (declare (optimize (safety ,policy2)))
-                                (the (values t (single-float 2f0 3f0))
+                                (the (values t (single-float 2f0 3f0) &optional)
                                   (funcall f)))))))
                (lambda () (values x y)))
     (type-error (error)
@@ -725,10 +725,14 @@
 ;;; COERCE got its own DEFOPTIMIZER which has to reimplement most of
 ;;; SPECIFIER-TYPE-NTH-ARG.  For a while, an illegal type would throw
 ;;; you into the debugger on compilation.
-(defun coerce-defopt (x)
+(defun coerce-defopt1 (x)
   ;; illegal, but should be compilable.
   (coerce x '(values t)))
-(assert (null (ignore-errors (coerce-defopt 3))))
+(defun coerce-defopt2 (x)
+  ;; illegal, but should be compilable.
+  (coerce x '(values t &optional)))
+(assert (null (ignore-errors (coerce-defopt1 3))))
+(assert (null (ignore-errors (coerce-defopt2 3))))
 
 ;;; Oops.  In part of the (CATCH ..) implementation of DEBUG-RETURN,
 ;;; it was possible to confuse the type deriver of the compiler

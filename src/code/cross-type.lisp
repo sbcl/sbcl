@@ -184,7 +184,7 @@
 	     ;; we don't continue doing it after we someday patch
 	     ;; SBCL's type system so that * is no longer a type, we
 	     ;; make this assertion. -- WHN 2001-08-08
-	     (aver (typep (specifier-type '*) 'named-type))
+	     (aver (typep (values-specifier-type '*) 'named-type))
 	     (values t t))
 	    (;; Many simple types are guaranteed to correspond exactly
 	     ;; between any host ANSI Common Lisp and the target

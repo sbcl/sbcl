@@ -397,6 +397,7 @@
 
 ;;; SBCL-only special forms
 (define-walker-template sb!ext:truly-the     (nil quote eval))
+(define-walker-template named-lambda         walk-named-lambda)
 
 (defvar *walk-form-expand-macros-p* nil)
 
@@ -812,6 +813,20 @@
 	     (walk-declarations body #'walk-repeat-eval new-env)))
       (relist* form
 	       (car form)
+	       walked-arglist
+	       walked-body))))
+
+(defun walk-named-lambda (form context old-env)
+  (walker-environment-bind (new-env old-env)
+    (let* ((name (second form))
+           (arglist (third form))
+	   (body (cdddr form))
+	   (walked-arglist (walk-arglist arglist context new-env))
+	   (walked-body
+	     (walk-declarations body #'walk-repeat-eval new-env)))
+      (relist* form
+	       (car form)
+               name
 	       walked-arglist
 	       walked-body))))
 

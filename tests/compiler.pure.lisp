@@ -400,3 +400,5 @@
                                 :external-format '#:nonsense)))
 (assert (raises-error? (funcall (eval #'load) "assertoid.lisp"
                                 :external-format '#:nonsense)))
+
+(assert (= (the (values integer symbol) (values 1 'foo 13)) 1))

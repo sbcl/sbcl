@@ -950,4 +950,8 @@ Form: NIL   Context: EVAL; bound: NIL
                  (error "Walker didn't do lexical variables of a closure properly."))))
          ""))
 
+;; old PCL hung up on it
+(defmethod #:foo ()
+  (defun #:bar ()))
+
 (quit :unix-status 104)
