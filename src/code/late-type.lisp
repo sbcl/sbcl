@@ -887,7 +887,7 @@
 ;;; shared logic for unions and intersections: Make a COMPOUND-TYPE
 ;;; object whose components are the types in TYPES, or skip to special
 ;;; cases when TYPES is short.
-(defun make-compound-type-or-something (constructor types enumerable identity)
+(defun make-probably-compound-type (constructor types enumerable identity)
   (declare (type function constructor))
   (declare (type (vector ctype) types))
   (declare (type ctype identity))
@@ -901,7 +901,7 @@
 		;; brain-dead, so that would generate a full call to
 		;; SPECIFIER-TYPE at runtime, so we get into bootstrap
 		;; problems in cold init because 'LIST is a compound
-		;; type, so we need to MAKE-COMPOUND-TYPE-OR-SOMETHING
+		;; type, so we need to MAKE-PROBABLY-COMPOUND-TYPE
 		;; before we know what 'LIST is. Once the COERCE
 		;; optimizer is less brain-dead, we can make this
 		;; (COERCE TYPES 'LIST) again.
@@ -949,11 +949,11 @@
 	       :specifier `(and ,@(map 'list
 				       #'type-specifier
 				       simplified-types)))))
-	(make-compound-type-or-something #'%make-intersection-type
-					 simplified-types
-					 (some #'type-enumerable
-					       simplified-types)
-					 *universal-type*))))
+	(make-probably-compound-type #'%make-intersection-type
+				     simplified-types
+				     (some #'type-enumerable
+					   simplified-types)
+				     *universal-type*))))
 
 (defun type-union (&rest input-types)
   (%type-union input-types))
@@ -964,10 +964,10 @@
   (let ((simplified-types (simplified-compound-types input-types
 						     #'union-type-p
 						     #'type-union2)))
-    (make-compound-type-or-something #'make-union-type
-				     simplified-types
-				     (every #'type-enumerable simplified-types)
-				     *empty-type*)))
+    (make-probably-compound-type #'make-union-type
+				 simplified-types
+				 (every #'type-enumerable simplified-types)
+				 *empty-type*)))
 
 ;;;; built-in types
 

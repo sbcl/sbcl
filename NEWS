@@ -1612,12 +1612,12 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
        on malformed property lists;
 
 changes in sbcl-0.8.0 relative to sbcl-0.7.14
-  * the old distinction between CL:CLASS objects and SB-PCL:CLASS
+  * The old distinction between CL:CLASS objects and SB-PCL:CLASS
     objects has been removed.  The return value from CL:FIND-CLASS is
     now a CLOS class, and likewise that of CL:CLASS-OF;
     CL:BUILT-IN-CLASS, CL:STRUCTURE-CLASS and CL:STANDARD-CLASS name
     CLOS classes.
-  * an interface to the MetaObject Protocol, as described in Kiczales,
+  * An interface to the MetaObject Protocol, as described in Kiczales,
     des Rivieres and Bobrow's "The Art of the Metaobject Protocol",
     MIT Press, 1991, is available from the SB-MOP package.
   * incompatible change: the SB-PCL package should now be considered a
@@ -1628,6 +1628,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     addresses instead of being hardcoded per-port.  Users affected by
     this probably have to be doing advanced things with shared
     libraries, and will know who they are.
+  * minor incompatible change: *STANDARD-INPUT* is now only an
+    INPUT-STREAM, not a BIDIRECTIONAL-STREAM. (thanks to Antonio 
+    Martinez)
   * known functions, which cannot be open coded by backend, are
     considered to be able to check types of their arguments.
     (reported by Nathan J. Froyd)
@@ -1636,11 +1639,13 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     forward-referenced superclasses.  (thanks to Gerd Moellmann)
   * fixed evaluation order in optional entries.  (reported by Gilbert
     Baumann)
-  * *STANDARD-INPUT* is now 
   * SB-MOP:ENSURE-CLASS-USING-CLASS now takes its arguments in the
     specified-by-AMOP order of (CLASS NAME &REST ARGS &KEY).
   * fixed bug 20: DEFMETHOD can define methods using names that are
     not the proper names of classes to designate class specializers.
+  * bug fix: INTERACTIVE-STREAM-P now works on streams associated with
+    Unix file descriptors, instead of blowing up. (thanks to Antonio
+    Martinez)
   * Experimental native threads support, on x86 Linux.  This is not 
     compiled in by default: you need to add :SB-THREAD to the target
     features.  See the "Beyond ANSI" chapter of the manual for 

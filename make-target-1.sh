@@ -20,7 +20,7 @@ echo //entering make-target-1.sh
 if [ "$GNUMAKE" != "" ] ; then
   # The user is evidently trying to tell us something.
   gnumake="$GNUMAKE"
-elif [ -x `which gmake` ] ; then
+elif [ -x "`which gmake`" ] ; then
   # "gmake" is the preferred name in *BSD.
   gnumake=gmake
 else
