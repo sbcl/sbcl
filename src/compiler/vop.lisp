@@ -77,8 +77,8 @@
 ;;;    environment pointer should be saved after the binding is
 ;;;    instantiated.
 ;;;
-;;; Environment-Info
-;;;    Holds the IR2-Environment structure.
+;;; Physenv-Info
+;;;    Holds the Ir2-Physenv structure.
 ;;;
 ;;; Tail-Set-Info
 ;;;    Holds the Return-Info structure.
@@ -328,9 +328,9 @@
   ;; of this function
   (type 'function :type (or list (member function))))
 
-;;; An IR2-ENVIRONMENT is used to annotate non-LET LAMBDAs with their
-;;; passing locations. It is stored in the ENVIRONMENT-INFO.
-(defstruct (ir2-environment (:copier nil))
+;;; An IR2-PHYSENV is used to annotate non-LET LAMBDAs with their
+;;; passing locations. It is stored in the PHYSENV-INFO.
+(defstruct (ir2-physenv (:copier nil))
   ;; the TNs that hold the passed environment within the function.
   ;; This is an alist translating from the NLX-INFO or LAMBDA-VAR to
   ;; the TN that holds the corresponding value within this function.
@@ -367,7 +367,7 @@
   ;; from their passing locations, etc. This is the start of the
   ;; function as far as the debugger is concerned.
   (environment-start nil :type (or label null)))
-(defprinter (ir2-environment)
+(defprinter (ir2-physenv)
   environment
   old-fp
   return-pc
@@ -924,8 +924,8 @@
   ;; some kind of info about how important this TN is
   (cost 0 :type fixnum)
   ;; If a :ENVIRONMENT or :DEBUG-ENVIRONMENT TN, this is the
-  ;; environment that the TN is live throughout.
-  (environment nil :type (or environment null)))
+  ;; physical environment that the TN is live throughout.
+  (physenv nil :type (or physenv null)))
 (def!method print-object ((tn tn) stream)
   (print-unreadable-object (tn stream :type t)
     ;; KLUDGE: The distinction between PRINT-TN and PRINT-OBJECT on TN is

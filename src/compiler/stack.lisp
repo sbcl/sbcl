@@ -100,7 +100,7 @@
 	(dolist (pred (block-pred block))
 	  (if (eq pred (component-head (block-component block)))
 	      (aver (find block
-			  (environment-nlx-info (block-environment block))
+			  (physenv-nlx-info (block-physenv block))
 			  :key #'nlx-info-target))
 	      (let ((pred-stack (ir2-block-end-stack (block-info pred))))
 		(unless (tailp new-stack pred-stack)

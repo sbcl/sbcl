@@ -897,8 +897,8 @@
       (unless template
 	(when (and (eq (continuation-function-name (combination-fun call))
 		       (leaf-name
-			(environment-function
-			 (node-environment call))))
+			(physenv-function
+			 (node-physenv call))))
 		   (let ((info (basic-combination-kind call)))
 		     (not (or (function-info-ir2-convert info)
 			      (ir1-attributep (function-info-attributes info)

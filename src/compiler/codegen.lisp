@@ -35,9 +35,9 @@
 (defun current-nfp-tn (vop)
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
     (let ((block (ir2-block-block (vop-block vop))))
-    (when (ir2-environment-number-stack-p
-	   (environment-info
-	    (block-environment block)))
+    (when (ir2-physenv-number-stack-p
+	   (physenv-info
+	    (block-physenv block)))
       (ir2-component-nfp (component-info (block-component block)))))))
 
 ;;; the TN that is used to hold the number stack frame-pointer in the
@@ -45,13 +45,13 @@
 ;;; allocated
 (defun callee-nfp-tn (2env)
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
-    (when (ir2-environment-number-stack-p 2env)
+    (when (ir2-physenv-number-stack-p 2env)
       (ir2-component-nfp (component-info *component-being-compiled*)))))
 
 ;;; the TN used for passing the return PC in a local call to the function
 ;;; designated by 2ENV
 (defun callee-return-pc-tn (2env)
-  (ir2-environment-return-pc-pass 2env))
+  (ir2-physenv-return-pc-pass 2env))
 
 ;;;; specials used during code generation
 
@@ -134,10 +134,10 @@
 		   (block-start 1block))
 	  (sb!assem:assemble (*code-segment*)
 	    (sb!assem:emit-label (block-label 1block)))
-	  (let ((env (block-environment 1block)))
+	  (let ((env (block-physenv 1block)))
 	    (unless (eq env prev-env)
 	      (let ((lab (gen-label)))
-		(setf (ir2-environment-elsewhere-start (environment-info env))
+		(setf (ir2-physenv-elsewhere-start (physenv-info env))
 		      lab)
 		(emit-label-elsewhere lab))
 	      (setq prev-env env)))))

@@ -742,15 +742,15 @@
   (depart-from-tail-set fun)
 
   (let* ((home (node-home-lambda call))
-	 (home-env (lambda-environment home)))
+	 (home-env (lambda-physenv home)))
     (push fun (lambda-lets home))
     (setf (lambda-home fun) home)
-    (setf (lambda-environment fun) home-env)
+    (setf (lambda-physenv fun) home-env)
 
     (let ((lets (lambda-lets fun)))
       (dolist (let lets)
 	(setf (lambda-home let) home)
-	(setf (lambda-environment let) home-env))
+	(setf (lambda-physenv let) home-env))
 
       (setf (lambda-lets home) (nconc lets (lambda-lets home)))
       (setf (lambda-lets fun) ()))

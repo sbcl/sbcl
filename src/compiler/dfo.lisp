@@ -366,7 +366,7 @@
   (setf (functional-kind lambda) :deleted)
   (dolist (let (lambda-lets lambda))
     (setf (lambda-home let) result-lambda)
-    (setf (lambda-environment let) (lambda-environment result-lambda))
+    (setf (lambda-physenv let) (lambda-physenv result-lambda))
     (push let (lambda-lets result-lambda)))
   (setf (lambda-entries result-lambda)
 	(nconc (lambda-entries result-lambda)

@@ -46,10 +46,10 @@
 		 (list location)))
     location))
 
-#!-sb-fluid (declaim (inline ir2-block-environment))
-(defun ir2-block-environment (2block)
+#!-sb-fluid (declaim (inline ir2-block-physenv))
+(defun ir2-block-physenv (2block)
   (declare (type ir2-block 2block))
-  (block-environment (ir2-block-block 2block)))
+  (block-physenv (ir2-block-block 2block)))
 
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the
@@ -136,7 +136,7 @@
   (declare (type clambda fun))
   (let ((res (source-path-tlf-number (node-source-path (lambda-bind fun)))))
     (declare (type (or index null) res))
-    (do-environment-ir2-blocks (2block (lambda-environment fun))
+    (do-physenv-ir2-blocks (2block (lambda-physenv fun))
       (let ((block (ir2-block-block 2block)))
 	(when (eq (block-info block) 2block)
 	  (unless (eql (source-path-tlf-number
@@ -173,16 +173,16 @@
     (dump-location-from-info loc tlf-num var-locs))
   (values))
 
-;;; Dump the successors of Block, being careful not to fly into space on
-;;; weird successors.
+;;; Dump the successors of Block, being careful not to fly into space
+;;; on weird successors.
 (defun dump-block-successors (block env)
-  (declare (type cblock block) (type environment env))
+  (declare (type cblock block) (type physenv env))
   (let* ((tail (component-tail (block-component block)))
 	 (succ (block-succ block))
 	 (valid-succ
 	  (if (and succ
 		   (or (eq (car succ) tail)
-		       (not (eq (block-environment (car succ)) env))))
+		       (not (eq (block-physenv (car succ)) env))))
 	      ()
 	      succ)))
     (vector-push-extend
@@ -190,7 +190,7 @@
      *byte-buffer*)
     (let ((base (block-number
 		 (node-block
-		  (lambda-bind (environment-function env))))))
+		  (lambda-bind (physenv-function env))))))
       (dolist (b valid-succ)
 	(write-var-integer
 	 (the index (- (block-number b) base))
@@ -209,11 +209,11 @@
   (setf (fill-pointer *byte-buffer*) 0)
   (let ((*previous-location* 0)
 	(tlf-num (find-tlf-number fun))
-	(env (lambda-environment fun))
+	(env (lambda-physenv fun))
 	(prev-locs nil)
 	(prev-block nil))
     (collect ((elsewhere))
-      (do-environment-ir2-blocks (2block env)
+      (do-physenv-ir2-blocks (2block env)
 	(let ((block (ir2-block-block 2block)))
 	  (when (eq (block-info block) 2block)
 	    (when prev-block
@@ -366,8 +366,8 @@
 		 (frob-leaf leaf (leaf-info leaf) gensym-p))))
       (frob-lambda fun t)
       (when (>= level 2)
-	(dolist (x (ir2-environment-environment
-		    (environment-info (lambda-environment fun))))
+	(dolist (x (ir2-physenv-environment
+		    (physenv-info (lambda-physenv fun))))
 	  (let ((thing (car x)))
 	    (when (lambda-var-p thing)
 	      (frob-leaf thing (cdr x) (= level 3)))))
@@ -471,7 +471,7 @@
 ;;; Return a C-D-F structure with all the mandatory slots filled in.
 (defun dfun-from-fun (fun)
   (declare (type clambda fun))
-  (let* ((2env (environment-info (lambda-environment fun)))
+  (let* ((2env (physenv-info (lambda-physenv fun)))
 	 (dispatch (lambda-optional-dispatch fun))
 	 (main-p (and dispatch
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
@@ -484,10 +484,10 @@
 		  (component-name
 		   (block-component (node-block (lambda-bind fun))))))
      :kind (if main-p nil (functional-kind fun))
-     :return-pc (tn-sc-offset (ir2-environment-return-pc 2env))
-     :old-fp (tn-sc-offset (ir2-environment-old-fp 2env))
-     :start-pc (label-position (ir2-environment-environment-start 2env))
-     :elsewhere-pc (label-position (ir2-environment-elsewhere-start 2env)))))
+     :return-pc (tn-sc-offset (ir2-physenv-return-pc 2env))
+     :old-fp (tn-sc-offset (ir2-physenv-old-fp 2env))
+     :start-pc (label-position (ir2-physenv-environment-start 2env))
+     :elsewhere-pc (label-position (ir2-physenv-elsewhere-start 2env)))))
 
 ;;; Return a complete C-D-F structure for Fun. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as

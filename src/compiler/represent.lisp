@@ -317,9 +317,9 @@
 		     (vop-block (tn-ref-vop ref)))))
 	   (tails (lambda-tail-set lambda)))
       (flet ((frob (fun)
-	       (setf (ir2-environment-number-stack-p
-		      (environment-info
-		       (lambda-environment fun)))
+	       (setf (ir2-physenv-number-stack-p
+		      (physenv-info
+		       (lambda-physenv fun)))
 		     t)))
 	(frob lambda)
 	(when tails

@@ -825,16 +825,16 @@
 ;;; full call passing locations.
 (defun check-environment-lifetimes (component)
   (dolist (fun (component-lambdas component))
-    (let* ((env (lambda-environment fun))
-	   (2env (environment-info env))
+    (let* ((env (lambda-physenv fun))
+	   (2env (physenv-info env))
 	   (vars (lambda-vars fun))
-	   (closure (ir2-environment-environment 2env))
-	   (pc (ir2-environment-return-pc-pass 2env))
-	   (fp (ir2-environment-old-fp 2env))
+	   (closure (ir2-physenv-environment 2env))
+	   (pc (ir2-physenv-return-pc-pass 2env))
+	   (fp (ir2-physenv-old-fp 2env))
 	   (2block (block-info
 		    (node-block
 		     (lambda-bind
-		      (environment-function env))))))
+		      (physenv-function env))))))
       (do ((conf (ir2-block-global-tns 2block)
 		 (global-conflicts-next conf)))
 	  ((null conf))

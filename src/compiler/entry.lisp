@@ -56,7 +56,7 @@
   (let ((bind (lambda-bind fun))
 	(internal-fun (functional-entry-function fun)))
     (setf (entry-info-closure-p info)
-	  (not (null (environment-closure (lambda-environment fun)))))
+	  (not (null (physenv-closure (lambda-physenv fun)))))
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
 	  (let ((name (leaf-name internal-fun)))
@@ -94,8 +94,8 @@
 					:info (leaf-info lambda)
 					:name (leaf-name ef)
 					:lexenv (make-null-lexenv)))
-		  (closure (environment-closure
-			    (lambda-environment (main-entry ef)))))
+		  (closure (physenv-closure
+			    (lambda-physenv (main-entry ef)))))
 	     (dolist (ref (leaf-refs lambda))
 	       (let ((ref-component (block-component (node-block ref))))
 		 (cond ((eq ref-component component))

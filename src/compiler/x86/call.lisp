@@ -70,28 +70,28 @@
       (make-normal-tn *fixnum-primitive-type*)))
 
 ;;; Make the TNs used to hold Old-FP and Return-PC within the current
-;;; function. We treat these specially so that the debugger can find them at a
-;;; known location.
+;;; function. We treat these specially so that the debugger can find
+;;; them at a known location.
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wire to the stack? No problems.
 (!def-vm-support-routine make-old-fp-save-location (env)
-  (environment-debug-live-tn (make-wired-tn *fixnum-primitive-type*
-					    control-stack-sc-number
-					    ocfp-save-offset)
-			     env))
+  (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
+					control-stack-sc-number
+					ocfp-save-offset)
+			 env))
 ;;; Using a save-tn. No problems.
 #+nil
 (!def-vm-support-routine make-old-fp-save-location (env)
   (specify-save-tn
-   (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
 		  ocfp-save-offset)))
 
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wire to the stack? No problems.
 (!def-vm-support-routine make-return-pc-save-location (env)
-  (environment-debug-live-tn
+  (physenv-debug-live-tn
    (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		  sap-stack-sc-number return-pc-save-offset)
    env))
@@ -100,7 +100,7 @@
 (!def-vm-support-routine make-return-pc-save-location (env)
   (let ((ptype (primitive-type-or-lose 'system-area-pointer)))
     (specify-save-tn
-     (environment-debug-live-tn (make-normal-tn ptype) env)
+     (physenv-debug-live-tn (make-normal-tn ptype) env)
      (make-wired-tn ptype sap-stack-sc-number return-pc-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location. We only

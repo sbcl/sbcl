@@ -1,8 +1,8 @@
 ;;;; This file implements the environment analysis phase for the
 ;;;; compiler. This phase annotates IR1 with a hierarchy environment
-;;;; structures, determining the environment that each LAMBDA 
+;;;; structures, determining the physical environment that each LAMBDA
 ;;;; allocates its variables and finding what values are closed over
-;;;; by each environment.
+;;;; by each physical environment.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -17,22 +17,23 @@
 
 ;;; Do environment analysis on the code in COMPONENT. This involves
 ;;; various things:
-;;;  1. Make an ENVIRONMENT structure for each non-LET LAMBDA, assigning 
-;;;     the LAMBDA-ENVIRONMENT for all LAMBDAs.
-;;;  2. Find all values that need to be closed over by each environment.
+;;;  1. Make a PHYSENV structure for each non-LET LAMBDA, assigning 
+;;;     the LAMBDA-PHYSENV for all LAMBDAs.
+;;;  2. Find all values that need to be closed over by each
+;;;     physical environment.
 ;;;  3. Scan the blocks in the component closing over non-local-exit
 ;;;     continuations.
 ;;;  4. Delete all non-top-level functions with no references. This
 ;;;     should only get functions with non-NULL kinds, since normal
 ;;;     functions are deleted when their references go to zero. 
-(defun environment-analyze (component)
+(defun physenv-analyze (component)
   (declare (type component component))
   (aver (every (lambda (x)
 		 (eq (functional-kind x) :deleted))
 	       (component-new-functions component)))
   (setf (component-new-functions component) ())
   (dolist (fun (component-lambdas component))
-    (reinit-lambda-environment fun))
+    (reinit-lambda-physenv fun))
   (dolist (fun (component-lambdas component))
     (compute-closure fun)
     (dolist (let (lambda-lets fun))
@@ -60,7 +61,7 @@
 ;;; functions with closed-over top-level variables. The post-pass will
 ;;; use the existing structure, rather than allocating a new one. We
 ;;; return true if we discover any possible closure vars.
-(defun pre-environment-analyze-top-level (component)
+(defun pre-physenv-analyze-top-level (component)
   (declare (type component component))
   (let ((found-it nil))
     (dolist (lambda (component-lambdas component))
@@ -95,30 +96,29 @@
 ;;; bottom out on the outermost enclosing thing, and (insert
 ;;; mysterious reason here) it's important to set up bottomed-out-here
 ;;; environments before anything else. -- WHN 2001-09-30
-(defun preallocate-environments-for-top-levelish-lambdas (component)
+(defun preallocate-physenvs-for-top-levelish-lambdas (component)
   (dolist (clambda (component-lambdas component))
     (when (lambda-top-levelish-p clambda)
       (compute-closure clambda)))
   (values))
 
-;;; If FUN has an environment, return it, otherwise assign an empty one.
-(defun get-lambda-environment (fun)
-  (declare (type clambda fun))
-  (let* ((fun (lambda-home fun))
-	 (env (lambda-environment fun)))
-    (or env
-	(let ((res (make-environment :function fun)))
-	  (setf (lambda-environment fun) res)
-	  (dolist (letlambda (lambda-lets fun))
+;;; If CLAMBDA has a PHYSENV , return it, otherwise assign an empty one.
+(defun get-lambda-physenv (clambda)
+  (declare (type clambda clambda))
+  (let ((homefun (lambda-home clambda)))
+    (or (lambda-physenv homefun)
+	(let ((res (make-physenv :function homefun)))
+	  (setf (lambda-physenv homefun) res)
+	  (dolist (letlambda (lambda-lets homefun))
 	    ;; This assertion is to make explicit an
 	    ;; apparently-otherwise-undocumented property of existing
-	    ;; code: We never overwrite an old LAMBDA-ENVIRONMENT.
+	    ;; code: We never overwrite an old LAMBDA-PHYSENV.
 	    ;; -- WHN 2001-09-30
-	    (aver (null (lambda-environment letlambda)))
+	    (aver (null (lambda-physenv letlambda)))
 	    ;; I *think* this is true regardless of LAMBDA-KIND.
 	    ;; -- WHN 2001-09-30
-	    (aver (eql (lambda-home letlambda) fun))
-	    (setf (lambda-environment letlambda) res))
+	    (aver (eql (lambda-home letlambda) homefun))
+	    (setf (lambda-physenv letlambda) res))
 	  res))))
 
 ;;; If FUN has no physical environment, assign one, otherwise clean up
@@ -127,14 +127,14 @@
 ;;; from the closure. If it has no sets, we clear the INDIRECT flag.
 ;;; This is necessary because pre-analysis is done before
 ;;; optimization.
-(defun reinit-lambda-environment (fun)
-  (let ((old (lambda-environment (lambda-home fun))))
+(defun reinit-lambda-physenv (fun)
+  (let ((old (lambda-physenv (lambda-home fun))))
     (cond (old
-	   (setf (environment-closure old)
+	   (setf (physenv-closure old)
 		 (delete-if #'(lambda (x)
 				(and (lambda-var-p x)
 				     (null (leaf-refs x))))
-			    (environment-closure old)))
+			    (physenv-closure old)))
 	   (flet ((clear (fun)
 		    (dolist (var (lambda-vars fun))
 		      (unless (lambda-var-sets var)
@@ -143,13 +143,13 @@
 	     (dolist (let (lambda-lets fun))
 	       (clear let))))
 	  (t
-	   (get-lambda-environment fun))))
+	   (get-lambda-physenv fun))))
   (values))
 
 ;;; Get NODE's environment, assigning one if necessary.
-(defun get-node-environment (node)
+(defun get-node-physenv (node)
   (declare (type node node))
-  (get-lambda-environment (node-home-lambda node)))
+  (get-lambda-physenv (node-home-lambda node)))
 
 ;;; Find any variables in FUN with references outside of the home
 ;;; environment and close over them. If a closed over variable is set,
@@ -159,19 +159,19 @@
 ;;; to do it. We return true if we close over anything.
 (defun compute-closure (fun)
   (declare (type clambda fun))
-  (let ((env (get-lambda-environment fun))
+  (let ((env (get-lambda-physenv fun))
 	(did-something nil))
     (note-unreferenced-vars fun)
     (dolist (var (lambda-vars fun))
       (dolist (ref (leaf-refs var))
-	(let ((ref-env (get-node-environment ref)))
+	(let ((ref-env (get-node-physenv ref)))
 	  (unless (eq ref-env env)
 	    (when (lambda-var-sets var)
 	      (setf (lambda-var-indirect var) t))
 	    (setq did-something t)
 	    (close-over var ref-env env))))
       (dolist (set (basic-var-sets var))
-	(let ((set-env (get-node-environment set)))
+	(let ((set-env (get-node-physenv set)))
 	  (unless (eq set-env env)
 	    (setq did-something t)
 	    (setf (lambda-var-indirect var) t)
@@ -183,19 +183,19 @@
 ;;; (not just calls.) HOME-ENV is THING's home environment. When we
 ;;; reach the home environment, we stop propagating the closure.
 (defun close-over (thing ref-env home-env)
-  (declare (type environment ref-env home-env))
+  (declare (type physenv ref-env home-env))
   (cond ((eq ref-env home-env))
-	((member thing (environment-closure ref-env)))
+	((member thing (physenv-closure ref-env)))
 	(t
-	 (push thing (environment-closure ref-env))
-	 (dolist (call (leaf-refs (environment-function ref-env)))
-	   (close-over thing (get-node-environment call) home-env))))
+	 (push thing (physenv-closure ref-env))
+	 (dolist (call (leaf-refs (physenv-function ref-env)))
+	   (close-over thing (get-node-physenv call) home-env))))
   (values))
 
 ;;;; non-local exit
 
 ;;; Insert the entry stub before the original exit target, and add a
-;;; new entry to the ENVIRONMENT-NLX-INFO. The %NLX-ENTRY call in the
+;;; new entry to the PHYSENV-NLX-INFO. The %NLX-ENTRY call in the
 ;;; stub is passed the NLX-INFO as an argument so that the back end
 ;;; knows what entry is being done.
 ;;;
@@ -211,7 +211,7 @@
 ;;; actually exiting the scope (i.e. a BLOCK), and will also do any
 ;;; other cleanups that may have to be done on the way.
 (defun insert-nlx-entry-stub (exit env)
-  (declare (type environment env) (type exit exit))
+  (declare (type physenv env) (type exit exit))
   (let* ((exit-block (node-block exit))
 	 (next-block (first (block-succ exit-block)))
 	 (cleanup (entry-cleanup (exit-entry exit)))
@@ -228,7 +228,7 @@
     (link-blocks (component-head component) new-block)
 
     (setf (nlx-info-target info) new-block)
-    (push info (environment-nlx-info env))
+    (push info (physenv-nlx-info env))
     (push info (cleanup-nlx-info cleanup))
     (when (member (cleanup-kind cleanup) '(:catch :unwind-protect))
       (setf (node-lexenv (block-last new-block))
@@ -253,7 +253,7 @@
 ;;;    NLX continuation so that there will be a use to represent
 ;;;    the NLX use.
 (defun note-non-local-exit (env exit)
-  (declare (type environment env) (type exit exit))
+  (declare (type physenv env) (type exit exit))
   (let ((entry (exit-entry exit))
 	(cont (node-cont exit))
 	(exit-fun (node-home-lambda exit)))
@@ -267,7 +267,7 @@
 
     (let ((info (find-nlx-info entry cont)))
       (aver info)
-      (close-over info (node-environment exit) env)
+      (close-over info (node-physenv exit) env)
       (when (eq (functional-kind exit-fun) :escape)
 	(mapc #'(lambda (x)
 		  (setf (node-derived-type x) *wild-type*))
@@ -289,8 +289,8 @@
   (dolist (lambda (component-lambdas component))
     (dolist (entry (lambda-entries lambda))
       (dolist (exit (entry-exits entry))
-	(let ((target-env (node-environment entry)))
-	  (if (eq (node-environment exit) target-env)
+	(let ((target-env (node-physenv entry)))
+	  (if (eq (node-physenv exit) target-env)
 	      (maybe-delete-exit exit)
 	      (note-non-local-exit target-env exit))))))
 
@@ -354,11 +354,11 @@
 (defun find-cleanup-points (component)
   (declare (type component component))
   (do-blocks (block1 component)
-    (let ((env1 (block-environment block1))
+    (let ((env1 (block-physenv block1))
 	  (cleanup1 (block-end-cleanup block1)))
       (dolist (block2 (block-succ block1))
 	(when (block-start block2)
-	  (let ((env2 (block-environment block2))
+	  (let ((env2 (block-physenv block2))
 		(cleanup2 (block-start-cleanup block2)))
 	    (unless (or (not (eq env2 env1))
 			(eq cleanup1 cleanup2)

@@ -230,9 +230,10 @@
 
 ;;;; miscellaneous shorthand functions
 
-;;; Return the home (i.e. enclosing non-let) lambda for Node. Since the
-;;; LEXENV-LAMBDA may be deleted, we must chain up the LAMBDA-CALL-LEXENV
-;;; thread until we find a lambda that isn't deleted, and then return its home.
+;;; Return the home (i.e. enclosing non-LET) CLAMBDA for NODE. Since
+;;; the LEXENV-LAMBDA may be deleted, we must chain up the
+;;; LAMBDA-CALL-LEXENV thread until we find a CLAMBDA that isn't
+;;; deleted, and then return its home.
 (declaim (maybe-inline node-home-lambda))
 (defun node-home-lambda (node)
   (declare (type node node))
@@ -244,14 +245,14 @@
       (return fun))))
 
 #!-sb-fluid (declaim (inline node-block node-tlf-number))
-(declaim (maybe-inline node-environment))
+(declaim (maybe-inline node-physenv))
 (defun node-block (node)
   (declare (type node node))
   (the cblock (continuation-block (node-prev node))))
-(defun node-environment (node)
+(defun node-physenv (node)
   (declare (type node node))
   #!-sb-fluid (declare (inline node-home-lambda))
-  (the environment (lambda-environment (node-home-lambda node))))
+  (the physenv (lambda-physenv (node-home-lambda node))))
 
 ;;; Return the enclosing cleanup for environment of the first or last node
 ;;; in BLOCK.
@@ -268,11 +269,11 @@
   #!-sb-fluid (declare (inline node-home-lambda))
   (node-home-lambda (block-last block)))
 
-;;; Return the IR1 environment for BLOCK.
-(defun block-environment (block)
+;;; Return the IR1 physical environment for BLOCK.
+(defun block-physenv (block)
   (declare (type cblock block))
   #!-sb-fluid (declare (inline node-home-lambda))
-  (lambda-environment (node-home-lambda (block-last block))))
+  (lambda-physenv (node-home-lambda (block-last block))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top-level form in its compilation unit.
@@ -1162,7 +1163,7 @@
 (defun find-nlx-info (entry cont)
   (declare (type entry entry) (type continuation cont))
   (let ((entry-cleanup (entry-cleanup entry)))
-    (dolist (nlx (environment-nlx-info (node-environment entry)) nil)
+    (dolist (nlx (physenv-nlx-info (node-physenv entry)) nil)
       (when (and (eq (nlx-info-continuation nlx) cont)
 		 (eq (nlx-info-cleanup nlx) entry-cleanup))
 	(return nlx)))))

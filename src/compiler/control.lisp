@@ -50,15 +50,15 @@
 (defun find-rotated-loop-head (block)
   (declare (type cblock block))
   (let* ((num (block-number block))
-	 (env (block-environment block))
+	 (env (block-physenv block))
 	 (pred (dolist (pred (block-pred block) nil)
 		 (when (and (not (block-flag pred))
-			    (eq (block-environment pred) env)
+			    (eq (block-physenv pred) env)
 			    (< (block-number pred) num))
 		   (return pred)))))
     (cond
      ((and pred
-	   (not (environment-nlx-info env))
+	   (not (physenv-nlx-info env))
 	   (not (eq (node-block (lambda-bind (block-home-lambda block)))
 		    block)))
       (let ((current pred)
@@ -69,7 +69,7 @@
 	      (when (eq pred block)
 		(return-from DONE))
 	      (when (and (not (block-flag pred))
-			 (eq (block-environment pred) env)
+			 (eq (block-physenv pred) env)
 			 (> (block-number pred) current-num))
 		(setq current pred   current-num (block-number pred))
 		(return)))))
@@ -110,8 +110,8 @@
       (let ((last (block-last block)))
 	(cond ((and (combination-p last) (node-tail-p last)
 		    (eq (basic-combination-kind last) :local)
-		    (not (eq (node-environment last)
-			     (lambda-environment (combination-lambda last)))))
+		    (not (eq (node-physenv last)
+			     (lambda-physenv (combination-lambda last)))))
 	       (combination-lambda last))
 	      (t
 	       (let ((component-tail (component-tail (block-component block)))
@@ -128,12 +128,12 @@
 
 ;;; Analyze all of the NLX EPs first to ensure that code reachable
 ;;; only from a NLX is emitted contiguously with the code reachable
-;;; from the Bind. Code reachable from the Bind is inserted *before*
-;;; the NLX code so that the Bind marks the beginning of the code for
-;;; the function. If the walks from NLX EPs reach the bind block, then
+;;; from the BIND. Code reachable from the BIND is inserted *before*
+;;; the NLX code so that the BIND marks the beginning of the code for
+;;; the function. If the walks from NLX EPs reach the BIND block, then
 ;;; we just move it to the beginning.
 ;;;
-;;; If the walk from the bind node encountered a tail local call, then
+;;; If the walk from the BIND node encountered a tail local call, then
 ;;; we start over again there to help the call drop through. Of
 ;;; course, it will never get a drop-through if either function has
 ;;; NLX code.
@@ -143,7 +143,7 @@
 	 (prev-block (block-annotation-prev tail-block))
 	 (bind-block (node-block (lambda-bind fun))))
     (unless (block-flag bind-block)
-      (dolist (nlx (environment-nlx-info (lambda-environment fun)))
+      (dolist (nlx (physenv-nlx-info (lambda-physenv fun)))
 	(control-analyze-block (nlx-info-target nlx) tail-block
 			       block-info-constructor))
       (cond

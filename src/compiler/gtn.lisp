@@ -20,7 +20,7 @@
   (setf (component-info component) (make-ir2-component))
   (let ((funs (component-lambdas component)))
     (dolist (fun funs)
-      (assign-ir2-environment fun)
+      (assign-ir2-physenv fun)
       (assign-return-locations fun)
       (assign-ir2-nlx-info fun)
       (assign-lambda-var-tns fun nil)
@@ -30,7 +30,7 @@
   (values))
 
 ;;; We have to allocate the home TNs for variables before we can call
-;;; ASSIGN-IR2-ENVIRONMENT so that we can close over TNs that haven't
+;;; ASSIGN-IR2-PHYSENV so that we can close over TNs that haven't
 ;;; had their home environment assigned yet. Here we evaluate the
 ;;; DEBUG-INFO/SPEED tradeoff to determine how variables are
 ;;; allocated. If SPEED is 3, then all variables are subject to
@@ -49,21 +49,20 @@
 			  (policy node (zerop debug))
 			  (policy node (= speed 3)))
 		      temp
-		      (environment-debug-live-tn temp
-						 (lambda-environment fun)))))
+		      (physenv-debug-live-tn temp (lambda-physenv fun)))))
 	(setf (tn-leaf res) var)
 	(setf (leaf-info var) res))))
   (values))
 
-;;; Give CLAMBDA an IR2-ENVIRONMENT structure. (And in order to
+;;; Give CLAMBDA an IR2-PHYSENV structure. (And in order to
 ;;; properly initialize the new structure, we make the TNs which hold
 ;;; environment values and the old-FP/return-PC.)
-(defun assign-ir2-environment (clambda)
+(defun assign-ir2-physenv (clambda)
   (declare (type clambda clambda))
-  (let ((lambda-environment (lambda-environment clambda))
-	(reversed-ir2-environment-alist nil))
+  (let ((lambda-physenv (lambda-physenv clambda))
+	(reversed-ir2-physenv-alist nil))
     ;; FIXME: should be MAPCAR, not DOLIST
-    (dolist (thing (environment-closure lambda-environment))
+    (dolist (thing (physenv-closure lambda-physenv))
       (let ((ptype (etypecase thing
 		     (lambda-var
 		      (if (lambda-var-indirect thing)
@@ -71,17 +70,17 @@
 			  (primitive-type (leaf-type thing))))
 		     (nlx-info *backend-t-primitive-type*))))
 	(push (cons thing (make-normal-tn ptype))
-	      reversed-ir2-environment-alist)))
+	      reversed-ir2-physenv-alist)))
 
-    (let ((res (make-ir2-environment
-		:environment (nreverse reversed-ir2-environment-alist)
+    (let ((res (make-ir2-physenv
+		:environment (nreverse reversed-ir2-physenv-alist)
 		:return-pc-pass (make-return-pc-passing-location
 				 (external-entry-point-p clambda)))))
-      (setf (environment-info lambda-environment) res)
-      (setf (ir2-environment-old-fp res)
-	    (make-old-fp-save-location lambda-environment))
-      (setf (ir2-environment-return-pc res)
-	    (make-return-pc-save-location lambda-environment))))
+      (setf (physenv-info lambda-physenv) res)
+      (setf (ir2-physenv-old-fp res)
+	    (make-old-fp-save-location lambda-physenv))
+      (setf (ir2-physenv-return-pc res)
+	    (make-return-pc-save-location lambda-physenv))))
 
   (values))
 
@@ -204,12 +203,12 @@
 ;;; isn't live afterwards.
 (defun assign-ir2-nlx-info (fun)
   (declare (type clambda fun))
-  (let ((env (lambda-environment fun)))
-    (dolist (nlx (environment-nlx-info env))
+  (let ((physenv (lambda-physenv fun)))
+    (dolist (nlx (physenv-nlx-info physenv))
       (setf (nlx-info-info nlx)
 	    (make-ir2-nlx-info
 	     :home (when (member (cleanup-kind (nlx-info-cleanup nlx))
 				 '(:block :tagbody))
 		     (make-normal-tn *backend-t-primitive-type*))
-	     :save-sp (make-nlx-sp-tn env)))))
+	     :save-sp (make-nlx-sp-tn physenv)))))
   (values))

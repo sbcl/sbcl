@@ -49,14 +49,14 @@
 ;;; debugger can find them at a known location.
 (!def-vm-support-routine make-old-fp-save-location (env)
   (specify-save-tn
-   (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type*
 		  control-stack-arg-scn
 		  ocfp-save-offset)))
 (!def-vm-support-routine make-return-pc-save-location (env)
   (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
-     (environment-debug-live-tn (make-normal-tn ptype) env)
+     (physenv-debug-live-tn (make-normal-tn ptype) env)
      (make-wired-tn ptype control-stack-arg-scn lra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location. We
@@ -163,7 +163,7 @@
     (trace-table-entry trace-table-function-prologue)
     (move csp-tn res)
     (inst lda csp-tn (* word-bytes (sb-allocated-size 'control-stack)) csp-tn)
-    (when (ir2-environment-number-stack-p callee)
+    (when (ir2-physenv-number-stack-p callee)
       (inst subq nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
 	    nsp-tn)
       (move nsp-tn nfp))

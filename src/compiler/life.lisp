@@ -370,9 +370,9 @@
 
 ;;;; environment TN stuff
 
-;;; Add a :LIVE global conflict for TN in 2block if there is none present.
-;;; If Debug-P is false (a :ENVIRONMENT TN), then modify any existing conflict
-;;; to be :LIVE.
+;;; Add a :LIVE global conflict for TN in 2block if there is none
+;;; present. If DEBUG-P is false (a :ENVIRONMENT TN), then modify any
+;;; existing conflict to be :LIVE.
 (defun setup-environment-tn-conflict (tn 2block debug-p)
   (declare (type tn tn) (type ir2-block 2block))
   (let ((block-num (ir2-block-number 2block)))
@@ -398,14 +398,14 @@
 ;;; TN. We make the TN global if it isn't already. The TN must have at
 ;;; least one reference.
 (defun setup-environment-tn-conflicts (component tn env debug-p)
-  (declare (type component component) (type tn tn) (type environment env))
+  (declare (type component component) (type tn tn) (type physenv env))
   (when (and debug-p
 	     (not (tn-global-conflicts tn))
 	     (tn-local tn))
     (convert-to-global tn))
   (setf (tn-current-conflict tn) (tn-global-conflicts tn))
   (do-blocks-backwards (block component)
-    (when (eq (block-environment block) env)
+    (when (eq (block-physenv block) env)
       (let* ((2block (block-info block))
 	     (last (do ((b (ir2-block-next 2block) (ir2-block-next b))
 			(prev 2block b))
@@ -421,56 +421,58 @@
 (defun setup-environment-live-conflicts (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))
-    (let* ((env (lambda-environment fun))
-	   (2env (environment-info env)))
-      (dolist (tn (ir2-environment-live-tns 2env))
+    (let* ((env (lambda-physenv fun))
+	   (2env (physenv-info env)))
+      (dolist (tn (ir2-physenv-live-tns 2env))
 	(setup-environment-tn-conflicts component tn env nil))
-      (dolist (tn (ir2-environment-debug-live-tns 2env))
+      (dolist (tn (ir2-physenv-debug-live-tns 2env))
 	(setup-environment-tn-conflicts component tn env t))))
   (values))
 
 ;;; Convert a :NORMAL or :DEBUG-ENVIRONMENT TN to an :ENVIRONMENT TN. This
 ;;; requires adding :LIVE conflicts to all blocks in TN-ENV.
 (defun convert-to-environment-tn (tn tn-env)
-  (declare (type tn tn) (type environment tn-env))
+  (declare (type tn tn) (type physenv tn-env))
   (aver (member (tn-kind tn) '(:normal :debug-environment)))
   (when (eq (tn-kind tn) :debug-environment)
-    (aver (eq (tn-environment tn) tn-env))
-    (let ((2env (environment-info tn-env)))
-      (setf (ir2-environment-debug-live-tns 2env)
-	    (delete tn (ir2-environment-debug-live-tns 2env)))))
+    (aver (eq (tn-physenv tn) tn-env))
+    (let ((2env (physenv-info tn-env)))
+      (setf (ir2-physenv-debug-live-tns 2env)
+	    (delete tn (ir2-physenv-debug-live-tns 2env)))))
   (setup-environment-tn-conflicts *component-being-compiled* tn tn-env nil)
   (setf (tn-local tn) nil)
   (setf (tn-local-number tn) nil)
   (setf (tn-kind tn) :environment)
-  (setf (tn-environment tn) tn-env)
-  (push tn (ir2-environment-live-tns (environment-info tn-env)))
+  (setf (tn-physenv tn) tn-env)
+  (push tn (ir2-physenv-live-tns (physenv-info tn-env)))
   (values))
 
 ;;;; flow analysis
 
-;;; For each Global-TN in Block2 that is :Live, :Read or :Read-Only, ensure
-;;; that there is a corresponding Global-Conflict in Block1. If there is none,
-;;; make a :Live Global-Conflict. If there is a :Read-Only conflict, promote
-;;; it to :Live.
+;;; For each GLOBAL-TN in Block2 that is :LIVE, :READ or :READ-ONLY,
+;;; ensure that there is a corresponding GLOBAL-CONFLICT in BLOCK1. If
+;;; there is none, make a :LIVE GLOBAL-CONFLICT. If there is a
+;;; :READ-ONLY conflict, promote it to :LIVE.
 ;;;
-;;; If we did added a new conflict, return true, otherwise false. We don't
-;;; need to return true when we promote a :Read-Only conflict, since it doesn't
-;;; reveal any new information to predecessors of Block1.
+;;; If we did added a new conflict, return true, otherwise false. We
+;;; don't need to return true when we promote a :READ-ONLY conflict,
+;;; since it doesn't reveal any new information to predecessors of
+;;; BLOCK1.
 ;;;
-;;; We use the Tn-Current-Conflict to walk through the global
-;;; conflicts. Since the global conflicts for a TN are ordered by block, we
-;;; can be sure that the Current-Conflict always points at or before the block
-;;; that we are looking at. This allows us to quickly determine if there is a
-;;; global conflict for a given TN in Block1.
+;;; We use the TN-CURRENT-CONFLICT to walk through the global
+;;; conflicts. Since the global conflicts for a TN are ordered by
+;;; block, we can be sure that the CURRENT-CONFLICT always points at
+;;; or before the block that we are looking at. This allows us to
+;;; quickly determine if there is a global conflict for a given TN in
+;;; BLOCK1.
 ;;;
-;;; When we scan down the conflicts, we know that there must be at least one
-;;; conflict for TN, since we got our hands on TN by picking it out of a
-;;; conflict in Block2.
+;;; When we scan down the conflicts, we know that there must be at
+;;; least one conflict for TN, since we got our hands on TN by picking
+;;; it out of a conflict in BLOCK2.
 ;;;
-;;; We leave the Current-Conflict pointing to the conflict for Block1. The
-;;; Current-Conflict must be initialized to the head of the Global-Conflicts
-;;; for the TN between each flow analysis iteration.
+;;; We leave the CURRENT-Conflict pointing to the conflict for BLOCK1.
+;;; The CURRENT-CONFLICT must be initialized to the head of the
+;;; GLOBAL-CONFLICTS for the TN between each flow analysis iteration.
 (defun propagate-live-tns (block1 block2)
   (declare (type ir2-block block1 block2))
   (let ((live-in (ir2-block-live-in block1))
@@ -598,7 +600,7 @@
 	       (num (global-conflicts-number conf)))
 	  (when (and num (zerop (sbit live-bits num))
 		     (eq (tn-kind tn) :debug-environment)
-		     (eq (tn-environment tn) (block-environment 1block))
+		     (eq (tn-physenv tn) (block-physenv 1block))
 		     (saved-after-read tn block))
 	    (note-conflicts live-bits live-list tn num)
 	    (setf (sbit live-bits num) 1)
@@ -668,7 +670,7 @@
 	  (unless (eq (tn-kind tn) :environment)
 	    (convert-to-environment-tn
 	     tn
-	     (block-environment (ir2-block-block block))))))))
+	     (block-physenv (ir2-block-block block))))))))
   (values))
 
 ;;; FIXME: The next 3 macros aren't needed in the target runtime.

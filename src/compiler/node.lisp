@@ -186,10 +186,10 @@
   ;; top-level form containing the original source.
   (source-path *current-path* :type list)
   ;; If this node is in a tail-recursive position, then this is set to
-  ;; T. At the end of IR1 (in environment analysis) this is computed
-  ;; for all nodes (after cleanup code has been emitted). Before then,
-  ;; a non-null value indicates that IR1 optimization has converted a
-  ;; tail local call to a direct transfer.
+  ;; T. At the end of IR1 (in physical environment analysis) this is
+  ;; computed for all nodes (after cleanup code has been emitted).
+  ;; Before then, a non-null value indicates that IR1 optimization has
+  ;; converted a tail local call to a direct transfer.
   ;;
   ;; If the back-end breaks tail-recursion for some reason, then it
   ;; can null out this slot.
@@ -357,9 +357,9 @@
   ;; Entry/exit points have these blocks as their
   ;; predecessors/successors. Null temporarily. The start and return
   ;; from each non-deleted function is linked to the component head
-  ;; and tail. Until environment analysis links NLX entry stubs to the
-  ;; component head, every successor of the head is a function start
-  ;; (i.e. begins with a BIND node.)
+  ;; and tail. Until physical environment analysis links NLX entry
+  ;; stubs to the component head, every successor of the head is a
+  ;; function start (i.e. begins with a BIND node.)
   (head nil :type (or null cblock))
   (tail nil :type (or null cblock))
   ;; This becomes a list of the CLAMBDA structures for all functions
@@ -457,16 +457,14 @@
   ;; deleted due to unreachability.
   (mess-up nil :type (or node null))
   ;; a list of all the NLX-INFO structures whose NLX-INFO-CLEANUP is
-  ;; this cleanup. This is filled in by environment analysis.
+  ;; this cleanup. This is filled in by physical environment analysis.
   (nlx-info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up
   (nlx-info :test nlx-info))
 
-;;; original CMU CL comment:
-;;;   An ENVIRONMENT structure represents the result of environment
-;;;   analysis.
+;;; A PHYSENV represents the result of physical environment analysis.
 ;;;
 ;;; As far as I can tell from reverse engineering, this IR1 structure
 ;;; represents the physical environment (which is probably not the
@@ -484,29 +482,32 @@
 ;;; FROB-THINGS and FROBBING-ONE-THING are all in the inner LAMBDA's
 ;;; lexical environment, but of those only THING, PATTERN, and
 ;;; FROB-THINGS are in its physical environment. In IR1, we largely
-;;; just collect the names of these things; in IR2 an IR2-ENVIRONMENT
+;;; just collect the names of these things; in IR2 an IR2-PHYSENV
 ;;; structure is attached to INFO and used to keep track of
 ;;; associations between these names and less-abstract things (like
 ;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
-(defstruct (environment (:copier nil))
-  ;; the function that allocates this environment
+(defstruct (physenv (:copier nil))
+  ;; the function that allocates this physical environment
   (function (required-argument) :type clambda)
-  ;; a list of all the lambdas that allocate variables in this environment
+  #| ; seems not to be used as of sbcl-0.pre7.51
+  ;; a list of all the lambdas that allocate variables in this
+  ;; physical environment
   (lambdas nil :type list)
+  |#
   ;; This ultimately converges to a list of all the LAMBDA-VARs and
   ;; NLX-INFOs needed from enclosing environments by code in this
-  ;; environment. In the meantime, it may be
+  ;; physical environment. In the meantime, it may be
   ;;   * NIL at object creation time
   ;;   * a superset of the correct result, generated somewhat later
   ;;   * smaller and smaller sets converging to the correct result as
   ;;     we notice and delete unused elements in the superset
   (closure nil :type list)
   ;; a list of NLX-INFO structures describing all the non-local exits
-  ;; into this environment
+  ;; into this physical environment
   (nlx-info nil :type list)
   ;; some kind of info used by the back end
   (info nil))
-(defprinter (environment :identity t)
+(defprinter (physenv :identity t)
   function
   (closure :test closure)
   (nlx-info :test nlx-info))
@@ -541,7 +542,7 @@
 ;;; The NLX-Info structure is used to collect various information
 ;;; about non-local exits. This is effectively an annotation on the
 ;;; CONTINUATION, although it is accessed by searching in the
-;;; ENVIRONMENT-NLX-INFO.
+;;; PHYSENV-NLX-INFO.
 (def!struct (nlx-info (:make-load-form-fun ignore-it))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
@@ -551,8 +552,8 @@
   (cleanup (required-argument) :type cleanup)
   ;; the continuation exited to (the CONT of the EXIT nodes). If this
   ;; exit is from an escape function (CATCH or UNWIND-PROTECT), then
-  ;; environment analysis deletes the escape function and instead has
-  ;; the %NLX-ENTRY use this continuation.
+  ;; physical environment analysis deletes the escape function and
+  ;; instead has the %NLX-ENTRY use this continuation.
   ;;
   ;; This slot is primarily an indication of where this exit delivers
   ;; its values to (if any), but it is also used as a sort of name to
@@ -561,9 +562,9 @@
   ;; since exits to different places may deliver their result to the
   ;; same continuation.
   (continuation (required-argument) :type continuation)
-  ;; the entry stub inserted by environment analysis. This is a block
-  ;; containing a call to the %NLX-Entry funny function that has the
-  ;; original exit destination as its successor. Null only
+  ;; the entry stub inserted by physical environment analysis. This is
+  ;; a block containing a call to the %NLX-Entry funny function that
+  ;; has the original exit destination as its successor. Null only
   ;; temporarily.
   (target nil :type (or cblock null))
   ;; some kind of info used by the back end
@@ -829,11 +830,11 @@
   ;; (so that any further optimizations on the rest of the tail
   ;; set won't modify the value) if necessary.
   (tail-set nil :type (or tail-set null))
-  ;; the structure which represents the environment that this
+  ;; the structure which represents the phsical environment that this
   ;; function's variables are allocated in. This is filled in by
-  ;; environment analysis. In a LET, this is EQ to our home's
-  ;; environment.
-  (environment nil :type (or environment null))
+  ;; physical environment analysis. In a LET, this is EQ to our home's
+  ;; physical environment.
+  (physenv nil :type (or physenv null))
   ;; In a LET, this is the NODE-LEXENV of the combination node. We
   ;; retain it so that if the LET is deleted (due to a lack of vars),
   ;; we will still have caller's lexenv to figure out which cleanup is
@@ -945,20 +946,20 @@
 ;;; lambda arguments which may ultimately turn out not to be simple
 ;;; and lexical.
 ;;;
-;;; LAMBDA-VARs with no REFs are considered to be deleted; environment
-;;; analysis isn't done on these variables, so the back end must check
-;;; for and ignore unreferenced variables. Note that a deleted
-;;; lambda-var may have sets; in this case the back end is still
-;;; responsible for propagating the Set-Value to the set's Cont.
+;;; LAMBDA-VARs with no REFs are considered to be deleted; physical
+;;; environment analysis isn't done on these variables, so the back
+;;; end must check for and ignore unreferenced variables. Note that a
+;;; deleted lambda-var may have sets; in this case the back end is
+;;; still responsible for propagating the Set-Value to the set's Cont.
 (def!struct (lambda-var (:include basic-var))
   ;; true if this variable has been declared IGNORE
   (ignorep nil :type boolean)
   ;; the CLAMBDA that this var belongs to. This may be null when we are
   ;; building a lambda during IR1 conversion.
   (home nil :type (or null clambda))
-  ;; This is set by environment analysis if it chooses an indirect
-  ;; (value cell) representation for this variable because it is both
-  ;; set and closed over.
+  ;; This is set by physical environment analysis if it chooses an
+  ;; indirect (value cell) representation for this variable because it
+  ;; is both set and closed over.
   (indirect nil :type boolean)
   ;; The following two slots are only meaningful during IR1 conversion
   ;; of hairy lambda vars:
@@ -1187,4 +1188,4 @@
 
 #!-sb-fluid
 (declaim (freeze-type node leaf lexenv continuation cblock component cleanup
-		      environment tail-set nlx-info))
+		      physenv tail-set nlx-info))

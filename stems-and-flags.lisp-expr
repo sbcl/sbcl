@@ -140,11 +140,7 @@
  ;; inherited from CMU CL comcom.lisp. We shouldn't need two versions,
  ;; so I've deleted the one here. -- WHN 19990620
 
- ;; FIXME: There are lots of "maybe" notes in this file, e.g.
- ;; "maybe should be :BYTE-COMPILE T". Once the system is stable,
- ;; look into them.
-
- ("src/code/target-error" :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/target-error" :not-host)
 
  ;; a comment from classic CMU CL:
  ;;   "These guys can supposedly come in any order, but not really.
@@ -231,22 +227,22 @@
 
  ("src/code/stream"        :not-host)
  ("src/code/print"         :not-host)
- ("src/code/pprint"        :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/pprint"        :not-host)
  ("src/code/early-format")
- ("src/code/target-format" :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/target-format" :not-host)
  ("src/code/defpackage"    :not-host)
- ("src/code/pp-backq"      :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/pp-backq"      :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
 
  ("src/code/serve-event" :not-host)
  ("src/code/fd-stream"   :not-host)
 
- ("src/code/module" :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/module" :not-host)
 
  ("src/code/interr" :not-host)
 
- ("src/code/query"  :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/query"  :not-host)
 
  ("src/code/sort"  :not-host)
  ("src/code/time"  :not-host)
@@ -315,7 +311,7 @@
 
  ;; The definitions for CONDITION and CONDITION-CLASS depend on
  ;; SLOT-CLASS, defined in classes.lisp.
- ("src/code/condition" :not-host) ; FIXME: maybe should be :BYTE-COMPILE T
+ ("src/code/condition" :not-host)
 
  ("src/compiler/generic/primtype")
 
@@ -468,7 +464,7 @@
  ("src/compiler/dfo")
  ("src/compiler/checkgen")
  ("src/compiler/constraint")
- ("src/compiler/envanal")
+ ("src/compiler/physenvanal")
 
  ("src/compiler/tn")
  ("src/compiler/life")
@@ -573,10 +569,8 @@
  ("src/code/target-random"     :not-host) ; needs "code/random"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
  ("src/code/reader"            :not-host) ; needs "code/readtable"
- ("src/code/target-pathname"   :not-host) ; needs "code/pathname", maybe 
-                                          ;   should be :BYTE-COMPILE T
- ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname",
-                                          ;   maybe should be :BYTE-COMPILE T
+ ("src/code/target-pathname"   :not-host) ; needs "code/pathname"
+ ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
  ("src/code/save"              :not-host) ; uses the definition of PATHNAME
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
@@ -588,7 +582,7 @@
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/target/target-insts" :not-host)
 
- ("src/code/debug" :not-host) ; maybe should be :BYTE-COMPILE T
+ ("src/code/debug" :not-host)
 
  ;; These can't be compiled until CONDITION and DEFINE-CONDITION
  ;; are defined, and they also use SB-DEBUG:*STACK-TOP-HINT*.

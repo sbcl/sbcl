@@ -1917,19 +1917,19 @@
 		   (when (and ,tn-var (not (eq ,tn-var :more)))
 		     (,n-bod ,tn-var)))))))))))
 
-;;; Iterate over all the IR2 blocks in the environment Env, in emit order.
-(defmacro do-environment-ir2-blocks ((block-var env &optional result)
-				     &body body)
-  (once-only ((n-env env))
+;;; Iterate over all the IR2 blocks in PHYSENV, in emit order.
+(defmacro do-physenv-ir2-blocks ((block-var physenv &optional result)
+				 &body body)
+  (once-only ((n-physenv physenv))
     (once-only ((n-first `(node-block
 			   (lambda-bind
-			    (environment-function ,n-env)))))
+			    (physenv-function ,n-physenv)))))
       (once-only ((n-tail `(block-info
 			    (component-tail
 			     (block-component ,n-first)))))
 	`(do ((,block-var (block-info ,n-first)
 			  (ir2-block-next ,block-var)))
 	     ((or (eq ,block-var ,n-tail)
-		  (not (eq (ir2-block-environment ,block-var) ,n-env)))
+		  (not (eq (ir2-block-physenv ,block-var) ,n-physenv)))
 	      ,result)
 	   ,@body)))))

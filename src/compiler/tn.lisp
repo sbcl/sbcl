@@ -64,14 +64,14 @@
 	       (case (tn-kind tn)
 		 (:environment
 		  (clear-live tn
-			      #'ir2-environment-live-tns
-			      #'(setf ir2-environment-live-tns)))
+			      #'ir2-physenv-live-tns
+			      #'(setf ir2-physenv-live-tns)))
 		 (:debug-environment
 		  (clear-live tn
-			      #'ir2-environment-debug-live-tns
-			      #'(setf ir2-environment-debug-live-tns)))))
+			      #'ir2-physenv-debug-live-tns
+			      #'(setf ir2-physenv-debug-live-tns)))))
 	     (clear-live (tn getter setter)
-	       (let ((env (environment-info (tn-environment tn))))
+	       (let ((env (physenv-info (tn-physenv tn))))
 		 (funcall setter (delete tn (funcall getter env)) env))))
       (declare (inline used-p delete-some delete-1 clear-live))
       (delete-some #'ir2-component-alias-tns
@@ -136,23 +136,24 @@
     (push-in tn-next res (ir2-component-restricted-tns component))
     res))
 
-;;; Make TN be live throughout environment. Return TN. In the DEBUG case,
-;;; the TN is treated normally in blocks in the environment which reference the
-;;; TN, allowing targeting to/from the TN. This results in move efficient
-;;; code, but may result in the TN sometimes not being live when you want it.
-(defun environment-live-tn (tn env)
-  (declare (type tn tn) (type environment env))
+;;; Make TN be live throughout environment. Return TN. In the DEBUG
+;;; case, the TN is treated normally in blocks in the environment
+;;; which reference the TN, allowing targeting to/from the TN. This
+;;; results in move efficient code, but may result in the TN sometimes
+;;; not being live when you want it.
+(defun physenv-live-tn (tn env)
+  (declare (type tn tn) (type physenv env))
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :environment)
-  (setf (tn-environment tn) env)
-  (push tn (ir2-environment-live-tns (environment-info env)))
+  (setf (tn-physenv tn) env)
+  (push tn (ir2-physenv-live-tns (physenv-info env)))
   tn)
-(defun environment-debug-live-tn (tn env)
-  (declare (type tn tn) (type environment env))
+(defun physenv-debug-live-tn (tn env)
+  (declare (type tn tn) (type physenv env))
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :debug-environment)
-  (setf (tn-environment tn) env)
-  (push tn (ir2-environment-debug-live-tns (environment-info env)))
+  (setf (tn-physenv tn) env)
+  (push tn (ir2-physenv-debug-live-tns (physenv-info env)))
   tn)
 
 ;;; Make TN be live throughout the current component. Return TN.

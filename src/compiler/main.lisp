@@ -472,7 +472,7 @@
 
     ;; FIXME: What is MAYBE-MUMBLE for? Do we need it any more?
     (maybe-mumble "env ")
-    (environment-analyze component)
+    (physenv-analyze component)
     (dfo-as-needed component)
 
     (delete-if-no-entries component)
@@ -911,7 +911,7 @@
 
       (let ((*all-components* (append components-from-dfo top-components)))
         (/noshow components-from-dfo top-components *all-components*)
-	(mapc #'preallocate-environments-for-top-levelish-lambdas
+	(mapc #'preallocate-physenvs-for-top-levelish-lambdas
 	      (append hairy-top top-components))
         (dolist (component-from-dfo components-from-dfo)
           (/show "compiling a COMPONENT-FROM-DFO")
@@ -1256,7 +1256,7 @@
 	(check-ir1-consistency *all-components*))
 
       (dolist (component (append hairy-top top-components))
-	(when (pre-environment-analyze-top-level component)
+	(when (pre-physenv-analyze-top-level component)
 	  (setq top-level-closure t)))
 
       (dolist (component components)
