@@ -193,3 +193,10 @@
 		  '(rational 0 10)))
 (assert (subtypep '(rational 0 10)
 		  '(or (eql 0) (rational (0) 10))))
+;;; Until sbcl-0.7.13.7, union of CONS types when the CDRs were the
+;;; same type gave exceedingly wrong results
+(assert (null (subtypep '(or (cons fixnum single-float)
+			     (cons bignum single-float))
+			'(cons single-float single-float))))
+(assert (subtypep '(cons integer single-float)
+		  '(or (cons fixnum single-float) (cons bignum single-float))))

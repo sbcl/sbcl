@@ -2681,13 +2681,35 @@
 	(car-type2 (cons-type-car-type type2))
 	(cdr-type1 (cons-type-cdr-type type1))
 	(cdr-type2 (cons-type-cdr-type type2)))
-    (cond ((type= car-type1 car-type2)
-	   (make-cons-type car-type1
-			   (type-union cdr-type1 cdr-type2)))
-	  ((type= cdr-type1 cdr-type2)
-	   (make-cons-type (type-union cdr-type1 cdr-type2)
-			   cdr-type1)))))
-
+    ;; UGH.  -- CSR, 2003-02-24
+    (macrolet ((frob-car (car1 car2 cdr1 cdr2)
+		 `(type-union
+		   (make-cons-type ,car1 (type-union ,cdr1 ,cdr2))
+		   (make-cons-type
+		    (type-intersection ,car2
+		     (specifier-type
+		      `(not ,(type-specifier ,car1))))
+		    ,cdr2))))
+      (cond ((type= car-type1 car-type2)
+	     (make-cons-type car-type1
+			     (type-union cdr-type1 cdr-type2)))
+	    ((type= cdr-type1 cdr-type2)
+	     (make-cons-type (type-union car-type1 car-type2)
+			     cdr-type1))
+	    ((csubtypep car-type1 car-type2)
+	     (frob-car car-type1 car-type2 cdr-type1 cdr-type2))
+	    ((csubtypep car-type2 car-type1)
+	     (frob-car car-type2 car-type1 cdr-type2 cdr-type1))
+	    ;; Don't put these in -- consider the effect of taking the
+	    ;; union of (CONS (INTEGER 0 2) (INTEGER 5 7)) and
+	    ;; (CONS (INTEGER 0 3) (INTEGER 5 6)).
+	    #+nil
+	    ((csubtypep cdr-type1 cdr-type2)
+	     (frob-cdr car-type1 car-type2 cdr-type1 cdr-type2))
+	    #+nil
+	    ((csubtypep cdr-type2 cdr-type1)
+	     (frob-cdr car-type2 car-type1 cdr-type2 cdr-type1))))))
+	    
 (!define-type-method (cons :simple-intersection2) (type1 type2)
   (declare (type cons-type type1 type2))
   (let (car-int2
