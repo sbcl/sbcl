@@ -142,19 +142,25 @@
 ;;;; file position and file length
 
 ;;; Call the MISC method with the :FILE-POSITION operation.
-(defun file-position (stream &optional position)
+#!-sb-fluid (declaim (inline ansi-stream-file-position))
+(defun ansi-stream-file-position (stream position)
   (declare (type stream stream))
-  (declare (type (or index (alien sb!unix:off-t) (member nil :start :end)) position))
+  (declare (type (or index (alien sb!unix:off-t) (member nil :start :end))
+                 position))
   (cond
-   (position
-    (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-    (funcall (ansi-stream-misc stream) stream :file-position position))
-   (t
-    (let ((res (funcall (ansi-stream-misc stream) stream :file-position nil)))
-      (when res
-	(- res
-	   (- +ansi-stream-in-buffer-length+
-	      (ansi-stream-in-index stream))))))))
+    (position
+     (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+     (funcall (ansi-stream-misc stream) stream :file-position position))
+    (t
+     (let ((res (funcall (ansi-stream-misc stream) stream :file-position nil)))
+       (when res
+         (- res
+            (- +ansi-stream-in-buffer-length+
+               (ansi-stream-in-index stream))))))))
+
+
+(defun file-position (stream &optional position)
+  (ansi-stream-file-position stream position))
 
 ;;; This is a literal translation of the ANSI glossary entry "stream
 ;;; associated with a file".
@@ -199,12 +205,10 @@
 
 ;;;; input functions
 
-(defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
-			    recursive-p)
+#!-sb-fluid (declaim (inline ansi-stream-read-line))
+(defun ansi-stream-read-line (stream eof-error-p eof-value recursive-p)
   (declare (ignore recursive-p))
-  (let ((stream (in-synonym-of stream)))
-    (if (ansi-stream-p stream)
-	(prepare-for-fast-read-char stream
+  (prepare-for-fast-read-char stream
 	  (let ((res (make-string 80))
 		(len 80)
 		(index 0))
@@ -231,95 +235,128 @@
 		     ;; shouldn't do another READ-CHAR.
 		     (t
 		      (done-with-fast-read-char)
-		      (return (values (shrink-vector res index) t))))))))
+		      (return (values (shrink-vector res index) t)))))))))
+
+(defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
+			    recursive-p)
+  (let ((stream (in-synonym-of stream)))
+    (if (ansi-stream-p stream)
+	(ansi-stream-read-line stream eof-error-p eof-value recursive-p)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(multiple-value-bind (string eof) (stream-read-line stream)
 	  (if (and eof (zerop (length string)))
 	      (values (eof-or-lose stream eof-error-p eof-value) t)
 	      (values string eof))))))
 
-;;; We proclaim them INLINE here, then proclaim them MAYBE-INLINE at EOF,
+;;; We proclaim them INLINE here, then proclaim them NOTINLINE later on,
 ;;; so, except in this file, they are not inline by default, but they can be.
 #!-sb-fluid (declaim (inline read-char unread-char read-byte listen))
+
+#!-sb-fluid (declaim (inline ansi-stream-read-char))
+(defun ansi-stream-read-char (stream eof-error-p eof-value recursive-p)
+  (declare (ignore recursive-p))
+  (prepare-for-fast-read-char stream
+    (prog1
+        (fast-read-char eof-error-p eof-value)
+      (done-with-fast-read-char))))
 
 (defun read-char (&optional (stream *standard-input*)
 			    (eof-error-p t)
 			    eof-value
 			    recursive-p)
-  (declare (ignore recursive-p))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
-	(prepare-for-fast-read-char stream
-	  (prog1
-	      (fast-read-char eof-error-p eof-value)
-	    (done-with-fast-read-char)))
+	(ansi-stream-read-char stream eof-error-p eof-value recursive-p)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(let ((char (stream-read-char stream)))
 	  (if (eq char :eof)
 	      (eof-or-lose stream eof-error-p eof-value)
 	      char)))))
 
+#!-sb-fluid (declaim (inline ansi-stream-unread-char))
+(defun ansi-stream-unread-char (character stream)
+  (let ((index (1- (ansi-stream-in-index stream)))
+        (buffer (ansi-stream-in-buffer stream)))
+    (declare (fixnum index))
+    (when (minusp index) (error "nothing to unread"))
+    (cond (buffer
+           (setf (aref buffer index) (char-code character))
+           (setf (ansi-stream-in-index stream) index))
+          (t
+           (funcall (ansi-stream-misc stream) stream
+                    :unread character)))))
+
 (defun unread-char (character &optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
-	(let ((index (1- (ansi-stream-in-index stream)))
-	      (buffer (ansi-stream-in-buffer stream)))
-	  (declare (fixnum index))
-	  (when (minusp index) (error "nothing to unread"))
-	  (cond (buffer
-		 (setf (aref buffer index) (char-code character))
-		 (setf (ansi-stream-in-index stream) index))
-		(t
-		 (funcall (ansi-stream-misc stream) stream
-			  :unread character))))
+	(ansi-stream-unread-char character stream)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(stream-unread-char stream character)))
   nil)
 
+#!-sb-fluid (declaim (inline ansi-stream-listen))
+(defun ansi-stream-listen (stream)
+  (or (/= (the fixnum (ansi-stream-in-index stream))
+          +ansi-stream-in-buffer-length+)
+      ;; Test for T explicitly since misc methods return :EOF sometimes.
+      (eq (funcall (ansi-stream-misc stream) stream :listen) t)))
+
 (defun listen (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
-	(or (/= (the fixnum (ansi-stream-in-index stream))
-		+ansi-stream-in-buffer-length+)
-	    ;; Test for T explicitly since misc methods return :EOF sometimes.
-	    (eq (funcall (ansi-stream-misc stream) stream :listen) t))
+	(ansi-stream-listen stream)
 	;; Fall through to Gray streams FUNDAMENTAL-STREAM case.
 	(stream-listen stream))))
+
+#!-sb-fluid (declaim (inline ansi-stream-read-char-no-hang))
+(defun ansi-stream-read-char-no-hang (stream eof-error-p eof-value recursive-p)
+  (if (funcall (ansi-stream-misc stream) stream :listen)
+      ;; On T or :EOF get READ-CHAR to do the work.
+      (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
+      nil))
 
 (defun read-char-no-hang (&optional (stream *standard-input*)
 				    (eof-error-p t)
 				    eof-value
 				    recursive-p)
-  (declare (ignore recursive-p))
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
-	(if (funcall (ansi-stream-misc stream) stream :listen)
-	    ;; On T or :EOF get READ-CHAR to do the work.
-	    (read-char stream eof-error-p eof-value)
-	    nil)
+	(ansi-stream-read-char-no-hang stream eof-error-p eof-value
+                                       recursive-p)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(let ((char (stream-read-char-no-hang stream)))
 	  (if (eq char :eof)
 	      (eof-or-lose stream eof-error-p eof-value)
 	      char)))))
 
+#!-sb-fluid (declaim (inline ansi-stream-clear-input))
+(defun ansi-stream-clear-input (stream)
+  (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+  (funcall (ansi-stream-misc stream) stream :clear-input))
+
 (defun clear-input (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
-    (cond ((ansi-stream-p stream)
-	   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-	   (funcall (ansi-stream-misc stream) stream :clear-input))
-	  (t
-	   (stream-clear-input stream))))
+    (if (ansi-stream-p stream)
+        (ansi-stream-clear-input stream)
+        ;; must be Gray streams FUNDAMENTAL-STREAM
+        (stream-clear-input stream)))
   nil)
 
-(declaim (maybe-inline read-byte))
+#!-sb-fluid (declaim (inline ansi-stream-read-byte))
+(defun ansi-stream-read-byte (stream eof-error-p eof-value recursive-p)
+  ;; Why the "recursive-p" parameter?  a-s-r-b is funcall'ed from
+  ;; a-s-read-sequence and needs a lambda list that's congruent with
+  ;; that of a-s-read-char
+  (declare (ignore recursive-p))
+  (prepare-for-fast-read-byte stream
+    (prog1
+        (fast-read-byte eof-error-p eof-value t)
+      (done-with-fast-read-byte))))
+
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
-	(prepare-for-fast-read-byte stream
-	  (prog1
-	      (fast-read-byte eof-error-p eof-value t)
-	    (done-with-fast-read-byte)))
+	(ansi-stream-read-byte stream eof-error-p eof-value nil)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(let ((char (stream-read-byte stream)))
 	  (if (eq char :eof)
@@ -440,12 +477,16 @@
   (with-out-stream stream (ansi-stream-out #\newline) (stream-terpri))
   nil)
 
+#!-sb-fluid (declaim (inline ansi-stream-fresh-line))
+(defun ansi-stream-fresh-line (stream)
+  (when (/= (or (charpos stream) 1) 0)
+    (funcall (ansi-stream-out stream) stream #\newline)
+    t))
+
 (defun fresh-line (&optional (stream *standard-output*))
   (let ((stream (out-synonym-of stream)))
     (if (ansi-stream-p stream)
-	(when (/= (or (charpos stream) 1) 0)
-	  (funcall (ansi-stream-out stream) stream #\newline)
-	  t)
+	(ansi-stream-fresh-line stream)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(stream-fresh-line stream))))
 
@@ -463,21 +504,28 @@
 				      string start end))
   string)
 
+#!-sb-fluid (declaim (inline ansi-stream-write-string))
+(defun ansi-stream-write-string (string stream start end)
+  (declare (type string string))
+  (declare (type ansi-stream stream))
+  (declare (type index start end))
+  (if (array-header-p string)
+      (with-array-data ((data string) (offset-start start)
+                        (offset-end end))
+        (funcall (ansi-stream-sout stream)
+                 stream data offset-start offset-end))
+      (funcall (ansi-stream-sout stream) stream string start end))
+  string)
+
 (defun %write-string (string stream start end)
   (declare (type string string))
   (declare (type stream-designator stream))
   (declare (type index start end))
   (let ((stream (out-synonym-of stream)))
-    (cond ((ansi-stream-p stream)
-	   (if (array-header-p string)
-	       (with-array-data ((data string) (offset-start start)
-				 (offset-end end))
-		 (funcall (ansi-stream-sout stream)
-			  stream data offset-start offset-end))
-	       (funcall (ansi-stream-sout stream) stream string start end))
-	   string)
-	  (t ; must be Gray streams FUNDAMENTAL-STREAM
-	   (stream-write-string stream string start end)))))
+    (if(ansi-stream-p stream)
+       (ansi-stream-write-string string stream start end)
+       ;; must be Gray streams FUNDAMENTAL-STREAM
+       (stream-write-string stream string start end))))
 
 ;;; A wrapper function for all those (MACROLET OUT-FUN) definitions,
 ;;; which cannot deal with keyword arguments.
@@ -528,7 +576,7 @@
 ;;; globally.  And we must not inline them in the rest of this file if
 ;;; dispatch to gray or simple streams is to work, since both redefine
 ;;; these functions later.)
-(declaim (maybe-inline read-char unread-char read-byte listen))
+(declaim (notinline read-char unread-char read-byte listen))
 
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
@@ -1679,14 +1727,14 @@
       (list
        (let ((read-function
 	      (if (subtypep (stream-element-type stream) 'character)
-		  #'read-char
-		  #'read-byte)))
+		  #'ansi-stream-read-char
+		  #'ansi-stream-read-byte)))
 	 (do ((rem (nthcdr start seq) (rest rem))
 	      (i start (1+ i)))
 	     ((or (endp rem) (>= i end)) i)
 	   (declare (type list rem)
 		    (type index i))
-	   (let ((el (funcall read-function stream nil :eof)))
+	   (let ((el (funcall read-function stream nil :eof nil)))
 	     (when (eq el :eof)
 	       (return i))
 	     (setf (first rem) el)))))
@@ -1705,12 +1753,12 @@
 	   (t
 	    (let ((read-function
 		   (if (subtypep (stream-element-type stream) 'character)
-		       #'read-char
-		       #'read-byte)))
+		       #'ansi-stream-read-char
+		       #'ansi-stream-read-byte)))
 	      (do ((i offset-start (1+ i)))
 		  ((>= i offset-end) end)
 		(declare (type index i))
-		(let ((el (funcall read-function stream nil :eof)))
+		(let ((el (funcall read-function stream nil :eof nil)))
 		  (when (eq el :eof)
 		    (return (+ start (- i offset-start))))
 		  (setf (aref data i) el)))))))))))
@@ -1742,6 +1790,9 @@
       (list
        (let ((write-function
 	      (if (subtypep (stream-element-type stream) 'character)
+                  ;; FIXME (rudi 2004-08-09): since we know we're an
+                  ;; ansi stream here, we could replace these
+                  ;; functions with ansi-stream-specific constructs
 		  #'write-char
 		  #'write-byte)))
 	 (do ((rem (nthcdr start seq) (rest rem))
@@ -1755,6 +1806,9 @@
       (vector
        (let ((write-function
 	      (if (subtypep (stream-element-type stream) 'character)
+                  ;; FIXME (rudi 2004-08-09): since we know we're an
+                  ;; ansi stream here, we could replace these
+                  ;; functions with ansi-specific constructs
 		  #'write-char
 		  #'write-byte)))
 	 (do ((i start (1+ i)))

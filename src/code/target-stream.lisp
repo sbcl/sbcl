@@ -62,40 +62,45 @@
             (t
              (bug "Impossible case reached in PEEK-CHAR"))))))
 
-;;; We proclaim them INLINE here, then proclaim them MAYBE-INLINE at EOF,
-;;; so, except in this file, they are not inline by default, but they can be.
-#!-sb-fluid (declaim (inline read-char unread-char read-byte listen))
+;;; rudi (2004-08-09): There was an inline declaration for read-char,
+;;; unread-char, read-byte, listen here that was removed because these
+;;; functions are redefined when simple-streams are loaded.
+
+#!-sb-fluid (declaim (inline ansi-stream-peek-char))
+(defun ansi-stream-peek-char (peek-type stream eof-error-p eof-value
+                              recursive-p)
+  (cond ((typep stream 'echo-stream)
+         (echo-misc stream
+                    :peek-char
+                    peek-type
+                    (list eof-error-p eof-value)))
+        (t
+         (generalized-peeking-mechanism
+          peek-type eof-value char
+          (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
+          (ansi-stream-unread-char char stream)))))
 
 (defun peek-char (&optional (peek-type nil)
 			    (stream *standard-input*)
 			    (eof-error-p t)
 			    eof-value
 			    recursive-p)
-  (declare (ignore recursive-p))
   (the (or character boolean) peek-type)
   (let ((stream (in-synonym-of stream)))
-    (cond ((typep stream 'echo-stream)
-	   (echo-misc stream
-		      :peek-char
-		      peek-type
-		      (list eof-error-p eof-value)))
-	  ((ansi-stream-p stream)
-	   (generalized-peeking-mechanism
-	    peek-type eof-value char
-	    (read-char stream eof-error-p eof-value)
-	    (unread-char char stream)))
-	  (t
-	   ;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
-	   (generalized-peeking-mechanism
-	    peek-type :eof char
-	    (if (null peek-type)
-		(stream-peek-char stream)
-		(stream-read-char stream))
-	    (if (null peek-type)
-		()
-		(stream-unread-char stream char))
-	    ()
-	    (eof-or-lose stream eof-error-p eof-value))))))
+    (if (ansi-stream-p stream)
+        (ansi-stream-peek-char peek-type stream eof-error-p eof-value
+                               recursive-p)
+        ;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
+        (generalized-peeking-mechanism
+         peek-type :eof char
+         (if (null peek-type)
+             (stream-peek-char stream)
+             (stream-read-char stream))
+         (if (null peek-type)
+             ()
+             (stream-unread-char stream char))
+         ()
+         (eof-or-lose stream eof-error-p eof-value)))))
 
 (defun echo-misc (stream operation &optional arg1 arg2)
   (let* ((in (two-way-stream-input-stream stream))
@@ -159,4 +164,3 @@
 	       (funcall (ansi-stream-misc out) out operation arg1 arg2)
 	       (stream-misc-dispatch out operation arg1 arg2)))))))
 
-(declaim (maybe-inline read-char unread-char read-byte listen))

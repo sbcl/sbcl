@@ -597,191 +597,6 @@
        (error "Wrong vector type for read-vector on stream not of type simple-stream."))
      (read-sequence vector stream :start (or start 0) :end end))))
 
-;;; Basic functionality for ansi-streams.  These are separate
-;;; functions because they are called in places where we already know
-;;; we operate on an ansi-stream (as opposed to a simple- or
-;;; gray-stream, or the symbols t or nil), so we can evade typecase
-;;; and (in|out)-synonym-of calls.
-
-(declaim (inline %ansi-stream-read-byte %ansi-stream-read-char
-                 %ansi-stream-unread-char %ansi-stream-read-line
-                 %ansi-stream-read-sequence))
-
-(defun %ansi-stream-read-byte (stream eof-error-p eof-value blocking)
-  (declare (ignore blocking))
-  #+nil
-  (sb-kernel:ansi-stream-read-byte stream eof-error-p eof-value)
-  (sb-int:prepare-for-fast-read-byte stream
-    (prog1
-        (sb-int:fast-read-byte eof-error-p eof-value t)
-      (sb-int:done-with-fast-read-byte))))
-
-(defun %ansi-stream-read-char (stream eof-error-p eof-value blocking)
-  (declare (ignore blocking))
-  #+nil
-  (sb-kernel:ansi-stream-read-char stream eof-error-p eof-value)
-  (sb-int:prepare-for-fast-read-char stream
-    (prog1
-        (sb-int:fast-read-char eof-error-p eof-value)
-      (sb-int:done-with-fast-read-char))))
-
-(defun %ansi-stream-unread-char (character stream)
-  (let ((index (1- (sb-kernel:ansi-stream-in-index stream)))
-        (buffer (sb-kernel:ansi-stream-in-buffer stream)))
-    (declare (fixnum index))
-    (when (minusp index) (error "nothing to unread"))
-    (cond (buffer
-           (setf (aref buffer index) (char-code character))
-           (setf (sb-kernel:ansi-stream-in-index stream) index))
-          (t
-           (funcall (sb-kernel:ansi-stream-misc stream) stream
-                    :unread character)))))
-
-(defun %ansi-stream-read-line (stream eof-error-p eof-value)
-  (sb-int:prepare-for-fast-read-char stream
-    (let ((res (make-string 80))
-          (len 80)
-          (index 0))
-      (loop
-       (let ((ch (sb-int:fast-read-char nil nil)))
-         (cond (ch
-                (when (char= ch #\newline)
-                  (sb-int:done-with-fast-read-char)
-                  (return (values (sb-kernel:shrink-vector res index) nil)))
-                (when (= index len)
-                  (setq len (* len 2))
-                  (let ((new (make-string len)))
-                    (replace new res)
-                    (setq res new)))
-                (setf (schar res index) ch)
-                (incf index))
-               ((zerop index)
-                (sb-int:done-with-fast-read-char)
-                (return (values (sb-impl::eof-or-lose stream eof-error-p
-                                                      eof-value)
-                                t)))
-               ;; Since FAST-READ-CHAR already hit the eof char, we
-               ;; shouldn't do another READ-CHAR.
-               (t
-                (sb-int:done-with-fast-read-char)
-                (return (values (sb-kernel:shrink-vector res index) t)))))))))
-
-(defun %ansi-stream-read-sequence (seq stream start %end)
-  (declare (type sequence seq)
-	   (type sb-kernel:ansi-stream stream)
-	   (type sb-int:index start)
-	   (type sb-kernel:sequence-end %end)
-	   (values sb-int:index))
-  (let ((end (or %end (length seq))))
-    (declare (type sb-int:index end))
-    (etypecase seq
-      (list
-       (let ((read-function
-	      (if (subtypep (stream-element-type stream) 'character)
-		  #'%ansi-stream-read-char
-		  #'%ansi-stream-read-byte)))
-	 (do ((rem (nthcdr start seq) (rest rem))
-	      (i start (1+ i)))
-	     ((or (endp rem) (>= i end)) i)
-	   (declare (type list rem)
-		    (type sb-int:index i))
-	   (let ((el (funcall read-function stream nil :eof nil)))
-	     (when (eq el :eof)
-	       (return i))
-	     (setf (first rem) el)))))
-      (vector
-       (sb-kernel:with-array-data ((data seq) (offset-start start)
-                                   (offset-end end))
-         (typecase data
-	   ((or (simple-array (unsigned-byte 8) (*))
-		(simple-array (signed-byte 8) (*))
-		simple-string)
-	    (let* ((numbytes (- end start))
-		   (bytes-read (sb-sys:read-n-bytes stream
-						    data
-						    offset-start
-						    numbytes
-						    nil)))
-	      (if (< bytes-read numbytes)
-		  (+ start bytes-read)
-		  end)))
-	   (t
-	    (let ((read-function
-		   (if (subtypep (stream-element-type stream) 'character)
-		       #'%ansi-stream-read-char
-		       #'%ansi-stream-read-byte)))
-	      (do ((i offset-start (1+ i)))
-		  ((>= i offset-end) end)
-		(declare (type sb-int:index i))
-		(let ((el (funcall read-function stream nil :eof nil)))
-		  (when (eq el :eof)
-		    (return (+ start (- i offset-start))))
-		  (setf (aref data i) el)))))))))))
-
-
-(defun %ansi-stream-write-string (string stream start end)
-  (declare (type string string)
-           (type sb-kernel:ansi-stream stream)
-           (type sb-int:index start end))
-
-  ;; Note that even though you might expect, based on the behavior of
-  ;; things like AREF, that the correct upper bound here is
-  ;; (ARRAY-DIMENSION STRING 0), the ANSI glossary definitions for
-  ;; "bounding index" and "length" indicate that in this case (i.e.
-  ;; for the ANSI-specified functions WRITE-STRING and WRITE-LINE
-  ;; which are implemented in terms of this function), (LENGTH STRING)
-  ;; is the required upper bound. A foolish consistency is the
-  ;; hobgoblin of lesser languages..
-  (unless (<= 0 start end (length string))
-    (error "~@<bad bounding indices START=~W END=~W for ~2I~_~S~:>"
-	   start
-	   end
-	   string))
-
-  (if (sb-kernel:array-header-p string)
-      (sb-kernel:with-array-data ((data string) (offset-start start)
-                                  (offset-end end))
-        (funcall (sb-kernel:ansi-stream-sout stream)
-                 stream data offset-start offset-end))
-      (funcall (sb-kernel:ansi-stream-sout stream) stream string start end))
-  string)
-
-(defun %ansi-stream-write-sequence (seq stream start %end)
-  (declare (type sequence seq)
-           (type sb-kernel:ansi-stream stream)
-           (type sb-int:index start)
-           (type sb-kernel:sequence-end %end)
-           (values sequence))
-  (let ((end (or %end (length seq))))
-    (declare (type sb-int:index end))
-    (etypecase seq
-      (list
-       (let ((write-function
-	      (if (subtypep (stream-element-type stream) 'character)
-                  ;; TODO: Replace these with ansi-stream specific
-                  ;; functions too.
-		  #'write-char
-		  #'write-byte)))
-	 (do ((rem (nthcdr start seq) (rest rem))
-	      (i start (1+ i)))
-	     ((or (endp rem) (>= i end)) seq)
-	   (declare (type list rem)
-		    (type sb-int:index i))
-	   (funcall write-function (first rem) stream))))
-      (string
-       (%ansi-stream-write-string seq stream start end))
-      (vector
-       (let ((write-function
-	      (if (subtypep (stream-element-type stream) 'character)
-                  ;; TODO: Replace these with ansi-stream specific
-                  ;; functions too.
-		  #'write-char
-		  #'write-byte)))
-	 (do ((i start (1+ i)))
-	     ((>= i end) seq)
-	   (declare (type sb-int:index i))
-	   (funcall write-function (aref seq i) stream)))))))
-
 
 ;;;
 ;;; USER-LEVEL FUNCTIONS
@@ -910,7 +725,7 @@
       (simple-stream
        (%read-byte stream eof-error-p eof-value))
       (ansi-stream
-       (%ansi-stream-read-byte stream eof-error-p eof-value t))
+       (sb-impl::ansi-stream-read-byte stream eof-error-p eof-value nil))
       (fundamental-stream
        (let ((char (sb-gray:stream-read-byte stream)))
 	 (if (eq char :eof)
@@ -925,7 +740,8 @@
       (simple-stream
        (%read-char stream eof-error-p eof-value recursive-p t))
       (ansi-stream
-       (%ansi-stream-read-char stream eof-error-p eof-value t))
+       (sb-impl::ansi-stream-read-char stream eof-error-p eof-value
+                                       recursive-p))
       (fundamental-stream
        (let ((char (sb-gray:stream-read-char stream)))
 	 (if (eq char :eof)
@@ -943,9 +759,8 @@
        (with-stream-class (simple-stream)
 	 (funcall-stm-handler j-read-char stream eof-error-p eof-value nil)))
       (ansi-stream
-       (if (funcall (sb-kernel:ansi-stream-misc stream) stream :listen)
-           (%ansi-stream-read-char stream eof-error-p eof-value t)
-           nil))
+       (sb-impl::ansi-stream-read-char-no-hang stream eof-error-p eof-value
+                                               recursive-p))
       (fundamental-stream
        (let ((char (sb-gray:stream-read-char-no-hang stream)))
 	 (if (eq char :eof)
@@ -959,7 +774,7 @@
       (simple-stream
        (%unread-char stream character))
       (ansi-stream
-       (%ansi-stream-unread-char character stream))
+       (sb-impl::ansi-stream-unread-char character stream))
       (fundamental-stream
        (sb-gray:stream-unread-char stream character))))
   nil)
@@ -976,26 +791,8 @@
       ;; FIXME: Broken on ECHO-STREAM (cf internal implementation?) --
       ;; CSR, 2004-01-19
       (ansi-stream
-       (let ((char (%ansi-stream-read-char stream eof-error-p eof-value t)))
-          (cond ((eq char eof-value) char)
-                ((characterp peek-type)
-                 (do ((char char (%ansi-stream-read-char stream eof-error-p
-                                                         eof-value t)))
-                     ((or (eq char eof-value) (char= char peek-type))
-                      (unless (eq char eof-value)
-                        (%ansi-stream-unread-char char stream))
-                      char)))
-                ((eq peek-type t)
-                 (do ((char char (%ansi-stream-read-char stream eof-error-p
-                                                         eof-value t)))
-                     ((or (eq char eof-value)
-			  (not (sb-impl::whitespacep char)))
-                      (unless (eq char eof-value)
-                        (%ansi-stream-unread-char char stream))
-                      char)))
-                (t
-                 (%ansi-stream-unread-char char stream)
-                 char))))
+       (sb-impl::ansi-stream-peek-char peek-type stream eof-error-p eof-value
+                                       recursive-p))
       (fundamental-stream
        (cond ((characterp peek-type)
 	      (do ((char (sb-gray:stream-read-char stream)
@@ -1022,8 +819,9 @@
 		    char))))))))
 
 (defun listen (&optional (stream *standard-input*) (width 1))
-  "Returns T if Width octets are available on the given Stream.  If Width
-  is given as 'character, check for a character."
+  "Returns T if WIDTH octets are available on STREAM.  If WIDTH is
+given as 'CHARACTER, check for a character.  Note: the WIDTH argument
+is supported only on simple-streams."
   ;; WIDTH is number of octets which must be available; any value
   ;; other than 1 is treated as 'character.
   (let ((stream (sb-impl::in-synonym-of stream)))
@@ -1031,11 +829,7 @@
       (simple-stream
        (%listen stream width))
       (ansi-stream
-       (or (/= (the fixnum (sb-kernel:ansi-stream-in-index stream))
-               sb-impl::+ansi-stream-in-buffer-length+)
-	    ;; Test for T explicitly since misc methods return :EOF sometimes.
-	    (eq (funcall (sb-kernel:ansi-stream-misc stream) stream :listen)
-                t)))
+       (sb-impl::ansi-stream-listen stream))
       (fundamental-stream
        (sb-gray:stream-listen stream)))))
 
@@ -1049,7 +843,8 @@
       (simple-stream
        (%read-line stream eof-error-p eof-value recursive-p))
       (ansi-stream
-       (%ansi-stream-read-line stream eof-error-p eof-value))
+       (sb-impl::ansi-stream-read-line stream eof-error-p eof-value
+                                       recursive-p))
       (fundamental-stream
        (multiple-value-bind (string eof) (sb-gray:stream-read-line stream)
 	 (if (and eof (zerop (length string)))
@@ -1070,7 +865,7 @@
        (with-stream-class (simple-stream stream)
 	 (%read-sequence stream seq start end partial-fill)))
       (ansi-stream
-       (%ansi-stream-read-sequence seq stream start end))
+       (sb-impl::ansi-stream-read-sequence seq stream start end))
       (fundamental-stream
        (sb-gray:stream-read-sequence stream seq start end)))))
 
@@ -1081,9 +876,7 @@
       (simple-stream
        (%clear-input stream buffer-only))
       (ansi-stream
-       (setf (sb-kernel:ansi-stream-in-index stream)
-             sb-impl::+ansi-stream-in-buffer-length+)
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :clear-input))
+       (sb-impl::ansi-stream-clear-input stream))
       (fundamental-stream
        (sb-gray:stream-clear-input stream))))
   nil)
@@ -1116,23 +909,21 @@
 			    &key (start 0) (end nil))
   "Outputs the String to the given Stream."
   (let ((stream (sb-impl::out-synonym-of stream))
-	(end (or end (length string))))
+	(end (sb-impl::%check-vector-sequence-bounds string start end)))
     (etypecase stream
       (simple-stream
        (%write-string stream string start end)
        string)
       (ansi-stream
-       (%ansi-stream-write-string string stream start end))
+       (sb-impl::ansi-stream-write-string string stream start end))
       (fundamental-stream
        (sb-gray:stream-write-string stream string start end)))))
 
 (defun write-line (string &optional (stream *standard-output*)
 			  &key (start 0) end)
   (declare (type string string))
-  ;; FIXME: Why is there this difference between the treatments of the
-  ;; STREAM argument in WRITE-STRING and WRITE-LINE?
   (let ((stream (sb-impl::out-synonym-of stream))
-	(end (or end (length string))))
+	(end (sb-impl::%check-vector-sequence-bounds string start end)))
     (etypecase stream
       (simple-stream
        (%check stream :output)
@@ -1140,7 +931,7 @@
 	 (funcall-stm-handler-2 j-write-chars string stream start end)
 	 (funcall-stm-handler-2 j-write-char #\Newline stream)))
       (ansi-stream
-       (%ansi-stream-write-string string stream start end)
+       (sb-impl::ansi-stream-write-string string stream start end)
        (funcall (sb-kernel:ansi-stream-out stream) stream #\Newline))
       (fundamental-stream
        (sb-gray:stream-write-string stream string start end)
@@ -1155,7 +946,7 @@
       (simple-stream
        (%write-sequence stream seq start end))
       (ansi-stream
-       (%ansi-stream-write-sequence seq stream start end))
+       (sb-impl::ansi-stream-write-sequence seq stream start end))
       (fundamental-stream
        (sb-gray:stream-write-sequence stream seq start end)))))
 
@@ -1181,9 +972,7 @@
       (simple-stream
        (%fresh-line stream))
       (ansi-stream
-       (when (/= (or (sb-kernel:charpos stream) 1) 0)
-	 (funcall (sb-kernel:ansi-stream-out stream) stream #\Newline)
-	 t))
+       (sb-impl::ansi-stream-fresh-line stream))
       (fundamental-stream
        (sb-gray:stream-fresh-line stream)))))
 
@@ -1230,24 +1019,13 @@
    File-Stream is open to.  If the second argument is supplied, then
    this becomes the new file position.  The second argument may also
    be :start or :end for the start and end of the file, respectively."
-  (declare (type (or (integer 0 *) (member nil :start :end)) position))
+  (declare (type (or index (alien sb!unix:off-t) (member nil :start :end))
+                 position))
   (etypecase stream
     (simple-stream
      (%file-position stream position))
     (ansi-stream
-     (cond
-       (position
-        (setf (sb-kernel:ansi-stream-in-index stream)
-              sb-impl::+ansi-stream-in-buffer-length+)
-        (funcall (sb-kernel:ansi-stream-misc stream)
-                 stream :file-position position))
-       (t
-        (let ((res (funcall (sb-kernel:ansi-stream-misc stream)
-                            stream :file-position nil)))
-          (when res
-            (- res
-               (- sb-impl::+ansi-stream-in-buffer-length+
-                  (sb-kernel:ansi-stream-in-index stream))))))))))
+     (sb-impl::ansi-stream-file-position stream position))))
 
 (defun file-length (stream)
   "This function returns the length of the file that File-Stream is open to."
@@ -1255,8 +1033,8 @@
     (simple-stream
      (%file-length stream))
     (ansi-stream
-     (progn (sb-impl::stream-must-be-associated-with-file stream)
-            (funcall (sb-kernel:ansi-stream-misc stream) stream :file-length)))))
+     (sb-impl::stream-must-be-associated-with-file stream)
+     (funcall (sb-kernel:ansi-stream-misc stream) stream :file-length))))
 
 (defun charpos (&optional (stream *standard-output*))
   "Returns the number of characters on the current line of output of the given
