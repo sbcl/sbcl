@@ -158,8 +158,8 @@ it would not be in the following situation:
   (length rest))
 @end lisp
 
-because the @code{optimize} declaration affects the binding, not the
-allocation.
+because both the allocation of the @code{&rest} list and the variable
+binding are outside the scope of the @code{optimize} declaration.
 
 There are many cases when dynamic-extent declarations could be useful.
 At present, SBCL implements
