@@ -34,7 +34,7 @@
 #include "lispregs.h"
 #include "interrupt.h"
 #include "genesis/static-symbols.h"
-#include "primitive-objects.h"
+#include "genesis/primitive-objects.h"
 
 
 

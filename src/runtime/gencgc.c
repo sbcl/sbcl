@@ -26,8 +26,6 @@
 
 #include <stdio.h>
 #include <signal.h>
-#include <sys/ptrace.h>
-#include <linux/user.h>
 #include <errno.h>
 #include "runtime.h"
 #include "sbcl.h"
@@ -979,7 +977,7 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 		if((page_table[first_page].allocated ==
 		    (unboxed ? UNBOXED_PAGE : BOXED_PAGE)) &&
 		   (page_table[first_page].large_object == 0) &&
-		   (gc_alloc_genration == 0) &&
+		   (gc_alloc_generation == 0) &&
 		   (page_table[first_page].gen == gc_alloc_generation) &&
 		   (page_table[first_page].bytes_used < (4096-32)) &&
 		   (page_table[first_page].write_protected == 0) &&

@@ -24,7 +24,6 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "gencgc-alloc-region.h"
-#include "genesis/thread.h"
 #include "genesis/unwind-block.h"
 #include "genesis/value-cell.h"
 #include "genesis/vector.h"

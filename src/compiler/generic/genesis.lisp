@@ -3290,7 +3290,12 @@ initially undefined function references:~2%")
 	  (dolist (obj structs)
 	    (out-to
 	     (string-downcase (string (sb!vm:primitive-object-name obj)))
-	     (write-primitive-object obj))))
+	     (write-primitive-object obj)))
+	  (out-to "primitive-objects"
+		  (dolist (obj structs)
+		    (format t "~&#include \"~A.h\"~%"
+			    (string-downcase 
+			     (string (sb!vm:primitive-object-name obj)))))))
 	(out-to "static-symbols" (write-static-symbols))
 	
       (when core-file-name

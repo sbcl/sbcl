@@ -21,6 +21,8 @@
 #include "os.h"
 #include "interrupt.h"
 #include "lispregs.h"
+#include "genesis/static-symbols.h"
+#include "genesis/primitive-objects.h"
 
 #ifndef __i386__
 

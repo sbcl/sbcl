@@ -28,7 +28,8 @@
 #include "interr.h"
 #include "gc.h"
 #include "gc-internal.h"
-#include "primitive-objects.h"
+#include "genesis/primitive-objects.h"
+#include "genesis/static-symbols.h"
 
 #define PRINTNOISE
 

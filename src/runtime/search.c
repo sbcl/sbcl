@@ -15,7 +15,7 @@
 #include "sbcl.h"
 #include "os.h"
 #include "search.h"
-#include "primitive-objects.h"
+#include "genesis/primitive-objects.h"
 
 boolean search_for_type(int type, lispobj **start, int *count)
 {
