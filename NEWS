@@ -1930,6 +1930,8 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     8) data.  (thanks to David Lichteblau)
   * bug fix: it is possible to add a method to a generic function
     without lambda list.
+  * bug fix: reader failed to signal END-OF-FILE inside an
+    object representation. (reported by Nikodemus Siivola)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
     ** condition slot accessors are methods.

@@ -76,10 +76,18 @@
   (assert (= (parse-integer "   12asdb" :junk-allowed t) 12)))
 
 ;;; #A notation enforces that once one 0 dimension has been found, all
-;;; subsequent ones are also 0.  
+;;; subsequent ones are also 0.
 (assert (equal (array-dimensions (read-from-string "#3A()"))
 	       '(0 0 0)))
 (assert (equal (array-dimensions (read-from-string "#3A(())"))
 	       '(1 0 0)))
 (assert (equal (array-dimensions (read-from-string "#3A((() ()))"))
 	       '(1 2 0)))
+
+;;; Bug reported by Nikodemus Siivola on sbcl-devel 2003-07-21:
+;;; package misconfiguration
+(assert (eq
+         (handler-case (with-input-from-string (s "cl:") (read s))
+           (end-of-file (c)
+             'good))
+         'good))
