@@ -28,7 +28,7 @@
 ;;; (But with the PURIFY option it seems to work OK.)
 (defun save-lisp-and-die (core-file-name &key
 					 (toplevel #'toplevel-init)
-					 (purify nil)
+					 (purify t)
 					 (root-structures ())
 					 (environment-name "auxiliary"))
   #!+sb-doc

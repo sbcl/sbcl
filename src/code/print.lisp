@@ -291,20 +291,23 @@
 ;;; Check to see whether OBJECT is a circular reference, and return
 ;;; something non-NIL if it is. If ASSIGN is T, then the number to use
 ;;; in the #n= and #n# noise is assigned at this time.
+;;; If ASSIGN is true, reference bookkeeping will only be done for
+;;; existing entries, no new references will be recorded!
 ;;;
 ;;; Note: CHECK-FOR-CIRCULARITY must be called *exactly* once with
 ;;; ASSIGN true, or the circularity detection noise will get confused
 ;;; about when to use #n= and when to use #n#. If this returns non-NIL
 ;;; when ASSIGN is true, then you must call HANDLE-CIRCULARITY on it.
-;;; If you are not using this inside a WITH-CIRCULARITY-DETECTION,
-;;; then you have to be prepared to handle a return value of :INITIATE
-;;; which means it needs to initiate the circularity detection noise.
+;;; If CHECK-FOR-CIRCULARITY returns :INITIATE as the second value,
+;;; you need to initiate the circularity detection noise, e.g. bind
+;;; *CIRCULARITY-HASH-TABLE* and *CIRCULARITY-COUNTER* to suitable values
+;;; (see #'OUTPUT-OBJECT for an example).
 (defun check-for-circularity (object &optional assign)
   (cond ((null *print-circle*)
 	 ;; Don't bother, nobody cares.
 	 nil)
 	((null *circularity-hash-table*)
-	 :initiate)
+          (values nil :initiate))
 	((null *circularity-counter*)
 	 (ecase (gethash object *circularity-hash-table*)
 	   ((nil)
@@ -396,19 +399,20 @@
 		       (output-ugly-object object stream)))
 		 (output-ugly-object object stream)))
 	   (check-it (stream)
-	     (let ((marker (check-for-circularity object t)))
-	       (case marker
-		 (:initiate
-		  (let ((*circularity-hash-table*
+             (multiple-value-bind (marker initiate)
+                 (check-for-circularity object t)
+               ;; initialization of the circulation detect noise ...
+	       (if (eq initiate :initiate)
+                 (let ((*circularity-hash-table*
 			 (make-hash-table :test 'eq)))
-		    (check-it (make-broadcast-stream))
-		    (let ((*circularity-counter* 0))
-		      (check-it stream))))
-		 ((nil)
-		  (print-it stream))
-		 (t
-		  (when (handle-circularity marker stream)
-		    (print-it stream)))))))
+                   (check-it (make-broadcast-stream))
+                   (let ((*circularity-counter* 0))
+                     (check-it stream)))
+                 ;; otherwise
+                 (if marker
+                   (when (handle-circularity marker stream)
+                     (print-it stream))
+                   (print-it stream))))))
     (cond (;; Maybe we don't need to bother with circularity detection.
 	   (or (not *print-circle*)
 	       (uniquely-identified-by-print-p object))
@@ -947,7 +951,8 @@
 	(output-object (pop list) stream)
 	(unless list
 	  (return))
-	(when (or (atom list) (check-for-circularity list))
+	(when (or (atom list)
+                  (check-for-circularity list))
 	  (write-string " . " stream)
 	  (output-object list stream)
 	  (return))

@@ -1205,7 +1205,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "VECTOR-TO-BIT-VECTOR*" "VECTOR-TO-SIMPLE-BIT-VECTOR*"
              "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH"
              "WITH-ARRAY-DATA"
-             "WITH-CIRCULARITY-DETECTION" "WITH-TYPE-CACHES"
              "WRONG-NUMBER-OF-INDICES-ERROR"
 
              "FDEFN" "MAKE-FDEFN" "FDEFN-P"

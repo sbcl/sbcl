@@ -1,0 +1,71 @@
+;;;; test of the pretty-printer
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; While most of SBCL is derived from the CMU CL system, the test
+;;;; files (like this one) were written from scratch after the fork
+;;;; from CMU CL.
+;;;; 
+;;;; This software is in the public domain and is provided with
+;;;; absolutely no warranty. See the COPYING and CREDITS files for
+;;;; more information.
+
+(in-package :cl-user)
+
+;;;; tests for former BUG 99, where pretty-printing was pretty messed
+;;;; up, e.g. PPRINT-LOGICAL-BLOCK - because of CHECK-FOR-CIRCULARITY
+;;;; - didn't really work:
+;;;;   "DESCRIBE interacts poorly with *PRINT-CIRCLE*, e.g. the output from 
+;;;;    (let ((*print-circle* t)) (describe (make-hash-table)))
+;;;;  is weird, [...] #<HASH-TABLE :TEST EQL :COUNT 0 {90BBFC5}> is an . (EQL)
+;;;; ..."
+;;;; So, this was mainly a pretty printing problem.
+
+;;; Create a circular list.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *circ-list* '(1 1))
+  (prog1 nil
+    (setf (cdr *circ-list*) *circ-list*)))
+
+;;; circular lists are still being printed correctly?
+(assert (equal
+         (with-output-to-string (*standard-output*)
+           (let ((*print-circle* t))
+             (pprint-logical-block (*standard-output* *circ-list*)
+                                 (format *standard-output* "~S" *circ-list*))))
+         "#1=(1 . #1#)"))
+
+;;; test from CLHS
+(assert (equal
+         (with-output-to-string (*standard-output*)
+          (let ((a (list 1 2 3)))
+            (setf (cdddr a) a)
+            (let ((*print-circle* t))
+              (write a :stream *standard-output*))
+            :done))
+         "#1=(1 2 3 . #1#)"))
+
+;;; test case 1 for bug 99
+(assert (equal
+         (with-output-to-string (*standard-output*)
+           (let* ((*print-circle* t))
+             (format *standard-output* "~@<~S ~_is ~S. This was not seen!~:>"
+                     'eql 'eql)))
+         "EQL is EQL. This was not seen!"))
+
+;;; test case 2 for bug 99
+(assert (equal
+         (with-output-to-string (*standard-output*)
+           (let* ((*print-circle* t))
+             (format *standard-output*
+                     "~@<~S ~_is ~S and ~S. This was not seen!~:>"
+                     'eql 'eql 'eql)))
+         "EQL is EQL and EQL. This was not seen!"))
+
+;;; the original test for BUG 99 (only interactive), no obvious
+;;; way to make an automated test:
+;;;  (LET ((*PRINT-CIRCLE* T)) (DESCRIBE (MAKE-HASH-TABLE)))
+
+;;; success
+(quit :unix-status 104)

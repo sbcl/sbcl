@@ -86,6 +86,8 @@ mkdir animal/vertebrate/mammal/bear
 mkdir animal/vertebrate/mammal/mythical
 mkdir animal/vertebrate/mammal/rodent
 mkdir animal/vertebrate/mammal/ruminant
+touch animal/vertebrate/mammal/platypus
+touch animal/vertebrate/mammal/walrus
 touch animal/vertebrate/mammal/bear/grizzly
 touch animal/vertebrate/mammal/mythical/mermaid
 touch animal/vertebrate/mammal/mythical/unicorn
