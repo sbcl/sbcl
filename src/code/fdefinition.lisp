@@ -273,4 +273,5 @@
   (let ((fdefn (fdefinition-object name nil)))
     (when fdefn
       (fdefn-makunbound fdefn)))
+  (sb!kernel:undefine-fun-name name)
   name)

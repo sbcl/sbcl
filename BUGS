@@ -1335,6 +1335,14 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   forever, even when it is uninterned and all other references to it
   are lost. 
 
+136:
+  (reported by Arnaud Rouanet on cmucl-imp 2001-12-18)
+    (defmethod foo ((x integer))
+      x)
+    (defmethod foo :around ((x integer))
+      (let ((x (1+ x)))
+        (call-next-method)))
+  Now (FOO 3) should return 3, but instead it returns 4.
     
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

@@ -564,6 +564,10 @@
 ;;; BITS must be evenly divisible by eight.
 (defun write-packed-bit-vector (bits byte-buffer)
   (declare (type simple-bit-vector bits) (type byte-buffer byte-buffer))
+
+  ;; Enforce constraint from CMU-CL-era comment.
+  (aver (zerop (mod (length bits) 8)))
+
   (multiple-value-bind (initial step done)
       (ecase *backend-byte-order*
 	(:little-endian (values 0  1  8))
