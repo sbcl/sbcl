@@ -38,7 +38,7 @@
              (with-open-file (stream (merge-pathnames
                                       (make-pathname
                                        :directory
-                                       '(:relative :up :up "tools-for-build")
+                                       '(:relative :up :up "output")
                                        :name "ucd"
                                        :type "dat")
                                       sb!xc:*compile-file-pathname*)
@@ -128,7 +128,7 @@
 	 (#x97 ("End-Guarded-Area"))
 	 (#x98 ("Start-String"))
 	 (#x99 ("C99"))
-	 (#x9A ("Single-character-Introducer"))
+	 (#x9A ("Single-Character-Introducer"))
 	 (#x9B ("Control-Sequence-Introducer"))
 	 (#x9C ("String-Terminator"))
 	 (#x9D ("Operating-System-Command"))
@@ -137,11 +137,13 @@
 
 ;;;; accessor functions
 
+;; (* 8 186) => 1488
+;; (+ 1488 (ash #x110000 -8)) => 5840
 (defun ucd-index (char)
   (let* ((cp (char-code char))
 	 (cp-high (ash cp -8))
-	 (page (aref *character-database* (+ 1472 cp-high))))
-    (+ 5824 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
+	 (page (aref *character-database* (+ 1488 cp-high))))
+    (+ 5840 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
 
 (defun ucd-value-0 (char)
   (aref *character-database* (ucd-index char)))
@@ -265,7 +267,7 @@
   "The argument must be a character object. BOTH-CASE-P returns T if the
   argument is an alphabetic character and if the character exists in
   both upper and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
-  (< (ucd-value-0 char) 3))
+  (< (ucd-value-0 char) 2))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
