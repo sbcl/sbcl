@@ -211,6 +211,12 @@
 		    (values (typep host-object target-type) t))
 		   (t
 		    (values nil t))))
+	    (;; Complexes suffer the same kind of problems as arrays
+	     (and (not (unknown-type-p (values-specifier-type target-type)))
+		  (sb!xc:subtypep target-type 'cl:complex))
+	     (if (complexp host-object)
+		 (warn-and-give-up) ; general-case complexes being way too hard
+		 (values nil t))) ; but "obviously not a complex" being easy
 	    ;; Some types require translation between the cross-compilation
 	    ;; host Common Lisp and the target SBCL.
 	    ((target-type-is-in '(sb!xc:class))

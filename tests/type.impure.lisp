@@ -9,16 +9,21 @@
 (defmacro assert-t-t (expr)
   `(assert (equal '(t t) (multiple-value-list ,expr))))
 
+(defmacro assert-t-t-or-uncertain (expr)
+  `(assert (let ((list (multiple-value-list ,expr)))
+	     (or (equal '(nil nil) list)
+		 (equal '(t t) list)))))
+
 (let ((types '(character
 	       integer fixnum (integer 0 10)
 	       single-float (single-float -1.0 1.0) (single-float 0.1)
 	       (real 4 8) (real -1 7) (real 2 11)
+	       null symbol keyword
 	       (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
-	       ;; FIXME: When bug 91 is fixed, add these to the list:
-	       ;;   (INTEGER -1 1)
-	       ;;   UNSIGNED-BYTE
-	       ;;   (RATIONAL -1 7) (RATIONAL -2 4)
-	       ;;   RATIO
+	       (integer -1 1)
+	       unsigned-byte
+	       (rational -1 7) (rational -2 4)
+	       ratio
 	       )))
   (dolist (i types)
     (format t "type I=~S~%" i)
@@ -170,6 +175,13 @@
 ;;; corresponding to the NIL type-specifier; we were bogusly returning
 ;;; NIL, T (indicating surety) for the following:
 (assert-nil-nil (subtypep '(satisfies some-undefined-fun) 'nil))
+
+;;; It turns out that, as of sbcl-0.7.2, we require to be able to
+;;; detect this to compile src/compiler/node.lisp (and in particular,
+;;; the definition of the component structure). Since it's a sensible
+;;; thing to want anyway, let's test for it here:
+(assert-t-t (subtypep '(or some-undefined-type (member :no-ir2-yet :dead))
+		      '(or some-undefined-type (member :no-ir2-yet :dead))))
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and

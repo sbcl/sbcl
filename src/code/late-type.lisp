@@ -640,6 +640,8 @@
   (declare (type ctype type1 type2))
   (cond ((eq type1 type2)
 	 type1)
+	((csubtypep type1 type2) type2)
+	((csubtypep type2 type1) type1)
 	((or (union-type-p type1)
 	     (union-type-p type2))
 	 ;; Unions of UNION-TYPE should have the UNION-TYPE-TYPES
@@ -692,6 +694,9 @@
 	      ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (cond ((eq type1 type2)
+	 ;; FIXME: For some reason, this doesn't catch e.g. type1 =
+	 ;; type2 = (SPECIFIER-TYPE
+	 ;; 'SOME-UNKNOWN-TYPE). Investigate. - CSR, 2002-04-10
 	 type1)
 	((or (intersection-type-p type1)
 	     (intersection-type-p type2))
@@ -914,7 +919,13 @@
   (values (or (eq type1 *empty-type*) (eq type2 *wild-type*)) t))
 
 (!define-type-method (named :complex-subtypep-arg1) (type1 type2)
-  (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
+  ;; This AVER causes problems if we write accurate methods for the
+  ;; union (and possibly intersection) types which then delegate to
+  ;; us; while a user shouldn't get here, because of the odd status of
+  ;; *wild-type* a type-intersection executed by the compiler can. -
+  ;; CSR, 2002-04-10
+  ;;
+  ;; (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (cond ((eq type1 *empty-type*)
 	 t)
 	(;; When TYPE2 might be the universal type in disguise
@@ -933,7 +944,7 @@
 	 (values nil nil))
 	(t
 	 ;; By elimination, TYPE1 is the universal type.
-	 (aver (eq type1 *universal-type*))
+	 (aver (or (eq type1 *wild-type*) (eq type1 *universal-type*)))
 	 ;; This case would have been picked off by the SIMPLE-SUBTYPEP
 	 ;; method, and so shouldn't appear here.
 	 (aver (not (eq type2 *universal-type*)))
@@ -1094,8 +1105,9 @@
 
 (!define-type-method (hairy :simple-intersection2 :complex-intersection2)
 		     (type1 type2)
-  (declare (ignore type1 type2))
-  nil)
+  (if (type= type1 type2)
+      type1
+      nil))
 
 (!define-type-method (hairy :simple-=) (type1 type2)
   (if (equal (hairy-type-specifier type1)
@@ -2114,28 +2126,87 @@
       'list
       `(or ,@(mapcar #'type-specifier (union-type-types type)))))
 
+;;; Two union types are equal if they are each subtypes of each
+;;; other. We need to be this clever because our complex subtypep
+;;; methods are now more accurate; we don't get infinite recursion
+;;; because the simple-subtypep method delegates to complex-subtypep
+;;; of the individual types of type1. - CSR, 2002-04-09
+;;;
+;;; Previous comment, now obsolete, but worth keeping around because
+;;; it is true, though too strong a condition:
+;;;
 ;;; Two union types are equal if their subtypes are equal sets.
 (!define-type-method (union :simple-=) (type1 type2)
-  (type=-set (union-type-types type1)
-	     (union-type-types type2)))
+  (multiple-value-bind (subtype certain?)
+      (csubtypep type1 type2)
+    (if subtype
+	(csubtypep type2 type1)
+	;; we might as well become as certain as possible.
+	(if certain?
+	    (values nil t)
+	    (multiple-value-bind (subtype certain?)
+		(csubtypep type2 type1)
+	      (declare (ignore subtype))
+	      (values nil certain?))))))
+
+(!define-type-method (union :complex-=) (type1 type2)
+  (if (some #'hairy-type-p (union-type-types type2))
+      (values nil nil)
+      (values nil t)))
 
 ;;; Similarly, a union type is a subtype of another if and only if
 ;;; every element of TYPE1 is a subtype of TYPE2.
-(!define-type-method (union :simple-subtypep) (type1 type2)
+(defun union-simple-subtypep (type1 type2)
   (every/type (swapped-args-fun #'union-complex-subtypep-arg2)
 	      type2
 	      (union-type-types type1)))
 
+(!define-type-method (union :simple-subtypep) (type1 type2)
+  (union-simple-subtypep type1 type2))
+  
 (defun union-complex-subtypep-arg1 (type1 type2)
   (every/type (swapped-args-fun #'csubtypep)
 	      type2
 	      (union-type-types type1)))
+
 (!define-type-method (union :complex-subtypep-arg1) (type1 type2)
   (union-complex-subtypep-arg1 type1 type2))
 
 (defun union-complex-subtypep-arg2 (type1 type2)
-  (multiple-value-bind (sub-value sub-certain?) 
-      (any/type #'csubtypep type1 (union-type-types type2))
+  (multiple-value-bind (sub-value sub-certain?)
+      ;; was: (any/type #'csubtypep type1 (union-type-types type2)),
+      ;; which turns out to be too restrictive, causing bug 91.
+      ;;
+      ;; the following reimplementation might look dodgy.  It is
+      ;; dodgy. It depends on the union :complex-= method not doing
+      ;; very much work -- certainly, not using subtypep. Reasoning:
+      (progn
+	;; At this stage, we know that type2 is a union type and type1
+	;; isn't. We might as well check this, though:
+	(aver (union-type-p type2))
+	(aver (not (union-type-p type1)))
+	;;     A is a subset of (B1 u B2)
+	;; <=> A n (B1 u B2) = A
+	;; <=> (A n B1) u (A n B2) = A
+	;;
+	;; But, we have to be careful not to delegate this type= to
+	;; something that could invoke subtypep, which might get us
+	;; back here -> stack explosion. We therefore ensure that the
+	;; second type (which is the one that's dispatched on) is
+	;; either a union type (where we've ensured that the complex-=
+	;; method will not call subtypep) or something with no union
+	;; types involved, in which case we'll never come back here.
+	;;
+	;; If we don't do this, then e.g.
+	;; (SUBTYPEP '(MEMBER 3) '(OR (SATISFIES FOO) (SATISFIES BAR)))
+	;; would loop infinitely, as the member :complex-= method is
+	;; implemented in terms of subtypep.
+	;;
+	;; Ouch. - CSR, 2002-04-10
+	(type= type1
+	       (apply #'type-union
+		      (mapcar (lambda (x) (type-intersection type1 x))
+			      (union-type-types type2)))))
     (if sub-certain?
 	(values sub-value sub-certain?)
 	;; The ANY/TYPE expression above is a sufficient condition for
@@ -2143,6 +2214,7 @@
 	;; certain answer by this CALL-NEXT-METHOD-ish step when the
 	;; ANY/TYPE expression is uncertain.
 	(invoke-complex-subtypep-arg1-method type1 type2))))
+
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
   (union-complex-subtypep-arg2 type1 type2))
 
@@ -2160,9 +2232,19 @@
   ;; CSUBTYPEP, in order to avoid possibly invoking any methods which
   ;; might in turn invoke (TYPE-INTERSECTION2 TYPE1 TYPE2) and thus
   ;; cause infinite recursion.
-  (cond ((union-complex-subtypep-arg2 type1 type2)
+  ;;
+  ;; Within this method, type2 is guaranteed to be a union type:
+  (aver (union-type-p type2))
+  ;; Make sure to call only the applicable methods...
+  (cond ((and (union-type-p type1)
+	      (union-simple-subtypep type1 type2)) type1)
+	((and (union-type-p type1)
+	      (union-simple-subtypep type2 type1)) type2)
+	((and (not (union-type-p type1))
+	      (union-complex-subtypep-arg2 type1 type2))
 	 type1)
-	((union-complex-subtypep-arg1 type2 type1)
+	((and (not (union-type-p type1))
+	      (union-complex-subtypep-arg1 type2 type1))
 	 type2)
 	(t 
 	 ;; KLUDGE: This code accumulates a sequence of TYPE-UNION2

@@ -594,18 +594,6 @@ WORKAROUND:
   bootstrap on a system which uses a different value of CHAR-CODE-LIMIT
   than SBCL does.
 
-91:
-  (subtypep '(or (integer -1 1)
-                 unsigned-byte)
-            '(or (rational -1 7)
-                 unsigned-byte
-                 (integer -1 1))) => NIL,T
-  An analogous problem with SINGLE-FLOAT and REAL types was fixed in 
-  sbcl-0.6.11.22, but some peculiarites of the RATIO type make it 
-  awkward to generalize the fix to INTEGER and RATIONAL. It's not 
-  clear what's the best fix. (See the "bug in type handling" discussion
-  on cmucl-imp ca. 2001-03-22 and ca. 2001-02-12.)
-
 94a: 
   Inconsistencies between derived and declared VALUES return types for
   DEFUN aren't checked very well. E.g. the logic which successfully
@@ -1252,13 +1240,7 @@ WORKAROUND:
   figured out how to reproduce).
 
 155:
-  Executing 
-    (defclass standard-gadget (basic-gadget) ())
-    (defclass basic-gadget () ())
-  gives an error:
-    The slot SB-PCL::DIRECT-SUPERCLASSES is unbound in the
-    object #<SB-PCL::STANDARD-CLASS "unbound">.
-  (reported by Brian Spilsbury sbcl-devel 2002-04-09)
+  (fixed in sbcl-0.7.2.9)
 
 156:
   FUNCTION-LAMBDA-EXPRESSION doesn't work right in 0.7.0 or 0.7.2.9:
@@ -1306,6 +1288,13 @@ WORKAROUND:
   HOST-NAMESTRING on a Unix pathname returns "Unix", which isn't
   treated as a valid host by anything else in the system. (Reported by
   Erik Naggum on comp.lang.lisp 2002-04-18)
+
+164:
+  The type system still can't quite deal with all useful identities;
+  for instance, as of sbcl-0.7.2.18, the type specifier '(and (real -1
+  7) (real 4 8)) is a HAIRY-TYPE rather than that which would be hoped
+  for, viz: '(real 4 7).
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
