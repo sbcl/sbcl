@@ -1079,7 +1079,15 @@ WORKAROUND:
       (declare (type (integer 0 #.large-constant) n))
       (expt 1/10 n))
 
-  (fixed in 0.8.2.51)
+  (fixed in 0.8.2.51, but a test case would be good)
+
+276:
+    (defmethod fee ((x fixnum))
+      (setq x (/ x 2))
+      x)
+    (fee 1) => type error
+
+  (taken from CLOCC)
 
 
 DEFUNCT CATEGORIES OF BUGS
