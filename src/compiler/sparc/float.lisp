@@ -118,7 +118,7 @@
 (defun move-long-reg (dst src)
   (cond
     ((member :sparc-v9 *backend-subfeatures*)
-     (inst fmovq dst src)
+     (inst fmovq dst src))
     (t
      (dotimes (i 4)
        (let ((dst (make-random-tn :kind :normal
@@ -127,7 +127,7 @@
 	     (src (make-random-tn :kind :normal
 				  :sc (sc-or-lose 'single-reg)
 				  :offset (+ i (tn-offset src)))))
-	 (inst fmovs dst src)))))))
+	 (inst fmovs dst src))))))
 
 (macrolet ((frob (vop sc format)
 	     `(progn

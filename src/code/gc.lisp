@@ -138,23 +138,6 @@ and submit it as a patch."
   (+ (dynamic-usage)
      *n-bytes-freed-or-purified*))
 
-;;;; variables and constants
-
-;;; the minimum amount of dynamic space which must be consed before a
-;;; GC will be triggered
-;;;
-;;; Unlike CMU CL, we don't export this variable. (There's no need to,
-;;; since our BYTES-CONSED-BETWEEN-GCS function is SETFable.)
-(defvar *bytes-consed-between-gcs*
-  #!+gencgc (* 4 (expt 10 6))
-  ;; Stop-and-copy GC is really really slow when used too often. CSR
-  ;; reported that even on his old 64 Mb SPARC, 20 Mb is much faster
-  ;; than 4 Mb when rebuilding SBCL ca. 0.7.1. For modern machines
-  ;; with >> 128 Mb memory, the optimum could be significantly more
-  ;; than this, but at least 20 Mb should be better than 4 Mb.
-  #!-gencgc (* 20 (expt 10 6)))
-(declaim (type index *bytes-consed-between-gcs*))
-
 ;;;; GC hooks
 
 (defvar *before-gc-hooks* nil ; actually initialized in cold init
