@@ -1165,13 +1165,16 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
 changes in sbcl-0.7.6 relative to sbcl-0.7.5:
   * Array initialization with :INITIAL-ELEMENT is now much faster for
     cases when the compiler cannot open code the array creation, but
-    does know what the UPGRADED-ARRAY-ELEMENT-TYPE will be.
+    does know what the UPGRADED-ARRAY-ELEMENT-TYPE will be. General
+    array accesses have also seen a speed increase.
   * bug fix: LOAD :IF-DOES-NOT-EXIST NIL now works when file type is
     specified. (This was at the root of some bad interactions between
     SBCL and ILISP: thanks to Gregory Wright for diagnosing this and
     reporting the bug.)
   * bug fix: Floating point exceptions are treated much more
     consistently on the x86/Linux and PPC/Linux platforms.
+  * bug fix: Internal error arguments for undefined functions are now
+    computed correctly on the PPC/Linux platform.
   * Support for the Solaris 9 operating environment has been included
     (thanks to Daniel Merritt)
 
