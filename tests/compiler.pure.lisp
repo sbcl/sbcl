@@ -337,3 +337,7 @@
 (assert (equal (funcall (eval '(lambda (x &optional (y (pop x))) (list x y)))
                         '(1 2))
                '((2) 1)))
+
+;;; Bug reported by Paul Dietz on cmucl-imp and fixed by Gerd
+;;; Moellmann: CONVERT-MORE-CALL failed on the following call
+(assert (eq (eval '((lambda (&key) 'u) :allow-other-keys nil)) 'u))

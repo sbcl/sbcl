@@ -77,8 +77,8 @@
 	 ;; considering at this point in the code. PATH-0 is the root of the
 	 ;; lambda list, which is the initial value of PATH.
 	 (path-0 (if toplevel
-		   `(cdr ,arg-list-name)
-		   arg-list-name))
+                     `(cdr ,arg-list-name)
+                     arg-list-name))
 	 (path path-0) ; (will change below)
 	 (now-processing :required)
 	 (maximum 0)
@@ -92,117 +92,126 @@
 			   (reversed-result nil))
 			  ((atom in-pdll)
 			   (nreverse (if in-pdll
-				       (list* in-pdll '&rest reversed-result)
-				       reversed-result)))
+                                         (list* in-pdll '&rest reversed-result)
+                                         reversed-result)))
 			(push (car in-pdll) reversed-result)))
 	 rest-name restp allow-other-keys-p env-arg-used)
     (when (member '&whole (rest lambda-list))
       (error "&WHOLE may only appear first in ~S lambda-list." error-kind))
     (do ((rest-of-args lambda-list (cdr rest-of-args)))
 	((null rest-of-args))
-      (let ((var (car rest-of-args)))
-	(cond ((eq var '&whole)
-	       (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
-		      (setq rest-of-args (cdr rest-of-args))
-		      (push-let-binding (car rest-of-args) arg-list-name nil))
-		     (t
-		      (defmacro-error "&WHOLE" error-kind name))))
-	      ((eq var '&environment)
-	       (cond (env-illegal
-		      (error "&ENVIRONMENT is not valid with ~S." error-kind))
-		     ((not toplevel)
-		      (error "&ENVIRONMENT is only valid at top level of ~
-			      lambda-list.")))
-	       (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
-		      (setq rest-of-args (cdr rest-of-args))
-		      (push-let-binding (car rest-of-args) env-arg-name nil)
-		      (setq env-arg-used t))
-		     (t
-		      (defmacro-error "&ENVIRONMENT" error-kind name))))
-	      ((or (eq var '&rest)
-		   (eq var '&body))
-	       (cond (restp
-		      (defmacro-error (symbol-name var) error-kind name))
-		     ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
-		      (setq rest-of-args (cdr rest-of-args))
-		      (setq restp t)
-		      (push-let-binding (car rest-of-args) path nil))
-		     (t
-		      (defmacro-error (symbol-name var) error-kind name))))
-	      ((eq var '&optional)
-	       (setq now-processing :optionals))
-	      ((eq var '&key)
-	       (setq now-processing :keywords)
-	       (setq rest-name (gensym "KEYWORDS-"))
-	       (push rest-name *ignorable-vars*)
-	       (setq restp t)
-	       (push-let-binding rest-name path t))
-	      ((eq var '&allow-other-keys)
-	       (setq allow-other-keys-p t))
-	      ((eq var '&aux)
-	       (setq now-processing :auxs))
-	      ((listp var)
-	       (case now-processing
-		 ((:required)
-		  (when restp
-		    (defmacro-error "required argument after &REST/&BODY" error-kind name))  
-		  (let ((sub-list-name (gensym "SUBLIST-")))
-		    (push-sub-list-binding sub-list-name `(car ,path) var
-					   name error-kind error-fun)
-		    (parse-defmacro-lambda-list var sub-list-name name
-						error-kind error-fun))
-		  (setq path `(cdr ,path)
-			minimum (1+ minimum)
-			maximum (1+ maximum)))
-		 ((:optionals)
-		  (destructuring-bind (varname &optional initform supplied-p)
-		      var
-		    (push-optional-binding varname initform supplied-p
-					   `(not (null ,path)) `(car ,path)
-					   name error-kind error-fun))
-		  (setq path `(cdr ,path)
-			maximum (1+ maximum)))
-		 ((:keywords)
-		  (let* ((keyword-given (consp (car var)))
-			 (variable (if keyword-given
-				       (cadar var)
-				       (car var)))
-			 (keyword (if keyword-given
-				      (caar var)
-				      (keywordicate variable)))
-			 (supplied-p (caddr var)))
-		    (push-optional-binding variable (cadr var) supplied-p
-					   `(keyword-supplied-p ',keyword
-					     ,rest-name)
-					   `(lookup-keyword ',keyword
-					     ,rest-name)
-					   name error-kind error-fun)
-		    (push keyword keys)))
-		 ((:auxs)
-		  (push-let-binding (car var) (cadr var) nil))))
-	      ((symbolp var)
-	       (case now-processing
-		 ((:required)
-		  (when restp
-		    (defmacro-error "required argument after &REST/&BODY" error-kind name))
-		  (push-let-binding var `(car ,path) nil)
-		  (setq minimum (1+ minimum)
-			maximum (1+ maximum)
-			path `(cdr ,path)))
-		 ((:optionals)
-		  (push-let-binding var `(car ,path) nil `(not (null ,path)))
-		  (setq path `(cdr ,path)
-			maximum (1+ maximum)))
-		 ((:keywords)
-		  (let ((key (keywordicate var)))
-		    (push-let-binding var
-				      `(lookup-keyword ,key ,rest-name)
-				      nil)
-		    (push key keys)))
-		 ((:auxs)
-		  (push-let-binding var nil nil))))
-	      (t
-	       (error "non-symbol in lambda-list: ~S" var)))))
+      (macrolet ((process-sublist (var sublist-name path)
+                   (once-only ((var var))
+                     `(if (consp ,var)
+                          (let ((sub-list-name (gensym ,sublist-name)))
+                            (push-sub-list-binding sub-list-name ,path ,var
+                                                   name error-kind error-fun)
+                            (parse-defmacro-lambda-list ,var sub-list-name name
+                                                        error-kind error-fun))
+                          (push-let-binding ,var ,path nil)))))
+        (let ((var (car rest-of-args)))
+          (typecase var
+            (list
+             (case now-processing
+               ((:required)
+                (when restp
+                  (defmacro-error "required argument after &REST/&BODY"
+                      error-kind name))
+                (process-sublist var "SUBLIST-" `(car ,path))
+                (setq path `(cdr ,path)
+                      minimum (1+ minimum)
+                      maximum (1+ maximum)))
+               ((:optionals)
+                (destructuring-bind (varname &optional initform supplied-p)
+                    var
+                  (push-optional-binding varname initform supplied-p
+                                         `(not (null ,path)) `(car ,path)
+                                         name error-kind error-fun))
+                (setq path `(cdr ,path)
+                      maximum (1+ maximum)))
+               ((:keywords)
+                (let* ((keyword-given (consp (car var)))
+                       (variable (if keyword-given
+                                     (cadar var)
+                                     (car var)))
+                       (keyword (if keyword-given
+                                    (caar var)
+                                    (keywordicate variable)))
+                       (supplied-p (caddr var)))
+                  (push-optional-binding variable (cadr var) supplied-p
+                                         `(keyword-supplied-p ',keyword
+                                                              ,rest-name)
+                                         `(lookup-keyword ',keyword
+                                                          ,rest-name)
+                                         name error-kind error-fun)
+                  (push keyword keys)))
+               ((:auxs)
+                (push-let-binding (car var) (cadr var) nil))))
+            ((and symbol (not (eql nil)))
+             (case var
+               (&whole
+                (cond ((cdr rest-of-args)
+                       (setq rest-of-args (cdr rest-of-args))
+                       (process-sublist (car rest-of-args)
+                                        "WHOLE-LIST-" arg-list-name))
+                      (t
+                       (defmacro-error "&WHOLE" error-kind name))))
+               (&environment
+                (cond (env-illegal
+                       (error "&ENVIRONMENT is not valid with ~S." error-kind))
+                      ((not toplevel)
+                       (error "&ENVIRONMENT is only valid at top level of ~
+                             lambda-list.")))
+                (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
+                       (setq rest-of-args (cdr rest-of-args))
+                       (push-let-binding (car rest-of-args) env-arg-name nil)
+                       (setq env-arg-used t))
+                      (t
+                       (defmacro-error "&ENVIRONMENT" error-kind name))))
+               ((&rest &body)
+                (cond ((and (not restp) (cdr rest-of-args))
+                       (setq rest-of-args (cdr rest-of-args))
+                       (setq restp t)
+                       (process-sublist (car rest-of-args) "REST-LIST-" path))
+                      (t
+                       (defmacro-error (symbol-name var) error-kind name))))
+               (&optional
+                (setq now-processing :optionals))
+               (&key
+                (setq now-processing :keywords)
+                (setq rest-name (gensym "KEYWORDS-"))
+                (push rest-name *ignorable-vars*)
+                (setq restp t)
+                (push-let-binding rest-name path t))
+               (&allow-other-keys
+                (setq allow-other-keys-p t))
+               (&aux
+                (setq now-processing :auxs))
+               ;; FIXME: Other lambda list keywords.
+               (t
+                (case now-processing
+                  ((:required)
+                   (when restp
+                     (defmacro-error "required argument after &REST/&BODY"
+                         error-kind name))
+                   (push-let-binding var `(car ,path) nil)
+                   (setq minimum (1+ minimum)
+                         maximum (1+ maximum)
+                         path `(cdr ,path)))
+                  ((:optionals)
+                   (push-let-binding var `(car ,path) nil `(not (null ,path)))
+                   (setq path `(cdr ,path)
+                         maximum (1+ maximum)))
+                  ((:keywords)
+                   (let ((key (keywordicate var)))
+                     (push-let-binding var
+                                       `(lookup-keyword ,key ,rest-name)
+                                       nil)
+                     (push key keys)))
+                  ((:auxs)
+                   (push-let-binding var nil nil))))))
+            (t
+             (error "non-symbol in lambda-list: ~S" var))))))
     (let (;; common subexpression, suitable for passing to functions
 	  ;; which expect a MAXIMUM argument regardless of whether
 	  ;; there actually is a maximum number of arguments

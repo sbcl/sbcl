@@ -637,7 +637,7 @@
       (collect ((call-args))
 	(do ((var arglist (cdr var))
 	     (temp temps (cdr temp)))
-	    (())
+	    ((null var))
 	  (let ((info (lambda-var-arg-info (car var))))
 	    (if info
 		(ecase (arg-info-kind info)

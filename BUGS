@@ -1315,6 +1315,10 @@ WORKAROUND:
   (When this is fixed, the ROOM entries in tests/smoke.impure.lisp
   should be uncommented.)
 
+248: "reporting errors in type specifier syntax"
+  (TYPEP 1 '(SYMBOL NIL)) says something about "unknown type
+  specifier".
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

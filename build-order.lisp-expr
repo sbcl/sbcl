@@ -96,9 +96,9 @@
  ("src/compiler/target/parms")
  ("src/code/early-array") ; needs "early-vm" numbers
 
+ ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
- ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/compiler/defconstant")
  ("src/code/early-alieneval")  ; for vars needed both at build and run time

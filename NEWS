@@ -1658,9 +1658,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * bug fix: INTERACTIVE-STREAM-P now works on streams associated with
     Unix file descriptors, instead of blowing up. (thanks to Antonio
     Martinez)
-  * Experimental native threads support, on x86 Linux.  This is not 
+  * Experimental native threads support, on x86 Linux.  This is not
     compiled in by default: you need to add :SB-THREAD to the target
-    features.  See the "Beyond ANSI" chapter of the manual for 
+    features.  See the "Beyond ANSI" chapter of the manual for
     details.
   * sb-aclrepl module improvements: an integrated inspector, added
     repl features, and a bug fix to :trace command.
@@ -1677,6 +1677,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
        causes an error;
     ** condition slots are now initialized once each, not multiple
        times;  (thanks to Gerd Moellmann)
+    ** CONVERT-MORE-CALL failed on a lambda list (&KEY);  (thanks to
+       Gerd Moellmann)
+    ** &WHOLE and &REST arguments in macro lambda lists are patterns;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
