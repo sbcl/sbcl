@@ -28,8 +28,8 @@ gnumake=${GNUMAKE:-gmake}
 # doesn't matter.)
 echo //building runtime system and symbol table file
 cd src/runtime
-$gnumake clean  || exit 1
-$gnumake depend || exit 1
+#$gnumake clean  || exit 1
+#$gnumake depend || exit 1
 $gnumake all    || exit 1
 cd ../..
 

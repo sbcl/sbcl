@@ -113,3 +113,4 @@ sh make-target-2.sh || exit 1
 
 echo //ordinary termination of slam.sh
 date
+exit 0

@@ -1382,7 +1382,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
  #s(sb-cold:package-data
     :name "SB!THREAD"
-    :doc "public (low-level): native thread support"
+    :use ("CL" "SB!ALIEN")
+    :doc "public (but low-level): native thread support"
     :export ("MAKE-THREAD" "THREAD" "CURRENT-THREAD"))
  
  #s(sb-cold:package-data

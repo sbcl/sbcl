@@ -1,8 +1,30 @@
-* stuff that needs to happen before it will run
+-*- Text -*- 
 
-21) add a lisp interface to init_thread
 
-* stuff that can be fixed later
+* design issues
+
+What API to export?  Not interested, really, in supporting the full
+symbolics stack-groups crud (whostate, run-reasons, etc).  Basic
+thread control functions would be nice
+
+make-thread
+kill-thread (with signal?)
+current-thread-id
+current-thread-handle
+suspend/resume?  deadlock-prone, though.  having them block on locks
+ would be nicer
+
+Even if we don't provide one, some higher level process glue will want
+to slap extra stuff (thread names, for example) around us.  One
+possible approach is that taken by corman, where the acl-like
+MP package keeps a hash table of thread id -> 'process' 
+
+What to do with the debugger?  Each thread can rebind *debug-io*,
+which provided we actually _use_ it for debugging (need to check this)
+absolves us of the need to care too much
+
+
+* seriously broken : affecting correct running
 
 14) allocation/gc still needs locking.
 
@@ -17,16 +39,23 @@ way that the allocator lock is free before gc is triggered.  Ideally,
 the allocation attempt should then be repeated after the gc has
 finished.
 
-20) read genesis again and convince ourselves it does actually work
+10) locking, in general
+
+* broken but uninteresting or cosmetic
 
 2) grow tlv when full
-
-10) locking
 
 12) fix ROOM
 
 13) fix other runtime stuff that has been temporarily ripped out
  - control stack scrubbing and bounds checking
+
+* code cleanup
+
+17) code in target-thread.lisp, thread.c, x86/system.lisp (interrupt
+contexts) has brittle dependency on thread.h
+
+20) read genesis again and convince ourselves it does actually work
 
 15) it would be nice to have a faster way to find the current thread
     from C than calling getpid().  For x86 we can write a bit of asm
@@ -34,9 +63,6 @@ finished.
     stored there at thread init.  For other ports something more
     complicated needs doing, unless we can find a register to use for
     the tls base that C promises not to overwrite.  
-
-17) code in target-thread.lisp, thread.c, x86/system.lisp (interrupt
-contexts) has brittle dependency on thread.h
 
 18) do we need per-thread alien stack anyway? remembering that alien
     code runs on the control stack, there seem to be only a few palces

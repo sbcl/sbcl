@@ -119,7 +119,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
         ;; this can be a good time to run it. The resulting core isn't
 	;; used in the normal build, but can be handy for experimenting
 	;; with the system. (See slam.sh for an example.)
-	(when (position :sb-after-xc-core *shebang-features*)
+	(when t
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
 	  )
