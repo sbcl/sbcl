@@ -904,16 +904,15 @@
       count)))
 
 (defmacro define-external-format (external-format size out-expr in-expr)
-  (let ((out-function (intern (let ((*print-case* :upcase))
-				(format nil "OUTPUT-BYTES/~A"
-					external-format))))
-	(format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" external-format))
-	(in-function (intern (let ((*print-case* :upcase))
-			       (format nil "FD-STREAM-READ-N-CHARACTERS/~A"
-				       external-format))))
-	(in-char-function (intern (let ((*print-case* :upcase))
-				    (format nil "INPUT-CHAR/~A"
-					    external-format)))))
+  (let* ((name (first external-format))
+         (out-function (intern (let ((*print-case* :upcase))
+                                 (format nil "OUTPUT-BYTES/~A" name))))
+         (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" name))
+         (in-function (intern (let ((*print-case* :upcase))
+                                (format nil "FD-STREAM-READ-N-CHARACTERS/~A"
+                                        name))))
+         (in-char-function (intern (let ((*print-case* :upcase))
+                                     (format nil "INPUT-CHAR/~A" name)))))
     `(progn
       (defun ,out-function (fd-stream string flush-p start end)
 	(let ((start (or start 0))
@@ -1105,44 +1104,44 @@
 			 '(:none :line :full)))
 	*external-formats*)))))
 
-(define-external-format (:latin-1 :latin1 :ascii)
+(define-external-format (:latin-1 :latin1 :iso-8859-1
+                         ;; FIXME: shouldn't ASCII-like things have an
+                         ;; extra typecheck for 7-bitness?
+                         :ascii :ansi_x3.4-1968)
     1
   (setf (sap-ref-8 sap tail) bits)
   (code-char byte))
 
-(defparameter *latin-9-table*
-  (let ((table (make-string 256)))
-    (do ((i 0 (1+ i)))
-	((= i 256))
-      (setf (aref table i) (code-char i)))
-    (setf (aref table #xa4) (code-char #x20ac))
-    (setf (aref table #xa6) (code-char #x0160))
-    (setf (aref table #xa8) (code-char #x0161))
-    (setf (aref table #xb4) (code-char #x017d))
-    (setf (aref table #xb8) (code-char #x017e))
-    (setf (aref table #xbc) (code-char #x0152))
-    (setf (aref table #xbd) (code-char #x0153))
-    (setf (aref table #xbe) (code-char #x0178))
-    table))
-
-(defparameter *latin-9-reverse-1*
-  (make-array 16 :element-type '(unsigned-byte 21)
-	      :initial-contents '(#x0160 #x0161 #x0152 #x0153 0 0 0 0 #x0178 0 0 0 #x20ac #x017d #x017e 0)))
-(defparameter *latin-9-reverse-2*
-  (make-array 16 :element-type '(unsigned-byte 8)
-	      :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0)))
-
-(define-external-format (:latin-9 :latin9)
-    1
-  (setf (sap-ref-8 sap tail)
-	(if (< bits 256)
-	    (if (= bits (char-code (aref *latin-9-table* bits)))
-		bits
-		(error "cannot encode ~A in latin-9" bits))
-	    (if (= (aref *latin-9-reverse-1* (logand bits 15)) bits)
-		(aref *latin-9-reverse-2* (logand bits 15))
-		(error "cannot encode ~A in latin-9" bits))))
-  (aref *latin-9-table* byte))
+(let ((latin-9-table (let ((table (make-string 256)))
+                       (do ((i 0 (1+ i)))
+                           ((= i 256))
+                         (setf (aref table i) (code-char i)))
+                       (setf (aref table #xa4) (code-char #x20ac))
+                       (setf (aref table #xa6) (code-char #x0160))
+                       (setf (aref table #xa8) (code-char #x0161))
+                       (setf (aref table #xb4) (code-char #x017d))
+                       (setf (aref table #xb8) (code-char #x017e))
+                       (setf (aref table #xbc) (code-char #x0152))
+                       (setf (aref table #xbd) (code-char #x0153))
+                       (setf (aref table #xbe) (code-char #x0178))
+                       table))
+      (latin-9-reverse-1 (make-array 16
+                                     :element-type '(unsigned-byte 21)
+                                     :initial-contents '(#x0160 #x0161 #x0152 #x0153 0 0 0 0 #x0178 0 0 0 #x20ac #x017d #x017e 0)))
+      (latin-9-reverse-2 (make-array 16
+                                     :element-type '(unsigned-byte 8)
+                                     :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0))))
+  (define-external-format (:latin-9 :latin9 :iso-8859-15)
+      1
+    (setf (sap-ref-8 sap tail)
+          (if (< bits 256)
+              (if (= bits (char-code (aref latin-9-table bits)))
+                  bits
+                  (error "cannot encode ~A in latin-9" bits))
+              (if (= (aref latin-9-reverse-1 (logand bits 15)) bits)
+                  (aref latin-9-reverse-2 (logand bits 15))
+                  (error "cannot encode ~A in latin-9" bits))))
+    (aref latin-9-table byte)))
 
 (define-external-format/variable-width (:utf-8 :utf8)
   (let ((bits (char-code byte)))
@@ -1211,6 +1210,10 @@
 			 sb!unix:codeset)
 			"LATIN-1")
 		    "KEYWORD")))
+    (dolist (entry *external-formats*
+	     (setf (fd-stream-external-format fd-stream) :latin-1))
+      (when (member (fd-stream-external-format fd-stream) (first entry))
+	(return)))
 
     (when input-p
       (multiple-value-bind (routine type size read-n-characters

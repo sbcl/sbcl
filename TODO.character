@@ -98,7 +98,7 @@ be terribly useful.
      it seemed due to a bug rendering FAST-READ-CHAR more-or-less
      exactly the same as READ-CHAR).
   -- nl_langinfo(CODESET) :DEFAULT processing done.
-  -- TODO: :ISO-8859-1, aliases
+  -- :ISO-8859-1 and :ISO-8859-15 done (Teemu Kalvas)
 
 ** alter the reader and any similar data structures such that they do
 not scale linearly in size with the number of characters in the
@@ -130,6 +130,10 @@ adjusting the dumper/fop code and the low-level memory accessors.
      >> rewrote SYMBOLICATE to avoid needing the type system (or a
         transformed to low-level bit-bashing CONCATENATE) early in
         cold-init.
+     >> adjusted vm definition (*BYTE-REGS*, MOVE-FROM-CHAR) and array
+        accessors.
+     >> fop, load and genesis adjustments.
+     >> TODO: restore speed in CONCATENATE, REPLACE, etc.
 
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
 (Rationale: for calling out to Pango or similar.  Actually, a valid
@@ -149,3 +153,4 @@ reduction of size bloat.)
 ** implement many useful external formats.  (Rationale: now that we
 have these characters, we want to be able to use them when talking to
 the rest of the world.)
+  -- done: latin-9 aka iso-8859-15 (Teemu Kalvas).
