@@ -508,7 +508,9 @@
   "Default number of samples taken.")
 (declaim (type sb-impl::index *max-samples*))
 
-(defconstant +sample-size+ 2)
+(defconstant +sample-size+
+  #+(or x86 x86-64) 8
+  #-(or x86 x86-64) 2)
 
 (defvar *samples* nil)
 (declaim (type (or null (vector address)) *samples*))
@@ -536,7 +538,7 @@
 
 (defun show-progress (format-string &rest args)
   (when *show-progress*
-    (apply #'format t format-string args)
+    (apply #'format t format-string args)    
     (finish-output)))
 
 (defun start-sampling ()
@@ -552,16 +554,15 @@
   `(let ((*sampling* ,on))
      ,@body))
 
-(defun sort-samples (&key (key :pc))
+(defun sort-samples (key-offset)
   "Sort *Samples* using comparison Test.  Key must be one of
    :Pc or :Return-Pc for sorting by pc or return pc."
-  (declare (type (member :pc :return-pc) key))
   (when (plusp *samples-index*)
     (qsort *samples*
 	   :from 0
 	   :to (- *samples-index* +sample-size+)
 	   :element-size +sample-size+
-	   :key-offset (if (eq key :pc) 0 1))))
+	   :key-offset key-offset)))
 
 (defun record (pc)
   (declare (type address pc))
@@ -570,23 +571,44 @@
 
 ;;; SIGPROF handler.  Record current PC and return address in
 ;;; *SAMPLES*.
-#+x86
+#+(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code) (type system-area-pointer scp))
   (when (and *sampling*
 	     (< *samples-index* (length *samples*)))
     (sb-sys:without-gcing
-     (with-alien ((scp (* os-context-t) :local scp))
-       (locally (declare (optimize (inhibit-warnings 2)))
-	 (let* ((pc-ptr (sb-vm:context-pc scp))
-		(fp (sb-vm::context-register scp #.sb-vm::ebp-offset))
-		(ra (sap-ref-word (int-sap fp)
-				  (- (* (1+ sb-vm::return-pc-save-offset)
-					sb-vm::n-word-bytes)))))
-	   (record (sap-int pc-ptr))
-	   (record ra)))))))
+	(locally (declare (optimize (inhibit-warnings 2)))
+	  (with-alien ((scp (* os-context-t) :local scp))
+	    ;; For some reason completely bogus small values for the
+	    ;; frame pointer are returned every now and then, leading
+	    ;; to segfaults. Try to avoid these cases.
+	    ;;
+	    ;; FIXME: Do a more thorough sanity check on ebp, or figure
+	    ;; out why this is happening.
+	    ;; -- JES, 2005-01-11
+	    (when (< (sb-vm::context-register scp #.sb-vm::ebp-offset)
+		     4096)
+	      (dotimes (i +sample-size+)
+		(record 0))
+	      (return-from sigprof-handler nil))
+	    (let* ((pc-ptr (sb-vm:context-pc scp))
+		   (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
+	      (record (sap-int pc-ptr))
+	      (let ((fp (int-sap fp))
+		    ra)
+		(dotimes (i (1- +sample-size+))
+		  (cond (fp
+			 (setf (values ra fp)
+			       (sb-di::x86-call-context fp :depth i))
+			 (record (if ra
+				     (sap-int ra)
+				     0)))
+			(t
+			 (record 0)))))))))))
 
-#-x86
+;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
+;; than one level.
+#-(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code))
   (when (and *sampling*
@@ -596,7 +618,7 @@
        (locally (declare (optimize (inhibit-warnings 2)))
 	 (let* ((pc-ptr (sb-vm:context-pc scp))
 		(fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
-		(ra (sap-ref-word 
+		(ra (sap-ref-word
 		     (int-sap fp)
 		     (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
 	   (record (sap-int pc-ptr))
@@ -634,13 +656,9 @@
 		   *dynamic-space-code-info*))))
     (map-dynamic-space-code #'record-address)))
 
-;;; Adjust pcs or return-pcs in *SAMPLES* for address changes of
-;;; dynamic-space code objects.  KEY being :PC means adjust pcs.
-(defun adjust-samples (key)
-  (declare (type (member :pc :return-pc) key))
-  (sort-samples :key key)
-  (let ((sidx 0)
-	(offset (if (eq key :pc) 0 1)))
+(defun adjust-samples (offset)
+  (sort-samples offset)
+  (let ((sidx 0))
     (declare (type sb-impl::index sidx))
     (dolist (info *dynamic-space-code-info*)
       (unless (= (dyninfo-new-start info) (dyninfo-start info))
@@ -672,8 +690,8 @@
      (setf (dyninfo-new-start info)
 	   (code-start (dyninfo-code info))))
    (progn
-     (adjust-samples :pc)
-     (adjust-samples :return-pc))
+     (dotimes (i +sample-size+)
+       (adjust-samples i)))
    (dolist (info *dynamic-space-code-info*)
      (let ((size (- (dyninfo-end info) (dyninfo-start info))))
        (setf (dyninfo-start info) (dyninfo-new-start info))
@@ -800,8 +818,10 @@
        (%make-node :name name
 		   :start-pc (+ start-pc start-offset)
 		   :end-pc (+ start-pc end-offset))))
-    (t
-     (%make-node :name (sb-di::debug-fun-name info)))))
+    (sb-di::debug-fun
+     (%make-node :name (sb-di::debug-fun-name info)))
+    (t 
+     (%make-node :name (coerce info 'string)))))
 
 ;;; Return something serving as debug info for address PC.  If we can
 ;;; get something from SB-DI:DEBUG-FUNCTION-FROM-PC, return that.
@@ -810,17 +830,23 @@
 (defun debug-info (pc)
   (declare (type address pc))
   (let ((ptr (sb-di::component-ptr-from-pc (int-sap pc))))
-    (unless (sap= ptr (int-sap 0))
-       (let* ((code (sb-di::component-from-component-ptr ptr))
-	      (code-header-len (* (sb-kernel:get-header-data code)
-				  sb-vm:n-word-bytes))
-	      (pc-offset (- pc
-			    (- (sb-kernel:get-lisp-obj-address code)
-			       sb-vm:other-pointer-lowtag)
-			    code-header-len))
-	      (df (ignore-errors (sb-di::debug-fun-from-pc code
-							   pc-offset))))
-	 (or df code)))))
+    (cond ((sap= ptr (int-sap 0))
+	   (let ((name (foreign-symbol-in-address (int-sap pc))))
+	     (when name
+	       (format nil "foreign function ~a" name))))
+	  (t
+	   (let* ((code (sb-di::component-from-component-ptr ptr))
+		  (code-header-len (* (sb-kernel:get-header-data code)
+				      sb-vm:n-word-bytes))
+		  (pc-offset (- pc
+				(- (sb-kernel:get-lisp-obj-address code)
+				   sb-vm:other-pointer-lowtag)
+				code-header-len))
+		  (df (ignore-errors (sb-di::debug-fun-from-pc code
+							       pc-offset))))
+	     (or df
+		 code))))))
+	     
 
 ;;; One function can have more than one COMPILED-DEBUG-FUNCTION with
 ;;; the same name.  Reduce the number of calls to Debug-Info by first
@@ -877,10 +903,11 @@
 	collect node))
 
 ;;; Value is a CALL-GRAPH for the current contents of *SAMPLES*.
-(defun make-call-graph-1 ()
-  (let ((elsewhere-count 0))
+(defun make-call-graph-1 (depth)
+  (let ((elsewhere-count 0)
+	visited-nodes)
     (with-lookup-tables ()
-      (loop for i below *samples-index* by +sample-size+
+      (loop for i below (1- *samples-index*) ;; by +sample-size+
 	    as pc = (aref *samples* i)
 	    as return-pc = (aref *samples* (1+ i))
 	    as callee = (lookup-node pc)
@@ -889,22 +916,33 @@
 		(let ((caller (lookup-node return-pc)))
 		  (when caller
 		    caller)))
-	    when (and *show-progress* (plusp i)) do
+	    do
+	    (when (and *show-progress* (plusp i))
 	      (cond ((zerop (mod i 1000))
 		     (show-progress "~d" i))
 		    ((zerop (mod i 100))
-		     (show-progress ".")))
-	    if callee do
-	      (incf (node-count callee))
-	    else do
-	      (incf elsewhere-count)
-	    when (and callee caller) do
-	      (let ((call (find callee (node-edges caller)
-				:key #'call-vertex)))
-		(pushnew caller (node-callers callee))
-		(if call
-		    (incf (call-count call))
-		    (push (make-call callee) (node-edges caller)))))
+		     (show-progress "."))))
+	    (when (< (mod i +sample-size+) depth)
+	      (when (= (mod i +sample-size+) 0)
+		(setf visited-nodes nil)
+		(cond (callee
+		       (incf (node-accrued-count callee))
+		       (incf (node-count callee)))
+		      (t
+		       (incf elsewhere-count))))
+	      (when callee
+		(push callee visited-nodes))
+	      (when caller
+		(unless (member caller visited-nodes)
+		  (incf (node-accrued-count caller)))
+		(when callee
+		  (let ((call (find callee (node-edges caller)
+				    :key #'call-vertex)))
+		    (pushnew caller (node-callers callee))
+		    (if call
+			(unless (member caller visited-nodes)
+			  (incf (call-count call)))
+			(push (make-call callee) (node-edges caller))))))))
       (let ((sorted-nodes (sort (collect-nodes) #'> :key #'node-count)))
 	(loop for node in sorted-nodes and i from 1 do
 		(setf (node-index node) i))
@@ -944,16 +982,16 @@
 ;;; *SAMPLES*.  The result contain a list of nodes sorted by self-time
 ;;; in the FLAT-NODES slot, and a dag in VERTICES, with call cycles
 ;;; reduced to CYCLE structures.
-(defun make-call-graph ()
+(defun make-call-graph (depth)
   (stop-profiling)
   (show-progress "~&Computing call graph ")
-  (let ((call-graph (without-gcing (make-call-graph-1))))
+  (let ((call-graph (without-gcing (make-call-graph-1 depth))))
     (setf (call-graph-flat-nodes call-graph)
 	  (copy-list (graph-vertices call-graph)))
     (show-progress "~&Finding cycles")
     (reduce-call-graph call-graph)
     (show-progress "~&Propagating counts")
-    (compute-accrued-counts call-graph)
+    #+nil (compute-accrued-counts call-graph)
     call-graph))
 
 
@@ -991,8 +1029,8 @@
 		       0)))
     (when print-header
       (print-call-graph-header call-graph))
-    (format t "~&           Self        Total~%")
-    (format t "~&  Nr  Count     %  Count     % Function~%")
+    (format t "~&           Self        Cumul        Total~%")
+    (format t "~&  Nr  Count     %  Count     %  Count     % Function~%")
     (print-separator)
     (let ((elsewhere-count (call-graph-elsewhere-count call-graph))
 	  (i 0))
@@ -1001,16 +1039,21 @@
 		  (< (node-count node) min-count))
 	  (return))
 	(let* ((count (node-count node))
-	       (percent (samples-percent call-graph count)))
+	       (percent (samples-percent call-graph count))
+	       (accrued-count (node-accrued-count node))
+	       (accrued-percent (samples-percent call-graph accrued-count)))
 	  (incf total-count count)
 	  (incf total-percent percent)
-	  (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~s~%"
+	  (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~s~%"
 		  (node-index node)
 		  count
 		  percent
+		  accrued-count
+		  accrued-percent
 		  total-count
 		  total-percent
-		  (node-name node))))
+		  (node-name node))
+	  (finish-output)))
       (print-separator)
       (format t "~&    ~6d ~5,1f              elsewhere~%"
 	      elsewhere-count
@@ -1110,8 +1153,7 @@
 
    Value of this function is a Call-Graph object representing the
    resulting call-graph."
-  (declare (type report-type type))
-  (let ((graph (or call-graph (make-call-graph))))
+  (let ((graph (or call-graph (make-call-graph (1- +sample-size+)))))
     (ecase type
       (:flat
        (print-flat graph :stream stream :max max :min-percent min-percent))
