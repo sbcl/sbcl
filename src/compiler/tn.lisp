@@ -427,10 +427,8 @@
 ;;; Return a list of N normal TNs of the specified primitive type.
 (defun make-n-tns (n ptype)
   (declare (type unsigned-byte n) (type primitive-type ptype))
-  (collect ((res))
-    (dotimes (i n)
-      (res (make-normal-tn ptype)))
-    (res)))
+  (loop repeat n
+        collect (make-normal-tn ptype)))
 
 ;;; Return true if X and Y are packed in the same location, false otherwise.
 ;;; This is false if either operand is constant.

@@ -948,12 +948,14 @@ WORKAROUND:
   In sbcl-0.7.4.24, compiling
     (defun bug178 (x)
       (funcall (the function (the standard-object x))))
-  gives 
+  gives
     failed AVER:
       "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
   This variant compiles OK, though:
     (defun bug178alternative (x)
       (funcall (the nil x)))
+
+  (since 0.7.8.9 it does not signal an error; see also bug 199)
 
 183: "IEEE floating point issues"
   Even where floating point handling is being dealt with relatively
@@ -1197,6 +1199,8 @@ WORKAROUND:
       "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
 
   APD further reports that this bug is not present in CMUCL.
+
+  (this case was fixed in 0.7.8.9; see also bug 178)
 
 201: "Incautious type inference from compound CONS types"
   (reported by APD sbcl-devel 2002-09-17)

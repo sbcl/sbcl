@@ -72,6 +72,8 @@
 	   nil)
 	  ((csubtypep otype type)
 	   t)
+          ((eq type *empty-type*)
+           nil)
 	  (t
 	   (give-up-ir1-transform)))))
 

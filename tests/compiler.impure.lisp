@@ -426,6 +426,19 @@ BUG 48c, not yet fixed:
 (declaim (ftype (function () null) bug202))
 (defun bug202 ()
   t)
+
+;;; bugs 178, 199: compiler failed to compile a call of a function
+;;; with a hairy type
+(defun bug178 (x)
+      (funcall (the function (the standard-object x))))
+
+(defun bug199-aux (f)
+  (eq nil (funcall f)))
+
+(defun bug199 (f x)
+  (declare (type (and function (satisfies bug199-aux)) f))
+  (funcall f x))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

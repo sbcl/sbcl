@@ -383,6 +383,8 @@
 	     (part-of function)
 	     (part-of instance)))
 	(ctype
-	 (any))))))
+         (if (csubtypep type (specifier-type 'function))
+	     (part-of function)
+             (any)))))))
 
 (/show0 "primtype.lisp end of file")
