@@ -144,7 +144,7 @@
 		:element-size 2 :alignment 2) ; (signed-byte 64)
   (unsigned-stack non-descriptor-stack
 		  :element-size 2 :alignment 2) ; (unsigned-byte 64)
-  (base-char-stack non-descriptor-stack) ; non-descriptor characters.
+  (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack
 	     :element-size 2 :alignment 2) ; System area pointers.
   (single-stack non-descriptor-stack) ; single-floats
@@ -174,11 +174,11 @@
                   :alternate-scs (control-stack))
 
   ;; Non-Descriptor characters
-  (base-char-reg registers
+  (character-reg registers
                  :locations #.non-descriptor-regs
    :constant-scs (immediate)
    :save-p t
-   :alternate-scs (base-char-stack))
+   :alternate-scs (character-stack))
 
   ;; Non-Descriptor SAP's (arbitrary pointers into address space)
   (sap-reg registers

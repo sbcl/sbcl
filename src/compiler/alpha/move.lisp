@@ -23,7 +23,7 @@
       (symbol
        (load-symbol y val))
       (character
-       (inst li (logior (ash (char-code val) n-widetag-bits) base-char-widetag)
+       (inst li (logior (ash (char-code val) n-widetag-bits) character-widetag)
 	     y)))))
 
 (define-move-fun (load-number 1) (vop x y)
@@ -31,8 +31,8 @@
    (signed-reg unsigned-reg))
   (inst li (tn-value x) y))
 
-(define-move-fun (load-base-char 1) (vop x y)
-  ((immediate) (base-char-reg))
+(define-move-fun (load-character 1) (vop x y)
+  ((immediate) (character-reg))
   (inst li (char-code (tn-value x)) y))
 
 (define-move-fun (load-system-area-pointer 1) (vop x y)
@@ -48,7 +48,7 @@
   (load-stack-tn y x))
 
 (define-move-fun (load-number-stack 5) (vop x y)
-  ((base-char-stack) (base-char-reg))
+  ((character-stack) (character-reg))
   (let ((nfp (current-nfp-tn vop)))
     (loadw y nfp (tn-offset x))))
 
@@ -64,7 +64,7 @@
   (store-stack-tn y x))
 
 (define-move-fun (store-number-stack 5) (vop x y)
-  ((base-char-reg) (base-char-stack))
+  ((character-reg) (character-stack))
   (let ((nfp (current-nfp-tn vop)))
     (storew x nfp (tn-offset y))))
 
@@ -142,7 +142,7 @@
 ;;;; representation. Similarly, the MOVE-FROM-WORD VOPs converts a raw
 ;;;; integer to a tagged bignum or fixnum.
 
-;;; Arg is a fixnum, so just shift it. We need a type restriction
+;;; ARG is a fixnum, so just shift it. We need a type restriction
 ;;; because some possible arg SCs (control-stack) overlap with
 ;;; possible bignum arg SCs.
 (define-vop (move-to-word/fixnum)
@@ -152,22 +152,20 @@
   (:note "fixnum untagging")
   (:generator 1
     (inst sra x n-fixnum-tag-bits y)))
-;;;
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
-;;; Arg is a non-immediate constant, load it.
+;;; ARG is a non-immediate constant, load it.
 (define-vop (move-to-word-c)
   (:args (x :scs (constant)))
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "constant load")
   (:generator 1
     (inst li (tn-value x) y)))
-;;;
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 
-;;; Arg is a fixnum or bignum, figure out which and load if necessary.
+;;; ARG is a fixnum or bignum, figure out which and load if necessary.
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (signed-reg unsigned-reg)))
@@ -193,12 +191,10 @@
     (when (sc-is y unsigned-reg)
       (inst mskll y 4 y))
     DONE))
-;;;
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
 
-
-;;; Result is a fixnum, so we can just shift. We need the result type
+;;; RESULT is a fixnum, so we can just shift. We need the result type
 ;;; restriction because of the control-stack ambiguity noted above.
 (define-vop (move-from-word/fixnum)
   (:args (x :scs (signed-reg unsigned-reg)))
@@ -207,11 +203,10 @@
   (:note "fixnum tagging")
   (:generator 1
     (inst sll x n-fixnum-tag-bits y)))
-;;;
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
-;;; Result may be a bignum, so we have to check. Use a worst-case cost
+;;; RESULT may be a bignum, so we have to check. Use a worst-case cost
 ;;; to make sure people know they may be number consing.
 (define-vop (move-from-signed)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
@@ -242,8 +237,6 @@
       (inst srl x 32 temp)
       (storew temp y (1+ bignum-digits-offset) other-pointer-lowtag))
     DONE))
-      
-;;;
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
@@ -276,8 +269,6 @@
       (inst srl x 32 temp)
       (storew temp y (1+ bignum-digits-offset) other-pointer-lowtag))
     DONE))
-
-;;;
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
@@ -293,7 +284,6 @@
   (:note "word integer move")
   (:generator 0
     (move x y)))
-;;;
 (define-move-vop word-move :move
   (signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
@@ -311,7 +301,6 @@
        (move x y))
       ((signed-stack unsigned-stack)
        (storeq x fp (tn-offset y))))))
-;;;
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 

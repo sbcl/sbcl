@@ -15,7 +15,6 @@
 
 ;;; Return a wired TN describing the N'th full call argument passing
 ;;; location.
-;;;
 (!def-vm-support-routine standard-arg-location (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
@@ -95,7 +94,6 @@
     (vector-push-extend nil
 			(ir2-component-constants (component-info component))))
   (values))
-
 
 ;;;; Frame hackery:
 
@@ -108,7 +106,6 @@
 
 
 ;;; Used for setting up the Old-FP in local call.
-;;;
 (define-vop (current-fp)
   (:results (val :scs (any-reg)))
   (:generator 1
@@ -116,7 +113,6 @@
 
 ;;; Used for computing the caller's NFP for use in known-values return.  Only
 ;;; works assuming there is no variable size stuff on the nstack.
-;;;
 (define-vop (compute-old-nfp)
   (:results (val :scs (any-reg)))
   (:vop-var vop)
@@ -124,7 +120,6 @@
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
 	(inst addi val nfp (bytes-needed-for-non-descriptor-stack-frame))))))
-
 
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
@@ -176,7 +171,6 @@
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
 ;;; is the number of arguments passed.  If no stack arguments are passed, then
 ;;; we don't have to do anything.
-;;;
 (define-vop (allocate-full-call-frame)
   (:info nargs)
   (:results (res :scs (any-reg)))
@@ -184,7 +178,6 @@
     (when (> nargs register-arg-count)
       (move res csp-tn)
       (inst addi csp-tn csp-tn (* nargs n-word-bytes)))))
-
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values.  Values is the head of the TN-REF
@@ -343,7 +336,6 @@ default-value-8
 ;;;    Args and Nargs are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with the
 ;;; results Start and Count (also, it's nice to be able to target them).
-;;;
 (defun receive-unknown-values (args nargs start count lra-label temp)
   (declare (type tn args nargs start count temp))
   (let ((variable-values (gen-label))
@@ -375,9 +367,8 @@ default-value-8
   (values))
 
 
-;;; VOP that can be inherited by unknown values receivers.  The main thing this
-;;; handles is allocation of the result temporaries.
-;;;
+;;; VOP that can be inherited by unknown values receivers.  The main
+;;; thing this handles is allocation of the result temporaries.
 (define-vop (unknown-values-receiver)
   (:results
    (start :scs (any-reg))
@@ -411,7 +402,6 @@ default-value-8
 ;;; Note: we can't use normal load-tn allocation for the fixed args, since all
 ;;; registers may be tied up by the more operand.  Instead, we use
 ;;; MAYBE-LOAD-STACK-TN.
-;;;
 (define-vop (call-local)
   (:args (fp)
 	 (nfp)
@@ -456,7 +446,6 @@ default-value-8
 ;;; Note: we can't use normal load-tn allocation for the fixed args, since all
 ;;; registers may be tied up by the more operand.  Instead, we use
 ;;; MAYBE-LOAD-STACK-TN.
-;;;
 (define-vop (multiple-call-local unknown-values-receiver)
   (:args (fp)
 	 (nfp)
@@ -499,7 +488,6 @@ default-value-8
 ;;; Note: we can't use normal load-tn allocation for the fixed args, since all
 ;;; registers may be tied up by the more operand.  Instead, we use
 ;;; MAYBE-LOAD-STACK-TN.
-;;;
 (define-vop (known-call-local)
   (:args (fp)
 	 (nfp)
@@ -539,7 +527,6 @@ default-value-8
 ;;; Note: we can't use normal load-tn allocation for the fixed args, since all
 ;;; registers may be tied up by the more operand.  Instead, we use
 ;;; MAYBE-LOAD-STACK-TN.
-;;;
 (define-vop (known-return)
   (:args (old-fp :target old-fp-temp)
 	 (return-pc :target return-pc-temp)
@@ -825,9 +812,8 @@ default-value-8
 (define-full-call multiple-call-variable nil :unknown t)
 
 
-;;; Defined separately, since needs special code that BLT's the arguments
-;;; down.
-;;;
+;;; Defined separately, since needs special code that BLT's the
+;;; arguments down.
 (define-vop (tail-call-variable)
   (:args
    (args-arg :scs (any-reg) :target args)
@@ -865,9 +851,7 @@ default-value-8
 
 ;;;; Unknown values return:
 
-
 ;;; Return a single value using the unknown-values convention.
-;;; 
 (define-vop (return-single)
   (:args (old-fp :scs (any-reg))
 	 (return-pc :scs (descriptor-reg))
@@ -902,7 +886,6 @@ default-value-8
 ;;; When there are stack values, we must initialize the argument pointer to
 ;;; point to the beginning of the values block (which is the beginning of the
 ;;; current frame.)
-;;;
 (define-vop (return)
   (:args
    (old-fp :scs (any-reg))
@@ -948,11 +931,11 @@ default-value-8
 	   (lisp-return return-pc lip)))
     (trace-table-entry trace-table-normal)))
 
-;;; Do unknown-values return of an arbitrary number of values (passed on the
-;;; stack.)  We check for the common case of a single return value, and do that
-;;; inline using the normal single value return convention.  Otherwise, we
-;;; branch off to code that calls an assembly-routine.
-;;;
+;;; Do unknown-values return of an arbitrary number of values (passed
+;;; on the stack.)  We check for the common case of a single return
+;;; value, and do that inline using the normal single value return
+;;; convention.  Otherwise, we branch off to code that calls an
+;;; assembly-routine.
 (define-vop (return-multiple)
   (:args
    (old-fp-arg :scs (any-reg) :to (:eval 1))
@@ -998,14 +981,10 @@ default-value-8
       (move nvals nvals-arg)
       (inst ba (make-fixup 'return-multiple :assembly-routine)))
     (trace-table-entry trace-table-normal)))
-
-
 
 ;;;; XEP hackery:
 
-
 ;;; We don't need to do anything special for regular functions.
-;;;
 (define-vop (setup-environment)
   (:info label)
   (:ignore label)
@@ -1014,7 +993,6 @@ default-value-8
     ))
 
 ;;; Get the lexical environment from its passing location.
-;;;
 (define-vop (setup-closure-environment)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :target closure
 	       :to (:result 0))
@@ -1028,7 +1006,6 @@ default-value-8
 
 ;;; Copy a more arg from the argument area to the end of the current frame.
 ;;; Fixed is the number of non-more arguments. 
-;;;
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
@@ -1087,16 +1064,14 @@ default-value-8
       (emit-label done))))
 
 
-;;; More args are stored consecutively on the stack, starting immediately at
-;;; the context pointer.  The context pointer is not typed, so the lowtag is 0.
-;;;
+;;; More args are stored consecutively on the stack, starting
+;;; immediately at the context pointer.  The context pointer is not
+;;; typed, so the lowtag is 0.
 (define-vop (more-arg word-index-ref)
   (:variant 0 0)
   (:translate %more-arg))
 
-
 ;;; Turn more arg (context, count) into a list.
-;;;
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
 	 (count-arg :target count :scs (any-reg)))
@@ -1153,16 +1128,16 @@ default-value-8
     DONE))
 
 
-;;; Return the location and size of the more arg glob created by Copy-More-Arg.
-;;; Supplied is the total number of arguments supplied (originally passed in
-;;; NARGS.)  Fixed is the number of non-rest arguments.
+;;; Return the location and size of the more arg glob created by
+;;; COPY-MORE-ARG.  SUPPLIED is the total number of arguments supplied
+;;; (originally passed in NARGS.)  Fixed is the number of non-rest
+;;; arguments.
 ;;;
-;;; We must duplicate some of the work done by Copy-More-Arg, since at that
-;;; time the environment is in a pretty brain-damaged state, preventing this
-;;; info from being returned as values.  What we do is compute
-;;; supplied - fixed, and return a pointer that many words below the current
-;;; stack top.
-;;;
+;;; We must duplicate some of the work done by COPY-MORE-ARG, since at
+;;; that time the environment is in a pretty brain-damaged state,
+;;; preventing this info from being returned as values.  What we do is
+;;; compute (- SUPPLIED FIXED), and return a pointer that many words
+;;; below the current stack top.
 (define-vop (more-arg-context)
   (:policy :fast-safe)
   (:translate sb!c::%more-arg-context)
@@ -1177,24 +1152,6 @@ default-value-8
     (inst subi count supplied (fixnumize fixed))
     (inst sub context csp-tn count)))
 
-
-;;; Signal wrong argument count error if Nargs isn't = to Count.
-;;;
-#|
-(define-vop (verify-argument-count)
-  (:policy :fast-safe)
-  (:translate sb!c::%verify-argument-count)
-  (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:info count)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 3
-    (let ((err-lab
-	   (generate-error-code vop invalid-argument-count-error nargs)))
-      (inst cmpwi nargs (fixnumize count))
-      (inst bne err-lab))))
-|#
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
@@ -1206,9 +1163,7 @@ default-value-8
   (:generator 3
    (inst twi :ne nargs (fixnumize count))))
 
-
 ;;; Signal various errors.
-;;;
 (macrolet ((frob (name error translate &rest args)
 	     `(define-vop (,name)
 		,@(when translate

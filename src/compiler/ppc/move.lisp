@@ -1,8 +1,15 @@
-;;; Written by Rob MacLachlan.
-;;; SPARC conversion by William Lott.
-;;;
-(in-package "SB!VM")
+;;;; the PPC VM definition of operand loading/saving and the Move VOP
 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!VM")
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate zero)
@@ -62,7 +69,6 @@
 
 
 ;;;; The Move VOP:
-;;;
 (define-vop (move)
   (:args (x :target y
 	    :scs (any-reg descriptor-reg zero null)
@@ -78,15 +84,13 @@
   (any-reg descriptor-reg)
   (any-reg descriptor-reg))
 
-;;; Make Move the check VOP for T so that type check generation doesn't think
-;;; it is a hairy type.  This also allows checking of a few of the values in a
-;;; continuation to fall out.
-;;;
+;;; Make MOVE the check VOP for T so that type check generation
+;;; doesn't think it is a hairy type.  This also allows checking of a
+;;; few of the values in a continuation to fall out.
 (primitive-type-vop move (:check) t)
 
-;;;    The Move-Argument VOP is used for moving descriptor values into another
+;;; The MOVE-ARG VOP is used for moving descriptor values into another
 ;;; frame for argument or known value passing.
-;;;
 (define-vop (move-arg)
   (:args (x :target y
 	    :scs (any-reg descriptor-reg zero null))
@@ -108,11 +112,10 @@
 
 ;;;; ILLEGAL-MOVE
 
-;;; This VOP exists just to begin the lifetime of a TN that couldn't be written
-;;; legally due to a type error.  An error is signalled before this VOP is
-;;; so we don't need to do anything (not that there would be anything sensible
-;;; to do anyway.)
-;;;
+;;; This VOP exists just to begin the lifetime of a TN that couldn't
+;;; be written legally due to a type error.  An error is signalled
+;;; before this VOP is so we don't need to do anything (not that there
+;;; would be anything sensible to do anyway.)
 (define-vop (illegal-move)
   (:args (x) (type))
   (:results (y))
@@ -130,9 +133,8 @@
 ;;; representation.  Similarly, the MOVE-FROM-WORD VOPs converts a raw integer
 ;;; to a tagged bignum or fixnum.
 
-;;; Arg is a fixnum, so just shift it.  We need a type restriction because some
+;;; ARG is a fixnum, so just shift it.  We need a type restriction because some
 ;;; possible arg SCs (control-stack) overlap with possible bignum arg SCs.
-;;;
 (define-vop (move-to-word/fixnum)
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (signed-reg unsigned-reg)))
@@ -140,23 +142,20 @@
   (:note "fixnum untagging")
   (:generator 1
     (inst srawi y x 2)))
-;;;
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
-;;; Arg is a non-immediate constant, load it.
+;;; ARG is a non-immediate constant; load it.
 (define-vop (move-to-word-c)
   (:args (x :scs (constant)))
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "constant load")
   (:generator 1
     (inst lr y (tn-value x))))
-;;;
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 
-
-;;; Arg is a fixnum or bignum, figure out which and load if necessary.
+;;; ARG is a fixnum or bignum; figure out which and load if necessary.
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (signed-reg unsigned-reg)))
@@ -175,15 +174,11 @@
       (loadw y x bignum-digits-offset other-pointer-lowtag)
       
       (emit-label done))))
-;;;
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
 
-
-
-;;; Result is a fixnum, so we can just shift.  We need the result type
+;;; RESULT is a fixnum, so we can just shift.  We need the result type
 ;;; restriction because of the control-stack ambiguity noted above.
-;;;
 (define-vop (move-from-word/fixnum)
   (:args (x :scs (signed-reg unsigned-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -191,14 +186,11 @@
   (:note "fixnum tagging")
   (:generator 1
     (inst slwi y x 2)))
-;;;
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
-
-;;; Result may be a bignum, so we have to check.  Use a worst-case cost to make
-;;; sure people know they may be number consing.
-;;;
+;;; RESULT may be a bignum, so we have to check.  Use a worst-case
+;;; cost to make sure people know they may be number consing.
 (define-vop (move-from-signed)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -217,14 +209,12 @@
       (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
 	(storew x y bignum-digits-offset other-pointer-lowtag))
       (emit-label done))))
-;;;
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
-
-;;; Check for fixnum, and possibly allocate one or two word bignum result.  Use
-;;; a worst-case cost to make sure people know they may be number consing.
-;;;
+;;; Check for fixnum, and possibly allocate one or two word bignum
+;;; result.  Use a worst-case cost to make sure people know they may
+;;; be number consing.
 (define-vop (move-from-unsigned)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -253,13 +243,11 @@
 	(storew temp y 0 other-pointer-lowtag)
 	(storew x y bignum-digits-offset other-pointer-lowtag))
       (emit-label done))))
-;;;
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
 
 ;;; Move untagged numbers.
-;;;
 (define-vop (word-move)
   (:args (x :target y
 	    :scs (signed-reg unsigned-reg)
@@ -271,13 +259,11 @@
   (:note "word integer move")
   (:generator 0
     (move y x)))
-;;;
 (define-move-vop word-move :move
   (signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
 
 ;;; Move untagged number arguments/return-values.
-;;;
 (define-vop (move-word-arg)
   (:args (x :target y
 	    :scs (signed-reg unsigned-reg))
@@ -291,13 +277,10 @@
        (move y x))
       ((signed-stack unsigned-stack)
        (storew x fp (tn-offset y))))))
-;;;
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
-
-;;; Use standard MOVE-ARGUMENT + coercion to move an untagged number to a
+;;; Use standard MOVE-ARG + coercion to move an untagged number to a
 ;;; descriptor passing location.
-;;;
 (define-move-vop move-arg :move-arg
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
