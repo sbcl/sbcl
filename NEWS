@@ -1629,6 +1629,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * fixed a bug in computing method discriminating functions: it is
     now possible to define methods specialized on classes which have
     forward-referenced superclasses.  (thanks to Gerd Moellmann)
+  * fixed evaluation order in optional entries. (reported by Gilbert
+    Baumann)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;

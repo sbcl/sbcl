@@ -332,3 +332,8 @@
        ((lambda (&optional *x* &rest y) (declare (special *x*)) (values *x* y)) nil))
    for real-warns-p = (nth-value 1 (compile nil fun))
    do (assert (eq warns-p real-warns-p)))
+
+;;; Bug reported by Gilbert Baumann on #lisp IRC 2003-03-26
+(assert (equal (funcall (eval '(lambda (x &optional (y (pop x))) (list x y)))
+                        '(1 2))
+               '((2) 1)))

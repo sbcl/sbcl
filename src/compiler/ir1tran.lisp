@@ -1535,12 +1535,21 @@
 			      :where-from (leaf-where-from var)
 			      :specvar (lambda-var-specvar var)))
 			   fvars))
-	 (fun (ir1-convert-lambda-body `((%funcall ,fun
-						   ,@(reverse vals)
-						   ,@defaults))
-				       arg-vars
-				       :debug-name "&OPTIONAL processor"
-                                       :note-lexical-bindings nil)))
+	 (fun (collect ((default-bindings)
+                        (default-vals))
+                (dolist (default defaults)
+                  (if (constantp default)
+                      (default-vals default)
+                      (let ((var (gensym)))
+                        (default-bindings `(,var ,default))
+                        (default-vals var))))
+                (ir1-convert-lambda-body `((let (,@(default-bindings))
+                                             (%funcall ,fun
+                                                       ,@(reverse vals)
+                                                       ,@(default-vals))))
+                                         arg-vars
+                                         :debug-name "&OPTIONAL processor"
+                                         :note-lexical-bindings nil))))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
 	      (setf (leaf-ever-used var) t)))

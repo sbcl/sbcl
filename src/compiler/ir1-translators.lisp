@@ -530,15 +530,17 @@
   During evaluation of the Forms, bind the Vars to the result of evaluating the
   Value forms. The variables are bound in parallel after all of the Values are
   evaluated."
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-      (let ((fun-cont (make-continuation)))
-        (let* ((*lexenv* (process-decls decls vars nil cont))
-               (fun (ir1-convert-lambda-body
-                     forms vars
-                     :debug-name (debug-namify "LET ~S" bindings))))
-          (reference-leaf start fun-cont fun))
-        (ir1-convert-combination-args fun-cont cont values)))))
+  (if (null bindings)
+      (ir1-translate-locally  body start cont)
+      (multiple-value-bind (forms decls) (parse-body body nil)
+        (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
+          (let ((fun-cont (make-continuation)))
+            (let* ((*lexenv* (process-decls decls vars nil cont))
+                   (fun (ir1-convert-lambda-body
+                         forms vars
+                         :debug-name (debug-namify "LET ~S" bindings))))
+              (reference-leaf start fun-cont fun))
+            (ir1-convert-combination-args fun-cont cont values))))))
 
 (def-ir1-translator let* ((bindings &body body)
 			  start cont)
