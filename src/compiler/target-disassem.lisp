@@ -1956,8 +1956,7 @@
 		      assoc-with
 		      (sb!di:debug-var-symbol
 		       (aref (dstate-debug-vars dstate)
-			     storage-location))
-		      stream))
+			     storage-location))))
 	    dstate)
       t)))
 

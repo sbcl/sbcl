@@ -646,7 +646,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
  #s(sb-cold:package-data
     :name "SB!FORMAT"
     :doc "private: implementation of FORMAT and friends"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL"))
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
+    :export ("%COMPILER-WALK-FORMAT-STRING" "FORMAT-ERROR"))
 
  #s(sb-cold:package-data
     :name "SB!GRAY"

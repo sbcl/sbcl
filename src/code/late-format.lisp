@@ -1203,3 +1203,115 @@
 		 (subseq name (1+ first-colon)))
 		(t name))
 	      package))))
+
+;;; compile-time checking for argument mismatch.  This code is
+;;; inspired by that of Gerd Moellmann, and comes decorated with
+;;; FIXMEs:
+(defun %compiler-walk-format-string (string args)
+  (declare (type simple-string string))
+  (let ((*default-format-error-control-string* string))
+    (macrolet ((incf-both (&optional (increment 1))
+		 `(progn
+		   (incf min ,increment)
+		   (incf max ,increment)))
+	       (walk-complex-directive (function)
+		 `(multiple-value-bind (min-inc max-inc remaining)
+		   (,function directive directives args)
+		   (incf min min-inc)
+		   (incf max max-inc)
+		   (setq directives remaining))))
+      ;; FIXME: these functions take a list of arguments as well as
+      ;; the directive stream.  This is to enable possibly some
+      ;; limited type checking on FORMAT's arguments, as well as
+      ;; simple argument count mismatch checking: when the minimum and
+      ;; maximum argument counts are the same at a given point, we
+      ;; know which argument is going to be used for a given
+      ;; directive, and some (annotated below) require arguments of
+      ;; particular types.
+      (labels
+	  ((walk-justification (justification directives args)
+	     (declare (ignore args))
+	     (let ((*default-format-error-offset*
+		    (1- (format-directive-end justification))))
+	       (multiple-value-bind (segments first-semi close remaining)
+		   (parse-format-justification directives)
+		 (declare (ignore segments first-semi))
+		 (cond
+		   ((not (format-directive-colonp close))
+		    (values 0 0 directives))
+		   ((format-directive-atsignp justification)
+		    (values 0 sb!xc:call-arguments-limit directives))
+		   ;; FIXME: here we could assert that the
+		   ;; corresponding argument was a list.
+		   (t (values 1 1 remaining))))))
+	   (walk-conditional (conditional directives args)
+	     (declare (ignore args))
+	     (let ((*default-format-error-offset*
+		    (1- (format-directive-end conditional))))
+	       (multiple-value-bind (sublists last-semi-with-colon-p remaining)
+		   (parse-conditional-directive directives)
+		 (declare (ignore last-semi-with-colon-p))
+		 (let ((sub-max (loop for s in sublists
+				      maximize (nth-value 1 (walk-directive-list s args)))))
+		   (cond
+		     ((format-directive-atsignp conditional)
+		      (values 1 (max 1 sub-max) remaining))
+		     ((loop for p in (format-directive-params conditional)
+			    thereis (or (integerp (cdr p))
+					(memq (cdr p) '(:remaining :arg))))
+		      (values 0 sub-max remaining))
+		     ;; FIXME: if not COLONP, then the next argument
+		     ;; must be a number.
+		     (t (values 1 (1+ sub-max) remaining)))))))
+	   (walk-iteration (iteration directives args)
+	     (declare (ignore args))
+	     (let ((*default-format-error-offset*
+		    (1- (format-directive-end iteration))))
+	       (let* ((close (find-directive directives #\} nil))
+		      (posn (position close directives))
+		      (remaining (nthcdr (1+ posn) directives)))
+		 ;; FIXME: if POSN is zero, the next argument must be
+		 ;; a format control (either a function or a string).
+		 (if (format-directive-atsignp iteration)
+		     (values (if (zerop posn) 1 0)
+			     sb!xc:call-arguments-limit
+			     remaining)
+		     ;; FIXME: the argument corresponding to this
+		     ;; directive must be a list.
+		     (let ((nreq (if (zerop posn) 2 1)))
+		       (values nreq nreq remaining))))))
+	   (walk-directive-list (directives args)
+	     (let ((min 0) (max 0))
+	       (loop
+		(let ((directive (pop directives)))
+		  (when (null directive)
+		    (return (values min (min max sb!xc:call-arguments-limit))))
+		  (when (format-directive-p directive)
+		    (incf-both (count :arg (format-directive-params directive)
+				      :key #'cdr))
+		    (let ((c (format-directive-character directive)))
+		      (cond
+			((find c "ABCDEFGORSWX$/")
+			 (incf-both))
+			((char= c #\P)
+			 (unless (format-directive-colonp directive)
+			   (incf-both)))
+			((or (find c "IT%&|_();>") (char= c #\Newline)))
+			((char= c #\<)
+			 (walk-complex-directive walk-justification))
+			((char= c #\[)
+			 (walk-complex-directive walk-conditional))
+			((char= c #\{)
+			 (walk-complex-directive walk-iteration))
+			((char= c #\?)
+			 ;; FIXME: the argument corresponding to this
+			 ;; directive must be a format control.
+			 (cond
+			   ((format-directive-atsignp directive)
+			    (incf min)
+			    (setq max sb!xc:call-arguments-limit))
+			   (t (incf-both 2))))
+			(t (throw 'give-up-format-string-walk nil))))))))))
+	(catch 'give-up-format-string-walk
+	  (let ((directives (tokenize-control-string string)))
+	    (walk-directive-list directives args)))))))

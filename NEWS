@@ -1944,6 +1944,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
   * Compiler code deletion notes now signal a condition of type
     SB-EXT:CODE-DELETION-NOTE (a subtype of SB-EXT:COMPILER-NOTE) with
     an associated MUFFLE-WARNING restart.
+  * The compiler now performs limited argument count validation of
+    constant format strings in FORMAT.  (thanks to Gerd Moellmann)
   * bug fix: WITH-OUTPUT-TO-STRING (and MAKE-STRING-OUTPUT-STREAM) now
     accept and act upon their :ELEMENT-TYPE keyword argument.
     (reported by Edi Weitz)

@@ -540,9 +540,9 @@
 	   (let ((sym (read *query-io*)))
 	     (cond
 	      ((not (symbolp sym))
-	       (format *query-io* "~S is not a symbol."))
+	       (format *query-io* "~S is not a symbol." sym))
 	      ((not (member sym cset))
-	       (format *query-io* "~S is not one of the conflicting symbols."))
+	       (format *query-io* "~S is not one of the conflicting symbols." sym))
 	      (t
 	       (shadowing-import sym package)
 	       (return-from unintern t)))))))

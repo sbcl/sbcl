@@ -3191,14 +3191,46 @@
 ;;;; or T and the control string is a function (i.e. FORMATTER), then
 ;;;; convert the call to FORMAT to just a FUNCALL of that function.
 
+(defun check-format-args (string args)
+  (declare (type string string))
+  (unless (typep string 'simple-string)
+    (setq string (coerce string 'simple-string)))
+  (multiple-value-bind (min max)
+      (handler-case (sb!format:%compiler-walk-format-string string args)
+	(sb!format:format-error (c)
+	  (compiler-warn "~A" c)))
+    (when min
+      (let ((nargs (length args)))
+	(cond
+	  ((< nargs min)
+	   (compiler-warn "Too few arguments (~D) to FORMAT ~S: ~
+                           requires at least ~D."
+			  nargs string min))
+	  ((> nargs max)
+	   (;; to get warned about probably bogus code at
+	    ;; cross-compile time.
+	    #+sb-xc-host compiler-warn
+	    ;; ANSI saith that too many arguments doesn't cause a
+	    ;; run-time error.
+	    #-sb-xc-host compiler-style-warn
+	    "Too many arguments (~D) to FORMAT ~S: uses at most ~D."
+	    nargs string max)))))))
+
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
-		      :policy (> speed space))
-  (unless (constant-continuation-p control)
-    (give-up-ir1-transform "The control string is not a constant."))
-  (let ((arg-names (make-gensym-list (length args))))
-    `(lambda (dest control ,@arg-names)
-       (declare (ignore control))
-       (format dest (formatter ,(continuation-value control)) ,@arg-names))))
+		      :node node)
+
+  (cond
+    ((policy node (> speed space))
+     (unless (constant-continuation-p control)
+       (give-up-ir1-transform "The control string is not a constant."))
+     (check-format-args (continuation-value control) args)
+     (let ((arg-names (make-gensym-list (length args))))
+       `(lambda (dest control ,@arg-names)
+	 (declare (ignore control))
+	 (format dest (formatter ,(continuation-value control)) ,@arg-names))))
+    (t (when (constant-continuation-p control)
+	 (check-format-args (continuation-value control) args))
+       (give-up-ir1-transform))))
 
 (deftransform format ((stream control &rest args) (stream function &rest t) *
 		      :policy (> speed space))
