@@ -32,6 +32,9 @@
 #include "interr.h"
 #include "lispregs.h"
 #include "thread.h"
+#include "runtime.h"
+#include "genesis/static-symbols.h"
+#include "genesis/fdefn.h"
 
 #include <sys/types.h>
 #include <signal.h>
@@ -189,7 +192,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     if (!gencgc_handle_wp_violation(fault_addr)) 
         if(!handle_guard_page_triggered(context,fault_addr))
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-	    arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_HANDLER));
+	    arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
 #else
 	    interrupt_handle_now(signal, siginfo, context);
 #endif
