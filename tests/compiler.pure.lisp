@@ -114,3 +114,18 @@
     (assert (functionp fun))
     (assert (not warnings-p))
     (assert (not failure-p))))
+
+;;; a bug in 0.7.4.11
+(dolist (i '(a b 1 2 "x" "y"))
+  ;; In sbcl-0.7.4.11, the compiler tried to source-transform the
+  ;; TYPEP here but got confused and died, doing
+  ;;   (ASSOC '(AND INTEGERP (SATISFIES PLUSP)))
+  ;;          *BACKEND-TYPE-PREDICATES*
+  ;;          :TEST #'TYPE=)
+  ;; and blowing up because TYPE= tried to call PLUSP on the
+  ;; characters of the MEMBER-TYPE representing STANDARD-CHAR.
+  (when (typep i '(and integer (satisfies oddp)))
+    (print i)))
+(dotimes (i 14)
+  (when (typep i '(and integer (satisfies oddp)))
+    (print i)))

@@ -81,7 +81,26 @@
 	  (let ((predicate-name (second hairy-spec)))
 	    (declare (type symbol predicate-name)) ; by ANSI spec of SATISFIES
 	    (if (fboundp predicate-name)
-		(values (not (null (funcall predicate-name obj))) t)
+		(let* (;; "Is OBJ of the SATISFIES type?" represented
+		       ;; as a generalized boolean.
+		       ;;
+		       ;; (Why IGNORE-ERRORS? This code is used to try to
+		       ;; check type relationships at compile time. 
+		       ;; Passing only-slightly-twisted types like
+		       ;; (AND INTEGER (SATISFIES ODDP)) into the
+		       ;; rather-significantly-twisted type dispatch
+		       ;; system can easily give rise to oddities like
+		       ;; calling predicates like ODDP on values they
+		       ;; don't like. (E.g. on OBJ=#\NEWLINE when the
+		       ;; above type is tested for TYPE= against
+		       ;; STANDARD-CHAR, represented as a
+		       ;; MEMBER-TYPE.) In such cases, NIL seems to be
+		       ;; an appropriate answer to "is OBJ of the
+		       ;; SATISFIES type?")
+		       (gbool (ignore-errors (funcall predicate-name obj)))
+		       ;; RAW coerced to a pure BOOLEAN value
+		       (bool (not (not gbool))))
+		  (values bool t))
 		(values nil nil)))))))))
 
 ;;; Return the layout for an object. This is the basic operation for
