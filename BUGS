@@ -1230,6 +1230,22 @@ WORKAROUND:
   failed in FIND-IN-PHYSENV instead. Fixes in sbcl-0.7.1.3 (not
   closing over unreferenced variables) made this second test case
   compile without error, but the original test case still fails.
+ 
+  Another way to get rid of the DEFTYPE without changing the symptom
+  of the bug is
+    (defvar *ch*)
+    (defun parse-num (string ind)
+      (flet ((digs ()
+               (let ()
+                 (if (and (< ind ind)
+			  (sb-int:memq *ch* '(#\1)))
+                     nil))))))
+  In sbcl-0.7.1.3, this fails with
+    internal error, failed AVER: "(= (LENGTH (BLOCK-SUCC CALL-BLOCK)) 1)" 
+  The problem occurs while the inline expansion of MEMQ,
+  #<LAMBDA :%DEBUG-NAME "varargs entry point for SB-C::.ANONYMOUS.">
+  is being LET-converted after having its second REF deleted, leaving
+  it with only one entry in LEAF-REFS.
   
 148:
   In sbcl-0.7.1.3 on x86, COMPILE-FILE on this file

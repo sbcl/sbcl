@@ -2021,7 +2021,8 @@
     (unless (eq (defined-fun-inlinep var) :inline)
       (setf (defined-fun-inline-expansion var) nil))
     (let* ((name (leaf-source-name var))
-	   (fun (funcall converter lambda :source-name name))
+	   (fun (funcall converter lambda
+			 :source-name name))
 	   (fun-info (info :function :info name)))
       (setf (functional-inlinep fun) (defined-fun-inlinep var))
       (assert-new-definition var fun)

@@ -36,12 +36,12 @@
   (sb-ext:gc-on)
   (sb-ext:gc))
 
-;;; FIXME: I'm now inclined to make all the bootstrap stuff run in CL-USER
-;;; instead of SB-COLD. If I do so, I should first take care to
-;;; UNINTERN any old stuff in CL-USER, since ANSI says (11.1.2.2, "The
-;;; COMMON-LISP-USER Package") that CL-USER can have arbitrary symbols in
-;;; it. (And of course I should set the USE list to only CL.)
+;;; SB-COLD holds stuff used to build the initial SBCL core file
+;;; (including not only the final construction of the core file, but
+;;; also the preliminary steps like e.g. building the cross-compiler
+;;; and running the cross-compiler to produce target FASL files).
 (defpackage "SB-COLD" (:use "CL"))
+
 (in-package "SB-COLD")
 
 ;;; prefixes for filename stems when cross-compiling. These are quite arbitrary
@@ -50,20 +50,31 @@
 ;;; "host-objects/" or absolute pathnames (e.g. "/tmp/sbcl-xc-host-objects/").
 ;;;
 ;;; The cross-compilation process will force the creation of these directories
-;;; by executing CL:ENSURE-DIRECTORIES-EXIST (on the host Common Lisp).
+;;; by executing CL:ENSURE-DIRECTORIES-EXIST (on the xc host Common Lisp).
 (defvar *host-obj-prefix*)
 (defvar *target-obj-prefix*)
 
-;;; suffixes for filename stems when cross-compiling. Everything
-;;; should work fine for any arbitrary string values here. With more
-;;; work maybe we could cause these automatically to become the
-;;; traditional extensions for whatever host and target architectures
-;;; (e.g. ".x86f" or ".axpf") we're currently doing. That would make
-;;; it easier for a human looking at the temporary files to figure out
-;;; what they're for, but it's not necessary for the compilation
-;;; process to work, so we haven't bothered.
-(defvar *host-obj-suffix* ".lisp-obj")
-(defvar *target-obj-suffix* ".lisp-obj")
+;;; suffixes for filename stems when cross-compiling
+(defvar *host-obj-suffix* 
+  (or
+   ;; On some xc hosts, it's impossible to LOAD a fasl file unless it
+   ;; has the same extension that the host uses for COMPILE-FILE
+   ;; output, so we have to be careful to use the xc host's preferred
+   ;; extension.
+   ;;
+   ;; FIXME: This is a little ugly and annoying to maintain. And
+   ;; there's very likely some way to rearrange the build process so
+   ;; that we never explicitly refer to host object file suffixes,
+   ;; only to the result of CL:COMPILE-FILE-PATHNAME.
+   #+lispworks ".ufsl" ; as per Lieven Marchand sbcl-devel 2002-02-01
+   ;; On most xc hosts, any old extension works, so we use an
+   ;; arbitrary one.
+   ".lisp-obj"))
+(defvar *target-obj-suffix*
+  ;; Target fasl files are LOADed (actually only quasi-LOADed, in
+  ;; GENESIS) only by SBCL code, and it doesn't care about particular
+  ;; extensions, so we can use something arbitrary.
+  ".lisp-obj")
 
 ;;; a function of one functional argument, which calls its functional argument
 ;;; in an environment suitable for compiling the target. (This environment

@@ -628,6 +628,10 @@
   ;; skewed enough (e.g. for macro functions or method functions) that
   ;; we don't want to have that name affect compilation
   ;;
+  ;; (We use .ANONYMOUS. here more or less the way we'd ordinarily use
+  ;; NIL, but we're afraid to use NIL because it's a symbol which could
+  ;; be the name of a leaf, if only the constant named NIL.)
+  ;;
   ;; The value of this slot in can affect ordinary runtime behavior,
   ;; e.g. of special variables and known functions, not just debugging.
   ;;

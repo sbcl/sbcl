@@ -767,8 +767,8 @@
               alien code or from unsafe Lisp code; or there might be a bug ~
               in the OS or hardware that SBCL is running on.) If it seems to ~
               be a bug in SBCL itself, the maintainers would like to know ~
-              how to exercise the bug so it can be fixed. Bug reports are ~
-              welcome on the SBCL mailing lists, which you can find at ~
+              about it. Bug reports are welcome on the SBCL ~
+              mailing lists, which you can find at ~
               <http://sbcl.sourceforge.net/>.~:@>"
 	     '((fmakunbound 'compile))))))
 (defun bug (format-control &rest format-arguments)

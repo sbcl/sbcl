@@ -220,14 +220,18 @@
 ;;;
 ;;; the problem, part II: The <something> is represented as a pair
 ;;; of values, SOURCE-NAME and DEBUG-NAME, where SOURCE-NAME is used
-;;; if it's not null.
+;;; if it's not .ANONYMOUS. (This is parallel to the way that ordinarily
+;;; we don't use a value if it's NIL, instead defaulting it. But we
+;;; can't safely/comfortably use NIL for that in this context, since
+;;; the app programmer can use NIL as a name, so we use the private
+;;; symbol .ANONYMOUS. instead.)
 ;;;
 ;;; the solution: Use this function to convert whatever it is to a
 ;;; string, which FORMAT can then splice using "~A".
 (defun as-debug-name (source-name debug-name)
-  (if source-name
-      (debug-namify "~S" source-name)
-      debug-name))
+  (if (eql source-name '.anonymous.)
+      debug-name
+      (debug-namify "~S" source-name)))
 
 ;;; Return a COMPILER-ERROR-CONTEXT structure describing the current
 ;;; error context, or NIL if we can't figure anything out. ARGS is a

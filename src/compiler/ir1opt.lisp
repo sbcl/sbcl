@@ -412,7 +412,7 @@
 ;;; variable has no references.
 ;;;
 ;;; [### For now, don't delete potentially flushable calls when they
-;;; have the CALL attribute. Someday we should look at the funcitonal
+;;; have the CALL attribute. Someday we should look at the functional
 ;;; args to determine if they have any side-effects.]
 (defun flush-dead-code (block)
   (declare (type cblock block))
@@ -1096,9 +1096,9 @@
 (defun transform-call (node res)
   (declare (type combination node) (list res))
   (with-ir1-environment-from-node node
-    (let ((new-fun (ir1-convert-inline-lambda
-		    res
-		    :debug-name "something inlined in TRANSFORM-CALL"))
+      (let ((new-fun (ir1-convert-inline-lambda
+		      res
+		      :debug-name "something inlined in TRANSFORM-CALL"))
 	  (ref (continuation-use (combination-fun node))))
       (change-ref-leaf ref new-fun)
       (setf (combination-kind node) :full)
