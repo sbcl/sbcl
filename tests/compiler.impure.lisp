@@ -890,7 +890,24 @@
                  (type-error (c)
                    (return-from return :good))))
              :good))
-
+
+;;;; MUFFLE-CONDITIONS test (corresponds to the test in the manual)
+(defvar *compiler-note-count* 0)
+(handler-bind ((sb-ext:compiler-note (lambda (c)
+				       (declare (ignore c))
+				       (incf *compiler-note-count*))))
+  (let ((fun
+	 (compile nil
+		  '(lambda (x)
+		    (declare (optimize speed) (fixnum x))
+		    (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+		    (values (* x 5) ; no compiler note from this
+		     (locally
+		       (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
+		       ;; this one gives a compiler note
+		       (* x -5)))))))
+    (assert (= *compiler-note-count* 1))
+    (assert (equal (multiple-value-list (funcall fun 1)) '(5 -5)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -1171,6 +1171,16 @@
         (make-lexenv
          :default res
          :policy (process-optimize-decl spec (lexenv-policy res))))
+       (muffle-conditions
+	(make-lexenv
+	 :default res
+	 :handled-conditions (process-muffle-conditions-decl
+			      spec (lexenv-handled-conditions res))))
+       (unmuffle-conditions
+	(make-lexenv
+	 :default res
+	 :handled-conditions (process-unmuffle-conditions-decl
+			      spec (lexenv-handled-conditions res))))
        (type
         (process-type-decl (cdr spec) res vars))
        (values

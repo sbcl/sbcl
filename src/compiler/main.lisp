@@ -805,7 +805,8 @@
 ;;; *TOPLEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
-  (let* ((*lexenv* (make-lexenv :policy *policy*))
+  (let* ((*lexenv* (make-lexenv :policy *policy*
+				:handled-conditions *handled-conditions*))
 	 (tll (ir1-toplevel form path nil)))
     (cond ((eq *block-compile* t) (push tll *toplevel-lambdas*))
 	  (t (compile-toplevel (list tll) nil)))))
@@ -850,7 +851,9 @@
 	   ;; FIXME: Ideally, something should be done so that DECLAIM
 	   ;; inside LOCALLY works OK. Failing that, at least we could
 	   ;; issue a warning instead of silently screwing up.
-	   (*policy* (lexenv-policy *lexenv*)))
+	   (*policy* (lexenv-policy *lexenv*))
+	   ;; This is probably also a hack
+	   (*handled-conditions* (lexenv-handled-conditions *lexenv*)))
       (process-toplevel-progn forms path compile-time-too))))
 
 ;;; Parse an EVAL-WHEN situations list, returning three flags,
@@ -948,7 +951,8 @@
 		  '(original-source-start 0 0)))
   (when name
     (legal-fun-name-or-type-error name))
-  (let* ((*lexenv* (make-lexenv :policy *policy*))
+  (let* ((*lexenv* (make-lexenv :policy *policy*
+				:handled-conditions *handled-conditions*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
 						    :path path)))
@@ -1338,6 +1342,45 @@
     (setq *block-compile* nil)
     (setq *entry-points* nil)))
 
+(defun handle-condition-p (condition)
+  (let ((lexenv
+	 (etypecase *compiler-error-context*
+	   (node
+	    (node-lexenv *compiler-error-context*))
+	   (compiler-error-context
+	    (let ((lexenv (compiler-error-context-lexenv
+			   *compiler-error-context*)))
+	      (aver lexenv)
+	      lexenv))
+	   (null *lexenv*))))
+    (let ((muffles (lexenv-handled-conditions lexenv)))
+      (if (null muffles) ; common case
+	  nil
+	  (dolist (muffle muffles nil)
+	    (destructuring-bind (typespec . restart-name) muffle
+	      (when (and (typep condition typespec)
+			 (find-restart restart-name condition))
+		(return t))))))))
+
+(defun handle-condition-handler (condition)
+  (let ((lexenv
+	 (etypecase *compiler-error-context*
+	   (node
+	    (node-lexenv *compiler-error-context*))
+	   (compiler-error-context
+	    (let ((lexenv (compiler-error-context-lexenv
+			   *compiler-error-context*)))
+	      (aver lexenv)
+	      lexenv))
+	   (null *lexenv*))))
+    (let ((muffles (lexenv-handled-conditions lexenv)))
+      (aver muffles)
+      (dolist (muffle muffles (bug "fell through"))
+	(destructuring-bind (typespec . restart-name) muffle
+	  (when (typep condition typespec)
+	    (awhen (find-restart restart-name condition)
+	      (invoke-restart it))))))))
+
 ;;; Read all forms from INFO and compile them, with output to OBJECT.
 ;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
@@ -1348,6 +1391,7 @@
         (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
 
         (*policy* *policy*)
+	(*handled-conditions* *handled-conditions*)
         (*lexenv* (make-null-lexenv))
         (*block-compile* *block-compile-arg*)
         (*source-info* info)
@@ -1372,19 +1416,20 @@
         (*info-environment* *info-environment*)
         (*gensym-counter* 0))
     (handler-case
-	(with-compilation-values
-	 (sb!xc:with-compilation-unit ()
-	   (clear-stuff)
-
-	   (sub-sub-compile-file info)
-
-	   (finish-block-compilation)
-	   (let ((object *compile-object*))
-	     (etypecase object
-	       (fasl-output (fasl-dump-source-info info object))
-	       (core-object (fix-core-source-info info object))
-	       (null)))
-	   nil))
+	(handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
+	  (with-compilation-values
+	      (sb!xc:with-compilation-unit ()
+		(clear-stuff)
+		
+		(sub-sub-compile-file info)
+		
+		(finish-block-compilation)
+		(let ((object *compile-object*))
+		  (etypecase object
+		    (fasl-output (fasl-dump-source-info info object))
+		    (core-object (fix-core-source-info info object))
+		    (null)))
+		nil)))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of
       ;; the input file.

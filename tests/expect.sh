@@ -36,10 +36,6 @@ EOF
 
 # Test that a file compiles cleanly, with no ERRORs, WARNINGs or
 # STYLE-WARNINGs.
-#
-# Maybe this wants to be in a compiler.test.sh script?  This function
-# was originally written to test APD's patch for slot readers and
-# writers not being known to the compiler. -- CSR, 2002-08-14
 expect_clean_compile () 
 {
     $SBCL <<EOF
@@ -95,8 +91,21 @@ fail_on_compiler_note ()
           (sb-ext:quit :unix-status 52))
 EOF
     if [ $? != 52 ]; then
-        echo compiler-note $1 test failed: $?
+        echo fail-on-compiler-note $1 test failed: $?
         exit 1
     fi
 }
 
+expect_compiler_note ()
+{
+    $SBCL <<EOF
+        (handler-bind ((sb-ext:compiler-note (lambda (c)
+                                               (declare (ignore c))
+                                               (sb-ext:quit :unix-status 52))))
+          (compile-file "$1"))
+EOF
+    if [ $? != 52 ]; then
+	echo expect-compiler-note $1 test failed: $?
+	exit 1
+    fi
+}

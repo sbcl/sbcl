@@ -169,6 +169,70 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+# MUFFLE-CONDITIONS tests
+cat > $tmpfilename <<EOF
+    (defun foo ()
+      (declare (muffle-conditions style-warning))
+      (bar))
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (defun foo ()
+      (declare (muffle-conditions code-deletion-note))
+      (if t (foo) (foo)))
+EOF
+fail_on_compiler_note $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (defun foo (x y)
+      (declare (muffle-conditions compiler-note))
+      (declare (optimize speed))
+      (+ x y))
+EOF
+fail_on_compiler_note $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (declaim (muffle-conditions compiler-note))
+    (defun foo (x y)
+      (declare (optimize speed))
+      (+ x y))
+EOF
+fail_on_compiler_note $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (declaim (muffle-conditions compiler-note))
+    (defun foo (x y)
+      (declare (unmuffle-conditions compiler-note))
+      (declare (optimize speed))
+      (+ x y))
+EOF
+expect_compiler_note $tmpfilename
+
+# undefined variable causes a WARNING
+cat > $tmpfilename <<EOF
+    (declaim (muffle-conditions warning))
+    (declaim (unmuffle-conditions style-warning))
+    (defun foo () x)
+EOF
+expect_clean_compile $tmpfilename
+
+# top level LOCALLY behaves nicely
+cat > $tmpfilename <<EOF
+    (locally
+      (declare (muffle-conditions warning))
+      (defun foo () x))
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (locally
+      (declare (muffle-conditions warning))
+      (defun foo () x))
+    (defun bar () x)
+EOF
+expect_failed_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

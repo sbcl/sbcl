@@ -16,6 +16,12 @@
      
 @printindex vr
 
+@node Type Index
+@comment  node-name,  next,  previous,  up
+@appendix Type Index
+
+@printindex tp
+
 @node Colophon
 @comment  node-name,  next,  previous,  up
 @unnumbered Colophon

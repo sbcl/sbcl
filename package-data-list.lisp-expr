@@ -568,6 +568,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	     ;; verbosity
 	     "CODE-DELETION-NOTE" "COMPILER-NOTE"
 
+	     ;; and a mechanism for controlling same at compile time
+	     "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
+
 	     ;; FIXME: This name doesn't match the DEFFOO - vs. -
 	     ;; DEFINE-FOO convention used in the ANSI spec, and so
 	     ;; was deprecated in sbcl-0.pre7, ca. 2001-12-12. After

@@ -72,7 +72,9 @@
   ;; the file position at which the top level form starts, if applicable
   (file-position nil :type (or index null))
   ;; the original source part of the source path
-  (original-source-path nil :type list))
+  (original-source-path nil :type list)
+  ;; the lexenv active at the time
+  (lexenv nil :type (or null lexenv)))
 
 ;;; If true, this is the node which is used as context in compiler warning
 ;;; messages.
@@ -239,7 +241,10 @@
 		     (declare (ignore ignore))
 		     pos)
 		   :original-source-path
-		   (source-path-original-source path))))))))))
+		   (source-path-original-source path)
+		   :lexenv (if context
+			       (node-lexenv context)
+			       (if (boundp '*lexenv*) *lexenv* nil)))))))))))
 
 ;;;; printing error messages
 
@@ -539,13 +544,27 @@ has written, having proved that it is unreachable."))
 	   ;; Check for boundness so we don't blow up if we're called
 	   ;; when IR1 conversion isn't going on.
 	   (boundp '*lexenv*)
-	   ;; FIXME: I'm pretty sure the INHIBIT-WARNINGS test below
-	   ;; isn't a good idea; we should have INHIBIT-WARNINGS
-	   ;; affect compiler notes, not STYLE-WARNINGs. And I'm not
-	   ;; sure what the BOUNDP '*LEXENV* test above is for; it's
-	   ;; likely a good idea, but it probably deserves an
-	   ;; explanatory comment.
-	   (policy *lexenv* (= inhibit-warnings 3)))
+	   (or
+	    ;; FIXME: I'm pretty sure the INHIBIT-WARNINGS test below
+	    ;; isn't a good idea; we should have INHIBIT-WARNINGS
+	    ;; affect compiler notes, not STYLE-WARNINGs. And I'm not
+	    ;; sure what the BOUNDP '*LEXENV* test above is for; it's
+	    ;; likely a good idea, but it probably deserves an
+	    ;; explanatory comment.
+	    (policy *lexenv* (= inhibit-warnings 3))
+	    ;; KLUDGE: weird decoupling between here and where we're
+	    ;; going to signal the condition.  I don't think we can
+	    ;; rewrite this using SIGNAL and RESTART-CASE (to take
+	    ;; advantage of the (SATISFIES HANDLE-CONDITION-P)
+	    ;; handler, because if that doesn't handle it the ordinary
+	    ;; compiler handlers will trigger.
+	    (typep
+	     (ecase kind
+	       (:variable (make-condition 'warning))
+	       ((:function :type) (make-condition 'style-warning)))
+	     (car
+	      (rassoc 'muffle-warning
+		      (lexenv-handled-conditions *lexenv*))))))
     (let* ((found (dolist (warning *undefined-warnings* nil)
 		    (when (and (equal (undefined-warning-name warning) name)
 			       (eq (undefined-warning-kind warning) kind))

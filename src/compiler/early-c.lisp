@@ -101,6 +101,7 @@
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
+(defvar *handled-conditions*)
 (defvar *policy*)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)

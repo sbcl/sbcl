@@ -11,8 +11,6 @@
 
 (in-package "SB!C")
 
-#!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
-
 ;;; The LEXENV represents the lexical environment used for IR1 conversion.
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
@@ -28,7 +26,8 @@
 	     (:constructor internal-make-lexenv
 			   (funs vars blocks tags
                                  type-restrictions
-				 lambda cleanup policy)))
+				 lambda cleanup handled-conditions
+				 policy)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -61,8 +60,10 @@
   ;; FIXME: This should be :TYPE (OR CLAMBDA NULL), but it was too hard
   ;; to get CLAMBDA defined in time for the cross-compiler.
   (lambda nil)
-  ;; the lexically enclosing cleanup, or NIL if none enclosing within Lambda
+  ;; the lexically enclosing cleanup, or NIL if none enclosing within LAMBDA
   (cleanup nil)
+  ;; condition types we handle with a handler around the compiler
+  (handled-conditions *handled-conditions*)
   ;; the current OPTIMIZE policy
   (policy *policy* :type policy))
 

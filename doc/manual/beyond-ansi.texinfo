@@ -317,9 +317,7 @@ implementation-defined.  In SBCL, @code{require} behaves in the
 following way:
 
 @include fun-common-lisp-require.texinfo
-
 @include var-sb-ext-star-module-provider-functions-star.texinfo
-
 
 @node  Tools To Help Developers
 @comment  node-name,  next,  previous,  up
@@ -334,7 +332,6 @@ Debugger}.
 
 Documentation for @code{inspect} is accessed by typing @kbd{help} at
 the @code{inspect} prompt.
-
 
 @node  Interface To Low-Level SBCL Implementation
 @comment  node-name,  next,  previous,  up

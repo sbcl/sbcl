@@ -56,3 +56,45 @@
 (deftest macroexpand-all.4
     (macroexpand-all '(symbol-macrolet ((srlt '(nil zool))) (testr)))
   (symbol-macrolet ((srlt '(nil zool))) 'zool))
+
+(defmacro dinfo (thing &environment env)
+  `',(declaration-information thing env))
+
+(macrolet ((def (x)
+	       `(macrolet ((frob (suffix answer &optional declaration)
+			    `(deftest ,(intern (concatenate 'string
+							    "DECLARATION-INFORMATION."
+							    (symbol-name ',x)
+							    suffix))
+			       (locally (declare ,@(when declaration
+							 (list declaration)))
+				 (cadr (assoc ',',x (dinfo optimize))))
+			      ,answer)))
+		 (frob ".DEFAULT" 1)
+		 (frob ".0" 0 (optimize (,x 0)))
+		 (frob ".1" 1 (optimize (,x 1)))
+		 (frob ".2" 2 (optimize (,x 2)))
+		 (frob ".3" 3 (optimize (,x 3)))
+		 (frob ".IMPLICIT" 3 (optimize ,x)))))
+  (def speed)
+  (def safety)
+  (def debug)
+  (def compilation-speed)
+  (def space))
+
+(deftest declaration-information.muffle-conditions.default
+  (dinfo sb-ext:muffle-conditions)
+  nil)
+(deftest declaration-information.muffle-conditions.1
+  (locally (declare (sb-ext:muffle-conditions warning))
+    (dinfo sb-ext:muffle-conditions))
+  warning)
+(deftest declaration-information.muffle-conditions.2
+  (locally (declare (sb-ext:muffle-conditions warning))
+    (locally (declare (sb-ext:unmuffle-conditions style-warning))
+      (let ((dinfo (dinfo sb-ext:muffle-conditions)))
+	(not
+	 (not
+	  (and (subtypep dinfo '(and warning (not style-warning)))
+	       (subtypep '(and warning (not style-warning)) dinfo)))))))
+  t)

@@ -67,6 +67,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Concept Index::
 * Function Index::
 * Variable Index::
+* Type Index::
 * Colophon::
 @end menu
 

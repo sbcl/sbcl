@@ -22,13 +22,6 @@
 ;;; alists instead.
 (def!type policy () 'list)
 
-;;; FIXME: the original implementation of this was protected by
-;;;
-;;; (eval-when (#-sb-xc-host :compile-toplevel :load-toplevel :execute)
-;;;
-;;; but I don't know why.  This seems to work, but I don't understand
-;;; why the original wasn't this in the first place.  -- CSR,
-;;; 2003-05-04
 (defstruct policy-dependent-quality
   name
   expression
@@ -37,8 +30,7 @@
 
 ;;; names of recognized optimization policy qualities
 (defvar *policy-qualities*) ; (initialized at cold init)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *policy-dependent-qualities* nil)) ; alist of POLICY-DEPENDENT-QUALITYs
+(defvar *policy-dependent-qualities* nil) ; alist of POLICY-DEPENDENT-QUALITYs
 
 ;;; Is X the name of an optimization policy quality?
 (defun policy-quality-name-p (x)
@@ -75,10 +67,14 @@
 	  inhibit-warnings))
   (setf *policy*
 	(mapcar (lambda (name)
-		  ;; CMU CL didn't use 1 as the default for everything,
-		  ;; but since ANSI says 1 is the ordinary value, we do.
+		  ;; CMU CL didn't use 1 as the default for
+		  ;; everything, but since ANSI says 1 is the ordinary
+		  ;; value, we do.
 		  (cons name 1))
-		*policy-qualities*)))
+		*policy-qualities*))
+  ;; not actually POLICY, but very similar
+  (setf *handled-conditions* nil))
+  
 ;;; On the cross-compilation host, we initialize immediately (not
 ;;; waiting for "cold init", since cold init doesn't exist on
 ;;; cross-compilation host).
@@ -88,6 +84,7 @@
 ;;; called by compiler code for known-valid QUALITY-NAMEs, e.g. SPEED;
 ;;; it's an error if it's called for a quality which isn't defined.
 (defun policy-quality (policy quality-name)
+  (aver (policy-quality-name-p quality-name))
   (let* ((acons (assoc quality-name policy))
          (result (or (cdr acons) 1)))
     result))

@@ -70,6 +70,8 @@
 	     ;; call %COMPILE with a core-object, not a fasl-stream,
 	     ;; but caveat future maintainers. -- CSR, 2002-10-27
 	     (*policy* (lexenv-policy *lexenv*))
+	     ;; see above
+	     (*handled-conditions* (lexenv-handled-conditions *lexenv*))
 	     ;; FIXME: ANSI doesn't say anything about CL:COMPILE
 	     ;; interacting with these variables, so we shouldn't. As
 	     ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by
@@ -78,11 +80,12 @@
 	     ;; controlled by function arguments and lexical variables.
 	     (*compile-verbose* nil)
 	     (*compile-print* nil))
-	(clear-stuff)
-	(find-source-paths form 0)
-	(%compile form (make-core-object)
-		  :name name
-		  :path '(original-source-start 0 0))))))
+	(handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
+	  (clear-stuff)
+	  (find-source-paths form 0)
+	  (%compile form (make-core-object)
+		    :name name
+		    :path '(original-source-start 0 0)))))))
 
 (defun compile-in-lexenv (name definition lexenv)
   (multiple-value-bind (compiled-definition warnings-p failure-p)

@@ -311,6 +311,11 @@ explanation, so the compiler backed out one level.
 @subsection Error Severity
 @cindex Severity of compiler errors
 @cindex compiler error severity
+@tindex error
+@tindex warning
+@tindex style-warning
+@tindex compiler-note
+@tindex code-deletion-note
 
 There are four levels of compiler error severity: @emph{error},
 @emph{warning}, @emph{style warning}, and @emph{note}. The first three
@@ -319,10 +324,15 @@ standard for Common Lisp and which have special significance to the
 @code{compile} and @code{compile-file} functions. These levels of
 compiler error severity occur when the compiler handles conditions of
 these classes. The fourth level of compiler error severity,
-@emph{note}, is used for problems which are too mild for the standard
-condition classes, typically hints about how efficiency might be
-improved.
-@comment mention sb-ext:compiler-note
+@emph{note}, corresponds to the @code{sb-ext:compiler-note}, and is
+used for problems which are too mild for the standard condition
+classes, typically hints about how efficiency might be improved.  The
+@code{sb-ext:code-deletion-note}, a subtype of @code{compiler-note},
+is signalled when the compiler deletes user-supplied code, usually
+after proving that the code in question is unreachable.
+
+@include condition-sb-ext-compiler-note.texinfo
+@include condition-sb-ext-code-deletion-note.texinfo
 
 @node  Errors During Macroexpansion
 @comment  node-name,  next,  previous,  up
@@ -773,8 +783,8 @@ is some rudimentary documentation on the current behavior of the
 system.
 
 Compiler policy is controlled by the @code{optimize} declaration. The
-compiler supports the ANSI optimization qualities, and also an
-extension @code{sb-ext:inhibit-warnings}.
+compiler supports the ANSI optimization qualities, and also a
+deprecated extension @code{sb-ext:inhibit-warnings}.
 
 Ordinarily, when the @code{speed} quality is high, the compiler emits
 notes to notify the programmer about its inability to apply various
@@ -786,28 +796,31 @@ notes about having to use generic arithmetic instead of fixnum
 arithmetic, which is not helpful for code which by design supports
 arbitrary-sized integers instead of being limited to fixnums.)
 
-@quotation
-Note: The basic functionality of the @code{optimize
-inhibit-warnings} extension will probably be supported in all future
-versions of the system, but it will probably be renamed when the
-compiler and its interface are cleaned up. The current name is
-misleading, because it mostly inhibits optimization notes, not
-warnings. And making it an optimization quality is misleading, because
-it shouldn't affect the resulting code at all. It may become a
-declaration identifier with a name like
-@code{sb-ext:inhibit-notes}, so that what's currently written.
-
+The recommended way to inhibit compiler diagnostics (of any severity
+other than @code{error}: @pxref{Error Severity}) is to use the
+@code{sb-ext:muffle-conditions} declaration, specifying the type of
+condition that is to be muffled (using an associated
+@code{muffle-warning} restart).  Thus, what was previously written
 @lisp
 (declaim (optimize (sb-ext:inhibit-warnings 2)))
 @end lisp
-
-would become something like
-
+becomes something like
 @lisp
-(declaim (sb-ext:inhibit-notes 2))
+(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
 @end lisp
-
-@end quotation
+to muffle all compiler notes.  Compiler diagnostics can be muffled in
+the lexical scope of a declaration, and also lexically unmuffled by
+the use of the sb-ext:unmuffle-conditions, for instance
+@lisp
+(defun foo (x)
+  (declare (optimize speed) (fixnum x))
+  (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+  (values (* x 5) ; no compiler note from this
+    (locally
+      (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
+      ;; this one gives a compiler note
+      (* x -5))))
+@end lisp
 
 In early versions of SBCL, a @code{speed} value of zero was used to
 enable byte compilation, but since version 0.7.0, SBCL only supports

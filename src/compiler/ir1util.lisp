@@ -538,6 +538,7 @@
                          type-restrictions
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
+		         (handled-conditions (lexenv-handled-conditions default))
 			 (policy (lexenv-policy default)))
   (macrolet ((frob (var slot)
 	       `(let ((old (,slot default)))
@@ -550,7 +551,7 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup policy)))
+     lambda cleanup handled-conditions policy)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander
@@ -579,6 +580,7 @@
      (lexenv-type-restrictions lexenv) ; XXX
      nil
      nil
+     (lexenv-handled-conditions lexenv)
      (lexenv-policy lexenv))))
 
 ;;;; flow/DFO/component hackery

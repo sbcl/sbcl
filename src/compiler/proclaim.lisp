@@ -52,6 +52,12 @@
 	       (compiler-warn "ignoring bad optimization value ~S in ~S"
 			      raw-value spec))
 	      (t
+	       ;; we can't do this yet, because CLOS macros expand
+	       ;; into code containing INHIBIT-WARNINGS.
+	       #+nil
+	       (when (eql quality 'sb!ext:inhibit-warnings)
+		 (compiler-style-warn "~S is deprecated: use ~S instead"
+				      quality 'sb!ext:muffle-conditions))
 	       (push (cons quality raw-value)
 		     result)))))
     ;; Add any nonredundant entries from old POLICY.
@@ -60,6 +66,58 @@
 	(push old-entry result)))
     ;; Voila.
     result))
+
+(declaim (ftype (function (list list) list)
+		process-handle-conditions-decl))
+(defun process-handle-conditions-decl (spec list)
+  (let ((new (copy-alist list)))
+    (dolist (clause (cdr spec))
+      (destructuring-bind (typespec restart-name) clause
+	(let ((ospec (rassoc restart-name new :test #'eq)))
+	  (if ospec
+	      (setf (car ospec)
+		    (type-specifier
+		     (type-union (specifier-type (car ospec))
+				 (specifier-type typespec))))
+	      (push (cons (type-specifier (specifier-type typespec))
+			  restart-name)
+		    new)))))
+    new))
+(declaim (ftype (function (list list) list)
+		process-muffle-conditions-decl))
+(defun process-muffle-conditions-decl (spec list)
+  (process-handle-conditions-decl
+   (cons 'handle-conditions
+	 (mapcar (lambda (x) (list x 'muffle-warning)) (cdr spec)))
+   list))
+
+(declaim (ftype (function (list list) list)
+		process-unhandle-conditions-decl))
+(defun process-unhandle-conditions-decl (spec list)
+  (let ((new (copy-alist list)))
+    (dolist (clause (cdr spec))
+      (destructuring-bind (typespec restart-name) clause
+	(let ((ospec (rassoc restart-name new :test #'eq)))
+	  (if ospec
+	      (let ((type-specifier
+		     (type-specifier
+		      (type-intersection
+		       (specifier-type (car ospec))
+		       (specifier-type `(not ,typespec))))))
+		(if type-specifier
+		    (setf (car ospec) type-specifier)
+		    (setq new
+			  (delete restart-name new :test #'eq :key #'cdr))))
+	      ;; do nothing?
+	      nil))))
+    new))
+(declaim (ftype (function (list list) list)
+		process-unmuffle-conditions-decl))
+(defun process-unmuffle-conditions-decl (spec list)
+  (process-unhandle-conditions-decl
+   (cons 'unhandle-conditions
+	 (mapcar (lambda (x) (list x 'muffle-warning)) (cdr spec)))
+   list))
 
 ;;; ANSI defines the declaration (FOO X Y) to be equivalent to
 ;;; (TYPE FOO X Y) when FOO is a type specifier. This function
@@ -158,6 +216,12 @@
 		   (setf (classoid-state subclass) :sealed))))))))
       (optimize
        (setq *policy* (process-optimize-decl form *policy*)))
+      (muffle-conditions
+       (setq *handled-conditions*
+	     (process-muffle-conditions-decl form *handled-conditions*)))
+      (unmuffle-conditions
+       (setq *handled-conditions*
+	     (process-unmuffle-conditions-decl form *handled-conditions*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
 	 (proclaim-as-fun-name name) ; since implicitly it is a function

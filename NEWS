@@ -2398,6 +2398,11 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
        to Bruno Haible)
 
 changes in sbcl-0.8.11 relative to sbcl-0.8.10:
+  * new feature: the SB-EXT:MUFFLE-CONDITIONS declaration should be
+    used to control emission of compiler diagnostics, rather than the
+    SB-EXT:INHIBIT-WARNINGS OPTIMIZE quality.  See the manual for
+    documentation on this feature.  The SB-EXT:INHIBIT-WARNINGS
+    quality should be considered deprecated.
   * fixed bug 320: Shared to local slot value transfers in class 
     redefinitions now happen corrently from superclasses as
     well. (reported by Bruno Haible)
