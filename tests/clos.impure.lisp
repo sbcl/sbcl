@@ -491,5 +491,32 @@
 (assert (equal *d-m-c-args-test*
 	       '("unlock" "object-lock" "lock" "object-lock")))
 
+;;; The walker (on which DEFMETHOD depended) didn't know how to handle
+;;; SYMBOL-MACROLET properly.  In fact, as of sbcl-0.7.10.20 it still
+;;; doesn't, but it does well enough to compile the following without
+;;; error (the problems remain in asking for a complete macroexpansion
+;;; of an arbitrary form).
+(symbol-macrolet ((x 1))
+  (defmethod bug222 (z)
+    (macrolet ((frob (form) `(progn ,form ,x)))
+      (frob (print x)))))
+(assert (= (bug222 t) 1))
+
+;;; also, a test case to guard against bogus environment hacking:
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setq bug222-b 3))
+;;; this should at the least compile:
+(let ((bug222-b 1))
+  (defmethod bug222-b (z stream)
+    (macrolet ((frob (form) `(progn ,form ,bug222-b)))
+      (frob (format stream "~D~%" bug222-b)))))
+;;; and it would be nice (though not specified by ANSI) if the answer
+;;; were as follows:
+(let ((x (make-string-output-stream)))
+  ;; not specified by ANSI
+  (assert (= (bug222-b t x) 3))
+  ;; specified.
+  (assert (char= (char (get-output-stream-string x) 0) #\1)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

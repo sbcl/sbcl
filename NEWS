@@ -1444,6 +1444,14 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     (thanks to Dag-Erling Smorgrav)
   * fixed bug 219: DEFINE-COMPILER-MACRO no longer has compile-time
     effect when it is not in a toplevel context.
+  * fixed bug 222: DEFMETHOD and SYMBOL-MACROLET interactions now
+    stand a better chance of being correct.  (thanks to Gerd
+    Moellmann)
+  * fixed bug in COERCE, which now signals an error on coercing a
+    rational to a bounded real type which excludes the expected
+    answer.
+  * the compiler is now able to derive types more accurately from the
+    COERCE and COMPILE functions.
   * fixed some more bugs revealed by Paul Dietz' test suite:
     ** As required by ANSI, LOOP now disallows anonymous collection
        clauses such as COLLECT I in conjunction with aggregate boolean

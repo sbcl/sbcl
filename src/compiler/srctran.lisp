@@ -3236,83 +3236,158 @@
        nil)))
 
 (defoptimizer (coerce derive-type) ((value type))
-  (let ((value-type (continuation-type value))
-        (type-type (continuation-type type)))
-    (labels
-        ((good-cons-type-p (cons-type)
-           ;; Make sure the cons-type we're looking at is something
-           ;; we're prepared to handle which is basically something
-           ;; that array-element-type can return.
-           (or (and (member-type-p cons-type)
-                    (null (rest (member-type-members cons-type)))
-                    (null (first (member-type-members cons-type))))
-               (let ((car-type (cons-type-car-type cons-type)))
-                 (and (member-type-p car-type)
-                      (null (rest (member-type-members car-type)))
-                      (or (symbolp (first (member-type-members car-type)))
-                          (numberp (first (member-type-members car-type)))
-                          (and (listp (first (member-type-members car-type)))
-                               (numberp (first (first (member-type-members
-                                                       car-type))))))
-                      (good-cons-type-p (cons-type-cdr-type cons-type))))))
-         (unconsify-type (good-cons-type)
-           ;; Convert the "printed" respresentation of a cons
-           ;; specifier into a type specifier.  That is, the specifier
-           ;; (cons (eql signed-byte) (cons (eql 16) null)) is
-           ;; converted to (signed-byte 16).
-           (cond ((or (null good-cons-type)
-                      (eq good-cons-type 'null))
-                   nil)
-                 ((and (eq (first good-cons-type) 'cons)
-                       (eq (first (second good-cons-type)) 'member))
-                   `(,(second (second good-cons-type))
-                     ,@(unconsify-type (caddr good-cons-type))))))
-         (coerceable-p (c-type)
-           ;; Can the value be coerced to the given type?  Coerce is
-           ;; complicated, so we don't handle every possible case
-           ;; here---just the most common and easiest cases:
-           ;;
-           ;; o Any real can be coerced to a float type.
-           ;; o Any number can be coerced to a complex single/double-float.
-           ;; o An integer can be coerced to an integer.
-           (let ((coerced-type c-type))
-             (or (and (subtypep coerced-type 'float)
-                      (csubtypep value-type (specifier-type 'real)))
-                 (and (subtypep coerced-type
-                                '(or (complex single-float)
-                                  (complex double-float)))
-                      (csubtypep value-type (specifier-type 'number)))
-                 (and (subtypep coerced-type 'integer)
-                      (csubtypep value-type (specifier-type 'integer))))))
-         (process-types (type)
-           ;; FIXME:
-           ;; This needs some work because we should be able to derive
-           ;; the resulting type better than just the type arg of
-           ;; coerce.  That is, if x is (integer 10 20), the (coerce x
-           ;; 'double-float) should say (double-float 10d0 20d0)
-           ;; instead of just double-float.
-           (cond ((member-type-p type)
-                   (let ((members (member-type-members type)))
-                     (if (every #'coerceable-p members)
-                       (specifier-type `(or ,@members))
-                       *universal-type*)))
-                 ((and (cons-type-p type)
-                       (good-cons-type-p type))
-                   (let ((c-type (unconsify-type (type-specifier type))))
-                     (if (coerceable-p c-type)
-                       (specifier-type c-type)
-                       *universal-type*)))
-                 (t
-                   *universal-type*))))
-      (cond ((union-type-p type-type)
-              (apply #'type-union (mapcar #'process-types
-                                          (union-type-types type-type))))
-            ((or (member-type-p type-type)
-                 (cons-type-p type-type))
-              (process-types type-type))
-            (t
-              *universal-type*)))))
+  (cond
+    ((constant-continuation-p type)
+     ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
+     ;; but dealing with the niggle that complex canonicalization gets
+     ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
+     ;; type COMPLEX.
+     (let* ((specifier (continuation-value type))
+	    (result-typeoid (careful-specifier-type specifier)))
+       (cond
+	 ((csubtypep result-typeoid (specifier-type 'number))
+	  ;; the difficult case: we have to cope with ANSI 12.1.5.3
+	  ;; Rule of Canonical Representation for Complex Rationals,
+	  ;; which is a truly nasty delivery to field.
+	  (cond
+	    ((csubtypep result-typeoid (specifier-type 'real))
+	     ;; cleverness required here: it would be nice to deduce
+	     ;; that something of type (INTEGER 2 3) coerced to type
+	     ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
+	     ;; FLOAT gets its own clause because it's implemented as
+	     ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
+	     ;; logic below.
+	     result-typeoid)
+	    ((and (numeric-type-p result-typeoid)
+		  (eq (numeric-type-complexp result-typeoid) :real))
+	     ;; FIXME: is this clause (a) necessary or (b) useful?
+	     result-typeoid)
+	    ((or (csubtypep result-typeoid
+			    (specifier-type '(complex single-float)))
+		 (csubtypep result-typeoid
+			    (specifier-type '(complex double-float)))
+		 #!+long-float
+		 (csubtypep result-typeoid
+			    (specifier-type '(complex long-float))))
+	     ;; float complex types are never canonicalized.
+	     result-typeoid)
+	    (t
+	     ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
+	     ;; probably just a COMPLEX or equivalent.  So, in that
+	     ;; case, we will return a complex or an object of the
+	     ;; provided type if it's rational:
+	     (type-union result-typeoid
+			 (type-intersection (continuation-type value)
+					    (specifier-type 'rational))))))
+	 (t result-typeoid))))
+    (t
+     ;; OK, the result-type argument isn't constant.  However, there
+     ;; are common uses where we can still do better than just
+     ;; *UNIVERSAL-TYPE*: e.g. (COERCE X (ARRAY-ELEMENT-TYPE Y)),
+     ;; where Y is of a known type.  See messages on cmucl-imp
+     ;; 2001-02-14 and sbcl-devel 2002-12-12.  We only worry here
+     ;; about types that can be returned by (ARRAY-ELEMENT-TYPE Y), on
+     ;; the basis that it's unlikely that other uses are both
+     ;; time-critical and get to this branch of the COND (non-constant
+     ;; second argument to COERCE).  -- CSR, 2002-12-16
+     (let ((value-type (continuation-type value))
+	   (type-type (continuation-type type)))
+       (labels
+	   ((good-cons-type-p (cons-type)
+	      ;; Make sure the cons-type we're looking at is something
+	      ;; we're prepared to handle which is basically something
+	      ;; that array-element-type can return.
+	      (or (and (member-type-p cons-type)
+		       (null (rest (member-type-members cons-type)))
+		       (null (first (member-type-members cons-type))))
+		  (let ((car-type (cons-type-car-type cons-type)))
+		    (and (member-type-p car-type)
+			 (null (rest (member-type-members car-type)))
+			 (or (symbolp (first (member-type-members car-type)))
+			     (numberp (first (member-type-members car-type)))
+			     (and (listp (first (member-type-members
+						 car-type)))
+				  (numberp (first (first (member-type-members
+							  car-type))))))
+			 (good-cons-type-p (cons-type-cdr-type cons-type))))))
+	    (unconsify-type (good-cons-type)
+	      ;; Convert the "printed" respresentation of a cons
+	      ;; specifier into a type specifier.  That is, the
+	      ;; specifier (CONS (EQL SIGNED-BYTE) (CONS (EQL 16)
+	      ;; NULL)) is converted to (SIGNED-BYTE 16).
+	      (cond ((or (null good-cons-type)
+			 (eq good-cons-type 'null))
+		     nil)
+		    ((and (eq (first good-cons-type) 'cons)
+			  (eq (first (second good-cons-type)) 'member))
+		     `(,(second (second good-cons-type))
+		       ,@(unconsify-type (caddr good-cons-type))))))
+	    (coerceable-p (c-type)
+	      ;; Can the value be coerced to the given type?  Coerce is
+	      ;; complicated, so we don't handle every possible case
+	      ;; here---just the most common and easiest cases:
+	      ;;
+	      ;; * Any REAL can be coerced to a FLOAT type.
+	      ;; * Any NUMBER can be coerced to a (COMPLEX
+	      ;;   SINGLE/DOUBLE-FLOAT).
+	      ;;
+	      ;; FIXME I: we should also be able to deal with characters
+	      ;; here.
+	      ;;
+	      ;; FIXME II: I'm not sure that anything is necessary
+	      ;; here, at least while COMPLEX is not a specialized
+	      ;; array element type in the system.  Reasoning: if
+	      ;; something cannot be coerced to the requested type, an
+	      ;; error will be raised (and so any downstream compiled
+	      ;; code on the assumption of the returned type is
+	      ;; unreachable).  If something can, then it will be of
+	      ;; the requested type, because (by assumption) COMPLEX
+	      ;; (and other difficult types like (COMPLEX INTEGER)
+	      ;; aren't specialized types.
+	      (let ((coerced-type c-type))
+		(or (and (subtypep coerced-type 'float)
+			 (csubtypep value-type (specifier-type 'real)))
+		    (and (subtypep coerced-type
+				   '(or (complex single-float)
+				        (complex double-float)))
+			 (csubtypep value-type (specifier-type 'number))))))
+	    (process-types (type)
+	      ;; FIXME: This needs some work because we should be able
+	      ;; to derive the resulting type better than just the
+	      ;; type arg of coerce.  That is, if X is (INTEGER 10
+	      ;; 20), then (COERCE X 'DOUBLE-FLOAT) should say
+	      ;; (DOUBLE-FLOAT 10d0 20d0) instead of just
+	      ;; double-float.
+	      (cond ((member-type-p type)
+		     (let ((members (member-type-members type)))
+		       (if (every #'coerceable-p members)
+			   (specifier-type `(or ,@members))
+			   *universal-type*)))
+		    ((and (cons-type-p type)
+			  (good-cons-type-p type))
+		     (let ((c-type (unconsify-type (type-specifier type))))
+		       (if (coerceable-p c-type)
+			   (specifier-type c-type)
+			   *universal-type*)))
+		    (t
+		     *universal-type*))))
+	 (cond ((union-type-p type-type)
+		(apply #'type-union (mapcar #'process-types
+					    (union-type-types type-type))))
+	       ((or (member-type-p type-type)
+		    (cons-type-p type-type))
+		(process-types type-type))
+	       (t
+		*universal-type*)))))))
 
+(defoptimizer (compile derive-type) ((nameoid function))
+  (when (csubtypep (continuation-type nameoid)
+		   (specifier-type 'null))
+    (specifier-type 'function)))
+
+;;; FIXME: Maybe also STREAM-ELEMENT-TYPE should be given some loving
+;;; treatment along these lines? (See discussion in COERCE DERIVE-TYPE
+;;; optimizer, above).
 (defoptimizer (array-element-type derive-type) ((array))
   (let ((array-type (continuation-type array)))
     (labels ((consify (list)

@@ -150,46 +150,63 @@
 		  :format-arguments (list object)))
 	 (eval `#',object))
 	((numberp object)
-	 (let ((res
-		(cond
-		  ((csubtypep type (specifier-type 'single-float))
-		   (%single-float object))
-		  ((csubtypep type (specifier-type 'double-float))
-		   (%double-float object))
-		  #!+long-float
-		  ((csubtypep type (specifier-type 'long-float))
-		   (%long-float object))
-		  ((csubtypep type (specifier-type 'float))
-		   (%single-float object))
-		  ((csubtypep type (specifier-type '(complex single-float)))
-		   (complex (%single-float (realpart object))
-			    (%single-float (imagpart object))))
-		  ((csubtypep type (specifier-type '(complex double-float)))
-		   (complex (%double-float (realpart object))
-			    (%double-float (imagpart object))))
-		  #!+long-float
-		  ((csubtypep type (specifier-type '(complex long-float)))
-		   (complex (%long-float (realpart object))
-			    (%long-float (imagpart object))))
-		  ((and (typep object 'rational)
-			(csubtypep type (specifier-type '(complex float))))
-		   ;; Perhaps somewhat surprisingly, ANSI specifies
-		   ;; that (COERCE FOO 'FLOAT) is a SINGLE-FLOAT, not
-		   ;; dispatching on *READ-DEFAULT-FLOAT-FORMAT*.  By
-		   ;; analogy, we do the same for complex numbers. --
-		   ;; CSR, 2002-08-06
-		   (complex (%single-float object)))
-		  ((csubtypep type (specifier-type 'complex))
-		   (complex object))
-		  (t
-		   (coerce-error)))))
-	   ;; If RES has the wrong type, that means that rule of canonical
-	   ;; representation for complex rationals was invoked. According to
-	   ;; the Hyperspec, (coerce 7/2 'complex) returns 7/2. Thus, if the
-	   ;; object was a rational, there is no error here.
-	   (unless (or (typep res output-type-spec) (rationalp object))
-	     (coerce-error))
-	   res))
+	 (cond
+	   ((csubtypep type (specifier-type 'single-float))
+	    (let ((res (%single-float object)))
+	      (unless (typep res output-type-spec)
+		(coerce-error))
+	      res))
+	   ((csubtypep type (specifier-type 'double-float))
+	    (let ((res (%double-float object)))
+	      (unless (typep res output-type-spec)
+		(coerce-error))
+	      res))
+	   #!+long-float
+	   ((csubtypep type (specifier-type 'long-float))
+	    (let ((res (%long-float object)))
+	      (unless (typep res output-type-spec)
+		(coerce-error))
+	      res))
+	   ((csubtypep type (specifier-type 'float))
+	    (let ((res (%single-float object)))
+	      (unless (typep res output-type-spec)
+		(coerce-error))
+	      res))
+	   (t
+	    (let ((res
+		   (cond
+		     ((csubtypep type (specifier-type '(complex single-float)))
+		      (complex (%single-float (realpart object))
+			       (%single-float (imagpart object))))
+		     ((csubtypep type (specifier-type '(complex double-float)))
+		      (complex (%double-float (realpart object))
+			       (%double-float (imagpart object))))
+		     #!+long-float
+		     ((csubtypep type (specifier-type '(complex long-float)))
+		      (complex (%long-float (realpart object))
+			       (%long-float (imagpart object))))
+		     ((and (typep object 'rational)
+			   (csubtypep type (specifier-type '(complex float))))
+		      ;; Perhaps somewhat surprisingly, ANSI specifies
+		      ;; that (COERCE FOO 'FLOAT) is a SINGLE-FLOAT,
+		      ;; not dispatching on
+		      ;; *READ-DEFAULT-FLOAT-FORMAT*.  By analogy, we
+		      ;; do the same for complex numbers. -- CSR,
+		      ;; 2002-08-06
+		      (complex (%single-float object)))
+		     ((csubtypep type (specifier-type 'complex))
+		      (complex object))
+		     (t
+		      (coerce-error)))))
+	      ;; If RES has the wrong type, that means that rule of
+	      ;; canonical representation for complex rationals was
+	      ;; invoked. According to the Hyperspec, (coerce 7/2
+	      ;; 'complex) returns 7/2. Thus, if the object was a
+	      ;; rational, there is no error here.
+	      (unless (or (typep res output-type-spec)
+			  (rationalp object))
+		(coerce-error))
+	      res))))
 	((csubtypep type (specifier-type 'list))
 	 (if (vectorp object)
 	     (cond ((type= type (specifier-type 'list))

@@ -35,7 +35,9 @@
   ;; FIXME: It's actually not clear that COERCE on non-NUMBER types
   ;; is FOLDABLE at all. Check this.
   (movable #-sb-xc-host foldable)
-  :derive-type (result-type-specifier-nth-arg 2))
+  ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 2 ? Nope... (COERCE 1 'COMPLEX)
+  ;; returns REAL/INTEGER, not COMPLEX.
+  )
 (defknown list-to-vector* (list type-specifier) vector)
 (defknown vector-to-vector* (vector type-specifier) vector)
 

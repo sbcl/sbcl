@@ -101,8 +101,9 @@
 ;;; So, now we hide our bits of interest in the walker-info slot in
 ;;; our new BOGO-FUN.
 ;;;
-;;; MACROEXPAND-1 is the only SBCL function that gets called with the
-;;; constructed environment argument.
+;;; MACROEXPAND-1 and SB-INT:EVAL-IN-LEXENV are the only SBCL
+;;; functions that get called with the constructed environment
+;;; argument.
 
 (/show "walk.lisp 108")
 
@@ -195,15 +196,17 @@
 	    (push (list (car mac)
 			(convert-macro-to-lambda (cadr mac)
 						 (cddr mac)
+						 ,old-env
 						 (string (car mac))))
 		  ,macros))))
        (with-augmented-environment
 	      (,new-env ,old-env :functions ,functions :macros ,macros)
 	 ,@body))))
 
-(defun convert-macro-to-lambda (llist body &optional (name "dummy macro"))
+(defun convert-macro-to-lambda (llist body env &optional (name "dummy macro"))
   (let ((gensym (make-symbol name)))
-    (eval `(defmacro ,gensym ,llist ,@body))
+    (eval-in-lexenv `(defmacro ,gensym ,llist ,@body)
+		    (sb-c::make-restricted-lexenv env))
     (macro-function gensym)))
 
 ;;;; the actual walker
@@ -263,7 +266,7 @@
 
 (defun variable-symbol-macro-p (var env)
   (let ((entry (member var (env-lexical-variables env) :key #'car)))
-    (when (eq (cadar entry) :macro)
+    (when (eq (cadar entry) 'sb-sys:macro)
       entry)))
 
 (defvar *var-declarations* '(special))
@@ -844,7 +847,7 @@
 		 :lexical-variables
 		 (append (mapcar (lambda (binding)
 				   `(,(car binding)
-				     :macro . ,(cadr binding)))
+				     sb-sys:macro . ,(cadr binding)))
 				 bindings)
 			 (env-lexical-variables old-env)))
       (relist* form 'symbol-macrolet bindings
