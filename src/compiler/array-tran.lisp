@@ -189,12 +189,13 @@
 
 ;;; Just convert it into a MAKE-ARRAY.
 (deftransform make-string ((length &key
-				   (element-type 'base-char)
+				   (element-type 'character)
 				   (initial-element
 				    #.*default-init-char-form*)))
-  '(make-array (the index length)
-               :element-type element-type
-               :initial-element initial-element))
+  `(the simple-string (make-array (the index length)
+		       :element-type element-type
+		       ,@(when initial-element
+			   '(:initial-element initial-element)))))
 
 (defstruct (specialized-array-element-type-properties
 	    (:conc-name saetp-)
