@@ -11,7 +11,13 @@ ARCH_SRC = ppc-arch.c
 
 CPP = cpp -no-cpp-precomp
 
-# FIXME - "-Wl,-segaddr,SBCLRO,0x1000000" is output from
+# KLUDGE: in OS X 10.3, Apple started putting the heap right where we
+# expect our read-only space mapped. This hack causes the linker to
+# place a zero-fill-on-demand segment in the same place and size as
+# read-only-space, which is the only thing capable of keeping malloc
+# out of this range."
+#
+# FIXME: "-Wl,-segaddr,SBCLRO,0x1000000" is output from
 # ppc-darwin-mkrospace (it depends on READ_ONLY_SPACE I believe) but it
 # is hard-coded here!
 OS_LINK_FLAGS = -dynamic -L$(HOME)/local/lib -L/sw/lib -L/opt/local/lib -L/usr/local/lib -Wl,-segaddr,SBCLRO,0x1000000 -Wl,-seg1addr,0x5000000 $(if $(AFTER_GROVEL_HEADERS),ppc-darwin-rospace.o)

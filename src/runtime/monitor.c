@@ -511,7 +511,11 @@ monitor_or_something()
 #if defined(LISP_FEATURE_SB_LDB)
     ldb_monitor();
 #else
-    fprintf(stderr, "There's no LDB in this build; exiting.\n");
+     fprintf(stderr,
+"The system is too badly corrupted or confused to continue at the Lisp\n\
+level. If the system had been compiled with the SB-LDB feature, we'd drop\n\
+into the LDB low-level debugger now. But there's no LDB in this build, so\n\
+we can't really do anything but just exit, sorry.\n");
     exit(1);
 #endif
 }
