@@ -1,0 +1,13 @@
+metadocumentation: hints for how to set things up so that the 
+documentation gets processed correctly
+
+WHN's approach:
+  * (starting from Debian 3.0r1, in a configuration where 
+    openjade-based toolchain for SGML DocBook was already present)
+  * Use dselect to install everything plausible-looking which matches 
+    the search string 'xsl': docbook-xsl, xsltproc, libxslt1.
+  * (Now things work. This is probably in part because Kevin Rosenberg 
+    already set up a suitable Debian configuration in the CVS files,
+    so if you're on a system where there hasn't been done already -- i.e.
+    system other than Debian or RedHat as of sbcl-0.8.6.1 -- you might
+    need to add such a configuration yourself.)

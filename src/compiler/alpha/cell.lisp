@@ -86,8 +86,6 @@
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
   (:translate symbol-value))
-
-
 
 ;;;; fdefinition (FDEFN) objects
 
