@@ -2961,7 +2961,7 @@ initially undefined function references:~2%")
 				     sb!vm:static-space-start))
 	   (*dynamic*   (make-gspace :dynamic
 				     dynamic-space-id
-				     sb!vm:*dynamic-space-start*))
+				     sb!vm:dynamic-space-start))
 	   (*nil-descriptor* (make-nil-descriptor))
 	   (*current-reversed-cold-toplevels* *nil-descriptor*)
 	   (*unbound-marker* (make-other-immediate-descriptor

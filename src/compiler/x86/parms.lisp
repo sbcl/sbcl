@@ -135,14 +135,14 @@
 (progn
   (defconstant read-only-space-start #x01000000)
   (defconstant static-space-start    #x05000000)
-  (defparameter *dynamic-space-start*   #x09000000))
+  (defconstant dynamic-space-start   #x09000000))
 #!+bsd
 (progn
   (defconstant read-only-space-start #x10000000)
   (defconstant static-space-start
     #!+freebsd #x30000000
     #!+openbsd #x28000000)
-  (defparameter *dynamic-space-start*   #x48000000))
+  (defconstant dynamic-space-start   #x48000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
