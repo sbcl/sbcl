@@ -651,19 +651,13 @@
 
 (define-alien-routine get-timezone sb!alien:void
   (when sb!alien:long :in)
-  (minutes-west sb!alien:int :out)
+  (seconds-west sb!alien:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 
-(defun unix-get-minutes-west (secs)
-  (multiple-value-bind (ignore minutes dst) (get-timezone secs)
+(defun unix-get-seconds-west (secs)
+  (multiple-value-bind (ignore seconds dst) (get-timezone secs)
     (declare (ignore ignore) (ignore dst))
-    (values minutes)))
-
-(defun unix-get-timezone (secs)
-  (multiple-value-bind (ignore minutes dst) (get-timezone secs)
-    (declare (ignore ignore) (ignore minutes))
-    (values (deref unix-tzname (if dst 1 0)))))
-
+    (values seconds)))
 
 ;;;; sys/time.h
 

@@ -17,19 +17,19 @@
 #include <time.h>
 #include "runtime.h"
 
-void get_timezone(time_t when, int *minwest, boolean *dst)
+void get_timezone(time_t when, int *secwest, boolean *dst)
 {
     struct tm ltm, gtm;
-    int mw;
+    int sw;
 
     ltm = *localtime(&when);
     gtm = *gmtime(&when);
 
-    mw = ((gtm.tm_hour*60)+gtm.tm_min) - ((ltm.tm_hour*60)+ltm.tm_min);
+    sw = (((gtm.tm_hour*60)+gtm.tm_min)*60+gtm.tm_sec) - (((ltm.tm_hour*60)+ltm.tm_min)*60+ltm.tm_sec);
     if ((gtm.tm_wday + 1) % 7 == ltm.tm_wday)
-	mw -= 24*60;
+	sw -= 24*3600;
     else if (gtm.tm_wday == (ltm.tm_wday + 1) % 7)
-	mw += 24*60;
-    *minwest = mw;
+	sw += 24*3600;
+    *secwest = sw;
     *dst = ltm.tm_isdst;
 }

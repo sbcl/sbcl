@@ -2233,6 +2233,11 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
        SUBTYPEP.
     ** VALUES tranformer lost derived type.
 
+changes in sbcl-0.8.8 relative to sbcl-0.8.7:
+  * bug fix: DECODE-UNIVERSAL-TIME now accepts timezone arguments with
+    second-resolution: integer multiples of 1/3600 between -24 and 24.
+    (thanks to Vincent Arkesteijn)
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

@@ -109,3 +109,22 @@
 (documentation 'fixnum 'type)
 (documentation 'class 'type)
 (documentation (find-class 'class) 'type)
+
+;;; DECODE-UNIVERSAL-TIME should accept second-resolution time-zones.
+(macrolet ((test (ut time-zone list)
+	     (destructuring-bind (sec min hr date mon yr day tz)
+		 list
+	       `(multiple-value-bind (sec min hr date mon yr day dst tz)
+		    (decode-universal-time ,ut ,time-zone)
+		  (declare (ignore dst))
+		  (assert (= sec ,sec))
+		  (assert (= min ,min))
+		  (assert (= hr ,hr))
+		  (assert (= date ,date))
+		  (assert (= mon ,mon))
+		  (assert (= yr ,yr))
+		  (assert (= day ,day))
+		  (assert (= tz ,tz))))))
+  (test (* 86400 365) -1/3600 (1 0 0 1 1 1901 1 -1/3600))
+  (test (* 86400 365) 0 (0 0 0 1 1 1901 1 0))
+  (test (* 86400 365) 1/3600 (59 59 23 31 12 1900 0 1/3600)))
