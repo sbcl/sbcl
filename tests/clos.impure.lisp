@@ -115,6 +115,31 @@
 (defgeneric born-to-be-redefined (x))
 (assert (eq (born-to-be-redefined 1) 'int))
 
+;;; in the removal of ITERATE from SB-PCL, a bug was introduced
+;;; preventing forward-references and also change-class (which
+;;; forward-references used interally) from working properly.  One
+;;; symptom was reported by Brian Spilsbury (sbcl-devel 2002-04-08),
+;;; and another on IRC by Dan Barlow simultaneously.  Better check
+;;; that it doesn't happen again.
+;;;
+;;; First, the forward references:
+(defclass a (b) ())
+(defclass b () ())
+;;; Then change-class
+(defclass class-with-slots ()
+  ((a-slot :initarg :a-slot :accessor a-slot)
+   (b-slot :initarg :b-slot :accessor b-slot)
+   (c-slot :initarg :c-slot :accessor c-slot)))
+
+(let ((foo (make-instance 'class-with-slots
+			  :a-slot 1
+			  :b-slot 2
+			  :c-slot 3)))
+  (let ((bar (change-class foo 'class-with-slots)))
+    (assert (= (a-slot bar) 1))
+    (assert (= (b-slot bar) 2))
+    (assert (= (c-slot bar) 3))))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

@@ -1181,7 +1181,8 @@
         (let ((old-position (posq new-slot old-layout)))
           (when old-position
             (setf (clos-slots-ref new-slots new-position)
-                  (clos-slots-ref old-slots old-position))))))
+                  (clos-slots-ref old-slots old-position))))
+	(incf new-position)))
 
     ;; "The values of slots specified as shared in the class CFROM and
     ;; as local in the class CTO are retained."
