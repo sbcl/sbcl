@@ -3176,13 +3176,13 @@
     (if (null rest)
 	`(values (the real ,arg0))
 	`(let ((maxrest (max ,@rest)))
-	  (if (> ,arg0 maxrest) ,arg0 maxrest)))))
+	  (if (>= ,arg0 maxrest) ,arg0 maxrest)))))
 (define-source-transform min (arg0 &rest rest)
   (once-only ((arg0 arg0))
     (if (null rest)
 	`(values (the real ,arg0))
 	`(let ((minrest (min ,@rest)))
-	  (if (< ,arg0 minrest) ,arg0 minrest)))))
+	  (if (<= ,arg0 minrest) ,arg0 minrest)))))
 
 ;;;; converting N-arg arithmetic functions
 ;;;;

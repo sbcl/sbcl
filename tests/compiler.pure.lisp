@@ -1117,3 +1117,20 @@
                 'integer)))
         (funcall #'%f12 0))))
    -33)))
+
+;;; Discussion of a CMUCL PCL bug on Sparc with Raymond Toy revealed a
+;;; potential problem: optimizers and type derivers for MAX and MIN
+;;; were not consistent in treating EQUALP, but not EQL, arguments.
+(dolist (f '(min max))
+  (loop for complex-arg-args in '((1d0 2d0) (0d0 1d0))
+        for complex-arg = `(if x ,@complex-arg-args)
+        do
+        (loop for args in `((1 ,complex-arg)
+                            (,complex-arg 1))
+              for form = `(,f ,@args)
+              for f1 = (compile nil `(lambda (x) ,form))
+              and f2 = (compile nil `(lambda (x) (declare (notinline min max))
+                                             ,form))
+              do
+              (dolist (x '(nil t))
+                (assert (eql (funcall f1 x) (funcall f2 x)))))))

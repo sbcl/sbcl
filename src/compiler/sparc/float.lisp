@@ -2396,14 +2396,14 @@
 (defun %%min (x y)
   (declare (type (or (unsigned-byte 32) (signed-byte 32)
 		     single-float double-float) x y))
-  (if (< x y)
+  (if (<= x y)
       x y))
 
 #+nil
 (defun %%max (x y)
   (declare (type (or (unsigned-byte 32) (signed-byte 32)
 		     single-float double-float) x y))
-  (if (> x y)
+  (if (>= x y)
       x y))
 #+nil  
 (macrolet
@@ -2538,11 +2538,11 @@
 					    (lvar-type y)))))))
 
 (defoptimizer (min derive-type) ((x y))
-  (multiple-value-bind (definitely-< definitely->=)
-      (ir1-transform-<-helper x y)
-    (cond (definitely-<
+  (multiple-value-bind (definitely-> definitely-<=)
+      (ir1-transform-<-helper y x)
+    (cond (definitely-<=
 	      (lvar-type x))
-	  (definitely->=
+	  (definitely->
 	      (lvar-type y))
 	  (t
 	   (make-canonical-union-type (list (lvar-type x)
@@ -2575,7 +2575,7 @@
 		 (arg2 (gensym)))
 	     `(let ((,arg1 x)
 		    (,arg2 y))
-	       (if (> ,arg1 ,arg2)
+	       (if (>= ,arg1 ,arg2)
 		   ,arg1 ,arg2)))))))
 
 (deftransform min ((x y) (real real) *)
@@ -2602,7 +2602,7 @@
 		 (arg2 (gensym)))
 	     `(let ((,arg1 x)
 		    (,arg2 y))
-		(if (< ,arg1 ,arg2)
+		(if (<= ,arg1 ,arg2)
 		    ,arg1 ,arg2)))))))
 
 ) ; PROGN

@@ -2262,6 +2262,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
   * optimization: SEARCH on simple-base-strings can now be open-coded.
     (see also contrib/compiler-extras.lisp for inspiration for
     teaching the compiler about the Boyer-Moore algorithm).
+  * value, returned by MAX (and MIN) called with several EQUALP, but
+    not EQL, arguments now does not depend on compiler settings.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** in stack analysis liveness information is propagated from
        non-local entry points.

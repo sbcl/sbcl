@@ -765,7 +765,8 @@
 
 (defun max (number &rest more-numbers)
   #!+sb-doc
-  "Return the greatest of its arguments."
+  "Return the greatest of its arguments; among EQUALP greatest, return
+the first."
   (do ((nlist more-numbers (cdr nlist))
        (result number))
       ((null nlist) (return result))
@@ -775,7 +776,8 @@
 
 (defun min (number &rest more-numbers)
   #!+sb-doc
-  "Return the least of its arguments."
+  "Return the least of its arguments; among EQUALP least, return
+the first."
   (do ((nlist more-numbers (cdr nlist))
        (result number))
       ((null nlist) (return result))
