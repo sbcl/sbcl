@@ -31,7 +31,10 @@
 	(emit-test)))
     (results)))
 
-(defmacro test-type (value target not-p &rest type-codes)
+(defmacro test-type (value target not-p
+		     (&rest type-codes)
+		     &rest other-args
+		     &key &allow-other-keys)
   ;; Determine what interesting combinations we need to test for.
   (let* ((type-codes (mapcar #'eval type-codes))
 	 (fixnump (and (member even-fixnum-lowtag type-codes)
@@ -62,8 +65,10 @@
 	 (error "can't mix fixnum testing with other immediates"))
        (if headers
 	   `(%test-fixnum-and-headers ,value ,target ,not-p
-	     ',(canonicalize-headers headers))
-	   `(%test-fixnum ,value ,target ,not-p)))
+	     ',(canonicalize-headers headers)
+	     ,@other-args)
+	   `(%test-fixnum ,value ,target ,not-p
+	     ,@other-args)))
       (immediates
        (when headers
 	 (error "can't mix testing of immediates with testing of headers"))
@@ -71,18 +76,22 @@
 	 (error "can't mix testing of immediates with testing of lowtags"))
        (when (cdr immediates)
 	 (error "can't test multiple immediates at the same time"))
-       `(%test-immediate ,value ,target ,not-p ,(car immediates)))
+       `(%test-immediate ,value ,target ,not-p ,(car immediates)
+	 ,@other-args))
       (lowtags
        (when (cdr lowtags)
 	 (error "can't test multiple lowtags at the same time"))
        (if headers
 	   `(%test-lowtag-and-headers
 	     ,value ,target ,not-p ,(car lowtags)
-	     ,function-p ',(canonicalize-headers headers))
-	   `(%test-lowtag ,value ,target ,not-p ,(car lowtags))))
+	     ,function-p ',(canonicalize-headers headers)
+	     ,@other-args)
+	   `(%test-lowtag ,value ,target ,not-p ,(car lowtags)
+	     ,@other-args)))
       (headers
        `(%test-headers ,value ,target ,not-p ,function-p
-	 ',(canonicalize-headers headers)))
+	 ',(canonicalize-headers headers)
+	 ,@other-args))
       (t
        (error "nothing to test?")))))
 

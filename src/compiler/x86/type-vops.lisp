@@ -139,10 +139,6 @@
   (:info target not-p)
   (:policy :fast-safe))
 
-;;; FIXME: DEF-TYPE-VOPS and DEF-SIMPLE-TYPE-VOPS are only used in
-;;; this file, so they should be in the EVAL-WHEN above, or otherwise
-;;; tweaked so that they don't appear in the target system.
-
 (defun cost-to-test-types (type-codes)
   (+ (* 2 (length type-codes))
      (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
@@ -161,13 +157,13 @@
 	   `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
 	       (:translate ,pred-name)
 	       (:generator ,cost
-		 (test-type value target not-p ,@type-codes)))))
+		 (test-type value target not-p (,@type-codes))))))
        ,@(when check-name
 	   `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
 	       (:generator ,cost
 		 (let ((err-lab
 			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t ,@type-codes)
+		   (test-type value err-lab t (,@type-codes))
 		   (move result value))))))
        ,@(when ptype
 	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
@@ -315,7 +311,7 @@
     (let ((is-symbol-label (if not-p drop-thru target)))
       (inst cmp value nil-value)
       (inst jmp :e is-symbol-label)
-      (test-type value target not-p symbol-header-widetag))
+      (test-type value target not-p (symbol-header-widetag)))
     DROP-THRU))
 
 (define-vop (check-symbol check-type)
@@ -323,7 +319,7 @@
     (let ((error (generate-error-code vop object-not-symbol-error value)))
       (inst cmp value nil-value)
       (inst jmp :e drop-thru)
-      (test-type value error t symbol-header-widetag))
+      (test-type value error t (symbol-header-widetag)))
     DROP-THRU
     (move result value)))
 
@@ -333,7 +329,7 @@
     (let ((is-not-cons-label (if not-p target drop-thru)))
       (inst cmp value nil-value)
       (inst jmp :e is-not-cons-label)
-      (test-type value target not-p list-pointer-lowtag))
+      (test-type value target not-p (list-pointer-lowtag)))
     DROP-THRU))
 
 (define-vop (check-cons check-type)
@@ -341,5 +337,5 @@
     (let ((error (generate-error-code vop object-not-cons-error value)))
       (inst cmp value nil-value)
       (inst jmp :e error)
-      (test-type value error t list-pointer-lowtag)
+      (test-type value error t (list-pointer-lowtag))
       (move result value))))
