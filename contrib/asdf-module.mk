@@ -1,7 +1,7 @@
 CC=gcc
-export CC
+export CC SBCL
 
-all: 
+all: $(EXTRA_ALL_TARGETS)
 	$(MAKE) -C ../asdf
 	$(SBCL) --eval '(load "../asdf/asdf")' \
 	  --eval "(setf asdf::*central-registry* '((MERGE-PATHNAMES \"systems/\" (TRUENAME (SB-EXT:POSIX-GETENV \"SBCL_HOME\")))))" \
@@ -14,6 +14,6 @@ test: all
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
 
-install:
+install: $(EXTRA_INSTALL_TARGETS)
 	tar cf - . | ( cd $(INSTALL_DIR) && tar xpvf - )
 	( cd  $(SBCL_HOME)/systems && ln -fs ../$(SYSTEM)/$(SYSTEM).asd . )

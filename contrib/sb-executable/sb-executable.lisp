@@ -21,18 +21,20 @@
 
 (defvar *exec-header*
   "#!/bin/sh --
-exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type '(unsigned-byte 8)) (loop while (< ret 2) when (= (read-byte i) 10) count 1 into ret) (load i) (quit))\" --end-toplevel-options ${1+\"$@\"}
+exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type '(unsigned-byte 8)) (loop while (< ret 2) when (= (read-byte i) 10) count 1 into ret) (load i) (funcall (quote ~A)) (quit))\" --end-toplevel-options ${1+\"$@\"}
 ")
 
 (defun make-executable (output-file fasls
 			&key (runtime-flags '("--disable-debugger"
 					      "--userinit /dev/null"
-					      "--sysinit /dev/null")))
+					      "--sysinit /dev/null"))
+			initial-function)
   "Write an executable called OUTPUT-FILE which can be run from the shell, by 'linking' together code from FASLS.  Actually works by concatenating them and prepending a #! header"
   (with-open-file (out output-file :direction :output
 		       :element-type '(unsigned-byte 8))
     (write-sequence (map 'vector #'char-code
-			 (format nil *exec-header* runtime-flags)) out)
+			 (format nil *exec-header* runtime-flags
+				 (or initial-function 'values))) out)
     (dolist (input-file (if (listp fasls) fasls (list fasls)))
       (with-open-file (in (merge-pathnames input-file
 					   (make-pathname :type "fasl"))

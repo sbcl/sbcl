@@ -19,7 +19,7 @@ if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    exit 1
 fi
 SBCL_HOME=$INSTALL_ROOT/lib/sbcl
-export SBCL_HOME
+export SBCL_HOME INSTALL_ROOT
 ensure_dirs $INSTALL_ROOT $INSTALL_ROOT/bin $INSTALL_ROOT/lib \
     $INSTALL_ROOT/man $INSTALL_ROOT/man/man1 \
     $SBCL_HOME $SBCL_HOME/systems $SBCL_HOME/site-systems
