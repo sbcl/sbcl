@@ -65,7 +65,6 @@ echo //doing warm init
 	;; (GC :FULL T gets us down to about 38 Mbytes, but PURIFY
 	;; gets us down to about 19 Mbytes.)
 	(sb-int:/show "done with warm.lisp, about to GC :FULL T")
-	(sb-c::pack-before-gc-hook) ; KLUDGE
 	(gc :full t)
 
         ;; resetting compilation policy to neutral values in

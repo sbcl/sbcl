@@ -104,14 +104,13 @@
   ;; See also the description of VOP-INFO-TARGETS. -- APD, 2002-01-30
   (def!constant max-vop-tn-refs 256))
 
+;;; FIXME: This is a remarkably eccentric way of implementing what
+;;; would appear to be by nature a closure.  A closure isn't any more
+;;; threadsafe than this special variable implementation, but at least
+;;; it's more idiomatic, and one could imagine closing over an
+;;; extensible pool to make a thread-safe implementation.
+(declaim (type (simple-vector #.max-vop-tn-refs) *vop-tn-refs*))
 (defvar *vop-tn-refs* (make-array max-vop-tn-refs :initial-element nil))
-(defvar *using-vop-tn-refs* nil)
-
-(defun flush-vop-tn-refs ()
-  (unless *using-vop-tn-refs*
-    (fill *vop-tn-refs* nil)))
-
-(pushnew 'flush-vop-tn-refs *before-gc-hooks*)
 
 (def!constant sc-bits (integer-length (1- sc-number-limit)))
 
@@ -131,61 +130,64 @@
 		   num-args num-results num-operands)
 	     (type (integer -1 #.(1- max-vop-tn-refs)) last-arg last-result))
     (setf (vop-codegen-info vop) info)
-    (let ((refs *vop-tn-refs*)
-	  (*using-vop-tn-refs* t))
-      (declare (type (simple-vector #.max-vop-tn-refs) refs))
-      (do ((index 0 (1+ index))
-	   (ref args (and ref (tn-ref-across ref))))
-	  ((= index num-args))
-	(setf (svref refs index) ref))
-      (do ((index num-args (1+ index))
-	   (ref results (and ref (tn-ref-across ref))))
-	  ((= index num-operands))
-	(setf (svref refs index) ref))
-      (let ((temps (vop-info-temps template)))
-	(when temps
-	  (let ((index num-operands)
-		(prev nil))
-	    (dotimes (i (length temps))
-	      (let* ((temp (aref temps i))
-		     (tn (if (logbitp 0 temp)
-			     (make-wired-tn nil
-					    (ldb (byte sc-bits 1) temp)
-					    (ash temp (- (1+ sc-bits))))
-			     (make-restricted-tn nil (ash temp -1))))
-		     (write-ref (reference-tn tn t)))
-                ;; KLUDGE: These formulas must be consistent with those in
-                ;; COMPUTE-REF-ORDERING, and this is currently
-		;; maintained by hand. -- WHN 2002-01-30, paraphrasing APD
-		(setf (aref refs index) (reference-tn tn nil))
-		(setf (aref refs (1+ index)) write-ref)
-		(if prev
-		    (setf (tn-ref-across prev) write-ref)
-		    (setf (vop-temps vop) write-ref))
-		(setf prev write-ref)
-		(incf index 2))))))
-      (let ((prev nil))
-	(flet ((add-ref (ref)
-		 (setf (tn-ref-vop ref) vop)
-		 (setf (tn-ref-next-ref ref) prev)
-		 (setf prev ref)))
-	  (declare (inline add-ref))
-	  (dotimes (i (length ref-ordering))
-	    (let* ((index (aref ref-ordering i))
-		   (ref (aref refs index)))
-	      (if (or (= index last-arg) (= index last-result))
-		  (do ((ref ref (tn-ref-across ref)))
-		      ((null ref))
-		    (add-ref ref))
-		  (add-ref ref)))))
-	(setf (vop-refs vop) prev))
-      (let ((targets (vop-info-targets template)))
-	(when targets
-	  (dotimes (i (length targets))
-	    (let ((target (aref targets i)))
-	      (target-if-desirable (aref refs (ldb (byte 8 8) target))
-				   (aref refs (ldb (byte 8 0) target))))))))
-    (values vop vop)))
+    (unwind-protect
+	 (let ((refs *vop-tn-refs*))
+	   (declare (type (simple-vector #.max-vop-tn-refs) refs))
+	   (do ((index 0 (1+ index))
+		(ref args (and ref (tn-ref-across ref))))
+	       ((= index num-args))
+	     (setf (svref refs index) ref))
+	   (do ((index num-args (1+ index))
+		(ref results (and ref (tn-ref-across ref))))
+	       ((= index num-operands))
+	     (setf (svref refs index) ref))
+	   (let ((temps (vop-info-temps template)))
+	     (when temps
+	       (let ((index num-operands)
+		     (prev nil))
+		 (dotimes (i (length temps))
+		   (let* ((temp (aref temps i))
+			  (tn (if (logbitp 0 temp)
+				  (make-wired-tn nil
+						 (ldb (byte sc-bits 1) temp)
+						 (ash temp (- (1+ sc-bits))))
+				  (make-restricted-tn nil (ash temp -1))))
+			  (write-ref (reference-tn tn t)))
+		     ;; KLUDGE: These formulas must be consistent with
+		     ;; those in COMPUTE-REF-ORDERING, and this is
+		     ;; currently maintained by hand. -- WHN
+		     ;; 2002-01-30, paraphrasing APD
+		     (setf (aref refs index) (reference-tn tn nil))
+		     (setf (aref refs (1+ index)) write-ref)
+		     (if prev
+			 (setf (tn-ref-across prev) write-ref)
+			 (setf (vop-temps vop) write-ref))
+		     (setf prev write-ref)
+		     (incf index 2))))))
+	   (let ((prev nil))
+	     (flet ((add-ref (ref)
+		      (setf (tn-ref-vop ref) vop)
+		      (setf (tn-ref-next-ref ref) prev)
+		      (setf prev ref)))
+	       (declare (inline add-ref))
+	       (dotimes (i (length ref-ordering))
+		 (let* ((index (aref ref-ordering i))
+			(ref (aref refs index)))
+		   (if (or (= index last-arg) (= index last-result))
+		       (do ((ref ref (tn-ref-across ref)))
+			   ((null ref))
+			 (add-ref ref))
+		       (add-ref ref)))))
+	     (setf (vop-refs vop) prev))
+	   (let ((targets (vop-info-targets template)))
+	     (when targets
+	       (dotimes (i (length targets))
+		 (let ((target (aref targets i)))
+		   (target-if-desirable
+		    (aref refs (ldb (byte 8 8) target))
+		    (aref refs (ldb (byte 8 0) target)))))))
+	   (values vop vop))
+      (fill *vop-tn-refs* nil))))
 
 ;;;; function translation stuff
 

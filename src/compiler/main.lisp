@@ -612,13 +612,7 @@
     (setq *tn-id* 0)
     (clrhash *label-ids*)
     (clrhash *id-labels*)
-    (setq *label-id* 0)
-
-    ;; Clear some PACK data structures (for GC purposes only).
-    (aver (not *in-pack*))
-    (dolist (sb *backend-sb-list*)
-      (when (finite-sb-p sb)
-	(fill (finite-sb-live-tns sb) nil))))
+    (setq *label-id* 0))
 
   ;; (Note: The CMU CL code used to set CL::*GENSYM-COUNTER* to zero here.
   ;; Superficially, this seemed harmful -- the user could reasonably be
