@@ -1,3 +1,14 @@
+;;;; the MIPS implementation of unknown-values VOPs
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 (define-vop (reset-stack-pointer)
@@ -5,6 +16,42 @@
   (:generator 1
     (move csp-tn ptr)))
 
+(define-vop (%%nip-values)
+  (:args (last-nipped-ptr :scs (any-reg) :target dest)
+         (last-preserved-ptr :scs (any-reg) :target src)
+         (moved-ptrs :scs (any-reg) :more t))
+  (:results (r-moved-ptrs :scs (any-reg) :more t))
+  (:temporary (:sc any-reg) src)
+  (:temporary (:sc any-reg) dest)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:ignore r-moved-ptrs)
+  (:generator 1
+    (inst move src last-preserved-ptr)
+    (inst move dest last-nipped-ptr)
+    (inst move temp zero-tn)
+    (inst sltu temp src csp-tn)
+    (inst beq temp zero-tn DONE)
+    (inst nop) ; not strictly necessary
+    LOOP
+    (loadw temp src)
+    (inst add dest dest n-word-bytes)
+    (inst add src src n-word-bytes)
+    (storew temp dest -1)
+    (inst sltu temp src csp-tn)
+    (inst bne temp zero-tn LOOP)
+    (inst nop)
+    DONE
+    (inst move csp-tn dest)
+    (inst sub src src dest)
+    (loop for moved = moved-ptrs then (tn-ref-across moved)
+          while moved
+          do (sc-case (tn-ref-tn moved)
+               ((descriptor-reg any-reg)
+                (inst sub (tn-ref-tn moved) (tn-ref-tn moved) src))
+               ((control-stack)
+                (load-stack-tn temp (tn-ref-tn moved))
+                (inst sub temp temp src)
+                (store-stack-tn (tn-ref-tn moved) temp))))))
 
 ;;; Push some values onto the stack, returning the start and number of values
 ;;; pushed as results.  It is assumed that the Vals are wired to the standard
@@ -42,10 +89,8 @@
     (move start start-temp)
     (inst li count (fixnumize nvals))))
 
-
 ;;; Push a list of values on the stack, returning Start and Count as used in
 ;;; unknown values continuations.
-;;;
 (define-vop (values-list)
   (:args (arg :scs (descriptor-reg) :target list))
   (:arg-types list)
@@ -76,10 +121,8 @@
     DONE
     (inst subu count csp-tn start)))
 
-
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
-;;;
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
 	 (skip :scs (any-reg zero immediate))

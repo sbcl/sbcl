@@ -2422,9 +2422,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     (reported by Antonio Menezes Leitao)
   * fixed bug 307: The obsolete instance protocol ensures that
     subclasses are properly obsoleted.  (thanks to Nikodemus Siivola)
-  * on SPARC, X86 and Alpha fixed bug 298, revealed by Paul F. Dietz'
-    test suite: SBCL can remove dead unknown-values globs from the
-    middle of the stack.
+  * on MIPS, SPARC, X86 and Alpha fixed bug 298, revealed by Paul
+    F. Dietz' test suite: SBCL can remove dead unknown-values globs
+    from the middle of the stack.
   * added a new restart to *BREAK-ON-SIGNALS* handling to make it
     easier to resume long computations after using *BREAK-ON-SIGNALS*
     to diagnose and fix failures.  (thanks to Nikodemus Siivola)
