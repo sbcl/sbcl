@@ -39,7 +39,7 @@ INSTALLING SBCL
   The SBCL runtime needs to be able to find the ancillary files
   associated with it: the "sbcl.core" file, and the contrib modules.
 
-  This can happen in three ways:
+  Finding core can happen in three ways:
 
     1. By default, in a location configured when the system was built.
        For binary distributions this is in "/usr/local/lib/sbcl".
@@ -57,14 +57,16 @@ INSTALLING SBCL
 
          $ sbcl --core /foo/bar/sbcl.core
 
-       When using this option contrib modules are looked for in the
-       directory where the designated core resides, and in "SBCL_HOME".
-
   The usual, recommended approach is method #1. Method #2 is useful if
   you're installing SBCL on a system in a non-standard location
   (e.g. in your user account), instead of installing SBCL on an entire
   system.  Method #3 is mostly useful for testing or other special
   cases.
+
+  Contributed modules are primarily looked for in "SBCL_HOME", or the
+  directory the core resides in if "SBCL_HOME" is not set.
+  ASDF:*CENTRAL-REGISTRY* serves as an additional fallback for
+  ASDF-based modules.
 
 1.3. Anatomy of SBCL
 

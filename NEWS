@@ -9,6 +9,10 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     work for CMUCL)
   * documentation: networking interface SB-BSD-SOCKETS' documentation
     has been integrated into the user manual.
+  * bug fix: SBCL can now load its contributed modules with REQUIRE
+    even if the system-provided entries have been removed from
+    ASDF:*CENTRAL-REGISTRY*. Infinite recursion in REQUIRE is also
+    detected.
   * bug fix: backtraces involving undefined functions or assembly
     routines are more informative.  (thanks to Brian Downing)
   * bug fix: mutually referent alien structures now work correctly.

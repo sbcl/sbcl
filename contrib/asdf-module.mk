@@ -17,12 +17,7 @@ export CC SBCL EXTRA_CFLAGS EXTRA_LDFLAGS
 
 all: $(EXTRA_ALL_TARGETS)
 	$(MAKE) -C ../asdf
-	$(SBCL) --eval '(load "../asdf/asdf")' \
-	  --eval "(setf asdf::*central-registry* '((MERGE-PATHNAMES \"systems/\" (TRUENAME (SB-EXT:POSIX-GETENV \"SBCL_HOME\")))))" \
-	  --eval "(push :sb-building-contrib *features*)" \
-	  --eval "(asdf:operate 'asdf:load-op :$(SYSTEM))" \
-	  --eval "(progn (when (probe-file \"$(SYSTEM).fasl\") (error \"fasl file exists\")) (with-open-file (s \"$(SYSTEM).lisp\" :direction :output :if-exists :error) (print (quote (require :asdf)) s) (print (quote (require :$(SYSTEM))) s)) (compile-file \"$(SYSTEM).lisp\") (delete-file \"$(SYSTEM).lisp\"))" \
-	  --eval "(quit)"
+	$(SBCL) --eval '(defvar *system* "$(SYSTEM)")' --load ../asdf-stub.lisp --eval '(quit)'
 
 test: all
 	echo "(asdf:operate (quote asdf:load-op) :$(SYSTEM))" \
