@@ -1144,6 +1144,31 @@
               (optimize (speed 3) (space 3) (safety 1)
                (debug 2) (compilation-speed 0)))
              (apply (constantly 0) (catch 'ct2 0) 0 (catch 'ct2 0) nil))))))
+
+;;; MISC.292
+(assert (zerop (funcall
+                (compile
+                 nil
+                 '(lambda (a b)
+                   (declare (optimize (speed 2) (space 0) (safety 3) (debug 1)
+                             (compilation-speed 2)))
+                   (apply (constantly 0)
+                    a
+                    0
+                    (catch 'ct6
+                      (apply (constantly 0)
+                             0
+                             0
+                             (let* ((v1
+                                     (let ((*s7* 0))
+                                       b)))
+                               0)
+                             0
+                             nil))
+                    0
+                    nil)))
+                1 2)))
+
 
 ;;; MISC.275
 (assert

@@ -1,7 +1,7 @@
 ;;;; This file implements the stack analysis phase in the compiler. We
 ;;;; do a graph walk to determine which unknown-values lvars are on
 ;;;; the stack at each point in the program, and then we insert
-;;;; cleanup code to pop off unused values.
+;;;; cleanup code to remove unused values.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -41,7 +41,7 @@
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
 
-;;;; annotation graph walk
+;;;; Computation of live UVL sets
 (defun nle-block-nlx-info (block)
   (let* ((start-node (block-start-node block))
          (nlx-ref (ctran-next (node-next start-node)))
@@ -63,6 +63,10 @@
 ;;; Update information on stacks of unknown-values LVARs on the
 ;;; boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
+;;;
+;;; An LVAR is live at the end iff it is live at some of blocks, which
+;;; BLOCK can transfer control to. There are two kind of control
+;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.
 (defun update-uvl-live-sets (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
@@ -85,10 +89,13 @@
                      block)
 
     (setf (ir2-block-end-stack 2block) new-end)
+
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
       (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
 
+      ;; We cannot delete unused UVLs during NLX, so all UVLs live at
+      ;; ENTRY will be actually live at NLE.
       (when (and (eq (component-head (block-component block))
                      (first (block-pred block)))
                  (not (bind-p (block-start-node block))))
@@ -97,15 +104,20 @@
           (setq start (merge-uvl-live-sets start entry-stack))))
 
       (when *check-consistency*
-               (aver (subsetp original-start start)))
-      (values (cond ((subsetp start original-start)
-                     nil)
-                    (t
-                     (setf (ir2-block-start-stack 2block) start)
-                     t))
-              start new-end))))
+        (aver (subsetp original-start start)))
+      (cond ((subsetp start original-start)
+             nil)
+            (t
+             (setf (ir2-block-start-stack 2block) start)
+             t)))))
 
-;;;
+
+;;;; Ordering of live UVL stacks
+
+;;; Put UVLs on the start/end stacks of BLOCK in the right order. PRED
+;;; is a predecessor of BLOCK with already sorted stacks; because all
+;;; UVLs being live at the BLOCK start are live in PRED, we just need
+;;; to delete dead UVLs.
 (defun order-block-uvl-sets (block pred)
   (let* ((2block (block-info block))
          (pred-end-stack (ir2-block-end-stack (block-info pred)))
@@ -121,7 +133,9 @@
     (let* ((last (block-last block))
            (tailp-lvar (if (node-tail-p last) (node-lvar last)))
            (end-stack start-stack))
-      (setq end-stack (set-difference end-stack (ir2-block-popped 2block)))
+      (dolist (pop (ir2-block-popped 2block))
+        (aver (eq pop (car end-stack)))
+        (pop end-stack))
       (dolist (push (ir2-block-pushed 2block))
         (aver (not (memq push end-stack)))
         (push push end-stack))
@@ -180,7 +194,7 @@
                             (n-last-nipped (+ n-last-preserved nipped-count)))
                    (aver (equal (nthcdr (1+ n-last-nipped) block1-stack)
                                 (nthcdr preserved-count block2-stack)))
-                   (format t "%NIP-VALUES emitted~%")
+                   (compiler-notify "%NIP-VALUES emitted")
                    `(%nip-values ',(elt block1-stack n-last-nipped)
                                  ',(elt block1-stack n-last-preserved)
                                  ,@(loop for moved in block1-stack
@@ -224,12 +238,6 @@
 ;;; received. This phase doesn't need to be run when Values-Receivers
 ;;; is null, i.e. there are no unknown-values lvars used across block
 ;;; boundaries.
-;;;
-;;; Do the backward graph walk, starting at each values receiver. We
-;;; ignore receivers that already have a non-null START-STACK. These
-;;; are nested values receivers that have already been reached on
-;;; another walk. We don't want to clobber that result with our null
-;;; initial stack.
 (defun stack-analyze (component &aux (*check-consistency* t))
   (declare (type component component))
   (let* ((2comp (component-info component))
@@ -239,15 +247,14 @@
     (dolist (block generators)
       (find-pushed-lvars block))
 
+    ;;; Compute sets of live UVLs
     (loop for did-something = nil
           do (do-blocks-backwards (block component)
                (when (update-uvl-live-sets block)
                  (setq did-something t)))
           while did-something)
 
-    ;;(break)
     (order-uvl-sets component)
-    ;;(break)
 
     (do-blocks (block component)
       (let ((top (ir2-block-end-stack (block-info block))))
