@@ -47,7 +47,7 @@ size_t os_vm_page_size;
 u32 local_ldt_copy[LDT_ENTRIES*LDT_ENTRY_SIZE/sizeof(u32)];
 
 /* XXX this could be conditionally compiled based on some
- * "debug-friendly" flag.  But it doesn't really make stuff slowed,
+ * "debug-friendly" flag.  But it doesn't really make stuff slower,
  * just the runtime gets fractionally larger */
 
 void debug_get_ldt()
@@ -56,7 +56,7 @@ void debug_get_ldt()
     printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
 }
 
-int os_set_tls_pointer(struct thread *thread) {
+int arch_os_thread_init(struct thread *thread) {
     /* this must be called from a function that has an exclusive lock
      * on all_threads
      */
@@ -64,9 +64,14 @@ int os_set_tls_pointer(struct thread *thread) {
 	1, 0, 0, /* index, address, length filled in later */
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
-    /* find index of get next free ldt entry */
-    int n=__modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy)
-	/LDT_ENTRY_SIZE;
+    /* get next free ldt entry */
+    int n=__modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
+    if(n) {
+	u32 *p;
+	for(n=0,p=local_ldt_copy;*p;p+=LDT_ENTRY_SIZE/sizeof(u32))
+	    n++;
+    }
+    fprintf(stderr,"ldt entry %d\n",n);
 
     ldt_entry.entry_number=n;
     ldt_entry.base_addr=(unsigned long) thread;
@@ -79,7 +84,8 @@ int os_set_tls_pointer(struct thread *thread) {
 			  ((n << 3) /* selector number */
 			   + (1 << 2) /* TI set = LDT */
 			   + 3)); /* privilege level */
-    return n;
+    thread->tls_cookie=n;
+    return (n>=0);
 }
 
 struct thread *arch_os_get_current_thread() {

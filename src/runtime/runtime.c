@@ -286,7 +286,7 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     sigint_init();
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
-    init_thread(initial_function);
+    create_thread(initial_function);
     fprintf(stderr,"started lisp thread\n");
     while(pause()) 
 	fprintf(stderr,"parent thread caught a signal\n");

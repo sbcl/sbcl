@@ -16,9 +16,45 @@
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 
-struct thread *init_thread(lispobj initial_function) {
+
+
+/* this is the first thing that clone() runs in the child (which is
+ * why the silly calling convention).  Basically it calls the user's
+ * requested lisp function after doing arch_os_thread_init and
+ * whatever other bookkeeping needs to be done
+ */
+
+/* set go to 0 to stop the thread before it starts.  Convenient if you
+* want to attach a debugger to it before it does anything */
+
+volatile int go=1;		
+int
+new_thread_trampoline(struct thread *th)
+{
+    lispobj function = th->unbound_marker;
+    th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+
+    FSHOW((stderr, "/pausing 0x%lx(%d) before new_thread_trampoline(0x%lx)\n",
+	   (unsigned long)th,getpid(),(unsigned long)function));
+    if(go==0) {
+	while(go==0) ;
+	FSHOW((stderr, "/continue\n"));
+    }
+    if(arch_os_thread_init(th)==0) 
+	return 1;		/* failure.  no, really */
+    else 
+	return funcall0(function);
+}
+
+/* this is called from any other thread to create the new one, and
+ * initialize all parts of it that can be initialized from another 
+ * thread 
+ */
+
+struct thread *create_thread(lispobj initial_function) {
     /* XXX This function or some of it needs to lock all_threads
      */
+    lispobj trampoline_argv[2];
     union per_thread_data *per_thread;
     struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
@@ -74,20 +110,19 @@ struct thread *init_thread(lispobj initial_function) {
     bind_variable(INTERRUPTS_ENABLED,T,th);
 
     th->next=all_threads;
-    th->tls_cookie=os_set_tls_pointer(th);
-    if(th->tls_cookie<0) goto cleanup;
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
+
+    th->unbound_marker=initial_function;
     th->pid=
-	clone(funcall0,th->binding_stack_start-2,
-	      ((getpid()!=parent_pid)?CLONE_PARENT:0)
-	      |CLONE_SIGHAND|CLONE_VM,initial_function);
+	clone(new_thread_trampoline,th->binding_stack_start-2,
+	      (((getpid()!=parent_pid)?CLONE_PARENT:0)
+	       |CLONE_SIGHAND|CLONE_VM),th);
     fprintf(stderr,"child pid is %d\n",th->pid);
-    if(!th->pid) goto cleanup;
+    if(th->pid<=0) goto cleanup;
 #else
 #error this stuff presently only works on x86 Linux
 #endif
     all_threads=th;
-
     return th;
  cleanup:
     /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */
@@ -96,6 +131,7 @@ struct thread *init_thread(lispobj initial_function) {
 			     ALIEN_STACK_SIZE+dynamic_values_bytes);
     return 0;
 }
+
 
 struct thread *find_thread_by_pid(pid_t pid) 
 {

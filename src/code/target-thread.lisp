@@ -3,11 +3,11 @@
 ;; opaque type
 (sb!alien:define-alien-type thread (struct thread-struct))
 
-(sb!alien::define-alien-routine ("init_thread" %init-thread)
+(sb!alien::define-alien-routine ("create_thread" %create-thread)
      (* thread) (lisp-fun-address sb!alien:unsigned-long))
 
 (defun make-thread (function)
-  (%init-thread (sb!kernel:get-lisp-obj-address (coerce function 'function))))
+  (%create-thread (sb!kernel:get-lisp-obj-address (coerce function 'function))))
 
 #|
 (defvar *foo* nil)

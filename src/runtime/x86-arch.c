@@ -315,14 +315,12 @@ call_into_lisp(lispobj fun, lispobj *args, int nargs);
  * could be in registers depending on what the compiler likes. So we
  * copy the args into a portable vector and let the assembly language
  * call-in function figure it out. */
-volatile int go=1;
+
 lispobj
 funcall0(lispobj function)
 {
     lispobj *args = NULL;
 
-    FSHOW((stderr, "/pausing %d before entering funcall0(0x%lx)\n", getpid(),(long)function));
-    while(go==0) ; 
     FSHOW((stderr, "/entering funcall0(0x%lx)\n", (long)function));
     return call_into_lisp(function, args, 0);
 }

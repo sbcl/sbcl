@@ -12,6 +12,9 @@
 
 struct thread {
     lispobj unbound_marker;	/* tls[0] = UNBOUND_MARKER_WIDETAG */
+    /* unbound_marker is borrowed very briefly at thread startup to 
+     * pass the address of initial_function into new_thread_trampoline 
+     */
     lispobj *binding_stack_start;
     lispobj *binding_stack_pointer;
     lispobj *control_stack_start;
