@@ -317,6 +317,8 @@
 
 (defgeneric add-method (generic-function method))
 
+(defgeneric (setf class-slot-cells) (new-value class))
+
 (defgeneric class-slot-value (class slot-name))
 
 (defgeneric compatible-meta-class-change-p (class proto-new-class))

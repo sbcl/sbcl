@@ -141,6 +141,8 @@
 
 (defmethod class-slot-cells ((class std-class))
   (plist-value class 'class-slot-cells))
+(defmethod (setf class-slot-cells) (new-value (class std-class))
+  (setf (plist-value class 'class-slot-cells) new-value))
 
 ;;;; class accessors that are even a little bit more complicated than those
 ;;;; above. These have a protocol for updating them, we must implement that
@@ -1040,8 +1042,20 @@
 	       (incf location))
 	      (:class
 	       (let* ((name (slot-definition-name eslotd))
-		      (from-class (slot-definition-allocation-class eslotd))
-		      (cell (assq name (class-slot-cells from-class))))
+		      (from-class 
+		       (or 
+			(slot-definition-allocation-class eslotd)
+			;; we get here if the user adds an extra slot
+			;; himself...
+			(setf (slot-definition-allocation-class eslotd) 
+			      class)))
+		      ;; which raises the question of what we should
+		      ;; do if we find that said user has added a slot
+		      ;; with the same name as another slot...
+		      (cell (or (assq name (class-slot-cells from-class))
+				(setf (class-slot-cells from-class)
+				      (cons (cons name +slot-unbound+)
+					    (class-slot-cells from-class))))))
 		 (aver (consp cell))
 		 (if (eq +slot-unbound+ (cdr cell))
 		     ;; We may have inherited an initfunction
@@ -1050,6 +1064,8 @@
 			   (rplacd cell (funcall initfun))
 			   cell))
 		     cell)))))
+      (unless (slot-definition-class eslotd)
+	(setf (slot-definition-class eslotd) class))
       (initialize-internal-slot-functions eslotd))))
 
 (defmethod compute-slots ((class funcallable-standard-class))

@@ -2572,6 +2572,9 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed bug #340: SETF of VALUES obeys the specification in ANSI
     5.1.2.3 for multiple-value place subforms.  (reported by Kalle
     Olavi Niemetalo)
+  * fixed bug #334: programmatic addition of slots using specialized
+    methods on SB-MOP:COMPUTE-SLOTS works for :ALLOCATION :INSTANCE
+    and :ALLOCATION :CLASS slots.
   * fixed a bug: #\Space (and other whitespace characters) are no
     longer considered to be macro characters in standard syntax by
     GET-MACRO-CHARACTER.

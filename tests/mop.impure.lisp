@@ -182,5 +182,68 @@
   (assert (not (typep 1 spec)))
   (assert (typep 4.0 spec)))
 
+;;; BUG #334, relating to programmatic addition of slots to a class
+;;; with COMPUTE-SLOTS.
+;;;
+;;; FIXME: the DUMMY classes here are to prevent class finalization
+;;; before the compute-slots method is around.  This should probably
+;;; be done by defining the COMPUTE-SLOTS methods on a metaclass,
+;;; which can be defined before.
+;;;
+;;; a. adding an :allocation :instance slot
+(defclass class-to-add-instance-slot (dummy-ctais) ())
+(defmethod compute-slots ((c (eql (find-class 'class-to-add-instance-slot))))
+  (append (call-next-method)
+	  (list (make-instance 'standard-effective-slot-definition
+			       :name 'y
+			       :allocation :instance))))
+(defclass dummy-ctais () ((x :allocation :class)))
+(assert (equal (mapcar #'slot-definition-allocation 
+		       (class-slots (find-class 'class-to-add-instance-slot)))
+	       ;; FIXME: is the order really guaranteed?
+	       '(:class :instance)))
+(assert (typep (slot-definition-location 
+		(cadr (class-slots (find-class 'class-to-add-instance-slot)))) 
+	       'unsigned-byte))
+#| (assert (typep (slot-definition-location (car ...)) '???)) |#
+(let ((x (make-instance 'class-to-add-instance-slot)))
+  (assert (not (slot-boundp x 'x)))
+  (setf (slot-value x 'x) t)
+  (assert (not (slot-boundp x 'y)))
+  (setf (slot-value x 'y) 1)
+  (assert (= 1 (slot-value x 'y))))
+(let ((x (make-instance 'class-to-add-instance-slot)))
+  (assert (slot-boundp x 'x))
+  (assert (eq t (slot-value x 'x)))
+  (assert (not (slot-boundp x 'y))))
+
+;;; b. adding an :allocation :class slot
+(defclass class-to-add-class-slot (dummy-ctacs) ())
+(defmethod compute-slots ((c (eql (find-class 'class-to-add-class-slot))))
+  (append (call-next-method)
+	  (list (make-instance 'standard-effective-slot-definition
+			       :name 'y
+			       :allocation :class))))
+(defclass dummy-ctacs () ((x :allocation :class)))
+(assert (equal (mapcar #'slot-definition-allocation 
+		       (class-slots (find-class 'class-to-add-class-slot)))
+	       '(:class :class)))
+(let ((x (make-instance 'class-to-add-class-slot)))
+  (assert (not (slot-boundp x 'x)))
+  (setf (slot-value x 'x) nil)
+  (assert (not (slot-boundp x 'y)))
+  (setf (slot-value x 'y) 1)
+  (assert (= 1 (slot-value x 'y))))
+(let ((x (make-instance 'class-to-add-class-slot)))
+  (assert (slot-boundp x 'x))
+  (assert (eq nil (slot-value x 'x)))
+  (assert (slot-boundp x 'y))
+  (assert (= 1 (slot-value x 'y))))
+;; extra paranoia: check that we haven't broken the instance-slot class
+(let ((x (make-instance 'class-to-add-instance-slot)))
+  (assert (slot-boundp x 'x))
+  (assert (eq t (slot-value x 'x)))
+  (assert (not (slot-boundp x 'y))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
