@@ -69,7 +69,7 @@
   (context nil :type list)
   ;; the FILE-INFO-NAME for the relevant FILE-INFO
   (file-name (missing-arg) :type (or pathname (member :lisp :stream)))
-  ;; the file position at which the top-level form starts, if applicable
+  ;; the file position at which the top level form starts, if applicable
   (file-position nil :type (or index null))
   ;; the original source part of the source path
   (original-source-path nil :type list))

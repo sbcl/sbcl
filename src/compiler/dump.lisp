@@ -86,7 +86,7 @@
   enclosing-object)
 
 ;;; a list of the CIRCULARITY structures for all of the circularities
-;;; detected in the current top-level call to DUMP-OBJECT. Setting
+;;; detected in the current top level call to DUMP-OBJECT. Setting
 ;;; this lobotomizes circularity detection as well, since circular
 ;;; dumping uses the table.
 (defvar *circularities-detected*)
@@ -380,7 +380,7 @@
 ;;;
 ;;; This is the function used for recursive calls to the fasl dumper.
 ;;; We don't worry about creating circularities here, since it is
-;;; assumed that there is a top-level call to DUMP-OBJECT.
+;;; assumed that there is a top level call to DUMP-OBJECT.
 (defun sub-dump-object (x file)
   (cond ((listp x)
 	 (if x
@@ -1148,9 +1148,9 @@
     (dump-push handle fasl-output))
   (values))
 
-;;; Dump a FOP-FUNCALL to call an already-dumped top-level lambda at
+;;; Dump a FOP-FUNCALL to call an already-dumped top level lambda at
 ;;; load time.
-(defun fasl-dump-top-level-lambda-call (fun fasl-output)
+(defun fasl-dump-toplevel-lambda-call (fun fasl-output)
   (declare (type sb!c::clambda fun))
   (dump-push-previously-dumped-fun fun fasl-output)
   (dump-fop 'fop-funcall-for-effect fasl-output)

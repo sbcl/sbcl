@@ -25,7 +25,7 @@
 ;;; 10. the &MORE context var;
 ;;; 11. the &MORE count var.
 ;;;
-;;; The top-level lambda list syntax is checked for validity, but the
+;;; The top level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
 ;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.

@@ -117,7 +117,7 @@
 
 (defun sigquit-handler (signal code context)
   (declare (ignore signal code context))
-  (throw 'sb!impl::top-level-catcher nil))
+  (throw 'sb!impl::toplevel-catcher nil))
 
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc

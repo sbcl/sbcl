@@ -195,8 +195,8 @@
 
 ;;;; translators for compiler-magic special forms
 
-;;; This handles EVAL-WHEN in non-top-level forms. (EVAL-WHENs in
-;;; top-level forms are picked off and handled by PROCESS-TOP-LEVEL-FORM,
+;;; This handles EVAL-WHEN in non-top-level forms. (EVAL-WHENs in top
+;;; level forms are picked off and handled by PROCESS-TOPLEVEL-FORM,
 ;;; so that they're never seen at this level.)
 ;;;
 ;;; ANSI "3.2.3.1 Processing of Top Level Forms" says that processing
@@ -240,7 +240,7 @@
 ;;; call FUN (with no arguments).
 ;;;
 ;;; This is split off from the IR1 convert method so that it can be
-;;; shared by the special-case top-level MACROLET processing code.
+;;; shared by the special-case top level MACROLET processing code.
 (defun funcall-in-macrolet-lexenv (definitions fun)
   (%funcall-in-foomacrolet-lexenv
    (lambda (definition)
@@ -519,9 +519,9 @@
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
 ;;;
-;;; Note that all these things need to preserve top-level-formness,
+;;; Note that all these things need to preserve toplevel-formness,
 ;;; but we don't need to worry about that within an IR1 translator,
-;;; since top-level-formness is picked off by PROCESS-TOP-LEVEL-FOO
+;;; since toplevel-formness is picked off by PROCESS-TOPLEVEL-FOO
 ;;; forms before we hit the IR1 transform level.
 (defun ir1-translate-locally (body start cont)
   (declare (type list body) (type continuation start cont))
@@ -533,8 +533,8 @@
   #!+sb-doc
   "LOCALLY Declaration* Form*
   Sequentially evaluate the Forms in a lexical environment where the
-  the Declarations have effect. If LOCALLY is a top-level form, then
-  the Forms are also processed as top-level forms."
+  the Declarations have effect. If LOCALLY is a top level form, then
+  the Forms are also processed as top level forms."
   (ir1-translate-locally body start cont))
 
 ;;;; FLET and LABELS

@@ -1022,7 +1022,7 @@
 			    :key #'operand-parse-name))))))
   (values))
 
-;;; the top-level parse function: clobber PARSE to represent the
+;;; the top level parse function: clobber PARSE to represent the
 ;;; specified options.
 (defun parse-define-vop (parse specs)
   (declare (type vop-parse parse) (list specs))

@@ -1,4 +1,4 @@
-;;;; When this file's top-level forms are run, it precomputes the
+;;;; When this file's top level forms are run, it precomputes the
 ;;;; translations for commonly used type specifiers. This stuff is
 ;;;; split off from the other type stuff to get around problems with
 ;;;; everything needing to be loaded before everything else. This is

@@ -51,7 +51,7 @@ message:
     <function>with-compilation-unit</> is used to delay undefined
     warnings.</para></listitem>
   <listitem><para><computeroutput>in: DEFUN FOO</> This is the
-    definition top-level form responsible for the error. It is
+    definition top level form responsible for the error. It is
     obtained by taking the first two elements of the enclosing form
     whose first element is a symbol beginning with <quote><literal>def</></>.
     If there is no such enclosing <quote><literal>def</></> form, then the 
@@ -63,7 +63,7 @@ message:
     <emphasis>original source</> form responsible for the error.
     Original source means that the form directly appeared in the
     original input to the compiler, i.e. in the lambda passed to
-    <function>compile</> or in the top-level form read from the
+    <function>compile</> or in the top level form read from the
     source file. In this example, the expansion of the <function>zoq</>
     macro was responsible for the error.</para></listitem>
   <listitem><para><computeroutput>--> ROQ PLOQ +</> This is the

@@ -67,10 +67,10 @@
 ;;;;    number of locations in this block
 ;;;;    kind of first location (single byte)
 ;;;;    delta from previous PC (or from 0 if first location in function.)
-;;;;    [offset of first top-level form, if no function TLF-NUMBER]
+;;;;    [offset of first top level form, if no function TLF-NUMBER]
 ;;;;    form number of first source form
 ;;;;    first live mask (length in bytes determined by number of VARIABLES)
-;;;;    ...more <kind, delta, top-level form offset, form-number, live-set>
+;;;;    ...more <kind, delta, top level form offset, form-number, live-set>
 ;;;;       tuples...
 
 (defconstant-eqx compiled-debug-block-nsucc-byte (byte 2 0) #'equalp)
@@ -91,19 +91,20 @@
   ;; function name, otherwise it is a descriptive string.
   (name (missing-arg) :type (or simple-string cons symbol))
   ;; The kind of function (same as FUNCTIONAL-KIND):
-  (kind nil :type (member nil :optional :external :top-level :cleanup))
+  (kind nil :type (member nil :optional :external :toplevel :cleanup))
   ;; a description of variable locations for this function, in alphabetical
   ;; order by name; or NIL if no information is available
   ;;
-  ;; The variable entries are alphabetically ordered. This ordering is used in
-  ;; lifetime info to refer to variables: the first entry is 0, the second
-  ;; entry is 1, etc. Variable numbers are *not* the byte index at which the
-  ;; representation of the location starts.
+  ;; The variable entries are alphabetically ordered. This ordering is
+  ;; used in lifetime info to refer to variables: the first entry is
+  ;; 0, the second entry is 1, etc. Variable numbers are *not* the
+  ;; byte index at which the representation of the location starts.
   ;;
   ;; Each entry is:
   ;;   * a FLAGS value, which is a FIXNUM with various
   ;;     COMPILED-DEBUG-FUN-FOO bits set
-  ;;   * the symbol which names this variable, unless debug info is minimal
+  ;;   * the symbol which names this variable, unless debug info
+  ;;     is minimal
   ;;   * the variable ID, when it has one
   ;;   * SC-offset of primary location, if it has one
   ;;   * SC-offset of save location, if it has one
@@ -119,15 +120,17 @@
   ;; transform correctly under package renaming). Check whether this slot's
   ;; data might have the same problem that that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
-  ;; If all code locations in this function are in the same top-level form,
-  ;; then this is the number of that form, otherwise NIL. If NIL, then each
-  ;; code location represented in the BLOCKS specifies the TLF number.
+  ;; If all code locations in this function are in the same top level
+  ;; form, then this is the number of that form, otherwise NIL. If
+  ;; NIL, then each code location represented in the BLOCKS specifies
+  ;; the TLF number.
   (tlf-number nil :type (or index null))
-  ;; A vector describing the variables that the argument values are stored in
-  ;; within this function. The locations are represented by the ordinal number
-  ;; of the entry in the VARIABLES slot value. The locations are in the order
-  ;; that the arguments are actually passed in, but special marker symbols can
-  ;; be interspersed to indicate the original call syntax:
+  ;; a vector describing the variables that the argument values are
+  ;; stored in within this function. The locations are represented by
+  ;; the ordinal number of the entry in the VARIABLES slot value. The
+  ;; locations are in the order that the arguments are actually passed
+  ;; in, but special marker symbols can be interspersed to indicate
+  ;; the original call syntax:
   ;;
   ;; DELETED
   ;;    There was an argument to the function in this position, but it was
@@ -242,7 +245,7 @@
   ;;    :LISP - from Lisp (i.e. COMPILE)
   (from (missing-arg) :type (member :file :lisp))
   ;; If :FILE, the file name, if :LISP or :STREAM, then a vector of
-  ;; the top-level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
+  ;; the top level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
   (name nil)
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
@@ -253,7 +256,7 @@
   ;; source (i.e. the total number of forms converted previously in
   ;; this compilation)
   (source-root 0 :type index)
-  ;; The FILE-POSITIONs of the truly top-level forms read from this
+  ;; The FILE-POSITIONs of the truly top level forms read from this
   ;; file (if applicable). The vector element type will be chosen to
   ;; hold the largest element. May be null to save space, or if
   ;; :DEBUG-SOURCE-FORM is :LISP.

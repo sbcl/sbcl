@@ -30,8 +30,8 @@
 ;;; Find the function that is being compiled by COMPILE and bash its
 ;;; name to NAME. We also substitute for any references to name so
 ;;; that recursive calls will be compiled direct. LAMBDA is the
-;;; top-level lambda for the compilation. A REF for the real function
-;;; is the only thing in the top-level lambda other than the bind and
+;;; top level lambda for the compilation. A REF for the real function
+;;; is the only thing in the top level lambda other than the bind and
 ;;; return, so it isn't too hard to find.
 (defun compile-fix-fun-name (lambda name)
   (declare (type clambda lambda) (type (or symbol cons) name))
@@ -64,7 +64,7 @@
 	     (*lexenv* (make-null-lexenv))
 	     (form (get-lambda-to-compile definition))
 	     (*source-info* (make-lisp-source-info form))
-	     (*top-level-lambdas* ())
+	     (*toplevel-lambdas* ())
 	     (*block-compile* nil)
 	     (*compiler-error-bailout*
 	      #'(lambda ()

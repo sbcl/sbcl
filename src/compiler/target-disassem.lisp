@@ -973,13 +973,13 @@
 (defstruct (source-form-cache (:conc-name sfcache-)
 			      (:copier nil))
   (debug-source nil :type (or null sb!di:debug-source))
-  (top-level-form-index -1 :type fixnum)
-  (top-level-form nil :type list)
+  (toplevel-form-index -1 :type fixnum)
+  (toplevel-form nil :type list)
   (form-number-mapping-table nil :type (or null (vector list)))
   (last-location-retrieved nil :type (or null sb!di:code-location))
   (last-form-retrieved -1 :type fixnum))
 
-(defun get-top-level-form (debug-source tlf-index)
+(defun get-toplevel-form (debug-source tlf-index)
   (let ((name (sb!di:debug-source-name debug-source)))
     (ecase (sb!di:debug-source-from debug-source)
       (:file
@@ -1005,7 +1005,8 @@
 				  (file-position f char-offset))
 				 (t
 				  (warn "Source file ~S has been modified; ~@
-					 using form offset instead of file index."
+					 using form offset instead of ~
+                                         file index."
 					name)
 				  (let ((*read-suppress* t))
 				    (dotimes (i local-tlf-index) (read f)))))
@@ -1025,41 +1026,41 @@
   (and cache
        (and (eq (sb!di:code-location-debug-source loc)
 		(sfcache-debug-source cache))
-	    (eq (sb!di:code-location-top-level-form-offset loc)
-		(sfcache-top-level-form-index cache)))))
+	    (eq (sb!di:code-location-toplevel-form-offset loc)
+		(sfcache-toplevel-form-index cache)))))
 
 (defun get-source-form (loc context &optional cache)
   (let* ((cache-valid (cache-valid loc cache))
-	 (tlf-index (sb!di:code-location-top-level-form-offset loc))
+	 (tlf-index (sb!di:code-location-toplevel-form-offset loc))
 	 (form-number (sb!di:code-location-form-number loc))
-	 (top-level-form
+	 (toplevel-form
 	  (if cache-valid
-	      (sfcache-top-level-form cache)
-	      (get-top-level-form (sb!di:code-location-debug-source loc)
+	      (sfcache-toplevel-form cache)
+	      (get-toplevel-form (sb!di:code-location-debug-source loc)
 				  tlf-index)))
 	 (mapping-table
 	  (if cache-valid
 	      (sfcache-form-number-mapping-table cache)
-	      (sb!di:form-number-translations top-level-form tlf-index))))
+	      (sb!di:form-number-translations toplevel-form tlf-index))))
     (when (and (not cache-valid) cache)
       (setf (sfcache-debug-source cache) (sb!di:code-location-debug-source loc)
-	    (sfcache-top-level-form-index cache) tlf-index
-	    (sfcache-top-level-form cache) top-level-form
+	    (sfcache-toplevel-form-index cache) tlf-index
+	    (sfcache-toplevel-form cache) toplevel-form
 	    (sfcache-form-number-mapping-table cache) mapping-table))
-    (cond ((null top-level-form)
+    (cond ((null toplevel-form)
 	   nil)
 	  ((> form-number (length mapping-table))
 	   (warn "bogus form-number in form!  The source file has probably ~@
 		  been changed too much to cope with.")
 	   (when cache
 	     ;; Disable future warnings.
-	     (setf (sfcache-top-level-form cache) nil))
+	     (setf (sfcache-toplevel-form cache) nil))
 	   nil)
 	  (t
 	   (when cache
 	     (setf (sfcache-last-location-retrieved cache) loc)
 	     (setf (sfcache-last-form-retrieved cache) form-number))
-	   (sb!di:source-path-context top-level-form
+	   (sb!di:source-path-context toplevel-form
 				      (aref mapping-table form-number)
 				      context)))))
 
@@ -1500,7 +1501,7 @@
       (dolist (seg segments)
 	(disassemble-segment seg stream dstate)))))
 
-;;;; top-level functions
+;;;; top level functions
 
 ;;; Disassemble the machine code instructions for FUNCTION.
 (defun disassemble-function (function &key

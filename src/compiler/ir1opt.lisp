@@ -1234,7 +1234,7 @@
 ;;;
 ;;; Substitution of individual references is inhibited if the
 ;;; reference is in a different component from the home. This can only
-;;; happen with closures over top-level lambda vars. In such cases,
+;;; happen with closures over top level lambda vars. In such cases,
 ;;; the references may have already been compiled, and thus can't be
 ;;; retroactively modified.
 ;;;
@@ -1267,7 +1267,7 @@
 			      t)
 			     (t
 			      (aver (eq (functional-kind (lambda-home fun))
-					:top-level))
+					:toplevel))
 			      nil)))
 		   leaf var))
 		t)))))

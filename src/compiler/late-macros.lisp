@@ -78,10 +78,10 @@
 ;;; to use code like this, to factor out some shared functionality for clarity
 ;;; and for economy. But the motivation for splitting out this code here is
 ;;; much weirder. In the current version of the code, the cross-compiler calls
-;;; UNCROSS on each top-level form before processing it. Ordinarily, UNCROSS
+;;; UNCROSS on each top level form before processing it. Ordinarily, UNCROSS
 ;;; isn't called on macro expansions, but since DEF-BOOLEAN-ATTRIBUTE expands
 ;;; into a PROGN, the cross-compiler does end up calling UNCROSS on (the
-;;; components of) its macroexpansion, since they're separate top-level forms.
+;;; components of) its macroexpansion, since they're separate top level forms.
 ;;; In the classic CMU CL macroexpansion, the call to GET-SETF-EXPANSION is in
 ;;; the macroexpansion, and even when I translate it to
 ;;; SB!XC:GET-SETF-MACROEXPANSION so that it will work on target code, my

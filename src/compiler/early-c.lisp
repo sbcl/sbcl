@@ -125,7 +125,7 @@
 		note-name-defined))
 (defun note-name-defined (name kind)
   ;; We do this BOUNDP check because this function can be called when
-  ;; not in a compilation unit (as when loading top-level forms).
+  ;; not in a compilation unit (as when loading top level forms).
   (when (boundp '*undefined-warnings*)
     (setq *undefined-warnings*
 	  (delete-if (lambda (x)

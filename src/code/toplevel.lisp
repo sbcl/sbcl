@@ -236,20 +236,20 @@
 
 (defvar / nil
   #!+sb-doc
-  "a list of all the values returned by the most recent top-level EVAL")
+  "a list of all the values returned by the most recent top level EVAL")
 (defvar //  nil #!+sb-doc "the previous value of /")
 (defvar /// nil #!+sb-doc "the previous value of //")
-(defvar *   nil #!+sb-doc "the value of the most recent top-level EVAL")
+(defvar *   nil #!+sb-doc "the value of the most recent top level EVAL")
 (defvar **  nil #!+sb-doc "the previous value of *")
 (defvar *** nil #!+sb-doc "the previous value of **")
-(defvar +   nil #!+sb-doc "the value of the most recent top-level READ")
+(defvar +   nil #!+sb-doc "the value of the most recent top level READ")
 (defvar ++  nil #!+sb-doc "the previous value of +")
 (defvar +++ nil #!+sb-doc "the previous value of ++")
 (defvar -   nil #!+sb-doc "the form currently being evaluated")
-(defvar *prompt* "* "
-  #!+sb-doc
-  "The top-level prompt string. This also may be a function of no arguments
-   that returns a simple-string.")
+
+;;; the top level prompt string, or a function of no arguments that
+;;; returns a simple-string
+(defvar *prompt* "* ")
 
 (defun interactive-eval (form)
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
@@ -285,7 +285,7 @@
     (finish-output (symbol-value name)))
   (values))
 
-;;; the default system top-level function
+;;; the default system top level function
 (defun toplevel-init ()
 
   (/show0 "entering TOPLEVEL-INIT")
@@ -474,31 +474,31 @@
 	;; get you out to here.
         (with-simple-restart (abort
 			      "Reduce debugger level (leaving debugger).")
-	  (catch 'top-level-catcher
-	  (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
-	  (/show0 "about to enter inner LOOP in TOPLEVEL-REPL")
-	  (loop				; FIXME: Do we need this inner LOOP?
-	   ;; FIXME: It seems bad to have GC behavior depend on scrubbing
-	   ;; the control stack before each interactive command. Isn't
-	   ;; there some way we can convince the GC to just ignore
-	   ;; dead areas of the control stack, so that we don't need to
-	   ;; rely on this half-measure?
-	   (scrub-control-stack)
-	   (unless noprint
-	     (fresh-line)
-	     (princ (if (functionp *prompt*)
-			(funcall *prompt*)
-			*prompt*))
-	     (flush-standard-output-streams))
-	   (let ((form (read *standard-input* nil eof-marker)))
-	     (if (eq form eof-marker)
-		 (quit)
-		 (let ((results
-			(multiple-value-list (interactive-eval form))))
-		   (unless noprint
-		     (dolist (result results)
-		       (fresh-line)
-		       (prin1 result)))))))))))))
+	  (catch 'toplevel-catcher
+	    (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	    (/show0 "about to enter inner LOOP in TOPLEVEL-REPL")
+	    (loop ; FIXME: Do we need this inner LOOP?
+	     ;; FIXME: It seems bad to have GC behavior depend on scrubbing
+	     ;; the control stack before each interactive command. Isn't
+	     ;; there some way we can convince the GC to just ignore
+	     ;; dead areas of the control stack, so that we don't need to
+	     ;; rely on this half-measure?
+	     (scrub-control-stack)
+	     (unless noprint
+	       (fresh-line)
+	       (princ (if (functionp *prompt*)
+			  (funcall *prompt*)
+			  *prompt*))
+	       (flush-standard-output-streams))
+	     (let ((form (read *standard-input* nil eof-marker)))
+	       (if (eq form eof-marker)
+		   (quit)
+		   (let ((results
+			  (multiple-value-list (interactive-eval form))))
+		     (unless noprint
+		       (dolist (result results)
+			 (fresh-line)
+			 (prin1 result)))))))))))))
 
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
   (declare (ignore old-debugger-hook))

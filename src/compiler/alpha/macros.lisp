@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-;;; a handy macro for defining top-level forms that depend on the
+;;; a handy macro for defining top level forms that depend on the
 ;;; compile environment
 (defmacro expand (expr)
   (let ((gensym (gensym)))

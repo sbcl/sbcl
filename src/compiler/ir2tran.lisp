@@ -149,15 +149,15 @@
 ;;; This gets interesting when the referenced function is a closure:
 ;;; we must make the closure and move the closed over values into it.
 ;;;
-;;; LEAF is either a :TOP-LEVEL-XEP functional or the XEP lambda for
+;;; LEAF is either a :TOPLEVEL-XEP functional or the XEP lambda for
 ;;; the called function, since local call analysis converts all
 ;;; closure references. If a TL-XEP, we know it is not a closure.
 ;;;
 ;;; If a closed-over LAMBDA-VAR has no refs (is deleted), then we
 ;;; don't initialize that slot. This can happen with closures over
-;;; top-level variables, where optimization of the closure deleted the
+;;; top level variables, where optimization of the closure deleted the
 ;;; variable. Since we committed to the closure format when we
-;;; pre-analyzed the top-level code, we just leave an empty slot.
+;;; pre-analyzed the top level code, we just leave an empty slot.
 (defun ir2-convert-closure (node block leaf res)
   (declare (type ref node) (type ir2-block block)
 	   (type functional leaf) (type tn res))
@@ -168,7 +168,7 @@
 		   (clambda
 		    (physenv-closure (get-lambda-physenv leaf)))
 		   (functional
-		    (aver (eq (functional-kind leaf) :top-level-xep))
+		    (aver (eq (functional-kind leaf) :toplevel-xep))
 		    nil))))
     (cond (closure
 	   (let ((this-env (node-physenv node)))
@@ -1032,7 +1032,7 @@
 		(vop closure-ref node block closure (incf n) (cdr loc)))))
 	  (vop setup-environment node block start-label)))
 
-    (unless (eq (functional-kind fun) :top-level)
+    (unless (eq (functional-kind fun) :toplevel)
       (let ((vars (lambda-vars fun))
 	    (n 0))
 	(when (leaf-refs (first vars))
@@ -1064,7 +1064,7 @@
   (let* ((fun (bind-lambda node))
 	 (env (physenv-info (lambda-physenv fun))))
     (aver (member (functional-kind fun)
-		  '(nil :external :optional :top-level :cleanup)))
+		  '(nil :external :optional :toplevel :cleanup)))
 
     (when (external-entry-point-p fun)
       (init-xep-environment node block fun)

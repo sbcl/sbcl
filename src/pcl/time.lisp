@@ -88,7 +88,7 @@
 	    '(time-constant-keys-make-instance 1000))
       *tests*)
 
-(expanding-make-instance-top-level
+(expanding-make-instance-toplevel
 (defun constant-keys-make-instance (n)
   (dotimes-fixnum (i n) (make-instance 'plist-mixin))))
 

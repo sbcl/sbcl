@@ -12,7 +12,7 @@
 ;;;; for !COLD-INIT to be called at cold load time. !COLD-INIT is
 ;;;; responsible for explicitly initializing anything which has to be
 ;;;; initialized early before it transfers control to the ordinary
-;;;; top-level forms.
+;;;; top level forms.
 ;;;;
 ;;;; (In CMU CL, and in SBCL as of 0.6.9 anyway, functions not defined
 ;;;; by DEFUN aren't set up specially by GENESIS. In particular,

@@ -387,7 +387,7 @@
 ;;;   The code for initializing the cache is wrapped in a form with
 ;;;   the specified name. (:INIT-WRAPPER is set to COLD-INIT-FORMS
 ;;;   in type system definitions so that caches will be created
-;;;   before top-level forms run.)
+;;;   before top level forms run.)
 (defmacro define-hash-cache (name args &key hash-function hash-bits default
 				  (init-wrapper 'progn)
 				  (values 1))

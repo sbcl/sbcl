@@ -68,29 +68,29 @@
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear
-;;; in top-level or externally-referenced components, changing to
-;;; :TOP-LEVEL-XEP FUNCTIONALs. If the cross-component ref is not in a
-;;; :TOP-LEVEL/externally-referenced component, or is to a closure,
+;;; in top level or externally-referenced components, changing to
+;;; :TOPLEVEL-XEP FUNCTIONALs. If the cross-component ref is not in a
+;;; :TOPLEVEL/externally-referenced component, or is to a closure,
 ;;; then substitution is suppressed.
 ;;;
 ;;; When a cross-component ref is not substituted, we return T to
 ;;; indicate that early deletion of this component's IR1 should not be
 ;;; done. We also return T if this component contains
-;;; :TOP-LEVEL/externally-referenced lambdas (though it is not a
-;;; :TOP-LEVEL component.)
+;;; :TOPLEVEL/externally-referenced lambdas (though it is not a
+;;; :TOPLEVEL component.)
 ;;;
 ;;; We deliberately don't use the normal reference deletion, since we
 ;;; don't want to trigger deletion of the XEP (although it shouldn't
 ;;; hurt, since this is called after COMPONENT is compiled.) Instead,
 ;;; we just clobber the REF-LEAF.
-(defun replace-top-level-xeps (component)
+(defun replace-toplevel-xeps (component)
   (let ((res nil))
     (dolist (lambda (component-lambdas component))
       (case (functional-kind lambda)
 	(:external
 	 (unless (lambda-has-external-references-p lambda)
 	   (let* ((ef (functional-entry-function lambda))
-		  (new (make-functional :kind :top-level-xep
+		  (new (make-functional :kind :toplevel-xep
 					:info (leaf-info lambda)
 					:name (leaf-name ef)
 					:lexenv (make-null-lexenv)))
@@ -99,12 +99,12 @@
 	     (dolist (ref (leaf-refs lambda))
 	       (let ((ref-component (block-component (node-block ref))))
 		 (cond ((eq ref-component component))
-		       ((or (not (component-top-levelish-p ref-component))
+		       ((or (not (component-toplevelish-p ref-component))
 			    closure)
 			(setq res t))
 		       (t
 			(setf (ref-leaf ref) new)
 			(push ref (leaf-refs new)))))))))
-	(:top-level
+	(:toplevel
 	 (setq res t))))
     res))

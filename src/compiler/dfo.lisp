@@ -170,10 +170,10 @@
 ;;; References to functions which local call analysis could not (or
 ;;; were chosen not) to local call convert will appear as references
 ;;; to XEP lambdas. We can ignore references to XEPs that appear in
-;;; :TOP-LEVEL components, since environment analysis goes to special
-;;; effort to allow closing over of values from a separate top-level
+;;; :TOPLEVEL components, since environment analysis goes to special
+;;; effort to allow closing over of values from a separate top level
 ;;; component. (And now that HAS-EXTERNAL-REFERENCES-P-ness
-;;; generalizes :TOP-LEVEL-ness, we ignore those too.) All other
+;;; generalizes :TOPLEVEL-ness, we ignore those too.) All other
 ;;; references must cause components to be joined.
 ;;;
 ;;; References in deleted functions are also ignored, since this code
@@ -184,7 +184,7 @@
       (let* ((home (node-home-lambda ref))
 	     (home-kind (functional-kind home))
 	     (home-externally-visible-p
-	      (or (eq home-kind :top-level)
+	      (or (eq home-kind :toplevel)
 		  (functional-has-external-references-p home))))
 	(unless (or (and home-externally-visible-p
 			 (eq (functional-kind fun) :external))
@@ -262,13 +262,13 @@
 	     (find-if #'entry-exits entries)))))
 
 ;;; Compute the result of FIND-INITIAL-DFO given the list of all
-;;; resulting components. Components with a :TOP-LEVEL lambda, but no
-;;; normal XEPs or potential non-local exits are marked as :TOP-LEVEL.
-;;; If there is a :TOP-LEVEL lambda, and also a normal XEP, then we
+;;; resulting components. Components with a :TOPLEVEL lambda, but no
+;;; normal XEPs or potential non-local exits are marked as :TOPLEVEL.
+;;; If there is a :TOPLEVEL lambda, and also a normal XEP, then we
 ;;; treat the component as normal, but also return such components in
 ;;; a list as the third value. Components with no entry of any sort
 ;;; are deleted.
-(defun find-top-level-components (components)
+(defun find-toplevel-components (components)
   (declare (list components))
   (collect ((real)
 	    (top)
@@ -276,19 +276,19 @@
     (dolist (com components)
       (unless (eq (block-next (component-head com)) (component-tail com))
 	(let* ((funs (component-lambdas com))
-	       (has-top (find :top-level funs :key #'functional-kind))
+	       (has-top (find :toplevel funs :key #'functional-kind))
 	       (has-external-references
 		(some #'functional-has-external-references-p funs)))
 	  (cond (;; The FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P concept
 		 ;; is newer than the rest of this function, and
 		 ;; doesn't really seem to fit into its mindset. Here
 		 ;; we mark components which contain such FUNCTIONs
-		 ;; them as :COMPLEX-TOP-LEVEL, since they do get
+		 ;; them as :COMPLEX-TOPLEVEL, since they do get
 		 ;; executed at run time, and since it's not valid to
 		 ;; delete them just because they don't have any
-		 ;; references from pure :TOP-LEVEL components. -- WHN
+		 ;; references from pure :TOPLEVEL components. -- WHN
 		 has-external-references
-		 (setf (component-kind com) :complex-top-level)
+		 (setf (component-kind com) :complex-toplevel)
 		 (real com)
 		 (real-top com))
 		((or (some #'has-xep-or-nlx funs)
@@ -296,22 +296,22 @@
 		 (setf (component-name com) (find-component-name com))
 		 (real com)
 		 (when has-top
-		   (setf (component-kind com) :complex-top-level)
+		   (setf (component-kind com) :complex-toplevel)
 		   (real-top com)))
 		(has-top
-		 (setf (component-kind com) :top-level)
-		 (setf (component-name com) "top-level form")
+		 (setf (component-kind com) :toplevel)
+		 (setf (component-name com) "top level form")
 		 (top com))
 		(t
 		 (delete-component com))))))
 
     (values (real) (top) (real-top))))
 
-;;; Given a list of top-level lambdas, return three lists of
+;;; Given a list of top level lambdas, return three lists of
 ;;; components representing the actual component division:
 ;;;  1. the non-top-level components,
-;;;  2. and the second is the top-level components, and
-;;;  3. Components in [1] that also have a top-level lambda.
+;;;  2. and the second is the top level components, and
+;;;  3. Components in [1] that also have a top level lambda.
 ;;;
 ;;; We assign the DFO for each component, and delete any unreachable
 ;;; blocks. We assume that the Flags have already been cleared.
@@ -325,7 +325,7 @@
 ;;; the appropriate newc component tail.
 ;;;
 ;;; When we are done, we assign DFNs and call
-;;; FIND-TOP-LEVEL-COMPONENTS to pull out top-level code.
+;;; FIND-TOPLEVEL-COMPONENTS to pull out top level code.
 (defun find-initial-dfo (lambdas)
   (declare (list lambdas))
   (collect ((components))
@@ -334,7 +334,7 @@
 	(let ((component (block-component (node-block (lambda-bind tll)))))
 	  (dolist (fun (component-lambdas component))
 	    (aver (member (functional-kind fun)
-			  '(:optional :external :top-level nil :escape
+			  '(:optional :external :toplevel nil :escape
 				      :cleanup)))
 	    (let ((res (dfo-walk-call-graph fun new)))
 	      (when (eq res new)
@@ -356,7 +356,7 @@
 	(do-blocks-backwards (block com :both)
 	  (setf (block-number block) (incf num)))))
 
-    (find-top-level-components (components))))
+    (find-toplevel-components (components))))
 
 ;;; Insert the code in LAMBDA at the end of RESULT-LAMBDA.
 (defun merge-1-tl-lambda (result-lambda lambda)
@@ -423,7 +423,7 @@
 
     ;; If there is a return, then delete it (making the preceding node
     ;; the last node) and link the block to the result return. There
-    ;; is always a preceding REF NIL node in top-level lambdas.
+    ;; is always a preceding REF NIL node in top level lambdas.
     (let ((return (lambda-return lambda)))
       (when return
 	(let ((return-block (node-block return))
@@ -433,11 +433,11 @@
 	  (delete-continuation result)
 	  (link-blocks return-block result-return-block))))))
 
-;;; Given a non-empty list of top-level LAMBDAs, smash them into a
-;;; top-level lambda and component, returning these as values. We use
+;;; Given a non-empty list of top level LAMBDAs, smash them into a
+;;; top level lambda and component, returning these as values. We use
 ;;; the first lambda and its component, putting the other code in that
 ;;; component and deleting the other lambdas.
-(defun merge-top-level-lambdas (lambdas)
+(defun merge-toplevel-lambdas (lambdas)
   (declare (cons lambdas))
   (let* ((result-lambda (first lambdas))
 	 (result-return (lambda-return result-lambda)))

@@ -356,7 +356,7 @@
 		(block-delete-p block)
 		(eq (functional-kind (block-home-lambda block)) :deleted)
 		(member (functional-kind original-fun)
-			'(:top-level-xep :deleted))
+			'(:toplevel-xep :deleted))
 		(not (or (eq (component-kind component) :initial)
 			 (eq (block-component
 			      (node-block
@@ -686,7 +686,7 @@
   ;;
   ;; The (SETF .. NIL) caused problems in sbcl-0.pre7.37.flaky5.2 when
   ;; I was trying to get Python to emit :EXTERNAL LAMBDAs directly
-  ;; (instead of only being able to emit funny little :TOP-LEVEL stubs
+  ;; (instead of only being able to emit funny little :TOPLEVEL stubs
   ;; which you called in order to get the address of an external LAMBDA):
   ;; the external function was defined in terms of internal function,
   ;; which was LET-converted, and then things blew up downstream when

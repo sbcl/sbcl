@@ -74,7 +74,7 @@
 	  (sb-kernel:become-defined-fun-name sym)
 	  `(,sym ',class (list ,@initargs)))))))
 
-(defmacro expanding-make-instance-top-level (&rest forms &environment env)
+(defmacro expanding-make-instance-toplevel (&rest forms &environment env)
   (let* ((*make-instance-function-keys* nil)
 	 (form (macroexpand `(expanding-make-instance ,@forms) env)))
     `(progn
@@ -97,7 +97,7 @@
 
 (defmacro defconstructor
 	  (name class lambda-list &rest initialization-arguments)
-  `(expanding-make-instance-top-level
+  `(expanding-make-instance-toplevel
     (defun ,name ,lambda-list
       (make-instance ',class ,@initialization-arguments))))
 

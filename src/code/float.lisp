@@ -120,8 +120,8 @@
 
 ;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
 ;;; because the cross-compilation host might not support floating
-;;; point infinities. Putting them inside a LET remove
-;;; top-level-formness, so that any EVAL-WHEN trickiness in the
+;;; point infinities. Putting them inside a LET removes
+;;; toplevel-formness, so that any EVAL-WHEN trickiness in the
 ;;; DEFCONSTANT forms is suppressed.
 (let ()
 (defconstant single-float-positive-infinity

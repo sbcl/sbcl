@@ -61,7 +61,7 @@
 		maximum)))))
 
 ;;; partial reverse-engineered documentation:
-;;;   TOP-LEVEL is true for calls through PARSE-DEFMACRO from DEFSETF and
+;;;   TOPLEVEL is true for calls through PARSE-DEFMACRO from DEFSETF and
 ;;;     DESTRUCTURING-BIND, false otherwise.
 ;;; -- WHN 19990620
 (defun parse-defmacro-lambda-list (possibly-dotted-lambda-list
@@ -70,13 +70,13 @@
 				   error-kind
 				   error-fun
 				   &optional
-				   top-level
+				   toplevel
 				   env-illegal
 				   env-arg-name)
   (let* (;; PATH is a sort of pointer into the part of the lambda list we're
 	 ;; considering at this point in the code. PATH-0 is the root of the
 	 ;; lambda list, which is the initial value of PATH.
-	 (path-0 (if top-level
+	 (path-0 (if toplevel
 		   `(cdr ,arg-list-name)
 		   arg-list-name))
 	 (path path-0) ; (will change below)
@@ -110,7 +110,7 @@
 	      ((eq var '&environment)
 	       (cond (env-illegal
 		      (error "&ENVIRONMENT is not valid with ~S." error-kind))
-		     ((not top-level)
+		     ((not toplevel)
 		      (error "&ENVIRONMENT is only valid at top level of ~
 			      lambda-list.")))
 	       (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))

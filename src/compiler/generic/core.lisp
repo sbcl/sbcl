@@ -78,9 +78,9 @@
 	      (gethash info (core-object-patch-table object)))))
   (values))
 
-;;; Call the top-level lambda function dumped for Entry, returning the
-;;; values. Entry may be a :TOP-LEVEL-XEP functional.
-(defun core-call-top-level-lambda (entry object)
+;;; Call the top level lambda function dumped for ENTRY, returning the
+;;; values. ENTRY may be a :TOPLEVEL-XEP functional.
+(defun core-call-toplevel-lambda (entry object)
   (declare (type functional entry) (type core-object object))
   (funcall (or (gethash (leaf-info entry)
 			(core-object-entry-table object))

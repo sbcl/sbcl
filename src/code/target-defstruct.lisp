@@ -140,7 +140,7 @@
     (setf (%instance-layout result) layout)
     result))
 
-;;;; target-only parts of the DEFSTRUCT top-level code
+;;;; target-only parts of the DEFSTRUCT top level code
 
 ;;; Catch attempts to mess up definitions of symbols in the CL package.
 (defun protect-cl (symbol)

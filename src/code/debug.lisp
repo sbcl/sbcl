@@ -1143,7 +1143,7 @@ argument")
 ;;; and "terminate the Lisp system" as the SB-EXT:QUIT function.)
 ;;;
 ;;;(!def-debug-command "QUIT" ()
-;;;  (throw 'sb!impl::top-level-catcher nil))
+;;;  (throw 'sb!impl::toplevel-catcher nil))
 
 ;;; CMU CL supported this GO debug command, but SBCL doesn't -- in
 ;;; SBCL you just type the CONTINUE restart name instead (or "RESTART
@@ -1271,39 +1271,39 @@ argument")
 		 *cached-readtable* nil))
 	 *before-save-initializations*)
 
-;;; We also cache the last top-level form that we printed a source for
+;;; We also cache the last toplevel form that we printed a source for
 ;;; so that we don't have to do repeated reads and calls to
 ;;; FORM-NUMBER-TRANSLATIONS.
-(defvar *cached-top-level-form-offset* nil)
-(declaim (type (or index null) *cached-top-level-form-offset*))
-(defvar *cached-top-level-form*)
+(defvar *cached-toplevel-form-offset* nil)
+(declaim (type (or index null) *cached-toplevel-form-offset*))
+(defvar *cached-toplevel-form*)
 (defvar *cached-form-number-translations*)
 
 ;;; Given a code location, return the associated form-number
-;;; translations and the actual top-level form. We check our cache ---
+;;; translations and the actual top level form. We check our cache ---
 ;;; if there is a miss, we dispatch on the kind of the debug source.
-(defun get-top-level-form (location)
+(defun get-toplevel-form (location)
   (let ((d-source (sb!di:code-location-debug-source location)))
     (if (and (eq d-source *cached-debug-source*)
-	     (eql (sb!di:code-location-top-level-form-offset location)
-		  *cached-top-level-form-offset*))
-	(values *cached-form-number-translations* *cached-top-level-form*)
-	(let* ((offset (sb!di:code-location-top-level-form-offset location))
+	     (eql (sb!di:code-location-toplevel-form-offset location)
+		  *cached-toplevel-form-offset*))
+	(values *cached-form-number-translations* *cached-toplevel-form*)
+	(let* ((offset (sb!di:code-location-toplevel-form-offset location))
 	       (res
 		(ecase (sb!di:debug-source-from d-source)
-		  (:file (get-file-top-level-form location))
+		  (:file (get-file-toplevel-form location))
 		  (:lisp (svref (sb!di:debug-source-name d-source) offset)))))
-	  (setq *cached-top-level-form-offset* offset)
+	  (setq *cached-toplevel-form-offset* offset)
 	  (values (setq *cached-form-number-translations*
 			(sb!di:form-number-translations res offset))
-		  (setq *cached-top-level-form* res))))))
+		  (setq *cached-toplevel-form* res))))))
 
-;;; Locate the source file (if it still exists) and grab the top-level
-;;; form. If the file is modified, we use the top-level-form offset
+;;; Locate the source file (if it still exists) and grab the top level
+;;; form. If the file is modified, we use the top level form offset
 ;;; instead of the recorded character offset.
-(defun get-file-top-level-form (location)
+(defun get-file-toplevel-form (location)
   (let* ((d-source (sb!di:code-location-debug-source location))
-	 (tlf-offset (sb!di:code-location-top-level-form-offset location))
+	 (tlf-offset (sb!di:code-location-toplevel-form-offset location))
 	 (local-tlf-offset (- tlf-offset
 			      (sb!di:debug-source-root-number d-source)))
 	 (char-offset
@@ -1353,7 +1353,7 @@ argument")
 (defun print-code-location-source-form (location context)
   (let* ((location (maybe-block-start-location location))
 	 (form-num (sb!di:code-location-form-number location)))
-    (multiple-value-bind (translations form) (get-top-level-form location)
+    (multiple-value-bind (translations form) (get-toplevel-form location)
       (unless (< form-num (length translations))
 	(error "The source path no longer exists."))
       (prin1 (sb!di:source-path-context form
@@ -1418,9 +1418,9 @@ argument")
 		    (not prev-location)
 		    (not (eq (sb!di:code-location-debug-source code-location)
 			     (sb!di:code-location-debug-source prev-location)))
-		    (not (eq (sb!di:code-location-top-level-form-offset
+		    (not (eq (sb!di:code-location-toplevel-form-offset
 			      code-location)
-			     (sb!di:code-location-top-level-form-offset
+			     (sb!di:code-location-toplevel-form-offset
 			      prev-location)))
 		    (not (eq (sb!di:code-location-form-number code-location)
 			     (sb!di:code-location-form-number prev-location))))

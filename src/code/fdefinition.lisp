@@ -239,8 +239,8 @@
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
   (let ((fdefn (fdefinition-object name t)))
-    ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running top-level
-    ;; forms in the kernel core startup.
+    ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
+    ;; top level forms in the kernel core startup.
     (when (boundp '*setf-fdefinition-hook*)
       (dolist (f *setf-fdefinition-hook*)
 	(funcall f name new-value)))

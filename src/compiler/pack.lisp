@@ -742,7 +742,7 @@
 	
 ;;; Like EMIT-SAVES, only different. We avoid redundant saving within
 ;;; the block, and don't restore values that aren't used before the
-;;; next call. This function is just the top-level loop over the
+;;; next call. This function is just the top level loop over the
 ;;; blocks in the component, which locates blocks that need saving
 ;;; done.
 (defun optimized-emit-saves (component)

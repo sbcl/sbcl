@@ -276,7 +276,7 @@
   (lambda-physenv (node-home-lambda (block-last block))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
-;;; of its original source's top-level form in its compilation unit.
+;;; of its original source's top level form in its compilation unit.
 (defun source-path-tlf-number (path)
   (declare (list path))
   (car (last path)))
@@ -585,7 +585,7 @@
   (declare (type clambda leaf))
   (let ((kind (functional-kind leaf))
 	(bind (lambda-bind leaf)))
-    (aver (not (member kind '(:deleted :optional :top-level))))
+    (aver (not (member kind '(:deleted :optional :toplevel))))
     (aver (not (functional-has-external-references-p leaf)))
     (setf (functional-kind leaf) :deleted)
     (setf (lambda-bind leaf) nil)
@@ -1198,10 +1198,10 @@
 	      (return nil)))))))
 
 ;;; Return true if function is an XEP. This is true of normal XEPs
-;;; (:EXTERNAL kind) and top-level lambdas (:TOP-LEVEL kind.)
+;;; (:EXTERNAL kind) and top level lambdas (:TOPLEVEL kind.)
 (defun external-entry-point-p (fun)
   (declare (type functional fun))
-  (not (null (member (functional-kind fun) '(:external :top-level)))))
+  (not (null (member (functional-kind fun) '(:external :toplevel)))))
 
 ;;; If CONT's only use is a non-notinline global function reference,
 ;;; then return the referenced symbol, otherwise NIL. If NOTINLINE-OK

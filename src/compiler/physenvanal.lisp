@@ -46,7 +46,7 @@
   (dolist (fun (component-lambdas component))
     (when (null (leaf-refs fun))
       (let ((kind (functional-kind fun)))
-	(unless (or (eq kind :top-level)
+	(unless (or (eq kind :toplevel)
 		    (functional-has-external-references-p fun))
 	  (aver (member kind '(:optional :cleanup :escape)))
 	  (setf (functional-kind fun) nil)
@@ -54,14 +54,14 @@
 
   (values))
 
-;;; This is to be called on a COMPONENT with top-level LAMBDAs before
+;;; This is to be called on a COMPONENT with top level LAMBDAs before
 ;;; the compilation of the associated non-top-level code to detect
-;;; closed over top-level variables. We just do COMPUTE-CLOSURE on all
+;;; closed over top level variables. We just do COMPUTE-CLOSURE on all
 ;;; the lambdas. This will pre-allocate environments for all the
-;;; functions with closed-over top-level variables. The post-pass will
+;;; functions with closed-over top level variables. The post-pass will
 ;;; use the existing structure, rather than allocating a new one. We
 ;;; return true if we discover any possible closure vars.
-(defun pre-physenv-analyze-top-level (component)
+(defun pre-physenv-analyze-toplevel (component)
   (declare (type component component))
   (let ((found-it nil))
     (dolist (lambda (component-lambdas component))
@@ -72,7 +72,7 @@
 	  (setq found-it t))))
     found-it))
 
-;;; This is like old CMU CL PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL, except
+;;; This is like old CMU CL PRE-ENVIRONMENT-ANALYZE-TOPLEVEL, except
 ;;;   (1) It's been brought into the post-0.7.0 world where the property
 ;;;       HAS-EXTERNAL-REFERENCES-P is orthogonal to the property of
 ;;;       being specialized/optimized for locall at top level.
@@ -80,13 +80,13 @@
 ;;;       find any possible closure variables.
 ;;;
 ;;; I wish I could find an explanation of why
-;;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL is important. The old CMU CL
+;;; PRE-ENVIRONMENT-ANALYZE-TOPLEVEL is important. The old CMU CL
 ;;; comments said
-;;;     Called on component with top-level lambdas before the
+;;;     Called on component with top level lambdas before the
 ;;;     compilation of the associated non-top-level code to detect
-;;;     closed over top-level variables. We just do COMPUTE-CLOSURE on
+;;;     closed over top level variables. We just do COMPUTE-CLOSURE on
 ;;;     all the lambdas. This will pre-allocate environments for all
-;;;     the functions with closed-over top-level variables. The
+;;;     the functions with closed-over top level variables. The
 ;;;     post-pass will use the existing structure, rather than
 ;;;     allocating a new one. We return true if we discover any
 ;;;     possible closure vars.
@@ -96,9 +96,9 @@
 ;;; bottom out on the outermost enclosing thing, and (insert
 ;;; mysterious reason here) it's important to set up bottomed-out-here
 ;;; environments before anything else. -- WHN 2001-09-30
-(defun preallocate-physenvs-for-top-levelish-lambdas (component)
+(defun preallocate-physenvs-for-toplevelish-lambdas (component)
   (dolist (clambda (component-lambdas component))
-    (when (lambda-top-levelish-p clambda)
+    (when (lambda-toplevelish-p clambda)
       (compute-closure clambda)))
   (values))
 

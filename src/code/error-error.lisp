@@ -21,17 +21,17 @@
   (let ((*error-error-depth* (1+ *error-error-depth*)))
     (when (> *error-throw-up-count* 50)
       (%primitive sb!c:halt)
-      (throw 'sb!impl::top-level-catcher nil))
+      (throw 'sb!impl::toplevel-catcher nil))
     (case *error-error-depth*
       (1)
       (2
        (stream-cold-init-or-reset))
       (3
        (incf *error-throw-up-count*)
-       (throw 'sb!impl::top-level-catcher nil))
+       (throw 'sb!impl::toplevel-catcher nil))
       (t
        (%primitive sb!c:halt)
-       (throw 'sb!impl::top-level-catcher nil)))
+       (throw 'sb!impl::toplevel-catcher nil)))
 
     (with-standard-io-syntax
       (let ((*print-readably* nil))

@@ -311,10 +311,10 @@
 
 ;;;; exported functions
 
-;;; This function takes a form and the top-level form number for that
+;;; This function takes a form and the top level form number for that
 ;;; form, and returns a lambda representing the translation of that
 ;;; form in the current global environment. The returned lambda is a
-;;; top-level lambda that can be called to cause evaluation of the
+;;; top level lambda that can be called to cause evaluation of the
 ;;; forms. This lambda is in the initial component. If FOR-VALUE is T,
 ;;; then the value of the form is returned from the function,
 ;;; otherwise NIL is returned.
@@ -335,7 +335,7 @@
 ;;; The hashtables used to hold global namespace info must be
 ;;; reallocated elsewhere. Note also that *LEXENV* is not bound, so
 ;;; that local macro definitions can be introduced by enclosing code.
-(defun ir1-top-level (form path for-value)
+(defun ir1-toplevel (form path for-value)
   (declare (list path))
   (let* ((*current-path* path)
 	 (component (make-empty-component))
@@ -344,23 +344,23 @@
     (setf (component-kind component) :initial)
     (let* ((forms (if for-value `(,form) `(,form nil)))
 	   (res (ir1-convert-lambda-body forms ())))
-      (setf (leaf-name res) "top-level form")
+      (setf (leaf-name res) "top level form") ; FIXME: would be nice to have form index in name here, or some other info to aid in BACKTRACE
       (setf (functional-entry-function res) res)
       (setf (functional-arg-documentation res) ())
-      (setf (functional-kind res) :top-level)
+      (setf (functional-kind res) :toplevel)
       res)))
 
 ;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
 ;;; form number to associate with a source path. This should be bound
 ;;; to an initial value of 0 before the processing of each truly
-;;; top-level form.
+;;; top level form.
 (declaim (type index *current-form-number*))
 (defvar *current-form-number*)
 
 ;;; This function is called on freshly read forms to record the
 ;;; initial location of each form (and subform.) Form is the form to
-;;; find the paths in, and TLF-NUM is the top-level form number of the
-;;; truly top-level form.
+;;; find the paths in, and TLF-NUM is the top level form number of the
+;;; truly top level form.
 ;;;
 ;;; This gets a bit interesting when the source code is circular. This
 ;;; can (reasonably?) happen in the case of circular list constants.
@@ -1132,7 +1132,7 @@
 ;;; &OPTIONAL and &REST args are annotated with an ARG-INFO structure
 ;;; which contains the extra information. If we hit something losing,
 ;;; we bug out with COMPILER-ERROR. These values are returned:
-;;;  1. a list of the var structures for each top-level argument;
+;;;  1. a list of the var structures for each top level argument;
 ;;;  2. a flag indicating whether &KEY was specified;
 ;;;  3. a flag indicating whether other &KEY args are allowed;
 ;;;  4. a list of the &AUX variables; and
@@ -1925,7 +1925,7 @@
 			   (function-info-ir2-convert function-info))))
 	(substitute-leaf fun var)
 	;; If in a simple environment, then we can allow backward
-	;; references to this function from following top-level forms.
+	;; references to this function from following top level forms.
 	(when expansion (setf (defined-fun-functional var) fun)))
       fun)))
 

@@ -466,10 +466,10 @@
   ;; out and just find it in the blocks cache in DEBUG-FUN.
   (%debug-block :unparsed :type (or debug-block (member :unparsed)))
   ;; This is the number of forms processed by the compiler or loader
-  ;; before the top-level form containing this code-location.
+  ;; before the top level form containing this code-location.
   (%tlf-offset :unparsed :type (or index (member :unparsed)))
   ;; This is the depth-first number of the node that begins
-  ;; code-location within its top-level form.
+  ;; code-location within its top level form.
   (%form-number :unparsed :type (or index (member :unparsed))))
 (def!method print-object ((obj code-location) str)
   (print-unreadable-object (obj str :type t)
@@ -495,12 +495,12 @@
 
 ;;;; DEBUG-SOURCEs
 
-;;; Return the number of top-level forms processed by the compiler
+;;; Return the number of top level forms processed by the compiler
 ;;; before compiling this source. If this source is uncompiled, this
 ;;; is zero. This may be zero even if the source is compiled since the
 ;;; first form in the first file compiled in one compilation, for
 ;;; example, must have a root number of zero -- the compiler saw no
-;;; other top-level forms before it.
+;;; other top level forms before it.
 (defun debug-source-root-number (debug-source)
   (sb!c::debug-source-source-root debug-source))
 
@@ -1205,7 +1205,7 @@
 				  sb!vm:n-word-bytes)))))))
 
 ;;; Return the kind of the function, which is one of :OPTIONAL,
-;;; :EXTERNAL, TOP-level, :CLEANUP, or NIL.
+;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.
 (defun debug-fun-kind (debug-fun)
   ;; FIXME: This "is one of" information should become part of the function
   ;; declamation, not just a doc string
@@ -1735,7 +1735,7 @@
 	   (car sources)
 	   (do ((prev sources src)
 		(src (cdr sources) (cdr src))
-		(offset (code-location-top-level-form-offset code-location)))
+		(offset (code-location-toplevel-form-offset code-location)))
 	       ((null src) (car prev))
 	     (when (< offset (sb!c::debug-source-source-root (car src)))
 	       (return (car prev)))))))
@@ -1743,11 +1743,11 @@
     ;; did special tricks to debug the IR1 interpreter.)
     ))
 
-;;; Returns the number of top-level forms before the one containing
+;;; Returns the number of top level forms before the one containing
 ;;; CODE-LOCATION as seen by the compiler in some compilation unit. (A
 ;;; compilation unit is not necessarily a single file, see the section
 ;;; on debug-sources.)
-(defun code-location-top-level-form-offset (code-location)
+(defun code-location-toplevel-form-offset (code-location)
   (when (code-location-unknown-p code-location)
     (error 'unknown-code-location :code-location code-location))
   (let ((tlf-offset (code-location-%tlf-offset code-location)))
@@ -1766,7 +1766,7 @@
 	  (t tlf-offset))))
 
 ;;; Return the number of the form corresponding to CODE-LOCATION. The
-;;; form number is derived by a walking the subforms of a top-level
+;;; form number is derived by a walking the subforms of a top level
 ;;; form in depth-first order.
 (defun code-location-form-number (code-location)
   (when (code-location-unknown-p code-location)
@@ -2602,15 +2602,15 @@
 ;;; This code produces and uses what we call source-paths. A
 ;;; source-path is a list whose first element is a form number as
 ;;; returned by CODE-LOCATION-FORM-NUMBER and whose last element is a
-;;; top-level-form number as returned by
-;;; CODE-LOCATION-TOP-LEVEL-FORM-NUMBER. The elements from the last to
+;;; top level form number as returned by
+;;; CODE-LOCATION-TOPLEVEL-FORM-NUMBER. The elements from the last to
 ;;; the first, exclusively, are the numbered subforms into which to
 ;;; descend. For example:
 ;;;    (defun foo (x)
 ;;;      (let ((a (aref x 3)))
 ;;;	(cons a 3)))
 ;;; The call to AREF in this example is form number 5. Assuming this
-;;; DEFUN is the 11'th top-level-form, the source-path for the AREF
+;;; DEFUN is the 11'th top level form, the source-path for the AREF
 ;;; call is as follows:
 ;;;    (5 1 0 1 3 11)
 ;;; Given the DEFUN, 3 gets you the LET, 1 gets you the bindings, 0
@@ -2623,13 +2623,13 @@
 ;;; table used to detect CAR circularities in FORM-NUMBER-TRANSLATIONS
 (defvar *form-number-circularity-table* (make-hash-table :test 'eq))
 
-;;; This returns a table mapping form numbers to source-paths. A source-path
-;;; indicates a descent into the top-level-form form, going directly to the
-;;; subform corressponding to the form number.
+;;; This returns a table mapping form numbers to source-paths. A
+;;; source-path indicates a descent into the TOPLEVEL-FORM form,
+;;; going directly to the subform corressponding to the form number.
 ;;;
 ;;; The vector elements are in the same format as the compiler's
 ;;; NODE-SOURCE-PATH; that is, the first element is the form number and
-;;; the last is the top-level-form number.
+;;; the last is the TOPLEVEL-FORM number.
 (defun form-number-translations (form tlf-number)
   (clrhash *form-number-circularity-table*)
   (setf (fill-pointer *form-number-temp*) 0)
@@ -2658,7 +2658,7 @@
 	  (frob)
 	  (setq trail (cdr trail)))))))
 
-;;; FORM is a top-level form, and path is a source-path into it. This
+;;; FORM is a top level form, and path is a source-path into it. This
 ;;; returns the form indicated by the source-path. Context is the
 ;;; number of enclosing forms to return instead of directly returning
 ;;; the source-path form. When context is non-zero, the form returned

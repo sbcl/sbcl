@@ -175,15 +175,15 @@
   ;; is indicated by the magic ORIGINAL-SOURCE-START marker. The first
   ;; element of the original source is the "form number", which is the
   ;; ordinal number of this form in a depth-first, left-to-right walk
-  ;; of the truly top-level form in which this appears.
+  ;; of the truly-top-level form in which this appears.
   ;;
   ;; Following is a list of integers describing the path taken through
   ;; the source to get to this point:
   ;;     (K L M ...) => (NTH K (NTH L (NTH M ...)))
   ;;
-  ;; The last element in the list is the top-level form number, which
+  ;; The last element in the list is the top level form number, which
   ;; is the ordinal number (in this call to the compiler) of the truly
-  ;; top-level form containing the original source.
+  ;; top level form containing the original source.
   (source-path *current-path* :type list)
   ;; If this node is in a tail-recursive position, then this is set to
   ;; T. At the end of IR1 (in physical environment analysis) this is
@@ -337,12 +337,12 @@
   ;; The possibilities are:
   ;;   NIL
   ;;     an ordinary component, containing non-top-level code
-  ;;   :TOP-LEVEL
+  ;;   :TOPLEVEL
   ;;     a component containing only load-time code
-  ;;   :COMPLEX-TOP-LEVEL
+  ;;   :COMPLEX-TOPLEVEL
   ;;     In the old system, before FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P
   ;;     was defined, this was necessarily a component containing both
-  ;;     top-level and run-time code. Now this state is also used for
+  ;;     top level and run-time code. Now this state is also used for
   ;;     a component with HAS-EXTERNAL-REFERENCES-P functionals in it.
   ;;   :INITIAL
   ;;     the result of initial IR1 conversion, on which component
@@ -350,8 +350,8 @@
   ;;   :DELETED
   ;;     debris left over from component analysis
   ;;
-  ;; See also COMPONENT-TOP-LEVELISH-P.
-  (kind nil :type (member nil :top-level :complex-top-level :initial :deleted))
+  ;; See also COMPONENT-TOPLEVELISH-P.
+  (kind nil :type (member nil :toplevel :complex-toplevel :initial :deleted))
   ;; the blocks that are the dummy head and tail of the DFO
   ;;
   ;; Entry/exit points have these blocks as their
@@ -417,7 +417,7 @@
   name
   (reanalyze :test reanalyze))
 
-;;; Before sbcl-0.7.0, there were :TOP-LEVEL things which were magical
+;;; Before sbcl-0.7.0, there were :TOPLEVEL things which were magical
 ;;; in multiple ways. That's since been refactored into the orthogonal
 ;;; properties "optimized for locall with no arguments" and "externally
 ;;; visible/referenced (so don't delete it)". The code <0.7.0 did a lot
@@ -425,16 +425,16 @@
 ;;; this function is a sort of literal translation of those tests into
 ;;; the new world.
 ;;;
-;;; FIXME: After things settle down, bare :TOP-LEVEL might go away, at
+;;; FIXME: After things settle down, bare :TOPLEVEL might go away, at
 ;;; which time it might be possible to replace the COMPONENT-KIND
-;;; :TOP-LEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
+;;; :TOPLEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
 ;;; along the lines of FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P.
-(defun lambda-top-levelish-p (clambda)
-  (or (eql (lambda-kind clambda) :top-level)
+(defun lambda-toplevelish-p (clambda)
+  (or (eql (lambda-kind clambda) :toplevel)
       (lambda-has-external-references-p clambda)))
-(defun component-top-levelish-p (component)
+(defun component-toplevelish-p (component)
   (member (component-kind component)
-	  '(:top-level :complex-top-level)))
+	  '(:toplevel :complex-toplevel)))
 
 ;;; A CLEANUP structure represents some dynamic binding action. Blocks
 ;;; are annotated with the current CLEANUP so that dynamic bindings
@@ -717,17 +717,17 @@
   ;;	an external entry point lambda. The function it is an entry
   ;;	for is in the ENTRY-FUNCTION slot.
   ;;
-  ;;    :TOP-LEVEL
-  ;;	a top-level lambda, holding a compiled top-level form.
+  ;;    :TOPLEVEL
+  ;;	a top level lambda, holding a compiled top level form.
   ;;	Compiled very much like NIL, but provides an indication of
-  ;;	top-level context. A top-level lambda should have *no*
-  ;;	references. Its Entry-Function is a self-pointer.
+  ;;	top level context. A :TOPLEVEL lambda should have *no*
+  ;;	references. Its ENTRY-FUNCTION is a self-pointer.
   ;;
-  ;;    :TOP-LEVEL-XEP
-  ;;	After a component is compiled, we clobber any top-level code
+  ;;    :TOPLEVEL-XEP
+  ;;	After a component is compiled, we clobber any top level code
   ;;	references to its non-closure XEPs with dummy FUNCTIONAL
   ;;	structures having this kind. This prevents the retained
-  ;;	top-level code from holding onto the IR for the code it
+  ;;	top level code from holding onto the IR for the code it
   ;;	references.
   ;;
   ;;    :ESCAPE
@@ -742,15 +742,15 @@
   ;;    :DELETED
   ;;	This function has been found to be uncallable, and has been
   ;;	marked for deletion.
-  (kind nil :type (member nil :optional :deleted :external :top-level
+  (kind nil :type (member nil :optional :deleted :external :toplevel
 			  :escape :cleanup :let :mv-let :assignment
-			  :top-level-xep))
+			  :toplevel-xep))
   ;; Is this a function that some external entity (e.g. the fasl dumper)
   ;; refers to, so that even when it appears to have no references, it
   ;; shouldn't be deleted? In the old days (before
   ;; sbcl-0.pre7.37.flaky5.2) this was sort of implicitly true when
-  ;; KIND was :TOP-LEVEL. Now it must be set explicitly, both for
-  ;; :TOP-LEVEL functions and for any other kind of functions that we
+  ;; KIND was :TOPLEVEL. Now it must be set explicitly, both for
+  ;; :TOPLEVEL functions and for any other kind of functions that we
   ;; want to dump or return from #'CL:COMPILE or whatever.
   (has-external-references-p nil) 
   ;; In a normal function, this is the external entry point (XEP)
@@ -762,7 +762,7 @@
   ;; In an XEP lambda (indicated by the :EXTERNAL kind), this is the
   ;; function that the XEP is an entry-point for. The body contains
   ;; local calls to all the actual entry points in the function. In a
-  ;; :TOP-LEVEL lambda (which is its own XEP) this is a self-pointer.
+  ;; :TOPLEVEL lambda (which is its own XEP) this is a self-pointer.
   ;;
   ;; With all other kinds, this is null.
   (entry-function nil :type (or functional null))

@@ -1,4 +1,4 @@
-;;;; the top-level interfaces to the compiler, plus some other
+;;;; the top level interfaces to the compiler, plus some other
 ;;;; compiler-related stuff (e.g. CL:CALL-ARGUMENTS-LIMIT) which
 ;;;; doesn't obviously belong anywhere else
 
@@ -50,10 +50,10 @@
 (defvar *entry-points*)
 (declaim (list *entry-points*))
 
-;;; When block compiling, used by PROCESS-FORM to accumulate top-level
+;;; When block compiling, used by PROCESS-FORM to accumulate top level
 ;;; lambdas resulting from compiling subforms. (In reverse order.)
-(defvar *top-level-lambdas*)
-(declaim (list *top-level-lambdas*))
+(defvar *toplevel-lambdas*)
+(declaim (list *toplevel-lambdas*))
 
 (defvar sb!xc:*compile-verbose* t
   #!+sb-doc
@@ -453,7 +453,7 @@
     (when (functional-has-external-references-p fun)
       (return))
     (case (functional-kind fun)
-      (:top-level (return))
+      (:toplevel (return))
       (:external
        (unless (every (lambda (ref)
 			(eq (block-component (node-block ref))
@@ -738,9 +738,9 @@
 	     (vector-push-extend form forms)
 	     (vector-push-extend pos (file-info-positions file-info))
 	     (find-source-paths form current-idx)
-	     (process-top-level-form form
-				     `(original-source-start 0 ,current-idx)
-				     nil)))))))
+	     (process-toplevel-form form
+				    `(original-source-start 0 ,current-idx)
+				    nil)))))))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
@@ -750,18 +750,18 @@
     (values (aref (file-info-forms file-info) index)
 	    (aref (file-info-positions file-info) index))))
 
-;;;; top-level form processing
+;;;; processing of top level forms
 
-;;; This is called by top-level form processing when we are ready to
+;;; This is called by top level form processing when we are ready to
 ;;; actually compile something. If *BLOCK-COMPILE* is T, then we still
 ;;; convert the form, but delay compilation, pushing the result on
-;;; *TOP-LEVEL-LAMBDAS* instead.
+;;; *TOPLEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
-	 (tll (ir1-top-level form path nil)))
-    (cond ((eq *block-compile* t) (push tll *top-level-lambdas*))
-	  (t (compile-top-level (list tll) nil)))))
+	 (tll (ir1-toplevel form path nil)))
+    (cond ((eq *block-compile* t) (push tll *toplevel-lambdas*))
+	  (t (compile-toplevel (list tll) nil)))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
@@ -775,18 +775,18 @@
 			(format nil "~S" form))
 		      condition))))
 
-;;; Process a PROGN-like portion of a top-level form. FORMS is a list of
+;;; Process a PROGN-like portion of a top level form. FORMS is a list of
 ;;; the forms, and PATH is the source path of the FORM they came out of.
 ;;; COMPILE-TIME-TOO is as in ANSI "3.2.3.1 Processing of Top Level Forms".
-(defun process-top-level-progn (forms path compile-time-too)
+(defun process-toplevel-progn (forms path compile-time-too)
   (declare (list forms) (list path))
   (dolist (form forms)
-    (process-top-level-form form path compile-time-too)))
+    (process-toplevel-form form path compile-time-too)))
 
-;;; Process a top-level use of LOCALLY, or anything else (e.g.
-;;; MACROLET) at top-level which has declarations and ordinary forms.
+;;; Process a top level use of LOCALLY, or anything else (e.g.
+;;; MACROLET) at top level which has declarations and ordinary forms.
 ;;; We parse declarations and then recursively process the body.
-(defun process-top-level-locally (body path compile-time-too)
+(defun process-toplevel-locally (body path compile-time-too)
   (declare (list path))
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (let* ((*lexenv*
@@ -802,7 +802,7 @@
 	   ;; inside LOCALLY works OK. Failing that, at least we could
 	   ;; issue a warning instead of silently screwing up.
 	   (*policy* (lexenv-policy *lexenv*)))
-      (process-top-level-progn forms path compile-time-too))))
+      (process-toplevel-progn forms path compile-time-too))))
 
 ;;; Parse an EVAL-WHEN situations list, returning three flags,
 ;;; (VALUES COMPILE-TOPLEVEL LOAD-TOPLEVEL EXECUTE), indicating
@@ -845,14 +845,14 @@
 			   (maybe-frob (optional-dispatch-more-entry f))
 			   (maybe-frob (optional-dispatch-main-entry f)))))))
 
-(defun make-functional-from-top-level-lambda (definition
-					      &key
-					      name
-					      (path
-					       ;; I'd thought NIL should
-					       ;; work, but it doesn't.
-					       ;; -- WHN 2001-09-20
-					       (missing-arg)))
+(defun make-functional-from-toplevel-lambda (definition
+					     &key
+					     name
+					     (path
+					      ;; I'd thought NIL should
+					      ;; work, but it doesn't.
+					      ;; -- WHN 2001-09-20
+					      (missing-arg)))
   (let* ((*current-path* path)
          (component (make-empty-component))
          (*current-component* component))
@@ -891,17 +891,17 @@
   (unless (or (null name) (legal-fun-name-p name))
     (error "not a legal function name: ~S" name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
-         (fun (make-functional-from-top-level-lambda lambda-expression
-                                                     :name name
-						     :path path)))
+         (fun (make-functional-from-toplevel-lambda lambda-expression
+						    :name name
+						    :path path)))
 
     ;; FIXME: The compile-it code from here on is sort of a
-    ;; twisted version of the code in COMPILE-TOP-LEVEL. It'd be
+    ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
     ;; better to find a way to share the code there; or
     ;; alternatively, to use this code to replace the code there.
     ;; (The second alternative might be pretty easy if we used
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
-    ;; whole FUNCTIONAL-KIND=:TOP-LEVEL case could go away..)
+    ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
 
     (local-call-analyze-until-done (list fun))
 
@@ -909,11 +909,11 @@
         (find-initial-dfo (list fun))
 
       (let ((*all-components* (append components-from-dfo top-components)))
-	(mapc #'preallocate-physenvs-for-top-levelish-lambdas
+	(mapc #'preallocate-physenvs-for-toplevelish-lambdas
 	      (append hairy-top top-components))
         (dolist (component-from-dfo components-from-dfo)
           (compile-component component-from-dfo)
-          (replace-top-level-xeps component-from-dfo)))
+          (replace-toplevel-xeps component-from-dfo)))
 
       (prog1
           (let ((entry-table (etypecase *compile-object*
@@ -928,7 +928,7 @@
         (mapc #'clear-ir1-info components-from-dfo)
         (clear-stuff)))))
 
-(defun process-top-level-cold-fset (name lambda-expression path)
+(defun process-toplevel-cold-fset (name lambda-expression path)
   (unless (producing-fasl-file)
     (error "can't COLD-FSET except in a fasl file"))
   (unless (legal-fun-name-p name)
@@ -941,18 +941,18 @@
                        *compile-object*)
   (values))
 
-;;; Process a top-level FORM with the specified source PATH.
-;;;  * If this is a magic top-level form, then do stuff.
+;;; Process a top level FORM with the specified source PATH.
+;;;  * If this is a magic top level form, then do stuff.
 ;;;  * If this is a macro, then expand it.
 ;;;  * Otherwise, just compile it.
 ;;;
 ;;; COMPILE-TIME-TOO is as defined in ANSI
 ;;; "3.2.3.1 Processing of Top Level Forms".
-(defun process-top-level-form (form path compile-time-too)
+(defun process-toplevel-form (form path compile-time-too)
 
   (declare (list path))
 
-  (catch 'process-top-level-form-error-abort
+  (catch 'process-toplevel-form-error-abort
     (let* ((path (or (gethash form *source-paths*) (cons form path)))
 	   (*compiler-error-bailout*
 	    (lambda ()
@@ -960,7 +960,7 @@
 	       `(error "execution of a form compiled with errors:~% ~S"
 		       ',form)
 	       path)
-	      (throw 'process-top-level-form-error-abort nil))))
+	      (throw 'process-toplevel-form-error-abort nil))))
 
       (if (atom form)
 	  ;; (There are no EVAL-WHEN issues in the ATOM case until
@@ -980,9 +980,9 @@
 	       (aver (not compile-time-too))
 	       (destructuring-bind (cold-fset fun-name lambda-expression) form
 		 (declare (ignore cold-fset))
-		 (process-top-level-cold-fset fun-name
-					      lambda-expression
-					      path)))
+		 (process-toplevel-cold-fset fun-name
+					     lambda-expression
+					     path)))
 	      ((eval-when macrolet symbol-macrolet);things w/ 1 arg before body
 	       (need-at-least-one-arg form)
 	       (destructuring-bind (special-operator magic &rest body) form
@@ -995,7 +995,7 @@
 		      (let ((new-compile-time-too (or ct
 						      (and compile-time-too
 							   e))))
-			(cond (lt (process-top-level-progn
+			(cond (lt (process-toplevel-progn
 				   body path new-compile-time-too))
 			      (new-compile-time-too (eval
 						     `(progn ,@body)))))))
@@ -1003,20 +1003,20 @@
 		    (funcall-in-macrolet-lexenv
 		     magic
 		     (lambda ()
-		       (process-top-level-locally body
-						  path
-						  compile-time-too))))
+		       (process-toplevel-locally body
+						 path
+						 compile-time-too))))
 		   ((symbol-macrolet)
 		    (funcall-in-symbol-macrolet-lexenv
 		     magic
 		     (lambda ()
-		       (process-top-level-locally body
-						  path
-						  compile-time-too)))))))
+		       (process-toplevel-locally body
+						 path
+						 compile-time-too)))))))
 	      ((locally)
-	       (process-top-level-locally (rest form) path compile-time-too))
+	       (process-toplevel-locally (rest form) path compile-time-too))
 	      ((progn)
-	       (process-top-level-progn (rest form) path compile-time-too))
+	       (process-toplevel-progn (rest form) path compile-time-too))
 	      ;; When we're cross-compiling, consider: what should we
 	      ;; do when we hit e.g.
 	      ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL)
@@ -1053,7 +1053,8 @@
 		      ;; cross-compilation host.)
 		      (slightly-uncrossed (cons (uncross (first form))
 						(rest form)))
-		      (expanded (preprocessor-macroexpand-1 slightly-uncrossed)))
+		      (expanded (preprocessor-macroexpand-1
+				 slightly-uncrossed)))
 		 (if (eq expanded slightly-uncrossed)
 		     ;; (Now that we're no longer processing toplevel
 		     ;; forms, and hence no longer need to worry about
@@ -1064,7 +1065,7 @@
 		     ;; otherwise we'd tend to EVAL subforms more than
 		     ;; once, because of WHEN COMPILE-TIME-TOO form
 		     ;; above.)
-		     (process-top-level-form expanded path nil))))
+		     (process-toplevel-form expanded path nil))))
 	      ;; When we're not cross-compiling, we only need to
 	      ;; macroexpand once, so we can follow the 1-thru-6
 	      ;; sequence of steps in ANSI's "3.2.3.1 Processing of
@@ -1077,9 +1078,9 @@
 			  (eval form))
 			(convert-and-maybe-compile form path))
 		       (t
-			(process-top-level-form expanded
-						path
-						compile-time-too))))))))))
+			(process-toplevel-form expanded
+					       path
+					       compile-time-too))))))))))
 
   (values))
 
@@ -1114,40 +1115,40 @@
 ;;; not value) at load time.
 (defun compile-make-load-form-init-forms (forms name)
   (let ((lambda (compile-load-time-stuff `(progn ,@forms) name nil)))
-    (fasl-dump-top-level-lambda-call lambda *compile-object*)))
+    (fasl-dump-toplevel-lambda-call lambda *compile-object*)))
 
 ;;; Does the actual work of COMPILE-LOAD-TIME-VALUE or
 ;;; COMPILE-MAKE-LOAD-FORM- INIT-FORMS.
 (defun compile-load-time-stuff (form name for-value)
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))
-	  (lambda (ir1-top-level form *current-path* for-value)))
+	  (lambda (ir1-toplevel form *current-path* for-value)))
      (setf (leaf-name lambda) name)
-     (compile-top-level (list lambda) t)
+     (compile-toplevel (list lambda) t)
      lambda)))
 
-;;; This is called by COMPILE-TOP-LEVEL when it was passed T for
+;;; This is called by COMPILE-TOPLEVEL when it was passed T for
 ;;; LOAD-TIME-VALUE-P (which happens in COMPILE-LOAD-TIME-STUFF). We
 ;;; don't try to combine this component with anything else and frob
-;;; the name. If not in a :TOP-LEVEL component, then don't bother
+;;; the name. If not in a :TOPLEVEL component, then don't bother
 ;;; compiling, because it was merged with a run-time component.
 (defun compile-load-time-value-lambda (lambdas)
   (aver (null (cdr lambdas)))
   (let* ((lambda (car lambdas))
 	 (component (block-component (node-block (lambda-bind lambda)))))
-    (when (eql (component-kind component) :top-level)
+    (when (eql (component-kind component) :toplevel)
       (setf (component-name component) (leaf-name lambda))
       (compile-component component)
       (clear-ir1-info component))))
 
 ;;;; COMPILE-FILE
 
-;;; We build a list of top-level lambdas, and then periodically smash
+;;; We build a list of top level lambdas, and then periodically smash
 ;;; them together into a single component and compile it.
-(defvar *pending-top-level-lambdas*)
+(defvar *pending-toplevel-lambdas*)
 
-;;; The maximum number of top-level lambdas we put in a single
-;;; top-level component.
+;;; The maximum number of top level lambdas we put in a single
+;;; top level component.
 ;;;
 ;;; CMU CL 18b used this nontrivially by default (setting it to 10)
 ;;; but consequently suffered from the inability to execute some
@@ -1169,41 +1170,41 @@
 ;;; GENESIS, which is desirable, since at least for SBCL version
 ;;; 0.6.7, this is the high water mark for memory usage during system
 ;;; construction.
-(defparameter *top-level-lambda-max* 0)
+(defparameter *toplevel-lambda-max* 0)
 
-(defun object-call-top-level-lambda (tll)
+(defun object-call-toplevel-lambda (tll)
   (declare (type functional tll))
   (let ((object *compile-object*))
     (etypecase object
       (fasl-output
-       (fasl-dump-top-level-lambda-call tll object))
+       (fasl-dump-toplevel-lambda-call tll object))
       (core-object
-       (core-call-top-level-lambda tll object))
+       (core-call-toplevel-lambda tll object))
       (null))))
 
 ;;; Add LAMBDAS to the pending lambdas. If this leaves more than
-;;; *TOP-LEVEL-LAMBDA-MAX* lambdas in the list, or if FORCE-P is true,
+;;; *TOPLEVEL-LAMBDA-MAX* lambdas in the list, or if FORCE-P is true,
 ;;; then smash the lambdas into a single component, compile it, and
 ;;; call the resulting function.
-(defun sub-compile-top-level-lambdas (lambdas force-p)
+(defun sub-compile-toplevel-lambdas (lambdas force-p)
   (declare (list lambdas))
-  (setq *pending-top-level-lambdas*
-	(append *pending-top-level-lambdas* lambdas))
-  (let ((pending *pending-top-level-lambdas*))
+  (setq *pending-toplevel-lambdas*
+	(append *pending-toplevel-lambdas* lambdas))
+  (let ((pending *pending-toplevel-lambdas*))
     (when (and pending
-	       (or (> (length pending) *top-level-lambda-max*)
+	       (or (> (length pending) *toplevel-lambda-max*)
 		   force-p))
-      (multiple-value-bind (component tll) (merge-top-level-lambdas pending)
-	(setq *pending-top-level-lambdas* ())
+      (multiple-value-bind (component tll) (merge-toplevel-lambdas pending)
+	(setq *pending-toplevel-lambdas* ())
 	(compile-component component)
 	(clear-ir1-info component)
-	(object-call-top-level-lambda tll))))
+	(object-call-toplevel-lambda tll))))
   (values))
 
-;;; Compile top-level code and call the top-level lambdas. We pick off
-;;; top-level lambdas in non-top-level components here, calling
-;;; SUB-c-t-l-l on each subsequence of normal top-level lambdas.
-(defun compile-top-level-lambdas (lambdas force-p)
+;;; Compile top level code and call the top level lambdas. We pick off
+;;; top level lambdas in non-top-level components here, calling
+;;; SUB-c-t-l-l on each subsequence of normal top level lambdas.
+(defun compile-toplevel-lambdas (lambdas force-p)
   (declare (list lambdas))
   (let ((len (length lambdas)))
     (flet ((loser (start)
@@ -1212,7 +1213,7 @@
 					  (block-component
 					   (node-block
 					    (lambda-bind x))))
-					 :top-level)))
+					 :toplevel)))
 			      lambdas
 			      :start start)
 		 len)))
@@ -1220,19 +1221,19 @@
 	    (loser (loser start) (loser start)))
 	   ((>= start len)
 	    (when force-p
-	      (sub-compile-top-level-lambdas nil t)))
-	(sub-compile-top-level-lambdas (subseq lambdas start loser)
-				       (or force-p (/= loser len)))
+	      (sub-compile-toplevel-lambdas nil t)))
+	(sub-compile-toplevel-lambdas (subseq lambdas start loser)
+				      (or force-p (/= loser len)))
 	(unless (= loser len)
-	  (object-call-top-level-lambda (elt lambdas loser))))))
+	  (object-call-toplevel-lambda (elt lambdas loser))))))
   (values))
 
-;;; Compile LAMBDAS (a list of CLAMBDAs for top-level forms) into the
+;;; Compile LAMBDAS (a list of CLAMBDAs for top level forms) into the
 ;;; object file. 
 ;;;
 ;;; LOAD-TIME-VALUE-P seems to control whether it's MAKE-LOAD-FORM and
 ;;; COMPILE-LOAD-TIME-VALUE stuff. -- WHN 20000201
-(defun compile-top-level (lambdas load-time-value-p)
+(defun compile-toplevel (lambdas load-time-value-p)
   (declare (list lambdas))
 
   (maybe-mumble "locall ")
@@ -1242,19 +1243,19 @@
   (multiple-value-bind (components top-components hairy-top)
       (find-initial-dfo lambdas)
     (let ((*all-components* (append components top-components))
-	  (top-level-closure nil))
+	  (toplevel-closure nil))
       (when *check-consistency*
 	(maybe-mumble "[check]~%")
 	(check-ir1-consistency *all-components*))
 
       (dolist (component (append hairy-top top-components))
-	(when (pre-physenv-analyze-top-level component)
-	  (setq top-level-closure t)))
+	(when (pre-physenv-analyze-toplevel component)
+	  (setq toplevel-closure t)))
 
       (dolist (component components)
 	(compile-component component)
-	(when (replace-top-level-xeps component)
-	  (setq top-level-closure t)))
+	(when (replace-toplevel-xeps component)
+	  (setq toplevel-closure t)))
 	
       (when *check-consistency*
 	(maybe-mumble "[check]~%")
@@ -1262,7 +1263,7 @@
 	
       (if load-time-value-p
 	  (compile-load-time-value-lambda lambdas)
-	  (compile-top-level-lambdas lambdas top-level-closure))
+	  (compile-toplevel-lambdas lambdas toplevel-closure))
 
       (mapc #'clear-ir1-info components)
       (clear-stuff)))
@@ -1272,9 +1273,9 @@
 ;;; compilation.
 (defun finish-block-compilation ()
   (when *block-compile*
-    (when *top-level-lambdas*
-      (compile-top-level (nreverse *top-level-lambdas*) nil)
-      (setq *top-level-lambdas* ()))
+    (when *toplevel-lambdas*
+      (compile-toplevel (nreverse *toplevel-lambdas*) nil)
+      (setq *toplevel-lambdas* ()))
     (setq *block-compile* nil)
     (setq *entry-points* nil)))
 
@@ -1289,8 +1290,8 @@
 	 (*source-info* info)
 	 (sb!xc:*compile-file-pathname* nil)
 	 (sb!xc:*compile-file-truename* nil)
-	 (*top-level-lambdas* ())
-	 (*pending-top-level-lambdas* ())
+	 (*toplevel-lambdas* ())
+	 (*pending-toplevel-lambdas* ())
 	 (*compiler-error-bailout*
 	  (lambda ()
 	    (compiler-mumble "~2&; fatal error, aborting compilation~%")
@@ -1317,7 +1318,7 @@
 	   (sub-sub-compile-file info)
 
 	   (finish-block-compilation)
-	   (compile-top-level-lambdas () t)
+	   (compile-toplevel-lambdas () t)
 	   (let ((object *compile-object*))
 	     (etypecase object
 	       (fasl-output (fasl-dump-source-info info object))
@@ -1594,7 +1595,7 @@
 	(:ignore-it
 	 nil)
 	(t
-	 (compile-top-level-lambdas () t)
+	 (compile-toplevel-lambdas () t)
 	 (when (fasl-constant-already-dumped-p constant *compile-object*)
 	   (return-from emit-make-load-form nil))
 	 (let* ((name (let ((*print-level* 1) (*print-length* 2))

@@ -27,7 +27,7 @@
   #+sb-xc-host nil)
 
 ;;; Note: Unlike the analogous COLD-INIT macro in CMU CL, this macro
-;;; makes no attempt to simulate a top-level situation by treating
+;;; makes no attempt to simulate a top level situation by treating
 ;;; EVAL-WHEN forms specially.
 (defmacro !cold-init-forms (&rest forms)
   ;; In the target Lisp, stuff the forms into a named function which

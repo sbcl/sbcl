@@ -55,7 +55,7 @@
 	(eval (first i))
 	(return (eval (first i))))))
 
-;;; Pick off a few easy cases, and the various top-level EVAL-WHEN
+;;; Pick off a few easy cases, and the various top level EVAL-WHEN
 ;;; magical cases, and call %EVAL for the rest. 
 (defun eval (original-exp)
   #!+sb-doc
@@ -112,8 +112,8 @@
 		     (set (first args) (eval (second args)))))
 		(let ((symbol (first name)))
 		  (case (info :variable :kind symbol)
-		    ;; FIXME: I took out the *TOP-LEVEL-AUTO-DECLARE*
-		    ;; test here, and removed the *TOP-LEVEL-AUTO-DECLARE*
+		    ;; FIXME: I took out the *TOPLEVEL-AUTO-DECLARE*
+		    ;; test here, and removed the *TOPLEVEL-AUTO-DECLARE*
 		    ;; variable; the code should now act as though that
 		    ;; variable is NIL. This should be tested..
 		    (:special)

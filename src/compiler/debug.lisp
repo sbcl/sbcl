@@ -39,8 +39,8 @@
   One of :WARN, :ERROR or :NONE.")
 (declaim (type (member :warn :error :none) *burp-action*))
 
-;;; Called when something funny but possibly correct is noticed. Otherwise
-;;; similar to Barf.
+;;; Called when something funny but possibly correct is noticed.
+;;; Otherwise similar to BARF.
 (declaim (ftype (function (string &rest t) (values)) burp))
 (defun burp (string &rest *args*)
   (ecase *burp-action*
@@ -49,15 +49,16 @@
     (:none))
   (values))
 
-;;; *Seen-Blocks* is a hashtable with true values for all blocks which appear
-;;; in the DFO for one of the specified components.
+;;; *SEEN-BLOCKS* is a hashtable with true values for all blocks which
+;;; appear in the DFO for one of the specified components.
+;;;
+;;; *SEEN-FUNCTIONS* is similar, but records all the lambdas we
+;;; reached by recursing on top level functions.
 (defvar *seen-blocks* (make-hash-table :test 'eq))
-
-;;; *Seen-Functions* is similar, but records all the lambdas we reached by
-;;; recursing on top-level functions.
 (defvar *seen-functions* (make-hash-table :test 'eq))
 
-;;; Barf if Node is in a block which wasn't reached during the graph walk.
+;;; Barf if NODE is in a block which wasn't reached during the graph
+;;; walk.
 (declaim (ftype (function (node) (values)) check-node-reached))
 (defun check-node-reached (node)
   (unless (gethash (continuation-block (node-prev node)) *seen-blocks*)
@@ -196,7 +197,7 @@
 		   (eq functional (optional-dispatch-main-entry ef)))
 	 (barf ":OPTIONAL ~S is not an e-p for its OPTIONAL-DISPATCH ~S."
 	       functional ef))))
-    (:top-level
+    (:toplevel
      (unless (eq (functional-entry-function functional) functional)
        (barf "The ENTRY-FUNCTION in ~S isn't a self-pointer." functional)))
     ((nil :escape :cleanup)
@@ -211,7 +212,7 @@
      (return-from check-function-stuff)))
 
   (case (functional-kind functional)
-    ((nil :optional :external :top-level :escape :cleanup)
+    ((nil :optional :external :toplevel :escape :cleanup)
      (when (lambda-p functional)
        (dolist (fun (lambda-lets functional))
 	 (unless (eq (lambda-home fun) functional)
@@ -484,10 +485,10 @@
     (ref
      (let ((leaf (ref-leaf node)))
        (when (functional-p leaf)
-	 (if (eq (functional-kind leaf) :top-level-xep)
+	 (if (eq (functional-kind leaf) :toplevel-xep)
 	     (unless (eq (component-kind (block-component (node-block node)))
-			 :top-level)
-	       (barf ":TOP-LEVEL-XEP ref in non-top-level component: ~S"
+			 :toplevel)
+	       (barf ":TOPLEVEL-XEP ref in non-top-level component: ~S"
 		     node))
 	     (check-function-reached leaf node)))))
     (basic-combination
@@ -917,7 +918,7 @@
     (optional-dispatch
      (format stream "optional-dispatch ~S" (leaf-name leaf)))
     (functional
-     (aver (eq (functional-kind leaf) :top-level-xep))
+     (aver (eq (functional-kind leaf) :toplevel-xep))
      (format stream "TL-XEP ~S"
 	     (entry-info-name (leaf-info leaf))))))
 
