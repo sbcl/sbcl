@@ -63,6 +63,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
 	     "SAP-ALIEN" "SHORT" "SIGNED" "SLOT" "STRUCT"
 	     "UNSIGNED"
 	     "UNSIGNED-CHAR" "UNSIGNED-INT" "UNSIGNED-LONG" "UNSIGNED-SHORT"
+             "UTF8-STRING"
 	     "VOID"
 	     "WITH-ALIEN"))
 
@@ -910,7 +911,7 @@ retained, possibly temporariliy, because it might be used internally."
 
 	       ;; various internal defaults
 	       "DEFAULT-INIT-CHAR" "*DEFAULT-INIT-CHAR-FORM*"
-	       "*LOAD-SOURCE-DEFAULT-TYPE*"
+	       "*LOAD-SOURCE-DEFAULT-TYPE*" "BASE-CHAR-CODE-LIMIT"
 
 	       ;; hash caches
 	       "DEFINE-HASH-CACHE"

@@ -615,10 +615,10 @@
 ;;; character has. At characters have at least one bit set, so we can
 ;;; search for any character with a positive test.
 (defvar *character-attributes*
-  (make-array char-code-limit
+  (make-array 160 ; FIXME
 	      :element-type '(unsigned-byte 16)
 	      :initial-element 0))
-(declaim (type (simple-array (unsigned-byte 16) (#.char-code-limit))
+(declaim (type (simple-array (unsigned-byte 16) (#.160)) ; FIXME
 	       *character-attributes*))
 
 ;;; constants which are a bit-mask for each interesting character attribute
@@ -672,17 +672,17 @@
   (set-bit #\/ slash-attribute)
 
   ;; Mark anything not explicitly allowed as funny.
-  (dotimes (i char-code-limit)
+  (dotimes (i 160) ; FIXME
     (when (zerop (aref *character-attributes* i))
       (setf (aref *character-attributes* i) funny-attribute))))
 
 ;;; For each character, the value of the corresponding element is the
 ;;; lowest base in which that character is a digit.
 (defvar *digit-bases*
-  (make-array char-code-limit
+  (make-array 128 ; FIXME
 	      :element-type '(unsigned-byte 8)
 	      :initial-element 36))
-(declaim (type (simple-array (unsigned-byte 8) (#.char-code-limit))
+(declaim (type (simple-array (unsigned-byte 8) (#.128)) ; FIXME
 	       *digit-bases*))
 (dotimes (i 36)
   (let ((char (digit-char i 36)))
@@ -698,7 +698,11 @@
 		   ,(if at-end '(go TEST-SIGN) '(return nil)))
 		 (setq current (schar name index)
 		       code (char-code current)
-		       bits (aref attributes code))
+		       bits (cond ; FIXME
+                              ((< code 160) (aref attributes code))
+                              ((upper-case-p current) uppercase-attribute)
+                              ((lower-case-p current) lowercase-attribute)
+                              (t other-attribute)))
 		 (incf index)
 		 (go ,tag)))
 	     (test (&rest attributes)
@@ -713,7 +717,8 @@
 					attributes))
 			     bits)))))
 	     (digitp ()
-	       `(< (the fixnum (aref bases code)) base)))
+               `(and (< code 128) ; FIXME
+                     (< (the fixnum (aref bases code)) base))))
 
     (prog ((len (length name))
 	   (attributes *character-attributes*)
@@ -740,7 +745,13 @@
 			  letter-attribute)))
 	(do ((i (1- index) (1+ i)))
 	    ((= i len) (return-from symbol-quotep nil))
-	  (unless (zerop (logand (aref attributes (char-code (schar name i)))
+	  (unless (zerop (logand (let* ((char (schar name i))
+					(code (char-code char)))
+				   (cond 
+				     ((< code 160) (aref attributes code))
+				     ((upper-case-p char) uppercase-attribute)
+				     ((lower-case-p char) lowercase-attribute)
+				     (t other-attribute)))
 				 mask))
 	    (return-from symbol-quotep t))))
 

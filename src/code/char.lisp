@@ -15,3 +15,5 @@
 (def!constant sb!xc:char-code-limit 256
   #!+sb-doc
   "the upper exclusive bound on values produced by CHAR-CODE")
+
+(def!constant base-char-code-limit 256)
