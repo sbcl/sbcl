@@ -55,6 +55,12 @@
 (defknown %sxhash-simple-substring (simple-string index) index
   (foldable flushable))
 
+(defknown symbol-hash (symbol) (integer 0 #.sb!xc:most-positive-fixnum)
+  (flushable movable))
+
+(defknown %set-symbol-hash (symbol (integer 0 #.sb!xc:most-positive-fixnum))
+  t (unsafe))
+
 (defknown vector-length (vector) index (flushable))
 
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer

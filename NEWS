@@ -2458,6 +2458,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by
     approximately 10%.
+  * optimization: used a previously little-used slot in symbols to
+    cache SXHASH values, yielding a 5-10% compiler speedup.  (thanks
+    to Juho Snellman)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MAKE-INSTANCES-OBSOLETE returns the class name when called with 
        a symbol.

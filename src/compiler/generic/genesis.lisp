@@ -798,11 +798,9 @@
 					 (1- sb!vm:symbol-size)
 					 sb!vm:symbol-header-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
-    #!+x86
     (write-wordindexed symbol
 		       sb!vm:symbol-hash-slot
-		       (make-fixnum-descriptor
-			(1+ (random sb!xc:most-positive-fixnum))))
+		       (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-plist-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
 		       (string-to-core name *dynamic*))

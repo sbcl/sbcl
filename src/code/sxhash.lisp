@@ -105,6 +105,18 @@
 (deftransform sxhash ((x) (symbol))
   (if #+sb-xc-host nil #-sb-xc-host (constant-lvar-p x)
       (sxhash (lvar-value x))
-      '(%sxhash-simple-string (symbol-name x))))
-
-
+      ;; Cache the value of the symbol's sxhash in the symbol-hash slot.
+      '(let ((result (symbol-hash x)))
+	;; 0 marks uninitialized slot. We can't use negative values
+	;; for the uninitialized slots since NIL might be located so
+	;; high in memory on some platforms that its SYMBOL-HASH
+	;; (which contains NIL itself) is a negative fixnum.
+	(if (= 0 result)
+	    (let ((sxhash (%sxhash-simple-string (symbol-name x))))
+	      ;; We could do a (logor sxhash #x10000000) to ensure
+	      ;; that we never store a 0 in the slot. However, it's
+	      ;; such an unlikely event (1/5e8?) that it makes more
+	      ;; sense to optimize for the common case...
+	      (%set-symbol-hash x sxhash)
+	      sxhash)
+	    result))))

@@ -1,5 +1,16 @@
-(in-package "SB!VM")
+;;;; the VM definition of various primitive memory access VOPs for
+;;;; MIPS
 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!VM")
 
 ;;;; Data object ref/set stuff.
 
@@ -76,6 +87,23 @@
   (:policy :fast)
   (:translate symbol-value))
 
+(define-vop (symbol-hash)
+  (:policy :fast-safe)
+  (:translate symbol-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:temporary (:scs (any-reg)) temp)
+  (:generator 2
+    ;; The symbol-hash slot of NIL holds NIL because it is also the
+    ;; cdr slot, so we have to strip off the two low bits to make sure
+    ;; it is a fixnum.  The lowtag selection magic that is required to
+    ;; ensure this is explained in the comment in objdef.lisp
+    ;;
+    ;; wow, MIPS sucks (or I do) -- CSR, 2004-05-20
+    (inst li temp (fixnumize -1))
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst and res temp)))
 
 ;;;; Fdefinition (fdefn) objects.
 

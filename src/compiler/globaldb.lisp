@@ -32,11 +32,7 @@
 (declaim (special *universal-type*))
 
 ;;; This is sorta semantically equivalent to SXHASH, but optimized for
-;;; legal function names. Note: semantically equivalent does *not*
-;;; mean that it always returns the same value as SXHASH, just that it
-;;; satisfies the formal definition of SXHASH. The ``sorta'' is
-;;; because SYMBOL-HASH will not necessarily return the same value in
-;;; different lisp images.
+;;; legal function names.
 ;;;
 ;;; Why optimize? We want to avoid the fully-general TYPECASE in ordinary
 ;;; SXHASH, because
@@ -58,17 +54,17 @@
 ;;; aren't used too early in cold boot for SXHASH to run).
 #!-sb-fluid (declaim (inline globaldb-sxhashoid))
 (defun globaldb-sxhashoid (x)
-  (cond #-sb-xc-host ; (SYMBOL-HASH doesn't exist on cross-compilation host.)
-	((symbolp x)
-	 (symbol-hash x))
-	#-sb-xc-host ; (SYMBOL-HASH doesn't exist on cross-compilation host.)
+  (cond	((symbolp x) (sxhash x))
 	((and (listp x)
 	      (eq (first x) 'setf)
 	      (let ((rest (rest x)))
 		(and (symbolp (car rest))
 		     (null (cdr rest)))))
-	 (logxor (symbol-hash (second x))
-		 110680597))
+	 ;; We need to declare the type of the value we're feeding to
+	 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
+	 (let ((symbol (second x)))
+	   (declare (symbol symbol))
+	   (logxor (sxhash symbol) 110680597)))
 	(t (sxhash x))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.
