@@ -20,3 +20,72 @@
 (format t
 	"~&printable now: ~A~%"
 	(make-condition 'file-error :pathname "foo"))
+
+(assert (eq
+         (block nil
+           (macrolet ((opaque-error (arg) `(error ,arg)))
+             (handler-bind
+                 ((error (lambda (c)
+                           (let ((restarts (remove 'res (compute-restarts c)
+                                                   :key #'restart-name
+                                                   :test-not #'eql)))
+                             (assert (= (length restarts) 2))
+                             (invoke-restart (second restarts))))))
+               (let ((foo1 (make-condition 'error))
+                     (foo2 (make-condition 'error)))
+                 (restart-case
+                     (with-condition-restarts foo1 (list (find-restart 'res))
+                       (restart-case
+                           (opaque-error foo2)
+                         (res () 'int1)
+                         (res () 'int2)))
+                   (res () 'ext))))))
+         'int2))
+
+(assert (eq
+         (block nil
+           (macrolet ((opaque-error (arg) `(error ,arg)))
+             (let ((foo1 (make-condition 'error))
+                   (foo2 (make-condition 'error)))
+               (handler-bind
+                   ((error (lambda (c)
+                             (let ((restarts (remove 'res (compute-restarts foo1)
+                                                     :key #'restart-name
+                                                     :test-not #'eql)))
+                               (assert (= (length restarts) 1))
+                               (invoke-restart (first restarts))))))
+                 (restart-case
+                     (with-condition-restarts foo1 (list (find-restart 'res))
+                       (restart-case
+                           (opaque-error foo2)
+                         (res () 'int1)
+                         (res () 'int2)))
+                   (res () 'ext))))))
+         'ext))
+
+(assert (eq
+         'ext
+         (block nil
+           (let ((visible nil)
+                 (c1 (make-condition 'error))
+                 (c2 (make-condition 'error)))
+             (handler-bind
+                 ((error
+                   (lambda (c)
+                     (declare (ignore c))
+                     (flet ((check-restarts (length)
+                              (assert (= length
+                                         (length (remove 'foo (compute-restarts c1)
+                                                         :key #'restart-name
+                                                         :test-not #'eql))))))
+                       (check-restarts 1)
+                       (setq visible t)
+                       (check-restarts 1)
+                       (invoke-restart (find-restart 'foo c1))))))
+               (restart-case
+                   (restart-case
+                       (error c2)
+                     (foo () 'in1)
+                     (foo () :test (lambda (c) (declare (ignore c)) visible)
+                          'in2))
+                 (foo () 'ext)))))))

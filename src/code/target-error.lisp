@@ -155,8 +155,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if
 ;;; appropriate. Gross, but it's what the book seems to say...
-(defun munge-restart-case-expression (expression data)
-  (let ((exp (macroexpand expression)))
+(defun munge-restart-case-expression (expression env)
+  (let ((exp (sb!xc:macroexpand expression env)))
     (if (consp exp)
 	(let* ((name (car exp))
 	       (args (if (eq name 'cerror) (cddr exp) (cdr exp))))
@@ -171,9 +171,7 @@
 				    ',name)))
 		`(with-condition-restarts
 		     ,n-cond
-		     (list ,@(mapcar (lambda (da)
-				       `(find-restart ',(nth 0 da)))
-				     data))
+		     (car *restart-clusters*)
 		   ,(if (eq name 'cerror)
 			`(cerror ,(second expression) ,n-cond)
 			`(,name ,n-cond))))
@@ -183,7 +181,7 @@
 
 ;;; FIXME: I did a fair amount of rearrangement of this code in order to
 ;;; get WITH-KEYWORD-PAIRS to work cleanly. This code should be tested..
-(defmacro restart-case (expression &body clauses)
+(defmacro restart-case (expression &body clauses &environment env)
   #!+sb-doc
   "(RESTART-CASE form
    {(case-name arg-list {keyword value}* body)}*)
@@ -268,7 +266,7 @@
 				     ,@keys)))
 			 data)
 	      (return-from ,block-tag
-			   ,(munge-restart-case-expression expression data)))
+			   ,(munge-restart-case-expression expression env)))
 	    ,@(mapcan (lambda (datum)
 			(let ((tag  (nth 1 datum))
 			      (bvl  (nth 3 datum))

@@ -1682,6 +1682,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     ** &WHOLE and &REST arguments in macro lambda lists are patterns;
     ** NSET-EXCLUSIVE-OR does not return extra elements when its
        arguments contain duplicated elements;
+    ** RESTART-CASE understands local macros;
+    ** ... and associates exactly its own restarts with a condition;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
