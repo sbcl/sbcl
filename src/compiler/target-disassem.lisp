@@ -726,15 +726,15 @@
 
     (when (null plen)
       (setf plen location-column-width)
-      (set-location-printing-range dstate
-				  (seg-virtual-location (dstate-segment dstate))
-				  (seg-length (dstate-segment dstate))))
+      (let ((seg (dstate-segment dstate)))
+	(set-location-printing-range dstate
+				     (seg-virtual-location seg)
+				     (seg-length seg))))
     (when (eq (dstate-output-state dstate) :beginning)
       (setf plen location-column-width))
 
     (fresh-line stream)
 
-    ;; MNA: compiler message patch
     (setf location-column-width (+ 2 location-column-width))
     (princ "; " stream)
 
@@ -784,7 +784,6 @@
   (with-print-restrictions
     (dolist (note (dstate-notes dstate))
       (format stream "~Vt; " *disassem-note-column*)
-      ;; MNA: compiler message patch
       (pprint-logical-block (stream nil :per-line-prefix "; ")
       (etypecase note
 	(string

@@ -307,10 +307,8 @@
 ;;;; We provide a few special operations that can be meaningfully used
 ;;;; on VALUES types (as well as on any other type).
 
-;;; Return the type of the first value indicated by Type. This is used
-;;; by people who don't want to have to deal with values types.
-
-;;; MNA: fix-instance-typep-call patch
+;;; Return the type of the first value indicated by TYPE. This is used
+;;; by people who don't want to have to deal with VALUES types.
 #!-sb-fluid (declaim (freeze-type values-type))
 ; (inline single-value-type))
 (defun single-value-type (type)
@@ -318,7 +316,8 @@
   (cond ((values-type-p type)
 	 (or (car (args-type-required type))
              (if (args-type-optional type)
-                 (type-union (car (args-type-optional type)) (specifier-type 'null)))
+                 (type-union (car (args-type-optional type))
+			     (specifier-type 'null)))
 	     (args-type-rest type)
              (specifier-type 'null)))
 	((eq type *wild-type*)
@@ -340,10 +339,10 @@
 	    (values fixed (+ fixed (length (args-type-optional type))))))
       (values nil nil)))
 
-;;; Determine if Type corresponds to a definite number of values. The
-;;; first value is a list of the types for each value, and the second
-;;; value is the number of values. If the number of values is not
-;;; fixed, then return NIL and :Unknown.
+;;; Determine whether TYPE corresponds to a definite number of values.
+;;; The first value is a list of the types for each value, and the
+;;; second value is the number of values. If the number of values is
+;;; not fixed, then return NIL and :UNKNOWN.
 (defun values-types (type)
   (declare (type ctype type))
   (cond ((eq type *wild-type*)
@@ -360,7 +359,6 @@
 	   (values (mapcar #'single-value-type req) (length req))))))
 
 ;;; Return two values:
-;;; MNA: fix-instance-typep-call patch
 ;;; 1. A list of all the positional (fixed and optional) types.
 ;;; 2. The &REST type (if any). If keywords allowed, *UNIVERSAL-TYPE*.
 ;;;    If no keywords or &REST, then the DEFAULT-TYPE.
@@ -371,8 +369,7 @@
 	  (cond ((args-type-keyp type) *universal-type*)
 		((args-type-rest type))
 		(t
-                  ;; MNA: fix-instance-typep-call patch
-                  default-type))))
+		 default-type))))
 
 ;;; Return a list of OPERATION applied to the types in TYPES1 and
 ;;; TYPES2, padding with REST2 as needed. TYPES1 must not be shorter
@@ -424,19 +421,15 @@
 ;;; OPERATION returned true as its second value each time we called
 ;;; it. Since we approximate the intersection of VALUES types, the
 ;;; second value being true doesn't mean the result is exact.
-;;; MNA: fix-instance-typep-call patch
 (defun args-type-op (type1 type2 operation nreq default-type)
-  ;;; MNA: fix-instance-typep-call patch
   (declare (type ctype type1 type2 default-type)
  	   (type function operation nreq))
   (if (or (values-type-p type1) (values-type-p type2))
       (let ((type1 (coerce-to-values type1))
 	    (type2 (coerce-to-values type2)))
 	(multiple-value-bind (types1 rest1)
-            ;;; MNA: fix-instance-typep-call patch
             (values-type-types type1 default-type)
 	  (multiple-value-bind (types2 rest2)
-              ;;; MNA: fix-instance-typep-call patch
               (values-type-types type2 default-type)
 	    (multiple-value-bind (rest rest-exact)
 		(funcall operation rest1 rest2)
@@ -458,7 +451,6 @@
 			       :optional (if opt-last
 					     (subseq opt 0 (1+ opt-last))
 					     ())
-                               ;; MNA fix-instance-typep-call patch
 			       :rest (if (eq rest default-type) nil rest))
 			      (and rest-exact res-exact)))))))))
       (funcall operation type1 type2)))
@@ -480,9 +472,7 @@
 	((eq type1 *empty-type*) type2)
 	((eq type2 *empty-type*) type1)
 	(t
-          ;;; MNA: fix-instance-typep-call patch
 	 (values (args-type-op type1 type2 #'type-union #'min *empty-type*)))))
-;;;
 (defun-cached (values-type-intersection :hash-function type-cache-hash
 					:hash-bits 8
 					:values 2
@@ -493,7 +483,10 @@
   (cond ((eq type1 *wild-type*) (values type2 t))
 	((eq type2 *wild-type*) (values type1 t))
 	(t
-	 (args-type-op type1 type2 #'type-intersection #'max (specifier-type 'null)))))
+	 (args-type-op type1 type2
+		       #'type-intersection
+		       #'max
+		       (specifier-type 'null)))))
 
 ;;; This is like TYPES-INTERSECT, except that it sort of works on
 ;;; VALUES types. Note that due to the semantics of

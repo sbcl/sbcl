@@ -2482,7 +2482,6 @@
   (frob logior)
   (frob logxor))
 
-;; MNA: defoptimizer for integer-length patch
 (defoptimizer (integer-length derive-type) ((x))
   (let ((x-type (continuation-type x)))
     (when (and (numeric-type-p x-type)

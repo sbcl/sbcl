@@ -299,7 +299,8 @@
 		     ,@(when (member :internal ',ordered-types)
 			 `((:internal
 			    (setf ,',counter
-				  (position-if #',',real-symbol-p ,',hash-vector
+				  (position-if #',',real-symbol-p
+					       ,',hash-vector
 					       :start (if ,',counter
 							  (1+ ,',counter)
 							  0)))
@@ -311,7 +312,8 @@
 		     ,@(when (member :external ',ordered-types)
 			 `((:external
 			    (setf ,',counter
-				  (position-if #',',real-symbol-p ,',hash-vector
+				  (position-if #',',real-symbol-p
+					       ,',hash-vector
 					       :start (if ,',counter
 							  (1+ ,',counter)
 							  0)))

@@ -122,7 +122,6 @@
 ;;; Mumble conditional on *COMPILE-PROGRESS*.
 (defun maybe-mumble (&rest foo)
   (when *compile-progress*
-    ;; MNA: compiler message patch
     (compiler-mumble "~&")
     (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
        (apply #'compiler-mumble foo))))
@@ -228,7 +227,6 @@
 		   (zerop *compiler-warning-count*)
 		   (zerop *compiler-style-warning-count*)
 		   (zerop *compiler-note-count*)))
-    ;; MNA: compiler message patch
     (format *error-output* "~&")
     (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
     (compiler-mumble
@@ -497,7 +495,6 @@
 		 (return nil)))))))
 
     (when sb!xc:*compile-print*
-      ;; MNA: compiler message patch
       (compiler-mumble "~&; ~:[~;byte ~]compiling ~A: "
 		       *byte-compiling*
 		       (component-name component)))
@@ -1368,11 +1365,9 @@
 	 (*top-level-lambdas* ())
 	 (*pending-top-level-lambdas* ())
 	 (*compiler-error-bailout*
-	  #'(lambda ()
-	      (compiler-mumble
-               ;; MNA: compiler message patch
-	       "~2&; fatal error, aborting compilation~%")
-	      (return-from sub-compile-file (values nil t t))))
+	  (lambda ()
+	    (compiler-mumble "~2&; fatal error, aborting compilation~%")
+	    (return-from sub-compile-file (values nil t t))))
 	 (*current-path* nil)
 	 (*last-source-context* nil)
 	 (*last-original-source* nil)
@@ -1431,7 +1426,6 @@
 (defun start-error-output (source-info)
   (declare (type source-info source-info))
   (dolist (x (source-info-files source-info))
-    ;; MNA: compiler message patch
     (compiler-mumble "~&; compiling file ~S (written ~A):~%"
 		     (namestring (file-info-name x))
 		     (sb!int:format-universal-time nil
@@ -1443,7 +1437,6 @@
 
 (defun finish-error-output (source-info won)
   (declare (type source-info source-info))
-  ;; MNA: compiler message patch
   (compiler-mumble "~&; compilation ~:[aborted after~;finished in~] ~A~&"
 		   won
 		   (elapsed-time-to-string
@@ -1529,7 +1522,6 @@
 	(close-fasl-file fasl-file (not compile-won))
 	(setq output-file-name (pathname (fasl-file-stream fasl-file)))
 	(when (and compile-won sb!xc:*compile-verbose*)
-          ;; MNA: compiler message patch
 	  (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
 
       (when sb!xc:*compile-verbose*

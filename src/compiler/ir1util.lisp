@@ -153,9 +153,10 @@
     (setf (continuation-dest new) dest))
   (values))
 
-;;; Replace all uses of Old with uses of New, where New has an arbitary
-;;; number of uses. If New will end up with more than one use, then we must
-;;; arrange for it to start a block if it doesn't already.
+;;; Replace all uses of OLD with uses of NEW, where NEW has an
+;;; arbitary number of uses. If NEW will end up with more than one
+;;; use, then we must arrange for it to start a block if it doesn't
+;;; already.
 (defun substitute-continuation-uses (new old)
   (declare (type continuation old new))
   (unless (and (eq (continuation-kind new) :unused)
@@ -165,7 +166,6 @@
   (do-uses (node old)
     (delete-continuation-use node)
     (add-continuation-use node new))
-  ;; MNA: Re: two obscure bugs in CMU CL
   (dolist (lexenv-use (continuation-lexenv-uses old))
     (setf (cadr lexenv-use) new))
 
@@ -174,14 +174,15 @@
 
 ;;;; block starting/creation
 
-;;; Return the block that Continuation is the start of, making a block if
-;;; necessary. This function is called by IR1 translators which may cause a
-;;; continuation to be used more than once. Every continuation which may be
-;;; used more than once must start a block by the time that anyone does a
-;;; Use-Continuation on it.
+;;; Return the block that CONT is the start of, making a block if
+;;; necessary. This function is called by IR1 translators which may
+;;; cause a continuation to be used more than once. Every continuation
+;;; which may be used more than once must start a block by the time
+;;; that anyone does a USE-CONTINUATION on it.
 ;;;
 ;;; We also throw the block into the next/prev list for the
-;;; *current-component* so that we keep track of which blocks we have made.
+;;; *CURRENT-COMPONENT* so that we keep track of which blocks we have
+;;; made.
 (defun continuation-starts-block (cont)
   (declare (type continuation cont))
   (ecase (continuation-kind cont)
@@ -1423,7 +1424,7 @@
 	       (values '(unable to locate source)
 		       '((some strange place)))))))))
 
-;;; Convert a source form to a string, formatted suitably for use in
+;;; Convert a source form to a string, suitably formatted for use in
 ;;; compiler warnings.
 (defun stringify-form (form &optional (pretty t))
   (let ((*print-level* *compiler-error-print-level*)
@@ -1431,15 +1432,14 @@
 	(*print-lines* *compiler-error-print-lines*)
 	(*print-pretty* pretty))
     (if pretty
-      ;;; MNA: compiler message patch
-      ;;; (format nil "  ~S~%" form)
-      (format nil "~<~@;  ~S~:>" (list form))
+	(format nil "~<~@;  ~S~:>" (list form))
 	(prin1-to-string form))))
 
-;;; Return a COMPILER-ERROR-CONTEXT structure describing the current error
-;;; context, or NIL if we can't figure anything out. ARGS is a list of things
-;;; that are going to be printed out in the error message, and can thus be
-;;; blown off when they appear in the source context.
+;;; Return a COMPILER-ERROR-CONTEXT structure describing the current
+;;; error context, or NIL if we can't figure anything out. ARGS is a
+;;; list of things that are going to be printed out in the error
+;;; message, and can thus be blown off when they appear in the source
+;;; context.
 (defun find-error-context (args)
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
@@ -1483,8 +1483,8 @@
 
 ;;;; printing error messages
 
-;;; We save the context information that we printed out most recently so that
-;;; we don't print it out redundantly.
+;;; We save the context information that we printed out most recently
+;;; so that we don't print it out redundantly.
 
 ;;; The last COMPILER-ERROR-CONTEXT that we printed.
 (defvar *last-error-context* nil)
@@ -1496,8 +1496,8 @@
 (declaim (type (or string null) *last-format-string*))
 (declaim (type list *last-format-args*))
 
-;;; The number of times that the last error message has been emitted, so that
-;;; we can compress duplicate error messages.
+;;; The number of times that the last error message has been emitted,
+;;; so that we can compress duplicate error messages.
 (defvar *last-message-count* 0)
 (declaim (type index *last-message-count*))
 
@@ -1508,19 +1508,18 @@
   (cond ((= *last-message-count* 1)
 	 (when terpri (terpri *error-output*)))
 	((> *last-message-count* 1)
-          ;; MNA: compiler message patch
-          (format *error-output* "~&; [Last message occurs ~D times]~2%"
+          (format *error-output* "~&; [Last message occurs ~D times.]~2%"
 		 *last-message-count*)))
   (setq *last-message-count* 0))
 
-;;; Print out the message, with appropriate context if we can find it. If
-;;; If the context is different from the context of the last message we
-;;; printed, then we print the context. If the original source is different
-;;; from the source we are working on, then we print the current source in
-;;; addition to the original source.
+;;; Print out the message, with appropriate context if we can find it.
+;;; If If the context is different from the context of the last
+;;; message we printed, then we print the context. If the original
+;;; source is different from the source we are working on, then we
+;;; print the current source in addition to the original source.
 ;;;
-;;; We suppress printing of messages identical to the previous, but record
-;;; the number of times that the message is repeated.
+;;; We suppress printing of messages identical to the previous, but
+;;; record the number of times that the message is repeated.
 (defun print-compiler-message (format-string format-args)
 
   (declare (type simple-string format-string))
@@ -1542,14 +1541,12 @@
 	  (when (pathnamep file)
 	    (note-message-repeats)
 	    (setq last nil)
-            ;; MNA: compiler message patch
             (format stream "~2&; file: ~A~%" (namestring file))))
 
 	(unless (and last
 		     (equal in (compiler-error-context-context last)))
 	  (note-message-repeats)
 	  (setq last nil)
-          ;; MNA: compiler message patch
           (format stream "~&")
           (pprint-logical-block (stream nil :per-line-prefix "; ")
             (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
@@ -1561,7 +1558,6 @@
 			      (compiler-error-context-original-source last)))
 	  (note-message-repeats)
 	  (setq last nil)
-          ;; MNA: compiler message patch
           (format stream "~&")
           (pprint-logical-block (stream nil :per-line-prefix "; ")
             (format stream "  ~A" form))
@@ -1573,7 +1569,6 @@
 	  (when enclosing
 	    (note-message-repeats)
 	    (setq last nil)
-            ;; MNA: compiler message patch
 	    (format stream "~&; --> ~{~<~%; --> ~1:;~A~> ~}~%" enclosing)))
 
 	(unless (and last
@@ -1582,7 +1577,6 @@
 	  (when source
 	    (note-message-repeats)
 	    (dolist (src source)
-              ;; MNA: compiler message patch
               (format stream "~&")
               (write-string "; ==>" stream)
               (format stream "~&")
@@ -1604,7 +1598,6 @@
       (let ((*print-level*  *compiler-error-print-level*)
 	    (*print-length* *compiler-error-print-length*)
 	    (*print-lines*  *compiler-error-print-lines*))
-        ;; MNA: compiler message patch
         (format stream "~&")
         (pprint-logical-block (stream nil :per-line-prefix "; ")
           (format stream "~&~?" format-string format-args))

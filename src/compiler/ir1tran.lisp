@@ -1046,10 +1046,6 @@
 			     (string= (symbol-name what) "CLASS"))) ; pcl hack
 		   (or (info :type :kind what)
 		       (and (consp what) (info :type :translator (car what)))))
-;;; MNA - abbreviated declaration bug
-;;               (unless (policy nil (= brevity 3))
-		;; FIXME: Is it ANSI to warn about this? I think not.
-;;		(compiler-note "abbreviated type declaration: ~S." spec))
 	      (process-type-declaration spec res vars))
 	     ((info :declaration :recognized what)
 	      res)
@@ -1560,13 +1556,11 @@
 		       (let ((n-supplied (gensym "N-SUPPLIED-")))
 			 (temps n-supplied)
 			 (arg-vals n-value n-supplied)
-                         ;; MNA: non-self-eval-keyword patch
 			 (tests `((eq ,n-key ',keyword)
 				  (setq ,n-supplied t)
 				  (setq ,n-value ,n-value-temp)))))
 		      (t
 		       (arg-vals n-value)
-                        ;; MNA: non-self-eval-keyword patch
 		       (tests `((eq ,n-key ',keyword)
 				(setq ,n-value ,n-value-temp)))))))
 
@@ -1921,11 +1915,9 @@
     (prev-link entry start)
     (use-continuation entry dummy)
     
-    ;; MNA - Re: two obscure bugs in CMU CL
     (let* ((env-entry (list entry cont))
-           (*lexenv*
-            (make-lexenv :blocks (list (cons name env-entry))
-				 :cleanup cleanup)))
+           (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
+				  :cleanup cleanup)))
       (push env-entry (continuation-lexenv-uses cont))
       (ir1-convert-progn-body dummy cont forms))))
 
@@ -2009,15 +2001,13 @@
 	      (conts))
       (starts dummy)
       (dolist (segment (rest segments))
-	;; MNA - Re: two obscure bugs
 	(let* ((tag-cont (make-continuation))
                (tag (list (car segment) entry tag-cont)))          
 	  (conts tag-cont)
 	  (starts tag-cont)
 	  (continuation-starts-block tag-cont)
           (tags tag)
-          (push (cdr tag) (continuation-lexenv-uses tag-cont))
-          ))
+          (push (cdr tag) (continuation-lexenv-uses tag-cont))))
       (conts cont)
 
       (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
@@ -2482,8 +2472,7 @@
   the Forms are also processed as top-level forms."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (let ((*lexenv* (process-decls decls nil nil cont)))
-      ;;; MNA: locally patch - #'ir1-convert-progn-body gets called anyway!
-      (ir1-convert-progn-body start cont forms))))
+      (ir1-convert-aux-bindings start cont forms nil nil nil))))
 
 ;;;; FLET and LABELS
 
@@ -3015,7 +3004,6 @@
       (ir1-convert start cont `(%%define-compiler-macro ',name ,fun ,doc)))
 
     (when sb!xc:*compile-print*
-      ;; MNA compiler message patch
       (compiler-mumble "~&; converted ~S~%" name))))
 
 ;;;; defining global functions
@@ -3224,5 +3212,4 @@
 		       ,@(when save-expansion `(',save-expansion)))))
 
 	(when sb!xc:*compile-print*
-          ;; MNA compiler message patch
 	  (compiler-mumble "~&; converted ~S~%" name))))))

@@ -486,10 +486,10 @@ Function and macro commands:
 					     s)))))
   string)
 
-;;; Print frame with verbosity level 1. If we hit a rest-arg, then
+;;; Print frame with verbosity level 1. If we hit a &REST arg, then
 ;;; print as many of the values as possible, punting the loop over
 ;;; lambda-list variables since any other arguments will be in the
-;;; rest-arg's list of values.
+;;; &REST arg's list of values.
 (defun print-frame-call-1 (frame)
   (let* ((d-fun (sb!di:frame-debug-function frame))
 	 (loc (sb!di:frame-code-location frame))
@@ -515,6 +515,19 @@ Function and macro commands:
       (sb!di:lambda-list-unavailable
        ()
        (push (make-unprintable-object "lambda list unavailable") results)))
+    ;; FIXME: For some reason this sometimes prints as
+    ;;    (FOO-BAR-LONG-THING
+    ;;     X
+    ;;     Y
+    ;;     Z)
+    ;; (OK) and sometimes prints as
+    ;;    (FOO-BAR-LONG-THING X
+    ;;                        Y
+    ;;                        Z)
+    ;; even when this second style causes confusingly long weird lines
+    ;; (bad). Handle printing explicitly inside our own
+    ;; PPRINT-LOGICAL-BLOCK, and force the preferred style for long
+    ;; lines.
     (prin1 (mapcar #'ensure-printable-object (nreverse results)))
     (when (sb!di:debug-function-kind d-fun)
       (write-char #\[)
@@ -536,8 +549,8 @@ Function and macro commands:
     (sb!di:debug-var-value var frame)
     (make-unprintable-object "unavailable arg")))
 
-;;; Prints a representation of the function call causing frame to
-;;; exist. Verbosity indicates the level of information to output;
+;;; Prints a representation of the function call causing FRAME to
+;;; exist. VERBOSITY indicates the level of information to output;
 ;;; zero indicates just printing the debug-function's name, and one
 ;;; indicates displaying call-like, one-liner format with argument
 ;;; values.
@@ -845,8 +858,9 @@ reset to ~S."
 		   (:set
 		    `(setf (sb!di:debug-var-value (car vars) *current-frame*)
 			   ,value-var))))
-	       ;; If there weren't any exact matches, flame about ambiguity
-	       ;; unless all the variables have the same name.
+	       ;; If there weren't any exact matches, flame about
+	       ;; ambiguity unless all the variables have the same
+	       ;; name.
 	       ((and (not exact)
 		     (find-if-not
 		      #'(lambda (v)
@@ -858,8 +872,8 @@ reset to ~S."
 			       (delete-duplicates
 				vars :test #'string=
 				:key #'sb!di:debug-var-symbol-name))))
-	       ;; All names are the same, so see whether the user ID'ed one of
-	       ;; them.
+	       ;; All names are the same, so see whether the user
+	       ;; ID'ed one of them.
 	       (id-supplied
 		(let ((v (find id vars :key #'sb!di:debug-var-id)))
 		  (unless v
@@ -901,11 +915,11 @@ reset to ~S."
 (defun (setf var) (value name &optional (id 0 id-supplied))
   (define-var-operation :set value))
 
-;;; This returns the COUNT'th arg as the user sees it from args, the result of
-;;; SB!DI:DEBUG-FUNCTION-LAMBDA-LIST. If this returns a potential
-;;; DEBUG-VAR from the lambda-list, then the second value is T. If this
-;;; returns a keyword symbol or a value from a rest arg, then the second value
-;;; is NIL.
+;;; This returns the COUNT'th arg as the user sees it from args, the
+;;; result of SB!DI:DEBUG-FUNCTION-LAMBDA-LIST. If this returns a
+;;; potential DEBUG-VAR from the lambda-list, then the second value is
+;;; T. If this returns a keyword symbol or a value from a rest arg,
+;;; then the second value is NIL.
 (declaim (ftype (function (index list)) nth-arg))
 (defun nth-arg (count args)
   (let ((n count))
@@ -922,7 +936,7 @@ reset to ~S."
 	:rest ((let ((var (second ele)))
 		 (lambda-var-dispatch var (sb!di:frame-code-location
 					   *current-frame*)
-		   (error "unused REST-arg before n'th argument")
+		   (error "unused &REST arg before n'th argument")
 		   (dolist (value
 			    (sb!di:debug-var-value var *current-frame*)
 			    (error
@@ -931,7 +945,7 @@ reset to ~S."
 		     (if (zerop n)
 			 (return-from nth-arg (values value nil))
 			 (decf n)))
-		   (error "invalid REST-arg before n'th argument")))))
+		   (error "invalid &REST arg before n'th argument")))))
       (decf n))))
 
 (defun arg (n)

@@ -1017,7 +1017,6 @@ bootstrapping.
 					       (cadar var))
 				       (values (sb-int:keywordicate (car var))
 					       (car var)))
-                                 ;; MNA: non-self-eval-keyword patch
 				 `((,key (get-key-arg1 ',keyword ,args-tail))
 				   (,variable (if (consp ,key)
 						  (car ,key)
@@ -1029,7 +1028,6 @@ bootstrapping.
 					       (cadar var))
 				       (values (sb-int:keywordicate (car var))
 					       (car var)))
-                                 ;; MNA: non-self-eval-keyword patch
 				 `((,key (get-key-arg1 ',keyword ,args-tail))
 				   (,(caddr var) ,key)
 				   (,variable (if (consp ,key)
