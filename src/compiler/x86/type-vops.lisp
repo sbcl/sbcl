@@ -65,12 +65,6 @@
   (inst cmp al-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-lowtag-and-headers (value target not-p lowtag function-p headers)
-  (let ((drop-through (gen-label)))
-    (%test-lowtag value (if not-p drop-through target) nil lowtag)
-    (%test-headers value target not-p function-p headers drop-through t)))
-
-
 (defun %test-headers (value target not-p function-p headers
 			    &optional (drop-through (gen-label)) al-loaded)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))

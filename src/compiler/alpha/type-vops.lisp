@@ -42,13 +42,6 @@
 	(inst bne temp target)
 	(inst beq temp target))))
 
-(defun %test-lowtag-and-headers (value target not-p lowtag
-				 function-p headers &key temp)
-  (let ((drop-through (gen-label)))
-    (%test-lowtag value (if not-p drop-through target) nil lowtag :temp temp)
-    (%test-headers value target not-p function-p headers
-		   :drop-through drop-through :temp temp)))
-
 (defun %test-headers (value target not-p function-p headers
 		      &key (drop-through (gen-label)) temp)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))

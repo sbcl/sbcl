@@ -38,14 +38,6 @@
       (inst extru value 31 3 temp))
     (inst bci := not-p lowtag temp target)))
 
-(defun %test-lowtag-and-headers (value target not-p lowtag
-				 function-p headers &key temp)
-  (let ((drop-through (gen-label)))
-    (%test-lowtag value (if not-p drop-through target) nil lowtag
-		  :temp temp)
-    (%test-headers value target not-p function-p headers
-		   :drop-through drop-through :temp temp :temp-loaded t)))
-
 (defun %test-headers (value target not-p function-p headers
 		      &key temp (drop-through (gen-label)) temp-loaded)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))

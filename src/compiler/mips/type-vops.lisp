@@ -47,14 +47,6 @@
     (unless skip-nop
       (inst nop))))
 
-(defun %test-lowtag-and-headers (value target not-p lowtag
-				 function-p headers &key temp)
-  (let ((drop-through (gen-label)))
-    (%test-lowtag value (if not-p drop-through target) nil lowtag
-		  :skip-nop t :temp temp)
-    (%test-headers value target not-p function-p headers
-		   :drop-through drop-through :temp temp)))
-
 (defun %test-headers (value target not-p function-p headers
 		      &key (drop-through (gen-label)) temp)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))

@@ -91,13 +91,9 @@
       (lowtags
        (when (cdr lowtags)
 	 (error "can't test multiple lowtags at the same time"))
-       (if headers
-	   `(%test-lowtag-and-headers
-	     ,value ,target ,not-p ,(car lowtags)
-	     ,function-p ',(canonicalize-headers headers)
-	     ,@other-args)
-	   `(%test-lowtag ,value ,target ,not-p ,(car lowtags)
-	     ,@other-args)))
+       (when headers
+	 (error "can't test non-fixnum lowtags and headers at the same time"))
+       `(%test-lowtag ,value ,target ,not-p ,(car lowtags) ,@other-args))
       (headers
        `(%test-headers ,value ,target ,not-p ,function-p
 	 ',(canonicalize-headers headers)
