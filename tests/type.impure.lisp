@@ -409,6 +409,14 @@
         (t1 (sb-kernel:specifier-type s)))
    (eval `(defstruct ,s))
    (sb-kernel:type= t1 (sb-kernel:specifier-type s))))
+
+;;; bug found by PFD's random subtypep tester
+(let ((t1 '(cons rational (cons (not rational) (cons integer t))))
+      (t2 '(not (cons (integer 0 1) (cons single-float long-float)))))
+  (assert-t-t (subtypep t1 t2))
+  (assert-nil-t (subtypep t2 t1))
+  (assert-t-t (subtypep `(not ,t2) `(not ,t1)))
+  (assert-nil-t (subtypep `(not ,t1) `(not ,t2))))
 
 ;;; success
 (quit :unix-status 104)

@@ -2129,6 +2129,8 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
        interval, containing 0.
     ** ASH of a negative bignum by a negative bignum count now returns
        -1, not 0.
+    ** intersection of CONS types now canonicalizes properly, fixing
+       inconsistencies in SUBTYPEP.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -2810,14 +2810,21 @@
 	    
 (!define-type-method (cons :simple-intersection2) (type1 type2)
   (declare (type cons-type type1 type2))
-  (let (car-int2
-	cdr-int2)
-    (and (setf car-int2 (type-intersection2 (cons-type-car-type type1)
-					    (cons-type-car-type type2)))
-	 (setf cdr-int2 (type-intersection2 (cons-type-cdr-type type1)
-					    (cons-type-cdr-type type2)))
-	 (make-cons-type car-int2 cdr-int2))))
-
+  (let ((car-int2 (type-intersection2 (cons-type-car-type type1)
+				      (cons-type-car-type type2)))
+	(cdr-int2 (type-intersection2 (cons-type-cdr-type type1)
+				      (cons-type-cdr-type type2))))
+    (cond
+      ((and car-int2 cdr-int2) (make-cons-type car-int2 cdr-int2))
+      (car-int2 (make-cons-type car-int2
+				(type-intersection
+				 (cons-type-cdr-type type1)
+				 (cons-type-cdr-type type2))))
+      (cdr-int2 (make-cons-type
+		 (type-intersection (cons-type-car-type type1)
+				    (cons-type-car-type type2))
+		 cdr-int2)))))
+				 
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.
 ;;;
