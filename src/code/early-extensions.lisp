@@ -619,8 +619,14 @@
 	   :format-control "invalid function name: ~S"
 	   :format-arguments (list name))))
 
-;;; Given a function name, return the name for the BLOCK which
-;;; encloses its body (e.g. in DEFUN, DEFINE-COMPILER-MACRO, or FLET).
+;;; Given a function name, return the symbol embedded in it.
+;;;
+;;; The ordinary use for this operator (and the motivation for the
+;;; name of this operator) is to convert from a function name to the
+;;; name of the BLOCK which encloses its body.
+;;;
+;;; Occasionally the operator is useful elsewhere, where the operator
+;;; name is less mnemonic. (Maybe it should be changed?)
 (declaim (ftype (function ((or symbol cons)) symbol) fun-name-block-name))
 (defun fun-name-block-name (fun-name)
   (cond ((symbolp fun-name)
