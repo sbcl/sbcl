@@ -652,7 +652,7 @@
 (defun required-argument ()
   #!+sb-doc
   (/show0 "entering REQUIRED-ARGUMENT")
-  (error "A required &KEY argument was not supplied."))
+  (error "A required &KEY or &OPTIONAL argument was not supplied."))
 
 ;;; like CL:ASSERT and CL:CHECK-TYPE, but lighter-weight
 ;;;

@@ -166,30 +166,77 @@
 		   :element-type ,element-type
 		   :initial-element ,initial-element)))
 
-(defparameter *array-info*
-  #((base-char #.default-init-char 8 sb!vm:simple-string-type)
-    (single-float 0.0s0 32 sb!vm:simple-array-single-float-type)
-    (double-float 0.0d0 64 sb!vm:simple-array-double-float-type)
-    #!+long-float (long-float 0.0l0 #!+x86 96 #!+sparc 128
-			      sb!vm:simple-array-long-float-type)
-    (bit 0 1 sb!vm:simple-bit-vector-type)
-    ((unsigned-byte 2) 0 2 sb!vm:simple-array-unsigned-byte-2-type)
-    ((unsigned-byte 4) 0 4 sb!vm:simple-array-unsigned-byte-4-type)
-    ((unsigned-byte 8) 0 8 sb!vm:simple-array-unsigned-byte-8-type)
-    ((unsigned-byte 16) 0 16 sb!vm:simple-array-unsigned-byte-16-type)
-    ((unsigned-byte 32) 0 32 sb!vm:simple-array-unsigned-byte-32-type)
-    ((signed-byte 8) 0 8 sb!vm:simple-array-signed-byte-8-type)
-    ((signed-byte 16) 0 16 sb!vm:simple-array-signed-byte-16-type)
-    ((signed-byte 30) 0 32 sb!vm:simple-array-signed-byte-30-type)
-    ((signed-byte 32) 0 32 sb!vm:simple-array-signed-byte-32-type)
-    ((complex single-float) #C(0.0s0 0.0s0) 64
-     sb!vm:simple-array-complex-single-float-type)
-    ((complex double-float) #C(0.0d0 0.0d0) 128
-     sb!vm:simple-array-complex-double-float-type)
-    #!+long-float
-    ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
-     sb!vm:simple-array-complex-long-float-type)
-    (t 0 32 sb!vm:simple-vector-type)))
+(defstruct (specialized-array-element-type-properties
+	    (:conc-name saetp-)
+	    (:constructor !make-saetp (ctype
+				       low-level-initial-element-default
+				       n-bits
+				       typecode
+				       &key
+				       (n-pad-elements 0)
+				       (high-level-initial-element-default
+					low-level-initial-element-default)))
+	    (:copier nil))
+  ;; the element type, e.g. #<BUILT-IN-CLASS BASE-CHAR (sealed)> or
+  ;; #<SB-KERNEL:NUMERIC-TYPE (UNSIGNED-BYTE 4)>
+  (ctype (required-argument) :type ctype :read-only t)
+  ;; what we get when the low-level vector-creation logic zeroes all the bits
+  (low-level-initial-element-default (required-argument) :read-only t)
+  ;; the high level default value. The distinction between this and
+  ;; the low-level default can be illustrated for strings of ASCII
+  ;; characters. The low-level default is #\NULL (i.e. CHAR-CODE = 0)
+  ;; because the array, like other arrays, is born zeroed. However, we
+  ;; don't like that as a high level default because it's not a
+  ;; STANDARD-CHAR, so we use something else (e.g. #\SPACE) instead.
+  (high-level-initial-element-default (required-argument) :read-only t)
+  ;; how many bits per element
+  (n-bits (required-argument) :type index :read-only t)
+  ;; the low-level type code
+  (typecode (required-argument) :type index :read-only t)
+  ;; the number of extra elements we use at the end of the array for
+  ;; low level hackery (e.g., one element for arrays of BASE-CHAR,
+  ;; which is used for a fixed #\NULL so that when we call out to C
+  ;; we don't need to cons a new copy)
+  (n-pad-elements (required-argument) :type index :read-only t))
+
+(defparameter *specialized-array-element-type-properties*
+  (map 'simple-vector
+       (lambda (args)
+	 (destructuring-bind (type-spec &rest rest) args
+	   (let ((ctype (specifier-type type-spec)))
+	     (apply #'!make-saetp ctype rest))))
+       `((base-char ,(code-char 0) 8 ,sb!vm:simple-string-type
+		    ;; (SIMPLE-STRINGs are stored with an extra trailing
+		    ;; #\NULL for convenience in calling out to C.)
+		    :n-pad-elements 1
+		    ;; #\NULL is set automatically by the low-level
+		    ;; logic, but that's a little distasteful as a
+		    ;; high-level default because it's not a
+		    ;; STANDARD-CHAR, so use #\SPACE instead.
+		    :high-level-initial-element-default #\space)
+	 (single-float 0.0s0 32 ,sb!vm:simple-array-single-float-type)
+	 (double-float 0.0d0 64 ,sb!vm:simple-array-double-float-type)
+	 #!+long-float (long-float 0.0L0 #!+x86 96 #!+sparc 128
+				   ,sb!vm:simple-array-long-float-type)
+	 (bit 0 1 ,sb!vm:simple-bit-vector-type)
+	 ((unsigned-byte 2) 0 2 ,sb!vm:simple-array-unsigned-byte-2-type)
+	 ((unsigned-byte 4) 0 4 ,sb!vm:simple-array-unsigned-byte-4-type)
+	 ((unsigned-byte 8) 0 8 ,sb!vm:simple-array-unsigned-byte-8-type)
+	 ((unsigned-byte 16) 0 16 ,sb!vm:simple-array-unsigned-byte-16-type)
+	 ((unsigned-byte 32) 0 32 ,sb!vm:simple-array-unsigned-byte-32-type)
+	 ((signed-byte 8) 0 8 ,sb!vm:simple-array-signed-byte-8-type)
+	 ((signed-byte 16) 0 16 ,sb!vm:simple-array-signed-byte-16-type)
+	 ((signed-byte 30) 0 32 ,sb!vm:simple-array-signed-byte-30-type)
+	 ((signed-byte 32) 0 32 ,sb!vm:simple-array-signed-byte-32-type)
+	 ((complex single-float) #C(0.0s0 0.0s0) 64
+	  ,sb!vm:simple-array-complex-single-float-type)
+	 ((complex double-float) #C(0.0d0 0.0d0) 128
+	  ,sb!vm:simple-array-complex-double-float-type)
+	 #!+long-float ((complex long-float) #C(0.0L0 0.0L0)
+			#!+x86 192 #!+sparc 256
+			,sb!vm:simple-array-complex-long-float-type)
+	 (t 0 32 ,sb!vm:simple-vector-type
+	    :high-level-initial-element-default nil))))
 
 ;;; The integer type restriction on the length ensures that it will be
 ;;; a vector. The lack of adjustable, fill-pointer, and displaced-to
@@ -206,28 +253,39 @@
 		  (continuation-value length)
 		  '*))
 	 (spec `(simple-array ,eltype (,len)))
-	 (eltype-type (specifier-type eltype)))
-    (multiple-value-bind (default-initial-element element-size typecode)
-	(dovector (info *array-info*
-			(give-up-ir1-transform
-			 "cannot open-code creation of ~S" spec))
-	  (when (csubtypep eltype-type (specifier-type (car info)))
-	    (return (values-list (cdr info)))))
-      (let* ((nwords-form
-	      (if (>= element-size sb!vm:word-bits)
-		  `(* length ,(/ element-size sb!vm:word-bits))
-		  (let ((elements-per-word (/ 32 element-size)))
-		    `(truncate (+ length
-				  ,(if (eq 'sb!vm:simple-string-type typecode)
-				     ;; (Simple strings are stored with an
-				     ;; extra trailing null for convenience
-				     ;; in calling out to C.)
-				     elements-per-word
-				     (1- elements-per-word)))
-			       ,elements-per-word))))
-	     (constructor
-	      `(truly-the ,spec
-			  (allocate-vector ,typecode length ,nwords-form))))
+	 (eltype-type (specifier-type eltype))
+	 (saetp (find-if (lambda (saetp)
+			   (csubtypep eltype-type (saetp-ctype saetp)))
+			 *specialized-array-element-type-properties*)))
+    (unless saetp
+      (give-up-ir1-transform
+       "cannot open-code creation of ~S" spec))
+
+    (let* (;; FIXME: This is basically a literal translation of the
+	   ;; old CMU CL code, which made no distinction between low-
+	   ;; and high-level default initial elements (hence bug 126),
+	   ;; so we just drop the high-level default initial element
+	   ;; on the floor here (hence bug 126 remains).
+	   (default-initial-element
+	     (saetp-low-level-initial-element-default saetp))
+	   (n-bits-per-element (saetp-n-bits saetp))
+	   (typecode (saetp-typecode saetp))
+	   (n-pad-elements (saetp-n-pad-elements saetp))
+	   (padded-length-form (if (zerop n-pad-elements)
+				   'length
+				   `(+ length ,n-pad-elements)))
+	   (n-words-form
+	    (if (>= n-bits-per-element sb!vm:word-bits)
+		`(* ,padded-length-form
+		    (the fixnum ; i.e., not RATIO
+		      ,(/ n-bits-per-element sb!vm:word-bits)))
+		(let ((n-elements-per-word (/ sb!vm:word-bits
+					      n-bits-per-element)))
+		  (declare (type index n-elements-per-word)) ; i.e., not RATIO
+		  `(ceiling ,padded-length-form ,n-elements-per-word))))
+	   (constructor
+	    `(truly-the ,spec
+			(allocate-vector ,typecode length ,n-words-form))))
 	(values
 	 (cond ((and default-initial-element
 		     (or (null initial-element)
@@ -255,7 +313,7 @@
 		constructor)
 	       (t
 		`(truly-the ,spec (fill ,constructor initial-element))))
-	 '((declare (type index length))))))))
+	 '((declare (type index length)))))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
