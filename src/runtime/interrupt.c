@@ -592,18 +592,19 @@ uninstall_low_level_interrupt_handlers_atexit(void)
     }
 }
 
-/* Install a special low-level handler for signal; or if handler is
- * SIG_DFL, remove any special handling for signal.
+/* Undoably install a special low-level handler for signal; or if
+ * handler is SIG_DFL, remove any special handling for signal.
  *
- * The "undoably_" part is because we also arrange with atexit() for
- * the handler to be restored to its old value. This is for tidiness,
- * though it shouldn't really matter in normal operation of the
- * program, except perhaps that it removes a window when e.g. SIGINT
- * would be handled bizarrely. The original motivation was that some
- * memory corruption problems in OpenBSD ca sbcl-0.6.12.12 became
- * unnecessarily hard to debug when they ended up back in gencgc.c
- * code (courtesy of the gencgc SIGSEGV handler) after exit() was
- * called. */
+ * The "undoably" aspect is because we also arrange with atexit() for
+ * the handler to be restored to its old value. This is for tidiness:
+ * it shouldn't matter much ordinarily, but it does remove a window
+ * where e.g. memory fault signals (SIGSEGV or SIGBUS, which in
+ * ordinary operation of SBCL are sent to the generational garbage
+ * collector, then possibly onward to Lisp code) or SIGINT (which is
+ * ordinarily passed to Lisp code) could otherwise be handled
+ * bizarrely/brokenly because the Lisp code would try to deal with
+ * them using machinery (like stream output buffers) which has already
+ * been dismantled. */
 void
 undoably_install_low_level_interrupt_handler (int signal,
 					      void handler(int,

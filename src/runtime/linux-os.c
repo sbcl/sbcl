@@ -64,8 +64,8 @@ void os_init(void)
     }
 
     os_vm_page_size = getpagesize();
-   /* this could just as well be in arch_init, but it's not  */
-#ifdef i386
+   /* This could just as well be in arch_init(), but it's not. */
+#ifdef __i386__
     SET_FPU_CONTROL_WORD(0x1372|4|8|16|32); /* no interrupts */
 #endif
 }
@@ -249,10 +249,10 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_context_t *context = (os_context_t*)void_context;
     os_vm_address_t addr;
 
-#ifdef i386
+#ifdef __i386__
     interrupt_handle_now(signal,contextstruct);
 #else
-#define CONTROL_STACK_TOP (((char*)CONTROL_STACK_START)+CONTROL_STACK_SIZE)
+    char *control_stack_top = (char*)CONTROL_STACK_START + CONTROL_STACK_SIZE;
     
     addr = arch_get_bad_addr(signal,info,context);
 
@@ -270,11 +270,16 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	 */
 	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
 	interrupt_handle_pending(context);
-    } else if (addr > CONTROL_STACK_TOP && addr < BINDING_STACK_START) {
-	fprintf(stderr, "Possible stack overflow at 0x%016lX: CONTROL_STACK_TOP=%lx, BINDING_STACK_START=%lx\n",addr, CONTROL_STACK_TOP,BINDING_STACK_START);
-	/* try to fix control frame pointer */
+    } else if (addr > control_stack_top && addr < BINDING_STACK_START) {
+	fprintf(stderr,
+		"Possible stack overflow at 0x%016lX:\n"
+		"control_stack_top=%lx, BINDING_STACK_START=%lx\n",
+		addr,
+		control_stack_top,
+		BINDING_STACK_START);
+	/* Try to fix control frame pointer. */
 	while ( ! (CONTROL_STACK_START <= *current_control_frame_pointer &&
-		   *current_control_frame_pointer <= CONTROL_STACK_TOP))
+		   *current_control_frame_pointer <= control_stack_top))
 	    ((char*)current_control_frame_pointer) -= sizeof(lispobj);
 	ldb_monitor();
     } else if (!interrupt_maybe_gc(signal, info, context)) {
@@ -283,8 +288,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 #endif
 }
 #endif
-
-
 
 void
 os_install_interrupt_handlers(void)

@@ -921,12 +921,12 @@ trans_return_pc_header(lispobj object)
 	return ret;
 }
 
-/* On the 386, closures hold a pointer to the raw address instead of the
-   function object, so we can use CALL [$FDEFN+const] to invoke the function
-   without loading it into a register.  Given that code objects don't move,
-   we don't need to update anything, but we do have to figure out that the
-   function is still live. */
-#ifdef i386
+/* On the 386, closures hold a pointer to the raw address instead of
+ * the function object, so we can use CALL [$FDEFN+const] to invoke
+ * the function without loading it into a register. Given that code
+ * objects don't move, we don't need to update anything, but we do
+ * have to figure out that the function is still live. */
+#ifdef __i386__
 static
 scav_closure_header(where, object)
 lispobj *where, object;
@@ -2102,7 +2102,7 @@ gc_init(void)
 	scavtab[type_FunctionHeader] = scav_function_header;
 	scavtab[type_ClosureFunctionHeader] = scav_function_header;
 	scavtab[type_ReturnPcHeader] = scav_return_pc_header;
-#ifdef i386
+#ifdef __i386__
 	scavtab[type_ClosureHeader] = scav_closure_header;
 	scavtab[type_FuncallableInstanceHeader] = scav_closure_header;
 	scavtab[type_ByteCodeFunction] = scav_closure_header;

@@ -128,10 +128,6 @@ F(setpgrp)
 #if !defined(SVR4) ||  defined(SOLARIS25)
 F(setpriority)
 #endif
-#if !defined(hpux) && !defined(SVR4) ||  defined(SOLARIS25)
-F(setregid)
-F(setreuid)
-#endif
 F(setrlimit)
 F(setsockopt)
 F(settimeofday)

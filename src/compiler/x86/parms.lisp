@@ -123,7 +123,6 @@
 ;;;     stomping on an address range that the dynamic libraries want to use. 
 ;;;     (They want to use this address range even if we try to reserve it
 ;;;     with a call to validate() as the first operation in main().)
-
 #!+linux
 (progn
 

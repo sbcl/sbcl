@@ -111,8 +111,6 @@ ldso_stub__ ## fct: ; \
  LDSO_STUBIFY(send)
  LDSO_STUBIFY(setitimer)
  LDSO_STUBIFY(setpgrp)
- LDSO_STUBIFY(setregid)
- LDSO_STUBIFY(setreuid)
  LDSO_STUBIFY(sigblock)
  LDSO_STUBIFY(sigpause)
  LDSO_STUBIFY(sigsetmask)
@@ -707,8 +705,6 @@ ldso_stub__ ## fct: ; \
 /*  LDSO_STUBIFY(setpriority) */
 /*  LDSO_STUBIFY(setprotoent) */
 /*  LDSO_STUBIFY(setpwent) */
-/*  LDSO_STUBIFY(setregid) */
-/*  LDSO_STUBIFY(setreuid) */
 /*  LDSO_STUBIFY(setrlimit) */
 /*  LDSO_STUBIFY(setrpcent) */
 /*  LDSO_STUBIFY(setservent) */

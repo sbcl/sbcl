@@ -2,3 +2,4 @@ depend
 sbcl
 sbcl.h
 sbcl.nm
+trymap

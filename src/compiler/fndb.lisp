@@ -1137,8 +1137,7 @@
    (:verbose t)
    (:print t)
    (:if-does-not-exist (member :error :create nil))
-   ;; FIXME: ANSI specifies an :EXTERNAL-FORMAT keyword too.
-   )
+   (:external-format (member :default)))
   t)
 
 (defknown directory (pathname-designator &key

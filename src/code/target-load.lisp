@@ -142,8 +142,6 @@
 ;;; take effect. If the compiler is loaded, we make the
 ;;; compiler-policy local to LOAD by binding it to itself.
 ;;;
-;;; FIXME: ANSI specifies a &KEY :EXTERNAL-FORMAT argument.
-;;;
 ;;; FIXME: Daniel Barlow's ilsb.tar ILISP-for-SBCL patches contain an
 ;;; implementation of "DEFUN SOURCE-FILE" which claims, in a comment, that CMU
 ;;; CL does not correctly record source file information when LOADing a
@@ -152,23 +150,13 @@
 	     &key
 	     (verbose *load-verbose*)
 	     (print *load-print*)
-	     (if-does-not-exist t))
+	     (if-does-not-exist t)
+	     (external-format :default))
   #!+sb-doc
-  "Loads the file given by FILESPEC into the Lisp environment, returning
-   T on success. These options are defined:
-
-   :IF-DOES-NOT-EXIST
-       What should we do if the file can't be located? If true (the
-       default), signal an error. If NIL, simply return NIL.
-
-   :VERBOSE
-       If true, print a line describing each file loaded. The default
-       is *LOAD-VERBOSE*.
-
-   :PRINT
-       If true, print information about loaded values. When loading the
-       source, the result of evaluating each top-level form is printed.
-       The default is *LOAD-PRINT*."
+  "Load the file given by FILESPEC into the Lisp environment, returning
+   T on success."
+  (unless (eq external-format :default)
+    (error "Non-:DEFAULT EXTERNAL-FORMAT values are not supported."))
 
   (let ((*load-depth* (1+ *load-depth*))
 	;; KLUDGE: I can't find in the ANSI spec where it says that
