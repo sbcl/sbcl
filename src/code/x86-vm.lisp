@@ -89,11 +89,12 @@
 			    (sb!kernel:code-instructions code)))
 	    (obj-start-addr (logand (sb!kernel:get-lisp-obj-address code)
 				    #xfffffff8))
-	    #+nil (const-start-addr (+ obj-start-addr (* 5 4)))
+	    ;; FIXME: what is this 5?
+	    #+nil (const-start-addr (+ obj-start-addr (* 5 n-word-bytes)))
 	    (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
 					      code)))
 	    (ncode-words (sb!kernel:code-header-ref code 1))
-	    (code-end-addr (+ code-start-addr (* ncode-words 4))))
+	    (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
        (unless (member kind '(:absolute :relative))
 	 (error "Unknown code-object-fixup kind ~S." kind))
        (ecase kind
@@ -113,7 +114,7 @@
 	    (add-fixup code offset))
 	  ;; Replace word with value to add to that loc to get there.
 	  (let* ((loc-sap (+ (sap-int sap) offset))
-		 (rel-val (- fixup loc-sap 4)))
+		 (rel-val (- fixup loc-sap n-word-bytes)))
 	    (declare (type (unsigned-byte 32) loc-sap)
 		     (type (signed-byte 32) rel-val))
 	    (setf (signed-sap-ref-32 sap offset) rel-val))))))
@@ -155,7 +156,7 @@
 	   (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
 					     code)))
 	   (ncode-words (sb!kernel:code-header-ref code 1))
-	 (code-end-addr (+ code-start-addr (* ncode-words 4))))
+	 (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
       (ecase kind
 	(:absolute
 	 ;; Record absolute fixups that point within the code object.
