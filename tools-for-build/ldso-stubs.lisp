@@ -198,6 +198,7 @@ ldso_stub__ ## fct: ;                           \\
                    "malloc"
                    "memmove"
                    "mkdir"
+                   "nl_langinfo"
                    "open"
                    "opendir"
                    "pipe"

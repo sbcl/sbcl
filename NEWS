@@ -1,4 +1,8 @@
 changes in sbcl-0.8.17 relative to sbcl-0.8.16:
+  * the system now has rudimentary external-format support; the
+    primary user-visible change at this time is that characters with
+    the high bit set (such as lower-case-e-acute) will print correctly
+    to a terminal in a UTF-8 environment.
   * minor incompatible change: BASE-CHAR no longer names a class;
     however, CHARACTER continues to do so, as required by ANSI.
   * minor incompatible change: SB-DEBUG:*DEBUG-PRINT-FOO* variables

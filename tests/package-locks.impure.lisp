@@ -450,7 +450,7 @@
 (assert (trace test:function :break t))
 
 ;;;; No bogus violations from defclass with accessors in a locked
-;;;; package. Reported by by François-René Rideau.
+;;;; package. Reported by by Francois-Rene Rideau.
 (assert (package-locked-p :sb-gray))
 (multiple-value-bind (fun compile-errors)
     (ignore-errors 

@@ -30,6 +30,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <dlfcn.h>
+#include <langinfo.h>
 
 #include "genesis/config.h"
 
@@ -71,6 +72,9 @@ main(int argc, char *argv[])
     defconstant ("rtld-global", RTLD_GLOBAL);
     
     printf("(in-package \"SB!UNIX\")\n\n");
+
+    printf(";;; langinfo\n");
+    defconstant("codeset", CODESET);
 
     printf(";;; types, types, types\n");
     DEFTYPE("clock-t", clock_t);

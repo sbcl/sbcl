@@ -557,6 +557,11 @@ Miles Egan:
   He creates binary packages of SBCL releases for Red Hat and other
   (which?) platforms.
 
+Andreas Fuchs:
+  He provides infrastructure for monitoring build and performance
+  regressions of SBCL.  He assisted with the integration of the
+  Unicode work.
+
 Nathan Froyd:
   He has fixed various bugs, and also done a lot of internal
   cleanup, not visible at the user level but important for
@@ -579,7 +584,8 @@ Espen S Johnsen:
 
 Teemu Kalvas:
   He worked on Unicode support for SBCL, including parsing the Unicode
-  character database and restoring the FAST-READ-CHAR optimization.
+  character database, restoring the FAST-READ-CHAR optimization and
+  developing external format support.
 
 Frederik Kuivinen:
   He showed how to implement the DEBUG-RETURN functionality.
