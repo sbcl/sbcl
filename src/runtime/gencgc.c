@@ -6030,7 +6030,7 @@ gc_init(void)
 
     gc_init_tables();
 
-    heap_base = (void*)DYNAMIC_0_SPACE_START;
+    heap_base = (void*)DYNAMIC_SPACE_START;
 
     /* Initialize each page structure. */
     for (i = 0; i < NUM_PAGES; i++) {
@@ -6089,7 +6089,7 @@ void
 gencgc_pickup_dynamic(void)
 {
     int page = 0;
-    int addr = DYNAMIC_0_SPACE_START;
+    int addr = DYNAMIC_SPACE_START;
     int alloc_ptr = SymbolValue(ALLOCATION_POINTER);
 
     /* Initialize the first region. */
@@ -6099,7 +6099,7 @@ gencgc_pickup_dynamic(void)
 	page_table[page].bytes_used = 4096;
 	page_table[page].large_object = 0;
 	page_table[page].first_object_offset =
-	    (void *)DYNAMIC_0_SPACE_START - page_address(page);
+	    (void *)DYNAMIC_SPACE_START - page_address(page);
 	addr += 4096;
 	page++;
     } while (addr < alloc_ptr);

@@ -30,16 +30,13 @@ extern lispobj *current_binding_stack_pointer;
 
 extern lispobj *read_only_space;
 extern lispobj *static_space;
-extern lispobj *dynamic_0_space;
-extern lispobj *dynamic_1_space;
 extern lispobj *control_stack;
 extern lispobj *binding_stack;
 #ifdef __i386__
 extern lispobj *control_stack_end;
 #endif
-extern lispobj *current_dynamic_space;
 #if !defined(ibmrt) && !defined(__i386__)
-extern lispobj *current_dynamic_space_free_pointer;
+extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;
 #endif
 
@@ -77,7 +74,7 @@ EXTERN(current_control_stack_pointer, 4)
 EXTERN(current_control_frame_pointer, 4)
 #if !defined(ibmrt) && !defined(__i386__)
 EXTERN(current_binding_stack_pointer, 4)
-EXTERN(current_dynamic_space_free_pointer, 4)
+EXTERN(dynamic_space_free_pointer, 4)
 #endif
 
 #ifdef mips

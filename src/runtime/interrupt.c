@@ -113,10 +113,10 @@ fake_foreign_function_call(os_context_t *context)
 
     /* Get current Lisp state from context. */
 #ifdef reg_ALLOC
-    current_dynamic_space_free_pointer =
+    dynamic_space_free_pointer =
 	(lispobj *)(*os_context_register_addr(context, reg_ALLOC));
 #ifdef alpha
-    if ((long)current_dynamic_space_free_pointer & 1) {
+    if ((long)dynamic_space_free_pointer & 1) {
       lose("dead in fake_foreign_function_call, context = %x", context);
     }
 #endif
@@ -212,7 +212,7 @@ undo_fake_foreign_function_call(os_context_t *context)
 #ifdef reg_ALLOC
     /* Put the dynamic space free pointer back into the context. */
     *os_context_register_addr(context, reg_ALLOC) =
-        (unsigned long) current_dynamic_space_free_pointer;
+        (unsigned long) dynamic_space_free_pointer;
 #endif
 }
 
@@ -447,7 +447,7 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 						      context);
 
 	return (badaddr >= current_auto_gc_trigger &&
-		badaddr < current_dynamic_space + DYNAMIC_SPACE_SIZE);
+		badaddr < DYNAMIC_SPACE_START + DYNAMIC_SPACE_SIZE);
     }
 }
 #endif

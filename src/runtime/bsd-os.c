@@ -194,8 +194,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
 {
     return in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE)
 	|| in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE   )
-	|| in_range_p(addr, DYNAMIC_0_SPACE_START, DYNAMIC_SPACE_SIZE  )
-	|| in_range_p(addr, DYNAMIC_1_SPACE_START, DYNAMIC_SPACE_SIZE  )
+	|| in_range_p(addr, DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE  )
 	|| in_range_p(addr, CONTROL_STACK_START  , CONTROL_STACK_SIZE  )
 	|| in_range_p(addr, BINDING_STACK_START  , BINDING_STACK_SIZE  );
 }

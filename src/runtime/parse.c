@@ -249,11 +249,11 @@ static boolean lookup_symbol(char *name, lispobj *result)
     }
 
     /* Search dynamic space. */
-    headerptr = current_dynamic_space;
+    headerptr = DYNAMIC_SPACE_START;
 #if !defined(ibmrt) && !defined(__i386__)
-    count = current_dynamic_space_free_pointer - current_dynamic_space;
+    count = dynamic_space_free_pointer - DYNAMIC_SPACE_START;
 #else
-    count = (lispobj *)SymbolValue(ALLOCATION_POINTER) - current_dynamic_space;
+    count = (lispobj *)SymbolValue(ALLOCATION_POINTER) - DYNAMIC_SPACE_START;
 #endif
     if (search_for_symbol(name, &headerptr, &count)) {
         *result = (lispobj)headerptr | type_OtherPointer;

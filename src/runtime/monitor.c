@@ -157,13 +157,13 @@ static void regs_cmd(char **ptr)
     printf("BSP\t=\t0x%08X\n", SymbolValue(BINDING_STACK_POINTER));
 #endif
 
-    printf("DYNAMIC\t=\t0x%08lX\n", (unsigned long)current_dynamic_space);
+    printf("DYNAMIC\t=\t0x%08lX\n", (unsigned long)DYNAMIC_SPACE_START);
 #if defined(ibmrt) || defined(__i386__)
     printf("ALLOC\t=\t0x%08lX\n", SymbolValue(ALLOCATION_POINTER));
     printf("TRIGGER\t=\t0x%08lX\n", SymbolValue(INTERNAL_GC_TRIGGER));
 #else
     printf("ALLOC\t=\t0x%08X\n",
-	   (unsigned long)current_dynamic_space_free_pointer);
+	   (unsigned long)dynamic_space_free_pointer);
     printf("TRIGGER\t=\t0x%08X\n", (unsigned long)current_auto_gc_trigger);
 #endif
     printf("STATIC\t=\t0x%08lX\n", SymbolValue(STATIC_SPACE_FREE_POINTER));

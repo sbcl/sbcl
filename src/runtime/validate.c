@@ -72,16 +72,7 @@ void validate(void)
 	ensure_space(static_space, STATIC_SPACE_SIZE);
 
 	/* Dynamic-0 Space */
-	dynamic_0_space = (lispobj *) DYNAMIC_0_SPACE_START;
-	ensure_space(dynamic_0_space, DYNAMIC_SPACE_SIZE);
-
-	current_dynamic_space = dynamic_0_space;
-
-	/* Dynamic-1 Space */
-	dynamic_1_space = (lispobj *) DYNAMIC_1_SPACE_START;
-#ifndef GENCGC
- 	ensure_space(dynamic_1_space, DYNAMIC_SPACE_SIZE);
-#endif
+	ensure_space(DYNAMIC_SPACE_START, DYNAMIC_SPACE_SIZE);
 
 	/* Control Stack */
 	control_stack = (lispobj *) CONTROL_STACK_START;

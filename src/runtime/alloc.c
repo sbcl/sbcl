@@ -31,9 +31,8 @@
 #define SET_GC_TRIGGER(new_value) \
     (SetSymbolValue(INTERNAL_GC_TRIGGER,(lispobj)(new_value)))
 #else
-#define GET_FREE_POINTER() current_dynamic_space_free_pointer
-#define SET_FREE_POINTER(new_value) \
-    (current_dynamic_space_free_pointer = (new_value))
+#define GET_FREE_POINTER() dynamic_space_free_pointer
+#define SET_FREE_POINTER(new_value) (dynamic_space_free_pointer = (new_value))
 #define GET_GC_TRIGGER() current_auto_gc_trigger
 #define SET_GC_TRIGGER(new_value) \
     clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
@@ -56,7 +55,7 @@ static lispobj *alloc(int bytes)
 
     if (GET_GC_TRIGGER() && GET_FREE_POINTER() > GET_GC_TRIGGER()) {
 	SET_GC_TRIGGER((char *)GET_FREE_POINTER()
-		       - (char *)current_dynamic_space);
+		       - (char *)DYNAMIC_SPACE_START);
     }
 
     return result;

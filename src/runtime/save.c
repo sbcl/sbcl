@@ -103,7 +103,7 @@ save(char *filename, lispobj init_function)
      * MBs of just cleared heap.
      */
     if(SymbolValue(X86_CGC_ACTIVE_P) != NIL)
-      SetSymbolValue(ALLOCATION_POINTER,DYNAMIC_0_SPACE_START);
+      SetSymbolValue(ALLOCATION_POINTER, DYNAMIC_SPACE_START);
 #endif
     /* Open the file: */
     unlink(filename);
@@ -138,8 +138,8 @@ save(char *filename, lispobj init_function)
     output_space(file, STATIC_SPACE_ID, static_space,
 		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER));
 #ifdef reg_ALLOC
-    output_space(file, DYNAMIC_SPACE_ID, current_dynamic_space,
-		 current_dynamic_space_free_pointer);
+    output_space(file, DYNAMIC_SPACE_ID, DYNAMIC_SPACE_START,
+		 dynamic_space_free_pointer);
 #else
 #ifdef GENCGC
     /* Flush the current_region updating the tables. */
@@ -147,7 +147,7 @@ save(char *filename, lispobj init_function)
     gc_alloc_update_page_tables(1,&unboxed_region);
     update_x86_dynamic_space_free_pointer();
 #endif
-    output_space(file, DYNAMIC_SPACE_ID, current_dynamic_space,
+    output_space(file, DYNAMIC_SPACE_ID, DYNAMIC_SPACE_START,
 		 (lispobj *)SymbolValue(ALLOCATION_POINTER));
 #endif
 

@@ -36,7 +36,7 @@
 #undef PRINTNOISE
 
 #if defined(ibmrt) || defined(__i386__)
-static lispobj *current_dynamic_space_free_pointer;
+static lispobj *dynamic_space_free_pointer;
 #endif
 
 #define gc_abort() \
@@ -96,12 +96,16 @@ static boolean
 dynamic_pointer_p(lispobj ptr)
 {
 #ifndef __i386__
-    return (ptr >= (lispobj)dynamic_0_space);
+    /* KLUDGE: This has an implicit dependence on the ordering of
+     * address spaces, and is therefore basically wrong. I'd fix it,
+     * but I don't have a non-386 port to test it on. Porters are
+     * encouraged to fix it. -- WHN 2000-10-17 */
+    return (ptr >= (lispobj)DYNAMIC_SPACE_START);
 #else
     /* Be more conservative, and remember, this is a maybe. */
-    return (ptr >= (lispobj)current_dynamic_space
+    return (ptr >= (lispobj)DYNAMIC_SPACE_START
 	    &&
-	    ptr < (lispobj)current_dynamic_space_free_pointer);
+	    ptr < (lispobj)dynamic_space_free_pointer);
 #endif
 }
 
@@ -1382,7 +1386,7 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     }
 
 #if defined(ibmrt) || defined(__i386__)
-    current_dynamic_space_free_pointer =
+    dynamic_space_free_pointer =
       (lispobj*)SymbolValue(ALLOCATION_POINTER);
 #endif
 
@@ -1486,11 +1490,12 @@ int purify(lispobj static_roots, lispobj read_only_roots)
 #endif
 
 #if defined(WANT_CGC) && defined(X86_CGC_ACTIVE_P)
-    if(SymbolValue(X86_CGC_ACTIVE_P) != T)
-      os_zero((os_vm_address_t) current_dynamic_space,
-	      (os_vm_size_t) DYNAMIC_SPACE_SIZE);
+    if(SymbolValue(X86_CGC_ACTIVE_P) != T) {
+	os_zero((os_vm_address_t) DYNAMIC_SPACE_START,
+		(os_vm_size_t) DYNAMIC_SPACE_SIZE);
+    }
 #else
-    os_zero((os_vm_address_t) current_dynamic_space,
+    os_zero((os_vm_address_t) DYNAMIC_SPACE_START,
             (os_vm_size_t) DYNAMIC_SPACE_SIZE);
 #endif
 
@@ -1526,20 +1531,20 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free);
 
 #if !defined(ibmrt) && !defined(__i386__)
-    current_dynamic_space_free_pointer = current_dynamic_space;
+    dynamic_space_free_pointer = DYNAMIC_SPACE_START;
 #else
 #if defined(WANT_CGC) && defined(X86_CGC_ACTIVE_P)
     /* X86 using CGC */
     if(SymbolValue(X86_CGC_ACTIVE_P) != T)
-      SetSymbolValue(ALLOCATION_POINTER, (lispobj)current_dynamic_space);
+	SetSymbolValue(ALLOCATION_POINTER, (lispobj)DYNAMIC_SPACE_START);
     else
-      cgc_free_heap();
+	cgc_free_heap();
 #else
 #if defined GENCGC
     gc_free_heap();
 #else
     /* ibmrt using GC */
-    SetSymbolValue(ALLOCATION_POINTER, (lispobj)current_dynamic_space);
+    SetSymbolValue(ALLOCATION_POINTER, (lispobj)DYNAMIC_SPACE_START);
 #endif
 #endif
 #endif

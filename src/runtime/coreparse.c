@@ -65,15 +65,13 @@ static void process_directory(int fd, long *ptr, int count)
 
 	switch (id) {
 	case DYNAMIC_SPACE_ID:
-	    if (addr != (os_vm_address_t)dynamic_0_space
-		&& addr != (os_vm_address_t)dynamic_1_space) {
-		lose("bizarre dynamic space!");
+	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
+		lose("incorrect dynamic space");
 	    }
-	    current_dynamic_space = (lispobj *)addr;
 #if defined(ibmrt) || defined(__i386__)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
 #else
-	    current_dynamic_space_free_pointer = free_pointer;
+	    dynamic_space_free_pointer = free_pointer;
 #endif
 	    break;
 	case STATIC_SPACE_ID:

@@ -64,12 +64,7 @@
 #define CONTROL_STACK_START	(0x40000000)
 #define CONTROL_STACK_SIZE	(0x08000000) /* 128MB */
 
-#define DYNAMIC_0_SPACE_START	(0x48000000)
-#ifdef GENCGC
-#define DYNAMIC_SPACE_SIZE	(0x40000000) /* May be up to 2GB */
-#else
-#define DYNAMIC_SPACE_SIZE	(0x04000000) /* 64MB */
-#endif
+#define DYNAMIC_SPACE_SIZE	(0x40000000) /* may be up to 2GB */
 #endif
 
 /* FIXME: It's gross to have numbers like 0x50000000 wired into the
@@ -94,15 +89,7 @@
 #define CONTROL_STACK_START	(0x50000000)
 #define CONTROL_STACK_SIZE	(0x07fff000) /* 128MB - 1 page */
 
-#define DYNAMIC_0_SPACE_START	(0x09000000)
-#ifdef GENCGC
 #define DYNAMIC_SPACE_SIZE	(0x20000000) /* 512MB */
-#else
-#define DYNAMIC_SPACE_SIZE	(0x04000000) /* 64MB */
-#endif
 #endif
 
 #define CONTROL_STACK_END	(CONTROL_STACK_START + CONTROL_STACK_SIZE)
-
-/* Note that GENCGC only uses dynamic_space 0. */
-#define DYNAMIC_1_SPACE_START	(DYNAMIC_0_SPACE_START + DYNAMIC_SPACE_SIZE)

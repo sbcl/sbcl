@@ -2477,10 +2477,10 @@
 	    (or (< sb!vm:read-only-space-start val
 		   (* sb!vm:*read-only-space-free-pointer*
 		      sb!vm:word-bytes))
-		(< sb!vm::static-space-start val
+		(< sb!vm:static-space-start val
 		   (* sb!vm:*static-space-free-pointer*
 		      sb!vm:word-bytes))
-		(< (sb!vm:current-dynamic-space-start) val
+		(< (sb!vm:dynamic-space-start) val
 		   (sap-int (dynamic-space-free-pointer))))))
       (make-lisp-obj val)
       :invalid-object))

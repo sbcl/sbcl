@@ -33,17 +33,14 @@ lispobj *current_binding_stack_pointer;
 
 lispobj *read_only_space;
 lispobj *static_space;
-lispobj *dynamic_0_space;
-lispobj *dynamic_1_space;
 lispobj *control_stack;
 #ifdef __i386__
 lispobj *control_stack_end;
 #endif
 lispobj *binding_stack;
 
-lispobj *current_dynamic_space;
 #ifndef ALLOCATION_POINTER
-lispobj *current_dynamic_space_free_pointer;
+lispobj *dynamic_space_free_pointer;
 #endif
 #ifndef INTERNAL_GC_TRIGGER
 lispobj *current_auto_gc_trigger;
