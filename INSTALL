@@ -77,6 +77,12 @@ This software has been built successfully on these systems:
 		os = Debian GNU/Linux 2.2 with libc >= 2.1
 			host lisp = OpenMCL 0.12
 			host lisp = SBCL itself
+		os = MacOS X.2
+			host lisp = OpenMCL 0.13.6
+			host lisp = SBCL itself
+	cpu = mips and mipsel
+		os = Debian GNU/Linux 3.0
+			host lisp = SBCL itself
 
 Reports of other systems that it works on (or doesn't work on, for
 that matter), or help in making it run on more systems, would be

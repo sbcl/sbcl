@@ -190,7 +190,7 @@
 (define-vop (fast-ash/unsigned=>unsigned)
   (:note "inline ASH")
   (:args (number :scs (unsigned-reg) :to :save)
-	 (amount :scs (signed-reg)))
+	 (amount :scs (signed-reg) :to :save))
   (:arg-types unsigned-num signed-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -201,11 +201,11 @@
   (:generator 3
     (inst bgez amount positive)
     (inst subu ndesc zero-tn amount)
-    (inst slt temp ndesc 31)
+    (inst slt temp ndesc 32)
     (inst bne temp zero-tn done)
     (inst srl result number ndesc)
     (inst b done)
-    (inst srl result number 31)
+    (inst move result zero-tn)
 
     POSITIVE
     ;; The result-type assures us that this shift will not overflow.
