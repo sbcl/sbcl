@@ -213,9 +213,9 @@
  					  (list (first aux-vars))
  					  :aux-vars (rest aux-vars)
  					  :aux-vals (rest aux-vals)
- 					  :debug-name (debug-namify
- 						       "&AUX bindings " 
- 						       aux-vars))))
+ 					  :debug-name (debug-name 
+                                                       '&aux-bindings 
+                                                       aux-vars))))
 	(reference-leaf start ctran fun-lvar fun)
 	(ir1-convert-combination-args fun-lvar ctran next result
 				      (list (first aux-vals)))))
@@ -373,7 +373,7 @@
 ;;; then we mark the corresponding var as EVER-USED to inhibit
 ;;; "defined but not read" warnings for arguments that are only used
 ;;; by default forms.
-(defun convert-optional-entry (fun vars vals defaults)
+(defun convert-optional-entry (fun vars vals defaults name)
   (declare (type clambda fun) (list vars vals defaults))
   (let* ((fvars (reverse vars))
 	 (arg-vars (mapcar (lambda (var)
@@ -396,9 +396,13 @@
                                                        ,@(reverse vals)
                                                        ,@(default-vals))))
                                          arg-vars
-                                         :debug-name
-                                         (debug-namify "&OPTIONAL processor "
-						       (gensym))
+                                         ;; FIXME: Would be nice to
+                                         ;; share these names instead
+                                         ;; of consing up several
+                                         ;; identical ones. Oh well.
+                                         :debug-name (debug-name 
+                                                      '&optional-processor 
+                                                      name)
                                          :note-lexical-bindings nil))))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
@@ -452,22 +456,22 @@
     ;; problems: hidden references should not be established to
     ;; lambdas of kind NIL should not have (otherwise the compiler
     ;; might let-convert or delete them) and to variables.
-    (if (or force
-            supplied-p-p ; this entry will be of kind NIL
-            (and (lambda-p ep) (eq (lambda-kind ep) nil)))
-        (convert-optional-entry ep
-                                default-vars default-vals
-                                (if supplied-p
-                                    (list default nil)
-                                    (list default)))
-        (delay
-         (register-entry-point
-           (convert-optional-entry (force ep)
-                                   default-vars default-vals
-                                   (if supplied-p
-                                       (list default nil)
-                                       (list default)))
-           res)))))
+    (let ((name (or debug-name source-name))
+          (defaults (if supplied-p (list default nil) (list default))))
+      (if (or force
+              supplied-p-p ; this entry will be of kind NIL
+              (and (lambda-p ep) (eq (lambda-kind ep) nil)))
+          (convert-optional-entry ep
+                                  default-vars default-vals
+                                  defaults
+                                  name)
+          (delay
+           (register-entry-point
+            (convert-optional-entry (force ep)
+                                    default-vars default-vals
+                                    defaults
+                                    name)            
+            res))))))
 
 ;;; Create the MORE-ENTRY function for the OPTIONAL-DISPATCH RES.
 ;;; ENTRY-VARS and ENTRY-VALS describe the fixed arguments. REST is
@@ -493,7 +497,7 @@
 ;;;
 ;;; We deal with :ALLOW-OTHER-KEYS by delaying unknown keyword errors
 ;;; until we have scanned all the keywords.
-(defun convert-more-entry (res entry-vars entry-vals rest morep keys)
+(defun convert-more-entry (res entry-vars entry-vals rest morep keys name)
   (declare (type optional-dispatch res) (list entry-vars entry-vals keys))
   (collect ((arg-vars)
 	    (arg-vals (reverse entry-vals))
@@ -593,7 +597,7 @@
 		     (%funcall ,(optional-dispatch-main-entry res)
 			       ,@(arg-vals))))
 		 (arg-vars)
-		 :debug-name "&MORE processing"
+		 :debug-name (debug-name '&more-processor name)
                  :note-lexical-bindings nil)))
 	(setf (optional-dispatch-more-entry res)
               (register-entry-point ep res)))))
@@ -675,21 +679,23 @@
 	       (main-vals (arg-info-default info))
 	       (bind-vals n-val)))))
 
-    (let* ((main-entry (ir1-convert-lambda-body
+    (let* ((name (or debug-name source-name))
+           (main-entry (ir1-convert-lambda-body
 			body (main-vars)
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
-			:debug-name (debug-namify
-				     "varargs entry for " source-name debug-name)))
+			:debug-name (debug-name 'varargs-entry name)))
 	   (last-entry (convert-optional-entry main-entry default-vars
-					       (main-vals) ())))
+					       (main-vals) () name)))
       (setf (optional-dispatch-main-entry res)
             (register-entry-point main-entry res))
-      (convert-more-entry res entry-vars entry-vals rest more-context keys)
+      (convert-more-entry res entry-vars entry-vals rest more-context keys
+                          name)
 
       (push (register-entry-point
              (if supplied-p-p
-		(convert-optional-entry last-entry entry-vars entry-vals ())
+		(convert-optional-entry last-entry entry-vars entry-vals 
+                                        () name)
 		last-entry)
              res)
 	    (optional-dispatch-entry-points res))
@@ -743,19 +749,19 @@
                                entry-vars entry-vals
                                nil nil nil vars supplied-p-p body aux-vars
                                aux-vals source-name debug-name)
-             (let ((fun (ir1-convert-lambda-body
+             (let* ((name (or debug-name source-name))
+                    (fun (ir1-convert-lambda-body
 			 body (reverse default-vars)
 			 :aux-vars aux-vars
 			 :aux-vals aux-vals
-			 :debug-name (debug-namify
-				      "hairy arg processor for "
-				      source-name
-				      debug-name))))
+			 :debug-name (debug-name 'hairy-arg-processor name))))
+
                (setf (optional-dispatch-main-entry res) fun)
                (register-entry-point fun res)
                (push (if supplied-p-p
                          (register-entry-point
-                          (convert-optional-entry fun entry-vars entry-vals ())
+                          (convert-optional-entry fun entry-vars entry-vals ()
+                                                  name)
                           res)
                           fun)
                      (optional-dispatch-entry-points res))
@@ -784,7 +790,9 @@
                 (push (if (lambda-p ep)
                           (register-entry-point
                            (if supplied-p-p
-                               (convert-optional-entry ep entry-vars entry-vals ())
+                               (convert-optional-entry 
+                                ep entry-vars entry-vals nil
+                                (or debug-name source-name))
                                ep)
                            res)
                           (progn (aver (not supplied-p-p))
@@ -816,9 +824,8 @@
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals
 				      &key
 				      (source-name '.anonymous.)
-				      (debug-name (debug-namify
-						   "OPTIONAL-DISPATCH "
-						   vars)))
+				      (debug-name 
+                                       (debug-name '&optional-dispatch vars)))
   (declare (list body vars aux-vars aux-vals))
   (let ((res (make-optional-dispatch :arglist vars
 				     :allowp allowp
@@ -842,7 +849,6 @@
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
                            debug-name)
-
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
 		    (type-of form)
@@ -864,8 +870,9 @@
                   (process-decls decls (append aux-vars vars) nil))
                  (forms (if (and *allow-instrumenting*
                                  (policy *lexenv* (>= insert-debug-catch 2)))
-                            `((catch (locally (declare (optimize (insert-step-conditions 0)))
-                                       (make-symbol "SB-DEBUG-CATCH-TAG"))
+                            `((catch (locally 
+                                         (declare (optimize (insert-step-conditions 0)))
+                                    (make-symbol "SB-DEBUG-CATCH-TAG"))
                                 ,@forms))
                             forms))
                  (forms (if (eq result-type *wild-type*)
@@ -888,43 +895,41 @@
 
 ;;; helper for LAMBDA-like things, to massage them into a form
 ;;; suitable for IR1-CONVERT-LAMBDA.
-;;;
-;;; KLUDGE: We cons up a &REST list here, maybe for no particularly
-;;; good reason.  It's probably lost in the noise of all the other
-;;; consing, but it's still inelegant.  And we force our called
-;;; functions to do full runtime keyword parsing, ugh.  -- CSR,
-;;; 2003-01-25
-(defun ir1-convert-lambdalike (thing &rest args
-			       &key (source-name '.anonymous.)
+(defun ir1-convert-lambdalike (thing
+			       &key 
+                               (source-name '.anonymous.)
 			       debug-name)
-  (declare (ignorable source-name debug-name))
   (ecase (car thing)
-    ((lambda) (apply #'ir1-convert-lambda thing args))
+    ((lambda) 
+     (ir1-convert-lambda thing 
+                         :source-name source-name 
+                         :debug-name debug-name))
     ((instance-lambda)
-     (let ((res (apply #'ir1-convert-lambda
-		       `(lambda ,@(cdr thing)) args)))
+     (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing))
+                                    :source-name source-name
+                                    :debug-name debug-name)))
        (setf (getf (functional-plist res) :fin-function) t)
        res))
     ((named-lambda)
-     (let ((name (cadr thing)))
+     (let ((name (cadr thing))
+           (lambda-expression `(lambda ,@(cddr thing))))
        (if (legal-fun-name-p name)
 	   (let ((defined-fun-res (get-defined-fun name))
-                 (res (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
-			     :source-name name
-			     :debug-name nil
-			     args)))
+                 (res (ir1-convert-lambda lambda-expression 
+                                          :source-name name)))
 	     (assert-global-function-definition-type name res)
-             (setf (defined-fun-functional defined-fun-res)
-                   res)
+             (setf (defined-fun-functional defined-fun-res) res)
              (unless (eq (defined-fun-inlinep defined-fun-res) :notinline)
                (substitute-leaf-if
                 (lambda (ref)
                   (policy ref (> recognize-self-calls 0)))
                 res defined-fun-res))
 	     res)
-	   (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
-		  :debug-name name args))))
-    ((lambda-with-lexenv) (apply #'ir1-convert-inline-lambda thing args))))
+	   (ir1-convert-lambda lambda-expression :debug-name name))))
+    ((lambda-with-lexenv) 
+     (ir1-convert-inline-lambda thing 
+                                :source-name source-name 
+                                :debug-name debug-name))))
 
 ;;;; defining global functions
 

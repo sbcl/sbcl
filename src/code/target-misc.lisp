@@ -35,33 +35,43 @@
                  (values (svref (sb!c::debug-source-name source) 0)
                          nil
 			 name))
-		;; FIXME: shouldn't these two clauses be the other way
-		;; round?  Using VALID-FUNCTION-NAME-P to see if we
-		;; want to find an inline-expansion?
-                ((stringp name)
-                 (values nil t name))
-                (t
+                ((legal-fun-name-p name)
                  (let ((exp (fun-name-inline-expansion name)))
-                   (if exp
-                       (values exp nil name)
-                       (values nil t name))))))
+                   (values exp (not exp) name)))
+                (t
+                 (values nil t name))))
         (values nil t name))))
+
+(defun closurep (object)
+  (= sb!vm:closure-header-widetag (widetag-of object)))
+
+(defun %fun-fun (function)
+  (declare (function function))
+  (case (widetag-of function)
+    (#.sb!vm:simple-fun-header-widetag 
+     function)
+    (#.sb!vm:closure-header-widetag 
+     (%closure-fun function))
+    (#.sb!vm:funcallable-instance-header-widetag
+     (funcallable-instance-fun function))))
+
+(defun %closure-values (object)
+  (declare (function object))
+  (coerce (loop for index from 0 below (1- (get-closure-length object))
+                collect (%closure-index-ref object index))
+          'simple-vector))
+
+(defun %fun-lambda-list (object)
+  (%simple-fun-arglist (%fun-fun object)))
 
 ;;; a SETFable function to return the associated debug name for FUN
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
 ;;; or NIL if there's none
-(defun %fun-name (fun)
-  (case (widetag-of fun)
-    (#.sb!vm:closure-header-widetag
-     (%simple-fun-name (%closure-fun fun)))
-    (#.sb!vm:simple-fun-header-widetag
-     ;; KLUDGE: The pun that %SIMPLE-FUN-NAME is used for closure
-     ;; functions is left over from CMU CL (modulo various renaming
-     ;; that's gone on since the fork).
-     (%simple-fun-name fun))
-    (#.sb!vm:funcallable-instance-header-widetag
-     (%simple-fun-name
-      (funcallable-instance-fun fun)))))
+(defun %fun-name (function)
+  (%simple-fun-name (%fun-fun function)))
+
+(defun %fun-type (function)
+  (%simple-fun-type (%fun-fun function)))
 
 (defun (setf %fun-name) (new-name fun)
   (aver nil) ; since this is unsafe 'til bug 137 is fixed

@@ -1,3 +1,16 @@
+changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
+  * internal entry point details and argument counts no longer appear
+     in backtraces unless explicitly requested by setting
+     SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*.
+  * built-in and standard functions no longer have names like "top
+     level local call to FOO".
+  * fixed bug 32: functions defined in non-null lexical environments
+     now have more legible printed representation
+  * fixed bug 33: functions defined in non-null lexical environemnts
+     are now more amenable to inspection by INSPECT.
+  * workaround for bug 354: XEPs no longer appear in backtraces unless
+     explicitly requested.
+
 changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed inspection of specialized arrays. (thanks to Simon Alexander)
   * fixed disassembly of SHLD and SHRD on x86.  (thanks to David

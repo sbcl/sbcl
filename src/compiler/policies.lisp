@@ -15,7 +15,6 @@
     (cond ((= safety 0) 0)
           ;; FIXME: It is duplicated in PROBABLE-TYPE-CHECK-P and in
           ;; some other places.
-
           ((and (<= speed safety)
                 (<= space safety)
                 (<= compilation-speed safety))

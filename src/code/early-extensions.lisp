@@ -641,6 +641,7 @@
 ;;;; various operations on names
 
 ;;; Is NAME a legal function name?
+(declaim (inline legal-fun-name-p))
 (defun legal-fun-name-p (name)
   (values (valid-function-name-p name)))
 
@@ -796,6 +797,14 @@
      (%failed-aver ,(format nil "~A" expr))))
 
 (defun %failed-aver (expr-as-string)
+  ;; hackish way to tell we're in a cold sbcl and output the
+  ;; message before signallign error, as it may be this is too
+  ;; early in the cold init.
+  (when (find-package "SB!C")
+    (fresh-line)
+    (write-line "failed AVER:")
+    (write-line expr-as-string)
+    (terpri))
   (bug "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
 
 (defun bug (format-control &rest format-arguments)

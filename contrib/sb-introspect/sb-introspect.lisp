@@ -44,6 +44,7 @@
   "True if NAME denotes a function name that can be passed to MACRO-FUNCTION or FDEFINITION "
   (and (sb-int:valid-function-name-p name) t))
 
+;;; FIXME: maybe this should be renamed as FUNCTION-LAMBDA-LIST?
 (defun function-arglist (function)
   "Describe the lambda list for the function designator FUNCTION.
 Works for special-operators, macros, simple functions and generic

@@ -3,31 +3,13 @@
 @chapter Debugger
 @cindex Debugger
 
-The SBCL debugger (as the CMUCL debugger it was derived from) has very
-good support for source-level debugging of compiled code.  Although
-some other debuggers allow access of variables by name, this seems to
-be the first Lisp debugger that:
-
-@itemize
-
-@item
-Tells you when a variable doesn't have a value because it hasn't been
-initialized yet or has already been deallocated, or
-
-@item
-Can display the precise source location corresponding to a code
-location in the debugged program.
-
-@end itemize
-
-These features allow the debugging of compiled code to be made almost
-indistinguishable from interpreted code debugging.
-
+This chapter documents the debugging facilities of SBCL, including
+the debugger, single-stepper and @code{trace}, and the effect of
+@code{(optimize debug)} declarations.
 
 @menu
-* Starting the Debugger::       
-* The Debugger Command Loop::   
-* Controlling Printing in the Debugger::  
+* Debugger Entry::              
+* Debugger Command Loop::       
 * Stack Frames::                
 * Variable Access::             
 * Source Location Printing::    
@@ -38,107 +20,109 @@ indistinguishable from interpreted code debugging.
 * Single Stepping::             
 @end menu
 
-@node  Starting the Debugger
+@node Debugger Entry
 @comment  node-name,  next,  previous,  up
-@section Starting the Debugger
+@section Debugger Entry
 
-The debugger is an interactive command loop that allows a user to examine
-the function call stack.  The debugger is invoked when:
+@menu
+* Debugger Banner::             
+* Debugger Invokation::         
+@end menu
 
-@itemize
+@node Debugger Banner
+@comment  node-name,  next,  previous,  up
+@subsection Debugger Banner
 
-@item
-A @code{serious-condition} is signaled, and it is not handled, or
-
-@item
-@code{error} is called, and the condition it signals is not handled,
-or
-
-@item
-the debugger is explicitly entered with the Lisp @code{break} or
-@code{invoke-debugger} functions.
-
-@end itemize
-
-When you enter the TTY debugger, it looks something like this:
+When you enter the debugger, it looks something like this:
 
 @example
 debugger invoked on a TYPE-ERROR in thread 11184:
   The value 3 is not of type LIST.
+
+You can type HELP for debugger help, or (SB-EXT:QUIT) to exit from SBCL.
+
 restarts (invokable by number or by possibly-abbreviated name):
   0: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
   1: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
-(CAR 1 3)[:EXTERNAL]
+(CAR 1 3)
 0]
 @end example
 
 The first group of lines describe what the error was that put us in
-the debugger.  In this case @code{car} was called on @code{3}.  After
-@samp{restarts} is a list of all the ways that we can restart
-execution after this error.  In this case, both options return to
-top-level.  After printing its banner, the debugger prints the current
-frame and the debugger prompt.
+the debugger.  In this case @code{car} was called on @code{3}, causing
+a @code{type-error}.  
+
+This is followed by the ``beginner help line'', which appears only if
+@code{sb-ext:*debugger-beginner-help*} is true (default).
+
+Next comes a listing of the active restart names, along with their
+descriptions -- the ways we can restart execution after this error. In
+this case, both options return to top-level. Restarts can be selected
+by entering the corresponding number or name.
+
+The current frame appears right underneath the restarts, immediately
+followed by the debugger prompt.
+
+@node Debugger Invokation
+@comment  node-name,  next,  previous,  up
+@subsection Debugger Invokation
+
+The debugger is invoked when:
+
+@itemize
+
+@item
+@code{error} is called, and the condition it signals is not handled.
+
+@item
+@code{break} is called, or @code{signal} is called with a condition
+that matches the current @code{*break-on-signals*}.
+
+@item
+the debugger is explicitly entered with the @code{invoke-debugger}
+function.
+
+@end itemize
 
 When the debugger is invoked by a condition, ANSI mandates that the
 value of @code{*debugger-hook*}, if any, be called with two arguments:
 the condition that caused the debugger to be invoked and the previous
 value of @code{*debugger-hook*}. When this happens,
-@code{*debugger-hook*} is bound to NIL to prevent recursive
-errors. However, ANSI also mandates that @code{*debugger-hook*} not be
-invoked when the debugger is to be entered by the @code{break}
-function. For users who wish to provide an alternate debugger
-interface (and thus catch @code{break} entries into the debugger),
-SBCL provides @code{sb-ext:*invoke-debugger-hook*}, which is invoked
-during any entry into the debugger.
+@code{*debugger-hook*} is bound to NIL to prevent recursive errors.
+However, ANSI also mandates that @code{*debugger-hook*} not be invoked
+when the debugger is to be entered by the @code{break} function. For
+users who wish to provide an alternate debugger interface (and thus
+catch @code{break} entries into the debugger), SBCL provides
+@code{sb-ext:*invoke-debugger-hook*}, which is invoked during any
+entry into the debugger.
 
 @include var-sb-ext-star-invoke-debugger-hook-star.texinfo
 
-
-@node  The Debugger Command Loop
+@node  Debugger Command Loop
 @comment  node-name,  next,  previous,  up
-@section The Debugger Command Loop
-@cindex Evaluation, in the debugger
+@section Debugger Command Loop
 
-The debugger is an interactive read-eval-print loop much like the normal
-top-level, but some symbols are interpreted as debugger commands instead
-of being evaluated.  A debugger command starts with the symbol name of
-the command, possibly followed by some arguments on the same line.  Some
-commands prompt for additional input.  Debugger commands can be
-abbreviated by any unambiguous prefix: @command{help} can be typed as
-@samp{h}, @samp{he}, etc.  For convenience, some commands have
-ambiguous one-letter abbreviations: @samp{f} for @command{frame}.
-@comment FIXME: what does that last bit mean?
+The debugger is an interactive read-eval-print loop much like the
+normal top level, but some symbols are interpreted as debugger
+commands instead of being evaluated. A debugger command starts with
+the symbol name of the command, possibly followed by some arguments on
+the same line. Some commands prompt for additional input. Debugger
+commands can be abbreviated by any unambiguous prefix: @command{help}
+can be typed as @samp{h}, @samp{he}, etc.
 
-The package is not significant in debugger commands; any symbol with the
-name of a debugger command will work.  If you want to show the value of
-a variable that happens also to be the name of a debugger command, you
-can use the @command{list-locals} command or the @code{sb-debug:var}
-function, or you can wrap the variable in a @code{progn} to hide it from
+The package is not significant in debugger commands; any symbol with
+the name of a debugger command will work. If you want to show the
+value of a variable that happens also to be the name of a debugger
+command you can wrap the variable in a @code{progn} to hide it from
 the command loop.
 
 The debugger prompt is ``@code{@var{frame}]}'', where @var{frame} is
 the number of the current frame.  Frames are numbered starting from
 zero at the top (most recent call), increasing down to the bottom.
-The current frame is the frame that commands refer to.  The current
-frame also provides the lexical environment for evaluation of
-non-command forms.
+The current frame is the frame that commands refer to. 
 
- The debugger evaluates forms in the lexical environment of the
-functions being debugged.  The debugger can only access variables.
-You can't @code{go} or @code{return-from} into a function, and you
-can't call local functions.  Special variable references are evaluated
-with their current value (the innermost binding around the debugger
-invocation) -- you don't get the value that the special had in the
-current frame.  For more information on debugger variable access, see
-@ref{Variable Access}.
-
-
-@node Controlling Printing in the Debugger
-@comment  node-name,  next,  previous,  up
-@section Controlling Printing in the Debugger
-
-In the debugger, it is possible to override the printing behaviour of
-the REPL.
+It is possible to override the normal printing behaviour in the
+debugger by using the @code{sb-ext:*debug-print-variable-alist*}.
 
 @include var-sb-ext-star-debug-print-variable-alist-star.texinfo
 
@@ -155,25 +139,23 @@ what it is doing.  Frames have:
 
 @item
 @dfn{variables} (@pxref{Variable Access}), which are the values being operated
-on;
+on.
 
 @item
 @dfn{arguments} to the call (which are really just particularly
-interesting variables), and
+interesting variables).
 
 @item
-a current location (@pxref{Source Location Printing}), which is the place in
-the program where the function was running when it stopped to call
-another function, or because of an interrupt or error.
+a current source location (@pxref{Source Location Printing}), which is
+the place in the program where the function was running when it
+stopped to call another function, or because of an interrupt or error.
 
 @end itemize
-
 
 @menu
 * Stack Motion::                
 * How Arguments are Printed::   
 * Function Names::              
-* Funny Frames::                
 * Debug Tail Recursion::        
 * Unknown Locations and Interrupts::  
 @end menu
@@ -290,42 +272,28 @@ unavailable or not known to be available (@pxref{Variable Access}),
 then @samp{#<unavailable-arg>} will be printed instead of the argument
 value.
 
-@vindex *debug-print-variable-alist*
-Printing of argument values is controlled by
-@code{*debug-print-variable-alist*}.  @xref{Controlling Printing in
-the Debugger}.
+ Note that inline expansion and open-coding affect what frames
+are present in the debugger, see @ref{Debugger Policy Control}.
+@comment FIXME: link here to section about open coding once it exists.
+@c @ref{open-coding}
 
 
 @node  Function Names
 @comment  node-name,  next,  previous,  up
 @subsection Function Names
 
-If a function is defined by @code{defun}, @code{labels}, or
-@code{flet}, then the debugger will print the actual function name
-after the open parenthesis, like:
+If a function is defined by @code{defun} it will appear in backtrace
+by that name. Functions defined by @code{labels} and @code{flet} will
+appear as @code{(FLET <name>)} and @code{(LABELS <name>)} respectively.
+Anonymous lambdas will appear as @code{(LAMDBA <lambda-list>)}.
 
-@example
-(STRING-UPCASE "test case" :START 0 :END NIL)
-((SETF AREF) #\a "for" 1)
-@end example
+@menu
+* Entry Point Details::         
+@end menu
 
-Otherwise, the function name is a string, and will be printed in
-quotes:
-
-@example
-("DEFUN MYFUN" BAR)
-("DEFMACRO DO" (DO ((I 0 (1+ I))) ((= I 13))) NIL)
-("SETQ *GC-NOTIFY-BEFORE*")
-@end example
-
-This string name is derived from the @code{def@var{mumble}} form
-that encloses or expanded into the lambda, or the outermost enclosing
-form if there is no @code{def@var{mumble}}.
-
-
-@node  Funny Frames
+@node  Entry Point Details
 @comment  node-name,  next,  previous,  up
-@subsection Funny Frames
+@subsubsection Entry Point Details
 @cindex External entry points
 @cindex Entry points, external
 @cindex Block compilation, debugger implications
@@ -333,60 +301,38 @@ form if there is no @code{def@var{mumble}}.
 @cindex Optional, stack frame kind
 @cindex Cleanup, stack frame kind
 
-Sometimes the evaluator introduces new functions that are used to
+Sometimes the compiler introduces new functions that are used to
 implement a user function, but are not directly specified in the
-source.  The main place this is done is for checking argument type and
-syntax.  Usually these functions do their thing and then go away, and
-thus are not seen on the stack in the debugger.  But when you get some
-sort of error during lambda-list processing, you end up in the
-debugger on one of these funny frames.
+source. This is mostly done for argument type and count checking.
 
-These funny frames are flagged by printing
-``@code{[@var{keyword}]}'' after the parentheses.  For example,
-this call:
+The debugger will normally show these entry point functions as if
+they were the normal main entry point, but more detail can be obtained
+by setting @code{sb-debug:*show-entry-point-details*} to true; this is
+primarily useful for debugging SBCL itself, but may help pinpoint
+problems that occur during lambda-list processing.
 
-@lisp
-(car 'a 'b)
-@end lisp
+@c FIXME: the following bits talked about block-compilation, but
+@c we don't currently support it...
 
-will look like this:
+@c With recursive 
+@c or block compiled 
+@c functions, an additional @code{:EXTERNAL} frame
+@c may appear before the frame representing the first call to the
+@c recursive function
+@c or entry to the compiled block. 
+@c This is a
+@c consequence of the way the compiler works: there is
+@c nothing odd with your program. You will also see @code{:CLEANUP}
+@c frames during the execution of @code{unwind-protect} cleanup
+@c code.
 
-@example
-(CAR 2 A)[:EXTERNAL]
-@end example
-
-And this call:
-
-@lisp
-(string-upcase "test case" :end)
-@end lisp
-
-would look like this:
-
-@example
-("SB!INT:&MORE processing" "test case" 1053984 1)[:OPTIONAL]
-@end example
-
-As you can see, these frames have only a vague resemblance to the
-original call.  Fortunately, the error message displayed when you
-enter the debugger will usually tell you what problem is (in these
-cases, too many arguments and odd keyword arguments.)  Also, if you go
-down the stack to the frame for the calling function, you can display
-the original source.  @xref{Source Location Printing}.
-
-@c FIXME: is the block-compilation part correct for SBCL?
-
-With recursive or block compiled functions, an @code{:EXTERNAL} frame
-may appear before the frame representing the first call to the
-recursive function or entry to the compiled block. This is a
-consequence of the way the compiler does block compilation: there is
-nothing odd with your program. You will also see @code{:CLEANUP}
-frames during the execution of @code{unwind-protect} cleanup
-code. Note that inline expansion and open-coding affect what frames
-are present in the debugger, see @ref{Debugger Policy Control}.
-@comment FIXME: link here to section about open coding once it exists.
-@c @ref{open-coding}
-
+With recursive functions, an additional @code{:EXTERNAL} frame may
+appear before the frame representing the first call to the recursive
+function. This is a consequence of the way the compiler works: there
+is nothing odd with your program. You will also see @code{:CLEANUP}
+frames during the execution of @code{unwind-protect} cleanup code.
+The @code{:EXTERNAL} and @code{:CLEANUP} above are entry-point types,
+visible only if @code{sb-debug:*show-entry-point-details*} os true.
 
 @node  Debug Tail Recursion
 @comment  node-name,  next,  previous,  up
@@ -394,10 +340,10 @@ are present in the debugger, see @ref{Debugger Policy Control}.
 @cindex Tail recursion
 @cindex Recursion, tail
 
-Both the compiler and the interpreter are ``properly tail recursive.''
-If a function call is in a tail-recursive position, the stack frame
-will be deallocated @emph{at the time of the call}, rather than after
-the call returns.  Consider this backtrace:
+The compiler is ``properly tail recursive.'' If a function call is in
+a tail-recursive position, the stack frame will be deallocated
+@emph{at the time of the call}, rather than after the call returns.
+Consider this backtrace:
 
 @example
 (BAR ...) 
@@ -436,7 +382,6 @@ optimization quality is greater than @code{2}.
 
 @comment FIXME: reinstate this link once the chapter is in the manual.
 @c For a more thorough discussion of tail recursion, @ref{tail-recursion}.
-
 
 @node Unknown Locations and Interrupts
 @comment  node-name,  next,  previous,  up

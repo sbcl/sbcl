@@ -90,17 +90,6 @@ WORKAROUND:
 	Process inferior-lisp exited abnormally with code 1
   I haven't noticed a repeatable case of this yet.
 
-32:
-  The printer doesn't report closures very well. This is true in 
-  CMU CL 18b as well:
-    (defstruct foo bar)
-    (print #'foo-bar)
-  gives
-    #<FUNCTION "CLOSURE" {406974D5}>
-  It would be nice to make closures have a settable name slot,
-  and make things like DEFSTRUCT and FLET, which create closures,
-  set helpful values into this slot.
-
 33:
   And as long as we're wishing, it would be awfully nice if INSPECT could
   also report on closures, telling about the values of the bound variables.
@@ -145,10 +134,6 @@ WORKAROUND:
   but at least as of FreeBSD 4.0, the floating point state *is* saved,
   so they could be supported after all. Very likely 
   SIGCONTEXT-FLOATING-POINT-MODES could now be supported, too.
-
-60:
-  The debugger LIST-LOCATIONS command doesn't work properly.
-  (How should it work properly?)
 
 61:
   Compiling and loading
@@ -1541,6 +1526,9 @@ WORKAROUND:
    (test)
  Has the XEP for TEST in the backtrace, not the TEST frame itself.
  (sparc and x86 at least)
+
+ Since SBCL 0.8.20.1 this is hidden unless *SHOW-ENTRY-POINT-DETAILS*
+ is true.
 
 355: change-class of generic-function
     (reported by Bruno Haible)

@@ -435,6 +435,15 @@
   (reference-constant start next result thing))
 
 ;;;; FUNCTION and NAMED-LAMBDA
+(defun name-lambdalike (thing)
+  (ecase (car thing)
+    ((named-lambda)
+     (second thing))
+    ((lambda instance-lambda)
+     `(lambda ,(second thing)))
+    ((lambda-with-lexenv)'
+     `(lambda ,(fifth thing)))))
+
 (defun fun-name-leaf (thing)
   (if (consp thing)
       (cond
@@ -442,7 +451,7 @@
 		 '(lambda named-lambda instance-lambda lambda-with-lexenv))
 	 (values (ir1-convert-lambdalike
                   thing
-                  :debug-name (debug-namify "#'" thing))
+                  :debug-name (name-lambdalike thing))
                  t))
 	((legal-fun-name-p thing)
 	 (values (find-lexically-apparent-fun
@@ -581,8 +590,7 @@
                            (let ((fun (ir1-convert-lambda-body
                                        forms
                                        vars
-                                       :debug-name (debug-namify "LET S"
-                                                                 bindings))))
+                                       :debug-name (debug-name 'let bindings))))
                              (reference-leaf start ctran fun-lvar fun))
                            (values next result))))
                (ir1-convert-combination-args fun-lvar ctran next result values)))))
@@ -696,8 +704,7 @@
       (let ((fvars (mapcar (lambda (n d)
                              (ir1-convert-lambda d
                                                  :source-name n
-                                                 :debug-name (debug-namify
-                                                              "FLET " n)))
+                                                 :debug-name (debug-name 'flet n)))
                            names defs)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
@@ -717,8 +724,8 @@
              (placeholder-funs (mapcar (lambda (name)
                                          (make-functional
                                           :%source-name name
-                                          :%debug-name (debug-namify
-                                                        "LABELS placeholder "
+                                          :%debug-name (debug-name 
+                                                        'labels-placeholder 
                                                         name)))
                                        names))
              ;; (like PAIRLIS but guaranteed to preserve ordering:)
@@ -730,8 +737,7 @@
                 (mapcar (lambda (name def)
                           (ir1-convert-lambda def
                                               :source-name name
-                                              :debug-name (debug-namify
-                                                           "LABELS " name)))
+                                              :debug-name (debug-name 'labels name)))
                         names defs))))
 
         ;; Modify all the references to the dummy function leaves so
@@ -905,7 +911,7 @@
                (ir1-convert-lambda
                 `(lambda ()
                    (return-from ,tag (%unknown-values)))
-                :debug-name (debug-namify "escape function for " tag))))
+                :debug-name (debug-name 'escape-fun tag))))
         (ctran (make-ctran)))
     (setf (functional-kind fun) :escape)
     (ir1-convert start ctran nil `(%%allocate-closures ,fun))

@@ -128,13 +128,13 @@
       (let ((def `(lambda (,whole ,environment)
 		    ,@local-decs
 		    ,body))
-	    (debug-name (sb!c::debug-namify "DEFINE-COMPILER-MACRO " name)))
+	    (debug-name (sb!c::debug-name 'compiler-macro-function name)))
 	`(eval-when (:compile-toplevel :load-toplevel :execute)
-	  (sb!c::%define-compiler-macro ',name
-					#',def
-					',lambda-list
-					,doc
-					,debug-name))))))
+           (sb!c::%define-compiler-macro ',name
+                                         #',def
+                                         ',lambda-list
+                                         ,doc
+                                         ',debug-name))))))
 
 ;;; FIXME: This will look remarkably similar to those who have already
 ;;; seen the code for %DEFMACRO in src/code/defmacro.lisp.  Various

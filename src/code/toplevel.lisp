@@ -272,9 +272,9 @@ steppers to maintain contextual information.")
    +++, ++, +, ///, //, /, and -."
   (setf - form)
   (let ((results
-	 (multiple-value-list
-	  (eval-in-lexenv form
-			  (make-null-interactive-lexenv)))))
+         (multiple-value-list
+          (eval-in-lexenv form
+                          (make-null-interactive-lexenv)))))
     (setf /// //
 	  // /
 	  / results

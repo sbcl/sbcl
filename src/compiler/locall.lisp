@@ -226,9 +226,8 @@
   (aver (null (functional-entry-fun fun)))
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
-				   :debug-name (debug-namify
-						"XEP for "
-						(leaf-debug-name fun)))))
+				   :debug-name (debug-name 
+                                                'xep (leaf-debug-name fun)))))
       (setf (functional-kind res) :external
 	    (leaf-ever-used res) t
 	    (functional-entry-fun res) fun
@@ -385,10 +384,9 @@
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
-                           :debug-name (debug-namify
-                                        "local inline "
-                                        (leaf-debug-name
-                                         original-functional)))))))
+                           :debug-name (debug-name 'local-inline 
+                                                   (leaf-debug-name 
+                                                    original-functional)))))))
           (cond (losing-local-object
                  (if (functional-p losing-local-object)
                      (let ((*compiler-error-context* call))
@@ -579,9 +577,9 @@
 	    `(lambda ,vars
 	       (declare (ignorable ,@ignores))
 	       (%funcall ,entry ,@args))
-	    :debug-name (debug-namify "hairy function entry "
-				      (lvar-fun-name
-				       (basic-combination-fun call)))))))
+	    :debug-name (debug-name 'hairy-function-entry 
+                                    (lvar-fun-name
+                                     (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
       (convert-call-if-possible ref (lvar-dest (node-lvar ref))))))

@@ -1630,23 +1630,15 @@
   nil)
 
 (defun output-fun (object stream)
-  (let* ((*print-length* 3) ; in case we have to..
-	 (*print-level* 3)  ; ..print an interpreted function definition
-	 ;; FIXME: This find-the-function-name idiom ought to be
-	 ;; encapsulated in a function somewhere.
-	 (name (case (fun-subtype object)
-		 (#.sb!vm:closure-header-widetag "CLOSURE")
-		 (#.sb!vm:simple-fun-header-widetag (%simple-fun-name object))
-		 (t 'no-name-available)))
-	 (identified-by-name-p (and (symbolp name)
-				    (fboundp name)
-				    (eq (fdefinition name) object))))
-      (print-unreadable-object (object
-				stream
-				:identity (not identified-by-name-p))
-	(prin1 'function stream)
-	(unless (eq name 'no-name-available)
-	  (format stream " ~S" name)))))
+    (let* ((*print-length* 3)  ; in case we have to..
+           (*print-level* 3)  ; ..print an interpreted function definition
+           (name (%fun-name object))
+           (proper-name-p (and (legal-fun-name-p name) (fboundp name)
+                               (eq (fdefinition name) object))))
+      (print-unreadable-object (object stream :identity (not proper-name-p))
+        (format stream "~:[FUNCTION~;CLOSURE~]~@[ ~S~]" 
+                (closurep object)
+                name))))
 
 ;;;; catch-all for unknown things
 

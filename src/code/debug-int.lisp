@@ -1408,6 +1408,9 @@ register."
 		 ;; optional. Stick the extra var in the result
 		 ;; element representing the keyword or optional,
 		 ;; which is the previous one.
+                 ;;
+                 ;; FIXME: NCONC used for side-effect: the effect is defined,
+                 ;; but this is bad style no matter what.
 		 (nconc (car res)
 			(list (compiled-debug-fun-lambda-list-var
 			       args (incf i) vars))))

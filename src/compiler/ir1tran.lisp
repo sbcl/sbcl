@@ -388,12 +388,12 @@
 	 (component (make-empty-component))
 	 (*current-component* component)
          (*allow-instrumenting* t))
-    (setf (component-name component) "initial component")
+    (setf (component-name component) 'initial-component)
     (setf (component-kind component) :initial)
     (let* ((forms (if for-value `(,form) `(,form nil)))
 	   (res (ir1-convert-lambda-body
 		 forms ()
-		 :debug-name (debug-namify "top level form " form))))
+		 :debug-name (debug-name 'top-level-form form))))
       (setf (functional-entry-fun res) res
 	    (functional-arg-documentation res) ()
 	    (functional-kind res) :toplevel)
@@ -516,11 +516,11 @@
                                                  form
                                                  (ir1-convert-lambda
                                                   opname
-                                                  :debug-name (debug-namify
-                                                               "LAMBDA CAR "
+                                                  :debug-name (debug-name
+                                                               'lambda-car 
                                                                opname))))))))))
     (values))
-
+  
   ;; Generate a reference to a manifest constant, creating a new leaf
   ;; if necessary. If we are producing a fasl file, make sure that
   ;; MAKE-LOAD-FORM gets used on any parts of the constant that it

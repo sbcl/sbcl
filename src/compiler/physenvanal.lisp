@@ -464,7 +464,12 @@
       ;; FIXME: It might be better to add another DEFKNOWN property
       ;; (e.g. NO-TAIL-RECURSION) and use it for error-handling
       ;; functions like ERROR, instead of spreading this special case
-      ;; net so widely.
+      ;; net so widely. --WHN?
+      ;;
+      ;; Why is that bad? Because this non-elimination of
+      ;; non-returning tail calls causes the XEP for FOO appear in
+      ;; backtrace for (defun foo (x) (error "foo ~S" x)) wich seems
+      ;; less then optimal. --NS 2005-02-28
       (when ret
 	(let ((result (return-result ret)))
 	  (do-uses (use result)

@@ -948,17 +948,15 @@
          (component (make-empty-component))
          (*current-component* component))
     (setf (component-name component)
-	  (debug-namify "~S initial component" name))
+	  (debug-name 'initial-component name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (let ((*allow-instrumenting* t))
-                         (ir1-convert-lambdalike
-                          definition
-                          :debug-name (debug-namify "top level local call "
-                                                    name))))
+                         (apply #'ir1-convert-lambdalike 
+                                definition
+                                (list :source-name name))))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
 				    :source-name (or name '.anonymous.)
-				    :debug-name (unless name
-						  "top level form"))))
+				    :debug-name (debug-name 'tl-xep  name))))
       (when name
         (assert-global-function-definition-type name locall-fun))
       (setf (functional-entry-fun fun) locall-fun
@@ -988,10 +986,10 @@
 		  '(original-source-start 0 0)))
   (when name
     (legal-fun-name-or-type-error name))
-  (let* (
-         (*lexenv* (make-lexenv :policy *policy*
-				:handled-conditions *handled-conditions*
-				:disabled-package-locks *disabled-package-locks*))
+  (let* ((*lexenv* (make-lexenv 
+                    :policy *policy*
+                    :handled-conditions *handled-conditions*
+                    :disabled-package-locks *disabled-package-locks*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
 						    :path path)))

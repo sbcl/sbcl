@@ -119,9 +119,7 @@ process, and is also provided as an extension to the user.
 SBCL can also be configured to exit if an unhandled error occurs,
 which is mainly useful for acting as part of a shell pipeline; doing
 so under most other circumstances would mean giving up large parts of
-the flexibility and robustness of Common Lisp. See @ref{Starting the
-Debugger}.
-
+the flexibility and robustness of Common Lisp. See @ref{Debugger Entry}.
 
 @node Command Line Options
 @comment  node-name,  next,  previous,  up
@@ -236,7 +234,7 @@ cleanly in Unix pipelines.
 
 @item --disable-debugger
 This is equivalent to @code{--eval '(sb-ext:disable-debugger)'}.
-@xref{Starting the Debugger}.
+@xref{Debugger Entry}.
 
 @end table
 

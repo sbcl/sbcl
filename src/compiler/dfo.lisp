@@ -357,16 +357,6 @@
 
     (values (real) (top) (real-top))))
 
-;;; COMPONENTs want strings for names, LEAF-DEBUG-NAMEs mightn't be
-;;; strings...
-(defun component-name-from-functional-debug-name (functional)
-  (declare (type functional functional))
-  (let ((leaf-debug-name (leaf-debug-name functional)))
-    (the simple-string
-      (if (stringp leaf-debug-name)
-	  leaf-debug-name
-	  (debug-namify "function " leaf-debug-name)))))
-
 ;;; Given a list of top level lambdas, return
 ;;;   (VALUES NONTOP-COMPONENTS TOP-COMPONENTS HAIRY-TOP-COMPONENTS).
 ;;; Each of the three values returned is a list of COMPONENTs:
@@ -403,8 +393,7 @@
 		  ;; component, since it might end up with multiple
 		  ;; lambdas in it, not just this one, but it does
 		  ;; seem a better name than just "<unknown>".
-		  (component-name-from-functional-debug-name
-		   component-lambda)))
+                  (leaf-debug-name component-lambda)))
 	  (let ((res (dfo-scavenge-dependency-graph component-lambda
 						    new-component)))
 	    (when (eq res new-component)

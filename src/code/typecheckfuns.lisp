@@ -130,20 +130,26 @@
 
 #+sb-xc
 (defun !typecheckfuns-cold-init ()
+  (/show0 "in typecheckfuns-cold-init")
   (setf *typecheckfuns* (make-hash-table :test 'equal))
   ;; Initialize the table of common typespecs.
   (setf *common-typespecs* #.*compile-time-common-typespecs*)
   ;; Initialize *TYPECHECKFUNS* with typecheckfuns for common typespecs.
+  (/show0 "typecheckfuns-cold-init initial setfs done")
   (macrolet ((macro ()
 	       `(progn
 		  ,@(map 'list
 			 (lambda (typespec)
-			   `(setf (gethash ',typespec *typecheckfuns*)
-				  (lambda (arg)
-				    (unless (typep arg ',typespec)
-				      (typecheck-failure arg ',typespec))
-				    (values))))
-			 *common-typespecs*))))
+			   `(progn
+                              (/show0 "setf")
+                              (setf (gethash ',typespec *typecheckfuns*)
+                                    (progn
+                                      (/show0 "lambda")
+                                      (lambda (arg)                                      
+                                        (unless (typep arg ',typespec)
+                                          (typecheck-failure arg ',typespec))
+                                        (values))))))
+                         *common-typespecs*))))
     (macro))
   (values))
 

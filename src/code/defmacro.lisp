@@ -41,9 +41,10 @@
 	      ;; If we want to move over to list-style names
 	      ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
 	      ;; functionality] here might be a good place to start.
-	      (debug-name (sb!c::debug-namify "DEFMACRO " name)))
+	      (debug-name (sb!c::debug-name 'macro-function name)))
 	  `(eval-when (:compile-toplevel :load-toplevel :execute)
-             (sb!c::%defmacro ',name #',def ',lambda-list ,doc ,debug-name)))))))
+             (sb!c::%defmacro ',name #',def ',lambda-list 
+                              ,doc ',debug-name)))))))
 
 (macrolet
     ((def (times set-p)

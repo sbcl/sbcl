@@ -17,6 +17,9 @@
 
 ;;;; Check that we get debug arglists right.
 
+;;; FIXME: This should use some get-argslist like functionality that
+;;; we actually export.
+;;;
 ;;; Return the debug arglist of the function object FUN as a list, or
 ;;; punt with :UNKNOWN.
 (defun get-arglist (fun)
@@ -63,43 +66,70 @@
 ;;; and that it contains the frames we expect, doesn't contain any
 ;;; "bogus stack frame"s, and contains the appropriate toplevel call
 ;;; and hasn't been cut off anywhere.
-(defun verify-backtrace (test-function frame-name
-                         &key (key #'first) (test #'eql)
-                         (allow-bogus-frames nil))
-  (let ((result nil)
-        (return-value nil))
-    (block outer-handler
-      (handler-bind
-          ((error #'(lambda (condition)
-                      (let ((backtrace (ignore-errors
-                                         (sb-debug:backtrace-as-list))))
-                        ;; Make sure we find what we're looking for.
-                        (if (member frame-name backtrace :key key :test test)
-                            (setf result (list :error condition))
-                            (print (list :failed :frame frame-name :backtrace backtrace)))
-                        ;; Make sure there's no bogus stack frames
-                        ;; unless they're explicitly allowed.
-                        (when (and (not allow-bogus-frames)
-                                   (member "bogus stack frame" backtrace
-                                           :key #'first :test #'equal))
-                          (print 'verify-backtrace-bogus)
+(defun verify-backtrace (test-function frame-specs &key (allow-stunted nil))
+  (labels ((args-equal (want real)
+             (cond ((endp want)
+                    (endp real))
+                   ((eq '&rest (car want))
+                    t)
+                   ((or (eq '? (car want)) (equal (car want) (car real)))
+                    (args-equal (cdr want) (cdr real)))
+                   (t
+                    nil))))
+    (let ((result nil))
+      (block outer-handler
+        (handler-bind
+            ((error (lambda (condition)
+                      ;; find the part of the backtrace we're interested in
+                      (let ((backtrace (progn
+                                         ;; (backtrace 13)
+                                         (member (caar frame-specs)
+                                                 (sb-debug:backtrace-as-list)
+                                                 :key #'car
+                                                 :test #'equal))))
+                        
+                        (setf result condition)
+                        
+                        (unless backtrace
+                          (print :missing-backtrace)
                           (setf result nil))
+                        
+                        ;; check that we have all the frames we wanted
+                        (mapcar 
+                         (lambda (spec frame)
+                           (unless (or (not spec)
+                                       (and (equal (car spec) (car frame))
+                                            (args-equal (cdr spec) 
+                                                        (cdr frame))))
+                             (print (list :mismatch spec frame))
+                             (setf result nil)))
+                         frame-specs
+                         backtrace)
+                        
                         ;; Make sure the backtrace isn't stunted in
                         ;; any way.  (Depends on running in the main
                         ;; thread.)
-                        (unless (member 'sb-impl::toplevel-init backtrace
-                                        :key #'first :test #'equal)
-                          (print 'verify-backtrace-stunted)
-                          (setf result nil)))
-                      (return-from outer-handler))))
-        (funcall test-function)))
-    (values result return-value)))
+                        (let ((end (last backtrace 2)))
+                          (unless (equal (caar end) 
+                                         (if *show-entry-point-details*
+                                             '(sb-c::tl-xep sb-impl::toplevel-init)
+                                             'sb-impl::toplevel-init))
+                            (print (list :backtrace-stunted (caar end)))
+                            (setf result nil)))
+                        (return-from outer-handler)))))
+          (funcall test-function)))
+      result)))
 
+(defvar *undefined-function-frame*
+  ;; bug 353
+  '(#+(or x86 x86-64) "bogus stack frame"
+    #-(or x86 x86-64) "undefined function"))
+
+#-(or alpha) ; bug 346
 ;;; Test for "undefined function" (undefined_tramp) working properly.
 ;;; Try it with and without tail call elimination, since they can have
 ;;; different effects.  (Specifically, if undefined_tramp is incorrect
 ;;; a stunted stack can result from the tail call variant.)
-#-(or alpha) ; bug 346
 (flet ((optimized ()
          (declare (optimize (speed 2) (debug 1))) ; tail call elimination
          (#:undefined-function 42))
@@ -109,19 +139,19 @@
        (test (fun)
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
-  #-x86 ; <- known bug (?): fails for me on 0.8.17.31/Linux/x86 -- WHN 2004-12-27
-  (dolist (frame '(#-(or x86 x86-64) "undefined function" ; bug 353
-                   "FLET COMMON-LISP-USER::TEST"))
-    (assert (verify-backtrace (lambda () (test #'optimized)) frame
-                              :test #'equal
-                              :allow-bogus-frames (or #+(or x86 x86-64) t))))
-  (dolist (frame '(#-(or x86 x86-64) "undefined function" ; bug 353
-                   "FLET COMMON-LISP-USER::NOT-OPTIMIZED"
-                   "FLET COMMON-LISP-USER::TEST"))
-    (assert (verify-backtrace (lambda () (test #'not-optimized)) frame
-                              :test #'equal
-                              :allow-bogus-frames (or #+(or x86 x86-64) t)))))
 
+  (assert (verify-backtrace
+           (lambda () (test #'optimized))
+           (list *undefined-function-frame*
+                 (list '(flet test) #'optimized))))
+  
+  (assert (verify-backtrace 
+           (lambda () (test #'not-optimized))
+           (list *undefined-function-frame*
+                 (list '(flet not-optimized))
+                 (list '(flet test) #'not-optimized)))))
+
+#-alpha ; bug 346
 ;;; Division by zero was a common error on PPC.  It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,
 ;;; or more than MOST-POSITIVE-FIXNUM bytes ahead.  It also depends on
@@ -134,26 +164,101 @@
 ;;; the return value (to the flet or the enclosing top level form) is
 ;;; more than MOST-POSITIVE-FIXNUM with the current spaces on OS X.
 ;;; Enabling it might catch other problems, so do it anyway.
-#-alpha ; bug 346
-(progn
-  (flet ((test-function ()
-	   (declare (optimize (speed 2) (debug 1))) ; tail call elimination
-	   (/ 42 0)))
-    (assert (verify-backtrace #'test-function '/)))
-
-  (flet ((test-function ()
-	   (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
-	   (/ 42 0)))
-    (assert (verify-backtrace #'test-function '/))))
+(flet ((optimized ()
+         (declare (optimize (speed 2) (debug 1))) ; tail call elimination
+         (/ 42 0))
+       (not-optimized ()
+         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (/ 42 0))
+       (test (fun)
+         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (funcall fun)))
+  (assert (verify-backtrace (lambda () (test #'optimized))
+                            (list '(/ 42 &rest) 
+                                  (list '(flet test) #'optimized))))
+  (assert (verify-backtrace (lambda () (test #'not-optimized))
+                            (list '(/ 42 &rest)
+                                  '((flet not-optimized))
+                                  (list '(flet test) #'not-optimized)))))
 
 #-(or alpha) ; bug 61
 (progn
   (defun throw-test ()
     (throw 'no-such-tag t))
-  (assert (verify-backtrace #'throw-test 
-                            #-(or x86 x86-64 sparc) 'throw-test
-                            #+(or x86 x86-64 sparc) "XEP for COMMON-LISP-USER::THROW-TEST" ; bug 354
-                            :test #'equal)))
+  (assert (verify-backtrace #'throw-test '((throw-test)))))
+
+;;; test entry point handling in backtraces
+
+(defun oops ()
+  (error "oops"))
+
+(defun bt.1 (&key key)
+  (list key))
+
+(defun bt.2 (x)
+  (list x))
+
+(defun bt.3 (&key (key (oops)))
+  (list key))
+
+;;; ERROR instead of OOPS so that tail call elimination doesn't happen
+(defun bt.4 (&optional opt)
+  (list (error "error")))
+
+(defun bt.5 (&optional (opt (oops)))
+  (list opt))
+
+(macrolet ((with-details (bool &body body)
+             `(let ((sb-debug:*show-entry-point-details* ,bool))
+                ,@body)))
+
+  ;; &MORE-PROCESSOR
+  (with-details t
+    (assert (verify-backtrace (lambda () (bt.1 :key))
+                              '(((sb-c::&more-processor bt.1) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace (lambda () (bt.1 :key))
+                              '((bt.1 :key)))))
+
+  ;; XEP
+  (with-details t
+    (assert (verify-backtrace #'bt.2
+                              '(((sb-c::xep bt.2) 0 ?)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.2
+                              '((bt.2)))))
+
+  ;; TL-XEP
+  (with-details t
+    (assert (verify-backtrace #'namestring
+                              '(((sb-c::tl-xep namestring) 0 ?)))))
+  (with-details nil
+    (assert (verify-backtrace #'namestring
+                              '((namestring)))))
+
+  ;; VARARGS-ENTRY
+  (with-details t
+    (assert (verify-backtrace #'bt.3
+                             '(((sb-c::varargs-entry bt.3) :key nil)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.3
+                              '((bt.3 :key nil)))))
+
+  ;; HAIRY-ARG-PROCESSOR
+  (with-details t
+    (assert (verify-backtrace #'bt.4
+                              '(((sb-c::hairy-arg-processor bt.4) ?)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.4
+                              '((bt.4 ?)))))
+
+  ;; &OPTIONAL-PROCESSOR
+  (with-details t
+    (assert (verify-backtrace #'bt.5
+                              '(((sb-c::&optional-processor bt.5))))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.5
+                              '((bt.5))))))
 
 ;;; success
 (quit :unix-status 104)

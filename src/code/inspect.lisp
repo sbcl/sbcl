@@ -211,18 +211,19 @@ evaluated expressions.
 	  (inspected-standard-object-elements object)))
 
 (defmethod inspected-parts ((object function))
-  (let* ((type (sb-kernel:widetag-of object))
-	 (object (if (= type sb-vm:closure-header-widetag)
-		     (sb-kernel:%closure-fun object)
-		     object)))
-    (values (format nil "FUNCTION ~S.~@[~%Argument List: ~A~]." object
-		    (sb-kernel:%simple-fun-arglist object)
-		    ;; Defined-from stuff used to be here. Someone took
-		    ;; it out. FIXME: We should make it easy to get
-		    ;; to DESCRIBE from the inspector.
-		    )
-	    t
-	    nil)))
+           (values (format nil "The object is a ~A named ~S.~%" 
+                           (if (closurep object) 'closure 'function)
+                           (%fun-name object))
+                   t
+                   ;; Defined-from stuff used to be here. Someone took
+                   ;; it out. FIXME: We should make it easy to get
+                   ;; to DESCRIBE from the inspector.
+                   (list*
+                    (cons "Lambda-list" (%fun-lambda-list object))
+                    (cons "Ftype" (%fun-type object))
+                    (when (closurep object)
+                      (list
+                       (cons "Closed over values" (%closure-values object)))))))
 
 (defmethod inspected-parts ((object vector))
   (values (format nil

@@ -93,11 +93,12 @@ provide bindings for printer control variables.")
 Any command -- including the name of a restart -- may be uniquely abbreviated.
 The debugger rebinds various special variables for controlling i/o, sometimes
   to defaults (much like WITH-STANDARD-IO-SYNTAX does) and sometimes to 
-  its own special values, based on SB-EXT:*DEBUG-PRINT-VARIBALE-ALIST*.
+  its own special values, based on SB-EXT:*DEBUG-PRINT-VARIABLE-ALIST*.
 Debug commands do not affect *, //, and similar variables, but evaluation in
   the debug loop does affect these variables.
 SB-DEBUG:*FLUSH-DEBUG-ERRORS* controls whether errors at the debug prompt
-  drop you deeper into the debugger.
+  drop you deeper into the debugger. The default NIL allows recursive entry
+  to debugger.
 
 Getting in and out of the debugger:
   RESTART  invokes restart numbered as shown (prompt if not given).
@@ -107,20 +108,19 @@ Getting in and out of the debugger:
     that restart.
 
 Changing frames:
-  U      up frame     D    down frame
-  B  bottom frame     F n  frame n (n=0 for top frame)
+  UP     up frame         DOWN     down frame
+  BOTTOM bottom frame     FRAME n  frame n (n=0 for top frame)
 
 Inspecting frames:
   BACKTRACE [n]  shows n frames going down the stack.
-  LIST-LOCALS, L lists locals in current function.
-  PRINT, P       displays current function call.
+  LIST-LOCALS, L lists locals in current frame.
+  PRINT, P       displays function call for current frame.
   SOURCE [n]     displays frame's source form with n levels of enclosing forms.
 
 Stepping:
-  STEP                              
-    [EXPERIMENTAL] Selects the CONTINUE restart if one exists and starts 
-    single-stepping. Single stepping affects only code compiled with
-    under high DEBUG optimization quality. See User Manul for details.
+  STEP  Selects the CONTINUE restart if one exists and starts 
+        single-stepping. Single stepping affects only code compiled with
+        under high DEBUG optimization quality. See User Manual for details.
 
 Function and macro commands:
  (SB-DEBUG:ARG n)
@@ -130,9 +130,10 @@ Function and macro commands:
 
 Other commands:
   RETURN expr
-    [EXPERIMENTAL] Return the values resulting from evaluation of expr
-    from the current frame, if this frame was compiled with a sufficiently
-    high DEBUG optimization quality.
+    Return the values resulting from evaluation of expr from the
+    current frame, if this frame was compiled with a sufficiently high
+    DEBUG optimization quality.
+
   SLURP
     Discard all pending input on *STANDARD-INPUT*. (This can be
     useful when the debugger was invoked to handle an error in
@@ -149,8 +150,7 @@ Other commands:
 		      (return loc))))
 	(cond ((and (not (sb!di:debug-block-elsewhere-p block))
 		    start)
-	       ;; FIXME: Why output on T instead of *DEBUG-FOO* or something?
-	       (format t "~%unknown location: using block start~%")
+	       (format *debug-io* "~%unknown location: using block start~%")
 	       start)
 	      (t
 	       loc)))
@@ -158,19 +158,18 @@ Other commands:
 
 ;;;; BACKTRACE
 
-(defun backtrace (&optional (count most-positive-fixnum)
-			    (*standard-output* *debug-io*))
+(defun backtrace (&optional (count most-positive-fixnum) (stream *debug-io*))
   #!+sb-doc
-  "Show a listing of the call stack going down from the current frame. In the
-   debugger, the current frame is indicated by the prompt. COUNT is how many
-   frames to show."
-  (fresh-line *standard-output*)
+  "Show a listing of the call stack going down from the current frame.
+In the debugger, the current frame is indicated by the prompt. COUNT
+is how many frames to show."
+  (fresh-line stream)
   (do ((frame (if *in-the-debugger* *current-frame* (sb!di:top-frame))
 	      (sb!di:frame-down frame))
        (count count (1- count)))
       ((or (null frame) (zerop count)))
-    (print-frame-call frame :number t))
-  (fresh-line *standard-output*)
+    (print-frame-call frame stream :number t))
+  (fresh-line stream)
   (values))
 
 (defun backtrace-as-list (&optional (count most-positive-fixnum))
@@ -184,8 +183,8 @@ Other commands:
     (push (frame-call-as-list frame) reversed-result)))
 
 (defun frame-call-as-list (frame)
-  (cons (sb!di:debug-fun-name (sb!di:frame-debug-fun frame))
-	(frame-args-as-list frame)))
+  (multiple-value-bind (name args) (frame-call frame)
+    (cons name args)))
 
 ;;;; frame printing
 
@@ -266,31 +265,45 @@ Other commands:
       (sb!di:lambda-list-unavailable
        ()
        (make-unprintable-object "unavailable lambda list")))))
+(legal-fun-name-p '(lambda ()))
+(defvar *show-entry-point-details* nil)
 
-;;; Print FRAME with verbosity level 1. If we hit a &REST arg, then
-;;; print as many of the values as possible, punting the loop over
-;;; lambda-list variables since any other arguments will be in the
-;;; &REST arg's list of values.
-(defun print-frame-call-1 (frame)
-  (let ((debug-fun (sb!di:frame-debug-fun frame)))
-
-    (pprint-logical-block (*standard-output* nil :prefix "(" :suffix ")")
-      (let ((args (ensure-printable-object (frame-args-as-list frame))))
-	;; Since we go to some trouble to make nice informative function
-	;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
-	;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
-	(let ((*print-length* nil)
-	      (*print-level* nil))
-	  (prin1 (ensure-printable-object (sb!di:debug-fun-name debug-fun))))
-	;; For the function arguments, we can just print normally.
-        (if (listp args)
-            (format t "~{ ~_~S~}" args)
-            (format t " ~S" args))))
-
-    (when (sb!di:debug-fun-kind debug-fun)
-      (write-char #\[)
-      (prin1 (sb!di:debug-fun-kind debug-fun))
-      (write-char #\]))))
+(defun frame-call (frame)
+  (labels ((clean-name-and-args (name args)
+             (if (and (consp name) (not *show-entry-point-details*))
+                 (case (first name)
+                   ((sb!c::xep sb!c::tl-xep)
+                    (clean-name-and-args 
+                     (second name)
+                     (let ((count (first args))
+                           (real-args (rest args)))
+                       (subseq real-args 0 (min count (length real-args))))))
+                   ((sb!c::&more-processor)
+                    (clean-name-and-args
+                     (second name)
+                     (let* ((more (last args 2))
+                            (context (first more))
+                            (count (second more)))
+                       (append (butlast args 2)
+                               (multiple-value-list 
+                                (sb!c:%more-arg-values context 0 count))))))
+                   ;; FIXME: do we need to deal with
+                   ;; HAIRY-FUNCTION-ENTRY here? I can't make it or
+                   ;; &AUX-BINDINGS appear in backtraces, so they are
+                   ;; left alone for now. --NS 2005-02-28
+                   ((sb!c::hairy-arg-processor 
+                     sb!c::varargs-entry sb!c::&optional-processor)
+                    (clean-name-and-args (second name) args))
+                   (t
+                    (values name args)))
+                 (values name args))))
+    (let ((debug-fun (sb!di:frame-debug-fun frame)))
+      (multiple-value-bind (name args)
+          (clean-name-and-args (sb!di:debug-fun-name debug-fun)
+                                (frame-args-as-list frame))
+        (values name args
+                (when *show-entry-point-details*
+                  (sb!di:debug-fun-kind debug-fun)))))))
 
 (defun ensure-printable-object (object)
   (handler-case
@@ -312,25 +325,43 @@ Other commands:
 ;;; zero indicates just printing the DEBUG-FUN's name, and one
 ;;; indicates displaying call-like, one-liner format with argument
 ;;; values.
-(defun print-frame-call (frame &key (verbosity 1) (number nil))
-  (cond
-   ((zerop verbosity)
-    (when number
-      (format t "~&~S: " (sb!di:frame-number frame)))
-    (format t "~S" frame))
-   (t
-    (when number
-      (format t "~&~S: " (sb!di:frame-number frame)))
-    (print-frame-call-1 frame)))
+(defun print-frame-call (frame stream &key (verbosity 1) (number nil))
+  (when number
+    (format stream "~&~S: " (sb!di:frame-number frame)))
+  (if (zerop verbosity)
+      (let ((*print-readably* nil))
+        (prin1 frame stream))
+      (multiple-value-bind (name args kind) (frame-call frame)
+        (pprint-logical-block (stream nil :prefix "(" :suffix ")")
+          ;; Since we go to some trouble to make nice informative function
+          ;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
+          ;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
+          ;; For the function arguments, we can just print normally.
+          (let ((*print-length* nil)
+                (*print-level* nil))
+            (prin1 (ensure-printable-object name) stream))
+          ;; If we hit a &REST arg, then print as many of the values as
+          ;; possible, punting the loop over lambda-list variables since any
+          ;; other arguments will be in the &REST arg's list of values.
+          (let ((args (ensure-printable-object args)))
+            (if (listp args)
+                (format stream "~{ ~_~S~}" args)
+                (format stream " ~S" args))))
+        (when kind
+          (format stream "[~S]" kind))))
   (when (>= verbosity 2)
     (let ((loc (sb!di:frame-code-location frame)))
       (handler-case
 	  (progn
+            ;; FIXME: Is this call really necessary here? If it is,
+            ;; then the reason for it should be unobscured.
 	    (sb!di:code-location-debug-block loc)
-	    (format t "~%source: ")
-	    (print-code-location-source-form loc 0))
-	(sb!di:debug-condition (ignore) ignore)
-	(error (c) (format t "error finding source: ~A" c))))))
+	    (format stream "~%source: ")
+	    (prin1 (code-location-source-form loc 0) stream))
+	(sb!di:debug-condition (ignore) 
+          ignore)
+	(error (c) 
+          (format stream "error finding source: ~A" c))))))
 
 ;;;; INVOKE-DEBUGGER
 
@@ -514,16 +545,14 @@ reset to ~S."
       ;; been converted to behave this way. -- WHN 2000-11-16)
 
       (unwind-protect
-	   (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
-		 ;; violating the principle of least surprise, and making
-		 ;; it impossible for the user to do reasonable things
-		 ;; like using PRINT at the debugger prompt to send output
-		 ;; to the program's ordinary (possibly
-		 ;; redirected-to-a-file) *STANDARD-OUTPUT*. (CMU CL
-		 ;; used to rebind *STANDARD-INPUT* here too, but that's
-		 ;; been fixed already.)
-		 (*standard-output* *debug-io*)
-		 ;; This seems reasonable: e.g. if the user has redirected
+	   (let (;; We used to bind *STANDARD-OUTPUT* to *DEBUG-IO*
+		 ;; here as well, but that is probably bogus since it
+                 ;; removes the users ability to do output to a redirected
+                 ;; *S-O*. Now we just rebind it so that users can temporarily
+                 ;; frob it. FIXME: This and other "what gets bound when"
+                 ;; behaviour should be documented in the manual.
+                 (*standard-output* *standard-output*)
+                 ;; This seems reasonable: e.g. if the user has redirected
 		 ;; *ERROR-OUTPUT* to some log file, it's probably wrong
 		 ;; to send errors which occur in interactive debugging to
 		 ;; that file, and right to send them to *DEBUG-IO*.
@@ -676,17 +705,15 @@ reset to ~S."
 		      (princ condition *debug-io*)
 		      (/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
 		      (throw 'debug-loop-catcher nil))))
-      (fresh-line)
-      (print-frame-call *current-frame* :verbosity 2)
+      (fresh-line *debug-io*)
+      (print-frame-call *current-frame* *debug-io* :verbosity 2)
       (loop
 	(catch 'debug-loop-catcher
 	  (handler-bind ((error (lambda (condition)
 				  (when *flush-debug-errors*
 				    (clear-input *debug-io*)
-				    (princ condition)
-				    ;; FIXME: Doing input on *DEBUG-IO*
-				    ;; and output on T seems broken.
-				    (format t
+				    (princ condition *debug-io*)
+				    (format *debug-io*
 					    "~&error flushed (because ~
                                              ~S is set)"
 					    '*flush-debug-errors*)
@@ -706,34 +733,23 @@ reset to ~S."
 		  (cond ((not cmd-fun)
 			 (debug-eval-print exp))
 			((consp cmd-fun)
-			 (format t "~&Your command, ~S, is ambiguous:~%"
+			 (format *debug-io* 
+                                 "~&Your command, ~S, is ambiguous:~%"
 				 exp)
 			 (dolist (ele cmd-fun)
-			   (format t "   ~A~%" ele)))
+			   (format *debug-io* "   ~A~%" ele)))
 			(t
 			 (funcall cmd-fun))))))))))))
 
 ;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
 (defun debug-eval-print (expr)
   (/noshow "entering DEBUG-EVAL-PRINT" expr)
-  (/noshow (fboundp 'compile))
-  (setq +++ ++ ++ + + - - expr)
-  (let* ((values (multiple-value-list (eval -)))
-	 (*standard-output* *debug-io*))
+  (let ((values (multiple-value-list 
+                 (interactive-eval (sb!di:preprocess-for-eval expr)))))
     (/noshow "done with EVAL in DEBUG-EVAL-PRINT")
-    (fresh-line)
-    (if values (prin1 (car values)))
-    (dolist (x (cdr values))
-      (fresh-line)
-      (prin1 x))
-    (setq /// // // / / values)
-    (setq *** ** ** * * (car values))
-    ;; Make sure that nobody passes back an unbound marker.
-    (unless (boundp '*)
-      (setq * nil)
-      (fresh-line)
-      ;; FIXME: The way INTERACTIVE-EVAL does this seems better.
-      (princ "Setting * to NIL (was unbound marker)."))))
+    (dolist (value values)
+      (fresh-line *debug-io*)
+      (prin1 value))))
 
 ;;;; debug loop functions
 
@@ -998,17 +1014,17 @@ reset to ~S."
   (let ((next (sb!di:frame-up *current-frame*)))
     (cond (next
 	   (setf *current-frame* next)
-	   (print-frame-call next))
+	   (print-frame-call next *debug-io*))
 	  (t
-	   (format t "~&Top of stack.")))))
+	   (format *debug-io* "~&Top of stack.")))))
 
 (!def-debug-command "DOWN" ()
   (let ((next (sb!di:frame-down *current-frame*)))
     (cond (next
 	   (setf *current-frame* next)
-	   (print-frame-call next))
+	   (print-frame-call next *debug-io*))
 	  (t
-	   (format t "~&Bottom of stack.")))))
+	   (format *debug-io* "~&Bottom of stack.")))))
 
 (!def-debug-command-alias "D" "DOWN")
 
@@ -1020,14 +1036,14 @@ reset to ~S."
 ;;;       (lead (sb!di:frame-up *current-frame*) (sb!di:frame-up lead)))
 ;;;      ((null lead)
 ;;;       (setf *current-frame* prev)
-;;;       (print-frame-call prev))))
+;;;       (print-frame-call prev *debug-io*))))
 
 (!def-debug-command "BOTTOM" ()
   (do ((prev *current-frame* lead)
        (lead (sb!di:frame-down *current-frame*) (sb!di:frame-down lead)))
       ((null lead)
        (setf *current-frame* prev)
-       (print-frame-call prev))))
+       (print-frame-call prev *debug-io*))))
 
 (!def-debug-command-alias "B" "BOTTOM")
 
@@ -1045,11 +1061,11 @@ reset to ~S."
 	      (cond (next-frame
 		     (setf frame next-frame))
 		    (t
-		     (format t
+		     (format *debug-io*
 			     "The ~A of the stack was encountered.~%"
 			     limit-string)
 		     (return frame)))))))
-  (print-frame-call *current-frame*))
+  (print-frame-call *current-frame* *debug-io*))
 
 (!def-debug-command-alias "F" "FRAME")
 
@@ -1088,16 +1104,13 @@ reset to ~S."
 				    (string= (symbol-name sym1)
 					     (symbol-name sym2)))))
 		     (t
-		      (format t "~S is invalid as a restart name.~%" num)
+		      (format *debug-io* "~S is invalid as a restart name.~%" 
+                              num)
 		      (return-from restart-debug-command nil)))))
       (/show0 "got RESTART")
       (if restart
 	  (invoke-restart-interactively restart)
-	  ;; FIXME: Even if this isn't handled by WARN, it probably
-	  ;; shouldn't go to *STANDARD-OUTPUT*, but *ERROR-OUTPUT* or
-	  ;; *QUERY-IO* or something. Look through this file to
-	  ;; straighten out stream usage.
-	  (princ "There is no such restart.")))))
+	  (princ "There is no such restart." *debug-io*)))))
 
 ;;;; information commands
 
@@ -1122,7 +1135,7 @@ reset to ~S."
   (backtrace (read-if-available most-positive-fixnum)))
 
 (!def-debug-command "PRINT" ()
-  (print-frame-call *current-frame*))
+  (print-frame-call *current-frame* *debug-io*))
 
 (!def-debug-command-alias "P" "PRINT")
 
@@ -1140,7 +1153,7 @@ reset to ~S."
 	    (setf any-p t)
 	    (when (eq (sb!di:debug-var-validity v location) :valid)
 	      (setf any-valid-p t)
-	      (format t "~S~:[#~W~;~*~]  =  ~S~%"
+	      (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
 		      (sb!di:debug-var-symbol v)
 		      (zerop (sb!di:debug-var-id v))
 		      (sb!di:debug-var-id v)
@@ -1148,21 +1161,24 @@ reset to ~S."
 
 	  (cond
 	   ((not any-p)
-	    (format t "There are no local variables ~@[starting with ~A ~]~
-                       in the function."
+	    (format *debug-io* 
+                    "There are no local variables ~@[starting with ~A ~]~
+                    in the function."
 		    prefix))
 	   ((not any-valid-p)
-	    (format t "All variables ~@[starting with ~A ~]currently ~
-                       have invalid values."
+	    (format *debug-io* 
+                    "All variables ~@[starting with ~A ~]currently ~
+                    have invalid values."
 		    prefix))))
-	(write-line "There is no variable information available."))))
+	(write-line "There is no variable information available."
+                    *debug-io*))))
 
 (!def-debug-command-alias "L" "LIST-LOCALS")
 
 (!def-debug-command "SOURCE" ()
-  (fresh-line)
-  (print-code-location-source-form (sb!di:frame-code-location *current-frame*)
-				   (read-if-available 0)))
+  (print (code-location-source-form (sb!di:frame-code-location *current-frame*)
+                                    (read-if-available 0))
+         *debug-io*))
 
 ;;;; source location printing
 
@@ -1241,7 +1257,7 @@ reset to ~S."
 	(setq *cached-source-stream* (open name :if-does-not-exist nil))
 	(unless *cached-source-stream*
 	  (error "The source file no longer exists:~%  ~A" (namestring name)))
-	(format t "~%; file: ~A~%" (namestring name)))
+	(format *debug-io* "~%; file: ~A~%" (namestring name)))
 
 	(setq *cached-debug-source*
 	      (if (= (sb!di:debug-source-created d-source)
@@ -1252,7 +1268,8 @@ reset to ~S."
      ((eq *cached-debug-source* d-source)
       (file-position *cached-source-stream* char-offset))
      (t
-      (format t "~%; File has been modified since compilation:~%;   ~A~@
+      (format *debug-io*
+              "~%; File has been modified since compilation:~%;   ~A~@
                  ; Using form offset instead of character position.~%"
 	      (namestring name))
       (file-position *cached-source-stream* 0)
@@ -1271,15 +1288,15 @@ reset to ~S."
     (let ((*readtable* *cached-readtable*))
       (read *cached-source-stream*))))
 
-(defun print-code-location-source-form (location context)
+(defun code-location-source-form (location context)
   (let* ((location (maybe-block-start-location location))
 	 (form-num (sb!di:code-location-form-number location)))
     (multiple-value-bind (translations form) (get-toplevel-form location)
       (unless (< form-num (length translations))
 	(error "The source path no longer exists."))
-      (prin1 (sb!di:source-path-context form
-					(svref translations form-num)
-					context)))))
+      (sb!di:source-path-context form
+                                 (svref translations form-num)
+                                 context))))
 
 ;;; step to the next steppable form
 (!def-debug-command "STEP" ()
@@ -1299,7 +1316,7 @@ reset to ~S."
 	 (function (sb!di:debug-fun-fun debug-fun)))
     (if function
 	(describe function)
-	(format t "can't figure out the function for this frame"))))
+	(format *debug-io* "can't figure out the function for this frame"))))
 
 (!def-debug-command "SLURP" ()
   (loop while (read-char-no-hang *standard-input*)))
@@ -1318,16 +1335,17 @@ reset to ~S."
 		    return
 		    (sb!di:frame-code-location *current-frame*))
 		   *current-frame*))
-	(format t "~@<can't find a tag for this frame ~
-                   ~2I~_(hint: try increasing the DEBUG optimization quality ~
-                   and recompiling)~:@>"))))
+	(format *debug-io* 
+                "~@<can't find a tag for this frame ~
+                 ~2I~_(hint: try increasing the DEBUG optimization quality ~
+                 and recompiling)~:@>"))))
 
 ;;;; debug loop command utilities
 
 (defun read-prompting-maybe (prompt)
   (unless (sb!int:listen-skip-whitespace *debug-io*)
-    (princ prompt)
-    (force-output))
+    (princ prompt *debug-io*)
+    (force-output *debug-io*))
   (read *debug-io*))
 
 (defun read-if-available (default)

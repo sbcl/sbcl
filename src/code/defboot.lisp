@@ -160,7 +160,7 @@
 			  (block ,(fun-name-block-name name)
 			    ,@forms)))
 	   (lambda `(lambda ,@lambda-guts))
-	   #-sb-xc-host
+           #-sb-xc-host
 	   (named-lambda `(named-lambda ,name ,@lambda-guts))
 	   (inline-lambda
 	    (when (inline-fun-name-p name)
@@ -175,14 +175,14 @@
       `(progn
 	 ;; In cross-compilation of toplevel DEFUNs, we arrange for
 	 ;; the LAMBDA to be statically linked by GENESIS.
-	 ;;
-	 ;; It may seem strangely inconsistent not to use NAMED-LAMBDA
-	 ;; here instead of LAMBDA. The reason is historical:
-	 ;; COLD-FSET was written before NAMED-LAMBDA, and has special
-	 ;; logic of its own to notify the compiler about NAME.
-	 #+sb-xc-host
+         ;;
+         ;; It may seem strangely inconsistent not to use NAMED-LAMBDA
+         ;; here instead of LAMBDA. The reason is historical:
+         ;; COLD-FSET was written before NAMED-LAMBDA, and has special
+         ;; logic of its own to notify the compiler about NAME.
+ 	 #+sb-xc-host
 	 (cold-fset ,name ,lambda)
-
+         
 	 (eval-when (:compile-toplevel)
 	   (sb!c:%compiler-defun ',name ',inline-lambda t))
 	 (eval-when (:load-toplevel :execute)

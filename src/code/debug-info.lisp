@@ -263,7 +263,7 @@
 
 (def!struct debug-info
   ;; Some string describing something about the code in this component.
-  (name (missing-arg) :type simple-string)
+  (name (missing-arg) :type t)
   ;; A list of DEBUG-SOURCE structures describing where the code for this
   ;; component came from, in the order that they were read.
   ;;

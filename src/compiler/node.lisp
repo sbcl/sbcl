@@ -360,7 +360,7 @@
   ;; messed up by IR1 optimizations, so the DFO should be recomputed.
   (reanalyze nil :type boolean)
   ;; some sort of name for the code in this component
-  (name "<unknown>" :type simple-string)
+  (name "<unknown>" :type t)
   ;; When I am a child, this is :NO-IR2-YET.
   ;; In my adulthood, IR2 stores notes to itself here.
   ;; After I have left the great wheel and am staring into the GC, this
@@ -732,18 +732,6 @@
   ;; or not, as if it is a valid function name then it can look for an
   ;; inline expansion.
   ;;
-  ;; The value of this slot can be anything, except that it shouldn't
-  ;; be a legal function name, since otherwise debugging gets
-  ;; confusing. (If a legal function name is a good name for the
-  ;; function, it should be in %SOURCE-NAME, and then we shouldn't
-  ;; need a %DEBUG-NAME.) In SBCL as of 0.pre7.87, it's always a
-  ;; string unless it's NIL, since that's how CMU CL represented debug
-  ;; names. However, eventually I (WHN) think it we should start using
-  ;; list values instead, since they have much nicer print properties
-  ;; (abbreviation, skipping package prefixes when unneeded, and
-  ;; renaming package prefixes when we do things like renaming SB!EXT
-  ;; to SB-EXT).
-  ;;
   ;; E.g. for the function which implements (DEFUN FOO ...), we could
   ;; have
   ;;   %SOURCE-NAME=FOO
@@ -751,17 +739,17 @@
   ;; for the function which implements the top level form
   ;; (IN-PACKAGE :FOO) we could have
   ;;   %SOURCE-NAME=NIL
-  ;;   %DEBUG-NAME="top level form (IN-PACKAGE :FOO)"
+  ;;   %DEBUG-NAME=(TOP-LEVEL-FORM (IN-PACKAGE :FOO)
   ;; for the function which implements FOO in
   ;;   (DEFUN BAR (...) (FLET ((FOO (...) ...)) ...))
   ;; we could have
   ;;   %SOURCE-NAME=FOO
-  ;;   %DEBUG-NAME="FLET FOO in BAR"
+  ;;   %DEBUG-NAME=(FLET FOO)
   ;; and for the function which implements FOO in
   ;;   (DEFMACRO FOO (...) ...)
   ;; we could have
   ;;   %SOURCE-NAME=FOO (or maybe .ANONYMOUS.?)
-  ;;   %DEBUG-NAME="DEFMACRO FOO"
+  ;;   %DEBUG-NAME=(MACRO-FUNCTION FOO)
   (%debug-name nil
 	       :type (or null (not (satisfies legal-fun-name-p)))
 	       :read-only t)
