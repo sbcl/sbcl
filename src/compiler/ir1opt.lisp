@@ -166,10 +166,10 @@
 	  (reoptimize-continuation (node-cont node))))))
   (values))
 
-;;; Similar to Derive-Node-Type, but asserts that it is an error for
-;;; Cont's value not to be typep to Type. If we improve the assertion,
-;;; we set TYPE-CHECK and TYPE-ASSERTED to guarantee that the new
-;;; assertion will be checked.
+;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
+;;; error for CONT's value not to be TYPEP to TYPE. If we improve the
+;;; assertion, we set TYPE-CHECK and TYPE-ASSERTED to guarantee that
+;;; the new assertion will be checked.
 (defun assert-continuation-type (cont type)
   (declare (type continuation cont) (type ctype type))
   (let ((cont-type (continuation-asserted-type cont)))
@@ -184,7 +184,7 @@
 	  (reoptimize-continuation cont)))))
   (values))
 
-;;; Assert that Call is to a function of the specified Type. It is
+;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
 ;;; keyword positions.
 (defun assert-call-type (call type)
@@ -216,9 +216,9 @@
 
 ;;;; IR1-OPTIMIZE
 
-;;; Do one forward pass over Component, deleting unreachable blocks
+;;; Do one forward pass over COMPONENT, deleting unreachable blocks
 ;;; and doing IR1 optimizations. We can ignore all blocks that don't
-;;; have the Reoptimize flag set. If Component-Reoptimize is true when
+;;; have the REOPTIMIZE flag set. If COMPONENT-REOPTIMIZE is true when
 ;;; we are done, then another iteration would be beneficial.
 ;;;
 ;;; We delete blocks when there is either no predecessor or the block
@@ -1178,7 +1178,7 @@
 ;;;    would be NIL.
 ;;; -- the var's DEST has a different policy than the ARG's (think safety).
 ;;;
-;;; We change the Ref to be a reference to NIL with unused value, and
+;;; We change the REF to be a reference to NIL with unused value, and
 ;;; let it be flushed as dead code. A side-effect of this substitution
 ;;; is to delete the variable.
 (defun substitute-single-use-continuation (arg var)

@@ -102,12 +102,12 @@
 (assert (subtypep 'ratio 'real))
 (assert (subtypep 'ratio 'number))
 
-;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to allow
-;;;; inline type tests for CONDITIONs and STANDARD-OBJECTs, and generally
-;;;; be nicer, and Martin Atzmueller ported the patches.
-;;;; They look nice but they're nontrivial enough that it's not obvious
-;;;; from inspection that everything is OK. Let's make sure that things
-;;;; still basically work.
+;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
+;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and
+;;;; generally be nicer, and Martin Atzmueller ported the patches.
+;;;; They look nice but they're nontrivial enough that it's not
+;;;; obvious from inspection that everything is OK. Let's make sure
+;;;; that things still basically work.
 
 ;; structure type tests setup
 (defstruct structure-foo1)

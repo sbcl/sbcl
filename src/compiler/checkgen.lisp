@@ -130,7 +130,7 @@
 ;;; the proven type and the corresponding type in TYPES. If so, we opt
 ;;; for a :HAIRY check with that test negated. Otherwise, we try to do
 ;;; a simple test, and if that is impossible, we do a hairy test with
-;;; non-negated types. If true, Force-Hairy forces a hairy type check.
+;;; non-negated types. If true, FORCE-HAIRY forces a hairy type check.
 ;;;
 ;;; When doing a non-negated check, we call MAYBE-WEAKEN-CHECK to
 ;;; weaken the test to a convenient supertype (conditional on policy.)
@@ -446,7 +446,7 @@
       (setf (basic-combination-kind dest) :error)))
   (values))
 
-;;; Loop over all blocks in Component that have TYPE-CHECK set,
+;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,
 ;;; looking for continuations with TYPE-CHECK T. We do two mostly
 ;;; unrelated things: detect compile-time type errors and determine if
 ;;; and how to do run-time type checks.
