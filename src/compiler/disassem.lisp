@@ -403,9 +403,7 @@
 	   (eq (car form) 'function))
       ;; a function def
       (let ((wrapper-name (symbolicate prefix "-" arg-name "-WRAPPER"))
-	    (wrapper-args nil))
-	(dotimes (i (length funargs))
-	  (push (gensym) wrapper-args))
+	    (wrapper-args (make-gensym-list (length funargs))))
 	(values `#',wrapper-name
 		`(defun ,wrapper-name ,wrapper-args
 		   (funcall ,form ,@wrapper-args))))
@@ -632,57 +630,6 @@
 				    arg ,args-var ',name)))
 			     ,args-var))))))))))
 
-;;; FIXME: old CMU CL version, doesn't work with SBCL bootstrapping
-;;; scheme, kept around for reference until I get the new sbcl-0.6.4
-;;; version to work, then can be deleted
-#|
-(defun gen-format-def-form (header descrips &optional (evalp t))
-  #!+sb-doc
-  "Generate a form to define an instruction format. See
-  DEFINE-INSTRUCTION-FORMAT for more info."
-  (when (atom header)
-    (setf header (list header)))
-  (destructuring-bind (name length &key default-printer include) header
-    (let ((args-var (gensym))
-	  (length-var (gensym))
-	  (all-wrapper-defs nil)
-	  (arg-count 0))
-      (collect ((arg-def-forms))
-	(dolist (descrip descrips)
-	  (let ((name (pop descrip)))
-	    (multiple-value-bind (descrip wrapper-defs)
-		(munge-fun-refs
-		 descrip evalp t (format nil "~:@(~A~)-~D" name arg-count))
-	      (arg-def-forms
-	       (update-args-form args-var `',name descrip evalp length-var))
-	      (setf all-wrapper-defs
-		    (nconc wrapper-defs all-wrapper-defs)))
-	    (incf arg-count)))
-	`(progn
-	   ,@all-wrapper-defs
-	   (eval-when (:compile-toplevel :execute)
-	     (let ((,length-var ,length)
-		   (,args-var
-		    ,(and include
-			  `(copy-list
-			    (format-args
-			     (format-or-lose ,include))))))
-	       ,@(arg-def-forms)
-	       (setf (gethash ',name *disassem-inst-formats*)
-		     (make-instruction-format
-		      :name ',name
-		      :length (bits-to-bytes ,length-var)
-		      :default-printer ,(maybe-quote evalp default-printer)
-		      :args ,args-var))
-	       (eval
-		`(progn
-		   ,@(mapcar #'(lambda (arg)
-				 (when (arg-fields arg)
-				   (gen-arg-access-macro-def-form
-				    arg ,args-var ',name)))
-			     ,args-var))))))))))
-|#
-
 ;;; FIXME: probably needed only at build-the-system time, not in
 ;;; final target system
 (defun modify-or-add-arg (arg-name
@@ -810,9 +757,7 @@
 	       ;; just use the same as the forms
 	       (setq vars nil))
 	      (t
-	       (setq vars nil)
-	       (dotimes (i (length forms))
-		 (push (gensym) vars))))
+	       (setq vars (make-gensym-list (length forms)))))
 	(set-arg-temps vars forms arg kind funstate)))
     (or vars forms)))
 

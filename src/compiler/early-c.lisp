@@ -38,8 +38,6 @@
 ;;;; somewhere else, not "early-c", since they're after all not part
 ;;;; of the compiler.
 
-(def!type sb!kernel:index () `(integer 0 (,sb!xc:array-dimension-limit)))
-
 ;;; the type of LAYOUT-DEPTHOID slot values
 (def!type sb!kernel::layout-depthoid () '(or index (integer -1 -1)))
 

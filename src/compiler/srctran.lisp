@@ -35,8 +35,7 @@
 
 ;;; Bind the values and make a closure that returns them.
 (def-source-transform constantly (value &rest values)
-  (let ((temps (loop repeat (1+ (length values))
-		     collect (gensym)))
+  (let ((temps (make-gensym-list (1+ (length values))))
 	(dum (gensym)))
     `(let ,(loop for temp in temps and
 		 value in (list* value values)
@@ -55,7 +54,7 @@
       (function-type-nargs (continuation-type fun))
     (cond
      ((and min (eql min max))
-      (let ((dums (loop repeat min collect (gensym))))
+      (let ((dums (make-gensym-list min)))
 	`#'(lambda ,dums (not (funcall fun ,@dums)))))
      ((let* ((cont (node-cont node))
 	     (dest (continuation-dest cont)))
@@ -3248,13 +3247,12 @@
 	  ((not (policy nil (>= speed space) (>= speed cspeed)))
 	   (values nil t))
 	  (t
-	   (collect ((vars))
-	     (dotimes (i nargs) (vars (gensym)))
-	     (do ((var (vars) next)
-		  (next (cdr (vars)) (cdr next))
+	   (let ((vars (make-gensym-list nargs)))
+	     (do ((var vars next)
+		  (next (cdr vars) (cdr next))
 		  (result 't))
 		 ((null next)
-		  `((lambda ,(vars) ,result) . ,args))
+		  `((lambda ,vars ,result) . ,args))
 	       (let ((v1 (first var)))
 		 (dolist (v2 next)
 		   (setq result `(if (,predicate ,v1 ,v2) nil ,result))))))))))
@@ -3370,28 +3368,28 @@
 ;;;; If the control string is a compile-time constant, then replace it
 ;;;; with a use of the FORMATTER macro so that the control string is
 ;;;; ``compiled.'' Furthermore, if the destination is either a stream
-;;;; or T and the control string is a function (i.e. formatter), then
-;;;; convert the call to format to just a funcall of that function.
+;;;; or T and the control string is a function (i.e. FORMATTER), then
+;;;; convert the call to FORMAT to just a FUNCALL of that function.
 
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
 		      :policy (> speed space))
   (unless (constant-continuation-p control)
     (give-up-ir1-transform "The control string is not a constant."))
-  (let ((arg-names (mapcar #'(lambda (x) (declare (ignore x)) (gensym)) args)))
+  (let ((arg-names (make-gensym-list (length args))))
     `(lambda (dest control ,@arg-names)
        (declare (ignore control))
        (format dest (formatter ,(continuation-value control)) ,@arg-names))))
 
 (deftransform format ((stream control &rest args) (stream function &rest t) *
 		      :policy (> speed space))
-  (let ((arg-names (mapcar #'(lambda (x) (declare (ignore x)) (gensym)) args)))
+  (let ((arg-names (make-gensym-list (length args))))
     `(lambda (stream control ,@arg-names)
        (funcall control stream ,@arg-names)
        nil)))
 
 (deftransform format ((tee control &rest args) ((member t) function &rest t) *
 		      :policy (> speed space))
-  (let ((arg-names (mapcar #'(lambda (x) (declare (ignore x)) (gensym)) args)))
+  (let ((arg-names (make-gensym-list (length args))))
     `(lambda (tee control ,@arg-names)
        (declare (ignore tee))
        (funcall control *standard-output* ,@arg-names)

@@ -127,33 +127,27 @@
   (etypecase fun
     (clambda
      (let ((nargs (length (lambda-vars fun)))
-	   (n-supplied (gensym)))
-       (collect ((temps))
-	 (dotimes (i nargs)
-	   (temps (gensym)))
-	 `(lambda (,n-supplied ,@(temps))
-	    (declare (type index ,n-supplied))
-	    ,(if (policy nil (zerop safety))
-		 `(declare (ignore ,n-supplied))
-		 `(%verify-argument-count ,n-supplied ,nargs))
-	    (%funcall ,fun ,@(temps))))))
+	   (n-supplied (gensym))
+	   (temps (make-gensym-list (length (lambda-vars fun)))))
+       `(lambda (,n-supplied ,@temps)
+	  (declare (type index ,n-supplied))
+	  ,(if (policy nil (zerop safety))
+	       `(declare (ignore ,n-supplied))
+	       `(%verify-argument-count ,n-supplied ,nargs))
+	  (%funcall ,fun ,@temps))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
 	    (max (optional-dispatch-max-args fun))
 	    (more (optional-dispatch-more-entry fun))
-	    (n-supplied (gensym)))
-       (collect ((temps)
-		 (entries))
-	 (dotimes (i max)
-	   (temps (gensym)))
-
+	    (n-supplied (gensym))
+	    (temps (make-gensym-list max)))
+       (collect ((entries))
 	 (do ((eps (optional-dispatch-entry-points fun) (rest eps))
 	      (n min (1+ n)))
 	     ((null eps))
 	   (entries `((= ,n-supplied ,n)
-		      (%funcall ,(first eps) ,@(subseq (temps) 0 n)))))
-
-	 `(lambda (,n-supplied ,@(temps))
+		      (%funcall ,(first eps) ,@(subseq temps 0 n)))))
+	 `(lambda (,n-supplied ,@temps)
 	    ;; FIXME: Make sure that INDEX type distinguishes between target
 	    ;; and host. (Probably just make the SB!XC:DEFTYPE different from
 	    ;; CL:DEFTYPE.)
@@ -166,7 +160,7 @@
 			   (n-count (gensym)))
 		       `(multiple-value-bind (,n-context ,n-count)
 			    (%more-arg-context ,n-supplied ,max)
-			  (%funcall ,more ,@(temps) ,n-context ,n-count))))))
+			  (%funcall ,more ,@temps ,n-context ,n-count))))))
 	     (t
 	      (%argument-count-error ,n-supplied)))))))))
 
@@ -526,10 +520,10 @@
 	 (args (combination-args call))
 	 (more (nthcdr max args))
 	 (flame (policy call (or (> speed brevity) (> space brevity))))
-	 (loser nil))
-    (collect ((temps)
-	      (more-temps)
-	      (ignores)
+	 (loser nil)
+	 (temps (make-gensym-list max))
+	 (more-temps (make-gensym-list (length more))))
+    (collect ((ignores)
 	      (supplied)
 	      (key-vars))
 
@@ -545,12 +539,6 @@
 	       (setf (basic-combination-kind call) :error)
 	       (return-from convert-more-call))))))
 
-      (dotimes (i max)
-	(temps (gensym "FIXED-ARG-TEMP-")))
-
-      (dotimes (i (length more))
-	(more-temps (gensym "MORE-ARG-TEMP-")))
-
       (when (optional-dispatch-keyp fun)
 	(when (oddp (length more))
 	  (compiler-warning "function called with odd number of ~
@@ -560,7 +548,7 @@
 	  (return-from convert-more-call))
 
 	(do ((key more (cddr key))
-	     (temp (more-temps) (cddr temp)))
+	     (temp more-temps (cddr temp)))
 	    ((null key))
 	  (let ((cont (first key)))
 	    (unless (constant-continuation-p cont)
@@ -590,7 +578,7 @@
 
       (collect ((call-args))
 	(do ((var arglist (cdr var))
-	     (temp (temps) (cdr temp)))
+	     (temp temps (cdr temp)))
 	    (())
 	  (let ((info (lambda-var-arg-info (car var))))
 	    (if info
@@ -600,7 +588,7 @@
 		   (when (arg-info-supplied-p info)
 		     (call-args t)))
 		  (:rest
-		   (call-args `(list ,@(more-temps)))
+		   (call-args `(list ,@more-temps))
 		   (return))
 		  (:keyword
 		   (return)))
@@ -616,7 +604,7 @@
 	      (call-args (not (null temp))))))
 
 	(convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
-				 (append (temps) (more-temps))
+				 (append temps more-temps)
 				 (ignores) (call-args)))))
 
   (values))

@@ -280,12 +280,8 @@
 ;;; We can always use Multiple-Value-Bind, since the macro is clever about
 ;;; binding a single variable.
 (defun make-type-check-form (types)
-  (collect ((temps))
-    (dotimes (i (length types))
-      (temps (gensym)))
-
-    `(multiple-value-bind ,(temps)
-			  'dummy
+  (let ((temps (make-gensym-list (length types))))
+    `(multiple-value-bind ,temps 'dummy
        ,@(mapcar #'(lambda (temp type)
 		     (let* ((spec
 			     (let ((*unparse-function-type-simplify* t))
@@ -295,8 +291,9 @@
 			  (%type-check-error
 			   ,temp
 			   ',(type-specifier (third type))))))
-		 (temps) types)
-       (values ,@(temps)))))
+		 temps
+		 types)
+       (values ,@temps))))
 
 ;;; Splice in explicit type check code immediately before the node which is
 ;;; Cont's Dest. This code receives the value(s) that were being passed to

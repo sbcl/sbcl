@@ -31,25 +31,26 @@
 (defstruct segment
   ;; the name of this segment (for debugging output and stuff)
   (name "Unnamed" :type simple-base-string)
-  ;; Ordinarily this is a vector where instructions are written. If the segment
-  ;; is made invalid (e.g. by APPEND-SEGMENT) then the vector can be
-  ;; replaced by NIL.
+  ;; Ordinarily this is a vector where instructions are written. If
+  ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
+  ;; vector can be replaced by NIL.
   (buffer (make-array 0
 		      :fill-pointer 0
 		      :adjustable t
 		      :element-type 'assembly-unit)
 	  :type (or null (vector assembly-unit)))
-  ;; whether or not to run the scheduler. Note: if the instruction definitions
-  ;; were not compiled with the scheduler turned on, this has no effect.
+  ;; whether or not to run the scheduler. Note: if the instruction
+  ;; definitions were not compiled with the scheduler turned on, this
+  ;; has no effect.
   (run-scheduler nil)
-  ;; If a function, then this is funcalled for each inst emitted with the
-  ;; segment, the VOP, the name of the inst (as a string), and the inst
-  ;; arguments.
+  ;; If a function, then this is funcalled for each inst emitted with
+  ;; the segment, the VOP, the name of the inst (as a string), and the
+  ;; inst arguments.
   (inst-hook nil :type (or function null))
-  ;; what position does this correspond to? Initially, positions and indexes
-  ;; are the same, but after we start collapsing choosers, positions can change
-  ;; while indexes stay the same.
-  (current-posn 0 :type posn)
+  ;; what position does this correspond to? Initially, positions and
+  ;; indexes are the same, but after we start collapsing choosers,
+  ;; positions can change while indexes stay the same.
+  (current-posn 0 :type index)
   ;; a list of all the annotations that have been output to this segment
   (annotations nil :type list)
   ;; a pointer to the last cons cell in the annotations list. This is
@@ -58,12 +59,12 @@
   ;; the number of bits of alignment at the last time we synchronized
   (alignment max-alignment :type alignment)
   ;; the position the last time we synchronized
-  (sync-posn 0 :type posn)
-  ;; The posn and index everything ends at. This is not maintained while the
-  ;; data is being generated, but is filled in after. Basically, we copy
-  ;; current-posn and current-index so that we can trash them while processing
-  ;; choosers and back-patches.
-  (final-posn 0 :type posn)
+  (sync-posn 0 :type index)
+  ;; The posn and index everything ends at. This is not maintained
+  ;; while the data is being generated, but is filled in after.
+  ;; Basically, we copy current-posn and current-index so that we can
+  ;; trash them while processing choosers and back-patches.
+  (final-posn 0 :type index)
   (final-index 0 :type index)
   ;; *** State used by the scheduler during instruction queueing.
   ;;
@@ -78,28 +79,28 @@
 	   :type simple-vector)
   (writers (make-array *assem-max-locations* :initial-element nil)
 	   :type simple-vector)
-  ;; The number of additional cycles before the next control transfer, or NIL
-  ;; if a control transfer hasn't been queued. When a delayed branch is
-  ;; queued, this slot is set to the delay count.
+  ;; The number of additional cycles before the next control transfer,
+  ;; or NIL if a control transfer hasn't been queued. When a delayed
+  ;; branch is queued, this slot is set to the delay count.
   (branch-countdown nil :type (or null (and fixnum unsigned-byte)))
   ;; *** These two slots are used both by the queuing noise and the
   ;; scheduling noise.
   ;;
-  ;; All the instructions that are pending and don't have any unresolved
-  ;; dependents. We don't list branches here even if they would otherwise
-  ;; qualify. They are listed above.
+  ;; All the instructions that are pending and don't have any
+  ;; unresolved dependents. We don't list branches here even if they
+  ;; would otherwise qualify. They are listed above.
   (emittable-insts-sset (make-sset) :type sset)
-  ;; list of queued branches. We handle these specially, because they have to
-  ;; be emitted at a specific place (e.g. one slot before the end of the
-  ;; block).
+  ;; list of queued branches. We handle these specially, because they
+  ;; have to be emitted at a specific place (e.g. one slot before the
+  ;; end of the block).
   (queued-branches nil :type list)
   ;; *** state used by the scheduler during instruction scheduling.
   ;;
-  ;; the instructions who would have had a read dependent removed if it were
-  ;; not for a delay slot. This is a list of lists. Each element in the
-  ;; top level list corresponds to yet another cycle of delay. Each element
-  ;; in the second level lists is a dotted pair, holding the dependency
-  ;; instruction and the dependent to remove.
+  ;; the instructions who would have had a read dependent removed if
+  ;; it were not for a delay slot. This is a list of lists. Each
+  ;; element in the top level list corresponds to yet another cycle of
+  ;; delay. Each element in the second level lists is a dotted pair,
+  ;; holding the dependency instruction and the dependent to remove.
   (delayed nil :type list)
   ;; The emittable insts again, except this time as a list sorted by depth.
   (emittable-insts-queue nil :type list)
@@ -119,10 +120,11 @@
     ;; Make sure that the array is big enough.
     (do ()
 	((>= (array-dimension buffer 0) new-value))
-      ;; When we have to increase the size of the array, we want to roughly
-      ;; double the vector length: that way growing the array to size N conses
-      ;; only O(N) bytes in total. But just doubling the length would leave a
-      ;; zero-length vector unchanged. Hence, take the MAX with 1..
+      ;; When we have to increase the size of the array, we want to
+      ;; roughly double the vector length: that way growing the array
+      ;; to size N conses only O(N) bytes in total. But just doubling
+      ;; the length would leave a zero-length vector unchanged. Hence,
+      ;; take the MAX with 1..
       (adjust-array buffer (max 1 (* 2 (array-dimension buffer 0)))))
     ;; Now that the array has the intended next free byte, we can point to it.
     (setf (fill-pointer buffer) new-value)))
@@ -130,16 +132,18 @@
 ;;;; structures/types used by the scheduler
 
 (sb!c:def-boolean-attribute instruction
-  ;; This attribute is set if the scheduler can freely flush this instruction
-  ;; if it thinks it is not needed. Examples are NOP and instructions that
-  ;; have no side effect not described by the writes.
+  ;; This attribute is set if the scheduler can freely flush this
+  ;; instruction if it thinks it is not needed. Examples are NOP and
+  ;; instructions that have no side effect not described by the
+  ;; writes.
   flushable
-  ;; This attribute is set when an instruction can cause a control transfer.
-  ;; For test instructions, the delay is used to determine how many
-  ;; instructions follow the branch.
+  ;; This attribute is set when an instruction can cause a control
+  ;; transfer. For test instructions, the delay is used to determine
+  ;; how many instructions follow the branch.
   branch
-  ;; This attribute indicates that this ``instruction'' can be variable length,
-  ;; and therefore better never be used in a branch delay slot.
+  ;; This attribute indicates that this ``instruction'' can be
+  ;; variable length, and therefore better never be used in a branch
+  ;; delay slot.
   variable-length)
 
 (defstruct (instruction
@@ -151,16 +155,17 @@
   (emitter (required-argument) :type (or null function))
   ;; The attributes of this instruction.
   (attributes (instruction-attributes) :type sb!c:attributes)
-  ;; Number of instructions or cycles of delay before additional instructions
-  ;; can read our writes.
+  ;; Number of instructions or cycles of delay before additional
+  ;; instructions can read our writes.
   (delay 0 :type (and fixnum unsigned-byte))
-  ;; the maximum number of instructions in the longest dependency chain from
-  ;; this instruction to one of the independent instructions. This is used
-  ;; as a heuristic at to which instructions should be scheduled first.
+  ;; the maximum number of instructions in the longest dependency
+  ;; chain from this instruction to one of the independent
+  ;; instructions. This is used as a heuristic at to which
+  ;; instructions should be scheduled first.
   (depth nil :type (or null (and fixnum unsigned-byte)))
-  ;; ** When trying remember which of the next four is which, note that the
-  ;; ``read'' or ``write'' always refers to the dependent (second)
-  ;; instruction.
+  ;; Note: When trying remember which of the next four is which, note
+  ;; that the ``read'' or ``write'' always refers to the dependent
+  ;; (second) instruction.
   ;;
   ;; instructions whose writes this instruction tries to read
   (read-dependencies (make-sset) :type sset)
@@ -290,9 +295,10 @@
 	(push inst (svref (segment-writers segment) index)))))
   (values))
 
-;;; This routine is called by due to uses of the INST macro when the scheduler
-;;; is turned on. The change to the dependency graph has already been computed,
-;;; so we just have to check to see whether the basic block is terminated.
+;;; This routine is called by due to uses of the INST macro when the
+;;; scheduler is turned on. The change to the dependency graph has
+;;; already been computed, so we just have to check to see whether the
+;;; basic block is terminated.
 (defun queue-inst (segment inst)
   #!+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
   #!+sb-show-assem (format *trace-output*
@@ -326,11 +332,11 @@
 	(schedule-pending-instructions segment))))
   (values))
 
-;;; Emit all the pending instructions, and reset any state. This is called
-;;; whenever we hit a label (i.e. an entry point of some kind) and when the
-;;; user turns the scheduler off (otherwise, the queued instructions would
-;;; sit there until the scheduler was turned back on, and emitted in the
-;;; wrong place).
+;;; Emit all the pending instructions, and reset any state. This is
+;;; called whenever we hit a label (i.e. an entry point of some kind)
+;;; and when the user turns the scheduler off (otherwise, the queued
+;;; instructions would sit there until the scheduler was turned back
+;;; on, and emitted in the wrong place).
 (defun schedule-pending-instructions (segment)
   (assert (segment-run-scheduler segment))
 
@@ -343,8 +349,8 @@
   #!+sb-show-assem (format *trace-output*
 			   "~&scheduling pending instructions..~%")
 
-  ;; Note that any values live at the end of the block have to be computed
-  ;; last.
+  ;; Note that any values live at the end of the block have to be
+  ;; computed last.
   (let ((emittable-insts (segment-emittable-insts-sset segment))
 	(writers (segment-writers segment)))
     (dotimes (index (length writers))
@@ -362,8 +368,8 @@
 	  (setf (instruction-attributep (inst-attributes inst) flushable)
 		nil)))))
 
-  ;; Grovel through the entire graph in the forward direction finding all
-  ;; the leaf instructions.
+  ;; Grovel through the entire graph in the forward direction finding
+  ;; all the leaf instructions.
   (labels ((grovel-inst (inst)
 	     (let ((max 0))
 	       (do-sset-elements (dep (inst-write-dependencies inst))
@@ -409,9 +415,9 @@
 			   "initially delayed: ~S~%"
 			   (segment-delayed segment))
 
-  ;; Accumulate the results in reverse order. Well, actually, this list will
-  ;; be in forward order, because we are generating the reverse order in
-  ;; reverse.
+  ;; Accumulate the results in reverse order. Well, actually, this
+  ;; list will be in forward order, because we are generating the
+  ;; reverse order in reverse.
   (let ((results nil))
 
     ;; Schedule all the branches in their exact locations.
@@ -419,18 +425,19 @@
       (dolist (branch (segment-queued-branches segment))
 	(let ((inst (cdr branch)))
 	  (dotimes (i (- (car branch) insts-from-end))
-	    ;; Each time through this loop we need to emit another instruction.
-	    ;; First, we check to see whether there is any instruction that
-	    ;; must be emitted before (i.e. must come after) the branch inst.
-	    ;; If so, emit it. Otherwise, just pick one of the emittable
-	    ;; insts. If there is nothing to do, then emit a nop.
-	    ;; ### Note: despite the fact that this is a loop, it really won't
-	    ;; work for repetitions other then zero and one. For example, if
-	    ;; the branch has two dependents and one of them dpends on the
-	    ;; other, then the stuff that grabs a dependent could easily
-	    ;; grab the wrong one. But I don't feel like fixing this because
-	    ;; it doesn't matter for any of the architectures we are using
-	    ;; or plan on using.
+	    ;; Each time through this loop we need to emit another
+	    ;; instruction. First, we check to see whether there is
+	    ;; any instruction that must be emitted before (i.e. must
+	    ;; come after) the branch inst. If so, emit it. Otherwise,
+	    ;; just pick one of the emittable insts. If there is
+	    ;; nothing to do, then emit a nop. ### Note: despite the
+	    ;; fact that this is a loop, it really won't work for
+	    ;; repetitions other then zero and one. For example, if
+p	    ;; the branch has two dependents and one of them dpends on
+	    ;; the other, then the stuff that grabs a dependent could
+	    ;; easily grab the wrong one. But I don't feel like fixing
+	    ;; this because it doesn't matter for any of the
+	    ;; architectures we are using or plan on using.
 	    (flet ((maybe-schedule-dependent (dependents)
 		     (do-sset-elements (inst dependents)
 		       ;; If do-sset-elements enters the body, then there is a
@@ -502,9 +509,9 @@
   ;; That's all, folks.
   (values))
 
-;;; Utility for maintaining the segment-delayed list. We cdr down list
-;;; n times (extending it if necessary) and then push thing on into the car
-;;; of that cons cell.
+;;; a utility for maintaining the segment-delayed list. We cdr down
+;;; list n times (extending it if necessary) and then push thing on
+;;; into the car of that cons cell.
 (defun add-to-nth-list (list thing n)
   (do ((cell (or list (setf list (list nil)))
 	     (or (cdr cell) (setf (cdr cell) (list nil))))
@@ -515,8 +522,8 @@
 
 ;;; Find the next instruction to schedule and return it after updating
 ;;; any dependency information. If we can't do anything useful right
-;;; now, but there is more work to be done, return :NOP to indicate that
-;;; a nop must be emitted. If we are all done, return NIL.
+;;; now, but there is more work to be done, return :NOP to indicate
+;;; that a nop must be emitted. If we are all done, return NIL.
 (defun schedule-one-inst (segment delay-slot-p)
   (do ((prev nil remaining)
        (remaining (segment-emittable-insts-queue segment) (cdr remaining)))
@@ -540,9 +547,9 @@
 		     (if (inst-emitter inst)
 			 ;; Nope, it's still a go. So return it.
 			 inst
-			 ;; Yes, so pick a new one. We have to start over,
-			 ;; because note-resolved-dependencies might have
-			 ;; changed the emittable-insts-queue.
+			 ;; Yes, so pick a new one. We have to start
+			 ;; over, because note-resolved-dependencies
+			 ;; might have changed the emittable-insts-queue.
 			 (schedule-one-inst segment delay-slot-p))))))
   ;; Nothing to do, so make something up.
   (cond ((segment-delayed segment)
@@ -554,11 +561,11 @@
 	 ;; All done.
 	 nil)))
 
-;;; This function is called whenever an instruction has been scheduled, and we
-;;; want to know what possibilities that opens up. So look at all the
-;;; instructions that this one depends on, and remove this instruction from
-;;; their dependents list. If we were the last dependent, then that
-;;; dependency can be emitted now.
+;;; This function is called whenever an instruction has been
+;;; scheduled, and we want to know what possibilities that opens up.
+;;; So look at all the instructions that this one depends on, and
+;;; remove this instruction from their dependents list. If we were the
+;;; last dependent, then that dependency can be emitted now.
 (defun note-resolved-dependencies (segment inst)
   (assert (sset-empty (inst-read-dependents inst)))
   (assert (sset-empty (inst-write-dependents inst)))
@@ -587,8 +594,8 @@
 			       (inst-delay dep)))))
   (values))
 
-;;; Process the next entry in segment-delayed. This is called whenever anyone
-;;; emits an instruction.
+;;; Process the next entry in segment-delayed. This is called whenever
+;;; anyone emits an instruction.
 (defun advance-one-inst (segment)
   (let ((delayed-stuff (pop (segment-delayed segment))))
     (dolist (stuff delayed-stuff)
@@ -602,10 +609,11 @@
 	      (insert-emittable-inst segment dependency)))
 	  (insert-emittable-inst segment stuff)))))
 
-;;; Note that inst is emittable by sticking it in the SEGMENT-EMITTABLE-INSTS-
-;;; QUEUE list. We keep the emittable-insts sorted with the largest ``depths''
-;;; first. Except that if INST is a branch, don't bother. It will be handled
-;;; correctly by the branch emitting code in SCHEDULE-PENDING-INSTRUCTIONS.
+;;; Note that inst is emittable by sticking it in the
+;;; SEGMENT-EMITTABLE-INSTS-QUEUE list. We keep the emittable-insts
+;;; sorted with the largest ``depths'' first. Except that if INST is a
+;;; branch, don't bother. It will be handled correctly by the branch
+;;; emitting code in SCHEDULE-PENDING-INSTRUCTIONS.
 (defun insert-emittable-inst (segment inst)
   (unless (instruction-attributep (inst-attributes inst) branch)
     #!+sb-show-assem (format *trace-output* "now emittable: ~S~%" inst)
@@ -662,9 +670,10 @@
   ;; The function to use to generate the real data
   (function nil :type function))
 
-;;; This is similar to a BACK-PATCH, but also an indication that the amount
-;;; of stuff output depends on label-positions, etc. Back-patches can't change
-;;; their mind about how much stuff to emit, but choosers can.
+;;; This is similar to a BACK-PATCH, but also an indication that the
+;;; amount of stuff output depends on label-positions, etc.
+;;; Back-patches can't change their mind about how much stuff to emit,
+;;; but choosers can.
 (defstruct (chooser
 	    (:include annotation)
 	    (:constructor make-chooser
@@ -695,12 +704,13 @@
 ;;; interface: Emit the supplied BYTE to SEGMENT, growing SEGMENT if necessary.
 (defun emit-byte (segment byte)
   (declare (type segment segment))
-  ;; We could use DECLARE instead of CHECK-TYPE here, but (1) CMU CL's inspired
-  ;; decision to treat DECLARE as ASSERT by default has not been copied by
-  ;; other compilers, and this code runs in the cross-compilation host Common
-  ;; Lisp, not just CMU CL, and (2) classic CMU CL allowed more things here
-  ;; than this, and I haven't tried to proof-read all the calls to EMIT-BYTE to
-  ;; ensure that they're passing appropriate. -- WHN 19990323
+  ;; We could use DECLARE instead of CHECK-TYPE here, but (1) CMU CL's
+  ;; inspired decision to treat DECLARE as ASSERT by default has not
+  ;; been copied by other compilers, and this code runs in the
+  ;; cross-compilation host Common Lisp, not just CMU CL, and (2)
+  ;; classic CMU CL allowed more things here than this, and I haven't
+  ;; tried to proof-read all the calls to EMIT-BYTE to ensure that
+  ;; they're passing appropriate. -- WHN 19990323
   (check-type byte possibly-signed-assembly-unit)
   (vector-push-extend (logand byte assembly-unit-mask)
 		      (segment-buffer segment))
@@ -716,8 +726,8 @@
   (values))
 
 ;;; Used to handle the common parts of annotation emision. We just
-;;; assign the posn and index of the note and tack it on to the end
-;;; of the segment's annotations list.
+;;; assign the posn and index of the note and tack it on to the end of
+;;; the segment's annotations list.
 (defun emit-annotation (segment note)
   (declare (type segment segment)
 	   (type annotation note))
@@ -766,22 +776,23 @@
     (emit-skip segment size)
     (adjust-alignment-after-chooser segment chooser)))
 
-;;; Called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to recompute the
-;;; current alignment information in light of this chooser. If the alignment
-;;; guaranteed byte the chooser is less then the segments current alignment,
-;;; we have to adjust the segments notion of the current alignment.
+;;; Called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to recompute
+;;; the current alignment information in light of this chooser. If the
+;;; alignment guaranteed byte the chooser is less then the segments
+;;; current alignment, we have to adjust the segments notion of the
+;;; current alignment.
 ;;;
-;;; The hard part is recomputing the sync posn, because it's not just the
-;;; choosers posn. Consider a chooser that emits either one or three words.
-;;; It preserves 8-byte (3 bit) alignments, because the difference between
-;;; the two choices is 8 bytes.
+;;; The hard part is recomputing the sync posn, because it's not just
+;;; the choosers posn. Consider a chooser that emits either one or
+;;; three words. It preserves 8-byte (3 bit) alignments, because the
+;;; difference between the two choices is 8 bytes.
 (defun adjust-alignment-after-chooser (segment chooser)
   (declare (type segment segment) (type chooser chooser))
   (let ((alignment (chooser-alignment chooser))
 	(seg-alignment (segment-alignment segment)))
     (when (< alignment seg-alignment)
-      ;; The chooser might change the alignment of the output. So we have
-      ;; to figure out what the worst case alignment could be.
+      ;; The chooser might change the alignment of the output. So we
+      ;; have to figure out what the worst case alignment could be.
       (setf (segment-alignment segment) alignment)
       (let* ((posn (chooser-posn chooser))
 	     (sync-posn (segment-sync-posn segment))
@@ -790,8 +801,8 @@
 	(setf (segment-sync-posn segment) (- posn delta)))))
   (values))
 
-;;; Used internally whenever a chooser or alignment decides it doesn't need
-;;; as much space as it originally thought.
+;;; Used internally whenever a chooser or alignment decides it doesn't
+;;; need as much space as it originally thought.
 (defun emit-filler (segment bytes)
   (let ((last (segment-last-annotation segment)))
     (cond ((and last (filler-p (car last)))
@@ -801,8 +812,8 @@
   (incf (segment-current-index segment) bytes)
   (values))
 
-;;; EMIT-LABEL (the interface) basically just expands into this, supplying
-;;; the segment and vop.
+;;; EMIT-LABEL (the interface) basically just expands into this,
+;;; supplying the segment and vop.
 (defun %emit-label (segment vop label)
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
@@ -815,10 +826,10 @@
       (funcall hook segment vop :label label)))
   (emit-annotation segment label))
 
-;;; Called by the ALIGN macro to emit an alignment note. We check to see
-;;; if we can guarantee the alignment restriction by just outputting a fixed
-;;; number of bytes. If so, we do so. Otherwise, we create and emit
-;;; an alignment note.
+;;; Called by the ALIGN macro to emit an alignment note. We check to
+;;; see if we can guarantee the alignment restriction by just
+;;; outputting a fixed number of bytes. If so, we do so. Otherwise, we
+;;; create and emit an alignment note.
 (defun emit-alignment (segment vop bits &optional (fill-byte 0))
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
@@ -830,8 +841,8 @@
 		   (segment-sync-posn segment))))
     (cond ((> bits alignment)
 	   ;; We need more bits of alignment. First emit enough noise
-	   ;; to get back in sync with alignment, and then emit an alignment
-	   ;; note to cover the rest.
+	   ;; to get back in sync with alignment, and then emit an
+	   ;; alignment note to cover the rest.
 	   (let ((slop (logand offset (1- (ash 1 alignment)))))
 	     (unless (zerop slop)
 	       (emit-skip segment (- (ash 1 alignment) slop) fill-byte)))
@@ -844,8 +855,8 @@
 	   (setf (segment-sync-posn segment) (segment-current-posn segment)))
 	  (t
 	   ;; The last alignment was more restrictive then this one.
-	   ;; So we can just figure out how much noise to emit assuming
-	   ;; the last alignment was met.
+	   ;; So we can just figure out how much noise to emit
+	   ;; assuming the last alignment was met.
 	   (let* ((mask (1- (ash 1 bits)))
 		  (new-offset (logand (+ offset mask) (lognot mask))))
 	     (emit-skip segment (- new-offset offset) fill-byte))
@@ -854,25 +865,25 @@
 	   (emit-annotation segment (make-alignment bits 0 fill-byte)))))
   (values))
 
-;;; Used to find how ``aligned'' different offsets are. Returns the number
-;;; of low-order 0 bits, up to MAX-ALIGNMENT.
+;;; Used to find how ``aligned'' different offsets are. Returns the
+;;; number of low-order 0 bits, up to MAX-ALIGNMENT.
 (defun find-alignment (offset)
   (dotimes (i max-alignment max-alignment)
     (when (logbitp i offset)
       (return i))))
 
-;;; Emit a postit. The function will be called as a back-patch with the
-;;; position the following instruction is finally emitted. Postits do not
-;;; interfere at all with scheduling.
+;;; Emit a postit. The function will be called as a back-patch with
+;;; the position the following instruction is finally emitted. Postits
+;;; do not interfere at all with scheduling.
 (defun %emit-postit (segment function)
   (push function (segment-postits segment))
   (values))
 
 ;;;; output compression/position assignment stuff
 
-;;; Grovel though all the annotations looking for choosers. When we find
-;;; a chooser, invoke the maybe-shrink function. If it returns T, it output
-;;; some other byte sequence.
+;;; Grovel though all the annotations looking for choosers. When we
+;;; find a chooser, invoke the maybe-shrink function. If it returns T,
+;;; it output some other byte sequence.
 (defun compress-output (segment)
   (dotimes (i 5) ; it better not take more than one or two passes.
     (let ((delta 0))
@@ -932,8 +943,9 @@
 	      (setf prev remaining))))
 	   ((alignment-p note)
 	    (unless (zerop (alignment-size note))
-	      ;; Re-emit the alignment, letting it collapse if we know anything
-	      ;; more about the alignment guarantees of the segment.
+	      ;; Re-emit the alignment, letting it collapse if we know
+	      ;; anything more about the alignment guarantees of the
+	      ;; segment.
 	      (let ((index (alignment-index note)))
 		(setf (segment-current-index segment) index)
 		(setf (segment-current-posn segment) posn)
@@ -1000,8 +1012,8 @@
       (decf (segment-final-posn segment) delta)))
   (values))
 
-;;; Grovel over segment, filling in any backpatches. If any choosers are left
-;;; over, we need to emit their worst case varient.
+;;; Grovel over segment, filling in any backpatches. If any choosers
+;;; are left over, we need to emit their worst case varient.
 (defun process-back-patches (segment)
   (do* ((prev nil)
 	(remaining (segment-annotations segment) next)
@@ -1035,41 +1047,42 @@
 
 ;;;; interface to the rest of the compiler
 
-;;; This holds the current segment while assembling. Use ASSEMBLE to change
-;;; it.
+;;; This holds the current segment while assembling. Use ASSEMBLE to
+;;; change it.
 ;;;
 ;;; The double asterisks in the name are intended to suggest that this
-;;; isn't just any old special variable, it's an extra-special variable,
-;;; because sometimes MACROLET is used to bind it. So be careful out there..
+;;; isn't just any old special variable, it's an extra-special
+;;; variable, because sometimes MACROLET is used to bind it. So be
+;;; careful out there..
 (defvar **current-segment**)
 
-;;; Just like **CURRENT-SEGMENT**, except this holds the current vop. Used only
-;;; to keep track of which vops emit which insts.
+;;; Just like **CURRENT-SEGMENT**, except this holds the current vop.
+;;; Used only to keep track of which vops emit which insts.
 ;;;
 ;;; The double asterisks in the name are intended to suggest that this
-;;; isn't just any old special variable, it's an extra-special variable,
-;;; because sometimes MACROLET is used to bind it. So be careful out there..
+;;; isn't just any old special variable, it's an extra-special
+;;; variable, because sometimes MACROLET is used to bind it. So be
+;;; careful out there..
 (defvar **current-vop** nil)
 
-;;; We also symbol-macrolet **CURRENT-SEGMENT** to a local holding the segment
-;;; so uses of **CURRENT-SEGMENT** inside the body don't have to keep
-;;; dereferencing the symbol. Given that ASSEMBLE is the only interface to
-;;; **CURRENT-SEGMENT**, we don't have to worry about the special value
-;;; becomming out of sync with the lexical value. Unless some bozo closes over
-;;; it, but nobody does anything like that...
+;;; We also SYMBOL-MACROLET **CURRENT-SEGMENT** to a local holding the
+;;; segment so uses of **CURRENT-SEGMENT** inside the body don't have
+;;; to keep dereferencing the symbol. Given that ASSEMBLE is the only
+;;; interface to **CURRENT-SEGMENT**, we don't have to worry about the
+;;; special value becomming out of sync with the lexical value. Unless
+;;; some bozo closes over it, but nobody does anything like that...
 ;;;
-;;; FIXME: The way this macro uses MACROEXPAND internally breaks my old
-;;; assumptions about macros which are needed both in the host and the target.
-;;; (This is more or less the same way that PUSH-IN, DELETEF-IN, and
-;;; DEF-BOOLEAN-ATTRIBUTE break my old assumptions, except that they used
-;;; GET-SETF-EXPANSION instead of MACROEXPAND to do the dirty deed.) The
-;;; quick and dirty "solution" here is the same as there: use cut and
-;;; paste to duplicate the defmacro in a
-;;;   (SB!INT:DEF!MACRO FOO (..) .. CL:MACROEXPAND ..)
-;;;   #+SB-XC-HOST
-;;;   (DEFMACRO FOO (..) .. SB!XC:MACROEXPAND ..)
-;;; idiom. This is disgusting and unmaintainable, and there are obviously
-;;; better solutions and maybe even good solutions, but I'm disinclined to
+;;; FIXME: The way this macro uses MACROEXPAND internally breaks my
+;;; old assumptions about macros which are needed both in the host and
+;;; the target. (This is more or less the same way that PUSH-IN,
+;;; DELETEF-IN, and DEF-BOOLEAN-ATTRIBUTE break my old assumptions,
+;;; except that they used GET-SETF-EXPANSION instead of MACROEXPAND to
+;;; do the dirty deed.) The quick and dirty "solution" here is the
+;;; same as there: use cut and paste to duplicate the defmacro in a
+;;; (SB!INT:DEF!MACRO FOO (..) .. CL:MACROEXPAND ..) #+SB-XC-HOST
+;;; (DEFMACRO FOO (..) .. SB!XC:MACROEXPAND ..) idiom. This is
+;;; disgusting and unmaintainable, and there are obviously better
+;;; solutions and maybe even good solutions, but I'm disinclined to
 ;;; hunt for good solutions until the system works and I can test them
 ;;; in isolation.
 (sb!int:def!macro assemble ((&optional segment vop &key labels) &body body
@@ -1165,20 +1178,22 @@
 	  (t
 	   `(,inst **current-segment** **current-vop** ,@args)))))
 
-;;; Note: The need to capture SYMBOL-MACROLET bindings of **CURRENT-SEGMENT*
-;;; and **CURRENT-VOP** prevents this from being an ordinary function.
+;;; Note: The need to capture SYMBOL-MACROLET bindings of
+;;; **CURRENT-SEGMENT* and **CURRENT-VOP** prevents this from being an
+;;; ordinary function.
 (defmacro emit-label (label)
   #!+sb-doc
   "Emit LABEL at this location in the current segment."
   `(%emit-label **current-segment** **current-vop** ,label))
 
-;;; Note: The need to capture SYMBOL-MACROLET bindings of **CURRENT-SEGMENT*
-;;; prevents this from being an ordinary function.
+;;; Note: The need to capture SYMBOL-MACROLET bindings of
+;;; **CURRENT-SEGMENT* prevents this from being an ordinary function.
 (defmacro emit-postit (function)
   `(%emit-postit **current-segment** ,function))
 
-;;; Note: The need to capture SYMBOL-MACROLET bindings of **CURRENT-SEGMENT*
-;;; and **CURRENT-VOP** prevents this from being an ordinary function.
+;;; Note: The need to capture SYMBOL-MACROLET bindings of
+;;; **CURRENT-SEGMENT* and **CURRENT-VOP** prevents this from being an
+;;; ordinary function.
 (defmacro align (bits &optional (fill-byte 0))
   #!+sb-doc
   "Emit an alignment restriction to the current segment."
@@ -1252,17 +1267,19 @@
   (process-back-patches segment)
   (segment-final-posn segment))
 
-;;; Call FUNCTION on all the stuff accumulated in SEGMENT. FUNCTION should
-;;; accept a single vector argument. It will be called zero or more times
-;;; on vectors of the appropriate byte type. The concatenation of the
-;;; vector arguments from all the calls is the contents of SEGMENT.
+;;; Call FUNCTION on all the stuff accumulated in SEGMENT. FUNCTION
+;;; should accept a single vector argument. It will be called zero or
+;;; more times on vectors of the appropriate byte type. The
+;;; concatenation of the vector arguments from all the calls is the
+;;; contents of SEGMENT.
 ;;;
-;;; KLUDGE: This implementation is sort of slow and gross, calling FUNCTION
-;;; repeatedly and consing a fresh vector for its argument each time. It might
-;;; be possible to make a more efficient version by making FINALIZE-SEGMENT do
-;;; all the compacting currently done by this function: then this function
-;;; could become trivial and fast, calling FUNCTION once on the entire
-;;; compacted segment buffer. -- WHN 19990322
+;;; KLUDGE: This implementation is sort of slow and gross, calling
+;;; FUNCTION repeatedly and consing a fresh vector for its argument
+;;; each time. It might be possible to make a more efficient version
+;;; by making FINALIZE-SEGMENT do all the compacting currently done by
+;;; this function: then this function could become trivial and fast,
+;;; calling FUNCTION once on the entire compacted segment buffer. --
+;;; WHN 19990322
 (defun on-segment-contents-vectorly (segment function)
   (let ((buffer (segment-buffer segment))
 	(i0 0))
@@ -1277,8 +1294,8 @@
       (frob i0 (segment-final-index segment))))
   (values))
 
-;;; Write the code accumulated in SEGMENT to STREAM, and return the number of
-;;; bytes written.
+;;; Write the code accumulated in SEGMENT to STREAM, and return the
+;;; number of bytes written.
 (defun write-segment-contents (segment stream)
   (let ((result 0))
     (declare (type index result))
@@ -1291,9 +1308,9 @@
 
 ;;;; interface to the instruction set definition
 
-;;; Define a function named NAME that merges its arguments into a single
-;;; integer and then emits the bytes of that integer in the correct order
-;;; based on the endianness of the target-backend.
+;;; Define a function named NAME that merges its arguments into a
+;;; single integer and then emits the bytes of that integer in the
+;;; correct order based on the endianness of the target-backend.
 (defmacro define-bitfield-emitter (name total-bits &rest byte-specs)
   (sb!int:collect ((arg-names) (arg-types))
     (let* ((total-bits (eval total-bits))
@@ -1496,7 +1513,8 @@
 				 (cdr option-spec)))))
 		 pdefs))
 	  (:printer-list
-	   ;; same as :PRINTER, but is EVALed first, and is a list of printers
+	   ;; same as :PRINTER, but is EVALed first, and is a list of
+	   ;; printers
 	   (push
 	    (eval
 	     `(eval
@@ -1567,11 +1585,13 @@
 	   (let ((,postits (segment-postits ,segment-name)))
 	     (setf (segment-postits ,segment-name) nil)
 	     (symbol-macrolet
-		 (;; Apparently this binding is intended to keep anyone from
-		  ;; accidentally using **CURRENT-SEGMENT** within the body
-		  ;; of the emitter. The error message sorta suggests that
-		  ;; this can happen accidentally by including one emitter
-		  ;; inside another. But I dunno.. -- WHN 19990323
+		 (;; Apparently this binding is intended to keep
+		  ;; anyone from accidentally using
+		  ;; **CURRENT-SEGMENT** within the body of the
+		  ;; emitter. The error message sorta suggests that
+		  ;; this can happen accidentally by including one
+		  ;; emitter inside another. But I dunno.. -- WHN
+		  ;; 19990323
 		  (**current-segment**
 		   ;; FIXME: I can't see why we have to use
 		   ;;   (MACROLET ((LOSE () (ERROR ..))) (LOSE))

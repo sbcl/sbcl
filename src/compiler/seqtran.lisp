@@ -71,7 +71,42 @@
 
 ;;;; mapping onto sequences: the MAP function
 
-;;; Try to compile MAP efficiently when we can determine sequence
+;;; MAP is %MAP plus a check to make sure that any length specified in
+;;; the result type matches the actual result. We also wrap it in a
+;;; TRULY-THE for the most specific type we can determine.
+(deftransform map ((result-type-arg fun &rest seqs) * * :node node)
+  (let* ((seq-names (make-gensym-list (length seqs)))
+	 (bare `(%map result-type-arg fun ,@seq-names))
+	 (constant-result-type-arg-p (constant-continuation-p result-type-arg))
+	 ;; what we know about the type of the result. (Note that the
+	 ;; "result type" argument is not necessarily the type of the
+	 ;; result, since NIL means the result has NULL type.)
+	 (result-type (if (not constant-result-type-arg-p)
+			  'consed-sequence
+			  (let ((result-type-arg-value
+				 (continuation-value result-type-arg)))
+			    (if (null result-type-arg-value)
+				'null
+				result-type-arg-value)))))
+    `(lambda (result-type-arg fun ,@seq-names)
+       (truly-the ,result-type
+	 ,(cond ((policy node (> speed safety))
+		 bare)
+		((not constant-result-type-arg-p)
+		 `(sequence-of-checked-length-given-type ,bare
+							 result-type-arg))
+		(t
+		 (let ((result-ctype (specifier-type result-type)))
+		   (if (array-type-p result-ctype)
+		       (let* ((dims (array-type-dimensions result-ctype))
+			      (dim (first dims)))
+			 (if (eq dim '*)
+			     bare
+			     `(vector-of-checked-length-given-length ,bare
+								     ,dim)))
+		       bare))))))))
+
+;;; Try to compile %MAP efficiently when we can determine sequence
 ;;; argument types at compile time.
 ;;;
 ;;; Note: This transform was written to allow open coding of
@@ -83,11 +118,7 @@
 ;;; handle that case more efficiently, but it's left as an exercise to
 ;;; the reader, because the code is complicated enough already and I
 ;;; don't happen to need that functionality right now. -- WHN 20000410
-;;;
-;;; FIXME: Now that we have this transform, we should be able
-;;; to get rid of the macros MAP-TO-LIST, MAP-TO-SIMPLE,
-;;; and MAP-FOR-EFFECT.
-(deftransform map ((result-type fun &rest seqs) * *)
+(deftransform %map ((result-type fun &rest seqs) * * :policy (>= speed space))
   "open code"
   (unless seqs (abort-ir1-transform "no sequence args"))
   (unless (constant-continuation-p result-type)
@@ -136,10 +167,7 @@
 		   (t (give-up-ir1-transform
 		       "internal error: unexpected sequence type"))))
 	    (t
-	     (let* ((seq-args (mapcar (lambda (seq)
-					(declare (ignore seq))
-					(gensym "SEQ"))
-				      seqs))
+	     (let* ((seq-args (make-gensym-list (length seqs)))
 		    (index-bindingoids
 		     (mapcar (lambda (seq-arg seq-supertype)
 			       (let ((i (gensym "I"))) 
@@ -178,9 +206,7 @@
 		 ;; of the &REST vars.)
 		 `(lambda (result-type fun ,@seq-args)
 		    (declare (ignore result-type))
-		    (do ((really-fun (if (functionp fun)
-					 fun
-					 (%coerce-name-to-function fun)))
+		    (do ((really-fun (%coerce-callable-to-function fun))
 			 ,@index-bindingoids
 			 (acc nil))
 		    ((or ,@tests)

@@ -12,7 +12,7 @@
 (file-comment
  "$Header$")
 
-(defmacro sb!xc:deftype (name arglist &body body)
+(def!macro sb!xc:deftype (name arglist &body body)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
   (unless (symbolp name)

@@ -592,7 +592,7 @@
 (deftransform alien-funcall ((function &rest args)
 			     ((alien (* t)) &rest *) *
 			     :important t)
-  (let ((names (loop repeat (length args) collect (gensym))))
+  (let ((names (make-gensym-list (length args))))
     (/noshow "entering first DEFTRANSFORM ALIEN-FUNCALL" function args)
     `(lambda (function ,@names)
        (alien-funcall (deref function) ,@names))))

@@ -1613,22 +1613,23 @@
 
   (values))
 
-;;; Called by IR1-Convert-Hairy-Args when we run into a rest or keyword arg.
-;;; The arguments are similar to that function, but we split off any rest arg
-;;; and pass it in separately. Rest is the rest arg var, or NIL if there is no
-;;; rest arg. Keys is a list of the keyword argument vars.
+;;; Called by IR1-Convert-Hairy-Args when we run into a rest or
+;;; keyword arg. The arguments are similar to that function, but we
+;;; split off any rest arg and pass it in separately. Rest is the rest
+;;; arg var, or NIL if there is no rest arg. Keys is a list of the
+;;; keyword argument vars.
 ;;;
 ;;; When there are keyword arguments, we introduce temporary gensym
-;;; variables to hold the values while keyword defaulting is in progress to get
-;;; the required sequential binding semantics.
+;;; variables to hold the values while keyword defaulting is in
+;;; progress to get the required sequential binding semantics.
 ;;;
 ;;; This gets interesting mainly when there are keyword arguments with
-;;; supplied-p vars or non-constant defaults. In either case, pass in a
-;;; supplied-p var. If the default is non-constant, we introduce an IF in the
-;;; main entry that tests the supplied-p var and decides whether to evaluate
-;;; the default or not. In this case, the real incoming value is NIL, so we
-;;; must union NULL with the declared type when computing the type for the main
-;;; entry's argument.
+;;; supplied-p vars or non-constant defaults. In either case, pass in
+;;; a supplied-p var. If the default is non-constant, we introduce an
+;;; IF in the main entry that tests the supplied-p var and decides
+;;; whether to evaluate the default or not. In this case, the real
+;;; incoming value is NIL, so we must union NULL with the declared
+;;; type when computing the type for the main entry's argument.
 (defun ir1-convert-more (res default-vars default-vals entry-vars entry-vals
 			     rest more-context more-count keys supplied-p-p
 			     body aux-vars aux-vals cont)
@@ -1654,7 +1655,7 @@
 	     (default (arg-info-default info))
 	     (hairy-default (not (sb!xc:constantp default)))
 	     (supplied-p (arg-info-supplied-p info))
-	     (n-val (make-symbol (format nil ; FIXME: GENSYM?
+	     (n-val (make-symbol (format nil
 					 "~A-DEFAULTING-TEMP"
 					 (leaf-name key))))
 	     (key-type (leaf-type key))
@@ -2259,18 +2260,13 @@
 ;;; (not symbols). %FUNCALL is used directly in some places where the
 ;;; call should always be open-coded even if FUNCALL is :NOTINLINE.
 (deftransform funcall ((function &rest args) * * :when :both)
-  (collect ((arg-names))
-    (dolist (arg args)
-      (declare (ignore arg))
-      (arg-names (gensym "FUNCALL-ARG-NAMES-")))
-    `(lambda (function ,@(arg-names))
+  (let ((arg-names (make-gensym-list (length args))))
+    `(lambda (function ,@arg-names)
        (%funcall ,(if (csubtypep (continuation-type function)
 				 (specifier-type 'function))
 		      'function
-		      '(if (functionp function)
-			   function
-			   (%coerce-name-to-function function)))
-		 ,@(arg-names)))))
+		      '(%coerce-callable-to-function function))
+		 ,@arg-names))))
 
 (def-ir1-translator %funcall ((function &rest args) start cont)
   (let ((fun-cont (make-continuation)))
@@ -2287,9 +2283,11 @@
       `(%funcall ,function ,@args)
       (values nil t)))
 
-(deftransform %coerce-name-to-function ((thing) * * :when :both)
-  (give-up-ir1-transform
-   "might be a symbol, so must call FDEFINITION at runtime"))
+(deftransform %coerce-callable-to-function ((thing) (function) *
+					    :when :both
+					    :important t)
+  "optimize away possible call to FDEFINITION at runtime"
+  'thing)
 
 ;;;; symbol macros
 
@@ -2784,10 +2782,7 @@
     (ir1-convert start fun-cont
 		 (if (and (consp fun) (eq (car fun) 'function))
 		     fun
-		     (once-only ((fun fun))
-		       `(if (functionp ,fun)
-			    ,fun
-			    (%coerce-name-to-function ,fun)))))
+		     `(%coerce-callable-to-function ,fun)))
     (setf (continuation-dest fun-cont) node)
     (assert-continuation-type fun-cont
 			      (specifier-type '(or function symbol)))

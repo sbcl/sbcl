@@ -131,8 +131,8 @@
 	     `((setf (symbol-function ',name)
 		     (lambda (&rest rest)
 		       (declare (ignore rest))
-		       (error "Can't FUNCALL the SYMBOL-FUNCTION of ~
-			       special forms.")))))))))
+		       (error "can't FUNCALL the SYMBOL-FUNCTION of ~
+			       special forms")))))))))
 
 ;;; Similar to DEF-IR1-TRANSLATOR, except that we pass if the syntax is
 ;;; invalid.
@@ -212,7 +212,7 @@
     (dolist (name names)
       (let ((mask (cdr (assoc name alist))))
 	(unless mask
-	  (error "Unknown attribute name: ~S." name))
+	  (error "unknown attribute name: ~S" name))
 	(res mask)))
     (res)))
 
@@ -572,7 +572,7 @@
   for various optimizers that the function might have."
   (when (and (intersection attributes '(any call unwind))
 	     (intersection attributes '(movable)))
-    (error "Function cannot have both good and bad attributes: ~S" attributes))
+    (error "function cannot have both good and bad attributes: ~S" attributes))
 
   `(%defknown ',(if (and (consp name)
 			 (not (eq (car name) 'setf)))
@@ -638,7 +638,7 @@
 
   If supplied, Result-Form is the value to return."
   (unless (member ends '(nil :head :tail :both))
-    (error "Losing Ends value: ~S." ends))
+    (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
 	(n-tail (gensym)))
     `(let* ((,n-component ,component)
@@ -656,7 +656,7 @@
   "Do-Blocks-Backwards (Block-Var Component [Ends] [Result-Form]) {Declaration}* {Form}*
   Like Do-Blocks, only iterate over the blocks in reverse order."
   (unless (member ends '(nil :head :tail :both))
-    (error "Losing Ends value: ~S." ends))
+    (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
 	(n-head (gensym)))
     `(let* ((,n-component ,component)
@@ -1014,7 +1014,7 @@
   Next. Key, Test and Test-Not are the same as for generic sequence
   functions."
   (when (and test-p not-p)
-    (error "It's silly to supply both :Test and :Test-Not."))
+    (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
       (do ((current list (funcall next current)))
 	  ((null current) nil)
@@ -1037,7 +1037,7 @@
   linked by the accessor function Next. Key, Test and Test-Not are the same as
   for generic sequence functions."
   (when (and test-p not-p)
-    (error "Silly to supply both :Test and :Test-Not."))
+    (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
       (do ((current list (funcall next current))
 	   (i 0 (1+ i)))

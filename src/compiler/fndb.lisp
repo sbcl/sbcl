@@ -450,7 +450,7 @@
   (flushable)
   :derive-type (result-type-specifier-nth-arg 1))
 
-(defknown map (type-specifier callable sequence &rest sequence) consed-sequence
+(defknown (map %map) (type-specifier callable sequence &rest sequence) consed-sequence
   (flushable call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
@@ -462,7 +462,7 @@
 (defknown %map-to-nil-on-vector (callable vector) null (flushable call))
 (defknown %map-to-nil-on-sequence (callable sequence) null (flushable call))
 
-;;; returns predicate result...
+;;; returns the result from the predicate...
 (defknown some (callable sequence &rest sequence) t
   (foldable flushable call))
 
@@ -1272,7 +1272,8 @@
   (values (simple-array * (*)) index index index)
   (foldable flushable))
 (defknown %set-symbol-package (symbol t) t (unsafe))
-(defknown %coerce-name-to-function (t) function (flushable))
+(defknown %coerce-name-to-function ((or symbol cons)) function (flushable))
+(defknown %coerce-callable-to-function (callable) function (flushable))
 
 ;;; Structure slot accessors or setters are magically "known" to be
 ;;; these functions, although the var remains the Slot-Accessor

@@ -887,8 +887,8 @@
 			   (and dest (not (if-p dest))))))
 		(let ((name (leaf-name leaf)))
 		  (when (symbolp name)
-		    (let ((dums (loop repeat (length (combination-args call))
-				      collect (gensym))))
+		    (let ((dums (make-gensym-list (length
+						   (combination-args call)))))
 		      (transform-call call
 				      `(lambda ,dums
 					 (,name ,@dums))))))))))))
@@ -924,7 +924,7 @@
 	 (table (component-failed-optimizations *component-being-compiled*))
 	 (flame (if (transform-important transform)
 		    (policy node (>= speed brevity))
-		  (policy node (> speed brevity))))
+		    (policy node (> speed brevity))))
 	 (*compiler-error-context* node))
     (cond ((not (member (transform-when transform)
 			(if *byte-compiling*
@@ -1024,8 +1024,7 @@
 	(careful-call fun args call "constant folding")
       (if (not win)
 	(setf (combination-kind call) :error)
-	(let ((dummies (loop repeat (length args)
-			     collect (gensym))))
+	(let ((dummies (make-gensym-list (length args))))
 	  (transform-call
 	   call
 	   `(lambda ,dummies
@@ -1396,7 +1395,7 @@
 			   (t nil))))
 	  (when count
 	    (with-ir1-environment node
-	      (let* ((dums (loop repeat count collect (gensym)))
+	      (let* ((dums (make-gensym-list count))
 		     (ignore (gensym))
 		     (fun (ir1-convert-lambda
 			   `(lambda (&optional ,@dums &rest ,ignore)
@@ -1500,8 +1499,7 @@
     (give-up-ir1-transform))
   (setf (node-derived-type node) *wild-type*)
   (if vals
-      (let ((dummies (loop repeat (1- (length vals))
-		       collect (gensym))))
+      (let ((dummies (make-gensym-list (length (cdr vals)))))
 	`(lambda (val ,@dummies)
 	   (declare (ignore ,@dummies))
 	   val))
