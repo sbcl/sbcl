@@ -30,4 +30,4 @@ extern void collect_garbage(unsigned last_gen);
 extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
 
-#endif _GC_H_
+#endif /* _GC_H_ */

@@ -19,4 +19,4 @@ extern lispobj alloc_number(long n);
 extern lispobj alloc_string(char *str);
 extern lispobj alloc_sap(void *ptr);
 
-#endif _ALLOC_H_
+#endif /* _ALLOC_H_ */

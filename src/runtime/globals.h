@@ -34,7 +34,7 @@ extern lispobj *current_dynamic_space;
 
 extern void globals_init(void);
 
-#else  LANGUAGE_ASSEMBLY
+#else /* LANGUAGE_ASSEMBLY */
 
 #ifdef mips
 #define EXTERN(name,bytes) .extern name bytes
@@ -78,6 +78,6 @@ EXTERN(current_dynamic_space, 4)
 EXTERN(current_flags_register, 4)
 #endif
 
-#endif LANGUAGE_ASSEMBLY
+#endif /* LANGUAGE_ASSEMBLY */
 
-#endif _INCLUDED_GLOBALS_H_
+#endif /* _INCLUDED_GLOBALS_H_ */
