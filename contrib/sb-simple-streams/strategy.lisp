@@ -9,33 +9,62 @@
 (in-package "SB-SIMPLE-STREAMS")
 
 
-(defun refill-buffer (stream blocking)
-  (with-stream-class (simple-stream stream)
+
+(defun sc-refill-buffer (stream blocking)
+  (with-stream-class (single-channel-simple-stream stream)
+    (when (any-stream-instance-flags stream :dirty)
+      ;; FIXME: Implement flush-buffer failure protocol instead of
+      ;; blocking here
+      (sc-flush-buffer stream t))
     (let* ((unread (sm last-char-read-size stream))
-	   (buffer (sm buffer stream)))
+           (buffer (sm buffer stream)))
       (unless (zerop unread)
-        ;; Keep last read character at beginning of buffer
-	(buffer-copy buffer (- (sm buffer-ptr stream) unread) buffer 0 unread))
+        (buffer-copy buffer (- (sm buffer-ptr stream) unread) buffer 0 unread))
       (let ((bytes (device-read stream nil unread nil blocking)))
-	(declare (type fixnum bytes))
-	(setf (sm buffpos stream) unread
-	      (sm buffer-ptr stream) (if (plusp bytes)
-					 (+ bytes unread)
-					 unread))
-	bytes))))
+        (declare (type fixnum bytes))
+        (setf (sm buffpos stream) unread
+              (sm buffer-ptr stream) (if (plusp bytes)
+                                         (+ bytes unread)
+                                         unread))
+        bytes))))
+
 
 (defun sc-flush-buffer (stream blocking)
   (with-stream-class (single-channel-simple-stream stream)
     (let ((ptr 0)
 	  (bytes (sm buffpos stream)))
       (declare (type fixnum ptr bytes))
+      ;; Seek to the left before flushing buffer -- the user could
+      ;; have set the file-position, and scribbled something in the
+      ;; data that was read from the file.
+      (when (> (sm buffer-ptr stream) 0)
+        (setf (device-file-position stream)
+              (- (device-file-position stream) (sm buffer-ptr stream))))
       (loop
-	(when (>= ptr bytes) (setf (sm buffpos stream) 0) (return))
+	(when (>= ptr bytes)
+          (setf (sm buffpos stream) 0
+                (sm buffer-ptr stream) 0)
+          (remove-stream-instance-flags stream :dirty)
+          (return 0))
 	(let ((bytes-written (device-write stream nil ptr nil blocking)))
 	  (declare (fixnum bytes-written))
 	  (when (minusp bytes-written)
 	    (error "DEVICE-WRITE error."))
 	  (incf ptr bytes-written))))))
+
+(defun dc-refill-buffer (stream blocking)
+  (with-stream-class (dual-channel-simple-stream stream)
+    (let* ((unread (sm last-char-read-size stream))
+           (buffer (sm buffer stream)))
+      (unless (zerop unread)
+        (buffer-copy buffer (- (sm buffer-ptr stream) unread) buffer 0 unread))
+      (let ((bytes (device-read stream nil unread nil blocking)))
+        (declare (type fixnum bytes))
+        (setf (sm buffpos stream) unread
+              (sm buffer-ptr stream) (if (plusp bytes)
+                                         (+ bytes unread)
+                                         unread))
+        bytes))))
 
 (defun dc-flush-buffer (stream blocking)
   (with-stream-class (dual-channel-simple-stream stream)
@@ -43,7 +72,7 @@
 	  (bytes (sm outpos stream)))
       (declare (type fixnum ptr bytes))
       (loop
-	(when (>= ptr bytes) (setf (sm outpos stream) 0) (return))
+	(when (>= ptr bytes) (setf (sm outpos stream) 0) (return 0))
 	(let ((bytes-written (device-write stream nil ptr nil blocking)))
 	  (declare (fixnum bytes-written))
 	  (when (minusp bytes-written)
@@ -65,7 +94,7 @@
 		     (progn
 		       (setf (sm buffpos stream) (1+ ptr))
 		       (bref buffer ptr))
-		     (let ((bytes (refill-buffer stream blocking)))
+		     (let ((bytes (sc-refill-buffer stream blocking)))
 		       (declare (type fixnum bytes))
 		       (unless (minusp bytes)
 			 (let ((ptr (sm buffpos stream)))
@@ -120,7 +149,7 @@
 	   (optimize (speed 3) (space 2) (safety 0) (debug 0)))
   (with-stream-class (single-channel-simple-stream stream)
     (setf (sm last-char-read-size stream) 0)
-    ;; Should arrange for the last character to be unreadable
+    ;; FIXME: Should arrange for the last character to be unreadable
     (do ((buffer (sm buffer stream))
 	 (ptr (sm buffpos stream))
 	 (max (sm buffer-ptr stream))
@@ -132,7 +161,7 @@
 		       (prog1
 			   (bref buffer ptr)
 			 (incf ptr))
-		       (let ((bytes (refill-buffer stream blocking)))
+		       (let ((bytes (sc-refill-buffer stream blocking)))
 			 (declare (type fixnum bytes))
 			 (setf ptr (sm buffpos stream)
 			       max (sm buffer-ptr stream))
@@ -162,7 +191,7 @@
 	   (type fixnum start end)
 	   (type boolean blocking)
 	   (optimize (speed 3) (space 2) (safety 0) (debug 0)))
-  ;; TODO: what about the blocking parameter?
+  (declare (ignore blocking))           ; everything is in the buffer
   (with-stream-class (single-channel-simple-stream stream)
     (do ((buffer (sm buffer stream))
 	 (ptr (sm buffpos stream))
@@ -220,12 +249,11 @@
 		 (funcall (the (or symbol function) (svref ctrl code))
 			  stream character))
 	(return-from sc-write-char character))
-      ;; FIXME: Shouldn't this be buf-len, not buffer-ptr?
-      (unless (< ptr (sm buffer-ptr stream))
-        (sc-flush-buffer stream t)
-        (setf ptr (sm buffpos stream)))
+      (when (>= ptr (sm buf-len stream))
+        (setf ptr (sc-flush-buffer stream t)))
       (setf (bref buffer ptr) code)
-      (setf (sm buffpos stream) (1+ ptr))))
+      (setf (sm buffpos stream) (1+ ptr))
+      (add-stream-instance-flags stream :dirty)))
   character)
 
 (declaim (ftype j-write-chars-fn sc-write-chars))
@@ -233,18 +261,21 @@
   (with-stream-class (single-channel-simple-stream stream)
     (do ((buffer (sm buffer stream))
 	 (ptr (sm buffpos stream))
-         ;; xxx buffer-ptr or buf-len?  TODO: look them up in the
-         ;; docs; was: buffer-ptr, but it's initialized to 0 in
-         ;; (device-open file-simple-stream); buf-len seems to work(tm)
-	 (max #+nil(sm buffer-ptr stream) ;; or buf-len?
-              (sm buf-len stream))
+	 (max (sm buf-len stream))
 	 (ctrl (sm control-out stream))
 	 (posn start (1+ posn))
 	 (count 0 (1+ count)))
-	((>= posn end) (setf (sm buffpos stream) ptr) count)
+	((>= posn end)
+         (setf (sm buffpos stream) ptr)
+         (add-stream-instance-flags stream :dirty)
+         count)
       (declare (type fixnum ptr max posn count))
       (let* ((char (char string posn))
 	     (code (char-code char)))
+        ;; FIXME: Can functions in the control-out table side-effect
+        ;; the stream?  Section 9.0 prohibits this only for control-in
+        ;; functions.  If they can, update (sm buffpos stream) here,
+        ;; like around the call to sc-flush-buffer below
 	(unless (and (< code 32) ctrl (svref ctrl code)
 		     (funcall (the (or symbol function) (svref ctrl code))
 			      stream char))
@@ -267,6 +298,23 @@
 	  (-3 t)
 	  (t (error "DEVICE-READ error."))))))
 
+;;; SC-READ-BYTE doesn't actually live in a strategy slot
+(defun sc-read-byte (stream eof-error-p eof-value blocking)
+  (with-stream-class (single-channel-simple-stream stream)
+    ;; @@1
+    (let ((ptr (sm buffpos stream)))
+      (when (>= ptr (sm buffer-ptr stream))
+        (let ((bytes (device-read stream nil 0 nil blocking)))
+          (declare (type fixnum bytes))
+          (if (plusp bytes)
+              (setf (sm buffer-ptr stream) bytes
+                    ptr 0)
+              (return-from sc-read-byte
+                (sb-impl::eof-or-lose stream eof-error-p eof-value)))))
+      (setf (sm buffpos stream) (1+ ptr))
+      (setf (sm last-char-read-size stream) 0)
+      (bref (sm buffer stream) ptr))))
+
 ;;;
 ;;; DUAL-CHANNEL STRATEGY FUNCTIONS
 ;;;
@@ -282,7 +330,7 @@
 		     (progn
 		       (setf (sm buffpos stream) (1+ ptr))
 		       (bref buffer ptr))
-		     (let ((bytes (refill-buffer stream blocking)))
+		     (let ((bytes (dc-refill-buffer stream blocking)))
 		       (declare (type fixnum bytes))
 		       (unless (minusp bytes)
 			 (let ((ptr (sm buffpos stream)))
@@ -327,7 +375,7 @@
 		       (prog1
 			   (bref buffer ptr)
 			 (incf ptr))
-		       (let ((bytes (refill-buffer stream blocking)))
+		       (let ((bytes (dc-refill-buffer stream blocking)))
 			 (declare (type fixnum bytes))
 			 (setf ptr (sm buffpos stream)
 			       max (sm buffer-ptr stream))
@@ -365,22 +413,20 @@
 
 (declaim (ftype j-write-char-fn dc-write-char))
 (defun dc-write-char (character stream)
-  (with-stream-class (dual-channel-simple-stream stream)
-    (let* ((buffer (sm out-buffer stream))
-	   (ptr (sm outpos stream))
-	   (code (char-code character))
-	   (ctrl (sm control-out stream)))
-      (when (and (< code 32) ctrl (svref ctrl code)
-		 (funcall (the (or symbol function) (svref ctrl code))
-			  stream character))
-	(return-from dc-write-char character))
-      (unless (< ptr (sm max-out-pos stream))
-        (dc-flush-buffer stream t)
-        (setf ptr (sm outpos stream)))
-      (progn
+  (when character
+    (with-stream-class (dual-channel-simple-stream stream)
+      (let* ((buffer (sm out-buffer stream))
+             (ptr (sm outpos stream))
+             (code (char-code character))
+             (ctrl (sm control-out stream)))
+        (when (and (< code 32) ctrl (svref ctrl code)
+                   (funcall (the (or symbol function) (svref ctrl code))
+                            stream character))
+          (return-from dc-write-char character))
+        (when (>= ptr (sm max-out-pos stream))
+          (setq ptr (dc-flush-buffer stream t)))
         (setf (bref buffer ptr) code)
-        (setf (sm outpos stream) (1+ ptr))
-        )))
+        (setf (sm outpos stream) (1+ ptr)))))
   character)
 
 (declaim (ftype j-write-chars-fn dc-write-chars))
@@ -417,6 +463,22 @@
 	  (-3 t)
 	  (t (error "DEVICE-READ error."))))))
 
+;;; DC-READ-BYTE doesn't actually live in a strategy slot
+(defun dc-read-byte (stream eof-error-p eof-value blocking)
+  (with-stream-class (dual-channel-simple-stream stream)
+    (let ((ptr (sm buffpos stream)))
+      (when (>= ptr (sm buffer-ptr stream))
+        (let ((bytes (device-read stream nil 0 nil blocking)))
+          (declare (type fixnum bytes))
+          (if (plusp bytes)
+              (setf (sm buffer-ptr stream) bytes
+                    ptr 0)
+              (return-from dc-read-byte
+                (sb-impl::eof-or-lose stream eof-error-p eof-value)))))
+      (setf (sm buffpos stream) (1+ ptr))
+      (setf (sm last-char-read-size stream) 0)
+      (bref (sm buffer stream) ptr))))
+
 ;;;
 ;;; STRING STRATEGY FUNCTIONS
 ;;;
@@ -447,6 +509,7 @@
 (declaim (ftype j-read-char-fn composing-crlf-read-char))
 (defun composing-crlf-read-char (stream eof-error-p eof-value blocking)
   ;; TODO: what about the eof-error-p parameter?
+  (declare (ignore eof-error-p eof-value))
   (with-stream-class (simple-stream stream)
     (let* ((melded-stream (sm melded-stream stream))
 	   (char (funcall-stm-handler j-read-char melded-stream nil stream
@@ -479,45 +542,110 @@
     (funcall-stm-handler j-unread-char (sm melded-stream stream) nil)))
 
 ;;;
+;;; Functions to install the strategy functions in the appropriate slots
 ;;;
-;;;
+
+(defun %find-topmost-stream (stream)
+  ;; N.B.: the topmost stream in the chain of encapsulations is actually
+  ;; the bottommost in the "melding" chain
+  (with-stream-class (simple-stream)
+    (loop
+      (when (eq (sm melded-stream stream) (sm melding-base stream))
+	(return stream))
+      (setq stream (sm melded-stream stream)))))
 
 (defun install-single-channel-character-strategy (stream external-format
 							 access)
-  (declare (ignore external-format))
-  ;; ACCESS is usually NIL
-  ;; May be "undocumented" values: stream::buffer, stream::mapped
-  ;;   to install strategies suitable for direct buffer streams
-  ;;   (i.e., ones that call DEVICE-EXTEND instead of DEVICE-READ)
-  ;; (Avoids checking "mode" flags by installing special strategy)
-  (with-stream-class (single-channel-simple-stream stream)
-    (if (or (eq access 'buffer) (eq access 'mapped))
-	(setf (sm j-read-char stream) #'sc-read-char--buffer
-	      (sm j-read-chars stream) #'sc-read-chars--buffer
-	      (sm j-unread-char stream) #'sc-unread-char
-	      (sm j-write-char stream) #'sc-write-char
-	      (sm j-write-chars stream) #'sc-write-chars
-	      (sm j-listen stream) #'sc-listen)
-	(setf (sm j-read-char stream) #'sc-read-char
-	      (sm j-read-chars stream) #'sc-read-chars
-	      (sm j-unread-char stream) #'sc-unread-char
-	      (sm j-write-char stream) #'sc-write-char
-	      (sm j-write-chars stream) #'sc-write-chars
-	      (sm j-listen stream) #'sc-listen)))
+  (find-external-format external-format)
+  (let ((stream (%find-topmost-stream stream)))
+    ;; ACCESS is usually NIL
+    ;; May be "undocumented" values: stream::buffer, stream::mapped
+    ;;   to install strategies suitable for direct buffer streams
+    ;;   (i.e., ones that call DEVICE-EXTEND instead of DEVICE-READ)
+    ;; (Avoids checking "mode" flags by installing special strategy)
+    (with-stream-class (single-channel-simple-stream stream)
+      (if (or (eq access 'buffer) (eq access 'mapped))
+          (setf (sm j-read-char stream) #'sc-read-char--buffer
+                (sm j-read-chars stream) #'sc-read-chars--buffer
+                (sm j-unread-char stream) #'sc-unread-char
+                (sm j-write-char stream) #'sc-write-char
+                (sm j-write-chars stream) #'sc-write-chars
+                (sm j-listen stream) #'sc-listen)
+          (setf (sm j-read-char stream) #'sc-read-char
+                (sm j-read-chars stream) #'sc-read-chars
+                (sm j-unread-char stream) #'sc-unread-char
+                (sm j-write-char stream) #'sc-write-char
+                (sm j-write-chars stream) #'sc-write-chars
+                (sm j-listen stream) #'sc-listen))))
   stream)
 
 (defun install-dual-channel-character-strategy (stream external-format)
-  (declare (ignore external-format))
-  (with-stream-class (dual-channel-simple-stream stream)
-    (setf (sm j-read-char stream) #'dc-read-char
-	  (sm j-read-chars stream) #'dc-read-chars
-	  (sm j-unread-char stream) #'dc-unread-char
-	  (sm j-write-char stream) #'dc-write-char
-	  (sm j-write-chars stream) #'dc-write-chars
-	  (sm j-listen stream) #'dc-listen))
+  (find-external-format external-format)
+  (let ((stream (%find-topmost-stream stream)))
+    (with-stream-class (dual-channel-simple-stream stream)
+      (setf (sm j-read-char stream) #'dc-read-char
+            (sm j-read-chars stream) #'dc-read-chars
+            (sm j-unread-char stream) #'dc-unread-char
+            (sm j-write-char stream) #'dc-write-char
+            (sm j-write-chars stream) #'dc-write-chars
+            (sm j-listen stream) #'dc-listen)))
   stream)
 
-(defun install-string-character-strategy (stream)
-  (with-stream-class (string-simple-stream stream)
-    (setf (sm j-read-char stream) #'string-read-char))
+(defun install-string-input-character-strategy (stream)
+  #| implement me |#
+  (let ((stream (%find-topmost-stream stream)))
+    (with-stream-class (simple-stream stream)
+      (setf (sm j-read-char stream) #'string-read-char)))
   stream)
+
+(defun install-string-output-character-strategy (stream)
+  #| implement me |#
+  stream)
+
+(defun compose-encapsulating-streams (stream external-format)
+  (when (consp external-format)
+    (with-stream-class (simple-stream)
+      (dolist (fmt (butlast external-format))
+	(let ((encap (make-instance 'composing-stream :composing-format fmt)))
+	  (setf (sm melding-base encap) stream)
+	  (setf (sm melded-stream encap) (sm melded-stream stream))
+	  (setf (sm melded-stream stream) encap)
+	  (rotatef (sm j-listen encap) (sm j-listen stream))
+	  (rotatef (sm j-read-char encap) (sm j-read-char stream))
+	  (rotatef (sm j-read-chars encap) (sm j-read-chars stream))
+	  (rotatef (sm j-unread-char encap) (sm j-unread-char stream))
+	  (rotatef (sm j-write-char encap) (sm j-write-char stream))
+	  (rotatef (sm j-write-chars encap) (sm j-write-chars stream)))))))
+
+;;;
+;;; NULL STRATEGY FUNCTIONS
+;;;
+
+(declaim (ftype j-read-char-fn null-read-char))
+(defun null-read-char (stream eof-error-p eof-value blocking)
+  (declare (ignore blocking))
+  (sb-impl::eof-or-lose stream eof-error-p eof-value))
+
+(declaim (ftype j-read-chars-fn null-read-chars))
+(defun null-read-chars (stream string search start end blocking)
+  (declare (ignore stream string search start end blocking))
+  (values 0 :eof))
+
+(declaim (ftype j-unread-char-fn null-unread-char))
+(defun null-unread-char (stream relaxed)
+  (declare (ignore stream relaxed)))
+
+(declaim (ftype j-write-char-fn null-write-char))
+(defun null-write-char (character stream)
+  (declare (ignore stream))
+  character)
+
+(declaim (ftype j-write-chars-fn null-write-chars))
+(defun null-write-chars (string stream start end)
+  (declare (ignore string stream))
+  (- end start))
+
+(declaim (ftype j-listen-fn null-listen))
+(defun null-listen (stream)
+  (declare (ignore stream))
+  nil)

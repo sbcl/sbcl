@@ -1,27 +1,20 @@
 ;;; -*- lisp -*-
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (require :sb-grovel))
-(defpackage #:sb-simple-stream-system (:use #:asdf #:cl #:sb-grovel))
+(defpackage #:sb-simple-stream-system (:use #:asdf #:cl))
 (in-package #:sb-simple-stream-system)
 
 
 (defsystem sb-simple-streams
-  :depends-on (sb-grovel sb-bsd-sockets)
+  :depends-on (sb-bsd-sockets sb-posix)
   :components ((:file "package")
                (:file "fndb")
-               (grovel-constants-file "constants"
-                                      :package :sb-simple-streams
-                                      :pathname "constants.lisp"
-                                      :depends-on ("package"))
-               (:file "unix" :depends-on ("constants"))
                ;;(:file "pcl")
                ;;(:file "ext-format" :depends-on ("package"))
                (:file "classes" :depends-on ("package"))
                (:file "internal" :depends-on ("classes"))
                (:file "strategy" :depends-on ("internal"))
                (:file "cl" :depends-on ("internal" "fndb"))
-               (:file "simple-streams" :depends-on ("cl" "strategy" "unix"))
+               (:file "simple-streams" :depends-on ("cl" "strategy"))
                ;;(:file "gray-compat" :depends-on ("package"))
                ;;(:file "iodefs" :depends-on ("package"))
                ))

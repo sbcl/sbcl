@@ -35,7 +35,7 @@
 	     (values fixnum &optional (member nil t :eof))))
 
 (deftype j-write-char-fn ()
-  '(function (character simple-stream) character))
+  '(function ((or character null) simple-stream) (or character null)))
 
 (deftype j-write-chars-fn ()
   '(function (string simple-stream fixnum fixnum) t)) ;; return chars-written?
@@ -66,6 +66,9 @@
   (defvar *slot-access-functions* (make-hash-table))
   (defvar *automagic-accessors* nil))
 
+;;; Commented out in favor of standard class machinery that does not
+;;; depend on implementation internals.
+#+nil
 (defmacro def-stream-class (name superclasses slots &rest options)
   (let ((accessors ())
 	(real-slots ()))
@@ -123,6 +126,12 @@
 	      collect `(setf (gethash ',(car accessor) *slot-access-functions*)
 			     ',(cdr accessor)))))))
 
+
+(defmacro def-stream-class (name superclasses slots &rest options)
+  (let ((slots (copy-tree slots)))
+    (dolist (slot slots) (remf (cdr slot) 'sb-pcl::location))
+    `(defclass ,name ,superclasses ,slots ,@options)))
+
 (def-stream-class simple-stream (standard-object stream)
   ((plist :initform nil :type list :accessor stream-plist sb-pcl::location 19)
 
@@ -131,17 +140,17 @@
 
    ;; A function that determines if one character can be successfully
    ;; read from stream.
-   (j-listen :type j-listen-fn sb-pcl::location 18)
+   (j-listen :initform #'sb-kernel:ill-in :type j-listen-fn sb-pcl::location 18)
    ;; A function that reads one character.
-   (j-read-char :type j-read-char-fn sb-pcl::location 17)
+   (j-read-char :initform #'sb-kernel:ill-in :type j-read-char-fn sb-pcl::location 17)
    ;; A function that reads characters into a string.
-   (j-read-chars :type j-read-chars-fn sb-pcl::location 16)
+   (j-read-chars :initform #'sb-kernel:ill-in :type j-read-chars-fn sb-pcl::location 16)
    ;; A function that writes one character.
-   (j-write-char :type j-write-char-fn sb-pcl::location 15)
+   (j-write-char :initform #'sb-kernel:ill-out :type j-write-char-fn sb-pcl::location 15)
    ;; A function that writes characters from a string into the stream.
-   (j-write-chars :type j-write-chars-fn sb-pcl::location 14)
+   (j-write-chars :initform #'sb-kernel:ill-out :type j-write-chars-fn sb-pcl::location 14)
    ;; A function that unreads the last character read.
-   (j-unread-char :type j-unread-char-fn sb-pcl::location 13)
+   (j-unread-char :initform #'sb-kernel:ill-in :type j-unread-char-fn sb-pcl::location 13)
 
    ;; Other slots
 
@@ -211,10 +220,11 @@
   ())
 
 (def-stream-class file-simple-stream (single-channel-simple-stream)
-  ((pathname :initform nil :initarg :pathname)
-   (filename :initform nil :initarg :filename)
-   (original :initform nil :initarg :original)
-   (delete-original :initform nil :initarg :delete-original)
+  ((pathname :initform nil :initarg :pathname sb-pcl::location 27)
+   (filename :initform nil :initarg :filename sb-pcl::location 26)
+   (original :initform nil :initarg :original sb-pcl::location 25)
+   (delete-original :initform nil :initarg :delete-original
+                    sb-pcl::location 24)
    ))
 
 (def-stream-class mapped-file-simple-stream (file-simple-stream
@@ -224,8 +234,8 @@
 ;;; A stream with two octet buffers, for example a socket or terminal
 ;;; stream.
 (def-stream-class dual-channel-simple-stream (simple-stream)
-  ;; Output buffer.
-  ((out-buffer :initform nil :type (or simple-stream-buffer null)
+  (;; Output buffer.
+   (out-buffer :initform nil :type (or simple-stream-buffer null)
 	       sb-pcl::location 26)
    ;; Current position in output buffer.
    (outpos :initform 0 :type fixnum sb-pcl::location 25)
@@ -256,8 +266,14 @@
 
 ;;; A stream with a string as buffer.
 (def-stream-class string-simple-stream (simple-stream)
-  ;; The input/output buffer.
-  ((buffer :initform nil :type (or simple-stream-buffer null)
+  ())
+
+(def-stream-class composing-stream (string-simple-stream)
+  ())
+
+(def-stream-class string-input-simple-stream (string-simple-stream)
+  (;; The input buffer.
+   (buffer :initform nil :type (or simple-stream-buffer null)
            sb-pcl::location 23)
    ;; Current position in buffer.
    (buffpos :initform 0 :type fixnum sb-pcl::location 22)
@@ -265,22 +281,24 @@
    (buffer-ptr :initform 0 :type fixnum sb-pcl::location 21)
    (buf-len :initform 0 :type fixnum sb-pcl::location 20)))
 
-(def-stream-class composing-stream (string-simple-stream)
-  ())
-
-(def-stream-class string-input-simple-stream (string-simple-stream)
-  ())
-
 (def-stream-class string-output-simple-stream (string-simple-stream)
-  ;; The output buffer (slot added so that a class can inherit from
-  ;; both string-input-simple-stream and string-output-simple-stream
-  ;; without the strategies clashing)
-  ((out-buffer :initform nil :type (or simple-stream-buffer null)
-	       sb-pcl::location 26)
+  (;; The input buffer.
+   (buffer :initform nil :type (or simple-stream-buffer null)
+            sb-pcl::location 26)
+   ;; Current position in input buffer.
+   (buffpos :initform 0 :type fixnum  sb-pcl::location 25)
+   ;; Maximum valid position in input buffer, or -1 on eof.
+   (buffer-ptr :initform 0 :type fixnum  sb-pcl::location 24)
+   (buf-len :initform 0 :type fixnum sb-pcl::location 23)
+   ;; The output buffer (slot added so that a class can inherit from
+   ;; both string-input-simple-stream and string-output-simple-stream
+   ;; without the strategies clashing)
+   (out-buffer :initform nil :type (or simple-stream-buffer null)
+                sb-pcl::location 22)
    ;; Current position in output buffer.
-   (outpos :initform 0 :type fixnum sb-pcl::location 25)
+   (outpos :initform 0 :type fixnum sb-pcl::location 21)
    ;; Buffer length (one greater than maximum output buffer index)
-   (max-out-pos :initform 0 :type fixnum sb-pcl::location 24)))
+   (max-out-pos :initform 0 :type fixnum sb-pcl::location 20)))
 
 (def-stream-class fill-pointer-output-simple-stream
     (string-output-simple-stream)
@@ -328,7 +346,5 @@
 (defgeneric device-write (stream buffer start end blocking))
 
 (defgeneric device-clear-output (stream))
-
-(defgeneric device-extend (stream need action))
 
 (defgeneric device-finish-record (stream blocking action))

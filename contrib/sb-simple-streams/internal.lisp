@@ -45,10 +45,14 @@
 ;;; forms, the inner with-stream-class form must specify a stream
 ;;; argument if the outer one specifies one, or the wrong object will
 ;;; be accessed.
+
+;;; Commented out in favor of standard class machinery that does not
+;;; depend on implementation internals.
+#+nil
 (defmacro with-stream-class ((class-name &optional stream) &body body)
   (if stream
       (let ((stm (gensym "STREAM"))
-	    (slt (gensym)))
+	    (slt (gensym "SV")))
 	`(let* ((,stm ,stream)
 		(,slt (sb-pcl::std-instance-slots ,stm)))
 	   (declare (type ,class-name ,stm) (ignorable ,slt))
@@ -95,6 +99,45 @@
 			    (t `(slot-value ,stream ',slot-name))))))
 	 ,@body)))
 
+
+(defmacro with-stream-class ((class-name &optional stream) &body body)
+  (if stream
+    (let ((stm (gensym "STREAM"))
+	  (slt (gensym "SV")))
+      `(let* ((,stm ,stream)
+	      (,slt (sb-kernel:%instance-ref ,stm 1)))
+	 (declare (type ,class-name ,stm)
+		  (type simple-vector ,slt)
+		  (ignorable ,slt))
+	 (macrolet ((sm (slot-name stream)
+		      (declare (ignore stream))
+		      #-count-sm
+		      `(slot-value ,',stm ',slot-name)
+		      #+count-sm
+		      `(%sm ',slot-name ,',stm))
+		    (add-stream-instance-flags (stream &rest flags)
+		      (declare (ignore stream))
+		      `(setf (sm %flags ,',stm) (logior (sm %flags ,',stm)
+							,(%flags flags))))
+		    (remove-stream-instance-flags (stream &rest flags)
+		      (declare (ignore stream))
+		      `(setf (sm %flags ,',stm) (logandc2 (sm %flags ,',stm)
+							  ,(%flags flags))))
+		    (any-stream-instance-flags (stream &rest flags)
+		      (declare (ignore stream))
+		      `(not (zerop (logand (sm %flags ,',stm)
+					   ,(%flags flags))))))
+	   ,@body)))
+    `(macrolet ((sm (slot-name stream)
+		  #-count-sm
+		  `(slot-value ,stream ',slot-name)
+		  #+count-sm
+		  `(%sm ',slot-name ,stream)))
+       ,@body)))
+
+;;; Commented out in favor of standard class machinery that does not
+;;; depend on implementation internals.
+#+nil
 (defmacro sm (slot-name stream)
   (let ((slot-access (gethash slot-name *slot-access-functions*)))
     (warn "Using ~S macro outside ~S" 'sm 'with-stream-class)
@@ -105,6 +148,12 @@
 	  (slot-access
 	   `(the ,(car slot-access) (,(cdr slot-access) ,stream)))
 	  (t `(slot-value ,stream ',slot-name)))))
+
+
+(defmacro sm (slot-name stream)
+  "Access the named slot in Stream."
+  (warn "Using ~S macro outside ~S." 'sm 'with-stream-class)
+  `(slot-value ,stream ',slot-name))
 
 (defmacro funcall-stm-handler (slot-name stream &rest args)
   (let ((s (gensym)))
@@ -137,6 +186,17 @@
        (with-stream-class (simple-stream ,s)
 	 (not (zerop (logand (sm %flags ,s) ,(%flags flags))))))))
 
+(defmacro simple-stream-dispatch (stream single dual string)
+  (let ((s (gensym "STREAM")))
+    `(let ((,s ,stream))
+       (with-stream-class (simple-stream ,s)
+	 (let ((%flags (sm %flags ,s)))
+	   (cond ((zerop (logand %flags ,(%flags '(:string :dual))))
+		  ,single)
+		 ((zerop (logand %flags ,(%flags '(:string))))
+		  ,dual)
+		 (t
+		  ,string)))))))
 
 (declaim (inline buffer-sap bref (setf bref) buffer-copy))
 
@@ -173,7 +233,7 @@
       (make-array size :element-type '(unsigned-byte 8))))
 
 (defun free-buffer (buffer)
-  (when (not (vectorp buffer))
+  (when (sb-sys:system-area-pointer-p buffer)
     (push buffer sb-impl::*available-buffers*))
   t)
 
@@ -207,9 +267,7 @@
 	       ((:rename :rename-and-delete)
 		(setf mask (logior mask sb-unix:o_creat)))
 	       ((:new-version :supersede)
-		(setf mask (logior mask sb-unix:o_trunc)))
-	       (:append
-		(setf mask (logior mask sb-unix:o_append)))))
+		(setf mask (logior mask sb-unix:o_trunc)))))
 	    (t
 	     (setf if-exists nil)))	; :ignore-this-arg
       (unless if-does-not-exist-given
@@ -282,6 +340,8 @@
 		  (sb-unix:unix-open name mask mode)
 		  (values nil sb-unix:enoent))
 	    (cond ((sb-int:fixnump fd)
+                   (when (eql if-exists :append)
+                     (sb-unix:unix-lseek fd 0 sb-unix:l_xtnd))
 		   (return (values fd name original delete-original)))
 		  ((eql errno sb-unix:enoent)
 		   (case if-does-not-exist
@@ -341,50 +401,30 @@
 			 :overwrite :append :supersede nil) if-exists)
 	   (type (member :error :create nil) if-does-not-exist)
 	   (ignore external-format))
-  (setq pathname (pathname pathname))
-  (multiple-value-bind (fd namestring original delete-original)
-      (%fd-open pathname direction if-exists if-exists-given
-		if-does-not-exist if-does-not-exist-given)
-    (when fd
-      (case direction
-	((:input :output :io)
-	 (sb-sys:make-fd-stream fd
-                                :input (member direction '(:input :io))
-                                :output (member direction '(:output :io))
-                                :element-type element-type
-                                :file namestring
-                                :original original
-                                :delete-original delete-original
-                                :pathname pathname
-                                :input-buffer-p t
-                                :auto-close t))
-	(:probe
-	 (let ((stream (sb-impl::%make-fd-stream :name namestring :fd fd
-                                                 :pathname pathname
-                                                 :element-type element-type)))
-	   (close stream)
-	   stream))))))
+  (let ((filespec (merge-pathnames pathname)))
+    (multiple-value-bind (fd namestring original delete-original)
+        (%fd-open filespec direction if-exists if-exists-given
+                  if-does-not-exist if-does-not-exist-given)
+      (when fd
+        (case direction
+          ((:input :output :io)
+           (sb-sys:make-fd-stream fd
+                                  :input (member direction '(:input :io))
+                                  :output (member direction '(:output :io))
+                                  :element-type element-type
+                                  :file namestring
+                                  :original original
+                                  :delete-original delete-original
+                                  :pathname pathname
+                                  :input-buffer-p t
+                                  :auto-close t))
+          (:probe
+           (let ((stream (sb-impl::%make-fd-stream :name namestring :fd fd
+                                                   :pathname pathname
+                                                   :element-type element-type)))
+             (close stream)
+             stream)))))))
 
-
-;; Make PATHNAME and NAMESTRING work
-(defun cl::file-name (stream &optional new-name)
-  (typecase stream
-    (file-simple-stream
-     (with-stream-class (file-simple-stream stream)
-       (cond (new-name
-	      (setf (sm pathname stream) new-name)
-	      (setf (sm filename stream) (sb-int:unix-namestring new-name nil))
-	      t)
-	     (t
-	      (sm pathname stream)))))
-    (sb-sys::file-stream
-     (cond (new-name
-	    (setf (sb-impl::fd-stream-pathname stream) new-name)
-	    (setf (sb-impl::fd-stream-file stream)
-		  (sb-int:unix-namestring new-name nil))
-	    t)
-	   (t
-	    (sb-impl::fd-stream-pathname stream))))))
 
 ;; Experimental "filespec" stuff
 
