@@ -9,7 +9,7 @@ all: $(EXTRA_ALL_TARGETS)
 	  --eval "(quit)"
 
 test: all
-	echo "(asdf:operate (quote asdf:load-op) :$(SYSTEM)) "\
+	echo "(asdf:operate (quote asdf:load-op) :$(SYSTEM))" \
 	     "(asdf:operate (quote asdf:test-op) :$(SYSTEM))" | \
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
