@@ -1004,6 +1004,9 @@
 	(when (optional-dispatch-more-entry leaf)
 	  (frob (optional-dispatch-more-entry leaf)))
 	(let ((main (optional-dispatch-main-entry leaf)))
+          (when entry
+            (setf (functional-entry-fun entry) main)
+            (setf (functional-entry-fun main) entry))
 	  (when (eq (functional-kind main) :optional)
 	    (frob main))))))
 

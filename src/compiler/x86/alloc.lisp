@@ -115,18 +115,19 @@
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
-  (:info length)
+  (:info length stack-allocate-p)
   (:temporary (:sc any-reg) temp)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
-   (pseudo-atomic
-    (let ((size (+ length closure-info-offset)))
-      (allocation result (pad-data-block size) node)
-      (inst lea result
-	    (make-ea :byte :base result :disp fun-pointer-lowtag))
-      (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
-	      result 0 fun-pointer-lowtag))
+   (maybe-pseudo-atomic stack-allocate-p
+     (let ((size (+ length closure-info-offset)))
+       (allocation result (pad-data-block size) node
+                   stack-allocate-p)
+       (inst lea result
+             (make-ea :byte :base result :disp fun-pointer-lowtag))
+       (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
+               result 0 fun-pointer-lowtag))
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
     (storew temp result closure-fun-slot fun-pointer-lowtag))))
 

@@ -90,6 +90,7 @@ echo //doing warm init
 	#+sb-show (setf sb-int:*/show* nil)
         ;; The system is complete now, all standard functions are
         ;; defined.
+        (sb-kernel::ctype-of-cache-clear)
         (setq sb-c::*flame-on-necessarily-undefined-function* t)
 	(sb-ext:save-lisp-and-die "output/sbcl.core" :purify t)
 	EOF

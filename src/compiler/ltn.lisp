@@ -402,6 +402,17 @@
   ltn-policy ; a hack to effectively (DECLARE (IGNORE LTN-POLICY))
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil))
+
+;;; Make sure that arguments of magic functions are not annotated.
+;;; (Otherwise the compiler may dump its internal structures as
+;;; constants :-()
+(defoptimizer (%pop-values ltn-annotate) ((%lvar) node ltn-policy)
+  %lvar node ltn-policy)
+(defoptimizer (%nip-values ltn-annotate) ((last-nipped last-preserved
+                                                       &rest moved)
+                                          node ltn-policy)
+  last-nipped last-preserved moved node ltn-policy)
+
 
 ;;;; known call annotation
 

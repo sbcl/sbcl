@@ -96,7 +96,6 @@
                          (let* ((generator (lvar-use lvar))
                                 (block (node-block generator))
                                 (2block (block-info block)))
-                           (aver (eq generator (block-last block)))
                            ;; DX objects, living in the LVAR, are
                            ;; alive in the environment, protected by
                            ;; the CLEANUP. We also cannot move them

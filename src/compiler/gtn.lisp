@@ -68,7 +68,8 @@
 		      (if (lambda-var-indirect thing)
 			  *backend-t-primitive-type*
 			  (primitive-type (leaf-type thing))))
-		     (nlx-info *backend-t-primitive-type*))))
+		     (nlx-info *backend-t-primitive-type*)
+                     (clambda *backend-t-primitive-type*))))
 	(push (cons thing (make-normal-tn ptype))
 	      reversed-ir2-physenv-alist)))
 

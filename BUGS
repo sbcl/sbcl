@@ -379,24 +379,6 @@ WORKAROUND:
    a STYLE-WARNING for references to variables similar to locals might
    be a good thing.)
 
-125:
-   (as reported by Gabe Garza on cmucl-help 2001-09-21)
-	(defvar *tmp* 3)
-	(defun test-pred (x y)
-	  (eq x y))
-	(defun test-case ()
-	  (let* ((x *tmp*)
-	         (func (lambda () x)))
-	    (print (eq func func))
-	    (print (test-pred func func))
-	    (delete func (list func))))
-   Now calling (TEST-CASE) gives output
-     NIL
-     NIL
-     (#<FUNCTION {500A9EF9}>)
-   Evidently Python thinks of the lambda as a code transformation so
-   much that it forgets that it's also an object.
-
 135:
   Ideally, uninterning a symbol would allow it, and its associated
   FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However,

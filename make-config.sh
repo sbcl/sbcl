@@ -187,6 +187,7 @@ cd $original_dir
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
+    printf ' :stack-allocatable-closures' >> $ltf
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ]; then
 	printf ' :linkage-table' >> $ltf
     fi

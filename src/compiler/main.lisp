@@ -669,7 +669,7 @@
     (format t "~4TL~D: ~S~:[~; [closure]~]~%"
 	    (label-id (entry-info-offset entry))
 	    (entry-info-name entry)
-	    (entry-info-closure-p entry)))
+	    (entry-info-closure-tn entry)))
   (terpri)
   (pre-pack-tn-stats component *standard-output*)
   (terpri)
@@ -996,18 +996,12 @@
     ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
 
     (locall-analyze-clambdas-until-done (list fun))
-    
+
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
+      (declare (ignore hairy-top))
 
       (let ((*all-components* (append components-from-dfo top-components)))
-	;; FIXME: This is more monkey see monkey do based on CMU CL
-	;; code. If anyone figures out why to only prescan HAIRY-TOP
-	;; and TOP-COMPONENTS here, instead of *ALL-COMPONENTS* or
-	;; some other combination of results from FIND-INITIAL-VALUES,
-	;; it'd be good to explain it.
-	(mapc #'preallocate-physenvs-for-toplevelish-lambdas hairy-top)
-	(mapc #'preallocate-physenvs-for-toplevelish-lambdas top-components)
         (dolist (component-from-dfo components-from-dfo)
           (compile-component component-from-dfo)
           (replace-toplevel-xeps component-from-dfo)))

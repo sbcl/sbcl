@@ -319,8 +319,9 @@
 ;;; this case the slots aren't actually initialized until entry
 ;;; analysis runs.
 (defstruct (entry-info (:copier nil))
-  ;; Does this function have a non-null closure environment?
-  (closure-p nil :type boolean)
+  ;; TN, containing closure (if needed) for this function in the home
+  ;; environment.
+  (closure-tn nil :type (or null tn))
   ;; a label pointing to the entry vector for this function, or NIL
   ;; before ENTRY-ANALYZE runs
   (offset nil :type (or label null))

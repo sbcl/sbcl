@@ -59,7 +59,7 @@
 ;;;; leaf reference
 
 ;;; Return the TN that holds the value of THING in the environment ENV.
-(declaim (ftype (function ((or nlx-info lambda-var) physenv) tn)
+(declaim (ftype (function ((or nlx-info lambda-var clambda) physenv) tn)
 		find-in-physenv))
 (defun find-in-physenv (thing physenv)
   (or (cdr (assoc thing (ir2-physenv-closure (physenv-info physenv))))
@@ -81,7 +81,10 @@
 	 (leaf-info thing))
 	(nlx-info
 	 (aver (eq physenv (block-physenv (nlx-info-target thing))))
-	 (ir2-nlx-info-home (nlx-info-info thing))))
+	 (ir2-nlx-info-home (nlx-info-info thing)))
+        (clambda
+         (aver (xep-p thing))
+         (entry-info-closure-tn (lambda-info thing))))
       (bug "~@<~2I~_~S ~_not found in ~_~S~:>" thing physenv)))
 
 ;;; If LEAF already has a constant TN, return that, otherwise make a
@@ -210,8 +213,7 @@
   (unless (leaf-info functional)
     (setf (leaf-info functional)
 	  (make-entry-info :name (functional-debug-name functional))))
-  (let ((entry (make-load-time-constant-tn :entry functional))
-	(closure (etypecase functional
+  (let ((closure (etypecase functional
 		   (clambda
 		    (assertions-on-ir2-converted-clambda functional)
 		    (physenv-closure (get-lambda-physenv functional)))
@@ -220,17 +222,73 @@
 		    nil))))
 
     (cond (closure
-	   (let ((this-env (node-physenv ref)))
-	     (vop make-closure ref ir2-block entry (length closure) res)
-	     (loop for what in closure and n from 0 do
-	       (unless (and (lambda-var-p what)
-			    (null (leaf-refs what)))
-		 (vop closure-init ref ir2-block
-		      res
-		      (find-in-physenv what this-env)
-		      n)))))
+           (let* ((physenv (node-physenv ref))
+                  (tn (find-in-physenv functional physenv)))
+             (emit-move ref ir2-block tn res)))
 	  (t
-	   (emit-move ref ir2-block entry res))))
+           (let ((entry (make-load-time-constant-tn :entry functional)))
+             (emit-move ref ir2-block entry res)))))
+  (values))
+
+(defoptimizer (%allocate-closures ltn-annotate) ((leaves) node ltn-policy)
+  ltn-policy ; a hack to effectively (DECLARE (IGNORE LTN-POLICY))
+  (when (lvar-dynamic-extent leaves)
+    (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
+      (setf (ir2-lvar-kind info) :delayed)
+      (setf (lvar-info leaves) info)
+      #!+stack-grows-upward-not-downward
+      (let ((tn (make-normal-tn *backend-t-primitive-type*)))
+        (setf (ir2-lvar-locs info) (list tn)))
+      #!+stack-grows-downward-not-upward
+      (setf (ir2-lvar-stack-pointer info)
+            (make-stack-pointer-tn)))))
+
+(defoptimizer (%allocate-closures ir2-convert) ((leaves) call 2block)
+  (let ((dx-p (lvar-dynamic-extent leaves))
+        #!+stack-grows-upward-not-downward
+        (first-closure nil))
+    (collect ((delayed))
+      #!+stack-grows-downward-not-upward
+      (when dx-p
+        (vop current-stack-pointer call 2block
+             (ir2-lvar-stack-pointer (lvar-info leaves))))
+      (dolist (leaf (lvar-value leaves))
+        (binding* ((xep (functional-entry-fun leaf) :exit-if-null)
+                   (nil (aver (xep-p xep)))
+                   (entry-info (lambda-info xep) :exit-if-null)
+                   (tn (entry-info-closure-tn entry-info) :exit-if-null)
+                   (closure (physenv-closure (get-lambda-physenv xep)))
+                   (entry (make-load-time-constant-tn :entry xep)))
+          (let ((this-env (node-physenv call))
+                (leaf-dx-p (and dx-p (leaf-dynamic-extent leaf))))
+            (vop make-closure call 2block entry (length closure)
+                 leaf-dx-p tn)
+            #!+stack-grows-upward-not-downward
+            (when (and (not first-closure) leaf-dx-p)
+              (setq first-closure tn))
+            (loop for what in closure and n from 0 do
+                  (unless (and (lambda-var-p what)
+                               (null (leaf-refs what)))
+                    ;; In LABELS a closure may refer to another closure
+                    ;; in the same group, so we must be sure that we
+                    ;; store a closure only after its creation.
+                    ;;
+                    ;; TODO: Here is a simple solution: we postpone
+                    ;; putting of all closures after all creations
+                    ;; (though it may require more registers).
+                    (if (lambda-p what)
+                        (delayed (list tn (find-in-physenv what this-env) n))
+                        (vop closure-init call 2block
+                             tn
+                             (find-in-physenv what this-env)
+                             n)))))))
+      #!+stack-grows-upward-not-downward
+      (when dx-p
+        (emit-move call 2block first-closure
+                   (first (ir2-lvar-locs (lvar-info leaves)))))
+      (loop for (tn what n) in (delayed)
+            do (vop closure-init call 2block
+                    tn what n))))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also

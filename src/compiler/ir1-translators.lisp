@@ -440,23 +440,45 @@
       (cond
 	((member (car thing)
 		 '(lambda named-lambda instance-lambda lambda-with-lexenv))
-	 (ir1-convert-lambdalike
-			  thing
-			  :debug-name (debug-namify "#'" thing)))
+	 (values (ir1-convert-lambdalike
+                  thing
+                  :debug-name (debug-namify "#'" thing))
+                 t))
 	((legal-fun-name-p thing)
-	 (find-lexically-apparent-fun
-		     thing "as the argument to FUNCTION"))
+	 (values (find-lexically-apparent-fun
+                  thing "as the argument to FUNCTION")
+                 nil))
 	(t
 	 (compiler-error "~S is not a legal function name." thing)))
-      (find-lexically-apparent-fun
-       thing "as the argument to FUNCTION")))
+      (values (find-lexically-apparent-fun
+               thing "as the argument to FUNCTION")
+              nil)))
+
+(def-ir1-translator %%allocate-closures ((&rest leaves) start next result)
+  (aver (eq result 'nil))
+  (let ((lambdas leaves))
+    (ir1-convert start next result `(%allocate-closures ',lambdas))
+    (let ((allocator (node-dest (ctran-next start))))
+      (dolist (lambda lambdas)
+        (setf (functional-allocator lambda) allocator)))))
+
+(defmacro with-fun-name-leaf ((leaf thing start) &body body)
+  `(multiple-value-bind (,leaf allocate-p) (fun-name-leaf ,thing)
+     (if allocate-p
+       (let ((.new-start. (make-ctran)))
+         (ir1-convert ,start .new-start. nil `(%%allocate-closures ,leaf))
+         (let ((,start .new-start.))
+           ,@body))
+       (locally
+           ,@body))))
 
 (def-ir1-translator function ((thing) start next result)
   #!+sb-doc
   "FUNCTION Name
   Return the lexically apparent definition of the function Name. Name may also
   be a lambda expression."
-  (reference-leaf start next result (fun-name-leaf thing)))
+  (with-fun-name-leaf (leaf thing start)
+    (reference-leaf start next result leaf)))
 
 ;;;; FUNCALL
 
@@ -474,8 +496,8 @@
 
 (def-ir1-translator %funcall ((function &rest args) start next result)
   (if (and (consp function) (eq (car function) 'function))
-      (ir1-convert start next result
-                   `(,(fun-name-leaf (second function)) ,@args))
+      (with-fun-name-leaf (leaf (second function) start)
+        (ir1-convert start next result `(,leaf ,@args)))
       (let ((ctran (make-ctran))
             (fun-lvar (make-lvar)))
         (ir1-convert start ctran fun-lvar `(the function ,function))
@@ -556,14 +578,14 @@
                         (fun-lvar (make-lvar))
                         ((next result)
                          (processing-decls (decls vars nil next result)
-                                           (let ((fun (ir1-convert-lambda-body
-                                                       forms
-                                                       vars
-                                                       :debug-name (debug-namify "LET S"
-                                                                                 bindings))))
-                                             (reference-leaf start ctran fun-lvar fun))
-                                           (values next result))))
-                       (ir1-convert-combination-args fun-lvar ctran next result values)))))
+                           (let ((fun (ir1-convert-lambda-body
+                                       forms
+                                       vars
+                                       :debug-name (debug-namify "LET S"
+                                                                 bindings))))
+                             (reference-leaf start ctran fun-lvar fun))
+                           (values next result))))
+               (ir1-convert-combination-args fun-lvar ctran next result values)))))
         (t
          (compiler-error "Malformed LET bindings: ~S." bindings))))
 
@@ -578,14 +600,14 @@
           (parse-body body :doc-string-allowed nil)
         (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
           (processing-decls (decls vars nil start next)
-                            (ir1-convert-aux-bindings start 
-                                                      next 
-                                                      result
-                                                      forms
-                                                      vars 
-                                                      values))))
+            (ir1-convert-aux-bindings start
+                                      next
+                                      result
+                                      forms
+                                      vars
+                                      values))))
       (compiler-error "Malformed LET* bindings: ~S." bindings)))
-  
+
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
 ;;;
@@ -637,6 +659,29 @@
 		     . ,forms))))))
     (values (names) (defs))))
 
+(defun ir1-convert-fbindings (start next result funs body)
+  (let ((ctran (make-ctran))
+        (dx-p (find-if #'leaf-dynamic-extent funs)))
+    (when dx-p
+      (ctran-starts-block ctran)
+      (ctran-starts-block next))
+    (ir1-convert start ctran nil `(%%allocate-closures ,@funs))
+    (cond (dx-p
+           (let* ((dummy (make-ctran))
+                  (entry (make-entry))
+                  (cleanup (make-cleanup :kind :dynamic-extent
+                                         :mess-up entry
+                                         :info (list (node-dest
+                                                      (ctran-next start))))))
+             (push entry (lambda-entries (lexenv-lambda *lexenv*)))
+             (setf (entry-cleanup entry) cleanup)
+             (link-node-to-previous-ctran entry ctran)
+             (use-ctran entry dummy)
+
+             (let ((*lexenv* (make-lexenv :cleanup cleanup)))
+               (ir1-convert-progn-body dummy next result body))))
+          (t (ir1-convert-progn-body ctran next result body)))))
+
 (def-ir1-translator flet ((definitions &body body)
 			  start next result)
   #!+sb-doc
@@ -656,10 +701,7 @@
                            names defs)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
-            (ir1-convert-progn-body start 
-                                    next 
-                                    result
-                                    forms)))))))
+            (ir1-convert-fbindings start next result fvars forms)))))))
 
 (def-ir1-translator labels ((definitions &body body) start next result)
   #!+sb-doc
@@ -691,14 +733,14 @@
                                               :debug-name (debug-namify
                                                            "LABELS " name)))
                         names defs))))
-        
+
         ;; Modify all the references to the dummy function leaves so
         ;; that they point to the real function leaves.
         (loop for real-fun in real-funs and
               placeholder-cons in placeholder-fenv do
               (substitute-leaf real-fun (cdr placeholder-cons))
               (setf (cdr placeholder-cons) real-fun))
-        
+
         ;; Voila.
         (processing-decls (decls nil real-funs next result)
           (let ((*lexenv* (make-lexenv
@@ -707,10 +749,7 @@
                            ;; lexical environment is used for inline
                            ;; expansion we'll get the right functions.
                            :funs (pairlis names real-funs))))
-            (ir1-convert-progn-body start 
-                                    next 
-                                    result
-                                    forms)))))))
+            (ir1-convert-fbindings start next result real-funs forms)))))))
 
 
 ;;;; the THE special operator, and friends
@@ -866,9 +905,11 @@
                (ir1-convert-lambda
                 `(lambda ()
                    (return-from ,tag (%unknown-values)))
-                :debug-name (debug-namify "escape function for " tag)))))
+                :debug-name (debug-namify "escape function for " tag))))
+        (ctran (make-ctran)))
     (setf (functional-kind fun) :escape)
-    (reference-leaf start next result fun)))
+    (ir1-convert start ctran nil `(%%allocate-closures ,fun))
+    (reference-leaf ctran next result fun)))
 
 ;;; Yet another special special form. This one looks up a local
 ;;; function and smashes it to a :CLEANUP function, as well as

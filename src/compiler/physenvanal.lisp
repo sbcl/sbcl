@@ -210,6 +210,10 @@
 	(setf did-something t)))
     did-something))
 
+(defun xep-allocator (xep)
+  (let ((entry (functional-entry-fun xep)))
+    (functional-allocator entry)))
+
 ;;; Make sure that THING is closed over in REF-PHYSENV and in all
 ;;; PHYSENVs for the functions that reference REF-PHYSENV's function
 ;;; (not just calls). HOME-PHYSENV is THING's home environment. When we
@@ -217,13 +221,31 @@
 (defun close-over (thing ref-physenv home-physenv)
   (declare (type physenv ref-physenv home-physenv))
   (let ((flooded-physenvs nil))
-    (named-let flood ((flooded-physenv ref-physenv))
-      (unless (or (eql flooded-physenv home-physenv)
-		  (member flooded-physenv flooded-physenvs))
-	(push flooded-physenv flooded-physenvs)
-	(pushnew thing (physenv-closure flooded-physenv))
-	(dolist (ref (leaf-refs (physenv-lambda flooded-physenv)))
-	  (flood (get-node-physenv ref))))))
+    (labels ((flood (flooded-physenv)
+               (unless (or (eql flooded-physenv home-physenv)
+                           (member flooded-physenv flooded-physenvs))
+                 (push flooded-physenv flooded-physenvs)
+                 (unless (memq thing (physenv-closure flooded-physenv))
+                   (push thing (physenv-closure flooded-physenv))
+                   (let ((lambda (physenv-lambda flooded-physenv)))
+                     (cond ((eq (functional-kind lambda) :external)
+                            (let* ((alloc-node (xep-allocator lambda))
+                                   (alloc-lambda (node-home-lambda alloc-node))
+                                   (alloc-physenv (get-lambda-physenv alloc-lambda)))
+                              (flood alloc-physenv)
+                              (dolist (ref (leaf-refs lambda))
+                                (close-over lambda
+                                            (get-node-physenv ref) alloc-physenv))))
+                           (t (dolist (ref (leaf-refs lambda))
+                                ;; FIXME: This assertion looks
+                                ;; reasonable, but does not work for
+                                ;; :CLEANUPs.
+                                #+nil
+                                (let ((dest (node-dest ref)))
+                                  (aver (basic-combination-p dest))
+                                  (aver (eq (basic-combination-kind dest) :local)))
+                                (flood (get-node-physenv ref))))))))))
+      (flood ref-physenv)))
   (values))
 
 ;;;; non-local exit
@@ -328,7 +350,7 @@
 	      (note-non-local-exit target-physenv exit))))))
   (values))
 
-;;;; final decision on stack allocation of dynamic-extent structores
+;;;; final decision on stack allocation of dynamic-extent structures
 (defun recheck-dynamic-extent-lvars (component)
   (declare (type component component))
   (dolist (lambda (component-lambdas component))
@@ -336,15 +358,37 @@
             for cleanup = (entry-cleanup entry)
             do (when (eq (cleanup-kind cleanup) :dynamic-extent)
                  (collect ((real-dx-lvars))
-                   (loop for lvar in (cleanup-info cleanup)
-                         do (let ((use (lvar-uses lvar)))
-                              (if (and (combination-p use)
-                                       (eq (basic-combination-kind use) :known)
-                                       (awhen (fun-info-stack-allocate-result
-                                               (basic-combination-fun-info use))
-                                         (funcall it use)))
-                                  (real-dx-lvars lvar)
-                                  (setf (lvar-dynamic-extent lvar) nil))))
+                   (loop for what in (cleanup-info cleanup)
+                         do (etypecase what
+                              (lvar
+                               (let* ((lvar what)
+                                      (use (lvar-uses lvar)))
+                                 (if (and (combination-p use)
+                                          (eq (basic-combination-kind use) :known)
+                                          (awhen (fun-info-stack-allocate-result
+                                                  (basic-combination-fun-info use))
+                                            (funcall it use)))
+                                     (real-dx-lvars lvar)
+                                     (setf (lvar-dynamic-extent lvar) nil))))
+                              (node ; DX closure
+                               (let* ((call what)
+                                      (arg (first (basic-combination-args call)))
+                                      (funs (lvar-value arg))
+                                      (dx nil))
+                                 (dolist (fun funs)
+                                   (binding* ((() (leaf-dynamic-extent fun)
+                                                  :exit-if-null)
+                                              (xep (functional-entry-fun fun)
+                                                   :exit-if-null)
+                                              (closure (physenv-closure
+                                                        (get-lambda-physenv xep))))
+                                     (cond (closure
+                                            (setq dx t))
+                                           (t
+                                            (setf (leaf-dynamic-extent fun) nil)))))
+                                 (when dx
+                                   (setf (lvar-dynamic-extent arg) cleanup)
+                                   (real-dx-lvars arg))))))
                    (setf (cleanup-info cleanup) (real-dx-lvars))
                    (setf (component-dx-lvars component)
                          (append (real-dx-lvars) (component-dx-lvars component)))))))

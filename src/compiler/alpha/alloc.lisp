@@ -113,7 +113,8 @@
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
-  (:info length)
+  (:info length stack-allocate-p)
+  (:ignore stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 10

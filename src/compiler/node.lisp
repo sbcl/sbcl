@@ -455,7 +455,9 @@
   ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
   ;; cleanup. This is filled when the cleanup is created (now by
   ;; locall call analysis) and is rechecked by physical environment
-  ;; analysis.
+  ;; analysis. (For closures this is a list of the allocating node -
+  ;; during IR1, and a list of the argument LVAR of the allocator -
+  ;; after physical environment analysis.)
   (info nil :type list))
 (defprinter (cleanup :identity t)
   kind
@@ -857,6 +859,9 @@
   ;; the original function or macro lambda list, or :UNSPECIFIED if
   ;; this is a compiler created function
   (arg-documentation nil :type (or list (member :unspecified)))
+  ;; Node, allocating closure for this lambda. May be NIL when we are
+  ;; sure that no closure is needed.
+  (allocator nil :type (or null combination))
   ;; various rare miscellaneous info that drives code generation & stuff
   (plist () :type list))
 (defprinter (functional :identity t)

@@ -148,3 +148,12 @@
 ;;; bug 261
 (let ((x (list (the (values &optional fixnum) (eval '(values))))))
   (assert (equal x '(nil))))
+
+;;; Bug 125, reported by Gabe Garza: Python did not preserve identity
+;;; of closures.
+(flet ((test-case (test-pred x)
+         (let ((func (lambda () x)))
+           (list (eq func func)
+                 (funcall test-pred func func)
+                 (delete func (list func))))))
+  (assert (equal '(t t nil) (funcall (eval #'test-case) #'eq 3))))

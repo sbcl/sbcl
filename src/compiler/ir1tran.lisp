@@ -1125,7 +1125,7 @@
 	(setf (lambda-var-ignorep var) t)))))
   (values))
 
-(defun process-dx-decl (names vars)
+(defun process-dx-decl (names vars fvars)
   (flet ((maybe-notify (control &rest args)
 	   (when (policy *lexenv* (> speed inhibit-warnings))
 	     (apply #'compiler-notify control args))))
@@ -1153,7 +1153,24 @@
 		  (eq (car name) 'function)
 		  (null (cddr name))
 		  (valid-function-name-p (cadr name)))
-	     (maybe-notify "ignoring DYNAMIC-EXTENT declaration for ~S" name))
+             (let* ((fname (cadr name))
+                    (bound-fun (find fname fvars
+                                     :key #'leaf-source-name
+                                     :test #'equal)))
+	       (etypecase bound-fun
+		 (leaf
+                  #!+stack-allocatable-closures
+		  (setf (leaf-dynamic-extent bound-fun) t)
+                  #!-stack-allocatable-closures
+                  (maybe-notify
+                   "ignoring DYNAMIC-EXTENT declaration on a function ~S ~
+                    (not supported on this platform)." fname))
+		 (cons
+		  (compiler-error "DYNAMIC-EXTENT on macro: ~S" fname))
+                 (null
+                  (maybe-notify
+                   "ignoring DYNAMIC-EXTENT declaration for free ~S"
+                   fname)))))
 	    (t (compiler-error "DYNAMIC-EXTENT on a weird thing: ~S" name))))
       (maybe-notify "ignoring DYNAMIC-EXTENT declarations for ~S" names))))
 
@@ -1209,12 +1226,12 @@
                        `(values ,@types)))))
           res))
        (dynamic-extent
-	(process-dx-decl (cdr spec) vars)
+	(process-dx-decl (cdr spec) vars fvars)
         res)
        ((disable-package-locks enable-package-locks)
         (make-lexenv
          :default res
-         :disabled-package-locks (process-package-lock-decl 
+         :disabled-package-locks (process-package-lock-decl
                                   spec (lexenv-disabled-package-locks res))))
        (t
         (unless (info :declaration :recognized (first spec))
