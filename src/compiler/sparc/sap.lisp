@@ -1,4 +1,4 @@
-;;;; the Alpha VM definition of SAP operations
+;;;; the SPARC VM definition of SAP operations
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -1,13 +1,20 @@
-;;;
-;;; Written by William Lott.
-;;;
+;;;; the PPC VM definition of SAP operations
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
 ;;;; Moves and coercions:
 
 ;;; Move a tagged SAP to an untagged representation.
-;;;
 (define-vop (move-to-sap)
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (sap-reg)))
@@ -15,13 +22,11 @@
   (:generator 1
     (loadw y x sap-pointer-slot other-pointer-lowtag)))
 
-;;;
 (define-move-vop move-to-sap :move
   (descriptor-reg) (sap-reg))
 
 
 ;;; Move an untagged SAP to a tagged representation.
-;;;
 (define-vop (move-from-sap)
   (:args (sap :scs (sap-reg) :to :save))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -31,13 +36,11 @@
   (:generator 20
     (with-fixed-allocation (res pa-flag ndescr sap-widetag sap-size)
       (storew sap res sap-pointer-slot other-pointer-lowtag))))
-;;;
+
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
-
 ;;; Move untagged sap values.
-;;;
 (define-vop (sap-move)
   (:args (x :target y
 	    :scs (sap-reg)
@@ -49,13 +52,12 @@
   (:affected)
   (:generator 0
     (move y x)))
-;;;
+
 (define-move-vop sap-move :move
   (sap-reg) (sap-reg))
 
 
 ;;; Move untagged sap arguments/return-values.
-;;;
 (define-vop (move-sap-arg)
   (:args (x :target y
 	    :scs (sap-reg))
@@ -69,21 +71,16 @@
        (move y x))
       (sap-stack
        (storew x fp (tn-offset y))))))
-;;;
+
 (define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 
-
 ;;; Use standard MOVE-ARG + coercion to move an untagged sap to a
 ;;; descriptor passing location.
-;;;
 (define-move-vop move-arg :move-arg
   (sap-reg) (descriptor-reg))
-
-
 
 ;;;; SAP-INT and INT-SAP
-
 (define-vop (sap-int)
   (:args (sap :scs (sap-reg) :target int))
   (:arg-types system-area-pointer)
@@ -103,11 +100,8 @@
   (:policy :fast-safe)
   (:generator 1
     (move sap int)))
-
-
 
 ;;;; POINTER+ and POINTER-
-
 (define-vop (pointer+)
   (:translate sap+)
   (:args (ptr :scs (sap-reg))
@@ -140,11 +134,8 @@
   (:result-types signed-num)
   (:generator 1
     (inst sub res ptr1 ptr2)))
-
-
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
-
 (macrolet ((def-system-ref-and-set
 	       (ref-name set-name sc type size &optional signed)
 	       (let ((ref-name-c (symbolicate ref-name "-C"))
@@ -254,11 +245,8 @@
     single-reg single-float :single)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
     double-reg double-float :double))
-
-
 
 ;;; Noise to convert normal lisp data objects into SAPs.
-
 (define-vop (vector-sap)
   (:translate vector-sap)
   (:policy :fast-safe)
@@ -268,10 +256,8 @@
   (:generator 2
     (inst addi sap vector
 	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
-
 
 ;;; Transforms for 64-bit SAP accessors.
-#|
 (deftransform sap-ref-64 ((sap offset) (* *))
   '(logior (ash (sap-ref-32 sap offset) 32)
 	   (sap-ref-32 sap (+ offset 4))))
@@ -289,4 +275,3 @@
   '(progn
      (%set-signed-sap-ref-32 sap offset (ash value -32))
      (%set-sap-ref-32 sap (+ 4 offset) (logand value #xffffffff))))
-|#
