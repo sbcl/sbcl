@@ -1229,8 +1229,8 @@
                      (output-push-constant segment (leaf-name leaf))
                      (output-do-inline-function segment 'symbol-value))))
 	    (clambda
-	     (let* ((refered-env (lambda-environment leaf))
-		    (closure (environment-closure refered-env)))
+	     (let* ((referred-env (lambda-environment leaf))
+		    (closure (environment-closure referred-env)))
 	       (if (null closure)
 		   (output-push-load-time-constant segment :entry leaf)
 		   (let ((my-env (node-environment ref)))
@@ -1275,18 +1275,20 @@
 	 ((:special :global)
 	  (output-push-constant segment (global-var-name leaf))
 	  (output-do-inline-function segment 'setf-symbol-value))))
-      ;;; MNA: cmucl-commit: Tue, 26 Sep 2000 09:41:00 -0700 (PDT)
-      ;;; Within generate-byte-code-for-set, avoid trying to set a lexical
-      ;;; variable with no refs since the compiler deletes such variables.
       (lambda-var
+       ;; Note: It's important to test for whether there are any
+       ;; references to the variable before we actually try to set it.
+       ;; (Setting a lexical variable with no refs caused bugs ca. CMU
+       ;; CL 18c, because the compiler deletes such variables.)
         (cond ((leaf-refs leaf)
-	      (unless (eql values 0)
-		;; Someone wants the value, so copy it.
-		(output-do-xop segment 'dup))
-	      (output-set-lambda-var segment leaf (node-environment set)))
-	     ;; If no-one wants the value then pop it else leave it for them.
-	     ((eql values 0)
-	      (output-byte-with-operand segment byte-pop-n 1)))))
+	       (unless (eql values 0)
+		 ;; Someone wants the value, so copy it.
+		 (output-do-xop segment 'dup))
+	       (output-set-lambda-var segment leaf (node-environment set)))
+	      ;; If no one wants the value, then pop it, else leave it
+	      ;; for them.
+	      ((eql values 0)
+	       (output-byte-with-operand segment byte-pop-n 1)))))
     (unless (eql values 0)
       (checked-canonicalize-values segment cont 1)))
   (values))

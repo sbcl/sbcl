@@ -736,17 +736,8 @@
 ;;; XXX Should probably check whether it has reached the bottom of the
 ;;; stack.
 ;;;
-;;; XXX Should handle interrupted frames, both Lisp and C. At present it
-;;; manages to find a fp trail, see linux hack below.
-
-;;; MNA: cmucl-commit: Mon, 6 Nov 2000 10:08:39 -0800 (PST)
-;;; Upon a stack trace ambiguity in x86-call-context, choose the lisp
-;;; frame in preference to the C frame as this is frame of interest.
-
-;;; MNA: cmucl-commit: Mon, 6 Nov 2000 09:48:00 -0800 (PST)
-;;; Limit the stack trace failure warning in x86-call-context to fails for the
-;;; immediate frame rather failures deeper within the search.
-
+;;; XXX Should handle interrupted frames, both Lisp and C. At present
+;;; it manages to find a fp trail, see linux hack below.
 (defun x86-call-context (fp &key (depth 0))
   (declare (type system-area-pointer fp)
 	   (fixnum depth))

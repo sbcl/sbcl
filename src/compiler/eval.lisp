@@ -843,13 +843,11 @@
       (sb!c::global-var
        (setf (symbol-value (sb!c::global-var-name var)) value)))))
 
-;;; This does SET-LEAF-VALUE for a lambda-var leaf. The debugger tools'
+;;; This does SET-LEAF-VALUE for a LAMBDA-VAR leaf. The debugger tools'
 ;;; internals uses this also to set interpreted local variables.
-
-;;; MNA: cmucl-commit: Tue, 26 Sep 2000 09:40:37 -0700 (PDT)
-;;; Within set-leaf-value-lambda-var, avoid trying to set a lexical
-;;; variable with no refs since the compiler deletes such variables.
 (defun set-leaf-value-lambda-var (node var frame-ptr closure value)
+  ;; Note: We avoid trying to set a lexical variable with no refs
+  ;; because the compiler deletes such variables.
   (when (sb!c::leaf-refs var)
     (let ((env (sb!c::node-environment node)))
       (cond ((not (eq (sb!c::lambda-environment (sb!c::lambda-var-home var))

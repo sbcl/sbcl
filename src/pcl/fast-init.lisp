@@ -60,16 +60,18 @@
 	     (sym (make-instance-function-symbol key)))
 	(push key *make-instance-function-keys*)
 	(when sym
-          ;; MNA: cmucl-commit Sat, 27 Jan 2001 07:07:45 -0800 (PST)
-          ;; Silence compiler warnings about undefined function
-          ;; <hairy-make-instance-name>
-          ;; when compiling a method containing a make-instance call.
-          (progn ;; Lifted from c::%%defun.
-            (sb-c::proclaim-as-function-name sym)
-	    (when (eq (sb-int:info :function :where-from sym) :assumed)
-	      (setf (sb-int:info :function :where-from sym) :defined)
-	      (when (sb-int:info :function :assumed-type sym)
-		(setf (sb-int:info :function :assumed-type sym) nil))))
+	  ;; (famous last words:
+	  ;;   1. Don't worry, I know what I'm doing.
+	  ;;   2. You and what army?
+	  ;;   3. If you were as smart as you think you are, you
+	  ;;      wouldn't be a copy.
+	  ;; This is case #1.:-) Even if SYM hasn't been defined yet,
+	  ;; it must be an implementation function, or we we wouldn't
+	  ;; have expanded into it. So declare SYM as defined, so that
+	  ;; even if it hasn't been defined yet, the user doesn't get
+	  ;; obscure warnings about undefined internal implementation
+	  ;; functions like HAIRY-MAKE-instance-name.
+	  (sb-kernel:become-defined-function-name sym)
 	  `(,sym ',class (list ,@initargs)))))))
 
 (defmacro expanding-make-instance-top-level (&rest forms &environment env)

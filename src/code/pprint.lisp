@@ -97,6 +97,11 @@
   (declare (type posn posn) (type pretty-stream stream)
 	   (values posn))
   (index-column (posn-index posn stream) stream))
+
+;;; Is it OK to do pretty printing on this stream at this time?
+(defun print-pretty-on-stream-p (stream)
+  (and (pretty-stream-p stream)
+       *print-pretty*))
 
 ;;;; stream interface routines
 
@@ -628,10 +633,6 @@
 
 ;;;; user interface to the pretty printer
 
-;;; MNA: cmucl-commit: Wed, 27 Dec 2000 07:42:40 -0800 (PST)
-;;; pprint-newline, pprint-indent, and pprint-tab should do nothing if
-;;; *print-pretty* is not true.
-
 (defun pprint-newline (kind &optional stream)
   #!+sb-doc
   "Output a conditional newline to STREAM (which defaults to
@@ -659,7 +660,7 @@
 		  ((t) *terminal-io*)
 		  ((nil) *standard-output*)
 		  (t stream))))
-    (when (and (pretty-stream-p stream) *print-pretty*)
+    (when (print-pretty-on-stream-p stream)
       (enqueue-newline stream kind)))
   nil)
 
@@ -682,7 +683,7 @@
 		  ((t) *terminal-io*)
 		  ((nil) *standard-output*)
 		  (t stream))))
-    (when (and (pretty-stream-p stream) *print-pretty*)
+    (when (print-pretty-on-stream-p stream)
       (enqueue-indent stream relative-to n)))
   nil)
 
@@ -707,7 +708,7 @@
 		  ((t) *terminal-io*)
 		  ((nil) *standard-output*)
 		  (t stream))))
-    (when (and (pretty-stream-p stream) *print-pretty*)
+    (when (print-pretty-on-stream-p stream)
       (enqueue-tab stream kind colnum colinc)))
   nil)
 

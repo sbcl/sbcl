@@ -69,6 +69,15 @@
       (frob :source-transform)
       (frob :assumed-type)))
   (values))
+
+;;; part of what happens with DEFUN, also with some PCL stuff:
+;;; Make NAME known to be a function definition.
+(defun become-defined-function-name (name)
+  (proclaim-as-function-name name)
+  (when (eq (info :function :where-from name) :assumed)
+    (setf (info :function :where-from name) :defined)
+    (if (info :function :assumed-type name)
+	(setf (info :function :assumed-type name) nil))))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database

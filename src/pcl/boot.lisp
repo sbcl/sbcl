@@ -2057,9 +2057,6 @@ bootstrapping.
     (setq spec-ll (pop cdr-of-form))
     (values name qualifiers spec-ll cdr-of-form)))
 
-;;; MNA: cmucl-commit: Tue, 19 Dec 2000 06:26:31 -0800 (PST)
-;;; Add a defensive declaration to PARSE-SPECIALIZERS.
-
 (defun parse-specializers (specializers)
   (declare (list specializers))
   (flet ((parse (spec)

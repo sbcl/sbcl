@@ -182,15 +182,11 @@
 					,expr-tmp))
 		    (error "already bound differently: ~S")))
 		 (t
-                  ;;; MNA: CMU CL does not like DEFCONSTANT-EQX,
-                  ;;; at least it does not like using EXPR-TMP-<X>,
-                  ;;; below.
 		  (defconstant ,symbol
-                    ;; MNA: 
-                    ;; FIXME: this is a very ugly hack,
-                    ;; to be able to build SBCL with CMU CL (2.4.19),
-                    ;; because there seems to be some confusion in
-                    ;; CMU CL about ,expr-temp at EVAL-WHEN time ...
+                    ;; KLUDGE: This is a very ugly hack, to be able to
+                    ;; build SBCL with CMU CL (2.4.19), because there
+                    ;; seems to be some confusion in CMU CL about
+                    ;; ,EXPR-TEMP at EVAL-WHEN time ... -- MNA 2000-02-23
                     #-cmu ,expr-tmp
                     #+cmu ,expr
                     ,@(when doc `(,doc)))))))

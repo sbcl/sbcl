@@ -1404,25 +1404,21 @@
 
 ) ; PROGN
 
-;;; MNA: cmucl-commit: Wed, 3 Jan 2001 21:49:12 -0800 (PST)
-;;; Rework the 'ash derive-type optimizer so better handle large negative bounds.
-;;; Based on suggestions from Raymond Toy.
 
-;;; 'ash derive type optimizer.
+;;; ASH derive type optimizer
 ;;;
-;;; Large resulting bounds are easy to generate but are not particularly
-;;; useful, so an open outer bound is returned for a shift greater than 64 -
-;;; the largest word size of any of the ports. Large negative shifts are also
-;;; problematic as the 'ash implementation only accepts shifts greater than
-;;; the most-negative-fixnum. These issues are handled by two local functions:
+;;; Large resulting bounds are easy to generate but are not
+;;; particularly useful, so an open outer bound is returned for a
+;;; shift greater than 64 - the largest word size of any of the ports.
+;;; Large negative shifts are also problematic as the ASH
+;;; implementation only accepts shifts greater than
+;;; MOST-NEGATIVE-FIXNUM. These issues are handled by two local
+;;; functions:
+;;;   ASH-OUTER: Perform the shift when within an acceptable range,
+;;;     otherwise return an open bound.
+;;;   ASH-INNER: Perform the shift when within range, limited to a
+;;;     maximum of 64, otherwise returns the inner limit.
 ;;;
-;;; ash-outer: performs the shift when within an acceptable range, otherwise
-;;; returns an open bound.
-;;;
-;;; ash-inner: performs the shift when within range, limited to a maximum of
-;;; 64, otherwise returns the inner limit.
-;;;
-
 ;;; KLUDGE: All this ASH optimization is suppressed under CMU CL
 ;;; because as of version 2.4.6 for Debian, CMU CL blows up on (ASH
 ;;; 1000000000 -100000000000) (i.e. ASH of two bignums yielding zero)
@@ -1432,13 +1428,13 @@
 #!-propagate-fun-type
 (defoptimizer (ash derive-type) ((n shift))
    (flet ((ash-outer (n s)
-            (when (and (fixnump s)
+            (when (and (target-fixnump s)
                        (<= s 64)
-                       (> s most-negative-fixnum))
+                       (> s sb!vm:*target-most-negative-fixnum*))
               (ash n s)))
           (ash-inner (n s)
-            (if (and (fixnump s)
-                     (> s most-negative-fixnum))
+            (if (and (target-fixnump s)
+                     (> s sb!vm:*target-most-negative-fixnum*))
               (ash n (min s 64))
               (if (minusp n) -1 0))))
      (or (let ((n-type (continuation-type n)))
@@ -1447,22 +1443,26 @@
                    (n-high (numeric-type-high n-type)))
                (if (constant-continuation-p shift)
                  (let ((shift (continuation-value shift)))
-                   (make-numeric-type :class 'integer  :complexp :real
+                   (make-numeric-type :class 'integer
+				      :complexp :real
                                       :low (when n-low (ash n-low shift))
                                       :high (when n-high (ash n-high shift))))
                  (let ((s-type (continuation-type shift)))
                    (when (numeric-type-p s-type)
-                     (let ((s-low (numeric-type-low s-type))
-                           (s-high (numeric-type-high s-type)))
-                       (make-numeric-type :class 'integer  :complexp :real
-                                          :low (when n-low
-                                                 (if (minusp n-low)
-                                                   (ash-outer n-low s-high)
-                                                   (ash-inner n-low s-low)))
-                                          :high (when n-high
-                                                  (if (minusp n-high)
-                                                    (ash-inner n-high s-low)
-                                                    (ash-outer n-high s-high)))))))))))
+                     (let* ((s-low (numeric-type-low s-type))
+			    (s-high (numeric-type-high s-type))
+			    (low-slot (when n-low
+					(if (minusp n-low)
+					    (ash-outer n-low s-high)
+					    (ash-inner n-low s-low))))
+			    (high-slot (when n-high
+					 (if (minusp n-high)
+					     (ash-inner n-high s-low)
+					     (ash-outer n-high s-high)))))
+                       (make-numeric-type :class 'integer
+					  :complexp :real
+                                          :low low-slot
+                                          :high high-slot))))))))
          *universal-type*))
   (or (let ((n-type (continuation-type n)))
 	(when (numeric-type-p n-type)
@@ -1495,16 +1495,16 @@
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
   (flet ((ash-outer (n s)
-	   (when (and (fixnump s)
+	   (when (and (target-fixnump s)
 		      (<= s 64)
-		      (> s most-negative-fixnum))
+		      (> s sb!vm:*target-most-negative-fixnum*))
 	     (ash n s)))
          ;; KLUDGE: The bare 64's here should be related to
          ;; symbolic machine word size values somehow.
 
 	 (ash-inner (n s)
-	   (if (and (fixnump s)
-		    (> s most-negative-fixnum))
+	   (if (and (target-fixnump s)
+		    (> s sb!vm:*target-most-negative-fixnum*))
              (ash n (min s 64))
              (if (minusp n) -1 0))))
     (or (and (csubtypep n-type (specifier-type 'integer))
@@ -2583,13 +2583,13 @@
 ;;;; functions into boolean operations when the size and position are constant
 ;;;; and the operands are fixnums.
 
-(macrolet (;; Evaluate body with Size-Var and Pos-Var bound to expressions that
-	   ;; evaluate to the Size and Position of the byte-specifier form
-	   ;; Spec. We may wrap a let around the result of the body to bind
+(macrolet (;; Evaluate body with SIZE-VAR and POS-VAR bound to expressions that
+	   ;; evaluate to the SIZE and POSITION of the byte-specifier form
+	   ;; SPEC. We may wrap a let around the result of the body to bind
 	   ;; some variables.
 	   ;;
-	   ;; If the spec is a Byte form, then bind the vars to the subforms.
-	   ;; otherwise, evaluate Spec and use the Byte-Size and Byte-Position.
+	   ;; If the spec is a BYTE form, then bind the vars to the subforms.
+	   ;; otherwise, evaluate SPEC and use the BYTE-SIZE and BYTE-POSITION.
 	   ;; The goal of this transformation is to avoid consing up byte
 	   ;; specifiers and then immediately throwing them away.
 	   (with-byte-specifier ((size-var pos-var spec) &body body)
@@ -2698,7 +2698,7 @@
 (deftransform %ldb ((size posn int)
 		    (fixnum fixnum integer)
 		    (unsigned-byte #.sb!vm:word-bits))
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   `(logand (ash int (- posn))
 	   (ash ,(1- (ash 1 sb!vm:word-bits))
 		(- size ,sb!vm:word-bits))))
@@ -2706,7 +2706,7 @@
 (deftransform %mask-field ((size posn int)
 			   (fixnum fixnum integer)
 			   (unsigned-byte #.sb!vm:word-bits))
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   `(logand int
 	   (ash (ash ,(1- (ash 1 sb!vm:word-bits))
 		     (- size ,sb!vm:word-bits))
@@ -2721,7 +2721,7 @@
 (deftransform %dpb ((new size posn int)
 		    *
 		    (unsigned-byte #.sb!vm:word-bits))
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
 	     (logand int (lognot (ash mask posn))))))
@@ -2729,7 +2729,7 @@
 (deftransform %dpb ((new size posn int)
 		    *
 		    (signed-byte #.sb!vm:word-bits))
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
 	     (logand int (lognot (ash mask posn))))))
@@ -2737,7 +2737,7 @@
 (deftransform %deposit-field ((new size posn int)
 			      *
 			      (unsigned-byte #.sb!vm:word-bits))
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
 	     (logand int (lognot mask)))))
@@ -2745,7 +2745,7 @@
 (deftransform %deposit-field ((new size posn int)
 			      *
 			      (signed-byte #.sb!vm:word-bits))
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
 	     (logand int (lognot mask)))))
@@ -2767,7 +2767,7 @@
 
 ;;; Handle the case of a constant BOOLE-CODE.
 (deftransform boole ((op x y) * * :when :both)
-  "convert to inline logical ops"
+  "convert to inline logical operations"
   (unless (constant-continuation-p op)
     (give-up-ir1-transform "BOOLE code is not a constant."))
   (let ((control (continuation-value op)))
@@ -3118,7 +3118,8 @@
 ;;; If X and Y are the same leaf, then the result is true. Otherwise, if
 ;;; there is no intersection between the types of the arguments, then the
 ;;; result is definitely false.
-(deftransform simple-equality-transform ((x y) * * :defun-only t
+(deftransform simple-equality-transform ((x y) * *
+					 :defun-only t
 					 :when :both)
   (cond ((same-leaf-ref-p x y)
 	 't)
@@ -3130,18 +3131,19 @@
 (dolist (x '(eq char= equal))
   (%deftransform x '(function * *) #'simple-equality-transform))
 
-;;; Similar to SIMPLE-EQUALITY-PREDICATE, except that we also try to convert
-;;; to a type-specific predicate or EQ:
-;;; -- If both args are characters, convert to CHAR=. This is better than just
-;;;    converting to EQ, since CHAR= may have special compilation strategies
-;;;    for non-standard representations, etc.
-;;; -- If either arg is definitely not a number, then we can compare with EQ.
-;;; -- Otherwise, we try to put the arg we know more about second. If X is
-;;;    constant then we put it second. If X is a subtype of Y, we put it
-;;;    second. These rules make it easier for the back end to match these
-;;;    interesting cases.
-;;; -- If Y is a fixnum, then we quietly pass because the back end can handle
-;;;    that case, otherwise give an efficency note.
+;;; Similar to SIMPLE-EQUALITY-PREDICATE, except that we also try to
+;;; convert to a type-specific predicate or EQ:
+;;; -- If both args are characters, convert to CHAR=. This is better than
+;;;    just converting to EQ, since CHAR= may have special compilation
+;;;    strategies for non-standard representations, etc.
+;;; -- If either arg is definitely not a number, then we can compare
+;;;    with EQ.
+;;; -- Otherwise, we try to put the arg we know more about second. If X
+;;;    is constant then we put it second. If X is a subtype of Y, we put
+;;;    it second. These rules make it easier for the back end to match
+;;;    these interesting cases.
+;;; -- If Y is a fixnum, then we quietly pass because the back end can
+;;;    handle that case, otherwise give an efficency note.
 (deftransform eql ((x y) * * :when :both)
   "convert to simpler equality predicate"
   (let ((x-type (continuation-type x))
@@ -3309,8 +3311,10 @@
 
 (def-source-transform char-equal (&rest args) (multi-compare 'char-equal args nil))
 (def-source-transform char-lessp (&rest args) (multi-compare 'char-lessp args nil))
-(def-source-transform char-greaterp (&rest args) (multi-compare 'char-greaterp args nil))
-(def-source-transform char-not-greaterp (&rest args) (multi-compare 'char-greaterp args t))
+(def-source-transform char-greaterp (&rest args)
+  (multi-compare 'char-greaterp args nil))
+(def-source-transform char-not-greaterp (&rest args)
+  (multi-compare 'char-greaterp args t))
 (def-source-transform char-not-lessp (&rest args) (multi-compare 'char-lessp args t))
 
 ;;; This function does source transformation of N-arg inequality
@@ -3374,7 +3378,7 @@
 
 ;;; Do source transformations for transitive functions such as +.
 ;;; One-arg cases are replaced with the arg and zero arg cases with
-;;; the identity. If Leaf-Fun is true, then replace two-arg calls with
+;;; the identity. If LEAF-FUN is true, then replace two-arg calls with
 ;;; a call to that function.
 (defun source-transform-transitive (fun args identity &optional leaf-fun)
   (declare (symbol fun leaf-fun) (list args))
@@ -3389,9 +3393,12 @@
 
 (def-source-transform + (&rest args) (source-transform-transitive '+ args 0))
 (def-source-transform * (&rest args) (source-transform-transitive '* args 1))
-(def-source-transform logior (&rest args) (source-transform-transitive 'logior args 0))
-(def-source-transform logxor (&rest args) (source-transform-transitive 'logxor args 0))
-(def-source-transform logand (&rest args) (source-transform-transitive 'logand args -1))
+(def-source-transform logior (&rest args)
+  (source-transform-transitive 'logior args 0))
+(def-source-transform logxor (&rest args)
+  (source-transform-transitive 'logxor args 0))
+(def-source-transform logand (&rest args)
+  (source-transform-transitive 'logand args -1))
 
 (def-source-transform logeqv (&rest args)
   (if (evenp (length args))

@@ -236,21 +236,7 @@
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
-;;; MNA: cmucl-commit: Mon, 1 Jan 2001 01:30:53 -0800 (PST)
-;;; Correct the pretty printing by print-unreadable-object. Only attempt
-;;; to print pretty when the stream is a pretty-stream (and when *print-pretty*)
-;;; to ensure that all output goes to the same stream. 
-
-;;; MNA: cmucl-commit: Wed, 27 Dec 2000 05:24:30 -0800 (PST)
-;;; Have print-unreadable-object respect *print-pretty*.
-
-;;; Guts of print-unreadable-object.
-;;;
-;;; When *print-pretty* and the stream is a pretty-stream, format the object
-;;; within a logical block - pprint-logical-block does not rebind the stream
-;;; when it is already a pretty stream so output from the body will go to the
-;;; same stream.
-;;;
+;;; guts of PRINT-UNREADABLE-OBJECT
 (defun %print-unreadable-object (object stream type identity body)
   (when *print-readably*
     (error 'print-not-readable :object object))
@@ -271,9 +257,13 @@
 	     (write (get-lisp-obj-address object) :stream stream
 		    :radix nil :base 16)
 	     (write-char #\} stream))))
-    (cond ((and (sb!pretty:pretty-stream-p stream) *print-pretty*)
-            (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
-                                  (print-description)))
+    (cond ((print-pretty-on-stream-p stream)
+	   ;; Since we're printing prettily on STREAM, format the
+	   ;; object within a logical block. PPRINT-LOGICAL-BLOCK does
+	   ;; not rebind the stream when it is already a pretty stream
+	   ;; so output from the body will go to the same stream.
+	   (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
+	     (print-description)))
 	  (t
             (write-string "#<" stream)
             (print-description)
@@ -1514,14 +1504,8 @@
 
 ;;;; other leaf objects
 
-;;; MNA: cmucl-commit: Mon, 1 Jan 2001 03:41:18 -0800 (PST)
-;;; Fix output-character to escape the char-name. Reworking quote-string
-;;; to not write the delimiting quotes so that is can be used by
-;;; output-character.
-
-
-;;; If *PRINT-ESCAPE* is false, just do a WRITE-CHAR, otherwise output the
-;;; character name or the character in the #\char format.
+;;; If *PRINT-ESCAPE* is false, just do a WRITE-CHAR, otherwise output
+;;; the character name or the character in the #\char format.
 (defun output-character (char stream)
   (if (or *print-escape* *print-readably*)
       (let ((name (char-name char)))

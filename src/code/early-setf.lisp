@@ -326,7 +326,7 @@ GET-SETF-EXPANSION directly."
 ;;;; DEFSETF
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  ;;; Assign setf macro information for NAME, making all appropriate checks.
+  ;;; Assign SETF macro information for NAME, making all appropriate checks.
   (defun assign-setf-macro (name expander inverse doc)
     (cond ((gethash name sb!c:*setf-assumed-fboundp*)
 	   (warn
@@ -341,7 +341,7 @@ GET-SETF-EXPANSION directly."
 	   (warn "defining SETF macro for DEFSTRUCT slot ~
 		 accessor; redefining as a normal function: ~S"
 		 name)
-	   (sb!c::proclaim-as-function-name name))
+	   (proclaim-as-function-name name))
 	  ((not (eq (symbol-package name) (symbol-package 'aref)))
 	   (style-warn "defining setf macro for ~S when ~S is fbound"
 		       name `(setf ,name))))

@@ -38,7 +38,7 @@ static int cur_clock = 0;
 
 static void print_obj(char *prefix, lispobj obj);
 
-#define NEWLINE if (continue_p(1)) newline(NULL); else return;
+#define NEWLINE_OR_RETURN if (continue_p(1)) newline(NULL); else return;
 
 char *lowtag_Names[] = {
     "even fixnum",
@@ -450,7 +450,7 @@ static void print_otherptr(lispobj obj)
 
         print_obj("header: ", header);
         if (LowtagOf(header) != type_OtherImmediate0 && LowtagOf(header) != type_OtherImmediate1) {
-            NEWLINE;
+            NEWLINE_OR_RETURN;
             printf("(invalid header object)");
             return;
         }
@@ -458,7 +458,7 @@ static void print_otherptr(lispobj obj)
         switch (type) {
             case type_Bignum:
                 ptr += count;
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("0x");
                 while (count-- > 0)
                     printf("%08lx", (unsigned long) *--ptr);
@@ -477,51 +477,51 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case type_SingleFloat:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%g", ((struct single_float *)PTR(obj))->value);
                 break;
 
             case type_DoubleFloat:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%g", ((struct double_float *)PTR(obj))->value);
                 break;
 
 #ifdef type_LongFloat
             case type_LongFloat:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%Lg", ((struct long_float *)PTR(obj))->value);
                 break;
 #endif
 
 #ifdef type_ComplexSingleFloat
             case type_ComplexSingleFloat:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%g", ((struct complex_single_float *)PTR(obj))->real);
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%g", ((struct complex_single_float *)PTR(obj))->imag);
                 break;
 #endif
 
 #ifdef type_ComplexDoubleFloat
             case type_ComplexDoubleFloat:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%g", ((struct complex_double_float *)PTR(obj))->real);
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%g", ((struct complex_double_float *)PTR(obj))->imag);
                 break;
 #endif
 
 #ifdef type_ComplexLongFloat
             case type_ComplexLongFloat:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%Lg", ((struct complex_long_float *)PTR(obj))->real);
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("%Lg", ((struct complex_long_float *)PTR(obj))->imag);
                 break;
 #endif
 
             case type_SimpleString:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 cptr = (char *)(ptr+1);
                 putchar('"');
                 while (length-- > 0)
@@ -530,7 +530,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case type_SimpleVector:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("length = %ld", length);
                 ptr++;
                 index = 0;
@@ -540,11 +540,8 @@ static void print_otherptr(lispobj obj)
                 }
                 break;
 
-                /* MNA: cmucl-commit Tue, 9 Jan 2001 11:46:57 -0800 (PST)
-                   Correct the printing of instance objects for which the length was
-                   being incorrectly calculated. */
             case type_InstanceHeader:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("length = %ld", (long) count);
                 index = 0;
                 while (count-- > 0) {
@@ -618,7 +615,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case type_Sap:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
 #ifndef alpha
                 printf("0x%08lx", (unsigned long) *ptr);
 #else
@@ -632,7 +629,7 @@ static void print_otherptr(lispobj obj)
 
             case type_BaseChar:
             case type_UnboundMarker:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("pointer to an immediate?");
                 break;
 
@@ -641,7 +638,7 @@ static void print_otherptr(lispobj obj)
 		break;
 		
             default:
-                NEWLINE;
+                NEWLINE_OR_RETURN;
                 printf("Unknown header object?");
                 break;
         }

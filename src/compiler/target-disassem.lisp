@@ -1787,23 +1787,21 @@
 
 ;;; routines to find things in the Lisp environment
 
+;;; an alist of (SYMBOL-SLOT-OFFSET . ACCESS-FUNCTION-NAME) for slots
+;;; in a symbol object that we know about
 (defparameter *grokked-symbol-slots*
   (sort `((,sb!vm:symbol-value-slot . symbol-value)
 	  (,sb!vm:symbol-plist-slot . symbol-plist)
 	  (,sb!vm:symbol-name-slot . symbol-name)
 	  (,sb!vm:symbol-package-slot . symbol-package))
 	#'<
-	:key #'car)
-  #!+sb-doc
-  "An alist of (SYMBOL-SLOT-OFFSET . ACCESS-FUNCTION-NAME) for slots in a
-symbol object that we know about.")
+	:key #'car))
 
+;;; Given ADDRESS, try and figure out if which slot of which symbol is
+;;; being referred to. Of course we can just give up, so it's not a
+;;; big deal... Return two values, the symbol and the name of the
+;;; access function of the slot.
 (defun grok-symbol-slot-ref (address)
-  #!+sb-doc
-  "Given ADDRESS, try and figure out if which slot of which symbol is being
-  refered to. Of course we can just give up, so it's not a big deal...
-  Returns two values, the symbol and the name of the access function of the
-  slot."
   (declare (type address address))
   (if (not (aligned-p address sb!vm:word-bytes))
       (values nil nil)
@@ -1821,25 +1819,24 @@ symbol object that we know about.")
 
 (defvar *address-of-nil-object* (sb!kernel:get-lisp-obj-address nil))
 
+;;; Given a BYTE-OFFSET from NIL, try and figure out which slot of
+;;; which symbol is being referred to. Of course we can just give up,
+;;; so it's not a big deal... Return two values, the symbol and the
+;;; access function.
 (defun grok-nil-indexed-symbol-slot-ref (byte-offset)
-  #!+sb-doc
-  "Given a BYTE-OFFSET from NIL, try and figure out if which slot of which
-  symbol is being refered to. Of course we can just give up, so it's not a big
-  deal... Returns two values, the symbol and the access function."
   (declare (type offset byte-offset))
   (grok-symbol-slot-ref (+ *address-of-nil-object* byte-offset)))
 
+;;; Return the Lisp object located BYTE-OFFSET from NIL.
 (defun get-nil-indexed-object (byte-offset)
-  #!+sb-doc
-  "Returns the lisp object located BYTE-OFFSET from NIL."
   (declare (type offset byte-offset))
   (sb!kernel:make-lisp-obj (+ *address-of-nil-object* byte-offset)))
 
+;;; Return two values; the Lisp object located at BYTE-OFFSET in the
+;;; constant area of the code-object in the current segment and T, or
+;;; NIL and NIL if there is no code-object in the current segment.
 (defun get-code-constant (byte-offset dstate)
   #!+sb-doc
-  "Returns two values; the lisp-object located at BYTE-OFFSET in the constant
-  area of the code-object in the current segment and T, or NIL and NIL if
-  there is no code-object in the current segment."
   (declare (type offset byte-offset)
 	   (type disassem-state dstate))
   (let ((code (seg-code (dstate-segment dstate))))
@@ -1854,10 +1851,9 @@ symbol object that we know about.")
 
 (defvar *assembler-routines-by-addr* nil)
 
+;;; Return the name of the primitive Lisp assembler routine located at
+;;; ADDRESS, or NIL if there isn't one.
 (defun find-assembler-routine (address)
-  #!+sb-doc
-  "Returns the name of the primitive lisp assembler routine located at
-  ADDRESS, or NIL if there isn't one."
   (declare (type address address))
   (when (null *assembler-routines-by-addr*)
     (setf *assembler-routines-by-addr* (make-hash-table))

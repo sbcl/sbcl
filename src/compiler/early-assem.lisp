@@ -26,7 +26,7 @@
 ;;; sequence.)
 
 ;;; ASSEMBLY-UNIT-BITS -- the number of bits in the minimum assembly
-;;; unit, (also refered to as a ``byte''). Hopefully, different
+;;; unit, (also referred to as a ``byte''). Hopefully, different
 ;;; instruction sets won't require changing this.
 (defconstant assembly-unit-bits 8)
 (defconstant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))

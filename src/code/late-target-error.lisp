@@ -217,10 +217,8 @@
       (if (eq val *empty-condition-slot*)
 	  (let ((actual-initargs (condition-actual-initargs condition))
 		(slot (find-condition-class-slot class name)))
-            ;; MNA: cmucl-commit: Mon, 8 Jan 2001 21:21:23 -0800 (PST)
-            ;; Catch missing slots in condition-reader-function, and signal an error.
             (unless slot
-	      (error "Slot ~S of ~S missing." name condition))
+	      (error "missing slot ~S of ~S" name condition))
 	    (dolist (initarg (condition-slot-initargs slot))
 	      (let ((val (getf actual-initargs
 			       initarg

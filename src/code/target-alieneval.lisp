@@ -321,8 +321,9 @@
 
 ;;;; the DEREF operator
 
-;;; Does most of the work of the different DEREF methods. Returns two values:
-;;; the type and the offset (in bits) of the refered to alien.
+;;; This function does most of the work of the different DEREF
+;;; methods. It returns two values: the type and the offset (in bits)
+;;; of the referred-to alien.
 (defun deref-guts (alien indices)
   (declare (type alien-value alien)
 	   (type list indices)

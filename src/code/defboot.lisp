@@ -169,12 +169,7 @@
     (if (and (consp name) (eq (first name) 'setf))
 	(setf (fdocumentation (second name) 'setf) doc)
 	(setf (fdocumentation name 'function) doc)))
-  (sb!c::proclaim-as-function-name name)
-  (if (eq (info :function :where-from name) :assumed)
-      (progn
-	(setf (info :function :where-from name) :defined)
-	(if (info :function :assumed-type name)
-	    (setf (info :function :assumed-type name) nil))))
+  (become-defined-function-name name)
   (when (or inline-expansion
 	    (info :function :inline-expansion name))
     (setf (info :function :inline-expansion name)
