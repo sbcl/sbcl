@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# Run clocc's ansi-test suite on SBCL.
+# Run clocc's ansi-test suite on SBCL (if you set the appropriate
+# environment variable so that the test suite, a separate piece of
+# software, can be found).
 #
 # This is implemented as a shell script because ansi-test likes to
 # report its errors on standard output and it's convenient to use the
@@ -28,9 +30,10 @@ originalpwd=`pwd`
 
 # Find clocc ansi-test (or just punt, returning success).
 if [ "$SBCL_CLOCC_ANSI_TEST" = "" ] ; then
-    echo punting clocc ansi-test because SBCL_CLOCC_ANSI_TEST is undefined
+    echo //punting clocc ansi-test because SBCL_CLOCC_ANSI_TEST is undefined
     exit 104
 else 
+    echo //going on to run clocc ansi-test in $SBCL_CLOCC_ANSI_TEST
     cd $SBCL_CLOCC_ANSI_TEST
 fi
 
@@ -40,7 +43,7 @@ rawfilename="$tmpprefix-raw.tmp"
 bugsfilename="$tmpprefix-bugs.tmp"
 
 # Go SBCL go.
-$SBCL <<EOF | tee $rawfilename
+$SBCL <<EOF >$rawfilename
 (in-package :cl-user)
 ;;; Tell ansi-test about our known bugs.
 (load "$originalpwd/clocc-ansi-test-known-bugs.lisp")
@@ -48,6 +51,7 @@ $SBCL <<EOF | tee $rawfilename
 (load "tests.lisp")
 ;;; Return a special status code to show that we reached the end
 ;;; normally instead of taking a dirt nap.
+(print "back from ansi-test tests.lisp")
 (sb-ext:quit :unix-status 52)
 EOF
 if [ $? != 52 ]; then
@@ -55,8 +59,8 @@ if [ $? != 52 ]; then
     exit 1
 fi
 
-# Klingon programmers detect errors by searching for error tags in
-# standard output.
+# Klingon programmers handle errors by recognizing error strings
+# in standard output.
 if egrep 'ERROR!!' $rawfilename > $bugsfilename; then
     # new bugs, better luck next time
     cat $bugsfilename

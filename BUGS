@@ -1187,6 +1187,12 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 126:
   (fixed in 0.pre7.41)
 
+127:
+  The DEFSTRUCT section of the ANSI spec, in the :CONC-NAME section,
+  specifies a precedence rule for name collisions between slot accessors of
+  structure classes related by inheritance. As of 0.7.0, SBCL still 
+  doesn't follow it.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

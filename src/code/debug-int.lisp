@@ -1475,8 +1475,8 @@
 	   (debug-signal 'no-debug-blocks
 			 :debug-fun debug-fun)))))
 
-;;; This returns a SIMPLE-VECTOR of DEBUG-BLOCKs or NIL. NIL indicates
-;;; there was no basic block information.
+;;; Return a SIMPLE-VECTOR of DEBUG-BLOCKs or NIL. NIL indicates there
+;;; was no basic block information.
 (defun parse-debug-blocks (debug-fun)
   (etypecase debug-fun
     (compiled-debug-fun

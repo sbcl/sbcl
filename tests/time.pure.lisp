@@ -11,7 +11,8 @@
 
 (in-package "CL-USER")
 
-;;; Test for monotonicity of GET-INTERNAL-RUN-TIME.
+;;; Test for monotonicity of GET-INTERNAL-RUN-TIME. (On OpenBSD, this
+;;; is not a given, because of a longstanding bug in getrusage().)
 (funcall (compile nil
 		  '(lambda (n-seconds)
 		     (declare (type fixnum n-seconds))
@@ -26,21 +27,3 @@
 			  (when (>= time time1)
 			    (return)))))))
 	 3)
-
-(locally
-  (declare (notinline mapcar))
-  (mapcar (lambda (args)
-	    (destructuring-bind (obj type-spec result) args
-	      (flet ((matches-result? (x)
-		       (eq (if x t nil) result)))
-		(assert (matches-result? (typep obj type-spec)))
-		(assert (matches-result? (sb-kernel:ctypep
-					  obj
-					  (sb-kernel:specifier-type
-					   type-spec)))))))
-	  '((nil (or null vector)              t)
-	    (nil (or number vector)            nil)
-	    (12  (or null vector)              nil)
-	    (12  (and (or number vector) real) t))))
-
-	    

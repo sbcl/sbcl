@@ -11,13 +11,13 @@
 
 (in-package "SB!IMPL")
 
-(defconstant internal-time-units-per-second 100
+(defconstant sb!xc:internal-time-units-per-second 1000
   #!+sb-doc
   "The number of internal time units that fit into a second. See
   GET-INTERNAL-REAL-TIME and GET-INTERNAL-RUN-TIME.")
 
 (defconstant micro-seconds-per-internal-time-unit
-  (/ 1000000 internal-time-units-per-second))
+  (/ 1000000 sb!xc:internal-time-units-per-second))
 
 ;;; The base number of seconds for our internal "epoch". We initialize
 ;;; this to the time of the first call to GET-INTERNAL-REAL-TIME, and
@@ -41,7 +41,7 @@
 	     (truly-the (unsigned-byte 32)
 			(+ (the (unsigned-byte 32)
 				(* (the (unsigned-byte 32) (- seconds base))
-				   internal-time-units-per-second))
+				   sb!xc:internal-time-units-per-second))
 			   uint)))
 	    (t
 	     (setq *internal-real-time-base-seconds* seconds)
@@ -70,7 +70,7 @@
 
     (let ((result (+ (the (unsigned-byte 32)
 			  (* (the (unsigned-byte 32) (+ utime-sec stime-sec))
-			     internal-time-units-per-second))
+			     sb!xc:internal-time-units-per-second))
 		     (floor (+ utime-usec
 			       stime-usec
 			       (floor micro-seconds-per-internal-time-unit 2))
@@ -302,12 +302,12 @@
 		 ~S page fault~:P and~%  ~
 		 ~S bytes consed.~%"
 		(max (/ (- new-real-time old-real-time)
-			(float internal-time-units-per-second))
+			(float sb!xc:internal-time-units-per-second))
 		     0.0)
 		(max (/ (- new-run-utime old-run-utime) 1000000.0) 0.0)
 		(max (/ (- new-run-stime old-run-stime) 1000000.0) 0.0)
 		(unless (zerop gc-run-time)
 		  (/ (float gc-run-time)
-		     (float internal-time-units-per-second)))
+		     (float sb!xc:internal-time-units-per-second)))
 		(max (- new-page-faults old-page-faults) 0)
 		(max (- new-bytes-consed old-bytes-consed) 0)))))))

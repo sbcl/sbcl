@@ -38,7 +38,7 @@
 
 ;;; This value should be incremented when the system changes in such
 ;;; a way that it will no longer work reliably with old fasl files.
-(defconstant +fasl-file-version+ 20)
+(defconstant +fasl-file-version+ 21)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -77,10 +77,15 @@
 ;;;      the PPC port
 ;;; (In 0.pre7.48, the low-level object layout of SYMBOL on the
 ;;; non-X86 ports changed. I forgot to bump the fasl version number:
-;;; I only have an X86..)
+;;; I only have an X86.. -- WHN)
 ;;; 19 = sbcl-0.pre7.50 deleted byte-compiler-related low-level type codes
 ;;; 20 = sbcl-0.pre7.51 modified names and layouts of
 ;;;      physical-environment-related structures in the compiler
+;;; 21 = sbcl-0.pre7.62 finally incremented the version after several
+;;;      incompatible changes in earlier versions: many many symbols
+;;;      renamed, changes in globaldb representation of constants
+;;;      and inline functions, and change in the value of
+;;;      INTERNAL-TIME-UNITS-PER-SECOND
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

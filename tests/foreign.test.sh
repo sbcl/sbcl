@@ -13,7 +13,7 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-testfilestem=$TMPDIR/sbcl-foreign-test-$$
+testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
 make $testfilestem.o
@@ -37,6 +37,8 @@ fi
 # would cry. If he didn't keel over on the spot and then commence
 # rolling over in his grave.:-) It would be good to make a test case
 # for it..
+
+rm $testfilestem.*
 
 # success convention for script
 exit 104

@@ -18,8 +18,8 @@
   `(nth-value 1
      (ignore-errors ,@body)))
 
-(defmacro raises-error? (&body body)
-  `(typep (nth-value 1 (ignore-errors ,@body)) 'error))
+(defmacro raises-error? (form &optional (error-subtype-spec 'error))
+  `(typep (nth-value 1 (ignore-errors ,form)) ',error-subtype-spec))
 
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of
@@ -40,8 +40,8 @@
 ;;; LAMBDA. EXPECTED-EQL, EXPECTED-EQUAL, and EXPECTED-EQUALP are
 ;;; shorthand for special cases of EXPECTED-LAMBDA.
 ;;;
-;;; Use EXPECTED-ERROR to require an error to be thrown. Use
-;;; EXPECTED-ERROR-LAMBDA to require that an error be thrown and
+;;; Use EXPECTED-ERROR to require an error to be signalled. Use
+;;; EXPECTED-ERROR-LAMBDA to require that an error be signalled and
 ;;; that further it satisfies the given lambda.
 (defmacro assertoid (expr
 		     &key
