@@ -26,8 +26,6 @@ struct thread *all_threads;
 volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
 
-void get_spinlock(volatile lispobj *word,int value);
-
 int
 initial_thread_trampoline(struct thread *th)
 {
@@ -277,6 +275,17 @@ void destroy_thread (struct thread *th)
 		  32*SIGSTKSZ);
 }
 
+struct thread *find_thread_by_pid(pid_t pid) 
+{
+    struct thread *th;
+    for_each_thread(th)
+	if(th->pid==pid) return th;
+    return 0;
+}
+
+#if defined LISP_FEATURE_SB_THREAD
+/* This is not needed unless #+SB-THREAD, as there's a trivial null
+ * unithread definition. */
 void reap_dead_threads() 
 {
     struct thread *th,*next,*prev=0;
@@ -304,19 +313,9 @@ void reap_dead_threads()
     }
 }
 
-
-struct thread *find_thread_by_pid(pid_t pid) 
-{
-    struct thread *th;
-    for_each_thread(th)
-	if(th->pid==pid) return th;
-    return 0;
-}
-
 /* These are not needed unless #+SB-THREAD, and since sigwaitinfo()
  * doesn't seem to be easily available everywhere (OpenBSD...) it's
  * more trouble than it's worth to compile it when not needed. */
-#if defined LISP_FEATURE_SB_THREAD
 void block_sigcont(void)
 {
     /* don't allow ourselves to receive SIGCONT while we're in the
