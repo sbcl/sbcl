@@ -28,7 +28,7 @@
 #endif
 
 extern void validate(void);
-extern void protect_control_stack_guard_page(struct thread *th,int protect_p);
+extern void protect_control_stack_guard_page(pid_t t_id, int protect_p);
 #endif
 
 /* note for anyone trying to port an architecture's support files

@@ -60,6 +60,10 @@ clean:
 TAGS: $(SRCS)
 	etags $(SRCS)
 
+sbcl.h: genesis/*.h
+	echo '#include "genesis/config.h"' >sbcl.h
+	echo '#include "genesis/constants.h"' >>sbcl.h
+
 depend: ${C_SRCS} sbcl.h
 	$(CC) ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS}  ${C_SRCS} > depend.tmp
 	mv -f depend.tmp depend

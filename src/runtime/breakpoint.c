@@ -22,6 +22,8 @@
 #include "alloc.h"
 #include "breakpoint.h"
 #include "thread.h"
+#include "genesis/code.h"
+#include "genesis/fdefn.h"
 
 #define REAL_LRA_SLOT 0
 #ifndef __i386__

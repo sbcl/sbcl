@@ -29,6 +29,7 @@
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
+#include "primitive-objects.h"
 
 #define PRINTNOISE
 

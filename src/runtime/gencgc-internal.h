@@ -20,6 +20,7 @@
 #define _GENCGC_INTERNAL_H_
 
 #include "gencgc-alloc-region.h"
+#include "genesis/code.h"
 
 void gc_free_heap(void);
 inline int find_page_index(void *);

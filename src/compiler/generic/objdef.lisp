@@ -360,3 +360,26 @@
   (real :c-type "long double" :length #!+x86 3 #!+sparc 4)
   (imag :c-type "long double" :length #!+x86 3 #!+sparc 4))
 
+;;; this isn't actually a lisp object at all, it's a c structure that lives
+;;; in c-land.  However, we need sight of so many parts of it from Lisp that
+;;; it makes sense to define it here anyway, so that the GENESIS machinery
+;;; can take care of maintaining Lisp and C versions.
+;;; Hence the even-fixnum lowtag just so we don't get odd(sic) numbers 
+;;; added to the slot offsets
+(define-primitive-object (thread :lowtag even-fixnum-lowtag)
+  ;; unbound_marker is borrowed very briefly at thread startup to 
+  ;; pass the address of initial-function into new_thread_trampoline 
+  (unbound-marker :init :unbound) ; tls[0] = UNBOUND_MARKER_WIDETAG 
+  (binding-stack-start :c-type "lispobj *")
+  (binding-stack-pointer :c-type "lispobj *")
+  (control-stack-start :c-type "lispobj *")
+  (alien-stack-start :c-type "lispobj *")
+  (alien-stack-pointer :c-type "lispobj *")
+  (alloc-region :c-type "struct alloc_region" :length 5)
+  (pid :c-type "pid_t")
+  (tls-cookie)				;  on x86, the LDT index 
+  (this :c-type "struct thread *")
+  (next :c-type "struct thread *")
+  (pseudo-atomic-atomic)
+  (pseudo-atomic-interrupted)
+  (interrupt-contexts :c-type "os_context_t *" :rest-p t))

@@ -41,6 +41,9 @@
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
+#include "genesis/vector.h"
+#include "genesis/weak-pointer.h"
+#include "genesis/simple-fun.h"
 /* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
 

@@ -4,16 +4,22 @@
 (sb!alien:define-alien-type thread (struct thread-struct))
 
 (sb!alien::define-alien-routine ("create_thread" %create-thread)
-     (* thread) (lisp-fun-address sb!alien:unsigned-long))
+     sb!alien:unsigned-long (lisp-fun-address sb!alien:unsigned-long))
 
 (defun make-thread (function)
   (%create-thread (sb!kernel:get-lisp-obj-address (coerce function 'function))))
 
-#|
+#||
 (defvar *foo* nil)
 (defun thread-nnop () (loop (setf *foo* (not *foo*)) (sleep 1)))
 (make-thread #'thread-nnop)
-|#
+
+(make-listener-thread "/dev/pts/6")
+
+||#
+
+(defun current-thread-id ()
+  (int-sap (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)))
 
 (defun make-listener-thread (tty-name)
   (assert (probe-file tty-name))
@@ -29,18 +35,14 @@
 	 (sb!impl::*tty* 
 	  (sb!sys:make-fd-stream err :input t :output t :buffering :line)))
     (labels ((thread-repl () 
-	       (with-simple-restart 
-		   (destroy-thread
-		    (format nil "~~@<Destroy this thread (~A)~~@:>"
-			    SB!VM::*CURRENT-THREAD*))
-		 (sb!impl::toplevel-repl nil))))
+	       (handling-end-of-the-world
+		(with-simple-restart 
+		    (destroy-thread
+		     (format nil "~~@<Destroy this thread (~A)~~@:>"
+			     (current-thread-id)))
+		  (sb!impl::toplevel-repl nil)))))
       (make-thread #'thread-repl))))
 
-#|
-(make-listener-thread "/dev/pts/6")
-
-
-|#
 
 ;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp
 
@@ -53,9 +55,10 @@
   (name nil :type (or null simple-base-string))
   (value nil))
 
-(defun get-mutex (lock &optional (new-value sb!vm::*current-thread*) timeout)
+(defun get-mutex (lock &optional new-value  timeout)
   (declare (type mutex lock))
   (let ((timeout (and timeout (+ (get-internal-real-time) timeout))))
+    (unless new-value (setf new-value (current-thread-id)))
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value

@@ -292,11 +292,22 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGCHLD);
     sigaddset(&sigset, SIGSEGV);
+    sigaddset(&sigset, SIGTERM);
+    sigprocmask(SIG_BLOCK,&sigset,0);
     while(all_threads) {
 	int signal;
+	siginfo_t info;
 	fprintf(stderr,"parent thread waiting for a signal\n");
-	sigwait(&sigset,&signal);
-	fprintf(stderr,"parent thread got signal %d, maybe_gc_pending=%d\n",signal , maybe_gc_pending);
+	sigwaitinfo(&sigset,&info);
+	fprintf(stderr,"parent thread got signal %d %x, maybe_gc_pending=%d\n",info.si_signo ,info.si_code , maybe_gc_pending);
+	if((info.si_signo==SIGTERM) && 
+	   ((info.si_code==CLD_EXITED) ||
+	    (info.si_code==CLD_KILLED) ||
+	    (info.si_code==CLD_DUMPED))) {
+	    struct thread *th=find_thread_by_pid(info.si_pid);
+	    fprintf(stderr,"need to reap child %d %x\n",info.si_pid,th);
+	    if(th) destroy_thread(th);
+	}
 	if(maybe_gc_pending) {
 	    /* someone asked for a garbage collection */
 	    int pa_thread;

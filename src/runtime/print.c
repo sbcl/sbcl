@@ -31,6 +31,10 @@
 #include "vars.h"
 #include "os.h"
 
+#include "genesis/static-symbols.h"
+#include "gencgc-alloc-region.h" /* genesis/thread.h needs this */
+#include "primitive-objects.h"
+
 static int max_lines = 20, cur_lines = 0;
 static int max_depth = 5, brief_depth = 2, cur_depth = 0;
 static int max_length = 5;

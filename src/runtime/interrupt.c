@@ -32,6 +32,8 @@
 #include "dynbind.h"
 #include "interr.h"
 #include "thread.h"
+#include "genesis/fdefn.h"
+#include "genesis/simple-fun.h"
 
 void sigaddset_blockable(sigset_t *s)
 {
@@ -533,7 +535,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
        /* fprintf(stderr, "hit end of control stack\n");  */
        /* we hit the end of the control stack.  disable protection
         * temporarily so the error handler has some headroom */
-       protect_control_stack_guard_page(th,0L);
+       protect_control_stack_guard_page(th->pid,0L);
 
        fun = (void *)
            native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));

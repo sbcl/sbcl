@@ -25,6 +25,8 @@
 #include "interr.h"
 #include "print.h"
 #include "lispregs.h"
+#include "genesis/static-symbols.h"
+#include "genesis/vector.h"
 
 /* the way that we shut down the system on a fatal error */
 

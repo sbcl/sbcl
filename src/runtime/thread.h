@@ -13,27 +13,13 @@
 #else
 #error "threading doesn't work with cheney gc yet"
 #endif
+#include "genesis/symbol.h"
+#include "genesis/static-symbols.h"
+#include "genesis/thread.h"
 
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
 
-struct thread {
-    lispobj unbound_marker;	/* tls[0] = UNBOUND_MARKER_WIDETAG */
-    /* unbound_marker is borrowed very briefly at thread startup to 
-     * pass the address of initial_function into new_thread_trampoline 
-     */
-    lispobj *binding_stack_start;
-    lispobj *binding_stack_pointer;
-    lispobj *control_stack_start;
-    lispobj *alien_stack_start;
-    lispobj *alien_stack_pointer; 
-    struct alloc_region alloc_region; /* 5 words: first 2 are pointer, end */
-    os_context_t *interrupt_contexts[MAX_INTERRUPTS];
-    pid_t pid;
-    u32 tls_cookie;		/* on x86, the LDT index */
-    struct thread *this,*next;
-    lispobj pseudo_atomic_atomic,pseudo_atomic_interrupted; /* slots 23,24 */
-};
 union per_thread_data {
     struct thread thread;
     lispobj dynamic_values[1];	/* actually more like 4000 or so */

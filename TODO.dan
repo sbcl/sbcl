@@ -3,31 +3,60 @@
 
 * design issues
 
-What API to export?  Not interested, really, in supporting the full
-symbolics stack-groups crud (whostate, run-reasons, etc).  Basic
-thread control functions would be nice
+** What API to export?  
 
-make-thread
-kill-thread (with signal?)
-current-thread-id
-current-thread-handle
-suspend/resume?  deadlock-prone, though.  having them block on locks
- would be nicer
+Not interested, really, in supporting the full symbolics stack-groups
+crud (whostate, run-reasons, etc).  Basic thread control functions
+would be nice
+
+make-thread, we already have.  {kill,suspend,resume}-thread are simple
+wrappers around corresponding unix-foo functions
 
 Even if we don't provide one, some higher level process glue will want
 to slap extra stuff (thread names, for example) around us.  One
 possible approach is that taken by corman, where the acl-like
 MP package keeps a hash table of thread id -> 'process' 
 
-What to do with the debugger?  Each thread can rebind *debug-io*,
-which provided we actually _use_ it for debugging (need to check this)
-absolves us of the need to care too much
+We're going to use "smallish integer" as thread id.  For Linux,
+because we can, it will be the PID
+
+** locking for library functions
+
+Slap this or something like it around each unsafe function.  Watch the
+code size go boom bigga bigga bing
+
+#+stack-grows-downward-not-upward
+(unless (and (sap>= (control-stack-end) (mutex-value *big-library-lock*)) 
+	     (sap>  (mutex-value *big-library-lock*) (sb-vm::current-fp)))
+  (get-mutex *big-library-lock* (sb-vm::current-fp)))
+,@body
+(when (eql (mutex-value *big-library-lock*) (sb-vm::current-fp))
+  (free-mutex *big-library-lock*)))
+  
+it would be nice if we could confine this to fewer entry points than
+there are functions in SBCL
+
+Debugging:
+
+Some threads open a terminal, bind *std{in,out,err}* streams, and start a
+listener.  That's OK, they'll drop into a break loop if anything goes
+wrong in them.  Other threads don't.  They'll end up writing to the
+initial thread's sb!impl::*stderr* instead.
+
+We could do a handler-bind at thread startup, to make an error handler
+that does a pty open, then write to the master and sends sb!impl::*stderr* 
+(assumed to be connected to emacs or something like it) a specially
+formatted message saying "now open /dev/pts/slave because we want to
+run a break loop in it".  We need to sort out the rather crap pty
+handling anyway
+ master = open("/dev/ptmx", O_RDWR);
+ grantpt(master);
+ unlockpt(master);
+ slave=open(ptsname(fd), O_RDWR);
 
 * seriously broken : affecting correct running
 
-10) locking, in general
-
-10a) waiting for locks
+10) locking, in general: waiting for locks
 
 we would like some mechanism to sleep and be woken on lock contention.
 sys_futex will be in 2.6, but is not in 2.4 (though there are patches,
@@ -37,43 +66,24 @@ sigwait() (looks like a good way to sleep for signals without having a
 signal handler be called).  This means we need to manage our own
 queues too
 
-We _could_ do something a bit less sophisticated, and just busy-wait
-but loop calling (something in the kernel that calls schedule()).  say
-select(0).  Tuning spin retry attempts vs scheduler-friendly attempts
-is not possible without knowing the lock contention.  So, we could
-just pass that decision onto the user.  If 2.6 is going to be widely
-used in the next six months or so, this could be a win.
+We _could_ do something a bit less sophisticated, and just loop
+calling sched_yield() while we wwait.  Tuning spin retry attempts vs
+scheduler-friendly attempts is not possible without knowing the lock
+contention.  So, we could just pass that decision onto the user.  If
+2.6 is going to be widely used in the next six months or so, this
+could be a win.
 
-14) allocation/gc still needs locking.
+14) allocation locking still not completely done: we're not sure what
+happens if two threads simultaneously create a new region, but the
+desired effect is "nothing bad"
 
-a) lots of threads can allocate at once, if allocation happens
- within an open region
-b) but creating a new region must be a one-at-a-time operation
-c) if any thread is allocating, no thread is allowed to gc
 
-allocation is protected by an rwlock, with unlimited 'readers'
-(allocators) and a maximum of 1 'writer' (new region creation or gc)
+setup_i386_stack_scav in purify.c needs doing for multiple threads?
 
-when we need a new region, we have to drop our own readlock on the
-allocator first, otherwise we'll deadlock waiting for our own task.
-Then we have to repeat the allocation request
-
-Do we need access to locks from C?  On the non-x86 ports, we can get
-the gc lock for writing in maybe-gc, which is lisp (and not called
-from inside a pa, because it gets delayed and handled in
-pending_interrupt) but allocation is done inline, which is potentially
-a problem.  Ceases to be a problem if we can port the gencgc to
-non-x86, though.  That might be simplest (and doesn't have to be c either)
-
-On the x86 we're going to have to work out exactly what needs locking,
-and see if we can lock it from lisp space.  Suspect not.  Half the
-allocation seems to be done from VOPs (unsurprising, really)
-
-how does this all relate to the existing pseudo-atomic stuff?  PA 
-delays the delivery of signals to the thread until a critical section
-is complete.  I think that's orthogonal.
 
 * broken but uninteresting or cosmetic
+
+25) write a vop for (current-thread-slot-sap n)
 
 2) grow tlv when full
 
@@ -84,30 +94,25 @@ is complete.  I think that's orthogonal.
 
 * code cleanup
 
-17) code in thread.c and x86/system.lisp (interrupt contexts) has brittle
-dependency on thread.h
-
-17a) code in x86/macros.lisp (the allocate macro) has GROSS and
-DISGUSTING dependency ditto
-
-I think the cleanest way to deal with these is probably to define struct
-thread using the primitive object stuff, so that the offsets are all
-available in make-host-1
-
-15) it would be nice to have a faster way to find the current thread
-    from C than calling getpid().  For x86 we can write a bit of asm
-    to dereference %gs:(offsetof self), for other ports something more
-    complicated needs doing, unless we can find a register to use for
-    the tls base that C promises not to overwrite.
-
-18) do we need per-thread alien stack anyway? remembering that alien
-    code runs on the control stack, there seem to be only a few places
-    this area gets used at all
-
-22) allocate-on-same-page stuff in gc_find_freeish_pages needs
-    re-enabling to avoid massive heap fragmentation
+24) get rid of the fairly randomly named/placed thread element accessors.
+   - exhaust.lisp needs a thread* to call protect_control_stack_guard_page 
+     (write a vop to get thread base in a register)
+   - target-thread needs some per-thread quantity that it can use
+     as a default for locking, and to print the thread id in a restart
+     (tbh, the pid would do fine)
 
 23) Some of the static symbols also have static tls offsets and the
     code that accesses them could be a lot shorter (faster is nice,
     but avoiding allocating a register is even nicer) if these were
     known at host-1 compile time
+
+15) we'd like a faster way to find the current thread from C than
+    calling getpid().  For x86, for now, we can write a bit of asm to
+    dereference %gs:(offsetof self), for other ports something more
+    complicated needs doing, unless we can find a register to use for
+    the tls base that C promises not to overwrite.
+
+22) allocate-on-same-page stuff in gc_find_freeish_pages needs
+    re-enabling to avoid massive heap fragmentation
+
+

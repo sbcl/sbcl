@@ -890,7 +890,10 @@
 #!+x86
 (defun nth-interrupt-context (n)
   (declare (type (unsigned-byte 32) n))
-  (sb!alien:sap-alien (nth-interrupt-context-sap n) (* os-context-t)))
+  (sb!alien:sap-alien 
+   (sb!vm::current-thread-offset-sap 
+    (+ sb!vm::thread-interrupt-contexts-offset n))
+   (* os-context-t)))
 
 
 #!+x86

@@ -18,6 +18,9 @@
 #include "globals.h"
 #include "dynbind.h"
 #include "thread.h"
+#include "genesis/symbol.h"
+#include "genesis/binding.h"
+#include "genesis/thread.h"
 
 #if defined(__i386__)
 #define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER,thread))

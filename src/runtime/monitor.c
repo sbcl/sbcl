@@ -34,6 +34,7 @@
 #include "lispregs.h"
 #include "interrupt.h"
 #include "thread.h"
+#include "primitive-objects.h"
 
 /* When we need to do command input, we use this stream, which is not
  * in general stdin, so that things will "work" (as well as being

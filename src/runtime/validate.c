@@ -85,13 +85,8 @@ validate(void)
 #endif
 }
 
-void protect_control_stack_guard_page(struct thread *th,int protect_p) {
-    fprintf(stderr, "%sprotecting control stack guard page, th=%x, args %x,%x,%x\n",
-	    protect_p ? "" : "un", th,
-	    CONTROL_STACK_GUARD_PAGE(th),
-	    os_vm_page_size,protect_p ?
-	    (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
-
+void protect_control_stack_guard_page(pid_t t_id, int protect_p) {
+    struct thread *th= find_thread_by_pid(t_id);
     os_protect(CONTROL_STACK_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?
 	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);

@@ -331,15 +331,16 @@
   (let ((label (gensym "LABEL-")))
     `(let ((,label (gen-label)))
       (inst gs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 23)) 1) ;FIXME EVIL HARDCODED NUMBER
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
       (inst gs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 24)) 0) 
-					;(23 and 24 are the slot offsets
-      ,@forms		    ;for *p-a-a* and *p-a-i* in struct thread)
+      (inst mov (make-ea :byte 
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0) 
+      ,@forms
       (inst gs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 23)) 0)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
       (inst gs-segment-prefix)
-      (inst cmp (make-ea :byte :disp (* 4 24)) 0)
+      (inst cmp (make-ea :byte
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
       (inst jmp :eq ,label)
       ;; if PAI was set, interrupts were disabled at the same time
       ;; using the process signal mask.  

@@ -14,15 +14,20 @@
  * files for more information.
  */
 
+#include <stdio.h>
+#include <string.h>
+
 #include "runtime.h"
+#include "os.h"
 #include "sbcl.h"
 #include "alloc.h"
 #include "globals.h"
 #include "gc.h"
-#include <stdio.h>
-#include <string.h>
-#include "runtime.h"
 #include "thread.h"
+#include "genesis/vector.h"
+#include "genesis/cons.h"
+#include "genesis/bignum.h"
+#include "genesis/sap.h"
 
 #define GET_FREE_POINTER() dynamic_space_free_pointer
 #define SET_FREE_POINTER(new_value) \
@@ -38,7 +43,7 @@ extern lispobj *alloc(int bytes);
 lispobj *
 pa_alloc(int bytes) 
 {
-    char *result=0;
+    lispobj *result=0;
     struct thread *th=arch_os_get_current_thread();
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
     SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);

@@ -52,6 +52,7 @@
 #include "lispregs.h"
 #include "arch.h"
 #include "gc.h"
+#include "primitive-objects.h"
 #include "gc-internal.h"
 
 #ifdef LISP_FEATURE_SPARC

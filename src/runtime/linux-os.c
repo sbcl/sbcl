@@ -229,15 +229,19 @@ in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 boolean
 is_valid_lisp_addr(os_vm_address_t addr)
 {
-    return
-	in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
-	in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
-	in_range_p(addr, DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE) ||
-	/* XXX >1 thread? */
-	in_range_p(addr, all_threads->control_stack_start,
-		   THREAD_CONTROL_STACK_SIZE) ||
-	in_range_p(addr, all_threads->binding_stack_start,
-		   BINDING_STACK_SIZE);
+    struct thread *th;
+    if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
+       in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
+       in_range_p(addr, DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE))
+	return 1;
+    for_each_thread(th) {
+	if(in_range_p(addr, th->control_stack_start,
+		      THREAD_CONTROL_STACK_SIZE) ||
+	   in_range_p(addr, th->binding_stack_start,
+		      BINDING_STACK_SIZE))
+	    return 1;
+    }
+    return 0;
 }
 
 /*

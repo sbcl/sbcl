@@ -16,7 +16,10 @@
 #define LANGUAGE_ASSEMBLY
 #include "validate.h"
 #include "sbcl.h"
-
+#include "genesis/closure.h"
+#include "genesis/fdefn.h"
+#include "genesis/static-symbols.h"
+	
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined __FreeBSD__ /* (but *not* OpenBSD) */
 #define GNAME(var) var
