@@ -894,37 +894,37 @@
 			   (maybe-frob (optional-dispatch-more-entry f))
 			   (maybe-frob (optional-dispatch-main-entry f)))))))
 
-;;; Process DEFINITION (a lambda expression), returning a FUNCTIONAL
-;;; representing its IR1 translation.
-;;;
-;;; This is similar to IR1-TOP-LEVEL, but with fewer implicit
-;;; assumptions about e.g. the function only being localled and only
-;;; being called for effect. FIXME: It'd be good to factor out the
-;;; basic logic here so that it can be explicitly shared between this
-;;; function and IR1-TOP-LEVEL.
-(defun ir1-top-level-cold-lambda (name definition path)
+(defun make-functional-from-top-level-lambda (definition &key name path)
   (let* ((*current-path* path)
-	 (component (make-empty-component))
-	 (*current-component* component))
+         (component (make-empty-component))
+         (*current-component* component))
     (setf (component-name component)
-	  (format nil "IR1-TOP-LEVEL-FOP-DEFUN ~S initial component" name))
+          (format nil "IR1-TOP-LEVEL-FOP-DEFUN ~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda definition
-					   (format nil "locall ~S" name)))
-	   (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
+                                           (format nil "locall ~S" name)))
+           (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
       (setf (functional-entry-function fun) locall-fun
-	    (functional-kind fun) :external
-	    (functional-has-external-references-p fun) t)
+            (functional-kind fun) :external
+            (functional-has-external-references-p fun) t)
       fun)))
 
-(defun process-cold-fset (name lambda-expression path)
-  (unless (producing-fasl-file)
-    (error "can't COLD-FSET except in a fasl file"))
-  (unless (legal-function-name-p name)
+;;; Compile LAMBDA-EXPRESSION into *COMPILE-OBJECT*, returning a
+;;; description of the result.
+;;;   * If *COMPILE-OBJECT* is a CORE-OBJECT, then write the function
+;;;     into core and return the compiled FUNCTION value.
+;;;   * If *COMPILE-OBJECT* is a fasl file, then write the function
+;;;     into the fasl file and return a dump handle.
+;;;
+;;; If NAME is provided, then we try to use it as the name of the
+;;; function for debugging/diagnostic information.
+(defun %compile (lambda-expression *compile-object* &key name path)
+  (unless (or (null name) (legal-function-name-p name))
     (error "not a legal function name: ~S" name))
-  (/show "entering PROCESS-COLD-FSET" name)
   (let* ((*lexenv* (make-lexenv :policy *policy*))
-	 (fun (ir1-top-level-cold-lambda name lambda-expression path)))
+         (fun (make-functional-from-top-level-lambda lambda-expression
+                                                     :name name
+						     :path path)))
 
     (/noshow fun)
 
@@ -932,42 +932,63 @@
     ;; twisted version of the code in COMPILE-TOP-LEVEL. It'd be
     ;; better to find a way to share the code there; or
     ;; alternatively, to use this code to replace the code there.
+    ;; (The second alternative might be pretty easy if we used
+    ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
+    ;; whole FUNCTIONAL-KIND=:TOP-LEVEL case could go away..)
 
     (loop
      (/noshow "at head of locall loop")
      (let ((did-something nil))
        (let ((*all-components* (functional-components fun)))
-	 (dolist (component *all-components*)
-	   (when (component-new-functions component)
-	     (/noshow (component-new-functions component))
-	     (setf did-something t)
-	     (local-call-analyze component))))
+         (dolist (component *all-components*)
+           (when (component-new-functions component)
+             (/noshow (component-new-functions component))
+             (setf did-something t)
+             (local-call-analyze component))))
        (unless did-something (return))))
 
     (multiple-value-bind (components-from-dfo top-components hairy-top)
-	(find-initial-dfo (list fun))
+        (find-initial-dfo (list fun))
 
       (let ((*all-components* (append components-from-dfo top-components)))
-	(/noshow components-from-dfo top-components *all-components*)
-	;; FIXME: I dunno whether we actually need to do
-	;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL for its side-effects
-	;; like this. (In the original SUB-COMPILE-TOP-LEVEL-LAMBDAS
-	;; it was used for its return value.)
-	(mapc #'pre-environment-analyze-top-level
-	      (append hairy-top top-components))
-	(dolist (component-from-dfo components-from-dfo)
-	  (/noshow component-from-dfo)
-	  (compile-component component-from-dfo)
-	  (replace-top-level-xeps component-from-dfo)))
+        (/noshow components-from-dfo top-components *all-components*)
+        ;; FIXME: I dunno whether we actually need to do
+        ;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL for its side-effects
+        ;; like this. (In the original SUB-COMPILE-TOP-LEVEL-LAMBDAS
+        ;; it was used for its return value.)
+        (mapc #'pre-environment-analyze-top-level
+              (append hairy-top top-components))
+        (dolist (component-from-dfo components-from-dfo)
+          (/noshow component-from-dfo)
+          (compile-component component-from-dfo)
+          (replace-top-level-xeps component-from-dfo)))
 
-      (/noshow "ready to dump" fun)
-      (fasl-dump-cold-fset name fun *compile-object*)
+      (prog1
+          (let ((entry-table (etypecase *compile-object*
+                               (fasl-output (fasl-output-entry-table
+                                             *compile-object*))
+                               (core-object (core-object-entry-table
+                                             *compile-object*)))))
+            (multiple-value-bind (result found-p)
+                (gethash (leaf-info fun) entry-table)
+              (aver found-p)
+              result))
+        (mapc #'clear-ir1-info components-from-dfo)
+        (clear-stuff)))))
 
-      (mapc #'clear-ir1-info components-from-dfo))
-    
-    (clear-stuff))
-
-  (/show "finished with PROCESS-COLD-FSET" name)
+(defun process-top-level-cold-fset (name lambda-expression path)
+  (/show "entering PROCESS-TOP-LEVEL-COLD-FSET" name)
+  (unless (producing-fasl-file)
+    (error "can't COLD-FSET except in a fasl file"))
+  (unless (legal-function-name-p name)
+    (error "not a legal function name: ~S" name))
+  (fasl-dump-cold-fset name
+                       (%compile lambda-expression
+                                 *compile-object*
+                                 :name name
+				 :path path)
+                       *compile-object*)
+  (/show "finished with PROCESS-TOP-LEVEL-COLD-FSET" name)
   (values))
 
 ;;; Process a top-level FORM with the specified source PATH.
@@ -1002,14 +1023,16 @@
 				     (car form)
 				     form))))
 	    (case (car form)
-	      ;; In the cross-compiler, COLD-FSET arranges for static
-	      ;; linking at cold init time.
+	      ;; In the cross-compiler, top level COLD-FSET arranges
+	      ;; for static linking at cold init time.
 	      #+sb-xc-host
 	      ((cold-fset)
 	       (aver (not compile-time-too))
 	       (destructuring-bind (cold-fset fun-name lambda-expression) form
 		 (declare (ignore cold-fset))
-		 (process-cold-fset fun-name lambda-expression path)))
+		 (process-top-level-cold-fset fun-name
+					      lambda-expression
+					      path)))
 	      ((eval-when macrolet symbol-macrolet);things w/ 1 arg before body
 	       (need-at-least-one-arg form)
 	       (destructuring-bind (special-operator magic &rest body) form

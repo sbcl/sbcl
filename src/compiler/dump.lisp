@@ -1308,14 +1308,15 @@
   (dump-byte 0 fasl-output)
   (values))
 
-;;; Dump a FOP-FSET to statically link already-dumped FUN to FUN-NAME
-;;; at cold init.
+;;; Dump a FOP-FSET to arrange static linkage (at cold init) between
+;;; FUN-NAME and the already-dumped function whose dump handle is
+;;; FUN-DUMP-HANDLE.
 #+sb-xc-host
-(defun fasl-dump-cold-fset (fun-name fun fasl-output)
-  (declare (type sb!c::clambda fun))
+(defun fasl-dump-cold-fset (fun-name fun-dump-handle fasl-output)
+  (declare (type fixnum fun-dump-handle))
   (aver (legal-function-name-p fun-name))
   (dump-non-immediate-object fun-name fasl-output)
-  (dump-push-previously-dumped-fun fun fasl-output)
+  (dump-push fun-dump-handle fasl-output)
   (dump-fop 'fop-fset fasl-output)
   (values))
     
