@@ -24,6 +24,18 @@ for use in external formats and describing the BASE-CHAR type.)
 ** set BASE-CHAR to be (CHARACTER-SET 0 127), implementing a new
 low-level representation of CHARACTER-STRING for (SIMPLE-ARRAY
 CHARACTER (*)) (which is now distinct from SIMPLE-BASE-STRING).
+(Rationale: exposes issues in the SBCL codebase where BASE-CHAR =
+CHARACTER assumptions have been made.)  (Rationale: having BASE-STRING
+be pure ASCII (and not latin1 or similar) means that, for a wide
+variety of external formats (including utf-8, latin-X and POSIX),
+writing the string to a stream is as simple as blitting the bits of
+the string to the buffer.)  (Rationale: while some implementations do
+retain BASE-CHAR = CHARACTER, they either (a) bloat all strings by a
+factor of four; (b) bloat all strings by a factor of two and don't
+support the whole of Unicode; or (c) add an extra level of indirection
+for strings so that the storage compaction can be mutated on demand,
+with garbage collector support.  None of these strategies is
+particularly appealing.)
   -- done for x86:
      >> cold init runs;
      >> warm load runs to completion;
@@ -68,3 +80,14 @@ be terribly useful.
 support people other than simply those living in non-Eurozone Western
 Europe or the United States of America.)  This requires at minimum
 adjusting the dumper/fop code and the low-level memory accessors.
+
+** possibly retain a CHAR-CODE-LIMIT = 256 build option, with
+character point encoding dependent on locale.  This requires
+implementing, at a minimum, latin-X eternal formats, so that files
+with one or two high-bit characters (e.g. e-acute) can be read in
+applicable locales (e.g. latin1 and latin15).  (Rationale: possible
+reduction of size bloat.)
+
+** implement many useful external formats.  (Rationale: now that we
+have these characters, we want to be able to use them when talking to
+the rest of the world.)
