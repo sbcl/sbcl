@@ -37,28 +37,35 @@
  * problem.. */
 #define QSHOW_SIGNALS 0
 
-/* FIXME: Make HeaderValue, CONS, SYMBOL, and FDEFN into inline
- * functions instead of macros. */
-
-#define HeaderValue(obj) ((unsigned long) ((obj) >> N_WIDETAG_BITS))
-
-#define CONS(obj) ((struct cons *)((obj)-LIST_POINTER_LOWTAG))
-#define SYMBOL(obj) ((struct symbol *)((obj)-OTHER_POINTER_LOWTAG))
-#define FDEFN(obj) ((struct fdefn *)((obj)-OTHER_POINTER_LOWTAG))
-
 /* KLUDGE: These are in theory machine-dependent and OS-dependent, but
  * in practice the "foo int" definitions work for all the machines
  * that SBCL runs on as of 0.6.7. If we port to the Alpha or some
  * other non-32-bit machine we'll probably need real machine-dependent
  * and OS-dependent definitions again. */
 /* even on alpha, int happens to be 4 bytes.  long is longer. */
+/* FIXME: these names really shouldn't reflect their length and this
+   is not quite right for some of the FFI stuff */
+#if 64 == N_WORD_BITS
+typedef unsigned long u32;
+typedef signed long s32;
+#else
 typedef unsigned int u32;
 typedef signed int s32;
-#define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)
+#endif
+
 /* this is an integral type the same length as a machine pointer */
 typedef unsigned long pointer_sized_uint_t ;
 
-typedef u32 lispobj;
+/* FIXME: we do things this way because of the alpha32 port.  once
+   alpha64 has arrived, all this nastiness can go away */
+#if 64 == N_WORD_BITS
+#define LOW_WORD(c) ((pointer_sized_uint_t)c)
+typedef unsigned long lispobj;
+#else
+#define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)
+/* fake it on alpha32 */
+typedef unsigned int lispobj;
+#endif
 
 static inline int
 lowtag_of(lispobj obj) {
@@ -68,6 +75,30 @@ lowtag_of(lispobj obj) {
 static inline int
 widetag_of(lispobj obj) {
     return obj & WIDETAG_MASK;
+}
+
+static inline unsigned long
+HeaderValue(lispobj obj)
+{
+  return obj >> N_WIDETAG_BITS;
+}
+
+static inline struct cons *
+CONS(lispobj obj)
+{
+  return (struct cons *)(obj - LIST_POINTER_LOWTAG);
+}
+
+static inline struct symbol *
+SYMBOL(lispobj obj)
+{
+  return (struct symbol *)(obj - OTHER_POINTER_LOWTAG);
+}
+
+static inline struct fdefn *
+FDEFN(lispobj obj)
+{
+  return (struct fdefn *)(obj - OTHER_POINTER_LOWTAG);
 }
 
 /* Is the Lisp object obj something with pointer nature (as opposed to

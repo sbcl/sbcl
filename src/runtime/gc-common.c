@@ -107,10 +107,10 @@ copy_object(lispobj object, int nwords)
     tag = lowtag_of(object);
 
     /* Allocate space. */
-    new = gc_general_alloc(nwords*4,ALLOC_BOXED,ALLOC_QUICK);
+    new = gc_general_alloc(nwords*N_WORD_BYTES,ALLOC_BOXED,ALLOC_QUICK);
 
     /* Copy the object. */
-    memcpy(new,native_pointer(object),nwords*4);
+    memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
     return make_lispobj(new,tag);
 }
 
@@ -175,7 +175,7 @@ scavenge(lispobj *start, long n_words)
 	    }
 	}
 #endif
-	else if ((object & 3) == 0) {
+	else if (fixnump(object)) {
 	    /* It's a fixnum: really easy.. */
 	    n_words_scavenged = 1;
 	} else {
@@ -399,7 +399,8 @@ trans_return_pc_header(lispobj object)
     struct code *code, *ncode;
 
     return_pc = (struct simple_fun *) native_pointer(object);
-    offset = HeaderValue(return_pc->header)  * 4 ;
+    /* FIXME: was times 4, should it really be N_WORD_BYTES? */
+    offset = HeaderValue(return_pc->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
     code = (struct code *) ((unsigned long) return_pc - offset);
@@ -453,7 +454,8 @@ trans_fun_header(lispobj object)
     struct code *code, *ncode;
 	
     fheader = (struct simple_fun *) native_pointer(object);
-    offset = HeaderValue(fheader->header) * 4;
+    /* FIXME: was times 4, should it really be N_WORD_BYTES? */
+    offset = HeaderValue(fheader->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
     code = (struct code *) ((unsigned long) fheader - offset);
@@ -690,8 +692,7 @@ scav_fdefn(lispobj *where, lispobj object)
 	    fdefn->raw_addr = (char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET);
 	/* gc.c has more casts here, which may be relevant or alternatively
 	   may be compiler warning defeaters.  try 
-        fdefn->raw_addr =
-	    (u32)  ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
+        fdefn->raw_addr = ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
 	*/
 	return sizeof(struct fdefn) / sizeof(lispobj);
     } else {
@@ -1144,7 +1145,7 @@ scav_vector_single_float(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
     return nwords;
 }
@@ -1159,7 +1160,7 @@ trans_vector_single_float(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1172,7 +1173,7 @@ size_vector_single_float(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
     return nwords;
 }
@@ -1185,7 +1186,7 @@ scav_vector_double_float(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 2 + 2, 2);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
 
     return nwords;
 }
@@ -1200,7 +1201,7 @@ trans_vector_double_float(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 2 + 2, 2);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1213,7 +1214,7 @@ size_vector_double_float(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 2 + 2, 2);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
 
     return nwords;
 }
@@ -1272,7 +1273,7 @@ scav_vector_complex_single_float(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 2 + 2, 2);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
 
     return nwords;
 }
@@ -1287,7 +1288,7 @@ trans_vector_complex_single_float(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 2 + 2, 2);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1300,7 +1301,7 @@ size_vector_complex_single_float(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 2 + 2, 2);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
 
     return nwords;
 }
@@ -1315,7 +1316,7 @@ scav_vector_complex_double_float(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 4 + 2, 2);
+    nwords = CEILING(NWORDS(length, 128) + 2, 2);
 
     return nwords;
 }
@@ -1330,7 +1331,7 @@ trans_vector_complex_double_float(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 4 + 2, 2);
+    nwords = CEILING(NWORDS(length, 128) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1343,7 +1344,7 @@ size_vector_complex_double_float(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length * 4 + 2, 2);
+    nwords = CEILING(NWORDS(length, 128) + 2, 2);
 
     return nwords;
 }
@@ -1470,8 +1471,9 @@ static int
 scav_lose(lispobj *where, lispobj object)
 {
     lose("no scavenge function for object 0x%08x (widetag 0x%x)",
-	 (unsigned long)object,
-	 widetag_of(*(lispobj*)native_pointer(object)));
+         (unsigned long)object,
+         widetag_of(*(lispobj*)native_pointer(object)));
+
     return 0; /* bogus return value to satisfy static type checking */
 }
 
@@ -1697,7 +1699,7 @@ gc_init_tables(void)
 	trans_vector_unsigned_byte_32;
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG] =
-	trans_vector_unsigned_byte_32;
+	trans_vector_unsigned_byte_64;
 #endif
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG] =

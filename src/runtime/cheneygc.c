@@ -72,7 +72,7 @@ tv_diff(struct timeval *x, struct timeval *y)
 static void
 zero_stack(void)
 {
-    u32 *ptr = (u32 *)current_control_stack_pointer;
+    lispobj *ptr = current_control_stack_pointer;
  search:
     do {
 	if (*ptr)
@@ -92,7 +92,7 @@ zero_stack(void)
 void *
 gc_general_alloc(int bytes, int unboxed_p, int quick_p) {
     lispobj *new=new_space_free_pointer;
-    new_space_free_pointer+=(bytes/4);
+    new_space_free_pointer+=(bytes/N_WORD_BYTES);
     return new;
 }
 
@@ -273,15 +273,8 @@ collect_garbage(unsigned ignore)
     user_time = tv_diff(&stop_rusage.ru_utime, &start_rusage.ru_utime);
     system_time = tv_diff(&stop_rusage.ru_stime, &start_rusage.ru_stime);
 
-#if 0
-    printf("Statistics:\n");
-    printf("%10.2f sec of real time\n", real_time);
-    printf("%10.2f sec of user time,\n", user_time);
-    printf("%10.2f sec of system time.\n", system_time);
-#else
     printf("Statistics: %10.2fs real, %10.2fs user, %10.2fs system.\n",
 	   real_time, user_time, system_time);
-#endif        
 
     gc_rate = ((float) size_retained / (float) (1<<20)) / real_time;
 	
@@ -339,8 +332,9 @@ scavenge_interrupt_context(os_context_t *context)
     /* before we scavenge the context. */
 #ifdef reg_LIP
     lip = *os_context_register_addr(context, reg_LIP);
-    /*  0x7FFFFFFF or 0x7FFFFFFFFFFFFFFF ? */
-    lip_offset = 0x7FFFFFFF;
+    /* 0x7FFFFFFF on 32-bit platforms;
+       0x7FFFFFFFFFFFFFFF on 64-bit platforms */
+    lip_offset = (((unsigned long)1) << (N_WORD_BITS - 1)) - 1;
     lip_register_pair = -1;
     for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
 	unsigned long reg;
@@ -529,7 +523,7 @@ scav_fdefn(lispobj *where, lispobj object)
 	== (char *)((unsigned long)(fdefn->raw_addr))) {
         scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1);
         fdefn->raw_addr =
-	    (u32)  ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
+            (u32) ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
         return sizeof(struct fdefn) / sizeof(lispobj);
     }
     else

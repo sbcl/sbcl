@@ -33,9 +33,18 @@
 static inline unsigned int
 NWORDS(unsigned int x, unsigned int n_bits)
 {
-    unsigned int elements_per_word = N_WORD_BITS/n_bits;
+    /* A good compiler should be able to constant-fold this whole thing,
+       even with the conditional. */
+    if(n_bits <= N_WORD_BITS) {
+        unsigned int elements_per_word = N_WORD_BITS/n_bits;
 
-    return CEILING(x, elements_per_word)/elements_per_word;
+        return CEILING(x, elements_per_word)/elements_per_word;
+    }
+    else {
+        /* FIXME: should have some sort of assertion that N_WORD_BITS
+           evenly divides n_bits */
+        return x * (n_bits/N_WORD_BITS);
+    }
 }
 
 /* FIXME: Shouldn't this be defined in sbcl.h? */
@@ -82,7 +91,7 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
 
 	/* If thing is an immediate then this is a cons. */
 	if (is_lisp_pointer(thing)
-	    || ((thing & 3) == 0) /* fixnum */
+	    || (fixnump(thing))
 	    || (widetag_of(thing) == BASE_CHAR_WIDETAG)
 	    || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
 	    count = 2;

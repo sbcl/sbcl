@@ -1150,7 +1150,7 @@ copy_large_object(lispobj object, int nwords)
 	gc_assert(page_table[first_page].first_object_offset == 0);
 
 	next_page = first_page;
-	remaining_bytes = nwords*4;
+	remaining_bytes = nwords*N_WORD_BYTES;
 	while (remaining_bytes > PAGE_BYTES) {
 	    gc_assert(page_table[next_page].gen == from_space);
 	    gc_assert(page_table[next_page].allocated == BOXED_PAGE_FLAG);
@@ -1212,7 +1212,7 @@ copy_large_object(lispobj object, int nwords)
 	bytes_allocated -= bytes_freed;
 
 	/* Add the region to the new_areas if requested. */
-	add_new_area(first_page,0,nwords*4);
+	add_new_area(first_page,0,nwords*N_WORD_BYTES);
 
 	return(object);
     } else {
@@ -1220,9 +1220,9 @@ copy_large_object(lispobj object, int nwords)
 	tag = lowtag_of(object);
 
 	/* Allocate space. */
-	new = gc_quick_alloc_large(nwords*4);
+	new = gc_quick_alloc_large(nwords*N_WORD_BYTES);
 
-	memcpy(new,native_pointer(object),nwords*4);
+	memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
 
 	/* Return Lisp pointer of new object. */
 	return ((lispobj) new) | tag;
@@ -1244,9 +1244,9 @@ copy_unboxed_object(lispobj object, int nwords)
     tag = lowtag_of(object);
 
     /* Allocate space. */
-    new = gc_quick_alloc_unboxed(nwords*4);
+    new = gc_quick_alloc_unboxed(nwords*N_WORD_BYTES);
 
-    memcpy(new,native_pointer(object),nwords*4);
+    memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
 
     /* Return Lisp pointer of new object. */
     return ((lispobj) new) | tag;
@@ -1268,7 +1268,6 @@ copy_large_unboxed_object(lispobj object, int nwords)
 {
     int tag;
     lispobj *new;
-    lispobj *source, *dest;
     int first_page;
 
     gc_assert(is_lisp_pointer(object));
@@ -1276,7 +1275,7 @@ copy_large_unboxed_object(lispobj object, int nwords)
     gc_assert((nwords & 0x01) == 0);
 
     if ((nwords > 1024*1024) && gencgc_verbose)
-	FSHOW((stderr, "/copy_large_unboxed_object: %d bytes\n", nwords*4));
+	FSHOW((stderr, "/copy_large_unboxed_object: %d bytes\n", nwords*N_WORD_BYTES));
 
     /* Check whether it's a large object. */
     first_page = find_page_index((void *)object);
@@ -1294,7 +1293,7 @@ copy_large_unboxed_object(lispobj object, int nwords)
 	gc_assert(page_table[first_page].first_object_offset == 0);
 
 	next_page = first_page;
-	remaining_bytes = nwords*4;
+	remaining_bytes = nwords*N_WORD_BYTES;
 	while (remaining_bytes > PAGE_BYTES) {
 	    gc_assert(page_table[next_page].gen == from_space);
 	    gc_assert((page_table[next_page].allocated == UNBOXED_PAGE_FLAG)
@@ -1352,8 +1351,8 @@ copy_large_unboxed_object(lispobj object, int nwords)
 		   "/copy_large_unboxed bytes_freed=%d\n",
 		   bytes_freed));
 
-	generations[from_space].bytes_allocated -= 4*nwords + bytes_freed;
-	generations[new_space].bytes_allocated += 4*nwords;
+	generations[from_space].bytes_allocated -= nwords*N_WORD_BYTES + bytes_freed;
+	generations[new_space].bytes_allocated += nwords*N_WORD_BYTES;
 	bytes_allocated -= bytes_freed;
 
 	return(object);
@@ -1363,19 +1362,10 @@ copy_large_unboxed_object(lispobj object, int nwords)
 	tag = lowtag_of(object);
 
 	/* Allocate space. */
-	new = gc_quick_alloc_large_unboxed(nwords*4);
+	new = gc_quick_alloc_large_unboxed(nwords*N_WORD_BYTES);
 
-	dest = new;
-	source = (lispobj *) native_pointer(object);
-
-	/* Copy the object. */
-	while (nwords > 0) {
-	    dest[0] = source[0];
-	    dest[1] = source[1];
-	    dest += 2;
-	    source += 2;
-	    nwords -= 2;
-	}
+        /* Copy the object. */
+        memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
 
 	/* Return Lisp pointer of new object. */
 	return ((lispobj) new) | tag;
@@ -1419,10 +1409,10 @@ sniff_code_object(struct code *code, unsigned displacement)
     nheader_words = HeaderValue(*(lispobj *)code);
     nwords = ncode_words + nheader_words;
 
-    constants_start_addr = (void *)code + 5*4;
-    constants_end_addr = (void *)code + nheader_words*4;
-    code_start_addr = (void *)code + nheader_words*4;
-    code_end_addr = (void *)code + nwords*4;
+    constants_start_addr = (void *)code + 5*N_WORD_BYTES;
+    constants_end_addr = (void *)code + nheader_words*N_WORD_BYTES;
+    code_start_addr = (void *)code + nheader_words*N_WORD_BYTES;
+    code_end_addr = (void *)code + nwords*N_WORD_BYTES;
 
     /* Work through the unboxed code. */
     for (p = code_start_addr; p < code_end_addr; p++) {
@@ -1589,10 +1579,10 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     /* FSHOW((stderr,
 	     "/compiled code object at %x: header words = %d, code words = %d\n",
 	     new_code, nheader_words, ncode_words)); */
-    constants_start_addr = (void *)new_code + 5*4;
-    constants_end_addr = (void *)new_code + nheader_words*4;
-    code_start_addr = (void *)new_code + nheader_words*4;
-    code_end_addr = (void *)new_code + nwords*4;
+    constants_start_addr = (void *)new_code + 5*N_WORD_BYTES;
+    constants_end_addr = (void *)new_code + nheader_words*N_WORD_BYTES;
+    code_start_addr = (void *)new_code + nheader_words*N_WORD_BYTES;
+    code_end_addr = (void *)new_code + nwords*N_WORD_BYTES;
     /*
     FSHOW((stderr,
 	   "/const start = %x, end = %x\n",
@@ -1648,7 +1638,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 	    /* If it's within the old_code object then it must be an
 	     * absolute fixup (relative ones are not saved) */
 	    if ((old_value >= (unsigned)old_code)
-		&& (old_value < ((unsigned)old_code + nwords*4)))
+		&& (old_value < ((unsigned)old_code + nwords*N_WORD_BYTES)))
 		/* So add the dispacement. */
 		*(unsigned *)((unsigned)code_start_addr + offset) =
 		    old_value + displacement;
@@ -2065,11 +2055,11 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	}
 	/* Is it plausible cons? */
 	if ((is_lisp_pointer(start_addr[0])
-	    || ((start_addr[0] & 3) == 0) /* fixnum */
+	    || (fixnump(start_addr[0]))
 	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
-	       || ((start_addr[1] & 3) == 0) /* fixnum */
+	       || (fixnump(start_addr[1]))
 	       || (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
 	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
 	    break;
@@ -2315,7 +2305,7 @@ maybe_adjust_large_object(lispobj *where)
     gc_assert(page_table[first_page].first_object_offset == 0);
 
     next_page = first_page;
-    remaining_bytes = nwords*4;
+    remaining_bytes = nwords*N_WORD_BYTES;
     while (remaining_bytes > PAGE_BYTES) {
 	gc_assert(page_table[next_page].gen == from_space);
 	gc_assert((page_table[next_page].allocated == BOXED_PAGE_FLAG)
@@ -2532,7 +2522,7 @@ update_page_write_prot(int page)
     int j;
     int wp_it = 1;
     void **page_addr = (void **)page_address(page);
-    int num_words = page_table[page].bytes_used / 4;
+    int num_words = page_table[page].bytes_used / N_WORD_BYTES;
 
     /* Shouldn't be a free page. */
     gc_assert(page_table[page].allocated != FREE_PAGE_FLAG);
@@ -2871,12 +2861,10 @@ scavenge_newspace_generation(int generation)
 
 	    /* Work through previous_new_areas. */
 	    for (i = 0; i < previous_new_areas_index; i++) {
-		/* FIXME: All these bare *4 and /4 should be something
-		 * like BYTES_PER_WORD or WBYTES. */
 		int page = (*previous_new_areas)[i].page;
 		int offset = (*previous_new_areas)[i].offset;
-		int size = (*previous_new_areas)[i].size / 4;
-		gc_assert((*previous_new_areas)[i].size % 4 == 0);
+		int size = (*previous_new_areas)[i].size / N_WORD_BYTES;
+		gc_assert((*previous_new_areas)[i].size % N_WORD_BYTES == 0);
 		scavenge(page_address(page)+offset, size);
 	    }
 
@@ -3346,7 +3334,7 @@ verify_zero_fill(void)
 	    if (free_bytes > 0) {
 		int *start_addr = (int *)((unsigned)page_address(page)
 					  + page_table[page].bytes_used);
-		int size = free_bytes / 4;
+		int size = free_bytes / N_WORD_BYTES;
 		int i;
 		for (i = 0; i < size; i++) {
 		    if (start_addr[i] != 0) {
