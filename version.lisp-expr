@@ -18,4 +18,4 @@
 ;;; versions, especially for internal versions off the main CVS
 ;;; branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
 
-"0.pre8.66"
+"0.pre8.67"
