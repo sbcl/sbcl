@@ -84,8 +84,9 @@
                (unless (member state
                                '(:required :optional :post-rest :post-more))
                  (compiler-error "misplaced &KEY in lambda list: ~S" list))
+	       #-sb-xc-host
 	       (when (optional)
-		 (style-warn
+		 (compiler-style-warn
 		  "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
                (setq keyp t
                      state :key))
