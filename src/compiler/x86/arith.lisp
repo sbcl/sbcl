@@ -794,6 +794,82 @@
 
     DONE))
 
+(in-package "SB!C")
+
+(defknown %lea (integer integer (member 1 2 4 8) (signed-byte 32))
+  integer
+  (foldable flushable movable))
+
+(defoptimizer (%lea derive-type) ((base index scale disp))
+  (when (and (constant-lvar-p scale)
+	     (constant-lvar-p disp))
+    (let ((scale (lvar-value scale))
+	  (disp (lvar-value disp))
+	  (base-type (lvar-type base))
+	  (index-type (lvar-type index)))
+      (when (and (numeric-type-p base-type)
+		 (numeric-type-p index-type))
+	(let ((base-lo (numeric-type-low base-type))
+	      (base-hi (numeric-type-high base-type))
+	      (index-lo (numeric-type-low index-type))
+	      (index-hi (numeric-type-high index-type)))
+	  (make-numeric-type :class 'integer
+			     :complexp :real
+			     :low (when (and base-lo index-lo)
+				    (+ base-lo (* index-lo scale) disp))
+			     :high (when (and base-hi index-hi)
+				     (+ base-hi (* index-hi scale) disp))))))))
+
+(defun %lea (base index scale disp)
+  (+ base (* index scale) disp))
+
+(in-package "SB!VM")
+
+(define-vop (%lea/unsigned=>unsigned)
+  (:translate %lea)
+  (:policy :fast-safe)
+  (:args (base :scs (unsigned-reg))
+	 (index :scs (unsigned-reg)))
+  (:info scale disp)
+  (:arg-types unsigned-num unsigned-num
+	      (:constant (member 1 2 4 8))
+	      (:constant (signed-byte 32)))
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (inst lea r (make-ea :dword :base base :index index
+			 :scale scale :disp disp))))
+
+(define-vop (%lea/signed=>signed)
+  (:translate %lea)
+  (:policy :fast-safe)
+  (:args (base :scs (signed-reg))
+	 (index :scs (signed-reg)))
+  (:info scale disp)
+  (:arg-types signed-num signed-num
+	      (:constant (member 1 2 4 8))
+	      (:constant (signed-byte 32)))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 4
+    (inst lea r (make-ea :dword :base base :index index
+			 :scale scale :disp disp))))
+
+(define-vop (%lea/fixnum=>fixnum)
+  (:translate %lea)
+  (:policy :fast-safe)
+  (:args (base :scs (any-reg))
+	 (index :scs (any-reg)))
+  (:info scale disp)
+  (:arg-types tagged-num tagged-num
+	      (:constant (member 1 2 4 8))
+	      (:constant (signed-byte 32)))
+  (:results (r :scs (any-reg)))
+  (:result-types tagged-num)
+  (:generator 3
+    (inst lea r (make-ea :dword :base base :index index
+			 :scale scale :disp disp))))
+
 ;;; FIXME: before making knowledge of this too public, it needs to be
 ;;; fixed so that it's actually _faster_ than the non-CMOV version; at
 ;;; least on my Celeron-XXX laptop, this version is marginally slower
@@ -1163,6 +1239,26 @@
              fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod32))
 
+(in-package "SB!C")
+
+(defknown sb!vm::%lea-mod32 (integer integer (member 1 2 4 8) (signed-byte 32))
+  (unsigned-byte 32)
+  (foldable flushable movable))
+
+(define-modular-fun-optimizer %lea ((base index scale disp) :width width)
+  (when (and (<= width 32)
+	     (constant-lvar-p scale)
+	     (constant-lvar-p disp))
+    (cut-to-width base width)
+    (cut-to-width index width)
+    'sb!vm::%lea-mod32))
+
+(in-package "SB!VM")
+
+(define-vop (%lea-mod32/unsigned=>unsigned
+	     %lea/unsigned=>unsigned)
+  (:translate %lea-mod32))
+
 ;;; logical operations
 (define-modular-fun lognot-mod32 (x) lognot 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
@@ -1508,84 +1604,6 @@
     (inst mov tmp y)
     (inst shr tmp 18)
     (inst xor y tmp)))
-
-(in-package "SB!C")
-
-(defknown %lea ((or (signed-byte 32) (unsigned-byte 32))
-		(or (signed-byte 32) (unsigned-byte 32))
-		(member 1 2 4 8) (signed-byte 32))
-  (or (signed-byte 32) (unsigned-byte 32))
-  (foldable flushable))
-
-(defoptimizer (%lea derive-type) ((base index scale disp))
-  (when (and (constant-lvar-p scale)
-	     (constant-lvar-p disp))
-    (let ((scale (lvar-value scale))
-	  (disp (lvar-value disp))
-	  (base-type (lvar-type base))
-	  (index-type (lvar-type index)))
-      (when (and (numeric-type-p base-type)
-		 (numeric-type-p index-type))
-	(let ((base-lo (numeric-type-low base-type))
-	      (base-hi (numeric-type-high base-type))
-	      (index-lo (numeric-type-low index-type))
-	      (index-hi (numeric-type-high index-type)))
-	  (make-numeric-type :class 'integer
-			     :complexp :real
-			     :low (when (and base-lo index-lo)
-				    (+ base-lo (* index-lo scale) disp))
-			     :high (when (and base-hi index-hi)
-				     (+ base-hi (* index-hi scale) disp))))))))
-
-(defun %lea (base index scale disp)
-  (+ base (* index scale) disp))
-
-(in-package "SB!VM")
-
-(define-vop (%lea/unsigned=>unsigned)
-  (:translate %lea)
-  (:policy :fast-safe)
-  (:args (base :scs (unsigned-reg))
-	 (index :scs (unsigned-reg)))
-  (:info scale disp)
-  (:arg-types unsigned-num unsigned-num
-	      (:constant (member 1 2 4 8))
-	      (:constant (signed-byte 32)))
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:generator 5
-    (inst lea r (make-ea :dword :base base :index index
-			 :scale scale :disp disp))))
-
-(define-vop (%lea/signed=>signed)
-  (:translate %lea)
-  (:policy :fast-safe)
-  (:args (base :scs (signed-reg))
-	 (index :scs (signed-reg)))
-  (:info scale disp)
-  (:arg-types signed-num signed-num
-	      (:constant (member 1 2 4 8))
-	      (:constant (signed-byte 32)))
-  (:results (r :scs (signed-reg)))
-  (:result-types signed-num)
-  (:generator 4
-    (inst lea r (make-ea :dword :base base :index index
-			 :scale scale :disp disp))))
-
-(define-vop (%lea/fixnum=>fixnum)
-  (:translate %lea)
-  (:policy :fast-safe)
-  (:args (base :scs (any-reg))
-	 (index :scs (any-reg)))
-  (:info scale disp)
-  (:arg-types tagged-num tagged-num
-	      (:constant (member 1 2 4 8))
-	      (:constant (signed-byte 32)))
-  (:results (r :scs (any-reg)))
-  (:result-types tagged-num)
-  (:generator 3
-    (inst lea r (make-ea :dword :base base :index index
-			 :scale scale :disp disp))))
 
 (in-package "SB!C")
 

@@ -1019,3 +1019,16 @@
                    (dotimes (iv4 5 a) (%f9 0 0 b)))
                  0)))
           1 2)))
+
+;;; MISC.259-264 (aka "CSR screwed up implementing *-MOD32")
+(assert
+ (= (funcall
+     (compile
+      nil
+      '(lambda (a)
+         (declare (type (integer 177547470 226026978) a))
+         (declare (optimize (speed 3) (space 0) (safety 0) (debug 0)
+                            (compilation-speed 1)))
+         (logand a (* a 438810))))
+     215067723)
+    13739018))
