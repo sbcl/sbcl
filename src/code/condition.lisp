@@ -324,7 +324,7 @@
 ;;; ANSI-compliant, fixing it would also be good.:-)
 (defun compute-effective-slots (class)
   (collect ((res (copy-list (condition-classoid-slots class))))
-    (dolist (sclass (condition-classoid-cpl class))
+    (dolist (sclass (cdr (condition-classoid-cpl class)))
       (dolist (sslot (condition-classoid-slots sclass))
 	(let ((found (find (condition-slot-name sslot) (res))))
 	  (cond (found

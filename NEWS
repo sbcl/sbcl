@@ -1650,6 +1650,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     Baumann)
   * SB-MOP:ENSURE-CLASS-USING-CLASS now takes its arguments in the
     specified-by-AMOP order of (CLASS NAME &REST ARGS &KEY).
+  * SB-MOP:COMPUTE-EFFECTIVE-SLOT-DEFINITION now takes the
+    required-by-AMOP NAME argument, as well as CLASS and
+    DIRECT-SLOT-DEFINITIONS.  (thanks to Kevin Rosenberg)
   * fixed bug 20: DEFMETHOD can define methods using names that are
     not the proper names of classes to designate class specializers.
   * bug fix: INTERACTIVE-STREAM-P now works on streams associated with
@@ -1672,6 +1675,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     ** DEFCLASS of forward-referenced classes with another
        forward-referenced class in the superclasses list no longer
        causes an error;
+    ** condition slots are now initialized once each, not multiple
+       times;  (thanks to Gerd Moellmann)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
