@@ -1061,6 +1061,22 @@ WORKAROUND:
 269:
   SCALE-FLOAT should accept any integer for its second argument.
 
+270:
+  In the following function constraint propagator optimizes nothing:
+
+    (defun foo (x)
+      (declare (integer x))
+      (declare (optimize speed))
+      (typecase x
+        (fixnum "hala")
+        (fixnum "buba")
+        (bignum "hip")
+        (t "zuz")))
+
+271:
+  Cross-compiler cannot perform constant folding of some internal
+  functions, such as %NEGATE.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

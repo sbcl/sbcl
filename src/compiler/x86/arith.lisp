@@ -997,22 +997,8 @@
   (:result-types unsigned-num)
   (:policy :fast-safe))
 
-(define-vop (32bit-logical-not)
-  (:translate 32bit-logical-not)
-  (:args (x :scs (unsigned-reg) :target r
-	    :load-if (not (and (sc-is x unsigned-stack)
-			       (sc-is r unsigned-stack)
-			       (location= x r)))))
-  (:arg-types unsigned-num)
-  (:results (r :scs (unsigned-reg)
-	       :load-if (not (and (sc-is x unsigned-stack)
-				  (sc-is r unsigned-stack)
-				  (location= x r)))))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 1
-    (move r x)
-    (inst not r)))
+(define-source-transform 32bit-logical-not (x)
+  `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
 
 (define-vop (32bit-logical-and 32bit-logical)
   (:translate 32bit-logical-and)
@@ -1390,8 +1376,8 @@
     (inst shr tmp 18)
     (inst xor y tmp)))
 
-;;; Modular functions
-(define-modular-fun +-mod32 + 32)
+;;;; Modular functions
+(define-modular-fun +-mod32 (x y) + 32)
 
 (define-vop (fast-+-mod32/unsigned=>unsigned fast-safe-arith-op)
   (:translate +-mod32)
@@ -1415,3 +1401,23 @@
 	  (t
 	   (move r x)
 	   (inst add r y)))))
+
+;;; logical operations
+(define-modular-fun lognot-mod32 (x) lognot 32)
+
+(define-vop (lognot-mod32/unsigned=>unsigned)
+  (:translate lognot-mod32)
+  (:args (x :scs (unsigned-reg) :target r
+	    :load-if (not (and (sc-is x unsigned-stack)
+			       (sc-is r unsigned-stack)
+			       (location= x r)))))
+  (:arg-types unsigned-num)
+  (:results (r :scs (unsigned-reg)
+	       :load-if (not (and (sc-is x unsigned-stack)
+				  (sc-is r unsigned-stack)
+				  (location= x r)))))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 1
+    (move r x)
+    (inst not r)))

@@ -445,6 +445,7 @@
 	  (multiple-value-bind (code-length trace-table fixups)
 	      (generate-code component)
 
+            #-sb-xc-host
 	    (when *compiler-trace-output*
 	      (format *compiler-trace-output*
 		      "~|~%disassembly of code for ~S~2%" component)

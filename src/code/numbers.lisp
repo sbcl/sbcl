@@ -1340,10 +1340,10 @@
 ;;;; modular functions
 #.
 (collect ((forms))
-  (flet ((definition (name width pattern)
+  (flet ((definition (name lambda-list width pattern)
            ;; We rely on (SUBTYPEP `(UNSIGNED-BYTE ,WIDTH)
            ;;                      'BIGNUM-ELEMENT-TYPE)
-           `(defun ,name (x y)
+           `(defun ,name ,lambda-list
               (flet ((prepare-argument (x)
                        (declare (integer x))
                        (etypecase x
@@ -1351,10 +1351,14 @@
                          (bignum-element-type (logand x ,pattern))
                          (fixnum (logand x ,pattern))
                          (bignum (logand (%bignum-ref x 0) ,pattern)))))
-                (,name (prepare-argument x) (prepare-argument y))))))
-    (loop for info being each hash-value of sb!c::*modular-funs*
+                (,name ,@(loop for arg in lambda-list
+                               collect `(prepare-argument ,arg)))))))
+    (loop for infos being each hash-value of sb!c::*modular-funs*
           ;; FIXME: We need to process only "toplevel" functions
-          do (loop for (width . name) in info
+          do (loop for info in infos
+                   for name = (sb!c::modular-fun-info-name info)
+                   and width = (sb!c::modular-fun-info-width info)
+                   and lambda-list = (sb!c::modular-fun-info-lambda-list info)
                    for pattern = (1- (ash 1 width))
-                   do (forms (definition name width pattern)))))
+                   do (forms (definition name lambda-list width pattern)))))
   `(progn ,@(forms)))

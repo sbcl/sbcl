@@ -158,32 +158,51 @@
 
 ;;; List of increasing widths
 (defvar *modular-funs-widths* nil)
+(defstruct modular-fun-info
+  (name (missing-arg) :type symbol)
+  (width (missing-arg) :type (integer 0))
+  (lambda-list (missing-arg) :type list)
+  (prototype (missing-arg) :type symbol))
 
 (defun find-modular-version (fun-name width)
-  (let ((info (gethash fun-name *modular-funs*)))
-    (cdr (find-if (lambda (item-width) (>= item-width width))
-                  info
-                  :key #'car))))
+  (let ((infos (gethash fun-name *modular-funs*)))
+    (find-if (lambda (item-width) (>= item-width width))
+             infos
+             :key #'modular-fun-info-width)))
 
-(defun %define-modular-fun (name prototype width)
-  (let* ((list (gethash prototype *modular-funs*))
-         (entry (assoc width list)))
-    (if entry
-        (unless (eq name (cdr entry))
-          (setf (cdr entry) name)
+(defun %define-modular-fun (name lambda-list prototype width)
+  (let* ((infos (the list (gethash prototype *modular-funs*)))
+         (info (find-if (lambda (item-width) (= item-width width))
+                        infos
+                        :key #'modular-fun-info-width)))
+    (if info
+        (unless (and (eq name (modular-fun-info-name info))
+                     (= (length lambda-list)
+                        (length (modular-fun-info-lambda-list info))))
+          (setf (modular-fun-info-name info) name)
           (style-warn "Redefining modular version ~S of ~S for width ~S."
                       name prototype width))
         (setf (gethash prototype *modular-funs*)
-              (merge 'list (list (cons width name)) list #'<))))
+              (merge 'list
+                     (list (make-modular-fun-info :name name
+                                                  :width width
+                                                  :lambda-list lambda-list
+                                                  :prototype prototype))
+                     infos
+                     #'< :key #'modular-fun-info-width))))
   (setq *modular-funs-widths*
         (merge 'list (list width) *modular-funs-widths* #'<)))
 
-(defmacro define-modular-fun (name prototype width)
+(defmacro define-modular-fun (name lambda-list prototype width)
   (check-type name symbol)
   (check-type prototype symbol)
   (check-type width unsigned-byte)
+  (dolist (arg lambda-list)
+    (when (member arg lambda-list-keywords)
+      (error "Lambda list keyword ~S is not supported for ~
+              modular function lambda lists." arg)))
   `(progn
-     (%define-modular-fun ',name ',prototype ,width)
-     (defknown ,name (integer integer) (unsigned-byte ,width)
-               (foldable flushable movable))
-     ))
+     (%define-modular-fun ',name ',lambda-list ',prototype ,width)
+     (defknown ,name ,(mapcar (constantly 'integer) lambda-list)
+               (unsigned-byte ,width)
+               (foldable flushable movable))))

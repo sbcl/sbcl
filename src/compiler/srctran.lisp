@@ -2441,8 +2441,12 @@
 	     (logand int (lognot mask)))))
 
 ;;; modular functions
+;;;
+;;; -- lower N bits of a result depend only on lower N bits of
+;;; arguments.
 
-;;; Try to cut all uses of the continuation CONT to WIDTH bits.
+;;; Try to recursively cut all uses of the continuation CONT to WIDTH
+;;; bits.
 (defun cut-to-width (cont width)
   (declare (type continuation cont) (type (integer 0) width))
   (labels ((cut-node (node)
@@ -2450,15 +2454,16 @@
                         (fun-info-p (basic-combination-kind node)))
                (let* ((fun-ref (continuation-use (combination-fun node)))
                       (fun-name (leaf-source-name (ref-leaf fun-ref)))
-                      (modular-fun-name (find-modular-version fun-name width)))
-                 (when modular-fun-name
+                      (modular-fun (find-modular-version fun-name width))
+                      (name (and modular-fun
+                                 (modular-fun-info-name modular-fun))))
+                 (when modular-fun
                    (change-ref-leaf fun-ref
-                                    (find-free-fun modular-fun-name
-                                                   "in a strange place"))
+                                    (find-free-fun name "in a strange place"))
                    (setf (combination-kind node) :full)
                    (setf (node-derived-type node)
-                         (values-specifier-type `(values (unsigned-byte ,width)
-                                                         &optional)))
+                         (fun-type-returns
+                          (info :function :type name)))
                    (setf (continuation-%derived-type (node-cont node)) nil)
                    (setf (node-reoptimize node) t)
                    (setf (block-reoptimize (node-block node)) t)

@@ -391,6 +391,7 @@
 
 
 ;;;; 32-bit operations
+#!-x86 ; on X86 it is a modular function
 (deftransform lognot ((x) ((unsigned-byte 32)) *
                       :node node
                       :result result)
