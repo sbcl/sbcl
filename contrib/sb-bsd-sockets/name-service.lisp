@@ -43,7 +43,8 @@ eventually, so that we can do DNS lookups in parallel with other things
 			     (assert (= length 4))
 			     (let ((addr (make-array 4 :element-type '(unsigned-byte 8))))
 			       (loop for i from 0 below length
-				     do (setf (elt addr i) (sb-alien:deref ad i)))))
+				     do (setf (elt addr i) (sb-alien:deref ad i)))
+			       addr))
 			  (#.sockint::af-local
 			   (sb-alien:cast ad sb-alien:c-string))))))
     (make-instance 'host-ent
