@@ -78,7 +78,7 @@
 
 (assert (raises-error? (read-byte (make-string-input-stream "abc"))
 		       type-error))
-(assert (raises-error? (with-open-file (s "/dev/random")
+(assert (raises-error? (with-open-file (s "/dev/zero")
 			 (read-byte s))
 		       type-error))
 ;;; success

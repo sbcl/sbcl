@@ -13,37 +13,8 @@
 ;;;; CLISP issues
 
 #+clisp
-(locally
-
-  (in-package "COMMON-LISP")
-
-  ;; no longer needed in CLISP 1999-01-08, hurrah!
-  #|
-  ;; ANSI specifies that package LISP defines the type BOOLEAN, and the CMU CL
-  ;; compiler uses it a lot. This should be trivial to patch in CLISP, except
-  ;; that CLISP defines FFI:BOOLEAN, which conflicts. Gads.. Here we try to fix
-  ;; it with some package hacking. (Please do not take this as an example of
-  ;; good package hacking, I just messed with it until it seemed to work well
-  ;; enough to bootstrap CMU CL, because I'm highly unmotivated to make elegant
-  ;; fixes for nonstandard behavior. -- WHN)
-  (shadow 'ffi:boolean "FFI")
-  (deftype cl::boolean () '(member t nil))
-  (export 'boolean "LISP")
-  |#
-
-  ;; apparently fixed sometime in 2001, hurray!
-  #| (error "can't use CLISP -- no MAKE-LOAD-FORM") |#
-
-  ;; CLISP is still unsupported as a cross-compilation host because of
-  ;; these known problems:
-  (flet ((clisp-ouch (s) (error "can't bootstrap with CLISP: ~A" s)))
-    ;; These problems don't seem deep, and could probably be worked
-    ;; around.
-    #+nil (clisp-ouch "no (DOCUMENTATION X) when X is a PACKAGE")
-    #+nil (clisp-ouch "no (FUNCTION (SETF SYMBOL-FUNCTION))"))
-  
-  (ext:without-package-lock ("SYSTEM")
-    (setf system::*inhibit-floating-point-underflow* t)))
+(ext:without-package-lock ("SYSTEM")
+  (setf system::*inhibit-floating-point-underflow* t))
 
 ;;;; CMU CL issues
 
@@ -79,6 +50,10 @@
 (unless (ignore-errors (read-from-string "1.0l0"))
   (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
 
+#+(and cmu sparc)
+(ext:set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
+
+;;;; OpenMCL issues
 #+openmcl 
 (unless (ignore-errors (funcall (constantly t) 1 2 3)) 
   (error "please find a binary that understands CONSTANTLY to build from"))

@@ -181,7 +181,7 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
     # The default stack ulimit under darwin is too small to run PURIFY.
     # Best we can do is complain and exit at this stage
-    if [ $(ulimit -s) = "512" ]; then
+    if [ "`ulimit -s`" = "512" ]; then
         echo "Your stack size limit is too small to build SBCL."
         echo "See the limit(1) or ulimit(1) commands and the README file."
         exit 1
