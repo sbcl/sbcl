@@ -175,7 +175,7 @@
 	     (:copier nil)
 	     #-sb-xc-host (:pure t))
   ;; string name of slot
-  %name	
+  %name
   ;; its position in the implementation sequence
   (index (missing-arg) :type fixnum)
   ;; the name of the accessor function
@@ -187,6 +187,8 @@
   (accessor-name nil)
   default			; default value expression
   (type t)			; declared type specifier
+  (safe-p t :type boolean)      ; whether the slot is known to be
+                                ; always of the specified type
   ;; If this object does not describe a raw slot, this value is T.
   ;;
   ;; If this object describes a raw slot, this value is the type of the
@@ -235,11 +237,11 @@
     ;; What operator is used (on the raw data vector) to access a slot
     ;; of this type?
     (accessor-name (missing-arg) :type symbol :read-only t)
-    ;; How many words are each value of this type? (This is used to 
+    ;; How many words are each value of this type? (This is used to
     ;; rescale the offset into the raw data vector.)
     (n-words (missing-arg) :type (and index (integer 1)) :read-only t))
 
-  (defvar *raw-slot-data-list* 
+  (defvar *raw-slot-data-list*
     (list
      ;; The compiler thinks that the raw data vector is a vector of
      ;; word-sized unsigned bytes, so if the slot we want to access
@@ -888,17 +890,16 @@
 ;;; and writer functions of the slot described by DSD.
 (defun slot-accessor-inline-expansion-designators (dd dsd)
   (let ((instance-type-decl `(declare (type ,(dd-name dd) instance)))
-	(accessor-place-form (%accessor-place-form dd dsd 'instance))
-	(dsd-type (dsd-type dsd)))
-    (values (lambda ()
-	      `(lambda (instance)
-		 ,instance-type-decl
-		 (truly-the ,dsd-type ,accessor-place-form)))
-	    (lambda ()
-	      `(lambda (new-value instance)
-		 (declare (type ,dsd-type new-value))
-		 ,instance-type-decl
-		 (setf ,accessor-place-form new-value))))))
+        (accessor-place-form (%accessor-place-form dd dsd 'instance))
+        (dsd-type (dsd-type dsd))
+        (value-the (if (dsd-safe-p dsd) 'truly-the 'the)))
+    (values (lambda () `(lambda (instance)
+                          ,instance-type-decl
+                          (,value-the ,dsd-type ,accessor-place-form)))
+	    (lambda () `(lambda (new-value instance)
+                          (declare (type ,dsd-type new-value))
+                          ,instance-type-decl
+                          (setf ,accessor-place-form new-value))))))
 
 ;;; Return a LAMBDA form which can be used to set a slot.
 (defun slot-setter-lambda-form (dd dsd)
@@ -1398,10 +1399,11 @@
 	       (arglist) (vars) (types)
                (loop for slot in (dd-slots defstruct)
                      for name = (dsd-name slot)
-                     collect (if (find name (skipped-vars) :test #'string=)
-                                 '.do-not-initialize-slot.
-                                 (or (find (dsd-name slot) (vars) :test #'string=)
-                                     (dsd-default slot))))))))
+                     collect (cond ((find name (skipped-vars) :test #'string=)
+                                    (setf (dsd-safe-p slot) nil)
+                                    '.do-not-initialize-slot.)
+                                   ((or (find (dsd-name slot) (vars) :test #'string=)
+                                        (dsd-default slot)))))))))
 
 ;;; Grovel the constructor options, and decide what constructors (if
 ;;; any) to create.
@@ -1461,7 +1463,7 @@
 ;;;; main DEFSTRUCT macro. Hopefully it will go away presently
 ;;;; (perhaps when CL:CLASS and SB-PCL:CLASS meet) as per FIXME below.
 ;;;; -- WHN 2001-10-28
-;;;; 
+;;;;
 ;;;; FIXME: There seems to be no good reason to shoehorn CONDITION,
 ;;;; STANDARD-INSTANCE, and GENERIC-FUNCTION into mutated structures
 ;;;; instead of just implementing them as primitive objects. (This
@@ -1585,7 +1587,7 @@
 			          ,slot-name)))
 		       slot-names)
 	     ,object-gensym))
-			      
+
 	 ;; predicate
 	 ,@(when predicate
 	     ;; Just delegate to the compiler's type optimization

@@ -1322,12 +1322,14 @@
        (null (lambda-var-sets leaf)))
       (defined-fun
        (not (eq (defined-fun-inlinep leaf) :notinline)))
-      #!+(and (not sb-fluid) (not sb-xc-host))
       (global-var
        (case (global-var-kind leaf)
-	 (:global-function (let ((name (leaf-source-name leaf)))
-			     (eq (symbol-package (fun-name-block-name name))
-				 *cl-package*))))))))
+	 (:global-function
+          (let ((name (leaf-source-name leaf)))
+            (or #-sb-xc-host
+                (eq (symbol-package (fun-name-block-name name))
+                    *cl-package*)
+                (info :function :info name)))))))))
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's CONT with the arg continuation.

@@ -1246,6 +1246,7 @@
     (push ref (leaf-refs leaf))
     (delete-ref ref)
     (setf (ref-leaf ref) leaf)
+    (setf (leaf-ever-used leaf) t)
     (let ((ltype (leaf-type leaf)))
       (if (fun-type-p ltype)
 	  (setf (node-derived-type ref) ltype)
