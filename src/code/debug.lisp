@@ -806,7 +806,7 @@ reset to ~S."
 					    '*flush-debug-errors*)
 				    (/show0 "throwing DEBUG-LOOP-CATCHER")
 				    (throw 'debug-loop-catcher nil)))))
-	    ;; We have to bind level for the restart function created by
+	    ;; We have to bind LEVEL for the restart function created by
 	    ;; WITH-SIMPLE-RESTART.
 	    (let ((level *debug-command-level*)
 		  (restart-commands (make-restart-commands)))

@@ -268,18 +268,18 @@
 ;;; 19991204) haven't been motivated to reverse engineer them from the
 ;;; code and document them here.
 ;;;
-;;; FIXME: This is awkward and unmnemonic. There is a function
-;;; (INVALID-WRAPPER-P) to test this return result abstractly for
-;;; invalidness but it's not called consistently; the functions that
-;;; need to know whether a wrapper is invalid often test (EQ
-;;; (WRAPPER-STATE X) T), ick. It would be good to use the abstract
-;;; test instead. It would probably be even better to switch the sense
-;;; of the WRAPPER-STATE function, renaming it to WRAPPER-INVALID and
-;;; making it synonymous with LAYOUT-INVALID. Then the
-;;; INVALID-WRAPPER-P function would become trivial and would go away
-;;; (replaced with WRAPPER-INVALID), since all the various invalid
-;;; wrapper states would become generalized boolean "true" values. --
-;;; WHN 19991204
+;;; FIXME: We have removed the persistent use of this function throughout
+;;; the PCL codebase, instead opting to use INVALID-WRAPPER-P, which 
+;;; abstractly tests the return result of this function for invalidness.
+;;; However, part of the original comment that is still applicable follows.
+;;;   --njf, 2002-05-02
+;;;
+;;; FIXME: It would probably be even better to switch the sense of the
+;;; WRAPPER-STATE function, renaming it to WRAPPER-INVALID and making it
+;;; synonymous with LAYOUT-INVALID. Then the INVALID-WRAPPER-P function
+;;; would become trivial and would go away (replaced with
+;;; WRAPPER-INVALID), since all the various invalid wrapper states would
+;;; become generalized boolean "true" values. -- WHN 19991204
 #-sb-fluid (declaim (inline wrapper-state (setf wrapper-state)))
 (defun wrapper-state (wrapper)
   (let ((invalid (sb-kernel:layout-invalid wrapper)))
@@ -297,7 +297,7 @@
   (setf (sb-kernel:layout-invalid wrapper)
 	(if (eq new-value t)
 	    nil
-	  new-value)))
+	    new-value)))
 
 (defmacro wrapper-instance-slots-layout (wrapper)
   `(%wrapper-instance-slots-layout ,wrapper))
@@ -443,16 +443,16 @@
 	     (gethash nwrapper *previous-nwrappers*) new-previous)))))
 
 (defun check-wrapper-validity (instance)
-  (let* ((owrapper (wrapper-of instance))
-	 (state (wrapper-state owrapper)))
-    (if (eq state t)
+  (let* ((owrapper (wrapper-of instance)))
+    (if (not (invalid-wrapper-p owrapper))
 	owrapper
-	(let ((nwrapper
+	(let* ((state (wrapper-state wrapper))
+	       (nwrapper
 		(ecase (car state)
 		  (:flush
-		    (flush-cache-trap owrapper (cadr state) instance))
+		   (flush-cache-trap owrapper (cadr state) instance))
 		  (:obsolete
-		    (obsolete-instance-trap owrapper (cadr state) instance)))))
+		   (obsolete-instance-trap owrapper (cadr state) instance)))))
 	  ;; This little bit of error checking is superfluous. It only
 	  ;; checks to see whether the person who implemented the trap
 	  ;; handling screwed up. Since that person is hacking

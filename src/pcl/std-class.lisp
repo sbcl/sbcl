@@ -1006,14 +1006,13 @@
 	(eq (class-of class) new-super-meta-class))))
 
 (defun force-cache-flushes (class)
-  (let* ((owrapper (class-wrapper class))
-	 (state (wrapper-state owrapper)))
+  (let* ((owrapper (class-wrapper class)))
     ;; We only need to do something if the state is still T. If the
     ;; state isn't T, it will be FLUSH or OBSOLETE, and both of those
     ;; will already be doing what we want. In particular, we must be
     ;; sure we never change an OBSOLETE into a FLUSH since OBSOLETE
     ;; means do what FLUSH does and then some.
-    (when (eq state t) ; FIXME: should be done through INVALID-WRAPPER-P
+    (unless (invalid-wrapper-p owrapper)
       (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
 				    class)))
 	(setf (wrapper-instance-slots-layout nwrapper)
@@ -1029,9 +1028,9 @@
   (declare (ignore owrapper))
   (set-wrapper instance nwrapper))
 
-;;; make-instances-obsolete can be called by user code. It will cause the
-;;; next access to the instance (as defined in 88-002R) to trap through the
-;;; update-instance-for-redefined-class mechanism.
+;;; MAKE-INSTANCES-OBSOLETE can be called by user code. It will cause
+;;; the next access to the instance (as defined in 88-002R) to trap
+;;; through the UPDATE-INSTANCE-FOR-REDEFINED-CLASS mechanism.
 (defmethod make-instances-obsolete ((class std-class))
   (let* ((owrapper (class-wrapper class))
 	 (nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
@@ -1049,8 +1048,8 @@
 (defmethod make-instances-obsolete ((class symbol))
   (make-instances-obsolete (find-class class)))
 
-;;; obsolete-instance-trap is the internal trap that is called when we see
-;;; an obsolete instance. The times when it is called are:
+;;; OBSOLETE-INSTANCE-TRAP is the internal trap that is called when we
+;;; see an obsolete instance. The times when it is called are:
 ;;;   - when the instance is involved in method lookup
 ;;;   - when attempting to access a slot of an instance
 ;;;
@@ -1068,12 +1067,13 @@
 ;;; sure that the traps are only happening when they should, and that
 ;;; the trap methods are computing appropriate new wrappers.
 
-;;; obsolete-instance-trap might be called on structure instances
-;;; after a structure is redefined. In most cases, obsolete-instance-trap
-;;; will not be able to fix the old instance, so it must signal an
-;;; error. The hard part of this is that the error system and debugger
-;;; might cause obsolete-instance-trap to be called again, so in that
-;;; case, we have to return some reasonable wrapper, instead.
+;;; OBSOLETE-INSTANCE-TRAP might be called on structure instances
+;;; after a structure is redefined. In most cases,
+;;; OBSOLETE-INSTANCE-TRAP will not be able to fix the old instance,
+;;; so it must signal an error. The hard part of this is that the
+;;; error system and debugger might cause OBSOLETE-INSTANCE-TRAP to be
+;;; called again, so in that case, we have to return some reasonable
+;;; wrapper, instead.
 
 (defvar *in-obsolete-instance-trap* nil)
 (defvar *the-wrapper-of-structure-object*

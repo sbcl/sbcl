@@ -191,16 +191,14 @@
 	 (value (typecase location
 		  (fixnum
 		   (cond ((std-instance-p object)
-			  ;; FIXME: EQ T (WRAPPER-STATE ..) is better done
-			  ;; through INVALID-WRAPPER-P (here and below).
-			  (unless (eq t (wrapper-state (std-instance-wrapper
-							object)))
+			  (when (invalid-wrapper-p (std-instance-wrapper
+                                                    object))
 			    (check-wrapper-validity object))
 			  (clos-slots-ref (std-instance-slots object)
 					  location))
 			 ((fsc-instance-p object)
-			  (unless (eq t (wrapper-state (fsc-instance-wrapper
-							object)))
+			  (when (invalid-wrapper-p (fsc-instance-wrapper
+                                                    object))
 			    (check-wrapper-validity object))
 			  (clos-slots-ref (fsc-instance-slots object)
 					  location))
@@ -224,12 +222,12 @@
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (unless (eq t (wrapper-state (std-instance-wrapper object)))
+	      (when (invalid-wrapper-p (std-instance-wrapper object))
 		(check-wrapper-validity object))
                (setf (clos-slots-ref (std-instance-slots object) location)
 		     new-value))
 	     ((fsc-instance-p object)
-	      (unless (eq t (wrapper-state (fsc-instance-wrapper object)))
+	      (when (invalid-wrapper-p (fsc-instance-wrapper object))
 		(check-wrapper-validity object))
                (setf (clos-slots-ref (fsc-instance-slots object) location)
 		     new-value))
@@ -249,14 +247,14 @@
 	 (value (typecase location
 		  (fixnum
 		   (cond ((std-instance-p object)
-			  (unless (eq t (wrapper-state (std-instance-wrapper
-							object)))
+			  (when (invalid-wrapper-p (std-instance-wrapper
+                                                    object))
 			    (check-wrapper-validity object))
 			  (clos-slots-ref (std-instance-slots object)
 					  location))
 			 ((fsc-instance-p object)
-			  (unless (eq t (wrapper-state (fsc-instance-wrapper
-							object)))
+			  (when (invalid-wrapper-p (fsc-instance-wrapper
+                                                    object))
 			    (check-wrapper-validity object))
 			  (clos-slots-ref (fsc-instance-slots object)
 					  location))
@@ -278,12 +276,12 @@
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (unless (eq t (wrapper-state (std-instance-wrapper object)))
+	      (when (invalid-wrapper-p (std-instance-wrapper object))
 		(check-wrapper-validity object))
                (setf (clos-slots-ref (std-instance-slots object) location)
 		     +slot-unbound+))
 	     ((fsc-instance-p object)
-	      (unless (eq t (wrapper-state (fsc-instance-wrapper object)))
+	      (when (invalid-wrapper-p (fsc-instance-wrapper object))
 		(check-wrapper-validity object))
                (setf (clos-slots-ref (fsc-instance-slots object) location)
 		     +slot-unbound+))

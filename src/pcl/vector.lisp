@@ -1156,7 +1156,7 @@
 	 (w-t pv-wrappers))
     (dolist (arg args)
       (setq w (wrapper-of arg))
-      (unless (eq t (wrapper-state w)) ; FIXME: should be INVALID-WRAPPER-P
+      (when (invalid-wrapper-p w)
 	(setq w (check-wrapper-validity arg)))
       (setf (car w-t) w))
       (setq w-t (cdr w-t))
