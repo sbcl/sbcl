@@ -704,7 +704,7 @@ bug.~:@>")
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
 	 (len (read-byte-arg))
-	 (sym (make-string len)))
+	 (sym (make-string len :element-type 'base-char)))
     (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
 			     (read-word-arg)

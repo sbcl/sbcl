@@ -31,16 +31,17 @@ cc -c $testfilestem.c -o $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
 # Foreign definitions & load
-cat > $testfilestem.deflisp <<EOF
+cat > $testfilestem.def.lisp <<EOF
   (define-alien-variable environ (* c-string))
   (defvar *environ* environ)
-  (handler-case 
-      (load-shared-object "$testfilestem.so")
-    (sb-int:unsupported-operator ()
-     ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
-     ;; supported on every OS. In that case, there's nothing to test,
-     ;; and we can just fall through to success.
-     (sb-ext:quit :unix-status 22))) ; catch that
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (handler-case 
+        (load-shared-object "$testfilestem.so")
+      (sb-int:unsupported-operator ()
+        ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
+        ;; supported on every OS. In that case, there's nothing to test,
+        ;; and we can just fall through to success.
+        (sb-ext:quit :unix-status 22)))) ; catch that
   (define-alien-routine summish int (x int) (y int))
   (define-alien-variable numberish int)
   (define-alien-routine nummish int (x int))
@@ -56,7 +57,7 @@ cat > $testfilestem.deflisp <<EOF
 EOF
 
 # Test code
-cat > $testfilestem.testlisp <<EOF
+cat > $testfilestem.test.lisp <<EOF
   (assert (= (summish 10 20) 31))
   (assert (= 42 numberish))
   (setf numberish 13)
@@ -65,17 +66,27 @@ cat > $testfilestem.testlisp <<EOF
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
 
-${SBCL:-sbcl} --load $testfilestem.deflisp --load $testfilestem.testlisp
-if [ $? = 22 ]; then
+${SBCL:-sbcl} --eval "(progn (compile-file #p\"$testfilestem.def.lisp\") (sb-ext:quit :unix-status 52))"
+if [ $? = 52 ] ; then :
+else
+    # we can't compile the test file. something's wrong.
+    rm $testfilestem.*
+    echo test failed: $?
+    exit 1
+fi
+
+${SBCL:-sbcl} --load $testfilestem.def.fasl --load $testfilestem.test.lisp
+RET=$?
+if [ $RET = 22 ]; then
     rm $testfilestem.*
     exit $PUNT # success -- load-shared-object not supported
-elif [ $? != 52]; then
+elif [ $RET != 52 ]; then
     rm $testfilestem.*
     echo test failed: $?
     exit 1 
 fi
 
-${SBCL:-sbcl} --load $testfilestem.deflisp --eval "(when (member :linkage-table *features*) (save-lisp-and-die \"$testfilestem.core\"))" <<EOF
+${SBCL:-sbcl} --load $testfilestem.def.fasl --eval "(when (member :linkage-table *features*) (save-lisp-and-die \"$testfilestem.core\"))" <<EOF
   (sb-ext:quit :unix-status 22) ; catch this
 EOF
 if [ $? = 22 ]; then
@@ -83,7 +94,7 @@ if [ $? = 22 ]; then
     exit $PUNT # success -- linkage-table not available
 fi
 
-$SBCL_ALLOWING_CORE --core $testfilestem.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.testlisp
+$SBCL_ALLOWING_CORE --core $testfilestem.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
 if [ $? != 52 ]; then
     rm $testfilestem.*
     echo test failed: $?
