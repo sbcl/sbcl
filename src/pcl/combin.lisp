@@ -351,9 +351,10 @@
 	   (let ((main-effective-method
 		   (if (or before after)
 		       `(multiple-value-prog1
-			  (progn ,(make-call-methods before)
-				 (call-method ,(first primary)
-					      ,(rest primary)))
+			  (progn
+			    ,(make-call-methods before)
+			    (call-method ,(first primary)
+					 ,(rest primary)))
 			  ,(make-call-methods (reverse after)))
 		       `(call-method ,(first primary) ,(rest primary)))))
 	     (if around

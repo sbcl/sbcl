@@ -130,7 +130,6 @@
   ((a-slot :initarg :a-slot :accessor a-slot)
    (b-slot :initarg :b-slot :accessor b-slot)
    (c-slot :initarg :c-slot :accessor c-slot)))
-
 (let ((foo (make-instance 'class-with-slots
 			  :a-slot 1
 			  :b-slot 2
@@ -140,26 +139,33 @@
     (assert (= (b-slot bar) 2))
     (assert (= (c-slot bar) 3))))
 
-;;; some more change-class testing, now that we have an ANSI-compliant
-;;; version (thanks to Espen Johnsen):
+;;; some more CHANGE-CLASS testing, now that we have an ANSI-compliant
+;;; version (thanks to Espen Johnsen)
 (defclass from-class ()
   ((foo :initarg :foo :accessor foo)))
-
 (defclass to-class ()
   ((foo :initarg :foo :accessor foo)
    (bar :initarg :bar :accessor bar)))
-
 (let* ((from (make-instance 'from-class :foo 1))
        (to (change-class from 'to-class :bar 2)))
   (assert (= (foo to) 1))
   (assert (= (bar to) 2)))
+
+;;; Until Pierre Mai's patch (sbcl-devel 2002-06-18, merged in
+;;; sbcl-0.7.4.39) the :MOST-SPECIFIC-LAST option had no effect.
+(defgeneric bug180 ((x t))
+  (:method-combination list :most-specific-last))
+(defmethod bug180 list ((x number))
+  'number)
+(defmethod bug180 list ((x fixnum))
+  'fixnum)
+(assert (equal (bug180 14) '(number fixnum)))
 
 ;;; printing a structure class should not loop indefinitely (or cause
 ;;; a stack overflow):
 (defclass test-printing-structure-class ()
   ((slot :initarg :slot))
   (:metaclass structure-class))
-
 (print (make-instance 'test-printing-structure-class :slot 2))
 
 ;;; structure-classes should behave nicely when subclassed
@@ -167,11 +173,9 @@
   ((a :initarg :a :accessor a-accessor)
    (b :initform 2 :reader b-reader))
   (:metaclass structure-class))
-
 (defclass sub-structure (super-structure)
   ((c :initarg :c :writer c-writer :accessor c-accessor))
   (:metaclass structure-class))
-
 (let ((foo (make-instance 'sub-structure :a 1 :c 3)))
   (assert (= (a-accessor foo) 1))
   (assert (= (b-reader foo) 2))

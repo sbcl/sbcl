@@ -124,6 +124,7 @@
   (let ((type (method-combination-type combin))
 	(operator (short-combination-operator combin))
 	(ioa (short-combination-identity-with-one-argument combin))
+	(order (car (method-combination-options combin)))
 	(around ())
 	(primary ()))
     (dolist (m applicable-methods)
@@ -147,8 +148,11 @@
 		 (push m primary))
 		(t
 		 (lose m "has an illegal qualifier"))))))
-    (setq around (nreverse around)
-	  primary (nreverse primary))
+    (setq around (nreverse around))
+    (ecase order
+      (:most-specific-last) ; nothing to be done, already in correct order
+      (:most-specific-first
+       (setq primary (nreverse primary))))
     (let ((main-method
 	    (if (and (null (cdr primary))
 		     (not (null ioa)))
