@@ -389,27 +389,25 @@ interactive."
 		     (session-interactive-threads *session*))))
     (get-foreground)))
 
-(defun thread-repl-prompt-fun (out-stream)
-  (get-foreground)
-  (let ((stopped-threads (cdr (session-interactive-threads *session*))))
-    (when stopped-threads
-      (format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
-    (sb!impl::repl-prompt-fun out-stream)))
 
 (defun get-foreground ()
-  (loop
-   (with-mutex ((session-lock *session*))
-     (let ((tid (current-thread-id))
-	   (int-t (session-interactive-threads *session*)))
-       (when (eql (car int-t) tid)
-	 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
-	 (return-from get-foreground t))
-       (unless (member tid int-t)
-	 (setf (cdr (last int-t))
-	       (list tid)))
-       (condition-wait
-	(session-interactive-threads-queue *session*)
-	(session-lock *session*))))))
+  (let ((was-foreground t))
+    (loop
+     (with-mutex ((session-lock *session*))
+       (let ((tid (current-thread-id))
+	     (int-t (session-interactive-threads *session*)))
+	 (when (eql (car int-t) tid)
+	   (unless was-foreground
+	     (format *query-io* "Resuming thread ~A~%" tid))
+	   (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
+	   (return-from get-foreground t))
+	 (setf was-foreground nil)
+	 (unless (member tid int-t)
+	   (setf (cdr (last int-t))
+		 (list tid)))
+	 (condition-wait
+	  (session-interactive-threads-queue *session*)
+	  (session-lock *session*)))))))
 
 (defun release-foreground (&optional next)
   "Background this thread.  If NEXT is supplied, arrange for it to have the foreground next"

@@ -26,9 +26,6 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <signal.h>
-#ifdef LISP_FEATURE_SB_THREAD
-#include <sys/ptrace.h>
-#endif
 #include <sched.h>
 #include <errno.h>
 
@@ -189,7 +186,6 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 ", SBCL_VERSION_STRING);
 }
 
-int gc_thread_pid;
 FILE *stdlog;
 
 
@@ -318,9 +314,6 @@ main(int argc, char *argv[], char *envp[])
 	fflush(stdout);
     }
 
-#ifdef MACH
-    mach_init();
-#endif
 #if defined(SVR4) || defined(__linux__)
     tzset();
 #endif
@@ -357,24 +350,15 @@ main(int argc, char *argv[], char *envp[])
     create_thread(initial_function);
     /* in a unithread build, create_thread never returns */
 #ifdef LISP_FEATURE_SB_THREAD
-    gc_thread_pid=getpid();
     parent_loop();
 #endif
 }
 
-static void parent_sighandler(int signum,siginfo_t *info, void *void_context) 
-{
-#if 0
-    os_context_t *context = (os_context_t*)void_context;
-    fprintf(stderr,
-	    "parent thread got signal %d from %d, maybe_gc_pending=%d\n",
-	    signum, info->si_pid,
-	    maybe_gc_pending);
-#endif
-}
-
 #ifdef LISP_FEATURE_SB_THREAD
-int show_thread_exit=0;
+
+/* this is being pared down as time goes on; eventually we want to get
+ * to the point that we have no parent loop at all and the parent
+ * thread runs Lisp just like any other */
 
 static void /* noreturn */ parent_loop(void)
 {
@@ -384,41 +368,25 @@ static void /* noreturn */ parent_loop(void)
     pid_t pid=0;
 
     sigemptyset(&sigset);
-
-    sigaddset(&sigset, SIGCHLD);
-    sigaddset(&sigset, SIG_THREAD_EXIT);
-    sigprocmask(SIG_UNBLOCK,&sigset,0);
-    sa.sa_handler=parent_sighandler;
-    sa.sa_mask=sigset;
-    sa.sa_flags=SA_SIGINFO;
-    sigaction(SIGCHLD, &sa, 0);
-
-    sigemptyset(&sigset);
     sa.sa_handler=SIG_IGN;
     sa.sa_mask=sigset;
     sa.sa_flags=0;
-    sigaction(SIGINT, &sa, 0);
+    sigaction(SIGINT, &sa, 0); 	/* ^c should go to the lisp thread instead */
     sigaction(SIG_THREAD_EXIT, &sa, 0);
+    sigaction(SIGCHLD, &sa, 0);
 
     while(!all_threads) {
 	sched_yield();
     }
     while(all_threads && (pid=waitpid(-1,&status,__WALL))) {
 	struct thread *th;
-	int real_errno=errno;
 	if(pid==-1) {
-	    if(real_errno == EINTR) {
-		continue;
-	    }
-	    if(real_errno == ECHILD) break;
-	    fprintf(stderr,"waitpid: %s\n",strerror(real_errno));
-	    continue;
+	    if(errno == EINTR) continue;
+	    fprintf(stderr,"waitpid: %s\n",strerror(errno));
 	}
-	if(WIFEXITED(status) || WIFSIGNALED(status)) {
+	else if(WIFEXITED(status) || WIFSIGNALED(status)) {
 	    th=find_thread_by_pid(pid);
 	    if(!th) continue;
-	    if(show_thread_exit)
-		fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
 	    destroy_thread(th);
 	    if(!all_threads) break;
 	}
