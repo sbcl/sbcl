@@ -1413,3 +1413,21 @@
   (frob nil (defgeneric #:foo (x &optional y z)))
   (frob nil (defgeneric #:foo (x &key y z)))
   (frob t (defun #:foo (x) (flet ((foo (x &optional y &key z) (list x y z))) (foo x x :z x)))))
+
+;;; this was a bug in the LOGXOR type deriver.  The top form gave a
+;;; note, because the system failed to derive the fact that the return
+;;; from LOGXOR was small and negative, though the bottom one worked.
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil '(lambda ()
+		 (declare (optimize speed (safety 0)))
+		 (lambda (x y)
+		   (declare (type (integer 3 6) x)
+			    (type (integer -6 -3) y))
+		   (+ (logxor x y) most-positive-fixnum)))))
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil '(lambda ()
+		 (declare (optimize speed (safety 0)))
+		 (lambda (x y)
+		   (declare (type (integer 3 6) y)
+			    (type (integer -6 -3) x))
+		   (+ (logxor x y) most-positive-fixnum)))))

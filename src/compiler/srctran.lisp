@@ -2136,14 +2136,18 @@
     (return-from logand-derive-type-aux x))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
     (declare (ignore x-pos))
-    (multiple-value-bind (y-len y-pos y-neg) (integer-type-length  y)
+    (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)
       (declare (ignore y-pos))
       (if (not x-neg)
 	  ;; X must be positive.
 	  (if (not y-neg)
 	      ;; They must both be positive.
-	      (cond ((or (null x-len) (null y-len))
+	      (cond ((and (null x-len) (null y-len))
 		     (specifier-type 'unsigned-byte))
+		    ((null x-len)
+		     (specifier-type `(unsigned-byte* ,y-len)))
+		    ((null y-len)
+		     (specifier-type `(unsigned-byte* ,x-len)))
 		    (t
 		     (specifier-type `(unsigned-byte* ,(min x-len y-len)))))
 	      ;; X is positive, but Y might be negative.
@@ -2218,7 +2222,7 @@
 					      (max x-len y-len)
 					      '*))))
        ((or (and (not x-pos) (not y-neg))
-	    (and (not y-neg) (not y-pos)))
+	    (and (not y-pos) (not x-neg)))
 	;; Either X is negative and Y is positive or vice-versa. The
 	;; result will be negative.
 	(specifier-type `(integer ,(if (and x-len y-len)
@@ -2240,7 +2244,6 @@
   (deffrob logior)
   (deffrob logxor))
 
-;;; FIXME: could actually do stuff with SAME-LEAF
 (defoptimizer (logeqv derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
 			     (lognot-derive-type-aux 
@@ -2256,7 +2259,6 @@
 			     (lognot-derive-type-aux
 			      (logior-derive-type-aux x y same-leaf)))
 		       #'lognor))
-;;; FIXME: use SAME-LEAF instead of ignoring it.
 (defoptimizer (logandc1 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
 			     (if same-leaf
