@@ -8,10 +8,6 @@ CC=gcc
 # ones as dependencies.
 
 UNAME:=$(shell uname -m)
-ifeq (x86_64,$(UNAME))
-    export EXTRA_LDFLAGS=-m32 -shared
-    export EXTRA_CFLAGS+=-m32
-endif
 
 export CC SBCL EXTRA_CFLAGS EXTRA_LDFLAGS
 

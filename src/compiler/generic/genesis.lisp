@@ -673,7 +673,7 @@ core and return a descriptor to it."
 	 (ecase sb!c:*backend-byte-order*
 	   (:little-endian
 	    (write-wordindexed address index low-bits)
-	    (write-wordindexed address index high-bits))
+	    (write-wordindexed address (1+ index) high-bits))
 	   (:big-endian
 	    (write-wordindexed address index high-bits)
 	    (write-wordindexed address (1+ index) low-bits)))))
