@@ -816,7 +816,7 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
   (error 'simple-type-error ; maybe should be TYPE-BUG, subclass of BUG?
 	 :value value
 	 :expected-type type
-	 :format-string "~@<~S ~_is not a ~_~S~:>"
+	 :format-control "~@<~S ~_is not a ~_~S~:>"
 	 :format-arguments (list value type)))
 
 ;;; Return a function like FUN, but expecting its (two) arguments in

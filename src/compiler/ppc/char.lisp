@@ -1,29 +1,31 @@
-;;;
-;;; Written by Rob MacLachlan
-;;; Converted for the MIPS R2000 by Christopher Hoover.
-;;; And then to the SPARC by William Lott.
-;;;
+;;;; the PPC VM definition of character operations
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
 
 ;;;; Moves and coercions:
 
 ;;; Move a tagged char to an untagged representation.
-;;;
 (define-vop (move-to-base-char)
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (base-char-reg)))
   (:note "character untagging")
   (:generator 1
     (inst srwi y x sb!vm:n-widetag-bits)))
-;;;
+
 (define-move-vop move-to-base-char :move
   (any-reg descriptor-reg) (base-char-reg))
 
 
 ;;; Move an untagged char to a tagged representation.
-;;;
 (define-vop (move-from-base-char)
   (:args (x :scs (base-char-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -31,12 +33,11 @@
   (:generator 1
     (inst slwi y x sb!vm:n-widetag-bits)
     (inst ori y y sb!vm:base-char-widetag)))
-;;;
+
 (define-move-vop move-from-base-char :move
   (base-char-reg) (any-reg descriptor-reg))
 
 ;;; Move untagged base-char values.
-;;;
 (define-vop (base-char-move)
   (:args (x :target y
 	    :scs (base-char-reg)
@@ -48,13 +49,11 @@
   (:affected)
   (:generator 0
     (move y x)))
-;;;
+
 (define-move-vop base-char-move :move
   (base-char-reg) (base-char-reg))
 
-
 ;;; Move untagged base-char arguments/return-values.
-;;;
 (define-vop (move-base-char-arg)
   (:args (x :target y
 	    :scs (base-char-reg))
@@ -68,14 +67,13 @@
        (move y x))
       (base-char-stack
        (storew x fp (tn-offset y))))))
-;;;
+
 (define-move-vop move-base-char-arg :move-arg
   (any-reg base-char-reg) (base-char-reg))
 
 
 ;;; Use standard MOVE-ARG + coercion to move an untagged base-char
 ;;; to a descriptor passing location.
-;;;
 (define-move-vop move-arg :move-arg
   (base-char-reg) (any-reg descriptor-reg))
 
@@ -105,7 +103,6 @@
 
 
 ;;; Comparison of base-chars.
-;;;
 (define-vop (base-char-compare)
   (:args (x :scs (base-char-reg))
 	 (y :scs (base-char-reg)))
@@ -128,6 +125,30 @@
   (:variant :lt :ge))
 
 (define-vop (fast-char>/base-char base-char-compare)
+  (:translate char>)
+  (:variant :gt :le))
+
+(define-vop (base-char-compare/c)
+  (:args (x :scs (base-char-reg)))
+  (:arg-types base-char (:constant base-char))
+  (:conditional)
+  (:info target not-p y)
+  (:policy :fast-safe)
+  (:note "inline comparison")
+  (:variant-vars condition not-condition)
+  (:generator 2
+    (inst cmplwi x (sb!xc:char-code y))
+    (inst b? (if not-p not-condition condition) target)))
+
+(define-vop (fast-char=/base-char/c base-char-compare/c)
+  (:translate char=)
+  (:variant :eq :ne))
+
+(define-vop (fast-char</base-char/c base-char-compare/c)
+  (:translate char<)
+  (:variant :lt :ge))
+
+(define-vop (fast-char>/base-char/c base-char-compare/c)
   (:translate char>)
   (:variant :gt :le))
 

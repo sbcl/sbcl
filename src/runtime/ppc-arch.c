@@ -49,7 +49,7 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
     if ((((unsigned long)pc) & 3) != 0 ||
 	((pc < READ_ONLY_SPACE_START ||
 	  pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
-	 ((lispobj *)pc < current_dynamic_space &&
+	 ((lispobj *)pc < current_dynamic_space || 
 	  (lispobj *)pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE)))
 	return 0;
     

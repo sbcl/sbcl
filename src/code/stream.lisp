@@ -185,7 +185,7 @@
 	   ;; private predicate function..) is ugly and confusing, but
 	   ;; I can't see any other way. -- WHN 2001-04-14
 	   :expected-type '(satisfies stream-associated-with-file-p)
-	   :format-string
+	   :format-control
 	   "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
 	   :format-arguments (list stream))))
 

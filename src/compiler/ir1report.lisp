@@ -433,7 +433,7 @@
 	      (policy *lexenv* (= inhibit-warnings 3)))
     (restart-case
 	(signal (make-condition 'simple-compiler-note
-				:format-string format-string
+				:format-control format-string
 				:format-arguments format-args))
       (muffle-warning ()
 	(return-from compiler-notify (values))))
@@ -449,7 +449,7 @@
       (progn
 	(restart-case
 	    (signal (make-condition 'simple-compiler-note
-				    :format-string (car rest)
+				    :format-control (car rest)
 				    :format-arguments (cdr rest)))
 	  (muffle-warning ()
 	    (return-from maybe-compiler-notify (values))))
