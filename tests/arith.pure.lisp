@@ -117,3 +117,9 @@
     (truncate 291351647815394962053040658028983955 10000000000000000000000000)
   (assert (= quo 29135164781))
   (assert (= rem 5394962053040658028983955)))
+
+;;; x86 LEA bug:
+(assert (= (funcall
+	    (compile nil '(lambda (x) (declare (bit x)) (+ x #xf0000000)))
+	    1)
+	   #xf0000001))

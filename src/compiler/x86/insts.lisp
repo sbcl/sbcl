@@ -666,7 +666,7 @@
   (base nil :type (or tn null))
   (index nil :type (or tn null))
   (scale 1 :type (member 1 2 4 8))
-  (disp 0 :type (or (signed-byte 32) fixup)))
+  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup)))
 (def!method print-object ((ea ea) stream)
   (cond ((or *print-escape* *print-readably*)
 	 (print-unreadable-object (ea stream :type t)

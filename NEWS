@@ -2050,6 +2050,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
        displaced string.
     ** LCM with two arguments of 0 returns 0 rather than signalling
        DIVISION-BY-ZERO.
+    ** unsigned addition of a 32-bit constant with the high bit set no
+       longer causes an internal compiler error.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -571,3 +571,15 @@
   (assert (= (funcall fun 0 0) 0))
   (assert (= (funcall fun 0 -1) -1))
   (assert (= (funcall fun -1 -1) 0)))
+
+;;; from PFD's torture test, triggering a bug in our effective address
+;;; treatment.
+(compile
+ nil
+ `(lambda (a b)
+    (declare (type (integer 8 22337) b))
+    (logandc2
+     (logandc2
+      (* (logandc1 (max -29303 b) 4) b)
+      (abs (logorc1 (+ (logandc1 -11 b) 2607688420) -31153924)))
+     (logeqv (max a 0) b))))
