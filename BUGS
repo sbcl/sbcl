@@ -1959,3 +1959,38 @@ WORKAROUND:
       (:method ((x integer)) (cons 'integer nil)))
   => SB-KERNEL::CONTROL-STACK-EXHAUSTED
 
+367: TYPE-ERROR at compile time, undetected TYPE-ERROR at runtime
+  This test program
+    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
+    (defstruct e367)
+    (defstruct i367)
+    (defstruct g367
+      (i367s (make-array 0 :fill-pointer t) :type (or (vector i367) null)))
+    (defstruct s367
+      (g367 (error "missing :G367") :type g367 :read-only t))
+    ;;; In sbcl-0.8.18, commenting out this (DECLAIM (FTYPE ... R367))
+    ;;; gives an internal error at compile time:
+    ;;;    The value #<SB-KERNEL:NAMED-TYPE NIL> is not of
+    ;;;    type SB-KERNEL:VALUES-TYPE.
+    (declaim (ftype (function ((vector i367) e367) (or s367 null)) r367))
+    (declaim (ftype (function ((vector e367)) (values)) h367))
+    (defun frob (v w)
+      (let ((x (g367-i367s (make-g367))))
+        (let* ((y (or (r367 x w)
+                      (h367 x)))
+               (z (s367-g367 y)))
+          (format t "~&Y=~S Z=~S~%" y z)
+          (g367-i367s z))))
+    (defun r367 (x y) (declare (ignore x y)) nil)
+    (defun h367 (x) (declare (ignore x)) (values))
+    ;;; In sbcl-0.8.18, executing this form causes an low-level error
+    ;;;   segmentation violation at #X9B0E1F4
+    ;;; (instead of the TYPE-ERROR that one might like).
+    (frob 0 (make-e367))
+  can be made to cause two different problems, as noted in the comments:
+    bug 367a: Compile and load the file. No TYPE-ERROR is signalled at 
+      run time (in the (S367-G367 Y) form of FROB, when Y is NIL 
+      instead of an instance of S367). Instead (on x86/Linux at least)
+      we end up with a segfault.
+    bug 367b: Comment out the (DECLAIM (FTYPE ... R367)), and compile 
+      the file. The compiler fails with TYPE-ERROR at compile time.
