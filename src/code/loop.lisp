@@ -426,10 +426,11 @@ code to be loaded.
 ;;; See LOOP-NAMED-VAR.
 (defvar *loop-named-vars*)
 
-;;; LETlist-like list being accumulated for one group of parallel bindings.
+;;; LETlist-like list being accumulated for current group of bindings.
 (defvar *loop-vars*)
 
-;;; list of declarations being accumulated in parallel with *LOOP-VARS*
+;;; List of declarations being accumulated in parallel with
+;;; *LOOP-VARS*.
 (defvar *loop-declarations*)
 
 ;;; This is used by LOOP for destructuring binding, if it is doing
@@ -438,21 +439,17 @@ code to be loaded.
 
 ;;; list of wrapping forms, innermost first, which go immediately
 ;;; inside the current set of parallel bindings being accumulated in
-;;; *LOOP-VARS*. The wrappers are appended onto a body. E.g.,
-;;; this list could conceivably have as its value
+;;; *LOOP-VARS*. The wrappers are appended onto a body. E.g., this
+;;; list could conceivably have as its value
 ;;;   ((WITH-OPEN-FILE (G0001 G0002 ...))),
-;;; with G0002 being one of the bindings in *LOOP-VARS* (This is
-;;; why the wrappers go inside of the variable bindings).
+;;; with G0002 being one of the bindings in *LOOP-VARS* (This is why
+;;; the wrappers go inside of the variable bindings).
 (defvar *loop-wrappers*)
 
-;;; This accumulates lists of previous values of *LOOP-VARS* and
-;;; the other lists above, for each new nesting of bindings. See
+;;; This accumulates lists of previous values of *LOOP-VARS* and the
+;;; other lists above, for each new nesting of bindings. See
 ;;; LOOP-BIND-BLOCK.
 (defvar *loop-bind-stack*)
-
-;;; This is simply a list of LOOP iteration variables, used for
-;;; checking for duplications.
-(defvar *loop-iteration-vars*)
 
 ;;; list of prologue forms of the loop, accumulated in reverse order
 (defvar *loop-prologue*)
@@ -793,7 +790,6 @@ code to be loaded.
 		       *loop-universe*)
   (let ((*loop-original-source-code* *loop-source-code*)
 	(*loop-source-context* nil)
-	(*loop-iteration-vars* nil)
 	(*loop-vars* nil)
 	(*loop-named-vars* nil)
 	(*loop-declarations* nil)
@@ -843,7 +839,8 @@ code to be loaded.
       answer)))
 
 (defun loop-iteration-driver ()
-  (do () ((null *loop-source-code*))
+  (do () 
+      ((null *loop-source-code*))
     (let ((keyword (car *loop-source-code*)) (tem nil))
       (cond ((not (symbolp keyword))
 	     (loop-error "~S found where LOOP keyword expected" keyword))
@@ -1020,7 +1017,7 @@ code to be loaded.
       ((null entry) (return nil))
       ((assoc name (caar entry) :test #'eq) (return t)))))
 
-(defun loop-make-var (name initialization dtype &optional iteration-var-p step-var-p)
+(defun loop-make-var (name initialization dtype &optional step-var-p)
   (cond ((null name)
 	 (setq name (gensym "LOOP-IGNORE-"))
 	 (push (list name initialization) *loop-vars*)
@@ -1028,13 +1025,9 @@ code to be loaded.
 	     (push `(ignore ,name) *loop-declarations*)
 	     (loop-declare-var name dtype)))
 	((atom name)
-	 (cond (iteration-var-p
-		(if (member name *loop-iteration-vars*)
-		    (loop-error "duplicated LOOP iteration variable ~S" name)
-		    (push name *loop-iteration-vars*)))
-	       ((assoc name *loop-vars*)
-		(loop-error "duplicated variable ~S in LOOP parallel binding"
-			    name)))
+         (when (or (assoc name *loop-vars*)
+                   (loop-var-p name))
+           (loop-error "duplicated variable ~S in a LOOP binding" name))
 	 (unless (symbolp name)
 	   (loop-error "bad variable ~S somewhere in LOOP" name))
 	 (loop-declare-var name dtype step-var-p)
@@ -1052,12 +1045,9 @@ code to be loaded.
 	(t (let ((tcar nil) (tcdr nil))
 	     (if (atom dtype) (setq tcar (setq tcdr dtype))
 		 (setq tcar (car dtype) tcdr (cdr dtype)))
-	     (loop-make-var (car name) nil tcar iteration-var-p)
-	     (loop-make-var (cdr name) nil tcdr iteration-var-p))))
+	     (loop-make-var (car name) nil tcar)
+	     (loop-make-var (cdr name) nil tcdr))))
   name)
-
-(defun loop-make-iteration-var (name initialization dtype)
-  (loop-make-var name initialization dtype t))
 
 (defun loop-declare-var (name dtype &optional step-var-p)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
@@ -1311,7 +1301,8 @@ code to be loaded.
 
 (defun loop-do-with ()
   (loop-disallow-conditional :with)
-  (do ((var) (val) (dtype)) (nil)
+  (do ((var) (val) (dtype)) 
+      (nil)
     (setq var (loop-pop-source)
 	  dtype (loop-optional-type var)
 	  val (cond ((loop-tequal (car *loop-source-code*) :=)
@@ -1425,7 +1416,7 @@ code to be loaded.
 ;;; is present. I.e., the first initialization occurs in the loop body
 ;;; (first-step), not in the variable binding phase.
 (defun loop-ansi-for-equals (var val data-type)
-  (loop-make-iteration-var var nil data-type)
+  (loop-make-var var nil data-type)
   (cond ((loop-tequal (car *loop-source-code*) :then)
 	 ;; Then we are the same as "FOR x FIRST y THEN z".
 	 (loop-pop-source)
@@ -1435,7 +1426,7 @@ code to be loaded.
 	 `(() (,var ,val) () ()))))
 
 (defun loop-for-across (var val data-type)
-  (loop-make-iteration-var var nil data-type)
+  (loop-make-var var nil data-type)
   (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
 	(index-var (gensym "LOOP-ACROSS-INDEX-")))
     (multiple-value-bind (vector-form constantp vector-value)
@@ -1494,9 +1485,10 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar var))
       (cond ((and var (symbolp var))
-	     (loop-make-iteration-var var list data-type))
-	    (t (loop-make-var (setq listvar (gensym)) list 't)
-	       (loop-make-iteration-var var nil data-type)))
+	     (loop-make-var var list data-type))
+	    (t 
+             (loop-make-var (setq listvar (gensym)) list 't)
+             (loop-make-var var nil data-type)))
       (let ((list-step (loop-list-step listvar)))
 	(let* ((first-endtest
 		;; mysterious comment from original CMU CL sources:
@@ -1521,7 +1513,7 @@ code to be loaded.
   (multiple-value-bind (list constantp list-value)
       (loop-constant-fold-if-possible val)
     (let ((listvar (gensym "LOOP-LIST-")))
-      (loop-make-iteration-var var nil data-type)
+      (loop-make-var var nil data-type)
       (loop-make-var listvar list 'list)
       (let ((list-step (loop-list-step listvar)))
 	(let* ((first-endtest `(endp ,listvar))
@@ -1612,8 +1604,8 @@ code to be loaded.
 		  path))
     (do ((l (car stuff) (cdr l)) (x)) ((null l))
       (if (atom (setq x (car l)))
-	  (loop-make-iteration-var x nil nil)
-	  (loop-make-iteration-var (car x) (cadr x) (caddr x))))
+	  (loop-make-var x nil nil)
+	  (loop-make-var (car x) (cadr x) (caddr x))))
     (setq *loop-prologue* (nconc (reverse (cadr stuff)) *loop-prologue*))
     (cddr stuff)))
 
@@ -1698,7 +1690,7 @@ code to be loaded.
      (flet ((assert-index-for-arithmetic (index)
 	      (unless (atom index)
 		(loop-error "Arithmetic index must be an atom."))))
-       (when variable (loop-make-iteration-var variable nil variable-type))
+       (when variable (loop-make-var variable nil variable-type))
        (do ((l prep-phrases (cdr l)) (prep) (form) (odir)) ((null l))
 	 (setq prep (caar l) form (cadar l))
 	 (case prep
@@ -1715,7 +1707,7 @@ code to be loaded.
 	    ;; KLUDGE: loop-make-var generates a temporary symbol for
 	    ;; indexv if it is NIL. We have to use it to have the index
 	    ;; actually count
-	    (setq indexv (loop-make-iteration-var indexv form indexv-type)))
+	    (setq indexv (loop-make-var indexv form indexv-type)))
 	   ((:upto :to :downto :above :below)
 	    (cond ((loop-tequal prep :upto) (setq inclusive-iteration
 						  (setq dir ':up)))
@@ -1739,7 +1731,7 @@ code to be loaded.
 	      (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
 		 form
 		 `(and ,indexv-type (real (0)))
-		 nil t)))
+		 t)))
 	   (t (loop-error
 		 "~S invalid preposition in sequencing or sequence path;~@
               maybe invalid prepositions were specified in iteration path descriptor?"
@@ -1772,7 +1764,7 @@ code to be loaded.
 	   (progn
 	     (assert-index-for-arithmetic indexv)
 	     (setq indexv
-		   (loop-make-iteration-var
+		   (loop-make-var
 		      indexv
 		      (setq start-constantp t
 			    start-value (or (loop-typed-init indexv-type) 0))

@@ -229,3 +229,10 @@
 ;;; Kalvas: end testing is done "as if by atom" so this is supposed
 ;;; to work.
 (assert (equal '(1 2) (loop for (a . b) on '(1 2 . 3)  collect a)))
+
+;;; Detection of duplicate bindings, reported by Bruno Haible for CMUCL.
+(multiple-value-bind (_ condition)
+    (ignore-errors 
+      (macroexpand '(LOOP WITH A = 0 FOR A DOWNFROM 10 TO 0 DO (PRINT A))))
+  (declare (ignore _))
+  (assert (typep condition 'program-error)))

@@ -25,6 +25,9 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
     types.
   * fixed bug #308: non-graphic characters now all have names, as
     required.  (reported by Bruno Haible)
+  * bug fix: duplicate LOOP variable bindings now signal PROGRAM-ERROR
+    during macroexpansion for non-iteration variables as well. (reported 
+    by Bruno Haible for CMUCL)
   * bug fix: Cyclic structures and unprintable objects in compiler
     messages no longer cause errors. (reported by Bruno Haible)
   * bug fix: READ, READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST,
