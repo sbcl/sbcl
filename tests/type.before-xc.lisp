@@ -209,4 +209,7 @@
 			(specifier-type '(or (single-float -1.0 1.0)
 					     (single-float 0.1))))))
 
+(assert (sb-xc:typep #\, 'character))
+(assert (sb-xc:typep #\@ 'character))
+
 (/show "done with tests/type.before-xc.lisp")

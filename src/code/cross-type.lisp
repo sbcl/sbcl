@@ -371,7 +371,7 @@
      (cond ((typep x 'standard-char)
 	    ;; (Note that SBCL doesn't distinguish between BASE-CHAR and
 	    ;; CHARACTER.)
-	    (find-classoid 'character))
+	    (specifier-type 'character))
 	   ((not (characterp x))
 	    nil)
 	   (t

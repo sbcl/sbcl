@@ -304,6 +304,8 @@
 	 (ecase (named-type-name type)
 	   ((t *) (values *backend-t-primitive-type* t))
 	   ((nil) (any))))
+	(character-range-type
+	 (exactly character))
 	(built-in-classoid
 	 (case (classoid-name type)
 	   ((complex function instance
@@ -311,6 +313,7 @@
 	    (values (primitive-type-or-lose (classoid-name type)) t))
 	   (funcallable-instance
 	    (part-of function))
+	   #+nil
 	   (character
 	    (exactly character))
 	   (cons-type

@@ -330,6 +330,29 @@
 		     :high high
 		     :enumerable enumerable))
 
+(defstruct (character-range-type
+	     (:include ctype
+		       (class-info (type-class-or-lose 'character-range)))
+	     (:constructor %make-character-range-type)
+	     (:copier nil))
+  (low (missing-arg) :type (integer 0 (#.sb!xc:char-code-limit)) :read-only t)
+  (high (missing-arg)
+	:type (integer 0 (#.sb!xc:char-code-limit)) :read-only t))
+(defun make-character-range-type (&key low high)
+  (if (or
+       ;; interval is empty
+       (and low
+	    high
+	    (> low high))
+       ;; high is less than zero
+       (and high (< high 0))
+       ;; low is greater than or equal to CHAR-CODE-LIMIT
+       (and low (>= low sb!xc:char-code-limit)))
+      *empty-type*
+      (let ((low (if (null low) 0 low))
+	    (high (if (null high) (1- sb!xc:char-code-limit) high)))
+	(%make-character-range-type :low low :high high))))
+
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype

@@ -2378,17 +2378,25 @@
 
 (!def-type-translator member (&rest members)
   (if members
-      (let (ms numbers)
+      (let (ms numbers char-codes)
 	(dolist (m (remove-duplicates members))
 	  (typecase m
 	    (float (if (zerop m)
 		       (push m ms)
 		       (push (ctype-of m) numbers)))
 	    (real (push (ctype-of m) numbers))
+	    (character (push (sb!xc:char-code m) char-codes))
 	    (t (push m ms))))
 	(apply #'type-union
 	       (if ms
 		   (make-member-type :members ms)
+		   *empty-type*)
+	       (if char-codes
+		   ;; FIXME: this almost certainly sucks too hard.
+		   (apply #'type-union
+			  (mapcar (lambda (x) (make-character-range-type
+					       :low x :high x))
+				  char-codes))
 		   *empty-type*)
 	       (nreverse numbers)))
       *empty-type*))
@@ -2562,6 +2570,7 @@
     ((type= type (specifier-type 'simple-string)) 'simple-string)
     ((type= type (specifier-type 'string)) 'string)
     ((type= type (specifier-type 'complex)) 'complex)
+    ((type= type (specifier-type 'standard-char)) 'standard-char)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each
@@ -2834,6 +2843,83 @@
 		 (type-intersection (cons-type-car-type type1)
 				    (cons-type-car-type type2))
 		 cdr-int2)))))
+
+;;;; CHARACTER-RANGE types
+
+(!define-type-class character-range)
+
+(!def-type-translator character-range (&optional
+				       (low 0) (high sb!xc:char-code-limit))
+  (make-character-range-type :low low :high high))
+
+(!define-type-method (character-range :negate) (type)
+  ;; FIXME: rearrange the NUMBER :NEGATE method similarly to this one
+  (let ((low (character-range-type-low type))
+	(high (character-range-type-high type)))
+    (if (and (= low 0)
+	     (= high (1- sb!xc:char-code-limit)))
+	(make-negation-type :type type)
+	(let ((not-character
+	       (make-negation-type
+		:type (make-character-range-type
+		       :low 0 :high (1- sb!xc:char-code-limit)))))
+	  (type-union
+	   not-character
+	   (type-union
+	    (make-character-range-type
+	     :low (1+ high) :high sb!xc:char-code-limit)
+	    (make-character-range-type :low 0 :high (1- low))))))))
+
+(!define-type-method (character-range :unparse) (type)
+  (cond
+    ((type= type (specifier-type 'character)) 'character)
+    ((type= type (specifier-type 'base-char)) 'base-char)
+    ((type= type (specifier-type 'extended-char)) 'extended-char)
+    ((type= type (specifier-type 'standard-char)) 'standard-char)
+    (t (let ((low (character-range-type-low type))
+	     (high (character-range-type-high type)))
+	 `(member ,@(loop for code from low upto high
+			  collect (sb!xc:code-char code)))))))
+
+(!define-type-method (character-range :simple-=) (type1 type2)
+  (let ((low1 (character-range-type-low type1))
+	(low2 (character-range-type-low type2))
+	(high1 (character-range-type-high type1))
+	(high2 (character-range-type-high type2)))
+    (values (and (= low1 low2) (= high1 high2)) t)))
+ 
+(!define-type-method (character-range :simple-subtypep) (type1 type2)
+  (let ((low1 (character-range-type-low type1))
+	(low2 (character-range-type-low type2))
+	(high1 (character-range-type-high type1))
+	(high2 (character-range-type-high type2)))
+    (cond
+      ((and (>= low1 low2) (<= high1 high2))
+       (values t t))
+      (t
+       (values nil t)))))
+
+(!define-type-method (character-range :simple-union2) (type1 type2)
+  (let ((low1 (character-range-type-low type1))
+	(low2 (character-range-type-low type2))
+	(high1 (character-range-type-high type1))
+	(high2 (character-range-type-high type2)))
+    (cond
+      ((and (<= low1 low2) (<= (1- low2) high1))
+       (make-character-range-type :low low1 :high (max high1 high2)))
+      ((and (<= low2 low1) (<= (1- low1) high2))
+       (make-character-range-type :low low2 :high (max high1 high2))))))
+
+(!define-type-method (character-range :simple-intersection2) (type1 type2)
+  (let ((low1 (character-range-type-low type1))
+	(low2 (character-range-type-low type2))
+	(high1 (character-range-type-high type1))
+	(high2 (character-range-type-high type2)))
+    (cond
+      ((and (<= low1 low2) (<= low2 high1))
+       (make-character-range-type :low low2 :high (min high1 high2)))
+      ((and (<= low2 low1) (<= (1- low1) high2))
+       (make-character-range-type :low low1 :high (min high1 high2))))))
 				 
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.

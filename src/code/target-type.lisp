@@ -33,6 +33,7 @@
 	 named-type
 	 member-type
 	 array-type
+	 character-range-type
 	 built-in-classoid
 	 cons-type)
      (values (%typep obj type) t))
@@ -191,6 +192,8 @@
 			:specialized-element-type etype)))
     (cons
      (make-cons-type *universal-type* *universal-type*))
+    (character
+     (specifier-type 'character))
     (t
      (classoid-of x))))
 
