@@ -478,50 +478,51 @@
     (ir1-error-bailout (start next result form)
       (let ((*current-path* (or (gethash form *source-paths*)
 				(cons form *current-path*))))
-	(if (step-form-p form)
-	    (ir1-convert-step start next result form)
-	(if (atom form)
-	    (cond ((and (symbolp form) (not (keywordp form)))
-		   (ir1-convert-var start next result form))
-		  ((leaf-p form)
-		   (reference-leaf start next result form))
-		  (t
-		   (reference-constant start next result form)))
-	    (let ((opname (car form)))
-	      (cond ((or (symbolp opname) (leaf-p opname))
-		     (let ((lexical-def (if (leaf-p opname)
-                                            opname
-                                            (lexenv-find opname funs))))
-		       (typecase lexical-def
-			 (null
-                          (ir1-convert-global-functoid start next result
-                                                       form))
-			 (functional
-			  (ir1-convert-local-combination start next result
-							 form
-							 lexical-def))
-			 (global-var
-			  (ir1-convert-srctran start next result
-                                               lexical-def form))
-			 (t
-			  (aver (and (consp lexical-def)
-				     (eq (car lexical-def) 'macro)))
-			  (ir1-convert start next result
-				       (careful-expand-macro (cdr lexical-def)
-							     form))))))
-		    ((or (atom opname) (not (eq (car opname) 'lambda)))
-		     (compiler-error "illegal function call"))
-		    (t
-		     ;; implicitly (LAMBDA ..) because the LAMBDA
-		     ;; expression is the CAR of an executed form
-		     (ir1-convert-combination start next result
-					      form
-					      (ir1-convert-lambda
-					       opname
-					       :debug-name (debug-namify
-							    "LAMBDA CAR "
-							    opname)
-					       :allow-debug-catch-tag t)))))))))
+	(cond ((step-form-p form)
+               (ir1-convert-step start next result form))
+              ((atom form)
+               (cond ((and (symbolp form) (not (keywordp form)))
+                      (ir1-convert-var start next result form))
+                     ((leaf-p form)
+                      (reference-leaf start next result form))
+                     (t
+                      (reference-constant start next result form))))
+              (t
+               (let ((opname (car form)))
+                 (cond ((or (symbolp opname) (leaf-p opname))
+                        (let ((lexical-def (if (leaf-p opname)
+                                               opname
+                                               (lexenv-find opname funs))))
+                          (typecase lexical-def
+                            (null
+                             (ir1-convert-global-functoid start next result
+                                                          form))
+                            (functional
+                             (ir1-convert-local-combination start next result
+                                                            form
+                                                            lexical-def))
+                            (global-var
+                             (ir1-convert-srctran start next result
+                                                  lexical-def form))
+                            (t
+                             (aver (and (consp lexical-def)
+                                        (eq (car lexical-def) 'macro)))
+                             (ir1-convert start next result
+                                          (careful-expand-macro (cdr lexical-def)
+                                                                form))))))
+                       ((or (atom opname) (not (eq (car opname) 'lambda)))
+                        (compiler-error "illegal function call"))
+                       (t
+                        ;; implicitly (LAMBDA ..) because the LAMBDA
+                        ;; expression is the CAR of an executed form
+                        (ir1-convert-combination start next result
+                                                 form
+                                                 (ir1-convert-lambda
+                                                  opname
+                                                  :debug-name (debug-namify
+                                                               "LAMBDA CAR "
+                                                               opname)
+                                                  :allow-debug-catch-tag t)))))))))
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf

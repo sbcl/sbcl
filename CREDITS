@@ -675,7 +675,8 @@ Rudi Schlatte:
 Nikodemus Siivola:
   He provided build fixes, in particular to tame the SunOS toolchain,
   implemented package locks, ported the linkage-table code from CMUCL,
-  and has fixed many (stream-related and other) bugs besides.
+  reimplemented STEP, and has fixed many (stream-related and other) bugs 
+  besides.
 
 Juho Snellman:
   He provided several performance enhancements, including a better hash
