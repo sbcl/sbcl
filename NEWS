@@ -1905,6 +1905,8 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     arguments. (reported by Adam Warner)
   * optimization: character compare routines now optimize comparing
     against a constant character. (reported by Gilbert Baumann)
+  * bug fix: (SETF AREF) on byte-sized-element arrays with constant index
+    argument now works properly on the MIPS platform.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
 

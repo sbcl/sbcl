@@ -7,6 +7,8 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+include ../src/runtime/Config
+
 all: grovel_headers determine-endianness
 
 clean: 

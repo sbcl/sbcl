@@ -53,25 +53,7 @@ if [ "$sbcl_arch" = "" ] ; then
     exit 1
 fi
 printf ":%s" "$sbcl_arch" >> $ltf 
-# KLUDGE: currently the x86 only works with the generational garbage
-# collector (indicated by the presence of :GENCGC in *FEATURES*) and
-# alpha, sparc and ppc with the stop'n'copy collector (indicated by
-# the absence of :GENCGC in *FEATURES*). This isn't a great
-# separation, but for now, rather than have :GENCGC in
-# base-target-features.lisp-expr, we add it into local-target-features
-# if we're building for x86. -- CSR, 2002-02-21 Then we do something
-# similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
-if [ "$sbcl_arch" = "x86" ] ; then
-    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-elif [ "$sbcl_arch" = "mips" ] ; then
-    # Use a little C program to try to guess the endianness.  Ware
-    # cross-compilers!
-    $GNUMAKE -C tools-for-build determine-endianness
-    tools-for-build/determine-endianness >> $ltf
-else
-    # Nothing need be done in this case, but sh syntax wants a placeholder.
-    echo > /dev/null
-fi
+
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
     original_dir=`pwd`
@@ -157,6 +139,26 @@ case `uname` in
 esac
 cd $original_dir
 
+# KLUDGE: currently the x86 only works with the generational garbage
+# collector (indicated by the presence of :GENCGC in *FEATURES*) and
+# alpha, sparc and ppc with the stop'n'copy collector (indicated by
+# the absence of :GENCGC in *FEATURES*). This isn't a great
+# separation, but for now, rather than have :GENCGC in
+# base-target-features.lisp-expr, we add it into local-target-features
+# if we're building for x86. -- CSR, 2002-02-21 Then we do something
+# similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
+if [ "$sbcl_arch" = "x86" ] ; then
+    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
+elif [ "$sbcl_arch" = "mips" ] ; then
+    # Use a little C program to try to guess the endianness.  Ware
+    # cross-compilers!
+    $GNUMAKE -C tools-for-build determine-endianness
+    tools-for-build/determine-endianness >> $ltf
+else
+    # Nothing need be done in this case, but sh syntax wants a placeholder.
+    echo > /dev/null
+fi
+			    
 echo //finishing $ltf
 echo ')' >> $ltf
 

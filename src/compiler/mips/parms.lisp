@@ -126,6 +126,10 @@
     *current-catch-block*
     *current-unwind-protect-block*
 
+    *binding-stack-start*
+    *control-stack-start*
+    *control-stack-end*
+    
     ;; Interrupt Handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*

@@ -373,7 +373,7 @@
 						  ,(eval offset))))
 	 (:results (value :scs ,scs))
 	 (:result-types ,el-type)
-	 (:generator 5
+	 (:generator 4
 	   (inst ,(ecase size
 		    (:byte (if signed 'lb 'lbu))
 		    (:short (if signed 'lh 'lhu)))
@@ -417,9 +417,9 @@
 		     ,el-type)
 	 (:results (result :scs ,scs))
 	 (:result-types ,el-type)
-	 (:generator 5
+	 (:generator 4
 	   (inst ,(ecase size (:byte 'sb) (:short 'sh))
 		 value object
-		 (- (* ,offset n-word-bytes) (* index ,scale) ,lowtag))
+		 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag))
 	   (move result value))))))
 
