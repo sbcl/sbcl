@@ -10,6 +10,8 @@
 
 
 ;; FIXME - test for successful compilation of sb-aclrepl
-
 (defmethod perform ((o test-op) (c (eql (find-system :sb-aclrepl))))
-  t)
+  (and (boundp 'sb-impl::*inspect-fun*)
+       (boundp 'sb-int:*repl-prompt-fun*)
+       (boundp 'sb-int:*repl-read-form-fun*)))
+

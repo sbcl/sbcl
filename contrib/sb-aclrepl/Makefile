@@ -1,2 +1,2 @@
-MODULE=sb-aclrepl
+SYSTEM=sb-aclrepl
 include ../asdf-module.mk
