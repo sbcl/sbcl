@@ -1268,6 +1268,8 @@
 ;;; the CLM, but they are required for the implementation of
 ;;; WITH-OUTPUT-TO-STRING.
 
+;;; FIXME: need to support (VECTOR BASE-CHAR) and (VECTOR NIL),
+;;; ideally without destroying all hope of efficiency.
 (deftype string-with-fill-pointer ()
   '(and (vector character)
 	(satisfies array-has-fill-pointer-p)))
@@ -1297,9 +1299,9 @@
 	(if (= offset-current end)
 	    (let* ((new-length (1+ (* current 2)))
 		   (new-workspace (make-string new-length)))
-	      (declare (simple-string new-workspace))
-	      (%byte-blt workspace start
-			 new-workspace 0 current)
+	      (declare (type (simple-array character (*)) new-workspace))
+              (replace new-workspace workspace
+                       :start2 start :end2 offset-current)
 	      (setf workspace new-workspace
 		    offset-current current)
 	      (set-array-header buffer workspace new-length
@@ -1327,21 +1329,16 @@
 	    (let* ((new-length (+ (the fixnum (* current 2)) string-len))
 		   (new-workspace (make-string new-length)))
 	      (declare (type (simple-array character (*)) new-workspace))
-	      (%byte-blt workspace dst-start
-			 new-workspace 0 current)
-	      (setf workspace new-workspace)
-	      (setf offset-current current)
-	      (setf offset-dst-end dst-end)
-	      (set-array-header buffer
-				workspace
-				new-length
-				dst-end
-				0
-				new-length
-				nil))
+              (replace new-workspace workspace
+                       :start2 dst-start :end2 offset-current)
+	      (setf workspace new-workspace
+                    offset-current current
+                    offset-dst-end dst-end)
+	      (set-array-header buffer workspace new-length
+				dst-end 0 new-length nil))
 	    (setf (fill-pointer buffer) dst-end))
-	(%byte-blt string start
-		   workspace offset-current offset-dst-end)))
+	(replace workspace string
+                 :start1 offset-current :start2 start :end2 end)))
     dst-end))
 
 (defun fill-pointer-misc (stream operation &optional arg1 arg2)
