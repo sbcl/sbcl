@@ -784,7 +784,7 @@ retained, possibly temporariliy, because it might be used internally."
              "INDEX" "LOAD/STORE-INDEX"
 	     "SIGNED-BYTE-WITH-A-BITE-OUT"
 	     "UNSIGNED-BYTE-WITH-A-BITE-OUT"
-             "SFUNCTION"
+             "SFUNCTION" "UNSIGNED-BYTE*"
              ;; ..and type predicates
              "INSTANCEP"
              "DOUBLE-FLOAT-P"

@@ -145,3 +145,11 @@
 (let ((f (compile nil '(lambda (b)
                         (integer-length (deposit-field b (byte 4 28) -1005))))))
   (assert (= (funcall f 1230070) 32)))
+
+;;; type inference leading to an internal compiler error:
+(let ((f (compile nil '(lambda (x)
+			(declare (type fixnum x))
+			(ldb (byte 0 0) x)))))
+  (assert (= (funcall f 1) 0))
+  (assert (= (funcall f most-positive-fixnum) 0))
+  (assert (= (funcall f -1) 0)))

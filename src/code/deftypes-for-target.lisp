@@ -46,6 +46,14 @@
 	(t
 	 (error "bad size specified for UNSIGNED-BYTE type specifier: ~S" s))))
 
+;;; ANSI got UNSIGNED-BYTE wrong, prohibiting (UNSIGNED-BYTE 0).
+;;; Since this is actually a substantial impediment to clarity...
+(sb!xc:deftype unsigned-byte* (&optional s)
+  (cond
+    ((eq s '*) '(integer 0))
+    ((zerop s) '(integer 0 0))
+    (t `(unsigned-byte ,s))))
+
 (sb!xc:deftype bit () '(integer 0 1))
 
 (sb!xc:deftype compiled-function () 'function)

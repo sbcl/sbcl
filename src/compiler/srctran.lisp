@@ -2137,27 +2137,19 @@
 	      ;; They must both be positive.
 	      (cond ((or (null x-len) (null y-len))
 		     (specifier-type 'unsigned-byte))
-		    ((or (zerop x-len) (zerop y-len))
-		     (specifier-type '(integer 0 0)))
 		    (t
-		     (specifier-type `(unsigned-byte ,(min x-len y-len)))))
+		     (specifier-type `(unsigned-byte* ,(min x-len y-len)))))
 	      ;; X is positive, but Y might be negative.
 	      (cond ((null x-len)
 		     (specifier-type 'unsigned-byte))
-		    ((zerop x-len)
-		     (specifier-type '(integer 0 0)))
 		    (t
-		     (specifier-type `(unsigned-byte ,x-len)))))
+		     (specifier-type `(unsigned-byte* ,x-len)))))
 	  ;; X might be negative.
 	  (if (not y-neg)
 	      ;; Y must be positive.
 	      (cond ((null y-len)
 		     (specifier-type 'unsigned-byte))
-		    ((zerop y-len)
-		     (specifier-type '(integer 0 0)))
-		    (t
-		     (specifier-type
-		      `(unsigned-byte ,y-len))))
+		    (t (specifier-type `(unsigned-byte* ,y-len))))
 	      ;; Either might be negative.
 	      (if (and x-len y-len)
 		  ;; The result is bounded.
@@ -2172,11 +2164,9 @@
       (cond
        ((and (not x-neg) (not y-neg))
 	;; Both are positive.
-	(if (and x-len y-len (zerop x-len) (zerop y-len))
-	    (specifier-type '(integer 0 0))
-	    (specifier-type `(unsigned-byte ,(if (and x-len y-len)
-					     (max x-len y-len)
-					     '*)))))
+	(specifier-type `(unsigned-byte* ,(if (and x-len y-len)
+					      (max x-len y-len)
+					      '*))))
        ((not x-pos)
 	;; X must be negative.
 	(if (not y-pos)
@@ -2215,11 +2205,9 @@
 	    (and (not x-pos) (not y-pos)))
 	;; Either both are negative or both are positive. The result
 	;; will be positive, and as long as the longer.
-	(if (and x-len y-len (zerop x-len) (zerop y-len))
-	    (specifier-type '(integer 0 0))
-	    (specifier-type `(unsigned-byte ,(if (and x-len y-len)
-					     (max x-len y-len)
-					     '*)))))
+	(specifier-type `(unsigned-byte* ,(if (and x-len y-len)
+					      (max x-len y-len)
+					      '*))))
        ((or (and (not x-pos) (not y-neg))
 	    (and (not y-neg) (not y-pos)))
 	;; Either X is negative and Y is positive of vice-versa. The
@@ -2327,7 +2315,7 @@
 	     (csubtypep size (specifier-type 'integer)))
 	(let ((size-high (numeric-type-high size)))
 	  (if (and size-high (<= size-high sb!vm:n-word-bits))
-	      (specifier-type `(unsigned-byte ,size-high))
+	      (specifier-type `(unsigned-byte* ,size-high))
 	      (specifier-type 'unsigned-byte)))
 	*universal-type*)))
 
@@ -2342,7 +2330,7 @@
 	      (posn-high (numeric-type-high posn)))
 	  (if (and size-high posn-high
 		   (<= (+ size-high posn-high) sb!vm:n-word-bits))
-	      (specifier-type `(unsigned-byte ,(+ size-high posn-high)))
+	      (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
 	      (specifier-type 'unsigned-byte)))
 	*universal-type*)))
 
@@ -2375,7 +2363,7 @@
             (specifier-type
              (if (minusp low)
                  `(signed-byte ,(1+ raw-bit-count))
-                 `(unsigned-byte ,raw-bit-count)))))))))
+                 `(unsigned-byte* ,raw-bit-count)))))))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
   (%deposit-field-derive-type-aux size posn int))
