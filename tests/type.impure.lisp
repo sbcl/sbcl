@@ -30,7 +30,7 @@
 	       (real 4 8) (real -1 7) (real 2 11)
 	       null symbol keyword
 	       (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
-	       (integer -1 1)
+	       (member #\a #\c #\d #\f) (integer -1 1)
 	       unsigned-byte
 	       (rational -1 7) (rational -2 4)
 	       ratio

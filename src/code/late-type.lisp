@@ -2392,11 +2392,9 @@
 		   (make-member-type :members ms)
 		   *empty-type*)
 	       (if char-codes
-		   ;; FIXME: this almost certainly sucks too hard.
-		   (apply #'type-union
-			  (mapcar (lambda (x) (make-character-range-type
-					       :low x :high x))
-				  char-codes))
+		   (make-character-set-type
+		    :pairs (mapcar (lambda (x) (cons x x))
+				   (sort char-codes #'<)))
 		   *empty-type*)
 	       (nreverse numbers)))
       *empty-type*))
@@ -2844,82 +2842,88 @@
 				    (cons-type-car-type type2))
 		 cdr-int2)))))
 
-;;;; CHARACTER-RANGE types
+;;;; CHARACTER-SET types
 
-(!define-type-class character-range)
+(!define-type-class character-set)
 
-(!def-type-translator character-range (&optional
-				       (low 0) (high sb!xc:char-code-limit))
-  (make-character-range-type :low low :high high))
+(!def-type-translator character-set
+    (&optional (pairs '((0 . #.(1- sb!xc:char-code-limit)))))
+  (make-character-set-type :pairs pairs))
 
-(!define-type-method (character-range :negate) (type)
-  ;; FIXME: rearrange the NUMBER :NEGATE method similarly to this one
-  (let ((low (character-range-type-low type))
-	(high (character-range-type-high type)))
-    (if (and (= low 0)
-	     (= high (1- sb!xc:char-code-limit)))
+(!define-type-method (character-set :negate) (type)
+  (let ((pairs (character-set-type-pairs type)))
+    (if (and (= (length pairs) 1)
+	     (= (caar pairs) 0)
+	     (= (cdar pairs) (1- sb!xc:char-code-limit)))
 	(make-negation-type :type type)
 	(let ((not-character
 	       (make-negation-type
-		:type (make-character-range-type
-		       :low 0 :high (1- sb!xc:char-code-limit)))))
+		:type (make-character-set-type
+		       :pairs '((0 . #.(1- sb!xc:char-code-limit)))))))
 	  (type-union
 	   not-character
-	   (type-union
-	    (make-character-range-type
-	     :low (1+ high) :high sb!xc:char-code-limit)
-	    (make-character-range-type :low 0 :high (1- low))))))))
+	   (make-character-set-type
+	    :pairs (let (not-pairs)
+		     (when (> (caar pairs) 0)
+		       (push (cons 0 (1- (caar pairs))) not-pairs))
+		     (do* ((tail pairs (cdr tail))
+			   (high1 (cdar tail))
+			   (low2 (caadr tail)))
+			  ((null (cdr tail))
+			   (when (< (cdar tail) (1- sb!xc:char-code-limit))
+			     (push (cons (1+ (cdar tail))
+					 (1- sb!xc:char-code-limit))
+				   not-pairs))
+			   (nreverse not-pairs))
+		       (push (cons (1+ high1) (1- low2)) not-pairs)))))))))
 
-(!define-type-method (character-range :unparse) (type)
+(!define-type-method (character-set :unparse) (type)
   (cond
     ((type= type (specifier-type 'character)) 'character)
     ((type= type (specifier-type 'base-char)) 'base-char)
     ((type= type (specifier-type 'extended-char)) 'extended-char)
     ((type= type (specifier-type 'standard-char)) 'standard-char)
-    (t (let ((low (character-range-type-low type))
-	     (high (character-range-type-high type)))
-	 `(member ,@(loop for code from low upto high
-			  collect (sb!xc:code-char code)))))))
+    (t (let ((pairs (character-set-type-pairs type)))
+	 `(member ,@(loop for (low . high) in pairs
+			  append (loop for code from low upto high
+				       collect (sb!xc:code-char code))))))))
 
-(!define-type-method (character-range :simple-=) (type1 type2)
-  (let ((low1 (character-range-type-low type1))
-	(low2 (character-range-type-low type2))
-	(high1 (character-range-type-high type1))
-	(high2 (character-range-type-high type2)))
-    (values (and (= low1 low2) (= high1 high2)) t)))
+(!define-type-method (character-set :simple-=) (type1 type2)
+  (let ((pairs1 (character-set-type-pairs type1))
+	(pairs2 (character-set-type-pairs type2)))
+    (values (equal pairs1 pairs2) t)))
  
-(!define-type-method (character-range :simple-subtypep) (type1 type2)
-  (let ((low1 (character-range-type-low type1))
-	(low2 (character-range-type-low type2))
-	(high1 (character-range-type-high type1))
-	(high2 (character-range-type-high type2)))
-    (cond
-      ((and (>= low1 low2) (<= high1 high2))
-       (values t t))
-      (t
-       (values nil t)))))
+(!define-type-method (character-set :simple-subtypep) (type1 type2)
+  (values
+   (dolist (pair (character-set-type-pairs type1) t)
+     (unless (position pair (character-set-type-pairs type2)
+		       :test (lambda (x y) (and (>= (car x) (car y))
+						(<= (cdr x) (cdr y)))))
+       (return nil)))
+   t))
 
-(!define-type-method (character-range :simple-union2) (type1 type2)
-  (let ((low1 (character-range-type-low type1))
-	(low2 (character-range-type-low type2))
-	(high1 (character-range-type-high type1))
-	(high2 (character-range-type-high type2)))
-    (cond
-      ((and (<= low1 low2) (<= (1- low2) high1))
-       (make-character-range-type :low low1 :high (max high1 high2)))
-      ((and (<= low2 low1) (<= (1- low1) high2))
-       (make-character-range-type :low low2 :high (max high1 high2))))))
+(!define-type-method (character-set :simple-union2) (type1 type2)
+  ;; KLUDGE: the canonizing in the MAKE-CHARACTER-SET-TYPE function
+  ;; actually does the union for us.  It might be a little fragile to
+  ;; rely on it.
+  (make-character-set-type
+   :pairs (merge 'list
+		 (copy-alist (character-set-type-pairs type1))
+		 (copy-alist (character-set-type-pairs type2))
+		 #'< :key #'car)))
 
-(!define-type-method (character-range :simple-intersection2) (type1 type2)
-  (let ((low1 (character-range-type-low type1))
-	(low2 (character-range-type-low type2))
-	(high1 (character-range-type-high type1))
-	(high2 (character-range-type-high type2)))
-    (cond
-      ((and (<= low1 low2) (<= low2 high1))
-       (make-character-range-type :low low2 :high (min high1 high2)))
-      ((and (<= low2 low1) (<= (1- low1) high2))
-       (make-character-range-type :low low1 :high (min high1 high2))))))
+(!define-type-method (character-set :simple-intersection2) (type1 type2)
+  ;; KLUDGE: brute force.
+  (let (pairs)
+    (dolist (pair1 (character-set-type-pairs type1)
+	     (make-character-set-type
+	      :pairs (sort pairs #'< :key #'car)))
+      (dolist (pair2 (character-set-type-pairs type2))
+	(cond
+	  ((<= (car pair1) (car pair2) (cdr pair1))
+	   (push (cons (car pair2) (min (cdr pair1) (cdr pair2))) pairs))
+	  ((<= (car pair2) (car pair1) (cdr pair2))
+	   (push (cons (car pair1) (min (cdr pair1) (cdr pair2))) pairs)))))))
 				 
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.

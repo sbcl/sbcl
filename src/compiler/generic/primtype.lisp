@@ -304,8 +304,13 @@
 	 (ecase (named-type-name type)
 	   ((t *) (values *backend-t-primitive-type* t))
 	   ((nil) (any))))
-	(character-range-type
-	 (exactly character))
+	(character-set-type
+	 (let ((pairs (character-set-type-pairs type)))
+	   (if (and (= (length pairs) 1)
+		    (= (caar pairs) 0)
+		    (= (cdar pairs) (1- sb!xc:char-code-limit)))
+	       (exactly character)
+	       (part-of character))))
 	(built-in-classoid
 	 (case (classoid-name type)
 	   ((complex function instance
@@ -313,9 +318,6 @@
 	    (values (primitive-type-or-lose (classoid-name type)) t))
 	   (funcallable-instance
 	    (part-of function))
-	   #+nil
-	   (character
-	    (exactly character))
 	   (cons-type
 	    (part-of list))
 	   (t

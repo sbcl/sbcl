@@ -117,12 +117,14 @@
      (and (consp object)
 	  (%%typep (car object) (cons-type-car-type type))
 	  (%%typep (cdr object) (cons-type-cdr-type type))))
-    (character-range-type
+    (character-set-type
      (and (characterp object)
 	  (let ((code (char-code object))
-		(low (character-range-type-low type))
-		(high (character-range-type-high type)))
-	    (<= low code high))))
+		(pairs (character-set-type-pairs type)))
+	    (dolist (pair pairs nil)
+	      (destructuring-bind (low . high) pair
+		(when (<= low code high)
+		  (return t)))))))
     (unknown-type
      ;; dunno how to do this ANSIly -- WHN 19990413
      #+sb-xc-host (error "stub: %%TYPEP UNKNOWN-TYPE in xcompilation host")

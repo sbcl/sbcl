@@ -212,4 +212,8 @@
 (assert (sb-xc:typep #\, 'character))
 (assert (sb-xc:typep #\@ 'character))
 
+(assert (type= (type-intersection (specifier-type '(member #\a #\c #\e))
+				  (specifier-type '(member #\b #\c #\f)))
+	       (specifier-type '(member #\c))))
+
 (/show "done with tests/type.before-xc.lisp")

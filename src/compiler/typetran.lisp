@@ -292,14 +292,20 @@
 			`((typep (cdr ,n-obj)
 				 ',(type-specifier cdr-type))))))))))
  
-(defun source-transform-character-range-typep (object type)
-  (let ((low (character-range-type-low type))
-	(high (character-range-type-high type)))
-    (if (and (= low 0) (= high (1- sb!xc:char-code-limit)))
+(defun source-transform-character-set-typep (object type)
+  (let ((pairs (character-set-type-pairs type)))
+    (if (and (= (length pairs) 1)
+	     (= (caar pairs) 0)
+	     (= (cdar pairs) (1- sb!xc:char-code-limit)))
 	`(characterp ,object)
 	(once-only ((n-obj object))
-	  `(and (characterp ,n-obj)
-	        (<= ,low (sb!xc:char-code ,n-obj) ,high))))))
+	  (let ((n-code (gensym "CODE")))
+	    `(and (characterp ,n-obj)
+	          (let ((,n-code (sb!xc:char-code ,n-obj)))
+		    (or
+		     ,@(loop for pair in pairs
+			     collect
+			     `(<= ,(car pair) ,n-code ,(cdr pair)))))))))))
 
 ;;; Return the predicate and type from the most specific entry in
 ;;; *TYPE-PREDICATES* that is a supertype of TYPE.
@@ -502,8 +508,8 @@
 	       (source-transform-array-typep object type))
 	      (cons-type
 	       (source-transform-cons-typep object type))
-	      (character-range-type
-	       (source-transform-character-range-typep object type))
+	      (character-set-type
+	       (source-transform-character-set-typep object type))
 	      (t nil))
 	    `(%typep ,object ,spec)))
       (values nil t)))

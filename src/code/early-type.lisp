@@ -330,28 +330,33 @@
 		     :high high
 		     :enumerable enumerable))
 
-(defstruct (character-range-type
+(defstruct (character-set-type
 	     (:include ctype
-		       (class-info (type-class-or-lose 'character-range)))
-	     (:constructor %make-character-range-type)
+		       (class-info (type-class-or-lose 'character-set)))
+	     (:constructor %make-character-set-type)
 	     (:copier nil))
-  (low (missing-arg) :type (integer 0 (#.sb!xc:char-code-limit)) :read-only t)
-  (high (missing-arg)
-	:type (integer 0 (#.sb!xc:char-code-limit)) :read-only t))
-(defun make-character-range-type (&key low high)
-  (if (or
-       ;; interval is empty
-       (and low
-	    high
-	    (> low high))
-       ;; high is less than zero
-       (and high (< high 0))
-       ;; low is greater than or equal to CHAR-CODE-LIMIT
-       (and low (>= low sb!xc:char-code-limit)))
-      *empty-type*
-      (let ((low (if (null low) 0 low))
-	    (high (if (null high) (1- sb!xc:char-code-limit) high)))
-	(%make-character-range-type :low low :high high))))
+  (pairs (missing-arg) :type list :read-only t))
+(defun make-character-set-type (&key pairs)
+  (aver (equal (mapcar #'car pairs)
+	       (sort (mapcar #'car pairs) #'<)))
+  (let ((pairs (let (result)
+		 (do ((pairs pairs (cdr pairs)))
+		     ((null pairs) (nreverse result))
+		   (destructuring-bind (low . high) (car pairs)
+		     (loop for (low1 . high1) in (cdr pairs)
+			   if (<= low1 (1+ high))
+			   do (progn (setf high (max high high1))
+				     (setf pairs (cdr pairs)))
+			   else do (return nil))
+		     (cond
+		       ((>= low sb!xc:char-code-limit))
+		       ((< high 0))
+		       (t (push (cons (max 0 low)
+				      (min high (1- sb!xc:char-code-limit)))
+				result))))))))
+    (if (null pairs)
+	*empty-type*
+	(%make-character-set-type :pairs pairs))))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.

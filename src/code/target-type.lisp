@@ -33,7 +33,7 @@
 	 named-type
 	 member-type
 	 array-type
-	 character-range-type
+	 character-set-type
 	 built-in-classoid
 	 cons-type)
      (values (%typep obj type) t))
