@@ -64,3 +64,6 @@
 				       (loop for (a . a) in '((1 . 2) (3 . 4))
 					     return a)))))
 	       'program-error))
+
+;;; similar to gcl/ansi-test LOOP.1.27, and fixed at the same time:
+(assert (equal (loop for x downto 7 by 2 from 13 collect x) '(13 11 9 7)))
