@@ -1739,3 +1739,16 @@
   (compile nil '(lambda (x y)
 		 (declare (type simple-bit-vector x y))
 		 (equal x y))))
+
+;;; MISC.550: CAST merging in IR1 finalization caused unexpected
+;;; code transformations.
+(assert (eql (funcall
+  (compile
+   nil
+   '(lambda (p1 p2)
+     (declare (optimize (speed 3) (safety 2) (debug 3) (space 3))
+      (type atom p1)
+      (type symbol p2))
+     (or p1 (the (eql t) p2))))
+   nil t)
+  t))

@@ -391,5 +391,22 @@
            (foo-b (z) (foo-a z)))
     (declare (inline foo-a))
     (foo-a x)))
+
+;;; broken inference of an upper bound of an iteration variable,
+;;; reported by Rajat Datta.
+(defun isieve (num)
+  (let ((vec (make-array num :initial-element 0))
+        (acc 0))
+    (do ((i 2 (+ i 1)))
+        ((>= i num) 'done)
+      (when (= (svref vec i) 0)
+        (do ((j (* i i) (+ j i)))
+            ((>= j num) 'done)
+          (setf (svref vec j) 1))
+        (incf acc)))
+    acc))
+
+(assert (= (isieve 46349) 4792))
+
 
 (sb-ext:quit :unix-status 104)

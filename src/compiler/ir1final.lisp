@@ -117,14 +117,19 @@
         (cond ((and (cast-p dest)
                     (not (cast-type-check dest))
                     (immediately-used-p lvar node))
-               (when (values-types-equal-or-intersect
-                      (node-derived-type node)
-                      (cast-asserted-type dest))
-                 ;; FIXME: We do not perform pathwise CAST->type-error
-                 ;; conversion, and type errors can later cause
-                 ;; backend failures. On the other hand, this version
-                 ;; produces less efficient code.
-                 (derive-node-type node (cast-asserted-type dest))))
+               (let ((dtype (node-derived-type node))
+                     (atype (node-derived-type dest)))
+                 (when (values-types-equal-or-intersect
+                        dtype atype)
+                   ;; FIXME: We do not perform pathwise CAST->type-error
+                   ;; conversion, and type errors can later cause
+                   ;; backend failures. On the other hand, this version
+                   ;; produces less efficient code.
+                   ;;
+                   ;; This is sorta DERIVE-NODE-TYPE, but does not try
+                   ;; to optimize the node.
+                   (setf (node-derived-type node)
+                         (values-type-intersection dtype atype)))))
               ((and (cast-p node)
                     (eq (cast-type-check node) :external))
                (aver (basic-combination-p dest))

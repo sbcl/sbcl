@@ -1,3 +1,11 @@
+changes in sbcl-0.8.22 relative to sbcl-0.8.21:
+  * fixed inference of the upper bound of an iteration variable.
+    (reported by Rajat Datta).
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** MISC.549 and similar: late transformation of unsafe type
+       assertions into derived types caused unexpected code
+       transformations.
+
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
   * incompatible change: thread support for non-NPTL systems has
     been removed - locking is buggy and unreliable.  A threaded 
