@@ -375,6 +375,19 @@
 ;;; Even with bug 210, these assertions succeeded.
 (assert (typep (nth-value 1 (ignore-errors *bug210*)) 'unbound-variable))
 (assert (typep (nth-value 1 (ignore-errors (make-bug210b))) 'unbound-variable))
+
+;;; In sbcl-0.7.8.53, DEFSTRUCT blew up in non-toplevel contexts
+;;; because it implicitly assumed that EVAL-WHEN (COMPILE) stuff
+;;; setting up compiler-layout information would run before the
+;;; constructor function installing the layout was compiled. Make sure
+;;; that doesn't happen again.
+(defun foo-0-7-8-53 () (defstruct foo-0-7-8-53 x (y :not)))
+(assert (not (find-class 'foo-0-7-8-53 nil)))
+(foo-0-7-8-53)
+(assert (find-class 'foo-0-7-8-53 nil))
+(let ((foo-0-7-8-53 (make-foo-0-7-8-53 :x :s)))
+  (assert (eq (foo-0-7-8-53-x foo-0-7-8-53) :s))
+  (assert (eq (foo-0-7-8-53-y foo-0-7-8-53) :not)))
 
 ;;; success
 (format t "~&/returning success~%")

@@ -27,10 +27,36 @@
 	  (t res))))
 
 ;;; Delay looking for compiler-layout until the constructor is being
-;;; compiled, since it doesn't exist until after the EVAL-WHEN (COMPILE)
-;;; stuff is compiled.
+;;; compiled, since it doesn't exist until after the EVAL-WHEN
+;;; (COMPILE) stuff is compiled. (Or, in the oddball case when
+;;; DEFSTRUCT is executing in a non-toplevel context, the
+;;; compiler-layout still doesn't exist at compilation time, and we
+;;; delay still further.)
 (sb!xc:defmacro %delayed-get-compiler-layout (name)
-  `',(compiler-layout-or-lose name))
+  (let ((layout (info :type :compiler-layout name)))
+    (cond (layout
+	   ;; ordinary case: When the DEFSTRUCT is at top level,
+	   ;; then EVAL-WHEN (COMPILE) stuff will have set up the
+	   ;; layout for us to use.
+	   (unless (typep (layout-info layout) 'defstruct-description)
+	     (error "Class is not a structure class: ~S" name))
+	   `,layout)
+	  (t
+	   ;; KLUDGE: In the case that DEFSTRUCT is not at top-level
+	   ;; the layout doesn't exist at compile time. In that case
+	   ;; we laboriously look it up at run time. This code will
+	   ;; run on every constructor call and will likely be quite
+	   ;; slow, so if anyone cares about performance of
+	   ;; non-toplevel DEFSTRUCTs, it should be rewritten to be
+	   ;; cleverer. -- WHN 2002-10-23
+	   (sb!c::compiler-note
+	    "implementation limitation: ~
+             Non-toplevel DEFSTRUCT constructors are slow.")
+	   (let ((layout (gensym "LAYOUT")))
+	     `(let ((,layout (info :type :compiler-layout ',name)))
+		(unless (typep (layout-info ,layout) 'defstruct-description)
+		  (error "Class is not a structure class: ~S" ',name))
+		,layout))))))
 
 ;;; Get layout right away.
 (sb!xc:defmacro compile-time-find-layout (name)
