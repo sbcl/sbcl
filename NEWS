@@ -641,6 +641,24 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
 * Martin Atzmueller pointed out that bug 37 was fixed by his patches
   some time ago.
 
+changes in sbcl-0.6.11 relative to sbcl-0.6.10:
+* The Gray subclassable streams extension now works, thanks to a 
+  patch from Martin Atzmueller.
+* The full LOAD-FOREIGN extension (not just the primitive
+  LOAD-FOREIGN-1) now works, thanks to a patch from Martin Atzmueller.
+* The default behavior of RUN-PROGRAM has changed. Now, unlike CMU CL
+  but like most other programs, it defaults to copying the Unix
+  environment from the original process instead of starting the
+  new process in an empty environment.
+* Extensions which manipulate the Unix environment now support
+  an :ENVIRONMENT keyword option which doesn't smash case or 
+  do other bad things. The CMU-CL-style :ENV option is retained
+  for porting convenience.
+* DESCRIBE now works on structure objects again.
+* Fasl file format version numbers have increased again, because
+  support for the Gray streams extension changes the format of the
+  system's stream objects.
+
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
   as you get deeper into recursive calls to the debugger command loop,

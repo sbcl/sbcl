@@ -129,12 +129,12 @@
     (format stream
 	    "~@[~&It has nicknames ~{~:_~S~^ ~}~]"
 	    (package-nicknames package))
-    (let* ((internal (sb-impl::package-internal-symbols package))
-	   (internal-count (- (sb-impl::package-hashtable-size internal)
-			      (sb-impl::package-hashtable-free internal)))
-	   (external (sb-impl::package-external-symbols package))
-	   (external-count (- (sb-impl::package-hashtable-size external)
-			      (sb-impl::package-hashtable-free external))))
+    (let* ((internal (package-internal-symbols package))
+	   (internal-count (- (package-hashtable-size internal)
+			      (package-hashtable-free internal)))
+	   (external (package-external-symbols package))
+	   (external-count (- (package-hashtable-size external)
+			      (package-hashtable-free external))))
       (format stream
 	      "~&It has ~S internal and ~S external symbols."
 	      internal-count external-count))

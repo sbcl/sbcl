@@ -13,9 +13,9 @@
 
 (in-package "SB!IMPL")
 
-;;; There seems to be no portable way to mask float traps, but we shouldn't
-;;; encounter any float traps when cross-compiling SBCL itself, anyway, so we
-;;; just make this a no-op.
+;;; There seems to be no portable way to mask float traps, but we
+;;; shouldn't encounter any float traps when cross-compiling SBCL
+;;; itself, anyway, so we just make this a no-op.
 (defmacro sb!vm::with-float-traps-masked (traps &body body)
   (declare (ignore traps))
   ;; FIXME: should become STYLE-WARNING?
@@ -36,8 +36,8 @@
       (logior uresult
 	      (logand -1 (lognot mask))))))
 
-;;; portable implementations of SINGLE-FLOAT-BITS, DOUBLE-FLOAT-LOW-BITS, and
-;;; DOUBLE-FLOAT-HIGH-BITS
+;;; portable implementations of SINGLE-FLOAT-BITS,
+;;; DOUBLE-FLOAT-LOW-BITS, and DOUBLE-FLOAT-HIGH-BITS
 ;;;
 ;;; KLUDGE: These will fail if the target's floating point isn't IEEE, and so
 ;;; I'd be more comfortable if there were an assertion "target's floating point

@@ -191,8 +191,16 @@
 		"src/pcl/print-object"
 		"src/pcl/precom1"
 		"src/pcl/precom2"
-		;; functionality which depends on CLOS
+
+		;; miscellaneous functionality which depends on CLOS
 		"src/code/force-delayed-defbangmethods"
+
+		;; CLOS-level support for the Gray OO streams
+		;; extension (which is also supported by various
+		;; lower-level hooks elsewhere in the code)
+		"src/pcl/gray-streams-class"
+		"src/pcl/gray-streams"
+
 		;; other functionality not needed for cold init, moved
 		;; to warm init to reduce peak memory requirement in
 		;; cold init
@@ -202,15 +210,13 @@
 		"src/code/ntrace"
 		"src/code/foreign"
 		"src/code/run-program"
+
 		;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
 		;; facility is still used in our ANSI DESCRIBE
 		;; facility, and should be compiled and loaded after
 		;; our DESCRIBE facility is compiled and loaded.
-		"src/pcl/describe" ; FIXME: should probably be byte compiled
-		;; FIXME: What about Gray streams? e.g. "gray-streams.lisp"
-		;; and "gray-streams-class.lisp"? For now, we just
-		;; have stubs (installed in cold load).
-		))
+		"src/pcl/describe")) ; FIXME: should probably be byte compiled
+
   (let ((fullname (concatenate 'string stem ".lisp")))
     (sb-int:/show "about to compile" fullname)
     (multiple-value-bind

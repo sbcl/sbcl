@@ -87,18 +87,16 @@ save(char *filename, lispobj init_function)
     char sbuf[128];
     strcpy(sbuf,filename);
     filename=sbuf;
-    /* Get rid of remnant stuff. This is a MUST so that
-     * the memory manager can get started correctly when
-     * we restart after this save. Purify is going to
-     * maybe move the args so we need to consider them volatile,
-     * especially if the gcc optimizer is working!!
-     */
+    /* Get rid of remnant stuff. This is a MUST so that the memory
+     * manager can get started correctly when we restart after this
+     * save. Purify is going to maybe move the args so we need to
+     * consider them volatile, especially if the gcc optimizer is
+     * working!! */
     purify(NIL,NIL);
 
     init_function = *func_ptr;
     /* Set dynamic space pointer to base value so we don't write out
-     * MBs of just cleared heap.
-     */
+     * MBs of just cleared heap. */
     if(SymbolValue(X86_CGC_ACTIVE_P) != NIL)
       SetSymbolValue(ALLOCATION_POINTER, DYNAMIC_SPACE_START);
 #endif

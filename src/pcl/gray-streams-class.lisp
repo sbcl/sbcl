@@ -13,7 +13,8 @@
 ;;; Bootstrap the FUNDAMENTAL-STREAM class.
 (let ((sb-pcl::*pcl-class-boot* 'fundamental-stream))
   (defclass fundamental-stream (standard-object stream)
-    ()
+    ((open-p :initform t
+             :accessor stream-open-p))
     #+sb-doc
     (:documentation "the base class for all CLOS streams")))
 
@@ -38,6 +39,9 @@
 (defclass fundamental-binary-output-stream
     (fundamental-output-stream fundamental-binary-stream) nil)
 
+#|
+This is not in the gray-stream proposal, so it is left here
+as example code.
 ;;; example character input and output streams
 
 (defclass character-output-stream (fundamental-character-output-stream)
@@ -47,3 +51,4 @@
 (defclass character-input-stream (fundamental-character-input-stream)
   ((lisp-stream :initarg :lisp-stream
 		:accessor character-input-stream-lisp-stream)))
+|#

@@ -25,10 +25,10 @@
 
 ;;; functions, macros, and special forms
 (defmethod documentation ((x function) (doc-type (eql 't)))
-  (sb-impl::function-doc x))
+  (function-doc x))
 
 (defmethod documentation ((x function) (doc-type (eql 'function)))
-  (sb-impl::function-doc x))
+  (function-doc x))
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
   ;; FIXME: could test harder to see whether it's a SETF function name,
@@ -59,10 +59,10 @@
 
 ;;; packages
 (defmethod documentation ((x package) (doc-type (eql 't)))
-  (sb-impl::package-doc-string x))
+  (package-doc-string x))
 
 (defmethod (setf documentation) (new-value (x package) (doc-type (eql 't)))
-  (setf (sb-impl::package-doc-string x) new-value))
+  (setf (package-doc-string x) new-value))
 ;;; KLUDGE: It's nasty having things like this accessor floating around
 ;;; out in this mostly-unrelated source file. Perhaps it would be
 ;;; better to support WARM-INIT-FORMS by analogy with the existing

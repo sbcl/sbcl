@@ -224,7 +224,6 @@
  #!+gengc ("code/gengc"    :not-host)
 
  ("code/stream"            :not-host)
- ("pcl/gray-streams-stubs" :not-host)
  ("code/print"             :not-host)
  ("code/pprint"            :not-host) ; maybe should be :BYTE-COMPILE T
  ("code/early-format")

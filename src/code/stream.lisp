@@ -613,15 +613,9 @@
   nil)
 
 (defun write-byte (integer stream)
-  (with-out-stream stream
-    ;; FIXME: CMU CL had 
-    ;;     (stream-write-byte integer)
-    ;; which was broken unless Gray streams were installed.
-    ;; In order to make this work again, MNA replaced it with
-    ;; bare (LISP-STREAM-BOUT). Something more complicated will
-    ;; probably be required when Gray stream support is restored,
-    ;; in order to make those work too; but I dunno what it will be.
-    (lisp-stream-bout integer)))
+  (with-out-stream stream (lisp-stream-bout integer)
+		   (stream-write-byte integer))
+  integer)
 
 ;;; This is called from lisp-steam routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the

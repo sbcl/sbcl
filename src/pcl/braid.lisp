@@ -551,7 +551,7 @@
 					(cl:find-class symbol))))
 			      ;; a hack to add the STREAM class as a
 			      ;; mixin to the LISP-STREAM class.
-			      ((eq symbol 'sb-sys:lisp-stream)
+			      ((eq symbol 'sb-kernel:lisp-stream)
 			       '(structure-object stream))
 			      ((structure-type-included-type-name symbol)
 			       (list (structure-type-included-type-name

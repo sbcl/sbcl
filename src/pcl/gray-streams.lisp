@@ -33,10 +33,10 @@
   called on the stream."))
 
 (defmethod pcl-open-stream-p ((stream lisp-stream))
-  (not (eq (sb-impl::lisp-stream-in stream) #'sb-impl::closed-flame)))
+  (not (eq (lisp-stream-in stream) #'closed-flame)))
 
 (defmethod pcl-open-stream-p ((stream fundamental-stream))
-  nil)
+  (stream-open-p stream))
 
 ;;; bootstrapping hack
 (pcl-open-stream-p (make-string-output-stream))
@@ -54,17 +54,21 @@
     (funcall (lisp-stream-misc stream) stream :close abort))
   t)
 
+(defmethod pcl-close ((stream fundamental-stream) &key abort)
+  (setf (stream-open-p stream) nil)
+  t)
+
 (setf (fdefinition 'close) #'pcl-close)
 
 (fmakunbound 'input-stream-p)
 
 (defgeneric input-stream-p (stream)
   #+sb-doc
-  (:documentation "Returns non-nil if the given Stream can perform input operations."))
+  (:documentation "Return non-nil if the given Stream can perform input operations."))
 
 (defmethod input-stream-p ((stream lisp-stream))
-  (and (not (eq (sb-impl::lisp-stream-in stream) #'sb-impl::closed-flame))
-       (or (not (eq (sb-impl::lisp-stream-in stream) #'ill-in))
+  (and (not (eq (lisp-stream-in stream) #'closed-flame))
+       (or (not (eq (lisp-stream-in stream) #'ill-in))
 	   (not (eq (lisp-stream-bin stream) #'ill-bin)))))
 
 (defmethod input-stream-p ((stream fundamental-input-stream))
@@ -74,10 +78,10 @@
 
 (defgeneric output-stream-p (stream)
   #+sb-doc
-  (:documentation "Returns non-nil if the given Stream can perform output operations."))
+  (:documentation "Return non-nil if the given Stream can perform output operations."))
 
 (defmethod output-stream-p ((stream lisp-stream))
-  (and (not (eq (sb-impl::lisp-stream-in stream) #'sb-impl::closed-flame))
+  (and (not (eq (lisp-stream-in stream) #'closed-flame))
        (or (not (eq (lisp-stream-out stream) #'ill-out))
 	   (not (eq (lisp-stream-bout stream) #'ill-bout)))))
 
@@ -205,6 +209,9 @@
   defined for this function, although it is permissible for it to
   always return NIL."))
 
+(defmethod stream-line-column ((stream fundamental-character-output-stream))
+   nil)
+
 ;;; STREAM-LINE-LENGTH is a CMU CL extension to Gray streams.
 ;;; FIXME: Should we support it? Probably not..
 (defgeneric stream-line-length (stream)
@@ -319,7 +326,7 @@
   (let ((current-column (stream-line-column stream)))
     (when current-column
       (let ((fill (- column current-column)))
-	(dotimes-fixnum (i fill)
+	(dotimes (i fill)
 	  (stream-write-char stream #\Space)))
       T)))
 
@@ -343,6 +350,9 @@
    "Implements WRITE-BYTE; writes the integer to the stream and
   returns the integer as the result."))
 
+#|
+This is not in the gray-stream proposal, so it is left here
+as example code.
 ;;; example character output stream encapsulating a lisp-stream
 (defun make-character-output-stream (lisp-stream)
   (declare (type lisp-stream lisp-stream))
@@ -415,3 +425,4 @@
 
 (defmethod stream-clear-input ((stream character-input-stream))
   (clear-input (character-input-stream-lisp-stream stream)))
+|#

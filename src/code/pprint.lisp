@@ -28,7 +28,7 @@
 
 (defconstant default-line-length 80)
 
-(defstruct (pretty-stream (:include sb!sys:lisp-stream
+(defstruct (pretty-stream (:include sb!kernel:lisp-stream
 				    (:out #'pretty-out)
 				    (:sout #'pretty-sout)
 				    (:misc #'pretty-misc))

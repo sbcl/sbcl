@@ -181,8 +181,8 @@
 
 (defun describe-vector-parts (object)
   (list* (format nil "The object is a ~:[~;displaced ~]vector of length ~D.~%"
-		 (and (sb-impl::array-header-p object)
-		      (sb-impl::%array-displaced-p object))
+		 (and (array-header-p object)
+		      (%array-displaced-p object))
 		 (length object))
 	 nil
 	 (coerce object 'list)))
@@ -210,8 +210,8 @@
     (push (format nil "The object is ~:[a displaced~;an~] array of ~A.~%~
 		       Its dimensions are ~S.~%"
 		  (array-element-type object)
-		  (and (sb-impl::array-header-p object)
-		       (sb-impl::%array-displaced-p object))
+		  (and (array-header-p object)
+		       (%array-displaced-p object))
 		  dimensions)
 	  parts)
     (push t parts)
