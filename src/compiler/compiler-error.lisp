@@ -111,12 +111,9 @@
   (values))
 
 (defun make-compiler-error-form (condition source)
-  ;; The condition must be literal so the this form kicks off the
-  ;; MAKE-LOAD-FORM in the file-compiler for COMPILED-PROGRAM-ERROR,
-  ;; not the encapsulated condition.
-  `(error ,(make-condition 'compiled-program-error
-			   :condition condition
-			   :source source)))
+  `(error 'compiled-program-error
+          :message ,(princ-to-string condition)
+          :source ,(princ-to-string source)))
 
 ;;; the condition of COMPILE-FILE being unable to READ from the
 ;;; source file

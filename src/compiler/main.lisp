@@ -1695,9 +1695,7 @@
 	(handler-case
             (sb!xc:make-load-form constant (make-null-lexenv))
 	  (error (condition)
-		 (compiler-error 'make-load-form-error
-				 :condition condition
-				 :object constant)))
+	    (compiler-error condition)))
       (case creation-form
 	(:sb-just-dump-it-normally
 	 (fasl-validate-structure constant *compile-object*)

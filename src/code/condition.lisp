@@ -557,25 +557,6 @@
 		       (condition-actual-initargs condition)
 		       (condition-assigned-slots condition))))
 
-;;;; MAKE-LOAD-FORM equivalent for conditions.
-
-;;; We need this to be able to dump arbitrary encapsulated conditions
-;;; with MAKE-LOAD-FORM for COMPILED-PROGRAM-ERRORs. Unfortunately
-;;; ANSI specifies that MAKE-LOAD-FORM for conditions should signal an
-;;; error, despite the fact that it also specifies that the
-;;; file-compiler should use MAKE-LOAD-FORM for conditions. Bah.
-;;; Badness results if this is called before PCL is in place. Unlike
-;;; real make-load-form we return just a single form, so that it can
-;;; easily be embedded in the surrounding condition.
-(defun make-condition-load-form (condition &optional env)
-  (with-unique-names (instance)
-    (multiple-value-bind (create init)
-        (make-load-form-saving-slots condition :environment env)
-      (let ((fixed-init (subst instance condition init)))
-        `(let ((,instance ,create))
-          ,fixed-init
-          ,instance)))))
-
 ;;;; various CONDITIONs specified by ANSI
 
 (define-condition serious-condition (condition) ())

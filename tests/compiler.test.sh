@@ -261,6 +261,31 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+# This should fail, and fail nicely -- not eg. loop trying to dump
+# references to the unbound variable.
+cat > $tmpfilename <<EOF
+(defmacro macro-with-unbound-variables (foo)
+  `(print ,bar))
+
+(macro-with-unbound-variables 'xxx)
+EOF
+expect_failed_compile $tmpfilename
+
+# This should fail, as the MAKE-LOAD-FORM must be used for
+# externalizing conditions, and the method for CONDITION must signal
+# an error.
+cat > $tmpfilename <<EOF
+(defvar *oops* #.(make-condition 'condition))
+EOF
+expect_failed_compile $tmpfilename
+
+# This should fail, as the MAKE-LOAD-FORM must be used for objects,
+# and the method for STANDARD.OBJECT is required to signal an error.
+cat > $tmpfilename <<EOF
+(defvar *oops* #.(make-instance 'standard-object))
+EOF
+expect_failed_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

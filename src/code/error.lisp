@@ -70,60 +70,15 @@
 	      (case-failure-name condition)
 	      (case-failure-possibilities condition)))))
 
-(define-condition compiled-program-error (encapsulated-condition program-error)
-  ((source :initarg :source :reader program-error-source))
+(define-condition compiled-program-error (program-error)
+  ((message :initarg :message :reader program-error-message)
+   (source :initarg :source :reader program-error-source))
   (:report (lambda (condition stream)
-             (let ((source (program-error-source condition)))
-	       ;; Source may be either a list or string, and
-	       ;; string needs to be printed without escapes.
-	       (format stream "Execution of a form compiled with errors.~%~
-                               Form:~%  ~
-                               ~:[~S~;~A~]~%~
-                               Compile-time-error:~%  "
-		       (stringp source) source)
-	       (print-object (encapsulated-condition condition) stream)))))
-
-(def!method make-load-form ((condition compiled-program-error) &optional env)
-  (let ((source (program-error-source condition)))
-    ;; Safe since the encapsulated condition shouldn't contain
-    ;; references back up to the main condition. The source needs to
-    ;; be converted to a string, since it may contain arbitrary
-    ;; unexternalizable objects.
-    `(make-condition 'compiled-program-error
-		     :condition ,(make-condition-load-form
-				  (encapsulated-condition condition) env)
-		     :source ,(if (stringp source)
-				  source
-				  (write-to-string
-				   source :pretty t :circle t :escape t :readably nil)))))
-
-(define-condition make-load-form-error (encapsulated-condition error)
-  ((object :initarg :object :reader make-load-form-error-object))
-  (:report (lambda (condition stream)
-	     (let ((object (make-load-form-error-object condition)))
-	       ;; If the MAKE-LOAD-FORM-ERROR itself has been
-	       ;; externalized, the object will only have it's string
-	       ;; representation.
-	       (format stream "~@<Unable to externalize ~:[~S~;~A~], ~
-                              error from ~S:~:@>~%  "
-		       (stringp object)
-		       object
-		       'make-load-form)
-	       (print-object (encapsulated-condition condition) stream)))))
-
-(def!method make-load-form ((condition make-load-form-error) &optional env)
-  (let ((object (make-load-form-error-object condition)))
-    ;; Safe, because neither the object nor the encapsulated condition
-    ;; should contain any references to the error itself. However, the
-    ;; object will need to be converted to its string representation,
-    ;; since the chances are that it's not externalizable.
-    `(make-condition 'make-load-form-error
-		     :condition ,(make-condition-load-form
-				  (encapsulated-condition condition) env)
-		     :object ,(if (stringp object)
-				  object
-				  (write-to-string
-				   object :pretty t :circle t :escape t :readably nil)))))
+	     (format stream "Execution of a form compiled with errors.~%~
+                            Form:~%  ~A~%~
+                            Compile-time-error:~%  ~A"
+		       (program-error-source condition)
+		       (program-error-message condition)))))
 
 (define-condition simple-control-error (simple-condition control-error) ())
 (define-condition simple-file-error    (simple-condition file-error)    ())

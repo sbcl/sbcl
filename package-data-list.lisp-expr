@@ -746,10 +746,7 @@ retained, possibly temporariliy, because it might be used internally."
 					      "*SETF-FDEFINITION-HOOK*"
 
 					      ;; error-reporting facilities
-					      "MAKE-CONDITION-LOAD-FORM"
-					      "COMPILED-PROGRAM-ERROR"
-					      "ENCAPSULATED-CONDITION"
-					      "MAKE-LOAD-FORM-ERROR"
+					      "ENCAPSULATED-CONDITION" "COMPILED-PROGRAM-ERROR"
 					      "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
 					      "SIMPLE-PARSE-ERROR"
 					      "SIMPLE-PROGRAM-ERROR" "SIMPLE-STREAM-ERROR"
