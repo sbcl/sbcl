@@ -78,8 +78,8 @@
                       (#.sb!vm:closure-header-widetag
                        (setf (%simple-fun-arglist (%closure-fun definition))
                              lambda-list))
-                      ((#.sb-vm:simple-fun-header-widetag
-                        #.sb-vm:closure-fun-header-widetag)
+                      ((#.sb!vm:simple-fun-header-widetag
+                        #.sb!vm:closure-fun-header-widetag)
                        (setf (%simple-fun-arglist definition) lambda-list))))
             name))))
   (progn
