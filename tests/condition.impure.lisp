@@ -37,5 +37,14 @@
   (assert (eql (code-msg code) 2))
   (assert (eql (%code-msg code) 1)))
 
+;;; Check that initializing the condition class metaobject doesn't create
+;;; any instances. Reported by Marco Baringer on sbcl-devel Mon, 05 Jul 2004.
+(defvar *condition-count* 0)
+(define-condition counted-condition () ((slot :initform (incf *condition-count*))))
+(defmethod frob-counted-condition ((x counted-condition)) x)
+(assert (= 0 *condition-count*))
+(assert (typep (sb-mop:class-prototype (find-class 'counted-condition))
+	       '(and condition counted-condition)))
+
 ;;; success
 (sb-ext:quit :unix-status 104)

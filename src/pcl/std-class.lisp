@@ -133,6 +133,10 @@
 		  (allocate-instance class)
 		  (allocate-standard-instance wrapper))))))
 
+(defmethod class-prototype ((class condition-class))
+  (with-slots (prototype) class
+    (or prototype (setf prototype (allocate-instance class)))))
+
 (defmethod class-direct-default-initargs ((class slot-class))
   (plist-value class 'direct-default-initargs))
 
@@ -594,7 +598,6 @@
       (setq direct-supers direct-superclasses)
       (setq wrapper (classoid-layout classoid))
       (setq class-precedence-list (compute-class-precedence-list class))
-      (setq prototype (make-condition (class-name class)))
       (add-direct-subclasses class direct-superclasses)
       (setq predicate-name (make-class-predicate-name (class-name class)))
       (make-class-predicate class predicate-name)

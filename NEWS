@@ -9,6 +9,9 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     an implementation-internal package.
   * the SB-SPROF contrib now works on (most) non-x86 architectures.
     It is known as of this release not to work on the Alpha, however.
+  * fixed bug: initialization of condition class metaobjects no longer
+    causes an instance of the condition to be created. (reported by Marco
+    Baringer)
   * fixed bug #338: instances of EQL-SPECIFIER are now valid type
     designators and can hence be used with TYPEP.
   * fixed bug #333: CHECK-TYPE now ensures that the type error
