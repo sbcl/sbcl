@@ -45,3 +45,14 @@
                           (foo 1))))))
       (remove-duplicates *expansions*))
   (1))
+
+(defun smv (env)
+  (multiple-value-bind (expansion macro-p) 
+      (macroexpand 'srlt env) 
+    (when macro-p (eval expansion))))
+(defmacro testr (&environment env) 
+  `',(getf (smv env) nil))
+
+(deftest macroexpand-all.4
+    (macroexpand-all '(symbol-macrolet ((srlt '(nil zool))) (testr)))
+  (symbol-macrolet ((srlt '(nil zool))) 'zool))

@@ -1805,6 +1805,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     SB-EXT:DEFCONSTANT-UNEQL if it is being asked to redefine a
     constant to a non-EQL value; CONTINUE and ABORT restarts
     respectively change and preserve the value.
+  * fixed bug 63: the code walker, part of the implementation of CLOS,
+    is better at handling symbol macros.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

@@ -257,17 +257,6 @@ WORKAROUND:
   then requesting a BACKTRACE at the debugger prompt gives no information
   about where in the user program the problem occurred.
 
-63:
-  Paul Werkowski wrote on cmucl-imp@cons.org 2000-11-15
-    I am looking into this problem that showed up on the cmucl-help
-    list. It seems to me that the "implementation specific environment
-    hacking functions" found in pcl/walker.lisp are completely messed
-    up. The good thing is that they appear to be barely used within
-    PCL and the munged environment object is passed to cmucl only
-    in calls to macroexpand-1, which is probably why this case fails.
-  SBCL uses essentially the same code, so if the environment hacking
-  is screwed up, it affects us too.
-
 64:
   Using the pretty-printer from the command prompt gives funny
   results, apparently because the pretty-printer doesn't know

@@ -153,6 +153,9 @@
   (let ((lexenv (sb!kernel::coerce-to-lexenv env)))
     (sb!c::make-lexenv
      :default lexenv
+     :vars (when (eql (caar macros) *key-to-walker-environment*)
+	     (copy-tree (remove :lexical-var (fourth (cadar macros))
+				:key #'cadr)))
      :funs (append (mapcar (lambda (f)
 			     (cons (car f)
 				   (sb!c::make-functional :lexenv lexenv)))
@@ -236,14 +239,14 @@
 (defun walker-environment-bind-1 (env &key (walk-function nil wfnp)
 					   (walk-form nil wfop)
 					   (declarations nil decp)
-					   (lexical-variables nil lexp))
-  (let ((lock (environment-macro env *key-to-walker-environment*)))
+					   (lexical-vars nil lexp))
+  (let ((lock (env-lock env)))
     (list
       (list *key-to-walker-environment*
-	    (list (if wfnp walk-function     (car lock))
-		  (if wfop walk-form         (cadr lock))
-		  (if decp declarations      (caddr lock))
-		  (if lexp lexical-variables (cadddr lock)))))))
+	    (list (if wfnp walk-function (car lock))
+		  (if wfop walk-form     (cadr lock))
+		  (if decp declarations  (caddr lock))
+		  (if lexp lexical-vars  (cadddr lock)))))))
 
 (defun env-walk-function (env)
   (car (env-lock env)))
@@ -397,6 +400,8 @@
 
 ;;; SBCL-only special forms
 (define-walker-template sb!ext:truly-the     (nil quote eval))
+;;; FIXME: maybe we don't need this one any more, given that
+;;; NAMED-LAMBDA now expands into (FUNCTION (NAMED-LAMBDA ...))?
 (define-walker-template named-lambda         walk-named-lambda)
 
 (defvar *walk-form-expand-macros-p* nil)
@@ -845,7 +850,7 @@
 	 (body (cddr form)))
     (walker-environment-bind
 	(new-env old-env
-		 :lexical-variables
+		 :lexical-vars
 		 (append (mapcar (lambda (binding)
 				   `(,(car binding)
 				     sb!sys:macro . ,(cadr binding)))
