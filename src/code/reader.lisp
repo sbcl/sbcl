@@ -154,19 +154,20 @@
 ;;;; readtable operations
 
 (defun copy-readtable (&optional (from-readtable *readtable*)
-				 (to-readtable (make-readtable)))
-  (let ((really-from-readtable (or from-readtable *standard-readtable*)))
-    (replace (character-attribute-table to-readtable)
+				 to-readtable)
+  (let ((really-from-readtable (or from-readtable *standard-readtable*))
+        (really-to-readtable (or to-readtable (make-readtable))))
+    (replace (character-attribute-table really-to-readtable)
 	     (character-attribute-table really-from-readtable))
-    (replace (character-macro-table to-readtable)
+    (replace (character-macro-table really-to-readtable)
 	     (character-macro-table really-from-readtable))
-    (setf (dispatch-tables to-readtable)
+    (setf (dispatch-tables really-to-readtable)
 	  (mapcar #'(lambda (pair) (cons (car pair)
 					 (copy-seq (cdr pair))))
 		  (dispatch-tables really-from-readtable)))
-    (setf (readtable-case to-readtable)
-	  (readtable-case from-readtable))
-    to-readtable))
+    (setf (readtable-case really-to-readtable)
+	  (readtable-case really-from-readtable))
+    really-to-readtable))
 
 (defun set-syntax-from-char (to-char from-char &optional
 				     (to-readtable *readtable*)
@@ -192,20 +193,21 @@
 (defun set-macro-character (char function &optional
 				 (non-terminatingp nil) (rt *readtable*))
   #!+sb-doc
-  "Causes char to be a macro character which invokes function when
-   seen by the reader. The non-terminatingp flag can be used to
+  "Causes CHAR to be a macro character which invokes FUNCTION when
+   seen by the reader. The NON-TERMINATINGP flag can be used to
    make the macro character non-terminating. The optional readtable
-   argument defaults to the current readtable. Set-macro-character
+   argument defaults to the current readtable. SET-MACRO-CHARACTER
    returns T."
-  (if non-terminatingp
-      (set-cat-entry char (get-secondary-attribute char) rt)
-      (set-cat-entry char +char-attr-terminating-macro+ rt))
-  (set-cmt-entry char function rt)
-  T)
+  (let ((rt (or rt *standard-readtable*)))
+    (if non-terminatingp
+        (set-cat-entry char (get-secondary-attribute char) rt)
+        (set-cat-entry char +char-attr-terminating-macro+ rt))
+    (set-cmt-entry char function rt)
+    T))
 
 (defun get-macro-character (char &optional (rt *readtable*))
   #!+sb-doc
-  "Return the function associated with the specified char which is a macro
+  "Return the function associated with the specified CHAR which is a macro
   character. The optional readtable argument defaults to the current
   readtable."
   (let ((rt (or rt *standard-readtable*)))
@@ -1291,6 +1293,7 @@
   (when (digit-char-p sub-char)
     (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
   (let* ((sub-char (char-upcase sub-char))
+         (rt (or rt *standard-readtable*))
 	 (dpair (find disp-char (dispatch-tables rt)
 		      :test #'char= :key #'car)))
     (if dpair
@@ -1302,8 +1305,8 @@
 (defun get-dispatch-macro-character (disp-char sub-char
                                      &optional (rt *readtable*))
   #!+sb-doc
-  "Return the macro character function for sub-char under disp-char
-   or nil if there is no associated function."
+  "Return the macro character function for SUB-CHAR under DISP-CHAR
+   or NIL if there is no associated function."
   (unless (digit-char-p sub-char)
     (let* ((sub-char (char-upcase sub-char))
 	   (rt (or rt *standard-readtable*))
