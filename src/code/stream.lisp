@@ -882,7 +882,7 @@
 		      (in #'echo-in)
 		      (bin #'echo-bin)
 		      (misc #'echo-misc)
-		      (n-bin #'ill-bin))
+		      (n-bin #'echo-n-bin))
 	    (:constructor %make-echo-stream (input-stream output-stream))
 	    (:copier nil))
   unread-stuff)
@@ -921,6 +921,36 @@
 			(t (,out-fun result out) result)))))))
   (in-fun echo-in read-char write-char eof-error-p eof-value)
   (in-fun echo-bin read-byte write-byte eof-error-p eof-value))
+
+(defun echo-n-bin (stream buffer start numbytes eof-error-p)
+  (let ((new-start start)
+	(read 0))
+    (loop
+     (let ((thing (pop (echo-stream-unread-stuff stream))))
+       (cond
+	 (thing
+	  (setf (aref buffer new-start) thing)
+	  (incf new-start)
+	  (incf read)
+	  (when (= read numbytes)
+	    (return-from echo-n-bin numbytes)))
+	 (t (return nil)))))
+    (let ((bytes-read (read-n-bytes (echo-stream-input-stream stream) buffer
+				    new-start (- numbytes read) nil)))
+      (cond
+	((not eof-error-p)
+	 (write-sequence buffer (echo-stream-output-stream stream)
+			 :start new-start :end (+ new-start bytes-read))
+	 (+ bytes-read read))
+	((> numbytes (+ read bytes-read))
+	 (write-sequence buffer (echo-stream-output-stream stream)
+			 :start new-start :end (+ new-start bytes-read))
+	 (error 'end-of-file :stream stream))
+	(t
+	 (write-sequence buffer (echo-stream-output-stream stream)
+			 :start new-start :end (+ new-start bytes-read))
+	 (aver (= numbytes (+ new-start bytes-read)))
+	 numbytes)))))
 
 ;;;; base STRING-STREAM stuff
 
@@ -1659,11 +1689,8 @@
 		(simple-array (signed-byte 8) (*))
 		simple-string)
 	    (let* ((numbytes (- end start))
-		   (bytes-read (sb!sys:read-n-bytes stream
-						    data
-						    offset-start
-						    numbytes
-						    nil)))
+		   (bytes-read (read-n-bytes stream data offset-start
+					     numbytes nil)))
 	      (if (< bytes-read numbytes)
 		  (+ start bytes-read)
 		  end)))

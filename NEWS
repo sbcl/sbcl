@@ -2383,6 +2383,8 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     values.  (thanks to Zach Beane)
   * bug fix: streams with element-type (SIGNED-BYTE <N>) for <N>
     greater than 32 handle EOF correctly.
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** READ-SEQUENCE now works on ECHO-STREAMs.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
