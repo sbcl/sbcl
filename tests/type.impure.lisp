@@ -109,6 +109,16 @@
 (assert (raises-error? (typep 11 'eql)))
 (assert (raises-error? (typep 11 'satisfies)))
 (assert (raises-error? (typep 11 'not)))
+;;; and while it doesn't specifically disallow illegal compound
+;;; specifiers from the CL package, we don't have any.
+(assert (raises-error? (subtypep 'fixnum '(fixnum 1))))
+(assert (raises-error? (subtypep 'class '(list))))
+(assert (raises-error? (subtypep 'foo '(ratio 1/2 3/2))))
+(assert (raises-error? (subtypep 'character '(character 10))))
+#+nil ; doesn't yet work on PCL-derived internal types
+(assert (raises-error? (subtypep 'lisp '(class))))
+#+nil
+(assert (raises-error? (subtypep 'bar '(method number number))))
 
 ;;; Of course empty lists of subtypes are still OK.
 (assert (typep 11 '(and)))

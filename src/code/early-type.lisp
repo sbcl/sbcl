@@ -499,8 +499,9 @@
 		   (fun (info :type :translator (car lspec))))
 	      (cond (fun
 		     (funcall fun lspec))
-		    ((or (and (consp spec) (symbolp (car spec)))
-			 (symbolp spec))
+		    ((or (and (consp spec) (symbolp (car spec))
+			      (not (info :type :builtin (car spec))))
+			 (and (symbolp spec) (not (info :type :builtin spec))))
 		     (when (and *type-system-initialized*
                                 (not (eq (info :type :kind spec)
                                          :forthcoming-defclass-type)))
@@ -534,7 +535,7 @@
   (let ((def (cond ((symbolp form)
                     (info :type :expander form))
                    ((and (consp form) (symbolp (car form)))
-                    (info :type :expander (car form)))
+		    (info :type :expander (car form)))
                    (t nil))))
     (if def
         (type-expand (funcall def (if (consp form) form (list form))))
