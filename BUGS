@@ -356,9 +356,6 @@ WORKAROUND:
   crashes SBCL. In general tracing anything which is used in the 
   implementation of TRACE is likely to have the same problem.
 
-72:
-  (DECLAIM (OPTIMIZE ..)) doesn't work properly inside LOCALLY forms.
-
 75:
   As reported by Martin Atzmueller on sbcl-devel 26 Dec 2000,
   ANSI says that WITH-OUTPUT-TO-STRING should have a keyword
@@ -499,18 +496,6 @@ WORKAROUND:
   the first time around, until regression tests are written I'm not 
   comfortable merging the patches in the CVS version of SBCL.
 
-104:
-  (DESCRIBE 'SB-ALIEN:DEF-ALIEN-TYPE) reports the macro argument list
-  incorrectly:
-	DEF-ALIEN-TYPE is
-	  an external symbol
-	  in #<PACKAGE "SB-ALIEN">.
-	Macro-function: #<FUNCTION "DEF!MACRO DEF-ALIEN-TYPE" {19F4A39}>
-	  Macro arguments:  (#:whole-470 #:environment-471)
-	  On Sat, May 26, 2001 09:45:57 AM CDT it was compiled from:
-	  /usr/stuff/sbcl/src/code/host-alieneval.lisp
-	    Created: Monday, March 12, 2001 07:47:43 AM CST
-
 108:
   (TIME (ROOM T)) reports more than 200 Mbytes consed even for
   a clean, just-started SBCL system. And it seems to be right:
@@ -583,26 +568,6 @@ WORKAROUND:
    return type from any function of that name, the return type of NIL
    is attached to FOO in 120a above, and used to optimize code which
    calls FOO. 
-
-122:
-   There was some sort of screwup in handling of
-   (IF (NOT (IGNORE-ERRORS ..))). E.g.
-	(defun foo1i ()
-	  (if (not (ignore-errors
-		     (make-pathname :host "foo"
-                                    :directory "!bla"
-                                    :name "bar")))
-	      (print "ok")
-	      (error "notunlessnot")))
-   The (NOT (IGNORE-ERRORS ..)) form evaluates to T, so this should be
-   printing "ok", but instead it's going to the ERROR. This problem
-   seems to've been introduced by MNA's HANDLER-CASE patch (sbcl-devel
-   2001-07-17) and as a workaround (put in sbcl-0.pre7.14.flaky4.12)
-   I reverted back to the old weird HANDLER-CASE code. However, I
-   think the problem looks like a compiler bug in handling RETURN-FROM,
-   so I left the MNA-patched code in HANDLER-CASE (suppressed with
-   #+NIL) and I'd like to go back to see whether this really is
-   a compiler bug before I delete this BUGS entry.
 
 124:
    As of version 0.pre7.14, SBCL's implementation of MACROLET makes
@@ -692,36 +657,6 @@ WORKAROUND:
       (let ((x (1+ x)))
         (call-next-method)))
   Now (FOO 3) should return 3, but instead it returns 4.
-
-140:
-  (reported by Alexey Dejneka sbcl-devel 2002-01-03)
-
-  SUBTYPEP does not work well with redefined classes:
-  ---
-  * (defclass a () ())
-  #<STANDARD-CLASS A>
-  * (defclass b () ())
-  #<STANDARD-CLASS B>
-  * (subtypep 'b 'a)
-  NIL
-  T
-  * (defclass b (a) ())
-  #<STANDARD-CLASS B>
-  * (subtypep 'b 'a)
-  T
-  T
-  * (defclass b () ())
-  #<STANDARD-CLASS B>
-
-  ;;; And now...
-  * (subtypep 'b 'a)
-  T
-  T
-
-  This bug was fixed in sbcl-0.7.4.1 by invalidating the PCL wrapper
-  class upon redefinition. Unfortunately, doing so causes bug #176 to
-  appear.  Pending further investigation, one or other of these bugs
-  might be present at any given time.
 
 141: 
   Pretty-printing nested backquotes doesn't work right, as 
@@ -907,39 +842,6 @@ WORKAROUND:
   COMPILE and COMPILE-FILE returned FAILURE-P=T for perfectly legal
   code. Since then the warning has been downgraded to STYLE-WARNING, 
   so it's still a bug but at least it's a little less annoying.
-
-176:
-  reported by Alexey Dejneka 08 Jun 2002 in sbcl-devel:
-    Playing with McCLIM, I've received an error "Unbound variable WRAPPER
-    in SB-PCL::CHECK-WRAPPER-VALIDITY".
-      (defun check-wrapper-validity (instance)
-        (let* ((owrapper (wrapper-of instance)))
-          (if (not (invalid-wrapper-p owrapper))
-              owrapper
-              (let* ((state (wrapper-state wrapper)) ; !!!
-        ...
-    I've tried to replace it with OWRAPPER, but now OBSOLETE-INSTANCE-TRAP
-    breaks with "NIL is not of type SB-KERNEL:LAYOUT".
-    SBCL 0.7.4.13.
-  partial fix: The undefined variable WRAPPER resulted from an error
-  in recent refactoring, as can be seen by comparing to the code in e.g. 
-  sbcl-0.7.2. Replacing WRAPPER with OWRAPPER (done by WHN in sbcl-0.7.4.22)
-  should bring the code back to its behavior as of sbcl-0.7.2, but
-  that still leaves the OBSOLETE-INSTANCE-TRAP bug. An example of 
-  input which triggers that bug is
-    (dotimes (i 20)
-      (let ((lastname (intern (format nil "C~D" (1- i))))
-            (name (intern (format nil "C~D" i))))
-      (eval `(defclass ,name
-                 (,@(if (= i 0) nil (list lastname)))
-               ()))
-      (eval `(defmethod initialize-instance :after ((x ,name) &rest any)
-               (declare (ignore any))))))
-    (defclass b () ())
-    (defclass c0 (b) ())
-    (make-instance 'c19)
-
-  See also bug #140.
 
 178: "AVER failure compiling confused THEs in FUNCALL"
   In sbcl-0.7.4.24, compiling
@@ -1254,12 +1156,6 @@ WORKAROUND:
   package: FOO-SLOT". (This is fairly bad code, but still it's hard
   to see that it should cause symbols to be interned in the CL package.)
 
-209: "DOCUMENTATION generic function has wrong argument precedence order"
-  (fixed in sbcl-0.7.8.39)
-
-210: "unsafe evaluation of DEFSTRUCT slot initforms in BOA constructors"
-  (fixed in sbcl-0.7.8.35)
-
 211: "keywords processing"
   a. :ALLOW-OTHER-KEYS T should allow a function to receive an odd
      number of keyword arguments.
@@ -1275,7 +1171,6 @@ WORKAROUND:
        ; 
        ; caught STYLE-WARNING:
        ;   The variable #:G15 is defined but never used.
-
 
 212: "Sequence functions and circular arguments"
   COERCE, MERGE and CONCATENATE go into an infinite loop when given
@@ -1326,7 +1221,7 @@ WORKAROUND:
   a. FIND and POSITION currently signal errors when given non-NIL for
      both their :TEST and (deprecated) :TEST-NOT arguments, but by
      ANSI 17.2 "the consequences are unspecified", which by ANSI 1.4.2
-     means that the effect is "unpredictable but harmless.  It's not
+     means that the effect is "unpredictable but harmless".  It's not
      clear what that actually means; it may preclude conforming
      implementations from signalling errors.
   b. COUNT, REMOVE and the like give priority to a :TEST-NOT argument

@@ -261,44 +261,6 @@
 (defmacro wrapper-no-of-instance-slots (wrapper)
   `(sb-kernel:layout-length ,wrapper))
 
-;;; WRAPPER-STATE returns T (not generalized boolean, but T exactly)
-;;; iff the wrapper is valid. Any other return value denotes some
-;;; invalid state. Special conventions have been set up for certain
-;;; invalid states, e.g. obsoleteness or flushedness, but I (WHN
-;;; 19991204) haven't been motivated to reverse engineer them from the
-;;; code and document them here.
-;;;
-;;; FIXME: We have removed the persistent use of this function throughout
-;;; the PCL codebase, instead opting to use INVALID-WRAPPER-P, which 
-;;; abstractly tests the return result of this function for invalidness.
-;;; However, part of the original comment that is still applicable follows.
-;;;   --njf, 2002-05-02
-;;;
-;;; FIXME: It would probably be even better to switch the sense of the
-;;; WRAPPER-STATE function, renaming it to WRAPPER-INVALID and making it
-;;; synonymous with LAYOUT-INVALID. Then the INVALID-WRAPPER-P function
-;;; would become trivial and would go away (replaced with
-;;; WRAPPER-INVALID), since all the various invalid wrapper states would
-;;; become generalized boolean "true" values. -- WHN 19991204
-#-sb-fluid (declaim (inline wrapper-state (setf wrapper-state)))
-(defun wrapper-state (wrapper)
-  (let ((invalid (sb-kernel:layout-invalid wrapper)))
-    (cond ((null invalid)
-	   t)
-	  ((atom invalid)
-	   ;; some non-PCL object. INVALID is probably :INVALID. We
-	   ;; should arguably compute the new wrapper here instead of
-	   ;; returning NIL, but we don't bother, since
-	   ;; OBSOLETE-INSTANCE-TRAP can't use it.
-	   '(:obsolete nil))
-	  (t
-	   invalid))))
-(defun (setf wrapper-state) (new-value wrapper)
-  (setf (sb-kernel:layout-invalid wrapper)
-	(if (eq new-value t)
-	    nil
-	    new-value)))
-
 (defmacro wrapper-instance-slots-layout (wrapper)
   `(%wrapper-instance-slots-layout ,wrapper))
 (defmacro wrapper-class-slots (wrapper)
@@ -411,63 +373,52 @@
 
 (declaim (inline invalid-wrapper-p))
 (defun invalid-wrapper-p (wrapper)
-  (neq (wrapper-state wrapper) t))
+  (not (null (sb-kernel:layout-invalid wrapper))))
 
 (defvar *previous-nwrappers* (make-hash-table))
 
 (defun invalidate-wrapper (owrapper state nwrapper)
-  (ecase state
-    ((:flush :obsolete)
-     (let ((new-previous ()))
-       ;; First off, a previous call to INVALIDATE-WRAPPER may have
-       ;; recorded OWRAPPER as an NWRAPPER to update to. Since
-       ;; OWRAPPER is about to be invalid, it no longer makes sense to
-       ;; update to it.
-       ;;
-       ;; We go back and change the previously invalidated wrappers so
-       ;; that they will now update directly to NWRAPPER. This
-       ;; corresponds to a kind of transitivity of wrapper updates.
-       (dolist (previous (gethash owrapper *previous-nwrappers*))
-	 (when (eq state :obsolete)
-	   (setf (car previous) :obsolete))
-	 (setf (cadr previous) nwrapper)
-	 (push previous new-previous))
+  (aver (member state '(:flush :obsolete) :test #'eq))
+  (let ((new-previous ()))
+    ;; First off, a previous call to INVALIDATE-WRAPPER may have
+    ;; recorded OWRAPPER as an NWRAPPER to update to. Since OWRAPPER
+    ;; is about to be invalid, it no longer makes sense to update to
+    ;; it.
+    ;;
+    ;; We go back and change the previously invalidated wrappers so
+    ;; that they will now update directly to NWRAPPER. This
+    ;; corresponds to a kind of transitivity of wrapper updates.
+    (dolist (previous (gethash owrapper *previous-nwrappers*))
+      (when (eq state :obsolete)
+	(setf (car previous) :obsolete))
+      (setf (cadr previous) nwrapper)
+      (push previous new-previous))
 
-       (let ((ocnv (wrapper-cache-number-vector owrapper)))
-	 (dotimes (i sb-kernel:layout-clos-hash-length)
-	   (setf (cache-number-vector-ref ocnv i) 0)))
-       (push (setf (wrapper-state owrapper) (list state nwrapper))
-	     new-previous)
+    (let ((ocnv (wrapper-cache-number-vector owrapper)))
+      (dotimes (i sb-kernel:layout-clos-hash-length)
+	(setf (cache-number-vector-ref ocnv i) 0)))
 
-       (setf (gethash owrapper *previous-nwrappers*) ()
-	     (gethash nwrapper *previous-nwrappers*) new-previous)))))
+    (push (setf (sb-kernel:layout-invalid owrapper) (list state nwrapper))
+	  new-previous)
+
+    (setf (gethash owrapper *previous-nwrappers*) ()
+	  (gethash nwrapper *previous-nwrappers*) new-previous)))
 
 (defun check-wrapper-validity (instance)
-  (let* ((owrapper (wrapper-of instance)))
-    (if (not (invalid-wrapper-p owrapper))
+  (let* ((owrapper (wrapper-of instance))
+	 (state (sb-kernel:layout-invalid owrapper)))
+    (if (null state)
 	owrapper
-	(let* ((state (wrapper-state owrapper))
-	       (nwrapper
-		(ecase (car state)
-		  (:flush
-		   (flush-cache-trap owrapper (cadr state) instance))
-		  (:obsolete
-		   (obsolete-instance-trap owrapper (cadr state) instance)))))
-	  ;; This little bit of error checking is superfluous. It only
-	  ;; checks to see whether the person who implemented the trap
-	  ;; handling screwed up. Since that person is hacking
-	  ;; internal PCL code, and is not a user, this should be
-	  ;; needless. Also, since this directly slows down instance
-	  ;; update and generic function cache refilling, feel free to
-	  ;; take it out sometime soon.
-	  ;;
-	  ;; FIXME: We probably need to add a #+SB-PARANOID feature to
-	  ;; make stuff like this optional. Until then, it stays in.
-	  (cond ((neq nwrapper (wrapper-of instance))
-		 (error "wrapper returned from trap not wrapper of instance"))
-		((invalid-wrapper-p nwrapper)
-		 (error "wrapper returned from trap invalid")))
-	  nwrapper))))
+	(ecase (car state)
+	  (:flush
+	   (flush-cache-trap owrapper (cadr state) instance))
+	  (:obsolete
+	   (obsolete-instance-trap owrapper (cadr state) instance))))))
+
+(declaim (inline check-obsolete-instance))
+(defun check-obsolete-instance (instance)
+  (when (invalid-wrapper-p (sb-kernel:layout-of instance))
+    (check-wrapper-validity instance)))
 
 (defvar *free-caches* nil)
 

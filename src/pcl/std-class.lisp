@@ -1050,12 +1050,17 @@
 
 (defun force-cache-flushes (class)
   (let* ((owrapper (class-wrapper class)))
-    ;; We only need to do something if the state is still T. If the
-    ;; state isn't T, it will be FLUSH or OBSOLETE, and both of those
-    ;; will already be doing what we want. In particular, we must be
-    ;; sure we never change an OBSOLETE into a FLUSH since OBSOLETE
-    ;; means do what FLUSH does and then some.
-    (unless (invalid-wrapper-p owrapper)
+    ;; We only need to do something if the wrapper is still valid. If
+    ;; the wrapper isn't valid, state will be FLUSH or OBSOLETE, and
+    ;; both of those will already be doing what we want. In
+    ;; particular, we must be sure we never change an OBSOLETE into a
+    ;; FLUSH since OBSOLETE means do what FLUSH does and then some.
+    (when (or (not (invalid-wrapper-p owrapper))
+	      ;; Ick. LAYOUT-INVALID can return a list (which we can
+	      ;; handle), T (which we can't), NIL (which is handled by
+	      ;; INVALID-WRAPPER-P) or :UNINITIALIZED (which never
+	      ;; gets here (I hope).  -- CSR, 2002-10-28
+	      (eq (sb-kernel:layout-invalid owrapper) t))
       (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
 				    class)))
 	(setf (wrapper-instance-slots-layout nwrapper)

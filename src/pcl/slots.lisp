@@ -187,19 +187,14 @@
 (defmethod slot-value-using-class ((class std-class)
 				   (object std-object)
 				   (slotd standard-effective-slot-definition))
+  (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
 	 (value (typecase location
 		  (fixnum
 		   (cond ((std-instance-p object)
-			  (when (invalid-wrapper-p (std-instance-wrapper
-                                                    object))
-			    (check-wrapper-validity object))
 			  (clos-slots-ref (std-instance-slots object)
 					  location))
 			 ((fsc-instance-p object)
-			  (when (invalid-wrapper-p (fsc-instance-wrapper
-                                                    object))
-			    (check-wrapper-validity object))
 			  (clos-slots-ref (fsc-instance-slots object)
 					  location))
 			 (t (error "unrecognized instance type"))))
@@ -218,19 +213,16 @@
 	   (new-value (class std-class)
 		      (object std-object)
 		      (slotd standard-effective-slot-definition))
+  (check-obsolete-instance object)
   (let ((location (slot-definition-location slotd)))
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (when (invalid-wrapper-p (std-instance-wrapper object))
-		(check-wrapper-validity object))
-               (setf (clos-slots-ref (std-instance-slots object) location)
-		     new-value))
+	      (setf (clos-slots-ref (std-instance-slots object) location)
+		    new-value))
 	     ((fsc-instance-p object)
-	      (when (invalid-wrapper-p (fsc-instance-wrapper object))
-		(check-wrapper-validity object))
-               (setf (clos-slots-ref (fsc-instance-slots object) location)
-		     new-value))
+	      (setf (clos-slots-ref (fsc-instance-slots object) location)
+		    new-value))
 	     (t (error "unrecognized instance type"))))
       (cons
        (setf (cdr location) new-value))
@@ -243,19 +235,14 @@
 	   ((class std-class)
 	    (object std-object)
 	    (slotd standard-effective-slot-definition))
+  (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
 	 (value (typecase location
 		  (fixnum
 		   (cond ((std-instance-p object)
-			  (when (invalid-wrapper-p (std-instance-wrapper
-                                                    object))
-			    (check-wrapper-validity object))
 			  (clos-slots-ref (std-instance-slots object)
 					  location))
 			 ((fsc-instance-p object)
-			  (when (invalid-wrapper-p (fsc-instance-wrapper
-                                                    object))
-			    (check-wrapper-validity object))
 			  (clos-slots-ref (fsc-instance-slots object)
 					  location))
 			 (t (error "unrecognized instance type"))))
@@ -272,19 +259,16 @@
 	   ((class std-class)
 	    (object std-object)
 	    (slotd standard-effective-slot-definition))
+  (check-obsolete-instance object)
   (let ((location (slot-definition-location slotd)))
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (when (invalid-wrapper-p (std-instance-wrapper object))
-		(check-wrapper-validity object))
-               (setf (clos-slots-ref (std-instance-slots object) location)
-		     +slot-unbound+))
+	      (setf (clos-slots-ref (std-instance-slots object) location)
+		    +slot-unbound+))
 	     ((fsc-instance-p object)
-	      (when (invalid-wrapper-p (fsc-instance-wrapper object))
-		(check-wrapper-validity object))
-               (setf (clos-slots-ref (fsc-instance-slots object) location)
-		     +slot-unbound+))
+	      (setf (clos-slots-ref (fsc-instance-slots object) location)
+		    +slot-unbound+))
 	     (t (error "unrecognized instance type"))))
       (cons
        (setf (cdr location) +slot-unbound+))

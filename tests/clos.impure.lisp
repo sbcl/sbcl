@@ -327,6 +327,21 @@
 (assert (eq (no-next-method-test 1) 'success))
 (assert (null (ignore-errors (no-next-method-test 'foo))))
 
+;;; regression test for bug 176, following a fix that seems
+;;; simultaneously to fix 140 while not exposing 176 (by Gerd
+;;; Moellmann, merged in sbcl-0.7.9.12).
+(dotimes (i 10)
+  (let ((lastname (intern (format nil "C176-~D" (1- i))))
+        (name (intern (format nil "C176-~D" i))))
+  (eval `(defclass ,name
+             (,@(if (= i 0) nil (list lastname)))
+           ()))
+  (eval `(defmethod initialize-instance :after ((x ,name) &rest any)
+           (declare (ignore any))))))
+(defclass b176 () (aslot-176))
+(defclass c176-0 (b176) ())
+(assert (= 1 (setf (slot-value (make-instance 'c176-9) 'aslot-176) 1)))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)
