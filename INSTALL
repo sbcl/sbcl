@@ -50,6 +50,11 @@ This software has been built successfully on these systems:
 			host lisp = SBCL itself
 		os = OpenBSD 2.6, 2.7, 2.8, 2.9, and 3.0
 			host lisp = SBCL itself
+	cpu = sparc
+		os = Debian GNU/Linux 2.2 with libc >= 2.2
+			host lisp = SBCL itself
+		os = Solaris 8
+			host lisp = SBCL itself
 It is known not to build under CLISP because of (as of early June 2002)
 bugs in the CLISP garbage collector, and it is known not to build under
 other systems like OpenMCL because of (as of early June 2002) remaining

@@ -47,7 +47,6 @@
 
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
-	    (eval :scs (descriptor-reg))
 	    (alien-stack :scs (descriptor-reg)))
   (:generator 13
     (load-symbol-value catch *current-catch-block*)
@@ -55,7 +54,6 @@
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
-	 (eval :scs (descriptor-reg))
 	 (alien-stack :scs (descriptor-reg)))
   (:generator 10
     (store-symbol-value catch *current-catch-block*)

@@ -160,7 +160,6 @@
     ;; Things needed for non-local-exit.
     *current-catch-block*
     *current-unwind-protect-block*
-    *eval-stack-top*
 
     ;; Interrupt Handling
     *free-interrupt-context-index*

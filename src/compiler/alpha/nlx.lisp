@@ -46,8 +46,7 @@
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
 	    (nfp :scs (descriptor-reg))
-	    (nsp :scs (descriptor-reg))
-	    (eval :scs (descriptor-reg)))
+	    (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 13
     (load-symbol-value catch *current-catch-block*)
@@ -59,8 +58,7 @@
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
 	 (nfp :scs (descriptor-reg))
-	 (nsp :scs (descriptor-reg))
-	 (eval :scs (descriptor-reg)))
+	 (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:temporary (:sc any-reg) temp)
   (:generator 10

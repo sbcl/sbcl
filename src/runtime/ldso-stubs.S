@@ -24,6 +24,7 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
+#define LANGUAGE_ASSEMBLY
 #include "sbcl.h"
         .text
 

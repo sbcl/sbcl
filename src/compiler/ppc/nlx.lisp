@@ -41,26 +41,22 @@
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
 	    (nfp :scs (descriptor-reg))
-	    (nsp :scs (descriptor-reg))
-	    (eval :scs (descriptor-reg)))
+	    (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 13
     (load-symbol-value catch *current-catch-block*)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(move nfp cur-nfp)))
-    (move nsp nsp-tn)
-    (load-symbol-value eval *eval-stack-top*)))
+    (move nsp nsp-tn)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
 	 (nfp :scs (descriptor-reg))
-	 (nsp :scs (descriptor-reg))
-	 (eval :scs (descriptor-reg)))
+	 (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 10
     (store-symbol-value catch *current-catch-block*)
-    (store-symbol-value eval *eval-stack-top*)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(move cur-nfp nfp)))

@@ -23,6 +23,7 @@
 ;;; but my head is currently spinning (host? target? both?) so I'll go
 ;;; for the minimal changeset... -- CSR, 2002-05-11
 (defmacro def!constant (&whole whole name value &optional doc)
+  (declare (ignore value doc #-sb-xc-host name))
   `(progn
      #-sb-xc-host
      (defconstant ,@(cdr whole))
