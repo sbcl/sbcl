@@ -85,7 +85,8 @@ static lispobj find_code(os_context_t *context)
 #ifdef __i386__
 static lispobj find_code(os_context_t *context)
 {
-  lispobj codeptr = component_ptr_from_pc(*os_context_pc_addr(context));
+  lispobj codeptr =
+      (lispobj)component_ptr_from_pc((lispobj *)(*os_context_pc_addr(context)));
 
   if (codeptr == 0) {
       return NIL;

@@ -39,7 +39,7 @@ set_lossage_handler(void handler(void))
     lossage_handler = handler;
 }
 
-void
+never_returns
 lose(char *fmt, ...)
 {
     va_list ap;
@@ -53,6 +53,8 @@ lose(char *fmt, ...)
     fprintf(stderr, "\n");
     fflush(stderr);
     lossage_handler();
+    fprintf(stderr, "Argh! lossage_handler() returned, total confusion..\n");
+    exit(1);
 }
 
 /* internal error handler for when the Lisp error system doesn't exist

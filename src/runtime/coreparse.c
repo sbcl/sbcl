@@ -27,6 +27,8 @@
 #include "runtime.h"
 #include "globals.h"
 #include "core.h"
+#include "arch.h"
+#include "interr.h"
 #include "sbcl.h"
 
 static void process_directory(int fd, long *ptr, int count)

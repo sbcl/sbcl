@@ -6315,8 +6315,10 @@ clear_auto_gc_trigger(void)
     auto_gc_trigger = 0;
 }
 
-/* Find the code object for the given pc, or return NULL on failure. */
-lispobj*
+/* Find the code object for the given pc, or return NULL on failure.
+ *
+ * FIXME: PC shouldn't be lispobj*, should it? Maybe void*? */
+lispobj *
 component_ptr_from_pc(lispobj *pc)
 {
     lispobj *object = NULL;

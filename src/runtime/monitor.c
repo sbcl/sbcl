@@ -28,6 +28,7 @@
 #include "monitor.h"
 #include "print.h"
 #include "arch.h"
+#include "interr.h"
 #include "gc.h"
 #include "search.h"
 #include "purify.h"
@@ -150,20 +151,25 @@ static void regs_cmd(char **ptr)
     printf("BSP\t=\t0x%08X\n", (unsigned long)current_binding_stack_pointer);
 #endif
 #ifdef __i386__
-    printf("BSP\t=\t0x%08X\n", SymbolValue(BINDING_STACK_POINTER));
+    printf("BSP\t=\t0x%08lx\n",
+	   (unsigned long)SymbolValue(BINDING_STACK_POINTER));
 #endif
 
-    printf("DYNAMIC\t=\t0x%08lX\n", (unsigned long)DYNAMIC_SPACE_START);
+    printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)DYNAMIC_SPACE_START);
 #if defined(ibmrt) || defined(__i386__)
-    printf("ALLOC\t=\t0x%08lX\n", SymbolValue(ALLOCATION_POINTER));
-    printf("TRIGGER\t=\t0x%08lX\n", SymbolValue(INTERNAL_GC_TRIGGER));
+    printf("ALLOC\t=\t0x%08lx\n",
+	   (unsigned long)SymbolValue(ALLOCATION_POINTER));
+    printf("TRIGGER\t=\t0x%08lx\n",
+	   (unsigned long)SymbolValue(INTERNAL_GC_TRIGGER));
 #else
     printf("ALLOC\t=\t0x%08X\n",
 	   (unsigned long)dynamic_space_free_pointer);
-    printf("TRIGGER\t=\t0x%08X\n", (unsigned long)current_auto_gc_trigger);
+    printf("TRIGGER\t=\t0x%08lx\n", (unsigned long)current_auto_gc_trigger);
 #endif
-    printf("STATIC\t=\t0x%08lX\n", SymbolValue(STATIC_SPACE_FREE_POINTER));
-    printf("RDONLY\t=\t0x%08lX\n", SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+    printf("STATIC\t=\t0x%08lx\n",
+	   (unsigned long)SymbolValue(STATIC_SPACE_FREE_POINTER));
+    printf("RDONLY\t=\t0x%08lx\n",
+	   (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
 
 #ifdef MIPS
     printf("FLAGS\t=\t0x%08x\n", current_flags_register);
@@ -244,27 +250,27 @@ static void call_cmd(char **ptr)
 		    goto fdefn;
 		}
 	    }
-	    printf("symbol 0x%08lx is undefined.\n", thing);
+	    printf("symbol 0x%08lx is undefined.\n", (long unsigned)thing);
 	    return;
 
 	  case type_Fdefn:
 	  fdefn:
 	    function = FDEFN(thing)->function;
 	    if (function == NIL) {
-		printf("fdefn 0x%08lx is undefined.\n", thing);
+		printf("fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
 		return;
 	    }
 	    break;
 	  default:
-	    printf(
-	      "0x%08lx is not a function pointer, symbol, or fdefn object.\n",
-		   thing);
+	    printf("0x%08lx is not a function pointer, symbol, "
+		   "or fdefn object.\n",
+		   (long unsigned)thing);
 	    return;
 	}
     }
     else if (LowtagOf(thing) != type_FunctionPointer) {
         printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
-	       thing);
+	       (long unsigned)thing);
         return;
     }
     else
@@ -273,25 +279,27 @@ static void call_cmd(char **ptr)
     numargs = 0;
     while (more_p(ptr)) {
 	if (numargs >= 3) {
-	    printf("Too many arguments. (3 at most)\n");
+	    printf("too many arguments (no more than 3 allowed)\n");
 	    return;
 	}
 	args[numargs++] = parse_lispobj(ptr);
     }
 
     switch (numargs) {
-      case 0:
+    case 0:
 	result = funcall0(function);
 	break;
-      case 1:
+    case 1:
 	result = funcall1(function, args[0]);
 	break;
-      case 2:
+    case 2:
 	result = funcall2(function, args[0], args[1]);
 	break;
-      case 3:
+    case 3:
 	result = funcall3(function, args[0], args[1], args[2]);
 	break;
+    default:
+	lose("unsupported argument count");
     }
 
     print(result);
@@ -348,7 +356,8 @@ static void print_context(os_context_t *context)
 								i)));
 #endif
 	}
-	printf("PC:\t\t  0x%08lx\n", *os_context_pc_addr(context));
+	printf("PC:\t\t  0x%08lx\n",
+	       (unsigned long)(*os_context_pc_addr(context)));
 }
 
 static void print_context_cmd(char **ptr)
@@ -415,8 +424,9 @@ static void catchers_cmd(char **ptr)
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
 		   (unsigned long)catch, (unsigned long)(catch->current_uwp),
 		   (unsigned long)(catch->current_cont),
-		   component_ptr_from_pc(catch->entry_pc) + type_OtherPointer,
-		   catch->entry_pc);
+		   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc) +
+		   type_OtherPointer,
+		   (unsigned long)catch->entry_pc);
 #endif
             brief_print((lispobj)catch->tag);
             catch = catch->previous_catch;

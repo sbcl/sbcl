@@ -97,4 +97,5 @@ void sniff_code_object(struct code *code, unsigned displacement);
 int  update_x86_dynamic_space_free_pointer(void);
 void  gc_alloc_update_page_tables(int unboxed,
 				  struct alloc_region *alloc_region);
+
 #endif _GENCGC_H_

@@ -12,7 +12,7 @@
 #ifndef _INTERR_H_
 #define _INTERR_H_
 
-extern void lose(char *fmt, ...);
+extern never_returns lose(char *fmt, ...);
 extern void set_lossage_handler(void fun(void));
 extern void describe_internal_error(os_context_t *context);
 

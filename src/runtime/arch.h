@@ -31,5 +31,6 @@ extern lispobj funcall1(lispobj function, lispobj arg0);
 extern lispobj funcall2(lispobj function, lispobj arg0, lispobj arg1);
 extern lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1,
 			lispobj arg2);
+extern lispobj *component_ptr_from_pc(lispobj *pc);
 
 #endif /* __ARCH_H__ */

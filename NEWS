@@ -502,11 +502,13 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   of static symbols.
 * FINISH-OUTPUT is now called more consistently on QUIT. (It
   used to not be called for a saved Lisp image.)
+?? A bug related to the signal handling rewrite, keeping the DEBUG:ARG 
+  function from working, was fixed.
 * Martin Atzmueller's version of a patch to fix a compiler crash,
   as posted on sbcl-devel 13 September 2000, has been installed.
 * Instead of installing Martin Atzmueller's patch for the
   compiler transform for SUBSEQ, I deleted the compiler transform,
-  and transforms for some similar consing operations (CONCATENATE
+  and transforms for some similar consing operations.
 ?? A bug in signal handling which kept TRACE from working on OpenBSD
   has been fixed.
   ?? Remember to remove this from the port-specific section of BUGS.
@@ -520,7 +522,7 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   (through GENESIS and the sbcl.h file). Therefore, patching the
   address map is less unnecessarily tedious and error-prone. The
   Lisp names of address space constants have also been systematized.
-?? CVS tags like dollar-Header-dollar have been removed from
+* CVS tags like dollar-Header-dollar have been removed from
   the sources, because they have never saved me trouble and
   they've been source of trouble working with patches and other
   diff-related operations.
