@@ -770,11 +770,8 @@ bootstrapping.
 #-sb-fluid (declaim (sb-ext:freeze-type fast-instance-boundp))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defvar *allow-emf-call-tracing-p* nil)
-(defvar *enable-emf-call-tracing-p* #-testing nil #+testing t)
-
-) ; EVAL-WHEN
+  (defvar *allow-emf-call-tracing-p* nil)
+  (defvar *enable-emf-call-tracing-p* #-sb-show nil #+sb-show t))
 
 ;;;; effective method functions
 
@@ -820,30 +817,34 @@ bootstrapping.
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (invoke-fast-method-call ,emf ,@required-args+rest-arg)))
 
+;;; KLUDGE: an opaque-to-the-compiler IDENTITY function to hide code
+;;; from the too-easily-bewildered compiler type checker
+(defun trust-me-i-know-what-i-am-doing (x)
+  x)
+
 (defmacro invoke-effective-method-function (emf restp
 						&rest required-args+rest-arg)
   (unless (constantp restp)
     (error "The RESTP argument is not constant."))
+  ;; FIXME: The RESTP handling here is confusing and maybe slightly
+  ;; broken if RESTP evaluates to a non-self-evaluating form. E.g. if
+  ;;   (INVOKE-EFFECTIVE-METHOD-FUNCTION EMF '(ERROR "gotcha") ...)
+  ;; then TRACE-EMF-CALL-CALL-INTERNAL might die on a gotcha error.
   (setq restp (eval restp))
-  `(locally
-
-     ;; In sbcl-0.6.11.43, the compiler would issue bogus warnings
-     ;; about type mismatches in unreachable code when we
-     ;; macroexpanded the GET-SLOTS-OR-NIL expressions here and
-     ;; byte-compiled the code. GET-SLOTS-OR-NIL is now an inline
-     ;; function instead of a macro, which seems sufficient to solve
-     ;; the problem all by itself (probably because of some quirk in
-     ;; the relative order of expansion and type inference) but we
-     ;; also use overkill by NOTINLINEing GET-SLOTS-OR-NIL, because it
-     ;; looks as though (1) inlining isn't that much of a win anyway,
-     ;; and (2a) once you miss the FAST-METHOD-CALL clause you're
-     ;; going to be slow anyway, but (2b) code bloat still hurts even
-     ;; when it's off the critical path.
-     (declare (notinline get-slots-or-nil))
-
+  `(progn
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (cond ((typep ,emf 'fast-method-call)
-	     (invoke-fast-method-call ,emf ,@required-args+rest-arg))
+	    (invoke-fast-method-call ,emf ,@required-args+rest-arg))
+	   ;; "What," you may wonder, "do these next two clauses do?"
+	   ;; In that case, you are not a PCL implementor, for they
+	   ;; considered this to be self-documenting.:-| Or CSR, for
+	   ;; that matter, since he can also figure it out by looking
+	   ;; at it without breaking stride. For the rest of us,
+	   ;; though: From what the code is doing with .SLOTS. and
+	   ;; whatnot, evidently it's implementing SLOT-VALUEish and
+	   ;; GET-SLOT-VALUEish things. Then we can reason backwards
+	   ;; and conclude that setting EMF to a FIXNUM is an
+	   ;; optimized way to represent these slot access operations.
 	   ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
 	       `(((typep ,emf 'fixnum)
 		  (let* ((.slots. (get-slots-or-nil
@@ -858,18 +859,31 @@ bootstrapping.
 		  (let ((.new-value. ,(car required-args+rest-arg))
 			(.slots. (get-slots-or-nil
 				  ,(car required-args+rest-arg))))
-                    (when .slots.
-                         (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
-	   #||
-	   ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
-	       `(((typep ,emf 'fast-instance-boundp)
-		  (let ((.slots. (get-slots-or-nil
-				  ,(car required-args+rest-arg))))
-		    (and .slots.
-			 (not (eq (clos-slots-ref
-				   .slots. (fast-instance-boundp-index ,emf))
-				  +slot-unbound+)))))))
-	   ||#
+		    ;; KLUDGE: As of sbcl-0.7.4.20 or so, there's not
+		    ;; enough information available either at
+		    ;; macroexpansion time or at compile time to
+		    ;; exclude the possibility that a two-argument
+		    ;; CALL-NEXT-METHOD might be a FIXNUM-encoded slot
+		    ;; writer, and when the compiler sees into this
+		    ;; macroexpansion, it can tell that the type
+		    ;; of this clause -- just in case of being
+		    ;; a slot writer -- doesn't match the type
+		    ;; needed for CALL-NEXT-METHOD, and complain.
+		    ;; (E.g. in
+		    ;;   (defmethod get-price ((obj1 a) (obj2 c))
+		    ;;     (* 3 (call-next-method)))
+		    ;; in the original bug report from Stig Erik
+		    ;; Sandoe. As a quick hack to make the bogus
+		    ;; warning go away we use this
+		    ;; opaque-to-the-compiler IDENTITY operation to
+		    ;; hide any possible type mismatch.)
+		    (trust-me-i-know-what-i-am-doing
+		     (when .slots.
+		       (setf (clos-slots-ref .slots. ,emf) .new-value.)))))))
+	   ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
+	   ;; ...) clause here to handle SLOT-BOUNDish stuff. Since
+	   ;; there was no explanation and presumably the code is 10+
+	   ;; years stale, I simply deleted it. -- WHN)
 	   (t
 	    (etypecase ,emf
 	      (method-call
@@ -988,7 +1002,7 @@ bootstrapping.
                          `(if ,cnm-args
                            (bind-args ((,@',args
                                         ,@',(when rest-arg
-                                                  `(&rest ,rest-arg)))
+					      `(&rest ,rest-arg)))
                                        ,cnm-args)
                             ,call)
                            ,call))))

@@ -1,6 +1,8 @@
 for early 0.7.x:
 
-* building with CLISP (or explaining why not)
+* building using something other than SBCL/CMUCL, e.g. CLISP or OpenMCL,
+	as xc host; or at least hitting bugs (in them, not us:-) which
+	give us a good excuse not to:-|
 * urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
 	** (also, while working on INLINE anyway, it might be easy

@@ -970,9 +970,9 @@
   (let ((method (get-method generic-function () (list class) nil)))
     (when method (remove-method generic-function method))))
 
-;;; make-reader-method-function and make-write-method function are NOT part of
-;;; the standard protocol. They are however useful, PCL makes uses makes use
-;;; of them internally and documents them for PCL users.
+;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITE-METHOD function are NOT
+;;; part of the standard protocol. They are however useful, PCL makes
+;;; use of them internally and documents them for PCL users.
 ;;;
 ;;; *** This needs work to make type testing by the writer functions which
 ;;; *** do type testing faster. The idea would be to have one constructor
@@ -980,7 +980,7 @@
 ;;;
 ;;; *** There is a subtle bug here which is going to have to be fixed.
 ;;; *** Namely, the simplistic use of the template has to be fixed. We
-;;; *** have to give the optimize-slot-value method the user might have
+;;; *** have to give the OPTIMIZE-SLOT-VALUE method the user might have
 ;;; *** defined for this metaclass a chance to run.
 
 (defmethod make-reader-method-function ((class slot-class) slot-name)
