@@ -35,6 +35,7 @@ case `uname -m` in
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
     ppc) guessed_sbcl_arch=ppc ;;
+    parisc) guessed_sbcl_arch=hppa ;;
     *)
         # If we're not building on a supported target architecture, we
 	# we have no guess, but it's not an error yet, since maybe

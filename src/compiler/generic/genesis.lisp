@@ -1678,8 +1678,8 @@
 			       (descriptor-gspace code-object))))
     (ecase +backend-fasl-file-implementation+
       ;; See CMU CL source for other formerly-supported architectures
-      ;; (and note that you have to rewrite them to use VECTOR-REF
-      ;; unstead of SAP-REF).
+      ;; (and note that you have to rewrite them to use BVREF-X
+      ;; instead of SAP-REF).
       (:alpha
 	 (ecase kind
          (:jmp-hint
@@ -1710,6 +1710,36 @@
                 (ldb (byte 8 0) value)
                 (bvref-8 gspace-bytes (1+ gspace-byte-offset))
                 (ldb (byte 8 8) value)))))
+      (:hppa
+       (ecase kind
+	 (:load
+	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
+		(logior (ash (ldb (byte 11 0) value) 1)
+			(logand (bvref-32 gspace-bytes gspace-byte-offset) 
+				#xffffc000))))
+	 (:load-short
+	  (let ((low-bits (ldb (byte 11 0) value)))
+	    (assert (<= 0 low-bits (1- (ash 1 4))))
+	    (setf (bvref-32 gspace-bytes gspace-byte-offset)
+		  (logior (ash low-bits 17)
+			  (logand (bvref-32 gspace-bytes gspace-byte-offset)
+				  #xffe0ffff)))))
+	 (:hi
+	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
+		(logior (ash (ldb (byte 5 13) value) 16)
+			(ash (ldb (byte 2 18) value) 14)
+			(ash (ldb (byte 2 11) value) 12)
+			(ash (ldb (byte 11 20) value) 1)
+			(ldb (byte 1 31) value)
+			(logand (bvref-32 gspace-bytes gspace-byte-offset)
+				#xffe00000))))
+	 (:branch
+	  (let ((bits (ldb (byte 9 2) value)))
+	    (assert (zerop (ldb (byte 2 0) value)))
+	    (setf (bvref-32 gspace-bytes gspace-byte-offset)
+		  (logior (ash bits 3)
+			  (logand (bvref-32 gspace-bytes gspace-byte-offset)
+				  #xffe0e002)))))))
       (:ppc
        (ecase kind
          (:ba

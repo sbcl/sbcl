@@ -1191,6 +1191,10 @@ changes in sbcl-0.7.6 relative to sbcl-0.7.5:
     is no longer a static symbol.)
 
 changes in sbcl-0.7.7 relative to sbcl-0.7.6:
+  * An alpha-quality port to the parisc architecture running Linux,
+    based on the old CMUCL backend has been made.  This, even more so
+    than the other backends, should be considered still a work in
+    progress.
   * fixed bug 189: The compiler now respects NOTINLINE declarations for
     functions declared in FLET and LABELS. (I.e. "LET conversion" is
     suppressed.) Also now that the compiler is looking at declarations

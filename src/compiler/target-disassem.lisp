@@ -276,71 +276,6 @@
 	      (seg-virtual-location seg)
 	      (seg-code seg)))))
 
-;;; All state during disassembly. We store some seemingly redundant
-;;; information so that we can allow garbage collect during disassembly and
-;;; not get tripped up by a code block being moved...
-(defstruct (disassem-state (:conc-name dstate-)
-			   (:constructor %make-dstate)
-			   (:copier nil))
-  ;; offset of current pos in segment
-  (cur-offs 0 :type offset)		
-  ;; offset of next position
-  (next-offs 0 :type offset)		
-  ;; a sap pointing to our segment
-  (segment-sap (missing-arg) :type sb!sys:system-area-pointer)
-  ;; the current segment					
-  (segment nil :type (or null segment))	
-  ;; what to align to in most cases
-  (alignment sb!vm:n-word-bytes :type alignment) 
-  (byte-order :little-endian
-	      :type (member :big-endian :little-endian))
-  ;; for user code to hang stuff off of
-  (properties nil :type list)
-  (filtered-values (make-array max-filtered-value-index)
-		   :type filtered-value-vector)
-  ;; used for prettifying printing
-  (addr-print-len nil :type (or null (integer 0 20)))
-  (argument-column 0 :type column)
-  ;; to make output look nicer
-  (output-state :beginning		
-		:type (member :beginning
-			      :block-boundary
-			      nil))
-
-  ;; alist of (address . label-number)
-  (labels nil :type list)		
-  ;; same as LABELS slot data, but in a different form
-  (label-hash (make-hash-table) :type hash-table)
-  ;; list of function
-  (fun-hooks nil :type list) 		
-
-  ;; alist of (address . label-number), popped as it's used
-  (cur-labels nil :type list)
-  ;; OFFS-HOOKs, popped as they're used
-  (cur-offs-hooks nil :type list) 	
-
-  ;; for the current location
-  (notes nil :type list)
-
-  ;; currently active source variables
-  (current-valid-locations nil :type (or null (vector bit))))
-(def!method print-object ((dstate disassem-state) stream)
-  (print-unreadable-object (dstate stream :type t)
-    (format stream
-	    "+~W~@[ in ~S~]"
-	    (dstate-cur-offs dstate)
-	    (dstate-segment dstate))))
-
-;;; Return the absolute address of the current instruction in DSTATE.
-(defun dstate-cur-addr (dstate)
-  (the address (+ (seg-virtual-location (dstate-segment dstate))
-		  (dstate-cur-offs dstate))))
-
-;;; Return the absolute address of the next instruction in DSTATE.
-(defun dstate-next-addr (dstate)
-  (the address (+ (seg-virtual-location (dstate-segment dstate))
-		  (dstate-next-offs dstate))))
-
 ;;;; function ops
 
 (defun fun-self (fun)

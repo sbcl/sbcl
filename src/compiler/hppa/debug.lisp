@@ -1,0 +1,121 @@
+(in-package "SB!VM")
+
+
+(define-vop (debug-cur-sp)
+  (:translate current-sp)
+  (:policy :fast-safe)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 1
+    (move csp-tn res)))
+
+(define-vop (debug-cur-fp)
+  (:translate current-fp)
+  (:policy :fast-safe)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 1
+    (move cfp-tn res)))
+
+(define-vop (read-control-stack)
+  (:translate stack-ref)
+  (:policy :fast-safe)
+  (:args (object :scs (sap-reg))
+	 (offset :scs (any-reg)))
+  (:arg-types system-area-pointer positive-fixnum)
+  (:results (result :scs (descriptor-reg)))
+  (:result-types *)
+  (:generator 5
+    (inst ldwx offset object result)))
+
+(define-vop (read-control-stack-c)
+  (:translate stack-ref)
+  (:policy :fast-safe)
+  (:args (object :scs (sap-reg)))
+  (:info offset)
+  (:arg-types system-area-pointer (:constant (signed-byte 12)))
+  (:results (result :scs (descriptor-reg)))
+  (:result-types *)
+  (:generator 4
+    (inst ldw (* offset n-word-bytes) object result)))
+
+(define-vop (write-control-stack)
+  (:translate %set-stack-ref)
+  (:policy :fast-safe)
+  (:args (object :scs (sap-reg) :target sap)
+	 (offset :scs (any-reg))
+	 (value :scs (descriptor-reg) :target result))
+  (:arg-types system-area-pointer positive-fixnum *)
+  (:results (result :scs (descriptor-reg)))
+  (:result-types *)
+  (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
+  (:generator 2
+    (inst add object offset sap)
+    (inst stw value 0 sap)
+    (move value result)))
+
+(define-vop (write-control-stack-c)
+  (:translate %set-stack-ref)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg))
+	 (value :scs (descriptor-reg) :target result))
+  (:info offset)
+  (:arg-types system-area-pointer (:constant (signed-byte 12)) *)
+  (:results (result :scs (descriptor-reg)))
+  (:result-types *)
+  (:generator 1
+    (inst stw value (* offset n-word-bytes) sap)
+    (move value result)))
+
+(define-vop (code-from-mumble)
+  (:policy :fast-safe)
+  (:args (thing :scs (descriptor-reg) :to :save))
+  (:results (code :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:variant-vars lowtag)
+  (:generator 5
+    (loadw temp thing 0 lowtag)
+    (inst srl temp n-widetag-bits temp)
+    (inst comb := zero-tn temp done)
+    (move null-tn code)
+    (inst sll temp (1- (integer-length n-word-bytes)) temp)
+    (unless (= lowtag other-pointer-lowtag)
+      (inst addi (- lowtag other-pointer-lowtag) temp temp))
+    (inst sub thing temp code)
+    DONE))
+
+(define-vop (code-from-lra code-from-mumble)
+  (:translate lra-code-header)
+  (:variant other-pointer-lowtag))
+
+(define-vop (code-from-fun code-from-mumble)
+  (:translate fun-code-header)
+  (:variant fun-pointer-lowtag))
+
+(define-vop (make-lisp-obj)
+  (:policy :fast-safe)
+  (:translate make-lisp-obj)
+  (:args (value :scs (unsigned-reg) :target result))
+  (:arg-types unsigned-num)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 1
+    (move value result)))
+
+(define-vop (get-lisp-obj-address)
+  (:policy :fast-safe)
+  (:translate get-lisp-obj-address)
+  (:args (thing :scs (descriptor-reg) :target result))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (move thing result)))
+
+(define-vop (fun-word-offset)
+  (:policy :fast-safe)
+  (:translate fun-word-offset)
+  (:args (fun :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 5
+    (loadw res fun 0 fun-pointer-lowtag)
+    (inst srl res n-widetag-bits res)))
