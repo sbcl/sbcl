@@ -108,23 +108,6 @@ WORKAROUND:
   Perhaps any number of such consecutive lines ought to turn into a
   single "compiling top-level forms:" line.
 
-10:
-  The way that the compiler munges types with arguments together
-  with types with no arguments (in e.g. TYPE-EXPAND) leads to
-  weirdness visible to the user:
-	(DEFTYPE FOO () 'FIXNUM)
-	(TYPEP 11 'FOO) => T
-	(TYPEP 11 '(FOO)) => T, which seems weird
-	(TYPEP 11 'FIXNUM) => T
-	(TYPEP 11 '(FIXNUM)) signals an error, as it should
-  The situation is complicated by the presence of Common Lisp types
-  like UNSIGNED-BYTE (which can either be used in list form or alone)
-  so I'm not 100% sure that the behavior above is actually illegal.
-  But I'm 90+% sure, and the following related behavior,
-	(TYPEP 11 'AND) => T
-  treating the bare symbol AND as equivalent to '(AND), is specifically
-  forbidden (by the ANSI specification of the AND type).
-
 11:
   It would be nice if the
 	caught ERROR:
@@ -206,13 +189,6 @@ WORKAROUND:
   but at least as of FreeBSD 4.0, the floating point state *is* saved,
   so they could be supported after all. Very likely 
   SIGCONTEXT-FLOATING-POINT-MODES could now be supported, too.
-
-43:
-  (as discussed by Douglas Crosher on the cmucl-imp mailing list ca. 
-  Aug. 10, 2000): CMUCL currently interprets 'member as '(member); same
-  issue with 'union, 'and, 'or etc. So even though according to the
-  ANSI spec, bare 'MEMBER, 'AND, and 'OR are not legal types, CMUCL
-  (and now SBCL) interpret them as legal types.
 
 45:
   a slew of floating-point-related errors reported by Peter Van Eynde
@@ -381,7 +357,7 @@ WORKAROUND:
     As a workaround for the problem, #'(SETF FOO) expressions can
   be replaced with (EFFICIENT-SETF-FUNCTION FOO), where
 (defmacro efficient-setf-function (place-function-name)
-  (or #+sbcl (and (sb-impl::info :function :accessor-for place-function-name)
+  (or #+sbcl (and (sb-int:info :function :accessor-for place-function-name)
 		  ;; a workaround for the problem, encouraging the
 		  ;; inline expansion of the structure accessor, so
 		  ;; that the compiler can optimize its type test
@@ -1075,14 +1051,6 @@ WORKAROUND:
 245: bugs in disassembler
   a. On X86 an immediate operand for IMUL is printed incorrectly.
   b. On X86 operand size prefix is not recognized.
-
-246: "NTH-VALUE scaling problem"
-  NTH-VALUE's current implementation for constant integers scales in
-  compile-time as O(n^4), as indeed must the optional dispatch
-  mechanism on which it is implemented.  While it is unlikely to
-  matter in real user code, it's still unpleasant to observe that
-  (NTH-VALUE 1000 (VALUES-LIST (MAKE-LIST 1001))) takes several hours
-  to compile.
 
 248: "reporting errors in type specifier syntax"
   (TYPEP 1 '(SYMBOL NIL)) says something about "unknown type

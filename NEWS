@@ -1802,7 +1802,9 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * bug fix: defining a generic function with a :METHOD-CLASS being a
     subclass of STANDARD-METHOD no longer causes stack exhaustion.
     (thanks to Gerd Moellmann)
-  * increased compilation speed of long MULTIPLE-VALUES-BIND.
+  * fixed bug 246: increased compilation speed of long
+    MULTIPLE-VALUE-BIND (and likewise of NTH-VALUE with a constant
+    integer argument).
   * a contributed module implementing COMPILER-LET and MACROEXPAND-ALL
     has been included.
   * DEFCONSTANT now throws a condition of type
@@ -1815,6 +1817,11 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     Raymond Toy)
   * bug fix: in macro-like defining macros/special operators the
     implicit block does not enclose lambda list.
+  * fixed bugs 10 and 43: VALUES, AND, OR and MEMBER are not suitable as 
+    atomic type specifiers, and their use properly signals an error now.
+  * bug fix: an argument count mismatch for a type specifier in code
+    being compiled no longer causes an unhandled error at compile
+    time, but signals a compile-time warning.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

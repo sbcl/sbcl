@@ -487,13 +487,10 @@
 		(or (built-in-classoid-translation spec) spec)
 		spec))
 	   (t
-	    (let* (;; FIXME: This automatic promotion of FOO-style
-		   ;; specs to (FOO)-style specs violates the ANSI
-		   ;; standard. Unfortunately, we can't fix the
-		   ;; problem just by removing it, since then things
-		   ;; downstream should break. But at some point we
-		   ;; should fix this and the things downstream too.
-		   (lspec (if (atom spec) (list spec) spec))
+	    (when (and (atom spec)
+		       (member spec '(and or not member eql satisfies values)))
+	      (error "The symbol ~S is not valid as a type specifier." spec))
+	    (let* ((lspec (if (atom spec) (list spec) spec))
 		   (fun (info :type :translator (car lspec))))
 	      (cond (fun
 		     (funcall fun lspec))
