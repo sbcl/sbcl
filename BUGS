@@ -1060,6 +1060,36 @@ WORKAROUND:
 257:
   Complex array type does not have corresponding type specifier.
 
+  This is a problem because the compiler emits optimization notes when
+  you use a non-simple array, and without a type specifier for hairy
+  array types, there's no good way to tell it you're doing it 
+  intentionally so that it should shut up and just compile the code.
+
+258: "TYPE-ERROR when recursive LABELS function is declared INLINE"
+  The compiler does emit a helpful 
+    ; note: couldn't inline expand because expansion calls this 
+    ;   LET-converted local function:
+    ;   "LABELS COMMON-LISP-USER::C.FROB"
+  but still shouldn't fail with a TYPE-ERROR 
+    The value NIL is not of type SB-C::NODE.
+  when compiling
+    (cl:in-package :cl-user)
+    (declaim (optimize (safety 3) (speed 2) (space 1)))
+    (defvar *foo*)
+    (defvar *bar*)
+    (defun u-b-sra (x r ad0 &optional ad1 &rest ad-list)
+        (labels ((c.frob (c0)
+                   (let ()
+                     (when *foo*
+                       (vector-push-extend c0 *bar*))))
+                 (ad.frob (ad)
+                   (if *foo*
+                       (map nil #'ad.frob (the (vector t) *bar*))
+                       (dolist (b *bar*)
+                         (c.frob b)))))
+          (declare (inline c.frob ad.frob)) ; 'til DYNAMIC-EXTENT
+          (ad.frob ad0)))
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
