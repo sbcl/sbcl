@@ -176,9 +176,16 @@
 		  (:translate ,translate)
 		  (:generator ,untagged-penalty
 		  (move r x)
-		  (inst ,op r y))))))
-
-  ;;(define-binop + 4 add)
+		  ,(if (eq translate 'logand)
+		       ;; for the -C/UNSIGNED=>UNSIGNED VOP, this case
+		       ;; is optimized away as an identity somewhere
+		       ;; along the lines.  However, this VOP is used in
+		       ;; -C/SIGNED=>UNSIGNED, below, when the
+		       ;; higher-level lisp code can't optimize away the
+		       ;; non-trivial identity.
+		       `(unless (= y #.(1- (ash 1 n-word-bits)))
+			  (inst ,op r y))
+		       `(inst ,op r y)))))))
   (define-binop - 4 sub)
   (define-binop logand 2 and)
   (define-binop logior 2 or)
@@ -248,7 +255,6 @@
 	  (t
 	   (move r x)
 	   (inst add r y)))))
-
 
 ;;;; Special logand cases: (logand signed unsigned) => unsigned
 
