@@ -62,7 +62,7 @@
 
 (defsystem sb-bsd-sockets
     :version "0.58"
-    :depends-on (sb-rt sb-grovel)
+    :depends-on (sb-grovel)
     :components ((:file "defpackage")
 		 (:file "split" :depends-on ("defpackage"))
                  (:file "array-data" :depends-on ("defpackage"))
@@ -85,7 +85,6 @@
 		 (:file "misc" :depends-on ("sockets" "constants"))
 
 		 (:file "def-to-lisp")
-		 (:file "tests" :depends-on ("inet" "sockopt"))
 
 		 (:static-file "NEWS")
 		 ;; (:static-file "INSTALL")
@@ -98,6 +97,13 @@
   (provide 'sb-bsd-sockets))
 
 (defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets))))
+  (operate 'load-op 'sb-bsd-sockets-tests)
+  (operate 'test-op 'sb-bsd-sockets-tests))
+
+(defsystem sb-bsd-sockets-tests
+  :depends-on (sb-rt sb-bsd-sockets)
+  :components ((:file "tests")))
+
+(defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets-tests))))
   (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
       (error "test-op failed")))
-

@@ -13,7 +13,7 @@
 ;;; unix.lisp, should presumably end up somewhere else, either in sbcl
 ;;; itself or in sb-posix.
 
-("stdio.h" "sys/types.h" "sys/stat.h" "fcntl.h" "asm/errno.h" "sys/mman.h")
+("stdio.h" "sys/types.h" "sys/stat.h" "fcntl.h" "errno.h" "sys/mman.h")
 
 ((:integer eacces "EACCES" "Error code for access error")
  (:integer prot-none "PROT_NONE" "mmap: no protection")

@@ -6,7 +6,13 @@
     (format stream "printf(\"(sb-grovel::define-c-struct ~A %d)\\n\",sizeof (~A));~%" lisp-name c-name)
     (dolist (e elements)
       (destructuring-bind (lisp-type lisp-el-name c-type c-el-name) e
-        (format stream "printf(\"(sb-grovel::define-c-accessor ~A-~A ~A ~A \");~%"
+	;; FIXME: this format string doesn't actually guarantee
+	;; non-multilined-string-constantness, it just makes it more
+	;; likely.  Sort out the required behaviour (and maybe make
+	;; the generated C more readable, while we're at it...) --
+	;; CSR, 2003-05-27
+        (format stream "printf(\"(sb-grovel::define-c-accessor ~A-~A\\n\\~%  ~
+                        ~A ~A \");~%"
                 lisp-name lisp-el-name lisp-name lisp-type)
         ;; offset
         (format stream "{ ~A t;printf(\"%d \",((unsigned long)&(t.~A)) - ((unsigned long)&(t)) ); }~%"
@@ -18,21 +24,11 @@
 
 (defun c-for-function (stream lisp-name alien-defn)
   (destructuring-bind (c-name &rest definition) alien-defn
-    (let ((*print-right-margin* nil))
-      (format stream "printf(\"(cl:declaim (cl:inline ~A))\\n\");~%"
-              lisp-name)
-      (princ "printf(\"(sb-grovel::define-foreign-routine (" stream)
-      (princ "\\\"" stream) (princ c-name stream) (princ "\\\" " stream)
-      (princ lisp-name stream)
-      (princ " ) " stream)
-      (terpri stream)
-      (dolist (d definition)
-        (write d :length nil
-               :right-margin nil :stream stream)
-        (princ " " stream))
-      (format stream ")\\n\");")
-      (terpri stream))))
-
+    (format stream "printf(\"(cl:declaim (cl:inline ~A))\\n\");~%" lisp-name)
+    (format stream
+	    "printf(\"(sb-grovel::define-foreign-routine (\\\"~A\\\" ~A)\\n\\~%~
+            ~{  ~W~^\\n\\~%~})\\n\");~%"
+	    c-name lisp-name definition)))
 
 (defun print-c-source (stream headers definitions package-name)
   (let ((*print-right-margin* nil))
@@ -69,7 +65,7 @@ printf(\"(in-package ~S)\\\n\");~%" package-name)
               (t
                (format stream
                        "printf(\";; Non hablo Espagnol, Monsieur~%")))))
-    (format stream "exit(0);~%}")))
+    (format stream "exit(0);~%}~%")))
 
 (defun c-constants-extract  (filename output-file package)
   (with-open-file (f output-file :direction :output)
