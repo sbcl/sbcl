@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE catalog
+   PUBLIC "-//OASIS/DTD Entity Resolution XML Catalog V1.0//EN"
+   "http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd">
+
+<catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
+
+  <!-- The directory DTD and stylesheet files are installed under -->
+  <group  xml:base="file:///usr/share/sgml/docbook/" >
+
+    <!-- Resolve DTD URL system ID to local file -->
+    <rewriteSystem
+        systemIdStartString="http://www.oasis-open.org/docbook/xml/4.1/"
+        rewritePrefix="xml-dtd-4.1.2-1.0-22.1/" />
+
+    <!-- FIXME: Need to verify the location of the XSL files on RedHat -->
+    <!-- Resolve stylesheet URL to local file -->
+    <rewriteURI
+        uriStartString="http://docbook.sourceforge.net/release/xsl/current/"
+        rewritePrefix="xsl-stylesheets/" />
+
+    <!-- Resolve DTD PUBLIC identifiers -->
+    <nextCatalog  catalog="xmlcatalog" />
+
+    <!-- To resolve simple DTD SYSTEM identifiers. -->
+    <!-- Note: this does not work with Java resolver -->
+    <!--   classes in Saxon or Xalan -->
+    <system
+         systemId="docbook.dtd"
+         uri="xml-dtd-4.1.2-1.0-22.1/docbookx.dtd" />
+
+    <!-- To resolve short stylesheet references -->
+    <uri
+        name="docbook_html.xsl"
+        uri="xsl-stylesheets/xhtml/docbook.xsl" />
+    <uri 
+        name="docbook_chunk.xsl"
+        uri="xsl-stylesheets/xhtml/chunk.xsl" />
+    <uri
+        name="docbook_fo.xsl"
+        uri="xsl-stylesheets/fo/docbook.xsl" />
+
+  </group>
+
+</catalog>

@@ -68,3 +68,11 @@ Tools for Fink
        
   The easiest way to do this is with the command:
     fink install libxslt docbook-dtd docbook-xsl libxml2-bin
+
+Tools Web Home
+--------------
+xsltproc     http://xmlsoft.org/XSLT/
+DocBook DTD  http://www.docbook.org/xml/
+DocBook XSL  http://sourceforge.net/projects/docbook
+xmllint      http://xmlsoft.org/
+FOP          http://xml.apache.org/fop/

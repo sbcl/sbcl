@@ -9,10 +9,6 @@ DOCFILE_EXT_DEFAULT:=xml
 SYSTEM:=$(shell uname)
 
 ifeq ($(SYSTEM),Linux) 
-  DEBIAN=$()
-  SUSE=
-  REDHAT=
-
   ifneq ($(shell expr "`cat /etc/issue`" : '.*Debian.*'),0)
     OS:=debian
     else
@@ -21,6 +17,10 @@ ifeq ($(SYSTEM),Linux)
     else   
       ifneq ($(shell expr "`cat /etc/issue`" : 'Red Hat Linux release 9'),0)
         OS=redhat9
+      else   
+        ifneq ($(shell expr "`cat /etc/issue`" : '.*Yarrow.*'),0)
+          OS=fedora1
+        endif
       endif
     endif
   endif
@@ -52,7 +52,7 @@ ifeq ($(XSLTPROC),)
   XSLTPROC:=xsltproc
 endif
 
-CATALOG:=`pwd`/catalog-${OS}.xml
+CATALOG:=`pwd`/catalogs/catalog-${OS}.xml
 CHECK:=XML_CATALOG_FILES="$(CATALOG)" xmllint --noout --xinclude --postvalid $(DOCFILE) || exit 1
 
 .PHONY: all
