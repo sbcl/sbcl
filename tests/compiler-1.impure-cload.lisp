@@ -121,5 +121,22 @@
 (defun bug221 (b x)
   (funcall (if b #'bug221-f1 #'bug221-f2) x))
 
+;;; bug 166: compiler failure
+(defstruct bug166s)
+(defmethod permanentize ((uustk bug166s))
+  (flet ((frob (hash-table test-for-deletion)
+           )
+         (obj-entry.stale? (oe)
+           (destructuring-bind (key . datum) oe
+             (declare (type simple-vector key))
+             (deny0 (void? datum))
+             (some #'stale? key))))
+    (declare (inline frob obj-entry.stale?))
+    (frob (uustk.args-hash->obj-alist uustk)
+          #'obj-entry.stale?)
+    (frob (uustk.hash->memoized-objs-list uustk)
+          #'objs.stale?))
+  (call-next-method))
+
 (sb-ext:quit :unix-status 104) ; success
 

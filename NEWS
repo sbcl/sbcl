@@ -1363,6 +1363,8 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
         correct order
      ** MULTIPLE-VALUE-SETQ evaluates side-effectful places before
         value producing form
+   * fixed bug 166: compiler preserves "there is a way to go"
+     invariant when deleting code
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

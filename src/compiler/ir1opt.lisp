@@ -282,9 +282,9 @@
       ;; exception).
       (labels ((mark-blocks (block)
                  (dolist (pred (block-pred block))
-                   (when (and (not (block-delete-p pred))
-                              (eq (functional-kind (block-home-lambda pred))
-                                  :deleted))
+                   (unless (or (block-delete-p pred)
+                               (eq (component-head (block-component pred))
+                                   pred))
                      (setf (block-delete-p pred) t)
                      (mark-blocks pred)))))
         (mark-blocks block)

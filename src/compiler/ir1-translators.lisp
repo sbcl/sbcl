@@ -299,8 +299,7 @@
   "MACROLET ({(Name Lambda-List Form*)}*) Body-Form*
   Evaluate the Body-Forms in an environment with the specified local macros
   defined. Name is the local macro name, Lambda-List is the DEFMACRO style
-  destructuring lambda list, and the Forms evaluate to the expansion. The
-  Forms are evaluated in the null environment."
+  destructuring lambda list, and the Forms evaluate to the expansion.."
   (funcall-in-macrolet-lexenv
    definitions
    (lambda (&key funs)
