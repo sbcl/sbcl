@@ -2190,6 +2190,7 @@
 			  (specialized-element-type-maybe type2))
 		   t)))))
 
+;;; FIXME: is this dead?
 (!define-superclasses array
   ((base-string base-string)
    (vector vector)

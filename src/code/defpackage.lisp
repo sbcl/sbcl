@@ -135,11 +135,9 @@
 		       :format-arguments (list (car x)(car y) z)))))
 
 (defun stringify-name (name kind)
-  (/show0 "in STRINGIFY-NAME, NAME=..")
-  (/hexstr name)
   (typecase name
     (simple-base-string name)
-    (base-string (coerce name 'simple-base-string))
+    (string (coerce name 'simple-base-string))
     (symbol (symbol-name name))
     (base-char (string name))
     (t

@@ -1058,10 +1058,12 @@
      :inherits (vector simple-array array sequence))
     (string
      :translation string
+     :direct-superclasses (vector)
      :inherits (vector array sequence))
     (simple-string
      :translation simple-string
-     :inherits (string simple-array))
+     :direct-superclasses (string simple-array)
+     :inherits (string vector simple-array array sequence))
     (vector-nil
      ;; FIXME: Should this be (AND (VECTOR NIL) (NOT (SIMPLE-ARRAY NIL (*))))?
      :translation (vector nil)
