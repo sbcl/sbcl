@@ -60,26 +60,24 @@
 (defmethod describe-object ((x array) s)
   (fresh-line s)
   (pprint-logical-block (s nil)
-    (let ((rank (array-rank x)))
-      (cond ((= rank 1)
-	     (format s
-		     "~S is a ~:[~;displaced ~]vector of length ~S." x
-		     (and (array-header-p x)
-			  (%array-displaced-p x)
-			  ) (length x))
-	     (when (array-has-fill-pointer-p x)
-	       (format s "~@:_It has a fill pointer, currently ~S."
-		       (fill-pointer x))))
-	    (t
-	     (format s "~S ~_is " x)
-	     (write-string (if (%array-displaced-p x) "a displaced" "an") s)
-	     (format s " array of rank ~S." rank)
-	     (format s "~@:_Its dimensions are ~S." (array-dimensions x)))))
+    (cond
+     ((= 1 (array-rank x))
+      (format s "~S is a vector with ~D elements."
+	      x (car (array-dimensions x)))
+      (when (array-has-fill-pointer-p x)
+	(format s "~@:_It has a fill pointer value of ~S."
+		(fill-pointer x))))
+     (t
+      (format s "~S is an array of dimension ~:S."
+	      x (array-dimensions x))))
     (let ((array-element-type (array-element-type x)))
       (unless (eq array-element-type t)
 	(format s
 		"~@:_Its element type is specialized to ~S."
-		array-element-type))))
+		array-element-type)))
+    (if (and (array-header-p x) (%array-displaced-p x))
+	(format s "~@:_The array is displaced with offset ~S."
+		(%array-displacement x))))
   (terpri s))
 
 (defmethod describe-object ((x hash-table) s)

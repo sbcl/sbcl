@@ -1,8 +1,10 @@
 (in-package :cl-user)
 
 (eval-when (:load-toplevel)
-  (require 'asdf)
-  (require 'asdf-install))
+  (unless (find-package 'asdf)
+    (require 'asdf))
+  (let ((asdf::*verbose-out* nil))
+    (require 'asdf-install)))
 
 (defun run ()
   (handler-case
