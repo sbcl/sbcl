@@ -1086,39 +1086,6 @@ WORKAROUND:
 
  (see also bug 117)
 
-280: bogus WARNING about duplicate function definition 
-  In sbcl-0.8.3 and sbcl-0.8.1.47, if BS.MIN is defined inline,
-  e.g. by 
-     (declaim (inline bs.min))
-     (defun bs.min (bases) nil)
-  before compiling the file below, the compiler warns
-     Duplicate definition for BS.MIN found in one static
-     unit (usually a file).
-  when compiling 
-    (declaim (special *minus* *plus* *stagnant*))
-    (defun b.*.min (&optional (x () xp) (y () yp) &rest rest)
-      (bs.min avec))
-    (define-compiler-macro b.*.min (&rest rest)
-      `(bs.min ,@rest))
-    (defun afish-d-rbd (pd)
-      (if *stagnant* 
-          (b.*.min (foo-d-rbd *stagnant*))
-          (multiple-value-bind (reduce-fn initial-value)
-              (etypecase pd
-                (list (values #'bs.min 0))
-                (vector (values #'bs.min *plus*)))
-            (let ((cv-ks (cv (kpd.ks pd))))
-              (funcall reduce-fn d-rbds)))))
-    (defun bfish-d-rbd (pd)
-      (if *stagnant* 
-          (b.*.min (foo-d-rbd *stagnant*))
-          (multiple-value-bind (reduce-fn initial-value)
-              (etypecase pd
-                (list (values #'bs.min *minus*))
-                (vector (values #'bs.min 0)))
-            (let ((cv-ks (cv (kpd.ks pd))))
-              (funcall reduce-fn d-rbds)))))
-
 281: COMPUTE-EFFECTIVE-METHOD error signalling.
   (slightly obscured by a non-0 default value for
    SB-PCL::*MAX-EMF-PRECOMPUTE-METHODS*)
@@ -1329,18 +1296,6 @@ WORKAROUND:
   The tokenizer's use of *read-buffer* and *read-buffer-length* causes
   spurious errors should two threads attempt to tokenise at the same
   time.
-
-312:
-  (reported by Jon Dyte)
-  SBCL issues a warning "Duplicate definition of FOO" compiling
-
-    (declaim (inline foo))
-    (defun foo (x)
-      (1+ x))
-    (defun bar (y)
-      (list (foo y) (if (> y 1) (funcall (if (> y 0) #'foo #'identity) y))))
-
-  (probably related to the bug 280.)
 
 314: "LOOP :INITIALLY clauses and scope of initializers"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP

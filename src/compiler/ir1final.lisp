@@ -87,13 +87,7 @@
                   (type-specifier declared-ftype)
                   (type-specifier defined-ftype)))))
 	    (:defined
-	     (setf (info :function :type source-name) defined-ftype)))
-	  (when (fasl-output-p *compile-object*)
-	    (if (member source-name *fun-names-in-this-file* :test #'equal)
-		(compiler-warn "~@<Duplicate definition for ~S found in ~
-                                one static unit (usually a file).~@:>"
-			       source-name)
-		(push source-name *fun-names-in-this-file*)))))))
+	     (setf (info :function :type source-name) defined-ftype)))))))
   (values))
 
 ;;; Find all calls in COMPONENT to assumed functions and update the

@@ -184,7 +184,7 @@
 	 (cold-fset ,name ,lambda)
 
 	 (eval-when (:compile-toplevel)
-	   (sb!c:%compiler-defun ',name ',inline-lambda))
+	   (sb!c:%compiler-defun ',name ',inline-lambda t))
 	 (eval-when (:load-toplevel :execute)
 	   (%defun ',name
 		   ;; In normal compilation (not for cold load) this is
@@ -201,7 +201,7 @@
   (declare (type function def))
   (declare (type (or null simple-string) doc))
   (aver (legal-fun-name-p name)) ; should've been checked by DEFMACRO DEFUN
-  (sb!c:%compiler-defun name inline-lambda)
+  (sb!c:%compiler-defun name inline-lambda nil)
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")
     (style-warn "redefining ~S in DEFUN" name))

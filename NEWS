@@ -2448,6 +2448,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug: as reported by Juan Ripoll on cmucl-imp,
     MULTIPLE-VALUE-BIND should be able to lexically bind lambda list
     keywords.
+  * fixed bugs 280 and 312: the checking for multiple definitions in a
+    file is less likely to become confused by uses of inline
+    functions.
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by

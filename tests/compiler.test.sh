@@ -50,6 +50,23 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+# This shouldn't fail because it's not really a multiple definition
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (eval-when (:compile-toplevel :load-toplevel :execute)
+      (defun foo (x) x))
+EOF
+expect_clean_compile $tmpfilename
+
+# Likewise
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (eval-when (:compile-toplevel)
+      (defun foo (x) x))
+    (defun foo (x) x)
+EOF
+expect_clean_compile $tmpfilename
+
 # This shouldn't fail despite the apparent type mismatch, because of
 # the NOTINLINE declamation.
 cat > $tmpfilename <<EOF
@@ -57,6 +74,17 @@ cat > $tmpfilename <<EOF
     (defun foo (x) (list x))
     (declaim (notinline foo))
     (defun bar (x) (1+ (foo x)))
+EOF
+expect_clean_compile $tmpfilename
+
+# This shouldn't fail, but did until sbcl-0.8.10.4x
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (declaim (inline foo))
+    (defun foo (x)
+      (1+ x))
+    (defun bar (y)
+      (list (foo y) (if (> y 1) (funcall (if (> y 0) #'foo #'identity) y))))
 EOF
 expect_clean_compile $tmpfilename
 
