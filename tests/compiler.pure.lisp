@@ -1372,3 +1372,16 @@
                        (progn (if (ldb-test (byte 0 0) (rational (throw 'ct7 0))) 0 0) 0))))
         0 0))))
    391833530 -32785211)))
+
+;;; Efficiency notes for FUNCALL
+(handler-case
+    (compile nil '(lambda (x) (funcall x)))
+  (sb-ext:compiler-note (e)
+    (error "bogus compiler note: ~S." e)))
+
+(catch :got-note
+  (handler-case
+      (compile nil '(lambda (x) (declare (optimize speed)) (funcall x)))
+    (sb-ext:compiler-note (e)
+      (throw :got-note nil)))
+  (error "missing compiler note for FUNCALL"))

@@ -479,8 +479,7 @@
       `(%funcall ,function ,@args)
       (values nil t)))
 
-(deftransform %coerce-callable-to-fun ((thing) (function) *
-				       :important t)
+(deftransform %coerce-callable-to-fun ((thing) (function) *)
   "optimize away possible call to FDEFINITION at runtime"
   'thing)
 
