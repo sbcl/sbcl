@@ -1,13 +1,13 @@
-DOCFILES:=$(shell echo *.texinfo)
-ROOTFILE:=sbcl.texinfo
-TMPFILES:=sbcl.aux sbcl.cp sbcl.fn sbcl.ky sbcl.log sbcl.pg sbcl.toc sbcl.tp sbcl.vr
-
-PSFILE=sbcl.ps
-PDFFILE=sbcl.pdf
-DVIFILE=sbcl.dvi
-INFOFILE=sbcl.info
+SBCLTEXI:=sbcl.texinfo
+ASDFTEXI:=asdf.texinfo
+DOCFILES:=*.texinfo $(ASDFTEXI)
+TMPTYPES:=aux cps fns ky log pg toc tps vrs
+TMPFILES:=$(foreach target,asdf sbcl,$(foreach type,$(TMPTYPES),$(target).$(type)))
+PSFILES=sbcl.ps asdf.ps
+PDFFILES=sbcl.pdf asdf.pdf
+INFOFILES=sbcl.info asdf.info
 VARSFILE=variables.template
-HTMLDIR=$(basename $(ROOTFILE))
+HTMLDIRS=$(basename $(SBCLTEXI)) $(basename $(ASDFTEXI))
 # Place where generated documentation ends up. The value of
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
 # Lisp's `pathname' function).
@@ -32,50 +32,52 @@ ifeq ($(DVIPS),)
 endif
 
 .PHONY: all
-all: ps pdf info html
+all: asdf.texinfo ps pdf info html
 
 .PHONY: dist
 dist: html pdf
 
+asdf.texinfo:
+	rm -f asdf.texinfo
+	ln -s ../../contrib/asdf/asdf.texinfo
 
 variables: ${VARSFILE}
 	./extract-values.sh < ${VARSFILE} >variables.texinfo
 
-# html documentation; output in $(HTMLDIR)
+# html documentation; output in $(HTMLDIRS)
 .PHONY: html
 html: html-stamp
 
 html-stamp: variables $(DOCFILES) docstrings
-	@rm -rf $(HTMLDIR)
-	$(MAKEINFO) $(I_FLAGS) --html $(ROOTFILE)
+	@rm -rf $(HTMLDIRS)
+	$(MAKEINFO) $(I_FLAGS) --html $(SBCLTEXI)
+	$(MAKEINFO) --html $(ASDFTEXI)
 	touch html-stamp
 
 # Postscript documentation
 .PHONY: ps
-ps: $(PSFILE)
+ps: $(PSFILES)
 
-$(PSFILE): $(DVIFILE)
+%.ps: %.dvi
 	dvips -o $@ $<
 
-$(DVIFILE): variables $(DOCFILES) docstrings
-	texi2dvi $(I_FLAGS) $(ROOTFILE)
+# DVI generation
+%.dvi: %.texinfo variables $(DOCFILES) docstrings
+	texi2dvi $(I_FLAGS) $<
 
 # PDF documentation
 .PHONY: pdf
-pdf: $(PDFFILE)
+pdf: $(PDFFILES)
 
-$(PDFFILE): variables $(DOCFILES) docstrings
-	texi2pdf $(I_FLAGS) $(ROOTFILE)
+%.pdf: %.texinfo variables $(DOCFILES) docstrings
+	texi2pdf $(I_FLAGS) $<
 
 # info docfiles
 .PHONY: info
-info: $(INFOFILE)
+info: $(INFOFILES)
 
-$(INFOFILE): variables $(DOCFILES) docstrings
-	$(MAKEINFO) $(I_FLAGS) $(ROOTFILE)
-
-# contrib-modules.texinfo includes contrib-doc-list.texi-temp
-contrib-modules.texinfo: tempfiles-stamp
+%.info: %.texinfo variables $(DOCFILES) docstrings
+	$(MAKEINFO) $(I_FLAGS) $<
 
 # Texinfo docstring snippets
 .PHONY: docstrings
@@ -88,11 +90,11 @@ tempfiles-stamp:
 .PHONY: clean
 clean: 
 	rm -f *~ *.bak *.orig \#*\# .\#* texput.log *.fasl
-	rm -rf $(HTMLDIR) $(DOCSTRINGDIR)
+	rm -rf $(HTMLDIRS) $(DOCSTRINGDIR)
 	rm -f contrib-docs.texi-temp
 	rm -f package-locks.texi-temp
 	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp tempfiles-stamp
-	rm -f $(TMPFILES) contrib-doc-list.texi-temp
+	rm -f $(TMPFILES)
 	rm -f sbcl.info sbcl.info-*
 
 .PHONY: distclean

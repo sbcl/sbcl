@@ -50,7 +50,8 @@ extensions have proper documentation yet.
 
 @item System Definition Tool
 @code{asdf} is a flexible and popular protocol-oriented system
-definition tool by Daniel Barlow. 
+definition tool by Daniel Barlow. @inforef{Top,the asdf manual,asdf}, for
+more information.
 
 @item Third-party Extension Installation Tool
 @code{asdf-install} is a tool that can be used to download and install

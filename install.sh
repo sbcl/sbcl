@@ -79,22 +79,28 @@ echo "Documentation:"
 cp doc/sbcl.1 $BUILD_ROOT$MAN_DIR/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1/sbcl.1"
 
 # info
-INFO_FILE=doc/manual/sbcl.info
-test -f $INFO_FILE && cp $INFO_FILE $BUILD_ROOT$INFO_DIR/ \
-    && echo -n " info $BUILD_ROOT$INFO_DIR/sbcl.info" \
-    && ( install-info $BUILD_ROOT$INFO_DIR/sbcl.info > /dev/null 2>&1 \
-         || echo -n " (could not add to system catalog)" ) \
-    && echo
+for info in doc/manual/*.info
+do
+  cp $info $BUILD_ROOT$INFO_DIR/ \
+      && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info`" \
+      && ( install-info $BUILD_ROOT$INFO_DIR/`basename $info` > /dev/null 2>&1 \
+           || echo -n " (could not add to system catalog)" ) \
+      && echo
+done
 
 # pdf
-PDF_FILE=doc/manual/sbcl.pdf
-test -f $PDF_FILE && cp $PDF_FILE $BUILD_ROOT$DOC_DIR/ \
-    && echo " pdf $BUILD_ROOT$DOC_DIR/sbcl.pdf"
+for pdf in doc/manual/*.pdf
+do
+  cp $pdf $BUILD_ROOT$DOC_DIR/ \
+      && echo " pdf $BUILD_ROOT$DOC_DIR/`basename $pdf`"
+done
 
 # html
-HTMLS=doc/manual/sbcl
-test -d $HTMLS && cp -r $HTMLS $BUILD_ROOT$DOC_DIR/html \
-    && echo " html $BUILD_ROOT$DOC_DIR/html/index.html"
+for html in doc/manual/sbcl doc/manual/asdf
+do
+  test -d $html && cp -r $html $BUILD_ROOT$DOC_DIR/`basename $html` \
+      && echo " html $BUILD_ROOT$DOC_DIR/`basename $html`/index.html"
+done
 
 for f in BUGS SUPPORT CREDITS COPYING NEWS
 do
