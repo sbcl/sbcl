@@ -1410,6 +1410,9 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
   * fixed bug 136: CALL-NEXT-METHOD no longer gets confused when
     arguments are lexically rebound. (thanks to Gerd Moellmann and
     Pierre Mai)
+  * fixed bug 194: error messages are now more informative when there
+    is no primary method applicable in a call to a generic
+    function. (thanks to Gerd Moellmann)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

@@ -1614,12 +1614,6 @@ code to be loaded.
 	    ((and using-allowed (loop-tequal token 'using))
 	     (loop-pop-source)
 	     (do ((z (loop-pop-source) (loop-pop-source)) (tem)) (nil)
-	       (when (or (atom z)
-			 (atom (cdr z))
-			 (not (null (cddr z)))
-			 (not (symbolp (car z)))
-			 (and (cadr z) (not (symbolp (cadr z)))))
-		 (loop-error "~S bad variable pair in path USING phrase" z))
 	       (when (cadr z)
 		 (if (setq tem (loop-tassoc (car z) *loop-named-vars*))
 		     (loop-error
@@ -1759,7 +1753,7 @@ code to be loaded.
 				    sequence-type
 				    element-type)
   (multiple-value-bind (indexv) (loop-named-var 'index)
-    (let ((sequencev (named-var 'sequence)))
+    (let ((sequencev (loop-named-var 'sequence)))
       (list* nil nil				; dummy bindings and prologue
 	     (loop-sequencer
 	      indexv 'fixnum 
@@ -1779,7 +1773,7 @@ code to be loaded.
 ||#
 
 (defun loop-hash-table-iteration-path (variable data-type prep-phrases
-				       &key (which (missing-arg)))
+				       &key (which (sb!int:missing-arg)))
   (declare (type (member :hash-key :hash-value) which))
   (cond ((or (cdr prep-phrases) (not (member (caar prep-phrases) '(:in :of))))
 	 (loop-error "too many prepositions!"))
@@ -1800,11 +1794,12 @@ code to be loaded.
       ;; dummy NILs into MULTIPLE-VALUE-SETQ variable lists.
       (setq other-p t
 	    dummy-predicate-var (loop-when-it-var))
-      (let ((key-var nil)
-	    (val-var nil)
-	    (bindings `((,variable nil ,data-type)
-			(,ht-var ,(cadar prep-phrases))
-			,@(and other-p other-var `((,other-var nil))))))
+      (let* ((key-var nil)
+	     (val-var nil)
+	     (variable (or variable (gensym "LOOP-HASH-VAR-TEMP-")))
+	     (bindings `((,variable nil ,data-type)
+			 (,ht-var ,(cadar prep-phrases))
+			 ,@(and other-p other-var `((,other-var nil))))))
 	(ecase which
 	  (:hash-key (setq key-var variable
 			   val-var (and other-p other-var)))
@@ -1838,7 +1833,8 @@ code to be loaded.
   (unless (symbolp variable)
     (loop-error "Destructuring is not valid for package symbol iteration."))
   (let ((pkg-var (gensym "LOOP-PKGSYM-"))
-	(next-fn (gensym "LOOP-PKGSYM-NEXT-")))
+	(next-fn (gensym "LOOP-PKGSYM-NEXT-"))
+	(variable (or variable (gensym "LOOP-PKGSYM-VAR-"))))
     (push `(with-package-iterator (,next-fn ,pkg-var ,@symbol-types))
 	  *loop-wrappers*)
     `(((,variable nil ,data-type) (,pkg-var ,(cadar prep-phrases)))

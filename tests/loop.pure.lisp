@@ -67,3 +67,16 @@
 
 ;;; similar to gcl/ansi-test LOOP.1.27, and fixed at the same time:
 (assert (equal (loop for x downto 7 by 2 from 13 collect x) '(13 11 9 7)))
+
+;;; some more from gcl/ansi-test:
+(let ((table (make-hash-table)))
+  (setf (gethash 'foo table) '(bar baz))
+  (assert (= (loop for nil being the hash-keys of table count t) 1))
+  (assert (equal (loop for nil being the hash-keys of table
+		               using (hash-value (v1 . v2))
+		       when v1
+		         return v2)
+		 '(baz))))
+
+(assert (= (loop for nil being the external-symbols of :cl count t) 978))
+(assert (= (loop for x being the external-symbols of :cl count x) 977))

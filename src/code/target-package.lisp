@@ -355,7 +355,10 @@
 	 (name (string name))
 	 (found (find-package name)))
     (unless (or (not found) (eq found package))
-      (error "A package named ~S already exists." name))
+      (error 'simple-package-error
+	     :package name
+	     :format-control "A package named ~S already exists."
+	     :format-arguments (list name)))
     (remhash (package-%name package) *package-names*)
     (dolist (n (package-%nicknames package))
       (remhash n *package-names*))
