@@ -516,7 +516,10 @@
     :initform (cons nil nil))
    (predicate-name
     :initform nil
-    :reader class-predicate-name)))
+    :reader class-predicate-name)
+   (finalized-p
+    :initform nil
+    :reader class-finalized-p)))
 
 (def!method make-load-form ((class class) &optional env)
   ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably

@@ -96,7 +96,8 @@
     ((and (null supers)
 	  (not (forward-referenced-class-p class)))
      (list class))
-    ((and (null (cdr supers))
+    ((and (car supers)
+	  (null (cdr supers))
 	  (not (forward-referenced-class-p (car supers))))
      (cons class
 	   (compute-std-cpl (car supers)
@@ -119,7 +120,9 @@
 	       (or (gethash c table)
 		   (setf (gethash c table) (make-cpd))))
 	     (walk (c supers)
-	       (if (forward-referenced-class-p c)
+	       (declare (special *allow-forward-referenced-classes-in-cpl-p*))
+	       (if (and (forward-referenced-class-p c)
+			(not *allow-forward-referenced-classes-in-cpl-p*))
 		   (cpl-forward-referenced-class-error class c)
 		   (let ((cpd (get-cpd c)))
 		     (unless (cpd-class cpd)	;If we have already done this

@@ -261,6 +261,7 @@
 	 (set-slot (slot-name value)
 	   (!bootstrap-set-slot metaclass-name class slot-name value)))
     (set-slot 'name name)
+    (set-slot 'finalized-p t)
     (set-slot 'source source)
     (set-slot 'type (if (eq class (find-class t))
 			t

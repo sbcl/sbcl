@@ -588,5 +588,15 @@
 (assert (= (something-that-specializes (make-instance 'other-name-for-class))
 	   2))
 
+;;; more forward referenced classes stuff
+(defclass frc-1 (frc-2) ())
+(assert (subtypep 'frc-1 (find-class 'frc-2)))
+(assert (subtypep (find-class 'frc-1) 'frc-2))
+(assert (not (subtypep (find-class 'frc-2) 'frc-1)))
+(defclass frc-2 (frc-3) ((a :initarg :a)))
+(assert (subtypep 'frc-1 (find-class 'frc-3)))
+(defclass frc-3 () ())
+(assert (typep (make-instance 'frc-1 :a 2) (find-class 'frc-1)))
+(assert (typep (make-instance 'frc-2 :a 3) (find-class 'frc-2)))
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -87,9 +87,6 @@
 (defmacro find-class-cell-predicate (cell)
   `(cadr ,cell))
 
-(defmacro find-class-cell-make-instance-function-keys (cell)
-  `(cddr ,cell))
-
 (defmacro make-find-class-cell (class-name)
   (declare (ignore class-name))
   '(list* nil #'constantly-nil nil))
@@ -165,18 +162,21 @@
 			  (find-class-from-cell ',symbol ,class-cell nil))))))
       form))
 
-(defun (setf find-class) (new-value symbol)
-  (if (legal-class-name-p symbol)
-      (let ((cell (find-class-cell symbol)))
+(defun (setf find-class) (new-value name &optional errorp environment)
+  (declare (ignore errorp environment))
+  (if (legal-class-name-p name)
+      (let ((cell (find-class-cell name)))
 	(setf (find-class-cell-class cell) new-value)
+	(when (and (eq *boot-state* 'complete) (null new-value))
+	  (setf (find-classoid name) nil))
 	(when (or (eq *boot-state* 'complete)
 		  (eq *boot-state* 'braid))
 	  (when (and new-value (class-wrapper new-value))
 	    (setf (find-class-cell-predicate cell)
 		  (fdefinition (class-predicate-name new-value))))
-	  (update-ctors 'setf-find-class :class new-value :name symbol))
+	  (update-ctors 'setf-find-class :class new-value :name name))
 	new-value)
-      (error "~S is not a legal class name." symbol)))
+      (error "~S is not a legal class name." name)))
 
 (/show "pcl/macros.lisp 230")
 

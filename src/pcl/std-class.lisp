@@ -151,10 +151,6 @@
 ;;;; various class accessors that are a little more complicated than can be
 ;;;; done with automatically generated reader methods
 
-(defmethod class-finalized-p ((class pcl-class))
-  (with-slots (wrapper) class
-    (not (null wrapper))))
-
 (defmethod class-prototype ((class std-class))
   (with-slots (prototype) class
     (or prototype (setq prototype (allocate-instance class)))))
@@ -354,12 +350,11 @@
 (defun fix-super (s)
   (cond ((classp s) s)
         ((not (legal-class-name-p s))
-          (error "~S is not a class or a legal class name." s))
+	 (error "~S is not a class or a legal class name." s))
         (t
-          (or (find-class s nil)
-              (setf (find-class s)
-                      (make-instance 'forward-referenced-class
-                                     :name s))))))
+	 (or (find-class s nil)
+	     (make-instance 'forward-referenced-class
+			    :name s)))))
 
 (defun ensure-class-values (class args)
   (let* ((initargs (copy-list args))
@@ -510,7 +505,49 @@
   (add-direct-subclasses class direct-superclasses)
   (make-class-predicate class predicate-name)
   (update-class class nil)
-  (add-slot-accessors class direct-slots))
+  (add-slot-accessors class direct-slots)
+  (make-preliminary-layout class))
+
+(defmethod shared-initialize :after ((class forward-referenced-class)
+				     slot-names &key &allow-other-keys)
+  (declare (ignore slot-names))
+  (make-preliminary-layout class))
+
+(defvar *allow-forward-referenced-classes-in-cpl-p* nil)
+
+;;; Give CLASS a preliminary layout if it doesn't have one already, to
+;;; make it known to the type system.
+(defun make-preliminary-layout (class)
+  (flet ((compute-preliminary-cpl (root)
+	   (let ((*allow-forward-referenced-classes-in-cpl-p* t))
+	     (compute-class-precedence-list root))))
+    (unless (class-finalized-p class)
+      (let ((name (class-name class)))
+	(setf (find-class name) class)
+	;; KLUDGE: This is fairly horrible.  We need to make a
+	;; full-fledged CLASSOID here, not just tell the compiler that
+	;; some class is forthcoming, because there are legitimate
+	;; questions one can ask of the type system, implemented in
+	;; terms of CLASSOIDs, involving forward-referenced classes. So.
+	(when (and (eq *boot-state* 'complete)
+		   (null (find-classoid name nil)))
+	  (setf (find-classoid name)
+		(make-standard-classoid :name name)))
+	(set-class-type-translation class name)
+	(let ((layout (make-wrapper 0 class))
+	      (classoid (find-classoid name)))
+	  (setf (layout-classoid layout) classoid)
+	  (setf (classoid-pcl-class classoid) class)
+	  (setf (slot-value class 'wrapper) layout)
+	  (let ((cpl (compute-preliminary-cpl class)))
+	    (setf (layout-inherits layout)
+		  (order-layout-inherits
+		   (map 'simple-vector #'class-wrapper
+			(reverse (rest cpl))))))
+	  (register-layout layout :invalidate t)
+	  (setf (classoid-layout classoid) layout)
+	  (mapc #'make-preliminary-layout (class-direct-subclasses class)))))))
+
 
 (defmethod shared-initialize :before ((class class) slot-names &key name)
   (declare (ignore slot-names name))
@@ -538,6 +575,7 @@
     (with-slots (wrapper class-precedence-list prototype predicate-name
 			 (direct-supers direct-superclasses))
 	class
+      (setf (slot-value class 'finalized-p) t)
       (setf (classoid-pcl-class classoid) class)
       (setq direct-supers direct-superclasses)
       (setq wrapper (classoid-layout classoid))
@@ -660,6 +698,7 @@
     (let ((lclass (find-classoid (class-name class))))
       (setf (classoid-pcl-class lclass) class)
       (setf (slot-value class 'wrapper) (classoid-layout lclass)))
+    (setf (slot-value class 'finalized-p) t)
     (update-pv-table-cache-info class)
     (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
@@ -794,8 +833,10 @@
 				  :key #'slot-definition-location)))
 	   (nslots (length nlayout))
 	   (nwrapper-class-slots (compute-class-slots class-slots))
-	   (owrapper (class-wrapper class))
-	   (olayout (and owrapper (wrapper-instance-slots-layout owrapper)))
+	   (owrapper (when (class-finalized-p class)
+		       (class-wrapper class)))
+	   (olayout (when owrapper
+		      (wrapper-instance-slots-layout owrapper)))
 	   (owrapper-class-slots (and owrapper (wrapper-class-slots owrapper)))
 	   (nwrapper
 	    (cond ((null owrapper)
@@ -822,7 +863,7 @@
 	      (wrapper-class-slots nwrapper) nwrapper-class-slots
 	      (wrapper-no-of-instance-slots nwrapper) nslots
 	      wrapper nwrapper))
-
+      (setf (slot-value class 'finalized-p) t)
       (unless (eq owrapper nwrapper)
 	(update-pv-table-cache-info class)))))
 

@@ -241,35 +241,36 @@
 ;;; the mapping between CL:CLASS and SB-KERNEL:CLASSOID objects.
 (defun make-wrapper (length class)
   (cond
-   ((typep class 'std-class)
-    (make-wrapper-internal
-     :length length
-     :classoid
-     (let ((owrap (class-wrapper class)))
-       (cond (owrap
-	      (layout-classoid owrap))
-	     ((*subtypep (class-of class)
-			 *the-class-standard-class*)
-	      (cond ((and *pcl-class-boot*
-			  (eq (slot-value class 'name) *pcl-class-boot*))
-		     (let ((found (find-classoid
-				   (slot-value class 'name))))
-		       (unless (classoid-pcl-class found)
-			 (setf (classoid-pcl-class found) class))
-		       (aver (eq (classoid-pcl-class found) class))
-		       found))
-		    (t
-		     (make-standard-classoid :pcl-class class))))
-	     (t
-	      (make-random-pcl-classoid :pcl-class class))))))
-   (t
-    (let* ((found (find-classoid (slot-value class 'name)))
-	   (layout (classoid-layout found)))
-      (unless (classoid-pcl-class found)
-	(setf (classoid-pcl-class found) class))
-      (aver (eq (classoid-pcl-class found) class))
-      (aver layout)
-      layout))))
+    ((or (typep class 'std-class)
+	 (typep class 'forward-referenced-class))
+     (make-wrapper-internal
+      :length length
+      :classoid
+      (let ((owrap (class-wrapper class)))
+	(cond (owrap
+	       (layout-classoid owrap))
+	      ((or (*subtypep (class-of class) *the-class-standard-class*)
+		   (typep class 'forward-referenced-class))
+	       (cond ((and *pcl-class-boot*
+			   (eq (slot-value class 'name) *pcl-class-boot*))
+		      (let ((found (find-classoid
+				    (slot-value class 'name))))
+			(unless (classoid-pcl-class found)
+			  (setf (classoid-pcl-class found) class))
+			(aver (eq (classoid-pcl-class found) class))
+			found))
+		     (t
+		      (make-standard-classoid :pcl-class class))))
+	      (t
+	       (make-random-pcl-classoid :pcl-class class))))))
+    (t
+     (let* ((found (find-classoid (slot-value class 'name)))
+	    (layout (classoid-layout found)))
+       (unless (classoid-pcl-class found)
+	 (setf (classoid-pcl-class found) class))
+       (aver (eq (classoid-pcl-class found) class))
+       (aver layout)
+       layout))))
 
 (defconstant +first-wrapper-cache-number-index+ 0)
 
