@@ -122,7 +122,7 @@
     ;; (DEFINE-COMPILER-MACRO (SETF FOO) ...) could easily be surprised
     ;; by this way of complying with a rather screwy aspect of the ANSI
     ;; spec, so at least we can warn him...
-    (compiler-style-warn
+    (sb!c::compiler-style-warn
      "defining compiler macro of (SETF ...), which will not be expanded"))
   (let ((whole (gensym "WHOLE-"))
 	(environment (gensym "ENV-")))
@@ -173,10 +173,13 @@
       (destructuring-bind (keyoid &rest forms) case
 	(cond ((memq keyoid '(t otherwise))
 	       (if errorp
-		   (error 'simple-program-error
-			  :format-control
-			  "No default clause is allowed in ~S: ~S"
-			  :format-arguments (list name case))
+		   (progn
+		     ;; FIXME: this message could probably do with
+		     ;; some loving pretty-printer format controls.
+		     (style-warn "Treating bare ~A in ~A as introducing a normal-clause, not an otherwise-clause" keyoid name)
+		     (push keyoid keys)
+		     (push `((,test ,keyform-value ',keyoid) nil ,@forms)
+			   clauses))
 		   (push `(t nil ,@forms) clauses)))
 	      ((and multi-p (listp keyoid))
 	       (setf keys (append keyoid keys))

@@ -222,5 +222,15 @@
   (assert (null result))
   (assert (typep error 'program-error)))
 
+(multiple-value-bind (result error)
+    (ignore-errors (ecase 1 (t 0)))
+  (assert (null result))
+  (assert (typep error 'type-error)))
+
+(multiple-value-bind (result error)
+    (ignore-errors (ecase 1 (t 0) (1 2)))
+  (assert (eql result 2))
+  (assert (null error)))
+	  
 ;;; FTYPE should accept any functional type specifier
 (compile nil '(lambda (x) (declare (ftype function f)) (f x)))

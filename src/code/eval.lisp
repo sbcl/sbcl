@@ -204,7 +204,7 @@
                          (dolist (arg (rest exp))
                            (args (eval-in-lexenv arg lexenv)))
                          (apply (symbol-function name) (args)))
-		(%eval original-exp lexenv))))))
+		(%eval exp lexenv))))))
       (t
        exp))))
 

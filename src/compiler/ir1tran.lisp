@@ -657,27 +657,12 @@
 		;; or the cross-compiler which encountered the problem?"
 		#+sb-xc-host "(in cross-compiler macroexpansion of ~S)"
 		form))))
-      (handler-bind (;; When cross-compiling, we can get style warnings
-                     ;; about e.g. undefined functions. An unhandled
-                     ;; CL:STYLE-WARNING (as opposed to a
-                     ;; SB!C::COMPILER-NOTE) would cause FAILURE-P to be
-                     ;; set on the return from #'SB!XC:COMPILE-FILE, which
-                     ;; would falsely indicate an error sufficiently
-                     ;; serious that we should stop the build process. To
-                     ;; avoid this, we translate CL:STYLE-WARNING
-                     ;; conditions from the host Common Lisp into
-                     ;; cross-compiler SB!C::COMPILER-NOTE calls. (It
-                     ;; might be cleaner to just make Python use
-                     ;; CL:STYLE-WARNING internally, so that the
-                     ;; significance of any host Common Lisp
-                     ;; CL:STYLE-WARNINGs is understood automatically. But
-                     ;; for now I'm not motivated to do this. -- WHN
-                     ;; 19990412)
-                     (style-warning (lambda (c)
-                                      (compiler-note "~@<~A~:@_~A~:@_~A~:>"
-						     (wherestring) hint c)
-                                      (muffle-warning-or-die)))
-                     ;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for
+      (handler-bind ((style-warning (lambda (c)
+				      (compiler-style-warn
+				       "~@<~A~:@_~A~@:_~A~:>"
+				       (wherestring) hint c)
+				      (muffle-warning-or-die)))
+		     ;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for
                      ;; Debian Linux, anyway) raises a CL:WARNING
                      ;; condition (not a CL:STYLE-WARNING) for undefined
                      ;; symbols when converting interpreted functions,
@@ -692,7 +677,7 @@
                      ;; and this code does so, by crudely suppressing all
                      ;; warnings in cross-compilation macroexpansion. --
                      ;; WHN 19990412
-                     #+cmu
+                     #+(and cmu sb-xc-host)
                      (warning (lambda (c)
                                 (compiler-note
                                  "~@<~A~:@_~
@@ -709,6 +694,11 @@
                                  (wherestring)
                                  c)
                                 (muffle-warning-or-die)))
+		     #-(and cmu sb-xc-host)
+		     (warning (lambda (c)
+				(compiler-warn "~@<~A~:@_~A~@:_~A~:>"
+					       (wherestring) hint c)
+				(muffle-warning-or-die)))
                      (error (lambda (c)
                               (compiler-error "~@<~A~:@_~A~@:_~A~:>"
                                               (wherestring) hint c))))
