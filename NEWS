@@ -1163,10 +1163,17 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
     Instead, an error of type FILE-ERROR is signalled.
 
 changes in sbcl-0.7.6 relative to sbcl-0.7.5:
+  * Array initialization with :INITIAL-ELEMENT is now much faster for
+    cases when the compiler cannot open code the array creation, but
+    does know what the UPGRADED-ARRAY-ELEMENT-TYPE will be.
   * bug fix: LOAD :IF-DOES-NOT-EXIST NIL now works when file type is
     specified. (This was at the root of some bad interactions between
     SBCL and ILISP: thanks to Gregory Wright for diagnosing this and
     reporting the bug.)
+  * bug fix: Floating point exceptions are treated much more
+    consistently on the x86/Linux and PPC/Linux platforms.
+  * Support for the Solaris 9 operating environment has been included
+    (thanks to Daniel Merritt)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
