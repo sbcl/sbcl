@@ -166,6 +166,11 @@
 		    (not (fboundp object)))
 	   (error 'simple-type-error
 		  :datum object
+		  ;; FIXME: SATISFIES FBOUNDP is a kinda bizarre broken
+		  ;; type specifier, since the set of values it describes
+		  ;; isn't in general constant in time. Maybe we could
+		  ;; find a better way of expressing this error? (Maybe
+		  ;; with the UNDEFINED-FUNCTION condition?)
 		  :expected-type '(satisfies fboundp)
 	       :format-control "~S isn't fbound."
 	       :format-arguments (list object)))

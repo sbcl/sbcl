@@ -324,15 +324,6 @@ WORKAROUND:
 	c: SYMBOL-MACROLET should signal PROGRAM-ERROR if something
 	   it binds is declared SPECIAL inside.
 
-50:
-  type system errors reported by Peter Van Eynde July 25, 2000:
-	g: The type system [still] isn't all that smart about relationships
-	   between hairy types. [The original example from PVE was
-	   (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL, which was fixed
-	   by CSR in sbcl-0.7.1.28, but there are still
-           plenty of corner cases out there: (SUBTYPEP 'ATOM 'LIST)
-           returns NIL, NIL in sbcl-0.7.1.31.]
-
 51:
   miscellaneous errors reported by Peter Van Eynde July 25, 2000:
 	a: (PROGN
@@ -1280,6 +1271,15 @@ WORKAROUND:
     * (frob)
   but it has happened in more complicated cases (which I haven't
   figured out how to reproduce).
+
+155:
+  Executing 
+    (defclass standard-gadget (basic-gadget) ())
+    (defclass basic-gadget () ())
+  gives an error:
+    The slot SB-PCL::DIRECT-SUPERCLASSES is unbound in the
+    object #<SB-PCL::STANDARD-CLASS "unbound">.
+  (reported by Brian Spilsbury sbcl-devel 2002-04-09)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

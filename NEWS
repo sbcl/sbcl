@@ -1073,6 +1073,22 @@ changes in sbcl-0.7.3 relative to sbcl-0.7.2:
   * The user manual (in doc/) is formatted into HTML more nicely.
     (thanks to coreythomas)
 
+changes in sbcl-0.7.3 relative to sbcl-0.7.2:
+  * The system is smarter about SUBTYPEP relationships, especially
+    those involving NOT types (including types such as ATOM which are
+    represented internally using NOT types). Thus SUBTYPEP is less
+    likely to return (VALUES NIL NIL) in general, and in particular
+    bugs 58 and (the remaining bits of) bug 50 are fixed. (thanks to
+    Christophe Rhodes)
+  * The fasl file format has changed again, because the internal
+    representation of types now includes a new slot to support the new
+    SUBTYPEP-of-NOT-types logic.
+  * (not a change in the main branch of SBCL, but a related prototype
+    which can hopefully be merged into the main branch of SBCL in the
+    future:) Brian Spilsbury has produced a Unicode-enabled variant of
+    sbcl-0.7.0, available as a patch against sbcl-0.7.0 at
+      <http://designix.com.au/brian/SBCL/sbcl-0.7.0-unicode.p0.gz>.
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

@@ -91,7 +91,7 @@
 (assert-nil-nil (subtypep '(vector t) '(vector utype-2)))
 
 ;;; ANSI specifically disallows bare AND and OR symbols as type specs.
-#| ; Alas, this is part of bug 10, still unfixed as of sbcl-0.6.11.10.
+#| ; Alas, this is part of bug 10, still unfixed as of sbcl-0.7.2.
 (assert (raises-error? (typep 11 'and)))
 (assert (raises-error? (typep 11 'or)))
 |#
@@ -117,25 +117,54 @@
 (assert-nil-t (subtypep '(not float) 'single-float))
 (assert-t-t (subtypep '(not atom) 'cons))
 (assert-t-t (subtypep 'cons '(not atom)))
-;;; FIXME: Another thing to revisit is %INVOKE-TYPE-METHOD.
-;;; Essentially, the problem is that when the two arguments to
-;;; subtypep are of different specifier-type types (e.g. HAIRY and
-;;; UNION), there are two applicable type methods -- in this case
+;;; ANSI requires that SUBTYPEP relationships among built-in primitive
+;;; types never be uncertain, i.e. never return NIL as second value.
+;;; Prior to about sbcl-0.7.2.6, ATOM caused a lot of problems here
+;;; (because it's a negation type, implemented as a HAIRY-TYPE, and
+;;; CMU CL's HAIRY-TYPE logic punted a lot).
+(assert-t-t (subtypep 'integer 'atom))
+(assert-t-t (subtypep 'function 'atom))
+(assert-nil-t (subtypep 'list 'atom))
+(assert-nil-t (subtypep 'atom 'integer))
+(assert-nil-t (subtypep 'atom 'function))
+(assert-nil-t (subtypep 'atom 'list))
+;;; ATOM is equivalent to (NOT CONS):
+(assert-t-t (subtypep 'integer '(not cons)))
+(assert-nil-t (subtypep 'list '(not cons)))
+(assert-nil-t (subtypep '(not cons) 'integer))
+(assert-nil-t (subtypep '(not cons) 'list))
+;;; And we'd better check that all the named types are right. (We also
+;;; do some more tests on ATOM here, since once CSR experimented with
+;;; making it a named type.)
+(assert-t-t (subtypep 'nil 'nil))
+(assert-t-t (subtypep 'nil 'atom))
+(assert-t-t (subtypep 'nil 't))
+(assert-nil-t (subtypep 'atom 'nil))
+(assert-t-t (subtypep 'atom 'atom))
+(assert-t-t (subtypep 'atom 't))
+(assert-nil-t (subtypep 't 'nil))
+(assert-nil-t (subtypep 't 'atom))
+(assert-t-t (subtypep 't 't))
+;;; Also, LIST is now somewhat special, in that (NOT LIST) should be
+;;; recognized as a subtype of ATOM:
+(assert-t-t (subtypep '(not list) 'atom))
+(assert-nil-t (subtypep 'atom '(not list)))
+;;; These used to fail, because when the two arguments to subtypep are
+;;; of different specifier-type types (e.g. HAIRY and UNION), there
+;;; are two applicable type methods -- in this case
 ;;; HAIRY-COMPLEX-SUBTYPEP-ARG1-TYPE-METHOD and
-;;; UNION-COMPLEX-SUBTYPEP-ARG2-TYPE-METHOD.  Both of these exist, but
+;;; UNION-COMPLEX-SUBTYPEP-ARG2-TYPE-METHOD. Both of these exist, but
 ;;; [!%]INVOKE-TYPE-METHOD aren't smart enough to know that if one of
 ;;; them returns NIL, NIL (indicating uncertainty) it should try the
-;;; other; this is complicated by the presence of other TYPE-METHODS
-;;; (e.g. INTERSECTION and UNION) whose return convention may or may
-;;; not follow the same standard.
-#||
+;;; other. However, as of sbcl-0.7.2.6 or so, CALL-NEXT-METHOD-ish
+;;; logic in those type methods fixed it.
 (assert-nil-t (subtypep '(not cons) 'list))
 (assert-nil-t (subtypep '(not single-float) 'float))
-||#
-;;; If we fix the above FIXME, we should for free have fixed bug 58.
-#||
+;;; Somewhere along the line (probably when adding CALL-NEXT-METHOD-ish
+;;; logic in SUBTYPEP type methods) we fixed bug 58 too:
 (assert-t-t (subtypep '(and zilch integer) 'zilch))
-||#
+(assert-t-t (subtypep '(and integer zilch) 'zilch))
+
 ;;; Bug 84: SB-KERNEL:CSUBTYPEP was a bit enthusiastic at
 ;;; special-casing calls to subtypep involving *EMPTY-TYPE*,
 ;;; corresponding to the NIL type-specifier; we were bogusly returning

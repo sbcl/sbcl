@@ -42,7 +42,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(defconstant +fasl-file-version+ 26)
+(defconstant +fasl-file-version+ 27)
 ;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.
@@ -51,6 +51,7 @@
 ;;; 25 = sbcl-0.7.1.41 (and immediately preceding versions, actually)
 ;;;      introduced new functions to check for control stack exhaustion
 ;;; 26 = sbcl-0.7.2.4 or so added :VARIABLE :MACRO-EXPANSION to INFO codes
+;;; 27 (2002-04-08) added MIGHT-CONTAIN-OTHER-TYPES? slot to CTYPE
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

@@ -198,9 +198,9 @@
 	     ;; Common Lisp. (Some array types are too, but they
 	     ;; were picked off earlier.)
 	     (target-type-is-in
-	      '(bit character complex cons float function integer keyword
-		    list nil null number rational real signed-byte symbol t
-		    unsigned-byte))
+	      '(atom bit character complex cons float function integer keyword
+		list nil null number rational real signed-byte symbol t
+		unsigned-byte))
 	     (values (typep host-object target-type) t))
 	    (;; Floating point types are guaranteed to correspond,
 	     ;; too, but less exactly.

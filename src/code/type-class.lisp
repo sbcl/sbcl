@@ -152,7 +152,7 @@
   ;; KLUDGE: If the slots of TYPE-CLASS ever change in a way not
   ;; reflected in *TYPE-CLASS-FUN-SLOTS*, the slots here will
   ;; have to be hand-tweaked to match. -- WHN 2001-03-19
-  (make-type-class :name                  (type-class-name x)
+  (make-type-class :name (type-class-name x)
 		   . #.(mapcan (lambda (type-class-fun-slot)
 				 (destructuring-bind (keyword . slot-accessor)
 				     type-class-fun-slot
@@ -214,15 +214,15 @@
        (%invoke-type-method ',(class-fun-slot-or-lose simple)
 			    ',(class-fun-slot-or-lose
 			       (if complex-arg1-p
-				 complex-arg1
-				 complex-arg2))
+				   complex-arg1
+				   complex-arg2))
 			    ',(class-fun-slot-or-lose complex-arg2)
 			    ,complex-arg1-p
 			    ,type1
 			    ,type2)
      (if valid-p
-       (values result-a result-b)
-       ,default)))
+	 (values result-a result-b)
+	 ,default)))
 
 ;;; most of the implementation of !INVOKE-TYPE-METHOD
 ;;;
@@ -241,20 +241,48 @@
       (let ((class1 (type-class-info type1))
 	    (class2 (type-class-info type2)))
 	(if (eq class1 class2)
-	  (funcall (funcall simple class1) type1 type2)
-	  (let ((complex2 (funcall cslot2 class2)))
-	    (if complex2
-	      (funcall complex2 type1 type2)
-	      (let ((complex1 (funcall cslot1 class1)))
-		(if complex1
-		  (if complex-arg1-p
-		    (funcall complex1 type1 type2)
-		    (funcall complex1 type2 type1))
-		  ;; No meaningful result was found: the caller should
-		  ;; use the default value instead.
-		  (return-from %invoke-type-method (values nil nil nil))))))))
+	    (funcall (funcall simple class1) type1 type2)
+	    (let ((complex2 (funcall cslot2 class2)))
+	      (if complex2
+		  (funcall complex2 type1 type2)
+		  (let ((complex1 (funcall cslot1 class1)))
+		    (if complex1
+			(if complex-arg1-p
+			    (funcall complex1 type1 type2)
+			    (funcall complex1 type2 type1))
+			;; No meaningful result was found: the caller
+			;; should use the default value instead.
+			(return-from %invoke-type-method
+			  (values nil nil nil))))))))
     ;; If we get to here (without breaking out by calling RETURN-FROM)
     ;; then a meaningful result was found, and we return it.
     (values result-a result-b t)))
+
+;;; This is a very specialized implementation of CLOS-style
+;;; CALL-NEXT-METHOD within our twisty little type class object
+;;; system, which works given that it's called from within a
+;;; COMPLEX-SUBTYPEP-ARG2 method. (We're particularly motivated to
+;;; implement CALL-NEXT-METHOD in that case, because ANSI imposes some
+;;; strict limits on when SUBTYPEP is allowed to return (VALUES NIL NIL),
+;;; so instead of just complacently returning (VALUES NIL NIL) from a
+;;; COMPLEX-SUBTYPEP-ARG2 method we usually need to CALL-NEXT-METHOD.)
+;;;
+;;; KLUDGE: In CLOS, this could just be CALL-NEXT-METHOD and
+;;; everything would Just Work without us having to think about it. In
+;;; our goofy type dispatch system, it's messier to express. It's also
+;;; more fragile, since (0) there's no check that it's called from
+;;; within a COMPLEX-SUBTYPEP-ARG2 method as it should be, and (1) we
+;;; rely on our global knowledge that the next (and only) relevant
+;;; method is COMPLEX-SUBTYPEP-ARG1, and (2) we rely on our global
+;;; knowledge of the appropriate default for the CSUBTYPEP function
+;;; when no next method exists. -- WHN 2002-04-07
+;;;
+;;; (We miss CLOS! -- CSR and WHN)
+(defun invoke-complex-subtypep-arg1-method (type1 type2)
+  (let* ((type-class (type-class-info type1))
+	 (method-fun (type-class-complex-subtypep-arg1 type-class)))
+    (if method-fun
+	(funcall (the function method-fun) type1 type2)
+	(values nil nil))))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)

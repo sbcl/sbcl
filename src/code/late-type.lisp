@@ -65,21 +65,29 @@
 ;;; This is used by !DEFINE-SUPERCLASSES to define the SUBTYPE-ARG1
 ;;; method. INFO is a list of conses
 ;;;   (SUPERCLASS-CLASS . {GUARD-TYPE-SPECIFIER | NIL}).
-;;; This will never be called with a hairy type as TYPE2, since the
-;;; hairy type TYPE2 method gets first crack.
 (defun !has-superclasses-complex-subtypep-arg1 (type1 type2 info)
-  (values
-   (and (sb!xc:typep type2 'sb!xc:class)
-	(dolist (x info nil)
-	  (when (or (not (cdr x))
-		    (csubtypep type1 (specifier-type (cdr x))))
-	    (return
-	     (or (eq type2 (car x))
-		 (let ((inherits (layout-inherits (class-layout (car x)))))
-		   (dotimes (i (length inherits) nil)
-		     (when (eq type2 (layout-class (svref inherits i)))
-		       (return t)))))))))
-   t))
+  ;; If TYPE2 might be concealing something related to our class
+  ;; hierarchy
+  (if (type-might-contain-other-types? type2)
+      ;; too confusing, gotta punt 
+      (values nil nil)
+      ;; ordinary case expected by old CMU CL code, where the taxonomy
+      ;; of TYPE2's representation accurately reflects the taxonomy of
+      ;; the underlying set
+      (values
+       ;; FIXME: This old CMU CL code probably deserves a comment
+       ;; explaining to us mere mortals how it works...
+       (and (sb!xc:typep type2 'sb!xc:class)
+	    (dolist (x info nil)
+	      (when (or (not (cdr x))
+			(csubtypep type1 (specifier-type (cdr x))))
+		(return
+		 (or (eq type2 (car x))
+		     (let ((inherits (layout-inherits (class-layout (car x)))))
+		       (dotimes (i (length inherits) nil)
+			 (when (eq type2 (layout-class (svref inherits i)))
+			   (return t)))))))))
+       t)))
 
 ;;; This function takes a list of specs, each of the form
 ;;;    (SUPERCLASS-NAME &OPTIONAL GUARD).
@@ -892,7 +900,7 @@
    (frob t *universal-type*))
  (setf *universal-fun-type*
        (make-fun-type :wild-args t
-			   :returns *wild-type*)))
+		      :returns *wild-type*)))
 
 (!define-type-method (named :simple-=) (type1 type2)
   ;; FIXME: BUG 85: This assertion failed when I added it in
@@ -907,25 +915,38 @@
 
 (!define-type-method (named :complex-subtypep-arg1) (type1 type2)
   (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
-  ;; FIXME: Why does this (old CMU CL) assertion hold? Perhaps 'cause
-  ;; the HAIRY-TYPE COMPLEX-SUBTYPEP-ARG2 method takes precedence over
-  ;; this COMPLEX-SUBTYPE-ARG1 method? (I miss CLOS..)
-  (aver (not (hairy-type-p type2))) 
-  ;; Besides the old CMU CL assertion above, we also need to avoid
-  ;; compound types, else we could get into trouble with
-  ;;   (SUBTYPEP T '(OR (SATISFIES FOO) (SATISFIES BAR)))
-  ;; or
-  ;;   (SUBTYPEP T '(AND (SATISFIES FOO) (SATISFIES BAR))).
-  (aver (not (compound-type-p type2))) 
-  ;; Then, since TYPE2 is reasonably tractable, we're good to go.
-  (values (eq type1 *empty-type*) t))
+  (cond ((eq type1 *empty-type*)
+	 t)
+	(;; When TYPE2 might be the universal type in disguise
+	 (type-might-contain-other-types? type2)
+	 ;; Now that the UNION and HAIRY COMPLEX-SUBTYPEP-ARG2 methods
+	 ;; can delegate to us (more or less as CALL-NEXT-METHOD) when
+	 ;; they're uncertain, we can't just barf on COMPOUND-TYPE and
+	 ;; HAIRY-TYPEs as we used to. Instead we deal with the
+	 ;; problem (where at least part of the problem is cases like
+	 ;;   (SUBTYPEP T '(SATISFIES FOO))
+	 ;; or
+	 ;;   (SUBTYPEP T '(AND (SATISFIES FOO) (SATISFIES BAR)))
+	 ;; where the second type is a hairy type like SATISFIES, or
+	 ;; is a compound type which might contain a hairy type) by
+	 ;; returning uncertainty.
+	 (values nil nil))
+	(t
+	 ;; By elimination, TYPE1 is the universal type.
+	 (aver (eq type1 *universal-type*))
+	 ;; This case would have been picked off by the SIMPLE-SUBTYPEP
+	 ;; method, and so shouldn't appear here.
+	 (aver (not (eq type2 *universal-type*)))
+	 ;; Since TYPE2 is not EQ *UNIVERSAL-TYPE* and is not the
+	 ;; universal type in disguise, TYPE2 is not a superset of TYPE1.
+	 (values nil t))))
 
 (!define-type-method (named :complex-subtypep-arg2) (type1 type2)
   (aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond ((eq type2 *universal-type*)
 	 (values t t))
 	((hairy-type-p type1)
-	 (values nil nil))
+	 (invoke-complex-subtypep-arg1-method type1 type2))
 	(t
 	 ;; FIXME: This seems to rely on there only being 2 or 3
 	 ;; HAIRY-TYPE values, and the exclusion of various
@@ -971,11 +992,13 @@
 						     complement-type2)))
 	     (if intersection2
 		 (values (eq intersection2 *empty-type*) t)
-		 (values nil nil))))
+		 (invoke-complex-subtypep-arg1-method type1 type2))))
 	  (t
-	   (values nil nil)))))
+	   (invoke-complex-subtypep-arg1-method type1 type2)))))
 
 (!define-type-method (hairy :complex-subtypep-arg1) (type1 type2)
+  ;; "Incrementally extended heuristic algorithms tend inexorably toward the
+  ;; incomprehensible." -- http://www.unlambda.com/~james/lambda/lambda.txt
   (let ((hairy-spec (hairy-type-specifier type1)))
      (cond ((and (consp hairy-spec) (eq (car hairy-spec) 'not))
 	    ;; You may not believe this. I couldn't either. But then I
@@ -1007,11 +1030,31 @@
 		    (return (values nil nil)))
 		  (when equal
 		    (return (values nil t))))
-		;; This (TYPE= TYPE1 TYPE2) branch would never be
-		;; taken, as type1 and type2 will only be equal if
+		;; KLUDGE: ANSI requires that the SUBTYPEP result
+		;; between any two built-in atomic type specifiers
+		;; never be uncertain. This is hard to do cleanly for
+		;; the built-in types whose definitions include
+		;; (NOT FOO), i.e. CONS and RATIO. However, we can do
+		;; it with this hack, which uses our global knowledge
+		;; that our implementation of the type system uses
+		;; disjoint implementation types to represent disjoint
+		;; sets (except when types are contained in other types).
+		;; (This is a KLUDGE because it's fragile. Various
+		;; changes in internal representation in the type
+		;; system could make it start confidently returning
+		;; incorrect results.) -- WHN 2002-03-08
+		(unless (or (type-might-contain-other-types? complement-type1)
+			    (type-might-contain-other-types? type2))
+		  ;; Because of the way our types which don't contain
+		  ;; other types are disjoint subsets of the space of
+		  ;; possible values, (SUBTYPEP '(NOT AA) 'B)=NIL when
+		  ;; AA and B are simple (and B is not T, as checked above).
+		  (return (values nil t)))
+		;; The old (TYPE= TYPE1 TYPE2) branch would never be
+		;; taken, as TYPE1 and TYPE2 will only be equal if
 		;; they're both NOT types, and then the
 		;; :SIMPLE-SUBTYPEP method would be used instead.
-		;; ((type= type1 type2) (values t t))
+		;; But a CSUBTYPEP relationship might still hold:
 		(multiple-value-bind (equal certain)
 		    (csubtypep complement-type1 type2)
 		  ;; If a is a subtype of b, ~a is not a subtype of b
@@ -1029,16 +1072,18 @@
 		    (return (values nil nil)))
 		  (when equal
 		    (return (values nil t))))
-		;; Other cases here would rely on being able to catch
-		;; all possible cases, which the fragility of this
-		;; type system doesn't inspire me; for instance, if a
-		;; is type= to ~b, then we want T, T; if this is not
-		;; the case and the types are disjoint (have an
-		;; intersection of *empty-type*) then we want NIL, T;
-		;; else if the union of a and b is the
-		;; *universal-type* then we want T, T. So currently we
-		;; still claim to be unsure about e.g. (subtypep '(not
-		;; fixnum) 'single-float).
+		;; old CSR comment ca. 0.7.2, now obsoleted by the
+		;; SIMPLE-CTYPE? KLUDGE case above:
+		;;   Other cases here would rely on being able to catch
+		;;   all possible cases, which the fragility of this
+		;;   type system doesn't inspire me; for instance, if a
+		;;   is type= to ~b, then we want T, T; if this is not
+		;;   the case and the types are disjoint (have an
+		;;   intersection of *empty-type*) then we want NIL, T;
+		;;   else if the union of a and b is the
+		;;   *universal-type* then we want T, T. So currently we
+		;;   still claim to be unsure about e.g. (subtypep '(not
+		;;   fixnum) 'single-float).
 		)))
 	   (t
 	    (values nil nil)))))
@@ -1924,7 +1969,8 @@
 ;;; subtype of the MEMBER type.
 (!define-type-method (member :complex-subtypep-arg2) (type1 type2)
   (cond ((not (type-enumerable type1)) (values nil t))
-	((types-equal-or-intersect type1 type2) (values nil nil))
+	((types-equal-or-intersect type1 type2)
+	 (invoke-complex-subtypep-arg1-method type1 type2))
 	(t (values nil t))))
 
 (!define-type-method (member :simple-intersection2) (type1 type2)
@@ -2073,8 +2119,8 @@
   (type=-set (union-type-types type1)
 	     (union-type-types type2)))
 
-;;; Similarly, a union type is a subtype of another if every element
-;;; of TYPE1 is a subtype of some element of TYPE2.
+;;; Similarly, a union type is a subtype of another if and only if
+;;; every element of TYPE1 is a subtype of TYPE2.
 (!define-type-method (union :simple-subtypep) (type1 type2)
   (every/type (swapped-args-fun #'union-complex-subtypep-arg2)
 	      type2
@@ -2088,7 +2134,15 @@
   (union-complex-subtypep-arg1 type1 type2))
 
 (defun union-complex-subtypep-arg2 (type1 type2)
-  (any/type #'csubtypep type1 (union-type-types type2)))
+  (multiple-value-bind (sub-value sub-certain?) 
+      (any/type #'csubtypep type1 (union-type-types type2))
+    (if sub-certain?
+	(values sub-value sub-certain?)
+	;; The ANY/TYPE expression above is a sufficient condition for
+	;; subsetness, but not a necessary one, so we might get a more
+	;; certain answer by this CALL-NEXT-METHOD-ish step when the
+	;; ANY/TYPE expression is uncertain.
+	(invoke-complex-subtypep-arg1-method type1 type2))))
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
   (union-complex-subtypep-arg2 type1 type2))
 

@@ -78,7 +78,17 @@
   ;; (since EQ hashing can't be done portably)
   (hash-value (random (1+ most-positive-fixnum))
 	      :type (and fixnum unsigned-byte)
-	      :read-only t))
+	      :read-only t)
+  ;; Can this object contain other types? A global property of our
+  ;; implementation (which unfortunately seems impossible to enforce
+  ;; with assertions or other in-the-code checks and constraints) is
+  ;; that subclasses which don't contain other types correspond to
+  ;; disjoint subsets (except of course for the NAMED-TYPE T, which
+  ;; covers everything). So NUMBER-TYPE is disjoint from CONS-TYPE is
+  ;; is disjoint from MEMBER-TYPE and so forth. But types which can
+  ;; contain other types, like HAIRY-TYPE and INTERSECTION-TYPE, can
+  ;; violate this rule.
+  (might-contain-other-types? nil :read-only t))
 (def!method print-object ((ctype ctype) stream)
   (print-unreadable-object (ctype stream :type t)
     (prin1 (type-specifier ctype) stream)))

@@ -851,8 +851,8 @@
   (defvar *precompiled-pprint-dispatch-funs*
     (list (frob (typep object 'array))
 	  (frob (and (consp object)
-		     (and (typep (car object) 'symbol)
-			  (typep (car object) '(satisfies fboundp)))))
+		     (symbolp (car object))
+		     (fboundp (car object))))
 	  (frob (typep object 'cons)))))
 
 (defun compute-test-fn (type)
@@ -1265,7 +1265,7 @@
     ;; printers for regular types
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
     (set-pprint-dispatch 'array #'pprint-array)
-    (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))
+    (set-pprint-dispatch '(cons symbol)
 			 #'pprint-fun-call -1)
     (set-pprint-dispatch 'cons #'pprint-fill -2)
     ;; cons cells with interesting things for the car
