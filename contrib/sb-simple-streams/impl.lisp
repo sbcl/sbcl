@@ -953,6 +953,8 @@
     (etypecase stream
       (simple-stream
        (%peek-char stream peek-type eof-error-p eof-value recursive-p))
+      ;; FIXME: Broken on ECHO-STREAM (cf internal implementation?) --
+      ;; CSR, 2004-01-19
       (ansi-stream
        (let ((char (%ansi-stream-read-char stream eof-error-p eof-value t)))
           (cond ((eq char eof-value) char)
@@ -967,7 +969,7 @@
                  (do ((char char (%ansi-stream-read-char stream eof-error-p
                                                          eof-value t)))
                      ((or (eq char eof-value)
-			  (not (sb-int:whitespace-char-p char)))
+			  (not (sb-impl::whitespacep char)))
                       (unless (eq char eof-value)
                         (%ansi-stream-unread-char char stream))
                       char)))
@@ -987,7 +989,7 @@
 	     ((eq peek-type t)
 	      (do ((char (sb-gray:stream-read-char stream)
 			 (sb-gray:stream-read-char stream)))
-		  ((or (eq char :eof) (not (sb-int:whitespace-char-p char)))
+		  ((or (eq char :eof) (not (sb-impl::whitespacep char)))
 		   (cond ((eq char :eof)
 			  (sb-impl::eof-or-lose stream eof-error-p eof-value))
 			 (t

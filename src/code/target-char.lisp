@@ -210,13 +210,6 @@
 	  ;; Else, fail.
 	  (t nil))))
 
-(defun whitespace-char-p (x)
-  (and (characterp x)
-       (or (char= x #\space)
-	   (char= x (code-char tab-char-code))
-	   (char= x (code-char return-char-code))
-	   (char= x #\linefeed))))
-
 (defun alphanumericp (char)
   #!+sb-doc
   "Given a character-object argument, ALPHANUMERICP returns T if the

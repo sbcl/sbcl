@@ -613,6 +613,7 @@
  ("src/code/target-random"     :not-host) ; needs "code/random"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
  ("src/code/reader"            :not-host) ; needs "code/readtable"
+ ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host) ; needs "code/pathname"
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
  ("src/code/save"              :not-host) ; uses the definition of PATHNAME

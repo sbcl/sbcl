@@ -760,16 +760,15 @@
   (and (characterp x)
        (or (char= x #\space)
 	   (char= x #\tab)
+	   (char= x #\page)
 	   (char= x #\newline)
 	   (char= x #\return))))
 
 (defun whitespace-char-not-newline-p (x)
   (and (whitespace-char-p x)
        (not (char= x #\newline))))
-
 
 ;;;; linking into SBCL hooks
-
 
 (defun repl-prompt-fun (stream)
   (let ((break-level (when (plusp *break-level*)

@@ -35,19 +35,12 @@
   up. The system itself should be initialized at this point, but applications
   might not be.")
 
-;;;; miscellaneous I/O
-
-(defun skip-whitespace (&optional (stream *standard-input*))
-  (loop (let ((char (read-char stream)))
-	  (unless (sb!impl::whitespacep char)
-	    (return (unread-char char stream))))))
-
 ;;; like LISTEN, but any whitespace in the input stream will be flushed
 (defun listen-skip-whitespace (&optional (stream *standard-input*))
   (do ((char (read-char-no-hang stream nil nil nil)
 	     (read-char-no-hang stream nil nil nil)))
       ((null char) nil)
-    (cond ((not (whitespace-char-p char))
+    (cond ((not (whitespacep char))
 	   (unread-char char stream)
 	   (return t)))))
 
