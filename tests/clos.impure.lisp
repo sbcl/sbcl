@@ -322,7 +322,18 @@
 			  (:default-initargs :a 1)
 			  (:default-initargs :a 2)))
   ;; and also BUG 47d, fixed in sbcl-0.8alpha.0.26
-  (assert-program-error (defgeneric if (x))))
+  (assert-program-error (defgeneric if (x)))
+  ;; DEFCLASS should detect an error if slot names aren't suitable as
+  ;; variable names:
+  (assert-program-error (defclass foo009 ()
+			  ((:a :initarg :a))))
+  (assert-program-error (defclass foo010 ()
+			  (("a" :initarg :a))))
+  (assert-program-error (defclass foo011 ()
+			  ((#1a() :initarg :a))))
+  (assert-program-error (defclass foo012 ()
+			  ((t :initarg :t))))
+  (assert-program-error (defclass foo013 () ("a"))))
 
 ;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
 ;;; preserved through the bootstrap process until sbcl-0.7.8.39.
