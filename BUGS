@@ -126,45 +126,9 @@ WORKAROUND:
   (Also, when this is fixed, we can enable the code in PROCLAIM which 
   checks for incompatible FTYPE redeclarations.)
 
-18:
-  from DTC on the CMU CL mailing list 25 Feb 2000:
-;;; Compiler fails when this file is compiled.
-;;;
-;;; Problem shows up in delete-block within ir1util.lisp. The assertion
-;;; (assert (member (functional-kind lambda) '(:let :mv-let :assignment)))
-;;; fails within bind node branch.
-;;;
-;;; Note that if c::*check-consistency* is enabled then an un-reached
-;;; entry is also reported.
-;;;
-(defun foo (val)
-  (declare (values nil))
-  nil)
-(defun bug (val)
-  (multiple-value-call
-      #'(lambda (res)
-          (block nil
-            (tagbody
-             loop
-               (when res
-                 (return nil))
-               (go loop))))
-    (foo val))
-  (catch 'ccc1
-    (throw 'ccc1
-      (block bbbb
-        (tagbody
-
-           (let ((ttt #'(lambda () (go cccc))))
-             (declare (special ttt))
-             (return-from bbbb nil))
-
-         cccc
-           (return-from bbbb nil))))))
-
 19:
   (I *think* this is a bug. It certainly seems like strange behavior. But
-  the ANSI spec is scary, dark, and deep..)
+  the ANSI spec is scary, dark, and deep.. -- WHN)
     (FORMAT NIL  "~,1G" 1.4) => "1.    "
     (FORMAT NIL "~3,1G" 1.4) => "1.    "
 
@@ -190,24 +154,6 @@ WORKAROUND:
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting
 	Process inferior-lisp exited abnormally with code 1
   I haven't noticed a repeatable case of this yet.
-
-29:
-  some sort of bug in inlining and RETURN-FROM in sbcl-0.6.5: Compiling
-    (DEFUN BAR? (X)
-      (OR (NAR? X)
-          (BLOCK USED-BY-SOME-Y?
-            (FLET ((FROB (STK)
-                     (DOLIST (Y STK)
-                       (UNLESS (REJECTED? Y)
-                         (RETURN-FROM USED-BY-SOME-Y? T)))))
-              (DECLARE (INLINE FROB))
-              (FROB (RSTK X))
-              (FROB (MRSTK X)))
-            NIL)))
-  gives
-   error in function SB-KERNEL:ASSERT-ERROR:
-   The assertion (EQ (SB-C::CONTINUATION-KIND SB-C::CONT) :BLOCK-START) failed.
-  This is still present in sbcl-0.6.8.
 
 31:
   In some cases the compiler believes type declarations on array

@@ -51,7 +51,32 @@
 ;;; bug reported and fixed by Alexey Dejneka sbcl-devel 2001-09-10:
 ;;; This DEFGENERIC shouldn't cause an error.
 (defgeneric ad-gf (a) (:method :around (x) x))
-
+
+;;; DEFGENERIC and DEFMETHOD shouldn't accept &REST when it's not
+;;; followed by a variable:
+;;; e.g. (DEFMETHOD FOO ((X T) &REST) NIL) should signal an error.
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (defmacro expect-error (&body body)
+    `(multiple-value-bind (res condition)
+      (ignore-errors (progn ,@body))
+      (declare (ignore res))
+      (typep condition 'error))))
+
+(assert (expect-error
+         (macroexpand-1
+          '(defmethod foo0 ((x t) &rest) nil))))
+
+(assert (expect-error (defgeneric foo1 (x &rest))))
+(assert (expect-error (defgeneric foo2 (x a &rest))))
+
+(defgeneric foo3 (x &rest y))
+(defmethod foo3 ((x t) &rest y) nil)
+(defmethod foo4 ((x t) &key y &rest z) nil)
+(defgeneric foo4 (x &key y &rest z))
+
+(assert (expect-error (defgeneric foo5 (x &rest))))
+(assert (expect-error (macroexpand-1 '(defmethod foo6 (x &rest)))))
+
 ;;; structure-class tests setup
 (defclass structure-class-foo1 () () (:metaclass cl:structure-class))
 (defclass structure-class-foo2 (structure-class-foo1)

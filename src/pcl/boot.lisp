@@ -1299,6 +1299,7 @@ bootstrapping.
 	  (noptional 0)
 	  (keysp nil)
 	  (restp nil)
+          (nrest 0)
 	  (allow-other-keys-p nil)
 	  (keywords ())
 	  (keyword-parameters ())
@@ -1321,7 +1322,11 @@ bootstrapping.
 	      (optional  (incf noptional))
 	      (key       (push (parse-key-argument x) keywords)
 			 (push x keyword-parameters))
-	      (rest      ()))))
+	      (rest      (incf nrest)))))
+      (when (and restp (zerop nrest))
+        (error "Error in lambda-list:~%~
+                After &REST, a DEFGENERIC lambda-list ~
+                must be followed by at least one variable."))
       (values nrequired noptional keysp restp allow-other-keys-p
 	      (reverse keywords)
 	      (reverse keyword-parameters)))))
@@ -2158,17 +2163,12 @@ bootstrapping.
 	   (values nil arglist nil))
 	  ((memq arg lambda-list-keywords)
 	   (unless (memq arg '(&optional &rest &key &allow-other-keys &aux))
-	     ;; Warn about non-standard lambda-list-keywords, but then
-	     ;; go on to treat them like a standard lambda-list-keyword
-	     ;; what with the warning its probably ok.
-	     ;;
-	     ;; FIXME: This shouldn't happen now that this is maintained
-	     ;; as part of SBCL, should it? Perhaps this is now
-	     ;; "internal error: unrecognized lambda-list keyword ~S"?
-	     (warn "Unrecognized lambda-list keyword ~S in arglist.~%~
-		    Assuming that the symbols following it are parameters,~%~
-		    and not allowing any parameter specializers to follow it."
-		   arg))
+	     ;; Now, since we try to conform to ANSI, non-standard
+             ;; lambda-list-keywords should be treated as errors.
+	     (error 'simple-program-error
+                    :format-control "unrecognized lambda-list keyword ~S ~
+                     in arglist.~%"
+		    :format-arguments (list arg)))
 	   ;; When we are at a lambda-list keyword, the parameters
 	   ;; don't include the lambda-list keyword; the lambda-list
 	   ;; does include the lambda-list keyword; and no
@@ -2176,6 +2176,13 @@ bootstrapping.
 	   ;; keywords (at least for now).
 	   (multiple-value-bind (parameters lambda-list)
 	       (parse-specialized-lambda-list (cdr arglist) t)
+	     (when (eq arg '&rest)
+	       ;; check, if &rest is followed by a var ...
+	       (when (or (null lambda-list)
+			 (memq (car lambda-list) lambda-list-keywords))
+		 (error "Error in lambda-list:~%~
+                         After &REST, a DEFMETHOD lambda-list ~
+                         must be followed by at least one variable.")))
 	     (values parameters
 		     (cons arg lambda-list)
 		     ()
