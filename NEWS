@@ -4,6 +4,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
     *READ-SUPPRESS* is true. (reported by Bruno Haible for CMUCL)
   * bug fix: Default value of EOF-ERROR-P in READ-FROM-STRING is true.
     (reported by Bruno Haible for CMUCL)
+  * bug fix: ERROR now signals a TYPE-ERROR if the arguments to ERROR
+    do not designate a condition. (reported by Bruno Haible for CMUCL)
 
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now

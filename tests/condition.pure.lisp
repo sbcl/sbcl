@@ -122,3 +122,18 @@
 		 (subtypep 'fixnum (type-error-expected-type c))))
     (assert (eq (type-error-datum c) t)))
   (:no-error (&rest rest) (error "no error: ~S" rest)))
+
+;;; ANSI specifies TYPE-ERROR if datum and arguments of ERROR are not
+;;; designators for a condition. Reported by Bruno Haible on cmucl-imp
+;;; 2004-10-12.
+(flet ((test (&rest args)
+         (multiple-value-bind (res err) 
+             (ignore-errors (apply #'error args))
+           (assert (not res))
+           (assert (typep err 'type-error)))))
+  (test '#:no-such-condition)
+  (test nil)
+  (test t)
+  (test 42)
+  (test (make-instance 'standard-object)))
+

@@ -702,13 +702,15 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun find-classoid (name &optional (errorp t) environment)
   #!+sb-doc
-  "Return the class with the specified NAME. If ERRORP is false, then NIL is
-   returned when no such class exists."
+  "Return the class with the specified NAME. If ERRORP is false, then
+NIL is returned when no such class exists."
   (declare (type symbol name) (ignore environment))
   (let ((res (classoid-cell-classoid (find-classoid-cell name))))
     (if (or res (not errorp))
 	res
-	(error "class not yet defined:~%  ~S" name))))
+	(error 'simple-type-error
+               :format-control "class not yet defined:~%  ~S" 
+               :format-arguments (list name)))))
 (defun (setf find-classoid) (new-value name)
   #-sb-xc (declare (type (or null classoid) new-value))
   (cond
