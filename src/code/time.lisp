@@ -27,8 +27,8 @@
 
 (defun get-internal-real-time ()
   #!+sb-doc
-  "Return the real time in the internal time format. This is useful for
-  finding elapsed time. See INTERNAL-TIME-UNITS-PER-SECOND."
+  "Return the real time in the internal time format. (See
+  INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding elapsed time."
   (multiple-value-bind (ignore seconds useconds) (sb!unix:unix-gettimeofday)
     (declare (ignore ignore) (type (unsigned-byte 32) seconds useconds))
     (let ((base *internal-real-time-base-seconds*)
@@ -47,8 +47,8 @@
 
 (defun get-internal-run-time ()
   #!+sb-doc
-  "Return the run time in the internal time format. This is useful for
-  finding CPU usage."
+  "Return the run time in the internal time format. (See
+  INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding CPU usage."
   (declare (values (unsigned-byte 32)))
   (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
       (sb!unix:unix-fast-getrusage sb!unix:rusage_self)
