@@ -566,33 +566,29 @@
 	(stream-fresh-line stream))))
 
 (defun write-string (string &optional (stream *standard-output*)
-			    &key (start 0) (end (length (the string string))))
+			    &key (start 0) (end nil))
+  (%write-string string stream start (or end (length string)))
+  string)
 
-  ;; FIXME: These SETFs don't look right to me. Looking at the
-  ;; definition of "bounding indices" in the glossary of the ANSI
-  ;; spec, and extrapolating from the behavior of other operations
-  ;; when their operands are the wrong type, it seems that it would be
-  ;; more correct to essentially
-  ;;    (AVER (<= 0 START END (LENGTH STRING)))
-  ;; instead of modifying the incorrect values.
-  #!+high-security
-  (setf end (min end (length (the vector string))))
-  #!+high-security
-  (setf start (max start 0))
+(defun %write-string (string stream start end)
+  (declare (type string string))
+  (declare (type streamlike stream))
+  (declare (type index start end))
 
-  ;; FIXME: And I'd just signal a non-continuable error..
-  #!+high-security
-  (when (< end start)
-      (cerror "Continue with switched start and end ~S <-> ~S"
-	      "Write-string: start (~S) and end (~S) exchanged."
-	      start end string)
-      (rotatef start end))
+  ;; Note that even though you might expect, based on the behavior of
+  ;; things like AREF, that the correct upper bound here is
+  ;; (ARRAY-DIMENSION STRING 0), the ANSI glossary definitions for
+  ;; "bounding index" and "length" indicate that in this case (i.e.
+  ;; for the ANSI-specified functions WRITE-STRING and WRITE-LINE
+  ;; which are implemented in terms of this function), (LENGTH STRING)
+  ;; is the required upper bound. A foolish consistency is the
+  ;; hobgoblin of lesser languages..
+  (unless (<= 0 start end (length string))
+    (error "~@<bad bounding indices START=~W END=~W for ~2I~_~S~:>"
+	   start
+	   end
+	   string))
 
-  (write-string* string stream start end))
-
-(defun write-string* (string &optional (stream *standard-output*)
-			     (start 0) (end (length (the vector string))))
-  (declare (fixnum start end))
   (let ((stream (out-synonym-of stream)))
     (cond ((lisp-stream-p stream)
 	   (if (array-header-p string)
@@ -606,25 +602,12 @@
 	   (stream-write-string stream string start end)))))
 
 (defun write-line (string &optional (stream *standard-output*)
-			  &key (start 0) (end (length string)))
-  (write-line* string stream start end))
-
-(defun write-line* (string &optional (stream *standard-output*)
-			   (start 0) (end (length string)))
-  (declare (fixnum start end))
-  (let ((stream (out-synonym-of stream)))
-    (cond ((lisp-stream-p stream)
-	   (if (array-header-p string)
-	       (with-array-data ((data string) (offset-start start)
-				 (offset-end end))
-		 (with-out-stream stream (lisp-stream-sout data offset-start
-							   offset-end)))
-	       (with-out-stream stream (lisp-stream-sout string start end)))
-	   (funcall (lisp-stream-out stream) stream #\newline))
-	  (t ; must be Gray streams FUNDAMENTAL-STREAM
-	   (stream-write-string stream string start end)
-	   (stream-write-char stream #\Newline)))
-    string))
+			  &key (start 0) (end nil))
+  (let ((defaulted-stream (out-synonym-of stream))
+	(defaulted-end (or end (length string))))
+    (%write-string string defaulted-stream start defaulted-end)
+    (write-char #\newline defaulted-stream))
+  string)
 
 (defun charpos (&optional (stream *standard-output*))
   (with-out-stream stream (lisp-stream-misc :charpos) (stream-line-column)))
@@ -1265,8 +1248,10 @@
 ;;; Dump the characters buffer up in IN-STREAM to OUT-STREAM as
 ;;; GET-OUTPUT-STREAM-STRING would return them.
 (defun dump-output-stream-string (in-stream out-stream)
-  (write-string* (string-output-stream-string in-stream) out-stream
-		 0 (string-output-stream-index in-stream))
+  (%write-string (string-output-stream-string in-stream)
+		 out-stream
+		 0
+		 (string-output-stream-index in-stream))
   (setf (string-output-stream-index in-stream) 0))
 
 ;;;; fill-pointer streams
@@ -1380,9 +1365,11 @@
   `(do ((i 0 (+ i 60))
 	(indentation (indenting-stream-indentation ,stream)))
        ((>= i indentation))
-     (write-string*
+     (%write-string
       "							    "
-      ,sub-stream 0 (min 60 (- indentation i)))))
+      ,sub-stream
+      0
+      (min 60 (- indentation i)))))
 
 ;;; INDENTING-OUT writes a character to an indenting stream.
 (defun indenting-out (stream char)
@@ -1399,11 +1386,11 @@
       ((= i end))
     (let ((newline (position #\newline string :start i :end end)))
       (cond (newline
-	     (write-string* string sub-stream i (1+ newline))
+	     (%write-string string sub-stream i (1+ newline))
 	     (indenting-indent stream sub-stream)
 	     (setq i (+ newline 1)))
 	    (t
-	     (write-string* string sub-stream i end)
+	     (%write-string string sub-stream i end)
 	     (setq i end))))))
 
 ;;; INDENTING-MISC just treats just the :LINE-LENGTH message
@@ -1786,7 +1773,7 @@
 		    (type index i))
 	   (funcall write-function (first rem) stream))))
       (string
-       (write-string* seq stream start end))
+       (%write-string seq stream start end))
       (vector
        (let ((write-function
 	      (if (subtypep (stream-element-type stream) 'character)
