@@ -1104,6 +1104,38 @@
 	(setf (lambda-var-ignorep var) t)))))
   (values))
 
+(defun process-dx-decl (names vars)
+  (flet ((maybe-notify (control &rest args)
+	   (when (policy *lexenv* (> speed inhibit-warnings))
+	     (apply #'compiler-notify control args))))
+    (if (policy *lexenv* (= stack-allocate-dynamic-extent 3))
+	(dolist (name names)
+	  (cond
+	    ((symbolp name)
+	     (let* ((bound-var (find-in-bindings vars name))
+		    (var (or bound-var
+			     (lexenv-find name vars)
+			     (find-free-var name))))
+	       (etypecase var
+		 (leaf
+		  (if bound-var
+		      (setf (leaf-dynamic-extent var) t)
+		      (maybe-notify
+		       "ignoring DYNAMIC-EXTENT declaration for free ~S"
+		       name)))
+		 (cons
+		  (compiler-error "DYNAMIC-EXTENT on symbol-macro: ~S" name))
+		 (heap-alien-info
+		  (compiler-error "DYNAMIC-EXTENT on heap-alien-info: ~S"
+				  name)))))
+	    ((and (consp name)
+		  (eq (car name) 'function)
+		  (null (cddr name))
+		  (valid-function-name-p (cadr name)))
+	     (maybe-notify "ignoring DYNAMIC-EXTENT declaration for ~S" name))
+	    (t (compiler-error "DYNAMIC-EXTENT on a weird thing: ~S" name))))
+      (maybe-notify "ignoring DYNAMIC-EXTENT declarations for ~S" names))))
+
 ;;; FIXME: This is non-ANSI, so the default should be T, or it should
 ;;; go away, I think.
 (defvar *suppress-values-declaration* nil
@@ -1146,10 +1178,7 @@
                        `(values ,@types)))))
           res))
        (dynamic-extent
-        (when (policy *lexenv* (> speed inhibit-warnings))
-          (compiler-notify
-           "compiler limitation: ~
-          ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
+	(process-dx-decl (cdr spec) vars)
         res)
        (t
         (unless (info :declaration :recognized (first spec))

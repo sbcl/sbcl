@@ -255,6 +255,24 @@
 				      (rest svars))))))
   (values))
 
+;;; FIXME: this is the interface of the CMUCL WITH-DYNAMIC-EXTENT
+;;; macro.  It is slightly confusing, in that START and BODY-START are
+;;; already-existing CTRANs (and FIXME: probably deserve a ONCE-ONLY),
+;;; whereas NEXT is a variable naming a CTRAN in the body.  -- CSR,
+;;; 2004-03-30.
+(defmacro with-dynamic-extent ((start body-start next kind) &body body)
+  (with-unique-names (cleanup next-ctran)
+    `(progn
+      (ctran-starts-block ,body-start)
+      (let ((,cleanup (make-cleanup :kind :dynamic-extent))
+	    (,next-ctran (make-ctran))
+	    (,next (make-ctran)))
+	(ir1-convert ,start ,next-ctran nil '(%dynamic-extent-start))
+	(setf (cleanup-mess-up ,cleanup) (ctran-use ,next-ctran))
+	(let ((*lexenv* (make-lexenv :cleanup ,cleanup)))
+	  (ir1-convert ,next-ctran ,next nil '(%cleanup-point))
+	  (locally ,@body))))))
+
 ;;; Create a lambda node out of some code, returning the result. The
 ;;; bindings are specified by the list of VAR structures VARS. We deal
 ;;; with adding the names to the LEXENV-VARS for the conversion. The
@@ -267,7 +285,7 @@
 ;;; the special binding code.
 ;;;
 ;;; We ignore any ARG-INFO in the VARS, trusting that someone else is
-;;; dealing with &nonsense.
+;;; dealing with &NONSENSE, except for &REST vars with DYNAMIC-EXTENT.
 ;;;
 ;;; AUX-VARS is a list of VAR structures for variables that are to be
 ;;; sequentially bound. Each AUX-VAL is a form that is to be evaluated
@@ -291,7 +309,8 @@
                   :%source-name source-name
                   :%debug-name debug-name))
 	 (result-ctran (make-ctran))
-         (result-lvar (make-lvar)))
+         (result-lvar (make-lvar))
+	 (dx-rest nil))
 
     (awhen (lexenv-lambda *lexenv*)
       (push lambda (lambda-children it))
@@ -321,7 +340,12 @@
 		(t
                  (when note-lexical-bindings
                    (note-lexical-binding (leaf-source-name var)))
-		 (new-venv (cons (leaf-source-name var) var))))))
+		 (new-venv (cons (leaf-source-name var) var)))))
+	(let ((info (lambda-var-arg-info var)))
+	  (when (and info
+		     (eq (arg-info-kind info) :rest)
+		     (leaf-dynamic-extent var))
+	    (setq dx-rest t))))
 
       (let ((*lexenv* (make-lexenv :vars (new-venv)
 				   :lambda lambda
@@ -346,9 +370,14 @@
             (ctran-starts-block prebind-ctran)
             (link-node-to-previous-ctran bind prebind-ctran)
             (use-ctran bind postbind-ctran)
-            (ir1-convert-special-bindings postbind-ctran result-ctran result-lvar
-                                          body
-                                          aux-vars aux-vals (svars))))))
+	    (if dx-rest
+		(with-dynamic-extent (postbind-ctran result-ctran dx :rest)
+		  (ir1-convert-special-bindings dx result-ctran result-lvar
+						body aux-vars aux-vals
+						(svars)))
+		(ir1-convert-special-bindings postbind-ctran result-ctran
+					      result-lvar body
+					      aux-vars aux-vals (svars)))))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
     (push lambda (component-new-functionals *current-component*))
@@ -514,7 +543,8 @@
       (arg-vars context-temp count-temp)
 
       (when rest
-	(arg-vals `(%listify-rest-args ,n-context ,n-count)))
+	(arg-vals `(%listify-rest-args
+		    ,n-context ,n-count ,(leaf-dynamic-extent rest))))
       (when morep
 	(arg-vals n-context)
 	(arg-vals n-count))

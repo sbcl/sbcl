@@ -1331,6 +1331,9 @@
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
   (vop unbind node block))
 
+(defoptimizer (%dynamic-extent-start ir2-convert) (() node block) node block)
+(defoptimizer (%dynamic-extent-end ir2-convert) (() node block) node block)
+
 ;;; ### It's not clear that this really belongs in this file, or
 ;;; should really be done this way, but this is the least violation of
 ;;; abstraction in the current setup. We don't want to wire

@@ -1265,7 +1265,8 @@
   (:policy :safe)
   (:args (context :scs (descriptor-reg) :target src)
 	 (count :scs (any-reg) :target ecx))
-  (:arg-types * tagged-num)
+  (:info *dynamic-extent*)
+  (:arg-types * tagged-num (:constant t))
   (:temporary (:sc unsigned-reg :offset esi-offset :from (:argument 0)) src)
   (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
   (:temporary (:sc unsigned-reg :offset eax-offset) eax)
@@ -1283,7 +1284,7 @@
       (inst jecxz done)
       (inst lea dst (make-ea :dword :index ecx :scale 2))
       (pseudo-atomic
-       (allocation dst dst node)
+       (allocation dst dst node *dynamic-extent*)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
        ;; Convert the count into a raw value, so that we can use the
        ;; LOOP instruction.

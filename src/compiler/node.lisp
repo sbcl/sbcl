@@ -423,7 +423,8 @@
 (defstruct (cleanup (:copier nil))
   ;; the kind of thing that has to be cleaned up
   (kind (missing-arg)
-	:type (member :special-bind :catch :unwind-protect :block :tagbody))
+	:type (member :special-bind :catch :unwind-protect
+		      :block :tagbody :dynamic-extent))
   ;; the node that messes things up. This is the last node in the
   ;; non-messed-up environment. Null only temporarily. This could be
   ;; deleted due to unreachability.
@@ -593,6 +594,8 @@
   ;; true if there was ever a REF or SET node for this leaf. This may
   ;; be true when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type boolean)
+  ;; is it declared dynamic-extent?
+  (dynamic-extent nil :type boolean)
   ;; some kind of info used by the back end
   (info nil))
 

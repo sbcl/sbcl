@@ -2364,6 +2364,9 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        the readtable currently in effect.
 
 changes in sbcl-0.8.10 relative to sbcl-0.8.9:
+  * [placeholder for DX summary]
+    ** user code with &REST lists declared dynamic-extent, under high
+       speed or space and low safety and debug optimization policy.
   * bug fix: compiler emitted division in optimized DEREF.  (thanks for
     the test case to Dave Roberts)
   * bug fix: multidimensional simple arrays loaded from FASLs had fill

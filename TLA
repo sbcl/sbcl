@@ -19,6 +19,7 @@ Some of these already were used pretty consistently in CMU CL.
 Others not so much, but in sbcl-0.7.0 I put some effort into
 making them more consistent.
 	ARG	argument
+        DX	dynamic-extent
 	FUN	function
 	GC	garbage collect(ion)
 	N	new: number, as in e.g. N-PASSES or N-WORD-BITS

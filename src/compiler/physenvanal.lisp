@@ -364,7 +364,9 @@
 	       (code `(%funcall ,fun))))
 	    ((:block :tagbody)
 	     (dolist (nlx (cleanup-nlx-info cleanup))
-	       (code `(%lexical-exit-breakup ',nlx)))))))
+	       (code `(%lexical-exit-breakup ',nlx))))
+	    (:dynamic-extent
+	     (code `(%dynamic-extent-end))))))
 
       (when (code)
 	(aver (not (node-tail-p (block-last block1))))

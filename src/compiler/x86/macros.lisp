@@ -148,17 +148,24 @@
 (defvar *maybe-use-inline-allocation* t) ; FIXME unused
 
 ;;; Emit code to allocate an object with a size in bytes given by
-;;; Size. The size may be an integer of a TN. If Inline is a VOP
+;;; SIZE. The size may be an integer of a TN. If Inline is a VOP
 ;;; node-var then it is used to make an appropriate speed vs size
 ;;; decision.
 
-;;; This macro should only be used inside a pseudo-atomic section,
-;;; which should also cover subsequent initialization of the
-;;; object.
-(defun allocation (alloc-tn size &optional inline)
-  ;; FIXME: since it appears that inline allocation is gone, we should
-  ;; remove the INLINE parameter and *MAYBE-USE-INLINE-ALLOCATION*
-  (declare (ignore inline))  
+(defun allocation-dynamic-extent (alloc-tn size)
+  (inst sub esp-tn size)
+  ;; FIXME: SIZE _should_ be double-word aligned (suggested but
+  ;; unfortunately not enforced by PAD-DATA-BLOCK and
+  ;; WITH-FIXED-ALLOCATION), so that ESP is always divisible by 8 (for
+  ;; 32-bit lispobjs).  In that case, this AND instruction is
+  ;; unneccessary and could be removed.  If not, explain why.  -- CSR,
+  ;; 2004-03-30
+  (inst and esp-tn #.(ldb (byte 32 0) (lognot lowtag-mask)))
+  (aver (not (location= alloc-tn esp-tn)))
+  (inst mov alloc-tn esp-tn)
+  (values))
+
+(defun allocation-notinline (alloc-tn size)
   (flet ((load-size (dst-tn size)
 	   (unless (and (tn-p size) (location= alloc-tn size))
 	     (inst mov dst-tn size))))
@@ -226,7 +233,18 @@
 	       (t
 		(load-size edi-tn size)
 		(inst call (make-fixup (extern-alien-name "alloc_to_edi")
-				   :foreign))))))))
+				   :foreign)))))))))
+  
+;;; This macro should only be used inside a pseudo-atomic section,
+;;; which should also cover subsequent initialization of the object.
+;;; (FIXME: so why aren't we asserting this?)
+(defun allocation (alloc-tn size &optional inline dynamic-extent)
+  ;; FIXME: since it appears that inline allocation is gone, we should
+  ;; remove the INLINE parameter and *MAYBE-USE-INLINE-ALLOCATION*
+  (declare (ignore inline))  
+  (cond
+    (dynamic-extent (allocation-dynamic-extent alloc-tn size))
+    (t (allocation-notinline alloc-tn size)))
   (values))
 
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
@@ -298,75 +316,84 @@
 ;;; set with a single operation and cleared with SHR *PSEUDO-ATOMIC-BITS*,-2;
 ;;; the ATOMIC bit is bit 0, the INTERRUPTED bit is bit 1, and you check
 ;;; the C flag after the shift to see whether you were interrupted.
+;;;
+;;; KLUDGE: since the stack on the x86 is treated conservatively, it
+;;; does not matter whether a signal occurs during construction of a
+;;; dynamic-extent object, as the half-finished construction of the
+;;; object will not cause any difficulty.  We can therefore elide 
+(defvar *dynamic-extent* nil)
 
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
-    `(let ((,label (gen-label)))
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :byte 
-		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
-      ,@forms
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
-      (inst fs-segment-prefix)
-      (inst cmp (make-ea :byte
-		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
-      (inst jmp :eq ,label)
-      ;; if PAI was set, interrupts were disabled at the same time
-      ;; using the process signal mask.  
-      (inst break pending-interrupt-trap)
-      (emit-label ,label))))
+    `(if *dynamic-extent* ; I will burn in hell
+         (progn ,@forms)
+         (let ((,label (gen-label)))
+	   (inst fs-segment-prefix)
+	   (inst mov (make-ea :byte 
+			      :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+	   (inst fs-segment-prefix)
+	   (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
+	   ,@forms
+	   (inst fs-segment-prefix)
+	   (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
+	   (inst fs-segment-prefix)
+	   (inst cmp (make-ea :byte
+			      :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+	   (inst jmp :eq ,label)
+	   ;; if PAI was set, interrupts were disabled at the same
+	   ;; time using the process signal mask.
+	   (inst break pending-interrupt-trap)
+	   (emit-label ,label)))))
 
 #!-sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
-    `(let ((,label (gen-label)))
-      ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
-      ;; something. (perhaps SVLB, for static variable low byte)
-      (inst mov (make-ea :byte :disp (+ nil-value
-                                        (static-symbol-offset
-                                         '*pseudo-atomic-interrupted*)
-                                        (ash symbol-value-slot word-shift)
-                                        ;; FIXME: Use mask, not minus, to
-                                        ;; take out type bits.
-                                        (- other-pointer-lowtag)))
-       0)
-      (inst mov (make-ea :byte :disp (+ nil-value
-                                        (static-symbol-offset
-                                         '*pseudo-atomic-atomic*)
-                                        (ash symbol-value-slot word-shift)
-                                        (- other-pointer-lowtag)))
-       (fixnumize 1))
-      ,@forms
-      (inst mov (make-ea :byte :disp (+ nil-value
-                                        (static-symbol-offset
-                                         '*pseudo-atomic-atomic*)
-                                        (ash symbol-value-slot word-shift)
-                                        (- other-pointer-lowtag)))
-       0)
-      ;; KLUDGE: Is there any requirement for interrupts to be
-      ;; handled in order? It seems as though an interrupt coming
-      ;; in at this point will be executed before any pending interrupts.
-      ;; Or do incoming interrupts check to see whether any interrupts
-      ;; are pending? I wish I could find the documentation for
-      ;; pseudo-atomics.. -- WHN 19991130
-      (inst cmp (make-ea :byte
-                 :disp (+ nil-value
-                          (static-symbol-offset
-                           '*pseudo-atomic-interrupted*)
-                          (ash symbol-value-slot word-shift)
-                          (- other-pointer-lowtag)))
-       0)
-      (inst jmp :eq ,label)
-      ;; if PAI was set, interrupts were disabled at the same time
-      ;; using the process signal mask.  
-      (inst break pending-interrupt-trap)
-      (emit-label ,label))))
-
-
+    `(if *dynamic-extent*
+         (progn ,@forms)
+         (let ((,label (gen-label)))
+	   ;; FIXME: The MAKE-EA noise should become a MACROLET macro
+	   ;; or something. (perhaps SVLB, for static variable low
+	   ;; byte)
+	   (inst mov (make-ea :byte :disp (+ nil-value
+					     (static-symbol-offset
+					      '*pseudo-atomic-interrupted*)
+					     (ash symbol-value-slot word-shift)
+					     ;; FIXME: Use mask, not minus, to
+					     ;; take out type bits.
+					     (- other-pointer-lowtag)))
+		 0)
+	   (inst mov (make-ea :byte :disp (+ nil-value
+					     (static-symbol-offset
+					      '*pseudo-atomic-atomic*)
+					     (ash symbol-value-slot word-shift)
+					     (- other-pointer-lowtag)))
+		 (fixnumize 1))
+	   ,@forms
+	   (inst mov (make-ea :byte :disp (+ nil-value
+					     (static-symbol-offset
+					      '*pseudo-atomic-atomic*)
+					     (ash symbol-value-slot word-shift)
+					     (- other-pointer-lowtag)))
+		 0)
+	   ;; KLUDGE: Is there any requirement for interrupts to be
+	   ;; handled in order? It seems as though an interrupt coming
+	   ;; in at this point will be executed before any pending
+	   ;; interrupts.  Or do incoming interrupts check to see
+	   ;; whether any interrupts are pending? I wish I could find
+	   ;; the documentation for pseudo-atomics.. -- WHN 19991130
+	   (inst cmp (make-ea :byte
+			      :disp (+ nil-value
+				       (static-symbol-offset
+					'*pseudo-atomic-interrupted*)
+				       (ash symbol-value-slot word-shift)
+				       (- other-pointer-lowtag)))
+		 0)
+	   (inst jmp :eq ,label)
+	   ;; if PAI was set, interrupts were disabled at the same
+	   ;; time using the process signal mask.
+	   (inst break pending-interrupt-trap)
+	   (emit-label ,label)))))
 
 ;;;; indexed references
 

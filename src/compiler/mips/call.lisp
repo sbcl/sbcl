@@ -1,5 +1,15 @@
-(in-package "SB!VM")
+;;;; the VM definition of function call for MIPS
 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!VM")
 
 ;;;; Interfaces to IR2 conversion:
 
@@ -1099,7 +1109,9 @@ default-value-8
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
 	 (count-arg :target count :scs (any-reg)))
-  (:arg-types * tagged-num)
+  (:info dx)
+  (:ignore dx)
+  (:arg-types * tagged-num (:constant t))
   (:temporary (:scs (any-reg) :from (:argument 0)) context)
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
   (:temporary (:scs (descriptor-reg) :from :eval) temp dst)
