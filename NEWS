@@ -2381,6 +2381,8 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     pointers.  (reported by Sean Ross)
   * bug fix: PROFILE output is printed nicely even for large numerical
     values.  (thanks to Zach Beane)
+  * bug fix: streams with element-type (SIGNED-BYTE <N>) for <N>
+    greater than 32 handle EOF correctly.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

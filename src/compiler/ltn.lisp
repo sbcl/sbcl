@@ -434,6 +434,7 @@
 (defun template-args-ok (template call safe-p)
   (declare (type template template)
 	   (type combination call))
+  (declare (ignore safe-p))
   (let ((mtype (template-more-args-type template)))
     (do ((args (basic-combination-args call) (cdr args))
 	 (types (template-arg-types template) (cdr types)))

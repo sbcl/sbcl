@@ -69,8 +69,7 @@
 
 (declaim (inline adjust-fixup-array))
 (defun adjust-fixup-array (array size)
-  (let ((length (length array))
-        (new (make-array size :element-type '(unsigned-byte 32))))
+  (let ((new (make-array size :element-type '(unsigned-byte 32))))
     (replace new array)
     new))
 

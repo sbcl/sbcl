@@ -75,7 +75,7 @@
 ;;; objects
 (defun just-dump-it-normally (object &optional (env nil env-p))
   (declare (type structure!object object))
-  (declare (ignorable env env-p))
+  (declare (ignorable env env-p object))
   ;; KLUDGE: we require essentially three different behaviours of
   ;; JUST-DUMP-IT-NORMALLY, two of which (host compiler's
   ;; MAKE-LOAD-FORM, cross-compiler's MAKE-LOAD-FORM) are handled by

@@ -165,7 +165,7 @@
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
-
+  (declare (ignore external-format))
   (let ((*load-depth* (1+ *load-depth*))
 	;; KLUDGE: I can't find in the ANSI spec where it says that
 	;; DECLAIM/PROCLAIM of optimization policy should have file

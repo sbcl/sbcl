@@ -137,7 +137,7 @@
 
 ;;; Signal the appropriate condition when we get a floating-point error.
 (defun sigfpe-handler (signal info context)
-  (declare (ignore signal info context))
+  (declare (ignore signal info))
   (declare (type system-area-pointer context))
   (let* ((modes (context-floating-point-modes
 		 (sb!alien:sap-alien context (* os-context-t))))

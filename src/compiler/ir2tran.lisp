@@ -559,6 +559,7 @@
 (defun find-template-result-types (call template rtypes)
   (declare (type combination call)
 	   (type template template) (list rtypes))
+  (declare (ignore template))
   (let* ((dtype (node-derived-type call))
 	 (type dtype)
 	 (types (mapcar #'primitive-type
@@ -857,6 +858,7 @@
 ;;;      lvar LOC.
 ;;;   -- We don't know what it is.
 (defun fun-lvar-tn (node block lvar)
+  (declare (ignore node block))
   (declare (type lvar lvar))
   (let ((2lvar (lvar-info lvar)))
     (if (eq (ir2-lvar-kind 2lvar) :delayed)

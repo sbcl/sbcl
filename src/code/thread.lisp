@@ -1,6 +1,7 @@
 (in-package "SB!THREAD")
 
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
+  (declare (ignore #!-sb-thread mutex))
   #!+sb-thread
   (with-unique-names (cfp)
     `(let ((,cfp (sb!kernel:current-fp)))

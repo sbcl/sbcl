@@ -65,6 +65,7 @@
          (new-end end)
          (cleanup (block-end-cleanup block))
          (found-similar-p nil))
+    (declare (ignore #-nil cleanup))
     (dolist (succ (block-succ block))
       #+nil
       (when (and (< block succ)

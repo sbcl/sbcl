@@ -68,6 +68,7 @@
 ;;; this is the right thing to do anyway; omitting them can lead to
 ;;; system corruption on conforming code.  -- CSR
 (defun maybe-fp-wait (node &optional note-next-instruction)
+  (declare (ignore node))
   #+nil
   (when (policy node (or (= debug 3) (> safety speed))))
   (when note-next-instruction

@@ -58,11 +58,12 @@
       `(progn
 	 (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
 			 ,fn-name))
-	 (defun ,fn-name (,start-var ,next-var ,result-var ,n-form)
-	   (let ((,n-env *lexenv*))
-	     ,@decls
-	     ,body
-	     (values)))
+	 (defun ,fn-name (,start-var ,next-var ,result-var ,n-form
+			  &aux (,n-env *lexenv*))
+	   (declare (ignorable ,start-var ,next-var ,result-var))
+	   ,@decls
+	   ,body
+	   (values))
 	 ,@(when doc
 	     `((setf (fdocumentation ',name 'function) ,doc)))
 	 ;; FIXME: Evidently "there can only be one!" -- we overwrite any
@@ -513,6 +514,7 @@
     (let ((n-args (gensym)))
       `(progn
 	(defun ,name (,n-node ,@vars)
+	  (declare (ignorable ,@vars))
 	  (let ((,n-args (basic-combination-args ,n-node)))
 	    ,(parse-deftransform lambda-list body n-args
 				 `(return-from ,name nil))))

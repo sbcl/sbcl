@@ -1245,14 +1245,15 @@
 		   ;; corresponding argument was a list.
 		   (t (values 1 1 remaining))))))
 	   (walk-conditional (conditional directives args)
-	     (declare (ignore args))
 	     (let ((*default-format-error-offset*
 		    (1- (format-directive-end conditional))))
 	       (multiple-value-bind (sublists last-semi-with-colon-p remaining)
 		   (parse-conditional-directive directives)
 		 (declare (ignore last-semi-with-colon-p))
-		 (let ((sub-max (loop for s in sublists
-				      maximize (nth-value 1 (walk-directive-list s args)))))
+		 (let ((sub-max
+			(loop for s in sublists
+			      maximize (nth-value
+					1 (walk-directive-list s args)))))
 		   (cond
 		     ((format-directive-atsignp conditional)
 		      (values 1 (max 1 sub-max) remaining))

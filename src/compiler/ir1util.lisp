@@ -1149,8 +1149,14 @@
 	(unless (policy *compiler-error-context* (= inhibit-warnings 3))
 	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
 	  ;; requires this to be no more than a STYLE-WARNING.
+	  #-sb-xc-host
 	  (compiler-style-warn "The variable ~S is defined but never used."
-			       (leaf-debug-name var)))
+			       (leaf-debug-name var))
+	  ;; There's no reason to accept this kind of equivocation
+	  ;; when compiling our own code, though.
+	  #+sb-xc-host
+	  (compiler-warn "The variable ~S is defined but never used."
+			 (leaf-debug-name var)))
 	(setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
   (values))
 
@@ -1466,8 +1472,7 @@
 ;;; exits to CONT in that entry, then return it, otherwise return NIL.
 (defun find-nlx-info (exit)
   (declare (type exit exit))
-  (let* ((entry (exit-entry exit))
-         (entry-cleanup (entry-cleanup entry)))
+  (let ((entry (exit-entry exit)))
     (dolist (nlx (physenv-nlx-info (node-physenv entry)) nil)
       (when (eq (nlx-info-exit nlx) exit)
 	(return nlx)))))

@@ -261,6 +261,7 @@
 ;;; whereas NEXT is a variable naming a CTRAN in the body.  -- CSR,
 ;;; 2004-03-30.
 (defmacro with-dynamic-extent ((start body-start next kind) &body body)
+  (declare (ignore kind))
   (with-unique-names (cleanup next-ctran)
     `(progn
       (ctran-starts-block ,body-start)
@@ -966,6 +967,7 @@
 				      (source-name '.anonymous.)
 				      debug-name
 				      allow-debug-catch-tag)
+  (declare (ignore allow-debug-catch-tag))
   (destructuring-bind (decls macros symbol-macros &rest body)
 		      (if (eq (car fun) 'lambda-with-lexenv)
 			  (cdr fun)

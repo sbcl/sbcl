@@ -574,7 +574,7 @@
 	   (let ((,element-var
 		  (catch 'eof-input-catcher
 		    (input-at-least ,stream-var ,bytes)
-		    ,@read-forms)))
+		    (locally ,@read-forms))))
 	     (cond (,element-var
 		    (incf (fd-stream-ibuf-head ,stream-var) ,bytes)
 		    ,element-var)
@@ -663,14 +663,15 @@
 	do (return-from pick-input-routine
 	     (values
 	      (lambda (stream eof-error eof-value)
-		(let ((sap (fd-stream-ibuf-sap stream))
-		      (head (fd-stream-ibuf-head stream)))
-		  (loop for j from 0 below (/ i 8)
-			with result = 0
-			do (setf result
-				 (+ (* 256 result)
-				    (sap-ref-8 sap (+ head j))))
-			finally (return (dpb result (byte i 0) -1)))))
+		(input-wrapper (stream (/ i 8) eof-error eof-value)
+		  (let ((sap (fd-stream-ibuf-sap stream))
+			(head (fd-stream-ibuf-head stream)))
+		    (loop for j from 0 below (/ i 8)
+			  with result = 0
+			  do (setf result
+				   (+ (* 256 result)
+				      (sap-ref-8 sap (+ head j))))
+			  finally (return (dpb result (byte i 0) -1))))))
 	      `(signed-byte ,i)
 	      (/ i 8)))))
 
@@ -1185,6 +1186,8 @@
    :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
   See the manual for details."
 
+  (declare (ignore external-format)) ; FIXME: CHECK-TYPE?  WARN-if-not?
+  
   ;; Calculate useful stuff.
   (multiple-value-bind (input output mask)
       (case direction

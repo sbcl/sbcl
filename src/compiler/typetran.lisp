@@ -243,13 +243,13 @@
 
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
-;;; single LISTP call. Note that if SYMBOL is in the union, then LIST
-;;; will be a subtype even without there being any (member NIL). We
-;;; just drop through to the general code in this case, rather than
-;;; trying to optimize it.
+;;; single LISTP call.  Note that if SYMBOL is in the union, then LIST
+;;; will be a subtype even without there being any (member NIL).  We
+;;; currently just drop through to the general code in this case,
+;;; rather than trying to optimize it (but FIXME CSR 2004-04-05: it
+;;; wouldn't be hard to optimize it after all).
 (defun source-transform-union-typep (object type)
   (let* ((types (union-type-types type))
-	 (type-list (specifier-type 'list))
          (type-cons (specifier-type 'cons))
 	 (mtype (find-if #'member-type-p types))
          (members (when mtype (member-type-members mtype))))

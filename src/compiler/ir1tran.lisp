@@ -619,7 +619,12 @@
 	 (when (lambda-var-ignorep var)
 	   ;; (ANSI's specification for the IGNORE declaration requires
 	   ;; that this be a STYLE-WARNING, not a full WARNING.)
-	   (compiler-style-warn "reading an ignored variable: ~S" name)))
+	   #-sb-xc-host
+	   (compiler-style-warn "reading an ignored variable: ~S" name)
+	   ;; there's no need for us to accept ANSI's lameness when
+	   ;; processing our own code, though.
+	   #+sb-xc-host
+	   (compiler-warn "reading an ignored variable: ~S" name)))
        (reference-leaf start next result var))
       (cons
        (aver (eq (car var) 'MACRO))

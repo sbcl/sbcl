@@ -162,6 +162,7 @@
     (if (< unix-time (ash 1 31))
 	unix-time
 	(multiple-value-bind (year offset) (years-since-mar-2000 utime)
+	  (declare (ignore year))
 	  (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))))
   
 (defun decode-universal-time (universal-time &optional time-zone)

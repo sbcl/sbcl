@@ -160,13 +160,14 @@
 ;;; the end of string and the string is adjustable the string will be
 ;;; implicitly extended, otherwise an error will be signalled. The
 ;;; latter case is provided for in the code, but not currently
-;;; excercised since SBCL fill-pointer arrays are always (currently) adjustable.
+;;; excercised since SBCL fill-pointer arrays are always (currently)
+;;; adjustable.
 ;;;
 ;;; * END will refer to the ARRAY-TOTAL-SIZE of string, not
 ;;; FILL-POINTER, since by definition the FILE-POSITION will always be
 ;;; a FILL-POINTER, so that would be of limited use.
 ;;;
-;;; * Rewinding the stream works with owerwriting semantics.
+;;; * Rewinding the stream works with overwriting semantics.
 ;;;
 #+nil (let ((str (make-array 0
 		       :element-type 'character
@@ -238,3 +239,6 @@
   (frob 'character)
   (frob 'base-char)
   (frob 'nil))
+
+(with-open-file (s "/dev/null" :element-type '(signed-byte 48))
+  (assert (eq :eof (read-byte s nil :eof))))

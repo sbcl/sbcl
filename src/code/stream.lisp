@@ -789,8 +789,7 @@
 		      (bin #'concatenated-bin)
 		      (n-bin #'concatenated-n-bin)
 		      (misc #'concatenated-misc))
-	    (:constructor %make-concatenated-stream
-			  (&rest streams &aux (current streams)))
+	    (:constructor %make-concatenated-stream (&rest streams))
 	    (:copier nil))
   ;; The car of this is the substream we are reading from now.
   (streams nil :type list))
@@ -1255,7 +1254,7 @@
     dst-end))
 
 (defun fill-pointer-misc (stream operation &optional arg1 arg2)
-  (declare (ignore arg1 arg2))
+  (declare (ignore arg2))
   (case operation
     (:file-position
      (let ((buffer (fill-pointer-output-stream-string stream)))

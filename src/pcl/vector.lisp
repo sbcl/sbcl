@@ -907,7 +907,8 @@
   `(pv-env (,pv ,calls ,pv-table-symbol ,pv-parameters)
      (let (,@(mapcar (lambda (slot-var p) `(,slot-var (get-slots-or-nil ,p)))
 		     slot-vars pv-parameters))
-	,@body)))
+       (declare (ignorable ,@(mapcar #'identity slot-vars)))
+       ,@body)))
 
 ;;; This gets used only when the default MAKE-METHOD-LAMBDA is
 ;;; overridden.

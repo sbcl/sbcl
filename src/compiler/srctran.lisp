@@ -2121,7 +2121,8 @@
       (values nil t t)))
 
 (defun logand-derive-type-aux (x y &optional same-leaf)
-  (declare (ignore same-leaf))
+  (when same-leaf
+    (return-from logand-derive-type-aux x))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
     (declare (ignore x-pos))
     (multiple-value-bind (y-len y-pos y-neg) (integer-type-length  y)
@@ -2153,7 +2154,8 @@
 		  (specifier-type 'integer)))))))
 
 (defun logior-derive-type-aux (x y &optional same-leaf)
-  (declare (ignore same-leaf))
+  (when same-leaf
+    (return-from logior-derive-type-aux x))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
     (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)
       (cond
@@ -2192,7 +2194,8 @@
 		(specifier-type 'integer))))))))
 
 (defun logxor-derive-type-aux (x y &optional same-leaf)
-  (declare (ignore same-leaf))
+  (when same-leaf
+    (return-from logxor-derive-type-aux (specifier-type '(eql 0))))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
     (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)
       (cond
@@ -2230,7 +2233,7 @@
 (defoptimizer (logeqv derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
 			     (lognot-derive-type-aux 
-			      (logxor-derive-type-aux x y same-leaf))) 
+			      (logxor-derive-type-aux x y same-leaf)))
 		       #'logeqv))
 (defoptimizer (lognand derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
@@ -2242,25 +2245,34 @@
 			     (lognot-derive-type-aux
 			      (logior-derive-type-aux x y same-leaf)))
 		       #'lognor))
+;;; FIXME: use SAME-LEAF instead of ignoring it.
 (defoptimizer (logandc1 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
-			     (logand-derive-type-aux
-			      (lognot-derive-type-aux x) y nil))
+			     (if same-leaf
+				 (specifier-type '(eql 0))
+				 (logand-derive-type-aux
+				  (lognot-derive-type-aux x) y nil)))
 		       #'logandc1))
 (defoptimizer (logandc2 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
-			     (logand-derive-type-aux
-			      x (lognot-derive-type-aux y) nil))
+			     (if same-leaf
+				 (specifier-type '(eql 0))
+				 (logand-derive-type-aux
+				  x (lognot-derive-type-aux y) nil)))
 		       #'logandc2))
 (defoptimizer (logorc1 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
-			     (logior-derive-type-aux
-			      (lognot-derive-type-aux x) y nil))
+			     (if same-leaf
+				 (specifier-type '(eql -1))
+				 (logior-derive-type-aux
+				  (lognot-derive-type-aux x) y nil)))
 		       #'logorc1))
 (defoptimizer (logorc2 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
-			     (logior-derive-type-aux
-			      x (lognot-derive-type-aux y) nil))
+			     (if same-leaf
+				 (specifier-type '(eql -1))
+				 (logior-derive-type-aux
+				  x (lognot-derive-type-aux y) nil)))
 		       #'logorc2))
 
 ;;;; miscellaneous derive-type methods

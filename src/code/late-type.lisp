@@ -307,6 +307,10 @@
     ((csubtypep type1 (specifier-type 'function)) nil)
     (t :call-other-method)))
 (!define-type-method (function :complex-union2) (type1 type2)
+  (declare (ignore type2))
+  ;; TYPE2 is a FUNCTION type.  If TYPE1 is a classoid type naming
+  ;; FUNCTION, then it is the union of the two; otherwise, there is no
+  ;; special union.
   (cond
     ((type= type1 (specifier-type 'function)) type1)
     (t nil)))

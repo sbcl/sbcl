@@ -14,9 +14,11 @@
 ;;;; queues, locks 
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
-(defun get-spinlock (lock offset new-value) )
+(defun get-spinlock (lock offset new-value)
+  (declare (ignore lock offset new-value)))
 
 (defmacro with-spinlock ((queue) &body body)
+  (declare (ignore queue))
   `(progn ,@body))
 
 ;;;; the higher-level locking operations are based on waitqueues
@@ -128,7 +130,11 @@ time we reacquire LOCK and return to the caller."
 ;;;; job control
 
 (defun init-job-control () t)
-(defun debugger-wait-until-foreground-thread (stream) t)
+(defun debugger-wait-until-foreground-thread (stream)
+  (declare (ignore stream))
+  t)
 (defun get-foreground () t)
-(defun release-foreground (&optional next) t)
+(defun release-foreground (&optional next)
+  (declare (ignore next))
+  t)
 (defun terminate-session ())

@@ -740,6 +740,7 @@
          (ctran (node-next node))
 	 (tail (component-tail (block-component block)))
 	 (succ (first (block-succ block))))
+    (declare (ignore lvar))
     (unless (or (and (eq node (block-last block)) (eq succ tail))
 		(block-delete-p block))
       (when (eq (node-derived-type node) *empty-type*)

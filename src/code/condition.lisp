@@ -781,6 +781,7 @@
 (define-condition nil-array-accessed-error (type-error)
   ()
   (:report (lambda (condition stream)
+	     (declare (ignore condition))
 	     (format stream
 		     "An attempt to access an array of element-type ~
                       NIL was made.  Congratulations!"))))
