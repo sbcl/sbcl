@@ -140,3 +140,10 @@
 ;;; bug caught and fixed by Raymond Toy cmucl-imp 2002-07-10: &REST
 ;;; variable is not optional.
 (assert (null (ignore-errors (eval '(funcall (lambda (&rest) 12))))))
+
+;;; on the PPC, we got the magic numbers in undefined_tramp wrong for
+;;; a while; fixed by CSR 2002-07-18
+(multiple-value-bind (value error)
+    (ignore-errors (some-undefined-function))
+  (assert (null value))
+  (assert (eq (cell-error-name error) 'some-undefined-function)))

@@ -347,10 +347,9 @@ lra:
 
 	GFUNCDEF(xundefined_tramp)
 	.globl undefined_tramp
-	.byte 0,0,0,SIMPLE_FUN_HEADER_WIDETAG /* type_FunctionHeader */
-
+	.byte 0,0,0,SIMPLE_FUN_HEADER_WIDETAG
 	.byte 18<<2
-undefined_tramp:
+undefined_tramp:	
 	.byte 0,0,24
 	.long undefined_tramp
 	.long NIL
@@ -360,7 +359,7 @@ undefined_tramp:
 	twllei reg_ZERO,trap_Cerror
 	.byte 4
 	.byte UNDEFINED_FUN_ERROR
-	.byte 254, 140, 2	/* 140?  sparc says sc_descriptorReg */
+	.byte 254, sc_DescriptorReg+0x40, 1	/* 140?  sparc says sc_descriptorReg */
 	.align 2
 1:	lwz reg_CODE,FDEFN_RAW_ADDR_OFFSET(reg_FDEFN)
 	la reg_LIP,SIMPLE_FUN_CODE_OFFSET(reg_CODE)
