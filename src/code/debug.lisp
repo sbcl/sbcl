@@ -637,6 +637,12 @@ reset to ~S."
 	    (*print-pretty* t)
 	    (*package* original-package))
 
+       ;; Before we start our own output, finish any pending output.
+       ;; Otherwise, if the user tried to track the progress of
+       ;; his program using PRINT statements, he'd tend to lose
+       ;; the last line of output or so, and get confused.
+       (flush-standard-output-streams)
+
        ;; The initial output here goes to *ERROR-OUTPUT*, because the
        ;; initial output is not interactive, just an error message,
        ;; and when people redirect *ERROR-OUTPUT*, they could

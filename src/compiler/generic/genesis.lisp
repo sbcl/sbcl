@@ -6,13 +6,20 @@
 ;;;; As explained by Rob MacLachlan on the CMU CL mailing list Wed, 06
 ;;;; Jan 1999 11:05:02 -0500, this cold load generator more or less
 ;;;; fakes up static function linking. I.e. it makes sure that all the
-;;;; functions in the fasl files it reads are bound to the
+;;;; DEFUN-defined functions in the fasl files it reads are bound to the
 ;;;; corresponding symbols before execution starts. It doesn't do
 ;;;; anything to initialize variable values; instead it just arranges
 ;;;; for !COLD-INIT to be called at cold load time. !COLD-INIT is
 ;;;; responsible for explicitly initializing anything which has to be
 ;;;; initialized early before it transfers control to the ordinary
 ;;;; top-level forms.
+;;;;
+;;;; (In CMU CL, and in SBCL as of 0.6.9 anyway, functions not defined
+;;;; by DEFUN aren't set up specially by GENESIS. In particular,
+;;;; structure slot accessors are not set up. Slot accessors are
+;;;; available at cold init time because they're usually compiled
+;;;; inline. They're not available as out-of-line functions until the
+;;;; toplevel forms installing them have run.)
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

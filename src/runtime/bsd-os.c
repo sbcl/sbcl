@@ -242,8 +242,10 @@ os_install_interrupt_handlers(void)
 #endif /* !defined GENCGC */
 
 /*
- * stuff to help work with dynamically linked libraries
- */
+ * Stuff to help work with dynamically linked libraries.
+ *
+ * FIXME: Remove this, and use the stub code in linux-stub.S
+ * instead. */ 
 
 /* feh!
  *
@@ -254,7 +256,10 @@ os_install_interrupt_handlers(void)
  *
  * FIXME: This flag should be set in Config.bsd */
 #if defined __FreeBSD__
-#define DL_WORKAROUND 1
+/* FreeBSD can (and should!) use lunix-stubs.S instead of the
+ * following code. That leaves exactly 0 uses of this code :-) 
+ * -- RAW 20001011 */
+#define DL_WORKAROUND 0
 #elif defined __OpenBSD__
 /* SBCL doesn't (yet?) work at all with dynamic libs on OpenBSD, so we
  * wouldn't get any use out of these stubs. -- WHN 20001001 */

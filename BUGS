@@ -886,6 +886,26 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   Probably SBCL should stop accepting the "~:8D"-style format arguments,
   or at least issue a warning.
 
+70:
+  The compiler doesn't like &OPTIONAL arguments in LABELS and FLET
+  forms. E.g.
+    (DEFUN FIND-BEFORE (ITEM SEQUENCE &KEY (TEST #'EQL))
+      (LABELS ((FIND-ITEM (OBJ SEQ TEST &OPTIONAL (VAL NIL))
+                 (LET ((ITEM (FIRST SEQ)))
+		   (COND ((NULL SEQ)
+			  (VALUES NIL NIL))
+			 ((FUNCALL TEST OBJ ITEM)
+			  (VALUES VAL SEQ))
+			 (T	
+			  (FIND-ITEM OBJ (REST SEQ) TEST (NCONC VAL `(,ITEM))))))))
+      (FIND-ITEM ITEM SEQUENCE TEST)))
+  from David Young's bug report on cmucl-help@cons.org 30 Nov 2000
+  causes sbcl-0.6.9 to fail with
+    error in function SB-KERNEL:ASSERT-ERROR:
+       The assertion (EQ (SB-C::LAMBDA-TAIL-SET SB-C::CALLER)
+                         (SB-C::LAMBDA-TAIL-SET
+                          (SB-C::LAMBDA-HOME SB-C::CALLEE))) failed.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

@@ -1,4 +1,13 @@
+# -*- makefile -*-
 include Config.x86-bsd
+
+# It turns out that this file is also useable for FreeBSD, and is
+# preferable to the stub code in bsd-os.c (#ifdef-protected by a test
+# on the symbold DL_WORKAROUND). 
+# This may also be the case for OpenBSD.
+# TODO: Rename linux-stub.S (to ldso-stubs.S, perhaps?) and remove the
+# stub code from bsd-os.c.
+ASSEM_SRC += linux-stubs.S
 
 # Until sbcl-0.6.7.3, we used "OS_LINK_FLAGS=-static" here, which
 # worked fine for most things, but LOAD-FOREIGN & friends require
