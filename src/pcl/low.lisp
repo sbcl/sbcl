@@ -306,12 +306,19 @@
 	 nil)))
 
 ;;;; support for useful hashing of PCL instances
-(let ((hash-code 0))
-  (declare (fixnum hash-code))
-  (defun get-instance-hash-code ()
-    (if (< hash-code most-positive-fixnum)
-	(incf hash-code)
-	(setq hash-code 0))))
+
+(defvar *instance-hash-code-random-state* (make-random-state))
+(defun get-instance-hash-code ()
+  ;; ANSI SXHASH wants us to make a good-faith effort to produce
+  ;; hash-codes that are well distributed within the range of
+  ;; non-negative fixnums, and this RANDOM operation does that, unlike
+  ;; the sbcl<=0.8.16 implementation of this operation as
+  ;; (INCF COUNTER).
+  ;;
+  ;; Hopefully there was no virtue to the old counter implementation
+  ;; that I am insufficiently insightful to insee. -- WHN 2004-10-28
+  (random most-positive-fixnum
+	  *instance-hash-code-random-state*))
 
 (defun sb-impl::sxhash-instance (x)
   (cond
