@@ -96,12 +96,24 @@
 
       ;; We cannot delete unused UVLs during NLX, so all UVLs live at
       ;; ENTRY will be actually live at NLE.
+      ;;
+      ;; BUT, UNWIND-PROTECTor is called in the environment, which has
+      ;; nothing in common with the environment of its entry. So we
+      ;; fictively compute its stack from the containing cleanups, but
+      ;; do not propagate additional LVARs from the entry, thus
+      ;; preveting bogus stack cleanings.
+      ;;
+      ;; TODO: Insert a check that no values are discarded in UWP. Or,
+      ;; maybe, we just don't need to create NLX-ENTRY for UWP?
       (when (and (eq (component-head (block-component block))
                      (first (block-pred block)))
                  (not (bind-p (block-start-node block))))
-        (let* ((entry-block (nle-block-entry-block block))
-               (entry-stack (ir2-block-start-stack (block-info entry-block))))
-          (setq start (merge-uvl-live-sets start entry-stack))))
+        (let* ((nlx-info (nle-block-nlx-info block))
+               (cleanup (nlx-info-cleanup nlx-info)))
+          (unless (eq (cleanup-kind cleanup) :unwind-protect)
+            (let* ((entry-block (node-block (cleanup-mess-up cleanup)))
+                   (entry-stack (ir2-block-start-stack (block-info entry-block))))
+              (setq start (merge-uvl-live-sets start entry-stack))))))
 
       (when *check-consistency*
         (aver (subsetp original-start start)))

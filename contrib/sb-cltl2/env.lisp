@@ -52,6 +52,19 @@ alist of declarations that apply to the apparent binding of VAR."
                       (type . ,(type-specifier ; XXX local type
                                 (info :variable :type var)))))))))
 
+(declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)
+                declaration-information))
+(defun declaration-information (declaration-name &optional env)
+  (let ((policy (sb-c::lexenv-policy (or env (make-null-lexenv)))))
+    (case declaration-name
+      (optimize (collect ((res))
+                  (dolist (name sb-c::*policy-qualities*)
+                    (res (list name (cdr (assoc name policy)))))
+                  (loop for (name . nil) in sb-c::*policy-dependent-qualities*
+                        do (res (list name (sb-c::policy-quality policy name))))
+                  (res)))
+      (t (error "Unsupported declaration ~S." declaration-name)))))
+
 (defun parse-macro (name lambda-list body &optional env)
   (declare (ignore env))
   (with-unique-names (whole environment)

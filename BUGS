@@ -736,7 +736,6 @@ WORKAROUND:
   all of the arguments are circular is probably desireable).
 
 213: "Sequence functions and type checking"
-  a. (fixed in 0.8.4.36)
   b. MAP, when given a type argument that is SUBTYPEP LIST, does not
      check that it will return a sequence of the given type.  Fixing
      it along the same lines as the others (cf. work done around
@@ -1342,9 +1341,6 @@ WORKAROUND:
       (list (foo y) (if (> y 1) (funcall (if (> y 0) #'foo #'identity) y))))
 
   (probably related to the bug 280.)
-
-313: "source-transforms are Lisp-1"
-  (fixed in 0.8.10.2)
 
 314: "LOOP :INITIALLY clauses and scope of initializers"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP

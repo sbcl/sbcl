@@ -1234,6 +1234,31 @@
 (assert (equal (non-continuous-stack-test t) '(11 12 13 14 1 2 3 4 5 6 7 8 :ext)))
 (assert (equal (non-continuous-stack-test nil) '(:b1 :b2 :b3 :b4 :a1 :a2 :a3 :a4 :int)))
 
+;;; MISC.362: environment of UNWIND-PROTECTor is different from that
+;;; if ENTRY.
+(assert (equal (multiple-value-list (funcall
+   (compile
+    nil
+    '(lambda (b g h)
+       (declare (optimize (speed 3) (space 3) (safety 2)
+			  (debug 2) (compilation-speed 3)))
+       (catch 'ct5
+	 (unwind-protect
+	     (labels ((%f15 (f15-1 f15-2 f15-3)
+                            (rational (throw 'ct5 0))))
+	       (%f15 0
+		     (apply #'%f15
+			    0
+			    h
+			    (progn
+			      (progv '(*s2* *s5*) (list 0 (%f15 0 g 0)) b)
+			      0)
+			    nil)
+		     0))
+	   (common-lisp:handler-case 0)))))
+   1 2 3))
+ '(0)))
+
 
 ;;; MISC.275
 (assert
