@@ -961,7 +961,13 @@
 (defun output-vector (vector stream)
   (declare (vector vector))
   (cond ((stringp vector)
-	 (cond ((or *print-escape* *print-readably*)
+	 (cond ((and *print-readably*
+		     (not (eq (array-element-type vector)
+			      (load-time-value
+			       (array-element-type
+				(make-array 0 :element-type 'character))))))
+		(error 'print-not-readable :object vector))
+	       ((or *print-escape* *print-readably*)
 		(write-char #\" stream)
 		(quote-string vector stream)
 		(write-char #\" stream))

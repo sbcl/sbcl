@@ -112,15 +112,22 @@
 		     (print (make-array '(1 2 0)) s)))))
 	       '(1 2 0)))
 
-(assert (multiple-value-bind (result error)
-	    (ignore-errors (read-from-string
-			    (with-output-to-string (s)
-			      (let ((*print-readably* t))
-				(print (make-array '(1 0 1)) s)))))
-	  ;; it might not be readably-printable
-	  (or (typep error 'print-not-readable)
-	      ;; or else it had better have the same dimensions
-	      (equal (array-dimensions result) '(1 0 1)))))
+(dolist (array (list (make-array '(1 0 1))
+		     (make-array 0 :element-type nil)
+		     (make-array 1 :element-type 'base-char)
+		     (make-array 1 :element-type 'character)))
+  (assert (multiple-value-bind (result error)
+	      (ignore-errors (read-from-string
+			      (with-output-to-string (s)
+				(let ((*print-readably* t))
+				  (print array s)))))
+	    ;; it might not be readably-printable
+	    (or (typep error 'print-not-readable)
+		(and
+		 ;; or else it had better have the same dimensions
+		 (equal (array-dimensions result) (array-dimensions array))
+		 ;; and the same element-type
+		 (equal (array-element-type result) (array-element-type array)))))))
 
 ;;; before 0.8.0.66 it signalled UNBOUND-VARIABLE
 (write #(1 2 3) :pretty nil :readably t)

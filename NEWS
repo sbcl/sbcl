@@ -2414,6 +2414,10 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     is now consistent with (COMPLEX <x>); bugs in treatment of COMPLEX
     MEMBER and UNION types have likewise been fixed.  (thanks to Bruno
     Haible)
+  * fixed a (fairly theoretical) bug in string printing: if
+    *PRINT-READABLY* is true, signal PRINT-NOT-READABLE if the string
+    does not have array-element-type equal to the most general string
+    type.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
