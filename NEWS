@@ -1506,7 +1506,7 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     SBCL now looks for its core file in /usr/{local/,}lib/sbcl/sbcl.core 
     if it's not in $SBCL_HOME.  It also sets SBCL_HOME to match.
   * REQUIRE and PROVIDE are now optionally capable of doing something
-    useful: see the documentation string for REQUIRE
+    useful. See the documentation string for REQUIRE.
   * infrastructure for a managed SBCL contrib system: contributed 
     modules in this release include:
     ** the ASDF system definition facility;
