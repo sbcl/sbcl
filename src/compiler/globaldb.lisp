@@ -717,8 +717,8 @@
 
   (values))
 
-;;; Given a volatile environment Env, bind Table-Var the environment's table
-;;; and Index-Var to the index of Name's bucket in the table. We also flush
+;;; Given a volatile environment ENV, bind TABLE-VAR the environment's table
+;;; and INDEX-VAR to the index of NAME's bucket in the table. We also flush
 ;;; the cache so that things will be consistent if body modifies something.
 (eval-when (:compile-toplevel :execute)
   (#+sb-xc-host cl:defmacro
@@ -1036,7 +1036,7 @@
   ;;   (or approximate-fun-type null)).
   ;; It was changed to T as a hopefully-temporary hack while getting
   ;; cold init problems untangled.
-  :type-spec t) 
+  :type-spec t)
 
 ;;; where this information came from:
 ;;;    :ASSUMED  = from uses of the object
@@ -1119,13 +1119,6 @@
   :type :ir1-convert
   :type-spec (or function null))
 
-;;; a function which gets a chance to do stuff to the IR1 for any call
-;;; to this function.
-(define-info-type
-  :class :function
-  :type :ir1-transform
-  :type-spec (or function null))
-
 ;;; If a function is "known" to the compiler, then this is a FUN-INFO
 ;;; structure containing the info used to special-case compilation.
 (define-info-type
@@ -1143,7 +1136,7 @@
 (define-info-type
   :class :function
   :type :definition
-  :type-spec t
+  :type-spec (or fdefn null)
   :default nil)
 
 ;;;; definitions for other miscellaneous information

@@ -130,7 +130,12 @@
 (defknown apply (callable t &rest t) *) ; ### Last arg must be List...
 (defknown funcall (callable &rest t) *)
 
-(defknown (mapcar maplist mapcan mapcon) (callable list &rest list) list
+(defknown (mapcar maplist) (callable list &rest list) list
+  (call))
+
+;;; According to CLHS the result must be a LIST, but we do not check
+;;; it.
+(defknown (mapcan mapcon) (callable list &rest list) t
   (call))
 
 (defknown (mapc mapl) (callable list &rest list) list (foldable call))
@@ -648,6 +653,9 @@
   t
   (foldable flushable))
 
+;; Correct argument type restrictions for these functions are
+;; complicated, so we just declare them to accept LISTs and suppress
+;; flushing is safe code.
 (defknown (caar cadr cdar cddr
                 caaar caadr cadar caddr cdaar cdadr cddar cdddr
                 caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr

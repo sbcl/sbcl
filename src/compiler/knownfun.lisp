@@ -179,8 +179,8 @@
 (defun %defknown (names type attributes &key derive-type optimizer)
   (let ((ctype (specifier-type type))
 	(info (make-fun-info :attributes attributes
-				  :derive-type derive-type
-				  :optimizer optimizer))
+                             :derive-type derive-type
+                             :optimizer optimizer))
 	(target-env *info-environment*))
     (dolist (name names)
       (let ((old-fun-info (info :function :info name)))
