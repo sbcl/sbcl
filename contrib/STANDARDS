@@ -1,6 +1,6 @@
 Proposed contrib standard, version $Revision$
 
-The SBCL contrib mechanism is intended to provide a mechanism to
+The SBCL contrib mechanism provides a mechanism to
 manage code which does not form part of SBCL itself, but which is
 sufficiently closely associated with it that it would not be sensible
 to run it as a completely separate project.  For example, alternative
@@ -21,10 +21,9 @@ to not install stale contrib code: a contrib that fails its test suite
 against a given version of SBCL will not be installed in that release.
 
 Note that despite leaving you the contrib maintainer with the
-responsibility of maintenance, we don't _necessarily_ (although we
-quite possibly would) offer you CVS access to the SBCL tree.  This is
-because we can't do that without letting you write to the rest of the
-tree as well (at least as far as I know, at sourceforge).  
+responsibility of maintenance, it doesn't follow that we'd
+_necessarily_ offer you CVS access to the SBCL tree: each application
+is considered individually.  We often do, though.
 
 ** Release cycle
 
@@ -93,5 +92,5 @@ SBCL that provide clean documented APIs which reasonably can be
 preserved.  If in doubt, seek consensus on the sbcl-devel list
 
 A contrib must load into its own Lisp package(s) instead of polluting
-CL-USER or one of the system packages.  The Lisp package name should
+CL-USER or one of the system packages.  The Lisp package names should
 begin with "SB-".  Ask the sbcl-devel list for a suitable name.

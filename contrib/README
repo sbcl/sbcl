@@ -1,14 +1,28 @@
 This directory is for extensions to SBCL. They aren't necessary for
 core SBCL functionality, or else they'd be built into the main SBCL
 binary automatically. And they're not portable Common Lisp, or they'd
-be put elsewhere (e.g. http://clocc.sourceforge.net/).
+be put elsewhere (see http://sbcl.sf.net/libs.php for pointers)
+
+There are two kinds of contrib module in this directory:
+
+  * Newer contrib modules conform to the contrib standard (see 
+    STANDARDS) and are automatically built and installed along with
+    SBCL itself.  Each of these is in its own subdirectory with a
+    Makefile, and can be loaded with REQUIRE
+
+    Many of them use ASDF, so you have to require that first: e.g.
+
+        * (require 'asdf)
+        * (require 'sb-bsd-sockets)
+
+  * Older standalone files are effectively unpackaged and may or may 
+    not work with the current SBCL version.
 
 Some good candidates for future extensions here are:
   * bindings to existing foreign libraries (e.g. to a regexp library
     like PCRE, or to a compression library like zlib, or to a graphics
     library like Tk)
-  * new libraries (e.g. a CORBA interface, or a port of the CMU CL
-    POSIX functions, or a new higher-level POSIX functions)
+  * new libraries (e.g. a CORBA interface)
   * low-level hooks into SBCL needed to interface it to some wrapper
     system (e.g. to interface to a graphical debugger of some sort)
   * a too-alpha-to-be-supported-yet tree shaker
@@ -17,5 +31,5 @@ SBCL extensions of less general interest, e.g. a binding to the C
 interface of the Oracle RDBMS, or particularly large extensions, e.g.
 big graphics frameworks, can also be associated with the SBCL project,
 but instead of being included in this directory as part of the
-distribution, they will be made available on the SBCL project web
-site.
+distribution, they will be made available or linked to on the SBCL
+project web site.
