@@ -1390,6 +1390,7 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        UNDEFINED-FUNCTION;
     ** PSETQ now works as required in the presence of side-effecting
        symbol-macro places;
+    ** NCONC accepts any object as its last argument
   * fixed bug 166: compiler preserves "there is a way to go"
     invariant when deleting code.
   * fixed bug 172: macro lambda lists with required arguments after
@@ -1397,7 +1398,7 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
     Matthew Danish)
   * fixed Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug (thanks
     to Matthew Danish)
-  * fixed bug 225: STRING-STREAM is now a class (reported byg Gilbert
+  * fixed bug 225: STRING-STREAM is now a class (reported by Gilbert
     Baumann)
 
 planned incompatible changes in 0.7.x:
