@@ -2355,7 +2355,7 @@
     (if (and (numeric-type-p size)
 	     (csubtypep size (specifier-type 'integer)))
 	(let ((size-high (numeric-type-high size)))
-	  (if (and size-high (<= size-high sb!vm:word-bits))
+	  (if (and size-high (<= size-high sb!vm:n-word-bits))
 	      (specifier-type `(unsigned-byte ,size-high))
 	      (specifier-type 'unsigned-byte)))
 	*universal-type*)))
@@ -2370,7 +2370,7 @@
 	(let ((size-high (numeric-type-high size))
 	      (posn-high (numeric-type-high posn)))
 	  (if (and size-high posn-high
-		   (<= (+ size-high posn-high) sb!vm:word-bits))
+		   (<= (+ size-high posn-high) sb!vm:n-word-bits))
 	      (specifier-type `(unsigned-byte ,(+ size-high posn-high)))
 	      (specifier-type 'unsigned-byte)))
 	*universal-type*)))
@@ -2390,7 +2390,7 @@
 	      (high (numeric-type-high int))
 	      (low (numeric-type-low int)))
 	  (if (and size-high posn-high high low
-		   (<= (+ size-high posn-high) sb!vm:word-bits))
+		   (<= (+ size-high posn-high) sb!vm:n-word-bits))
 	      (specifier-type
 	       (list (if (minusp low) 'signed-byte 'unsigned-byte)
 		     (max (integer-length high)
@@ -2414,7 +2414,7 @@
 	      (high (numeric-type-high int))
 	      (low (numeric-type-low int)))
 	  (if (and size-high posn-high high low
-		   (<= (+ size-high posn-high) sb!vm:word-bits))
+		   (<= (+ size-high posn-high) sb!vm:n-word-bits))
 	      (specifier-type
 	       (list (if (minusp low) 'signed-byte 'unsigned-byte)
 		     (max (integer-length high)
@@ -2425,19 +2425,19 @@
 
 (deftransform %ldb ((size posn int)
 		    (fixnum fixnum integer)
-		    (unsigned-byte #.sb!vm:word-bits))
+		    (unsigned-byte #.sb!vm:n-word-bits))
   "convert to inline logical operations"
   `(logand (ash int (- posn))
-	   (ash ,(1- (ash 1 sb!vm:word-bits))
-		(- size ,sb!vm:word-bits))))
+	   (ash ,(1- (ash 1 sb!vm:n-word-bits))
+		(- size ,sb!vm:n-word-bits))))
 
 (deftransform %mask-field ((size posn int)
 			   (fixnum fixnum integer)
-			   (unsigned-byte #.sb!vm:word-bits))
+			   (unsigned-byte #.sb!vm:n-word-bits))
   "convert to inline logical operations"
   `(logand int
-	   (ash (ash ,(1- (ash 1 sb!vm:word-bits))
-		     (- size ,sb!vm:word-bits))
+	   (ash (ash ,(1- (ash 1 sb!vm:n-word-bits))
+		     (- size ,sb!vm:n-word-bits))
 		posn)))
 
 ;;; Note: for %DPB and %DEPOSIT-FIELD, we can't use
@@ -2448,7 +2448,7 @@
 
 (deftransform %dpb ((new size posn int)
 		    *
-		    (unsigned-byte #.sb!vm:word-bits))
+		    (unsigned-byte #.sb!vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
@@ -2456,7 +2456,7 @@
 
 (deftransform %dpb ((new size posn int)
 		    *
-		    (signed-byte #.sb!vm:word-bits))
+		    (signed-byte #.sb!vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
@@ -2464,7 +2464,7 @@
 
 (deftransform %deposit-field ((new size posn int)
 			      *
-			      (unsigned-byte #.sb!vm:word-bits))
+			      (unsigned-byte #.sb!vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
@@ -2472,7 +2472,7 @@
 
 (deftransform %deposit-field ((new size posn int)
 			      *
-			      (signed-byte #.sb!vm:word-bits))
+			      (signed-byte #.sb!vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)

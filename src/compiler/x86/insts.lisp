@@ -1787,7 +1787,7 @@
 	   (values 0 (1+ length) nil nil))
 	  (t
 	   (sb!kernel:copy-from-system-area sap (* byte-bits (1+ offset))
-					    vector (* word-bits
+					    vector (* n-word-bits
 						      vector-data-offset)
 					    (* length byte-bits))
 	   (collect ((sc-offsets)

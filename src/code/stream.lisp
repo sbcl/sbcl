@@ -511,10 +511,10 @@
 	   (when (/= start +in-buffer-extra+)
 	     (bit-bash-copy ibuf (+ (* +in-buffer-extra+ sb!vm:byte-bits)
 				    (* sb!vm:vector-data-offset
-				       sb!vm:word-bits))
+				       sb!vm:n-word-bits))
 			    ibuf (+ (the index (* start sb!vm:byte-bits))
 				    (* sb!vm:vector-data-offset
-				       sb!vm:word-bits))
+				       sb!vm:n-word-bits))
 			    (* count sb!vm:byte-bits)))
 	   (setf (lisp-stream-in-index stream) (1+ start))
 	   (code-char (aref ibuf start))))))
@@ -533,10 +533,10 @@
 	   (funcall (lisp-stream-bin stream) stream eof-error-p eof-value))
 	  (t
 	   (unless (zerop start)
-	     (bit-bash-copy ibuf (* sb!vm:vector-data-offset sb!vm:word-bits)
+	     (bit-bash-copy ibuf (* sb!vm:vector-data-offset sb!vm:n-word-bits)
 			    ibuf (+ (the index (* start sb!vm:byte-bits))
 				    (* sb!vm:vector-data-offset
-				       sb!vm:word-bits))
+				       sb!vm:n-word-bits))
 			    (* count sb!vm:byte-bits)))
 	   (setf (lisp-stream-in-index stream) (1+ start))
 	   (aref ibuf start)))))

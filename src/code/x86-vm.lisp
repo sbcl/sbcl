@@ -276,7 +276,7 @@
       (/hexstr length)
       (/hexstr vector)
       (copy-from-system-area pc (* sb!vm:byte-bits 2)
-			     vector (* sb!vm:word-bits
+			     vector (* sb!vm:n-word-bits
 				       sb!vm:vector-data-offset)
 			     (* length sb!vm:byte-bits))
       (let* ((index 0)

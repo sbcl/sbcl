@@ -817,7 +817,7 @@
 		      (+ (ash word sb!vm:byte-bits) byte)
 		      (+ word (ash byte bit-shift))))
 	    (incf bit-shift sb!vm:byte-bits)))
-	(format stream "#X~V,'0X" (ash sb!vm:word-bits -2) word)))))
+	(format stream "#X~V,'0X" (ash sb!vm:n-word-bits -2) word)))))
 
 (defvar *default-dstate-hooks* (list #'lra-hook))
 

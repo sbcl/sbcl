@@ -413,7 +413,7 @@
 	  ;; Blast the string into place.
 	  (sb-kernel:copy-to-system-area (the simple-string s)
 					 (* sb-vm:vector-data-offset
-					    sb-vm:word-bits)
+					    sb-vm:n-word-bits)
 					 string-sap 0
 					 (* (1+ n) sb-vm:byte-bits))
 	  ;; Blast the pointer to the string into place.
@@ -713,7 +713,7 @@
 				   (sb-kernel:copy-from-system-area
 				    (alien-sap buf) 0
 				    string (* sb-vm:vector-data-offset
-					      sb-vm:word-bits)
+					      sb-vm:n-word-bits)
 				    (* count sb-vm:byte-bits))
 				   (write-string string stream
 						 :end count)))))))))))

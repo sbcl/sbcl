@@ -29,14 +29,14 @@
 (defvar *meta-room-info* (make-array 256 :initial-element nil))
 
 (dolist (obj *primitive-objects*)
-  (let ((header (primitive-object-header obj))
+  (let ((widetag (primitive-object-widetag obj))
 	(lowtag (primitive-object-lowtag obj))
 	(name (primitive-object-name obj))
 	(variable (primitive-object-variable-length obj))
 	(size (primitive-object-size obj)))
     (cond
      ((not lowtag))
-     ((not header)
+     ((not widetag)
       (let ((info (make-room-info :name name
 				  :kind :lowtag))
 	    (lowtag (symbol-value lowtag)))
@@ -45,7 +45,7 @@
 	  (setf (svref *meta-room-info* (logior lowtag (ash i 3))) info))))
      (variable)
      (t
-      (setf (svref *meta-room-info* (symbol-value header))
+      (setf (svref *meta-room-info* (symbol-value widetag))
 	    (make-room-info :name name
 			    :kind :fixed
 			    :length size))))))

@@ -119,7 +119,8 @@
   (sb!kernel:%raw-bits object offset))
 
 (defun %set-raw-bits (object offset value)
-  (declare (type index offset) (type (unsigned-byte #.sb!vm:word-bits) value))
+  (declare (type index offset))
+  (declare (type (unsigned-byte #.sb!vm:n-word-bits) value))
   (setf (sb!kernel:%raw-bits object offset) value))
 
 (defun make-single-float (x) (make-single-float x))

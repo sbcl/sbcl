@@ -2031,8 +2031,8 @@
          (sb!sys:int-sap val)))
       (#.sb!vm:signed-reg-sc-number
        (with-escaped-value (val)
-         (if (logbitp (1- sb!vm:word-bits) val)
-             (logior val (ash -1 sb!vm:word-bits))
+         (if (logbitp (1- sb!vm:n-word-bits) val)
+             (logior val (ash -1 sb!vm:n-word-bits))
              val)))
       (#.sb!vm:unsigned-reg-sc-number
        (with-escaped-value (val)
@@ -2176,8 +2176,8 @@
       (#.sb!vm:signed-reg-sc-number
        (/show0 "case of SIGNED-REG-SC-NUMBER")
        (with-escaped-value (val)
-	 (if (logbitp (1- sb!vm:word-bits) val)
-	     (logior val (ash -1 sb!vm:word-bits))
+	 (if (logbitp (1- sb!vm:n-word-bits) val)
+	     (logior val (ash -1 sb!vm:n-word-bits))
 	     val)))
       (#.sb!vm:unsigned-reg-sc-number
        (/show0 "case of UNSIGNED-REG-SC-NUMBER")
@@ -2331,7 +2331,7 @@
       (#.sb!vm:sap-reg-sc-number
        (set-escaped-value (sap-int value)))
       (#.sb!vm:signed-reg-sc-number
-       (set-escaped-value (logand value (1- (ash 1 sb!vm:word-bits)))))
+       (set-escaped-value (logand value (1- (ash 1 sb!vm:n-word-bits)))))
       (#.sb!vm:unsigned-reg-sc-number
        (set-escaped-value value))
       (#.sb!vm:non-descriptor-reg-sc-number
@@ -2465,7 +2465,7 @@
       (#.sb!vm:sap-reg-sc-number
        (set-escaped-value (sap-int value)))
       (#.sb!vm:signed-reg-sc-number
-       (set-escaped-value (logand value (1- (ash 1 sb!vm:word-bits)))))
+       (set-escaped-value (logand value (1- (ash 1 sb!vm:n-word-bits)))))
       (#.sb!vm:unsigned-reg-sc-number
        (set-escaped-value value))
       (#.sb!vm:single-reg-sc-number
@@ -3223,7 +3223,7 @@
 	 (frame (do ((cfp (sb!vm:context-register scp sb!vm::cfp-offset))
 		     (f (top-frame) (frame-down f)))
 		    ((= cfp (sap-int (frame-pointer f))) f)
-		  (declare (type (unsigned-byte #.sb!vm:word-bits) cfp))))
+		  (declare (type (unsigned-byte #.sb!vm:n-word-bits) cfp))))
 	 (component (breakpoint-data-component data))
 	 (cookie (gethash component *fun-end-cookies*)))
     (remhash component *fun-end-cookies*)

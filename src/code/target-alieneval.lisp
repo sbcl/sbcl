@@ -517,7 +517,7 @@
 			 (ecase units
 			   (:bits 1)
 			   (:bytes sb!vm:byte-bits)
-			   (:words sb!vm:word-bits))))
+			   (:words sb!vm:n-word-bits))))
 	(error "unknown size for alien type ~S"
 	       (unparse-alien-type alien-type)))))
 

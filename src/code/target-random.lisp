@@ -191,7 +191,7 @@
      (- (sb!impl::make-double-float
 	 (dpb (ash (random-chunk state)
 		   (- sb!vm:double-float-digits random-chunk-length
-		      sb!vm:word-bits))
+		      sb!vm:n-word-bits))
 	      sb!vm:double-float-significand-byte
 	      (sb!impl::double-float-high-bits 1d0))
 	 (random-chunk state))
@@ -207,7 +207,7 @@
        (- (sb!impl::make-double-float
 	   (dpb (ash (sb!vm::random-mt19937 state-vector)
 		     (- sb!vm:double-float-digits random-chunk-length
-			sb!vm:word-bits))
+			sb!vm:n-word-bits))
 		sb!vm:double-float-significand-byte
 		(sb!impl::double-float-high-bits 1d0))
 	   (sb!vm::random-mt19937 state-vector))

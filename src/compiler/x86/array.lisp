@@ -121,7 +121,7 @@
 ;;;; bit, 2-bit, and 4-bit vectors
 
 (macrolet ((def-small-data-vector-frobs (type bits)
-	     (let* ((elements-per-word (floor sb!vm:word-bits bits))
+	     (let* ((elements-per-word (floor sb!vm:n-word-bits bits))
 		    (bit-shift (1- (integer-length elements-per-word))))
     `(progn
        (define-vop (,(symbolicate 'data-vector-ref/ type))

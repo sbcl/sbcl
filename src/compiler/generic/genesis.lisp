@@ -138,7 +138,7 @@
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
   (gspace nil :type (or gspace null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet
-  (word-offset nil :type (or (unsigned-byte #.sb!vm:word-bits) null))
+  (word-offset nil :type (or (unsigned-byte #.sb!vm:n-word-bits) null))
   ;; the high and low halves of the descriptor
   ;;
   ;; KLUDGE: Judging from the comments in genesis.lisp of the CMU CL
@@ -220,14 +220,14 @@
 
 (defun descriptor-fixnum (des)
   (let ((bits (descriptor-bits des)))
-    (if (logbitp (1- sb!vm:word-bits) bits)
-      ;; KLUDGE: The (- SB!VM:WORD-BITS 2) term here looks right to
-      ;; me, and it works, but in CMU CL it was (1- SB!VM:WORD-BITS),
+    (if (logbitp (1- sb!vm:n-word-bits) bits)
+      ;; KLUDGE: The (- SB!VM:N-WORD-BITS 2) term here looks right to
+      ;; me, and it works, but in CMU CL it was (1- SB!VM:N-WORD-BITS),
       ;; and although that doesn't make sense for me, or work for me,
       ;; it's hard to see how it could have been wrong, since CMU CL
       ;; genesis worked. It would be nice to understand how this came
       ;; to be.. -- WHN 19990901
-      (logior (ash bits -2) (ash -1 (- sb!vm:word-bits 2)))
+      (logior (ash bits -2) (ash -1 (- sb!vm:n-word-bits 2)))
       (ash bits -2))))
 
 ;;; common idioms
@@ -278,12 +278,13 @@
 (defun make-random-descriptor (value)
   (make-descriptor (logand (ash value (- descriptor-low-bits))
 			   (1- (ash 1
-				    (- sb!vm:word-bits descriptor-low-bits))))
+				    (- sb!vm:n-word-bits
+				       descriptor-low-bits))))
 		   (logand value (1- (ash 1 descriptor-low-bits)))))
 
 (defun make-fixnum-descriptor (num)
   (when (>= (integer-length num)
-	    (1+ (- sb!vm:word-bits sb!vm:n-lowtag-bits)))
+	    (1+ (- sb!vm:n-word-bits sb!vm:n-lowtag-bits)))
     (error "~D is too big for a fixnum." num))
   (make-random-descriptor (ash num (1- sb!vm:n-lowtag-bits))))
 
@@ -380,7 +381,7 @@
 
 (defun maybe-byte-swap (word)
   (declare (type (unsigned-byte 32) word))
-  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:n-word-bits 32))
   (aver (= sb!vm:byte-bits 8))
   (if (not *genesis-byte-order-swap-p*)
       word
@@ -391,7 +392,7 @@
 
 (defun maybe-byte-swap-short (short)
   (declare (type (unsigned-byte 16) short))
-  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:n-word-bits 32))
   (aver (= sb!vm:byte-bits 8))
   (if (not *genesis-byte-order-swap-p*)
       short
@@ -415,7 +416,7 @@
                             (ldb (byte 8 ,(* i 8)) new-value)))))
               `(progn
                  (defun ,name (byte-vector byte-index)
-  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:n-word-bits 32))
   (aver (= sb!vm:byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
@@ -423,7 +424,7 @@
     (:big-endian
      (error "stub: no big-endian ports of SBCL (yet?)"))))
                  (defun (setf ,name) (new-value byte-vector byte-index)
-  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:n-word-bits 32))
   (aver (= sb!vm:byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
@@ -581,20 +582,20 @@
 (defun bignum-to-core (n)
   #!+sb-doc
   "Copy a bignum to the cold core."
-  (let* ((words (ceiling (1+ (integer-length n)) sb!vm:word-bits))
+  (let* ((words (ceiling (1+ (integer-length n)) sb!vm:n-word-bits))
 	 (handle (allocate-unboxed-object *dynamic*
-					  sb!vm:word-bits
+					  sb!vm:n-word-bits
 					  words
 					  sb!vm:bignum-widetag)))
     (declare (fixnum words))
     (do ((index 1 (1+ index))
-	 (remainder n (ash remainder (- sb!vm:word-bits))))
+	 (remainder n (ash remainder (- sb!vm:n-word-bits))))
 	((> index words)
 	 (unless (zerop (integer-length remainder))
 	   ;; FIXME: Shouldn't this be a fatal error?
 	   (warn "~D words of ~D were written, but ~D bits were left over."
 		 words n remainder)))
-      (let ((word (ldb (byte sb!vm:word-bits 0) remainder)))
+      (let ((word (ldb (byte sb!vm:n-word-bits 0) remainder)))
 	(write-wordindexed handle index
 			   (make-descriptor (ash word (- descriptor-low-bits))
 					    (ldb (byte descriptor-low-bits 0)
@@ -604,7 +605,7 @@
 (defun number-pair-to-core (first second type)
   #!+sb-doc
   "Makes a number pair of TYPE (ratio or complex) and fills it in."
-  (let ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits 2 type)))
+  (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits 2 type)))
     (write-wordindexed des 1 first)
     (write-wordindexed des 2 second)
     des))
@@ -613,7 +614,7 @@
   (etypecase x
     (single-float
      (let ((des (allocate-unboxed-object *dynamic*
-					 sb!vm:word-bits
+					 sb!vm:n-word-bits
 					 (1- sb!vm:single-float-size)
 					 sb!vm:single-float-widetag)))
        (write-wordindexed des
@@ -622,7 +623,7 @@
        des))
     (double-float
      (let ((des (allocate-unboxed-object *dynamic*
-					 sb!vm:word-bits
+					 sb!vm:n-word-bits
 					 (1- sb!vm:double-float-size)
 					 sb!vm:double-float-widetag))
 	   (high-bits (make-random-descriptor (double-float-high-bits x)))
@@ -638,7 +639,7 @@
     #!+(and long-float x86)
     (long-float
      (let ((des (allocate-unboxed-object *dynamic*
-					 sb!vm:word-bits
+					 sb!vm:n-word-bits
 					 (1- sb!vm:long-float-size)
 					 sb!vm:long-float-widetag))
 	   (exp-bits (make-random-descriptor (long-float-exp-bits x)))
@@ -655,7 +656,7 @@
 
 (defun complex-single-float-to-core (num)
   (declare (type (complex single-float) num))
-  (let ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
+  (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 				      (1- sb!vm:complex-single-float-size)
 				      sb!vm:complex-single-float-widetag)))
     (write-wordindexed des sb!vm:complex-single-float-real-slot
@@ -666,7 +667,7 @@
 
 (defun complex-double-float-to-core (num)
   (declare (type (complex double-float) num))
-  (let ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
+  (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 				      (1- sb!vm:complex-double-float-size)
 				      sb!vm:complex-double-float-widetag)))
     (let* ((real (realpart num))
@@ -715,7 +716,7 @@
 (declaim (ftype (function (sb!vm:word) descriptor) sap-to-core))
 (defun sapint-to-core (sapint)
   (let ((des (allocate-unboxed-object *dynamic*
-				      sb!vm:word-bits
+				      sb!vm:n-word-bits
 				      (1- sb!vm:sap-size)
 				      sb!vm:sap-widetag)))
     (write-wordindexed des
@@ -734,7 +735,7 @@
 ;;; descriptor.
 (defun vector-in-core (&rest objects)
   (let* ((size (length objects))
-	 (result (allocate-vector-object *dynamic* sb!vm:word-bits size
+	 (result (allocate-vector-object *dynamic* sb!vm:n-word-bits size
 					 sb!vm:simple-vector-widetag)))
     (dotimes (index size)
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
@@ -751,7 +752,7 @@
   (declare (simple-string name))
   (let ((symbol (allocate-unboxed-object (or *cold-symbol-allocation-gspace*
 					     *dynamic*)
-					 sb!vm:word-bits
+					 sb!vm:n-word-bits
 					 (1- sb!vm:symbol-size)
 					 sb!vm:symbol-header-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
@@ -1056,7 +1057,7 @@
 (defun make-nil-descriptor ()
   (let* ((des (allocate-unboxed-object
 	       *static*
-	       sb!vm:word-bits
+	       sb!vm:n-word-bits
 	       sb!vm:symbol-size
 	       0))
 	 (result (make-descriptor (descriptor-high des)
@@ -1926,7 +1927,7 @@
 		(fop-small-vector)
   (let* ((size (clone-arg))
 	 (result (allocate-vector-object *dynamic*
-					 sb!vm:word-bits
+					 sb!vm:n-word-bits
 					 size
 					 sb!vm:simple-vector-widetag)))
     (do ((index (1- size) (1- index)))
@@ -1964,7 +1965,7 @@
   (let* ((len (read-arg 4))
 	 (result (allocate-vector-object
 		  *dynamic*
-		  sb!vm:word-bits
+		  sb!vm:n-word-bits
 		  len
 		  sb!vm:simple-array-single-float-widetag))
 	 (start (+ (descriptor-byte-offset result)
@@ -2043,7 +2044,7 @@
   (ecase +backend-fasl-file-implementation+
     (:x86 ; (which has 80-bit long-float format)
      (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
+       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 					    (1- sb!vm:long-float-size)
 					    sb!vm:long-float-widetag))
 	      (low-bits (make-random-descriptor (fast-read-u-integer 4)))
@@ -2059,7 +2060,7 @@
     #+nil
     (#.sb!c:sparc-fasl-file-implementation ; 128 bit long-float format
      (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
+       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 					    (1- sb!vm:long-float-size)
 					    sb!vm:long-float-widetag))
 	      (low-bits (make-random-descriptor (fast-read-u-integer 4)))
@@ -2078,7 +2079,7 @@
   (ecase +backend-fasl-file-implementation+
     (:x86 ; (which has 80-bit long-float format)
      (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
+       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 					    (1- sb!vm:complex-long-float-size)
 					    sb!vm:complex-long-float-widetag))
 	      (real-low-bits (make-random-descriptor (fast-read-u-integer 4)))
@@ -2111,7 +2112,7 @@
     #+nil
     (#.sb!c:sparc-fasl-file-implementation ; 128 bit long-float format
      (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
+       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 					    (1- sb!vm:complex-long-float-size)
 					    sb!vm:complex-long-float-widetag))
 	      (real-low-bits (make-random-descriptor (fast-read-u-integer 4)))
@@ -2182,7 +2183,7 @@
 (defun finalize-load-time-value-noise ()
   (cold-set (cold-intern '*!load-time-values*)
 	    (allocate-vector-object *dynamic*
-				    sb!vm:word-bits
+				    sb!vm:n-word-bits
 				    *load-time-value-counter*
 				    sb!vm:simple-vector-widetag)))
 
@@ -2616,7 +2617,7 @@
 	      "struct ~A {~%"
 	      (nsubstitute #\_ #\-
 	      (string-downcase (string (sb!vm:primitive-object-name obj)))))
-      (when (sb!vm:primitive-object-header obj)
+      (when (sb!vm:primitive-object-widetag obj)
 	(format t "    lispobj header;~%"))
       (dolist (slot (sb!vm:primitive-object-slots obj))
 	(format t "    ~A ~A~@[[1]~];~%"

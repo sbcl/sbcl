@@ -20,7 +20,7 @@
 
 ;;;; FIXME: I'm not sure where to put this. -- WHN 19990817
 
-(deftype sb!vm:word () `(unsigned-byte ,sb!vm:word-bits))
+(deftype sb!vm:word () `(unsigned-byte ,sb!vm:n-word-bits))
 
 ;;;; implementation-dependent DEFTYPEs
 
@@ -72,7 +72,7 @@
 ;;; internal time format. (Note: not a FIXNUM, ouch..)
 (sb!xc:deftype internal-time () 'unsigned-byte)
 
-(sb!xc:deftype bignum-element-type () `(unsigned-byte ,sb!vm:word-bits))
+(sb!xc:deftype bignum-element-type () `(unsigned-byte ,sb!vm:n-word-bits))
 (sb!xc:deftype bignum-type () 'bignum)
 (sb!xc:deftype bignum-index () 'index)
 

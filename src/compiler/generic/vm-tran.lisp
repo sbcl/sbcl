@@ -16,7 +16,7 @@
 ;;; FIXME: Add a comment telling whether this holds for all vectors
 ;;; or only for vectors based on simple arrays (non-adjustable, etc.).
 (defconstant vector-data-bit-offset
-  (* sb!vm:vector-data-offset sb!vm:word-bits))
+  (* sb!vm:vector-data-offset sb!vm:n-word-bits))
 
 ;;; We need to define these predicates, since the TYPEP source
 ;;; transform picks whichever predicate was defined last when there
@@ -153,7 +153,7 @@
 #+nil
 (macrolet
     ((frob (type bits)
-       (let ((elements-per-word (truncate sb!vm:word-bits bits)))
+       (let ((elements-per-word (truncate sb!vm:n-word-bits bits)))
 	 `(progn
 	    (deftransform data-vector-ref ((vector index)
 					   (,type *))
@@ -161,7 +161,7 @@
 		   (floor index ,',elements-per-word)
 		 (ldb ,(ecase sb!vm:target-byte-order
 			 (:little-endian '(byte ,bits (* bit ,bits)))
-			 (:big-endian '(byte ,bits (- sb!vm:word-bits
+			 (:big-endian '(byte ,bits (- sb!vm:n-word-bits
 						      (* (1+ bit) ,bits)))))
 		      (%raw-bits vector (+ word sb!vm:vector-data-offset)))))
 	    (deftransform data-vector-set ((vector index new-value)
@@ -171,7 +171,7 @@
 		 (setf (ldb ,(ecase sb!vm:target-byte-order
 			       (:little-endian '(byte ,bits (* bit ,bits)))
 			       (:big-endian
-				'(byte ,bits (- sb!vm:word-bits
+				'(byte ,bits (- sb!vm:n-word-bits
 						(* (1+ bit) ,bits)))))
 			    (%raw-bits vector (+ word sb!vm:vector-data-offset)))
 		       new-value)))))))
@@ -212,8 +212,8 @@
 	      (end (+ sb!vm:vector-data-offset
 		      (truncate (the index
 				     (+ (length bit-array-1)
-					sb!vm:word-bits -1))
-				sb!vm:word-bits))))
+					sb!vm:n-word-bits -1))
+				sb!vm:n-word-bits))))
 	     ((= index end) result-bit-array)
 	   (declare (optimize (speed 3) (safety 0))
 		    (type index index end))
@@ -236,8 +236,8 @@
 	  (end (+ sb!vm:vector-data-offset
 		  (truncate (the index
 				 (+ (length bit-array)
-				    (1- sb!vm:word-bits)))
-			    sb!vm:word-bits))))
+				    (1- sb!vm:n-word-bits)))
+			    sb!vm:n-word-bits))))
 	 ((= index end) result-bit-array)
        (declare (optimize (speed 3) (safety 0))
 		(type index index end))

@@ -24,7 +24,7 @@
 
 ;;;; machine architecture parameters
 
-(defconstant word-bits 32
+(defconstant n-word-bits 32
   #!+sb-doc
   "Number of bits per word where a word holds one lisp descriptor.")
 
@@ -32,11 +32,11 @@
   #!+sb-doc
   "Number of bits per byte where a byte is the smallest addressable object.")
 
-(defconstant word-shift (1- (integer-length (/ word-bits byte-bits)))
+(defconstant word-shift (1- (integer-length (/ n-word-bits byte-bits)))
   #!+sb-doc
   "Number of bits to shift between word addresses and byte addresses.")
 
-(defconstant word-bytes (/ word-bits byte-bits)
+(defconstant word-bytes (/ n-word-bits byte-bits)
   #!+sb-doc
   "Number of bytes in a word.")
 
@@ -77,10 +77,10 @@
   (+ (byte-size single-float-significand-byte) 1))
 
 (defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) word-bits 1))
+  (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
 (defconstant long-float-digits
-  (+ (byte-size long-float-significand-byte) word-bits 1))
+  (+ (byte-size long-float-significand-byte) n-word-bits 1))
 
 ;;; pfw -- from i486 microprocessor programmer's reference manual
 (defconstant float-invalid-trap-bit	   (ash 1 0))

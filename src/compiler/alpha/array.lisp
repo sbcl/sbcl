@@ -122,7 +122,7 @@
                   ,size vector-data-offset other-pointer-lowtag ,scs
                   ,element-type data-vector-set)))
            (def-small-data-vector-frobs (type bits)
-             (let* ((elements-per-word (floor word-bits bits))
+             (let* ((elements-per-word (floor n-word-bits bits))
                     (bit-shift (1- (integer-length elements-per-word))))
                `(progn
                   (define-vop (,(symbolicate 'data-vector-ref/ type))

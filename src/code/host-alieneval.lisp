@@ -332,7 +332,7 @@
 
 (def-alien-type-translator system-area-pointer ()
   (make-alien-system-area-pointer-type
-   :bits #!-alpha sb!vm:word-bits #!+alpha 64))
+   :bits #!-alpha sb!vm:n-word-bits #!+alpha 64))
 
 (def-alien-type-method (system-area-pointer :unparse) (type)
   (declare (ignore type))
@@ -509,13 +509,13 @@
 (def-alien-type-class (integer)
   (signed t :type (member t nil)))
 
-(def-alien-type-translator signed (&optional (bits sb!vm:word-bits))
+(def-alien-type-translator signed (&optional (bits sb!vm:n-word-bits))
   (make-alien-integer-type :bits bits))
 
-(def-alien-type-translator integer (&optional (bits sb!vm:word-bits))
+(def-alien-type-translator integer (&optional (bits sb!vm:n-word-bits))
   (make-alien-integer-type :bits bits))
 
-(def-alien-type-translator unsigned (&optional (bits sb!vm:word-bits))
+(def-alien-type-translator unsigned (&optional (bits sb!vm:n-word-bits))
   (make-alien-integer-type :bits bits :signed nil))
 
 (def-alien-type-method (integer :unparse) (type)
@@ -569,7 +569,7 @@
 
 ;;; FIXME: Check to make sure that we aren't attaching user-readable
 ;;; stuff to CL:BOOLEAN in any way which impairs ANSI compliance.
-(def-alien-type-translator boolean (&optional (bits sb!vm:word-bits))
+(def-alien-type-translator boolean (&optional (bits sb!vm:n-word-bits))
   (make-alien-boolean-type :bits bits :signed nil))
 
 (def-alien-type-method (boolean :unparse) (type)
@@ -771,7 +771,8 @@
 ;;;; the POINTER type
 
 (def-alien-type-class (pointer :include (alien-value (:bits
-						      #!-alpha sb!vm:word-bits
+						      #!-alpha
+						      sb!vm:n-word-bits
 						      #!+alpha 64)))
   (to nil :type (or alien-type null)))
 

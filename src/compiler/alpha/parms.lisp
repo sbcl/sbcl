@@ -11,7 +11,7 @@
 
 (eval-when  (:compile-toplevel :load-toplevel :execute)
 
-(defconstant word-bits 32
+(defconstant n-word-bits 32
   #!+sb-doc
   "Number of bits per word where a word holds one lisp descriptor.")
 
@@ -19,11 +19,11 @@
   #!+sb-doc
   "Number of bits per byte where a byte is the smallest addressable object.")
 
-(defconstant word-shift (1- (integer-length (/ word-bits byte-bits)))
+(defconstant word-shift (1- (integer-length (/ n-word-bits byte-bits)))
   #!+sb-doc
   "Number of bits to shift between word addresses and byte addresses.")
 
-(defconstant word-bytes (/ word-bits byte-bits)
+(defconstant word-bytes (/ n-word-bits byte-bits)
   #!+sb-doc
   "Number of bytes in a word.")
 
@@ -49,7 +49,7 @@
   (+ (byte-size single-float-significand-byte) 1))
 
 (defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) word-bits 1))
+  (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
 ;; Values in 17f code seem to be same as HPPA. These values are from
 ;; DEC Assembly Language Programmers guide. The active bits are

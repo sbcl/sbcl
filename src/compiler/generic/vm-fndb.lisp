@@ -228,7 +228,7 @@
   (foldable flushable movable))
 
 (defknown %fixnum-digit-with-correct-sign (bignum-element-type)
-  (signed-byte #.sb!vm:word-bits)
+  (signed-byte #.sb!vm:n-word-bits)
   (foldable flushable movable))
 
 (defknown (%ashl %ashr %digit-logical-shift-right)

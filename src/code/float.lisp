@@ -864,19 +864,19 @@ uninterruptibly frob the rounding modes & do ieee round-to-integer.
 	   (exp (ldb sb!vm:double-float-exponent-byte hi-bits))
 	   (frac (logior (ldb sb!vm:double-float-significand-byte hi-bits)
 			 sb!vm:double-float-hidden-bit))
-	   (shift (- exp (- sb!vm:double-float-digits sb!vm:word-bits)
+	   (shift (- exp (- sb!vm:double-float-digits sb!vm:n-word-bits)
 		     sb!vm:double-float-bias)))
       (when (> exp sb!vm:double-float-normal-exponent-max)
 	(error 'floating-point-invalid-operation :operator 'truncate
 	       :operands (list x)))
-      (if (<= shift (- sb!vm:word-bits sb!vm:double-float-digits))
+      (if (<= shift (- sb!vm:n-word-bits sb!vm:double-float-digits))
 	  0
 	  (let* ((res-hi (ash frac shift))
 		 (res (if (plusp shift)
 			  (logior res-hi
 				  (the fixnum
 				       (ash (double-float-low-bits x)
-					    (- shift sb!vm:word-bits))))
+					    (- shift sb!vm:n-word-bits))))
 			  res-hi)))
 	    (declare (type (unsigned-byte 31) res-hi res))
 	    (if (minusp hi-bits)

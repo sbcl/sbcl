@@ -83,7 +83,7 @@
 
       (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot) length)
       (copy-to-system-area trace-table
-			   (* sb!vm:vector-data-offset sb!vm:word-bits)
+			   (* sb!vm:vector-data-offset sb!vm:n-word-bits)
 			   fill-ptr
 			   0
 			   trace-table-bits)

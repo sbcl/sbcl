@@ -45,7 +45,7 @@
 
 (def!struct (primitive-object (:make-load-form-fun just-dump-it-normally))
   (name nil :type symbol)
-  (header nil :type symbol)
+  (widetag nil :type symbol)
   (lowtag nil :type symbol)
   (options nil :type list)
   (slots nil :type list)
@@ -63,10 +63,10 @@
     name))
 
 (defmacro define-primitive-object
-	  ((name &key header lowtag alloc-trans (type t))
+	  ((name &key lowtag widetag alloc-trans (type t))
 	   &rest slot-specs)
   (collect ((slots) (exports) (constants) (forms) (inits))
-    (let ((offset (if header 1 0))
+    (let ((offset (if widetag 1 0))
 	  (variable-length nil))
       (dolist (spec slot-specs)
 	(when variable-length
@@ -110,13 +110,13 @@
 	  (constants `(defconstant ,size ,offset))
 	  (exports size)))
       (when alloc-trans
-	(forms `(def-alloc ,alloc-trans ,offset ,variable-length ,header
+	(forms `(def-alloc ,alloc-trans ,offset ,variable-length ,widetag
 			   ,lowtag ',(inits))))
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
 	   (%define-primitive-object
 	    ',(make-primitive-object :name name
-				     :header header
+				     :widetag widetag
 				     :lowtag lowtag
 				     :slots (slots)
 				     :size offset

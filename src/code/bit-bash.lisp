@@ -14,7 +14,7 @@
 ;;;; constants and types
 
 ;;; the number of bits to process at a time
-(defconstant unit-bits sb!vm:word-bits)
+(defconstant unit-bits sb!vm:n-word-bits)
 
 ;;; the maximum number of bits that can be dealt with in a single call
 (defconstant max-bits (ash most-positive-fixnum -2))
@@ -512,7 +512,7 @@
   ;; %BYTE-BLIT (and correspondingly rename the corresponding VOP) and
   ;; replace the DST-END argument with an N-BYTES argument?
   (copy-to-system-area bv
-		       (* sb!vm:vector-data-offset sb!vm:word-bits)
+		       (* sb!vm:vector-data-offset sb!vm:n-word-bits)
 		       sap
 		       offset
 		       (* (length bv) sb!vm:byte-bits)))

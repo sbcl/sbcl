@@ -325,7 +325,7 @@
 		 (copy-to-system-area thing
 				      (+ (* start sb!vm:byte-bits)
 					 (* sb!vm:vector-data-offset
-					    sb!vm:word-bits))
+					    sb!vm:n-word-bits))
 				      (fd-stream-obuf-sap fd-stream)
 				      (* tail sb!vm:byte-bits)
 				      (* bytes sb!vm:byte-bits)))
@@ -343,7 +343,7 @@
 		 (copy-to-system-area thing
 				      (+ (* start sb!vm:byte-bits)
 					 (* sb!vm:vector-data-offset
-					    sb!vm:word-bits))
+					    sb!vm:n-word-bits))
 				      (fd-stream-obuf-sap fd-stream)
 				      0
 				      (* bytes sb!vm:byte-bits)))
@@ -581,7 +581,8 @@
   (let* ((length (- end start))
 	 (string (make-string length)))
     (copy-from-system-area sap (* start sb!vm:byte-bits)
-			   string (* sb!vm:vector-data-offset sb!vm:word-bits)
+			   string (* sb!vm:vector-data-offset
+				     sb!vm:n-word-bits)
 			   (* length sb!vm:byte-bits))
     string))
 

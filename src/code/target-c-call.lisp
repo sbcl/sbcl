@@ -42,6 +42,6 @@
        (let ((result (make-string length)))
 	 (sb!kernel:copy-from-system-area (alien-sap ptr) 0
 					  result (* sb!vm:vector-data-offset
-						    sb!vm:word-bits)
+						    sb!vm:n-word-bits)
 					  (* length sb!vm:byte-bits))
 	 result)))))

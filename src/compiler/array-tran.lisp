@@ -253,11 +253,11 @@
 				   'length
 				   `(+ length ,n-pad-elements)))
 	   (n-words-form
-	    (if (>= n-bits-per-element sb!vm:word-bits)
+	    (if (>= n-bits-per-element sb!vm:n-word-bits)
 		`(* ,padded-length-form
 		    (the fixnum ; i.e., not RATIO
-		      ,(/ n-bits-per-element sb!vm:word-bits)))
-		(let ((n-elements-per-word (/ sb!vm:word-bits
+		      ,(/ n-bits-per-element sb!vm:n-word-bits)))
+		(let ((n-elements-per-word (/ sb!vm:n-word-bits
 					      n-bits-per-element)))
 		  (declare (type index n-elements-per-word)) ; i.e., not RATIO
 		  `(ceiling ,padded-length-form ,n-elements-per-word))))

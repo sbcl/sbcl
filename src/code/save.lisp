@@ -19,7 +19,7 @@
 
 (sb!alien:def-alien-routine "save" (sb!alien:boolean)
   (file sb!c-call:c-string)
-  (initial-function (sb!alien:unsigned #.sb!vm:word-bits)))
+  (initial-function (sb!alien:unsigned #.sb!vm:n-word-bits)))
 
 ;;; FIXME: When this is run without the PURIFY option,
 ;;; it seems to save memory all the way up to the high-water mark,

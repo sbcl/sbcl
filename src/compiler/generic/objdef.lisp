@@ -19,18 +19,18 @@
   (cdr :ref-trans cdr :set-trans sb!c::%rplacd :init :arg))
 
 (define-primitive-object (instance :lowtag instance-pointer-lowtag
-				   :header instance-header-widetag
+				   :widetag instance-header-widetag
 				   :alloc-trans %make-instance)
   (slots :rest-p t))
 
 (define-primitive-object (bignum :lowtag other-pointer-lowtag
-				 :header bignum-widetag
+				 :widetag bignum-widetag
 				 :alloc-trans sb!bignum::%allocate-bignum)
   (digits :rest-p t :c-type #!-alpha "long" #!+alpha "u32"))
 
 (define-primitive-object (ratio :type ratio
 				:lowtag other-pointer-lowtag
-				:header ratio-widetag
+				:widetag ratio-widetag
 				:alloc-trans %make-ratio)
   (numerator :type integer
 	     :ref-known (flushable movable)
@@ -42,23 +42,23 @@
 	       :init :arg))
 
 (define-primitive-object (single-float :lowtag other-pointer-lowtag
-				       :header single-float-widetag)
+				       :widetag single-float-widetag)
   (value :c-type "float"))
 
 (define-primitive-object (double-float :lowtag other-pointer-lowtag
-				       :header double-float-widetag)
+				       :widetag double-float-widetag)
   (filler)
   (value :c-type "double" :length 2))
 
 #!+long-float
 (define-primitive-object (long-float :lowtag other-pointer-lowtag
-				     :header long-float-widetag)
+				     :widetag long-float-widetag)
   #!+sparc (filler)
   (value :c-type "long double" :length #!+x86 3 #!+sparc 4))
 
 (define-primitive-object (complex :type complex
 				  :lowtag other-pointer-lowtag
-				  :header complex-widetag
+				  :widetag complex-widetag
 				  :alloc-trans %make-complex)
   (real :type real
 	:ref-known (flushable movable)
@@ -70,7 +70,7 @@
 	:init :arg))
 
 (define-primitive-object (array :lowtag other-pointer-lowtag
-				:header t)
+				:widetag t)
   (fill-pointer :type index
 		:ref-trans %array-fill-pointer
 		:ref-known (flushable foldable)
@@ -105,14 +105,14 @@
 
 (define-primitive-object (vector :type vector
 				 :lowtag other-pointer-lowtag
-				 :header t)
+				 :widetag t)
   (length :ref-trans sb!c::vector-length
 	  :type index)
   (data :rest-p t :c-type #!-alpha "unsigned long" #!+alpha "u32"))
 
 (define-primitive-object (code :type code-component
 			       :lowtag other-pointer-lowtag
-			       :header t)
+			       :widetag t)
   (code-size :type index
 	     :ref-known (flushable movable)
 	     :ref-trans %code-code-size)
@@ -131,7 +131,7 @@
 
 (define-primitive-object (fdefn :type fdefn
 				:lowtag other-pointer-lowtag
-				:header fdefn-widetag)
+				:widetag fdefn-widetag)
   (name :ref-trans fdefn-name)
   (fun :type (or function null) :ref-trans fdefn-fun)
   (raw-addr :c-type #!-alpha "char *" #!+alpha "u32"))
@@ -140,7 +140,7 @@
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
 (define-primitive-object (simple-fun :type function
 				     :lowtag fun-pointer-lowtag
-				     :header simple-fun-header-widetag)
+				     :widetag simple-fun-header-widetag)
   #!-x86 (self :ref-trans %simple-fun-self
 	       :set-trans (setf %simple-fun-self))
   #!+x86 (self
@@ -178,17 +178,17 @@
 	:set-trans (setf %simple-fun-type))
   (code :rest-p t :c-type "unsigned char"))
 
-(define-primitive-object (return-pc :lowtag other-pointer-lowtag :header t)
+(define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
-				  :header closure-header-widetag)
+				  :widetag closure-header-widetag)
   (fun :init :arg :ref-trans %closure-fun)
   (info :rest-p t))
 
 (define-primitive-object (funcallable-instance
 			  :lowtag fun-pointer-lowtag
-			  :header funcallable-instance-header-widetag
+			  :widetag funcallable-instance-header-widetag
 			  :alloc-trans %make-funcallable-instance)
   #!-x86
   (fun
@@ -219,7 +219,7 @@
   (info :rest-p t))
 
 (define-primitive-object (value-cell :lowtag other-pointer-lowtag
-				     :header value-cell-header-widetag
+				     :widetag value-cell-header-widetag
 				     :alloc-trans make-value-cell)
   (value :set-trans value-cell-set
 	 :set-known (unsafe)
@@ -229,19 +229,19 @@
 
 #!+alpha
 (define-primitive-object (sap :lowtag other-pointer-lowtag
-			      :header sap-widetag)
+			      :widetag sap-widetag)
   (padding)
   (pointer :c-type "char *" :length 2))
 
 #!-alpha
 (define-primitive-object (sap :lowtag other-pointer-lowtag
-			      :header sap-widetag)
+			      :widetag sap-widetag)
   (pointer :c-type "char *"))
 
 
 (define-primitive-object (weak-pointer :type weak-pointer
 				       :lowtag other-pointer-lowtag
-				       :header weak-pointer-widetag
+				       :widetag weak-pointer-widetag
 				       :alloc-trans make-weak-pointer)
   (value :ref-trans sb!c::%weak-pointer-value :ref-known (flushable)
 	 :init :arg)
@@ -282,7 +282,7 @@
   (flushable movable))
 
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
-				 :header symbol-header-widetag
+				 :widetag symbol-header-widetag
 				 #!-x86 :alloc-trans #!-x86 make-symbol)
   (value :set-trans %set-symbol-value
 	 :init :unbound)
@@ -297,13 +297,13 @@
 
 (define-primitive-object (complex-single-float
 			  :lowtag other-pointer-lowtag
-			  :header complex-single-float-widetag)
+			  :widetag complex-single-float-widetag)
   (real :c-type "float")
   (imag :c-type "float"))
 
 (define-primitive-object (complex-double-float
 			  :lowtag other-pointer-lowtag
-			  :header complex-double-float-widetag)
+			  :widetag complex-double-float-widetag)
   (filler)
   (real :c-type "double" :length 2)
   (imag :c-type "double" :length 2))
@@ -311,7 +311,7 @@
 #!+long-float
 (define-primitive-object (complex-long-float
 			  :lowtag other-pointer-lowtag
-			  :header complex-long-float-widetag)
+			  :widetag complex-long-float-widetag)
   #!+sparc (filler)
   (real :c-type "long double" :length #!+x86 3 #!+sparc 4)
   (imag :c-type "long double" :length #!+x86 3 #!+sparc 4))

@@ -63,8 +63,8 @@
   (sb!xc:defmacro pick-vector-type (type &rest specs)
     `(cond ,@(mapcar #'(lambda (spec)
 			 `(,(if (eq (car spec) t)
-			      t
-			      `(subtypep ,type ',(car spec)))
+				t
+				`(subtypep ,type ',(car spec)))
 			   ,@(cdr spec)))
 		     specs))))
 
@@ -75,7 +75,7 @@
 ;;; MAKE-ARRAY for any non-simple array. Thus, there's some value to
 ;;; making this somewhat efficient, at least not doing full calls to
 ;;; SUBTYPEP in the easy cases.
-(defun %vector-type-code (type)
+(defun %vector-widetag-and-n-bits (type)
   (case type
     ;; Pick off some easy common cases.
     ;;
@@ -84,7 +84,7 @@
     ;; on smarter compiler transforms which do the calculation once
     ;; and for all in any reasonable user programs.)
     ((t)
-     (values #.sb!vm:simple-vector-widetag #.sb!vm:word-bits))
+     (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
     ((character base-char standard-char)
      (values #.sb!vm:simple-string-widetag #.sb!vm:byte-bits))
     ((bit)
@@ -129,8 +129,8 @@
 	(values #.sb!vm:simple-array-complex-long-float-widetag
 		#!+x86 192
 		#!+sparc 256))
-       (t (values #.sb!vm:simple-vector-widetag #.sb!vm:word-bits))))))
-(defun %complex-vector-type-code (type)
+       (t (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))))))
+(defun %complex-vector-widetag (type)
   (case type
     ;; Pick off some easy common cases.
     ((t)
@@ -161,9 +161,10 @@
       (error "can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
     (if (and simple (= array-rank 1))
 	;; Its a (simple-array * (*))
-	(multiple-value-bind (type bits) (%vector-type-code element-type)
+	(multiple-value-bind (type n-bits)
+	    (%vector-widetag-and-n-bits element-type)
 	  (declare (type (unsigned-byte 8) type)
-		   (type (integer 1 256) bits))
+		   (type (integer 1 256) n-bits))
 	  (let* ((length (car dimensions))
 		 (array (allocate-vector
 			 type
@@ -171,8 +172,8 @@
 			 (ceiling (* (if (= type sb!vm:simple-string-widetag)
 					 (1+ length)
 					 length)
-				     bits)
-				  sb!vm:word-bits))))
+				     n-bits)
+				  sb!vm:n-word-bits))))
 	    (declare (type index length))
 	    (when initial-element-p
 	      (fill array initial-element))
@@ -195,7 +196,7 @@
 			  initial-contents initial-element initial-element-p)))
 	       (array (make-array-header
 		       (cond ((= array-rank 1)
-			      (%complex-vector-type-code element-type))
+			      (%complex-vector-widetag element-type))
 			     (simple sb!vm:simple-array-widetag)
 			     (t sb!vm:complex-array-widetag))
 		       array-rank)))

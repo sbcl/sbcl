@@ -61,37 +61,37 @@
 	 (function-p (if (intersection headers *fun-header-widetags*)
 			 (if (subsetp headers *fun-header-widetags*)
 			     t
-			     (error "Can't test for mix of function subtypes ~
+			     (error "can't test for mix of function subtypes ~
 				     and normal header types."))
 			 nil)))
     (unless type-codes
-      (error "Must supply at least on type for test-type."))
+      (error "must supply at least one type for test-type"))
     (cond
      (fixnump
       (when (remove-if #'(lambda (x)
 			   (or (= x even-fixnum-lowtag)
 			       (= x odd-fixnum-lowtag)))
 		       lowtags)
-	(error "Can't mix fixnum testing with other lowtags."))
+	(error "can't mix fixnum testing with other lowtags"))
       (when function-p
-	(error "Can't mix fixnum testing with function subtype testing."))
+	(error "can't mix fixnum testing with function subtype testing"))
       (when immediates
-	(error "Can't mix fixnum testing with other immediates."))
+	(error "can't mix fixnum testing with other immediates"))
       (if headers
 	  `(%test-fixnum-and-headers ,value ,temp ,target ,not-p
 				     ',(canonicalize-headers headers))
 	  `(%test-fixnum ,value ,temp ,target ,not-p)))
      (immediates
       (when headers
-	(error "Can't mix testing of immediates with testing of headers."))
+	(error "can't mix testing of immediates with testing of headers"))
       (when lowtags
-	(error "Can't mix testing of immediates with testing of lowtags."))
+	(error "can't mix testing of immediates with testing of lowtags"))
       (when (cdr immediates)
-	(error "Can't test multiple immediates at the same time."))
+	(error "can't test multiple immediates at the same time"))
       `(%test-immediate ,value ,temp ,target ,not-p ,(car immediates)))
      (lowtags
       (when (cdr lowtags)
-	(error "Can't test multiple lowtags at the same time."))
+	(error "can't test multiple lowtags at the same time"))
       (if headers
 	  `(%test-lowtag-and-headers
 	    ,value ,temp ,target ,not-p ,(car lowtags)
@@ -101,7 +101,7 @@
       `(%test-headers ,value ,temp ,target ,not-p ,function-p
 		      ',(canonicalize-headers headers)))
      (t
-      (error "Nothing to test?"))))))
+      (error "nothing to test?"))))))
 
 (defun %test-fixnum (value temp target not-p)
   (assemble ()
