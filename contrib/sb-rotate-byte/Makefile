@@ -9,7 +9,7 @@ SYSTEM=sb-rotate-byte
 
 all: 
 	$(MAKE) -C ../asdf
-	echo "(asdf:operate 'asdf:load-op :$(SYSTEM))" | \
+	echo "(asdf:operate 'asdf:load-op :$(SYSTEM) :force t)" | \
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
 test: all

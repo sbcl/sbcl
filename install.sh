@@ -22,12 +22,14 @@ SBCL_HOME=$INSTALL_ROOT/lib/sbcl
 export SBCL_HOME
 ensure_dirs $INSTALL_ROOT $INSTALL_ROOT/bin $INSTALL_ROOT/lib \
     $INSTALL_ROOT/man $INSTALL_ROOT/man/man1 \
-    $SBCL_HOME $SBCL_HOME/systems
+    $SBCL_HOME $SBCL_HOME/systems $SBCL_HOME/site-systems
 
+# move old versions out of the way.  Safer than copying: don't want to
+# break any running instances that have these files mapped
 test -f $INSTALL_ROOT/bin/sbcl && \
-    cp $INSTALL_ROOT/bin/sbcl $INSTALL_ROOT/bin/sbcl.old
+    mv $INSTALL_ROOT/bin/sbcl $INSTALL_ROOT/bin/sbcl.old
 test -f $SBCL_HOME/sbcl.core && \
-    cp $SBCL_HOME/sbcl.core $SBCL_HOME/sbcl.core.old
+    mv $SBCL_HOME/sbcl.core $SBCL_HOME/sbcl.core.old
 
 cp src/runtime/sbcl $INSTALL_ROOT/bin/
 cp output/sbcl.core $SBCL_HOME/sbcl.core
