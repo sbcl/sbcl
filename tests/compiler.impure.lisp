@@ -871,6 +871,26 @@
     (truncate (expt a b))))
 (assert (equal (multiple-value-list (expt-derive-type-bug 1 1))
 	       '(1 0)))
+
+;;; Problems with type checking in functions with EXPLICIT-CHECK
+;;; attribute (reported by Peter Graves)
+(loop for (fun . args) in '((= a) (/= a)
+                            (< a) (<= a) (> a) (>= a))
+      do (assert (raises-error? (apply fun args) type-error)))
+
+(defclass broken-input-stream (sb-gray:fundamental-input-stream) ())
+(defmethod sb-gray:stream-read-char ((stream broken-input-stream))
+  (throw 'break :broken))
+(assert (eql (block return
+               (handler-case
+                   (catch 'break
+                     (funcall (eval ''peek-char)
+                              1 (make-instance 'broken-input-stream))
+                     :test-broken)
+                 (type-error (c)
+                   (return-from return :good))))
+             :good))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

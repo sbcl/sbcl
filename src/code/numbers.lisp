@@ -708,6 +708,7 @@
 (defun = (number &rest more-numbers)
   #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
+  (the number number)
   (do ((nlist more-numbers (cdr nlist)))
       ((atom nlist) T)
      (declare (list nlist))
@@ -716,7 +717,7 @@
 (defun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
-  (do* ((head number (car nlist))
+  (do* ((head (the number number) (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
@@ -729,7 +730,7 @@
 (defun < (number &rest more-numbers)
   #!+sb-doc
   "Return T if its arguments are in strictly increasing order, NIL otherwise."
-  (do* ((n number (car nlist))
+  (do* ((n (the number number) (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
@@ -738,7 +739,7 @@
 (defun > (number &rest more-numbers)
   #!+sb-doc
   "Return T if its arguments are in strictly decreasing order, NIL otherwise."
-  (do* ((n number (car nlist))
+  (do* ((n (the number number) (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
@@ -747,7 +748,7 @@
 (defun <= (number &rest more-numbers)
   #!+sb-doc
   "Return T if arguments are in strictly non-decreasing order, NIL otherwise."
-  (do* ((n number (car nlist))
+  (do* ((n (the number number) (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
@@ -756,7 +757,7 @@
 (defun >= (number &rest more-numbers)
   #!+sb-doc
   "Return T if arguments are in strictly non-increasing order, NIL otherwise."
-  (do* ((n number (car nlist))
+  (do* ((n (the number number) (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))

@@ -332,6 +332,7 @@
 			    eof-value
 			    recursive-p)
   (declare (ignore recursive-p))
+  (the (or character boolean) peek-type)
   (let ((stream (in-synonym-of stream)))
     (cond ((typep stream 'echo-stream)
 	   (echo-misc stream
