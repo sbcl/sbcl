@@ -171,19 +171,21 @@
 				  :optimizer optimizer))
 	(target-env (or *backend-info-environment* *info-environment*)))
     (dolist (name names)
-      (when (info :function :info name)
-        ;; This is an error because it's generally a bad thing to blow
-        ;; away all the old optimization stuff. It's also a potential
-        ;; source of sneaky bugs:
-        ;;    DEFKNOWN FOO
-        ;;    DEFTRANSFORM FOO
-        ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
-        ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
-        ;; However, it's continuable because it might be useful to do
-        ;; it when testing new optimization stuff interactively.
-	#+nil (cerror "Go ahead, overwrite it."
-		      "overwriting old FUNCTION-INFO for ~S" name)
-	(warn "overwriting old FUNCTION-INFO for ~S" name))
+      (let ((old-function-info (info :function :info name)))
+	(when old-function-info
+	  ;; This is an error because it's generally a bad thing to blow
+	  ;; away all the old optimization stuff. It's also a potential
+	  ;; source of sneaky bugs:
+	  ;;    DEFKNOWN FOO
+	  ;;    DEFTRANSFORM FOO
+	  ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
+	  ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
+	  ;; However, it's continuable because it might be useful to do
+	  ;; it when testing new optimization stuff interactively.
+	  #+nil (cerror "Go ahead, overwrite it."
+			"overwriting old FUNCTION-INFO for ~S" name)
+	  (warn "~@<overwriting old FUNCTION-INFO ~2I~_~S ~I~_for ~S~:>"
+		old-function-info name)))
       (setf (info :function :type name target-env) ctype)
       (setf (info :function :where-from name target-env) :declared)
       (setf (info :function :kind name target-env) :function)

@@ -256,10 +256,13 @@
     (storew temp function function-self-slot function-pointer-type)
     (move result new-self)))
 
-;;; REMOVEME
+;;; KLUDGE: This seems to be some kind of weird override of the way
+;;; that the objdef.lisp code would ordinarily set up the slot
+;;; accessor. It's inherited from CMU CL, and it works, and naively
+;;; deleting it seemed to cause problems, but it's not obvious why
+;;; it's done this way. Any ideas? -- WHN 2001-08-02
 (defknown ((setf %funcallable-instance-function)) (function function) function
-	(unsafe))
-
+  (unsafe))
 ;;; CMU CL comment:
 ;;;   We would have really liked to use a source-transform for this, but
 ;;;   they don't work with SETF functions.

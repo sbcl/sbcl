@@ -400,17 +400,17 @@
 
 ;;;; miscellaneous primitive stubs
 
-(macrolet ((frob (name &optional (args '(x)))
+(macrolet ((def-frob (name &optional (args '(x)))
 	     `(defun ,name ,args (,name ,@args))))
-  (frob %CODE-CODE-SIZE)
-  (frob %CODE-DEBUG-INFO)
-  (frob %CODE-ENTRY-POINTS)
-  (frob %FUNCALLABLE-INSTANCE-FUNCTION)
-  (frob %FUNCALLABLE-INSTANCE-LAYOUT)
-  (frob %FUNCALLABLE-INSTANCE-LEXENV)
-  (frob %FUNCTION-NEXT)
-  (frob %FUNCTION-SELF)
-  (frob %SET-FUNCALLABLE-INSTANCE-FUNCTION (fin new-val)))
+  (def-frob %code-code-size)
+  (def-frob %code-debug-info)
+  (def-frob %code-entry-points)
+  (def-frob %funcallable-instance-function)
+  (def-frob %funcallable-instance-layout)
+  (def-frob %funcallable-instance-lexenv)
+  (def-frob %function-next)
+  (def-frob %function-self)
+  (def-frob %set-funcallable-instance-function (fin new-val)))
 
 ;;;; funny functions
 

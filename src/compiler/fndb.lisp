@@ -1340,6 +1340,9 @@
 	   long-float-p base-char-p %standard-char-p %instancep
 	   array-header-p)
   (t) boolean (movable foldable flushable))
+
+;;; REMOVEME
+#|
 
 ;;;; miscellaneous "sub-primitives"
 
@@ -1347,3 +1350,4 @@
   (simple-string index index simple-string index index)
   (or index null)
   (foldable flushable))
+|#

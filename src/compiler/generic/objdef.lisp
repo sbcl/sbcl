@@ -174,10 +174,28 @@
 			  :lowtag function-pointer-type
 			  :header funcallable-instance-header-type
 			  :alloc-trans %make-funcallable-instance)
-  #!-gengc
+  #!-(or gengc x86)
   (function
    :ref-known (flushable) :ref-trans %funcallable-instance-function
    :set-known (unsafe) :set-trans (setf %funcallable-instance-function))
+  #!+x86
+  (function
+   :ref-known (flushable) :ref-trans %funcallable-instance-function
+   ;; KLUDGE: There's no :SET-KNOWN or :SET-TRANS in this case.
+   ;; Instead, later in compiler/x86/system.lisp there's a separate
+   ;; DEFKNOWN for (SETF %FUNCALLABLE-INSTANCE-FUNCTION), and a weird
+   ;; unexplained DEFTRANSFORM from (SETF %FUNCTION-INSTANCE-FUNCTION)
+   ;; into (SETF %FUNCTION-SELF). The #!+X86 wrapped around this case
+   ;; is a literal translation of the old CMU CL implementation into
+   ;; the new world of sbcl-0.6.12.63, where multiple DEFKNOWNs for
+   ;; the same operator cause an error (instead of silently deleting
+   ;; all information associated with the old DEFKNOWN, as before).
+   ;; It's definitely not very clean, with too many #!+ conditionals,
+   ;; too little documentation, and an implicit assumption that GENGC
+   ;; and X86 are mutually exclusive, but I have more urgent things to
+   ;; clean up right now, so I've just left it as a literal
+   ;; translation without trying to fix it. -- WHN 2001-08-02
+   )
   #!+gengc (entry-point :c-type "char *")
   (lexenv :ref-known (flushable) :ref-trans %funcallable-instance-lexenv
 	  :set-known (unsafe) :set-trans (setf %funcallable-instance-lexenv))
