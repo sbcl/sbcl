@@ -1193,6 +1193,10 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   structure classes related by inheritance. As of 0.7.0, SBCL still 
   doesn't follow it.
 
+128:
+  READ-SEQUENCE doesn't work for Gray streams. (reported by Nathan
+  Froyd sbcl-devel 2001-10-15)
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

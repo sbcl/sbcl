@@ -653,7 +653,7 @@
 	 ;; anyway, and (2) such a declamation can be (especially for
 	 ;; alien values) both messy to do by hand and very important
 	 ;; for performance of later code which uses the return value.
-	 (declaim (ftype (function (mapcar (constantly t) ',args)
+	 (declaim (ftype (function ,(mapcar (constantly t) args)
 				   (alien ,result-type))
 			 ,lisp-name))
 
