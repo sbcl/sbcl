@@ -170,6 +170,7 @@
               "*BACKEND-SB-LIST*" "*BACKEND-SB-NAMES*"
               "*BACKEND-SC-NAMES*" "*BACKEND-SC-NUMBERS*"
               "*BACKEND-SPECIAL-ARG-TYPES*"
+              "*BACKEND-SUBFEATURES*"
               "*BACKEND-T-PRIMITIVE-TYPE*"
 
               "*CODE-SEGMENT*" 

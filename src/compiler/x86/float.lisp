@@ -2929,12 +2929,6 @@
   (:arg-types double-float)
   (:result-types double-float)
   (:policy :fast-safe)
-  ;; FIXME: PENTIUM isn't used on the *FEATURES* list of the CMU CL I based
-  ;; SBCL on, even when it is running on a Pentium. Find out what's going
-  ;; on here and see what the proper value should be. (Perhaps just use the
-  ;; apparently-conservative value of T always?) For more confusion, see also
-  ;; apparently-reversed-sense test for the FLOG1P-PENTIUM vop below.
-  (:guard #!+pentium nil #!-pentium t)
   (:note "inline log1p function")
   (:ignore temp)
   (:generator 5
@@ -2988,12 +2982,11 @@
   (:arg-types double-float)
   (:result-types double-float)
   (:policy :fast-safe)
-  ;; FIXME: See comments on DEFINE-VOP FLOG1P :GUARD above.
-  (:guard #!+pentium t #!-pentium nil)
+  (:guard (member :pentium-style-fyl2xp1 *backend-subfeatures*))
   (:note "inline log1p with limited x range function")
   (:vop-var vop)
   (:save-p :compute-only)
-  (:generator 5
+  (:generator 4
      (note-this-location vop :internal-error)
      (sc-case x
 	(double-reg
