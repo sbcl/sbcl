@@ -37,30 +37,25 @@
 (defun unix-killpg (pgrp signal)
   (real-unix-killpg pgrp signal))
 
-;;; Set the current set of masked signals (those being blocked from
+;;; Reset the current set of masked signals (those being blocked from
 ;;; delivery).
 ;;;
-;;; (Note: CMU CL had a SIGMASK operator to create masks, but since
-;;; SBCL only uses 0, we no longer support it. If you need it, you
-;;; can pull it out of the CMU CL sources, or the old SBCL sources;
-;;; but you might also consider doing things the SBCL way and moving
-;;; this kind of C-level work down to C wrapper functions.)
-#!-sunos
-(sb!alien:define-alien-routine ("sigsetmask" unix-sigsetmask)
-			       sb!alien:unsigned-long
-  (mask sb!alien:unsigned-long))
+;;; (Note: CMU CL had a more general SIGSETMASK call and a SIGMASK
+;;; operator to create masks, but since we only ever reset to 0, we no
+;;; longer support it. If you need it, you can pull it out of the CMU
+;;; CL sources, or the old SBCL sources; but you might also consider
+;;; doing things the SBCL way and moving this kind of C-level work
+;;; down to C wrapper functions.)
+
+;;; When inappropriate build options are used, this also prints messages
+;;; listing the signals that were masked
+(sb!alien:define-alien-routine "reset_signal_mask" sb!alien:void)
 
 ;;;; C routines that actually do all the work of establishing signal handlers
 (sb!alien:define-alien-routine ("install_handler" install-handler)
 			       sb!alien:unsigned-long
   (signal sb!alien:int)
   (handler sb!alien:unsigned-long))
-;;; assert (though non-fatally) that there are no signals masked
-(sb!alien:define-alien-routine "warn_when_signals_masked" sb!alien:void)
-
-
-
-
 
 ;;;; interface to enabling and disabling signal handlers
 

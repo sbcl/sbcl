@@ -117,16 +117,20 @@ boolean internal_errors_enabled = 0;
 
 struct interrupt_data * global_interrupt_data;
 
-/* this is used from Lisp in toplevel.lisp, replacing an older 
- * (sigsetmask 0) - we'd like to find out when the signal mask is 
- * not 0 */
+/* At the toplevel repl we routinely call this function.  The signal
+ * mask ought to be clear anyway most of the time, but may be non-zero
+ * if we were interrupted e.g. while waiting for a queue.  */
 
-/* This check was introduced in 0.8.4.x and some day will go away
- * again unless we find a way to trigger it */
-
-void warn_when_signals_masked () 
+#if 1
+void reset_signal_mask () 
 {
-    /* and as a side-eeffect, unmask them */
+    sigset_t new;
+    sigemptyset(&new);
+    sigprocmask(SIG_SETMASK,&new,0);
+}
+#else
+void reset_signal_mask () 
+{
     sigset_t new,old;
     int i;
     int wrong=0;
@@ -142,6 +146,9 @@ void warn_when_signals_masked ()
     if(wrong) 
 	fprintf(stderr,"If this version of SBCL is less than three months old, please report this.\nOtherwise, please try a newer version first\n.  Reset signal mask.\n");
 }
+#endif
+
+
 
 
 /*

@@ -1,0 +1,156 @@
+
+The attached changes are supposed to fix bugs in SBCL when used for
+gc-intensive multithreaded applications.  They haven't had sufficient
+testing to be commited in time for SBCL 0.8.5 (may even make things
+worse), but if you run into problems with deadlock or spinning on CPU,
+you may want to apply this and rebuild.    -dan 2003.10.23
+
+
+
+Index: src/code/gc.lisp
+===================================================================
+RCS file: /cvsroot/sbcl/sbcl/src/code/gc.lisp,v
+retrieving revision 1.52
+diff -u -r1.52 gc.lisp
+--- src/code/gc.lisp	2 Oct 2003 23:13:09 -0000	1.52
++++ src/code/gc.lisp	23 Oct 2003 19:22:19 -0000
+@@ -236,22 +236,26 @@
+ (defvar *already-in-gc* nil "System is running SUB-GC")
+ (defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
+ 
++
++
+ (defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
+   ;; catch attempts to gc recursively or during post-hooks and ignore them
+-  (when (sb!thread::mutex-value *gc-mutex*)  (return-from sub-gc nil))
+-  (sb!thread:with-mutex (*gc-mutex* :wait-p nil)
+-    (setf *need-to-collect-garbage* t)
+-    (when (zerop *gc-inhibit*)
+-      (without-interrupts
+-       (gc-stop-the-world)
+-       (collect-garbage gen)
+-       (incf *n-bytes-freed-or-purified*
+-	     (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
+-       (setf *need-to-collect-garbage* nil)
+-       (gc-start-the-world))
+-      (scrub-control-stack)
+-      (setf *need-to-collect-garbage* nil)
+-      (dolist (h *after-gc-hooks*) (carefully-funcall h))))
++  (let ((value (sb!thread::mutex-value *gc-mutex*))) 
++    (when (eql value (sb!thread:current-thread-id)) (return-from sub-gc nil))
++    (sb!thread:with-mutex (*gc-mutex*)
++      (when value (return-from sub-gc nil))
++      (setf *need-to-collect-garbage* t)
++      (when (zerop *gc-inhibit*)
++	(without-interrupts
++	 (gc-stop-the-world)
++	 (collect-garbage gen)
++	 (incf *n-bytes-freed-or-purified*
++	       (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
++	 (setf *need-to-collect-garbage* nil)
++	 (gc-start-the-world))
++	(scrub-control-stack)
++	(setf *need-to-collect-garbage* nil)
++	(dolist (h *after-gc-hooks*) (carefully-funcall h)))))
+   (values))
+        
+ 
+Index: src/runtime/thread.c
+===================================================================
+RCS file: /cvsroot/sbcl/sbcl/src/runtime/thread.c,v
+retrieving revision 1.18
+diff -u -r1.18 thread.c
+--- src/runtime/thread.c	7 Oct 2003 21:41:27 -0000	1.18
++++ src/runtime/thread.c	23 Oct 2003 19:22:26 -0000
+@@ -53,6 +53,8 @@
+ 	fprintf(stderr, "/continue\n");
+     }
+     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
++    if(arch_os_thread_init(th)==0) 
++	return 1;		/* failure.  no, really */
+ #ifdef LISP_FEATURE_SB_THREAD
+     /* wait here until our thread is linked into all_threads: see below */
+     while(th->pid<1) sched_yield();
+@@ -61,8 +63,7 @@
+ 	lose("th->pid not set up right");
+ #endif
+ 
+-    if(arch_os_thread_init(th)==0) 
+-	return 1;		/* failure.  no, really */
++    th->state=STATE_RUNNING;
+ #if !defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_X86)
+     return call_into_lisp_first_time(function,args,0);
+ #else
+@@ -139,7 +140,7 @@
+     th->binding_stack_pointer=th->binding_stack_start;
+     th->this=th;
+     th->pid=0;
+-    th->state=STATE_RUNNING;
++    th->state=STATE_STOPPED;
+ #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
+     th->alien_stack_pointer=((void *)th->alien_stack_start
+ 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
+@@ -312,39 +313,36 @@
+ {
+     /* stop all other threads by sending them SIG_STOP_FOR_GC */
+     struct thread *p,*th=arch_os_get_current_thread();
+-    struct thread *tail=0;
++    pid_t old_pid;
+     int finished=0;
+     do {
+ 	get_spinlock(&all_threads_lock,th->pid);
+-	if(tail!=all_threads) {
+-	    /* new threads always get consed onto the front of all_threads,
+-	     * and may be created by any thread that we haven't signalled
+-	     * yet or hasn't received our signal and stopped yet.  So, check
+-	     * for them on each time around */
+-	    for(p=all_threads;p!=tail;p=p->next) {
+-		if(p==th) continue;
+-		/* if the head of all_threads is removed during
+-		 * gc_stop_the_world, we may take a second trip through the 
+-		 * list and end up counting twice as many threads to wait for
+-		 * as actually exist */
+-		if(p->state!=STATE_RUNNING) continue;
+-		countdown_to_gc++;
+-		p->state=STATE_STOPPING;
+-		/* Note no return value check from kill().  If the
+-		 * thread had been reaped already, we kill it and
+-		 * increment countdown_to_gc anyway.  This is to avoid
+-		 * complicating the logic in destroy_thread, which would 
+-		 * otherwise have to know whether the thread died before or
+-		 * after it was killed
+-		 */
+-		kill(p->pid,SIG_STOP_FOR_GC);
+-	    }
+-	    tail=all_threads;
+-	} else {
+-	    finished=(countdown_to_gc==0);
++	for(p=all_threads,old_pid=p->pid; p; p=p->next) {
++	    if(p==th) continue;
++	    if(p->state!=STATE_RUNNING) continue;
++	    countdown_to_gc++;
++	    p->state=STATE_STOPPING;
++	    /* Note no return value check from kill().  If the
++	     * thread had been reaped already, we kill it and
++	     * increment countdown_to_gc anyway.  This is to avoid
++	     * complicating the logic in destroy_thread, which would 
++	     * otherwise have to know whether the thread died before or
++	     * after it was killed
++	     */
++	    kill(p->pid,SIG_STOP_FOR_GC);
+ 	}
+ 	release_spinlock(&all_threads_lock);
+ 	sched_yield();
++	/* if everything has stopped, and there is no possibility that
++	 * a new thread has been created, we're done.  Otherwise go
++	 * round again and signal anything that sprang up since last
++	 * time	 */
++	if(old_pid==all_threads->pid) {
++	    finished=1;
++	    for_each_thread(p) 
++		finished = finished &&
++		((p==th) || (p->state==STATE_STOPPED));
++	}
+     } while(!finished);
+ }
+ 

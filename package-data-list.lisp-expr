@@ -1853,7 +1853,7 @@ no guarantees of interface stability."
              "EUSERS" "EVICEERR" "EVICEOP" "EWOULDBLOCK" "EXDEV"
 
              "FD-ISSET" "FD-SET" "LTCHARS" "UNIX-FAST-SELECT"
-             "UNIX-FILE-KIND" "UNIX-KILL" "UNIX-SIGSETMASK"
+             "UNIX-FILE-KIND" "UNIX-KILL" 
              "TCSETPGRP" "FD-ZERO" "FD-CLR" "CHECK" "UNIX-RESOLVE-LINKS"
              "FD-SETSIZE" "TCGETPGRP" "UNIX-FAST-GETRUSAGE"
              "UNIX-SIMPLIFY-PATHNAME" "UNIX-KILLPG"

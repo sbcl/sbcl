@@ -506,7 +506,7 @@
 	   (abort
 	    "~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
 	 (catch 'toplevel-catcher
-	   (sb!unix::warn-when-signals-masked)
+	   (sb!unix::reset-signal-mask)
 	   ;; in the event of a control-stack-exhausted-error, we should
 	   ;; have unwound enough stack by the time we get here that this
 	   ;; is now possible
