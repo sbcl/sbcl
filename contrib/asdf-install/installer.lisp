@@ -99,7 +99,7 @@
 (defun url-port (url)
   (assert (string-equal url "http://" :end1 7))
   (let ((port-start (position #\: url :start 7)))
-    (if port-start (parse-integer url :start port-start :junk-allowed t) 80)))
+    (if port-start (parse-integer url :start (1+ port-start) :junk-allowed t) 80)))
 
 (defun url-connection (url)
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))

@@ -91,7 +91,7 @@
     `(defun ,name (signal info context)
        (declare (ignore signal info))
        (declare (type system-area-pointer context))
-       (/show "in Lisp-level signal handler" (sap-int context))
+       (/show "in Lisp-level signal handler" ,(symbol-name name) (sap-int context))
        (,function ,(concatenate 'simple-string what " at #X~X")
 		  (with-alien ((context (* os-context-t) context))
 		    (sap-int (sb!vm:context-pc context)))))))

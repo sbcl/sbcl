@@ -137,7 +137,7 @@
 				`((setq ,symbol ,initial-value)))
 			    ,@body)))))
 		    (:extern
-		     (/show ":EXTERN case")
+		     (/show0 ":EXTERN case")
 		     (let ((info (make-heap-alien-info
 				  :type alien-type
 				  :sap-form `(foreign-symbol-address
@@ -146,7 +146,7 @@
 			  ((,symbol (%heap-alien ',info)))
 			  ,@body))))
 		    (:local
-		     (/show ":LOCAL case")
+		     (/show0 ":LOCAL case")
 		     (let ((var (gensym))
 			   (initval (if initial-value (gensym)))
 			   (info (make-local-alien-info :type alien-type)))
@@ -164,7 +164,7 @@
 			       (dispose-local-alien ',info ,var))))))))))))
     (/show "revised" body)
     (verify-local-auxiliaries-okay)
-    (/show "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
+    (/show0 "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
     `(symbol-macrolet ((&auxiliary-type-definitions&
 			,(append *new-auxiliary-types*
 				 (auxiliary-type-definitions env))))

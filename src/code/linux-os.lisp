@@ -34,9 +34,9 @@
 					       :output stream))))))
 
 (defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
-  (/show "entering linux-os.lisp OS-COLD-INIT-OR-REINIT")
+  (/show0 "entering linux-os.lisp OS-COLD-INIT-OR-REINIT")
   (setf *software-version* nil)
-  (/show "setting *DEFAULT-PATHNAME-DEFAULTS*")
+  (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")
   (setf *default-pathname-defaults*
 	;; (temporary value, so that #'PATHNAME won't blow up when
 	;; we call it below:)
@@ -44,7 +44,7 @@
 	*default-pathname-defaults*
 	;; (final value, constructed using #'PATHNAME:)
 	(pathname (sb!unix:posix-getcwd/)))
-  (/show "leaving linux-os.lisp OS-COLD-INIT-OR-REINIT"))
+  (/show0 "leaving linux-os.lisp OS-COLD-INIT-OR-REINIT"))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
