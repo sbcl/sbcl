@@ -11,7 +11,7 @@
 		   `(deftest ,(intern (format nil "SB-MD5.RFC1321.~A" i))
 		     (string= (format nil
 			       "~(~{~2,'0X~}~)"
-			       (coerce (md5sum-sequence ,string) 'list))
+			       (coerce (md5sum-string ,string :external-format :ascii) 'list))
 		      ,expected-result)
 		     t)))))
   (define-rfc1321-tests
@@ -31,7 +31,8 @@
 		   collect
 		   `(deftest ,(intern (format nil "SB-MD5.OTHER.~A" i))
 		     (string=
-		      (format nil "~(~{~2,'0X~}~)" (coerce (md5sum-sequence ,string) 'list))
+		      (format nil "~(~{~2,'0X~}~)"
+                       (coerce (md5sum-string ,string :external-format :ascii) 'list))
 		      ,expected-result)
 		     t)))))
   (define-other-tests

@@ -11,6 +11,8 @@ Algorithm. [FIXME cite]
 
 @include fun-sb-md5-md5sum-stream.texinfo
 
+@include fun-sb-md5-md5sum-string.texinfo
+
 @subsection Credits
 
 The implementation for CMUCL was largely done by Pierre Mai, with help

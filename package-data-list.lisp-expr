@@ -716,7 +716,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	       "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
 	       "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
 	       "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
-	       "PROCESS-STATUS-HOOK" "PROCESS-WAIT"))
+	       "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
+
+               ;; external-format support
+               "OCTETS-TO-STRING" "STRING-TO-OCTETS"))
 
    #s(sb-cold:package-data
       :name "SB!FORMAT"

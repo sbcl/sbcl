@@ -40,7 +40,7 @@
    #:md5-state #:md5-state-p #:make-md5-state
    #:update-md5-state #:finalize-md5-state
    ;; High-Level functions on sequences, streams and files
-   #:md5sum-sequence #:md5sum-stream #:md5sum-file))
+   #:md5sum-sequence #:md5sum-string #:md5sum-stream #:md5sum-file))
 
 (in-package :SB-MD5)
 
@@ -516,10 +516,9 @@ The resulting MD5 message-digest is returned as an array of sixteen
 ;;; High-Level Drivers
 
 (defun md5sum-sequence (sequence &key (start 0) end)
-  "Calculate the MD5 message-digest of data in sequence.  On CMU CL
-this works for all sequences whose element-type is supported by the
-underlying MD5 routines, on other implementations it only works for 1d
-simple-arrays with such element types."
+  "Calculate the MD5 message-digest of data bounded by START and END
+in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
+8)."
   (declare (optimize (speed 3) (space 0) (debug 0))
 	   (type vector sequence) (type fixnum start))
   (let ((state (make-md5-state)))
@@ -536,6 +535,14 @@ simple-arrays with such element types."
       (update-md5-state state sequence :start start :end real-end))
     (finalize-md5-state state)))
 
+(defun md5sum-string (string &key (external-format :default) (start 0) end)
+  (declare (optimize (speed 3) (space 0) (debug 0))
+           (type string string))
+  (md5sum-sequence
+   (sb-ext:string-to-octets string
+                            :external-format external-format
+                            :start start :end end)))
+
 (defconstant +buffer-size+ (* 128 1024)
   "Size of internal buffer to use for md5sum-stream and md5sum-file
 operations.  This should be a multiple of 64, the MD5 block size.")
@@ -543,8 +550,8 @@ operations.  This should be a multiple of 64, the MD5 block size.")
 (deftype buffer-index () `(integer 0 ,+buffer-size+))
 
 (defun md5sum-stream (stream)
-  "Calculate an MD5 message-digest of the contents of stream.  Its
-element-type has to be either (unsigned-byte 8) or character."
+  "Calculate an MD5 message-digest of the contents of STREAM, whose
+element-type has to be (UNSIGNED-BYTE 8)."
   (declare (optimize (speed 3) (space 0) (debug 0)))
   (let ((state (make-md5-state)))
     (declare (type md5-state state))

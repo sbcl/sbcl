@@ -23,6 +23,11 @@ changes in sbcl-0.8.19 relative to sbcl-0.8.18:
     ** encoding and decoding errors are now much more robustly
        handled; it should now be possible to recover even from invalid
        input or output to the terminal.  (thanks to Teemu Kalvas)
+    ** provided a first cut at implementing STRING-TO-OCTETS and
+       OCTETS-TO-STRING.  (thanks to Robert J. Macomber)
+    ** altered the SB-MD5 contributed module slightly, changing the
+       interface just enough for it to be supportable for builds where
+       lisp characters are not eight bits.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the FORMATTER-generated functions for ~V[ conditionals require
        the correct number of arguments.
