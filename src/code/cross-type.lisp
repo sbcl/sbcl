@@ -148,14 +148,14 @@
 	     (typep target-type 'class)
 	     (bug "We don't support CROSS-TYPEP of CLASS type specifiers"))
 	    ((and (symbolp target-type)
-		  (find-class target-type nil)
-		  (subtypep target-type 'sb!kernel::structure!object))
-	     (values (typep host-object target-type) t))
-	    ((and (symbolp target-type)
 		  (find-classoid target-type nil)
 		  (sb!xc:subtypep target-type 'cl:structure-object)
 		  (typep host-object '(or symbol number list character)))
 	     (values nil t))
+	    ((and (symbolp target-type)
+		  (find-class target-type nil)
+		  (subtypep target-type 'sb!kernel::structure!object))
+	     (values (typep host-object target-type) t))
 	    (;; easy cases of arrays and vectors
 	     (target-type-is-in
 	      '(array simple-string simple-vector string vector))
