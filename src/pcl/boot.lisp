@@ -804,22 +804,25 @@ bootstrapping.
 (defmacro bind-simple-lexical-method-macros ((method-args next-methods)
 					     &body body)
   `(macrolet ((call-next-method-bind (&body body)
-		`(let ((.next-method. (car ,',next-methods))
-		       (,',next-methods (cdr ,',next-methods)))
-		   .next-method. ,',next-methods
-		   ,@body))
+	       `(let ((.next-method. (car ,',next-methods))
+		      (,',next-methods (cdr ,',next-methods)))
+		 .next-method. ,',next-methods
+		 ,@body))
 	      (call-next-method-body (method-name-declaration cnm-args)
-		`(if .next-method.
-		     (funcall (if (std-instance-p .next-method.)
-				  (method-function .next-method.)
-				  .next-method.) ; for early methods
-			      (or ,cnm-args ,',method-args)
-			      ,',next-methods)
-		     (apply #'call-no-next-method ',method-name-declaration
+	       `(if .next-method.
+		    (funcall (if (std-instance-p .next-method.)
+				 (method-function .next-method.)
+			     .next-method.) ; for early methods
+		             (or ,cnm-args ,',method-args)
+		             ,',next-methods)
+		    (apply #'call-no-next-method ',method-name-declaration
 		            (or ,cnm-args ,',method-args))))
 	      (next-method-p-body ()
-		`(not (null .next-method.))))
-     ,@body))
+	       `(not (null .next-method.)))
+	      (with-rebound-original-args ((call-next-method-p) &body body)
+		(declare (ignore call-next-method-p))
+		`(let () ,@body)))
+    ,@body))
 
 (defun call-no-next-method (method-name-declaration &rest args)
   (destructuring-bind (name) method-name-declaration
@@ -1037,85 +1040,93 @@ bootstrapping.
 
 (defmacro bind-fast-lexical-method-macros ((args rest-arg next-method-call)
 					   &body body)
-  `(macrolet ((narrowed-emf (emf)
-	        ;; INVOKE-EFFECTIVE-METHOD-FUNCTION has code in it to
-		;; dispatch on the possibility that EMF might be of
-		;; type FIXNUM (as an optimized representation of a
-		;; slot accessor). But as far as I (WHN 2002-06-11)
-		;; can tell, it's impossible for such a representation
-		;; to end up as .NEXT-METHOD-CALL. By reassuring
-		;; INVOKE-E-M-F that when called from this context
-		;; it needn't worry about the FIXNUM case, we can
-		;; keep those cases from being compiled, which is
-		;; good both because it saves bytes and because it
-		;; avoids annoying type mismatch compiler warnings.
-		;;
-                ;; KLUDGE: In sbcl-0.7.4.29, the compiler's type
-		;; system isn't smart enough about NOT and intersection
-		;; types to benefit from a (NOT FIXNUM) declaration
-		;; here. -- WHN 2002-06-12
-		;;
-		;; FIXME: Might the FUNCTION type be omittable here,
-		;; leaving only METHOD-CALLs? Failing that, could this
-		;; be documented somehow? (It'd be nice if the types
-		;; involved could be understood without solving the
-                ;; halting problem.)
-                `(the (or function method-call fast-method-call)
+  (let* ((all-params (append args (when rest-arg (list rest-arg))))
+	 (rebindings (mapcar (lambda (x) (list x x)) all-params)))
+    `(macrolet ((narrowed-emf (emf)
+		 ;; INVOKE-EFFECTIVE-METHOD-FUNCTION has code in it to
+		 ;; dispatch on the possibility that EMF might be of
+		 ;; type FIXNUM (as an optimized representation of a
+		 ;; slot accessor). But as far as I (WHN 2002-06-11)
+		 ;; can tell, it's impossible for such a representation
+		 ;; to end up as .NEXT-METHOD-CALL. By reassuring
+		 ;; INVOKE-E-M-F that when called from this context
+		 ;; it needn't worry about the FIXNUM case, we can
+		 ;; keep those cases from being compiled, which is
+		 ;; good both because it saves bytes and because it
+		 ;; avoids annoying type mismatch compiler warnings.
+		 ;;
+		 ;; KLUDGE: In sbcl-0.7.4.29, the compiler's type
+		 ;; system isn't smart enough about NOT and
+		 ;; intersection types to benefit from a (NOT FIXNUM)
+		 ;; declaration here. -- WHN 2002-06-12 (FIXME: maybe
+		 ;; it is now... -- CSR, 2003-06-07)
+		 ;;
+		 ;; FIXME: Might the FUNCTION type be omittable here,
+		 ;; leaving only METHOD-CALLs? Failing that, could this
+		 ;; be documented somehow? (It'd be nice if the types
+		 ;; involved could be understood without solving the
+		 ;; halting problem.)
+		 `(the (or function method-call fast-method-call)
 		   ,emf))
-	      (call-next-method-bind (&body body)
-               `(let () ,@body))
-	      (call-next-method-body (method-name-declaration cnm-args)
-               `(if ,',next-method-call
-                 ,(locally
-                   ;; This declaration suppresses a "deleting
-                   ;; unreachable code" note for the following IF when
-                   ;; REST-ARG is NIL. It is not nice for debugging
-                   ;; SBCL itself, but at least it keeps us from
-                   ;; annoying users.
-                   (declare (optimize (inhibit-warnings 3)))
-                   (if (and (null ',rest-arg)
-                            (consp cnm-args)
-                            (eq (car cnm-args) 'list))
-                       `(invoke-effective-method-function
-                         (narrowed-emf ,',next-method-call)
-			 nil
-                         ,@(cdr cnm-args))
-                       (let ((call `(invoke-effective-method-function
-                                     (narrowed-emf ,',next-method-call)
-                                     ,',(not (null rest-arg))
-                                     ,@',args
-                                     ,@',(when rest-arg `(,rest-arg)))))
-                         `(if ,cnm-args
-                           (bind-args ((,@',args
-                                        ,@',(when rest-arg
-					      `(&rest ,rest-arg)))
-                                       ,cnm-args)
-                            ,call)
-                           ,call))))
-		 ,(locally
-		   ;; As above, this declaration suppresses code
-		   ;; deletion notes.
-		   (declare (optimize (inhibit-warnings 3)))
-		   (if (and (null ',rest-arg)
-			    (consp cnm-args)
-			    (eq (car cnm-args) 'list))
-		       `(call-no-next-method ',method-name-declaration
-			                     ,@(cdr cnm-args))
-		       `(call-no-next-method ',method-name-declaration
-			                     ,@',args
-			                     ,@',(when rest-arg
-						       `(,rest-arg)))))))
-	      (next-method-p-body ()
-               `(not (null ,',next-method-call))))
-    ,@body))
+		(call-next-method-bind (&body body)
+		 `(let () ,@body))
+		(call-next-method-body (method-name-declaration cnm-args)
+		 `(if ,',next-method-call
+		      ,(locally
+			;; This declaration suppresses a "deleting
+			;; unreachable code" note for the following IF
+			;; when REST-ARG is NIL. It is not nice for
+			;; debugging SBCL itself, but at least it
+			;; keeps us from annoying users.
+			(declare (optimize (inhibit-warnings 3)))
+			(if (and (null ',rest-arg)
+				 (consp cnm-args)
+				 (eq (car cnm-args) 'list))
+			    `(invoke-effective-method-function
+			      (narrowed-emf ,',next-method-call)
+			      nil
+			      ,@(cdr cnm-args))
+			    (let ((call `(invoke-effective-method-function
+					  (narrowed-emf ,',next-method-call)
+					  ,',(not (null rest-arg))
+					  ,@',args
+					  ,@',(when rest-arg `(,rest-arg)))))
+			      `(if ,cnm-args
+				(bind-args ((,@',args
+					     ,@',(when rest-arg
+						       `(&rest ,rest-arg)))
+					    ,cnm-args)
+				 ,call)
+				,call))))
+		      ,(locally
+			;; As above, this declaration suppresses code
+			;; deletion notes.
+			(declare (optimize (inhibit-warnings 3)))
+			(if (and (null ',rest-arg)
+				 (consp cnm-args)
+				 (eq (car cnm-args) 'list))
+			    `(call-no-next-method ',method-name-declaration
+			      ,@(cdr cnm-args))
+			    `(call-no-next-method ',method-name-declaration
+			      ,@',args
+			      ,@',(when rest-arg
+					`(,rest-arg)))))))
+		(next-method-p-body ()
+		 `(not (null ,',next-method-call)))
+		(with-rebound-original-args ((cnm-p) &body body)
+		  (if cnm-p
+		      `(let ,',rebindings
+			(declare (ignorable ,@',all-params))
+			,@body)
+		      `(let () ,@body))))
+      ,@body)))
 
 (defmacro bind-lexical-method-functions
     ((&key call-next-method-p next-method-p-p
 	   closurep applyp method-name-declaration)
      &body body)
   (cond ((and (null call-next-method-p) (null next-method-p-p)
-	      (null closurep)
-	      (null applyp))
+	      (null closurep) (null applyp))
 	 `(let () ,@body))
 	(t
 	 `(call-next-method-bind
@@ -1126,8 +1137,9 @@ bootstrapping.
 			      cnm-args))))
 		   ,@(and next-method-p-p
 			  '((next-method-p ()
-			      (next-method-p-body)))))
-	      ,@body)))))
+			     (next-method-p-body)))))
+	      (with-rebound-original-args (,call-next-method-p)
+		,@body))))))
 
 (defmacro bind-args ((lambda-list args) &body body)
   (let ((args-tail '.args-tail.)

@@ -1815,6 +1815,11 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
        causes a type error.
     ** (SETF FIND-CLASS) now accepts NIL as an argument to remove the
        association between the name and a class.
+    ** generic functions with non-standard method-combination and over
+       six methods all of which return constants no longer return NIL
+       after the first few invocations.  (thanks to Gerd Moellmann)
+    ** CALL-NEXT-METHOD with no arguments now passes the original
+       values of the arguments, even in the presence of assignment.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

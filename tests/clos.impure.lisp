@@ -661,5 +661,14 @@
 (assert (equal (cpl (make-broadcast-stream))
 	       '(broadcast-stream stream structure-object)))
 
+;;; Bug in CALL-NEXT-METHOD: assignment to the method's formal
+;;; parameters shouldn't affect the arguments to the next method for a
+;;; no-argument call to CALL-NEXT-METHOD
+(defgeneric cnm-assignment (x)
+  (:method (x) x)
+  (:method ((x integer)) (setq x 3)
+	   (list x (call-next-method) (call-next-method x))))
+(assert (equal (cnm-assignment 1) '(3 1 3)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
