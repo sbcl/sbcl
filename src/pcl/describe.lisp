@@ -97,7 +97,7 @@
     (if (null methods)
 	(format stream "~&It has no methods.~%")
 	(let ((gf-name (generic-function-name fun)))
-	  (format stream "Its methods are:")
+	  (format stream "~&Its methods are:")
 	  (dolist (method methods)
 	    (format stream "~2%    (~A ~{~S ~}~:S) =>"
 		    gf-name
