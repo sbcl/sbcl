@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  $\Revision: 1.58 $
+;;; This is asdf: Another System Definition Facility.  $\Revision: 1.59 $
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -87,7 +87,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "$\Revision: 1.58 $")
+(defvar *asdf-revision* (let* ((v "$\Revision: 1.59 $")
 			       (colon (position #\: v))
 			       (dot (position #\. v)))
 			  (and v colon dot 
@@ -146,7 +146,7 @@ and NIL NAME and TYPE components"
   ((component :reader error-component :initarg :component)
    (operation :reader error-operation :initarg :operation))
   (:report (lambda (c s)
-	     (format s "Erred while invoking ~A on ~A"
+	     (format s (formatter "~@<erred while invoking ~A on ~A~@:>")
 		     (error-operation c) (error-component c)))))
 (define-condition compile-error (operation-error) ())
 (define-condition compile-failed (compile-error) ())
@@ -177,8 +177,9 @@ and NIL NAME and TYPE components"
 ;;;; methods: conditions
 
 (defmethod print-object ((c missing-dependency) s)
-  (call-next-method)
-  (format s ", required by ~A" (missing-required-by c)))
+  (format s (formatter "~@<~A, required by ~A~@:>")
+	  (call-next-method c nil)
+	  (missing-required-by c)))
 
 (defun sysdef-error (format &rest arguments)
   (error 'formatted-system-definition-error :format-control format :format-arguments arguments))
@@ -186,11 +187,13 @@ and NIL NAME and TYPE components"
 ;;;; methods: components
 
 (defmethod print-object ((c missing-component) s)
-  (format s "Component ~S not found" (missing-requires c))
-  (when (missing-version c)
-    (format s " or does not match version ~A" (missing-version c)))
-  (when (missing-parent c)
-    (format s " in ~A" (component-name (missing-parent c)))))
+  (format s (formatter "~@<component ~S not found~
+                        ~@[ or does not match version ~A~]~
+                        ~@[ in ~A~]~@:>")
+	  (missing-requires c)
+	  (missing-version c)
+	  (when (missing-parent c)
+	    (component-name (missing-parent c)))))
 
 (defgeneric component-system (component)
   (:documentation "Find the top-level system containing COMPONENT"))
@@ -302,7 +305,8 @@ and NIL NAME and TYPE components"
      (component (component-name name))
      (symbol (string-downcase (symbol-name name)))
      (string name)
-     (t (sysdef-error "Invalid component designator ~A" name))))
+     (t (sysdef-error (formatter "~@<invalid component designator ~A~@:>")
+		      name))))
 
 (defun system-definition-pathname (system)
   (some (lambda (x) (funcall x system))
@@ -341,8 +345,12 @@ and NIL NAME and TYPE components"
 		   (< (car in-memory) (file-write-date on-disk))))
       (let ((*package* (make-package (gensym (package-name #.*package*))
 				     :use '(:cl :asdf))))
-	(format t ";;; Loading system definition from ~A into ~A~%"
-		on-disk *package*)
+	(format t
+		(formatter "~&~@<; ~@;loading system definition from ~A into ~A~@:>~%")
+		;; FIXME: This wants to be (ENOUGH-NAMESTRING
+		;; ON-DISK), but CMUCL barfs on that.
+		on-disk
+		*package*)
 	(load on-disk)))
     (let ((in-memory (gethash name *defined-systems*)))
       (if in-memory
@@ -351,7 +359,7 @@ and NIL NAME and TYPE components"
 	  (if error-p (error 'missing-component :requires name))))))
 
 (defun register-system (name system)
-  (format t "Registering ~A as ~A ~%" system name)
+  (format t (formatter "~&~@<; ~@;registering ~A as ~A~@:>~%") system name)
   (setf (gethash (coerce-name  name) *defined-systems*)
 	(cons (get-universal-time) system)))
 
@@ -487,6 +495,8 @@ system."))
   (cdr (assoc (class-name (class-of o))
 	      (slot-value c 'in-order-to))))
 
+(defgeneric component-self-dependencies (operation component))
+
 (defmethod component-self-dependencies ((o operation) (c component))
   (let ((all-deps (component-depends-on o c)))
     (remove-if-not (lambda (x)
@@ -615,7 +625,8 @@ system."))
 
 (defmethod perform ((operation operation) (c source-file))
   (sysdef-error
-   "Required method PERFORM not implemented for operation ~A, component ~A"
+   (formatter "~@<required method PERFORM not implemented~
+               for operation ~A, component ~A~@:>")
    (class-of operation) (class-of c)))
 
 (defmethod perform ((operation operation) (c module))
@@ -771,7 +782,8 @@ system."))
 	(and (eq type :file)
 	     (or (module-default-component-class parent)
 		 (find-class 'cl-source-file)))
-	(sysdef-error "Don't recognize component type ~A" type))))
+	(sysdef-error (formatter "~@<don't recognize component type ~A~@:>")
+		      type))))
 
 (defun maybe-add-tree (tree op1 op2 c)
   "Add the node C at /OP1/OP2 in TREE, unless it's there already.
@@ -944,6 +956,16 @@ output to *trace-output*.  Returns the shell's exit code."
   (pushnew
    (merge-pathnames "systems/"
 		    (truename (sb-ext:posix-getenv "SBCL_HOME")))
+   *central-registry*)
+  
+  (pushnew
+   (merge-pathnames "site-systems/"
+		    (truename (sb-ext:posix-getenv "SBCL_HOME")))
+   *central-registry*)
+  
+  (pushnew
+   (merge-pathnames ".sbcl/systems"
+		    (user-homedir-pathname))
    *central-registry*)
   
   (pushnew 'module-provide-asdf sb-ext:*module-provider-functions*))
