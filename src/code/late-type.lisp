@@ -1914,16 +1914,18 @@
   (type=-set (intersection-type-types type1)
 	     (intersection-type-types type2)))
 
-(flet ((intersection-complex-subtypep-arg1 (type1 type2)
-         (any/type (swapped-args-fun #'csubtypep)
-		   type2
-		   (intersection-type-types type1))))
-  (!define-type-method (intersection :simple-subtypep) (type1 type2)
-    (every/type #'intersection-complex-subtypep-arg1
-		type1
-		(intersection-type-types type2)))
-  (!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
-    (intersection-complex-subtypep-arg1 type1 type2)))
+(defun %intersection-complex-subtypep-arg1 (type1 type2)
+  (any/type (swapped-args-fun #'csubtypep)
+	    type2
+	    (intersection-type-types type1)))
+
+(!define-type-method (intersection :simple-subtypep) (type1 type2)
+  (every/type #'%intersection-complex-subtypep-arg1
+	      type1
+	      (intersection-type-types type2)))
+
+(!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
+  (%intersection-complex-subtypep-arg1 type1 type2))
 
 (!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
   (every/type #'csubtypep type1 (intersection-type-types type2)))

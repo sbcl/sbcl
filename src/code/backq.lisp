@@ -11,6 +11,8 @@
 
 (in-package "SB!IMPL")
 
+(/show0 "entering backq.lisp")
+
 ;;; The flags passed back by BACKQUOTIFY can be interpreted as follows:
 ;;;
 ;;;   |`,|: [a] => a
@@ -45,6 +47,8 @@
 (defvar *bq-dot-flag* '(|,.|))
 (defvar *bq-vector-flag* '(|bqv|))
 
+(/show0 "backq.lisp 50")
+
 ;;; the actual character macro
 (defun backquote-macro (stream ignore)
   (declare (ignore ignore))
@@ -56,6 +60,8 @@
       (if (eq flag *bq-dot-flag*)
 	  (%reader-error stream ",. after backquote in ~S" thing))
       (values (backquotify-1 flag thing) 'list))))
+
+(/show0 "backq.lisp 64")
 
 (defun comma-macro (stream ignore)
   (declare (ignore ignore))
@@ -73,6 +79,8 @@
 	   (t (unread-char c stream)
 	      (cons *bq-comma-flag* (read stream t nil t))))
      'list)))
+
+(/show0 "backq.lisp 83")
 
 ;;; This does the expansion from table 2.
 (defun backquotify (stream code)
@@ -128,6 +136,8 @@
 		       (values 'list*
 			       (list a (backquotify-1 dflag d)))))))))))
 
+(/show0 "backq.lisp 139")
+
 ;;; This handles the <hair> cases.
 (defun comma (code)
   (cond ((atom code)
@@ -143,6 +153,8 @@
 	((eq (car code) 'cons)
 	 (values 'list* (cdr code)))
 	(t (values *bq-comma-flag* code))))
+
+(/show0 "backq.lisp 157")
 
 ;;; This handles table 1.
 (defun backquotify-1 (flag thing)
@@ -169,6 +181,8 @@
 
 ;;;; magic BACKQ- versions of builtin functions
 
+(/show0 "backq.lisp 184")
+
 ;;; Define synonyms for the lisp functions we use, so that by using
 ;;; them, the backquoted material will be recognizable to the
 ;;; pretty-printer.
@@ -187,11 +201,15 @@
   (def-frob backq-nconc nconc)
   (def-frob backq-cons cons))
 
+(/show0 "backq.lisp 204")
+
 (defun backq-vector (list)
   (declare (list list))
   (coerce list 'simple-vector))
 
 ;;;; initialization
+
+(/show0 "backq.lisp 212")
 
 ;;; Install BACKQ stuff in the current *READTABLE*.
 ;;;
@@ -209,3 +227,5 @@
   (set-macro-character #\` #'backquote-macro)
   (set-macro-character #\, #'comma-macro))
 #+sb-xc-host (!backq-cold-init)
+
+(/show0 "done with backq.lisp")

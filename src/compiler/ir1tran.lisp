@@ -1741,9 +1741,9 @@
 				aux-vals cont)))))))
 
 ;;; This function deals with the case where we have to make an
-;;; Optional-Dispatch to represent a lambda. We cons up the result and
+;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
 ;;; call IR1-CONVERT-HAIRY-ARGS to do the work. When it is done, we
-;;; figure out the min-args and max-args.
+;;; figure out the MIN-ARGS and MAX-ARGS.
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont)
   (declare (list body vars aux-vars aux-vals) (type continuation cont))
   (let ((res (make-optional-dispatch :arglist vars
@@ -1853,8 +1853,8 @@
 ;;;; mark its extent. When doing GO or RETURN-FROM, we emit an Exit
 ;;;; node.
 
-;;; Make a :entry cleanup and emit an Entry node, then convert the
-;;; body in the modified environment. We make Cont start a block now,
+;;; Make a :ENTRY cleanup and emit an ENTRY node, then convert the
+;;; body in the modified environment. We make CONT start a block now,
 ;;; since if it was done later, the block would be in the wrong
 ;;; environment.
 (def-ir1-translator block ((name &rest forms) start cont)
@@ -1882,9 +1882,9 @@
       (ir1-convert-progn-body dummy cont forms))))
 
 
-;;; We make Cont start a block just so that it will have a block
+;;; We make CONT start a block just so that it will have a block
 ;;; assigned. People assume that when they pass a continuation into
-;;; IR1-Convert as Cont, it will have a block when it is done.
+;;; IR1-CONVERT as CONT, it will have a block when it is done.
 (def-ir1-translator return-from ((name &optional value)
 				 start cont)
   #!+sb-doc
@@ -3029,26 +3029,35 @@
       fun)))
 
 ;;; the even-at-compile-time part of DEFUN
+;;;
+;;; The INLINE-EXPANSION is a LAMBDA-WITH-LEXENV, or NIL if there is
+;;; no inline expansion.
 (defun %compiler-defun (name lambda-with-lexenv)
 
-  (when sb!xc:*compile-print*
-    (compiler-mumble "~&; recognizing DEFUN ~S~%" name))
+  (let ((defined-function nil)) ; will be set below if we're in the compiler
+    
+    ;; when in the compiler
+    (when (boundp '*lexenv*) 
+      (when sb!xc:*compile-print*
+	(compiler-mumble "~&; recognizing DEFUN ~S~%" name))
+      (remhash name *free-functions*)
+      (setf defined-function (get-defined-function name)))
 
-  ;; FIXME: Couldn't these be PROCLAIM-AS-FUNCTION-NAME instead?
-  (become-defined-function-name name)
-  (remhash name *free-functions*)
+    (become-defined-function-name name)
 
-  (let ((defined-function (get-defined-function name)))
-
-    (when lambda-with-lexenv
-      (setf (info :function :inline-expansion name) lambda-with-lexenv)
-      (setf (defined-function-inline-expansion defined-function)
-	    lambda-with-lexenv))
+    (cond (lambda-with-lexenv
+	   (setf (info :function :inline-expansion name) lambda-with-lexenv)
+	   (when defined-function 
+	     (setf (defined-function-inline-expansion defined-function)
+		   lambda-with-lexenv)))
+	  (t
+	   (clear-info :function :inline-expansion name)))
 
     ;; old CMU CL comment:
     ;;   If there is a type from a previous definition, blast it,
     ;;   since it is obsolete.
-    (when (eq (leaf-where-from defined-function) :defined)
+    (when (and defined-function
+	       (eq (leaf-where-from defined-function) :defined))
       (setf (leaf-type defined-function)
 	    ;; FIXME: If this is a block compilation thing, shouldn't
 	    ;; we be setting the type to the full derived type for the

@@ -73,7 +73,7 @@
   (and (typep x 'simple-array)
        (= 1 (array-rank x))))
 
-;;; Genesis needs these at cross-compile time. The target
+;;; GENESIS needs these at cross-compile time. The target
 ;;; implementation of these is reasonably efficient by virtue of its
 ;;; ability to peek into the internals of the package implementation;
 ;;; this reimplementation is portable but slow.

@@ -179,7 +179,7 @@
 				     lambda lexenv))))
       `(progn
 
-	 ;; In cross-compilation of toplevel COLD-FSETs, we arrange
+	 ;; In cross-compilation of toplevel DEFUNs, we arrange
 	 ;; for the LAMBDA to be statically linked by GENESIS.
 	 #+sb-xc-host
 	 (cold-fset ,name ,lambda)
@@ -197,14 +197,23 @@
 		 ,doc)))))
 #-sb-xc-host
 (defun %defun (name def doc)
+  (declare (type function def))
+  (declare (type (or null simple-string doc)))
+  (/show0 "entering %DEFUN, name (or block name) = ..")
+  (/primitive-print (symbol-name (function-name-block-name name)))
+  (aver (legal-function-name-p name))
   (when (fboundp name)
+    (/show0 "redefining NAME")
     (style-warn "redefining ~S in DEFUN" name))
+  (/show0 "setting FDEFINITION")
   (setf (sb!xc:fdefinition name) def)
   (when doc
     ;; FIXME: This should use shared SETF-name-parsing logic.
+    (/show0 "setting FDOCUMENTATION")
     (if (and (consp name) (eq (first name) 'setf))
 	(setf (fdocumentation (second name) 'setf) doc)
 	(setf (fdocumentation (the symbol name) 'function) doc)))
+  (/show0 "leaving %DEFUN")
   name)
 
 ;;;; DEFVAR and DEFPARAMETER
