@@ -236,13 +236,7 @@
 	(declare (fixnum i))
 	(push (pop-stack) stuff))
       (let* ((dbi (car (last stuff)))	; debug-info
-	     (tto (first stuff))	; trace-table-offset
-	     ;; Old CMU CL code had maybe-we-shouldn't-load-to-dyn-space
-	     ;; pussyfooting around here, apparently dating back to the
-	     ;; stone age of the X86 port, but in SBCL we always load
-	     ;; to dynamic space. FIXME: So now this "variable" could go
-	     ;; away entirely.
-	     (load-to-dynamic-space t))
+	     (tto (first stuff)))	; trace-table-offset
 
 	(setq stuff (nreverse stuff))
 
@@ -255,18 +249,11 @@
 		      (sb!c::debug-info-p dbi)
 		      (sb!c::compiled-debug-info-name dbi)
 		      tto)
-	      (if load-to-dynamic-space
-		  (format t "   loading to the dynamic space~%")
-		  (format t "   loading to the static space~%")))
+              (format t "   loading to the dynamic space~%"))
 
-	(let ((code
-	       (if load-to-dynamic-space
-		   (%primitive sb!c:allocate-dynamic-code-object
-			       box-num
-			       code-length)
-		   (%primitive sb!c:allocate-code-object
-			       box-num
-			       code-length)))
+	(let ((code (%primitive sb!c:allocate-dynamic-code-object
+                                box-num
+                                code-length))
 	      (index (+ sb!vm:code-trace-table-offset-slot box-num)))
 	  (declare (type index index))
 	  (when *load-code-verbose*
