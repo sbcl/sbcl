@@ -1274,6 +1274,10 @@
 ;;; sequentially bind each AUX-VAR to the corresponding AUX-VAL before
 ;;; converting the body. If there are no bindings, just convert the
 ;;; body, otherwise do one binding and recurse on the rest.
+;;;
+;;; FIXME: This could and probably should be converted to use
+;;; SOURCE-NAME and DEBUG-NAME. But I (WHN) don't use &AUX bindings,
+;;; so I'm not motivated. Patches will be accepted...
 (defun ir1-convert-aux-bindings (start cont body aux-vars aux-vals)
   (declare (type continuation start cont) (list body aux-vars aux-vals))
   (if (null aux-vars)
@@ -1454,7 +1458,8 @@
 (defun generate-optional-default-entry (res default-vars default-vals
 					    entry-vars entry-vals
 					    vars supplied-p-p body
-					    aux-vars aux-vals cont)
+					    aux-vars aux-vals cont
+					    source-name debug-name)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals vars body
 		 aux-vars aux-vals)
@@ -1470,14 +1475,16 @@
 		  (list* (leaf-source-name supplied-p) arg-name default-vals)
 		  (cons arg entry-vars)
 		  (list* t arg-name entry-vals)
-		  (rest vars) t body aux-vars aux-vals cont)
+		  (rest vars) t body aux-vars aux-vals cont
+		  source-name debug-name)
 		 (ir1-convert-hairy-args
 		  res
 		  (cons arg default-vars)
 		  (cons arg-name default-vals)
 		  (cons arg entry-vars)
 		  (cons arg-name entry-vals)
-		  (rest vars) supplied-p-p body aux-vars aux-vals cont))))
+		  (rest vars) supplied-p-p body aux-vars aux-vals cont
+		  source-name debug-name))))
 
     (convert-optional-entry ep default-vars default-vals
 			    (if supplied-p
@@ -1622,7 +1629,8 @@
 ;;; type when computing the type for the main entry's argument.
 (defun ir1-convert-more (res default-vars default-vals entry-vars entry-vals
 			     rest more-context more-count keys supplied-p-p
-			     body aux-vars aux-vals cont)
+			     body aux-vars aux-vals cont
+			     source-name debug-name)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals keys body
 		 aux-vars aux-vals)
@@ -1683,7 +1691,10 @@
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
 			:result cont
-			:debug-name (debug-namify "~S processor" '&more)))
+			:debug-name (debug-namify "~S processor for ~A"
+						  '&more
+						  (as-debug-name source-name
+								 debug-name))))
 	   (last-entry (convert-optional-entry main-entry default-vars
 					       (main-vals) ())))
       (setf (optional-dispatch-main-entry res) main-entry)
@@ -1730,7 +1741,8 @@
 (defun ir1-convert-hairy-args (res default-vars default-vals
                                    entry-vars entry-vals
                                    vars supplied-p-p body aux-vars
-                                   aux-vals cont)
+                                   aux-vals cont
+				   source-name debug-name)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
                  aux-vars aux-vals)
@@ -1741,13 +1753,16 @@
              (ir1-convert-more res default-vars default-vals
                                entry-vars entry-vals
                                nil nil nil vars supplied-p-p body aux-vars
-                               aux-vals cont)
+                               aux-vals cont source-name debug-name)
              (let ((fun (ir1-convert-lambda-body
 			 body (reverse default-vars)
 			 :aux-vars aux-vars
 			 :aux-vals aux-vals
 			 :result cont
-			 :debug-name "hairy arg processor")))
+			 :debug-name (debug-namify
+				      "hairy arg processor for ~A"
+				      (as-debug-name source-name
+						     debug-name)))))
                (setf (optional-dispatch-main-entry res) fun)
                (push (if supplied-p-p
                          (convert-optional-entry fun entry-vars entry-vals ())
@@ -1760,7 +1775,8 @@
                 (nvals (cons (leaf-source-name arg) default-vals)))
            (ir1-convert-hairy-args res nvars nvals nvars nvals
                                    (rest vars) nil body aux-vars aux-vals
-                                   cont)))
+                                   cont
+				   source-name debug-name)))
         (t
          (let* ((arg (first vars))
                 (info (lambda-var-arg-info arg))
@@ -1770,7 +1786,8 @@
               (let ((ep (generate-optional-default-entry
                          res default-vars default-vals
                          entry-vars entry-vals vars supplied-p-p body
-                         aux-vars aux-vals cont)))
+                         aux-vars aux-vals cont
+			 source-name debug-name)))
                 (push (if supplied-p-p
                           (convert-optional-entry ep entry-vars entry-vals ())
                           ep)
@@ -1780,17 +1797,19 @@
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 arg nil nil (rest vars) supplied-p-p body
-                                aux-vars aux-vals cont))
+                                aux-vars aux-vals cont
+				source-name debug-name))
              (:more-context
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil arg (second vars) (cddr vars) supplied-p-p
-                                body aux-vars aux-vals cont))
+                                body aux-vars aux-vals cont
+				source-name debug-name))
              (:keyword
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil nil nil vars supplied-p-p body aux-vars
-                                aux-vals cont)))))))
+                                aux-vals cont source-name debug-name)))))))
 
 ;;; This function deals with the case where we have to make an
 ;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
@@ -1811,7 +1830,7 @@
 	(min (or (position-if #'lambda-var-arg-info vars) (length vars))))
     (push res (component-new-funs *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
-			    cont)
+			    cont source-name debug-name)
     (setf (optional-dispatch-min-args res) min)
     (setf (optional-dispatch-max-args res)
 	  (+ (1- (length (optional-dispatch-entry-points res))) min))

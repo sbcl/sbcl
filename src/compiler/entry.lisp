@@ -23,7 +23,7 @@
 (defun entry-analyze (component)
   (let ((2comp (component-info component)))
     (dolist (fun (component-lambdas component))
-      (when (external-entry-point-p fun)
+      (when (xep-p fun)
 	(let ((info (or (leaf-info fun)
 			(setf (leaf-info fun) (make-entry-info)))))
 	  (compute-entry-info fun info)

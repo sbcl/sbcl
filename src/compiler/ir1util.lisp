@@ -1108,7 +1108,7 @@
 		     (not (block-delete-p block))))))))
 
 ;;; Delete all the blocks and functions in COMPONENT. We scan first
-;;; marking the blocks as delete-p to prevent weird stuff from being
+;;; marking the blocks as DELETE-P to prevent weird stuff from being
 ;;; triggered by deletion.
 (defun delete-component (component)
   (declare (type component component))
@@ -1261,9 +1261,10 @@
 	     (t
 	      (return nil)))))))
 
-;;; Return true if function is an XEP. This is true of normal XEPs
-;;; (:EXTERNAL kind) and top level lambdas (:TOPLEVEL kind.)
-(defun external-entry-point-p (fun)
+;;; Return true if function is an external entry point. This is true
+;;; of normal XEPs (:EXTERNAL kind) and also of top level lambdas
+;;; (:TOPLEVEL kind.)
+(defun xep-p (fun)
   (declare (type functional fun))
   (not (null (member (functional-kind fun) '(:external :toplevel)))))
 

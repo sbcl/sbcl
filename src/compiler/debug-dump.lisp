@@ -512,7 +512,7 @@
 	(setf (compiled-debug-fun-tlf-number dfun) tlf-num)
 	(setf (compiled-debug-fun-blocks dfun) blocks)))
 
-    (if (external-entry-point-p fun)
+    (if (xep-p fun)
 	(setf (compiled-debug-fun-returns dfun) :standard)
 	(let ((info (tail-set-info (lambda-tail-set fun))))
 	  (when info

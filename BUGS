@@ -1343,6 +1343,22 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   which fails for the test case above but doesn't keep the system
   from cross-compiling itself or passing its tests.
 
+  I traced IR1-CONVERT-LAMBDA (with :PRINT *CURRENT-COMPONENT*)
+  and tracing various COMPONENT-manipulating functions like
+  FIND-INITIAL-DFO, DFO-SCAVENGE-DEPENDENCY-GRAPH,
+  JOIN-COMPONENTS, LOCALL-ANALYZE-COMPONENT, etc. From that,
+  it looks as though the problem is that IR1-CONVERT-LAMBDA
+  is being called by MAKE-EXTERNAL-ENTRY-POINT to
+  create the mislaid LAMBDA in an environment set up by
+  WITH-BELATED-IR1-ENVIRONMENT which has *CURRENT-COMPONENT* set
+  to a component which is never seen again, and specifically never
+  passed to LOCALL-ANALYZE-COMPONENT or JOIN-COMPONENTS, so that
+  its NEW-FUNS list (where the mislaid LAMBDA is waiting patiently)
+  gets lost. Thus, the LAMBDA is essentially being written into never
+  never land. But I haven't figured out why. *CURRENT-COMPONENT* is set
+  wrong? Something later on is dropping the ball and neglecting
+  to look at all the components it should? Something else?
+
 139:
   In sbcl-0.pre7.107, (DIRECTORY "*.*") is broken, as reported by 
   Nathan Froyd sbcl-devel 2001-12-28.

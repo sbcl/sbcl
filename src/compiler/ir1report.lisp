@@ -208,6 +208,27 @@
          (*print-level* 2))
      (apply #'format nil format-string format-arguments))))
 
+;;; shorthand for a repeated idiom in creating debug names
+;;;
+;;; the problem, part I: We want to create debug names that look like
+;;; "&MORE processor for <something>" where <something> might be
+;;; either a source-name value (typically a symbol) or a non-symbol
+;;; debug-name value (typically a string). It's awkward to handle this
+;;; with FORMAT because we'd like to splice a source-name value using
+;;; "~S" (to get package qualifiers) but a debug-name value using "~A"
+;;; (to avoid irrelevant quotes at string splice boundaries).
+;;;
+;;; the problem, part II: The <something> is represented as a pair
+;;; of values, SOURCE-NAME and DEBUG-NAME, where SOURCE-NAME is used
+;;; if it's not null.
+;;;
+;;; the solution: Use this function to convert whatever it is to a
+;;; string, which FORMAT can then splice using "~A".
+(defun as-debug-name (source-name debug-name)
+  (if source-name
+      (debug-namify "~S" source-name)
+      debug-name))
+
 ;;; Return a COMPILER-ERROR-CONTEXT structure describing the current
 ;;; error context, or NIL if we can't figure anything out. ARGS is a
 ;;; list of things that are going to be printed out in the error

@@ -1107,7 +1107,7 @@
     (aver (member (functional-kind fun)
 		  '(nil :external :optional :toplevel :cleanup)))
 
-    (when (external-entry-point-p fun)
+    (when (xep-p fun)
       (init-xep-environment node block fun)
       #!+sb-dyncount
       (when *collect-dynamic-statistics*
@@ -1146,7 +1146,7 @@
 	 (returns (tail-set-info (lambda-tail-set fun))))
     (cond
      ((and (eq (return-info-kind returns) :fixed)
-	   (not (external-entry-point-p fun)))
+	   (not (xep-p fun)))
       (let ((locs (continuation-tns node block cont
 				    (return-info-types returns))))
 	(vop* known-return node block
@@ -1569,8 +1569,7 @@
 	    (when *collect-dynamic-statistics*
 	      (let ((first-node (continuation-next (block-start block))))
 		(unless (or (and (bind-p first-node)
-				 (external-entry-point-p
-				  (bind-lambda first-node)))
+				 (xep-p (bind-lambda first-node)))
 			    (eq (continuation-fun-name
 				 (node-cont first-node))
 				'%nlx-entry))

@@ -75,7 +75,7 @@
     (let ((res (make-ir2-physenv
 		:closure (nreverse reversed-ir2-physenv-alist)
 		:return-pc-pass (make-return-pc-passing-location
-				 (external-entry-point-p clambda)))))
+				 (xep-p clambda)))))
       (setf (physenv-info lambda-physenv) res)
       (setf (ir2-physenv-old-fp res)
 	    (make-old-fp-save-location lambda-physenv))
@@ -111,7 +111,7 @@
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
-    (or (and (find-if #'external-entry-point-p funs)
+    (or (and (find-if #'xep-p funs)
 	     (find-if #'has-full-call-use funs))
 	(block punt
 	  (dolist (fun funs t)
@@ -192,7 +192,7 @@
 	 (return (lambda-return fun)))
     (when (and return
 	       (not (eq (return-info-kind returns) :unknown))
-	       (external-entry-point-p fun))
+	       (xep-p fun))
       (do-uses (use (return-result return))
 	(setf (node-tail-p use) nil))))
   (values))

@@ -188,7 +188,7 @@
     (clear-flags component)
 
     (dolist (fun (component-lambdas component))
-      (when (external-entry-point-p fun)
+      (when (xep-p fun)
 	(control-analyze-1-fun fun component block-info-constructor)))
 
     (dolist (fun (component-lambdas component))

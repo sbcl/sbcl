@@ -175,7 +175,7 @@
 ;;;
 ;;; We set REANALYZE and REOPTIMIZE in the component, just in case we
 ;;; discover an XEP after the initial local call analyze pass.
-(defun make-external-entry-point (fun)
+(defun make-xep (fun)
   (declare (type functional fun))
   (aver (not (functional-entry-fun fun)))
   (with-belated-ir1-environment (lambda-bind (main-entry fun))
@@ -207,10 +207,10 @@
 (defun reference-entry-point (ref)
   (declare (type ref ref))
   (let ((fun (ref-leaf ref)))
-    (unless (or (external-entry-point-p fun)
+    (unless (or (xep-p fun)
 		(member (functional-kind fun) '(:escape :cleanup)))
       (change-ref-leaf ref (or (functional-entry-fun fun)
-			       (make-external-entry-point fun))))))
+			       (make-xep fun))))))
 
 ;;; Attempt to convert all references to FUN to local calls. The
 ;;; reference must be the function for a call, and the function
@@ -387,7 +387,7 @@
 			      (node-block
 			       (lambda-bind (main-entry original-fun))))
 			     component))))
-      (let ((fun (if (external-entry-point-p original-fun)
+      (let ((fun (if (xep-p original-fun)
 		     (functional-entry-fun original-fun)
 		     original-fun))
 	    (*compiler-error-context* call))
@@ -528,7 +528,7 @@
 	    `(lambda ,vars
 	       (declare (ignorable . ,ignores))
 	       (%funcall ,entry . ,args))
-	    :debug-name (debug-namify "hairy fun entry ~S"
+	    :debug-name (debug-namify "hairy function entry ~S"
 				      (continuation-fun-name
 				       (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
