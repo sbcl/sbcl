@@ -7,7 +7,7 @@
 ;;;; A summary of inspector navigation is contained in the below *INSPECT-HELP*
 ;;;; variable.
 
-(cl:in-package :sb-aclrepl)
+(cl:in-package #:sb-aclrepl)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +default-inspect-length+ 10))
@@ -53,7 +53,8 @@ i set <name> <form>  set named component to evalated form
 
 ;;; When *INSPECT-UNBOUND-OBJECT-MARKER* occurs in a parts list, it
 ;;; indicates that that a slot is unbound.
-(defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-"))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-")))
 
 
 ;; Setup binding for multithreading
@@ -73,243 +74,299 @@ i set <name> <form>  set named component to evalated form
 	  (list (format nil "(inspect ~S)" object)))
     (%inspect output-stream))
 
- 
+  (setq sb-impl::*inspect-fun* #'inspector)
+  
+  (defun istep (args stream)
+    (unless *current-inspect*
+      (setq *current-inspect* (make-inspect)))
+    (istep-dispatch args
+		     (first args)
+		     (when (first args) (read-from-string (first args)))
+		     stream))
+
+  (defun istep-dispatch (args option-string option stream)
+    (cond
+      ((or (string= "=" option-string) (zerop (length args)))
+       (istep-cmd-redisplay stream))
+      ((or (string= "-" option-string) (string= "^" option-string))
+       (istep-cmd-parent stream))
+      ((string= "*" option-string)
+       (istep-cmd-inspect-* stream))
+      ((string= "+" option-string)
+       (istep-cmd-inspect-new-form (read-from-string (second args)) stream))
+      ((or (string= "<" option-string)
+	   (string= ">" option-string))
+       (istep-cmd-select-parent-component option-string stream))
+      ((string-equal "set" option-string)
+       (istep-cmd-set (second args) (third args) stream))
+      ((string-equal "raw" option-string)
+       (istep-cmd-set-raw (second args) stream))
+      ((string-equal "q" option-string)
+       (istep-cmd-reset))
+      ((string-equal "?" option-string)
+       (istep-cmd-help stream))
+      ((string-equal "skip" option-string)
+       (istep-cmd-skip (second args) stream))
+      ((string-equal "tree" option-string)
+       (istep-cmd-tree stream)) 
+      ((string-equal "print" option-string)
+       (istep-cmd-print (second args) stream))
+      ((or (symbolp option)
+	   (integerp option))
+       (istep-cmd-select-component option stream))
+      (t
+       (istep-cmd-set-stack option stream))))
+
   (defun set-current-inspect (inspect)
     (setq *current-inspect* inspect))
-
-  (defun istep (arg-string output-stream)
-    (%istep arg-string output-stream))
-
-  (setq sb-impl::*inspect-fun* #'inspector)
 
   (defun reset-stack ()
     (setf (inspect-object-stack *current-inspect*) nil)
     (setf (inspect-select-stack *current-inspect*) nil))
 
-  (defun %istep (arg-string output-stream)
-    (unless *current-inspect*
-      (setq *current-inspect* (make-inspect)))
-    (let* ((args (when arg-string (string-to-list-skip-spaces arg-string)))
-	   (option (car args))
-	   (option-read (when arg-string
-			  (read-from-string arg-string)))
-	   (stack (inspect-object-stack *current-inspect*)))
+  (defun output-inspect-note (stream note &rest args)
+    (apply #'format stream note args)
+    (princ #\Newline stream))
+
+  (defun stack ()
+     (inspect-object-stack *current-inspect*))
+
+  (defun redisplay (stream)
+    (%inspect stream))
+
+  ;;;
+  ;;; istep command processing
+  ;;;
+  
+  (defun istep-cmd-redisplay (stream)
+    (redisplay stream))
+
+  (defun istep-cmd-parent (stream)
+    (cond
+      ((> (length (inspect-object-stack *current-inspect*)) 1)
+       (setf (inspect-object-stack *current-inspect*)
+	     (cdr (inspect-object-stack *current-inspect*)))
+       (setf (inspect-select-stack *current-inspect*)
+	     (cdr (inspect-select-stack *current-inspect*)))
+       (redisplay stream))
+      ((stack)
+       (output-inspect-note stream "Object has no parent"))
+      (t
+       (redisplay stream))))
+  
+  (defun istep-cmd-inspect-* (stream)
+    (reset-stack) 
+    (setf (inspect-object-stack *current-inspect*) (list *))
+    (setf (inspect-select-stack *current-inspect*) (list "(inspect *)"))
+    (set-break-inspect *current-inspect*)
+    (redisplay stream))
+
+  (defun istep-cmd-inspect-new-form (form stream)
+    (inspector (eval form) nil stream))
+
+  (defun istep-cmd-select-parent-component (option stream)
+    (if (stack)
+	(if (eql (length (stack)) 1)
+	    (output-inspect-note stream "Object does not have a parent")
+	    (let ((parent (second (stack)))
+		  (id (car (inspect-select-stack *current-inspect*))))
+	      (multiple-value-bind (position parts)
+		  (find-object-part-with-id parent id)
+		(let ((new-position (if (string= ">" option)
+					(1+ position)
+					(1- position))))
+		  (if (< -1 new-position (parts-count parts))
+		      (let* ((value (element-at parts new-position)))
+			(setf (car (inspect-object-stack *current-inspect*))
+			      value)
+			(setf (car (inspect-select-stack *current-inspect*))
+			      (if (integerp id)
+				  new-position
+				  (let ((label (label-at parts new-position)))
+				    (if (stringp label)
+					(read-from-string label)
+					label))))
+			(redisplay stream))
+		      (output-inspect-note stream
+					   "Parent has no selectable component indexed by ~d"
+					   new-position))))))
+	(redisplay stream)))
+
+  (defun istep-cmd-set-raw (option-string stream)
+    (when (inspect-object-stack *current-inspect*)
       (cond
-	;; Redisplay
-	((or (string= "=" option)
-	     (zerop (length args)))
-	 (%inspect output-stream))
-	;; Select parent
-	((or (string= "-" option)
-	     (string= "^" option))
-	 (cond
-	   ((> (length stack) 1)
-	    (setf (inspect-object-stack *current-inspect*) (cdr stack))
-	    (setf (inspect-select-stack *current-inspect*)
-		  (cdr (inspect-select-stack *current-inspect*)))
-	    (%inspect output-stream))
-	   (stack
-	    (format output-stream "Object has no parent.~%"))
-	   (t
-	    (%inspect output-stream))))
-	;; Select * to inspect
-	((string= "*" option)
-	 (reset-stack) 
-	 (setf (inspect-object-stack *current-inspect*) (list *))
-	 (setf (inspect-select-stack *current-inspect*) (list "(inspect *)"))
-	 (set-break-inspect *current-inspect*)
-	 (%inspect output-stream))
-	;; Start new inspect level for eval'd form
-	((string= "+" option)
-	 (inspector (eval (read-from-string (second args))) nil output-stream))
-	;; Next or previous parent component
-	((or (string= "<" option)
-	     (string= ">" option))
-	 (if stack
-	     (if (eq (length stack) 1)
-		 (format output-stream "Object does not have a parent")
-		 (let ((parent (second stack))
-		       (id (car (inspect-select-stack *current-inspect*))))
-		   (multiple-value-bind (position parts)
-		       (find-object-part-with-id parent id)
-		     (let ((new-position (if (string= ">" option)
-					     (1+ position)
-					     (1- position))))
-		       (if (< -1 new-position (parts-count parts))
-			   (let* ((value (element-at parts new-position)))
-			     (setf (car stack) value)
-			     (setf (car (inspect-select-stack *current-inspect*))
-				   (if (integerp id)
-				       new-position
-				       (let ((label (label-at parts new-position)))
-					 (if (stringp label)
-					     (read-from-string label)
-					     label))))
-			     (%inspect output-stream))
-		       (format output-stream "Parent has no selectable component indexed by ~d"
-				   new-position))))))
-	     (%inspect output-stream)))
-	;; Set component to eval'd form
-	((string-equal "set" option)
-	 (if stack
-	     (let ((id (when (second args)
-			 (read-from-string (second args)))))
-	       (multiple-value-bind (position parts)
-		   (find-object-part-with-id (car stack) id)
-		 (if parts
-		     (if position
-			 (let ((value-stirng (third args)))
-			   (when value-stirng
-			     (let ((new-value (eval (read-from-string (third args)))))
-			       (let ((result 
-				      (set-component-value (car stack)
+	((null option-string)
+	 (setq *inspect-raw* t))
+	((eq (read-from-string option-string) t)
+	 (setq *inspect-raw* t))
+	((eq (read-from-string option-string) nil)
+	 (setq *inspect-raw* nil)))
+      (redisplay stream)))
+
+  (defun istep-cmd-reset ()
+    (reset-stack)
+    (set-break-inspect *current-inspect*))
+
+  (defun istep-cmd-help (stream)
+    (format stream *inspect-help*))
+
+  (defun istep-cmd-skip (option-string stream)
+    (if option-string
+	(let ((len (read-from-string option-string)))
+	  (if (and (integerp len) (>= len 0))
+	      (let ((*inspect-skip* len)) 
+		(redisplay stream))
+	      (output-inspect-note stream "Skip length invalid")))
+	(output-inspect-note stream "Skip length missing")))
+
+  (defun istep-cmd-print (option-string stream)
+    (if option-string
+	(let ((len (read-from-string option-string)))
+	  (if (and (integerp len) (plusp len))
+	      (setq *inspect-length* len)
+	      (output-inspect-note stream "Cannot set print limit to ~A~%" len)))
+	(output-inspect-note stream "Print length missing")))
+
+  (defun select-description (select)
+    (typecase select
+      (integer
+       (format nil "which is componenent number ~d of" select))
+      (symbol
+       (format nil "which is the ~a component of" select))
+      (string
+       (format nil "which was selected by ~S" select))
+      (t
+       (write-to-string select))))
+  
+  (defun istep-cmd-tree (stream)
+    (let ((stack (inspect-object-stack *current-inspect*)))
+      (if stack
+	  (progn
+	    (output-inspect-note stream "The current object is:")
+	    (dotimes (i (length stack))
+	      (output-inspect-note
+	       stream "~A, ~A~%"
+	       (inspected-description (nth i stack))
+	       (select-description
+		(nth i (inspect-select-stack *current-inspect*))))))
+	  (%inspect stream))))
+
+  (defun istep-cmd-set (id-string value-string stream)
+    (if (stack)
+	(let ((id (when id-string (read-from-string id-string))))
+	  (multiple-value-bind (position parts)
+	      (find-object-part-with-id (car (stack)) id)
+	    (if parts
+		(if position
+		    (when value-string
+		      (let ((new-value (eval (read-from-string value-string))))
+			(let ((result (set-component-value (car (stack))
 							   id
 							   new-value
-							   (element-at parts position))))
-				 (typecase result
-				   (string
-				    (format output-stream result))
-				   (t
-				    (%inspect output-stream)))))))
-			 (format output-stream
-				 "Object has no selectable component named by ~A" id))
-		     (format output-stream
-			     "Object has no selectable components"))))
-	     (%inspect output-stream)))
-	;; Set/reset raw display mode for components
-	((string-equal "raw" option)
-	 (when stack
-	   (when (and (second args)
-		      (or (null (second args))
-			  (eq (read-from-string (second args)) t)))
-	     (setq *inspect-raw* t))
-	   (%inspect output-stream)))
-	;; Reset stack
-	((string-equal "q" option)
-	 (reset-stack)
-	 (set-break-inspect *current-inspect*))
-	;; Display help
-	((string-equal "?" option)
-	 (format output-stream *inspect-help*))
-	;; Set number of components to skip
-	((string-equal "skip" option)
-	 (let ((len (read-from-string (second args))))
-	   (if (and (integerp len) (>= len 0))
-	       (let ((*inspect-skip* len)) 
-		 (%inspect output-stream))
-	       (format output-stream "Skip missing or invalid~%"))))
-	;; Print stack tree
-	((string-equal "tree" option)
-	 (if stack
-	     (progn
-	       (format output-stream "The current object is:~%")
-	       (dotimes (i (length stack))
-		 (format output-stream "~A, ~A~%"
-			 (inspected-description (nth i stack))
-			 (let ((select (nth i (inspect-select-stack *current-inspect*))))
-			   (typecase select
-			     (integer
-			      (format nil "which is componenent number ~d of" select))
-			     (symbol
-			      (format nil "which is the ~a component of" select))
-			     (string
-			      (format nil "which was selected by ~S" select))
-			     (t
-			      (write-to-string select)))))))
-	     (%inspect output-stream)))
-	;; Set maximum number of components to print 
-	((string-equal "print" option)
-	 (let ((len (read-from-string (second args))))
-	   (if (and (integerp len) (plusp len))
-	       (setq *inspect-length* len)
-	       (format output-stream "Cannot set print limit to ~A~%" len))))
-	;; Select numbered or named component
-	((or (symbolp option-read)
-	     (integerp option-read))
-	 (if stack
-	     (multiple-value-bind (position parts)
-		 (find-object-part-with-id (car stack) option-read)
-	       (cond
-		 ((integerp position)
-		  (let* ((value (element-at parts position)))
-		    (cond ((eq value *inspect-unbound-object-marker*)
-			   (format output-stream "That slot is unbound~%"))
-			  (t
-			   (push value (inspect-object-stack *current-inspect*))
-			   (push option-read (inspect-select-stack *current-inspect*))
-			   (%inspect output-stream)))))
-		 ((null parts)
-		  (format output-stream "Object does not contain any subobjects~%"))
-		 (t
-		  (typecase option-read
-		    (symbol
-		     (format output-stream
-			     "Object has no selectable component named ~A"
-			     option))
-		    (integer
-		     (format output-stream
-			     "Object has no selectable component indexed by ~d~&Enter a valid index (~:[0-~W~;0~])~%"
-			     option-read
-			     (= (parts-count parts) 1)
-			     (1- (parts-count parts))))))))
-	     (%inspect output-stream)))
-	;; Default is to select eval'd form
-	(t
-	 (reset-stack)
-	 (let ((object (eval option-read)))
-	   (setf (inspect-object-stack *current-inspect*) (list object))
-	   (setf (inspect-select-stack *current-inspect*)
-		 (list (format nil ":i ~S" object))))
-	 (set-break-inspect *current-inspect*)
-	 (%inspect output-stream))
-	)))
+							   (element-at
+							    parts position))))
+			  (typecase result
+			    (string
+			     (output-inspect-note stream result))
+			    (t
+			     (%inspect stream))))))
+		    (output-inspect-note
+		     stream
+		     "Object has no selectable component named by ~A" id))
+		(output-inspect-note stream
+				     "Object has no selectable components"))))
+	(%inspect stream)))
+
+  (defun istep-cmd-select-component (id stream)
+    (if (stack)
+	(multiple-value-bind (position parts)
+	    (find-object-part-with-id (car (stack)) id)
+	  (cond
+	    ((integerp position)
+	     (let* ((value (element-at parts position)))
+	       (cond ((eq value *inspect-unbound-object-marker*)
+		      (output-inspect-note stream "That slot is unbound"))
+		     (t
+		      (push value (inspect-object-stack *current-inspect*))
+		      (push id (inspect-select-stack *current-inspect*))
+		      (redisplay stream)))))
+	    ((null parts)
+	     (output-inspect-note stream "Object does not contain any subobjects"))
+	    (t
+	     (typecase id
+	       (symbol
+		(output-inspect-note
+		 stream "Object has no selectable component named ~A"
+		 id))
+	       (integer
+		(output-inspect-note
+		 stream "Object has no selectable component indexed by ~d"
+		 id)
+		(output-inspect-note
+		 stream "Enter a valid index (~:[0-~W~;0~])"
+		 (= (parts-count parts) 1)
+		 (1- (parts-count parts))))))))
+	(%inspect stream)))
+
+  (defun istep-cmd-set-stack (form stream)
+    (reset-stack)
+    (let ((object (eval form)))
+      (setf (inspect-object-stack *current-inspect*) (list object))
+      (setf (inspect-select-stack *current-inspect*)
+	    (list (format nil ":i ~S" object))))
+    (set-break-inspect *current-inspect*)
+    (redisplay stream))
+
+  ;;;
+  ;;; aclrepl-specific inspection display
+  ;;;
   
   (defun %inspect (s)
     (if (inspect-object-stack *current-inspect*)
-	(let ((inspected (car (inspect-object-stack *current-inspect*))))
-	  (setq cl:* inspected)
-	  (display-inspected-parts inspected s))
-	(format s "No object is being inspected")))
-
-
-  (defun display-inspected-parts (object stream)
-    (multiple-value-bind (elements labels count)
-	(inspected-elements object *inspect-length* *inspect-skip*)
-      (format stream "~&~A" (inspected-description object))
-      (unless (or (characterp object) (typep object 'fixnum))
-	(format stream " at #x~X" (sb-kernel:get-lisp-obj-address object)))
-      (princ #\newline stream)
-      (dotimes (i count)
-	(let ((label (elt labels i))
-	      (element (elt elements i)))
-	  (cond
-	    ((eq label :ellipses)
-	     (format stream "~&   ...~%"))
-	    ((eq label :tail)
-	     (format stream "tail-> ~A~%" (inspected-description element)))
-	    ((consp label)
-	     (format stream
-		     (if (and (stringp (cdr label)) (char= (char (cdr label) 0) #\[))
-			 ;; for arrays
-			 "~4,' D ~A-> ~A~%"
-			 ;; for named
-			 "~4,' D ~16,1,1,'-A> ~A~%")
-		     (car label)
-		     (format nil "~A " (cdr label))
-		     (if (eq element *inspect-unbound-object-marker*)
-			 "..unbound.."
-			 (inspected-description element))))
-	    (t
-	     (if (integerp label)
-		 (format stream "~4,' D-> ~A~%" label (inspected-description element))
-		 (format stream "~4A-> ~A~%" label (inspected-description element)))))))))
-  
+	(let ((inspected))
+	  (setq cl:*  (car (inspect-object-stack *current-inspect*)))
+	  (display-inspected-parts inspected s *inspect-length* *inspect-skip*))
+	(output-inspect-note s "No object is being inspected")))
   ) ;; end binding for multithreading
 
 
+(defun display-inspected-parts (object stream &optional length skip)
+  (multiple-value-bind (elements labels count)
+      (inspected-elements object length skip)
+    (format stream "~&~A" (inspected-description object))
+    (unless (or (characterp object) (typep object 'fixnum))
+      (format stream " at #x~X" (sb-kernel:get-lisp-obj-address object)))
+    (princ #\newline stream)
+    (dotimes (i count)
+      (fresh-line stream)
+      (display-labelled-element (elt elements i) (elt labels i) stream))))
+  
+(defun array-label-p (label)
+  (and (stringp (cdr label)) (char= (char (cdr label) 0) #\[)))
+
+(defun named-or-array-label-p (label)
+  (consp label))
+
+(defun display-labelled-element (element label stream)
+  (cond
+    ((eq label :ellipses)
+     (format stream "   ..."))
+    ((eq label :tail)
+     (format stream "tail-> ~A" (inspected-description element)))
+    ((named-or-array-label-p label)
+     (format stream
+	     (if (array-label-p label)
+		 "~4,' D ~A-> ~A"
+		 "~4,' D ~16,1,1,'-A> ~A")
+	     (car label)
+	     (format nil "~A " (cdr label))
+	     (inspected-description element)))
+    (t
+     (format stream "~4,' D-> ~A" label (inspected-description element)))))
+
 ;;; THE BEGINNINGS OF AN INSPECTOR API
 ;;; which can be used to retrieve object descriptions as component values/labels and also
-;;; process component length and skip selectors
+;;; process print length and skip selectors
 ;;;
 ;;; FUNCTIONS TO CONSIDER FOR EXPORT
 ;;;   FIND-OBJECT-PART-WITH-ID
@@ -319,16 +376,17 @@ i set <name> <form>  set named component to evalated form
 ;;;   INSPECTED-DESCRIPTION
 ;;;
 ;;; will also need hooks
-;;;    *inspect-start-inspection* (maybe. Would setup a window for a GUI inspector)
+;;;    *inspect-start-inspection*
+;;;       (maybe. Would setup a window for a GUI inspector)
 ;;;    *inspect-prompt-fun*
 ;;;    *inspect-read-cmd*
 ;;;
 ;;; and, either an *inspect-process-cmd*, or *inspect-display* hook
 ;;; That'll depend if choose to have standardized inspector commands such that
 ;;; (funcall *inspect-read-cmd*) will return a standard command that SBCL will
-;;; process and then call the *inspect-display* hook, or if the *inspect-read-cmd*
-;;; will return an impl-dependent cmd that sbcl will send to the contributed
-;;; inspector for processing and display.
+;;; process and then call the *inspect-display* hook, or if the
+;;; *inspect-read-cmd* will return an impl-dependent cmd that sbcl will
+;;; send to the contributed inspector for processing and display.
 
 (defun find-object-part-with-id (object id)
   "COMPONENT-ID can be an integer or a name of a id.
@@ -409,12 +467,14 @@ position with the label is the label is a string."
 	      (push r list)))
 	  (format nil "[~W~{,~W~}]" (car list) (cdr list))))))
 
-(defun inspected-elements (object length skip)
+(defun inspected-elements (object &optional length skip)
   "Returns elements of an object that have been trimmed and labeled based on
-length and skip. Returns (VALUES ELEMENTS LABELS COUNT) where ELEMENTS contains
-COUNT ITERMS, LABELS is a SEQUENCES with COUNT items. LABELS may be a string, number,
-:tail, or :ellipses. This function may return a COUNT of up to (+ 3 length) which would
-include an :ellipses at the beginning, :ellipses at the end, and the last element."
+length and skip. Returns (VALUES ELEMENTS LABELS ELEMENT-COUNT)
+where ELEMENTS and LABELS are vectors containing ELEMENT-COUNT items.
+LABELS may be a string, number, cons pair, :tail, or :ellipses.
+This function may return an ELEMENT-COUNT of up to (+ 3 length) which would
+include an :ellipses at the beginning, :ellipses at the end,
+and the last element."
   (let* ((parts (inspected-parts object))
 	 (count (parts-count parts)))
     (unless skip (setq skip 0))
@@ -558,6 +618,9 @@ include an :ellipses at the beginning, :ellipses at the end, and the last elemen
 (defmethod inspected-description ((object t))
   (format nil "a generic object ~W" object))
 
+(defmethod inspected-description ((object (eql *inspect-unbound-object-marker*)))
+  "..unbound..")
+
 
 ;;; INSPECTED-PARTS
 ;;;
@@ -578,11 +641,11 @@ include an :ellipses at the beginning, :ellipses at the end, and the last elemen
 ;;;      If SEQ-TYPE is :list, then each element is a value of an array
 ;;;      If SEQ-TYPE is :vector, then each element is a value of an vector
 ;;;      If SEQ-TYPE is :array, then each element is a value of an array
-;;;        with rank >= 2
+;;;        with rank >= 2. The 
 ;;;
 ;;;   COUNT is the total number of components in the OBJECT
 ;;;
-;;; SEQ-HINT Stores a seq-type dependent hint. Used by SEQ-TYPE :array
+;;; SEQ-HINT is a seq-type dependent hint. Used by SEQ-TYPE :array
 ;;; to hold the reverse-dimensions of the orignal array.
 
 (declaim (inline parts-components))
@@ -633,12 +696,13 @@ include an :ellipses at the beginning, :ellipses at the end, and the last elemen
 (defun inspected-standard-object-parts (object)
   (let ((reversed-components nil)
 	(class-slots (sb-pcl::class-slots (class-of object))))
-    (dolist (class-slot class-slots (nreverse reversed-components))
+    (dolist (class-slot class-slots reversed-components)
       (let* ((slot-name (slot-value class-slot 'sb-pcl::name))
 	     (slot-value (if (slot-boundp object slot-name)
 			       (slot-value object slot-name)
 			       *inspect-unbound-object-marker*)))
 	(push (cons slot-name slot-value) reversed-components)))))
+
 
 (defmethod inspected-parts ((object standard-object))
   (let ((components (inspected-standard-object-parts object)))
@@ -716,20 +780,6 @@ include an :ellipses at the beginning, :ellipses at the end, and the last elemen
 
 (defmethod set-component-value ((object standard-object) id value element)
   (format nil "Standard object does not support setting of component ~A" id))
-
-(defmethod set-component-value ((object sb-kernel:funcallable-instance) id value element)
-  (format nil "Funcallable instance object does not support setting of component ~A" id))
-
-(defmethod set-component-value ((object function) id value element)
-  (format nil "Function object does not support setting of component ~A" id))
-
-;; whn believes it is unsafe to change components of this object
-(defmethod set-component-value ((object complex) id value element)
-  (format nil "Object does not support setting of component ~A" id))
-
-;; whn believes it is unsafe to change components of this object
-(defmethod set-component-value ((object ratio) id value element)
-  (format nil "Object does not support setting of component ~A" id))
 
 (defmethod set-component-value ((object t) id value element)
   (format nil "Object does not support setting of component ~A" id))

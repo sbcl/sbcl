@@ -306,7 +306,7 @@
 
 (defun string-to-list-skip-spaces (str)
   "Return a list of strings, delimited by spaces, skipping spaces."
-  (declare (string str)) 
+  (declare (type (or null string) str)) 
   (when str
     (loop for i = 0 then (1+ j)
 	  as j = (position #\space str :start i)
@@ -368,7 +368,7 @@
   (values))
 
 (defun istep-cmd (&optional arg-string)
-  (istep arg-string *repl-output*)
+  (istep (string-to-list-skip-spaces arg-string) *repl-output*)
   (values))
 
 (defun describe-cmd (&rest args)
@@ -476,6 +476,7 @@
   )
 
 (defun local-cmd (&optional var)
+  (declare (ignore var))
   )
 
 (defun processes-cmd ()
@@ -516,20 +517,21 @@
 		    signal selected-pid))
 	  (format *repl-output* "~&No thread ~A exists" selected-pid))))
   #-sb-thread
-  (declare (ignore selected-pids))
+  (declare (ignore signal selected-pids))
   #-sb-thread
   (format *repl-output* "~&Threads are not supported in this version of sbcl")
   (values))
 
 (defun focus-cmd (&optional process)
+  #-sb-thread
+  (declare (ignore process))
   #+sb-thread
   (when process
     (format *repl-output* "~&Focusing on next thread waiting waiting for the debugger~%"))
+  #+sb-thread
   (progn
     (sb-thread:release-foreground)
     (sleep 1))
-  #-sb-thread
-  (declare (ignore process))
   #-sb-thread
   (format *repl-output* "~&Threads are not supported in this version of sbcl")
   (values))
@@ -575,6 +577,7 @@
 	 ("pop" 3 pop-cmd "pop up `n' (default 1) break levels")
 	 ("popd" 4 popd-cmd "pop directory from stack")
 	 #+sb-thread ("processes" 3 processes-cmd "list all processes")
+	 ("reset" 3 reset-cmd "reset to top break level")
 	 ("trace" 2 trace-cmd "trace a function")
 	 ("untrace" 4 untrace-cmd "untrace a function")
 	 ("dirs" 2 dirs-cmd "show directory stack")

@@ -4,14 +4,14 @@
 (in-package #:sb-aclrepl-system)
 
 (defsystem sb-aclrepl
-    :version "0.5"
+    :version "0.6"
+    :author "Kevin Rosenberg <kevin@rosenberg.net>"
+    :description "An AllegroCL compatible REPL"
     :components ((:file "repl")
-		 (:file "inspect" :depends-on ("repl"))))
+		 (:file "inspect" :depends-on ("repl"))
+		 (:file "debug" :depends-on ("repl"))))
 
-
-;; FIXME - test for successful compilation of sb-aclrepl
 (defmethod perform ((o test-op) (c (eql (find-system :sb-aclrepl))))
-  (and (boundp 'sb-impl::*inspect-fun*)
-       (boundp 'sb-int:*repl-prompt-fun*)
-       (boundp 'sb-int:*repl-read-form-fun*)))
+  (or (load "aclrepl-tests.lisp")
+      (error "test-op failed")))
 
