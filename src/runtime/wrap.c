@@ -125,7 +125,7 @@ wrapped_readlink(char *path)
     int bufsiz = strlen(path) + 16;
     while (1) {
 	char *result = malloc(bufsiz);
-	int n_read = readlink(path, result, n_read);
+	int n_read = readlink(path, result, bufsiz);
 	if (n_read < 0) {
 	    free(result);
 	    return 0;
