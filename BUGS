@@ -1596,3 +1596,16 @@ WORKAROUND:
     => (EXPT X 2)
   from CLHS entry for DEFINE-COMPILER-MACRO fails in 0.8.13.41 with an
   error. Fixed in CMUCL 19a.
+
+348:
+  Structure slot setters do not preserve evaluation order:
+
+    (defstruct foo (x))
+
+    (let ((i (eval '-2))
+          (x (make-foo)))
+      (funcall #'(setf foo-x)
+               (incf i)
+               (aref (vector x) (incf i)))
+      (foo-x x))
+    => error
