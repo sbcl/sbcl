@@ -375,7 +375,10 @@
 	     (defaults-directory (%pathname-directory defaults))
 	     (prefix-len (length defaults-directory))
 	     (result-directory
-	      (cond ((and (> prefix-len 1)
+	      (cond ((null pathname-directory) '(:relative))
+		    ((eq (car pathname-directory) :relative)
+		     pathname-directory)
+		    ((and (> prefix-len 1)
 			  (>= (length pathname-directory) prefix-len)
 			  (compare-component (subseq pathname-directory
 						     0 prefix-len)
@@ -387,8 +390,7 @@
 		     ;; We are an absolute pathname, so we can just use it.
 		     pathname-directory)
 		    (t
-		     ;; We are a relative directory. So we lose.
-		     (lose)))))
+		     (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
 	(strings (unparse-unix-directory-list result-directory)))
       (let* ((pathname-type (%pathname-type pathname))
 	     (type-needed (and pathname-type

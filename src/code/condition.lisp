@@ -816,8 +816,9 @@
      (destructuring-bind (type data) (cdr reference)
        (ecase type
 	 (:node (format stream "Node ~S" data))
-	 (:variable (format stream "Variable ~S" data)))))
-    ;; FIXME: other documents (e.g. AMOP, Franz documentation :-)
+	 (:variable (format stream "Variable ~S" data))
+	 (:function (format stream "Function ~S" data)))))
+    ;; FIXME: other documents (e.g. CLIM, Franz documentation :-)
     ))
 (define-condition reference-condition ()
   ((references :initarg :references :reader reference-condition-references)))

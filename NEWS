@@ -32,6 +32,8 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * bug fix: pass the right initargs to :BEFORE or :AFTER methods on
     SHARED-INITIALIZE or INITIALIZE-INSTANCE in optimized
     MAKE-INSTANCE constructors.  (reported by Axel Schairer for cmucl)
+  * bug fix: pathnames with relative directory components can be
+    represented relative to default pathnames.
   * optimization: in taking the GCD of bignums, reduce the two bignums
     to approximately the same size (using Euclid's algorithm) before
     applying the more sophisticated binary GCD.  (thanks to Juho

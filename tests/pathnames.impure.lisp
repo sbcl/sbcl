@@ -331,5 +331,9 @@
     (when (probe-file test)
       (delete-file test))))
 
+;;; ENOUGH-NAMESTRING should probably not fail when the namestring in
+;;; question has a :RELATIVE pathname.
+(assert (equal (enough-namestring #p"foo" #p"./") "foo"))
+
 ;;;; success
 (quit :unix-status 104)

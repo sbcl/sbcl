@@ -42,7 +42,7 @@
            get-host-by-name get-host-by-address
            host-ent
            host-ent-addresses host-ent-address
-           host-ent aliases host-ent-name
+           host-ent-aliases host-ent-name
            name-service-error
            ;; not sure if these are really good names or not
            netdb-internal-error
