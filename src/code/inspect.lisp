@@ -57,6 +57,7 @@ evaluated expressions.
 	     ;; thing to do (as opposed to e.g. handling it as U), we
 	     ;; could document it. Meanwhile, it seems more Unix-y to
 	     ;; do this than to signal an error.
+	     (/show0 "THROWing QUIT-INSPECT for EOF")
 	     (throw 'quit-inspect nil))
 	    (integer
 	     (let ((elements-length (length elements)))
@@ -81,6 +82,7 @@ evaluated expressions.
 	    (symbol
 	     (case (find-symbol (symbol-name command) *keyword-package*)
 	       ((:q :e)
+		(/show0 "THROWing QUIT-INSPECT for :Q or :E")
 		(throw 'quit-inspect nil))
 	       (:u
 		(return-from %inspect))

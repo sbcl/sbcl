@@ -17,9 +17,21 @@
 ;;; a list of lists of restarts
 (defvar *restart-clusters* '())
 
-;;;  An ALIST (condition . restarts) which records the restarts currently
-;;; associated with Condition.
+;;; an ALIST (condition . restarts) which records the restarts currently
+;;; associated with Condition
 (defvar *condition-restarts* ())
+
+(defstruct (restart (:copier nil) (:predicate nil))
+  (name (missing-arg) :type symbol :read-only t)
+  function
+  report-function
+  interactive-function
+  (test-function #'(lambda (cond) (declare (ignore cond)) t)))
+(def!method print-object ((restart restart) stream)
+  (if *print-escape*
+      (print-unreadable-object (restart stream :type t :identity t)
+	(prin1 (restart-name restart) stream))
+      (restart-report restart stream)))
 
 (defun compute-restarts (&optional condition)
   #!+sb-doc
@@ -42,17 +54,6 @@
 		     (funcall (restart-test-function restart) condition))
 	    (res restart))))
       (res))))
-
-(defstruct (restart (:copier nil))
-  name
-  function
-  report-function
-  interactive-function
-  (test-function #'(lambda (cond) (declare (ignore cond)) t)))
-(def!method print-object ((restart restart) stream)
-  (if *print-escape*
-      (print-unreadable-object (restart stream :type t :identity t))
-      (restart-report restart stream)))
 
 #!+sb-doc
 (setf (fdocumentation 'restart-name 'function)
@@ -97,20 +98,19 @@
 				 (warn "Unnamed restart does not have a ~
 					report function: ~S"
 				       binding))
-			       `(make-restart
-				 :name ',(car binding)
-				 :function ,(cadr binding)
-				 ,@(cddr binding)))
+			       `(make-restart :name ',(car binding)
+					      :function ,(cadr binding)
+					      ,@(cddr binding)))
 			       bindings))
 		*restart-clusters*)))
      ,@forms))
 
 (defun find-restart (name &optional condition)
   #!+sb-doc
-  "Return the first restart named name. If name is a restart, it is returned
-   if it is currently active. If no such restart is found, nil is returned.
-   It is an error to supply nil as a name. If Condition is specified and not
-   NIL, then only restarts associated with that condition (or with no
+  "Return the first restart named NAME. If NAME names a restart, the restart
+   is returned if it is currently active. If no such restart is found, NIL is
+   returned. It is an error to supply NIL as a name. If CONDITION is specified
+   and not NIL, then only restarts associated with that condition (or with no
    condition) will be returned."
   (find-if #'(lambda (x)
 	       (or (eq x name)
@@ -122,11 +122,13 @@
   "Calls the function associated with the given restart, passing any given
    arguments. If the argument restart is not a restart or a currently active
    non-nil restart name, then a control-error is signalled."
+  (/show "entering INVOKE-RESTART" restart)
   (let ((real-restart (find-restart restart)))
     (unless real-restart
       (error 'simple-control-error
 	     :format-control "Restart ~S is not active."
 	     :format-arguments (list restart)))
+    (/show (restart-name real-restart))
     (apply (restart-function real-restart) values)))
 
 (defun invoke-restart-interactively (restart)
@@ -134,11 +136,14 @@
   "Calls the function associated with the given restart, prompting for any
    necessary arguments. If the argument restart is not a restart or a
    currently active non-nil restart name, then a control-error is signalled."
+  (/show "entering INVOKE-RESTART-INTERACTIVELY" restart)
   (let ((real-restart (find-restart restart)))
     (unless real-restart
       (error 'simple-control-error
 	     :format-control "Restart ~S is not active."
 	     :format-arguments (list restart)))
+    (/show (restart-name real-restart))
+    (/show0 "falling through to APPLY of RESTART-FUNCTION")
     (apply (restart-function real-restart)
 	   (let ((interactive-function
 		  (restart-interactive-function real-restart)))
@@ -321,7 +326,7 @@
 
 ;;;; HANDLER-CASE
 
-(defmacro handler-case (form &rest cases)
+(defmacro handler-case (form &rest clauses)
   "(HANDLER-CASE form
    { (type ([var]) body) }* )
    Execute FORM in a context with handlers established for the condition
@@ -350,7 +355,12 @@
   ;; sbcl-0.pre7.14.flaky4.11, and reverted to the old code at that point.
   ;; The problem also occurs at least in sbcl-0.6.12.59 and
   ;; sbcl-0.6.13.) -- WHN
-  (let ((no-error-clause (assoc ':no-error cases)))
+  ;;
+  ;; Note also: I think the old nested THROW/CATCH version became
+  ;; easier to read once I converted it to use DESTRUCTURING-BIND and
+  ;; mnemonic names, and it would probably be a useful to do that to
+  ;; the RETURN-FROM version when/if it's adopted.
+  (let ((no-error-clause (assoc ':no-error clauses)))
     (if no-error-clause
         (let ((normal-return (make-symbol "normal-return"))
               (error-return  (make-symbol "error-return")))
@@ -359,13 +369,18 @@
                (block ,normal-return
                  (return-from ,error-return
                    (handler-case (return-from ,normal-return ,form)
-                     ,@(remove no-error-clause cases)))))))
-        (let ((var (gensym))
-              (outer-tag (gensym))
-              (inner-tag (gensym))
-              (tag-var (gensym))
-              (annotated-cases (mapcar #'(lambda (case) (cons (gensym) case))
-                                       cases)))
+		     ;; FIXME: What if there's more than one :NO-ERROR
+		     ;; clause? The code here and above doesn't seem
+		     ;; either to remove both of them or to signal
+		     ;; a good error, so it's probably wrong.
+                     ,@(remove no-error-clause clauses)))))))
+        (let ((var (gensym "HC-VAR-"))
+              (outer-tag (gensym "OUTER-HC-TAG-"))
+              (inner-tag (gensym "INNER-HC-TAG-"))
+              (tag-var (gensym "HC-TAG-VAR-"))
+              (tagged-clauses (mapcar (lambda (clause)
+					(cons (gensym "HC-TAG-") clause))
+				      clauses)))
           `(let ((,outer-tag (cons nil nil))
                  (,inner-tag (cons nil nil))
                  ,var ,tag-var)
@@ -375,27 +390,34 @@
                (catch ,inner-tag
                  (throw ,outer-tag
                         (handler-bind
-                            ,(mapcar #'(lambda (annotated-case)
-                                         `(,(cadr annotated-case)
-                                           #'(lambda (temp)
-                                               ,(if (caddr annotated-case)
-                                                    `(setq ,var temp)
-                                                    '(declare (ignore temp)))
-                                               (setf ,tag-var
-                                                     ',(car annotated-case))
-                                               (throw ,inner-tag nil))))
-                                     annotated-cases)
+                            ,(mapcar (lambda (tagged-clause)
+				       (destructuring-bind
+					   (tag typespec args &body body)
+					   tagged-clause
+					 (declare (ignore body))
+                                         `(,typespec
+                                           (lambda (temp)
+					     ,(if args
+						  `(setq ,var temp)
+						  '(declare (ignore temp)))
+					     (setf ,tag-var ',tag)
+					     (/show "THROWing INNER-TAG from HANDLER-BIND closure for" ',typespec)
+					     (throw ,inner-tag nil)))))
+                                     tagged-clauses)
                           ,form)))
                (case ,tag-var
-                 ,@(mapcar #'(lambda (annotated-case)
-                               (let ((body (cdddr annotated-case))
-                                     (varp (caddr annotated-case)))
-                                 `(,(car annotated-case)
-                                   ,@(if varp
-                                         `((let ((,(car varp) ,var))
-                                             ,@body))
-                                         body))))
-                           annotated-cases)))))))
+                 ,@(mapcar (lambda (tagged-clause)
+			     (destructuring-bind
+				 (tag typespec args &body body)
+				 tagged-clause
+			       (declare (ignore typespec))
+			       `(,tag
+				 ,@(if args
+				       (destructuring-bind (arg) args
+					 `((let ((,arg ,var))
+					     ,@body)))
+				       body))))
+                           tagged-clauses)))))))
   #+nil ; MNA's patched version -- see FIXME above
   (let ((no-error-clause (assoc ':no-error cases)))
     (if no-error-clause

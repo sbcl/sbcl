@@ -240,6 +240,7 @@
   and so forth) unless RECKLESSLY-P is non-NIL. On UNIX-like systems,
   UNIX-STATUS is used as the status code."
   (declare (type (signed-byte 32) unix-status unix-code))
+  (/show0 "entering QUIT")
   ;; FIXME: UNIX-CODE was deprecated in sbcl-0.6.8, after having been
   ;; around for less than a year. It should be safe to remove it after
   ;; a year.

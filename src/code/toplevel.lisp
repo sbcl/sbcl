@@ -437,11 +437,14 @@
 		(eval eval)
 		(flush-standard-output-streams)))
 	  (continue ()
-		    :report "Continue anyway (skipping to toplevel read/eval/print loop)."
-		    (values)) ; (no-op, just fall through)
+	    :report
+	    "Continue anyway (skipping to toplevel read/eval/print loop)."
+	    (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
+	    (values)) ; (no-op, just fall through)
 	  (quit ()
-		:report "Quit SBCL (calling #'QUIT, killing the process)."
-		(quit))))
+	    :report "Quit SBCL (calling #'QUIT, killing the process)."
+	    (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
+	    (quit))))
 
       ;; one more time for good measure, in case we fell out of the
       ;; RESTART-CASE above before one of the flushes in the ordinary
@@ -490,17 +493,20 @@
 		  *prompt*))
        (flush-standard-output-streams))
      (let ((form (read *standard-input* nil eof-marker)))
-       (if (eq form eof-marker)
-	   (quit)
-	   (let ((results (multiple-value-list (interactive-eval form))))
-	     (unless noprint
-	       (dolist (result results)
-		 (fresh-line)
-		 (prin1 result)))))))))
+       (cond ((eq form eof-marker)
+	      (/show0 "doing QUIT for EOF in REPL")
+	      (quit))
+	     (t
+	      (let ((results (multiple-value-list (interactive-eval form))))
+		(unless noprint
+		  (dolist (result results)
+		    (fresh-line)
+		    (prin1 result))))))))))
 
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
   (declare (ignore old-debugger-hook))
   (flet ((failure-quit (&key recklessly-p)
+           (/show0 "in FAILURE-QUIT (in noprogrammer debugger hook)")
 	   (quit :unix-status 1 :recklessly-p recklessly-p)))
     ;; This HANDLER-CASE is here mostly to stop output immediately
     ;; (and fall through to QUIT) when there's an I/O error. Thus,

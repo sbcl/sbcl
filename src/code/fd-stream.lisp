@@ -479,6 +479,7 @@
 		 (simple-stream-perror "couldn't read from ~S" stream errno)))
 	    ((zerop count)
 	     (setf (fd-stream-listen stream) :eof)
+	     (/show0 "THROWing EOF-INPUT-CATCHER")
 	     (throw 'eof-input-catcher nil))
 	    (t
 	     (incf (fd-stream-ibuf-tail stream) count))))))
