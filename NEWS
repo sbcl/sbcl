@@ -57,6 +57,8 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed arguably-a-bug: GC time proportional to number of threads in 
     system even when most of them are idle
   * optimization: improved performance of BIT and SBIT on bit-vectors.
+  * .fasl file incompatibility: The fasl file version number has
+    been incremented because of changes associated with package locks.
 
 changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * minor incompatible change: the system no longer provides
