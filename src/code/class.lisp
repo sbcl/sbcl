@@ -1231,7 +1231,7 @@
 		    (if (eq name t)
 		      nil
 		      (mapcar #'sb!xc:find-class direct-superclasses)))))
-	(setf (info :type :kind name) :primitive
+	(setf (info :type :kind name) #+sb-xc-host :defined #-sb-xc-host :primitive
 	      (class-cell-class (find-class-cell name)) class)
 	(unless trans-p
 	  (setf (info :type :builtin name) class))

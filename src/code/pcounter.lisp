@@ -18,13 +18,7 @@
 
 ;;;; basic PCOUNTER stuff
 
-(/show0 "pcounter.lisp 16")
-
-(defstruct (pcounter (:copier nil))
-  (integer 0 :type unsigned-byte)
-  (fixnum 0 :type (and fixnum unsigned-byte)))
-
-(/show0 "pcounter.lisp 22")
+(/show0 "pcounter.lisp 21")
 
 (declaim (maybe-inline incf-pcounter))
 (defun incf-pcounter (pcounter delta)
@@ -37,7 +31,7 @@
 	   (setf (pcounter-fixnum pcounter) 0))))
   pcounter)
 
-(/show0 "pcounter.lisp 36")
+(/show0 "pcounter.lisp 34")
 
 ;;;(declaim (inline pcounter->integer)) ; FIXME: maybe inline when more stable
 (defun pcounter->integer (pcounter)
@@ -50,7 +44,7 @@
 ;;;; start with a FIXNUM counter and only create a PCOUNTER if the
 ;;;; FIXNUM overflows.
 
-(/show0 "pcounter.lisp 50")
+(/show0 "pcounter.lisp 47")
 
 (declaim (inline %incf-pcounter-or-fixnum))
 (defun %incf-pcounter-or-fixnum (x delta)
@@ -65,7 +59,7 @@
   
 (define-modify-macro incf-pcounter-or-fixnum (delta) %incf-pcounter-or-fixnum)
 
-(/show0 "pcounter.lisp 64")
+(/show0 "pcounter.lisp 62")
 
 ;;; Trade off space for execution time by handling the common fast
 ;;; (TYPEP DELTA 'FIXNUM) case inline and only calling generic
@@ -79,7 +73,7 @@
 	   (incf-pcounter-or-fixnum ,x ,delta)
 	   (incf-pcounter-or-fixnum ,x ,delta)))))
 
-(/show0 "pcounter.lisp 80")
+(/show0 "pcounter.lisp 76")
 
 (declaim (maybe-inline pcounter-or-fixnum->integer))
 (defun pcounter-or-fixnum->integer (x)

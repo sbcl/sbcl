@@ -131,6 +131,7 @@
  ;; accessors.)
  ("src/code/type-class")
 
+ ("src/code/early-pcounter")
  ("src/code/pcounter" :not-host)
 
  ("src/code/ansi-stream" :not-host)

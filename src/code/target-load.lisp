@@ -96,7 +96,7 @@
 ;;; possible types are ".lisp" and ".cl", and both "foo.lisp" and
 ;;; "foo.cl" exist?)
 (defun try-default-type (pathname type)
-  (let ((pn (make-pathname :type type :defaults pathname)))
+  (let ((pn (translate-logical-pathname (make-pathname :type type :defaults pathname))))
     (values pn (probe-file pn))))
 
 ;;; a helper function for LOAD: Handle the case of INTERNAL-LOAD where
@@ -183,29 +183,19 @@
 			'(unsigned-byte 8)))
 	     (load-as-fasl filespec verbose print)
 	     (load-as-source filespec verbose print))
-	 (let* (;; FIXME: MERGE-PATHNAMES doesn't work here for
-		;; FILESPEC="TEST:Load-Test" and
-		;; (LOGICAL-PATHNAME-TRANSLATIONS "TEST")
-		;;   = (("**;*.*.*" "/foo/bar/**/*.*")).
-		;; Physicalizing the pathname before merging 
-		;; is a workaround, but the ANSI spec talks about
-		;; MERGE-PATHNAMES accepting (and returning)
-		;; logical pathnames, so a true fix would probably
-		;; include fixing MERGE-PATHNAMES, then probably
-		;; revisiting this code.
-		(ppn (physicalize-pathname (pathname filespec)))
-		(unix-name (unix-namestring ppn t)))
-	   (if (or unix-name (pathname-type ppn))
-	       (internal-load ppn
-			      unix-name
+	 (let* ((pathname (pathname filespec))
+		(physical-pathname (translate-logical-pathname pathname)))
+	   (if (or (probe-file physical-pathname) (pathname-type physical-pathname))
+	       (internal-load physical-pathname
+			      (truename physical-pathname)
 			      internal-if-does-not-exist
 			      verbose
 			      print)
-	       (internal-load-default-type
-		ppn
-		internal-if-does-not-exist
-		verbose
-		print)))))))
+	       
+	       (internal-load-default-type pathname
+					   internal-if-does-not-exist
+					   verbose
+					   print)))))))
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
 ;;; the boxed storage section, then SIZE bytes of code are read in.

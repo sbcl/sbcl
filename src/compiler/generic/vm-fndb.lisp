@@ -179,19 +179,19 @@
 
 ;;;; bignum operations
 
-(defknown %allocate-bignum (bignum-index) bignum-widetag
+(defknown %allocate-bignum (bignum-index) bignum-type
   (flushable))
 
-(defknown %bignum-length (bignum-widetag) bignum-index
+(defknown %bignum-length (bignum-type) bignum-index
   (foldable flushable movable))
 
-(defknown %bignum-set-length (bignum-widetag bignum-index) bignum-widetag
+(defknown %bignum-set-length (bignum-type bignum-index) bignum-type
   (unsafe))
 
-(defknown %bignum-ref (bignum-widetag bignum-index) bignum-element-type
+(defknown %bignum-ref (bignum-type bignum-index) bignum-element-type
   (flushable))
 
-(defknown %bignum-set (bignum-widetag bignum-index bignum-element-type)
+(defknown %bignum-set (bignum-type bignum-index bignum-element-type)
   bignum-element-type
   (unsafe))
 
