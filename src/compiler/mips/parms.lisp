@@ -1,20 +1,15 @@
 (in-package "SB!VM")
 
-(def!constant n-word-bits 32
-  "Number of bits per word where a word holds one lisp descriptor.")
+;;; number of bits per word where a word holds one lisp descriptor
+(def!constant n-word-bits 32)
 
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
 (def!constant n-machine-word-bits 32)
 
-(def!constant n-byte-bits 8
-  "Number of bits per byte where a byte is the smallest addressable object.")
-
-(def!constant word-shift (1- (integer-length (/ n-word-bits n-byte-bits)))
-  "Number of bits to shift between word addresses and byte addresses.")
-
-(def!constant n-word-bytes (/ n-word-bits n-byte-bits)
-  "Number of bytes in a word.")
+;;; number of bits per byte where a byte is the smallest addressable
+;;; object
+(def!constant n-byte-bits 8)
 
 
 (def!constant float-sign-shift 31)

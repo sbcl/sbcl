@@ -25,6 +25,12 @@
 ;;; the bit width of positive fixnums
 (def!constant n-positive-fixnum-bits (- n-word-bits n-fixnum-tag-bits 1))
 
+;;; the number of bits to shift between word addresses and byte addresses
+(def!constant word-shift (1- (integer-length (/ n-word-bits n-byte-bits))))
+
+;;; the number of bytes in a word
+(def!constant n-word-bytes (/ n-word-bits n-byte-bits))
+
 ;;; the number of bits used in the header word of a data block to store
 ;;; the type
 (def!constant n-widetag-bits 8)

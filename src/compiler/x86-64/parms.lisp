@@ -35,12 +35,6 @@
 ;;; addressable object
 (def!constant n-byte-bits 8)
 
-;;; the number of bits to shift between word addresses and byte addresses
-(def!constant word-shift (1- (integer-length (/ n-word-bits n-byte-bits))))
-
-;;; the number of bytes in a word
-(def!constant n-word-bytes (/ n-word-bits n-byte-bits))
-
 (def!constant float-sign-shift 31)
 
 ;;; comment from CMU CL:

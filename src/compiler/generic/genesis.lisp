@@ -199,13 +199,21 @@
   (make-bvref-n 64))
 
 ;; lispobj-sized word, whatever that may be
+;; hopefully nobody ever wants a 128-bit SBCL...
+#!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+(progn
 (defun bvref-word (bytes index)
-  #!+x86-64 (bvref-64 bytes index)
-  #!-x86-64 (bvref-32 bytes index))
-
+  (bvref-64 bytes index))
 (defun (setf bvref-word) (new-val bytes index)
-  #!+x86-64 (setf (bvref-64 bytes index) new-val)
-  #!-x86-64 (setf (bvref-32 bytes index) new-val))
+  (setf (bvref-64 bytes index) new-val)))
+
+#!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+(progn
+(defun bvref-word (bytes index)
+  (bvref-32 bytes index))
+(defun (setf bvref-word) (new-val bytes index)
+  (setf (bvref-32 bytes index) new-val)))
+
 
 ;;;; representation of spaces in the core
 
