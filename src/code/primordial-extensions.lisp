@@ -182,7 +182,18 @@
 					,expr-tmp))
 		    (error "already bound differently: ~S")))
 		 (t
-		  (defconstant ,symbol ,expr-tmp ,@(when doc `(,doc)))))))
+                  ;;; MNA: CMU CL does not like DEFCONSTANT-EQX,
+                  ;;; at least it does not like using EXPR-TMP-<X>,
+                  ;;; below.
+		  (defconstant ,symbol
+                    ;; MNA: 
+                    ;; FIXME: this is a very ugly hack,
+                    ;; to be able to build SBCL with CMU CL (2.4.19),
+                    ;; because there seems to be some confusion in
+                    ;; CMU CL about ,expr-temp at EVAL-WHEN time ...
+                    #-cmu ,expr-tmp
+                    #+cmu ,expr
+                    ,@(when doc `(,doc)))))))
        ;; The #+SB-XC :COMPILE-TOPLEVEL situation is special, since we
        ;; want to define the symbol not just in the cross-compilation
        ;; host Lisp (which was handled above) but also in the

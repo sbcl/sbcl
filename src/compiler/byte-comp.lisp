@@ -1275,8 +1275,18 @@
 	 ((:special :global)
 	  (output-push-constant segment (global-var-name leaf))
 	  (output-do-inline-function segment 'setf-symbol-value))))
+      ;;; MNA: cmucl-commit: Tue, 26 Sep 2000 09:41:00 -0700 (PDT)
+      ;;; Within generate-byte-code-for-set, avoid trying to set a lexical
+      ;;; variable with no refs since the compiler deletes such variables.
       (lambda-var
-       (output-set-lambda-var segment leaf (node-environment set))))
+        (cond ((leaf-refs leaf)
+	      (unless (eql values 0)
+		;; Someone wants the value, so copy it.
+		(output-do-xop segment 'dup))
+	      (output-set-lambda-var segment leaf (node-environment set)))
+	     ;; If no-one wants the value then pop it else leave it for them.
+	     ((eql values 0)
+	      (output-byte-with-operand segment byte-pop-n 1)))))
     (unless (eql values 0)
       (checked-canonicalize-values segment cont 1)))
   (values))

@@ -530,12 +530,24 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case type_SimpleVector:
-            case type_InstanceHeader:
                 NEWLINE;
                 printf("length = %ld", length);
                 ptr++;
                 index = 0;
                 while (length-- > 0) {
+                    sprintf(buffer, "%d: ", index++);
+                    print_obj(buffer, *ptr++);
+                }
+                break;
+
+                /* MNA: cmucl-commit Tue, 9 Jan 2001 11:46:57 -0800 (PST)
+                   Correct the printing of instance objects for which the length was
+                   being incorrectly calculated. */
+            case type_InstanceHeader:
+                NEWLINE;
+                printf("length = %ld", (long) count);
+                index = 0;
+                while (count-- > 0) {
                     sprintf(buffer, "%d: ", index++);
                     print_obj(buffer, *ptr++);
                 }

@@ -236,24 +236,48 @@
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
+;;; MNA: cmucl-commit: Mon, 1 Jan 2001 01:30:53 -0800 (PST)
+;;; Correct the pretty printing by print-unreadable-object. Only attempt
+;;; to print pretty when the stream is a pretty-stream (and when *print-pretty*)
+;;; to ensure that all output goes to the same stream. 
+
+;;; MNA: cmucl-commit: Wed, 27 Dec 2000 05:24:30 -0800 (PST)
+;;; Have print-unreadable-object respect *print-pretty*.
+
+;;; Guts of print-unreadable-object.
+;;;
+;;; When *print-pretty* and the stream is a pretty-stream, format the object
+;;; within a logical block - pprint-logical-block does not rebind the stream
+;;; when it is already a pretty stream so output from the body will go to the
+;;; same stream.
+;;;
 (defun %print-unreadable-object (object stream type identity body)
   (when *print-readably*
     (error 'print-not-readable :object object))
-  (write-string "#<" stream)
-  (when type
-    (write (type-of object) :stream stream :circle nil
-	   :level nil :length nil)
-    (write-char #\space stream))
-  (when body
-    (funcall body))
-  (when identity
-    (unless (and type (null body))
-      (write-char #\space stream))
-    (write-char #\{ stream)
-    (write (get-lisp-obj-address object) :stream stream
-	   :radix nil :base 16)
-    (write-char #\} stream))
-  (write-char #\> stream)
+  (flet ((print-description ()
+	   (when type
+	     (write (type-of object) :stream stream :circle nil
+		    :level nil :length nil)
+	     (when (or body identity)
+	       (write-char #\space stream)
+	       (pprint-newline :fill stream)))
+	   (when body
+	     (funcall body))
+	   (when identity
+	     (when body
+	       (write-char #\space stream)
+	       (pprint-newline :fill stream))
+	     (write-char #\{ stream)
+	     (write (get-lisp-obj-address object) :stream stream
+		    :radix nil :base 16)
+	     (write-char #\} stream))))
+    (cond ((and (sb!pretty:pretty-stream-p stream) *print-pretty*)
+            (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
+                                  (print-description)))
+	  (t
+            (write-string "#<" stream)
+            (print-description)
+            (write-char #\> stream))))
   nil)
 
 ;;;; WHITESPACE-CHAR-P
@@ -940,27 +964,30 @@
 (defun output-vector (vector stream)
   (declare (vector vector))
   (cond ((stringp vector)
-	 (if (or *print-escape* *print-readably*)
-	     (quote-string vector stream)
-	     (write-string vector stream)))
+          (cond ((or *print-escape* *print-readably*)
+                  (write-char #\" stream)
+                  (quote-string vector stream)
+                  (write-char #\" stream))
+                (t
+                  (write-string vector stream))))
 	((not (or *print-array* *print-readably*))
-	 (output-terse-array vector stream))
+          (output-terse-array vector stream))
 	((bit-vector-p vector)
-	 (write-string "#*" stream)
-	 (dotimes (i (length vector))
-	   (output-object (aref vector i) stream)))
+          (write-string "#*" stream)
+          (dotimes (i (length vector))
+            (output-object (aref vector i) stream)))
 	(t
-	 (when (and *print-readably*
-		    (not (eq (array-element-type vector) 't)))
-	   (error 'print-not-readable :object vector))
-	 (descend-into (stream)
-	   (write-string "#(" stream)
-	   (dotimes (i (length vector))
-	     (unless (zerop i)
-	       (write-char #\space stream))
-	     (punt-print-if-too-long i stream)
-	     (output-object (aref vector i) stream))
-	   (write-string ")" stream)))))
+          (when (and *print-readably*
+                     (not (eq (array-element-type vector) 't)))
+            (error 'print-not-readable :object vector))
+          (descend-into (stream)
+                        (write-string "#(" stream)
+                        (dotimes (i (length vector))
+                          (unless (zerop i)
+                            (write-char #\space stream))
+                          (punt-print-if-too-long i stream)
+                          (output-object (aref vector i) stream))
+                        (write-string ")" stream)))))
 
 ;;; This function outputs a string quoting characters sufficiently that so
 ;;; someone can read it in again. Basically, put a slash in front of an
@@ -970,15 +997,13 @@
 	       ;; KLUDGE: We probably should look at the readtable, but just do
 	       ;; this for now. [noted by anonymous long ago] -- WHN 19991130
 	       `(or (char= ,char #\\)
-		    (char= ,char #\"))))
-    (write-char #\" stream)
+                 (char= ,char #\"))))
     (with-array-data ((data string) (start) (end (length string)))
       (do ((index start (1+ index)))
 	  ((>= index end))
 	(let ((char (schar data index)))
 	  (when (needs-slash-p char) (write-char #\\ stream))
-	  (write-char char stream))))
-    (write-char #\" stream)))
+	  (write-char char stream))))))
 
 (defun output-array (array stream)
   #!+sb-doc
@@ -1489,6 +1514,12 @@
 
 ;;;; other leaf objects
 
+;;; MNA: cmucl-commit: Mon, 1 Jan 2001 03:41:18 -0800 (PST)
+;;; Fix output-character to escape the char-name. Reworking quote-string
+;;; to not write the delimiting quotes so that is can be used by
+;;; output-character.
+
+
 ;;; If *PRINT-ESCAPE* is false, just do a WRITE-CHAR, otherwise output the
 ;;; character name or the character in the #\char format.
 (defun output-character (char stream)
@@ -1496,7 +1527,7 @@
       (let ((name (char-name char)))
 	(write-string "#\\" stream)
 	(if name
-	    (write-string name stream)
+	    (quote-string name stream)
 	    (write-char char stream)))
       (write-char char stream)))
 

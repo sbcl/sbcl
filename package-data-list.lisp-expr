@@ -843,8 +843,11 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "%CLOSURE-INDEX-REF" "%COS" "%COS-QUICK"
              "%COSH" "%DEPOSIT-FIELD"
              "%DOUBLE-FLOAT" "%DPB" "%EXP" "%EXPM1"
-             "%FUNCTION-HEADER-ARGLIST"
-             "%FUNCTION-HEADER-NAME" "%FUNCTION-HEADER-TYPE"
+;;; MNA: cmucl-commit: Mon, 4 Dec 2000 13:50:25 -0800 (PST)
+;;; No need to export the unused symbols %function-header-arglist
+;;; %function-header-name %function-header-type.
+;;;             "%FUNCTION-HEADER-ARGLIST"
+;;;             "%FUNCTION-HEADER-NAME" "%FUNCTION-HEADER-TYPE"
              "%HYPOT" "%INSTANCE-SET-CONDITIONAL" "%LDB"
              "%LOG" "%LOGB" "%LOG10" "%LOG1P" "%LONG-FLOAT"
              "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE" "%MAKE-RATIO"

@@ -1404,6 +1404,25 @@
 
 ) ; PROGN
 
+;;; MNA: cmucl-commit: Wed, 3 Jan 2001 21:49:12 -0800 (PST)
+;;; Rework the 'ash derive-type optimizer so better handle large negative bounds.
+;;; Based on suggestions from Raymond Toy.
+
+;;; 'ash derive type optimizer.
+;;;
+;;; Large resulting bounds are easy to generate but are not particularly
+;;; useful, so an open outer bound is returned for a shift greater than 64 -
+;;; the largest word size of any of the ports. Large negative shifts are also
+;;; problematic as the 'ash implementation only accepts shifts greater than
+;;; the most-negative-fixnum. These issues are handled by two local functions:
+;;;
+;;; ash-outer: performs the shift when within an acceptable range, otherwise
+;;; returns an open bound.
+;;;
+;;; ash-inner: performs the shift when within range, limited to a maximum of
+;;; 64, otherwise returns the inner limit.
+;;;
+
 ;;; KLUDGE: All this ASH optimization is suppressed under CMU CL
 ;;; because as of version 2.4.6 for Debian, CMU CL blows up on (ASH
 ;;; 1000000000 -100000000000) (i.e. ASH of two bignums yielding zero)
@@ -1412,6 +1431,39 @@
 (progn
 #!-propagate-fun-type
 (defoptimizer (ash derive-type) ((n shift))
+   (flet ((ash-outer (n s)
+            (when (and (fixnump s)
+                       (<= s 64)
+                       (> s most-negative-fixnum))
+              (ash n s)))
+          (ash-inner (n s)
+            (if (and (fixnump s)
+                     (> s most-negative-fixnum))
+              (ash n (min s 64))
+              (if (minusp n) -1 0))))
+     (or (let ((n-type (continuation-type n)))
+           (when (numeric-type-p n-type)
+             (let ((n-low (numeric-type-low n-type))
+                   (n-high (numeric-type-high n-type)))
+               (if (constant-continuation-p shift)
+                 (let ((shift (continuation-value shift)))
+                   (make-numeric-type :class 'integer  :complexp :real
+                                      :low (when n-low (ash n-low shift))
+                                      :high (when n-high (ash n-high shift))))
+                 (let ((s-type (continuation-type shift)))
+                   (when (numeric-type-p s-type)
+                     (let ((s-low (numeric-type-low s-type))
+                           (s-high (numeric-type-high s-type)))
+                       (make-numeric-type :class 'integer  :complexp :real
+                                          :low (when n-low
+                                                 (if (minusp n-low)
+                                                   (ash-outer n-low s-high)
+                                                   (ash-inner n-low s-low)))
+                                          :high (when n-high
+                                                  (if (minusp n-high)
+                                                    (ash-inner n-high s-low)
+                                                    (ash-outer n-high s-high)))))))))))
+         *universal-type*))
   (or (let ((n-type (continuation-type n)))
 	(when (numeric-type-p n-type)
 	  (let ((n-low (numeric-type-low n-type))
@@ -1438,28 +1490,40 @@
 			  (make-numeric-type :class 'integer
 					     :complexp :real)))))))))
       *universal-type*))
+
 #!+propagate-fun-type
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
-  (or (and (csubtypep n-type (specifier-type 'integer))
-	   (csubtypep shift (specifier-type 'integer))
-	   (let ((n-low (numeric-type-low n-type))
-		 (n-high (numeric-type-high n-type))
-		 (s-low (numeric-type-low shift))
-		 (s-high (numeric-type-high shift)))
-	     ;; KLUDGE: The bare 64's here should be related to
-	     ;; symbolic machine word size values somehow.
-	     (if (and s-low s-high (<= s-low 64) (<= s-high 64))
-		 (make-numeric-type :class 'integer :complexp :real
-				    :low (when n-low
-					   (min (ash n-low s-high)
-						(ash n-low s-low)))
-				    :high (when n-high
-					    (max (ash n-high s-high)
-						 (ash n-high s-low))))
-		 (make-numeric-type :class 'integer
-				    :complexp :real))))
-      *universal-type*))
+  (flet ((ash-outer (n s)
+	   (when (and (fixnump s)
+		      (<= s 64)
+		      (> s most-negative-fixnum))
+	     (ash n s)))
+         ;; KLUDGE: The bare 64's here should be related to
+         ;; symbolic machine word size values somehow.
+
+	 (ash-inner (n s)
+	   (if (and (fixnump s)
+		    (> s most-negative-fixnum))
+             (ash n (min s 64))
+             (if (minusp n) -1 0))))
+    (or (and (csubtypep n-type (specifier-type 'integer))
+	     (csubtypep shift (specifier-type 'integer))
+	     (let ((n-low (numeric-type-low n-type))
+		   (n-high (numeric-type-high n-type))
+		   (s-low (numeric-type-low shift))
+		   (s-high (numeric-type-high shift)))
+	       (make-numeric-type :class 'integer  :complexp :real
+				  :low (when n-low
+					 (if (minusp n-low)
+                                           (ash-outer n-low s-high)
+                                           (ash-inner n-low s-low)))
+				  :high (when n-high
+					  (if (minusp n-high)
+                                            (ash-inner n-high s-low)
+                                            (ash-outer n-high s-high))))))
+	*universal-type*)))
+
 #!+propagate-fun-type
 (defoptimizer (ash derive-type) ((n shift))
   (two-arg-derive-type n shift #'ash-derive-type-aux #'ash))

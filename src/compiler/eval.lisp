@@ -845,22 +845,27 @@
 
 ;;; This does SET-LEAF-VALUE for a lambda-var leaf. The debugger tools'
 ;;; internals uses this also to set interpreted local variables.
+
+;;; MNA: cmucl-commit: Tue, 26 Sep 2000 09:40:37 -0700 (PDT)
+;;; Within set-leaf-value-lambda-var, avoid trying to set a lexical
+;;; variable with no refs since the compiler deletes such variables.
 (defun set-leaf-value-lambda-var (node var frame-ptr closure value)
-  (let ((env (sb!c::node-environment node)))
-    (cond ((not (eq (sb!c::lambda-environment (sb!c::lambda-var-home var))
-		    env))
-	   (setf (indirect-value
-		  (svref closure
-			 (position var (sb!c::environment-closure env)
-				   :test #'eq)))
-		 value))
-	  ((sb!c::lambda-var-indirect var)
-	   (setf (indirect-value
-		  (eval-stack-local frame-ptr (sb!c::lambda-var-info var)))
-		 value))
-	  (t
-	   (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
-		 value)))))
+  (when (sb!c::leaf-refs var)
+    (let ((env (sb!c::node-environment node)))
+      (cond ((not (eq (sb!c::lambda-environment (sb!c::lambda-var-home var))
+                      env))
+              (setf (indirect-value
+                     (svref closure
+                            (position var (sb!c::environment-closure env)
+                                      :test #'eq)))
+                      value))
+            ((sb!c::lambda-var-indirect var)
+              (setf (indirect-value
+                     (eval-stack-local frame-ptr (sb!c::lambda-var-info var)))
+                      value))
+            (t
+              (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
+                      value))))))
 
 ;;; This figures out how to return a value for a ref node. Leaf is the ref's
 ;;; structure that tells us about the value, and it is one of the following

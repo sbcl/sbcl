@@ -2047,7 +2047,7 @@ bootstrapping.
 ;;; into the 'real' arguments. This is where the syntax of DEFMETHOD
 ;;; is really implemented.
 (defun parse-defmethod (cdr-of-form)
-  ;;(declare (values name qualifiers specialized-lambda-list body))
+  (declare (list cdr-of-form))
   (let ((name (pop cdr-of-form))
 	(qualifiers ())
 	(spec-ll ()))
@@ -2057,7 +2057,11 @@ bootstrapping.
     (setq spec-ll (pop cdr-of-form))
     (values name qualifiers spec-ll cdr-of-form)))
 
+;;; MNA: cmucl-commit: Tue, 19 Dec 2000 06:26:31 -0800 (PST)
+;;; Add a defensive declaration to PARSE-SPECIALIZERS.
+
 (defun parse-specializers (specializers)
+  (declare (list specializers))
   (flet ((parse (spec)
 	   (let ((result (specializer-from-type spec)))
 	     (if (specializerp result)

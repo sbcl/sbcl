@@ -60,6 +60,16 @@
 	     (sym (make-instance-function-symbol key)))
 	(push key *make-instance-function-keys*)
 	(when sym
+          ;; MNA: cmucl-commit Sat, 27 Jan 2001 07:07:45 -0800 (PST)
+          ;; Silence compiler warnings about undefined function
+          ;; <hairy-make-instance-name>
+          ;; when compiling a method containing a make-instance call.
+          (progn ;; Lifted from c::%%defun.
+            (sb-c::proclaim-as-function-name sym)
+	    (when (eq (sb-int:info :function :where-from sym) :assumed)
+	      (setf (sb-int:info :function :where-from sym) :defined)
+	      (when (sb-int:info :function :assumed-type sym)
+		(setf (sb-int:info :function :assumed-type sym) nil))))
 	  `(,sym ',class (list ,@initargs)))))))
 
 (defmacro expanding-make-instance-top-level (&rest forms &environment env)
@@ -683,7 +693,7 @@
 (defvar *note-iis-entry-p* nil)
 
 (defvar *compiled-initialize-instance-simple-functions*
-  (make-hash-table :test 'equal))
+  (make-hash-table :test #'equal))
 
 (defun initialize-instance-simple-function (use info class form-list)
   (let* ((pv-cell (get-pv-cell-for-class class))
