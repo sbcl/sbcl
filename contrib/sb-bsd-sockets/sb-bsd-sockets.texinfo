@@ -1,0 +1,166 @@
+@node sb-bsd-sockets
+@section sb-bsd-sockets
+@cindex Sockets, Networking
+
+The @code{sb-bsd-sockets} module provides a thinly disguised BSD socket
+API for SBCL. Ideas stolen from the BSD socket API for C and Graham
+Barr's IO::Socket classes for Perl.
+
+Sockets are represented as CLOS objects, and the API naming
+conventions attempt to balance between the BSD names and good lisp style.
+
+@menu
+* Sockets Overview::
+* General Sockets::      Methods applicable to all sockets
+* Socket Options::
+* INET Domain Sockets::
+* Local (Unix) Domain Sockets::
+* Name Service::
+@end menu
+
+@node Sockets Overview
+@subsection Sockets Overview
+
+Most of the functions are modelled on the BSD socket API.  BSD sockets
+are widely supported, portably @emph{(``portable'' by Unix standards, at least)}
+available on a variety of systems, and documented.  There are some
+differences in approach where we have taken advantage of some of the
+more useful features of Common Lisp - briefly:
+
+@itemize
+
+@item
+Where the C API would typically return -1 and set @code{errno},
+@code{sb-bsd-sockets} signals an error. All the errors are subclasses
+of @code{sb-bsd-sockets:socket-condition} and generally correspond one
+for one with possible @code{errno} values.
+
+@item 
+We use multiple return values in many places where the C API would use
+pass-by-reference values.
+
+@item
+We can often avoid supplying an explicit @emph{length} argument to
+functions because we already know how long the argument is.
+
+@item
+IP addresses and ports are represented in slightly friendlier fashion
+than "network-endian integers".
+
+@end itemize
+
+@node General Sockets
+@subsection General Sockets
+
+@include class-sb-bsd-sockets-socket.texinfo
+
+@include fun-sb-bsd-sockets-socket-bind.texinfo
+
+@include fun-sb-bsd-sockets-socket-accept.texinfo
+
+@include fun-sb-bsd-sockets-socket-connect.texinfo
+
+@include fun-sb-bsd-sockets-socket-peername.texinfo
+
+@include fun-sb-bsd-sockets-socket-name.texinfo
+
+@include fun-sb-bsd-sockets-socket-receive.texinfo
+
+@include fun-sb-bsd-sockets-socket-listen.texinfo
+
+@include fun-sb-bsd-sockets-socket-close.texinfo
+
+@include fun-sb-bsd-sockets-socket-make-stream.texinfo
+
+@include fun-sb-bsd-sockets-socket-error.texinfo
+
+@include fun-sb-bsd-sockets-non-blocking-mode.texinfo
+
+@node Socket Options
+@subsection Socket Options
+
+A subset of socket options are supported, using a fairly general
+framework which should make it simple to add more as required - see
+@file{SYS:CONTRIB;SB-BSD-SOCKETS:SOCKOPT.LISP} for details. The name
+mapping from C is fairly straightforward: @code{SO_RCVLOWAT} becomes
+@code{sockopt-receive-low-water} and @code{(setf
+sockopt-receive-low-water)}.
+
+@include fun-sb-bsd-sockets-sockopt-reuse-address.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-keep-alive.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-oob-inline.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-bsd-compatible.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-pass-credentials.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-debug.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-dont-route.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-broadcast.texinfo
+
+@include fun-sb-bsd-sockets-sockopt-tcp-nodelay.texinfo
+
+@node INET Domain Sockets
+@subsection INET Domain Sockets
+
+The TCP and UDP sockets that you know and love. Some representation
+issues:
+
+@itemize
+
+@item
+Internet addresses are represented by vectors of (unsigned-byte 8) -
+viz. #(127 0 0 1). Ports are just integers: 6010. No conversion
+between network- and host-order data is needed from the user of this
+package.
+
+@item
+Socket addresses are represented by the two values for address and
+port, so for example, (socket-connect s #(192 168 1 1) 80).
+
+@end itemize
+
+@include class-sb-bsd-sockets-inet-socket.texinfo
+
+@include fun-sb-bsd-sockets-make-inet-address.texinfo
+
+@include fun-sb-bsd-sockets-get-protocol-by-name.texinfo
+
+@node Local (Unix) Domain Sockets
+@subsection Local (Unix) Domain Sockets
+
+Local domain (@code{AF_LOCAL}) sockets are also known as Unix-domain
+sockets, but were renamed by POSIX presumably on the basis that they
+may be available on other systems too.
+                                                                                
+A local socket address is a string, which is used to create a node in
+the local filesystem. This means of course that they cannot be used
+across a network.
+
+@include class-sb-bsd-sockets-local-socket.texinfo
+
+@node Name Service
+@subsection Name Service
+
+Presently name service is implemented by calling whatever
+@code{gethostbyname(2)} uses. This may be any or all of
+@file{/etc/hosts}, NIS, DNS, or something completely different.
+Typically it's controlled by @file{/etc/nsswitch.conf}.
+                                                                                
+Direct links to the asynchronous @code{resolver(3)} routines would be
+nice to have eventually, so that we can do DNS lookups in parallel
+with other things
+
+@include class-sb-bsd-sockets-host-ent.texinfo
+
+@include fun-sb-bsd-sockets-get-host-by-name.texinfo
+
+@include fun-sb-bsd-sockets-get-host-by-address.texinfo
+
+@include fun-sb-bsd-sockets-host-ent-address.texinfo
+
+@include fun-sb-bsd-sockets-name-service-error.texinfo
