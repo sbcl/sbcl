@@ -50,7 +50,7 @@
   "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
   (c-strings->string-list (wrapped-environ)))
 
-;;; Convert as best we can from a SBCL representation of a Unix
+;;; Convert as best we can from an SBCL representation of a Unix
 ;;; environment to a CMU CL representation.
 ;;;
 ;;; * (UNIX-ENVIRONMENT-CMUCL-FROM-SBCL '("Bletch=fub" "Noggin" "YES=No!"))

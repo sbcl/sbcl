@@ -759,3 +759,13 @@
 		   (dolist (ref (leaf-refs var))
 		     (derive-node-type ref type)))))
 	  t))))))
+
+(defun check-catch-tag-type (tag)
+  (declare (type continuation tag))
+  (let ((ctype (continuation-type tag)))
+    (when (csubtypep ctype (specifier-type '(or number character)))
+      (compiler-style-warn "~@<using ~S of type ~S as a catch tag (which ~
+                            tends to be unportable because THROW and CATCH ~
+                            use EQ comparison)~@:>"
+			   (continuation-source tag)
+			   (type-specifier (continuation-type tag))))))

@@ -92,7 +92,7 @@
 ;;; tag, and link the block into the CURRENT-CATCH list
 (define-vop (make-catch-block)
   (:args (tn)
-	 (tag :scs (descriptor-reg) :to (:result 1)))
+	 (tag :scs (any-reg descriptor-reg) :to (:result 1)))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:sc descriptor-reg) temp)

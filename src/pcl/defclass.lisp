@@ -116,10 +116,12 @@
                   (eval-when (:compile-toplevel :load-toplevel :execute)
                     ,defclass-form)))
 	      `(progn
-                ;; By telling the type system at compile time about
-                ;; the existence of a class named NAME, we can avoid
-                ;; various bogus warnings about "type isn't defined yet".
-                ,(when (and
+		 ;; By telling the type system at compile time about
+		 ;; the existence of a class named NAME, we can avoid
+		 ;; various bogus warnings about "type isn't defined yet"
+		 ;; for code elsewhere in the same file which uses
+		 ;; the name of the type.
+		 ,(when (and
 			 ;; But it's not so important to get rid of
 			 ;; "not defined yet" warnings during
 			 ;; bootstrapping, and machinery like
@@ -143,7 +145,7 @@
                          ;; Later, INFORM-TYPE-SYSTEM-ABOUT-STD-CLASS is
                          ;; called by way of LOAD-DEFCLASS (calling
                          ;; ENSURE-CLASS-USING-CLASS) to establish the 'real'
-                         ;; type predicate.                         
+                         ;; type predicate.
                          (inform-type-system-about-std-class ',name)))
                 ,defclass-form))))))))
 

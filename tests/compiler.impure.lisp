@@ -52,5 +52,12 @@
 	       (setq x nil))))
       (when (and (digs) (digs)) x))))
 
+;;; Bug 132: The compiler used to fail to compile INTEGER-valued CATCH
+;;; tags. This was fixed by Alexey Dejneka in sbcl-0.7.1.14. (They're
+;;; still a bad idea because tags are compared with EQ, but now it's a
+;;; compiler warning instead of a failure to compile.)
+(defun foo ()
+  (catch 0 (print 1331)))
+
 ;;; success
 (quit :unix-status 104)

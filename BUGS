@@ -1061,20 +1061,6 @@ WORKAROUND:
   arguments in FLET/LABELS: it might be an old Python bug which is 
   only exercised by the new arrangement of the SBCL compiler.)
 
-132:
-  Trying to compile 
-    (DEFUN FOO () (CATCH 0 (PRINT 1331)))
-  gives an error
-    #<SB-C:TN '0!1> is not valid as the second argument to VOP:
-      SB-C:MAKE-CATCH-BLOCK,
-    since the TN's primitive type SB-VM::POSITIVE-FIXNUM doesn't allow
-    any of the SCs allowed by the operand restriction:
-     (SB-VM::DESCRIPTOR-REG)
-  The (CATCH 0 ...) construct is bad style (because of unportability
-  of EQ testing of numbers) but it is legal, and shouldn't cause an
-  internal compiler error. (This error occurs in sbcl-0.6.13 and in
-  0.pre7.86.flaky7.14.)
-
 135:
   Ideally, uninterning a symbol would allow it, and its associated
   FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However, 

@@ -1370,6 +1370,7 @@
 (defun ir2-convert-throw (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (let ((args (basic-combination-args node)))
+    (check-catch-tag-type (first args))
     (vop* throw node block
 	  ((continuation-tn node block (first args))
 	   (reference-tn-list
@@ -1430,6 +1431,7 @@
 
 ;;; Set up the unwind block for these guys.
 (defoptimizer (%catch ir2-convert) ((info-cont tag) node block)
+  (check-catch-tag-type tag)
   (emit-nlx-start node block (continuation-value info-cont) tag))
 (defoptimizer (%unwind-protect ir2-convert) ((info-cont cleanup) node block)
   (emit-nlx-start node block (continuation-value info-cont) nil))
