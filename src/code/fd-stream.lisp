@@ -531,11 +531,9 @@
     (multiple-value-bind (count errno)
 	;; XXX XXX XXX a bogus check-unsigned-byte-32 is emitted here
 	;; on amd64. Kludge around it with (safety 0) until problem is solved.
-	(locally
-	    (declare (optimize (safety 0)))
-	  (sb!unix:unix-read fd
-			     (sb!sys:int-sap (+ (sb!sys:sap-int ibuf-sap) tail))
-			     (- buflen tail)))
+	(sb!unix:unix-read fd
+			   (sb!sys:int-sap (+ (sb!sys:sap-int ibuf-sap) tail))
+			   (- buflen tail))
       (cond ((null count)
 	     (if (eql errno sb!unix:ewouldblock)
 		 (progn

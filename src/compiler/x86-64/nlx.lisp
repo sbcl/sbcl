@@ -211,7 +211,7 @@
     ;; Copy them down.
     (inst std)
     (inst rep)
-    (inst movs :dword)
+    (inst movs :qword)
 
     DONE
     ;; Reset the CSP at last moved arg.

@@ -61,7 +61,7 @@
     (inst add res y)
     (inst jmp :no OKAY)
     (inst rcr res 1)		      ; carry has correct sign
-    (inst sar res 1)		      ; remove type bits
+    (inst sar res 2)		      ; remove type bits
 
     (move rcx res)
 
@@ -81,7 +81,7 @@
     (inst sub res y)
     (inst jmp :no OKAY)
     (inst rcr res 1)
-    (inst sar res 1)		      ; remove type bits
+    (inst sar res 2)		      ; remove type bits
 
     (move rcx res)
 

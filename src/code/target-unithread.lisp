@@ -16,11 +16,11 @@
 (defun sb!vm::current-thread-offset-sap (n) 
   (declare (type (unsigned-byte 27) n))
   (sb!sys:sap-ref-sap (alien-sap (extern-alien "all_threads" (* t))) 
-	       (* n 4)))
+	       (* n sb!vm:n-word-bytes)))
 
 (defun current-thread-id ()
   (sb!sys:sap-ref-32 (alien-sap (extern-alien "all_threads" (* t))) 
-	       (* sb!vm::thread-pid-slot 4)))
+	       (* sb!vm::thread-pid-slot sb!vm:n-word-bytes)))
 
 (defun reap-dead-threads ())
 

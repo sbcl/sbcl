@@ -43,12 +43,13 @@
 
 (defknown sap+ (system-area-pointer integer) system-area-pointer
   (movable flushable))
-(defknown sap- (system-area-pointer system-area-pointer) (signed-byte 32)
+(defknown sap- (system-area-pointer system-area-pointer) 
+               (signed-byte #.sb!vm::n-word-bits)
   (movable flushable))
 
-(defknown sap-int (system-area-pointer) (unsigned-byte #!-alpha 32 #!+alpha 64)
+(defknown sap-int (system-area-pointer) (unsigned-byte #.sb!vm::n-word-bits)
   (movable flushable))
-(defknown int-sap ((unsigned-byte #!-alpha 32 #!+alpha 64))
+(defknown int-sap ((unsigned-byte #.sb!vm::n-word-bits))
   system-area-pointer (movable))
 
 (defknown sap-ref-8 (system-area-pointer fixnum) (unsigned-byte 8)
