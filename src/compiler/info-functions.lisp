@@ -42,6 +42,12 @@
   (check-fun-name name)
 
   ;; scrubbing old data I: possible collision with old definition
+  ;;
+  ;; only do this on the target, as we shouldn't do any of this in our
+  ;; own build, and further we will want to reason about function
+  ;; names which don't make sense in the context of the host compiler
+  ;; (FBOUNDP will signal an error).
+  #-sb-xc-host
   (when (fboundp name)
     (ecase (info :function :kind name)
       (:function) ; happy case

@@ -13,7 +13,6 @@
 
 ;;;; general warm init compilation policy
 
-
 (proclaim '(optimize (compilation-speed 1)
 		     (debug #+sb-show 2 #-sb-show 1)
 		     (inhibit-warnings 2)
@@ -105,8 +104,8 @@
 		#+nil "src/pcl/low"
                 #+nil "src/pcl/slot-name"
 		#+nil "src/pcl/fngen"
-		"src/pcl/defclass"
-		"src/pcl/defs"
+		#+nil "src/pcl/defclass"
+		#+nil "src/pcl/defs"
 		"src/pcl/cache"
 		"src/pcl/dlisp"
 		"src/pcl/dlisp2"

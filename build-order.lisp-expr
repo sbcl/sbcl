@@ -667,4 +667,6 @@
  ("src/pcl/target-low" :not-host)
  ("src/pcl/slot-name")
  ("src/pcl/fngen")
+ ("src/pcl/defclass")
+ ("src/pcl/defs")
  )

@@ -315,7 +315,7 @@
   (declare (ignore slot-names))
   (setf (slot-value specl 'type) `(eql ,(specializer-object specl))))
 
-(defun real-load-defclass (name metaclass-name supers slots other)
+(defun load-defclass (name metaclass-name supers slots other)
   (let ((res (apply #'ensure-class name :metaclass metaclass-name
 		    :direct-superclasses supers
 		    :direct-slots slots
@@ -327,8 +327,6 @@
     ;; does not yet exist. Maybe should return NIL in that case as RES
     ;; is not useful to the user?
     (and (class-wrapper res) (sb-kernel:layout-class (class-wrapper res)))))
-
-(setf (gdefinition 'load-defclass) #'real-load-defclass)
 
 (defun ensure-class (name &rest all)
   (apply #'ensure-class-using-class name (find-class name nil) all))
