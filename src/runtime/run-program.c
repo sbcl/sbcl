@@ -19,9 +19,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#if defined(SVR4) || defined(__linux__)
 #include <unistd.h>
-#endif
 
 #include <sys/ioctl.h>
 #include <termios.h>

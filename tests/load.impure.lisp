@@ -33,3 +33,5 @@
              (assert (not (array-has-fill-pointer-p *array*)))))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
+
+(quit :unix-status 104)

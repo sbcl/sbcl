@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sched.h>
 #include <signal.h>
 #include <stddef.h>

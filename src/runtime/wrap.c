@@ -36,8 +36,10 @@
 #include "sbcl.h"
 #include "util.h"
 
-/* KLUDGE: Neither the OpenBSD nor the Linux man page give a header
- * file to find this in (?). -- WHN 2002-02-07 */
+/* Although it might seem as though this should be in some standard
+   Unix header, according to Perry E. Metzger, in a message on
+   sbcl-devel dated 2004-03-29, this is the POSIXly-correct way of
+   using environ: by an explicit declaration.  -- CSR, 2004-03-30 */
 extern char **environ;
    
 /*
