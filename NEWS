@@ -980,12 +980,20 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
 * The fasl file version number changed again, for dozens of reasons,
   some of which are apparent above.
 
-changes in sbcl-0.7.0 relative to sbcl-0.6.13:
-* various bug fixes, notably:
-  ** DEFGENERIC is now choosier about the methods it redefines, so
-     reLOADing a previously-LOADed file containing DEFGENERICs does
-     the right thing now, so now the Lispy edit/reLOAD-a-little/test
-     cycle works as it should. (thanks to APD)
+changes in sbcl-0.7.1 relative to sbcl-0.7.0:
+* SB-ALIEN:LOAD-FOREIGN and SB-ALIEN:LOAD-1-FOREIGN are set
+  up properly again. (There was a packaging bug in 0.7.0 which
+  left their definitions in SB-SYS::LOAD-FOREIGN and 
+  SB-SYS::LOAD-1-FOREIGN.)
+* DEFGENERIC is now choosier about the methods it redefines, so that
+  reLOADing a previously-LOADed file containing DEFGENERICs does
+  the right thing now. Thus, the Lispy edit/reLOAD-a-little/test
+  cycle now works as it should. (thanks to Alexey Dejneka)
+* Bug 106 (types (COMPLEX FOO) where FOO is an obscure type) was
+  fixed by Christophe Rhodes. (He actually submitted this patch
+  months ago, and I delayed until after 0.7.0.)
+* Bug 111 (internal compiler confusion about runtime checks on
+  FUNCTION types) was fixed by Alexey Dejneka.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

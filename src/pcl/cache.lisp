@@ -1353,8 +1353,9 @@
 ;;; KLUDGE: Isn't something very similar going on in precom1.lisp? Do
 ;;; we need it both here and there? Why? -- WHN 19991203
 (eval-when (:load-toplevel)
-  (dolist (n-size '((1 513)(3 257)(3 129)(14 128)(6 65)(2 64)(7 33)(16 32)
-		    (16 17)(32 16)(64 9)(64 8)(6 5)(128 4)(35 2)))
+  (dolist (n-size '((1 513) (3 257) (3 129) (14 128) (6 65)
+		    (2 64) (7 33) (16 32) (16 17) (32 16)
+		    (64 9) (64 8) (6 5) (128 4) (35 2)))
     (let ((n (car n-size))
 	  (size (cadr n-size)))
       (mapcar #'free-cache-vector

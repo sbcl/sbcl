@@ -43,7 +43,7 @@
 
 (defun expand-make-instance-form (form)
   (let ((class (cadr form)) (initargs (cddr form))
-	(keys nil)(allow-other-keys-p nil) key value)
+	(keys nil) (allow-other-keys-p nil) key value)
     (when (and (constant-symbol-p class)
 	       (let ((initargs-tail initargs))
 		 (loop (when (null initargs-tail) (return t))

@@ -56,9 +56,9 @@
      (node-derived-type (continuation-use cont)))))
 
 ;;; Our best guess for the type of this continuation's value. Note
-;;; that this may be Values or Function type, which cannot be passed
+;;; that this may be VALUES or FUNCTION type, which cannot be passed
 ;;; as an argument to the normal type operations. See
-;;; Continuation-Type. This may be called on deleted continuations,
+;;; CONTINUATION-TYPE. This may be called on deleted continuations,
 ;;; always returning *.
 ;;;
 ;;; What we do is call CONTINUATION-PROVEN-TYPE and check whether the
@@ -84,6 +84,18 @@
     (cond ((values-subtypep proven asserted)
 	   (setf (continuation-%type-check cont) nil)
 	   (setf (continuation-%derived-type cont) proven))
+          ((and (values-subtypep proven (specifier-type 'function))
+                (values-subtypep asserted (specifier-type 'function)))
+	   ;; It's physically impossible for a runtime type check to
+	   ;; distinguish between the various subtypes of FUNCTION, so
+	   ;; it'd be pointless to do more type checks here.
+           (setf (continuation-%type-check cont) nil)
+           (setf (continuation-%derived-type cont)
+		 ;; FIXME: This should depend on optimization
+		 ;; policy. This is for SPEED > SAFETY:
+                 #+nil (values-type-intersection asserted proven)
+                 ;; and this is for SAFETY >= SPEED:
+                 #-nil proven))
 	  (t
 	   (unless (or (continuation-%type-check cont)
 		       (not (continuation-dest cont))

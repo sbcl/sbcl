@@ -255,21 +255,24 @@ WORKAROUND:
 45:
   a slew of floating-point-related errors reported by Peter Van Eynde
   on July 25, 2000:
-	a: (fixed in sbcl-0.6.11.25)
 	b: SBCL's value for LEAST-POSITIVE-SHORT-FLOAT is bogus, and 
 	   should probably be 1.4012985e-45. In SBCL,
 	   (/ LEAST-POSITIVE-SHORT-FLOAT 2) returns a number smaller
 	   than LEAST-POSITIVE-SHORT-FLOAT. Similar problems 
 	   exist for LEAST-NEGATIVE-SHORT-FLOAT, LEAST-POSITIVE-LONG-FLOAT,
 	   and LEAST-NEGATIVE-LONG-FLOAT.
-	c: Many expressions generate floating infinity:
+	c: Many expressions generate floating infinity on x86/Linux:
 		(/ 1 0.0)
 		(/ 1 0.0d0)
 		(EXPT 10.0 1000)
 		(EXPT 10.0d0 1000)
-	   PVE's regression tests want them to raise errors. SBCL
-	   generates the infinities instead, which may or may not be
-	   conforming behavior.
+	   PVE's regression tests want them to raise errors. sbcl-0.7.0.5
+	   on x86/Linux generates the infinities instead. That might or
+	   might not be conforming behavior, but it's also inconsistent,
+           which is almost certainly wrong. (Inconsistency: (/ 1 0.0)
+	   should give the same result as (/ 1.0 0.0), but instead (/ 1 0.0)
+	   generates SINGLE-FLOAT-POSITIVE-INFINITY and (/ 1.0 0.0)
+	   signals an error.
 	d: (in section12.erg) various forms a la 
 		(FLOAT 1 DOUBLE-FLOAT-EPSILON)
 	   don't give the right behavior.
@@ -331,7 +334,7 @@ WORKAROUND:
 	d: In general, the system doesn't like '(INTEGER (0) (0)) -- it
 	   blows up at the level of SPECIFIER-TYPE with
 	   "Lower bound (0) is greater than upper bound (0)." Probably
-	   SPECIFIER-TYPE should return NIL instead.
+	   SPECIFIER-TYPE should return the NIL type instead.
 	g: The type system isn't all that smart about relationships
 	   between hairy types, as shown in the type.erg test results,
 	   e.g. (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL.
@@ -801,20 +804,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   (not the SIGBUS reported in the comment) but that's broken too; 
   type declarations are supposed to be treated as assertions unless
   SAFETY 0, so we should be getting a TYPE-ERROR.
-
-111:
-  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
-  collection:
-    (in-package :cl-user)
-    ;;; Produces an assertion failures when compiled.
-    (defun foo (z)
-      (declare (type (or (function (t) t) null) z))
-      (let ((z (or z #'identity)))
-        (declare (type (function (t) t) z))
-        (funcall z 1)))
-  The error in sbcl-0.6.12.42 is
-    internal error, failed AVER:
-      "(COMMON-LISP:NOT (COMMON-LISP:EQ SB!C::CHECK COMMON-LISP:T))"
 
 112:
   reported by Martin Atzmueller 2001-06-25; taken from CMU CL bugs

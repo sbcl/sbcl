@@ -491,37 +491,51 @@ Function and macro commands:
 ;;; lambda-list variables since any other arguments will be in the
 ;;; &REST arg's list of values.
 (defun print-frame-call-1 (frame)
-  (let* ((d-fun (sb!di:frame-debug-fun frame))
-	 (loc (sb!di:frame-code-location frame))
-	 (results (list (sb!di:debug-fun-name d-fun))))
+  (let ((debug-fun (sb!di:frame-debug-fun frame))
+	(loc (sb!di:frame-code-location frame))
+	(reversed-args nil))
+
+    ;; Construct function arguments in REVERSED-ARGS.
     (handler-case
-	(dolist (ele (sb!di:debug-fun-lambda-list d-fun))
+	(dolist (ele (sb!di:debug-fun-lambda-list debug-fun))
 	  (lambda-list-element-dispatch ele
-	    :required ((push (frame-call-arg ele loc frame) results))
-	    :optional ((push (frame-call-arg (second ele) loc frame) results))
-	    :keyword ((push (second ele) results)
-		      (push (frame-call-arg (third ele) loc frame) results))
-	    :deleted ((push (frame-call-arg ele loc frame) results))
+	    :required ((push (frame-call-arg ele loc frame) reversed-args))
+	    :optional ((push (frame-call-arg (second ele) loc frame)
+			     reversed-args))
+	    :keyword ((push (second ele) reversed-args)
+		      (push (frame-call-arg (third ele) loc frame)
+			    reversed-args))
+	    :deleted ((push (frame-call-arg ele loc frame) reversed-args))
 	    :rest ((lambda-var-dispatch (second ele) loc
 		     nil
 		     (progn
-		       (setf results
+		       (setf reversed-args
 			     (append (reverse (sb!di:debug-var-value
 					       (second ele) frame))
-				     results))
+				     reversed-args))
 		       (return))
 		     (push (make-unprintable-object
 			    "unavailable &REST argument")
-			   results)))))
+			   reversed-args)))))
       (sb!di:lambda-list-unavailable
        ()
-       (push (make-unprintable-object "lambda list unavailable") results)))
-    (pprint-logical-block (*standard-output* nil)
-      (let ((x (nreverse (mapcar #'ensure-printable-object results))))
-	(format t "(~@<~S~{ ~_~S~}~:>)" (first x) (rest x))))
-    (when (sb!di:debug-fun-kind d-fun)
+       (push (make-unprintable-object "lambda list unavailable")
+	     reversed-args)))
+
+    (pprint-logical-block (*standard-output* nil :prefix "(" :suffix ")")
+      (let ((args (nreverse (mapcar #'ensure-printable-object reversed-args))))
+	;; Since we go to some trouble to make nice informative function
+	;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
+	;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
+	(let ((*print-length* nil)
+	      (*print-level* nil))
+	  (prin1 (ensure-printable-object (sb!di:debug-fun-name debug-fun))))
+	;; For the function arguments, we can just print normally.
+	(format t "~{ ~_~S~}" args)))
+
+    (when (sb!di:debug-fun-kind debug-fun)
       (write-char #\[)
-      (prin1 (sb!di:debug-fun-kind d-fun))
+      (prin1 (sb!di:debug-fun-kind debug-fun))
       (write-char #\]))))
 
 (defun ensure-printable-object (object)

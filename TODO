@@ -1,8 +1,5 @@
 for early 0.7.x:
 
-* patches postponed until after 0.7.0:
-	** CSR "rough patch to fix bug 106" 2001-10-28
-	** Alexey Dejneka "bug 111" 2001-12-30
 * building with CLISP (or explaining why not). This will likely involve
 	a rearrangement of the build system so that it never renames
 	the output from COMPILE-FILE, because CLISP's COMPILE-FILE
@@ -11,7 +8,7 @@ for early 0.7.x:
 	besides CLISPiosyncrasies, I'm reasonably motivated to do it.
 * urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
-	** (also, while working on INLINE anyway, it should be easy
+	** (also, while working on INLINE anyway, it might be easy
 		to flush the old MAYBE-INLINE cruft entirely, 
 		including e.g. on the man page)
 	** fixed bug 137 (more)

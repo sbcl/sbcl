@@ -811,20 +811,6 @@
 	       walked-arglist
 	       walked-body))))
 
-(defun walk-named-lambda (form context old-env)
-  (walker-environment-bind (new-env old-env)
-    (let* ((name (cadr form))
-	   (arglist (caddr form))
-	   (body (cdddr form))
-	   (walked-arglist (walk-arglist arglist context new-env))
-	   (walked-body
-	     (walk-declarations body #'walk-repeat-eval new-env)))
-      (relist* form
-	       (car form)
-	       name
-	       walked-arglist
-	       walked-body))))
-
 (defun walk-setq (form context env)
   (if (cdddr form)
       (let* ((expanded (let ((rforms nil)

@@ -290,7 +290,7 @@
 	     (slot-name-lists (pv-table-slot-name-lists pv-table))
 	     (pv-size (pv-table-pv-size pv-table))
 	     (pv-map (make-array pv-size :initial-element nil)))
-	(let ((map-index 1)(param-index 0))
+	(let ((map-index 1) (param-index 0))
 	  (dolist (slot-name-list slot-name-lists)
 	    (dolist (slot-name (cdr slot-name-list))
 	      (let ((a (assoc slot-name new-values)))
@@ -917,8 +917,13 @@
   ;; don't *think* CMU CL had, or SBCL has, VALUES declarations. If
   ;; SBCL doesn't have 'em, VALUES should probably be removed from
   ;; this list.
-  '(values %method-name %method-lambda-list
-    optimize ftype inline notinline))
+  '(values
+    %method-name
+    %method-lambda-list
+    optimize
+    ftype
+    inline
+    notinline))
 
 (defvar *var-declarations-with-arg*
   '(%class
@@ -987,7 +992,7 @@
 			(if (member var args)
 			    ;; Quietly remove IGNORE declarations on
 			    ;; args when a next-method is involved, to
-			    ;; prevent compiler warns about ignored
+			    ;; prevent compiler warnings about ignored
 			    ;; args being read.
 			    (unless (and calls-next-method-p
 					 (eq (car dname) 'ignore))
@@ -1000,9 +1005,34 @@
 	  (setq body (cdr body)))
     (values outer-decls inner-decls body)))
 
+;;; Pull a name out of the %METHOD-NAME declaration in the function
+;;; body given, or return NIL if no %METHOD-NAME declaration is found.
+(defun body-method-name (body)
+  (multiple-value-bind (documentation declarations real-body)
+      (extract-declarations body nil)
+    (declare (ignore documentation real-body))
+    (let ((name-decl (get-declaration '%method-name declarations)))
+      (and name-decl
+	   (destructuring-bind (name) name-decl
+	     name)))))
+
+;;; Convert a lambda expression containing a SB-PCL::%METHOD-NAME
+;;; declaration (which is a naming style internal to PCL) into an
+;;; SB-INT:NAMED-LAMBDA expression (which is a naming style used
+;;; throughout SBCL, understood by the main compiler); or if there's
+;;; no SB-PCL::%METHOD-NAME declaration, then just return the original
+;;; lambda expression.
+(defun name-method-lambda (method-lambda)
+  (let ((method-name (body-method-name (cddr method-lambda))))
+    (if method-name
+	`(named-lambda ,method-name ,(rest method-lambda))
+	method-lambda)))
+
 (defun make-method-initargs-form-internal (method-lambda initargs env)
   (declare (ignore env))
-  (let (method-lambda-args lmf lmf-params)
+  (let (method-lambda-args
+	lmf ; becomes body of function
+	lmf-params)
     (if (not (and (= 3 (length method-lambda))
 		  (= 2 (length (setq method-lambda-args (cadr method-lambda))))
 		  (consp (setq lmf (third method-lambda)))
@@ -1011,15 +1041,20 @@
 		      (cadr (setq lmf-params (cadr lmf))))
 		  (eq (cadr method-lambda-args)
 		      (caddr lmf-params))))
-	`(list* :function #',method-lambda
+	`(list* :function ,(name-method-lambda method-lambda)
 		',initargs)
 	(let* ((lambda-list (car lmf-params))
-	       (nreq 0)(restp nil)(args nil))
+	       (nreq 0)
+	       (restp nil)
+	       (args nil))
 	  (dolist (arg lambda-list)
 	    (when (member arg '(&optional &rest &key))
-	      (setq restp t)(return nil))
-	    (when (eq arg '&aux) (return nil))
-	    (incf nreq)(push arg args))
+	      (setq restp t)
+	      (return nil))
+	    (when (eq arg '&aux)
+	      (return nil))
+	    (incf nreq)
+	    (push arg args))
 	  (setq args (nreverse args))
 	  (setf (getf (getf initargs :plist) :arg-info) (cons nreq restp))
 	  (make-method-initargs-form-internal1
@@ -1027,31 +1062,36 @@
 
 (defun make-method-initargs-form-internal1
     (initargs body req-args lmf-params restp)
-  (multiple-value-bind (outer-decls inner-decls body)
+  (multiple-value-bind (outer-decls inner-decls body-sans-decls)
       (split-declarations
        body req-args (getf (cdr lmf-params) :call-next-method-p))
     (let* ((rest-arg (when restp '.rest-arg.))
 	   (args+rest-arg (if restp
 			      (append req-args (list rest-arg))
 			      req-args)))
-      `(list* :fast-function
-	(lambda (.pv-cell. .next-method-call. ,@args+rest-arg)
-	  (declare (ignorable .pv-cell. .next-method-call.))
-	  ,@outer-decls
-	  (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
-			      &rest forms)
-		       (declare (ignore pv-table-symbol pv-parameters))
-		       `(let ((,pv (car .pv-cell.))
-			      (,calls (cdr .pv-cell.)))
-			  (declare ,(make-pv-type-declaration pv)
-				   ,(make-calls-type-declaration calls))
-			  ,pv ,calls
-			  ,@forms)))
-	    (fast-lexical-method-functions
-	     (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
-	      ,@(cdddr lmf-params))
-	     ,@inner-decls
-	     ,@body)))
+      `(list*
+	:fast-function
+	(named-lambda
+	 ,(or (body-method-name body) '.method.) ; function name
+	 (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
+	 ;; body of the function
+	 (declare (ignorable .pv-cell. .next-method-call.))
+	 ,@outer-decls
+	 (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
+			     &rest forms)
+			    (declare (ignore pv-table-symbol
+					     pv-parameters))
+			    `(let ((,pv (car .pv-cell.))
+				   (,calls (cdr .pv-cell.)))
+			       (declare ,(make-pv-type-declaration pv)
+					,(make-calls-type-declaration calls))
+			       ,pv ,calls
+			       ,@forms)))
+	   (fast-lexical-method-functions
+	    (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
+	     ,@(cdddr lmf-params))
+	    ,@inner-decls
+	    ,@body-sans-decls)))
 	',initargs))))
 
 ;;; Use arrays and hash tables and the fngen stuff to make this much

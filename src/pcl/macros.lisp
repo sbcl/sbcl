@@ -29,11 +29,14 @@
 (/show "starting pcl/macros.lisp")
 
 (declaim (declaration
-	  ;; These three nonstandard declarations seem to be used
-	  ;; privately within PCL itself to pass information around,
-	  ;; so we can't just delete them.
-	  %class
+	  ;; As of sbcl-0.7.0.6, SBCL actively uses this declaration
+	  ;; to propagate information needed to set up nice debug
+	  ;; names (as seen e.g. in BACKTRACE) for method functions.
 	  %method-name
+	  ;; These nonstandard declarations seem to be used privately
+	  ;; within PCL itself to pass information around, so we can't
+	  ;; just delete them.
+	  %class
 	  %method-lambda-list
 	  ;; This declaration may also be used within PCL to pass
 	  ;; information around, I'm not sure. -- WHN 2000-12-30

@@ -441,29 +441,32 @@
 ;;; except that the value of NAME is passed to the compiler for use in
 ;;; creation of debug information for the resulting function.
 ;;;
-;;; Eventually we might use this for NAME values other than legal
-;;; function names, e.g.
+;;; NAME can be a legal function name or some arbitrary other thing.
+;;;
+;;; If NAME is a legal function name, then the caller should be
+;;; planning to set (FDEFINITION NAME) to the created function.
+;;; (Otherwise the debug names will be inconsistent and thus
+;;; unnecessarily confusing.)
+;;;
+;;; Arbitrary other things are appropriate for naming things which are
+;;; not the FDEFINITION of NAME. E.g.
 ;;;   NAME = (:FLET FOO BAR)
 ;;; for the FLET function in
 ;;;   (DEFUN BAR (X)
 ;;;     (FLET ((FOO (Y) (+ X Y)))
 ;;;       FOO))
 ;;; or
-;;;   NAME = (:METHOD PRINT-OBJECT (STARSHIP T))
+;;;   NAME = (:METHOD PRINT-OBJECT :AROUND (STARSHIP T))
 ;;; for the function used to implement
-;;;   (DEFMETHOD PRINT-OBJECT ((SS STARSHIP) STREAM) ...).
-;;; However, as of this writing (while defining/implementing it in
-;;; sbcl-0.pre7.108) NAME is always a legal function name.
-;;;
-;;; If NAME is a legal function name, then the caller should be
-;;; planning to set (FDEFINITION NAME) to the created function.
-;;; (Otherwise the debug names will be inconsistent and thus
-;;; unnecessarily confusing.)
+;;;   (DEFMETHOD PRINT-OBJECT :AROUND ((SS STARSHIP) STREAM) ...).
 (def-ir1-translator named-lambda ((name &rest rest) start cont)
   (reference-leaf start
 		  cont
-		  (ir1-convert-lambda `(lambda ,@rest)
-				      :source-name name)))
+		  (if (legal-fun-name-p name)
+		      (ir1-convert-lambda `(lambda ,@rest)
+					  :source-name name)
+		      (ir1-convert-lambda `(lambda ,@rest)
+					  :debug-name name))))
 
 ;;;; FUNCALL
 

@@ -36,6 +36,17 @@
        :ALLTEST-LEGACY-1613
        :ALLTEST-LEGACY-1715
        :ALLTEST-LEGACY-1723
+
+       ;; bug 45c
+       #+(and linux x86) :ALLTEST-LEGACY-1814
+       #+(and linux x86) :ALLTEST-LEGACY-1818
+       #+(and linux x86) :ALLTEST-LEGACY-1822
+       #+(and linux x86) :ALLTEST-LEGACY-1826
+       #+(and linux x86) :ALLTEST-LEGACY-1830
+       #+(and linux x86) :ALLTEST-LEGACY-1834
+       #+(and linux x86) :ALLTEST-LEGACY-1838
+       #+(and linux x86) :ALLTEST-LEGACY-1842
+
        :ALLTEST-LEGACY-2204
        :CLOS-LEGACY-170
        :CMUCL-BUGS-LEGACY-292

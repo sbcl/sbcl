@@ -404,7 +404,8 @@ bootstrapping.
 				   ,,(cadr specializer))
 				`',specializer))
 			  specializers))
-	 unspecialized-lambda-list method-class-name
+	 unspecialized-lambda-list
+	 method-class-name
 	 initargs-form
 	 pv-table-symbol))))
 
@@ -446,7 +447,24 @@ bootstrapping.
 	(extract-declarations body env)
       (values `(lambda ,unspecialized-lambda-list
 		 ,@(when documentation `(,documentation))
-		 (declare (%method-name ,(list name qualifiers specializers)))
+		 ;; (Old PCL code used a somewhat different style of
+		 ;; list for %METHOD-NAME values. Our names use
+		 ;; ,@QUALIFIERS instead of ,QUALIFIERS so that the
+		 ;; method names look more like what you see in a
+		 ;; DEFMETHOD form.)
+		 ;;
+		 ;; FIXME: As of sbcl-0.7.0.6, code elsewhere, at
+		 ;; least the code to set up named BLOCKs around the
+		 ;; bodies of methods, depends on the function's base
+		 ;; name being the first element of the %METHOD-NAME
+		 ;; list. It would be good to remove this dependency,
+		 ;; perhaps by building the BLOCK here, or by using
+		 ;; another declaration (e.g. %BLOCK-NAME), so that
+		 ;; our method debug names are free to have any format,
+		 ;; e.g. (:METHOD PRINT-OBJECT :AROUND (CLOWN T)).
+		 (declare (%method-name (,name
+					 ,@qualifiers
+					 ,specializers)))
 		 (declare (%method-lambda-list ,@lambda-list))
 		 ,@declarations
 		 ,@real-body)
@@ -455,7 +473,8 @@ bootstrapping.
 (defun real-make-method-initargs-form (proto-gf proto-method
 				       method-lambda initargs env)
   (declare (ignore proto-gf proto-method))
-  (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
+  (unless (and (consp method-lambda)
+	       (eq (car method-lambda) 'lambda))
     (error "The METHOD-LAMBDA argument to MAKE-METHOD-FUNCTION, ~S, ~
 	    is not a lambda form."
 	   method-lambda))
@@ -946,31 +965,38 @@ bootstrapping.
 (defmacro bind-fast-lexical-method-macros ((args rest-arg next-method-call)
 					   &body body)
   `(macrolet ((call-next-method-bind (&body body)
-		`(let () ,@body))
+               `(let () ,@body))
 	      (call-next-method-body (cnm-args)
-		`(if ,',next-method-call
-		     ,(if (and (null ',rest-arg)
-			       (consp cnm-args)
-			       (eq (car cnm-args) 'list))
-			  `(invoke-effective-method-function
-			    ,',next-method-call nil
-			    ,@(cdr cnm-args))
-			  (let ((call `(invoke-effective-method-function
-					,',next-method-call
-					,',(not (null rest-arg))
-					,@',args
-					,@',(when rest-arg `(,rest-arg)))))
-			    `(if ,cnm-args
-				 (bind-args ((,@',args
-					      ,@',(when rest-arg
-						    `(&rest ,rest-arg)))
-					     ,cnm-args)
-					    ,call)
-				 ,call)))
-		     (error "no next method")))
+               `(if ,',next-method-call
+                 ,(locally
+                   ;; This declaration suppresses a "deleting
+                   ;; unreachable code" note for the following IF when
+                   ;; REST-ARG is NIL. It is not nice for debugging
+                   ;; SBCL itself, but at least it keeps us from
+                   ;; annoying users.
+                   (declare (optimize (inhibit-warnings 3)))
+                   (if (and (null ',rest-arg)
+                            (consp cnm-args)
+                            (eq (car cnm-args) 'list))
+                       `(invoke-effective-method-function
+                         ,',next-method-call nil
+                         ,@(cdr cnm-args))
+                       (let ((call `(invoke-effective-method-function
+                                     ,',next-method-call
+                                     ,',(not (null rest-arg))
+                                     ,@',args
+                                     ,@',(when rest-arg `(,rest-arg)))))
+                         `(if ,cnm-args
+                           (bind-args ((,@',args
+                                        ,@',(when rest-arg
+                                                  `(&rest ,rest-arg)))
+                                       ,cnm-args)
+                            ,call)
+                           ,call))))
+                 (error "no next method")))
 	      (next-method-p-body ()
-		`(not (null ,',next-method-call))))
-     ,@body))
+               `(not (null ,',next-method-call))))
+    ,@body))
 
 (defmacro bind-lexical-method-functions
     ((&key call-next-method-p next-method-p-p closurep applyp)
