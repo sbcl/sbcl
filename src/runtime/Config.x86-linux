@@ -1,4 +1,4 @@
-ASSEM_SRC = x86-assem.S linux-stubs.S
+ASSEM_SRC = x86-assem.S ldso-stubs.S
 ARCH_SRC = x86-arch.c
 
 OS_SRC = linux-os.c os-common.c

@@ -1,8 +1,8 @@
 /*
- * Linux stubs
+ * stubs for C-linkage library functions used by the runtime
  *
- * These are needed because the locations of the
- * libraries are filled in by ld.so at runtime.
+ * These are needed because the locations of the libraries are
+ * filled in by the dynamic linker ld.so at runtime.
  */
 
 /*
@@ -16,7 +16,7 @@
  * files for more information.
  */
 
-	.file	"linux-stubs.S"
+	.file	"ldso-stubs.S"
 	.version	"01.01"
 gcc2_compiled.:
         .text
