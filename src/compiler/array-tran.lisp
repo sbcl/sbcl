@@ -25,14 +25,6 @@
 	element-type-specifier)))
 
 ;;; Array access functions return an object from the array, hence its
-;;; type will be asserted to be array element type.
-(defun extract-element-type (array)
-  (let ((type (continuation-type array)))
-    (if (array-type-p type)
-	(array-type-element-type type)
-	*universal-type*)))
-
-;;; Array access functions return an object from the array, hence its
 ;;; type is going to be the array upgraded element type.
 (defun extract-upgraded-element-type (array)
   (let ((type (continuation-type array)))
@@ -46,7 +38,7 @@
 (defun assert-new-value-type (new-value array)
   (let ((type (continuation-type array)))
     (when (array-type-p type)
-      (assert-continuation-type new-value (array-type-element-type type))))
+      (assert-continuation-type new-value (array-type-specialized-element-type type))))
   (continuation-type new-value))
 
 ;;; Return true if Arg is NIL, or is a constant-continuation whose
@@ -75,7 +67,7 @@
   ;; If the node continuation has a single use then assert its type.
   (let ((cont (node-cont node)))
     (when (= (length (find-uses cont)) 1)
-      (assert-continuation-type cont (extract-element-type array))))
+      (assert-continuation-type cont (extract-upgraded-element-type array))))
   (extract-upgraded-element-type array))
 
 (defoptimizer (%aset derive-type) ((array &rest stuff))
@@ -99,7 +91,7 @@
     (when (array-type-p atype)
       (values-specifier-type
        `(values (simple-array ,(type-specifier
-				(array-type-element-type atype))
+				(array-type-specialized-element-type atype))
 			      (*))
 		index index index)))))
 

@@ -157,22 +157,6 @@ WORKAROUND:
 	Process inferior-lisp exited abnormally with code 1
   I haven't noticed a repeatable case of this yet.
 
-31:
-  In some cases the compiler believes type declarations on array
-  elements without checking them, e.g.
-	(DECLAIM (OPTIMIZE (SAFETY 3) (SPEED 1) (SPACE 1)))
-	(DEFSTRUCT FOO A B)
-	(DEFUN BAR (X)
-	  (DECLARE (TYPE (SIMPLE-ARRAY CONS 1) X))
-	  (WHEN (CONSP (AREF X 0))
-	    (PRINT (AREF X 0))))
-	(BAR (VECTOR (MAKE-FOO :A 11 :B 12)))
-  prints
-	#S(FOO :A 11 :B 12) 
-  in SBCL 0.6.5 (and also in CMU CL 18b). This does not happen for
-  all cases, e.g. the type assumption *is* checked if the array
-  elements are declared to be of some structure type instead of CONS.
-
 32:
   The printer doesn't report closures very well. This is true in 
   CMU CL 18b as well:
@@ -1247,6 +1231,26 @@ WORKAROUND:
   7) (real 4 8)) is a HAIRY-TYPE rather than that which would be hoped
   for, viz: '(real 4 7).
 
+165:
+  Array types with element-types of some unknown type are falsely being
+  assumed to be of type (ARRAY T) by the compiler in some cases. The
+  following code demonstrates the problem:
+
+  (defun foo (x)
+    (declare (type (vector bar) x))
+    (aref x 1))
+  (deftype bar () 'single-float)
+  (foo (make-array 3 :element-type 'bar))
+    -> TYPE-ERROR "The value #(0.0 0.0 0.0) is not of type (VECTOR BAR)."
+  (typep (make-array 3 :element-type 'bar) '(vector bar))
+    -> T
+
+  The easy solution is to make the functions which depend on knowing
+  the upgraded-array-element-type (in compiler/array-tran and
+  compiler/generic/vm-tran as of sbcl-0.7.3.x) be slightly smarter about
+  unknown types; an alternative is to have the
+  specialized-element-type slot in the ARRAY-TYPE structure be
+  *WILD-TYPE* for UNKNOWN-TYPE element types.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

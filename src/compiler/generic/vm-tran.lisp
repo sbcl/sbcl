@@ -79,7 +79,7 @@
     (let ((dims (array-type-dimensions array-type)))
       (when (or (atom dims) (= (length dims) 1))
         (give-up-ir1-transform))
-      (let ((el-type (array-type-element-type array-type))
+      (let ((el-type (array-type-specialized-element-type array-type))
             (total-size (if (member '* dims)
                             '*
                             (reduce #'* dims))))
@@ -127,7 +127,7 @@
     (let ((dims (array-type-dimensions array-type)))
       (when (or (atom dims) (= (length dims) 1))
         (give-up-ir1-transform))
-      (let ((el-type (array-type-element-type array-type))
+      (let ((el-type (array-type-specialized-element-type array-type))
             (total-size (if (member '* dims)
                             '*
                             (reduce #'* dims))))

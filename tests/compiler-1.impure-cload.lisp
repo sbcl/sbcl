@@ -52,10 +52,9 @@
 (declaim (ftype function i-am-just-a-function))
 (defun i-am-just-a-function (x y) (+ x y 1))
 
-;;; Stig E SandPHI (where PHI is some phi-like character not
-;;; representable in ASCII) reported in cclan-Bugs-431263 that SBCL
-;;; couldn't compile this. sbcl-0.6.12.26 died in CIRCULAR-LIST-P with
-;;; "The value \"EST\" is not of type LIST." Dan Barlow fixed it.
+;;; Stig E Sandoe reported in cclan-Bugs-431263 that SBCL couldn't
+;;; compile this. sbcl-0.6.12.26 died in CIRCULAR-LIST-P with "The
+;;; value \"EST\" is not of type LIST." Dan Barlow fixed it.
 (defvar +time-zones+
   '((5 "EDT" . "EST") (6 "CDT" . "CST") (7 "MDT" .
 "MST") (8 "PDT" . "PST")
@@ -96,5 +95,15 @@
           (t
            (error "Invalid pixarray: ~S." pixarray)))))
 (assert (eql 1 (pixarray-element-size #*110)))
+
+;;; bug 31 turned out to be a manifestation of non-ANSI array type
+;;; handling, fixed by CSR in sbcl-0.7.3.8.
+(defun array-element-type-handling (x)
+  (declare (type (vector cons) x))
+  (when (consp (aref x 0))
+    (aref x 0)))
+(assert (eq (array-element-type-handling
+	     (make-array 3 :element-type t :initial-element 0))
+	    nil))
 
 (sb-ext:quit :unix-status 104) ; success
