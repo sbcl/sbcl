@@ -11,7 +11,7 @@
 * On X86 I is represented as a tagged integer.
 
 * EQL uses "CMP reg,reg" instead of "CMP reg,im". This causes
-  allocation of extra register and extra move.
+  allocation of an extra register and an extra move.
 
 * Unnecessary move:
   3: SLOT S!11[EDX] {SB-C::VECTOR-LENGTH 1 7} => t23[EAX]
@@ -63,3 +63,4 @@ VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
   last two moves.
 
 * And why two moves?
+--------------------------------------------------------------------------------
