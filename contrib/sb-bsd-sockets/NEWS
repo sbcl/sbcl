@@ -1,0 +1,135 @@
+Changes in 0.58 - Sun Jan 12 00:53:53 GMT 2003
+
+Fix db-sockets.asd so that it doesn't recompile alien.so every single
+time.
+
+Announce anon-cvs repo for people to get in-between versions
+
+MSG_NOSIGNAL is a linuxism, I'm told.
+
+Changes in 0.57 - Wed Sep 11 12:27:32 2002
+
+Fix for compilation bug reported by Andreas Fuchs.  Don't use 0.56, it
+was a mistakenly uploaded file
+
+Changes in 0.55 - Tue Sep 10 23:42:27 2002
+
+Fix for a unix-domain sockets problem, courtesy of David Lichteblau
+
+Changes in 0.54 - Wed Mar 6 2002
+
+New version mostly due to new packaging format: this is now a
+vendor-neutral cclan (vn-cclan) package.  See INSTALL file
+
+Fixed bug in af_file support.
+
+Changes in 0.53 - Thu Jan 31 2002
+
+By popular request (two people, at last count) this works in CMUCL again.
+Also, some documentation updates, a really silly bug in make-instance 
+fixed, and support for the TCP_NODELAY socket option
+
+Changes in 0.52 - Tue Jan 8 2002
+
+Very few.  This release was put out a few days after 0.5.1 because
+0.5.1 is less than 0.42, and various packaging tools tend to get
+confused to see version numbers go backwards.
+
+Changes in 0.5.1 - Mon Jan 7 2002
+
+Support for AF_FILE (formerly known as Unix-domain) sockets; both
+stream and datagram.  
+
+MAKE-INET-SOCKET has been deprecated (but is still there).  New code is
+encouraged to write (make-instance 'inet-socket ...) instead
+
+Fairly pervasive low-level changes to avoid leaking quite as much
+memory.  May also have fixed a file descriptor leak in the process.
+
+Changes in 0.42
+
+Repackaged to be a debian-like package, and use
+common-lisp-controller, which required a reasonably large amount of
+thrashing around renaming files and so on.
+
+New function GET-HOST-BY-ADDRESS returns a HOST-ENT just like
+GET-HOST-BY-NAME does.
+
+Tested on SBCL 0.6.12.7.flaky1.1 (x86),  SBCL 0.6.12.7 (Alpha),
+CMUCL 18c+ 2.5.2 (x86)
+
+Changes in 0.41 - Sun Jan 7 2001
+
+Cleanups in the tests for more intelligible failure messages
+
+SOCKET-ERROR conditions now inherit from ERROR not CONDITION - as
+otherwise IGNORE-ERROR doesn't ignore them, which is unexpected
+
+Tested on debian cmucl 2.4.19 , sbcl pre-0.6.9 snapshot of Nov 30 2000.
+
+The latter doesn't build without manual intervention:
+
+ error in function SB-C::%DEFCONSTANT:
+    The constant INET-ADDRESS-ANY is being redefined.
+
+(just continue)
+
+Changes in 0.4 - Mon Jul 3 2000
+
+Now works (passes tests) in
+
+- Solaris 2.6 SPARC (CMUCL 18b)
+- Debian x86 GNU/Linux (Debian CMUCL 2.4.19)
+- Debian x86 GNU/Linux (SBCL 0.6.5)
+
+Some CMUCL-on-FreeBSD changes (mostly involve commenting stuff out).  Doesn't 
+work, though (but might in SBCL/FreeBSD)
+
+The Solaris changes comprised disabling bits and fixing an 
+endianness problem. 
+
+
+Changes in 0.37 -  Sat May 20 2000
+
+
+Changes from Martin Atzmueller to make it compile more cleanly in SBCL
+
+Changes in 0.36 -  Thu May 11 2000
+
+Some documentation cleanups
+
+New functions NON-BLOCKING-MODE and (SETF NON-BLOCKING-MODE) 
+
+EINTR now generates a INTERRUPTED-ERROR condition
+
+
+Changes in 0.35  - Mon May 1 2000
+
+
+MAKE-INET-SOCKET now can take a keyword for PROTOCOL: it lowercases
+the symbol's name, then looks it up using GET-PROTOCOL-BY-NAME
+
+A bad bug in the CMUCL code (which caused the EXTENSIONS package to
+disappear - oops...) was found and fixed
+
+
+Changes in 0.3  -  Apr 17 2000 
+
+Now works with SBCL (0.6.1, 0.6.2) in addition to CMUCL.
+
+Fixed to actually work with a READ-SEQUENCE implementation that does
+the right thing instead of the (suspected buggy) implementation in
+CMUCL. At least, the Hyperspec doesn't give me any particular cause
+for belief that READ-SEQUENCE can return before reading as much as the
+user asks it to, which is what we were using it for hitherto.
+
+The Makefile got a lot bigger. defs-to-lisp.lisp got a lot smaller.
+
+Standard make target creates "sockets-system.x86f" which contains all
+the code in a single file
+
+If you want to build it on SBCL you'll need a working defsystem for
+said platform first. This involves some fiddling around: first you
+need to get it from CLOCC on Sourceforge then you need to patch it
+with this diff. Unless you're looking at a version newer than 1.12, in
+which case they might have patched it already before you

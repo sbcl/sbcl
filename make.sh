@@ -86,7 +86,8 @@ sh make-config.sh || exit 1
 #     SBCL_XC_HOST=<whatever> sh make-host-2.sh
 #   Copy output/cold-sbcl.core from the host system to the target system.
 #   On the target system:
-#     sh make-host-2.sh
+#     sh make-target-2.sh
+#     sh make-target-contrib.sh
 # Or, if you can set up the files somewhere shared (with NFS, AFS, or
 # whatever) between the host machine and the target machine, the basic
 # procedure above should still work, but you can skip the "copy" steps.
@@ -94,4 +95,5 @@ sh make-host-1.sh   || exit 1
 sh make-target-1.sh || exit 1
 sh make-host-2.sh   || exit 1
 sh make-target-2.sh || exit 1
+sh make-target-contrib.sh || exit 1
 date

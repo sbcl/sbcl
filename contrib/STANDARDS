@@ -56,7 +56,7 @@ If the contrib package involves more than one file, you are encouraged
 to use ASDF to build it and load it.  A version of asdf is bundled as
 an SBCL contrib, which knows to look in $SBCL_HOME/systems/ for asd
 files - your install target should create an appropriate symlink there
-to the installed location of the system file.  Look in bsd-sockets/Makefile
+to the installed location of the system file.  Look in sb-bsd-sockets/Makefile
 for an example of an asdf-using contrib
 
 $(INSTALL_DIR) will have been created by the system before your
@@ -77,25 +77,21 @@ of the preceding.  Document formats not available on typical
 well-endowed-with-free-stuff Unix systems are discouraged.  DocBook
 is fine, as the SBCL manual is DocBook anyway ]
 
-[ install.sh should copy the documentation somewhere that the user can
-find it ]
+[ make install should copy the documentation somewhere that the user
+can find it ]
 
 * Lisp-level requirements
 
-An sbcl contrib should not stamp on sbcl internals or redefine symbols
-in CL, CL-USER.  Sometimes this is the only way to do something,
-though: individual cases will be considered on their merits.  A
-package that hacks undocumented(sic) interfaces may be accepted for
-contrib, but it does not follow from that that the interface is now
-published or will be preserved in future SBCL versions - contrib
-authors are encouraged instead to submit patches to SBCL that provide
-clean documented APIs which reasonably can be preserved.  If in doubt,
-seek consensus on the sbcl-devel list
+An sbcl contrib should attempt to avoid stamping on sbcl internals or
+redefining symbols in CL, CL-USER.  Sometimes this is the only way to do
+something, though: individual cases will be considered on their
+merits.  A package that hacks undocumented(sic) interfaces may be
+accepted for contrib, but it does not follow from that that the
+interface is now published or will be preserved in future SBCL
+versions - contrib authors are encouraged instead to submit patches to
+SBCL that provide clean documented APIs which reasonably can be
+preserved.  If in doubt, seek consensus on the sbcl-devel list
 
 A contrib must load into its own Lisp package(s) instead of polluting
 CL-USER or one of the system packages.  The Lisp package name should
-be chosen in some way that has reasonable expectation of being unique.
-[We could potentially keep a registry of contrib archive name =>
-package name(s)]
-
-
+begin with "SB-".  Ask the sbcl-devel list for a suitable name.

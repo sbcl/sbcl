@@ -1549,8 +1549,11 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * REQUIRE and PROVIDE are now optionally capable of doing something
     useful: see the documentation string for REQUIRE
   * infrastructure for a managed SBCL contrib system: contributed 
-    modules in this release include a copy of the ASDF system definition
-    facility, and an interface to the BSD Sockets API
+    modules in this release include 
+	- the ASDF system definition facility
+	- an interface to the BSD Sockets API
+	- an ACL-like convenience interface to the repl 
+		(thanks to Kevin Rosenberg)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

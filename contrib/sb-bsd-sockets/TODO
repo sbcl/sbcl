@@ -1,0 +1,20 @@
+
+Things To Do - Urgent!    (with apologies to Douglas Adams)
+
+I probably have opinions about how to do most of these.  Even if not,
+I almost certainly have opinions on how not to.  Send me a proposal
+before spending serious amounts of time on it.
+
+- the rest of the functions.  A socket-send that doesn't use streams 
+would be a good one
+
+- the rest of the errors
+
+- the rest of the socket options: integer and boolean socket-level
+options are in but need odd ones, plus tcp, udp, ip
+
+- async name service lookups.
+
+- write tests for socket-name and socket-peername
+
+- documentation: see doc.lisp, but beware: it's grotty.
