@@ -1157,3 +1157,17 @@
 	(*read-suppress* *read-suppress*)
 	(*readtable* *readtable*))
     (funcall function)))
+
+;;; Bind a few "potentially dangerous" printer control variables to
+;;; safe values, respecting current values if possible.
+(defmacro with-sane-io-syntax (&body forms)
+  `(call-with-sane-io-syntax (lambda () ,@forms)))
+
+(defun call-with-sane-io-syntax (function)
+  (declare (type function function))
+  (macrolet ((true (sym)
+               `(and (boundp ',sym) ,sym)))
+    (let ((*print-readably* nil)
+          (*print-level* (or (true *print-level*) 6))
+          (*print-length* (or (true *print-length*) 12)))
+      (funcall function))))

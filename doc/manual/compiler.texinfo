@@ -77,6 +77,12 @@ Cancels the effect of a previous @code{sb-ext:muffle-condition}
 declaration.
 @end deffn
 
+Various details of @emph{how} the compiler messages are printed can be
+controlled via the alist
+@code{sb-ext:*compiler-print-variable-alist*}.
+
+@include var-sb-ext-star-compiler-print-variable-alist-star.texinfo
+
 @c <!-- FIXME: How much control over error messages is in SBCL?
 @c      _     How much should be? How much of this documentation should
 @c      _     we save or adapt? 
@@ -99,15 +105,6 @@ declaration.
 @c      _   which is useful when debugging macros.
 @c      _ \end{defvar}
 @c      _ 
-@c      _ \begin{defvar}{}{error-print-length}
-@c      _   \defvarx{error-print-level}
-@c      _ 
-@c      _   These variables are the print level and print length used in
-@c      _   printing error messages.  The default values are \code{5} and
-@c      _   \code{3}.  If null, the global values of \code{*print-level*} and
-@c      _   \code{*print-length*} are used.
-@c      _ \end{defvar}
-@c      _ 
 @c      _ \begin{defmac}{extensions:}{define-source-context}{%
 @c      _     \args{\var{name} \var{lambda-list} \mstar{form}}}
 @c      _ 
@@ -123,7 +120,6 @@ declaration.
 @c      _ \end{defmac}
 @c      _ 
 @c      _ -->
-
 
 @node  Diagnostic Severity
 @comment  node-name,  next,  previous,  up

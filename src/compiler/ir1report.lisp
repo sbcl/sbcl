@@ -16,27 +16,6 @@
 
 (declaim (special *current-path*))
 
-;;; We bind print level and length when printing out messages so that
-;;; we don't dump huge amounts of garbage.
-;;;
-;;; FIXME: It's not possible to get the defaults right for everyone.
-;;; So: Should these variables be in the SB-EXT package? Or should we
-;;; just get rid of them completely and just use the bare
-;;; CL:*PRINT-FOO* variables instead?
-(declaim (type (or unsigned-byte null)
-	       *compiler-error-print-level*
-	       *compiler-error-print-length*
-	       *compiler-error-print-lines*))
-(defvar *compiler-error-print-level* 5
-  #!+sb-doc
-  "the value for *PRINT-LEVEL* when printing compiler error messages")
-(defvar *compiler-error-print-length* 10
-  #!+sb-doc
-  "the value for *PRINT-LENGTH* when printing compiler error messages")
-(defvar *compiler-error-print-lines* 12
-  #!+sb-doc
-  "the value for *PRINT-LINES* when printing compiler error messages")
-
 (defvar *enclosing-source-cutoff* 1
   #!+sb-doc
   "The maximum number of enclosing non-original source forms (i.e. from
@@ -188,14 +167,11 @@
 ;;; compiler warnings.
 (defun stringify-form (form &optional (pretty t))
   (with-standard-io-syntax
-   (let ((*print-readably* nil)
-         (*print-pretty* pretty)
-         (*print-level* *compiler-error-print-level*)
-         (*print-length* *compiler-error-print-length*)
-         (*print-lines* *compiler-error-print-lines*))
-     (if pretty
-         (format nil "~<~@;  ~S~:>" (list form))
-         (prin1-to-string form)))))
+    (with-compiler-io-syntax
+        (let ((*print-pretty* pretty))
+          (if pretty
+              (format nil "~<~@;  ~S~:>" (list form))
+              (prin1-to-string form))))))
 
 ;;; Return a COMPILER-ERROR-CONTEXT structure describing the current
 ;;; error context, or NIL if we can't figure anything out. ARGS is a
@@ -285,11 +261,13 @@
 ;;;
 ;;; We suppress printing of messages identical to the previous, but
 ;;; record the number of times that the message is repeated.
-(defun print-compiler-message (format-string format-args)
+(defmacro print-compiler-message (format-string format-args)
+  `(with-compiler-io-syntax
+     (%print-compiler-message ,format-string ,format-args)))
 
+(defun %print-compiler-message (format-string format-args)
   (declare (type simple-string format-string))
-  (declare (type list format-args))
-  
+  (declare (type list format-args))  
   (let ((stream *error-output*)
 	(context (find-error-context format-args)))
     (cond
@@ -362,14 +340,11 @@
       (note-message-repeats nil)
       (setq *last-format-string* format-string)
       (setq *last-format-args* format-args)
-      (let ((*print-level*  *compiler-error-print-level*)
-	    (*print-length* *compiler-error-print-length*)
-	    (*print-lines*  *compiler-error-print-lines*))
-        (format stream "~&")
-        (pprint-logical-block (stream nil :per-line-prefix "; ")
-          (format stream "~&~?" format-string format-args))
-        (format stream "~&"))))
-
+      (format stream "~&")
+      (pprint-logical-block (stream nil :per-line-prefix "; ")
+        (format stream "~&~?" format-string format-args))
+      (format stream "~&")))
+  
   (incf *last-message-count*)
   (values))
 

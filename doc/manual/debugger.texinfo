@@ -140,21 +140,7 @@ current frame.  For more information on debugger variable access, see
 In the debugger, it is possible to override the printing behaviour of
 the REPL.
 
-@defvr {Variable} sb-debug:*debug-print-variable-alist*
-
-An association list describing new bindings for special variables
-(typically *PRINT-FOO* variables) to be used within the debugger, e.g.
-@lisp
-((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
-@end lisp
-The variables in the @code{car} position are bound to the values in
-the @code{cdr} during the execution of some debug commands.  When
-evaluating arbitrary expressions in the debugger, the normal values of
-the printer control variables are in effect. @c FIXME: is this correct?
-@code{*debug-print-variable-alist*} does not contain any bindings
-initially.
-
-@end defvr
+@include var-sb-ext-star-debug-print-variable-alist-star.texinfo
 
 @node  Stack Frames
 @comment  node-name,  next,  previous,  up
@@ -1007,8 +993,9 @@ proceed cases.
 @end deffn
 
 @deffn {Debugger Command} backtrace [@var{n}]
-Displays all the frames from the current to the bottom.  Only shows
-@var{n} frames if specified.  The printing is controlled by @code{*debug-print-variable-alist*}.
+Displays all the frames from the current to the bottom. Only shows
+@var{n} frames if specified. The printing is controlled by
+@code{*debug-print-variable-alist*}.
 @end deffn
 
 @deffn {Debugger Command} step

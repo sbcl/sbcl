@@ -17,9 +17,10 @@
 (defun style-warn (format-control &rest format-arguments)
   (/show0 "entering STYLE-WARN")
   (/show format-control format-arguments)
-  (warn 'simple-style-warning
-	:format-control format-control
-	:format-arguments format-arguments))
+  (with-sane-io-syntax
+      (warn 'simple-style-warning
+            :format-control format-control
+            :format-arguments format-arguments)))
 
 ;;; a utility for SIGNAL, ERROR, CERROR, WARN, COMPILER-NOTIFY and
 ;;; INVOKE-DEBUGGER: Parse the hairy argument conventions into a

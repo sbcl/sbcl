@@ -365,10 +365,9 @@ basic stuff like BACKTRACE and ARG. For now, the actual supported interface
 is still mixed indiscriminately with low-level internal implementation stuff
 like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL")
+      :reexport ("*DEBUG-PRINT-VARIABLE-ALIST*")
       :export ("*DEBUG-BEGINNER-HELP-P*"
 	       "*DEBUG-CONDITION*"
-	       "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*"
-	       "*DEBUG-PRINT-VARIABLE-ALIST*"
 	       "*DEBUG-READTABLE*" "*DEBUG-HELP-STRING*"
 	       "*FLUSH-DEBUG-ERRORS*" "*IN-THE-DEBUGGER*"
 	       "*TRACE-INDENTATION-STEP*" "*MAX-TRACE-INDENTATION*"
@@ -554,6 +553,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	       "GC" "GC-OFF" "GC-ON" "GET-BYTES-CONSED"
 	       "*GC-RUN-TIME*"
 	       "PURIFY"
+
+               ;; Customizing printing of compiler and debugger messages
+               "*COMPILER-PRINT-VARIABLE-ALIST*"
+               "*DEBUG-PRINT-VARIABLE-ALIST*"
 
                ;; Hooks into init & save sequences
                "*INIT-HOOKS*" "*SAVE-HOOKS*"
@@ -848,6 +851,7 @@ retained, possibly temporariliy, because it might be used internally."
 	       "BINDING*"
 	       "!DEF-BOOLEAN-ATTRIBUTE"
 	       "WITH-REBOUND-IO-SYNTAX"
+	       "WITH-SANE-IO-SYNTAX"
 
 	       ;; ..and CONDITIONs..
 	       "BUG"

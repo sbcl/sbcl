@@ -1217,15 +1217,20 @@ WORKAROUND:
 318: "stack overflow in compiler warning with redefined class"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
   test suite.
-    (setq *print-pretty* nil)
     (defstruct foo a)
     (setf (find-class 'foo) nil)
     (defstruct foo slot-1)
-  gives 
-    ...#<SB-KERNEL:STRUCTURE-CLASSOID #<SB-KERNEL:STRUCTURE-CLASSOID #<SB-KERNEL:STRUCTURE-CLASSOID #<SB-KERNEL:STRUCTUREControl stack guard page temporarily disabled: proceed with caution
-  (it's not really clear what it should give: is (SETF FIND-CLASS)
-  meant to be enough to delete structure classes from the system?
-  Giving a stack overflow is definitely suboptimal, though.)
+  This used to give a stack overflow from within the printer, which has
+  been fixed as of 0.8.16.11. Current result:
+    ; caught ERROR:
+    ;   can't compile TYPEP of anonymous or undefined class:
+    ;     #<SB-KERNEL:STRUCTURE-CLASSOID FOO>
+    ...
+    debugger invoked on a TYPE-ERROR in thread 19973:
+      The value NIL is not of type FUNCTION.
+
+  CSR notes: it's not really clear what it should give: is (SETF FIND-CLASS)
+    meant to be enough to delete structure classes from the system?
 
 319: "backquote with comma inside array"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP

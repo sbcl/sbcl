@@ -31,25 +31,20 @@
 ;;;         to satisfy lambda list
 ;;;           #:
 ;;;         exactly 2 expected, but 5 found
-;;;
-;;; FIXME: These variables were deprecated in late February 2004, and
-;;; can probably be removed in about a year.
-(defvar *debug-print-level* 5
-  #!+sb-doc
-  "(This is deprecated in favor of *DEBUG-PRINT-VARIABLE-ALIST*.)
-
-*PRINT-LEVEL* for the debugger")
-(defvar *debug-print-length* 7
-  #!+sb-doc
-  "(This is deprecated in favor of *DEBUG-PRINT-VARIABLE-ALIST*.)
-
-*PRINT-LENGTH* for the debugger")
-
 (defvar *debug-print-variable-alist* nil
   #!+sb-doc
   "an association list describing new bindings for special variables
-(typically *PRINT-FOO* variables) to be used within the debugger, e.g.
-((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))")
+to be used within the debugger. Eg.
+
+ ((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
+
+The variables in the CAR positions are bound to the values in the CDR
+during the execution of some debug commands. When evaluating arbitrary
+expressions in the debugger, the normal values of the printer control
+variables are in effect.
+
+Initially empty, *DEBUG-PRINT-VARIABLE-ALIST* is typically used to
+provide bindings for printer control variables.")
 
 (defvar *debug-readtable*
   ;; KLUDGE: This can't be initialized in a cold toplevel form,
@@ -98,7 +93,7 @@
 Any command -- including the name of a restart -- may be uniquely abbreviated.
 The debugger rebinds various special variables for controlling i/o, sometimes
   to defaults (much like WITH-STANDARD-IO-SYNTAX does) and sometimes to 
-  its own special values, e.g. SB-DEBUG:*DEBUG-PRINT-LEVEL*.
+  its own special values, based on SB-EXT:*DEBUG-PRINT-VARIBALE-ALIST*.
 Debug commands do not affect *, //, and similar variables, but evaluation in
   the debug loop does affect these variables.
 SB-DEBUG:*FLUSH-DEBUG-ERRORS* controls whether errors at the debug prompt
@@ -377,62 +372,56 @@ Other commands:
 	(original-package *package*)
 	(original-print-pretty *print-pretty*))
     (with-standard-io-syntax
-     (let (;; We want the printer and reader to be in a useful state,
-	   ;; regardless of where the debugger was invoked in the
-	   ;; program. WITH-STANDARD-IO-SYNTAX did much of what we
-	   ;; want, but
-	   ;;   * It doesn't affect our internal special variables 
-	   ;;     like *CURRENT-LEVEL-IN-PRINT*.
-	   ;;   * It isn't customizable.
-	   ;;   * It doesn't set *PRINT-READABLY* to the same value
-	   ;;     as the toplevel default.
-	   ;;   * It sets *PACKAGE* to COMMON-LISP-USER, which is not
-	   ;;     helpful behavior for a debugger.
-	   ;;   * There's no particularly good debugger default for
-	   ;;     *PRINT-PRETTY*, since T is usually what you want
-	   ;;     -- except absolutely not what you want when you're
-	   ;;     debugging failures in PRINT-OBJECT logic.
-	   ;; We try to address all these issues with explicit
-	   ;; rebindings here.
-	   (sb!kernel:*current-level-in-print* 0)
-	   (*package* original-package)
-	   (*print-pretty* original-print-pretty)
-	   (*print-readably* nil)
-	   ;; Clear the circularity machinery to try to to reduce the
-	   ;; pain from sharing the circularity table across all
-	   ;; streams; if these are not rebound here, then setting
-	   ;; *PRINT-CIRCLE* within the debugger when debugging in a
-	   ;; state where something circular was being printed (e.g.,
-	   ;; because the debugger was entered on an error in a
-	   ;; PRINT-OBJECT method) makes a hopeless mess. Binding them
-	   ;; here does seem somewhat ugly because it makes it more
-	   ;; difficult to debug the printing-of-circularities code
-	   ;; itself; however, as far as I (WHN, 2004-05-29) can see,
-	   ;; that's almost entirely academic as long as there's one
-	   ;; shared *C-H-T* for all streams (i.e., it's already
-	   ;; unreasonably difficult to debug print-circle machinery
-	   ;; given the buggy crosstalk between the debugger streams
-	   ;; and the stream you're trying to watch), and any fix for
-	   ;; that buggy arrangement will likely let this hack go away
-	   ;; naturally.
-	   (sb!impl::*circularity-hash-table* . nil)
-	   (sb!impl::*circularity-counter* . nil)
-	   ;; These rebindings are now (as of early 2004) deprecated,
-	   ;; with the new *PRINT-VAR-ALIST* mechanism preferred.
-	   (*print-length* *debug-print-length*)
-	   (*print-level* *debug-print-level*)
-	   (*readtable* *debug-readtable*))
-       (progv
-	   ;; (Why NREVERSE? PROGV makes the later entries have
-	   ;; precedence over the earlier entries.
-	   ;; *DEBUG-PRINT-VARIABLE-ALIST* is called an alist, so it's
-	   ;; expected that its earlier entries have precedence. And
-	   ;; the earlier-has-precedence behavior is mostly more
-	   ;; convenient, so that programmers can use PUSH or LIST* to
-	   ;; customize *DEBUG-PRINT-VARIABLE-ALIST*.)
-	   (nreverse (mapcar #'car *debug-print-variable-alist*))
-	   (nreverse (mapcar #'cdr *debug-print-variable-alist*))
-	 (apply fun rest))))))
+      (with-sane-io-syntax
+          (let (;; We want the printer and reader to be in a useful
+                ;; state, regardless of where the debugger was invoked
+                ;; in the program. WITH-STANDARD-IO-SYNTAX and
+                ;; WITH-SANE-IO-SYNTAX do much of what we want, but
+                ;;   * It doesn't affect our internal special variables 
+                ;;     like *CURRENT-LEVEL-IN-PRINT*.
+                ;;   * It isn't customizable.
+                ;;   * It sets *PACKAGE* to COMMON-LISP-USER, which is not
+                ;;     helpful behavior for a debugger.
+                ;;   * There's no particularly good debugger default for
+                ;;     *PRINT-PRETTY*, since T is usually what you want
+                ;;     -- except absolutely not what you want when you're
+                ;;     debugging failures in PRINT-OBJECT logic.
+                ;; We try to address all these issues with explicit
+                ;; rebindings here.
+                (sb!kernel:*current-level-in-print* 0)
+                (*package* original-package)
+                (*print-pretty* original-print-pretty)
+                ;; Clear the circularity machinery to try to to reduce the
+                ;; pain from sharing the circularity table across all
+                ;; streams; if these are not rebound here, then setting
+                ;; *PRINT-CIRCLE* within the debugger when debugging in a
+                ;; state where something circular was being printed (e.g.,
+                ;; because the debugger was entered on an error in a
+                ;; PRINT-OBJECT method) makes a hopeless mess. Binding them
+                ;; here does seem somewhat ugly because it makes it more
+                ;; difficult to debug the printing-of-circularities code
+                ;; itself; however, as far as I (WHN, 2004-05-29) can see,
+                ;; that's almost entirely academic as long as there's one
+                ;; shared *C-H-T* for all streams (i.e., it's already
+                ;; unreasonably difficult to debug print-circle machinery
+                ;; given the buggy crosstalk between the debugger streams
+                ;; and the stream you're trying to watch), and any fix for
+                ;; that buggy arrangement will likely let this hack go away
+                ;; naturally.
+                (sb!impl::*circularity-hash-table* . nil)
+                (sb!impl::*circularity-counter* . nil)
+                (*readtable* *debug-readtable*))
+            (progv
+                ;; (Why NREVERSE? PROGV makes the later entries have
+                ;; precedence over the earlier entries.
+                ;; *DEBUG-PRINT-VARIABLE-ALIST* is called an alist, so it's
+                ;; expected that its earlier entries have precedence. And
+                ;; the earlier-has-precedence behavior is mostly more
+                ;; convenient, so that programmers can use PUSH or LIST* to
+                ;; customize *DEBUG-PRINT-VARIABLE-ALIST*.)
+                (nreverse (mapcar #'car *debug-print-variable-alist*))
+                (nreverse (mapcar #'cdr *debug-print-variable-alist*))
+              (apply fun rest)))))))
 
 ;;; the ordinary ANSI case of INVOKE-DEBUGGER, when not suppressed by
 ;;; command-line --disable-debugger option

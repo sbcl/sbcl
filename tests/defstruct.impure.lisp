@@ -551,6 +551,17 @@
     (warning (c)
       (error "shouldn't warn just from macroexpansion here"))))
 
+;;; bug 318 symptom no 1. (rest not fixed yet)
+(catch :ok
+  (handler-bind ((error (lambda (c)
+                          ;; Used to cause stack-exhaustion
+                          (unless (typep c 'storege-condition)
+                            (throw :ok)))))
+    (eval '(progn
+            (defstruct foo a)
+            (setf (find-class 'foo) nil)
+            (defstruct foo slot-1)))))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)
