@@ -24,13 +24,17 @@ location for my OpenBSD 2.9 system. There's got to be a more flexible
 way to do it, but I'm not enough of an SGML guru to begin to guess
 what it would be. (WHN 2001-10-15)
 
---
+
 
  [<!ENTITY docbook.dsl
            SYSTEM
 	   "/usr/local/share/sgml/docbook/dsssl/modular/html/docbook.dsl"
 	   CDATA
 	   dsssl>]>
+
+--
+[<!ENTITY docbook.dsl PUBLIC "-//Norman Walsh//DOCUMENT DocBook HTML Stylesheet//EN" CDATA dsssl>]>
+
 
 <style-sheet>
 <style-specification id="html" use="docbook">
