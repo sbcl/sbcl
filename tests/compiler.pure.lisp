@@ -434,3 +434,9 @@
                                    (char/= x y z)))
                         nil #\a #\a)
                type-error)
+
+;;; Compiler lost return type of MAPCAR and friends
+(dolist (fun '(mapcar mapc maplist mapl))
+  (assert (nth-value 2 (compile nil
+                                `(lambda (x)
+                                   (1+ (,fun #'print x)))))))

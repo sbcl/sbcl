@@ -1833,6 +1833,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     strings which use variants of the ~* directive inside.
   * bug fix: SEARCH now applies its TEST predicate to the elements of
     the arguments in the correct order.  (thanks to Wolfhard Buss)
+  * fixed bug 235b: compiler uses return types of MAPCAR and friends
+    in type inference.  (thanks to Robert E. Brown)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

@@ -142,9 +142,9 @@
             ,(cond ((constant-continuation-p dims)
                     (let* ((val (continuation-value dims))
 			   (cdims (if (listp val) val (list val))))
-		      (if (or simple (/= (length cdims) 1))
+		      (if simple
 			  cdims
-			  '(*))))
+			  (length cdims))))
                    ((csubtypep (continuation-type dims)
                                (specifier-type 'integer))
                     '(*))

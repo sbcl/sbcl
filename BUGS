@@ -721,8 +721,8 @@ WORKAROUND:
      lists and &KEY arguments) do not signal errors when they should.
 
 
-201: "Incautious type inference from compound CONS types"
-  (reported by APD sbcl-devel 2002-09-17)
+201: "Incautious type inference from compound types"
+  a. (reported by APD sbcl-devel 2002-09-17)
     (DEFUN FOO (X)
       (LET ((Y (CAR (THE (CONS INTEGER *) X))))
         (SETF (CAR X) NIL)
@@ -734,6 +734,17 @@ WORKAROUND:
                 Y)))
 
     (FOO ' (1 . 2)) => "NIL IS INTEGER, Y = 1"
+
+  b.
+    * (defun foo (x)
+        (declare (type (array * (4 4)) x))
+        (let ((y x))
+          (setq x (make-array '(4 4)))
+          (adjust-array y '(3 5))
+          (= (array-dimension y 0) (eval `(array-dimension ,y 0)))))
+    FOO
+    * (foo (make-array '(4 4) :adjustable t))
+    NIL
 
 205: "environment issues in cross compiler"
   (These bugs have no impact on user code, but should be fixed or
@@ -929,17 +940,6 @@ WORKAROUND:
               (acc y))))
 
   (foo '(nil) '(t)) => NIL, T.
-
-  b. (reported by brown on #lisp 2003-01-21)
-
-    (defun find-it (x)
-      (declare (optimize (speed 3) (safety 0)))
-      (declare (notinline mapcar))
-      (let ((z (mapcar #'car x)))
-        (find 'foobar z)))
-
-  Without (DECLARE (NOTINLINE MAPCAR)), Python cannot derive that Z is
-  LIST.
 
 237: "Environment arguments to type functions"
   a. Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
