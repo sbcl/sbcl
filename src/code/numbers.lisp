@@ -1358,15 +1358,13 @@
 #.
 (collect ((forms))
   (flet ((definition (name lambda-list width pattern)
-           (assert (sb!xc:subtypep `(unsigned-byte ,width)
-                                   'bignum-element-type))
            `(defun ,name ,lambda-list
               (flet ((prepare-argument (x)
                        (declare (integer x))
                        (etypecase x
                          ((unsigned-byte ,width) x)
                          (fixnum (logand x ,pattern))
-                         (bignum (logand (%bignum-ref x 0) ,pattern)))))
+                         (bignum (logand x ,pattern)))))
                 (,name ,@(loop for arg in lambda-list
                                collect `(prepare-argument ,arg)))))))
     (loop for infos being each hash-value of sb!c::*modular-funs*
