@@ -1411,11 +1411,7 @@ And so, we are saved.
 		     (eq (cadr specl) (cadr type)))
 		    (class
 		     (or (eq (cadr specl) (cadr type))
-			 (memq (cadr specl)
-			       (if (eq *boot-state* 'complete)
-				   (class-precedence-list (cadr type))
-				   (early-class-precedence-list
-				    (cadr type)))))))))
+			 (memq (cadr specl) (cpl-or-nil (cadr type))))))))
 	(values pred pred))))
 
 (defun saut-prototype (specl type)
@@ -1428,10 +1424,7 @@ And so, we are saved.
 		(class-eq   (eq (cadr specl) (class-of (cadr type))))
 		(class      (memq (cadr specl)
 				  (let ((class (class-of (cadr type))))
-				    (if (eq *boot-state* 'complete)
-					(class-precedence-list class)
-					(early-class-precedence-list
-					 class))))))))
+				    (cpl-or-nil class)))))))
     (values pred pred)))
 
 (defun specializer-applicable-using-type-p (specl type)

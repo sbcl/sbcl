@@ -63,6 +63,13 @@
 (defmethod baz ((x specializer1)) x)
 (assert (typep (baz (make-instance 'specializer1)) 'specializer1))
 
+;;; ... and from McCLIM, another test case:
+(defclass specializer1a (specializer2a specializer2b) ())
+(defclass specializer2a () ())
+(defmethod initialize-instance :after
+    ((obj specializer2a) &key &allow-other-keys)
+  (print obj))
+
 ;;; in a similar vein, we should be able to define methods on classes
 ;;; that are effectively unknown to the type system:
 (sb-mop:ensure-class 'unknown-type)
