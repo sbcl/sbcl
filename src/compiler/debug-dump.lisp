@@ -240,7 +240,7 @@
 
 ;;; Return a list of DEBUG-SOURCE structures containing information
 ;;; derived from INFO. Unless :BYTE-COMPILE T was specified, we always
-;;; dump the Start-Positions, since it is too hard figure out whether
+;;; dump the START-POSITIONS, since it is too hard figure out whether
 ;;; we need them or not.
 (defun debug-source-for-info (info)
   (declare (type source-info info))

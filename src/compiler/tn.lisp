@@ -16,10 +16,10 @@
 ;;; in this component.
 (defvar *component-being-compiled*)
 
+;;; Do-Packed-TNs (TN-Var Component [Result]) Declaration* Form*
+;;;
+;;; Iterate over all packed TNs allocated in Component.
 (defmacro do-packed-tns ((tn component &optional result) &body body)
-  #!+sb-doc
-  "Do-Packed-TNs (TN-Var Component [Result]) Declaration* Form*
-  Iterate over all packed TNs allocated in Component."
   (let ((n-component (gensym)))
     `(let ((,n-component (component-info ,component)))
        (do ((,tn (ir2-component-normal-tns ,n-component) (tn-next ,tn)))
@@ -33,10 +33,10 @@
 	    ,result)
 	 ,@body))))
 
-;;; Remove all TNs with no references from the lists of unpacked TNs. We
-;;; null out the Offset so that nobody will mistake deleted wired TNs for
-;;; properly packed TNs. We mark non-deleted alias TNs so that aliased TNs
-;;; aren't considered to be unreferenced.
+;;; Remove all TNs with no references from the lists of unpacked TNs.
+;;; We null out the Offset so that nobody will mistake deleted wired
+;;; TNs for properly packed TNs. We mark non-deleted alias TNs so that
+;;; aliased TNs aren't considered to be unreferenced.
 (defun delete-unreferenced-tns (component)
   (let* ((2comp (component-info component))
 	 (aliases (make-array (1+ (ir2-component-global-tn-counter 2comp))

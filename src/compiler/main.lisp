@@ -315,8 +315,8 @@
     (declare (special *constraint-number* *delayed-ir1-transforms*))
     (loop
       (ir1-optimize-until-done component)
-      (when (or (component-new-funs component)
-		(component-reanalyze-funs component))
+      (when (or (component-new-functionals component)
+		(component-reanalyze-functionals component))
 	(maybe-mumble "locall ")
 	(locall-analyze-component component))
       (dfo-as-needed component)
@@ -328,8 +328,8 @@
       (flet ((want-reoptimization-p ()
 	       (or (component-reoptimize component)
 		   (component-reanalyze component)
-		   (component-new-funs component)
-		   (component-reanalyze-funs component))))
+		   (component-new-functionals component)
+		   (component-reanalyze-functionals component))))
 	(unless (and (want-reoptimization-p)
 		     ;; We delay the generation of type checks until
 		     ;; the type constraints have had time to
@@ -593,7 +593,7 @@
 
 ;;;; trace output
 
-;;; Print out some useful info about Component to Stream.
+;;; Print out some useful info about COMPONENT to STREAM.
 (defun describe-component (component *standard-output*)
   (declare (type component component))
   (format t "~|~%;;;; component: ~S~2%" (component-name component))
@@ -622,7 +622,7 @@
 ;;;; the error context and for recovering from errors.
 ;;;;
 ;;;; The interface we provide to this stuff is the stream-oid
-;;;; Source-Info structure. The bookkeeping is done as a side-effect
+;;;; SOURCE-INFO structure. The bookkeeping is done as a side effect
 ;;;; of getting the next source form.
 
 ;;; A FILE-INFO structure holds all the source information for a

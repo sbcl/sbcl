@@ -233,11 +233,6 @@
 ;;; and doing IR1 optimizations. We can ignore all blocks that don't
 ;;; have the REOPTIMIZE flag set. If COMPONENT-REOPTIMIZE is true when
 ;;; we are done, then another iteration would be beneficial.
-;;;
-;;; We delete blocks when there is either no predecessor or the block
-;;; is in a lambda that has been deleted. These blocks would
-;;; eventually be deleted by DFO recomputation, but doing it here
-;;; immediately makes the effect available to IR1 optimization.
 (defun ir1-optimize (component)
   (declare (type component component))
   (setf (component-reoptimize component) nil)
@@ -270,48 +265,58 @@
 	(aver (not (block-delete-p block)))
 	(ir1-optimize-block block))
 
+      ;; We delete blocks when there is either no predecessor or the
+      ;; block is in a lambda that has been deleted. These blocks
+      ;; would eventually be deleted by DFO recomputation, but doing
+      ;; it here immediately makes the effect available to IR1
+      ;; optimization.
       (when (and (block-flush-p block) (block-component block))
 	(aver (not (block-delete-p block)))
 	(flush-dead-code block)))))
 
   (values))
 
-;;; Loop over the nodes in BLOCK, looking for stuff that needs to be
-;;; optimized. We dispatch off of the type of each node with its
-;;; reoptimize flag set:
-
-;;; -- With a COMBINATION, we call PROPAGATE-FUN-CHANGE whenever
-;;;    the function changes, and call IR1-OPTIMIZE-COMBINATION if any
-;;;    argument changes.
-;;; -- With an EXIT, we derive the node's type from the VALUE's type.
-;;;    We don't propagate CONT's assertion to the VALUE, since if we
-;;;    did, this would move the checking of CONT's assertion to the
-;;;    exit. This wouldn't work with CATCH and UWP, where the EXIT
-;;;    node is just a placeholder for the actual unknown exit.
+;;; Loop over the nodes in BLOCK, acting on (and clearing) REOPTIMIZE
+;;; flags.
 ;;;
-;;; Note that we clear the node & block reoptimize flags *before*
-;;; doing the optimization. This ensures that the node or block will
-;;; be reoptimized if necessary. We leave the NODE-OPTIMIZE flag set
-;;; going into IR1-OPTIMIZE-RETURN, since IR1-OPTIMIZE-RETURN wants to
-;;; clear the flag itself.
+;;; Note that although they are cleared here, REOPTIMIZE flags might
+;;; still be set upon return from this function, meaning that further
+;;; optimization is wanted (as a consequence of optimizations we did).
 (defun ir1-optimize-block (block)
   (declare (type cblock block))
+  ;; We clear the node and block REOPTIMIZE flags before doing the
+  ;; optimization, not after. This ensures that the node or block will
+  ;; be reoptimized if necessary.
   (setf (block-reoptimize block) nil)
   (do-nodes (node cont block :restart-p t)
     (when (node-reoptimize node)
+      ;; As above, we clear the node REOPTIMIZE flag before optimizing.
       (setf (node-reoptimize node) nil)
       (typecase node
 	(ref)
 	(combination
+	 ;; With a COMBINATION, we call PROPAGATE-FUN-CHANGE whenever
+	 ;; the function changes, and call IR1-OPTIMIZE-COMBINATION if
+	 ;; any argument changes.
 	 (ir1-optimize-combination node))
 	(cif
 	 (ir1-optimize-if node))
 	(creturn
+	 ;; KLUDGE: We leave the NODE-OPTIMIZE flag set going into
+	 ;; IR1-OPTIMIZE-RETURN, since IR1-OPTIMIZE-RETURN wants to
+	 ;; clear the flag itself. -- WHN 2002-02-02, quoting original
+	 ;; CMU CL comments
 	 (setf (node-reoptimize node) t)
 	 (ir1-optimize-return node))
 	(mv-combination
 	 (ir1-optimize-mv-combination node))
 	(exit
+	 ;; With an EXIT, we derive the node's type from the VALUE's
+	 ;; type. We don't propagate CONT's assertion to the VALUE,
+	 ;; since if we did, this would move the checking of CONT's
+	 ;; assertion to the exit. This wouldn't work with CATCH and
+	 ;; UWP, where the EXIT node is just a placeholder for the
+	 ;; actual unknown exit.
 	 (let ((value (exit-value node)))
 	   (when value
 	     (derive-node-type node (continuation-derived-type value)))))
@@ -321,21 +326,6 @@
 
 ;;; Try to join with a successor block. If we succeed, we return true,
 ;;; otherwise false.
-;;;
-;;; We cannot combine with a successor block if:
-;;;  1. The successor has more than one predecessor.
-;;;  2. The last node's CONT is also used somewhere else.
-;;;  3. The successor is the current block (infinite loop).
-;;;  4. The next block has a different cleanup, and thus we may want 
-;;;     to insert cleanup code between the two blocks at some point.
-;;;  5. The next block has a different home lambda, and thus the
-;;;     control transfer is a non-local exit.
-;;;
-;;; Joining is easy when the successor's START continuation is the
-;;; same from our LAST's CONT. If they differ, then we can still join
-;;; when the last continuation has no next and the next continuation
-;;; has no uses. In this case, we replace the next continuation with
-;;; the last before joining the blocks.
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
   (let ((next (first (block-succ block))))
@@ -343,22 +333,39 @@
       (let* ((last (block-last block))
 	     (last-cont (node-cont last))
 	     (next-cont (block-start next)))
-	(cond ((or (rest (block-pred next))
-		   (not (eq (continuation-use last-cont) last))
-		   (eq next block)
-		   (not (eq (block-end-cleanup block)
-			    (block-start-cleanup next)))
-		   (not (eq (block-home-lambda block)
-			    (block-home-lambda next))))
+	(cond (;; We cannot combine with a successor block if:
+	       (or
+		;; The successor has more than one predecessor.
+		(rest (block-pred next))
+		;; The last node's CONT is also used somewhere else.
+		(not (eq (continuation-use last-cont) last))
+		;; The successor is the current block (infinite loop).
+		(eq next block)
+		;; The next block has a different cleanup, and thus
+		;; we may want to insert cleanup code between the
+		;; two blocks at some point.
+		(not (eq (block-end-cleanup block)
+			 (block-start-cleanup next)))
+		;; The next block has a different home lambda, and
+		;; thus the control transfer is a non-local exit.
+		(not (eq (block-home-lambda block)
+			 (block-home-lambda next))))
 	       nil)
+	      ;; Joining is easy when the successor's START
+	      ;; continuation is the same from our LAST's CONT. 
 	      ((eq last-cont next-cont)
 	       (join-blocks block next)
 	       t)
+	      ;; If they differ, then we can still join when the last
+	      ;; continuation has no next and the next continuation
+	      ;; has no uses. 
 	      ((and (null (block-start-uses next))
 		    (eq (continuation-kind last-cont) :inside-block))
+	       ;; In this case, we replace the next
+	       ;; continuation with the last before joining the blocks.
 	       (let ((next-node (continuation-next next-cont)))
 		 ;; If NEXT-CONT does have a dest, it must be
-		 ;; unreachable, since there are no uses.
+		 ;; unreachable, since there are no USES.
 		 ;; DELETE-CONTINUATION will mark the dest block as
 		 ;; DELETE-P [and also this block, unless it is no
 		 ;; longer backward reachable from the dest block.]
@@ -407,13 +414,9 @@
 
   (values))
 
-;;; Delete any nodes in BLOCK whose value is unused and have no
-;;; side-effects. We can delete sets of lexical variables when the set
+;;; Delete any nodes in BLOCK whose value is unused and which have no
+;;; side effects. We can delete sets of lexical variables when the set
 ;;; variable has no references.
-;;;
-;;; [### For now, don't delete potentially flushable calls when they
-;;; have the CALL attribute. Someday we should look at the functional
-;;; args to determine if they have any side-effects.]
 (defun flush-dead-code (block)
   (declare (type cblock block))
   (do-nodes-backwards (node cont block)
@@ -427,6 +430,11 @@
 	   (when (fun-info-p info)
 	     (let ((attr (fun-info-attributes info)))
 	       (when (and (ir1-attributep attr flushable)
+			  ;; ### For now, don't delete potentially
+			  ;; flushable calls when they have the CALL
+			  ;; attribute. Someday we should look at the
+			  ;; functional args to determine if they have
+			  ;; any side effects.
 			  (not (ir1-attributep attr call)))
 		 (flush-dest (combination-fun node))
 		 (dolist (arg (combination-args node))
@@ -618,9 +626,9 @@
 
 ;;; This function attempts to delete an exit node, returning true if
 ;;; it deletes the block as a consequence:
-;;; -- If the exit is degenerate (has no Entry), then we don't do
+;;; -- If the exit is degenerate (has no ENTRY), then we don't do
 ;;;    anything, since there is nothing to be done.
-;;; -- If the exit node and its Entry have the same home lambda then
+;;; -- If the exit node and its ENTRY have the same home lambda then
 ;;;    we know the exit is local, and can delete the exit. We change
 ;;;    uses of the Exit-Value to be uses of the original continuation,
 ;;;    then unlink the node. If the exit is to a TR context, then we
@@ -699,9 +707,7 @@
 		    ;; cross-compiler can't fold it because the
 		    ;; cross-compiler doesn't know how to evaluate it.
 		    #+sb-xc-host
-		    (let* ((ref (continuation-use (combination-fun node)))
-			   (fun-name (leaf-source-name (ref-leaf ref))))
-		      (fboundp fun-name)))
+		    (fboundp (combination-fun-source-name node)))
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
 
@@ -940,7 +946,8 @@
 		    (transform-call call
 				    `(lambda ,dummies
 				       (,(leaf-source-name leaf)
-					,@dummies)))))))))))
+					,@dummies))
+				    (leaf-source-name leaf))))))))))
   (values))
 
 ;;;; known function optimization
@@ -992,7 +999,9 @@
 	       (valid-fun-use node type :strict-result t))
 	   (multiple-value-bind (severity args)
 	       (catch 'give-up-ir1-transform
-		 (transform-call node (funcall fun node))
+		 (transform-call node
+				 (funcall fun node)
+				 (combination-fun-source-name node))
 		 (values :none nil))
 	     (ecase severity
 	       (:none
@@ -1088,21 +1097,31 @@
  		(setf (component-reoptimize (block-component block)) t)))))))
     reoptimize))
 
-
 ;;; Take the lambda-expression RES, IR1 convert it in the proper
 ;;; environment, and then install it as the function for the call
 ;;; NODE. We do local call analysis so that the new function is
 ;;; integrated into the control flow.
-(defun transform-call (node res)
+;;;
+;;; We require the original function source name in order to generate
+;;; a meaningful debug name for the lambda we set up. (It'd be
+;;; possible to do this starting from debug names as well as source
+;;; names, but as of sbcl-0.7.1.5, there was no need for this
+;;; generality, since source names are always known to our callers.)
+(defun transform-call (node res source-name)
   (declare (type combination node) (list res))
+  (aver (and (legal-fun-name-p source-name)
+	     (not (eql source-name '.anonymous.))))
   (with-ir1-environment-from-node node
       (let ((new-fun (ir1-convert-inline-lambda
 		      res
-		      :debug-name "something inlined in TRANSFORM-CALL"))
-	  (ref (continuation-use (combination-fun node))))
-      (change-ref-leaf ref new-fun)
-      (setf (combination-kind node) :full)
-      (locall-analyze-component *current-component*)))
+		      :debug-name (debug-namify "LAMBDA-inlined ~A"
+						(as-debug-name
+						 source-name
+						 "<unknown function>"))))
+	    (ref (continuation-use (combination-fun node))))
+	(change-ref-leaf ref new-fun)
+	(setf (combination-kind node) :full)
+	(locall-analyze-component *current-component*)))
   (values))
 
 ;;; Replace a call to a foldable function of constant arguments with
@@ -1114,24 +1133,21 @@
 ;;; call a :ERROR call.
 ;;;
 ;;; If there is more than one value, then we transform the call into a
-;;; values form.
+;;; VALUES form.
 (defun constant-fold-call (call)
-  (declare (type combination call))
-  (let* ((args (mapcar #'continuation-value (combination-args call)))
-	 (ref (continuation-use (combination-fun call)))
-	 (fun-name (leaf-source-name (ref-leaf ref))))
-
+  (let ((args (mapcar #'continuation-value (combination-args call)))
+	(fun-name (combination-fun-source-name call)))
     (multiple-value-bind (values win)
 	(careful-call fun-name args call "constant folding")
       (if (not win)
-	(setf (combination-kind call) :error)
-	(let ((dummies (make-gensym-list (length args))))
-	  (transform-call
-	   call
-	   `(lambda ,dummies
-	      (declare (ignore ,@dummies))
-	      (values ,@(mapcar (lambda (x) `',x) values))))))))
-
+	  (setf (combination-kind call) :error)
+	  (let ((dummies (make-gensym-list (length args))))
+	    (transform-call
+	     call
+	     `(lambda ,dummies
+		(declare (ignore ,@dummies))
+		(values ,@(mapcar (lambda (x) `',x) values)))
+	     fun-name)))))
   (values))
 
 ;;;; local call optimization
@@ -1205,7 +1221,7 @@
 ;;; -- the var's DEST has a different policy than the ARG's (think safety).
 ;;;
 ;;; We change the REF to be a reference to NIL with unused value, and
-;;; let it be flushed as dead code. A side-effect of this substitution
+;;; let it be flushed as dead code. A side effect of this substitution
 ;;; is to delete the variable.
 (defun substitute-single-use-continuation (arg var)
   (declare (type continuation arg) (type lambda-var var))
@@ -1239,15 +1255,15 @@
 ;;; any unreferenced variables. Note that FLUSH-DEAD-CODE will come
 ;;; along right away and delete the REF and then the lambda, since we
 ;;; flush the FUN continuation.
-(defun delete-let (fun)
-  (declare (type clambda fun))
-  (aver (member (functional-kind fun) '(:let :mv-let)))
-  (note-unreferenced-vars fun)
-  (let ((call (let-combination fun)))
+(defun delete-let (clambda)
+  (declare (type clambda clambda))
+  (aver (functional-letlike-p clambda))
+  (note-unreferenced-vars clambda)
+  (let ((call (let-combination clambda)))
     (flush-dest (basic-combination-fun call))
     (unlink-node call)
-    (unlink-node (lambda-bind fun))
-    (setf (lambda-bind fun) nil))
+    (unlink-node (lambda-bind clambda))
+    (setf (lambda-bind clambda) nil))
   (values))
 
 ;;; This function is called when one of the arguments to a LET

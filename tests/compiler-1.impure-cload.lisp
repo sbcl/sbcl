@@ -1,4 +1,4 @@
-;;;; miscellaneous compiler tests with side-effects (e.g. DEFUN
+;;;; miscellaneous compiler tests with side effects (e.g. DEFUN
 ;;;; changing FDEFINITIONs and globaldb stuff)
 
 ;;;; This software is part of the SBCL system. See the README file for

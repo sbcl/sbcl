@@ -14,9 +14,9 @@
 
 (in-package "SB!C")
 
-;;; Scan through Block looking for uses of :Unknown continuations that have
-;;; their Dest outside of the block. We do some checking to verify the
-;;; invariant that all pushes come after the last pop.
+;;; Scan through BLOCK looking for uses of :UNKNOWN continuations that
+;;; have their DEST outside of the block. We do some checking to
+;;; verify the invariant that all pushes come after the last pop.
 (defun find-pushed-continuations (block)
   (let* ((2block (block-info block))
 	 (popped (ir2-block-popped 2block))
@@ -184,7 +184,7 @@
 ;;;; stack analysis
 
 ;;; Return a list of all the blocks containing genuine uses of one of the
-;;; Receivers. Exits are excluded, since they don't drop through to the
+;;; RECEIVERS. Exits are excluded, since they don't drop through to the
 ;;; receiver.
 (defun find-values-generators (receivers)
   (declare (list receivers))
@@ -196,15 +196,17 @@
 	    (res (node-block use))))))
     (res)))
 
-;;; Analyze the use of unknown-values continuations in Component, inserting
-;;; cleanup code to discard values that are generated but never received. This
-;;; phase doesn't need to be run when Values-Receivers is null, i.e. there are
-;;; no unknown-values continuations used across block boundaries.
+;;; Analyze the use of unknown-values continuations in COMPONENT,
+;;; inserting cleanup code to discard values that are generated but
+;;; never received. This phase doesn't need to be run when
+;;; Values-Receivers is null, i.e. there are no unknown-values
+;;; continuations used across block boundaries.
 ;;;
-;;; Do the backward graph walk, starting at each values receiver. We ignore
-;;; receivers that already have a non-null Start-Stack. These are nested
-;;; values receivers that have already been reached on another walk. We don't
-;;; want to clobber that result with our null initial stack.
+;;; Do the backward graph walk, starting at each values receiver. We
+;;; ignore receivers that already have a non-null START-STACK. These
+;;; are nested values receivers that have already been reached on
+;;; another walk. We don't want to clobber that result with our null
+;;; initial stack.
 (defun stack-analyze (component)
   (declare (type component component))
   (let* ((2comp (component-info component))

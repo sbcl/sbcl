@@ -84,7 +84,8 @@
   (dolist (c components)
     (let* ((head (component-head c))
 	   (tail (component-tail c)))
-      (unless (and (null (block-pred head)) (null (block-succ tail)))
+      (unless (and (null (block-pred head))
+		   (null (block-succ tail)))
 	(barf "~S is malformed." c))
 
       (do ((prev nil block)
@@ -178,7 +179,7 @@
 	 (barf "The function for XEP ~S has kind." functional))
        (unless (eq (functional-entry-fun fun) functional)
 	 (barf "bad back-pointer in function for XEP ~S" functional))))
-    ((:let :mv-let :assignment)
+    ((:let :mv-let :assignment) ; i.e. SOMEWHAT-LETLIKE-P
      (check-fun-reached (lambda-home functional) functional)
      (when (functional-entry-fun functional)
        (barf "The LET ~S has entry function." functional))
@@ -245,7 +246,7 @@
 
 (defun check-fun-consistency (components)
   (dolist (c components)
-    (dolist (new-fun (component-new-funs c))
+    (dolist (new-fun (component-new-functionals c))
       (observe-functional new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :external)
@@ -257,7 +258,7 @@
 	(observe-functional let))))
 
   (dolist (c components)
-    (dolist (new-fun (component-new-funs c))
+    (dolist (new-fun (component-new-functionals c))
       (check-fun-stuff new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :deleted)

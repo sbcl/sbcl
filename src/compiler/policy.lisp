@@ -90,7 +90,7 @@
 ;;; FIXME: Doing this is slightly flaky (since we can't do it right
 ;;; without all the headaches of true code walking), and it shouldn't
 ;;; be necessary with modern Python anyway, as long as POLICY-QUALITY
-;;; is properly DEFKNOWNed to have no side-effects so that it can be
+;;; is properly DEFKNOWNed to have no side effects so that it can be
 ;;; optimized away if unused. So this should probably go away.
 (defun policy-qualities-used-by (expr)
   (let ((result nil))

@@ -60,13 +60,13 @@
 ;;;; IR1 annotations used for IR2 conversion
 
 ;;; Block-Info
-;;;    Holds the IR2-Block structure. If there are overflow blocks,
-;;;    then this points to the first IR2-Block. The Block-Info of the
+;;;    Holds the IR2-BLOCK structure. If there are overflow blocks,
+;;;    then this points to the first IR2-BLOCK. The BLOCK-INFO of the
 ;;;    dummy component head and tail are dummy IR2 blocks that begin
 ;;;    and end the emission order thread.
 ;;;
 ;;; Component-Info
-;;;    Holds the IR2-Component structure.
+;;;    Holds the IR2-COMPONENT structure.
 ;;;
 ;;; Continuation-Info
 ;;;    Holds the IR2-Continuation structure. Continuations whose
@@ -146,7 +146,7 @@
   ;; assign all the more args one LTN number, and all the more results
   ;; another LTN number. We can do this, since more operands are
   ;; referenced simultaneously as far as conflict analysis is
-  ;; concerned. Note that all these :More TNs will be global TNs.
+  ;; concerned. Note that all these :MORE TNs will be global TNs.
   (local-tns (make-array local-tn-limit) :type local-tn-vector)
   ;; Bit-vectors used during lifetime analysis to keep track of
   ;; references to local TNs. When indexed by the LTN number, the
@@ -159,9 +159,8 @@
 	    :type local-tn-bit-vector)
   ;; This is similar to the above, but is updated by lifetime flow
   ;; analysis to have a 1 for LTN numbers of TNs live at the end of
-  ;; the block. This takes into account all TNs that aren't :Live.
-  (live-in (make-array local-tn-limit :element-type 'bit
-		       :initial-element 0)
+  ;; the block. This takes into account all TNs that aren't :LIVE.
+  (live-in (make-array local-tn-limit :element-type 'bit :initial-element 0)
 	   :type local-tn-bit-vector)
   ;; a thread running through the global-conflicts structures for this
   ;; block, sorted by TN number
@@ -285,12 +284,12 @@
   ;; overhead that is eventually stuffed in somehow.
   (constants (make-array 10 :fill-pointer 0 :adjustable t) :type vector)
   ;; some kind of info about the component's run-time representation.
-  ;; This is filled in by the VM supplied Select-Component-Format function.
+  ;; This is filled in by the VM supplied SELECT-COMPONENT-FORMAT function.
   format
   ;; a list of the ENTRY-INFO structures describing all of the entries
   ;; into this component. Filled in by entry analysis.
   (entries nil :type list)
-  ;; Head of the list of :ALIAS TNs in this component, threaded by TN-NEXT.
+  ;; head of the list of :ALIAS TNs in this component, threaded by TN-NEXT
   (alias-tns nil :type (or tn null))
   ;; SPILLED-VOPS is a hashtable translating from "interesting" VOPs
   ;; to a list of the TNs spilled at that VOP. This is used when
@@ -575,7 +574,7 @@
 (def!struct (vop-info
 	     (:include template)
 	     (:make-load-form-fun ignore-it))
-  ;; side-effects of this VOP and side-effects that affect the value
+  ;; side effects of this VOP and side effects that affect the value
   ;; of this VOP
   (effects (missing-arg) :type attributes)
   (affected (missing-arg) :type attributes)
@@ -959,16 +958,16 @@
   ;;    :READ-ONLY
   ;;	The TN is read, but never written. It starts the block live,
   ;;	and is not killed by the block. Lifetime analysis will promote
-  ;;	:Read-Only TNs to :Live if they are live at the block end.
+  ;;	:READ-ONLY TNs to :LIVE if they are live at the block end.
   ;;
   ;;    :LIVE
   ;;	The TN is not referenced. It is live everywhere in the block.
   (kind :read-only :type (member :read :write :read-only :live))
   ;; a local conflicts vector representing conflicts with TNs live in
-  ;; Block. The index for the local TN number of each TN we conflict
-  ;; with in this block is 1. To find the full conflict set, the :Live
-  ;; TNs for Block must also be included. This slot is not meaningful
-  ;; when Kind is :Live.
+  ;; BLOCK. The index for the local TN number of each TN we conflict
+  ;; with in this block is 1. To find the full conflict set, the :LIVE
+  ;; TNs for BLOCK must also be included. This slot is not meaningful
+  ;; when KIND is :LIVE.
   (conflicts (make-array local-tn-limit
 			 :element-type 'bit
 			 :initial-element 0)
@@ -977,7 +976,7 @@
   (tn (missing-arg) :type tn)
   ;; thread through all the Global-Conflicts for TN
   (tn-next nil :type (or global-conflicts null))
-  ;; TN's local TN number in Block. :Live TNs don't have local numbers.
+  ;; TN's local TN number in BLOCK. :LIVE TNs don't have local numbers.
   (number nil :type (or local-tn-number null)))
 (defprinter (global-conflicts)
   tn

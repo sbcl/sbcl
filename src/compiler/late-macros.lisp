@@ -4,7 +4,7 @@
 ;;;; this code can't appear in the build sequence until after
 ;;;; SB!XC:DEFMACRO has been defined, and so this stuff is separated
 ;;;; out of the main compiler/macros.lisp file (which has to appear
-;;;; earlier)
+;;;; earlier).
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -17,22 +17,22 @@
 
 (in-package "SB!C")
 
+;;; Def-Boolean-Attribute Name Attribute-Name*
+;;;
+;;; Define a new class of Boolean attributes, with the attributes
+;;; having the specified ATTRIBUTE-NAMES. NAME is the name of the
+;;; class, which is used to generate some macros to manipulate sets of
+;;; the attributes:
+;;;
+;;;   NAME-attributep attributes attribute-name*
+;;;     Return true if any of the named attributes are present, false
+;;;     otherwise. When set with SETF, updates the place Attributes
+;;;     setting or clearing the specified attributes.
+;;;
+;;;   NAME-attributes attribute-name*
+;;;     Return a set of the named attributes.
 #+sb-xc-host
 (sb!xc:defmacro def-boolean-attribute (name &rest attribute-names)
-  #!+sb-doc
-  "Def-Boolean-Attribute Name Attribute-Name*
-  Define a new class of boolean attributes, with the attributes having the
-  specified Attribute-Names. Name is the name of the class, which is used to
-  generate some macros to manipulate sets of the attributes:
-
-    NAME-attributep attributes attribute-name*
-      Return true if one of the named attributes is present, false otherwise.
-      When set with SETF, updates the place Attributes setting or clearing the
-      specified attributes.
-
-    NAME-attributes attribute-name*
-      Return a set of the named attributes."
-
   (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
 	(test-name (symbolicate name "-ATTRIBUTEP")))
     (collect ((alist))
@@ -47,16 +47,16 @@
 	   (defparameter ,translations-name ',(alist)))
 
 	 (defmacro ,test-name (attributes &rest attribute-names)
-	   "Automagically generated boolean attribute test function. See
-	    Def-Boolean-Attribute."
+	   "Automagically generated Boolean attribute test function. See
+	    DEF-BOOLEAN-ATTRIBUTE."
 	   `(logtest ,(compute-attribute-mask attribute-names
 					      ,translations-name)
 		     (the attributes ,attributes)))
 
 	 (define-setf-expander ,test-name (place &rest attributes
 						 &environment env)
-	   "Automagically generated boolean attribute setter. See
-	    Def-Boolean-Attribute."
+	   "Automagically generated Boolean attribute setter. See
+	    DEF-BOOLEAN-ATTRIBUTE."
 	   (boolean-attribute-setter--target place
 					     attributes
 					     env
@@ -67,8 +67,8 @@
 					     ',test-name))
 
 	 (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
-	   "Automagically generated boolean attribute creation function. See
-	    Def-Boolean-Attribute."
+	   "Automagically generated Boolean attribute creation function. See
+	    DEF-BOOLEAN-ATTRIBUTE."
 	   (compute-attribute-mask attribute-names ,translations-name))))))
 
 ;;; a helper function for the cross-compilation target Lisp code which
@@ -131,11 +131,10 @@
 			(,next ,n-current)))))
 	 (values)))))
 
+;;; Push ITEM onto a list linked by the accessor function NEXT that is
+;;; stored in PLACE.
 #+sb-xc-host
 (sb!xc:defmacro push-in (next item place &environment env)
-  #!+sb-doc
-  "Push Item onto a list linked by the accessor function Next that is stored in
-  Place."
   (multiple-value-bind (temps vals stores store access)
       (sb!xc:get-setf-expansion place env)
     (when (cdr stores)

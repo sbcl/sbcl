@@ -137,6 +137,8 @@ WORKAROUND:
 	(defclass ccc () ())
 	(setf (find-class 'ccc1) (find-class 'ccc))
 	(defmethod zut ((c ccc1)) 123)
+  In sbcl-0.7.1.13, this gives an error, 
+	There is no class named CCC1.
   DTC's recommended workaround from the mailing list 3 Mar 2000:
 	(setf (pcl::find-class 'ccc1) (pcl::find-class 'ccc))
 
@@ -1248,7 +1250,7 @@ WORKAROUND:
   it with only one entry in LEAF-REFS.
   
 148:
-  In sbcl-0.7.1.3 on x86, COMPILE-FILE on this file
+  In sbcl-0.7.1.3 on x86, COMPILE-FILE on the file
     (in-package :cl-user)
     (defvar *thing*)
     (defvar *zoom*)
@@ -1269,8 +1271,20 @@ WORKAROUND:
   fails with
     debugger invoked on condition of type TYPE-ERROR:
       The value NIL is not of type SB-C::NODE.
-  in IR1-OPTIMIZE-BLOCK.
+  The location of this failure has moved around as various related
+  issues were cleaned up. As of sbcl-0.7.1.9, it occurs in 
+  NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
 
+149:
+  (reported by Stig E Sandoe sbcl-devel 2002-02-02)
+  In sbcl-0.7.1.13, compiling a DEFCLASS FOO form isn't enough to make
+  the class known to the compiler for other forms compiled in the same
+  file, so bogus warnings "undefined type: FOO" are generated, e.g.
+  when compiling 
+    (in-package :cl-user)
+    (defclass foo () ())
+    (defun bar (x)
+      (typep x 'foo))
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

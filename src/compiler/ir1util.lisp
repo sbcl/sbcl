@@ -192,13 +192,13 @@
      (let* ((head (component-head *current-component*))
 	    (next (block-next head))
 	    (new-block (make-block cont)))
-       (setf (block-next new-block) next)
-       (setf (block-prev new-block) head)
-       (setf (block-prev next) new-block)
-       (setf (block-next head) new-block)
-       (setf (continuation-block cont) new-block)
-       (setf (continuation-use cont) nil)
-       (setf (continuation-kind cont) :block-start)
+       (setf (block-next new-block) next
+	     (block-prev new-block) head
+	     (block-prev next) new-block
+	     (block-next head) new-block
+	     (continuation-block cont) new-block
+	     (continuation-use cont) nil
+	     (continuation-kind cont) :block-start)
        new-block))
     (:block-start
      (continuation-block cont))))
@@ -488,7 +488,7 @@
   (values))
 
 ;;; Add BLOCK to the next/prev chain following AFTER. We also set the
-;;; Component to be the same as for AFTER.
+;;; COMPONENT to be the same as for AFTER.
 (defun add-to-dfo (block after)
   (declare (type cblock block after))
   (let ((next (block-next after))
@@ -568,18 +568,14 @@
 
 ;;;; deleting stuff
 
-;;; Deal with deleting the last (read) reference to a LAMBDA-VAR. We
-;;; iterate over all local calls flushing the corresponding argument,
-;;; allowing the computation of the argument to be deleted. We also
-;;; mark the let for reoptimization, since it may be that we have
-;;; deleted the last variable.
-;;;
-;;; The LAMBDA-VAR may still have some SETs, but this doesn't cause
-;;; too much difficulty, since we can efficiently implement write-only
-;;; variables. We iterate over the sets, marking their blocks for dead
-;;; code flushing, since we can delete sets whose value is unused.
+;;; Deal with deleting the last (read) reference to a LAMBDA-VAR. 
 (defun delete-lambda-var (leaf)
   (declare (type lambda-var leaf))
+
+  ;; Iterate over all local calls flushing the corresponding argument,
+  ;; allowing the computation of the argument to be deleted. We also
+  ;; mark the LET for reoptimization, since it may be that we have
+  ;; deleted its last variable.
   (let* ((fun (lambda-var-home leaf))
 	 (n (position leaf (lambda-vars fun))))
     (dolist (ref (leaf-refs fun))
@@ -594,17 +590,22 @@
 	    (flush-dest arg)
 	    (setf (elt args n) nil))))))
 
+  ;; The LAMBDA-VAR may still have some SETs, but this doesn't cause
+  ;; too much difficulty, since we can efficiently implement
+  ;; write-only variables. We iterate over the SETs, marking their
+  ;; blocks for dead code flushing, since we can delete SETs whose
+  ;; value is unused.
   (dolist (set (lambda-var-sets leaf))
     (setf (block-flush-p (node-block set)) t))
 
   (values))
 
-;;; Note that something interesting has happened to VAR. We only deal
-;;; with LET variables, marking the corresponding initial value arg as
-;;; needing to be reoptimized.
+;;; Note that something interesting has happened to VAR. 
 (defun reoptimize-lambda-var (var)
   (declare (type lambda-var var))
   (let ((fun (lambda-var-home var)))
+    ;; We only deal with LET variables, marking the corresponding
+    ;; initial value arg as needing to be reoptimized.
     (when (and (eq (functional-kind fun) :let)
 	       (leaf-refs var))
       (do ((args (basic-combination-args
@@ -628,58 +629,60 @@
     (clambda (delete-lambda fun)))
   (values))
 
-;;; Deal with deleting the last reference to a LAMBDA. Since there is
-;;; only one way into a LAMBDA, deleting the last reference to a
-;;; LAMBDA ensures that there is no way to reach any of the code in
+;;; Deal with deleting the last reference to a CLAMBDA. Since there is
+;;; only one way into a CLAMBDA, deleting the last reference to a
+;;; CLAMBDA ensures that there is no way to reach any of the code in
 ;;; it. So we just set the FUNCTIONAL-KIND for FUN and its LETs to
 ;;; :DELETED, causing IR1 optimization to delete blocks in that
-;;; lambda.
-;;;
-;;; If the function isn't a LET, we unlink the function head and tail
-;;; from the component head and tail to indicate that the code is
-;;; unreachable. We also delete the function from COMPONENT-LAMBDAS
-;;; (it won't be there before local call analysis, but no matter.) If
-;;; the lambda was never referenced, we give a note.
-;;;
-;;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
-;;; ENTRY-FUN so that people will know that it is not an entry point
-;;; anymore.
-(defun delete-lambda (leaf)
-  (declare (type clambda leaf))
-  (let ((kind (functional-kind leaf))
-	(bind (lambda-bind leaf)))
-    (aver (not (member kind '(:deleted :optional :toplevel))))
-    (aver (not (functional-has-external-references-p leaf)))
-    (setf (functional-kind leaf) :deleted)
-    (setf (lambda-bind leaf) nil)
-    (dolist (let (lambda-lets leaf))
+;;; CLAMBDA.
+(defun delete-lambda (clambda)
+  (declare (type clambda clambda))
+  (let ((original-kind (functional-kind clambda))
+	(bind (lambda-bind clambda)))
+    (aver (not (member original-kind '(:deleted :optional :toplevel))))
+    (aver (not (functional-has-external-references-p clambda)))
+    (setf (functional-kind clambda) :deleted)
+    (setf (lambda-bind clambda) nil)
+    (dolist (let (lambda-lets clambda))
       (setf (lambda-bind let) nil)
       (setf (functional-kind let) :deleted))
 
-    (if (member kind '(:let :mv-let :assignment))
-	(let ((home (lambda-home leaf)))
-	  (setf (lambda-lets home) (delete leaf (lambda-lets home))))
+    ;; (The IF test is (FUNCTIONAL-SOMEWHAT-LETLIKE-P CLAMBDA), except
+    ;; that we're using the old value of the KIND slot, not the
+    ;; current slot value, which has now been set to :DELETED.)
+    (if (member original-kind '(:let :mv-let :assignment))
+	(let ((home (lambda-home clambda)))
+	  (setf (lambda-lets home) (delete clambda (lambda-lets home))))
+	;; If the function isn't a LET, we unlink the function head
+	;; and tail from the component head and tail to indicate that
+	;; the code is unreachable. We also delete the function from
+	;; COMPONENT-LAMBDAS (it won't be there before local call
+	;; analysis, but no matter.) If the lambda was never
+	;; referenced, we give a note.
 	(let* ((bind-block (node-block bind))
 	       (component (block-component bind-block))
-	       (return (lambda-return leaf)))
-	  (aver (null (leaf-refs leaf)))
-	  (unless (leaf-ever-used leaf)
+	       (return (lambda-return clambda)))
+	  (aver (null (leaf-refs clambda)))
+	  (unless (leaf-ever-used clambda)
 	    (let ((*compiler-error-context* bind))
 	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"
-			     (leaf-debug-name leaf))))
+			     (leaf-debug-name clambda))))
 	  (unlink-blocks (component-head component) bind-block)
 	  (when return
 	    (unlink-blocks (node-block return) (component-tail component)))
 	  (setf (component-reanalyze component) t)
-	  (let ((tails (lambda-tail-set leaf)))
+	  (let ((tails (lambda-tail-set clambda)))
 	    (setf (tail-set-funs tails)
-		  (delete leaf (tail-set-funs tails)))
-	    (setf (lambda-tail-set leaf) nil))
+		  (delete clambda (tail-set-funs tails)))
+	    (setf (lambda-tail-set clambda) nil))
 	  (setf (component-lambdas component)
-		(delete leaf (component-lambdas component)))))
+		(delete clambda (component-lambdas component)))))
 
-    (when (eq kind :external)
-      (let ((fun (functional-entry-fun leaf)))
+    ;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
+    ;; ENTRY-FUN so that people will know that it is not an entry
+    ;; point anymore.
+    (when (eq original-kind :external)
+      (let ((fun (functional-entry-fun clambda)))
 	(setf (functional-entry-fun fun) nil)
 	(when (optional-dispatch-p fun)
 	  (delete-optional-dispatch fun)))))
@@ -699,11 +702,11 @@
 ;;; entry-points, making them be normal lambdas, and then deleting the
 ;;; ones with no references. This deletes any e-p lambdas that were
 ;;; either never referenced, or couldn't be deleted when the last
-;;; deference was deleted (due to their :OPTIONAL kind.)
+;;; reference was deleted (due to their :OPTIONAL kind.)
 ;;;
-;;; Note that the last optional ep may alias the main entry, so when
-;;; we process the main entry, its kind may have been changed to NIL
-;;; or even converted to a let.
+;;; Note that the last optional entry point may alias the main entry,
+;;; so when we process the main entry, its KIND may have been changed
+;;; to NIL or even converted to a LETlike value.
 (defun delete-optional-dispatch (leaf)
   (declare (type optional-dispatch leaf))
   (let ((entry (functional-entry-fun leaf)))
@@ -750,7 +753,7 @@
 	     (clambda
 	      (ecase (functional-kind leaf)
 		((nil :let :mv-let :assignment :escape :cleanup)
-		 (aver (not (functional-entry-fun leaf)))
+		 (aver (null (functional-entry-fun leaf)))
 		 (delete-lambda leaf))
 		(:external
 		 (delete-lambda leaf))
@@ -775,7 +778,7 @@
 ;;; containing uses of CONT and set COMPONENT-REOPTIMIZE. If the PREV
 ;;; of the use is deleted, then we blow off reoptimization.
 ;;;
-;;; If the continuation is :Deleted, then we don't do anything, since
+;;; If the continuation is :DELETED, then we don't do anything, since
 ;;; all semantics have already been flushed. :DELETED-BLOCK-START
 ;;; start continuations are treated just like :BLOCK-START; it is
 ;;; possible that the continuation may be given a new dest (e.g. by
@@ -892,9 +895,10 @@
 		  ;; Guards COMBINATION-LAMBDA agains the REF being deleted.
 		  (continuation-use (basic-combination-fun node)))
 	 (let ((fun (combination-lambda node)))
-	   ;; If our REF was the 2'nd to last ref, and has been deleted, then
-	   ;; Fun may be a LET for some other combination.
-	   (when (and (member (functional-kind fun) '(:let :mv-let))
+	   ;; If our REF was the second-to-last ref, and has been
+	   ;; deleted, then FUN may be a LET for some other
+	   ;; combination.
+	   (when (and (functional-letlike-p fun)
 		      (eq (let-combination fun) node))
 	     (delete-lambda fun))))
        (flush-dest (basic-combination-fun node))
@@ -903,7 +907,7 @@
       (bind
        (let ((lambda (bind-lambda node)))
 	 (unless (eq (functional-kind lambda) :deleted)
-	   (aver (member (functional-kind lambda) '(:let :mv-let :assignment)))
+	   (aver (functional-somewhat-letlike-p lambda))
 	   (delete-lambda lambda))))
       (exit
        (let ((value (exit-value node))
@@ -1114,7 +1118,7 @@
 ;;; triggered by deletion.
 (defun delete-component (component)
   (declare (type component component))
-  (aver (null (component-new-funs component)))
+  (aver (null (component-new-functionals component)))
   (setf (component-kind component) :deleted)
   (do-blocks (block component)
     (setf (block-delete-p block) t))
@@ -1287,10 +1291,16 @@
 	      nil))
 	nil)))
 
+;;; Return the source name of a combination. (This is an idiom
+;;; which was used in CMU CL. I gather it always works. -- WHN)
+(defun combination-fun-source-name (combination)
+  (let ((ref (continuation-use (combination-fun combination))))
+    (leaf-source-name (ref-leaf ref))))
+
 ;;; Return the COMBINATION node that is the call to the LET FUN.
 (defun let-combination (fun)
   (declare (type clambda fun))
-  (aver (member (functional-kind fun) '(:let :mv-let)))
+  (aver (functional-letlike-p fun))
   (continuation-dest (node-cont (first (leaf-refs fun)))))
 
 ;;; Return the initial value continuation for a LET variable, or NIL

@@ -29,7 +29,7 @@
   "If the trace indentation exceeds this value, then indentation restarts at
    0.")
 
-(defvar *trace-encapsulate-default* :default
+(defvar *trace-encapsulate-default* nil
   #+sb-doc
   "the default value for the :ENCAPSULATE option to TRACE")
 

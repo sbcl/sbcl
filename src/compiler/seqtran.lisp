@@ -388,9 +388,9 @@
   ;; A form that returns the current value. This may be set with SETF to set
   ;; the current value.
   (current (error "Must specify CURRENT."))
-  ;; In a :Normal iterator, a form that tests whether there is a current value.
+  ;; In a :NORMAL iterator, a form that tests whether there is a current value.
   (done nil)
-  ;; In a :Result iterator, a form that truncates the result at the current
+  ;; In a :RESULT iterator, a form that truncates the result at the current
   ;; position and returns it.
   (result nil)
   ;; A form that returns the initial total number of values. The result is

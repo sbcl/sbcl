@@ -1,6 +1,6 @@
 ;;;; This file contains stuff for maintaining a database of special
 ;;;; information about functions known to the compiler. This includes
-;;;; semantic information such as side-effects and type inference
+;;;; semantic information such as side effects and type inference
 ;;;; functions as well as transforms and IR2 translators.
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -18,87 +18,93 @@
 
 ;;; IR1 boolean function attributes
 ;;;
-;;; There are a number of boolean attributes of known functions which we like
-;;; to have in IR1. This information is mostly side effect information of a
-;;; sort, but it is different from the kind of information we want in IR2. We
-;;; aren't interested in a fine breakdown of side effects, since we do very
-;;; little code motion on IR1. We are interested in some deeper semantic
-;;; properties such as whether it is safe to pass stack closures to.
+;;; There are a number of boolean attributes of known functions which
+;;; we like to have in IR1. This information is mostly side effect
+;;; information of a sort, but it is different from the kind of
+;;; information we want in IR2. We aren't interested in a fine
+;;; breakdown of side effects, since we do very little code motion on
+;;; IR1. We are interested in some deeper semantic properties such as
+;;; whether it is safe to pass stack closures to.
 (def-boolean-attribute ir1
-  ;; May call functions that are passed as arguments. In order to determine
-  ;; what other effects are present, we must find the effects of all arguments
-  ;; that may be functions.
+  ;; may call functions that are passed as arguments. In order to
+  ;; determine what other effects are present, we must find the
+  ;; effects of all arguments that may be functions.
   call
-  ;; May incorporate function or number arguments into the result or somehow
-  ;; pass them upward. Note that this applies to any argument that *might* be
-  ;; a function or number, not just the arguments that always are.
+  ;; may incorporate function or number arguments into the result or
+  ;; somehow pass them upward. Note that this applies to any argument
+  ;; that *might* be a function or number, not just the arguments that
+  ;; always are.
   unsafe
-  ;; May fail to return during correct execution. Errors are O.K.
+  ;; may fail to return during correct execution. Errors are O.K.
   unwind
-  ;; The (default) worst case. Includes all the other bad things, plus any
-  ;; other possible bad thing. If this is present, the above bad attributes
-  ;; will be explicitly present as well.
+  ;; the (default) worst case. Includes all the other bad things, plus
+  ;; any other possible bad thing. If this is present, the above bad
+  ;; attributes will be explicitly present as well.
   any
-  ;; May be constant-folded. The function has no side effects, but may be
-  ;; affected by side effects on the arguments. e.g. SVREF, MAPC. Functions
-  ;; that side-effect their arguments are not considered to be foldable.
-  ;; Although it would be "legal" to constant fold them (since it "is an error"
-  ;; to modify a constant), we choose not to mark these functions as foldable
-  ;; in this database.
+  ;; may be constant-folded. The function has no side effects, but may
+  ;; be affected by side effects on the arguments. e.g. SVREF, MAPC.
+  ;; Functions that side-effect their arguments are not considered to
+  ;; be foldable. Although it would be "legal" to constant fold them
+  ;; (since it "is an error" to modify a constant), we choose not to
+  ;; mark these functions as foldable in this database.
   foldable
-  ;; May be eliminated if value is unused. The function has no side effects
-  ;; except possibly CONS. If a function is defined to signal errors, then it
-  ;; is not flushable even if it is movable or foldable.
+  ;; may be eliminated if value is unused. The function has no side
+  ;; effects except possibly CONS. If a function is defined to signal
+  ;; errors, then it is not flushable even if it is movable or
+  ;; foldable.
   flushable
-  ;; May be moved with impunity. Has no side effects except possibly CONS, and
-  ;; is affected only by its arguments.
+  ;; may be moved with impunity. Has no side effects except possibly
+  ;; consing, and is affected only by its arguments.
   movable
-  ;; Function is a true predicate likely to be open-coded. Convert any
-  ;; non-conditional uses into (IF <pred> T NIL).
+  ;; The function is a true predicate likely to be open-coded. Convert
+  ;; any non-conditional uses into (IF <pred> T NIL).
   predicate
-  ;; Inhibit any warning for compiling a recursive definition. (Normally the
-  ;; compiler warns when compiling a recursive definition for a known function,
-  ;; since it might be a botched interpreter stub.)
+  ;; Inhibit any warning for compiling a recursive definition.
+  ;; (Normally the compiler warns when compiling a recursive
+  ;; definition for a known function, since it might be a botched
+  ;; interpreter stub.)
   recursive
-  ;; Function does explicit argument type checking, so the declared type should
-  ;; not be asserted when a definition is compiled.
+  ;; The function does explicit argument type checking, so the
+  ;; declared type should not be asserted when a definition is
+  ;; compiled.
   explicit-check)
 
 (defstruct (fun-info #-sb-xc-host (:pure t))
-  ;; Boolean attributes of this function.
+  ;; boolean attributes of this function.
   (attributes (missing-arg) :type attributes)
-  ;; A list of Transform structures describing transforms for this function.
+  ;; TRANSFORM structures describing transforms for this function
   (transforms () :type list)
-  ;; A function which computes the derived type for a call to this function by
-  ;; examining the arguments. This is null when there is no special method for
-  ;; this function.
+  ;; a function which computes the derived type for a call to this
+  ;; function by examining the arguments. This is null when there is
+  ;; no special method for this function.
   (derive-type nil :type (or function null))
-  ;; A function that does various unspecified code transformations by directly
-  ;; hacking the IR. Returns true if further optimizations of the call
-  ;; shouldn't be attempted.
+  ;; a function that does various unspecified code transformations by
+  ;; directly hacking the IR. Returns true if further optimizations of
+  ;; the call shouldn't be attempted.
   ;;
-  ;; KLUDGE: This return convention (non-NIL if you shouldn't do further
-  ;; optimiz'ns) is backwards from the return convention for transforms.
-  ;; -- WHN 19990917
+  ;; KLUDGE: This return convention (non-NIL if you shouldn't do
+  ;; further optimiz'ns) is backwards from the return convention for
+  ;; transforms. -- WHN 19990917
   (optimizer nil :type (or function null))
-  ;; If true, a special-case LTN annotation method that is used in place of the
-  ;; standard type/policy template selection. It may use arbitrary code to
-  ;; choose a template, decide to do a full call, or conspire with the
-  ;; IR2-Convert method to do almost anything. The Combination node is passed
-  ;; as the argument.
+  ;; If true, a special-case LTN annotation method that is used in
+  ;; place of the standard type/policy template selection. It may use
+  ;; arbitrary code to choose a template, decide to do a full call, or
+  ;; conspire with the IR2-Convert method to do almost anything. The
+  ;; Combination node is passed as the argument.
   (ltn-annotate nil :type (or function null))
-  ;; If true, the special-case IR2 conversion method for this function. This
-  ;; deals with funny functions, and anything else that can't be handled using
-  ;; the template mechanism. The Combination node and the IR2-Block are passed
-  ;; as arguments.
+  ;; If true, the special-case IR2 conversion method for this
+  ;; function. This deals with funny functions, and anything else that
+  ;; can't be handled using the template mechanism. The Combination
+  ;; node and the IR2-Block are passed as arguments.
   (ir2-convert nil :type (or function null))
-  ;; A list of all the templates that could be used to translate this function
+  ;; all the templates that could be used to translate this function
   ;; into IR2, sorted by increasing cost.
   (templates nil :type list)
-  ;; If non-null, then this function is a unary type predicate for this type.
+  ;; If non-null, then this function is a unary type predicate for
+  ;; this type.
   (predicate-type nil :type (or ctype null))
-  ;; If non-null, use this function to annotate the known call for the byte
-  ;; compiler. If it returns NIL, then change the call to :full.
+  ;; If non-null, use this function to annotate the known call for the
+  ;; byte compiler. If it returns NIL, then change the call to :full.
   (byte-annotate nil :type (or function null)))
 
 (defprinter (fun-info)
@@ -123,8 +129,8 @@
   ;; sbcl-0.pre7.54 or so, that's inconsistent with being a
   ;; FUN-TYPE.)
   (type (missing-arg) :type ctype)
-  ;; the transformation function. Takes the COMBINATION node and returns a
-  ;; lambda, or throws out.
+  ;; the transformation function. Takes the COMBINATION node and
+  ;; returns a lambda expression, or throws out.
   (function (missing-arg) :type function)
   ;; string used in efficiency notes
   (note (missing-arg) :type string)
@@ -227,17 +233,17 @@
     (when cont (continuation-type cont))))
 
 ;;; Derive the result type according to the float contagion rules, but
-;;; always return a float. This is used for irrational functions that preserve
-;;; realness of their arguments.
+;;; always return a float. This is used for irrational functions that
+;;; preserve realness of their arguments.
 (defun result-type-float-contagion (call)
   (declare (type combination call))
   (reduce #'numeric-contagion (combination-args call)
 	  :key #'continuation-type
 	  :initial-value (specifier-type 'single-float)))
 
-;;; Return a closure usable as a derive-type method for accessing the N'th
-;;; argument. If arg is a list, result is a list. If arg is a vector, result
-;;; is a vector with the same element type.
+;;; Return a closure usable as a derive-type method for accessing the
+;;; N'th argument. If arg is a list, result is a list. If arg is a
+;;; vector, result is a vector with the same element type.
 (defun sequence-result-nth-arg (n)
   (lambda (call)
     (declare (type combination call))

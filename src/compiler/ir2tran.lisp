@@ -152,69 +152,71 @@
     (move-continuation-result node block locs cont))
   (values))
 
-;;; Emit code to load a function object implementing FUN into
+;;; some sanity checks for a CLAMBDA passed to IR2-CONVERT-CLOSURE
+(defun assertions-on-ir2-converted-clambda (clambda)
+  ;; This assertion was sort of an experiment. It would be nice and
+  ;; sane and easier to understand things if it were *always* true,
+  ;; but experimentally I observe that it's only *almost* always
+  ;; true. -- WHN 2001-01-02
+  #+nil 
+  (aver (eql (lambda-component clambda)
+	     (block-component (ir2-block-block ir2-block))))
+  ;; Check for some weirdness which came up in bug
+  ;; 138, 2002-01-02.
+  ;;
+  ;; The MAKE-LOAD-TIME-CONSTANT-TN call above puts an :ENTRY record
+  ;; into the IR2-COMPONENT-CONSTANTS table. The dump-a-COMPONENT
+  ;; code
+  ;;   * treats every HANDLEless :ENTRY record into a
+  ;;     patch, and
+  ;;   * expects every patch to correspond to an
+  ;;     IR2-COMPONENT-ENTRIES record.
+  ;; The IR2-COMPONENT-ENTRIES records are set by ENTRY-ANALYZE
+  ;; walking over COMPONENT-LAMBDAS. Bug 138b arose because there
+  ;; was a HANDLEless :ENTRY record which didn't correspond to an
+  ;; IR2-COMPONENT-ENTRIES record. That problem is hard to debug
+  ;; when it's caught at dump time, so this assertion tries to catch
+  ;; it here.
+  (aver (member clambda
+		(component-lambdas (lambda-component clambda))))
+  ;; another bug-138-related issue: COMPONENT-NEW-FUNCTIONALS is
+  ;; used as a queue for stuff pending to do in IR1, and now that
+  ;; we're doing IR2 it should've been completely flushed (but
+  ;; wasn't).
+  (aver (null (component-new-functionals (lambda-component clambda))))
+  (values))
+
+;;; Emit code to load a function object implementing FUNCTIONAL into
 ;;; RES. This gets interesting when the referenced function is a
 ;;; closure: we must make the closure and move the closed-over values
 ;;; into it.
 ;;;
-;;; FUN is either a :TOPLEVEL-XEP functional or the XEP lambda for the
-;;; called function, since local call analysis converts all closure
-;;; references. If a :TOPLEVEL-XEP, we know it is not a closure.
+;;; FUNCTIONAL is either a :TOPLEVEL-XEP functional or the XEP lambda
+;;; for the called function, since local call analysis converts all
+;;; closure references. If a :TOPLEVEL-XEP, we know it is not a
+;;; closure.
 ;;;
 ;;; If a closed-over LAMBDA-VAR has no refs (is deleted), then we
 ;;; don't initialize that slot. This can happen with closures over
 ;;; top level variables, where optimization of the closure deleted the
 ;;; variable. Since we committed to the closure format when we
 ;;; pre-analyzed the top level code, we just leave an empty slot.
-(defun ir2-convert-closure (ref ir2-block fun res)
-  (declare (type ref ref) (type ir2-block ir2-block)
-	   (type functional fun) (type tn res))
-
-  (unless (leaf-info fun)
-    (setf (leaf-info fun)
-	  (make-entry-info :name (functional-debug-name fun))))
-  (let ((entry (make-load-time-constant-tn :entry fun))
-	(closure (etypecase fun
+(defun ir2-convert-closure (ref ir2-block functional res)
+  (declare (type ref ref)
+	   (type ir2-block ir2-block)
+	   (type functional functional)
+	   (type tn res))
+  (aver (not (eql (functional-kind functional) :deleted)))
+  (unless (leaf-info functional)
+    (setf (leaf-info functional)
+	  (make-entry-info :name (functional-debug-name functional))))
+  (let ((entry (make-load-time-constant-tn :entry functional))
+	(closure (etypecase functional
 		   (clambda
-
-		    ;; This assertion was sort of an experiment. It
-		    ;; would be nice and sane and easier to understand
-		    ;; things if it were *always* true, but
-		    ;; experimentally I observe that it's only
-		    ;; *almost* always true. -- WHN 2001-01-02
-		    #+nil 
-		    (aver (eql (lambda-component fun)
-			       (block-component (ir2-block-block ir2-block))))
-
-		    ;; Check for some weirdness which came up in bug
-		    ;; 138, 2002-01-02.
-		    ;;
-		    ;; The MAKE-LOAD-TIME-CONSTANT-TN call above puts
-		    ;; an :ENTRY record into the
-		    ;; IR2-COMPONENT-CONSTANTS table. The
-		    ;; dump-a-COMPONENT code
-		    ;;   * treats every HANDLEless :ENTRY record into a
-		    ;;     patch, and
-		    ;;   * expects every patch to correspond to an
-		    ;;     IR2-COMPONENT-ENTRIES record.
-		    ;; The IR2-COMPONENT-ENTRIES records are set by
-		    ;; ENTRY-ANALYZE walking over COMPONENT-LAMBDAS.
-		    ;; Bug 138b arose because there was a HANDLEless
-		    ;; :ENTRY record which didn't correspond to an
-		    ;; IR2-COMPONENT-ENTRIES record. That problem is
-		    ;; hard to debug when it's caught at dump time, so
-		    ;; this assertion tries to catch it here.
-		    (aver (member fun
-				  (component-lambdas (lambda-component fun))))
-
-		    ;; another bug-138-related issue: COMPONENT-NEW-FUNS
-		    ;; is an IR1 temporary, and now that we're doing IR2
-		    ;; it should've been completely flushed (but wasn't).
-		    (aver (null (component-new-funs (lambda-component fun))))
-
-		    (physenv-closure (get-lambda-physenv fun)))
+		    (assertions-on-ir2-converted-clambda functional)
+		    (physenv-closure (get-lambda-physenv functional)))
 		   (functional
-		    (aver (eq (functional-kind fun) :toplevel-xep))
+		    (aver (eq (functional-kind functional) :toplevel-xep))
 		    nil))))
 
     (cond (closure
@@ -1195,7 +1197,7 @@
 
 ;;;; multiple values
 
-;;; This is almost identical to IR2-Convert-Let. Since LTN annotates
+;;; This is almost identical to IR2-CONVERT-LET. Since LTN annotates
 ;;; the continuation for the correct number of values (with the
 ;;; continuation user responsible for defaulting), we can just pick
 ;;; them up from the continuation.
@@ -1331,7 +1333,7 @@
 
 ;;;; non-local exit
 
-;;; Convert a non-local lexical exit. First find the NLX-Info in our
+;;; Convert a non-local lexical exit. First find the NLX-INFO in our
 ;;; environment. Note that this is never called on the escape exits
 ;;; for CATCH and UNWIND-PROTECT, since the escape functions aren't
 ;;; IR2 converted.
@@ -1377,7 +1379,7 @@
   (move-continuation-result node block () (node-cont node))
   (values))
 
-;;; Emit code to set up a non-local exit. INFO is the NLX-Info for the
+;;; Emit code to set up a non-local exit. INFO is the NLX-INFO for the
 ;;; exit, and TAG is the continuation for the catch tag (if any.) We
 ;;; get at the target PC by passing in the label to the vop. The vop
 ;;; is responsible for building a return-PC object.

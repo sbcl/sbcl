@@ -180,10 +180,10 @@
 ;;; SET-FUN-NAME-INTERN which takes a list spec for a function
 ;;; name and turns it into a symbol if need be.
 ;;;
-;;; When given a funcallable instance, SET-FUN-NAME *must*
-;;; side-effect that FIN to give it the name. When given any other
-;;; kind of function SET-FUN-NAME is allowed to return a new
-;;; function which is "the same" except that it has the name.
+;;; When given a funcallable instance, SET-FUN-NAME *must* side-effect
+;;; that FIN to give it the name. When given any other kind of
+;;; function SET-FUN-NAME is allowed to return a new function which is
+;;; "the same" except that it has the name.
 ;;;
 ;;; In all cases, SET-FUN-NAME must return the new (or same)
 ;;; function. (Unlike other functions to set stuff, it does not return

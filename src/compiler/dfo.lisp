@@ -69,9 +69,10 @@
     (setf (component-lambdas new)
 	  (nconc (component-lambdas old) (component-lambdas new)))
     (setf (component-lambdas old) nil)
-    (setf (component-new-funs new) (nconc (component-new-funs old)
-					  (component-new-funs new))
-	  (component-new-funs old) nil)
+    (setf (component-new-functionals new)
+	  (nconc (component-new-functionals old)
+		 (component-new-functionals new)))
+    (setf (component-new-functionals old) nil)
 
     (dolist (xp (block-pred old-tail))
       (unlink-blocks xp old-tail)

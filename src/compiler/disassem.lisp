@@ -1479,7 +1479,7 @@
                 (declare (ignorable #'local-filter #'local-extract)
                          (inline (setf local-filtered-value)
                                  local-filter local-extract))
-                ;; Use them for side-effects only.
+                ;; Use them for side effects only.
                 (let* ,(make-arg-temp-bindings funstate)
                   ,@(forms)))))))))
 

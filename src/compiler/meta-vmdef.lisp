@@ -87,34 +87,35 @@
 ;;; small, non-negative integer that is used as an alias. The following
 ;;; keywords are defined:
 ;;;
-;;; :Element-Size Size
-;;;   The size of objects in this SC in whatever units the SB uses. This
-;;;   defaults to 1.
+;;; :ELEMENT-SIZE Size
+;;;   The size of objects in this SC in whatever units the SB uses.
+;;;   This defaults to 1.
 ;;;
-;;; :Alignment Size
-;;;   The alignment restrictions for this SC. TNs will only be allocated at
-;;;   offsets that are an even multiple of this number. Defaults to 1.
+;;; :ALIGNMENT Size
+;;;   The alignment restrictions for this SC. TNs will only be
+;;;   allocated at offsets that are an even multiple of this number.
+;;;   This defaults to 1.
 ;;;
-;;; :Locations (Location*)
-;;;   If the SB is :Finite, then this is a list of the offsets within the SB
-;;;   that are in this SC.
+;;; :LOCATIONS (Location*)
+;;;   If the SB is :FINITE, then this is a list of the offsets within
+;;;   the SB that are in this SC.
 ;;;
-;;; :Reserve-Locations (Location*)
+;;; :RESERVE-LOCATIONS (Location*)
 ;;;   A subset of the Locations that the register allocator should try to
 ;;;   reserve for operand loading (instead of to hold variable values.)
 ;;;
-;;; :Save-P {T | NIL}
+;;; :SAVE-P {T | NIL}
 ;;;   If T, then values stored in this SC must be saved in one of the
-;;;   non-save-p :Alternate-SCs across calls.
+;;;   non-save-p :ALTERNATE-SCs across calls.
 ;;;
-;;; :Alternate-SCs (SC*)
+;;; :ALTERNATE-SCS (SC*)
 ;;;   Indicates other SCs that can be used to hold values from this SC across
 ;;;   calls or when storage in this SC is exhausted. The SCs should be
 ;;;   specified in order of decreasing \"goodness\". There must be at least
 ;;;   one SC in an unbounded SB, unless this SC is only used for restricted or
 ;;;   wired TNs.
 ;;;
-;;; :Constant-SCs (SC*)
+;;; :CONSTANT-SCS (SC*)
 ;;;   A list of the names of all the constant SCs that can be loaded into this
 ;;;   SC by a move function.
 (defmacro define-storage-class (name number sb-name &key (element-size '1)
@@ -319,15 +320,15 @@
 (defparameter *primitive-type-slot-alist*
   '((:check . primitive-type-check)))
 
+;;;  Primitive-Type-VOP Vop (Kind*) Type*
+;;;
+;;; Annotate all the specified primitive Types with the named VOP
+;;; under each of the specified kinds:
+;;;
+;;; :CHECK
+;;;    A one-argument one-result VOP that moves the argument to the
+;;;    result, checking that the value is of this type in the process.
 (defmacro primitive-type-vop (vop kinds &rest types)
-  #!+sb-doc
-  "Primitive-Type-VOP Vop (Kind*) Type*
-  Annotate all the specified primitive Types with the named VOP under each of
-  the specified kinds:
-
-  :Check
-      A one argument one result VOP that moves the argument to the result,
-      checking that the value is of this type in the process."
   (let ((n-vop (gensym))
 	(n-type (gensym)))
     `(let ((,n-vop (template-or-lose ',vop)))
@@ -344,8 +345,8 @@
 	  types)
        nil)))
 
-;;; Return true if SC is either one of Ptype's SC's, or one of those SC's
-;;; alternate or constant SCs.
+;;; Return true if SC is either one of PTYPE's SC's, or one of those
+;;; SC's alternate or constant SCs.
 (defun meta-sc-allowed-by-primitive-type (sc ptype)
   (declare (type sc sc) (type primitive-type ptype))
   (let ((scn (sc-number sc)))
@@ -416,7 +417,7 @@
   (effects '(any) :type list)
   (affected '(any) :type list)
   ;; a list of the names of functions this VOP is a translation of and
-  ;; the policy that allows this translation to be done. :Fast is a
+  ;; the policy that allows this translation to be done. :FAST is a
   ;; safe default, since it isn't a safe policy.
   (translate () :type list)
   (ltn-policy :fast :type ltn-policy)
@@ -1496,8 +1497,8 @@
 ;;; keyword indicating the interpretation of the other forms in the
 ;;; SPEC:
 ;;;
-;;; :Args {(Name {Key Value}*)}*
-;;; :Results {(Name {Key Value}*)}*
+;;; :ARGS {(Name {Key Value}*)}*
+;;; :RESULTS {(Name {Key Value}*)}*
 ;;;     The Args and Results are specifications of the operand TNs passed
 ;;;     to the VOP. If there is an inherited VOP, any unspecified options
 ;;;     are defaulted from the inherited argument (or result) of the same
@@ -1509,11 +1510,11 @@
 ;;;	necessary, guaranteeing that the operand is always one of the
 ;;;	specified SCs.
 ;;;
-;;;     :Load-TN Load-Name
-;;;         Load-Name is bound to the load TN allocated for this operand, 
-;;;         or to NIL if no load TN was allocated.
+;;;     :LOAD-TN Load-Name
+;;;         Load-Name is bound to the load TN allocated for this
+;;;         operand, or to NIL if no load TN was allocated.
 ;;;
-;;;     :Load-If EXPRESSION
+;;;     :LOAD-IF EXPRESSION
 ;;;         Controls whether automatic operand loading is done.
 ;;;         EXPRESSION is evaluated with the fixed operand TNs bound.
 ;;;         If EXPRESSION is true,then loading is done and the variable
@@ -1521,56 +1522,57 @@
 ;;;         loading is not done, and the variable is bound to the actual
 ;;;         operand.
 ;;;
-;;;     :More T-or-NIL
-;;;         If specified, Name is bound to the TN-Ref for the first
+;;;     :MORE T-or-NIL
+;;;         If specified, NAME is bound to the TN-Ref for the first
 ;;;         argument or result following the fixed arguments or results.
 ;;;         A :MORE operand must appear last, and cannot be targeted or
 ;;;         restricted.
 ;;;
-;;;     :Target Operand
+;;;     :TARGET Operand
 ;;;         This operand is targeted to the named operand, indicating a
 ;;;         desire to pack in the same location. Not legal for results.
 ;;;
-;;;     :From Time-Spec
-;;;     :To Time-Spec
+;;;     :FROM Time-Spec
+;;;     :TO Time-Spec
 ;;;         Specify the beginning or end of the operand's lifetime.
 ;;;         :FROM can only be used with results, and :TO only with
 ;;;         arguments. The default for the N'th argument/result is
 ;;;         (:ARGUMENT N)/(:RESULT N). These options are necessary
 ;;;         primarily when operands are read or written out of order.
 ;;;
-;;; :Conditional
+;;; :CONDITIONAL
 ;;;     This is used in place of :RESULTS with conditional branch VOPs.
 ;;;     There are no result values: the result is a transfer of control.
 ;;;     The target label is passed as the first :INFO arg. The second
 ;;;     :INFO arg is true if the sense of the test should be negated.
-;;;     A side-effect is to set the PREDICATE attribute for functions
+;;;     A side effect is to set the PREDICATE attribute for functions
 ;;;     in the :TRANSLATE option.
 ;;;
-;;; :Temporary ({Key Value}*) Name*
+;;; :TEMPORARY ({Key Value}*) Name*
 ;;;     Allocate a temporary TN for each Name, binding that variable to
 ;;;     the TN within the body of the generators. In addition to :TARGET
 ;;;     (which is is the same as for operands), the following options are
 ;;;     defined:
 ;;;
 ;;;     :SC SC-Name
-;;;     :Offset SB-Offset
-;;;         Force the temporary to be allocated in the specified SC with the
-;;;         specified offset. Offset is evaluated at macroexpand time. If
-;;;         Offset is emitted, the register allocator chooses a free
-;;;         location in SC. If both SC and Offset are omitted, then the
-;;;         temporary is packed according to its primitive type.
+;;;     :OFFSET SB-Offset
+;;;         Force the temporary to be allocated in the specified SC
+;;;         with the specified offset. Offset is evaluated at
+;;;         macroexpand time. If Offset is emitted, the register
+;;;         allocator chooses a free location in SC. If both SC and
+;;;         Offset are omitted, then the temporary is packed according
+;;;         to its primitive type.
 ;;;
-;;;     :From Time-Spec
-;;;     :To Time-Spec
-;;;         Similar to the argument/result option, this specifies the start and
-;;;         end of the temporaries' lives. The defaults are :Load and :Save,
-;;;         i.e. the duration of the VOP. The other intervening phases are
-;;;         :Argument,:Eval and :Result. Non-zero sub-phases can be specified
-;;;         by a list, e.g. by default the second argument's life ends at
-;;;         (:Argument 1).
+;;;     :FROM Time-Spec
+;;;     :TO Time-Spec
+;;;         Similar to the argument/result option, this specifies the
+;;;         start and end of the temporaries' lives. The defaults are
+;;;         :LOAD and :SAVE, i.e. the duration of the VOP. The other
+;;;         intervening phases are :ARGUMENT,:EVAL and :RESULT.
+;;;         Non-zero sub-phases can be specified by a list, e.g. by
+;;;         default the second argument's life ends at (:ARGUMENT 1).
 ;;;
-;;; :Generator Cost Form*
+;;; :GENERATOR Cost Form*
 ;;;     Specifies the translation into assembly code. Cost is the
 ;;;     estimated cost of the code emitted by this generator. The body
 ;;;     is arbitrary Lisp code that emits the assembly language
@@ -1579,72 +1581,73 @@
 ;;;     During the evaluation of the body, the names of the operands
 ;;;     and temporaries are bound to the actual TNs.
 ;;;
-;;; :Effects Effect*
-;;; :Affected Effect*
+;;; :EFFECTS Effect*
+;;; :AFFECTED Effect*
 ;;;     Specifies the side effects that this VOP has and the side
 ;;;     effects that effect its execution. If unspecified, these
 ;;;     default to the worst case.
 ;;;
-;;; :Info Name*
+;;; :INFO Name*
 ;;;     Define some magic arguments that are passed directly to the code
 ;;;     generator. The corresponding trailing arguments to VOP or
 ;;;     %PRIMITIVE are stored in the VOP structure. Within the body
 ;;;     of the generators, the named variables are bound to these
-;;;     values. Except in the case of :Conditional VOPs, :Info arguments
+;;;     values. Except in the case of :CONDITIONAL VOPs, :INFO arguments
 ;;;     cannot be specified for VOPS that are the direct translation
-;;;     for a function (specified by :Translate).
+;;;     for a function (specified by :TRANSLATE).
 ;;;
-;;; :Ignore Name*
+;;; :IGNORE Name*
 ;;;     Causes the named variables to be declared IGNORE in the
 ;;;     generator body.
 ;;;
-;;; :Variant Thing*
-;;; :Variant-Vars Name*
+;;; :VARIANT Thing*
+;;; :VARIANT-VARS Name*
 ;;;     These options provide a way to parameterize families of VOPs
-;;;     that differ only trivially. :Variant makes the specified
+;;;     that differ only trivially. :VARIANT makes the specified
 ;;;     evaluated Things be the "variant" associated with this VOP.
 ;;;     :VARIANT-VARS causes the named variables to be bound to the
 ;;;     corresponding Things within the body of the generator.
 ;;;
-;;; :Variant-Cost Cost
+;;; :VARIANT-COST Cost
 ;;;     Specifies the cost of this VOP, overriding the cost of any 
 ;;;     inherited generator.
 ;;;
-;;; :Note {String | NIL}
+;;; :NOTE {String | NIL}
 ;;;     A short noun-like phrase describing what this VOP "does", i.e.
 ;;;     the implementation strategy. If supplied, efficiency notes will
 ;;;     be generated when type uncertainty prevents :TRANSLATE from
 ;;;     working. NIL inhibits any efficiency note.
 ;;;
-;;; :Arg-Types    {* | PType | (:OR PType*) | (:CONSTANT Type)}*
-;;; :Result-Types {* | PType | (:OR PType*)}*
-;;;     Specify the template type restrictions used for automatic translation.
-;;;     If there is a :More operand, the last type is the more type. :CONSTANT
-;;;     specifies that the argument must be a compile-time constant of the
-;;;     specified Lisp type. The constant values of :CONSTANT arguments are
-;;;     passed as additional :INFO arguments rather than as :ARGS.
+;;; :ARG-TYPES    {* | PType | (:OR PType*) | (:CONSTANT Type)}*
+;;; :RESULT-TYPES {* | PType | (:OR PType*)}*
+;;;     Specify the template type restrictions used for automatic
+;;;     translation. If there is a :MORE operand, the last type is the
+;;;     more type. :CONSTANT specifies that the argument must be a
+;;;     compile-time constant of the specified Lisp type. The constant
+;;;     values of :CONSTANT arguments are passed as additional :INFO
+;;;     arguments rather than as :ARGS.
 ;;;
-;;; :Translate Name*
+;;; :TRANSLATE Name*
 ;;;     This option causes the VOP template to be entered as an IR2
 ;;;     translation for the named functions.
 ;;;
-;;; :Policy {:Small | :Fast | :Safe | :Fast-Safe}
+;;; :POLICY {:SMALL | :FAST | :SAFE | :FAST-SAFE}
 ;;;     Specifies the policy under which this VOP is the best translation.
 ;;;
-;;; :Guard Form
-;;;     Specifies a Form that is evaluated in the global environment. If
-;;;     form returns NIL, then emission of this VOP is prohibited even when
-;;;     all other restrictions are met.
+;;; :GUARD Form
+;;;     Specifies a Form that is evaluated in the global environment.
+;;;     If form returns NIL, then emission of this VOP is prohibited
+;;;     even when all other restrictions are met.
 ;;;
-;;; :VOP-Var Name
-;;; :Node-Var Name
+;;; :VOP-VAR Name
+;;; :NODE-VAR Name
 ;;;     In the generator, bind the specified variable to the VOP or
 ;;;     the Node that generated this VOP.
 ;;;
-;;; :Save-P {NIL | T | :Compute-Only | :Force-To-Stack}
+;;; :SAVE-P {NIL | T | :COMPUTE-ONLY | :FORCE-TO-STACK}
 ;;;     Indicates how a VOP wants live registers saved.
 ;;;
-;;; :Move-Args {NIL | :Full-Call | :Local-Call | :Known-Return}
+;;; :MOVE-ARGS {NIL | :FULL-CALL | :LOCAL-CALL | :KNOWN-RETURN}
 ;;;     Indicates if and how the more args should be moved into a
 ;;;     different frame.
 (def!macro define-vop ((name &optional inherits) &rest specs)
@@ -1712,8 +1715,8 @@
 
 ;;; Emit-Template Node Block Template Args Results [Info]
 ;;;
-;;; Call the emit function for Template, linking the result in at the
-;;; end of Block.
+;;; Call the emit function for TEMPLATE, linking the result in at the
+;;; end of BLOCK.
 (defmacro emit-template (node block template args results &optional info)
   (let ((n-first (gensym))
 	(n-last (gensym)))
@@ -1728,18 +1731,18 @@
 
 ;;; VOP Name Node Block Arg* Info* Result*
 ;;;
-;;; Emit the VOP (or other template) Name at the end of the IR2-Block
-;;; Block, using Node for the source context. The interpretation of
+;;; Emit the VOP (or other template) NAME at the end of the IR2-BLOCK
+;;; BLOCK, using NODE for the source context. The interpretation of
 ;;; the remaining arguments depends on the number of operands of
 ;;; various kinds that are declared in the template definition. VOP
 ;;; cannot be used for templates that have more-args or more-results,
 ;;; since the number of arguments and results is indeterminate for
 ;;; these templates. Use VOP* instead.
 ;;;
-;;; Args and Results are the TNs that are to be referenced by the
+;;; ARGS and RESULTS are the TNs that are to be referenced by the
 ;;; template as arguments and results. If the template has
-;;; codegen-info arguments, then the appropriate number of Info forms
-;;; following the Arguments are used for codegen info.
+;;; codegen-info arguments, then the appropriate number of INFO forms
+;;; following the arguments are used for codegen info.
 (defmacro vop (name node block &rest operands)
   (let* ((parse (vop-parse-or-lose name))
 	 (arg-count (length (vop-parse-args parse)))
@@ -1792,10 +1795,10 @@
 ;;; arguments and results to the template. More-Args and More-Results
 ;;; are heads of TN-Ref lists that are added onto the end of the
 ;;; TN-Refs for the explicitly supplied operand TNs. The TN-Refs for
-;;; the more operands must have the TN and Write-P slots correctly
+;;; the more operands must have the TN and WRITE-P slots correctly
 ;;; initialized.
 ;;;
-;;; As with VOP, the Info forms are evaluated and passed as codegen
+;;; As with VOP, the INFO forms are evaluated and passed as codegen
 ;;; info arguments.
 (defmacro vop* (name node block args results &rest info)
   (declare (type cons args results))
@@ -1906,7 +1909,7 @@
 	     (,n-bod ,tn-var))
 
 	   (let ((,ltns (ir2-block-local-tns ,n-block)))
-	     ;; Do TNs always-live in this block and live :More TNs.
+	     ;; Do TNs always-live in this block and live :MORE TNs.
 	     (do ((,n-conf (ir2-block-global-tns ,n-block)
 			   (global-conflicts-next ,n-conf)))
 		 ((null ,n-conf))

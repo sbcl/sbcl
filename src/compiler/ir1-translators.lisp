@@ -12,7 +12,7 @@
 
 (in-package "SB!C")
 
-;;;; control special forms
+;;;; special forms for control
 
 (def-ir1-translator progn ((&rest forms) start cont)
   #!+sb-doc
@@ -83,7 +83,6 @@
 				  :cleanup cleanup)))
       (push env-entry (continuation-lexenv-uses cont))
       (ir1-convert-progn-body dummy cont forms))))
-
 
 (def-ir1-translator return-from ((name &optional value) start cont)
   #!+sb-doc

@@ -361,7 +361,7 @@
 	;; said that somewhere in here we
 	;;   Set the new block's start and end cleanups to the *start*
 	;;   cleanup of PREV's block. This overrides the incorrect
-	;;   default from WITH-BELATED-IR1-ENVIRONMENT.
+	;;   default from WITH-IR1-ENVIRONMENT-FROM-NODE.
 	;; Unfortunately I can't find any code which corresponds to this.
 	;; Perhaps it was a stale comment? Or perhaps I just don't
 	;; understand.. -- WHN 19990521

@@ -19,6 +19,7 @@ for early 0.7.x:
 		(so that slam.sh will run faster and also just because
 		ideally everything would be in cold init)
 	** profiled and tweaked
+* fixed (TRACE :REPORT PROFILE ...) interface to profiling
 * more EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made %COMPILE understand magicality of DEFUN FOO
 		w.r.t. e.g. preexisting inlineness of FOO
@@ -32,15 +33,11 @@ for early 0.7.x:
 		are now implemented as closures (because
 		they're structure slot accessors) won't be so
 		nasty in the debugger
-	** %SLOT-ACCESSOR/%SLOT-ACCESSOR stuff can probably go away,
-		since we inline expand all slot accessors into 
-		%INSTANCE-REF and the optimizer knows all it needs
-		to know about that.
 * rewrote long-standing confusing error restarts for redefining
 	DEFSTRUCTs
 * outstanding embarrassments
 	** cut-and-pasted DEF-BOOLEAN-ATTRIBUTE (maybe easier to fix
-		now that EVAL-WHEN does what it should..)
+		now that EVAL-WHEN works correctly..)
 	** incomplete manual
 	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr. (It's
 		reasonable to support this as a crutch when initially
@@ -151,7 +148,7 @@ are still welcome!) until after 1.0:
 		out of scope. (However, it still might be possible to
 		determine that some or all of them are hopelessly stale
 		and delete them.)
-===============================================================================
+=======================================================================
 other known issues with no particular target date:
 
 bugs listed on the man page

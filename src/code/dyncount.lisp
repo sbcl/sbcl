@@ -186,7 +186,7 @@ comments from CMU CL:
   #!+sb-doc
   "Return a hash-table mapping string VOP names to VOP-STATS structures
    describing the VOPs executed. If clear is true, then reset all counts to
-   zero as a side-effect."
+   zero as a side effect."
   (locally
       (declare (optimize (speed 3) (safety 0))
 	       (inline sb!vm::map-allocated-objects))

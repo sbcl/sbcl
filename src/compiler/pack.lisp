@@ -125,7 +125,7 @@
 	    (bit-ior (the local-tn-bit-vector (svref loc-confs num))
 		     (tn-local-conflicts tn) t))))))))
 
-;;; Return the total number of IR2 blocks in Component.
+;;; Return the total number of IR2-BLOCKs in COMPONENT.
 (defun ir2-block-count (component)
   (declare (type component component))
   (do ((2block (block-info (block-next (component-head component)))
@@ -135,7 +135,7 @@
     (when (ir2-block-number 2block)
       (return (1+ (ir2-block-number 2block))))))
 
-;;; Ensure that the conflicts vectors for each :Finite SB are large
+;;; Ensure that the conflicts vectors for each :FINITE SB are large
 ;;; enough for the number of blocks allocated. Also clear any old
 ;;; conflicts and reset the current size to the initial size.
 (defun init-sb-vectors (component)
@@ -187,7 +187,7 @@
 	  (setf (finite-sb-current-size sb) (sb-size sb))
 	  (setf (finite-sb-last-offset sb) 0))))))
 
-;;; Expand the :Unbounded SB backing SC by either the initial size or
+;;; Expand the :UNBOUNDED SB backing SC by either the initial size or
 ;;; the SC element size, whichever is larger. If NEEDED-SIZE is
 ;;; larger, then use that size.
 (defun grow-sc (sc &optional (needed-size 0))
@@ -323,11 +323,11 @@
 	(cond
 	 (ptype
 	  (aver (member (sc-number sc) (primitive-type-scs ptype)))
-	  (error "SC ~S doesn't have any :Unbounded alternate SCs, but is~@
+	  (error "SC ~S doesn't have any :UNBOUNDED alternate SCs, but is~@
 		  a SC for primitive-type ~S."
 		 (sc-name sc) (primitive-type-name ptype)))
 	 (t
-	  (error "SC ~S doesn't have any :Unbounded alternate SCs."
+	  (error "SC ~S doesn't have any :UNBOUNDED alternate SCs."
 		 (sc-name sc)))))))))
 
 ;;; Return a list of format arguments describing how TN is used in
@@ -1387,7 +1387,7 @@
 ;;; Pack a wired TN, checking that the offset is in bounds for the SB,
 ;;; and that the TN doesn't conflict with some other TN already packed
 ;;; in that location. If the TN is wired to a location beyond the end
-;;; of a :Unbounded SB, then grow the SB enough to hold the TN.
+;;; of a :UNBOUNDED SB, then grow the SB enough to hold the TN.
 ;;;
 ;;; ### Checking for conflicts is disabled for :SPECIFIED-SAVE TNs.
 ;;; This is kind of a hack to make specifying wired stack save

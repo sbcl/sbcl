@@ -177,7 +177,7 @@
 ;;; discover an XEP after the initial local call analyze pass.
 (defun make-xep (fun)
   (declare (type functional fun))
-  (aver (not (functional-entry-fun fun)))
+  (aver (null (functional-entry-fun fun)))
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
 				   :debug-name (debug-namify
@@ -248,69 +248,59 @@
 
   (values))
 
-;;; We examine all NEW-FUNS in COMPONENT, attempting to convert calls
-;;; into local calls when it is legal. We also attempt to convert each
-;;; LAMBDA to a LET. LET conversion is also triggered by deletion of a
-;;; function reference, but functions that start out eligible for
-;;; conversion must be noticed sometime.
+;;; We examine all NEW-FUNCTIONALS in COMPONENT, attempting to convert
+;;; calls into local calls when it is legal. We also attempt to
+;;; convert each LAMBDA to a LET. LET conversion is also triggered by
+;;; deletion of a function reference, but functions that start out
+;;; eligible for conversion must be noticed sometime.
 ;;;
 ;;; Note that there is a lot of action going on behind the scenes
 ;;; here, triggered by reference deletion. In particular, the
 ;;; COMPONENT-LAMBDAS are being hacked to remove newly deleted and LET
 ;;; converted LAMBDAs, so it is important that the LAMBDA is added to
-;;; the COMPONENT-LAMBDAS when it is. Also, the COMPONENT-NEW-FUNS may
-;;; contain all sorts of drivel, since it is not updated when we
-;;; delete functions, etc. Only COMPONENT-LAMBDAS is updated.
+;;; the COMPONENT-LAMBDAS when it is. Also, the
+;;; COMPONENT-NEW-FUNCTIONALS may contain all sorts of drivel, since
+;;; it is not updated when we delete functions, etc. Only
+;;; COMPONENT-LAMBDAS is updated.
 ;;;
-;;; COMPONENT-REANALYZE-FUNS is treated similarly to
-;;; NEW-FUNS, but we don't add lambdas to the LAMBDAS.
+;;; COMPONENT-REANALYZE-FUNCTIONALS is treated similarly to
+;;; COMPONENT-NEW-FUNCTIONALS, but we don't add lambdas to the
+;;; LAMBDAS.
 (defun locall-analyze-component (component)
   (declare (type component component))
   (aver-live-component component)
   (loop
-    (let* ((new-fun (pop (component-new-funs component)))
-	   (fun (or new-fun (pop (component-reanalyze-funs component)))))
-      (unless fun (return))
-      (let ((kind (functional-kind fun)))
-	(cond ((member kind '(:deleted :let :mv-let :assignment)))
-	      ((and (null (leaf-refs fun)) (eq kind nil)
-		    (not (functional-entry-fun fun)))
-	       (delete-functional fun))
+    (let* ((new-functional (pop (component-new-functionals component)))
+	   (functional (or new-functional
+			   (pop (component-reanalyze-functionals component)))))
+      (unless functional
+	(return))
+      (let ((kind (functional-kind functional)))
+	(cond ((or (functional-somewhat-letlike-p functional)
+		   (eql kind :deleted))
+	       (values)) ; nothing to do
+	      ((and (null (leaf-refs functional)) (eq kind nil)
+		    (not (functional-entry-fun functional)))
+	       (delete-functional functional))
 	      (t
-	       ;; Fix/check FUN's relationship to COMPONENT-LAMDBAS.
-	       (cond ((not (lambda-p fun))
-		      ;; Since FUN isn't a LAMBDA, this doesn't apply: no-op.
+	       ;; Fix/check FUNCTIONAL's relationship to COMPONENT-LAMDBAS.
+	       (cond ((not (lambda-p functional))
+		      ;; Since FUNCTIONAL isn't a LAMBDA, this doesn't
+		      ;; apply: no-op.
 		      (values))
-		     (new-fun ; FUN came from NEW-FUNS, hence is new.
-		      ;; FUN becomes part of COMPONENT-LAMBDAS now.
-		      (aver (not (member fun (component-lambdas component))))
-		      (push fun (component-lambdas component)))
-		     ;; FIXME: Maybe we don't need this clause?
-		     ;; The only time I really thought I needed it
-		     ;; was bug 138, and adding this clause didn't
-		     ;; fix bug 138 but instead caused all sorts
-		     ;; of other things to fail downstream...
-		     #|
-		     ((eql (lambda-inlinep fun) :inline)
-		      ;; FUNs marked :INLINE are sometimes in
-		      ;; COMPONENT-LAMBDAS and sometimes not. I (WHN
-		      ;; 2002-01-01) haven't figured this one out yet,
-		      ;; so don't assert anything.
-		      ;;
-		      ;; (One possibility: LAMBDAs to represent the
-		      ;; inline expansions of things which are defined
-		      ;; elsewhere might not be in COMPONENT-LAMBDAS,
-		      ;; which LAMBDAs to represent the inline
-		      ;; expansions of local functions might in
-		      ;; COMPONENT-LAMBDAS?)
-		      (values))
-                     |#
-		     (t ; FUN is old.
-		      ;; FUN should be in COMPONENT-LAMBDAS already.
-		      (aver (member fun (component-lambdas component)))))
-	       (locall-analyze-fun-1 fun)
-	       (when (lambda-p fun)
-		 (maybe-let-convert fun)))))))
+		     (new-functional ; FUNCTIONAL came from
+				     ; NEW-FUNCTIONALS, hence is new.
+		      ;; FUNCTIONAL becomes part of COMPONENT-LAMBDAS now.
+		      (aver (not (member functional
+					 (component-lambdas component))))
+		      (push functional (component-lambdas component)))
+		     (t ; FUNCTIONAL is old.
+		      ;; FUNCTIONAL should be in COMPONENT-LAMBDAS already.
+		      (aver (member functional (component-lambdas
+						component)))))
+	       (locall-analyze-fun-1 functional)
+	       (when (lambda-p functional)
+		 (maybe-let-convert functional)))))))
   (values))
 
 (defun locall-analyze-clambdas-until-done (clambdas)
@@ -323,7 +313,7 @@
 	 ;; COMPONENT is the only one here. Let's make that explicit.
 	 (aver (= 1 (length (functional-components clambda))))
 	 (aver (eql component (first (functional-components clambda))))
-	 (when (component-new-funs component)
+	 (when (component-new-functionals component)
 	   (setf did-something t)
 	   (locall-analyze-component component))))
      (unless did-something
@@ -334,32 +324,34 @@
 ;;; to be in an infinite recursive loop, then change the reference to
 ;;; reference a fresh copy. We return whichever function we decide to
 ;;; reference.
-(defun maybe-expand-local-inline (fun ref call)
+(defun maybe-expand-local-inline (original-functional ref call)
   (if (and (policy call
-		   (and (>= speed space) (>= speed compilation-speed)))
+		   (and (>= speed space)
+			(>= speed compilation-speed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
 	   (inline-expansion-ok call))
-      (with-ir1-environment-from-node call
-	(let* ((*lexenv* (functional-lexenv fun))
-	       (won nil)
-	       (res (catch 'local-call-lossage
-		      (prog1
-			  (ir1-convert-lambda
-			   (functional-inline-expansion fun)
-			   :debug-name (debug-namify "local inline ~A"
-						     (leaf-debug-name fun)))
-			(setq won t)))))
-	  (cond (won
-		 (change-ref-leaf ref res)
-		 res)
-		(t
-		 (let ((*compiler-error-context* call))
-		   (compiler-note "couldn't inline expand because expansion ~
-				   calls this LET-converted local function:~
-				   ~%  ~S"
-				  (leaf-debug-name res)))
-		 fun))))
-      fun))
+      (multiple-value-bind (losing-local-functional converted-lambda)
+	  (catch 'locall-already-let-converted
+	    (with-ir1-environment-from-node call
+	      (let ((*lexenv* (functional-lexenv original-functional)))
+		(values nil
+			(ir1-convert-lambda
+			 (functional-inline-expansion original-functional)
+			 :debug-name (debug-namify
+				      "local inline ~A"
+				      (leaf-debug-name
+				       original-functional)))))))
+	(cond (losing-local-functional
+	       (let ((*compiler-error-context* call))
+		 (compiler-note "couldn't inline expand because expansion ~
+		                 calls this LET-converted local function:~
+		                 ~%  ~S"
+				(leaf-debug-name losing-local-functional)))
+	       original-functional)
+	      (t
+	       (change-ref-leaf ref converted-lambda)
+	       converted-lambda)))
+      original-functional))
 
 ;;; Dispatch to the appropriate function to attempt to convert a call.
 ;;; REF must be a reference to a FUNCTIONAL. This is called in IR1
@@ -1061,10 +1053,11 @@
 	(link-blocks block (lambda-block fun))
 	(values t (maybe-convert-to-assignment fun))))))
 
-;;; This is called when we believe it might make sense to convert Fun
-;;; to an assignment. All this function really does is determine when
-;;; a function with more than one call can still be combined with the
-;;; calling function's environment. We can convert when:
+;;; This is called when we believe it might make sense to convert
+;;; CLAMBDA to an assignment. All this function really does is
+;;; determine when a function with more than one call can still be
+;;; combined with the calling function's environment. We can convert
+;;; when:
 ;;; -- The function is a normal, non-entry function, and
 ;;; -- Except for one call, all calls must be tail recursive calls 
 ;;;    in the called function (i.e. are self-recursive tail calls)
@@ -1081,28 +1074,32 @@
 ;;; calls as long as they all return to the same place (i.e. have the
 ;;; same conceptual continuation.) A special case of this would be
 ;;; when all of the outside calls are tail recursive.
-(defun maybe-convert-to-assignment (fun)
-  (declare (type clambda fun))
-  (when (and (not (functional-kind fun))
-	     (not (functional-entry-fun fun)))
+(defun maybe-convert-to-assignment (clambda)
+  (declare (type clambda clambda))
+  (when (and (not (functional-kind clambda))
+	     (not (functional-entry-fun clambda)))
     (let ((non-tail nil)
 	  (call-fun nil))
-      (when (and (dolist (ref (leaf-refs fun) t)
+      (when (and (dolist (ref (leaf-refs clambda) t)
 		   (let ((dest (continuation-dest (node-cont ref))))
 		     (when (or (not dest)
                                (block-delete-p (node-block dest)))
                        (return nil))
 		     (let ((home (node-home-lambda ref)))
-		       (unless (eq home fun)
-			 (when call-fun (return nil))
+		       (unless (eq home clambda)
+			 (when call-fun
+			   (return nil))
 			 (setq call-fun home))
 		       (unless (node-tail-p dest)
-			 (when (or non-tail (eq home fun)) (return nil))
+			 (when (or non-tail (eq home clambda))
+			   (return nil))
 			 (setq non-tail dest)))))
-		 (ok-initial-convert-p fun))
-	(setf (functional-kind fun) :assignment)
-	(let-convert fun (or non-tail
-			     (continuation-dest
-			      (node-cont (first (leaf-refs fun))))))
-	(when non-tail (reoptimize-call non-tail))
+		 (ok-initial-convert-p clambda))
+	(setf (functional-kind clambda) :assignment)
+	(let-convert clambda
+		     (or non-tail
+			 (continuation-dest
+			  (node-cont (first (leaf-refs clambda))))))
+	(when non-tail
+	  (reoptimize-call non-tail))
 	t))))

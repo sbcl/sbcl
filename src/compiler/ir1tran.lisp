@@ -81,7 +81,7 @@
 ;;; predicate didn't exist.
 ;;;
 ;;; This predicate was added to fix bug 138 in SBCL. In some obscure
-;;; circumstances, it was possible for a *FREE-FUNS* to contain a
+;;; circumstances, it was possible for a *FREE-FUNS* entry to contain a
 ;;; DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object contained IR1
 ;;; stuff (NODEs, BLOCKs...) referring to an already compiled (aka
 ;;; "dead") component. When this IR1 stuff was reused in a new
@@ -96,24 +96,27 @@
   ;; (sbcl-0.pre7.118) is this one:
   (and (defined-fun-p free-fun)
        (let ((functional (defined-fun-functional free-fun)))
-	 (and (lambda-p functional)
-	      (or
-	       ;; (The main reason for this first test is to bail out
-	       ;; early in cases where the LAMBDA-COMPONENT call in
-	       ;; the second test would fail because links it needs
-	       ;; are uninitialized or invalid.)
-	       ;;
-	       ;; If the BIND node for this LAMBDA is null, then
-	       ;; according to the slot comments, the LAMBDA has been
-	       ;; deleted or its call has been deleted. In that case,
-	       ;; it seems rather questionable to reuse it, and
-	       ;; certainly it shouldn't be necessary to reuse it, so
-	       ;; we cheerfully declare it invalid.
-	       (null (lambda-bind functional))
-	       ;; If this IR1 stuff belongs to a dead component, then
-	       ;; we can't reuse it without getting into bizarre
-	       ;; confusion.
-	       (eql (component-info (lambda-component functional)) :dead))))))
+	 (or (and functional
+		  (eql (functional-kind functional) :deleted))
+	     (and (lambda-p functional)
+		  (or
+		   ;; (The main reason for this first test is to bail
+		   ;; out early in cases where the LAMBDA-COMPONENT
+		   ;; call in the second test would fail because links
+		   ;; it needs are uninitialized or invalid.)
+		   ;;
+		   ;; If the BIND node for this LAMBDA is null, then
+		   ;; according to the slot comments, the LAMBDA has
+		   ;; been deleted or its call has been deleted. In
+		   ;; that case, it seems rather questionable to reuse
+		   ;; it, and certainly it shouldn't be necessary to
+		   ;; reuse it, so we cheerfully declare it invalid.
+		   (null (lambda-bind functional))
+		   ;; If this IR1 stuff belongs to a dead component,
+		   ;; then we can't reuse it without getting into
+		   ;; bizarre confusion.
+		   (eql (component-info (lambda-component functional))
+			:dead)))))))
 
 ;;; If NAME already has a valid entry in *FREE-FUNS*, then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
@@ -503,26 +506,28 @@
        (use-continuation res cont)))
     (values)))
 
-;;; Add FUN to the COMPONENT-REANALYZE-FUNS, unless it's some trivial
-;;; type for which reanalysis is a trivial no-op, or unless it doesn't
-;;; belong in this component at all.
+;;; Add FUNCTIONAL to the COMPONENT-REANALYZE-FUNCTIONALS, unless it's
+;;; some trivial type for which reanalysis is a trivial no-op, or
+;;; unless it doesn't belong in this component at all.
 ;;;
-;;; FUN is returned.
-(defun maybe-reanalyze-fun (fun)
-  (declare (type functional fun))
+;;; FUNCTIONAL is returned.
+(defun maybe-reanalyze-functional (functional)
 
+  (aver (not (eql (functional-kind functional) :deleted))) ; bug 148
   (aver-live-component *current-component*)
 
-  ;; When FUN is of a type for which reanalysis isn't a trivial no-op
-  (when (typep fun '(or optional-dispatch clambda))
+  ;; When FUNCTIONAL is of a type for which reanalysis isn't a trivial
+  ;; no-op
+  (when (typep functional '(or optional-dispatch clambda))
 
-    ;; When FUN knows its component
-    (when (lambda-p fun) 
-      (aver (eql (lambda-component fun) *current-component*)))
+    ;; When FUNCTIONAL knows its component
+    (when (lambda-p functional) 
+      (aver (eql (lambda-component functional) *current-component*)))
 
-    (pushnew fun (component-reanalyze-funs *current-component*)))
+    (pushnew functional
+	     (component-reanalyze-functionals *current-component*)))
 
-  fun)
+  functional)
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
 ;;; needed. If LEAF represents a defined function which has already
@@ -533,9 +538,10 @@
   (let* ((leaf (or (and (defined-fun-p leaf)
 			(not (eq (defined-fun-inlinep leaf)
 				 :notinline))
-			(let ((fun (defined-fun-functional leaf)))
-			  (when (and fun (not (functional-kind fun)))
-			    (maybe-reanalyze-fun fun))))
+			(let ((functional (defined-fun-functional leaf)))
+			  (when (and functional
+				     (not (functional-kind functional)))
+			    (maybe-reanalyze-functional functional))))
 		   leaf))
 	 (res (make-ref (or (lexenv-find leaf type-restrictions)
 			    (leaf-type leaf))
@@ -805,15 +811,40 @@
       (setf (continuation-%type-check fun-cont) nil)))
   (values))
 
-;;; Convert a call to a local function. If the function has already
-;;; been LET converted, then throw FUN to LOCAL-CALL-LOSSAGE. This
-;;; should only happen when we are converting inline expansions for
-;;; local functions during optimization.
-(defun ir1-convert-local-combination (start cont form fun)
-  (if (functional-kind fun)
-      (throw 'local-call-lossage fun)
-      (ir1-convert-combination start cont form
-			       (maybe-reanalyze-fun fun))))
+;;; Convert a call to a local function, or if the function has already
+;;; been LET converted, then throw FUNCTIONAL to
+;;; LOCALL-ALREADY-LET-CONVERTED. The THROW should only happen when we
+;;; are converting inline expansions for local functions during
+;;; optimization.
+(defun ir1-convert-local-combination (start cont form functional)
+
+  ;; The test here is for "when LET converted", as a translation of
+  ;; the old CMU CL comments into code. Unfortunately, the old CMU CL
+  ;; comments aren't specific enough to tell whether the correct
+  ;; translation is FUNCTIONAL-SOMEWHAT-LETLIKE-P or
+  ;; FUNCTIONAL-LETLIKE-P or what. The old CMU CL code assumed that
+  ;; any non-null FUNCTIONAL-KIND meant that the function "had been
+  ;; LET converted", which might even be right, but seems fragile, so
+  ;; we try to be pickier.
+  (when (or
+	 ;; looks LET-converted
+	 (functional-somewhat-letlike-p functional)
+	 ;; It's possible for a LET-converted function to end up
+	 ;; deleted later. In that case, for the purposes of this
+	 ;; analysis, it is LET-converted: LET-converted functionals
+	 ;; are too badly trashed to expand them inline, and deleted
+	 ;; LET-converted functionals are even worse.
+	 (eql (functional-kind functional) :deleted))
+    (throw 'locall-already-let-converted functional))
+  ;; Any other non-NIL KIND value is a case we haven't found a
+  ;; justification for, and at least some such values (e.g. :EXTERNAL
+  ;; and :TOPLEVEL) seem obviously wrong.
+  (aver (null (functional-kind functional)))
+
+  (ir1-convert-combination start
+			   cont
+			   form
+			   (maybe-reanalyze-functional functional)))
 
 ;;;; PROCESS-DECLS
 
@@ -839,9 +870,9 @@
 	     (setf found (cdr var)))))
     found))
 
-;;; Called by Process-Decls to deal with a variable type declaration.
-;;; If a lambda-var being bound, we intersect the type with the vars
-;;; type, otherwise we add a type-restriction on the var. If a symbol
+;;; Called by PROCESS-DECLS to deal with a variable type declaration.
+;;; If a LAMBDA-VAR being bound, we intersect the type with the var's
+;;; type, otherwise we add a type restriction on the var. If a symbol
 ;;; macro, we just wrap a THE around the expansion.
 (defun process-type-decl (decl res vars)
   (declare (list decl vars) (type lexenv res))
@@ -1361,8 +1392,8 @@
 ;;; Create a lambda node out of some code, returning the result. The
 ;;; bindings are specified by the list of VAR structures VARS. We deal
 ;;; with adding the names to the LEXENV-VARS for the conversion. The
-;;; result is added to the NEW-FUNS in the *CURRENT-COMPONENT* and
-;;; linked to the component head and tail.
+;;; result is added to the NEW-FUNCTIONALS in the *CURRENT-COMPONENT*
+;;; and linked to the component head and tail.
 ;;;
 ;;; We detect special bindings here, replacing the original VAR in the
 ;;; lambda list with a temporary variable. We then pass a list of the
@@ -1449,7 +1480,7 @@
 	    (link-blocks block (component-tail *current-component*))))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
-    (push lambda (component-new-funs *current-component*))
+    (push lambda (component-new-functionals *current-component*))
 
     lambda))
 
@@ -1727,7 +1758,7 @@
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
 			:result cont
-			:debug-name (debug-namify "varargs entry point for ~A"
+			:debug-name (debug-namify "varargs entry for ~A"
 						  (as-debug-name source-name
 								 debug-name))))
 	   (last-entry (convert-optional-entry main-entry default-vars
@@ -1864,7 +1895,7 @@
 				     :%debug-name debug-name))
 	(min (or (position-if #'lambda-var-arg-info vars) (length vars))))
     (aver-live-component *current-component*)
-    (push res (component-new-funs *current-component*))
+    (push res (component-new-functionals *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
 			    cont source-name debug-name)
     (setf (optional-dispatch-min-args res) min)

@@ -163,7 +163,7 @@
 				   block-info-constructor)))))))
   (values))
 
-;;; Do control analysis on Component, finding the emit order. Our only
+;;; Do control analysis on COMPONENT, finding the emit order. Our only
 ;;; cleverness here is that we walk XEP's first to increase the
 ;;; probability that the tail call will be a drop-through.
 ;;;

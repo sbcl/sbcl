@@ -30,10 +30,10 @@
   (declare (type component component))
   (aver (every (lambda (x)
 		 (eq (functional-kind x) :deleted))
-	       (component-new-funs component)))
-  (setf (component-new-funs component) ())
-  (dolist (fun (component-lambdas component))
-    (reinit-lambda-physenv fun))
+	       (component-new-functionals component)))
+  (setf (component-new-functionals component) ())
+  (dolist (clambda (component-lambdas component))
+    (reinit-lambda-physenv clambda))
   (mapc #'add-lambda-vars-and-let-vars-to-closures
 	(component-lambdas component))
 
@@ -240,7 +240,7 @@
 ;;;
 ;;; If a CATCH or an UNWIND-protect, then we set the LEXENV for the
 ;;; last node in the cleanup code to be the enclosing environment, to
-;;; represent the fact that the binding was undone as a side-effect of
+;;; represent the fact that the binding was undone as a side effect of
 ;;; the exit. This will cause a lexical exit to be broken up if we are
 ;;; actually exiting the scope (i.e. a BLOCK), and will also do any
 ;;; other cleanups that may have to be done on the way.
@@ -274,7 +274,7 @@
 ;;; EXIT into ENV. This is called for each non-local exit node, of
 ;;; which there may be several per exit continuation. This is what we
 ;;; do:
-;;; -- If there isn't any NLX-Info entry in the environment, make
+;;; -- If there isn't any NLX-INFO entry in the environment, make
 ;;;    an entry stub, otherwise just move the exit block link to
 ;;;    the component tail.
 ;;; -- Close over the NLX-INFO in the exit environment.

@@ -161,7 +161,7 @@
        :IOFKTS-LEGACY-791
 
        ;; (These aren't really separate bugs, but 804 depends on a
-       ;; side-effect of 791, then 812 depends on a side effect of
+       ;; side effect of 791, and then 812 depends on a side effect of
        ;; 804, so that as long as 791 is suppressed we need to
        ;; suppress these too.)
        :IOFKTS-LEGACY-804

@@ -707,7 +707,7 @@
 ;;; the last fixed argument. If Variable is false, then the passing
 ;;; locations are passed as a more arg. Variable is true if there are
 ;;; a variable number of arguments passed on the stack. Variable
-;;; cannot be specified with :Tail return. TR variable argument call
+;;; cannot be specified with :TAIL return. TR variable argument call
 ;;; is implemented separately.
 ;;;
 ;;; In tail call with fixed arguments, the passing locations are

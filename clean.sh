@@ -23,16 +23,16 @@ rm -rf obj/* output/* doc/user-manual \
 # standard clean.sh file.)
 
 # Ask some other directories to clean themselves up.
-pwd=`pwd`
+original_pwd=`pwd`
 for d in tools-for-build; do
-    cd $d
+    cd $d > /dev/null
     # I hope the -s option is standard. At least GNU make and BSD make
     # support it. It silences make, since otherwise the output from
     # this script is just the operations done by these make's, which
     # is misleading when this script does lotso other operations too.
     # -- WHN
     make -s clean
-    cd $pwd
+    cd $original_pwd  > /dev/null
 done
 
 # Within all directories, remove things which don't look like source

@@ -326,7 +326,7 @@ code to be loaded.
 			    (setf (gethash (car x) ht) (cadr x))))
 		      ht))))
 
-;;;; SETQ hackery
+;;;; SETQ hackery, including destructuring ("DESETQ")
 
 (defun loop-make-psetq (frobs)
   (and frobs
@@ -345,10 +345,10 @@ code to be loaded.
 	(make-symbol "LOOP-DESETQ-TEMP"))
 
 (sb!int:defmacro-mundanely loop-really-desetq (&environment env
-						  &rest var-val-pairs)
+				               &rest var-val-pairs)
   (labels ((find-non-null (var)
-	     ;; see whether there's any non-null thing here
-	     ;; recurse if the list element is itself a list
+	     ;; See whether there's any non-null thing here. Recurse
+	     ;; if the list element is itself a list.
 	     (do ((tail var)) ((not (consp tail)) tail)
 	       (when (find-non-null (pop tail)) (return t))))
 	   (loop-desetq-internal (var val &optional temp)
@@ -356,10 +356,10 @@ code to be loaded.
 	     (typecase var
 	       (null
 		 (when (consp val)
-		   ;; Don't lose possible side-effects.
+		   ;; Don't lose possible side effects.
 		   (if (eq (car val) 'prog1)
-		       ;; These can come from psetq or desetq below.
-		       ;; Throw away the value, keep the side-effects.
+		       ;; These can come from PSETQ or DESETQ below.
+		       ;; Throw away the value, keep the side effects.
 		       ;; Special case is for handling an expanded POP.
 		       (mapcan (lambda (x)
 				 (and (consp x)
@@ -390,7 +390,7 @@ code to be loaded.
 				 ,@body)
 			       `((let ((,temp ,val))
 				   ,@body))))
-			 ;; no cdring to do
+			 ;; no CDRing to do
 			 (loop-desetq-internal car `(car ,val) temp)))))
 	       (otherwise
 		 (unless (eq var val)

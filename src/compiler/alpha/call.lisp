@@ -575,20 +575,20 @@ default-value-8
 ;;; Named is true if the first argument is a symbol whose global
 ;;; function definition is to be called.
 ;;;
-;;; Return is either :Fixed, :Unknown or :Tail:
-;;; -- If :Fixed, then the call is for a fixed number of values, returned in
-;;;    the standard passing locations (passed as result operands).
-;;; -- If :Unknown, then the result values are pushed on the stack, and the
-;;;    result values are specified by the Start and Count as in the
+;;; Return is either :FIXED, :UNKNOWN or :TAIL:
+;;; -- If :FIXED, then the call is for a fixed number of values, returned
+;;;    in the standard passing locations (passed as result operands).
+;;; -- If :UNKNOWN, then the result values are pushed on the stack, and 
+;;;    the result values are specified by the Start and Count as in the
 ;;;    unknown-values continuation representation.
-;;; -- If :Tail, then do a tail-recursive call.  No values are returned.
+;;; -- If :TAIL, then do a tail-recursive call.  No values are returned.
 ;;;    The Ocfp and Return-PC are passed as the second and third arguments.
 ;;;
 ;;; In non-tail calls, the pointer to the stack arguments is passed as
 ;;; the last fixed argument. If Variable is false, then the passing
 ;;; locations are passed as a more arg. Variable is true if there are
 ;;; a variable number of arguments passed on the stack. Variable
-;;; cannot be specified with :Tail return. TR variable argument call
+;;; cannot be specified with :TAIL return. TR variable argument call
 ;;; is implemented separately.
 ;;;
 ;;; In tail call with fixed arguments, the passing locations are

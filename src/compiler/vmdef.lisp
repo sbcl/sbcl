@@ -45,7 +45,7 @@
 (defun meta-sc-number-or-lose (x)
   (the sc-number (sc-number (meta-sc-or-lose x))))
 
-;;;; side-effect classes
+;;;; side effect classes
 
 (def-boolean-attribute vop
   any)

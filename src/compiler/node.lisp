@@ -200,7 +200,7 @@
 ;;; Flags that are used to indicate various things about a block, such
 ;;; as what optimizations need to be done on it:
 ;;; -- REOPTIMIZE is set when something interesting happens the uses of a
-;;;    continuation whose Dest is in this block. This indicates that the
+;;;    continuation whose DEST is in this block. This indicates that the
 ;;;    value-driven (forward) IR1 optimizations should be done on this block.
 ;;; -- FLUSH-P is set when code in this block becomes potentially flushable,
 ;;;    usually due to a continuation's DEST becoming null.
@@ -386,8 +386,8 @@
   ;;
   ;; Note that logical associations between CLAMBDAs and COMPONENTs
   ;; seem to exist for a while before this is initialized. See e.g.
-  ;; the NEW-FUNS slot. In particular, I got burned by writing some
-  ;; code to use this value to decide which components need
+  ;; the NEW-FUNCTIONALS slot. In particular, I got burned by writing
+  ;; some code to use this value to decide which components need
   ;; LOCALL-ANALYZE-COMPONENT, when it turns out that
   ;; LOCALL-ANALYZE-COMPONENT had a role in initializing this value
   ;; (and DFO stuff does too, maybe). Also, even after it's
@@ -400,7 +400,7 @@
   ;; (possibly as LETs, or implicitly as XEPs if an OPTIONAL-DISPATCH.)
   ;; Between runs of local call analysis there may be some debris of
   ;; converted or even deleted functions in this list.
-  (new-funs () :type list)
+  (new-functionals () :type list)
   ;; If this is true, then there is stuff in this component that could
   ;; benefit from further IR1 optimization.
   (reoptimize t :type boolean)
@@ -414,7 +414,7 @@
   ;; After I have left the great wheel and am staring into the GC, this
   ;;   is set to :DEAD to indicate that it's a gruesome error to operate
   ;;   on me (e.g. by using me as *CURRENT-COMPONENT*, or by pushing
-  ;;   LAMBDAs onto my NEW-FUNS, as in sbcl-0.pre7.115).
+  ;;   LAMBDAs onto my NEW-FUNCTIONALS, as in sbcl-0.pre7.115).
   (info :no-ir2-yet :type (or ir2-component (member :no-ir2-yet :dead)))
   ;; the SOURCE-INFO structure describing where this component was
   ;; compiled from
@@ -430,11 +430,11 @@
   ;; arguments for the note, or the FUN-TYPE that would have
   ;; enabled the transformation but failed to match.
   (failed-optimizations (make-hash-table :test 'eq) :type hash-table)
-  ;; This is similar to NEW-FUNS, but is used when a function has
-  ;; already been analyzed, but new references have been added by
-  ;; inline expansion. Unlike NEW-FUNS, this is not disjoint from
-  ;; COMPONENT-LAMBDAS.
-  (reanalyze-funs nil :type list))
+  ;; This is similar to NEW-FUNCTIONALS, but is used when a function
+  ;; has already been analyzed, but new references have been added by
+  ;; inline expansion. Unlike NEW-FUNCTIONALS, this is not disjoint
+  ;; from COMPONENT-LAMBDAS.
+  (reanalyze-functionals nil :type list))
 (defprinter (component :identity t)
   name
   #!+sb-show id
@@ -442,7 +442,7 @@
 
 ;;; Check that COMPONENT is suitable for roles which involve adding
 ;;; new code. (gotta love imperative programming with lotso in-place
-;;; side-effects...)
+;;; side effects...)
 (defun aver-live-component (component)
   ;; FIXME: As of sbcl-0.pre7.115, we're asserting that
   ;; COMPILE-COMPONENT hasn't happened yet. Might it be even better
@@ -572,8 +572,8 @@
   type
   (info :test info))
 
-;;; The NLX-Info structure is used to collect various information
-;;; about non-local exits. This is effectively an annotation on the
+;;; An NLX-INFO structure is used to collect various information about
+;;; non-local exits. This is effectively an annotation on the
 ;;; CONTINUATION, although it is accessed by searching in the
 ;;; PHYSENV-NLX-INFO.
 (def!struct (nlx-info (:make-load-form-fun ignore-it))
@@ -590,13 +590,13 @@
   ;;
   ;; This slot is primarily an indication of where this exit delivers
   ;; its values to (if any), but it is also used as a sort of name to
-  ;; allow us to find the NLX-Info that corresponds to a given exit.
-  ;; For this purpose, the Entry must also be used to disambiguate,
+  ;; allow us to find the NLX-INFO that corresponds to a given exit.
+  ;; For this purpose, the ENTRY must also be used to disambiguate,
   ;; since exits to different places may deliver their result to the
   ;; same continuation.
   (continuation (missing-arg) :type continuation)
   ;; the entry stub inserted by physical environment analysis. This is
-  ;; a block containing a call to the %NLX-Entry funny function that
+  ;; a block containing a call to the %NLX-ENTRY funny function that
   ;; has the original exit destination as its successor. Null only
   ;; temporarily.
   (target nil :type (or cblock null))
@@ -799,14 +799,16 @@
   ;;	continuation for the call.
   ;;
   ;;    :MV-LET
-  ;;	Similar to :LET, but the call is an MV-CALL.
+  ;;	Similar to :LET (as per FUNCTIONAL-LETLIKE-P), but the call
+  ;;    is an MV-CALL.
   ;;
   ;;    :ASSIGNMENT
-  ;;	similar to a LET, but can have other than one call as long as
-  ;;	there is at most one non-tail call.
+  ;;	similar to a LET (as per FUNCTIONAL-SOMEWHAT-LETLIKE-P), but
+  ;;    can have other than one call as long as there is at most
+  ;;    one non-tail call.
   ;;
   ;;    :OPTIONAL
-  ;;	a lambda that is an entry-point for an optional-dispatch.
+  ;;	a lambda that is an entry point for an OPTIONAL-DISPATCH.
   ;;	Similar to NIL, but requires greater caution, since local call
   ;;	analysis may create new references to this function. Also, the
   ;;	function cannot be deleted even if it has *no* references. The
@@ -865,14 +867,15 @@
   ;;
   ;; With all other kinds, this is null.
   (entry-fun nil :type (or functional null))
-  ;; the value of any inline/notinline declaration for a local function
+  ;; the value of any inline/notinline declaration for a local
+  ;; function (or NIL in any case if no inline expansion is available)
   (inlinep nil :type inlinep)
   ;; If we have a lambda that can be used as in inline expansion for
   ;; this function, then this is it. If there is no source-level
-  ;; lambda corresponding to this function then this is Null (but then
+  ;; lambda corresponding to this function then this is null (but then
   ;; INLINEP will always be NIL as well.)
   (inline-expansion nil :type list)
-  ;; the lexical environment that the inline-expansion should be converted in
+  ;; the lexical environment that the INLINE-EXPANSION should be converted in
   (lexenv *lexenv* :type lexenv)
   ;; the original function or macro lambda list, or :UNSPECIFIED if
   ;; this is a compiler created function
@@ -883,6 +886,21 @@
   %source-name
   %debug-name
   #!+sb-show id)
+
+;;; Is FUNCTIONAL LET-converted? (where we're indifferent to whether
+;;; it returns one value or multiple values)
+(defun functional-letlike-p (functional)
+  (member (functional-kind functional)
+	  '(:let :mv-let)))
+
+;;; Is FUNCTIONAL sorta LET-converted? (where even an :ASSIGNMENT counts)
+;;;
+;;; FIXME: I (WHN) don't understand this one well enough to give a good
+;;; definition or even a good function name, it's just a literal copy
+;;; of a CMU CL idiom. Does anyone have a better name or explanation?
+(defun functional-somewhat-letlike-p (functional)
+  (or (functional-letlike-p functional)
+      (eql (functional-kind functional) :assignment)))
 
 ;;; FUNCTIONAL name operations
 (defun functional-debug-name (functional)
@@ -1247,7 +1265,7 @@
 ;;;; lexical exits.
 
 ;;; The ENTRY node serves to mark the start of the dynamic extent of a
-;;; lexical exit. It is the mess-up node for the corresponding :Entry
+;;; lexical exit. It is the mess-up node for the corresponding :ENTRY
 ;;; cleanup.
 (defstruct (entry (:include node)
 		  (:copier nil))

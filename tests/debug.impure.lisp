@@ -1,5 +1,5 @@
 ;;;; This file is for testing debugging functionality, using
-;;;; test machinery which might have side-effects (e.g. 
+;;;; test machinery which might have side effects (e.g. 
 ;;;; executing DEFUN).
 
 ;;;; This software is part of the SBCL system. See the README file for

@@ -29,7 +29,7 @@ rm -f output/after-xc.core
 # that we used to compile it:
 #   (1) It reduces the chance that the cross-compilation process
 #       inadvertently comes to depend on some weird compile-time
-#       side-effect.
+#       side effect.
 #   (2) It reduces peak memory demand (because definitions wrapped in
 #       (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE) ..) aren't defined
 #       in the fresh image).
