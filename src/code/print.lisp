@@ -454,8 +454,6 @@
     ;; As long as no one comes up with a non-obscure way of detecting this
     ;; sleaziness, fixing this nonconformity will probably have a low
     ;; priority. -- WHN 2001-11-25
-    (fixnum
-     (output-integer object stream))
     (list
      (if (null object)
 	 (output-symbol object stream)
@@ -1082,115 +1080,70 @@
 
 ;;;; integer, ratio, and complex printing (i.e. everything but floats)
 
+(defun %output-radix (base stream)
+  (write-char #\# stream)
+  (write-char (case base
+                (2 #\b)
+                (8 #\o)
+                (16 #\x)
+                (t (%output-fixnum-in-base base 10 stream)
+                   #\r))
+              stream))
+
+(defun %output-fixnum-in-base (n base stream)
+  (multiple-value-bind (q r)
+      (truncate n base)
+    ;; Recurse until you have all the digits pushed on
+    ;; the stack.
+    (unless (zerop q)
+      (%output-fixnum-in-base q base stream))
+    ;; Then as each recursive call unwinds, turn the
+    ;; digit (in remainder) into a character and output
+    ;; the character.
+    (write-char 
+     (schar "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" r) 
+     stream)))
+
+(defun %output-bignum-in-base (n base stream)
+  (labels ((bisect (n power)
+             (if (fixnump n)
+                 (%output-fixnum-in-base n base stream)
+                 (let ((k (truncate power 2)))
+                   (multiple-value-bind (q r) (truncate n (expt base k))
+                     (bisect q (- power k))
+                     (let ((npower (if (zerop r) 0 (truncate (log r base)))))
+                       (dotimes (z (- k npower 1))
+                         (write-char #\0 stream))
+                       (bisect r npower)))))))
+    (bisect n (truncate (log n base)))))
+
+(defun %output-integer-in-base (integer base stream)
+  (when (minusp integer)
+    (write-char #\- stream)
+    (setf integer (- integer)))
+  (if (fixnump integer)
+      (%output-fixnum-in-base integer base stream)
+      (%output-bignum-in-base integer base stream)))
+
 (defun output-integer (integer stream)
-  ;; FIXME: This UNLESS form should be pulled out into something like
-  ;; (SANE-PRINT-BASE), along the lines of (SANE-PACKAGE) for the
-  ;; *PACKAGE* variable.
-  (unless (and (fixnump *print-base*)
-	       (< 1 *print-base* 37))
-    (let ((obase *print-base*))
-      (setq *print-base* 10.)
-      (error "~A is not a reasonable value for *PRINT-BASE*." obase)))
-  (when (and (not (= *print-base* 10.))
-	     *print-radix*)
-    ;; First print leading base information, if any.
-    (write-char #\# stream)
-    (write-char (case *print-base*
-		  (2. #\b)
-		  (8. #\o)
-		  (16. #\x)
-		  (T (let ((fixbase *print-base*)
-			   (*print-base* 10.)
-			   (*print-radix* ()))
-		       (sub-output-integer fixbase stream))
-		     #\r))
-		stream))
-  ;; Then output a minus sign if the number is negative, then output
-  ;; the absolute value of the number.
-  (cond ((bignump integer) (print-bignum integer stream))
-	((< integer 0)
-	 (write-char #\- stream)
-	 (sub-output-integer (- integer) stream))
-	(t
-	 (sub-output-integer integer stream)))
-  ;; Print any trailing base information, if any.
-  (if (and (= *print-base* 10.) *print-radix*)
-      (write-char #\. stream)))
-
-(defun sub-output-integer (integer stream)
-  (let ((quotient ())
-	(remainder ()))
-    ;; Recurse until you have all the digits pushed on the stack.
-    (if (not (zerop (multiple-value-setq (quotient remainder)
-		      (truncate integer *print-base*))))
-	(sub-output-integer quotient stream))
-    ;; Then as each recursive call unwinds, turn the digit (in remainder)
-    ;; into a character and output the character.
-    (write-char (code-char (if (and (> remainder 9.)
-				    (> *print-base* 10.))
-			       (+ (char-code #\A) (- remainder 10.))
-			       (+ (char-code #\0) remainder)))
-		stream)))
-
-;;;; bignum printing
-
-;;; *BASE-POWER* holds the number that we keep dividing into the
-;;; bignum for each *print-base*. We want this number as close to
-;;; *most-positive-fixnum* as possible, i.e. (floor (log
-;;; most-positive-fixnum *print-base*)).
-(defparameter *base-power* (make-array 37 :initial-element nil))
-
-;;; *FIXNUM-POWER--1* holds the number of digits for each *PRINT-BASE*
-;;; that fit in the corresponding *base-power*.
-(defparameter *fixnum-power--1* (make-array 37 :initial-element nil))
-
-;;; Print the bignum to the stream. We first generate the correct
-;;; value for *base-power* and *fixnum-power--1* if we have not
-;;; already. Then we call bignum-print-aux to do the printing.
-(defun print-bignum (big stream)
-  (unless (aref *base-power* *print-base*)
-    (do ((power-1 -1 (1+ power-1))
-	 (new-divisor *print-base* (* new-divisor *print-base*))
-	 (divisor 1 new-divisor))
-	((not (fixnump new-divisor))
-	 (setf (aref *base-power* *print-base*) divisor)
-	 (setf (aref *fixnum-power--1* *print-base*) power-1))))
-  (bignum-print-aux (cond ((minusp big)
-			   (write-char #\- stream)
-			   (- big))
-			  (t big))
-		    (aref *base-power* *print-base*)
-		    (aref *fixnum-power--1* *print-base*)
-		    stream)
-  big)
-
-(defun bignum-print-aux (big divisor power-1 stream)
-  (multiple-value-bind (newbig fix) (truncate big divisor)
-    (if (fixnump newbig)
-	(sub-output-integer newbig stream)
-	(bignum-print-aux newbig divisor power-1 stream))
-    (do ((zeros power-1 (1- zeros))
-	 (base-power *print-base* (* base-power *print-base*)))
-	((> base-power fix)
-	 (dotimes (i zeros) (write-char #\0 stream))
-	 (sub-output-integer fix stream)))))
+  (let ((base *print-base*))
+    (when (and (/= base 10) *print-radix*)
+      (%output-radix base stream))
+    (%output-integer-in-base integer base stream)
+    (when (and *print-radix* (= base 10))
+      (write-char #\. stream))))
 
 (defun output-ratio (ratio stream)
-  (when *print-radix*
-    (write-char #\# stream)
-    (case *print-base*
-      (2 (write-char #\b stream))
-      (8 (write-char #\o stream))
-      (16 (write-char #\x stream))
-      (t (write *print-base* :stream stream :radix nil :base 10)
-	 (write-char #\r stream))))
-  (let ((*print-radix* nil))
-    (output-integer (numerator ratio) stream)
+  (let ((base *print-base*))
+    (when *print-radix*
+      (%output-radix base stream))
+    (%output-integer-in-base (numerator ratio) base stream)
     (write-char #\/ stream)
-    (output-integer (denominator ratio) stream)))
+    (%output-integer-in-base (denominator ratio) base stream)))
 
 (defun output-complex (complex stream)
   (write-string "#C(" stream)
+  ;; FIXME: Could this just be OUTPUT-NUMBER? 
   (output-object (realpart complex) stream)
   (write-char #\space stream)
   (output-object (imagpart complex) stream)

@@ -266,5 +266,37 @@
   (assert (format nil x nil))
   (assert (format nil (eval `(formatter ,x)) nil)))
 
+;;; bug 350: bignum printing so memory-hungry that heap runs out
+;;; -- just don't stall here forever on a slow box
+(handler-case
+    (with-timeout 10
+      (print (ash 1 1000000)))
+  (timeout ()
+    (print 'timeout!)))
+
+;;; a spot of random-testing for rational printing
+(defvar *seed-state* (make-random-state))
+(prin1 *seed-state*) ; so that we can reproduce errors
+(let ((seed (make-random-state *seed-state*)))
+  (loop repeat 42
+     do (let ((n (random (ash 1 1000) seed))
+              (d (random (ash 1 1000) seed)))
+          (when (zerop (random 2 seed))
+            (setf n (- n)))
+          (let ((r (/ n d)))
+            (loop for base from 2 to 36
+               do (let ((*print-base* base)
+                        (*read-base* base)
+                        (*print-radix* nil))
+                    (assert (= r (read-from-string (prin1-to-string r))))
+                    (if (= 36 base)
+                        (decf *read-base*)
+                        (incf *read-base*))
+                    (assert (not (eql r (read-from-string (prin1-to-string r)))))
+                    (let ((*print-radix* t))
+                      (assert (= r (read-from-string 
+                                    (princ-to-string r)))))))))
+       (write-char #\.)
+       (finish-output)))
 ;;; success
 (quit :unix-status 104)
