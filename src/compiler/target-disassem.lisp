@@ -1373,7 +1373,8 @@
 		     last-debug-fun))
 	  (if (null segments)
 	      (let ((offs (fun-insts-offset function)))
-		(make-code-segment code offs (- max-offset offs)))
+		(list 
+		 (make-code-segment code offs (- max-offset offs))))
 	      (nreverse segments)))))))
 
 ;;; Return a list of the segments of memory containing machine code

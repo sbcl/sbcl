@@ -35,10 +35,10 @@
 (sb!xc:defstruct (package-hashtable (:constructor %make-package-hashtable ())
 				    (:copier nil))
   ;; The g-vector of symbols.
-  ;; FIXME: could just be type SIMPLE-VECTOR, with REQUIRED-ARG
+  ;; FIXME: could just be type SIMPLE-VECTOR, with (MISSING-ARG) default
   (table nil :type (or simple-vector null))
   ;; The i-vector of pname hash values.
-  ;; FIXME: could just be type HASH-VECTOR, with REQUIRED-ARG
+  ;; FIXME: could just be type HASH-VECTOR, with (MISSING-ARG) default
   (hash nil :type (or hash-vector null))
   ;; The total number of entries allowed before resizing.
   ;;
