@@ -5,4 +5,4 @@ $(MODULE).fasl: $(MODULE).lisp ../../output/sbcl.core
 test:: $(MODULE).fasl
 
 install:
-	cp $(MODULE).fasl $(INSTALL_DIR)
+	cp $(MODULE).fasl $(BUILD_ROOT)$(INSTALL_DIR)

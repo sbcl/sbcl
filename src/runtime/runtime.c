@@ -62,6 +62,11 @@
 #include <string.h>
 #include "interr.h"
 #endif
+
+#ifndef SBCL_HOME
+#define SBCL_HOME "/usr/local/lib/sbcl/"
+#endif
+
 
 /* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
 static void
@@ -278,46 +283,36 @@ main(int argc, char *argv[], char *envp[])
     /* If no core file was specified, look for one. */
     if (!core) {
 	char *sbcl_home = getenv("SBCL_HOME");
-	if (sbcl_home) {
-	    char *lookhere;
-	    char *stem = "/sbcl.core";
-	    lookhere = (char *) calloc(strlen(sbcl_home) +
-				       strlen(stem) +
-				       1,
-				       sizeof(char));
-	    sprintf(lookhere, "%s%s", sbcl_home, stem);
-	    core = copied_existing_filename_or_null(lookhere);
-	    free(lookhere);
-	} else {
-	    putenv("SBCL_HOME=/usr/local/lib/sbcl/");
-	    core = copied_existing_filename_or_null("/usr/local/lib/sbcl/sbcl.core");
-	    if (!core) {
-		putenv("SBCL_HOME=/usr/lib/sbcl/");
-		core =
-		    copied_existing_filename_or_null("/usr/lib/sbcl/sbcl.core");
-	    }
-	}
+	char *lookhere;
+	char *stem = "/sbcl.core";
+	if(!sbcl_home) sbcl_home = SBCL_HOME;
+	lookhere = (char *) calloc(strlen(sbcl_home) +
+				   strlen(stem) +
+				   1,
+				   sizeof(char));
+	sprintf(lookhere, "%s%s", sbcl_home, stem);
+	core = copied_existing_filename_or_null(lookhere);
+	free(lookhere);
 	if (!core) {
 	    lose("can't find core file");
 	}
-    } else {
-	/* If a core was specified and SBCL_HOME is unset, set it */
-	char *sbcl_home = getenv("SBCL_HOME");
-	if (!sbcl_home) {
-	    char *envstring, *copied_core, *dir;
-	    char *stem = "SBCL_HOME=";
-	    copied_core = copied_string(core);
-	    dir = dirname(copied_core);
-	    envstring = (char *) calloc(strlen(stem) +
-					strlen(dir) + 
-					1,
-					sizeof(char));
-	    sprintf(envstring, "%s%s", stem, dir);
-	    putenv(envstring);
-	    free(copied_core);
-	}
     }
-
+    /* Make sure that SBCL_HOME is set, no matter where the core was
+     * found */
+    if (!getenv("SBCL_HOME")) {
+	char *envstring, *copied_core, *dir;
+	char *stem = "SBCL_HOME=";
+	copied_core = copied_string(core);
+	dir = dirname(copied_core);
+	envstring = (char *) calloc(strlen(stem) +
+				    strlen(dir) + 
+				    1,
+				    sizeof(char));
+	sprintf(envstring, "%s%s", stem, dir);
+	putenv(envstring);
+	free(copied_core);
+    }
+    
     if (!noinform) {
 	print_banner();
 	fflush(stdout);

@@ -139,6 +139,7 @@ pid_t create_thread(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->pid=0;
+    th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */

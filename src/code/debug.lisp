@@ -726,9 +726,10 @@ reset to ~S."
        ;; regardless of what the debugger does afterwards.)
        (handler-case
 	   (format *error-output*
-		   "~2&~@<debugger invoked on condition of type ~S: ~
+		   "~2&~@<debugger invoked on condition of type ~S in thread ~A: ~
                     ~2I~_~A~:>~%"
 		   (type-of *debug-condition*)
+		   (sb!thread:current-thread-id)
 		   *debug-condition*)
 	 (error (condition)
            (setf *nested-debug-condition* condition)

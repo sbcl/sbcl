@@ -216,6 +216,7 @@
 	 (return))))))
 
 
+
 (defun verify-gpg-signature/url (url file-name)
   (destructuring-bind (response headers stream)
       (url-connection (concatenate 'string url ".asc"))
@@ -330,3 +331,18 @@
 	    (prin1 *trusted-uids* out))))
       (dolist (l *temporary-files*)
 	(when (probe-file l) (delete-file l))))))
+
+(defun uninstall (system &optional (prompt t))
+  (let* ((asd (asdf:system-definition-pathname system))
+	 (system (asdf:find-system system))
+	 (dir (asdf::pathname-sans-name+type
+	       (asdf::resolve-symlinks asd))))
+    (when (or (not prompt)
+	      (y-or-n-p
+	       "Delete system ~A~%asd file: ~A~%sources: ~A~%Are you sure?"
+	       system asd dir))
+      (delete-file asd)
+      (asdf:run-shell-command "rm -r ~A" (namestring dir)))))
+      
+;;; some day we will also do UPGRADE, but we need to sort out version
+;;; numbering a bit better first

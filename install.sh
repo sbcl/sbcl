@@ -10,6 +10,7 @@ ensure_dirs ()
 }
 
 INSTALL_ROOT=${INSTALL_ROOT-/usr/local}
+MAN_DIR=${MAN_DIR-$INSTALL_ROOT/man}
 SBCL_SOURCE=`pwd`
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.
@@ -20,20 +21,22 @@ if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
 fi
 SBCL_HOME=$INSTALL_ROOT/lib/sbcl
 export SBCL_HOME INSTALL_ROOT
-ensure_dirs $INSTALL_ROOT $INSTALL_ROOT/bin $INSTALL_ROOT/lib \
-    $INSTALL_ROOT/man $INSTALL_ROOT/man/man1 \
-    $SBCL_HOME $SBCL_HOME/systems $SBCL_HOME/site-systems
+ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
+    $BUILD_ROOT$INSTALL_ROOT/lib  \
+    $BUILD_ROOT$INSTALL_ROOT/man $BUILD_ROOT$INSTALL_ROOT/man/man1 \
+    $BUILD_ROOT$SBCL_HOME $BUILD_ROOT$SBCL_HOME/systems \
+    $BUILD_ROOT$SBCL_HOME/site-systems
 
 # move old versions out of the way.  Safer than copying: don't want to
 # break any running instances that have these files mapped
-test -f $INSTALL_ROOT/bin/sbcl && \
-    mv $INSTALL_ROOT/bin/sbcl $INSTALL_ROOT/bin/sbcl.old
-test -f $SBCL_HOME/sbcl.core && \
-    mv $SBCL_HOME/sbcl.core $SBCL_HOME/sbcl.core.old
+test -f $BUILD_ROOT$INSTALL_ROOT/bin/sbcl && \
+    mv $BUILD_ROOT$INSTALL_ROOT/bin/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/sbcl.old
+test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
+    mv $BUILD_ROOT$SBCL_HOME/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core.old
 
-cp src/runtime/sbcl $INSTALL_ROOT/bin/
-cp output/sbcl.core $SBCL_HOME/sbcl.core
-cp doc/sbcl.1 $INSTALL_ROOT/man/man1/
+cp src/runtime/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/
+cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
+cp doc/sbcl.1 $BUILD_ROOT$INSTALL_ROOT/man/man1/
 
 # installing contrib 
 
@@ -48,5 +51,5 @@ for i in contrib/*; do
     test -d $i && test -f $i/test-passed || continue;
     INSTALL_DIR=$SBCL_HOME/`basename $i `
     export INSTALL_DIR
-    ensure_dirs $INSTALL_DIR && $GNUMAKE -C $i install
+    ensure_dirs $BUILD_ROOT$INSTALL_DIR && $GNUMAKE -C $i install
 done

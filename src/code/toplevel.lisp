@@ -405,14 +405,10 @@
 			  possible-init-file-names)
 	       (/show0 "leaving PROBE-INIT-FILES"))))
       (let* ((sbcl-home (posix-getenv "SBCL_HOME"))
-	     (sysinit-truename (if sbcl-home
-				   (probe-init-files sysinit
-						     (concatenate 'string
-								  sbcl-home
-								  "/sbclrc"))
-				   (probe-init-files sysinit
-						     "/etc/sbclrc"
-						     "/usr/local/etc/sbclrc")))
+	     (sysinit-truename
+	      (probe-init-files sysinit
+				(concatenate 'string sbcl-home "/sbclrc")
+				"/etc/sbclrc"))
 	     (user-home (or (posix-getenv "HOME")
 			    (error "The HOME environment variable is unbound, ~
 				    so user init file can't be found.")))
