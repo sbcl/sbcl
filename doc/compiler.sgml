@@ -509,84 +509,14 @@ slots as precisely as possible. This often involves the use of
 <quote>weakened type checking</>, when the value for the
 <parameter>speed</> optimization quality is greater than
 <parameter>safety</>, and <parameter>safety</> is not <literal>0</>.
-The &CMUCL; manual still has a description of it, but the code no
-longer corresponds to the manual. It sounds like a good thing to have,
-and we might someday be able to restore it in &SBCL; but in the
-meantime, if you ask the compiler to optimize <parameter>speed</> to a
-higher level than <parameter>safety</>, your program is performing
-without a safety net, because &SBCL; may believe any or all type
-declarations without any runtime checking at all.</para>
-
-<!-- (beginning of text adapted from out-of-date CMUCL manual, describing
-_    features it would be nice for SBCL to restore someday)
-_ 
-_ <para>When the value for the <parameter>speed</> optimization quality
-_ is greater than <parameter>safety</>, and <parameter>safety</> is not
-_ <literal>0</>, then type checking is weakened to reduce the speed and
-_ space penalty. In structure-intensive code this can double the speed,
-_ yet still catch most type errors. Weakened type checks provide a level
-_ of safety similar to that of <quote>safe</> code in other &CommonLisp;
-_ compilers.</para>
-_ 
-_ <para>A type check is weakened by changing the check to be for some
-_ convenient supertype of the asserted type. For example, <type>(integer
-_ 3 17)</> is changed to <type>fixnum</>, <type>(simple-vector 17)</> to
-_ <type>simple-vector</>, and structure types are changed to
-_ <type>structure-object</>. A test for a complex type like <type>(or node hunk
-_ (member :foo :bar :baz))</> will be omitted entirely (i.e., the type
-_ is weakened to <type>*</>.) If a precise check can be done for no
-_ extra cost, then no weakening is done.</para>
-_ 
-_ <para>Although weakened type checking is similar to type checking done
-_ by other compilers, it is sometimes safer and sometimes less safe.
-_ Weakened checks are done in the same places is precise checks, so all
-_ the preceding discussion about where checking is done still applies.
-_ Weakened checking is sometimes somewhat unsafe because although the
-_ check is weakened, the precise type is still input into type
-_ inference. In some contexts this will result in type inferences not
-_ justified by the weakened check, and hence deletion of some type
-_ checks that would be done by conventional compilers.</para>
-_ 
-_ <para>For example, if this code was compiled with weakened checks
-_ 
-_ <programlisting>(defstruct foo
-_   (a nil :type simple-string))
-_ 
-_ (defstruct bar
-_   (a nil :type single-float))
-_ 
-_ (defun myfun (x)
-_   (declare (type bar x))
-_   (* (bar-a x) 3.0))</programlisting>
-_ 
-_ and <function>myfun</> was passed a value of
-_ type <type>foo</>, then no type error would be
-_ signaled, and we would try to multiply a <type>simple-vector</> as
-_ though it were a <type>single-float</> (with unpredictable results.)
-_ This is because the check for <type>bar</> was weakened to
-_ <type>structure-object</>, yet when compiling the call to <type>bar-a</>, the
-_ compiler thinks it knows it has a <type>bar</>.</para>
-_ 
-_ <para>Note that normally even weakened type checks report the precise
-_ type in error messages. For example, if <function>myfun</>'s
-_ <type>bar</> check is weakened to <type>structure-object</>, and the argument
-_ is <literal>nil</>, then the error will be:
-_ 
-_ <screen>Type-error in MYFUN:
-_   NIL is not of type BAR</screen>
-_ 
-_ However, there is some speed and space cost for signaling a precise
-_ error, so the weakened type is reported if the <parameter>speed</>
-_ optimization quality is <literal>3</> or <parameter>debug</>
-_ quality is less than <literal>1</>:
-_ 
-_ <screen>Type-error in MYFUN:
-_   NIL is not of type STRUCTURE-OBJECT</screen>
-_ 
-_ </para>
-_ 
-_ (end of text adapted from out-of-date CMUCL manual, describing
-_ features it would be nice for SBCL to restore someday) -->
+The &CMUCL; manual still has a description of it, but even the CMU CL
+code no longer corresponds to the manual. Some of this partial safety
+checking lingers on in SBCL, but it's not a supported feature, and 
+should not be relied on. If you ask the compiler to optimize
+<parameter>speed</> to a higher level than <parameter>safety</>,
+your program is performing without a safety net, because &SBCL; may
+at its option believe any or all type declarations with either partial
+or nonexistent runtime checking.</para>
 
 </sect2>
 
