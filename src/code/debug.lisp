@@ -741,11 +741,9 @@ reset to ~S."
 			(t
 			 (funcall cmd-fun))))))))))))
 
-;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
 (defun debug-eval-print (expr)
   (/noshow "entering DEBUG-EVAL-PRINT" expr)
-  (let ((values (multiple-value-list 
-                 (interactive-eval (sb!di:preprocess-for-eval expr)))))
+  (let ((values (multiple-value-list (interactive-eval expr))))
     (/noshow "done with EVAL in DEBUG-EVAL-PRINT")
     (dolist (value values)
       (fresh-line *debug-io*)
