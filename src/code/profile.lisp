@@ -162,7 +162,6 @@
        (let ((dticks 0)
 	     (dconsing 0)
 	     (inner-enclosed-profiles 0))
-         (declare (optimize (safety 0)))
 	 (declare (type unsigned-byte dticks dconsing))
 	 (declare (type unsigned-byte inner-enclosed-profiles))
 	 (aver (typep dticks 'unsigned-byte))
@@ -195,13 +194,9 @@
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
 		     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
-		   (let ((net-dconsing (fastbig-
-                                        (fastbig- dconsing
-                                                  (pcounter-or-fixnum->integer
-                                                   *enclosed-consing*))
-                                        ;; three variables with value
-                                        ;; cells two bytes each.
-                                        (* 3 2 sb-vm:n-word-bytes))))
+		   (let ((net-dconsing (fastbig- dconsing
+						 (pcounter-or-fixnum->integer
+						  *enclosed-consing*))))
 		     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
 		   (fastbig-incf-pcounter-or-fixnum profiles
 						    inner-enclosed-profiles))))
