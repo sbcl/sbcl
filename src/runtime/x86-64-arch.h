@@ -13,7 +13,7 @@
  * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
 
 static inline void 
-get_spinlock(lispobj *word,int value)
+get_spinlock(lispobj *word,long value)
 {
 #if 0
     u32 eax=0;

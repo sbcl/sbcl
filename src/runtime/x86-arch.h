@@ -25,7 +25,7 @@
 extern never_returns lose(char *fmt, ...);
 
 static inline void 
-get_spinlock(volatile lispobj *word,int value)
+get_spinlock(volatile lispobj *word,long value)
 {
     u32 eax=0;
     if(*word==value) 

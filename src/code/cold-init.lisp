@@ -297,8 +297,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
       ;; see also comment at the previous SET-FLOATING-POINT-MODES
       ;; call site.
       (set-floating-point-modes
-       :traps '(:overflow #!-netbsd :invalid :divide-by-zero))
-      (sb!thread::maybe-install-futex-functions)))
+       :traps '(:overflow #!-netbsd :invalid :divide-by-zero))))
   (thread-init-or-reinit)
   (gc-reinit)
   ;; make sure TIME works correctly from saved cores

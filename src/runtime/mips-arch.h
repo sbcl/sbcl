@@ -3,7 +3,7 @@
 
 
 static inline void 
-get_spinlock(lispobj *word,int value)
+get_spinlock(lispobj *word,long value)
 {
     *word=value;		/* FIXME for threads */
 }

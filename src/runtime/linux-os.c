@@ -49,7 +49,7 @@
 #include "thread.h"
 size_t os_vm_page_size;
 
-#ifdef LISP_FEATURE_SB_FUTEX
+#ifdef LISP_FEATURE_SB_THREAD
 #include <linux/unistd.h>
 #include <errno.h>
 
@@ -73,7 +73,6 @@ _syscall4(int,sys_futex,
 #include "gc.h"
 
 int linux_sparc_siginfo_bug = 0;
-int linux_supports_futex=0;
 
 void os_init(void)
 {
@@ -94,17 +93,16 @@ void os_init(void)
 	     major_version);
     }
     if (!(major_version>2 || minor_version >= 4)) {
-#ifdef LISP_FEATURE_SB_THREAD
-	lose("linux kernel 2.4 required for thread-enabled SBCL");
-#endif
 #ifdef LISP_FEATURE_SPARC
 	FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
 	linux_sparc_siginfo_bug = 1;
 #endif
     }
-#ifdef LISP_FEATURE_SB_FUTEX
+#ifdef LISP_FEATURE_SB_THREAD
     futex_wait(futex,-1);
-    if(errno!=ENOSYS) linux_supports_futex=1;
+    if(errno==ENOSYS) {
+	lose("linux with NPTL support (e.g. kernel 2.6 or newer) required for thread-enabled SBCL");
+    }
 #endif
     os_vm_page_size = getpagesize();
 }
@@ -288,13 +286,10 @@ os_install_interrupt_handlers(void)
 						 sig_stop_for_gc_handler);
     undoably_install_low_level_interrupt_handler(SIG_THREAD_EXIT,
 						 thread_exit_handler);
-    if(!linux_supports_futex)
-	undoably_install_low_level_interrupt_handler(SIG_DEQUEUE,
-						     sigcont_handler);
 #endif
 }
 
-#ifdef LISP_FEATURE_SB_FUTEX
+#ifdef LISP_FEATURE_SB_THREAD
 int futex_wait(int *lock_word, int oldval) {
     int t= sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
     return t;

@@ -141,8 +141,6 @@ time we reacquire LOCK and return to the caller."
   "Notify one of the processes waiting on QUEUE"
   (signal-queue-head queue))
 
-(defun maybe-install-futex-functions () nil)
-
 ;;;; job control
 
 (defun init-job-control () t)

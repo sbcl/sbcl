@@ -84,67 +84,19 @@
 (sb!alien:define-alien-routine "block_sigcont"  void)
 (sb!alien:define-alien-routine "unblock_sigcont_and_sleep"  void)
 
-#!+sb-futex
 (declaim (inline futex-wait futex-wake))
-#!+sb-futex
 (sb!alien:define-alien-routine
     "futex_wait" int (word unsigned-long) (old-value unsigned-long))
-#!+sb-futex
 (sb!alien:define-alien-routine
     "futex_wake" int (word unsigned-long) (n unsigned-long))
 
 
-;;; this should only be called while holding the queue spinlock.
-;;; it releases the spinlock before sleeping
-(defun wait-on-queue (queue &optional lock)
-  (let ((pid (current-thread-id)))
-    (block-sigcont)
-    (when lock (release-mutex lock))
-    (sb!sys:without-interrupts
-     (pushnew pid (waitqueue-data queue)))
-    (setf (waitqueue-lock queue) 0)
-    (unblock-sigcont-and-sleep)))
-
-;;; this should only be called while holding the queue spinlock.  It doesn't
-;;; release it
-(defun dequeue (queue)
-  (let ((pid (current-thread-id)))
-    (sb!sys:without-interrupts     
-     (setf (waitqueue-data queue)
-	   (delete pid (waitqueue-data queue))))))
-
-;;; this should only be called while holding the queue spinlock.
-(defun signal-queue-head (queue)
-  (let ((p (car (waitqueue-data queue))))
-    (when p (signal-thread-to-dequeue p))))
-
 ;;;; mutex
 
-;;; i suspect there may be a race still in this: the futex version requires
-;;; the old mutex value before sleeping, so how do we get away without it
 (defun get-mutex (lock &optional new-value (wait-p t))
   "Acquire LOCK, setting it to NEW-VALUE or some suitable default value 
 if NIL.  If WAIT-P is non-NIL and the lock is in use, sleep until it
 is available"
-  (declare (type mutex lock) (optimize (speed 3)))
-  (let ((pid (current-thread-id)))
-    (unless new-value (setf new-value pid))
-    (assert (not (eql new-value (mutex-value lock))))
-    (get-spinlock lock 2 pid)
-    (loop
-     (unless
-	 ;; args are object slot-num old-value new-value
-	 (sb!vm::%instance-set-conditional lock 4 nil new-value)
-       (dequeue lock)
-       (setf (waitqueue-lock lock) 0)
-       (return t))
-     (unless wait-p
-       (setf (waitqueue-lock lock) 0)
-       (return nil))
-     (wait-on-queue lock nil))))
-
-#!+sb-futex
-(defun get-mutex/futex (lock &optional new-value (wait-p t))
   (declare (type mutex lock)  (optimize (speed 3)))
   (let ((pid (current-thread-id))
 	old)
@@ -159,15 +111,7 @@ is available"
      (futex-wait (mutex-value-address lock)
 		 (sb!kernel:get-lisp-obj-address old)))))
 
-(defun release-mutex (lock &optional (new-value nil))
-  (declare (type mutex lock))
-  ;; we assume the lock is ours to release
-  (with-spinlock (lock)
-    (setf (mutex-value lock) new-value)
-    (signal-queue-head lock)))
-
-#!+sb-futex
-(defun release-mutex/futex (lock)
+(defun release-mutex (lock)
   (declare (type mutex lock))
   (setf (mutex-value lock) nil)
   (futex-wake (mutex-value-address lock) 1))
@@ -178,22 +122,6 @@ is available"
   "Atomically release LOCK and enqueue ourselves on QUEUE.  Another
 thread may subsequently notify us using CONDITION-NOTIFY, at which
 time we reacquire LOCK and return to the caller."
-  (assert lock)
-  (let ((value (mutex-value lock)))
-    (unwind-protect
-	 (progn
-	   (get-spinlock queue 2 (current-thread-id))
-	   (wait-on-queue queue lock))
-      ;; If we are interrupted while waiting, we should do these things
-      ;; before returning.  Ideally, in the case of an unhandled signal,
-      ;; we should do them before entering the debugger, but this is
-      ;; better than nothing.
-      (with-spinlock (queue)
-	(dequeue queue))
-      (get-mutex lock value))))
-
-#!+sb-futex
-(defun condition-wait/futex (queue lock)
   (assert lock)
   (let ((value (mutex-value lock)))
     (unwind-protect
@@ -218,11 +146,6 @@ time we reacquire LOCK and return to the caller."
 
 (defun condition-notify (queue)
   "Notify one of the processes waiting on QUEUE"
-  (with-spinlock (queue) (signal-queue-head queue)))
-
-#!+sb-futex
-(defun condition-notify/futex (queue)
-  "Notify one of the processes waiting on QUEUE."
   (let ((me (current-thread-id)))
     ;; no problem if >1 thread notifies during the comment in
     ;; condition-wait: as long as the value in queue-data isn't the
@@ -232,29 +155,10 @@ time we reacquire LOCK and return to the caller."
     (setf (waitqueue-data queue) me)
     (futex-wake (waitqueue-data-address queue) 1)))
 
-#!+sb-futex
-(defun condition-broadcast/futex (queue)
+(defun condition-broadcast (queue)
   (let ((me (current-thread-id)))
     (setf (waitqueue-data queue) me)
     (futex-wake (waitqueue-data-address queue) (ash 1 30))))
-
-(defun condition-broadcast (queue)
-  "Notify all of the processes waiting on QUEUE."
-  (with-spinlock (queue)
-    (map nil #'signal-thread-to-dequeue (waitqueue-data queue))))
-
-;;; Futexes may be available at compile time but not runtime, so we
-;;; default to not using them unless os_init says they're available
-(defun maybe-install-futex-functions ()
-  #!+sb-futex
-  (unless (zerop (extern-alien "linux_supports_futex" int))
-    (sb!ext:without-package-locks
-      (setf (fdefinition 'get-mutex) #'get-mutex/futex
-            (fdefinition 'release-mutex) #'release-mutex/futex
-            (fdefinition 'condition-wait) #'condition-wait/futex
-            (fdefinition 'condition-broadcast) #'condition-broadcast/futex
-            (fdefinition 'condition-notify) #'condition-notify/futex))
-    t))
 
 (defun make-thread (function)
   (let* ((real-function (coerce function 'function))

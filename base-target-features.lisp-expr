@@ -154,20 +154,13 @@
 
  ;; low-level thread primitives support
  ;;
- ;; As of SBCL 0.8,  this is only supposed to work in x86 Linux, on which
- ;; system it's implemented using clone(2) and the %fs segment register.
- ;; Note that no consistent effort to audit the SBCL library code for
- ;; thread safety has been performed, so caveat executor.
+ ;; As of SBCL 0.8, this is only supposed to work in x86 Linux with
+ ;; NPTL support (usually kernel 2.6, though sme Red Hat distributions
+ ;; with older kernels also have it) and is implemented using clone(2)
+ ;; and the %fs segment register.  Note that no consistent effort to
+ ;; audit the SBCL library code for thread safety has been performed,
+ ;; so caveat executor.
  ; :sb-thread
-
- ;; Kernel support for futexes (so-called "fast userspace mutexes") is
- ;; available in Linux 2.6 and some versions of 2.4 (Red Hat vendor
- ;; kernels, possibly other vendors too).  We can take advantage of
- ;; these to do faster and probably more reliable mutex and condition
- ;; variable support.  An SBCL built with this feature will fall back
- ;; to the old system if the futex() syscall is not available at
- ;; runtime
- ; :sb-futex
 
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
