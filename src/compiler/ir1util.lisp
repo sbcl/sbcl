@@ -1081,9 +1081,12 @@
     (when last
       (let ((cont (node-cont last)))
         (delete-continuation-use last)
-        (if (eq (continuation-kind cont) :unused)
-            (delete-continuation cont)
-            (reoptimize-continuation cont)))))
+        (acond ((eq (continuation-kind cont) :unused)
+                (delete-continuation cont))
+               ((and (null (find-uses cont))
+                     (continuation-dest cont))
+                (mark-for-deletion (node-block it)))
+               ((reoptimize-continuation cont))))))
 
   (dolist (b (block-pred block))
     (unlink-blocks b block)
@@ -1143,7 +1146,7 @@
       (cast
        (flush-dest (cast-value node))))
 
-       (delete-continuation (node-prev node)))
+    (delete-continuation (node-prev node)))
 
   (remove-from-dfo block)
   (values))

@@ -475,7 +475,10 @@
        (unless (gethash (continuation-block cont) *seen-blocks*)
 	 (barf "~S receives ~S, which is in an unknown block." node cont))
        (unless (eq (continuation-dest cont) node)
-	 (barf "DEST for ~S should be ~S." cont node)))))
+	 (barf "DEST for ~S should be ~S." cont node))
+       (unless (find-uses cont)
+         (barf "Continuation ~S has a destinatin, but no uses."
+               cont)))))
   (values))
 
 ;;; This function deals with checking for consistency of the
@@ -496,25 +499,25 @@
      (check-dest (basic-combination-fun node) node)
      (dolist (arg (basic-combination-args node))
        (cond
-	(arg (check-dest arg node))
-	((not (and (eq (basic-combination-kind node) :local)
-		   (combination-p node)))
-	 (barf "flushed arg not in local call: ~S" node))
-	(t
-	 (locally
-	   ;; KLUDGE: In sbcl-0.6.11.37, the compiler doesn't like
-	   ;; (DECLARE (TYPE INDEX POS)) after the inline expansion of
-	   ;; POSITION. It compiles it correctly, but it issues a type
-	   ;; mismatch warning because it can't eliminate the
-	   ;; possibility that control will flow through the
-	   ;; NIL-returning branch. So we punt here. -- WHN 2001-04-15
-	   (declare (notinline position))
-	   (let ((fun (ref-leaf (continuation-use
-				 (basic-combination-fun node))))
-		 (pos (position arg (basic-combination-args node))))
-	     (declare (type index pos))
-	     (when (leaf-refs (elt (lambda-vars fun) pos))
-	       (barf "flushed arg for referenced var in ~S" node)))))))
+         (arg (check-dest arg node))
+         ((not (and (eq (basic-combination-kind node) :local)
+                    (combination-p node)))
+          (barf "flushed arg not in local call: ~S" node))
+         (t
+          (locally
+              ;; KLUDGE: In sbcl-0.6.11.37, the compiler doesn't like
+              ;; (DECLARE (TYPE INDEX POS)) after the inline expansion of
+              ;; POSITION. It compiles it correctly, but it issues a type
+              ;; mismatch warning because it can't eliminate the
+              ;; possibility that control will flow through the
+              ;; NIL-returning branch. So we punt here. -- WHN 2001-04-15
+              (declare (notinline position))
+            (let ((fun (ref-leaf (continuation-use
+                                  (basic-combination-fun node))))
+                  (pos (position arg (basic-combination-args node))))
+              (declare (type index pos))
+              (when (leaf-refs (elt (lambda-vars fun) pos))
+                (barf "flushed arg for referenced var in ~S" node)))))))
      (let ((dest (continuation-dest (node-cont node))))
        (when (and (return-p dest)
 		  (eq (basic-combination-kind node) :local)
@@ -954,6 +957,8 @@
   (pprint-logical-block (nil nil)
     (format t "~:@_IR1 block ~D start c~D"
            (block-number block) (cont-num (block-start block)))
+    (when (block-delete-p block)
+      (format t " <deleted>"))
 
     (let ((last (block-last block)))
      (pprint-newline :mandatory)

@@ -1913,8 +1913,12 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     anymore.
   * fixed bug: sometimes MAKE-INSTANCE did not work with classes with
     many :DEFAULT-INITARGS. (reported by Istvan Marko)
+  * fixed bug: if last continuation of a deleted block has a
+    destination, this destination should be deleted too. (reported by
+    ohler on #lisp)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
+    ** condition slot accessors are methods.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

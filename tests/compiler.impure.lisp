@@ -839,6 +839,12 @@
     (list (bar x) (bar x) (bar x))))
 
 (assert (raises-error? (bug249 1.0) type-error))
+
+;;; bug reported by ohler on #lisp 2003-07-10
+(defun bug-ohler-2003-07-10 (a b)
+  (declare (optimize (speed 0) (safety 3) (space 0)
+                     (debug 1) (compilation-speed 0)))
+  (adjoin a b))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

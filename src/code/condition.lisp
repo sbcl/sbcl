@@ -346,6 +346,25 @@
 		 (res (copy-structure sslot)))))))
     (res)))
 
+;;; Early definitions of slot accessor creators.
+;;;
+;;; Slot accessors must be generic functions, but ANSI does not seem
+;;; to specify any of them, and we cannot support it before end of
+;;; warm init. So we use ordinary functions inside SBCL, and switch to
+;;; GFs only at the end of building.
+(declaim (notinline install-condition-slot-reader
+                    install-condition-slot-writer))
+(defun install-condition-slot-reader (name condition slot-name)
+  (declare (ignore condition))
+  (setf (fdefinition name)
+        (lambda (condition)
+          (condition-reader-function condition slot-name))))
+(defun install-condition-slot-writer (name condition slot-name)
+  (declare (ignore condition))
+  (setf (fdefinition name)
+        (lambda (new-value condition)
+          (condition-writer-function condition new-value slot-name))))
+
 (defun %define-condition (name slots documentation report default-initargs)
   (let ((class (find-classoid name)))
     (setf (condition-classoid-slots class) slots)
@@ -356,15 +375,11 @@
     (dolist (slot slots)
 
       ;; Set up reader and writer functions.
-      (let ((name (condition-slot-name slot)))
+      (let ((slot-name (condition-slot-name slot)))
 	(dolist (reader (condition-slot-readers slot))
-	  (setf (fdefinition reader)
-		(lambda (condition)
-		  (condition-reader-function condition name))))
+          (install-condition-slot-reader reader name slot-name))
 	(dolist (writer (condition-slot-writers slot))
-	  (setf (fdefinition writer)
-		(lambda (new-value condition)
-		  (condition-writer-function condition new-value name))))))
+	  (install-condition-slot-writer writer name slot-name))))
 
     ;; Compute effective slots and set up the class and hairy slots
     ;; (subsets of the effective slots.)

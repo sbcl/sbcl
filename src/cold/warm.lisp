@@ -136,6 +136,7 @@
 
 		;; miscellaneous functionality which depends on CLOS
 		"src/code/force-delayed-defbangmethods"
+                "src/code/late-condition"
 
 		;; CLOS-level support for the Gray OO streams
 		;; extension (which is also supported by various
