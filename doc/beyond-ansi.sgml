@@ -336,11 +336,9 @@ fixed addresses, a precondition for using copy-on-write to share code
 between multiple Lisp processes. is less important with modern
 generational garbage collectors. </para>
 
-<para>The <function>sb-ext:truly-the</> operator does what the
-<function>cl:the</> operator does in a more conventional
-implementation of &CommonLisp;, declaring the type of its argument
-without any runtime checks. (Ordinarily in &SBCL;, any type
-declaration is treated as an assertion and checked at runtime.)</para>
+<para>The <function>sb-ext:truly-the</> declares the type of the
+result of the operations, producing its argument; the declaration is
+not checked. In short: don't use it.</para>
 
 <para>The <function>sb-ext:freeze-type</> declaration declares that a
 type will never change, which can make type testing
@@ -353,6 +351,8 @@ to it. This is appropriate for functions like <function>sqrt</>, but
 is <emphasis>not</> appropriate for functions like <function>aref</>,
 which can change their return values when the underlying data are
 changed.</para>
+<!-- FIXME: This declaration does not seem to be supported in the --
+  -- current compiler. -->
 
 </sect2>
 

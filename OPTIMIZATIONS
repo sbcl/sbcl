@@ -162,3 +162,7 @@ It could be optimized to
 
 tests lowtag.
 --------------------------------------------------------------------------------
+#13
+FAST-+/FIXNUM and similar should accept unboxed arguments in interests
+of representation selection. Problem: inter-TN dependencies.
+--------------------------------------------------------------------------------

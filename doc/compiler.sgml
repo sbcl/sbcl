@@ -376,11 +376,19 @@ types.
 Ideally, the compiler would consider <emphasis>all</> type declarations to
 be assertions, so that adding type declarations to a program, no
 matter how incorrect they might be, would <emphasis>never</> cause
-undefined behavior. As of &SBCL; version 0.6.4, the compiler is known to
+undefined behavior. As of &SBCL; version 0.8.1, the compiler is known to
 fall short of this goal in two areas:
 <itemizedlist>
-  <listitem><para>The compiler trusts function return values which 
-    have been established with <function>proclaim</>.</para></listitem>
+  <listitem><para><function>Proclaim</>ed constraints on argument and
+    result types of a function are supposed to be checked by the
+    function. If the function type is proclaimed before function
+    definition, type checks are inserted by the compiler, but the
+    standard allows the reversed order, in which case the compiler
+    will trust the declaration.</para></listitem>
+  <listitem><para>The compiler cannot check types of an unknown number
+  of values; if the number of generated values is unknown, but the
+  number of consumed is known, only consumed values are
+  checked.</para></listitem>
   <listitem><para>There are a few poorly characterized but apparently
     very uncommon situations where a type declaration in an unexpected
     location will be trusted and never checked by the
@@ -439,8 +447,8 @@ an error if it is executed) and gives a warning.</para>
 
 <para>
 Type warnings are inhibited when the
-<parameter>extensions:inhibit-warnings</> optimization quality is
-<literal>3</>. (See <link linkend="compiler-policy">the section 
+<parameter>sb-ext:inhibit-warnings</> optimization quality is
+<literal>3</>. (See <link linkend="compiler-policy">the section
 on compiler policy</>.) This can be used in a local declaration
 to inhibit type warnings in a code fragment that has spurious
 warnings.</para>
@@ -452,31 +460,26 @@ warnings.</para>
 <!--INDEX {type checking}{precise}-->
 
 <para>With the default compilation policy, all type declarations are
-precisely checked, except in a few situations (such as using
-<function>the</> to constrain the argument type passed to a function)
-where they are simply ignored instead. Precise checking means that the
-check is done as though <function>typep</> had been called with the
-exact type specifier that appeared in the declaration. In &SBCL;,
-adding type declarations makes code safer. (Except that as noted <link
-linkend="compiler-impl-limitations">elsewhere</link>, remaining bugs in
-the compiler's handling of types unfortunately provide some exceptions to
-this rule.)</para>
+precisely checked, except in a few situations where they are simply
+ignored instead. Precise checking means that the check is done as
+though <function>typep</> had been called with the exact type
+specifier that appeared in the declaration. In &SBCL;, adding type
+declarations makes code safer. (Except that as noted <link
+linkend="compiler-impl-limitations">elsewhere</link>, remaining bugs
+in the compiler's handling of types unfortunately provide some
+exceptions to this rule.)</para>
 
 <para>If a variable is declared to be
-<type>(integer 3 17)</>
-then its
-value must always always be an integer between <literal>3</>
-and <literal>17</>.
-If multiple type declarations apply to a single variable, then all the
-declarations must be correct; it is as though all the types were
-intersected producing a single <type>and</> type specifier.</para>
+<type>(integer 3 17)</> then its value must always be an integer
+between <literal>3</> and <literal>17</>. If multiple type
+declarations apply to a single variable, then all the declarations
+must be correct; it is as though all the types were intersected
+producing a single <type>and</> type specifier.</para>
 
-<para>Argument type declarations are automatically enforced. If you declare
-the type of a function argument, a type check will be done when that
-function is called. In a function call, the called function does the
-argument type checking, which means that a more restrictive type
-assertion in the calling function (e.g., from <function>the</>) may be
-lost.</para>
+<para>Argument and result type declarations are automatically
+enforced. If you declare the type of a function argument, a type check
+will be done when that function is called. In a function call, the
+called function does the argument type checking.</para>
 
 <para>The types of structure slots are also checked. The value of a
 structure slot must always be of the type indicated in any

@@ -39,6 +39,9 @@ few other points to keep in mind.
     (This doesn't affect its ability to benefit from explicit type
     declarations involving the assigned variables, only its ability to
     get by without explicit type declarations.)</para></listitem>
+<!-- FIXME: Python dislikes assignments, but not in type
+    inference. The real problems are loop induction, closed over
+    variables and aliases. -->
   <listitem><para>Since the time the &CMUCL; manual was written,
     &CMUCL; (and thus &SBCL;) has gotten a generational garbage
     collector. This means that there are some efficiency implications
