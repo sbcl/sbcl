@@ -822,8 +822,8 @@
                                        modified
                                        (copy-structure included-slot))))
             (when (and (neq (dsd-type new-slot) (dsd-type included-slot))
-                       (not (subtypep (dsd-type included-slot)
-                                      (dsd-type new-slot)))
+                       (not (sb!xc:subtypep (dsd-type included-slot)
+					    (dsd-type new-slot)))
                        (dsd-safe-p included-slot))
               (setf (dsd-safe-p new-slot) nil)
               ;; XXX: notify?

@@ -1,5 +1,6 @@
 contrib-doc-list.texi-temp
 docstrings
+variables.texinfo
 *-stamp
 sbcl
 sbcl.cp
@@ -7,3 +8,4 @@ sbcl.cp
 sbcl.fn
 sbcl.tp
 sbcl.vr
+*.texi-temp

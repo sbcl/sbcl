@@ -219,12 +219,18 @@
   (multiple-value-bind (name defstruct-args mlff def!struct-supertype)
       (apply #'parse-def!struct-args args)
     `(progn
-       ;; Make sure that we really do include STRUCTURE!OBJECT. (If an
-       ;; :INCLUDE clause was used, and the included class didn't
-       ;; itself include STRUCTURE!OBJECT, then we wouldn't; and it's
-       ;; better to find out ASAP then to let the bug lurk until
-       ;; someone tries to do MAKE-LOAD-FORM on the object.)
-       (aver (subtypep ',def!struct-supertype 'structure!object))
+       ;; There are two valid cases here: creating the
+       ;; STRUCTURE!OBJECT root of the inheritance hierarchy, or
+       ;; inheriting from STRUCTURE!OBJECT somehow.
+      ;;
+       ;; The invalid case that we want to exclude is when an :INCLUDE
+       ;; clause was used, and the included class didn't inherit frmo
+       ;; STRUCTURE!OBJECT. We want to catch that error ASAP because
+       ;; otherwise the bug might lurk until someone tried to do
+       ;; MAKE-LOAD-FORM on an instance of the class.
+       ,@(if (eq name 'structure!object)
+	     (aver (null def!struct-supertype))
+	     `((aver (subtypep ',def!struct-supertype 'structure!object))))
        (defstruct ,@defstruct-args)
        (setf (def!struct-type-make-load-form-fun ',name)
 	     ,(if (symbolp mlff)
@@ -232,20 +238,6 @@
 		  mlff)
 	     (def!struct-supertype ',name)
 	     ',def!struct-supertype)
-       ;; This bit of commented-out code hasn't been needed for quite
-       ;; some time, but the comments here about why not might still
-       ;; be useful to me until I finally get the system to work. When
-       ;; I do remove all this, I should be sure also to remove the
-       ;; "outside the EVAL-WHEN" comments above, since they will no
-       ;; longer make sense. -- WHN 19990803
-       ;;(eval-when (:compile-toplevel :load-toplevel :execute)
-       ;;  ;; (The DEFSTRUCT used to be in here, but that failed when trying
-       ;;  ;; to cross-compile the hash table implementation.)
-       ;;  ;;(defstruct ,@defstruct-args)
-       ;;  ;; The (SETF (DEF!STRUCT-TYPE-MAKE-LOAD-FORM-FUN ..) ..) used to
-       ;;  ;; be in here too, but that failed an assertion in the SETF
-       ;;  ;; definition once we moved the DEFSTRUCT outside.)
-       ;;  )
        #+sb-xc-host ,(let ((u (uncross-defstruct-args defstruct-args)))
 		       (if (boundp '*delayed-def!structs*)
 			   `(push (make-delayed-def!struct :args ',u)

@@ -599,16 +599,16 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 
     if (addr < (os_vm_address_t)dynamic_space_free_pointer) {
 	fprintf(stderr,
-	   "set_auto_gc_trigger: tried to set gc trigger too low! (%d < %p)\n",
-		(unsigned int)dynamic_usage,
-		(os_vm_address_t)dynamic_space_free_pointer
-		- (os_vm_address_t)current_dynamic_space);
+	   "set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)\n",
+		(unsigned long)dynamic_usage,
+		(unsigned long)((os_vm_address_t)dynamic_space_free_pointer
+				- (os_vm_address_t)current_dynamic_space));
 	lose("lost");
     }
     else if (length < 0) {
 	fprintf(stderr,
-		"set_auto_gc_trigger: tried to set gc trigger too high! (%p)\n",
-		dynamic_usage);
+		"set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
+		(unsigned long)dynamic_usage);
 	lose("lost");
     }
 

@@ -179,7 +179,8 @@ struct thread * create_thread_struct(lispobj initial_function) {
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
 
-    th->interrupt_data=os_validate(0,(sizeof (struct interrupt_data)));
+    th->interrupt_data =
+	os_validate(0,(sizeof (struct interrupt_data)));
     if(all_threads) 
 	memcpy(th->interrupt_data,
 	       arch_os_get_current_thread()->interrupt_data,

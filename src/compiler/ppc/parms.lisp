@@ -107,9 +107,8 @@
   (def!constant linkage-table-space-start #x50000000)
   (def!constant linkage-table-space-end   #x51000000)
   (def!constant linkage-table-entry-size 16))
-
 
-;;;; Other random constants.
+;;;; Other miscellaneous constants.
 
 (defenum (:suffix -trap :start 8)
   halt

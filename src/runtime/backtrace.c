@@ -156,7 +156,7 @@ previous_info(struct call_info *info)
     int free;
 
     if (!cs_valid_pointer_p(info->frame)) {
-        printf("Bogus callee value (0x%08x).\n", (unsigned long)info->frame);
+        printf("Bogus callee value (0x%08lx).\n", (unsigned long)info->frame);
         return 0;
     }
 
@@ -207,13 +207,13 @@ backtrace(int nframes)
     call_info_from_lisp_state(&info);
 
     do {
-        printf("<Frame 0x%08x%s, ", (unsigned long) info.frame,
+        printf("<Frame 0x%08lx%s, ", (unsigned long) info.frame,
                 info.interrupted ? " [interrupted]" : "");
 
         if (info.code != (struct code *) 0) {
             lispobj function;
 
-            printf("CODE: 0x%08X, ", (unsigned long) info.code | OTHER_POINTER_LOWTAG);
+            printf("CODE: 0x%08lX, ", (unsigned long) info.code | OTHER_POINTER_LOWTAG);
 
 #ifndef alpha
             function = info.code->entry_points;
@@ -257,7 +257,7 @@ backtrace(int nframes)
             printf("CODE: ???, ");
 
         if (info.lra != NIL)
-            printf("LRA: 0x%08x, ", (unsigned long)info.lra);
+            printf("LRA: 0x%08lx, ", (unsigned long)info.lra);
         else
             printf("<no LRA>, ");
 
