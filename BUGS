@@ -1357,6 +1357,37 @@ WORKAROUND:
   (IGNORE-ERRORS (MIN '(1 2 3))) from returning NIL as it should when
   the MIN source transform expanded to (THE REAL '(1 2 3)), because
   (IGNORE-ERRORS (THE REAL '(1 2 3))) returns (1 2 3).
+  Alexey Dejneka pointed out that
+  (IGNORE-ERRORS (IDENTITY (THE REAL '(1 2 3)))) works as it should.
+  (IGNORE-ERRORS (VALUES (THE REAL '(1 2 3)))) also works as it should.
+  Perhaps this is another case of VALUES type intersections behaving
+  in non-useful ways?
+    When I (WHN) tried to use the VALUES trick to work around this bug
+  in the MIN source transform, it didn't work for
+    (assert (null (ignore-errors (min 1 #(1 2 3)))))
+  Hand-expanding the source transform, I get
+    (assert (null (ignore-errors
+                   (let ((arg1 1)
+                         (arg2 (identity (the real #(1 2 3)))))
+                     (if (< arg1 arg2) arg1 arg2))))) 
+  which fails (i.e. the assertion fails, because the IGNORE-ERRORS
+  doesn't report MIN signalling a type error). At the REPL
+    (null (ignore-errors
+           (let ((arg1 1)
+                 (arg2 (identity (the real #(1 2 3)))))
+             (if (< arg1 arg2) arg1 arg2))))
+    => T
+  but when this expression is used as the body of (DEFUN FOO () ...)
+  then (FOO)=>NIL.
+
+195: "confusing reporting of not-a-REAL TYPE-ERRORs from THE REAL"
+  In sbcl-0.7.7.10, (THE REAL #(1 2 3)) signals a type error which
+  prints as "This is not a (OR SINGLE-FLOAT DOUBLE-FLOAT RATIONAL)".
+  The (OR SINGLE-FLOAT DOUBLE-FLOAT RATIONAL) representation of
+  REAL is unnecessarily confusing, especially since it relies on 
+  internal implementation knowledge that even with SHORT-FLOAT
+  and LONG-FLOAT left out of the union, this type is equal to REAL.
+  So it'd be better just to say "This is not a REAL".
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

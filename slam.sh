@@ -55,6 +55,12 @@
 #       file
 #    Mostly it looks as though such limitations aren't fixable without
 #    the aforementioned rearchitecting or solving the halting problem.
+#
+# To make this work, you need an after-xc.core file. To cause the 
+# system to generate an after-xc.core file, you need
+# :SB-AFTER-XC-CORE in target features during an ordinary build.
+# See the comments in base-target-features.lisp-expr for the 
+# recommended way to make that happen.
 #######################################################################
 
 if [ "" != "$*" ]; then

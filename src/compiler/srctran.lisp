@@ -3083,23 +3083,44 @@
 (define-source-transform char-not-equal (&rest args)
   (multi-not-equal 'char-equal args))
 
+;;; FIXME: can go away once bug 194 is fixed and we can use (THE REAL X)
+;;; as God intended
+(defun error-not-a-real (x)
+  (error 'simple-type-error
+	 :datum x
+	 :expected-type 'real
+	 :format-control "not a REAL: ~S"
+	 :format-arguments (list x)))
+
 ;;; Expand MAX and MIN into the obvious comparisons.
-(define-source-transform max (arg &rest more-args)
-  (if (null more-args)
-      `(the real ,arg) ; ANSI: should signal TYPE-ERROR if any arg not a REAL
-      (once-only ((arg1 arg)
-		  (arg2 `(max ,@more-args)))
-	`(if (> ,arg1 ,arg2)
-	     ,arg1
-	     ,arg2))))
-(define-source-transform min (arg &rest more-args)
-  (if (null more-args)
-      `(the real ,arg) ; ANSI: should signal TYPE-ERROR if any arg not a REAL
-      (once-only ((arg1 arg)
-		  (arg2 `(min ,@more-args)))
-	`(if (< ,arg1 ,arg2)
-	     ,arg1
-	     ,arg2))))
+(define-source-transform max (arg0 &rest rest)
+  (once-only ((arg0 arg0))
+    ;; ANSI says MAX should signal TYPE-ERROR if any arg isn't a REAL.
+    ;;
+    ;; KLUDGE: This UNLESS hackery is a workaround for bug 194.
+    ;; Better, when that bug is fixed, would be (THE REAL ,ARG0).
+    ;; -- WHN 2002-09-02
+    `(progn
+       (unless (realp ,arg0)
+	 (error-not-a-real ,arg0))
+       ,(if (null rest)
+	    arg0
+	    `(let ((maxrest (max ,@rest)))
+	       (if (> ,arg0 maxrest) ,arg0 maxrest))))))
+(define-source-transform min (arg0 &rest rest)
+  (once-only ((arg0 arg0))
+    ;; ANSI says MIN should signal TYPE-ERROR if any arg isn't a REAL.
+    ;;
+    ;; KLUDGE: This UNLESS hackery is a workaround for bug 194.
+    ;; Better, when that bug is fixed, would be (THE REAL ,ARG0).
+    ;; -- WHN 2002-09-02
+    `(progn
+       (unless (realp ,arg0)
+	 (error-not-a-real ,arg0))
+       ,(if (null rest)
+	    arg0
+	    `(let ((minrest (min ,@rest)))
+	       (if (< ,arg0 minrest) ,arg0 minrest))))))
 
 ;;;; converting N-arg arithmetic functions
 ;;;;
