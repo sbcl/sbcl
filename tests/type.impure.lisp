@@ -25,13 +25,10 @@
       (dolist (k types)
 	(format t "    type K=~S~%" k)
 	(assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
-	;; FIXME: The old code (including original CMU CL code)
-	;; fails this test. When this is fixed, we can re-enable it.
-	#+nil (assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
+	(assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
 
 ;;; gotchas that can come up in handling subtypeness as "X is a
 ;;; subtype of Y if each of the elements of X is a subtype of Y"
-#+nil ; FIXME: suppressed until we can fix old CMU CL big
 (let ((subtypep-values (multiple-value-list
 			(subtypep '(single-float -1.0 1.0)
 				  '(or (real -100.0 0.0)
@@ -43,7 +40,8 @@
 		    ;; But if it does, that'd be neat.
 		    (t t)
 		    ;; (And any other return would be wrong.)
-		    ))))
+		    )
+		  :test #'equal)))
 
 (defun type-evidently-= (x y)
   (and (subtypep x y)

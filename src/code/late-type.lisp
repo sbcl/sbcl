@@ -1297,17 +1297,40 @@
   (setf (info :type :builtin 'number)
 	(make-numeric-type :complexp nil)))
 
-(!def-type-translator complex (&optional (spec '*))
-  (if (eq spec '*)
+(!def-type-translator complex (&optional (typespec '*))
+  (if (eq typespec '*)
       (make-numeric-type :complexp :complex)
-      (let ((type (specifier-type spec)))
-	(unless (numeric-type-p type)
-	  (error "The component type for COMPLEX is not numeric: ~S" spec))
-	(when (eq (numeric-type-complexp type) :complex)
-	  (error "The component type for COMPLEX is complex: ~S" spec))
-	(let ((res (copy-numeric-type type)))
-	  (setf (numeric-type-complexp res) :complex)
-	  res))))
+      (labels ((not-numeric ()
+                 ;; FIXME: should probably be TYPE-ERROR
+		 (error "The component type for COMPLEX is not numeric: ~S"
+			typespec))
+	       (complex1 (component-type)
+	         (unless (numeric-type-p component-type)
+		   ;; FIXME: As per the FIXME below, ANSI says we're
+		   ;; supposed to handle any subtype of REAL, not only
+		   ;; those which can be represented as NUMERIC-TYPE.
+		   (not-numeric))
+		 (when (eq (numeric-type-complexp component-type) :complex)
+		   (error "The component type for COMPLEX is complex: ~S"
+			  typespec))
+		 (let ((result (copy-numeric-type component-type)))
+		   (setf (numeric-type-complexp result) :complex)
+		   result)))
+	(let ((type (specifier-type typespec)))
+	  (typecase type
+	    ;; This is all that CMU CL handled.
+	    (numeric-type (complex1 type))
+	    ;; We need to handle UNION-TYPEs in order to deal with
+	    ;; REAL and FLOAT being represented as UNION-TYPEs of more
+	    ;; primitive types.
+	    (union-type (apply #'type-union
+			       (mapcar #'complex1
+				       (union-type-types type))))
+	    ;; FIXME: ANSI just says that TYPESPEC is a subtype of type
+	    ;; REAL, not necessarily a NUMERIC-TYPE. E.g. TYPESPEC could
+	    ;; legally be (AND REAL (SATISFIES ODDP))! But like the old
+	    ;; CMU CL code, we're still not nearly that general.
+	    (t (not-numeric)))))))
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
 ;;; member of TYPE or a one-element list of a member of TYPE.
@@ -1348,8 +1371,66 @@
        (make-numeric-type :class ',class :format ',format :low lb :high hb))))
 
 (!def-bounded-type rational rational nil)
-(!def-bounded-type float float nil)
-(!def-bounded-type real nil nil)
+
+;;; Unlike CMU CL, we represent the types FLOAT and REAL as
+;;; UNION-TYPEs of more primitive types, in order to make
+;;; type representation more unique, avoiding problems in the
+;;; simplification of things like
+;;;   (subtypep '(or (single-float -1.0 1.0) (single-float 0.1))
+;;;             '(or (real -1 7) (single-float 0.1) (single-float -1.0 1.0)))
+;;; When we allowed REAL to remain as a separate NUMERIC-TYPE,
+;;; it was too easy for the first argument to be simplified to
+;;; '(SINGLE-FLOAT -1.0), and for the second argument to be simplified
+;;; to '(OR (REAL -1 7) (SINGLE-FLOAT 0.1)) and then for the
+;;; SUBTYPEP to fail (returning NIL,T instead of T,T) because
+;;; the first argument can't be seen to be a subtype of any of the
+;;; terms in the second argument.
+;;;
+;;; The old CMU CL way was:
+;;;   (!def-bounded-type float float nil)
+;;;   (!def-bounded-type real nil nil)
+;;;
+;;; FIXME: If this new way works for a while with no weird new
+;;; problems, we can go back and rip out support for separate FLOAT
+;;; and REAL flavors of NUMERIC-TYPE. The new way was added in
+;;; sbcl-0.6.11.22, 2001-03-21.
+;;;
+;;; FIXME: It's probably necessary to do something to fix the
+;;; analogous problem with INTEGER and RATIONAL types. Perhaps
+;;; bounded RATIONAL types should be represented as (OR RATIO INTEGER).
+(defun coerce-bound (bound type inner-coerce-bound-fun)
+  (declare (type function inner-coerce-bound-fun))
+  (cond ((eql bound '*)
+	 bound)
+	((consp bound)
+	 (destructuring-bind (inner-bound) bound
+	   (list (funcall inner-coerce-bound-fun inner-bound type))))
+	(t
+	 (funcall inner-coerce-bound-fun bound type))))
+(defun inner-coerce-real-bound (bound type)
+  (ecase type
+    (rational (rationalize bound))
+    (float (if (floatp bound)
+	       bound
+	       ;; Coerce to the widest float format available, to
+	       ;; avoid unnecessary loss of precision:
+	       (coerce bound 'long-float)))))
+(defun coerced-real-bound (bound type)
+  (coerce-bound bound type #'inner-coerce-real-bound))
+(defun coerced-float-bound (bound type)
+  (coerce-bound bound type #'coerce))
+(!def-type-translator real (&optional (low '*) (high '*))
+  (specifier-type `(or (float ,(coerced-real-bound  low 'float)
+			      ,(coerced-real-bound high 'float))
+		       (rational ,(coerced-real-bound  low 'rational)
+				 ,(coerced-real-bound high 'rational)))))
+(!def-type-translator float (&optional (low '*) (high '*))
+  (specifier-type 
+   `(or (single-float ,(coerced-float-bound  low 'single-float)
+		      ,(coerced-float-bound high 'single-float))
+	(double-float ,(coerced-float-bound  low 'double-float)
+		      ,(coerced-float-bound high 'double-float))
+	#!+long-float ,(error "stub: no long float support yet"))))
 
 (defmacro !define-float-format (f)
   `(!def-bounded-type ,f float ,f))
