@@ -129,7 +129,8 @@ boolean gencgc_zero_check_during_free_heap = 0;
 
 /* the total bytes allocated. These are seen by Lisp DYNAMIC-USAGE. */
 unsigned long bytes_allocated = 0;
-static unsigned long auto_gc_trigger = 0;
+unsigned long bytes_consed_between_gcs = 4*1024*1024;
+unsigned long auto_gc_trigger = 0;
 
 /* the source and destination generations. These are set before a GC starts
  * scavenging. */
@@ -3984,7 +3985,10 @@ collect_garbage(unsigned last_gen)
     gc_alloc_generation = 0;
 
     update_x86_dynamic_space_free_pointer();
-
+    auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
+    if(gencgc_verbose)
+	fprintf(stderr,"Next gc when %d bytes have been consed\n",
+		auto_gc_trigger);
     SHOW("returning from collect_garbage");
 }
 
@@ -4220,7 +4224,6 @@ alloc(int nbytes)
      * we should GC in the near future
      */
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-	auto_gc_trigger *= 2;
 	/* set things up so that GC happens when we finish the PA
 	 * section.  */
 	maybe_gc_pending=1;
@@ -4238,13 +4241,13 @@ alloc(int nbytes)
 void
 set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 {
-    auto_gc_trigger += dynamic_usage;
+    /* auto_gc_trigger += dynamic_usage; */
 }
 
 void
 clear_auto_gc_trigger(void)
 {
-    auto_gc_trigger = 0;
+    /* auto_gc_trigger = 0; */
 }
 
 /* Find the code object for the given pc, or return NULL on failure.

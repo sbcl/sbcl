@@ -95,7 +95,6 @@
   (setf *gc-notify-stream* nil
         *before-gc-hooks* nil
         *after-gc-hooks* nil
-        *already-maybe-gcing* t
 	*gc-inhibit* 1
 	*need-to-collect-garbage* nil
 	sb!unix::*interrupts-enabled* t
@@ -235,7 +234,6 @@
   (setf *cold-init-complete-p* t)
 
   ;; The system is finally ready for GC.
-  (setf *already-maybe-gcing* nil)
   (/show0 "enabling GC")
   (gc-on)
   (/show0 "doing first GC")
