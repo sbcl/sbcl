@@ -1,3 +1,6 @@
+@node Efficiency
+@comment  node-name,  next,  previous,  up
+@chapter Efficiency
 @cindex Efficiency
 
 FIXME: The material in the CMUCL manual about getting good

@@ -1,3 +1,6 @@
+@node Profiling
+@comment  node-name,  next,  previous,  up
+@chapter Profiling
 @cindex Profiling
 
 SBCL includes both an accurate profiler, that can collect statistics

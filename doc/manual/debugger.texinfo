@@ -1,3 +1,6 @@
+@node Debugger
+@comment  node-name,  next,  previous,  up
+@chapter Debugger
 @cindex Debugger
 
 The SBCL debugger (as the CMUCL debugger it was derived from) has very

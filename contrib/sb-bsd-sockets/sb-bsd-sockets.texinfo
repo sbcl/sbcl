@@ -1,6 +1,6 @@
-@c This currently appears in the manual as a chapter: if a
-@c higher-level interface appear, it will make sense to lower this
-@c into a section.
+@node Networking
+@comment  node-name,  next,  previous,  up
+@chapter Networking
 @cindex Sockets, Networking
 
 The @code{sb-bsd-sockets} module provides a thinly disguised BSD

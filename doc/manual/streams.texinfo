@@ -1,3 +1,7 @@
+@node Extensible Streams
+@comment  node-name,  next,  previous,  up
+@chapter Extensible Streams
+
 SBCL supports @dfn{Gray streams}, user-overloadable CLOS classes whose
 instances can be used as Lisp streams (e.g. passed as the first
 argument to @code{format}).  Additionally, the bundled contrib module
@@ -5,8 +9,8 @@ argument to @code{format}).  Additionally, the bundled contrib module
 simple-streams proposal.
 
 @menu
-* Gray Streams::
-* Simple Streams::
+* Gray Streams::                
+* Simple Streams::              
 @end menu
 
 @node Gray Streams

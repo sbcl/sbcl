@@ -1,3 +1,6 @@
+@node Package Locks
+@comment  node-name,  next,  previous,  up
+@chapter Package Locks
 @cindex Packages, locked
 
 None of the following sections apply to SBCL built without package
@@ -9,19 +12,19 @@ consept of implementation packages and the associated operators may be
 renamed.
 
 @menu
-* Package Lock Concepts::
-* Package Lock Dictionary::
+* Package Lock Concepts::       
+* Package Lock Dictionary::     
 @end menu
 
 @node Package Lock Concepts
 @section Package Lock Concepts
 
 @menu
-* Package Lock Overview::                    
+* Package Lock Overview::       
 * Implementation Packages::     
-* Package Lock Violations::
-* Package Locks in Compiled Code::               
-* Operations Violating Package Locks::
+* Package Lock Violations::     
+* Package Locks in Compiled Code::  
+* Operations Violating Package Locks::  
 @end menu
 
 @node Package Lock Overview

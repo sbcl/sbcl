@@ -1,3 +1,7 @@
+@node Contributed Modules
+@comment  node-name,  next,  previous,  up
+@chapter Contributed Modules
+
 SBCL comes with a number of modules that are not part of the core
 system.  These are loaded via @code{(require :@var{modulename})}
 (@pxref{Customization Hooks for Users}).  This section contains

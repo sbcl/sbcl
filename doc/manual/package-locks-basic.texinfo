@@ -1,3 +1,7 @@
+@node Package Locks
+@comment  node-name,  next,  previous,  up
+@chapter Package Locks
+
 SBCL can be built with support for package locks to protect against
 unintentional modifications of packages. The full documentation for
 package locks is only built if package locks are enabled in the image

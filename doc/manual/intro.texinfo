@@ -1,3 +1,7 @@
+@node Introduction
+@comment  node-name,  next,  previous,  up
+@chapter Introduction
+
 SBCL is a mostly-conforming implementation of the ANSI Common Lisp
 standard. This manual focuses on behavior which is specific to SBCL,
 not on behavior which is common to all implementations of ANSI Common
