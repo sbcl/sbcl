@@ -709,6 +709,8 @@ NIL is returned when no such class exists."
     (if (or res (not errorp))
 	res
 	(error 'simple-type-error
+               :datum nil
+               :expected-type 'class
                :format-control "class not yet defined:~%  ~S" 
                :format-arguments (list name)))))
 (defun (setf find-classoid) (new-value name)

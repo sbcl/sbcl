@@ -431,8 +431,7 @@
 		 (funcall (get-coerced-cmt-entry char *readtable*)
 			  stream
 			  char))))
-    (when (and retval (not *read-suppress*))
-      (rplacd retval nil))))
+    (if retval (rplacd retval nil))))
 
 (defun read (&optional (stream *standard-input*)
 		       (eof-error-p t)
@@ -465,7 +464,7 @@
   (do ((char (flush-whitespace input-stream)
 	     (flush-whitespace input-stream))
        (retlist ()))
-      ((char= char endchar) (nreverse retlist))
+      ((char= char endchar) (unless *read-suppress* (nreverse retlist)))
     (setq retlist (nconc (read-maybe-nothing input-stream char) retlist))))
 
 ;;;; basic readmacro definitions

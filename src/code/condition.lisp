@@ -233,8 +233,7 @@
   "Make an instance of a condition object using the specified initargs."
   ;; Note: ANSI specifies no exceptional situations in this function.
   ;; signalling simple-type-error would not be wrong.
-  (let* ((thing (if (symbolp thing)
-		    (find-classoid thing)
+  (let* ((thing (or (and (symbolp thing) (find-classoid thing nil))
 		    thing))
 	 (class (typecase thing
 		  (condition-classoid thing)

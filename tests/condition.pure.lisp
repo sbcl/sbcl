@@ -130,10 +130,13 @@
          (multiple-value-bind (res err) 
              (ignore-errors (apply #'error args))
            (assert (not res))
-           (assert (typep err 'type-error)))))
+           (assert (typep err 'type-error))
+           (assert (not (nth-value 1 (ignore-errors 
+                                       (type-error-datum err)))))
+           (assert (not (nth-value 1 (ignore-errors 
+                                       (type-error-expected-type err))))))))
   (test '#:no-such-condition)
   (test nil)
   (test t)
   (test 42)
   (test (make-instance 'standard-object)))
-

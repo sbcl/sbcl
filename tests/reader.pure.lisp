@@ -224,3 +224,7 @@
 (multiple-value-bind (res err) (ignore-errors (read-from-string ""))
   (assert (not res))
   (assert (typep err 'end-of-file)))
+
+(assert (equal '((0 . "A") (1 . "B"))
+               (coerce (read-from-string "#((0 . \"A\") (1 . \"B\"))") 
+                       'list)))
