@@ -73,7 +73,6 @@
 	   (type (unsigned-byte 32) x)
 	   (type (integer -40 0) y))
   (ash x y))
-
 (defun what-about-with-constants (x)
   (declare (optimize speed) (type (unsigned-byte 32) x))
   (ash x -32))
@@ -83,14 +82,20 @@
 	     (if (< i 32)
 		 (1- (ash 1 (- 32 i)))
 	         0))))
-
 (assert (= (what-about-with-constants (1- (ash 1 32))) 0))
 
 (defun one-more-test-case-to-catch-sparc (x y)
   (declare (optimize speed (safety 0))
 	   (type (unsigned-byte 32) x) (type (integer -40 2) y))
   (the (unsigned-byte 32) (ash x y)))
-
 (assert (= (one-more-test-case-to-catch-sparc (1- (ash 1 32)) -40) 0))
+
+(defun 64-bit-logcount (x)
+  (declare (optimize speed) (type (unsigned-byte 54) x))
+  (logcount x))
+(assert (= (64-bit-logcount (1- (ash 1 24))) 24))
+(assert (= (64-bit-logcount (1- (ash 1 32))) 32))
+(assert (= (64-bit-logcount (1- (ash 1 48))) 48))
+(assert (= (64-bit-logcount (1- (ash 1 54))) 54))
 
 (sb-ext:quit :unix-status 104)

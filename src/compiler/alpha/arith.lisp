@@ -24,7 +24,7 @@
 (define-vop (signed-unop)
   (:args (x :scs (signed-reg)))
   (:results (res :scs (signed-reg)))
-  (:note "inline (signed-byte 32) arithmetic")
+  (:note "inline (signed-byte 64) arithmetic")
   (:arg-types signed-num)
   (:result-types signed-num)
   (:policy :fast-safe))
@@ -70,7 +70,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic")
+  (:note "inline (unsigned-byte 64) arithmetic")
   (:effects)
   (:affected)
   (:policy :fast-safe))
@@ -81,7 +81,7 @@
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
-  (:note "inline (signed-byte 32) arithmetic")
+  (:note "inline (signed-byte 64) arithmetic")
   (:effects)
   (:affected)
   (:policy :fast-safe))
@@ -156,13 +156,13 @@
 
 ;;;; shifting
 
-(define-vop (fast-ash)
+(define-vop (fast-ash/unsigned=>unsigned)
   (:note "inline ASH")
-  (:args (number :scs (signed-reg unsigned-reg) :to :save)
+  (:args (number :scs (unsigned-reg) :to :save)
 	 (amount :scs (signed-reg)))
-  (:arg-types (:or signed-num unsigned-num) signed-num)
-  (:results (result :scs (signed-reg unsigned-reg)))
-  (:result-types (:or signed-num unsigned-num))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
   (:translate ash)
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
@@ -170,47 +170,78 @@
   (:generator 3
     (inst bge amount positive)
     (inst subq zero-tn amount ndesc)
-    (inst cmplt ndesc 31 temp)
-    (sc-case number
-      (signed-reg (inst sra number ndesc result))
-      (unsigned-reg (inst srl number ndesc result)))
+    (inst cmplt ndesc 64 temp)
+    (inst srl number ndesc result)
+    ;; FIXME: this looks like a candidate for a conditional move --
+    ;; CSR, 2003-09-10
     (inst bne temp done)
-    (sc-case number
-      (signed-reg (inst sra number 31 result))
-      (unsigned-reg (inst srl number 31 result)))
+    (move zero-tn result)
     (inst br zero-tn done)
       
     POSITIVE
-    ;; The result-type assures us that this shift will not overflow.
     (inst sll number amount result)
       
     DONE))
 
-(define-vop (fast-ash-c)
+(define-vop (fast-ash/signed=>signed)
+  (:note "inline ASH")
+  (:args (number :scs (signed-reg) :to :save)
+	 (amount :scs (signed-reg)))
+  (:arg-types signed-num signed-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:temporary (:sc non-descriptor-reg) ndesc)
+  (:temporary (:sc non-descriptor-reg :to :eval) temp)
+  (:generator 3
+    (inst bge amount positive)
+    (inst subq zero-tn amount ndesc)
+    (inst cmplt ndesc 63 temp)
+    (inst sra number ndesc result)
+    (inst bne temp done)
+    (inst sra number 63 result)
+    (inst br zero-tn done)
+      
+    POSITIVE
+    (inst sll number amount result)
+      
+    DONE))
+
+(define-vop (fast-ash-c/signed=>signed)
   (:policy :fast-safe)
   (:translate ash)
   (:note nil)
-  (:args (number :scs (signed-reg unsigned-reg)))
+  (:args (number :scs (signed-reg)))
   (:info count)
-  (:arg-types (:or signed-num unsigned-num) (:constant integer))
-  (:results (result :scs (signed-reg unsigned-reg)))
-  (:result-types (:or signed-num unsigned-num))
+  (:arg-types signed-num (:constant integer))
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
   (:generator 1
-    (cond ((< count 0)
-	   ;; It is a right shift.
-	   (sc-case number
-	     (signed-reg (inst sra number (- count) result))
-	     (unsigned-reg (inst srl number (- count) result))))
-	  ((> count 0)
-	   ;; It is a left shift.
-	   (inst sll number count result))
-	  (t
-	   ;; Count=0?  Shouldn't happen, but it's easy:
-	   (move number result)))))
+    (cond
+      ((< count 0) (inst sra number (- count) result))
+      ((> count 0) (inst sll number count result))
+      (t (bug "identity ASH not transformed away")))))
 
-(define-vop (signed-byte-32-len)
+(define-vop (fast-ash-c/unsigned=>unsigned)
+  (:policy :fast-safe)
+  (:translate ash)
+  (:note nil)
+  (:args (number :scs (unsigned-reg)))
+  (:info count)
+  (:arg-types unsigned-num (:constant integer))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (cond
+      ((< count -63) (move zero-tn result))
+      ((< count 0) (inst sra number (- count) result))
+      ((> count 0) (inst sll number count result))
+      (t (bug "identity ASH not transformed away")))))
+
+(define-vop (signed-byte-64-len)
   (:translate integer-length)
-  (:note "inline (signed-byte 32) integer-length")
+  (:note "inline (signed-byte 64) integer-length")
   (:policy :fast-safe)
   (:args (arg :scs (signed-reg) :to (:argument 1)))
   (:arg-types signed-num)
@@ -220,16 +251,16 @@
   (:generator 30
     (inst not arg shift)
     (inst cmovge arg arg shift)
-    (inst subq zero-tn 4 res)
+    (inst subq zero-tn (fixnumize 1) res)
     (inst sll shift 1 shift)
     LOOP
     (inst addq res (fixnumize 1) res)
     (inst srl shift 1 shift)
     (inst bne shift loop)))
 
-(define-vop (unsigned-byte-32-count)
+(define-vop (unsigned-byte-64-count)
   (:translate logcount)
-  (:note "inline (unsigned-byte 32) logcount")
+  (:note "inline (unsigned-byte 64) logcount")
   (:policy :fast-safe)
   (:args (arg :scs (unsigned-reg) :target num))
   (:arg-types unsigned-num)
@@ -238,29 +269,36 @@
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0) :to (:result 0)
 		    :target res) num)
   (:temporary (:scs (non-descriptor-reg)) mask temp)
-  (:generator 30
-    (inst li #x55555555 mask)
+  (:generator 60
+    ;; FIXME: now this looks expensive, what with these 64bit loads.
+    ;; Maybe a loop and count would be faster?  -- CSR, 2003-09-10
+    (inst li #x5555555555555555 mask)
     (inst srl arg 1 temp)
     (inst and arg mask num)
     (inst and temp mask temp)
     (inst addq num temp num)
-    (inst li #x33333333 mask)
+    (inst li #x3333333333333333 mask)
     (inst srl num 2 temp)
     (inst and num mask num)
     (inst and temp mask temp)
     (inst addq num temp num)
-    (inst li #x0f0f0f0f mask)
+    (inst li #x0f0f0f0f0f0f0f0f mask)
     (inst srl num 4 temp)
     (inst and num mask num)
     (inst and temp mask temp)
     (inst addq num temp num)
-    (inst li #x00ff00ff mask)
+    (inst li #x00ff00ff00ff00ff mask)
     (inst srl num 8 temp)
     (inst and num mask num)
     (inst and temp mask temp)
     (inst addq num temp num)
-    (inst li #x0000ffff mask)
+    (inst li #x0000ffff0000ffff mask)
     (inst srl num 16 temp)
+    (inst and num mask num)
+    (inst and temp mask temp)
+    (inst addq num temp num)
+    (inst li #x00000000ffffffff mask)
+    (inst srl num 32 temp)
     (inst and num mask num)
     (inst and temp mask temp)
     (inst addq num temp res)))
@@ -309,7 +347,7 @@
   (:args (x :scs (signed-reg))
 	 (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
-  (:note "inline (signed-byte 32) comparison"))
+  (:note "inline (signed-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg)))
@@ -320,7 +358,7 @@
   (:args (x :scs (unsigned-reg))
 	 (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:note "inline (unsigned-byte 32) comparison"))
+  (:note "inline (unsigned-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg)))
