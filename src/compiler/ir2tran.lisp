@@ -1039,9 +1039,8 @@
 	(bug "full call to ~S" fname)))
 
     (when (consp fname)
+      (aver (legal-fun-name-p fname))
       (destructuring-bind (setfoid &rest stem) fname
-	(aver (member setfoid
-		      '(setf sb!pcl::class-predicate sb!pcl::slot-accessor)))
 	(when (eq setfoid 'setf)
 	  (setf (gethash (car stem) *setf-assumed-fboundp*) t))))))
 

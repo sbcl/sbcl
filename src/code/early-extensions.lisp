@@ -601,26 +601,7 @@
 
 ;;; Is NAME a legal function name?
 (defun legal-fun-name-p (name)
-  (or (symbolp name)
-      (and (consp name)
-	   ;; (SETF FOO)
-	   ;; (CLASS-PREDICATE FOO)
-           (or (and (or (eq (car name) 'setf)
-			(eq (car name) 'sb!pcl::class-predicate))
-		    (consp (cdr name))
-		    (symbolp (cadr name))
-		    (null (cddr name)))
-	       ;; (SLOT-ACCESSOR <CLASSNAME-OR-:GLOBAL>
-	       ;;  <SLOT-NAME> [READER|WRITER|BOUNDP])
-	       (and (eq (car name) 'sb!pcl::slot-accessor)
-		    (consp (cdr name))
-		    (symbolp (cadr name))
-		    (consp (cddr name))
-		    (or (symbolp (caddr name)) (stringp (caddr name)))
-		    (consp (cdddr name))
-		    (member
-		     (cadddr name)
-		     '(sb!pcl::reader sb!pcl::writer sb!pcl::boundp)))))))
+  (values (valid-function-name-p name)))
 
 ;;; Signal an error unless NAME is a legal function name.
 (defun legal-fun-name-or-type-error (name)
@@ -643,11 +624,12 @@
 (defun fun-name-block-name (fun-name)
   (cond ((symbolp fun-name)
 	 fun-name)
-	((and (consp fun-name)
-	      (legal-fun-name-p fun-name))
-	 (case (car fun-name)
-	   ((setf sb!pcl::class-predicate) (second fun-name))
-	   ((sb!pcl::slot-accessor) (third fun-name))))
+	((consp fun-name)
+	 (multiple-value-bind (legalp block-name)
+	     (valid-function-name-p fun-name)
+	   (if legalp
+	       block-name
+	       (error "not legal as a function name: ~S" fun-name))))
 	(t
 	 (error "not legal as a function name: ~S" fun-name))))
 

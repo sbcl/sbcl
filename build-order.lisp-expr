@@ -66,6 +66,8 @@
  ;; that they can handle the change. -- WHN 19990919
  ("src/code/defsetfs")
 
+ ("src/code/cold-init-helper-macros")
+
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; cross-compiler-only replacements for stuff which in target Lisp would be
  ;;; supplied by basic machinery
@@ -89,6 +91,9 @@
 
  ("src/code/primordial-extensions")
 
+ ;; comes early so that stuff can reason about function names
+ ("src/code/function-names")
+
  ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
  ;; SB!VM:N-LOWTAG-BITS, needed by "early-objdef" and others
  ("src/compiler/generic/early-vm")
@@ -110,8 +115,6 @@
 
  ;; mostly needed by stuff from comcom, but also used by "x86-vm"
  ("src/code/debug-var-io")
-
- ("src/code/cold-init-helper-macros")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these

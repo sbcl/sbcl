@@ -430,15 +430,16 @@
   Return the lexically apparent definition of the function Name. Name may also
   be a lambda expression."
   (if (consp thing)
-      (case (car thing)
-	((lambda named-lambda instance-lambda lambda-with-lexenv)
+      (cond
+	((member (car thing)
+		 '(lambda named-lambda instance-lambda lambda-with-lexenv))
 	 (reference-leaf start
 			 cont
 			 (ir1-convert-lambdalike
 			  thing
 			  :debug-name (debug-namify "#'~S" thing)
 			  :allow-debug-catch-tag t)))
-	((setf sb!pcl::class-predicate sb!pcl::slot-accessor)
+	((legal-fun-name-p thing)
 	 (let ((var (find-lexically-apparent-fun
 		     thing "as the argument to FUNCTION")))
 	   (reference-leaf start cont var)))

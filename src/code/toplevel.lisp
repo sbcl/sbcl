@@ -173,7 +173,8 @@
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
 	 (initial-offset (logand csp (1- bytes-per-scrub-unit)))
 	 (end-of-stack
-	  (- sb!vm:*control-stack-end* sb!c:*backend-page-size*)))
+	  (- (sb!vm:fixnumize sb!vm:*control-stack-end*)
+	     sb!c:*backend-page-size*)))
     (labels
 	((scrub (ptr offset count)
 	   (declare (type system-area-pointer ptr)
@@ -205,7 +206,8 @@
 
   #!+stack-grows-downward-not-upward
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (end-of-stack (+ sb!vm:*control-stack-start* sb!c:*backend-page-size*))
+	 (end-of-stack (+ (sb!vm:fixnumize sb!vm:*control-stack-start*)
+			  sb!c:*backend-page-size*))
 	 (initial-offset (logand csp (1- bytes-per-scrub-unit))))
     (labels
 	((scrub (ptr offset count)

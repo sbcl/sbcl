@@ -844,6 +844,7 @@ retained, possibly temporariliy, because it might be used internally."
              "C-STRINGS->STRING-LIST"
 
              ;; misc. utilities used internally
+	     "DEFINE-FUNCTION-NAME-SYNTAX" "VALID-FUNCTION-NAME-P" ; should be SB!EXT? 
              "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
              "FUN-NAME-BLOCK-NAME"
 	     "FUN-NAME-INLINE-EXPANSION"
@@ -1370,6 +1371,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 	     
              "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
              "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
+	     "!FUNCTION-NAMES-COLD-INIT"
              "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
              "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
              "!EARLY-TYPE-COLD-INIT" "!LATE-TYPE-COLD-INIT"

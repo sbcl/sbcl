@@ -54,3 +54,25 @@
 	   ,(nth-value 2 (sb-pcl::parse-specialized-lambda-list
 			  (elt stuff arg-pos))))
 	`(defmethod ,name "<illegal syntax>"))))
+
+(defvar sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
+
+(defmacro define-internal-pcl-function-name-syntax (name &rest rest)
+  `(progn
+     (define-function-name-syntax ,name ,@rest)
+     (pushnew ',name sb-pcl::*internal-pcl-generalized-fun-name-symbols*)))
+
+(define-internal-pcl-function-name-syntax sb-pcl::class-predicate (list)
+  (when (cdr list)
+    (destructuring-bind (name &rest rest) (cdr list)
+      (when (and (symbolp name)
+		 (null rest))
+	(values t name)))))
+
+(define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
+  (when (= (length list) 4)
+    (destructuring-bind (class slot rwb) (cdr list)
+      (when (and (member rwb '(sb-pcl::reader sb-pcl::writer sb-pcl::boundp))
+		 (symbolp slot)
+		 (symbolp class))
+	(values t slot)))))

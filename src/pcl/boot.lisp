@@ -1747,27 +1747,21 @@ bootstrapping.
 		    (generic-function-name gf)
 		    (!early-gf-name gf))))
       (esetf (gf-precompute-dfun-and-emf-p arg-info)
-	     (let* ((sym (if (atom name) name (cadr name)))
-		    (pkg-list (cons *pcl-package*
-				    (package-use-list *pcl-package*))))
-	       ;; FIXME: given the presence of generalized function
-	       ;; names, this test is broken.  A little
-	       ;; reverse-engineering suggests that this was intended
-	       ;; to prevent precompilation of things on some
-	       ;; PCL-internal automatically-constructed functions
-	       ;; like the old "~A~A standard class ~A reader"
-	       ;; functions.  When the CADR of SB-PCL::SLOT-ACCESSOR
-	       ;; generalized functions was *, this test returned T,
-	       ;; not NIL, and an error was signalled in
-	       ;; MAKE-ACCESSOR-TABLE for (DEFUN FOO (X) (SLOT-VALUE X
-	       ;; 'ASLDKJ)).  Whether the right thing to do is to fix
-	       ;; MAKE-ACCESSOR-TABLE so that it can work in the
-	       ;; presence of slot names that have no classes, or to
-	       ;; restore this test to something more obvious, I don't
-	       ;; know.  -- CSR, 2003-02-14
-	       (and sym (symbolp sym)
-		    (not (null (memq (symbol-package sym) pkg-list)))
-		    (not (find #\space (symbol-name sym))))))))
+	     (cond
+	       ((and (consp name)
+		     (member (car name)
+			     *internal-pcl-generalized-fun-name-symbols*))
+		nil)
+	       (t (let* ((symbol (fun-name-block-name name))
+			 (package (symbol-package symbol)))
+		    (and (or (eq package *pcl-package*)
+			     (memq package (package-use-list *pcl-package*)))
+			 ;; FIXME: this test will eventually be
+			 ;; superseded by the *internal-pcl...* test,
+			 ;; above.  While we are in a process of
+			 ;; transition, however, it should probably
+			 ;; remain.
+			 (not (find #\Space (symbol-name symbol))))))))))
   (esetf (gf-info-fast-mf-p arg-info)
 	 (or (not (eq *boot-state* 'complete))
 	     (let* ((method-class (generic-function-method-class gf))
