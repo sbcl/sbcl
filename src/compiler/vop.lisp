@@ -422,8 +422,7 @@
   save-sp
   dynamic-state)
 
-(defstruct (cloop (:print-function print-cloop)
-		  (:conc-name loop-)
+(defstruct (cloop (:conc-name loop-)
 		  (:predicate loop-p)
 		  (:constructor make-loop)
 		  (:copier copy-loop))
