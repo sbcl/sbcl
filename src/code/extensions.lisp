@@ -874,12 +874,3 @@
   (if (typep possibly-logical-pathname 'logical-pathname)
       (translate-logical-pathname possibly-logical-pathname)
       possibly-logical-pathname))
-
-#|
-;;; REMOVEME when done testing byte cross-compiler
-(defun byte-compiled-foo (x y)
-  (declare (optimize (speed 0) (debug 1)))
-  (if x
-      x
-      (cons y y)))
-|#

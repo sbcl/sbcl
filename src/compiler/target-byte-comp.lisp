@@ -95,8 +95,8 @@
 		 (hairy-byte-function-entry-points xep)))
 	    #'<)))))
 
-;;; Given a byte-compiled component, disassemble it to standard output.
-;;; EPS is a list of the entry points.
+;;; Given a byte-compiled component, disassemble it to standard
+;;; output. EPS is a list of the entry points.
 (defun disassem-byte-component (component &optional (eps '(0)))
   (let* ((bytes (* (code-header-ref component sb!vm:code-code-size-slot)
 		   sb!vm:word-bytes))
@@ -114,8 +114,8 @@
 ;;; Disassemble byte code from a SAP and constants vector.
 (defun disassem-byte-sap (sap bytes constants eps)
   (declare (optimize (inhibit-warnings 3)))
-  (/show "entering DISASSEM-BYTE-SAP" bytes constants eps)
   (let ((index 0))
+    (declare (type index index))
     (labels ((newline ()
 	       (format t "~&~4D:" index))
 	     (next-byte ()
@@ -124,12 +124,10 @@
 		 (incf index)
 		 byte))
 	     (extract-24-bits ()
-	       (/show "in EXTRACT-24-BITS")
 	       (logior (ash (next-byte) 16)
 		       (ash (next-byte) 8)
 		       (next-byte)))
 	     (extract-extended-op ()
-	       (/show "in EXTRACT-EXTENDED-OP")
 	       (let ((byte (next-byte)))
 		 (if (= byte 255)
 		     (extract-24-bits)
@@ -145,7 +143,6 @@
 		     :var
 		     3-bits)))
 	     (extract-branch-target (byte)
-	       (/show "in EXTRACT-BRANCH-TARGET")
 	       (if (logbitp 0 byte)
 		   (let ((disp (next-byte)))
 		     (if (logbitp 7 disp)
@@ -153,18 +150,16 @@
 			 (+ index disp)))
 		   (extract-24-bits)))
 	     (note (string &rest noise)
-	       (format t "~12T~?" string noise))
+	       (format t " ~14T~?" string noise))
 	     (get-constant (index)
 	       (if (< -1 index (length constants))
 		   (aref constants index)
 		   "<bogus index>")))
       (loop
-        (/show "at head of LOOP" index bytes)
 	(unless (< index bytes)
 	  (return))
 
 	(when (eql index (first eps))
-	  (/show "in EQL INDEX (FIRST EPS) case")
 	  (newline)
 	  (pop eps)
 	  (let ((frame-size
@@ -174,17 +169,20 @@
 		       (logior (ash (next-byte) 16)
 			       (ash (next-byte) 8)
 			       (next-byte))))))
-	    (note "Entry point, frame-size=~D~%" frame-size)))
+	    (note "entry point, frame-size=~D~%" frame-size)))
 
 	(newline)
 	(let ((byte (next-byte)))
-	  (/show "at head of DISPATCH" index byte)
 	  (macrolet ((dispatch (&rest clauses)
-		       `(cond ,@(mapcar #'(lambda (clause)
-					    `((= (logand byte ,(caar clause))
-						 ,(cadar clause))
-					      ,@(cdr clause)))
-					clauses))))
+		       `(cond ,@(mapcar (lambda (clause)
+					  (destructuring-bind
+					      ((mask match) &body body)
+					      clause
+					    `((= (logand byte ,mask) ,match)
+					      ,@body)))
+					clauses)
+			      (t (error "disassembly failure for bytecode ~X"
+					byte)))))
 	    (dispatch
 	     ((#b11110000 #b00000000)
 	      (let ((op (extract-4-bit-op byte)))
@@ -193,6 +191,9 @@
 	      (let ((op (extract-4-bit-op byte)))
 		(note "push-arg ~D" op)))
 	     ((#b11110000 #b00100000)
+	      ;; FIXME: could use WITH-PRINT-RESTRICTIONS here and in
+	      ;; next clause (or just in LABELS NOTE) instead of
+	      ;; hand-rolling values in each case here
 	      (let ((*print-level* 3)
 		    (*print-lines* 2))
 		(note "push-const ~S" (get-constant (extract-4-bit-op byte)))))
@@ -258,7 +259,6 @@
 	      ;; if-eq
 	      (note "if-eq ~D" (extract-branch-target byte)))
 	     ((#b11111000 #b11011000)
-	      (/show "in XOP case")
 	      ;; XOP
 	      (let* ((low-3-bits (extract-3-bit-op byte))
 		     (xop (nth (if (eq low-3-bits :var) (next-byte) low-3-bits)

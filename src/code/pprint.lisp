@@ -56,9 +56,20 @@
   ;; zero, but if we end up with a very long line with no breaks in it we
   ;; might have to output part of it. Then this will no longer be zero.
   (buffer-start-column (or (sb!impl::charpos target) 0) :type column)
-  ;; The line number we are currently on. Used for *print-lines* abrevs and
-  ;; to tell when sections have been split across multiple lines.
+  ;; The line number we are currently on. Used for *PRINT-LINES*
+  ;; abbreviations and to tell when sections have been split across
+  ;; multiple lines.
   (line-number 0 :type index)
+  ;; the value of *PRINT-LINES* captured at object creation time. We
+  ;; use this, instead of the dynamic *PRINT-LINES*, to avoid
+  ;; weirdness like
+  ;;   (let ((*print-lines* 50))
+  ;;     (pprint-logical-block ..
+  ;;       (dotimes (i 10)
+  ;;         (let ((*print-lines* 8))
+  ;;           (print (aref possiblybigthings i) prettystream)))))
+  ;; terminating the output of the entire logical blockafter 8 lines.
+  (print-lines *print-lines* :type (or index null) :read-only t)
   ;; Stack of logical blocks in effect at the buffer start.
   (blocks (list (make-logical-block)) :type list)
   ;; Buffer holding the per-line prefix active at the buffer start.
@@ -532,8 +543,10 @@
 
 (defun fits-on-line-p (stream until force-newlines-p)
   (let ((available (pretty-stream-line-length stream)))
-    (when (and (not *print-readably*) *print-lines*
-	       (= *print-lines* (pretty-stream-line-number stream)))
+    (when (and (not *print-readably*)
+	       (pretty-stream-print-lines stream)
+	       (= (pretty-stream-print-lines stream)
+		  (pretty-stream-line-number stream)))
       (decf available 3) ; for the `` ..''
       (decf available (logical-block-suffix-length
 		       (car (pretty-stream-blocks stream)))))
@@ -567,7 +580,8 @@
     (let ((line-number (pretty-stream-line-number stream)))
       (incf line-number)
       (when (and (not *print-readably*)
-		 *print-lines* (>= line-number *print-lines*))
+		 (pretty-stream-print-lines stream)
+		 (>= line-number (pretty-stream-print-lines stream)))
 	(write-string " .." target)
 	(let ((suffix-length (logical-block-suffix-length
 			      (car (pretty-stream-blocks stream)))))

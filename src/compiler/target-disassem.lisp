@@ -771,7 +771,7 @@
 	(string
 	 (write-string note stream))
 	(function
-           (funcall note stream))))
+	 (funcall note stream))))
       (terpri stream))
     (fresh-line stream)
     (setf (dstate-notes dstate) nil)))
@@ -1516,6 +1516,7 @@
       (error "can't compile a lexical closure"))
     (compile nil lambda)))
 
+;;; FIXME: Couldn't we just use COMPILE for this?
 (defun compiled-function-or-lose (thing &optional (name thing))
   (cond ((or (symbolp thing)
 	     (and (listp thing)
@@ -1544,14 +1545,14 @@
 	   (type (or (member t) stream) stream)
 	   (type (member t nil) use-labels))
   (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
-  (let ((fun (compiled-function-or-lose object)))
-    (if (typep fun 'sb!kernel:byte-function)
-	(sb!c:disassem-byte-fun fun)
-	;; We can't detect closures, so be careful.
-	(disassemble-function (fun-self fun)
-			      :stream stream
-			      :use-labels use-labels)))
-  nil))
+    (let ((fun (compiled-function-or-lose object)))
+      (if (typep fun 'sb!kernel:byte-function)
+	  (sb!c:disassem-byte-fun fun)
+	  ;; We can't detect closures, so be careful.
+	  (disassemble-function (fun-self fun)
+				:stream stream
+				:use-labels use-labels)))
+    nil))
 
 ;;; Disassembles the given area of memory starting at ADDRESS and
 ;;; LENGTH long. Note that if CODE-COMPONENT is NIL and this memory

@@ -670,7 +670,7 @@
 
 ;;;; frames
 
-;;; This is used in FIND-ESCAPE-FRAME and with the bogus components
+;;; This is used in FIND-ESCAPED-FRAME and with the bogus components
 ;;; and LRAs used for :function-end breakpoints. When a components
 ;;; debug-info slot is :bogus-lra, then the real-lra-slot contains the
 ;;; real component to continue executing, as opposed to the bogus

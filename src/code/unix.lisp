@@ -419,36 +419,29 @@
 
 ;;;; sys/select.h
 
-(defmacro unix-fast-select (num-descriptors
-			    read-fds write-fds exception-fds
-			    timeout-secs &optional (timeout-usecs 0))
-  #!+sb-doc
-  "Perform the UNIX select(2) system call."
-  ;; FIXME: These DECLAREs don't belong at macroexpansion time. They
-  ;; should be done at runtime instead. Perhaps we could just redo
-  ;; UNIX-FAST-SELECT as an inline function, and then all the
-  ;; declarations would work nicely.
-  #|
+;;;; FIXME: Why have both UNIX-SELECT and UNIX-FAST-SELECT?
+
+;;; Perform the UNIX select(2) system call.
+(declaim (inline unix-fast-select)) ; (used to be a macro in CMU CL)
+(defun unix-fast-select (num-descriptors
+			 read-fds write-fds exception-fds
+			 timeout-secs &optional (timeout-usecs 0))
   (declare (type (integer 0 #.fd-setsize) num-descriptors)
 	   (type (or (alien (* (struct fd-set))) null)
 		 read-fds write-fds exception-fds)
 	   (type (or null (unsigned-byte 31)) timeout-secs)
 	   (type (unsigned-byte 31) timeout-usecs))
-  |#
   ;; FIXME: CMU CL had
-  ;;   (optimize (speed 3) (safety 0) (inhibit-warnings 3))
-  ;; in the declarations above. If they're important, they should
-  ;; be in a declaration inside the LET expansion, not in the
-  ;; macro compile-time code.
-  `(let ((timeout-secs ,timeout-secs))
-     (with-alien ((tv (struct timeval)))
-       (when timeout-secs
-	 (setf (slot tv 'tv-sec) timeout-secs)
-	 (setf (slot tv 'tv-usec) ,timeout-usecs))
-       (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-		     (* (struct fd-set)) (* (struct timeval)))
-		    ,num-descriptors ,read-fds ,write-fds ,exception-fds
-		    (if timeout-secs (alien-sap (addr tv)) (int-sap 0))))))
+  ;;   (declare (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
+  ;; here. Is that important for SBCL? If so, why? Profiling might tell us..
+  (with-alien ((tv (struct timeval)))
+    (when timeout-secs
+      (setf (slot tv 'tv-sec) timeout-secs)
+      (setf (slot tv 'tv-usec) timeout-usecs))
+    (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
+		  (* (struct fd-set)) (* (struct timeval)))
+		 num-descriptors read-fds write-fds exception-fds
+		 (if timeout-secs (alien-sap (addr tv)) (int-sap 0)))))
 
 ;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
 ;;; to happen on one of them or to time out.
