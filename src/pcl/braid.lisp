@@ -547,10 +547,9 @@
 					 :metaclass metaclass :name name
 					 :direct-superclasses supers
 					 :direct-slots slots)
-	       (let ((supers (nsubstitute t 'instance supers)))
-		 (ensure-class-using-class name nil
-					   :metaclass metaclass :name name
-					   :direct-superclasses supers))))))
+	       (ensure-class-using-class name nil
+					 :metaclass metaclass :name name
+					 :direct-superclasses supers)))))
     (cond ((structure-type-p name)
 	   (ensure 'structure-class
 		   (mapcar #'slot-initargs-from-structure-slotd

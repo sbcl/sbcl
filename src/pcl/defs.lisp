@@ -151,7 +151,7 @@
 	;; FIXME: do we still need this?
 	((and (null args) (typep type 'classoid))
 	 (or (classoid-pcl-class type)
-	     (ensure-non-structure-class (classoid-name type))))
+	     (ensure-non-standard-class (classoid-name type))))
 	((specializerp type) type)))
 
 ;;; interface

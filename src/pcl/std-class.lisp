@@ -449,7 +449,8 @@
       (when (neq supplied-supers unsupplied)
 	(list :direct-superclasses (mapcar #'fix-super supplied-supers)))
       (when (neq supplied-slots unsupplied)
-	(list :direct-slots supplied-slots))))))
+	(list :direct-slots supplied-slots))
+      initargs))))
 
 (defmethod shared-initialize :after
 	   ((class std-class)
