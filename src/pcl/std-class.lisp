@@ -895,6 +895,7 @@
 	      (push (list name slot) name-dslotds-alist)))))
     (mapcar (lambda (direct)
 	      (compute-effective-slot-definition class
+						 (car direct)
 						 (nreverse (cdr direct))))
 	    name-dslotds-alist)))
 
@@ -968,8 +969,10 @@
 (defmethod compute-slots ((class structure-class))
   (mapcan (lambda (superclass)
 	    (mapcar (lambda (dslotd)
-		      (compute-effective-slot-definition class
-							 (list dslotd)))
+		      (compute-effective-slot-definition
+		       class
+		       (slot-definition-name dslotd)
+		       (list dslotd)))
 		    (class-direct-slots superclass)))
 	  (reverse (slot-value class 'class-precedence-list))))
 
@@ -978,7 +981,8 @@
     (mapc #'initialize-internal-slot-functions eslotds)
     eslotds))
 
-(defmethod compute-effective-slot-definition ((class slot-class) dslotds)
+(defmethod compute-effective-slot-definition ((class slot-class) name dslotds)
+  (declare (ignore name))
   (let* ((initargs (compute-effective-slot-definition-initargs class dslotds))
 	 (class (effective-slot-definition-class class initargs)))
     (apply #'make-instance class initargs)))

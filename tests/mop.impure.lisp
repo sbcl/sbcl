@@ -146,5 +146,20 @@
 (defvar *automethod-object* (make-instance 'automethod-object))
 (assert (typep *automethod-object* 'automethod-object))
 
+;;; COMPUTE-EFFECTIVE-SLOT-DEFINITION should take three arguments, one
+;;; of which is the name of the slot.
+(defvar *compute-effective-slot-definition-count* 0)
+(defmethod compute-effective-slot-definition :before
+    (class (name (eql 'foo)) dsds)
+  (incf *compute-effective-slot-definition-count*))
+(defclass cesd-test-class ()
+  ((foo :initarg :foo)))
+(make-instance 'cesd-test-class :foo 3)
+;;; FIXME: this assertion seems a little weak.  I don't know why
+;;; COMPUTE-EFFECTIVE-SLOT-DEFINITION gets called twice in this
+;;; sequence, nor whether that's compliant with AMOP.  -- CSR,
+;;; 2003-04-17
+(assert (> *compute-effective-slot-definition-count* 0))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

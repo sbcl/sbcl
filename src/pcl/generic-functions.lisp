@@ -328,8 +328,6 @@
 (defgeneric compute-applicable-methods-using-classes
   (generic-function classes))
 
-(defgeneric compute-effective-slot-definition (class dslotds))
-
 (defgeneric compute-effective-slot-definition-initargs (class direct-slotds))
 
 (defgeneric describe-object (object stream))
@@ -414,6 +412,8 @@
 (defgeneric compute-effective-method (generic-function
 				      combin
 				      applicable-methods))
+
+(defgeneric compute-effective-slot-definition (class name dslotds))
 
 (defgeneric compute-slot-accessor-info (slotd type gf))
 
