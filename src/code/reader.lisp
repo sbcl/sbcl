@@ -11,10 +11,12 @@
 
 (in-package "SB!IMPL")
 
-;;; miscellaneous global variables
+;;;; miscellaneous global variables
 
-(defvar *read-default-float-format* 'single-float
-  #!+sb-doc "Float format for 1.0E1")
+;;; ANSI: "the floating-point format that is to be used when reading a
+;;; floating-point number that has no exponent marker or that has e or
+;;; E for an exponent marker"
+(defvar *read-default-float-format* 'single-float)
 (declaim (type (member short-float single-float double-float long-float)
 	       *read-default-float-format*))
 
@@ -55,6 +57,10 @@
 
 ;;;; constants for character attributes. These are all as in the manual.
 
+;;; FIXME: It's disturbing to bind nice names like ESCAPE and DELIMITER
+;;; as constants throughout the entire SB-IMPL package. Perhaps these
+;;; could be given some standard prefix, so instead we have constants
+;;; CHATTR-ESCAPE and CHATTR-DELIMITER and so forth.
 (defconstant whitespace 0)
 (defconstant terminating-macro 1)
 (defconstant escape 2)
@@ -67,8 +73,7 @@
 ;; the "9" entry intentionally left blank for some reason -- WHN 19990806
 (defconstant multiple-escape 10)
 (defconstant package-delimiter 11)
-;; a fake attribute for use in read-unqualified-token
-(defconstant delimiter 12)
+(defconstant delimiter 12) ; (a fake for use in read-unqualified-token)
 
 ;;;; macros and functions for character tables
 
@@ -111,20 +116,20 @@
   (test-attribute char whitespace rt))
 
 (defmacro constituentp (char &optional (rt '*readtable*))
-  `(>= (get-cat-entry ,char ,rt) #.constituent))
+  `(>= (get-cat-entry ,char ,rt) constituent))
 
 (defmacro terminating-macrop (char &optional (rt '*readtable*))
-  `(test-attribute ,char #.terminating-macro ,rt))
+  `(test-attribute ,char terminating-macro ,rt))
 
 (defmacro escapep (char &optional (rt '*readtable*))
-  `(test-attribute ,char #.escape ,rt))
+  `(test-attribute ,char escape ,rt))
 
 (defmacro multiple-escape-p (char &optional (rt '*readtable*))
-  `(test-attribute ,char #.multiple-escape ,rt))
+  `(test-attribute ,char multiple-escape ,rt))
 
 (defmacro token-delimiterp (char &optional (rt '*readtable*))
   ;; depends on actual attribute numbering above.
-  `(<= (get-cat-entry ,char ,rt) #.terminating-macro))
+  `(<= (get-cat-entry ,char ,rt) terminating-macro))
 
 ;;;; secondary attribute table
 
@@ -141,26 +146,26 @@
 (defun !cold-init-secondary-attribute-table ()
   (setq *secondary-attribute-table*
 	(make-array char-code-limit :element-type '(unsigned-byte 8)
-		    :initial-element #.constituent))
-  (!set-secondary-attribute #\: #.package-delimiter)
-  (!set-secondary-attribute #\| #.multiple-escape)	; |) [for EMACS]
-  (!set-secondary-attribute #\. #.constituent-dot)
-  (!set-secondary-attribute #\+ #.constituent-sign)
-  (!set-secondary-attribute #\- #.constituent-sign)
-  (!set-secondary-attribute #\/ #.constituent-slash)
+		    :initial-element constituent))
+  (!set-secondary-attribute #\: package-delimiter)
+  (!set-secondary-attribute #\| multiple-escape)	; |) [for EMACS]
+  (!set-secondary-attribute #\. constituent-dot)
+  (!set-secondary-attribute #\+ constituent-sign)
+  (!set-secondary-attribute #\- constituent-sign)
+  (!set-secondary-attribute #\/ constituent-slash)
   (do ((i (char-code #\0) (1+ i)))
       ((> i (char-code #\9)))
-    (!set-secondary-attribute (code-char i) #.constituent-digit))
-  (!set-secondary-attribute #\E #.constituent-expt)
-  (!set-secondary-attribute #\F #.constituent-expt)
-  (!set-secondary-attribute #\D #.constituent-expt)
-  (!set-secondary-attribute #\S #.constituent-expt)
-  (!set-secondary-attribute #\L #.constituent-expt)
-  (!set-secondary-attribute #\e #.constituent-expt)
-  (!set-secondary-attribute #\f #.constituent-expt)
-  (!set-secondary-attribute #\d #.constituent-expt)
-  (!set-secondary-attribute #\s #.constituent-expt)
-  (!set-secondary-attribute #\l #.constituent-expt))
+    (!set-secondary-attribute (code-char i) constituent-digit))
+  (!set-secondary-attribute #\E constituent-expt)
+  (!set-secondary-attribute #\F constituent-expt)
+  (!set-secondary-attribute #\D constituent-expt)
+  (!set-secondary-attribute #\S constituent-expt)
+  (!set-secondary-attribute #\L constituent-expt)
+  (!set-secondary-attribute #\e constituent-expt)
+  (!set-secondary-attribute #\f constituent-expt)
+  (!set-secondary-attribute #\d constituent-expt)
+  (!set-secondary-attribute #\s constituent-expt)
+  (!set-secondary-attribute #\l constituent-expt))
 
 (defmacro get-secondary-attribute (char)
   `(elt *secondary-attribute-table*
@@ -212,16 +217,16 @@
    returns T."
   (if non-terminatingp
       (set-cat-entry char (get-secondary-attribute char) rt)
-      (set-cat-entry char #.terminating-macro rt))
+      (set-cat-entry char terminating-macro rt))
   (set-cmt-entry char function rt)
   T)
 
-(defun get-macro-character (char &optional rt)
+(defun get-macro-character (char &optional (rt *readtable*))
   #!+sb-doc
   "Returns the function associated with the specified char which is a macro
   character. The optional readtable argument defaults to the current
   readtable."
-  (let ((rt (or rt *readtable*)))
+  (let ((rt (or rt *standard-readtable*)))
     ;; Check macro syntax, return associated function if it's there.
     ;; Returns a value for all constituents.
     (cond ((constituentp char)
@@ -243,7 +248,7 @@
 	  (do ((attribute-table (character-attribute-table *readtable*))
 	       (char (fast-read-char t) (fast-read-char t)))
 	      ((/= (the fixnum (aref attribute-table (char-code char)))
-		   #.whitespace)
+		   whitespace)
 	       (done-with-fast-read-char)
 	       char)))
 	;; fundamental-stream
@@ -251,7 +256,7 @@
 	     (char (stream-read-char stream) (stream-read-char stream)))
 	    ((or (eq char :eof)
 		 (/= (the fixnum (aref attribute-table (char-code char)))
-		     #.whitespace))
+		     whitespace))
 	     (if (eq char :eof)
 		 (error 'end-of-file :stream stream)
 		 char))))))
@@ -263,14 +268,14 @@
   ;; All characters default to "constituent" in MAKE-READTABLE.
   ;; *** un-constituent-ize some of these ***
   (let ((*readtable* *standard-readtable*))
-    (set-cat-entry (code-char tab-char-code) #.whitespace)
-    (set-cat-entry #\linefeed #.whitespace)
-    (set-cat-entry #\space #.whitespace)
-    (set-cat-entry (code-char form-feed-char-code) #.whitespace)
-    (set-cat-entry (code-char return-char-code) #.whitespace)
-    (set-cat-entry #\\ #.escape)
+    (set-cat-entry (code-char tab-char-code) whitespace)
+    (set-cat-entry #\linefeed whitespace)
+    (set-cat-entry #\space whitespace)
+    (set-cat-entry (code-char form-feed-char-code) whitespace)
+    (set-cat-entry (code-char return-char-code) whitespace)
+    (set-cat-entry #\\ escape)
     (set-cmt-entry #\\ #'read-token)
-    (set-cat-entry (code-char rubout-char-code) #.whitespace)
+    (set-cat-entry (code-char rubout-char-code) whitespace)
     (set-cmt-entry #\: #'read-token)
     (set-cmt-entry #\| #'read-token)
     ;; macro definitions
@@ -294,8 +299,9 @@
 
 (defvar *read-buffer*)
 (defvar *read-buffer-length*)
-;;; FIXME: Is it really helpful to have *READ-BUFFER-LENGTH* be a separate
-;;; variable instead of just calculating it on the fly as (LENGTH *READ-BUFFER*)?
+;;; FIXME: Is it really helpful to have *READ-BUFFER-LENGTH* be a
+;;; separate variable instead of just calculating it on the fly as
+;;; (LENGTH *READ-BUFFER*)?
 
 (defvar *inch-ptr*)
 (defvar *ouch-ptr*)
@@ -304,12 +310,12 @@
 (declaim (simple-string *read-buffer*))
 
 (defmacro reset-read-buffer ()
-  ;; Turn *read-buffer* into an empty read buffer.
-  ;; *Ouch-ptr* always points to next char to write.
+  ;; Turn *READ-BUFFER* into an empty read buffer.
   `(progn
-    (setq *ouch-ptr* 0)
-    ;; *inch-ptr* always points to next char to read.
-    (setq *inch-ptr* 0)))
+     ;; *OUCH-PTR* always points to next char to write.
+     (setq *ouch-ptr* 0)
+     ;; *INCH-PTR* always points to next char to read.
+     (setq *inch-ptr* 0)))
 
 (defun !cold-init-read-buffer ()
   (setq *read-buffer* (make-string 512)) ; initial bufsize
@@ -317,9 +323,10 @@
   (reset-read-buffer))
 
 ;;; FIXME I removed "THE FIXNUM"'s from OUCH-READ-BUFFER and
-;;; OUCH-UNREAD-BUFFER, check to make sure that Python really is smart enough
-;;; to make good code without them. And while I'm at it, converting them
-;;; from macros to inline functions might be good, too.
+;;; OUCH-UNREAD-BUFFER, check to make sure that Python really is smart
+;;; enough to make good code without them. And while I'm at it,
+;;; converting them from macros to inline functions might be good,
+;;; too.
 
 (defmacro ouch-read-buffer (char)
   `(progn
@@ -539,14 +546,18 @@
   (declare (ignore ignore))
   (%reader-error stream "unmatched close parenthesis"))
 
-;;; Read from the stream up to the next delimiter. Leave the resulting token in
-;;; *read-buffer*, and return two values:
+;;; Read from the stream up to the next delimiter. Leave the resulting
+;;; token in *READ-BUFFER*, and return two values:
 ;;; -- a list of the escaped character positions, and
 ;;; -- The position of the first package delimiter (or NIL).
-(defun internal-read-extended-token (stream firstchar)
+(defun internal-read-extended-token (stream firstchar escape-firstchar)
   (reset-read-buffer)
+  (let ((escapes '()))
+    (when escape-firstchar
+      (push *ouch-ptr* escapes)
+      (ouch-read-buffer firstchar)
+      (setq firstchar (read-char stream nil *eof-object*)))
   (do ((char firstchar (read-char stream nil *eof-object*))
-       (escapes ())
        (colon nil))
       ((cond ((eofp char) t)
 	     ((token-delimiterp char)
@@ -563,8 +574,8 @@
 		 (reader-eof-error stream "after escape character")
 		 (ouch-read-buffer nextchar))))
 	  ((multiple-escape-p char)
-	   ;; Read to next multiple-escape, escaping single chars along the
-	   ;; way.
+	   ;; Read to next multiple-escape, escaping single chars
+	   ;; along the way.
 	   (loop
 	     (let ((ch (read-char stream nil *eof-object*)))
 	       (cond
@@ -573,18 +584,21 @@
 		((multiple-escape-p ch) (return))
 		((escapep ch)
 		 (let ((nextchar (read-char stream nil *eof-object*)))
-		   (if (eofp nextchar)
-		       (reader-eof-error stream "after escape character")
-		       (ouch-read-buffer nextchar))))
+		   (cond ((eofp nextchar)
+			  (reader-eof-error stream "after escape character"))
+			 (t
+			  (push *ouch-ptr* escapes)
+			  (ouch-read-buffer nextchar)))))
 		(t
 		 (push *ouch-ptr* escapes)
 		 (ouch-read-buffer ch))))))
 	  (t
 	   (when (and (constituentp char)
-		      (eql (get-secondary-attribute char) #.package-delimiter)
+			(eql (get-secondary-attribute char)
+                             package-delimiter)
 		      (not colon))
 	     (setq colon *ouch-ptr*))
-	   (ouch-read-buffer char)))))
+	   (ouch-read-buffer char))))))
 
 ;;;; character classes
 
@@ -592,17 +606,17 @@
 (defmacro char-class (char attable)
   `(let ((att (aref ,attable (char-code ,char))))
      (declare (fixnum att))
-     (if (<= att #.terminating-macro)
-	 #.delimiter
+     (if (<= att terminating-macro)
+	 delimiter
 	 att)))
 
-;;; Return the character class for CHAR, which might be part of a rational
-;;; number.
+;;; Return the character class for CHAR, which might be part of a
+;;; rational number.
 (defmacro char-class2 (char attable)
   `(let ((att (aref ,attable (char-code ,char))))
      (declare (fixnum att))
-     (if (<= att #.terminating-macro)
-	 #.delimiter
+     (if (<= att terminating-macro)
+	 delimiter
 	 (if (digit-char-p ,char *read-base*)
 	     constituent-digit
 	     (if (= att constituent-digit)
@@ -622,8 +636,8 @@
 	 (setq possibly-float
 	       (or (digit-char-p ,char 10)
 		   (= att constituent-dot))))
-     (if (<= att #.terminating-macro)
-	 #.delimiter
+     (if (<= att terminating-macro)
+	 delimiter
 	 (if (digit-char-p ,char (max *read-base* 10))
 	     (if (digit-char-p ,char *read-base*)
 		 constituent-digit
@@ -688,15 +702,15 @@
 (defun read-token (stream firstchar)
   #!+sb-doc
   "This function is just an fsm that recognizes numbers and symbols."
-  ;; Check explicitly whether firstchar has entry for non-terminating
-  ;; in character-attribute-table and read-dot-number-symbol in CMT.
-  ;; Report an error if these are violated (if we called this, we want
-  ;; something that is a legitimate token!).
-  ;; Read in the longest possible string satisfying the bnf for
-  ;; "unqualified-token". Leave the result in the *READ-BUFFER*.
-  ;; Return next char after token (last char read).
+  ;; Check explicitly whether FIRSTCHAR has an entry for
+  ;; NON-TERMINATING in CHARACTER-ATTRIBUTE-TABLE and
+  ;; READ-DOT-NUMBER-SYMBOL in CMT. Report an error if these are
+  ;; violated. (If we called this, we want something that is a
+  ;; legitimate token!) Read in the longest possible string satisfying
+  ;; the Backus-Naur form for "unqualified-token". Leave the result in
+  ;; the *READ-BUFFER*. Return next char after token (last char read).
   (when *read-suppress*
-    (internal-read-extended-token stream firstchar)
+    (internal-read-extended-token stream firstchar nil)
     (return-from read-token nil))
   (let ((attribute-table (character-attribute-table *readtable*))
 	(package-designator nil)
@@ -713,10 +727,9 @@
 	(#.escape (go ESCAPE))
 	(#.package-delimiter (go COLON))
 	(#.multiple-escape (go MULT-ESCAPE))
-	;;can't have eof, whitespace, or terminating macro as first char!
+	;; can't have eof, whitespace, or terminating macro as first char!
 	(t (go SYMBOL)))
-     SIGN
-      ;;saw "sign"
+     SIGN ; saw "sign"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
@@ -730,8 +743,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))	
 	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
 	(t (go SYMBOL)))
-     LEFTDIGIT
-      ;;saw "[sign] {digit}+"
+     LEFTDIGIT ; saw "[sign] {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-integer)))
@@ -749,8 +761,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     MIDDLEDOT
-      ;;saw "[sign] {digit}+ dot"
+     MIDDLEDOT ; saw "[sign] {digit}+ dot"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (let ((*read-base* 10))
@@ -766,8 +777,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     RIGHTDIGIT
-      ;;saw "[sign] {digit}* dot {digit}+"
+     RIGHTDIGIT ; saw "[sign] {digit}* dot {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-float)))
@@ -779,8 +789,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     SIGNDOT
-      ;;saw "[sign] dot"
+     SIGNDOT ; saw "[sign] dot"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
@@ -790,8 +799,7 @@
 	(#.escape (go ESCAPE))
 	(#.multiple-escape (go MULT-ESCAPE))
 	(t (go SYMBOL)))
-     FRONTDOT
-      ;;saw "dot"
+     FRONTDOT ; saw "dot"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (%reader-error stream "dot context error"))
@@ -815,8 +823,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     EXPTSIGN
-      ;;we got to EXPONENT, and saw a sign character.
+     EXPTSIGN ; got to EXPONENT, and saw a sign character
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
@@ -827,8 +834,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     EXPTDIGIT
-      ;;got to EXPONENT, saw "[sign] {digit}+"
+     EXPTDIGIT ; got to EXPONENT, saw "[sign] {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-float)))
@@ -839,8 +845,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     RATIO
-      ;;saw "[sign] {digit}+ slash"
+     RATIO ; saw "[sign] {digit}+ slash"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
@@ -851,8 +856,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     RATIODIGIT
-      ;;saw "[sign] {digit}+ slash {digit}+"
+     RATIODIGIT ; saw "[sign] {digit}+ slash {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-ratio)))
@@ -863,8 +867,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     DOTS
-      ;; saw "dot {dot}+"
+     DOTS ; saw "dot {dot}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (%reader-error stream "too many dots"))
@@ -877,8 +880,7 @@
 	(#.multiple-escape (go MULT-ESCAPE))
 	(#.package-delimiter (go COLON))
 	(t (go SYMBOL)))
-     SYMBOL
-      ;; not a dot, dots, or number
+     SYMBOL ; not a dot, dots, or number
       (let ((stream (in-synonym-of stream)))
 	(if (lisp-stream-p stream)
 	    (prepare-for-fast-read-char stream
@@ -911,10 +913,9 @@
 	       (#.multiple-escape (go MULT-ESCAPE))
 	       (#.package-delimiter (go COLON))
 	       (t (go SYMBOL-LOOP))))))
-     ESCAPE
-      ;;saw an escape.
-      ;;don't put the escape in the read buffer.
-      ;;read-next char, put in buffer (no case conversion).
+     ESCAPE ; saw an escape
+      ;; Don't put the escape in the read buffer.
+      ;; READ-NEXT CHAR, put in buffer (no case conversion).
       (let ((nextchar (read-char stream nil nil)))
 	(unless nextchar
 	  (reader-eof-error stream "after escape character"))
@@ -1014,26 +1015,40 @@
 			     "Symbol ~S not found in the ~A package.")))
 		(return (intern name found)))))))))
 
+;;; for semi-external use:
+;;;
+;;; For semi-external use: Return 3 values: the string for the token,
+;;; a flag for whether there was an escape char, and the position of
+;;; any package delimiter.
 (defun read-extended-token (stream &optional (*readtable* *readtable*))
-  #!+sb-doc
-  "For semi-external use: returns 3 values: the string for the token,
-   a flag for whether there was an escape char, and the position of any
-   package delimiter."
-  (let ((firstch (read-char stream nil nil t)))
-    (cond (firstch
+  (let ((first-char (read-char stream nil nil t)))
+    (cond (first-char
 	   (multiple-value-bind (escapes colon)
-	       (internal-read-extended-token stream firstch)
+               (internal-read-extended-token stream first-char nil)
 	     (casify-read-buffer escapes)
 	     (values (read-buffer-to-string) (not (null escapes)) colon)))
 	  (t
 	   (values "" nil nil)))))
+
+;;; for semi-external use:
+;;;
+;;; Read an extended token with the first character escaped. Return
+;;; the string for the token.
+(defun read-extended-token-escaped (stream &optional (*readtable* *readtable*))
+  (let ((first-char (read-char stream nil nil)))
+    (cond (first-char
+            (let ((escapes (internal-read-extended-token stream first-char t)))
+              (casify-read-buffer escapes)
+              (read-buffer-to-string)))
+          (t
+            (reader-eof-error stream "after escape")))))
 
 ;;;; number-reading functions
 
 (defmacro digit* nil
   `(do ((ch char (inch-read-buffer)))
        ((or (eofp ch) (not (digit-char-p ch))) (setq char ch))
-     ;;report if at least one digit is seen:
+     ;; Report if at least one digit is seen.
      (setq one-digit t)))
 
 (defmacro exponent-letterp (letter)
@@ -1172,6 +1187,12 @@
 	     ;; appropriately. This should avoid any unnecessary
 	     ;; underflow or overflow problems.
 	     (multiple-value-bind (min-expo max-expo)
+		 ;; FIXME: These #. forms are broken w.r.t.
+		 ;; cross-compilation portability. Maybe expressions
+		 ;; like
+		 ;;   (LOG SB!XC:MOST-POSITIVE-SHORT-FLOAT 10s0)
+		 ;; could be used instead? Or perhaps some sort of
+		 ;; load-time-form magic?
 		 (case float-format
 		   (short-float
 		    (values
@@ -1199,7 +1220,9 @@
 		 (setf number (/ number (expt 10 correction)))
 		 (setq num (make-float-aux number divisor float-format))
 		 (setq num (* num (expt 10 exponent)))
-		 (return-from make-float (if negative-fraction (- num) num))))))
+		 (return-from make-float (if negative-fraction
+					     (- num)
+					     num))))))
 	  ;; should never happen:	
 	  (t (error "internal error in floating point reader")))))
 
@@ -1207,7 +1230,7 @@
   (coerce (/ number divisor) float-format))
 
 (defun make-ratio ()
-  ;; Assume *read-buffer* contains a legal ratio. Build the number from
+  ;; Assume *READ-BUFFER* contains a legal ratio. Build the number from
   ;; the string.
   ;;
   ;; Look for optional "+" or "-".
@@ -1248,25 +1271,23 @@
 					   (non-terminating-p nil)
 					   (rt *readtable*))
   #!+sb-doc
-  "Causes char to become a dispatching macro character in readtable
-   (which defaults to the current readtable). If the non-terminating-p
-   flag is set to T, the char will be non-terminating. Make-dispatch-
-   macro-character returns T."
+  "Cause CHAR to become a dispatching macro character in readtable (which
+   defaults to the current readtable). If NON-TERMINATING-P, the char will
+   be non-terminating."
   (set-macro-character char #'read-dispatch-char non-terminating-p rt)
   (let* ((dalist (dispatch-tables rt))
 	 (dtable (cdr (find char dalist :test #'char= :key #'car))))
     (cond (dtable
-	   (error "Dispatch character already exists."))
+	   (error "The dispatch character ~S already exists." char))
 	  (t
 	   (setf (dispatch-tables rt)
 		 (push (cons char (make-char-dispatch-table)) dalist))))))
 
-(defun set-dispatch-macro-character
-       (disp-char sub-char function &optional (rt *readtable*))
+(defun set-dispatch-macro-character (disp-char sub-char function
+                                               &optional (rt *readtable*))
   #!+sb-doc
-  "Causes function to be called whenever the reader reads
-   disp-char followed by sub-char. Set-dispatch-macro-character
-   returns T."
+  "Cause FUNCTION to be called whenever the reader reads DISP-CHAR
+   followed by SUB-CHAR."
   ;; Get the dispatch char for macro (error if not there), diddle
   ;; entry for sub-char.
   (when (digit-char-p sub-char)
@@ -1280,13 +1301,14 @@
 	      (coerce function 'function))
 	(error "~S is not a dispatch char." disp-char))))
 
-(defun get-dispatch-macro-character (disp-char sub-char &optional rt)
+(defun get-dispatch-macro-character (disp-char sub-char
+                                     &optional (rt *readtable*))
   #!+sb-doc
   "Returns the macro character function for sub-char under disp-char
    or nil if there is no associated function."
   (unless (digit-char-p sub-char)
     (let* ((sub-char (char-upcase sub-char))
-	   (rt (or rt *readtable*))
+	   (rt (or rt *standard-readtable*))
 	   (dpair (find disp-char (dispatch-tables rt)
 			:test #'char= :key #'car)))
       (if dpair

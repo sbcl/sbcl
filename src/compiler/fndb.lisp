@@ -184,7 +184,7 @@
 (defknown make-package (stringable &key
 				   (:use list)
 				   (:nicknames list)
-				   ;; ### Extensions...
+				   ;; ### extensions...
 				   (:internal-symbols index)
 				   (:external-symbols index))
   sb!xc:package)
@@ -209,8 +209,10 @@
 (defknown unintern (symbol &optional package-designator) boolean)
 (defknown unexport (symbols &optional package-designator) (eql t))
 (defknown shadowing-import (symbols &optional package-designator) (eql t))
-(defknown shadow ((or symbol string list) &optional package-designator) (eql t))
-(defknown (use-package unuse-package) ((or list package-designator) &optional package-designator) (eql t))
+(defknown shadow ((or symbol string list) &optional package-designator)
+  (eql t))
+(defknown (use-package unuse-package)
+  ((or list package-designator) &optional package-designator) (eql t))
 (defknown find-all-symbols (stringable) list (flushable))
 
 ;;;; from the "Numbers" chapter:
@@ -360,7 +362,8 @@
 (defknown lognot (integer) integer (movable foldable flushable explicit-check))
 (defknown logtest (integer integer) boolean (movable foldable flushable))
 (defknown logbitp (bit-index integer) boolean (movable foldable flushable))
-(defknown ash (integer integer) integer (movable foldable flushable explicit-check))
+(defknown ash (integer integer) integer
+  (movable foldable flushable explicit-check))
 (defknown (logcount integer-length) (integer) bit-index
   (movable foldable flushable explicit-check))
 ;;; FIXME: According to the ANSI spec, it's legal to use any
@@ -449,7 +452,8 @@
   (flushable)
   :derive-type (result-type-specifier-nth-arg 1))
 
-(defknown (map %map) (type-specifier callable sequence &rest sequence) consed-sequence
+(defknown (map %map) (type-specifier callable sequence &rest sequence)
+  consed-sequence
   (flushable call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
@@ -555,21 +559,22 @@
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown remove-duplicates
-  (sequence &key (:test callable) (:test-not callable) (:start index) (:from-end t)
-	    (:end sequence-end) (:key callable))
+  (sequence &key (:test callable) (:test-not callable) (:start index)
+	    (:from-end t) (:end sequence-end) (:key callable))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown delete-duplicates
-  (sequence &key (:test callable) (:test-not callable) (:start index) (:from-end t)
-	    (:end sequence-end) (:key callable))
+  (sequence &key (:test callable) (:test-not callable) (:start index)
+	    (:from-end t) (:end sequence-end) (:key callable))
   sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown find (t sequence &key (:test callable) (:test-not callable)
-		  (:start index) (:from-end t) (:end sequence-end) (:key callable))
+		  (:start index) (:from-end t) (:end sequence-end)
+		  (:key callable))
   t
   (foldable flushable call))
 
@@ -605,7 +610,8 @@
 
 (defknown (mismatch search)
   (sequence sequence &key (:from-end t) (:test callable) (:test-not callable)
-	    (:start1 index) (:end1 sequence-end) (:start2 index) (:end2 sequence-end)
+	    (:start1 index) (:end1 sequence-end)
+	    (:start2 index) (:end2 sequence-end)
 	    (:key callable))
   (or index null)
   (foldable flushable call))
@@ -661,7 +667,8 @@
 (defknown make-list (index &key (:initial-element t)) list
   (movable flushable unsafe))
 
-;;; All but last must be list...
+;;; All but last must be of type LIST, but there seems to be no way to
+;;; express that in this syntax..
 (defknown append (&rest t) t (flushable))
 
 (defknown copy-list (list) list (flushable))
@@ -700,17 +707,17 @@
   list (foldable flushable unsafe call))
 
 (defknown (union intersection set-difference set-exclusive-or)
-	  (list list &key (:key callable) (:test callable) (:test-not callable))
+  (list list &key (:key callable) (:test callable) (:test-not callable))
   list
   (foldable flushable call))
 
 (defknown (nunion nintersection nset-difference nset-exclusive-or)
-	  (list list &key (:key callable) (:test callable) (:test-not callable))
+  (list list &key (:key callable) (:test callable) (:test-not callable))
   list
   (foldable flushable call))
 
 (defknown subsetp
-	  (list list &key (:key callable) (:test callable) (:test-not callable))
+  (list list &key (:key callable) (:test callable) (:test-not callable))
   boolean
   (foldable flushable call))
 
@@ -798,7 +805,8 @@
   (foldable)
   #|:derive-type #'result-type-last-arg|#)
 
-(defknown array-has-fill-pointer-p (array) boolean (movable foldable flushable))
+(defknown array-has-fill-pointer-p (array) boolean
+  (movable foldable flushable))
 (defknown fill-pointer (vector) index (foldable flushable))
 (defknown vector-push (t vector) (or index null) ())
 (defknown vector-push-extend (t vector &optional index) index ())
@@ -876,22 +884,25 @@
 (defknown make-concatenated-stream (&rest stream) stream (flushable))
 (defknown make-two-way-stream (stream stream) stream (flushable))
 (defknown make-echo-stream (stream stream) stream (flushable))
-(defknown make-string-input-stream (string &optional index index) stream (flushable unsafe))
+(defknown make-string-input-stream (string &optional index index) stream
+  (flushable unsafe))
 (defknown make-string-output-stream () stream (flushable))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
-(defknown stream-element-type (stream) type-specifier (movable foldable flushable))
-(defknown (output-stream-p input-stream-p) (stream) boolean (movable foldable
-								     flushable))
+(defknown stream-element-type (stream) type-specifier
+  (movable foldable flushable))
+(defknown (output-stream-p input-stream-p) (stream) boolean
+  (movable foldable flushable))
 (defknown close (stream &key (:abort t)) stream ())
 
 ;;;; from the "Input/Output" chapter:
 
-;;; The I/O functions are currently given effects ANY under the theory
-;;; that code motion over I/O operations is particularly confusing and
-;;; not very important for efficency.
+;;; (The I/O functions are given effects ANY under the theory that
+;;; code motion over I/O operations is particularly confusing and not
+;;; very important for efficiency.)
 
-(defknown copy-readtable (&optional (or readtable null) readtable) readtable
+(defknown copy-readtable (&optional (or readtable null) (or readtable null))
+  readtable
   ())
 (defknown readtablep (t) boolean (movable foldable flushable))
 
@@ -899,9 +910,10 @@
   (character character &optional (or readtable null) readtable) (eql t)
   ())
 
-(defknown set-macro-character (character callable &optional t readtable) (eql t)
+(defknown set-macro-character (character callable &optional t readtable)
+  (eql t)
   (unsafe))
-(defknown get-macro-character (character &optional readtable)
+(defknown get-macro-character (character &optional (or readtable null))
   (values callable boolean) (flushable))
 
 (defknown make-dispatch-macro-character (character &optional t readtable)
@@ -910,12 +922,12 @@
   (character character callable &optional readtable) (eql t)
   (unsafe))
 (defknown get-dispatch-macro-character
-  (character character &optional readtable) callable
+  (character character &optional (or readtable null)) callable
   (flushable))
 
 ;;; may return any type due to eof-value...
 (defknown (read read-preserving-whitespace read-char-no-hang read-char)
-  (&optional streamlike t t t) t  (explicit-check))
+  (&optional streamlike t t t) t (explicit-check))
 
 (defknown read-delimited-list (character &optional streamlike t) t
   (explicit-check))
@@ -1265,9 +1277,11 @@
   (movable foldable flushable explicit-check))
 (defknown %negate (number) number (movable foldable flushable explicit-check))
 (defknown %check-bound (array index fixnum) index (movable foldable flushable))
-(defknown data-vector-ref (simple-array index) t (foldable flushable explicit-check))
+(defknown data-vector-ref (simple-array index) t
+  (foldable flushable explicit-check))
 (defknown data-vector-set (array index t) t (unsafe explicit-check))
-(defknown hairy-data-vector-ref (array index) t (foldable flushable explicit-check))
+(defknown hairy-data-vector-ref (array index) t
+  (foldable flushable explicit-check))
 (defknown hairy-data-vector-set (array index t) t (unsafe explicit-check))
 (defknown sb!kernel:%caller-frame-and-pc () (values t t) (flushable))
 (defknown sb!kernel:%with-array-data (array index (or index null))

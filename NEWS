@@ -631,12 +631,13 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
 * Bug #17 (differing COMPILE-FILE behavior between logical and 
   physical pathnames) has been fixed, and some related misbehavior too,
   thanks to a patch from Martin Atzmueller.
-?? Martin Atzmueller fixed several filesystem-related problems,
+* Bug #30 (reader problems) is gone, thanks to a CMU CL patch
+  by Tim Moore, ported to SBCL by Martin Atzmueller.
+* Martin Atzmueller fixed several filesystem-related problems,
   including bug #36, in part by porting CMU CL patches, which were
   written in part by Paul Werkowski.
-?? #'(SETF DOCUMENTATION) is now defined.
 * More compiler warnings in src/runtime/ are gone, thanks to 
-  patches from Martin Atzmueller.
+  more patches from Martin Atzmueller.
 * Martin Atzmueller pointed out that bug 37 was fixed by his patches
   some time ago.
 

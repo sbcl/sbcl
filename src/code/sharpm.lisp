@@ -300,17 +300,14 @@
 
 (defun sharp-backslash (stream backslash numarg)
   (ignore-numarg backslash numarg)
-  (unread-char backslash stream)
-  (let* ((*readtable* *standard-readtable*)
-	 (charstring (read-extended-token stream)))
+  (let ((charstring (read-extended-token-escaped stream)))
     (declare (simple-string charstring))
     (cond (*read-suppress* nil)
 	  ((= (the fixnum (length charstring)) 1)
 	   (char charstring 0))
 	  ((name-char charstring))
 	  (t
-	   (%reader-error stream
-			  "unrecognized character name: ~S"
+	   (%reader-error stream "unrecognized character name: ~S"
 			  charstring)))))
 
 (defun sharp-vertical-bar (stream sub-char numarg)

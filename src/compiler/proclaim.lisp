@@ -102,7 +102,7 @@
 (defun canonized-decl-spec (decl-spec)
   (let ((id (first decl-spec)))
     (unless (symbolp id)
-      (error "The declaration identifier is not a symbol: ~S" what))
+      (error "The declaration identifier is not a symbol: ~S" id))
     (let ((id-is-type (info :type :kind id))
 	  (id-is-declared-decl (info :declaration :recognized id)))
       (cond ((and id-is-type id-is-declared-decl)

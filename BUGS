@@ -309,11 +309,6 @@ returning an array as first value always.
    The assertion (EQ (SB-C::CONTINUATION-KIND SB-C::CONT) :BLOCK-START) failed.
   This is still present in sbcl-0.6.8.
 
-30:
-  The CMU CL reader code takes liberties in binding the standard read table
-  when reading the names of characters. Tim Moore posted a patch to the 
-  CMU CL mailing list Mon, 22 May 2000 21:30:41 -0700.
-
 31:
   In some cases the compiler believes type declarations on array
   elements without checking them, e.g.

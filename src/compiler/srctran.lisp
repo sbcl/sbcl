@@ -2996,6 +2996,9 @@
 ;;; Perhaps we should have to prove that the denominator is nonzero before
 ;;; doing them? (Also the DOLIST over macro calls is weird. Perhaps
 ;;; just FROB?) -- WHN 19990917
+;;;
+;;; FIXME: What gives with the single quotes in the argument lists
+;;; for DEFTRANSFORMs here? Does that work? Is it needed? Why?
 (dolist (name '(ash /))
   (deftransform name ((x y) '((constant-argument (integer 0 0)) integer) '*
 		      :eval-name t :when :both)

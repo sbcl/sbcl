@@ -1882,7 +1882,7 @@
   `(vector-locater-macro ,sequence
 			 (locater-test-not ,item ,sequence :vector ,return-type)
 			 ,return-type))
-
+
 (sb!xc:defmacro locater-if-test (test sequence seq-type return-type sense)
   (let ((seq-ref (case return-type
 		   (:position
@@ -1909,7 +1909,7 @@
 
 (sb!xc:defmacro vector-locater-if-not (test sequence return-type)
   `(vector-locater-if-macro ,test ,sequence ,return-type nil))
-
+
 (sb!xc:defmacro list-locater-macro (sequence body-form return-type)
   `(if from-end
        (do ((sequence (nthcdr (- (the fixnum (length sequence))
@@ -1965,7 +1965,7 @@
 ) ; EVAL-WHEN
 
 ;;; POSITION cannot default end to the length of sequence since it is not
-;;; an error to supply nil for its value. We must test for end being nil
+;;; an error to supply nil for its value. We must test for END being NIL
 ;;; in the body of the function, and this is actually done in the support
 ;;; routines for other reasons (see below).
 (defun position (item sequence &key from-end (test #'eql) test-not (start 0)
