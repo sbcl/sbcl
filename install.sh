@@ -5,7 +5,7 @@
 ensure_dirs () 
 {
     for j in $*; do 
-	test -d $j || mkdir $j
+	test -d $j || mkdir -p $j
     done;
 }
 
@@ -23,7 +23,7 @@ SBCL_HOME=$INSTALL_ROOT/lib/sbcl
 export SBCL_HOME INSTALL_ROOT
 ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
     $BUILD_ROOT$INSTALL_ROOT/lib  \
-    $MAN_DIR $MAN_DIR/man1 \
+    $BUILD_ROOT$MAN_DIR $BUILD_ROOT$MAN_DIR/man1 \
     $BUILD_ROOT$SBCL_HOME $BUILD_ROOT$SBCL_HOME/systems \
     $BUILD_ROOT$SBCL_HOME/site-systems
 

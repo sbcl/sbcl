@@ -197,9 +197,10 @@ GET-SETF-EXPANSION directly."
 
 (defmacro-mundanely pushnew (obj place &rest keys &environment env)
   #!+sb-doc
-  "Takes an object and a location holding a list. If the object is already
-  in the list, does nothing. Else, conses the object onto the list. Returns
-  NIL. If there is a :TEST keyword, this is used for the comparison."
+  "Takes an object and a location holding a list. If the object is
+  already in the list, does nothing; otherwise, conses the object onto
+  the list. Returns the modified list. If there is a :TEST keyword, this
+  is used for the comparison."
   (multiple-value-bind (dummies vals newval setter getter)
       (get-setf-method place env)
     (let ((g (gensym)))
