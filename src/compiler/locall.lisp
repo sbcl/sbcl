@@ -124,7 +124,7 @@
 ;;; FUN will be verified. Since nothing is known about the type of the
 ;;; XEP arg vars, type checks will be emitted when the XEP's arg vars
 ;;; are passed to the actual function.
-(defun make-xep-lambda (fun)
+(defun make-xep-lambda-expression (fun)
   (declare (type functional fun))
   (etypecase fun
     (clambda
@@ -179,7 +179,7 @@
   (declare (type functional fun))
   (aver (not (functional-entry-function fun)))
   (with-ir1-environment (lambda-bind (main-entry fun))
-    (let ((res (ir1-convert-lambda (make-xep-lambda fun)
+    (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
 				   :debug-name (debug-namify
 						"XEP for ~A"
 						(leaf-debug-name fun)))))
@@ -190,12 +190,12 @@
 	    (component-reanalyze *current-component*) t
 	    (component-reoptimize *current-component*) t)
       (etypecase fun
-	(clambda (local-call-analyze-1 fun))
+	(clambda (locall-analyze-fun-1 fun))
 	(optional-dispatch
 	 (dolist (ep (optional-dispatch-entry-points fun))
-	   (local-call-analyze-1 ep))
+	   (locall-analyze-fun-1 ep))
 	 (when (optional-dispatch-more-entry fun)
-	   (local-call-analyze-1 (optional-dispatch-more-entry fun)))))
+	   (locall-analyze-fun-1 (optional-dispatch-more-entry fun)))))
       res)))
 
 ;;; Notice a REF that is not in a local-call context. If the REF is
@@ -223,10 +223,10 @@
 ;;; function as an entry-point, creating a new XEP if necessary. We
 ;;; don't try to convert calls that are in error (:ERROR kind.)
 ;;;
-;;; This is broken off from LOCAL-CALL-ANALYZE so that people can
-;;; force analysis of newly introduced calls. Note that we don't do
-;;; LET conversion here.
-(defun local-call-analyze-1 (fun)
+;;; This is broken off from LOCALL-ANALYZE-COMPONENT so that people
+;;; can force analysis of newly introduced calls. Note that we don't
+;;; do LET conversion here.
+(defun locall-analyze-fun-1 (fun)
   (declare (type functional fun))
   (let ((refs (leaf-refs fun))
 	(first-time t))
@@ -247,28 +247,27 @@
 
   (values))
 
-;;; We examine all NEW-FUNCTIONS in component, attempting to convert
-;;; calls into local calls when it is legal. We also attempt to
-;;; convert each LAMBDA to a LET. LET conversion is also triggered by
-;;; deletion of a function reference, but functions that start out
-;;; eligible for conversion must be noticed sometime.
+;;; We examine all NEW-FUNS in COMPONENT, attempting to convert calls
+;;; into local calls when it is legal. We also attempt to convert each
+;;; LAMBDA to a LET. LET conversion is also triggered by deletion of a
+;;; function reference, but functions that start out eligible for
+;;; conversion must be noticed sometime.
 ;;;
 ;;; Note that there is a lot of action going on behind the scenes
 ;;; here, triggered by reference deletion. In particular, the
 ;;; COMPONENT-LAMBDAS are being hacked to remove newly deleted and let
 ;;; converted LAMBDAs, so it is important that the LAMBDA is added to
-;;; the COMPONENT-LAMBDAS when it is. Also, the
-;;; COMPONENT-NEW-FUNCTIONS may contain all sorts of drivel, since it
-;;; is not updated when we delete functions, etc. Only
-;;; COMPONENT-LAMBDAS is updated.
+;;; the COMPONENT-LAMBDAS when it is. Also, the COMPONENT-NEW-FUNS may
+;;; contain all sorts of drivel, since it is not updated when we
+;;; delete functions, etc. Only COMPONENT-LAMBDAS is updated.
 ;;;
-;;; COMPONENT-REANALYZE-FUNCTIONS is treated similarly to
-;;; NEW-FUNCTIONS, but we don't add lambdas to the LAMBDAS.
-(defun local-call-analyze (component)
+;;; COMPONENT-REANALYZE-FUNS is treated similarly to
+;;; NEW-FUNS, but we don't add lambdas to the LAMBDAS.
+(defun locall-analyze-component (component)
   (declare (type component component))
   (loop
-    (let* ((new (pop (component-new-functions component)))
-	   (fun (or new (pop (component-reanalyze-functions component)))))
+    (let* ((new-fun (pop (component-new-funs component)))
+	   (fun (or new-fun (pop (component-reanalyze-funs component)))))
       (unless fun (return))
       (let ((kind (functional-kind fun)))
 	(cond ((member kind '(:deleted :let :mv-let :assignment)))
@@ -276,15 +275,15 @@
 		    (not (functional-entry-function fun)))
 	       (delete-functional fun))
 	      (t
-	       (when (and new (lambda-p fun))
+	       (when (and new-fun (lambda-p fun))
 		 (push fun (component-lambdas component)))
-	       (local-call-analyze-1 fun)
+	       (locall-analyze-fun-1 fun)
 	       (when (lambda-p fun)
 		 (maybe-let-convert fun)))))))
 
   (values))
 
-(defun local-call-analyze-until-done (clambdas)
+(defun locall-analyze-clambdas-until-done (clambdas)
   (loop
    (let ((did-something nil))
      (dolist (clambda clambdas)
@@ -294,9 +293,9 @@
 	 ;; COMPONENT is the only one here. Let's make that explicit.
 	 (aver (= 1 (length (functional-components clambda))))
 	 (aver (eql component (first (functional-components clambda))))
-	 (when (component-new-functions component)
+	 (when (component-new-funs component)
 	   (setf did-something t)
-	   (local-call-analyze component))))
+	   (locall-analyze-component component))))
      (unless did-something
        (return))))
   (values))
@@ -315,8 +314,10 @@
 	       (won nil)
 	       (res (catch 'local-call-lossage
 		      (prog1
-			  (ir1-convert-lambda (functional-inline-expansion
-					       :source-name fun))
+			  (ir1-convert-lambda
+			   (functional-inline-expansion fun)
+			   :debug-name (debug-namify "local inline ~A"
+						     (leaf-debug-name fun)))
 			(setq won t)))))
 	  (cond (won
 		 (change-ref-leaf ref res)
@@ -486,17 +487,17 @@
 	   (setf (basic-combination-kind call) :error))))
   (values))
 
-;;; This function is used to convert a call to an entry point when complex
-;;; transformations need to be done on the original arguments. Entry is the
-;;; entry point function that we are calling. Vars is a list of variable names
-;;; which are bound to the original call arguments. Ignores is the subset of
-;;; Vars which are ignored. Args is the list of arguments to the entry point
-;;; function.
+;;; This function is used to convert a call to an entry point when
+;;; complex transformations need to be done on the original arguments.
+;;; ENTRY is the entry point function that we are calling. VARS is a
+;;; list of variable names which are bound to the original call
+;;; arguments. IGNORES is the subset of VARS which are ignored. ARGS
+;;; is the list of arguments to the entry point function.
 ;;;
-;;; In order to avoid gruesome graph grovelling, we introduce a new function
-;;; that rearranges the arguments and calls the entry point. We analyze the
-;;; new function and the entry point immediately so that everything gets
-;;; converted during the single pass.
+;;; In order to avoid gruesome graph grovelling, we introduce a new
+;;; function that rearranges the arguments and calls the entry point.
+;;; We analyze the new function and the entry point immediately so
+;;; that everything gets converted during the single pass.
 (defun convert-hairy-fun-entry (ref call entry vars ignores args)
   (declare (list vars ignores args) (type ref ref) (type combination call)
 	   (type clambda entry))

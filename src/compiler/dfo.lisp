@@ -69,10 +69,10 @@
 
     (setf (component-lambdas new)
 	  (nconc (component-lambdas old) (component-lambdas new)))
-    (setf (component-lambdas old) ())
-    (setf (component-new-functions new)
-	  (nconc (component-new-functions old) (component-new-functions new)))
-    (setf (component-new-functions old) ())
+    (setf (component-lambdas old) nil)
+    (setf (component-new-funs new) (nconc (component-new-funs old)
+					  (component-new-funs new))
+	  (component-new-funs old) nil)
 
     (dolist (xp (block-pred old-tail))
       (unlink-blocks xp old-tail)
@@ -125,7 +125,7 @@
 	(let* ((bind-block (node-block (lambda-bind home)))
 	       (home-component (block-component bind-block)))
 	  (cond ((eq (component-kind home-component) :initial)
-		 (dfo-walk-call-graph home component))
+		 (dfo-scavenge-call-graph home component))
 		((eq home-component component)
 		 component)
 		(t
@@ -178,7 +178,7 @@
 ;;;
 ;;; References in deleted functions are also ignored, since this code
 ;;; will be deleted eventually.
-(defun find-reference-functions (fun)
+(defun find-reference-funs (fun)
   (collect ((res))
     (dolist (ref (leaf-refs fun))
       (let* ((home (node-home-lambda ref))
@@ -220,34 +220,46 @@
 ;;; ensures that conversion of a full call to a local call won't
 ;;; result in a need to join components, since the components will
 ;;; already be one.
-(defun dfo-walk-call-graph (fun component)
+(defun dfo-scavenge-call-graph (fun component)
   (declare (type clambda fun) (type component component))
+  (/show "entering DFO-SCAVENGE-CALL-GRAPH" fun component)
   (let* ((bind-block (node-block (lambda-bind fun)))
-	 (this (block-component bind-block))
+	 (old-lambda-component (block-component bind-block))
 	 (return (lambda-return fun)))
     (cond
-     ((eq this component) component)
-     ((not (eq (component-kind this) :initial))
-      (join-components this component)
-      this)
+     ((eq old-lambda-component component)
+      (/show "LAMBDA is already in COMPONENT")
+      component)
+     ((not (eq (component-kind old-lambda-component) :initial))
+      (/show "joining COMPONENTs")
+      (join-components old-lambda-component component)
+      old-lambda-component)
      ((block-flag bind-block)
+      (/show "do-nothing (BLOCK-FLAG BIND-BLOCK) case")
       component)
      (t
+      (/show "full scavenge case")
       (push fun (component-lambdas component))
-      (setf (component-lambdas this)
-	    (delete fun (component-lambdas this)))
+      (setf (component-lambdas old-lambda-component)
+	    (delete fun (component-lambdas old-lambda-component)))
       (link-blocks (component-head component) bind-block)
-      (unlink-blocks (component-head this) bind-block)
+      (unlink-blocks (component-head old-lambda-component) bind-block)
       (when return
 	(let ((return-block (node-block return)))
 	  (link-blocks return-block (component-tail component))
-	  (unlink-blocks return-block (component-tail this))))
+	  (unlink-blocks return-block (component-tail old-lambda-component))))
+
+      (/show (functional-kind fun))
+      (/show (lambda-calls fun))
+      (when (eq (functional-kind fun) :external)
+	(/show (find-reference-funs fun)))
+
       (let ((calls (if (eq (functional-kind fun) :external)
-		       (append (find-reference-functions fun)
+		       (append (find-reference-funs fun)
 			       (lambda-calls fun))
 		       (lambda-calls fun))))
 	(do ((res (find-initial-dfo-aux bind-block component)
-		  (dfo-walk-call-graph (first funs) res))
+		  (dfo-scavenge-call-graph (first funs) res))
 	     (funs calls (rest funs)))
 	    ((null funs) res)
 	  (declare (type component res))))))))
@@ -268,14 +280,15 @@
 ;;; treat the component as normal, but also return such components in
 ;;; a list as the third value. Components with no entry of any sort
 ;;; are deleted.
-(defun find-toplevel-components (components)
+(defun separate-toplevelish-components (components)
   (declare (list components))
   (collect ((real)
 	    (top)
 	    (real-top))
-    (dolist (com components)
-      (unless (eq (block-next (component-head com)) (component-tail com))
-	(let* ((funs (component-lambdas com))
+    (dolist (component components)
+      (unless (eq (block-next (component-head component))
+		  (component-tail component))
+	(let* ((funs (component-lambdas component))
 	       (has-top (find :toplevel funs :key #'functional-kind))
 	       (has-external-references
 		(some #'functional-has-external-references-p funs)))
@@ -288,75 +301,105 @@
 		 ;; delete them just because they don't have any
 		 ;; references from pure :TOPLEVEL components. -- WHN
 		 has-external-references
-		 (setf (component-kind com) :complex-toplevel)
-		 (real com)
-		 (real-top com))
+		 (setf (component-kind component) :complex-toplevel)
+		 (real component)
+		 (real-top component))
 		((or (some #'has-xep-or-nlx funs)
 		     (and has-top (rest funs)))
-		 (setf (component-name com) (find-component-name com))
-		 (real com)
+		 (setf (component-name component)
+		       (find-component-name component))
+		 (real component)
 		 (when has-top
-		   (setf (component-kind com) :complex-toplevel)
-		   (real-top com)))
+		   (setf (component-kind component) :complex-toplevel)
+		   (real-top component)))
 		(has-top
-		 (setf (component-kind com) :toplevel)
-		 (setf (component-name com) "top level form")
-		 (top com))
+		 (setf (component-kind component) :toplevel)
+		 (setf (component-name component) "top level form")
+		 (top component))
 		(t
-		 (delete-component com))))))
+		 (delete-component component))))))
 
     (values (real) (top) (real-top))))
 
-;;; Given a list of top level lambdas, return three lists of
-;;; components representing the actual component division:
-;;;  1. the non-top-level components,
-;;;  2. and the second is the top level components, and
-;;;  3. Components in [1] that also have a top level lambda.
+;; COMPONENTs want strings for names, LEAF-DEBUG-NAMEs mightn't be
+;; strings..
+(defun component-name-from-functional-debug-name (functional)
+  (declare (type functional functional))
+  (let ((leaf-debug-name (leaf-debug-name functional)))
+    (the simple-string
+      (if (stringp leaf-debug-name)
+	  leaf-debug-name
+	  (debug-namify "function ~S" leaf-debug-name)))))
+
+;;; Given a list of top level lambdas, return
+;;;   (VALUES NONTOP-COMPONENTS TOP-COMPONENTS HAIRY-TOP-COMPONENTS).
+;;; Each of the three values returned is a list of COMPONENTs:
+;;;   NONTOP-COMPONENTS = non-top-level-ish COMPONENTs;
+;;;   TOP-COMPONENTS = top-level-ish COMPONENTs;
+;;;   HAIRY-TOP-COMPONENTS = a subset of NONTOP-COMPONENTS, those
+;;;    elements which include a top-level-ish lambda.
 ;;;
 ;;; We assign the DFO for each component, and delete any unreachable
-;;; blocks. We assume that the Flags have already been cleared.
-;;;
-;;; We iterate over the lambdas in each initial component, trying to
-;;; put each function in its own component, but joining it to an
-;;; existing component if we find that there are references between
-;;; them. Any code that is left in an initial component must be
-;;; unreachable, so we can delete it. Stray links to the initial
-;;; component tail (due NIL function terminated blocks) are moved to
-;;; the appropriate newc component tail.
-;;;
-;;; When we are done, we assign DFNs and call
-;;; FIND-TOPLEVEL-COMPONENTS to pull out top level code.
-(defun find-initial-dfo (lambdas)
-  (declare (list lambdas))
+;;; blocks. We assume that the FLAGS have already been cleared.
+(defun find-initial-dfo (toplevel-lambdas)
+  (declare (list toplevel-lambdas))
+  (/show "entering FIND-INITIAL-DFO" toplevel-lambdas)
   (collect ((components))
-    (let ((new (make-empty-component)))
-      (dolist (tll lambdas)
-	(let ((component (block-component (node-block (lambda-bind tll)))))
-	  (dolist (fun (component-lambdas component))
-	    (aver (member (functional-kind fun)
-			  '(:optional :external :toplevel nil :escape
-				      :cleanup)))
-	    (let ((res (dfo-walk-call-graph fun new)))
-	      (when (eq res new)
-		(components new)
-		(setq new (make-empty-component)))))
-	  (when (eq (component-kind component) :initial)
-	    (aver (null (component-lambdas component)))
-	    (let ((tail (component-tail component)))
-	      (dolist (pred (block-pred tail))
-		(let ((pred-component (block-component pred)))
-		  (unless (eq pred-component component)
-		    (unlink-blocks pred tail)
-		    (link-blocks pred (component-tail pred-component))))))
-	    (delete-component component)))))
+    ;; We iterate over the lambdas in each initial component, trying
+    ;; to put each function in its own component, but joining it to
+    ;; an existing component if we find that there are references
+    ;; between them. Any code that is left in an initial component
+    ;; must be unreachable, so we can delete it. Stray links to the
+    ;; initial component tail (due NIL function terminated blocks)
+    ;; are moved to the appropriate newc component tail.
+    (dolist (toplevel-lambda toplevel-lambdas)
+      (/show toplevel-lambda)
+      (let* ((block (node-block (lambda-bind toplevel-lambda)))
+	     (old-component (block-component block))
+	     (old-component-lambdas (component-lambdas old-component))
+	     (new-component nil))
+	(/show old-component old-component-lambdas)
+	(aver (member toplevel-lambda old-component-lambdas))
+	(dolist (component-lambda old-component-lambdas)
+	  (/show component-lambda)
+	  (aver (member (functional-kind component-lambda)
+			'(:optional :external :toplevel nil :escape
+				    :cleanup)))
+	  (unless new-component
+	    (setf new-component (make-empty-component))
+	    (setf (component-name new-component)
+		  ;; This isn't necessarily an ideal name for the
+		  ;; component, since it might end up with multiple
+		  ;; lambdas in it, not just this one, but it does
+		  ;; seem a better name than just "<unknown>".
+		  (component-name-from-functional-debug-name
+		   component-lambda)))
+	  (let ((res (dfo-scavenge-call-graph component-lambda new-component)))
+	    (when (eq res new-component)
+	      (/show "saving" new-component (component-lambdas new-component))
+	      (aver (not (position new-component (components))))
+	      (components new-component)
+	      (setq new-component nil))))
+	(when (eq (component-kind old-component) :initial)
+	  (aver (null (component-lambdas old-component)))
+	  (/show "clearing/deleting OLD-COMPONENT because KIND=:INITIAL")
+	  (let ((tail (component-tail old-component)))
+	    (dolist (pred (block-pred tail))
+	      (let ((pred-component (block-component pred)))
+		(unless (eq pred-component old-component)
+		  (unlink-blocks pred tail)
+		  (link-blocks pred (component-tail pred-component))))))
+	  (delete-component old-component))))
 
-    (dolist (com (components))
+    ;; When we are done, we assign DFNs.
+    (dolist (component (components))
       (let ((num 0))
 	(declare (fixnum num))
-	(do-blocks-backwards (block com :both)
+	(do-blocks-backwards (block component :both)
 	  (setf (block-number block) (incf num)))))
 
-    (find-toplevel-components (components))))
+    ;; Pull out top-level-ish code.
+    (separate-toplevelish-components (components))))
 
 ;;; Insert the code in LAMBDA at the end of RESULT-LAMBDA.
 (defun merge-1-tl-lambda (result-lambda lambda)

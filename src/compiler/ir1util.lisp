@@ -1050,7 +1050,7 @@
 ;;; triggered by deletion.
 (defun delete-component (component)
   (declare (type component component))
-  (aver (null (component-new-functions component)))
+  (aver (null (component-new-funs component)))
   (setf (component-kind component) :deleted)
   (do-blocks (block component)
     (setf (block-delete-p block) t))

@@ -41,6 +41,10 @@ rm -f output/after-xc.core
 # an enormously important disadvantage, either.)
 echo //running cross-compiler to create target object files
 $SBCL_XC_HOST <<-'EOF' || exit 1
+
+        ;;;
+        ;;; Set up the cross-compiler.
+        ;;;
 	(setf *print-level* 5 *print-length* 5)
 	(load "src/cold/shared.lisp")
 	(in-package "SB-COLD")
@@ -89,7 +93,15 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(setf *target-assemble-file* 'sb!c:assemble-file)
 	(setf *in-target-compilation-mode-fn*
 	      #'in-target-cross-compilation-mode)
+
+        ;;;
+        ;;; Run the cross-compiler to produce cold fasl files.
+        ;;;
 	(load "src/cold/compile-cold-sbcl.lisp")
+ 
+        ;;; 
+        ;;; miscellaneous tidying up and saving results
+        ;;; 
 	(let ((filename "output/object-filenames-for-genesis.lisp-expr"))
 	  (ensure-directories-exist filename :verbose t)
 	  (with-open-file (s filename :direction :output)

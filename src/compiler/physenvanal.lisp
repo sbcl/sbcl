@@ -30,8 +30,8 @@
   (declare (type component component))
   (aver (every (lambda (x)
 		 (eq (functional-kind x) :deleted))
-	       (component-new-functions component)))
-  (setf (component-new-functions component) ())
+	       (component-new-funs component)))
+  (setf (component-new-funs component) ())
   (dolist (fun (component-lambdas component))
     (reinit-lambda-physenv fun))
   (dolist (fun (component-lambdas component))
@@ -344,7 +344,7 @@
 			     (block-last block1)
 			     `(progn ,@(code)))
 	(dolist (fun (reanalyze-funs))
-	  (local-call-analyze-1 fun)))))
+	  (locall-analyze-fun-1 fun)))))
 
   (values))
 

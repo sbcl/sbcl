@@ -487,11 +487,11 @@
        (use-continuation res cont)))
     (values)))
 
-;;; Add FUN to the COMPONENT-REANALYZE-FUNCTIONS. FUN is returned.
- (defun maybe-reanalyze-function (fun)
+;;; Add FUN to the COMPONENT-REANALYZE-FUNS. FUN is returned.
+(defun maybe-reanalyze-fun (fun)
   (declare (type functional fun))
   (when (typep fun '(or optional-dispatch clambda))
-    (pushnew fun (component-reanalyze-functions *current-component*)))
+    (pushnew fun (component-reanalyze-funs *current-component*)))
   fun)
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
@@ -505,7 +505,7 @@
 				 :notinline))
 			(let ((fun (defined-fun-functional leaf)))
 			  (when (and fun (not (functional-kind fun)))
-			    (maybe-reanalyze-function fun))))
+			    (maybe-reanalyze-fun fun))))
 		   leaf))
 	 (res (make-ref (or (lexenv-find leaf type-restrictions)
 			    (leaf-type leaf))
@@ -780,7 +780,7 @@
   (if (functional-kind fun)
       (throw 'local-call-lossage fun)
       (ir1-convert-combination start cont form
-			       (maybe-reanalyze-function fun))))
+			       (maybe-reanalyze-fun fun))))
 
 ;;;; PROCESS-DECLS
 
@@ -1323,8 +1323,8 @@
 ;;; Create a lambda node out of some code, returning the result. The
 ;;; bindings are specified by the list of VAR structures VARS. We deal
 ;;; with adding the names to the LEXENV-VARIABLES for the conversion.
-;;; The result is added to the NEW-FUNCTIONS in the
-;;; *CURRENT-COMPONENT* and linked to the component head and tail.
+;;; The result is added to the NEW-FUNS in the *CURRENT-COMPONENT* and
+;;; linked to the component head and tail.
 ;;;
 ;;; We detect special bindings here, replacing the original VAR in the
 ;;; lambda list with a temporary variable. We then pass a list of the
@@ -1407,7 +1407,7 @@
 	    (link-blocks block (component-tail *current-component*))))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
-    (push lambda (component-new-functions *current-component*))
+    (push lambda (component-new-funs *current-component*))
     lambda))
 
 ;;; Create the actual entry-point function for an optional entry
@@ -1806,7 +1806,7 @@
 				     :%source-name source-name
 				     :%debug-name debug-name))
 	(min (or (position-if #'lambda-var-arg-info vars) (length vars))))
-    (push res (component-new-functions *current-component*))
+    (push res (component-new-funs *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
 			    cont)
     (setf (optional-dispatch-min-args res) min)

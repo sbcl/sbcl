@@ -245,8 +245,8 @@
 
 (defun check-function-consistency (components)
   (dolist (c components)
-    (dolist (fun (component-new-functions c))
-      (observe-functional fun))
+    (dolist (new-fun (component-new-funs c))
+      (observe-functional new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :external)
 	(let ((ef (functional-entry-function fun)))
@@ -257,8 +257,8 @@
 	(observe-functional let))))
 
   (dolist (c components)
-    (dolist (fun (component-new-functions c))
-      (check-function-stuff fun))
+    (dolist (new-fun (component-new-funs c))
+      (check-function-stuff new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :deleted)
 	(barf "deleted lambda ~S in Lambdas for ~S" fun c))

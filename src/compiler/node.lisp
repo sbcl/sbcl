@@ -368,22 +368,22 @@
   ;; deleted or LET lambdas.
   ;;
   ;; Note that logical associations between CLAMBDAs and COMPONENTs
-  ;; seem to exist for a while before this is initialized. In
-  ;; particular, I got burned by writing some code to use this value
-  ;; to decide which components need LOCAL-CALL-ANALYZE, when it turns
-  ;; out that LOCAL-CALL-ANALYZE had a role in initializing this value
+  ;; seem to exist for a while before this is initialized. See e.g.
+  ;; the NEW-FUNS slot. In particular, I got burned by writing some
+  ;; code to use this value to decide which components need
+  ;; LOCALL-ANALYZE-COMPONENT, when it turns out that
+  ;; LOCALL-ANALYZE-COMPONENT had a role in initializing this value
   ;; (and DFO stuff does too, maybe). Also, even after it's
   ;; initialized, it might change as CLAMBDAs are deleted or merged.
   ;; -- WHN 2001-09-30
   (lambdas () :type list)
-  ;; a list of FUNCTIONAL structures for functions that are newly
-  ;; converted, and haven't been local-call analyzed yet. Initially
-  ;; functions are not in the LAMBDAS list. LOCAL-CALL-ANALYZE moves
-  ;; them there (possibly as LETs, or implicitly as XEPs if an
-  ;; OPTIONAL-DISPATCH.) Between runs of LOCAL-CALL-ANALYZE there may
-  ;; be some debris of converted or even deleted functions in this
-  ;; list.
-  (new-functions () :type list)
+  ;; a list of FUNCTIONALs for functions that are newly converted, and
+  ;; haven't been local-call analyzed yet. Initially functions are not
+  ;; in the LAMBDAS list. Local call analysis moves them there
+  ;; (possibly as LETs, or implicitly as XEPs if an OPTIONAL-DISPATCH.)
+  ;; Between runs of local call analysis there may be some debris of
+  ;; converted or even deleted functions in this list.
+  (new-funs () :type list)
   ;; If this is true, then there is stuff in this component that could
   ;; benefit from further IR1 optimization.
   (reoptimize t :type boolean)
@@ -408,11 +408,11 @@
   ;; arguments for the note, or the FUN-TYPE that would have
   ;; enabled the transformation but failed to match.
   (failed-optimizations (make-hash-table :test 'eq) :type hash-table)
-  ;; This is similar to NEW-FUNCTIONS, but is used when a function has
+  ;; This is similar to NEW-FUNS, but is used when a function has
   ;; already been analyzed, but new references have been added by
-  ;; inline expansion. Unlike NEW-FUNCTIONS, this is not disjoint from
+  ;; inline expansion. Unlike NEW-FUNS, this is not disjoint from
   ;; COMPONENT-LAMBDAS.
-  (reanalyze-functions nil :type list))
+  (reanalyze-funs nil :type list))
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))

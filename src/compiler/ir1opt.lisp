@@ -820,7 +820,7 @@
 	    (frob)
 	    (with-ir1-environment call
 	      (frob)
-	      (local-call-analyze *current-component*))))
+	      (locall-analyze-component *current-component*))))
 
       (values (ref-leaf (continuation-use (basic-combination-fun call)))
 	      nil))
@@ -1090,7 +1090,7 @@
 	  (ref (continuation-use (combination-fun node))))
       (change-ref-leaf ref new-fun)
       (setf (combination-kind node) :full)
-      (local-call-analyze *current-component*)))
+      (locall-analyze-component *current-component*)))
   (values))
 
 ;;; Replace a call to a foldable function of constant arguments with
@@ -1491,7 +1491,7 @@
 			      (funcall ,(ref-leaf ref) ,@dums)))))
 		(change-ref-leaf ref fun)
 		(aver (eq (basic-combination-kind node) :full))
-		(local-call-analyze *current-component*)
+		(locall-analyze-component *current-component*)
 		(aver (eq (basic-combination-kind node) :local)))))))))
   (values))
 

@@ -316,10 +316,10 @@
     (declare (special *constraint-number* *delayed-ir1-transforms*))
     (loop
       (ir1-optimize-until-done component)
-      (when (or (component-new-functions component)
-		(component-reanalyze-functions component))
+      (when (or (component-new-funs component)
+		(component-reanalyze-funs component))
 	(maybe-mumble "locall ")
-	(local-call-analyze component))
+	(locall-analyze-component component))
       (dfo-as-needed component)
       (when *constraint-propagate*
 	(maybe-mumble "constraint ")
@@ -331,15 +331,15 @@
       ;; confuse itself.
       (unless (and (or (component-reoptimize component)
 		       (component-reanalyze component)
-		       (component-new-functions component)
-		       (component-reanalyze-functions component))
+		       (component-new-funs component)
+		       (component-reanalyze-funs component))
 		   (< loop-count (- *reoptimize-after-type-check-max* 4)))
         (maybe-mumble "type ")
 	(generate-type-checks component)
 	(unless (or (component-reoptimize component)
 		    (component-reanalyze component)
-		    (component-new-functions component)
-		    (component-reanalyze-functions component))
+		    (component-new-funs component)
+		    (component-reanalyze-funs component))
 	  (return)))
       (when (>= loop-count *reoptimize-after-type-check-max*)
 	(maybe-mumble "[reoptimize limit]")
@@ -857,16 +857,19 @@
          (component (make-empty-component))
          (*current-component* component))
     (setf (component-name component)
-          (format nil "~S initial component" name))
+	  (debug-namify "~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda definition
 					   :debug-name (debug-namify
 							"top level locall ~S"
 							name)))
-           (fun (ir1-convert-lambda (make-xep-lambda locall-fun)
+           (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
 				    :source-name (or name '.anonymous.)
-				    :debug-name (or name "top level form"))))
+				    :debug-name (unless name
+						  "top level form"))))
       (/show "in MAKE-FUNCTIONAL-FROM-TOP-LEVEL-LAMBDA" locall-fun fun component)
+      (/show (component-lambdas component))
+      (/show (lambda-calls fun))
       (setf (functional-entry-function fun) locall-fun
             (functional-kind fun) :external
             (functional-has-external-references-p fun) t)
@@ -899,7 +902,9 @@
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
 						    :path path)))
-    (/show fun)
+    (/show "back in %COMPILE from M-F-FROM-TL-LAMBDA" fun)
+    (/show (block-component (node-block (lambda-bind fun))))
+    (/show (component-lambdas (block-component (node-block (lambda-bind fun)))))
 
     ;; FIXME: The compile-it code from here on is sort of a
     ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
@@ -909,15 +914,25 @@
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
     ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
 
-    (local-call-analyze-until-done (list fun))
-
+    (locall-analyze-clambdas-until-done (list fun))
+    (/show (lambda-calls fun))
+    #+nil (break "back from LOCALL-ANALYZE-CLAMBDAS-UNTIL-DONE" fun)
+    
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
       (/show components-from-dfo top-components hairy-top)
+      (/show (mapcar #'component-lambdas components-from-dfo))
+      (/show (mapcar #'component-lambdas top-components))
+      (/show (mapcar #'component-lambdas hairy-top))
 
       (let ((*all-components* (append components-from-dfo top-components)))
-	(mapc #'preallocate-physenvs-for-toplevelish-lambdas
-	      (append hairy-top top-components))
+	;; FIXME: This is more monkey see monkey do based on CMU CL
+	;; code. If anyone figures out why to only prescan HAIRY-TOP
+	;; and TOP-COMPONENTS here, instead of *ALL-COMPONENTS* or
+	;; some other combination of results from FIND-INITIAL-VALUES,
+	;; it'd be good to explain it.
+	(mapc #'preallocate-physenvs-for-toplevelish-lambdas hairy-top)
+	(mapc #'preallocate-physenvs-for-toplevelish-lambdas top-components)
         (dolist (component-from-dfo components-from-dfo)
 	  (/show component-from-dfo (component-lambdas component-from-dfo))
           (compile-component component-from-dfo)
@@ -1245,7 +1260,7 @@
   (declare (list lambdas))
 
   (maybe-mumble "locall ")
-  (local-call-analyze-until-done lambdas)
+  (locall-analyze-clambdas-until-done lambdas)
 
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components hairy-top)

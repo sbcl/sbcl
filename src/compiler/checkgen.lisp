@@ -394,7 +394,7 @@
 	(substitute-continuation new-start victim)))
 
     ;; Invoking local call analysis converts this call to a LET.
-    (local-call-analyze *current-component*))
+    (locall-analyze-component *current-component*))
 
   (values))
 
