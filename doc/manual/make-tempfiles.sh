@@ -24,7 +24,7 @@ else
     SBCLRUNTIME="${1:-`which sbcl`}"
 fi
 
-SBCL=$SBCLRUNTIME --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
+SBCL="$SBCLRUNTIME --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger"
 
 # Output directory.  This has to end with a slash (it's interpreted by
 # Lisp's `pathname' function) or you lose.  This is normally set from
@@ -46,7 +46,7 @@ echo /creating contrib-docs.texi-temp
 echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL
 
 echo /creating package-locks.texi-temp
-if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-exit))) (quit :unix-status (if (and plp (fboundp plp)) 0 1)))";
+if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-ext))) (quit :unix-status (if (and plp (fboundp plp)) 0 1)))";
 then
     cp package-locks-extended.texinfo package-locks.texi-temp
 else
