@@ -2313,6 +2313,15 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     ** OPEN and WITH-OPEN-STREAM allow opening streams with
        element-type larger than ([UN]SIGNED-BYTE 32).
 
+<<<<<<< NEWS
+changes in sbcl-0.8.9 relative to sbcl-0.8.8:
+  * *DEBUG-PRINT-LEVEL* and *DEBUG-PRINT-LENGTH* are now deprecated in 
+    favor of the new, more general SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST*
+    mechanism. (This matters to you only if you rebind the printer control
+    variables and then find you want different bindings in the debugger
+    than in the ordinary execution of your program.)
+
+=======
 changes in sbcl-0.8.9 relative to sbcl-0.8.8:
   * The runtime build system has been tweaked to support building
     (on SPARC/SunOS) using a C compiler which invokes Sun's own
@@ -2335,6 +2344,7 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
     ** CONCATENATED-STREAM-STREAMS discards constituent streams which
        have been read to end-of-file.
 
+>>>>>>> 1.484
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

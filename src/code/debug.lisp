@@ -31,12 +31,25 @@
 ;;;         to satisfy lambda list
 ;;;           #:
 ;;;         exactly 2 expected, but 5 found
+;;;
+;;; FIXME: These variables were deprecated in late February 2004, and
+;;; can probably be removed in about a year.
 (defvar *debug-print-level* 5
   #!+sb-doc
-  "*PRINT-LEVEL* for the debugger")
+  "(This is deprecated in favor of *DEBUG-PRINT-VARIABLE-ALIST*.)
+
+*PRINT-LEVEL* for the debugger")
 (defvar *debug-print-length* 7
   #!+sb-doc
-  "*PRINT-LENGTH* for the debugger")
+  "(This is deprecated in favor of *DEBUG-PRINT-VARIABLE-ALIST*.)
+
+*PRINT-LENGTH* for the debugger")
+
+(defvar *debug-print-variable-alist* nil
+  #!+sb-doc
+  "an association list describing new bindings for special variables
+(typically *PRINT-FOO* variables) to be used within the debugger, e.g.
+((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))")
 
 (defvar *debug-readtable*
   ;; KLUDGE: This can't be initialized in a cold toplevel form,
@@ -656,11 +669,62 @@ Other commands:
 (defvar *debug-condition*)
 (defvar *nested-debug-condition*)
 
+;;; Oh, what a tangled web we weave when we preserve backwards
+;;; compatibility with 1968-style use of global variables to control
+;;; per-stream i/o properties; there's really no way to get this
+;;; quite right, but we do what we can.
+(defun funcall-with-debug-io-syntax (fun &rest rest)
+  (declare (type function fun))
+  ;; Try to force the other special variables into a useful state.
+  (let (;; Protect from WITH-STANDARD-IO-SYNTAX some variables where
+	;; any default we might use is less useful than just reusing
+	;; the global values.
+	(original-package *package*)
+	(original-print-pretty *print-pretty*))
+    (with-standard-io-syntax
+     (let (;; We want the printer and reader to be in a useful state,
+	   ;; regardless of where the debugger was invoked in the
+	   ;; program. WITH-STANDARD-IO-SYNTAX did much of what we
+	   ;; want, but
+	   ;;   * It doesn't affect our internal special variables 
+	   ;;     like *CURRENT-LEVEL-IN-PRINT*.
+	   ;;   * It isn't customizable.
+	   ;;   * It doesn't set *PRINT-READABLY* to the same value
+	   ;;     as the toplevel default.
+	   ;;   * It sets *PACKAGE* to COMMON-LISP-USER, which is not
+	   ;;     helpful behavior for a debugger.
+	   ;;   * There's no particularly good debugger default for
+	   ;;     *PRINT-PRETTY*, since T is usually what you want
+	   ;;     -- except absolutely not what you want when you're
+	   ;;     debugging failures in PRINT-OBJECT logic.
+	   ;; We try to address all these issues with explicit
+	   ;; rebindings here.
+	   (sb!kernel:*current-level-in-print* 0)
+	   (*package* original-package)
+	   (*print-pretty* original-print-pretty)
+	   (*print-readably* nil)
+	   ;; These rebindings are now (as of early 2004) deprecated,
+	   ;; with the new *PRINT-VAR-ALIST* mechanism preferred.
+	   (*print-length* *debug-print-length*)
+	   (*print-level* *debug-print-level*)
+	   (*readtable* *debug-readtable*))
+       (progv
+	   ;; (Why NREVERSE? PROGV makes the later entries have
+	   ;; precedence over the earlier entries. *PRINT-VAR-ALIST*
+	   ;; is called an alist, so it's expected that its earlier
+	   ;; entries have precedence. And the earlier-has-precedence
+	   ;; behavior is mostly more convenient, so that programmers
+	   ;; can use PUSH or LIST* to customize *PRINT-VAR-ALIST*.)
+	   (nreverse (mapcar #'car *debug-print-variable-alist*))
+	   (nreverse (mapcar #'cdr *debug-print-variable-alist*))
+	 (apply fun rest))))))
+
 ;;; the ordinary ANSI case of INVOKE-DEBUGGER, when not suppressed by
 ;;; command-line --disable-debugger option
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
+
   (let ((old-hook *debugger-hook*))
     (when old-hook
       (let ((*debugger-hook* nil))
@@ -691,117 +755,88 @@ Other commands:
 reset to ~S."
 	    '*package* *package*))
 
-  ;; Try to force the other special variables into a useful state.
-  (let (;; Protect from WITH-STANDARD-IO-SYNTAX some variables where
-	;; any default we might use is less useful than just reusing
-	;; the global values.
-	(original-package *package*)
-	(original-print-pretty *print-pretty*))
-    (with-standard-io-syntax
-     (let ((*debug-condition* condition)
-	   (*debug-restarts* (compute-restarts condition))
-	   (*nested-debug-condition* nil)
-	   ;; We want the printer and reader to be in a useful state,
-	   ;; regardless of where the debugger was invoked in the
-	   ;; program. WITH-STANDARD-IO-SYNTAX did much of what we
-	   ;; want, but
-	   ;;   * It doesn't affect our internal special variables 
-	   ;;     like *CURRENT-LEVEL-IN-PRINT*.
-	   ;;   * It isn't customizable.
-	   ;;   * It doesn't set *PRINT-READABLY* to the same value
-	   ;;     as the toplevel default.
-	   ;;   * It sets *PACKAGE* to COMMON-LISP-USER, which is not
-	   ;;     helpful behavior for a debugger.
-	   ;;   * There's no particularly good debugger default for
-	   ;;     *PRINT-PRETTY*, since T is usually what you want
-	   ;;     -- except absolutely not what you want when you're
-	   ;;     debugging failures in PRINT-OBJECT logic.
-	   ;; We try to address all these issues with explicit
-	   ;; rebindings here.
-	   (sb!kernel:*current-level-in-print* 0)
-	   (*print-length* *debug-print-length*)
-	   (*print-level* *debug-print-level*)
-	   (*readtable* *debug-readtable*)
-	   (*print-readably* nil)
-	   (*package* original-package)
-	   (background-p nil)
-	   (*print-pretty* original-print-pretty))
+  ;; Before we start our own output, finish any pending output.
+  ;; Otherwise, if the user tried to track the progress of his program
+  ;; using PRINT statements, he'd tend to lose the last line of output
+  ;; or so, which'd be confusing.
+  (flush-standard-output-streams)
 
-       ;; Before we start our own output, finish any pending output.
-       ;; Otherwise, if the user tried to track the progress of his
-       ;; program using PRINT statements, he'd tend to lose the last
-       ;; line of output or so, which'd be confusing.
-       (flush-standard-output-streams)
+  (funcall-with-debug-io-syntax #'%invoke-debugger condition))
 
-       ;; (The initial output here goes to *ERROR-OUTPUT*, because the
-       ;; initial output is not interactive, just an error message,
-       ;; and when people redirect *ERROR-OUTPUT*, they could
-       ;; reasonably expect to see error messages logged there,
-       ;; regardless of what the debugger does afterwards.)
-       (handler-case
-	   (format *error-output*
-		   "~2&~@<debugger invoked on a ~S in thread ~A: ~
+(defun %invoke-debugger (condition)
+  
+  (let ((*debug-condition* condition)
+	(*debug-restarts* (compute-restarts condition))
+	(*nested-debug-condition* nil))
+    (handler-case
+	;; (The initial output here goes to *ERROR-OUTPUT*, because the
+	;; initial output is not interactive, just an error message, and
+	;; when people redirect *ERROR-OUTPUT*, they could reasonably
+	;; expect to see error messages logged there, regardless of what
+	;; the debugger does afterwards.)
+	(format *error-output*
+		"~2&~@<debugger invoked on a ~S in thread ~A: ~
                     ~2I~_~A~:>~%"
-		   (type-of *debug-condition*)
-		   (sb!thread:current-thread-id)
-		   *debug-condition*)
-	 (error (condition)
-           (setf *nested-debug-condition* condition)
-	   (let ((ndc-type (type-of *nested-debug-condition*)))
-	     (format *error-output*
-		     "~&~@<(A ~S was caught when trying to print ~S when ~
+		(type-of *debug-condition*)
+		(sb!thread:current-thread-id)
+		*debug-condition*)
+      (error (condition)
+	(setf *nested-debug-condition* condition)
+	(let ((ndc-type (type-of *nested-debug-condition*)))
+	  (format *error-output*
+		  "~&~@<(A ~S was caught when trying to print ~S when ~
                       entering the debugger. Printing was aborted and the ~
                       ~S was stored in ~S.)~@:>~%"
-		     ndc-type
-		     '*debug-condition*
-		     ndc-type
-		     '*nested-debug-condition*))
-	   (when (typep condition 'cell-error)
-	     ;; what we really want to know when it's e.g. an UNBOUND-VARIABLE:
-	     (format *error-output*
-		     "~&(CELL-ERROR-NAME ~S) = ~S~%"
-		     '*debug-condition*
-		     (cell-error-name *debug-condition*)))))
+		  ndc-type
+		  '*debug-condition*
+		  ndc-type
+		  '*nested-debug-condition*))
+	(when (typep condition 'cell-error)
+	  ;; what we really want to know when it's e.g. an UNBOUND-VARIABLE:
+	  (format *error-output*
+		  "~&(CELL-ERROR-NAME ~S) = ~S~%"
+		  '*debug-condition*
+		  (cell-error-name *debug-condition*)))))
 
-       (setf background-p
-	     (sb!thread::debugger-wait-until-foreground-thread *debug-io*))
+    (let ((background-p (sb!thread::debugger-wait-until-foreground-thread
+			 *debug-io*)))
 
-       ;; After the initial error/condition/whatever announcement to
-       ;; *ERROR-OUTPUT*, we become interactive, and should talk on
-       ;; *DEBUG-IO* from now on. (KLUDGE: This is a normative
-       ;; statement, not a description of reality.:-| There's a lot of
-       ;; older debugger code which was written to do i/o on whatever
-       ;; stream was in fashion at the time, and not all of it has
-       ;; been converted to behave this way. -- WHN 2000-11-16)
+      ;; After the initial error/condition/whatever announcement to
+      ;; *ERROR-OUTPUT*, we become interactive, and should talk on
+      ;; *DEBUG-IO* from now on. (KLUDGE: This is a normative
+      ;; statement, not a description of reality.:-| There's a lot of
+      ;; older debugger code which was written to do i/o on whatever
+      ;; stream was in fashion at the time, and not all of it has
+      ;; been converted to behave this way. -- WHN 2000-11-16)
 
-       (unwind-protect
-	    (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
-		  ;; violating the principle of least surprise, and making
-		  ;; it impossible for the user to do reasonable things
-		  ;; like using PRINT at the debugger prompt to send output
-		  ;; to the program's ordinary (possibly
-		  ;; redirected-to-a-file) *STANDARD-OUTPUT*. (CMU CL
-		  ;; used to rebind *STANDARD-INPUT* here too, but that's
-		  ;; been fixed already.)
-		  (*standard-output* *debug-io*)
-		  ;; This seems reasonable: e.g. if the user has redirected
-		  ;; *ERROR-OUTPUT* to some log file, it's probably wrong
-		  ;; to send errors which occur in interactive debugging to
-		  ;; that file, and right to send them to *DEBUG-IO*.
-		  (*error-output* *debug-io*))
-	      (unless (typep condition 'step-condition)
-		(when *debug-beginner-help-p*
-		  (format *debug-io*
-			  "~%~@<You can type HELP for debugger help, or ~
-                                (SB-EXT:QUIT) to exit from SBCL.~:@>~2%"))
-		(show-restarts *debug-restarts* *debug-io*))
-	      (internal-debug))
-	 (when background-p
-	   (sb!thread::release-foreground)))))))
+      (unwind-protect
+	   (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
+		 ;; violating the principle of least surprise, and making
+		 ;; it impossible for the user to do reasonable things
+		 ;; like using PRINT at the debugger prompt to send output
+		 ;; to the program's ordinary (possibly
+		 ;; redirected-to-a-file) *STANDARD-OUTPUT*. (CMU CL
+		 ;; used to rebind *STANDARD-INPUT* here too, but that's
+		 ;; been fixed already.)
+		 (*standard-output* *debug-io*)
+		 ;; This seems reasonable: e.g. if the user has redirected
+		 ;; *ERROR-OUTPUT* to some log file, it's probably wrong
+		 ;; to send errors which occur in interactive debugging to
+		 ;; that file, and right to send them to *DEBUG-IO*.
+		 (*error-output* *debug-io*))
+	     (unless (typep condition 'step-condition)
+	       (when *debug-beginner-help-p*
+		 (format *debug-io*
+			 "~%~@<You can type HELP for debugger help, or ~
+                               (SB-EXT:QUIT) to exit from SBCL.~:@>~2%"))
+	       (show-restarts *debug-restarts* *debug-io*))
+	     (internal-debug))
+	(when background-p
+	  (sb!thread::release-foreground))))))
 
 ;;; this function is for use in *INVOKE-DEBUGGER-HOOK* when ordinary
-;;; ANSI behavior has been suppressed by command-line
-;;; --disable-debugger option
+;;; ANSI behavior has been suppressed by the "--disable-debugger"
+;;; command-line option
 (defun debugger-disabled-hook (condition me)
   (declare (ignore me))
   ;; There is no one there to interact with, so report the

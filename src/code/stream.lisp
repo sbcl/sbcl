@@ -828,11 +828,11 @@
   (do ((streams (concatenated-stream-streams stream) (cdr streams))
        (current-start start)
        (remaining-bytes numbytes))
-      ((null current)
+      ((null streams)
        (if eof-errorp
 	   (error 'end-of-file :stream stream)
 	   (- numbytes remaining-bytes)))
-    (let* ((stream (car current))
+    (let* ((stream (car streams))
            (bytes-read (read-n-bytes stream buffer current-start
 	                             remaining-bytes nil)))
       (incf current-start bytes-read)
