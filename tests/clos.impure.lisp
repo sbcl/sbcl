@@ -610,5 +610,11 @@
   (assert (= (slot-value x 'name) 1))
   (assert (= (slot-value x 'cl-user::name) 2)))
 
+;;; ALLOCATE-INSTANCE should work on structures, even if defined by
+;;; DEFSTRUCT (and not DEFCLASS :METACLASS STRUCTURE-CLASS).
+(defstruct allocatable-structure a)
+(assert (typep (allocate-instance (find-class 'allocatable-structure))
+	       'allocatable-structure))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -1739,6 +1739,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
        no method was removed.
     ** SHARED-INITIALIZE now initializes the values of the requested
        slots, including those with :ALLOCATION :CLASS.
+    ** ALLOCATE-INSTANCE now works on structure classes defined via
+       DEFSTRUCT (and not just by those from DEFCLASS :METACLASS
+       STRUCTURE-CLASS).
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
