@@ -250,11 +250,11 @@
 	   (defun ,aux-name (num)
 	     ;; When converting a number to a float, the limits are
 	     ;; the same.
-	     (let* ((lo (bound-func #'(lambda (x)
-					(coerce x ',type))
+	     (let* ((lo (bound-func (lambda (x)
+				      (coerce x ',type))
 				    (numeric-type-low num)))
-		    (hi (bound-func #'(lambda (x)
-					(coerce x ',type))
+		    (hi (bound-func (lambda (x)
+				      (coerce x ',type))
 				    (numeric-type-high num))))
 	       (specifier-type `(,',type ,(or lo '*) ,(or hi '*)))))
 
@@ -649,11 +649,11 @@
 	 `(defoptimizer (,name derive-type) ((,num))
 	   (one-arg-derive-type
 	    ,num
-	    #'(lambda (arg)
-		(elfun-derive-type-simple arg #',name
-					  ,domain-low ,domain-high
-					  ,def-low-bnd ,def-high-bnd
-					  ,increasingp))
+	    (lambda (arg)
+	      (elfun-derive-type-simple arg #',name
+					,domain-low ,domain-high
+					,def-low-bnd ,def-high-bnd
+					,increasingp))
 	    #',name)))))
   ;; These functions are easy because they are defined for the whole
   ;; real line.
@@ -1271,9 +1271,9 @@
 
 (defoptimizer (cis derive-type) ((num))
   (one-arg-derive-type num
-     #'(lambda (arg)
-	 (sb!c::specifier-type
-	  `(complex ,(or (numeric-type-format arg) 'float))))
+     (lambda (arg)
+       (sb!c::specifier-type
+	`(complex ,(or (numeric-type-format arg) 'float))))
      #'cis))
 
 ) ; PROGN

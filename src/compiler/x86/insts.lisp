@@ -192,24 +192,23 @@
 (sb!disassem:define-argument-type displacement
   :sign-extend t
   :use-label #'offset-next
-  :printer #'(lambda (value stream dstate)
-	       (sb!disassem:maybe-note-assembler-routine value nil dstate)
-	       (print-label value stream dstate)))
+  :printer (lambda (value stream dstate)
+	     (sb!disassem:maybe-note-assembler-routine value nil dstate)
+	     (print-label value stream dstate)))
 
 (sb!disassem:define-argument-type accum
-  :printer #'(lambda (value stream dstate)
-	       (declare (ignore value)
-			(type stream stream)
-			(type sb!disassem:disassem-state dstate))
-	       (print-reg 0 stream dstate))
-  )
+  :printer (lambda (value stream dstate)
+	     (declare (ignore value)
+		      (type stream stream)
+		      (type sb!disassem:disassem-state dstate))
+	     (print-reg 0 stream dstate)))
 
 (sb!disassem:define-argument-type word-accum
-  :printer #'(lambda (value stream dstate)
-	       (declare (ignore value)
-			(type stream stream)
-			(type sb!disassem:disassem-state dstate))
-	       (print-word-reg 0 stream dstate)))
+  :printer (lambda (value stream dstate)
+	     (declare (ignore value)
+		      (type stream stream)
+		      (type sb!disassem:disassem-state dstate))
+	     (print-word-reg 0 stream dstate)))
 
 (sb!disassem:define-argument-type reg
   :printer #'print-reg)
@@ -225,43 +224,41 @@
   :printer #'print-label)
 
 (sb!disassem:define-argument-type imm-data
-  :prefilter #'(lambda (value dstate)
-		 (declare (ignore value)) ; always nil anyway
-		 (sb!disassem:read-suffix
-		  (width-bits (sb!disassem:dstate-get-prop dstate 'width))
-		  dstate))
-  )
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (sb!disassem:read-suffix
+		(width-bits (sb!disassem:dstate-get-prop dstate 'width))
+		dstate)))
 
 (sb!disassem:define-argument-type signed-imm-data
-  :prefilter #'(lambda (value dstate)
-		 (declare (ignore value)) ; always nil anyway
-		 (let ((width (sb!disassem:dstate-get-prop dstate 'width)))
-		   (sb!disassem:read-signed-suffix (width-bits width) dstate)))
-  )
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (let ((width (sb!disassem:dstate-get-prop dstate 'width)))
+		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
 
 (sb!disassem:define-argument-type signed-imm-byte
-  :prefilter #'(lambda (value dstate)
-		 (declare (ignore value)) ; always nil anyway
-		 (sb!disassem:read-signed-suffix 8 dstate)))
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (sb!disassem:read-signed-suffix 8 dstate)))
 
 (sb!disassem:define-argument-type signed-imm-dword
-  :prefilter #'(lambda (value dstate)
-		 (declare (ignore value))		; always nil anyway
-		 (sb!disassem:read-signed-suffix 32 dstate)))
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value))	; always nil anyway
+	       (sb!disassem:read-signed-suffix 32 dstate)))
 
 (sb!disassem:define-argument-type imm-word
-  :prefilter #'(lambda (value dstate)
-		 (declare (ignore value)) ; always nil anyway
-		 (let ((width
-			(or (sb!disassem:dstate-get-prop dstate 'word-width)
-			    +default-operand-size+)))
-		   (sb!disassem:read-suffix (width-bits width) dstate))))
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (let ((width
+		      (or (sb!disassem:dstate-get-prop dstate 'word-width)
+			  +default-operand-size+)))
+		 (sb!disassem:read-suffix (width-bits width) dstate))))
 
 ;;; needed for the ret imm16 instruction
 (sb!disassem:define-argument-type imm-word-16
-  :prefilter #'(lambda (value dstate)
-		 (declare (ignore value)) ; always nil anyway
-		 (sb!disassem:read-suffix 16 dstate)))
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (sb!disassem:read-suffix 16 dstate)))
 
 (sb!disassem:define-argument-type reg/mem
   :prefilter #'prefilter-reg/mem
@@ -291,16 +288,16 @@
 
 (sb!disassem:define-argument-type width
   :prefilter #'prefilter-width
-  :printer #'(lambda (value stream dstate)
-	       (if ;; (zerop value)
-		   (or (null value)
-		       (and (numberp value) (zerop value))) ; zzz jrd
-		   (princ 'b stream)
-		   (let ((word-width
-			  ;; set by a prefix instruction
-			  (or (sb!disassem:dstate-get-prop dstate 'word-width)
-			      +default-operand-size+)))
-		     (princ (schar (symbol-name word-width) 0) stream)))))
+  :printer (lambda (value stream dstate)
+	     (if;; (zerop value)
+		 (or (null value)
+		     (and (numberp value) (zerop value))) ; zzz jrd
+		 (princ 'b stream)
+		 (let ((word-width
+			;; set by a prefix instruction
+			(or (sb!disassem:dstate-get-prop dstate 'word-width)
+			    +default-operand-size+)))
+		   (princ (schar (symbol-name word-width) 0) stream)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
@@ -548,9 +545,9 @@
   ;; The disassembler currently doesn't let you have an instruction > 32 bits
   ;; long, so we fake it by using a prefilter to read the offset.
   (label :type 'displacement
-	 :prefilter #'(lambda (value dstate)
-			(declare (ignore value))   ; always nil anyway
-			(sb!disassem:read-signed-suffix 32 dstate))))
+	 :prefilter (lambda (value dstate)
+		      (declare (ignore value)) ; always nil anyway
+		      (sb!disassem:read-signed-suffix 32 dstate))))
 
 (sb!disassem:define-instruction-format (near-jump 8
 				     :default-printer '(:name :tab label))
@@ -558,9 +555,9 @@
   ;; The disassembler currently doesn't let you have an instruction > 32 bits
   ;; long, so we fake it by using a prefilter to read the address.
   (label :type 'displacement
-	 :prefilter #'(lambda (value dstate)
-			(declare (ignore value))   ; always nil anyway
-			(sb!disassem:read-signed-suffix 32 dstate))))
+	 :prefilter (lambda (value dstate)
+		      (declare (ignore value)) ; always nil anyway
+		      (sb!disassem:read-signed-suffix 32 dstate))))
 
 
 (sb!disassem:define-instruction-format (cond-set 24
@@ -612,13 +609,13 @@
     (if (label-p offset)
 	(emit-back-patch segment
 			 4 ; FIXME: sb!vm:n-word-bytes
-			 #'(lambda (segment posn)
-			     (declare (ignore posn))
-			     (emit-dword segment
-					 (- (+ (component-header-length)
-					       (or (label-position offset)
-						   0))
-					    other-pointer-lowtag))))
+			 (lambda (segment posn)
+			   (declare (ignore posn))
+			   (emit-dword segment
+				       (- (+ (component-header-length)
+					     (or (label-position offset)
+						 0))
+					  other-pointer-lowtag))))
 	(emit-dword segment (or offset 0)))))
 
 (defun emit-relative-fixup (segment fixup)
@@ -1637,10 +1634,10 @@
       (emit-byte segment #b11101000)
       (emit-back-patch segment
 		       4
-		       #'(lambda (segment posn)
-			   (emit-dword segment
-				       (- (label-position where)
-					  (+ posn 4))))))
+		       (lambda (segment posn)
+			 (emit-dword segment
+				     (- (label-position where)
+					(+ posn 4))))))
      (fixup
       (emit-byte segment #b11101000)
       (emit-relative-fixup segment where))
@@ -1651,10 +1648,10 @@
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment
 		   1
-		   #'(lambda (segment posn)
-		       (let ((disp (- (label-position target) (1+ posn))))
-			 (aver (<= -128 disp 127))
-			 (emit-byte segment disp)))))
+		   (lambda (segment posn)
+		     (let ((disp (- (label-position target) (1+ posn))))
+		       (aver (<= -128 disp 127))
+		       (emit-byte segment disp)))))
 
 (define-instruction jmp (segment cond &optional where)
   ;; conditional jumps
@@ -1668,39 +1665,38 @@
    (cond (where
 	  (emit-chooser
 	   segment 6 2
-	   #'(lambda (segment posn delta-if-after)
-	       (let ((disp (- (label-position where posn delta-if-after)
-			      (+ posn 2))))
-		 (when (<= -128 disp 127)
-		       (emit-byte segment
-				  (dpb (conditional-opcode cond)
-				       (byte 4 0)
-				       #b01110000))
-		       (emit-byte-displacement-backpatch segment where)
-		       t)))
-	   #'(lambda (segment posn)
-	       (let ((disp (- (label-position where) (+ posn 6))))
-		 (emit-byte segment #b00001111)
+	   (lambda (segment posn delta-if-after)
+	     (let ((disp (- (label-position where posn delta-if-after)
+			    (+ posn 2))))
+	       (when (<= -128 disp 127)
 		 (emit-byte segment
 			    (dpb (conditional-opcode cond)
 				 (byte 4 0)
-				 #b10000000))
-		 (emit-dword segment disp)))))
+				 #b01110000))
+		 (emit-byte-displacement-backpatch segment where)
+		 t)))
+	   (lambda (segment posn)
+	     (let ((disp (- (label-position where) (+ posn 6))))
+	       (emit-byte segment #b00001111)
+	       (emit-byte segment
+			  (dpb (conditional-opcode cond)
+			       (byte 4 0)
+			       #b10000000))
+	       (emit-dword segment disp)))))
 	 ((label-p (setq where cond))
 	  (emit-chooser
 	   segment 5 0
-	   #'(lambda (segment posn delta-if-after)
-	       (let ((disp (- (label-position where posn delta-if-after)
-			      (+ posn 2))))
-		 (when (<= -128 disp 127)
-		       (emit-byte segment #b11101011)
-		       (emit-byte-displacement-backpatch segment where)
-		       t)))
-	   #'(lambda (segment posn)
-	       (let ((disp (- (label-position where) (+ posn 5))))
-		 (emit-byte segment #b11101001)
-		 (emit-dword segment disp))
-	       )))
+	   (lambda (segment posn delta-if-after)
+	     (let ((disp (- (label-position where posn delta-if-after)
+			    (+ posn 2))))
+	       (when (<= -128 disp 127)
+		 (emit-byte segment #b11101011)
+		 (emit-byte-displacement-backpatch segment where)
+		 t)))
+	   (lambda (segment posn)
+	     (let ((disp (- (label-position where) (+ posn 5))))
+	       (emit-byte segment #b11101001)
+	       (emit-dword segment disp)))))
 	 ((fixup-p where)
 	  (emit-byte segment #b11101001)
 	  (emit-relative-fixup segment where))

@@ -336,16 +336,16 @@
   (%make-funstate :args args))
 
 (defun funstate-compatible-p (funstate args)
-  (every #'(lambda (this-arg-temps)
-             (let* ((old-arg (car this-arg-temps))
-                    (new-arg (find (arg-name old-arg) args :key #'arg-name)))
-               (and new-arg
-                    (every #'(lambda (this-kind-temps)
-                               (funcall (find-arg-form-checker
-                                         (car this-kind-temps))
-                                        new-arg
-                                        old-arg))
-                           (cdr this-arg-temps)))))
+  (every (lambda (this-arg-temps)
+	   (let* ((old-arg (car this-arg-temps))
+		  (new-arg (find (arg-name old-arg) args :key #'arg-name)))
+	     (and new-arg
+		  (every (lambda (this-kind-temps)
+			   (funcall (find-arg-form-checker
+				     (car this-kind-temps))
+				    new-arg
+				    old-arg))
+			 (cdr this-arg-temps)))))
          (funstate-arg-temps funstate)))
 
 (defun arg-or-lose (name funstate)
@@ -418,9 +418,9 @@
         (values wrapper-name `(defparameter ,wrapper-name ,form)))))
 
 (defun filter-overrides (overrides evalp)
-  (mapcar #'(lambda (override)
-              (list* (car override) (cadr override)
-                     (munge-fun-refs (cddr override) evalp)))
+  (mapcar (lambda (override)
+	    (list* (car override) (cadr override)
+		   (munge-fun-refs (cddr override) evalp)))
           overrides))
 
 (defparameter *arg-function-params*
@@ -452,12 +452,12 @@
 (defun gen-args-def-form (overrides format-form &optional (evalp t))
   (let ((args-var (gensym)))
     `(let ((,args-var (copy-list (format-args ,format-form))))
-       ,@(mapcar #'(lambda (override)
-                     (update-args-form args-var
-                                       `',(car override)
-                                       (and (cdr override)
-                                            (cons :value (cdr override)))
-                                       evalp))
+       ,@(mapcar (lambda (override)
+		   (update-args-form args-var
+				     `',(car override)
+				     (and (cdr override)
+					  (cons :value (cdr override)))
+				     evalp))
                  overrides)
        ,args-var)))
 
@@ -638,10 +638,10 @@
                       :args ,args-var))
                (eval
                 `(progn
-                   ,@(mapcar #'(lambda (arg)
-                                 (when (arg-fields arg)
-                                   (gen-arg-access-macro-def-form
-                                    arg ,args-var ',name)))
+                   ,@(mapcar (lambda (arg)
+			       (when (arg-fields arg)
+				 (gen-arg-access-macro-def-form
+				  arg ,args-var ',name)))
                              ,args-var))))))))))
 
 ;;; FIXME: probably needed only at build-the-system time, not in
@@ -691,20 +691,20 @@
           can't specify fields except using DEFINE-INSTRUCTION-FORMAT~:>"
          arg-name))
       (setf (arg-fields arg)
-            (mapcar #'(lambda (bytespec)
-                        (when (> (+ (byte-position bytespec)
-                                    (byte-size bytespec))
-                                 format-length)
-                          (error "~@<in arg ~S: ~3I~:_~
+            (mapcar (lambda (bytespec)
+		      (when (> (+ (byte-position bytespec)
+				  (byte-size bytespec))
+			       format-length)
+			(error "~@<in arg ~S: ~3I~:_~
                                      The field ~S doesn't fit in an ~
                                      instruction-format ~W bits wide.~:>"
-                                 arg-name
-                                 bytespec
-                                 format-length))
-                        (correct-dchunk-bytespec-for-endianness
-                         bytespec
-                         format-length
-                         sb!c:*backend-byte-order*))
+			       arg-name
+			       bytespec
+			       format-length))
+		      (correct-dchunk-bytespec-for-endianness
+		       bytespec
+		       format-length
+		       sb!c:*backend-byte-order*))
                     fields)))
     args))
 
@@ -752,8 +752,8 @@
               ((atom (cadr atk))
                (push `(,(cadr atk) ,(cddr atk)) bindings))
               (t
-               (mapc #'(lambda (var form)
-                         (push `(,var ,form) bindings))
+               (mapc (lambda (var form)
+		       (push `(,var ,form) bindings))
                      (cadr atk)
                      (cddr atk))))))
     bindings))
@@ -855,35 +855,35 @@
 
 (defmacro def-arg-form-kind ((&rest names) &rest inits)
   `(let ((kind (make-arg-form-kind :names ',names ,@inits)))
-     ,@(mapcar #'(lambda (name)
-                   `(setf (getf *arg-form-kinds* ',name) kind))
+     ,@(mapcar (lambda (name)
+		 `(setf (getf *arg-form-kinds* ',name) kind))
                names)))
 
 (def-arg-form-kind (:raw)
-  :producer #'(lambda (arg funstate)
-                (declare (ignore funstate))
-                (mapcar #'(lambda (bytespec)
-                            `(the (unsigned-byte ,(byte-size bytespec))
-                                  (local-extract ',bytespec)))
-                        (arg-fields arg)))
-  :checker #'(lambda (new-arg old-arg)
-               (equal (arg-fields new-arg)
-                      (arg-fields old-arg))))
+  :producer (lambda (arg funstate)
+	      (declare (ignore funstate))
+	      (mapcar (lambda (bytespec)
+			`(the (unsigned-byte ,(byte-size bytespec))
+			   (local-extract ',bytespec)))
+		      (arg-fields arg)))
+  :checker (lambda (new-arg old-arg)
+	     (equal (arg-fields new-arg)
+		    (arg-fields old-arg))))
 
 (def-arg-form-kind (:sign-extended :unfiltered)
-  :producer #'(lambda (arg funstate)
-                (let ((raw-forms (gen-arg-forms arg :raw funstate)))
-                  (if (and (arg-sign-extend-p arg) (listp raw-forms))
-                      (mapcar #'(lambda (form field)
-                                  `(the (signed-byte ,(byte-size field))
-                                        (sign-extend ,form
-                                                     ,(byte-size field))))
-                              raw-forms
-                              (arg-fields arg))
-                      raw-forms)))
-  :checker #'(lambda (new-arg old-arg)
-               (equal (arg-sign-extend-p new-arg)
-                      (arg-sign-extend-p old-arg))))
+  :producer (lambda (arg funstate)
+	      (let ((raw-forms (gen-arg-forms arg :raw funstate)))
+		(if (and (arg-sign-extend-p arg) (listp raw-forms))
+		    (mapcar (lambda (form field)
+			      `(the (signed-byte ,(byte-size field))
+				 (sign-extend ,form
+					      ,(byte-size field))))
+			    raw-forms
+			    (arg-fields arg))
+		    raw-forms)))
+  :checker (lambda (new-arg old-arg)
+	     (equal (arg-sign-extend-p new-arg)
+		    (arg-sign-extend-p old-arg))))
 
 (defun valsrc-equal (f1 f2)
   (if (null f1)
@@ -892,73 +892,73 @@
              (value-or-source f2))))
 
 (def-arg-form-kind (:filtering)
-  :producer #'(lambda (arg funstate)
-                (let ((sign-extended-forms
-                       (gen-arg-forms arg :sign-extended funstate))
-                      (pf (arg-prefilter arg)))
-                  (if pf
-                      (values
-                       `(local-filter ,(maybe-listify sign-extended-forms)
-                                      ,(source-form pf))
-                       t)
-                      (values sign-extended-forms nil))))
-  :checker #'(lambda (new-arg old-arg)
-               (valsrc-equal (arg-prefilter new-arg) (arg-prefilter old-arg))))
+  :producer (lambda (arg funstate)
+	      (let ((sign-extended-forms
+		     (gen-arg-forms arg :sign-extended funstate))
+		    (pf (arg-prefilter arg)))
+		(if pf
+		    (values
+		     `(local-filter ,(maybe-listify sign-extended-forms)
+				    ,(source-form pf))
+		     t)
+		    (values sign-extended-forms nil))))
+  :checker (lambda (new-arg old-arg)
+	     (valsrc-equal (arg-prefilter new-arg) (arg-prefilter old-arg))))
 
 (def-arg-form-kind (:filtered :unadjusted)
-  :producer #'(lambda (arg funstate)
-                (let ((pf (arg-prefilter arg)))
-                  (if pf
-                      (values `(local-filtered-value ,(arg-position arg)) t)
-                      (gen-arg-forms arg :sign-extended funstate))))
-  :checker #'(lambda (new-arg old-arg)
-               (let ((pf1 (arg-prefilter new-arg))
-                     (pf2 (arg-prefilter old-arg)))
-                 (if (null pf1)
-                     (null pf2)
-                     (= (arg-position new-arg)
-                        (arg-position old-arg))))))
+  :producer (lambda (arg funstate)
+	      (let ((pf (arg-prefilter arg)))
+		(if pf
+		    (values `(local-filtered-value ,(arg-position arg)) t)
+		    (gen-arg-forms arg :sign-extended funstate))))
+  :checker (lambda (new-arg old-arg)
+	     (let ((pf1 (arg-prefilter new-arg))
+		   (pf2 (arg-prefilter old-arg)))
+	       (if (null pf1)
+		   (null pf2)
+		   (= (arg-position new-arg)
+		      (arg-position old-arg))))))
 
 (def-arg-form-kind (:adjusted :numeric :unlabelled)
-  :producer #'(lambda (arg funstate)
-                (let ((filtered-forms (gen-arg-forms arg :filtered funstate))
-                      (use-label (arg-use-label arg)))
-                  (if (and use-label (not (eq use-label t)))
-                      (list
-                       `(adjust-label ,(maybe-listify filtered-forms)
-                                      ,(source-form use-label)))
-                      filtered-forms)))
-  :checker #'(lambda (new-arg old-arg)
-               (valsrc-equal (arg-use-label new-arg) (arg-use-label old-arg))))
+  :producer (lambda (arg funstate)
+	      (let ((filtered-forms (gen-arg-forms arg :filtered funstate))
+		    (use-label (arg-use-label arg)))
+		(if (and use-label (not (eq use-label t)))
+		    (list
+		     `(adjust-label ,(maybe-listify filtered-forms)
+				    ,(source-form use-label)))
+		    filtered-forms)))
+  :checker (lambda (new-arg old-arg)
+	     (valsrc-equal (arg-use-label new-arg) (arg-use-label old-arg))))
 
 (def-arg-form-kind (:labelled :final)
-  :producer #'(lambda (arg funstate)
-                (let ((adjusted-forms
-                       (gen-arg-forms arg :adjusted funstate))
-                      (use-label (arg-use-label arg)))
-                  (if use-label
-                      (let ((form (maybe-listify adjusted-forms)))
-                        (if (and (not (eq use-label t))
-                                 (not (atom adjusted-forms))
-                                 (/= (Length adjusted-forms) 1))
-                            (pd-error
-                             "cannot label a multiple-field argument ~
+  :producer (lambda (arg funstate)
+	      (let ((adjusted-forms
+		     (gen-arg-forms arg :adjusted funstate))
+		    (use-label (arg-use-label arg)))
+		(if use-label
+		    (let ((form (maybe-listify adjusted-forms)))
+		      (if (and (not (eq use-label t))
+			       (not (atom adjusted-forms))
+			       (/= (Length adjusted-forms) 1))
+			  (pd-error
+			   "cannot label a multiple-field argument ~
                               unless using a function: ~S" arg)
-                            `((lookup-label ,form))))
-                      adjusted-forms)))
-  :checker #'(lambda (new-arg old-arg)
-               (let ((lf1 (arg-use-label new-arg))
-                     (lf2 (arg-use-label old-arg)))
-                 (if (null lf1) (null lf2) t))))
+			  `((lookup-label ,form))))
+		    adjusted-forms)))
+  :checker (lambda (new-arg old-arg)
+	     (let ((lf1 (arg-use-label new-arg))
+		   (lf2 (arg-use-label old-arg)))
+	       (if (null lf1) (null lf2) t))))
 
 ;;; This is a bogus kind that's just used to ensure that printers are
 ;;; compatible...
 (def-arg-form-kind (:printed)
-  :producer #'(lambda (&rest noise)
-                (declare (ignore noise))
-                (pd-error "bogus! can't use the :printed value of an arg!"))
-  :checker #'(lambda (new-arg old-arg)
-               (valsrc-equal (arg-printer new-arg) (arg-printer old-arg))))
+  :producer (lambda (&rest noise)
+	      (declare (ignore noise))
+	      (pd-error "bogus! can't use the :printed value of an arg!"))
+  :checker (lambda (new-arg old-arg)
+	     (valsrc-equal (arg-printer new-arg) (arg-printer old-arg))))
 
 (defun remember-printer-use (arg funstate)
   (set-arg-temps nil nil arg :printed funstate))
@@ -1122,8 +1122,8 @@
            test
            key
            (sharing-mapcar
-            #'(lambda (sub-test)
-                (preprocess-test subj sub-test args))
+            (lambda (sub-test)
+	      (preprocess-test subj sub-test args))
             body))))
         (t form)))))
 
@@ -1147,24 +1147,24 @@
           printer
           :cond
           (sharing-mapcar
-           #'(lambda (clause)
-               (let ((filtered-body
-                      (sharing-mapcar
-                       #'(lambda (sub-printer)
-                           (preprocess-conditionals sub-printer args))
-                       (cdr clause))))
-                 (sharing-cons
-                  clause
-                  (preprocess-test (find-first-field-name filtered-body)
-                                   (car clause)
-                                   args)
-                  filtered-body)))
+           (lambda (clause)
+	     (let ((filtered-body
+		    (sharing-mapcar
+		     (lambda (sub-printer)
+		       (preprocess-conditionals sub-printer args))
+		     (cdr clause))))
+	       (sharing-cons
+		clause
+		(preprocess-test (find-first-field-name filtered-body)
+				 (car clause)
+				 args)
+		filtered-body)))
            (cdr printer))))
         (quote printer)
         (t
          (sharing-mapcar
-          #'(lambda (sub-printer)
-              (preprocess-conditionals sub-printer args))
+          (lambda (sub-printer)
+	    (preprocess-conditionals sub-printer args))
           printer)))))
 
 ;;; Return a version of the disassembly-template PRINTER with
@@ -1196,7 +1196,7 @@
         ((eq (car printer) :choose)
          (pick-printer-choice (cdr printer) args))
         (t
-         (sharing-mapcar #'(lambda (sub) (preprocess-chooses sub args))
+         (sharing-mapcar (lambda (sub) (preprocess-chooses sub args))
                          printer))))
 
 ;;;; some simple functions that help avoid consing when we're just
@@ -1226,7 +1226,7 @@
         ((symbolp printer)
          (find printer args :key #'arg-name))
         ((listp printer)
-         (every #'(lambda (x) (all-arg-refs-relevant-p x args))
+         (every (lambda (x) (all-arg-refs-relevant-p x args))
                 printer))
         (t t)))
 
@@ -1292,13 +1292,13 @@
         ((eq (car source) 'function)
          `(local-call-global-printer ,source))
         ((eq (car source) :cond)
-         `(cond ,@(mapcar #'(lambda (clause)
-                              `(,(compile-test (find-first-field-name
-                                                (cdr clause))
-                                               (car clause)
-                                               funstate)
-                                ,@(compile-printer-list (cdr clause)
-                                                        funstate)))
+         `(cond ,@(mapcar (lambda (clause)
+			    `(,(compile-test (find-first-field-name
+					      (cdr clause))
+					     (car clause)
+					     funstate)
+			      ,@(compile-printer-list (cdr clause)
+						      funstate)))
                           (cdr source))))
         ;; :IF, :UNLESS, and :WHEN are replaced by :COND during preprocessing
         (t
@@ -1347,7 +1347,7 @@
            `(equal ,(listify-fields val-form-1)
                    ,(listify-fields val-form-2)))
           (t
-           `(and ,@(mapcar #'(lambda (v1 v2) `(= ,v1 ,v2))
+           `(and ,@(mapcar (lambda (v1 v2) `(= ,v1 ,v2))
                            val-form-1 val-form-2))))))
 
 (defun compile-test (subj test funstate)
@@ -1381,8 +1381,8 @@
                  (arg2 (arg-or-lose (car body) funstate)))
              (unless (and (= (length (arg-fields arg1))
                              (length (arg-fields arg2)))
-                          (every #'(lambda (bs1 bs2)
-                                     (= (byte-size bs1) (byte-size bs2)))
+                          (every (lambda (bs1 bs2)
+				   (= (byte-size bs1) (byte-size bs2)))
                                  (arg-fields arg1)
                                  (arg-fields arg2)))
                (pd-error "can't compare differently sized fields: ~
@@ -1390,10 +1390,10 @@
              (compare-fields-form (gen-arg-forms arg1 :numeric funstate)
                                   (gen-arg-forms arg2 :numeric funstate))))
           ((eq key :or)
-           `(or ,@(mapcar #'(lambda (sub) (compile-test subj sub funstate))
+           `(or ,@(mapcar (lambda (sub) (compile-test subj sub funstate))
                           body)))
           ((eq key :and)
-           `(and ,@(mapcar #'(lambda (sub) (compile-test subj sub funstate))
+           `(and ,@(mapcar (lambda (sub) (compile-test subj sub funstate))
                            body)))
           ((eq key :not)
            `(not ,(compile-test subj (car body) funstate)))

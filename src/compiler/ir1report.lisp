@@ -106,8 +106,8 @@
    list of subforms suitable for a \"~{~S ~}\" format string."
   (let ((n-whole (gensym)))
     `(setf (gethash ',name *source-context-methods*)
-	   #'(lambda (,n-whole)
-	       (destructuring-bind ,lambda-list ,n-whole ,@body)))))
+	   (lambda (,n-whole)
+	     (destructuring-bind ,lambda-list ,n-whole ,@body)))))
 
 (defmacro def-source-context (&rest rest)
   (deprecation-warning 'def-source-context 'define-source-context)
@@ -130,9 +130,9 @@
   (cond ((atom form) nil)
 	((>= (length form) 2)
 	 (funcall (gethash (first form) *source-context-methods*
-			   #'(lambda (x)
-			       (declare (ignore x))
-			       (list (first form) (second form))))
+			   (lambda (x)
+			     (declare (ignore x))
+			     (list (first form) (second form))))
 		  (rest form)))
 	(t
 	 form)))

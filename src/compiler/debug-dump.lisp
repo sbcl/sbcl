@@ -461,8 +461,8 @@
 ;;; (Must be known values return...)
 (defun compute-debug-returns (fun)
   (coerce-to-smallest-eltype
-   (mapcar #'(lambda (loc)
-	       (tn-sc-offset loc))
+   (mapcar (lambda (loc)
+	     (tn-sc-offset loc))
 	   (return-info-locations (tail-set-info (lambda-tail-set fun))))))
 
 ;;;; debug functions

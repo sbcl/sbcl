@@ -19,7 +19,7 @@
 	(parse-defmacro arglist whole body name 'deftype :default-default ''*)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
 	 (%compiler-deftype ',name
-			    #'(lambda (,whole)
-				,@local-decs
-				(block ,name ,body))
+			    (lambda (,whole)
+			      ,@local-decs
+			      (block ,name ,body))
 			    ,@(when doc `(,doc)))))))

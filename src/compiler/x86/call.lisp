@@ -769,12 +769,12 @@
 	       ;; doing the call. Therefore, we have to tell the
 	       ;; lifetime stuff that we need to use them.
 	       ,@(when variable
-		   (mapcar #'(lambda (name offset)
-			       `(:temporary (:sc descriptor-reg
-						 :offset ,offset
-						 :from (:argument 0)
-						 :to :eval)
-					    ,name))
+		   (mapcar (lambda (name offset)
+			     `(:temporary (:sc descriptor-reg
+					       :offset ,offset
+					       :from (:argument 0)
+					       :to :eval)
+					  ,name))
 			   *register-arg-names* *register-arg-offsets*))
 
 	       ,@(when (eq return :tail)
@@ -1359,8 +1359,8 @@
 		,@(when translate
 		    `((:policy :fast-safe)
 		      (:translate ,translate)))
-		(:args ,@(mapcar #'(lambda (arg)
-				     `(,arg :scs (any-reg descriptor-reg)))
+		(:args ,@(mapcar (lambda (arg)
+				   `(,arg :scs (any-reg descriptor-reg)))
 				 args))
 		(:vop-var vop)
 		(:save-p :compute-only)

@@ -239,17 +239,17 @@
 ;;; argument. If arg is a list, result is a list. If arg is a vector, result
 ;;; is a vector with the same element type.
 (defun sequence-result-nth-arg (n)
-  #'(lambda (call)
-      (declare (type combination call))
-      (let ((cont (nth (1- n) (combination-args call))))
-	(when cont
-	  (let ((type (continuation-type cont)))
-	    (if (array-type-p type)
-		(specifier-type
-		 `(vector ,(type-specifier (array-type-element-type type))))
-		(let ((ltype (specifier-type 'list)))
-		  (when (csubtypep type ltype)
-		    ltype))))))))
+  (lambda (call)
+    (declare (type combination call))
+    (let ((cont (nth (1- n) (combination-args call))))
+      (when cont
+	(let ((type (continuation-type cont)))
+	  (if (array-type-p type)
+	      (specifier-type
+	       `(vector ,(type-specifier (array-type-element-type type))))
+	      (let ((ltype (specifier-type 'list)))
+		(when (csubtypep type ltype)
+		  ltype))))))))
 
 ;;; Derive the type to be the type specifier which is the N'th arg.
 (defun result-type-specifier-nth-arg (n)

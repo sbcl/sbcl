@@ -842,28 +842,28 @@
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
 	     `(progn
 		,@(mapcar
-		   #'(lambda (suffix cost signed)
-		       `(define-vop (;; FIXME: These could be done more
-				     ;; cleanly with SYMBOLICATE.
-				     ,(intern (format nil "~:@(FAST-IF-~A~A~)"
-						      tran suffix))
-				     ,(intern
-				       (format nil "~:@(FAST-CONDITIONAL~A~)"
-					       suffix)))
-			  (:translate ,tran)
-			  (:generator ,cost
-				      (inst cmp x
-					    ,(if (eq suffix '-c/fixnum)
-						 '(fixnumize y)
-						 'y))
-				      (inst jmp (if not-p
-						    ,(if signed
-							 not-cond
-							 not-unsigned)
-						    ,(if signed
-							 cond
-							 unsigned))
-					    target))))
+		   (lambda (suffix cost signed)
+		     `(define-vop (;; FIXME: These could be done more
+				   ;; cleanly with SYMBOLICATE.
+				   ,(intern (format nil "~:@(FAST-IF-~A~A~)"
+						    tran suffix))
+				   ,(intern
+				     (format nil "~:@(FAST-CONDITIONAL~A~)"
+					     suffix)))
+			(:translate ,tran)
+			(:generator ,cost
+				    (inst cmp x
+					  ,(if (eq suffix '-c/fixnum)
+					       '(fixnumize y)
+					       'y))
+				    (inst jmp (if not-p
+						  ,(if signed
+						       not-cond
+						       not-unsigned)
+						  ,(if signed
+						       cond
+						       unsigned))
+					  target))))
 		   '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
 		   '(4 3 6 5 6 5)
 		   '(t t t t nil nil)))))

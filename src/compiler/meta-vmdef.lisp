@@ -153,8 +153,8 @@
 	 (if (or (eq sb-name 'non-descriptor-stack)
 		 (find 'non-descriptor-stack
 		       (mapcar #'meta-sc-or-lose alternate-scs)
-		       :key #'(lambda (x)
-				(sb-name (sc-sb x)))))
+		       :key (lambda (x)
+			      (sb-name (sc-sb x)))))
 	     t nil)))
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -331,15 +331,15 @@
 	(n-type (gensym)))
     `(let ((,n-vop (template-or-lose ',vop)))
        ,@(mapcar
-	  #'(lambda (type)
-	      `(let ((,n-type (primitive-type-or-lose ',type)))
-		 ,@(mapcar
-		    #'(lambda (kind)
-			(let ((slot (or (cdr (assoc kind
-						    *primitive-type-slot-alist*))
-					(error "unknown kind: ~S" kind))))
-			  `(setf (,slot ,n-type) ,n-vop)))
-		    kinds)))
+	  (lambda (type)
+	    `(let ((,n-type (primitive-type-or-lose ',type)))
+	       ,@(mapcar
+		  (lambda (kind)
+		    (let ((slot (or (cdr (assoc kind
+						*primitive-type-slot-alist*))
+				    (error "unknown kind: ~S" kind))))
+		      `(setf (,slot ,n-type) ,n-vop)))
+		  kinds)))
 	  types)
        nil)))
 
@@ -665,14 +665,14 @@
 	     (refs (cons (cons born t) index))))
 	  (incf index)))
       (let* ((sorted (sort (refs)
-			   #'(lambda (x y)
-			       (let ((x-time (car x))
-				     (y-time (car y)))
-				 (if (time-spec-order x-time y-time)
-				     (if (time-spec-order y-time x-time)
-					 (and (not (cdr x)) (cdr y))
-					 nil)
-				     t)))
+			   (lambda (x y)
+			     (let ((x-time (car x))
+				   (y-time (car y)))
+			       (if (time-spec-order x-time y-time)
+				   (if (time-spec-order y-time x-time)
+				       (and (not (cdr x)) (cdr y))
+				       nil)
+				   t)))
 			   :key #'car))
 	     (oe-type '(mod #.max-vop-tn-refs)) ; :REF-ORDERING element type
 	     (te-type '(mod #.(* max-vop-tn-refs 2))) ; :TARGETS element type
@@ -774,13 +774,13 @@
 			  (setf (vop-parse-vop-var parse) (gensym))))
 	       (form (if (rest funs)
 			 `(sc-case ,tn
-			    ,@(mapcar #'(lambda (x)
-					  `(,(mapcar #'sc-name (car x))
-					    ,(if load-p
-						 `(,(cdr x) ,n-vop ,tn
-						   ,load-tn)
-						 `(,(cdr x) ,n-vop ,load-tn
-						   ,tn))))
+			    ,@(mapcar (lambda (x)
+					`(,(mapcar #'sc-name (car x))
+					  ,(if load-p
+					       `(,(cdr x) ,n-vop ,tn
+						 ,load-tn)
+					       `(,(cdr x) ,n-vop ,load-tn
+						 ,tn))))
 				      funs))
 			 (if load-p
 			     `(,(cdr (first funs)) ,n-vop ,tn ,load-tn)
@@ -845,10 +845,10 @@
 		    (tn-ref-tn ,(operand-parse-temp op)))))
 	  ((:more-argument :more-result))))
 
-      `#'(lambda (,n-vop)
-	   (let* (,@(access-operands (vop-parse-args parse)
-				     (vop-parse-more-args parse)
-				     `(vop-args ,n-vop))
+      `(lambda (,n-vop)
+	 (let* (,@(access-operands (vop-parse-args parse)
+				   (vop-parse-more-args parse)
+				   `(vop-args ,n-vop))
 		  ,@(access-operands (vop-parse-results parse)
 				     (vop-parse-more-results parse)
 				     `(vop-results ,n-vop))
@@ -865,11 +865,11 @@
 		  ,@(when (vop-parse-node-var parse)
 		      `((,(vop-parse-node-var parse) (vop-node ,n-vop))))
 		  ,@(binds))
-	     (declare (ignore ,@(vop-parse-ignores parse)))
-	     ,@(loads)
-	     (sb!assem:assemble (*code-segment* ,n-vop)
-	       ,@(vop-parse-body parse))
-	     ,@(saves))))))
+	   (declare (ignore ,@(vop-parse-ignores parse)))
+	   ,@(loads)
+	   (sb!assem:assemble (*code-segment* ,n-vop)
+			      ,@(vop-parse-body parse))
+	   ,@(saves))))))
 
 ;;; Given a list of operand specifications as given to DEFINE-VOP,
 ;;; return a list of OPERAND-PARSE structures describing the fixed

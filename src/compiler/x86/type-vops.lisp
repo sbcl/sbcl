@@ -68,9 +68,9 @@
       (error "At least one type must be supplied for TEST-TYPE."))
     (cond
      (fixnump
-      (when (remove-if #'(lambda (x)
-			   (or (= x even-fixnum-lowtag)
-			       (= x odd-fixnum-lowtag)))
+      (when (remove-if (lambda (x)
+			 (or (= x even-fixnum-lowtag)
+			     (= x odd-fixnum-lowtag)))
 		       lowtags)
 	(error "can't mix fixnum testing with other lowtags"))
       (when function-p

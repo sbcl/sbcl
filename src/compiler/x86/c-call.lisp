@@ -106,8 +106,8 @@
 
 #+nil ;;pfw obsolete now?
 (define-alien-type-method (values :result-tn) (type state)
-  (mapcar #'(lambda (type)
-	      (invoke-alien-type-method :result-tn type state))
+  (mapcar (lambda (type)
+	    (invoke-alien-type-method :result-tn type state))
 	  (alien-values-type-values type)))
 
 ;;; pfw - from alpha

@@ -318,23 +318,23 @@
 	(multiple-value-bind (check types) (continuation-check-types cont)
 	  (aver (eq check :simple))
 	  (let ((ntypes (length types)))
-	    (mapcar #'(lambda (from to-type assertion)
-			(let ((temp (make-normal-tn to-type)))
-			  (if assertion
-			      (emit-type-check node block from temp assertion)
-			      (emit-move node block from temp))
-			  temp))
+	    (mapcar (lambda (from to-type assertion)
+		      (let ((temp (make-normal-tn to-type)))
+			(if assertion
+			    (emit-type-check node block from temp assertion)
+			    (emit-move node block from temp))
+			temp))
 		    locs ptypes
 		    (if (< ntypes nlocs)
 			(append types (make-list (- nlocs ntypes)
 						 :initial-element nil))
 			types))))
-	(mapcar #'(lambda (from to-type)
-		    (if (eq (tn-primitive-type from) to-type)
-			from
-			(let ((temp (make-normal-tn to-type)))
-			  (emit-move node block from temp)
-			  temp)))
+	(mapcar (lambda (from to-type)
+		  (if (eq (tn-primitive-type from) to-type)
+		      from
+		      (let ((temp (make-normal-tn to-type)))
+			(emit-move node block from temp)
+			temp)))
 		locs
 		ptypes))))
 
@@ -373,10 +373,10 @@
 			(unless (eq (tn-primitive-type (car loc)) (car type))
 			  (return nil))))
 		 locs
-		 (mapcar #'(lambda (loc type)
-			     (if (eq (tn-primitive-type loc) type)
-				 loc
-				 (make-normal-tn type)))
+		 (mapcar (lambda (loc type)
+			   (if (eq (tn-primitive-type loc) type)
+			       loc
+			       (make-normal-tn type)))
 			 (if (< nlocs ntypes)
 			     (append locs
 				     (mapcar #'make-normal-tn
@@ -420,9 +420,9 @@
   (declare (type node node) (type ir2-block block) (list src dest))
   (let ((nsrc (length src))
 	(ndest (length dest)))
-    (mapc #'(lambda (from to)
-	      (unless (eq from to)
-		(emit-move node block from to)))
+    (mapc (lambda (from to)
+	    (unless (eq from to)
+	      (emit-move node block from to)))
 	  (if (> ndest nsrc)
 	      (append src (make-list (- ndest nsrc)
 				     :initial-element (emit-constant nil)))
@@ -637,13 +637,13 @@
 ;;; this.
 (defun ir2-convert-let (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
-  (mapc #'(lambda (var arg)
-	    (when arg
-	      (let ((src (continuation-tn node block arg))
-		    (dest (leaf-info var)))
-		(if (lambda-var-indirect var)
-		    (do-make-value-cell node block src dest)
-		    (emit-move node block src dest)))))
+  (mapc (lambda (var arg)
+	  (when arg
+	    (let ((src (continuation-tn node block arg))
+		  (dest (leaf-info var)))
+	      (if (lambda-var-indirect var)
+		  (do-make-value-cell node block src dest)
+		  (emit-move node block src dest)))))
 	(lambda-vars fun) (basic-combination-args node))
   (values))
 
@@ -664,10 +664,10 @@
 	   (type (or tn null) old-fp))
   (let* ((called-env (physenv-info (lambda-physenv fun)))
 	 (this-1env (node-physenv node))
-	 (actuals (mapcar #'(lambda (x)
-			     (when x
-			       (continuation-tn node block x)))
-			 (combination-args node))))
+	 (actuals (mapcar (lambda (x)
+			    (when x
+			      (continuation-tn node block x)))
+			  (combination-args node))))
     (collect ((temps)
 	      (locs))
       (dolist (var (lambda-vars fun))
@@ -708,8 +708,8 @@
     (multiple-value-bind (temps locs)
 	(emit-psetq-moves node block fun (ir2-physenv-old-fp this-env))
 
-      (mapc #'(lambda (temp loc)
-		(emit-move node block temp loc))
+      (mapc (lambda (temp loc)
+	      (emit-move node block temp loc))
 	    temps locs))
 
     (emit-move node block
@@ -727,8 +727,8 @@
   (declare (type combination node) (type ir2-block block) (type clambda fun))
     (multiple-value-bind (temps locs) (emit-psetq-moves node block fun nil)
 
-      (mapc #'(lambda (temp loc)
-		(emit-move node block temp loc))
+      (mapc (lambda (temp loc)
+	      (emit-move node block temp loc))
 	    temps locs))
   (values))
 
@@ -1158,8 +1158,8 @@
 	     (cont-locs (continuation-tns node block cont types))
 	     (nvals (length cont-locs))
 	     (locs (make-standard-value-tns nvals)))
-	(mapc #'(lambda (val loc)
-		  (emit-move node block val loc))
+	(mapc (lambda (val loc)
+		(emit-move node block val loc))
 	      cont-locs
 	      locs)
 	(if (= nvals 1)
@@ -1201,15 +1201,15 @@
 	 (fun (ref-leaf (continuation-use (basic-combination-fun node))))
 	 (vars (lambda-vars fun)))
     (aver (eq (functional-kind fun) :mv-let))
-    (mapc #'(lambda (src var)
-	      (when (leaf-refs var)
-		(let ((dest (leaf-info var)))
-		  (if (lambda-var-indirect var)
-		      (do-make-value-cell node block src dest)
-		      (emit-move node block src dest)))))
+    (mapc (lambda (src var)
+	    (when (leaf-refs var)
+	      (let ((dest (leaf-info var)))
+		(if (lambda-var-indirect var)
+		    (do-make-value-cell node block src dest)
+		    (emit-move node block src dest)))))
 	  (continuation-tns node block cont
-			    (mapcar #'(lambda (x)
-					(primitive-type (leaf-type x)))
+			    (mapcar (lambda (x)
+				      (primitive-type (leaf-type x)))
 				    vars))
 	  vars))
   (values))
@@ -1259,8 +1259,8 @@
 
 ;;; Deliver the values TNs to CONT using MOVE-CONTINUATION-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
-  (let ((tns (mapcar #'(lambda (x)
-			 (continuation-tn node block x))
+  (let ((tns (mapcar (lambda (x)
+		       (continuation-tn node block x))
 		     values)))
     (move-continuation-result node block tns (node-cont node))))
 
@@ -1318,8 +1318,8 @@
    (once-only ((n-save-bs '(%primitive current-binding-pointer)))
      `(unwind-protect
 	  (progn
-	    (mapc #'(lambda (var val)
-		      (%primitive bind val var))
+	    (mapc (lambda (var val)
+		    (%primitive bind val var))
 		  ,vars
 		  ,vals)
 	    ,@body)

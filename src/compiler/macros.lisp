@@ -239,10 +239,10 @@
 ;;;   those in Attr2.
 (defmacro attributes-union (&rest attributes)
   `(the attributes
-	(logior ,@(mapcar #'(lambda (x) `(the attributes ,x)) attributes))))
+	(logior ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
 (defmacro attributes-intersection (&rest attributes)
   `(the attributes
-	(logand ,@(mapcar #'(lambda (x) `(the attributes ,x)) attributes))))
+	(logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
 (declaim (ftype (function (attributes attributes) boolean) attributes=))
 #!-sb-fluid (declaim (inline attributes=))
 (defun attributes= (attr1 attr2)
@@ -431,7 +431,7 @@
 		,(if eval-name
 		     ``(function ,,arg-types ,,result-type)
 		     `'(function ,arg-types ,result-type))
-		#'(lambda ,@stuff)
+		(lambda ,@stuff)
 		,doc
 		,(if important t nil)
 		,when)))))))
@@ -815,10 +815,10 @@
 (declaim (ftype (function (&optional unsigned-byte stream) (values)) event-statistics))
 (defun event-statistics (&optional (min-count 1) (stream *standard-output*))
   (collect ((info))
-    (maphash #'(lambda (k v)
-		 (declare (ignore k))
-		 (when (>= (event-info-count v) min-count)
-		   (info v)))
+    (maphash (lambda (k v)
+	       (declare (ignore k))
+	       (when (>= (event-info-count v) min-count)
+		 (info v)))
 	     *event-info*)
     (dolist (event (sort (info) #'> :key #'event-info-count))
       (format stream "~6D: ~A~%" (event-info-count event)
@@ -828,9 +828,9 @@
 
 (declaim (ftype (function nil (values)) clear-event-statistics))
 (defun clear-event-statistics ()
-  (maphash #'(lambda (k v)
-	       (declare (ignore k))
-	       (setf (event-info-count v) 0))
+  (maphash (lambda (k v)
+	     (declare (ignore k))
+	     (setf (event-info-count v) 0))
 	   *event-info*)
   (values))
 

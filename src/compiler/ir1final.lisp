@@ -126,7 +126,7 @@
   (maphash #'note-failed-optimization
 	   (component-failed-optimizations component))
 
-  (maphash #'(lambda (k v)
-	       (note-assumed-types component k v))
+  (maphash (lambda (k v)
+	     (note-assumed-types component k v))
 	   *free-functions*)
   (values))

@@ -497,7 +497,7 @@
 		    ((or (atom opname) (not (eq (car opname) 'lambda)))
 		     (compiler-error "illegal function call"))
 		    (t
-		     ;; implicitly #'(LAMBDA ..) because the LAMBDA
+		     ;; implicitly (LAMBDA ..) because the LAMBDA
 		     ;; expression is the CAR of an executed form
 		     (ir1-convert-combination start
 					      cont

@@ -367,9 +367,9 @@
 					      x)) thing))
 		(any-lowers
 		 ;; all lowercase, becomes all upper case
-		 (diddle-with #'(lambda (x) (if (stringp x)
-						(string-upcase x)
-						x)) thing))
+		 (diddle-with (lambda (x) (if (stringp x)
+					      (string-upcase x)
+					      x)) thing))
 		(t
 		 ;; no letters?  I guess just leave it.
 		 thing))))

@@ -276,8 +276,8 @@
   (let ((res (make-ir2-continuation nil)))
     (if (member (continuation-type-check cont) '(:deleted nil))
 	(setf (ir2-continuation-locs res) (mapcar #'make-normal-tn types))
-	(let* ((proven (mapcar #'(lambda (x)
-				   (make-normal-tn (primitive-type x)))
+	(let* ((proven (mapcar (lambda (x)
+				 (make-normal-tn (primitive-type x)))
 			       (values-types
 				(continuation-proven-type cont))))
 	       (num-proven (length proven))
@@ -730,18 +730,18 @@
       (:arg-types
        (funcall frob "argument types invalid")
        (funcall frob "argument primitive types:~%  ~S"
-		(mapcar #'(lambda (x)
-			    (primitive-type-name
-			     (continuation-ptype x)))
+		(mapcar (lambda (x)
+			  (primitive-type-name
+			   (continuation-ptype x)))
 			(combination-args call)))
        (funcall frob "argument type assertions:~%  ~S"
-		(mapcar #'(lambda (x)
-			    (if (atom x)
-				x
-				(ecase (car x)
-				  (:or `(:or .,(mapcar #'primitive-type-name
-						       (cdr x))))
-				  (:constant `(:constant ,(third x))))))
+		(mapcar (lambda (x)
+			  (if (atom x)
+			      x
+			      (ecase (car x)
+				(:or `(:or .,(mapcar #'primitive-type-name
+						     (cdr x))))
+				(:constant `(:constant ,(third x))))))
 			(template-arg-types template))))
       (:conditional
        (funcall frob "conditional in a non-conditional context"))

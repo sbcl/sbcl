@@ -1129,7 +1129,7 @@
 	   call
 	   `(lambda ,dummies
 	      (declare (ignore ,@dummies))
-	      (values ,@(mapcar #'(lambda (x) `',x) values))))))))
+	      (values ,@(mapcar (lambda (x) `',x) values))))))))
 
   (values))
 
@@ -1289,12 +1289,12 @@
 		(propagate-to-refs var (continuation-type arg))
 		(let ((use-component (node-component use)))
 		  (substitute-leaf-if
-		   #'(lambda (ref)
-		       (cond ((eq (node-component ref) use-component)
-			      t)
-			     (t
-			      (aver (lambda-toplevelish-p (lambda-home fun)))
-			      nil)))
+		   (lambda (ref)
+		     (cond ((eq (node-component ref) use-component)
+			    t)
+			   (t
+			    (aver (lambda-toplevelish-p (lambda-home fun)))
+			    nil)))
 		   leaf var))
 		t)))))
        ((and (null (rest (leaf-refs var)))
@@ -1325,11 +1325,11 @@
   (unless (or (functional-entry-fun fun)
 	      (lambda-optional-dispatch fun))
     (let* ((vars (lambda-vars fun))
-	   (union (mapcar #'(lambda (arg var)
-			      (when (and arg
-					 (continuation-reoptimize arg)
-					 (null (basic-var-sets var)))
-				(continuation-type arg)))
+	   (union (mapcar (lambda (arg var)
+			    (when (and arg
+				       (continuation-reoptimize arg)
+				       (null (basic-var-sets var)))
+			      (continuation-type arg)))
 			  (basic-combination-args call)
 			  vars))
 	   (this-ref (continuation-use (basic-combination-fun call))))
@@ -1342,16 +1342,16 @@
 	(let ((dest (continuation-dest (node-cont ref))))
 	  (unless (or (eq ref this-ref) (not dest))
 	    (setq union
-		  (mapcar #'(lambda (this-arg old)
-			      (when old
-				(setf (continuation-reoptimize this-arg) nil)
-				(type-union (continuation-type this-arg) old)))
+		  (mapcar (lambda (this-arg old)
+			    (when old
+			      (setf (continuation-reoptimize this-arg) nil)
+			      (type-union (continuation-type this-arg) old)))
 			  (basic-combination-args dest)
 			  union)))))
 
-      (mapc #'(lambda (var type)
-		(when type
-		  (propagate-to-refs var type)))
+      (mapc (lambda (var type)
+	      (when type
+		(propagate-to-refs var type)))
 	    vars union)))
 
   (values))
@@ -1413,11 +1413,11 @@
     (multiple-value-bind (types nvals)
 	(values-types (continuation-derived-type arg))
       (unless (eq nvals :unknown)
-	(mapc #'(lambda (var type)
-		  (if (basic-var-sets var)
-		      (propagate-from-sets var type)
-		      (propagate-to-refs var type)))
-		vars
+	(mapc (lambda (var type)
+		(if (basic-var-sets var)
+		    (propagate-from-sets var type)
+		    (propagate-to-refs var type)))
+	      vars
 		(append types
 			(make-list (max (- (length vars) nvals) 0)
 				   :initial-element (specifier-type 'null))))))
