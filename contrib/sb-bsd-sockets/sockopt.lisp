@@ -37,35 +37,42 @@ Code for options that not every system has should be conditionalised:
 
 (defmacro define-socket-option
     (lisp-name documentation
-     level number buffer-type mangle-arg mangle-return mangle-setf-buffer)
+     level number buffer-type mangle-arg mangle-return mangle-setf-buffer
+     &optional features info)
   (let ((find-level
 	 (if (numberp (eval level))
 	     level
-	     `(get-protocol-by-name ,(string-downcase (symbol-name level))))))
+	     `(get-protocol-by-name ,(string-downcase (symbol-name level)))))
+	(supportedp (or (null features) (featurep features))))
     `(progn
       (export ',lisp-name)
-      (defun ,lisp-name (socket &aux (fd (socket-file-descriptor socket)))
-	,@(when documentation (list documentation))
-	(sb-alien:with-alien ((size sb-alien:integer)
-			      (buffer ,buffer-type))
-	  (setf size (sb-alien:alien-size ,buffer-type :bytes))
-	  (if (= -1 (sockint::getsockopt fd ,find-level ,number
-					 (sb-alien:addr buffer)
-					 (sb-alien:addr size)))
-	      (socket-error "getsockopt")
-	      (,mangle-return buffer size))))
-      (defun (setf ,lisp-name) (new-val socket
-				&aux (fd (socket-file-descriptor socket)))
-	(sb-alien:with-alien ((buffer ,buffer-type))
-	  (setf buffer ,(if mangle-arg
-			    `(,mangle-arg new-val)
-			    `new-val))
-	  (when (= -1 (sockint::setsockopt fd ,find-level ,number
-					   (,mangle-setf-buffer buffer)
-					   ,(if (eql buffer-type 'sb-alien:c-string)
-						`(length new-val)
-						`(sb-alien:alien-size ,buffer-type :bytes))))
-	    (socket-error "setsockopt")))))))
+      (defun ,lisp-name (socket)
+	,@(when documentation (list (concatenate 'string documentation " " info)))
+	,(if supportedp
+	     `(sb-alien:with-alien ((size sb-alien:integer)
+				      (buffer ,buffer-type))
+		  (setf size (sb-alien:alien-size ,buffer-type :bytes))
+		  (if (= -1 (sockint::getsockopt (socket-file-descriptor socket)
+						 ,find-level ,number
+						 (sb-alien:addr buffer)
+						 (sb-alien:addr size)))
+		      (socket-error "getsockopt")
+		      (,mangle-return buffer size)))
+	     `(error 'unsupported-operator :name ',lisp-name)))
+      (defun (setf ,lisp-name) (new-val socket)
+	,(if supportedp
+	     `(sb-alien:with-alien ((buffer ,buffer-type))
+		  (setf buffer ,(if mangle-arg
+				    `(,mangle-arg new-val)
+				    `new-val))
+		  (when (= -1 (sockint::setsockopt (socket-file-descriptor socket)
+						   ,find-level ,number
+						   (,mangle-setf-buffer buffer)
+						   ,(if (eql buffer-type 'sb-alien:c-string)
+							`(length new-val)
+							`(sb-alien:alien-size ,buffer-type :bytes))))
+		    (socket-error "setsockopt")))
+	     `(error 'unsupported-operator :name `(setf ,lisp-name)))))))
 
 ;;; sockopts that have integer arguments
 
@@ -73,9 +80,9 @@ Code for options that not every system has should be conditionalised:
   (assert (= size (sb-alien:alien-size sb-alien:integer :bytes)))
   buffer)
 
-(defmacro define-socket-option-int (name level number)
+(defmacro define-socket-option-int (name level number &optional features (info ""))
   `(define-socket-option ,name nil ,level ,number
-     sb-alien:integer nil foreign-int-to-integer sb-alien:addr))
+     sb-alien:integer nil foreign-int-to-integer sb-alien:addr ,features ,info))
 
 (define-socket-option-int
   sockopt-receive-low-water sockint::sol-socket sockint::so-rcvlowat)
@@ -87,8 +94,9 @@ Code for options that not every system has should be conditionalised:
   sockopt-send-buffer sockint::sol-socket sockint::so-sndbuf)
 (define-socket-option-int
   sockopt-receive-buffer sockint::sol-socket sockint::so-rcvbuf)
-#+linux(define-socket-option-int
-  sockopt-priority sockint::sol-socket sockint::so-priority)
+(define-socket-option-int
+  sockopt-priority sockint::sol-socket sockint::so-priority :linux
+  "Available only on Linux.")
 
 ;;; boolean options are integers really
 
@@ -100,11 +108,14 @@ Code for options that not every system has should be conditionalised:
 (defun bool-to-foreign-int (val)
   (if val 1 0))
 
-(defmacro define-socket-option-bool (name level c-name)
+(defmacro define-socket-option-bool (name level c-name &optional features (info ""))
   `(define-socket-option ,name
-    ,(format nil "Return the value of the ~A socket option for SOCKET.  This can also be updated with SETF." (symbol-name c-name))
+    ,(format nil "~@<Return the value of the ~A socket option for SOCKET. ~
+                 This can also be updated with SETF.~:@>"
+	     (symbol-name c-name))
     ,level ,c-name
-     sb-alien:integer bool-to-foreign-int foreign-int-to-bool sb-alien:addr))
+    sb-alien:integer bool-to-foreign-int foreign-int-to-bool sb-alien:addr
+    ,features ,info))
 
 (define-socket-option-bool
   sockopt-reuse-address sockint::sol-socket sockint::so-reuseaddr)
@@ -112,10 +123,12 @@ Code for options that not every system has should be conditionalised:
   sockopt-keep-alive sockint::sol-socket sockint::so-keepalive)
 (define-socket-option-bool
   sockopt-oob-inline sockint::sol-socket sockint::so-oobinline)
-#+linux(define-socket-option-bool
-  sockopt-bsd-compatible sockint::sol-socket sockint::so-bsdcompat)
-#+linux(define-socket-option-bool
-  sockopt-pass-credentials sockint::sol-socket sockint::so-passcred)
+(define-socket-option-bool
+  sockopt-bsd-compatible sockint::sol-socket sockint::so-bsdcompat :linux
+  "Available only on Linux.")
+(define-socket-option-bool
+  sockopt-pass-credentials sockint::sol-socket sockint::so-passcred :linux
+  "Available only on Linux.")
 (define-socket-option-bool
   sockopt-debug sockint::sol-socket sockint::so-debug)
 (define-socket-option-bool
@@ -129,8 +142,9 @@ Code for options that not every system has should be conditionalised:
   (declare (ignore args))
   x)
 
-#+linux(define-socket-option sockopt-bind-to-device nil sockint::sol-socket
-  sockint::so-bindtodevice sb-alien:c-string identity identity-1 identity)
+(define-socket-option sockopt-bind-to-device nil sockint::sol-socket
+  sockint::so-bindtodevice sb-alien:c-string identity identity-1 identity
+  :linux "Available only on Linux")
 
 ;;; other kinds of socket option
 

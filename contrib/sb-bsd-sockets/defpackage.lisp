@@ -3,7 +3,6 @@
   (:shadow close listen)
   #+cmu (:shadowing-import-from "CL" with-array-data)
   #+sbcl (:shadowing-import-from "SB-KERNEL" with-array-data)
-
   #+cmu (:use "COMMON-LISP" "ALIEN" "SYSTEM" "EXT" "C-CALL")
   #+sbcl (:use "COMMON-LISP" "SB-ALIEN" #+nil "SB-SYSTEM" "SB-EXT" "SB-C-CALL"))
 
@@ -64,6 +63,7 @@
            non-blocking-mode
            )
   (:use "COMMON-LISP" "SB-BSD-SOCKETS-INTERNAL")
+  (:import-from "SB-INT" "UNSUPPORTED-OPERATOR" "FEATUREP")
   (:documentation
    "
 

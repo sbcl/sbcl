@@ -309,3 +309,7 @@
 (defun foreign-symbol-address (symbol)
   (int-sap (foreign-symbol-address-as-integer
 	    (sb!vm:extern-alien-name symbol))))
+
+;;; Overridden in foreign.lisp once we're running on target
+(defun foreign-symbol-in-address (sap)
+  (declare (ignore sap)))

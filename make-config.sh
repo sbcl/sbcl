@@ -201,6 +201,8 @@ else
     echo > /dev/null
 fi
 
+sh tools-for-build/grovel-features.sh >> $ltf
+
 echo //finishing $ltf
 echo ')' >> $ltf
 

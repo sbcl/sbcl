@@ -26,10 +26,10 @@
 ;;; It also works on OpenBSD, which isn't ELF, but is otherwise modern
 ;;; enough to have a fairly well working dlopen/dlsym implementation.
 (macrolet ((define-unsupported-fun (fun-name &optional (error-message "unsupported on this system"))
-	     `(defun ,fun-name (&rest rest)
-		,error-message
-                (declare (ignore rest))
-		(error 'unsupported-operator :name ',fun-name))))
+	       `(defun ,fun-name (&rest rest)
+		 ,error-message
+		 (declare (ignore rest))
+		 (error 'unsupported-operator :name ',fun-name))))
   #-(or linux sunos FreeBSD OpenBSD NetBSD darwin)
   (define-unsupported-fun load-shared-object)
   #+(or linux sunos FreeBSD OpenBSD NetBSD darwin)
@@ -136,32 +136,26 @@
 	  (unless (zerop possible-result)
 	    (return possible-result)))))
 
+    #+os-provides-dladdr
+    ;;; Override the early definition in target-load.lisp
     (defun foreign-symbol-in-address (sap)
-      (declare (ignore sap)))
-
-    (when (ignore-errors (foreign-symbol-address "dladdr"))
-      (setf (symbol-function 'foreign-symbol-in-address)
-	    ;; KLUDGE: This COMPILE trick is to avoid trying to
-	    ;; compile a reference to dladdr on platforms without it.
-	    (compile nil
-	     '(lambda (sap)
-	       (let ((addr (sap-int sap)))
-		 (with-alien ((info
-			       (struct dl-info
-				       (filename c-string)
-				       (base unsigned)
-				       (symbol c-string)
-				       (symbol-address unsigned)))
-			      (dladdr
-			       (function unsigned
-					 unsigned (* (struct dl-info)))
-			       :extern "dladdr"))
-		   (let ((err (alien-funcall dladdr addr (addr info))))
-		     (if (zerop err)
-			 nil
-			 (values (slot info 'symbol)
-				 (slot info 'filename)
-				 addr
-				 (- addr (slot info 'symbol-address)))))))))))
+      (let ((addr (sap-int sap)))
+	(with-alien ((info
+		      (struct dl-info
+			      (filename c-string)
+			      (base unsigned)
+			      (symbol c-string)
+			      (symbol-address unsigned)))
+		     (dladdr
+		      (function unsigned
+				unsigned (* (struct dl-info)))
+		      :extern "dladdr"))
+	  (let ((err (alien-funcall dladdr addr (addr info))))
+	    (if (zerop err)
+		nil
+		(values (slot info 'symbol)
+			(slot info 'filename)
+			addr
+			(- addr (slot info 'symbol-address))))))))
     
     ))					; PROGN, MACROLET

@@ -258,6 +258,8 @@ ldso_stub__ ## fct: ;                           \\
                    "dlerror"
                    "dlopen"
                    "dlsym")
+		 #!+os-provides-dladdr 
+		 '("dladdr")
                  #!-(and sparc sunos) ;; !defined(SVR4)
                  '("sigsetmask")))
 

@@ -301,20 +301,20 @@ initialization file does the trick:
 @lisp
 ;;; If the first user-processable command-line argument is a filename,
 ;;; disable the debugger, load the file handling shebang-line and quit.
-(let ((script (and (second sb-ext:*posix-argv*)
-                   (probe-file (second sb-ext:*posix-argv*)))))
+(let ((script (and (second *posix-argv*) (probe-file (second *posix-argv*)))))
   (when script
-    ;; Handle the possible shebang-line
+    ;; Handle shebang-line
     (set-dispatch-macro-character #\# #\!
 				  (lambda (stream char arg)
 				    (declare (ignore char arg))
 				    (read-line stream)))
     ;; Disable debugger
-    (setf sb-ext:*invoke-debugger-hook* 
-          (lambda (condition hook)
-            (declare (ignore hook))
-            (format *error-output* "Error: ~A~%" condition)
-            (quit :unix-status 1)))
+    (setf *invoke-debugger-hook* (lambda (condition hook)
+				   (declare (ignore hook))
+                                   ;; Uncomment to get backtraces on errors
+				   ;; (sb-debug:backtrace 20)
+				   (format *error-output* "Error: ~A~%" condition)
+				   (quit)))
     (load script)
     (quit)))
 @end lisp
@@ -364,7 +364,8 @@ handles recompilation automatically for ASDF-based systems.
 ;;; If a fasl was stale, try to recompile and load (once). 
 (defmethod asdf:perform :around ((o asdf:load-op) (c asdf:cl-source-file))
   (handler-case (call-next-method o c)
-    (sb-ext:invalid-fasl error ()
-     (asdf:perform (make-instance 'asdf:compile-op) c)
-     (call-next-method))))
+    ;; If a fasl was stale, try to recompile and load (once).
+    (sb-ext:invalid-fasl ()
+      (asdf:perform (make-instance 'asdf:compile-op) c)
+      (call-next-method))))
 @end lisp
