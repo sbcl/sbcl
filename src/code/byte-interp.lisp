@@ -1,5 +1,6 @@
 ;;;; the byte code interpreter
 
+;;; FIXME: should really be in SB!BYTECODE
 (in-package "SB!C")
 
 ;;;; This software is part of the SBCL system. See the README file for

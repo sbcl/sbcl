@@ -1,8 +1,9 @@
-;;;; error-handling machinery for PARSE-DEFMACRO, separated from PARSE-DEFMACRO
-;;;; code itself because the happy path can be handled earlier in the bootstrap
-;;;; sequence than DEFINE-CONDITION can be, and because some of the error
-;;;; handling depends on SBCL extensions, while PARSE-DEFMACRO needs to run in
-;;;; the cross-compiler on the host Common Lisp
+;;;; error-handling machinery for PARSE-DEFMACRO, separated from
+;;;; PARSE-DEFMACRO code itself because the happy path can be handled
+;;;; earlier in the bootstrap sequence than DEFINE-CONDITION can be,
+;;;; and because some of the error handling depends on SBCL
+;;;; extensions, while PARSE-DEFMACRO needs to run in the
+;;;; cross-compiler on the host Common Lisp
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

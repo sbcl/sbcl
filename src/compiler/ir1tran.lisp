@@ -1993,7 +1993,7 @@
 
 ;;; This handles EVAL-WHEN in non-top-level forms. (EVAL-WHENs in
 ;;; top-level forms are picked off and handled by PROCESS-TOP-LEVEL-FORM,
-;;; so they're never seen at this level.)
+;;; so that they're never seen at this level.)
 ;;;
 ;;; ANSI "3.2.3.1 Processing of Top Level Forms" says that processing
 ;;; of non-top-level EVAL-WHENs is very simple:
@@ -2010,8 +2010,7 @@
   :LOAD-TOPLEVEL, or :EXECUTE, or (deprecated) COMPILE, LOAD, or EVAL)."
   (multiple-value-bind (ct lt e) (parse-eval-when-situations situations)
     (declare (ignore ct lt))
-    (when e
-      (ir1-convert-progn-body start cont forms)))
+    (ir1-convert-progn-body start cont (and e forms)))
   (values))
 
 ;;; common logic for MACROLET and SYMBOL-MACROLET

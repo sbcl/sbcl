@@ -75,15 +75,14 @@
 
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.
-;;;
-;;; FIXME: This implementation will hang on circular list structure.
-;;; Since this is an error-checking utility, i.e. its job is to deal
-;;; with screwed-up input, it'd be good style to fix it so that it can
-;;; deal with circular list structure.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Return true if X is a proper list whose length is between MIN and
   ;; MAX (inclusive).
   (defun proper-list-of-length-p (x min &optional (max min))
+    ;; FIXME: This implementation will hang on circular list
+    ;; structure. Since this is an error-checking utility, i.e. its
+    ;; job is to deal with screwed-up input, it'd be good style to fix
+    ;; it so that it can deal with circular list structure.
     (cond ((minusp max)
 	   nil)
 	  ((null x)
@@ -114,6 +113,25 @@
   (or (zerop n) ; since anything can be considered an improper list of length 0
       (and (consp x)
 	   (list-of-length-at-least-p (cdr x) (1- n)))))
+
+;;; Is X is a positive prime integer? 
+(defun positive-primep (x)
+  ;; This happens to be called only from one place in sbcl-0.7.0, and
+  ;; only for fixnums, we can limit it to fixnums for efficiency. (And
+  ;; if we didn't limit it to fixnums, we should use a cleverer
+  ;; algorithm, since this one scales pretty badly for huge X.)
+  (declare (fixnum x))
+  (if (<= x 5)
+      (and (>= x 2) (/= x 4))
+      (and (not (evenp x))
+	   (not (zerop (rem x 3)))
+	   (do ((q 6)
+		(r 1)
+		(inc 2 (logxor inc 6)) ;; 2,4,2,4...
+		(d 5 (+ d inc)))
+	       ((or (= r 0) (> d q)) (/= r 0))
+	     (declare (fixnum inc))
+	     (multiple-value-setq (q r) (truncate x d))))))
 
 ;;;; the COLLECT macro
 ;;;;

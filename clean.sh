@@ -58,8 +58,8 @@ done
 #   *~, #*#, TAGS
 #     common names for editor temporary files
 #   *.htm, *.html
-#     The system doc sources are SGML, any HTML is automatically 
-#     generated output.
+#     The system doc sources are SGML, any HTML is
+#     automatically-generated output.
 #   depend
 #     made by "make depend" (or "gmake depend" or some such thing)
 #   *.x86f, *.axpf, *.lbytef, *.fasl

@@ -9,12 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!BYTECODE")
-
-;;; Note: This is defined here, but it's visible in SB-KERNEL, since
-;;; various magical things need to happen to it, e.g. initialization
-;;; early in cold load, and save/restore in nonlocal exit logic.
-(defvar *eval-stack-top* 0)
+(in-package "SB!IMPL")
 
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to the byte compiler.
@@ -38,6 +33,27 @@
 		       (declare (optimize (compilation-speed 3)))
 
 		       ,expr))))
+
+;;; Handle PROGN and implicit PROGN.
+(defun eval-progn-body (progn-body)
+  (unless (list-with-length-p progn-body)
+    (let ((*print-circle* t))
+      (error 'simple-program-error
+	     :format-control
+	     "~@<not a proper list in PROGN or implicit PROGN: ~2I~_~S~:>"
+	     :format-arguments (list progn-body))))
+  ;; Note:
+  ;;   * We can't just use (MAP NIL #'EVAL PROGN-BODY) here, because we
+  ;;     need to take care to return all the values of the final EVAL.
+  ;;   * It's left as an exercise to the reader to verify that this
+  ;;     gives the right result when PROGN-BODY is NIL, because
+  ;;     (FIRST NIL) = (REST NIL) = NIL.
+  (do* ((i progn-body rest-i)
+	(rest-i (rest i) (rest i)))
+      (nil)
+    (if rest-i ; if not last element of list
+	(eval (first i))
+	(return (eval (first i))))))
 
 ;;; Pick off a few easy cases, and the various top-level EVAL-WHEN
 ;;; magical cases, and call %EVAL for the rest. 
@@ -67,10 +83,10 @@
 	  (%eval original-exp))))
       (list
        (let ((name (first exp))
-	     (args (1- (length exp))))
+	     (n-args (1- (length exp))))
 	 (case name
 	   (function
-	    (unless (= args 1)
+	    (unless (= n-args 1)
 	      (error "wrong number of args to FUNCTION:~% ~S" exp))
 	    (let ((name (second exp)))
 	      (if (or (atom name)
@@ -79,13 +95,13 @@
 		  (fdefinition name)
 		  (%eval original-exp))))
 	   (quote
-	    (unless (= args 1)
+	    (unless (= n-args 1)
 	      (error "wrong number of args to QUOTE:~% ~S" exp))
 	    (second exp))
 	   (setq
-	    (unless (evenp args)
+	    (unless (evenp n-args)
 	      (error "odd number of args to SETQ:~% ~S" exp))
-	    (unless (zerop args)
+	    (unless (zerop n-args)
 	      (do ((name (cdr exp) (cddr name)))
 		  ((null name)
 		   (do ((args (cdr exp) (cddr args)))
@@ -103,17 +119,33 @@
 		    (:special)
 		    (t (return (%eval original-exp))))))))
 	   ((progn)
-	    (when (> args 0)
-	      (dolist (x (butlast (rest exp)) (eval (car (last exp))))
-		(eval x))))
+	    (eval-progn-body (rest exp)))
 	   ((eval-when)
-	    (if (and (> args 0)
-		     (or (member 'eval (second exp))
-			 (member :execute (second exp))))
-		(when (> args 1)
-		  (dolist (x (butlast (cddr exp)) (eval (car (last exp))))
-		    (eval x)))
-		(%eval original-exp)))
+	    ;; FIXME: DESTRUCTURING-BIND returns
+	    ;; DEFMACRO-LL-ARG-COUNT-ERROR instead of PROGRAM-ERROR
+	    ;; when there's something wrong with the syntax here (e.g.
+	    ;; missing SITUATIONS). This could be fixed by
+	    ;; hand-crafting clauses to catch and report each
+	    ;; possibility, but it would probably be cleaner to write
+	    ;; a new macro DESTRUCTURING-BIND-PROGRAM-SYNTAX which
+	    ;; does DESTRUCTURING-BIND and promotes any mismatch to
+	    ;; PROGRAM-ERROR, then to use it here and in (probably
+	    ;; dozens of) other places where the same problem arises.
+	    (destructuring-bind (eval-when situations &rest body) exp
+	      (declare (ignore eval-when))
+	      (multiple-value-bind (ct lt e)
+		  (sb!c:parse-eval-when-situations situations)
+		;; CLHS 3.8 - Special Operator EVAL-WHEN: The use of
+		;; the situation :EXECUTE (or EVAL) controls whether
+		;; evaluation occurs for other EVAL-WHEN forms; that
+		;; is, those that are not top level forms, or those in
+		;; code processed by EVAL or COMPILE. If the :EXECUTE
+		;; situation is specified in such a form, then the
+		;; body forms are processed as an implicit PROGN;
+		;; otherwise, the EVAL-WHEN form returns NIL.
+		(declare (ignore ct lt))
+		(when e
+		  (eval-progn-body body)))))
 	   (t
 	    (if (and (symbolp name)
 		     (eq (info :function :kind name) :function))

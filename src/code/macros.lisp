@@ -413,7 +413,7 @@ the usual naming convention (names like *FOO*) for special variables"
 
 (defmacro-mundanely nth-value (n form)
   #!+sb-doc
-  "Evaluates FORM and returns the Nth value (zero based). This involves no
+  "Evaluate FORM and return the Nth value (zero based). This involves no
   consing when N is a trivial constant integer."
   (if (integerp n)
       (let ((dummy-list nil)
@@ -456,10 +456,19 @@ the usual naming convention (names like *FOO*) for special variables"
 				  `(sb!xc:proclaim ',x))
 			      specs))))
 
-(defmacro-mundanely print-unreadable-object ((object stream
-					      &key type identity)
+(defmacro-mundanely print-unreadable-object ((object stream &key type identity)
 					     &body body)
+  "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
+  with object-type prefix and object-identity suffix, and executing the
+  code in BODY to provide possible further output."
   `(%print-unreadable-object ,object ,stream ,type ,identity
 			     ,(if body
 				  `#'(lambda () ,@body)
 				  nil)))
+
+(defmacro-mundanely ignore-errors (&rest forms)
+  #!+sb-doc
+  "Execute FORMS handling ERROR conditions, returning the result of the last
+  form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
+  `(handler-case (progn ,@forms)
+     (error (condition) (values nil condition))))

@@ -319,7 +319,7 @@
        ;; Wait for any float exceptions.
        #!+x86 (float-wait))))
 
-;;;; HANDLER-CASE and IGNORE-ERRORS
+;;;; HANDLER-CASE
 
 (defmacro handler-case (form &rest cases)
   "(HANDLER-CASE form
@@ -444,13 +444,6 @@
 				       (t
 					`(progn ,@body)))))))
 		   annotated-cases))))))))
-
-(defmacro ignore-errors (&rest forms)
-  #!+sb-doc
-  "Execute FORMS handling ERROR conditions, returning the result of the last
-  form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
-  `(handler-case (progn ,@forms)
-     (error (condition) (values nil condition))))
 
 ;;;; helper functions for restartable error handling which couldn't be
 ;;;; defined 'til now 'cause they use the RESTART-CASE macro

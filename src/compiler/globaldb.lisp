@@ -84,8 +84,7 @@
 (defun primify (x)
   (declare (type unsigned-byte x))
   (do ((n (logior x 1) (+ n 2)))
-      ((sb!sys:positive-primep n)
-       n)))
+      ((positive-primep n) n)))
 
 ;;;; info classes, info types, and type numbers, part I: what's needed
 ;;;; not only at compile time but also at run time

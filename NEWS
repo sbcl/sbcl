@@ -833,12 +833,18 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   doubled, to 4 million. (If your application spends a lot of time
   GCing and you have a lot of RAM, you might want to experiment with
   increasing it even more.)
-?? The system's handling of top-level forms and EVAL-WHEN is now
-  more ANSI-compliant, fixing bugs
+* The EVAL and EVAL-WHEN code has been largely rewritten, and the
+  old CMU CL "IR1 interpreter" has gone away. The new interpreter
+  is probably slower and harder to debug than the old one, but
+  it's much simpler (several thousand lines of source code simpler)
+  and considerably more ANSI-compliant. Bugs
     ?? IR1-3 and
-    ?? IR1-3a.
-  It's also done by much newer code, so there might be some new bugs,
-  but hopefully if so they'll be less fundamental and more fixable.
+    ?? IR1-3a
+  have been fixed. Since the code is newer, there might still be
+  some new bugs (though not as many as before Martin Atzmueller's
+  fixes:-). But hopefully any remaining bugs will be simpler, less
+  fundamental, and more fixable then the bugs in the old IR1
+  interpreter code.
 * PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry
   and uses that copy, rather than the current dynamic value, when
   it's trying to decide whether to truncate output . Thus e.g.

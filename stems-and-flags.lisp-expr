@@ -88,11 +88,11 @@
  ("src/compiler/target/parms")
  ("src/code/early-array") ; needs "early-vm" numbers
 
- ("src/code/parse-body")      ; on host for PARSE-BODY
- ("src/code/parse-defmacro")  ; on host for PARSE-DEFMACRO
- ("src/code/extensions")      ; on host for COLLECT, SYMBOLICATE, etc.
- ("src/compiler/deftype")     ; on host for SB!XC:DEFTYPE
- ("src/code/early-alieneval") ; for vars needed both at build and run time
+ ("src/code/parse-body")       ; on host for PARSE-BODY
+ ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
+ ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
+ ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
+ ("src/code/early-alieneval")  ; for vars needed both at build and run time
 
  ("src/code/specializable-array")
 
@@ -142,9 +142,7 @@
  ;; "maybe should be :BYTE-COMPILE T". Once the system is stable,
  ;; look into them.
 
- ("src/code/early-target-error" :not-host) ; maybe should be :BYTE-COMPILE T
- ;; FIXME: maybe should be called "target-error", with "late-target-error"
- ;; called "condition"
+ ("src/code/target-error" :not-host) ; maybe should be :BYTE-COMPILE T
 
  ;; a comment from classic CMU CL:
  ;;   "These guys can supposedly come in any order, but not really.
@@ -265,8 +263,6 @@
 
  ("src/compiler/early-c")
  ("src/compiler/policy")
- ("src/code/numbers")
-
  ("src/code/typedefs")
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
@@ -317,7 +313,7 @@
 
  ;; The definitions for CONDITION and CONDITION-CLASS depend on
  ;; SLOT-CLASS, defined in classes.lisp.
- ("src/code/late-target-error" :not-host) ; FIXME: maybe should be :BYTE-COMPILE T
+ ("src/code/condition" :not-host) ; FIXME: maybe should be :BYTE-COMPILE T
 
  ("src/compiler/generic/primtype")
 
@@ -550,10 +546,10 @@
  ("src/code/macroexpand")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; files which are only needed in the target system, and/or which are
- ;; only possible in the target system, and which depend in some way 
- ;; (directly or indirectly) on stuff compiled as part of the compiler
+ ;; files which depend in some way (directly or indirectly) on stuff
+ ;; compiled as part of the compiler
 
+ ("src/code/late-extensions") ; needs condition system
  ("src/compiler/generic/target-core" :not-host) ; uses stuff from
                                                 ;   "compiler/generic/core"
 
