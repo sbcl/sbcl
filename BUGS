@@ -184,15 +184,6 @@ WORKAROUND:
 		(FLOAT 1 DOUBLE-FLOAT-EPSILON)
 	   don't give the right behavior.
 
-46:
-  type safety errors reported by Peter Van Eynde July 25, 2000:
-	k: READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
-	   not a binary input stream, but instead cheerfully reads from
-	   string-input streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
-  [ Bug was reported as "from character streams", but in 0.8.3.10 we
-  get correct behaviour from (WITH-OPEN-FILE (i "/dev/zero") (READ-BYTE i)) ]
-
-
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
   (How should it work properly?)
@@ -377,14 +368,6 @@ WORKAROUND:
    Raymond Toy comments that this is tricky on the X86 since its FPU
    uses 80-bit precision internally.
 
-120b:
-   Even in sbcl-0.pre7.x, which is supposed to be free of the old
-   non-ANSI behavior of treating the function return type inferred
-   from the current function definition as a declaration of the
-   return type from any function of that name, the return type of NIL
-   is attached to FOO in 120a above, and used to optimize code which
-   calls FOO. 
-
 124:
    As of version 0.pre7.14, SBCL's implementation of MACROLET makes
    the entire lexical environment at the point of MACROLET available
@@ -463,6 +446,8 @@ WORKAROUND:
   a.
     * '``(FOO ,@',@S)
     ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
+
+  b. (fixed in 0.8.4.7)
 
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately
@@ -890,10 +875,6 @@ WORKAROUND:
   a. On X86 an immediate operand for IMUL is printed incorrectly.
   b. On X86 operand size prefix is not recognized.
 
-248: "reporting errors in type specifier syntax"
-  (TYPEP 1 '(SYMBOL NIL)) says something about "unknown type
-  specifier".
-
 251:
   (defun foo (&key (a :x))
     (declare (fixnum a))
@@ -977,12 +958,6 @@ WORKAROUND:
          (sin (* x y))))
 
   Urgh... It's time to write IR1-copier.
-
-265:
-  SB-EXT:RUN-PROGRAM is currently non-functional on Linux/PPC;
-  attempting to use it leads to segmentation violations.  This is
-  probably because of a bogus implementation of
-  os_restore_fp_control().
 
 266:
   David Lichteblau provided (sbcl-devel 2003-06-01) a patch to fix
@@ -1172,20 +1147,12 @@ WORKAROUND:
   this problem.
 
 288: fundamental cross-compilation issues (from old UGLINESS file)
-  288a: Using host floating point numbers to represent target
-    floating point numbers, or host characters to represent
-    target characters, is theoretically shaky. (The characters
-    are OK as long as the characters are in the ANSI-guaranteed
-    character set, though, so they aren't a real problem as
-    long as the sources don't need anything but that.)
-  288b: The compiler still makes assumptions about cross-compilation-host
-    implementation of ANSI CL:
-    288b1: Simple bit vectors are distinct from simple vectors (in
-	DEFINE-STORAGE-BASE and elsewhere). (Actually, I'm not *sure*
-	that things would really break if this weren't so, but I 
-	strongly suspect that they would.)
-    288b2: SINGLE-FLOAT is distinct from DOUBLE-FLOAT. (This is 
-	in a sense just one aspect of bug 288a.)
+  Using host floating point numbers to represent target floating point
+  numbers, or host characters to represent target characters, is
+  theoretically shaky. (The characters are OK as long as the characters
+  are in the ANSI-guaranteed character set, though, so they aren't a
+  real problem as long as the sources don't need anything but that;
+  the floats are a real problem.)
 
 289: "type checking and source-transforms"
   a.
@@ -1215,11 +1182,6 @@ WORKAROUND:
   denormalized float, in general, we mask out that bit when we restore
   the control word; however, this clobbers any change the user might
   have made.
-
-295:
-  From Paul Dietz:
-
-  (ash -1000000000000 -10000000000000000000) ==> 0  ;; should be -1
 
 296:
   (reported by Adam Warner, sbcl-devel 2003-09-23)

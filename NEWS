@@ -2132,6 +2132,8 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
   * fixed bug 213a: even fairly unreasonable CONS type specifiers are
     now understood by sequence creation functions such as MAKE-SEQUENCE
     and COERCE.
+  * fixed bug 46k: READ-BYTE now signals an error when asked to read from
+    a STRING-INPUT-STREAM.
   * compiler enhancement: SIGNUM is now better able to derive the type
     of its result.
   * type declarations inside WITH-SLOTS are checked.  (reported by

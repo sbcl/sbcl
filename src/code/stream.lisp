@@ -1085,7 +1085,7 @@
 (defstruct (string-input-stream
 	     (:include string-stream
 		       (in #'string-inch)
-		       (bin #'string-binch)
+		       (bin #'ill-bin)
 		       (n-bin #'string-stream-read-n-bytes)
 		       (misc #'string-in-misc)
                        (string (missing-arg) :type simple-string))

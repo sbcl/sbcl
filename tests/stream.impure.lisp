@@ -76,5 +76,10 @@
   (close stream)
   (delete-file p))
 
+(assert (raises-error? (read-byte (make-string-input-stream "abc"))
+		       type-error))
+(assert (raises-error? (with-open-file (s "/dev/random")
+			 (read-byte s))
+		       type-error))
 ;;; success
 (quit :unix-status 104)
