@@ -179,8 +179,14 @@
 (define-source-transform logorc1 (x y) `(logior (lognot ,x) ,y))
 (define-source-transform logorc2 (x y) `(logior ,x (lognot ,y)))
 (define-source-transform logtest (x y) `(not (zerop (logand ,x ,y))))
-(define-source-transform logbitp (index integer)
-  `(not (zerop (logand (ash 1 ,index) ,integer))))
+
+(deftransform logbitp
+    ((index integer) (unsigned-byte (or (signed-byte #.sb!vm:n-word-bits)
+					(unsigned-byte #.sb!vm:n-word-bits))))
+  `(if (>= index #.sb!vm:n-word-bits)
+       (minusp integer)
+       (not (zerop (logand integer (ash 1 index))))))
+
 (define-source-transform byte (size position)
   `(cons ,size ,position))
 (define-source-transform byte-size (spec) `(car ,spec))

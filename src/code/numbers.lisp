@@ -1008,8 +1008,9 @@
   if INTEGER is negative."
   (etypecase integer
     (fixnum
-     (logcount (truly-the (integer 0 #.(max most-positive-fixnum
-					    (lognot most-negative-fixnum)))
+     (logcount (truly-the (integer 0
+				   #.(max sb!xc:most-positive-fixnum
+					  (lognot sb!xc:most-negative-fixnum)))
 			  (if (minusp (truly-the fixnum integer))
 			      (lognot (truly-the fixnum integer))
 			      integer))))
@@ -1024,7 +1025,12 @@
 (defun logbitp (index integer)
   #!+sb-doc
   "Predicate returns T if bit index of integer is a 1."
-  (logbitp index integer))
+  (number-dispatch ((index integer) (integer integer))
+    ((fixnum fixnum) (if (> index #.(- sb!vm:n-word-bits sb!vm:n-lowtag-bits))
+			 (minusp integer)
+			 (not (zerop (logand integer (ash 1 index))))))
+    ((fixnum bignum) (bignum-logbitp index integer))
+    ((bignum (foreach fixnum bignum)) (minusp integer))))
 
 (defun ash (integer count)
   #!+sb-doc

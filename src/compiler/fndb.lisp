@@ -370,7 +370,7 @@
 
 (defknown lognot (integer) integer (movable foldable flushable explicit-check))
 (defknown logtest (integer integer) boolean (movable foldable flushable))
-(defknown logbitp (bit-index integer) boolean (movable foldable flushable))
+(defknown logbitp (unsigned-byte integer) boolean (movable foldable flushable))
 (defknown ash (integer integer) integer
   (movable foldable flushable explicit-check))
 (defknown (logcount integer-length) (integer) bit-index

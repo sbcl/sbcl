@@ -22,7 +22,7 @@
 ;;;       bignum-logical-and bignum-logical-ior bignum-logical-xor
 ;;;       bignum-logical-not bignum-load-byte bignum-deposit-byte
 ;;;       bignum-truncate bignum-plus-p bignum-compare make-small-bignum
-;;;       bignum-logcount
+;;;       bignum-logbitp bignum-logcount
 ;;;   These symbols define the interface to the compiler:
 ;;;       bignum-type bignum-element-type bignum-index %allocate-bignum
 ;;;       %bignum-length %bignum-set-length %bignum-ref %bignum-set
@@ -1009,7 +1009,7 @@
      (t
       (round-up))))))
 
-;;;; integer length and logcount
+;;;; integer length and logbitp/logcount
 
 (defun bignum-integer-length (bignum)
   (declare (type bignum-type bignum))
@@ -1020,6 +1020,17 @@
 	     (type bignum-element-type digit))
     (+ (integer-length (%fixnum-digit-with-correct-sign digit))
        (* len-1 digit-size))))
+
+(defun bignum-logbitp (index bignum)
+  (declare (type bignum-type bignum))
+  (let ((len (%bignum-length bignum)))
+    (declare (type bignum-index len))
+    (multiple-value-bind (word-index bit-index)
+	(floor index digit-size)
+      (if (>= word-index len)
+	  (not (bignum-plus-p bignum))
+	  (not (zerop (logand (%bignum-ref bignum word-index)
+			      (ash 1 bit-index))))))))
 
 (defun bignum-logcount (bignum)
   (declare (type bignum-type bignum))

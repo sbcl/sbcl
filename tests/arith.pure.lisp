@@ -123,3 +123,17 @@
 	    (compile nil '(lambda (x) (declare (bit x)) (+ x #xf0000000)))
 	    1)
 	   #xf0000001))
+
+;;; LOGBITP on bignums:
+(dolist (x '(((1+ most-positive-fixnum) 1 nil)
+	     ((1+ most-positive-fixnum) -1 t)
+	     ((1+ most-positive-fixnum) (1+ most-positive-fixnum) nil)
+	     ((1+ most-positive-fixnum) (1- most-negative-fixnum) t)
+	     (1 (ash most-negative-fixnum 1) nil)
+	     (29 most-negative-fixnum t)
+	     (30 (ash most-negative-fixnum 1) t)
+	     (31 (ash most-negative-fixnum 1) t)
+	     (64 (ash most-negative-fixnum 36) nil)
+	     (65 (ash most-negative-fixnum 36) t)))
+  (destructuring-bind (index int result) x
+    (assert (eq (eval `(logbitp ,index ,int)) result))))
