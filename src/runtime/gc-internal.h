@@ -36,6 +36,7 @@
 #define FREE_PAGE 0
 #define BOXED_PAGE 1
 #define UNBOXED_PAGE 2
+#define OPEN_REGION_PAGE 4
 
 #define ALLOC_BOXED 0
 #define ALLOC_UNBOXED 1

@@ -69,7 +69,7 @@ int os_set_tls_pointer(struct thread *thread) {
 	/LDT_ENTRY_SIZE;
 
     ldt_entry.entry_number=n;
-    ldt_entry.base_addr=(unsigned long) (thread->dynamic_values_start);
+    ldt_entry.base_addr=(unsigned long) thread;
     ldt_entry.limit=dynamic_values_bytes;
     ldt_entry.limit_in_pages=0;
     if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 

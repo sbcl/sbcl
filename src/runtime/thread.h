@@ -4,17 +4,30 @@
 #include "sbcl.h"
 #include "os.h"
 #include "interrupt.h"
+#ifdef LISP_FEATURE_GENCGC
+#include "gencgc-alloc-region.h"
+#else
+#error "threading doesn't work with cheney gc yet"
+#endif
 
 struct thread {
-    lispobj *control_stack_start;
+    lispobj unbound_marker;	/* tls[0] = UNBOUND_MARKER_WIDETAG */
     lispobj *binding_stack_start;
+    lispobj *binding_stack_pointer;
+    lispobj *control_stack_start;
     lispobj *alien_stack_start;
-    lispobj *dynamic_values_start;
-    pid_t pid;
-    int tls_cookie;		/* on x86, the LDT index */
+    lispobj *alien_stack_pointer; 
+    struct alloc_region alloc_region; /* 5 words: first 2 are pointer, end */
     os_context_t *interrupt_contexts[MAX_INTERRUPTS];
-    struct thread *next;
+    pid_t pid;
+    u32 tls_cookie;		/* on x86, the LDT index */
+    struct thread *this,*next;
 };
+union per_thread_data {
+    struct thread thread;
+    lispobj dynamic_values[1];	/* actually more like 4000 or so */
+};
+
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
 extern struct thread *find_thread_by_pid(pid_t pid);
@@ -26,8 +39,8 @@ static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     if(thread && sym->tls_index) {
 	lispobj r=
-	    ((struct thread *)thread)
-	    -> dynamic_values_start[fixnum_value(sym->tls_index)];
+	    ((union per_thread_data *)thread)
+	    ->dynamic_values[fixnum_value(sym->tls_index)];
 	if(r!=UNBOUND_MARKER_WIDETAG) return r;
     }
     return sym->value;
@@ -35,16 +48,16 @@ static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
 static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
-    return ((struct thread *)thread)
-	->dynamic_values_start[fixnum_value(sym->tls_index)];
+    return ((union per_thread_data *)thread)
+	->dynamic_values[fixnum_value(sym->tls_index)];
 }
 
 static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     if(thread && sym->tls_index) {
-	lispobj *pr=&(((struct thread *)thread)
-		      ->dynamic_values_start[fixnum_value(sym->tls_index)]);
+	lispobj *pr= &(((union per_thread_data *)thread)
+		       ->dynamic_values[fixnum_value(sym->tls_index)]);
 	if(*pr!= UNBOUND_MARKER_WIDETAG) {
 	    *pr=val;
 	    return;
@@ -55,8 +68,8 @@ static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *t
 static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
-    (((struct thread *)thread)
-     ->dynamic_values_start[fixnum_value(sym->tls_index)])
+    ((union per_thread_data *)thread)
+	->dynamic_values[fixnum_value(sym->tls_index)]
 	=val;
 }
 

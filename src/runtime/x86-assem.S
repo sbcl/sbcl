@@ -648,7 +648,7 @@ GNAME(alloc_16_to_edi):
 		
 
 
-#ifdef LISP_FEATURE_GENCGC
+#ifdef GENCGC_INLINE_ALLOC /* LISP_FEATURE_GENCGC */
 
 /* These routines are called from Lisp when an inline allocation 
  * overflows. Every register except the result needs to be preserved.

@@ -19,6 +19,8 @@
 #ifndef _GENCGC_INTERNAL_H_
 #define _GENCGC_INTERNAL_H_
 
+#include "gencgc-alloc-region.h"
+
 void gc_free_heap(void);
 inline int find_page_index(void *);
 inline void *page_address(int);
@@ -42,7 +44,7 @@ struct page {
          * for boxed objects; 2 for unboxed objects. If the page is
          * free the following slots are invalid (well the bytes_used
          * must be 0). */
-	allocated :2,
+	allocated :3,
 	/* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
 	dont_move :1,
@@ -75,28 +77,6 @@ struct page {
 /* the number of pages needed for the dynamic space - rounding up */
 #define NUM_PAGES ((DYNAMIC_SPACE_SIZE+4095)/4096)
 extern struct page page_table[NUM_PAGES];
-
-/* Abstract out the data for an allocation region allowing a single
- * routine to be used for allocation and closing. */
-struct alloc_region {
-
-    /* These two are needed for quick allocation. */
-    void  *free_pointer;
-    void  *end_addr; /* pointer to the byte after the last usable byte */
-
-    /* These are needed when closing the region. */
-    int  first_page;
-    int  last_page;
-    void  *start_addr;
-};
-
-extern struct alloc_region  boxed_region;
-extern struct alloc_region  unboxed_region;
-extern int from_space, new_space;
-extern struct weak_pointer *weak_pointers;
-
-extern void *current_region_free_pointer;
-extern void *current_region_end_addr;
 
 
 void  gencgc_pickup_dynamic(void);

@@ -148,17 +148,8 @@ save(char *filename, lispobj init_function)
 		 dynamic_space_free_pointer);
 #else
 #ifdef LISP_FEATURE_GENCGC
-    /* I don't know too much about the circumstances in which we could
-     * end up here.  It may be that current_region_free_pointer is
-     * guaranteed to be relevant and we could skip these slightly
-     * paranoid checks.  TRT would be to rid the code of
-     * current_region_foo completely - dan 2002.09.17 */
-    if((boxed_region.free_pointer < current_region_free_pointer) &&
-       (boxed_region.end_addr == current_region_end_addr))
-	boxed_region.free_pointer = current_region_free_pointer;
     /* Flush the current_region, updating the tables. */
-    gc_alloc_update_page_tables(0,&boxed_region);
-    gc_alloc_update_page_tables(1,&unboxed_region);
+    gc_alloc_update_all_page_tables();
     update_x86_dynamic_space_free_pointer();
 #endif
     output_space(file,

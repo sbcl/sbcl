@@ -235,8 +235,9 @@
     ;; free pointers
     ;; 
     ;; Note that these are FIXNUM word counts, not (as one might
-    ;; expect) byte counts or SAPs. The reason seems to be that by
-    ;; representing them this way, we can avoid consing bignums. 
+    ;; expect) byte counts or SAPs.  This is presumably to
+    ;; avoid consing bignums
+    ;; allow them to be GCed freely
     ;; -- WHN 2000-10-02
     *read-only-space-free-pointer*
     *static-space-free-pointer*
@@ -258,9 +259,9 @@
     
     *allocation-pointer*
     *binding-stack-pointer*
+    *binding-stack-start*
+    *control-stack-start*
 
-    *current-thread-struct* 
-    
     ;; the floating point constants
     *fp-constant-0d0*
     *fp-constant-1d0*

@@ -274,6 +274,20 @@
   (:generator 1
     (inst break pending-interrupt-trap)))
 
+(defknown sb!di::nth-interrupt-context-sap ((unsigned-byte 32))  
+  system-area-pointer (flushable))
+
+(define-vop (sb!di::nth-interrupt-context-sap)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate sb!di::nth-interrupt-context-sap)
+  (:args (n :scs (unsigned-reg) :target sap))
+  (:arg-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst gs-segment-prefix)
+    (inst mov sap (make-ea :dword :disp (* 4 11) :index n :scale 4))))
+
 (define-vop (halt)
   (:generator 1
     (inst break halt-trap)))

@@ -166,116 +166,70 @@
 	   (unless (and (tn-p size) (location= alloc-tn size))
 	     (inst mov dst-tn size))))
     (let ((alloc-tn-offset (tn-offset alloc-tn)))
-      ;; FIXME: All these (MAKE-FIXUP (EXTERN-ALIEN-NAME "foo") :FOREIGN)
-      ;; expressions should be moved into MACROLET ((ALIEN-FIXUP ..)),
-      ;; and INST CALL (MAKE-FIXUP ..) should become CALL-ALIEN-FIXUP.
-      (if (and #!+gencgc t #!-gencgc nil
-	       *maybe-use-inline-allocation*
-	       (or (null inline) (policy inline (>= speed space))))
-	  ;; Inline allocation with GENCGC.
-	  (let ((ok (gen-label)))
-	    ;; Load the size first so that the size can be in the same
-	    ;; register as alloc-tn.
-	    (load-size alloc-tn size)
-	    (inst add alloc-tn
-		  (make-fixup (extern-alien-name "current_region_free_pointer")
-			      :foreign))
-	    (inst cmp alloc-tn
-		  (make-fixup (extern-alien-name "current_region_end_addr")
-			      :foreign))
-	    (inst jmp :be OK)
-	    ;; Dispatch to the appropriate overflow routine. There is a
-	    ;; routine for each destination.
-	    ;; FIXME: Could we use an alist here instead of an ECASE with lots
-	    ;; of duplicate code? (and similar question for next ECASE, too)
-	    (ecase alloc-tn-offset
-	      (#.eax-offset ;; FIXME: Why the #\# #\.?
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_eax")
+      ;; C call to allocate via dispatch routines. Each
+      ;; destination has a special entry point. The size may be a
+      ;; register or a constant.
+      (ecase alloc-tn-offset
+	(#.eax-offset
+	 (case size
+	   (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_eax")
+				     :foreign)))
+	   (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_eax")
 				      :foreign)))
-	      (#.ecx-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_ecx")
+	   (t
+	    (load-size eax-tn size)
+	    (inst call (make-fixup (extern-alien-name "alloc_to_eax")
+				   :foreign)))))
+	(#.ecx-offset
+	 (case size
+	   (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_ecx")
+				     :foreign)))
+	   (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_ecx")
 				      :foreign)))
-	      (#.edx-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_edx")
+	   (t
+	    (load-size ecx-tn size)
+	    (inst call (make-fixup (extern-alien-name "alloc_to_ecx")
+				   :foreign)))))
+	(#.edx-offset
+	 (case size
+	   (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_edx")
+				     :foreign)))
+	   (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_edx")
 				      :foreign)))
-	      (#.ebx-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_ebx")
+	   (t
+	    (load-size edx-tn size)
+	    (inst call (make-fixup (extern-alien-name "alloc_to_edx")
+				   :foreign)))))
+	(#.ebx-offset
+	 (case size
+	   (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_ebx")
+				     :foreign)))
+	   (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_ebx")
 				      :foreign)))
-	      (#.esi-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_esi")
+	   (t
+	    (load-size ebx-tn size)
+	    (inst call (make-fixup (extern-alien-name "alloc_to_ebx")
+				   :foreign)))))
+	(#.esi-offset
+	 (case size
+	   (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_esi")
+				     :foreign)))
+	   (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_esi")
 				      :foreign)))
-	      (#.edi-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_edi")
-				      :foreign))))
-	    (emit-label ok)
-	    (inst xchg (make-fixup
-			(extern-alien-name "current_region_free_pointer")
-			:foreign)
-		  alloc-tn))
-	  ;; C call to allocate via dispatch routines. Each
-	  ;; destination has a special entry point. The size may be a
-	  ;; register or a constant.
-	  (ecase alloc-tn-offset
-	    (#.eax-offset
-	     (case size
-	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_eax")
-					 :foreign)))
-	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_eax")
-					  :foreign)))
-	       (t
-		(load-size eax-tn size)
-		(inst call (make-fixup (extern-alien-name "alloc_to_eax")
-				       :foreign)))))
-	    (#.ecx-offset
-	     (case size
-	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_ecx")
-					 :foreign)))
-	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_ecx")
-					  :foreign)))
-	       (t
-		(load-size ecx-tn size)
-		(inst call (make-fixup (extern-alien-name "alloc_to_ecx")
-				       :foreign)))))
-	    (#.edx-offset
-	     (case size
-	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_edx")
-					 :foreign)))
-	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_edx")
-					  :foreign)))
-	       (t
-		(load-size edx-tn size)
-		(inst call (make-fixup (extern-alien-name "alloc_to_edx")
-				       :foreign)))))
-	    (#.ebx-offset
-	     (case size
-	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_ebx")
-					 :foreign)))
-	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_ebx")
-					  :foreign)))
-	       (t
-		(load-size ebx-tn size)
-		(inst call (make-fixup (extern-alien-name "alloc_to_ebx")
-				       :foreign)))))
-	    (#.esi-offset
-	     (case size
-	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_esi")
-					 :foreign)))
-	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_esi")
-					  :foreign)))
-	       (t
-		(load-size esi-tn size)
-		(inst call (make-fixup (extern-alien-name "alloc_to_esi")
-				       :foreign)))))
-	    (#.edi-offset
-	     (case size
-	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_edi")
-					 :foreign)))
-	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_edi")
-					  :foreign)))
-	       (t
-		(load-size edi-tn size)
-		(inst call (make-fixup (extern-alien-name "alloc_to_edi")
-				       :foreign)))))))))
+	   (t
+	    (load-size esi-tn size)
+	    (inst call (make-fixup (extern-alien-name "alloc_to_esi")
+				   :foreign)))))
+	(#.edi-offset
+	 (case size
+	   (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_edi")
+				     :foreign)))
+	   (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_edi")
+				      :foreign)))
+	   (t
+	    (load-size edi-tn size)
+	    (inst call (make-fixup (extern-alien-name "alloc_to_edi")
+				   :foreign))))))))
   (values))
 
 ;;; Allocate an other-pointer object of fixed SIZE with a single word

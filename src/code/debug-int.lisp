@@ -527,8 +527,8 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  (let* ((control-stack-start (sb!vm::current-thread-control-stack-start))
-	 (control-stack-end (sb!vm::current-thread-control-stack-end)))
+  (let* ((control-stack-start (sb!di::current-thread-control-stack-start))
+	 (control-stack-end (sb!di::current-thread-control-stack-end)))
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
 	 (sap<= control-stack-start
@@ -889,9 +889,9 @@
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (let ((lisp-interrupt-contexts (sb!vm::current-thread-interrupt-contexts)))
+    (let ()
       (/noshow0 "at head of WITH-ALIEN")
-      (let ((context (sb!alien:deref lisp-interrupt-contexts index)))
+      (let ((context (nth-interrupt-context index)))
 	(/noshow0 "got CONTEXT")
 	(when (= (sap-int frame-pointer)
 		 (sb!vm:context-register context sb!vm::cfp-offset))

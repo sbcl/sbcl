@@ -19,42 +19,50 @@ struct thread *all_threads;
 struct thread *init_thread(lispobj initial_function) {
     /* XXX This function or some of it needs to lock all_threads
      */
-
-    struct thread *th=calloc(sizeof(struct thread),1);
+    union per_thread_data *per_thread;
+    struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
 
-    /* may as well allocate all of thse at once: it saves us from
+    /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed */
-       
     spaces=os_validate(0,
 		       THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
 		       ALIEN_STACK_SIZE+dynamic_values_bytes);
     if(!spaces) goto cleanup;
+    per_thread=(union per_thread_data *)
+	(spaces+THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+ALIEN_STACK_SIZE);
+
+    th=&per_thread->thread;
+    if(all_threads) {
+	memcpy(per_thread,arch_os_get_current_thread(),
+	       dynamic_values_bytes);
+    } else {
+	int i;
+	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
+	    per_thread->dynamic_values[i]=UNBOUND_MARKER_WIDETAG;
+	SetSymbolValue(FREE_TLS_INDEX,
+		       make_fixnum(sizeof(struct thread)/sizeof(lispobj)),0);
+	((struct symbol *)(BINDING_STACK_START-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(1);
+	((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(2);
+	((struct symbol *)(CONTROL_STACK_START-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(3);
+	((struct symbol *)(ALIEN_STACK-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(5);
+    }
+
     th->control_stack_start = spaces;
     th->binding_stack_start=
 	(lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
     th->alien_stack_start=
 	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
-    th->dynamic_values_start=
-	(lispobj*)((void*)th->alien_stack_start+ALIEN_STACK_SIZE);
-    if(all_threads) {
-	memcpy(th->dynamic_values_start,
-	       arch_os_get_current_thread()->dynamic_values_start,
-	       dynamic_values_bytes);
-    } else {
-	int i;
-	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
-	    th->dynamic_values_start[i]=UNBOUND_MARKER_WIDETAG;
-	SetSymbolValue(FREE_TLS_INDEX,make_fixnum(3),0);
-	((struct symbol *)(CURRENT_THREAD_STRUCT-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(1);
-	((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(2);
-    }
-
-    SetTlSymbolValue(CURRENT_THREAD_STRUCT,th,th);
-    SetTlSymbolValue(BINDING_STACK_POINTER,LOW_WORD(th->binding_stack_start),th);
+    th->binding_stack_pointer=th->binding_stack_start;
+    th->alien_stack_pointer=((void *)th->alien_stack_start
+			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
+    gc_set_region_empty(&th->alloc_region);
+    
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
     bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th); 
     bind_variable(PSEUDO_ATOMIC_ATOMIC,make_fixnum(0),th);
@@ -62,15 +70,14 @@ struct thread *init_thread(lispobj initial_function) {
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
-    /* do we need per-thread alien stack anyway? */
-    bind_variable(ALIEN_STACK,LOW_WORD(th->dynamic_values_start-1),th);
 
     th->next=all_threads;
     th->tls_cookie=os_set_tls_pointer(th);
     if(th->tls_cookie<0) goto cleanup;
-
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
-    *(th->binding_stack_start-1) = LOW_WORD(th->dynamic_values_start);
+    /* what's this line for? I think it's the obsolete tls-pointer-at */
+    /* end-of-stack stuff */
+    *(th->binding_stack_start-1) = LOW_WORD(th);
     th->pid=
 	clone(funcall0,th->binding_stack_start-2,
 	      ((getpid()!=parent_pid)?CLONE_PARENT:0)
@@ -88,8 +95,6 @@ struct thread *init_thread(lispobj initial_function) {
     if(spaces) os_invalidate(spaces,
 			     THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
 			     ALIEN_STACK_SIZE+dynamic_values_bytes);
-    if(th) free(th);
-    
     return 0;
 }
 
