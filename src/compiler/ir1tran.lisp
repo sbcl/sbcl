@@ -2174,9 +2174,6 @@
       (compiler-error "Lisp error during evaluation of info args:~%~A"
 		      condition))))
 
-;;; a hashtable that translates from primitive names to translation functions
-(defvar *primitive-translators* (make-hash-table :test 'eq))
-
 ;;; If there is a primitive translator, then we expand the call.
 ;;; Otherwise, we convert to the %%PRIMITIVE funny function. The first
 ;;; argument is the template, the second is a list of the results of
@@ -2187,60 +2184,54 @@
 ;;; a fatal error during IR2 conversion.
 ;;;
 ;;; KLUDGE: It's confusing having multiple names floating around for
-;;; nearly the same concept: PRIMITIVE, TEMPLATE, VOP. Might it be
-;;; possible to reimplement BYTE-BLT (the only use of
-;;; *PRIMITIVE-TRANSLATORS*) some other way, then get rid of primitive
-;;; translators altogether, so that there would be no distinction
-;;; between primitives and vops? Then we could call primitives vops,
-;;; rename TEMPLATE to VOP-TEMPLATE, rename BACKEND-TEMPLATE-NAMES to
-;;; BACKEND-VOPS, and rename %PRIMITIVE to VOP.. -- WHN 19990906
-;;; FIXME: Look at doing this ^, it doesn't look too hard actually. I
-;;; think BYTE-BLT could probably just become an inline function.
+;;; nearly the same concept: PRIMITIVE, TEMPLATE, VOP. Now that CMU
+;;; CL's *PRIMITIVE-TRANSLATORS* stuff is gone, we could call
+;;; primitives VOPs, rename TEMPLATE to VOP-TEMPLATE, rename
+;;; BACKEND-TEMPLATE-NAMES to BACKEND-VOPS, and rename %PRIMITIVE to
+;;; VOP or %VOP.. -- WHN 2001-06-11
+;;; FIXME: Look at doing this ^, it doesn't look too hard actually.
 (def-ir1-translator %primitive ((&whole form name &rest args) start cont)
 
   (unless (symbolp name)
     (compiler-error "The primitive name ~S is not a symbol." name))
 
-  (let* ((translator (gethash name *primitive-translators*)))
-    (if translator
-	(ir1-convert start cont (funcall translator (cdr form)))
-	(let* ((template (or (gethash name *backend-template-names*)
-			     (compiler-error
-			      "The primitive name ~A is not defined."
-			      name)))
-	       (required (length (template-arg-types template)))
-	       (info (template-info-arg-count template))
-	       (min (+ required info))
-	       (nargs (length args)))
-	  (if (template-more-args-type template)
-	      (when (< nargs min)
-		(compiler-error "Primitive ~A was called with ~R argument~:P, ~
-	    			 but wants at least ~R."
-				name
-				nargs
-				min))
-	      (unless (= nargs min)
-		(compiler-error "Primitive ~A was called with ~R argument~:P, ~
-				 but wants exactly ~R."
-				name
-				nargs
-				min)))
+  (let* ((template (or (gethash name *backend-template-names*)
+		       (compiler-error
+			"The primitive name ~A is not defined."
+			name)))
+	 (required (length (template-arg-types template)))
+	 (info (template-info-arg-count template))
+	 (min (+ required info))
+	 (nargs (length args)))
+    (if (template-more-args-type template)
+	(when (< nargs min)
+	  (compiler-error "Primitive ~A was called with ~R argument~:P, ~
+	    		   but wants at least ~R."
+			  name
+			  nargs
+			  min))
+	(unless (= nargs min)
+	  (compiler-error "Primitive ~A was called with ~R argument~:P, ~
+			   but wants exactly ~R."
+			  name
+			  nargs
+			  min)))
 
-	  (when (eq (template-result-types template) :conditional)
-	    (compiler-error
-	     "%PRIMITIVE was used with a conditional template."))
+    (when (eq (template-result-types template) :conditional)
+      (compiler-error
+       "%PRIMITIVE was used with a conditional template."))
 
-	  (when (template-more-results-type template)
-	    (compiler-error
-	     "%PRIMITIVE was used with an unknown values template."))
+    (when (template-more-results-type template)
+      (compiler-error
+       "%PRIMITIVE was used with an unknown values template."))
 
-	  (ir1-convert start
-		       cont
-		      `(%%primitive ',template
-				    ',(eval-info-args
-				       (subseq args required min))
-				    ,@(subseq args 0 required)
-				    ,@(subseq args min)))))))
+    (ir1-convert start
+		 cont
+		 `(%%primitive ',template
+			       ',(eval-info-args
+				  (subseq args required min))
+			       ,@(subseq args 0 required)
+			       ,@(subseq args min)))))
 
 ;;;; QUOTE and FUNCTION
 

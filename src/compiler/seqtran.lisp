@@ -324,27 +324,6 @@
 ;;; applied to characters
 (defparameter *char=-functions* '(eql equal char=))
 
-(deftransform search ((string1 string2 &key (start1 0) end1 (start2 0) end2
-			       test)
-		      (simple-string simple-string &rest t))
-  (unless (or (not test)
-	      (continuation-function-is test *char=-functions*))
-    (give-up-ir1-transform))
-  '(sb!impl::%sp-string-search string1 start1 (or end1 (length string1))
-			       string2 start2 (or end2 (length string2))))
-
-(deftransform position ((item sequence &key from-end test (start 0) end)
-			(t simple-string &rest t))
-  (unless (or (not test)
-	      (continuation-function-is test *char=-functions*))
-    (give-up-ir1-transform))
-  `(and (typep item 'character)
-	(,(if (constant-value-or-lose from-end)
-	      'sb!impl::%sp-reverse-find-character
-	      'sb!impl::%sp-find-character)
-	 sequence start (or end (length sequence))
-	 item)))
-
 (deftransform find ((item sequence &key from-end (test #'eql) (start 0) end)
 		    (t simple-string &rest t))
   `(if (position item sequence

@@ -244,36 +244,7 @@
        (setf (%raw-bits result-bit-array index)
 	     (32bit-logical-not (%raw-bits bit-array index))))))
 
-;;;; BYTE-BLT
-
-(def-primitive-translator byte-blt (src src-start dst dst-start dst-end)
-
-  ;; new version
-  ;;
-  ;; FIXME: CMU CL had a hairier implementation of this. It had the
-  ;; small problem that it didn't work for large (>16M) values of
-  ;; SRC-START or DST-START. However, it might have been more
-  ;; efficient. In particular, I don't really know how much the
-  ;; foreign function call costs us here. My guess is that if the
-  ;; overhead is acceptable for SQRT and COS, it's acceptable here,
-  ;; but this should probably be checked. -- WHN
-  (once-only ((src-start src-start)
-	      (dst-start dst-start))
-    `(flet ((->sap (thing)
-	      (etypecase thing
-		(system-area-pointer thing)
-		;; FIXME: The code here rather relies on the simple
-		;; unboxed array here having byte-sized entries. That
-		;; should be asserted explicitly, I just haven't found
-		;; a concise way of doing it. (It would be nice to
-		;; declare it in the DEFKNOWN too.)
-		((simple-unboxed-array (*)) (vector-sap thing)))))
-	 (declare (inline ->sap))
-	 (without-gcing
-	  (memmove (sap+ (->sap ,dst) ,dst-start)
-		   (sap+ (->sap ,src) ,src-start)
-		   (- ,dst-end ,dst-start)))
-	 nil)))
+;;;; %BYTE-BLT
 
 ;;; FIXME: The old CMU CL code used various COPY-TO/FROM-SYSTEM-AREA
 ;;; stuff (with all the associated bit-index cruft and overflow
@@ -282,8 +253,35 @@
 ;;; currently (ca. sbcl-0.6.12.30) the main interface for code in
 ;;; SB!KERNEL and SB!SYS (e.g. i/o code). It's not clear that it's the
 ;;; ideal interface, though, and it probably deserves some thought.
-(deftransform %byte-blt ((a1 a2 a3 a4 a5) (t t t t t))
-  '(%primitive byte-blt a1 a2 a3 a4 a5))
+(deftransform %byte-blt ((src src-start dst dst-start dst-end)
+			 ((or (simple-unboxed-array (*)) system-area-pointer)
+			  index
+			  (or (simple-unboxed-array (*)) system-area-pointer)
+			  index
+			  index))
+  ;; FIXME: CMU CL had a hairier implementation of this (back when it
+  ;; was still called (%PRIMITIVE BYTE-BLT). It had the small problem
+  ;; that it didn't work for large (>16M) values of SRC-START or
+  ;; DST-START. However, it might have been more efficient. In
+  ;; particular, I don't really know how much the foreign function
+  ;; call costs us here. My guess is that if the overhead is
+  ;; acceptable for SQRT and COS, it's acceptable here, but this
+  ;; should probably be checked. -- WHN
+  '(flet ((sapify (thing)
+	    (etypecase thing
+	      (system-area-pointer thing)
+	      ;; FIXME: The code here rather relies on the simple
+	      ;; unboxed array here having byte-sized entries. That
+	      ;; should be asserted explicitly, I just haven't found
+	      ;; a concise way of doing it. (It would be nice to
+	      ;; declare it in the DEFKNOWN too.)
+	      ((simple-unboxed-array (*)) (vector-sap thing)))))
+     (declare (inline sapify))
+     (without-gcing
+      (memmove (sap+ (sapify dst) dst-start)
+	       (sap+ (sapify src) src-start)
+	       (- dst-end dst-start)))
+     nil))
 
 ;;;; transforms for EQL of floating point values
 

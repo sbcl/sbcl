@@ -172,7 +172,6 @@
               "ANY" "ARGUMENT-COUNT-ERROR" "ASSEMBLE-FILE"
               "ATTRIBUTES" "ATTRIBUTES-INTERSECTION" "ATTRIBUTES-UNION"
               "ATTRIBUTES=" "BIND"
-              "BYTE-BLT"
               "CALL" "CALL-LOCAL" "CALL-NAMED" "CALL-OUT" "CALL-VARIABLE"
               "CALLEE-NFP-TN" "CALLEE-RETURN-PC-TN"
               "CASE-BODY" "CATCH-BLOCK" "CHECK-CONS"
@@ -187,7 +186,7 @@
               "CURRENT-BINDING-POINTER" "CURRENT-NFP-TN"
               "CURRENT-STACK-POINTER" "DEALLOC-ALIEN-STACK-SPACE"
               "DEALLOC-NUMBER-STACK-SPACE" "DEF-BOOLEAN-ATTRIBUTE"
-              "DEF-IR1-TRANSLATOR" "DEF-PRIMITIVE-TRANSLATOR"
+              "DEF-IR1-TRANSLATOR"
               "!DEF-PRIMITIVE-TYPE" "!DEF-PRIMITIVE-TYPE-ALIAS"
               "DEF-SOURCE-TRANSFORM" "!DEF-VM-SUPPORT-ROUTINE"
               "DEFINE-ASSEMBLY-ROUTINE" "DEFINE-MOVE-FUNCTION"
@@ -1444,7 +1443,7 @@ and even SB-VM seem to have become somewhat blurred over the years."
              ;; FIXME: %PRIMITIVE shouldn't be here. (I now know that %SYS
              ;; is for OS-dependent stuff. %PRIMITIVE should probably be in
              ;; SB!KERNEL.)
-             "%PRIMITIVE" "%SP-FIND-CHARACTER"
+             "%PRIMITIVE"
              "%STANDARD-CHAR-P"
              "*LONG-SITE-NAME*" "*SHORT-SITE-NAME*"
              "*STDERR*" "*STDIN*"
