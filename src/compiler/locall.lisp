@@ -47,7 +47,8 @@
   (declare (type combination call) (type clambda fun))
   (loop for arg in (basic-combination-args call)
         and var in (lambda-vars fun)
-        when (and (lambda-var-dynamic-extent var)
+        when (and arg
+                  (lambda-var-dynamic-extent var)
                   (not (lvar-dynamic-extent arg)))
         collect arg into dx-lvars
         and do (let ((use (lvar-uses arg)))
