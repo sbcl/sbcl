@@ -41,66 +41,19 @@
 (defvar *optimize-speed* '(optimize (speed 3) (safety 0)))
 ) ; EVAL-WHEN
 
-;;; FIXME: Do these definitions actually increase speed significantly?
-;;; Could we just use SVREF instead, possibly with a few extra
-;;; OPTIMIZE declarations added here and ther?
-(defmacro %svref (vector index)
-  `(locally (declare #.*optimize-speed*
-		     (inline svref))
-	    (svref (the simple-vector ,vector) (the fixnum ,index))))
-(defsetf %svref %set-svref)
-(defmacro %set-svref (vector index new-value)
-  `(locally (declare #.*optimize-speed*
-		     (inline svref))
-     (setf (svref (the simple-vector ,vector) (the fixnum ,index))
-	   ,new-value)))
-
-;;; I want the body to be evaluated in such a way that no other code that is
-;;; running PCL can be run during that evaluation. I agree that the body
-;;; won't take *long* to evaluate. That is to say that I will only use
-;;; WITHOUT-INTERRUPTS around relatively small computations.
-;;;
-;;; FIXME: We can get rid of this macro definitionand either USE package %SYS
-;;; or add an explicit SB-SYS: prefix to each reference to WITHOUT-INTERRUPTS.
-(defmacro without-interrupts (&rest stuff)
-  `(sb-sys:without-interrupts ,@stuff))
-
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))
      ,@body))
 
-;;;; very low-level representation of instances with meta-class
-;;;; STANDARD-CLASS
 
-;;; FIXME: more than one IN-PACKAGE in a source file, ick
-(in-package "SB-C")
-
-(defknown sb-pcl::pcl-instance-p (t) boolean
-  (movable foldable flushable explicit-check))
-
-(deftransform sb-pcl::pcl-instance-p ((object))
-  (let* ((otype (continuation-type object))
-	 (std-obj (specifier-type 'sb-pcl::std-object)))
-    (cond
-      ;; Flush tests whose result is known at compile time.
-      ((csubtypep otype std-obj) 't)
-      ((not (types-intersect otype std-obj)) 'nil)
-      (t
-       `(typep (sb-kernel:layout-of object) 'sb-pcl::wrapper)))))
-
-(in-package "SB-PCL")
-
-;;; FIXME: What do these do? Could we use SB-KERNEL:INSTANCE-REF instead?
-(defmacro %instance-ref (slots index)
-  `(%svref ,slots ,index))
 (defmacro instance-ref (slots index)
   `(svref ,slots ,index))
 
-;;; Note on implementation under CMU CL >=17 and SBCL: STD-INSTANCE-P is
-;;; only used to discriminate between functions (including FINs) and
-;;; normal instances, so we can return true on structures also. A few
-;;; uses of (or std-instance-p fsc-instance-p) are changed to
+;;; Note on implementation under CMU CL >=17 and SBCL: STD-INSTANCE-P
+;;; is only used to discriminate between functions (including FINs)
+;;; and normal instances, so we can return true on structures also. A
+;;; few uses of (or std-instance-p fsc-instance-p) are changed to
 ;;; pcl-instance-p.
 (defmacro std-instance-p (x)
   `(sb-kernel:%instancep ,x))
@@ -139,13 +92,6 @@
 (defmacro std-instance-class (instance)
   `(wrapper-class* (std-instance-wrapper ,instance)))
 
-;;;; FUNCTION-ARGLIST
-
-;;; FIXME: Does FUNCTION-PRETTY-ARGLIST need to be settable at all?
-(defsetf function-pretty-arglist set-function-pretty-arglist)
-(defun set-function-pretty-arglist (function new-value)
-  (declare (ignore function))
-  new-value)
 
 ;;; SET-FUNCTION-NAME
 ;;;
@@ -216,36 +162,6 @@
 		   (format nil "~S" name))
 		 *pcl-package*))))
 
-;;;; COMPILE-LAMBDA
-
-;;; This is like the Common Lisp function COMPILE. In fact, that is what it
-;;; ends up calling. The difference is that it deals with things like not
-;;; calling the compiler in certain cases.
-;;;
-;;; FIXME: I suspect that in SBCL, we should always call the compiler. (PCL
-;;; was originally designed to run even on systems with dog-slow call-out-to-C
-;;; compilers, and I suspect that this code is needed only for that.)
-(defun compile-lambda (lambda &optional (desirability :fast))
-  (cond ((eq desirability :fast)
-	 (compile nil lambda))
-	(t
-	 (compile-lambda-uncompiled lambda))))
-
-(defun compile-lambda-uncompiled (uncompiled)
-  #'(lambda (&rest args) (apply (coerce uncompiled 'function) args)))
-
-(defun compile-lambda-deferred (uncompiled)
-  (let ((function (coerce uncompiled 'function))
-	(compiled nil))
-    (declare (type (or function null) compiled))
-    #'(lambda (&rest args)
-	(if compiled
-	    (apply compiled args)
-	    (if (in-the-compiler-p)
-		(apply function args)
-		(progn (setq compiled (compile nil uncompiled))
-		       (apply compiled args)))))))
-
 ;;; FIXME: probably no longer needed after init
 (defmacro precompile-random-code-segments (&optional system)
   `(progn
@@ -263,26 +179,6 @@
   ())
 
 (defun doctor-dfun-for-the-debugger (gf dfun) (declare (ignore gf)) dfun)
-
-;;;; low level functions for structures I: functions on arbitrary objects
-
-;;; FIXME: Maybe we don't need this given the SBCL-specific
-;;; versions of the functions which would otherwise use it?
-(defvar *structure-table* (make-hash-table :test 'eq))
-
-(defun declare-structure (name included-name slot-description-list)
-  (setf (gethash name *structure-table*)
-	(cons included-name slot-description-list)))
-
-(unless (fboundp 'structure-functions-exist-p)
-  (setf (symbol-function 'structure-functions-exist-p)
-	#'(lambda () nil)))
-
-;;; FIXME: should probably be INLINE
-;;; FIXME: should probably be moved to package SB-INT along with
-;;; other nonstandard type predicates, or removed entirely
-(defun structurep (x)
-  (typep x 'cl:structure-object))
 
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x)
@@ -328,11 +224,6 @@
 	   (fsc-instance-slots ,n-inst)))))
 
 ;;;; structure-instance stuff
-
-;;; FIXME: This can be removed by hardwiring uses of it to T.
-(defun structure-functions-exist-p ()
-  t)
-
 ;;; The definition of STRUCTURE-TYPE-P was moved to early-low.lisp.
 
 (defun get-structure-dd (type)
@@ -368,14 +259,3 @@
 
 (defun structure-slotd-init-form (slotd)
   (sb-kernel::dsd-default slotd))
-
-;;; FIXME: more than one IN-PACKAGE in a source file, ick
-(in-package "SB-C")
-
-(def-source-context defmethod (name &rest stuff)
-  (let ((arg-pos (position-if #'listp stuff)))
-    (if arg-pos
-	`(defmethod ,name ,@(subseq stuff 0 arg-pos)
-	   ,(nth-value 2 (sb-pcl::parse-specialized-lambda-list
-			  (elt stuff arg-pos))))
-	`(defmethod ,name "<illegal syntax>"))))

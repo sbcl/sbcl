@@ -308,8 +308,7 @@
   (declare (ignore slot-names))
   (setf (slot-value specl 'type) `(eql ,(specializer-object specl))))
 
-(defun real-load-defclass (name metaclass-name supers slots other accessors)
-  (do-standard-defsetfs-for-defclass accessors)			;***
+(defun real-load-defclass (name metaclass-name supers slots other)
   (let ((res (apply #'ensure-class name :metaclass metaclass-name
 		    :direct-superclasses supers
 		    :direct-slots slots
@@ -546,7 +545,7 @@
 	       `(progn
 		  ,defstruct
 		  ,@readers-init ,@writers-init
-		  (declare-structure ',name nil nil))))
+		  (cons nil nil))))
 	(unless (structure-type-p name) (eval defstruct-form))
 	(mapc #'(lambda (dslotd reader-name writer-name)
 		  (let* ((reader (gdefinition reader-name))
@@ -1000,7 +999,7 @@
 	      (wrapper-instance-slots-layout owrapper))
 	(setf (wrapper-class-slots nwrapper)
 	      (wrapper-class-slots owrapper))
-	(without-interrupts
+	(sb-sys:without-interrupts
 	  (update-lisp-class-layout class nwrapper)
 	  (setf (slot-value class 'wrapper) nwrapper)
 	  (invalidate-wrapper owrapper ':flush nwrapper))))))
@@ -1020,7 +1019,7 @@
 	    (wrapper-instance-slots-layout owrapper))
       (setf (wrapper-class-slots nwrapper)
 	    (wrapper-class-slots owrapper))
-      (without-interrupts
+      (sb-sys:without-interrupts
 	(update-lisp-class-layout class nwrapper)
 	(setf (slot-value class 'wrapper) nwrapper)
 	(invalidate-wrapper owrapper ':obsolete nwrapper)

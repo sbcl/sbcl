@@ -92,12 +92,6 @@ WORKAROUND:
   Perhaps any number of such consecutive lines ought to turn into a
   single "byte compiling top-level forms:" line.
 
-9:
-  The handling of IGNORE declarations on lambda list arguments of
-  DEFMETHOD is at least weird, and in fact seems broken and useless.
-  I should fix up another layer of binding, declared IGNORABLE, for
-  typed lambda list arguments.
-
 10:
   The way that the compiler munges types with arguments together
   with types with no arguments (in e.g. TYPE-EXPAND) leads to
@@ -244,35 +238,6 @@ WORKAROUND:
   instead handle the error, perhaps issuing (and handling)
   a secondary error "caught ERROR: unrecoverable error during compilation"
   and then return with FAILURE-P true,
-
-25:
-  from CMU CL mailing list 01 May 2000 
-
-I realize I can take care of this by doing (proclaim (ignore pcl::.slots1.))
-but seeing as .slots0. is not-exported, shouldn't it be ignored within the
-+expansion
-when not used?
- 
-In: DEFMETHOD FOO-BAR-BAZ (RESOURCE-TYPE)
-  (DEFMETHOD FOO-BAR-BAZ
-             ((SELF RESOURCE-TYPE))
-             (SETF (SLOT-VALUE SELF 'NAME) 3))
---> BLOCK MACROLET PCL::FAST-LEXICAL-METHOD-FUNCTIONS
---> PCL::BIND-FAST-LEXICAL-METHOD-MACROS MACROLET
---> PCL::BIND-LEXICAL-METHOD-FUNCTIONS LET PCL::BIND-ARGS LET* PCL::PV-BINDING
---> PCL::PV-BINDING1 PCL::PV-ENV LET
-==>
-  (LET ((PCL::.SLOTS0. #))
-    (PROGN SELF)
-    (BLOCK FOO-BAR-BAZ
-      (LET #
-        #)))
-Warning: Variable PCL::.SLOTS0. defined but never used.
- 
-Compilation unit finished.
-  1 warning
-
-#<Standard-Method FOO-BAR-BAZ (RESOURCE-TYPE) {480918FD}>
 
 26:
   reported by Sam Steingold on the cmucl-imp mailing list 12 May 2000:

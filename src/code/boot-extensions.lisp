@@ -228,3 +228,17 @@
 	       (setq list (cdr x))
 	       (rplacd splice (cdr x))))
 	    (t (setq splice x)))))) ; Move splice along to include element.
+
+
+;; (defmacro posq (item list) `(position ,item ,list :test #'eq))
+(defun posq (item list)
+  #!+sb-doc
+  "Returns the position of the first element EQ to ITEM."
+  (do ((i list (cdr i))
+       (j 0 (1+ j)))
+      ((null i))
+    (when (eq (car i) item)
+      (return j))))
+
+;; (defmacro neq (x y) `(not (eq ,x ,y)))
+(defun neq (x y) (not (eq x y)))

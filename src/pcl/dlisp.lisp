@@ -106,7 +106,7 @@
 			  ,form)))))
     (values (if *precompiling-lap*
 		`#',lambda
-		(compile-lambda lambda))
+		(compile nil lambda))
 	    nil)))
 
 ;;; note on implementation for CMU 17 and later (including SBCL):
@@ -163,7 +163,12 @@
 (defun emit-slot-read-form (class-slot-p index slots)
   (if class-slot-p
       `(cdr ,index)
-      `(%instance-ref ,slots ,index)))
+      `(instance-ref ,slots ,index)))
+
+(defun emit-slot-write-form (class-slot-p index slots value)
+  (if class-slot-p
+      `(setf (cdr ,index) ,value)
+      `(and ,slots (setf (instance-ref ,slots ,index) ,value))))
 
 (defun emit-boundp-check (value-form miss-fn arglist)
   `(let ((value ,value-form))
@@ -172,10 +177,12 @@
 	 value)))
 
 (defun emit-slot-access (reader/writer class-slot-p slots index miss-fn arglist)
-  (let ((read-form (emit-slot-read-form class-slot-p index slots)))
+  (let ((read-form (emit-slot-read-form class-slot-p index slots))
+        (write-form (emit-slot-write-form
+                     class-slot-p index slots (car arglist))))
     (ecase reader/writer
       (:reader (emit-boundp-check read-form miss-fn arglist))
-      (:writer `(setf ,read-form ,(car arglist))))))
+      (:writer write-form))))
 
 (defmacro emit-reader/writer-macro (reader/writer 1-or-2-class class-slot-p)
   (let ((*emit-function-p* nil)

@@ -55,6 +55,7 @@
   t)
 
 (defmethod pcl-close ((stream fundamental-stream) &key abort)
+  (declare (ignore abort))
   (setf (stream-open-p stream) nil)
   t)
 

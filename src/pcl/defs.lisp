@@ -23,16 +23,6 @@
 
 (in-package "SB-PCL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-;;; FIXME: These are non-ANSI hacks which it would be nice to get rid of.
-(defvar *defclass-times*   '(:load-toplevel :execute)) ; You probably have
-					; to change this if you use
-					; DEFCONSTRUCTOR.
-(defvar *defmethod-times*  '(:load-toplevel :execute))
-(defvar *defgeneric-times* '(:load-toplevel :execute))
-
-) ; EVAL-WHEN
 
 (eval-when (:load-toplevel :execute)
   (when (eq *boot-state* 'complete)
@@ -58,31 +48,14 @@
 ;;;   which has a 'real' function spec mechanism can use that instead
 ;;;   and in that way get rid of setf generic function names.
 (defmacro parse-gspec (spec
-		       (non-setf-var . non-setf-case)
-		       (setf-var . setf-case))
-  #+setf (declare (ignore setf-var setf-case))
-  (once-only (spec)
-    `(cond (#-setf (symbolp ,spec) #+setf t
-	    (let ((,non-setf-var ,spec)) ,@non-setf-case))
-	   #-setf
-	   ((and (listp ,spec)
-		 (eq (car ,spec) 'setf)
-		 (symbolp (cadr ,spec)))
-	    (let ((,setf-var (cadr ,spec))) ,@setf-case))
-	   #-setf
-	   (t
-	    (error
-	      "Can't understand ~S as a generic function specifier.~%~
-	       It must be either a symbol which can name a function or~%~
-	       a list like ~S, where the car is the symbol ~S and the cadr~%~
-	       is a symbol which can name a generic function."
-	      ,spec '(setf <foo>) 'setf)))))
+		       (non-setf-var . non-setf-case))
+  `(let ((,non-setf-var ,spec)) ,@non-setf-case))
 
 ;;; If symbol names a function which is traced or advised, return the
 ;;; unadvised, traced etc. definition. This lets me get at the generic
 ;;; function object even when it is traced.
 (defun unencapsulated-fdefinition (symbol)
-  (symbol-function symbol))
+  (name-get-fdefinition symbol))
 
 ;;; If symbol names a function which is traced or advised, redefine
 ;;; the `real' definition without affecting the advise.
@@ -91,29 +64,23 @@
     (sb-c::%%defun name new-definition nil)
     (sb-c::note-name-defined name :function)
     new-definition)
-  (setf (symbol-function name) new-definition))
+  (name-set-fdefinition name new-definition))
 
 (defun gboundp (spec)
   (parse-gspec spec
-    (name (fboundp name))
-    (name (fboundp (get-setf-function-name name)))))
+    (name (fboundp name))))
 
 (defun gmakunbound (spec)
   (parse-gspec spec
-    (name (fmakunbound name))
-    (name (fmakunbound (get-setf-function-name name)))))
+    (name (fmakunbound name))))
 
 (defun gdefinition (spec)
   (parse-gspec spec
-    (name (or #-setf (macro-function name)		;??
-	      (unencapsulated-fdefinition name)))
-    (name (unencapsulated-fdefinition (get-setf-function-name name)))))
+    (name (unencapsulated-fdefinition name))))
 
-(defun #-setf SETF\ SB-PCL\ GDEFINITION #+setf (setf gdefinition) (new-value
-								   spec)
+(defun (setf gdefinition) (new-value spec)
   (parse-gspec spec
-    (name (fdefine-carefully name new-value))
-    (name (fdefine-carefully (get-setf-function-name name) new-value))))
+    (name (fdefine-carefully name new-value))))
 
 (declaim (special *the-class-t*
 		  *the-class-vector* *the-class-symbol*
@@ -424,9 +391,7 @@
 (defun plist-value (object name)
   (getf (object-plist object) name))
 
-(defun #-setf SETF\ SB-PCL\ PLIST-VALUE #+setf (setf plist-value) (new-value
-								   object
-								   name)
+(defun (setf plist-value) (new-value object name)
   (if new-value
       (setf (getf (object-plist object) name) new-value)
       (progn

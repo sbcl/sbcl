@@ -674,7 +674,7 @@ retained, possibly temporariliy, because it might be used internally."
              "*SETF-FDEFINITION-HOOK*"
 
              ;; non-standard but widely useful user-level functions..
-             "ASSQ" "DELQ" "MEMQ"
+             "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
 	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
              "SANE-PACKAGE"
              "CIRCULAR-LIST-P"
@@ -1292,7 +1292,8 @@ definitely not guaranteed to be present in later versions of SBCL."
                    "PACKAGE-DOC-STRING"
                    "PACKAGE-HASHTABLE-SIZE" "PACKAGE-HASHTABLE-FREE"
                    "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"
-                   "SB!INT" "SB!EXT"))
+                   "SB!INT" "SB!EXT")
+                   ("SB!INT" "MEMQ" "ASSQ" "DELQ" "POSQ" "NEQ"))
     :reexport ("ADD-METHOD" "ALLOCATE-INSTANCE"
                "COMPUTE-APPLICABLE-METHODS"
                "ENSURE-GENERIC-FUNCTION"

@@ -37,61 +37,25 @@
 	  ;; information around, I'm not sure. -- WHN 2000-12-30
 	  %variable-rebinding))
 
-;;; comment from CMU CL PCL:
-;;;   These are age-old functions which CommonLisp cleaned-up away. They
-;;;   probably exist in other packages in all CommonLisp
-;;;   implementations, but I will leave it to the compiler to optimize
-;;;   into calls to them.
-;;;
-;;; FIXME: MEMQ, ASSQ, and DELQ are already defined in SBCL, and we
-;;; should use those definitions. POSQ and NEQ aren't defined in SBCL,
-;;; and are used too often in PCL to make it appealing to hand expand
-;;; all uses and then delete the macros, so they should be boosted up
-;;; to SB-INT to stand by MEMQ, ASSQ, and DELQ.
-(defmacro memq (item list) `(member ,item ,list :test #'eq))
-(defmacro assq (item list) `(assoc ,item ,list :test #'eq))
-(defmacro delq (item list) `(delete ,item ,list :test #'eq))
-(defmacro posq (item list) `(position ,item ,list :test #'eq))
-(defmacro neq (x y) `(not (eq ,x ,y)))
+(defmacro name-get-fdefinition (name)
+  (sb-int:once-only ((name name))
+             `(if (symbolp ,name) ; take care of "setf <fun>"'s
+               (symbol-function ,name)
+               (fdefinition ,name))))
+
+(defmacro name-set-fdefinition (name new-definition)
+  (sb-int:once-only ((name name))
+             `(if (symbolp ,name) ; take care of "setf <fun>"'s
+               (setf (symbol-function ,name) ,new-definition)
+               (setf (fdefinition ,name) ,new-definition))))
+
 ;;; FIXME: CONSTANTLY-FOO should be boosted up to SB-INT too.
 (macrolet ((def-constantly-fun (name constant-expr)
-	     `(setf (symbol-function ',name)
+	     `(name-set-fdefinition ',name
 		    (constantly ,constant-expr))))
   (def-constantly-fun constantly-t t)
   (def-constantly-fun constantly-nil nil)
   (def-constantly-fun constantly-0 0))
-
-;;; comment from original CMU CL PCL: ONCE-ONLY does the same thing as
-;;; it does in zetalisp. I should have just lifted it from there but I
-;;; am honest. Not only that but this one is written in Common Lisp. I
-;;; feel a lot like bootstrapping, or maybe more like rebuilding Rome.
-;;;
-;;; FIXME: We should only need one ONCE-ONLY in SBCL, and there's one
-;;; in SB-INT already. Can we use only one of these in both places?
-(defmacro once-only (vars &body body)
-  (let ((gensym-var (gensym))
-	(run-time-vars (gensym))
-	(run-time-vals (gensym))
-	(expand-time-val-forms ()))
-    (dolist (var vars)
-      (push `(if (or (symbolp ,var)
-		     (numberp ,var)
-		     (and (listp ,var)
-			  (member (car ,var) '(quote function))))
-		 ,var
-		 (let ((,gensym-var (gensym)))
-		   (push ,gensym-var ,run-time-vars)
-		   (push ,var ,run-time-vals)
-		   ,gensym-var))
-	    expand-time-val-forms))
-    `(let* (,run-time-vars
-	    ,run-time-vals
-	    (wrapped-body
-	      (let ,(mapcar #'list vars (reverse expand-time-val-forms))
-		,@body)))
-       `(let ,(mapcar #'list (reverse ,run-time-vars)
-			     (reverse ,run-time-vals))
-	  ,wrapped-body))))
 
 ;;; FIXME: This looks like SBCL's PARSE-BODY, and should be shared.
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -258,14 +222,7 @@
 			  (find-class-from-cell ',symbol ,class-cell nil))))))
       form))
 
-;;; FIXME: These #-SETF forms are pretty ugly. Could they please go away?
-#-setf
-(defsetf find-class (symbol &optional (errorp t) environment) (new-value)
-  (declare (ignore errorp environment))
-  `(SETF\ SB-PCL\ FIND-CLASS ,new-value ,symbol))
-
-(defun #-setf SETF\ SB-PCL\ FIND-CLASS #+setf (setf find-class) (new-value
-							       symbol)
+(defun (setf find-class) (new-value symbol)
   (if (legal-class-name-p symbol)
       (let ((cell (find-class-cell symbol)))
 	(setf (find-class-cell-class cell) new-value)
@@ -273,7 +230,7 @@
 		  (eq *boot-state* 'braid))
 	  (when (and new-value (class-wrapper new-value))
 	    (setf (find-class-cell-predicate cell)
-		  (symbol-function (class-predicate-name new-value))))
+		  (name-get-fdefinition (class-predicate-name new-value))))
 	  (when (and new-value (not (forward-referenced-class-p new-value)))
 
 	    (dolist (keys+aok (find-class-cell-make-instance-function-keys cell))
@@ -283,17 +240,11 @@
 	new-value)
       (error "~S is not a legal class name." symbol)))
 
-#-setf
-(defsetf find-class-predicate (symbol &optional (errorp t) environment) (new-value)
-  (declare (ignore errorp environment))
-  `(SETF\ SB-PCL\ FIND-CLASS-PREDICATE ,new-value ,symbol))
-
-(defun #-setf SETF\ SB-PCL\ FIND-CLASS-PREDICATE
-       #+setf (setf find-class-predicate)
-    (new-value symbol)
+(defun (setf find-class-predicate)
+       (new-value symbol)
   (if (legal-class-name-p symbol)
-      (setf (find-class-cell-predicate (find-class-cell symbol)) new-value)
-      (error "~S is not a legal class name." symbol)))
+    (setf (find-class-cell-predicate (find-class-cell symbol)) new-value)
+    (error "~S is not a legal class name." symbol)))
 
 (defun find-wrapper (symbol)
   (class-wrapper (find-class symbol)))
@@ -341,112 +292,8 @@
 (defmacro function-apply (form &rest args)
   `(apply (the function ,form) ,@args))
 
-;;;; various nastiness to work around nonstandardness of SETF when PCL
-;;;; was written
-
-;;; Convert a function name to its standard SETF function name. We
-;;; have to do this hack because not all Common Lisps have yet
-;;; converted to having SETF function specs.
-;;;
-;;; KLUDGE: We probably don't have to do this any more. But in Debian
-;;; cmucl 2.4.8 the :SETF feature isn't set (?). Perhaps it's because of
-;;; the comment ca. 10 lines down about how the built-in setf mechanism
-;;; takes a hash table lookup each time? It would be nice to go one
-;;; way or another on this, perhaps some benchmarking would be in order..
-;;; (Oh, more info: In debian src/pcl/notes.text, which looks like stale
-;;; documentation from 1992, it says TO DO: When CMU CL improves its
-;;; SETF handling, remove the comment in macros.lisp beginning the line
-;;; #+CMU (PUSHNEW :SETF *FEATURES*). So since CMU CL's (and now SBCL's)
-;;; SETF handling seems OK to me these days, there's a fairly decent chance
-;;; this would work.) -- WHN 19991203
-;;;
-;;; In a port that does have SETF function specs you can use those just by
-;;; making the obvious simple changes to these functions. The rest of PCL
-;;; believes that there are function names like (SETF <foo>), this is the
-;;; only place that knows about this hack.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-; In 15e (and also 16c), using the built-in SETF mechanism costs
-; a hash table lookup every time a SETF function is called.
-; Uncomment the next line to use the built in SETF mechanism.
-;#+cmu (pushnew :setf *features*)
-) ; EVAL-WHEN
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-#-setf
-(defvar *setf-function-names* (make-hash-table :size 200 :test 'eq))
 
 (defun get-setf-function-name (name)
-  #+setf `(setf ,name)
-  #-setf
-  (or (gethash name *setf-function-names*)
-      (setf (gethash name *setf-function-names*)
-	    (let ((pkg (symbol-package name)))
-	      (if pkg
-		  (intern (format nil
-				  "SETF ~A ~A"
-				  (package-name pkg)
-				  (symbol-name name))
-			  *pcl-package*)
-		  (make-symbol (format nil "SETF ~A" (symbol-name name))))))))
-
-;;; Call this to define a setf macro for a function with the same behavior as
-;;; specified by the SETF function cleanup proposal. Specifically, this will
-;;; cause: (SETF (FOO a b) x) to expand to (|SETF FOO| x a b).
-;;;
-;;; do-standard-defsetf		  A macro interface for use at top level
-;;;				      in files. Unfortunately, users may
-;;;				      have to use this for a while.
-;;;
-;;; do-standard-defsetfs-for-defclass    A special version called by defclass.
-;;;
-;;; do-standard-defsetf-1		A functional interface called by the
-;;;				      above, defmethod and defgeneric.
-;;;				      Since this is all a crock anyways,
-;;;				      users are free to call this as well.
-;;;
-;;; FIXME: Once we fix up SETF, a lot of stuff around here should evaporate.
-(defmacro do-standard-defsetf (&rest function-names)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (dolist (fn-name ',function-names) (do-standard-defsetf-1 fn-name))))
-
-(defun do-standard-defsetfs-for-defclass (accessors)
-  (dolist (name accessors) (do-standard-defsetf-1 name)))
-
-(defun do-standard-defsetf-1 (function-name)
-  #+setf
-  (declare (ignore function-name))
-  #+setf nil
-  #-setf
-  (unless (and (setfboundp function-name)
-	       (get function-name 'standard-setf))
-    (setf (get function-name 'standard-setf) t)
-    (let* ((setf-function-name (get-setf-function-name function-name)))
-      (eval `(defsetf ,function-name (&rest accessor-args) (new-value)
-	       (let* ((bindings (mapcar #'(lambda (x) `(,(gensym) ,x)) accessor-args))
-		      (vars (mapcar #'car bindings)))
-		  `(let ,bindings
-		      (,',setf-function-name ,new-value ,@vars))))))))
-
-(defun setfboundp (symbol)
-  (fboundp `(setf ,symbol)))
-
-) ; EVAL-WHEN
-
-;;; PCL, like user code, must endure the fact that we don't have a
-;;; properly working SETF. Many things work because they get mentioned
-;;; by a DEFCLASS or DEFMETHOD before they are used, but others have
-;;; to be done by hand.
-;;;
-;;; FIXME: We don't have to do this stuff any more, do we?
-(do-standard-defsetf
-  class-wrapper				 ;***
-  generic-function-name
-  method-function-plist
-  method-function-get
-  plist-value
-  object-plist
-  gdefinition
-  slot-value-using-class)
+  `(setf ,name))
 
 (defsetf slot-value set-slot-value)

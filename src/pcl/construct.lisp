@@ -126,26 +126,24 @@
        ;;   So instead:
        (declaim (ftype ,(ftype-declaration-from-lambda-list lambda-list name)
 		       ,name))
-       ,(make-top-level-form `(defconstructor ,name)
-			     '(load eval)
-	  `(load-constructor
-	     ',class-name
-	     ',(class-name (class-of class))
-	     ',name
-	     ',supplied-initarg-names
-	     ;; make-constructor-code-generators is called to return a list
-	     ;; of constructor code generators. The actual interpretation
-	     ;; of this list is left to compute-constructor-code, but the
-	     ;; general idea is that it should be an plist where the keys
-	     ;; name a kind of constructor code and the values are generator
-	     ;; functions which return the actual constructor code. The
-	     ;; constructor code is usually a closures over the arguments
-	     ;; to the generator.
-	     ,(make-constructor-code-generators class
-						name
-						lambda-list
-						supplied-initarg-names
-						supplied-initargs))))))
+       (load-constructor
+        ',class-name
+        ',(class-name (class-of class))
+        ',name
+        ',supplied-initarg-names
+        ;; make-constructor-code-generators is called to return a list
+        ;; of constructor code generators. The actual interpretation
+        ;; of this list is left to compute-constructor-code, but the
+        ;; general idea is that it should be an plist where the keys
+        ;; name a kind of constructor code and the values are generator
+        ;; functions which return the actual constructor code. The
+        ;; constructor code is usually a closures over the arguments
+        ;; to the generator.
+        ,(make-constructor-code-generators class
+                                           name
+                                           lambda-list
+                                           supplied-initarg-names
+                                           supplied-initargs)))))
 
 (defun load-constructor (class-name metaclass-name constructor-name
 			 supplied-initarg-names code-generators)
@@ -632,23 +630,23 @@
 			(.initargs. .constant-initargs.))
 		   .positions.
 
-		   (dolist (entry .initfns-initargs-and-positions.)
-		     (let ((val (funcall (car entry)))
-			   (initarg (cadr entry)))
-		       (when initarg
-			 (push val .initargs.)
-			 (push initarg .initargs.))
-		       (dolist (pos (cddr entry))
-			 (setf (%instance-ref .slots. pos) val))))
+                   (dolist (entry .initfns-initargs-and-positions.)
+                     (let ((val (funcall (car entry)))
+                           (initarg (cadr entry)))
+                       (when initarg
+                         (push val .initargs.)
+                         (push initarg .initargs.))
+                       (dolist (pos (cddr entry))
+                         (setf (instance-ref .slots. pos) val))))
 
 		   ,@(gathering1 (collecting)
-		       (doplist (initarg value) supplied-initargs
+                       (doplist (initarg value) supplied-initargs
 			 (unless (constantp value)
 			   (gather1 `(let ((.value. ,value))
 				       (push .value. .initargs.)
 				       (push ',initarg .initargs.)
 				       (dolist (.p. (pop .positions.))
-					 (setf (%instance-ref .slots. .p.)
+					 (setf (instance-ref .slots. .p.)
 					       .value.)))))))
 
 		   (dolist (fn .shared-initfns.)
@@ -786,7 +784,7 @@
 		   (dolist (entry .initfns-and-positions.)
 		     (let ((val (funcall (car entry))))
 		       (dolist (pos (cdr entry))
-			 (setf (%instance-ref .slots. pos) val))))
+			 (setf (instance-ref .slots. pos) val))))
 
 		   ,@(gathering1 (collecting)
 		       (doplist (initarg value) supplied-initargs
@@ -794,7 +792,7 @@
 			   (gather1
 			     `(let ((.value. ,value))
 				(dolist (.p. (pop .positions.))
-				  (setf (%instance-ref .slots. .p.) .value.)))))))
+				  (setf (instance-ref .slots. .p.) .value.)))))))
 
 		   .instance.))))))))
 
@@ -916,8 +914,8 @@
 			     (gather1
 			       `(let ((.value. ,value))
 				  (dolist (.p. (pop .positions.))
-				    (setf (%instance-ref .slots. .p.)
-					  .value.)))))))
+				    (setf (instance-ref .slots. .p.)
+                                            .value.)))))))
 
 		     .instance.))))))))))
 
@@ -999,4 +997,3 @@
 		 (bail-out)))))
 
       (values constants (nreverse supplied-initarg-positions)))))
-

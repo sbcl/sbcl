@@ -105,25 +105,16 @@ bootstrapping.
 ;;; early definition. Do this in a way that makes sure that if we
 ;;; redefine one of the early definitions the redefinition will take
 ;;; effect. This makes development easier.
-;;;
-;;; The function which generates the redirection closure is pulled out
-;;; into a separate piece of code because of a bug in ExCL which
-;;; causes this not to work if it is inlined.
-;;; FIXME: We no longer need to worry about ExCL now, so we could unscrew this.
 (eval-when (:load-toplevel :execute)
-
-(defun !redirect-early-function-internal (real early)
-  (setf (gdefinition real)
-	(set-function-name
-	 #'(lambda (&rest args)
-	     (apply (the function (symbol-function early)) args))
-	 real)))
-
+  
 (dolist (fns *!early-functions*)
   (let ((name (car fns))
 	(early-name (cadr fns)))
-    (!redirect-early-function-internal name early-name)))
-
+    (setf (gdefinition name)
+            (set-function-name
+             #'(lambda (&rest args)
+                 (apply (the function (name-get-fdefinition early-name)) args))
+             name))))
 ) ; EVAL-WHEN
 
 ;;; *!GENERIC-FUNCTION-FIXUPS* is used by !FIX-EARLY-GENERIC-FUNCTIONS
@@ -172,8 +163,6 @@ bootstrapping.
   (expand-defgeneric function-name lambda-list options))
 
 (defun expand-defgeneric (function-name lambda-list options)
-  (when (listp function-name)
-    (do-standard-defsetf-1 (sb-int:function-name-block-name function-name)))
   (let ((initargs ())
 	(methods ()))
     (flet ((duplicate-option (name)
@@ -223,10 +212,7 @@ bootstrapping.
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
 	   (compile-or-load-defgeneric ',function-name))
-	 ,(make-top-level-form
-	   `(defgeneric ,function-name)
-	   *defgeneric-times*
-	   `(load-defgeneric ',function-name ',lambda-list ,@initargs))
+         (load-defgeneric ',function-name ',lambda-list ,@initargs)
 	 ,@(mapcar #'expand-method-definition methods)
 	 `,(function ,function-name)))))
 
@@ -239,8 +225,6 @@ bootstrapping.
 	  (sb-kernel:specifier-type 'function))))
 
 (defun load-defgeneric (function-name lambda-list &rest initargs)
-  (when (listp function-name)
-    (do-standard-defsetf-1 (cadr function-name)))
   (when (fboundp function-name)
     (sb-kernel::style-warn "redefining ~S in DEFGENERIC" function-name))
   (apply #'ensure-generic-function
@@ -311,8 +295,6 @@ bootstrapping.
 			 lambda-list
 			 body
 			 env)
-  (when (listp name)
-    (do-standard-defsetf-1 (cadr name)))
   (let ((*make-instance-function-keys* nil)
 	(*optimize-asv-funcall-p* t)
 	(*asv-readers* nil) (*asv-writers* nil) (*asv-boundps* nil))
@@ -405,7 +387,7 @@ bootstrapping.
 					;; prefixes.)
 					(*package* sb-int:*keyword-package*))
 				    (format nil "~S" mname)))))
-	  `(eval-when ,*defmethod-times*
+	  `(eval-when (:load-toplevel :execute)
 	    (defun ,mname-sym ,(cadr fn-lambda)
 	      ,@(cddr fn-lambda))
 	    ,(make-defmethod-form-internal
@@ -415,20 +397,17 @@ bootstrapping.
 		      #',mname-sym
 		      ,@(cdddr initargs-form))
 	      pv-table-symbol)))
-	(make-top-level-form
-	 `(defmethod ,name ,@qualifiers ,specializers)
-	 *defmethod-times*
-	 (make-defmethod-form-internal
-	  name qualifiers
+      (make-defmethod-form-internal
+       name qualifiers
 	  `(list ,@(mapcar #'(lambda (specializer)
 			       (if (consp specializer)
 				   ``(,',(car specializer)
 				      ,,(cadr specializer))
 				   `',specializer))
-		    specializers))
+                           specializers))
 	  unspecialized-lambda-list method-class-name
 	  initargs-form
-	  pv-table-symbol)))))
+	  pv-table-symbol))))
 
 (defun make-defmethod-form-internal
     (name qualifiers specializers-form unspecialized-lambda-list
@@ -624,15 +603,12 @@ bootstrapping.
 				      (constantp (car real-body))))
 	       (constant-value (and constant-value-p
 				    (eval (car real-body))))
-	       ;; FIXME: This can become a bare AND (no IF), just like
-	       ;; the expression for CONSTANT-VALUE just above.
-	       (plist (if (and constant-value-p
-			       (or (typep constant-value
-					  '(or number character))
-				   (and (symbolp constant-value)
-					(symbol-package constant-value))))
-			  (list :constant-value constant-value)
-			  ()))
+	       (plist (and constant-value-p
+                           (or (typep constant-value
+                                      '(or number character))
+                               (and (symbolp constant-value)
+                                    (symbol-package constant-value)))
+                           (list :constant-value constant-value)))
 	       (applyp (dolist (p lambda-list nil)
 			 (cond ((memq p '(&optional &rest &key))
 				(return t))
@@ -841,7 +817,7 @@ bootstrapping.
 	       `(((typep ,emf 'fixnum)
 		  (let* ((.slots. (get-slots-or-nil
 				   ,(car required-args+rest-arg)))
-			 (value (when .slots. (%instance-ref .slots. ,emf))))
+			 (value (when .slots. (instance-ref .slots. ,emf))))
 		    (if (eq value +slot-unbound+)
 			(slot-unbound-internal ,(car required-args+rest-arg)
 					       ,emf)
@@ -851,15 +827,15 @@ bootstrapping.
 		  (let ((.new-value. ,(car required-args+rest-arg))
 			(.slots. (get-slots-or-nil
 				  ,(car required-args+rest-arg))))
-		    (when .slots. ; just to avoid compiler warnings
-		      (setf (%instance-ref .slots. ,emf) .new-value.))))))
+                    (when .slots.
+                         (setf (instance-ref .slots. ,emf) .new-value.))))))
 	   #||
 	   ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
 	       `(((typep ,emf 'fast-instance-boundp)
 		  (let ((.slots. (get-slots-or-nil
 				  ,(car required-args+rest-arg))))
 		    (and .slots.
-			 (not (eq (%instance-ref
+			 (not (eq (instance-ref
 				   .slots. (fast-instance-boundp-index ,emf))
 				  +slot-unbound+)))))))
 	   ||#
@@ -911,20 +887,22 @@ bootstrapping.
     (fixnum
      (cond ((null args) (error "1 or 2 args were expected."))
 	   ((null (cdr args))
-	    (let ((value (%instance-ref (get-slots (car args)) emf)))
+	    (let* ((slots (get-slots (car args)))
+                   (value (instance-ref slots emf)))
 	      (if (eq value +slot-unbound+)
 		  (slot-unbound-internal (car args) emf)
 		  value)))
 	   ((null (cddr args))
-	    (setf (%instance-ref (get-slots (cadr args)) emf)
-		  (car args)))
+             (setf (instance-ref (get-slots (cadr args)) emf)
+                     (car args)))
 	   (t (error "1 or 2 args were expected."))))
     (fast-instance-boundp
      (if (or (null args) (cdr args))
 	 (error "1 arg was expected.")
-	 (not (eq (%instance-ref (get-slots (car args))
-				 (fast-instance-boundp-index emf))
-		  +slot-unbound+))))
+       (let ((slots (get-slots (car args))))
+	 (not (eq (instance-ref slots
+                                 (fast-instance-boundp-index emf))
+		  +slot-unbound+)))))
     (function
      (apply emf args))))
 
@@ -1116,24 +1094,16 @@ bootstrapping.
 				(setq closurep t)
 				form)
 			       (t nil))))
-		   (;; FIXME: should be MEMQ or FIND :TEST #'EQ
-		    (and (or (eq (car form) 'slot-value)
-			     (eq (car form) 'set-slot-value)
-			     (eq (car form) 'slot-boundp))
+		   ((and (memq (car form)
+                               '(slot-value set-slot-value slot-boundp))
 			 (constantp (caddr form)))
-		    (let ((parameter (can-optimize-access form
-							  required-parameters
-							  env)))
-		      ;; FIXME: could be
-		      ;;   (LET ((FUN (ECASE (CAR FORM) ..)))
-		      ;;     (FUNCALL FUN SLOTS PARAMETER FORM))
-		      (ecase (car form)
-			(slot-value
-			 (optimize-slot-value     slots parameter form))
-			(set-slot-value
-			 (optimize-set-slot-value slots parameter form))
-			(slot-boundp
-			 (optimize-slot-boundp    slots parameter form)))))
+                     (let ((parameter
+                            (can-optimize-access form required-parameters env)))
+                      (let ((fun (ecase (car form)
+                                   (slot-value #'optimize-slot-value)
+                                   (set-slot-value #'optimize-set-slot-value)
+                                   (slot-boundp #'optimize-slot-boundp))))
+                        (funcall fun slots parameter form))))
 		   ((and (eq (car form) 'apply)
 			 (consp (cadr form))
 			 (eq (car (cadr form)) 'function)
@@ -1186,8 +1156,7 @@ bootstrapping.
 	  *mf1p* (gethash method-function *method-function-plist*)))
   *mf1p*)
 
-(defun #-setf SETF\ SB-PCL\ METHOD-FUNCTION-PLIST
-       #+setf (setf method-function-plist)
+(defun (setf method-function-plist)
     (val method-function)
   (unless (eq method-function *mf1*)
     (rotatef *mf1* *mf2*)
@@ -1202,8 +1171,7 @@ bootstrapping.
 (defun method-function-get (method-function key &optional default)
   (getf (method-function-plist method-function) key default))
 
-(defun #-setf SETF\ SB-PCL\ METHOD-FUNCTION-GET
-       #+setf (setf method-function-get)
+(defun (setf method-function-get)
     (val method-function key)
   (setf (getf (method-function-plist method-function) key) val))
 
@@ -1221,7 +1189,6 @@ bootstrapping.
 
 (defun load-defmethod
     (class name quals specls ll initargs &optional pv-table-symbol)
-  (when (listp name) (do-standard-defsetf-1 (cadr name)))
   (setq initargs (copy-tree initargs))
   (let ((method-spec (or (getf initargs ':method-spec)
 			 (make-method-spec name quals specls))))
@@ -1233,20 +1200,16 @@ bootstrapping.
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
 		  initargs pv-table-symbol)
-  (when (listp gf-spec) (do-standard-defsetf-1 (cadr gf-spec)))
   (when pv-table-symbol
     (setf (getf (getf initargs ':plist) :pv-table-symbol)
 	  pv-table-symbol))
-  ;; FIXME: It seems as though I should be able to get this to work.
-  ;; But it keeps on screwing up PCL bootstrapping.
-  #+nil
   (when (and (eq *boot-state* 'complete)
 	     (fboundp gf-spec))
-    (let* ((gf (symbol-function gf-spec))
+    (let* ((gf (name-get-fdefinition gf-spec))
 	   (method (and (generic-function-p gf)
 			(find-method gf
 				     qualifiers
-				     (mapcar #'find-class specializers)
+                                     (parse-specializers specializers)
 				     nil))))
       (when method
 	(sb-kernel::style-warn "redefining ~S~{ ~S~} ~S in DEFMETHOD"
@@ -1371,14 +1334,14 @@ bootstrapping.
 				  keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
-    (let* ((old (sb-c::info :function :type name)) ;FIXME:FDOCUMENTATION instead?
-	   (old-ftype (if (sb-c::function-type-p old) old nil))
-	   (old-restp (and old-ftype (sb-c::function-type-rest old-ftype)))
+    (let* ((old (sb-int:info :function :type name)) ;FIXME:FDOCUMENTATION instead?
+	   (old-ftype (if (sb-kernel:function-type-p old) old nil))
+	   (old-restp (and old-ftype (sb-kernel:function-type-rest old-ftype)))
 	   (old-keys (and old-ftype
-			  (mapcar #'sb-c::key-info-name
-				  (sb-c::function-type-keywords old-ftype))))
-	   (old-keysp (and old-ftype (sb-c::function-type-keyp old-ftype)))
-	   (old-allowp (and old-ftype (sb-c::function-type-allowp old-ftype)))
+			  (mapcar #'sb-kernel:key-info-name
+				  (sb-kernel:function-type-keywords old-ftype))))
+	   (old-keysp (and old-ftype (sb-kernel:function-type-keyp old-ftype)))
+	   (old-allowp (and old-ftype (sb-kernel:function-type-allowp old-ftype)))
 	   (keywords (union old-keys (mapcar #'keyword-spec-name keywords))))
       `(function ,(append (make-list nrequired :initial-element 't)
 			  (when (plusp noptional)
@@ -2046,7 +2009,7 @@ bootstrapping.
 
     (dolist (fn *!early-functions*)
       (sb-int:/show fn)
-      (setf (gdefinition (car fn)) (symbol-function (caddr fn))))
+      (setf (gdefinition (car fn)) (name-get-fdefinition (caddr fn))))
 
     (dolist (fixup *!generic-function-fixups*)
       (sb-int:/show fixup)
@@ -2057,7 +2020,7 @@ bootstrapping.
 					 (specializers (second method))
 					 (method-fn-name (third method))
 					 (fn-name (or method-fn-name fspec))
-					 (fn (symbol-function fn-name))
+					 (fn (name-get-fdefinition fn-name))
 					 (initargs
 					  (list :function
 						(set-function-name
@@ -2194,8 +2157,7 @@ bootstrapping.
 	     ;; "internal error: unrecognized lambda-list keyword ~S"?
 	     (warn "Unrecognized lambda-list keyword ~S in arglist.~%~
 		    Assuming that the symbols following it are parameters,~%~
-		    and not allowing any parameter specializers to follow~%~
-		    to follow it."
+		    and not allowing any parameter specializers to follow it."
 		   arg))
 	   ;; When we are at a lambda-list keyword, the parameters
 	   ;; don't include the lambda-list keyword; the lambda-list

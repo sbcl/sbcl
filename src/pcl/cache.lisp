@@ -115,13 +115,13 @@
   `(cache-vector-ref ,cache-vector 0))
 
 (defun flush-cache-vector-internal (cache-vector)
-  (without-interrupts
+  (sb-sys:without-interrupts
     (fill (the simple-vector cache-vector) nil)
     (setf (cache-vector-lock-count cache-vector) 0))
   cache-vector)
 
 (defmacro modify-cache (cache-vector &body body)
-  `(without-interrupts
+  `(sb-sys:without-interrupts
      (multiple-value-prog1
        (progn ,@body)
        (let ((old-count (cache-vector-lock-count ,cache-vector)))
@@ -175,7 +175,7 @@
 ;;; ever return a larger cache.
 (defun get-cache-vector (size)
   (let ((entry (gethash size *free-cache-vectors*)))
-    (without-interrupts
+    (sb-sys:without-interrupts
       (cond ((null entry)
 	     (setf (gethash size *free-cache-vectors*) (cons 0 nil))
 	     (get-cache-vector size))
@@ -189,7 +189,7 @@
 
 (defun free-cache-vector (cache-vector)
   (let ((entry (gethash (cache-vector-size cache-vector) *free-cache-vectors*)))
-    (without-interrupts
+    (sb-sys:without-interrupts
       (if (null entry)
 	  (error
 	   "attempt to free a cache-vector not allocated by GET-CACHE-VECTOR")
@@ -510,7 +510,8 @@
 (defvar *free-caches* nil)
 
 (defun get-cache (nkeys valuep limit-fn nlines)
-  (let ((cache (or (without-interrupts (pop *free-caches*)) (make-cache))))
+  (let ((cache (or (sb-sys:without-interrupts (pop *free-caches*))
+                   (make-cache))))
     (declare (type cache cache))
     (multiple-value-bind (cache-mask actual-size line-size nlines)
 	(compute-cache-parameters nkeys valuep nlines)
@@ -534,7 +535,8 @@
 			     &optional (new-field (first-wrapper-cache-number-index)))
   (let ((nkeys (cache-nkeys old-cache))
 	(valuep (cache-valuep old-cache))
-	(cache (or (without-interrupts (pop *free-caches*)) (make-cache))))
+	(cache (or (sb-sys:without-interrupts (pop *free-caches*))
+                   (make-cache))))
     (declare (type cache cache))
     (multiple-value-bind (cache-mask actual-size line-size nlines)
 	(if (= new-nlines (cache-nlines old-cache))

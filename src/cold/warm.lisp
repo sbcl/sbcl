@@ -159,6 +159,7 @@
 		"src/pcl/iterate"
 		"src/pcl/early-low"
 		"src/pcl/macros"
+                "src/pcl/compiler-support"
 		"src/pcl/low"
 		"src/pcl/fin"
 		"src/pcl/defclass"

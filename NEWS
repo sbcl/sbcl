@@ -642,6 +642,8 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
   some time ago.
 
 changes in sbcl-0.6.11 relative to sbcl-0.6.10:
+* Martin Atzmueller pointed out that bugs #9 and #25 are gone in
+  current SBCL.
 * bug 34 fixed by Martin Atzmueller: dumping/loading instances works
   better
 * fixed bug 40: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, 

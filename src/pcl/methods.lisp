@@ -291,7 +291,7 @@
     (cond ((or (null (fboundp generic-function-name))
 	       (not (generic-function-p
 		      (setq generic-function
-			    (symbol-function generic-function-name)))))
+			    (name-get-fdefinition generic-function-name)))))
 	   (error "~S does not name a generic function."
 		  generic-function-name))
 	  ((null (setq method (get-method generic-function
@@ -312,7 +312,7 @@
 			      lambda-list
 			      &rest other-initargs)
   (unless (and (fboundp generic-function-name)
-	       (typep (symbol-function generic-function-name)
+	       (typep (name-get-fdefinition generic-function-name)
 		      'generic-function))
     (sb-kernel::style-warn "implicitly creating new generic function ~S"
 			   generic-function-name))

@@ -73,10 +73,8 @@
 	   (getf (cddr whole) :identity-with-one-argument nil))
 	 (operator
 	   (getf (cddr whole) :operator type)))
-    (make-top-level-form `(define-method-combination ,type)
-			 '(:load-toplevel :execute)
-      `(load-short-defcombin
-	 ',type ',operator ',identity-with-one-arg ',documentation))))
+    `(load-short-defcombin
+     ',type ',operator ',identity-with-one-arg ',documentation)))
 
 (defun load-short-defcombin (type operator ioa doc)
   (let* ((truename *load-truename*)
@@ -189,9 +187,7 @@
 	(make-long-method-combination-function
 	  type lambda-list method-group-specifiers arguments-option gf-var
 	  body)
-      (make-top-level-form `(define-method-combination ,type)
-			   '(:load-toplevel :execute)
-	`(load-long-defcombin ',type ',documentation #',function)))))
+      `(load-long-defcombin ',type ',documentation #',function))))
 
 (defvar *long-method-combination-functions* (make-hash-table :test 'eq))
 

@@ -112,7 +112,7 @@ And so, we are saved.
   (let* ((generator-entry (assq generator *dfun-constructors*))
 	 (args-entry (assoc args (cdr generator-entry) :test #'equal)))
     (if (null *enable-dfun-constructor-caching*)
-	(apply (symbol-function generator) args)
+	(apply (name-get-fdefinition generator) args)
 	(or (cadr args-entry)
 	    (multiple-value-bind (new not-best-p)
 		(apply (symbol-function generator) args)
@@ -161,15 +161,12 @@ And so, we are saved.
 			 (eq (caddr args-entry) system))
 		 (when system (setf (caddr args-entry) system))
 		 (gather1
-		   (make-top-level-form `(precompile-dfun-constructor
-					  ,(car generator-entry))
-					'(:load-toplevel)
-		     `(load-precompiled-dfun-constructor
-		       ',(car generator-entry)
-		       ',(car args-entry)
-		       ',system
-		       ,(apply (symbol-function (car generator-entry))
-			       (car args-entry))))))))))))
+                  `(load-precompiled-dfun-constructor
+                    ',(car generator-entry)
+                    ',(car args-entry)
+                    ',system
+                    ,(apply (name-get-fdefinition (car generator-entry))
+                            (car args-entry)))))))))))
 
 ;;; When all the methods of a generic function are automatically generated
 ;;; reader or writer methods a number of special optimizations are possible.

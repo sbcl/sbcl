@@ -23,27 +23,6 @@
 
 (in-package "SB-PCL")
 
-;;; MAKE-TOP-LEVEL-FORM is used by all PCL macros that appear `at top-level'.
-;;;
-;;; The original motiviation for this function was to deal with the
-;;; bug in the Genera compiler that prevents lambda expressions in
-;;; top-level forms other than DEFUN from being compiled.
-;;;
-;;; Now this function is used to grab other functionality as well. This
-;;; includes:
-;;;   - Preventing the grouping of top-level forms. For example, a
-;;;     DEFCLASS followed by a DEFMETHOD may not want to be grouped
-;;;     into the same top-level form.
-;;;   - Telling the programming environment what the pretty version
-;;;     of the name of this form is. This is used by WARN.
-;;;
-;;; FIXME: It's not clear that this adds value any more. Couldn't
-;;; we just use EVAL-WHEN?
-(defun make-top-level-form (name times form)
-  (if (or (member 'compile times)
-	  (member ':compile-toplevel times))
-      `(eval-when ,times ,form)
-      form))
 
 (defun make-progn (&rest forms)
   (let ((progn-form nil))
@@ -73,7 +52,7 @@
   ;; FIXME: We should probably just ensure that the relevant
   ;; DEFVAR/DEFPARAMETERs occur before this definition, rather 
   ;; than locally declaring them SPECIAL.
-  (declare (special *defclass-times* *boot-state* *the-class-structure-class*))
+  (declare (special *boot-state* *the-class-structure-class*))
   (setq supers  (copy-tree supers)
 	slots   (copy-tree slots)
 	options (copy-tree options))
@@ -95,10 +74,9 @@
 	    (return t))))
 
     (let ((*initfunctions* ())
-	  (*accessors* ())		;Truly a crock, but we got
-	  (*readers* ())		;to have it to live nicely.
-	  (*writers* ()))
-      (declare (special *initfunctions* *accessors* *readers* *writers*))
+	  (*readers* ())		;Truly a crock, but we got
+	  (*writers* ()))               ;to have it to live nicely.
+      (declare (special *initfunctions* *readers* *writers*))
       (let ((canonical-slots
 	      (mapcar #'(lambda (spec)
 			  (canonicalize-slot-specification name spec))
@@ -112,29 +90,24 @@
 				(and mclass
 				     (*subtypep mclass
 						*the-class-structure-class*))))))
-	(do-standard-defsetfs-for-defclass *accessors*)
 	(let ((defclass-form
-		 (make-top-level-form `(defclass ,name)
-		   (if defstruct-p '(:load-toplevel :execute) *defclass-times*)
-		   `(progn
-		      ,@(mapcar #'(lambda (x)
-				    `(declaim (ftype (function (t) t) ,x)))
-				*readers*)
-		      ,@(mapcar #'(lambda (x)
-				    #-setf (when (consp x)
-					     (setq x (get-setf-function-name (cadr x))))
-				    `(declaim (ftype (function (t t) t) ,x)))
-				*writers*)
-		      (let ,(mapcar #'cdr *initfunctions*)
-			(load-defclass ',name
-				       ',metaclass
-				       ',supers
-				       (list ,@canonical-slots)
-				       (list ,@(apply #'append
-						      (when defstruct-p
-							'(:from-defclass-p t))
-						      other-initargs))
-				       ',*accessors*))))))
+                (eval-when (:load-toplevel :execute)
+                  `(progn
+                    ,@(mapcar #'(lambda (x)
+                                  `(declaim (ftype (function (t) t) ,x)))
+                              *readers*)
+                    ,@(mapcar #'(lambda (x)
+                                  `(declaim (ftype (function (t t) t) ,x)))
+                              *writers*)
+                    (let ,(mapcar #'cdr *initfunctions*)
+                      (load-defclass ',name
+                                     ',metaclass
+                                     ',supers
+                                     (list ,@canonical-slots)
+                                     (list ,@(apply #'append
+                                                    (when defstruct-p
+                                                      '(:from-defclass-p t))
+                                                    other-initargs))))))))
 	  (if defstruct-p
 	      (progn
 		(eval defclass-form) ; Define the class now, so that..
@@ -142,8 +115,7 @@
 		   ,(class-defstruct-form (find-class name))
 		   ,defclass-form))
 	      (progn
-		(when (and (eq *boot-state* 'complete)
-			   (not (member 'compile *defclass-times*)))
+		(when (eq *boot-state* 'complete)
 		  (inform-type-system-about-std-class name))
 		defclass-form)))))))
 
@@ -168,7 +140,7 @@
 	   (cadr entry)))))
 
 (defun canonicalize-slot-specification (class-name spec)
-  (declare (special *accessors* *readers* *writers*))
+  (declare (special *readers* *writers*))
   (cond ((and (symbolp spec)
 	      (not (keywordp spec))
 	      (not (memq spec '(t nil))))
@@ -190,8 +162,7 @@
 		(initform (getf spec :initform unsupplied)))
 	   (doplist (key val) spec
 	     (case key
-	       (:accessor (push val *accessors*)
-			  (push val readers)
+	       (:accessor (push val readers)
 			  (push `(setf ,val) writers))
 	       (:reader   (push val readers))
 	       (:writer   (push val writers))
@@ -365,18 +336,16 @@
 (unless (fboundp 'class-name-of)
   (setf (symbol-function 'class-name-of)
 	(symbol-function 'early-class-name-of)))
-;;; FIXME: Can we then delete EARLY-CLASS-NAME-OF?
+(unintern 'early-class-name-of)
 
 (defun early-class-direct-subclasses (class)
   (!bootstrap-get-slot 'class class 'direct-subclasses))
 
 (declaim (notinline load-defclass))
-(defun load-defclass
-       (name metaclass supers canonical-slots canonical-options accessor-names)
+(defun load-defclass (name metaclass supers canonical-slots canonical-options)
   (setq supers  (copy-tree supers)
 	canonical-slots   (copy-tree canonical-slots)
 	canonical-options (copy-tree canonical-options))
-  (do-standard-defsetfs-for-defclass accessor-names)
   (when (eq metaclass 'standard-class)
     (inform-type-system-about-std-class name))
   (let ((ecd

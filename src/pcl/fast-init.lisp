@@ -692,7 +692,7 @@
 			(nconc *initialize-instance-simple-alist*
 			       (list entry)))))
 	    (unless (or *note-iis-entry-p* (cadr entry))
-	      (setf (cadr entry) (compile-lambda (car entry))))
+	      (setf (cadr entry) (compile nil (car entry))))
 	    (if (cadr entry)
 		(apply (the function (cadr entry)) args)
 		`(call-initialize-instance-simple ,pv-cell ,form-list))))
@@ -718,22 +718,18 @@
 			       :test #'equal))))
 
 (defmacro precompile-iis-functions (&optional system)
-  (let ((index -1))
-    `(progn
-      ,@(gathering1 (collecting)
-	 (dolist (iis-entry *initialize-instance-simple-alist*)
-	   (when (or (null (caddr iis-entry))
-		     (eq (caddr iis-entry) system))
-	     (when system (setf (caddr iis-entry) system))
-	     (gather1
-	      (make-top-level-form
-	       `(precompile-initialize-instance-simple ,system ,(incf index))
-	       '(:load-toplevel)
-	       `(load-precompiled-iis-entry
-		 ',(car iis-entry)
-		 #',(car iis-entry)
-		 ',system
-		 ',(cdddr iis-entry))))))))))
+  `(progn
+    ,@(gathering1 (collecting)
+                  (dolist (iis-entry *initialize-instance-simple-alist*)
+                    (when (or (null (caddr iis-entry))
+                              (eq (caddr iis-entry) system))
+                      (when system (setf (caddr iis-entry) system))
+                      (gather1
+                       `(load-precompiled-iis-entry
+                         ',(car iis-entry)
+                         #',(car iis-entry)
+                         ',system
+                         ',(cdddr iis-entry))))))))
 
 (defun compile-iis-functions (after-p)
   (let ((*compile-make-instance-functions-p* t)
@@ -830,7 +826,9 @@
 				value)))
 	   (if *inline-iis-instance-locations-p*
 	       (typecase location
-		 (fixnum `((setf (%instance-ref slots ,(const location)) value)))
+		 (fixnum `((and slots
+                                (setf (instance-ref slots ,(const location))
+                                        value))))
 		 (cons `((setf (cdr ,(const location)) value)))
 		 (t `(,default)))
 	       `((instance-write-internal pv slots ,(const pv-offset) value
@@ -846,8 +844,9 @@
 			   ,(const (caddr form)))))
 	   `((unless ,(if *inline-iis-instance-locations-p*
 			  (typecase location
-			    (fixnum `(not (eq (%instance-ref slots ,(const location))
-					      +slot-unbound+)))
+			    (fixnum `(not (and slots
+                                               (eq (instance-ref slots ,(const location))
+                                                   +slot-unbound+))))
 			    (cons `(not (eq (cdr ,(const location)) +slot-unbound+)))
 			    (t default))
 			  `(instance-boundp-internal pv slots ,(const pv-offset)
@@ -911,7 +910,7 @@
   (let* ((*make-instance-function-keys* nil)
 	 (expanded-form (expand-make-instance-form form)))
     (if expanded-form
-	`(funcall (symbol-function
+	`(funcall (name-get-fdefinition
 		   ;; The symbol is guaranteed to be fbound.
 		   ;; Is there a way to declare this?
 		   (load-time-value

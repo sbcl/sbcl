@@ -309,17 +309,12 @@
 
 (defun get-walker-template (x)
   (cond ((symbolp x)
-	 (or (get-walker-template-internal x)
-	     (get-implementation-dependent-walker-template x)))
+         (get-walker-template-internal x))
 	((and (listp x) (eq (car x) 'lambda))
 	 '(lambda repeat (eval)))
 	(t
 	 (error "can't get template for ~S" x))))
 
-;;; FIXME: This can go away in SBCL.
-(defun get-implementation-dependent-walker-template (x)
-  (declare (ignore x))
-  ())
 
 ;;;; the actual templates
 

@@ -663,7 +663,7 @@
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (setq ,value (typecase ,index
 			   ,@(when (or (null type) (eq type ':instance))
-			       `((fixnum (%instance-ref ,slots ,index))))
+			       `((fixnum (instance-ref ,slots ,index))))
 			   ,@(when (or (null type) (eq type ':class))
 			       `((cons (cdr ,index))))
 			   (t +slot-unbound+)))
@@ -697,7 +697,8 @@
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
 	      ,@(when (or (null type) (eq type ':instance))
-		  `((fixnum (setf (%instance-ref ,slots ,index) ,new-value))))
+                      `((fixnum (setf (instance-ref ,slots ,index)
+                                        ,new-value))))
 	      ,@(when (or (null type) (eq type ':class))
 		  `((cons (setf (cdr ,index) ,new-value))))
 	      (t ,default)))))))
@@ -743,8 +744,9 @@
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
 	      ,@(when (or (null type) (eq type ':instance))
-		  `((fixnum (not (eq (%instance-ref ,slots ,index)
-				     +slot-unbound+)))))
+		  `((fixnum (not (and ,slots
+                                      (eq (instance-ref ,slots ,index)
+                                          +slot-unbound+))))))
 	      ,@(when (or (null type) (eq type ':class))
 		  `((cons (not (eq (cdr ,index) +slot-unbound+)))))
 	      (t ,default)))))))

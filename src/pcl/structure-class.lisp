@@ -129,7 +129,7 @@
     (unless (extract-required-parameters (second constructor))
       (setf (slot-value class 'defstruct-constructor) (car constructor)))
     (when (and defstruct-predicate (not from-defclass-p))
-      (setf (symbol-function pred-name) (symbol-function defstruct-predicate)))
+      (name-set-fdefinition pred-name (symbol-function defstruct-predicate)))
     (unless (or from-defclass-p (slot-value class 'documentation))
       (setf (slot-value class 'documentation)
 	    (format nil "~S structure class made from Defstruct" name)))

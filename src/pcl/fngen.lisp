@@ -24,7 +24,7 @@
 (in-package "SB-PCL")
 
 ;;; GET-FUNCTION is the main user interface to this code. It is like
-;;; COMPILE-LAMBDA, only more efficient. It achieves this efficiency by
+;;; COMPILE, only more efficient. It achieves this efficiency by
 ;;; reducing the number of times that the compiler needs to be called.
 ;;; Calls to GET-FUNCTION in which the lambda forms differ only by constants
 ;;; can use the same piece of compiled code. (For example, dispatch dfuns and
@@ -44,9 +44,6 @@
 ;;;   compute-constants is used to generate the argument list that is
 ;;;		to be passed to the compiled function.
 ;;;
-;;; Whether the returned function is actually compiled depends on whether
-;;; the compiler is present (see COMPILE-LAMBDA) and whether this shape of
-;;; code was precompiled.
 (defun get-function (lambda
 		      &optional (test-converter     #'default-test-converter)
 				(code-converter     #'default-code-converter)
@@ -121,7 +118,7 @@
 (defun get-new-function-generator (lambda test code-converter)
   (multiple-value-bind (gensyms generator-lambda)
       (get-new-function-generator-internal lambda code-converter)
-    (let* ((generator (compile-lambda generator-lambda))
+    (let* ((generator (compile nil generator-lambda))
 	   (fgen (make-fgen test gensyms generator generator-lambda nil)))
       (store-fgen fgen)
       generator)))
@@ -176,22 +173,19 @@
 					   f)))))))))
 
 (defmacro precompile-function-generators (&optional system)
-  (let ((index -1))
-    `(progn ,@(gathering1 (collecting)
-		(dolist (fgen *fgens*)
-		  (when (or (null (fgen-system fgen))
-			    (eq (fgen-system fgen) system))
-		    (when system (setf (svref fgen 4) system))
-		    (gather1
-		     (make-top-level-form
-		      `(precompile-function-generators ,system ,(incf index))
-		      '(:load-toplevel)
-		      `(load-function-generator
-			',(fgen-test fgen)
-			',(fgen-gensyms fgen)
-			(function ,(fgen-generator-lambda fgen))
-			',(fgen-generator-lambda fgen)
-			',system)))))))))
+  `(progn
+    ,@(gathering1 (collecting)
+                  (dolist (fgen *fgens*)
+                    (when (or (null (fgen-system fgen))
+                              (eq (fgen-system fgen) system))
+                      (when system (setf (svref fgen 4) system))
+                      (gather1
+                       `(load-function-generator
+                         ',(fgen-test fgen)
+                         ',(fgen-gensyms fgen)
+                         (function ,(fgen-generator-lambda fgen))
+                         ',(fgen-generator-lambda fgen)
+                         ',system)))))))
 
 (defun load-function-generator (test gensyms generator generator-lambda system)
   (store-fgen (make-fgen test gensyms generator generator-lambda system)))

@@ -1873,8 +1873,8 @@
   |#
   ;; old code
   (reduce #'type-union
-        (mapcar #'specifier-type type-specifiers)
-        :initial-value *empty-type*))
+	  (mapcar #'specifier-type type-specifiers)
+	  :initial-value *empty-type*))
 
 ;;;; CONS types
 
