@@ -1,6 +1,6 @@
 ;;;; This file contains macro-like source transformations which
 ;;;; convert uses of certain functions into the canonical form desired
-;;;; within the compiler. ### and other IR1 transforms and stuff.
+;;;; within the compiler. FIXME: and other IR1 transforms and stuff.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -3095,32 +3095,16 @@
 ;;; Expand MAX and MIN into the obvious comparisons.
 (define-source-transform max (arg0 &rest rest)
   (once-only ((arg0 arg0))
-    ;; ANSI says MAX should signal TYPE-ERROR if any arg isn't a REAL.
-    ;;
-    ;; KLUDGE: This UNLESS hackery is a workaround for bug 194.
-    ;; Better, when that bug is fixed, would be (THE REAL ,ARG0).
-    ;; -- WHN 2002-09-02
-    `(progn
-       (unless (realp ,arg0)
-	 (error-not-a-real ,arg0))
-       ,(if (null rest)
-	    arg0
-	    `(let ((maxrest (max ,@rest)))
-	       (if (> ,arg0 maxrest) ,arg0 maxrest))))))
+    (if (null rest)
+	`(values (the real ,arg0))
+	`(let ((maxrest (max ,@rest)))
+	  (if (> ,arg0 maxrest) ,arg0 maxrest)))))
 (define-source-transform min (arg0 &rest rest)
   (once-only ((arg0 arg0))
-    ;; ANSI says MIN should signal TYPE-ERROR if any arg isn't a REAL.
-    ;;
-    ;; KLUDGE: This UNLESS hackery is a workaround for bug 194.
-    ;; Better, when that bug is fixed, would be (THE REAL ,ARG0).
-    ;; -- WHN 2002-09-02
-    `(progn
-       (unless (realp ,arg0)
-	 (error-not-a-real ,arg0))
-       ,(if (null rest)
-	    arg0
-	    `(let ((minrest (min ,@rest)))
-	       (if (< ,arg0 minrest) ,arg0 minrest))))))
+    (if (null rest)
+	`(values (the real ,arg0))
+	`(let ((minrest (min ,@rest)))
+	  (if (< ,arg0 minrest) ,arg0 minrest)))))
 
 ;;;; converting N-arg arithmetic functions
 ;;;;
@@ -3138,29 +3122,30 @@
 
 ;;; Do source transformations for transitive functions such as +.
 ;;; One-arg cases are replaced with the arg and zero arg cases with
-;;; the identity. If LEAF-FUN is true, then replace two-arg calls with
-;;; a call to that function.
-(defun source-transform-transitive (fun args identity &optional leaf-fun)
+;;; the identity.  ONE-ARG-RESULT-TYPE is, if non-NIL, the type to
+;;; ensure (with THE) that the argument in one-argument calls is.
+(defun source-transform-transitive (fun args identity
+				    &optional one-arg-result-type)
   (declare (symbol fun leaf-fun) (list args))
   (case (length args)
     (0 identity)
-    (1 `(values ,(first args)))
-    (2 (if leaf-fun
-	   `(,leaf-fun ,(first args) ,(second args))
-	   (values nil t)))
+    (1 (if one-arg-result-type
+	   `(values (the ,one-arg-result-type ,(first args)))
+	   `(values ,(first args))))
+    (2 (values nil t))
     (t
      (associate-args fun (first args) (rest args)))))
 
 (define-source-transform + (&rest args)
-  (source-transform-transitive '+ args 0))
+  (source-transform-transitive '+ args 0 'number))
 (define-source-transform * (&rest args)
-  (source-transform-transitive '* args 1))
+  (source-transform-transitive '* args 1 'number))
 (define-source-transform logior (&rest args)
-  (source-transform-transitive 'logior args 0))
+  (source-transform-transitive 'logior args 0 'integer))
 (define-source-transform logxor (&rest args)
-  (source-transform-transitive 'logxor args 0))
+  (source-transform-transitive 'logxor args 0 'integer))
 (define-source-transform logand (&rest args)
-  (source-transform-transitive 'logand args -1))
+  (source-transform-transitive 'logand args -1 'integer))
 
 (define-source-transform logeqv (&rest args)
   (if (evenp (length args))

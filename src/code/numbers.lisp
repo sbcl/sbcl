@@ -919,7 +919,8 @@
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logior result (pop integers))))
-	  ((null integers) result))
+	  ((null integers) result)
+	(declare (integer result)))
       0))
 
 (defun logxor (&rest integers)
@@ -928,7 +929,8 @@
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logxor result (pop integers))))
-	  ((null integers) result))
+	  ((null integers) result)
+	(declare (integer result)))
       0))
 
 (defun logand (&rest integers)
@@ -937,7 +939,8 @@
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logand result (pop integers))))
-	  ((null integers) result))
+	  ((null integers) result)
+	(declare (integer result)))
       -1))
 
 (defun logeqv (&rest integers)
@@ -946,7 +949,8 @@
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logeqv result (pop integers))))
-	  ((null integers) result))
+	  ((null integers) result)
+	(declare (integer result)))
       -1))
 
 (defun lognand (integer1 integer2)
