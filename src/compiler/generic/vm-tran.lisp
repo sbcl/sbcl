@@ -88,7 +88,8 @@
     (let ((element-type-specifier (type-specifier element-ctype)))
       `(multiple-value-bind (array index)
 	   (%data-vector-and-index array index)
-	 (declare (type (simple-array ,element-type-specifier 1) array))
+	 (declare (type (simple-array ,element-type-specifier 1) array)
+	          (type ,element-type-specifier new-value))
 	 (data-vector-set array
 			  index
 			  new-value)))))

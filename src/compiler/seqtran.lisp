@@ -293,17 +293,22 @@
 		    :policy (> speed space))
   "open code"
   (let ((element-type (upgraded-element-type-specifier-or-give-up seq)))
-    `(with-array-data ((data seq)
-		       (start start)
-		       (end end))
+    (values 
+     `(with-array-data ((data seq)
+			(start start)
+			(end end))
        (declare (type (simple-array ,element-type 1) data))
+       (declare (type fixnum start end))
        (do ((i start (1+ i)))
 	   ((= i end) seq)
 	 (declare (type index i))
 	 ;; WITH-ARRAY-DATA did our range checks once and for all, so
-	 ;; it'd be wasteful to check again on every AREF.
+	 ;; it'd be wasteful to check again on every AREF...
 	 (declare (optimize (safety 0))) 
-	 (setf (aref data i) item)))))
+	 (setf (aref data i) item)))
+     ;; ... though we still need to check that the new element can fit
+     ;; into the vector in safe code. -- CSR, 2002-07-05
+     `((declare (type ,element-type item))))))
 
 ;;;; utilities
 

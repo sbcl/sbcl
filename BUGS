@@ -1369,17 +1369,6 @@ WORKAROUND:
   however, compiling and loading the same expression in a file works
   as expected.
 
-186: "Undercautious FILL transform"
-  Compiling and loading the following code:
-  (declare (optimize (safety 3) (speed 2) (space 1)))
-  (defun foo (x)
-    (fill (make-string 10) x))
-  and then running
-  * (foo 4097)
-  "@@@@@@@@@@"
-  This is probably due to insufficient checking in the IR1
-  deftransform for FILL
-
 187: "type inference confusion around DEFTRANSFORM time"
   (reported even more verbosely on sbcl-devel 2002-06-28 as "strange
   bug in DEFTRANSFORM")

@@ -198,5 +198,14 @@
   ;; fixed in sbcl-0.7.4.22 by WHN
   (assert (null (ignore-errors (subseq avec 1 5)))))
 
+;;; FILL
+(defun test-fill-typecheck (x)
+  (declare (optimize (safety 3) (space 2) (speed 1)))
+  (fill (make-string 10) x))
+
+(assert (string= (test-fill-typecheck #\@) "@@@@@@@@@@"))
+;;; BUG 186, fixed in sbcl-0.7.5.5
+(assert (null (ignore-errors (test-fill-typecheck 4097))))
+
 ;;; success
 (quit :unix-status 104)
