@@ -1583,6 +1583,13 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * incremented fasl file version number due to the change in the
     DEFSTRUCT-SLOT-DESCRIPTION structure.
 
+changes in sbcl-0.7.14 relative to sbcl-0.7.13:
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** a bug in the CONS type specifier, whereby the CAR and CDR
+       types got intertwined, has been fixed;
+    ** the type system is now able to reason about the interaction
+       between INTEGER and RATIO types more completely;
+
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, maybe in 0.7.x, maybe later, it might impact TRACE. They both

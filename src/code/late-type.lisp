@@ -1145,7 +1145,8 @@
 	 (intersection2 (type-intersection2 type1
 					    complement-type2)))
     (if intersection2
-	(values (eq intersection2 *empty-type*) t)
+	;; FIXME: if uncertain, maybe try arg1?
+	(type= intersection2 *empty-type*)
 	(invoke-complex-subtypep-arg1-method type1 type2))))
 
 (!define-type-method (negation :complex-subtypep-arg1) (type1 type2)
@@ -2449,6 +2450,28 @@
 	((and (not (intersection-type-p type1))
 	      (%intersection-complex-subtypep-arg1 type2 type1))
 	 type1)
+	;; KLUDGE: This special (and somewhat hairy) magic is required
+	;; to deal with the RATIONAL/INTEGER special case.  The UNION
+	;; of (INTEGER * -1) and (AND (RATIONAL * -1/2) (NOT INTEGER))
+	;; should be (RATIONAL * -1/2) -- CSR, 2003-02-28
+	((and (csubtypep type2 (specifier-type 'ratio))
+	      (numeric-type-p type1)
+	      (csubtypep type1 (specifier-type 'integer))
+	      (csubtypep type2
+			 (make-numeric-type
+			  :class 'rational
+			  :complexp nil
+			  :low (if (null (numeric-type-low type1))
+				   nil
+				   (list (1- (numeric-type-low type1))))
+			  :high (if (null (numeric-type-high type1))
+				    nil
+				    (list (1+ (numeric-type-high type1)))))))
+	 (type-union type1
+		     (apply #'type-intersection
+			    (remove (specifier-type '(not integer))
+				    (intersection-type-types type2)
+				    :test #'type=))))
 	(t
 	 (let ((accumulator *universal-type*))
 	   (do ((t2s (intersection-type-types type2) (cdr t2s)))
