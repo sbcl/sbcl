@@ -325,6 +325,26 @@
                     (merge-tail-sets merge)))))
         (t (flush-dest value)
            (unlink-node node))))
+
+;;; Make a CAST and insert it into IR1 before node NEXT.
+(defun insert-cast-before (next lvar type policy)
+  (declare (type node next) (type lvar lvar) (type ctype type))
+  (with-ir1-environment-from-node next
+    (let* ((ctran (node-prev next))
+           (cast (make-cast lvar type policy))
+           (internal-ctran (make-ctran)))
+      (setf (ctran-next ctran) cast
+            (node-prev cast) ctran)
+      (use-ctran cast internal-ctran)
+      (link-node-to-previous-ctran next internal-ctran)
+      (setf (lvar-dest lvar) cast)
+      (reoptimize-lvar lvar)
+      (when (return-p next)
+        (node-ends-block cast))
+      (setf (block-attributep (block-flags (node-block cast))
+                              type-check type-asserted)
+            t)
+      cast)))
 
 ;;;; miscellaneous shorthand functions
 

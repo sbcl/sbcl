@@ -1656,3 +1656,14 @@
   (dotimes (i 100)
     (when (> (funcall fun t) 9)
       (error "bad RANDOM event"))))
+
+;;; 0.8.17.28-sma.1 lost derived type information.
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil
+    '(lambda (x y v)
+      (declare (optimize (speed 3) (safety 0)))
+      (declare (type (integer 0 80) x)
+       (type (integer 0 11) y)
+       (type (simple-array (unsigned-byte 32) (*)) v))
+      (setf (aref v 0) (* (* x #.(floor (ash 1 32) (* 11 80))) y))
+      nil)))
