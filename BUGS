@@ -1213,3 +1213,18 @@ WORKAROUND:
   This program violates "unknown values LVAR stack discipline": if INT
   returns, values returned by (EXT) must be removed from under that of
   (INT).
+
+299: (aka PFD MISC.186)
+    * (defun foo ()
+        (declare (optimize (debug 1)))
+        (multiple-value-call #'list
+          (if (eval t) (eval '(values :a :b :c)) nil) ; (*)
+          (catch 'foo (throw 'foo (values :x :y)))))
+    FOO
+    * (foo)
+    (:X :Y)
+
+  Operator THROW is represented with a call of a not returning funny
+  function %THROW, unknown values stack after the call is empty, so
+  the unknown values LVAR (*) is considered to be dead after the call
+  and, thus, before it and is popped by the stack analysis.
