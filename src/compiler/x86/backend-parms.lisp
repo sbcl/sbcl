@@ -22,15 +22,16 @@
 
 (setf *backend-fasl-file-type* "x86f")
 (setf *backend-fasl-file-implementation* :x86)
-(setf *backend-fasl-file-version* 4)
-;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC
-;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot
+(setf *backend-fasl-file-version* 5)
+;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
+;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 ;;;     when array headers or data element type uncertainty exist, and
 ;;;     uses DATA-VECTOR-REF and DATA-VECTOR-SET only for VOPs. (Thus,
 ;;;     full calls to DATA-VECTOR-REF and DATA-VECTOR-SET from older
 ;;;     fasl files would fail, because there are no DEFUNs for these
 ;;;     operations any more.)
+;;; 5 = sbcl-0.6.8 has rearranged static symbols.
 
 (setf *backend-register-save-penalty* 3)
 

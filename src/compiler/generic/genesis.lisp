@@ -44,7 +44,10 @@
 ;;; IP packets), and in fact the CMU CL version number never ended up
 ;;; being incremented past 0. A better approach might be to use a
 ;;; string which is set from CVS data.
-(defconstant sbcl-core-version-integer 0)
+;;;
+;;; 0: inherited from CMU CL
+;;; 1: rearranged static symbols for sbcl-0.6.8
+(defconstant sbcl-core-version-integer 1)
 
 (defun round-up (number size)
   #!+sb-doc
