@@ -1223,7 +1223,9 @@
   (negation-type-type x))
 
 (!define-type-method (negation :unparse) (x)
-  `(not ,(type-specifier (negation-type-type x))))
+  (if (type= (negation-type-type x) (specifier-type 'cons))
+      'atom
+      `(not ,(type-specifier (negation-type-type x)))))
 
 (!define-type-method (negation :simple-subtypep) (type1 type2)
   (csubtypep (negation-type-type type2) (negation-type-type type1)))

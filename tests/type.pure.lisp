@@ -43,16 +43,7 @@
 			array
 			generic-function
 			simple-error
-			;; so it might seem easy to change the HAIRY
-			;; :UNPARSE method to recognize that (NOT
-			;; CONS) should unparse as ATOM. However, we
-			;; then lose the nice (SUBTYPEP '(NOT ATOM)
-			;; 'CONS) => T,T behaviour that we get from
-			;; simplifying (NOT ATOM) -> (NOT (NOT CONS))
-			;; -> CONS. So, for now, we leave this
-			;; commented out.
-			;;
-			;; atom
+			atom
 			hash-table
 			simple-string              
 			base-char
