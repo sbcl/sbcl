@@ -1,8 +1,14 @@
 /*
- * stubs for C-linkage library functions used by the runtime
+ * stubs for C-linkage library functions which we need to refer to 
+ * from Lisp 
  *
- * These are needed because the locations of the libraries are
- * filled in by the dynamic linker ld.so at runtime.
+ * These exist for the benefit of Lisp code that needs to refer to
+ * foreign symbols when dlsym() is not available (i.e. when dumping
+ * cold-sbcl.core, when we may be running in a host that's not SBCL,
+ * or on platforms that don't have it at all). If the runtime is
+ * dynamically linked, library functions won't be linked into it, so
+ * the map file won't show them. So, we need a bunch of stubs that
+ * nm(1) _can_ see.  
  */
 
 /*
@@ -21,15 +27,34 @@
 gcc2_compiled.:
         .text
 
-#define LDSO_STUBIFY(fct) \
-	.align 16 ; \
-.globl ldso_stub__ ## fct ; \
+#if defined __i386__
+	
+#define LDSO_STUBIFY(fct)                       \
+	.align 16 ;                             \
+.globl ldso_stub__ ## fct ;                     \
 	.type	 ldso_stub__ ## fct,@function ; \
-ldso_stub__ ## fct: ; \
-	jmp fct ; \
-.L ## fct ## e1: ; \
+ldso_stub__ ## fct: ;                           \
+	jmp fct ;                               \
+.L ## fct ## e1: ;                              \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 
+#elif defined alpha
+	
+	/* I _hope_ this is correct - I haven't checked in the manual
+ 	 * yet.  It works to the point of building and passing tests,
+	 * at any rate     - dan 2001.05.10 */
+#define LDSO_STUBIFY(fct)                       \
+.globl ldso_stub__ ## fct ;                     \
+	.type	 ldso_stub__ ## fct,@function ; \
+ldso_stub__ ## fct: ;                           \
+	jmp fct ;                               \
+.L ## fct ## e1: ;                              \
+	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
+	
+#else
+#error unsupported CPU architecture
+#endif
+	
  LDSO_STUBIFY(accept)
  LDSO_STUBIFY(access)
  LDSO_STUBIFY(acos)
@@ -134,3 +159,23 @@ ldso_stub__ ## fct: ; \
  LDSO_STUBIFY(utimes)
  LDSO_STUBIFY(wait3)	
  LDSO_STUBIFY(write)
+
+/*
+ * These aren't needed on the X86 because they're microcoded into the
+ * FPU, so the Lisp VOPs can implement them directly without having to
+ * call C code.
+ *
+ * Note: There might be some other functions in this category as well.
+ * E.g. I notice tanh() and acos() in the list above.. -- WHN 2001-06-07
+ */
+#if !defined __i386__
+ LDSO_STUBIFY(sin)
+ LDSO_STUBIFY(cos) 
+ LDSO_STUBIFY(tan)      
+ LDSO_STUBIFY(atan) 
+ LDSO_STUBIFY(atan2) 
+ LDSO_STUBIFY(exp)      
+ LDSO_STUBIFY(log) 
+ LDSO_STUBIFY(log10) 
+ LDSO_STUBIFY(sqrt) 
+#endif

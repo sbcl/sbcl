@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-PROFILE")
+(in-package "SB-PROFILE") ; (SB-, not SB!, since we're built in warm load.)
 
 ;;;; reading internal run time with high resolution and low overhead
 

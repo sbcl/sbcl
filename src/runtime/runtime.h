@@ -65,7 +65,7 @@
  * that SBCL runs on as of 0.6.7. If we port to the Alpha or some
  * other non-32-bit machine we'll probably need real machine-dependent
  * and OS-dependent definitions again. */
-#if ((defined alpha) && !(defined linux))
+#if ((defined alpha) && !(defined __linux__))
 #error No u32,s32 definitions for this platform.  Write some.
 #else
 /* int happens to be 4 bytes on linux/alpha.  long is longer. */

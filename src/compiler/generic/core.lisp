@@ -57,7 +57,7 @@
 			 (error "undefined assembler routine: ~S" name)))
 		    (:foreign
 		     (aver (stringp name))
-		     (or (sb!impl::foreign-symbol-address-as-integer name)
+		     (or (foreign-symbol-address-as-integer name)
 			 (error "unknown foreign symbol: ~S")))
 		    #!+x86
 		    (:code-object

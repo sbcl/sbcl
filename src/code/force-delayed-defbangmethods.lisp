@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-IMPL")
+(in-package "SB-IMPL") ;(SB-IMPL, not SB!IMPL, since we're built in warm load.)
 
 (macrolet ((force-delayed-def!methods ()
 	     `(progn

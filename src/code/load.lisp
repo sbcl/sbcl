@@ -358,6 +358,20 @@
       (fill *fop-stack* nil :end *fop-stack-pointer-on-entry*)
       (fill *current-fop-table* nil)))
   t)
+
+;;; This is used in in target-load and also genesis, using
+;;; *COLD-FOREIGN-SYMBOL-TABLE*. All the speculative prefix-adding
+;;; code for foreign symbol lookup should be here.
+(defun find-foreign-symbol-in-table (name table)
+  (let ((prefixes
+         #!+(or linux freebsd) #("" "ldso_stub__")
+	 #!+openbsd #("" "_")))    
+    (some (lambda (prefix)
+	    (gethash (concatenate 'string prefix name)
+		     table
+		     nil))
+	  prefixes)))
+
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 

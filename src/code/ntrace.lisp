@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-DEBUG")
+(in-package "SB-DEBUG") ; (SB-, not SB!, since we're built in warm load.)
 
 ;;; FIXME: Why, oh why, doesn't the SB-DEBUG package use the SB-DI
 ;;; package? That would let us get rid of a whole lot of stupid

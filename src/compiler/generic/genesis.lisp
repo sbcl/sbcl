@@ -62,6 +62,9 @@
 
 ;;;; representation of spaces in the core
 
+;;; If there is more than one dynamic space in memory (i.e., if a
+;;; copying GC is in use), then only the active dynamic space gets
+;;; dumped to core.
 (defvar *dynamic*)
 (defconstant dynamic-space-id 1)
 
@@ -1343,7 +1346,7 @@
 	    (write-wordindexed fdefn
 			       sb!vm:fdefn-raw-addr-slot
 			       (make-random-descriptor
-				(lookup-foreign-symbol "undefined_tramp"))))
+				(cold-foreign-symbol-address-as-integer "undefined_tramp"))))
 	  fdefn))))
 
 (defun cold-fset (cold-name defn)
@@ -1365,7 +1368,7 @@
 				   sb!vm:word-shift))))
 			 (#.sb!vm:closure-header-type
 			  (make-random-descriptor
-			   (lookup-foreign-symbol "closure_tramp")))))
+			   (cold-foreign-symbol-address-as-integer "closure_tramp")))))
     fdefn))
 
 (defun initialize-static-fns ()
@@ -1396,7 +1399,9 @@
 (defvar *cold-foreign-symbol-table*)
 (declaim (type hash-table *cold-foreign-symbol-table*))
 
-(defun load-foreign-symbol-table (filename)
+;;; Read the sbcl.nm file to find the addresses for foreign-symbols in
+;;; the C runtime.  
+(defun load-cold-foreign-symbol-table (filename)
   (with-open-file (file filename)
     (loop
       (let ((line (read-line file nil nil)))
@@ -1444,40 +1449,15 @@
 		(setf (gethash name *cold-foreign-symbol-table*) value))))))
     (values)))
 
-;;; FIXME: the relation between #'lookup-foreign-symbol and
-;;; #'lookup-maybe-prefix-foreign-symbol seems more than slightly
-;;; illdefined
-
-(defun lookup-foreign-symbol (name)
-  #!+(or alpha x86)
-  (let ((prefixes
-	 #!+linux #(;; FIXME: How many of these are actually
-		    ;; needed? The first four are taken from rather
-		    ;; disorganized CMU CL code, which could easily
-		    ;; have had redundant values in it..
-		    "_"
-		    "__"
-		    "__libc_"
-		    "ldso_stub__"
-		    ;; ..and the fifth seems to match most
-		    ;; actual symbols, at least in RedHat 6.2.
-		    "")
-	 #!+freebsd #("" "ldso_stub__")
-	 #!+openbsd #("_")))
-    (or (some (lambda (prefix)
-		(gethash (concatenate 'string prefix name)
-			 *cold-foreign-symbol-table*
-			 nil))
-	      prefixes)
-	*foreign-symbol-placeholder-value*
-	(progn
-	  (format *error-output* "~&The foreign symbol table is:~%")
-	  (maphash (lambda (k v)
-		     (format *error-output* "~&~S = #X~8X~%" k v))
-		   *cold-foreign-symbol-table*)
-	  (format *error-output* "~&The prefix table is: ~S~%" prefixes)
-	  (error "The foreign symbol ~S is undefined." name))))
-  #!-(or x86 alpha) (error "non-x86/alpha unsupported in SBCL (but see old CMU CL code)"))
+(defun cold-foreign-symbol-address-as-integer (name)
+  (or (find-foreign-symbol-in-table name *cold-foreign-symbol-table*)
+      *foreign-symbol-placeholder-value*
+      (progn
+        (format *error-output* "~&The foreign symbol table is:~%")
+        (maphash (lambda (k v)
+                   (format *error-output* "~&~S = #X~8X~%" k v))
+                 *cold-foreign-symbol-table*)
+        (error "The foreign symbol ~S is undefined." name))))
 
 (defvar *cold-assembler-routines*)
 
@@ -1652,12 +1632,16 @@
       (when value
 	(do-cold-fixup (second fixup) (third fixup) value (fourth fixup))))))
 
+;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
+;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
+;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
+;;; target-load.lisp refers to.
 (defun linkage-info-to-core ()
   (let ((result *nil-descriptor*))
-    (maphash #'(lambda (symbol value)
-		 (cold-push (cold-cons (string-to-core symbol)
-				       (number-to-core value))
-			    result))
+    (maphash (lambda (symbol value)
+	       (cold-push (cold-cons (string-to-core symbol)
+				     (number-to-core value))
+			  result))
 	     *cold-foreign-symbol-table*)
     (cold-set (cold-intern '*!initial-foreign-symbols*) result))
   (let ((result *nil-descriptor*))
@@ -1669,9 +1653,12 @@
 
 ;;;; general machinery for cold-loading FASL files
 
-(defvar *cold-fop-functions* (replace (make-array 256) *fop-functions*)
-  #!+sb-doc
-  "FOP functions for cold loading")
+;;; FOP functions for cold loading
+(defvar *cold-fop-functions*
+  ;; We start out with a copy of the ordinary *FOP-FUNCTIONS*. The
+  ;; ones which aren't appropriate for cold load will be destructively
+  ;; modified.
+  (copy-seq *fop-functions*))
 
 (defvar *normal-fop-functions*)
 
@@ -2366,7 +2353,7 @@
 	 (sym (make-string len)))
     (read-string-as-bytes *fasl-input-stream* sym)
     (let ((offset (read-arg 4))
-	  (value (lookup-foreign-symbol sym)))
+	  (value (cold-foreign-symbol-address-as-integer sym)))
       (do-cold-fixup code-object offset value kind))
     code-object))
 
@@ -2892,7 +2879,7 @@ initially undefined function references:~2%")
 
     ;; Read symbol table, if any.
     (when symbol-table-file-name
-      (load-foreign-symbol-table symbol-table-file-name))
+      (load-cold-foreign-symbol-table symbol-table-file-name))
 
     ;; Now that we've successfully read our only input file (by
     ;; loading the symbol table, if any), it's a good time to ensure

@@ -38,7 +38,7 @@
 	(let ((results (multiple-value-list (eval sexpr))))
 	  (load-fresh-line)
 	  (format t "~{~S~^, ~}~%" results))
-	(eval sexpr))))
+      (eval sexpr))))
 
 ;;;; LOAD itself
 
@@ -331,14 +331,12 @@
 
 (declaim (ftype (function (string) sb!vm:word)
 		foreign-symbol-address-as-integer))
+
+
+;;; sb!sys:get-dynamic-foreign-symbol-address is in foreign.lisp, on
+;;; platforms that have dynamic loading
 (defun foreign-symbol-address-as-integer (foreign-symbol)
-  (or (gethash foreign-symbol *static-foreign-symbols*)
-      (gethash (concatenate 'simple-string
-			    #!+linux "ldso_stub__"
-			    #!+openbsd "_"
-			    #!+freebsd "ldso_stub__"
-			    foreign-symbol)
-	       *static-foreign-symbols*)
+  (or (find-foreign-symbol-in-table  foreign-symbol *static-foreign-symbols*)
       (sb!sys:get-dynamic-foreign-symbol-address foreign-symbol)
       (error "unknown foreign symbol: ~S" foreign-symbol)))
 

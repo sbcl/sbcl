@@ -53,7 +53,7 @@ extern void globals_init(void);
 #endif
 /**/
 #ifdef alpha
-#ifdef linux
+#ifdef __linux__
 #define EXTERN(name,bytes) .globl name 
 #endif
 #endif

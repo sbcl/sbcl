@@ -116,7 +116,7 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
     /* [1] This behaviour can be changed with osf_setsysinfo, but cmucl
      * didn't use that */
 
-#ifdef linux
+#ifdef __linux__
   *os_context_register_addr(context,reg_ALLOC) |=  (1L<<63);
 #else
   *os_context_register_addr(context,reg_ALLOC) |=  2;

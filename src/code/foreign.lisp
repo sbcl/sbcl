@@ -1,4 +1,5 @@
-;;;; support for dynamically loading foreign object files
+;;;; support for dynamically loading foreign object files and
+;;;; resolving symbols therein
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -9,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-SYS")
+(in-package "SB-SYS") ; (SB-SYS, not SB!SYS, since we're built in warm load.)
 
 (defun pick-temporary-file-name (&optional
 				 ;; KLUDGE: There are various security
@@ -52,12 +53,16 @@
 ;;; (On any OS which *does* support foreign object file loading, this
 ;;; placeholder implementation is overwritten by a subsequent real
 ;;; implementation.)
+;;;
+;;; You may want to use sb-sys:foreign-symbol-address instead of
+;;; calling this directly; see code/target-load.lisp.
 (defun get-dynamic-foreign-symbol-address (symbol)
   (declare (type simple-string symbol) (ignore symbol))
   nil)
 
-;;; Linux implementation of GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS
-;;; and functions (e.g. LOAD-FOREIGN) which affect it
+;;; dlsym()-based implementation of GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS
+;;; and functions (e.g. LOAD-FOREIGN) which affect it.  This should 
+;;; work on any ELF system with dlopen(3) and dlsym(3)
 #+(or linux FreeBSD)
 (progn
 
@@ -70,15 +75,16 @@
 					; obj file were linked directly
 					; into the program)?
 
-;;; a list of tables returned from dlopen(3) (or possibly some
+;;; a list of handles returned from dlopen(3) (or possibly some
 ;;; bogus value temporarily during initialization)
-(defvar *tables-from-dlopen* nil)
+(defvar *handles-from-dlopen* nil)
+
 ;;; Dynamically loaded stuff isn't there upon restoring from a save.
 ;;; Clearing the variable this way was originally done primarily for
 ;;; Irix, which resolves tzname at runtime, resulting in
-;;; *TABLES-FROM-DLOPEN* being set in the saved core image, resulting
-;;; in havoc upon restart; but it seems harmless and tidy for other
-;;; OSes too.
+;;; *HANDLES-FROM-DLOPEN* (which was then called *TABLES-FROM-DLOPEN*)
+;;; being set in the saved core image, resulting in havoc upon
+;;; restart; but it seems harmless and tidy for other OSes too.
 ;;;
 ;;; Of course, it can be inconvenient that dynamically loaded stuff
 ;;; goes away when we save and restore. However,
@@ -91,7 +97,11 @@
 ;;;      dynamic loading of foreign files and saving/restoring cores,
 ;;;      he probably has the sophistication to write his own after-save
 ;;;      code to reload the libraries without much difficulty.
-(push (lambda () (setq *tables-from-dlopen* nil))
+
+;;; dan 2001.05.10 suspects that objection (1) is bogus for
+;;; dlsym()-enabled systems
+
+(push (lambda () (setq *handles-from-dlopen* nil))
       *after-save-initializations*)
 
 (defvar *dso-linker* "/usr/bin/ld")
@@ -105,21 +115,26 @@
   (name sb-c-call:c-string))
 (sb-alien:def-alien-routine dlerror sb-c-call:c-string)
 
-;;; Ensure that we've opened our own binary so we can resolve global
-;;; variables in the Lisp image that come from libraries. This used to
-;;; happen only in GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS, and only if no
-;;; libraries were dlopen()ed already, but that didn't work if
-;;; something was dlopen()ed before any problem global vars were used.
-;;; So now we do this in any function that can add to the
-;;; *TABLES-FROM-DLOPEN*, as well as in
-;;; GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS.
-(defun ensure-lisp-table-opened ()
-  (unless *tables-from-dlopen*
+;;; Ensure that we've opened our own binary so we can dynamically resolve 
+;;; symbols in the C runtime.  
+
+;;; Old comment: This used to happen only in
+;;; GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS, and only if no libraries were
+;;; dlopen()ed already, but that didn't work if something was
+;;; dlopen()ed before any problem global vars were used.  So now we do
+;;; this in any function that can add to the *HANDLES-FROM-DLOPEN*, as
+;;; well as in GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS.
+
+;;; FIXME: It would work just as well to do it once at startup, actually.
+;;; Then at least we know it's done.    -dan 2001.05.10
+
+(defun ensure-runtime-symbol-table-opened ()
+  (unless *handles-from-dlopen*
     ;; Prevent recursive call if dlopen() isn't defined.
-    (setf *tables-from-dlopen* (int-sap 0))
-    (setf *tables-from-dlopen* (list (dlopen nil rtld-lazy)))
-    (when (zerop (sb-sys:sap-int (first *tables-from-dlopen*)))
-      (error "can't open global symbol table: ~S" (dlerror)))))
+    (setf *handles-from-dlopen* (int-sap 0))
+    (setf *handles-from-dlopen* (list (dlopen nil rtld-lazy)))
+    (when (zerop (sb-sys:sap-int (first *handles-from-dlopen*)))
+      (error "can't open our own binary's symbol table: ~S" (dlerror)))))
 
 (defun load-1-foreign (file)
   "the primitive upon which the more general LOAD-FOREIGN is built: load
@@ -134,7 +149,7 @@
     (DEF-ALIEN-ROUTINE SUMMISH INT (X INT) (Y INT))
   Now running (SUMMISH 10 20) should return 31.
 "
-  (ensure-lisp-table-opened)
+  (ensure-runtime-symbol-table-opened)
   ;; Note: We use RTLD-GLOBAL so that it can find all the symbols
   ;; previously loaded. We use RTLD-NOW so that dlopen() will fail if
   ;; not all symbols are defined.
@@ -142,11 +157,11 @@
          (sap (dlopen real-file (logior rtld-now rtld-global))))
        (if (zerop (sap-int sap))
 	   (error "can't open object ~S: ~S" real-file (dlerror))
-	   (pushnew sap *tables-from-dlopen* :test #'sap=)))
+	   (pushnew sap *handles-from-dlopen* :test #'sap=)))
   (values))
 
 (defun get-dynamic-foreign-symbol-address (symbol)
-  (ensure-lisp-table-opened)
+  (ensure-runtime-symbol-table-opened)
   ;; Find the symbol in any of the loaded object files. Search in
   ;; reverse order of loading, so that later loadings take precedence.
   ;;
@@ -154,11 +169,11 @@
   ;; that the list isn't guaranteed to be in reverse order of loading,
   ;; at least not if a file is loaded more than once. Is this the
   ;; right thing? (In what cases does it matter?)
-  (dolist (table *tables-from-dlopen*)
+  (dolist (handle *handles-from-dlopen*)
     ;; KLUDGE: We implicitly exclude the possibility that the variable
     ;; could actually be NULL, but the man page for dlsym(3) 
     ;; recommends doing a more careful test. -- WHN 20000825
-    (let ((possible-result (sap-int (dlsym table symbol))))
+    (let ((possible-result (sap-int (dlsym handle symbol))))
       (unless (zerop possible-result)
 	(return possible-result)))))
 

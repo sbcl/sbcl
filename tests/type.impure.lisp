@@ -97,5 +97,25 @@
 (assert (subtypep 'ratio 'real))
 (assert (subtypep 'ratio 'number))
 
+;;; Pierre Mai rewrote the CMU CL type test system to allow inline
+;;; type tests for CONDITIONs and STANDARD-OBJECTs, and generally be
+;;; nicer, and Martin Atzmueller ported the patches. They look nice
+;;; but they're nontrivial enough that it's not obvious from
+;;; inspection that everything is OK. Let's make sure that things
+;;; still basically work.
+(defstruct foo1)
+(defstruct (foo2 (:include foo1))
+  x)
+(defstruct (foo3 (:include foo2)))
+(defstruct (foo4 (:include foo3))
+  y z)
+(assert (typep (make-foo3) 'foo2))
+(assert (not (typep (make-foo1) 'foo4)))
+(assert (null (ignore-errors (setf (foo2-x (make-foo1)) 11))))
+;;; (More tests here would be nice before merging the patches. More
+;;; tests for STRUCTURE-OBJECT, tests for CONDITION, tests for
+;;; STANDARD-OBJECT, compiled tests to make sure that the inline
+;;; versions of the tests work..)
+
 ;;; success
 (quit :unix-status 104)
