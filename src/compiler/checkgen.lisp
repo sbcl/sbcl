@@ -52,11 +52,8 @@
 		  (+ (function-cost found) (function-cost 'eq))
 		  nil))))
       (typecase type
-	(union-type
-	 (collect ((res 0 +))
-	   (dolist (mem (union-type-types type))
-	     (res (type-test-cost mem)))
-	   (res)))
+	(compound-type
+	 (reduce #'+ (compound-type-types type) :key 'type-test-cost))
 	(member-type
 	 (* (length (member-type-members type))
 	    (function-cost 'eq)))

@@ -144,8 +144,8 @@
 ) ; EVAL-WHEN
 
 (defmacro !define-type-method ((class method &rest more-methods)
-			      lambda-list &body body)
-  (let ((name (symbolicate CLASS "-" method "-TYPE-METHOD")))
+			       lambda-list &body body)
+  (let ((name (symbolicate class "-" method "-TYPE-METHOD")))
     `(progn
        (defun ,name ,lambda-list
 	 ,@body)

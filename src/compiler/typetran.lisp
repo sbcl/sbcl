@@ -299,6 +299,12 @@
 				`(typep ,n-obj ',(type-specifier x)))
 			    types)))))))
 
+;;; Do source transformation for TYPEP of a known intersection type.
+(defun source-transform-intersection-typep (object type)
+  ;; FIXME: This is just a placeholder; we should define a better
+  ;; version by analogy with SOURCE-TRANSFORM-UNION-TYPEP.
+  nil)
+
 ;;; If necessary recurse to check the cons type.
 (defun source-transform-cons-typep (object type)
   (let* ((car-type (cons-type-car-type type))
@@ -487,6 +493,8 @@
 	       (source-transform-hairy-typep object type))
 	      (union-type
 	       (source-transform-union-typep object type))
+	      (intersection-type
+	       (source-transform-intersection-typep object type))
 	      (member-type
 	       `(member ,object ',(member-type-members type)))
 	      (args-type

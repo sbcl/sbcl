@@ -186,38 +186,54 @@
 ;;; things such as SIMPLE-STRING.
 (defstruct (array-type (:include ctype
 				 (class-info (type-class-or-lose 'array))))
-  ;; The dimensions of the array. * if unspecified. If a dimension is
-  ;; unspecified, it is *.
+  ;; the dimensions of the array, or * if unspecified. If a dimension
+  ;; is unspecified, it is *.
   (dimensions '* :type (or list (member *)))
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
   (complexp :maybe :type (member t nil :maybe))
-  ;; The element type as originally specified.
+  ;; the element type as originally specified
   (element-type (required-argument) :type ctype)
-  ;; The element type as it is specialized in this implementation.
+  ;; the element type as it is specialized in this implementation
   (specialized-element-type *wild-type* :type ctype))
 
-;;; The Member-Type represents uses of the MEMBER type specifier. We
+;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
 (defstruct (member-type (:include ctype
 				  (class-info (type-class-or-lose 'member))
 				  (enumerable t))
 			#-sb-xc-host (:pure nil))
-  ;; The things in the set, with no duplications.
+  ;; the things in the set, with no duplications
   (members nil :type list))
+
+;;; A COMPOUND-TYPE is a type defined out of a set of types, 
+;;; the common parent of UNION-TYPE and INTERSECTION-TYPE.
+(defstruct (compound-type (:include ctype)
+			  (:constructor nil))
+  (types nil :type list :read-only t))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which can't
 ;;; be canonicalized to something simpler. Canonical form:
 ;;;   1. There is never more than one MEMBER-TYPE component.
 ;;;   2. There are never any UNION-TYPE components.
-(defstruct (union-type (:include ctype
+(defstruct (union-type (:include compound-type
 				 (class-info (type-class-or-lose 'union)))
-		       (:constructor %make-union-type (enumerable types)))
-  ;; The types in the union.
-  (types nil :type list))
+		       (:constructor %make-union-type (enumerable types))))
+
+;;; An INTERSECTION-TYPE represents a use of the AND type specifier
+;;; which can't be canonicalized to something simpler. Canonical form:
+;;;   1. There is never more than one MEMBER-TYPE component.
+;;;   2. There are never any INTERSECTION-TYPE or UNION-TYPE components.
+(defstruct (intersection-type (:include compound-type
+					(class-info (type-class-or-lose
+						     'intersection)))
+			      (:constructor %make-intersection-type
+					    (enumerable types))))
 
 ;;; Return TYPE converted to canonical form for a situation where the
-;;; type '* is equivalent to type T.
+;;; "type" '* (which SBCL still represents as a type even though ANSI
+;;; CL defines it as a related but different kind of placeholder) is
+;;; equivalent to type T.
 (defun type-*-to-t (type)
   (if (type= type *wild-type*)
       *universal-type*

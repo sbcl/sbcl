@@ -996,12 +996,10 @@
     (t
      type-list)))
 
-;;; Make-Canonical-Union-Type
-;;;
 ;;; Take a list of types and return a canonical type specifier,
-;;; combining any members types together. If both positive and
-;;; negative members types are present they are converted to a float
-;;; type. X This would be far simpler if the type-union methods could
+;;; combining any MEMBER types together. If both positive and
+;;; negative MEMBER types are present they are converted to a float
+;;; type. XXX This would be far simpler if the type-union methods could
 ;;; handle member/number unions.
 (defun make-canonical-union-type (type-list)
   (let ((members '())

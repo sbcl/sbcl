@@ -1666,7 +1666,6 @@
 	     (intersection-type-types type2)))
 
 (!define-type-method (intersection :simple-subtypep) (type1 type2)
-  (declare (type list type1 type2))
   (/show0 "entering INTERSECTION :SIMPLE-SUBTYPEP")
   (let ((certain? t))
     (dolist (t1 (intersection-type-types type1) (values nil certain?))
@@ -1722,28 +1721,29 @@
 (!define-type-method (intersection :simple-intersection :complex-intersection)
 		     (type1 type2)
   (/show0 "entering INTERSECTION :SIMPLE-INTERSECTION :COMPLEX-INTERSECTION")
-  (let ((type1types (intersection-type-types type1))
-	(type2types (if (intersection-type-p type2)
-			(intersection-type-types type2)
-			(list type2))))
+  (flet ((type-components (type)
+	   (typecase type
+	     (intersection-type (intersection-type-types type))
+	     (t (list type)))))
     (make-intersection-type-or-something
-     (simplify-intersection-type-types
-      (append type1types type2types)))))
+     ;; FIXME: Here and in MAKE-UNION-TYPE and perhaps elsewhere we
+     ;; should be looking for simplifications and putting things into
+     ;; canonical form.
+     (append (type-components type1)
+	     (type-components type2)))))
 
-#|
-(!def-type-translator and (&rest type-specifiers)
+(!def-type-translator foo-type (&rest type-specifiers)
   ;; Note: Between the behavior of SIMPLIFY-INTERSECTION-TYPE (which
   ;; will reduce to a 1-element list any list of types which CMU CL
   ;; could've represented) and MAKE-INTERSECTION-TYPE-OR-SOMETHING
   ;; (which knows to treat a 1-element intersection as the element
   ;; itself) we should recover CMU CL's behavior for anything which it
   ;; could handle usefully (i.e. could without punting to HAIRY-TYPE).
-  (/show0 "entering type translator for AND")
+  (/show0 "entering type translator for AND/FOO-TYPE")
   (make-intersection-type-or-something
-   (simplify-types (mapcar #'specifier-type type-specifiers)
-		   #'simplify2-intersection)))
-|#
+   (mapcar #'specifier-type type-specifiers)))
 ;;; (REMOVEME once INTERSECTION-TYPE works.)
+
 (!def-type-translator and (&whole spec &rest types)
   (let ((res *wild-type*))
     (dolist (type types res)
@@ -1987,13 +1987,13 @@
 	     (make-union-type-or-something (res)))))))
 
 (!def-type-translator array (&optional (element-type '*)
-				      (dimensions '*))
+				       (dimensions '*))
   (specialize-array-type
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
 		    :element-type (specifier-type element-type))))
 
 (!def-type-translator simple-array (&optional (element-type '*)
-					     (dimensions '*))
+					      (dimensions '*))
   (specialize-array-type
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
 		    :element-type (specifier-type element-type)

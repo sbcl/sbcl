@@ -1198,8 +1198,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 ;;;; value accumulation: LIST
 
 (defstruct (loop-collector
-	     (:copier nil)
-	     (:predicate nil))
+	    (:copier nil)
+	    (:predicate nil))
   name
   class
   (history nil)
@@ -1579,8 +1579,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 ;;;; iteration paths
 
 (defstruct (loop-path
-	     (:copier nil)
-	     (:predicate nil))
+	    (:copier nil)
+	    (:predicate nil))
   names
   preposition-groups
   inclusive-permitted

@@ -685,19 +685,26 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
 * many patches ported from CMU CL by Martin Atzmueller, with 
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
-?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE target features
+?? improved support for intersection types, fixing bug 12 (E.g., now
+  (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T.)
+?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
   are now supported, and enabled by default. Thus, the compiler can
   handle many floating point and complex operations much less
   inefficiently. (Thus e.g. you can implement a complex FFT
   without consing!)
+?? unscrewed floating point infinities (bug 13) in order to support
+  :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
+?? some minor ANSIfication of type specifications: bare 'AND and 'OR
+  are no longer valid type specifiers, so e.g. (TYPEP 11 'AND) now
+  signals an error; and SATISFIES requires its predicate to be a 
+  symbol, not a function object
 * various fixes to make the cross-compiler more portable to
   ANSI-conforming-but-different cross-compilation hosts (notably
   Lispworks for Windows, following bug reports from Arthur Lemmens)
 * a new workaround to make the cross-compiler portable to CMU CL
   again despite its non-ANSI EVAL-WHEN, thanks to Martin Atzmueller
-* new fasl file format version number (because a disused value was
-  removed from the sequence of byte code opcodes, causing the other
-  opcodes to change)
+* new fasl file format version number (because of changes in byte
+  code opcodes and in internal representation of (OR ..) types)
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
@@ -711,3 +718,7 @@ planned incompatible changes in 0.7.x:
   matter, though, unless you are using profiling. If you never 
   profile anything, TRACE should continue to behave as before.)
 * The fasl file extension may change, perhaps to ".fasl".
+* The default output representation for unprintable ASCII characters 
+  which, unlike e.g. #\Newline, don't have names defined in the 
+  ANSI Common Lisp standard, may change to their ASCII symbolic
+  names: #\Nul, #\Soh, #\Stx, etc.

@@ -117,9 +117,11 @@
      #+sb-xc-host (ctypep object type)
      #-sb-xc-host (class-typep (layout-of object) type object))
     (union-type
-     (dolist (type (union-type-types type))
-       (when (%%typep object type)
-	 (return t))))
+     (some (lambda (typ) (%%typep object typ))
+	   (union-type-types type)))
+    (intersection-type
+     (every (lambda (typ) (%%typep object typ))
+	    (intersection-type-types type)))
     (cons-type
      (and (consp object)
 	  (%%typep (car object) (cons-type-car-type type))
