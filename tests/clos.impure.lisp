@@ -428,6 +428,13 @@
   (assert (null result))
   (assert (typep error 'error)))
 
+;;; Classes with :ALLOCATION :CLASS slots should be subclassable (and
+;;; weren't for a while in sbcl-0.7.9.xx)
+(defclass superclass-with-slot ()
+  ((a :allocation :class)))
+(defclass subclass-for-class-allocation (superclass-with-slot) ())
+(make-instance 'subclass-for-class-allocation)
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

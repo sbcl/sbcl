@@ -1373,6 +1373,9 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        lambda lists are added to generic functions;
     ** COMPUTE-CLASS-PRECEDENCE-LIST now has a method specialized on
        CLASS, as specified in AMOP;
+    ** COMPUTE-SLOTS :AROUND now assigns locations sequentially based
+       on the order returned by the primary method for classes of
+       class STANDARD-CLASS;
   * fixed some bugs shown by Paul Dietz' test suite:
     ** DOLIST puts its body in TAGBODY
     ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the

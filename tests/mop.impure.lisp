@@ -87,5 +87,13 @@
 (make-instance 'finalization-test-2)
 (assert (= (get-count) 3))
 
+;;; Bits of FUNCALLABLE-STANDARD-CLASS are easy to break; make sure
+;;; that it is at least possible to define classes with that as a
+;;; metaclass.
+(defclass gf-class (standard-generic-function) ()
+  (:metaclass sb-pcl::funcallable-standard-class))
+(defgeneric g (a b c)
+  (:generic-function-class gf-class))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

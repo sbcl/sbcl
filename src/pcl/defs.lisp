@@ -645,7 +645,11 @@
   ((allocation
     :initform :instance
     :initarg :allocation
-    :accessor slot-definition-allocation)))
+    :accessor slot-definition-allocation)
+   (allocation-class
+    :initform nil
+    :initarg :allocation-class
+    :accessor slot-definition-allocation-class)))
 
 (defclass structure-slot-definition (slot-definition)
   ((defstruct-accessor-symbol
