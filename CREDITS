@@ -578,10 +578,10 @@ William ("Bill") Newman:
 
 Christophe Rhodes:
   He ported SBCL to SPARC, made various port-related and SPARC-related
-  changes (like *BACKEND-FEATURES*, made many fixes and improvements
-  in the compiler's type system, has done a substantial amount of work
-  on bootstrapping SBCL under unrelated (non-SBCL, non-CMU-CL) Common
-  Lisps, and contributed in other ways as well.
+  changes (like *BACKEND-SUBFEATURES*), made many fixes and
+  improvements in the compiler's type system, has done a substantial
+  amount of work on bootstrapping SBCL under unrelated (non-SBCL,
+  non-CMU-CL) Common Lisps, and contributed in other ways as well.
 
 Stig Erik Sandoe:
   He showed how to convince the GNU toolchain to build SBCL in a way

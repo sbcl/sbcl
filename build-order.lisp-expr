@@ -68,6 +68,7 @@
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-sap"   :not-target)
+ ("src/code/cross-make-load-form" :not-target)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; stuff needed early both in cross-compilation host and in target Lisp

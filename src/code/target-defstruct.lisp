@@ -452,7 +452,7 @@
   (declare (ignore object environment))
   (if slot-names
       (error "stub: MAKE-LOAD-FORM-SAVING-SLOTS :SLOT-NAMES not implemented") ; KLUDGE
-      :just-dump-it-normally))
+      :sb-just-dump-it-normally))
 
 ;;;; testing structure types
 

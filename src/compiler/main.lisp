@@ -1562,7 +1562,7 @@
 ;;; If the constant doesn't show up in *CONSTANTS-BEING-CREATED*, then
 ;;; we have to create it. We call MAKE-LOAD-FORM and check to see
 ;;; whether the creation form is the magic value
-;;; :JUST-DUMP-IT-NORMALLY. If it is, then we don't do anything. The
+;;; :SB-JUST-DUMP-IT-NORMALLY. If it is, then we don't do anything. The
 ;;; dumper will eventually get its hands on the object and use the
 ;;; normal structure dumping noise on it.
 ;;;
@@ -1603,7 +1603,7 @@
 				 constant
 				 condition)))
       (case creation-form
-	(:just-dump-it-normally
+	(:sb-just-dump-it-normally
 	 (fasl-validate-structure constant *compile-object*)
 	 t)
 	(:ignore-it

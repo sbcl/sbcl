@@ -1129,6 +1129,9 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
 changes in sbcl-0.7.5 relative to sbcl-0.7.4:
   * bug 140 fixed: redefinition of classes with different supertypes
     is now reflected in the type hierarchy. (thanks to Pierre Mai)
+  * bug 158 fixed: the compiler can now deal with integer loop
+    increments different from 1; fixing this turned out also to fix
+    bug 164.
   * bug 169 fixed: no more bogus warnings about using lexical bindings
     despite the presence of perfectly good SPECIAL declarations. (thanks
     to David Lichteblau)

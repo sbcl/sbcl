@@ -76,8 +76,8 @@
 (defun just-dump-it-normally (object &optional (env nil env-p))
   (declare (type structure!object object))
   (if env-p
-      (make-load-form-saving-slots object :environment env)
-      (make-load-form-saving-slots object)))
+      (sb!xc:make-load-form-saving-slots object :environment env)
+      (sb!xc:make-load-form-saving-slots object)))
 
 ;;; a MAKE-LOAD-FORM function for objects which don't use the load
 ;;; form system. This is used for LAYOUT objects because the special
