@@ -335,42 +335,6 @@ returning an array as first value always.
   And as long as we're wishing, it would be awfully nice if INSPECT could
   also report on closures, telling about the values of the bound variables.
 
-34:
-  WHN test case: Compile this file:
-    (eval-when (:compile-toplevel :load-toplevel :execute)
-      (defclass a-class () (a)))
-    (defconstant +a-constant+ (make-instance 'a-class))
-    (defconstant +another-constant+ (vector +a-constant+))
-  as reported by Robert Strandh on the CMU CL mailing list 12 Jun 2000:
-    $ cat xx.lisp
-    (defconstant +a-constant+ (make-instance 'a-class))
-    (defconstant +another-constant+ (vector +a-constant+))
-    $ lisp
-    CMU Common Lisp release x86-linux 2.4.19  8 February 2000 build 456,
-    running on
-    bobby
-    Send bug reports and questions to your local CMU CL maintainer,
-    or to pvaneynd@debian.org
-    or to cmucl-help@cons.org. (prefered)
-    type (help) for help, (quit) to exit, and (demo) to see the demos
-    Loaded subsystems:
-      Python 1.0, target Intel x86
-      CLOS based on PCL version:  September 16 92 PCL (f)
-    * (defclass a-class () ())
-    #<STANDARD-CLASS A-CLASS {48027BD5}>
-    * (compile-file "xx.lisp")
-    Python version 1.0, VM version Intel x86 on 12 JUN 00 08:12:55 am.
-    Compiling:
-    /home/strandh/Research/Functional/Common-Lisp/CLIM/Development/McCLIM
-    /xx.lisp 12 JUN 00 07:47:14 am
-    Compiling Load Time Value of (PCL::GET-MAKE-INSTANCE-FUNCTION-SYMBOL
-    '(A-CLASS NIL NIL)):
-    Byte Compiling Top-Level Form:
-    Error in function C::DUMP-STRUCTURE:  Attempt to dump invalid
-    structure:
-      #<A-CLASS {4803A5B5}>
-    How did this happen?
-
 35:
   The compiler assumes that any time a function of declared FTYPE
   doesn't signal an error, its arguments were of the declared type.
@@ -846,6 +810,17 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 80:
   (fixed early Feb 2001 by MNA)
+
+81:
+  As reported by wbuss@TELDA.NET (Wolfhard Buss) on cmucl-help
+  2001-02-14, 
+    According to CLHS
+	 (loop with (a . b) of-type float = '(0.0 . 1.0)
+	   and (c . d) of-type float = '(2.0 . 3.0)
+	   return (list a b c d))
+    should evaluate to (0.0 1.0 2.0 3.0). cmucl-18c disagrees and
+    invokes the debugger: "B is not of type list".
+  SBCL does the same thing.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

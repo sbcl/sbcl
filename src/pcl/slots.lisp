@@ -29,7 +29,7 @@
   ((instance :reader unbound-slot-instance :initarg :instance)
    (slot :reader unbound-slot-slot :initarg :slot))
   (:report (lambda(condition stream)
-	     (format stream "The slot ~S is unbound in the object ~S"
+	     (format stream "The slot ~S is unbound in the object ~S."
 		     (unbound-slot-slot condition)
 		     (unbound-slot-instance condition)))))
 
@@ -129,13 +129,15 @@
   (let* ((class (class-of object))
 	 (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(slot-missing class object slot-name 'setf)
+	(slot-missing class object slot-name 'setf new-value)
 	(setf (slot-value-using-class class object slot-definition)
 	      new-value))))
 
 (setf (gdefinition 'set-slot-value-normal) #'set-slot-value)
 
-(define-compiler-macro set-slot-value (object-form slot-name-form new-value-form)
+(define-compiler-macro set-slot-value (object-form
+				       slot-name-form
+				       new-value-form)
   (if (and (constantp slot-name-form)
 	   (let ((slot-name (eval slot-name-form)))
 	     (and (symbolp slot-name) (symbol-package slot-name))))
@@ -193,19 +195,22 @@
 		   (cond ((std-instance-p object)
 			  ;; FIXME: EQ T (WRAPPER-STATE ..) is better done
 			  ;; through INVALID-WRAPPER-P (here and below).
-			  (unless (eq 't (wrapper-state (std-instance-wrapper object)))
+			  (unless (eq t (wrapper-state (std-instance-wrapper
+							object)))
 			    (check-wrapper-validity object))
 			  (%instance-ref (std-instance-slots object) location))
 			 ((fsc-instance-p object)
-			  (unless (eq 't (wrapper-state (fsc-instance-wrapper object)))
+			  (unless (eq t (wrapper-state (fsc-instance-wrapper
+							object)))
 			    (check-wrapper-validity object))
 			  (%instance-ref (fsc-instance-slots object) location))
 			 (t (error "unrecognized instance type"))))
 		  (cons
 		   (cdr location))
 		  (t
-		   (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
-			   so it can't be read by the default ~S method."
+		   (error "~@<The slot ~S has neither :INSTANCE nor :CLASS ~
+                           allocation, so it can't be read by the default ~
+                           ~S method.~@:>"
 			  slotd 'slot-value-using-class)))))
     (if (eq value +slot-unbound+)
 	(slot-unbound class object (slot-definition-name slotd))
@@ -219,19 +224,21 @@
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (unless (eq 't (wrapper-state (std-instance-wrapper object)))
+	      (unless (eq t (wrapper-state (std-instance-wrapper object)))
 		(check-wrapper-validity object))
-	      (setf (%instance-ref (std-instance-slots object) location) new-value))
+	      (setf (%instance-ref (std-instance-slots object) location)
+		    new-value))
 	     ((fsc-instance-p object)
-	      (unless (eq 't (wrapper-state (fsc-instance-wrapper object)))
+	      (unless (eq t (wrapper-state (fsc-instance-wrapper object)))
 		(check-wrapper-validity object))
-	      (setf (%instance-ref (fsc-instance-slots object) location) new-value))
+	      (setf (%instance-ref (fsc-instance-slots object) location)
+		    new-value))
 	     (t (error "unrecognized instance type"))))
       (cons
        (setf (cdr location) new-value))
       (t
-       (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
-			   so it can't be written by the default ~S method."
+       (error "~@<The slot ~S has neither :INSTANCE nor :CLASS allocation, ~
+		   so it can't be written by the default ~S method.~:@>"
 	      slotd '(setf slot-value-using-class))))))
 
 (defmethod slot-boundp-using-class
@@ -242,19 +249,22 @@
 	 (value (typecase location
 		  (fixnum
 		   (cond ((std-instance-p object)
-			  (unless (eq 't (wrapper-state (std-instance-wrapper object)))
+			  (unless (eq t (wrapper-state (std-instance-wrapper
+							object)))
 			    (check-wrapper-validity object))
 			  (%instance-ref (std-instance-slots object) location))
 			 ((fsc-instance-p object)
-			  (unless (eq 't (wrapper-state (fsc-instance-wrapper object)))
+			  (unless (eq t (wrapper-state (fsc-instance-wrapper
+							object)))
 			    (check-wrapper-validity object))
 			  (%instance-ref (fsc-instance-slots object) location))
 			 (t (error "unrecognized instance type"))))
 		  (cons
 		   (cdr location))
 		  (t
-		   (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
-			   so it can't be read by the default ~S method."
+		   (error "~@<The slot ~S has neither :INSTANCE nor :CLASS ~
+                           allocation, so it can't be read by the default ~S ~
+                           method.~@:>"
 			  slotd 'slot-boundp-using-class)))))
     (not (eq value +slot-unbound+))))
 
@@ -266,12 +276,12 @@
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (unless (eq 't (wrapper-state (std-instance-wrapper object)))
+	      (unless (eq t (wrapper-state (std-instance-wrapper object)))
 		(check-wrapper-validity object))
 	      (setf (%instance-ref (std-instance-slots object) location)
 		    +slot-unbound+))
 	     ((fsc-instance-p object)
-	      (unless (eq 't (wrapper-state (fsc-instance-wrapper object)))
+	      (unless (eq t (wrapper-state (fsc-instance-wrapper object)))
 		(check-wrapper-validity object))
 	      (setf (%instance-ref (fsc-instance-slots object) location)
 		    +slot-unbound+))
@@ -279,8 +289,8 @@
       (cons
        (setf (cdr location) +slot-unbound+))
       (t
-       (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
-			   so it can't be written by the default ~S method."
+       (error "~@<The slot ~S has neither :INSTANCE nor :CLASS allocation, ~
+	       so it can't be written by the default ~S method.~@:>"
 	      slotd 'slot-makunbound-using-class))))
   nil)
 
@@ -317,7 +327,8 @@
 
 (defmethod slot-missing
 	   ((class t) instance slot-name operation &optional new-value)
-  (error "When attempting to ~A,~%the slot ~S is missing from the object ~S."
+  (error "~@<When attempting to ~A, the slot ~S is missing from the ~
+          object ~S.~@:>"
 	 (ecase operation
 	   (slot-value "read the slot's value (slot-value)")
 	   (setf (format nil

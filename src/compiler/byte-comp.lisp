@@ -1223,7 +1223,11 @@
 	 (t
 	  (etypecase leaf
 	    (constant
-	     (output-push-constant-leaf segment leaf))
+             (cond ((legal-immediate-constant-p leaf)
+                     (output-push-constant-leaf segment leaf))
+                   (t
+                     (output-push-constant segment (leaf-name leaf))
+                     (output-do-inline-function segment 'symbol-value))))
 	    (clambda
 	     (let* ((refered-env (lambda-environment leaf))
 		    (closure (environment-closure refered-env)))

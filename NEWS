@@ -642,27 +642,35 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
   some time ago.
 
 changes in sbcl-0.6.11 relative to sbcl-0.6.10:
+* bug 34 fixed by Martin Atzmueller: dumping/loading instances works
+  better
+* fixed bug 40: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, 
+  and UPGRADED-COMPLEX-PART-TYPE now work better with of compound
+  types built from undefined types, e.g. '(VECTOR SOME-UNDEF-TYPE).
 * The Gray subclassable streams extension now works, thanks to a 
   patch from Martin Atzmueller.
+* DESCRIBE now works on structure objects again.
+* Compiler output is now more verbose, with messages truncated
+  later than before. (There should be some supported way for users
+  to override the default verbosity, but I haven't decided how to 
+  provide it yet, so this behavior is still controlled by the internal
+  SB-C::*COMPILER-ERROR-PRINT-FOO* variables in
+  src/compiler/ir1util.lisp.)
 * The full LOAD-FOREIGN extension (not just the primitive
   LOAD-FOREIGN-1) now works, thanks to a patch from Martin Atzmueller.
 * The default behavior of RUN-PROGRAM has changed. Now, unlike CMU CL
   but like most other programs, it defaults to copying the Unix
   environment from the original process instead of starting the
   new process in an empty environment.
-* fixed bug 40: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, 
-  and UPGRADED-COMPLEX-PART-TYPE now work better with of compound
-  types built from undefined types, e.g. '(VECTOR SOME-UNDEF-TYPE).
 * Extensions which manipulate the Unix environment now support
   an :ENVIRONMENT keyword option which doesn't smash case or 
   do other bad things. The CMU-CL-style :ENV option is retained
   for porting convenience.
 * LOAD-FOREIGN (and LOAD-1-FOREIGN) now support logical pathnames,
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
-* DESCRIBE now works on structure objects again.
 * Fasl file format version numbers have increased again, because
-  support for the Gray streams extension changes the format of the
-  system's stream objects.
+  support for the Gray streams extension changes the layout of the
+  system's STREAM objects.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
