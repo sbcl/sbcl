@@ -13,9 +13,13 @@ for 0.7.0:
 * global style systematization:
 	** s/#'(lambda/(lambda/
 	** four-space indentation in C
-* pending patches that go in (or else get rejected) before 0.7.0:
-	** Alexey Dejneka "BUG in nested backquotes processing"
+* pending patches and bug reports that go in (or else get handled
+	somehow, rejected/logged/whatever) before 0.7.0:
+	** AD "BUG in nested backquotes processing"
 		sbcl-devel 2001-12-21
+	** NJF bug report "bug in COPY-READTABLE" and AD patch,
+		both sbcl-devel 2001-12-24
+	** AD patch for other readtable functions, sbcl-devel 2001-12-24
 =======================================================================
 for early 0.7.x:
 

@@ -173,9 +173,6 @@
 (defmethod class-default-initargs ((class slot-class))
   (plist-value class 'default-initargs))
 
-(defmethod class-constructors ((class slot-class))
-  (plist-value class 'constructors))
-
 (defmethod class-slot-cells ((class std-class))
   (plist-value class 'class-slot-cells))
 

@@ -95,12 +95,6 @@
 				      subform))))
 	       forms)))
 
-(defmacro defconstructor
-	  (name class lambda-list &rest initialization-arguments)
-  `(expanding-make-instance-toplevel
-    (defun ,name ,lambda-list
-      (make-instance ',class ,@initialization-arguments))))
-
 (defun get-make-instance-functions (key-list)
   (dolist (key key-list)
     (let* ((cell (find-class-cell (car key)))

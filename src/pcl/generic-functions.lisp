@@ -235,8 +235,6 @@
 
 (defgeneric accessor-method-slot-name (m))
 
-(defgeneric class-constructors (class))
-
 (defgeneric class-default-initargs (class))
 
 (defgeneric class-direct-default-initargs (class))
