@@ -1228,13 +1228,31 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   of the naturalized string. We could probably port the patches
   from the cmucl-imp mailing list.
 
+143:
+  (reported by Jesse Bouwman 2001-10-24 through the unfortunately
+  prominent SourceForge web/db bug tracking system, which is 
+  unfortunately not a reliable way to get a timely response from
+  the SBCL maintainers)
+      In the course of trying to build a test case for an 
+    application error, I encountered this behavior: 
+      If you start up sbcl, and then lay on CTRL-C for a 
+    minute or two, the lisp process will eventually say: 
+         %PRIMITIVE HALT called; the party is over. 
+    and throw you into the monitor. If I start up lisp, 
+    attach to the process with strace, and then do the same 
+    (abusive) thing, I get instead: 
+         access failure in heap page not marked as write-protected 
+    and the monitor again. I don't know enough to have the 
+    faintest idea of what is going on here. 
+      This is with sbcl 6.12, uname -a reports: 
+         Linux prep 2.2.19 #4 SMP Tue Apr 24 13:59:52 CDT 2001 i686 unknown 
+  I (WHN) have verified that the same thing occurs on sbcl-0.pre7.141
+  under OpenBSD 2.9 on my X86 laptop. Do be patient when you try it:
+  it took more than two minutes (but less than five) for me.
 
-KNOWN BUGS RELATED TO THE IR1 INTERPRETER
-
-(Now that the IR1 interpreter has gone away, these should be 
-relatively straightforward to fix.)
-
-IR1-4:
+144: 
+  (This was once known as IR1-4, but it lived on even after the
+  IR1 interpreter went to the big bit bucket in the sky.)
   The system accepts DECLAIM in most places where DECLARE would be 
   accepted, without even issuing a warning. ANSI allows this, but since
   it's fairly easy to mistype DECLAIM instead of DECLARE, and the
@@ -1248,6 +1266,8 @@ IR1-4:
   interpreter is gone, the system's notion of what's a top-level form
   and what's not will remain too confused to fix this problem.]
 
-IR1-6:
-  (another wishlist thing..) Reimplement DEFMACRO to be basically
-  like DEFMACRO-MUNDANELY, just using EVAL-WHEN.
+DEFUNCT CATEGORIES OF BUGS
+  IR1-#:
+    These numbers were used for bugs related to the old IR1
+    interpreter. The # values reached 6 before the category
+    was closed down.

@@ -78,6 +78,9 @@
 ;;; DEFMACRO-MUNDANELY is like SB!XC:DEFMACRO, except that it doesn't
 ;;; have any EVAL-WHEN or IR1 magic associated with it, so it only
 ;;; takes effect in :LOAD-TOPLEVEL or :EXECUTE situations.
+;;;
+;;; FIXME: It'd probably be good (especially for DEFMACRO)
+;;; to make this share more code with DEFMACRO.
 (def!macro defmacro-mundanely (name lambda-list &body body)
   (let ((whole (gensym "WHOLE-"))
 	(environment (gensym "ENVIRONMENT-")))

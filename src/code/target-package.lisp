@@ -25,13 +25,10 @@
 (!cold-init-forms
   (/show0 "entering !PACKAGE-COLD-INIT"))
 
+;;; the list of packages to use by default when no :USE argument is
+;;; supplied to MAKE-PACKAGE or other package creation forms
 (defvar *default-package-use-list*)
-(!cold-init-forms
-  (setf *default-package-use-list* '("COMMON-LISP")))
-#!+sb-doc
-(setf (fdocumentation '*default-package-use-list* 'variable)
-  "the list of packages to use by default when no :USE argument is supplied
-  to MAKE-PACKAGE or other package creation forms")
+(!cold-init-forms (setf *default-package-use-list* nil))
 
 ;;;; PACKAGE-HASHTABLE stuff
 
@@ -310,9 +307,11 @@
   #!+sb-doc
   "Makes a new package having the specified Name and Nicknames. The
   package will inherit all external symbols from each package in
-  the use list. :Internal-Symbols and :External-Symbols are
+  the use list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are
   estimates for the number of internal and external symbols which
-  will ultimately be present in the package."
+  will ultimately be present in the package. The default value of
+  USE is implementation-dependent, and in this implementation 
+  it is simply NIL."
 
   ;; Check for package name conflicts in name and nicknames, then
   ;; make the package.
