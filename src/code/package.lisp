@@ -32,22 +32,22 @@
 
 (sb!xc:deftype hash-vector () '(simple-array (unsigned-byte 8) (*)))
 
-(sb!xc:defstruct (package-hashtable (:constructor %make-package-hashtable ())
-				    (:copier nil))
+(sb!xc:defstruct (package-hashtable
+                   (:constructor %make-package-hashtable
+                                 (table hash size &aux (free size)))
+                   (:copier nil))
   ;; The g-vector of symbols.
-  ;; FIXME: could just be type SIMPLE-VECTOR, with (MISSING-ARG) default
-  (table nil :type (or simple-vector null))
+  (table (missing-arg) :type simple-vector)
   ;; The i-vector of pname hash values.
-  ;; FIXME: could just be type HASH-VECTOR, with (MISSING-ARG) default
-  (hash nil :type (or hash-vector null))
+  (hash (missing-arg) :type hash-vector)
   ;; The total number of entries allowed before resizing.
   ;;
   ;; FIXME: CAPACITY would be a more descriptive name. (This is
   ;; related to but not quite the same as HASH-TABLE-SIZE, so calling
   ;; it SIZE seems somewhat misleading.)
-  (size 0 :type index)
+  (size (missing-arg) :type index)
   ;; The remaining number of entries that can be made before we have to rehash.
-  (free 0 :type index)
+  (free (missing-arg) :type index)
   ;; The number of deleted entries.
   (deleted 0 :type index))
 
@@ -122,9 +122,6 @@
 	     (flet ((iterate-over-hash-table (table ignore)
 		      (let ((hash-vec (package-hashtable-hash table))
 			    (sym-vec (package-hashtable-table table)))
-			(declare (type (simple-array (unsigned-byte 8) (*))
-				       hash-vec)
-				 (type simple-vector sym-vec))
 			(dotimes (i (length sym-vec))
 			  (when (>= (aref hash-vec i) 2)
 			    (let ((sym (aref sym-vec i)))
@@ -159,9 +156,6 @@
 		  (table (package-external-symbols package))
 		  (hash-vec (package-hashtable-hash table))
 		  (sym-vec (package-hashtable-table table)))
-	     (declare (type (simple-array (unsigned-byte 8) (*))
-			    hash-vec)
-		      (type simple-vector sym-vec))
 	     (dotimes (i (length sym-vec))
 	       (when (>= (aref hash-vec i) 2)
 		 (,flet-name (aref sym-vec i))))))
@@ -187,9 +181,6 @@
 	     (flet ((iterate-over-hash-table (table)
 		      (let ((hash-vec (package-hashtable-hash table))
 			    (sym-vec (package-hashtable-table table)))
-			(declare (type (simple-array (unsigned-byte 8) (*))
-				       hash-vec)
-				 (type simple-vector sym-vec))
 			(dotimes (i (length sym-vec))
 			  (when (>= (aref hash-vec i) 2)
 			    (,flet-name (aref sym-vec i)))))))

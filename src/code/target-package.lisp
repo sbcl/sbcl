@@ -8,6 +8,9 @@
 ;;;;   symbol. A name conflict is said to occur when there would be more
 ;;;;   than one candidate symbol. Any time a name conflict is about to
 ;;;;   occur, a correctable error is signaled.
+;;;;
+;;;; FIXME: The code contains a lot of type declarations. Are they
+;;;; all really necessary?
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -46,22 +49,26 @@
 ;;; the hashtable.
 (defun make-or-remake-package-hashtable (size
 					 &optional
-					 (res (%make-package-hashtable)))
-  (do ((n (logior (truncate size package-rehash-threshold) 1)
-	  (+ n 2)))
-      ((positive-primep n)
-       (setf (package-hashtable-table res)
-	     (make-array n))
-       (setf (package-hashtable-hash res)
-	     (make-array n
-			 :element-type '(unsigned-byte 8)
-			 :initial-element 0))
-       (let ((size (truncate (* n package-rehash-threshold))))
-	 (setf (package-hashtable-size res) size)
-	 (setf (package-hashtable-free res) size))
-       (setf (package-hashtable-deleted res) 0)
-       res)
-    (declare (type fixnum n))))
+                                         res)
+  (flet ((actual-package-hashtable-size (size)
+           (loop for n of-type fixnum
+              from (logior (truncate size package-rehash-threshold) 1)
+              by 2
+              when (positive-primep n) return n)))
+    (let* ((n (actual-package-hashtable-size size))
+           (size (truncate (* n package-rehash-threshold)))
+           (table (make-array n))
+           (hash (make-array n
+                             :element-type '(unsigned-byte 8)
+                             :initial-element 0)))
+      (if res
+          (setf (package-hashtable-table res) table
+                (package-hashtable-hash res) hash
+                (package-hashtable-size res) size
+                (package-hashtable-free res) size
+                (package-hashtable-deleted res) 0)
+          (setf res (%make-package-hashtable table hash size)))
+      res)))
 
 ;;;; miscellaneous PACKAGE operations
 
@@ -85,14 +92,10 @@
 
 (defun %package-hashtable-symbol-count (table)
   (let ((size (the fixnum
-		(- (the fixnum (package-hashtable-size table))
-		   (the fixnum
-		     (package-hashtable-deleted table))))))
-    (declare (fixnum size))
+		(- (package-hashtable-size table)
+		   (package-hashtable-deleted table)))))
     (the fixnum
-      (- size
-	 (the fixnum
-	   (package-hashtable-free table))))))
+      (- size (package-hashtable-free table)))))
 
 (defun package-internal-symbol-count (package)
   (%package-hashtable-symbol-count (package-internal-symbols package)))
@@ -186,9 +189,7 @@
 	 (sxhash (%sxhash-simple-string (symbol-name symbol)))
 	 (h2 (the fixnum (1+ (the fixnum (rem sxhash
 					      (the fixnum (- len 2))))))))
-    (declare (simple-vector vec)
-	     (type (simple-array (unsigned-byte 8)) hash)
-	     (fixnum len sxhash h2))
+    (declare (fixnum len sxhash h2))
     (cond ((zerop (the fixnum (package-hashtable-free table)))
 	   (make-or-remake-package-hashtable (* (package-hashtable-size table)
 						2)
@@ -202,19 +203,18 @@
 	   (do ((i (rem sxhash len) (rem (+ i h2) len)))
 	       ((< (the fixnum (aref hash i)) 2)
 		(if (zerop (the fixnum (aref hash i)))
-		    (decf (the fixnum (package-hashtable-free table)))
-		    (decf (the fixnum (package-hashtable-deleted table))))
+		    (decf (package-hashtable-free table))
+		    (decf (package-hashtable-deleted table)))
 		(setf (svref vec i) symbol)
 		(setf (aref hash i)
-		      (entry-hash (length (the simple-string
-					       (symbol-name symbol)))
+		      (entry-hash (length (symbol-name symbol))
 				  sxhash)))
 	     (declare (fixnum i)))))))
 
-;;; Find where the symbol named String is stored in Table. Index-Var
-;;; is bound to the index, or NIL if it is not present. Symbol-Var
-;;; is bound to the symbol. Length and Hash are the length and sxhash
-;;; of String. Entry-Hash is the entry-hash of the string and length.
+;;; Find where the symbol named STRING is stored in TABLE. INDEX-VAR
+;;; is bound to the index, or NIL if it is not present. SYMBOL-VAR
+;;; is bound to the symbol. LENGTH and HASH are the length and sxhash
+;;; of STRING. ENTRY-HASH is the entry-hash of the string and length.
 (defmacro with-symbol ((index-var symbol-var table string length sxhash
 				  entry-hash)
 		       &body forms)
@@ -225,9 +225,7 @@
 	    (,len (length ,vec))
 	    (,h2 (1+ (the index (rem (the index ,sxhash)
 				      (the index (- ,len 2)))))))
-       (declare (type (simple-array (unsigned-byte 8) (*)) ,hash)
-		(simple-vector ,vec)
-		(type index ,len ,h2))
+       (declare (type index ,len ,h2))
        (prog ((,index-var (rem (the index ,sxhash) ,len))
 	      ,symbol-var ,ehash)
 	 (declare (type (or index null) ,index-var))
@@ -237,8 +235,7 @@
 		(setq ,symbol-var (svref ,vec ,index-var))
 		(let* ((,name (symbol-name ,symbol-var))
 		       (,name-len (length ,name)))
-		  (declare (simple-string ,name)
-			   (type index ,name-len))
+		  (declare (type index ,name-len))
 		  (when (and (= ,name-len ,length)
 			     (string= ,string ,name
 				      :end1 ,length
@@ -524,7 +521,7 @@
   (let* ((package (find-undeleted-package-or-lose package))
 	 (name (symbol-name symbol))
 	 (shadowing-symbols (package-%shadowing-symbols package)))
-    (declare (list shadowing-symbols) (simple-string name))
+    (declare (list shadowing-symbols))
 
     ;; If a name conflict is revealed, give use a chance to shadowing-import
     ;; one of the accessible symbols.
