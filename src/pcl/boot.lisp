@@ -239,7 +239,11 @@ bootstrapping.
   (flet ((ensure (arg ok)
            (unless ok
 	     (error
-	      "invalid argument ~S in the generic function lambda list ~S"
+	      ;; (s/invalid/non-ANSI-conforming/ because the old PCL
+	      ;; implementation allowed this, so people got used to
+	      ;; it, and maybe this phrasing will help them to guess
+	      ;; why their program which worked under PCL no longer works.)
+	      "~@<non-ANSI-conforming argument ~S ~_in the generic function lambda list ~S~:>"
 	      arg lambda-list))))
     (multiple-value-bind (required optional restp rest keyp keys allowp
                           auxp aux morep more-context more-count)

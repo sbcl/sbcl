@@ -464,6 +464,20 @@ Other commands:
     (print-frame-call frame :number t))
   (fresh-line *standard-output*)
   (values))
+
+(defun backtrace-as-list (&optional (count most-positive-fixnum))
+  #!+sb-doc "Return a list representing the current BACKTRACE."
+  (do ((reversed-result nil)
+       (frame (if *in-the-debugger* *current-frame* (sb!di:top-frame))
+	      (sb!di:frame-down frame))
+       (count count (1- count)))
+      ((or (null frame) (zerop count))
+       (nreverse reversed-result))
+    (push (frame-call-as-list frame) reversed-result)))
+
+(defun frame-call-as-list (frame)
+  (cons (sb!di:debug-fun-name (sb!di:frame-debug-fun frame))
+	(frame-args-as-list frame)))
 
 ;;;; frame printing
 
@@ -511,44 +525,51 @@ Other commands:
 	    (:copier nil))
   string)
 
+;;; Extract the function argument values for a debug frame.
+(defun frame-args-as-list (frame)
+  (let ((debug-fun (sb!di:frame-debug-fun frame))
+	(loc (sb!di:frame-code-location frame))
+	(reversed-result nil))
+    (handler-case
+	(progn
+	  (dolist (ele (sb!di:debug-fun-lambda-list debug-fun))
+	    (lambda-list-element-dispatch ele
+	     :required ((push (frame-call-arg ele loc frame) reversed-result))
+	     :optional ((push (frame-call-arg (second ele) loc frame)
+			      reversed-result))
+	     :keyword ((push (second ele) reversed-result)
+		       (push (frame-call-arg (third ele) loc frame)
+			     reversed-result))
+	     :deleted ((push (frame-call-arg ele loc frame) reversed-result))
+	     :rest ((lambda-var-dispatch (second ele) loc
+		     nil
+		     (progn
+		       (setf reversed-result
+			     (append (reverse (sb!di:debug-var-value
+					       (second ele) frame))
+				     reversed-result))
+		       (return))
+		     (push (make-unprintable-object
+			    "unavailable &REST argument")
+		     reversed-result)))))
+	  ;; As long as we do an ordinary return (as opposed to SIGNALing
+	  ;; a CONDITION) from the DOLIST above:
+	  (nreverse reversed-result))
+      (sb!di:lambda-list-unavailable
+       ()
+       :lambda-list-unavailable))))
+
 ;;; Print FRAME with verbosity level 1. If we hit a &REST arg, then
 ;;; print as many of the values as possible, punting the loop over
 ;;; lambda-list variables since any other arguments will be in the
 ;;; &REST arg's list of values.
 (defun print-frame-call-1 (frame)
   (let ((debug-fun (sb!di:frame-debug-fun frame))
-	(loc (sb!di:frame-code-location frame))
-	(reversed-args nil))
-
-    ;; Construct function arguments in REVERSED-ARGS.
-    (handler-case
-	(dolist (ele (sb!di:debug-fun-lambda-list debug-fun))
-	  (lambda-list-element-dispatch ele
-	    :required ((push (frame-call-arg ele loc frame) reversed-args))
-	    :optional ((push (frame-call-arg (second ele) loc frame)
-			     reversed-args))
-	    :keyword ((push (second ele) reversed-args)
-		      (push (frame-call-arg (third ele) loc frame)
-			    reversed-args))
-	    :deleted ((push (frame-call-arg ele loc frame) reversed-args))
-	    :rest ((lambda-var-dispatch (second ele) loc
-		     nil
-		     (progn
-		       (setf reversed-args
-			     (append (reverse (sb!di:debug-var-value
-					       (second ele) frame))
-				     reversed-args))
-		       (return))
-		     (push (make-unprintable-object
-			    "unavailable &REST argument")
-			   reversed-args)))))
-      (sb!di:lambda-list-unavailable
-       ()
-       (push (make-unprintable-object "lambda list unavailable")
-	     reversed-args)))
+	(loc (sb!di:frame-code-location frame)))
 
     (pprint-logical-block (*standard-output* nil :prefix "(" :suffix ")")
-      (let ((args (nreverse (mapcar #'ensure-printable-object reversed-args))))
+      (let ((args (mapcar #'ensure-printable-object
+			  (frame-args-as-list frame))))
 	;; Since we go to some trouble to make nice informative function
 	;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
 	;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
@@ -992,6 +1013,10 @@ reset to ~S."
 ;;; potential DEBUG-VAR from the lambda-list, then the second value is
 ;;; T. If this returns a keyword symbol or a value from a rest arg,
 ;;; then the second value is NIL.
+;;;
+;;; FIXME: There's probably some way to merge the code here with
+;;; FRAME-ARGS-AS-LIST. (A fair amount of logic is already shared
+;;; through LAMBDA-LIST-ELEMENT-DISPATCH, but I suspect more could be.)
 (declaim (ftype (function (index list)) nth-arg))
 (defun nth-arg (count args)
   (let ((n count))
@@ -1008,8 +1033,7 @@ reset to ~S."
 	:rest ((let ((var (second ele)))
 		 (lambda-var-dispatch var (sb!di:frame-code-location
 					   *current-frame*)
-		   (error "unused &REST argument before n'th
-argument")
+		   (error "unused &REST argument before n'th argument")
 		   (dolist (value
 			    (sb!di:debug-var-value var *current-frame*)
 			    (error
