@@ -7,7 +7,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-all: grovel_headers
+all: grovel_headers determine-endianness
 
 clean: 
-	rm -f *.o grovel_headers
+	rm -f *.o grovel_headers determine-endianness
