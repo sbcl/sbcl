@@ -77,7 +77,7 @@
 ;;;; move functions
 
 ;;; X is source, Y is destination.
-(define-move-fun (load-single 2) (vop x ysrc dest)
+(define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
   (inst movss y (ea-for-sf-stack x)))
 
