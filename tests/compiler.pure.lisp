@@ -456,3 +456,4 @@
   (let ((y (make-array 2 :element-type 'bit :initial-element 0)))
     (assert (equal y #*00))
     (funcall f y 1)
+    (assert (equal y #*10))))
