@@ -904,7 +904,12 @@
   (assert (string= (with-output-to-string (*standard-output*)
 		     (method-for-defined-classes #\3))
 		   "3")))
-	     
+
+(load "package-ctor-bug.lisp")
+(assert (= (package-ctor-bug:test) 3))
+(delete-package "PACKAGE-CTOR-BUG")
+(load "package-ctor-bug.lisp")
+(assert (= (package-ctor-bug:test) 3))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -85,6 +85,9 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
+(define-internal-pcl-function-name-syntax sb-pcl::ctor (list)
+  (valid-function-name-p (cadr list)))
+
 (defun sb-pcl::random-documentation (name type)
   (cdr (assoc type (info :random-documentation :stuff name))))
 

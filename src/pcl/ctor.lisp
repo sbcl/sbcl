@@ -134,17 +134,8 @@
     (setf (%funcallable-instance-info ctor 1)
 	  (ctor-function-name ctor))))
 
-;;; Keep this a separate function for testing.
 (defun make-ctor-function-name (class-name initargs)
-  (let ((*package* *pcl-package*)
-	(*print-case* :upcase)
-	(*print-pretty* nil)
-	(*print-gensym* t))
-    (format-symbol *pcl-package* "CTOR ~S::~S ~S ~S"
-		   (package-name (symbol-package class-name))
-		   (symbol-name class-name)
-		   (plist-keys initargs)
-		   (plist-values initargs :test #'constantp))))
+  (list* 'ctor class-name initargs))
 
 ;;; Keep this a separate function for testing.
 (defun ensure-ctor (function-name class-name initargs)
@@ -156,7 +147,7 @@
   (without-package-locks ; for (setf symbol-function)
    (let ((ctor (%make-ctor function-name class-name nil initargs)))
      (push ctor *all-ctors*)
-     (setf (symbol-function function-name) ctor)
+     (setf (fdefinition function-name) ctor)
      (install-initial-constructor ctor :force-p t)
      ctor)))
 
@@ -233,7 +224,7 @@
 				    t)
 			  (function (&rest t) t))
 		      ,function-name))
-	      (,function-name ,@value-forms))))))))
+	      (funcall (function ,function-name) ,@value-forms))))))))
 
 
 ;;; **************************************************
