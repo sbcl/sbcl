@@ -2455,8 +2455,7 @@
 
 ;;; unordered comparison
 (define-instruction fucom (segment src)
-  ;; XX Printer conflicts with frstor
-  ;; (:printer floating-point ((op '(#b101 #b100))))
+  (:printer floating-point-fp ((op '(#b101 #b100))))
   (:emitter
    (aver (fp-reg-tn-p src))
    (emit-byte segment #b11011101)

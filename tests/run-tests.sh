@@ -44,10 +44,10 @@ echo /with SBCL_ALLOWING_CORE=\'$SBCL_ALLOWING_CORE\'
 # returned unless we exit through the intended explicit "test
 # successful" path.
 tenfour () {
-    if [ $? = 104 ]; then
+    if [ $1 = 104 ]; then
 	echo ok
     else
-	echo test failed, expected 104 return code, got $?
+	echo test failed, expected 104 return code, got $1
 	exit 1
     fi
 }
@@ -66,7 +66,7 @@ for f in *.pure.lisp; do
     fi
 done
 echo "  (sb-ext:quit :unix-status 104)) ; Return status=success."
-) | $SBCL ; tenfour
+) | $SBCL ; tenfour $?
 
 # *.impure.lisp files are Lisp code with side effects (e.g. doing
 # DEFSTRUCT or DEFTYPE or DEFVAR, or messing with the read table).
@@ -77,7 +77,7 @@ echo //running '*.impure.lisp' tests
 for f in *.impure.lisp; do
     if [ -f $f ]; then
         echo //running $f test
-        echo "(load \"$f\")" | $SBCL ; tenfour
+        echo "(load \"$f\")" | $SBCL ; tenfour $?
     fi
 done
 
@@ -89,7 +89,7 @@ echo //running '*.test.sh' tests
 for f in *.test.sh; do
     if [ -f $f ]; then
 	echo //running $f test
-	sh $f "$SBCL"; tenfour
+	sh $f "$SBCL"; tenfour $?
     fi
 done
 
@@ -99,7 +99,7 @@ echo //running '*.assertoids' tests
 for f in *.assertoids; do
     if [ -f $f ]; then
 	echo //running $f test
-	echo "(load \"$f\")" | $SBCL --eval '(load "assertoid.lisp")' ; tenfour
+	echo "(load \"$f\")" | $SBCL --eval '(load "assertoid.lisp")' ; tenfour $?
     fi
 done
 
@@ -112,7 +112,7 @@ for f in *.pure-cload.lisp; do
     # to LOAD them all into the same Lisp.)
     if [ -f $f ]; then
 	echo //running $f test
-	$SBCL <<EOF ; tenfour
+	$SBCL <<EOF ; tenfour $?
 		(compile-file "$f")
                 (progn
                   (unwind-protect
@@ -130,7 +130,7 @@ echo //running '*.impure-cload.lisp' tests
 for f in *.impure-cload.lisp; do
     if [ -f $f ]; then
 	echo //running $f test
-	$SBCL <<EOF ; tenfour
+	$SBCL <<EOF ; tenfour $?
 		(compile-file "$f")
                 (progn
                   (unwind-protect

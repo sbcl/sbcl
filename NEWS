@@ -1785,6 +1785,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     classes.  (thanks to Antonio Martinez)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
+    ** arbitrary numbers, not just reals, are allowed in certain
+       circumstances in LOOP for-as-arithmetic clauses.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

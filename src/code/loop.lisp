@@ -511,7 +511,8 @@ code to be loaded.
       (setq constant-value (eval new-form)))
     (when (and constantp expected-type)
       (unless (sb!xc:typep constant-value expected-type)
-	(loop-warn "The form ~S evaluated to ~S, which was not of the anticipated type ~S."
+	(loop-warn "~@<The form ~S evaluated to ~S, which was not of ~
+                    the anticipated type ~S.~:@>"
 		   form constant-value expected-type)
 	(setq constantp nil constant-value nil)))
     (values new-form constantp constant-value)))
@@ -534,6 +535,11 @@ code to be loaded.
 	;; CLTL2, removed from ANSI standard) we could set these
 	;; values flexibly. Without DECLARATION-INFORMATION, we have
 	;; to set them to constants.
+	;;
+	;; except FIXME: we've lost all pretence of portability,
+	;; considering this instead an internal implementation, so
+	;; we're free to couple to our own representation of the
+	;; environment.
 	(speed 1)
 	(space 1))
     (+ 40 (* (- speed space) 10))))
@@ -1717,21 +1723,22 @@ code to be loaded.
 		((loop-tequal prep :below) (setq dir ':up)))
 	  (setq limit-given t)
 	  (multiple-value-setq (form limit-constantp limit-value)
-	    (loop-constant-fold-if-possible form indexv-type))
+	    (loop-constant-fold-if-possible form `(and ,indexv-type real)))
 	  (setq endform (if limit-constantp
 			    `',limit-value
 			    (loop-make-var
-			      (gensym "LOOP-LIMIT-") form indexv-type))))
+			     (gensym "LOOP-LIMIT-") form
+			      `(and ,indexv-type real)))))
 	 (:by
-	   (multiple-value-setq (form stepby-constantp stepby)
-	     (loop-constant-fold-if-possible form indexv-type))
-	   (unless stepby-constantp
-	     (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
-			    form
-			    indexv-type)))
+	  (multiple-value-setq (form stepby-constantp stepby)
+	    (loop-constant-fold-if-possible form `(and ,indexv-type (real (0)))))
+	  (unless stepby-constantp
+	    (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
+			   form
+			   `(and ,indexv-type (real (0))))))
 	 (t (loop-error
-	      "~S invalid preposition in sequencing or sequence path;~@
-	       maybe invalid prepositions were specified in iteration path descriptor?"
+	     "~S invalid preposition in sequencing or sequence path;~@
+	      maybe invalid prepositions were specified in iteration path descriptor?"
 	      prep)))
        (when (and odir dir (not (eq dir odir)))
 	 (loop-error "conflicting stepping directions in LOOP sequencing path"))
@@ -1739,12 +1746,27 @@ code to be loaded.
      (when (and sequence-variable (not sequencep))
        (loop-error "missing OF or IN phrase in sequence path"))
      ;; Now fill in the defaults.
-     (unless start-given
-       (loop-make-iteration-var
-	 indexv
-	 (setq start-constantp t
-	       start-value (or (loop-typed-init indexv-type) 0))
-	 indexv-type))
+     (if start-given
+	 (when limit-given
+	   ;; if both start and limit are given, they had better both
+	   ;; be REAL.  We already enforce the REALness of LIMIT,
+	   ;; above; here's the KLUDGE to enforce the type of START.
+	   (flet ((type-declaration-of (x)
+		    (and (eq (car x) 'type) (caddr x))))
+	     (let ((decl (find indexv *loop-declarations*
+			       :key #'type-declaration-of))
+		   (%decl (find indexv *loop-declarations*
+				:key #'type-declaration-of
+				:from-end t)))
+	       (sb!int:aver (eq decl %decl))
+	       (setf (cadr decl)
+		     `(and real ,(cadr decl))))))
+	 ;; default start
+	 (loop-make-iteration-var
+	  indexv
+	  (setq start-constantp t
+		start-value (or (loop-typed-init indexv-type) 0))
+	  `(and ,indexv-type real)))
      (cond ((member dir '(nil :up))
 	    (when (or limit-given default-top)
 	      (unless limit-given
@@ -1771,7 +1793,8 @@ code to be loaded.
        (setq step-hack
 	     `(,variable ,step-hack)))
      (let ((first-test test) (remaining-tests test))
-       (when (and stepby-constantp start-constantp limit-constantp)
+       (when (and stepby-constantp start-constantp limit-constantp
+		  (realp start-value) (realp limit-value))
 	 (when (setq first-test
 		     (funcall (symbol-function testfn)
 			      start-value
@@ -1784,7 +1807,7 @@ code to be loaded.
 
 (defun loop-for-arithmetic (var val data-type kwd)
   (loop-sequencer
-   var (loop-check-data-type data-type 'real)
+   var (loop-check-data-type data-type 'number)
    nil nil nil nil nil nil
    (loop-collect-prepositional-phrases
     '((:from :upfrom :downfrom) (:to :upto :downto :above :below) (:by))
