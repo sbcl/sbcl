@@ -38,7 +38,7 @@ case `uname -m` in
     ppc) guessed_sbcl_arch=ppc ;;
     Power*Macintosh) guessed_sbcl_arch=ppc ;;
     parisc) guessed_sbcl_arch=hppa ;;
-    mips) guessed_sbcl_arch=mips ;;
+    mips*) guessed_sbcl_arch=mips ;;
     *)
         # If we're not building on a supported target architecture, we
 	# we have no guess, but it's not an error yet, since maybe

@@ -3,13 +3,13 @@
 
 
 static inline void 
-get_spinlock(lispobj *word,long value)
+get_spinlock(volatile lispobj *word, long value)
 {
     *word=value;		/* FIXME for threads */
 }
 
 static inline void
-release_spinlock(lispobj *word)
+release_spinlock(volatile lispobj *word)
 {
     *word=0;
 }

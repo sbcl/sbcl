@@ -40,8 +40,8 @@ emulate_branch(os_context_t *context, unsigned long inst)
     long opcode = inst >> 26;
     long r1 = (inst >> 21) & 0x1f;
     long r2 = (inst >> 16) & 0x1f;
-    long bdisp = (inst&(1<<15)) ? inst | (-1 << 16) : inst&0xffff;
-    long jdisp = (inst&(1<<25)) ? inst | (-1 << 26) : inst&0xffff;
+    long bdisp = ((inst&(1<<15)) ? inst | (-1 << 16) : inst&0x7fff) << 2;
+    long jdisp = (inst&0x3ffffff) << 2;
     long disp = 0;
 
     switch(opcode) {
@@ -77,17 +77,14 @@ emulate_branch(os_context_t *context, unsigned long inst)
 	   != *os_context_register_addr(context, r2))
 	    disp = bdisp;
 	break;
-    case 0x6: /* ble */
+    case 0x6: /* blez */
 	if(*os_context_register_addr(context, r1)
-	   /* FIXME: One has to assume that the CMUCL gods of old have
-              got the sign issues right... but it might be worth
-              checking, someday */
 	   <= *os_context_register_addr(context, r2))
 	    disp = bdisp;
 	break;
     case 0x7: /* bgtz */
 	if(*os_context_register_addr(context, r1)
-	   >= *os_context_register_addr(context, r2))
+	   > *os_context_register_addr(context, r2))
 	    disp = bdisp;
 	break;
     case 0x2: /* j */
@@ -98,7 +95,7 @@ emulate_branch(os_context_t *context, unsigned long inst)
 	*os_context_register_addr(context, 31) = *os_context_pc_addr(context) + 4;
 	break;
     }
-    return (*os_context_pc_addr(context) + disp * 4);
+    return (*os_context_pc_addr(context) + disp);
 }
 
 void arch_skip_instruction(os_context_t *context)
@@ -166,9 +163,9 @@ static sigset_t orig_sigmask;
 void arch_do_displaced_inst(os_context_t *context,
 			    unsigned int orig_inst)
 {
-    unsigned long *pc = (unsigned long *)*os_context_pc_addr(context);
-    unsigned long *break_pc, *next_pc;
-    unsigned long next_inst;
+    unsigned int *pc = (unsigned int *)*os_context_pc_addr(context);
+    unsigned int *break_pc, *next_pc;
+    unsigned int next_inst;
     int opcode;
 
     orig_sigmask = *os_context_sigmask_addr(context);
@@ -186,7 +183,7 @@ void arch_do_displaced_inst(os_context_t *context,
 
     /* Put the original instruction back. */
     *break_pc = orig_inst;
-    os_flush_icache((os_vm_address_t)break_pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)break_pc, sizeof(unsigned int));
     skipped_break_addr = break_pc;
 
     /* Figure out where it goes. */
@@ -200,18 +197,18 @@ void arch_do_displaced_inst(os_context_t *context,
 
     displaced_after_inst = *next_pc;
     *next_pc = (trap_AfterBreakpoint << 16) | 0xd;
-    os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned int));
 }
 
 static void sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     sigset_t *mask;
-    int code;
+    unsigned int code;
     /* Don't disallow recursive breakpoint traps.  Otherwise, we can't */
     /* use debugger breakpoints anywhere in here. */
     mask = os_context_sigmask_addr(context);
-    sigsetmask(mask);
+    sigprocmask(SIG_SETMASK, mask, NULL);
     code = ((*(int *) (*os_context_pc_addr(context))) >> 16) & 0x1f;
 
     switch (code) {
@@ -243,7 +240,7 @@ static void sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 			sizeof(unsigned long));
 	skipped_break_addr = NULL;
 	*(unsigned long *)(*os_context_pc_addr(context)) = displaced_after_inst;
-	os_flush_icache((os_vm_address_t) *os_context_pc_addr(context), sizeof(unsigned long));
+	os_flush_icache((os_vm_address_t) *os_context_pc_addr(context), sizeof(unsigned int));
 	*os_context_sigmask_addr(context) = orig_sigmask;
 	break;
 

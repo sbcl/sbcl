@@ -1,14 +1,13 @@
-#define LANGUAGE_ASSEMBLY
-
-#include "sbcl.h"	
+#include "sbcl.h"
 #include "lispregs.h"
+#include "globals.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
 		
 #define zero $0
-#define at $1
+#define AT $1
 #define v0 $2
 #define v1 $3
 #define a0 $4
@@ -40,21 +39,37 @@
 #define s8 $30
 #define ra $31
 
+/*
+ * NESTED - declare nested routine entry point
+ */
+#define	NESTED(symbol, framesize, rpc)                  \
+		.globl	symbol;                         \
+		.align	2;                              \
+		.type	symbol,@function;               \
+		.ent	symbol,0;                       \
+symbol:		.frame	sp, framesize, rpc
+
+/*
+ * END - mark end of function
+ */
+#define	END(function)                                   \
+		.end	function;		        \
+		.size	function,.-function
+
+
+	.text
 	
 /*
  * Function to transfer control into lisp.
  */
-	.text
-	.globl	call_into_lisp
-	.ent	call_into_lisp
-call_into_lisp:
-#define framesize 12*4
+#define framesize 16*4
+	NESTED(call_into_lisp, framesize, ra)
 	subu	sp, framesize
-	.frame	sp, framesize, ra
 	/* Save all the C regs. */
-	.mask	0xc0ff0000, 0
+	.mask	0xd0ff0000, -4
 	sw	ra, framesize(sp)
 	sw	s8, framesize-4(sp)
+	sw	gp, framesize-8(sp)
 	sw	s7, framesize-12(sp)
 	sw	s6, framesize-16(sp)
 	sw	s5, framesize-20(sp)
@@ -110,9 +125,9 @@ pa1:
 	.set	reorder
 
 	/* Pass in args */
-	move	reg_LEXENV, $4
-	move	reg_CFP, $5
-	sll	reg_NARGS, $6, 2
+	move	reg_LEXENV, a0
+	move	reg_CFP, a1
+	sll	reg_NARGS, a2, 2
 	lw	reg_A0, 0(reg_CFP)
 	lw	reg_A1, 4(reg_CFP)
 	lw	reg_A2, 8(reg_CFP)
@@ -128,7 +143,7 @@ pa1:
 
 	/* Jump into lisp land. */
 	addu	reg_LIP, reg_CODE, 6*4 - FUN_POINTER_LOWTAG
-	j	reg_LIP
+	jr	reg_LIP
 
 	.set	noreorder
 	.align	3
@@ -179,6 +194,7 @@ pa2:
 	/* Restore C regs */
 	lw	ra, framesize(sp)
 	lw	s8, framesize-4(sp)
+	lw	gp, framesize-8(sp)
 	lw	s7, framesize-12(sp)
 	lw	s6, framesize-16(sp)
 	lw	s5, framesize-20(sp)
@@ -192,16 +208,17 @@ pa2:
 	addu	sp, framesize
 
 	/* Back we go. */
-	j	ra
+	jr	ra
 
-	.end	call_into_lisp
+	END(call_into_lisp)
 
 /*
  * Transfering control from Lisp into C
  */
-	.text
 	.globl	call_into_c
-	.ent	call_into_c
+	.align	2
+	.type	call_into_c,@function
+	.ent	call_into_c,0
 call_into_c:
 	/* Set up a stack frame. */
 	move	reg_OCFP, reg_CFP
@@ -243,7 +260,7 @@ pa3:
 
 	/* Into C land we go. */
 	move    t9, reg_CFUNC
-	jal	t9
+	jalr	t9
 	nop
 
 	lw      gp, 12(reg_CFP)
@@ -299,16 +316,14 @@ pa4:
 	/* Return to LISP. */
 	j	reg_LIP
 
-	.end	call_into_c
+	END(call_into_c)
 
-	.text
 	.globl	start_of_tramps
 start_of_tramps:
 
 /*
  * The undefined-function trampoline.
  */
-        .text
         .globl  undefined_tramp
         .ent    undefined_tramp
 undefined_tramp:
@@ -324,7 +339,6 @@ undefined_tramp:
 /*
  * The closure trampoline.
  */
-        .text
         .globl  closure_tramp
         .ent    closure_tramp
 closure_tramp:
@@ -334,7 +348,6 @@ closure_tramp:
         j       reg_LIP
         .end    closure_tramp
 
-	.text
 	.globl	end_of_tramps
 end_of_tramps:
 
@@ -343,7 +356,6 @@ end_of_tramps:
  * Function-end breakpoint magic.
  */
 
-	.text
 	.align	2
 	.set	noreorder
 	.globl	function_end_breakpoint_guts
@@ -371,67 +383,3 @@ fun_end_breakpoint_trap:
 	.globl	fun_end_breakpoint_end
 fun_end_breakpoint_end:
 	.set	reorder
-
-/* FIXME:	 I don't think the below are actually used anywhere */
-	.text
-	.align	2
-	.globl	call_on_stack
-	.ent	call_on_stack
-call_on_stack:
-	subu	sp, a1, 16
-	jal	a0
-	break	0
-	.end	call_on_stack
-
-	.globl	save_state
-	.ent	save_state
-save_state:
-	subu	sp, 40
-	.frame	sp, 40, ra
-	/* Save all the C regs. */
-	.mask	0xc0ff0000, 0
-	sw	ra, 40(sp)
-	sw	s8, 40-4(sp)
-	sw	s7, 40-8(sp)
-	sw	s6, 40-12(sp)
-	sw	s5, 40-16(sp)
-	sw	s4, 40-20(sp)
-	sw	s3, 40-24(sp)
-	sw	s2, 40-28(sp)
-	sw	s1, 40-32(sp)
-	sw	s0, 40-36(sp)
-
-	/* Should also save the floating point state. */
-
-	move	t0, a0
-	move	a0, sp
-
-	jal	t0
-
-_restore_state:
-
-	lw	ra, 40(sp)
-	lw	s8, 40-4(sp)
-	lw	s7, 40-8(sp)
-	lw	s6, 40-12(sp)
-	lw	s5, 40-16(sp)
-	lw	s4, 40-20(sp)
-	lw	s3, 40-24(sp)
-	lw	s2, 40-28(sp)
-	lw	s1, 40-32(sp)
-	lw	s0, 40-36(sp)
-
-	addu	sp, 40
-	j	ra
-
-	.globl	restore_state
-restore_state:
-	move	sp, a0
-	move	v0, a1
-	j	_restore_state
-	.end	save_state
-
-
-
-
-

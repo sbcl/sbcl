@@ -43,7 +43,11 @@ extern void globals_init(void);
 #else /* LANGUAGE_ASSEMBLY */
 
 #ifdef mips
+#ifdef __linux__
+#define EXTERN(name,bytes) .globl name 
+#else
 #define EXTERN(name,bytes) .extern name bytes
+#endif
 #endif
 /**/
 #ifdef sparc
