@@ -120,6 +120,54 @@
 		       ;; subtype of VECTOR but not an ARRAY-TYPE?
 		       bare))))))))
 
+;;; Return a DO loop, mapping a function FUN to elements of
+;;; sequences. SEQS is a list of continuations, SEQ-NAMES - list of
+;;; variables, bound to sequences, INTO - a variable, which is used in
+;;; MAP-INTO. RESULT and BODY are forms, which can use variables
+;;; FUNCALL-RESULT, containing the result of application of FUN, and
+;;; INDEX, containing the current position in sequences.
+(defun build-sequence-iterator (seqs seq-names &key result into body)
+  (declare (type list seqs seq-names)
+           (type symbol into))
+  (collect ((bindings)
+           (declarations)
+            (vector-lengths)
+            (tests)
+            (places))
+    (let ((found-vector-p nil))
+      (flet ((process-vector (length)
+               (unless found-vector-p
+                 (setq found-vector-p t)
+                 (bindings `(index 0 (1+ index)))
+                 (declarations `(type index index)))
+               (vector-lengths length)))
+        (loop for seq of-type continuation in seqs
+           for seq-name in seq-names
+           for type = (continuation-type seq)
+           do (cond ((csubtypep type (specifier-type 'list))
+                     (let ((index (gensym "I")))
+                       (bindings `(,index ,seq-name (cdr ,index)))
+                       (declarations `(type list ,index))
+                       (places `(car ,index))
+                       (tests `(endp ,index))))
+                    ((csubtypep type (specifier-type 'vector))
+                     (process-vector `(length ,seq-name))
+                     (places `(aref ,seq-name index)))
+                    (t
+                     (give-up-ir1-transform
+                      "can't determine sequence argument type"))))
+        (when into
+          (process-vector `(array-dimension ,into 0))))
+      (when found-vector-p
+        (bindings `(length (min ,@(vector-lengths))))
+        (tests `(= index length)))
+      `(do (,@(bindings))
+           ((or ,@(tests)) ,result)
+         (declare ,@(declarations))
+         (let ((funcall-result (funcall fun ,@(places))))
+           (declare (ignorable funcall-result))
+           ,body)))))
+
 ;;; Try to compile %MAP efficiently when we can determine sequence
 ;;; argument types at compile time.
 ;;;
@@ -137,22 +185,14 @@
   (unless seqs (abort-ir1-transform "no sequence args"))
   (unless (constant-continuation-p result-type)
     (give-up-ir1-transform "RESULT-TYPE argument not constant"))
-  (labels (;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
+  (labels ( ;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
 	   (fn-1subtypep (fn x y)
 	     (multiple-value-bind (subtype-p valid-p) (funcall fn x y)
 	       (if valid-p
 		   subtype-p
 		   (give-up-ir1-transform
 		    "can't analyze sequence type relationship"))))
-	   (1subtypep (x y) (fn-1subtypep #'sb!xc:subtypep x y))
-	   (1csubtypep (x y) (fn-1subtypep #'csubtypep x y))
-	   (seq-supertype (seq)
-	     (let ((ctype (continuation-type seq)))
-	       (cond ((1csubtypep ctype (specifier-type 'vector)) 'vector)
-		     ((1csubtypep ctype (specifier-type 'list)) 'list)
-		     (t
-		      (give-up-ir1-transform
-		       "can't determine sequence argument type"))))))
+	   (1subtypep (x y) (fn-1subtypep #'sb!xc:subtypep x y)))
     (let* ((result-type-value (continuation-value result-type))
 	   (result-supertype (cond ((null result-type-value) 'null)
 				   ((1subtypep result-type-value 'vector)
@@ -161,8 +201,7 @@
 				    'list)
 				   (t
 				    (give-up-ir1-transform
-				     "can't determine result type"))))
-	   (seq-supertypes (mapcar #'seq-supertype seqs)))
+				     "can't determine result type")))))
       (cond ((and result-type-value (= 1 (length seqs)))
 	     ;; The consing arity-1 cases can be implemented
 	     ;; reasonably efficiently as function calls, and the cost
@@ -172,7 +211,7 @@
 	     ;; optimization policy.
 	     (cond ((subtypep 'list result-type-value)
 		    '(apply #'%map-to-list-arity-1 fun seqs))
-		   (;; (This one can be inefficient due to COERCE, but
+		   ( ;; (This one can be inefficient due to COERCE, but
 		    ;; the current open-coded implementation has the
 		    ;; same problem.)
 		    (subtypep result-type-value 'vector)
@@ -180,36 +219,13 @@
 			     ',result-type-value))
 		   (t (bug "impossible (?) sequence type"))))
 	    (t
-	     (let* ((seq-args (make-gensym-list (length seqs)))
-		    (index-bindingoids
-		     (mapcar (lambda (seq-arg seq-supertype)
-			       (let ((i (gensym "I"))) 
-				 (ecase seq-supertype
-				   (vector `(,i 0 (1+ ,i)))
-				   (list `(,i ,seq-arg (rest ,i))))))
-			     seq-args seq-supertypes))
-		    (indices (mapcar #'first index-bindingoids))
-		    (index-decls (mapcar (lambda (index seq-supertype)
-					   `(type ,(ecase seq-supertype
-						     (vector 'index)
-						     (list 'list))
-						  ,index))
-					 indices seq-supertypes))
-		    (tests (mapcar (lambda (seq-arg seq-supertype index)
-				     (ecase seq-supertype
-				       (vector `(>= ,index (length ,seq-arg)))
-				       (list `(endp ,index))))
-				   seq-args seq-supertypes indices))
-		    (values (mapcar (lambda (seq-arg seq-supertype index)
-				      (ecase seq-supertype
-					(vector `(aref ,seq-arg ,index))
-					(list `(first ,index))))
-				    seq-args seq-supertypes indices)))
-	       (multiple-value-bind (push-dacc final-result)
+	     (let* ((seq-args (make-gensym-list (length seqs))))
+	       (multiple-value-bind (push-dacc result)
 		   (ecase result-supertype
 		     (null (values nil nil))
-		     (list (values `(push dacc acc) `(nreverse acc)))
-		     (vector (values `(push dacc acc)
+		     (list (values `(push funcall-result acc)
+                                   `(nreverse acc)))
+		     (vector (values `(push funcall-result acc)
 				     `(coerce (nreverse acc)
 					      ',result-type-value))))
 		 ;; (We use the same idiom, of returning a LAMBDA from
@@ -219,17 +235,14 @@
 		 ;; of the &REST vars.)
 		 `(lambda (result-type fun ,@seq-args)
 		    (declare (ignore result-type))
-		    (do ((really-fun (%coerce-callable-to-fun fun))
-			 ,@index-bindingoids
-			 (acc nil))
-		    ((or ,@tests)
-		     ,final-result)
-		    (declare ,@index-decls)
-		    (declare (type list acc))
-		    (declare (ignorable acc))
-		    (let ((dacc (funcall really-fun ,@values)))
-		      (declare (ignorable dacc))
-		      ,push-dacc))))))))))
+                    (let ((fun (%coerce-callable-to-fun fun))
+                          (acc nil))
+                      (declare (type list acc))
+                      (declare (ignorable acc))
+                      ,(build-sequence-iterator
+                        seqs seq-args
+                        :result result
+                        :body push-dacc))))))))))
 
 ;;; MAP-INTO
 (deftransform map-into ((result fun &rest seqs)
@@ -241,25 +254,13 @@
                               (gensym))
                             seqs)))
     `(lambda (result fun ,@seqs-names)
-       (let ((length (array-dimension result 0))
-             (i 0))
-         (declare (type index i))
-         (declare (ignorable i))
-         ,(cond ((null seqs)
-                 `(dotimes (j length (setq i length))
-                    (setf (aref result j) (funcall fun))))
-                (t
-                 `(block nil
-                    (map nil
-                         (lambda (,@seqs-names)
-                           (when (= i length) (return))
-                           (setf (aref result i)
-                                 (funcall fun ,@seqs-names))
-                           (incf i))
-                         ,@seqs-names))))
-         (when (array-has-fill-pointer-p result)
-           (setf (fill-pointer result) i))
-         result))))
+       ,(build-sequence-iterator
+         seqs seqs-names
+         :result '(when (array-has-fill-pointer-p result)
+                   (setf (fill-pointer result) index))
+         :into 'result
+         :body '(setf (aref result index) funcall-result))
+       result)))
 
 
 ;;; FIXME: once the confusion over doing transforms with known-complex
