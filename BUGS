@@ -1540,20 +1540,6 @@ WORKAROUND:
       (test-um12 17))
     fails with NO-APPLICABLE-METHOD.
 
-338: "MOP specializers as type specifiers"
-  (reported by Bruno Haible sbcl-devel 2004-06-11)
-
-  ANSI 7.6.2 says: 
-    Because every valid parameter specializer is also a valid type
-    specifier, the function typep can be used during method selection
-    to determine whether an argument satisfies a parameter
-    specializer.
-
-  however, SBCL's EQL specializers are not type specifiers:
-    (defmethod foo ((x (eql 4.0))) 3.0)
-    (typep 1 (first (sb-pcl:method-specializers *)))
-  gives an error.
-
 339: "DEFINE-METHOD-COMBINATION bugs"
   (reported by Bruno Haible via the clisp test suite)
 

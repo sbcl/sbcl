@@ -174,6 +174,13 @@
        (xs (class-direct-subclasses x)))
   (assert (>= (length xs) 1))
   (assert (member (find-class 'logical-pathname) xs)))
+
+;;; BUG 338: "MOP specializers as type specifiers"
+;;;  (reported by Bruno Haible sbcl-devel 2004-06-11)
+(let* ((m (defmethod eql-specialized-method ((x (eql 4.0))) 3.0))
+       (spec (first (sb-mop:method-specializers m))))
+  (assert (not (typep 1 spec)))
+  (assert (typep 4.0 spec)))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -279,7 +279,11 @@
 
 (defmethod shared-initialize :after ((specl eql-specializer) slot-names &key)
   (declare (ignore slot-names))
-  (setf (slot-value specl 'type) `(eql ,(specializer-object specl))))
+  (setf (slot-value specl 'type)
+        `(eql ,(specializer-object specl)))
+  (setf (info :type :translator specl)
+        (constantly (make-member-type :members (list (specializer-object specl))))))
+
 
 (defun real-load-defclass (name metaclass-name supers slots other)
   (let ((res (apply #'ensure-class name :metaclass metaclass-name
