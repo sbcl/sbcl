@@ -39,4 +39,8 @@
 				stem
 				*target-obj-suffix*)))
       (unless (output-up-to-date-wrt-input-p objname srcname)
-	(target-compile-stem stem)))))
+	(let (
+	      (*more-compile-file-flags* 
+	       (if (position :trace-file flags)
+		   '(:trace-file "/tmp/out.trace") nil)))
+	  (target-compile-stem stem))))))

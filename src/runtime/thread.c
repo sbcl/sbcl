@@ -9,13 +9,11 @@
 #include "validate.h"		/* for CONTROL_STACK_SIZE etc */
 #include "thread.h"
 #include "arch.h"
+#include "target-arch-os.h"
 #include "os.h"
 #include "globals.h"
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
-#if 0
-#define THREAD_CONTROL_STACK_SIZE (2*1024*1024)	/* must be 2^n */
-#endif
-int dynamic_values_bytes=256*sizeof(lispobj);	/* same for all threads */
+int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 
 struct thread *init_thread(lispobj initial_function) {
@@ -48,22 +46,27 @@ struct thread *init_thread(lispobj initial_function) {
 	int i;
 	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
 	    th->dynamic_values_start[i]=UNBOUND_MARKER_WIDETAG;
+	SetSymbolValue(FREE_TLS_INDEX,3,0);
     }
+    ((struct symbol *)(CURRENT_THREAD_STRUCT-OTHER_POINTER_LOWTAG))
+	->tls_index=1;
+    SetTlSymbolValue(CURRENT_THREAD_STRUCT,th,th);
 
-    /* yes, really we are keeping raw machine words in these lisp
-     * symbol value slots */
+    ((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))
+	->tls_index=2;
+    SetTlSymbolValue(BINDING_STACK_POINTER,LOW_WORD(th->binding_stack_start),th);
 
-    /* obviously we'll have to do the dynamic-value-offset thing here
-     * as soon as we want two threads to actually execute lisp at
-     * once */
-    ((struct symbol *)native_pointer(ALIEN_STACK))->value
-	=LOW_WORD(th->dynamic_values_start-1);
-#ifdef BINDING_STACK_POINTER
-    SetSymbolValue(BINDING_STACK_POINTER, LOW_WORD(th->binding_stack_start),th);
-#endif
+    bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
+    bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th); 
+    bind_variable(PSEUDO_ATOMIC_ATOMIC,make_fixnum(0),th);
+    bind_variable(PSEUDO_ATOMIC_INTERRUPTED,make_fixnum(0),th);
+    bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
+    bind_variable(INTERRUPT_PENDING, NIL,th);
+    bind_variable(INTERRUPTS_ENABLED,T,th);
+    /* do we need per-thread alien stack anyway? */
+    bind_variable(ALIEN_STACK,LOW_WORD(th->dynamic_values_start-1),th);
 
     th->next=all_threads;
-
     th->tls_cookie=os_set_tls_pointer(th);
     if(th->tls_cookie<0) goto cleanup;
 

@@ -326,7 +326,7 @@
   ;; subtract 3 from (sb-kernel:get-lisp-obj-address 'NIL) you get the
   ;; first data slot, and if you subtract 7 you get a symbol header.
 
-  (value :set-trans %set-symbol-value
+  (value ; :set-trans %set-symbol-value (not that simple any more)
 	 :init :unbound)		;also the CAR of NIL-as-end-of-list
   (hash)				;the CDR of NIL-as-end-of-list
 

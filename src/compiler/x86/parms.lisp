@@ -254,9 +254,13 @@
     sb!unix::*interrupt-pending*
     *free-interrupt-context-index*
 
+    *free-tls-index*
+    
     *allocation-pointer*
     *binding-stack-pointer*
 
+    *current-thread-struct* 
+    
     ;; the floating point constants
     *fp-constant-0d0*
     *fp-constant-1d0*

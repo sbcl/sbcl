@@ -25,7 +25,17 @@ with an unbound-marker.
 Symbol value lookup looks first in the TLV at the sppropriate offset,
 then at the global value if the TLV offset is unbound.
 
-When a symbol is unbound, we check 
+When a symbol is unbound, we assume that it must previously have been
+bound, and therefore that the tls-index is valid.  Also that as none
+of the previous bindings affected the global value, we don't ever need to 
+set the symbol-value slot
+
+But we still need to know when to put unbound-marker into the tls value.
+What if the first bind to a symbol puts unbound-marker on the binding
+stack instead of the actual value?
+
+
+we check 
 1) if the tlv value is unbound, we assign the new value to the
 symbol's global value slot
 2) if the new value is unbound, we assign the new value to the 

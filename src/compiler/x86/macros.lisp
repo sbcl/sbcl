@@ -84,6 +84,27 @@
 			   (- other-pointer-lowtag)))
 	 ,reg))
 
+(defmacro load-tl-symbol-value (reg symbol)
+  `(progn
+    (inst mov ,reg
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst gs-segment-prefix)
+    (inst mov ,reg (make-ea :dword :scale 4 :index ,reg))))
+
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(progn
+    (inst mov ,temp
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst gs-segment-prefix)
+    (inst mov (make-ea :dword :scale 4 :index ,temp) ,reg)))
 
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc

@@ -527,18 +527,16 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  (let* ((control-stack-start (logand (sap-int (current-sp))
-				      ;; XXX THREAD_CONTROL_STACK_SIZE
-				      (lognot (1- (* 2 1024 1024)))))
-	 (control-stack-end (+ control-stack-start (* 2 1024 1024))))
+  (let* ((control-stack-start (sb!vm::current-thread-control-stack-start))
+	 (control-stack-end (sb!vm::current-thread-control-stack-end)))
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
-	 (sap<= (int-sap control-stack-start)
+	 (sap<= control-stack-start
 		x)
 	 (zerop (logand (sap-int x) #b11)))
     #!+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
-	 (sap> (int-sap control-stack-end) x)
+	 (sap> control-stack-end x)
 	 (zerop (logand (sap-int x) #b11)))))
 
 #!+x86
@@ -891,8 +889,7 @@
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (sb!alien:with-alien
-	((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
+    (let ((lisp-interrupt-contexts (sb!vm::current-thread-interrupt-contexts)))
       (/noshow0 "at head of WITH-ALIEN")
       (let ((context (sb!alien:deref lisp-interrupt-contexts index)))
 	(/noshow0 "got CONTEXT")
@@ -931,46 +928,45 @@
 #!-x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
-  (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (sb!alien:with-alien
-     ((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
-     (let ((scp (sb!alien:deref lisp-interrupt-contexts index)))
-       (when (= (sap-int frame-pointer)
-                (sb!vm:context-register scp sb!vm::cfp-offset))
-         (without-gcing
-          (let ((code (code-object-from-bits
-                       (sb!vm:context-register scp sb!vm::code-offset))))
-            (when (symbolp code)
-              (return (values code 0 scp)))
-            (let* ((code-header-len (* (get-header-data code)
-                                       sb!vm:n-word-bytes))
-                   (pc-offset
-                    (- (sap-int (sb!vm:context-pc scp))
-                       (- (get-lisp-obj-address code)
-                          sb!vm:other-pointer-lowtag)
-                       code-header-len)))
-              ;; Check to see whether we were executing in a branch
-              ;; delay slot.
-              #!+(or pmax sgi) ; pmax only (and broken anyway)
-              (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
-                (incf pc-offset sb!vm:n-word-bytes))
-              (unless (<= 0 pc-offset
-                          (* (code-header-ref code sb!vm:code-code-size-slot)
-                             sb!vm:n-word-bytes))
-                ;; We were in an assembly routine. Therefore, use the
-                ;; LRA as the pc.
-                (setf pc-offset
-                      (- (sb!vm:context-register scp sb!vm::lra-offset)
-                         (get-lisp-obj-address code)
-                         code-header-len)))
+  (let ((lisp-interrupt-contexts (sb!vm::current-thread-interrupt-contexts)))
+    (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
+      (let ((scp (sb!alien:deref lisp-interrupt-contexts index)))
+	(when (= (sap-int frame-pointer)
+		 (sb!vm:context-register scp sb!vm::cfp-offset))
+	  (without-gcing
+	   (let ((code (code-object-from-bits
+			(sb!vm:context-register scp sb!vm::code-offset))))
+	     (when (symbolp code)
+	       (return (values code 0 scp)))
+	     (let* ((code-header-len (* (get-header-data code)
+					sb!vm:n-word-bytes))
+		    (pc-offset
+		     (- (sap-int (sb!vm:context-pc scp))
+			(- (get-lisp-obj-address code)
+			   sb!vm:other-pointer-lowtag)
+			code-header-len)))
+	       ;; Check to see whether we were executing in a branch
+	       ;; delay slot.
+	       #!+(or pmax sgi)	       ; pmax only (and broken anyway)
+	       (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
+		 (incf pc-offset sb!vm:n-word-bytes))
+	       (unless (<= 0 pc-offset
+			   (* (code-header-ref code sb!vm:code-code-size-slot)
+			      sb!vm:n-word-bytes))
+		 ;; We were in an assembly routine. Therefore, use the
+		 ;; LRA as the pc.
+		 (setf pc-offset
+		       (- (sb!vm:context-register scp sb!vm::lra-offset)
+			  (get-lisp-obj-address code)
+			  code-header-len)))
                (return
-                (if (eq (%code-debug-info code) :bogus-lra)
-                    (let ((real-lra (code-header-ref code
-                                                     real-lra-slot)))
-                      (values (lra-code-header real-lra)
-                              (get-header-data real-lra)
-                              nil))
-                  (values code pc-offset scp)))))))))))
+		 (if (eq (%code-debug-info code) :bogus-lra)
+		     (let ((real-lra (code-header-ref code
+						      real-lra-slot)))
+		       (values (lra-code-header real-lra)
+			       (get-header-data real-lra)
+			       nil))
+		     (values code pc-offset scp)))))))))))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the

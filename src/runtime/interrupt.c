@@ -61,7 +61,7 @@ void sigaddset_blockable(sigset_t *s)
  * becomes 'yes'.) */
 boolean internal_errors_enabled = 0;
 
-os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
+/* os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS]; */
 
 /* As far as I can tell, what's going on here is:
  *
@@ -194,7 +194,7 @@ fake_foreign_function_call(os_context_t *context)
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
 		  make_fixnum(context_index + 1),thread);
 
-    lisp_interrupt_contexts[context_index] = context;
+    thread->interrupt_contexts[context_index] = context;
 
     /* no longer in Lisp now */
     foreign_function_call_active = 1;

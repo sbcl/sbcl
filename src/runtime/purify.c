@@ -1313,13 +1313,13 @@ purify(lispobj static_roots, lispobj read_only_roots)
     
 #if defined(__i386__)
     dynamic_space_free_pointer =
-      (lispobj*)SymbolValue(ALLOCATION_POINTER,all_threads);
+      (lispobj*)SymbolValue(ALLOCATION_POINTER,0);
 #endif
 
     read_only_end = read_only_free =
-        (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,all_threads);
+        (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     static_end = static_free =
-        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,all_threads);
+        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
 
 #ifdef PRINTNOISE
     printf(" roots");
@@ -1367,10 +1367,11 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
 	  0);
 #else
-    pscav( (lispobj *)all_threads->binding_stack_start,
-	  (lispobj *)SymbolValue(BINDING_STACK_POINTER,all_threads) -
-	  (lispobj *)all_threads->binding_stack_start,
-	  0);
+    for_each_thread(thread)
+	pscav( (lispobj *)thread->binding_stack_start,
+	       (lispobj *)SymbolValue(BINDING_STACK_POINTER,thread) -
+	       (lispobj *)thread->binding_stack_start,
+	       0);
 #endif
 
     /* The original CMU CL code had scavenge-read-only-space code

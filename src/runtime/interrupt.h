@@ -21,7 +21,7 @@
  * I've scaled it back to see what happens. -- WHN 20000730 */
 #define MAX_INTERRUPTS 8 /* was 256, but they rarely seem useful */
 
-extern os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
+/* extern os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS]; */
 
 union interrupt_handler {
     lispobj lisp;

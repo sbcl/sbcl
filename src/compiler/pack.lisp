@@ -822,9 +822,8 @@
 	  (declare (type index offset end))
 	  (setf (svref (finite-sb-live-tns sb) offset) tn)))))
 
-  (setq *live-block* block)
-  (setq *live-vop* (ir2-block-last-vop block))
-
+  (setf *live-block* block)
+  (setf *live-vop* (ir2-block-last-vop block))
   (values))
 
 ;;; Set the LIVE-TNs in :FINITE SBs to represent the TNs live

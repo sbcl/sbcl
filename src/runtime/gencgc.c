@@ -3752,8 +3752,6 @@ garbage_collect_generation(int generation, int raise)
     /* Scavenge the binding stacks. */
  {
      struct thread *th;
-     /* XXX this would be better if it looked up the appropriate 
-      * per-thread value of BINDING_STACK_POINTER */
      for(th=all_threads;th;th=th->next)
 	 scavenge((lispobj *) th->binding_stack_start,
 		  (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
@@ -4245,11 +4243,11 @@ int alloc_entered = 0;
 char *
 alloc(int nbytes)
 {
+    struct thread *th=arch_os_get_current_thread();
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)current_region_free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
-
-    if (SymbolValue(PSEUDO_ATOMIC_ATOMIC,0)) {/* if already in a pseudo atomic */
+    if (SymbolValue(PSEUDO_ATOMIC_ATOMIC,th)) {/* if already in a pseudo atomic */
 	
 	void *new_free_pointer;
 
@@ -4295,16 +4293,16 @@ alloc(int nbytes)
 	    auto_gc_trigger *= 2;
 	    alloc_entered--;
 	    /* Exit the pseudo-atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0) != 0) {
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th) != 0) {
 		/* Handle any interrupts that occurred during
 		 * gc_alloc(..). */
 		do_pending_interrupt();
 	    }
 	    funcall0(SymbolFunction(MAYBE_GC));
 	    /* Re-enter the pseudo-atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),0);
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),0);
+	    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
 	    goto retry1;
 	}
 	/* Call gc_alloc(). */
@@ -4323,8 +4321,8 @@ alloc(int nbytes)
     retry2:
 	/* At least wrap this allocation in a pseudo atomic to prevent
 	 * gc_alloc() from being re-entered. */
-	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),0);
-	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),0);
+	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
+	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
 
 	if (alloc_entered)
 	    SHOW("alloc re-entered in not-already-pseudo-atomic case");
@@ -4338,8 +4336,8 @@ alloc(int nbytes)
 	    void *new_obj = current_region_free_pointer;
 	    current_region_free_pointer = new_free_pointer;
 	    alloc_entered--;
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0)) {
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)) {
 		/* Handle any interrupts that occurred during
 		 * gc_alloc(..). */
 		do_pending_interrupt();
@@ -4357,8 +4355,8 @@ alloc(int nbytes)
 	    auto_gc_trigger *= 2;
 	    alloc_entered--;
 	    /* Exit the pseudo atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0) != 0) {
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th) != 0) {
 		/* Handle any interrupts that occurred during
 		 * gc_alloc(..); */
 		do_pending_interrupt();
@@ -4374,8 +4372,8 @@ alloc(int nbytes)
 	current_region_end_addr = boxed_region.end_addr;
 
 	alloc_entered--;
-	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
-	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0) != 0) {
+	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th) != 0) {
 	    /* Handle any interrupts that occurred during gc_alloc(..). */
 	    do_pending_interrupt();
 	    goto retry2;

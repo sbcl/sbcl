@@ -1,0 +1,18 @@
+;;;; more code to manipulate symbols
+;;;;
+;;;; Many of these definitions are trivial interpreter entries to
+;;;; functions open-coded by the compiler.
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!IMPL")
+
+(defun %set-symbol-value (symbol new-value)
+  (%primitive set symbol new-value))

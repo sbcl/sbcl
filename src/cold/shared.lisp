@@ -32,6 +32,7 @@
 ;;; by executing CL:ENSURE-DIRECTORIES-EXIST (on the xc host Common Lisp).
 (defvar *host-obj-prefix*)
 (defvar *target-obj-prefix*)
+(defvar *more-compile-file-flags* nil)
 
 ;;; suffixes for filename stems when cross-compiling
 (defvar *host-obj-suffix* 
@@ -183,7 +184,7 @@
       (tagbody
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
-             (funcall compile-file src :output-file tmp-obj)
+             (apply compile-file src :output-file tmp-obj *more-compile-file-flags*)
            (declare (ignore warnings-p))
            (cond ((not output-truename)
                   (error "couldn't compile ~S" src))
@@ -293,6 +294,8 @@
     ;; :NOT-HOST is also set, since the SBCL assembler doesn't exist
     ;; while the cross-compiler is being built in the host ANSI Lisp.)
     :assem
+    ;; meaning: set TRACE-FILE when calling compile-file on this file
+    :trace-file
     ;; meaning: The #'COMPILE-STEM argument called :IGNORE-FAILURE-P
     ;; should be true. (This is a KLUDGE: I'd like to get rid of it.
     ;; For now, it exists so that compilation can proceed through the

@@ -29,17 +29,20 @@
 
 void bind_variable(lispobj symbol, lispobj value, void *th)
 {
-    lispobj old_value;
+    lispobj old_tl_value;
     struct binding *binding;
     struct thread *thread=(struct thread *)th;
-
-    old_value = SymbolValue(symbol,thread);
+    struct symbol *sym=(struct symbol *)native_pointer(symbol);
     binding = GetBSP();
     SetBSP(binding+1);
-
-    binding->value = old_value;
+    if(!sym->tls_index) {
+	sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
+	SetSymbolValue(FREE_TLS_INDEX,1+sym->tls_index,0);
+    }
+    old_tl_value=SymbolTlValue(symbol,thread);
+    binding->value = old_tl_value;
     binding->symbol = symbol;
-    SetSymbolValue(symbol, value,thread);
+    SetTlSymbolValue(symbol, value,thread);
 }
 
 void
@@ -53,7 +56,7 @@ unbind(void *th)
 		
     symbol = binding->symbol;
 
-    SetSymbolValue(symbol, binding->value,thread);
+    SetTlSymbolValue(symbol, binding->value,thread);
 
     binding->symbol = 0;
 
@@ -72,12 +75,10 @@ unbind_to_here(lispobj *bsp,void *th)
 	binding--;
 
 	symbol = binding->symbol;
-
 	if (symbol) {
-	    SetSymbolValue(symbol, binding->value,thread);
+	    SetTlSymbolValue(symbol, binding->value,thread);
 	    binding->symbol = 0;
 	}
-
     }
     SetBSP(binding);
 }

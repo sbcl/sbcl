@@ -1,59 +1,73 @@
+* stuff that needs to happen before it will run
+
+14) allocation and gc needs fairly serious attention.  There is only
+    one ALLOCATION-POINTER, access to which is not locked (other than
+    by PA).
+
+ok, how are going to do allocation
+
+a) we should make some kind of token effort to keep allocation-pointer
+current, but as long as it overreads it's not a big deal.  Suggestion:
+when creating a new region, set it to the end of that region (unless
+it's already higher than that)
+
+b) how do we indicate to the gc that now is not a good time to collect stuff
+because we have non-roots in our region?
+
+we need some lind of locking:
+1) lots of threads can allocate at once, if allocation happens
+ within an open region
+2) creating a new region should probably be a one-at-a-time operation
+3) if any thread is allocating, no thread is allowed to gc
+
+Note that this means gc cannot be called from within the allocator:
+the check for need-to-gc must happen in such a way that the allocator
+lock is free before gc is triggered.  Ideally, the allocation attempt
+should then be repeated after the gc has finished.
+
+there is 
+
+c) can we give each thread an open region of its own so it doesn't
+have to lock against other threads for allocation?
+
+alloc() is wired to use current_region_free_pointer, which is assigned
+from boxed_region.free_pointer (similar dependency exists between 
+current_region_end_addr, boxed_region.end_addr;
+
+eventually we call gc_general_alloc which uses my_region internally
+    struct alloc_region *my_region = 
+      unboxed_p ? &unboxed_region : &boxed_region;
+
+update_page_write_prot(int page) looks in the currently open regions.
+A whole bunch of places close all (both) open regions, and would need
+updating to loop through threads and make sure everything is shut.
+
+The unboxed region support is used for copying bignums and stuff like
+that: there's no way to allocate directly into it, but gc knows how to
+get to it for appropriate kinds of object.  That means we only need
+one of it
+
+Is the boxed_region set to something funny during gc?  Yes, but that's
+not our problem
+
+d) do we do a further bout of gencgc refactoring first? 
+
+19) should we put our new static symbols in early-impl.lisp ?
+
+20) how come genesis apparently works?  perhaps it doesn't
+
+21) add a lisp interface to init_thread
+
+* stuff that can be fixed later
+
 2) grow tlv when full
 
-3) implement bind vop
-
-4) implement unbind vop
-
-5) implement set-symbol-value
-
-6) figure out all the places using set directly, fast variants of
-   symbol-value, etc, and how to fix them
-
-7) some static symbols need attention
-
-    ;; these are per-thread indexes into binding stack, so will
-    ;; work if SymbolValue knows how to look up tls values
-    *current-catch-block*
-    *current-unwind-protect-block*
-    *binding-stack-pointer*
-
-    ;; interrupt handling.  these two are assigned but not bound, and
-    ;; probably should be visible across threads (so are ok)
-    *pseudo-atomic-atomic*
-    *pseudo-atomic-interrupted*
-
-    ;; do we need separate interrupt contexts per thread?  very
-    ;; probably, yes.  A gets interrupted, B gets interrupted, 
-    ;; A returns from handler before B returns from handler.
-    ;; So, bind this to 0 when each thread starts executing,
-    ;; and all's well
-    *free-interrupt-context-index*
-
-    ;; used for without-interrupts in much the same way as the
-    ;; *pseudo-atomic-...* variables are used for PA.  I think
-    ;; these will be OK if bound to T,0 on thread startup
-    sb!unix::*interrupts-enabled*  
-    sb!unix::*interrupt-pending*
-
-    ;; either we have to lock around this, or provide each thread its
-    ;; own region
-    *allocation-pointer*
-
-9) when creating a new thread, initialise dynamic bindings from
-   current thread, not from initial thread
-
 10) locking
-
-11) THREAD_CONTROL_STACK_SIZE value is hardcoded in debug-int.lisp
 
 12) fix ROOM
 
 13) fix other runtime stuff that has been temporarily ripped out
  - control stack scrubbing and bounds checking
-
-14) allocation and gc needs fairly serious attention.  There is only
-    one ALLOCATION-POINTER, access to which is not locked other (other
-    than by PA).
 
 15) it would be nice to have a faster way to find the current thread
     from C than calling getpid().  For x86 we can write a bit of asm
@@ -62,4 +76,8 @@
     complicated needs doing, unless we can find a register to use for
     the tls base that C promises not to overwrite.  
 
-16) interrupt contexts: we need per-thread interrupt context arrays
+17) code in target-thread.lisp has brittle dependency on thread.h
+
+18) do we need per-thread alien stack anyway? remembering that alien
+    code runs on the control stack, there seem to be only a few palces
+    this area gets used at all

@@ -44,7 +44,7 @@ never_returns
 lose(char *fmt, ...)
 {
     va_list ap;
-    fprintf(stderr, "fatal error encountered in SBCL runtime system");
+    fprintf(stderr, "fatal error encountered in SBCL pid %d\n",getpid());
     if (fmt) {
 	fprintf(stderr, ":\n");
 	va_start(ap, fmt);
@@ -53,7 +53,7 @@ lose(char *fmt, ...)
     }
     fprintf(stderr, "\n");
     fflush(stderr);
-    lossage_handler();
+     lossage_handler(); 
     fprintf(stderr, "Argh! lossage_handler() returned, total confusion..\n");
     exit(1);
 }

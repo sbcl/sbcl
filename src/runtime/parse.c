@@ -324,7 +324,7 @@ char **ptr;
 		throw_to_monitor();
 	    }
 
-	    context = lisp_interrupt_contexts[free - 1];
+	    context = thread->interrupt_contexts[free - 1];
 
 	    regnum = parse_regnum(token);
 	    if (regnum < 0) {

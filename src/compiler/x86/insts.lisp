@@ -1039,7 +1039,6 @@
 
 
 (define-instruction gs-segment-prefix (segment)
-  (:printer byte ((op #x65)))
   (:emitter
    (emit-byte segment #x65)))
 

@@ -57,11 +57,32 @@
 ;;; these next two cf the sparc version, by jrd.
 ;;; FIXME: Deref this ^ reference.
 
+
 ;;; The compiler likes to be able to directly SET symbols.
-(define-vop (set cell-set)
-  (:variant symbol-value-slot other-pointer-lowtag))
+(define-vop (set)
+  (:args (symbol :scs (descriptor-reg))
+         (value :scs (descriptor-reg any-reg)))
+  (:translate sb!kernel:%set-symbol-value)
+  (:temporary (:sc descriptor-reg ) tls)
+  ;;(:policy :fast-safe)
+  (:generator 4
+    (let ((global-val (gen-label))
+	  (done (gen-label)))
+      (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
+      (inst or tls tls)
+      (inst jmp :z global-val)
+      (inst gs-segment-prefix)
+      (inst cmp (make-ea :dword :scale 4 :index tls) unbound-marker-widetag)
+      (inst jmp :z global-val)
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :dword :scale 4 :index tls) value)
+      (inst jmp done)
+      (emit-label global-val)
+      (storew value symbol symbol-value-slot other-pointer-lowtag)
+      (emit-label done))))
 
 ;;; Do a cell ref with an error check for being unbound.
+;;; XXX stil used? I can't see where -dan
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -84,7 +105,7 @@
 	   (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst gs-segment-prefix)
-      (inst mov value (make-ea :dword :base value))
+      (inst mov value (make-ea :dword :index value :scale 4))
       (inst cmp value unbound-marker-widetag)
       (inst jmp :ne ret-lab)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -106,13 +127,16 @@
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
-
+#+nil
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
   (:translate symbol-value))
 
+;;; like to know where this is useed too
+#+nil
 (defknown fast-symbol-value-xadd (symbol fixnum) fixnum ())
+#+nil
 (define-vop (fast-symbol-value-xadd cell-xadd)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
@@ -203,32 +227,52 @@
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
 	 (symbol :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) temp bsp)
+  (:temporary (:sc unsigned-reg) tls-index temp bsp)
   (:generator 5
-    (load-symbol-value bsp *binding-stack-pointer*)
-    (loadw temp symbol symbol-value-slot other-pointer-lowtag)
-    (inst add bsp (* binding-size n-word-bytes))
-    (store-symbol-value bsp *binding-stack-pointer*)
-    (storew temp bsp (- binding-value-slot binding-size))
-    (storew symbol bsp (- binding-symbol-slot binding-size))
-    (storew val symbol symbol-value-slot other-pointer-lowtag)))
-
+    (let ((tls-index-valid (gen-label)))
+      (load-tl-symbol-value bsp *binding-stack-pointer*)
+      (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+      (inst add bsp (* binding-size n-word-bytes))
+      (store-tl-symbol-value bsp *binding-stack-pointer* temp)
+      
+      (inst or tls-index tls-index)
+      (inst jmp :ne tls-index-valid)
+      ;; allocate a new tls-index
+      (load-symbol-value tls-index *free-tls-index*)
+      (inst add tls-index 1)		;XXX surely we can do this more
+      (store-symbol-value tls-index *free-tls-index*) ;succintly
+      (inst sub tls-index 1)
+      (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+      (emit-label tls-index-valid)
+      (inst gs-segment-prefix) 
+      (inst mov temp (make-ea :dword :scale 4 :index tls-index))
+      (storew temp bsp (- binding-value-slot binding-size))
+      (storew symbol bsp (- binding-symbol-slot binding-size))
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :dword :scale 4 :index tls-index) val))))
+  
 (define-vop (unbind)
-  (:temporary (:sc unsigned-reg) symbol value bsp)
+    ;; four temporaries?   
+  (:temporary (:sc unsigned-reg) symbol value bsp tls-index)
   (:generator 0
-    (load-symbol-value bsp *binding-stack-pointer*)
+    (load-tl-symbol-value bsp *binding-stack-pointer*)
     (loadw symbol bsp (- binding-symbol-slot binding-size))
     (loadw value bsp (- binding-value-slot binding-size))
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
+
+    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)    
+    (inst gs-segment-prefix)
+    (inst mov (make-ea :dword :scale 4 :index tls-index) value)
+
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
-    (store-symbol-value bsp *binding-stack-pointer*)))
+    ;; we're done with value, so we can use it as a temp here
+    (store-tl-symbol-value bsp *binding-stack-pointer* value)))
 
 (define-vop (unbind-to-here)
   (:args (where :scs (descriptor-reg any-reg)))
-  (:temporary (:sc unsigned-reg) symbol value bsp)
+  (:temporary (:sc unsigned-reg) symbol value bsp tls-index)
   (:generator 0
-    (load-symbol-value bsp *binding-stack-pointer*)
+    (load-tl-symbol-value bsp *binding-stack-pointer*)
     (inst cmp where bsp)
     (inst jmp :e done)
 
@@ -237,16 +281,22 @@
     (inst or symbol symbol)
     (inst jmp :z skip)
     (loadw value bsp (- binding-value-slot binding-size))
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
+
+    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)    
+    (inst gs-segment-prefix)
+    (inst mov (make-ea :dword :scale 4 :index tls-index) value)
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
     (inst sub bsp (* binding-size n-word-bytes))
     (inst cmp where bsp)
     (inst jmp :ne loop)
-    (store-symbol-value bsp *binding-stack-pointer*)
+    ;; we're done with value, so can use it as a temporary
+    (store-tl-symbol-value bsp *binding-stack-pointer* value)
 
     DONE))
+
+
 
 ;;;; closure indexing
 

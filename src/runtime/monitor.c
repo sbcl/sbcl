@@ -342,7 +342,7 @@ print_context_cmd(char **ptr)
 	if ((index >= 0) && (index < free)) {
 	    printf("There are %d interrupt contexts.\n", free);
 	    printf("printing context %d\n", index);
-	    print_context(lisp_interrupt_contexts[index]);
+	    print_context(thread->interrupt_contexts[index]);
 	} else {
 	    printf("There aren't that many/few contexts.\n");
 	    printf("There are %d interrupt contexts.\n", free);
@@ -353,7 +353,7 @@ print_context_cmd(char **ptr)
 	else {
 	    printf("There are %d interrupt contexts.\n", free);
 	    printf("printing context %d\n", free - 1);
-	    print_context(lisp_interrupt_contexts[free - 1]);
+	    print_context(thread->interrupt_contexts[free - 1]);
 	}
     }
 }
