@@ -1268,7 +1268,8 @@
 ;;; continuation and the exit continuation's DEST. Instead of using
 ;;; the returned value being delivered directly to the exit
 ;;; continuation, it is delivered to our VALUE lvar. The original exit
-;;; lvar is the exit node's LVAR.
+;;; lvar is the exit node's LVAR; physenv analysis also makes it the
+;;; lvar of %NLX-ENTRY call.
 (defstruct (exit (:include valued-node)
 		 (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a

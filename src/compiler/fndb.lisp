@@ -1378,6 +1378,7 @@
 (defknown %nlx-entry (t) *)
 (defknown %%primitive (t t &rest t) *)
 (defknown %pop-values (t) t)
+(defknown %nip-values (t t &rest t) (values))
 (defknown %type-check-error (t t) nil)
 
 ;; FIXME: This function does not return, but due to the implementation

@@ -1210,18 +1210,6 @@ WORKAROUND:
   successive adds of integers to double-floats produces double-floats,
   so none of the type restrictions in the code is violated.
 
-298: (aka PFD MISC.183)
-  Compiler fails on
-
-    (defun foo ()
-      (multiple-value-call #'bar
-        (ext)
-        (catch 'tag (return-from foo (int)))))
-
-  This program violates "unknown values LVAR stack discipline": if INT
-  returns, values returned by (EXT) must be removed from under that of
-  (INT).
-
 300: (reported by Peter Graves) Function PEEK-CHAR checks PEEK-TYPE
   argument type only after having read a character. This is caused
   with EXPLICIT-CHECK attribute in DEFKNOWN. The similar problem

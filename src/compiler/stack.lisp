@@ -42,127 +42,113 @@
   (values))
 
 ;;;; annotation graph walk
+(defun nle-block-nlx-info (block)
+  (let* ((start-node (block-start-node block))
+         (nlx-ref (ctran-next (node-next start-node)))
+         (nlx-info (constant-value (ref-leaf nlx-ref))))
+    nlx-info))
+(defun nle-block-entry-block (block)
+  (let* ((nlx-info (nle-block-nlx-info block))
+         (mess-up (cleanup-mess-up (nlx-info-cleanup nlx-info)))
+         (entry-block (node-block mess-up)))
+    entry-block))
 
 ;;; Add LVARs from LATE to EARLY; use EQ to check whether EARLY has
 ;;; been changed.
-(defun merge-stacks (early late)
+(defun merge-uvl-live-sets (early late)
   (declare (type list early late))
-  (cond ((null early) late)
-        ((null late) early)
-        ((tailp early late) late)
-        ((tailp late early) early)
-        ;; FIXME
-        (t (bug "Lexical unwinding of UVL stack is not implemented."))))
+  (dolist (e late early)
+    (pushnew e early)))
 
 ;;; Update information on stacks of unknown-values LVARs on the
 ;;; boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
-(defun stack-update (block)
+(defun update-uvl-live-sets (block)
   (declare (type cblock block))
-  (declare (optimize (debug 3)))
   (let* ((2block (block-info block))
+         (original-start (ir2-block-start-stack 2block))
          (end (ir2-block-end-stack 2block))
-         (new-end end)
-         (cleanup (block-end-cleanup block))
-         (found-similar-p nil))
+         (new-end end))
     (dolist (succ (block-succ block))
-      #+nil
-      (when (and (< block succ)
-                 (eq cleanup (block-end-cleanup succ)))
-        (setq found-similar-p t))
-      (setq new-end (merge-stacks new-end (ir2-block-start-stack (block-info succ)))))
-    (unless found-similar-p
-      (map-block-nlxes (lambda (nlx-info)
-                         (let* ((nle (nlx-info-target nlx-info))
-                                (nle-start-stack (ir2-block-start-stack
-                                                  (block-info nle)))
-                                (exit-lvar (nlx-info-lvar nlx-info)))
-                           (when (eq exit-lvar (car nle-start-stack))
-                             (pop nle-start-stack))
-                           (setq new-end (merge-stacks new-end
-                                                       nle-start-stack))))
-                       block))
+      (setq new-end (merge-uvl-live-sets new-end
+                                         (ir2-block-start-stack (block-info succ)))))
+    (map-block-nlxes (lambda (nlx-info)
+                       (let* ((nle (nlx-info-target nlx-info))
+                              (nle-start-stack (ir2-block-start-stack
+                                                (block-info nle)))
+                              (exit-lvar (nlx-info-lvar nlx-info))
+                              (next-stack (if exit-lvar
+                                              (remove exit-lvar nle-start-stack)
+                                              nle-start-stack)))
+                         (setq new-end (merge-uvl-live-sets
+                                        new-end next-stack))))
+                     block)
 
     (setf (ir2-block-end-stack 2block) new-end)
     (let ((start new-end))
-      (dolist (push (reverse (ir2-block-pushed 2block)))
-        (if (eq (car start) push)
-            (pop start)
-            (aver (not (member push start)))))
+      (setq start (set-difference start (ir2-block-pushed 2block)))
+      (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
 
-      (dolist (pop (reverse (ir2-block-popped 2block)))
-        (push pop start))
+      (when (and (eq (component-head (block-component block))
+                     (first (block-pred block)))
+                 (not (bind-p (block-start-node block))))
+        (let* ((entry-block (nle-block-entry-block block))
+               (entry-stack (ir2-block-start-stack (block-info entry-block))))
+          (setq start (merge-uvl-live-sets start entry-stack))))
 
-      (cond ((equal-but-no-car-recursion start
-                                         (ir2-block-start-stack 2block))
-             nil)
-            (t
-             (setf (ir2-block-start-stack 2block) start)
-             t)))))
+      (when *check-consistency*
+               (aver (subsetp original-start start)))
+      (values (cond ((subsetp start original-start)
+                     nil)
+                    (t
+                     (setf (ir2-block-start-stack 2block) start)
+                     t))
+              start new-end))))
 
-;;; Do stack annotation for any values generators in Block that were
-;;; unreached by all walks (i.e. the lvar isn't live at the point that
-;;; it is generated.)  This will only happen when the values receiver cannot be
-;;; reached from this particular generator (due to an unconditional control
-;;; transfer.)
 ;;;
-;;; What we do is push on the End-Stack all lvars in Pushed that
-;;; aren't already present in the End-Stack. When we find any pushed
-;;; lvar that isn't live, it must be the case that all lvars
-;;; pushed after (on top of) it aren't live.
-;;;
-;;; If we see a pushed lvar that is the LVAR of a tail call, then we
-;;; ignore it, since the tail call didn't actually push anything. The
-;;; tail call must always the last in the block.
-;;;
-;;; [This function also fixes End-Stack in NLEs.]
-(defun annotate-dead-values (block)
-  (declare (type cblock block))
+(defun order-block-uvl-sets (block pred)
   (let* ((2block (block-info block))
-	 (stack (ir2-block-end-stack 2block))
-	 (last (block-last block))
-	 (tailp-lvar (if (node-tail-p last) (node-lvar last))))
-    (do ((pushes (ir2-block-pushed 2block) (rest pushes))
-	 (popping nil))
-	((null pushes))
-      (let ((push (first pushes)))
-	(cond ((member push stack)
-	       (aver (not popping)))
-	      ((eq push tailp-lvar)
-	       (aver (null (rest pushes))))
-	      (t
-	       (push push (ir2-block-end-stack 2block))
-	       (setq popping t))))))
+         (pred-end-stack (ir2-block-end-stack (block-info pred)))
+         (start (ir2-block-start-stack 2block))
+         (start-stack (loop for lvar in pred-end-stack
+                            when (memq lvar start)
+                            collect lvar))
+         (end (ir2-block-end-stack 2block)))
+    (when *check-consistency*
+      (aver (subsetp start start-stack)))
+    (setf (ir2-block-start-stack 2block) start-stack)
 
-  (values))
+    (let* ((last (block-last block))
+           (tailp-lvar (if (node-tail-p last) (node-lvar last)))
+           (end-stack start-stack))
+      (setq end-stack (set-difference end-stack (ir2-block-popped 2block)))
+      (dolist (push (ir2-block-pushed 2block))
+        (aver (not (memq push end-stack)))
+        (push push end-stack))
+      (aver (subsetp end end-stack))
+      (when (and tailp-lvar
+                 (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
+        (aver (eq tailp-lvar (first end-stack)))
+        (pop end-stack))
+      (setf (ir2-block-end-stack 2block) end-stack))))
 
-;;; For every NLE block push all LVARs that are live in its ENTRY to
-;;; its start stack. (We cannot pop unused LVARs on a control transfer
-;;; to an NLE block, so we must do it later.)
-(defun fix-nle-block-stacks (component)
-  (declare (type component component))
-  (dolist (block (block-succ (component-head component)))
-    (let ((start-node (block-start-node block)))
-      (unless (bind-p start-node)
-        (let* ((2block (block-info block))
-               (start-stack (block-start-stack 2block))
-               (nlx-ref (ctran-next (node-next start-node)))
-               (nlx-info (constant-value (ref-leaf nlx-ref)))
-               (mess-up (cleanup-mess-up (nlx-info-cleanup nlx-info)))
-               (entry-block (node-block mess-up))
-               (entry-stack (ir2-block-start-stack (block-info entry-block)))
-               (exit-lvar (nlx-info-lvar nlx-info)))
-          (when (and exit-lvar
-                     (eq exit-lvar (car start-stack)))
-            (when *check-consistency*
-              (aver (not (memq exit-lvar entry-stack))))
-            (push exit-lvar entry-stack))
-          (when *check-consistency*
-            (aver (subsetp start-stack entry-stack)))
-          (setf (ir2-block-start-stack 2block) entry-stack)
-          (setf (ir2-block-end-stack 2block) entry-stack)
-                                        ; ANNOTATE-DEAD-VALUES will do the rest
-          )))))
+(defun order-uvl-sets (component)
+  (clear-flags component)
+  (loop with head = (component-head component)
+        with repeat-p do
+        (setq repeat-p nil)
+        (do-blocks (block component)
+          (unless (block-flag block)
+            (let ((pred (find-if #'block-flag (block-pred block))))
+              (when (and (eq pred head)
+                         (not (bind-p (block-start-node block))))
+                (setq pred (nle-block-entry-block block)))
+              (cond (pred
+                     (setf (block-flag block) t)
+                     (order-block-uvl-sets block pred))
+                    (t
+                     (setq repeat-p t))))))
+        while repeat-p))
 
 ;;; This is called when we discover that the stack-top unknown-values
 ;;; lvar at the end of BLOCK1 is different from that at the start of
@@ -182,20 +168,38 @@
 (defun discard-unused-values (block1 block2)
   (declare (type cblock block1 block2))
   (let* ((block1-stack (ir2-block-end-stack (block-info block1)))
-	 (block2-stack (ir2-block-start-stack (block-info block2)))
-	 (last-popped (elt block1-stack
-			   (- (length block1-stack)
-			      (length block2-stack)
-			      1))))
-    (aver (tailp block2-stack block1-stack))
-
-    (let* ((block (insert-cleanup-code block1 block2
-				       (block-start-node block2)
-				       `(%pop-values ',last-popped)))
-	   (2block (make-ir2-block block)))
-      (setf (block-info block) 2block)
-      (add-to-emit-order 2block (block-info block1))
-      (ltn-analyze-belated-block block)))
+         (block2-stack (ir2-block-start-stack (block-info block2)))
+         (cleanup-code
+          (cond ((eq (car block1-stack) (car block2-stack))
+                 (binding* ((preserved-count (mismatch block1-stack block2-stack)
+                              :exit-if-null)
+                            (n-last-preserved (1- preserved-count))
+                            (nipped-count (- (length block1-stack)
+                                             (length block2-stack)))
+                            (n-last-nipped (+ n-last-preserved nipped-count)))
+                   (aver (equal (nthcdr (1+ n-last-nipped) block1-stack)
+                                (nthcdr preserved-count block2-stack)))
+                   (format t "%NIP-VALUES emitted~%")
+                   `(%nip-values ',(elt block1-stack n-last-nipped)
+                                 ',(elt block1-stack n-last-preserved)
+                                 ,@(loop for moved in block1-stack
+                                         repeat preserved-count
+                                         collect `',moved))))
+                (t
+                 (aver (tailp block2-stack block1-stack))
+                 (let ((last-popped (elt block1-stack
+                                         (- (length block1-stack)
+                                            (length block2-stack)
+                                            1))))
+                   `(%pop-values ',last-popped))))))
+    (when cleanup-code
+      (let* ((block (insert-cleanup-code block1 block2
+                                         (block-start-node block2)
+                                         cleanup-code))
+             (2block (make-ir2-block block)))
+        (setf (block-info block) 2block)
+        (add-to-emit-order 2block (block-info block1))
+        (ltn-analyze-belated-block block))))
 
   (values))
 
@@ -225,7 +229,7 @@
 ;;; are nested values receivers that have already been reached on
 ;;; another walk. We don't want to clobber that result with our null
 ;;; initial stack.
-(defun stack-analyze (component)
+(defun stack-analyze (component &aux (*check-consistency* t))
   (declare (type component component))
   (let* ((2comp (component-info component))
 	 (receivers (ir2-component-values-receivers 2comp))
@@ -236,23 +240,19 @@
 
     (loop for did-something = nil
           do (do-blocks-backwards (block component)
-               (when (stack-update block)
+               (when (update-uvl-live-sets block)
                  (setq did-something t)))
           while did-something)
 
-    (when *check-consistency*
-      (dolist (block (block-succ (component-head component)))
-        (when (bind-p (block-start-node block))
-          (aver (null (ir2-block-start-stack (block-info block)))))))
-
-    (dolist (block generators)
-      (annotate-dead-values block))
+    ;;(break)
+    (order-uvl-sets component)
+    ;;(break)
 
     (do-blocks (block component)
-      (let ((top (car (ir2-block-end-stack (block-info block)))))
+      (let ((top (ir2-block-end-stack (block-info block))))
 	(dolist (succ (block-succ block))
 	  (when (and (block-start succ)
-		     (not (eq (car (ir2-block-start-stack (block-info succ)))
+		     (not (eq (ir2-block-start-stack (block-info succ))
 			      top)))
 	    (discard-unused-values block succ))))))
 

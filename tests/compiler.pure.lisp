@@ -1033,6 +1033,8 @@
      215067723)
     13739018))
 
+
+;;;; Bugs in stack analysis
 ;;; bug 299 (reported by PFD)
 (assert
  (equal (funcall
@@ -1044,6 +1046,43 @@
               (if (eval t) (eval '(values :a :b :c)) nil)
               (catch 'foo (throw 'foo (values :x :y)))))))
         '(:a :b :c :x :y)))
+;;; bug 298 (= MISC.183)
+(assert (zerop (funcall
+                (compile
+                 nil
+                 '(lambda (a b c)
+                   (declare (type (integer -368154 377964) a))
+                   (declare (type (integer 5044 14959) b))
+                   (declare (type (integer -184859815 -8066427) c))
+                   (declare (ignorable a b c))
+                   (declare (optimize (speed 3)))
+                   (declare (optimize (safety 1)))
+                   (declare (optimize (debug 1)))
+                   (block b7
+                     (flet ((%f3 (f3-1 f3-2 f3-3) 0))
+                       (apply #'%f3 0 (catch 'foo (return-from b7 (%f3 0 b c))) c nil)))))
+                0 6000 -9000000)))
+(assert (equal (eval '(let () (apply #'list 1 (list (catch 'a (throw 'a (block b 2)))))))
+               '(1 2)))
+(let ((f (compile
+          nil
+          '(lambda (x)
+            (block foo
+              (multiple-value-call #'list
+                :a
+                (block bar
+                  (return-from foo
+                    (multiple-value-call #'list
+                      :b
+                      (block quux
+                        (return-from bar
+                          (catch 'baz
+                            (if x
+                                (return-from quux 1)
+                                (throw 'baz 2))))))))))))))
+  (assert (equal (funcall f t) '(:b 1)))
+  (assert (equal (funcall f nil) '(:a 2))))
+
 ;;; MISC.185
 (assert (equal
          (funcall
@@ -1094,6 +1133,7 @@
                 :good
                 (values result1 result2))))
          :good))
+
 ;;; MISC.275
 (assert
  (zerop

@@ -232,8 +232,8 @@
 ;;; knows what entry is being done.
 ;;;
 ;;; The link from the EXIT block to the entry stub is changed to be a
-;;; link to the component head. Similarly, the EXIT block is linked to
-;;; the component tail. This leaves the entry stub reachable, but
+;;; link from the component head. Similarly, the EXIT block is linked
+;;; to the component tail. This leaves the entry stub reachable, but
 ;;; makes the flow graph less confusing to flow analysis.
 ;;;
 ;;; If a CATCH or an UNWIND-protect, then we set the LEXENV for the
@@ -280,9 +280,10 @@
 ;;;    function reference. This will cause the escape function to
 ;;;    be deleted (although not removed from the DFO.)  The escape
 ;;;    function is no longer needed, and we don't want to emit code
-;;;    for it. We then also change the %NLX-ENTRY call to use the
-;;;    NLX continuation so that there will be a use to represent
-;;;    the NLX use.
+;;;    for it.
+;;; -- Change the %NLX-ENTRY call to use the NLX lvar so that 1) there
+;;;    will be a use to represent the NLX use; 2) make life easier for
+;;;    the stack analysis.
 (defun note-non-local-exit (env exit)
   (declare (type physenv env) (type exit exit))
   (let ((lvar (node-lvar exit))
@@ -300,11 +301,13 @@
 	(mapc (lambda (x)
 		(setf (node-derived-type x) *wild-type*))
 	      (leaf-refs exit-fun))
-	(substitute-leaf (find-constant info) exit-fun)
-	(let ((node (block-last (nlx-info-target info))))
-	  (delete-lvar-use node)
-          (aver (eq lvar (node-lvar exit)))
-	  (add-lvar-use node lvar)))))
+	(substitute-leaf (find-constant info) exit-fun))
+      (when lvar
+        (let ((node (block-last (nlx-info-target info))))
+          (unless (node-lvar node)
+            (aver (eq lvar (node-lvar exit)))
+            (setf (node-derived-type node) (lvar-derived-type lvar))
+            (add-lvar-use node lvar))))))
   (values))
 
 ;;; Iterate over the EXITs in COMPONENT, calling NOTE-NON-LOCAL-EXIT

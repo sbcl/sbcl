@@ -2371,3 +2371,7 @@ planned incompatible changes in 0.8.x:
 	(DEFUN BLETCH (..) (DECLARE (INLINE FOO)) (FOO ..))
     now does what ANSI says it should. The CMU-CL-style 
     SB-EXT:MAYBE-INLINE declaration is now deprecated and ignored.
+
+changes in the stack branch:
+  * fixed bug 298, revealed by Paul F. Dietz' test suite: SBCL can
+    remove dead unknown-values globs from the middle of the stack.
