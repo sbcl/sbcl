@@ -937,6 +937,7 @@ NIL is returned when no such class exists."
    '((t :state :read-only :translation t)
      (character :enumerable t 
                 :codes (#.sb!vm:character-widetag)
+                :translation (character-set)
                 :prototype-form (code-char 42))
      (symbol :codes (#.sb!vm:symbol-header-widetag)
              :prototype-form '#:mu)

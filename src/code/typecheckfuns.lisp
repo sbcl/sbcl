@@ -199,7 +199,11 @@
 	   (member-type-p ctype)
 	   (numeric-type-p ctype)
 	   (array-type-p ctype)
-	   (cons-type-p ctype))))
+           (cons-type-p ctype)
+           (intersection-type-p ctype)
+           (union-type-p ctype)
+           (negation-type-p ctype)
+           (character-set-type-p ctype))))
 
 ;;; Evaluate (at load/execute time) to a function which checks that
 ;;; its argument is of the specified type.

@@ -2378,18 +2378,24 @@
 
 (!def-type-translator member (&rest members)
   (if members
-      (let (ms numbers)
+      (let (ms numbers char-codes)
 	(dolist (m (remove-duplicates members))
 	  (typecase m
 	    (float (if (zerop m)
 		       (push m ms)
 		       (push (ctype-of m) numbers)))
 	    (real (push (ctype-of m) numbers))
+           (character (push (sb!xc:char-code m) char-codes))
 	    (t (push m ms))))
 	(apply #'type-union
 	       (if ms
 		   (make-member-type :members ms)
 		   *empty-type*)
+              (if char-codes
+                  (make-character-set-type
+                   :pairs (mapcar (lambda (x) (cons x x))
+                                  (sort char-codes #'<)))
+                  *empty-type*)
 	       (nreverse numbers)))
       *empty-type*))
 
@@ -2562,6 +2568,7 @@
     ((type= type (specifier-type 'simple-string)) 'simple-string)
     ((type= type (specifier-type 'string)) 'string)
     ((type= type (specifier-type 'complex)) 'complex)
+    ((type= type (specifier-type 'standard-char)) 'standard-char)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each
@@ -2834,7 +2841,90 @@
 		 (type-intersection (cons-type-car-type type1)
 				    (cons-type-car-type type2))
 		 cdr-int2)))))
-				 
+
+;;;; CHARACTER-SET types
+
+(!define-type-class character-set)
+
+(!def-type-translator character-set
+    (&optional (pairs '((0 . #.(1- sb!xc:char-code-limit)))))
+  (make-character-set-type :pairs pairs))
+
+(!define-type-method (character-set :negate) (type)
+  (let ((pairs (character-set-type-pairs type)))
+    (if (and (= (length pairs) 1)
+            (= (caar pairs) 0)
+            (= (cdar pairs) (1- sb!xc:char-code-limit)))
+       (make-negation-type :type type)
+       (let ((not-character
+              (make-negation-type
+               :type (make-character-set-type
+                      :pairs '((0 . #.(1- sb!xc:char-code-limit)))))))
+         (type-union
+          not-character
+          (make-character-set-type
+           :pairs (let (not-pairs)
+                    (when (> (caar pairs) 0)
+                      (push (cons 0 (1- (caar pairs))) not-pairs))
+                    (do* ((tail pairs (cdr tail))
+                          (high1 (cdar tail))
+                          (low2 (caadr tail)))
+                         ((null (cdr tail))
+                          (when (< (cdar tail) (1- sb!xc:char-code-limit))
+                            (push (cons (1+ (cdar tail))
+                                        (1- sb!xc:char-code-limit))
+                                  not-pairs))
+                          (nreverse not-pairs))
+                      (push (cons (1+ high1) (1- low2)) not-pairs)))))))))
+
+(!define-type-method (character-set :unparse) (type)
+  (cond
+    ((type= type (specifier-type 'character)) 'character)
+    ((type= type (specifier-type 'base-char)) 'base-char)
+    ((type= type (specifier-type 'extended-char)) 'extended-char)
+    ((type= type (specifier-type 'standard-char)) 'standard-char)
+    (t (let ((pairs (character-set-type-pairs type)))
+        `(member ,@(loop for (low . high) in pairs
+                         append (loop for code from low upto high
+                                      collect (sb!xc:code-char code))))))))
+
+(!define-type-method (character-set :simple-=) (type1 type2)
+  (let ((pairs1 (character-set-type-pairs type1))
+       (pairs2 (character-set-type-pairs type2)))
+    (values (equal pairs1 pairs2) t)))
+ 
+(!define-type-method (character-set :simple-subtypep) (type1 type2)
+  (values
+   (dolist (pair (character-set-type-pairs type1) t)
+     (unless (position pair (character-set-type-pairs type2)
+                      :test (lambda (x y) (and (>= (car x) (car y))
+                                               (<= (cdr x) (cdr y)))))
+       (return nil)))
+   t))
+
+(!define-type-method (character-set :simple-union2) (type1 type2)
+  ;; KLUDGE: the canonizing in the MAKE-CHARACTER-SET-TYPE function
+  ;; actually does the union for us.  It might be a little fragile to
+  ;; rely on it.
+  (make-character-set-type
+   :pairs (merge 'list
+                (copy-alist (character-set-type-pairs type1))
+                (copy-alist (character-set-type-pairs type2))
+                #'< :key #'car)))
+
+(!define-type-method (character-set :simple-intersection2) (type1 type2)
+  ;; KLUDGE: brute force.
+  (let (pairs)
+    (dolist (pair1 (character-set-type-pairs type1)
+            (make-character-set-type
+             :pairs (sort pairs #'< :key #'car)))
+      (dolist (pair2 (character-set-type-pairs type2))
+       (cond
+         ((<= (car pair1) (car pair2) (cdr pair1))
+          (push (cons (car pair2) (min (cdr pair1) (cdr pair2))) pairs))
+         ((<= (car pair2) (car pair1) (cdr pair2))
+          (push (cons (car pair1) (min (cdr pair1) (cdr pair2))) pairs)))))))
+
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.
 ;;;

@@ -330,6 +330,34 @@
 		     :high high
 		     :enumerable enumerable))
 
+(defstruct (character-set-type
+            (:include ctype
+                      (class-info (type-class-or-lose 'character-set)))
+            (:constructor %make-character-set-type)
+            (:copier nil))
+  (pairs (missing-arg) :type list :read-only t))
+(defun make-character-set-type (&key pairs)
+  (aver (equal (mapcar #'car pairs)
+              (sort (mapcar #'car pairs) #'<)))
+  (let ((pairs (let (result)
+                (do ((pairs pairs (cdr pairs)))
+                    ((null pairs) (nreverse result))
+                  (destructuring-bind (low . high) (car pairs)
+                    (loop for (low1 . high1) in (cdr pairs)
+                          if (<= low1 (1+ high))
+                          do (progn (setf high (max high high1))
+                                    (setf pairs (cdr pairs)))
+                          else do (return nil))
+                    (cond
+                      ((>= low sb!xc:char-code-limit))
+                      ((< high 0))
+                      (t (push (cons (max 0 low)
+                                     (min high (1- sb!xc:char-code-limit)))
+                               result))))))))
+    (if (null pairs)
+       *empty-type*
+       (%make-character-set-type :pairs pairs))))
+
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype
