@@ -857,7 +857,7 @@ ptrans_list(lispobj thing, boolean constant)
     struct cons *old, *new, *orig;
     int length;
 
-    orig = newspace_alloc(0,constant);
+    orig = (struct cons *) newspace_alloc(0,constant);
     length = 0;
 
     do {
