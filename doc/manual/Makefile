@@ -69,22 +69,25 @@ info: $(INFOFILE)
 $(INFOFILE): $(DOCFILES) docstrings
 	$(MAKEINFO) -I $(DOCSTRINGDIR) $(ROOTFILE)
 
-# Texinfo docstring snippets; output hardcoded in docstrings/ for now.
+# contrib-modules.texinfo includes contrib-doc-list.texi-temp
+contrib-modules.texinfo: tempfiles-stamp
+
+# Texinfo docstring snippets
 .PHONY: docstrings
-docstrings: docstrings-stamp
+docstrings: tempfiles-stamp
 
-docstrings-stamp:
-	DOCSTRINGDIR=$(DOCSTRINGDIR) sh docstrings.sh
-	touch docstrings-stamp
-
+tempfiles-stamp:
+	DOCSTRINGDIR=$(DOCSTRINGDIR) sh make-tempfiles.sh
+	touch tempfiles-stamp
 
 
 .PHONY: clean
 clean: 
 	rm -f *~ *.bak *.orig \#*\# .\#* texput.log *.fasl
 	rm -rf $(HTMLDIR) $(DOCSTRINGDIR)
-	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp docstrings-stamp
-	rm -f $(TMPFILES)
+	rm -f contrib-docs.texi-temp
+	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp tempfiles-stamp
+	rm -f $(TMPFILES) contrib-doc-list.texi-temp
 	rm -f sbcl.info sbcl.info-*
 
 .PHONY: distclean

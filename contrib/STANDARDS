@@ -71,11 +71,23 @@ good place to test that they still exist, etc.
 
 * Documentation
 
-[ Would be at least nice.  My tendency is to say plain text or HTML,
-and optionally your choice of source format which can generate either
-of the preceding.  Document formats not available on typical
-well-endowed-with-free-stuff Unix systems are discouraged.  DocBook
-is fine, as the SBCL manual is DocBook anyway ]
+Each package should provide documentation in Texinfo format.  For the
+documentation to be included in the sbcl manual, the following must
+hold:
+
+- Each Texinfo file must have the extension `.texinfo' so the
+  automatic manual builder will find it.
+
+- It must contain one @node - @section pair at the top and only
+  @subsection (or lower) sectioning commands within, e.g.
+
+@node Sample Contrib
+@section Sample Contrib
+...
+
+  so that the contrib menu can be created automatically.
+
+Take care to choose unique node names.
 
 [ make install should copy the documentation somewhere that the user
 can find it ]

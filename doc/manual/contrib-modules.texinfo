@@ -1,0 +1,5 @@
+@node Contributed Modules
+@comment  node-name,  next,  previous,  up
+@chapter Contributed Modules
+
+@include contrib-doc-list.texi-temp

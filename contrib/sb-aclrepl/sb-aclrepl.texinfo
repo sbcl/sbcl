@@ -1,0 +1,46 @@
+@node sb-aclrepl
+@section sb-aclrepl
+
+The @code{sb-aclrepl} module offers an AllegroCL style Read-Eval-Print
+Loop for SBCL. An AllegroCL style inspector is integrated. Adding an
+AllegroCL style debugger is planned.
+
+@menu
+* Usage::                       
+@end menu
+
+@node Usage
+@subsection Usage
+
+To start @code{sb-aclrepl} as your read-eval-print loop, put the form
+@lisp
+(require 'sb-aclrepl)
+@end lisp
+
+in your @file{~/.sbclrc} initialization file.
+
+Here's a longer example of a @file{~/.sbclrc} file that shows off
+some of the features of @code{sb-aclrepl}:
+
+@lisp
+(ignore-errors (require 'sb-aclrepl))
+
+(when (find-package 'sb-aclrepl)
+  (push :aclrepl cl:*features*))
+#+aclrepl
+(progn
+  (setq sb-aclrepl:*max-history* 100)
+  (setf (sb-aclrepl:alias "asdc") 
+       #'(lambda (sys) (asdf:operate 'asdf:compile-op sys)))
+  (sb-aclrepl:alias "l" (sys) (asdf:operate 'asdf:load-op sys))
+  (sb-aclrepl:alias "t" (sys) (asdf:operate 'asdf:test-op sys))
+  ;; The 1 below means that two characaters ("up") are required
+  (sb-aclrepl:alias ("up" 1 "Use package") (package) (use-package package))
+  ;; The 0 below means only the first letter ("r") is required,
+  ;; such as ":r base64"
+  (sb-aclrepl:alias ("require" 0 "Require module") (sys) (require sys))
+  (setq cl:*features* (delete :aclrepl cl:*features*)))
+@end lisp
+
+Questions, comments, or bug reports should be sent to Kevin Rosenberg
+(@email{kevin@@rosenberg.net}).

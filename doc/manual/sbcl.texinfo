@@ -64,7 +64,8 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * The Debugger::                
 * Efficiency::                  
 * Beyond The ANSI Standard::    
-* The Foreign Function Interface::  
+* The Foreign Function Interface::
+* Contributed Modules::    
 * Concept Index::
 * Function Index::              
 * Variable Index::              
@@ -79,6 +80,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include efficiency.texinfo
 @include beyond-ansi.texinfo
 @include ffi.texinfo
+@include contrib-modules.texinfo
 @include backmatter.texinfo
 
 @bye

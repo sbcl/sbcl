@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # Create Texinfo snippets from the documentation of exported symbols.
+# Also create contrib-docs.texi-temp to include documentation in contrib/.
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -33,3 +34,6 @@ PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP 
 
 echo /creating docstring snippets from SBCL=\'$SBCL\' for packages \'$PACKAGES\'
 echo "(progn (load \"docstrings.lisp\") (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
+
+echo /creating contrib-docs.texi-temp
+echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
