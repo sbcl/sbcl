@@ -1322,6 +1322,26 @@ WORKAROUND:
 225:
   (fixed in 0.7.9.42)
 
+226: "AVER failure in COMPILE-FILE of clocc-ansi-test/tests.lisp"
+  sbcl-0.7.9.43 dies with failed AVER "(EQ (TN-PHYSENV TN) TN-ENV)" when
+  trying to compile clocc-ansi-test/tests.lisp. sbcl-0.7.9.31 was able to
+  to compile it. A smaller test case exhibiting the same problem is
+   (declaim (optimize (speed 0) (safety 3) (debug 3)))
+   (defun c-a-p ()
+     (flet ((safe-format (stream string &rest r)
+              (unless (ignore-errors (progn
+                                       (apply #'format stream string r)
+                                       t))
+	        (format stream "~&foo ~S" string))))
+       (cond
+        ((eq my-result :ERROR)
+         (cond
+          ((ignore-errors (typep condition result))
+           (safe-format t "~&bar ~S" result))
+          (t
+           (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
