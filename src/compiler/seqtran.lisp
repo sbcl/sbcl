@@ -721,33 +721,31 @@
 			   (t &rest simple-string)
 			   simple-string
 			   :policy (< safety 3))
-  (collect ((lets)
-	    (forms)
-	    (all-lengths)
-	    (args))
-    (dolist (seq sequences)
-      (declare (ignorable seq))
-      (let ((n-seq (gensym))
-	    (n-length (gensym)))
-	(args n-seq)
-	(lets `(,n-length (the index (* (length ,n-seq) sb!vm:n-byte-bits))))
-	(all-lengths n-length)
-	(forms `(bit-bash-copy ,n-seq ,vector-data-bit-offset
-			       res start
-			       ,n-length))
-	(forms `(setq start (opaque-identity (+ start ,n-length))))))
-    `(lambda (rtype ,@(args))
-       (declare (ignore rtype))
-       ;; KLUDGE
-       (flet ((opaque-identity (x) x))
-	 (declare (notinline opaque-identity))
-	 (let* (,@(lets)
-		  (res (make-string (truncate (the index (+ ,@(all-lengths)))
-					      sb!vm:n-byte-bits)))
-		  (start ,vector-data-bit-offset))
-	   (declare (type index start ,@(all-lengths)))
-	   ,@(forms)
-	   res)))))
+  (loop for rest-seqs on sequences
+        for n-seq = (gensym "N-SEQ")
+        for n-length = (gensym "N-LENGTH")
+        for start = vector-data-bit-offset then next-start
+        for next-start = (gensym "NEXT-START")
+        collect n-seq into args
+        collect `(,n-length (* (length ,n-seq) sb!vm:n-byte-bits)) into lets
+        collect n-length into all-lengths
+        collect next-start into starts
+        collect `(bit-bash-copy ,n-seq ,vector-data-bit-offset
+                                res ,start ,n-length)
+                into forms
+        collect `(setq ,next-start (+ ,start ,n-length)) into forms
+        finally
+        (return
+          `(lambda (rtype ,@args)
+             (declare (ignore rtype))
+             (let* (,@lets
+                      (res (make-string (truncate (the index (+ ,@all-lengths))
+                                                  sb!vm:n-byte-bits))))
+               (declare (type index ,@all-lengths))
+               (let (,@(mapcar (lambda (name) `(,name 0)) starts))
+                 (declare (type index ,@starts))
+                 ,@forms)
+               res)))))
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 

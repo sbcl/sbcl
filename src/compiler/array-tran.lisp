@@ -111,11 +111,10 @@
 (defoptimizer (%with-array-data derive-type) ((array start end))
   (let ((atype (continuation-type array)))
     (when (array-type-p atype)
-      (values-specifier-type
-       `(values (simple-array ,(type-specifier
-				(array-type-specialized-element-type atype))
-			      (*))
-		index index index)))))
+      (specifier-type
+       `(simple-array ,(type-specifier
+                       (array-type-specialized-element-type atype))
+                     (*))))))
 
 (defoptimizer (array-row-major-index derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
@@ -140,9 +139,7 @@
                     (continuation-value element-type))
                    (t
                     '*))
-            ,(cond ((not simple)
-                    '*)
-                   ((constant-continuation-p dims)
+            ,(cond ((constant-continuation-p dims)
                     (let ((val (continuation-value dims)))
                       (if (listp val) val (list val))))
                    ((csubtypep (continuation-type dims)

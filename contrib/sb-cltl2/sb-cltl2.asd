@@ -5,7 +5,8 @@
     :description "Some functionality, mentioned in CLtL2, but not present in ANSI."
     :components ((:file "defpackage")
 		 (:file "compiler-let" :depends-on ("defpackage"))
-                 (:file "macroexpand" :depends-on ("defpackage"))))
+                 (:file "macroexpand" :depends-on ("defpackage"))
+                 (:file "env" :depends-on ("defpackage"))))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-cltl2))))
   (provide 'sb-cltl2))

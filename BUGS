@@ -672,44 +672,6 @@ WORKAROUND:
           :FAST-MODE NIL)
 
 188: "compiler performance fiasco involving type inference and UNION-TYPE"
-  (In sbcl-0.7.6.10, DEFTRANSFORM CONCATENATE was commented out until this
-  bug could be fixed properly, so you won't see the bug unless you restore
-  the DEFTRANSFORM by hand.) In sbcl-0.7.5.11 on a 700 MHz Pentium III, 
-    (time (compile
-           nil
-           '(lambda ()
-              (declare (optimize (safety 3)))
-              (declare (optimize (compilation-speed 2)))
-              (declare (optimize (speed 1) (debug 1) (space 1)))
-              (let ((fn "if-this-file-exists-the-universe-is-strange"))
-                (load fn :if-does-not-exist nil)
-                (load (concatenate 'string fn ".lisp") :if-does-not-exist nil)
-                (load (concatenate 'string fn ".fasl") :if-does-not-exist nil)
-                (load (concatenate 'string fn ".misc-garbage")
-                      :if-does-not-exist nil)))))
-  reports  
-  		 134.552 seconds of real time
-  		 133.35156 seconds of user run time
-  		 0.03125 seconds of system run time
-                   [Run times include 2.787 seconds GC run time.]
-  		 0 page faults and
-  		 246883368 bytes consed.
-  BACKTRACE from Ctrl-C in the compilation shows that the compiler is
-  thinking about type relationships involving types like
-     #<UNION-TYPE
-       (OR (INTEGER 576 576)
-           (INTEGER 1192 1192)
-           (INTEGER 2536 2536)
-           (INTEGER 1816 1816)
-           (INTEGER 2752 2752)
-           (INTEGER 1600 1600)
-           (INTEGER 2640 2640)
-           (INTEGER 1808 1808)
-           (INTEGER 1296 1296)
-           ...)>)[:EXTERNAL]
-
-  In recent SBCL the following example also illustrates this bug:
-
     (time (compile
            nil
            '(lambda ()
@@ -1064,8 +1026,25 @@ WORKAROUND:
   does not cause a warning. (BTW: old SBCL issued a warning, but for a
   function, which was never called!)
 
-255:
-  (fixed in 0.8.0.57)
+256:
+  Compiler does not emit warnings for
+
+  a. (lambda () (svref (make-array 8 :adjustable t) 1))
+
+  b. (lambda (x)
+       (list (let ((y (the real x)))
+               (unless (floatp y) (error ""))
+               y)
+             (integer-length x)))
+
+  c. (lambda (x)
+       (declare (optimize (debug 0)))
+       (declare (type vector x))
+       (list (fill-pointer x)
+             (svref x 1)))
+
+257:
+  Complex array type does not have corresponding type specifier.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

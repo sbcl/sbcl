@@ -419,3 +419,7 @@
                (defsetf #6=#:foo (&optional (x (return-from #6#))) ()))))
   (dolist (form forms)
     (assert (nth-value 2 (compile nil `(lambda () ,form))))))
+
+(assert (nth-value 2 (compile nil
+                              '(lambda ()
+                                (svref (make-array '(8 9) :adjustable t) 1)))))
