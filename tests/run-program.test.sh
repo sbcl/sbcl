@@ -57,6 +57,13 @@ ${SBCL:-sbcl} <<EOF
   ;; That's not just because POSIX-ENVIRON is having a bad hair
   ;; day and returning NIL, is it?
   (assert (plusp (length (sb-ext:posix-environ))))
+  ;; make sure that a stream input argument is basically reasonable.
+  (let ((string (let ((i (make-string-input-stream "abcdef")))
+                  (with-output-to-string (stream)
+                    (sb-ext:run-program "/bin/cat" ()
+                                        :input i :output stream)))))
+    (assert (= (length string) 6))
+    (assert (string= string "abcdef")))
   ;; success convention for this Lisp program run as part of a larger script
   (sb-ext:quit :unix-status 52)))
 EOF

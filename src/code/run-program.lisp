@@ -753,7 +753,16 @@
 			    (read-line object nil nil)
 			  (unless line
 			    (return))
-			  (sb-unix:unix-write fd line 0 (length line))
+			  (sb-unix:unix-write
+                           fd
+                           ;; FIXME: this really should be
+                           ;; (STRING-TO-OCTETS :EXTERNAL-FORMAT ...).
+                           ;; RUN-PROGRAM should take an
+                           ;; external-format argument, which should
+                           ;; be passed down to here.  Something
+                           ;; similar should happen on :OUTPUT, too.
+                           (map '(vector (unsigned-byte 8)) #'char-code line)
+                           0 (length line))
 			  (if no-cr
 			      (return)
 			      (sb-unix:unix-write fd newline 0 1)))))

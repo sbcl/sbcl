@@ -109,7 +109,7 @@
     (socket-connect
      s (car (host-ent-addresses (get-host-by-name (url-host (or *proxy* url)))))
      (url-port (or  *proxy* url)))
-    (let ((stream (socket-make-stream s :input t :output t :buffering :full)))
+    (let ((stream (socket-make-stream s :input t :output t :buffering :full :external-format :iso-8859-1)))
       ;; we are exceedingly unportable about proper line-endings here.
       ;; Anyone wishing to run this under non-SBCL should take especial care
       (format stream "GET ~A HTTP/1.0~%Host: ~A~%Cookie: CCLAN-SITE=~A~%~%"
@@ -150,11 +150,11 @@
 	(format t "Downloading ~A bytes from ~A ..."
 		(if length length "some unknown number of") url)
 	(force-output)
-	(with-open-file (o file-name :direction :output)
+	(with-open-file (o file-name :direction :output :external-format :iso-8859-1)
 	  (if length
 	      (let ((buf (make-array length
 				     :element-type
-				     (stream-element-type stream)  )))
+				     (stream-element-type stream))))
 		(read-sequence buf stream)
 		(write-sequence buf o)) 
 	      (sb-executable:copy-stream stream o))))

@@ -16,6 +16,11 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
   * bug fix: RANDOM can be compiled when the compiler derives the type
     of its numeric argument as a disjoint set of small integers.
     (reported by Paul Dietz)
+  * fixed some bugs related to Unicode integration:
+    ** RUN-PROGRAM can allow its child to take input from a Lisp
+       stream.  (reported by Stefan Scholl)
+    ** ASDF-INSTALL successfully downloads .tar.gz files in all
+       locales.  (reported by Ken Causey)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** INCF, DECF and REMF evaluate their place form as specified in
        CLtS 5.1.3.
