@@ -19,12 +19,13 @@
 (defun c-for-function (stream lisp-name alien-defn)
   (destructuring-bind (c-name &rest definition) alien-defn
     (let ((*print-right-margin* nil))
-      (format stream "printf(\"(declaim (inline ~A))\\n\");~%"
+      (format stream "printf(\"(cl:declaim (cl:inline ~A))\\n\");~%"
               lisp-name)
       (princ "printf(\"(sb-grovel::define-foreign-routine (" stream)
       (princ "\\\"" stream) (princ c-name stream) (princ "\\\" " stream)
       (princ lisp-name stream)
       (princ " ) " stream)
+      (terpri stream)
       (dolist (d definition)
         (write d :length nil
                :right-margin nil :stream stream)
@@ -35,22 +36,28 @@
 
 (defun print-c-source (stream headers definitions package-name)
   (let ((*print-right-margin* nil))
+    (format stream "#define SIGNEDP(x) (((x)-1)<0)~%")
+    (format stream "#define SIGNED_(x) (SIGNEDP(x)?\"\":\"un\")~%")
     (loop for i in headers
           do (format stream "#include <~A>~%" i))
     (format stream "main() { ~%
 printf(\"(in-package ~S)\\\n\");~%" package-name)  
-    (format stream "printf(\"(deftype int () '(signed-byte %d))\\\n\",8*sizeof (int));~%")
-    (format stream "printf(\"(deftype char () '(unsigned-byte %d))\\\n\",8*sizeof (char));~%")
-    (format stream "printf(\"(deftype long () '(unsigned-byte %d))\\\n\",8*sizeof (long));~%")
+    (format stream "printf(\"(cl:deftype int () '(%ssigned-byte %d))\\\n\",SIGNED_(int),8*sizeof (int));~%")
+    (format stream "printf(\"(cl:deftype char () '(unsigned-byte %d))\\\n\",SIGNED_(char),8*sizeof (char));~%")
+    (format stream "printf(\"(cl:deftype long () '(unsigned-byte %d))\\\n\",SIGNED_(long),8*sizeof (long));~%")
     (dolist (def definitions)
       (destructuring-bind (type lispname cname &optional doc) def
         (cond ((eq type :integer)
                (format stream
-                       "printf(\"(defconstant ~A %d \\\"~A\\\")\\\n\",~A);~%"
+                       "printf(\"(cl:defconstant ~A %d \\\"~A\\\")\\\n\",~A);~%"
                        lispname doc cname))
+	      ((eq type :type)
+	       (format stream
+                       "printf(\"(sb-alien:define-alien-type ~A (sb-alien:%ssigned %d))\\\n\",SIGNED_(~A),8*(sizeof(~A)));~%"
+		       lispname cname cname))
               ((eq type :string)
                (format stream
-                       "printf(\"(defvar ~A %S \\\"~A\\\")\\\n\",~A);~%"
+                       "printf(\"(cl:defvar ~A %S \\\"~A\\\")\\\n\",~A);~%"
                      lispname doc cname))
               ((eq type :function)
                (c-for-function stream lispname cname))

@@ -1,0 +1,118 @@
+-*- Text -*-
+
+* Scope
+
+The scope of this interface is "operating system calls on a typical
+Unixlike platform".  This is section 2 of the Unix manual, plus
+section 3 calls that are (a) typically found in libc, but (b) not part
+of the C standard.  For example, we intend to provide support for
+opendir() and readdir() , but not for printf()
+
+Some facilities are omitted where they offer absolutely no additional
+use over some portable function, or would be actively dangerous to the
+consistency of Lisp.  Not all functions are available on all
+platforms.  [TBD: unavailable functions should (a) not exist, or (b)
+exist but signal some kind of "not available on this platform" error]
+
+The general intent is for a low-level interface.  There are three
+reasons for this: it's easier to write a high-level interface given a
+low-level one than vice versa, there are fewer philosophical
+disagreements about what it should look like, and the work of
+implementing it is easily parallelisable - and in fact, can be
+attempted on an as-needed basis by the various people who want it.
+
+* Function names
+
+The package name for this interface is SB-POSIX.  In this package
+there is a Lisp function for each supported Unix function, and a
+variable or constant for each supported unix constant.  A symbol name
+is derived from the C binding's name, by (a) uppercasing, then (b)
+replacing underscore (#\_) characters with the hyphen (#\-)
+
+No other changes to "Lispify" symbol names are made, so creat()
+becomes CREAT, not CREATE
+
+The user is encouraged not to (USE-PACKAGE :SB-POSIX) but instead to
+use the SB-POSIX: prefix on all references, as some of our symbols
+have the same name as CL symbols (OPEN, CLOSE, SIGNAL etc).
+
+[ Rationale: We use similar names to the C bindings so that unix
+manual pages can be used for documentation.  To avoid name clashes
+with CL or other functions, the approaches considered were (a) prefix
+the names of clashing symbols with "POSIX-" or similar, (b) prefix
+_all_ symbols with "POSIX-", (c) use the packaging system to resolve
+ambiguities.  (a) was rejected as the set of symbols we may
+potentially clash with is not fixed (for example, if new symbols are
+added to SB-EXT) so symbols might have to be renamed over the lifetime
+of SB-POSIX, which is not good.  The choice between (b) and (c) was
+made on the grounds that POSIX-OPEN is about as much typing as
+SB-POSIX:OPEN anyway, and symbol munging is, the author feels,
+slightly tacky, when there's a package system available to do it more
+cleanly ]
+
+
+* Parameters
+
+The calling convention is modelled after that of CMUCL's UNIX package:
+in particular, it's like the C interface except
+
+a) length arguments are omitted or optional where the sensible value
+is obvious.  For example, 
+
+(read fd buffer &optional (length (length buffer))) => bytes-read
+
+b) where C simulates "out" parameters using pointers (for instance, in
+pipe() or socketpair()) we may use multiple return values instead.
+This doesn't apply to data transfer functions that fill buffers.
+
+c) some functions accept objects such as filenames or file
+descriptors.  In the C bindings these are strings and small integers
+respectively.  For the Lisp programmer's convenience we introduce
+"filename designators" and "file descriptor designator" concepts such
+that CL pathnames or open streams can be passed to these functions.
+
+[ Rationale: Keeping exact 1:1 correspondence with C conventions is
+less important here, as the function argument list can easily be
+accessed to find out exactly what the arguments are.  Designators
+are primarily a convenience feature ]
+
+* Return values
+
+The return value is usually the same as for the C binding, except in
+error cases: where the C function is defined as returning some
+sentinel value and setting "errno" on error, we instead signal an
+error of type SYSCALL-ERROR.  The actual error value ("errno") is
+stored in this condition and can be accessed with SYSCALL-ERRNO.
+[TBA: some interface to strerror, to get the user-readable translation
+of the error number]
+
+We do not automatically translate the returned value into "Lispy"
+objects - for example, SB-POSIX:OPEN returns a small integer, not a
+stream.
+
+[ Rationale: This is an interface to POSIX, not a high-level interface
+that uses POSIX, and many people using it will actually want to mess
+with the file descriptors directly.  People needing Lispy interfaces
+can implement them atop this - or indeed, use the existing COMMON-LISP
+package, which already has many high-level constructs built on top of
+the operating system ;-) ]
+
+
+* Implementation
+
+The initial implementation is in contrib/sb-posix, and being filled
+out on an as-needed basis.  Contributions following these style rules
+are welcome from anyone who writes them, provided the author is happy
+to release the code as Public Domain or MIT-style licence.
+
+See/update the TODO list for current status
+
+** Designators
+
+See designator.lisp, add a define-designator form
+
+** Adding functions
+
+The use of DEFINE-CALL macro in interface.lisp should be obvious from
+the existing examples, if less so from the macroexpansion
+
