@@ -1147,7 +1147,11 @@
   (case operation
     (:file-position
      (if arg1
-	 (setf (string-input-stream-current stream) arg1)
+	 (setf (string-input-stream-current stream)
+	       (case arg1
+		 (:start 0)
+		 (:end (string-input-stream-end stream))
+		 (t arg1)))
 	 (string-input-stream-current stream)))
     (:file-length (length (string-input-stream-string stream)))
     (:unread (decf (string-input-stream-current stream)))

@@ -53,7 +53,7 @@
        (return)))))
 
 ;;; Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug, fixed by
-;;; by MRD patch sbcl-devel 2002-11-02 merged ca. sbcl-0.7.9.32...
+;;; MRD patch sbcl-devel 2002-11-02 merged ca. sbcl-0.7.9.32...
 (assert (string=
 	 (with-output-to-string (out)
 	   (peek-char #\]
@@ -74,15 +74,15 @@
 	 ;; (Before the fix, the LET* expression just signalled an error.)
 	 "a"))
 
-;; 0.7.12 doesn't advance current stream in concatenated streams
-;; correctly when searching a stream for a char to read.
+;;; 0.7.12 doesn't advance current stream in concatenated streams
+;;; correctly when searching a stream for a char to read.
 (with-input-from-string (p "")
   (with-input-from-string (q "foo")
     (let* ((r (make-concatenated-stream p q)))
       (peek-char nil r))))
 
-;; 0.7.14 and previous SBCLs don't have a working INTERACTIVE-STREAM-P
-;; because it called UNIX-ISATTY, which wasn't defined.
+;;; 0.7.14 and previous SBCLs don't have a working INTERACTIVE-STREAM-P
+;;; because it called UNIX-ISATTY, which wasn't defined.
 (with-input-from-string (s "a non-interactive stream")
   (assert (not (interactive-stream-p s))))
 ;;; KLUDGE: Unfortunately it's hard to find a reliably interactive
@@ -90,3 +90,15 @@
 ;;; from a script, conceivably even as something like a cron job.
 ;;; Ideas?
 #+nil (assert (eq (interactive-stream-p *terminal-io*) t))
+
+;;; FILE-POSITION on string-input-streams should work, even with
+;;; :START or :END new positions.
+(let ((stream (make-string-input-stream "abc")))
+  (assert (char= (read-char stream) #\a))
+  (assert (= (file-position stream) 1))
+  (assert (file-position stream 0))
+  (assert (char= (read-char stream) #\a))
+  (assert (file-position stream :start))
+  (assert (char= (read-char stream) #\a))
+  (assert (file-position stream :end))
+  (assert (eq (read-char stream nil 'foo) 'foo)))
