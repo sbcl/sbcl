@@ -645,9 +645,8 @@
 	 (write-wordindexed des (1+ sb!vm:complex-double-float-imag-slot) low-bits))))
     des))
 
+;;; Copy the given number to the core.
 (defun number-to-core (number)
-  #!+sb-doc
-  "Copy the given number to the core, or flame out if we can't deal with it."
   (typecase number
     (integer (if (< (integer-length number) 30)
 		 (make-fixnum-descriptor number)
@@ -684,8 +683,8 @@
     (write-wordindexed dest 1 cdr)
     dest))
 
-;;; Make a simple-vector that holds the specified OBJECTS, and return its
-;;; descriptor.
+;;; Make a simple-vector on the target that holds the specified
+;;; OBJECTS, and return its descriptor.
 (defun vector-in-core (&rest objects)
   (let* ((size (length objects))
 	 (result (allocate-vector-object *dynamic* sb!vm:n-word-bits size
@@ -959,11 +958,74 @@
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
 
+;;; sanity check for a symbol we're about to create on the target
+;;;
+;;; Make sure that the symbol has an appropriate package. In
+;;; particular, catch the so-easy-to-make error of typing something
+;;; like SB-KERNEL:%BYTE-BLT in cold sources when what you really
+;;; need is SB!KERNEL:%BYTE-BLT.
+(defun package-ok-for-target-symbol-p (package)
+  (let ((package-name (package-name package)))
+    (or
+     ;; Cold interning things in these standard packages is OK. (Cold
+     ;; interning things in the other standard package, CL-USER, isn't
+     ;; OK. We just use CL-USER to expose symbols whose homes are in
+     ;; other packages. Thus, trying to cold intern a symbol whose
+     ;; home package is CL-USER probably means that a coding error has
+     ;; been made somewhere.)
+     (find package-name '("COMMON-LISP" "KEYWORD") :test #'string=)
+     ;; Cold interning something in one of our target-code packages,
+     ;; which are ever-so-rigorously-and-elegantly distinguished by
+     ;; this prefix on their names, is OK too.
+     (string= package-name "SB!" :end1 3 :end2 3)
+     ;; This one is OK too, since it ends up being COMMON-LISP on the
+     ;; target.
+     (string= package-name "SB-XC")
+     ;; Anything else looks bad. (maybe COMMON-LISP-USER? maybe an extension
+     ;; package in the xc host? something we can't think of
+     ;; a valid reason to cold intern, anyway...)
+     )))
+  
+;;; like SYMBOL-PACKAGE, but safe for symbols which end up on the target
+;;;
+;;; Most host symbols we dump onto the target are created by SBCL
+;;; itself, so that as long as we avoid gratuitously
+;;; cross-compilation-unfriendly hacks, it just happens that their
+;;; SYMBOL-PACKAGE in the host system corresponds to their
+;;; SYMBOL-PACKAGE in the target system. However, that's not the case
+;;; in the COMMON-LISP package, where we don't get to create the
+;;; symbols but instead have to use the ones that the xc host created.
+;;; In particular, while ANSI specifies which symbols are exported
+;;; from COMMON-LISP, it doesn't specify that their home packages are
+;;; COMMON-LISP, so the xc host can keep them in random packages which
+;;; don't exist on the target (e.g. CLISP keeping some CL-exported
+;;; symbols in the CLOS package).
+(defun symbol-package-for-target-symbol (symbol)
+  ;; We want to catch weird symbols like CLISP's
+  ;; CL:FIND-METHOD=CLOS::FIND-METHOD, but we don't want to get
+  ;; sidetracked by ordinary symbols like :CHARACTER which happen to
+  ;; have the same SYMBOL-NAME as exports from COMMON-LISP.
+  (multiple-value-bind (cl-symbol cl-status)
+      (find-symbol (symbol-name symbol) *cl-package*)
+    (if (and (eq symbol cl-symbol)
+	     (eq cl-status :external))
+	;; special case, to work around possible xc host weirdness
+	;; in COMMON-LISP package
+	*cl-package*
+	;; ordinary case
+	(let ((result (symbol-package symbol)))
+	  (aver (package-ok-for-target-symbol-p result))
+	  result))))
+
 ;;; Return a handle on an interned symbol. If necessary allocate the
 ;;; symbol and record which package the symbol was referenced in. When
 ;;; we allocate the symbol, make sure we record a reference to the
 ;;; symbol in the home package so that the package gets set.
-(defun cold-intern (symbol &optional (package (symbol-package symbol)))
+(defun cold-intern (symbol
+		    &optional
+		    (package (symbol-package-for-target-symbol symbol)))
+
+  (aver (package-ok-for-target-symbol-p package))
 
   ;; Anything on the cross-compilation host which refers to the target
   ;; machinery through the host SB-XC package should be translated to
@@ -975,41 +1037,16 @@
     (when (eq (symbol-package symbol) p)
       (setf symbol (intern (symbol-name symbol) *cl-package*))))
 
-  ;; Make sure that the symbol has an appropriate package. In
-  ;; particular, catch the so-easy-to-make error of typing something
-  ;; like SB-KERNEL:%BYTE-BLT in cold sources when what you really
-  ;; need is SB!KERNEL:%BYTE-BLT.
-  (let ((package-name (package-name package)))
-    (cond ((find package-name '("COMMON-LISP" "KEYWORD") :test #'string=)
-	   ;; Cold interning things in these standard packages is OK.
-	   ;; (Cold interning things in the other standard package,
-	   ;; CL-USER, isn't OK. We just use CL-USER to expose symbols
-	   ;; whose homes are in other packages. Thus, trying to cold
-	   ;; intern a symbol whose home package is CL-USER probably
-	   ;; means that a coding error has been made somewhere.)
-	   (values))
-	  ((string= package-name "SB!" :end1 3 :end2 3)
-	   ;; That looks OK, too. (All the target-code packages
-	   ;; have names like that.)
-	   (values))
-	  (t
-	   ;; looks bad: maybe COMMON-LISP-USER? maybe an extension
-	   ;; package in the xc host? something we can't think of
-	   ;; a valid reason to cold intern, anyway...
-	   (bug
-	    "internal error: PACKAGE-NAME=~S looks too much like a typo."
-	    package-name))))
-
   (let (;; Information about each cold-interned symbol is stored
 	;; in COLD-INTERN-INFO.
 	;;   (CAR COLD-INTERN-INFO) = descriptor of symbol
 	;;   (CDR COLD-INTERN-INFO) = list of packages, other than symbol's
-	;;			    own package, referring to symbol
+	;;			      own package, referring to symbol
 	;; (*COLD-PACKAGE-SYMBOLS* and *COLD-SYMBOLS* store basically the
 	;; same information, but with the mapping running the opposite way.)
 	(cold-intern-info (get symbol 'cold-intern-info)))
     (unless cold-intern-info
-      (cond ((eq (symbol-package symbol) package)
+      (cond ((eq (symbol-package-for-target-symbol symbol) package)
 	     (let ((handle (allocate-symbol (symbol-name symbol))))
 	       (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
 	       (when (eq package *keyword-package*)
@@ -1151,6 +1188,7 @@
 	     (imported-internal *nil-descriptor*)
 	     (imported-external *nil-descriptor*)
 	     (shadowing *nil-descriptor*))
+	(declare (type package cold-package)) ; i.e. not a target descriptor
 	(/show "dumping" cold-package symbols)
 
 	;; FIXME: Add assertions here to make sure that inappropriate stuff
@@ -1173,7 +1211,8 @@
 
 	(dolist (symbol symbols)
 	  (let ((handle (car (get symbol 'cold-intern-info)))
-		(imported-p (not (eq (symbol-package symbol) cold-package))))
+		(imported-p (not (eq (symbol-package-for-target-symbol symbol)
+				     cold-package))))
 	    (multiple-value-bind (found where)
 		(find-symbol (symbol-name symbol) cold-package)
 	      (unless (and where (eq found symbol))
