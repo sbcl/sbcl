@@ -1508,12 +1508,14 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * fixed bug 157: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE and
     UPGRADED-COMPLEX-PART-TYPE now take (ignored, in all situations)
     optional environment arguments, as required by ANSI.
-  * fixed bug 228: primary return values from
-    FUNCTION-LAMBDA-EXPRESSION are either NIL or suitable for input to
-    COMPILE or FUNCTION.
   * fixed bugs in other functions taking environment objects, allowing
     calls with an explicit NIL environment argument to be compiled
     without error.
+  * fixed bug 228: primary return values from
+    FUNCTION-LAMBDA-EXPRESSION are either NIL or suitable for input to
+    COMPILE or FUNCTION.
+  * fixed a bug in DEFSTRUCT: predicates for :NAMED structures with
+    :TYPE will no longer signal errors on innocuous objects.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;

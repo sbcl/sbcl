@@ -426,11 +426,20 @@
 	(predicate-name (dd-predicate-name defstruct))
 	(argname (gensym)))
     (when (and predicate-name (dd-named defstruct))
-      (let ((ltype (dd-lisp-type defstruct)))
+      (let ((ltype (dd-lisp-type defstruct))
+	    (name-index (cdr (car (last (find-name-indices defstruct))))))
 	`((defun ,predicate-name (,argname)
 	    (and (typep ,argname ',ltype)
+		 ,(cond
+		   ((subtypep ltype 'list)
+		    `(consp (nthcdr ,name-index (the ,ltype ,argname))))
+		   ((subtypep ltype 'vector)
+		    `(= (length (the ,ltype ,argname))
+		        ,(dd-length defstruct)))
+		   (t (bug "Uncatered-for lisp type in typed DEFSTRUCT: ~S."
+			   ltype)))
 		 (eq (elt (the ,ltype ,argname)
-			  ,(cdr (car (last (find-name-indices defstruct)))))
+			  ,name-index)
 		     ',name))))))))
 
 ;;; Return a list of forms to create a copier function of a typed DEFSTRUCT.

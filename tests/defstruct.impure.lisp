@@ -459,6 +459,23 @@
 (assert (raises-error? (conc-name-nil-slot (make-conc-name-nil))
 		       undefined-function))
 
+;;; The named/typed predicates were a little fragile, in that they
+;;; could throw errors on innocuous input:
+(defstruct (list-struct (:type list) :named) a-slot)
+(assert (list-struct-p (make-list-struct)))
+(assert (not (list-struct-p nil)))
+(assert (not (list-struct-p 1)))
+(defstruct (offset-list-struct (:type list) :named (:initial-offset 1)) a-slot)
+(assert (offset-list-struct-p (make-offset-list-struct)))
+(assert (not (offset-list-struct-p nil)))
+(assert (not (offset-list-struct-p 1)))
+(assert (not (offset-list-struct-p '(offset-list-struct))))
+(assert (not (offset-list-struct-p '(offset-list-struct . 3))))
+(defstruct (vector-struct (:type vector) :named) a-slot)
+(assert (vector-struct-p (make-vector-struct)))
+(assert (not (vector-struct-p nil)))
+(assert (not (vector-struct-p #())))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)
