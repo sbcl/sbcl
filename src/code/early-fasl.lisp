@@ -42,7 +42,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 29)
+(def!constant +fasl-file-version+ 30)
 ;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.
@@ -55,6 +55,8 @@
 ;;; 28: (2002-05-08) new convention for foreign symbols to support
 ;;;     dynamic loading in OpenBSD
 ;;; 29: (2002-06-24) removed *!INITIAL-FDEFN-OBJECTS* from static symbols
+;;; 30: (2002-07-26) deleted all references to %DETECT-STACK-EXHAUSTION, 
+;;;     which was introduced in version 25
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

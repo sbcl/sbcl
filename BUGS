@@ -89,6 +89,9 @@ WORKAROUND:
   also unstable in several ways, including its inability
   to really grok function declarations.
 
+  As of sbcl-0.7.5, sbcl's cross-compiler does run with
+  *TYPE-SYSTEM-INITIALIZED*; however, this bug remains.
+
 7:
   The "compiling top-level form:" output ought to be condensed.
   Perhaps any number of such consecutive lines ought to turn into a
@@ -1068,6 +1071,8 @@ WORKAROUND:
   It should be possible to be much more specific (overflow, division
   by zero, etc.) and of course the "How can this be?" should be fixable.
 
+  See also bugs #45.c and #183
+
 148:
   In sbcl-0.7.1.3 on x86, COMPILE-FILE on the file
     (in-package :cl-user)
@@ -1112,18 +1117,6 @@ WORKAROUND:
   should signal an error, but in sbcl-0.7.1.21 instead gives the output
     Is (1 . 1) of type CONS a cons? => NIL
   without signalling an error.
-
-154:
-  There's some sort of problem with aborting back out of the debugger
-  after a %DETECT-STACK-EXHAUSTION error in sbcl-0.7.1.38. In some cases
-  telling the debugger to ABORT doesn't get you back to the main REPL,
-  but instead just gives you another stack exhaustion error. The problem
-  doesn't occur in the trivial case
-    * (defun frob () (frob) (frob))
-    FROB
-    * (frob)
-  but it has happened in more complicated cases (which I haven't
-  figured out how to reproduce).
 
 157:
   Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
@@ -1450,8 +1443,11 @@ WORKAROUND:
            (INTEGER 1296 1296)
            ...)>)[:EXTERNAL]
 
-(189: "ignored NOTINLINE for functions defined by FLET or LABELS")
-  (fixed in sbcl-0.7.6.3)
+190: "PPC/Linux pipe? buffer? bug"
+  In sbcl-0.7.6, the run-program.test.sh test script sometimes hangs
+  on the PPC/Linux platform, waiting for a zombie env process.  This
+  is a classic symptom of buffer filling and deadlock, but it seems
+  only sporadically reproducible.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
