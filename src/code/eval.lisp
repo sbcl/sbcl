@@ -144,8 +144,8 @@
 			 ((null (cddr args))
 			  ;; We duplicate the call to SET so that the
 			  ;; correct value gets returned.
-			  (set (first args) (eval (second args))))
-		       (set (first args) (eval (second args)))))
+			  (set (first args) (eval-in-lexenv (second args) lexenv)))
+		       (set (first args) (eval-in-lexenv (second args) lexenv))))
 		  (let ((symbol (first name)))
 		    (case (info :variable :kind symbol)
 		      (:special)
