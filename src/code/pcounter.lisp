@@ -18,18 +18,15 @@
 (/show0 "pcounter.lisp 16")
 
 (defstruct (pcounter (:copier nil))
-  (integer 0);; :type unsigned-byte)
-  (fixnum 0));; :type (and fixnum unsigned-byte)))
+  (integer 0 :type unsigned-byte)
+  (fixnum 0 :type (and fixnum unsigned-byte)))
 
 (/show0 "pcounter.lisp 22")
 
-(declaim (ftype (function (pcounter unsigned-byte) pcounter) incf-pcounter))
-;;;(declaim (inline incf-pcounter)) ; FIXME: maybe inline when more stable
+(declaim (maybe-inline incf-pcounter))
 (defun incf-pcounter (pcounter delta)
   (aver (typep delta 'unsigned-byte))
   (let ((sum (+ (pcounter-fixnum pcounter) delta)))
-    (aver (typep sum 'unsigned-byte))
-    ;;(declare (type unsigned-byte sum))
     (cond ((typep sum 'fixnum)
 	   (setf (pcounter-fixnum pcounter) sum))
 	  (t
@@ -39,7 +36,6 @@
 
 (/show0 "pcounter.lisp 36")
 
-(declaim (ftype (function (pcounter) integer) pcounter->integer))
 ;;;(declaim (inline pcounter->integer)) ; FIXME: maybe inline when more stable
 (defun pcounter->integer (pcounter)
   (+ (pcounter-integer pcounter)
@@ -53,8 +49,7 @@
 
 (/show0 "pcounter.lisp 50")
 
-(declaim (ftype (function ((or pcounter fixnum) integer) (or pcounter fixnum)) %incf-pcounter-or-fixnum))
-;;;(declaim (inline %incf-pcounter-or-fixnum)) ; FIXME: maybe inline when more stable
+(declaim (inline %incf-pcounter-or-fixnum))
 (defun %incf-pcounter-or-fixnum (x delta)
   (etypecase x
     (fixnum
@@ -83,7 +78,6 @@
 
 (/show0 "pcounter.lisp 80")
 
-(declaim (ftype (function ((or pcounter fixnum)) integer) pcounter-or-fixnum->integer))
 (declaim (maybe-inline pcounter-or-fixnum->integer))
 (defun pcounter-or-fixnum->integer (x)
   (etypecase x

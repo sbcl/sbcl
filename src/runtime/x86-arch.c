@@ -265,7 +265,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 static void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
-    fprintf(stderr, "\n/entering sigill_handler()\n"); /*REMOVEME*/
     fake_foreign_function_call(context);
     ldb_monitor();
 }

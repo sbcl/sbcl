@@ -47,16 +47,6 @@
 	     (setq *internal-real-time-base-seconds* seconds)
 	     uint)))))
 
-;;; REMOVEME once runtime nonmonotonicity problem is debugged
-(defvar *last-utime-sec*)
-(defvar *last-utime-usec*)
-(defvar *last-stime-sec*)
-(defvar *last-stime-usec*)
-(defvar *last-internal-run-time*)
-(push (lambda ()
-	(makunbound '*last-internal-run-time*))
-      *before-save-initializations*)
-
 (defun get-internal-run-time ()
   #!+sb-doc
   "Return the run time in the internal time format. This is useful for
@@ -85,27 +75,6 @@
 			       stime-usec
 			       (floor micro-seconds-per-internal-time-unit 2))
 			    micro-seconds-per-internal-time-unit))))
-
-      ;; REMOVEME once runtime nonmonotonicity problem is debugged
-      (when (boundp '*last-internal-run-time*)
-	(unless (>= result *last-internal-run-time*)
-	  (error "non-monotonic:~@
-                  UTIME-SEC ~S ~S~@
-                  UTIME-USEC ~S ~S~@
-                  STIME-SEC ~S ~S~@
-                  STIME-USEC ~S ~S~@
-                  RESULT ~S ~S"
-		 *last-utime-sec* utime-sec
-		 *last-utime-usec* utime-usec
-		 *last-stime-sec* stime-sec
-		 *last-stime-usec* stime-usec
-		 *last-internal-run-time* result)))
-      (setf *last-utime-sec* utime-sec
-	    *last-utime-usec* utime-usec
-	    *last-stime-sec* stime-sec
-	    *last-stime-usec* stime-usec
-	    *last-internal-run-time* result)
-      
       result)))
 
 ;;;; Encode and decode universal times.

@@ -155,8 +155,8 @@
        (let ((dticks 0)
 	     (dconsing 0)
 	     (inner-enclosed-profiles 0))
-	 ;;(declare (type unsigned-byte dticks dconsing))
-	 ;;(declare (type unsigned-byte inner-enclosed-profiles))
+	 (declare (type unsigned-byte dticks dconsing))
+	 (declare (type unsigned-byte inner-enclosed-profiles))
 	 (aver (typep dticks 'unsigned-byte))
 	 (aver (typep dconsing 'unsigned-byte))
 	 (aver (typep inner-enclosed-profiles 'unsigned-byte))
@@ -177,15 +177,9 @@
 			 dconsing (fastbig- (get-bytes-consed) start-consing))
 		   (setf inner-enclosed-profiles
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
-		   (aver (not (minusp dconsing))) ; REMOVEME
-		   (aver (not (minusp inner-enclosed-profiles))) ; REMOVEME
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
 		     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
 		   (let ((net-dconsing (fastbig- dconsing *enclosed-consing*)))
-		     (when (minusp net-dconsing) ; REMOVEME
-		       (unprofile-all)
-		       (error "huh? DCONSING=~S, *ENCLOSED-CONSING*=~S"
-			      dticks *enclosed-ticks*))
 		     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
 		   (fastbig-incf-pcounter-or-fixnum profiles
 						    inner-enclosed-profiles))))
@@ -347,11 +341,10 @@
     (max raw-compensated 0.0)))
 
 (defun report ()
-  "Report results from profiling. The results are
-approximately adjusted for profiling overhead, but when RAW is true
-the unadjusted results are reported. The compensation may be somewhat
-inaccurate when bignums are involved in runtime calculation, as in
-a very-long-running Lisp process."
+  "Report results from profiling. The results are approximately adjusted
+for profiling overhead. The compensation may be rather inaccurate when
+bignums are involved in runtime calculation, as in a very-long-running
+Lisp process."
   (declare #.*optimize-external-despite-byte-compilation*)
   (unless (boundp '*overhead*)
     (setf *overhead*
@@ -426,9 +419,7 @@ a very-long-running Lisp process."
 
 ;;; We average the timing overhead over this many iterations.
 (defconstant +timer-overhead-iterations+
-  50 ; REMOVEME
-  ;;50000
-  )
+  50000)
 
 ;;; a dummy function that we profile to find profiling overhead
 (declaim (notinline compute-overhead-aux))
