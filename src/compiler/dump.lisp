@@ -279,17 +279,19 @@
     ;; character code.
     (fasl-write-string
      (with-standard-io-syntax
-       (format nil
-	       "~%  ~
-	        compiled from ~S~%  ~
-	        at ~A~%  ~
-	        on ~A~%  ~
-	        using ~A version ~A~%"
-	        where
-	        (format-universal-time nil (get-universal-time))
-	        (machine-instance)
-	        (sb!xc:lisp-implementation-type)
-	        (sb!xc:lisp-implementation-version)))
+       (let ((*print-readably* nil)
+	     (*print-pretty* nil))
+	 (format nil
+		 "~%  ~
+	          compiled from ~S~%  ~
+	          at ~A~%  ~
+	          on ~A~%  ~
+	          using ~A version ~A~%"
+		 where
+		 (format-universal-time nil (get-universal-time))
+		 (machine-instance)
+		 (sb!xc:lisp-implementation-type)
+		 (sb!xc:lisp-implementation-version))))
      stream)
     (dump-byte +fasl-header-string-stop-char-code+ res)
 

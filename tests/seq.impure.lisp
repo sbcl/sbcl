@@ -362,24 +362,45 @@
 ;;; KLUDGE: not all in one big form because that causes SBCL to spend
 ;;; an absolute age trying to compile it.
 (defmacro sequence-bounding-indices-test (&body body)
-  `(locally
-    ;; See Issues 332 [and 333(!)] in the CLHS
-    (declare (optimize (safety 3)))
-    (let ((string (make-array 10
-			      :fill-pointer 5
-			      :initial-element #\a
-			      :element-type 'base-char)))
-      (flet ((reset ()
-	       (setf (fill-pointer string) 10)
-	       (fill string #\a)
-	       (setf (fill-pointer string) 5)))
-	(declare (ignorable #'reset))
-	,@body))))
+  `(progn
+    (locally
+      ;; See Issues 332 [and 333(!)] in the CLHS
+      (declare (optimize (safety 3)))
+      (let ((string (make-array 10
+				:fill-pointer 5
+				:initial-element #\a
+				:element-type 'base-char)))
+	,(car body)
+	(format t "... BASE-CHAR")
+	(finish-output)
+	(flet ((reset ()
+		 (setf (fill-pointer string) 10)
+		 (fill string #\a)
+		 (setf (fill-pointer string) 5)))
+	  (declare (ignorable #'reset))
+	  ,@(cdr body))))
+    (locally
+      ;; See Issues 332 [and 333(!)] in the CLHS
+      (declare (optimize (safety 3)))
+      (let ((string (make-array 10
+				:fill-pointer 5
+				:initial-element #\a
+				:element-type 'character)))
+	,(car body)
+	(format t "... CHARACTER")
+	(finish-output)
+	(flet ((reset ()
+		 (setf (fill-pointer string) 10)
+		 (fill string #\a)
+		 (setf (fill-pointer string) 5)))
+	  (declare (ignorable #'reset))
+	  ,@(cdr body))))))
+
 (declaim (notinline opaque-identity))
 (defun opaque-identity (x) x)
 ;;; Accessor SUBSEQ
 (sequence-bounding-indices-test
- (format t "~&/Accessor SUBSEQ~%")
+ (format t "~&/Accessor SUBSEQ") 
  (assert (string= (subseq string 0 5) "aaaaa"))
  (assert (raises-error? (subseq string 0 6)))
  (assert (raises-error? (subseq string (opaque-identity -1) 5)))
@@ -395,7 +416,7 @@
 
 ;;; Function COUNT, COUNT-IF, COUNT-IF-NOT
 (sequence-bounding-indices-test
- (format t "~&/Function COUNT, COUNT-IF, COUNT-IF-NOT")
+ (format t "~&/Function COUNT, COUNT-IF, COUNT-IF-NOT") 
  (assert (= (count #\a string :start 0 :end nil) 5))
  (assert (= (count #\a string :start 0 :end 5) 5))
  (assert (raises-error? (count #\a string :start 0 :end 6)))
@@ -425,7 +446,7 @@
 
 ;;; Function FILL
 (sequence-bounding-indices-test
- (format t "~&/Function FILL~%")
+ (format t "~&/Function FILL") 
  (assert (string= (fill string #\b :start 0 :end 5) "bbbbb"))
  (assert (string= (fill string #\c :start 0 :end nil) "ccccc"))
  (assert (raises-error? (fill string #\d :start 0 :end 6)))
@@ -435,7 +456,7 @@
 
 ;;; Function FIND, FIND-IF, FIND-IF-NOT
 (sequence-bounding-indices-test
- (format t "~&/Function FIND, FIND-IF, FIND-IF-NOT~%")
+ (format t "~&/Function FIND, FIND-IF, FIND-IF-NOT") 
  (assert (char= (find #\a string :start 0 :end nil) #\a))
  (assert (char= (find #\a string :start 0 :end 5) #\a))
  (assert (raises-error? (find #\a string :start 0 :end 6)))
@@ -465,7 +486,7 @@
 
 ;;; Function MISMATCH
 (sequence-bounding-indices-test
- (format t "~&/Function MISMATCH~%")
+ (format t "~&/Function MISMATCH") 
  (assert (null (mismatch string "aaaaa" :start1 0 :end1 nil)))
  (assert (= (mismatch "aaab" string :start2 0 :end2 4) 3))
  (assert (raises-error? (mismatch "aaaaaa" string :start2 0 :end2 6)))
@@ -475,7 +496,7 @@
 
 ;;; Function PARSE-INTEGER
 (sequence-bounding-indices-test
- (format t "~&/Function PARSE-INTEGER~%")
+ (format t "~&/Function PARSE-INTEGER") 
  (setf (fill-pointer string) 10)
  (setf (subseq string 0 10) "1234567890")
  (setf (fill-pointer string) 5)
@@ -488,7 +509,7 @@
 
 ;;; Function PARSE-NAMESTRING
 (sequence-bounding-indices-test
- (format t "~&/Function PARSE-NAMESTRING~%")
+ (format t "~&/Function PARSE-NAMESTRING") 
  (setf (fill-pointer string) 10)
  (setf (subseq string 0 10) "/dev/ /tmp")
  (setf (fill-pointer string) 5)
@@ -511,7 +532,8 @@
 
 ;;; Function POSITION, POSITION-IF, POSITION-IF-NOT
 (sequence-bounding-indices-test
- (format t "~&/Function POSITION, POSITION-IF, POSITION-IF-NOT~%")
+ (format t "~&/Function POSITION, POSITION-IF, POSITION-IF-NOT")
+ 
  (assert (= (position #\a string :start 0 :end nil) 0))
  (assert (= (position #\a string :start 0 :end 5) 0))
  (assert (raises-error? (position #\a string :start 0 :end 6)))
@@ -541,7 +563,7 @@
 
 ;;; Function READ-FROM-STRING
 (sequence-bounding-indices-test
- (format t "~&/Function READ-FROM-STRING~%")
+ (format t "~&/Function READ-FROM-STRING") 
  (setf (subseq string 0 5) "(a b)")
  (assert (equal (read-from-string string nil nil :start 0 :end 5) '(a b)))
  (assert (equal (read-from-string string nil nil :start 0 :end nil) '(a b)))
@@ -552,7 +574,7 @@
 
 ;;; Function REDUCE
 (sequence-bounding-indices-test
- (format t "~&/Function REDUCE~%")
+ (format t "~&/Function REDUCE") 
  (setf (subseq string 0 5) "abcde")
  (assert (equal (reduce #'list* string :from-end t :start 0 :end nil)
 		'(#\a #\b #\c #\d . #\e)))
@@ -566,7 +588,7 @@
 ;;; Function REMOVE, REMOVE-IF, REMOVE-IF-NOT, DELETE, DELETE-IF,
 ;;; DELETE-IF-NOT
 (sequence-bounding-indices-test
- (format t "~&/Function REMOVE, REMOVE-IF, REMOVE-IF-NOT, ...~%")
+ (format t "~&/Function REMOVE, REMOVE-IF, REMOVE-IF-NOT, ...") 
  (assert (equal (remove #\a string :start 0 :end nil) ""))
  (assert (equal (remove #\a string :start 0 :end 5) ""))
  (assert (raises-error? (remove #\a string :start 0 :end 6)))
@@ -596,7 +618,7 @@
  (assert (raises-error?
 	  (remove-if-not #'alpha-char-p string :start 6 :end 9))))
 (sequence-bounding-indices-test
- (format t "~&/... DELETE, DELETE-IF, DELETE-IF-NOT")
+ (format t "~&/... DELETE, DELETE-IF, DELETE-IF-NOT") 
  (assert (equal (delete #\a string :start 0 :end nil) ""))
  (reset)
  (assert (equal (delete #\a string :start 0 :end 5) ""))
@@ -645,7 +667,7 @@
 
 ;;; Function REMOVE-DUPLICATES, DELETE-DUPLICATES
 (sequence-bounding-indices-test
- (format t "~&/Function REMOVE-DUPLICATES, DELETE-DUPLICATES~%")
+ (format t "~&/Function REMOVE-DUPLICATES, DELETE-DUPLICATES") 
  (assert (string= (remove-duplicates string :start 0 :end 5) "a"))
  (assert (string= (remove-duplicates string :start 0 :end nil) "a"))
  (assert (raises-error? (remove-duplicates string :start 0 :end 6)))
@@ -666,7 +688,7 @@
 
 ;;; Function REPLACE
 (sequence-bounding-indices-test
- (format t "~&/Function REPLACE~%")
+ (format t "~&/Function REPLACE") 
  (assert (string= (replace string "bbbbb" :start1 0 :end1 5) "bbbbb"))
  (assert (string= (replace (copy-seq "ccccc")
 			   string
@@ -678,7 +700,7 @@
 
 ;;; Function SEARCH
 (sequence-bounding-indices-test
- (format t "~&/Function SEARCH~%")
+ (format t "~&/Function SEARCH") 
  (assert (= (search "aa" string :start2 0 :end2 5) 0))
  (assert (null (search string "aa" :start1 0 :end2 nil)))
  (assert (raises-error? (search "aa" string :start2 0 :end2 6)))
@@ -696,11 +718,11 @@
     (assert (raises-error? (,fn string :start 6 :end 9)))))
   
 (sequence-bounding-indices-test
- (format t "~&/Function STRING-UPCASE, STRING-DOWNCASE, STRING-CAPITALIZE, ...~%")
+ (format t "~&/Function STRING-UPCASE, STRING-DOWNCASE, STRING-CAPITALIZE, ...")
  (string-case-frob string-upcase)
  (string-case-frob string-downcase)
  (string-case-frob string-capitalize)
- (format t "~&/... NSTRING-UPCASE, NSTRING-DOWNCASE, NSTRING-CAPITALIZE~%")
+ (format t "~&/... NSTRING-UPCASE, NSTRING-DOWNCASE, NSTRING-CAPITALIZE")
  (string-case-frob nstring-upcase)
  (string-case-frob nstring-downcase)
  (string-case-frob nstring-capitalize))
@@ -728,12 +750,12 @@
  (string-predicate-frob string<=)
  (string-predicate-frob string>=))
 (sequence-bounding-indices-test
- (format t "~&/... STRING-EQUAL, STRING-NOT-EQUAL, STRING-LESSP, ...~%")
+ (format t "~&/... STRING-EQUAL, STRING-NOT-EQUAL, STRING-LESSP, ...")
  (string-predicate-frob string-equal)
  (string-predicate-frob string-not-equal)
  (string-predicate-frob string-lessp))
 (sequence-bounding-indices-test
- (format t "~&/... STRING-GREATERP, STRING-NOT-GREATERP, STRING-NOT-LESSP~%")
+ (format t "~&/... STRING-GREATERP, STRING-NOT-GREATERP, STRING-NOT-LESSP")
  (string-predicate-frob string-greaterp)
  (string-predicate-frob string-not-greaterp)
  (string-predicate-frob string-not-lessp))
@@ -741,7 +763,7 @@
 ;;; Function SUBSTITUTE, SUBSTITUTE-IF, SUBSTITUTE-IF-NOT,
 ;;; NSUBSTITUTE, NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT
 (sequence-bounding-indices-test
- (format t "~&/Function SUBSTITUTE, SUBSTITUTE-IF, SUBSTITUTE-IF-NOT, ...~%")
+ (format t "~&/Function SUBSTITUTE, SUBSTITUTE-IF, SUBSTITUTE-IF-NOT, ...")
  (assert (string= (substitute #\b #\a string :start 0 :end 5) "bbbbb"))
  (assert (string= (substitute #\c #\a string :start 0 :end nil)
 		  "ccccc"))
@@ -778,7 +800,7 @@
  (assert (raises-error? (substitute-if-not #\b #'alpha-char-p string
 					   :start 6 :end 9))))
 (sequence-bounding-indices-test
- (format t "~&/... NSUBSTITUTE, NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT~%")
+ (format t "~&/... NSUBSTITUTE, NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT")
  (assert (string= (nsubstitute #\b #\a string :start 0 :end 5) "bbbbb"))
  (reset)
  (assert (string= (nsubstitute #\c #\a string :start 0 :end nil)
@@ -833,7 +855,7 @@
 					    :start 6 :end 9))))
 ;;; Function WRITE-STRING, WRITE-LINE
 (sequence-bounding-indices-test
- (format t "~&/Function WRITE-STRING, WRITE-LINE~%")
+ (format t "~&/Function WRITE-STRING, WRITE-LINE")
  (write-string string *standard-output* :start 0 :end 5)
  (write-string string *standard-output* :start 0 :end nil)
  (assert (raises-error? (write-string string *standard-output*
@@ -857,7 +879,7 @@
 
 ;;; Macro WITH-INPUT-FROM-STRING
 (sequence-bounding-indices-test
- (format t "~&/Macro WITH-INPUT-FROM-STRING~%")
+ (format t "~&/Macro WITH-INPUT-FROM-STRING")
  (with-input-from-string (s string :start 0 :end 5)
    (assert (char= (read-char s) #\a)))
  (with-input-from-string (s string :start 0 :end nil)

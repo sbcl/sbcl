@@ -297,7 +297,7 @@
 	      (t
 	       (error "invalid pattern piece: ~S" piece))))))
        (apply #'concatenate
-	      'simple-string
+	      'simple-base-string
 	      (strings))))))
 
 (defun unparse-unix-directory-list (directory)
@@ -323,7 +323,7 @@
 	   (pieces "/"))
 	  (t
 	   (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-string (pieces))))
+    (apply #'concatenate 'simple-base-string (pieces))))
 
 (defun unparse-unix-directory (pathname)
   (declare (type pathname pathname))
@@ -351,18 +351,18 @@
       (when type-supplied
 	(unless name
 	  (error "cannot specify the type without a file: ~S" pathname))
-	(when (typep type 'simple-base-string)
+	(when (typep type 'simple-string)
 	  (when (position #\. type)
 	    (error "type component can't have a #\. inside: ~S" pathname)))
 	(strings ".")
 	(strings (unparse-unix-piece type))))
-    (apply #'concatenate 'simple-string (strings))))
+    (apply #'concatenate 'simple-base-string (strings))))
 
 (/show0 "filesys.lisp 406")
 
 (defun unparse-unix-namestring (pathname)
   (declare (type pathname pathname))
-  (concatenate 'simple-string
+  (concatenate 'simple-base-string
 	       (unparse-unix-directory pathname)
 	       (unparse-unix-file pathname)))
 

@@ -28,7 +28,7 @@ CHARACTER (*)) (which is now distinct from SIMPLE-BASE-STRING).
      >> cold init runs;
      >> warm load runs to completion;
      >> all contribs build and pass self-tests;
-     >> (not yet done: check against sh ./run-tests.sh);
+     >> all sbcl tests pass;
      >> (not yet done: check against Paul Dietz' gcl/ansi-tests);
   -- TODO: sparc, mips, hppa, alpha, ppc.
 
@@ -38,6 +38,10 @@ to portability, so should not use any non-STANDARD-CHAR in its source
 code.  By definition, therefore, all strings and stringlike objects
 are dumpable as BASE-STRING, which allows for identical cores to be
 generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
+
+** fix the regular dumper to compute similarity properly for strings,
+rather than simply through an EQUAL hash table.  (Rationale: it's just
+completely broken at present.)
 
 ** define (CHARACTER-SET 128 255) to be the corresponding Latin1 (and
 Unicode) characters at those codepoints.  (Rationale: attempting to
