@@ -47,51 +47,64 @@
 #include "thread.h"
 size_t os_vm_page_size;
 
+#ifdef LISP_FEATURE_SB_FUTEX
+#include <asm/unistd.h>
+#include <errno.h>
+
+/* values taken from the kernel's linux/futex.h.  This header file
+   doesn't exist in userspace, which is our excuse for not grovelling
+   them automatically */
+#define FUTEX_WAIT (0)
+#define FUTEX_WAKE (1)
+#define FUTEX_FD (2)
+#define FUTEX_REQUEUE (3)
+
+#define __NR_sys_futex __NR_futex
+
+_syscall4(int,sys_futex,
+	  int *, futex,
+	  int, op,
+	  int, val,
+	  struct timespec *, rel);
+#endif
+
 #include "gc.h"
 
 int linux_sparc_siginfo_bug = 0;
+int linux_supports_futex=0;
 
 void os_init(void)
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
-    {
-        struct utsname name;
-	int major_version;
-	int minor_version;
-	char *p;
-	uname(&name);
-	p=name.release;  
-	major_version = atoi(p);
-	p=strchr(p,'.')+1;
-	minor_version = atoi(p);
-	if (major_version<2) {
-	    lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
-		 major_version);
-	}
+    int *futex=0;
+    struct utsname name;
+    int major_version;
+    int minor_version;
+    char *p;
+    uname(&name);
+    p=name.release;  
+    major_version = atoi(p);
+    p=strchr(p,'.')+1;
+    minor_version = atoi(p);
+    if (major_version<2) {
+	lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
+	     major_version);
+    }
+    if (!(major_version>2 || minor_version > 4)) {
 #ifdef LISP_FEATURE_SB_THREAD
-	if ((major_version <2) || (major_version==2 && minor_version < 4)) {
-	    lose("linux kernel 2.4 required for thread-enabled SBCL");
-	}
+	lose("linux kernel 2.4 required for thread-enabled SBCL");
 #endif
 #ifdef LISP_FEATURE_SPARC
-	if ((major_version <2) || (major_version==2 && minor_version < 4)) {
-	    FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
-	    linux_sparc_siginfo_bug = 1;
-	}
+	FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
+	linux_sparc_siginfo_bug = 1;
 #endif
     }
-
-    os_vm_page_size = getpagesize();
-    /* This could just as well be in arch_init(), but it's not. */
-#ifdef LISP_FEATURE_X86
-    /* FIXME: This used to be here.  However, I have just removed it
-       with no apparent ill effects (it may be that earlier kernels
-       started up a process with a different set of traps, or
-       something?) Find out what this was meant to do, and reenable it
-       or delete it if possible. -- CSR, 2002-07-15 */
-    /* SET_FPU_CONTROL_WORD(0x1372|4|8|16|32);  no interrupts */
+#ifdef LISP_FEATURE_SB_FUTEX
+    futex_wait(futex,-1);
+    if(errno!=ENOSYS) linux_supports_futex=1;
 #endif
+    os_vm_page_size = getpagesize();
 }
 
 
@@ -267,8 +280,18 @@ os_install_interrupt_handlers(void)
 						 handle_rt_signal);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
 						 sig_stop_for_gc_handler);
+    if(!linux_supports_futex)
+	undoably_install_low_level_interrupt_handler(SIG_DEQUEUE,
+						     sigcont_handler);
 #endif
-    undoably_install_low_level_interrupt_handler(SIG_DEQUEUE,
-						 sigcont_handler);
 }
 
+#ifdef LISP_FEATURE_SB_FUTEX
+int futex_wait(int *lock_word, int oldval) {
+    int t= sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
+    return t;
+}
+int futex_wake(int *lock_word, int n){
+    return sys_futex(lock_word,FUTEX_WAKE,n,0);
+}
+#endif

@@ -159,6 +159,15 @@
  ;; Note that no consistent effort to audit the SBCL library code for
  ;; thread safety has been performed, so caveat executor.
  ; :sb-thread
+
+ ;; Kernel support for futexes (so-called "fast userspace mutexes") is
+ ;; available in Linux 2.6 and some versions of 2.4 (Red Hat vendor
+ ;; kernels, possibly other vendors too).  We can take advantage of
+ ;; these to do faster and probably more reliable mutex and condition
+ ;; variable support.  An SBCL built with this feature will fall back
+ ;; to the old system if the futex() syscall is not available at
+ ;; runtime
+ ; :sb-futex
  
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply

@@ -72,8 +72,7 @@ void arch_skip_instruction(os_context_t *context)
     int vlen;
     int code;
 
-    FSHOW((stderr, "/[arch_skip_inst at %x]\n", *os_context_pc_addr(context)));
-
+    
     /* Get and skip the Lisp interrupt code. */
     code = *(char*)(*os_context_pc_addr(context))++;
     switch (code)
@@ -192,6 +191,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     int code = info->si_code;
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
+    sigset_t ss;
 
     if (single_stepping && (signal==SIGTRAP))
     {
@@ -242,6 +242,9 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     case trap_PendingInterrupt:
 	FSHOW((stderr, "/<trap pending interrupt>\n"));
 	arch_skip_instruction(context);
+	sigemptyset(&ss);
+	sigaddset(&ss,SIGTRAP);
+	sigprocmask(SIG_UNBLOCK,&ss,0);
 	interrupt_handle_pending(context);
 	break;
 

@@ -779,11 +779,12 @@ retained, possibly temporariliy, because it might be used internally."
              "AWHEN" "ACOND" "IT"
              "BINDING*"
 	     "!DEF-BOOLEAN-ATTRIBUTE"
-	     "WITH-REBOUND-IO-SYNTAX"
 
 	     ;; ..and CONDITIONs..
 	     "BUG"
 	     "UNSUPPORTED-OPERATOR"
+	     "BOOTSTRAP-PACKAGE-NOT-FOUND"
+	     "BOOTSTRAP-PACKAGE-NAME" "DEBOOTSTRAP-PACKAGE"
 
              ;; ..and DEFTYPEs..
              "INDEX" "LOAD/STORE-INDEX"
@@ -1470,7 +1471,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 	     "MAKE-LISTENER-THREAD" "DESTROY-THREAD" "TERMINATE-THREAD"
 	     "INTERRUPT-THREAD" "WITH-RECURSIVE-LOCK"
 	     "MUTEX" "MAKE-MUTEX" "GET-MUTEX" "RELEASE-MUTEX" "WITH-MUTEX"
-	     "WAITQUEUE" "MAKE-WAITQUEUE" "CONDITION-WAIT" "CONDITION-NOTIFY"
+	     "MUTEX-VALUE" "WAITQUEUE" "MAKE-WAITQUEUE"
+	     "CONDITION-WAIT" "CONDITION-NOTIFY" "CONDITION-BROADCAST"
 	     "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "CURRENT-THREAD-ID"))
  
  #s(sb-cold:package-data

@@ -230,28 +230,27 @@ and submit it as a patch."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defvar *already-in-gc* nil "System is running SUB-GC")
-(defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
+(defvar *already-in-gc* 
+  (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
 
 (defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
-  ;; catch attempts to gc recursively or during post-hooks and ignore them
-  (when (sb!thread::mutex-value *gc-mutex*)  (return-from sub-gc nil))
-  (sb!thread:with-mutex (*gc-mutex* :wait-p nil)
+  (let ((me (sb!thread:current-thread-id)))
+    (when (eql (sb!thread::mutex-value *already-in-gc*) me) 
+      (return-from sub-gc nil))
     (setf *need-to-collect-garbage* t)
     (when (zerop *gc-inhibit*)
-      (without-interrupts
-       (gc-stop-the-world)
-       (collect-garbage gen)
-       (incf *n-bytes-freed-or-purified*
-	     (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
-       (setf *need-to-collect-garbage* nil)
-       (gc-start-the-world))
-      (scrub-control-stack)
-      (setf *need-to-collect-garbage* nil)
-      (dolist (h *after-gc-hooks*) (carefully-funcall h))))
-  (values))
-       
-
+      (loop
+       (sb!thread:with-mutex (*already-in-gc*)
+	 (unless *need-to-collect-garbage* (return-from sub-gc nil))
+	 (without-interrupts
+	  (gc-stop-the-world)
+	  (collect-garbage gen)
+	  (incf *n-bytes-freed-or-purified*
+		(max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
+	  (scrub-control-stack)
+	  (setf *need-to-collect-garbage* nil)
+	  (dolist (h *after-gc-hooks*) (carefully-funcall h))
+	  (gc-start-the-world)))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)

@@ -289,6 +289,7 @@ instead (which is another name for the same thing)."))
       ;; disabled by default. Joe User can explicitly enable them if
       ;; desired.
       (set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
+      (sb!thread::maybe-install-futex-functions)
 
       ;; Clear pseudo atomic in case this core wasn't compiled with
       ;; support.

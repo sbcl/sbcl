@@ -2114,7 +2114,7 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
     return (NULL);
 }
 
-static lispobj*
+lispobj*
 search_read_only_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
@@ -2124,7 +2124,7 @@ search_read_only_space(lispobj *pointer)
     return (search_space(start, (pointer+2)-start, pointer));
 }
 
-static lispobj *
+lispobj *
 search_static_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)STATIC_SPACE_START;

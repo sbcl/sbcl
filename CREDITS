@@ -512,7 +512,7 @@ Daniel Barlow:
   and PPC ports (from CMUCL), control stack exhaustion checking (new)
   and native threads support for x86 Linux (new).  He also refactored
   the garbage collectors for understandability, wrote code
-  (e.g. grovel_headers.c and stat_wrapper stuff) to find
+  (e.g. grovel-headers.c and stat_wrapper stuff) to find
   machine-dependent and OS-dependent constants automatically, and was
   original author of the asdf, asdf-install, sb-bsd-sockets,
   sb-executable, sb-grovel and sb-posix contrib packages.

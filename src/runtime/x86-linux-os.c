@@ -33,19 +33,20 @@
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
+#include <asm/ldt.h>
 #include <sys/types.h>
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <asm/ldt.h>
+
 #include <linux/unistd.h>
 #include <sys/mman.h>
-#include <linux/version.h>
 #include "thread.h"		/* dynamic_values_bytes */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#if !__GLIBC_PREREQ(2,3)
+#warn old glibc
 #define user_desc  modify_ldt_ldt_s 
 #endif
 
