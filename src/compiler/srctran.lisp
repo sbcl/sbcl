@@ -2287,6 +2287,15 @@
             (setf min-len 0))
           (specifier-type `(integer ,(or min-len '*) ,(or max-len '*))))))))
 
+(defoptimizer (isqrt derive-type) ((x))
+  (let ((x-type (lvar-type x)))
+    (when (numeric-type-p x-type)
+      (let* ((lo (numeric-type-low x-type))
+             (hi (numeric-type-high x-type))
+             (lo-res (if lo (isqrt lo) '*))
+             (hi-res (if hi (isqrt hi) '*)))
+        (specifier-type `(integer ,lo-res ,hi-res))))))
+
 (defoptimizer (code-char derive-type) ((code))
   (specifier-type 'base-char))
 

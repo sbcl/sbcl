@@ -263,5 +263,28 @@
                  c)))
       (if (<= 11 c) (%f5) c))))
 
+;;; two bugs: "aggressive" deletion of optional entries and problems
+;;; of FIND-RESULT-TYPE in dealing with deleted code; reported by
+;;; Nikodemus Siivola (simplified version)
+(defun lisp-error-error-handler (condition)
+  (invoke-debugger condition)
+  (handler-bind ()
+    (unwind-protect
+         (with-simple-restart
+             (continue "return to hemlock's debug loop.")
+           (invoke-debugger condition))
+      (device))))
+
+;;;
+(defun foo ()
+  (labels ((foo (x)
+             (return-from foo x)
+             (block u
+               (labels ((bar (x &optional (y (return-from u)))
+                          (list x y (apply #'bar (fee)))))
+                 (list (bar 1) (bar 1 2))))
+             (1+ x)))
+    #'foo))
+
 
 (sb-ext:quit :unix-status 104)

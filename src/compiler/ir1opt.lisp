@@ -446,21 +446,24 @@
   (let ((result (return-result node)))
     (collect ((use-union *empty-type* values-type-union))
       (do-uses (use result)
-	(cond ((and (basic-combination-p use)
-		    (eq (basic-combination-kind use) :local))
-	       (aver (eq (lambda-tail-set (node-home-lambda use))
-			 (lambda-tail-set (combination-lambda use))))
-	       (when (combination-p use)
-		 (when (nth-value 1 (maybe-convert-tail-local-call use))
-		   (return-from find-result-type (values)))))
-	      (t
-	       (use-union (node-derived-type use)))))
+        (let ((use-home (node-home-lambda use)))
+          (cond ((or (eq (functional-kind use-home) :deleted)
+                     (block-delete-p (node-block use))))
+                ((and (basic-combination-p use)
+                      (eq (basic-combination-kind use) :local))
+                 (aver (eq (lambda-tail-set use-home)
+                           (lambda-tail-set (combination-lambda use))))
+                 (when (combination-p use)
+                   (when (nth-value 1 (maybe-convert-tail-local-call use))
+                     (return-from find-result-type (values)))))
+                (t
+                 (use-union (node-derived-type use))))))
       (let ((int
              ;; (values-type-intersection
              ;; (continuation-asserted-type result) ; FIXME -- APD, 2002-01-26
              (use-union)
               ;; )
-            ))
+              ))
 	(setf (return-result-type node) int))))
   (values))
 

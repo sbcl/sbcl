@@ -1365,7 +1365,6 @@
                        (declare (integer x))
                        (etypecase x
                          ((unsigned-byte ,width) x)
-                         (bignum-element-type (logand x ,pattern))
                          (fixnum (logand x ,pattern))
                          (bignum (logand (%bignum-ref x 0) ,pattern)))))
                 (,name ,@(loop for arg in lambda-list

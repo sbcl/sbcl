@@ -926,6 +926,7 @@
   %source-name
   %debug-name
   #!+sb-show id
+  kind
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (vars :prin1 (mapcar #'leaf-source-name vars)))

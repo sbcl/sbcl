@@ -774,7 +774,7 @@
 
 ;;; Deal with deleting the last reference to a CLAMBDA. It is called
 ;;; in two situations: when the lambda is unreachable (so that its
-;;; body mey be deleted), and when it is an effectless LET (in this
+;;; body may be deleted), and when it is an effectless LET (in this
 ;;; case its body is reachable and is not completely "its"). We set
 ;;; FUNCTIONAL-KIND to :DELETED and rely on IR1-OPTIMIZE to delete its
 ;;; blocks.
@@ -782,17 +782,18 @@
   (declare (type clambda clambda))
   (let ((original-kind (functional-kind clambda))
 	(bind (lambda-bind clambda)))
-    (aver (not (member original-kind '(:deleted :optional :toplevel))))
+    (aver (not (member original-kind '(:deleted :toplevel))))
     (aver (not (functional-has-external-references-p clambda)))
     (setf (functional-kind clambda) :deleted)
     (setf (lambda-bind clambda) nil)
 
-    (when bind ; CLAMBDA is deleted due to unreachability
+    (when bind              ; CLAMBDA is deleted due to unreachability
       (labels ((delete-children (lambda)
                  (dolist (child (lambda-children lambda))
-                   (if (eq (functional-kind child) :deleted)
-                       (delete-children child)
-                       (delete-lambda child)))
+                   (cond ((eq (functional-kind child) :deleted)
+                          (delete-children child))
+                         (t
+                          (delete-lambda child))))
                  (setf (lambda-children lambda) nil)
                  (setf (lambda-parent lambda) nil)))
         (delete-children clambda)))
@@ -1005,7 +1006,7 @@
   (do-nodes-carefully (node block)
     (when (valued-node-p node)
       (delete-lvar-use node))
-    (typecase node
+    (etypecase node
       (ref (delete-ref node))
       (cif (flush-dest (if-test node)))
       ;; The next two cases serve to maintain the invariant that a LET
@@ -1038,6 +1039,11 @@
          (when entry
            (setf (entry-exits entry)
                  (delq node (entry-exits entry))))))
+      (entry
+       (dolist (exit (entry-exits node))
+         (mark-for-deletion (node-block exit)))
+       (let ((home (node-home-lambda node)))
+         (setf (lambda-entries home) (delq node (lambda-entries home)))))
       (creturn
        (flush-dest (return-result node))
        (delete-return node))
