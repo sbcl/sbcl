@@ -113,11 +113,11 @@ sh make-config.sh || exit 1
 # Or, if you can set up the files somewhere shared (with NFS, AFS, or
 # whatever) between the host machine and the target machine, the basic
 # procedure above should still work, but you can skip the "copy" steps.
-sh make-host-1.sh   || exit 1
-sh make-target-1.sh || exit 1
-sh make-host-2.sh   || exit 1
-sh make-target-2.sh || exit 1
-sh make-target-contrib.sh || exit 1
+time sh make-host-1.sh   || exit 1
+time sh make-target-1.sh || exit 1
+time sh make-host-2.sh   || exit 1
+time sh make-target-2.sh || exit 1
+time sh make-target-contrib.sh || exit 1
 
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and thing that's all that is. So...

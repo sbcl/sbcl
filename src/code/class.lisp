@@ -485,19 +485,18 @@
 	(setf (layout-invalid layout) nil
 	      (classoid-layout classoid) layout))
 
-    (let ((inherits (layout-inherits layout)))
-      (dotimes (i (length inherits)) ; FIXME: should be DOVECTOR
-	(let* ((super (layout-classoid (svref inherits i)))
-	       (subclasses (or (classoid-subclasses super)
-			       (setf (classoid-subclasses super)
-				     (make-hash-table :test 'eq)))))
-	  (when (and (eq (classoid-state super) :sealed)
-		     (not (gethash classoid subclasses)))
-	    (warn "unsealing sealed class ~S in order to subclass it"
-		  (classoid-name super))
-	    (setf (classoid-state super) :read-only))
-	  (setf (gethash classoid subclasses)
-		(or destruct-layout layout))))))
+    (dovector (super-layout (layout-inherits layout))
+      (let* ((super (layout-classoid super-layout))
+             (subclasses (or (classoid-subclasses super)
+                             (setf (classoid-subclasses super)
+                                   (make-hash-table :test 'eq)))))
+        (when (and (eq (classoid-state super) :sealed)
+                   (not (gethash classoid subclasses)))
+          (warn "unsealing sealed class ~S in order to subclass it"
+                (classoid-name super))
+          (setf (classoid-state super) :read-only))
+        (setf (gethash classoid subclasses)
+              (or destruct-layout layout)))))
 
   (values))
 ); EVAL-WHEN
@@ -1282,9 +1281,8 @@
   (let ((inherits (layout-inherits layout))
 	(classoid (layout-classoid layout)))
     (modify-classoid classoid)
-    (dotimes (i (length inherits)) ; FIXME: DOVECTOR
-      (let* ((super (svref inherits i))
-	     (subs (classoid-subclasses (layout-classoid super))))
+    (dovector (super inherits)
+      (let ((subs (classoid-subclasses (layout-classoid super))))
 	(when subs
 	  (remhash classoid subs)))))
   (values))

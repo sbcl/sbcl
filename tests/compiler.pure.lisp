@@ -471,3 +471,12 @@
 	       (declare (double-float x))
 	       (let ((y (* x pi)))
 		 (atan y y))))
+
+;; bogus optimization of BIT-NOT
+(multiple-value-bind (result x)
+    (eval '(let ((x (eval #*1001)))
+            (declare (optimize (speed 2) (space 3))
+                     (type (bit-vector) x))
+            (values (bit-not x nil) x)))
+  (assert (equal x #*1001))
+  (assert (equal result #*0110)))

@@ -694,10 +694,6 @@
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
 ;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
-;;;
-;;; FIXME: In a version of CMU CL that I used at Cadabra ca. 20000101,
-;;; this didn't seem to expand into an assertion, at least for ALIEN
-;;; values. Check that SBCL doesn't have this problem.
 (def-ir1-translator the ((type value) start cont)
   (the-in-policy type value (lexenv-policy *lexenv*) start cont))
 

@@ -736,7 +736,7 @@
                    (make-array (length bit-array-1) :element-type 'bit)))
                ;; If result is T, make it the first arg.
                (deftransform ,fun ((bit-array-1 bit-array-2 result-bit-array)
-                                   (bit-vector bit-vector (member t)) *)
+                                   (bit-vector bit-vector (eql t)) *)
                  `(,',fun bit-array-1 bit-array-2 bit-array-1)))))
   (def bit-and)
   (def bit-ior)
@@ -756,11 +756,8 @@
   '(bit-not bit-array-1
 	    (make-array (length bit-array-1) :element-type 'bit)))
 (deftransform bit-not ((bit-array-1 result-bit-array)
-		       (bit-vector (constant-arg t)))
+		       (bit-vector (eql t)))
   '(bit-not bit-array-1 bit-array-1))
-;;; FIXME: What does (CONSTANT-ARG T) mean? Is it the same thing
-;;; as (CONSTANT-ARG (MEMBER T)), or does it mean any constant
-;;; value?
 
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))

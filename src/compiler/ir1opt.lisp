@@ -785,16 +785,16 @@
 ;;; the NODE's CONT to be a dummy continuation to prevent the use from
 ;;; confusing things.
 ;;;
-;;; Except when called during IR1 [FIXME: What does this mean? Except
-;;; during IR1 conversion? What about IR1 optimization?], we delete
-;;; the continuation if it has no other uses. (If it does have other
-;;; uses, we reoptimize.)
+;;; Except when called during IR1 convertion, we delete the
+;;; continuation if it has no other uses. (If it does have other uses,
+;;; we reoptimize.)
 ;;;
 ;;; Termination on the basis of a continuation type is
 ;;; inhibited when:
 ;;; -- The continuation is deleted (hence the assertion is spurious), or
 ;;; -- We are in IR1 conversion (where THE assertions are subject to
-;;;    weakening.)
+;;;    weakening.) FIXME: Now THE assertions are not weakened, but new
+;;;    uses can(?) be added later. -- APD, 2003-07-17
 (defun maybe-terminate-block (node ir1-converting-not-optimizing-p)
   (declare (type (or basic-combination cast) node))
   (let* ((block (node-block node))
@@ -847,14 +847,6 @@
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
 ;;; FUN-INFO assigned.
-;;;
-;;; FIXME: The IR1-CONVERTING-NOT-OPTIMIZING-P argument is what the
-;;; old CMU CL code called IR1-P, without explanation. My (WHN
-;;; 2002-01-09) tentative understanding of it is that we can call this
-;;; operation either in initial IR1 conversion or in later IR1
-;;; optimization, and it tells which is which. But it would be good
-;;; for someone who really understands it to check whether this is
-;;; really right.
 (defun recognize-known-call (call ir1-converting-not-optimizing-p)
   (declare (type combination call))
   (let* ((ref (continuation-use (basic-combination-fun call)))

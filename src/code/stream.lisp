@@ -332,20 +332,9 @@
 			    eof-value
 			    recursive-p)
   (declare (ignore recursive-p))
-  ;; FIXME: The type of PEEK-TYPE is also declared in a DEFKNOWN, but
-  ;; the compiler doesn't seem to be smart enough to go from there to
-  ;; imposing a type check. Figure out why (because PEEK-TYPE is an
-  ;; &OPTIONAL argument?) and fix it, and then this explicit type
-  ;; check can go away.
-  (unless (typep peek-type '(or character boolean))
-    (error 'simple-type-error
-	   :datum peek-type
-	   :expected-type '(or character boolean)
-	   :format-control "~@<bad PEEK-TYPE=~S, ~_expected ~S~:>"
-	   :format-arguments (list peek-type '(or character boolean))))
   (let ((stream (in-synonym-of stream)))
     (cond ((typep stream 'echo-stream)
-	   (echo-misc stream 
+	   (echo-misc stream
 		      :peek-char
 		      peek-type
 		      (list eof-error-p eof-value)))
