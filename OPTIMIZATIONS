@@ -1,3 +1,4 @@
+#1
 (defun mysl (s)
     (declare (simple-string s))
     (declare (optimize (speed 3) (safety 0) (debug 0)))
@@ -18,6 +19,7 @@
   4: MOVE t23[EAX] => t24[EBX]
 
 --------------------------------------------------------------------------------
+#2
 (defun quux (v)
   (declare (optimize (speed 3) (safety 0) (space 2) (debug 0)))
   (declare (type (simple-array double-float 1) v))
@@ -34,6 +36,7 @@
   and emits costy MOVE ... => FR1.
 
 --------------------------------------------------------------------------------
+#3
 (defun bar (n)
   (declare (optimize (speed 3) (safety 0) (space 2))
            (type fixnum n))
@@ -43,6 +46,7 @@
 
 * IR1 does not optimize away (MAKE-LIST N).
 --------------------------------------------------------------------------------
+#4
 (defun bar (v1 v2)
   (declare (optimize (speed 3) (safety 0) (space 2))
            (type (simple-array base-char 1) v1 v2))
@@ -61,10 +65,12 @@ VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
 
 * And why two moves?
 --------------------------------------------------------------------------------
+#5
 (loop repeat 1.5)
 
 uses generic arithmetic
 --------------------------------------------------------------------------------
+#6
 09:49:05 <jtra> I have found a case in those where suboptimal code is
   generate with nested loops, it might be moderately easy to fix that
 09:49:28 <jtra> see
@@ -93,12 +99,14 @@ uses generic arithmetic
                 (incf x)))))))
    (format t "~A~%" x)))
 --------------------------------------------------------------------------------
+#7
 (defun foo (x)
   (declare (optimize speed (debug 0)))
   (if (< x 0) x (foo (1- x))))
 
 SBCL generates a full call of FOO (but CMUCL does not).
 --------------------------------------------------------------------------------
+#8
 (defun foo (d)
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (declare (type (double-float 0d0 1d0) d))
@@ -120,6 +128,7 @@ The initial binding is effectless, and without it X is of type
 DOUBLE-FLOAT. Unhopefully, IR1 does not optimize away effectless
 SETs/bindings, and IR2 does not perform type inference.
 --------------------------------------------------------------------------------
+#9
 (defun foo (x)
   (if (= (cond ((irgh x) 0)
                ((buh x) 1)
@@ -134,4 +143,29 @@ This code could be optimized to
   (cond ((irgh x) :yes)
         ((buh x) :no)
         (t :no)))
+--------------------------------------------------------------------------------
+#10
+Reported by Robert E. Brown on sbcl-devel 2003-01-21:
+
+(defstruct trace-info
+  (foo nil :type (or null function)))
+
+(defun bad (x)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((wow (trace-info-foo x)))
+    (or (not wow) (funcall wow 1 2 3))))
+
+Python does not derive that FUNCALL is applied to FUNCTION.
+
+(OR ...) is equivalent to
+
+(LET ((G2407 (NOT WOW)))
+  (IF G2407 G2407 (FUNCALL WOW 1 2 3)))
+
+or to
+
+(LET ((G2407 (IF WOW NIL T)))
+  (IF G2407 G2407 (FUNCALL WOW 1 2 3)))
+
+so this is similar to #9.
 --------------------------------------------------------------------------------

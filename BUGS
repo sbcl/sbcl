@@ -1209,6 +1209,32 @@ WORKAROUND:
 234:
   (fixed in sbcl-0.7.10.36)
 
+235: "type system and inline expansion"
+  a.
+  (declaim (ftype (function (cons) number) acc))
+  (declaim (inline acc))
+  (defun acc (c)
+    (the number (car c)))
+
+  (defun foo (x y)
+    (values (locally (declare (optimize (safety 0)))
+              (acc x))
+            (locally (declare (optimize (safety 3)))
+              (acc y))))
+
+  (foo '(nil) '(t)) => NIL, T.
+
+  b. (reported by brown on #lisp 2003-01-21)
+
+    (defun find-it (x)
+      (declare (optimize (speed 3) (safety 0)))
+      (declare (notinline mapcar))
+      (let ((z (mapcar #'car x)))
+        (find 'foobar z)))
+
+  Without (DECLARE (NOTINLINE MAPCAR)), Python cannot derive that Z is
+  LIST.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
