@@ -948,7 +948,7 @@
        (let ((r-imag (complex-double-reg-imag-tn r)))
 	 (unless (location= imag r-imag)
 	   (inst movsd r-imag imag))))
-      (complex-single-stack
+      (complex-double-stack
        (inst movsd (ea-for-cdf-real-stack r) real)
        (inst movsd (ea-for-cdf-imag-stack r) imag)))))
 
