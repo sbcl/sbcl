@@ -1688,68 +1688,6 @@
 	    (return (make-hairy-type :specifier spec)))
 	  (setq res int))))))
 
-
-;;; MNA: cons compound-type patch
-;;; FIXIT: all commented out
-
-; (define-type-class cons)
- 
-; (def-type-translator cons (&optional car-type cdr-type)
-;   (make-cons-type :car-type (specifier-type car-type)
-;  		  :cdr-type (specifier-type cdr-type)))
- 
-; (define-type-method (cons :unparse) (type)
-;   (let ((car-eltype (type-specifier (cons-type-car-type type)))
-;  	(cdr-eltype (type-specifier (cons-type-cdr-type type))))
-;     (cond ((and (eq car-eltype '*) (eq cdr-eltype '*))
-;  	   'cons)
-;  	  (t
-;  	   `(cons ,car-eltype ,cdr-eltype)))))
- 
-; (define-type-method (cons :simple-=) (type1 type2)
-;   (declare (type cons-type type1 type2))
-;   (and (type= (cons-type-car-type type1) (cons-type-car-type type2))
-;        (type= (cons-type-cdr-type type1) (cons-type-cdr-type type2))))
- 
-; (define-type-method (cons :simple-subtypep) (type1 type2)
-;   (declare (type cons-type type1 type2))
-;   (multiple-value-bind (val-car win-car)
-;       (csubtypep (cons-type-car-type type1) (cons-type-car-type type2))
-;     (multiple-value-bind (val-cdr win-cdr)
-;  	(csubtypep (cons-type-cdr-type type1) (cons-type-cdr-type type2))
-;       (if (and val-car val-cdr)
-;  	  (values t (and win-car win-cdr))
-;         (values nil (or win-car win-cdr))))))
- 
-; ;;; CONS :simple-union method  -- Internal
-; ;;;
-; ;;; Give up if a precise type in not possible, to avoid returning overly
-; ;;; general types.
-; ;;;
-; (define-type-method (cons :simple-union) (type1 type2)
-;   (declare (type cons-type type1 type2))
-;   (let ((car-type1 (cons-type-car-type type1))
-;  	(car-type2 (cons-type-car-type type2))
-;  	(cdr-type1 (cons-type-cdr-type type1))
-;  	(cdr-type2 (cons-type-cdr-type type2)))
-;     (cond ((type= car-type1 car-type2)
-;  	   (make-cons-type :car-type car-type1
-;  			   :cdr-type (type-union cdr-type1 cdr-type2)))
-;  	  ((type= cdr-type1 cdr-type2)
-;  	   (make-cons-type :car-type (type-union cdr-type1 cdr-type2)
-;  			   :cdr-type cdr-type1)))))
- 
-; (define-type-method (cons :simple-intersection) (type1 type2)
-;   (declare (type cons-type type1 type2))
-;   (multiple-value-bind (int-car win-car)
-;       (type-intersection (cons-type-car-type type1) (cons-type-car-type type2))
-;     (multiple-value-bind (int-cdr win-cdr)
-;  	(type-intersection (cons-type-cdr-type type1) (cons-type-cdr-type type2))
-;       (values (make-cons-type :car-type int-car :cdr-type int-cdr)
-;  	      (and win-car win-cdr)))))
-
-
-
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.
 ;;;

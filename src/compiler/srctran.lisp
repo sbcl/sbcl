@@ -138,26 +138,6 @@
 		   `(cdr ,(frob (1- n))))))
       (frob n))))
 
-;;; MNA: cons compound-type patch
-;;; FIXIT: all commented out
-
-; ;;;; CONS assessor derive type optimizers.
-
-; (defoptimizer (car derive-type) ((cons))
-;   (let ((type (continuation-type cons)))
-;     (cond ((eq type (specifier-type 'null))
-;             (specifier-type 'null))
-;  	  ((cons-type-p type)
-;             (cons-type-car-type type)))))
- 
-; (defoptimizer (cdr derive-type) ((cons))
-;   (let ((type (continuation-type cons)))
-;     (cond ((eq type (specifier-type 'null))
-;             (specifier-type 'null))
-;  	  ((cons-type-p type)
-;             (cons-type-cdr-type type)))))
-
-
 ;;;; arithmetic and numerology
 
 (def-source-transform plusp (x) `(> ,x 0))

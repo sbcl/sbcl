@@ -921,9 +921,6 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "COMPLEX-RATIONAL-P" "COMPLEX-SINGLE-FLOAT-P"
              "COMPLEX-VECTOR-P" "CONSED-SEQUENCE" "CONSTANT" "CONSTANT-TYPE"
              "CONSTANT-TYPE-P" "CONSTANT-TYPE-TYPE"
-             ;; MNA: cons compound-type patch
-             ;; FIXIT: all commented out   
-             ; "CONS-TYPE" "CONS-TYPE-CAR-TYPE" "CONS-TYPE-CDR-TYPE" "CONS-TYPE-P"
              "CONTAINING-INTEGER-TYPE"
              "CONTROL-STACK-POINTER-SAP" "COPY-FROM-SYSTEM-AREA"
              "COPY-NUMERIC-TYPE" "COPY-TO-SYSTEM-AREA"
@@ -976,9 +973,6 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "LRA" "LRA-CODE-HEADER" "LRA-P"
              "MAKE-ALIEN-TYPE-TYPE" "MAKE-ARGS-TYPE"
              "MAKE-ARRAY-HEADER" "MAKE-ARRAY-TYPE" "MAKE-DOUBLE-FLOAT"
-              ;; MNA: cons compound-type patch
-              ;; FIXIT: all commented out
-              ; "MAKE-CONS-TYPE"
              "MAKE-FUNCTION-TYPE"
              "MAKE-KEY-INFO" "MAKE-LISP-OBJ" "MAKE-LONG-FLOAT"
              "MAKE-MEMBER-TYPE" "MAKE-NAMED-TYPE"

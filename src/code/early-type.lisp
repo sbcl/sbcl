@@ -175,9 +175,9 @@
   ;; FIXME: I'm bewildered by FOO-P names for things not intended to
   ;; interpreted as truth values. Perhaps rename this COMPLEXNESS?
   (complexp :real :type (member :real :complex nil))
-  ;; The upper and lower bounds on the value. If null, there is no bound. If
-  ;; a list of a number, the bound is exclusive. Integer types never have
-  ;; exclusive bounds.
+  ;; The upper and lower bounds on the value, or NIL if there is no
+  ;; bound. If a list of a number, the bound is exclusive. Integer
+  ;; types never have exclusive bounds.
   (low nil :type (or number cons null))
   (high nil :type (or number cons null)))
 
@@ -214,7 +214,7 @@
 		       (:constructor %make-union-type (enumerable types)))
   ;; The types in the union.
   (types nil :type list))
-
+
 ;;; Note that the type Name has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.
 (defun %note-type-defined (name)
@@ -223,29 +223,10 @@
   (when (boundp 'sb!kernel::*values-specifier-type-cache-vector*)
     (values-specifier-type-cache-clear))
   (values))
-
-
-;;; MNA: cons compound-type patch
-;;; FIXIT: all commented out
-;;;; Cons types:
- 
-;;; The Cons-Type is used to represent cons types.
-;;;
-;; (defstruct (cons-type (:include ctype
-;;  				(:class-info (type-class-or-lose 'cons)))
-;;                              (:print-function %print-type))
-;;   ;;
-;;   ;; The car element type.
-;;   (car-type *wild-type* :type ctype)
-;;   ;;
-;;   ;; The cdr element type.
-;;   (cdr-type *wild-type* :type ctype))
-
-;; (define-type-class cons)
-
-;;;; KLUDGE: not clear this really belongs here, but where?
 
 ;;; Is X a fixnum in the target Lisp?
+;;;
+;;; KLUDGE: not clear this really belongs in early-type.lisp, but where?
 (defun target-fixnump (x)
   (and (integerp x)
        (<= sb!vm:*target-most-negative-fixnum*

@@ -29,13 +29,14 @@
   "Return T iff OBJECT is of type TYPE."
   (%typep object type))
 
-;;; If Type is a type that we can do a compile-time test on, then return the
-;;; whether the object is of that type as the first value and second value
-;;; true. Otherwise return NIL, NIL.
+;;; If TYPE is a type that we can do a compile-time test on, then
+;;; return whether the object is of that type as the first value and
+;;; second value true. Otherwise return NIL, NIL.
 ;;;
-;;; We give up on unknown types and pick off FUNCTION and UNION types. For
-;;; structure types, we require that the type be defined in both the current
-;;; and compiler environments, and that the INCLUDES be the same.
+;;; We give up on unknown types and pick off FUNCTION and UNION types.
+;;; For structure types, we require that the type be defined in both
+;;; the current and compiler environments, and that the INCLUDES be
+;;; the same.
 (defun ctypep (obj type)
   (declare (type ctype type))
   (etypecase type
@@ -43,9 +44,6 @@
 	 named-type
 	 member-type
 	 array-type
-         ;; MNA: cons compound-type patch         
-         ;; FIXIT: all commented out
-         ; cons-type
 	 sb!xc:built-in-class)
      (values (%typep obj type) t))
     (sb!xc:class
@@ -203,10 +201,6 @@
 			:complexp (not (typep x 'simple-array))
 			:element-type etype
 			:specialized-element-type etype)))
-    ;; MNA: cons compound-type patch
-    ;; FIXIT: all commented
-    ; (cons
-    ; (make-cons-type))
     (t
      (sb!xc:class-of x))))
 
