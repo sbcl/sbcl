@@ -97,7 +97,7 @@
 	       (load-stack-tn cur-nfp nfp-save))
 	     ,@(moves (temp-names) (result-names))))))))
 
-) ; eval-when (compile load eval)
+) ; EVAL-WHEN
 
 (macrolet
     ((foo ()

@@ -89,13 +89,13 @@
   ;; If true, a special-case LTN annotation method that is used in
   ;; place of the standard type/policy template selection. It may use
   ;; arbitrary code to choose a template, decide to do a full call, or
-  ;; conspire with the IR2-Convert method to do almost anything. The
-  ;; Combination node is passed as the argument.
+  ;; conspire with the IR2-CONVERT method to do almost anything. The
+  ;; COMBINATION node is passed as the argument.
   (ltn-annotate nil :type (or function null))
   ;; If true, the special-case IR2 conversion method for this
   ;; function. This deals with funny functions, and anything else that
   ;; can't be handled using the template mechanism. The Combination
-  ;; node and the IR2-Block are passed as arguments.
+  ;; node and the IR2-BLOCK are passed as arguments.
   (ir2-convert nil :type (or function null))
   ;; all the templates that could be used to translate this function
   ;; into IR2, sorted by increasing cost.

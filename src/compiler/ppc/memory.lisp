@@ -50,10 +50,7 @@
 
 ;;;; Indexed references:
 
-;;; Define-Indexer  --  Internal
-;;;
-;;;    Define some VOPs for indexed memory reference.
-;;;
+;;; Define some VOPs for indexed memory reference.
 (defmacro define-indexer (name write-p ri-op rr-op shift &optional sign-extend-byte)
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))

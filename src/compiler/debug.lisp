@@ -594,7 +594,7 @@
 	  (unless (find-in #'tn-ref-next-ref target vop-refs)
 	    (barf "The target for ~S isn't in REFS for ~S." ref vop)))))))
 
-;;; Verify the sanity of the VOP-Refs slot in VOP. This involves checking
+;;; Verify the sanity of the VOP-REFS slot in VOP. This involves checking
 ;;; that each referenced TN appears as an argument, result or temp, and also
 ;;; basic checks for the plausibility of the specified ordering of the refs.
 (defun check-vop-refs (vop)
@@ -1188,7 +1188,7 @@
 
 (defun nth-vop (thing n)
   #!+sb-doc
-  "Return the Nth VOP in the IR2-Block pointed to by Thing."
+  "Return the Nth VOP in the IR2-BLOCK pointed to by THING."
   (let ((block (block-info (block-or-lose thing))))
     (do ((i 0 (1+ i))
 	 (vop (ir2-block-start-vop block) (vop-next vop)))

@@ -279,7 +279,7 @@
 ;;;    the component tail.
 ;;; -- Close over the NLX-INFO in the exit environment.
 ;;; -- If the exit is from an :ESCAPE function, then substitute a
-;;;    constant reference to NLX-Info structure for the escape
+;;;    constant reference to NLX-INFO structure for the escape
 ;;;    function reference. This will cause the escape function to
 ;;;    be deleted (although not removed from the DFO.)  The escape
 ;;;    function is no longer needed, and we don't want to emit code

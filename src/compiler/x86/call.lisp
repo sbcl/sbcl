@@ -31,8 +31,8 @@
   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		 sap-stack-sc-number return-pc-save-offset))
 
-;;; Similar to Make-Return-PC-Passing-Location, but makes a location
-;;; to pass Old-FP in.
+;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
+;;; location to pass OLD-FP in.
 ;;;
 ;;; This is wired in both the standard and the local-call conventions,
 ;;; because we want to be able to assume it's always there. Besides,
@@ -172,12 +172,12 @@
     (inst sub esp-tn (* (max nargs 3) n-word-bytes))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
-;;; for a fixed number of values. Values is the head of the TN-Ref
+;;; for a fixed number of values. Values is the head of the TN-REF
 ;;; list for the locations that the values are to be received into.
 ;;; Nvals is the number of values that are to be received (should
 ;;; equal the length of Values).
 ;;;
-;;; Move-Temp is a Descriptor-Reg TN used as a temporary.
+;;; MOVE-TEMP is a DESCRIPTOR-REG TN used as a temporary.
 ;;;
 ;;; This code exploits the fact that in the unknown-values convention,
 ;;; a single value return returns at the return PC + 2, whereas a

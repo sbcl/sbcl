@@ -411,7 +411,7 @@
 				(nd (if (eql t2 1) t3 (* t2 t3))))
 			   (if (eql nd 1) nn (%make-ratio nn nd))))))))))))
 
-); Eval-When (Compile)
+) ; EVAL-WHEN
 
 (two-arg-+/- two-arg-+ + add-bignums)
 (two-arg-+/- two-arg-- - subtract-bignum)

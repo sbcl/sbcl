@@ -271,11 +271,8 @@
 
   ;; A catch or unwind block.
   (catch-block control-stack :element-size sb!vm::kludge-nondeterministic-catch-block-size))
-
-
 
-;;;; Make some random tns for important registers.
-
+;;;; Make some miscellaneous TNs for important registers.
 (macrolet ((defregtn (name sc)
 	       (let ((offset-sym (symbolicate name "-OFFSET"))
 		     (tn-sym (symbolicate name "-TN")))
@@ -294,10 +291,8 @@
   (defregtn cfp any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg))
-
-
 
-;;; If value can be represented as an immediate constant, then return the
+;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
@@ -311,7 +306,6 @@
      (if (static-symbol-p value)
 	 (sc-number-or-lose 'immediate)
 	 nil))))
-
 
 ;;;; function call parameters
 
@@ -328,16 +322,14 @@
   (def!constant nfp-save-offset 2)
 
   ;; the number of arguments/return values passed in registers.
-  ;;
   (def!constant register-arg-count 6)
 
   ;; names to use for the argument registers.
-  ;; 
   (defparameter register-arg-names '(a0 a1 a2 a3 a4 a5))
-); eval-when (:compile-toplevel :load-toplevel :execute)
+) ; EVAL-WHEN
 
 
-;;; a list of TN's describing the register arguments.
+;;; a list of TN's describing the register arguments
 (defparameter *register-arg-tns*
   (mapcar (lambda (n)
 	    (make-random-tn :kind :normal
@@ -347,7 +339,6 @@
 
 ;;; This is used by the debugger.
 (def!constant single-value-return-byte-offset 8)
-
 
 ;;; This function is called by debug output routines that want a
 ;;; pretty name for a TN's location. It returns a thing that can be

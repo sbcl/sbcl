@@ -1268,7 +1268,13 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     (thanks to Alexey Dejneka)
   * fixed several bugs in PCL's error checking (thanks to Gerd
     Moellmann)
-  * fixed bug in printing of FILE-ERROR (thanks to Antonio Martinez)
+  * fixed bug in printing of FILE-ERROR (thanks to Antonio
+    Martinez-Shotton)
+  * fixed bug in compilation of functions as first class values
+    (thanks to Antonio Martinez-Shotton)
+  * The compiler's handling TYPE-ERRORs which it can prove will
+    inevitably happen at runtime has been cleaned up and corrected.
+    (thanks to Alexey Dejneka)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

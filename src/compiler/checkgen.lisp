@@ -185,7 +185,7 @@
 ;;;
 ;;; A type is checkable if it either represents a fixed number of
 ;;; values (as determined by VALUES-TYPES), or it is the assertion for
-;;; an MV-Bind. A type is simply checkable if all the type assertions
+;;; an MV-BIND. A type is simply checkable if all the type assertions
 ;;; have a TYPE-CHECK-TEMPLATE. In this :SIMPLE case, the second value
 ;;; is a list of the type restrictions specified for the leading
 ;;; positional values.
@@ -240,8 +240,8 @@
 ;;;  -- nobody uses the value, or
 ;;;  -- safety is totally unimportant, or
 ;;;  -- the continuation is an argument to an unknown function, or
-;;;  -- the continuation is an argument to a known function that has 
-;;;     no IR2-Convert method or :FAST-SAFE templates that are
+;;;  -- the continuation is an argument to a known function that has
+;;;     no IR2-CONVERT method or :FAST-SAFE templates that are
 ;;;     compatible with the call's type.
 ;;;
 ;;; We must only return NIL when it is *certain* that a check will not
@@ -250,25 +250,10 @@
 ;;; type checks. The penalty for erring by being too speculative is
 ;;; much nastier, e.g. falling through without ever being able to find
 ;;; an appropriate VOP.
-;;;
-;;; If there is a compile-time type error, then we always return true
-;;; unless the DEST is a full call. With a full call, the theory is
-;;; that the type error is probably from a declaration in (or on) the
-;;; callee, so the callee should be able to do the check. We want to
-;;; let the callee do the check, because it is possible that the error
-;;; is really in the callee, not the caller. We don't want to make
-;;; people recompile all calls to a function when they were originally
-;;; compiled with a bad declaration (or an old type assertion derived
-;;; from a definition appearing after the call.)
 (defun probable-type-check-p (cont)
   (declare (type continuation cont))
   (let ((dest (continuation-dest cont)))
-    (cond ((eq (continuation-type-check cont) :error)
-	   (if (and (combination-p dest)
-		    (eq (combination-kind dest) :error))
-	       nil
-	       t))
-	  ((or (not dest)
+    (cond ((or (not dest)
 	       (policy dest (zerop safety)))
 	   nil)
 	  ((basic-combination-p dest)
@@ -276,6 +261,19 @@
 	     (cond ((eq cont (basic-combination-fun dest)) t)
 		   ((eq kind :local) t)
 		   ((member kind '(:full :error)) nil)
+                   ;; :ERROR means that we have an invalid syntax of
+                   ;; the call and the callee will detect it before
+                   ;; thinking about types. When KIND is :FULL, the
+                   ;; theory is that the type assertion is probably
+                   ;; from a declaration in (or on) the callee, so the
+                   ;; callee should be able to do the check. We want
+                   ;; to let the callee do the check, because it is
+                   ;; possible that by the time of call that
+                   ;; declaration will be changed and we do not want
+                   ;; to make people recompile all calls to a function
+                   ;; when they were originally compiled with a bad
+                   ;; declaration. (See also bug 35.)
+
 		   ((fun-info-ir2-convert kind) t)
 		   (t
 		    (dolist (template (fun-info-templates kind) nil)
@@ -430,25 +428,6 @@
 	    what (type-specifier dtype) atype-spec))))
   (values))
 
-;;; Mark CONT as being a continuation with a manifest type error. We
-;;; set the kind to :ERROR, and clear any FUN-INFO if the
-;;; continuation is an argument to a known call. The last is done so
-;;; that the back end doesn't have to worry about type errors in
-;;; arguments to known functions. This clearing is inhibited for
-;;; things with IR2-CONVERT methods, since we can't do a full call to
-;;; funny functions.
-(defun mark-error-continuation (cont)
-  (declare (type continuation cont))
-  (setf (continuation-%type-check cont) :error)
-  (let ((dest (continuation-dest cont)))
-    (when (and (combination-p dest)
-	       (let ((kind (basic-combination-kind dest)))
-		 (or (eq kind :full)
-		     (and (fun-info-p kind)
-			  (not (fun-info-ir2-convert kind))))))
-      (setf (basic-combination-kind dest) :error)))
-  (values))
-
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,
 ;;; looking for continuations with TYPE-CHECK T. We do two mostly
 ;;; unrelated things: detect compile-time type errors and determine if
@@ -484,12 +463,11 @@
       (when (block-type-check block)
 	(do-nodes (node cont block)
 	  (let ((type-check (continuation-type-check cont)))
-	    (unless (member type-check '(nil :error :deleted))
+	    (unless (member type-check '(nil :deleted))
 	      (let ((atype (continuation-asserted-type cont)))
 		(do-uses (use cont)
 		  (unless (values-types-equal-or-intersect
 			   (node-derived-type use) atype)
-		    (mark-error-continuation cont)
 		    (unless (policy node (= inhibit-warnings 3))
 		      (emit-type-warning use))))))
 	    (when (eq type-check t)

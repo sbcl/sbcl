@@ -519,9 +519,9 @@
 	  (error "~S is not an operand to ~S." name (vop-parse-name parse))))
     found))
 
-;;; Get the VOP-Parse structure for NAME or die trying. For all
-;;; meta-compile time uses, the VOP-Parse should be used instead of
-;;; the VOP-Info.
+;;; Get the VOP-PARSE structure for NAME or die trying. For all
+;;; meta-compile time uses, the VOP-PARSE should be used instead of
+;;; the VOP-INFO.
 (defun vop-parse-or-lose (name)
   (the vop-parse
        (or (gethash name *backend-parsed-vops*)
@@ -544,7 +544,7 @@
 	(res `(,(operand-parse-name more-operand) ,prev))))
     (res)))
 
-;;; This is used with ACCESS-OPERANDS to prevent warnings for TN-Ref
+;;; This is used with ACCESS-OPERANDS to prevent warnings for TN-REF
 ;;; temps not used by some particular function. It returns the name of
 ;;; the last operand, or NIL if Operands is NIL.
 (defun ignore-unreferenced-temps (operands)
@@ -823,7 +823,7 @@
 	       ,load-tn
 	       (tn-ref-tn ,temp))))))
 
-;;; Make a lambda that parses the VOP TN-Refs, does automatic operand
+;;; Make a lambda that parses the VOP TN-REFS, does automatic operand
 ;;; loading, and runs the appropriate code generator.
 (defun make-generator-function (parse)
   (declare (type vop-parse parse))
@@ -1337,7 +1337,7 @@
   (values))
 
 ;;; Compute stuff that can only be computed after we are done parsing
-;;; everying. We set the VOP-Parse-Operands, and do various error checks.
+;;; everying. We set the VOP-PARSE-OPERANDS, and do various error checks.
 (defun !grovel-vop-operands (parse)
   (declare (type vop-parse parse))
 
@@ -1367,8 +1367,8 @@
 ;;;; function translation stuff
 
 ;;; Return forms to establish this VOP as a IR2 translation template
-;;; for the :TRANSLATE functions specified in the VOP-Parse. We also
-;;; set the Predicate attribute for each translated function when the
+;;; for the :TRANSLATE functions specified in the VOP-PARSE. We also
+;;; set the PREDICATE attribute for each translated function when the
 ;;; VOP is conditional, causing IR1 conversion to ensure that a call
 ;;; to the translated is always used in a predicate position.
 (defun !set-up-fun-translation (parse n-template)
@@ -1440,13 +1440,13 @@
   (defparameter *slot-inherit-alist*
     '((:generator-function . vop-info-generator-function))))
 
-;;; This is something to help with inheriting VOP-Info slots. We
+;;; This is something to help with inheriting VOP-INFO slots. We
 ;;; return a keyword/value pair that can be passed to the constructor.
 ;;; SLOT is the keyword name of the slot, Parse is a form that
-;;; evaluates to the VOP-Parse structure for the VOP inherited. If
+;;; evaluates to the VOP-PARSE structure for the VOP inherited. If
 ;;; PARSE is NIL, then we do nothing. If the TEST form evaluates to
 ;;; true, then we return a form that selects the named slot from the
-;;; VOP-Info structure corresponding to PARSE. Otherwise, we return
+;;; VOP-INFO structure corresponding to PARSE. Otherwise, we return
 ;;; the FORM so that the slot is recomputed.
 (defmacro inherit-vop-info (slot parse test form)
   `(if (and ,parse ,test)
@@ -1455,7 +1455,7 @@
 		     (template-or-lose ',(vop-parse-name ,parse))))
        (list ,slot ,form)))
 
-;;; Return a form that creates a VOP-Info structure which describes VOP.
+;;; Return a form that creates a VOP-INFO structure which describes VOP.
 (defun set-up-vop-info (iparse parse)
   (declare (type vop-parse parse) (type (or vop-parse null) iparse))
   (let ((same-operands
@@ -1523,7 +1523,7 @@
 ;;;         operand.
 ;;;
 ;;;     :MORE T-or-NIL
-;;;         If specified, NAME is bound to the TN-Ref for the first
+;;;         If specified, NAME is bound to the TN-REF for the first
 ;;;         argument or result following the fixed arguments or results.
 ;;;         A :MORE operand must appear last, and cannot be targeted or
 ;;;         restricted.
@@ -1683,12 +1683,12 @@
 ;;;; emission macros
 
 ;;; Return code to make a list of VOP arguments or results, linked by
-;;; TN-Ref-Across. The first value is code, the second value is LET*
+;;; TN-REF-ACROSS. The first value is code, the second value is LET*
 ;;; forms, and the third value is a variable that evaluates to the
 ;;; head of the list, or NIL if there are no operands. Fixed is a list
-;;; of forms that evaluate to TNs for the fixed operands. TN-Refs will
+;;; of forms that evaluate to TNs for the fixed operands. TN-REFS will
 ;;; be made for these operands according using the specified value of
-;;; Write-P. More is an expression that evaluates to a list of TN-Refs
+;;; WRITE-P. More is an expression that evaluates to a list of TN-REFS
 ;;; that will be made the tail of the list. If it is constant NIL,
 ;;; then we don't bother to set the tail.
 (defun make-operand-list (fixed more write-p)
@@ -1789,12 +1789,12 @@
 ;;;
 ;;; This is like VOP, but allows for emission of templates with
 ;;; arbitrary numbers of arguments, and for emission of templates
-;;; using already-created TN-Ref lists.
+;;; using already-created TN-REF lists.
 ;;;
-;;; The Arguments and Results are TNs to be referenced as the first
+;;; The ARGS and RESULTS are TNs to be referenced as the first
 ;;; arguments and results to the template. More-Args and More-Results
-;;; are heads of TN-Ref lists that are added onto the end of the
-;;; TN-Refs for the explicitly supplied operand TNs. The TN-Refs for
+;;; are heads of TN-REF lists that are added onto the end of the
+;;; TN-REFS for the explicitly supplied operand TNs. The TN-REFS for
 ;;; the more operands must have the TN and WRITE-P slots correctly
 ;;; initialized.
 ;;;
@@ -1853,15 +1853,15 @@
     (collect ((clauses))
       (do ((cases forms (rest cases)))
 	  ((null cases)
-	   (clauses `(t (error "unknown SC to SC-Case for ~S:~%  ~S" ,n-tn
+	   (clauses `(t (error "unknown SC to SC-CASE for ~S:~%  ~S" ,n-tn
 			       (sc-name (tn-sc ,n-tn))))))
 	(let ((case (first cases)))
 	  (when (atom case)
-	    (error "illegal SC-Case clause: ~S" case))
+	    (error "illegal SC-CASE clause: ~S" case))
 	  (let ((head (first case)))
 	    (when (eq head t)
 	      (when (rest cases)
-		(error "T case is not last in SC-Case."))
+		(error "T case is not last in SC-CASE."))
 	      (clauses `(t nil ,@(rest case)))
 	      (return))
 	    (clauses `((or ,@(mapcar (lambda (x)
@@ -1890,7 +1890,7 @@
      ,@forms))
 
 ;;; Iterate over all the TNs live at some point, with the live set
-;;; represented by a local conflicts bit-vector and the IR2-Block
+;;; represented by a local conflicts bit-vector and the IR2-BLOCK
 ;;; containing the location.
 (defmacro do-live-tns ((tn-var live block &optional result) &body body)
   (let ((n-conf (gensym))

@@ -187,7 +187,7 @@
       (inst lda csp-tn (* nargs n-word-bytes) csp-tn))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
-;;; for a fixed number of values. Values is the head of the TN-Ref
+;;; for a fixed number of values. Values is the head of the TN-REF
 ;;; list for the locations that the values are to be received into.
 ;;; Nvals is the number of values that are to be received (should
 ;;; equal the length of Values).

@@ -20,8 +20,8 @@
 
 
 
-;;; FIXUP-CODE-OBJECT -- Interface
-;;;
+;;;; FIXUP-CODE-OBJECT
+
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))

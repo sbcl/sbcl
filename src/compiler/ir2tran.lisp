@@ -266,7 +266,7 @@
 ;;;; utilities for receiving fixed values
 
 ;;; Return a TN that can be referenced to get the value of CONT. CONT
-;;; must be LTN-Annotated either as a delayed leaf ref or as a fixed,
+;;; must be LTN-ANNOTATED either as a delayed leaf ref or as a fixed,
 ;;; single-value continuation. If a type check is called for, do it.
 ;;;
 ;;; The primitive-type of the result will always be the same as the
@@ -470,7 +470,7 @@
 
 ;;;; template conversion
 
-;;; Build a TN-Refs list that represents access to the values of the
+;;; Build a TN-REFS list that represents access to the values of the
 ;;; specified list of continuations ARGS for TEMPLATE. Any :CONSTANT
 ;;; arguments are returned in the second value as a list rather than
 ;;; being accessed as a normal argument. NODE and BLOCK provide the
@@ -588,7 +588,7 @@
 	 cont
 	 (find-template-result-types call cont template rtypes)))))
 
-;;; Get the operands into TNs, make TN-Refs for them, and then call
+;;; Get the operands into TNs, make TN-REFs for them, and then call
 ;;; the template emit function.
 (defun ir2-convert-template (call block)
   (declare (type combination call) (type ir2-block block))

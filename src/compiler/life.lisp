@@ -177,7 +177,7 @@
 
   (values))
 
-(defevent split-ir2-block "Split an IR2 block to meet Local-TN-Limit.")
+(defevent split-ir2-block "Split an IR2 block to meet LOCAL-TN-LIMIT.")
 
 ;;; Move the code after the VOP LOSE in 2BLOCK into its own block. The
 ;;; block is linked into the emit order following 2BLOCK. NUMBER is
@@ -262,8 +262,8 @@
 ;;; since all &MORE args (and results) are referenced simultaneously
 ;;; as far as conflict analysis is concerned.
 ;;;
-;;; BLOCK is the IR2-Block that the more VOP is at the end of. OPS is
-;;; the full argument or result TN-Ref list. Fixed is the types of the
+;;; BLOCK is the IR2-BLOCK that the MORE VOP is at the end of. OPS is
+;;; the full argument or result TN-REF list. Fixed is the types of the
 ;;; fixed operands (used only to skip those operands.)
 ;;;
 ;;; What we do is grab a LTN number, then make a :READ-ONLY global
@@ -315,7 +315,7 @@
   (values))
 
 (defevent coalesce-more-ltn-numbers
-  "Coalesced LTN numbers for a more operand to meet Local-TN-Limit.")
+  "Coalesced LTN numbers for a more operand to meet LOCAL-TN-LIMIT.")
 
 ;;; Loop over the blocks in COMPONENT, assigning LTN numbers and
 ;;; recording TN birth and death. The only interesting action is when
@@ -622,7 +622,7 @@
   (values live-bits live-list))
 
 ;;; Return as values, a LTN bit-vector and a list (threaded by
-;;; TN-Next*) representing the TNs live at the end of Block (exclusive
+;;; TN-NEXT*) representing the TNs live at the end of BLOCK (exclusive
 ;;; of :LIVE TNs).
 ;;;
 ;;; We iterate over the TNs in the global conflicts that are live at

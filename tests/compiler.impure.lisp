@@ -336,6 +336,18 @@ BUG 48c, not yet fixed:
   (if x t (if y t (dont-constrain-if-too-much x y))))
 
 (assert (null (dont-constrain-if-too-much-aux nil nil)))  
+
+;;; TYPE-ERROR confusion ca. sbcl-0.7.7.24, reported and fixed by
+;;; APD sbcl-devel 2002-09-14
+(defun exercise-0-7-7-24-bug (x)
+  (declare (integer x))
+  (let (y)
+    (setf y (the single-float (if (> x 0) x 3f0)))
+    (list y y)))
+(multiple-value-bind (v e) (ignore-errors (exercise-0-7-7-24-bug 4))
+  (assert (null v))
+  (assert (typep e 'type-error)))
+(assert (equal (exercise-0-7-7-24-bug -4) '(3f0 3f0)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

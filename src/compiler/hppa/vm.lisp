@@ -258,11 +258,8 @@
 		  :offset 0))
 
 
-;;; Immediate-Constant-SC  --  Interface
-;;;
-;;; If value can be represented as an immediate constant, then return the
-;;; appropriate SC number, otherwise return NIL.
-;;;
+;;; If VALUE can be represented as an immediate constant, then return
+;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((integer 0 0)
@@ -308,7 +305,7 @@
 ;;; 
 (defconstant-eqx register-arg-names '(a0 a1 a2 a3 a4 a5) #'equal)
 
-); Eval-When (:Compile-Toplevel :Load-Toplevel :Execute)
+) ; EVAL-WHEN
 
 
 ;;; A list of TN's describing the register arguments.
@@ -320,18 +317,11 @@
 			      :offset n))
 	  *register-arg-offsets*))
 
-;;; SINGLE-VALUE-RETURN-BYTE-OFFSET
-;;;
 ;;; This is used by the debugger.
-;;;
 (defconstant single-value-return-byte-offset 4)
-
 
-;;; LOCATION-PRINT-NAME  --  Interface
-;;;
-;;;    This function is called by debug output routines that want a pretty name
+;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.
-;;;
 (!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))

@@ -46,7 +46,7 @@
 ;;;     ...package name bytes...]
 ;;;    [If has ID, ID as var-length integer]
 ;;;    SC-Offset of primary location (as var-length integer)
-;;;    [If has save SC, SC-Offset of save location (as var-length integer)]
+;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
 ;;; FIXME: The first two are no longer used in SBCL.
 ;;;(defconstant compiled-debug-var-uninterned		#b00000001)
@@ -184,10 +184,10 @@
   ;;    The function returns using the fixed-values convention, but
   ;;    in order to save space, we elected not to store a vector.
   (returns :fixed :type (or (simple-array * (*)) (member :standard :fixed)))
-  ;; SC-Offsets describing where the return PC and return FP are kept.
+  ;; SC-OFFSETs describing where the return PC and return FP are kept.
   (return-pc (missing-arg) :type sc-offset)
   (old-fp (missing-arg) :type sc-offset)
-  ;; SC-Offset for the number stack FP in this function, or NIL if no
+  ;; SC-OFFSET for the number stack FP in this function, or NIL if no
   ;; NFP allocated.
   (nfp nil :type (or sc-offset null))
   ;; The earliest PC in this function at which the environment is properly

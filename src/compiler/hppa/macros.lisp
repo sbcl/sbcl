@@ -87,9 +87,7 @@
 
 ;;;; Stack TN's
 
-;;; Load-Stack-TN, Store-Stack-TN  --  Interface
-;;;
-;;;    Move a stack TN to a register and vice-versa.
+;;; Move a stack TN to a register and vice-versa.
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
 	 (stack ,stack))
@@ -97,7 +95,6 @@
        (sc-case stack
 	 ((control-stack)
 	  (loadw reg cfp-tn offset))))))
-
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
 	 (reg ,reg))

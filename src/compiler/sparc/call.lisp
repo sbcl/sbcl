@@ -34,9 +34,9 @@
       (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
       (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
 
-;;; Similar to Make-Return-PC-Passing-Location, but makes a location
-;;; to pass Old-FP in.  This is (obviously) wired in the standard
-;;; convention, but is totally unrestricted in non-standard
+;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
+;;; location to pass OLD-FP in. This is (obviously) wired in the
+;;; standard convention, but is totally unrestricted in non-standard
 ;;; conventions, since we can always fetch it off of the stack using
 ;;; the arg pointer.
 (!def-vm-support-routine make-old-fp-passing-location (standard)
@@ -87,9 +87,9 @@
 	(make-normal-tn *fixnum-primitive-type*)))
 
 
-;;; This function is called by the Entry-Analyze phase, allowing
-;;; VM-dependent initialization of the IR2-Component structure.  We push
-;;; placeholder entries in the Constants to leave room for additional
+;;; This function is called by the ENTRY-ANALYZE phase, allowing
+;;; VM-dependent initialization of the IR2-COMPONENT structure.  We push
+;;; placeholder entries in the CONSTANTS to leave room for additional
 ;;; noise in the code object header.
 (!def-vm-support-routine select-component-format (component)
   (declare (type component component))
@@ -182,7 +182,7 @@
 
 
 ;;; Emit code needed at the return-point from an unknown-values call
-;;; for a fixed number of values.  Values is the head of the TN-Ref
+;;; for a fixed number of values.  Values is the head of the TN-REF
 ;;; list for the locations that the values are to be received into.
 ;;; Nvals is the number of values that are to be received (should
 ;;; equal the length of Values).
@@ -317,8 +317,6 @@ default-value-8
   (values))
 
 
-;;; Receive-Unknown-Values  --  Internal
-;;;
 ;;; Emit code needed at the return point for an unknown-values call
 ;;; for an arbitrary number of values.
 ;;;
@@ -330,12 +328,12 @@ default-value-8
 ;;; returning the old SP and 1.
 ;;;
 ;;; When there is a variable number of values, we move all of the
-;;; argument registers onto the stack, and return Args and Nargs.
+;;; argument registers onto the stack, and return ARGS and NARGS.
 ;;;
-;;; Args and Nargs are TNs wired to the named locations.  We must
+;;; ARGS and NARGS are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with
-;;; the results Start and Count (also, it's nice to be able to target
-;;; them).
+;;; the results START and COUNT. (Also, it's nice to be able to target
+;;; them.)
 (defun receive-unknown-values (args nargs start count lra-label temp)
   (declare (type tn args nargs start count temp))
   (let ((variable-values (gen-label))

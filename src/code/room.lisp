@@ -100,7 +100,7 @@
       (make-room-info :name 'instance
 		      :kind :instance))
 
-); eval-when (compile eval)
+) ; EVAL-WHEN
 
 (defparameter *room-info* '#.*meta-room-info*)
 (deftype spaces () '(member :static :dynamic :read-only))

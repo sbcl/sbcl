@@ -1,19 +1,13 @@
 (in-package "SB!VM")
 
-;;; MAKE-NLX-SP-TN  --  Interface
-;;;
-;;;    Make an environment-live stack TN for saving the SP for NLX entry.
-;;;
+;;; Make an environment-live stack TN for saving the SP for NLX entry.
 (!def-vm-support-routine make-nlx-sp-tn (env)
   (physenv-live-tn
    (make-representation-tn *fixnum-primitive-type* immediate-arg-scn)
    env))
 
-;;; Make-NLX-Entry-Argument-Start-Location  --  Interface
-;;;
-;;;    Make a TN for the argument count passing location for a
+;;; Make a TN for the argument count passing location for a
 ;;; non-local entry.
-;;;
 (!def-vm-support-routine make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
 
@@ -28,11 +22,8 @@
 ;;; pointers.
 
 
-;;; Make-Dynamic-State-TNs  --  Interface
-;;;
-;;;    Return a list of TNs that can be used to snapshot the dynamic state for
-;;; use with the Save/Restore-Dynamic-Environment VOPs.
-;;;
+;;; Return a list of TNs that can be used to snapshot the dynamic state for
+;;; use with the Save/Restore-DYNAMIC-ENVIRONMENT VOPs.
 (!def-vm-support-routine make-dynamic-state-tns ()
   (make-n-tns 4 *backend-t-primitive-type*))
 

@@ -14,8 +14,8 @@
   #!-little-endian "big-endian")
 
 
-;;; FIXUP-CODE-OBJECT -- Interface
-;;;
+;;;; FIXUP-CODE-OBJECT
+
 (defun fixup-code-object (code offset value kind)
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))

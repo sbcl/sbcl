@@ -98,7 +98,7 @@
 	     ,@(moves (result-names) (temp-names))))))))
 
 
-) ; eval-when (compile load eval)
+) ; EVAL-WHEN
 
 
 (expand

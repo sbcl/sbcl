@@ -124,14 +124,9 @@
   ;;    will be used. In the latter case, LTN must ensure that a safe
   ;;    implementation *is* used.
   ;;
-  ;; :ERROR
-  ;;    There is a compile-time type error in some use of this
-  ;;    continuation. A type check should still be generated, but be
-  ;;    careful.
-  ;;
   ;; This is computed lazily by CONTINUATION-DERIVED-TYPE, so use
   ;; CONTINUATION-TYPE-CHECK instead of the %'ed slot accessor.
-  (%type-check t :type (member t nil :deleted :no-check :error))
+  (%type-check t :type (member t nil :deleted :no-check))
   ;; something or other that the back end annotates this continuation with
   (info nil)
   ;; uses of this continuation in the lexical environment. They are

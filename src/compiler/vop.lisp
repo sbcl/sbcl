@@ -59,46 +59,46 @@
 
 ;;;; IR1 annotations used for IR2 conversion
 
-;;; Block-Info
+;;; BLOCK-INFO
 ;;;    Holds the IR2-BLOCK structure. If there are overflow blocks,
 ;;;    then this points to the first IR2-BLOCK. The BLOCK-INFO of the
 ;;;    dummy component head and tail are dummy IR2 blocks that begin
 ;;;    and end the emission order thread.
 ;;;
-;;; Component-Info
+;;; COMPONENT-INFO
 ;;;    Holds the IR2-COMPONENT structure.
 ;;;
-;;; Continuation-Info
-;;;    Holds the IR2-Continuation structure. Continuations whose
+;;; CONTINUATION-INFO
+;;;    Holds the IR2-CONTINUATION structure. Continuations whose
 ;;;    values aren't used won't have any.
 ;;;
-;;; Cleanup-Info
+;;; CLEANUP-INFO
 ;;;    If non-null, then a TN in which the affected dynamic
 ;;;    environment pointer should be saved after the binding is
 ;;;    instantiated.
 ;;;
-;;; Physenv-Info
-;;;    Holds the Ir2-Physenv structure.
+;;; PHYSENV-INFO
+;;;    Holds the IR2-PHYSENV structure.
 ;;;
-;;; Tail-Set-Info
-;;;    Holds the Return-Info structure.
+;;; TAIL-SET-INFO
+;;;    Holds the RETURN-INFO structure.
 ;;;
-;;; NLX-Info-Info
-;;;    Holds the IR2-NLX-Info structure.
+;;; NLX-INFO-INFO
+;;;    Holds the IR2-NLX-INFO structure.
 ;;;
-;;; Leaf-Info
+;;; LEAF-INFO
 ;;;    If a non-set lexical variable, the TN that holds the value in
 ;;;    the home environment. If a constant, then the corresponding
 ;;;    constant TN. If an XEP lambda, then the corresponding
 ;;;    Entry-Info structure.
 ;;;
-;;; Basic-Combination-Info
+;;; BASIC-COMBINATION-INFO
 ;;;    The template chosen by LTN, or
 ;;;	:FULL if this is definitely a full call.
 ;;;	:FUNNY if this is an oddball thing with IR2-convert.
 ;;;	:LOCAL if this is a local call.
 ;;;
-;;; Node-Tail-P
+;;; NODE-TAIL-P
 ;;;    After LTN analysis, this is true only in combination nodes that are
 ;;;    truly tail recursive.
 
@@ -117,7 +117,7 @@
   ;; Similarly, a continuation is POPPED if its DEST is in this block
   ;; but has its uses elsewhere. The continuations are in the order
   ;; that are pushed/popped in the block. Note that the args to a
-  ;; single MV-Combination appear reversed in POPPED, since we must
+  ;; single MV-COMBINATION appear reversed in POPPED, since we must
   ;; effectively pop the last argument first. All pops must come
   ;; before all pushes (although internal MV uses may be interleaved.)
   ;; POPPED is computed by LTN, and PUSHED is computed by stack
@@ -422,7 +422,7 @@
 		(:copier nil))
   ;; VOP-INFO structure containing static info about the operation
   (info nil :type (or vop-info null))
-  ;; the IR2-Block this VOP is in
+  ;; the IR2-BLOCK this VOP is in
   (block (missing-arg) :type ir2-block)
   ;; VOPs evaluated after and before this one. Null at the
   ;; beginning/end of the block, and temporarily during IR2
@@ -546,11 +546,11 @@
   (info-arg-count 0 :type index)
   ;; a function that emits the VOPs for this template. Arguments:
   ;;  1] Node for source context.
-  ;;  2] IR2-Block that we place the VOP in.
+  ;;  2] IR2-BLOCK that we place the VOP in.
   ;;  3] This structure.
-  ;;  4] Head of argument TN-Ref list.
-  ;;  5] Head of result TN-Ref list.
-  ;;  6] If Info-Arg-Count is non-zero, then a list of the magic
+  ;;  4] Head of argument TN-REF list.
+  ;;  5] Head of result TN-REF list.
+  ;;  6] If INFO-ARG-COUNT is non-zero, then a list of the magic
   ;;     arguments.
   ;;
   ;; Two values are returned: the first and last VOP emitted. This vop
@@ -883,7 +883,7 @@
   (leaf nil :type (or leaf null))
   ;; thread that links TNs together so that we can find them
   (next nil :type (or tn null))
-  ;; head of TN-Ref lists for reads and writes of this TN
+  ;; head of TN-REF lists for reads and writes of this TN
   (reads nil :type (or tn-ref null))
   (writes nil :type (or tn-ref null))
   ;; a link we use when building various temporary TN lists

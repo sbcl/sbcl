@@ -16,9 +16,9 @@
 ;;; in this component.
 (defvar *component-being-compiled*)
 
-;;; Do-Packed-TNs (TN-Var Component [Result]) Declaration* Form*
+;;; DO-PACKED-TNS (TN-Var Component [Result]) Declaration* Form*
 ;;;
-;;; Iterate over all packed TNs allocated in Component.
+;;; Iterate over all packed TNs allocated in COMPONENT.
 (defmacro do-packed-tns ((tn component &optional result) &body body)
   (let ((n-component (gensym)))
     `(let ((,n-component (component-info ,component)))
@@ -267,9 +267,10 @@
 
 ;;;; TN referencing
 
-;;; Make a TN-Ref that references TN and return it. Write-P should be true
-;;; if this is a write reference, otherwise false. All we do other than
-;;; calling the constructor is add the reference to the TN's references.
+;;; Make a TN-REF that references TN and return it. WRITE-P should be
+;;; true if this is a write reference, otherwise false. All we do
+;;; other than calling the constructor is add the reference to the
+;;; TN's references.
 (defun reference-tn (tn write-p)
   (declare (type tn tn) (type boolean write-p))
   (let ((res (make-tn-ref tn write-p)))
@@ -278,10 +279,10 @@
 	(push-in tn-ref-next res (tn-reads tn)))
     res))
 
-;;; Make TN-Refs to reference each TN in TNs, linked together by
-;;; TN-Ref-Across. Write-P is the Write-P value for the refs. More is
-;;; stuck in the TN-Ref-Across of the ref for the last TN, or returned as the
-;;; result if there are no TNs.
+;;; Make TN-REFS to reference each TN in TNs, linked together by
+;;; TN-REF-ACROSS. WRITE-P is the WRITE-P value for the refs. MORE is
+;;; stuck in the TN-REF-ACROSS of the ref for the last TN, or returned
+;;; as the result if there are no TNs.
 (defun reference-tn-list (tns write-p &optional more)
   (declare (list tns) (type boolean write-p) (type (or tn-ref null) more))
   (if tns
@@ -304,7 +305,7 @@
   (values))
 
 ;;; Do stuff to change the TN referenced by Ref. We remove Ref from its
-;;; old TN's refs, add ref to TN's refs, and set the TN-Ref-TN.
+;;; old TN's refs, add ref to TN's refs, and set the TN-REF-TN.
 (defun change-tn-ref-tn (ref tn)
   (declare (type tn-ref ref) (type tn tn))
   (delete-tn-ref ref)
@@ -404,7 +405,7 @@
 	    (setf (ir2-block-start-vop block) first))))
   (values))
 
-;;; Delete all of the TN-Refs associated with VOP and remove VOP from the IR2.
+;;; Delete all of the TN-REFs associated with VOP and remove VOP from the IR2.
 (defun delete-vop (vop)
   (declare (type vop vop))
   (do ((ref (vop-refs vop) (tn-ref-next-ref ref)))

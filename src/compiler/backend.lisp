@@ -107,7 +107,7 @@
 (defvar *backend-t-primitive-type*)
 (declaim (type primitive-type *backend-t-primitive-type*))
 
-;;; a hashtable translating from VOP names to the corresponding VOP-Parse
+;;; a hashtable translating from VOP names to the corresponding VOP-PARSE
 ;;; structures. This information is only used at meta-compile time.
 (defvar *backend-parsed-vops* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-parsed-vops*))

@@ -242,14 +242,9 @@
   (defregtn cfp any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg))
-
-
 
-;;; Immediate-Constant-SC  --  Interface
-;;;
-;;; If value can be represented as an immediate constant, then return the
+;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.
-;;;
 (!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((integer 0 0)
@@ -262,32 +257,28 @@
      (if (static-symbol-p value)
 	 (sc-number-or-lose 'immediate)
 	 nil))))
-
 
-;;;; Function Call Parameters
+;;;; function call parameters
 
-;;; The SC numbers for register and stack arguments/return values.
-;;;
+;;; the SC numbers for register and stack arguments/return values
 (def!constant register-arg-scn (meta-sc-number-or-lose 'descriptor-reg))
 (def!constant immediate-arg-scn (meta-sc-number-or-lose 'any-reg))
 (def!constant control-stack-arg-scn (meta-sc-number-or-lose 'control-stack))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-;;; Offsets of special stack frame locations
+;;; offsets of special stack frame locations
 (def!constant ocfp-save-offset 0)
 (def!constant lra-save-offset 1)
 (def!constant nfp-save-offset 2)
 
-;;; The number of arguments/return values passed in registers.
-;;;
+;;; the number of arguments/return values passed in registers
 (def!constant register-arg-count 4)
 
-;;; Names to use for the argument registers.
-;;; 
+;;; names to use for the argument registers
 
 
-); Eval-When (:compile-toplevel :load-toplevel :execute)
+) ; EVAL-WHEN
 
 
 ;;; A list of TN's describing the register arguments.
@@ -301,18 +292,11 @@
 
 (export 'single-value-return-byte-offset)
 
-;;; SINGLE-VALUE-RETURN-BYTE-OFFSET
-;;;
 ;;; This is used by the debugger.
-;;;
 (def!constant single-value-return-byte-offset 8)
-
 
-;;; LOCATION-PRINT-NAME  --  Interface
-;;;
-;;;    This function is called by debug output routines that want a pretty name
+;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.
-;;;
 (!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
@@ -327,7 +311,7 @@
       (immediate-constant "Immed"))))
 
 ;;; The loader uses this to convert alien names to the form they
-;;; occur in the symbol table.  This is ELF, so do nothing
+;;; occur in the symbol table.  This is ELF, so do nothing.
 
 (defun extern-alien-name (name)
   (declare (type simple-base-string name))

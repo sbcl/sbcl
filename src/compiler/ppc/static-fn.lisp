@@ -105,8 +105,7 @@
 	     ,@(moves (result-names) (temp-names))))))))
 
 
-) ; eval-when (:compile-toplevel :load-toplevel :execute)
-
+) ; EVAL-WHEN
 
 (macrolet ((frob (num-args num-res)
 	     (static-fun-template-vop (eval num-args) (eval num-res))))
@@ -116,7 +115,6 @@
   (frob 3 1)
   (frob 4 1)
   #|(frob 5 1)|#)
-
 
 (defmacro define-static-fun (name args &key (results '(x)) translate
 				       policy cost arg-types result-types)

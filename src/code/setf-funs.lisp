@@ -48,7 +48,7 @@
 	    (res (compute-one-setter sym type))))))
     `(progn ,@(res))))
 
-); eval-when (compile eval)
+) ; EVAL-WHEN
 
 (define-setters ("COMMON-LISP")
   ;; Semantically silly...

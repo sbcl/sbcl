@@ -16,12 +16,9 @@
 
 
 
-;;; SANCTIFY-FOR-EXECUTION -- Interface.
-;;;
 ;;; Do whatever is necessary to make the given code component executable.
 ;;; On the 601, we have less to do than on some other PowerPC chips.
-;;; This should what needs to be done in the general case.
-;;; 
+;;; This should be what needs to be done in the general case.
 (defun sanctify-for-execution (component)
   (without-gcing
     (alien-funcall (extern-alien "ppc_flush_icache"

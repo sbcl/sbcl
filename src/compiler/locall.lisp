@@ -427,7 +427,7 @@
   (values))
 
 ;;; Attempt to convert a multiple-value call. The only interesting
-;;; case is a call to a function that Looks-Like-An-MV-Bind, has
+;;; case is a call to a function that LOOKS-LIKE-AN-MV-BIND, has
 ;;; exactly one reference and no XEP, and is called with one values
 ;;; continuation.
 ;;;

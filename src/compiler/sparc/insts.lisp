@@ -949,7 +949,7 @@ about function addresses and register values.")
   (with-ref-format `(:NAME :TAB rd ", " ,ref-format))
   #'equalp)
 
-) ; eval-when (compile eval)
+) ; EVAL-WHEN
 
 (macrolet ((define-f3-inst (name op op3 &key fixup load-store (dest-kind 'reg)
 				 (printer :default) reads writes flushable print-name)

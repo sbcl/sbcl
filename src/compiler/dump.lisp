@@ -155,7 +155,7 @@
 	 (dump-byte ',val ,file))
       (error "compiler bug: ~S is not a legal fasload operator." fs))))
 
-;;; Dump a FOP-Code along with an integer argument, choosing the FOP
+;;; Dump a FOP-CODE along with an integer argument, choosing the FOP
 ;;; based on whether the argument will fit in a single byte.
 ;;;
 ;;; FIXME: This, like DUMP-FOP, should be a function with a

@@ -31,7 +31,7 @@
 ;;;    any of the component's blocks (always-live /= 0), then there
 ;;;    is a conflict.
 ;;; -- If TN is global (Confs true), then iterate over the blocks TN
-;;;    is live in (using TN-Global-Conflicts). If the TN is live
+;;;    is live in (using TN-GLOBAL-CONFLICTS). If the TN is live
 ;;;    everywhere in the block (:LIVE), then there is a conflict
 ;;;    if the element at offset is used anywhere in the block
 ;;;    (Always-Live /= 0). Otherwise, we use the local TN number for
