@@ -615,6 +615,9 @@ Peter Van Eynde:
   of bug reports resulting from that, and submitted many other bug
   reports as well.
 
+Valtteri Vuorikoski:
+  He ported SBCL to NetBSD.
+
 Colin Walters:
   His O(N) implementation of the general case of MAP, posted on the
   cmucl-imp@cons.org mailing list, was the inspiration for similar MAP
