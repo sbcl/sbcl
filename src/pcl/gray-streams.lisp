@@ -21,7 +21,7 @@
   which returns CHARACTER."))
 
 (defmethod stream-element-type ((stream ansi-stream))
-  (funcall (ansi-stream-misc stream) stream :element-type))
+  (ansi-stream-element-type stream))
 
 (defmethod stream-element-type ((stream fundamental-character-stream))
   'character)
@@ -34,7 +34,7 @@
   called on the stream."))
 
 (defmethod pcl-open-stream-p ((stream ansi-stream))
-  (not (eq (ansi-stream-in stream) #'closed-flame)))
+  (ansi-stream-open-stream-p stream))
 
 (defmethod pcl-open-stream-p ((stream fundamental-stream))
   (stream-open-p stream))
@@ -51,9 +51,7 @@
   to clean up the side effects of having created the stream."))
 
 (defmethod pcl-close ((stream ansi-stream) &key abort)
-  (when (open-stream-p stream)
-    (funcall (ansi-stream-misc stream) stream :close abort))
-  t)
+  (ansi-stream-close stream abort))
 
 (defmethod pcl-close ((stream fundamental-stream) &key abort)
   (declare (ignore abort))
@@ -69,9 +67,7 @@
   (:documentation "Can STREAM perform input operations?"))
 
 (defmethod input-stream-p ((stream ansi-stream))
-  (and (not (eq (ansi-stream-in stream) #'closed-flame))
-       (or (not (eq (ansi-stream-in stream) #'ill-in))
-	   (not (eq (ansi-stream-bin stream) #'ill-bin)))))
+  (ansi-stream-input-stream-p stream))
 
 (defmethod input-stream-p ((stream fundamental-input-stream))
   t)
@@ -83,9 +79,7 @@
   (:documentation "Can STREAM perform output operations?"))
 
 (defmethod output-stream-p ((stream ansi-stream))
-  (and (not (eq (ansi-stream-in stream) #'closed-flame))
-       (or (not (eq (ansi-stream-out stream) #'ill-out))
-	   (not (eq (ansi-stream-bout stream) #'ill-bout)))))
+  (ansi-stream-output-stream-p stream))
 
 (defmethod output-stream-p ((stream fundamental-output-stream))
   t)

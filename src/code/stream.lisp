@@ -59,16 +59,16 @@
 
 ;;; stream manipulation functions
 
-(defun input-stream-p (stream)
-  (declare (type stream stream))
+(declaim (inline ansi-stream-input-stream-p))
+(defun ansi-stream-input-stream-p (stream)
+  (declare (type ansi-stream stream))
 
   #!+high-security
   (when (synonym-stream-p stream)
     (setf stream
 	  (symbol-value (synonym-stream-symbol stream))))
 
-  (and (ansi-stream-p stream)
-       (not (eq (ansi-stream-in stream) #'closed-flame))
+  (and (not (eq (ansi-stream-in stream) #'closed-flame))
        ;;; KLUDGE: It's probably not good to have EQ tests on function
        ;;; values like this. What if someone's redefined the function?
        ;;; Is there a better way? (Perhaps just VALID-FOR-INPUT and
@@ -76,36 +76,59 @@
        (or (not (eq (ansi-stream-in stream) #'ill-in))
 	   (not (eq (ansi-stream-bin stream) #'ill-bin)))))
 
-(defun output-stream-p (stream)
+(defun input-stream-p (stream)
   (declare (type stream stream))
+  (and (ansi-stream-p stream)
+       (ansi-stream-input-stream-p stream)))
+
+(declaim (inline ansi-stream-output-stream-p))
+(defun ansi-stream-output-stream-p (stream)
+  (declare (type ansi-stream stream))
 
   #!+high-security
   (when (synonym-stream-p stream)
     (setf stream (symbol-value
 		  (synonym-stream-symbol stream))))
 
-  (and (ansi-stream-p stream)
-       (not (eq (ansi-stream-in stream) #'closed-flame))
+  (and (not (eq (ansi-stream-in stream) #'closed-flame))
        (or (not (eq (ansi-stream-out stream) #'ill-out))
 	   (not (eq (ansi-stream-bout stream) #'ill-bout)))))
 
-(defun open-stream-p (stream)
+(defun output-stream-p (stream)
   (declare (type stream stream))
+
+  (and (ansi-stream-p stream)
+       (ansi-stream-output-stream-p stream)))
+
+(declaim (inline ansi-stream-open-stream-p))
+(defun ansi-stream-open-stream-p (stream)
+  (declare (type ansi-stream stream))
   (not (eq (ansi-stream-in stream) #'closed-flame)))
 
-(defun stream-element-type (stream)
-  (declare (type stream stream))
+(defun open-stream-p (stream)
+  (ansi-stream-open-stream-p stream))
+
+(declaim (inline ansi-stream-element-type))
+(defun ansi-stream-element-type (stream)
+  (declare (type ansi-stream stream))
   (funcall (ansi-stream-misc stream) stream :element-type))
+
+(defun stream-element-type (stream)
+  (ansi-stream-element-type stream))
 
 (defun interactive-stream-p (stream)
   (declare (type stream stream))
   (funcall (ansi-stream-misc stream) stream :interactive-p))
 
-(defun close (stream &key abort)
-  (declare (type stream stream))
+(declaim (inline ansi-stream-close))
+(defun ansi-stream-close (stream abort)
+  (declare (type ansi-stream stream))
   (when (open-stream-p stream)
     (funcall (ansi-stream-misc stream) stream :close abort))
   t)
+
+(defun close (stream &key abort)
+  (ansi-stream-close stream abort))
 
 (defun set-closed-flame (stream)
   (setf (ansi-stream-in stream) #'closed-flame)
