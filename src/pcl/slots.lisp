@@ -58,7 +58,7 @@
 	 (error "unrecognized instance type"))))
 
 (defun swap-wrappers-and-slots (i1 i2)
-  (sb-sys:without-interrupts
+  (with-pcl-lock			;FIXME is this sufficient?
    (cond ((std-instance-p i1)
 	  (let ((w1 (std-instance-wrapper i1))
 		(s1 (std-instance-slots i1)))

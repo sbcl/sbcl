@@ -23,21 +23,5 @@
 
 (in-package "SB-PCL")
 
-;;; Pre-allocate generic function caches. The hope is that this will put
-;;; them nicely together in memory, and that that may be a win. Of course
-;;; the first gc copy will probably blow that out, this really wants to be
-;;; wrapped in something that declares the area static.
-;;;
-;;; This preallocation only creates about 25% more caches than PCL itself
-;;; uses need. Some ports may want to preallocate some more of these.
-(flet ((allocate (n size)
-		 (mapcar #'free-cache-vector
-			 (mapcar #'get-cache-vector
-				 (make-list n :initial-element size)))))
-  (allocate 128 4)
-  (allocate 64 8)
-  (allocate 64 9)
-  (allocate 32 16)
-  (allocate 16 17)
-  (allocate 16 32)
-  (allocate 1  64))
+;;; (We used to pre-allocate generic function caches here, but we let
+;;; the GC deal with that stuff these days)

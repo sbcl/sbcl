@@ -232,8 +232,7 @@
 	       (pv-cell (cons pv calls))
 	       (new-cache (fill-cache cache pv-wrappers pv-cell)))
 	  (unless (eq new-cache cache)
-	    (setf (pv-table-cache pv-table) new-cache)
-	    (free-cache cache))
+	    (setf (pv-table-cache pv-table) new-cache))
 	  pv-cell))))
 
 (defun make-pv-type-declaration (var)
