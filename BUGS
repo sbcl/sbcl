@@ -104,9 +104,10 @@ WORKAROUND:
 32:
   The printer doesn't report closures very well. This is true in 
   CMU CL 18b as well:
-    (PRINT #'CLASS-NAME)
+    (defstruct foo bar)
+    (print #'foo-bar)
   gives
-    #<Closure Over Function "DEFUN STRUCTURE-SLOT-ACCESSOR" {134D1A1}>
+    #<FUNCTION "CLOSURE" {406974D5}>
   It would be nice to make closures have a settable name slot,
   and make things like DEFSTRUCT and FLET, which create closures,
   set helpful values into this slot.
