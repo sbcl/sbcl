@@ -184,7 +184,10 @@
 				      (t (return (- -10 errno)))))
 			       ((zerop count) (return -1))
 			       (t (return count)))))))))))
-	(t (error "implement me"))))))
+        ;; Handle encapsulated stream.  FIXME: perhaps handle
+        ;; sbcl-vintage ansi-stream type in read-octets too?
+        (stream (read-octets fd buffer start end blocking))
+	(t (error "Don't know how to handle input handle &A" fd))))))
 
 (defun write-octets (stream buffer start end blocking)
   (declare (type simple-stream stream)
@@ -213,12 +216,16 @@
 			 (incf count bytes)
 			 (incf start bytes))
 		       (cond ((null bytes)
-			      (format t "~&;; UNIX-WRITE: errno=~D~%" errno)
+			      (format *debug-io* "~&;; UNIX-WRITE: errno=~D~%"
+                                      errno)
 			      (cond ((= errno sb-unix:eintr) (go again))
 				    ;; don't block for subsequent chars
 				    (t (return (- -10 errno)))))
 			     (t (return count)))))))))))
-	(t (error "implement me"))))))
+        ;; Handle encapsulated stream.  FIXME: perhaps handle
+        ;; sbcl-vintage ansi-stream type in write-octets too?
+        (stream (write-octets fd buffer start end blocking))
+	(t (error "Don't know how to handle output handle &A" fd))))))
 
 
 ;;;
@@ -238,7 +245,7 @@
   stream)
 
 (defun open-file-stream (stream options)
-  (let ((filename (getf options :filename))
+  (let ((filename (pathname (getf options :filename)))
 	(direction (getf options :direction :input))
 	(if-exists (getf options :if-exists))
 	(if-exists-given (not (getf options :if-exists t)))
@@ -371,8 +378,44 @@
   stream)
 
 (defmethod device-open ((stream socket-simple-stream) options)
-  #| do something |#
-  stream)
+  (with-stream-class (socket-simple-stream stream)
+     (let* ((remote-host (getf options :remote-host))
+            (remote-port (getf options :remote-port))
+            (socket (make-instance 'sb-bsd-sockets:inet-socket
+                                   :type :stream :protocol :tcp)))
+       (setf (sm socket stream) socket)
+       (sb-bsd-sockets:socket-connect socket remote-host remote-port)
+       (let ((fd (sb-bsd-sockets:socket-file-descriptor socket)))
+         ;; Connect stream to socket, ...
+         (setf (sm input-handle stream) fd)
+         (setf (sm output-handle stream) fd)
+         ;; ... and socket to stream.
+         (setf (slot-value socket 'stream) stream)
+         (sb-ext:cancel-finalization socket)
+         (sb-ext:finalize stream
+                          (lambda ()
+                            (sb-unix:unix-close fd)
+                            (format *terminal-io*
+                                    "~&;;; ** closed socket (fd ~D)~%" fd))))
+       ;; Now frob the stream slots.
+       (add-stream-instance-flags stream :simple :input :output :dual)
+       (unless (sm buffer stream)
+         (let ((length (device-buffer-length stream)))
+           ;; Buffer should be array of (unsigned-byte 8), in general
+           ;; use strings for now so it's easy to read the content...
+           (setf (sm buffer stream) (make-string length)
+                 (sm buffpos stream) 0
+                 (sm buffer-ptr stream) 0
+                 (sm buf-len stream) length)))
+       (unless (sm out-buffer stream)
+	(let ((length (device-buffer-length stream)))
+	  (setf (sm out-buffer stream) (make-string length)
+		(sm max-out-pos stream) length)))
+       (setf (sm control-in stream) *terminal-control-in-table*)
+       (setf (sm control-out stream) *std-control-out-table*)
+       (install-dual-channel-character-strategy
+        stream (getf options :external-format :default)))
+     stream))
 
 (defmethod device-open ((stream terminal-simple-stream) options)
   (with-stream-class (terminal-simple-stream stream)
@@ -428,7 +471,7 @@
 	   ))
     (if (sm input-handle stream)
 	(sb-unix:unix-close (sm input-handle stream))
-	(sb-unix:unix-close (sm output-handle stream)))
+      (sb-unix:unix-close (sm output-handle stream)))
     (setf (sm buffer stream) nil))
   t)
 
@@ -449,6 +492,15 @@
     (sb-unix:unix-close (sm input-handle stream)))
   t)
 
+(defmethod device-close ((stream socket-simple-stream) abort)
+  ;; Abort argument is handled by :around method on base class
+  (declare (ignore abort))
+  (with-stream-class (socket-simple-stream stream)
+    (sb-unix:unix-close (sm input-handle stream))
+    (setf (sm buffer stream) nil)
+    (setf (sm out-buffer stream) nil))
+  (sb-ext:cancel-finalization stream)
+  t)
 
 (defmethod device-buffer-length ((stream simple-stream))
   4096)

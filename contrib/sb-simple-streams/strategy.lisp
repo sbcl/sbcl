@@ -14,6 +14,7 @@
     (let* ((unread (sm last-char-read-size stream))
 	   (buffer (sm buffer stream)))
       (unless (zerop unread)
+        ;; Keep last read character at beginning of buffer
 	(buffer-copy buffer (- (sm buffer-ptr stream) unread) buffer 0 unread))
       (let ((bytes (device-read stream nil unread nil blocking)))
 	(declare (type fixnum bytes))
@@ -219,13 +220,12 @@
 		 (funcall (the (or symbol function) (svref ctrl code))
 			  stream character))
 	(return-from sc-write-char character))
-      (if (< ptr (sm buffer-ptr stream))
-	  (progn
-	    (setf (bref buffer ptr) code)
-	    (setf (sm buffpos stream) (1+ ptr)))
-	  (progn
-	    (sc-flush-buffer stream t)
-	    (setf ptr (sm buffpos stream))))))
+      ;; FIXME: Shouldn't this be buf-len, not buffer-ptr?
+      (unless (< ptr (sm buffer-ptr stream))
+        (sc-flush-buffer stream t)
+        (setf ptr (sm buffpos stream)))
+      (setf (bref buffer ptr) code)
+      (setf (sm buffpos stream) (1+ ptr))))
   character)
 
 (declaim (ftype j-write-chars-fn sc-write-chars))
@@ -373,13 +373,13 @@
 		 (funcall (the (or symbol function) (svref ctrl code))
 			  stream character))
 	(return-from dc-write-char character))
-      (if (< ptr (sm max-out-pos stream))
-	  (progn
-	    (setf (bref buffer ptr) code)
-	    (setf (sm outpos stream) (1+ ptr)))
-	  (progn
-	    (dc-flush-buffer stream t)
-	    (setf ptr (sm outpos stream))))))
+      (unless (< ptr (sm max-out-pos stream))
+        (dc-flush-buffer stream t)
+        (setf ptr (sm outpos stream)))
+      (progn
+        (setf (bref buffer ptr) code)
+        (setf (sm outpos stream) (1+ ptr))
+        )))
   character)
 
 (declaim (ftype j-write-chars-fn dc-write-chars))

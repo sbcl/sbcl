@@ -259,7 +259,8 @@
   ())
 
 (def-stream-class socket-simple-stream (dual-channel-simple-stream)
-  ())
+  ((socket :initform nil :type (or sb-bsd-sockets:socket null)
+           :initarg :socket sb-pcl::location 27)))
 
 (def-stream-class socket-base-simple-stream (dual-channel-simple-stream)
   ())

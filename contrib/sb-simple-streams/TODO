@@ -1,0 +1,12 @@
+-*- text -*-
+
+- Writing beyond the end of a mapped-simple-stream is funky; arguably,
+  it should signal an error.
+
+- write-octets / read-octets handling of encapsulated streams is
+  untested.
+
+- Implement socket-base-simple-stream and chunked transfer encoding.
+
+- Implement string streams.
+

@@ -2,17 +2,32 @@
 
 An implementation of simple streams for sbcl.
 
-Simple streams are an extensible streams protocol, with similar goals
-but different architecture than Gray streams.  Documentation about
-simple streams is available at
+Simple streams are an extensible streams protocol that avoids some
+problems with Gray streams.
+
+Documentation about simple streams is available at
 http://www.franz.com/support/documentation/6.2/doc/streams.htm
 
 This code was originally written by Paul Foley for cmucl; Paul's
 version resides (as of 2003-05-12) at
 http://users.actrix.co.nz/mycroft/cl.html
 
-The port to sbcl was done by Rudi Schlatte (rudi@constantly.at).  Bug
-reports welcome.
+The port to sbcl was done by Rudi Schlatte (rudi@constantly.at).
+
+This implementation should be considered Alpha-quality; the basic
+framework is there, but many classes are just stubs at the moment.
+See simple-stream-test.lisp for things that should work.
+
+
+
+Known differences to the ACL behaviour:
+
+- open not return a simple-stream by default.  This can be
+  adjusted; see default-open-class in the file cl.lisp
+
+
+
+
 
 ==================================================
 
@@ -26,19 +41,20 @@ Motivation:
 If you want to extend a given Gray stream, is it enough to supply a
 method for stream-write-byte, or do you have to overwrite
 stream-write-sequence as well?  How do you extend your Gray socket
-stream to support chunked stream encoding for HTTP/1.1?  Chances are
-that for any seriously interesting stream customization, you will
-implement some kind of buffer, collect data in it and
+stream to support chunked stream encoding for HTTP/1.1?  Is
+stream-read-char-no-hang required to call stream-listen, then
+stream-read-char?  Simple-streams solve these protocol problems by
+implementing a device layer following a buffering protocol and a thin
+"strategy" layer that provides the functionality for the normal CL
+stream semantics.
 
-
-
-Simple streams is a layered architecture.  The device layer at the
-bottom deals with transferring chunks of bytes between a buffer and a
-device (socket, file, printer, what-have-you).  The top layer is the
-familiar CL API (read-line, write-sequence, open, etc).  The strategy
-layer in the middle translates between the buffer-of-bytes and CL
-stream world-view, dealing with byte<->character conversion,
-line-ending and stream-external-format conventions, etc.
+The device layer at the bottom deals with transferring chunks of bytes
+between a buffer and a device (socket, file, printer, what-have-you).
+The top layer is the familiar CL API (read-line, write-sequence, open,
+etc).  The strategy layer in the middle translates between the
+buffer-of-bytes and CL stream world-view, dealing with
+byte<->character conversion, line-ending and stream-external-format
+conventions, etc.
 
 Implementing a new type of stream is a matter of extending the right
 stream class and implementing device-read, device-write, device-extend

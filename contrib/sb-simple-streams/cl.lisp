@@ -298,7 +298,7 @@ simple-streams proposal.")
       (error 'type-error :datum filename
 	     :expected-type '(or pathname stream base-string)))
     (cond ((eql klass 'sb-sys::file-stream)
-	   (remf options :claass)
+	   (remf options :class)
 	   (remf options :mapped)
 	   ;; INPUT-HANDLE and OUTPUT-HANDLE must be fixnums or NIL.
 	   ;; If both are given, they must be the same -- or maybe
@@ -708,6 +708,7 @@ simple-streams proposal.")
 		  (setf (bref (sm out-buffer stream) ptr) integer)))
 	       (t  ;; single-channel-simple-stream
 		(let ((ptr (sm buffpos stream)))
+                  ;; FIXME: Shouldn't this be buf-len, not buffer-ptr?
 		  (when (>= ptr (sm buffer-ptr stream))
 		    (sc-flush-buffer stream t)
 		    (setf ptr (1- (sm buffpos stream))))
@@ -1002,6 +1003,10 @@ simple-streams proposal.")
   (unless (device-open instance initargs)
     (device-close instance t)))
 
+;;; From the simple-streams documentation: "A generic function implies
+;;; a specialization capability that does not exist for
+;;; simple-streams; simple-stream specializations should be on
+;;; device-close."  So don't do it.
 (defmethod close ((stream simple-stream) &key abort)
   (device-close stream abort))
 
