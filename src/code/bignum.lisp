@@ -812,7 +812,7 @@
 	  (bignum-ashift-left-unaligned bignum digits n-bits res-len))))
     ;; Left shift by a number too big to be represented as a fixnum
     ;; would exceed our memory capacity, since a fixnum is big enough
-    ;; index any array, including a bit array.
+    ;; to index any array, including a bit array.
     (error "can't represent result of left shift")))
 
 (defun bignum-ashift-left-digits (bignum bignum-len digits)

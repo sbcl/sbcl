@@ -11,7 +11,6 @@
 ;;;
 (!def-vm-support-routine make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
-
 
 ;;; Save and restore dynamic environment.
 ;;;

@@ -881,7 +881,7 @@
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))
   ;; If this TN represents a variable or constant, then this is the
-  ;; corresponding Leaf.
+  ;; corresponding LEAF.
   (leaf nil :type (or leaf null))
   ;; thread that links TNs together so that we can find them
   (next nil :type (or tn null))

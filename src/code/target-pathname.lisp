@@ -625,7 +625,7 @@ a host-structure or string."
 	  (let ((potential-host
 		 (logical-word-or-lose (subseq namestr start colon))))
 	    ;; depending on the outcome of CSR comp.lang.lisp post
-	    ;; "can PARSE-NAMESTRING create logical hosts, we may need
+	    ;; "can PARSE-NAMESTRING create logical hosts", we may need
 	    ;; to do things with potential-host (create it
 	    ;; temporarily, parse the namestring and unintern the
 	    ;; logical host potential-host on failure.
@@ -683,7 +683,10 @@ a host-structure or string."
 	      ;; *DEFAULT-PATHNAME-DEFAULTS has a SB-IMPL::UNIX-HOST
 	      ;; for a host.
 	      ((pathname-host defaults)
-	       (funcall (host-parse (pathname-host defaults)) namestr start end))
+	       (funcall (host-parse (pathname-host defaults))
+			namestr
+			start
+			end))
 	      ;; I don't think we should ever get here, as the default
 	      ;; host will always have a non-null HOST, given that we
 	      ;; can't create a new pathname without going through

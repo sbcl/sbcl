@@ -440,21 +440,21 @@
   (values))
 
 ;;; Convert a :NORMAL or :DEBUG-ENVIRONMENT TN to an :ENVIRONMENT TN.
-;;; This requires adding :LIVE conflicts to all blocks in TN-ENV.
-(defun convert-to-environment-tn (tn tn-env)
-  (declare (type tn tn) (type physenv tn-env))
+;;; This requires adding :LIVE conflicts to all blocks in TN-PHYSENV.
+(defun convert-to-environment-tn (tn tn-physenv)
+  (declare (type tn tn) (type physenv tn-physenv))
   (aver (member (tn-kind tn) '(:normal :debug-environment)))
   (when (eq (tn-kind tn) :debug-environment)
-    (aver (eq (tn-physenv tn) tn-env))
-    (let ((2env (physenv-info tn-env)))
+    (aver (eq (tn-physenv tn) tn-physenv))
+    (let ((2env (physenv-info tn-physenv)))
       (setf (ir2-physenv-debug-live-tns 2env)
 	    (delete tn (ir2-physenv-debug-live-tns 2env)))))
-  (setup-environment-tn-conflicts *component-being-compiled* tn tn-env nil)
+  (setup-environment-tn-conflicts *component-being-compiled* tn tn-physenv nil)
   (setf (tn-local tn) nil)
   (setf (tn-local-number tn) nil)
   (setf (tn-kind tn) :environment)
-  (setf (tn-physenv tn) tn-env)
-  (push tn (ir2-physenv-live-tns (physenv-info tn-env)))
+  (setf (tn-physenv tn) tn-physenv)
+  (push tn (ir2-physenv-live-tns (physenv-info tn-physenv)))
   (values))
 
 ;;;; flow analysis

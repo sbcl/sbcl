@@ -1134,8 +1134,8 @@
 
 (defvar *list-conflicts-table* (make-hash-table :test 'eq))
 
-;;; Add all ALWAYS-LIVE TNs in Block to the conflicts. TN is ignored when
-;;; it appears in the global conflicts.
+;;; Add all ALWAYS-LIVE TNs in BLOCK to the conflicts. TN is ignored
+;;; when it appears in the global conflicts.
 (defun add-always-live-tns (block tn)
   (declare (type ir2-block block) (type tn tn))
   (do ((conf (ir2-block-global-tns block)
@@ -1147,7 +1147,7 @@
 	  (setf (gethash btn *list-conflicts-table*) t)))))
   (values))
 
-;;; Add all local TNs in block to the conflicts.
+;;; Add all local TNs in BLOCK to the conflicts.
 (defun add-all-local-tns (block)
   (declare (type ir2-block block))
   (let ((ltns (ir2-block-local-tns block)))
@@ -1176,7 +1176,8 @@
 	   (do ((conf confs (global-conflicts-next-tnwise conf)))
 	       ((null conf))
              (format t "~&#<block ~D kind ~S>~%"
-                     (block-number (ir2-block-block (global-conflicts-block conf)))
+                     (block-number (ir2-block-block (global-conflicts-block
+						     conf)))
                      (global-conflicts-kind conf))
 	     (let ((block (global-conflicts-block conf)))
 	       (add-always-live-tns block tn)

@@ -52,7 +52,7 @@
   (setf (ir2-component-wired-tns instance) value))
 
 ;;; Remove all TNs with no references from the lists of unpacked TNs.
-;;; We null out the Offset so that nobody will mistake deleted wired
+;;; We null out the OFFSET so that nobody will mistake deleted wired
 ;;; TNs for properly packed TNs. We mark non-deleted alias TNs so that
 ;;; aliased TNs aren't considered to be unreferenced.
 (defun delete-unreferenced-tns (component)
@@ -154,24 +154,24 @@
     (push-in tn-next res (ir2-component-restricted-tns component))
     res))
 
-;;; Make TN be live throughout environment. Return TN. In the DEBUG
-;;; case, the TN is treated normally in blocks in the environment
-;;; which reference the TN, allowing targeting to/from the TN. This
-;;; results in move efficient code, but may result in the TN sometimes
-;;; not being live when you want it.
-(defun physenv-live-tn (tn env)
-  (declare (type tn tn) (type physenv env))
+;;; Make TN be live throughout PHYSENV. Return TN. In the DEBUG case,
+;;; the TN is treated normally in blocks in the environment which
+;;; reference the TN, allowing targeting to/from the TN. This results
+;;; in move efficient code, but may result in the TN sometimes not
+;;; being live when you want it.
+(defun physenv-live-tn (tn physenv)
+  (declare (type tn tn) (type physenv physenv))
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :environment)
-  (setf (tn-physenv tn) env)
-  (push tn (ir2-physenv-live-tns (physenv-info env)))
+  (setf (tn-physenv tn) physenv)
+  (push tn (ir2-physenv-live-tns (physenv-info physenv)))
   tn)
-(defun physenv-debug-live-tn (tn env)
-  (declare (type tn tn) (type physenv env))
+(defun physenv-debug-live-tn (tn physenv)
+  (declare (type tn tn) (type physenv physenv))
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :debug-environment)
-  (setf (tn-physenv tn) env)
-  (push tn (ir2-physenv-debug-live-tns (physenv-info env)))
+  (setf (tn-physenv tn) physenv)
+  (push tn (ir2-physenv-debug-live-tns (physenv-info physenv)))
   tn)
 
 ;;; Make TN be live throughout the current component. Return TN.
@@ -183,7 +183,7 @@
 					 *component-being-compiled*)))
   tn)
 
-;;; Specify that Save be used as the save location for TN. TN is returned.
+;;; Specify that SAVE be used as the save location for TN. TN is returned.
 (defun specify-save-tn (tn save)
   (declare (type tn tn save))
   (aver (eq (tn-kind save) :normal))

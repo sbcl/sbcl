@@ -43,23 +43,22 @@
   (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
 		 ocfp-save-offset))
 
-;;; Make the TNs used to hold Old-FP and Return-PC within the current
+;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find
 ;;; them at a known location.
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
-;;; wire to the stack? 
-(!def-vm-support-routine make-old-fp-save-location (env)
+;;; wired to the stack? 
+(!def-vm-support-routine make-old-fp-save-location (physenv)
   (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
 					control-stack-sc-number
 					ocfp-save-offset)
-			 env))
-
-(!def-vm-support-routine make-return-pc-save-location (env)
+			 physenv))
+(!def-vm-support-routine make-return-pc-save-location (physenv)
   (physenv-debug-live-tn
    (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		  sap-stack-sc-number return-pc-save-offset)
-   env))
+   physenv))
 
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we

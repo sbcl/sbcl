@@ -805,7 +805,7 @@
 (defvar *repack-blocks*)
 (declaim (type (or hash-table null) *repack-blocks*))
 
-;;; Set the Live-TNs vectors in all :FINITE SBs to represent the TNs
+;;; Set the LIVE-TNS vectors in all :FINITE SBs to represent the TNs
 ;;; live at the end of BLOCK.
 (defun init-live-tns (block)
   (dolist (sb *backend-sb-list*)

@@ -781,10 +781,10 @@
   ;; information.
   (setf (tail-set-info (lambda-tail-set clambda)) nil))
 
-;;; Handle the environment semantics of LET conversion. We add CLAMBDA
-;;; and its LETs to LETs for the CALL's home function. We merge the
-;;; calls for CLAMBDA with the calls for the home function, removing
-;;; CLAMBDA in the process. We also merge the ENTRIES.
+;;; Handle the PHYSENV semantics of LET conversion. We add CLAMBDA and
+;;; its LETs to LETs for the CALL's home function. We merge the calls
+;;; for CLAMBDA with the calls for the home function, removing CLAMBDA
+;;; in the process. We also merge the ENTRIES.
 ;;;
 ;;; We also unlink the function head from the component head and set
 ;;; COMPONENT-REANALYZE to true to indicate that the DFO should be
@@ -803,20 +803,20 @@
   (depart-from-tail-set clambda)
 
   (let* ((home (node-home-lambda call))
-	 (home-env (lambda-physenv home)))
+	 (home-physenv (lambda-physenv home)))
 
     (aver (not (eq home clambda)))
 
     ;; CLAMBDA belongs to HOME now.
     (push clambda (lambda-lets home))
     (setf (lambda-home clambda) home)
-    (setf (lambda-physenv clambda) home-env)
+    (setf (lambda-physenv clambda) home-physenv)
 
     ;; All of CLAMBDA's LETs belong to HOME now.
     (let ((lets (lambda-lets clambda)))
       (dolist (let lets)
         (setf (lambda-home let) home)
-        (setf (lambda-physenv let) home-env))
+	(setf (lambda-physenv let) home-physenv))
       (setf (lambda-lets home) (nconc lets (lambda-lets home))))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; which has LETs.

@@ -1329,6 +1329,7 @@ WORKAROUND:
   (fixed in 0.7.9.42)
 
 226: "AVER failure in COMPILE-FILE of clocc-ansi-test/tests.lisp"
+  (APD points out that this seems to be another symptom of bug #115.)
   sbcl-0.7.9.43 dies with failed AVER "(EQ (TN-PHYSENV TN) TN-ENV)" when
   trying to compile clocc-ansi-test/tests.lisp. sbcl-0.7.9.31 was able to
   to compile it. A smaller test case exhibiting the same problem is
