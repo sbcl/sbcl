@@ -89,6 +89,9 @@
 (deftype ansi-stream-in-buffer ()
   `(simple-array (unsigned-byte 8) (,+ansi-stream-in-buffer-length+)))
 
+(deftype ansi-stream-cin-buffer ()
+  `(simple-array character (,+ansi-stream-in-buffer-length+)))
+
 ;;; base class for ANSI standard streams (as opposed to the Gray
 ;;; streams extension)
 (defstruct (ansi-stream (:constructor nil)
@@ -100,6 +103,7 @@
   ;; slot must must be NIL, and the IN-INDEX must be
   ;; +ANSI-STREAM-IN-BUFFER-LENGTH+.)
   (in-buffer nil :type (or ansi-stream-in-buffer null))
+  (cin-buffer nil :type (or ansi-stream-cin-buffer null))
   (in-index +ansi-stream-in-buffer-length+ :type index)
 
   ;; buffered input functions

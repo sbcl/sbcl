@@ -276,11 +276,11 @@
 #!-sb-fluid (declaim (inline ansi-stream-unread-char))
 (defun ansi-stream-unread-char (character stream)
   (let ((index (1- (ansi-stream-in-index stream)))
-        (buffer (ansi-stream-in-buffer stream)))
+        (buffer (ansi-stream-cin-buffer stream)))
     (declare (fixnum index))
     (when (minusp index) (error "nothing to unread"))
     (cond (buffer
-           (setf (aref buffer index) (char-code character))
+           (setf (aref buffer index) character)
            (setf (ansi-stream-in-index stream) index))
           (t
            (funcall (ansi-stream-misc stream) stream
@@ -418,7 +418,7 @@
 ;;; the IN-BUFFER for text streams. There is definitely an IN-BUFFER,
 ;;; and hence must be an N-BIN method.
 (defun fast-read-char-refill (stream eof-error-p eof-value)
-  (let* ((ibuf (ansi-stream-in-buffer stream))
+  (let* ((ibuf (ansi-stream-cin-buffer stream))
 	 (count (funcall (ansi-stream-n-bin stream)
 			 stream
 			 ibuf
@@ -442,7 +442,7 @@
 				       sb!vm:n-word-bits))
 			    (* count sb!vm:n-byte-bits)))
 	   (setf (ansi-stream-in-index stream) (1+ start))
-	   (code-char (aref ibuf start))))))
+	   (aref ibuf start)))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
 ;;; leave room for unreading.
@@ -1742,8 +1742,7 @@
        (with-array-data ((data seq) (offset-start start) (offset-end end))
          (typecase data
 	   ((or (simple-array (unsigned-byte 8) (*))
-		(simple-array (signed-byte 8) (*))
-		simple-string)
+		(simple-array (signed-byte 8) (*)))
 	    (let* ((numbytes (- end start))
 		   (bytes-read (read-n-bytes stream data offset-start
 					     numbytes nil)))

@@ -579,7 +579,7 @@ Espen S Johnsen:
 
 Teemu Kalvas:
   He worked on Unicode support for SBCL, including parsing the Unicode
-  character database.
+  character database and restoring the FAST-READ-CHAR optimization.
 
 Frederik Kuivinen:
   He showed how to implement the DEBUG-RETURN functionality.

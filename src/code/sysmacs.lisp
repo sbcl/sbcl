@@ -105,7 +105,7 @@
 (defmacro prepare-for-fast-read-char (stream &body forms)
   `(let* ((%frc-stream% ,stream)
 	  (%frc-method% (ansi-stream-in %frc-stream%))
-	  (%frc-buffer% (ansi-stream-in-buffer %frc-stream%))
+	  (%frc-buffer% (ansi-stream-cin-buffer %frc-stream%))
 	  (%frc-index% (ansi-stream-in-index %frc-stream%)))
      (declare (type index %frc-index%)
 	      (type ansi-stream %frc-stream%))
@@ -126,7 +126,7 @@
      (prog1 (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
 	    (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
     (t
-     (prog1 (code-char (aref %frc-buffer% %frc-index%))
+     (prog1 (aref %frc-buffer% %frc-index%)
 	    (incf %frc-index%)))))
 
 ;;;; And these for the fasloader...

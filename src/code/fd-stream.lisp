@@ -747,18 +747,25 @@
 (defun refill-fd-stream-buffer (stream)
   ;; We don't have any logic to preserve leftover bytes in the buffer,
   ;; so we should only be called when the buffer is empty.
-  (aver (= (fd-stream-ibuf-head stream) (fd-stream-ibuf-tail stream)))
-  (multiple-value-bind (count err)
-      (sb!unix:unix-read (fd-stream-fd stream)
-			 (fd-stream-ibuf-sap stream)
-			 (fd-stream-ibuf-length stream))
-    (declare (type (or index null) count))
-    (when (null count)
-      (simple-stream-perror "couldn't read from ~S" stream err))
-    (setf (fd-stream-listen stream) nil
-	  (fd-stream-ibuf-head stream) 0
-	  (fd-stream-ibuf-tail stream) count)
-    count))
+  ;; FIXME: can have three bytes in buffer because of UTF-8
+  (let ((new-head 0)
+        (sap (fd-stream-ibuf-sap stream)))
+    (do ((head (fd-stream-ibuf-head stream) (1+ head))
+         (tail (fd-stream-ibuf-tail stream)))
+        ((= head tail))
+      (setf (sap-ref-8 sap new-head) (sap-ref-8 sap head))
+      (incf new-head))
+    (multiple-value-bind (count err)
+        (sb!unix:unix-read (fd-stream-fd stream)
+                           (sap+ sap new-head)
+                           (- (fd-stream-ibuf-length stream) new-head))
+      (declare (type (or index null) count))
+      (when (null count)
+        (simple-stream-perror "couldn't read from ~S" stream err))
+      (setf (fd-stream-listen stream) nil
+            (fd-stream-ibuf-head stream) new-head
+            (fd-stream-ibuf-tail stream) (+ count new-head))
+      count)))
 
 ;;;; utility functions (misc routines, etc)
 
@@ -776,7 +783,8 @@
 	(input-type nil)
 	(output-type nil)
 	(input-size nil)
-	(output-size nil))
+	(output-size nil)
+	(character-stream-p (subtypep type 'character)))
 
     (when (fd-stream-obuf-sap fd-stream)
       (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
@@ -793,7 +801,7 @@
 	(setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
 	(setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
 	(setf (fd-stream-ibuf-tail fd-stream) 0)
-	(if (subtypep type 'character)
+	(if character-stream-p
 	    (setf (fd-stream-in fd-stream) routine
 		  (fd-stream-bin fd-stream) #'ill-bin)
 	    (setf (fd-stream-in fd-stream) #'ill-in
@@ -805,13 +813,19 @@
 		     ;; (unsigned-byte 8).  Because there's no buffer, the
 		     ;; other element-types will dispatch to the appropriate
 		     ;; input (output) routine in fast-read-byte.
-		     (equal target-type '(unsigned-byte 8))
-		     #+nil
+		     (or character-stream-p
+			 (equal target-type '(unsigned-byte 8)))
+		     (not output-p) ; temporary disable on :io streams
+		     #+(or)
 		     (or (eq type 'unsigned-byte)
 			 (eq type :default)))
-	    (setf (ansi-stream-in-buffer fd-stream)
-		  (make-array +ansi-stream-in-buffer-length+
-			      :element-type '(unsigned-byte 8)))))
+            (if character-stream-p
+                (setf (ansi-stream-cin-buffer fd-stream)
+                      (make-array +ansi-stream-in-buffer-length+
+                                  :element-type 'character))
+                (setf (ansi-stream-in-buffer fd-stream)
+                      (make-array +ansi-stream-in-buffer-length+
+                                  :element-type '(unsigned-byte 8))))))
 	(setf input-size size)
 	(setf input-type type)))
 
