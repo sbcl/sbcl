@@ -1296,7 +1296,6 @@
           (t (bug "Trying to pop a not stack-allocated LVAR ~S."
                   lvar)))))
 
-(locally (declare (optimize (debug 3)))
 (defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved
 						      &rest moved)
                                          node block)
@@ -1341,7 +1340,7 @@
              #!-stack-grows-downward-not-upward
              (nip-unaligned (ir2-lvar-stack-pointer 2after)))
             (t
-             (bug "Trying to nip a not stack-allocated LVAR ~S." after)))))))
+             (bug "Trying to nip a not stack-allocated LVAR ~S." after))))))
 
 ;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
