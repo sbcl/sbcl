@@ -55,10 +55,11 @@ evaluated expressions.
       (named-let reread ()
 	(format s "~&> ")
 	(force-output)
-	(let (;; KMP idiom, using stream itself as EOF value
-	      (command (read *standard-input* nil *standard-input*)))
-	  (typecase command
-	    (stream ; i.e. EOF
+	(let* (;; newly-consed object for hermetic protection against
+	       ;; mischievous input like #.*EOF-OBJECT*:
+	       (eof (cons *eof-object* nil))
+               (command (read *standard-input* nil eof)))
+          (when (eq command eof)
 	     ;; currently-undocumented feature: EOF is handled as Q.
 	     ;; If there's ever consensus that this is *the* right
 	     ;; thing to do (as opposed to e.g. handling it as U), we
@@ -66,6 +67,7 @@ evaluated expressions.
 	     ;; do this than to signal an error.
 	     (/show0 "THROWing QUIT-INSPECT for EOF")
 	     (throw 'quit-inspect nil))
+	  (typecase command
 	    (integer
 	     (let ((elements-length (length elements)))
 	       (cond ((< -1 command elements-length)
