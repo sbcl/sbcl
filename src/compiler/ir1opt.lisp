@@ -1737,6 +1737,8 @@
     (when (and (combination-p use)
 	       (eq (continuation-fun-name (combination-fun use))
 		   'list))
+
+      ;; FIXME: VALUES might not satisfy an assertion on NODE-CONT.
       (change-ref-leaf (continuation-use (combination-fun node))
 		       (find-free-fun 'values "in a strange place"))
       (setf (combination-kind node) :full)
