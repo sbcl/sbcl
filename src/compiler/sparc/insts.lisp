@@ -130,6 +130,7 @@ about function addresses and register values.")
 	 (rd (ldb (byte 5 25) word))
 	 (immed-p (not (zerop (ldb (byte 1 13) word))))
 	 (immed-val (sign-extend-immed-value (ldb (byte 13 0) word))))
+    (declare (ignore immed-p))
     ;; Only the value of format and rd are guaranteed to be correct
     ;; because the disassembler is trying to print out the value of a
     ;; register.  The other values may not be right.
@@ -207,6 +208,7 @@ about function addresses and register values.")
 			  dstate)))))))
 
 (defun handle-jmpl-inst (rs1 immed-val rd dstate)
+  (declare (ignore rd))
   (let* ((sethi (assoc rs1 *note-sethi-inst*)))
     (when sethi
       ;; RS1 was used in a SETHI instruction.  Assume that

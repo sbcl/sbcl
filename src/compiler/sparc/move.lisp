@@ -232,8 +232,7 @@
   (:generator 20
     (move x arg)
     (let ((done (gen-label))
-	  (one-word (gen-label))
-	  (initial-alloc (pad-data-block (1+ bignum-digits-offset))))
+	  (one-word (gen-label)))
       (inst sra temp x n-positive-fixnum-bits)
       (inst cmp temp)
       (inst b :eq done)
