@@ -1277,7 +1277,14 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     in several ways. (thanks to Alexey Dejneka)
   * fixed bug 181: compiler checks validity of user supplied type
     specifiers
-  * functions, which must signal errors, are no longer flushable
+  * cleaned up code flushing in optimization: Function calls which
+    should signal errors for safety purposes (e.g. which ANSI says
+    should signal errors when their arguments are of incorrect type)
+    are no longer optimized away.
+  * incremented fasl file version number, because changes in the
+    implementation of sequence functions like COERCE have old
+    internal utility functions like COERCE-TO-SIMPLE-VECTOR (used
+    in old inline expansions) to become undefined
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
