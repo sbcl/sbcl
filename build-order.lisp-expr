@@ -79,12 +79,14 @@
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-sap"   :not-target)
+ ("src/code/cross-thread" :not-target)
  ("src/code/cross-make-load-form" :not-target)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; stuff needed early both in cross-compilation host and in target Lisp
 
  ("src/code/uncross")
+ ("src/code/primordial-type")
  ("src/code/early-defbangmethod")
 
  ("src/code/defbangtype")
@@ -159,6 +161,7 @@
 
  ("src/code/target-error" :not-host)
 
+ ("src/compiler/early-backend")
  ;; a comment from classic CMU CL:
  ;;   "These guys can supposedly come in any order, but not really.
  ;;    Some are put at the end so that macros don't run interpreted
@@ -188,7 +191,8 @@
  ("src/code/misc-aliens" :not-host)
 
  ("src/code/array"         :not-host)
- ("src/code/target-sxhash" :not-host)
+ ("src/code/early-float"   :not-host)
+ ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host)
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
@@ -443,7 +447,6 @@
  ;; (and so that they don't cause lots of annoying compiler warnings
  ;; about undefined types). 
  ("src/compiler/generic/core")
- ("src/code/cross-thread" :not-target)
  ("src/code/thread")
  ("src/code/load")
 

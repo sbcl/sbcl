@@ -151,6 +151,24 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+# undeclared unbound variables should cause a full warning, as they
+# invoke undefined behaviour
+cat > $tmpfilename <<EOF
+    (defun foo () x)
+EOF
+expect_failed_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (declaim (special *x*))
+    (defun foo () *x*)
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (defun foo () (declare (special x)) x)
+EOF
+expect_clean_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

@@ -358,6 +358,8 @@
 (defun gf-requires-emf-keyword-checks (generic-function)
   (member '&key (gf-lambda-list generic-function)))
 
+(defvar *in-precompute-effective-methods-p* nil)
+
 (defun standard-compute-effective-method
     (generic-function combin applicable-methods)
   (collect ((before) (primary) (after) (around))

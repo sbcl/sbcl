@@ -18,8 +18,8 @@
 ;;; FIXME: The DEFVAR here is redundant with the (DECLAIM (SPECIAL ..))
 ;;; of all static symbols in early-impl.lisp.
 (progn
-  (defvar *current-catch-block*)
-  (defvar *current-unwind-protect-block*)
+  (defvar sb!vm::*current-catch-block*)
+  (defvar sb!vm::*current-unwind-protect-block*)
   (defvar *free-interrupt-context-index*))
 
 ;;; specials initialized by !COLD-INIT
@@ -409,7 +409,7 @@
 	     ;; USERINITish files
              (probe-init-files (explicitly-specified-init-file-name
 				&rest default-init-file-names)
-               (declare (type list possible-init-file-names))
+               (declare (type list default-init-file-names))
 	       (if explicitly-specified-init-file-name
 		   (or (probe-file explicitly-specified-init-file-name)
                         (startup-error "The file ~S was not found."

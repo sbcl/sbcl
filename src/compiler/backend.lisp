@@ -133,10 +133,6 @@
 ;;; they haven't been installed yet
 (defvar *backend-internal-errors* nil)
 (declaim (type (or simple-vector null) *backend-internal-errors*))
-
-;;; the maximum number of bytes per page on this system (used by GENESIS)
-(defvar *backend-page-size* 0)
-(declaim (type index *backend-page-size*))
 
 ;;;; VM support routines
 

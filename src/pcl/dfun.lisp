@@ -1476,9 +1476,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 			(return (setf (third c) t))))
 	      (return nil))))))
 
-(defvar *in-precompute-effective-methods-p* nil)
-
-;used only in map-all-orders
+;;; CMUCL comment: used only in map-all-orders
 (defun class-might-precede-p (class1 class2)
   (if (not *in-precompute-effective-methods-p*)
       (not (member class1 (cdr (class-precedence-list class2))))

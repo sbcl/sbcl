@@ -11,10 +11,6 @@
 
 (!begin-collecting-cold-init-forms)
 
-;;; Has the type system been properly initialized? (I.e. is it OK to
-;;; use it?)
-(defvar *type-system-initialized* #+sb-xc-host nil) ; (set in cold load)
-
 ;;;; representations of types
 
 ;;; A HAIRY-TYPE represents anything too weird to be described

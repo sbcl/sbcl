@@ -152,12 +152,6 @@ and submit it as a patch."
   The functions are run with interrupts disabled and all other threads
   paused.  They should take no arguments.")
 
-(defvar *gc-run-time* 0
-  #!+sb-doc
-  "the total CPU time spent doing garbage collection (as reported by
-   GET-INTERNAL-RUN-TIME)")
-(declaim (type index *gc-run-time*))
-
 ;;;; The following specials are used to control when garbage
 ;;;; collection occurs.
 

@@ -286,6 +286,12 @@
 
 ;;;; TIME
 
+(defvar *gc-run-time* 0
+  #!+sb-doc
+  "the total CPU time spent doing garbage collection (as reported by
+   GET-INTERNAL-RUN-TIME)")
+(declaim (type index *gc-run-time*))
+
 (defmacro time (form)
   #!+sb-doc
   "Execute FORM and print timing information on *TRACE-OUTPUT*."

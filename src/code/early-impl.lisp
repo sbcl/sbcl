@@ -19,8 +19,8 @@
 		  *read-only-space-free-pointer*
 		  sb!vm:*static-space-free-pointer*
 		  sb!vm:*initial-dynamic-space-free-pointer*
-		  *current-catch-block*
-		  *current-unwind-protect-block*
+		  sb!vm::*current-catch-block*
+		  sb!vm::*current-unwind-protect-block*
 		  sb!vm::*alien-stack*
 		  #!+sb-thread sb!thread::*foreground-thread-stack*
 		  sb!vm::*control-stack-start*

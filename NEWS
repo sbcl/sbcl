@@ -2323,6 +2323,10 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
   * The runtime build system has been tweaked to support building
     (on SPARC/SunOS) using a C compiler which invokes Sun's own
     assembler and linker.  (thanks to Nikodemus Siivola)
+  * Unbound, undefined, undeclared variables now trigger full
+    WARNINGs, not just STYLE-WARNINGs, on the assumption that this is
+    more often programmer error than deliberate exploitation of undefined
+    behaviour.
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the PPC backend.
   * fixed some bugs revealed by Paul Dietz' test suite:

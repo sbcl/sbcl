@@ -1380,11 +1380,6 @@
 		   name
 		   layout))))))
 
-;;; a vector that maps type codes to layouts, used for quickly finding
-;;; the layouts of built-in classes
-(defvar *built-in-class-codes*) ; initialized in cold load
-(declaim (type simple-vector *built-in-class-codes*))
-
 (!cold-init-forms
   #-sb-xc-host (/show0 "about to set *BUILT-IN-CLASS-CODES*")
   (setq *built-in-class-codes*

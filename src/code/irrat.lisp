@@ -637,7 +637,9 @@
 ;;; they're effectively implemented as special variable references,
 ;;; and the code below which uses them might be unnecessarily
 ;;; inefficient. Perhaps some sort of MAKE-LOAD-TIME-VALUE hackery
-;;; should be used instead?
+;;; should be used instead?  (KLUDGED 2004-03-08 CSR, by replacing the
+;;; special variable references with (probably equally slow)
+;;; constructors)
 
 (declaim (inline square))
 (defun square (x)
@@ -681,7 +683,8 @@
   (cond ((float-nan-p x)
 	 x)
 	((float-infinity-p x)
-	 sb!ext:double-float-positive-infinity)
+	 ;; DOUBLE-FLOAT-POSITIVE-INFINITY
+	 (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0))
 	((zerop x)
 	 ;; The answer is negative infinity, but we are supposed to
           ;; signal divide-by-zero, so do the actual division
@@ -727,7 +730,10 @@
 		      (float-infinity-p rho))
 		  (or (float-infinity-p (abs x))
 		      (float-infinity-p (abs y))))
-              (values sb!ext:double-float-positive-infinity 0))
+	     ;; DOUBLE-FLOAT-POSITIVE-INFINITY
+	     (values
+	      (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0)
+	      0))
 	    ((let ((threshold #.(/ least-positive-double-float
 				   double-float-epsilon))
 		   (traps (ldb sb!vm::float-sticky-bits

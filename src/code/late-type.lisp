@@ -1031,11 +1031,6 @@
 
 (!define-type-class named)
 
-(defvar *wild-type*)
-(defvar *empty-type*)
-(defvar *universal-type*)
-(defvar *universal-fun-type*)
-
 (!cold-init-forms
  (macrolet ((frob (name var)
 	      `(progn

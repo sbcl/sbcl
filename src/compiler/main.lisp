@@ -91,11 +91,6 @@
 ;;; normally causes nested uses to be no-ops).
 (defvar *in-compilation-unit* nil)
 
-;;; This lock is siezed in the same situation: the compiler is not
-;;; presently thread-safe
-(defvar *big-compiler-lock*
-  (sb!thread:make-mutex :name "big compiler lock"))
-
 ;;; Count of the number of compilation units dynamically enclosed by
 ;;; the current active WITH-COMPILATION-UNIT that were unwound out of.
 (defvar *aborted-compilation-unit-count*)
@@ -205,23 +200,34 @@
                        defined later, the code doing so would not be ~
                        portable.~:@>"
 		      kind name)))
-                  (compiler-style-warn "undefined ~(~A~): ~S" kind name)))
+		  (if (eq kind :variable)
+		      (compiler-warn "undefined ~(~A~): ~S" kind name)
+		      (compiler-style-warn "undefined ~(~A~): ~S" kind name))))
 	    (let ((warn-count (length warnings)))
 	      (when (and warnings (> undefined-warning-count warn-count))
 		(let ((more (- undefined-warning-count warn-count)))
-		  (compiler-style-warn
-		   "~W more use~:P of undefined ~(~A~) ~S"
-		   more kind name))))))
+		  (if (eq kind :variable)
+		      (compiler-warn
+		       "~W more use~:P of undefined ~(~A~) ~S"
+		       more kind name)
+		      (compiler-style-warn
+		       "~W more use~:P of undefined ~(~A~) ~S"
+		       more kind name)))))))
 
 	(dolist (kind '(:variable :function :type))
 	  (let ((summary (mapcar #'undefined-warning-name
 				 (remove kind undefs :test-not #'eq
 					 :key #'undefined-warning-kind))))
 	    (when summary
-	      (compiler-style-warn
-	       "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
-		~%  ~{~<~%  ~1:;~S~>~^ ~}"
-	       (cdr summary) kind summary)))))))
+	      (if (eq kind :variable)
+		  (compiler-warn
+		   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
+		    ~%  ~{~<~%  ~1:;~S~>~^ ~}"
+		   (cdr summary) kind summary)
+		  (compiler-style-warn
+		   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
+		   ~%  ~{~<~%  ~1:;~S~>~^ ~}"
+		   (cdr summary) kind summary))))))))
 
   (unless (and (not abort-p)
 	       (zerop *aborted-compilation-unit-count*)
