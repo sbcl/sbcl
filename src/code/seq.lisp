@@ -634,10 +634,33 @@
   specified OUTPUT-TYPE-SPEC."
   (let ((type (specifier-type output-type-spec)))
   (cond
+    ((csubtypep type (specifier-type 'list))
+     (cond
+       ((type= type (specifier-type 'list))
+	(apply #'concat-to-list* sequences))
+       ((eq type *empty-type*)
+	(bad-sequence-type-error nil))
+       ((type= type (specifier-type 'null))
+	(if (every (lambda (x) (or (null x)
+				   (and (vectorp x) (= (length x) 0))))
+		   sequences)
+	    'nil
+	    (sequence-type-length-mismatch-error type
+						 ;; FIXME: circular
+						 ;; list issues.  And
+						 ;; rightward-drift.
+						 (reduce #'+
+							 (mapcar #'length
+								 sequences)))))
+       ((csubtypep (specifier-type '(cons nil t)) type)
+	(if (notevery (lambda (x) (or (null x)
+				      (and (vectorp x) (= (length x) 0))))
+		      sequences)
+	    (apply #'concat-to-list* sequences)
+	    (sequence-type-length-mismatch-error type 0)))
+       (t (sequence-type-too-hairy (type-specifier type)))))
     ((csubtypep type (specifier-type 'vector))
      (apply #'concat-to-simple* output-type-spec sequences))
-    ((csubtypep type (specifier-type 'list))
-     (apply #'concat-to-list* sequences))
     (t
      (bad-sequence-type-error output-type-spec)))))
 

@@ -296,6 +296,10 @@
     ;; MAKE-SEQUENCE
     (assert-type-error (make-sequence 'cons 0))
     (assert-type-error (make-sequence 'null 1))
+    ;; KLUDGE: I'm not certain that this test actually tests for what
+    ;; it should test, in that the type deriver and optimizers might
+    ;; be too smart for the good of an exhaustive test system.
+    ;; However, it makes me feel good.  -- CSR, 2002-10-18
     (assert (null (make-sequence 'null 0)))
     (assert (= (length (make-sequence 'cons 3)) 3))
     ;; and NIL is not a valid type for MAKE-SEQUENCE
@@ -312,10 +316,15 @@
     (assert (null (merge 'null () () '<)))
     (assert (= (length (merge 'cons '(1 3) '(2 4) '<)) 4))
     (assert-type-error (merge 'nil () () '<))
-    ;; tests for MAP/CONCATENATE to come.
+    ;; CONCATENATE
+    (assert-type-error (concatenate 'null '(1) "2"))
+    (assert-type-error (concatenate 'cons #() ()))
+    (assert (null (concatenate 'null () #())))
+    (assert (= (length (concatenate 'cons #() '(1) "2 3")) 4))
+    (assert-type-error (concatenate 'nil '(3)))
+    ;; FIXME: tests for MAP to come when some brave soul implements
+    ;; the analogous type checking for MAP/%MAP.
     ))
-
-	     
 
 ;;; success
 (quit :unix-status 104)

@@ -1276,6 +1276,37 @@ WORKAROUND:
   c. Compiler should not warn on an unknown key :ALLOW-OTHER-KEYS.
   d. :ALLOW-OTHER-KEYS should be allowed as an ordinary key parameter.
 
+212: "Sequence functions and circular arguments"
+  COERCE, MERGE and CONCATENATE go into an infinite loop when given
+  circular arguments; it would be good for the user if they could be
+  given an error instead (ANSI 17.1.1 allows this behaviour on the part
+  of the implementation, as conforming code cannot give non-proper
+  sequences to these functions.  MAP also has this problem (and
+  solution), though arguably the convenience of being able to do 
+    (MAP 'LIST '+ FOO '#1=(1 . #1#)) 
+  might be classed as more important (though signalling an error when
+  all of the arguments are circular is probably desireable).
+
+213: "Sequence functions and type checking"
+  a. MAKE-SEQUENCE, COERCE, MERGE and CONCATENATE cannot deal with
+     various complicated, though recognizeable, CONS types [e.g. 
+       (CONS * (CONS * NULL))
+     which according to ANSI should be recognized] (and, in SAFETY 3
+     code, should return a list of LENGTH 2 or signal an error)
+  b. MAP, when given a type argument that is SUBTYPEP LIST, does not
+     check that it will return a sequence of the given type.  Fixing
+     it along the same lines as the others (cf. work done around
+     sbcl-0.7.8.45) is possible, but doing so efficiently didn't look
+     entirely straightforward.
+  c. All of these functions will silently accept a type of the form
+       (CONS INTEGER *)
+     whether or not the return value is of this type.  This is
+     probably permitted by ANSI (see "Exceptional Situations" under
+     ANSI MAKE-SEQUENCE), but the DERIVE-TYPE mechanism does not 
+     know about this escape clause, so code of the form
+       (INTEGERP (CAR (MAKE-SEQUENCE '(CONS INTEGER *) 2)))
+     can erroneously return T.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
