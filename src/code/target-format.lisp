@@ -1061,7 +1061,7 @@
 		(interpret-format-logical-block stream orig-args args
 						prefix per-line-p insides
 						suffix atsignp))
-	      (let ((count (apply #'+ (mapcar (lambda (x) (count-if #'illegal-inside-justification-p x)) segments))))
+	      (let ((count (reduce #'+ (mapcar (lambda (x) (count-if #'illegal-inside-justification-p x)) segments))))
 		(when (> count 0)
 		  ;; ANSI specifies that "an error is signalled" in this
 		  ;; situation.
