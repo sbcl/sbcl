@@ -527,8 +527,11 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  (let* ((control-stack-start (sb!di::current-thread-control-stack-start))
-	 (control-stack-end (sb!di::current-thread-control-stack-end)))
+  (let* ((control-stack-start
+	  (descriptor-sap sb!vm::*control-stack-start*))
+	 (control-stack-end
+	  (sap+
+	   (descriptor-sap sb!vm::*binding-stack-start*) -4)))
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
 	 (sap<= control-stack-start
@@ -712,9 +715,9 @@
 		   (let ((fp (frame-pointer frame)))
 		     (when (control-stack-pointer-valid-p fp)
 		       #!+x86
-			(multiple-value-bind (ra ofp) (x86-call-context fp)
-			  (compute-calling-frame ofp ra frame))
-			#!-x86
+		       (multiple-value-bind (ra ofp) (x86-call-context fp)
+			 (and ra (compute-calling-frame ofp ra frame)))
+		       #!-x86
 		       (compute-calling-frame
 			#!-alpha
 			(sap-ref-sap fp (* ocfp-save-offset
@@ -723,7 +726,7 @@
 			(int-sap
 			 (sap-ref-32 fp (* ocfp-save-offset
 					   sb!vm:n-word-bytes)))
-
+			
 			(stack-ref fp lra-save-offset)
 
 			frame)))))))
@@ -883,6 +886,12 @@
 						    escaped)
 			     (if up-frame (1+ (frame-number up-frame)) 0)
 			     escaped)))))
+
+#!+x86
+(defun nth-interrupt-context (n)
+  (declare (type (unsigned-byte 32) n))
+  (sb!alien:sap-alien (nth-interrupt-context-sap n) (* os-context-t)))
+
 
 #!+x86
 (defun find-escaped-frame (frame-pointer)

@@ -1,10 +1,3 @@
-(in-package "SB!DI")
+(in-package "SB!THREAD")
 
-(defun current-thread-control-stack-start () 
-  (int-sap sb!vm::*control-stack-start*))
 
-(defun current-thread-control-stack-end ()
-  (sap+ (int-sap sb!vm::*binding-stack-start*) -4))
-
-(defun nth-interrupt-context (n)
-  (sb!alien:sap-alien (nth-interrupt-context-sap n) (* os-context-t)))

@@ -41,8 +41,10 @@ struct thread *init_thread(lispobj initial_function) {
 	int i;
 	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
 	    per_thread->dynamic_values[i]=UNBOUND_MARKER_WIDETAG;
-	SetSymbolValue(FREE_TLS_INDEX,
-		       make_fixnum(sizeof(struct thread)/sizeof(lispobj)),0);
+	if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG) 
+	    SetSymbolValue(FREE_TLS_INDEX,
+			   make_fixnum(sizeof(struct thread)/sizeof(lispobj)),
+			   0);
 	((struct symbol *)(BINDING_STACK_START-OTHER_POINTER_LOWTAG))
 	    ->tls_index=make_fixnum(1);
 	((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))

@@ -1,5 +1,9 @@
 * stuff that needs to happen before it will run
 
+21) add a lisp interface to init_thread
+
+* stuff that can be fixed later
+
 14) allocation/gc still needs locking.
 
 a) lots of threads can allocate at once, if allocation happens
@@ -14,10 +18,6 @@ the allocation attempt should then be repeated after the gc has
 finished.
 
 20) read genesis again and convince ourselves it does actually work
-
-21) add a lisp interface to init_thread
-
-* stuff that can be fixed later
 
 2) grow tlv when full
 
