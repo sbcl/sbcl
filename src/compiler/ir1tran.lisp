@@ -2016,16 +2016,21 @@
 
 ;;; common logic for MACROLET and SYMBOL-MACROLET
 ;;;
-;;; Call DEFINITIONIZE on each element of DEFINITIONS to find its
+;;; Call DEFINITIONIZE-FUN on each element of DEFINITIONS to find its
 ;;; in-lexenv representation, stuff the results into *LEXENV*, and
 ;;; call FUN (with no arguments).
-(defun %funcall-in-foomacrolet-lexenv (definitionize definitions fun)
-  (declare (type function process-definitions-fun fun) (type list definitions))
+(defun %funcall-in-foomacrolet-lexenv (definitionize-fun
+				       definitionize-keyword
+				       definitions
+				       fun)
+  (declare (type function definitionize-fun fun))
+  (declare (type (member :variables :functions) definitionize-keyword))
+  (declare (type list definitions))
   (unless (= (length definitions)
              (length (remove-duplicates definitions :key #'first)))
     (compiler-style-warning "duplicate definitions in ~S" definitions))
-  (let* ((processed-definitions (mapcar definitionize definitions))
-         (*lexenv* (make-lexenv :functions processed-definitions)))
+  (let* ((processed-definitions (mapcar definitionize-fun definitions))
+         (*lexenv* (make-lexenv definitionize-keyword processed-definitions)))
     (funcall fun)))
 
 ;;; Tweak *LEXENV* to include the DEFINITIONS from a MACROLET, then
@@ -2053,6 +2058,7 @@
 			     `(lambda (,whole ,environment)
 				,@local-decls
 				(block ,name ,body))))))))
+   :functions
    definitions
    fun))
 
@@ -2067,32 +2073,20 @@
 			      (lambda ()
 				(ir1-translate-locally body start cont))))
 
-;;; Tweak *LEXENV* to include the MACROBINDINGS from a SYMBOL-MACROLET,
-;;; then call FUN (with no arguments).
-;;;
-;;; This is split off from the IR1 convert method so that it can be
-;;; shared by the special-case top-level SYMBOL-MACROLET processing code.
-(defun funcall-in-symbol-macrolet-lexenv (macrobindings fun)
-  (declare (type list macrobindings) (type function fun))
-  (let ((processed-macrobindings
-	 (mapcar (lambda (macrobinding)
-		   (unless (proper-list-of-length-p macrobinding 2)
-		     (compiler-error "malformed symbol/expansion pair: ~S"
-				     macrobinding))
-		   (destructuring-bind (name expansion) macrobinding
-		     (unless (symbolp name)
-		       (compiler-error
-			"The local symbol macro name ~S is not a symbol."
-			name))
-		     `(,name . (MACRO . ,expansion))))
-		 macrobindings)))
-    (unless (= (length macrobindings)
-	       (length (remove-duplicates macrobindings :key #'first)))
-      (compiler-style-warning
-       "duplicate symbol macro names in SYMBOL-MACROLET ~S" macrobindings))
-    (let ((*lexenv* (make-lexenv :variables processed-macrobindings)))
-      (funcall fun)))
-  (values))
+(defun funcall-in-symbol-macrolet-lexenv (definitions fun)
+  (%funcall-in-foomacrolet-lexenv
+   (lambda (definition)
+     (unless (proper-list-of-length-p definition 2)
+       (compiler-error "malformed symbol/expansion pair: ~S" definition))
+     (destructuring-bind (name expansion) definition
+       (unless (symbolp name)
+         (compiler-error
+          "The local symbol macro name ~S is not a symbol."
+          name))
+       `(,name . (MACRO . ,expansion))))
+   :variables
+   definitions
+   fun))
   
 (def-ir1-translator symbol-macrolet ((macrobindings &body body) start cont)
   #!+sb-doc
