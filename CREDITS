@@ -516,6 +516,11 @@ Daniel Barlow:
   for SBCL (as well as for free Common Lisp in general) through
   his CLiki website.
 
+Robert E. Brown:
+  He has reported various bugs and submitted several patches, 
+  especially improving removing gratuitous efficiencies in the
+  standard library.
+
 Cadabra, Inc. (later merged into GoTo.com):
   They hired Bill Newman to do some consulting for them,
   including the implementation of EQUALP hash tables for CMU CL;

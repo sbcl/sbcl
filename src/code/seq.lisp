@@ -1525,11 +1525,15 @@
 	     (atom current)))
       (declare (fixnum index))
       (if (or (and from-end
-		   (not (member (apply-key key (car current))
-				(nthcdr (1+ start) result)
-				:test test
-				:test-not test-not
-				:key key)))
+		   (not (if test-not
+			    (member (apply-key key (car current))
+				    (nthcdr (1+ start) result)
+				    :test-not test-not
+				    :key key)
+			    (member (apply-key key (car current))
+				    (nthcdr (1+ start) result)
+				    :test test
+				    :key key))))
 	      (and (not from-end)
 		   (not (do ((it (apply-key key (car current)))
 			     (l (cdr current) (cdr l))
@@ -1538,7 +1542,9 @@
 			     ())
 			  (declare (fixnum i))
 			  (if (if test-not
-				  (not (funcall test-not it (apply-key key (car l))))
+				  (not (funcall test-not
+						it
+						(apply-key key (car l))))
 				  (funcall test it (apply-key key (car l))))
 			      (return t))))))
 	  (setq splice (cdr (rplacd splice (list (car current))))))
@@ -1564,12 +1570,20 @@
     (do ((elt))
 	((= index end))
       (setq elt (aref vector index))
+      ;; FIXME: Relying on POSITION allowing both :TEST and :TEST-NOT
+      ;; arguments simultaneously is a little fragile, since ANSI says
+      ;; we can't depend on it, so we need to remember to keep that
+      ;; extension in our implementation. It'd probably be better to
+      ;; rewrite this to avoid passing both (as
+      ;; LIST-REMOVE-DUPLICATES* was rewritten ca. sbcl-0.7.12.18).
       (unless (or (and from-end
-			(position (apply-key key elt) result :start start
-			   :end jndex :test test :test-not test-not :key key))
+		       (position (apply-key key elt) result
+				 :start start :end jndex
+				 :test test :test-not test-not :key key))
 		  (and (not from-end)
-			(position (apply-key key elt) vector :start (1+ index)
-			   :end end :test test :test-not test-not :key key)))
+		       (position (apply-key key elt) vector
+				 :start (1+ index) :end end
+				 :test test :test-not test-not :key key)))
 	(setf (aref result jndex) elt)
 	(setq jndex (1+ jndex)))
       (setq index (1+ index)))
@@ -1583,7 +1597,7 @@
 (define-sequence-traverser remove-duplicates
     (sequence &key (test #'eql) test-not (start 0) end from-end key)
   #!+sb-doc
-  "The elements of Sequence are compared pairwise, and if any two match,
+  "The elements of SEQUENCE are compared pairwise, and if any two match,
    the one occurring earlier is discarded, unless FROM-END is true, in
    which case the one later in the sequence is discarded. The resulting
    sequence is returned.

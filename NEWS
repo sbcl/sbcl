@@ -1539,6 +1539,8 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
        freshly-consed result bit-array);
     ** ELT now signals an error on an invalid sequence index in safe
        code;
+  * lifted FDEFINITION lookup out of loops in the implementation of
+    many list operations (thanks to Robert E. Brown)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

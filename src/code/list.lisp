@@ -113,6 +113,7 @@
 (declaim (maybe-inline tree-equal-test tree-equal-test-not))
 
 (defun tree-equal-test-not (x y test-not)
+  (declare (type function test-not))
   (cond ((consp x)
 	 (and (consp y)
 	      (tree-equal-test-not (car x) (car y) test-not)
@@ -122,6 +123,7 @@
 	(t ())))
 
 (defun tree-equal-test (x y test)
+  (declare (type function test))
   (cond	((consp x)
 	 (and (consp y)
 	      (tree-equal-test (car x) (car y) test)
@@ -130,12 +132,14 @@
 	((funcall test x y) t)
 	(t ())))
 
-(defun tree-equal (x y &key (test #'eql) test-not)
+(defun tree-equal (x y &key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return T if X and Y are isomorphic trees with identical leaves."
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
   (if test-not
-      (tree-equal-test-not x y test-not)
-      (tree-equal-test x y test)))
+      (tree-equal-test-not x y (%coerce-callable-to-fun test-not))
+      (tree-equal-test x y (%coerce-callable-to-fun test))))
 
 (defun endp (object)
   #!+sb-doc
@@ -151,7 +155,8 @@
        (y list (cddr y))
        (z list (cdr z)))
       (())
-    (declare (fixnum n) (list y z))
+    (declare (type fixnum n)
+             (type list y z))
     (when (endp y) (return n))
     (when (endp (cdr y)) (return (+ n 1)))
     (when (and (eq y z) (> n 0)) (return nil))))
@@ -231,8 +236,8 @@
   "Return constructs and returns a list of its arguments."
   args)
 
-;;; List* is done the same as list, except that the last cons is made a
-;;; dotted pair
+;;; LIST* is done the same as LIST, except that the last cons is made
+;;; a dotted pair.
 
 (defun list* (arg &rest others)
   #!+sb-doc
@@ -252,10 +257,10 @@
       ((zerop count) result)
     (declare (type index count))))
 
-;;; The outer loop finds the first non-null list and the result is started.
-;;; The remaining lists in the arguments are tacked to the end of the result
-;;; using splice which cdr's down the end of the new list
-
+;;; The outer loop finds the first non-null list and the result is
+;;; started. The remaining lists in the arguments are tacked to the
+;;; end of the result using splice which cdr's down the end of the new
+;;; list.
 (defun append (&rest lists)
   #!+sb-doc
   "Construct a new list by concatenating the list arguments"
@@ -292,7 +297,7 @@
                               (cdr (rplacd splice (cons (car x) ())))))
                            (fail (car y))))))))))))
 
-;;; list copying functions
+;;;; list copying functions
 
 (defun copy-list (list)
   #!+sb-doc
@@ -342,7 +347,7 @@
       (cons (copy-tree (car object)) (copy-tree (cdr object)))
       object))
 
-;;; more commonly-used list functions
+;;;; more commonly-used list functions
 
 (defun revappend (x y)
   #!+sb-doc
@@ -480,7 +485,7 @@
        (list list (cdr list)))
       ((endp list)
        (error "~S is too large an index for SETF of NTH." n))
-    (declare (fixnum count))
+    (declare (type fixnum count))
     (when (<= count 0)
       (rplaca list newval)
       (return newval))))
@@ -499,9 +504,9 @@
 
 ;;; Use these with the following &KEY args:
 (defmacro with-set-keys (funcall)
-  `(cond ((and testp notp) (error ":TEST and :TEST-NOT were both supplied."))
-	 (notp ,(append funcall '(:key key :test-not test-not)))
-	 (t ,(append funcall '(:key key :test test)))))
+  `(if notp
+       ,(append funcall '(:key key :test-not test-not))
+       ,(append funcall '(:key key :test test))))
 
 (defmacro satisfies-the-test (item elt)
   (let ((key-tmp (gensym)))
@@ -512,120 +517,146 @@
 
 ;;;; substitution of expressions
 
-(defun subst (new old tree &key key (test #'eql testp) (test-not nil notp))
+(defun subst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
   "Substitutes new for subtrees matching old."
-  (labels ((s (subtree)
-	      (cond ((satisfies-the-test old subtree) new)
-		    ((atom subtree) subtree)
-		    (t (let ((car (s (car subtree)))
-			     (cdr (s (cdr subtree))))
-			 (if (and (eq car (car subtree))
-				  (eq cdr (cdr subtree)))
-			     subtree
-			     (cons car cdr)))))))
-    (s tree)))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (type function test test-not))
+    (labels ((s (subtree)
+               (cond ((satisfies-the-test old subtree) new)
+                     ((atom subtree) subtree)
+                     (t (let ((car (s (car subtree)))
+                              (cdr (s (cdr subtree))))
+                          (if (and (eq car (car subtree))
+                                   (eq cdr (cdr subtree)))
+                              subtree
+                              (cons car cdr)))))))
+      (s tree))))
 
 (defun subst-if (new test tree &key key)
   #!+sb-doc
   "Substitutes new for subtrees for which test is true."
-  (labels ((s (subtree)
-	      (cond ((funcall test (apply-key key subtree)) new)
-		    ((atom subtree) subtree)
-		    (t (let ((car (s (car subtree)))
-			     (cdr (s (cdr subtree))))
-			 (if (and (eq car (car subtree))
-				  (eq cdr (cdr subtree)))
-			     subtree
-			     (cons car cdr)))))))
-    (s tree)))
+  (let ((test (%coerce-callable-to-fun test))
+        (key (and key (%coerce-callable-to-fun key))))
+    (labels ((s (subtree)
+               (cond ((funcall test (apply-key key subtree)) new)
+                     ((atom subtree) subtree)
+                     (t (let ((car (s (car subtree)))
+                              (cdr (s (cdr subtree))))
+                          (if (and (eq car (car subtree))
+                                   (eq cdr (cdr subtree)))
+                              subtree
+                              (cons car cdr)))))))
+      (s tree))))
 
 (defun subst-if-not (new test tree &key key)
   #!+sb-doc
   "Substitutes new for subtrees for which test is false."
-  (labels ((s (subtree)
-	      (cond ((not (funcall test (apply-key key subtree))) new)
-		    ((atom subtree) subtree)
-		    (t (let ((car (s (car subtree)))
-			     (cdr (s (cdr subtree))))
-			 (if (and (eq car (car subtree))
-				  (eq cdr (cdr subtree)))
-			     subtree
-			     (cons car cdr)))))))
-    (s tree)))
+  (let ((test (%coerce-callable-to-fun test))
+        (key (and key (%coerce-callable-to-fun key))))
+    (labels ((s (subtree)
+               (cond ((not (funcall test (apply-key key subtree))) new)
+                     ((atom subtree) subtree)
+                     (t (let ((car (s (car subtree)))
+                              (cdr (s (cdr subtree))))
+                          (if (and (eq car (car subtree))
+                                   (eq cdr (cdr subtree)))
+                              subtree
+                              (cons car cdr)))))))
+      (s tree))))
 
-(defun nsubst (new old tree &key key (test #'eql testp) (test-not nil notp))
+(defun nsubst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
-  "Substitutes new for subtrees matching old."
-  (labels ((s (subtree)
-	      (cond ((satisfies-the-test old subtree) new)
-		    ((atom subtree) subtree)
-		    (t (do* ((last nil subtree)
-			     (subtree subtree (Cdr subtree)))
-			    ((atom subtree)
-			     (if (satisfies-the-test old subtree)
-				 (setf (cdr last) new)))
-			 (if (satisfies-the-test old subtree)
-			     (return (setf (cdr last) new))
-			     (setf (car subtree) (s (car subtree)))))
-		       subtree))))
-    (s tree)))
+  "Substitute NEW for subtrees matching OLD."
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (type function test test-not))
+    (labels ((s (subtree)
+               (cond ((satisfies-the-test old subtree) new)
+                     ((atom subtree) subtree)
+                     (t (do* ((last nil subtree)
+                              (subtree subtree (Cdr subtree)))
+                             ((atom subtree)
+                              (if (satisfies-the-test old subtree)
+                                  (setf (cdr last) new)))
+                          (if (satisfies-the-test old subtree)
+                              (return (setf (cdr last) new))
+                              (setf (car subtree) (s (car subtree)))))
+                        subtree))))
+      (s tree))))
 
 (defun nsubst-if (new test tree &key key)
   #!+sb-doc
-  "Substitutes new for subtrees of tree for which test is true."
-  (labels ((s (subtree)
-	      (cond ((funcall test (apply-key key subtree)) new)
-		    ((atom subtree) subtree)
-		    (t (do* ((last nil subtree)
-			     (subtree subtree (Cdr subtree)))
-			    ((atom subtree)
-			     (if (funcall test (apply-key key subtree))
-				 (setf (cdr last) new)))
-			 (if (funcall test (apply-key key subtree))
-			     (return (setf (cdr last) new))
-			     (setf (car subtree) (s (car subtree)))))
-		       subtree))))
-    (s tree)))
+  "Substitute NEW for subtrees of TREE for which TEST is true."
+  (let ((test (%coerce-callable-to-fun test))
+        (key (and key (%coerce-callable-to-fun key))))
+    (labels ((s (subtree)
+               (cond ((funcall test (apply-key key subtree)) new)
+                     ((atom subtree) subtree)
+                     (t (do* ((last nil subtree)
+                              (subtree subtree (Cdr subtree)))
+                             ((atom subtree)
+                              (if (funcall test (apply-key key subtree))
+                                  (setf (cdr last) new)))
+                          (if (funcall test (apply-key key subtree))
+                              (return (setf (cdr last) new))
+                              (setf (car subtree) (s (car subtree)))))
+                        subtree))))
+      (s tree))))
 
 (defun nsubst-if-not (new test tree &key key)
   #!+sb-doc
-  "Substitutes new for subtrees of tree for which test is false."
-  (labels ((s (subtree)
-	      (cond ((not (funcall test (apply-key key subtree))) new)
-		    ((atom subtree) subtree)
-		    (t (do* ((last nil subtree)
-			     (subtree subtree (Cdr subtree)))
-			    ((atom subtree)
-			     (if (not (funcall test (apply-key key subtree)))
-				 (setf (cdr last) new)))
-			 (if (not (funcall test (apply-key key subtree)))
-			     (return (setf (cdr last) new))
-			     (setf (car subtree) (s (car subtree)))))
-		       subtree))))
-    (s tree)))
+  "Substitute NEW for subtrees of TREE for which TEST is false."
+  (let ((test (%coerce-callable-to-fun test))
+        (key (and key (%coerce-callable-to-fun key))))
+    (labels ((s (subtree)
+               (cond ((not (funcall test (apply-key key subtree))) new)
+                     ((atom subtree) subtree)
+                     (t (do* ((last nil subtree)
+                              (subtree subtree (Cdr subtree)))
+                             ((atom subtree)
+                              (if (not (funcall test (apply-key key subtree)))
+                                  (setf (cdr last) new)))
+                          (if (not (funcall test (apply-key key subtree)))
+                              (return (setf (cdr last) new))
+                              (setf (car subtree) (s (car subtree)))))
+                        subtree))))
+      (s tree))))
 
-(defun sublis (alist tree &key key (test #'eql) (test-not nil notp))
+(defun sublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
-  "Substitutes from alist into tree nondestructively."
-  (declare (inline assoc))
-  (labels ((s (subtree)
-	     (let* ((key-val (apply-key key subtree))
-		    (assoc (if notp
-			       (assoc key-val alist :test-not test-not)
-			       (assoc key-val alist :test test))))
-	       (cond (assoc (cdr assoc))
-		     ((atom subtree) subtree)
-		     (t (let ((car (s (car subtree)))
-			      (cdr (s (cdr subtree))))
-			  (if (and (eq car (car subtreE))
-				   (eq cdr (cdr subtree)))
-			      subtree
-			      (cons car cdr))))))))
-    (s tree)))
+  "Substitute from ALIST into TREE nondestructively."
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (type function test test-not))
+    (declare (inline assoc))
+    (labels ((s (subtree)
+               (let* ((key-val (apply-key key subtree))
+                      (assoc (if notp
+                                 (assoc key-val alist :test-not test-not)
+                                 (assoc key-val alist :test test))))
+                 (cond (assoc (cdr assoc))
+                       ((atom subtree) subtree)
+                       (t (let ((car (s (car subtree)))
+                                (cdr (s (cdr subtree))))
+                            (if (and (eq car (car subtreE))
+                                     (eq cdr (cdr subtree)))
+                                subtree
+                                (cons car cdr))))))))
+      (s tree))))
 
-;;; These are in run-time env (i.e. not wrapped in EVAL-WHEN (COMPILE EVAL))
-;;; because they can be referenced in inline expansions.
+;;; This is in run-time env (i.e. not wrapped in EVAL-WHEN (COMPILE EVAL))
+;;; because it can be referenced in inline expansions.
 (defmacro nsublis-macro ()
   (let ((key-tmp (gensym)))
     `(let ((,key-tmp (apply-key key subtree)))
@@ -633,53 +664,68 @@
 	  (assoc ,key-tmp alist :test-not test-not)
 	  (assoc ,key-tmp alist :test test)))))
 
-(defun nsublis (alist tree &key key (test #'eql) (test-not nil notp))
+(defun nsublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
-  "Substitutes new for subtrees matching old."
-  (declare (inline assoc))
-  (let (temp)
-    (labels ((s (subtree)
-		(cond ((Setq temp (nsublis-macro))
-		       (cdr temp))
-		      ((atom subtree) subtree)
-		      (t (do* ((last nil subtree)
-			       (subtree subtree (Cdr subtree)))
-			      ((atom subtree)
-			       (if (setq temp (nsublis-macro))
-				   (setf (cdr last) (cdr temp))))
-			   (if (setq temp (nsublis-macro))
-			       (return (setf (Cdr last) (Cdr temp)))
-			       (setf (car subtree) (s (car subtree)))))
-			 subtree))))
-      (s tree))))
+  "Substitute from ALIST into TRUE destructively."
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (inline assoc))
+    (let (temp)
+      (labels ((s (subtree)
+                 (cond ((Setq temp (nsublis-macro))
+                        (cdr temp))
+                       ((atom subtree) subtree)
+                       (t (do* ((last nil subtree)
+                                (subtree subtree (Cdr subtree)))
+                               ((atom subtree)
+                                (if (setq temp (nsublis-macro))
+                                    (setf (cdr last) (cdr temp))))
+                            (if (setq temp (nsublis-macro))
+                                (return (setf (Cdr last) (Cdr temp)))
+                                (setf (car subtree) (s (car subtree)))))
+                          subtree))))
+        (s tree)))))
 
 ;;;; functions for using lists as sets
 
-(defun member (item list &key key (test #'eql testp) (test-not nil notp))
+(defun member (item list &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
   "Return the tail of LIST beginning with first element satisfying EQLity,
    :TEST, or :TEST-NOT with the given ITEM."
-  (do ((list list (cdr list)))
-      ((null list) nil)
-    (let ((car (car list)))
-      (if (satisfies-the-test item car)
-	  (return list)))))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (type function test test-not))
+    (do ((list list (cdr list)))
+        ((null list) nil)
+      (let ((car (car list)))
+        (if (satisfies-the-test item car)
+            (return list))))))
 
 (defun member-if (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element satisfying TEST."
-  (do ((list list (Cdr list)))
-      ((endp list) nil)
-    (if (funcall test (apply-key key (car list)))
-	(return list))))
+  (let ((test (%coerce-callable-to-fun test))
+        (key (and key (%coerce-callable-to-fun key))))
+    (do ((list list (cdr list)))
+        ((endp list) nil)
+      (if (funcall test (apply-key key (car list)))
+          (return list)))))
 
 (defun member-if-not (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element not satisfying TEST."
-  (do ((list list (cdr list)))
-      ((endp list) ())
-    (if (not (funcall test (apply-key key (car list))))
-	(return list))))
+  (let ((test (%coerce-callable-to-fun test))
+        (key (and key (%coerce-callable-to-fun key))))
+    (do ((list list (cdr list)))
+        ((endp list) ())
+      (if (not (funcall test (apply-key key (car list))))
+          (return list)))))
 
 (defun tailp (object list)
   #!+sb-doc
@@ -690,31 +736,36 @@
     (if (eql object list)
 	(return t))))
 
-(defun adjoin (item list &key key (test #'eql) (test-not nil notp))
+(defun adjoin (item list &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Add ITEM to LIST unless it is already a member"
-  (declare (inline member))
-  (if (let ((key-val (apply-key key item)))
-	(if notp
-	    (member key-val list :test-not test-not :key key)
-	    (member key-val list :test test :key key)))
-      list
-      (cons item list)))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (declare (inline member))
+    (if (let ((key-val (apply-key key item)))
+          (if notp
+              (member key-val list :test-not test-not :key key)
+              (member key-val list :test test :key key)))
+        list
+        (cons item list))))
 
-;;; This function assumes list2 is the result, adding to it from list1 as
-;;; necessary. List2 must initialize the result value, so the call to MEMBER
-;;; will apply the test to the elements from list1 and list2 in the correct
-;;; order.
 (defun union (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return the union of LIST1 and LIST2."
   (declare (inline member))
-  (when (and testp notp) (error "Test and test-not both supplied."))
-  (let ((res list2))
-    (dolist (elt list1)
-      (unless (with-set-keys (member (apply-key key elt) list2))
-	(push elt res)))
-    res))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  ;; We assumes LIST2 is the result, adding to it from LIST1 as
+  ;; necessary. LIST2 must initialize the result value, so the call to
+  ;; MEMBER will apply the test to the elements from LIST1 and LIST2
+  ;; in the correct order.
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (let ((res list2))
+      (dolist (elt list1)
+        (unless (with-set-keys (member (apply-key key elt) list2))
+          (push elt res)))
+      res)))
 
 ;;; Destination and source are SETF-able and many-evaluable. Set the
 ;;; SOURCE to the CDR, and "cons" the 1st elt of source to DESTINATION.
@@ -730,86 +781,92 @@
   #!+sb-doc
   "Destructively return the union of LIST1 and LIST2."
   (declare (inline member))
-  (if (and testp notp)
-      (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((res list2)
-	(list1 list1))
-    (do ()
-	((endp list1))
-      (if (not (with-set-keys (member (apply-key key (car list1)) list2)))
-	  (steve-splice list1 res)
-	  (setf list1 (cdr list1))))
-    res))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (let ((res list2)
+          (list1 list1))
+      (do ()
+          ((endp list1))
+        (if (not (with-set-keys (member (apply-key key (car list1)) list2)))
+            (steve-splice list1 res)
+            (setf list1 (cdr list1))))
+      res)))
 
-(defun intersection (list1 list2 &key key
-			   (test #'eql testp) (test-not nil notp))
+(defun intersection (list1 list2
+                     &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return the intersection of LIST1 and LIST2."
   (declare (inline member))
-  (if (and testp notp)
-      (error "Test and test-not both supplied."))
-  (let ((res nil))
-    (dolist (elt list1)
-      (if (with-set-keys (member (apply-key key elt) list2))
-	  (push elt res)))
-    res))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (let ((res nil))
+      (dolist (elt list1)
+        (if (with-set-keys (member (apply-key key elt) list2))
+            (push elt res)))
+      res)))
 
-(defun nintersection (list1 list2 &key key
-			    (test #'eql testp) (test-not nil notp))
+(defun nintersection (list1 list2
+                      &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the intersection of LIST1 and LIST2."
   (declare (inline member))
-  (if (and testp notp)
-      (error "Test and test-not both supplied."))
-  (let ((res nil)
-	(list1 list1))
-    (do () ((endp list1))
-      (if (with-set-keys (member (apply-key key (car list1)) list2))
-	  (steve-splice list1 res)
-	  (setq list1 (Cdr list1))))
-    res))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (let ((res nil)
+          (list1 list1))
+      (do () ((endp list1))
+        (if (with-set-keys (member (apply-key key (car list1)) list2))
+            (steve-splice list1 res)
+            (setq list1 (Cdr list1))))
+      res)))
 
-(defun set-difference (list1 list2 &key key
-			     (test #'eql testp) (test-not nil notp))
+(defun set-difference (list1 list2
+                       &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return the elements of LIST1 which are not in LIST2."
   (declare (inline member))
-  (if (and testp notp)
-      (error "Test and test-not both supplied."))
-  (if (null list2)
-      list1
-      (let ((res nil))
-	(dolist (elt list1)
-	  (if (not (with-set-keys (member (apply-key key elt) list2)))
-	      (push elt res)))
-	res)))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (if (null list2)
+        list1
+        (let ((res nil))
+          (dolist (elt list1)
+            (if (not (with-set-keys (member (apply-key key elt) list2)))
+                (push elt res)))
+          res))))
 
-(defun nset-difference (list1 list2 &key key
-			      (test #'eql testp) (test-not nil notp))
+(defun nset-difference (list1 list2
+                        &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Destructively return the elements of LIST1 which are not in LIST2."
   (declare (inline member))
-  (if (and testp notp)
-      (error "Test and test-not both supplied."))
-  (let ((res nil)
-	(list1 list1))
-    (do () ((endp list1))
-      (if (not (with-set-keys (member (apply-key key (car list1)) list2)))
-	  (steve-splice list1 res)
-	  (setq list1 (cdr list1))))
-    res))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (let ((res nil)
+          (list1 list1))
+      (do () ((endp list1))
+        (if (not (with-set-keys (member (apply-key key (car list1)) list2)))
+            (steve-splice list1 res)
+            (setq list1 (cdr list1))))
+      res)))
 
-(defun set-exclusive-or (list1 list2 &key key
-                         (test #'eql testp) (test-not nil notp))
+(defun set-exclusive-or (list1 list2
+                         &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
   "Return new list of elements appearing exactly once in LIST1 and LIST2."
   (declare (inline member))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
   (let ((result nil)
-        (key (when key (coerce key 'function)))
-        (test (coerce test 'function))
-        (test-not (if test-not (coerce test-not 'function) #'eql)))
-    (declare (type (or function null) key)
-             (type function test test-not))
+        (key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (type function test test-not))
     (dolist (elt list1)
       (unless (with-set-keys (member (apply-key key elt) list2))
 	(setq result (cons elt result))))
@@ -824,53 +881,63 @@
           (setq result (cons elt result)))))
     result))
 
-;;; The outer loop examines list1 while the inner loop examines list2.
-;;; If an element is found in list2 "equal" to the element in list1,
-;;; both are spliced out. When the end of list1 is reached, what is
-;;; left of list2 is tacked onto what is left of list1. The splicing
-;;; operation ensures that the correct operation is performed
-;;; depending on whether splice is at the top of the list or not
-(defun nset-exclusive-or (list1 list2 &key (test #'eql) (test-not nil notp)
-				key)
+(defun nset-exclusive-or (list1 list2
+                          &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
   "Destructively return a list with elements which appear but once in LIST1
    and LIST2."
-  (do ((list1 list1)
-       (list2 list2)
-       (x list1 (cdr x))
-       (splicex ()))
-      ((endp x)
-       (if (null splicex)
-	   (setq list1 list2)
-	   (rplacd splicex list2))
-       list1)
-    (do ((y list2 (cdr y))
-	 (splicey ()))
-	((endp y) (setq splicex x))
-      (cond ((let ((key-val-x (apply-key key (car x)))
-		   (key-val-y (apply-key key (Car y))))
-	       (if notp
-		   (not (funcall test-not key-val-x key-val-y))
-		   (funcall test key-val-x key-val-y)))
-	     (if (null splicex)
-		 (setq list1 (cdr x))
-		 (rplacd splicex (cdr x)))
-	     (if (null splicey)
-		 (setq list2 (cdr y))
-		 (rplacd splicey (cdr y)))
-	     (return ()))			; assume lists are really sets
-	    (t (setq splicey y))))))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (if testp (%coerce-callable-to-fun test) test))
+        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
+    (declare (type function test test-not))
+    ;; The outer loop examines LIST1 while the inner loop examines
+    ;; LIST2. If an element is found in LIST2 "equal" to the element
+    ;; in LIST1, both are spliced out. When the end of LIST1 is
+    ;; reached, what is left of LIST2 is tacked onto what is left of
+    ;; LIST1. The splicing operation ensures that the correct
+    ;; operation is performed depending on whether splice is at the
+    ;; top of the list or not
+    (do ((list1 list1)
+         (list2 list2)
+         (x list1 (cdr x))
+         (splicex ()))
+        ((endp x)
+         (if (null splicex)
+             (setq list1 list2)
+             (rplacd splicex list2))
+         list1)
+      (do ((y list2 (cdr y))
+           (splicey ()))
+          ((endp y) (setq splicex x))
+        (cond ((let ((key-val-x (apply-key key (car x)))
+                     (key-val-y (apply-key key (Car y))))
+                 (if notp
+                     (not (funcall test-not key-val-x key-val-y))
+                     (funcall test key-val-x key-val-y)))
+               (if (null splicex)
+                   (setq list1 (cdr x))
+                   (rplacd splicex (cdr x)))
+               (if (null splicey)
+                   (setq list2 (cdr y))
+                   (rplacd splicey (cdr y)))
+               (return ())) ; assume lists are really sets
+              (t (setq splicey y)))))))
 
 (defun subsetp (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return T if every element in LIST1 is also in LIST2."
   (declare (inline member))
-  (dolist (elt list1)
-    (unless (with-set-keys (member (apply-key key elt) list2))
-      (return-from subsetp nil)))
-  T)
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+    (dolist (elt list1)
+      (unless (with-set-keys (member (apply-key key elt) list2))
+        (return-from subsetp nil)))
+    t))
 
-;;; functions that operate on association lists
+;;;; functions that operate on association lists
 
 (defun acons (key datum alist)
   #!+sb-doc
@@ -887,140 +954,160 @@
 	(error "The lists of keys and data are of unequal length."))
     (setq alist (acons (car x) (car y) alist))))
 
-;;; This is in the run-time environment (i.e. not wrapped in
-;;; EVAL-WHEN (COMPILE EVAL)) because these guys can be inline
-;;; expanded.
-(defmacro assoc-guts (test-guy)
+;;; This is defined in the run-time environment, not just the compile-time
+;;; environment (i.e. not wrapped in EVAL-WHEN (COMPILE EVAL)) because it
+;;; can appear in inline expansions.
+(defmacro assoc-guts (test-expr)
   `(do ((alist alist (cdr alist)))
        ((endp alist))
-     ;; FIXME: would be clearer as (WHEN (AND ..) ..)
-     (if (car alist)
-	 (if ,test-guy (return (car alist))))))
+    (when (and (car alist) ,test-expr)
+      (return (car alist)))))
 
-(defun assoc (item alist &key key test test-not)
+(defun assoc (item alist &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the cons in ALIST whose car is equal (by a given test or EQL) to
    the ITEM."
-  ;; FIXME: Shouldn't there be a check for existence of both TEST and TEST-NOT?
-  (cond (test
-	 (if key
-	     (assoc-guts (funcall test item (funcall key (caar alist))))
-	     (assoc-guts (funcall test item (caar alist)))))
-	(test-not
-	 (if key
-	     (assoc-guts (not (funcall test-not item
-				       (funcall key (caar alist)))))
-	     (assoc-guts (not (funcall test-not item (caar alist))))))
-	(t
-	 (if key
-	     (assoc-guts (eql item (funcall key (caar alist))))
-	     (assoc-guts (eql item (caar alist)))))))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (and testp (%coerce-callable-to-fun test)))
+        (test-not (and notp (%coerce-callable-to-fun test-not))))
+    (cond (test
+           (if key
+               (assoc-guts (funcall test item (funcall key (caar alist))))
+               (assoc-guts (funcall test item (caar alist)))))
+          (test-not
+           (if key
+               (assoc-guts (not (funcall test-not item
+                                         (funcall key (caar alist)))))
+               (assoc-guts (not (funcall test-not item (caar alist))))))
+          (t
+           (if key
+               (assoc-guts (eql item (funcall key (caar alist))))
+               (assoc-guts (eql item (caar alist))))))))
 
 (defun assoc-if (predicate alist &key key)
   #!+sb-doc
-  "Return the first cons in alist whose car satisfies the Predicate. If
-   key is supplied, apply it to the car of each cons before testing."
-  (if key
-      (assoc-guts (funcall predicate (funcall key (caar alist))))
-      (assoc-guts (funcall predicate (caar alist)))))
+  "Return the first cons in ALIST whose CAR satisfies PREDICATE. If
+   KEY is supplied, apply it to the CAR of each cons before testing."
+  (let ((predicate (%coerce-callable-to-fun predicate))
+        (key (and key (%coerce-callable-to-fun key))))
+    (if key
+        (assoc-guts (funcall predicate (funcall key (caar alist))))
+        (assoc-guts (funcall predicate (caar alist))))))
 
 (defun assoc-if-not (predicate alist &key key)
   #!+sb-doc
-  "Return the first cons in ALIST whose car does not satisfy the PREDICATE.
-  If KEY is supplied, apply it to the car of each cons before testing."
-  (if key
-      (assoc-guts (not (funcall predicate (funcall key (caar alist)))))
-      (assoc-guts (not (funcall predicate (caar alist))))))
+  "Return the first cons in ALIST whose CAR does not satisfy PREDICATE.
+  If KEY is supplied, apply it to the CAR of each cons before testing."
+  (let ((predicate (%coerce-callable-to-fun predicate))
+        (key (and key (%coerce-callable-to-fun key))))
+    (if key
+        (assoc-guts (not (funcall predicate (funcall key (caar alist)))))
+        (assoc-guts (not (funcall predicate (caar alist)))))))
 
-(defun rassoc (item alist &key key test test-not)
+(defun rassoc (item alist &key key (test nil testp) (test-not nil notp))
   (declare (list alist))
   #!+sb-doc
-  "Return the cons in ALIST whose cdr is equal (by a given test or EQL) to
+  "Return the cons in ALIST whose CDR is equal (by a given test or EQL) to
    the ITEM."
-  (cond (test
-	 (if key
-	     (assoc-guts (funcall test item (funcall key (cdar alist))))
-	     (assoc-guts (funcall test item (cdar alist)))))
-	(test-not
-	 (if key
-	     (assoc-guts (not (funcall test-not item
-				       (funcall key (cdar alist)))))
-	     (assoc-guts (not (funcall test-not item (cdar alist))))))
-	(t
-	 (if key
-	     (assoc-guts (eql item (funcall key (cdar alist))))
-	     (assoc-guts (eql item (cdar alist)))))))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (and testp (%coerce-callable-to-fun test)))
+        (test-not (and notp (%coerce-callable-to-fun test-not))))
+    (cond (test
+           (if key
+               (assoc-guts (funcall test item (funcall key (cdar alist))))
+               (assoc-guts (funcall test item (cdar alist)))))
+          (test-not
+           (if key
+               (assoc-guts (not (funcall test-not item
+                                         (funcall key (cdar alist)))))
+               (assoc-guts (not (funcall test-not item (cdar alist))))))
+          (t
+           (if key
+               (assoc-guts (eql item (funcall key (cdar alist))))
+               (assoc-guts (eql item (cdar alist))))))))
 
 (defun rassoc-if (predicate alist &key key)
   #!+sb-doc
-  "Return the first cons in alist whose cdr satisfies the Predicate. If key
-  is supplied, apply it to the cdr of each cons before testing."
-  (if key
-      (assoc-guts (funcall predicate (funcall key (cdar alist))))
-      (assoc-guts (funcall predicate (cdar alist)))))
+  "Return the first cons in ALIST whose CDR satisfies PREDICATE. If KEY
+  is supplied, apply it to the CDR of each cons before testing."
+  (let ((predicate (%coerce-callable-to-fun predicate))
+        (key (and key (%coerce-callable-to-fun key))))
+    (if key
+        (assoc-guts (funcall predicate (funcall key (cdar alist))))
+        (assoc-guts (funcall predicate (cdar alist))))))
 
 (defun rassoc-if-not (predicate alist &key key)
   #!+sb-doc
-  "Return the first cons in alist whose cdr does not satisfy the Predicate.
-  If key is supplied, apply it to the cdr of each cons before testing."
-  (if key
-      (assoc-guts (not (funcall predicate (funcall key (cdar alist)))))
-      (assoc-guts (not (funcall predicate (cdar alist))))))
+  "Return the first cons in ALIST whose CDR does not satisfy PREDICATE.
+  If KEY is supplied, apply it to the CDR of each cons before testing."
+  (let ((predicate (%coerce-callable-to-fun predicate))
+        (key (and key (%coerce-callable-to-fun key))))
+    (if key
+        (assoc-guts (not (funcall predicate (funcall key (cdar alist)))))
+        (assoc-guts (not (funcall predicate (cdar alist)))))))
 
 ;;;; mapping functions
 
-(defun map1 (function original-arglists accumulate take-car)
-  #!+sb-doc
-  "This function is called by mapc, mapcar, mapcan, mapl, maplist, and mapcon.
-  It Maps function over the arglists in the appropriate way. It is done when any
-  of the arglists runs out. Until then, it CDRs down the arglists calling the
-  function and accumulating results as desired."
-
-  (let* ((arglists (copy-list original-arglists))
-	 (ret-list (list nil))
-	 (temp ret-list))
-    (do ((res nil)
-	 (args '() '()))
-	((dolist (x arglists nil) (if (null x) (return t)))
-	 (if accumulate
-	     (cdr ret-list)
-	     (car original-arglists)))
-      (do ((l arglists (cdr l)))
-	  ((null l))
-	(push (if take-car (caar l) (car l)) args)
-	(setf (car l) (cdar l)))
-      (setq res (apply function (nreverse args)))
-      (case accumulate
-	(:nconc (setq temp (last (nconc temp res))))
-	(:list (rplacd temp (list res))
-	       (setq temp (cdr temp)))))))
+;;; a helper function for implementation of MAPC, MAPCAR, MAPCAN,
+;;; MAPL, MAPLIST, and MAPCON
+;;;
+;;; Map the designated function over the arglists in the appropriate
+;;; way. It is done when any of the arglists runs out. Until then, it
+;;; CDRs down the arglists calling the function and accumulating
+;;; results as desired.
+(defun map1 (fun-designator original-arglists accumulate take-car)
+  (let ((fun (%coerce-callable-to-fun fun-designator)))
+    (let* ((arglists (copy-list original-arglists))
+           (ret-list (list nil))
+           (temp ret-list))
+      (do ((res nil)
+           (args '() '()))
+          ((dolist (x arglists nil) (if (null x) (return t)))
+           (if accumulate
+               (cdr ret-list)
+               (car original-arglists)))
+        (do ((l arglists (cdr l)))
+            ((null l))
+          (push (if take-car (caar l) (car l)) args)
+          (setf (car l) (cdar l)))
+        (setq res (apply fun (nreverse args)))
+        (case accumulate
+          (:nconc (setq temp (last (nconc temp res))))
+          (:list (rplacd temp (list res))
+                 (setq temp (cdr temp))))))))
 
 (defun mapc (function list &rest more-lists)
   #!+sb-doc
-  "Applies fn to successive elements of lists, returns its second argument."
+  "Apply FUNCTION to successive elements of lists. Return the second argument."
   (map1 function (cons list more-lists) nil t))
 
 (defun mapcar (function list &rest more-lists)
   #!+sb-doc
-  "Applies fn to successive elements of list, returns list of results."
+  "Apply FUNCTION to successive elements of LIST. Return list of FUNCTION
+   return values."
   (map1 function (cons list more-lists) :list t))
 
 (defun mapcan (function list &rest more-lists)
   #!+sb-doc
-  "Applies fn to successive elements of list, returns NCONC of results."
+  "Apply FUNCTION to successive elements of LIST. Return NCONC of FUNCTION
+   results."
   (map1 function (cons list more-lists) :nconc t))
 
 (defun mapl (function list &rest more-lists)
   #!+sb-doc
-  "Applies fn to successive CDRs of list, returns ()."
+  "Apply FUNCTION to successive CDRs of list. Return NIL."
   (map1 function (cons list more-lists) nil nil))
 
 (defun maplist (function list &rest more-lists)
   #!+sb-doc
-  "Applies fn to successive CDRs of list, returns list of results."
+  "Apply FUNCTION to successive CDRs of list. Return list of results."
   (map1 function (cons list more-lists) :list nil))
 
 (defun mapcon (function list &rest more-lists)
   #!+sb-doc
-  "Applies fn to successive CDRs of lists, returns NCONC of results."
+  "Apply FUNCTION to successive CDRs of lists. Return NCONC of results."
   (map1 function (cons list more-lists) :nconc nil))
