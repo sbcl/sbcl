@@ -1019,6 +1019,11 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "OBJECT-NOT-COMPLEX-LONG-FLOAT-ERROR"
              "OBJECT-NOT-COMPLEX-DOUBLE-FLOAT-ERROR"
              "OBJECT-NOT-COMPLEX-RATIONAL-ERROR"
+             ;; FIXME: It's confusing using "complex" to mean
+             ;; both "not on the real number line" and "not of
+             ;; a SIMPLE-ARRAY nature". Perhaps we could rename
+             ;; all the uses in the second sense as "hairy" instead?
+             "OBJECT-NOT-COMPLEX-VECTOR-ERROR"
              "OBJECT-NOT-CONS-ERROR"
              "OBJECT-NOT-DOUBLE-FLOAT-ERROR" "OBJECT-NOT-FIXNUM-ERROR"
              "OBJECT-NOT-FLOAT-ERROR" "OBJECT-NOT-FUNCTION-ERROR"

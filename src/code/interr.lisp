@@ -225,9 +225,12 @@
 	 :format-arguments (list nargs)))
 
 (deferr bogus-argument-to-values-list-error (list)
-  (error 'type-error
+  (error 'simple-type-error
 	 :function-name name
-	 :format-control "attempt to use VALUES-LIST on a dotted-list:~%  ~S"
+	 :datum list
+	 :expected-type 'list
+	 :format-control
+	 "~@<attempt to use VALUES-LIST on a dotted list: ~2I~_~S~:>"
 	 :format-arguments (list list)))
 
 (deferr unbound-symbol-error (symbol)
@@ -448,6 +451,12 @@
 	 :function-name name
 	 :datum object
 	 :expected-type 'instance))
+
+(deferr object-not-complex-vector-error (object)
+  (error 'type-error
+	 :function-name name
+	 :datum object
+	 :expected-type '(and vector (not simple-array))))
 
 ;;;; fetching errorful function name
 
