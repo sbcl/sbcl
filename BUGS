@@ -1302,6 +1302,14 @@ WORKAROUND:
     (defun bug178alternative (x)
       (funcall (the nil x)))
 
+179:
+  Reported by Miles Egan on sbcl-devel 11 June 2002:
+  In sbcl-0.7.4.x, doing
+    $ touch /tmp/bad\*
+    $ sbcl
+    * (directory "/tmp/*")
+  yields an error: "bad place for a wild pathname"
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -277,7 +277,8 @@
 ;;; a vector whose element size is an integer multiple of output byte
 ;;; size.
 (defun coerce-to-smallest-eltype (seq)
-  (let ((maxoid #-sb-xc-host 0
+  (let ((maxoid ;; It's probably better to avoid (UNSIGNED-BYTE 0).
+	        #-sb-xc-host 1 
 		;; An initial value of 255 prevents us from
 		;; specializing the array to anything smaller than
 		;; (UNSIGNED-BYTE 8), which keeps the cross-compiler's
@@ -294,7 +295,17 @@
 	    (frob i))
 	  (dovector (i seq)
 	    (frob i)))
-      (coerce seq `(simple-array (integer 0 ,maxoid) (*))))))
+      (let ((specializer `(unsigned-byte ,(integer-length maxoid))))
+	;; cross-compilers beware! It would be possible for the
+	;; upgraded-array-element-type of (UNSIGNED-BYTE 15) to be
+	;; (SIGNED-BYTE 16), and this is completely valid by
+	;; ANSI. However, the cross-compiler doesn't know how to dump
+	;; SIGNED-BYTE arrays, so better make it break now if it ever
+	;; will:
+	#+sb-xc-host
+	(aver (subtypep (upgraded-array-element-type specializer) 
+			'unsigned-byte))
+	(coerce seq `(simple-array ,specializer (*)))))))
 
 ;;;; variables
 
