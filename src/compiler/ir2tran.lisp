@@ -81,7 +81,9 @@
 	 (leaf-info thing))
 	(nlx-info
 	 (aver (eq physenv (block-physenv (nlx-info-target thing))))
-	 (ir2-nlx-info-home (nlx-info-info thing))))))
+	 (ir2-nlx-info-home (nlx-info-info thing))))
+      (error "~@<internal error: ~2I~_~S ~_not found in ~_~S~:>"
+	     thing physenv)))
 
 ;;; If LEAF already has a constant TN, return that, otherwise make a
 ;;; TN for it.
@@ -696,7 +698,7 @@
 	(dolist (thing (ir2-physenv-closure called-env))
 	  (temps (find-in-physenv (car thing) this-1env))
 	  (locs (cdr thing)))
-	
+
 	(temps old-fp)
 	(locs (ir2-physenv-old-fp called-env)))
 

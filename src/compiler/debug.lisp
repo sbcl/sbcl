@@ -91,7 +91,7 @@
 	   (block head (block-next block)))
 	  ((null block)
 	   (unless (eq prev tail)
-	     (barf "wrong Tail for DFO, ~S in ~S" prev c)))
+	     (barf "wrong TAIL for DFO, ~S in ~S" prev c)))
 	(setf (gethash block *seen-blocks*) t)
 	(unless (eq (block-prev block) prev)
 	  (barf "bad PREV for ~S, should be ~S" block prev))
@@ -377,7 +377,7 @@
       (when dest
 	(check-node-reached dest)))
 
-    (loop	
+    (loop
       (unless (eq (continuation-block this-cont) block)
 	(barf "BLOCK in ~S should be ~S." this-cont block))
 
@@ -393,7 +393,7 @@
 
 	(unless fun-deleted
 	  (check-node-consistency node))
-	
+
 	(let ((cont (node-cont node)))
 	  (when (not cont)
 	    (barf "~S has no CONT." node))
@@ -407,7 +407,7 @@
 	  (unless (eq (continuation-use cont) node)
 	    (barf "USE in ~S should be ~S." cont node))
 	  (setq this-cont cont))))
-	
+
     (check-block-successors block))
   (values))
 
@@ -557,12 +557,12 @@
 
 ;;;; IR2 consistency checking
 
-;;; Check for some kind of consistency in some Refs linked together by
-;;; TN-Ref-Across. VOP is the VOP that the references are in. Write-P is the
-;;; value of Write-P that should be present. Count is the minimum number of
-;;; operands expected. If More-P is true, then any larger number will also be
-;;; accepted. What is a string describing the kind of operand in error
-;;; messages.
+;;; Check for some kind of consistency in some REFs linked together by
+;;; TN-REF-ACROSS. VOP is the VOP that the references are in. WRITE-P
+;;; is the value of WRITE-P that should be present. COUNT is the
+;;; minimum number of operands expected. If MORE-P is true, then any
+;;; larger number will also be accepted. WHAT is a string describing
+;;; the kind of operand in error messages.
 (defun check-tn-refs (refs vop write-p count more-p what)
   (let ((vop-refs (vop-refs vop)))
     (do ((ref refs (tn-ref-across ref))
@@ -620,8 +620,8 @@
   (values))
 
 ;;; Check the basic sanity of the VOP linkage, then call some other
-;;; functions to check on the TN-Refs. We grab some info out of the VOP-Info
-;;; to tell us what to expect.
+;;; functions to check on the TN-REFS. We grab some info out of the
+;;; VOP-INFO to tell us what to expect.
 ;;;
 ;;; [### Check that operand type restrictions are met?]
 (defun check-ir2-block-consistency (2block)
@@ -658,12 +658,12 @@
 	(barf "wrong number of codegen info args in ~S" vop))))
   (values))
 
-;;; Check stuff about the IR2 representation of Component. This assumes the
+;;; Check stuff about the IR2 representation of COMPONENT. This assumes the
 ;;; sanity of the basic flow graph.
 ;;;
 ;;; [### Also grovel global TN data structures?  Assume pack not
-;;; done yet?  Have separate check-tn-consistency for pre-pack and
-;;; check-pack-consistency for post-pack?]
+;;; done yet?  Have separate CHECK-TN-CONSISTENCY for pre-pack and
+;;; CHECK-PACK-CONSISTENCY for post-pack?]
 (defun check-ir2-consistency (component)
   (declare (type component component))
   (do-ir2-blocks (block component)
@@ -722,7 +722,7 @@
        confs))
   (values))
 
-;;; If the entry in Local-TNs for TN in Block is :More, then do some checks
+;;; If the entry in Local-TNs for TN in BLOCK is :MORE, then do some checks
 ;;; for the validity of the usage.
 (defun check-more-tn-entry (tn block)
   (let* ((vop (ir2-block-start-vop block))
@@ -752,7 +752,7 @@
        ((eq kind :component)
 	(unless (member tn (ir2-component-component-tns
 			    (component-info component)))
-	  (barf "~S not in Component-TNs for ~S" tn component)))
+	  (barf "~S not in COMPONENT-TNs for ~S" tn component)))
        (conf
 	(do ((conf conf (global-conflicts-tn-next conf))
 	     (prev nil conf))
@@ -896,13 +896,13 @@
 		(proclaim '(hash-table ,vto ,vfrom))
 		(defvar ,counter 0)
 		(proclaim '(fixnum ,counter))
-		
+
 		(defun ,fto (x)
 		  (or (gethash x ,vto)
 		      (let ((num (incf ,counter)))
 			(setf (gethash num ,vfrom) x)
 			(setf (gethash x ,vto) num))))
-		
+
 		(defun ,ffrom (num)
 		  (values (gethash num ,vfrom))))))
   (def *continuation-number* *continuation-numbers* *number-continuations*
@@ -1000,9 +1000,9 @@
 	    (mapcar (lambda (x) (cont-num (block-start x))) succ)))
   (values))
 
-;;; Print a useful representation of a TN. If the TN has a leaf, then do a
-;;; Print-Leaf on that, otherwise print a generated ID.
-(defun print-tn (tn &optional (stream *standard-output*))
+;;; Print the guts of a TN. (logic shared between PRINT-OBJECT (TN T)
+;;; and printers for compound objects which contain TNs)
+(defun print-tn-guts (tn &optional (stream *standard-output*))
   (declare (type tn tn))
   (let ((leaf (tn-leaf tn)))
     (cond (leaf
@@ -1013,8 +1013,8 @@
     (when (and (tn-sc tn) (tn-offset tn))
       (format stream "[~A]" (location-print-name tn)))))
 
-;;; Print the TN-Refs representing some operands to a VOP, linked by
-;;; TN-Ref-Across.
+;;; Print the TN-REFs representing some operands to a VOP, linked by
+;;; TN-REF-ACROSS.
 (defun print-operands (refs)
   (declare (type (or tn-ref null) refs))
   (pprint-logical-block (*standard-output* nil)
@@ -1023,15 +1023,15 @@
       (let ((tn (tn-ref-tn ref))
 	    (ltn (tn-ref-load-tn ref)))
 	(cond ((not ltn)
-	       (print-tn tn))
+	       (print-tn-guts tn))
 	      (t
-	       (print-tn tn)
+	       (print-tn-guts tn)
 	       (princ (if (tn-ref-write-p ref) #\< #\>))
-	       (print-tn ltn)))
+	       (print-tn-guts ltn)))
 	(princ #\space)
 	(pprint-newline :fill)))))
 
-;;; Print the vop, putting args, info and results on separate lines, if
+;;; Print the VOP, putting args, info and results on separate lines, if
 ;;; necessary.
 (defun print-vop (vop)
   (pprint-logical-block (*standard-output* nil)

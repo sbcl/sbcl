@@ -421,7 +421,7 @@
 ;;; operands to the operation.
 (defstruct (vop (:constructor make-vop (block node info args results))
 		(:copier nil))
-  ;; VOP-Info structure containing static info about the operation
+  ;; VOP-INFO structure containing static info about the operation
   (info nil :type (or vop-info null))
   ;; the IR2-Block this VOP is in
   (block (missing-arg) :type ir2-block)
@@ -430,15 +430,15 @@
   ;; translation.
   (next nil :type (or vop null))
   (prev nil :type (or vop null))
-  ;; heads of the TN-Ref lists for operand TNs, linked using the
-  ;; Across slot
+  ;; heads of the TN-REF lists for operand TNs, linked using the
+  ;; ACROSS slot
   (args nil :type (or tn-ref null))
   (results nil :type (or tn-ref null))
   ;; head of the list of write refs for each explicitly allocated
-  ;; temporary, linked together using the Across slot
+  ;; temporary, linked together using the ACROSS slot
   (temps nil :type (or tn-ref null))
-  ;; head of the list of all TN-refs for references in this VOP,
-  ;; linked by the Next-Ref slot. There will be one entry for each
+  ;; head of the list of all TN-REFs for references in this VOP,
+  ;; linked by the NEXT-REF slot. There will be one entry for each
   ;; operand and two (a read and a write) for each temporary.
   (refs nil :type (or tn-ref null))
   ;; stuff that is passed uninterpreted from IR2 conversion to
@@ -446,7 +446,7 @@
   codegen-info
   ;; the node that generated this VOP, for keeping track of debug info
   (node nil :type (or node null))
-  ;; Local-TN bit vector representing the set of TNs live after args
+  ;; LOCAL-TN-BIT-VECTOR representing the set of TNs live after args
   ;; are read and before results are written. This is only filled in
   ;; when VOP-INFO-SAVE-P is non-null.
   (save-set nil :type (or local-tn-bit-vector null)))
@@ -465,20 +465,20 @@
   (tn (missing-arg) :type tn)
   ;; Is this is a write reference? (as opposed to a read reference)
   (write-p nil :type boolean)
-  ;; the link for a list running through all TN-Refs for this TN of
+  ;; the link for a list running through all TN-REFs for this TN of
   ;; the same kind (read or write)
   (next nil :type (or tn-ref null))
   ;; the VOP where the reference happens, or NIL temporarily
   (vop nil :type (or vop null))
-  ;; the link for a list of all TN-Refs in VOP, in reverse order of
+  ;; the link for a list of all TN-REFs in VOP, in reverse order of
   ;; reference
   (next-ref nil :type (or tn-ref null))
-  ;; the link for a list of the TN-Refs in VOP of the same kind
+  ;; the link for a list of the TN-REFs in VOP of the same kind
   ;; (argument, result, temp)
   (across nil :type (or tn-ref null))
-  ;; If true, this is a TN-Ref also in VOP whose TN we would like
+  ;; If true, this is a TN-REF also in VOP whose TN we would like
   ;; packed in the same location as our TN. Read and write refs are
-  ;; always paired: Target in the read points to the write, and
+  ;; always paired: TARGET in the read points to the write, and
   ;; vice-versa.
   (target nil :type (or null tn-ref))
   ;; the load TN allocated for this operand, if any
@@ -585,10 +585,10 @@
   ;;    save-sc will be saved in a TN in the save SC before the VOP
   ;;    and restored after the VOP. This is used by call VOPs. A bit
   ;;    vector representing the live TNs is stored in the VOP-SAVE-SET.
-  ;; -- If :Force-To-Stack, all such TNs will made into :Environment TNs
+  ;; -- If :FORCE-TO-STACK, all such TNs will made into :ENVIRONMENT TNs
   ;;    and forced to be allocated in SCs without any save-sc. This is
   ;;    used by NLX entry vops.
-  ;; -- If :Compute-Only, just compute the save set, don't do any saving.
+  ;; -- If :COMPUTE-ONLY, just compute the save set, don't do any saving.
   ;;    This is used to get the live variables for debug info.
   (save-p nil :type (member t nil :force-to-stack :compute-only))
   ;; info for automatic emission of move-arg VOPs by representation
@@ -649,11 +649,12 @@
   (temps nil :type (or null (specializable-vector (unsigned-byte 16))))
   ;; the order all the refs for this vop should be put in. Each
   ;; operand is assigned a number in the following ordering: args,
-  ;; more-args, results, more-results, temps This vector represents
+  ;; more-args, results, more-results, temps. This vector represents
   ;; the order the operands should be put into in the next-ref link.
   (ref-ordering nil :type (or null (specializable-vector (unsigned-byte 8))))
   ;; a vector of the various targets that should be done. Each element
-  ;; encodes the source ref (shifted 8) and the dest ref index.
+  ;; encodes the source ref (shifted 8, it is also encoded in
+  ;; MAX-VOP-TN-REFS) and the dest ref index.
   (targets nil :type (or null (specializable-vector (unsigned-byte 16)))))
 
 ;;;; SBs and SCs
@@ -929,7 +930,7 @@
   (print-unreadable-object (tn stream :type t)
     ;; KLUDGE: The distinction between PRINT-TN and PRINT-OBJECT on TN is
     ;; not very mnemonic. -- WHN 20000124
-    (print-tn tn stream)))
+    (print-tn-guts tn stream)))
 
 ;;; The GLOBAL-CONFLICTS structure represents the conflicts for global
 ;;; TNs. Each global TN has a list of these structures, one for each

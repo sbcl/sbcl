@@ -45,8 +45,8 @@
 
 #!-sb-fluid (declaim (inline read-byte))
 
-;;;    Expands into code to read an N-byte unsigned integer using
-;;; fast-read-byte.
+;;; This expands into code to read an N-byte unsigned integer using
+;;; FAST-READ-BYTE.
 (defmacro fast-read-u-integer (n)
   (declare (optimize (speed 0)))
   (do ((res '(fast-read-byte)
@@ -55,7 +55,7 @@
        (cnt 1 (1+ cnt)))
       ((>= cnt n) res)))
 
-;;; Like Fast-Read-U-Integer, but the size may be determined at run time.
+;;; like FAST-READ-U-INTEGER, but the size may be determined at run time
 (defmacro fast-read-var-u-integer (n)
   (let ((n-pos (gensym))
 	(n-res (gensym))

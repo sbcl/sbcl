@@ -23,7 +23,6 @@
 
 (in-package "SB-PCL")
 
-
 (defun make-progn (&rest forms)
   (let ((progn-form nil))
     (labels ((collect-forms (forms)

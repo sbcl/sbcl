@@ -638,6 +638,9 @@
 		   (operand-parse-name op)))
 	  (let ((target (find-operand (operand-parse-target op) parse
 				      '(:temporary :result))))
+	    ;; KLUDGE: These formulas must be consistent with those in
+	    ;; %EMIT-GENERIC-VOP, and this is currently maintained by
+	    ;; hand. -- WHN 2002-01-30, paraphrasing APD
 	    (targets (+ (* index max-vop-tn-refs)
 			(ecase (operand-parse-kind target)
 			  (:result
@@ -648,7 +651,9 @@
 			   (+ (* (position-or-lose target
 						   (vop-parse-temps parse))
 				 2)
-			      num-args num-results)))))))
+                              1
+			      num-args
+			      num-results)))))))
 	(let ((born (operand-parse-born op))
 	      (dies (operand-parse-dies op)))
 	  (ecase (operand-parse-kind op)
@@ -1755,7 +1760,7 @@
 	(make-operand-list (subseq operands 0 arg-count) nil nil)
       (multiple-value-bind (rcode rbinds n-results)
 	  (make-operand-list (subseq operands (+ arg-count info-count)) nil t)
-	
+
 	(collect ((ibinds)
 		  (ivars))
 	  (dolist (info (subseq operands arg-count (+ arg-count info-count)))
@@ -1817,7 +1822,7 @@
 	(make-operand-list fixed-args (car (last args)) nil)
       (multiple-value-bind (rcode rbinds n-results)
 	  (make-operand-list fixed-results (car (last results)) t)
-	
+
 	`(let* ((,n-node ,node)
 		(,n-block ,block)
 		(,n-template (template-or-lose ',name))

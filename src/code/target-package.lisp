@@ -571,9 +571,9 @@
 	(t
 	 (error "~S is neither a symbol nor a list of symbols." thing))))
 
-;;; Like UNINTERN, but if symbol is inherited chases down the package
-;;; it is inherited from and uninterns it there. Used for
-;;; name-conflict resolution. Shadowing symbols are not uninterned
+;;; This is like UNINTERN, except if SYMBOL is inherited, it chases
+;;; down the package it is inherited from and uninterns it there. Used
+;;; for name-conflict resolution. Shadowing symbols are not uninterned
 ;;; since they do not cause conflicts.
 (defun moby-unintern (symbol package)
   (unless (member symbol (package-%shadowing-symbols package))

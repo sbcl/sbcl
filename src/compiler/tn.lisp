@@ -314,7 +314,7 @@
       (insert-vop-sequence first last block before)
       last)))
 
-;;; Like EMIT-MOVE-TEMPLATE, except that we pass in Info args too.
+;;; like EMIT-MOVE-TEMPLATE, except that we pass in INFO args too
 (defun emit-load-template (node block template x y info &optional before)
   (declare (type node node) (type ir2-block block)
 	   (type template template) (type tn x y))
@@ -326,7 +326,7 @@
       (insert-vop-sequence first last block before)
       last)))
 
-;;; Like EMIT-MOVE-TEMPLATE, except that the VOP takes two args.
+;;; like EMIT-MOVE-TEMPLATE, except that the VOP takes two args
 (defun emit-move-arg-template (node block template x f y &optional before)
   (declare (type node node) (type ir2-block block)
 	   (type template template) (type tn x f y))
@@ -340,7 +340,7 @@
       (insert-vop-sequence first last block before)
       last)))
 
-;;; Like EMIT-MOVE-TEMPLATE, except that the VOP takes no args.
+;;; like EMIT-MOVE-TEMPLATE, except that the VOP takes no args
 (defun emit-context-template (node block template y &optional before)
   (declare (type node node) (type ir2-block block)
 	   (type template template) (type tn y))

@@ -363,7 +363,7 @@
 	  (t
 	   (values (logior sig sb!vm:single-float-hidden-bit) biased sign)))))
 
-;;; Like INTEGER-DECODE-SINGLE-DENORM, only doubly so.
+;;; like INTEGER-DECODE-SINGLE-DENORM, only doubly so
 (defun integer-decode-double-denorm (x)
   (declare (type double-float x))
   (let* ((high-bits (double-float-high-bits (abs x)))
@@ -395,7 +395,7 @@
 		  (truly-the fixnum (- biased extra-bias))
 		  sign)))))
 
-;;; Like INTEGER-DECODE-SINGLE-FLOAT, only doubly so.
+;;; like INTEGER-DECODE-SINGLE-FLOAT, only doubly so
 (defun integer-decode-double-float (x)
   (declare (double-float x))
   (let* ((abs (abs x))
@@ -527,7 +527,7 @@
 			 bits))
 		   biased sign)))))
 
-;;; Like DECODE-SINGLE-DENORM, only doubly so.
+;;; like DECODE-SINGLE-DENORM, only doubly so
 (defun decode-double-denorm (x)
   (declare (double-float x))
   (multiple-value-bind (sig exp sign) (integer-decode-double-denorm x)
@@ -540,7 +540,7 @@
 	    (truly-the fixnum (+ exp sb!vm:double-float-digits))
 	    (float sign x))))
 
-;;; Like DECODE-SINGLE-FLOAT, only doubly so.
+;;; like DECODE-SINGLE-FLOAT, only doubly so
 (defun decode-double-float (x)
   (declare (double-float x))
   (let* ((abs (abs x))

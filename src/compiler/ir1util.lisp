@@ -1196,8 +1196,8 @@
     (change-ref-leaf ref new-leaf))
   (values))
 
-;;; Like SUBSITUTE-LEAF, only there is a predicate on the REF to tell
-;;; whether to substitute.
+;;; like SUBSITUTE-LEAF, only there is a predicate on the REF to tell
+;;; whether to substitute
 (defun substitute-leaf-if (test new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf) (type function test))
   (dolist (ref (leaf-refs old-leaf))

@@ -386,8 +386,9 @@
 
 ;;; FIXME: All we seem to need is the RUSAGE_SELF version of this.
 ;;;
-;;; Like getrusage(2), but return only the system and user time,
-;;; and return the seconds and microseconds as separate values.
+;;; This is like getrusage(2), except it returns only the system and
+;;; user time, and returns the seconds and microseconds as separate
+;;; values.
 #!-sb-fluid (declaim (inline unix-fast-getrusage))
 (defun unix-fast-getrusage (who)
   (declare (values (member t)

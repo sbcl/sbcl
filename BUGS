@@ -1188,7 +1188,48 @@ WORKAROUND:
   upgraded to do so. (This doesn't seem to be a high priority
   conformance problem, since seems hard to construct useful code
   where it matters.)
-   
+
+146:
+  Floating point errors are reported poorly. E.g. on x86 OpenBSD
+  with sbcl-0.7.1, 
+	* (expt 2.0 12777)
+	debugger invoked on condition of type SB-KERNEL:FLOATING-POINT-EXCEPTION:
+	  An arithmetic error SB-KERNEL:FLOATING-POINT-EXCEPTION was signalled.
+	No traps are enabled? How can this be?
+  It should be possible to be much more specific (overflow, division
+  by zero, etc.) and of course the "How can this be?" should be fixable.
+
+147:
+  (reported by Alexey Dejneka sbcl-devel 2002-01-28)
+  Compiling a file containing
+    (deftype digit () '(member #\1))
+    (defun parse-num (string ind)
+      (flet ((digs ()
+               (let (old-index)
+                 (if (and (< ind ind)
+                          (typep (char string ind) 'digit))
+                     nil))))))
+  in sbcl-0.7.1 causes the compiler to fail with
+    internal error, failed AVER: "(= (LENGTH (BLOCK-SUCC CALL-BLOCK)) 1)" 
+  This problem seems to have been introduced by the sbcl-0.pre7.* compiler
+  changes, since 0.pre7.73 and 0.6.13 don't suffer from it. A related
+  test case is
+    (defun parse-num (index)
+      (let (num x)
+        (flet ((digs ()
+                 (setq num index))
+               (z ()
+                 (let ()
+                   (setq x nil))))
+          (when (and (digs) (digs)) x))))
+  In sbcl-0.7.1, it failed with the same
+    internal error, failed AVER: "(= (LENGTH (BLOCK-SUCC CALL-BLOCK)) 1)" 
+  but after the APD patches in sbcl-0.7.1.2 (new consistency check in
+  TARGET-IF-DESIRABLE, plus a fix in meta-vmdef.lisp to keep the
+  new consistency check from failing routinely) it fails in
+  FIND-IN-PHYSENV instead:
+  
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These numbers were used for bugs related to the old IR1

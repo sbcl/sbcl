@@ -63,8 +63,8 @@
       (inst xor value unbound-marker-widetag temp)
       (inst beq temp err-lab))))
 
-;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
-;;; is bound.
+;;; like CHECKED-CELL-REF, only we are a predicate to see if the cell
+;;; is bound
 (define-vop (boundp-frob)
   (:args (object :scs (descriptor-reg)))
   (:conditional)

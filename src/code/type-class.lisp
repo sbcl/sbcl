@@ -100,8 +100,8 @@
   ;; supplying both.
   (unary-typep nil :type (or symbol null))
   (typep nil :type (or symbol null))
-  ;; Like TYPEP, UNARY-TYPEP except these functions coerce objects to this
-  ;; type.
+  ;; These are like TYPEP and UNARY-TYPEP except they coerce objects to 
+  ;; the type.
   (unary-coerce nil :type (or symbol null))
   (coerce :type (or symbol null))
   |#

@@ -697,9 +697,9 @@
 	(join-components component clambda-component)))
     (let ((*current-component* component))
       (node-ends-block call))
-    ;; FIXME: Use PROPER-LIST-OF-LENGTH-P here, and look for other
+    ;; FIXME: Use DESTRUCTURING-BIND here, and grep for other 
     ;; uses of '=.*length' which could also be converted to use
-    ;; PROPER-LIST-OF-LENGTH-P.
+    ;; DESTRUCTURING-BIND or PROPER-LIST-OF-LENGTH-P.
     (aver (= (length (block-succ call-block)) 1))
     (let ((next-block (first (block-succ call-block))))
       (unlink-blocks call-block next-block)

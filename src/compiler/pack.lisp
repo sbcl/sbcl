@@ -337,7 +337,7 @@
 	 (args (vop-args vop))
 	 (results (vop-results vop))
 	 (name (with-output-to-string (stream)
-		 (print-tn tn stream)))
+		 (print-tn-guts tn stream)))
 	 (2comp (component-info *component-being-compiled*))
 	 temp)
     (cond
@@ -649,10 +649,10 @@
 ;;;
 ;;; SAVES and RESTORES are represented using both a list and a
 ;;; bit-vector so that we can quickly iterate and test for membership.
-;;; The incoming Saves and Restores args are used for computing these
+;;; The incoming SAVES and RESTORES args are used for computing these
 ;;; sets (the initial contents are ignored.)
 ;;;
-;;; When we hit a VOP with :COMPUTE-ONLY Save-P (an internal error
+;;; When we hit a VOP with :COMPUTE-ONLY SAVE-P (an internal error
 ;;; location), we pretend that all live TNs were read, unless (= speed
 ;;; 3), in which case we mark all the TNs that are live but not
 ;;; restored as spilled.
@@ -743,10 +743,10 @@
 		(do ((read (vop-args vop) (tn-ref-across read)))
 		    ((null read))
 		  (save-note-read (tn-ref-tn read))))))))))
-	
-;;; Like EMIT-SAVES, only different. We avoid redundant saving within
-;;; the block, and don't restore values that aren't used before the
-;;; next call. This function is just the top level loop over the
+
+;;; This is like EMIT-SAVES, only different. We avoid redundant saving
+;;; within the block, and don't restore values that aren't used before
+;;; the next call. This function is just the top level loop over the
 ;;; blocks in the component, which locates blocks that need saving
 ;;; done.
 (defun optimized-emit-saves (component)
@@ -794,8 +794,8 @@
 ;;;; load TN packing
 
 ;;; These variables indicate the last location at which we computed
-;;; the Live-TNs. They hold the Block and VOP values that were passed
-;;; to Compute-Live-TNs.
+;;; the Live-TNs. They hold the BLOCK and VOP values that were passed
+;;; to COMPUTE-LIVE-TNS.
 (defvar *live-block*)
 (defvar *live-vop*)
 
@@ -805,8 +805,8 @@
 (defvar *repack-blocks*)
 (declaim (type (or hash-table null) *repack-blocks*))
 
-;;; Set the Live-TNs vectors in all :Finite SBs to represent the TNs
-;;; live at the end of Block.
+;;; Set the Live-TNs vectors in all :FINITE SBs to represent the TNs
+;;; live at the end of BLOCK.
 (defun init-live-tns (block)
   (dolist (sb *backend-sb-list*)
     (when (eq (sb-kind sb) :finite)
@@ -827,8 +827,8 @@
 
   (values))
 
-;;; Set the Live-TNs in :Finite SBs to represent the TNs live
-;;; immediately after the evaluation of VOP in Block, excluding
+;;; Set the LIVE-TNs in :FINITE SBs to represent the TNs live
+;;; immediately after the evaluation of VOP in BLOCK, excluding
 ;;; results of the VOP. If VOP is null, then compute the live TNs at
 ;;; the beginning of the block. Sequential calls on the same block
 ;;; must be in reverse VOP order.
@@ -882,7 +882,7 @@
   (setq *live-vop* vop)
   (values))
 
-;;; This is kind of like Offset-Conflicts-In-SB, except that it uses
+;;; This is kind of like OFFSET-CONFLICTS-IN-SB, except that it uses
 ;;; the VOP refs to determine whether a Load-TN for OP could be packed
 ;;; in the specified location, disregarding conflicts with TNs not
 ;;; referenced by this VOP. There is a conflict if either:
@@ -964,7 +964,7 @@
 		     (load-tn-offset-conflicts-in-sb op sb i))))
 	(when res (return res))))))
 
-;;; If a load-TN for Op is targeted to a legal location in SC, then
+;;; If a load-TN for OP is targeted to a legal location in SC, then
 ;;; return the offset, otherwise return NIL. We see whether the target
 ;;; of the operand is packed, and try that location. There isn't any
 ;;; need to chain down the target path, since everything is packed
@@ -1132,8 +1132,8 @@
 		   (return res))))
 	     (push sc allowed)))))))))
 
-;;; Scan a list of load-SCs vectors and a list of TN-Refs threaded by
-;;; TN-Ref-Across. When we find a reference whose TN doesn't satisfy
+;;; Scan a list of load-SCs vectors and a list of TN-REFS threaded by
+;;; TN-REF-ACROSS. When we find a reference whose TN doesn't satisfy
 ;;; the restriction, we pack a Load-TN and load the operand into it.
 ;;; If a load-tn has already been allocated, we can assume that the
 ;;; restriction is satisfied.
@@ -1174,7 +1174,7 @@
 
   (values))
 
-;;; Scan the VOPs in Block, looking for operands whose SC restrictions
+;;; Scan the VOPs in BLOCK, looking for operands whose SC restrictions
 ;;; aren't satisfied. We do the results first, since they are
 ;;; evaluated later, and our conflict analysis is a backward scan.
 (defun pack-load-tns (block)
@@ -1190,30 +1190,34 @@
 				      (vop-args vop))))))
   (values))
 
-;;;; location-selection, targeting & pack interface
-
 ;;;; targeting
 
-;;; Link the TN-Refs Read and Write together using the TN-Ref-Target when
-;;; this seems like a good idea. Currently we always do, as this increases the
-;;; success of load-TN targeting.
+;;; Link the TN-REFS READ and WRITE together using the TN-REF-TARGET
+;;; when this seems like a good idea. Currently we always do, as this
+;;; increases the success of load-TN targeting.
 (defun target-if-desirable (read write)
   (declare (type tn-ref read write))
+  ;; As per the comments at the definition of TN-REF-TARGET, read and
+  ;; write refs are always paired, with TARGET in the read pointing to
+  ;; the write and vice versa.
+  (aver (eq (tn-ref-write-p read)
+            (not (tn-ref-write-p write))))
   (setf (tn-ref-target read) write)
   (setf (tn-ref-target write) read))
 
 ;;; If TN can be packed into SC so as to honor a preference to TARGET,
 ;;; then return the offset to pack at, otherwise return NIL. TARGET
-;;; must be already packed. We can honor a preference if:
-;;; -- TARGET's location is in SC's locations.
-;;; -- The element sizes of the two SCs are the same.
-;;; -- TN doesn't conflict with target's location.
+;;; must be already packed.
 (defun check-ok-target (target tn sc)
   (declare (type tn target tn) (type sc sc) (inline member))
   (let* ((loc (tn-offset target))
 	 (target-sc (tn-sc target))
 	 (target-sb (sc-sb target-sc)))
     (declare (type index loc))
+    ;; We can honor a preference if:
+    ;; -- TARGET's location is in SC's locations.
+    ;; -- The element sizes of the two SCs are the same.
+    ;; -- TN doesn't conflict with target's location.
     (if (and (eq target-sb (sc-sb sc))
 	     (or (eq (sb-kind target-sb) :unbounded)
 		 (member loc (sc-locations sc)))
@@ -1224,41 +1228,50 @@
 	nil)))
 
 ;;; Scan along the target path from TN, looking at readers or writers.
-;;; When we find a packed TN, return Check-OK-Target of that TN. If
+;;; When we find a packed TN, return CHECK-OK-TARGET of that TN. If
 ;;; there is no target, or if the TN has multiple readers (writers),
 ;;; then we return NIL. We also always return NIL after 10 iterations
 ;;; to get around potential circularity problems.
-(macrolet ((frob (slot)
-	     `(let ((count 10)
-		    (current tn))
-		(declare (type index count))
-		(loop
-		  (let ((refs (,slot current)))
-		    (unless (and (plusp count) refs (not (tn-ref-next refs)))
-		      (return nil))
-		    (let ((target (tn-ref-target refs)))
-		      (unless target (return nil))
-		      (setq current (tn-ref-tn target))
-		      (when (tn-offset current)
-			(return (check-ok-target current tn sc)))
-		      (decf count)))))))
-  (defun find-ok-target-offset (tn sc)
-    (declare (type tn tn) (type sc sc))
-    (or (frob tn-reads)
-	(frob tn-writes))))
-
+;;;
+;;; FIXME: (30 minutes of reverse engineering?) It'd be nice to
+;;; rewrite the header comment here to explain the interface and its
+;;; motivation, and move remarks about implementation details (like
+;;; 10!) inside.
+(defun find-ok-target-offset (tn sc)
+  (declare (type tn tn) (type sc sc))
+  (flet ((frob-slot (slot-fun)
+	   (declare (type function slot-fun))
+	   (let ((count 10)
+		 (current tn))
+	     (declare (type index count))
+	     (loop
+	      (let ((refs (funcall slot-fun current)))
+		(unless (and (plusp count)
+			     refs
+			     (not (tn-ref-next refs)))
+		  (return nil))
+		(let ((target (tn-ref-target refs)))
+		  (unless target (return nil))
+		  (setq current (tn-ref-tn target))
+		  (when (tn-offset current)
+		    (return (check-ok-target current tn sc)))
+		  (decf count)))))))
+    (declare (inline frob-slot)) ; until DYNAMIC-EXTENT works
+    (or (frob-slot #'tn-reads)
+	(frob-slot #'tn-writes))))
+
 ;;;; location selection
 
 ;;; Select some location for TN in SC, returning the offset if we
 ;;; succeed, and NIL if we fail. We start scanning at the Last-Offset
 ;;; in an attempt to distribute the TNs across all storage.
 ;;;
-;;; We call Offset-Conflicts-In-SB directly, rather than using
-;;; Conflicts-In-SC. This allows us to more efficient in packing
+;;; We call OFFSET-CONFLICTS-IN-SB directly, rather than using
+;;; CONFLICTS-IN-SC. This allows us to more efficient in packing
 ;;; multi-location TNs: we don't have to multiply the number of tests
-;;; by the TN size. This falls out natually, since we have to be aware
-;;; of TN size anyway so that we don't call Conflicts-In-SC on a bogus
-;;; offset.
+;;; by the TN size. This falls out naturally, since we have to be
+;;; aware of TN size anyway so that we don't call CONFLICTS-IN-SC on a
+;;; bogus offset.
 ;;;
 ;;; We give up on finding a location after our current pointer has
 ;;; wrapped twice. This will result in testing some locations twice in
@@ -1320,7 +1333,7 @@
   (if (member (tn-kind tn) '(:save :save-once :specified-save))
       (tn-save-tn tn)
       tn))
-
+
 ;;;; pack interface
 
 ;;; Attempt to pack TN in all possible SCs, first in the SC chosen by

@@ -31,9 +31,9 @@
 (defun sc-number-or-lose (x)
   (the sc-number (sc-number (sc-or-lose x))))
 
-;;; Like the non-meta versions, but go for the meta-compile-time info.
-;;; These should not be used after load time, since compiling the compiler
-;;; changes the definitions.
+;;; This is like the non-meta versions, except we go for the
+;;; meta-compile-time info. These should not be used after load time,
+;;; since compiling the compiler changes the definitions.
 (defun meta-sc-or-lose (x)
   (the sc
        (or (gethash x *backend-meta-sc-names*)
@@ -100,6 +100,8 @@
   ;; We need the EVAL-WHEN because %EMIT-GENERIC-VOP (below)
   ;; uses #.MAX-VOP-TN-REFS, not just MAX-VOP-TN-REFS.
   ;; -- AL 20010218
+  ;;
+  ;; See also the description of VOP-INFO-TARGETS. -- APD, 2002-01-30
   (defconstant max-vop-tn-refs 256))
 
 (defvar *vop-tn-refs* (make-array max-vop-tn-refs :initial-element nil))
@@ -152,6 +154,9 @@
 					    (ash temp (- (1+ sc-bits))))
 			     (make-restricted-tn nil (ash temp -1))))
 		     (write-ref (reference-tn tn t)))
+                ;; KLUDGE: These formulas must be consistent with those in
+                ;; COMPUTE-REF-ORDERING, and this is currently
+		;; maintained by hand. -- WHN 2002-01-30, paraphrasing APD
 		(setf (aref refs index) (reference-tn tn nil))
 		(setf (aref refs (1+ index)) write-ref)
 		(if prev

@@ -352,8 +352,8 @@
 		     (error "bad thing to be a type specifier: ~S"
 			    spec))))))))))
 
-;;; Like VALUES-SPECIFIER-TYPE, except that we guarantee to never
-;;; return a VALUES type.
+;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
+;;; never return a VALUES type.
 (defun specifier-type (x)
   (let ((res (values-specifier-type x)))
     (when (values-type-p res)

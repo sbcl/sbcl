@@ -986,7 +986,7 @@
 	(make-lexenv :default res :funs new-fenv)
 	res)))
 
-;;; Like FIND-IN-BINDINGS, but looks for #'foo in the fvars.
+;;; like FIND-IN-BINDINGS, but looks for #'FOO in the FVARS
 (defun find-in-bindings-or-fbindings (name vars fvars)
   (declare (list vars fvars))
   (if (consp name)

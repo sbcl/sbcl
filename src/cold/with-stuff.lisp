@@ -95,9 +95,9 @@
 (compile '%without-given-nickname)
 (compile '%multi-nickname-magic)
 
-;;; Like WITH-ADDITIONAL-NICKNAME and WITHOUT-GIVEN-NICKNAMES, except
-;;; working on arbitrary lists of nickname descriptors instead of
-;;; single nickname/package pairs.
+;;; This is like WITH-ADDITIONAL-NICKNAME and WITHOUT-GIVEN-NICKNAMES,
+;;; except working on arbitrary lists of nickname descriptors instead
+;;; of single nickname/package pairs.
 ;;;
 ;;; A nickname descriptor is a list of the form
 ;;;   PACKAGE-DESIGNATOR NICKNAME*

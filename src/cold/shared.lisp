@@ -330,7 +330,7 @@
     (load compiled-filename)))
 (compile 'host-cload-stem)
 
-;;; Like HOST-CLOAD-STEM, except that we don't bother to compile.
+;;; like HOST-CLOAD-STEM, except that we don't bother to compile
 (defun host-load-stem (stem &key ignore-failure-p)
   (declare (ignore ignore-failure-p)) ; (It's only relevant when
   ;; compiling.) KLUDGE: It's untidy to have the knowledge of how to

@@ -88,8 +88,8 @@
     (storew (make-fixup nil :code-object entry-label)
 	    block catch-block-entry-pc-slot)))
 
-;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
-;;; link the block into the Current-Catch list.
+;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
+;;; tag, and link the block into the CURRENT-CATCH list
 (define-vop (make-catch-block)
   (:args (tn)
 	 (tag :scs (descriptor-reg) :to (:result 1)))
