@@ -27,6 +27,7 @@
 
 #if !defined(LANGUAGE_ASSEMBLY)
 extern void validate(void);
+extern void protect_control_stack_guard_page(int protect_p);
 #endif
 
 /* note for anyone trying to port an architecture's support files

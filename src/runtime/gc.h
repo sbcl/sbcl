@@ -17,12 +17,6 @@
 #define _GC_H_
 
 extern void gc_init(void);
-
-/* Note: CMU CL had two different argument conventions for
- * collect_garbage(..), depending on whether gencgc was in use. SBCL
- * should have only one, which is automatic right now (20000814) since
- * we only support gencgc, but should also be maintained if someone
- * adds another GC, or ports one of the other CMU CL GCs like gengc. */
 extern void collect_garbage(unsigned last_gen);
 
 #include "os.h"
