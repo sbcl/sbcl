@@ -13,9 +13,8 @@
  * files for more information.
  */
 
-#include "x86-validate.h"
-	
 #define LANGUAGE_ASSEMBLY
+#include "validate.h"
 #include "sbcl.h"
 
 /* Minimize conditionalization for different OS naming schemes. */

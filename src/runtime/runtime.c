@@ -113,7 +113,7 @@ int
 main(int argc, char *argv[], char *envp[])
 {
     /* the name of the core file we're to execute. Note that this is
-     * a malloc'ed string which must be freed eventually. */
+     * a malloc'ed string which should be freed eventually. */
     char *core = 0;
 
     /* other command line options */
@@ -122,7 +122,11 @@ main(int argc, char *argv[], char *envp[])
 
     lispobj initial_function;
 
+    /* KLUDGE: os_vm_page_size is set by os_init(), and on some
+     * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
+     * it must follow os_init(). -- WHN 2000-01-26 */
     os_init();
+    arch_init();
     gc_init();
     validate();
 

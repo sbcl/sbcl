@@ -12,30 +12,28 @@
 #if !defined(_INCLUDE_VALIDATE_H_)
 #define _INCLUDE_VALIDATE_H_
 
-#ifdef parisc
-#include "hppa-validate.h"
-#endif parisc
+/* constants derived from the fundamental constants in passed by GENESIS */
+#define   BINDING_STACK_SIZE (  BINDING_STACK_END -   BINDING_STACK_START)
+#define   CONTROL_STACK_SIZE (  CONTROL_STACK_END -   CONTROL_STACK_START)
+#define   DYNAMIC_SPACE_SIZE (  DYNAMIC_SPACE_END -   DYNAMIC_SPACE_START)
+#define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
+#define    STATIC_SPACE_SIZE (   STATIC_SPACE_END -    STATIC_SPACE_START)
 
-#ifdef mips
-#include "mips-validate.h"
-#endif
-
-#ifdef ibmrt
-#include "rt-validate.h"
-#endif
-
-#ifdef sparc
-#include "sparc-validate.h"
-#endif
-
-#ifdef __i386__
-#include "x86-validate.h"
-#endif
-
-#ifdef alpha
-#include "alpha-validate.h"
-#endif
-
+#if !defined(LANGUAGE_ASSEMBLY)
 extern void validate(void);
+#endif
+
+/* note for anyone trying to port an architecture's support files
+ * from CMU CL to SBCL:
+ *
+ * CMU CL had architecture-dependent header files included here to
+ * define memory map data:
+ *   #ifdef __i386__
+ *   #include "x86-validate.h"
+ *   #endif
+ * and so forth. In SBCL, the memory map data are defined at the Lisp
+ * level and stuffed into the sbcl.h file created by GENESIS, so
+ * there's no longer a need for an architecture-dependent header file
+ * of memory map data. */
 
 #endif

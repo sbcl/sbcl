@@ -40,7 +40,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "x86-validate.h"
+#include "validate.h"
 size_t os_vm_page_size;
 
 #if defined GENCGC
