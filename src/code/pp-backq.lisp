@@ -35,8 +35,8 @@
    ((atom form)
     (backq-unparse-expr form splicing))
    ((not (null (cdr (last form))))
-    ;; FIXME: Shouldn't this be an ERROR?
-    "### illegal dotted backquote form ###")
+    ;; FIXME: this probably throws a recursive error
+    (bug "found illegal dotted backquote form: ~S" form))
    (t
     (case (car form)
       (backq-list
@@ -49,10 +49,10 @@
 		   (backq-unparse (car tail) t)))
 	 (push (backq-unparse (car tail)) accum)))
       (backq-append
-       (mapcan (lambda (el) (backq-unparse el t))
+       (mapcar (lambda (el) (backq-unparse el t))
 	       (cdr form)))
       (backq-nconc
-       (mapcan (lambda (el) (backq-unparse el :nconc))
+       (mapcar (lambda (el) (backq-unparse el :nconc))
 	       (cdr form)))
       (backq-cons
        (cons (backq-unparse (cadr form) nil)

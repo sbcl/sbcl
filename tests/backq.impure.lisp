@@ -55,5 +55,8 @@
 	(test-double-backquote (car test) (cdr test)))
       *backquote-tests*)
 
+(let ((string "`(foobar a b ,c ,'(e f g) d ,@'(e f g) (h i j) ,@foo)"))
+  (assert (equal (print (read-from-string string)) (read-from-string string))))
+
 ;;; success
 (quit :unix-status 104)
