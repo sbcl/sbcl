@@ -44,7 +44,7 @@
   (let ((namestring (handler-case (namestring pathname)
 		      (error nil))))
     (if namestring
-	(format stream "#P~S" namestring)
+	(format stream "#P~S" (coerce namestring '(simple-array character (*))))
 	(print-unreadable-object (pathname stream :type t)
 	  (format stream
 		  "~@<(with no namestring) ~_:HOST ~S ~_:DEVICE ~S ~_:DIRECTORY ~S ~
@@ -1526,12 +1526,9 @@ a host-structure or string."
     (t (translate-logical-pathname (pathname pathname)))))
 
 (defvar *logical-pathname-defaults*
-  (%make-logical-pathname (make-logical-host :name "BOGUS")
-			  :unspecific
-			  nil
-			  nil
-			  nil
-			  nil))
+  (%make-logical-pathname
+   (make-logical-host :name (logical-word-or-lose "BOGUS"))
+   :unspecific nil nil nil nil))
 
 (defun load-logical-pathname-translations (host)
   #!+sb-doc

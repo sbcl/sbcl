@@ -42,6 +42,14 @@ particularly appealing.)
      >> all contribs build and pass self-tests;
      >> all sbcl tests pass;
      >> checked against Paul Dietz' gcl/ansi-tests.
+     >> resulting sbcl self-builds.
+        (Note: this last step was more difficult than anticipated: the
+        difference between a self-build and a build from another lisp
+        is that literal strings are dumped as (SIMPLE-ARRAY CHARACTER
+        (*))s rather than as SIMPLE-BASE-STRINGs, revealing yet
+        another set of portability problems, and prompting some KLUDGEs
+        of the #.(coerce "foo" 'base-string) form that might
+        eventually be reversed.)
   -- TODO: sparc, mips, hppa, alpha, ppc.
 
 ** fix genesis to dump BASE-STRINGs always, and to use SB!XC:CHAR-CODE
@@ -50,6 +58,11 @@ to portability, so should not use any non-STANDARD-CHAR in its source
 code.  By definition, therefore, all strings and stringlike objects
 are dumpable as BASE-STRING, which allows for identical cores to be
 generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
+
+** fix FOREIGN-SYMBOL-ADDRESS to work with general constant strings,
+not just (:CONSTANT SIMPLE-BASE-STRING), coercing to base-string
+within the VOP implementation.  (Rationale: less use of #.(coerce
+"foo" 'base-string) throughout the code.)
 
 ** fix the regular dumper to compute similarity properly for strings,
 rather than simply through an EQUAL hash table.  (Rationale: it's just
@@ -62,7 +75,8 @@ confusion, probably.  If there is long-term demand for a purely 8-bit
 character SBCL, this decision might be revised, but this simplifying
 decision allows for infrastructural progress).  This requires
 modification of the various CHAR-UPCASE/STRING-DOWNCASE/GRAPHIC-CHAR-P
-etc. functions.
+etc. functions, and will probably address the failing test FORMAT.C.4A
+from gcl/ansi-tests.
 
 ** implement :UTF-8, :ISO-8859-1 and :POSIX external formats, and make
 :DEFAULT an alias for the approprate one based on nl_langinfo(CHARSET)
@@ -75,6 +89,11 @@ be terribly useful.
 
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
 (Rationale: for calling out to Pango or similar.)
+
+** alter the reader and any similar data structures such that they do
+not scale linearly in size with the number of characters in the
+system.  (Rationale: having a readtable with 2^21 entries would make
+even current bloated sbcl.core look tiny.)
 
 ** increase CHAR-CODE-LIMIT to something larger than 256.  (Rationale:
 support people other than simply those living in non-Eurozone Western

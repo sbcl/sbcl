@@ -1387,7 +1387,8 @@
 	(make-fd-stream 1 :name "standard output" :output t :buffering :line))
   (setf *stderr*
 	(make-fd-stream 2 :name "standard error" :output t :buffering :line))
-  (let ((tty (sb!unix:unix-open "/dev/tty" sb!unix:o_rdwr #o666)))
+  (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
+	 (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
     (if tty
 	(setf *tty*
 	      (make-fd-stream tty

@@ -139,7 +139,7 @@
     (defun foreign-symbol-in-address (sap)
       (declare (ignore sap)))
 
-    (when (ignore-errors (foreign-symbol-address "dladdr"))
+    (when (ignore-errors (foreign-symbol-address #.(coerce "dladdr" 'simple-base-string)))
       (setf (symbol-function 'foreign-symbol-in-address)
 	    ;; KLUDGE: This COMPILE trick is to avoid trying to
 	    ;; compile a reference to dladdr on platforms without it.
