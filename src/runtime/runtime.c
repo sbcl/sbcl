@@ -175,8 +175,6 @@ BSD-style licenses.  See the CREDITS and COPYING files in the\n\
 distribution for more information.\n\
 ", SBCL_VERSION_STRING);
 }
-
-FILE *stdlog;
 
 
 int

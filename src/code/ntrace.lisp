@@ -1,4 +1,4 @@
-;;;; a tracing facility based on breakpoints
+;;;; a tracing facility
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -497,8 +497,8 @@
   "TRACE {Option Global-Value}* {Name {Option Value}*}*
    TRACE is a debugging tool that provides information when specified functions
    are called. In its simplest form:
-       (trace Name-1 Name-2 ...)
-   (The Names are not evaluated.)
+       (TRACE NAME-1 NAME-2 ...)
+   (The NAMEs are not evaluated.)
 
    Options allow modification of the default behavior. Each option is a pair
    of an option keyword and a value form. Global options are specified before
@@ -530,6 +530,7 @@
        evaluates to true at the time of the call. :CONDITION-AFTER is
        similar, but suppresses the initial printout, and is tested when the
        function returns. :CONDITION-ALL tries both before and after.
+       This option is not supported with :REPORT PROFILE.
 
    :BREAK Form
    :BREAK-AFTER Form
@@ -544,13 +545,14 @@
        In addition to the usual printout, the result of evaluating Form is
        printed at the start of the function, at the end of the function, or
        both, according to the respective option. Multiple print options cause
-       multiple values to be printed.
+       multiple values to be printed. 
 
    :WHEREIN Names
        If specified, Names is a function name or list of names. TRACE does
        nothing unless a call to one of those functions encloses the call to
        this function (i.e. it would appear in a backtrace.)  Anonymous
-       functions have string names like \"DEFUN FOO\". 
+       functions have string names like \"DEFUN FOO\". This option is not
+       supported with :REPORT PROFILE.
 
    :ENCAPSULATE {:DEFAULT | T | NIL}
        If T, the tracing is done via encapsulation (redefining the function
@@ -563,11 +565,13 @@
    :FUNCTION Function-Form
        This is a not really an option, but rather another way of specifying
        what function to trace. The Function-Form is evaluated immediately,
-       and the resulting function is traced.
+       and the resulting function is instrumented, i.e. traced or profiled
+       as specified in REPORT.
 
-   :CONDITION, :BREAK and :PRINT forms are evaluated in the lexical environment
-   of the called function; SB-DEBUG:VAR and SB-DEBUG:ARG can be used. The
-   -AFTER and -ALL forms are evaluated in the null environment."
+   :CONDITION, :BREAK and :PRINT forms are evaluated in a context which
+   mocks up the lexical environment of the called function, so that
+   SB-DEBUG:VAR and SB-DEBUG:ARG can be used. The -AFTER and -ALL forms
+   are evaluated in the null environment."
   (if specs
       (expand-trace specs)
       '(%list-traced-funs)))

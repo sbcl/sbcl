@@ -716,20 +716,32 @@
       (ecase sb!c:*backend-byte-order*
 	(:little-endian
 	 (write-wordindexed des sb!vm:complex-double-float-real-slot low-bits)
-	 (write-wordindexed des (1+ sb!vm:complex-double-float-real-slot) high-bits))
+	 (write-wordindexed des
+			    (1+ sb!vm:complex-double-float-real-slot)
+			    high-bits))
 	(:big-endian
 	 (write-wordindexed des sb!vm:complex-double-float-real-slot high-bits)
-	 (write-wordindexed des (1+ sb!vm:complex-double-float-real-slot) low-bits))))
+	 (write-wordindexed des
+			    (1+ sb!vm:complex-double-float-real-slot)
+			    low-bits))))
     (let* ((imag (imagpart num))
 	   (high-bits (make-random-descriptor (double-float-high-bits imag)))
 	   (low-bits (make-random-descriptor (double-float-low-bits imag))))
       (ecase sb!c:*backend-byte-order*
 	(:little-endian
-	 (write-wordindexed des sb!vm:complex-double-float-imag-slot low-bits)
-	 (write-wordindexed des (1+ sb!vm:complex-double-float-imag-slot) high-bits))
+	 (write-wordindexed des
+			    sb!vm:complex-double-float-imag-slot
+			    low-bits)
+	 (write-wordindexed des
+			    (1+ sb!vm:complex-double-float-imag-slot)
+			    high-bits))
 	(:big-endian
-	 (write-wordindexed des sb!vm:complex-double-float-imag-slot high-bits)
-	 (write-wordindexed des (1+ sb!vm:complex-double-float-imag-slot) low-bits))))
+	 (write-wordindexed des
+			    sb!vm:complex-double-float-imag-slot
+			    high-bits)
+	 (write-wordindexed des
+			    (1+ sb!vm:complex-double-float-imag-slot)
+			    low-bits))))
     des))
 
 ;;; Copy the given number to the core.
@@ -1760,12 +1772,14 @@
 		(ash value -2)))
 	 (:lui
 	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
-		(logior (mask-field (byte 16 16) (bvref-32 gspace-bytes gspace-byte-offset))
+		(logior (mask-field (byte 16 16)
+				    (bvref-32 gspace-bytes gspace-byte-offset))
 			(+ (ash value -16)
 			   (if (logbitp 15 value) 1 0)))))
 	 (:addi
 	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
-		(logior (mask-field (byte 16 16) (bvref-32 gspace-bytes gspace-byte-offset))
+		(logior (mask-field (byte 16 16)
+				    (bvref-32 gspace-bytes gspace-byte-offset))
 			(ldb (byte 16 0) value))))))
        (:ppc
        (ecase kind
@@ -1897,7 +1911,9 @@
                forms))
        (setf (svref *cold-fop-funs* ,code) #',fname))))
 
-(defmacro clone-cold-fop ((name &key (pushp t) (stackp t)) (small-name) &rest forms)
+(defmacro clone-cold-fop ((name &key (pushp t) (stackp t))
+			  (small-name)
+			  &rest forms)
   (aver (member pushp '(nil t)))
   (aver (member stackp '(nil t)))
   `(progn
@@ -1929,8 +1945,6 @@
 
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
-(define-cold-fop (fop-character)
-  (make-character-descriptor (read-arg 3)))
 (define-cold-fop (fop-short-character)
   (make-character-descriptor (read-arg 1)))
 
@@ -2806,13 +2820,18 @@
   ;; type things. We therefore don't export it, but instead do
   #!+sparc
   (when (boundp 'sb!vm::pseudo-atomic-trap)
-    (format t "#define PSEUDO_ATOMIC_TRAP ~D /* 0x~:*~X */~%" sb!vm::pseudo-atomic-trap)
+    (format t
+	    "#define PSEUDO_ATOMIC_TRAP ~D /* 0x~:*~X */~%"
+	    sb!vm::pseudo-atomic-trap)
     (terpri))
   ;; possibly this is another candidate for a rename (to
   ;; pseudo-atomic-trap-number or pseudo-atomic-magic-constant
   ;; [possibly applicable to other platforms])
 
-  (dolist (symbol '(sb!vm::float-traps-byte sb!vm::float-exceptions-byte sb!vm::float-sticky-bits sb!vm::float-rounding-mode))
+  (dolist (symbol '(sb!vm::float-traps-byte
+		    sb!vm::float-exceptions-byte
+		    sb!vm::float-sticky-bits
+		    sb!vm::float-rounding-mode))
     (format t "#define ~A_POSITION ~A /* ~:*0x~X */~%"
 	    (substitute #\_ #\- (symbol-name symbol))
 	    (sb!xc:byte-position (symbol-value symbol)))

@@ -428,7 +428,7 @@ returns a pointer to the location specified by
 
 <synopsis>(sb-alien:cast foreign-value new-type)</synopsis>
   
-<para>The <function>sb-alien:cast</function>
+<para>The <function>sb-alien:cast</function> macro
 converts <varname>foreign-value</varname> to a new foreign value with the specified
 <varname>new-type</varname>. Both types, old and new, must be foreign pointer,
 array or function types.  Note that the resulting Lisp 
@@ -622,9 +622,10 @@ the operator <function>sb-alien:get-errno</function> to allow Lisp code to read 
 <para>
 The <function>extern-alien</function> macro
 returns an alien with the specified <type>type</type> which
-points to an externally defined value. <varname>name</varname> is not evaluated,
-and may be either a string or a symbol. <type>type</type> is
-an unevaluated alien type specifier.
+points to an externally defined value. 
+<varname>name</varname> is not evaluated,
+and may be either a string or a symbol. 
+<type>type</type> is an unevaluated alien type specifier.
 </para>
 
 </sect2>

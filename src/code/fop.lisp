@@ -123,8 +123,6 @@
   #-sb-xc-host
   (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-widetag))
 
-(define-fop (fop-character 68)
-  (code-char (read-arg 3)))
 ;;; CMU CL had FOP-CHARACTER as fop 68, but it's not needed in current
 ;;; SBCL as we have no extended characters, only 1-byte characters.
 ;;; (Ditto for CMU CL, actually: FOP-CHARACTER was speculative generality.)
