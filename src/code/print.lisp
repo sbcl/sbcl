@@ -429,6 +429,10 @@
 	   (/show0 "in don't-bother-after-all case")
 	   (print-it stream)))))
 
+;;; a hack for debugging
+#!+sb-show 
+(defvar *print-object-is-disabled-p*)
+
 ;;; Output OBJECT to STREAM observing all printer control variables
 ;;; except for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL,
 ;;; then the pretty printer will be used for any components of OBJECT,
@@ -464,7 +468,23 @@
 	 (output-list object stream)))
     (instance
      (/show0 "in PRINT-OBJECT case")
-     (print-object object stream))
+     #!-sb-show
+     (print-object object stream)
+
+     ;; After being bitten several times by the difficulty of
+     ;; debugging problems around DEFGENERIC PRINT-OBJECT when the old
+     ;; placeholder printer is disabled by FMAKUNBOUND 'PRINT-OBJECT
+     ;; and/or DEFGENERIC has already executed but DEFMETHODs haven't,
+     ;; I added this workaround to allow output during that
+     ;; interval... -- WHN 2001-11-25
+     #!+sb-show
+     (cond ((not (and (boundp '*print-object-is-disabled-p*)
+		      *print-object-is-disabled-p*))
+	    (print-object object stream))
+	   ((typep object 'structure-object)
+	    (default-structure-print object stream *current-level*))
+	   (t
+	    (write-string "#<INSTANCE but not STRUCTURE-OBJECT>"))))
     (function
      (unless (and (funcallable-instance-p object)
 		  (printed-as-funcallable-standard-class object stream))
