@@ -347,8 +347,8 @@
 
     (values (real) (top) (real-top))))
 
-;; COMPONENTs want strings for names, LEAF-DEBUG-NAMEs mightn't be
-;; strings..
+;;; COMPONENTs want strings for names, LEAF-DEBUG-NAMEs mightn't be
+;;; strings...
 (defun component-name-from-functional-debug-name (functional)
   (declare (type functional functional))
   (let ((leaf-debug-name (leaf-debug-name functional)))
@@ -375,7 +375,7 @@
     ;; an existing component if we find that there are references
     ;; between them. Any code that is left in an initial component
     ;; must be unreachable, so we can delete it. Stray links to the
-    ;; initial component tail (due NIL function terminated blocks)
+    ;; initial component tail (due to NIL function terminated blocks)
     ;; are moved to the appropriate new component tail.
     (dolist (toplevel-lambda toplevel-lambdas)
       (let* ((old-component (lambda-component toplevel-lambda))

@@ -289,7 +289,17 @@
   (list-copy-seq sequence))
 
 (defun vector-copy-seq* (sequence)
-  (vector-copy-seq sequence (type-of sequence)))
+  (declare (type vector sequence))
+  (vector-copy-seq sequence
+		   (typecase sequence
+		     ;; Pick off the common cases so that we don't have to... 
+		     ((vector t) 'simple-vector)
+		     (string 'simple-string)
+		     (bit-vector 'simple-bit-vector)
+		     ((vector single-float) '(simple-array single-float 1))
+		     ((vector double-float) '(simple-array double-float 1))
+		     ;; ...do a full call to TYPE-OF.
+		     (t (type-of sequence)))))
 
 ;;;; FILL
 

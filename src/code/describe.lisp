@@ -19,8 +19,8 @@
   #+sb-doc
   "Print a description of the object X."
   (let ((stream (out-synonym-of stream-designator)))
+    (fresh-line stream)
     (pprint-logical-block (stream nil)
-      (pprint-newline :mandatory stream)
       (describe-object x stream)
       (pprint-newline :mandatory stream)))
   (values))
