@@ -1347,6 +1347,13 @@ WORKAROUND:
      WARNING for calls with both :TEST and :TEST-NOT; possibly this
      latter should be WARNed about at execute-time too.
 
+216: "debugger confused by frames with invalid number of arguments"
+  In sbcl-0.7.8.51, executing e.g. (VECTOR-PUSH-EXTEND T), BACKTRACE, Q
+  leaves the system confused, enough so that (QUIT) no longer works.
+  It's as though the process of working with the uninitialized slot in
+  the bad VECTOR-PUSH-EXTEND frame causes GC problems, though that may
+  not be the actual problem. (CMU CL 18c doesn't have problems with this.)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
