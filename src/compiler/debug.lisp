@@ -662,7 +662,7 @@
 
 ;;; Dump some info about how many TNs there, and what the conflicts data
 ;;; structures are like.
-(defun pre-pack-tn-stats (component &optional (stream *error-output*))
+(defun pre-pack-tn-stats (component &optional (stream *standard-output*))
   (declare (type component component))
   (let ((wired 0)
 	(global 0)

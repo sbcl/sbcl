@@ -84,11 +84,6 @@ WORKAROUND:
 
   d: (fixed in 0.8.1.5)
 
-7:
-  The "compiling top-level form:" output ought to be condensed.
-  Perhaps any number of such consecutive lines ought to turn into a
-  single "compiling top-level forms:" line.
-
 27:
   Sometimes (SB-EXT:QUIT) fails with 
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting

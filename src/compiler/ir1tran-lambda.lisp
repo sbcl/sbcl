@@ -1049,17 +1049,12 @@
 ;;; The INLINE-EXPANSION is a LAMBDA-WITH-LEXENV, or NIL if there is
 ;;; no inline expansion.
 (defun %compiler-defun (name lambda-with-lexenv compile-toplevel)
-
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
-
     (when compile-toplevel
       ;; better be in the compiler
       (aver (boundp '*lexenv*)) 
-      (when sb!xc:*compile-print*
-	(compiler-mumble "~&; recognizing DEFUN ~S~%" name))
       (remhash name *free-funs*)
       (setf defined-fun (get-defined-fun name))
-
       (aver (fasl-output-p *compile-object*))
       (if (member name *fun-names-in-this-file* :test #'equal)
 	  (warn 'duplicate-definition :name name)

@@ -61,6 +61,10 @@
 (defvar *toplevel-lambdas*)
 (declaim (list *toplevel-lambdas*))
 
+;;; The current non-macroexpanded toplevel form as printed when
+;;; *compile-print* is true.
+(defvar *top-level-form-noted* nil)
+
 (defvar sb!xc:*compile-verbose* t
   #!+sb-doc
   "The default for the :VERBOSE argument to COMPILE-FILE.")
@@ -69,7 +73,7 @@
   "The default for the :PRINT argument to COMPILE-FILE.")
 (defvar *compile-progress* nil
   #!+sb-doc
-  "When this is true, the compiler prints to *ERROR-OUTPUT* progress
+  "When this is true, the compiler prints to *STANDARD-OUTPUT* progress
   information about the phases of compilation of each function. (This
   is useful mainly in large block compilations.)")
 
@@ -103,7 +107,7 @@
 (defun maybe-mumble (&rest foo)
   (when *compile-progress*
     (compiler-mumble "~&")
-    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+    (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
        (apply #'compiler-mumble foo))))
 
 (deftype object () '(or fasl-output core-object null))
@@ -239,8 +243,8 @@
 	       (zerop *compiler-warning-count*)
 	       (zerop *compiler-style-warning-count*)
 	       (zerop *compiler-note-count*))
-    (format *error-output* "~&")
-    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+    (fresh-line *standard-output*)
+    (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
       (compiler-mumble "compilation unit ~:[finished~;aborted~]~
                        ~[~:;~:*~&  caught ~W fatal ERROR condition~:P~]~
                        ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
@@ -253,7 +257,7 @@
 		       *compiler-warning-count*
 		       *compiler-style-warning-count*
 		       *compiler-note-count*)))
-  (format *error-output* "~&"))
+  (fresh-line *standard-output*))
 
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and
@@ -439,7 +443,7 @@
 
 	  (when *compile-progress*
 	    (compiler-mumble "") ; Sync before doing more output.
-	    (pre-pack-tn-stats component *error-output*))
+	    (pre-pack-tn-stats component *standard-output*))
 
 	  (when *check-consistency*
 	    (maybe-mumble "check-life ")
@@ -525,8 +529,6 @@
     (aver (eql (node-component (lambda-bind lambda)) component)))
 
   (let* ((*component-being-compiled* component))
-    (when sb!xc:*compile-print*
-      (compiler-mumble "~&; compiling ~A: " (component-name component)))
 
     (ir1-phases component)
 
@@ -561,10 +563,7 @@
       (%compile-component component)))
 
   (clear-constant-info)
-
-  (when sb!xc:*compile-print*
-    (compiler-mumble "~&"))
-
+  
   (values))
 
 ;;;; clearing global data structures
@@ -839,12 +838,16 @@
 ;;; *TOPLEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
-  (let* ((*lexenv* (make-lexenv :policy *policy*
-				:handled-conditions *handled-conditions*
-				:disabled-package-locks *disabled-package-locks*))
+  (let* ((*top-level-form-noted* (note-top-level-form form t))
+         (*lexenv* (make-lexenv 
+                    :policy *policy*
+                    :handled-conditions *handled-conditions*
+                    :disabled-package-locks *disabled-package-locks*))
 	 (tll (ir1-toplevel form path nil)))
-    (cond ((eq *block-compile* t) (push tll *toplevel-lambdas*))
-	  (t (compile-toplevel (list tll) nil)))))
+    (if (eq *block-compile* t) 
+        (push tll *toplevel-lambdas*)
+        (compile-toplevel (list tll) nil))
+    nil))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
@@ -853,7 +856,7 @@
   (handler-case (sb!xc:macroexpand-1 form *lexenv*)
     (error (condition)
       (compiler-error "(during macroexpansion of ~A)~%~A"
-		      (let ((*print-level* 1)
+		      (let ((*print-level* 2)
 			    (*print-length* 2))
 			(format nil "~S" form))
 		      condition))))
@@ -1073,6 +1076,28 @@
                        *compile-object*)
   (values))
 
+(defun note-top-level-form (form &optional finalp)
+  (when *compile-print*
+    (cond ((not *top-level-form-noted*)
+           (let ((*print-length* 2)
+                 (*print-level* 2)
+                 (*print-pretty* nil))
+             (with-compiler-io-syntax
+                 (compiler-mumble "~&; ~:[compiling~;converting~] ~S" 
+                                  *block-compile* form)))
+             form)
+          ((and finalp
+                (eq :top-level-forms *compile-print*)
+                (neq form *top-level-form-noted*))
+           (let ((*print-length* 1)
+                 (*print-level* 1)
+                 (*print-pretty* nil))
+             (with-compiler-io-syntax
+                 (compiler-mumble "~&; ... top level ~S" form)))
+           form)
+          (t
+           *top-level-form-noted*))))
+
 ;;; Process a top level FORM with the specified source PATH.
 ;;;  * If this is a magic top level form, then do stuff.
 ;;;  * If this is a macro, then expand it.
@@ -1081,10 +1106,9 @@
 ;;; COMPILE-TIME-TOO is as defined in ANSI
 ;;; "3.2.3.1 Processing of Top Level Forms".
 (defun process-toplevel-form (form path compile-time-too)
-
   (declare (list path))
 
-  (catch 'process-toplevel-form-error-abort
+  (catch 'process-toplevel-form-error-abort    
     (let* ((path (or (gethash form *source-paths*) (cons form path)))
 	   (*compiler-error-bailout*
 	    (lambda (&optional condition)
@@ -1094,69 +1118,70 @@
 	      (throw 'process-toplevel-form-error-abort nil))))
 
       (flet ((default-processor (form)
-               ;; When we're cross-compiling, consider: what should we
-               ;; do when we hit e.g.
-               ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL)
-               ;;     (DEFUN FOO (X) (+ 7 X)))?
-               ;; DEFUN has a macro definition in the cross-compiler,
-               ;; and a different macro definition in the target
-               ;; compiler. The only sensible thing is to use the
-               ;; target compiler's macro definition, since the
-               ;; cross-compiler's macro is in general into target
-               ;; functions which can't meaningfully be executed at
-               ;; cross-compilation time. So make sure we do the EVAL
-               ;; here, before we macroexpand.
-               ;;
-               ;; Then things get even dicier with something like
-               ;;   (DEFCONSTANT-EQX SB!XC:LAMBDA-LIST-KEYWORDS ..)
-               ;; where we have to make sure that we don't uncross
-               ;; the SB!XC: prefix before we do EVAL, because otherwise
-               ;; we'd be trying to redefine the cross-compilation host's
-               ;; constants.
-               ;;
-               ;; (Isn't it fun to cross-compile Common Lisp?:-)
-               #+sb-xc-host
-               (progn
-                 (when compile-time-too
-                   (eval form)) ; letting xc host EVAL do its own macroexpansion
-                 (let* (;; (We uncross the operator name because things
-                        ;; like SB!XC:DEFCONSTANT and SB!XC:DEFTYPE
-                        ;; should be equivalent to their CL: counterparts
-                        ;; when being compiled as target code. We leave
-                        ;; the rest of the form uncrossed because macros
-                        ;; might yet expand into EVAL-WHEN stuff, and
-                        ;; things inside EVAL-WHEN can't be uncrossed
-                        ;; until after we've EVALed them in the
-                        ;; cross-compilation host.)
-                        (slightly-uncrossed (cons (uncross (first form))
-                                                  (rest form)))
-                        (expanded (preprocessor-macroexpand-1
-                                   slightly-uncrossed)))
-                   (if (eq expanded slightly-uncrossed)
-                       ;; (Now that we're no longer processing toplevel
-                       ;; forms, and hence no longer need to worry about
-                       ;; EVAL-WHEN, we can uncross everything.)
-                       (convert-and-maybe-compile expanded path)
-                       ;; (We have to demote COMPILE-TIME-TOO to NIL
-                       ;; here, no matter what it was before, since
-                       ;; otherwise we'd tend to EVAL subforms more than
-                       ;; once, because of WHEN COMPILE-TIME-TOO form
-                       ;; above.)
-                       (process-toplevel-form expanded path nil))))
-               ;; When we're not cross-compiling, we only need to
-               ;; macroexpand once, so we can follow the 1-thru-6
-               ;; sequence of steps in ANSI's "3.2.3.1 Processing of
-               ;; Top Level Forms".
-               #-sb-xc-host
-               (let ((expanded (preprocessor-macroexpand-1 form)))
-		 (cond ((eq expanded form)
-			(when compile-time-too
-			  (eval-in-lexenv form *lexenv*))
-			(convert-and-maybe-compile form path))
-		       (t
-			(process-toplevel-form expanded
-					       path
-					       compile-time-too))))))
+               (let ((*top-level-form-noted* (note-top-level-form form)))
+                 ;; When we're cross-compiling, consider: what should we
+                 ;; do when we hit e.g.
+                 ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL)
+                 ;;     (DEFUN FOO (X) (+ 7 X)))?
+                 ;; DEFUN has a macro definition in the cross-compiler,
+                 ;; and a different macro definition in the target
+                 ;; compiler. The only sensible thing is to use the
+                 ;; target compiler's macro definition, since the
+                 ;; cross-compiler's macro is in general into target
+                 ;; functions which can't meaningfully be executed at
+                 ;; cross-compilation time. So make sure we do the EVAL
+                 ;; here, before we macroexpand.
+                 ;;
+                 ;; Then things get even dicier with something like
+                 ;;   (DEFCONSTANT-EQX SB!XC:LAMBDA-LIST-KEYWORDS ..)
+                 ;; where we have to make sure that we don't uncross
+                 ;; the SB!XC: prefix before we do EVAL, because otherwise
+                 ;; we'd be trying to redefine the cross-compilation host's
+                 ;; constants.
+                 ;;
+                 ;; (Isn't it fun to cross-compile Common Lisp?:-)
+                 #+sb-xc-host
+                 (progn
+                   (when compile-time-too
+                     (eval form)) ; letting xc host EVAL do its own macroexpansion
+                   (let* (;; (We uncross the operator name because things
+                          ;; like SB!XC:DEFCONSTANT and SB!XC:DEFTYPE
+                          ;; should be equivalent to their CL: counterparts
+                          ;; when being compiled as target code. We leave
+                          ;; the rest of the form uncrossed because macros
+                          ;; might yet expand into EVAL-WHEN stuff, and
+                          ;; things inside EVAL-WHEN can't be uncrossed
+                          ;; until after we've EVALed them in the
+                          ;; cross-compilation host.)
+                          (slightly-uncrossed (cons (uncross (first form))
+                                                    (rest form)))
+                          (expanded (preprocessor-macroexpand-1
+                                     slightly-uncrossed)))
+                     (if (eq expanded slightly-uncrossed)
+                         ;; (Now that we're no longer processing toplevel
+                         ;; forms, and hence no longer need to worry about
+                         ;; EVAL-WHEN, we can uncross everything.)
+                         (convert-and-maybe-compile expanded path)
+                         ;; (We have to demote COMPILE-TIME-TOO to NIL
+                         ;; here, no matter what it was before, since
+                         ;; otherwise we'd tend to EVAL subforms more than
+                         ;; once, because of WHEN COMPILE-TIME-TOO form
+                         ;; above.)
+                         (process-toplevel-form expanded path nil))))
+                 ;; When we're not cross-compiling, we only need to
+                 ;; macroexpand once, so we can follow the 1-thru-6
+                 ;; sequence of steps in ANSI's "3.2.3.1 Processing of
+                 ;; Top Level Forms".
+                 #-sb-xc-host
+                 (let ((expanded (preprocessor-macroexpand-1 form)))
+                   (cond ((eq expanded form)
+                          (when compile-time-too
+                            (eval-in-lexenv form *lexenv*))
+                          (convert-and-maybe-compile form path))
+                         (t
+                          (process-toplevel-form expanded
+                                                 path
+                                                 compile-time-too)))))))
         (if (atom form)
             #+sb-xc-host
             ;; (There are no xc EVAL-WHEN issues in the ATOM case until
@@ -1331,7 +1356,7 @@
 ;;; COMPILE-LOAD-TIME-VALUE stuff. -- WHN 20000201
 (defun compile-toplevel (lambdas load-time-value-p)
   (declare (list lambdas))
-
+  
   (maybe-mumble "locall ")
   (locall-analyze-clambdas-until-done lambdas)
 
@@ -1366,6 +1391,8 @@
 ;;; compilation.
 (defun finish-block-compilation ()
   (when *block-compile*
+    (when *compile-print*
+      (compiler-mumble "~&; block compiling converted top level forms..."))
     (when *toplevel-lambdas*
       (compile-toplevel (nreverse *toplevel-lambdas*) nil)
       (setq *toplevel-lambdas* ()))
@@ -1419,7 +1446,6 @@
         (*readtable* *readtable*)
         (sb!xc:*compile-file-pathname* nil) ; really bound in
         (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
-
         (*policy* *policy*)
 	(*handled-conditions* *handled-conditions*)
 	(*disabled-package-locks* *disabled-package-locks*)
@@ -1467,9 +1493,10 @@
       ;; the input file.
       (fatal-compiler-error (condition)
        (signal condition)
-       (format *error-output*
-	       "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
-	       condition)
+       (when *compile-verbose*
+         (format *standard-output*
+                 "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
+                 condition))
        (values nil t t)))))
 
 ;;; Return a pathname for the named file. The file must exist.
@@ -1495,7 +1522,7 @@
       (format nil "~D:~2,'0D:~2,'0D" thr min sec))))
 
 ;;; Print some junk at the beginning and end of compilation.
-(defun start-error-output (source-info)
+(defun print-compile-start-note (source-info)
   (declare (type source-info source-info))
   (let ((file-info (source-info-file-info source-info)))
     (compiler-mumble "~&; compiling file ~S (written ~A):~%"
@@ -1507,7 +1534,8 @@
 						   :print-weekday nil
 						   :print-timezone nil)))
   (values))
-(defun finish-error-output (source-info won)
+
+(defun print-compile-end-note (source-info won)
   (declare (type source-info source-info))
   (compiler-mumble "~&; compilation ~:[aborted after~;finished in~] ~A~&"
 		   won
@@ -1535,29 +1563,47 @@
      ;; extensions
      (trace-file nil) 
      ((:block-compile *block-compile-arg*) nil))
-
   #!+sb-doc
-  "Compile INPUT-FILE, producing a corresponding fasl file and returning
-   its filename. Besides the ANSI &KEY arguments :OUTPUT-FILE, :VERBOSE,
-   :PRINT, and :EXTERNAL-FORMAT, the following extensions are supported:
-     :TRACE-FILE
-        If given, internal data structures are dumped to the specified
-        file, or if a value of T is given, to a file of *.trace type
-        derived from the input file name.
-   Also, as a workaround for vaguely-non-ANSI behavior, the :BLOCK-COMPILE
-   argument is quasi-supported, to determine whether multiple
-   functions are compiled together as a unit, resolving function
-   references at compile time. NIL means that global function names
-   are never resolved at compilation time. Currently NIL is the
-   default behavior, because although section 3.2.2.3, \"Semantic
-   Constraints\", of the ANSI spec allows this behavior under all
-   circumstances, the compiler's runtime scales badly when it
-   tries to do this for large files. If/when this performance
-   problem is fixed, the block compilation default behavior will
-   probably be made dependent on the SPEED and COMPILATION-SPEED
-   optimization values, and the :BLOCK-COMPILE argument will probably
-   become deprecated."
+  "Compile INPUT-FILE, producing a corresponding fasl file and
+returning its filename.
 
+  :PRINT
+     If true, a message per non-macroexpanded top level form is printed 
+     to *STANDARD-OUTPUT*. Top level forms that whose subforms are
+     processed as top level forms (eg. EVAL-WHEN, MACROLET, PROGN) receive
+     no such message, but their subforms do.
+
+     As an extension to ANSI, if :PRINT is :top-level-forms, a message 
+     per top level form after macroexpansion is printed to *STANDARD-OUTPUT*. 
+     For example, compiling an IN-PACKAGE form will result in a message about
+     a top level SETQ in addition to the message about the IN-PACKAGE form'
+     itself.
+
+     Both forms of reporting obey the SB-EXT:*COMPILER-PRINT-VARIABLE-ALIST*.
+
+  :BLOCK-COMPILE
+     Though COMPILE-FILE accepts an additional :BLOCK-COMPILE
+     argument, it is not currently supported. (non-standard)
+
+  :TRACE-FILE
+     If given, internal data structures are dumped to the specified
+     file, or if a value of T is given, to a file of *.trace type
+     derived from the input file name. (non-standard)"
+;;; Block compilation is currently broken.
+#|
+  "Also, as a workaround for vaguely-non-ANSI behavior, the
+:BLOCK-COMPILE argument is quasi-supported, to determine whether
+multiple functions are compiled together as a unit, resolving function
+references at compile time. NIL means that global function names are
+never resolved at compilation time. Currently NIL is the default
+behavior, because although section 3.2.2.3, \"Semantic Constraints\",
+of the ANSI spec allows this behavior under all circumstances, the
+compiler's runtime scales badly when it tries to do this for large
+files. If/when this performance problem is fixed, the block
+compilation default behavior will probably be made dependent on the
+SPEED and COMPILATION-SPEED optimization values, and the
+:BLOCK-COMPILE argument will probably become deprecated."
+|#
   (let* ((fasl-output nil)
 	 (output-file-name nil)
 	 (compile-won nil)
@@ -1590,7 +1636,7 @@
 			  :direction :output))))
 
 	  (when sb!xc:*compile-verbose*
-	    (start-error-output source-info))
+	    (print-compile-start-note source-info))
 	  (let ((*compile-object* fasl-output)
 		dummy)
 	    (multiple-value-setq (dummy warnings-p failure-p)
@@ -1607,7 +1653,7 @@
 	  (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
 
       (when sb!xc:*compile-verbose*
-	(finish-error-output source-info compile-won))
+	(print-compile-end-note source-info compile-won))
 
       (when *compiler-trace-output*
 	(close *compiler-trace-output*)))
@@ -1731,9 +1777,7 @@
 	(t
 	 (when (fasl-constant-already-dumped-p constant *compile-object*)
 	   (return-from emit-make-load-form nil))
-	 (let* ((name (let ((*print-level* 1) (*print-length* 2))
-			(with-output-to-string (stream)
-			  (write constant :stream stream))))
+	 (let* ((name (write-to-string constant :level 1 :length 2))
 		(info (if init-form
 			  (list constant name init-form)
 			  (list constant))))

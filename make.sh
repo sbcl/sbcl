@@ -133,8 +133,9 @@ echo "the new SBCL, you can try:"
 echo
 echo "  cd tests && sh ./run-tests.sh"
 echo
-echo "  (All tests should pass on x86/Linux and ppc/Darwin, on other platforms"
-echo "  some failures are currently expected; patches welcome as always.)"
+echo "  (All tests should pass on x86/Linux, x86/FreeBSD4, and ppc/Darwin. On"
+echo "  other platforms some failures are currently expected; patches welcome"
+echo "  as always.)"
 echo
 echo "To build documentation:"
 echo

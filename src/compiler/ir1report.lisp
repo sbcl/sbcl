@@ -247,9 +247,9 @@
 ;;; count when we are done.
 (defun note-message-repeats (&optional (terpri t))
   (cond ((= *last-message-count* 1)
-	 (when terpri (terpri *error-output*)))
+	 (when terpri (terpri *standard-output*)))
 	((> *last-message-count* 1)
-          (format *error-output* "~&; [Last message occurs ~W times.]~2%"
+          (format *standard-output* "~&; [Last message occurs ~W times.]~2%"
 		 *last-message-count*)))
   (setq *last-message-count* 0))
 
@@ -268,7 +268,7 @@
 (defun %print-compiler-message (format-string format-args)
   (declare (type simple-string format-string))
   (declare (type list format-args))  
-  (let ((stream *error-output*)
+  (let ((stream *standard-output*)
 	(context (find-error-context format-args)))
     (cond
      (context
@@ -294,7 +294,6 @@
           (pprint-logical-block (stream nil :per-line-prefix "; ")
             (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
           (format stream "~%"))
-
 
 	(unless (and last
 		     (string= form
@@ -411,7 +410,7 @@ has written, having proved that it is unreachable."))
 	      (signal condition)
 	    (muffle-warning ()
 	      (return-from maybe-compiler-notify (values))))
-	  (let ((stream *error-output*))
+	  (let ((stream *standard-output*))
 	    (pprint-logical-block (stream nil :per-line-prefix ";")
 	      (format stream " note: ~3I~_")
 	      (pprint-logical-block (stream nil)
@@ -428,8 +427,8 @@ has written, having proved that it is unreachable."))
 (defun compiler-mumble (format-string &rest format-args)
   (note-message-repeats)
   (setq *last-error-context* nil)
-  (apply #'format *error-output* format-string format-args)
-  (force-output *error-output*)
+  (apply #'format *standard-output* format-string format-args)
+  (force-output *standard-output*)
   (values))
 
 ;;; Return a string that somehow names the code in COMPONENT. We use

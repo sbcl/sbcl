@@ -3,6 +3,9 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
     Lichteblau)
   * fixed loading of multiply forward-referenced layouts. 
     (thanks to Cheuksan Wang)
+  * fixed bug 7: less verbose COMPILE-FILE output. Additionally, the
+    output is now directed to *STANDARD-OUTPUT* as specified by ANSI. 
+    (see COMPILE-FILE documentation for details of :PRINT option)
   * fixed bugs 19 and 317: fixed-format floating point printing is
     more accurate.  This also fixes a bug reported by Adam Warner
     related to the ~@F format directive.

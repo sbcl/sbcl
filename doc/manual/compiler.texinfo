@@ -11,7 +11,7 @@ naive translation. Efficiency issues are sufficiently varied and
 separate that they have their own chapter, @ref{Efficiency}.
 
 @menu
-* Diagnostic Messages::         
+* Diagnostic Messages::
 * Handling of Types::           
 * Compiler Policy::             
 * Compiler Errors::             
