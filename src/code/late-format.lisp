@@ -792,9 +792,10 @@
 		 (error 'format-error
 			:complaint
 			"must specify exactly two sections"))
-	     (expand-bind-defaults ((index (expand-next-arg))) params
+	     (expand-bind-defaults ((index nil)) params
 	       (setf *only-simple-args* nil)
-	       (let ((clauses nil))
+	       (let ((clauses nil)
+                     (case `(or ,index ,(expand-next-arg))))
 		 (when last-semi-with-colon-p
 		   (push `(t ,@(expand-directive-list (pop sublists)))
 			 clauses))
@@ -803,7 +804,7 @@
 		     (push `(,(decf count)
 			     ,@(expand-directive-list sublist))
 			   clauses)))
-		 `(case ,index ,@clauses)))))
+		 `(case ,case ,@clauses)))))
      remaining)))
 
 (defun parse-conditional-directive (directives)
