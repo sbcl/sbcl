@@ -1181,6 +1181,27 @@
                (catch 'ct1 (throw 'ct1 0))))))
          15867134))
 
+;;; misc.361: replacing CAST with (m-v-call #'%compile-time-type-error)
+;;; could transform known-values LVAR to UVL
+(assert (zerop (funcall
+   (compile
+    nil
+    '(lambda (a b c)
+       (declare (notinline boole values denominator list))
+       (declare
+	(optimize (speed 2)
+		  (space 0)
+		  (safety 1)
+		  (debug 0)
+		  (compilation-speed 2)))
+       (catch 'ct6
+	 (progv
+	     '(*s8*)
+	     (list 0)
+	   (let ((v9 (ignore-errors (throw 'ct6 0))))
+	     (denominator
+	      (progv nil nil (values (boole boole-and 0 v9)))))))))
+   1 2 3)))
 
 ;;; MISC.275
 (assert

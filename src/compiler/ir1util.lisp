@@ -494,6 +494,10 @@
 (defun ctran-home-lambda (ctran)
   (ctran-home-lambda-or-null ctran))
 
+(declaim (inline cast-single-value-p))
+(defun cast-single-value-p (cast)
+  (not (values-type-p (cast-asserted-type cast))))
+
 #!-sb-fluid (declaim (inline lvar-single-value-p))
 (defun lvar-single-value-p (lvar)
   (or (not lvar)
@@ -506,7 +510,7 @@
           (cast
            (locally
                (declare (notinline lvar-single-value-p))
-             (and (not (values-type-p (cast-asserted-type dest)))
+             (and (cast-single-value-p dest)
                   (lvar-single-value-p (node-lvar dest)))))
           (t
            t)))))

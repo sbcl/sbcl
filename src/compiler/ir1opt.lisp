@@ -1773,7 +1773,9 @@
           ;; FIXME: Do it in one step.
           (filter-lvar
            value
-           `(multiple-value-call #'list 'dummy))
+           (if (cast-single-value-p cast)
+               `(list 'dummy)
+               `(multiple-value-call #'list 'dummy)))
           (filter-lvar
            (cast-value cast)
            ;; FIXME: Derived type.
