@@ -96,7 +96,7 @@
         *before-gc-hooks* nil
         *after-gc-hooks* nil
         *already-maybe-gcing* t
-	*gc-inhibit* t
+	*gc-inhibit* 1
 	*need-to-collect-garbage* nil
 	sb!unix::*interrupts-enabled* t
 	sb!unix::*interrupt-pending* nil

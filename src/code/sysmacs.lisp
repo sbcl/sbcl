@@ -11,14 +11,26 @@
 
 (in-package "SB!IMPL")
 
+
+#!-sb-thread
+(defmacro atomic-incf (symbol-name &optional (delta 1))
+  `(incf ,symbol-name ,delta))
+
+(defmacro atomic-decf (place &optional (delta 1))
+  `(atomic-incf ,place ,(- delta)))
+
+
 (defmacro without-gcing (&rest body)
   #!+sb-doc
   "Executes the forms in the body without doing a garbage collection."
   `(unwind-protect
-       (let ((*gc-inhibit* t))
-	 ,@body)
-     (when (and *need-to-collect-garbage* (not *gc-inhibit*))
-       (maybe-gc nil))))
+    (progn
+      (atomic-incf *gc-inhibit*)
+      ,@body)
+    (atomic-decf *gc-inhibit*)
+    (when (and *need-to-collect-garbage* (zerop *gc-inhibit*))
+      (maybe-gc nil))))
+
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.
 (defmacro eof-or-lose (stream eof-error-p eof-value)
