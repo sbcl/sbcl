@@ -890,8 +890,9 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   ** bogus entries in BUGS
   ** DIRECTORY when similar filenames are present
   ** DEFGENERIC with :METHOD options
-  ** problem with (MAKE-STRING N :INITIAL-ELEMENT #\SPACE))
-  ?? bugs 49b and 81
+  ** bug 126, in (MAKE-STRING N :INITIAL-ELEMENT #\SPACE))
+  ** bug in the optimization of ARRAY-ELEMENT-TYPE
+  ** LOOP bugs 49b and 81
 ?? Old operator names in the style DEF-FOO are now deprecated in favor
   of new corresponding names DEFINE-FOO, for consistency with the
   naming convention used in the ANSI standard). This mostly affects

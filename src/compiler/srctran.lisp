@@ -3307,21 +3307,23 @@
                   '(eql nil)
                   `(cons (eql ,(car list)) ,(consify (rest list)))))
             (get-element-type (a)
-              (let ((element-type (type-specifier
-                                   (array-type-specialized-element-type a))))
-                (cond ((symbolp element-type)
+              (let ((element-type
+		     (type-specifier (array-type-specialized-element-type a))))
+                (cond ((eq element-type '*)
+                       (specifier-type 'type-specifier))
+		      ((symbolp element-type)
                        (make-member-type :members (list element-type)))
                       ((consp element-type)
                        (specifier-type (consify element-type)))
                       (t
                        (error "can't understand type ~S~%" element-type))))))
       (cond ((array-type-p array-type)
-            (get-element-type array-type))
-           ((union-type-p array-type)             
+	     (get-element-type array-type))
+	    ((union-type-p array-type)             
              (apply #'type-union
                     (mapcar #'get-element-type (union-type-types array-type))))
-           (t
-            *universal-type*)))))
+	    (t
+	     *universal-type*)))))
 
 ;;;; debuggers' little helpers
 

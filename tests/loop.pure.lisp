@@ -22,3 +22,10 @@
 			     collect key)
 		       #'string<))
 	       '(key1 key2)))
+
+;;; Bug 81, reported by Wolfhard Buss on cmucl-help 2001-02-14, was
+;;; fixed by Alexey Dejneka's patch on sbcl-devel 2001-09-30.
+(assert (equal '(0.0 1.0 2.0 3.0)
+	       (loop with (a . b) of-type float = '(0.0 . 1.0)
+		     and (c . d) of-type float = '(2.0 . 3.0)
+		     return (list a b c d))))

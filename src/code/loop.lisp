@@ -770,6 +770,12 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			   specified-type required-type)))
 	specified-type)))
 
+(defun loop-build-destructuring-bindings (crocks forms)
+  (if crocks
+      `((destructuring-bind ,(car crocks) ,(cadr crocks)
+        ,@(loop-build-destructuring-bindings (cddr crocks) forms)))
+      forms))
+
 (defun loop-translate (*loop-source-code*
 		       *loop-macro-environment*
 		       *loop-universe*)
@@ -824,10 +830,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 				    (t
 				     'let))
 			     ,vars
-			     ,@(if crocks
-				   `((destructuring-bind ,@crocks
-					 ,@forms))
-				 forms)))))))
+			     ,@(loop-build-destructuring-bindings crocks
+								  forms)))))))
       answer)))
 
 (defun loop-iteration-driver ()
@@ -1906,6 +1910,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			     (below (loop-for-arithmetic :below))
 			     (to (loop-for-arithmetic :to))
 			     (upto (loop-for-arithmetic :upto))
+			     (by (loop-for-arithmetic :by))
 			     (being (loop-for-being)))
 	     :iteration-keywords '((for (loop-do-for))
 				   (as (loop-do-for))
@@ -1944,7 +1949,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		   'loop-package-symbols-iteration-path w
 		   :preposition-groups '((:of :in))
 		   :inclusive-permitted nil
-		   :user-data '(:symbol-types (:internal)))
+		   :user-data '(:symbol-types (:internal
+					       :external)))
     w))
 
 (defparameter *loop-ansi-universe*

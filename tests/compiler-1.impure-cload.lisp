@@ -100,4 +100,16 @@
 (assert (eql (bar "this is a test") :string))
 (assert (eql (bar (make-hash-table)) :t))
 
+;;; bug reported by Brian Spilsbury sbcl-devel 2001-09-30, fixed by
+;;; Alexey Dejneka patch sbcl-devel 2001-10-02
+(defun pixarray-element-size (pixarray)
+  (let ((eltype (array-element-type pixarray)))
+    (cond ((eq eltype 'bit) 1)
+          ((and (listp eltype)
+                (eq (first eltype) 'unsigned-byte))
+           (second eltype))
+          (t
+           (error "Invalid pixarray: ~S." pixarray)))))
+(assert (eql 1 (pixarray-element-size #*110)))
+
 (sb-ext:quit :unix-status 104) ; success

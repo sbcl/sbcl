@@ -387,15 +387,6 @@ WORKAROUND:
 	c: SYMBOL-MACROLET should signal PROGRAM-ERROR if something
 	   it binds is declared SPECIAL inside.
 
-49:
-  LOOP bugs reported by Peter Van Eynde July 25, 2000:
-	b: a messy one involving package iteration:
-interpreted Form: (LET ((PACKAGE (MAKE-PACKAGE "LOOP-TEST"))) (INTERN "blah" PACKAGE) (LET ((BLAH2 (INTERN "blah2" PACKAGE))) (EXPORT BLAH2 PACKAGE)) (LIST (SORT (LOOP FOR SYM BEING EACH PRESENT-SYMBOL OF PACKAGE FOR SYM-NAME = (SYMBOL-NAME SYM) COLLECT SYM-NAME) (FUNCTION STRING<)) (SORT (LOOP FOR SYM BEING EACH EXTERNAL-SYMBOL OF PACKAGE FOR SYM-NAME = (SYMBOL-NAME SYM) COLLECT SYM-NAME) (FUNCTION STRING<))))
-Should be: (("blah" "blah2") ("blah2"))
-SBCL: (("blah") ("blah2"))
-	* (LET ((X 1)) (LOOP FOR I BY (INCF X) FROM X TO 10 COLLECT I))
-	  doesn't work -- SBCL's LOOP says BY isn't allowed in a FOR clause.
-
 50:
   type system errors reported by Peter Van Eynde July 25, 2000:
 	a: (SUBTYPEP 'BIGNUM 'INTEGER) => NIL, NIL
@@ -705,17 +696,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 80:
   (fixed early Feb 2001 by MNA)
-
-81:
-  As reported by wbuss@TELDA.NET (Wolfhard Buss) on cmucl-help
-  2001-02-14, 
-    According to CLHS
-	 (loop with (a . b) of-type float = '(0.0 . 1.0)
-	   and (c . d) of-type float = '(2.0 . 3.0)
-	   return (list a b c d))
-    should evaluate to (0.0 1.0 2.0 3.0). cmucl-18c disagrees and
-    invokes the debugger: "B is not of type list".
-  SBCL does the same thing.
 
 82: 
   Functions are assigned names based on the context in which they're
