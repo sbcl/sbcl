@@ -1,4 +1,6 @@
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
+  * bug fix: read-write consistency on streams of element-type
+    (SIGNED-BYTE N) for N > 32.  (reported by Bruno Haible for CMUCL)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** POSITION on displaced vectors with non-zero displacement
        returns the right answer.
