@@ -18,5 +18,6 @@ extern lispobj alloc_cons(lispobj car, lispobj cdr);
 extern lispobj alloc_number(long n);
 extern lispobj alloc_string(char *str);
 extern lispobj alloc_sap(void *ptr);
+extern lispobj alloc_base_string(char *str);
 
 #endif /* _ALLOC_H_ */

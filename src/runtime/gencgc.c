@@ -49,8 +49,6 @@ void do_pending_interrupt(void);
 
 /* forward declarations */
 int gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed);
-void  gc_set_region_empty(struct alloc_region *region);
-void gc_alloc_update_all_page_tables(void);
 static void  gencgc_pickup_dynamic(void);
 boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
 

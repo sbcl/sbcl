@@ -136,13 +136,13 @@ describe_internal_error(os_context_t *context)
 #ifdef sc_WordPointerReg
 	case sc_WordPointerReg:
 #endif
-	    printf("\t0x%08x\n", *os_context_register_addr(context, offset));
+	    printf("\t0x%08lx\n", *os_context_register_addr(context, offset));
 	    break;
 	case sc_SignedReg:
-	    printf("\t%d\n", *os_context_register_addr(context, offset));
+	    printf("\t%ld\n", *os_context_register_addr(context, offset));
 	    break;
 	case sc_UnsignedReg:
-	    printf("\t%u\n", *os_context_register_addr(context, offset));
+	    printf("\t%lu\n", *os_context_register_addr(context, offset));
 	    break;
 #ifdef sc_SingleFloatReg
 	case sc_SingleFloatReg:

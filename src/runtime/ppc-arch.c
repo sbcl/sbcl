@@ -2,7 +2,6 @@
 
 #include "sbcl.h"
 #include "arch.h"
-#include "sbcl.h"
 #include "globals.h"
 #include "validate.h"
 #include "os.h"
