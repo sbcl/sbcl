@@ -763,7 +763,7 @@
 ;; (dotimes (i (length metatypes))
 ;;   (push (dfun-arg-symbol i) lambda-list))
 ;;
-;; used in the following six functions into common code that we can
+;; used in the following four functions into common code that we can
 ;; declare inline or something.  --njf 2001-12-20
 (defun make-dfun-lambda-list (metatypes applyp)
   (let ((lambda-list nil))
@@ -790,7 +790,7 @@
       (push '&rest lambda-list))
     (nreverse lambda-list)))
 
-;; FIXME: The next four functions suffer from having a `.DFUN-REST-ARG.'
+;; FIXME: The next two functions suffer from having a `.DFUN-REST-ARG.'
 ;; in their lambda lists, but no corresponding `&REST' symbol.  We assume
 ;; this should be the case by analogy with the previous two functions.
 ;; It works, and I don't know why.  Check the calling functions and
@@ -806,25 +806,6 @@
 	   'invoke-effective-method-function)
       ,fn-variable ,applyp ,@required ,@(when applyp `(.dfun-rest-arg.)))))
 
-(defun make-dfun-call (metatypes applyp fn-variable)
-  (let ((required
-         (let ((required nil))
-           (dotimes (i (length metatypes))
-             (push (dfun-arg-symbol i) required))
-           (nreverse required))))
-    (if applyp
-	`(function-apply   ,fn-variable ,@required .dfun-rest-arg.)
-	`(function-funcall ,fn-variable ,@required))))
-
-(defun make-dfun-arg-list (metatypes applyp)
-  (let ((required (let ((reversed-required nil))
-		    (dotimes (i (length metatypes))
-		      (push (dfun-arg-symbol i) reversed-required))
-		    (nreverse reversed-required))))
-    (if applyp
-	`(list* ,@required .dfun-rest-arg.)
-	`(list ,@required))))
-
 (defun make-fast-method-call-lambda-list (metatypes applyp)
   (let ((reversed-lambda-list nil))
     (push '.pv-cell. reversed-lambda-list)
@@ -835,198 +816,207 @@
       (push '.dfun-rest-arg. reversed-lambda-list))
     (nreverse reversed-lambda-list)))
 
-;;;; a comment from some PCL implementor:
-;;;;     Its too bad Common Lisp compilers freak out when you have a
-;;;;   DEFUN with a lot of LABELS in it. If I could do that I could
-;;;;   make this code much easier to read and work with.
-;;;;     Ahh Scheme...
-;;;;     In the absence of that, the following little macro makes the
-;;;;   code that follows a little bit more reasonable. I would like to
-;;;;   add that having to practically write my own compiler in order to
-;;;;   get just this simple thing is something of a drag.
-;;;;
-;;;; KLUDGE: Maybe we could actually implement this as LABELS now,
-;;;; since AFAIK CMU CL doesn't freak out when you have a DEFUN with a
-;;;; lot of LABELS in it (and if it does we can fix it instead of
-;;;; working around it). -- WHN 19991204
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defvar *cache* nil)
-
-;;; FIXME: should be undefined after bootstrapping
-(defparameter *local-cache-functions*
-  '((cache () .cache.)
-    (nkeys () (cache-nkeys .cache.))
-    (line-size () (cache-line-size .cache.))
-    (vector () (cache-vector .cache.))
-    (valuep () (cache-valuep .cache.))
-    (nlines () (cache-nlines .cache.))
-    (max-location () (cache-max-location .cache.))
-    (limit-fn () (cache-limit-fn .cache.))
-    (size () (cache-size .cache.))
-    (mask () (cache-mask .cache.))
-    (field () (cache-field .cache.))
-    (overflow () (cache-overflow .cache.))
-
-    ;; Return T IFF this cache location is reserved. The only time
-    ;; this is true is for line number 0 of an nkeys=1 cache.
-    (line-reserved-p (line)
-      (declare (fixnum line))
-      (and (= (nkeys) 1)
-	   (= line 0)))
-    (location-reserved-p (location)
-      (declare (fixnum location))
-      (and (= (nkeys) 1)
-	   (= location 0)))
-    ;; Given a line number, return the cache location. This is the
-    ;; value that is the second argument to cache-vector-ref. Basically,
-    ;; this deals with the offset of nkeys>1 caches and multiplies
-    ;; by line size.
-    (line-location (line)
-      (declare (fixnum line))
-      (when (line-reserved-p line)
-	(error "Line is reserved."))
-      (if (= (nkeys) 1)
-	  (the fixnum (* line (line-size)))
-	  (the fixnum (1+ (the fixnum (* line (line-size)))))))
-
-    ;; Given a cache location, return the line. This is the inverse
-    ;; of LINE-LOCATION.
-    (location-line (location)
-      (declare (fixnum location))
-      (if (= (nkeys) 1)
-	  (floor location (line-size))
-	  (floor (the fixnum (1- location)) (line-size))))
-
-    ;; Given a line number, return the wrappers stored at that line.
-    ;; As usual, if nkeys=1, this returns a single value. Only when
-    ;; nkeys>1 does it return a list. An error is signalled if the
-    ;; line is reserved.
-    (line-wrappers (line)
-      (declare (fixnum line))
-      (when (line-reserved-p line) (error "Line is reserved."))
-      (location-wrappers (line-location line)))
-    (location-wrappers (location) ; avoid multiplies caused by line-location
-      (declare (fixnum location))
-      (if (= (nkeys) 1)
-	  (cache-vector-ref (vector) location)
-	  (let ((list (make-list (nkeys)))
-		(vector (vector)))
-	    (declare (simple-vector vector))
-	    (dotimes-fixnum (i (nkeys) list)
-	      (setf (nth i list) (cache-vector-ref vector (+ location i)))))))
-
-    ;; Given a line number, return true IFF the line's
-    ;; wrappers are the same as wrappers.
-    (line-matches-wrappers-p (line wrappers)
-      (declare (fixnum line))
-      (and (not (line-reserved-p line))
-	   (location-matches-wrappers-p (line-location line) wrappers)))
-    (location-matches-wrappers-p (loc wrappers) ; must not be reserved
-      (declare (fixnum loc))
-      (let ((cache-vector (vector)))
-	(declare (simple-vector cache-vector))
-	(if (= (nkeys) 1)
-	    (eq wrappers (cache-vector-ref cache-vector loc))
-	    (dotimes-fixnum (i (nkeys) t)
-	      (unless (eq (pop wrappers)
-			  (cache-vector-ref cache-vector (+ loc i)))
-		(return nil))))))
-
-    ;; Given a line number, return the value stored at that line.
-    ;; If valuep is NIL, this returns NIL. As with line-wrappers,
-    ;; an error is signalled if the line is reserved.
-    (line-value (line)
-      (declare (fixnum line))
-      (when (line-reserved-p line) (error "Line is reserved."))
-      (location-value (line-location line)))
-    (location-value (loc)
-      (declare (fixnum loc))
-      (and (valuep)
-	   (cache-vector-ref (vector) (+ loc (nkeys)))))
-
-    ;; Given a line number, return true iff that line has data in
-    ;; it. The state of the wrappers stored in the line is not
-    ;; checked. An error is signalled if line is reserved.
-    (line-full-p (line)
-      (when (line-reserved-p line) (error "Line is reserved."))
-      (not (null (cache-vector-ref (vector) (line-location line)))))
-
-    ;; Given a line number, return true iff the line is full and
-    ;; there are no invalid wrappers in the line, and the line's
-    ;; wrappers are different from wrappers.
-    ;; An error is signalled if the line is reserved.
-    (line-valid-p (line wrappers)
-      (declare (fixnum line))
-      (when (line-reserved-p line) (error "Line is reserved."))
-      (location-valid-p (line-location line) wrappers))
-    (location-valid-p (loc wrappers)
-      (declare (fixnum loc))
-      (let ((cache-vector (vector))
-	    (wrappers-mismatch-p (null wrappers)))
-	(declare (simple-vector cache-vector))
-	(dotimes-fixnum (i (nkeys) wrappers-mismatch-p)
-	  (let ((wrapper (cache-vector-ref cache-vector (+ loc i))))
-	    (when (or (null wrapper)
-		      (invalid-wrapper-p wrapper))
-	      (return nil))
-	    (unless (and wrappers
-			 (eq wrapper
-			     (if (consp wrappers) (pop wrappers) wrappers)))
-	      (setq wrappers-mismatch-p t))))))
-
-    ;; how many unreserved lines separate line-1 and line-2
-    (line-separation (line-1 line-2)
-     (declare (fixnum line-1 line-2))
-     (let ((diff (the fixnum (- line-2 line-1))))
-       (declare (fixnum diff))
-       (when (minusp diff)
-	 (setq diff (+ diff (nlines)))
-	 (when (line-reserved-p 0)
-	   (setq diff (1- diff))))
-       diff))
-
-    ;; Given a cache line, get the next cache line. This will not
-    ;; return a reserved line.
-    (next-line (line)
-     (declare (fixnum line))
-     (if (= line (the fixnum (1- (nlines))))
-	 (if (line-reserved-p 0) 1 0)
-	 (the fixnum (1+ line))))
-    (next-location (loc)
-      (declare (fixnum loc))
-      (if (= loc (max-location))
-	  (if (= (nkeys) 1)
-	      (line-size)
-	      1)
-	  (the fixnum (+ loc (line-size)))))
-
-    ;; Given a line which has a valid entry in it, this will return
-    ;; the primary cache line of the wrappers in that line. We just
-    ;; call COMPUTE-PRIMARY-CACHE-LOCATION-FROM-LOCATION, this is an
-    ;; easier packaging up of the call to it.
-    (line-primary (line)
-      (declare (fixnum line))
-      (location-line (line-primary-location line)))
-    (line-primary-location (line)
-     (declare (fixnum line))
-     (compute-primary-cache-location-from-location
-       (cache) (line-location line)))))
-
 (defmacro with-local-cache-functions ((cache) &body body)
   `(let ((.cache. ,cache))
      (declare (type cache .cache.))
-     (macrolet ,(mapcar (lambda (fn)
-			  `(,(car fn) ,(cadr fn)
-			    `(let (,,@(mapcar (lambda (var)
-						``(,',var ,,var))
-					      (cadr fn)))
-			       ,@',(cddr fn))))
-			*local-cache-functions*)
+     (labels ((cache () .cache.)
+	      (nkeys () (cache-nkeys .cache.))
+	      (line-size () (cache-line-size .cache.))
+	      (vector () (cache-vector .cache.))
+	      (valuep () (cache-valuep .cache.))
+	      (nlines () (cache-nlines .cache.))
+	      (max-location () (cache-max-location .cache.))
+	      (limit-fn () (cache-limit-fn .cache.))
+	      (size () (cache-size .cache.))
+	      (mask () (cache-mask .cache.))
+	      (field () (cache-field .cache.))
+	      (overflow () (cache-overflow .cache.))
+	      ;;
+	      ;; Return T IFF this cache location is reserved.  The
+	      ;; only time this is true is for line number 0 of an
+	      ;; nkeys=1 cache.
+	      ;;
+	      (line-reserved-p (line)
+		(declare (fixnum line))
+		(and (= (nkeys) 1)
+		     (= line 0)))
+	      ;;
+	      (location-reserved-p (location)
+		(declare (fixnum location))
+		(and (= (nkeys) 1)
+		     (= location 0)))
+	      ;;
+	      ;; Given a line number, return the cache location.
+	      ;; This is the value that is the second argument to
+	      ;; cache-vector-ref.  Basically, this deals with the
+	      ;; offset of nkeys>1 caches and multiplies by line
+	      ;; size.
+	      ;; 	  
+	      (line-location (line)
+		(declare (fixnum line))
+		(when (line-reserved-p line)
+		  (error "line is reserved"))
+		(if (= (nkeys) 1)
+		    (the fixnum (* line (line-size)))
+		    (the fixnum (1+ (the fixnum (* line (line-size)))))))
+	      ;;
+	      ;; Given a cache location, return the line.  This is
+	      ;; the inverse of LINE-LOCATION.
+	      ;; 	  
+	      (location-line (location)
+		(declare (fixnum location))
+		(if (= (nkeys) 1)
+		    (floor location (line-size))
+		    (floor (the fixnum (1- location)) (line-size))))
+	      ;;
+	      ;; Given a line number, return the wrappers stored at
+	      ;; that line.  As usual, if nkeys=1, this returns a
+	      ;; single value.  Only when nkeys>1 does it return a
+	      ;; list.  An error is signalled if the line is
+	      ;; reserved.
+	      ;;
+	      (line-wrappers (line)
+		(declare (fixnum line))
+		(when (line-reserved-p line) (error "Line is reserved."))
+		(location-wrappers (line-location line)))
+	      ;;
+	      (location-wrappers (location) ; avoid multiplies caused by line-location
+		(declare (fixnum location))
+		(if (= (nkeys) 1)
+		    (cache-vector-ref (vector) location)
+		    (let ((list (make-list (nkeys)))
+			  (vector (vector)))
+		      (declare (simple-vector vector))
+		      (dotimes (i (nkeys) list)
+			(declare (fixnum i))
+			(setf (nth i list)
+			      (cache-vector-ref vector (+ location i)))))))
+	      ;;
+	      ;; Given a line number, return true IFF the line's
+	      ;; wrappers are the same as wrappers.
+	      ;;
+	      (line-matches-wrappers-p (line wrappers)
+		(declare (fixnum line))
+		(and (not (line-reserved-p line))
+		     (location-matches-wrappers-p (line-location line)
+						  wrappers)))
+	      ;;
+	      (location-matches-wrappers-p (loc wrappers) ; must not be reserved
+		(declare (fixnum loc))
+		(let ((cache-vector (vector)))
+		  (declare (simple-vector cache-vector))
+		  (if (= (nkeys) 1)
+		      (eq wrappers (cache-vector-ref cache-vector loc))
+		      (dotimes (i (nkeys) t)
+			(declare (fixnum i))
+			(unless (eq (pop wrappers)
+				    (cache-vector-ref cache-vector (+ loc i)))
+			  (return nil))))))
+	      ;;
+	      ;; Given a line number, return the value stored at that line.
+	      ;; If valuep is NIL, this returns NIL.  As with line-wrappers,
+	      ;; an error is signalled if the line is reserved.
+	      ;; 
+	      (line-value (line)
+		(declare (fixnum line))
+		(when (line-reserved-p line) (error "Line is reserved."))
+		(location-value (line-location line)))
+	      ;;
+	      (location-value (loc)
+		(declare (fixnum loc))
+		(and (valuep)
+		     (cache-vector-ref (vector) (+ loc (nkeys)))))
+	      ;;
+	      ;; Given a line number, return true IFF that line has data in
+	      ;; it.  The state of the wrappers stored in the line is not
+	      ;; checked.  An error is signalled if line is reserved.
+	      (line-full-p (line)
+		(when (line-reserved-p line) (error "Line is reserved."))
+		(not (null (cache-vector-ref (vector) (line-location line)))))
+	      ;;
+	      ;; Given a line number, return true IFF the line is full and
+	      ;; there are no invalid wrappers in the line, and the line's
+	      ;; wrappers are different from wrappers.
+	      ;; An error is signalled if the line is reserved.
+	      ;;
+	      (line-valid-p (line wrappers)
+		(declare (fixnum line))
+		(when (line-reserved-p line) (error "Line is reserved."))
+		(location-valid-p (line-location line) wrappers))
+	      ;;
+	      (location-valid-p (loc wrappers)
+		(declare (fixnum loc))
+		(let ((cache-vector (vector))
+		      (wrappers-mismatch-p (null wrappers)))
+		  (declare (simple-vector cache-vector))
+		  (dotimes (i (nkeys) wrappers-mismatch-p)
+		    (declare (fixnum i))
+		    (let ((wrapper (cache-vector-ref cache-vector (+ loc i))))
+		      (when (or (null wrapper)
+				(invalid-wrapper-p wrapper))
+			(return nil))
+		      (unless (and wrappers
+				   (eq wrapper
+				       (if (consp wrappers)
+					   (pop wrappers)
+					   wrappers)))
+			(setq wrappers-mismatch-p t))))))
+	      ;;
+	      ;; How many unreserved lines separate line-1 and line-2.
+	      ;;
+	      (line-separation (line-1 line-2)
+		(declare (fixnum line-1 line-2))
+		(let ((diff (the fixnum (- line-2 line-1))))
+		  (declare (fixnum diff))
+		  (when (minusp diff)
+		    (setq diff (+ diff (nlines)))
+		    (when (line-reserved-p 0)
+		      (setq diff (1- diff))))
+		  diff))
+	      ;;
+	      ;; Given a cache line, get the next cache line.  This will not
+	      ;; return a reserved line.
+	      ;; 
+	      (next-line (line)
+		(declare (fixnum line))
+		(if (= line (the fixnum (1- (nlines))))
+		    (if (line-reserved-p 0) 1 0)
+		    (the fixnum (1+ line))))
+	      ;;
+	      (next-location (loc)
+		(declare (fixnum loc))
+		(if (= loc (max-location))
+		    (if (= (nkeys) 1)
+			(line-size)
+			1)
+		    (the fixnum (+ loc (line-size)))))
+	      ;;
+	      ;; Given a line which has a valid entry in it, this
+	      ;; will return the primary cache line of the wrappers
+	      ;; in that line.  We just call
+	      ;; COMPUTE-PRIMARY-CACHE-LOCATION-FROM-LOCATION, this
+	      ;; is an easier packaging up of the call to it.
+	      ;; 
+	      (line-primary (line)
+		(declare (fixnum line))
+		(location-line (line-primary-location line)))
+	      ;;
+	      (line-primary-location (line)
+		(declare (fixnum line))
+		(compute-primary-cache-location-from-location
+		 (cache) (line-location line))))
+       (declare (ignorable #'cache #'nkeys #'line-size #'vector #'valuep
+			   #'nlines #'max-location #'limit-fn #'size
+			   #'mask #'field #'overflow #'line-reserved-p
+			   #'location-reserved-p #'line-location
+			   #'location-line #'line-wrappers #'location-wrappers
+			   #'line-matches-wrappers-p
+			   #'location-matches-wrappers-p
+			   #'line-value #'location-value #'line-full-p
+			   #'line-valid-p #'location-valid-p
+			   #'line-separation #'next-line #'next-location
+			   #'line-primary #'line-primary-location))
        ,@body)))
-
-) ; EVAL-WHEN
 
 ;;; Here is where we actually fill, recache and expand caches.
 ;;;

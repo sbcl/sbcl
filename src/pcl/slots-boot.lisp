@@ -65,16 +65,8 @@
   (let ((slot-name (eval slot-name)))
     `(slot-boundp-normal ,object ',slot-name)))
 
-(defun structure-slot-boundp (object)
-  (declare (ignore object))
-  t)
-
 (defun make-structure-slot-boundp-function (slotd)
-  (let* ((reader (slot-definition-internal-reader-function slotd))
-	 (fun (lambda (object)
-		(not (eq (funcall reader object) +slot-unbound+)))))
-    (declare (type function reader))
-    fun))
+  (lambda (object) (declare (ignore object)) t))
 
 (defun get-optimized-std-accessor-method-function (class slotd name)
   (if (structure-class-p class)
@@ -162,10 +154,8 @@
 (defun make-optimized-structure-slot-value-using-class-method-function (function)
   (declare (type function function))
   (lambda (class object slotd)
-    (let ((value (funcall function object)))
-      (if (eq value +slot-unbound+)
-	  (slot-unbound class object (slot-definition-name slotd))
-	  value))))
+    (declare (ignore class slotd))
+    (funcall function object)))
 
 (defun make-optimized-structure-setf-slot-value-using-class-method-function (function)
   (declare (type function function))
@@ -173,11 +163,10 @@
     (declare (ignore class slotd))
     (funcall function nv object)))
 
-(defun make-optimized-structure-slot-boundp-using-class-method-function (function)
-  (declare (type function function))
+(defun make-optimized-structure-slot-boundp-using-class-method-function ()
   (lambda (class object slotd)
-    (declare (ignore class slotd))
-    (not (eq (funcall function object) +slot-unbound+))))
+    (declare (ignore class object slotd))
+    t))
 
 (defun get-optimized-std-slot-value-using-class-method-function (class
 								 slotd
@@ -188,8 +177,7 @@
 		 (slot-definition-internal-reader-function slotd)))
 	(writer (make-optimized-structure-setf-slot-value-using-class-method-function
 		 (slot-definition-internal-writer-function slotd)))
-	(boundp (make-optimized-structure-slot-boundp-using-class-method-function
-		 (slot-definition-internal-writer-function slotd))))
+	(boundp (make-optimized-structure-slot-boundp-using-class-method-function)))
       (let* ((fsc-p (cond ((standard-class-p class) nil)
 			  ((funcallable-standard-class-p class) t)
 			  (t (error "~S is not a standard-class" class))))
