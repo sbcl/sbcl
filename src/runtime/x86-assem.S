@@ -658,7 +658,139 @@ GNAME(alloc_16_to_edi):
 	popl	%eax
 	ret
 	.size	GNAME(alloc_16_to_edi),.-GNAME(alloc_16_to_edi)
+
+	
+/* Called from lisp when an inline allocation overflows.
+   Every register except the result needs to be preserved.
+   We depend on C to preserve ebx, esi, edi, and ebp.
+   But where necessary must save eax, ecx, edx. */
+
+#ifdef LISP_FEATURE_SB_THREAD
+#define START_REGION %fs:THREAD_ALLOC_REGION_OFFSET
+#define DISPLACEMENT $7
+#else
+#define START_REGION boxed_region
+#define DISPLACEMENT $6
+#endif
 		
+/* This routine handles an overflow with eax=crfp+size. So the
+   size=eax-crfp. */
+        .align  align_4byte
+        .globl  GNAME(alloc_overflow_eax)
+        .type   GNAME(alloc_overflow_eax),@function
+GNAME(alloc_overflow_eax):
+        pushl   %ecx            # Save ecx
+        pushl   %edx            # Save edx
+        /* Calculate the size for the allocation. */
+        subl    START_REGION,%eax
+        pushl   %eax            # Push the size
+        call    GNAME(alloc)
+        addl    $4,%esp # pop the size arg.
+        popl    %edx    # Restore edx.
+        popl    %ecx    # Restore ecx.
+	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
+        ret
+        .size    GNAME(alloc_overflow_eax),.-GNAME(alloc_overflow_eax)
+
+        .align  align_4byte
+        .globl  GNAME(alloc_overflow_ecx)
+        .type   GNAME(alloc_overflow_ecx),@function
+GNAME(alloc_overflow_ecx):
+        pushl   %eax            # Save eax
+        pushl   %edx            # Save edx
+        /* Calculate the size for the allocation. */
+        subl    START_REGION,%ecx
+        pushl   %ecx            # Push the size
+        call    GNAME(alloc)
+        addl    $4,%esp # pop the size arg.
+        movl    %eax,%ecx       # setup the destination.
+        popl    %edx    # Restore edx.
+        popl    %eax    # Restore eax.
+	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
+        ret
+        .size    GNAME(alloc_overflow_ecx),.-GNAME(alloc_overflow_ecx)
+
+        .align  align_4byte
+        .globl  GNAME(alloc_overflow_edx)
+        .type   GNAME(alloc_overflow_edx),@function
+GNAME(alloc_overflow_edx):
+        pushl   %eax            # Save eax
+        pushl   %ecx            # Save ecx
+        /* Calculate the size for the allocation. */
+        subl    START_REGION,%edx
+        pushl   %edx            # Push the size
+        call    GNAME(alloc)
+        addl    $4,%esp # pop the size arg.
+        movl    %eax,%edx       # setup the destination.
+        popl    %ecx    # Restore ecx.
+        popl    %eax    # Restore eax.
+	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
+        ret
+        .size    GNAME(alloc_overflow_edx),.-GNAME(alloc_overflow_edx)
+
+/* This routine handles an overflow with ebx=crfp+size. So the
+   size=ebx-crfp. */
+        .align  align_4byte
+        .globl  GNAME(alloc_overflow_ebx)
+        .type   GNAME(alloc_overflow_ebx),@function
+GNAME(alloc_overflow_ebx):
+        pushl   %eax            # Save eax
+        pushl   %ecx            # Save ecx
+        pushl   %edx            # Save edx
+        /* Calculate the size for the allocation. */
+        subl    START_REGION,%ebx
+        pushl   %ebx            # Push the size
+        call    GNAME(alloc)
+        addl    $4,%esp # pop the size arg.
+        movl    %eax,%ebx       # setup the destination.
+        popl    %edx    # Restore edx.
+        popl    %ecx    # Restore ecx.
+        popl    %eax    # Restore eax.
+	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
+        ret
+        .size    GNAME(alloc_overflow_ebx),.-GNAME(alloc_overflow_ebx)
+
+/* This routine handles an overflow with esi=crfp+size. So the
+   size=esi-crfp. */
+        .align  align_4byte
+        .globl  GNAME(alloc_overflow_esi)
+        .type   GNAME(alloc_overflow_esi),@function
+GNAME(alloc_overflow_esi):
+        pushl   %eax            # Save eax
+        pushl   %ecx            # Save ecx
+        pushl   %edx            # Save edx
+        /* Calculate the size for the allocation. */
+        subl    START_REGION,%esi
+        pushl   %esi            # Push the size
+        call    GNAME(alloc)
+        addl    $4,%esp # pop the size arg.
+        movl    %eax,%esi       # setup the destination.
+        popl    %edx    # Restore edx.
+        popl    %ecx    # Restore ecx.
+        popl    %eax    # Restore eax.
+	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
+        ret
+        .size    GNAME(alloc_overflow_esi),.-GNAME(alloc_overflow_esi)
+
+        .align  align_4byte
+        .globl  GNAME(alloc_overflow_edi)
+        .type   GNAME(alloc_overflow_edi),@function
+GNAME(alloc_overflow_edi):
+        pushl   %eax            # Save eax
+        pushl   %ecx            # Save ecx
+        pushl   %edx            # Save edx
+        /* Calculate the size for the allocation. */
+        subl    START_REGION,%edi
+        pushl   %edi            # Push the size
+        call    GNAME(alloc)
+        addl    $4,%esp # pop the size arg.
+        movl    %eax,%edi       # setup the destination.
+        popl    %edx    # Restore edx.
+        popl    %ecx    # Restore ecx.
+        popl    %eax    # Restore eax.
+	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
+        ret
+        .size    GNAME(alloc_overflow_edi),.-GNAME(alloc_overflow_edi)
 
 	.align	align_4byte,0x90
 	.globl	GNAME(post_signal_tramp)
@@ -674,139 +806,4 @@ GNAME(post_signal_tramp):
 	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)
 
 	
-
-#ifdef GENCGC_INLINE_ALLOC /* LISP_FEATURE_GENCGC */
-
-/* These routines are called from Lisp when an inline allocation 
- * overflows. Every register except the result needs to be preserved.
- * We depend on C to preserve ebx, esi, edi, and ebp.
- * But where necessary must save eax, ecx, edx. */
-
-/* This routine handles an overflow with eax=crfp+size. So the
- * size=eax-crfp. */
-	.align	align_4byte
-	.globl	GNAME(alloc_overflow_eax)
-	.type	GNAME(alloc_overflow_eax),@function
-GNAME(alloc_overflow_eax):
-	pushl	%ecx		# Save ecx
-	pushl	%edx		# Save edx
-	/* Calculate the size for the allocation. */
-	subl	GNAME(current_region_free_pointer),%eax
-	pushl	%eax		# Push the size
-	call	GNAME(alloc)
-	addl	$4,%esp	# pop the size arg.
-	popl	%edx	# Restore edx.
-	popl	%ecx	# Restore ecx.
-	addl	$6,(%esp) # Adjust the return address to skip the next inst.
-	ret
-	.size	 GNAME(alloc_overflow_eax),.-GNAME(alloc_overflow_eax)
-
-/* This routine handles an overflow with ecx=crfp+size. So the
- * size=ecx-crfp. */
-	.align	align_4byte
-	.globl	GNAME(alloc_overflow_ecx)
-	.type	GNAME(alloc_overflow_ecx),@function
-GNAME(alloc_overflow_ecx):
-	pushl	%eax		# Save eax
-	pushl	%edx		# Save edx
-	/* Calculate the size for the allocation. */
-	subl	GNAME(current_region_free_pointer),%ecx
-	pushl	%ecx		# Push the size
-	call	GNAME(alloc)
-	addl	$4,%esp	# pop the size arg.
-	movl	%eax,%ecx	# setup the destination.
-	popl	%edx	# Restore edx.
-	popl	%eax	# Restore eax.
-	addl	$6,(%esp) # Adjust the return address to skip the next inst.
-	ret
-	.size	 GNAME(alloc_overflow_ecx),.-GNAME(alloc_overflow_ecx)
-
-/* This routine handles an overflow with edx=crfp+size. So the
- * size=edx-crfp. */
-	.align	align_4byte
-	.globl	GNAME(alloc_overflow_edx)
-	.type	GNAME(alloc_overflow_edx),@function
-GNAME(alloc_overflow_edx):
-	pushl	%eax		# Save eax
-	pushl	%ecx		# Save ecx
-	/* Calculate the size for the allocation. */
-	subl	GNAME(current_region_free_pointer),%edx
-	pushl	%edx		# Push the size
-	call	GNAME(alloc)
-	addl	$4,%esp	# pop the size arg.
-	movl	%eax,%edx	# setup the destination.
-	popl	%ecx	# Restore ecx.
-	popl	%eax	# Restore eax.
-	addl	$6,(%esp) # Adjust the return address to skip the next inst.
-	ret
-	.size	 GNAME(alloc_overflow_edx),.-GNAME(alloc_overflow_edx)
-
-/* This routine handles an overflow with ebx=crfp+size. So the
- * size=ebx-crfp. */
-	.align	align_4byte
-	.globl	GNAME(alloc_overflow_ebx)
-	.type	GNAME(alloc_overflow_ebx),@function
-GNAME(alloc_overflow_ebx):
-	pushl	%eax		# Save eax
-	pushl	%ecx		# Save ecx
-	pushl	%edx		# Save edx
-	/* Calculate the size for the allocation. */
-	subl	GNAME(current_region_free_pointer),%ebx
-	pushl	%ebx		# Push the size
-	call	GNAME(alloc)
-	addl	$4,%esp	# pop the size arg.
-	movl	%eax,%ebx	# setup the destination.
-	popl	%edx	# Restore edx.
-	popl	%ecx	# Restore ecx.
-	popl	%eax	# Restore eax.
-	addl	$6,(%esp) # Adjust the return address to skip the next inst.
-	ret
-	.size	 GNAME(alloc_overflow_ebx),.-GNAME(alloc_overflow_ebx)
-
-/* This routine handles an overflow with esi=crfp+size. So the
- * size=esi-crfp. */
-	.align	align_4byte
-	.globl	GNAME(alloc_overflow_esi)
-	.type	GNAME(alloc_overflow_esi),@function
-GNAME(alloc_overflow_esi):
-	pushl	%eax		# Save eax
-	pushl	%ecx		# Save ecx
-	pushl	%edx		# Save edx
-	/* Calculate the size for the allocation. */
-	subl	GNAME(current_region_free_pointer),%esi
-	pushl	%esi		# Push the size
-	call	GNAME(alloc)
-	addl	$4,%esp	# pop the size arg.
-	movl	%eax,%esi	# setup the destination.
-	popl	%edx	# Restore edx.
-	popl	%ecx	# Restore ecx.
-	popl	%eax	# Restore eax.
-	addl	$6,(%esp) # Adjust the return address to skip the next inst.
-	ret
-	.size	 GNAME(alloc_overflow_esi),.-GNAME(alloc_overflow_esi)
-
-/* This routine handles an overflow with edi=crfp+size. So the
- * size=edi-crfp. */
-	.align	align_4byte
-	.globl	GNAME(alloc_overflow_edi)
-	.type	GNAME(alloc_overflow_edi),@function
-GNAME(alloc_overflow_edi):
-	pushl	%eax		# Save eax
-	pushl	%ecx		# Save ecx
-	pushl	%edx		# Save edx
-	/* Calculate the size for the allocation. */
-	subl	GNAME(current_region_free_pointer),%edi
-	pushl	%edi		# Push the size
-	call	GNAME(alloc)
-	addl	$4,%esp	# pop the size arg.
-	movl	%eax,%edi	# setup the destination.
-	popl	%edx	# Restore edx.
-	popl	%ecx	# Restore ecx.
-	popl	%eax	# Restore eax.
-	addl	$6,(%esp) # Adjust the return address to skip the next inst.
-	ret
-	.size	 GNAME(alloc_overflow_edi),.-GNAME(alloc_overflow_edi)
-
-#endif
-
 	.end

@@ -27,7 +27,7 @@ The goals are
         spots.  Global state in closures, etc etc
 	    
 	(4) suggest strategies (e.g. rewrites of affected code, suitable
-	locks and lock acquitision/release places) to fix the issues
+	locks and lock acquisition/release places) to fix the issues
 	revealed in (2) and (3)
 	
 	(5) implement same
@@ -598,6 +598,10 @@ SB-PRETTY::*PRECOMPILED-PPRINT-DISPATCH-FUNS*
 Note that the compiler and fasloader are strongly believed not to be
 thread-safe, so there is currently a big lock (*big-compiler-lock*)
 around all calls to the compiler or fasloader
+
+Note that INFO functions use a shared cache for the globaldb, and
+don't lock for cache invalidation. This will need fixing when BCL is
+removed.
 
 *COMPILE-FILE-PATHNAME*  
 *COMPILE-FILE-TRUENAME* 

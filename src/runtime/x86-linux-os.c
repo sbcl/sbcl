@@ -70,8 +70,8 @@ volatile lispobj modify_ldt_lock;	/* protect all calls to modify_ldt */
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
 #ifdef LISP_FEATURE_SB_THREAD
-    /* this must be called from a function that has an exclusive lock
-     * on all_threads
+    /* FIXME Lock ordering rules: all_threads_lock must usually be
+     * held when getting modify_ldt_lock
      */
     struct user_desc ldt_entry = {
 	1, 0, 0, /* index, address, length filled in later */

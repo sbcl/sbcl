@@ -8,6 +8,10 @@
 #error genesis/config.h (or sbcl.h) must be incuded before this file
 #endif
 
+#ifndef SBCL_GENESIS_CONFIG
+#error genesis/config.h (or sbcl.h) must be incuded before this file
+#endif
+
 #define ARCH_HAS_STACK_POINTER
 
 /* FIXME: Do we also want

@@ -4008,8 +4008,12 @@ char *
 alloc(int nbytes)
 {
     struct thread *th=arch_os_get_current_thread();
-    struct alloc_region *region= 
+    struct alloc_region *region=
+#ifdef LISP_FEATURE_SB_THREAD
 	th ? &(th->alloc_region) : &boxed_region; 
+#else
+        &boxed_region; 
+#endif
     void *new_obj;
     void *new_free_pointer;
 
