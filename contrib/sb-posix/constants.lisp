@@ -11,7 +11,7 @@
  "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
  "netinet/ip.h" "net/if.h" "netdb.h" "errno.h" "netinet/tcp.h"
  "fcntl.h" "sys/mman.h"
- "dirent.h")
+ "dirent.h" "signal.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
@@ -21,6 +21,41 @@
 
  (:type pid-t "pid_t")
 
+ ;; signals
+ (:integer SIGHUP "SIGHUP" "terminal line hangup.")
+ (:integer SIGINT "SIGINT" "interrupt program.")
+ (:integer SIGQUIT "SIGQUIT" "quit program.")
+ (:integer SIGILL "SIGILL" "illegal instruction.")
+ (:integer SIGTRAP "SIGTRAP" "trace trap.")
+ (:integer SIGABRT "SIGABRT" "abort program (formerly SIGIOT).")
+ (:integer SIGEMT "SIGEMT" "emulate instruction executed.")
+ (:integer SIGFPE "SIGFPE" "floating-point exception.")
+ (:integer SIGKILL "SIGKILL" "kill program.")
+ (:integer SIGBUS "SIGBUS" "bus error.")
+ (:integer SIGSEGV "SIGSEGV" "segmentation violation.")
+ (:integer SIGSYS "SIGSYS" "non-existent system call invoked.")
+ (:integer SIGPIPE "SIGPIPE" "write on a pipe with no reader.")
+ (:integer SIGALRM "SIGALRM" "real-time timer expired.")
+ (:integer SIGTERM "SIGTERM" "software termination signal.")
+ (:integer SIGURG "SIGURG" "urgent condition present on socket.")
+ (:integer SIGSTOP "SIGSTOP" "stop (cannot be caught or ignored).")
+ (:integer SIGTSTP "SIGTSTP" "stop signal generated from keyboard.")
+ (:integer SIGCONT "SIGCONT" "continue after stop.")
+ (:integer SIGCHLD "SIGCHLD" "child status has changed.")
+ (:integer SIGTTIN "SIGTTIN" "background read attempted from control terminal.")
+ (:integer SIGTTOU "SIGTTOU" "background write attempted to control terminal.")
+ (:integer SIGIO "SIGIO" "I/O is possible on a descriptor (see fcntl(2)).")
+ (:integer SIGXCPU "SIGXCPU" "cpu time limit exceeded (see setrlimit(2)).")
+ (:integer SIGXFSZ "SIGXFSZ" "file size limit exceeded (see setrlimit(2)).")
+ (:integer SIGVTALRM "SIGVTALRM" "virtual time alarm (see setitimer(2)).")
+ (:integer SIGPROF "SIGPROF" "profiling timer alarm (see setitimer(2)).")
+ (:integer SIGWINCH "SIGWINCH" "Window size change.")
+ (:integer SIGINFO "SIGINFO" "status request from keyboard.")
+ (:integer SIGUSR1 "SIGUSR1" "User defined signal 1.")
+ (:integer SIGUSR2 "SIGUSR2" "User defined signal 2.")
+ (:integer SIGRTMIN "SIGRTMIN" "Smallest real-time signal number.")
+ (:integer SIGRTMAX "SIGRTMAX" "Largest real-time signal number.")
+ 
  ;; mode_t
  (:type mode-t "mode_t")
  (:integer s-isuid "S_ISUID")

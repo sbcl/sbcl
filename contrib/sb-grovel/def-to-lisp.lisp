@@ -50,8 +50,12 @@ printf(\"(in-package ~S)\\\n\");~%" package-name)
       (destructuring-bind (type lispname cname &optional doc) def
         (cond ((eq type :integer)
                (format stream
-                       "printf(\"(cl:defconstant ~A %d \\\"~A\\\")\\\n\",~A);~%"
-                       lispname doc cname))
+                       "#ifdef ~A~%~
+                        printf(\"(cl:defconstant ~A %d \\\"~A\\\")\\\n\",~A);~%~
+                        #else~%~
+                        printf(\"(sb-int:style-warn \\\"Couln't grovel definition for ~A (unknown to the C compiler).\\\")\\n\");~%~
+                        #endif~%"
+                       cname lispname doc cname cname))
 	      ((eq type :type)
 	       (format stream
                        "printf(\"(sb-alien:define-alien-type ~A (sb-alien:%ssigned %d))\\\n\",SIGNED_(~A),8*(sizeof(~A)));~%"
