@@ -234,5 +234,22 @@
                (MIN A (RETURN-FROM B8 C))))))
     C))
 
+;;; bug 292, reported by Paul Dietz
+(defun #:foo (C)
+  (DECLARE (TYPE (INTEGER -5945502333 12668542) C)
+           (OPTIMIZE (SPEED 3)))
+  (LET ((V2 (* C 12)))
+    (- (MAX (IF (/= 109335113 V2) -26479 V2)
+            (DEPOSIT-FIELD 311
+                           (BYTE 14 28)
+                           (MIN (MAX 521326 C) -51))))))
+
+;;; zombie variables, arising from constraints
+(defun #:foo (A B)
+  (DECLARE (TYPE (INTEGER -40945116 24028306) B)
+           (OPTIMIZE (SPEED 3)))
+  (LET ((V5 (MIN 31883 (LOGCOUNT A))))
+    (IF (/= B V5) (IF (EQL 122911784 V5) -43765 1487) B)))
+
 
 (sb-ext:quit :unix-status 104)

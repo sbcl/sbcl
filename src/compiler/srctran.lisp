@@ -243,7 +243,8 @@
 
 (defun make-interval (&key low high)
   (labels ((normalize-bound (val)
-	     (cond ((and (floatp val)
+	     (cond #-sb-xc-host
+                   ((and (floatp val)
 			 (float-infinity-p val))
 		    ;; Handle infinities.
 		    nil)
@@ -303,6 +304,23 @@
   (declare (type numeric-type x))
   (make-interval :low (numeric-type-low x)
 		 :high (numeric-type-high x)))
+
+(defun type-approximate-interval (type)
+  (declare (type ctype type))
+  (let ((types (prepare-arg-for-derive-type type))
+        (result nil))
+    (dolist (type types)
+      (let ((type (if (member-type-p type)
+                      (convert-member-type type)
+                      type)))
+        (unless (numeric-type-p type)
+          (return-from type-approximate-interval nil))
+        (let ((interval (numeric-type->interval type)))
+          (setq result
+                (if result
+                    (interval-approximate-union result interval)
+                    interval)))))
+    result))
 
 (defun copy-interval-limit (limit)
   (if (numberp limit)
@@ -534,6 +552,16 @@
 	     (y-hi (copy-interval-limit (interval-high y))))
 	(make-interval :low (select-bound x-lo y-lo #'< #'>)
 		       :high (select-bound x-hi y-hi #'> #'<))))))
+
+;;; return the minimal interval, containing X and Y
+(defun interval-approximate-union (x y)
+  (cond ((interval-merge-pair x y))
+        ((interval-< x y)
+         (make-interval :low (copy-interval-limit (interval-low x))
+                        :high (copy-interval-limit (interval-high y))))
+        (t
+         (make-interval :low (copy-interval-limit (interval-low y))
+                        :high (copy-interval-limit (interval-high x))))))
 
 ;;; basic arithmetic operations on intervals. We probably should do
 ;;; true interval arithmetic here, but it's complicated because we
@@ -2945,65 +2973,35 @@
 ;;; information. If X's high bound is < Y's low, then X < Y.
 ;;; Similarly, if X's low is >= to Y's high, the X >= Y (so return
 ;;; NIL). If not, at least make sure any constant arg is second.
-;;;
-;;; FIXME: Why should constant argument be second? It would be nice to
-;;; find out and explain.
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defun ir1-transform-< (x y first second inverse)
-  (if (same-leaf-ref-p x y)
-      nil
-      (let* ((x-type (numeric-type-or-lose x))
-	     (x-lo (numeric-type-low x-type))
-	     (x-hi (numeric-type-high x-type))
-	     (y-type (numeric-type-or-lose y))
-	     (y-lo (numeric-type-low y-type))
-	     (y-hi (numeric-type-high y-type)))
-	(cond ((and x-hi y-lo (< x-hi y-lo))
-	       t)
-	      ((and y-hi x-lo (>= x-lo y-hi))
-	       nil)
-	      ((and (constant-lvar-p first)
-		    (not (constant-lvar-p second)))
-	       `(,inverse y x))
-	      (t
-	       (give-up-ir1-transform))))))
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defun ir1-transform-< (x y first second inverse)
-  (if (same-leaf-ref-p x y)
-      nil
-      (let ((xi (numeric-type->interval (numeric-type-or-lose x)))
-	    (yi (numeric-type->interval (numeric-type-or-lose y))))
-	(cond ((interval-< xi yi)
-	       t)
-	      ((interval->= xi yi)
-	       nil)
-	      ((and (constant-lvar-p first)
-		    (not (constant-lvar-p second)))
-	       `(,inverse y x))
-	      (t
-	       (give-up-ir1-transform))))))
-
-(deftransform < ((x y) (integer integer) *)
-  (ir1-transform-< x y x y '>))
-
-(deftransform > ((x y) (integer integer) *)
-  (ir1-transform-< y x x y '<))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(deftransform < ((x y) (float float) *)
-  (ir1-transform-< x y x y '>))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(deftransform > ((x y) (float float) *)
-  (ir1-transform-< y x x y '<))
+(macrolet ((def (name reflexive-p surely-true surely-false)
+             `(deftransform ,name ((x y))
+                (if (same-leaf-ref-p x y)
+                    ,reflexive-p
+                    (let ((x (or (type-approximate-interval (lvar-type x))
+                                 (give-up-ir1-transform)))
+                          (y (or (type-approximate-interval (lvar-type y))
+                                 (give-up-ir1-transform))))
+                      (cond (,surely-true
+                             t)
+                            (,surely-false
+                             nil)
+                            ((and (constant-lvar-p x)
+                                  (not (constant-lvar-p y)))
+                             `(,',name y x))
+                            (t
+                             (give-up-ir1-transform))))))))
+  (def < nil (interval-< x y) (interval->= x y))
+  (def > nil (interval-< y x) (interval->= y x))
+  (def <= t (interval->= y x) (interval-< y x))
+  (def >= t (interval->= x y) (interval-< x y)))
 
 (defun ir1-transform-char< (x y first second inverse)
   (cond
     ((same-leaf-ref-p x y) nil)
     ;; If we had interval representation of character types, as we
     ;; might eventually have to to support 2^21 characters, then here
-    ;; we could do some compile-time computation as in IR1-TRANSFORM-<
-    ;; above.  -- CSR, 2003-07-01
+    ;; we could do some compile-time computation as in transforms for
+    ;; < above. -- CSR, 2003-07-01
     ((and (constant-lvar-p first)
 	  (not (constant-lvar-p second)))
      `(,inverse y x))

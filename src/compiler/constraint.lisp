@@ -354,7 +354,8 @@
 		     (setq not-res (type-union not-res other-type)))
 		   (let ((leaf-type (leaf-type leaf)))
 		     (when (or (constant-p other)
-			       (and (csubtypep other-type leaf-type)
+			       (and (leaf-refs other) ; protect from deleted vars
+                                    (csubtypep other-type leaf-type)
 				    (not (type= other-type leaf-type))))
 		       (change-ref-leaf ref other)
 		       (when (constant-p other) (return)))))))

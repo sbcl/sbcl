@@ -1257,13 +1257,4 @@ WORKAROUND:
   have made.
 
 292:
-  (COMPILE NIL
-           `(LAMBDA (C)
-              (DECLARE (TYPE (INTEGER -5945502333 12668542) C)
-                       (OPTIMIZE (SPEED 3)))
-              (LET ((V2 (* C 12)))
-                (- (MAX (IF (/= 109335113 V2) -26479 V2)
-                        (DEPOSIT-FIELD 311
-                                       (BYTE 14 28)
-                                       (MIN (MAX 521326 C) -51)))))))
-  causes compiler failure (reported by Paul Dietz).
+  (fixed in 0.8.3.74)
