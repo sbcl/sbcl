@@ -1022,7 +1022,7 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
   * new syntactic sugar for the Unix command line: --load foo.bar is now
     an alternate notation for --eval '(load "foo.bar")'.
   * bug fixes:
-    ?? The system now detects stack overflow and handles it gracefully,
+    ** The system now detects stack overflow and handles it gracefully,
        at least for (OR (> SAFETY (MAX SPEED SPACE)) (= SAFETY 3))
        optimization settings. (This is a good thing in general, and
        its introduction in this version should be particularly timely
@@ -1037,6 +1037,17 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
        classes in the same source file as the DEFCLASSes which defined
        them. (thanks to Stig E Sandoe for reporting and Martin Atzmueller
        for fixing this)
+    ** fixes in CONDITION class precedence list for undefined function
+       errors (thanks to Alexei Dejneka)
+    ** *DEFAULT-PATHNAME-DEFAULTS* is used more consistently and 
+       correctly. (thanks to Dan Barlow)
+    ** portability fixes aiming at bootstrapping under CLISP (thanks
+       to Dave McDonald and Christophe Rhodes)
+    ** FORMAT fixes (thanks to Robert Strandh and Dan Barlow)
+    ** fixes in type translation and and type inference (thanks to
+       Christophe Rhodes)
+    ** fixes to optimizer internal errors (thanks to Alexei Dejneka)
+    ** various fixes in the new ports (thanks to Dan Barlow)
   * several changes related to debugging:
     ** suppression of tail recursion, as noted above
     ** stack overflow detection, as noted above
@@ -1046,8 +1057,6 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
        implementation, at least on X86 systems; and I just noticed that
        encapsulation also seems closer to the spirit of the ANSI
        specification.)
-    ?? TRACE :ENCAPSULATE T now attaches a more informative debug
-       name to its wrapper function objects than it used to
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
