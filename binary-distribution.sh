@@ -14,5 +14,5 @@ tar cf $b-binary.tar \
     $b/output/sbcl.core $b/src/runtime/sbcl \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
     $b/install.sh \
-    $b/doc/sbcl.1 $b/doc/cmucl/cmu-user $b/doc/*.htm* \
+    $b/doc/sbcl.1 \
     $b/pubring.pgp
