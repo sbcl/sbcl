@@ -89,15 +89,6 @@ WORKAROUND:
   Perhaps any number of such consecutive lines ought to turn into a
   single "compiling top-level forms:" line.
 
-11:
-  It would be nice if the
-	caught ERROR:
-	  (during macroexpansion)
-  said what macroexpansion was at fault, e.g.
-	caught ERROR:
-	  (during macroexpansion of IN-PACKAGE,
-	  during macroexpansion of DEFFOO)
-
 19:
   (I *think* this is a bug. It certainly seems like strange behavior. But
   the ANSI spec is scary, dark, and deep.. -- WHN)
@@ -861,18 +852,6 @@ WORKAROUND:
     ; compilation unit finished
     ;   printed 1 note
 
-241: "DEFCLASS mysteriously remembers uninterned accessor names."
-  (from tonyms on #lisp IRC 2003-02-25)
-  In sbcl-0.7.12.55, typing
-    (defclass foo () ((bar :accessor foo-bar)))
-    (profile foo-bar)
-    (unintern 'foo-bar)
-    (defclass foo () ((bar :accessor foo-bar)))
-  gives the error message
-    "#:FOO-BAR already names an ordinary function or a macro."
-  So it's somehow checking the uninterned old accessor name instead
-  of the new requested accessor name, which seems broken to me (WHN).
-
 242: "WRITE-SEQUENCE suboptimality"
   (observed from clx performance)
   In sbcl-0.7.13, WRITE-SEQUENCE of a sequence of type 
@@ -1416,5 +1395,42 @@ WORKAROUND:
   (2) it might be sort of a pain to test that no other bugs had been
   introduced. 
 
-327: "Lazy construction of CLOS classes from system classoids"
-  (fixed in sbcl-0.8.10.69)
+328: "Profiling generic functions", transplanted from #241
+  (from tonyms on #lisp IRC 2003-02-25)
+  In sbcl-0.7.12.55, typing
+    (defclass foo () ((bar :accessor foo-bar)))
+    (profile foo-bar)
+    (unintern 'foo-bar)
+    (defclass foo () ((bar :accessor foo-bar)))
+  gives the error message
+    "#:FOO-BAR already names an ordinary function or a macro."
+
+  Problem: when a generic function is profiled, it appears as an ordinary
+  function to PCL. (Remembering the uninterned accessor is OK, as the
+  redefinition must be able to remove old accessors from their generic
+  functions.)
+
+329: "Sequential class redefinition"
+  reported by Bruno Haible:
+   (defclass reactor () ((max-temp :initform 10000000)))
+   (defvar *r1* (make-instance 'reactor))
+   (defvar *r2* (make-instance 'reactor))
+   (slot-value *r1* 'max-temp)
+   (slot-value *r2* 'max-temp)
+   (defclass reactor () ((uptime :initform 0)))
+   (slot-value *r1* 'uptime)
+   (defclass reactor () ((uptime :initform 0) (max-temp :initform 10000)))
+   (slot-value *r1* 'max-temp) ; => 10000
+   (slot-value *r2* 'max-temp) ; => 10000000 oops...
+
+  Possible solution: 
+   The method effective when the wrapper is obsoleted can be saved
+     in the wrapper, and then to update the instance just run through
+     all the old wrappers in order from oldest to newest.
+
+330: "PARSE-NAMESTRING should accept namestrings as the default argument"
+  (parse-namestring "foo" nil "/") 
+  debugger invoked on a TYPE-ERROR in thread 3138:
+    The value "/" is not of type PATHNAME.
+  According to the PARSE-NAMESTRING dictionary entry the
+  default-pathname parameter can be any pathname designator.
