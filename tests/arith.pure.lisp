@@ -206,3 +206,17 @@
 ;;; ASH of a negative bignum by a bignum count would erroneously
 ;;; return 0 prior to sbcl-0.8.4.4
 (assert (= (ash (1- most-negative-fixnum) (1- most-negative-fixnum)) -1))
+
+;;; Whoops.  Too much optimization in division operators for 0
+;;; divisor.
+(macrolet ((frob (name)
+	     `(let ((fn (compile nil '(lambda (x)
+				       (declare (optimize speed) (fixnum x))
+				       (,name x 0)))))
+	       (assert (raises-error? (funcall fn 1) division-by-zero)))))
+  (frob mod)
+  (frob truncate)
+  (frob rem)
+  (frob /)
+  (frob floor)
+  (frob ceiling))

@@ -8,6 +8,9 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     (reported by Rick Taube)
   * bug fix: structures defined by WITH-ALIEN can be referred to
     within other definitions in the same WITH-ALIEN.
+  * bug fix: division operators (MOD, TRUNCATE and the like) with
+    constant zero divisors and integer dividends no longer generate
+    left shifts.
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of

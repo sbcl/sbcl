@@ -565,7 +565,7 @@
     (give-up-ir1-transform))
   (let* ((denominator (lvar-value denominator))
 	 (bits (1- (integer-length denominator))))
-    (unless (= (ash 1 bits) denominator)
+    (unless (and (> denominator 0) (= (ash 1 bits) denominator))
       (give-up-ir1-transform))
     (let ((alignment (count-low-order-zeros numerator)))
       (unless (>= alignment bits)
