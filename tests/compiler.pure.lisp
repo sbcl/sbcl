@@ -1003,3 +1003,19 @@
                            0))))
                  0)))
           3040851270 1664281 -1340106197)))
+
+;;; MISC.249
+(assert (zerop
+         (funcall
+          (compile
+           nil
+           '(lambda (a b)
+             (declare (notinline <=))
+             (declare (optimize (speed 2) (space 3) (safety 0)
+                       (debug 1) (compilation-speed 3)))
+             (if (if (<= 0) nil nil)
+                 (labels ((%f9 (f9-1 f9-2 f9-3)
+                            (ignore-errors 0)))
+                   (dotimes (iv4 5 a) (%f9 0 0 b)))
+                 0)))
+          1 2)))

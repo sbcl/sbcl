@@ -814,7 +814,16 @@
        (let ((bind-block (node-block bind)))
          (mark-for-deletion bind-block))
        (let ((home (lambda-home clambda)))
-         (setf (lambda-lets home) (delete clambda (lambda-lets home)))))
+         (setf (lambda-lets home) (delete clambda (lambda-lets home))))
+       ;; KLUDGE: In presence of NLEs we cannot always understand that
+       ;; LET's BIND dominates its body [for a LET "its" body is not
+       ;; quite its]; let's delete too dangerous for IR2 stuff. --
+       ;; APD, 2004-01-01
+       (dolist (var (lambda-vars clambda))
+         (flet ((delete-node (node)
+                  (mark-for-deletion (node-block node))))
+         (mapc #'delete-node (leaf-refs var))
+         (mapc #'delete-node (lambda-var-sets var)))))
       (t
        ;; Function has no reachable references.
        (dolist (ref (lambda-refs clambda))

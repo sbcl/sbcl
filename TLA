@@ -24,6 +24,7 @@ making them more consistent.
 	N	new: number, as in e.g. N-PASSES or N-WORD-BITS
 		old: conventional prefix for temporary variables used to
 			implement evaluate-only-once semantics in macros
+        NLE     non-local entry
 	NLX	non-local exit (in compiler IR2)
 	SB	storage base (in compiler IR2)
 	SC	storage class (in compiler IR2)
