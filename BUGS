@@ -1251,3 +1251,20 @@ WORKAROUND:
       (funcall (aref s ei) x y))
   on sbcl-0.8.7.36/X86/Linux causes a BUG to be signalled:
     full call to SB-KERNEL:DATA-VECTOR-REF
+
+303: "nonlinear LVARs" (aka MISC.293)
+    (defun buu (x)
+      (multiple-value-call #'list
+        (block foo
+          (multiple-value-prog1
+              (eval '(values :a :b :c))
+            (catch 'bar
+              (if (> x 0)
+                  (return-from foo
+                    (eval `(if (> ,x 1)
+                               1
+                               (throw 'bar (values 3 4)))))))))))
+
+  (BUU 1) returns garbage.
+
+  The problem is that both EVALs sequentially write to the same LVAR.
