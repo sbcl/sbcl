@@ -571,7 +571,7 @@
 ;;; Parse a slot description for DEFSTRUCT, add it to the description
 ;;; and return it. If supplied, ISLOT is a pre-initialized DSD that we
 ;;; modify to get the new slot. This is supplied when handling
-;;; included slots. 
+;;; included slots.
 (defun parse-1-dsd (defstruct spec &optional
 		     (islot (make-defstruct-slot-description :%name ""
 							     :index 0
@@ -590,10 +590,9 @@
 		  read-only ro-p)))
        (t
 	(when (keywordp spec)
-	  ;; FIXME: should be style warning
-	  (warn "Keyword slot name indicates probable syntax ~
-		 error in DEFSTRUCT: ~S."
-		spec))
+	  (style-warn "Keyword slot name indicates probable syntax ~
+		       error in DEFSTRUCT: ~S."
+		      spec))
 	spec))
 
     (when (find name (dd-slots defstruct) :test #'string= :key #'dsd-%name)
@@ -602,8 +601,25 @@
 	     :format-arguments (list name)))
     (setf (dsd-%name islot) (string name))
     (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list islot)))
-    (setf (dsd-accessor islot)
-	  (symbolicate (or (dd-conc-name defstruct) "") name))
+
+    (let ((accessor-name (symbolicate (or (dd-conc-name defstruct) "") name))
+	  (predicate-name (dd-predicate defstruct)))
+      (setf (dsd-accessor islot) accessor-name)
+      (when (eql accessor-name predicate-name)
+	;; Some adventurous soul has named a slot so that its accessor
+	;; collides with the structure type predicate. ANSI doesn't
+	;; specify what to do in this case. As of 2001-09-04, Martin
+	;; Atzmueller reports that CLISP and Lispworks both give
+	;; priority to the slot accessor, so that the predicate is
+	;; overwritten. We might as well do the same (as well as
+	;; signalling a warning).
+	(style-warn
+	 "~@<The structure accessor name ~S is the same as the name of the ~
+          structure type predicate. ANSI doesn't specify what to do in ~
+          this case; this implementation chooses to overwrite the type ~
+          predicate with the slot accessor.~@:>"
+	 accessor-name)
+	(setf (dd-predicate defstruct) nil)))
 
     (when default-p
       (setf (dsd-default islot) default))

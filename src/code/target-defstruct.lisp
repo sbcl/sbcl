@@ -250,10 +250,7 @@
   ;; FIXME: CMU CL used (%INSTANCEP OBJ) here. Check that
   ;; (TYPEP OBJ 'INSTANCE) is optimized to equally efficient code.
   (and (typep obj 'instance)
-       (let (;; FIXME: Mightn't there be a slight efficiency improvement
-	     ;; by delaying the binding of DEPTHOID 'til it's needed?
-	     (depthoid (layout-depthoid layout))
-	     (obj-layout (%instance-layout obj)))
+       (let ((obj-layout (%instance-layout obj)))
 	 (cond ((eq obj-layout layout)
 		t)
 	       ;; FIXME: Does the test for LAYOUT-INVALID really belong
@@ -264,9 +261,10 @@
 		       :expected-type (layout-class obj-layout)
 		       :datum obj))
 	       (t
-		(and (> (layout-depthoid obj-layout) depthoid)
-		     (eq (svref (layout-inherits obj-layout) depthoid)
-			 layout)))))))
+                 (let ((depthoid (layout-depthoid layout)))
+                   (and (> (layout-depthoid obj-layout) depthoid)
+                        (eq (svref (layout-inherits obj-layout) depthoid)
+                            layout))))))))
 
 ;;;; implementing structure slot accessors as closures
 
@@ -305,12 +303,7 @@
 	      (unless (structure-test structure)
 		(error 'simple-type-error
 		       :datum structure
-		       ;; FIXME: :EXPECTED-TYPE should be something
-		       ;; comprehensible to the user, not this. Perhaps we
-		       ;; could work backwards from the LAYOUT-CLASS slot to
-		       ;; find something. (Note that all four SIMPLE-TYPE-ERROR
-		       ;; calls in this section have the same disease.)
-		       :expected-type '(satisfies structure-test)
+		       :expected-type (class-name (layout-class layout))
 		       :format-control
 		       "Structure for accessor ~S is not a ~S:~% ~S"
 		       :format-arguments
@@ -342,7 +335,7 @@
 	      (unless (structure-test structure)
 		(error 'simple-type-error
 		       :datum structure
-		       :expected-type '(satisfies structure-test)
+		       :expected-type (class-name (layout-class layout))
 		       :format-control
 		       "The structure for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
@@ -352,7 +345,7 @@
 	      (unless  (typep-test new-value)
 		(error 'simple-type-error
 		       :datum new-value
-		       :expected-type '(satisfies typep-test)
+		       :expected-type (class-name (layout-class layout))
 		       :format-control
 		       "The new value for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
@@ -369,7 +362,7 @@
 	      (unless (structure-test structure)
 		(error 'simple-type-error
 		       :datum structure
-		       :expected-type '(satisfies structure-test)
+		       :expected-type (class-name (layout-class layout))
 		       :format-control
 		       "The structure for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
@@ -379,7 +372,7 @@
 	      (unless  (typep-test new-value)
 		(error 'simple-type-error
 		       :datum new-value
-		       :expected-type '(satisfies typep-test)
+		       :expected-type (class-name (layout-class layout))
 		       :format-control
 		       "The new value for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
