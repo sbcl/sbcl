@@ -10,6 +10,18 @@
 ;;;; more information.
 
 (in-package "SB-GRAY")
+
+;;; BUG-OR-ERROR: because we have extensible streams, wherewith the
+;;; user is responsible for some of the protocol implementation, it's
+;;; not necessarily a bug in SBCL itself if we fall through to one of
+;;; these default methods.
+(defmacro bug-or-error (stream fun)
+  `(error "~@<The stream ~S has no suitable method for ~S, ~
+           and so has fallen through to this method.  If you think that this is ~
+           a bug, please report it to the applicable authority (bugs in SBCL itself ~
+           should go to the mailing lists referenced from <http://www.sbcl.org/>).~@:>"
+           ,stream ,fun))
+
 
 (fmakunbound 'stream-element-type)
 
@@ -25,6 +37,12 @@
 
 (defmethod stream-element-type ((stream fundamental-character-stream))
   'character)
+
+(defmethod stream-element-type ((stream stream))
+  (bug-or-error stream 'stream-element-type))
+
+(defmethod stream-element-type ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric pcl-open-stream-p (stream)
   #+sb-doc
@@ -38,6 +56,12 @@
 
 (defmethod pcl-open-stream-p ((stream fundamental-stream))
   (stream-open-p stream))
+
+(defmethod pcl-open-stream-p ((stream stream))
+  (bug-or-error stream 'open-stream-p))
+
+(defmethod pcl-open-stream-p ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 ;;; bootstrapping hack
 (pcl-open-stream-p (make-string-output-stream))
@@ -66,12 +90,18 @@
   (defgeneric input-stream-p (stream)
     #+sb-doc
     (:documentation "Can STREAM perform input operations?"))
-
+  
   (defmethod input-stream-p ((stream ansi-stream))
     (ansi-stream-input-stream-p stream))
-
+  
   (defmethod input-stream-p ((stream fundamental-input-stream))
-    t))
+    t)
+
+  (defmethod input-stream-p ((stream stream))
+    (bug-or-error stream 'input-stream-p))
+  
+  (defmethod input-stream-p ((non-stream t))
+    (error 'type-error :datum non-stream :expected-type 'stream)))
 
 (let ()
   (fmakunbound 'output-stream-p)
@@ -84,7 +114,13 @@
     (ansi-stream-output-stream-p stream))
 
   (defmethod output-stream-p ((stream fundamental-output-stream))
-    t))
+    t)
+
+  (defmethod output-stream-p ((stream stream))
+    (bug-or-error stream 'output-stream-p))
+
+  (defmethod output-stream-p ((non-stream t))
+    (error 'type-error :datum non-stream :expected-type 'stream)))
 
 ;;; character input streams
 ;;;

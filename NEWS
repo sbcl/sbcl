@@ -2239,15 +2239,21 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     (thanks to Vincent Arkesteijn)
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the x86 backend.
+  * optimization: SEARCH on simple-base-strings can now be open-coded.
+    (see also contrib/compiler-extras.lisp for inspiration for
+    teaching the compiler about the Boyer-Moore algorithm).
   * bug fix: functions =, /=, <, <=, >, >= did not check the argument
     type when called with 1 argument; PEEK-CHAR checked type of
     PEEK-TYPE only after having read first character from a
     stream. (reported by Peter Graves)
   * fixed some bugs revealed by Paul Dietz' test suite:
-    ** in stack analysys liveness information is propagated from
+    ** in stack analysis liveness information is propagated from
        non-local entry points.
     ** pathwise CAST removing failed when the CAST node did not start
        a block.
+    ** INPUT-STREAM-P, OUTPUT-STREAM-P, STREAM-ELEMENT-TYPE and
+       OPEN-STREAM-P signal a TYPE-ERROR if their argument is not a
+       stream.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
