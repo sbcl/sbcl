@@ -841,38 +841,40 @@
     (setf (concatenated-stream-streams stream) (cdr streams))))
 
 (defun concatenated-misc (stream operation &optional arg1 arg2)
-  (let ((left (concatenated-stream-streams stream)))
-    (when left
-      (let* ((current (car left)))
-	(case operation
-	  (:listen
-	   (loop
-	     (let ((stuff (if (ansi-stream-p current)
-			      (funcall (ansi-stream-misc current) current
-				       :listen)
-			      (stream-misc-dispatch current :listen))))
-	       (cond ((eq stuff :eof)
-		      ;; Advance STREAMS, and try again.
-		      (pop (concatenated-stream-streams stream))
-		      (setf current
-			    (car (concatenated-stream-streams stream)))
-		      (unless current
-			;; No further streams. EOF.
-			(return :eof)))
-		     (stuff
-		      ;; Stuff's available.
-		      (return t))
-		     (t
-		      ;; Nothing is available yet.
-		      (return nil))))))
-          (:clear-input (clear-input current))
-          (:unread (unread-char arg1 current))
-          (:close
-	   (set-closed-flame stream))
-	  (t
-	   (if (ansi-stream-p current)
-	       (funcall (ansi-stream-misc current) current operation arg1 arg2)
-	       (stream-misc-dispatch current operation arg1 arg2))))))))
+  (let* ((left (concatenated-stream-streams stream))
+	 (current (car left)))
+    (case operation
+      (:listen
+       (unless left
+	 (return-from concatenated-misc :eof))
+       (loop
+	(let ((stuff (if (ansi-stream-p current)
+			 (funcall (ansi-stream-misc current) current
+				  :listen)
+			 (stream-misc-dispatch current :listen))))
+	  (cond ((eq stuff :eof)
+		 ;; Advance STREAMS, and try again.
+		 (pop (concatenated-stream-streams stream))
+		 (setf current
+		       (car (concatenated-stream-streams stream)))
+		 (unless current
+		   ;; No further streams. EOF.
+		   (return :eof)))
+		(stuff
+		 ;; Stuff's available.
+		 (return t))
+		(t
+		 ;; Nothing is available yet.
+		 (return nil))))))
+      (:clear-input (when left (clear-input current)))
+      (:unread (when left (unread-char arg1 current)))
+      (:close
+       (set-closed-flame stream))
+      (t
+       (when left
+	 (if (ansi-stream-p current)
+	     (funcall (ansi-stream-misc current) current operation arg1 arg2)
+	     (stream-misc-dispatch current operation arg1 arg2)))))))
 
 ;;;; echo streams
 

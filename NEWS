@@ -2340,6 +2340,7 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        their output stream on EOF from read.
     ** CONCATENATED-STREAM-STREAMS discards constituent streams which
        have been read to end-of-file.
+    ** CLOSE works as expected on the null CONCATENATED-STREAM.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
