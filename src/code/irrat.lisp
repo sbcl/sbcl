@@ -879,25 +879,25 @@
        (declare (optimize (speed 3)))
     (cond ((or (> x theta)
 	       (> (abs y) theta))
-            ;; To avoid overflow...
-	   (setf eta (float-sign y half-pi))
-	   ;; nu is real part of 1/(x + iy).  This is x/(x^2+y^2),
+	   ;; To avoid overflow...
+	   (setf nu (float-sign y half-pi))
+	   ;; ETA is real part of 1/(x + iy).  This is x/(x^2+y^2),
 	   ;; which can cause overflow.  Arrange this computation so
 	   ;; that it won't overflow.
-	   (setf nu (let* ((x-bigger (> x (abs y)))
-			   (r (if x-bigger (/ y x) (/ x y)))
-			   (d (+ 1.0d0 (* r r))))
-		      (if x-bigger
-			  (/ (/ x) d)
-			  (/ (/ r y) d)))))
+	   (setf eta (let* ((x-bigger (> x (abs y)))
+			    (r (if x-bigger (/ y x) (/ x y)))
+			    (d (+ 1.0d0 (* r r))))
+		       (if x-bigger
+			   (/ (/ x) d)
+			   (/ (/ r y) d)))))
 	  ((= x 1.0d0)
 	   ;; Should this be changed so that if y is zero, eta is set
 	   ;; to +infinity instead of approx 176?  In any case
 	   ;; tanh(176) is 1.0d0 within working precision.
 	   (let ((t1 (+ 4d0 (square y)))
 		 (t2 (+ (abs y) rho)))
-	     (setf eta (log (/ (sqrt (sqrt t1)))
-			    (sqrt t2)))
+	     (setf eta (log (/ (sqrt (sqrt t1))
+			       (sqrt t2))))
 	     (setf nu (* 0.5d0
 			 (float-sign y
 				     (+ half-pi (atan (* 0.5d0 t2))))))))

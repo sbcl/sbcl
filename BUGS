@@ -1495,19 +1495,6 @@ WORKAROUND:
     when called with arguments
       (NIL).
    
-335: "ATANH completely broken"
-  a. (reported by Peter Graves sbcl-devel 2004-06-01)
-    (atanh #c(1 2)), and more generally atanh of any complex with real
-    part 1, computes entirely the wrong answer.
-  b. (discovered by CSR when investigating a.)
-    (atanh most-positive-double-float), and more generally atanh of any
-    number with magnitude larger than
-    sqrt(most-positive-double-float), computes a number whose real
-    part is the imaginary part of the correct answer, and whose
-    imaginary part is the real part of the correct answer.
-  (fixes for both of these were sent CSR sbcl-devel 2004-06-02, to be merged
-   post-0.8.11)
-
 336: "slot-definitions must retain the generic functions of accessors"
   reported by Tony Martinez:
     (defclass foo () ((bar :reader foo-bar)))

@@ -2518,6 +2518,10 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     ** ensured that pathnames, where they have a namestring, always
        print using #P"..." syntax.
 
+changes in sbcl-0.8.12 relative to sbcl-0.8.11:
+  * fixed bug 335: ATANH now computes the inverse hyperbolic tangent
+    even for difficult arguments.  (reported by Peter Graves)
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and
