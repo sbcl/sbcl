@@ -288,7 +288,7 @@
    body)
    If restart-name is not invoked, then all values returned by forms are
    returned. If control is transferred to this restart, it immediately
-   returns the values nil and t."
+   returns the values NIL and T."
   `(restart-case
        ;; If there's just one body form, then don't use PROGN. This allows
        ;; RESTART-CASE to "see" calls to ERROR, etc.

@@ -755,7 +755,7 @@
 	     (when (lambda-var-p leaf)
 	       (let ((home-lambda (continuation-home-lambda-or-null start)))
 		 (when home-lambda
-		   (pushnew leaf (lambda-refers-to-vars home-lambda))))
+		   (pushnew leaf (lambda-calls-or-closes home-lambda))))
 	       (when (lambda-var-ignorep leaf)
 		 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
 		 ;; requires that this be a STYLE-WARNING, not a full warning.

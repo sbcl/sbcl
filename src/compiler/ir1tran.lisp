@@ -526,7 +526,7 @@
        (when (lambda-var-p var)
 	 (let ((home (continuation-home-lambda-or-null start)))
 	   (when home
-	     (pushnew var (lambda-refers-to-vars home))))
+	     (pushnew var (lambda-calls-or-closes home))))
 	 (when (lambda-var-ignorep var)
 	   ;; (ANSI's specification for the IGNORE declaration requires
 	   ;; that this be a STYLE-WARNING, not a full WARNING.)

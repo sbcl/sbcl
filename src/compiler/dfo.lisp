@@ -255,27 +255,31 @@
 	  (unlink-blocks return-block (component-tail old-lambda-component))))
       (let ((res (find-initial-dfo-aux bind-block component)))
 	(declare (type component res))
-	;; Scavenge call relationships.
-	(let ((calls (if (eq (lambda-kind clambda) :external)
-			 (append (find-reference-funs clambda)
-				 (lambda-calls clambda))
-			 (lambda-calls clambda))))
-	  (dolist (call calls)
-	    (let ((call-home (lambda-home call)))
-	      (setf res (dfo-scavenge-dependency-graph call-home res)))))
-	;; Scavenge closure-over relationships: if FUN refers to a
-	;; variable whose home lambda is not FUN, then the home lambda
-	;; should be in the same component as FUN. (sbcl-0.6.13, and
-	;; CMU CL, didn't do this, leading to the occasional failure
-	;; when physenv analysis, which is local to each component,
-	;; would bogusly conclude that a closed-over variable was
-	;; unused and thus delete it. See e.g. cmucl-imp 2001-11-29.)
-	(dolist (var (lambda-refers-to-vars clambda))
-	  (unless (null (lambda-var-refs var)) ; i.e. unless deleted
-	    (let ((var-home-home (lambda-home (lambda-var-home var))))
-	      (unless (eql (lambda-kind var-home-home) :deleted)
-		(setf res
-		      (dfo-scavenge-dependency-graph var-home-home res))))))
+	;; Scavenge related lambdas.
+	(flet (;; Scavenge call relationship.
+	       (scavenge-call (call)
+		 (let ((call-home (lambda-home call)))
+		   (setf res (dfo-scavenge-dependency-graph call-home res))))
+	       ;; Scavenge closure-over relationship: if FUN refers to a
+	       ;; variable whose home lambda is not FUN, then the home lambda
+	       ;; should be in the same component as FUN. (sbcl-0.6.13, and
+	       ;; CMU CL, didn't do this, leading to the occasional failure
+	       ;; when physenv analysis, which is local to each component,
+	       ;; would bogusly conclude that a closed-over variable was
+	       ;; unused and thus delete it. See e.g. cmucl-imp 2001-11-29.)
+	       (scavenge-closure-var (var)
+		 (unless (null (lambda-var-refs var)) ; i.e. unless deleted
+		   (let ((var-home-home (lambda-home (lambda-var-home var))))
+		     (unless (eql (lambda-kind var-home-home) :deleted)
+		       (setf res
+			     (dfo-scavenge-dependency-graph var-home-home
+							    res)))))))
+	  (dolist (cc (lambda-calls-or-closes clambda))
+	    (etypecase cc
+	      (clambda (scavenge-call cc))
+	      (lambda-var (scavenge-closure-var cc))))
+	  (when (eq (lambda-kind clambda) :external)
+	    (mapc #'scavenge-call (find-reference-funs clambda))))
 	;; Voila.
 	res)))))
 

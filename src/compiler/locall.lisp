@@ -91,7 +91,7 @@
   (declare (type ref ref) (type combination call) (type clambda fun))
   (propagate-to-args call fun)
   (setf (basic-combination-kind call) :local)
-  (pushnew fun (lambda-calls (node-home-lambda call)))
+  (pushnew fun (lambda-calls-or-closes (node-home-lambda call)))
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
   (values))
@@ -417,7 +417,7 @@
 	     (= (length (basic-combination-args call)) 1))
     (let ((ep (car (last (optional-dispatch-entry-points fun)))))
       (setf (basic-combination-kind call) :local)
-      (pushnew ep (lambda-calls (node-home-lambda call)))
+      (pushnew ep (lambda-calls-or-closes (node-home-lambda call)))
       (merge-tail-sets call ep)
       (change-ref-leaf ref ep)
 
@@ -763,33 +763,25 @@
     (setf (lambda-home clambda) home)
     (setf (lambda-physenv clambda) home-env)
 
+    ;; All of CLAMBDA's LETs belong to HOME now.
     (let ((lets (lambda-lets clambda)))
-      ;; All of CLAMBDA's LETs belong to HOME now.
       (dolist (let lets)
 	(setf (lambda-home let) home)
 	(setf (lambda-physenv let) home-env))
-      (setf (lambda-lets home) (nconc lets (lambda-lets home)))
-      ;; CLAMBDA no longer has an independent existence as an entity
-      ;; which has LETs.
-      (setf (lambda-lets clambda) nil))
+      (setf (lambda-lets home) (nconc lets (lambda-lets home))))
+    ;; CLAMBDA no longer has an independent existence as an entity
+    ;; which has LETs.
+    (setf (lambda-lets clambda) nil)
 
     ;; HOME no longer calls CLAMBDA, and owns all of CLAMBDA's old
-    ;; calls.
-    (setf (lambda-calls home)
+    ;; DFO dependencies.
+    (setf (lambda-calls-or-closes home)
 	  (delete clambda
-		  (nunion (lambda-calls clambda)
-			  (lambda-calls home))))
+		  (nunion (lambda-calls-or-closes clambda)
+			  (lambda-calls-or-closes home))))
     ;; CLAMBDA no longer has an independent existence as an entity
-    ;; which calls things.
-    (setf (lambda-calls clambda) nil)
-
-    ;; All of CLAMBDA's variable references belong to HOME now.
-    (setf (lambda-refers-to-vars home)
-	  (nunion (lambda-refers-to-vars clambda)
-		  (lambda-refers-to-vars home)))
-    ;; CLAMBDA no longer has an independent existence as an entity
-    ;; which refers to things.
-    (setf (lambda-refers-to-vars clambda) nil)
+    ;; which calls things or has DFO dependencies.
+    (setf (lambda-calls-or-closes clambda) nil)
 
     ;; All of CLAMBDA's ENTRIES belong to HOME now.
     (setf (lambda-entries home)
@@ -853,30 +845,31 @@
 ;;; NEXT-BLOCK (FUN's return point.) We can't do this by DO-USES on
 ;;; the RETURN-RESULT, because the return might have been deleted (if
 ;;; all calls were TR.)
-;;;
-;;; The called function might be an assignment in the case where we
-;;; are currently converting that function. In steady-state,
-;;; assignments never appear in the lambda-calls.
 (defun unconvert-tail-calls (fun call next-block)
-  (dolist (called (lambda-calls fun))
-    (dolist (ref (leaf-refs called))
-      (let ((this-call (continuation-dest (node-cont ref))))
-	(when (and this-call
-		   (node-tail-p this-call)
-		   (eq (node-home-lambda this-call) fun))
-	  (setf (node-tail-p this-call) nil)
-	  (ecase (functional-kind called)
-	    ((nil :cleanup :optional)
-	     (let ((block (node-block this-call))
-		   (cont (node-cont call)))
-	       (ensure-block-start cont)
-	       (unlink-blocks block (first (block-succ block)))
-	       (link-blocks block next-block)
-	       (delete-continuation-use this-call)
-	       (add-continuation-use this-call cont)))
-	    (:deleted)
-	    (:assignment
-	     (aver (eq called fun))))))))
+  (dolist (called (lambda-calls-or-closes fun))
+    (when (lambda-p called)
+      (dolist (ref (leaf-refs called))
+	(let ((this-call (continuation-dest (node-cont ref))))
+	  (when (and this-call
+		     (node-tail-p this-call)
+		     (eq (node-home-lambda this-call) fun))
+	    (setf (node-tail-p this-call) nil)
+	    (ecase (functional-kind called)
+	      ((nil :cleanup :optional)
+	       (let ((block (node-block this-call))
+		     (cont (node-cont call)))
+		 (ensure-block-start cont)
+		 (unlink-blocks block (first (block-succ block)))
+		 (link-blocks block next-block)
+		 (delete-continuation-use this-call)
+		 (add-continuation-use this-call cont)))
+	      (:deleted)
+	      ;; The called function might be an assignment in the
+	      ;; case where we are currently converting that function.
+	      ;; In steady-state, assignments never appear as a called
+	      ;; function.
+	      (:assignment
+	       (aver (eq called fun)))))))))
   (values))
 
 ;;; Deal with returning from a LET or assignment that we are

@@ -911,25 +911,16 @@
   ;; If this CLAMBDA is a LET, then this slot holds the LAMBDA whose
   ;; LETS list we are in, otherwise it is a self-pointer.
   (home nil :type (or clambda null))
-  ;; a list of all the all the lambdas that have been LET-substituted
-  ;; in this lambda. This is only non-null in lambdas that aren't
-  ;; LETs.
-  (lets () :type list)
-  ;; a list of all the ENTRY nodes in this function and its LETs, or
-  ;; null in a LET
-  (entries () :type list)
-  ;; a list of all the functions directly called from this function
-  ;; (or one of its LETs) using a non-LET local call. This may include
-  ;; deleted functions because nobody bothers to clear them out.
-  (calls () :type list)
-  ;; a list of all the LAMBDA-VARs directly referred to from this
-  ;; function (or one of its LETs). This may include deleted variables
-  ;; because nobody bothers to clean them out.
-  ;;
-  ;; FIXME: This is completely analogous to the CALLS slot, except the
-  ;; elements here are LAMBDA-VARs instead of FUNCTIONALs. Maybe the
-  ;; two lists should be merged into a single list.
-  (refers-to-vars () :type list)
+  ;; all the lambdas that have been LET-substituted in this lambda.
+  ;; This is only non-null in lambdas that aren't LETs.
+  (lets nil :type list)
+  ;; all the ENTRY nodes in this function and its LETs, or null in a LET
+  (entries nil :type list)
+  ;; CLAMBDAs which are locally called by this lambda, and other
+  ;; objects (closed-over LAMBDA-VARs and XEPs) which this lambda
+  ;; depends on in such a way that DFO shouldn't put them in separate
+  ;; components.
+  (calls-or-closes nil :type list)
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
   ;;
   ;; In CMU CL, and old SBCL, this was also NILed out when LET
