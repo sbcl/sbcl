@@ -119,8 +119,6 @@
 
 ;;;; hacking the Unix environment
 
-(/show0 "unix.lisp 122")
-
 (def-alien-routine ("getenv" posix-getenv) c-string
   "Return the environment string \"name=value\" which corresponds to NAME, or
    NIL if there is none."
@@ -130,8 +128,8 @@
 
 (defun unix-rename (name1 name2)
   #!+sb-doc
-  "Unix-rename renames the file with string name1 to the string
-   name2. NIL and an error code is returned if an error occurs."
+  "Unix-rename renames the file with string NAME1 to the string
+   NAME2. NIL and an error code is returned if an error occurs."
   (declare (type unix-pathname name1 name2))
   (void-syscall ("rename" c-string c-string) name1 name2))
 
@@ -139,10 +137,9 @@
 
 (/show0 "unix.lisp 220")
 
+;;; FIXME: Isn't there some way to use a C wrapper to avoid this hand-copying?
 (defconstant +max-s-long+ 2147483647)
 (defconstant +max-u-long+ 4294967295)
-
-;;; FIXME: Isn't there some way to use a C wrapper to avoid this hand-copying?
 (def-alien-type quad-t #+nil long-long #-nil (array long 2))
 (def-alien-type uquad-t #+nil unsigned-long-long
 		#-nil (array unsigned-long 2))

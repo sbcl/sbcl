@@ -529,7 +529,7 @@ a host-structure or string."
 
 (defun pathname-host (pathname &key (case :local))
   #!+sb-doc
-  "Accessor for the pathname's host."
+  "Return PATHNAME's host."
   (declare (type pathname-designator pathname)
 	   (type (member :local :common) case)
 	   (values host)
@@ -539,7 +539,7 @@ a host-structure or string."
 
 (defun pathname-device (pathname &key (case :local))
   #!+sb-doc
-  "Accessor for pathname's device."
+  "Return PATHNAME's device."
   (declare (type pathname-designator pathname)
 	   (type (member :local :common) case))
   (with-pathname (pathname pathname)
@@ -551,7 +551,7 @@ a host-structure or string."
 
 (defun pathname-directory (pathname &key (case :local))
   #!+sb-doc
-  "Accessor for the pathname's directory list."
+  "Return PATHNAME's directory."
   (declare (type pathname-designator pathname)
 	   (type (member :local :common) case))
   (with-pathname (pathname pathname)
@@ -562,7 +562,7 @@ a host-structure or string."
 				:lower)))))
 (defun pathname-name (pathname &key (case :local))
   #!+sb-doc
-  "Accessor for the pathname's name."
+  "Return PATHNAME's name."
   (declare (type pathname-designator pathname)
 	   (type (member :local :common) case))
   (with-pathname (pathname pathname)
@@ -574,7 +574,7 @@ a host-structure or string."
 
 (defun pathname-type (pathname &key (case :local))
   #!+sb-doc
-  "Accessor for the pathname's name."
+  "Return PATHNAME's type."
   (declare (type pathname-designator pathname)
 	   (type (member :local :common) case))
   (with-pathname (pathname pathname)
@@ -586,7 +586,7 @@ a host-structure or string."
 
 (defun pathname-version (pathname)
   #!+sb-doc
-  "Accessor for the pathname's version."
+  "Return PATHNAME's version."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (%pathname-version pathname)))

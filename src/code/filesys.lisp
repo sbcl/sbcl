@@ -495,10 +495,11 @@
 				  &key (verify-existence t)
                                   (follow-links t))
 			     &body body)
-  (let ((body-name (gensym)))
+  (let ((body-name (gensym "ENUMERATE-MATCHES-BODY-FUN-")))
     `(block nil
        (flet ((,body-name (,var)
 		,@body))
+         (declare (dynamic-extent ,body-name))
 	 (%enumerate-matches (pathname ,pathname)
 			     ,verify-existence
                              ,follow-links
