@@ -32,6 +32,7 @@
 #include "dynbind.h"
 #include "interr.h"
 
+
 void sigaddset_blockable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
@@ -550,11 +551,20 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 	    arch_set_pseudo_atomic_interrupted(context);
 	}
 	else {
+	    lispobj *old_free_space=current_dynamic_space;
 	    fake_foreign_function_call(context);
 	    funcall0(SymbolFunction(MAYBE_GC));
 	    undo_fake_foreign_function_call(context);
-	}
-
+	    if(current_dynamic_space==old_free_space) 
+		/* MAYBE-GC (as the name suggest) might not.  If it
+		 * doesn't, it won't reset the GC trigger either, so we
+		 * have to do it ourselves.  Add small amount of space
+		 * to tide us over while GC is inhibited 
+		 */
+		set_auto_gc_trigger((u32)dynamic_space_free_pointer
+				    -(u32)current_dynamic_space
+				    +(u32)os_vm_page_size);
+	}       
 	return 1;
     } else {
 	return 0;

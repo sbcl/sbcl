@@ -26,6 +26,7 @@ CPP = cpp
 LD = ld
 LINKFLAGS = -g
 NM = nm -gp
+DEPEND_FLAGS=-M
 
 # The Config file is the preferred place for tweaking options which
 # are appropriate for particular setups (OS, CPU, whatever). Make a
@@ -34,12 +35,13 @@ NM = nm -gp
 include Config
 
 
-SRCS =	alloc.c backtrace.c breakpoint.c coreparse.c \
+C_SRCS =alloc.c backtrace.c breakpoint.c coreparse.c \
 	dynbind.c globals.c interr.c interrupt.c \
 	monitor.c parse.c print.c purify.c \
 	regnames.c run-program.c runtime.c save.c search.c \
-	time.c util.c validate.c vars.c wrap.c \
-	${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
+	time.c util.c validate.c vars.c wrap.c 
+
+SRCS=	$(C_SRCS) ${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
 
 OBJS = $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(patsubst %.s,%.o,$(SRCS))))
 
@@ -54,8 +56,9 @@ sbcl: ${OBJS}
 clean:
 	rm -f depend *.o sbcl sbcl.nm core *.tmp ; true
 
-depend: ${SRCS} sbcl.h
-	$(CC) -MM -E ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS} $^ > depend.tmp
+
+depend: ${C_SRCS} sbcl.h
+	$(CC) ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS}  ${C_SRCS} > depend.tmp
 	mv -f depend.tmp depend
 
 # By including this file, we cause GNU to automatically make depend if

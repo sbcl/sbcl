@@ -15,7 +15,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <asm/pal.h>		/* for PAL_gentrap */
 
 #include "runtime.h"
 #include "sbcl.h"
@@ -32,14 +31,17 @@
 #include "monitor.h"
 
 extern char call_into_lisp_LRA[], call_into_lisp_end[];
+
 extern size_t os_vm_page_size;
 #define BREAKPOINT_INST 0x80
+
 
 void
 arch_init(void)
 {
     /* This must be called _after_ os_init(), so that we know what the
      * page size is. */
+
     if (mmap((os_vm_address_t) call_into_lisp_LRA_page,os_vm_page_size,
 	     OS_VM_PROT_ALL,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)
 	== (os_vm_address_t) -1)
@@ -77,15 +79,7 @@ arch_get_bad_addr (int sig, siginfo_t *code, os_context_t *context)
 	  pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE))
 	return NULL;
 
-    badinst = *pc;
-
-    if (((badinst>>27)!=0x16)	/* STL or STQ */
-	&& ((badinst>>27)!=0x13)) /* STS or STT */
-	return NULL;		/* Otherwise forget about address. */
-  
-    return (os_vm_address_t)
-	(*os_context_register_addr(context,((badinst>>16)&0x1f))
-	 +(badinst&0xffff));
+    return context->uc_mcontext.sc_traparg_a0;
 }
 
 void
@@ -111,26 +105,16 @@ arch_pseudo_atomic_atomic(os_context_t *context)
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
     /* On coming out of an atomic section, we subtract 1 from
-     * reg_Alloc, then try to store something at that address.  On
-     * OSF/1 we add 1 to reg_Alloc here so that the end-of-atomic code
-     * will raise SIGTRAP for "unaligned access".  Linux catches
-     * unaligned accesses in the kernel and fixes them up[1], so there
-     * we toggle bit 63 instead.  The resulting address is somewhere
-     * out in no-man's land, so we get SIGSEGV when we try to access
-     * it.  We catch whichever signal it is (see the appropriate
-     * *-os.c) and call interrupt_handle_pending() from it */
+     * reg_Alloc, then try to store something at that address.  So,
+     * to signal that it was interrupted and a signal should be handled, 
+     * we set bit 63 of reg_ALLOC here so that the end-of-atomic code
+     * will raise SIGSEGV (no ram mapped there).  We catch the signal
+     * (see the appropriate *-os.c) and call interrupt_handle_pending() 
+     * for the saved signal instead */
 
-    /* [1] This behaviour can be changed with osf_setsysinfo, but cmucl
-     * didn't use that */
-
-#ifdef __linux__
     *os_context_register_addr(context,reg_ALLOC) |=  (1L<<63);
-#else
-    *os_context_register_addr(context,reg_ALLOC) |=  2;
-#endif
 }
 
-/* XXX but is the caller of this storing all 64 bits? */
 unsigned long arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
@@ -357,7 +341,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 	break;
 
       default:
-	fprintf(stderr, "unidetified breakpoint/trap %d\n",code);
+	fprintf(stderr, "unidentified breakpoint/trap %d\n",code);
 	interrupt_handle_now(signal, siginfo, context);
 	break;
     }

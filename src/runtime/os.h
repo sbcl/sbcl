@@ -37,18 +37,6 @@
  *   handler, i.e. the actual type of the thing pointed to by the
  *   void* third argument of a handler */
 
-/*
- #if defined __FreeBSD__
- #include "bsd-os.h"
- #elif defined __OpenBSD__
- #include "bsd-os.h"
- #elif defined __linux__
- #include "linux-os.h"
- #else
- #error unsupported OS
- #endif
-*/
-
 #include "target-os.h"
 
 

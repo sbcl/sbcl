@@ -353,9 +353,8 @@
 ;;; code for foreign symbol lookup should be here.
 (defun find-foreign-symbol-in-table (name table)
   (let ((prefixes
-         #!+(or linux freebsd) #("" "ldso_stub__")
-	 #!+openbsd #("")
-	 #!+sunos #("" "ldso_stub__")))    
+         #!+(or osf1 sunos linux freebsd) #("" "ldso_stub__")
+	 #!+openbsd #("")))
     (declare (notinline some)) ; to suppress bug 117 bogowarning
     (some (lambda (prefix)
 	    (gethash (concatenate 'string prefix name)

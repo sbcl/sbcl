@@ -28,8 +28,8 @@
 #include "interr.h"
 
 /* So you need to debug? */
-#if 0
 #define PRINTNOISE
+#if 0
 #define DEBUG_SPACE_PREDICATES
 #define DEBUG_SCAVENGE_VERBOSE
 #define DEBUG_COPY_VERBOSE
@@ -2253,10 +2253,10 @@ gc_init(void)
 
 void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 {
-    os_vm_address_t addr=(os_vm_address_t)current_dynamic_space +
-	dynamic_usage;
-    long length =
-	DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
+    os_vm_address_t addr=(os_vm_address_t)current_dynamic_space 
+	+ dynamic_usage;
+	
+    long length = DYNAMIC_SPACE_SIZE - dynamic_usage;
 
     if (addr < (os_vm_address_t)dynamic_space_free_pointer) {
 	fprintf(stderr,
@@ -2264,13 +2264,13 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 		(unsigned int)dynamic_usage,
 		(os_vm_address_t)dynamic_space_free_pointer
 		- (os_vm_address_t)current_dynamic_space);
-	return;
+	lose("lost");
     }
     else if (length < 0) {
 	fprintf(stderr,
 		"set_auto_gc_trigger: tried to set gc trigger too high! (%p)\n",
 		dynamic_usage);
-	return;
+	lose("lost");
     }
 
     addr=os_round_up_to_page(addr);

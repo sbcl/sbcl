@@ -66,6 +66,11 @@ extern void globals_init(void);
 #endif
 #endif
 
+/* FIXME : these sizes are, incidentally, bogus on Alpha.  But the
+ * EXTERN macro doesn't use its second arg anyway, so no immediate harm
+ * done   -dan 2002.05.07
+ */
+
 EXTERN(foreign_function_call_active, 4)
 
 EXTERN(current_control_stack_pointer, 4)

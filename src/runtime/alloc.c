@@ -36,24 +36,24 @@ extern lispobj *alloc(int bytes);
 static lispobj *
 alloc(int bytes)
 {
-    lispobj *result;
+    char *result;
 
     /* Round to dual word boundary. */
     bytes = (bytes + LOWTAG_MASK) & ~LOWTAG_MASK;
 
-    result = GET_FREE_POINTER();
+    result = (char *)GET_FREE_POINTER();
 
-    SET_FREE_POINTER(result + (bytes / sizeof(lispobj)));
+    SET_FREE_POINTER((lispobj *)(result + bytes));
 
     if (GET_GC_TRIGGER() && GET_FREE_POINTER() > GET_GC_TRIGGER()) {
 	SET_GC_TRIGGER((char *)GET_FREE_POINTER()
 		       - (char *)current_dynamic_space);
     }
-    return result;
+    return (lispobj *) result;
 }
 #endif
 
-static lispobj *
+lispobj *
 alloc_unboxed(int type, int words)
 {
     lispobj *result;
@@ -120,10 +120,9 @@ alloc_string(char *str)
 lispobj
 alloc_sap(void *ptr)
 {
-    int n_words_to_alloc =
-	(sizeof(struct sap) - sizeof(lispobj)) / sizeof(u32);
-    struct sap *sap =
-	(struct sap *)alloc_unboxed((int)SAP_WIDETAG, n_words_to_alloc);
+    struct sap *sap;
+    sap=(struct sap *)
+	alloc_unboxed((int)SAP_WIDETAG, sizeof(struct sap)/sizeof(lispobj) -1);
     sap->pointer = ptr;
     return (lispobj) sap | OTHER_POINTER_LOWTAG;
 }

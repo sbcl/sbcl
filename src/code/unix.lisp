@@ -282,22 +282,22 @@
   ;; pointer is used. On a system which doesn't support that
   ;; extension, it'll have to be rewritten somehow.
   ;;
-  ;; SunOS provides almost as useful an extension: if given a null
+  ;; SunOS and OSF/1 provide almost as useful an extension: if given a null
   ;; buffer pointer, it will automatically allocate size space. The
   ;; KLUDGE in this solution arises because we have just read off
   ;; PATH_MAX+1 from the Solaris header files and stuck it in here as
   ;; a constant. Going the grovel_headers route doesn't seem to be
   ;; helpful, either, as Solaris doesn't export PATH_MAX from
   ;; unistd.h.
-  #!-(or linux openbsd freebsd sunos) (,stub,)
-  #!+(or linux openbsd freebsd sunos)
+  #!-(or linux openbsd freebsd sunos osf1) (,stub,)
+  #!+(or linux openbsd freebsd sunos osf1)
   (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
 						       (function (* char)
 								 (* char)
 								 size-t))
 					 nil 
 					 #!+(or linux openbsd freebsd) 0
-					 #!+sunos 1025))
+					 #!+(or sunos osf1) 1025))
       (simple-perror "getcwd")))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated

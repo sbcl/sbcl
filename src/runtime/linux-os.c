@@ -274,14 +274,14 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 
     if (addr != NULL && 
        *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
+	
 	/* This is the end of a pseudo-atomic section during which
 	 * a signal was received.  We must deal with the pending interrupt
 	 * (see also interrupt.c, ../code/interrupt.lisp)
 	 */
-
 	/* (how we got here: when interrupting, we set bit 63 in
 	 * reg_Alloc.  At the end of the atomic section we tried to
-	 * write to reg_Alloc, got a SIGSEGV (there's nothing mapped
+	 * write to reg_ALLOC, got a SIGSEGV (there's nothing mapped
 	 * there) so ended up here
 	 */
 	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);

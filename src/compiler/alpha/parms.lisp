@@ -116,34 +116,34 @@
 #!+linux
 (progn
   (def!constant read-only-space-start #x20000000)
-  (def!constant read-only-space-end   #x24000000)
+  (def!constant read-only-space-end   #x24000000))
 
-  (def!constant static-space-start    #x28000000)
-  (def!constant static-space-end      #x2c000000)
-
-  ;; this is used in PURIFY as part of a sloppy check to see if a pointer
-  ;; is in dynamic space.  Chocolate brownie for the first person to fix it
-  ;; -dan 20010502
-  (def!constant dynamic-space-start   #x30000000)
-  (def!constant dynamic-space-end     #x3fff0000)
-
-  (def!constant dynamic-0-space-start   #x30000000)
-  (def!constant dynamic-0-space-end     #x3fff0000)
-  
-  (def!constant dynamic-1-space-start   #x40000000)
-  (def!constant dynamic-1-space-end     #x4fff0000)
-
-  (def!constant control-stack-start   #x50000000)
-  (def!constant control-stack-end     #x51000000)
-
-  (def!constant binding-stack-start    #x70000000)
-  (def!constant binding-stack-end      #x71000000))
-
-#!+osf1                                 ;as if
+#!+osf1
 (progn
-  (defparameter read-only-space-start #x10000000)
-  (defparameter static-space-start    #x28000000)
-  (defparameter dynamic-space-start   #x30000000))
+  (defconstant read-only-space-start #x10000000)
+  (defconstant read-only-space-end   #x25000000))
+
+
+(def!constant static-space-start    #x28000000)
+(def!constant static-space-end      #x2c000000)
+
+;; this is used in PURIFY as part of a sloppy check to see if a pointer
+;; is in dynamic space.  Chocolate brownie for the first person to fix it
+;; -dan 20010502
+(def!constant dynamic-space-start   #x30000000)
+(def!constant dynamic-space-end     #x3fff0000)
+
+(def!constant dynamic-0-space-start   #x30000000)
+(def!constant dynamic-0-space-end     #x3fff0000)
+
+(def!constant dynamic-1-space-start   #x40000000)
+(def!constant dynamic-1-space-end     #x4fff0000)
+
+(def!constant control-stack-start   #x50000000)
+(def!constant control-stack-end     #x51000000)
+
+(def!constant binding-stack-start    #x70000000)
+(def!constant binding-stack-end      #x71000000)
 
 
 ;;; FIXME nothing refers to either of these in alpha or x86 cmucl

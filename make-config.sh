@@ -100,6 +100,15 @@ case `uname` in
 	ln -s $sbcl_arch-linux-os.h target-arch-os.h
 	ln -s linux-os.h target-os.h
 	;;
+    OSF1)			
+        # it's changed name twice since it was called OSF/1: clearly
+        # the marketers forgot to tell the engineers about Digital Unix
+        # _or_ OSF/1 ...
+	printf ' :osf1' >> $ltf
+        ln -s Config.$sbcl_arch-osf1 Config
+	ln -s $sbcl_arch-osf1-os.h target-arch-os.h
+	ln -s osf1-os.h target-os.h
+	;;
     *BSD)
 	printf ' :bsd' >> $ltf
 	ln -s $sbcl_arch-bsd-os.h target-arch-os.h

@@ -11,8 +11,11 @@
 	
 #include "validate.h"		
 #include <alpha/regdef.h>
+#ifdef linux
 #include <asm/pal.h> 
-
+#else
+#include <alpha/pal.h>
+#endif
 #include "sbcl.h"
 #include "lispregs.h"
 /* #include "globals.h" */
@@ -61,10 +64,10 @@ call_into_lisp:
 	stl	zero,foreign_function_call_active
 
 	/* Load lisp state. */
-	ldl	reg_ALLOC,dynamic_space_free_pointer
-	ldl	reg_BSP,current_binding_stack_pointer
-	ldl	reg_CSP,current_control_stack_pointer
-	ldl	reg_OCFP,current_control_frame_pointer
+	ldq	reg_ALLOC,dynamic_space_free_pointer
+	ldq	reg_BSP,current_binding_stack_pointer
+	ldq	reg_CSP,current_control_stack_pointer
+	ldq	reg_OCFP,current_control_frame_pointer
 	mov	a1,reg_CFP
 
 	.set	noat
@@ -112,10 +115,10 @@ call_into_lisp_LRA:
 	/* Turn on pseudo-atomic. */
 
 	/* Save LISP registers */
-	stl	reg_ALLOC, dynamic_space_free_pointer 
-	stl	reg_BSP,current_binding_stack_pointer
-	stl	reg_CSP,current_control_stack_pointer
-	stl	reg_CFP,current_control_frame_pointer
+	stq	reg_ALLOC, dynamic_space_free_pointer 
+	stq	reg_BSP,current_binding_stack_pointer
+	stq	reg_CSP,current_control_stack_pointer
+	stq	reg_CFP,current_control_frame_pointer
 	
 	/* Back in C land.  [CSP is just a handy non-zero value.] */
 	stl	reg_CSP,foreign_function_call_active
@@ -172,10 +175,11 @@ call_into_c:
 
 	/* Save lisp state. */
 	subq	reg_ALLOC,1,reg_L1
-	stl	reg_L1, dynamic_space_free_pointer
-	stl	reg_BSP, current_binding_stack_pointer
-	stl	reg_CSP, current_control_stack_pointer
-	stl	reg_CFP, current_control_frame_pointer
+	stq	reg_L1, dynamic_space_free_pointer
+	
+	stq	reg_BSP, current_binding_stack_pointer
+	stq	reg_CSP, current_control_stack_pointer
+	stq	reg_CFP, current_control_frame_pointer
 
 	/* Mark us as in C land. */
 	stl	reg_CSP, foreign_function_call_active
@@ -186,13 +190,7 @@ call_into_c:
 
 	/* Into C land we go. */
 
-	/* L1 is pv (procedure variable).  The following line is */
-	/* apparently a jump hint and not mysterious at all */
-
-	/* <dhd> so, you have perfectly good code with comments written by */
-	/* people who don't understand the Alpha :)  */
-
-	mov	reg_CFUNC, reg_L1    /* ### This line is a mystery */
+	mov	reg_CFUNC, reg_L1    /* L1=pv: this is a hint to the cache */
 				  
 	jsr	ra, (reg_CFUNC)
 	ldgp	$29,0(ra)
@@ -220,7 +218,7 @@ call_into_c:
 	stl	reg_ZERO, foreign_function_call_active
 
 	/* Restore ALLOC, preserving pseudo-atomic-atomic */
-	ldl	reg_NL0,dynamic_space_free_pointer
+	ldq	reg_NL0,dynamic_space_free_pointer
 	addq	reg_ALLOC,reg_NL0,reg_ALLOC
 	
 	/* Check for interrupt */
@@ -253,10 +251,20 @@ start_of_tramps:
  * INTERNAL-ERROR function
  */
         .text
-        .globl  undefined_tramp
+	.globl	start_of_tramps
+	.globl	closure_tramp
+	.globl	undefined_tramp
+	.globl	closure_tramp_offset
+	.globl	undefined_tramp_offset
         .ent    undefined_tramp_offset
-undefined_tramp = /* ### undefined_tramp_offset-call_into_lisp_LRA*/ 0x140+call_into_lisp_LRA_page
 undefined_tramp_offset:
+	/* an explanation is called for here.  0x140 is the difference
+	 * between undefined_tramp_offset and call_into_lisp_LRA, but
+	 * the assembler is too dumb to allow that as an expression.
+	 * So, change this number whenever you add or remove any code
+	 * in this file */
+
+undefined_tramp= call_into_lisp_LRA_page+0x140
 	call_pal PAL_bugchk
 	.long    trap_Error
         .byte    4                         /* what are these numbers? */
@@ -265,22 +273,20 @@ undefined_tramp_offset:
         .byte    (0xe0 + sc_DescriptorReg)
         .byte    2
         .align 2
-        .end    undefined_tramp
+        .end     undefined_tramp_offset
 
 
-/*
- * The closure trampoline.
- */
+/* The closure trampoline. */
         .text
         .globl  closure_tramp
         .ent    closure_tramp_offset
-closure_tramp = /* ### */ 0x150 + call_into_lisp_LRA_page
+closure_tramp= call_into_lisp_LRA_page+0x150
 closure_tramp_offset:
         ldl     reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
         ldl     reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
         addl    reg_L0, SIMPLE_FUN_CODE_OFFSET, reg_LIP
         jmp     reg_ZERO,(reg_LIP)
-        .end    closure_tramp
+        .end    closure_tramp_offset
 
 	.text
 	.globl	end_of_tramps
@@ -317,5 +323,4 @@ fun_end_breakpoint_trap:
 
 	.globl	fun_end_breakpoint_end
 fun_end_breakpoint_end:
-
 

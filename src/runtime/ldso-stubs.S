@@ -24,13 +24,10 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-
-	.file	"ldso-stubs.S"
-	.version	"01.01"
-gcc2_compiled.:
+#include "sbcl.h"
         .text
 
-#if defined __i386__
+#if defined LISP_FEATURE_X86
 	
 #define LDSO_STUBIFY(fct)                       \
 	.align 16 ;                             \
@@ -41,7 +38,17 @@ ldso_stub__ ## fct: ;                           \
 .L ## fct ## e1: ;                              \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 
-#elif defined alpha
+#elif ((defined LISP_FEATURE_OSF1) && (defined LISP_FEATURE_ALPHA))
+/* osf1 has ancient cpp that doesn't do ## */
+#define LDSO_STUBIFY(fct)                       \
+.globl ldso_stub__/**/fct ;                     \
+ldso_stub__/**/fct: ;                           \
+	jmp fct ;                               \
+.L/**/fct/**/e1: ;                              
+
+
+#elif ((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_ALPHA))	
+/* but there's no reason we need to put up with that on modern (Linux) OSes */
 #define LDSO_STUBIFY(fct)                       \
 .globl ldso_stub__ ## fct ;                     \
 	.type	 ldso_stub__ ## fct,@function ; \
@@ -50,7 +57,7 @@ ldso_stub__ ## fct: ;                           \
 .L ## fct ## e1: ;                              \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 
-#elif defined ppc
+#elif defined LISP_FEATURE_PPC
 #define LDSO_STUBIFY(fct)                       \
 .globl ldso_stub__ ## fct ;                     \
 	.type    ldso_stub__ ## fct,@function ; \
@@ -59,7 +66,7 @@ ldso_stub__ ## fct: ;                           \
 .L ## fct ## e1: ;                              \
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 	
-#elif defined sparc
+#elif defined LISP_FEATURE_SPARC
 	
 	/* This is an attempt to follow DB's hint of sbcl-devel
 	 * 2001-09-18. -- CSR */

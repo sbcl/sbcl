@@ -12,7 +12,11 @@
 #define NREGS	(32)
 
 #ifdef LANGUAGE_ASSEMBLY
+#ifdef linux
 #define REG(num) $##num
+#else
+#define REG(num) $/**/num
+#endif /* linux */
 #else
 #define REG(num) num
 #endif
