@@ -21,11 +21,7 @@
   (let ((*noprint* noprint)
 	(*break-level* break-level)
 	(*inspect-break* inspect)
-	(*continuable-break* continuable)
-	(*dir-stack* nil)
-	(*history* nil)
-	(*cmd-number* 1)
-	(*package* *package*))
+	(*continuable-break* continuable))
     (sb-int:/show0 "entering REPL")
     (loop
      (multiple-value-bind (reason reason-param)
