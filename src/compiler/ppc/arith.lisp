@@ -377,14 +377,6 @@
   (:affected)
   (:policy :fast-safe))
 
-(deftype integer-with-a-bite-out (s bite)
-  (cond ((eq s '*) 'integer)
-	((and (integerp s) (> s 1))
-	 (let ((bound (ash 1 (1- s))))
-	   `(integer ,(- bound) ,(- bound bite 1))))
-	(t
-	 (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
-
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg zero))
 	 (y :scs (any-reg zero)))

@@ -16,25 +16,49 @@
 (let ((testcases '(;; Bug 126, confusion between high-level default string
 		   ;; initial element #\SPACE and low-level default array
 		   ;; element #\NULL, is gone.
-		   (#\null (make-array 11 :element-type 'character))
-		   (#\space (make-string 11 :initial-element #\space))
+		   (#\null (make-array 11 :element-type 'character) simple-string)
+		   (#\space (make-string 11 :initial-element #\space) string)
 		   (#\* (make-string 11 :initial-element #\*))
 		   (#\null (make-string 11))
 		   (#\null (make-string 11 :initial-element #\null))
 		   (#\x (make-string 11 :initial-element #\x))
 		   ;; And the other tweaks made when fixing bug 126 didn't
 		   ;; mess things up too badly either.
-		   (0 (make-array 11))
+		   (0 (make-array 11) simple-vector)
 		   (nil (make-array 11 :initial-element nil))
 		   (12 (make-array 11 :initial-element 12))
-		   (0 (make-array 11 :element-type '(unsigned-byte 4)))
+		   (0 (make-array 11 :element-type '(unsigned-byte 4)) (simple-array (unsigned-byte 4) (*)))
 		   (12 (make-array 11
 				   :element-type '(unsigned-byte 4)
 				   :initial-element 12)))))
   (dolist (testcase testcases)
-    (destructuring-bind (expected-result form) testcase
+    (destructuring-bind (expected-result form &optional type) testcase
       (unless (eql expected-result (aref (eval form) 3))
         (error "expected ~S in EVAL ~S" expected-result form))
       (unless (eql expected-result
 		   (aref (funcall (compile nil `(lambda () ,form))) 3))
-        (error "expected ~S in FUNCALL COMPILE ~S" expected-result form)))))
+        (error "expected ~S in FUNCALL COMPILE ~S" expected-result form))
+      ;; also do some testing of compilation and verification that
+      ;; errors are thrown appropriately.
+      (unless (eql expected-result
+		   (funcall (compile nil `(lambda () (aref ,form 3)))))
+	(error "expected ~S in COMPILED-AREF ~S" expected-result form))
+      (when type
+	(unless (eql expected-result
+		     (funcall (compile nil `(lambda () (let ((x ,form))
+							 (declare (type ,type x))
+							 (aref x 3))))))
+	  (error "expected ~S in COMPILED-DECLARED-AREF ~S" expected-result form)))
+      (when (ignore-errors (aref (eval form) 12))
+	(error "error not thrown in EVAL ~S" form))
+      (when (ignore-errors (aref (funcall (compile nil `(lambda () ,form))) 12))
+	(error "error not thrown in FUNCALL COMPILE ~S"))
+      (when (ignore-errors (funcall (compile nil `(lambda () (aref ,form 12)))))
+	(error "error not thrown in COMPILED-AREF ~S" form))
+      (when type
+	(when (ignore-errors (funcall
+			      (compile nil `(lambda () (let ((x ,form))
+							 (declare (type ,type x))
+							 (aref x 12))))))
+	  (error "error not thrown in COMPILED-DECLARED-AREF ~S" form))))))
+

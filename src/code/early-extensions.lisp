@@ -36,6 +36,26 @@
 ;;; index leaving the loop range)
 (def!type index-or-minus-1 () `(integer -1 (,sb!xc:array-dimension-limit)))
 
+;;; A couple of VM-related types that are currently used only on the
+;;; alpha platform. -- CSR, 2002-06-24
+(def!type unsigned-byte-with-a-bite-out (s bite)
+  (cond ((eq s '*) 'integer)
+        ((and (integerp s) (> s 1))
+         (let ((bound (ash 1 s)))
+           `(integer 0 ,(- bound bite 1))))
+        (t
+         (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
+
+(def!type load/store-index (scale lowtag min-offset
+				 &optional (max-offset min-offset))
+  `(integer ,(- (truncate (+ (ash 1 16)
+			     (* min-offset sb!vm:n-word-bytes)
+			     (- lowtag))
+			  scale))
+	    ,(truncate (- (+ (1- (ash 1 16)) lowtag)
+			  (* max-offset sb!vm:n-word-bytes))
+		       scale)))
+
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary, so we use the value that falls
 ;;; through when we just let the low-level consing code initialize

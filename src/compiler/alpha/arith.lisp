@@ -294,14 +294,6 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:policy :fast-safe))
 
-(deftype integer-with-a-bite-out (s bite)
-  (cond ((eq s '*) 'integer)
-	((and (integerp s) (> s 1))
-	 (let ((bound (ash 1 s)))
-	   `(integer 0 ,(- bound bite 1))))
-	(t
-	 (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
-
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg))
 	 (y :scs (any-reg)))
@@ -310,7 +302,7 @@
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (integer-with-a-bite-out 6 4)))
+  (:arg-types tagged-num (:constant (unsigned-byte-with-a-bite-out 6 4)))
   (:info target not-p y))
 
 (define-vop (fast-conditional/signed fast-conditional)
@@ -321,7 +313,7 @@
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (integer-with-a-bite-out 8 1)))
+  (:arg-types signed-num (:constant (unsigned-byte-with-a-bite-out 8 1)))
   (:info target not-p y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
@@ -332,7 +324,7 @@
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (integer-with-a-bite-out 8 1)))
+  (:arg-types unsigned-num (:constant (unsigned-byte-with-a-bite-out 8 1)))
   (:info target not-p y))
 
 

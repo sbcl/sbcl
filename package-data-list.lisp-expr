@@ -754,8 +754,8 @@ retained, possibly temporariliy, because it might be used internally."
 	     "UNSUPPORTED-OPERATOR"
 	     
              ;; ..and DEFTYPEs..
-             "INDEX" 
-
+             "INDEX" "LOAD/STORE-INDEX"
+	     "UNSIGNED-BYTE-WITH-A-BITE-OUT"
              ;; ..and type predicates
              "INSTANCEP"
              "DOUBLE-FLOATP"

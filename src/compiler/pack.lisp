@@ -254,7 +254,7 @@
     (dolist (sb *backend-sb-list*)
       (unless (eq (sb-kind sb) :non-packed)
 	(let ((size (sb-size sb)))
-	  (fill nil (finite-sb-always-live sb))
+	  (fill (finite-sb-always-live sb) nil)
 	  (setf (finite-sb-always-live sb)
 		(make-array size
 			    :initial-element
@@ -265,11 +265,11 @@
 			    ;; until runtime.
 			    #+sb-xc (make-array 0 :element-type 'bit)))
 
-	  (fill nil (finite-sb-conflicts sb))
+	  (fill (finite-sb-conflicts sb) nil)
 	  (setf (finite-sb-conflicts sb)
 		(make-array size :initial-element '#()))
 
-	  (fill nil (finite-sb-live-tns sb))
+	  (fill (finite-sb-live-tns sb) nil)
 	  (setf (finite-sb-live-tns sb)
 		(make-array size :initial-element nil))))))
   (values))

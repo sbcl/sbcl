@@ -319,7 +319,7 @@
     
 (defun hairy-data-vector-ref (array index)
   (with-array-data ((vector array) (index index) (end))
-    (declare (ignore end) (optimize (safety 3)))
+    (declare (ignore end))
     (etypecase vector .
 	       #.(mapcar (lambda (type)
 			   (let ((atype `(simple-array ,type (*))))
@@ -330,7 +330,7 @@
 
 (defun hairy-data-vector-set (array index new-value)
   (with-array-data ((vector array) (index index) (end))
-    (declare (ignore end) (optimize (safety 3)))
+    (declare (ignore end) (optimize))
     (etypecase vector .
 	       #.(mapcar (lambda (type)
 			   (let ((atype `(simple-array ,type (*))))
