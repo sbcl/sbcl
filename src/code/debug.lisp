@@ -639,6 +639,18 @@ Other commands:
    of this variable to the function because it binds *DEBUGGER-HOOK* to NIL
    around the invocation.")
 
+(defvar *invoke-debugger-hook* nil
+  #!+sb-doc
+  "This is either NIL or a designator for a function of two arguments,
+   to be run when the debugger is about to be entered.  The function is
+   run with *INVOKE-DEBUGGER-HOOK* bound to NIL to minimize recursive
+   errors, and receives as arguments the condition that triggered 
+   debugger entry and the previous value of *INVOKE-DEBUGGER-HOOK*   
+
+   This mechanism is an SBCL extension similar to the standard *DEBUGGER-HOOK*.
+   In contrast to *DEBUGGER-HOOK*, it is observed by INVOKE-DEBUGGER even when
+   called by BREAK.")
+
 ;;; These are bound on each invocation of INVOKE-DEBUGGER.
 (defvar *debug-restarts*)
 (defvar *debug-condition*)
@@ -646,23 +658,25 @@ Other commands:
 
 ;;; the ordinary ANSI case of INVOKE-DEBUGGER, when not suppressed by
 ;;; command-line --disable-debugger option
-(defun invoke-debugger/enabled (condition)
+(defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
   (let ((old-hook *debugger-hook*))
     (when old-hook
       (let ((*debugger-hook* nil))
 	(funcall old-hook condition old-hook))))
+  (let ((old-hook *invoke-debugger-hook*))
+    (when old-hook
+      (let ((*invoke-debugger-hook* nil))
+	(funcall old-hook condition old-hook))))
 
-  ;; If we're a background thread and *background-threads-wait-for-debugger*
-  ;; is NIL, this will invoke a restart
-
-  ;; Note: CMU CL had (SB-UNIX:UNIX-SIGSETMASK 0) here. I deleted it
-  ;; around sbcl-0.7.8.5 (by which time it had mutated to have a
-  ;; #!-SUNOS prefix and a FIXME note observing that it wasn't needed
-  ;; on SunOS and no one knew why it was needed anywhere else either).
-  ;; So if something mysteriously breaks that has worked since the CMU
-  ;; CL days, that might be why. -- WHN 2002-09-28
+  ;; Note: CMU CL had (SB-UNIX:UNIX-SIGSETMASK 0) here, to reset the
+  ;; signal state in the case that we wind up in the debugger as a
+  ;; result of something done by a signal handler.  It's not
+  ;; altogether obvious that this is necessary, and indeed SBCL has
+  ;; not been doing it since 0.7.8.5.  But nobody seems altogether
+  ;; convinced yet
+  ;; -- dan 2003.11.11, based on earlier comment of WHN 2002-09-28
 
   ;; We definitely want *PACKAGE* to be of valid type.
   ;;
@@ -749,6 +763,9 @@ reset to ~S."
 		     '*debug-condition*
 		     (cell-error-name *debug-condition*)))))
 
+       (setf background-p
+	     (sb!thread::debugger-wait-until-foreground-thread *debug-io*))
+
        ;; After the initial error/condition/whatever announcement to
        ;; *ERROR-OUTPUT*, we become interactive, and should talk on
        ;; *DEBUG-IO* from now on. (KLUDGE: This is a normative
@@ -757,8 +774,6 @@ reset to ~S."
        ;; stream was in fashion at the time, and not all of it has
        ;; been converted to behave this way. -- WHN 2000-11-16)
 
-       (setf background-p
-	     (sb!thread::debugger-wait-until-foreground-thread *debug-io*))
        (unwind-protect
        (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
 	     ;; violating the principle of least surprise, and making
@@ -789,9 +804,11 @@ reset to ~S."
 	      (internal-debug))
 	 (when background-p (sb!thread::release-foreground)))))))
 
-;;; the degenerate case of INVOKE-DEBUGGER, when ordinary ANSI behavior
-;;; has been suppressed by command-line --disable-debugger option
-(defun invoke-debugger/disabled (condition)
+;;; this function is for use in *INVOKE-DEBUGGER-HOOK* when ordinary
+;;; ANSI behavior has been suppressed by command-line
+;;; --disable-debugger option
+(defun debugger-disabled-hook (condition me)
+  (declare (ignore me))
   ;; There is no one there to interact with, so report the
   ;; condition and terminate the program.
   (flet ((failure-quit (&key recklessly-p)
@@ -849,13 +866,15 @@ reset to ~S."
 ;;; halt-on-failures and prompt-on-failures modes, suitable for
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
-  (setf (fdefinition 'invoke-debugger) #'invoke-debugger/disabled
-	*debug-io* *error-output*))
+  (when (eql *invoke-debugger-hook* nil)
+    (setf *debug-io* *error-output*
+	  *invoke-debugger-hook* 'debugger-disabled-hook)))
+
 (defun enable-debugger ()
-  (setf (fdefinition 'invoke-debugger) #'invoke-debugger/enabled
-	*debug-io* *query-io*))
-;;; The enabled mode is the ANSI default.
-(enable-debugger)
+  (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
+    (setf *invoke-debugger-hook* nil)))
+
+(setf *debug-io* *query-io*)
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)
@@ -885,6 +904,9 @@ reset to ~S."
 			      count (- max-name-len 3) name restart)
 		      (push name names-used))))
 	     (incf count))))))
+
+(defvar *debug-loop-fun* #'debug-loop-fun
+  "a function taking no parameters that starts the low-level debug loop")
 
 ;;; This calls DEBUG-LOOP, performing some simple initializations
 ;;; before doing so. INVOKE-DEBUGGER calls this to actually get into
@@ -955,9 +977,6 @@ reset to ~S."
 			   (format t "   ~A~%" ele)))
 			(t
 			 (funcall cmd-fun))))))))))))
-
-(defvar *debug-loop-fun* #'debug-loop-fun
-  "a function taking no parameters that starts the low-level debug loop")
 
 ;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
 (defun debug-eval-print (expr)
