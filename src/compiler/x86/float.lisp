@@ -3126,6 +3126,10 @@
 	  (descriptor-reg
 	   (inst fstp fr0)
 	   (inst fldd (ea-for-df-desc y)))))
+      ((and (sc-is x double-reg) (zerop (tn-offset x))
+	    (sc-is y double-reg) (zerop (tn-offset x)))
+       ;; copy x to fr1
+       (inst fst fr1))
       ;; y in fr0; x not in fr1
       ((and (sc-is y double-reg) (zerop (tn-offset y)))
        (inst fxch fr1)

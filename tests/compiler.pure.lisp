@@ -466,3 +466,8 @@
 ;; compiler failure
 (let ((f (compile nil '(lambda (x) (typep x '(not (member 0d0)))))))
   (assert (funcall f 1d0)))
+
+(compile nil '(lambda (x)
+	       (declare (double-float x))
+	       (let ((y (* x pi)))
+		 (atan y y))))
