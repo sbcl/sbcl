@@ -236,13 +236,28 @@
 
 (defun exit-cmd (&optional (status 0))
   #+sb-thread
-  (let ((threads (sb-thread::mapcar-threads #'identity)))
-    (if (> (length threads) 1)
-	(progn
-	  (format *repl-output* "The following threads are running, can't quit~%")
-	  (format *repl-output* "~S~%" threads))
-	(quit :unix-status status)))
-  #-sb-thread
+  (flet ((other-thread-pids ()
+	   (let* ((offset (* 4 sb-vm::thread-pid-slot))
+		  (pids (sb-thread::mapcar-threads
+			 #'(lambda (sap)
+			     (sb-sys:sap-ref-32 sap offset)))))
+	     (delete (sb-thread:current-thread-id) pids :test #'eql))))
+    (let ((other-pids (other-thread-pids)))
+      (when other-pids
+	  (format *repl-output* "There exists the following processes~%")
+	  (format *repl-output* "~{~5d~%~}" other-pids)
+	  (format *repl-output* "Do you want to exit lisp anyway [n]? ")
+	  (force-output *repl-output*)
+	  (let ((input (string-trim-whitespace (read-line *repl-input*))))
+	    (if (and (plusp (length input))
+		     (or (char= #\y (char input 0))
+			 (char= #\Y (char input 0))))
+		;; loop in case more threads get created while trying to exit
+		(do ((pids other-pids (other-thread-pids)))
+		    ((eq nil pids))
+		  (map nil #'sb-thread:destroy-thread pids)
+		  (sleep 0.2))
+		(return-from exit-cmd))))))
   (quit :unix-status status)
   (values))
 

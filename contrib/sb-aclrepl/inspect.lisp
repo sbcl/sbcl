@@ -150,10 +150,16 @@ The commands are:
 		       (let ((value-stirng (third args)))
 			 (when value-stirng
 			   (let ((new-value (eval (read-from-string (third args)))))
-			     ;; FIXME -- this will require new new generic
-			     ;; function to set component of the object
-			     (format output-stream "Set component - not yet implemented")))
-			 (%inspect output-stream))
+			     (let ((result 
+				    (set-component-value (car *inspect-stack*)
+							 id
+							 new-value
+							 (nth position elements))))
+			       (typecase result
+				 (string
+				  (format output-stream result))
+				 (t
+				  (%inspect output-stream)))))))
 		       (format output-stream
 			       "Object has no selectable component named by ~A" id))
 		   (format output-stream
@@ -311,9 +317,11 @@ POSITION is NIL if the id is invalid or not found."
 
 
 
-;;;; INSPECTED-PARTS
-
-;;; Destructure an object for inspection, returning
+;;; INSPECTED-PARTS
+;;;
+;;; Destructure an object for inspection, returning either
+;;;   DESCRIPTION
+;;; if description keyword is T, otherwise returns
 ;;;   (VALUES DESCRIPTION LIST-TYPE ELEMENTS),
 ;;; where..
 ;;;
@@ -324,10 +332,10 @@ POSITION is NIL if the id is invalid or not found."
 ;;;   of ELEMENTS.
 ;;;      If LIST-TYPE is :named, then each element is (CONS NAME VALUE)
 ;;;      If LIST-TYPE is :index-with-tail, then each element is just value,
-;;;        but the last element is marked as "tail"
+;;;        but the last element is label as "tail"
 ;;;      If LIST-TYPE is :long, then each element is just value,
 ;;;        and suspension points ('...) are shown before the last element.
-;;;      otherwise, each element is just VALUE.
+;;;      Otherwise, each element is just VALUE.
 ;;;
 ;;;   ELEMENTS is a list of the component parts of OBJECT (whose
 ;;;   representation is determined by LIST-TYPE).
@@ -550,3 +558,40 @@ POSITION is NIL if the id is invalid or not found."
     (if description
 	desc
 	(values desc nil nil))))
+
+;; FIXME - implement setting of component values
+
+(defgeneric set-component-value (object component-id value element))
+
+(defmethod set-component-value ((object cons) id value element)
+  (format nil "Cons object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object array) id value element)
+  (format nil "Array object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object symbol) id value element)
+  (format nil "Symbol object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object structure-object) id value element)
+  (format nil "Structure object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object standard-object) id value element)
+  (format nil "Standard object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object sb-kernel:funcallable-instance) id value element)
+  (format nil "Funcallable instance object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object function) id value element)
+  (format nil "Function object does not support setting of component ~A" id))
+
+;; whn believes it is unsafe to change components of this object
+(defmethod set-component-value ((object complex) id value element)
+  (format nil "Object does not support setting of component ~A" id))
+
+;; whn believes it is unsafe to change components of this object
+(defmethod set-component-value ((object ratio) id value element)
+  (format nil "Object does not support setting of component ~A" id))
+
+(defmethod set-component-value ((object t) id value element)
+  (format nil "Object does not support setting of component ~A" id))
+
