@@ -1095,7 +1095,8 @@ the first."
 
 (defun integer-length (integer)
   #!+sb-doc
-  "Return the number of significant bits in the absolute value of integer."
+  "Return the number of non-sign bits in the twos-complement representation
+  of INTEGER."
   (etypecase integer
     (fixnum
      (integer-length (truly-the fixnum integer)))

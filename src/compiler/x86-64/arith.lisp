@@ -909,7 +909,6 @@
 
     DONE))
 
-;;; Note: documentation for this function is wrong - rtfm
 (define-vop (signed-byte-64-len)
   (:translate integer-length)
   (:note "inline (signed-byte 32) integer-length")
