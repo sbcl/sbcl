@@ -2,6 +2,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * incompatible change: the --noprogrammer option, deprecated since
     version 0.7.5, has been removed.  Please use the equivalent
     --disable-debugger option instead.
+  * improved the startup banner.  (thanks to Brian Mastenbrook and
+    Teemu Kalvas)
   * optimization: REPLACE on declared (UNSIGNED-BYTE 8) vectors, as well
     as other specialized array types, is much faster.  SUBSEQ and
     COPY-SEQ on such arrays have also been sped up.
