@@ -2108,11 +2108,30 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     data structures referred to above).
 
 changes in sbcl-0.8.5 relative to sbcl-0.8.4:
-  * in full calls compiler does not generate checks for declared
+  * New code in contrib/sb-introspect (still probably not entirely
+    stable yet) provides some support for smart Lisp development 
+    environments like SLIME.
+  * The conditions signalled for errors occurring when loading .fasl
+    files have been systematized (inheriting from SB-EXT:INVALID-FASL)
+    in a way which should help ASDF recover gracefully.
+  * The REQUIRE/PROVIDE behavior of *MODULE-PROVIDER-FUNCTIONS* 
+    stuff has been cleaned up. If you code contrib/ stuff, this might 
+    affect you, and you can look at contrib/README, contrib/STANDARDS, 
+    and/or the 0.8.4.27 diff to check.
+  * In full calls the compiler now does not generate checks for declared
     argument types for all arguments.
-  * fix bug 282: compiler does not trust type assertions while passing
+  * various threading fixes
+    ** and some experimental patches which didn't make it into 
+       the main tree for this release, but which are shipped in 
+       contrib/experimental-thread.patch as a possible fix for some
+       failures (deadlock, spinning...) in GC-intensive multithreaded
+       applications.
+  * fixed PPC build problem (source code incompatibility of different 
+    library versions): added offsetof() hackery which attempts to divine 
+    where glibc maintainers put uc_mcontext today 
+  * fixed bug 282: compiler does not trust type assertions while passing
     arguments to a full call.
-  * fix bug 261: compiler allows NIL or "no value" to be accepted for
+  * fixed bug 261: compiler allows NIL or "no value" to be accepted for
     &OPTIONAL VALUES type parameter.
   * fix bug 214: algorithm for noting rejected templates is now more
     similar to that of template seletion. (also reported by rydis on
@@ -2138,9 +2157,6 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
     of its result.
   * type declarations inside WITH-SLOTS are checked.  (reported by
     salex on #lisp)
-  * loading incompatible FASLs, e.g. those produced by an incompatible
-    lisp implementation, cause a condition of type SB-EXT:INVALID-FASL
-    (a subtype of ERROR) to be raised.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** incorrect optimization of TRUNCATE for a positive first
        argument and negative second.
