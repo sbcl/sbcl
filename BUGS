@@ -1559,3 +1559,13 @@ WORKAROUND:
   SET-FUNCALLABLE-INSTANCE-FUN scary stuff in
   src/code/target-defstruct.lisp is broken?  This seems to be broken
   in CMUCL 18e, so it's not caused by a recent change.
+
+344: more (?) ROOM T problems (possibly part of bug 108)
+  In sbcl-0.8.12.51, and off and on leading up to it, the
+  SB!VM:MEMORY-USAGE operations in ROOM T caused 
+	unhandled condition (of type SB-INT:BUG):
+	    failed AVER: "(SAP= CURRENT END)"
+  Several clever people have taken a shot at this without fixing
+  it; this time around (before sbcl-0.8.13 release) I (WHN) just
+  commented out the SB!VM:MEMORY-USAGE calls until someone figures
+  out how to make them work reliably with the rest of the GC.

@@ -10,6 +10,11 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     object file, link it into a shared library outside of SBCL and
     load it using SB-ALIEN:LOAD-SHARED-OBJECT.  (incidentally fixes
     bug #79)
+  * bug workaround: ROOM T and the GC were not working together
+    reliably, because invariants expected by the SB!VM:INSTANCE-USAGE
+    reporting facility aren't preserved. That reporting has been
+    disabled, so now until and unless someone figures out how to make it
+    work reliably with the current GC, (ROOM T) is equivalent to (ROOM).
   * minor incompatible change: as threatened around sbcl-0.8.0, the
     home package of MOP-related symbols is now SB-MOP, not SB-PCL.
     The symbols are also exported from SB-PCL for backwards

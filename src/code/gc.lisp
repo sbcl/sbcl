@@ -83,10 +83,14 @@
 		      :print-summary nil))
 
 (defun room-maximal-info ()
-  (room-minimal-info)
-  (sb!vm:memory-usage :count-spaces '(:static :dynamic))
-  (sb!vm:instance-usage :dynamic :top-n 10)
-  (sb!vm:instance-usage :static :top-n 10))
+  ;; FIXME: SB!VM:INSTANCE-USAGE calls suppressed until bug 344 is fixed
+  (room-intermediate-info)
+  ;; old way, could be restored when bug 344 fixed:
+  ;;x (room-minimal-info)
+  ;;x (sb!vm:memory-usage :count-spaces '(:static :dynamic))
+  ;;x (sb!vm:instance-usage :dynamic :top-n 10)
+  ;;x (sb!vm:instance-usage :static :top-n 10)
+  )
 
 (defun room (&optional (verbosity :default))
   #!+sb-doc
