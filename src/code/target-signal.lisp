@@ -23,8 +23,7 @@
   (signal sb!alien:int))
 
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
-;;; should be a valid signal number or a keyword of the standard UNIX
-;;; signal name.
+;;; should be a valid signal number
 (defun unix-kill (pid signal)
   (real-unix-kill pid signal))
 
@@ -34,8 +33,7 @@
   (signal sb!alien:int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
-;;; PGRP. SIGNAL should be a valid signal number or a keyword of the
-;;; standard UNIX signal name.
+;;; PGRP. SIGNAL should be a valid signal number
 (defun unix-killpg (pgrp signal)
   (real-unix-killpg pgrp signal))
 
@@ -57,7 +55,13 @@
 			       sb!alien:unsigned-long
   (signal sb!alien:int)
   (handler sb!alien:unsigned-long))
+;;; assert (though non-fatally) that there are no signals masked
+(sb!alien:define-alien-routine "warn_when_signals_masked" sb!alien:void)
+
 
+
+
+
 ;;;; interface to enabling and disabling signal handlers
 
 (defun enable-interrupt (signal handler)

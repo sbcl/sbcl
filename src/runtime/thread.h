@@ -18,6 +18,10 @@ struct alloc_region { };
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 
+#define STATE_RUNNING (make_fixnum(0))
+#define STATE_STOPPING (make_fixnum(1))
+#define STATE_STOPPED (make_fixnum(2))
+
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
 

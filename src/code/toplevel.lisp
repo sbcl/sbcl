@@ -510,7 +510,7 @@
 	   (abort
 	    "~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
 	 (catch 'toplevel-catcher
-	   #!-sunos (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	   (sb!unix::warn-when-signals-masked)
 	   ;; in the event of a control-stack-exhausted-error, we should
 	   ;; have unwound enough stack by the time we get here that this
 	   ;; is now possible
@@ -553,6 +553,7 @@
   (loop
    ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
    (scrub-control-stack)
+   (sb!thread::get-foreground)
    (unless noprint
      (funcall *repl-prompt-fun* *standard-output*)
      ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own

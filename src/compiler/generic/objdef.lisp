@@ -384,6 +384,7 @@
   (tls-cookie)				;  on x86, the LDT index 
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
+  (state)				; running, stopping, stopped
   #!+x86 (pseudo-atomic-atomic)
   #!+x86 (pseudo-atomic-interrupted)
   (interrupt-data :c-type "struct interrupt_data *" 

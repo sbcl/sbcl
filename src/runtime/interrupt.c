@@ -69,7 +69,7 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 					 os_context_t *context);
 boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
-extern lispobj all_threads_lock;
+extern volatile lispobj all_threads_lock;
 extern volatile int countdown_to_gc;
 
 /*
@@ -116,6 +116,32 @@ void sigaddset_blockable(sigset_t *s)
 boolean internal_errors_enabled = 0;
 
 struct interrupt_data * global_interrupt_data;
+
+/* this is used from Lisp in toplevel.lisp, replacing an older 
+ * (sigsetmask 0) - we'd like to find out when the signal mask is 
+ * not 0 */
+
+/* This check was introduced in 0.8.4.x and some day will go away
+ * again unless we find a way to trigger it */
+
+void warn_when_signals_masked () 
+{
+    /* and as a side-eeffect, unmask them */
+    sigset_t new,old;
+    int i;
+    int wrong=0;
+    sigemptyset(&new);
+    sigprocmask(SIG_SETMASK,&new,&old);
+    for(i=1; i<NSIG; i++) {
+	if(sigismember(&old,i)) {
+	    fprintf(stderr,
+		    "Warning: signal %d is masked: this is unexpected\n",i);
+	    wrong=1;
+	}
+    }
+    if(wrong) 
+	fprintf(stderr,"If this version of SBCL is less than three months old, please report this.\nOtherwise, please try a newer version first\n.  Reset signal mask.\n");
+}
 
 
 /*
@@ -518,6 +544,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
     get_spinlock(&all_threads_lock,thread->pid);
     countdown_to_gc--;
+    thread->state=STATE_STOPPED;
     release_spinlock(&all_threads_lock);
     kill(thread->pid,SIGSTOP);
 

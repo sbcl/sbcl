@@ -24,7 +24,7 @@
 
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
-lispobj all_threads_lock;
+volatile lispobj all_threads_lock;
 volatile int countdown_to_gc;
 extern struct interrupt_data * global_interrupt_data;
 
@@ -238,6 +238,7 @@ void destroy_thread (struct thread *th)
 #endif
     get_spinlock(&all_threads_lock,th->pid);
     if(countdown_to_gc>0) countdown_to_gc--;
+    th->state=STATE_STOPPED;
     if(th==all_threads) 
 	all_threads=th->next;
     else {
@@ -321,8 +322,21 @@ void gc_stop_the_world()
 	     * for them on each time around */
 	    for(p=all_threads;p!=tail;p=p->next) {
 		if(p==th) continue;
-               countdown_to_gc++;
-               kill(p->pid,SIG_STOP_FOR_GC);
+		/* if the head of all_threads is removed during
+		 * gc_stop_the_world, we may take a second trip through the 
+		 * list and end up counting twice as many threads to wait for
+		 * as actually exist */
+		if(p->state!=STATE_RUNNING) continue;
+		countdown_to_gc++;
+		p->state=STATE_STOPPING;
+		/* Note no return value check from kill().  If the
+		 * thread had been reaped already, we kill it and
+		 * increment countdown_to_gc anyway.  This is to avoid
+		 * complicating the logic in destroy_thread, which would 
+		 * otherwise have to know whether the thread died before or
+		 * after it was killed
+		 */
+		kill(p->pid,SIG_STOP_FOR_GC);
 	    }
 	    tail=all_threads;
 	} else {
@@ -339,6 +353,7 @@ void gc_start_the_world()
     get_spinlock(&all_threads_lock,th->pid);
     for(p=all_threads;p;p=p->next) {
 	if(p==th) continue;
+	p->state=STATE_RUNNING;
 	kill(p->pid,SIGCONT);
     }
     release_spinlock(&all_threads_lock);

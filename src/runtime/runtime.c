@@ -379,6 +379,7 @@ static void parent_sighandler(int signum,siginfo_t *info, void *void_context)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
+int show_thread_exit=0;
 
 static void /* noreturn */ parent_loop(void)
 {
@@ -421,7 +422,8 @@ static void /* noreturn */ parent_loop(void)
 	if(WIFEXITED(status) || WIFSIGNALED(status)) {
 	    th=find_thread_by_pid(pid);
 	    if(!th) continue;
-	    fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
+	    if(show_thread_exit)
+		fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
 	    destroy_thread(th);
 	    if(!all_threads) break;
 	}
