@@ -683,9 +683,13 @@
 	   (inst lea result (make-ea :dword :index number :scale 8)))
 	  (t
 	   (move result number)
-	   (cond ((plusp amount) (inst shl result amount))
-		 ((< amount -31) (inst xor result result))
-		 (t (inst shr result (- amount))))))))
+	   (cond ((< -32 amount 32)
+                  ;; this code is used both in ASH and ASH-MOD32, so
+                  ;; be careful
+                  (if (plusp amount)
+                      (inst shl result amount)
+                      (inst shr result (- amount))))
+		 (t (inst xor result result)))))))
 
 (define-vop (fast-ash-left/signed=>signed)
   (:translate ash)

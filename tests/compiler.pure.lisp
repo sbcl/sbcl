@@ -695,3 +695,12 @@
 (assert (= (funcall (compile nil (lambda (x) (logand x x 0)))
 		    -1)
 	   0))
+
+;;; MISC.99 from Paul Dietz' random tester: FAST-ASH-MOD32-C VOP
+;;; produced wrong result for shift >=32 on X86
+(assert (= 0 (funcall
+              (compile nil
+                       '(lambda (a)
+                         (declare (type (integer 4303063 101130078) a))
+                         (mask-field (byte 18 2) (ash a 77))))
+              57132532)))

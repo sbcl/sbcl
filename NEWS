@@ -2178,6 +2178,8 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** compiler failure in compiling LOGAND expressions including a
        constant 0.
+    ** implementation of ASH-MOD32 on X86 did not work for the shift
+       greater than 32.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
