@@ -1053,6 +1053,7 @@
 		generic-sequence collection))
     (cons
      :codes (#.sb!vm:list-pointer-type)
+     :translation cons
      :inherits (list sequence
 		mutable-sequence mutable-collection
 		generic-sequence collection))

@@ -36,7 +36,10 @@ KNOWN BUGS OF NO SPECIAL CLASS:
 2:
   DEFSTRUCT should almost certainly overwrite the old LAYOUT information
   instead of just punting when a contradictory structure definition
-  is loaded.
+  is loaded. As it is, if you redefine DEFSTRUCTs in a way which 
+  changes their layout, you probably have to rebuild your entire
+  program, even if you know or guess enough about the internals of
+  SBCL to wager that this (undefined in ANSI) operation would be safe.
 
 3:
   It should cause a STYLE-WARNING, not a full WARNING, when a structure
@@ -54,7 +57,7 @@ KNOWN BUGS OF NO SPECIAL CLASS:
   very good when the stream argument has the wrong type, because
   the operation tries to fall through to Gray stream code, and then
   dies because it's undefined. E.g. 
-    (PRINT-UNREADABLE-OBJECT (*STANDARD-OUTPUT* 1))
+    (PRINT-UNREADABLE-OBJECT (*STANDARD-OUTPUT* 1)) ..)
   gives the error message
     error in SB-KERNEL::UNDEFINED-SYMBOL-ERROR-HANDLER:
       The function SB-IMPL::STREAM-WRITE-STRING is undefined.

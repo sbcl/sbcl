@@ -44,7 +44,8 @@
 	 named-type
 	 member-type
 	 array-type
-	 sb!xc:built-in-class)
+	 sb!xc:built-in-class
+	 cons-type)
      (values (%typep obj type) t))
     (sb!xc:class
      (if (if (csubtypep type (specifier-type 'funcallable-instance))
@@ -146,8 +147,8 @@
 
 ;;;; miscellaneous interfaces
 
-;;; Clear memoization of all type system operations that can be altered by
-;;; type definition/redefinition.
+;;; Clear memoization of all type system operations that can be
+;;; altered by type definition/redefinition.
 (defun clear-type-caches ()
   (when *type-system-initialized*
     (dolist (sym '(values-specifier-type-cache-clear
@@ -160,9 +161,10 @@
       (funcall (symbol-function sym))))
   (values))
 
-;;; Like TYPE-OF, only we return a CTYPE structure instead of a type specifier,
-;;; and we try to return the type most useful for type checking, rather than
-;;; trying to come up with the one that the user might find most informative.
+;;; Like TYPE-OF, only we return a CTYPE structure instead of a type
+;;; specifier, and we try to return the type most useful for type
+;;; checking, rather than trying to come up with the one that the user
+;;; might find most informative.
 (declaim (ftype (function (t) ctype) ctype-of))
 (defun-cached (ctype-of
 	       :hash-function (lambda (x) (logand (sxhash x) #x1FF))
@@ -201,6 +203,8 @@
 			:complexp (not (typep x 'simple-array))
 			:element-type etype
 			:specialized-element-type etype)))
+    (cons
+     (make-cons-type *universal-type* *universal-type*))
     (t
      (sb!xc:class-of x))))
 

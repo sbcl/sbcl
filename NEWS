@@ -571,3 +571,6 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   it doesn't seem to affect SBCL after all
 * The system now recovers better from non-PACKAGE values of the *PACKAGE*
   variable.
+* The system now understands compound CONS types (e.g. (CONS FIXNUM T))
+  as required by ANSI. (thanks to Douglas Crosher's CMU CL patches, with
+  some porting work by Martin Atzmueller)

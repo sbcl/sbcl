@@ -207,15 +207,43 @@
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which can't
 ;;; be canonicalized to something simpler. Canonical form:
-;;;   1. There is never more than one Member-Type component.
-;;;   2. There are never any Union-Type components.
+;;;   1. There is never more than one MEMBER-TYPE component.
+;;;   2. There are never any UNION-TYPE components.
 (defstruct (union-type (:include ctype
 				 (class-info (type-class-or-lose 'union)))
 		       (:constructor %make-union-type (enumerable types)))
   ;; The types in the union.
   (types nil :type list))
 
-;;; Note that the type Name has been (re)defined, updating the
+;;; Return TYPE converted to canonical form for a situation where the
+;;; type '* is equivalent to type T.
+(defun type-*-to-t (type)
+  (if (type= type *wild-type*)
+      *universal-type*
+      type))
+
+;;; A CONS-TYPE is used to represent a CONS type.
+(defstruct (cons-type (:include ctype
+ 				(:class-info (type-class-or-lose 'cons)))
+		      (:constructor
+		       ;; ANSI says that for CAR and CDR subtype
+		       ;; specifiers '* is equivalent to T. In order
+		       ;; to avoid special cases in SUBTYPEP and
+		       ;; possibly elsewhere, we slam all CONS-TYPE
+		       ;; objects into canonical form w.r.t. this
+		       ;; equivalence at creation time.
+		       make-cons-type (car-raw-type
+				       cdr-raw-type
+				       &aux
+				       (car-type (type-*-to-t car-raw-type))
+				       (cdr-type (type-*-to-t cdr-raw-type)))))
+  ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
+  ;;
+  ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.
+  (car-type (required-argument) :type ctype :read-only t)
+  (cdr-type (required-argument) :type ctype :read-only t))
+
+;;; Note that the type NAME has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.
 (defun %note-type-defined (name)
   (declare (symbol name))
