@@ -197,6 +197,30 @@
       (frob-output stream (fd-stream-obuf-sap stream) 0 length t)
       (setf (fd-stream-obuf-tail stream) 0))))
 
+(defmacro output-wrapper ((stream size buffering) &body body)
+  (let ((stream-var (gensym)))
+    `(let ((,stream-var ,stream))
+      ,(unless (eq (car buffering) :none)
+	 `(when (< (fd-stream-obuf-length ,stream-var)
+	           (+ (fd-stream-obuf-tail ,stream-var)
+		       ,size))
+            (flush-output-buffer ,stream-var)))
+      ,(unless (eq (car buffering) :none)
+	 `(when (> (fd-stream-ibuf-tail ,stream-var)
+		   (fd-stream-ibuf-head ,stream-var))
+            (file-position ,stream-var (file-position ,stream-var))))
+    
+      ,@body
+      (incf (fd-stream-obuf-tail ,stream-var) ,size)
+      ,(ecase (car buffering)
+	 (:none
+	  `(flush-output-buffer ,stream-var))
+	 (:line
+	  `(when (eq (char-code byte) (char-code #\Newline))
+	     (flush-output-buffer ,stream-var)))
+	 (:full))
+    (values))))
+
 ;;; Define output routines that output numbers SIZE bytes long for the
 ;;; given bufferings. Use BODY to do the actual output.
 (defmacro def-output-routines ((name-fmt size &rest bufferings) &body body)
@@ -209,27 +233,8 @@
 			       (format nil name-fmt (car buffering))))))
 		`(progn
 		   (defun ,function (stream byte)
-		     ,(unless (eq (car buffering) :none)
-			`(when (< (fd-stream-obuf-length stream)
-				  (+ (fd-stream-obuf-tail stream)
-				     ,size))
-			   (flush-output-buffer stream)))
-		     ,(unless (eq (car buffering) :none)
-			`(when (> (fd-stream-ibuf-tail stream)
-				  (fd-stream-ibuf-head stream))
-			   (file-position stream (file-position stream))))
-		     
-		     ,@body
-		     (incf (fd-stream-obuf-tail stream) ,size)
-		     ,(ecase (car buffering)
-			(:none
-			 `(flush-output-buffer stream))
-			(:line
-			 `(when (eq (char-code byte) (char-code #\Newline))
-			    (flush-output-buffer stream)))
-			(:full
-			 ))
-		     (values))
+		     (output-wrapper (stream ,size ,buffering)
+		       ,@body))
 		   (setf *output-routines*
 			 (nconc *output-routines*
 				',(mapcar
@@ -411,9 +416,60 @@
   (dolist (entry *output-routines*)
     (when (and (subtypep type (car entry))
 	       (eq buffering (cadr entry)))
-      (return (values (symbol-function (caddr entry))
-		      (car entry)
-		      (cadddr entry))))))
+      (return-from pick-output-routine
+	(values (symbol-function (caddr entry))
+		(car entry)
+		(cadddr entry)))))
+  ;; KLUDGE: dealing with the buffering here leads to excessive code
+  ;; explosion.
+  ;;
+  ;; KLUDGE: also see comments in PICK-INPUT-ROUTINE
+  (loop for i from 40 by 8 to 1024 ; ARB (KLUDGE)
+	if (subtypep type `(unsigned-byte ,i))
+	do (return-from pick-output-routine
+	     (values
+	      (ecase buffering
+		(:none
+		 (lambda (stream byte)
+		   (output-wrapper (stream (/ i 8) (:none))
+		     (loop for j from 0 below (/ i 8)
+			   do (setf (sap-ref-8 
+				     (fd-stream-obuf-sap stream)
+				     (+ j (fd-stream-obuf-tail stream)))
+				    (ldb (byte 8 (- i 8 (* j 8))) byte))))))
+		(:full
+		 (lambda (stream byte)
+		   (output-wrapper (stream (/ i 8) (:full))
+		     (loop for j from 0 below (/ i 8)
+			   do (setf (sap-ref-8 
+				     (fd-stream-obuf-sap stream)
+				     (+ j (fd-stream-obuf-tail stream)))
+				    (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
+	      `(unsigned-byte ,i)
+	      (/ i 8))))
+  (loop for i from 40 by 8 to 1024 ; ARB (KLUDGE)
+	if (subtypep type `(signed-byte ,i))
+	do (return-from pick-output-routine
+	     (values
+	      (ecase buffering
+		(:none
+		 (lambda (stream byte)
+		   (output-wrapper (stream (/ i 8) (:none))
+		     (loop for j from 0 below (/ i 8)
+			   do (setf (sap-ref-8 
+				     (fd-stream-obuf-sap stream)
+				     (+ j (fd-stream-obuf-tail stream)))
+				    (ldb (byte 8 (- i 8 (* j 8))) byte))))))
+		(:full
+		 (lambda (stream byte)
+		   (output-wrapper (stream (/ i 8) (:full))
+		     (loop for j from 0 below (/ i 8)
+			   do (setf (sap-ref-8 
+				     (fd-stream-obuf-sap stream)
+				     (+ j (fd-stream-obuf-tail stream)))
+				    (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
+	      `(signed-byte ,i)
+	      (/ i 8)))))
 
 ;;;; input routines and related noise
 
@@ -579,9 +635,44 @@
 (defun pick-input-routine (type)
   (dolist (entry *input-routines*)
     (when (subtypep type (car entry))
-      (return (values (symbol-function (cadr entry))
-		      (car entry)
-		      (caddr entry))))))
+      (return-from pick-input-routine
+	(values (symbol-function (cadr entry))
+		(car entry)
+		(caddr entry)))))
+  ;; FIXME: let's do it the hard way, then (but ignore things like
+  ;; endianness, efficiency, and the necessary coupling between these
+  ;; and the output routines).  -- CSR, 2004-02-09
+  (loop for i from 40 by 8 to 1024 ; ARB (well, KLUDGE really)
+	if (subtypep type `(unsigned-byte ,i))
+	do (return-from pick-input-routine
+	     (values
+	      (lambda (stream eof-error eof-value)
+		(input-wrapper (stream (/ i 8) eof-error eof-value)
+		  (let ((sap (fd-stream-ibuf-sap stream))
+			(head (fd-stream-ibuf-head stream)))
+		    (loop for j from 0 below (/ i 8)
+			  with result = 0
+			  do (setf result
+				   (+ (* 256 result)
+				      (sap-ref-8 sap (+ head j))))
+			  finally (return result)))))
+	      `(unsigned-byte ,i)
+	      (/ i 8))))
+  (loop for i from 40 by 8 to 1024 ; ARB (well, KLUDGE really)
+	if (subtypep type `(signed-byte ,i))
+	do (return-from pick-input-routine
+	     (values
+	      (lambda (stream eof-error eof-value)
+		(let ((sap (fd-stream-ibuf-sap stream))
+		      (head (fd-stream-ibuf-head stream)))
+		  (loop for j from 0 below (/ i 8)
+			with result = 0
+			do (setf result
+				 (+ (* 256 result)
+				    (sap-ref-8 sap (+ head j))))
+			finally (return (dpb result (byte i 0) -1)))))
+	      `(signed-byte ,i)
+	      (/ i 8)))))
 
 ;;; Return a string constructed from SAP, START, and END.
 (defun string-from-sap (sap start end)

@@ -2298,6 +2298,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
        examining the synonym.
     ** STREAM-ELEMENT-TYPE and FRESH-LINE on broadcast-streams now
        work as specified.
+    ** OPEN and WITH-OPEN-STREAM allow opening streams with
+       element-type larger than ([UN]SIGNED-BYTE 32).
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
