@@ -1,24 +1,30 @@
-<chapter id="beyond-ansi"><title>Beyond the &ANSI; Standard</>
+<chapter id="beyond-ansi"><title>Beyond The &ANSI; Standard</>
 
-<para>Besides &ANSI;, we have other stuff..</para>
+<para>&SBCL; is mostly an implementation of the &ANSI; standard for
+Common Lisp. However, there's some important behavior which extends
+or clarifies the standard, and various behavior which outright
+violates the standard.
+</para>
 
-<sect1 id="non-conformance"><title>Non-Conformance with the &ANSI; Standard</>
+<sect1 id="non-conformance"><title>Non-Conformance With The &ANSI; Standard</>
 
 <para>
-This section is essentially a placeholder. There is are
-important areas of non-conformance, like the difference
-between <function>sb-pcl:find-class</> and <function>cl:class</>,
-but progress is made
-and the list changes and I've tired of trying to keep
-the information here up to date. For information on the
-highlights, try the bugs sections of the Unix man page.
-For more detailed information, try the BUGS file in the 
-system distribution.
+Essentially every type of non-conformance is considered a bug.
+(The exceptions involve internal inconsistencies in the standard.)
+In &SBCL; 0.7.6, the master record of known bugs is in
+the <filename>BUGS</> file in the distribution.
+Some highlight information about bugs may also be found in the
+manual page. The recommended way to report bugs is through the sbcl-help or
+sbcl-devel mailings lists.
 </para>
 
 </sect1>
 
 <sect1 id="idiosyncrasies"><title>Idiosyncrasies</>
+
+<para>The information in this section describes some of the ways
+that &SBCL; deals with choices that the &ANSI; standard 
+leaves to the implementation.</para>
 
 <para>Declarations are generally treated as assertions. This general
 principle, and its implications, and the bugs which still keep the
@@ -33,8 +39,58 @@ expression to create a compiled function, and then calls
 <function>funcall</> on the resulting function object. This 
 is explicitly allowed by the &ANSI; standard, but leads to some
 oddities, e.g. collapsing <function>functionp</> and 
-<function>compiled-function-p</> into the same predicate.
-</para>
+<function>compiled-function-p</> into the same predicate.</para>
+
+<para>&SBCL; is quite strict about ANSI's definition of
+<function>defconstant</>. ANSI says that doing <function>defconstant</>
+of the same symbol more than once is undefined unless the new value
+is <function>eql</> to the old value. Conforming to this specification
+is a nuisance when the "constant" value is only constant under some
+weaker test like <function>string=</> or <function>equal</>. It's
+especially annoying because <function>defconstant</> takes effect
+not only at load time but also at compile time, so that just 
+compiling and loading reasonable code like 
+<programlisting>(defconstant +foobyte+ '(1 4))</>
+runs into this undefined behavior. Many
+implementations of Common Lisp try to help the programmer around
+this annoyance by silently accepting the undefined code and 
+trying to do what the programmer probably meant. &SBCL; instead
+treats the undefined behavior as an error. Often
+such code can be rewritten
+in portable &ANSI; Common Lisp which has the desired behavior.
+E.g., the code above can be given an exactly defined meaning by replacing
+<function>defconstant</> either with <function>defparameter</> or 
+with a customized macro which does the right thing, possibly along the
+lines of the <function>defconstant-eqx</> macro used internally in the
+implementation of SBCL itself.</para>
+
+<para>&SBCL; gives style warnings about various kinds of perfectly
+legal code, e.g.
+<itemizedlist>
+  <listitem><para><function>defmethod</> without
+    <function>defgeneric</></para></listitem>
+  <listitem><para>multiple <function>defun</>s of the same
+    symbol</para></listitem>
+  <listitem><para>special variables not named in the conventional
+    <varname>*foo*</> style, and lexical variables unconventionally named
+    in the <varname>*foo*</> style</para></listitem>
+</itemizedlist>
+This causes friction with people
+who point out that other ways of organizing code (especially
+avoiding the use of <function>defgeneric</>)
+are just as aesthetically stylish.
+However, these warnings should be read not
+as "warning, bad aesthetics detected, you have no style" but
+"warning, this style keeps the compiler from understanding
+the code as well as you might like." That is, 
+unless the compiler warns about such conditions, there's no
+way for the compiler to warn 
+about some programming errors which would otherwise be
+easy to overlook. (related bug: The warning about
+multiple <function>defun</>s is pointlessly annoying when you compile
+and then load a function containing <function>defun</> wrapped
+in <function>eval-when</>, and ideally should be suppressed in 
+that case, but still isn't as of &SBCL; 0.7.6.)</para>
 
 </sect1>
 
@@ -44,7 +100,7 @@ oddities, e.g. collapsing <function>functionp</> and
 to the &ANSI; standard. &SBCL; doesn't support as many extensions as
 &CMUCL;, but it still has quite a few.</para>
 
-<sect2><title>Things Which Might Be in the Next &ANSI; Standard</>
+<sect2><title>Things Which Might Be In The Next &ANSI; Standard</>
 
 <para>&SBCL; provides extensive support for 
 calling external C code, described 
@@ -62,7 +118,7 @@ first argument to <function>format</>).</para>
 
 </sect2>
 
-<sect2><title>Support for Unix</>
+<sect2><title>Support For Unix</>
 
 <para>The UNIX command line can be read from the variable
 <varname>sb-ext:*posix-argv*</>. The UNIX environment can be queried with the
@@ -75,7 +131,7 @@ is also supported.</para>
 
 </sect2>
 
-<sect2><title>Tools to Help Developers</title>
+<sect2><title>Tools To Help Developers</title>
 
 <para>&SBCL; provides a profiler and other extensions to the &ANSI;
 <function>trace</> facility. See the online function documentation for
@@ -97,7 +153,7 @@ accessed by typing <userinput>help</> at the debugger prompt.</para>
 
 </sect2>
 
-<sect2><title>Interface to Low-Level &SBCL; Implementation</title>
+<sect2><title>Interface To Low-Level &SBCL; Implementation</title>
 
 <para>&SBCL; has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
@@ -120,7 +176,7 @@ look good, and their interface looks good, but &IEEE; support is
 slightly broken due to a stupid decision to remove some support for
 infinities (because it wasn't in the &ANSI; spec and it didn't occur to
 me that it was in the &IEEE; spec). If you need this stuff, take a look
-at the ecode and bring it up on the developers' mailing
+at the code and bring it up on the developers' mailing
 list.</para></note>
 
 </sect2>
@@ -129,16 +185,20 @@ list.</para></note>
 
 <para>The <function>sb-ext:purify</function> function causes &SBCL;
 first to collect all garbage, then to mark all uncollected objects as
-permanent, never again attempting to collect them as garbage. (This
-can cause a large increase in efficiency when using a primitive
-garbage collector, but is less important with modern generational
-garbage collectors.)</para>
+permanent, never again attempting to collect them as garbage. This can
+cause a large increase in efficiency when using a primitive garbage
+collector, or a more moderate increase in efficiency when using a more
+sophisticated garbage collector which is well suited to the program's
+memory usage pattern. It also allows permanent code to be frozen at
+fixed addresses, a precondition for using copy-on-write to share code
+between multiple Lisp processes. is less important with modern
+generational garbage collectors. </para>
 
 <para>The <function>sb-ext:truly-the</> operator does what the
 <function>cl:the</> operator does in a more conventional
 implementation of &CommonLisp;, declaring the type of its argument
-without any runtime checks. (Ordinarily in &SBCL;, any type declaration
-is treated as an assertion and checked at runtime.)</para>
+without any runtime checks. (Ordinarily in &SBCL;, any type
+declaration is treated as an assertion and checked at runtime.)</para>
 
 <para>The <function>sb-ext:freeze-type</> declaration declares that a
 type will never change, which can make type testing
@@ -146,9 +206,10 @@ type will never change, which can make type testing
 
 <para>The <function>sb-ext:constant-function</> declaration specifies
 that a function will always return the same value for the same
-arguments. This is appropriate for functions like <function>sqrt</>.
-It is not appropriate for functions like <function>aref</>, which can
-change their return values when the underlying data are
+arguments, which may allow the compiler to optimize calls
+to it. This is appropriate for functions like <function>sqrt</>, but
+is <emphasis>not</> appropriate for functions like <function>aref</>,
+which can change their return values when the underlying data are
 changed.</para>
 
 </sect2>

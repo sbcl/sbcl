@@ -11,7 +11,7 @@ despite the mention of <quote>function</> in this term, <acronym>FFI</> also
 refers to direct manipulation of C data structures as well as
 functions. The traditional &CMUCL; terminology is Alien Interface, and
 while that older terminology is no longer used much in the system
-documentation, it still reflected in internal names in the
+documentation, it still reflected in names in the
 implementation, notably in the name of the <literal>SB-ALIEN</>
 package.</para></note>
 
@@ -20,10 +20,10 @@ package.</para></note>
 
 <para>
 Because of Lisp's emphasis on dynamic memory allocation and garbage
-collection, Lisp implementations use unconventional memory representations
-for objects.  This representation mismatch creates problems when a Lisp
-program must share objects with programs written in another language.  There
-are three different approaches to establishing communication:
+collection, Lisp implementations use non-C-like memory representations
+for objects.  This representation mismatch creates friction when a Lisp
+program must share objects with programs which expect C data.  There
+are three common approaches to establishing communication:
 <itemizedlist>
   <listitem><para>The burden can be placed on the foreign program
     (and programmer) by requiring the knowledge and use of the
@@ -44,8 +44,8 @@ are three different approaches to establishing communication:
 
 <para>&SBCL;, like &CMUCL; before it,
 relies primarily on the automatic conversion and direct manipulation
-approaches. Aliens of simple scalar types are automatically converted,
-complex types are directly manipulated in their foreign
+approaches. Foreign values of simple scalar types are automatically
+converted, complex types are directly manipulated in their foreign
 representation. Furthermore, Lisp strings are represented internally 
 with null termination bytes so that they can be passed directly to
 C interfaces without allocating new zero-terminated copies.</para>
@@ -58,10 +58,7 @@ encapsulating the raw pointer to the foreign data within an
 <type>alien-value</> object.</para>
 
 <para>The type language and operations on foreign types are
-intentionally similar to those of the C language. And as discussed
-above, they are applicable not only to communication with native C
-programs, but also to programs in other languages which provide
-C-level interfaces. </para>
+intentionally similar to those of the C language.</para>
 
 </sect1>
 
@@ -70,14 +67,12 @@ C-level interfaces. </para>
 
 <para>Alien types have a description language based on nested list
 structure. For example the C type
-<programlisting>
-struct foo {
+<programlisting>struct foo {
     int a;
     struct foo *b[100];
 };</programlisting>
 has the corresponding &SBCL; FFI type
-<programlisting>
-(struct foo
+<programlisting>(struct foo
   (a int)
   (b (array (* (struct foo)) 100)))</programlisting>
 </para>
@@ -103,7 +98,7 @@ the <function>define-alien-type</> macro.
 <para>
 The foreign types form a subsystem of the &SBCL; type system.  An
 <type>alien</> type specifier provides a way to use any foreign type as a
-Lisp type specifier.  For example
+Lisp type specifier.  For example,
 <programlisting>(typep foo '(alien (* int)))</programlisting>
 can be used to determine whether <varname>foo</> is a pointer to a foreign
 <type>int</>. <type>alien</> type specifiers can be used in the same ways
@@ -279,7 +274,7 @@ These are the basic foreign type specifiers:
       describes a pointer which is represented in Lisp as a
       <type>system-area-pointer</> object. &SBCL; exports this type from
       <literal>sb-alien</> because &CMUCL; did, but tentatively (as of
-      the first draft of this section of the manual, 2002-07-04) it is
+      the first draft of this section of the manual, &SBCL; 0.7.6) it is
       deprecated, since it doesn't seem to be required by user code.
     </para>
   </listitem>
@@ -397,7 +392,7 @@ argument, but it does refer to the same foreign data bits.</para>
 <para>The <function>sb-alien:sap-alien</> function converts <varname>sap</>
 (a system area pointer) to a foreign value with the specified
 <varname>type</>. <varname>type</> is not evaluated.
-As of 2002-07-04, it looks as though this and other SAP functionality
+As of &SBCL; 0.7.6, it looks as though this and other SAP functionality
 may become deprecated, since it shouldn't be needed by user code.
 </para>
 
@@ -408,7 +403,7 @@ record type.</para>
 
 <para>The <function>sb-alien:alien-sap</> function
 returns the SAP which points to <varname>alien-value</>'s data.
-As of 2002-07-04, it looks as though this and other SAP functionality
+As of &SBCL; 0.7.6, it looks as though this and other SAP functionality
 may become deprecated, since it shouldn't be needed by user code.
 </para>
 
@@ -567,7 +562,7 @@ write
 
 <para>
 Since in modern C libraries, the <varname>errno</> "variable" is typically
-no longer a variable, but some some bizarre artificial construct
+no longer a variable, but some bizarre artificial construct
 which behaves superficially like a variable within a given thread,
 it can no longer reliably be accessed through the ordinary 
 <varname>define-alien-variable</> mechanism. Instead, &SBCL; provides
@@ -579,7 +574,7 @@ the operator <function>sb-alien:get-errno</> to allow Lisp code to read it.
 <para>
 The <function>extern-alien</> macro
 returns an alien with the specified <type>type</> which
-points to an externally defined value.  <varname>name</> is not evaluated,
+points to an externally defined value. <varname>name</> is not evaluated,
 and may be either a string or a symbol. <type>type</> is
 an unevaluated alien type specifier.
 </para>
@@ -675,7 +670,7 @@ and runs the linker on the files and
 libraries, creating an absolute Unix object file which is then 
 processed by <function>load-1-foreign</>.</para>
 
-<para> Note that as of &SBCL; 0.7.5, all foreign code (code loaded
+<note><para>As of &SBCL; 0.7.5, all foreign code (code loaded
 with <function>load-1-function</> or <function>load-function</>) is
 lost when a Lisp core is saved with
 <function>sb-ext:save-lisp-and-die</>, and no attempt is made to
@@ -683,8 +678,9 @@ restore it when the core is loaded. Historically this has been an
 annoyance both for &SBCL; users and for &CMUCL; users.
 It's hard to solve this problem completely cleanly, but some
 generally-reliable partial solution might be useful. Once someone in
-either camp gets sufficiently annoyed to create it, some mechanism for
-automatically restoring foreign code is likely to be added.</para>
+either camp gets sufficiently annoyed to create it, &SBCL; is
+likely to adopt some mechanism for automatically restoring foreign
+code when a saved core is loaded.</para></note>
 
 </sect1>
 

@@ -56,7 +56,8 @@
 ;;;     dynamic loading in OpenBSD
 ;;; 29: (2002-06-24) removed *!INITIAL-FDEFN-OBJECTS* from static symbols
 ;;; 30: (2002-07-26) deleted all references to %DETECT-STACK-EXHAUSTION, 
-;;;     which was introduced in version 25
+;;;     which was introduced in version 25, since now control stack
+;;;     is checked using mmap() page protection
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
