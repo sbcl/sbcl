@@ -1362,6 +1362,13 @@ WORKAROUND:
           :ACCRUED-EXCEPTIONS (:INEXACT)
           :FAST-MODE NIL)
 
+184: "division by zero becomes frozen into RATIO"
+  (reported by Wolfhard Buss on cmucl-imp 18 Jun 2002, fails on
+  sbcl-0.7.4.39 too)
+  * (/ 1 (/ 3 2) 0)
+  1/0
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

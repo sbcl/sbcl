@@ -1132,32 +1132,33 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
     bootstrapping under CLISP.
   * SBCL now runs on the Tru64 (aka OSF/1) operating system on the
     Alpha architecture.
-  * bug 140 fixed: redefinition of classes with different supertypes
+  * bug 140 fixed: Redefinition of classes with different supertypes
     is now reflected in the type hierarchy. (thanks to Pierre Mai)
-  * bug 158 fixed: the compiler can now deal with integer loop
+  * bug 158 fixed: The compiler can now deal with integer loop
     increments different from 1; fixing this turned out also to fix
     bug 164.
   * bug 169 fixed: no more bogus warnings about using lexical bindings
-    despite the presence of perfectly good SPECIAL declarations. (thanks
+    despite the presence of perfectly good SPECIAL declarations (thanks
     to David Lichteblau)
-  * bug 175 fixed: more-closely-ANSI CHANGE-CLASS function, now
+  * bug 175 fixed: CHANGE-CLASS is now more ANSI-conforming,
     accepting initargs. (thanks to Espen Johnsen and Pierre Mai)
   * bug 179 fixed: DIRECTORY can now deal with filenames with pattern
     characters in them.
+  * bug 180 fixed: Method combination specifications no longer ignore
+    the :MOST-SPECIFIC-LAST option. (thanks to Pierre Mai)
   * bug fix: Structure type predicate functions now check their argument
     count as they should.
-  * bug fix: classes with :METACLASS STRUCTURE-CLASS now print
+  * bug fix: Classes with :METACLASS STRUCTURE-CLASS now print
     correctly. (thanks to Pierre Mai)
-  * bug 180 fixed: method combination specifications no longer ignore
-    the :MOST-SPECIFIC-LAST option
   * minor incompatible change: The --noprogrammer option is deprecated
-    in favor of the new name --disable-debugger option, which takes
-    effect at a slightly different time at startup (so that e.g.
-    handling of errors in --sysinit and --userinit files will be affected
-    differently). The SB-EXT:DISABLE-DEBUGGER and SB-EXT:ENABLE-DEBUGGER
-    functions have been added to allow this functionality to be controlled
-    from ordinary Lisp code. (ENABLE-DEBUGGER should help people like the
-    Debian maintainers, who might want to run non-interactive scripts to
+    in favor of the new --disable-debugger option, which is very similar.
+    (The major difference is that it takes effect at a slightly different
+    time at startup, causing handling of errors in --sysinit and
+    --userinit files will be affected differently.) The
+    SB-EXT:DISABLE-DEBUGGER and SB-EXT:ENABLE-DEBUGGER functions have
+    been added to allow this functionality to be controlled from ordinary
+    Lisp code. (ENABLE-DEBUGGER should help people like the Debian
+    maintainers, who might want to run non-interactive scripts to
     build SBCL cores which will later be used interactively.)
   * minor incompatible change: The LOAD function no longer, when given
     a wild pathname to load, loads all files matching that pathname.

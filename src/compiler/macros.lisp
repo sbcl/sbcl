@@ -149,7 +149,7 @@
 ) ; EVAL-WHEN
 
 ;;; Define a new class of boolean attributes, with the attributes
-;;; having the specified Attribute-Names. Name is the name of the
+;;; having the specified ATTRIBUTE-NAMES. NAME is the name of the
 ;;; class, which is used to generate some macros to manipulate sets of
 ;;; the attributes:
 ;;;
