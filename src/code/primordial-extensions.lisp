@@ -68,15 +68,16 @@
 		   (unless ,(first endlist) (go ,label-1))
 		   (return-from ,block (progn ,@(rest endlist))))))))))
 
+;;; DO-ANONYMOUS ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
+;;;
+;;; This is like DO, except it has no implicit NIL block. Each VAR is
+;;; initialized in parallel to the value of the specified INIT form.
+;;; On subsequent iterations, the VARS are assigned the value of the
+;;; STEP form (if any) in parallel. The TEST is evaluated before each
+;;; evaluation of the body FORMS. When the TEST is true, the
+;;; EXIT-FORMS are evaluated as a PROGN, with the result being the
+;;; value of the DO.
 (defmacro do-anonymous (varlist endlist &rest body)
-  #!+sb-doc
-  "DO-ANONYMOUS ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
-  Like DO, but has no implicit NIL block. Each Var is initialized in parallel
-  to the value of the specified Init form. On subsequent iterations, the Vars
-  are assigned the value of the Step form (if any) in parallel. The Test is
-  evaluated before each evaluation of the body Forms. When the Test is true,
-  the Exit-Forms are evaluated as a PROGN, with the result being the value
-  of the DO."
   (do-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
 ;;;; miscellany
@@ -94,11 +95,11 @@
   (let ((*package* *keyword-package*))
     (apply #'symbolicate things)))
 
-;;; Access *PACKAGE* in a way which lets us recover if someone has
+;;; Access *PACKAGE* in a way which lets us recover when someone has
 ;;; done something silly like (SETF *PACKAGE* :CL-USER). (Such an
-;;; assignment is undefined behavior, so it's sort of reasonable for it
-;;; to cause the system to go totally insane afterwards, but it's
-;;; a fairly easy mistake to make, so let's try to recover gracefully
+;;; assignment is undefined behavior, so it's sort of reasonable for
+;;; it to cause the system to go totally insane afterwards, but it's a
+;;; fairly easy mistake to make, so let's try to recover gracefully
 ;;; instead.)
 (defun sane-package ()
   (let ((maybe-package *package*))

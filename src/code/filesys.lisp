@@ -889,9 +889,9 @@
 			   (follow-links t))
   #!+sb-doc
   "Returns a list of pathnames, one for each file that matches the given
-   pathname. Supplying :ALL as nil causes this to ignore Unix dot files. This
+   pathname. Supplying :ALL as NIL causes this to ignore Unix dot files. This
    never includes Unix dot and dot-dot in the result. If :FOLLOW-LINKS is NIL,
-   then symblolic links in the result are not expanded. This is not the
+   then symbolic links in the result are not expanded. This is not the
    default because TRUENAME does follow links, and the result pathnames are
    defined to be the TRUENAME of the pathname (the truename of a link may well
    be in another directory.)"
@@ -909,13 +909,13 @@
 			(char/= (schar name (1+ slash)) #\.))))
 	  (push name results))))
     (let ((*ignore-wildcards* t))
-      (mapcar #'(lambda (name)
-		  (let ((name (if (and check-for-subdirs
-				       (eq (sb!unix:unix-file-kind name)
-					   :directory))
-				  (concatenate 'string name "/")
-				  name)))
-		    (if follow-links (truename name) (pathname name))))
+      (mapcar (lambda (name)
+		(let ((name (if (and check-for-subdirs
+				     (eq (sb!unix:unix-file-kind name)
+					 :directory))
+				(concatenate 'string name "/")
+				name)))
+		  (if follow-links (truename name) (pathname name))))
 	      (sort (delete-duplicates results :test #'string=) #'string<)))))
 
 ;;;; translating Unix uid's

@@ -56,16 +56,32 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  "Call FN with everything set up appropriately for cross-compiling
 	  a target file."
 	  (let (;; Life is simpler at genesis/cold-load time if we
-	        ;; needn't worry about byte-compiled code.
-	        (sb!ext:*byte-compile-top-level* nil)
-		;; Let the target know that we're the cross-compiler.
-		(*features* (cons :sb-xc *features*))
-                ;; We need to tweak the readtable..
-                (*readtable* (copy-readtable))
+		;; needn't worry about byte-compiled code.
+		(sb!ext:*byte-compile-top-level* nil)
 		;; In order to reduce peak memory usage during GENESIS,
 		;; it helps to stuff several toplevel forms together 
-                ;; into the same function.
-		(sb!c::*top-level-lambda-max* 10))
+		;; into the same function.
+		(sb!c::*top-level-lambda-max* 10)
+		;; Let the target know that we're the cross-compiler.
+		(*features* (cons :sb-xc *features*))
+		;; the CROSS-FLOAT-INFINITY-KLUDGE: When building a
+		;; compiler which runs under the SBCL runtime, which
+		;; supports floating point infinities, it's safe to
+		;; build with true PROPAGATE-FLOAT-TYPE and
+		;; PROPAGATE-FUN-TYPE features. (It wasn't safe
+		;; when building a cross-compiler to run under the
+		;; cross-compilation host Lisp).
+		#+nil ; FIXME: suppressed since 0.6.11.3 has no fp infinities
+		(sb-cold:*shebang-features*
+		 (substitute
+		  :propagate-float-type
+		  :will-propagate-float-type
+		  (substitute
+		   :propagate-fun-type
+		   :will-propagate-fun-type
+		   sb-cold:*shebang-features*)))
+		;; We need to tweak the readtable..
+		(*readtable* (copy-readtable)))
             ;; ..in order to make backquotes expand into target code
             ;; instead of host code.
             ;; FIXME: Isn't this now taken care of automatically by

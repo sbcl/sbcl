@@ -301,17 +301,6 @@
 
 ;;;; miscellany
 
-;;; FIXME: What is this used for that SYMBOLICATE couldn't be used for instead?
-;;; If nothing, replace it.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun concat-pnames (name1 name2)
-    (declare (symbol name1 name2))
-    (if name1
-	(intern (concatenate 'simple-string
-			     (symbol-name name1)
-			     (symbol-name name2)))
-	name2)))
-
 ;;; Is NAME a legal function name?
 (defun legal-function-name-p (name)
   (or (symbolp name)

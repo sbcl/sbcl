@@ -180,11 +180,9 @@
 
 ;;; toy@rtp.ericsson.se:
 ;;;
-;;; Optimizers for scale-float. If the float has bounds, new bounds
+;;; optimizers for SCALE-FLOAT. If the float has bounds, new bounds
 ;;; are computed for the result, if possible.
 
-#-sb-xc-host ;(CROSS-FLOAT-INFINITY-KLUDGE, see base-target-features.lisp-expr)
-(progn
 #!+propagate-float-type
 (progn
 
@@ -249,7 +247,7 @@
 	     (one-arg-derive-type num #',aux-name #',fun))))))
   (frob %single-float single-float)
   (frob %double-float double-float))
-)) ; PROGN PROGN
+) ; PROGN 
 
 ;;;; float contagion
 

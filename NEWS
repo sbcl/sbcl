@@ -682,6 +682,9 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
 
 changes in sbcl-0.6.12 relative to sbcl-0.6.11:
+?? many patches ported from CMU CL by Martin Atzmueller, notably
+  ??
+  ??
 ?? new fasl file format version number (because a disused byte code
   opcode was removed, causing the other opcodes to change)
 * various tweaks to make the system easier to build under other

@@ -52,15 +52,15 @@
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
-  (conc-name (concat-pnames name '-) :type (or symbol null))
+  (conc-name (symbolicate name "-") :type (or symbol null))
   ;; the name of the primary standard keyword constructor, or NIL if none
   (default-constructor nil :type (or symbol null))
   ;; all the explicit :CONSTRUCTOR specs, with name defaulted
   (constructors () :type list)
   ;; name of copying function
-  (copier (concat-pnames 'copy- name) :type (or symbol null))
+  (copier (symbolicate "COPY-" name) :type (or symbol null))
   ;; name of type predicate
-  (predicate (concat-pnames name '-p) :type (or symbol null))
+  (predicate (symbolicate name "-P") :type (or symbol null))
   ;; the arguments to the :INCLUDE option, or NIL if no included
   ;; structure
   (include nil :type list)
@@ -456,16 +456,16 @@
 		   conc-name
 		   (make-symbol (string conc-name))))))
       (:constructor
-       (destructuring-bind (&optional (cname (concat-pnames 'make- name))
+       (destructuring-bind (&optional (cname (symbolicate "MAKE-" name))
 				      &rest stuff)
 	   args
 	 (push (cons cname stuff) (dd-constructors defstruct))))
       (:copier
-       (destructuring-bind (&optional (copier (concat-pnames 'copy- name)))
+       (destructuring-bind (&optional (copier (symbolicate "COPY-" name)))
 	   args
 	 (setf (dd-copier defstruct) copier)))
       (:predicate
-       (destructuring-bind (&optional (pred (concat-pnames name '-p))) args
+       (destructuring-bind (&optional (pred (symbolicate name "-P"))) args
 	 (setf (dd-predicate defstruct) pred)))
       (:include
        (when (dd-include defstruct)
@@ -509,6 +509,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun parse-name-and-options (name-and-options)
   (destructuring-bind (name &rest options) name-and-options
+    (assert name) ; A null name doesn't seem to make sense here.
     (let ((defstruct (make-defstruct-description name)))
       (dolist (option options)
 	(cond ((consp option)
@@ -596,7 +597,7 @@
     (setf (dsd-%name islot) (string name))
     (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list islot)))
 
-    (let* ((accname (concat-pnames (dd-conc-name defstruct) name))
+    (let* ((accname (symbolicate (or (dd-conc-name defstruct) "") name))
 	   (existing (info :function :accessor-for accname)))
       (if (and (structure-class-p existing)
 	       (not (eq (sb!xc:class-name existing) (dd-name defstruct)))
@@ -1370,7 +1371,7 @@
       (return-from constructor-definitions ()))
 
     (unless (or defaults boas)
-      (push (concat-pnames 'make- (dd-name defstruct)) defaults))
+      (push (symbolicate "MAKE-" (dd-name defstruct)) defaults))
 
     (collect ((res))
       (when defaults

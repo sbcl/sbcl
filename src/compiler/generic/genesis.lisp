@@ -1748,16 +1748,17 @@
 
 (defvar *normal-fop-functions*)
 
-;;; This is like DEFINE-FOP which defines fops for warm load, but unlike
-;;; DEFINE-FOP, this version
-;;;   (1) looks up the code for this name (created by a previous DEFINE-FOP)
-;;;       instead of creating a code, and
-;;;   (2) stores its definition in the *COLD-FOP-FUNCTIONS* vector, instead
-;;;       of storing in the *FOP-FUNCTIONS* vector.
+;;; Cause a fop to have a special definition for cold load.
+;;; 
+;;; This is similar to DEFINE-FOP, but unlike DEFINE-FOP, this version
+;;;   (1) looks up the code for this name (created by a previous
+;;        DEFINE-FOP) instead of creating a code, and
+;;;   (2) stores its definition in the *COLD-FOP-FUNCTIONS* vector,
+;;;       instead of storing in the *FOP-FUNCTIONS* vector.
 (defmacro define-cold-fop ((name &optional (pushp t)) &rest forms)
   (check-type pushp (member nil t :nope))
   (let ((code (get name 'fop-code))
-	(fname (concat-pnames 'cold- name)))
+	(fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
     `(progn
@@ -1780,8 +1781,9 @@
   `(define-cold-fop (,name)
      (error "The fop ~S is not supported in cold load." ',name)))
 
-;;; COLD-LOAD loads stuff into the core image being built by calling FASLOAD
-;;; with the fop function table rebound to a table of cold loading functions.
+;;; COLD-LOAD loads stuff into the core image being built by calling
+;;; FASLOAD with the fop function table rebound to a table of cold
+;;; loading functions.
 (defun cold-load (filename)
   #!+sb-doc
   "Load the file named by FILENAME into the cold load image being built."

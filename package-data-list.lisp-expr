@@ -711,7 +711,7 @@ retained, possibly temporariliy, because it might be used internally."
              "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
 
              ;; symbol-hacking idioms
-             "CONCAT-PNAMES" "KEYWORDICATE" "SYMBOLICATE"
+             "KEYWORDICATE" "SYMBOLICATE"
 
              ;; search lists (FIXME: should go away)
              "ENUMERATE-SEARCH-LIST"

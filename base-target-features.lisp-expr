@@ -164,35 +164,24 @@
  ;; control other fancy numeric reasoning, e.g. knowing the result type of
  ;; a remainder calculation given the type of its inputs.
  ;;
- ;; KLUDGE: Even when this is implemented for the target feature list,
- ;; the code to implement this feature will not generated in the
- ;; cross-compiler (i.e. will only be generated in the target compiler).
- ;; The reason for this is that the interval arithmetic routines used
- ;; to implement this feature are written under the assumption that
- ;; Lisp arithmetic supports plus and minus infinity, which isn't guaranteed by
- ;; ANSI Common Lisp. I've tried to mark the conditionals which implement
- ;; this kludge with the string CROSS-FLOAT-INFINITY-KLUDGE so that
- ;; sometime it might be possible to undo them (perhaps by using
- ;; nice portable :PLUS-INFINITY and :MINUS-INFINITY values instead of
- ;; implementation dependent floating infinity values, which would
- ;; admittedly involve extra consing; or perhaps by finding some cleaner
- ;; way of suppressing the construction of this code in the cross-compiler).
- ;;
- ;; KLUDGE: Even after doing the KLUDGE above, the cross-compiler doesn't work,
- ;; because some interval operations are conditional on PROPAGATE-FUN-TYPE
- ;; instead of PROPAGATE-FLOAT-TYPE. So for now, I've completely turned off
- ;; both PROPAGATE-FUN-TYPE and PROPAGATE-FLOAT-TYPE. (After I build
- ;; a compiler which works, then I can think about getting the optimization
- ;; to work.) -- WHN 19990702
- ; :propagate-float-type
+ ;; CROSS-FLOAT-INFINITY-KLUDGE: The :PROPAGATE-FLOAT-TYPE and 
+ ;; :PROPAGATE-FUN-TYPE features are problematic when building 
+ ;; the cross-compiler itself. Their implementation depends on 
+ ;; floating point infinities, which might not be supported in the
+ ;; cross-compilation host. In order to avoid this problem, while
+ ;; still supporting these features in the target Lisp compiler,
+ ;; we use the :WILL-PROPAGATE-FLOAT-TYPE feature when building
+ ;; the cross-compiler, and munge it into :PROPAGATE-FLOAT-TYPE
+ ;; only when building the target compiler; and similarly for
+ ;; :WILL-PROPAGATE-FUN-TYPE. 
+ ;:will-propagate-float-type ; (becomes :PROPAGATE-FLOAT-TYPE)
 
  ;; According to cmu-user.tex, this enables the compiler to infer result
  ;; types for mathematical functions like SQRT, EXPT, and LOG, allowing
  ;; it to e.g. eliminate the possibility that a complex result will be
- ;; generated.
- ;;
- ;; KLUDGE: turned off as per the comments for PROPAGATE-FLOAT-TYPE above
- ; :propagate-fun-type
+ ;; generated. This applies only to the target compiler, not the 
+ ;; cross-compiler: see CROSS-FLOAT-INFINITY-KLUDGE.
+ ;:will-propagate-fun-type ; (becomes :PROPAGATE-FUN-TYPE)
 
  ;; It's unclear to me what this does (but it was enabled in the code that I
  ;; picked up from Peter Van Eynde). -- WHN 19990224
@@ -248,6 +237,9 @@
  ;; :SB-XC stands for "cross compiler", and is in *FEATURES* during the second
  ;; phase of cross-compilation bootstrapping, when the cross-compiler is
  ;; being used to create the first target Lisp.
+
+ ;; notes on the :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE
+ ;; features: See the comments on CROSS-FLOAT-INFINITY-KLUDGE.
 
  ;; notes on the :SB-ASSEMBLING feature (which isn't controlled by
  ;; this file):
