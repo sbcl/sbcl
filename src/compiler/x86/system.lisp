@@ -214,6 +214,7 @@
 		   :disp (- function-pointer-type other-pointer-type)))
     (inst add func code)))
 
+;;; REMOVEME
 (defknown %function-self (function) function (flushable))
 
 (define-vop (%function-self)
@@ -228,8 +229,8 @@
 		   :disp (- function-pointer-type
 			    (* function-code-offset word-bytes))))))
 
-;;; The closure function slot is a pointer to raw code on X86 instead of
-;;; a pointer to the code function object itself. This VOP is used
+;;; The closure function slot is a pointer to raw code on X86 instead
+;;; of a pointer to the code function object itself. This VOP is used
 ;;; to reference the function object given the closure object.
 (def-source-transform %closure-function (closure)
   `(%function-self ,closure))
@@ -237,6 +238,7 @@
 (def-source-transform %funcallable-instance-function (fin)
   `(%function-self ,fin))
 
+;;; REMOVEME
 (defknown (setf %function-self) (function function) function  (unsafe))
 
 (define-vop (%set-function-self)
@@ -254,10 +256,14 @@
     (storew temp function function-self-slot function-pointer-type)
     (move result new-self)))
 
-;; We would have really liked to use a source-transform for this, but
-;; they don't work with SETF functions.
+;;; REMOVEME
 (defknown ((setf %funcallable-instance-function)) (function function) function
-  (unsafe))
+	(unsafe))
+
+;;; CMU CL comment:
+;;;   We would have really liked to use a source-transform for this, but
+;;;   they don't work with SETF functions.
+;;; FIXME: Can't we just use DEFSETF or something?
 (deftransform (setf %funcallable-instance-function) ((value fin))
   '(setf (%function-self fin) value))
 
