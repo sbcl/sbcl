@@ -64,17 +64,18 @@
     (inst and al-tn lowtag-mask))
   (inst cmp al-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
-
+  
 (defun %test-headers (value target not-p function-p headers
 			    &optional (drop-through (gen-label)) al-loaded)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
-    (multiple-value-bind (equal less-or-equal when-true when-false)
-	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
-	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
-	;; it's true and when we know it's false respectively.
+    (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
+	;; EQUAL, LESS-OR-EQUAL and GREATER-OR-EQUAL are the conditions for
+	;; branching to TARGET.  WHEN-TRUE and WHEN-FALSE are the
+	;; labels to branch to when we know it's true and when we know
+	;; it's false respectively.
 	(if not-p
-	    (values :ne :a drop-through target)
-	    (values :e :na target drop-through))
+	    (values :ne :a :b drop-through target)
+	    (values :e :na :nb target drop-through))
       (%test-lowtag value when-false t lowtag al-loaded)
       (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
       (do ((remaining headers (cdr remaining)))
@@ -83,22 +84,59 @@
 	      (last (null (cdr remaining))))
 	  (cond
 	   ((atom header)
-	    (inst cmp al-tn header)
-	    (if last
-		(inst jmp equal target)
-		(inst jmp :e when-true)))
+	    (cond
+	      ((and (not last) (null (cddr remaining))
+		    (atom (cadr remaining))
+		    (= (logcount (logxor header (cadr remaining))) 1))
+	       ;; BASE-STRING, (VECTOR NIL), BIT-VECTOR, (VECTOR T)
+	       (inst and al-tn (ldb (byte 8 0) (logeqv header (cadr remaining))))
+	       (inst cmp al-tn (ldb (byte 8 0) (logand header (cadr remaining))))
+	       (inst jmp equal target)
+	       (return))
+	      (t
+	       (inst cmp al-tn header)
+	       (if last
+		   (inst jmp equal target)
+		   (inst jmp :e when-true)))))
 	   (t
 	     (let ((start (car header))
 		   (end (cdr header)))
-	       (unless (= start bignum-widetag)
-		 (inst cmp al-tn start)
-		 (inst jmp :b when-false)) ; was :l
-	       (inst cmp al-tn end)
-	       (if last
-		   (inst jmp less-or-equal target)
-		   (inst jmp :be when-true))))))) ; was :le
+	       (cond
+		 ;; LAST = don't need al-tn later
+		 ((and last (not (= start bignum-widetag))
+		       (= (+ start 4) end) (= (logcount (logxor start end)) 1))
+		  ;; SIMPLE-STRING
+		  (inst and al-tn (ldb (byte 8 0) (logeqv start end)))
+		  (inst cmp al-tn (ldb (byte 8 0) (logand start end)))
+		  (inst jmp equal target))
+		 ((and (not last) (null (cddr remaining))
+		       (= (+ start 4) end) (= (logcount (logxor start end)) 1)
+		       (listp (cadr remaining))
+		       (= (+ (caadr remaining) 4) (cdadr remaining))
+		       (= (logcount (logxor (caadr remaining) (cdadr remaining))) 1)
+		       (= (logcount (logxor (caadr remaining) start)) 1))
+		  ;; STRING
+		  (inst and al-tn (ldb (byte 8 0) (logeqv start (cdadr remaining))))
+		  (inst cmp al-tn (ldb (byte 8 0) (logand start (cdadr remaining))))
+		  (inst jmp equal target)
+		  ;; we've shortcircuited the DO, so we must return.
+		  ;; It's OK to do so, because (NULL (CDDR REMAINING))
+		  ;; was true.
+		  (return))
+		 (t
+		  (unless (= start bignum-widetag)
+		    (inst cmp al-tn start)
+		    (if (= end complex-array-widetag)
+			(progn
+			  (aver last)
+			  (inst jmp greater-or-equal target))
+			(inst jmp :b when-false))) ; was :l
+		  (unless (= end complex-array-widetag)
+		    (inst cmp al-tn end)
+		    (if last
+			(inst jmp less-or-equal target)
+			(inst jmp :be when-true)))))))))) ; was :le
       (emit-label drop-through))))
-
 
 ;;;; type checking and testing
 
