@@ -306,15 +306,29 @@ time we reacquire LOCK and return to the caller."
 ;;; locks, you probably won't like the effect.  Used with thought
 ;;; though, it's a good deal gentler than the last-resort functions above
 
+(define-condition interrupt-thread-error (error)
+  ((thread :reader interrupt-thread-error-thread :initarg :thread)
+   (errno :reader interrupt-thread-error-errno :initarg :errno))
+  (:report (lambda (c s)
+	     (format s "interrupt thread ~A failed (~A: ~A)"
+		     (interrupt-thread-error-thread c)
+		     (interrupt-thread-error-errno c)
+		     (strerror (interrupt-thread-error-errno c))))))
+
 (defun interrupt-thread (thread function)
   "Interrupt THREAD and make it run FUNCTION."
   (let ((function (coerce function 'function)))
-    (sb!sys:with-pinned-objects (function)
-      (sb!unix::syscall* ("interrupt_thread"
-			  sb!alien:unsigned-long  sb!alien:unsigned-long)
-			 thread
-			 thread 
-			 (sb!kernel:get-lisp-obj-address function)))))
+    (sb!sys:with-pinned-objects 
+     (function)
+     (multiple-value-bind (res err)
+	 (sb!unix::syscall ("interrupt_thread"
+			    sb!alien:unsigned-long  sb!alien:unsigned-long)
+			   thread
+			   thread 
+			   (sb!kernel:get-lisp-obj-address function))
+       (unless res
+	 (error 'interrupt-thread-error :thread thread :errno err))))))
+
 
 (defun terminate-thread (thread-id)
   "Terminate the thread identified by THREAD-ID, by causing it to run

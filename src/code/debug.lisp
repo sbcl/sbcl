@@ -874,8 +874,9 @@ reset to ~S."
     (handler-case
 	(progn
 	  (format *error-output*
-		  "~&~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
+		  "~&~@<unhandled ~S in thread ~S: ~2I~_~A~:>~2%"
 		  (type-of condition)
+		  (sb!thread:current-thread-id)
 		  condition)
 	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
 	  ;; even if we hit an error within BACKTRACE (e.g. a bug in

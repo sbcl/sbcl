@@ -289,6 +289,21 @@ struct thread *find_thread_by_pid(pid_t pid)
 #if defined LISP_FEATURE_SB_THREAD
 /* This is not needed unless #+SB-THREAD, as there's a trivial null
  * unithread definition. */
+
+void mark_dead_threads() 
+{
+    pid_t kid;
+    int status;
+    while(1) {
+	kid=waitpid(-1,&status,__WALL|WNOHANG);
+	if(kid<=0) break;
+	if(WIFEXITED(status) || WIFSIGNALED(status)) {
+	    struct thread *th=find_thread_by_pid(kid);
+	    if(th) th->state=STATE_DEAD;
+	}
+    }
+}
+
 void reap_dead_threads() 
 {
     struct thread *th,*next,*prev=0;
@@ -345,9 +360,12 @@ void unblock_sigcont_and_sleep(void)
 int interrupt_thread(pid_t pid, lispobj function)
 {
     union sigval sigval;
+    struct thread *th;
     sigval.sival_int=function;
-
-    return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
+    for_each_thread(th) 
+	if((th->pid==pid) && (th->state != STATE_DEAD))
+	    return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
+    errno=EPERM; return -1;
 }
 
 int signal_thread_to_dequeue (pid_t pid)
@@ -374,7 +392,12 @@ void gc_stop_the_world()
 	    if(p==th) continue;
 	    if(p->state==STATE_RUNNING) {
 		p->state=STATE_STOPPING;
-		kill(p->pid,SIG_STOP_FOR_GC);
+		if(kill(p->pid,SIG_STOP_FOR_GC)==-1) {
+		    /* we can't kill the process; assume because it
+		     * died already (and its parent is dead so never
+		     * saw the SIGCHLD) */
+		    p->state=STATE_DEAD;
+		}
 	    }
 	    if((p->state!=STATE_STOPPED) &&
 	       (p->state!=STATE_DEAD)) {

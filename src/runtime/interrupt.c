@@ -562,6 +562,12 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
     sigprocmask(SIG_BLOCK,&ss,0);
 
+    /* The GC can't tell if a thread is a zombie, so this would be a
+     * good time to let the kernel reap any of our children in that
+     * awful state, to stop them from being waited for indefinitely.
+     * Userland reaping is done later when GC is finished  */
+    mark_dead_threads();
+
     thread->state=STATE_STOPPED;
 
     sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
@@ -687,17 +693,7 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 
 void thread_exit_handler(int num, siginfo_t *info, void *v_context)
 {   /* called when a child thread exits */
-    pid_t kid;
-    int status;
-    
-    while(1) {
-	kid=waitpid(-1,&status,__WALL|WNOHANG);
-	if(kid<=0) break;
-	if(WIFEXITED(status) || WIFSIGNALED(status)) {
-	    struct thread *th=find_thread_by_pid(kid);
-	    if(th) th->state=STATE_DEAD;
-	}
-    }
+    mark_dead_threads();
 }
 
 	

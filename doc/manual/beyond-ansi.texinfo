@@ -175,39 +175,125 @@ requested order from a user-supplied primary method.
 @comment  node-name,  next,  previous,  up
 @subsection Threading (a.k.a Multiprocessing)
 
-SBCL (as of version 0.8.3, on Linux x86 only) supports a fairly
-low-level threading interface that maps onto the host operating
-system's concept of threads or lightweight processes.
+SBCL supports a fairly low-level threading interface that maps onto
+the host operating system's concept of threads or lightweight
+processes.  This means that threads may take advantage of hardware
+multiprocessing on machines that have more than one CPU, but it does 
+not allow Lisp control of the scheduler.  This is found in the
+SB-THREAD package.
 
-@subsubsection Lisp-level view
+This requires x86 and Linux kernel 2.6 or systems with NPTL backports.
 
-A rudimentary interface to creating and managing multiple threads can
-be found in the @dfn{sb-thread} package.  This is intended for public
-consumption, so look at the exported symbols and their documentation
-strings.
+@subsubsection Special variables
 
-Dynamic bindings to symbols are per-thread.  Signal handlers are
-per-thread.
-
-Mutexes and condition variables are available for managing access to
-shared data: see
+The interaction of special variables with multiple threads is mostly
+as one would expect, but users of other Lisps are warned that the
+behaviour of locally bound specials differs in places from what they
+may expect.
 
 @itemize
+@item 
+global special values are visible across all threads;
+@item
+bindings (e.g. using LET) are local to the thread;
+@item
+initial values in a new thread are taken from the thread that created it. 
+@end itemize
 
-@item
-@code{(apropos "mutex" :sb-thread)}
-  
-@item
-@code{(apropos "condition" :sb-thread)}
-  
-@item
-and the @code{waitqueue} structure
+@subsubsection Mutex support
+
+Mutexes are used for controlling access to a shared resource. One
+thread is allowed to hold the mutex, others which attempt to take it
+will be made to wait until it's free. Threads are woken in the order
+that they go to sleep.
+
+There isn't a timeout on mutex acquisition, but the usual WITH-TIMEOUT
+macro (which throws a TIMEOUT condition after n seconds) can be used
+if you want a bounded wait.
+
+@lisp
+(defpackage :demo (:use "CL" "SB-THREAD" "SB-EXT"))
+
+(in-package :demo)
+
+(defvar *a-mutex* (make-mutex :name "my lock"))
+
+(defun thread-fn ()
+  (let ((id (current-thread-id)))
+    (format t "Thread ~A running ~%" id)
+    (with-mutex (*a-mutex*)
+      (format t "Thread ~A got the lock~%" id)
+      (sleep (random 5)))
+    (format t "Thread ~A dropped lock, dying now~%" id)))
+
+(make-thread #'thread-fn)
+(make-thread #'thread-fn)
+
+@end lisp
+
+@subsubsection Waitqueue/condition variables
+
+These are based on the POSIX condition variable design, hence the
+annoyingly CL-conflicting name. For use when you want to check a
+condition and sleep until it's true. For example: you have a shared
+queue, a writer process checking ``queue is empty'' and one or more
+readers that need to know when ``queue is not empty''. It sounds
+simple, but is astonishingly easy to deadlock if another process runs
+when you weren't expecting it to.
+
+There are three components:
+
+@itemize
+@item the condition itself (not represented in code)
+@item the condition variable (a.k.a waitqueue) which proxies for it
+@item a lock to hold while testing the condition 
+@end itemize
+
+Important stuff to be aware of:
+
+@itemize
+@item when calling condition-wait, you must hold the mutex. condition-wait will drop the mutex while it waits, and obtain it again before returning for whatever reason;
+
+@item likewise, you must be holding the mutex around calls to condition-notify;
+
+@item a process may return from condition-wait in several circumstances: it is not guaranteed that the underlying condition has become true. You must check that the resource is ready for whatever you want to do to it. 
 
 @end itemize
 
-and poke around in their documentation strings.
+@lisp
+(defvar *buffer-queue* (make-waitqueue))
+(defvar *buffer-lock* (make-mutex :name "buffer lock"))
 
-@subsubsection Sessions
+(defvar *buffer* (list nil))
+
+(defun reader ()
+  (with-mutex (*buffer-lock*)
+    (loop
+     (condition-wait *buffer-queue* *buffer-lock*)
+     (loop
+      (unless *buffer* (return))
+      (let ((head (car *buffer*)))
+        (setf *buffer* (cdr *buffer*))
+        (format t "reader ~A woke, read ~A~%" 
+                (current-thread-id) head))))))
+
+(defun writer ()
+  (loop
+   (sleep (random 5))
+   (with-mutex (*buffer-lock*)
+     (let ((el (intern
+                (string (code-char 
+                         (+ (char-code #\A) (random 26)))))))
+       (setf *buffer* (cons el *buffer*)))
+     (condition-notify *buffer-queue*))))
+
+(make-thread #'writer)
+(make-thread #'reader)
+(make-thread #'reader)       
+
+@end lisp
+
+@subsubsection Sessions/Debugging
 
 If the user has multiple views onto the same Lisp image (for example,
 using multiple terminals, or a windowing system, or network access)
@@ -216,7 +302,8 @@ view has its own collection of foreground/background/stopped threads.
 A thread which wishes to create a new session can use
 @code{sb-thread:with-new-session} to remove itself from the current
 session (which it shares with its parent and siblings) and create a
-fresh one.  See also @code{sb-thread:make-listener-thread}.
+fresh one.  
+# See also @code{sb-thread:make-listener-thread}.
 
 Within a single session, threads arbitrate between themselves for the
 user's attention.  A thread may be in one of three notional states:
@@ -248,13 +335,9 @@ cause interesting results if you link to foreign code that expects
 threading or creates new threads, and the thread library in question
 uses %fs in an incompatible way.
 
-There are two implementation mechanisms for queueing.  If SBCL was
-built on an NPTL-capable Linux system (2.6 or some vendor 2.4 ports)
-with the @code{:SB-FUTEX} feature, queuing will be done using the
-@code{sys_futex()} system call if it's available at runtime.
-Otherwise it will fall back to using @code{sigtimedwait()} to sleep
-and a signal (@code{SIG_DEQUEUE}, one of the POSIX RT signals) to
-wake.
+Queues require the @code{sys_futex()} system call to be available:
+this is the reason for the NPTL requirement.  We test at runtime that
+this system call exists.
 
 Garbage collection is done with the existing Conservative Generational
 GC.  Allocation is done in small (typically 8k) regions: each thread
