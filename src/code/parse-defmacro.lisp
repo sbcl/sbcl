@@ -31,7 +31,7 @@
 ;;; Return, as multiple values, a body, possibly a DECLARE form to put
 ;;; where this code is inserted, the documentation for the parsed
 ;;; body, and bounds on the number of arguments.
-(defun parse-defmacro (lambda-list arg-list-name body name error-kind
+(defun parse-defmacro (lambda-list arg-list-name body name context
 				   &key
 				   (anonymousp nil)
 				   (doc-string-allowed t)
@@ -48,7 +48,7 @@
           (*env-var* nil))
       (multiple-value-bind (env-arg-used minimum maximum)
 	  (parse-defmacro-lambda-list lambda-list arg-list-name name
-				      error-kind error-fun (not anonymousp)
+				      context error-fun (not anonymousp)
 				      nil)
 	(values `(let* (,@(when env-arg-used
                             `((,*env-var* ,env-arg-name)))
@@ -75,7 +75,7 @@
 (defun parse-defmacro-lambda-list (possibly-dotted-lambda-list
 				   arg-list-name
 				   name
-				   error-kind
+				   context
 				   error-fun
 				   &optional
 				   toplevel
@@ -105,7 +105,7 @@
 			(push (car in-pdll) reversed-result)))
 	 rest-name restp allow-other-keys-p env-arg-used)
     (when (member '&whole (rest lambda-list))
-      (error "&WHOLE may only appear first in ~S lambda-list." error-kind))
+      (error "&WHOLE may only appear first in ~S lambda-list." context))
     (do ((rest-of-args lambda-list (cdr rest-of-args)))
 	((null rest-of-args))
       (macrolet ((process-sublist (var sublist-name path)
@@ -113,10 +113,13 @@
                      `(if (listp ,var)
                           (let ((sub-list-name (gensym ,sublist-name)))
                             (push-sub-list-binding sub-list-name ,path ,var
-                                                   name error-kind error-fun)
+                                                   name context error-fun)
                             (parse-defmacro-lambda-list ,var sub-list-name name
-                                                        error-kind error-fun))
-                          (push-let-binding ,var ,path nil)))))
+                                                        context error-fun))
+                          (push-let-binding ,var ,path nil))))
+		 (normalize-singleton (var)
+		   `(when (null (cdr ,var))
+		     (setf (cdr ,var) (list *default-default*)))))
         (let ((var (car rest-of-args)))
           (typecase var
             (list
@@ -124,20 +127,22 @@
                ((:required)
                 (when restp
                   (defmacro-error "required argument after &REST/&BODY"
-                      error-kind name))
+                      context name))
                 (process-sublist var "SUBLIST-" `(car ,path))
                 (setq path `(cdr ,path)
                       minimum (1+ minimum)
                       maximum (1+ maximum)))
                ((:optionals)
+		(normalize-singleton var)
                 (destructuring-bind (varname &optional initform supplied-p)
                     var
                   (push-optional-binding varname initform supplied-p
                                          `(not (null ,path)) `(car ,path)
-                                         name error-kind error-fun))
+                                         name context error-fun))
                 (setq path `(cdr ,path)
                       maximum (1+ maximum)))
                ((:keywords)
+		(normalize-singleton var)
                 (let* ((keyword-given (consp (car var)))
                        (variable (if keyword-given
                                      (cadar var)
@@ -151,7 +156,7 @@
                                                               ,rest-name)
                                          `(lookup-keyword ',keyword
                                                           ,rest-name)
-                                         name error-kind error-fun)
+                                         name context error-fun)
                   (push keyword keys)))
                ((:auxs)
                 (push-let-binding (car var) (cadr var) nil))))
@@ -160,13 +165,25 @@
                (&whole
                 (cond ((cdr rest-of-args)
                        (setq rest-of-args (cdr rest-of-args))
+		       ;; Special case for compiler-macros: if car of
+		       ;; the form is FUNCALL skip over it for
+		       ;; destructuring, pretending cdr of the form is
+		       ;; the actual form.
+		       (when (eq context 'define-compiler-macro)
+			 (push-let-binding
+			  arg-list-name
+			  arg-list-name
+			  t
+			  `(not (and (listp ,arg-list-name)
+				     (eq 'funcall (car ,arg-list-name))))
+			  `(setf ,arg-list-name (cdr ,arg-list-name))))
                        (process-sublist (car rest-of-args)
                                         "WHOLE-LIST-" arg-list-name))
                       (t
-                       (defmacro-error "&WHOLE" error-kind name))))
+                       (defmacro-error "&WHOLE" context name))))
                (&environment
                 (cond (env-illegal
-                       (error "&ENVIRONMENT is not valid with ~S." error-kind))
+                       (error "&ENVIRONMENT is not valid with ~S." context))
                       ((not toplevel)
                        (error "&ENVIRONMENT is only valid at top level of ~
                              lambda-list."))
@@ -178,14 +195,14 @@
                        (setq *env-var* (car rest-of-args))
                        (setq env-arg-used t))
                       (t
-                       (defmacro-error "&ENVIRONMENT" error-kind name))))
+                       (defmacro-error "&ENVIRONMENT" context name))))
                ((&rest &body)
                 (cond ((and (not restp) (cdr rest-of-args))
                        (setq rest-of-args (cdr rest-of-args))
                        (setq restp t)
                        (process-sublist (car rest-of-args) "REST-LIST-" path))
                       (t
-                       (defmacro-error (symbol-name var) error-kind name))))
+                       (defmacro-error (symbol-name var) context name))))
                (&optional
                 (setq now-processing :optionals))
                (&key
@@ -205,7 +222,7 @@
                   ((:required)
                    (when restp
                      (defmacro-error "required argument after &REST/&BODY"
-                         error-kind name))
+                         context name))
                    (push-let-binding var `(car ,path) nil)
                    (setq minimum (1+ minimum)
                          maximum (1+ maximum)
@@ -216,9 +233,11 @@
                          maximum (1+ maximum)))
                   ((:keywords)
                    (let ((key (keywordicate var)))
-                     (push-let-binding var
-                                       `(lookup-keyword ,key ,rest-name)
-                                       nil)
+                     (push-let-binding
+		      var
+		      `(lookup-keyword ,key ,rest-name)
+		      nil
+		      `(keyword-supplied-p ,key ,rest-name))
                      (push key keys)))
                   ((:auxs)
                    (push-let-binding var nil nil))))))
@@ -237,11 +256,11 @@
                             `(list-of-length-at-least-p ,path-0 ,minimum)
                             `(proper-list-of-length-p ,path-0 ,minimum ,maximum))
                  ,(if (eq error-fun 'error)
-                      `(arg-count-error ',error-kind ',name ,path-0
+                      `(arg-count-error ',context ',name ,path-0
                                         ',lambda-list ,minimum
                                         ,explicit-maximum)
                       `(,error-fun 'arg-count-error
-                                   :kind ',error-kind
+                                   :kind ',context
                                    ,@(when name `(:name ',name))
                                    :args ,path-0
                                    :lambda-list ',lambda-list
@@ -258,7 +277,7 @@
 		   (when ,problem
 		     (,error-fun
 		      'defmacro-lambda-list-broken-key-list-error
-		      :kind ',error-kind
+		      :kind ',context
 		      ,@(when name `(:name ',name))
 		      :problem ,problem
 		      :info ,info)))
@@ -266,18 +285,18 @@
       (values env-arg-used minimum explicit-maximum))))
 
 ;;; We save space in macro definitions by calling this function.
-(defun arg-count-error (error-kind name args lambda-list minimum maximum)
+(defun arg-count-error (context name args lambda-list minimum maximum)
   (let (#-sb-xc-host
 	(sb!debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
     (error 'arg-count-error
-	   :kind error-kind
+	   :kind context
 	   :name name
 	   :args args
 	   :lambda-list lambda-list
 	   :minimum minimum
 	   :maximum maximum)))
 
-(defun push-sub-list-binding (variable path object name error-kind error-fun)
+(defun push-sub-list-binding (variable path object name context error-fun)
   (check-defmacro-arg variable)
   (let ((var (gensym "TEMP-")))
     (push `(,variable
@@ -285,7 +304,7 @@
 	      (if (listp ,var)
 		,var
 		(,error-fun 'defmacro-bogus-sublist-error
-			    :kind ',error-kind
+			    :kind ',context
 			    ,@(when name `(:name ',name))
 			    :object ,var
 			    :lambda-list ',object))))
@@ -302,7 +321,7 @@
       (push let-form *user-lets*))))
 
 (defun push-optional-binding (value-var init-form supplied-var condition path
-					name error-kind error-fun)
+					name context error-fun)
   (unless supplied-var
     (setq supplied-var (gensym "SUPPLIEDP-")))
   (push-let-binding supplied-var condition t)
@@ -310,17 +329,17 @@
 	 (let ((whole-thing (gensym "OPTIONAL-SUBLIST-")))
 	   (push-sub-list-binding whole-thing
 				  `(if ,supplied-var ,path ,init-form)
-				  value-var name error-kind error-fun)
+				  value-var name context error-fun)
 	   (parse-defmacro-lambda-list value-var whole-thing name
-				       error-kind error-fun)))
+				       context error-fun)))
 	((symbolp value-var)
 	 (push-let-binding value-var path nil supplied-var init-form))
 	(t
 	 (error "illegal optional variable name: ~S" value-var))))
 
-(defun defmacro-error (problem kind name)
+(defun defmacro-error (problem context name)
   (error "illegal or ill-formed ~A argument in ~A~@[ ~S~]"
-	 problem kind name))
+	 problem context name))
 
 (defun check-defmacro-arg (arg)
   (when (or (and *env-var* (eq arg *env-var*))

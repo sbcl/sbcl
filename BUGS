@@ -1589,14 +1589,6 @@ WORKAROUND:
   In sbcl-0.8.13, all backtraces from errors caused by internal errors
   on the alpha seem to have a "bogus stack frame".
 
-347: FUNCALL forms and compiler-macros
-  (reported by Johan Bockgård on #lisp)
-  The example
-    (funcall (compiler-macro-function 'square) '(funcall #'square x) nil) 
-    => (EXPT X 2)
-  from CLHS entry for DEFINE-COMPILER-MACRO fails in 0.8.13.41 with an
-  error. Fixed in CMUCL 19a.
-
 348:
   Structure slot setters do not preserve evaluation order:
 

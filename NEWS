@@ -1,20 +1,28 @@
 changes in sbcl-0.8.15 relative to sbcl-0.8.14:
   * incompatible change: SB-INT:*BEFORE-SAVE-INITIALIZATIONS* and
     SB-INT:*AFTER-SAVE-INITIALIZATIONS* have been renamed
-    SB-EXT:*SAVE-HOOKS* and SB-EXT:*INIT-HOOKS*, and are now
-    part of the supported interface.
-  * new feature: Single-stepping of code compiled with DEBUG 2 or higher
-    and (> DEBUG (MAX SPACE SPEED)) is now possible.
+    SB-EXT:*SAVE-HOOKS* and SB-EXT:*INIT-HOOKS*, and are now part of
+    the supported interface.
+  * new feature: Single-stepping of code compiled with DEBUG 2 or
+    higher and (> DEBUG (MAX SPACE SPEED)) is now possible.
   * new feature: saving cores with foreign code loaded is now
-    supported on x86/FreeBSD, x86/Linux, and sparc/SunOS. (based
-    on Timothy Moore's work for CMUCL)
+    supported on x86/FreeBSD, x86/Linux, and sparc/SunOS. (based on
+    Timothy Moore's work for CMUCL)
+  * bug fix: DEFTYPE lambda-list parsing now binds unsupplied keyword
+    parameters to * instead of NIL if no initform is supplied.
+    (reported by Johan Bockgård)
+  * bug fix: DEFINE-COMPILER-MACRO lambda-list parsing now binds
+    correctly when FUNCALL appears as the car of the form. Note:
+    despite this FUNCALL forms are not currently subject to
+    compiler-macro expansion. (port of Raymond Toy's fix for the
+    same from CMUCL, reported by Johan Bockgård)
   * bug fix: FOR ... ON ... -clauses in LOOP now work on dotted lists
     (thanks for Teemu Kalvas)
   * bug fix: in FORMAT ~^ inside ~:{ now correctly steps to the next
-    case instead of terminating the iteration (thanks for Julian Squires,
-    Sean Champ and Raymond Toy)
-  * bug fix: incorrect expansion of defgeneric that caused
-    a style warning. (thanks for Zach Beane)
+    case instead of terminating the iteration (thanks for Julian
+    Squires, Sean Champ and Raymond Toy)
+  * bug fix: incorrect expansion of defgeneric that caused a style
+    warning. (thanks for Zach Beane)
   * on x86 compiler supports stack allocation of results of LIST and
     LIST*, bound to variables, declared DYNAMIC-EXTENT. (based on
     CMUCL implementation by Gerd Moellmann)
