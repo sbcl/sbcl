@@ -231,16 +231,23 @@ os_install_interrupt_handlers(void)
 #ifdef __NetBSD__
 static void netbsd_init()
 {
-	struct rlimit rl;
-
-	/* NetBSD counts mmap()ed space against the process's data size limit,
-	 * so yank it up. This might be a nasty thing to do? */
-	getrlimit (RLIMIT_DATA, &rl);
-	rl.rlim_cur = 1073741824;
-	if (setrlimit (RLIMIT_DATA, &rl) < 0) {
-		fprintf (stderr, "RUNTIME WARNING: unable to raise process data size limit to 1GB (%s). The system may fail to start.\n",
-			strerror(errno));
-	}
+    struct rlimit rl;
+    
+    /* NetBSD counts mmap()ed space against the process's data size limit,
+     * so yank it up. This might be a nasty thing to do? */
+    getrlimit (RLIMIT_DATA, &rl);
+    /* Amazingly for such a new port, the provenance and meaning of
+       this number are unknown.  It might just mean REALLY_BIG_LIMIT,
+       or possibly it should be calculated from dynamic space size.
+       -- CSR, 2004-04-08 */
+    rl.rlim_cur = 1073741824;
+    if (setrlimit (RLIMIT_DATA, &rl) < 0) {
+	fprintf (stderr, 
+		 "RUNTIME WARNING: unable to raise process data size limit:\n\
+  %s.\n\
+The system may fail to start.\n",
+		 strerror(errno));
+    }
 }
 #endif /* __NetBSD__ */
 

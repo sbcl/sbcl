@@ -610,7 +610,8 @@ Dave McDonald:
 
 Perry E. Metzger:
   He ported SBCL to NetBSD with newer signals, building on the
-  work of Valtteri Vuorikoski.
+  work of Valtteri Vuorikoski.  He also provided various cleanups to
+  the C runtime.
 
 Gerd Moellman:
   He has made many cleanups and improvements, small and large, in
