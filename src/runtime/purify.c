@@ -1369,8 +1369,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" handlers");
     fflush(stdout);
 #endif
-    pscav((lispobj *) interrupt_handlers,
-          sizeof(interrupt_handlers) / sizeof(lispobj),
+    pscav((lispobj *) all_threads->interrupt_data->interrupt_handlers,
+          sizeof(all_threads->interrupt_data->interrupt_handlers)
+	  / sizeof(lispobj),
           0);
 
 #ifdef PRINTNOISE

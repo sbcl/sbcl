@@ -15,6 +15,7 @@
 	  ;; can't use handling-end-of-the-world, because that flushes
 	  ;; output streams, and we don't necessarily have any (or we
 	  ;; could be sharing them)
+	  (sb!sys:enable-interrupt :sigint :ignore)
 	  (sb!unix:unix-exit
 	   (catch 'sb!impl::%end-of-the-world 
 	     (with-simple-restart 
@@ -68,8 +69,6 @@
     ("add_thread_to_queue" add-thread-to-queue) void
   (pid int) (mutex system-area-pointer))
 
-(defvar *session-lock* nil)
-
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
 (defun get-spinlock (lock offset new-value)
   (declare (optimize (speed 3) (safety 0)))
@@ -95,7 +94,7 @@
      (add-thread-to-queue
       pid (sb!sys:int-sap (sb!kernel:get-lisp-obj-address lock))))))
 
-(defun free-mutex (lock &optional (new-value nil))
+(defun release-mutex (lock &optional (new-value nil))
   (declare (type mutex lock))
   (let ((old-value (mutex-value lock))
 	(pid (current-thread-id))
@@ -115,6 +114,12 @@
 
 ;;;; multiple independent listeners
 
+(defvar *session-lock* nil)
+
+
+
+
+
 (defun make-listener-thread (tty-name)  
   (assert (probe-file tty-name))
   ;; FIXME probably still need to do some tty stuff to get signals
@@ -124,6 +129,7 @@
 	 (out (sb!unix:unix-dup in))
 	 (err (sb!unix:unix-dup in)))
     (labels ((thread-repl () 
+	       (sb!unix::unix-setsid)
 	       (let* ((*session-lock*
 		       (make-mutex :name (format nil "lock for ~A" tty-name)))
 		      (sb!impl::*stdin* 
@@ -136,11 +142,12 @@
 		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
 		      (sb!impl::*descriptor-handlers* nil))
 		 (get-mutex *session-lock*)
+		 (sb!sys:enable-interrupt :sigint #'sb!unix::sigint-handler)
 		 (unwind-protect
 		      (sb!impl::toplevel-repl nil)
 		   (sb!int:flush-standard-output-streams)))))
       (make-thread #'thread-repl))))
-
+  
 ;;;; job control
 
 (defvar *background-threads-wait-for-debugger* t)
@@ -160,25 +167,19 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
       (when (functionp wait-p) 
 	(setf wait-p 
 	      (funcall wait-p fd-stream (CURRENT-THREAD-ID))))
-      (cond (wait-p
-	     (get-mutex lock)
-	     #+nil
-	     (sb!sys:enable-interrupt :sigint *sigint-handler*)
-	     t)
-	    (t
-	     (invoke-restart (car (compute-restarts))))))))
-
-(defun thread-repl-prompt-fun (in-stream out-stream)
-  (let ((lock *session-lock*))
-    (unless (eql (mutex-value lock) (current-thread-id))
-      (get-mutex lock))
-    (let ((stopped (mutex-queue lock)))
-      (when stopped
-	(format out-stream "~{~&Thread ~A suspended~}~%" stopped))
-      (sb!impl::repl-prompt-fun in-stream out-stream))))
+      (cond (wait-p (get-foreground))
+	    (t  (invoke-restart (car (compute-restarts))))))))
 
 ;;; install this with (setf SB!INT:*REPL-PROMPT-FUN* #'thread-prompt-fun)
 ;;; One day it will be default
+(defun thread-repl-prompt-fun (in-stream out-stream)
+  (let ((lock *session-lock*))
+    (get-foreground)
+    (let ((stopped-threads (mutex-queue lock)))
+      (when stopped-threads
+	(format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
+      (sb!impl::repl-prompt-fun in-stream out-stream))))
+
 
 
 (defstruct rwlock
@@ -186,7 +187,7 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
   (value 0 :type fixnum)
   (max-readers nil :type (or fixnum null))
   (max-writers 1 :type fixnum))
-
+#+nil
 (macrolet
     ((make-rwlocking-function (lock-fn unlock-fn increment limit test)
        (let ((do-update '(when (eql old-value
@@ -226,12 +227,12 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
 			   (- (rwlock-max-writers lock))
 			   (and (<= old-value 0)
 				(>= new-value limit))))
-  
+#+nil  
 (defun get-rwlock (lock direction &optional timeout)
   (ecase direction
     (:read (%lock-for-reading lock timeout))
     (:write (%lock-for-writing lock timeout))))
-
+#+nil
 (defun free-rwlock (lock direction)
   (ecase direction
     (:read (%unlock-for-reading lock))

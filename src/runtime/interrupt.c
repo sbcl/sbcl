@@ -62,7 +62,7 @@ void sigaddset_blockable(sigset_t *s)
  * becomes 'yes'.) */
 boolean internal_errors_enabled = 0;
 
-os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
+struct interrupt_data * global_interrupt_data;
 
 /* As far as I can tell, what's going on here is:
  *
@@ -90,16 +90,6 @@ os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
  * 
  * - WHN 20000728, dan 20010128 */
 
-
-void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) = {0};
-union interrupt_handler interrupt_handlers[NSIG];
-
-/* signal number, siginfo_t, and old mask information for pending signal
- *
- * pending_signal=0 when there is no pending signal. */
-static int pending_signal = 0;
-static siginfo_t pending_info;
-static sigset_t pending_mask;
 
 boolean maybe_gc_pending = 0;
 
@@ -282,12 +272,15 @@ void
 interrupt_handle_pending(os_context_t *context)
 {
     struct thread *thread;
+    struct interrupt_data *data;
+
 #ifndef __i386__
     boolean were_in_lisp = !foreign_function_call_active;
 #endif
     while(stop_the_world) kill(getpid(),SIGALRM);
 
     thread=arch_os_get_current_thread();
+    data=thread->interrupt_data;
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
     if (maybe_gc_pending) {
@@ -334,12 +327,12 @@ interrupt_handle_pending(os_context_t *context)
     memcpy(os_context_sigmask_addr(context), &pending_mask, 
 	   4 /* sizeof(sigset_t) */ );
 #endif
-    sigemptyset(&pending_mask);
-    if (pending_signal) {
-	int signal = pending_signal;
+    sigemptyset(&data->pending_mask);
+    if (data->pending_signal) {
+	int signal = data->pending_signal;
 	siginfo_t info;
-	memcpy(&info, &pending_info, sizeof(siginfo_t));
-	pending_signal = 0;
+	memcpy(&info, &data->pending_info, sizeof(siginfo_t));
+	data->pending_signal = 0;
 	interrupt_handle_now(signal, &info, context);
     }
 }
@@ -363,6 +356,7 @@ void
 interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
+    struct thread *thread=arch_os_get_current_thread();
 #ifndef __i386__
     boolean were_in_lisp;
 #endif
@@ -374,7 +368,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
        delivered we appear to have a null FPU control word. */
     os_restore_fp_control(context);
 #endif 
-    handler = interrupt_handlers[signal];
+    handler = thread->interrupt_data->interrupt_handlers[signal];
 
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
 	return;
@@ -451,7 +445,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
-
+    struct interrupt_data *data=thread->interrupt_data;
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif 
@@ -464,9 +458,9 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 	/* FIXME: This code is exactly the same as the code in the
 	 * other leg of the if(..), and should be factored out into
 	 * a shared function. */
-        pending_signal = signal;
-	memcpy(&pending_info, info, sizeof(siginfo_t));
-        memcpy(&pending_mask,
+        data->pending_signal = signal;
+	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+        memcpy(&(data->pending_mask),
 	       os_context_sigmask_addr(context),
 	       sizeof(sigset_t));
 	sigaddset_blockable(os_context_sigmask_addr(context));
@@ -483,9 +477,9 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 	 * cpy_sigset_t, so that we only have to get the sizeof
 	 * expressions right in one place, and after that static type
 	 * checking takes over. */
-        pending_signal = signal;
-	memcpy(&pending_info, info, sizeof(siginfo_t));
-	memcpy(&pending_mask,
+        data->pending_signal = signal;
+	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+	memcpy(&(data->pending_mask),
 	       os_context_sigmask_addr(context),
 	       sizeof(sigset_t));
 	sigaddset_blockable(os_context_sigmask_addr(context));
@@ -644,54 +638,29 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
  * noise to install handlers
  */
 
-/*
- * what low-level signal handlers looked like before
- * undoably_install_low_level_interrupt_handler() got involved
- */
-struct low_level_signal_handler_state {
-    int was_modified;
-    void (*handler)(int, siginfo_t*, void*);
-} old_low_level_signal_handler_states[NSIG];
+/* SBCL used to have code to restore signal handlers on exit, which
+ * has been removed from the threaded version until we decide: exit of
+ * _what_ ? */
+
+/* SBCL comment: The "undoably" aspect is because we also arrange with
+ * atexit() for the handler to be restored to its old value. This is
+ * for tidiness: it shouldn't matter much ordinarily, but it does
+ * remove a window where e.g. memory fault signals (SIGSEGV or SIGBUS,
+ * which in ordinary operation of SBCL are sent to the generational
+ * garbage collector, then possibly onward to Lisp code) or SIGINT
+ * (which is ordinarily passed to Lisp code) could otherwise be
+ * handled bizarrely/brokenly because the Lisp code would try to deal
+ * with them using machinery (like stream output buffers) which has
+ * already been dismantled. */
+
+/* I'm not sure (a) whether this is a real concern, (b) how it helps
+   anyway */
 
 void
 uninstall_low_level_interrupt_handlers_atexit(void)
 {
-#if 0
-    int signal;
-
-    for (signal = 0; signal < NSIG; ++signal) {
-	struct low_level_signal_handler_state
-	    *old_low_level_signal_handler_state =
-	    old_low_level_signal_handler_states + signal;
-	if (old_low_level_signal_handler_state->was_modified) {
-	    struct sigaction sa;
-	    sa.sa_sigaction = old_low_level_signal_handler_state->handler;
-	    sigemptyset(&sa.sa_mask);
-	    sa.sa_flags = SA_SIGINFO | SA_RESTART; 
-	    sigaction(signal, &sa, NULL);
-	}
-    }
-#endif
 }
 
-/* FIXME the "undoable" below is currently a lie.  We don't want to 
- * remove any signal handlers while there are still >0 threads left, 
- * so that atexit thing has been disabled for the moment
- */
-
-/* Undoably install a special low-level handler for signal; or if
- * handler is SIG_DFL, remove any special handling for signal.
- *
- * The "undoably" aspect is because we also arrange with atexit() for
- * the handler to be restored to its old value. This is for tidiness:
- * it shouldn't matter much ordinarily, but it does remove a window
- * where e.g. memory fault signals (SIGSEGV or SIGBUS, which in
- * ordinary operation of SBCL are sent to the generational garbage
- * collector, then possibly onward to Lisp code) or SIGINT (which is
- * ordinarily passed to Lisp code) could otherwise be handled
- * bizarrely/brokenly because the Lisp code would try to deal with
- * them using machinery (like stream output buffers) which has already
- * been dismantled. */
 void
 undoably_install_low_level_interrupt_handler (int signal,
 					      void handler(int,
@@ -699,9 +668,10 @@ undoably_install_low_level_interrupt_handler (int signal,
 							   void*))
 {
     struct sigaction sa;
-    struct low_level_signal_handler_state *old_low_level_signal_handler_state =
-	old_low_level_signal_handler_states + signal;
-
+    struct thread *th=arch_os_get_current_thread();
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
+    
     if (0 > signal || signal >= NSIG) {
 	lose("bad signal number %d", signal);
     }
@@ -709,25 +679,13 @@ undoably_install_low_level_interrupt_handler (int signal,
     sa.sa_sigaction = handler;
     sigemptyset(&sa.sa_mask);
     sigaddset_blockable(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO ;
-    if((signal!=SIGTTOU) && (signal!=SIGTTIN))
-	sa.sa_flags|= SA_RESTART;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if(signal==SIG_MEMORY_FAULT) sa.sa_flags|= SA_ONSTACK;
 #endif
     
-    /* In the case of interrupt handlers which are modified more than
-     * once, we only save the original unmodified copy. */
-    if (!old_low_level_signal_handler_state->was_modified) {
-	struct sigaction *old_handler =
-	    (struct sigaction*) &old_low_level_signal_handler_state->handler;
-	old_low_level_signal_handler_state->was_modified = 1;
-	sigaction(signal, &sa, old_handler);
-    } else {
-	sigaction(signal, &sa, NULL);
-    }
-
-    interrupt_low_level_handlers[signal] =
+    sigaction(signal, &sa, NULL);
+    data->interrupt_low_level_handlers[signal] =
 	(ARE_SAME_HANDLER(handler, SIG_DFL) ? 0 : handler);
 }
 
@@ -738,6 +696,9 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     struct sigaction sa;
     sigset_t old, new;
     union interrupt_handler oldhandler;
+    struct thread *th=arch_os_get_current_thread();
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
 
     FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
 
@@ -750,7 +711,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 
     FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%d\n",
 	   interrupt_low_level_handlers[signal]));
-    if (interrupt_low_level_handlers[signal]==0) {
+    if (data->interrupt_low_level_handlers[signal]==0) {
 	if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
 	    ARE_SAME_HANDLER(handler, SIG_IGN)) {
 	    sa.sa_sigaction = handler;
@@ -762,14 +723,12 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 
 	sigemptyset(&sa.sa_mask);
 	sigaddset_blockable(&sa.sa_mask);
-	sa.sa_flags = SA_SIGINFO ;
-	if((signal!=SIGTTOU) && (signal!=SIGTTIN))
-	    sa.sa_flags|= SA_RESTART;
+	sa.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigaction(signal, &sa, NULL);
     }
 
-    oldhandler = interrupt_handlers[signal];
-    interrupt_handlers[signal].c = handler;
+    oldhandler = data->interrupt_handlers[signal];
+    data->interrupt_handlers[signal].c = handler;
 
     sigprocmask(SIG_SETMASK, &old, 0);
 
@@ -779,18 +738,15 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 }
 
 void
-interrupt_init(void)
+interrupt_init()
 {
     int i;
-
     SHOW("entering interrupt_init()");
-
-    /* Set up for recovery from any installed low-level handlers. */
-    atexit(&uninstall_low_level_interrupt_handlers_atexit);
+    global_interrupt_data=calloc(sizeof(struct interrupt_data), 1);
 
     /* Set up high level handler information. */
     for (i = 0; i < NSIG; i++) {
-        interrupt_handlers[i].c =
+        global_interrupt_data->interrupt_handlers[i].c =
 	    /* (The cast here blasts away the distinction between
 	     * SA_SIGACTION-style three-argument handlers and
 	     * signal(..)-style one-argument handlers, which is OK

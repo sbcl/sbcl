@@ -17,5 +17,15 @@
 	(get-mutex ,mutex ,cfp))
       (unwind-protect
 	   (progn ,@body)
-	(when (eql (mutex-value ,mutex) ,cfp) (free-mutex ,mutex))))))
+	(when (eql (mutex-value ,mutex) ,cfp) (release-mutex ,mutex))))))
 
+(defun get-foreground ()
+  (when (not (eql (mutex-value *session-lock*)  (CURRENT-THREAD-ID)))
+    (get-mutex *session-lock*))
+  (sb!sys:enable-interrupt :sigint #'sb!unix::sigint-handler)
+  t)
+
+(defun release-foreground ()
+  (sb!sys:enable-interrupt :sigint :ignore)
+  (release-mutex *session-lock*)
+  t)

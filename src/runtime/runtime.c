@@ -273,10 +273,8 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     gc_initialize_pointers();
 
     interrupt_init();
-
     arch_install_interrupt_handlers();
     os_install_interrupt_handlers();
-
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");
@@ -386,15 +384,11 @@ static void /* noreturn */ parent_loop(void)
 	    th=find_thread_by_pid(pid);
 	    if(!th) continue;
 	    if(WIFEXITED(status) || WIFSIGNALED(status)) {
-		struct thread *next=th->next;
 		fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
 		destroy_thread(th);		/* FIXME lock all_threads */
 
-		/* resume something, if anything can be found to resume */
-#if 0
-		if(!next) next=all_threads;
-		if(next) thread_to_foreground(next->pid);
-#endif
+		/* FIXME arrange to call or fake (free-mutex *session-lock*)
+		 * if necessary */
 	    }
 	    status=0;
 	}

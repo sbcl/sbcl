@@ -782,7 +782,7 @@ reset to ~S."
 			  '*debug-beginner-help-p*))
 		(show-restarts *debug-restarts* *debug-io*))
 	      (internal-debug))
-	 (when background-p (background-this-thread *debug-io*)))))))
+	 (when background-p (sb!thread::release-foreground)))))))
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)

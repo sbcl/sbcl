@@ -26,7 +26,19 @@ union interrupt_handler {
     void (*c)(int, siginfo_t*, void*);
 };
 
-extern void interrupt_init(void);
+struct interrupt_data {
+    void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) ;
+    union interrupt_handler interrupt_handlers[NSIG];
+
+    /* signal number, siginfo_t, and old mask information for pending
+     * signal.  pending_signal=0 when there is no pending signal. */
+    int pending_signal ;
+    siginfo_t pending_info;
+    sigset_t pending_mask;
+};
+
+
+extern void interrupt_init();
 extern void fake_foreign_function_call(os_context_t* context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
 extern void interrupt_handle_now(int, siginfo_t*, void*);

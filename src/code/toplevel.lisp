@@ -225,7 +225,7 @@
 
   (/show0 "entering TOPLEVEL-INIT")
   (setf sb!thread::*session-lock* (sb!thread:make-mutex :name "the terminal"))
-  (sb!thread:get-mutex sb!thread::*session-lock*)
+  (sb!thread::get-foreground)
   (let ((sysinit nil)        ; value of --sysinit option
 	(userinit nil)       ; value of --userinit option
 	(reversed-evals nil) ; values of --eval options, in reverse order; and

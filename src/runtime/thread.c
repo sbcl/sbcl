@@ -18,6 +18,7 @@
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 
+extern struct interrupt_data * global_interrupt_data;
 
 
 /* this is the first thing that clone() runs in the child (which is
@@ -42,14 +43,12 @@ new_thread_trampoline(struct thread *th)
 	fprintf(stderr, "/continue\n");
     }
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
-
     /* wait here until our thread is linked into all_threads: see below */
     while(th->pid<1) sched_yield();
 
     if(arch_os_thread_init(th)==0) 
 	return 1;		/* failure.  no, really */
-    else 
-	return funcall0(function);
+    return funcall0(function);
 }
 
 /* this is called from any other thread to create the new one, and
@@ -60,7 +59,7 @@ new_thread_trampoline(struct thread *th)
 struct thread *create_thread(lispobj initial_function) {
     /* XXX This function or some of it needs to lock all_threads
      */
-    lispobj trampoline_argv[2];
+    /* lispobj trampoline_argv[2]; */
     union per_thread_data *per_thread;
     struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
@@ -118,7 +117,6 @@ struct thread *create_thread(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->pid=0;
-    th->stopped_p=NIL;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
@@ -138,13 +136,22 @@ struct thread *create_thread(lispobj initial_function) {
     bind_variable(INTERRUPTS_ENABLED,T,th);
 
     th->next=all_threads;
+    th->interrupt_data=malloc(sizeof (struct interrupt_data));
+    if(all_threads) 
+	memcpy(th->interrupt_data,arch_os_get_current_thread()->interrupt_data,
+	       sizeof (struct interrupt_data));
+    else 
+	memcpy(th->interrupt_data,global_interrupt_data,
+	       sizeof (struct interrupt_data));
+
+
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
 
     th->unbound_marker=initial_function;
     kid_pid=
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
-	      (((getpid()!=parent_pid)?(CLONE_SIGHAND|CLONE_PARENT):0)
+	      (((getpid()!=parent_pid)?(CLONE_PARENT):0)
 	       |SIGALRM|CLONE_VM),th);
     if(kid_pid<=0) goto cleanup;
 #else

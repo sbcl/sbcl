@@ -377,10 +377,10 @@
   (alien-stack-pointer :c-type "lispobj *")
   (alloc-region :c-type "struct alloc_region" :length 5)
   (pid :c-type "pid_t")
-  (stopped-p)
   (tls-cookie)				;  on x86, the LDT index 
   (this :c-type "struct thread *")
   (next :c-type "struct thread *")
   (pseudo-atomic-atomic)
   (pseudo-atomic-interrupted)
+  (interrupt-data :c-type "struct interrupt_data *")
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))
