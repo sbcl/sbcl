@@ -2250,7 +2250,10 @@
 (define-cold-fop (fop-sanctify-for-execution)
   (pop-stack))
 
+;;; FIXME: byte compiler to be removed completely
+#|
 (not-cold-fop fop-make-byte-compiled-function)
+|#
 
 ;;; Setting this variable shows what code looks like before any
 ;;; fixups (or function headers) are applied.

@@ -163,7 +163,7 @@
 
 ;;; Now that we have the definition of MULTIPLE-VALUE-BIND, we can
 ;;; make a reasonably readable definition of DEFUN.
-(defmacro-mundanely defun (&environment lexenv name args &body body)
+(defmacro-mundanely defun (&environment env name args &body body)
   "Define a function at top level."
   #+sb-xc-host
   (unless (symbol-package (function-name-block-name name))
@@ -176,7 +176,8 @@
 	   (lambda `(lambda ,@lambda-tail))
 	   (lambda-with-lexenv (and (inline-function-name-p name)
 				    (sb!c:inline-syntactic-closure-lambda
-				     lambda lexenv))))
+				     lambda
+				     (coerce-to-lexenv env)))))
       `(progn
 
 	 ;; In cross-compilation of toplevel DEFUNs, we arrange

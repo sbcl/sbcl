@@ -659,6 +659,8 @@ bug.~:@>")
 	      (format t "~S defined~%" fun))
       fun)))
 
+;;; FIXME: byte compiler to be completely deleted
+#|
 (define-fop (fop-make-byte-compiled-function 143)
   (let* ((size (read-arg 1))
 	 (layout (pop-stack))
@@ -674,6 +676,7 @@ bug.~:@>")
 	    (load-fresh-line)
 	    (format t "~S defined~%" res))
     res))
+|#
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
 ;;;; was sufficiently stale that the functions it called were no

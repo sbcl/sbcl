@@ -17,8 +17,6 @@
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 (def!struct (lexenv
-	     ;; FIXME: should probably be called MAKE-EMPTY-LEXENV or
-	     ;; MAKE-NULL-LEXENV
 	     (:constructor make-null-lexenv ())
 	     (:constructor internal-make-lexenv
 			   (functions variables blocks tags type-restrictions
@@ -65,3 +63,10 @@
   ;; an alist of miscellaneous options that are associated with the
   ;; lexical environment
   (options nil :type list))
+
+;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
+;;; to be taken as a null lexical environment
+(defun coerce-to-lexenv (x)
+  (etypecase x
+    (null (make-null-lexenv))
+    (lexenv x)))

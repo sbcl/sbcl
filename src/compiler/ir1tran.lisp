@@ -2892,17 +2892,18 @@
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))
 
-;;; Return a lambda that has been "closed" with respect to ENV,
+;;; Return a lambda that has been "closed" with respect to LEXENV,
 ;;; returning a LAMBDA-WITH-LEXENV if there are interesting macros or
 ;;; declarations. If there is something too complex (like a lexical
 ;;; variable) in the environment, then we return NIL.
-(defun inline-syntactic-closure-lambda (lambda &optional (env *lexenv*))
-  (let ((variables (lexenv-variables env))
-	(functions (lexenv-functions env))
+(defun inline-syntactic-closure-lambda (lambda lexenv)
+  (declare (type lexenv lexenv))
+  (let ((variables (lexenv-variables lexenv))
+	(functions (lexenv-functions lexenv))
 	(decls ())
 	(symmacs ())
 	(macros ()))
-    (cond ((or (lexenv-blocks env) (lexenv-tags env)) nil)
+    (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
 	  ((and (null variables) (null functions))
 	   lambda)
 	  ((dolist (x variables nil)

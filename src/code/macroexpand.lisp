@@ -50,7 +50,7 @@
 				;; in what it sends and liberal in what it
 				;; accepts" by doing the defaulting itself.
 				;; -- WHN 19991128
-				(or env (make-null-lexenv)))
+				(coerce-to-lexenv env))
 		       t)
 	       (values form nil))))
 	((symbolp form)
