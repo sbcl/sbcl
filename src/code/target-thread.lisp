@@ -300,12 +300,15 @@ time we reacquire LOCK and return to the caller."
 ;;; though, it's a good deal gentler than the last-resort functions above
 
 (defun interrupt-thread (thread function)
-  "Interrupt THREAD and make it run FUNCTION.  "
-  (sb!unix::syscall* ("interrupt_thread"
-		      sb!alien:unsigned-long  sb!alien:unsigned-long)
-		     thread
-		     thread (sb!kernel:get-lisp-obj-address
-			     (coerce function 'function))))
+  "Interrupt THREAD and make it run FUNCTION."
+  (let ((function (coerce function 'function)))
+    (sb!sys:with-pinned-objects (function)
+      (sb!unix::syscall* ("interrupt_thread"
+			  sb!alien:unsigned-long  sb!alien:unsigned-long)
+			 thread
+			 thread 
+			 (sb!kernel:get-lisp-obj-address function)))))
+
 (defun terminate-thread (thread-id)
   "Terminate the thread identified by THREAD-ID, by causing it to run
 SB-EXT:QUIT - the usual cleanup forms will be evaluated"

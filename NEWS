@@ -2543,6 +2543,9 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * fixed another bug in backquote printing: no more destructive
     modification of the form's list structure.  (reported by Brian
     Downing)
+  * fixed bug in INTERRUPT-THREAD: pin the function, so that it cannot
+    move between its address being taken and the call to
+    interrupt_thread, fixing a crashing race condition.
   * the SB-POSIX contrib implementation has been adjusted so that it
     no longer exhibits ridiculously poor performance when constructing
     instances corresponding to C structs.
