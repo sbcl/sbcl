@@ -684,10 +684,15 @@ retained, possibly temporariliy, because it might be used internally."
              ;; in the cross-compiler's environment
              "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
 
+             ;; messing with PATHNAMEs
+             "MAKE-TRIVIAL-DEFAULT-PATHNAME"
+             "PHYSICALIZE-PATHNAME"
+             "SANE-DEFAULT-PATHNAME-DEFAULTS"
+
              ;; miscellaneous non-standard but handy user-level functions..
              "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
              "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
-             "SANE-PACKAGE" "SANE-DEFAULT-PATHNAME-DEFAULTS"
+             "SANE-PACKAGE" 
              "CIRCULAR-LIST-P"
              "SWAPPED-ARGS-FUN"
              "ANY/TYPE" "EVERY/TYPE"
@@ -695,7 +700,6 @@ retained, possibly temporariliy, because it might be used internally."
              "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
              "PSXHASH"
              "%BREAK"
-             "PHYSICALIZE-PATHNAME"
 
              ;; ..and macros..
              "COLLECT"

@@ -1017,14 +1017,6 @@
 		(t t)))
 	xn)))
 
-;;; FIXME/REMOVEME: We shouldn't need to do this here, since
-;;; *DEFAULT-PATHNAME-DEFAULTS* is now initialized in
-;;; OS-COLD-INIT-OR-REINIT. But in sbcl-0.6.12.19 someone is using
-;;; this too early for it to be deleted here. I'd like to fix the
-;;; #!+:SB-SHOW stuff, then come back to this. -- WHN 2001-05-29
-(defvar *default-pathname-defaults*
-  (%make-pathname *unix-host* nil nil nil nil :newest))
-
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
   #!+sb-doc
   "Test whether the directories containing the specified file

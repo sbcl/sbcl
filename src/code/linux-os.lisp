@@ -34,11 +34,17 @@
 					       :output stream))))))
 
 (defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
-  #!+sparc ;; Can't use #x20000000 thru #xDFFFFFFF, but mach tries to let us.
-  (sb!sys:allocate-system-memory-at (sb!sys:int-sap #x20000000) #xc0000000)
+  (/show "entering linux-os.lisp OS-COLD-INIT-OR-REINIT")
   (setf *software-version* nil)
+  (/show "setting *DEFAULT-PATHNAME-DEFAULTS*")
   (setf *default-pathname-defaults*
-	(pathname (sb!unix:posix-getcwd/))))
+	;; (temporary value, so that #'PATHNAME won't blow up when
+	;; we call it below:)
+	(make-trivial-default-pathname)
+	*default-pathname-defaults*
+	;; (final value, constructed using #'PATHNAME:)
+	(pathname (sb!unix:posix-getcwd/)))
+  (/show "leaving linux-os.lisp OS-COLD-INIT-OR-REINIT"))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

@@ -85,6 +85,12 @@
   ;; on standard Unix filesystems)
   (version nil :type (or integer pathname-component-tokens (member :newest))))
 
+;;; Return a value suitable, e.g., for preinitializing
+;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
+;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
+(defun make-trivial-default-pathname ()
+  (%make-pathname *unix-host* nil nil nil nil :newest))
+
 ;;; Logical pathnames have the following format:
 ;;;
 ;;; logical-namestring ::=
