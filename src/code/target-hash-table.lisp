@@ -648,8 +648,8 @@
 (declaim (inline maphash))
 (defun maphash (function-designator hash-table)
   #!+sb-doc
-  "For each entry in HASH-TABLE, call the designated function on the key
-   and value of the entry. Return NIL."
+  "For each entry in HASH-TABLE, call the designated two-argument function
+   on the key and value of the entry. Return NIL."
   (let ((fun (%coerce-callable-to-function function-designator))
 	(size (length (hash-table-next-vector hash-table))))
     (declare (type function fun))
@@ -665,33 +665,56 @@
 
 ;;;; methods on HASH-TABLE
 
-(def!method print-object ((ht hash-table) stream)
+;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE
+;;; when reconstructing HASH-TABLE.
+(defun hash-table-ctor-args (hash-table)
+  (when (hash-table-weak-p hash-table)
+    ;; FIXME: This might actually work with no trouble, but as of
+    ;; sbcl-0.6.12.10 when this code was written, weak hash tables
+    ;; weren't working yet, so I couldn't test it. When weak hash
+    ;; tables are supported again, this should be fixed.
+    (error "can't dump weak hash tables readably")) ; defensive programming..
+  `(:test             ',(hash-table-test             hash-table)
+    :size             ',(hash-table-size             hash-table)
+    :rehash-size      ',(hash-table-rehash-size      hash-table)
+    :rehash-threshold ',(hash-table-rehash-threshold hash-table)))
+
+;;; Return an association list representing the same data as HASH-TABLE.
+(defun hash-table-alist (hash-table)
+  (let ((result nil))
+    (maphash (lambda (key value)
+	       (push (cons key value) result))
+	     hash-table)
+    result))
+
+;;; Stuff an association list into HASH-TABLE. Return the hash table,
+;;; so that we can use this for the *PRINT-READABLY* case in
+;;; PRINT-OBJECT (HASH-TABLE T) without having to worry about LET
+;;; forms and readable gensyms and stuff.
+(defun stuff-hash-table (hash-table alist)
+  (dolist (x alist)
+    (setf (gethash (car x) hash-table) (cdr x)))
+  hash-table)
+
+(def!method print-object ((hash-table hash-table) stream)
   (declare (type stream stream))
-  (print-unreadable-object (ht stream :type t :identity t)
-    (format stream
-	    ":TEST ~S :COUNT ~D"
-	    (hash-table-test ht)
-	    (hash-table-number-entries ht))))
+  (cond ((not *print-readably*)
+	 (print-unreadable-object (hash-table stream :type t :identity t)
+	   (format stream
+		   ":TEST ~S :COUNT ~S"
+		   (hash-table-test hash-table)
+		   (hash-table-count hash-table))))
+	((not *read-eval*)
+	 (error "can't print hash tables readably without *READ-EVAL*"))
+	(t
+	 (with-standard-io-syntax
+	  (format stream
+		  "#.~W"
+		  `(stuff-hash-table (make-hash-table ,@(hash-table-ctor-args
+							 hash-table))
+				     ',(hash-table-alist hash-table)))))))
 
 (def!method make-load-form ((hash-table hash-table) &optional environment)
-  (declare (ignorable environment))
-  (values
-   `(make-hash-table
-     :test             ',(hash-table-test hash-table)
-     :size             ',(hash-table-size hash-table)
-     :rehash-size      ',(hash-table-rehash-size hash-table)
-     :rehash-threshold ',(hash-table-rehash-threshold hash-table))
-   (let ((alist nil))
-     (maphash (lambda (key value)
-		(push (cons key value) alist))
-	      hash-table)
-     (if alist
-	 ;; FIXME: It'd probably be more efficient here to write the
-	 ;; hash table values as a SIMPLE-VECTOR rather than an alist.
-	 ;; (Someone dumping a huge hash table might well thank us..)
-	 `(stuff-hash-table ,hash-table ',alist)
-	 nil))))
-
-(defun stuff-hash-table (table alist)
-  (dolist (x alist)
-    (setf (gethash (car x) table) (cdr x))))
+  (declare (ignore environment))
+  (values `(make-hash-table ,@(hash-table-ctor-args hash-table))
+	  `(stuff-hash-table ,hash-table ',(hash-table-alist hash-table))))

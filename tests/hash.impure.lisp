@@ -197,5 +197,29 @@
 	    (error "bad PSXHASH behavior for ~S ~S" i j))))
       )))
 
+;;; As of sbcl-0.6.12.10, writing hash tables readably should work.
+;;; This isn't required by the ANSI standard, but it should be, since
+;;; it's well-defined useful behavior which ANSI prohibits the users
+;;; from implementing themselves. (ANSI says the users can't define
+;;; their own their own PRINT-OBJECT (HASH-TABLE T) methods, and they
+;;; can't even wiggle out of it by subclassing HASH-TABLE or STREAM.)
+(let ((original-ht (make-hash-table :test 'equal :size 111))
+      (original-keys '(1 10 11 400030002 -100000000)))
+  (dolist (key original-keys)
+    (setf (gethash key original-ht)
+	  (expt key 4)))
+  (let* ((written-ht (with-output-to-string (s)
+		       (write original-ht :stream s :readably t)))
+	 (read-ht (with-input-from-string (s written-ht)
+		    (read s))))
+    (assert (= (hash-table-count read-ht)
+	       (hash-table-count original-ht)
+	       (length original-keys)))
+    (assert (eql (hash-table-test original-ht) (hash-table-test read-ht)))
+    (assert (eql (hash-table-size original-ht) (hash-table-size read-ht)))
+    (dolist (key original-keys)
+      (assert (eql (gethash key read-ht)
+		   (gethash key original-ht))))))
+
 ;;; success
 (quit :unix-status 104)

@@ -73,6 +73,25 @@
   (assert (equal pn1 pn2))
   (assert (equal pn1 pn3)))
 
+;;; In addition to the upper-case constraint above, if the logical-pathname
+;;; contains a string component in e.g. the directory, name and type slot,
+;;; these should be valid "WORDS", according to CLHS 19.3.1.
+;;; FIXME: currently SBCL throws NAMESTRING-PARSE-ERROR: should this be
+;;; a TYPE-ERROR?
+
+;; error: directory-component not valid
+(assert (not (ignore-errors
+               (make-pathname :host "FOO" :directory "!bla" :name "bar"))))
+
+;; error: name-component not valid
+(assert (not (ignore-errors
+               (make-pathname :host "FOO" :directory "bla" :name "!bar"))))
+
+;; error: type-component not valid.
+(assert (not (ignore-errors
+               (make-pathname :host "FOO" :directory "bla" :name "bar"
+                              :type "&baz"))))
+
 ;;; We may need to parse the host as a LOGICAL-NAMESTRING HOST. The
 ;;; HOST in PARSE-NAMESTRING can be either a string or :UNSPECIFIC
 ;;; without actually requiring the system to signal an error (apart
@@ -90,6 +109,12 @@
 ;;; ANSI says PARSE-NAMESTRING returns TYPE-ERROR on host mismatch.
 (let ((cond (grab-condition (parse-namestring "foo:jeamland" "demo2"))))
   (assert (typep cond 'type-error)))
+
+;;; turning one logical pathname into another:
+(setf (logical-pathname-translations "foo")
+       '(("tohome;*.*.*" "home:*.*.*")))
+(assert (equal (namestring (translate-logical-pathname "foo:tohome;x.y"))
+               "home:x.y"))    
 
 ;;; ANSI, in its wisdom, specifies that it's an error (specifically a
 ;;; TYPE-ERROR) to query the system about the translations of a string

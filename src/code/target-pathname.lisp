@@ -71,7 +71,7 @@
   ;; but the arguments given in the X3J13 cleanup issue
   ;; PATHNAME-LOGICAL:ADD seem compelling: we should canonicalize the
   ;; case, and uppercase is the ordinary way to do that.
-  (flet ((upcase-maybe (x) (typecase x (string (string-upcase x)) (t x))))
+  (flet ((upcase-maybe (x) (typecase x (string (logical-word-or-lose x)) (t x))))
     (if (typep host 'logical-host)
 	(%make-logical-pathname host
 				:unspecific
@@ -1227,7 +1227,7 @@ a host-structure or string."
 
 ;;;; utilities
 
-;;; Canonicalize a logical pathanme word by uppercasing it checking that it
+;;; Canonicalize a logical pathname word by uppercasing it checking that it
 ;;; contains only legal characters.
 (defun logical-word-or-lose (word)
   (declare (string word))
