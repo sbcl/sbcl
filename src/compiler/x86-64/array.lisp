@@ -1315,33 +1315,31 @@
     (move result eax)))
 
 ;;; These VOPs are used for implementing float slots in structures (whose raw
-;;; data is an unsigned-32 vector).
+;;; data is an unsigned-64 vector).
 (define-vop (raw-ref-single data-vector-ref/simple-array-single-float)
   (:translate %raw-ref-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 (define-vop (raw-ref-single-c data-vector-ref-c/simple-array-single-float)
   (:translate %raw-ref-single)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
 (define-vop (raw-set-single data-vector-set/simple-array-single-float)
   (:translate %raw-set-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum single-float))
+  (:arg-types sb!c::raw-vector positive-fixnum single-float))
 (define-vop (raw-set-single-c data-vector-set-c/simple-array-single-float)
   (:translate %raw-set-single)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))
-	      single-float))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61)) single-float))
 (define-vop (raw-ref-double data-vector-ref/simple-array-double-float)
   (:translate %raw-ref-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 (define-vop (raw-ref-double-c data-vector-ref-c/simple-array-double-float)
   (:translate %raw-ref-double)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
 (define-vop (raw-set-double data-vector-set/simple-array-double-float)
   (:translate %raw-set-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum double-float))
+  (:arg-types sb!c::raw-vector positive-fixnum double-float))
 (define-vop (raw-set-double-c data-vector-set-c/simple-array-double-float)
   (:translate %raw-set-double)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))
-	      double-float))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61)) double-float))
 
 
 ;;;; complex-float raw structure slot accessors
@@ -1349,37 +1347,36 @@
 (define-vop (raw-ref-complex-single
 	     data-vector-ref/simple-array-complex-single-float)
   (:translate %raw-ref-complex-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 (define-vop (raw-ref-complex-single-c
 	     data-vector-ref-c/simple-array-complex-single-float)
   (:translate %raw-ref-complex-single)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
 (define-vop (raw-set-complex-single
 	     data-vector-set/simple-array-complex-single-float)
   (:translate %raw-set-complex-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum complex-single-float))
+  (:arg-types sb!c::raw-vector positive-fixnum complex-single-float))
 (define-vop (raw-set-complex-single-c
 	     data-vector-set-c/simple-array-complex-single-float)
   (:translate %raw-set-complex-single)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))
 	      complex-single-float))
 (define-vop (raw-ref-complex-double
 	     data-vector-ref/simple-array-complex-double-float)
   (:translate %raw-ref-complex-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 (define-vop (raw-ref-complex-double-c
 	     data-vector-ref-c/simple-array-complex-double-float)
   (:translate %raw-ref-complex-double)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
 (define-vop (raw-set-complex-double
 	     data-vector-set/simple-array-complex-double-float)
   (:translate %raw-set-complex-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum
-	      complex-double-float))
+  (:arg-types sb!c::raw-vector positive-fixnum complex-double-float))
 (define-vop (raw-set-complex-double-c
 	     data-vector-set-c/simple-array-complex-double-float)
   (:translate %raw-set-complex-double)
-  (:arg-types simple-array-unsigned-byte-32 (:constant (signed-byte 61))
+  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))
 	      complex-double-float))
 
 

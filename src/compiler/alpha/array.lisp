@@ -529,41 +529,39 @@
 ;;;
 (define-vop (raw-ref-single data-vector-ref/simple-array-single-float)
   (:translate %raw-ref-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 ;;;
 (define-vop (raw-set-single data-vector-set/simple-array-single-float)
   (:translate %raw-set-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum single-float))
+  (:arg-types sb!c::raw-vector positive-fixnum single-float))
 ;;;
 (define-vop (raw-ref-double data-vector-ref/simple-array-double-float)
   (:translate %raw-ref-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 ;;;
 (define-vop (raw-set-double data-vector-set/simple-array-double-float)
   (:translate %raw-set-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum double-float))
+  (:arg-types sb!c::raw-vector positive-fixnum double-float))
 
 (define-vop (raw-ref-complex-single
 	     data-vector-ref/simple-array-complex-single-float)
   (:translate %raw-ref-complex-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 ;;;
 (define-vop (raw-set-complex-single
 	     data-vector-set/simple-array-complex-single-float)
   (:translate %raw-set-complex-single)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum
-	      complex-single-float))
+  (:arg-types sb!c::raw-vector positive-fixnum complex-single-float))
 ;;;
 (define-vop (raw-ref-complex-double
 	     data-vector-ref/simple-array-complex-double-float)
   (:translate %raw-ref-complex-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum))
+  (:arg-types sb!c::raw-vector positive-fixnum))
 ;;;
 (define-vop (raw-set-complex-double
 	     data-vector-set/simple-array-complex-double-float)
   (:translate %raw-set-complex-double)
-  (:arg-types simple-array-unsigned-byte-32 positive-fixnum
-	      complex-double-float))
+  (:arg-types sb!c::raw-vector positive-fixnum complex-double-float))
 
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
