@@ -80,6 +80,12 @@ decision allows for infrastructural progress).  This requires
 modification of the various CHAR-UPCASE/STRING-DOWNCASE/GRAPHIC-CHAR-P
 etc. functions, and will probably address the failing test FORMAT.C.4A
 from gcl/ansi-tests.
+  -- done, including a test case for ANSI consistency wrt
+     GRAPHIC-CHAR-P and CHAR-NAME.  The names of the characters
+     between #x80 and #xa0 might want to be revised.
+     (the inclusion of the binary data generated from the Unicode
+     data files might also be suboptimal in the long run.  Many other
+     possibilities exist.)
 
 ** implement :UTF-8, :ISO-8859-1 and :POSIX external formats, and make
 :DEFAULT an alias for the approprate one based on nl_langinfo(CHARSET)

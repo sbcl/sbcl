@@ -54,3 +54,10 @@
                 (digit-char 4 1)
                 (digit-char 4 37)))
   (assert (raises-error? (apply (car form) (mapcar 'eval (cdr form))) type-error)))
+
+(dotimes (i 256)
+  (let* ((char (code-char i))
+         (graphicp (graphic-char-p char))
+         (name (char-name char)))
+    (unless graphicp
+      (assert name))))
