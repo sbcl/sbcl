@@ -1256,5 +1256,44 @@ WORKAROUND:
   the control word; however, this clobbers any change the user might
   have made.
 
-292:
-  (fixed in 0.8.3.74)
+293:
+  From Paul Dietz:
+
+  (defparameter *f1*
+     (compile nil '(LAMBDA (C)
+  			(TRUNCATE (LOGORC1 -996082 C) -2))))
+
+  (defparameter *f2*
+     (compile nil '(LAMBDA (C) (DECLARE (NOTINLINE TRUNCATE))
+  			(TRUNCATE (LOGORC1 -996082 C) -2))))
+
+  (print (funcall *f1* 25337234)) ==> 13099002
+  (print (funcall *f2* 25337234)) ==> -13099001
+
+294:
+  From Paul Dietz:
+
+  * (funcall (compile nil `(lambda (c)
+                              (declare (optimize (speed 3))
+                                       (type (integer 23062188 149459656) c))
+                              (mod c (min -2 0))))
+              95019853)
+
+  debugger invoked on condition of type SB-INT:SIMPLE-PROGRAM-ERROR:
+     invalid number of arguments: 1
+
+  [...]
+
+  * (funcall (compile nil `(lambda (b)
+                              (declare (optimize (speed 3))
+                                       (type (integer 2 152044363) b))
+                               (rem b (min -16 0))))
+              108251912)
+
+  debugger invoked on condition of type SB-INT:SIMPLE-PROGRAM-ERROR:
+     invalid number of arguments: 1
+
+295:
+  From Paul Dietz:
+
+  (ash -1000000000000 -10000000000000000000) ==> 0  ;; should be -1

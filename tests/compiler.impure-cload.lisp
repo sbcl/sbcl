@@ -276,7 +276,7 @@
       (device))))
 
 ;;;
-(defun foo ()
+(defun #:foo ()
   (labels ((foo (x)
              (return-from foo x)
              (block u
@@ -285,6 +285,13 @@
                  (list (bar 1) (bar 1 2))))
              (1+ x)))
     #'foo))
+
+(defun #:foo (b c)
+  (declare (type (integer 0 1) b) (optimize (speed 3)))
+  (flet ((%f2 () (lognor (block b5 138) c)))
+    (if (not (or (= -67399 b) b))
+        (deposit-field (%f2) (byte 11 8) -3)
+        c)))
 
 
 (sb-ext:quit :unix-status 104)
