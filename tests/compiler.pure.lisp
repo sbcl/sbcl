@@ -520,3 +520,12 @@
                                  (+ i 2)))
                 (sb-ext:compiler-note (c) (return :good))))
             :good))
+
+;;; bug 277: IGNORE/IGNORABLE declarations should be acceptable for
+;;; symbol macros
+(assert (not (nth-value 1 (compile nil '(lambda (u v)
+                                         (symbol-macrolet ((x u)
+                                                           (y v))
+                                             (declare (ignore x)
+                                                      (ignorable y))
+                                           (list u v)))))))

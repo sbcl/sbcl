@@ -9,20 +9,23 @@ define-declaration
 |#
 
 (declaim (ftype (sfunction
-                 (symbol &optional (or null sb-kernel:lexenv))
+                 (symbol &optional (or null lexenv))
                  (values (member nil :special :lexical :symbol-macro :constant)
                          boolean
                          list))
                 variable-information))
 (defun variable-information (var &optional env)
-  (let* ((*lexenv* (or env (sb-kernel:make-null-lexenv)))
+  "Return three values. The first indicates a binding kind of VAR; the
+second is True if there is a local binding of VAR; the third is an
+alist of declarations that apply to the apparent binding of VAR."
+  (let* ((*lexenv* (or env (make-null-lexenv)))
          (info (lexenv-find var vars)))
     (etypecase info
-      (sb-c::leaf (let ((type (sb-kernel:type-specifier
-                               (sb-kernel:type-intersection
+      (sb-c::leaf (let ((type (type-specifier
+                               (type-intersection
                                 (sb-c::leaf-type info)
                                 (or (lexenv-find info type-restrictions)
-                                    sb-kernel:*universal-type*)))))
+                                    *universal-type*)))))
                     (etypecase info
                       (sb-c::lambda-var
                        (values :lexical t
@@ -46,24 +49,22 @@ define-declaration
                       (:global nil))
                     nil
                     `(                  ; XXX ignore
-                      (type . ,(sb-kernel:type-specifier ; XXX local type
+                      (type . ,(type-specifier ; XXX local type
                                 (info :variable :type var)))))))))
 
-(defun parse-macro (name lambda-list body
-                    &optional env)
+(defun parse-macro (name lambda-list body &optional env)
   (declare (ignore env))
   (with-unique-names (whole environment)
     (multiple-value-bind (body decls)
-        (sb-kernel:parse-defmacro lambda-list whole body name
-                                  'parse-macro
-                                  :environment environment)
+        (parse-defmacro lambda-list whole body name
+                        'parse-macro
+                        :environment environment)
       `(lambda (,whole ,environment)
          ,@decls
          ,body))))
 
-(defun enclose (lambda-expression
-                &optional env)
+(defun enclose (lambda-expression &optional env)
   (let ((env (if env
                  (sb-c::make-restricted-lexenv env)
-                 (sb-kernel:make-null-lexenv))))
+                 (make-null-lexenv))))
     (compile-in-lexenv nil lambda-expression env)))

@@ -383,7 +383,7 @@
 		     ,n-cond
 		     (car *restart-clusters*)
 		   ,(if (eq name 'cerror)
-			`(cerror ,(second expression) ,n-cond)
+			`(cerror ,(second exp) ,n-cond)
 			`(,name ,n-cond))))
 	      expression))
 	expression)))

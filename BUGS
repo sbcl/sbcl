@@ -1072,7 +1072,9 @@ WORKAROUND:
 
 274:
   CLHS says that type declaration of a symbol macro should not affect
-  its expansion, but in SBCL it does.
+  its expansion, but in SBCL it does. (If you like magic and want to
+  fix it, don't forget to change all uses of MACROEXPAND to
+  MACROEXPAND*.)
 
 275:
   The following code (taken from CLOCC) takes a lot of time to compile:
@@ -1090,10 +1092,6 @@ WORKAROUND:
     (fee 1) => type error
 
   (taken from CLOCC)
-
-277:
-  IGNORE/IGNORABLE declarations should be acceptable for symbol
-  macros.
 
 278:
   a.
@@ -1230,3 +1228,12 @@ WORKAROUND:
 
   (the type error doesn't seem to be terribly deterministic in when it
   occurs.  Bigger numbers seem better able to trigger the error)
+
+286: "recursive known functions"
+  Self-call recognition conflicts with known function
+  recognition. Currently cross compiler and target COMPILE do not
+  recognize recursion, and in target compiler it can be disabled. We
+  can always disable it for known functions with RECURSIVE attribute,
+  but there remains a possibility of a function with a
+  (tail)-recursive simplification pass and transforms/VOPs for base
+  cases.

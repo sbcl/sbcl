@@ -1061,7 +1061,7 @@
 	(compiler-style-warn "declaring unknown variable ~S to be ignored"
 			     name))
        ;; FIXME: This special case looks like non-ANSI weirdness.
-       ((and (consp var) (consp (cdr var)) (eq (cadr var) 'macro))
+       ((and (consp var) (eq (car var) 'macro))
 	;; Just ignore the IGNORE decl.
 	)
        ((functional-p var)

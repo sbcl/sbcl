@@ -1,5 +1,5 @@
 (defpackage :sb-cltl2
-  (:use :cl :sb-c :sb-int)
+  (:use :cl :sb-c :sb-int :sb-kernel)
   (:export #:compiler-let
            #:macroexpand-all
            ;; environment access
