@@ -963,23 +963,19 @@ And so, we are saved.
 ;;;	       an :instance slot, this is the index number of that slot
 ;;;	       in the object argument.
 (defun cache-miss-values (gf args state)
-  (if (null (if (early-gf-p gf)
-		(early-gf-methods gf)
-		(generic-function-methods gf)))
-      (apply #'no-applicable-method gf args)
-      (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
-	  (get-generic-function-info gf)
-	(declare (ignore nreq applyp nkeys))
-	(with-dfun-wrappers (args metatypes)
-	  (dfun-wrappers invalid-wrapper-p wrappers classes types)
-	  (error-need-at-least-n-args gf (length metatypes))
-	  (multiple-value-bind (emf methods accessor-type index)
-	      (cache-miss-values-internal
-	       gf arg-info wrappers classes types state)
-	    (values emf methods
-		    dfun-wrappers
-		    invalid-wrapper-p
-		    accessor-type index))))))
+  (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
+      (get-generic-function-info gf)
+    (declare (ignore nreq applyp nkeys))
+    (with-dfun-wrappers (args metatypes)
+      (dfun-wrappers invalid-wrapper-p wrappers classes types)
+      (error-need-at-least-n-args gf (length metatypes))
+      (multiple-value-bind (emf methods accessor-type index)
+          (cache-miss-values-internal
+           gf arg-info wrappers classes types state)
+        (values emf methods
+                dfun-wrappers
+                invalid-wrapper-p
+                accessor-type index)))))
 
 (defun cache-miss-values-internal (gf arg-info wrappers classes types state)
   (let* ((for-accessor-p (eq state 'accessor))

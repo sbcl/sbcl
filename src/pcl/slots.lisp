@@ -144,8 +144,6 @@
       `(accessor-set-slot-value ,object-form ,slot-name-form ,new-value-form)
       `(set-slot-value-normal ,object-form ,slot-name-form ,new-value-form)))
 
-(defconstant +optimize-slot-boundp+ nil)
-
 (defun slot-boundp (object slot-name)
   (let* ((class (class-of object))
 	 (slot-definition (find-slot-definition class slot-name)))

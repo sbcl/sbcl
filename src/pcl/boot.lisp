@@ -1760,7 +1760,11 @@ bootstrapping.
 	 (setf (getf ,all-keys :method-combination)
 	       (find-method-combination (class-prototype ,gf-class)
 					(car combin)
-					(cdr combin)))))))
+					(cdr combin)))))
+    (let ((method-class (getf ,all-keys :method-class '.shes-not-there.)))
+      (unless (eq method-class '.shes-not-there.)
+        (setf (getf ,all-keys :method-class)
+                (find-class method-class t ,env))))))
 
 (defun real-ensure-gf-using-class--generic-function
        (existing

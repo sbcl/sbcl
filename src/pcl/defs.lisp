@@ -198,12 +198,18 @@
     #'(lambda (x)
 	(funcall (the function (find-class-cell-predicate cell)) x))))
 
-(defun make-class-eq-predicate (class)
-  (when (symbolp class) (setq class (find-class class)))
-  #'(lambda (object) (eq class (class-of object))))
-
-(defun make-eql-predicate (eql-object)
-  #'(lambda (object) (eql eql-object object)))
+(defun make-type-predicate-name (name &optional kind)
+  (if (symbol-package name)
+      (intern (format nil
+		      "~@[~A ~]TYPE-PREDICATE ~A ~A"
+		      kind
+		      (package-name (symbol-package name))
+		      (symbol-name name))
+	      *pcl-package*)
+      (make-symbol (format nil
+			   "~@[~A ~]TYPE-PREDICATE ~A"
+			   kind
+			   (symbol-name name)))))
 
 ;;; internal to this file..
 ;;;
@@ -271,19 +277,6 @@
 	      (t
 	       (subtypep (convert-to-system-type type1)
 			 (convert-to-system-type type2))))))))
-
-(defun make-type-predicate-name (name &optional kind)
-  (if (symbol-package name)
-      (intern (format nil
-		      "~@[~A ~]TYPE-PREDICATE ~A ~A"
-		      kind
-		      (package-name (symbol-package name))
-		      (symbol-name name))
-	      *pcl-package*)
-      (make-symbol (format nil
-			   "~@[~A ~]TYPE-PREDICATE ~A"
-			   kind
-			   (symbol-name name)))))
 
 (defvar *built-in-class-symbols* ())
 (defvar *built-in-wrapper-symbols* ())

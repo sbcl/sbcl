@@ -23,22 +23,6 @@
 
 (in-package "SB-PCL")
 
-(defmethod shared-initialize :after ((slotd standard-slot-definition)
-				     slot-names &key)
-  (declare (ignore slot-names))
-  (with-slots (allocation class)
-    slotd
-    (setq allocation (if (eq allocation :class) class allocation))))
-
-(defmethod shared-initialize :after ((slotd structure-slot-definition)
-				     slot-names
-				     &key (allocation :instance))
-  (declare (ignore slot-names))
-  (unless (eq allocation :instance)
-    (error "Structure slots must have :INSTANCE allocation.")))
-
-(defmethod inform-type-system-about-class ((class structure-class) (name t))
-  nil)
 
 ;;; methods
 ;;;

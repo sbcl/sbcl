@@ -84,20 +84,13 @@
 	`(let ,bindings ,form)
 	form)))
 
-;;; FIXME: Why is this defined in two different places? And what does
-;;; it mean anyway? And can we just eliminate it completely (replacing
-;;; it with NIL, then hand-eliminating any resulting dead code)?
-(defconstant +optimize-slot-boundp+ nil)
-
 (defmacro accessor-slot-boundp (object slot-name)
   (unless (constantp slot-name)
     (error "~S requires its slot-name argument to be a constant"
 	   'accessor-slot-boundp))
   (let* ((slot-name (eval slot-name))
 	 (sym (slot-boundp-symbol slot-name)))
-    (if (not +optimize-slot-boundp+)
-	`(slot-boundp-normal ,object ',slot-name)
-	`(asv-funcall ,sym ,slot-name boundp ,object))))
+    `(slot-boundp-normal ,object ',slot-name)))
 
 (defun structure-slot-boundp (object)
   (declare (ignore object))
@@ -411,12 +404,6 @@
 	   (gf (ensure-generic-function name)))
       (unless (generic-function-methods gf)
 	(add-writer-method *the-class-slot-object* gf slot-name))))
-  (when (and +optimize-slot-boundp+
-	     (or (null type) (eq type 'boundp)))
-    (let* ((name (slot-boundp-symbol slot-name))
-	   (gf (ensure-generic-function name)))
-      (unless (generic-function-methods gf)
-	(add-boundp-method *the-class-slot-object* gf slot-name))))
   nil)
 
 (defun initialize-internal-slot-gfs* (readers writers boundps)

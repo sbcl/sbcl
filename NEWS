@@ -740,20 +740,20 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
 * Martin Atzmueller ported Tim Moore's marvellous CMU CL DISASSEMBLE
   patch, so that DISASSEMBLE output is much nicer.
 * better error handling in CLOS method combination, thanks to 
-  Martin Atzmueller and Pierre Mai
-* Logical pathnames work better, thanks to various fixes and 
-  tests from Dan Barlow.
+  Martin Atzmueller porting Pierre Mai's CMU CL patches
+* Pathnames are much more ANSI-compliant, thanks to various fixes
+  and tests from Dan Barlow.
 * Hash tables can be printed readably, as inspired by CMU CL code
   of Eric Marsden and SBCL code of Martin Atzmueller.
-* a new slam.sh hack to shorten the edit/compile/debug cycle for
-  low-level changes to SBCL itself, and a new :SB-AFTER-XC-CORE
-  target feature to control the generation of the after-xc.core
-  file needed by slam.sh.
 * Compiler trace output (the :TRACE-FILE option to COMPILE-FILE)
   is now a supported extension again, since the consensus is that
   it can be useful for ordinary development work, not just for
   debugging SBCL itself.
 ?? more overflow fixes for >16Mbyte i/o buffers
+* There's a new slam.sh hack to shorten the edit/compile/debug
+  cycle for low-level changes to SBCL itself, and a new
+  :SB-AFTER-XC-CORE target feature to control the generation of
+  the after-xc.core file needed by slam.sh.
 * minor incompatible change: The ENTRY-POINTS &KEY argument to 
   COMPILE-FILE is no longer supported, so that now every function
   gets an entry point, so that block compilation looks a little

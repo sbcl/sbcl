@@ -49,10 +49,6 @@
   (expand-defclass name direct-superclasses direct-slots options))
 
 (defun expand-defclass (name supers slots options)
-  ;; FIXME: We should probably just ensure that the relevant
-  ;; DEFVAR/DEFPARAMETERs occur before this definition, rather 
-  ;; than locally declaring them SPECIAL.
-  (declare (special *boot-state* *the-class-structure-class*))
   (setq supers  (copy-tree supers)
 	slots   (copy-tree slots)
 	options (copy-tree options))
@@ -127,6 +123,22 @@
 		   ,defclass-form))
 	      (progn
 		(when (eq *boot-state* 'complete)
+		  ;; FIXME: MNA (on sbcl-devel 2001-05-30) reported
+		  ;; (if I understand correctly -- WHN) that this call
+		  ;; is directly responsible for defining
+		  ;; class-predicates which always return
+		  ;; CONSTANTLY-NIL in the compile-time environment,
+		  ;; and is indirectly responsible for bogus warnings
+		  ;; about redefinitions when making definitions in
+		  ;; the interpreter. I didn't like his fix (deleting
+		  ;; the call) since I think the type system *should*
+		  ;; be informed about class definitions here. And I'm
+		  ;; not eager to look too deeply into this sort of
+		  ;; done-too-many-times-in-the-interpreter problem
+		  ;; right now, since it should be easier to make a
+		  ;; clean fix when EVAL-WHEN is made more ANSI (as
+		  ;; per the IR1 section in the BUGS file). But
+		  ;; at some point this should be cleaned up.
 		  (inform-type-system-about-std-class name))
 		defclass-form)))))))
 

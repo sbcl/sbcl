@@ -335,10 +335,9 @@
 (defmethod ensure-class-using-class (name (class null) &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
-    (inform-type-system-about-class (class-prototype meta) name);***
     (setf class (apply #'make-instance meta :name name initargs)
 	  (find-class name) class)
-    (inform-type-system-about-class class name)			;***
+    (inform-type-system-about-class class name)
     class))
 
 (defmethod ensure-class-using-class (name (class pcl-class) &rest args &key)
@@ -347,7 +346,7 @@
     (unless (eq (class-of class) meta) (change-class class meta))
     (apply #'reinitialize-instance class initargs)
     (setf (find-class name) class)
-    (inform-type-system-about-class class name)			;***
+    (inform-type-system-about-class class name)
     class))
 
 (defmethod class-predicate-name ((class t))
@@ -387,14 +386,6 @@
 		     (and (neq supplied-slots unsupplied) supplied-slots)
 		     initargs)))))
 
-#|| ; since it doesn't do anything
-(defmethod shared-initialize :before ((class std-class)
-				      slot-names
-				      &key direct-superclasses)
-  (declare (ignore slot-names))
-  ;; *** error checking
-  )
-||#
 
 (defmethod shared-initialize :after
 	   ((class std-class)
@@ -471,6 +462,20 @@
   (map-dependents class
 		  #'(lambda (dependent)
 		      (apply #'update-dependent class dependent initargs))))
+
+(defmethod shared-initialize :after ((slotd standard-slot-definition)
+				     slot-names &key)
+  (declare (ignore slot-names))
+  (with-slots (allocation class)
+    slotd
+    (setq allocation (if (eq allocation :class) class allocation))))
+
+(defmethod shared-initialize :after ((slotd structure-slot-definition)
+				     slot-names
+				     &key (allocation :instance))
+  (declare (ignore slot-names))
+  (unless (eq allocation :instance)
+    (error "Structure slots must have :INSTANCE allocation.")))
 
 (defmethod shared-initialize :after
       ((class structure-class)
@@ -968,7 +973,7 @@
 ;;; *** There is a subtle bug here which is going to have to be fixed.
 ;;; *** Namely, the simplistic use of the template has to be fixed. We
 ;;; *** have to give the optimize-slot-value method the user might have
-;;; *** defined for this metclass a chance to run.
+;;; *** defined for this metaclass a chance to run.
 
 (defmethod make-reader-method-function ((class slot-class) slot-name)
   (make-std-reader-method-function (class-name class) slot-name))
@@ -980,7 +985,6 @@
   (make-std-boundp-method-function (class-name class) slot-name))
 
 ;;;; inform-type-system-about-class
-;;;; make-type-predicate
 ;;;
 ;;; These are NOT part of the standard protocol. They are internal
 ;;; mechanism which PCL uses to *try* and tell the type system about
@@ -990,6 +994,9 @@
 ;;; the type system about new classes would be different.
 (defmethod inform-type-system-about-class ((class std-class) name)
   (inform-type-system-about-std-class name))
+
+(defmethod inform-type-system-about-class ((class structure-class) (name t))
+  nil)
 
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))
