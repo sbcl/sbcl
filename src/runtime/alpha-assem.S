@@ -18,6 +18,11 @@
 #endif
 #include "sbcl.h"
 #include "lispregs.h"
+#include "genesis/fdefn.h"
+#include "genesis/closure.h"
+#include "genesis/simple-fun.h"
+#include "genesis/static-symbols.h"
+
 /* #include "globals.h" */
 	
 /*
