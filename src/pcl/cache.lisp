@@ -816,25 +816,23 @@
 	`(function-funcall ,fn-variable ,@required))))
 
 (defun make-dfun-arg-list (metatypes applyp)
-  (let ((required
-         (let ((required nil))
-           (dotimes (i (length metatypes))
-             (push (dfun-arg-symbol i) required))
-           (nreverse required))))
+  (let ((required (let ((reversed-required nil))
+		    (dotimes (i (length metatypes))
+		      (push (dfun-arg-symbol i) reversed-required))
+		    (nreverse reversed-required))))
     (if applyp
 	`(list* ,@required .dfun-rest-arg.)
 	`(list ,@required))))
 
 (defun make-fast-method-call-lambda-list (metatypes applyp)
-  (let ((lambda-list nil))
-    (push '.pv-cell. lambda-list)
-    (push '.next-method-call. lambda-list)
+  (let ((reversed-lambda-list nil))
+    (push '.pv-cell. reversed-lambda-list)
+    (push '.next-method-call. reversed-lambda-list)
     (dotimes (i (length metatypes))
-      (push (dfun-arg-symbol i) lambda-list))
+      (push (dfun-arg-symbol i) reversed-lambda-list))
     (when applyp
-      (push '.dfun-rest-arg. lambda-list))
-    (nreverse lambda-list)))
-
+      (push '.dfun-rest-arg. reversed-lambda-list))
+    (nreverse reversed-lambda-list)))
 
 ;;;; a comment from some PCL implementor:
 ;;;;     Its too bad Common Lisp compilers freak out when you have a

@@ -62,7 +62,7 @@
 		      (emit-one-or-n-index-reader/writer-macro :writer nil nil)))))
    nil))
 
-;;; Note this list is setup in dlisp3.lisp when all the necessary
+;;; Note this list is set up in dlisp3.lisp when all the necessary
 ;;; macros have been loaded.
 (defvar *checking-or-caching-function-list* nil)
 

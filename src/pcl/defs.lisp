@@ -507,90 +507,93 @@
 
 (defclass funcallable-standard-object (std-object
 				       sb-kernel:funcallable-instance)
-     ()
+  ()
   (:metaclass funcallable-standard-class))
 
 (defclass specializer (standard-object)
-     ((type
-	:initform nil
-	:reader specializer-type)))
+  ((type
+    :initform nil
+    :reader specializer-type)))
 
 (defclass definition-source-mixin (std-object)
-     ((source
-	:initform *load-truename*
-	:reader definition-source
-	:initarg :definition-source))
+  ((source
+    :initform *load-truename*
+    :reader definition-source
+    :initarg :definition-source))
   (:metaclass std-class))
 
 (defclass plist-mixin (std-object)
-     ((plist
-	:initform ()
-	:accessor object-plist))
+  ((plist
+    :initform ()
+    :accessor object-plist))
   (:metaclass std-class))
 
 (defclass documentation-mixin (plist-mixin)
-     ()
+  ()
   (:metaclass std-class))
 
 (defclass dependent-update-mixin (plist-mixin)
-    ()
+  ()
   (:metaclass std-class))
 
-;;; The class CLASS is a specified basic class. It is the common superclass
-;;; of any kind of class. That is any class that can be a metaclass must
-;;; have the class CLASS in its class precedence list.
-(defclass class (documentation-mixin dependent-update-mixin
-		 definition-source-mixin specializer)
-     ((name
-	:initform nil
-	:initarg  :name
-	:accessor class-name)
-      (class-eq-specializer
-	:initform nil
-	:reader class-eq-specializer)
-      (direct-superclasses
-	:initform ()
-	:reader class-direct-superclasses)
-      (direct-subclasses
-	:initform ()
-	:reader class-direct-subclasses)
-      (direct-methods
-	:initform (cons nil nil))
-      (predicate-name
-	:initform nil
-	:reader class-predicate-name)))
+;;; The class CLASS is a specified basic class. It is the common
+;;; superclass of any kind of class. That is any class that can be a
+;;; metaclass must have the class CLASS in its class precedence list.
+(defclass class (documentation-mixin
+		 dependent-update-mixin
+		 definition-source-mixin
+		 specializer)
+  ((name
+    :initform nil
+    :initarg  :name
+    :accessor class-name)
+   (class-eq-specializer
+    :initform nil
+    :reader class-eq-specializer)
+   (direct-superclasses
+    :initform ()
+    :reader class-direct-superclasses)
+   (direct-subclasses
+    :initform ()
+    :reader class-direct-subclasses)
+   (direct-methods
+    :initform (cons nil nil))
+   (predicate-name
+    :initform nil
+    :reader class-predicate-name)))
 
-;;; The class PCL-CLASS is an implementation-specific common superclass of
-;;; all specified subclasses of the class CLASS.
+;;; The class PCL-CLASS is an implementation-specific common
+;;; superclass of all specified subclasses of the class CLASS.
 (defclass pcl-class (class)
-     ((class-precedence-list
-	:reader class-precedence-list)
-      (can-precede-list
-	:initform ()
-	:reader class-can-precede-list)
-      (incompatible-superclass-list
-	:initform ()
-	:accessor class-incompatible-superclass-list)
-      (wrapper
-	:initform nil
-	:reader class-wrapper)
-      (prototype
-	:initform nil
-	:reader class-prototype)))
+  ((class-precedence-list
+    :reader class-precedence-list)
+   (can-precede-list
+    :initform ()
+    :reader class-can-precede-list)
+   (incompatible-superclass-list
+    :initform ()
+    :accessor class-incompatible-superclass-list)
+   (wrapper
+    :initform nil
+    :reader class-wrapper)
+   (prototype
+    :initform nil
+    :reader class-prototype)))
 
 (defclass slot-class (pcl-class)
-     ((direct-slots
-	:initform ()
-	:accessor class-direct-slots)
-      (slots
-	:initform ()
-	:accessor class-slots)
-      (initialize-info
-	:initform nil
-	:accessor class-initialize-info)))
+  ((direct-slots
+    :initform ()
+    :accessor class-direct-slots)
+   (slots
+    :initform ()
+    :accessor class-slots)
+   (initialize-info
+    :initform nil
+    :accessor class-initialize-info)))
 
-;;; The class STD-CLASS is an implementation-specific common superclass of
-;;; the classes STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.
+;;; The class STD-CLASS is an implementation-specific common
+;;; superclass of the classes STANDARD-CLASS and
+;;; FUNCALLABLE-STANDARD-CLASS.
 (defclass std-class (slot-class)
   ())
 
@@ -644,41 +647,41 @@
 ;;;; slot definitions
 
 (defclass slot-definition (standard-object)
-     ((name
-	:initform nil
-	:initarg :name
-	:accessor slot-definition-name)
-      (initform
-	:initform nil
-	:initarg :initform
-	:accessor slot-definition-initform)
-      (initfunction
-	:initform nil
-	:initarg :initfunction
-	:accessor slot-definition-initfunction)
-      (readers
-	:initform nil
-	:initarg :readers
-	:accessor slot-definition-readers)
-      (writers
-	:initform nil
-	:initarg :writers
-	:accessor slot-definition-writers)
-      (initargs
-	:initform nil
-	:initarg :initargs
-	:accessor slot-definition-initargs)
-      (type
-	:initform t
-	:initarg :type
-	:accessor slot-definition-type)
-      (documentation
-	:initform ""
-	:initarg :documentation)
-      (class
-	:initform nil
-	:initarg :class
-	:accessor slot-definition-class)))
+  ((name
+    :initform nil
+    :initarg :name
+    :accessor slot-definition-name)
+   (initform
+    :initform nil
+    :initarg :initform
+    :accessor slot-definition-initform)
+   (initfunction
+    :initform nil
+    :initarg :initfunction
+    :accessor slot-definition-initfunction)
+   (readers
+    :initform nil
+    :initarg :readers
+    :accessor slot-definition-readers)
+   (writers
+    :initform nil
+    :initarg :writers
+    :accessor slot-definition-writers)
+   (initargs
+    :initform nil
+    :initarg :initargs
+    :accessor slot-definition-initargs)
+   (type
+    :initform t
+    :initarg :type
+    :accessor slot-definition-type)
+   (documentation
+    :initform ""
+    :initarg :documentation)
+   (class
+    :initform nil
+    :initarg :class
+    :accessor slot-definition-class)))
 
 (defclass standard-slot-definition (slot-definition)
   ((allocation
@@ -823,14 +826,17 @@
 
 (defclass method-combination (standard-object) ())
 
-(defclass standard-method-combination
-	  (definition-source-mixin method-combination)
-     ((type	  :reader method-combination-type
-		     :initarg :type)
-      (documentation :reader method-combination-documentation
-		     :initarg :documentation)
-      (options       :reader method-combination-options
-		     :initarg :options)))
+(defclass standard-method-combination (definition-source-mixin
+					method-combination)
+  ((type
+    :reader method-combination-type
+    :initarg :type)
+   (documentation
+    :reader method-combination-documentation
+    :initarg :documentation)
+   (options
+    :reader method-combination-options
+    :initarg :options)))
 
 (defparameter *early-class-predicates*
   '((specializer specializerp)

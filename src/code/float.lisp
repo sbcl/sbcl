@@ -1,7 +1,7 @@
-;;;; This file contains the definitions of float specific number
+;;;; This file contains the definitions of float-specific number
 ;;;; support (other than irrational stuff, which is in irrat.) There is
 ;;;; code in here that assumes there are only two float formats: IEEE
-;;;; single and double. (Long-float support has been added, but bugs
+;;;; single and double. (LONG-FLOAT support has been added, but bugs
 ;;;; may still remain due to old code which assumes this dichotomy.)
 
 ;;;; This software is part of the SBCL system. See the README file for

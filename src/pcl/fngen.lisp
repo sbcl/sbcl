@@ -39,7 +39,7 @@
 ;;; There are three internal functions which operate on the lambda argument
 ;;; to GET-FUN:
 ;;;   COMPUTE-TEST converts the lambda into a key to be used for lookup,
-;;;   COMPUTE-CODE is used by get-new-fun-generator-internal to
+;;;   COMPUTE-CODE is used by GET-NEW-FUN-GENERATOR-INTERNAL to
 ;;;		generate the actual lambda to be compiled, and
 ;;;   COMPUTE-CONSTANTS is used to generate the argument list that is
 ;;;		to be passed to the compiled function.

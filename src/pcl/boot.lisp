@@ -90,7 +90,6 @@ bootstrapping.
 (declaim (notinline make-a-method
 		    add-named-method
 		    ensure-generic-function-using-class
-
 		    add-method
 		    remove-method))
 

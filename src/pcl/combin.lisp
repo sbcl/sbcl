@@ -95,7 +95,7 @@
 
 (defun make-effective-method-function-simple
     (generic-function form &optional no-fmf-p)
-  ;; The effective method is just a call to call-method. This opens up
+  ;; The effective method is just a call to CALL-METHOD. This opens up
   ;; the possibility of just using the method function of the method as
   ;; the effective method function.
   ;;
@@ -179,8 +179,8 @@
 	  ;; args are not used giving a compiler warning.
 	  (error-p (eq (first effective-method) 'error)))
       `(lambda ,ll
-	 (declare (ignore ,@(if error-p ll '(.pv-cell. .next-method-call.))))
-	 ,effective-method))))
+	(declare (ignore ,@(if error-p ll '(.pv-cell. .next-method-call.))))
+	,effective-method))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
   (declare (ignore gf metatypes applyp env))
