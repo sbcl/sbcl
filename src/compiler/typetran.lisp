@@ -115,7 +115,6 @@
 ;;; just expand all its operations into toplevel code?
 (defun !define-standard-type-predicates ()
   (define-type-predicate arrayp array)
-  ; (The ATOM predicate is handled separately as (NOT CONS).)
   (define-type-predicate bit-vector-p bit-vector)
   (define-type-predicate characterp character)
   (define-type-predicate compiled-function-p compiled-function)
@@ -141,13 +140,11 @@
   (define-type-predicate symbolp symbol)
   (define-type-predicate vectorp vector))
 (!define-standard-type-predicates)
-
-;;;; transforms for type predicates not implemented primitively
-;;;;
-;;;; See also VM dependent transforms.
 
 (define-source-transform atom (x)
   `(not (consp ,x)))
+(define-source-transform base-char-p (x)
+  `(typep ,x 'base-char))
 
 ;;;; TYPEP source transform
 
