@@ -15,25 +15,6 @@
 
 echo //entering make-target-1.sh
 
-# the GNU dialect of "make" -- easier to find or port it than to
-# try to figure out how to port to the local dialect...
-if [ "$GNUMAKE" != "" ] ; then
-  # The user is evidently trying to tell us something.
-  gnumake="$GNUMAKE"
-elif [ -x "`which gmake`" ] ; then
-  # "gmake" is the preferred name in *BSD.
-  gnumake=gmake
-else
-  # All the world's a Linux, and all its users weary of cautious
-  # BSDish worries that "make" might not be GNU make; and at this
-  # point we've already spent quite a while in make-host-1.sh, so
-  # they're naturally unamused when we bail out complaining we don't
-  # know where GNU make is. So since it's not really any worse to guess
-  # wrong here than to fail by not trying, just guess that "make" is
-  # GNU make and hope for the best.
-  gnumake=make
-fi
-
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get
@@ -43,14 +24,14 @@ fi
 # doesn't matter.)
 echo //building runtime system and symbol table file
 cd src/runtime
-$gnumake clean  || exit 1
-$gnumake depend || exit 1
-$gnumake all    || exit 1
+$GNUMAKE clean  || exit 1
+$GNUMAKE depend || exit 1
+$GNUMAKE all    || exit 1
 cd ../..
 
 # Use a little C program to grab stuff from the C header files and
 # smash it into Lisp source code.
 cd tools-for-build
-$gnumake grovel_headers || exit 1
+$GNUMAKE grovel_headers || exit 1
 cd ..
 tools-for-build/grovel_headers > output/stuff-groveled-from-headers.lisp

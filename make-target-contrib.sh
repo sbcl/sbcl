@@ -24,8 +24,6 @@ SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 
-gnumake=${GNUMAKE:-gmake}
-
 mkdir -p contrib/systems
 rm -f contrib/systems/*
 
@@ -37,5 +35,5 @@ for i in contrib/*; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
     test -f $i/test-passed && rm $i/test-passed 
-    $gnumake -C $i test && touch $i/test-passed
+    $GNUMAKE -C $i test && touch $i/test-passed
 done

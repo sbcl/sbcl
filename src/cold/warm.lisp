@@ -162,17 +162,38 @@
 
   (let ((fullname (concatenate 'string stem ".lisp")))
     (sb-int:/show "about to compile" fullname)
-    (multiple-value-bind
-	(compiled-truename compilation-warnings-p compilation-failure-p)
-	(compile-file fullname)
-      (declare (ignore compilation-warnings-p))
-      (sb-int:/show "done compiling" fullname)
-      (cond (compilation-failure-p
-	     (error "COMPILE-FILE of ~S failed." fullname))
-	    (t
-	     (unless (load compiled-truename)
-	       (error "LOAD of ~S failed." compiled-truename))
-	     (sb-int:/show "done loading" compiled-truename))))))
+    (flet ((report-recompile-restart (stream)
+             (format stream "Recompile file ~S" src))
+           (report-continue-restart (stream)
+             (format stream "Continue, using possibly bogus file ~S" obj)))
+      (tagbody
+       retry-compile-file
+         (multiple-value-bind (output-truename warnings-p failure-p)
+             (compile-file fullname)
+           (declare (ignore warnings-p))
+	   (sb-int:/show "done compiling" fullname)
+           (cond ((not output-truename)
+                  (error "COMPILE-FILE of ~S failed." src))
+                 (failure-p
+		  (unwind-protect
+		       (restart-case
+			   (error "FAILURE-P was set when creating ~S."
+				  obj)
+			 (recompile ()
+			   :report report-recompile-restart
+			   (go retry-compile-file))
+			 (continue ()
+			   :report report-continue-restart
+			   (setf failure-p nil)))
+		    ;; Don't leave failed object files lying around.
+		    (when (and failure-p (probe-file output-truename))
+                          (delete-file output-truename)
+                          (format t "~&deleted ~S~%" output-truename))))
+                 ;; Otherwise: success, just fall through.
+                 (t nil))
+	   (unless (load output-truename)
+	     (error "LOAD of ~S failed." output-truename))
+	   (sb-int:/show "done loading" compiled-truename))))))
 
 ;;;; setting package documentation
 

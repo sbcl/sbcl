@@ -37,6 +37,8 @@
 #                 when you have weird things in your .cmucl-init file
 #   "openmcl --batch"
 #                 to use an OpenMCL binary as a cross-compilation host
+#   "clisp"
+#                 to use a CLISP binary as a cross-compilation host
 #
 # FIXME: Make a more sophisticated command line parser, probably
 # accepting "sh make.sh --xc-host foolisp" instead of the
@@ -60,6 +62,29 @@ SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 
+# the GNU dialect of "make" -- easier to find or port it than to
+# try to figure out how to port to the local dialect...
+if [ "$GNUMAKE" != "" ] ; then
+  # The user is evidently trying to tell us something.
+  GNUMAKE="$GNUMAKE"
+elif [ -x "`which gmake`" ] ; then
+  # "gmake" is the preferred name in *BSD.
+  GNUMAKE=gmake
+else
+  # FIXME: Now that we do this early, maybe prompt the user rather
+  # than guessing?  I'd still be annoyed, though... -- CSR,
+  # 2003-05-16.
+  #
+  # All the world's a Linux, and all its users weary of cautious
+  # BSDish worries that "make" might not be GNU make; so just guess
+  # that "make" is GNU make and hope for the best.
+  GNUMAKE=make
+fi
+
+export GNUMAKE
+echo //GNUMAKE=\"$GNUMAKE\"
+
+
 # If you're cross-compiling, you should probably just walk through the
 # make-config.sh script by hand doing the right thing on both the host
 # and target machines.
@@ -77,7 +102,8 @@ sh make-config.sh || exit 1
 #     identify the target architecture).
 #   On the host system:
 #     SBCL_XC_HOST=<whatever> sh make-host-1.sh
-#   Copy src/runtime/sbcl.h from the host system to the target system.
+#   Copy src/runtime/genesis/*.h from the host system to the target 
+#     system.
 #   On the target system:
 #     sh make-target-1.sh
 #   Copy src/runtime/sbcl.nm and output/stuff-groveled-from-headers.lisp

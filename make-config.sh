@@ -66,8 +66,7 @@ if [ "$sbcl_arch" = "x86" ] ; then
 elif [ "$sbcl_arch" = "mips" ] ; then
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
-    gnumake=${GNUMAKE:-gmake}
-    $gnumake -C tools-for-build determine-endianness
+    $GNUMAKE -C tools-for-build determine-endianness
     tools-for-build/determine-endianness >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
