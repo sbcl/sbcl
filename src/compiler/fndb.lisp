@@ -804,12 +804,12 @@
 
 (defknown (bit-and bit-ior bit-xor bit-eqv bit-nand bit-nor bit-andc1 bit-andc2
 		   bit-orc1 bit-orc2)
-  ((array bit) (array bit) &optional (or (array bit) (member t)))
+  ((array bit) (array bit) &optional (or (array bit) (member t nil)))
   (array bit)
   (foldable)
   #|:derive-type #'result-type-last-arg|#)
 
-(defknown bit-not ((array bit) &optional (or (array bit) (member t)))
+(defknown bit-not ((array bit) &optional (or (array bit) (member t nil)))
   (array bit)
   (foldable)
   #|:derive-type #'result-type-last-arg|#)
@@ -1341,8 +1341,8 @@
 (defknown %put (symbol t t) t (unsafe))
 (defknown %setelt (sequence index t) t (unsafe))
 (defknown %svset (simple-vector index t) t (unsafe))
-(defknown %bitset (bit-vector &rest index) bit (unsafe))
-(defknown %sbitset (simple-bit-vector &rest index) bit (unsafe))
+(defknown %bitset ((array bit) &rest index) bit (unsafe))
+(defknown %sbitset ((simple-array bit) &rest index) bit (unsafe))
 (defknown %charset (string index character) character (unsafe))
 (defknown %scharset (simple-string index character) character (unsafe))
 (defknown %set-symbol-value (symbol t) t (unsafe))

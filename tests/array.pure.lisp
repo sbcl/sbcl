@@ -96,3 +96,15 @@
   (assert (array-in-bounds-p a 7))
   (assert (not (array-in-bounds-p a 11)))
   (assert (not (array-in-bounds-p a (1+ most-positive-fixnum)))))
+
+;;; arrays of bits should work:
+(let ((a (make-array '(10 10) :element-type 'bit :adjustable t)))
+  (setf (bit a 0 0) 1)
+  (assert (= (bit a 0 0) 1)))
+(let ((a (make-array '(10 10) :element-type 'bit)))
+  (setf (sbit a 0 0) 1)
+  (assert (= (sbit a 0 0) 1)))
+
+(let ((x (copy-seq #*0011))
+      (y (copy-seq #*0101)))
+  (assert (equalp (bit-and x y nil) #*0001)))

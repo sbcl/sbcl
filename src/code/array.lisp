@@ -444,6 +444,13 @@
 ;;;  ZOO
 ;;; But that doesn't seem to be what happens in CMU CL.
 ;;;
+;;; KLUDGE: this is probably because ANSI, in its wisdom (CLHS
+;;; 5.1.2.5) requires implementations to support
+;;;   (SETF (APPLY #'AREF ...) ...)
+;;; [and also #'BIT and #'SBIT].  Yes, this is terrifying, and it's
+;;; also terrifying that this sequence of definitions causes it to
+;;; work.
+;;;
 ;;; Also, it would be nice to make DESCRIBE FOO tell whether a symbol
 ;;; has a setf expansion and/or a setf function defined.
 

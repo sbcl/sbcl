@@ -1514,6 +1514,9 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
+    ** the logical bit-array operators such as BIT-AND now accept an
+       explicit NIL for their "opt-arg" argument (to indicate a
+       freshly-consed result bit-array);
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
