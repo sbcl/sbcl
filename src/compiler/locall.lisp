@@ -1033,6 +1033,8 @@
 		     (eq (basic-combination-fun dest) ref-lvar)
 		     (eq (basic-combination-kind dest) :local)
 		     (not (block-delete-p (node-block dest)))
+                     (neq (functional-kind (node-home-lambda dest))
+                          :deleted)
 		     (cond ((ok-initial-convert-p clambda) t)
 			   (t
 			    (reoptimize-lvar ref-lvar)

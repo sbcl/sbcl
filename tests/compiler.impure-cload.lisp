@@ -251,5 +251,17 @@
   (LET ((V5 (MIN 31883 (LOGCOUNT A))))
     (IF (/= B V5) (IF (EQL 122911784 V5) -43765 1487) B)))
 
+;;; let-conversion of a function into deleted one
+(defun #:foo (a c)
+  (declare (type (integer -883 1566) a)
+           (type (integer -1 0) c)
+           (optimize (speed 3) (safety 1) (debug 1)))
+  (flet ((%f8 () c))
+    (flet ((%f5 ()
+             (if (< c a)
+                 (return-from %f5 (if (= -4857 a) (%f8) (%f8)))
+                 c)))
+      (if (<= 11 c) (%f5) c))))
+
 
 (sb-ext:quit :unix-status 104)
