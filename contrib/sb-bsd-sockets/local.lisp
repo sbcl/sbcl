@@ -32,7 +32,7 @@ a network.
   sockint::size-of-sockaddr-un)
 
 (defmethod bits-of-sockaddr ((socket local-socket) sockaddr)
-  "Returns filename of SOCKADDR"
+  "Return the file name of the local socket address SOCKADDR."
   (let ((name (sb-c-call::%naturalize-c-string
 	       (sb-sys:sap+ (sockint::array-data-address sockaddr)
 			    sockint::offset-of-sockaddr-un-path))))

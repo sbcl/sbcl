@@ -17,6 +17,8 @@ eventually, so that we can do DNS lookups in parallel with other things
 					; presently always AF_INET
    (addresses :initarg :addresses :accessor host-ent-addresses)))
 
+(defgeneric host-ent-address (host-ent))
+
 (defmethod host-ent-address ((host-ent host-ent))
   (car (host-ent-addresses host-ent)))
 

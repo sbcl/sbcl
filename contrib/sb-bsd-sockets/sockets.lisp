@@ -45,16 +45,22 @@
 
 
 
+(defgeneric make-sockaddr-for (socket &optional sockaddr &rest address)
+  (:documentation "Return a Socket Address object suitable for use with SOCKET.
+When SOCKADDR is passed, it is used instead of a new object."))
+
 ;; we deliberately redesign the "bind" interface: instead of passing a
 ;; sockaddr_something as second arg, we pass the elements of one as
 ;; multiple arguments.
 
-(defgeneric socket-bind (socket &rest address))
+(defgeneric socket-bind (socket &rest address)
+  (:documentation "Bind SOCKET to ADDRESS, which may vary according to
+socket family.  For the INET family, pass ADDRESS and PORT as two
+arguments; for FILE address family sockets, pass the filename string.
+See also bind(2)"))
+
 (defmethod socket-bind ((socket socket)
                         &rest address)
-  "Bind SOCKET to ADDRESS, which may vary according to socket family.  For
-the INET family, pass ADDRESS and PORT as two arguments; for FILE address
-family sockets, pass the filename string.  See also bind(2)"
   (let ((sockaddr (apply #'make-sockaddr-for socket nil address)))
     (if (= (sb-sys:without-gcing
 	    (sockint::bind (socket-file-descriptor socket)
@@ -64,9 +70,12 @@ family sockets, pass the filename string.  See also bind(2)"
         (socket-error "bind"))))
 
 
+(defgeneric socket-accept (socket)
+  (:documentation "Perform the accept(2) call, returning a
+newly-created connected socket and the peer address as multiple
+values"))
+  
 (defmethod socket-accept ((socket socket))
-  "Perform the accept(2) call, returning a newly-created connected socket
-and the peer address as multiple values"
   (let* ((sockaddr (make-sockaddr-for socket))
          (fd (sb-sys:without-gcing
 	      (sockint::accept (socket-file-descriptor socket)
@@ -82,9 +91,11 @@ and the peer address as multiple values"
 		 (sb-ext:finalize s (lambda () (sockint::close fd)))))
 	   (multiple-value-list (bits-of-sockaddr socket sockaddr)))))
 
-(defgeneric socket-connect (socket &rest address))
+(defgeneric socket-connect (socket &rest address)
+  (:documentation "Perform the connect(2) call to connect SOCKET to a
+  remote PEER.  No useful return value."))
+
 (defmethod socket-connect ((socket socket) &rest peer)
-  "Perform the connect(2) call to connect SOCKET to a remote PEER.  No useful return value"
   (let* ((sockaddr (apply #'make-sockaddr-for socket nil peer)))
     (if (= (sb-sys:without-gcing
 	    (sockint::connect (socket-file-descriptor socket)
@@ -93,8 +104,11 @@ and the peer address as multiple values"
 	   -1)
 	(socket-error "connect") )))
 
+(defgeneric socket-peername (socket)
+  (:documentation "Return the socket's peer; depending on the address
+  family this may return multiple values"))
+  
 (defmethod socket-peername ((socket socket))
-  "Return the socket's peer; depending on the address family this may return multiple values"  
   (let* ((sockaddr (make-sockaddr-for socket)))
     (when (= (sb-sys:without-gcing
 	      (sockint::getpeername (socket-file-descriptor socket)
@@ -104,8 +118,11 @@ and the peer address as multiple values"
       (socket-error "getpeername"))
     (bits-of-sockaddr socket sockaddr)))
 
+(defgeneric socket-name (socket)
+  (:documentation "Return the address (as vector of bytes) and port
+  that the socket is bound to, as multiple values."))
+
 (defmethod socket-name ((socket socket))
-  "Return the address (as vector of bytes) and port that the socket is bound to, as multiple values"
   (let* ((sockaddr (make-sockaddr-for socket)))
     (when (= (sb-sys:without-gcing
 	      (sockint::getsockname (socket-file-descriptor socket)
@@ -122,18 +139,22 @@ and the peer address as multiple values"
 ;;; allows us to read from an unconnected socket into a buffer, and
 ;;; to learn who the sender of the packet was
 
-(defmethod socket-receive ((socket socket) buffer length
-			 &key
-			 oob peek waitall
-			 (element-type 'character))
-  "Read LENGTH octets from SOCKET into BUFFER (or a freshly-consed buffer if
+(defgeneric socket-receive (socket buffer length
+			    &key
+			    oob peek waitall element-type)
+  (:documentation "Read LENGTH octets from SOCKET into BUFFER (or a freshly-consed buffer if
 NIL), using recvfrom(2).  If LENGTH is NIL, the length of BUFFER is
 used, so at least one of these two arguments must be non-NIL.  If
 BUFFER is supplied, it had better be of an element type one octet wide.
 Returns the buffer, its length, and the address of the peer
 that sent it, as multiple values.  On datagram sockets, sets MSG_TRUNC
 so that the actual packet length is returned even if the buffer was too
-small"
+small"))
+  
+(defmethod socket-receive ((socket socket) buffer length
+			 &key
+			 oob peek waitall
+			 (element-type 'character))
   (let ((flags
 	 (logior (if oob sockint::MSG-OOB 0)
 		 (if peek sockint::MSG-PEEK 0)
@@ -162,18 +183,22 @@ small"
 
 
 
-(defmethod socket-listen ((socket socket) backlog)
-  "Mark SOCKET as willing to accept incoming connections.  BACKLOG
+(defgeneric socket-listen (socket backlog)
+  (:documentation "Mark SOCKET as willing to accept incoming connections.  BACKLOG
 defines the maximum length that the queue of pending connections may
-grow to before new connection attempts are refused.  See also listen(2)"
+grow to before new connection attempts are refused.  See also listen(2)"))
+
+(defmethod socket-listen ((socket socket) backlog)
   (let ((r (sockint::listen (socket-file-descriptor socket) backlog)))
     (if (= r -1)
         (socket-error "listen"))))
 
-(defmethod socket-close ((socket socket))
-  "Close SOCKET.  May throw any kind of error that write(2) would have
+(defgeneric socket-close (socket)
+  (:documentation "Close SOCKET.  May throw any kind of error that write(2) would have
 thrown.  If SOCKET-MAKE-STREAM has been called, calls CLOSE on that
-stream instead"
+stream instead"))
+
+(defmethod socket-close ((socket socket))
   ;; the close(2) manual page has all kinds of warning about not
   ;; checking the return value of close, on the grounds that an
   ;; earlier write(2) might have returned successfully w/o actually
@@ -195,9 +220,12 @@ stream instead"
      (bad-file-descriptor-error (c) (declare (ignore c)) nil)
      (:no-error (c)  (declare (ignore c)) nil))))
 
+(defgeneric socket-make-stream (socket  &rest args)
+    (:documentation "Find or create a STREAM that can be used for IO
+on SOCKET (which must be connected).  ARGS are passed onto
+SB-SYS:MAKE-FD-STREAM."))
+
 (defmethod socket-make-stream ((socket socket)  &rest args)
-  "Find or create a STREAM that can be used for IO on SOCKET (which
-must be connected).  ARGS are passed onto SB-SYS:MAKE-FD-STREAM."
   (let ((stream
 	 (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
     (unless stream
@@ -276,4 +304,9 @@ must be connected).  ARGS are passed onto SB-SYS:MAKE-FD-STREAM."
     (error condition :errno errno  :syscall where)))
 
 
+(defgeneric bits-of-sockaddr (socket sockaddr)
+  (:documentation "Return protocol-dependent bits of parameter
+SOCKADDR, e.g. the Host/Port if SOCKET is an inet socket."))
 
+(defgeneric size-of-sockaddr (socket)
+  (:documentation "Return the size of a sockaddr object for SOCKET."))

@@ -9,8 +9,10 @@
 
 ;;; XXX bad (sizeof (int) ==4 ) assumptions
 
+(defgeneric non-blocking-mode (socket)
+  (:documentation "Is SOCKET in non-blocking mode?"))
+
 (defmethod non-blocking-mode ((socket socket))
-  "Is SOCKET in non-blocking mode?"
   (let ((fd (socket-file-descriptor socket)))
     (sb-alien:with-alien ((arg integer))
                          (> (logand
@@ -18,8 +20,10 @@
                              sockint::o-nonblock)
                             0))))
 
+(defgeneric (setf non-blocking-mode) (non-blocking-p socket)
+  (:documentation "Put SOCKET in non-blocking mode - or not, according to NON-BLOCKING-P"))
+
 (defmethod (setf non-blocking-mode) (non-blocking-p (socket socket))
-  "Put SOCKET in non-blocking mode - or not, according to NON-BLOCKING-P"
   (declare (optimize (speed 3)))
   (let* ((fd (socket-file-descriptor socket))
          (arg1 (the (signed-byte 32) (sockint::fcntl fd sockint::f-getfl 0)))

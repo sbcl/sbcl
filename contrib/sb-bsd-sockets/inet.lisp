@@ -85,10 +85,6 @@ using getprotobyname(2) which typically looks in NIS or /etc/protocols"
    (+ (* 256 (sockint::sockaddr-in-port sockaddr 0))
       (sockint::sockaddr-in-port sockaddr 1))))  
    
-
 (defun make-inet-socket (type protocol)
   "Make an INET socket.  Deprecated in favour of make-instance"
   (make-instance 'inet-socket :type type :protocol protocol))
-
-
-
