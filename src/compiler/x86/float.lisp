@@ -432,8 +432,8 @@
   (:results (y :scs (descriptor-reg)))
   (:generator 2
      (ecase (sb!c::constant-value (sb!c::tn-leaf x))
-       (0f0 (load-symbol-value y *fp-constant-0s0*))
-       (1f0 (load-symbol-value y *fp-constant-1s0*))
+       (0f0 (load-symbol-value y *fp-constant-0f0*))
+       (1f0 (load-symbol-value y *fp-constant-1f0*))
        (0d0 (load-symbol-value y *fp-constant-0d0*))
        (1d0 (load-symbol-value y *fp-constant-1d0*))
        #!+long-float

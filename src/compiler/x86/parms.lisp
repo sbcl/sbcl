@@ -267,8 +267,8 @@
     ;; the floating point constants
     *fp-constant-0d0*
     *fp-constant-1d0*
-    *fp-constant-0s0*
-    *fp-constant-1s0*
+    *fp-constant-0f0*
+    *fp-constant-1f0*
     ;; The following are all long-floats.
     *fp-constant-0l0*
     *fp-constant-1l0*

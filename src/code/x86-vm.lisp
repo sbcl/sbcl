@@ -310,8 +310,8 @@
 ;;; than the i387 load constant instructions to avoid consing in some
 ;;; cases. Note these are initialized by GENESIS as they are needed
 ;;; early.
-(defvar *fp-constant-0s0*)
-(defvar *fp-constant-1s0*)
+(defvar *fp-constant-0f0*)
+(defvar *fp-constant-1f0*)
 (defvar *fp-constant-0d0*)
 (defvar *fp-constant-1d0*)
 ;;; the long-float constants

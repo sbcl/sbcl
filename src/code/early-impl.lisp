@@ -40,8 +40,8 @@
 		  sb!vm::*internal-gc-trigger*
 		  sb!vm::*fp-constant-0d0*
 		  sb!vm::*fp-constant-1d0*
-		  sb!vm::*fp-constant-0s0*
-		  sb!vm::*fp-constant-1s0*
+		  sb!vm::*fp-constant-0f0*
+		  sb!vm::*fp-constant-1f0*
 		  sb!vm::*fp-constant-0l0*
 		  sb!vm::*fp-constant-1l0*
 		  sb!vm::*fp-constant-pi*

@@ -76,7 +76,7 @@
   (room-minimal-info)
   (sb!vm:memory-usage :count-spaces '(:dynamic)
 		      :print-spaces t
-		      :cutoff 0.05s0
+		      :cutoff 0.05f0
 		      :print-summary nil))
 
 (defun room-maximal-info ()

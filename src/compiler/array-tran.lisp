@@ -199,7 +199,7 @@
 		    ;; (SIMPLE-STRINGs are stored with an extra trailing
 		    ;; #\NULL for convenience in calling out to C.)
 		    :n-pad-elements 1)
-	 (single-float 0.0s0 32 ,sb!vm:simple-array-single-float-widetag)
+	 (single-float 0.0f0 32 ,sb!vm:simple-array-single-float-widetag)
 	 (double-float 0.0d0 64 ,sb!vm:simple-array-double-float-widetag)
 	 #!+long-float (long-float 0.0L0 #!+x86 96 #!+sparc 128
 				   ,sb!vm:simple-array-long-float-widetag)
@@ -213,7 +213,7 @@
 	 ((signed-byte 16) 0 16 ,sb!vm:simple-array-signed-byte-16-widetag)
 	 ((signed-byte 30) 0 32 ,sb!vm:simple-array-signed-byte-30-widetag)
 	 ((signed-byte 32) 0 32 ,sb!vm:simple-array-signed-byte-32-widetag)
-	 ((complex single-float) #C(0.0s0 0.0s0) 64
+	 ((complex single-float) #C(0.0f0 0.0f0) 64
 	  ,sb!vm:simple-array-complex-single-float-widetag)
 	 ((complex double-float) #C(0.0d0 0.0d0) 128
 	  ,sb!vm:simple-array-complex-double-float-widetag)

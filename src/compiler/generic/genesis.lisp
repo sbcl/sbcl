@@ -1250,8 +1250,8 @@
   (progn
     (cold-set 'sb!vm::*fp-constant-0d0* (number-to-core 0d0))
     (cold-set 'sb!vm::*fp-constant-1d0* (number-to-core 1d0))
-    (cold-set 'sb!vm::*fp-constant-0s0* (number-to-core 0s0))
-    (cold-set 'sb!vm::*fp-constant-1s0* (number-to-core 1s0))
+    (cold-set 'sb!vm::*fp-constant-0f0* (number-to-core 0f0))
+    (cold-set 'sb!vm::*fp-constant-1f0* (number-to-core 1f0))
     #!+long-float
     (progn
       (cold-set 'sb!vm::*fp-constant-0l0* (number-to-core 0L0))
@@ -2678,15 +2678,15 @@
     (dolist (obj structs)
       (format t
 	      "struct ~A {~%"
-	      (nsubstitute #\_ #\-
+	      (substitute #\_ #\-
 	      (string-downcase (string (sb!vm:primitive-object-name obj)))))
       (when (sb!vm:primitive-object-widetag obj)
 	(format t "    lispobj header;~%"))
       (dolist (slot (sb!vm:primitive-object-slots obj))
 	(format t "    ~A ~A~@[[1]~];~%"
 	(getf (sb!vm:slot-options slot) :c-type "lispobj")
-	(nsubstitute #\_ #\-
-		     (string-downcase (string (sb!vm:slot-name slot))))
+	(substitute #\_ #\-
+		    (string-downcase (string (sb!vm:slot-name slot))))
 	(sb!vm:slot-rest-p slot)))
       (format t "};~2%"))
     (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
@@ -2708,10 +2708,10 @@
     ;; FIXME: It would be nice to use longer names than NIL and
     ;; (particularly) T in #define statements.
     (format t "#define ~A LISPOBJ(0x~X)~%"
-	    (nsubstitute #\_ #\-
-			 (remove-if (lambda (char)
-				      (member char '(#\% #\* #\. #\!)))
-				    (symbol-name symbol)))
+	    (substitute #\_ #\-
+			(remove-if (lambda (char)
+				     (member char '(#\% #\* #\. #\!)))
+				   (symbol-name symbol)))
 	    (if *static*		; if we ran GENESIS
 	      ;; We actually ran GENESIS, use the real value.
 	      (descriptor-bits (cold-intern symbol))
