@@ -104,8 +104,12 @@ printf(\"(in-package ~S)\\\n\");~%" package-name)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
 	     filename tmp-c-source (constants-package component))
     (and		
-     (= (run-shell-command "gcc -o ~S ~S" (namestring tmp-a-dot-out)
-	 (namestring tmp-c-source)) 0)
+     (= (run-shell-command "gcc ~A -o ~S ~S"
+			   (if (sb-ext:posix-getenv "CFLAGS")
+			       (sb-ext:posix-getenv "CFLAGS")
+				"")
+			   (namestring tmp-a-dot-out)
+			   (namestring tmp-c-source)) 0)
      (= (run-shell-command "~A >~A"
 			   (namestring tmp-a-dot-out)
 			   (namestring tmp-constants)) 0)

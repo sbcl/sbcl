@@ -11,7 +11,7 @@
 
 CPPFLAGS=-I../src/runtime
 
-all: grovel-headers determine-endianness where-is-mcontext
+all: grovel-headers determine-endianness where-is-mcontext modify-ldt-struct-name 
 
 clean: 
-	rm -f *.o grovel-headers determine-endianness where-is-mcontext
+	rm -f *.o grovel-headers determine-endianness where-is-mcontext modify-ldt-structure-name

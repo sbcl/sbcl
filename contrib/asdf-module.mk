@@ -1,5 +1,29 @@
 CC=gcc
-export CC SBCL
+
+# Need to set CFLAGS and LDFLAGS here. sb-posix, sb-grovel, and
+# sb-bsd-sockets depends upon these being set on x86_64. Setting these
+# in their Makefile's is not adequate since their asd files are
+# invoked when loaded from other modules which don't require these
+# environmental values in their Makefile's.
+
+UNAME:=$(shell uname -m)
+export CFLAGS=-fPIC
+ifeq (solaris,$(UNAME))
+  export LDFLAGS=-shared -lresolv -lsocket -lnsl
+else
+  ifeq (Darwin,$(UNAME))
+    export LDFLAGS=-bundle
+  else
+    ifeq (x86_64,$(UNAME))
+      export LDFLAGS=-m32 -shared
+      export CFLAGS+= -m32
+    else
+      export LDFLAGS=-shared
+    endif
+  endif
+endif
+
+export CC SBCL CFLAGS LDFLAGS
 
 all: $(EXTRA_ALL_TARGETS)
 	$(MAKE) -C ../asdf

@@ -40,9 +40,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <asm/ldt.h>
+#include "modify-ldt-struct-name.h"
 #include <linux/unistd.h>
 #include <sys/mman.h>
 #include "thread.h"		/* dynamic_values_bytes */
+
+#ifndef MODIFY_LDT_STRUCT_NAMED_USER_DESC
+/* old glibc */
+#define user_desc  modify_ldt_ldt_s 
+#endif
 
 _syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount );
 
@@ -68,7 +74,7 @@ int arch_os_thread_init(struct thread *thread) {
     /* this must be called from a function that has an exclusive lock
      * on all_threads
      */
-    struct modify_ldt_ldt_s ldt_entry = {
+    struct user_desc ldt_entry = {
 	1, 0, 0, /* index, address, length filled in later */
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
@@ -123,7 +129,7 @@ struct thread *debug_get_fs() {
  */
 
 int arch_os_thread_cleanup(struct thread *thread) {
-    struct modify_ldt_ldt_s ldt_entry = {
+    struct user_desc ldt_entry = {
 	0, 0, 0, 
 	0, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 0
     }; 
