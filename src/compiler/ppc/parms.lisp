@@ -54,10 +54,23 @@
 (def!constant float-round-to-positive 2)
 (def!constant float-round-to-negative 3)
 
-(defconstant-eqx float-rounding-mode (byte 2 0) #'equalp)	  ; RD 
-(defconstant-eqx float-sticky-bits (byte 10 19) #'equalp)
-(defconstant-eqx float-traps-byte (byte 6 3) #'equalp)
-(defconstant-eqx float-exceptions-byte (byte 5 0) #'equalp)	  ; cexc
+(defconstant-eqx float-rounding-mode (byte 2 0) #'equalp)	  ; RD
+;;; FIXME I: Beware, all ye who trespass here. Despite its name,
+;;; FLOAT-STICKY-BITS is not the byte specifier for sticky bits in the
+;;; floating point control word. It is more like "accrued exceptions"
+;;; where FLOAT-EXCEPTIONS-BYTE is "current exceptions". Consequently,
+;;; on architectures where there is no "current exceptions"
+;;; FLOAT-EXCEPTIONS-BYTE and FLOAT-STICKY-BITS had better be the
+;;; same. 
+;;;
+;;; FIXME II: So, I've now documented this in comments in the PowerPC
+;;; tree. This may not make it easy to find for when new architectures
+;;; get backends written...
+;;;
+;;; CSR, 2002-06-11
+(defconstant-eqx float-sticky-bits (byte 5 25) #'equalp)
+(defconstant-eqx float-traps-byte (byte 5 3) #'equalp)
+(defconstant-eqx float-exceptions-byte (byte 5 25) #'equalp)	  ; cexc
 
 (def!constant float-fast-bit 2)		; Non-IEEE mode
 

@@ -547,6 +547,9 @@ Nathan Froyd:
 Matthias Hoelzl:
   He reported and fixed COMPILE's misbehavior on macros.
 
+Espen S Johnsen:
+  He provided an ANSI-compliant version of CHANGE-CLASS for PCL.
+
 Arthur Lemmens:
   He found and fixed a number of SBCL bugs while partially porting
   SBCL to bootstrap under <some other Common Lisp system -- LispWorks

@@ -94,6 +94,15 @@
 (eval '(foo-2002-05-13))
 (compile 'foo-2002-05-13)
 (foo-2002-05-13) ; (The bug caused UNDEFINED-FUNCTION to be signalled here.)
+
+;;; floating point pain on the PPC.
+;;;
+;;; This test case used to fail to compile on most powerpcs prior to
+;;; sbcl-0.7.4.2x, as floating point traps were being incorrectly
+;;; masked.
+(defun floating-point-pain (x)
+  (declare (single-float x))
+  (log x))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
