@@ -253,6 +253,9 @@
 	      (time-t ctime "time_t" "st_ctime")))
 
  ;; open()
+ (:integer o-rdonly "O_RDONLY")
+ (:integer o-wronly "O_WRONLY")
+ (:integer o-rdwr "O_RDWR")
  (:integer o-creat "O_CREAT")
  (:integer o-excl "O_EXCL")
  (:integer o-noctty "O_NOCTTY")
@@ -266,6 +269,8 @@
  (:integer o-direct "O_DIRECT")
  (:integer o-async "O_ASYNC")
  (:integer o-largefile "O_LARGEFILE") ; hmm...
+ (:integer o-dsync "O_DSYNC")
+ (:integer o-rsync "O_RSYNC")
 
  ;; lseek()
  (:integer seek-set "SEEK_SET")

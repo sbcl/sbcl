@@ -314,4 +314,15 @@
     (let ((*default-pathname-defaults* *test-directory*))
       (sb-posix:unlink (car (directory "*.txt")))))
   0)
-			 
+
+(deftest open.1
+  (let ((fd (sb-posix:open *test-directory* sb-posix::o-rdonly)))
+    (ignore-errors (sb-posix:close fd))
+    (< fd 0))
+  nil)
+
+(deftest open.error.1
+  (handler-case (sb-posix:open *test-directory* sb-posix::o-wronly)
+    (sb-posix:syscall-error (c)
+      (sb-posix:syscall-errno c)))
+  #.sb-posix::eisdir)

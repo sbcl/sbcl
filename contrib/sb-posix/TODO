@@ -13,7 +13,7 @@ create_module delete_module execve exit fcntl flock fork
 fstatfs ftime getcontext getdents getdomainname
 getdtablesize getgroups gethostid gethostname getitimer 
 getpeername getpriority getrlimit getrusage getsockname getsockopt
-gettimeofday gtty idle init_module ioctl ioctl_list ioperm iopl listen
+gettimeofday gtty idle init_module ioctl_list ioperm iopl listen
 llseek lock madvise mincore mknod mlock mlockall 
 modify_ldt mount mprotect mpx mremap msgctl msgget msgop msgrcv msgsnd
 munlock munlockall nanosleep nice pause poll

@@ -39,8 +39,12 @@
 (define-call "lseek" sb-posix::off-t minusp (fd file-descriptor) (offset sb-posix::off-t) (whence int))
 (define-call "mkdir" int minusp (pathname filename) (mode sb-posix::mode-t))
 (define-call "mkfifo" int minusp (pathname filename) (mode sb-posix::mode-t))
-;;; FIXME: MODE arg should be optional?
-(define-call "open" int minusp (pathname filename) (flags int) (mode sb-posix::mode-t)) 
+(define-call-internally open-with-mode "open" int minusp (pathname filename) (flags int) (mode sb-posix::mode-t))
+(define-call-internally open-without-mode "open" int minusp (pathname filename) (flags int))
+(define-entry-point "open" (pathname flags &optional (mode nil mode-supplied))
+  (if mode-supplied
+      (open-with-mode pathname flags mode)
+      (open-without-mode pathname flags)))
 ;;(define-call "readlink" int minusp (path filename) (buf (* t)) (len int))
 (define-call "rename" int minusp (oldpath filename) (newpath filename))
 (define-call "rmdir" int minusp (pathname filename))
@@ -48,6 +52,15 @@
 (define-call "sync" void never-fails)
 (define-call "truncate" int minusp (pathname filename) (length sb-posix::off-t))
 (define-call "unlink" int minusp (pathname filename))
+(define-call-internally ioctl-without-arg "ioctl" int minusp (fd file-descriptor) (cmd int))
+(define-call-internally ioctl-with-int-arg "ioctl" int minusp (fd file-descriptor) (cmd int) (arg int))
+(define-call-internally ioctl-with-pointer-arg "ioctl" int minusp (fd file-descriptor) (cmd int) (arg alien-pointer-to-anything-or-nil))
+(define-entry-point "ioctl" (fd cmd &optional (arg nil arg-supplied))
+  (if arg-supplied
+    (etypecase arg
+      ((alien int) (ioctl-with-int-arg fd cmd arg))
+      ((or (alien (* t)) null) (ioctl-with-pointer-arg fd cmd arg)))
+    (ioctl-without-arg fd cmd)))
 
 (define-call "opendir" (* t) null-alien (pathname filename))
 (define-call "readdir" (* t)
