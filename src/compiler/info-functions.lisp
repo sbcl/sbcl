@@ -26,9 +26,7 @@
 (defun check-fun-name (name)
   (typecase name
     (list
-     (unless (and (consp name) (consp (cdr name))
-		  (null (cddr name)) (eq (car name) 'setf)
-		  (symbolp (cadr name)))
+     (unless (legal-fun-name-p name)
        (compiler-error "illegal function name: ~S" name)))
     (symbol
      (when (eq (info :function :kind name) :special-form)

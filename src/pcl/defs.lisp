@@ -286,11 +286,8 @@
 (defvar *standard-method-combination*)
 
 (defun make-class-predicate-name (name)
-  (intern (format nil "~A::~A class predicate"
-		  (package-name (symbol-package name))
-		  name)
-	  *pcl-package*))
-
+  (list 'class-predicate name))
+  
 (defun plist-value (object name)
   (getf (object-plist object) name))
 

@@ -553,5 +553,8 @@
 (bug234-b)
 (assert (= *bug234-b* 1))
 
+;;; we should be able to make classes with uninterned names:
+(defclass #:class-with-uninterned-name () ())
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
