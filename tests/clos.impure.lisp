@@ -840,6 +840,14 @@
                                         (defgeneric nonsense ())))))
         'generic-function))
 
+(assert
+ (typep (funcall (compile nil
+                          '(lambda () (flet ((nonsense-2 () nil))
+                                        (defgeneric nonsense-2 ()
+                                          (:method () t))))))
+        'generic-function))
+
+
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

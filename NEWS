@@ -6,6 +6,9 @@ changes in sbcl-0.8.16 relative to sbcl-0.8.15:
     redefinition of generic functions with no DEFGENERIC to an
     incompatible lambda list now signals an error.  (thanks to Zach
     Beane)
+  * bug fix: DEFGENERIC now works even when there's a function of the
+    same name in an enclosing lexical environment.  (thanks to Zach
+    Beane)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** POSITION on displaced vectors with non-zero displacement
        returns the right answer.

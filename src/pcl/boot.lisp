@@ -165,7 +165,7 @@ bootstrapping.
 		    (qualifiers (subseq qab 0 arglist-pos))
 		    (body (nthcdr (1+ arglist-pos) qab)))
 	       `(push (defmethod ,fun-name ,@qualifiers ,arglist ,@body)
-                      (generic-function-initial-methods #',fun-name)))))
+                      (generic-function-initial-methods (fdefinition ',fun-name))))))
       (macrolet ((initarg (key) `(getf initargs ,key)))
 	(dolist (option options)
 	  (let ((car-option (car option)))
