@@ -632,7 +632,7 @@
 
 
 ;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
-;;; assignment. That way things like
+;;; assignment instead of doing cold static linking. That way things like
 ;;;   (FLET ((FROB (X) ..))
 ;;;     (DEFUN FOO (X Y) (FROB X) ..)
 ;;;     (DEFUN BAR (Z) (AND (FROB X) ..)))
@@ -645,7 +645,12 @@
    "~@<COLD-FSET ~S not cross-compiled at top level: demoting to ~
 (SETF FDEFINITION)~:@>"
    name)
-  `(setf (fdefinition ',name) ,lambda))
+  ;; We convert the LAMBDA expression to the corresponding NAMED-LAMBDA
+  ;; expression so that the compiler can use NAME in debug names etc. 
+  (destructuring-bind (lambda-symbol &rest lambda-rest) lambda
+    (assert (eql lambda-symbol 'lambda)) ; else dunno how to do conversion
+    `(setf (fdefinition ',name)
+           (named-lambda ,name ,@lambda-rest))))
 
 ;;;; ONCE-ONLY
 ;;;;

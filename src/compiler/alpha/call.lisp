@@ -533,7 +533,7 @@ default-value-8
 	 (return-pc :target return-pc-temp)
 	 (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) ocfp-temp)
-  (:temporary (:sc descriptor-reg any-reg :from (:argument 1))
+  (:temporary (:sc any-reg :from (:argument 1))
 	      return-pc-temp)
   (:temporary (:scs (interior-reg)) lip)
   (:move-args :known-return)

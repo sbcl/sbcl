@@ -560,8 +560,6 @@ like *STACK-TOP-HINT*"
              ;; ..and variables to control compiler policy
              "*INLINE-EXPANSION-LIMIT*"
              "*USE-IMPLEMENTATION-TYPES*"
-             "*BYTE-COMPILE-TOPLEVEL*"
-             "*BYTE-COMPILE-DEFAULT*"
              "*DERIVE-FUNCTION-TYPES*"
 
              ;; a special form for breaking out of our "declarations
@@ -655,9 +653,6 @@ retained, possibly temporariliy, because it might be used internally."
     :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!GRAY" "SB!FASL" "SB!SYS")
     :export ("*AFTER-SAVE-INITIALIZATIONS*" "*BEFORE-SAVE-INITIALIZATIONS*"
 
-             "*ALL-MODIFIER-NAMES*"
-             "*BACKUP-EXTENSION*"
-
 	     ;; lambda list keyword extensions
 	     "&MORE"
 
@@ -740,7 +735,7 @@ retained, possibly temporariliy, because it might be used internally."
              "ONCE-ONLY"
              "DEFENUM"
              "DEFPRINTER"
-             "AVER" "AVER-TYPE" "ENFORCE-TYPE"
+             "AVER" "ENFORCE-TYPE"
 
              ;; ..and DEFTYPEs..
              "INDEX" 
@@ -759,7 +754,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; encapsulation
              "ARGUMENT-LIST"
              "BASIC-DEFINITION"
-             "ENCAPSULATE" "ENCAPSULATED-DEFINITION" "ENCAPSULATED-P"
+             "ENCAPSULATE" "ENCAPSULATED-P"
              "UNENCAPSULATE"
 
              ;; various CHAR-CODEs
@@ -785,7 +780,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; time
              "FORMAT-DECODED-TIME"
              "FORMAT-UNIVERSAL-TIME"
-             "PARSE-TIME"
 
              ;; indenting
              "MAKE-INDENTING-STREAM"

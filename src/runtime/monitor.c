@@ -30,6 +30,9 @@
 #include "gc.h"
 #include "search.h"
 #include "purify.h"
+#include "globals.h"
+#include "lispregs.h"
+#include "interrupt.h"
 
 /* When we need to do command input, we use this stream, which is not
  * in general stdin, so that things will "work" (as well as being

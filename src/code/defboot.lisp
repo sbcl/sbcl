@@ -170,12 +170,13 @@
   (unless (symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned symbol ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
-    (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA
+    (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
 	   (lambda-guts `(,args
 			  ,@decls
 			  (block ,(fun-name-block-name name)
 			    ,@forms)))
 	   (lambda `(lambda ,@lambda-guts))
+	   (named-lambda `(named-lambda ,name ,@lambda-guts))
 	   (inline-lambda
 	    (cond (;; Does the user not even want to inline?
 		   (not (inline-fun-name-p name))
@@ -204,6 +205,11 @@
 
 	 ;; In cross-compilation of toplevel DEFUNs, we arrange
 	 ;; for the LAMBDA to be statically linked by GENESIS.
+	 ;;
+	 ;; It may seem strangely inconsistent not to use NAMED-LAMBDA
+	 ;; here instead of LAMBDA. The reason is historical:
+	 ;; COLD-FSET was written before NAMED-LAMBDA, and has special
+	 ;; logic of its own to notify the compiler about NAME.
 	 #+sb-xc-host
 	 (cold-fset ,name ,lambda)
 
@@ -215,7 +221,7 @@
 		 ;; where the compiled LAMBDA first appears. In
 		 ;; cross-compilation, we manipulate the
 		 ;; previously-statically-linked LAMBDA here.
-		 #-sb-xc-host ,lambda
+		 #-sb-xc-host ,named-lambda
 		 #+sb-xc-host (fdefinition ',name)
 		 ,doc)))))
 #-sb-xc-host

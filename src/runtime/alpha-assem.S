@@ -278,7 +278,7 @@ closure_tramp = /* ### */ 0x150 + call_into_lisp_LRA_page
 closure_tramp_offset:
         ldl     reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
         ldl     reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
-        addl    reg_L0, FUN_CODE_OFFSET, reg_LIP
+        addl    reg_L0, SIMPLE_FUN_CODE_OFFSET, reg_LIP
         jmp     reg_ZERO,(reg_LIP)
         .end    closure_tramp
 

@@ -1135,14 +1135,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   structure classes related by inheritance. As of 0.7.0, SBCL still 
   doesn't follow it.
 
-128:
-  READ-SEQUENCE doesn't work for Gray streams. (reported by Nathan
-  Froyd sbcl-devel 2001-10-15) As per subsequent discussion on the 
-  list, the Gray streams proposal doesn't mention READ-SEQUENCE and
-  WRITE-SEQUENCE because it predates them, generalizing it to 
-  cover them is an obvious extension, ACL does it, and there's a 
-  patch for for CMU CL which does it too.
-
 129:
   insufficient syntax checking in MACROLET:
    (defun foo (x)

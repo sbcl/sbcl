@@ -102,14 +102,15 @@
 
  ;; Build SBCL with the old CMU CL low level debugger, "ldb". If 
  ;; are aren't messing with CMU CL at a very low level (e.g. 
- ;; trying to diagnose GC problems) you shouldn't need this.
+ ;; trying to diagnose GC problems, or trying to debug assembly
+ ;; code for a port to a new CPU) you shouldn't need this.
  ; :sb-ldb
 
  ;; This isn't really a target Lisp feature at all, but controls
  ;; whether the build process produces an after-xc.core file. This
- ;; can be useful for shortening the edit/compile/debug cycle if
- ;; you're messing around with low-level internals of the system,
- ;; as in slam.sh. Otherwise you don't need it.
+ ;; can be useful for shortening the edit/compile/debug cycle when
+ ;; you modify SBCL's own source code, as in slam.sh. Otherwise
+ ;; you don't need it.
  ; :sb-after-xc-core
 
  ;; Enable extra debugging output in the assem.lisp assembler/scheduler

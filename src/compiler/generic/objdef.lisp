@@ -26,6 +26,9 @@
 ;;;;     SIMPLE-FUN-DEBUG-INFO slot holding a tagged object which needs
 ;;;;     to be GCed, you need to tweak scav_code_header() and
 ;;;;     verify_space() in gencgc.c, and the corresponding code in gc.c.
+;;;;   * The src/runtime/print.c code (used by LDB) is implemented
+;;;;     using hand-written lists of slot names, which aren't automatically
+;;;;     generated from the code in this file.
 ;;;;   * Various code (e.g. STATIC-FSET in genesis.lisp) is hard-wired
 ;;;;     to know the name of the last slot of the object the code works
 ;;;;     with, and implicitly to know that the last slot is special (being

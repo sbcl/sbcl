@@ -22,6 +22,7 @@
 
 #include "print.h"
 #include "runtime.h"
+#include "sbcl.h"
 
 /* This file can be skipped if we're not supporting LDB. */
 #if defined(LISP_FEATURE_SB_LDB)
@@ -247,8 +248,8 @@ static void brief_otherimm(lispobj obj)
 
         default:
 	    idx = type >> 2;
-	    if (idx < (sizeof(SUBNAMES_WIDETAG) / sizeof(char *)))
-		    printf("%s", SUBNAMES_WIDETAG[idx]);
+	    if (idx < (sizeof(lowtag_Names) / sizeof(char *)))
+		    printf("%s", lowtag_Names[idx]);
 	    else
 		    printf("unknown type (0x%0x)", type);
             break;
@@ -262,8 +263,8 @@ static void print_otherimm(lispobj obj)
     type = widetag_of(obj);
     idx = type >> 2;
 
-    if (idx < (sizeof(SUBNAMES_WIDETAG) / sizeof(char *)))
-	    printf(", %s", SUBNAMES_WIDETAG[idx]);
+    if (idx < (sizeof(lowtag_Names) / sizeof(char *)))
+	    printf(", %s", lowtag_Names[idx]);
     else
 	    printf(", unknown type (0x%0x)", type);
 
@@ -407,8 +408,9 @@ static void print_slots(char **slots, int count, lispobj *ptr)
     }
 }
 
-/* FIXME: Yikes again! This, like SUBNAMES_WIDETAG[], needs to depend
- * on the values in sbcl.h. */
+/* FIXME: Yikes again! This, like subtype_Names[], needs to depend
+ * on the values in sbcl.h (or perhaps be generated automatically
+ * by GENESIS as part of sbcl.h). */
 static char *symbol_slots[] = {"value: ", "unused: ",
     "plist: ", "name: ", "package: ", NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};

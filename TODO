@@ -23,6 +23,7 @@ for early 0.7.x:
 
 * patches postponed until after 0.7.0:
 	** Christophe Rhodes "rough patch to fix bug 106" 2001-10-28
+	** Alexey Dejneka "bug 111" 2001-12-30
 * building with CLISP (or explaining why not)
 * urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** fixed bug 137

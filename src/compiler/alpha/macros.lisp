@@ -167,7 +167,7 @@
 ;;; Temp-TN is a non- descriptor temp (which may be randomly used by
 ;;; the body.) The body is placed inside the PSEUDO-ATOMIC, and
 ;;; presumably initializes the object.
-(defmacro with-fixed-allocation ((result-tn temp-tn widetagsize)
+(defmacro with-fixed-allocation ((result-tn temp-tn widetag size)
 				 &body body)
   `(pseudo-atomic (:extra (pad-data-block ,size))
      (inst bis alloc-tn other-pointer-lowtag ,result-tn)
