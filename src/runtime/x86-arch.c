@@ -55,7 +55,7 @@ context_eflags_addr(os_context_t *context)
     return &context->uc_mcontext.gregs[16];
 #elif defined __FreeBSD__
     return &context->uc_mcontext.mc_eflags;
-#elif defined __OpenBSD__ || defined __NetBSD__
+#elif defined __OpenBSD__
     return &context->sc_eflags;
 #elif defined __NetBSD__
     return &(context->uc_mcontext.__gregs[_REG_EFL]);

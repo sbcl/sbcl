@@ -5,8 +5,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stddef.h>
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "os.h"
 #include "interrupt.h"
 #ifdef LISP_FEATURE_GENCGC
@@ -104,7 +104,7 @@ static inline os_context_t *get_interrupt_context_for_thread(struct thread *th)
  * much stuff like struct thread and all_threads to be defined, which
  * usually aren't by that time.  So, it's here instead.  Sorry */
 
-inline static struct thread *arch_os_get_current_thread() {
+static inline struct thread *arch_os_get_current_thread() {
 #if defined(LISP_FEATURE_SB_THREAD) && defined (LISP_FEATURE_X86)
     register struct thread *me=0;
     if(all_threads)

@@ -43,6 +43,7 @@ os_vm_size_t os_vm_page_size;
 
 #ifdef __NetBSD__
 #include <sys/resource.h>
+#include <sys/sysctl.h>
 #include <string.h>
 
 static void netbsd_init();
@@ -232,6 +233,21 @@ os_install_interrupt_handlers(void)
 static void netbsd_init()
 {
     struct rlimit rl;
+    int mib[2], osrev;
+    size_t len;
+
+    /* Are we running on a sufficiently functional kernel? */
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_OSREV;
+
+    len = sizeof(osrev);
+    sysctl(mib, 2, &osrev, &len, NULL, 0);
+
+    /* If we're older than 2.0... */
+    if (osrev < 200000000) {
+	fprintf(stderr, "osrev = %d (needed at least 200000000).\n", osrev);
+	lose("NetBSD kernel too old to run sbcl.\n");
+    }
     
     /* NetBSD counts mmap()ed space against the process's data size limit,
      * so yank it up. This might be a nasty thing to do? */

@@ -10,8 +10,10 @@
 /* FIXME: Do we also want
  *   #define ARCH_HAS_FLOAT_REGISTERS
  * here? (The answer wasn't obvious to me when merging the
- * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
+ * architecture-abstracting patches for CSR's SPARC port. -- WHN
+ * 2002-02-15) */
 
+#ifdef LISP_FEATURE_SB_THREAD
 static inline void 
 get_spinlock(lispobj *word,int value)
 {
@@ -31,4 +33,18 @@ release_spinlock(lispobj *word)
     *word=0;
 }
 
+#else
+
+static inline void 
+get_spinlock(lispobj *word, int value)
+{
+    *word = value;
+}
+
+static inline void
+release_spinlock(lispobj *word) {
+    *word = 0;
+}
+
+#endif /* LISP_FEATURE_SB_THREAD */
 #endif /* _X86_ARCH_H */
