@@ -24,12 +24,12 @@ for use in external formats and describing the BASE-CHAR type.)
 ** set BASE-CHAR to be (CHARACTER-SET 0 127), implementing a new
 low-level representation of CHARACTER-STRING for (SIMPLE-ARRAY
 CHARACTER (*)) (which is now distinct from SIMPLE-BASE-STRING).
-  -- mostly done for x86;
+  -- done for x86:
      >> cold init runs;
      >> warm load runs to completion;
      >> all contribs build and pass self-tests;
      >> all sbcl tests pass;
-     >> (not yet done: check against Paul Dietz' gcl/ansi-tests);
+     >> checked against Paul Dietz' gcl/ansi-tests.
   -- TODO: sparc, mips, hppa, alpha, ppc.
 
 ** fix genesis to dump BASE-STRINGs always, and to use SB!XC:CHAR-CODE

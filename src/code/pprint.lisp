@@ -119,7 +119,7 @@
 
 (defun pretty-out (stream char)
   (declare (type pretty-stream stream)
-	   (type base-char char))
+	   (type character char))
   (cond ((char= char #\newline)
 	 (enqueue-newline stream :literal))
 	(t
