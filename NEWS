@@ -1799,6 +1799,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     subclass of STANDARD-METHOD no longer causes stack exhaustion.
     (thanks to Gerd Moellmann)
   * increased compilation speed of long MULTIPLE-VALUES-BIND.
+  * a contributed module implementing COMPILER-LET and MACROEXPAND-ALL
+    has been included.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain
