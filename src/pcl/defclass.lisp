@@ -59,7 +59,7 @@
 ;;; After the metabraid has been setup, and the protocol for defining
 ;;; classes has been defined, the real definition of LOAD-DEFCLASS is
 ;;; installed by the file std-class.lisp
-(defmacro defclass (name %direct-superclasses %direct-slots &rest %options)
+(defmacro defclass (&environment env name %direct-superclasses %direct-slots &rest %options)
   (let ((supers  (copy-tree %direct-superclasses))
 	(slots   (copy-tree %direct-slots))
 	(options (copy-tree %options)))
@@ -82,7 +82,7 @@
             (*slot-names-for-this-defclass* ()))
         (let ((canonical-slots
                 (mapcar (lambda (spec)
-			  (canonicalize-slot-specification name spec))
+			  (canonicalize-slot-specification name spec env))
                         slots))
               (other-initargs
                 (mapcar (lambda (option)
@@ -181,52 +181,72 @@
 	     (push entry *initfunctions-for-this-defclass*))
 	   (cadr entry)))))
 
-(defun canonicalize-slot-specification (class-name spec)
-  (cond ((and (symbolp spec)
-	      (not (keywordp spec))
-	      (not (memq spec '(t nil))))
-         (push spec *slot-names-for-this-defclass*)
-	 `'(:name ,spec))
-	((not (consp spec))
-	 (error "~S is not a legal slot specification." spec))
-	((null (cdr spec))
-         (push (car spec) *slot-names-for-this-defclass*)
+(defun canonicalize-slot-specification (class-name spec env)
+  (labels ((slot-name-illegal (reason)
+	     (error 'simple-program-error
+		    :format-control
+		    (format nil "~~@<in DEFCLASS ~~S, the slot name in the ~
+                                 specification ~~S is ~A.~~@:>" reason)
+		    :format-arguments (list class-name spec)))
+	   (check-slot-name-legality (name)
+	     (cond
+	       ((not (symbolp name))
+		(slot-name-illegal "not a symbol"))
+	       ((keywordp name)
+		(slot-name-illegal "a keyword"))
+	       ((constantp name env)
+		(slot-name-illegal "a constant")))))
+    (cond ((atom spec)
+	   (check-slot-name-legality spec)
+	   (push spec *slot-names-for-this-defclass*)
+	   `'(:name ,spec))
+	  ((null (cdr spec))
+	   (check-slot-name-legality (car spec))
+	   (push (car spec) *slot-names-for-this-defclass*)
 	 `'(:name ,(car spec)))
-	((null (cddr spec))
-	 (error "In DEFCLASS ~S, the slot specification ~S is obsolete.~%~
-		 Convert it to ~S"
-		class-name spec (list (car spec) :initform (cadr spec))))
-	(t
-	 (let* ((name (pop spec))
-		(readers ())
-		(writers ())
-		(initargs ())
-		(unsupplied (list nil))
-		(initform (getf spec :initform unsupplied)))
-           (push name *slot-names-for-this-defclass*)
-	   (doplist (key val) spec
-	     (case key
-	       (:accessor (push val readers)
-			  (push `(setf ,val) writers))
-	       (:reader   (push val readers))
-	       (:writer   (push val writers))
-	       (:initarg  (push val initargs))))
-	   (loop (unless (remf spec :accessor) (return)))
-	   (loop (unless (remf spec :reader)   (return)))
-	   (loop (unless (remf spec :writer)   (return)))
-	   (loop (unless (remf spec :initarg)  (return)))
-	   (setq *writers-for-this-defclass*
-		 (append writers *writers-for-this-defclass*))
-	   (setq *readers-for-this-defclass*
-		 (append readers *readers-for-this-defclass*))
-	   (setq spec `(:name     ',name
-			:readers  ',readers
-			:writers  ',writers
-			:initargs ',initargs
-			',spec))
-	   (if (eq initform unsupplied)
-	       `(list* ,@spec)
-	       `(list* :initfunction ,(make-initfunction initform) ,@spec))))))
+	  ((null (cddr spec))
+	   (error 'simple-program-error
+		  :format-control
+		  "~@<in DEFCLASS ~S, the slot specification ~S is invalid; ~
+                   the probable intended meaning may be achieved by ~
+                   specifiying ~S instead."
+		  :format-arguments
+		  (list class-name spec
+			`(,(car spec) :initform ,(cadr spec)))))
+	  (t
+	   (let* ((name (car spec))
+		  (spec (cdr spec))
+		  (readers ())
+		  (writers ())
+		  (initargs ())
+		  (unsupplied (list nil))
+		  (initform (getf spec :initform unsupplied)))
+	     (check-slot-name-legality name)
+	     (push name *slot-names-for-this-defclass*)
+	     (doplist (key val) spec
+	       (case key
+		 (:accessor (push val readers)
+			    (push `(setf ,val) writers))
+		 (:reader   (push val readers))
+		 (:writer   (push val writers))
+		 (:initarg  (push val initargs))))
+	     (loop (unless (remf spec :accessor) (return)))
+	     (loop (unless (remf spec :reader)   (return)))
+	     (loop (unless (remf spec :writer)   (return)))
+	     (loop (unless (remf spec :initarg)  (return)))
+	     (setq *writers-for-this-defclass*
+		   (append writers *writers-for-this-defclass*))
+	     (setq *readers-for-this-defclass*
+		   (append readers *readers-for-this-defclass*))
+	     (setq spec `(:name     ',name
+			  :readers  ',readers
+			  :writers  ',writers
+			  :initargs ',initargs
+			  ',spec))
+	     (if (eq initform unsupplied)
+		 `(list* ,@spec)
+		 `(list* :initfunction ,(make-initfunction initform)
+		         ,@spec)))))))
 
 (defun canonicalize-defclass-option (class-name option)
   (declare (ignore class-name))

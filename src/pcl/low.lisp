@@ -354,7 +354,7 @@
 (defun structure-slotd-writer-function (type slotd)
   (if (dsd-read-only slotd)
       (let ((dd (get-structure-dd type)))
-	(coerce (sb-kernel::slot-setter-lambda-form dd slotd) 'function))
+	(coerce (slot-setter-lambda-form dd slotd) 'function))
       (fdefinition `(setf ,(dsd-accessor-name slotd)))))
 
 (defun structure-slotd-type (slotd)

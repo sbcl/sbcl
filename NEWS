@@ -1775,6 +1775,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** type checking in branches (194bc).
   * VALUES declaration is disabled.
   * a short form of VALUES type specifier has ANSI meaning.
+  * fixed bug in DEFSTRUCT: once again, naming structure slots with
+    keywords or constants is permissible.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -89,10 +89,7 @@
       "is not a non-null atom"))
 
 (defmethod legal-slot-name-p ((object standard-method) x)
-  (cond ((not (symbolp x)) "is not a symbol and so cannot be bound")
-	((keywordp x)      "is a keyword and so cannot be bound")
-	((memq x '(t nil)) "cannot be bound")
-	((constantp x)     "is a constant and so cannot be bound")
+  (cond ((not (symbolp x)) "is not a symbol")
 	(t t)))
 
 (defmethod legal-specializers-p ((object standard-method) x)
