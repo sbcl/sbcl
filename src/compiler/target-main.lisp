@@ -72,6 +72,8 @@
 	     (*policy* (lexenv-policy *lexenv*))
 	     ;; see above
 	     (*handled-conditions* (lexenv-handled-conditions *lexenv*))
+	     ;; ditto
+	     (*disabled-package-locks* (lexenv-disabled-package-locks *lexenv*))
 	     ;; FIXME: ANSI doesn't say anything about CL:COMPILE
 	     ;; interacting with these variables, so we shouldn't. As
 	     ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by

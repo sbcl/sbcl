@@ -73,8 +73,9 @@
 		  (cons name 1))
 		*policy-qualities*))
   ;; not actually POLICY, but very similar
-  (setf *handled-conditions* nil))
-  
+  (setf *handled-conditions* nil
+	*disabled-package-locks* nil))
+
 ;;; On the cross-compilation host, we initialize immediately (not
 ;;; waiting for "cold init", since cold init doesn't exist on
 ;;; cross-compilation host).

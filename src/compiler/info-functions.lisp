@@ -209,8 +209,10 @@
     (error "can't SETF COMPILER-MACRO-FUNCTION when ENV is non-NIL"))
   (when (eq (info :function :kind name) :special-form)
     (error "~S names a special form." name))
-  (setf (info :function :compiler-macro-function name) function)
-  function)
+  (with-single-package-locked-error 
+      (:symbol name "setting the compiler-macro-function of ~A")
+    (setf (info :function :compiler-macro-function name) function)
+    function))
 
 ;;;; a subset of DOCUMENTATION functionality for bootstrapping
 

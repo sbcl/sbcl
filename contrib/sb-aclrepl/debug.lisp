@@ -6,9 +6,11 @@
 
 (cl:in-package :sb-aclrepl)
 
-
+;;; FIXME: These declaims violate package locks. Are they needed at
+;;; all? Seems not.
+#+ignore
 (declaim (special
-	  sb-debug::*debug-command-level sb-debug::*debug-command-level*
+	  sb-debug::*debug-command-level*
 	  sb-debug::*real-stack-top* sb-debug::*stack-top*
 	  sb-debug::*stack-top-hint* sb-debug::*current-frame*
 	  sb-debug::*flush-debug-errors*))
@@ -45,7 +47,7 @@
 	   
 	   (if (zerop *break-level*) ; restart added by SBCL
 	       (repl :continuable continuable)       
-	       (let ((level *break-level*)) 
+	       (let ((level *break-level*))
 		 (with-simple-restart
 		     (abort "~@<Reduce debugger level (to break level ~W).~@:>"
 			    level)

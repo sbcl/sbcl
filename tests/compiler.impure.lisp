@@ -308,12 +308,17 @@
 ;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
 ;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.
 (multiple-value-bind (function warnings-p failure-p)
-    (compile nil '(lambda () (symbol-macrolet ((t nil)) t)))
+    (compile nil '(lambda ()
+                   ;; not interested in the package lock violation here
+                   (declare (sb-ext:disable-package-locks t))
+                   (symbol-macrolet ((t nil)) t)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
 (multiple-value-bind (function warnings-p failure-p)
     (compile nil
 	     '(lambda ()
+               ;; not interested in the package lock violation here
+               (declare (sb-ext:disable-package-locks *standard-input*))
 		(symbol-macrolet ((*standard-input* nil))
 		  *standard-input*)))
   (assert failure-p)

@@ -130,12 +130,11 @@
 	(*print-case* :upcase)
 	(*print-pretty* nil)
 	(*print-gensym* t))
-    (intern (format nil "CTOR ~S::~S ~S ~S"
-		    (package-name (symbol-package class-name))
-		    (symbol-name class-name)
-		    (plist-keys initargs)
-		    (plist-values initargs :test #'constantp))
-	    *pcl-package*)))
+    (format-symbol *pcl-package* "CTOR ~S::~S ~S ~S"
+		   (package-name (symbol-package class-name))
+		   (symbol-name class-name)
+		   (plist-keys initargs)
+		   (plist-values initargs :test #'constantp))))
 
 ;;;
 ;;; Keep this a separate function for testing.
@@ -148,11 +147,12 @@
 ;;; Keep this a separate function for testing.
 ;;;
 (defun make-ctor (function-name class-name initargs)
-  (let ((ctor (%make-ctor function-name class-name nil initargs)))
-    (push ctor *all-ctors*)
-    (setf (symbol-function function-name) ctor)
-    (install-initial-constructor ctor :force-p t)
-    ctor))
+  (without-package-locks ; for (setf symbol-function)
+   (let ((ctor (%make-ctor function-name class-name nil initargs)))
+     (push ctor *all-ctors*)
+     (setf (symbol-function function-name) ctor)
+     (install-initial-constructor ctor :force-p t)
+     ctor)))
 
 
 ;;; ***********************************************
@@ -174,7 +174,7 @@
 	     (let ((ps #(.p0. .p1. .p2. .p3. .p4. .p5.)))
 	       (if (array-in-bounds-p ps i)
 		   (aref ps i)
-		   (intern (format nil ".P~D." i) *pcl-package*))))
+		   (format-symbol *pcl-package* ".P~D." i))))
 	   ;;
 	   ;; Check if CLASS-NAME is a constant symbol.  Give up if
 	   ;; not.
@@ -220,17 +220,19 @@
 	  ;; Return code constructing a ctor at load time, which, when
 	  ;; called, will set its funcallable instance function to an
 	  ;; optimized constructor function.
-	  `(let ((.x. (load-time-value
-		       (ensure-ctor ',function-name ',class-name ',initargs))))
-	     (declare (ignore .x.))
-	     ;;; ??? check if this is worth it.
-	     (declare
-	      (ftype (or (function ,(make-list (length value-forms)
-					       :initial-element t)
-				   t)
-			 (function (&rest t) t))
-		     ,function-name))
-	     (,function-name ,@value-forms)))))))
+	  `(locally 
+	       (declare (disable-package-locks ,function-name))
+	    (let ((.x. (load-time-value
+			(ensure-ctor ',function-name ',class-name ',initargs))))
+	      (declare (ignore .x.))
+	      ;; ??? check if this is worth it.
+	      (declare
+	       (ftype (or (function ,(make-list (length value-forms)
+						:initial-element t)
+				    t)
+			  (function (&rest t) t))
+		      ,function-name))
+	      (,function-name ,@value-forms))))))))
 
 
 ;;; **************************************************
@@ -456,7 +458,7 @@
 	       (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
 		 (if (array-in-bounds-p ps i)
 		     (aref ps i)
-		     (intern (format nil ".D~D." i) *pcl-package*)))))
+		     (format-symbol *pcl-package* ".D~D." i)))))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr
@@ -470,24 +472,26 @@
 		      (if (consp location)
 			  (class-init location 'param value)
 			  (instance-init location 'param value)))))
+      ;;
       ;; Loop over default initargs of the class, recording
       ;; initializations of slots that have not been initialized
       ;; above.  Default initargs which are not in the supplied
       ;; initargs are treated as if they were appended to supplied
       ;; initargs, that is, their values must be evaluated even
       ;; if not actually used for initializing a slot.
+      ;;
       (loop for (key initfn initform) in default-initargs and i from 0
 	    unless (member key initkeys :test #'eq) do
-	      (let* ((type (if (constantp initform) 'constant 'var))
-		     (init (if (eq type 'var) initfn initform)))
-		(when (eq type 'var)
-		  (let ((init-var (default-init-var-name i)))
-		    (setq init init-var)
-		    (push (cons init-var initfn) default-inits)))
-		(dolist (location (initarg-locations key))
-		  (if (consp location)
-		      (class-init location type init)
-		      (instance-init location type init)))))
+	    (let* ((type (if (constantp initform) 'constant 'var))
+		   (init (if (eq type 'var) initfn initform)))
+	      (when (eq type 'var)
+		(let ((init-var (default-init-var-name i)))
+		  (setq init init-var)
+		  (push (cons init-var initfn) default-inits)))
+	      (dolist (location (initarg-locations key))
+		(if (consp location)
+		    (class-init location type init)
+		    (instance-init location type init)))))
       ;; Loop over all slots of the class, filling in the rest from
       ;; slot initforms.
       (loop for slotd in (class-slots class)

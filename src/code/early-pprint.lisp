@@ -96,15 +96,19 @@
 			    (incf ,count-name)
 			    ,@(when object
 				`((pop ,object-var)))))
-		     (declare (ignorable #',pp-pop-name))
-		     (macrolet ((pprint-pop ()
-				  '(,pp-pop-name))
-				(pprint-exit-if-list-exhausted ()
-				  ,(if object
-				       `'(when (null ,object-var)
-					   (return-from ,block-name nil))
-				       `'(return-from ,block-name nil))))
-		       ,@body)))
+		     (locally
+			 (declare (disable-package-locks 
+				   pprint-pop pprint-exit-if-list-exhausted))
+		       (macrolet ((pprint-pop ()
+				    '(,pp-pop-name))
+				  (pprint-exit-if-list-exhausted ()
+				    ,(if object
+					 `'(when (null ,object-var)
+					    (return-from ,block-name nil))
+					 `'(return-from ,block-name nil))))
+			 (declare (enable-package-locks
+				   pprint-pop pprint-exit-if-list-exhausted))
+			 ,@body))))
 		 ;; FIXME: Don't we need UNWIND-PROTECT to ensure this
 		 ;; always gets executed?
 		 (end-logical-block ,stream-var)))))

@@ -25,10 +25,13 @@
 
 (defmacro define-method-combination (&whole form &rest args)
   (declare (ignore args))
-  (if (and (cddr form)
-	   (listp (caddr form)))
-      (expand-long-defcombin form)
-      (expand-short-defcombin form)))
+  `(progn
+     (with-single-package-locked-error
+	 (:symbol ',(second form) "defining ~A as a method combination"))
+     ,(if (and (cddr form)
+	       (listp (caddr form)))
+	  (expand-long-defcombin form)
+	  (expand-short-defcombin form))))
 
 ;;;; standard method combination
 

@@ -23,6 +23,14 @@
 
 (in-package "SB-COLD")
 
+;;; FIXME: This is embarassing -- SBCL violates SBCL style-package locks
+;;; on the host lisp. Rather then find and fix all cases right now,
+;;; let's just remain self-hosting. The problems at least involve
+;;; a few defvars and local macros with names in the CL package.
+#+(and sbcl sb-package-locks)
+(dolist (p (list-all-packages))
+  (sb-ext:unlock-package p))
+
 ;;; prefixes for filename stems when cross-compiling. These are quite arbitrary
 ;;; (although of course they shouldn't collide with anything we don't want to
 ;;; write over). In particular, they can be either relative path names (e.g.

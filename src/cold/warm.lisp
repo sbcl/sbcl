@@ -13,13 +13,13 @@
 
 ;;;; general warm init compilation policy
 
-
 (proclaim '(optimize (compilation-speed 1)
 		     (debug #+sb-show 2 #-sb-show 1)
 		     (inhibit-warnings 2)
 		     (safety 2)
 		     (space 1)
 		     (speed 2)))
+
 
 ;;;; package hacking
 
@@ -226,3 +226,5 @@
 	       "public: the default package for user code and data")
 #+sb-doc (setf (documentation (find-package "KEYWORD") t)
 	       "public: home of keywords")
+
+

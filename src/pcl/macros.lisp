@@ -164,19 +164,23 @@
 
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))
-  (if (legal-class-name-p name)
-      (let ((cell (find-class-cell name)))
-	(setf (find-class-cell-class cell) new-value)
-	(when (and (eq *boot-state* 'complete) (null new-value))
-	  (setf (find-classoid name) nil))
-	(when (or (eq *boot-state* 'complete)
-		  (eq *boot-state* 'braid))
-	  (when (and new-value (class-wrapper new-value))
-	    (setf (find-class-cell-predicate cell)
-		  (fdefinition (class-predicate-name new-value))))
-	  (update-ctors 'setf-find-class :class new-value :name name))
-	new-value)
-      (error "~S is not a legal class name." name)))
+  (cond ((legal-class-name-p name)
+	 (with-single-package-locked-error
+	     (:symbol name "using ~A as the class-name argument in ~
+                           (SETF FIND-CLASS)"))
+	 (let ((cell (find-class-cell name)))
+	   (setf (find-class-cell-class cell) new-value)
+	   (when (and (eq *boot-state* 'complete) (null new-value))
+	     (setf (find-classoid name) nil))
+	   (when (or (eq *boot-state* 'complete)
+		     (eq *boot-state* 'braid))
+	     (when (and new-value (class-wrapper new-value))
+	       (setf (find-class-cell-predicate cell)
+		     (fdefinition (class-predicate-name new-value))))
+	     (update-ctors 'setf-find-class :class new-value :name name))
+	   new-value))
+	(t
+	 (error "~S is not a legal class name." name))))
 
 (/show "pcl/macros.lisp 230")
 

@@ -806,7 +806,8 @@
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
   (let* ((*lexenv* (make-lexenv :policy *policy*
-				:handled-conditions *handled-conditions*))
+				:handled-conditions *handled-conditions*
+				:disabled-package-locks *disabled-package-locks*))
 	 (tll (ir1-toplevel form path nil)))
     (cond ((eq *block-compile* t) (push tll *toplevel-lambdas*))
 	  (t (compile-toplevel (list tll) nil)))))
@@ -853,7 +854,9 @@
 	   ;; issue a warning instead of silently screwing up.
 	   (*policy* (lexenv-policy *lexenv*))
 	   ;; This is probably also a hack
-	   (*handled-conditions* (lexenv-handled-conditions *lexenv*)))
+	   (*handled-conditions* (lexenv-handled-conditions *lexenv*))
+	   ;; ditto
+	   (*disabled-package-locks* (lexenv-disabled-package-locks *lexenv*)))
       (process-toplevel-progn forms path compile-time-too))))
 
 ;;; Parse an EVAL-WHEN situations list, returning three flags,
@@ -952,7 +955,8 @@
   (when name
     (legal-fun-name-or-type-error name))
   (let* ((*lexenv* (make-lexenv :policy *policy*
-				:handled-conditions *handled-conditions*))
+				:handled-conditions *handled-conditions*
+				:disabled-package-locks *disabled-package-locks*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
 						    :path path)))
@@ -1175,8 +1179,9 @@
                      ((macrolet)
                       (funcall-in-macrolet-lexenv
                        magic
-                       (lambda (&key funs)
+                       (lambda (&key funs prepend)
                          (declare (ignore funs))
+			 (aver (null prepend))
                          (process-toplevel-locally body
                                                    path
                                                    compile-time-too))
@@ -1184,7 +1189,8 @@
                      ((symbol-macrolet)
                       (funcall-in-symbol-macrolet-lexenv
                        magic
-                       (lambda (&key vars)
+                       (lambda (&key vars prepend)
+			 (aver (null prepend))
                          (process-toplevel-locally body
                                                    path
                                                    compile-time-too
@@ -1392,6 +1398,7 @@
 
         (*policy* *policy*)
 	(*handled-conditions* *handled-conditions*)
+	(*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
         (*block-compile* *block-compile-arg*)
         (*source-info* info)

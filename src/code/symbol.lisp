@@ -41,11 +41,12 @@
 (defun makunbound (symbol)
   #!+sb-doc
   "Make SYMBOL unbound, removing any value it may currently have."
-  (set symbol
-       (%primitive sb!c:make-other-immediate-type
-		   0
-		   sb!vm:unbound-marker-widetag))
-  symbol)
+  (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
+    (set symbol
+	 (%primitive sb!c:make-other-immediate-type
+		     0
+		     sb!vm:unbound-marker-widetag))
+    symbol))
 
 ;;; Return the built-in hash value for SYMBOL.
 (defun symbol-hash (symbol)
@@ -58,7 +59,9 @@
 
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))
-  (setf (%coerce-name-to-fun symbol) new-value))
+  (with-single-package-locked-error 
+      (:symbol symbol "setting the symbol-function of ~A")
+    (setf (%coerce-name-to-fun symbol) new-value)))
 
 (defun symbol-plist (symbol)
   #!+sb-doc

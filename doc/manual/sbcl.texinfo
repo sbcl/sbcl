@@ -62,6 +62,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Efficiency::
 * Beyond The ANSI Standard::
 * The Foreign Function Interface::
+* Package Locks::
 * Contributed Modules::
 * Concept Index::
 * Function Index::
@@ -78,6 +79,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include efficiency.texinfo
 @include beyond-ansi.texinfo
 @include ffi.texinfo
+@include package-locks.texi-temp
 @include contrib-modules.texinfo
 @include backmatter.texinfo
 

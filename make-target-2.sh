@@ -78,6 +78,12 @@ echo //doing warm init
 		             (space 1)
 		             (speed 1)))
 
+        ;; Lock internal packages
+        #+sb-package-locks
+        (dolist (p (list-all-packages))
+          (unless (member p (mapcar #'find-package '(:keyword :cl-user)))
+             (lock-package p)))
+
         (sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
 	;; Even if /SHOW output was wanted during build, it's probably
 	;; not wanted by default after build is complete. (And if it's

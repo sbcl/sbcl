@@ -212,7 +212,7 @@
   ;; something sane, (1) doing so doesn't really fix the bug, and 
   ;; (2) doing probably isn't even really safe.
   #+nil (setf (%fun-name def) name)
-
+  
   (when doc
     (setf (fdocumentation name 'function) doc))
   name)

@@ -133,6 +133,9 @@
 
  ("src/code/target-extensions" :not-host)
 
+ ;; Needed before the first use of WITH-SINGLE-PACKAGE-LOCKED-ERROR.
+ ("src/code/early-package" :not-host)
+
  ("src/code/early-defstructs" :not-host) ; gotta-be-first DEFSTRUCTs
 
  ("src/code/defbangstruct")

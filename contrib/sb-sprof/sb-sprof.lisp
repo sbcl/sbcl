@@ -202,14 +202,14 @@
 (defun topological-sort (dag)
   (let ((sorted ())
 	(dfn -1))
-    (labels ((sort (v)
+    (labels ((rec-sort (v)
 	       (setf (vertex-visited v) t)
 	       (setf (vertex-dfn v) (incf dfn))
 	       (dolist (e (vertex-edges v))
 		 (unless (vertex-visited (edge-vertex e))
-		   (sort (edge-vertex e))))
+		   (rec-sort (edge-vertex e))))
 	       (push v sorted)))
-      (map-vertices #'sort dag)
+      (map-vertices #'rec-sort dag)
       (nreverse sorted))))
 
 ;;; Reduce graph G to a dag by coalescing strongly connected components
@@ -382,7 +382,7 @@
 		     (rotatef (aref vec i) (aref vec j))))
 	   (key (i)
 	     (aref vec (+ i key-offset)))
-	   (sort (from to)
+	   (rec-sort (from to)
 	     (when (> to from) 
 	       (let* ((mid (* element-size
 			      (round (+ (/ from element-size)
@@ -403,9 +403,9 @@
 		    (when (< j i) (return))
 		    (rotate i j))
 		 (rotate from j)
-		 (sort from (- j element-size))
-		 (sort i to)))))
-    (sort from to)
+		 (rec-sort from (- j element-size))
+		 (rec-sort i to)))))
+    (rec-sort from to)
     vec))
 
 
@@ -1013,7 +1013,7 @@
     (format t "~& Count     %                   Parts~%")
     (do-vertices (node call-graph)
       (when (cycle-p node)
-	(flet ((print (indent index count percent name)
+	(flet ((print-info (indent index count percent name)
 		 (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
 			 count percent indent name index)))
 	  (print-separator)
@@ -1022,9 +1022,9 @@
 		  (samples-percent call-graph (cycle-count node))
 		  (node-name node))
 	  (dolist (v (vertex-scc-vertices node))
-	    (print 4 (node-index v) (node-count v)
-		   (samples-percent call-graph (node-count v))
-		   (node-name v))))))
+	    (print-info 4 (node-index v) (node-count v)
+                        (samples-percent call-graph (node-count v))
+                        (node-name v))))))
     (print-separator)
     (format t "~2%")))
 
@@ -1036,7 +1036,7 @@
     (print-cycles call-graph)
     (flet ((find-call (from to)
 	     (find to (node-edges from) :key #'call-vertex))
-	   (print (indent index count percent name)
+	   (print-info (indent index count percent name)
 	     (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
 		     count percent indent name index)))
       (format t "~&                               Callers~%")
@@ -1048,10 +1048,10 @@
 	;; Print caller information.
 	(dolist (caller (node-callers node))
 	  (let ((call (find-call caller node)))
-	    (print 4 (node-index caller)
-		   (call-count call)
-		   (samples-percent call-graph (call-count call))
-		   (node-name caller))))
+	    (print-info 4 (node-index caller)
+                        (call-count call)
+                        (samples-percent call-graph (call-count call))
+                        (node-name caller))))
 	;; Print the node itself.
 	(format t "~&~6d ~5,1f ~6d ~5,1f   ~s [~d]~%"
 		(node-count node)
@@ -1062,10 +1062,10 @@
 		(node-index node))
 	;; Print callees.
 	(do-edges (call called node)
-	  (print 4 (node-index called)
-		 (call-count call)
-		 (samples-percent call-graph (call-count call))
-		 (node-name called))))
+	  (print-info 4 (node-index called)
+                      (call-count call)
+                      (samples-percent call-graph (call-count call))
+                      (node-name called))))
       (print-separator)
       (format t "~2%")
       (print-flat call-graph :stream stream :max max

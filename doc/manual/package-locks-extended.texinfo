@@ -1,0 +1,333 @@
+@include package-locks-basic.texinfo
+
+None of the following sections apply to SBCL built
+without package locks.
+
+The interface described here is experimental: incompatible changes
+in future SBCL releases are possible, even expected.
+
+@menu
+* Package Locking Overview::                    
+* Implementation Packages::     
+* Package Locked Errors::       
+* Package Locks in Compiled Code::               
+* Package Lock Violations::     
+* Package Lock Dictionary::
+@end menu
+
+@node Package Locking Overview
+@section Package Locking Overview
+Package locks protect against unintentional modifications of a
+package: they provide similar protection to user packages as is
+mandated to @code{common-lisp} package by the ANSI specification. They
+are not, and should not be used as a security measure.
+
+Newly created packages are by default unlocked (see the @code{:lock}
+option to @code{defpackage}).
+
+The package @code{common-lisp} and SBCL internal implementation
+packages are locked by default, including @code{sb-ext}.
+
+It may be beneficial to lock @code{common-lisp-user} as well, to
+ensure that various libraries don't pollute it without asking,
+but this is not currently done by default.
+
+@node Implementation Packages
+@section Implementation Packages
+
+Each package has a list of associated implementation packages. A
+locked package, and the symbols whose home package it is, can be
+modified without violating package locks only when @code{*package*} is
+bound to one of the implementation packages of the locked package.
+
+Unless explicitly altered by @code{defpackage},
+@code{sb-ext:add-implementation-package}, or
+@code{sb-ext:remove-implementation-package} each package is its own
+(only) implementation package.
+
+@node Package Locked Errors
+@section Package Locked Errors
+
+If an operation violates a package lock, a continuable error that is
+of a subtype of @code{sb-ext:package-lock-violation} (subtype of
+@code{package-error}) is signalled when the operation is attempted.
+
+Additional restarts may be established for continuable package lock
+violations for interactive use.
+
+The actual type of the error depends on circumstances that caused the
+violation: operations on packages signal errors of type
+@code{sb-ext:package-locked-error}, and operations on symbols signal
+errors of type @code{sb-ext:symbol-package-locked-error}.
+
+@node Package Locks in Compiled Code
+@section Package Locks in Compiled Code
+
+@subsection Lexical bindings and declarations
+
+Compiling lexical binding constructs or lexical declarations that
+violate package locks package cause a compile-time package-lock
+violation. A complete listing of operators affect by this is:
+@code{let}, @code{let*}, @code{flet}, @code{labels}, @code{macrolet},
+and @code{symbol-macrolet}, @code{declare}.
+
+Package locks affecting both lexical bindings and declarations can be
+disabled at compile-time with @code{sb-ext:disable-package-locks}
+declaration, and re-enabled with @code{sb-ext:enable-package-locks}
+declaration. Constructs compiled with package locks thusly disabled
+are guaranteed not to signal package lock violation errors at runtime.
+
+Example:
+
+@lisp
+(in-package :locked)
+
+(defun foo () ...)
+
+(defmacro with-foo (&body body)
+  `(locally (declare (disable-package-locks locked:foo))
+     (flet ((foo () ...))
+       (declare (enable-package-locks locked:foo)) ; re-enable for body
+       ,@@body)))
+@end lisp
+
+@subsection Interned symbols
+
+If compiled code contains interned symbols, then loading that code
+into an image without the said symbols will not cause a package lock
+violation even if the packages in question are locked.
+
+@subsection Other limitations on compiled code
+
+With the exception of the aforementioned contructs, and interned
+symbols, behaviour is unspecified if package locks affecting compiled
+code are not the same during loading of the code or execution.
+
+Specifically, code compiled with packages unlocked may or may not fail
+to signal package-lock-violations even if the packages are locked at
+runtime, and code compiled with packages locked may or may not signal
+spurious package-lock-violations at runtime even if the packages are
+unlocked.
+
+In practise all this means that package-locks have a neglible
+performance penalty in compiled code as long as they are not violated.
+
+@node Package Lock Violations
+@section Package Lock Violations
+
+@heading Operations on Packages
+
+Following actions cause a package lock violation if the package
+operated on is locked, and @code{*package*} is not an implementation
+package of that package, and the action would cause a change in the
+state of the package (eg. exporting already external symbols is
+allowed). Package lock violations caused by these operations signal
+errors of type @code{sb-ext:package-locked-error}.
+
+@enumerate
+@item
+Shadowing a symbol in a package.
+
+@item
+Importing a symbol to a package.
+
+@item
+Uninterning a symbol from a package.
+
+@item
+Exporting a symbol from a package.
+
+@item
+Unexporting a symbol from a package.
+
+@item
+Changing the packages used by a package.
+
+@item
+Renaming a package.
+
+@item
+Deleting a package.
+
+@end enumerate
+
+@heading Operations on Symbols
+
+Following actions cause a package lock violation if the home package
+of the symbol operated on is locked, and @code{*package*} is not an
+implementation package of that package. Package lock violations caused
+by these action signal errors of type
+@code{sb-ext:symbol-package-locked-error}.
+
+These actions cause only one package lock violation per lexically
+apparent violated package.
+
+Example:
+
+@lisp
+;; Packages FOO and BAR are locked.
+;;
+;; Two lexically apparent violated packages: exactly two
+;; package-locked-errors will be signalled.
+
+(defclass foo:point ()
+  ((x :accessor bar:x)
+   (y :accessor bar:y)))
+@end lisp
+
+@enumerate
+@item
+Binding or altering its value lexically or dynamically, or
+establishing it as a symbol-macro.
+
+Exceptions:
+
+@itemize @minus
+@item
+If the symbol is not defined as a constant, global symbol-macro or a
+global dynamic variable, it may be lexically bound or established as a
+local symbol macro.
+
+@item
+If the symbol is defined as a global dynamic variable, it may be
+assigned or bound.
+
+@end itemize
+
+@item
+Defining, undefining, or binding it, or its setf name as a function.
+
+Exceptions:
+
+@itemize @minus
+@item
+If the symbol is not defined as a function, macro, or special operator
+it and its setf name may be lexically bound as a function.
+
+@end itemize
+
+@item
+Defining, undefining, or binding it as a macro or compiler macro.
+
+Exceptions:
+
+@itemize @minus
+@item
+If the symbol is not defined as a function, macro, or special operator
+it may be lexically bound as a macro.
+
+@end itemize
+
+@item
+Defining it as a type specifier or structure.
+
+@item
+Defining it as a declaration with a declaration proclamation.
+
+@item
+Declaring or proclaiming it special.
+
+@item
+Declaring or proclaiming its type or ftype.
+
+Exceptions:
+
+@itemize @minus
+@item
+If the symbol may be lexically bound, the type of that binding may be
+declared.
+
+@item
+If the symbol may be lexically bound as a function, the ftype of that
+binding may be declared.
+
+@end itemize
+
+@item
+Defining a setf expander for it.
+
+@item
+Defining it as a method combination type.
+
+@item
+Using it as the class-name argument to setf of find-class.
+
+@end enumerate
+
+@node Package Lock Dictionary
+@section Package Lock Dictionary
+
+@deftp {Declaration} sb-ext:disable-package-locks
+
+Syntax: @code{(sb-ext:disable-package-locks symbol*)}
+
+Disables package locks affecting the named symbols during compilation
+in the lexical scope of the declaration. Disabling locks on symbols
+whose home package is unlocked, or disabling an already disabled lock,
+has no effect.
+@end deftp
+
+@deftp {Declaration} sb-ext:enable-package-locks
+
+Syntax: @code{(sb-ext:enable-package-locks symbol*)}
+
+Re-enables package locks affecting the named symbols during
+compilation in the lexical scope of the declaration. Enabling locks
+that were not first disabled with @code{sb-ext:disable-package-locks}
+declararion, or enabling locks that are already enabled has no effect.
+@end deftp
+
+@include condition-sb-ext-package-lock-violation.texinfo
+@include condition-sb-ext-package-locked-error.texinfo
+@include condition-sb-ext-symbol-package-locked-error.texinfo
+
+@defun sb-ext:package-locked-error-symbol @var{symbol-package-locked-error}
+
+Returns the symbol that caused the @code{symbol-package-locked-error}
+condition.
+@end defun
+
+@include fun-sb-ext-package-locked-p.texinfo
+@include fun-sb-ext-lock-package.texinfo
+@include fun-sb-ext-unlock-package.texinfo
+@include fun-sb-ext-package-implemented-by-list.texinfo
+@include fun-sb-ext-package-implements-list.texinfo
+@include fun-sb-ext-add-implementation-package.texinfo
+@include fun-sb-ext-remove-implementation-package.texinfo
+@include macro-sb-ext-without-package-locks.texinfo
+@include macro-sb-ext-with-unlocked-packages.texinfo
+
+@defmac defpackage name [[@var{option}]]* @result{} package
+
+Options are extended to include the following:
+
+@itemize
+@item
+@code{:lock} @var{boolean}
+
+If the argument to @code{:lock} is @code{t}, the package is initially
+locked.  If @code{:lock} is not provided it defaults to @code{nil}.
+
+@item
+@code{:implement} @var{package-designator}*
+
+The package is added as an implementation package to the packages
+named. If @code{:implement} is not provided, it defaults to the
+package itself.
+@end itemize
+
+Example:
+
+@lisp
+(defpackage "FOO" (:export "BAR") (:lock t) (:implement))
+(defpackage "FOO-INT" (:use "FOO") (:implement "FOO" "FOO-INT"))
+
+;;; is equivalent to
+
+(defpackage "FOO") (:export "BAR"))
+(lock-package "FOO")
+(remove-implementation-package "FOO" "FOO")
+(defpackage "FOO-INT" (:use "BAR"))
+(add-implementation-package "FOO-INT" "FOO")
+@end lisp
+@end defmac

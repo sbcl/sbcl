@@ -151,3 +151,34 @@
 #!+alpha
 (defun sb!vm::ash-left-mod64 (integer amount)
   (ldb (byte 64 0) (ash integer amount)))
+
+;;; package locking nops for the cross-compiler
+
+(defmacro without-package-locks (&body body)
+  `(progn ,@body))
+
+(defmacro with-single-package-locked-error ((&optional kind thing &rest format) 
+					    &body body)
+  (declare (ignore kind thing format))
+  `(progn ,@body))
+
+(defmacro with-deferred-package-lock-violations (&body body)
+  `(flet ((prepend-package-lock-violations (forms) forms)
+	  (package-lock-violations () nil))
+    ,@body))
+
+(defun assert-package-unlocked (package &optional control &rest args)
+  (declare (ignore control args))
+  package)
+
+(defun assert-symbol-home-package-unlocked (name format &key continuablep)
+  (declare (ignore format continuablep))
+  name)
+
+(deftype package-lock-violation () nil)
+
+(deftype package-locked-error () nil)
+
+(deftype symbol-package-locked-error () nil)
+
+(declaim (declaration enable-package-locks disable-package-locks))

@@ -377,7 +377,9 @@
 ;;; bug 313: source transforms were "lisp-1"
 (defun srctran-lisp1-1 (cadr) (if (functionp cadr) (funcall cadr 1) nil))
 (assert (eql (funcall (eval #'srctran-lisp1-1) #'identity) 1))
-(defvar caar)
+(without-package-locks 
+   ;; this be a nasal demon, but test anyways
+   (defvar caar))
 (defun srctran-lisp1-2 (caar) (funcall (sb-ext:truly-the function caar) 1))
 (assert (eql (funcall (eval #'srctran-lisp1-2) #'identity) 1))
 

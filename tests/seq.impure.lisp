@@ -13,10 +13,12 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 (load "assertoid.lisp")
-(use-package "ASSERTOID")
+
+(defpackage :seq-test
+  (:use :cl :assertoid))
+
+(in-package :seq-test)
 
 ;;; helper functions for exercising SEQUENCE code on data of many
 ;;; specialized types, and in many different optimization scenarios
@@ -874,4 +876,4 @@
 	    (read-char s)))))
 
 ;;; success
-(quit :unix-status 104)
+(sb-ext:quit :unix-status 104)

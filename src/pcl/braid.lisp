@@ -97,8 +97,7 @@
 (defmacro !initial-classes-and-wrappers (&rest classes)
   `(progn
      ,@(mapcar (lambda (class)
-		 (let ((wr (intern (format nil "~A-WRAPPER" class)
-				   *pcl-package*)))
+		 (let ((wr (format-symbol *pcl-package* "~A-WRAPPER" class)))
 		   `(setf ,wr ,(if (eq class 'standard-generic-function)
 				   '*sgf-wrapper*
 				   `(boot-make-wrapper
@@ -189,9 +188,7 @@
 				   (boot-make-wrapper (length slots) name))))
 		   (proto nil))
 	      (when (eq name t) (setq *the-wrapper-of-t* wrapper))
-	      (set (intern (format nil "*THE-CLASS-~A*" (symbol-name name))
-			   *pcl-package*)
-		   class)
+	      (set (make-class-symbol name) class)
 	      (dolist (slot slots)
 		(unless (eq (getf slot :allocation :instance) :instance)
 		  (error "Slot allocation ~S is not supported in bootstrap."

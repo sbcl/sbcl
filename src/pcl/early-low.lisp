@@ -60,6 +60,17 @@
 		      (classoid-layout classoid))
 		     'defstruct-description)))))
 
+;;; Symbol contruction utilities
+(defun format-symbol (package format-string &rest format-arguments)
+  (without-package-locks
+   (intern (apply #'format nil format-string format-arguments) package)))
+
+(defun make-class-symbol (class-name)
+  (format-symbol *pcl-package* "*THE-CLASS-~A*" (symbol-name class-name)))
+
+(defun make-wrapper-symbol (class-name)
+  (format-symbol *pcl-package* "*THE-WRAPPER-~A*" (symbol-name class-name)))
+
 (defun condition-type-p (type)
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))

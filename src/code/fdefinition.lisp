@@ -234,27 +234,28 @@
   #!+sb-doc
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
-  (let ((fdefn (fdefinition-object name t)))
-    ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
-    ;; top level forms in the kernel core startup.
-    (when (boundp '*setf-fdefinition-hook*)
-      (dolist (f *setf-fdefinition-hook*)
-        (declare (type function f))
-	(funcall f name new-value)))
-
-    (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))
-      (cond (encap-info
-	     (loop
-	       (let ((more-info
-		      (encapsulation-info
-		       (encapsulation-info-definition encap-info))))
-		 (if more-info
-		     (setf encap-info more-info)
-		     (return
-		      (setf (encapsulation-info-definition encap-info)
-			    new-value))))))
-	    (t
-	     (setf (fdefn-fun fdefn) new-value))))))
+  (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
+    (let ((fdefn (fdefinition-object name t)))
+      ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
+      ;; top level forms in the kernel core startup.
+      (when (boundp '*setf-fdefinition-hook*)
+	(dolist (f *setf-fdefinition-hook*)
+	  (declare (type function f))
+	  (funcall f name new-value)))
+      
+      (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))
+	(cond (encap-info
+	       (loop
+		(let ((more-info
+		       (encapsulation-info
+			(encapsulation-info-definition encap-info))))
+		  (if more-info
+		      (setf encap-info more-info)
+		      (return
+			(setf (encapsulation-info-definition encap-info)
+			      new-value))))))
+	      (t
+	       (setf (fdefn-fun fdefn) new-value)))))))
 
 ;;;; FBOUNDP and FMAKUNBOUND
 
@@ -267,8 +268,10 @@
 (defun fmakunbound (name)
   #!+sb-doc
   "Make NAME have no global function definition."
-  (let ((fdefn (fdefinition-object name nil)))
-    (when fdefn
-      (fdefn-makunbound fdefn)))
-  (sb!kernel:undefine-fun-name name)
-  name)
+  (with-single-package-locked-error 
+      (:symbol name "removing the function or macro definition of ~A")
+    (let ((fdefn (fdefinition-object name nil)))
+      (when fdefn
+	(fdefn-makunbound fdefn)))
+    (sb!kernel:undefine-fun-name name)
+    name))

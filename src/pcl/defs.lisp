@@ -216,19 +216,13 @@
 
 (defun get-built-in-class-symbol (class-name)
   (or (cadr (assq class-name *built-in-class-symbols*))
-      (let ((symbol (intern (format nil
-				    "*THE-CLASS-~A*"
-				    (symbol-name class-name))
-			    *pcl-package*)))
+      (let ((symbol (make-class-symbol class-name)))
 	(push (list class-name symbol) *built-in-class-symbols*)
 	symbol)))
 
 (defun get-built-in-wrapper-symbol (class-name)
   (or (cadr (assq class-name *built-in-wrapper-symbols*))
-      (let ((symbol (intern (format nil
-				    "*THE-WRAPPER-OF-~A*"
-				    (symbol-name class-name))
-			    *pcl-package*)))
+      (let ((symbol (make-wrapper-symbol class-name)))
 	(push (list class-name symbol) *built-in-wrapper-symbols*)
 	symbol)))
 

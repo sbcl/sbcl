@@ -98,20 +98,22 @@
                                         mclass
                                         *the-class-structure-class*))))))
           (let ((defclass-form
-		  `(progn
-		     (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
-		       (%compiler-defclass ',name
-					   ',*readers-for-this-defclass*
-					   ',*writers-for-this-defclass*
-					   ',*slot-names-for-this-defclass*)
-		       (load-defclass ',name
-				      ',metaclass
-				      ',supers
-				      (list ,@canonical-slots)
-				      (list ,@(apply #'append
-						     (when defstruct-p
-						       '(:from-defclass-p t))
-						     other-initargs)))))))
+		    `(progn
+		      (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
+			(with-single-package-locked-error
+			    (:symbol ',name "defining ~A as a class")
+			  (%compiler-defclass ',name
+					      ',*readers-for-this-defclass*
+					      ',*writers-for-this-defclass*
+					      ',*slot-names-for-this-defclass*)
+			  (load-defclass ',name
+					 ',metaclass
+					 ',supers
+					 (list ,@canonical-slots)
+					 (list ,@(apply #'append
+							(when defstruct-p
+							  '(:from-defclass-p t))
+							other-initargs))))))))
             (if defstruct-p
 		(progn
 		  ;; FIXME: (YUK!) Why do we do this? Because in order
@@ -131,7 +133,8 @@
 				      (and (not (eq name 'structure-object))
 					   *the-class-structure-object*)))
 			 (defstruct-form (make-structure-class-defstruct-form
-					  name (class-direct-slots (find-class name)) include)))
+					  name (class-direct-slots (find-class name))
+					  include)))
 		    `(progn
 		      (eval-when (:compile-toplevel :load-toplevel :execute)
 			,defstruct-form) ; really compile the defstruct-form
@@ -157,13 +160,14 @@
 		     ,defclass-form)))))))))
 
 (defun %compiler-defclass (name readers writers slot-names)
-  (preinform-compiler-about-class-type name)
-  (proclaim `(ftype (function (t) t)
-	      ,@readers
-	      ,@(mapcar #'slot-reader-name slot-names)
-	      ,@(mapcar #'slot-boundp-name slot-names)))
-  (proclaim `(ftype (function (t t) t)
-	      ,@writers ,@(mapcar #'slot-writer-name slot-names))))
+  (with-single-package-locked-error (:symbol name "defining ~A as a class")
+    (preinform-compiler-about-class-type name)
+    (proclaim `(ftype (function (t) t)
+		,@readers
+		,@(mapcar #'slot-reader-name slot-names)
+		,@(mapcar #'slot-boundp-name slot-names)))
+    (proclaim `(ftype (function (t t) t)
+		,@writers ,@(mapcar #'slot-writer-name slot-names)))))
 
 (defun make-initfunction (initform)
   (cond ((or (eq initform t)

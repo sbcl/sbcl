@@ -14,6 +14,8 @@
 (/show0 "compiler-deftype.lisp 14")
 
 (defun %compiler-deftype (name expander &optional doc)
+  (with-single-package-locked-error
+      (:symbol name "defining ~A as a type specifier"))
   (ecase (info :type :kind name)
     (:primitive
      (when *type-system-initialized*

@@ -337,15 +337,18 @@
        (if (dd-class-p dd)
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
-		;; Note we intentionally call %DEFSTRUCT first, and
-		;; especially before %COMPILER-DEFSTRUCT. %DEFSTRUCT
-		;; has the tests (and resulting CERROR) for collisions
-		;; with LAYOUTs which already exist in the runtime. If
-		;; there are any collisions, we want the user's
-		;; response to CERROR to control what happens.
-		;; Especially, if the user responds to the collision
-		;; with ABORT, we don't want %COMPILER-DEFSTRUCT to
-		;; modify the definition of the class.
+		;; Note we intentionally enforce package locks and
+		;; call %DEFSTRUCT first, and especially before
+		;; %COMPILER-DEFSTRUCT. %DEFSTRUCT has the tests (and
+		;; resulting CERROR) for collisions with LAYOUTs which
+		;; already exist in the runtime. If there are any
+		;; collisions, we want the user's response to CERROR
+		;; to control what happens. Especially, if the user
+		;; responds to the collision with ABORT, we don't want
+		;; %COMPILER-DEFSTRUCT to modify the definition of the
+		;; class.
+	        (with-single-package-locked-error
+		    (:symbol ',name "defining ~A as a structure"))
 		(%defstruct ',dd ',inherits)
 		(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (%compiler-defstruct ',dd ',inherits))
@@ -358,6 +361,8 @@
 			    (class-method-definitions dd)))
 		',name))
 	   `(progn
+	      (with-single-package-locked-error
+		  (:symbol ',name "defining ~A as a structure"))
 	      (eval-when (:compile-toplevel :load-toplevel :execute)
 		(setf (info :typed-structure :info ',name) ',dd))
 	      ,@(unless expanding-into-code-for-xc-host-p

@@ -337,6 +337,8 @@ GET-SETF-EXPANSION directly."
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
   (defun assign-setf-macro (name expander inverse doc)
+    (with-single-package-locked-error
+	(:symbol name "defining a setf-expander for ~A"))
     (cond ((gethash name sb!c:*setf-assumed-fboundp*)
 	   (warn
 	    "defining setf macro for ~S when ~S was previously ~

@@ -119,6 +119,17 @@
 	 (mapcar (lambda (x) (list x 'muffle-warning)) (cdr spec)))
    list))
 
+(declaim (ftype (function (list list) list)
+                process-package-lock-decl))
+(defun process-package-lock-decl (spec old)
+  (let ((decl (car spec))
+        (list (cdr spec)))
+    (ecase decl
+      (disable-package-locks
+       (union old list :test #'equal))
+      (enable-package-locks
+       (set-difference old list :test #'equal)))))
+
 ;;; ANSI defines the declaration (FOO X Y) to be equivalent to
 ;;; (TYPE FOO X Y) when FOO is a type specifier. This function
 ;;; implements that by converting (FOO X Y) to (TYPE FOO X Y).
@@ -157,6 +168,8 @@
 	   (error "can't declare a non-symbol as SPECIAL: ~S" name))
 	 (when (constantp name)
 	   (error "can't declare a constant as SPECIAL: ~S" name))
+	 (with-single-package-locked-error
+             (:symbol name "globally declaraing ~A special"))
 	 (clear-info :variable :constant-value name)
 	 (setf (info :variable :kind name) :special)))
       (type
@@ -165,6 +178,8 @@
 	     (dolist (name (rest args))
 	       (unless (symbolp name)
 		 (error "can't declare TYPE of a non-symbol: ~S" name))
+	       (with-single-package-locked-error
+                   (:symbol name "globally declaring the type of ~A"))
 	       (when (eq (info :variable :where-from name) :declared)
 		 (let ((old-type (info :variable :type name)))
 		   (when (type/= type old-type)
@@ -181,6 +196,8 @@
 	     (unless (csubtypep ctype (specifier-type 'function))
 	       (error "not a function type: ~S" (first args)))
 	     (dolist (name (rest args))
+	       (with-single-package-locked-error
+                   (:symbol name "globally declaring the ftype of ~A"))
                (when (eq (info :function :where-from name) :declared)
                  (let ((old-type (info :function :type name)))
                    (when (type/= ctype old-type)
@@ -222,6 +239,9 @@
       (unmuffle-conditions
        (setq *handled-conditions*
 	     (process-unmuffle-conditions-decl form *handled-conditions*)))
+      ((disable-package-locks enable-package-locks)
+         (setq *disabled-package-locks*
+               (process-package-lock-decl form *disabled-package-locks*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
 	 (proclaim-as-fun-name name) ; since implicitly it is a function
@@ -236,6 +256,8 @@
 	   (error "In~%  ~S~%the declaration to be recognized is not a ~
                   symbol:~%  ~S"
 		  form decl))
+	 (with-single-package-locked-error
+             (:symbol decl "globally declaring ~A as a declaration proclamation"))
 	 (setf (info :declaration :recognized decl) t)))
       (t
        (unless (info :declaration :recognized kind)

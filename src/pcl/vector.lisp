@@ -1091,27 +1091,30 @@
       `(list*
 	:fast-function
 	(,(if (body-method-name body) 'named-lambda 'lambda)
-	 ,@(when (body-method-name body)
-	     (list (body-method-name body))) ; function name
-	 (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
-	 ;; body of the function
-	 (declare (ignorable .pv-cell. .next-method-call.))
-	 ,@outer-decls
-	 (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
-			     &rest forms)
-			    (declare (ignore pv-table-symbol
-					     pv-parameters))
-			    `(let ((,pv (car .pv-cell.))
-				   (,calls (cdr .pv-cell.)))
-			       (declare ,(make-pv-type-declaration pv)
-					,(make-calls-type-declaration calls))
-			       ,pv ,calls
-			       ,@forms)))
-	   (fast-lexical-method-functions
-	    (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
-	     ,@(cdddr lmf-params))
-	    ,@inner-decls
-	    ,@body-sans-decls)))
+	  ,@(when (body-method-name body)
+		  (list (body-method-name body))) ; function name
+	  (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
+	  ;; body of the function
+	  (declare (ignorable .pv-cell. .next-method-call.))
+	  ,@outer-decls
+	  (declare (disable-package-locks pv-env))
+	   (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
+			       &rest forms)
+			(declare (ignore pv-table-symbol
+					 pv-parameters))
+			(declare (enable-package-locks pv-env))
+			`(let ((,pv (car .pv-cell.))
+			       (,calls (cdr .pv-cell.)))
+			   (declare ,(make-pv-type-declaration pv)
+				    ,(make-calls-type-declaration calls))
+			   ,pv ,calls
+			   ,@forms)))
+	     (declare (enable-package-locks pv-env))
+	     (fast-lexical-method-functions
+	      (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
+		,@(cdddr lmf-params))
+	      ,@inner-decls
+	      ,@body-sans-decls)))
 	',initargs))))
 
 ;;; Use arrays and hash tables and the fngen stuff to make this much
@@ -1150,7 +1153,7 @@
 			(setf (get (car fname) 'method-sym)
 			      (let ((str (symbol-name (car fname))))
 				(if (string= "FAST-" str :end2 5)
-				    (intern (subseq str 5) *pcl-package*)
+				    (format-symbol *pcl-package* (subseq str 5))
 				    (car fname)))))
 		    ,@(cdr fname))))
       (set-fun-name method-function name))

@@ -27,7 +27,7 @@
 			   (funs vars blocks tags
                                  type-restrictions
 				 lambda cleanup handled-conditions
-				 policy)))
+				 disabled-package-locks policy)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -64,6 +64,8 @@
   (cleanup nil)
   ;; condition types we handle with a handler around the compiler
   (handled-conditions *handled-conditions*)
+  ;; lexically disabled package locks (list of symbols)
+  (disabled-package-locks *disabled-package-locks*)
   ;; the current OPTIMIZE policy
   (policy *policy* :type policy))
 

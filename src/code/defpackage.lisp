@@ -28,19 +28,24 @@
     nil))
 
 (defmacro defpackage (package &rest options)
-  #!+sb-doc
-  "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
-   following:
-     (:NICKNAMES {package-name}*)
-     (:SIZE <integer>)
-     (:SHADOW {symbol-name}*)
-     (:SHADOWING-IMPORT-FROM <package-name> {symbol-name}*)
-     (:USE {package-name}*)
-     (:IMPORT-FROM <package-name> {symbol-name}*)
-     (:INTERN {symbol-name}*)
-     (:EXPORT {symbol-name}*)
-     (:DOCUMENTATION doc-string)
-   All options except :SIZE and :DOCUMENTATION can be used multiple times."
+  #!+sb-doc 
+  #.(format nil 
+  "Defines a new package called PACKAGE. Each of OPTIONS should be one of the 
+   following: ~{~&~4T~A~}
+   All options except ~{~A, ~}and :DOCUMENTATION can be used multiple 
+   times."
+  '((:nicknames "{package-name}*")
+    (:size "<integer>")
+    (:shadow "{symbol-name}*")
+    (:shadowing-import-from "<package-name> {symbol-name}*")
+    (:use "{package-name}*")
+    (:import-from "<package-name> {symbol-name}*")
+    (:intern "{symbol-name}*")
+    (:export "{symbol-name}*")
+    #!+sb-package-locks (:implement "{package-name}*")
+    #!+sb-package-locks (:lock "boolean")
+    (:documentation "doc-string"))
+  '(:size #!+sb-package-locks :lock))
   (let ((nicknames nil)
 	(size nil)
 	(shadows nil)
@@ -50,7 +55,12 @@
 	(imports nil)
 	(interns nil)
 	(exports nil)
+	(implement (stringify-names (list package) "package"))
+	(implement-p nil)
+	(lock nil)
 	(doc nil))
+    #!-sb-package-locks    
+    (declare (ignore implement-p))
     (dolist (option options)
       (unless (consp option)
 	(error 'simple-program-error
@@ -100,6 +110,19 @@
 	(:export
 	 (let ((new (stringify-names (cdr option) "symbol")))
 	   (setf exports (append exports new))))
+	#!+sb-package-locks
+	(:implement
+	 (unless implement-p 
+	   (setf implement nil))
+	 (let ((new (stringify-names (cdr option) "package")))
+	   (setf implement (append implement new)
+		 implement-p t)))
+	#!+sb-package-locks
+	(:lock
+	 (when lock
+	   (error 'simple-program-error
+		  :format-control "multiple :LOCK options"))
+	 (setf lock (coerce (second option) 'boolean)))
 	(:documentation
 	 (when doc
 	   (error 'simple-program-error
@@ -119,7 +142,7 @@
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%defpackage ,(stringify-name package "package") ',nicknames ',size
 		    ',shadows ',shadowing-imports ',(if use-p use :default)
-		    ',imports ',interns ',exports ',doc))))
+		    ',imports ',interns ',exports ',implement ',lock ',doc))))
 
 (defun check-disjoint (&rest args)
   ;; An arg is (:key . set)
@@ -149,12 +172,14 @@
 	  names))
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
-			 use imports interns exports doc-string)
+		    use imports interns exports implement lock doc-string)
   (declare (type simple-base-string name)
 	   (type list nicknames shadows shadowing-imports
 		 imports interns exports)
 	   (type (or list (member :default)) use)
-	   (type (or simple-base-string null) doc-string))
+	   (type (or simple-base-string null) doc-string)
+	   #!-sb-package-locks
+	   (ignore implement lock))
   (let ((package (or (find-package name)
 		     (progn
 		       (when (eq use :default)
@@ -217,6 +242,13 @@
 	  (warn 'package-at-variance
 		:format-control "~A also exports the following symbols:~%  ~S" 
 		:format-arguments (list name diff)))))
+    #!+sb-package-locks
+    (progn
+      ;; Handle packages this is an implementation package of
+      (dolist (p implement)
+	(add-implementation-package package p))
+      ;; Handle lock
+      (setf (package-lock package) lock))
     ;; Handle documentation.
     (setf (package-doc-string package) doc-string)
     package))

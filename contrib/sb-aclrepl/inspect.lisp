@@ -12,7 +12,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +default-inspect-length+ 20))
 
-(defstruct inspect
+(defstruct (%inspect (:constructor make-inspect)
+		     (:conc-name inspect-))
   ;; stack of parents of inspected object
   object-stack 
   ;;  a stack of indices of parent object components

@@ -1,0 +1,7 @@
+@node Package Locks
+@chapter Package Locks
+
+SBCL does not currently include package locking support by default. To
+build SBCL with package locking enabled add @code{:sb-package-locks}
+to target @code{*features*} as per instructions in the file
+@file{INSTALL}.

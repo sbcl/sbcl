@@ -302,23 +302,25 @@
 	 args))
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
-  (multiple-value-bind (meta initargs)
-      (ensure-class-values class args)
-    (set-class-type-translation (class-prototype meta) name)
-    (setf class (apply #'make-instance meta :name name initargs)
-	  (find-class name) class)
-    (set-class-type-translation class name)
-    class))
+  (without-package-locks
+   (multiple-value-bind (meta initargs)
+       (ensure-class-values class args)
+     (set-class-type-translation (class-prototype meta) name)
+     (setf class (apply #'make-instance meta :name name initargs)
+	   (find-class name) class)
+     (set-class-type-translation class name)
+     class)))
 
 (defmethod ensure-class-using-class ((class pcl-class) name &rest args &key)
-  (multiple-value-bind (meta initargs)
-      (ensure-class-values class args)
-    (unless (eq (class-of class) meta)
-      (apply #'change-class class meta initargs))
-    (apply #'reinitialize-instance class initargs)
-    (setf (find-class name) class)
-    (set-class-type-translation class name)
-    class))
+  (without-package-locks
+   (multiple-value-bind (meta initargs)
+       (ensure-class-values class args)
+     (unless (eq (class-of class) meta)
+       (apply #'change-class class meta initargs))
+     (apply #'reinitialize-instance class initargs)
+     (setf (find-class name) class)
+     (set-class-type-translation class name)
+     class)))
 
 (defmethod class-predicate-name ((class t))
   'constantly-nil)
@@ -523,32 +525,33 @@
   (flet ((compute-preliminary-cpl (root)
 	   (let ((*allow-forward-referenced-classes-in-cpl-p* t))
 	     (compute-class-precedence-list root))))
-    (unless (class-finalized-p class)
-      (let ((name (class-name class)))
-	(setf (find-class name) class)
-	;; KLUDGE: This is fairly horrible.  We need to make a
-	;; full-fledged CLASSOID here, not just tell the compiler that
-	;; some class is forthcoming, because there are legitimate
-	;; questions one can ask of the type system, implemented in
-	;; terms of CLASSOIDs, involving forward-referenced classes. So.
-	(when (and (eq *boot-state* 'complete)
-		   (null (find-classoid name nil)))
-	  (setf (find-classoid name)
-		(make-standard-classoid :name name)))
-	(set-class-type-translation class name)
-	(let ((layout (make-wrapper 0 class))
-	      (classoid (find-classoid name)))
-	  (setf (layout-classoid layout) classoid)
-	  (setf (classoid-pcl-class classoid) class)
-	  (setf (slot-value class 'wrapper) layout)
-	  (let ((cpl (compute-preliminary-cpl class)))
-	    (setf (layout-inherits layout)
-		  (order-layout-inherits
-		   (map 'simple-vector #'class-wrapper
-			(reverse (rest cpl))))))
-	  (register-layout layout :invalidate t)
-	  (setf (classoid-layout classoid) layout)
-	  (mapc #'make-preliminary-layout (class-direct-subclasses class)))))))
+    (without-package-locks
+     (unless (class-finalized-p class)
+       (let ((name (class-name class)))
+	 (setf (find-class name) class)
+	 ;; KLUDGE: This is fairly horrible.  We need to make a
+	 ;; full-fledged CLASSOID here, not just tell the compiler that
+	 ;; some class is forthcoming, because there are legitimate
+	 ;; questions one can ask of the type system, implemented in
+	 ;; terms of CLASSOIDs, involving forward-referenced classes. So.
+	 (when (and (eq *boot-state* 'complete)
+		    (null (find-classoid name nil)))
+	   (setf (find-classoid name)
+		 (make-standard-classoid :name name)))
+	 (set-class-type-translation class name)
+	 (let ((layout (make-wrapper 0 class))
+	       (classoid (find-classoid name)))
+	   (setf (layout-classoid layout) classoid)
+	   (setf (classoid-pcl-class classoid) class)
+	   (setf (slot-value class 'wrapper) layout)
+	   (let ((cpl (compute-preliminary-cpl class)))
+	     (setf (layout-inherits layout)
+		   (order-layout-inherits
+		    (map 'simple-vector #'class-wrapper
+			 (reverse (rest cpl))))))
+	   (register-layout layout :invalidate t)
+	   (setf (classoid-layout classoid) layout)
+	   (mapc #'make-preliminary-layout (class-direct-subclasses class))))))))
 
 
 (defmethod shared-initialize :before ((class class) slot-names &key name)
@@ -653,8 +656,8 @@
     (error "Structure slots must have :INSTANCE allocation.")))
 
 (defun make-structure-class-defstruct-form (name direct-slots include)
-  (let* ((conc-name (intern (format nil "~S structure class " name)))
-         (constructor (intern (format nil "~Aconstructor" conc-name)))
+  (let* ((conc-name (format-symbol *package* "~S structure class " name))
+         (constructor (format-symbol *package* "~Aconstructor" conc-name))
          (defstruct `(defstruct (,name
                                  ,@(when include
                                          `((:include ,(class-name include))))
@@ -738,11 +741,10 @@
 		    (mapcar (lambda (pl)
 			      (when defstruct-p
 				(let* ((slot-name (getf pl :name))
-				       (acc-name
-					(format nil
-						"~S structure class ~A"
-						name slot-name))
-				       (accessor (intern acc-name)))
+				       (accessor
+					(format-symbol *package*
+						       "~S structure class ~A"
+						       name slot-name)))
 				  (setq pl (list* :defstruct-accessor-symbol
 						  accessor pl))))
 			      (make-direct-slotd class pl))
@@ -799,22 +801,28 @@
   (fix-slot-accessors class dslotds 'remove))
 
 (defun fix-slot-accessors (class dslotds add/remove)
-  (flet ((fix (gfspec name r/w)
-	   (let* ((ll (case r/w (r '(object)) (w '(new-value object))))
-		  (gf (if (fboundp gfspec)
-			  (ensure-generic-function gfspec)
-			  (ensure-generic-function gfspec :lambda-list ll))))
-	     (case r/w
-	       (r (if (eq add/remove 'add)
-		      (add-reader-method class gf name)
-		      (remove-reader-method class gf)))
-	       (w (if (eq add/remove 'add)
-		      (add-writer-method class gf name)
-		      (remove-writer-method class gf)))))))
-    (dolist (dslotd dslotds)
-      (let ((slot-name (slot-definition-name dslotd)))
-	(dolist (r (slot-definition-readers dslotd)) (fix r slot-name 'r))
-	(dolist (w (slot-definition-writers dslotd)) (fix w slot-name 'w))))))
+  ;; We disable package locks here, since defining a class can trigger
+  ;; the update of the accessors of another class -- which might lead
+  ;; to package lock violations if we didn't.
+  (without-package-locks
+      (flet ((fix (gfspec name r/w)
+	       (let* ((ll (case r/w (r '(object)) (w '(new-value object))))
+		      (gf (if (fboundp gfspec)
+			      (ensure-generic-function gfspec)
+			      (ensure-generic-function gfspec :lambda-list ll))))
+		 (case r/w
+		   (r (if (eq add/remove 'add)
+			  (add-reader-method class gf name)
+			  (remove-reader-method class gf)))
+		   (w (if (eq add/remove 'add)
+			  (add-writer-method class gf name)
+			  (remove-writer-method class gf)))))))
+	(dolist (dslotd dslotds)
+	  (let ((slot-name (slot-definition-name dslotd)))
+	    (dolist (r (slot-definition-readers dslotd)) 
+	      (fix r slot-name 'r))
+	    (dolist (w (slot-definition-writers dslotd)) 
+	      (fix w slot-name 'w)))))))
 
 (defun add-direct-subclasses (class supers)
   (dolist (super supers)
@@ -853,26 +861,27 @@
   ;; Note that we can't simply delay the finalization when CLASS has
   ;; no forward referenced superclasses because that causes bootstrap
   ;; problems.
-  (when (and (not finalizep)
-	     (not (class-finalized-p class))
+  (without-package-locks
+   (when (and (not finalizep)
+	      (not (class-finalized-p class))
+	      (not (class-has-a-forward-referenced-superclass-p class)))
+     (finalize-inheritance class)
+     (return-from update-class))
+   (when (or finalizep (class-finalized-p class)
 	     (not (class-has-a-forward-referenced-superclass-p class)))
-    (finalize-inheritance class)
-    (return-from update-class))
-  (when (or finalizep (class-finalized-p class)
-	    (not (class-has-a-forward-referenced-superclass-p class)))
-    (setf (find-class (class-name class)) class)
-    (update-cpl class (compute-class-precedence-list class))
-    ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
-    ;; class.  The hoops above are to ensure that FINALIZE-INHERITANCE
+     (setf (find-class (class-name class)) class)
+     (update-cpl class (compute-class-precedence-list class))
+     ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
+     ;; class.  The hoops above are to ensure that FINALIZE-INHERITANCE
     ;; is called at finalization, so that MOP programmers can hook
-    ;; into the system as described in "Class Finalization Protocol"
-    ;; (section 5.5.2 of AMOP).
-    (update-slots class (compute-slots class))
-    (update-gfs-of-class class)
-    (update-initargs class (compute-default-initargs class))
-    (update-ctors 'finalize-inheritance :class class))
-  (unless finalizep
-    (dolist (sub (class-direct-subclasses class)) (update-class sub nil))))
+     ;; into the system as described in "Class Finalization Protocol"
+     ;; (section 5.5.2 of AMOP).
+     (update-slots class (compute-slots class))
+     (update-gfs-of-class class)
+     (update-initargs class (compute-default-initargs class))
+     (update-ctors 'finalize-inheritance :class class))
+   (unless finalizep
+     (dolist (sub (class-direct-subclasses class)) (update-class sub nil)))))
 
 (defun update-cpl (class cpl)
   (if (class-finalized-p class)

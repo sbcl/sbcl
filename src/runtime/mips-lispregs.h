@@ -1,5 +1,3 @@
-/* $Header$ */
-
 #ifdef LANGUAGE_ASSEMBLY
 #define REG(num) $ ## num
 #else

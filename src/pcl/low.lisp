@@ -219,12 +219,12 @@
 (defun intern-fun-name (name)
   (cond ((symbolp name) name)
 	((listp name)
-	 (intern (let ((*package* *pcl-package*)
-		       (*print-case* :upcase)
-		       (*print-pretty* nil)
-		       (*print-gensym* t))
-		   (format nil "~S" name))
-		 *pcl-package*))))
+	 (let ((*package* *pcl-package*)
+	       (*print-case* :upcase)
+	       (*print-pretty* nil)
+	       (*print-gensym* t))
+	   (format-symbol *pcl-package* "~S" name)))))
+
 
 ;;; FIXME: probably no longer needed after init
 (defmacro precompile-random-code-segments (&optional system)

@@ -73,7 +73,7 @@
 ;;; in a similar vein, we should be able to define methods on classes
 ;;; that are effectively unknown to the type system:
 (sb-mop:ensure-class 'unknown-type)
-(defmethod method ((x unknown-type)) x)
+(defmethod method-on-unknown ((x unknown-type)) x)
 ;;; (we can't call it without defining methods on allocate-instance
 ;;; etc., but we should be able to define it).
 

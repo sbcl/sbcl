@@ -79,6 +79,8 @@
     (error 'simple-type-error :datum name :expected-type 'symbol
 	   :format-control "Symbol macro name is not a symbol: ~S."
 	   :format-arguments (list name)))
+  (with-single-package-locked-error 
+      (:symbol name "defining ~A as a symbol-macro"))
   (ecase (info :variable :kind name)
     ((:macro :global nil)
      (setf (info :variable :kind name) :macro)

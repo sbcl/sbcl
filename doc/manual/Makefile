@@ -91,6 +91,7 @@ clean:
 	rm -f *~ *.bak *.orig \#*\# .\#* texput.log *.fasl
 	rm -rf $(HTMLDIR) $(DOCSTRINGDIR)
 	rm -f contrib-docs.texi-temp
+	rm -f package-locks.texi-temp
 	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp tempfiles-stamp
 	rm -f $(TMPFILES) contrib-doc-list.texi-temp
 	rm -f sbcl.info sbcl.info-*

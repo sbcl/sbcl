@@ -70,6 +70,190 @@
           (setf res (%make-package-hashtable table hash size)))
       res)))
 
+;;;; package locking operations, built conditionally on :sb-package-locks
+
+#!+sb-package-locks
+(progn
+(defun package-locked-p (package) 
+  #!+sb-doc 
+  "Returns T when PACKAGE is locked, NIL otherwise. Signals an error
+if PACKAGE doesn't designate a valid package."
+  (package-lock (find-undeleted-package-or-lose package)))
+
+(defun lock-package (package)
+  #!+sb-doc 
+  "Locks PACKAGE and returns T. Has no effect if PACKAGE was already
+locked. Signals an error if PACKAGE is not a valid package designator"
+  (setf (package-lock (find-undeleted-package-or-lose package)) t))
+
+(defun unlock-package (package)
+  #!+sb-doc 
+  "Unlocks PACKAGE and returns T. Has no effect if PACKAGE was already
+unlocked. Signals an error if PACKAGE is not a valid package designator."
+  (setf (package-lock (find-undeleted-package-or-lose package)) nil)
+  t)
+
+(defun package-implemented-by-list (package)
+  #!+sb-doc 
+  "Returns a list containing the implementation packages of
+PACKAGE. Signals an error if PACKAGE is not a valid package designator."
+  (package-%implementation-packages (find-undeleted-package-or-lose package)))
+
+(defun package-implements-list (package) 
+  #!+sb-doc 
+  "Returns the packages that PACKAGE is an implementation package
+of. Signals an error if PACKAGE is not a valid package designator."
+  (let ((package (find-undeleted-package-or-lose package)))
+    (loop for x in (list-all-packages)
+          when (member package (package-%implementation-packages x))
+          collect x)))
+
+(defun add-implementation-package (packages-to-add 
+				   &optional (package *package*))
+  #!+sb-doc 
+  "Adds PACKAGES-TO-ADD as implementation packages of PACKAGE. Signals
+an error if PACKAGE or any of the PACKAGES-TO-ADD is not a valid
+package designator."
+  (let ((package (find-undeleted-package-or-lose package))
+	(packages-to-add (package-listify packages-to-add)))
+    (setf (package-%implementation-packages package)
+          (union (package-%implementation-packages package)
+                 (mapcar #'find-undeleted-package-or-lose packages-to-add)))))
+
+(defun remove-implementation-package (packages-to-remove 
+				      &optional (package *package*)) 
+  #!+sb-doc 
+  "Removes PACKAGES-TO-REMOVE from the implementation packages of
+PACKAGE. Signals an error if PACKAGE or any of the PACKAGES-TO-REMOVE
+is not a valid package designator."
+  (let ((package (find-undeleted-package-or-lose package))
+	(packages-to-remove (package-listify packages-to-remove)))
+    (setf (package-%implementation-packages package)
+          (nset-difference 
+           (package-%implementation-packages package)
+           (mapcar #'find-undeleted-package-or-lose packages-to-remove)))))
+
+(defmacro with-unlocked-packages ((&rest packages) &body forms)
+  #!+sb-doc
+  "Unlocks PACKAGES for the dynamic scope of the body. Signals an
+error if any of PACKAGES is not a valid package designator."
+  (with-unique-names (unlocked-packages)
+    `(let (,unlocked-packages)
+      (unwind-protect
+           (progn 
+             (dolist (p ',packages)
+               (when (package-locked-p p)
+                 (push p ,unlocked-packages)
+                 (unlock-package p)))
+             ,@forms)
+        (dolist (p ,unlocked-packages)
+	  (when (find-package p)
+	    (lock-package p)))))))
+
+(defun package-lock-violation (package &key (symbol nil symbol-p)
+                               format-control format-arguments)
+  (let ((restart :continue)
+        (cl-violation-p (eq package (find-package :common-lisp))))
+    (flet ((error-arguments ()
+             (append (list (if symbol-p
+                               'symbol-package-locked-error
+                               'package-locked-error)
+                           :package package
+                           :format-control format-control
+                             :format-arguments format-arguments)
+                       (when symbol-p (list :symbol symbol))
+                       (list :references
+                             (append '((:sbcl :node "Package Locks"))
+                                     (when cl-violation-p
+                                       '((:ansi-cl :section (11 1 2 1 2)))))))))
+      (restart-case
+          (apply #'cerror "Ignore the package lock." (error-arguments))
+        (:ignore-all ()
+          :report "Ignore all package locks in the context of this operation."
+          (setf restart :ignore-all))
+        (:unlock-package ()
+          :report "Unlock the package."
+          (setf restart :unlock-package)))
+      (ecase restart
+        (:continue
+         (pushnew package *ignored-package-locks*))
+        (:ignore-all
+         (setf *ignored-package-locks* t))
+        (:unlock-package
+         (unlock-package package))))))
+
+(defun package-lock-violation-p (package &optional (symbol nil symbolp))
+  ;; KLUDGE: (package-lock package) needs to be before
+  ;; comparison to *package*, since during cold init this gets
+  ;; called before *package* is bound -- but no package should
+  ;; be locked at that point.
+  (and package 
+       (package-lock package)
+       ;; In package or implementation package
+       (not (or (eq package *package*)
+                (member *package* (package-%implementation-packages package))))
+       ;; Runtime disabling
+       (not (eq t *ignored-package-locks*))
+       (or (eq :invalid *ignored-package-locks*)
+           (not (member package *ignored-package-locks*)))
+       ;; declarations for symbols
+       (not (and symbolp (member symbol (disabled-package-locks))))))
+
+(defun disabled-package-locks ()
+  (if (boundp 'sb!c::*lexenv*)
+      (sb!c::lexenv-disabled-package-locks sb!c::*lexenv*)
+      sb!c::*disabled-package-locks*))
+
+) ; progn
+
+;;;; more package-locking these are NOPs unless :sb-package-locks is
+;;;; in target features. Cross-compiler NOPs for these are in cross-misc.
+
+;;; The right way to establish a package lock context is
+;;; WITH-SINGLE-PACKAGE-LOCKED-ERROR, defined in early-package.lisp
+;;;
+;;; Must be used inside the dynamic contour established by
+;;; WITH-SINGLE-PACKAGE-LOCKED-ERROR
+(defun assert-package-unlocked (package &optional format-control 
+				&rest format-arguments)
+  #!-sb-package-locks 
+  (declare (ignore format-control format-arguments))
+  #!+sb-package-locks
+  (when (package-lock-violation-p package)
+    (package-lock-violation package 
+			    :format-control format-control 
+			    :format-arguments format-arguments))
+  package)
+
+;;; Must be used inside the dynamic contour established by
+;;; WITH-SINGLE-PACKAGE-LOCKED-ERROR.
+;;;
+;;; FIXME: Maybe we should establish such contours for he toplevel
+;;; and others, so that %set-fdefinition and others could just use
+;;; this.
+(defun assert-symbol-home-package-unlocked (name format)
+  #!-sb-package-locks
+  (declare (ignore format))
+  #!+sb-package-locks
+  (let* ((symbol (etypecase name
+		   (symbol name)
+		   (list (if (eq 'setf (first name))
+			     (second name)
+			     ;; Skip (class-predicate foo), etc.
+			     ;; FIXME: MOP and package-lock
+			     ;; interaction needs to be thought about.
+			     (return-from 
+			      assert-symbol-home-package-unlocked
+			       name)))))
+	 (package (symbol-package symbol)))
+    (when (package-lock-violation-p package symbol)
+      (package-lock-violation package 
+			      :symbol symbol
+			      :format-control format
+			      :format-arguments (list name))))
+  name)
+
+
 ;;;; miscellaneous PACKAGE operations
 
 (def!method print-object ((package package) stream)
@@ -367,19 +551,28 @@
   "Changes the name and nicknames for a package."
   (let* ((package (find-undeleted-package-or-lose package))
 	 (name (string name))
-	 (found (find-package name)))
+	 (found (find-package name))
+	 (nicks (mapcar #'string nicknames)))
     (unless (or (not found) (eq found package))
       (error 'simple-package-error
 	     :package name
 	     :format-control "A package named ~S already exists."
 	     :format-arguments (list name)))
-    (remhash (package-%name package) *package-names*)
-    (dolist (n (package-%nicknames package))
-      (remhash n *package-names*))
-     (setf (package-%name package) name)
-    (setf (gethash name *package-names*) package)
-    (setf (package-%nicknames package) ())
-    (enter-new-nicknames package nicknames)
+    (with-single-package-locked-error ()
+	(unless (and (string= name (package-name package))
+		     (null (set-difference nicks (package-nicknames package) 
+				       :test #'string=)))
+	  (assert-package-unlocked package "rename as ~A~@[ with nickname~P ~
+                                           ~{~A~^, ~}~]" 
+				   name (length nicks) nicks))
+      ;; do the renaming
+      (remhash (package-%name package) *package-names*)
+      (dolist (n (package-%nicknames package))
+	(remhash n *package-names*))
+      (setf (package-%name package) name
+	    (gethash name *package-names*) package
+	    (package-%nicknames package) ())
+      (enter-new-nicknames package nicknames))
     package))
 
 (defun delete-package (package-or-name)
@@ -398,42 +591,44 @@
 	  ((not (package-name package)) ; already deleted
 	   nil)
 	  (t
-	   (let ((use-list (package-used-by-list package)))
-	     (when use-list
-	       ;; This continuable error is specified by ANSI.
-	       (with-simple-restart
-		   (continue "Remove dependency in other packages.")
-		 (error 'simple-package-error
-			:package package
-			:format-control
-			"Package ~S is used by package(s):~%  ~S"
-			:format-arguments
-			(list (package-name package)
-			      (mapcar #'package-name use-list))))
-	       (dolist (p use-list)
-		 (unuse-package package p))))
-	   (dolist (used (package-use-list package))
-	     (unuse-package used package))
-	   (do-symbols (sym package)
-	     (unintern sym package))
-	   (remhash (package-name package) *package-names*)
-	   (dolist (nick (package-nicknames package))
-	     (remhash nick *package-names*))
-	   (setf (package-%name package) nil
-		 ;; Setting PACKAGE-%NAME to NIL is required in order to
-		 ;; make PACKAGE-NAME return NIL for a deleted package as
-		 ;; ANSI requires. Setting the other slots to NIL
-		 ;; and blowing away the PACKAGE-HASHTABLES is just done
-		 ;; for tidiness and to help the GC.
-		 (package-%nicknames package) nil
-		 (package-%use-list package) nil
-		 (package-tables package) nil
-		 (package-%shadowing-symbols package) nil
-		 (package-internal-symbols package)
-		 (make-or-remake-package-hashtable 0)
-		 (package-external-symbols package)
-		 (make-or-remake-package-hashtable 0))
-	   t))))
+	   (with-single-package-locked-error
+	       (:package package "deleting package ~A" package)
+	     (let ((use-list (package-used-by-list package)))
+	       (when use-list
+		 ;; This continuable error is specified by ANSI.
+		 (with-simple-restart
+		     (continue "Remove dependency in other packages.")
+		   (error 'simple-package-error
+			  :package package
+			  :format-control
+			  "Package ~S is used by package(s):~%  ~S"
+			  :format-arguments
+			  (list (package-name package)
+				(mapcar #'package-name use-list))))
+		 (dolist (p use-list)
+		   (unuse-package package p))))
+	     (dolist (used (package-use-list package))
+	       (unuse-package used package))
+	     (do-symbols (sym package)
+	       (unintern sym package))
+	     (remhash (package-name package) *package-names*)
+	     (dolist (nick (package-nicknames package))
+	       (remhash nick *package-names*))
+	     (setf (package-%name package) nil
+		   ;; Setting PACKAGE-%NAME to NIL is required in order to
+		   ;; make PACKAGE-NAME return NIL for a deleted package as
+		   ;; ANSI requires. Setting the other slots to NIL
+		   ;; and blowing away the PACKAGE-HASHTABLES is just done
+		   ;; for tidiness and to help the GC.
+		   (package-%nicknames package) nil
+		   (package-%use-list package) nil
+		   (package-tables package) nil
+		   (package-%shadowing-symbols package) nil
+		   (package-internal-symbols package)
+		   (make-or-remake-package-hashtable 0)
+		   (package-external-symbols package)
+		   (make-or-remake-package-hashtable 0))
+	     t)))))
 
 (defun list-all-packages ()
   #!+sb-doc
@@ -452,11 +647,12 @@
   ;; logic is.
   (let ((name (if (simple-string-p name)
 		name
-		(coerce name 'simple-string))))
+		(coerce name 'simple-string)))
+	(package (find-undeleted-package-or-lose package)))
     (declare (simple-string name))
-    (intern* name
-	     (length name)
-	     (find-undeleted-package-or-lose package))))
+      (intern* name
+	       (length name)
+	       package)))
 
 (defun find-symbol (name &optional (package (sane-package)))
   #!+sb-doc
@@ -477,16 +673,20 @@
 (defun intern* (name length package)
   (declare (simple-string name))
   (multiple-value-bind (symbol where) (find-symbol* name length package)
-    (if where
-	(values symbol where)
-	(let ((symbol (make-symbol (subseq name 0 length))))
-	  (%set-symbol-package symbol package)
-	  (cond ((eq package *keyword-package*)
-		 (add-symbol (package-external-symbols package) symbol)
-		 (%set-symbol-value symbol symbol))
-		(t
-		 (add-symbol (package-internal-symbols package) symbol)))
-	  (values symbol nil)))))
+    (cond (where
+	   (values symbol where))
+	  (t
+	   (let ((symbol-name (subseq name 0 length)))
+	     (with-single-package-locked-error 
+		 (:package package "interning ~A" symbol-name)
+	       (let ((symbol (make-symbol symbol-name)))
+		 (%set-symbol-package symbol package)
+		 (cond ((eq package *keyword-package*)
+			(add-symbol (package-external-symbols package) symbol)
+			(%set-symbol-value symbol symbol))
+		       (t
+			(add-symbol (package-internal-symbols package) symbol)))
+		 (values symbol nil))))))))
 
 ;;; Check internal and external symbols, then scan down the list
 ;;; of hashtables for inherited symbols. When an inherited symbol
@@ -540,43 +740,47 @@
 	 (shadowing-symbols (package-%shadowing-symbols package)))
     (declare (list shadowing-symbols))
 
-    ;; If a name conflict is revealed, give use a chance to shadowing-import
-    ;; one of the accessible symbols.
-    (when (member symbol shadowing-symbols)
-      (let ((cset ()))
-	(dolist (p (package-%use-list package))
-	  (multiple-value-bind (s w) (find-external-symbol name p)
-	    (when w (pushnew s cset))))
-	(when (cdr cset)
-	  (loop
-	   (cerror
-	    "Prompt for a symbol to SHADOWING-IMPORT."
-	    "Uninterning symbol ~S causes name conflict among these symbols:~%~S"
-	    symbol cset)
-	   (write-string "Symbol to shadowing-import: " *query-io*)
-	   (let ((sym (read *query-io*)))
-	     (cond
-	      ((not (symbolp sym))
-	       (format *query-io* "~S is not a symbol." sym))
-	      ((not (member sym cset))
-	       (format *query-io* "~S is not one of the conflicting symbols." sym))
-	      (t
-	       (shadowing-import sym package)
-	       (return-from unintern t)))))))
-      (setf (package-%shadowing-symbols package)
-	    (remove symbol shadowing-symbols)))
+    (with-single-package-locked-error ()
+      (when (find-symbol name package)
+	(assert-package-unlocked package "uninterning ~A" name))
+      
+      ;; If a name conflict is revealed, give use a chance to shadowing-import
+      ;; one of the accessible symbols.
+      (when (member symbol shadowing-symbols)
+	(let ((cset ()))
+	  (dolist (p (package-%use-list package))
+	    (multiple-value-bind (s w) (find-external-symbol name p)
+	      (when w (pushnew s cset))))
+	  (when (cdr cset)
+	    (loop
+	     (cerror
+	      "Prompt for a symbol to SHADOWING-IMPORT."
+	      "Uninterning symbol ~S causes name conflict among these symbols:~%~S"
+	      symbol cset)
+	     (write-string "Symbol to shadowing-import: " *query-io*)
+	     (let ((sym (read *query-io*)))
+	       (cond
+		 ((not (symbolp sym))
+		  (format *query-io* "~S is not a symbol." sym))
+		 ((not (member sym cset))
+		  (format *query-io* "~S is not one of the conflicting symbols." sym))
+		 (t
+		  (shadowing-import sym package)
+		  (return-from unintern t)))))))
+	(setf (package-%shadowing-symbols package)
+	      (remove symbol shadowing-symbols)))
 
-    (multiple-value-bind (s w) (find-symbol name package)
-      (declare (ignore s))
-      (cond ((or (eq w :internal) (eq w :external))
-	     (nuke-symbol (if (eq w :internal)
-			      (package-internal-symbols package)
-			      (package-external-symbols package))
-			  name)
-	     (if (eq (symbol-package symbol) package)
-		 (%set-symbol-package symbol nil))
-	     t)
-	    (t nil)))))
+      (multiple-value-bind (s w) (find-symbol name package)
+	(declare (ignore s))
+	(cond ((or (eq w :internal) (eq w :external))
+	       (nuke-symbol (if (eq w :internal)
+				(package-internal-symbols package)
+				(package-external-symbols package))
+			    name)
+	       (if (eq (symbol-package symbol) package)
+		   (%set-symbol-package symbol nil))
+	       t)
+	      (t nil))))))
 
 ;;; Take a symbol-or-list-of-symbols and return a list, checking types.
 (defun symbol-listify (thing)
@@ -587,6 +791,11 @@
 	((symbolp thing) (list thing))
 	(t
 	 (error "~S is neither a symbol nor a list of symbols." thing))))
+
+(defun string-listify (thing)
+  (mapcar #'string (if (listp thing) 
+		       thing 
+		       (list thing))))
 
 ;;; This is like UNINTERN, except if SYMBOL is inherited, it chases
 ;;; down the package it is inherited from and uninterns it there. Used
@@ -618,67 +827,71 @@
 	(declare (ignore s))
 	(unless (or w (member sym syms))
 	  (push sym syms))))
-    ;; Find symbols and packages with conflicts.
-    (let ((used-by (package-%used-by-list package))
-	  (cpackages ())
-	  (cset ()))
-      (dolist (sym syms)
-	(let ((name (symbol-name sym)))
-	  (dolist (p used-by)
-	    (multiple-value-bind (s w) (find-symbol name p)
-	      (when (and w (not (eq s sym))
-			 (not (member s (package-%shadowing-symbols p))))
-		(pushnew sym cset)
-		(pushnew p cpackages))))))
-      (when cset
-	(restart-case
-	    (error
-	     'simple-package-error
-	     :package package
-	     :format-control
-	     "Exporting these symbols from the ~A package:~%~S~%~
-	      results in name conflicts with these packages:~%~{~A ~}"
-	     :format-arguments
-	     (list (package-%name package) cset
-		   (mapcar #'package-%name cpackages)))
-	  (unintern-conflicting-symbols ()
-	   :report "Unintern conflicting symbols."
-	   (dolist (p cpackages)
-	     (dolist (sym cset)
-	       (moby-unintern sym p))))
-	  (skip-exporting-these-symbols ()
-	   :report "Skip exporting conflicting symbols."
-	   (setq syms (nset-difference syms cset))))))
+    (with-single-package-locked-error ()
+      (when syms
+	(assert-package-unlocked package "exporting symbol~P ~{~A~^, ~}"
+				 (length syms) syms))
+      ;; Find symbols and packages with conflicts.
+      (let ((used-by (package-%used-by-list package))
+	    (cpackages ())
+	    (cset ()))
+	(dolist (sym syms)
+	  (let ((name (symbol-name sym)))
+	    (dolist (p used-by)
+	      (multiple-value-bind (s w) (find-symbol name p)
+		(when (and w (not (eq s sym))
+			   (not (member s (package-%shadowing-symbols p))))
+		  (pushnew sym cset)
+		  (pushnew p cpackages))))))
+	(when cset
+	  (restart-case
+	      (error
+	       'simple-package-error
+	       :package package
+	       :format-control
+	       "Exporting these symbols from the ~A package:~%~S~%~
+	        results in name conflicts with these packages:~%~{~A ~}"
+	       :format-arguments
+	       (list (package-%name package) cset
+		     (mapcar #'package-%name cpackages)))
+	    (unintern-conflicting-symbols ()
+	      :report "Unintern conflicting symbols."
+	      (dolist (p cpackages)
+		(dolist (sym cset)
+		  (moby-unintern sym p))))
+	    (skip-exporting-these-symbols ()
+	      :report "Skip exporting conflicting symbols."
+	      (setq syms (nset-difference syms cset))))))
 
-    ;; Check that all symbols are accessible. If not, ask to import them.
-    (let ((missing ())
-	  (imports ()))
-      (dolist (sym syms)
-	(multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
-	  (cond ((not (and w (eq s sym)))
-		 (push sym missing))
-		((eq w :inherited)
-		 (push sym imports)))))
-      (when missing
-	(with-simple-restart
-	    (continue "Import these symbols into the ~A package."
-	      (package-%name package))
-	  (error 'simple-package-error
-		 :package package
-		 :format-control
-		 "These symbols are not accessible in the ~A package:~%~S"
-		 :format-arguments
-		 (list (package-%name package) missing)))
-	(import missing package))
-      (import imports package))
+      ;; Check that all symbols are accessible. If not, ask to import them.
+      (let ((missing ())
+	    (imports ()))
+	(dolist (sym syms)
+	  (multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
+	    (cond ((not (and w (eq s sym)))
+		   (push sym missing))
+		  ((eq w :inherited)
+		   (push sym imports)))))
+	(when missing
+	  (with-simple-restart
+	      (continue "Import these symbols into the ~A package."
+			(package-%name package))
+	    (error 'simple-package-error
+		   :package package
+		   :format-control
+		   "These symbols are not accessible in the ~A package:~%~S"
+		   :format-arguments
+		   (list (package-%name package) missing)))
+	  (import missing package))
+	(import imports package))
 
-    ;; And now, three pages later, we export the suckers.
-    (let ((internal (package-internal-symbols package))
-	  (external (package-external-symbols package)))
-      (dolist (sym syms)
-	(nuke-symbol internal (symbol-name sym))
-	(add-symbol external sym)))
-    t))
+      ;; And now, three pages later, we export the suckers.
+      (let ((internal (package-internal-symbols package))
+	    (external (package-external-symbols package)))
+	(dolist (sym syms)
+	  (nuke-symbol internal (symbol-name sym))
+	  (add-symbol external sym))))
+      t))
 
 ;;; Check that all symbols are accessible, then move from external to internal.
 (defun unexport (symbols &optional (package (sane-package)))
@@ -694,12 +907,15 @@
 		      :format-control "~S is not accessible in the ~A package."
 		      :format-arguments (list sym (package-%name package))))
 	      ((eq w :external) (pushnew sym syms)))))
-
-    (let ((internal (package-internal-symbols package))
-	  (external (package-external-symbols package)))
-      (dolist (sym syms)
-	(add-symbol internal sym)
-	(nuke-symbol external (symbol-name sym))))
+    (with-single-package-locked-error ()
+      (when syms
+	(assert-package-unlocked package "unexporting symbol~P ~{~A~^, ~}"
+				 (length syms) syms))
+      (let ((internal (package-internal-symbols package))
+	    (external (package-external-symbols package)))
+	(dolist (sym syms)
+	  (add-symbol internal sym)
+	  (nuke-symbol external (symbol-name sym)))))
     t))
 
 ;;; Check for name conflict caused by the import and let the user
@@ -709,10 +925,11 @@
   "Make Symbols accessible as internal symbols in Package. If a symbol
   is already accessible then it has no effect. If a name conflict
   would result from the importation, then a correctable error is signalled."
-  (let ((package (find-undeleted-package-or-lose package))
-	(symbols (symbol-listify symbols))
-	(syms ())
-	(cset ()))
+  (let* ((package (find-undeleted-package-or-lose package))
+	 (symbols (symbol-listify symbols))
+	 (homeless (remove-if #'symbol-package symbols))
+	 (syms ())
+	 (cset ()))
     (dolist (sym symbols)
       (multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
 	(cond ((not w)
@@ -723,24 +940,29 @@
 		     (push sym syms))))
 	      ((not (eq s sym)) (push sym cset))
 	      ((eq w :inherited) (push sym syms)))))
-    (when cset
-      ;; ANSI specifies that this error is correctable.
-      (with-simple-restart
-	  (continue "Import these symbols with Shadowing-Import.")
-	(error 'simple-package-error
-	       :package package
-	       :format-control
-	       "Importing these symbols into the ~A package ~
+    (with-single-package-locked-error ()
+      (when (or homeless syms cset)
+	(let ((union (delete-duplicates (append homeless syms cset))))
+	  (assert-package-unlocked package "importing symbol~P ~{~A~^, ~}" 
+				   (length union) union)))
+      (when cset
+	;; ANSI specifies that this error is correctable.
+	(with-simple-restart
+	    (continue "Import these symbols with Shadowing-Import.")
+	  (error 'simple-package-error
+		 :package package
+		 :format-control
+		 "Importing these symbols into the ~A package ~
 		causes a name conflict:~%~S"
-	       :format-arguments (list (package-%name package) cset))))
-    ;; Add the new symbols to the internal hashtable.
-    (let ((internal (package-internal-symbols package)))
-      (dolist (sym syms)
-	(add-symbol internal sym)))
-    ;; If any of the symbols are uninterned, make them be owned by Package.
-    (dolist (sym symbols)
-      (unless (symbol-package sym) (%set-symbol-package sym package)))
-    (shadowing-import cset package)))
+		 :format-arguments (list (package-%name package) cset))))
+      ;; Add the new symbols to the internal hashtable.
+      (let ((internal (package-internal-symbols package)))
+	(dolist (sym syms)
+	  (add-symbol internal sym)))
+      ;; If any of the symbols are uninterned, make them be owned by Package.
+      (dolist (sym homeless)
+	(%set-symbol-package sym package))
+      (shadowing-import cset package))))
 
 ;;; If a conflicting symbol is present, unintern it, otherwise just
 ;;; stick the symbol in.
@@ -750,17 +972,26 @@
   a symbol of the same name is present, then it is uninterned.
   The symbols are added to the Package-Shadowing-Symbols."
   (let* ((package (find-undeleted-package-or-lose package))
-	 (internal (package-internal-symbols package)))
-    (dolist (sym (symbol-listify symbols))
-      (multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
-	(unless (and w (not (eq w :inherited)) (eq s sym))
-	  (when (or (eq w :internal) (eq w :external))
-	    ;; If it was shadowed, we don't want UNINTERN to flame out...
-	    (setf (package-%shadowing-symbols package)
-		  (remove s (the list (package-%shadowing-symbols package))))
-	    (unintern s package))
-	  (add-symbol internal sym))
-	(pushnew sym (package-%shadowing-symbols package)))))
+	 (internal (package-internal-symbols package))
+	 (symbols (symbol-listify symbols))
+	 (lock-asserted-p nil))
+    (with-single-package-locked-error ()
+      (dolist (sym symbols)
+	(multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
+	  (unless (or lock-asserted-p 
+		      (and (eq s sym) 
+			   (member s (package-shadowing-symbols package))))
+	    (assert-package-unlocked package "shadowing-importing symbol~P ~
+                                           ~{~A~^, ~}" (length symbols) symbols)
+	    (setf lock-asserted-p t))
+	  (unless (and w (not (eq w :inherited)) (eq s sym))
+	    (when (or (eq w :internal) (eq w :external))
+	      ;; If it was shadowed, we don't want UNINTERN to flame out...
+	      (setf (package-%shadowing-symbols package)
+		    (remove s (the list (package-%shadowing-symbols package))))
+	      (unintern s package))
+	    (add-symbol internal sym))
+	  (pushnew sym (package-%shadowing-symbols package))))))
   t)
 
 (defun shadow (symbols &optional (package (sane-package)))
@@ -771,15 +1002,25 @@
   the existing symbol is placed in the shadowing symbols list if it is
   not already present."
   (let* ((package (find-undeleted-package-or-lose package))
-	 (internal (package-internal-symbols package)))
-    (dolist (name (mapcar #'string
-			  (if (listp symbols) symbols (list symbols))))
-      (multiple-value-bind (s w) (find-symbol name package)
-	(when (or (not w) (eq w :inherited))
-	  (setq s (make-symbol name))
-	  (%set-symbol-package s package)
-	  (add-symbol internal s))
-	(pushnew s (package-%shadowing-symbols package)))))
+	 (internal (package-internal-symbols package))
+	 (symbols (string-listify symbols))
+	 (lock-asserted-p nil))
+    (flet ((present-p (w)
+	     (and w (not (eq w :inherited)))))
+      (with-single-package-locked-error ()
+	(dolist (name symbols)
+	  (multiple-value-bind (s w) (find-symbol name package)
+	    (unless (or lock-asserted-p 
+			(and (present-p w)
+			     (member s (package-shadowing-symbols package))))
+	      (assert-package-unlocked package "shadowing symbol~P ~{~A~^, ~}"
+				       (length symbols) symbols)
+	      (setf lock-asserted-p t))
+	    (unless (present-p w)
+	      (setq s (make-symbol name))
+	      (%set-symbol-package s package)
+	      (add-symbol internal s))
+	    (pushnew s (package-%shadowing-symbols package)))))))
   t)
 
 ;;; Do stuff to use a package, with all kinds of fun name-conflict checking.
@@ -792,71 +1033,79 @@
 	(package (find-undeleted-package-or-lose package)))
 
     ;; Loop over each package, USE'ing one at a time...
-    (dolist (pkg packages)
-      (unless (member pkg (package-%use-list package))
-	(let ((cset ())
-	      (shadowing-symbols (package-%shadowing-symbols package))
-	      (use-list (package-%use-list package)))
+    (with-single-package-locked-error ()
+      (dolist (pkg packages)
+	(unless (member pkg (package-%use-list package))
+	  (assert-package-unlocked package "using package~P ~{~A~^, ~}"
+				   (length packages) packages)
+	  (let ((cset ())
+		(shadowing-symbols (package-%shadowing-symbols package))
+		(use-list (package-%use-list package)))
+	  
+	    ;;   If the number of symbols already accessible is less than the
+	    ;; number to be inherited then it is faster to run the test the
+	    ;; other way. This is particularly valuable in the case of
+	    ;; a new package USEing Lisp.
+	    (cond
+	      ((< (+ (package-internal-symbol-count package)
+		     (package-external-symbol-count package)
+		     (let ((res 0))
+		       (dolist (p use-list res)
+			 (incf res (package-external-symbol-count p)))))
+		  (package-external-symbol-count pkg))
+	       (do-symbols (sym package)
+		 (multiple-value-bind (s w)
+		     (find-external-symbol (symbol-name sym) pkg)
+		   (when (and w (not (eq s sym))
+			      (not (member sym shadowing-symbols)))
+		     (push sym cset))))
+	       (dolist (p use-list)
+		 (do-external-symbols (sym p)
+		   (multiple-value-bind (s w)
+		       (find-external-symbol (symbol-name sym) pkg)
+		     (when (and w (not (eq s sym))
+				(not (member (find-symbol (symbol-name sym)
+							  package)
+					     shadowing-symbols)))
+		       (push sym cset))))))
+	      (t
+	       (do-external-symbols (sym pkg)
+		 (multiple-value-bind (s w)
+		     (find-symbol (symbol-name sym) package)
+		   (when (and w (not (eq s sym))
+			      (not (member s shadowing-symbols)))
+		     (push s cset))))))
 
-	  ;;   If the number of symbols already accessible is less than the
-	  ;; number to be inherited then it is faster to run the test the
-	  ;; other way. This is particularly valuable in the case of
-	  ;; a new package USEing Lisp.
-	  (cond
-	   ((< (+ (package-internal-symbol-count package)
-		  (package-external-symbol-count package)
-		  (let ((res 0))
-		    (dolist (p use-list res)
-		      (incf res (package-external-symbol-count p)))))
-	       (package-external-symbol-count pkg))
-	    (do-symbols (sym package)
-	      (multiple-value-bind (s w)
-		  (find-external-symbol (symbol-name sym) pkg)
-		(when (and w (not (eq s sym))
-			   (not (member sym shadowing-symbols)))
-		  (push sym cset))))
-	    (dolist (p use-list)
-	      (do-external-symbols (sym p)
-		(multiple-value-bind (s w)
-		    (find-external-symbol (symbol-name sym) pkg)
-		  (when (and w (not (eq s sym))
-			     (not (member (find-symbol (symbol-name sym)
-						       package)
-					  shadowing-symbols)))
-		    (push sym cset))))))
-	   (t
-	    (do-external-symbols (sym pkg)
-	      (multiple-value-bind (s w)
-		  (find-symbol (symbol-name sym) package)
-		(when (and w (not (eq s sym))
-			   (not (member s shadowing-symbols)))
-		  (push s cset))))))
+	    (when cset
+	      (cerror
+	       "Unintern the conflicting symbols in the ~2*~A package."
+	       "Using package ~A results in name conflicts for these symbols:~%~
+                ~S"
+	       (package-%name pkg) cset (package-%name package))
+	      (dolist (s cset) (moby-unintern s package))))
 
-	  (when cset
-	    (cerror
-	     "Unintern the conflicting symbols in the ~2*~A package."
-	     "Using package ~A results in name conflicts for these symbols:~%~
-              ~S"
-	     (package-%name pkg) cset (package-%name package))
-	    (dolist (s cset) (moby-unintern s package))))
-
-	(push pkg (package-%use-list package))
-	(push (package-external-symbols pkg) (cdr (package-tables package)))
-	(push package (package-%used-by-list pkg)))))
+	  (push pkg (package-%use-list package))
+	  (push (package-external-symbols pkg) (cdr (package-tables package)))
+	  (push package (package-%used-by-list pkg))))))
   t)
 
 (defun unuse-package (packages-to-unuse &optional (package (sane-package)))
   #!+sb-doc
   "Remove PACKAGES-TO-UNUSE from the USE list for PACKAGE."
-  (let ((package (find-undeleted-package-or-lose package)))
-    (dolist (p (package-listify packages-to-unuse))
-      (setf (package-%use-list package)
-	    (remove p (the list (package-%use-list package))))
-      (setf (package-tables package)
-	    (delete (package-external-symbols p)
-		    (the list (package-tables package))))
-      (setf (package-%used-by-list p)
-	    (remove package (the list (package-%used-by-list p)))))
+  (let ((package (find-undeleted-package-or-lose package))
+	(packages (package-listify packages-to-unuse)))
+    (with-single-package-locked-error ()
+      (dolist (p packages)
+	(when (member p (package-use-list package))
+	  (assert-package-unlocked package "unusing package~P ~{~A~^, ~}"
+				   (length packages) packages))
+	(setf (package-%use-list package)
+	      (remove p (the list (package-%use-list package))))
+	(setf (package-tables package)
+	      (delete (package-external-symbols p)
+		      (the list (package-tables package))))
+	(setf (package-%used-by-list p)
+	      (remove package (the list (package-%used-by-list p))))))
     t))
 
 (defun find-all-symbols (string-or-symbol)

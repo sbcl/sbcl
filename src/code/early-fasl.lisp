@@ -35,7 +35,7 @@
 
 (macrolet ((define-fasl-format-features ()
              (let (;; master value for *F-P-A-F-F*
-		   (fpaff '(:sb-thread)))
+		   (fpaff '(:sb-thread :sb-package-locks)))
 	       `(progn
 		  ;; a list of *(SHEBANG-)FEATURES* flags which affect
 		  ;; binary compatibility, i.e. which must be the same
@@ -161,6 +161,7 @@
 (defvar *load-print* nil
   #!+sb-doc
   "the default for the :PRINT argument to LOAD")
+
 (defvar *load-verbose* nil
   ;; Note that CMU CL's default for this was T, and ANSI says it's
   ;; implementation-dependent. We choose NIL on the theory that it's
@@ -169,4 +170,3 @@
   "the default for the :VERBOSE argument to LOAD")
 
 (defvar *load-code-verbose* nil)
-

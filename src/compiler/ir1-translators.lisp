@@ -255,6 +255,8 @@
     (compiler-style-warn "duplicate definitions in ~S" definitions))
   (let* ((processed-definitions (mapcar definitionize-fun definitions))
          (*lexenv* (make-lexenv definitionize-keyword processed-definitions)))
+    ;; I wonder how much of an compiler performance penalty this
+    ;; non-constant keyword is.
     (funcall fun definitionize-keyword processed-definitions)))
 
 ;;; Tweak LEXENV to include the DEFINITIONS from a MACROLET, then
@@ -278,6 +280,9 @@
       (destructuring-bind (name arglist &body body) definition
         (unless (symbolp name)
           (fail "The local macro name ~S is not a symbol." name))
+	(when (fboundp name)
+	  (with-single-package-locked-error
+	      (:symbol name "binding ~A as a local macro")))
         (unless (listp arglist)
           (fail "The local macro argument list ~S is not a list."
                 arglist))
@@ -326,10 +331,14 @@
       (destructuring-bind (name expansion) definition
         (unless (symbolp name)
           (fail "The local symbol macro name ~S is not a symbol." name))
+	(when (or (boundp name) (eq (info :variable :kind name) :macro))
+	  (with-single-package-locked-error
+	      (:symbol name "binding ~A as a local symbol-macro")))
         (let ((kind (info :variable :kind name)))
           (when (member kind '(:special :constant))
             (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
                   kind name)))
+	;; A magical cons that MACROEXPAND-1 understands.
         `(,name . (MACRO . ,expansion))))))
 
 (defun funcall-in-symbol-macrolet-lexenv (definitions fun context)
@@ -523,7 +532,10 @@
 		 (vars var)
 		 (names name)
 		 (vals (second spec)))))))
-
+    (dolist (name (names))
+      (when (eq (info :variable :kind name) :macro)
+	(with-single-package-locked-error
+	    (:symbol name "lexically binding symbol-macro ~A"))))
     (values (vars) (vals))))
 
 (def-ir1-translator let ((bindings &body body) start next result)
@@ -542,9 +554,10 @@
                      ((next result)
                       (processing-decls (decls vars nil next result)
                         (let ((fun (ir1-convert-lambda-body
-                                    forms vars
-                                    :debug-name (debug-namify "LET "
-							      bindings))))
+                                    forms
+                                    vars
+                                    :debug-name (debug-namify "LET S"
+                                                              bindings))))
                           (reference-leaf start ctran fun-lvar fun))
                         (values next result))))
             (ir1-convert-combination-args fun-lvar ctran next result values))))))
@@ -559,7 +572,12 @@
       (parse-body body :doc-string-allowed nil)
     (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
       (processing-decls (decls vars nil start next)
-        (ir1-convert-aux-bindings start next result forms vars values)))))
+        (ir1-convert-aux-bindings start 
+                                  next 
+                                  result
+                                  forms
+                                  vars 
+                                  values)))))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
@@ -601,6 +619,9 @@
 
       (let ((name (first def)))
 	(check-fun-name name)
+	(when (fboundp name)
+	  (with-single-package-locked-error
+	      (:symbol name "binding ~A as a local function")))
 	(names name)
 	(multiple-value-bind (forms decls) (parse-body (cddr def))
 	  (defs `(lambda ,(second def)
@@ -619,7 +640,7 @@
   (multiple-value-bind (forms decls)
       (parse-body body :doc-string-allowed nil)
     (multiple-value-bind (names defs)
-	(extract-flet-vars definitions 'flet)
+        (extract-flet-vars definitions 'flet)
       (let ((fvars (mapcar (lambda (n d)
                              (ir1-convert-lambda d
                                                  :source-name n
@@ -629,7 +650,10 @@
                            names defs)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
-            (ir1-convert-progn-body start next result forms)))))))
+            (ir1-convert-progn-body start 
+                                    next 
+                                    result
+                                    forms)))))))
 
 (def-ir1-translator labels ((definitions &body body) start next result)
   #!+sb-doc
@@ -639,46 +663,50 @@
   each other."
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (multiple-value-bind (names defs)
-	(extract-flet-vars definitions 'labels)
-      (let* ( ;; dummy LABELS functions, to be used as placeholders
+        (extract-flet-vars definitions 'labels)
+      (let* (;; dummy LABELS functions, to be used as placeholders
              ;; during construction of real LABELS functions
-	     (placeholder-funs (mapcar (lambda (name)
-					 (make-functional
-					  :%source-name name
-					  :%debug-name (debug-namify
-							"LABELS placeholder "
-							name)))
-				       names))
-	     ;; (like PAIRLIS but guaranteed to preserve ordering:)
-	     (placeholder-fenv (mapcar #'cons names placeholder-funs))
+             (placeholder-funs (mapcar (lambda (name)
+                                         (make-functional
+                                          :%source-name name
+                                          :%debug-name (debug-namify
+                                                        "LABELS placeholder "
+                                                        name)))
+                                       names))
+             ;; (like PAIRLIS but guaranteed to preserve ordering:)
+             (placeholder-fenv (mapcar #'cons names placeholder-funs))
              ;; the real LABELS functions, compiled in a LEXENV which
              ;; includes the dummy LABELS functions
-	     (real-funs
-	      (let ((*lexenv* (make-lexenv :funs placeholder-fenv)))
-		(mapcar (lambda (name def)
-			  (ir1-convert-lambda def
-					      :source-name name
-					      :debug-name (debug-namify
-							   "LABELS " name)
-					      :allow-debug-catch-tag t))
-			names defs))))
-
+             (real-funs
+              (let ((*lexenv* (make-lexenv :funs placeholder-fenv)))
+                (mapcar (lambda (name def)
+                          (ir1-convert-lambda def
+                                              :source-name name
+                                              :debug-name (debug-namify
+                                                           "LABELS " name)
+                                              :allow-debug-catch-tag t))
+                        names defs))))
+        
         ;; Modify all the references to the dummy function leaves so
         ;; that they point to the real function leaves.
-	(loop for real-fun in real-funs and
-	      placeholder-cons in placeholder-fenv do
-	      (substitute-leaf real-fun (cdr placeholder-cons))
-	      (setf (cdr placeholder-cons) real-fun))
-
+        (loop for real-fun in real-funs and
+              placeholder-cons in placeholder-fenv do
+              (substitute-leaf real-fun (cdr placeholder-cons))
+              (setf (cdr placeholder-cons) real-fun))
+        
         ;; Voila.
-	(processing-decls (decls nil real-funs next result)
+        (processing-decls (decls nil real-funs next result)
           (let ((*lexenv* (make-lexenv
                            ;; Use a proper FENV here (not the
                            ;; placeholder used earlier) so that if the
                            ;; lexical environment is used for inline
                            ;; expansion we'll get the right functions.
                            :funs (pairlis names real-funs))))
-            (ir1-convert-progn-body start next result forms)))))))
+            (ir1-convert-progn-body start 
+                                    next 
+                                    result
+                                    forms)))))))
+
 
 ;;;; the THE special operator, and friends
 
@@ -860,9 +888,8 @@
    (with-unique-names (exit-block)
      `(block ,exit-block
 	(%within-cleanup
-	    :catch
-	    (%catch (%escape-fun ,exit-block) ,tag)
-	  ,@body)))))
+	 :catch (%catch (%escape-fun ,exit-block) ,tag)
+	 ,@body)))))
 
 (def-ir1-translator unwind-protect
     ((protected &body cleanup) start next result)

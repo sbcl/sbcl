@@ -1163,16 +1163,24 @@
 	      ,@(mapcar (lambda (name)
 			  `(,name (gen-label)))
 			new-labels))
-	(declare (ignorable ,vop-var ,seg-var))
+	(declare (ignorable ,vop-var ,seg-var)
+	         ;; Must be done so that contribs and user code doing
+	         ;; low-level stuff don't need to worry about this.
+	         (disable-package-locks %%current-segment%% %%current-vop%%))
 	(macrolet ((%%current-segment%% () '**current-segment**)
 		   (%%current-vop%% () '**current-vop**))
-	 (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-			       `((..inherited-labels.. ,nested-labels))))
-	   ,@(mapcar (lambda (form)
-		       (if (label-name-p form)
-			   `(emit-label ,form)
-			   form))
-		     body)))))))
+          ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
+          ;; can't deal with this declaration, so disable it on host.
+          ;; Ditto for later ENABLE-PACKAGE-LOCKS %%C-S%% declaration.
+          #-sb-xc-host
+	  (declare (enable-package-locks %%current-segment%% %%current-vop%%))
+	  (symbol-macrolet (,@(when (or inherited-labels nested-labels)
+				    `((..inherited-labels.. ,nested-labels))))
+	      ,@(mapcar (lambda (form)
+			  (if (label-name-p form)
+			      `(emit-label ,form)
+			      form))
+			body)))))))
 #+sb-xc-host
 (sb!xc:defmacro assemble ((&optional segment vop &key labels)
 			  &body body
@@ -1209,13 +1217,13 @@
 	(declare (ignorable ,vop-var ,seg-var))
 	(macrolet ((%%current-segment%% () '**current-segment**)
 		   (%%current-vop%% () '**current-vop**))
-	 (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-			       `((..inherited-labels.. ,nested-labels))))
-	   ,@(mapcar (lambda (form)
-		       (if (label-name-p form)
-			   `(emit-label ,form)
-			   form))
-		     body)))))))
+	  (symbol-macrolet (,@(when (or inherited-labels nested-labels)
+				    `((..inherited-labels.. ,nested-labels))))
+	      ,@(mapcar (lambda (form)
+			  (if (label-name-p form)
+			      `(emit-label ,form)
+			      form))
+			body)))))))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
   #!+sb-doc
@@ -1636,10 +1644,19 @@
 	   ,@(when decls
 	       `((declare ,@decls)))
 	   (let ((,postits (segment-postits ,segment-name)))
+	     ;; Must be done so that contribs and user code doing
+	     ;; low-level stuff don't need to worry about this.
+	     (declare (disable-package-locks %%current-segment%%))
 	     (setf (segment-postits ,segment-name) nil)
 	     (macrolet ((%%current-segment%% ()
 			  (error "You can't use INST without an ~
 				  ASSEMBLE inside emitters.")))
+               ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
+               ;; can't deal with this declaration, so disable it on host
+               ;; Ditto for earlier ENABLE-PACKAGE-LOCKS %%C-S%% %%C-V%%
+               ;; declaration.
+               #-sb-xc-host
+	       (declare (enable-package-locks %%current-segment%%))
 	       ,@emitter))
 	   (values))
 	 (eval-when (:compile-toplevel :load-toplevel :execute)

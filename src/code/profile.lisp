@@ -248,8 +248,9 @@
   (let ((encapsulated-fun (fdefinition name)))
     (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
 	(profile-encapsulation-lambdas encapsulated-fun)
-      (setf (fdefinition name)
-	    encapsulation-fun)
+      (without-package-locks
+       (setf (fdefinition name)
+	     encapsulation-fun))
       (setf (gethash name *profiled-fun-name->info*)
 	    (make-profile-info :name name
 			       :encapsulated-fun encapsulated-fun
@@ -275,7 +276,8 @@
     (cond (pinfo
 	   (remhash name *profiled-fun-name->info*)
 	   (if (eq (fdefinition name) (profile-info-encapsulation-fun pinfo))
-	       (setf (fdefinition name) (profile-info-encapsulated-fun pinfo))
+	       (without-package-locks
+		(setf (fdefinition name) (profile-info-encapsulated-fun pinfo)))
 	       (warn "preserving current definition of redefined function ~S"
 		     name)))
 	  (t
@@ -515,5 +517,6 @@ Lisp process."
 ;;; different machine running at a different speed. We avoid this by
 ;;; erasing *CALL-OVERHEAD* whenever we save a .core file.
 (pushnew (lambda ()
-	   (makunbound '*overhead*))
+	   (without-package-locks
+	    (makunbound '*overhead*)))
 	 *before-save-initializations*)

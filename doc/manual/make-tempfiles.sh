@@ -15,12 +15,13 @@
 # We create the documentation from the in-tree sbcl if it is found,
 # else an installed sbcl is used.
 sbclsystem=`pwd`/../../src/runtime/sbcl
-if [ -e $sbclsystem ] 
+sbclcore=`pwd`/../../output/sbcl.core
+if [ -e $sbclsystem ] && [ -e $sbclcore ] 
 then
-SBCL="${1:-$sbclsystem --core `pwd`/../../output/sbcl.core}"
-export SBCL_HOME=`pwd`/../../contrib
+    SBCL="${1:-$sbclsystem --core $sbclcore}"
+    export SBCL_HOME=`pwd`/../../contrib
 else
-SBCL="${1:-`which sbcl`}"
+    SBCL="${1:-`which sbcl`}"
 fi
 
 # Output directory.  This has to end with a slash (it's interpreted by
@@ -41,3 +42,11 @@ echo "(progn (load \"docstrings.lisp\") (dolist (module (quote ($MODULES))) (req
 
 echo /creating contrib-docs.texi-temp
 echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
+
+echo /creating package-locks.texi-temp
+if $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger --eval '(quit :unix-status #+sb-package-locks 0 #-sb-package-locks 1)'
+then
+    cp package-locks-extended.texinfo package-locks.texi-temp
+else
+    cp package-locks-basic.texinfo package-locks.texi-temp
+fi

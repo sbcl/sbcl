@@ -99,7 +99,12 @@
   ;; shadowing symbols
   (%shadowing-symbols () :type list)
   ;; documentation string for this package
-  (doc-string nil :type (or simple-base-string null)))
+  (doc-string nil :type (or simple-base-string null))
+  ;; package locking
+  #!+sb-package-locks
+  (lock nil :type boolean)
+  #!+sb-package-locks
+  (%implementation-packages nil :type list))
 
 ;;;; iteration macros
 

@@ -651,13 +651,13 @@
 
 (defun dfun-arg-symbol (arg-number)
   (or (nth arg-number (the list *dfun-arg-symbols*))
-      (intern (format nil ".ARG~A." arg-number) *pcl-package*)))
+      (format-symbol *pcl-package* ".ARG~A." arg-number)))
 
 (defvar *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
 
 (defun slot-vector-symbol (arg-number)
   (or (nth arg-number (the list *slot-vector-symbols*))
-      (intern (format nil ".SLOTS~A." arg-number) *pcl-package*)))
+      (format-symbol *pcl-package* ".SLOTS~A." arg-number)))
 
 ;; FIXME: There ought to be a good way to factor out the idiom:
 ;;

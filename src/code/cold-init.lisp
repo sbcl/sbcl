@@ -111,6 +111,7 @@
   ;; this to be initialized, so we initialize it right away.
   (show-and-call !random-cold-init)
 
+  (show-and-call !early-package-cold-init)
   (show-and-call !package-cold-init)
   
   ;; All sorts of things need INFO and/or (SETF INFO).

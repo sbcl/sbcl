@@ -102,6 +102,7 @@
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
 (defvar *handled-conditions*)
+(defvar *disabled-package-locks*)
 (defvar *policy*)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)

@@ -46,7 +46,7 @@
 	(eval-in-lexenv (first i) lexenv)
 	(return (eval-in-lexenv (first i) lexenv)))))
 
-(defun eval-locally (exp lexenv &optional vars)
+(defun eval-locally (exp lexenv &key vars)
   (multiple-value-bind (body decls)
       (parse-body (rest exp) :doc-string-allowed nil)
     (let ((lexenv
@@ -62,10 +62,10 @@
            ;; undefined things can be accumulated [and
            ;; then thrown away, as it happens]). -- CSR,
            ;; 2002-10-24
-           (let ((sb!c:*lexenv* lexenv)
-                 (sb!c::*free-funs* (make-hash-table :test 'equal))
-                 (sb!c::*free-vars* (make-hash-table :test 'eq))
-                 (sb!c::*undefined-warnings* nil))
+           (let* ((sb!c:*lexenv* lexenv)
+		  (sb!c::*free-funs* (make-hash-table :test 'equal))
+		  (sb!c::*free-vars* (make-hash-table :test 'eq))
+		  (sb!c::*undefined-warnings* nil))
              ;; FIXME: VALUES declaration
              (sb!c::process-decls decls
                                   vars
@@ -188,7 +188,7 @@
 	     ((macrolet)
 	      (destructuring-bind (definitions &rest body)
 		  (rest exp)
-		(let ((lexenv
+                (let ((lexenv
                        (let ((sb!c:*lexenv* lexenv))
                          (sb!c::funcall-in-macrolet-lexenv
                           definitions
@@ -198,8 +198,7 @@
                           :eval))))
                   (eval-locally `(locally ,@body) lexenv))))
 	     ((symbol-macrolet)
-	      (destructuring-bind (definitions &rest body)
-		  (rest exp)
+	      (destructuring-bind (definitions &rest body) (rest exp)
                 (multiple-value-bind (lexenv vars)
                     (let ((sb!c:*lexenv* lexenv))
                       (sb!c::funcall-in-symbol-macrolet-lexenv
@@ -207,7 +206,7 @@
                        (lambda (&key vars)
                          (values sb!c:*lexenv* vars))
                        :eval))
-                  (eval-locally `(locally ,@body) lexenv vars))))
+                  (eval-locally `(locally ,@body) lexenv :vars vars))))
 	     (t
 	      (if (and (symbolp name)
 		       (eq (info :function :kind name) :function))

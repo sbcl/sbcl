@@ -198,9 +198,10 @@
 			(read-string-as-bytes *fasl-input-stream*
 					      ,n-buffer
 					      ,n-size)
-			(push-fop-table (intern* ,n-buffer
-						 ,n-size
-						 ,n-package)))))))))
+			(push-fop-table (without-package-locks
+					 (intern* ,n-buffer
+						  ,n-size
+						  ,n-package))))))))))
 
   ;; Note: CMU CL had FOP-SYMBOL-SAVE and FOP-SMALL-SYMBOL-SAVE, but
   ;; since they made the behavior of the fasloader depend on the

@@ -296,10 +296,9 @@
 	 (wrapper-bindings (mapcan (lambda (arg mt)
 				     (unless (eq mt t)
 				       (incf index)
-				       `((,(intern (format nil
-							   "WRAPPER-~D"
-							   index)
-						   *pcl-package*)
+				       `((,(format-symbol *pcl-package*
+							  "WRAPPER-~D"
+							  index)
 					  ,(emit-fetch-wrapper
 					    mt arg 'miss (pop slot-regs))))))
 				   args metatypes))

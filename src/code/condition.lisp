@@ -274,47 +274,49 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun %compiler-define-condition (name direct-supers layout
 				   all-readers all-writers)
-  (sb!xc:proclaim `(ftype (function (t) t) ,@all-readers))
-  (sb!xc:proclaim `(ftype (function (t t) t) ,@all-writers))
-  (multiple-value-bind (class old-layout)
-      (insured-find-classoid name
-			     #'condition-classoid-p
-			     #'make-condition-classoid)
-    (setf (layout-classoid layout) class)
-    (setf (classoid-direct-superclasses class)
-	  (mapcar #'find-classoid direct-supers))
-    (cond ((not old-layout)
-	   (register-layout layout))
-	  ((not *type-system-initialized*)
-	   (setf (layout-classoid old-layout) class)
-	   (setq layout old-layout)
-	   (unless (eq (classoid-layout class) layout)
+  (with-single-package-locked-error 
+      (:symbol name "defining ~A as a condition")
+    (sb!xc:proclaim `(ftype (function (t) t) ,@all-readers))
+    (sb!xc:proclaim `(ftype (function (t t) t) ,@all-writers))
+    (multiple-value-bind (class old-layout)
+	(insured-find-classoid name
+			       #'condition-classoid-p
+			       #'make-condition-classoid)
+      (setf (layout-classoid layout) class)
+      (setf (classoid-direct-superclasses class)
+	    (mapcar #'find-classoid direct-supers))
+      (cond ((not old-layout)
+	     (register-layout layout))
+	    ((not *type-system-initialized*)
+	     (setf (layout-classoid old-layout) class)
+	     (setq layout old-layout)
+	     (unless (eq (classoid-layout class) layout)
+	       (register-layout layout)))
+	    ((redefine-layout-warning "current"
+				      old-layout
+				      "new"
+				      (layout-length layout)
+				      (layout-inherits layout)
+				      (layout-depthoid layout))
+	     (register-layout layout :invalidate t))
+	    ((not (classoid-layout class))
 	     (register-layout layout)))
-	  ((redefine-layout-warning "current"
-				    old-layout
-				    "new"
-				    (layout-length layout)
-				    (layout-inherits layout)
-				    (layout-depthoid layout))
-	   (register-layout layout :invalidate t))
-	  ((not (classoid-layout class))
-	   (register-layout layout)))
-
-    (setf (layout-info layout)
-	  (locally
-	    ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant class
-	    ;; names which creates fast but non-cold-loadable, non-compact
-	    ;; code. In this context, we'd rather have compact, cold-loadable
-	    ;; code. -- WHN 19990928
-	    (declare (notinline find-classoid))
-	    (layout-info (classoid-layout (find-classoid 'condition)))))
-
-    (setf (find-classoid name) class)
-
-    ;; Initialize CPL slot.
-    (setf (condition-classoid-cpl class)
-	  (remove-if-not #'condition-classoid-p 
-			 (std-compute-class-precedence-list class))))
+      
+      (setf (layout-info layout)
+	    (locally
+		;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant class
+		;; names which creates fast but non-cold-loadable, non-compact
+		;; code. In this context, we'd rather have compact, cold-loadable
+		;; code. -- WHN 19990928
+		(declare (notinline find-classoid))
+	      (layout-info (classoid-layout (find-classoid 'condition)))))
+      
+      (setf (find-classoid name) class)
+      
+      ;; Initialize CPL slot.
+      (setf (condition-classoid-cpl class)
+	    (remove-if-not #'condition-classoid-p 
+			   (std-compute-class-precedence-list class)))))
   (values))
 ) ; EVAL-WHEN
 
@@ -369,49 +371,51 @@
 
 (defun %define-condition (name parent-types layout slots documentation
 			  report default-initargs all-readers all-writers)
-  (%compiler-define-condition name parent-types layout all-readers all-writers)
-  (let ((class (find-classoid name)))
-    (setf (condition-classoid-slots class) slots)
-    (setf (condition-classoid-report class) report)
-    (setf (condition-classoid-default-initargs class) default-initargs)
-    (setf (fdocumentation name 'type) documentation)
-
-    (dolist (slot slots)
-
-      ;; Set up reader and writer functions.
-      (let ((slot-name (condition-slot-name slot)))
-	(dolist (reader (condition-slot-readers slot))
-          (install-condition-slot-reader reader name slot-name))
-	(dolist (writer (condition-slot-writers slot))
-	  (install-condition-slot-writer writer name slot-name))))
-
-    ;; Compute effective slots and set up the class and hairy slots
-    ;; (subsets of the effective slots.)
-    (let ((eslots (compute-effective-slots class))
-	  (e-def-initargs
-	   (reduce #'append
-		   (mapcar #'condition-classoid-default-initargs
+  (with-single-package-locked-error 
+      (:symbol name "defining ~A as a condition")
+    (%compiler-define-condition name parent-types layout all-readers all-writers)
+    (let ((class (find-classoid name)))
+      (setf (condition-classoid-slots class) slots)
+      (setf (condition-classoid-report class) report)
+      (setf (condition-classoid-default-initargs class) default-initargs)
+      (setf (fdocumentation name 'type) documentation)
+      
+      (dolist (slot slots)
+	
+	;; Set up reader and writer functions.
+	(let ((slot-name (condition-slot-name slot)))
+	  (dolist (reader (condition-slot-readers slot))
+	    (install-condition-slot-reader reader name slot-name))
+	  (dolist (writer (condition-slot-writers slot))
+	    (install-condition-slot-writer writer name slot-name))))
+      
+      ;; Compute effective slots and set up the class and hairy slots
+      ;; (subsets of the effective slots.)
+      (let ((eslots (compute-effective-slots class))
+	    (e-def-initargs
+	     (reduce #'append
+		     (mapcar #'condition-classoid-default-initargs
 			   (condition-classoid-cpl class)))))
-      (dolist (slot eslots)
-	(ecase (condition-slot-allocation slot)
-	  (:class
-	   (unless (condition-slot-cell slot)
-	     (setf (condition-slot-cell slot)
-		   (list (if (condition-slot-initform-p slot)
-			     (let ((initform (condition-slot-initform slot)))
-			       (if (functionp initform)
-				   (funcall initform)
-				   initform))
-			     *empty-condition-slot*))))
-	   (push slot (condition-classoid-class-slots class)))
-	  ((:instance nil)
-	   (setf (condition-slot-allocation slot) :instance)
-	   (when (or (functionp (condition-slot-initform slot))
-		     (dolist (initarg (condition-slot-initargs slot) nil)
-		       (when (functionp (getf e-def-initargs initarg))
-			 (return t))))
-	     (push slot (condition-classoid-hairy-slots class))))))))
-  name)
+	(dolist (slot eslots)
+	  (ecase (condition-slot-allocation slot)
+	    (:class
+	     (unless (condition-slot-cell slot)
+	       (setf (condition-slot-cell slot)
+		     (list (if (condition-slot-initform-p slot)
+			       (let ((initform (condition-slot-initform slot)))
+				 (if (functionp initform)
+				     (funcall initform)
+				     initform))
+			       *empty-condition-slot*))))
+	     (push slot (condition-classoid-class-slots class)))
+	    ((:instance nil)
+	     (setf (condition-slot-allocation slot) :instance)
+	     (when (or (functionp (condition-slot-initform slot))
+		       (dolist (initarg (condition-slot-initargs slot) nil)
+			 (when (functionp (getf e-def-initargs initarg))
+			   (return t))))
+	       (push slot (condition-classoid-hairy-slots class))))))))
+    name))
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)
 				 &body options)
@@ -886,6 +890,50 @@
 
 (define-condition extension-failure (reference-condition simple-error)
   ())
+
+#!+sb-package-locks
+(progn
+
+(define-condition package-lock-violation (reference-condition package-error)
+  ((format-control :initform nil :initarg :format-control 
+		   :reader package-error-format-control)
+   (format-arguments :initform nil :initarg :format-arguments
+		     :reader package-error-format-arguments))
+  (:report 
+   (lambda (condition stream)
+     (let ((control (package-error-format-control condition))
+	   (*print-pretty* nil))
+       (if control
+	   (format stream "Package lock on ~S violated when ~?."
+		   (package-error-package condition)
+		   control
+		   (package-error-format-arguments condition))
+	   (format stream "Package lock on ~S violated."
+		   (package-error-package condition))))))
+  ;; no :default-initargs -- reference-stuff provided by the
+  ;; signalling form in target-package.lisp
+  #!+sb-doc
+  (:documentation
+   "Subtype of CL:PACKAGE-ERROR. A subtype of this error is signalled
+when a package-lock is violated."))
+
+(define-condition package-locked-error (package-lock-violation) ()
+  #!+sb-doc
+  (:documentation
+   "Subtype of SB-EXT:PACKAGE-LOCK-VIOLATION. An error of this type is
+signalled when an operation on a package violates a package lock."))
+
+
+(define-condition symbol-package-locked-error (package-lock-violation)
+  ((symbol :initarg :symbol :reader package-locked-error-symbol))
+  #!+sb-doc
+  (:documentation
+   "Subtype of SB-EXT:PACKAGE-LOCK-VIOLATION. An error of this type is
+signalled when an operation on a symbol violates a package lock. The
+symbol that caused the violation is accessed by the function
+SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
+
+) ; progn
 
 ;;;; various other (not specified by ANSI) CONDITIONs
 ;;;;

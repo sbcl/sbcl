@@ -922,6 +922,9 @@
     (collect ((restr nil cons)
              (new-vars nil cons))
       (dolist (var-name (rest decl))
+	(when (boundp var-name)
+	  (with-single-package-locked-error
+              (:symbol var-name "declaring the type of ~A")))
 	(let* ((bound-var (find-in-bindings vars var-name))
 	       (var (or bound-var
 			(lexenv-find var-name vars)
@@ -982,6 +985,9 @@
   (let ((type (compiler-specifier-type spec)))
     (collect ((res nil cons))
       (dolist (name names)
+	(when (fboundp name)
+	  (with-single-package-locked-error
+              (:symbol name "declaring the ftype of ~A")))
 	(let ((found (find name fvars
 			   :key #'leaf-source-name
 			   :test #'equal)))
@@ -1006,6 +1012,8 @@
   (declare (list spec vars) (type lexenv res))
   (collect ((new-venv nil cons))
     (dolist (name (cdr spec))
+      (with-single-package-locked-error
+          (:symbol name "declaring ~A special"))
       (let ((var (find-in-bindings vars name)))
 	(etypecase var
 	  (cons
@@ -1202,6 +1210,11 @@
        (dynamic-extent
 	(process-dx-decl (cdr spec) vars)
         res)
+       ((disable-package-locks enable-package-locks)
+        (make-lexenv
+         :default res
+         :disabled-package-locks (process-package-lock-decl 
+                                  spec (lexenv-disabled-package-locks res))))
        (t
         (unless (info :declaration :recognized (first spec))
           (compiler-warn "unrecognized declaration ~S" raw-spec))

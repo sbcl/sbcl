@@ -437,14 +437,14 @@ bootstrapping.
 	       (mname `(,(if (eq (cadr initargs-form) :function)
 			     'method 'fast-method)
 			,name ,@qualifiers ,specls))
-	       (mname-sym (intern (let ((*print-pretty* nil)
-					;; (We bind *PACKAGE* to
-					;; KEYWORD here as a way to
-					;; force symbols to be printed
-					;; with explicit package
-					;; prefixes.)
-					(*package* *keyword-package*))
-				    (format nil "~S" mname)))))
+	       (mname-sym (let ((*print-pretty* nil)
+				;; (We bind *PACKAGE* to KEYWORD here
+				;; as a way to force symbols to be
+				;; printed with explicit package
+				;; prefixes.)
+				(target *package*)
+				(*package* *keyword-package*))
+			    (format-symbol target "~S" mname))))
 	  `(progn
 	     (defun ,mname-sym ,(cadr fn-lambda)
 	       ,@(cddr fn-lambda))
@@ -460,7 +460,7 @@ bootstrapping.
 	 `(list ,@(mapcar (lambda (specializer)
 			    (if (consp specializer)
 				``(,',(car specializer)
-				   ,,(cadr specializer))
+				      ,,(cadr specializer))
 				`',specializer))
 			  specializers))
 	 unspecialized-lambda-list
@@ -1428,10 +1428,10 @@ bootstrapping.
 				   ;; failing that, to use a special
 				   ;; symbol prefix denoting privateness.
 				   ;; -- WHN 19991201
-				   (intern (format nil "FAST-~A"
-						   (car method-spec))
-					   *pcl-package*)))
-			 ,@(cdr method-spec))))
+				   (format-symbol *pcl-package*
+						  "FAST-~A" 
+						  (car method-spec))))
+			,@(cdr method-spec))))
 	    (set-fun-name mff name)
 	    (unless mf
 	      (set-mf-property :name name)))))
@@ -1939,7 +1939,7 @@ bootstrapping.
     (let ((method-class (getf ,all-keys :method-class '.shes-not-there.)))
       (unless (eq method-class '.shes-not-there.)
         (setf (getf ,all-keys :method-class)
-                (find-class method-class t ,env))))))
+	      (find-class method-class t ,env))))))
 
 (defun real-ensure-gf-using-class--generic-function
        (existing
