@@ -154,4 +154,4 @@
 ;; overall exit status is 0, not 104
 (sleep 2) 
 
-;(sb-ext:quit :unix-status 104)
+(sb-ext:quit :unix-status 104)

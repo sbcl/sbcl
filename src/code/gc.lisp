@@ -237,25 +237,21 @@ and submit it as a patch."
 (defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
 
 (defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
-  (when *already-in-gc* (return-from sub-gc nil))
-  (setf *need-to-collect-garbage* t)
-  (when (zerop *gc-inhibit*)
-    (sb!thread:with-recursive-lock (*gc-mutex*)
-      (let ((*already-in-gc* t))
-	(without-interrupts
-	 (gc-stop-the-world)
-	 #+nil
-	 (dolist (h *before-gc-hooks*)
-	   (carefully-funcall h))
-	 (collect-garbage gen)
-	 (incf *n-bytes-freed-or-purified*
-	       (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
-	 (setf *need-to-collect-garbage* nil)
-
-	 (gc-start-the-world)))
-      (scrub-control-stack))
-    (dolist (h *after-gc-hooks*)
-      (carefully-funcall h)))
+  ;; catch attempts to gc recursively or during post-hooks and ignore them
+  (when (sb!thread::mutex-value *gc-mutex*)  (return-from sub-gc nil))
+  (sb!thread:with-mutex (*gc-mutex* :wait-p nil)
+    (setf *need-to-collect-garbage* t)
+    (when (zerop *gc-inhibit*)
+      (without-interrupts
+       (gc-stop-the-world)
+       (collect-garbage gen)
+       (incf *n-bytes-freed-or-purified*
+	     (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
+       (setf *need-to-collect-garbage* nil)
+       (gc-start-the-world))
+      (scrub-control-stack)
+      (setf *need-to-collect-garbage* nil)
+      (dolist (h *after-gc-hooks*) (carefully-funcall h))))
   (values))
        
 
