@@ -80,14 +80,20 @@
 			       :element-type '(unsigned-byte 8))
 	 (load-as-fasl stream verbose print)))
       (t
-       (let ((first-line (with-open-file (stream truename :direction :input)
-			   (read-line stream nil)))
-	     (fhsss *fasl-header-string-start-string*))
+       (let* ((fhsss *fasl-header-string-start-string*)
+	      (first-line (make-array (length fhsss)
+				      :element-type '(unsigned-byte 8)))
+	      (read-length
+	       (with-open-file (stream truename
+				       :direction :input
+				       :element-type '(unsigned-byte 8))
+		 (read-sequence first-line stream))))
 	 (cond
-	  ((and first-line
-		(>= (length (the simple-string first-line))
-		    (length fhsss))
-		(string= first-line fhsss :end1 (length fhsss)))
+	   ((and (= read-length (length fhsss))
+		 (do ((i 0 (1+ i)))
+		     ((= i read-length) t)
+		   (when (/= (char-code (aref fhsss i)) (aref first-line i))
+		     (return))))
 	   (internal-load pathname truename if-does-not-exist verbose print
 			  :binary))
 	  (t

@@ -87,7 +87,8 @@
   (timeout nil :type (or index null))
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null))
-  (external-format :default))
+  (external-format :default)
+  (output-bytes #'ill-out :type function))
 (def!method print-object ((fd-stream file-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
@@ -200,14 +201,13 @@
 
 (defmacro output-wrapper/variable-width ((stream size buffering)
 					 &body body)
-  (let ((stream-var (gensym))
-	(size-var (gensym)))
+  (let ((stream-var (gensym)))
     `(let ((,stream-var ,stream)
-	   (,size-var ,size))
+	   (size ,size))
       ,(unless (eq (car buffering) :none)
 	 `(when (< (fd-stream-obuf-length ,stream-var)
 	           (+ (fd-stream-obuf-tail ,stream-var)
-		       ,size-var))
+		       size))
             (flush-output-buffer ,stream-var)))
       ,(unless (eq (car buffering) :none)
 	 `(when (> (fd-stream-ibuf-tail ,stream-var)
@@ -215,7 +215,7 @@
             (file-position ,stream-var (file-position ,stream-var))))
     
       ,@body
-      (incf (fd-stream-obuf-tail ,stream-var) ,size-var)
+      (incf (fd-stream-obuf-tail ,stream-var) size)
       ,(ecase (car buffering)
 	 (:none
 	  `(flush-output-buffer ,stream-var))
@@ -301,39 +301,6 @@
 				   (cdr buffering)))))))
 	    bufferings)))
 
-(def-output-routines/variable-width ("OUTPUT-CHAR-UTF8-~A-BUFFERED"
-				     (let ((bits (char-code byte)))
-				       (cond
-					 ((< bits #x80) 1)
-					 ((< bits #x800) 2)
-					 ((< bits #x10000) 3)
-					 (t 4)))
-				     :utf-8
-				     (:none character)
-				     (:line character)
-				     (:full character))
-  (if (char= byte #\Newline)
-      (setf (fd-stream-char-pos stream) 0)
-      (incf (fd-stream-char-pos stream)))
-  (let ((bits (char-code byte))
-	(sap (fd-stream-obuf-sap stream))
-	(tail (fd-stream-obuf-tail stream)))
-    (cond
-      ((< bits #x80)
-       (setf (sap-ref-8 sap tail) bits))
-      ((< bits #x800)
-       (setf (sap-ref-8 sap tail) (logior #xc0 (ldb (byte 5 6) bits))
-	     (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 0) bits))))
-      ((< bits #x10000)
-       (setf (sap-ref-8 sap tail) (logior #xe0 (ldb (byte 4 12) bits))
-	     (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 6) bits))
-	     (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-      (t
-       (setf (sap-ref-8 sap tail) (logior #xf0 (ldb (byte 3 18) bits))
-	     (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 12) bits))
-	     (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
-	     (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))))
-
 (def-output-routines ("OUTPUT-CHAR-~A-BUFFERED"
 		      1
 		      (:none character)
@@ -390,59 +357,7 @@
 			   (fd-stream-obuf-tail stream))
 	byte))
 
-(defun output-utf8-bytes (fd-stream string flush-p &optional start end)
-  #!+sb-doc
-  "Output STRING to FD-STREAM. Handle external-format."
-  (let ((start (or start 0))
-	(end (or end (length string))))
-    (declare (type index start end))
-    (when (> (fd-stream-ibuf-tail fd-stream)
-	     (fd-stream-ibuf-head fd-stream))
-      (file-position fd-stream (file-position fd-stream)))
-    (when (< end start)
-      (error ":END before :START!"))
-    (do ()
-	((= end start))
-      (setf (fd-stream-obuf-tail fd-stream)
-	    (do* ((len (fd-stream-obuf-length fd-stream))
-		  (sap (fd-stream-obuf-sap fd-stream))
-		  (tail (fd-stream-obuf-tail fd-stream)))
-		 ((or (= start end) (< (- len tail) 4)) tail)
-	      (let ((bits (char-code (aref string start))))
-		(incf tail
-		      (cond
-			((< bits #x80)
-			 (setf (sap-ref-8 sap tail) bits)
-			 1)
-			((< bits #x800)
-			 (setf (sap-ref-8 sap tail)
-			       (logior #xc0 (ldb (byte 5 6) bits))
-			       (sap-ref-8 sap (1+ tail))
-			       (logior #x80 (ldb (byte 6 0) bits)))
-			 2)
-			((< bits #x10000)
-			 (setf (sap-ref-8 sap tail)
-			       (logior #xe0 (ldb (byte 4 12) bits))
-			       (sap-ref-8 sap (1+ tail))
-			       (logior #x80 (ldb (byte 6 6) bits))
-			       (sap-ref-8 sap (+ 2 tail))
-			       (logior #x80 (ldb (byte 6 0) bits)))
-			 3)
-			(t
-			 (setf (sap-ref-8 sap tail)
-			       (logior #xf0 (ldb (byte 3 18) bits))
-			       (sap-ref-8 sap (1+ tail))
-			       (logior #x80 (ldb (byte 6 12) bits))
-			       (sap-ref-8 sap (+ 2 tail))
-			       (logior #x80 (ldb (byte 6 6) bits))
-			       (sap-ref-8 sap (+ 3 tail))
-			       (logior #x80 (ldb (byte 6 0) bits)))
-			 4)))
-		(incf start))))
-      (when (< start end)
-	(flush-output-buffer fd-stream)))
-    (when flush-p
-      (flush-output-buffer fd-stream))))
+
 
 ;;; Do the actual output. If there is space to buffer the string,
 ;;; buffer it. If the string would normally fit in the buffer, but
@@ -531,14 +446,8 @@
 					   :from-end t
 					   :start start
 					   :end end))))
-	  (if (eq (fd-stream-external-format stream) :utf-8)
-	      (ecase (fd-stream-buffering stream)
-		(:full
-		 (output-utf8-bytes stream thing nil start end))
-		(:line
-		 (output-utf8-bytes stream thing last-newline start end))
-		(:none
-		 (output-utf8-bytes stream thing t start end)))
+	  (if (and (typep thing 'base-string)
+		   (eq (fd-stream-external-format stream) :latin-1))
 	      (ecase (fd-stream-buffering stream)
 		(:full
 		 (output-raw-bytes stream thing start end))
@@ -547,7 +456,14 @@
 		 (when last-newline
 		   (flush-output-buffer stream)))
 		(:none
-		 (frob-output stream thing start end nil))))
+		 (frob-output stream thing start end nil)))
+	      (ecase (fd-stream-buffering stream)
+		(:full (funcall (fd-stream-output-bytes stream)
+				stream thing nil start end))
+		(:line (funcall (fd-stream-output-bytes stream)
+				stream thing last-newline start end))
+		(:none (funcall (fd-stream-output-bytes stream)
+				stream thing t start end))))
 	  (if last-newline
 	      (setf (fd-stream-char-pos stream)
 		    (- end last-newline 1))
@@ -559,10 +475,29 @@
 	  (:none
 	   (frob-output stream thing start end nil))))))
 
+(defvar *external-formats* ()
+  #!+sb-doc
+  "List of all available external formats. Each element is a list of the
+  element-type, string input function name, character input function name,
+  and string output function name.")
+
 ;;; Find an output routine to use given the type and buffering. Return
 ;;; as multiple values the routine, the real type transfered, and the
 ;;; number of bytes per element.
 (defun pick-output-routine (type buffering &optional external-format)
+  (when (subtypep type 'character)
+    (dolist (entry *external-formats*)
+      (when (member external-format (first entry))
+	(return-from pick-output-routine
+	  (values (symbol-function (nth (ecase buffering
+					  (:none 4)
+					  (:line 5)
+					  (:full 6))
+					entry))
+		  'character
+		  1
+		  (symbol-function (fourth entry))
+		  (first (first entry)))))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
 	       (eq buffering (second entry))
@@ -576,7 +511,7 @@
   ;; explosion.
   ;;
   ;; KLUDGE: also see comments in PICK-INPUT-ROUTINE
-  (loop for i from 40 by 8 to 1024 ; ARB (KLUDGE)
+  (loop for i from 40 by 8 to 1024	; ARB (KLUDGE)
 	if (subtypep type `(unsigned-byte ,i))
 	do (return-from pick-output-routine
 	     (values
@@ -584,22 +519,22 @@
 		(:none
 		 (lambda (stream byte)
 		   (output-wrapper (stream (/ i 8) (:none))
-		     (loop for j from 0 below (/ i 8)
-			   do (setf (sap-ref-8 
-				     (fd-stream-obuf-sap stream)
-				     (+ j (fd-stream-obuf-tail stream)))
-				    (ldb (byte 8 (- i 8 (* j 8))) byte))))))
+				   (loop for j from 0 below (/ i 8)
+					 do (setf (sap-ref-8 
+						   (fd-stream-obuf-sap stream)
+						   (+ j (fd-stream-obuf-tail stream)))
+						  (ldb (byte 8 (- i 8 (* j 8))) byte))))))
 		(:full
 		 (lambda (stream byte)
 		   (output-wrapper (stream (/ i 8) (:full))
-		     (loop for j from 0 below (/ i 8)
-			   do (setf (sap-ref-8 
-				     (fd-stream-obuf-sap stream)
-				     (+ j (fd-stream-obuf-tail stream)))
-				    (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
+				   (loop for j from 0 below (/ i 8)
+					 do (setf (sap-ref-8 
+						   (fd-stream-obuf-sap stream)
+						   (+ j (fd-stream-obuf-tail stream)))
+						  (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
 	      `(unsigned-byte ,i)
 	      (/ i 8))))
-  (loop for i from 40 by 8 to 1024 ; ARB (KLUDGE)
+  (loop for i from 40 by 8 to 1024	; ARB (KLUDGE)
 	if (subtypep type `(signed-byte ,i))
 	do (return-from pick-output-routine
 	     (values
@@ -607,19 +542,19 @@
 		(:none
 		 (lambda (stream byte)
 		   (output-wrapper (stream (/ i 8) (:none))
-		     (loop for j from 0 below (/ i 8)
-			   do (setf (sap-ref-8 
-				     (fd-stream-obuf-sap stream)
-				     (+ j (fd-stream-obuf-tail stream)))
-				    (ldb (byte 8 (- i 8 (* j 8))) byte))))))
+				   (loop for j from 0 below (/ i 8)
+					 do (setf (sap-ref-8 
+						   (fd-stream-obuf-sap stream)
+						   (+ j (fd-stream-obuf-tail stream)))
+						  (ldb (byte 8 (- i 8 (* j 8))) byte))))))
 		(:full
 		 (lambda (stream byte)
 		   (output-wrapper (stream (/ i 8) (:full))
-		     (loop for j from 0 below (/ i 8)
-			   do (setf (sap-ref-8 
-				     (fd-stream-obuf-sap stream)
-				     (+ j (fd-stream-obuf-tail stream)))
-				    (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
+				   (loop for j from 0 below (/ i 8)
+					 do (setf (sap-ref-8 
+						   (fd-stream-obuf-sap stream)
+						   (+ j (fd-stream-obuf-tail stream)))
+						  (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
 	      `(signed-byte ,i)
 	      (/ i 8)))))
 
@@ -716,10 +651,9 @@
 (defmacro input-wrapper/variable-width ((stream bytes eof-error eof-value)
 					&body read-forms)
   (let ((stream-var (gensym))
-	(element-var (gensym))
-	(bytes-var (gensym)))
+	(element-var (gensym)))
     `(let ((,stream-var ,stream)
-	   (,bytes-var nil))
+	   (size nil))
        (if (fd-stream-unread ,stream-var)
 	   (prog1
 	       (fd-stream-unread ,stream-var)
@@ -728,13 +662,13 @@
 	   (let ((,element-var
 		  (catch 'eof-input-catcher
 		    (input-at-least ,stream-var 1)
-		    (let ((byte (sap-ref-8 (fd-stream-ibuf-sap ,stream-var)
+		    (let* ((byte (sap-ref-8 (fd-stream-ibuf-sap ,stream-var)
 					   (fd-stream-ibuf-head ,stream-var))))
-		      (setq ,bytes-var ,bytes)
-		      (input-at-least ,stream-var ,bytes-var))
-		    (locally ,@read-forms))))
+		      (setq size ,bytes)
+		      (input-at-least ,stream-var size)
+		      (locally ,@read-forms)))))
 	     (cond (,element-var
-		    (incf (fd-stream-ibuf-head ,stream-var) ,bytes-var)
+		    (incf (fd-stream-ibuf-head ,stream-var) size)
 		    ,element-var)
 		   (t
 		    (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
@@ -785,29 +719,6 @@
 	   (nconc *input-routines*
 		  (list (list ',type ',name ',size nil))))))
 
-(def-input-routine/variable-width input-utf8-character
-    (character :utf-8
-	       (cond
-		 ((< byte #x80) 1)
-		 ((< byte #xe0) 2)
-		 ((< byte #xf0) 3)
-		 (t 4))
-	       sap head)
-  (let ((byte (sap-ref-8 sap head)))
-    (code-char (cond
-		 ((< byte #x80) byte)
-		 ((< byte #xe0)
-		  (dpb byte (byte 5 6) (sap-ref-8 sap (1+ head))))
-		 ((< byte #xf0)
-		  (dpb byte (byte 4 12)
-		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 6)
-			    (sap-ref-8 sap (+ 2 head)))))
-		 (t
-		  (dpb byte (byte 3 18)
-		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 12)
-			    (dpb (sap-ref-8 sap (+ 2 head)) (byte 6 6)
-				 (sap-ref-8 sap (+ 3 head))))))))))
-
 ;;; STREAM-IN routine for reading a string char
 (def-input-routine input-character
 		   (character 1 sap head)
@@ -843,10 +754,21 @@
 		   ((signed-byte 32) 4 sap head)
   (signed-sap-ref-32 sap head))
 
+
+
 ;;; Find an input routine to use given the type. Return as multiple
 ;;; values the routine, the real type transfered, and the number of
-;;; bytes per element.
+;;; bytes per element (and for character types string input routine).
 (defun pick-input-routine (type &optional external-format)
+  (when (subtypep type 'character)
+    (dolist (entry *external-formats*)
+      (when (member external-format (first entry))
+	(return-from pick-input-routine
+	  (values (symbol-function (third entry))
+		  'character
+		  1
+		  (symbol-function (second entry))
+		  (first (first entry)))))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
 	       (or (not (fourth entry))
@@ -961,18 +883,298 @@
 (defun refill-fd-stream-buffer (stream)
   ;; We don't have any logic to preserve leftover bytes in the buffer,
   ;; so we should only be called when the buffer is empty.
-  (aver (= (fd-stream-ibuf-head stream) (fd-stream-ibuf-tail stream)))
-  (multiple-value-bind (count err)
-      (sb!unix:unix-read (fd-stream-fd stream)
-			 (fd-stream-ibuf-sap stream)
-			 (fd-stream-ibuf-length stream))
-    (declare (type (or index null) count))
-    (when (null count)
-      (simple-stream-perror "couldn't read from ~S" stream err))
-    (setf (fd-stream-listen stream) nil
-	  (fd-stream-ibuf-head stream) 0
-	  (fd-stream-ibuf-tail stream) count)
-    count))
+  ;; FIXME: can have three bytes in buffer because of UTF-8
+  (let ((new-head 0)
+	(sap (fd-stream-ibuf-sap stream)))
+    (do ((head (fd-stream-ibuf-head stream) (1+ head))
+	 (tail (fd-stream-ibuf-tail stream)))
+	((= head tail))
+      (setf (sap-ref-8 sap new-head) (sap-ref-8 sap head))
+      (incf new-head))
+    (multiple-value-bind (count err)
+	(sb!unix:unix-read (fd-stream-fd stream)
+			   (sap+ sap new-head)
+			   (fd-stream-ibuf-length stream))
+      (declare (type (or index null) count))
+      (when (null count)
+	(simple-stream-perror "couldn't read from ~S" stream err))
+      (setf (fd-stream-listen stream) nil
+	    (fd-stream-ibuf-head stream) new-head
+	    (fd-stream-ibuf-tail stream) (+ count new-head))
+      count)))
+
+(defmacro define-external-format (external-format size out-expr in-expr)
+  (let ((out-function (intern (let ((*print-case* :upcase))
+				(format nil "OUTPUT-BYTES/~A"
+					external-format))))
+	(format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" external-format))
+	(in-function (intern (let ((*print-case* :upcase))
+			       (format nil "FD-STREAM-READ-N-CHARACTERS/~A"
+				       external-format))))
+	(in-char-function (intern (let ((*print-case* :upcase))
+				    (format nil "INPUT-CHAR/~A"
+					    external-format)))))
+    `(progn
+      (defun ,out-function (fd-stream string flush-p start end)
+	(let ((start (or start 0))
+	      (end (or end (length string))))
+	  (declare (type index start end))
+	  (when (> (fd-stream-ibuf-tail fd-stream)
+		   (fd-stream-ibuf-head fd-stream))
+	    (file-position fd-stream (file-position fd-stream)))
+	  (when (< end start)
+	    (error ":END before :START!"))
+	  (do ()
+	      ((= end start))
+	    (setf (fd-stream-obuf-tail fd-stream)
+		  (do* ((len (fd-stream-obuf-length fd-stream))
+			(sap (fd-stream-obuf-sap fd-stream))
+			(tail (fd-stream-obuf-tail fd-stream)))
+		       ((or (= start end) (< (- len tail) 4)) tail)
+		    (let* ((byte (aref string start))
+			   (bits (char-code byte)))
+		      ,out-expr
+		      (incf tail ,size)
+		      (incf start))))
+	    (when (< start end)
+	      (flush-output-buffer fd-stream)))
+	  (when flush-p
+	    (flush-output-buffer fd-stream))))
+      (def-output-routines (,format
+			    ,size
+			    (:none character)
+			    (:line character)
+			    (:full character))
+	  (if (char= byte #\Newline)
+	      (setf (fd-stream-char-pos stream) 0)
+	      (incf (fd-stream-char-pos stream)))
+	(let ((bits (char-code byte))
+	      (sap (fd-stream-obuf-sap stream))
+	      (tail (fd-stream-obuf-tail stream)))
+	  ,out-expr))
+      (defun ,in-function (stream buffer start requested eof-error-p
+			   &aux (total-copied 0))
+	(declare (type file-stream stream))
+	(declare (type index start requested total-copied))
+	(let ((unread (fd-stream-unread stream)))
+	  (when unread
+	    (setf (aref buffer start) unread)
+	    (setf (fd-stream-unread stream) nil)
+	    (setf (fd-stream-listen stream) nil)
+	    (incf total-copied)))
+	(do ()
+	    (nil)
+	  (let* ((head (fd-stream-ibuf-head stream))
+		 (tail (fd-stream-ibuf-tail stream))
+		 (sap (fd-stream-ibuf-sap stream)))
+	    (declare (type index head tail))
+	    ;; Copy data from stream buffer into user's buffer.
+	    (do ()
+		((or (= tail head) (= requested total-copied)))
+	      (let* ((byte (sap-ref-8 sap head)))
+		(when (> ,size (- tail head))
+		  (return))
+		(setf (aref buffer (+ start total-copied)) ,in-expr)
+		(incf total-copied)
+		(incf head ,size)))
+	    (setf (fd-stream-ibuf-head stream) head)
+	    ;; Maybe we need to refill the stream buffer.
+	    (cond ( ;; If there were enough data in the stream buffer, we're done.
+		   (= total-copied requested)
+		   (return total-copied))
+		  ( ;; If EOF, we're done in another way.
+		   (zerop (refill-fd-stream-buffer stream))
+		   (if eof-error-p
+		       (error 'end-of-file :stream stream)
+		       (return total-copied)))
+		  ;; Otherwise we refilled the stream buffer, so fall
+		  ;; through into another pass of the loop.
+		  ))))
+      (def-input-routine ,in-char-function (character ,size sap head)
+	(let ((byte (sap-ref-8 sap head)))
+	  ,in-expr))
+      (setf *external-formats*
+       (cons '(,external-format ,in-function ,in-char-function ,out-function
+	       ,@(mapcar #'(lambda (buffering)
+			     (intern (let ((*print-case* :upcase))
+				       (format nil format buffering))))
+			 '(:none :line :full)))
+	*external-formats*)))))
+
+(defmacro define-external-format/variable-width (external-format out-size-expr
+						 out-expr in-size-expr in-expr)
+  (let* ((name (first external-format))
+	 (out-function (intern (let ((*print-case* :upcase))
+				 (format nil "OUTPUT-BYTES/~A" name))))
+	 (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" name))
+	 (in-function (intern (let ((*print-case* :upcase))
+				(format nil "FD-STREAM-READ-N-CHARACTERS/~A"
+					name))))
+	 (in-char-function (intern (let ((*print-case* :upcase))
+				     (format nil "INPUT-CHAR/~A" name)))))
+    `(progn
+      (defun ,out-function (fd-stream string flush-p start end)
+	(let ((start (or start 0))
+	      (end (or end (length string))))
+	  (declare (type index start end))
+	  (when (> (fd-stream-ibuf-tail fd-stream)
+		   (fd-stream-ibuf-head fd-stream))
+	    (file-position fd-stream (file-position fd-stream)))
+	  (when (< end start)
+	    (error ":END before :START!"))
+	  (do ()
+	      ((= end start))
+	    (setf (fd-stream-obuf-tail fd-stream)
+		  (do* ((len (fd-stream-obuf-length fd-stream))
+			(sap (fd-stream-obuf-sap fd-stream))
+			(tail (fd-stream-obuf-tail fd-stream)))
+		       ((or (= start end) (< (- len tail) 4)) tail)
+		    (let* ((byte (aref string start))
+			   (bits (char-code byte))
+			   (size ,out-size-expr))
+		      ,out-expr
+		      (incf tail size)
+		      (incf start))))
+	    (when (< start end)
+	      (flush-output-buffer fd-stream)))
+	  (when flush-p
+	    (flush-output-buffer fd-stream))))
+      (def-output-routines/variable-width (,format
+					   ,out-size-expr
+					   ,external-format
+					   (:none character)
+					   (:line character)
+					   (:full character))
+	  (if (char= byte #\Newline)
+	      (setf (fd-stream-char-pos stream) 0)
+	      (incf (fd-stream-char-pos stream)))
+	(let ((bits (char-code byte))
+	      (sap (fd-stream-obuf-sap stream))
+	      (tail (fd-stream-obuf-tail stream)))
+	  ,out-expr))
+      (defun ,in-function (stream buffer start requested eof-error-p
+			   &aux (total-copied 0))
+	(declare (type file-stream stream))
+	(declare (type index start requested total-copied))
+	(let ((unread (fd-stream-unread stream)))
+	  (when unread
+	    (setf (aref buffer start) unread)
+	    (setf (fd-stream-unread stream) nil)
+	    (setf (fd-stream-listen stream) nil)
+	    (incf total-copied)))
+	(do ()
+	    (nil)
+	  (let* ((head (fd-stream-ibuf-head stream))
+		 (tail (fd-stream-ibuf-tail stream))
+		 (sap (fd-stream-ibuf-sap stream)))
+	    (declare (type index head tail))
+	    ;; Copy data from stream buffer into user's buffer.
+	    (do ()
+		((or (= tail head) (= requested total-copied)))
+	      (let* ((byte (sap-ref-8 sap head))
+		     (size ,in-size-expr))
+		(when (> size (- tail head))
+		  (return))
+		(setf (aref buffer (+ start total-copied)) ,in-expr)
+		(incf total-copied)
+		(incf head size)))
+	    (setf (fd-stream-ibuf-head stream) head)
+	    ;; Maybe we need to refill the stream buffer.
+	    (cond ( ;; If there were enough data in the stream buffer, we're done.
+		   (= total-copied requested)
+		   (return total-copied))
+		  ( ;; If EOF, we're done in another way.
+		   (zerop (refill-fd-stream-buffer stream))
+		   (if eof-error-p
+		       (error 'end-of-file :stream stream)
+		       (return total-copied)))
+		  ;; Otherwise we refilled the stream buffer, so fall
+		  ;; through into another pass of the loop.
+		  ))))
+      (def-input-routine/variable-width ,in-char-function (character
+							   ,external-format
+							   ,in-size-expr
+							   sap head)
+	(let ((byte (sap-ref-8 sap head)))
+	  ,in-expr))
+      (setf *external-formats*
+       (cons '(,external-format ,in-function ,in-char-function ,out-function
+	       ,@(mapcar #'(lambda (buffering)
+			     (intern (let ((*print-case* :upcase))
+				       (format nil format buffering))))
+			 '(:none :line :full)))
+	*external-formats*)))))
+
+(define-external-format (:latin-1 :latin1 :ascii)
+    1
+  (setf (sap-ref-8 sap tail) bits)
+  (code-char byte))
+
+(defparameter *latin-9-table*
+  (let ((table (make-string 256)))
+    (do ((i 0 (1+ i)))
+	((= i 256))
+      (setf (aref table i) (code-char i)))
+    (setf (aref table #xa4) (code-char #x20ac))
+    (setf (aref table #xa6) (code-char #x0160))
+    (setf (aref table #xa8) (code-char #x0161))
+    (setf (aref table #xb4) (code-char #x017d))
+    (setf (aref table #xb8) (code-char #x017e))
+    (setf (aref table #xbc) (code-char #x0152))
+    (setf (aref table #xbd) (code-char #x0153))
+    (setf (aref table #xbe) (code-char #x0178))
+    table))
+
+(defparameter *latin-9-reverse-1*
+  (make-array 16 :element-type '(unsigned-byte 21)
+	      :initial-contents '(#x0160 #x0161 #x0152 #x0153 0 0 0 0 #x0178 0 0 0 #x20ac #x017d #x017e 0)))
+(defparameter *latin-9-reverse-2*
+  (make-array 16 :element-type '(unsigned-byte 8)
+	      :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0)))
+
+(define-external-format (:latin-9 :latin9)
+    1
+  (setf (sap-ref-8 sap tail)
+	(if (< bits 256)
+	    (if (= bits (char-code (aref *latin-9-table* bits)))
+		bits
+		(error "cannot encode ~A in latin-9" bits))
+	    (if (= (aref *latin-9-reverse-1* (logand bits 15)) bits)
+		(aref *latin-9-reverse-2* (logand bits 15))
+		(error "cannot encode ~A in latin-9" bits))))
+  (aref *latin-9-table* byte))
+
+(define-external-format/variable-width (:utf-8 :utf8)
+  (let ((bits (char-code byte)))
+    (cond ((< bits #x80) 1)
+	  ((< bits #x800) 2)
+	  ((< bits #x10000) 3)
+	  (t 4)))
+  (ecase size
+    (1 (setf (sap-ref-8 sap tail) bits))
+    (2 (setf (sap-ref-8 sap tail) (logior #xc0 (ldb (byte 5 6) bits))
+	     (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 0) bits))))
+    (3 (setf (sap-ref-8 sap tail) (logior #xe0 (ldb (byte 4 12) bits))
+	     (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 6) bits))
+	     (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
+    (4 (setf (sap-ref-8 sap tail) (logior #xf0 (ldb (byte 3 18) bits))
+	     (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 12) bits))
+	     (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
+	     (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
+  (cond ((< byte #x80) 1)
+	((< byte #xe0) 2)
+	((< byte #xf0) 3)
+	(t 4))
+  (code-char (ecase size
+	       (1 byte)
+	       (2 (dpb byte (byte 5 6) (sap-ref-8 sap (1+ head))))
+	       (3 (dpb byte (byte 4 12)
+		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 6)
+			    (sap-ref-8 sap (+ 2 head)))))
+	       (4 (dpb byte (byte 3 18)
+		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 12)
+			    (dpb (sap-ref-8 sap (+ 2 head)) (byte 6 6)
+				 (sap-ref-8 sap (+ 3 head)))))))))
 
 ;;;; utility functions (misc routines, etc)
 
@@ -990,7 +1192,8 @@
 	(input-type nil)
 	(output-type nil)
 	(input-size nil)
-	(output-size nil))
+	(output-size nil)
+	(character-stream-p (subtypep type 'character)))
 
     (when (fd-stream-obuf-sap fd-stream)
       (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
@@ -999,56 +1202,68 @@
       (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
       (setf (fd-stream-ibuf-sap fd-stream) nil))
 
-    (if (and (subtypep target-type 'character)
-             (eq (fd-stream-external-format fd-stream) :default))
-        (setf (fd-stream-external-format fd-stream)
-              (intern (or (alien-funcall
-                           (extern-alien "nl_langinfo"
-                                         (function c-string int))
-                           sb!unix:codeset)
-                          "DEFAULT")
-                      "KEYWORD"))
-        ;; This isn't strictly necessary, but it'll make
-        ;; STREAM-EXTERNAL-FORMAT return a nice value on binary
-        ;; streams.
-        (setf (fd-stream-external-format fd-stream) :default))
+    (when (and character-stream-p
+	       (eq (fd-stream-external-format fd-stream) :default))
+      (setf (fd-stream-external-format fd-stream)
+	    (intern (or (alien-funcall
+			 (extern-alien "nl_langinfo"
+				       (function c-string int))
+			 sb!unix:codeset)
+			"LATIN-1")
+		    "KEYWORD")))
 
     (when input-p
-      (multiple-value-bind (routine type size)
+      (multiple-value-bind (routine type size read-n-characters
+				    normalized-external-format)
 	  (pick-input-routine target-type
 			      (fd-stream-external-format fd-stream))
+	(when normalized-external-format
+	  (setf (fd-stream-external-format fd-stream)
+		normalized-external-format))
 	(unless routine
 	  (error "could not find any input routine for ~S" target-type))
 	(setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
 	(setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
 	(setf (fd-stream-ibuf-tail fd-stream) 0)
-	(if (subtypep type 'character)
+	(if character-stream-p
 	    (setf (fd-stream-in fd-stream) routine
 		  (fd-stream-bin fd-stream) #'ill-bin)
 	    (setf (fd-stream-in fd-stream) #'ill-in
 		  (fd-stream-bin fd-stream) routine))
 	(when (eql size 1)
-	  (setf (fd-stream-n-bin fd-stream) #'fd-stream-read-n-bytes)
+	  (setf (fd-stream-n-bin fd-stream)
+		(if character-stream-p
+		    read-n-characters
+		    #'fd-stream-read-n-bytes))
 	  (when (and buffer-p
 		     ;; We only create this buffer for streams of type
 		     ;; (unsigned-byte 8).  Because there's no buffer, the
 		     ;; other element-types will dispatch to the appropriate
 		     ;; input (output) routine in fast-read-byte.
-		     (equal target-type '(unsigned-byte 8))
-		     #+nil
+		     (or character-stream-p
+			 (equal target-type '(unsigned-byte 8)))
+		     #+(or)
 		     (or (eq type 'unsigned-byte)
 			 (eq type :default)))
-	    (setf (ansi-stream-in-buffer fd-stream)
-		  (make-array +ansi-stream-in-buffer-length+
-			      :element-type '(unsigned-byte 8)))))
+	    (if character-stream-p
+		(setf (ansi-stream-cin-buffer fd-stream)
+		      (make-array +ansi-stream-in-buffer-length+
+				  :element-type 'character))
+		(setf (ansi-stream-in-buffer fd-stream)
+		      (make-array +ansi-stream-in-buffer-length+
+				  :element-type '(unsigned-byte 8))))))
 	(setf input-size size)
 	(setf input-type type)))
 
     (when output-p
-      (multiple-value-bind (routine type size)
+      (multiple-value-bind (routine type size output-bytes
+				    normalized-external-format)
 	  (pick-output-routine target-type
 			       (fd-stream-buffering fd-stream)
 			       (fd-stream-external-format fd-stream))
+	(when normalized-external-format
+	  (setf (fd-stream-external-format fd-stream)
+		normalized-external-format))
 	(unless routine
 	  (error "could not find any output routine for ~S buffered ~S"
 		 (fd-stream-buffering fd-stream)
@@ -1056,15 +1271,17 @@
 	(setf (fd-stream-obuf-sap fd-stream) (next-available-buffer))
 	(setf (fd-stream-obuf-length fd-stream) bytes-per-buffer)
 	(setf (fd-stream-obuf-tail fd-stream) 0)
-	(if (subtypep type 'character)
-	  (setf (fd-stream-out fd-stream) routine
-		(fd-stream-bout fd-stream) #'ill-bout)
-	  (setf (fd-stream-out fd-stream)
-		(or (if (eql size 1)
-		      (pick-output-routine 'base-char
-					   (fd-stream-buffering fd-stream)))
-		    #'ill-out)
-		(fd-stream-bout fd-stream) routine))
+	(when character-stream-p
+	  (setf (fd-stream-output-bytes fd-stream) output-bytes))
+	(if character-stream-p
+	    (setf (fd-stream-out fd-stream) routine
+		  (fd-stream-bout fd-stream) #'ill-bout)
+	    (setf (fd-stream-out fd-stream)
+		  (or (if (eql size 1)
+			  (pick-output-routine
+			   'base-char (fd-stream-buffering fd-stream)))
+		      #'ill-out)
+		  (fd-stream-bout fd-stream) routine))
 	(setf (fd-stream-sout fd-stream)
 	      (if (eql size 1) #'fd-sout #'ill-out))
 	(setf (fd-stream-char-pos fd-stream) 0)
