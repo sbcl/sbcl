@@ -38,15 +38,10 @@ int main (int argc, char *argv[]) {
 #ifndef PPC_LINUX_MCONTEXT_H\n\
 #define PPC_LINUX_MCONTEXT_H\n\n");
 
-    switch (offsetof(ucontext_t,uc_mcontext)) {
-    case 192:
+    if (offsetof(ucontext_t,uc_mcontext) > 40) {
 	printf("#define GLIBC232_STYLE_UCONTEXT\n\n");
-	break;
-    case 20:
+    } else {
 	printf("#define GLIBC231_STYLE_UCONTEXT\n\n");
-	break;
-    default:
-	printf("#error \"Unknown PPC/Linux ucontext layout\"\n\n");
     }
     printf("\
 #endif /* PPC_LINUX_MCONTEXT_H */\n");

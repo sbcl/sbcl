@@ -53,7 +53,7 @@ os_context_register_addr(os_context_t *context, int offset)
 #if defined(GLIBC231_STYLE_UCONTEXT)
     return &((context->uc_mcontext.regs)->gpr[offset]);
 #elif defined(GLIBC232_STYLE_UCONTEXT)
-    return &((context->uc_regs->gregs)[offset]);
+    return &((context->uc_mcontext.uc_regs->gregs)[offset]);
 #endif
 }
 
@@ -63,7 +63,7 @@ os_context_pc_addr(os_context_t *context)
 #if defined(GLIBC231_STYLE_UCONTEXT)
     return &((context->uc_mcontext.regs)->nip);
 #elif defined(GLIBC232_STYLE_UCONTEXT)
-    return &((context->uc_regs->gregs)[PT_NIP]);
+    return &((context->uc_mcontext.uc_regs->gregs)[PT_NIP]);
 #endif
 }
 
@@ -73,7 +73,7 @@ os_context_lr_addr(os_context_t *context)
 #if defined(GLIBC231_STYLE_UCONTEXT)
     return &((context->uc_mcontext.regs)->link);
 #elif defined(GLIBC232_STYLE_UCONTEXT)
-    return &((context->uc_regs->gregs)[PT_LNK]);
+    return &((context->uc_mcontext.uc_regs->gregs)[PT_LNK]);
 #endif
 }
 
@@ -83,7 +83,7 @@ os_context_sigmask_addr(os_context_t *context)
 #if defined(GLIBC231_STYLE_UCONTEXT)
     return &context->uc_sigmask;
 #elif defined(GLIBC232_STYLE_UCONTEXT)
-    return &context->uc_oldsigmask;
+    return &context->uc_sigmask;
 #endif
 }
 
@@ -98,7 +98,7 @@ os_context_fp_control(os_context_t *context)
 #if defined(GLIBC231_STYLE_UCONTEXT)
     return context->uc_mcontext.regs->gpr[PT_FPSCR]; 
 #elif defined(GLIBC232_STYLE_UCONTEXT)
-    return context->uc_regs->gregs[PT_FPSCR]; 
+    return context->uc_mcontext.uc_regs->gregs[PT_FPSCR]; 
 #endif
 }
 
