@@ -53,11 +53,30 @@
       (when (and (digs) (digs)) x))))
 
 ;;; Bug 132: The compiler used to fail to compile INTEGER-valued CATCH
-;;; tags. This was fixed by Alexey Dejneka in sbcl-0.7.1.14. (They're
-;;; still a bad idea because tags are compared with EQ, but now it's a
+;;; tags. This was fixed by Alexey Dejneka in sbcl-0.7.1.14. (INTEGER
+;;; catch tags are still a bad idea because EQ is used to compare
+;;; tags, and EQ comparison on INTEGERs is unportable; but now it's a
 ;;; compiler warning instead of a failure to compile.)
 (defun foo ()
   (catch 0 (print 1331)))
+
+;;; Bug 150: In sbcl-0.7.1.15, compiling this code caused a failure in
+;;; SB-C::ADD-TEST-CONSTRAINTS:
+;;;    The value NIL is not of type SB-C::CONTINUATION.
+;;; This bug was fixed by APD in sbcl-0.7.1.30.
+(defun bug150-test1 ()
+  (let* ()
+    (flet ((wufn () (glorp table1 4.9)))
+      (gleep *uustk* #'wufn "#1" (list)))
+    (if (eql (lo foomax 3.2))
+	(values)
+	(error "not ~S" '(eql (lo foomax 3.2))))
+    (values)))
+;;; A simpler test case for bug 150: The compiler died with the
+;;; same type error when trying to compile this.
+(defun bug150-test2 ()
+  (let ()
+    (<)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
