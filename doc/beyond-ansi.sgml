@@ -114,12 +114,14 @@ calling external C code, described
 <para>&SBCL; provides additional garbage collection functionality not
 specified by &ANSI;. Weak pointers allow references to objects to be
 maintained without keeping them from being GCed. And "finalization"
-hooks are available to cause code to be executed when an object is
+hooks are available to cause code to be executed when an object has been
 GCed.</para> <!-- FIXME: Actually documenting these would be good.:-| -->
 
 <para>&SBCL; supports Gray streams, user-overloadable CLOS classes
 whose instances can be used as Lisp streams (e.g. passed as the
-first argument to <function>format</>).</para>
+first argument to <function>format</>).  Additionally, the 
+bundled contrib module <interface>sb-simple-streams</interface>
+implements a subset of the Franz Allegro simple-streams proposal.</para>  
 
 <para>&SBCL; supports a MetaObject Protocol which is intended to be
 compatible with &AMOP;; present exceptions to this (as distinct from

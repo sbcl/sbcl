@@ -2060,6 +2060,14 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     is improved.
   * bug fix: FILE-POSITION works much better on string input and output
     streams.  (thanks to Nikodemus Siivola)
+  * bug fix: many threading/garbage collection symptoms sorted.  
+    SB-THREAD:INTERRUPT-THREAD now safe to call on a thread that might
+    be pseudo-atomic  
+  * internal change: Stopping for GC is now done with signals not ptrace.
+    GC is now done in whichever thread wanted it, instead of in the parent.  
+    This permits a
+  * bug fix: GC hooks (missing since 0.8) reinstated, so finalizers 
+    work again.
   * bug fix: result form in DO is not contained in the implicit
     TAGBODY.
   * incompatible change: ICR structure is changed; the value part of

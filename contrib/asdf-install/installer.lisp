@@ -4,7 +4,7 @@
 (defvar *cclan-mirror*
   (or (posix-getenv "CCLAN_MIRROR")
       "http://ftp.linux.org.uk/pub/lisp/cclan/"))
-    
+
 (defun directorify (name)
   ;; input name may or may not have a training #\/, but we know we
   ;; want a directory
@@ -21,13 +21,8 @@
   (merge-pathnames (make-pathname :directory '(:relative ".sbcl"))
 		   (user-homedir-pathname)))
 
-(defvar *verify-gpg-signatures* :unknown-locations
-  "Should we get detached GPG signatures for the packages and verify them?
-NIL - no, T - yes, :UNKNOWN-LOCATIONS - for any URL which isn't in CCLAN
-and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
-(defvar *safe-url-prefixes*
-  (list "http://ftp.linux.org.uk/pub/lisp/"
-	"http://files.b9.com/"))
+(defparameter *trusted-uids* nil)
+
 
 (defun verify-gpg-signatures-p (url)
   (labels ((prefixp (prefix string)
@@ -67,7 +62,33 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
   (:report (lambda (c s)
 	     (format s "Cannot verify package signature:  ~A"
 		     (signature-error-cause c)))))
-	     
+
+(define-condition gpg-error (error)
+  ((message :initarg :message :reader gpg-error-message))
+  (:report (lambda (c s)
+	     (format t "GPG failed with error status:~%~S"
+		     (gpg-error-message c)))))
+
+(define-condition no-signature (gpg-error) ())
+(define-condition key-not-found (gpg-error)
+  ((key-id :initarg :key-id :reader key-id))
+  (:report (lambda (c s)
+	     (format s "No key found for key id 0x~A.  Try some command like ~%  gpg  --recv-keys 0x~A"
+		     (key-id c) (key-id c)))))
+
+(define-condition key-not-trusted (gpg-error)
+  ((key-id :initarg :key-id :reader key-id)
+   (key-user-name :initarg :key-user-name :reader key-user-name))
+  (:report (lambda (c s)
+	     (format s "GPG warns that the key id 0x~A (~A) is not fully trusted"
+		     (key-id c) (key-user-name c)))))
+(define-condition author-not-trusted (gpg-error)
+  ((key-id :initarg :key-id :reader key-id)
+   (key-user-name :initarg :key-user-name :reader key-user-name))
+  (:report (lambda (c s)
+	     (format s "~A (key id ~A) is not on your package supplier list"
+		     (key-user-name c) (key-id c)))))
+  
 (defun url-host (url)
   (assert (string-equal url "http://" :end1 7))
   (let* ((port-start (position #\: url :start 7))
@@ -139,47 +160,75 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
 	      (sb-executable:copy-stream stream o))))
       (close stream)
       (terpri)
-      ;; seems to have worked.  let's try for a detached gpg signature too
-      (when (verify-gpg-signatures-p url)
-	(verify-gpg-signature url file-name)))))
+      (restart-case 
+	  (verify-gpg-signature/url url file-name)
+	(skip-gpg-check (&rest rest)
+	  :report "Don't ckeck GPG signature for this package"
+	  nil)))))
 
-(defun verify-gpg-signature (url file-name)
+(defun read-until-eof (stream)
+  (with-output-to-string (o)
+    (sb-executable:copy-stream stream o)))
+  
+(defun verify-gpg-signature/string (string file-name)
+  (let* ((proc
+	  (sb-ext:run-program
+	   "gpg"
+	   (list
+	    "--status-fd" "1" "--verify" "-"
+	    (namestring file-name))
+	   :output :stream :error :stream :search t
+	   :input (make-string-input-stream string) :wait t))
+	 (ret (process-exit-code proc))
+	 (err (read-until-eof (process-error proc)))
+	 tags)
+    (loop for l = (read-line (process-output proc) nil nil)
+	  while l
+	  when (> (mismatch l "[GNUPG:]") 6)
+	  do (destructuring-bind (_ tag &rest data) (asdf::split l)
+	       (pushnew (cons (intern tag :keyword)
+			      data) tags)))
+    ;; test for obvious key/sig problems
+    (let ((errsig (assoc :errsig tags)))
+      (and errsig (error 'key-not-found :key-id (second errsig) :gpg-err err)))
+    (let ((badsig (assoc :badsig tags)))
+      (and badsig (error 'key-not-found :key-id (second badsig) :gpg-err err)))
+    (let* ((good (assoc :goodsig tags))
+	   (id (second good))
+	   (name (format nil "~{~A~^ ~}" (nthcdr 2 good))))
+      ;; good signature, but perhaps not trusted
+      (unless (or (assoc :trust_ultimate tags)
+		  (assoc :trust_fully tags))
+	(cerror "Install the package anyway"
+		'key-not-trusted
+		:key-user-name name
+		:key-id id :gpg-err err))
+      (loop
+       (when
+	   (restart-case
+	       (or (assoc id *trusted-uids* :test #'equal)
+		   (error 'author-not-trusted
+			  :key-user-name name
+			  :key-id id :gpg-err nil))
+	     (add-key (&rest rest)
+	       :report "Add to package supplier list"
+	       (pushnew (list id name) *trusted-uids*)))
+	 (return))))))
+
+
+(defun verify-gpg-signature/url (url file-name)
   (destructuring-bind (response headers stream)
       (url-connection (concatenate 'string url ".asc"))
     (unwind-protect
 	 (if (= response 200)
-	     ;; sadly, we can't pass the stream directly to run-program,
-	     ;; because (at least in sbcl 0.8) that ignores existing buffered
-	     ;; data and only reads new fresh data direct from the file
-	     ;; descriptor
 	     (let ((data (make-string (parse-integer
 				       (cdr (assoc :content-length headers))
 				       :junk-allowed t))))
 	       (read-sequence data stream)
-	       (let ((ret
-		      (process-exit-code
-		       (sb-ext:run-program "gpg"
-					   (list "--verify" "-"
-						 (namestring file-name))
-					   :output t
-					   :search t
-					   :input (make-string-input-stream data)
-					   :wait t))))
-		 (unless (zerop ret)
-		   (error 'signature-error
-			  :cause (make-condition
-				  'simple-error
-				  :format-control "GPG returned exit status ~A"
-				  :format-arguments (list ret))))))
-	     (error 'signature-error
-		    :cause
-		    (make-condition
-		     'download-error :url  (concatenate 'string url ".asc")
-		     :response response)))
+	       (verify-gpg-signature/string data file-name))
+	     (error 'download-error :url  (concatenate 'string url ".asc")
+		    :response response))
       (close stream))))
-	
-    
-
 
 (defun where ()  
   (format t "Install where?~%")
@@ -237,7 +286,11 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
 
 ;; this is the external entry point
 (defun install (&rest packages)
-  (let ((*temporary-files* nil))
+  (let ((*temporary-files* nil)
+	(*trusted-uids*
+	 (let ((p (merge-pathnames "trusted-uids.lisp" *dot-sbcl*)))
+	   (when (probe-file p)
+	     (with-open-file (f p) (read f))))))
     (unwind-protect
 	 (destructuring-bind (source system name) (where)
 	   (labels ((one-iter (packages)
@@ -271,5 +324,9 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
 				 (asdf:operate 'asdf:load-op asd))
 			     (unless restart-p (return))))))))
 	     (one-iter packages)))
+      (let ((p (merge-pathnames "trusted-uids.lisp" *dot-sbcl*)))
+	(with-open-file (out p :direction :output)
+	  (with-standard-io-syntax
+	    (prin1 *trusted-uids* out))))
       (dolist (l *temporary-files*)
 	(when (probe-file l) (delete-file l))))))
