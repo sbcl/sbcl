@@ -313,7 +313,7 @@
 ;;; Dispatch to the appropriate function to attempt to convert a call.
 ;;; REF must be a reference to a FUNCTIONAL. This is called in IR1
 ;;; optimize as well as in local call analysis. If the call is is
-;;; already :Local, we do nothing. If the call is already scheduled
+;;; already :LOCAL, we do nothing. If the call is already scheduled
 ;;; for deletion, also do nothing (in addition to saving time, this
 ;;; also avoids some problems with optimizing collections of functions
 ;;; that are partially deleted.)

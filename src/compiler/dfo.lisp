@@ -362,7 +362,7 @@
 (defun merge-1-tl-lambda (result-lambda lambda)
   (declare (type clambda result-lambda lambda))
 
-  ;; Delete the lambda, and combine the lets and entries.
+  ;; Delete the lambda, and combine the LETs and entries.
   (setf (functional-kind lambda) :deleted)
   (dolist (let (lambda-lets lambda))
     (setf (lambda-home let) result-lambda)
@@ -379,9 +379,9 @@
 	  (block-component (node-block (lambda-bind result-lambda))))
 	 (result-return-block (node-block (lambda-return result-lambda))))
 
-    ;; Move blocks into the new component, and move any nodes directly
-    ;; in the old lambda into the new one (lets implicitly moved by
-    ;; changing their home.)
+    ;; Move blocks into the new COMPONENT, and move any nodes directly
+    ;; in the old LAMBDA into the new one (with LETs implicitly moved
+    ;; by changing their home.)
     (do-blocks (block component)
       (do-nodes (node cont block)
 	(let ((lexenv (node-lexenv node)))
@@ -391,7 +391,7 @@
 
     ;; Splice the blocks into the new DFO, and unlink them from the
     ;; old component head and tail. Non-return blocks that jump to the
-    ;; tail (NIL returning calls) are switched to go to the new tail.
+    ;; tail (NIL-returning calls) are switched to go to the new tail.
     (let* ((head (component-head component))
 	   (first (block-next head))
 	   (tail (component-tail component))

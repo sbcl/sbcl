@@ -1327,6 +1327,9 @@
 	      (new-venv nil cons))
 
       (dolist (var vars)
+	;; As far as I can see, LAMBDA-VAR-HOME should never have
+	;; been set before. Let's make sure. -- WHN 2001-09-29
+	(aver (null (lambda-var-home var)))
 	(setf (lambda-var-home var) lambda)
 	(let ((specvar (lambda-var-specvar var)))
 	  (cond (specvar
@@ -1647,24 +1650,24 @@
       last-entry)))
 
 ;;; This function generates the entry point functions for the
-;;; optional-dispatch Res. We accomplish this by recursion on the list of
-;;; arguments, analyzing the arglist on the way down and generating entry
-;;; points on the way up.
+;;; OPTIONAL-DISPATCH RES. We accomplish this by recursion on the list
+;;; of arguments, analyzing the arglist on the way down and generating
+;;; entry points on the way up.
 ;;;
-;;; Default-Vars is a reversed list of all the argument vars processed
-;;; so far, including supplied-p vars. Default-Vals is a list of the
-;;; names of the Default-Vars.
+;;; DEFAULT-VARS is a reversed list of all the argument vars processed
+;;; so far, including supplied-p vars. DEFAULT-VALS is a list of the
+;;; names of the DEFAULT-VARS.
 ;;;
-;;; Entry-Vars is a reversed list of processed argument vars,
-;;; excluding supplied-p vars. Entry-Vals is a list things that can be
-;;; evaluated to get the values for all the vars from the Entry-Vars.
+;;; ENTRY-VARS is a reversed list of processed argument vars,
+;;; excluding supplied-p vars. ENTRY-VALS is a list things that can be
+;;; evaluated to get the values for all the vars from the ENTRY-VARS.
 ;;; It has the var name for each required or optional arg, and has T
 ;;; for each supplied-p arg.
 ;;;
-;;; Vars is a list of the Lambda-Var structures for arguments that
-;;; haven't been processed yet. Supplied-p-p is true if a supplied-p
+;;; VARS is a list of the LAMBDA-VAR structures for arguments that
+;;; haven't been processed yet. SUPPLIED-P-P is true if a supplied-p
 ;;; argument has already been processed; only in this case are the
-;;; Default-XXX and Entry-XXX different.
+;;; DEFAULT-XXX and ENTRY-XXX different.
 ;;;
 ;;; The result at each point is a lambda which should be called by the
 ;;; above level to default the remaining arguments and evaluate the
@@ -1672,9 +1675,9 @@
 ;;; returning it as the result when the recursion bottoms out.
 ;;;
 ;;; Each level in the recursion also adds its entry point function to
-;;; the result Optional-Dispatch. For most arguments, the defaulting
+;;; the result OPTIONAL-DISPATCH. For most arguments, the defaulting
 ;;; function and the entry point function will be the same, but when
-;;; supplied-p args are present they may be different.
+;;; SUPPLIED-P args are present they may be different.
 ;;;
 ;;; When we run into a &REST or &KEY arg, we punt out to
 ;;; IR1-CONVERT-MORE, which finishes for us in this case.

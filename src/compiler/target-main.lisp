@@ -47,12 +47,18 @@
 (defun actually-compile (name definition)
   (with-compilation-values
     (sb!xc:with-compilation-unit ()
-      (let* (;; FIXME: Do we need this rebinding here? It's a literal
-	     ;; translation of the old CMU CL rebinding to (OR
-	     ;; *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*), and
-	     ;; it's not obvious whether the rebinding to itself is
-	     ;; needed now that SBCL doesn't need
-	     ;; *BACKEND-INFO-ENVIRONMENT*.
+      ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
+      ;; few changes. Once things are stable, the shared bindings
+      ;; probably be merged back together into some shared utility
+      ;; macro, or perhaps both merged into one of the existing utility
+      ;; macros SB-C::WITH-COMPILATION-VALUES or
+      ;; CL:WITH-COMPILATION-UNIT.
+      (let* (;; FIXME: Do we need the *INFO-ENVIRONMENT* rebinding
+	     ;; here? It's a literal translation of the old CMU CL
+	     ;; rebinding to (OR *BACKEND-INFO-ENVIRONMENT*
+	     ;; *INFO-ENVIRONMENT*), and it's not obvious whether the
+	     ;; rebinding to itself is needed now that SBCL doesn't
+	     ;; need *BACKEND-INFO-ENVIRONMENT*.
 	     (*info-environment* *info-environment*)
 	     (*lexenv* (make-null-lexenv))
 	     (form (get-lambda-to-compile definition))

@@ -60,6 +60,18 @@
   (or (cdr (assoc thing (ir2-environment-environment (environment-info env))))
       (etypecase thing
 	(lambda-var
+	 ;; I think that a failure of this assertion means that we're
+	 ;; trying to access a variable which was improperly closed
+	 ;; over. An ENVIRONMENT structure is a physical environment.
+	 ;; Every variable that a form refers to should either be in
+	 ;; its physical environment directly, or grabbed from a
+	 ;; surrounding physical environment when it was closed over.
+	 ;; The ASSOC expression above finds closed-over variables, so
+	 ;; if we fell through the ASSOC expression, it wasn't closed
+	 ;; over. Therefore, it must be in our physical environment
+	 ;; directly. If instead it is in some other physical
+	 ;; environment, then it's bogus for us to reference it here
+	 ;; without it being closed over. -- WHN 2001-09-29
 	 (aver (eq env (lambda-environment (lambda-var-home thing))))
 	 (leaf-info thing))
 	(nlx-info

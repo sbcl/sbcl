@@ -334,7 +334,10 @@
   ;; the TNs that hold the passed environment within the function.
   ;; This is an alist translating from the NLX-INFO or LAMBDA-VAR to
   ;; the TN that holds the corresponding value within this function.
-  ;; This list is in the same order as the ENVIRONMENT-CLOSURE.
+  ;;
+  ;; The elements of this list correspond to the elements of the list
+  ;; in the CLOSURE slot of the ENVIRONMENT object that links to us:
+  ;; essentially this list is related to the CLOSURE list by MAPCAR.
   (environment (required-argument) :type list :read-only t)
   ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
   ;; We always save these so that the debugger can do a backtrace,

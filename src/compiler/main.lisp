@@ -1392,12 +1392,7 @@
 ;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
   (declare (type source-info info))
-  (let* (;; These are bound in WITH-COMPILATION-UNIT now. -- WHN 20000308
-	 #+nil (*compiler-error-count* 0)
-	 #+nil (*compiler-warning-count* 0)
-	 #+nil (*compiler-style-warning-count* 0)
-	 #+nil (*compiler-note-count* 0)
-	 (*block-compile* *block-compile-argument*)
+  (let* ((*block-compile* *block-compile-argument*)
 	 (*package* (sane-package))
 	 (*policy* *policy*)
 	 (*lexenv* (make-null-lexenv))
