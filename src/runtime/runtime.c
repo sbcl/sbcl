@@ -264,16 +264,6 @@ More information on SBCL is available at <http://sbcl.sourceforge.net/>.
 #if defined GENCGC
     gencgc_pickup_dynamic();
 #else
-#if defined WANT_CGC && defined X86_CGC_ACTIVE_P
-    {
-        extern int use_cgc_p;
-        lispobj x = SymbolValue(X86_CGC_ACTIVE_P);
-        if (x != type_UnboundMarker && x != NIL) {
-	    /* Enable allocator. */
-	    use_cgc_p = 1;		
-	}
-    }
-#endif
 #endif
 
 #ifdef BINDING_STACK_POINTER

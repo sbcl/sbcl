@@ -18,7 +18,7 @@
 #include "globals.h"
 #include "dynbind.h"
 
-#if defined(ibmrt) || defined(__i386__)
+#if defined(__i386__)
 #define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER))
 #define SetBSP(value) SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value))
 #else

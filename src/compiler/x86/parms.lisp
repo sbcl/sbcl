@@ -224,8 +224,6 @@
 ;;;     Note these spaces grow from low to high addresses.
 (defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
-(defvar *x86-cgc-active-p*) ; FIXME: Document this.
-(defvar *static-blue-bag* nil)
 
 ;;; FIXME: *!INITIAL-FDEFN-OBJECTS* and !COLD-INIT probably don't need
 ;;; to be in the static symbols table any more. Also, if
@@ -285,29 +283,13 @@
     sb!vm::*fp-constant-lg2*
     sb!vm::*fp-constant-ln2*
 
-    ;; used by gencgc
-    sb!vm::*scavenge-read-only-space*
-
     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
     ;; common slot unbound check.
-    sb!pcl::..slot-unbound..
-
-    ;; spare symbols
-    sb!vm::spare-10
-    sb!vm::spare-9
-    sb!vm::spare-8
-    sb!vm::spare-7
-    sb!vm::spare-6
-    sb!vm::spare-5
-    sb!vm::spare-4
-    sb!vm::spare-3
-    sb!vm::spare-2
-    sb!vm::spare-1
-
-    ;; used by cgc
-    sb!vm::*x86-cgc-active-p*
-    sb!vm::*static-blue-bag*		; must be last or change C code
-    ))
+    ;;
+    ;; FIXME: In SBCL, the CLOS code has become sufficiently tightly
+    ;; integrated into the system that it'd probably make sense to use
+    ;; the ordinary unbound marker for this.
+    sb!pcl::..slot-unbound..))
 
 (defparameter *static-functions*
   '(length

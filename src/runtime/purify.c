@@ -31,7 +31,7 @@
 
 #define PRINTNOISE
 
-#if defined(ibmrt) || defined(__i386__)
+#if defined(__i386__)
 /* again, what's so special about the x86 that this is differently
  * visible there than on other platforms? -dan 20010125 
  */
@@ -111,108 +111,6 @@ dynamic_pointer_p(lispobj ptr)
 
 
 #ifdef __i386__
-
-#ifdef WANT_CGC
-/* original x86/CGC stack scavenging code by Paul Werkowski */
-
-static int
-maybe_can_move_p(lispobj thing)
-{
-    lispobj *thingp,header;
-    if (dynamic_pointer_p(thing)) { /* in dynamic space */
-	thingp = (lispobj*)PTR(thing);
-	header = *thingp;
-	if (Pointerp(header) && forwarding_pointer_p(header)) {
-	    return -1;		/* must change it */
-	} else if (LowtagOf(thing) == type_ListPointer) {
-	    return type_ListPointer;	/* can we check this somehow */
-	} else if (thing & 3) {	/* not fixnum */
-	    int kind = TypeOf(header);
-	    /* printf(" %x %x",header,kind); */
-	    switch (kind) {		/* something with a header */
-	    case type_Bignum:
-	    case type_SingleFloat:
-	    case type_DoubleFloat:
-#ifdef type_LongFloat
-	    case type_LongFloat:
-#endif
-	    case type_Sap:
-	    case type_SimpleVector:
-	    case type_SimpleString:
-	    case type_SimpleBitVector:
-	    case type_SimpleArrayUnsignedByte2:
-	    case type_SimpleArrayUnsignedByte4:
-	    case type_SimpleArrayUnsignedByte8:
-	    case type_SimpleArrayUnsignedByte16:
-	    case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte8
-	    case type_SimpleArraySignedByte8:
-#endif
-#ifdef type_SimpleArraySignedByte16
-	    case type_SimpleArraySignedByte16:
-#endif
-#ifdef type_SimpleArraySignedByte30
-	    case type_SimpleArraySignedByte30:
-#endif
-#ifdef type_SimpleArraySignedByte32
-	    case type_SimpleArraySignedByte32:
-#endif
-	    case type_SimpleArraySingleFloat:
-	    case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayLongFloat
-	    case type_SimpleArrayLongFloat:
-#endif
-#ifdef type_SimpleArrayComplexSingleFloat
-	    case type_SimpleArrayComplexSingleFloat:
-#endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-	    case type_SimpleArrayComplexDoubleFloat:
-#endif
-#ifdef type_SimpleArrayComplexLongFloat
-	    case type_SimpleArrayComplexLongFloat:
-#endif
-	    case type_CodeHeader:
-	    case type_FunctionHeader:
-	    case type_ClosureFunctionHeader:
-	    case type_ReturnPcHeader:
-	    case type_ClosureHeader:
-	    case type_FuncallableInstanceHeader:
-	    case type_InstanceHeader:
-	    case type_ValueCellHeader:
-	    case type_ByteCodeFunction:
-	    case type_ByteCodeClosure:
-	    case type_WeakPointer:
-	    case type_Fdefn:
-		return kind;
-		break;
-	    default:
-		return 0;
-	    }
-	}
-    }
-    return 0;
-}
-
-static int pverbose=0;
-#define PVERBOSE pverbose
-static void
-carefully_pscav_stack(lispobj*lowaddr, lispobj*base)
-{
-    lispobj *sp = lowaddr;
-    while (sp < base) {
-	int k;
-	lispobj thing = *sp;
-	if ((unsigned)thing & 0x3) {	/* may be pointer */
-	    /* need to check for valid float/double? */
-	    k = maybe_can_move_p(thing);
-	    if(PVERBOSE)printf("%8x %8x %d\n",sp, thing, k);
-	    if(k)
-		pscav(sp, 1, 0);
-	}
-	sp++;
-    }
-}
-#endif
 
 #ifdef GENCGC
 /*
@@ -1414,7 +1312,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
         return 0;
     }
 
-#if defined(ibmrt) || defined(__i386__)
+#if defined(__i386__)
     dynamic_space_free_pointer =
       (lispobj*)SymbolValue(ALLOCATION_POINTER);
 #endif
@@ -1457,18 +1355,13 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #ifdef GENCGC
     pscav_i386_stack();
 #endif
-#ifdef WANT_CGC
-    gc_assert((lispobj *)control_stack_end > ((&read_only_roots)+1));
-    carefully_pscav_stack(((&read_only_roots)+1),
-			  (lispobj *)CONTROL_STACK_END);
-#endif
 #endif
 
 #ifdef PRINTNOISE
     printf(" bindings");
     fflush(stdout);
 #endif
-#if !defined(ibmrt) && !defined(__i386__)
+#if !defined(__i386__)
     pscav( (lispobj *)BINDING_STACK_START,
 	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
 	  0);
@@ -1479,7 +1372,14 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  0);
 #endif
 
-#ifdef SCAVENGE_READ_ONLY_SPACE
+    /* The original CMU CL code had scavenge-read-only-space code
+     * controlled by the Lisp-level variable
+     * *SCAVENGE-READ-ONLY-SPACE*. It was disabled by default, and it
+     * wasn't documented under what circumstances it was useful or
+     * safe to turn it on, so it's been turned off in SBCL. If you
+     * want/need this functionality, and can test and document it,
+     * please submit a patch. */
+#if 0
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != type_UnboundMarker
 	&& SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
       unsigned  read_only_space_size =
@@ -1527,15 +1427,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#if defined(WANT_CGC) && defined(X86_CGC_ACTIVE_P)
-    if(SymbolValue(X86_CGC_ACTIVE_P) != T) {
-	os_zero((os_vm_address_t) DYNAMIC_SPACE_START,
-		(os_vm_size_t) DYNAMIC_SPACE_SIZE);
-    }
-#else
     os_zero((os_vm_address_t) current_dynamic_space,
             (os_vm_size_t) DYNAMIC_SPACE_SIZE);
-#endif
 
     /* Zero the stack. Note that the stack is also zeroed by SUB-GC
      * calling SCRUB-CONTROL-STACK - this zeros the stack on the x86. */
@@ -1547,44 +1440,18 @@ purify(lispobj static_roots, lispobj read_only_roots)
                              sizeof(lispobj))));
 #endif
 
-#if defined(WANT_CGC) && defined(STATIC_BLUE_BAG)
-    {
-      lispobj bag = SymbolValue(STATIC_BLUE_BAG);
-      struct cons*cons = (struct cons*)static_free;
-      struct cons*pair = cons + 1;
-      static_free += 2*WORDS_PER_CONS;
-      if(bag == type_UnboundMarker)
-	bag = NIL;
-      cons->cdr = bag;
-      cons->car = (lispobj)pair | type_ListPointer;
-      pair->car = (lispobj)static_end;
-      pair->cdr = (lispobj)static_free;
-      bag = (lispobj)cons | type_ListPointer;
-      SetSymbolValue(STATIC_BLUE_BAG, bag);
-    }
-#endif
-
     /* It helps to update the heap free pointers so that free_heap can
      * verify after it's done. */
     SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free);
     SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free);
 
-#if !defined(ibmrt) && !defined(__i386__)
+#if !defined(__i386__)
     dynamic_space_free_pointer = current_dynamic_space;
-#else
-#if defined(WANT_CGC) && defined(X86_CGC_ACTIVE_P)
-    /* X86 using CGC */
-    if(SymbolValue(X86_CGC_ACTIVE_P) != T)
-	SetSymbolValue(ALLOCATION_POINTER, (lispobj)DYNAMIC_SPACE_START);
-    else
-	cgc_free_heap();
 #else
 #if defined GENCGC
     gc_free_heap();
 #else
-    /* ibmrt using GC */
-    SetSymbolValue(ALLOCATION_POINTER, (lispobj)DYNAMIC_SPACE_START);
-#endif
+#error unsupported case /* in CMU CL, was "ibmrt using GC" */
 #endif
 #endif
 

@@ -230,11 +230,7 @@ struct timeval start_tv, stop_tv;
 	/* Set up from space and new space pointers. */
 
 	from_space = current_dynamic_space;
-#ifndef ibmrt
 	from_space_free_pointer = dynamic_space_free_pointer;
-#else
-	from_space_free_pointer = (lispobj *)SymbolValue(ALLOCATION_POINTER);
-#endif
 
 #ifdef PRINTNOISE
 	fprintf(stderr,"from_space = %lx\n",
@@ -279,14 +275,9 @@ struct timeval start_tv, stop_tv;
 	scavenge(((lispobj *)CONTROL_STACK_START), control_stack_size);
 		 
 
-#ifdef ibmrt
-	binding_stack_size =
-	    (lispobj *)SymbolValue(BINDING_STACK_POINTER) - binding_stack;
-#else
 	binding_stack_size = 
 	  current_binding_stack_pointer - 
 	    (lispobj *)BINDING_STACK_START;
-#endif
 #ifdef PRINTNOISE
 	printf("Scavenging the binding stack %x - %x (%d words) ...\n",
 	       BINDING_STACK_START,current_binding_stack_pointer,
@@ -331,11 +322,7 @@ struct timeval start_tv, stop_tv;
 		(os_vm_size_t) DYNAMIC_SPACE_SIZE);
 
 	current_dynamic_space = new_space;
-#ifndef ibmrt
 	dynamic_space_free_pointer = new_space_free_pointer;
-#else
-	SetSymbolValue(ALLOCATION_POINTER, (lispobj)new_space_free_pointer);
-#endif
 
 #ifdef PRINTNOISE
 	size_discarded = (from_space_free_pointer - from_space) * sizeof(lispobj);
@@ -2175,8 +2162,6 @@ gc_init(void)
 
 /* noise to manipulate the gc trigger stuff */
 
-#ifndef ibmrt
-
 void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 {
     os_vm_address_t addr=(os_vm_address_t)current_dynamic_space +
@@ -2229,5 +2214,3 @@ void clear_auto_gc_trigger(void)
 	current_auto_gc_trigger = NULL;
     }
 }
-
-#endif

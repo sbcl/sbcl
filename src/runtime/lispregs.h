@@ -17,10 +17,6 @@
 #include "sparc-lispregs.h"
 #endif
 
-#ifdef ibmrt
-#include "rt-lispregs.h"
-#endif
-
 #ifdef __i386__
 #include "x86-lispregs.h"
 #endif

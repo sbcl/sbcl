@@ -189,12 +189,10 @@
 
 (declaim (type (or index null) *gc-trigger*))
 
-;;; On the RT, we store the GC trigger in a ``static'' symbol instead of
-;;; letting magic C code handle it. It gets initialized by the startup
-;;; code. The X86 port defines this here because it uses the `ibmrt'
-;;; feature in the C code for allocation and binding stack access and
-;;; a lot of stuff wants this INTERNAL_GC_TRIGGER available as well.
-#!+(or ibmrt x86)
+;;; On the X86, we store the GC trigger in a ``static'' symbol instead
+;;; of letting magic C code handle it. It gets initialized by the
+;;; startup code.
+#!+x86
 (defvar sb!vm::*internal-gc-trigger*)
 
 ;;;; The following specials are used to control when garbage collection

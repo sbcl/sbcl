@@ -20,11 +20,11 @@ extern int foreign_function_call_active;
 
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
-#if !defined(ibmrt) && !defined(__i386__)
+#if !defined(__i386__)
 extern lispobj *current_binding_stack_pointer;
 #endif
 
-#if !defined(ibmrt) && !defined(__i386__)
+#if !defined(__i386__)
 /* FIXME: Why doesn't the x86 need this? */
 extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;
@@ -46,10 +46,6 @@ extern void globals_init(void);
 #else
 #define EXTERN(name,bytes) .global _ ## name
 #endif
-#endif
-/**/
-#ifdef ibmrt
-#define EXTERN(name,bytes) .globl _/**/name
 #endif
 /**/
 #ifdef alpha

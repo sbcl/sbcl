@@ -179,11 +179,11 @@
 			   (gspace-name gspace)
 			   "unknown"))))))))
 
-(defun allocate-descriptor (gspace length lowtag)
-  #!+sb-doc
-  "Return a descriptor for a block of LENGTH bytes out of GSPACE. The free
-  word index is boosted as necessary, and if additional memory is needed, we
-  grow the GSPACE. The descriptor returned is a pointer of type LOWTAG."
+;;; Return a descriptor for a block of LENGTH bytes out of GSPACE. The
+;;; free word index is boosted as necessary, and if additional memory
+;;; is needed, we grow the GSPACE. The descriptor returned is a
+;;; pointer of type LOWTAG.
+(defun allocate-cold-descriptor (gspace length lowtag)
   (let* ((bytes (round-up length (ash 1 sb!vm:lowtag-bits)))
 	 (old-free-word-index (gspace-free-word-index gspace))
 	 (new-free-word-index (+ old-free-word-index
@@ -512,16 +512,16 @@
   #!+sb-doc
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
-  (allocate-descriptor gspace (ash length sb!vm:word-shift) lowtag))
+  (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag))
 (defun allocate-unboxed-object (gspace element-bits length type)
   #!+sb-doc
   "Allocate LENGTH units of ELEMENT-BITS bits plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
   with the resultant length and TYPE."
   (let* ((bytes (/ (* element-bits length) sb!vm:byte-bits))
-	 (des (allocate-descriptor gspace
-				   (+ bytes sb!vm:word-bytes)
-				   sb!vm:other-pointer-type)))
+	 (des (allocate-cold-descriptor gspace
+					(+ bytes sb!vm:word-bytes)
+					sb!vm:other-pointer-type)))
     (write-memory des
 		  (make-other-immediate-descriptor (ash bytes
 							(- sb!vm:word-shift))
@@ -535,8 +535,9 @@
   ;; FIXME: Here and in ALLOCATE-UNBOXED-OBJECT, BYTES is calculated using
   ;; #'/ instead of #'CEILING, which seems wrong.
   (let* ((bytes (/ (* element-bits length) sb!vm:byte-bits))
-	 (des (allocate-descriptor gspace (+ bytes (* 2 sb!vm:word-bytes))
-					  sb!vm:other-pointer-type)))
+	 (des (allocate-cold-descriptor gspace
+					(+ bytes (* 2 sb!vm:word-bytes))
+					sb!vm:other-pointer-type)))
     (write-memory des (make-other-immediate-descriptor 0 type))
     (write-wordindexed des
 		       sb!vm:vector-length-slot
@@ -1243,9 +1244,7 @@
       (cold-set 'sb!vm::*fp-constant-lg2* (number-to-core (log 2L0 10L0)))
       (cold-set 'sb!vm::*fp-constant-ln2*
 	    (number-to-core
-	     (log 2L0 2.718281828459045235360287471352662L0))))
-    #!+gencgc
-    (cold-set 'sb!vm::*SCAVENGE-READ-ONLY-GSPACE* *nil-descriptor*)))
+	     (log 2L0 2.718281828459045235360287471352662L0))))))
 
 ;;; Make a cold list that can be used as the arg list to MAKE-PACKAGE in order
 ;;; to make a package that is similar to PKG.
@@ -2228,14 +2227,11 @@
 	     ;; Note: we round the number of constants up to ensure
 	     ;; that the code vector will be properly aligned.
 	     (round-up raw-header-n-words 2))
-	    (des (allocate-descriptor
-		  ;; In the X86 with CGC, code can't be relocated, so
-		  ;; we have to put it into static space. In all other
-		  ;; configurations, code can go into dynamic space.
-		  #!+(and x86 cgc) *static* ; KLUDGE: Why? -- WHN 19990907
-		  #!-(and x86 cgc) *dynamic*
-		  (+ (ash header-n-words sb!vm:word-shift) code-size)
-		  sb!vm:other-pointer-type)))
+	    (des (allocate-cold-descriptor *dynamic*
+					   (+ (ash header-n-words
+						   sb!vm:word-shift)
+					      code-size)
+					   sb!vm:other-pointer-type)))
        (write-memory des
 		     (make-other-immediate-descriptor header-n-words
 						      sb!vm:code-header-type))
@@ -2363,10 +2359,11 @@
 	  ;; Note: we round the number of constants up to ensure that
 	  ;; the code vector will be properly aligned.
 	  (round-up sb!vm:code-constants-offset 2))
-	 (des (allocate-descriptor *read-only*
-				   (+ (ash header-n-words sb!vm:word-shift)
-				      length)
-				   sb!vm:other-pointer-type)))
+	 (des (allocate-cold-descriptor *read-only*
+					(+ (ash header-n-words
+						sb!vm:word-shift)
+					   length)
+					sb!vm:other-pointer-type)))
     (write-memory des
 		  (make-other-immediate-descriptor header-n-words
 						   sb!vm:code-header-type))
@@ -2996,11 +2993,17 @@ initially undefined function references:~2%")
 
       ;; Tell the target Lisp how much stuff we've allocated.
       (cold-set 'sb!vm:*read-only-space-free-pointer*
-		(allocate-descriptor *read-only* 0 sb!vm:even-fixnum-type))
+		(allocate-cold-descriptor *read-only*
+					  0
+					  sb!vm:even-fixnum-type))
       (cold-set 'sb!vm:*static-space-free-pointer*
-		(allocate-descriptor *static* 0 sb!vm:even-fixnum-type))
+		(allocate-cold-descriptor *static*
+					  0
+					  sb!vm:even-fixnum-type))
       (cold-set 'sb!vm:*initial-dynamic-space-free-pointer*
-		(allocate-descriptor *dynamic* 0 sb!vm:even-fixnum-type))
+		(allocate-cold-descriptor *dynamic*
+					  0
+					  sb!vm:even-fixnum-type))
       (/show "done setting free pointers")
 
       ;; Write results to files.

@@ -320,10 +320,6 @@
 (defvar *fp-constant-lg2*)
 (defvar *fp-constant-ln2*)
 
-;;; Enable/disable scavenging of the read-only space.
-(defvar *scavenge-read-only-space* nil)
-;;; FIXME: should be *SCAVENGE-READ-ONLY-SPACE-P*
-
 ;;; The current alien stack pointer; saved/restored for non-local exits.
 (defvar *alien-stack*)
 

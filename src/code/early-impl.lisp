@@ -50,7 +50,4 @@
 		  sb!vm::*fp-constant-l2e*
 		  sb!vm::*fp-constant-lg2*
 		  sb!vm::*fp-constant-ln2*
-		  sb!vm::*scavenge-read-only-space*
-		  sb!pcl::..slot-unbound..
-		  sb!vm::*x86-cgc-active-p*
-		  sb!vm::*static-blue-bag*))
+		  sb!pcl::..slot-unbound..))

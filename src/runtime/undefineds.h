@@ -136,7 +136,7 @@ F(shutdown)
 F(sigblock)
 #endif
 F(sigpause)
-#if !defined(ibmrt) && !defined(hpux) && !defined(SVR4) && !defined(__i386__)
+#if !defined(hpux) && !defined(SVR4) && !defined(__i386__)
 F(sigreturn)
 #endif
 #if !defined(SVR4) && !defined(__FreeBSD__) && !defined(__OpenBSD__)

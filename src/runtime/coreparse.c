@@ -81,9 +81,9 @@ process_directory(int fd, long *ptr, int count)
 	    }
 #endif
 /* FIXME: Should the conditional here be reg_ALLOC instead of
- *   defined(ibmrt) || defined(__i386__)
+ *   defined(__i386__)
  * ? */
-#if defined(ibmrt) || defined(__i386__)
+#if defined(__i386__)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
 #else
 	    dynamic_space_free_pointer = free_pointer;

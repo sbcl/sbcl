@@ -5494,6 +5494,14 @@ garbage_collect_generation(int generation, int raise)
 	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
 	     (lispobj *)BINDING_STACK_START);
 
+    /* The original CMU CL code had scavenge-read-only-space code
+     * controlled by the Lisp-level variable
+     * *SCAVENGE-READ-ONLY-SPACE*. It was disabled by default, and it
+     * wasn't documented under what circumstances it was useful or
+     * safe to turn it on, so it's been turned off in SBCL. If you
+     * want/need this functionality, and can test and document it,
+     * please submit a patch. */
+#if 0
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
 	read_only_space_size =
 	    (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -
@@ -5503,6 +5511,7 @@ garbage_collect_generation(int generation, int raise)
 	       read_only_space_size * sizeof(lispobj)));
 	scavenge( (lispobj *) READ_ONLY_SPACE_START, read_only_space_size);
     }
+#endif
 
     static_space_size =
 	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -

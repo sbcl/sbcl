@@ -328,63 +328,6 @@ GNAME(do_pending_interrupt):
 	ret
 	.size	GNAME(do_pending_interrupt),.-GNAME(do_pending_interrupt)
 
-#ifdef WANT_CGC
-/* This is a copy function which is optimized for the Pentium and
- * works OK on 486 as well. This assumes (does not check) that the
- * input byte count is a multiple of 8 bytes (one Lisp object).
- * This code takes advantage of pairing in the Pentium as well
- * as the 128-bit cache line.
- */
-	.global	GNAME(fastcopy16)
-	.type	GNAME(fastcopy16),@function
-	.align align_4byte,0x90
-GNAME(fastcopy16):
-	pushl	%ebp
-	movl	%esp,%ebp
-	movl	8(%ebp), %edx	# dst
-	movl	12(%ebp),%eax	# src
-	movl	16(%ebp),%ecx	# bytes
-	pushl	%ebx
-	pushl	%esi
-	pushl	%edi
-	movl	%edx,%edi
-	movl	%eax,%esi
-	sarl	$3,%ecx		# number 8-byte units
-	testl	$1,%ecx		# odd?
-	jz	Lquad
-	movl	(%esi),%eax
-	movl	4(%esi),%ebx
-	movl	%eax,(%edi)
-	movl	%ebx,4(%edi)
-	leal	8(%esi),%esi
-	leal	8(%edi),%edi
-Lquad:	sarl	$1,%ecx		# count 16-byte units
-	jz	Lend
-	movl	%ecx,%ebp	# use ebp for loop counter
-	.align	align_16byte,0x90
-Ltop:
-	movl	  (%edi),%eax	# prefetch! MAJOR Pentium win..
-	movl	  (%esi),%eax
-	movl	 4(%esi),%ebx
-	movl	 8(%esi),%ecx
-	movl	12(%esi),%edx
-	movl	%eax,  (%edi)
-	movl	%ebx, 4(%edi)
-	movl	%ecx, 8(%edi)
-	movl	%edx,12(%edi)
-	leal	16(%esi),%esi
-	leal	16(%edi),%edi
-	decl	%ebp
-	jnz	Ltop		# non-prefixed jump saves cycles
-Lend:
-	popl	%edi
-	popl	%esi
-	popl	%ebx
-	popl	%ebp
-	ret
-	.size	GNAME(fastcopy16),.-GNAME(fastcopy16)
-#endif
-
 #ifdef GENCGC
 /* This is a fast bzero using the FPU. The first argument is the start
  * address which needs to be aligned on an 8 byte boundary, the second

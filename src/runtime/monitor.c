@@ -172,7 +172,7 @@ regs_cmd(char **ptr)
 {
     printf("CSP\t=\t0x%08lX\n", (unsigned long)current_control_stack_pointer);
     printf("FP\t=\t0x%08lX\n", (unsigned long)current_control_frame_pointer);
-#if !defined(ibmrt) && !defined(__i386__)
+#if !defined(__i386__)
     printf("BSP\t=\t0x%08X\n", (unsigned long)current_binding_stack_pointer);
 #endif
 #ifdef __i386__
@@ -181,7 +181,7 @@ regs_cmd(char **ptr)
 #endif
 
     printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)DYNAMIC_SPACE_START);
-#if defined(ibmrt) || defined(__i386__)
+#if defined(__i386__)
     printf("ALLOC\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(ALLOCATION_POINTER));
     printf("TRIGGER\t=\t0x%08lx\n",

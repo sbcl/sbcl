@@ -25,13 +25,9 @@ extern void gc_init(void);
  * adds another GC, or ports one of the other CMU CL GCs like gengc. */
 extern void collect_garbage(unsigned last_gen);
 
-#ifndef ibmrt
-
 #include "os.h"
 
 extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
-
-#endif ibmrt
 
 #endif _GC_H_

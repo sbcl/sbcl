@@ -38,7 +38,7 @@
 
 ;;; This value should be incremented when the system changes in such
 ;;; a way that it will no longer work reliably with old fasl files.
-(defconstant +fasl-file-version+ 12)
+(defconstant +fasl-file-version+ 13)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -56,12 +56,13 @@
 ;;; (somewhere in here also changes to AND and OR CTYPE layouts) 
 ;;; 10 = new layout for CONDITION in sbcl-0.6.11.38
 ;;; 11 = (a) new helper functions for MAKE-LOAD-FORM (HASH-TABLE) in
-;;;      sbcl-0.6.12.11
-;;;      (b) new address space constants for OpenBSD in 0.6.12.17,
-;;;          doesn't need separate version from (a) because the OpenBSD
-;;;          port was broken from sometime before 0.6.12.11 until
-;;;          the address space was changed
+;;;          sbcl-0.6.12.11
+;;;      (b) new address space constants for OpenBSD in 0.6.12.17
+;;;          (doesn't need separate version from (a) because the
+;;;          OpenBSD port was broken from sometime before 0.6.12.11
+;;;          until the address space was changed)
 ;;; 12 = sbcl-0.6.12.22 added new SB-FASL package
+;;; 13 = sbcl-0.6.12.x removed some elements from *STATIC-SYMBOLS* 
 
 ;;; the conventional file extension for fasl files on this
 ;;; architecture, e.g. "x86f"
