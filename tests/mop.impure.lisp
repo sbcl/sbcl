@@ -134,5 +134,17 @@
 (assert (null *e-c-u-c-arg-order*))
 (defclass e-c-u-c-arg-order () ())
 (assert (eq *e-c-u-c-arg-order* t))
+
+;;; verify that FIND-CLASS works after FINALIZE-INHERITANCE
+(defclass automethod-class (standard-class) ())
+(defmethod validate-superclass ((c1 automethod-class) (c2 standard-class))
+  t)
+(defmethod finalize-inheritance :after ((x automethod-class))
+  (format t "~&~S ~S~%" x (find-class (class-name x))))
+(defclass automethod-object () ()
+  (:metaclass automethod-class))
+(defvar *automethod-object* (make-instance 'automethod-object))
+(assert (typep *automethod-object* 'automethod-object))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

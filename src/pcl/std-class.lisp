@@ -507,8 +507,8 @@
 				     (make-class-predicate-name (class-name
 								 class))))))
   (add-direct-subclasses class direct-superclasses)
-  (update-class class nil)
   (make-class-predicate class predicate-name)
+  (update-class class nil)
   (add-slot-accessors class direct-slots))
 
 (defmethod shared-initialize :before ((class class) slot-names &key name)
@@ -742,6 +742,7 @@
     (return-from update-class))
   (when (or finalizep (class-finalized-p class)
 	    (not (class-has-a-forward-referenced-superclass-p class)))
+    (setf (find-class (class-name class)) class)
     (update-cpl class (compute-class-precedence-list class))
     ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
     ;; class.  The hoops above are to ensure that FINALIZE-INHERITANCE
