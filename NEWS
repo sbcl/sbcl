@@ -487,10 +487,18 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   single sequence argument). (The old non-inline implementation
   of the general M-argument sequence-of-length-N case required
   O(M*N*N) time when any of the sequence arguments were LISTs.)
-?? Raymond Wiker's port of CMU CL's RUN-PROGRAM has been added.
-(?? Don't forget to mention Raymond Wiker in the CREDITS file.)
+* The QUIT :UNIX-CODE keyword argument has been renamed to 
+  QUIT :UNIX-STATUS. (The old name still works, but is deprecated.)
+* Raymond Wiker's port of CMU CL's RUN-PROGRAM has been added.
+  ?? What about the undefined symbols in run-program.lisp?
+     SB-UNIX:UNIX-DUP
+     SB-UNIX:UNIX-IOCTL
+     SB-UNIX:UNIX-PIPE
 ?? The debugger now flushes standard output streams before it begins
   its output ("debugger invoked" and so forth).
+?? FINISH-OUTPUT now works better than it did before. (It used to 
+  have trouble with characters which weren't followed by a linefeed.)
+  ?? Remember to remove this from BUGS.
 ?? The patch for the SUBSEQ bug reported on the cmucl-imp mailing
   list 12 September 2000 has been applied to SBCL.
 ?? Martin Atzmueller's versions of two CMU CL patches, as posted on 
@@ -502,6 +510,5 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
 ?? The signal handling bug reported by Martin Atzmueller on 
   sbcl-devel 13 September 2000, which caused the debugger to 
   get confused after a Ctrl-C interrupt under ILISP, has been fixed.
-?? The QUIT :UNIX-CODE keyword argument has been renamed to 
-  QUIT :UNIX-STATUS. (The old name is still supported, but 
-  deprecated.)
+?? added enough DEFTRANSFORMs to allow (SXHASH 'FOO) to be optimized
+  away by constant folding

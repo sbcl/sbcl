@@ -25,7 +25,7 @@ include Config
 SRCS =	alloc.c backtrace.c breakpoint.c coreparse.c \
 	dynbind.c globals.c interr.c interrupt.c \
 	monitor.c parse.c print.c purify.c \
-	regnames.c runtime.c save.c search.c \
+	regnames.c runprog.c runtime.c save.c search.c \
 	time.c validate.c vars.c \
 	${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
 

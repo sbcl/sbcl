@@ -1,5 +1,5 @@
 /*
- * OS-dependent routines for FreeBSD (and could maybe be extended to all BSD?)
+ * OS-dependent routines for BSD-ish systems
  *
  * This file (along with os.h) exports an OS-independent interface to
  * the operating system VM facilities. This interface looks a lot like
@@ -245,3 +245,271 @@ os_install_interrupt_handlers(void)
 }
 
 #endif /* !defined GENCGC */
+
+/* feh!
+ *
+ * DL_WORKAROUND enables "stubbing" of various functions from libc et
+ * al. This is necessary when using dynamic linking in FreeBSD, as the
+ * symbols in the dynamic libraries will not have known addresses (in
+ * sbcl.nm).
+ *
+ * FIXME: This flag should be set in Config.bsd */
+#define DL_WORKAROUND 1
+
+#if DL_WORKAROUND
+#include <unistd.h>
+#include <dlfcn.h>
+#include <math.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <sys/resource.h>
+#include <signal.h>
+#include <fcntl.h>
+
+void *ldso_stub__dlopen(const char *path, int mode)
+{
+  return dlopen(path, mode);
+}
+
+void *ldso_stub__dlsym(void *handle, const char *symbol)
+{
+  return dlsym(handle, symbol);
+}
+
+const char *ldso_stub__dlerror(void)
+{
+  return dlerror();
+}
+int ldso_stub__access(const char *path, int mode)
+{
+  return access(path, mode);
+}
+
+double ldso_stub__acos(double x)
+{
+  return acos(x);
+}
+
+double ldso_stub__acosh(double x)
+{
+  return acosh(x);
+}
+
+double ldso_stub__asin(double x)
+{
+  return asin(x);
+}
+
+double ldso_stub__asinh(double x)
+{
+  return asin(x);
+}
+
+double ldso_stub__atanh(double x)
+{
+  return atanh(x);
+}
+
+
+int ldso_stub__chdir(const char *path)
+{
+  return chdir(path);
+}
+
+int ldso_stub__close(int d)
+{
+  return close(d);
+}
+
+int ldso_stub__closedir(DIR *dirp)
+{
+  return closedir(dirp);
+}
+
+double ldso_stub__cosh(double x)
+{
+  return cosh(x);
+}
+
+void ldso_stub__exit(int status)
+{
+  exit(status);
+}
+
+void ldso_stub__free(void *ptr)
+{
+  free(ptr);
+}
+
+int ldso_stub__fstat(int fd, struct stat *sb)
+{
+  return fstat(fd, sb);
+}
+
+int ldso_stub__fsync(int fd)
+{
+  return fsync(fd);
+}
+
+char *ldso_stub__getenv(const char *name)
+{
+  return getenv(name);
+}
+
+int ldso_stub__gethostname(char *name, int namelen)
+{
+  return gethostname(name, namelen);
+}
+
+pid_t ldso_stub__getpid(void)
+{
+  return getpid();
+}
+
+int ldso_stub__getrusage(int who, struct rusage *rusage)
+{
+  return getrusage(who, rusage);
+}
+
+int ldso_stub__gettimeofday(struct timeval *tp, struct timezone *tzp)
+{
+  return gettimeofday(tp, tzp);
+}
+
+uid_t ldso_stub__getuid(void)
+{
+  return getuid();
+}
+
+char *ldso_stub__getwd(char *buf)
+{
+  return getwd(buf);
+}
+
+double ldso_stub__hypot(double x, double y)
+{
+  return hypot(x, y);
+}
+
+int ldso_stub__kill(pid_t pid, int sig)
+{
+  return kill(pid, sig);
+}
+
+int ldso_stub__killpg(pid_t pgrp, int sig)
+{
+  return killpg(pgrp, sig);
+}
+
+off_t ldso_stub__lseek(int fildes, off_t offset, int whence)
+{
+  return lseek(fildes, offset, whence);
+}
+
+int ldso_stub__lstat(const char *path, struct stat *sb)
+{
+  return lstat(path, sb);
+}
+
+void *ldso_stub__malloc(size_t size)
+{
+  return malloc(size);
+}
+
+int ldso_stub__mkdir(const char *path, mode_t mode)
+{
+  return mkdir(path, mode);
+}
+
+int ldso_stub__open(const char *path, int flags, mode_t mode)
+{
+  return open(path, flags, mode);
+}
+
+DIR *ldso_stub__opendir(const char *filename)
+{
+  return opendir(filename);
+}
+
+double ldso_stub__pow(double x, double y)
+{
+  return pow(x, y);
+}
+
+ssize_t ldso_stub__read(int d, void *buf, size_t nbytes)
+{
+  return read(d, buf, nbytes);
+}
+
+struct dirent *ldso_stub__readdir(DIR *dirp)
+{
+  return readdir(dirp);
+}
+
+int ldso_stub__readlink(const char *path, char *buf, int bufsiz)
+{
+  return readlink(path, buf, bufsiz);
+}
+
+int ldso_stub__rename(const char *from, const char *to)
+{
+  return rename(from, to);
+}
+
+int ldso_stub__select(int nfds, fd_set *readfs, fd_set *writefds, 
+		      fd_set *exceptfds, struct timeval *timeout)
+{
+  return select(nfds, readfs, writefds, exceptfds, timeout);
+}
+
+int ldso_stub__sigblock(int mask)
+{
+  return sigblock(mask);
+}
+
+int ldso_stub__sigpause(int sigmask)
+{
+  return sigpause(sigmask);
+}
+
+int ldso_stub__sigsetmask(int mask)
+{
+  return sigsetmask(mask);
+}
+
+double ldso_stub__sinh(double x)
+{
+  return sin(x);
+}
+
+int ldso_stub__stat(const char *path, struct stat *sb)
+{
+  return stat(path, sb);
+}
+
+double ldso_stub__tanh(double x)
+{
+  return tanh(x);
+}
+
+/* tzname */
+
+int ldso_stub__unlink(const char *path)
+{
+  return unlink(path);
+}
+
+ssize_t ldso_stub__write(int d, const void *buf, size_t nbytes)
+{
+  return write(d, buf, nbytes);
+}
+
+pid_t ldso_stub__wait3(int *status, int options, struct rusage *rusage)
+{
+  return wait3(status, options, rusage);
+}
+
+#endif /* DL_WORKAROUND */

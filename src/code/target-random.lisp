@@ -54,7 +54,9 @@
 
 (defvar *random-state*)
 (defun !random-cold-init ()
-  (setf *random-state* (%make-random-state)))
+  (/show0 "entering !RANDOM-COLD-INIT")
+  (setf *random-state* (%make-random-state))
+  (/show0 "returning from !RANDOM-COLD-INIT"))
 
 (defun make-random-state (&optional state)
   #!+sb-doc

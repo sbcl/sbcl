@@ -21,25 +21,25 @@
     (:documentation "the base class for all CLOS streams")))
 
 ;;; Define the stream classes.
-(defclass fundamental-input-stream (fundamental-stream))
+(defclass fundamental-input-stream (fundamental-stream) nil)
 
-(defclass fundamental-output-stream (fundamental-stream))
+(defclass fundamental-output-stream (fundamental-stream) nil)
 
-(defclass fundamental-character-stream (fundamental-stream))
+(defclass fundamental-character-stream (fundamental-stream) nil)
 
-(defclass fundamental-binary-stream (fundamental-stream))
+(defclass fundamental-binary-stream (fundamental-stream) nil)
 
 (defclass fundamental-character-input-stream
-    (fundamental-input-stream fundamental-character-stream))
+    (fundamental-input-stream fundamental-character-stream) nil)
 
 (defclass fundamental-character-output-stream
-    (fundamental-output-stream fundamental-character-stream))
+    (fundamental-output-stream fundamental-character-stream) nil)
 
 (defclass fundamental-binary-input-stream
-    (fundamental-input-stream fundamental-binary-stream))
+    (fundamental-input-stream fundamental-binary-stream) nil)
 
 (defclass fundamental-binary-output-stream
-    (fundamental-output-stream fundamental-binary-stream))
+    (fundamental-output-stream fundamental-binary-stream) nil)
 
 ;;; example character input and output streams
 

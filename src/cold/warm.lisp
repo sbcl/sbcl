@@ -202,8 +202,8 @@
 		"src/code/inspect" ; FIXME: should be byte compiled
 		"src/code/profile"
 		"src/code/ntrace"
-		#+nil "src/code/run-program" ; not working as of 0.6.7
 		"src/code/foreign"
+		"src/code/run-program"
 		;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
 		;; facility is still used in our ANSI DESCRIBE
 		;; facility, and should be compiled and loaded after

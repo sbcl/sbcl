@@ -1439,7 +1439,7 @@
 		    ;; ..and the fifth seems to match most
 		    ;; actual symbols, at least in RedHat 6.2.
 		    "")
-	 #!+freebsd #("")
+	 #!+freebsd #("" "ldso_stub__")
 	 #!+openbsd #("_")))
     (or (some (lambda (prefix)
 		(gethash (concatenate 'string prefix name)

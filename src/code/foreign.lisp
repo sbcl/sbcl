@@ -63,7 +63,7 @@
 
 ;;; Linux implementation of GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS
 ;;; and functions (e.g. LOAD-FOREIGN) which affect it
-#+linux
+#+(or linux FreeBSD)
 (progn
 
 ;;; flags for dlopen()

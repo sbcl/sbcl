@@ -346,7 +346,7 @@
       (gethash (concatenate 'simple-string
 			    #!+linux "ldso_stub__"
 			    #!+openbsd "_"
-			    #!+freebsd ""
+			    #!+freebsd "ldso_stub__"
 			    foreign-symbol)
 	       *static-foreign-symbols*)
       (sb!sys:get-dynamic-foreign-symbol-address foreign-symbol)

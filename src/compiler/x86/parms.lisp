@@ -116,20 +116,18 @@
 ;;;
 ;;; FIXME: Couldn't/shouldn't these be DEFCONSTANT instead of DEFPARAMETER?
 #!-linux (defparameter *target-read-only-space-start* #x10000000)
-#!-linux (defparameter *target-static-space-start*    #x28000000)
+#!-linux (defparameter *target-static-space-start*
+                       ;; FIXME: was #x28000000 until RAW's RUN-PROGRAM
+                       ;; patches, why the change?
+                       #x30000000)
 #!-linux (defparameter *target-dynamic-space-start*   #x48000000)
 #!+linux (defparameter *target-read-only-space-start* #x01000000)
 #!+linux (defparameter *target-static-space-start*    #x05000000)
 #!+linux (defparameter *target-dynamic-space-start*   #x09000000)
 
-;;; Given that NIL is the first things allocated in static space, we
+;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
-;;;
-;;; FIXME: Couldn't/shouldn't this be a DEFCONSTANT, and shouldn't it be
-;;; calculated from TARGET-STATIC-SPACE-START instead of assigned
-;;; separately?
-#!-linux (defparameter *nil-value* #x2800000B)
-#!+linux (defparameter *nil-value* #x0500000B)
+(defparameter *nil-value* (+ *target-static-space-start* #xb))
 
 ;;;; other miscellaneous constants
 

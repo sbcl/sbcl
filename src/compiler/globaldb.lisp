@@ -28,6 +28,7 @@
   "$Header$")
 
 (!begin-collecting-cold-init-forms)
+#!+sb-show (!cold-init-forms (/show0 "early in globaldb.lisp cold init"))
 
 ;;; The DEFVAR for this appears later.
 ;;; FIXME: centralize

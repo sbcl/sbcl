@@ -1176,14 +1176,15 @@
 ;;; type declarations. Values are the values for the slots (in order.)
 ;;;
 ;;; This is split four ways because:
-;;; 1] list & vector structures need "name" symbols stuck in at various weird
-;;;    places, whereas STRUCTURE structures have a LAYOUT slot.
+;;; 1] list & vector structures need "name" symbols stuck in at
+;;;    various weird places, whereas STRUCTURE structures have
+;;;    a LAYOUT slot.
 ;;; 2] We really want to use LIST to make list structures, instead of
 ;;;    MAKE-LIST/(SETF ELT).
-;;; 3] STRUCTURE structures can have raw slots that must also be allocated and
-;;;    indirectly referenced. We use SLOT-ACCESSOR-FORM to compute how to set
-;;;    the slots, which deals with raw slots.
-;;; 4] funcallable structures are weird.
+;;; 3] STRUCTURE structures can have raw slots that must also be
+;;;    allocated and indirectly referenced. We use SLOT-ACCESSOR-FORM
+;;;    to compute how to set the slots, which deals with raw slots.
+;;; 4] Funcallable structures are weird.
 (defun create-vector-constructor
        (defstruct cons-name arglist vars types values)
   (let ((temp (gensym))

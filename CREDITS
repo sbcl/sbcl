@@ -477,20 +477,30 @@ whenever I got stuck.
 
 CREDITS SINCE THE RELEASE OF SBCL
 
-The PSXHASH code used to implement EQUALP hash tables was originally
-copyright (C) 2000 by Cadabra, Inc., then released into the public
-domain.
+Daniel Barlow:
+  He contributed sblisp.lisp, a set of patches to make SBCL
+  play nicely with ILISP. (Those patches have since disappeared from the
+  SBCL distribution because ILISP has since been patched to play nicely
+  with SBCL.) He also figured out how to get the CMU CL dynamic object
+  file loading code to work under SBCL.
 
-Daniel Barlow contributed sblisp.lisp, a set of patches to make SBCL
-play nicely with ILISP. (Those patches have since disappeared from the
-SBCL distribution because ILISP has since been patched to play nicely
-with SBCL.) He also figured out how to get the CMU CL dynamic object
-file loading code to work under SBCL.
+Cadabra, Inc.:
+  They hired William Newman to do some consulting for them,
+  including the implementation of EQUALP hash tables for CMU CL;
+  then agreed to release the EQUALP code into the public domain,
+  giving SBCL, and CMU CL, EQUALP hash tables.
 
-Raymond Wiker ported sbcl-0.6.3 back to FreeBSD, restoring the
-ancestral CMU CL support for FreeBSD and updating it for the changes
-made from FreeBSD version 3 to FreeBSD version 4.
+Peter Van Eynde:
+  He wrestled the CLISP test suite into a portable test suite which 
+  can be used on SBCL, and submitted many other bug reports as well.
 
-Colin Walters' O(N) implementation of the general case of MAP on the
-cmucl-imp@cons.org mailing list was the inspiration for similar MAP
-code in sbcl-0.6.8.
+Colin Walters:
+  His O(N) implementation of the general case of MAP, posted on the
+  cmucl-imp@cons.org mailing list, was the inspiration for similar MAP
+  code added in sbcl-0.6.8.
+
+Raymond Wiker:
+  He ported sbcl-0.6.3 back to FreeBSD, restoring the ancestral
+  CMU CL support for FreeBSD and updating it for the changes made
+  from FreeBSD version 3 to FreeBSD version 4. He also ported the
+  CMU CL extension RUN-PROGRAM, and related code, to SBCL.

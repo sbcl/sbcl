@@ -49,17 +49,16 @@ echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 # and target machines.
 sh make-config.sh || exit 1
 
-# The foo-host-bar.sh scripts are run on the cross-compilation host,
-# and the foo-target-bar.sh scripts are run on the target machine. In
+# The make-host-*.sh scripts are run on the cross-compilation host,
+# and the make-target-*.sh scripts are run on the target machine. In
 # ordinary compilation, we just do these phases consecutively on the
 # same machine, but if you wanted to cross-compile from one machine
-# which supports Common Lisp to another which does not (yet) support
-# Lisp, you could do something like this:
-#   Create copies of the source tree on both host and target.
-#   Create links from "target" to "x86" in "src/compiler/" and
-#     in "src/assembly/", on both the host and the target. (That
-#     would ordinarily be done by the make.sh code above; if we're
-#     doing make.sh stuff by hand, we need to do this by hand, too.)
+# which supports Common Lisp to another which does not (yet:-) support
+# Common Lisp, you could do something like this:
+#   Create copies of the source tree on both the host and the target.
+#   Read the make-config.sh script carefully and emulate it by hand
+#     on both machines (e.g. creating "target"-named symlinks to
+#     identify the target architecture).
 #   On the host system:
 #     SBCL_XC_HOST=<whatever> sh make-host-1.sh
 #   Copy src/runtime/sbcl.h from the host system to the target system.

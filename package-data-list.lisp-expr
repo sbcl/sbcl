@@ -576,9 +576,19 @@ like *STACK-TOP-HINT*"
              ;; miscellaneous useful supported extensions
              "QUIT"
 
-             ;; running a Unix program from Lisp, not quite working
-             ;; in sbcl-0.6.6, but maybe soon..
-             "RUN-PROGRAM"))
+             ;; RUN-PROGRAM is not only useful for users, but also
+             ;; useful to implement parts of SBCL itself, so we're
+             ;; going to have to implement it anyway, so we might
+             ;; as well support it. And then once we're committed
+             ;; to implementing RUN-PROGRAM, it's nice to have it
+             ;; return a PROCESS object with operations defined on
+             ;; that object.
+             "RUN-PROGRAM"
+             "PROCESS-ALIVE-P" "PROCESS-CLOSE"
+             "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
+             "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
+             "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
+             "PROCESS-STATUS-HOOK" "PROCESS-WAIT"))
 
  #s(sb-cold:package-data
     :name "SB!FORMAT"
@@ -738,14 +748,6 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; used for FORMAT tilde paren
              "MAKE-CASE-FROB-STREAM"
-
-             ;; Some of these are probably still used for Unix-y processes.
-             ;; -- WHN 19991206
-             "PROCESS-CLOSE"
-             "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
-             "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
-             "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
-             "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
 
              ;; debuggers' little helpers
              #!+sb-show "*/SHOW*"

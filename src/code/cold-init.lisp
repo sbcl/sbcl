@@ -114,6 +114,7 @@
   (show-and-call !random-cold-init)
 
   ;; All sorts of things need INFO and/or (SETF INFO).
+  (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
 
   ;; This needs to be done early, but needs to be after INFO is

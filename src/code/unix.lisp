@@ -895,8 +895,6 @@
 	    (tm-gmtoff long)	;  Seconds east of UTC.
 	    (tm-zone c-string)))	; Timezone abbreviation.
 
-(def-alien-variable ("tzname" unix-tzname) (array c-string 2))
-
 (def-alien-routine get-timezone sb!c-call:void
   (when sb!c-call:long :in)
   (minutes-west sb!c-call:int :out)
@@ -911,6 +909,7 @@
   (multiple-value-bind (ignore minutes dst) (get-timezone secs)
     (declare (ignore ignore) (ignore minutes))
     (values (deref unix-tzname (if dst 1 0)))))
+
 
 ;;;; sys/time.h
 
@@ -949,7 +948,9 @@
 (def-unix-error ENOENT 2 "No such file or directory")
 #|
 (def-unix-error ESRCH 3 "No such process")
+|#
 (def-unix-error EINTR 4 "Interrupted system call")
+#|
 (def-unix-error EIO 5 "I/O error")
 (def-unix-error ENXIO 6 "No such device or address")
 (def-unix-error E2BIG 7 "Arg list too long")

@@ -36,7 +36,7 @@
   called on the stream."))
 
 (defmethod pcl-open-stream-p ((stream lisp-stream))
-  (not (eq (lisp-stream-in stream) #'closed-flame)))
+  (not (eq (sb-impl::lisp-stream-in stream) #'sb-impl::closed-flame)))
 
 (defmethod pcl-open-stream-p ((stream fundamental-stream))
   nil)
@@ -66,8 +66,8 @@
   (:documentation "Returns non-nil if the given Stream can perform input operations."))
 
 (defmethod input-stream-p ((stream lisp-stream))
-  (and (not (eq (lisp-stream-in stream) #'closed-flame))
-       (or (not (eq (lisp-stream-in stream) #'ill-in))
+  (and (not (eq (sb-impl::lisp-stream-in stream) #'sb-impl::closed-flame))
+       (or (not (eq (sb-impl::lisp-stream-in stream) #'ill-in))
 	   (not (eq (lisp-stream-bin stream) #'ill-bin)))))
 
 (defmethod input-stream-p ((stream fundamental-input-stream))
@@ -80,7 +80,7 @@
   (:documentation "Returns non-nil if the given Stream can perform output operations."))
 
 (defmethod output-stream-p ((stream lisp-stream))
-  (and (not (eq (lisp-stream-in stream) #'closed-flame))
+  (and (not (eq (sb-impl::lisp-stream-in stream) #'sb-impl::closed-flame))
        (or (not (eq (lisp-stream-out stream) #'ill-out))
 	   (not (eq (lisp-stream-bout stream) #'ill-bout)))))
 

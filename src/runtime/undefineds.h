@@ -257,12 +257,14 @@ F(gethostbyname)
 F(gethostbyaddr)
 
 /* Other miscellaneous things. */
-#if defined(SVR4)
+#if defined(SVR4) || defined(__FreeBSD__)
 F(setpgid)
 F(getpgid)
 D(timezone)
+#if !defined(__FreeBSD__)
 D(altzone)
 D(daylight)
+#endif
 D(tzname)
 F(dlopen)
 F(dlsym)
