@@ -254,7 +254,7 @@
     (let* ((*rebound-effective-method-gensyms*
 	    *global-effective-method-gensyms*)
 	   (name (if (early-gf-p generic-function)
-		     (early-gf-name generic-function)
+		     (!early-gf-name generic-function)
 		     (generic-function-name generic-function)))
 	   (arg-info (cons nreq applyp))
 	   (effective-method-lambda (expand-effective-method-function
@@ -347,15 +347,19 @@
 ;;;; the file defcombin.lisp. This is because EQL methods can't appear in the
 ;;;; bootstrap.
 ;;;;
-;;;; The defclass for the METHOD-COMBINATION and STANDARD-METHOD-COMBINATION
-;;;; classes has to appear here for this reason. This code must conform to
-;;;; the code in the file defcombin.lisp, look there for more details.
+;;;; The DEFCLASS for the METHOD-COMBINATION and
+;;;; STANDARD-METHOD-COMBINATION classes has to appear here for this
+;;;; reason. This code must conform to the code in the file
+;;;; defcombin.lisp, look there for more details.
 
 (defun compute-effective-method (generic-function combin applicable-methods)
   (standard-compute-effective-method generic-function
 				     combin
 				     applicable-methods))
 
+;;; FIXME: As of sbcl-0.6.10, the bindings of *INVALID-METHOD-ERROR*
+;;; and *METHOD-COMBINATION-ERROR* are never changed, even within the
+;;; dynamic scope of method combination functions.
 (defvar *invalid-method-error*
 	#'(lambda (&rest args)
 	    (declare (ignore args))
@@ -364,7 +368,6 @@
 	       of a method combination function (inside the body of~%~
 	       DEFINE-METHOD-COMBINATION or a method on the generic~%~
 	       function COMPUTE-EFFECTIVE-METHOD).")))
-
 (defvar *method-combination-error*
 	#'(lambda (&rest args)
 	    (declare (ignore args))
@@ -389,11 +392,9 @@
 ;      (call-next-method))))
 
 (defun invalid-method-error (&rest args)
-  (declare (arglist method format-string &rest format-arguments))
   (apply *invalid-method-error* args))
 
 (defun method-combination-error (&rest args)
-  (declare (arglist format-string &rest format-arguments))
   (apply *method-combination-error* args))
 
 ;This definition now appears in defcombin.lisp.

@@ -300,13 +300,11 @@ And so, we are saved.
 (defun accessor-miss-function (gf dfun-info)
   (ecase (dfun-info-accessor-type dfun-info)
     (reader
-      #'(lambda (arg)
-	   (declare (pcl-fast-call))
-	   (accessor-miss gf nil arg dfun-info)))
+     (lambda (arg)
+       (accessor-miss gf nil arg dfun-info)))
     (writer
-     #'(lambda (new arg)
-	 (declare (pcl-fast-call))
-	 (accessor-miss gf new arg dfun-info)))))
+     (lambda (new arg)
+       (accessor-miss gf new arg dfun-info)))))
 
 #-sb-fluid (declaim (sb-ext:freeze-type dfun-info))
 
@@ -392,9 +390,8 @@ And so, we are saved.
 	   (funcall (get-dfun-constructor 'emit-checking metatypes applyp)
 		    cache
 		    function
-		    #'(lambda (&rest args)
-			(declare (pcl-fast-call))
-			(checking-miss generic-function args dfun-info)))
+		    (lambda (&rest args)
+		      (checking-miss generic-function args dfun-info)))
 	   cache
 	   dfun-info)))))
 
@@ -450,9 +447,8 @@ And so, we are saved.
       (values
        (funcall (get-dfun-constructor 'emit-caching metatypes applyp)
 		cache
-		#'(lambda (&rest args)
-		    (declare (pcl-fast-call))
-		    (caching-miss generic-function args dfun-info)))
+		(lambda (&rest args)
+		  (caching-miss generic-function args dfun-info)))
        cache
        dfun-info))))
 
@@ -511,9 +507,8 @@ And so, we are saved.
       (values
        (funcall (get-dfun-constructor 'emit-constant-value metatypes)
 		cache
-		#'(lambda (&rest args)
-		    (declare (pcl-fast-call))
-		    (constant-value-miss generic-function args dfun-info)))
+		(lambda (&rest args)
+		  (constant-value-miss generic-function args dfun-info)))
        cache
        dfun-info))))
 
@@ -1504,7 +1499,7 @@ And so, we are saved.
 (defun update-dfun (generic-function &optional dfun cache info)
   (let* ((early-p (early-gf-p generic-function))
 	 (gf-name (if early-p
-		      (early-gf-name generic-function)
+		      (!early-gf-name generic-function)
 		      (generic-function-name generic-function)))
 	 (ocache (gf-dfun-cache generic-function)))
     (set-dfun generic-function dfun cache info)

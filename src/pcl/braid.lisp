@@ -265,8 +265,8 @@
 
 ;;; Initialize a class metaobject.
 ;;;
-;;; FIXME: This and most stuff in this file is probably only needed at init
-;;; time.
+;;; FIXME: This and most stuff in this file is probably only needed at
+;;; init time.
 (defun !bootstrap-initialize-class
        (metaclass-name class name
 	class-eq-wrapper source direct-supers direct-subclasses cpl wrapper
@@ -279,6 +279,10 @@
     (set-slot 'source source)
     (set-slot 'type (if (eq class (find-class 't))
 			t
+			;; FIXME: Could this just be CLASS instead
+			;; of `(CLASS ,CLASS)? If not, why not?
+			;; (See also similar expression in 
+			;; SHARED-INITIALIZE :BEFORE (CLASS).)
 			`(class ,class)))
     (set-slot 'class-eq-specializer
 	      (let ((spec (allocate-standard-instance class-eq-wrapper)))

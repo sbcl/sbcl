@@ -525,9 +525,8 @@ like *STACK-TOP-HINT*"
              ;; now? -- WHN 19991206
 
              ;; extended declarations..
-             "CONSTANT-FUNCTION" "END-BLOCK" "FREEZE-TYPE"
-             "INHIBIT-WARNINGS"
-             "MAYBE-INLINE" "OPTIMIZE-INTERFACE" "START-BLOCK"
+             "FREEZE-TYPE" "INHIBIT-WARNINGS"
+             "MAYBE-INLINE" "OPTIMIZE-INTERFACE"
 
              ;; ..and variables to control compiler policy
              "*INLINE-EXPANSION-LIMIT*"
@@ -1089,7 +1088,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "TYPE-DIFFERENCE" "TYPE-EXPAND"
              "TYPE-INTERSECT"
              "TYPE-INTERSECTION" "TYPE-SPECIFIER"
-             "*STANDARD-TYPE-NAMES*" "TYPE-UNION" "TYPE/=" "TYPE="
+             "TYPE-UNION" "TYPE/=" "TYPE="
              "TYPES-INTERSECT" "UNBOUND-SYMBOL-ERROR" "UNBOXED-ARRAY"
              "UNDEFINED-SYMBOL-ERROR" "UNION-TYPE" "UNION-TYPE-P"
              "UNION-TYPE-TYPES" "UNKNOWN-ERROR"

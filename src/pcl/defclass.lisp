@@ -78,10 +78,12 @@
 ;;; classes has been defined, the real definition of LOAD-DEFCLASS is
 ;;; installed by the file defclass.lisp
 (defmacro defclass (name direct-superclasses direct-slots &rest options)
-  (declare (indentation 2 4 3 1))
   (expand-defclass name direct-superclasses direct-slots options))
 
 (defun expand-defclass (name supers slots options)
+  ;; FIXME: We should probably just ensure that the relevant
+  ;; DEFVAR/DEFPARAMETERs occur before this definition, rather 
+  ;; than locally declaring them SPECIAL.
   (declare (special *defclass-times* *boot-state* *the-class-structure-class*))
   (setq supers  (copy-tree supers)
 	slots   (copy-tree slots)

@@ -101,18 +101,18 @@ bootstrapping.
 			    real-add-named-method)
 	  ))
 
-;;; For each of the early functions, arrange to have it point to its early
-;;; definition. Do this in a way that makes sure that if we redefine one
-;;; of the early definitions the redefinition will take effect. This makes
-;;; development easier.
+;;; For each of the early functions, arrange to have it point to its
+;;; early definition. Do this in a way that makes sure that if we
+;;; redefine one of the early definitions the redefinition will take
+;;; effect. This makes development easier.
 ;;;
-;;; The function which generates the redirection closure is pulled out into
-;;; a separate piece of code because of a bug in ExCL which causes this not
-;;; to work if it is inlined.
+;;; The function which generates the redirection closure is pulled out
+;;; into a separate piece of code because of a bug in ExCL which
+;;; causes this not to work if it is inlined.
 ;;; FIXME: We no longer need to worry about ExCL now, so we could unscrew this.
 (eval-when (:load-toplevel :execute)
 
-(defun redirect-early-function-internal (real early)
+(defun !redirect-early-function-internal (real early)
   (setf (gdefinition real)
 	(set-function-name
 	 #'(lambda (&rest args)
@@ -122,7 +122,7 @@ bootstrapping.
 (dolist (fns *!early-functions*)
   (let ((name (car fns))
 	(early-name (cadr fns)))
-    (redirect-early-function-internal name early-name)))
+    (!redirect-early-function-internal name early-name)))
 
 ) ; EVAL-WHEN
 
@@ -251,10 +251,6 @@ bootstrapping.
 	 initargs))
 
 (defmacro defmethod (&rest args &environment env)
-  (declare (arglist name
-		    {method-qualifier}*
-		    specialized-lambda-list
-		    &body body))
   (multiple-value-bind (name qualifiers lambda-list body)
       (parse-defmethod args)
     (multiple-value-bind (proto-gf proto-method)
@@ -472,8 +468,8 @@ bootstrapping.
 	(extract-declarations body env)
       (values `(lambda ,unspecialized-lambda-list
 		 ,@(when documentation `(,documentation))
-		 (declare (method-name ,(list name qualifiers specializers)))
-		 (declare (method-lambda-list ,@lambda-list))
+		 (declare (%method-name ,(list name qualifiers specializers)))
+		 (declare (%method-lambda-list ,@lambda-list))
 		 ,@declarations
 		 ,@real-body)
 	      unspecialized-lambda-list specializers))))
@@ -502,8 +498,8 @@ bootstrapping.
 	   method-lambda))
   (multiple-value-bind (documentation declarations real-body)
       (extract-declarations (cddr method-lambda) env)
-    (let* ((name-decl (get-declaration 'method-name declarations))
-	   (sll-decl (get-declaration 'method-lambda-list declarations))
+    (let* ((name-decl (get-declaration '%method-name declarations))
+	   (sll-decl (get-declaration '%method-lambda-list declarations))
 	   (method-name (when (consp name-decl) (car name-decl)))
 	   (generic-function-name (when method-name (car method-name)))
 	   (specialized-lambda-list (or sll-decl (cadr method-lambda))))
@@ -517,13 +513,15 @@ bootstrapping.
 	       (calls (list nil))
 	       (class-declarations
 		`(declare
-		  ;; FIXME: These nonstandard (DECLARE (SB-PCL::CLASS FOO BAR))
-		  ;; declarations should go away but as of 0.6.9.10, it's not
-		  ;; as simple as just deleting them.
+		  ;; These declarations seem to be used by PCL to pass
+		  ;; information to itself; when I tried to delete 'em
+		  ;; ca. 0.6.10 it didn't work. I'm not sure how
+		  ;; they work, but note the (VARIABLE-DECLARATION '%CLASS ..)
+		  ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN 2000-12-30
 		  ,@(remove nil
 			    (mapcar (lambda (a s) (and (symbolp s)
 						       (neq s 't)
-						       `(class ,a ,s)))
+						       `(%class ,a ,s)))
 				    parameters
 				    specializers))
 		  ;; These TYPE declarations weren't in the original
@@ -1619,7 +1617,7 @@ bootstrapping.
   (unless was-valid-p
     (let ((name (if (eq *boot-state* 'complete)
 		    (generic-function-name gf)
-		    (early-gf-name gf))))
+		    (!early-gf-name gf))))
       (esetf (gf-precompute-dfun-and-emf-p arg-info)
 	     (let* ((sym (if (atom name) name (cadr name)))
 		    (pkg-list (cons *pcl-package*
@@ -1727,7 +1725,7 @@ bootstrapping.
 (defvar *sgf-name-index*
   (!bootstrap-slot-index 'standard-generic-function 'name))
 
-(defun early-gf-name (gf)
+(defun !early-gf-name (gf)
   (instance-ref (get-slots gf) *sgf-name-index*))
 
 (defun gf-lambda-list (gf)
@@ -1883,18 +1881,20 @@ bootstrapping.
 (defun early-method-standard-accessor-slot-name (early-method)
   (seventh (fifth early-method)))
 
-;;; Fetch the specializers of an early method. This is basically just a
-;;; simple accessor except that when the second argument is t, this converts
-;;; the specializers from symbols into class objects. The class objects
-;;; are cached in the early method, this makes bootstrapping faster because
-;;; the class objects only have to be computed once.
+;;; Fetch the specializers of an early method. This is basically just
+;;; a simple accessor except that when the second argument is t, this
+;;; converts the specializers from symbols into class objects. The
+;;; class objects are cached in the early method, this makes
+;;; bootstrapping faster because the class objects only have to be
+;;; computed once.
+;;;
 ;;; NOTE:
-;;;  the second argument should only be passed as T by early-lookup-method.
-;;;  this is to implement the rule that only when there is more than one
-;;;  early method on a generic function is the conversion from class names
-;;;  to class objects done.
-;;;  the corresponds to the fact that we are only allowed to have one method
-;;;  on any generic function up until the time classes exist.
+;;;  The second argument should only be passed as T by
+;;;  early-lookup-method. This is to implement the rule that only when
+;;;  there is more than one early method on a generic function is the
+;;;  conversion from class names to class objects done. This
+;;;  corresponds to the fact that we are only allowed to have one
+;;;  method on any generic function up until the time classes exist.
 (defun early-method-specializers (early-method &optional objectsp)
   (if (and (listp early-method)
 	   (eq (car early-method) :early-method))
@@ -1933,8 +1933,8 @@ bootstrapping.
     (add-method gf new)))
 
 ;;; This is the early version of ADD-METHOD. Later this will become a
-;;; generic function. See !FIX-EARLY-GENERIC-FUNCTIONS which has special
-;;; knowledge about ADD-METHOD.
+;;; generic function. See !FIX-EARLY-GENERIC-FUNCTIONS which has
+;;; special knowledge about ADD-METHOD.
 (defun add-method (generic-function method)
   (when (not (fsc-instance-p generic-function))
     (error "Early ADD-METHOD didn't get a funcallable instance."))
@@ -1942,7 +1942,8 @@ bootstrapping.
     (error "Early ADD-METHOD didn't get an early method."))
   (push method (early-gf-methods generic-function))
   (set-arg-info generic-function :new-method method)
-  (unless (assoc (early-gf-name generic-function) *!generic-function-fixups*
+  (unless (assoc (!early-gf-name generic-function)
+		 *!generic-function-fixups*
 		 :test #'equal)
     (update-dfun generic-function)))
 
@@ -1956,7 +1957,8 @@ bootstrapping.
   (setf (early-gf-methods generic-function)
 	(remove method (early-gf-methods generic-function)))
   (set-arg-info generic-function)
-  (unless (assoc (early-gf-name generic-function) *!generic-function-fixups*
+  (unless (assoc (!early-gf-name generic-function)
+		 *!generic-function-fixups*
 		 :test #'equal)
     (update-dfun generic-function)))
 
@@ -2063,9 +2065,9 @@ bootstrapping.
 	(set-methods gf methods))))
   (sb-int:/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
-;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument into
-;;; the 'real' arguments. This is where the syntax of DEFMETHOD is really
-;;; implemented.
+;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument
+;;; into the 'real' arguments. This is where the syntax of DEFMETHOD
+;;; is really implemented.
 (defun parse-defmethod (cdr-of-form)
   ;;(declare (values name qualifiers specialized-lambda-list body))
   (let ((name (pop cdr-of-form))
@@ -2107,7 +2109,6 @@ bootstrapping.
       (unparse-specializers (method-specializers specializers-or-method))))
 
 (defun parse-method-or-spec (spec &optional (errorp t))
-  ;;(declare (values generic-function method method-name))
   (let (gf method name temp)
     (if (method-p spec)	
 	(setq method spec
@@ -2181,10 +2182,11 @@ bootstrapping.
 		    and not allowing any parameter specializers to follow~%~
 		    to follow it."
 		   arg))
-	   ;; When we are at a lambda-list keyword, the parameters don't
-	   ;; include the lambda-list keyword; the lambda-list does include
-	   ;; the lambda-list keyword; and no specializers are allowed to
-	   ;; follow the lambda-list keywords (at least for now).
+	   ;; When we are at a lambda-list keyword, the parameters
+	   ;; don't include the lambda-list keyword; the lambda-list
+	   ;; does include the lambda-list keyword; and no
+	   ;; specializers are allowed to follow the lambda-list
+	   ;; keywords (at least for now).
 	   (multiple-value-bind (parameters lambda-list)
 	       (parse-specialized-lambda-list (cdr arglist) t)
 	     (values parameters
@@ -2210,10 +2212,10 @@ bootstrapping.
 (eval-when (:load-toplevel :execute)
   (setq *boot-state* 'early))
 
-;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET which used
-;;; %WALKER stuff. That suggests to me that maybe the code walker stuff was
-;;; only used for implementing stuff like that; maybe it's not needed any more?
-;;; Hunt down what it was used for and see.
+;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET
+;;; which used %WALKER stuff. That suggests to me that maybe the code
+;;; walker stuff was only used for implementing stuff like that; maybe
+;;; it's not needed any more? Hunt down what it was used for and see.
 
 (defmacro with-slots (slots instance &body body)
   (let ((in (gensym)))
@@ -2223,7 +2225,7 @@ bootstrapping.
 			     (third instance)
 			     instance)))
 	   (and (symbolp instance)
-		`((declare (variable-rebinding ,in ,instance)))))
+		`((declare (%variable-rebinding ,in ,instance)))))
        ,in
        (symbol-macrolet ,(mapcar #'(lambda (slot-entry)
 				     (let ((variable-name
@@ -2247,7 +2249,7 @@ bootstrapping.
 			     (third instance)
 			     instance)))
 	   (and (symbolp instance)
-		`((declare (variable-rebinding ,in ,instance)))))
+		`((declare (%variable-rebinding ,in ,instance)))))
        ,in
        (symbol-macrolet ,(mapcar #'(lambda (slot-entry)
 				   (let ((variable-name (car slot-entry))

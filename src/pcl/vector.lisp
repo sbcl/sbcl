@@ -63,7 +63,7 @@
 (defvar *slot-name-lists-inner* (make-hash-table :test 'equal))
 (defvar *slot-name-lists-outer* (make-hash-table :test 'equal))
 
-;entries in this are lists of (table . pv-offset-list)
+;;; Entries in this are lists of (table . pv-offset-list).
 (defvar *pv-key-to-pv-table-table* (make-hash-table :test 'equal))
 
 (defun intern-pv-table (&key slot-name-lists call-list)
@@ -250,9 +250,6 @@
 
 (defvar *pv-table-cache-update-info* nil)
 
-;called by:
-;(method shared-initialize :after (structure-class t))
-;update-slots
 (defun update-pv-table-cache-info (class)
   (let ((slot-names-for-pv-table-update nil)
 	(new-icui nil))
@@ -361,34 +358,24 @@
 		     (optimize-writer slots parameter gf-name form)))))
       (unless (and (consp (cadr form))
 		   (eq 'instance-accessor-parameter (caadr form)))
-	(or #||
-	    (cond ((and (= len 2) (symbolp fname))
-		   (let ((gf-name (gethash fname *gf-declared-reader-table*)))
-		     (when gf-name
-		       (maybe-optimize-reader))))
-		  ((= len 3)
-		   (let ((gf-name (gethash fname *gf-declared-writer-table*)))
-		     (when gf-name
-		       (maybe-optimize-writer)))))
-	    ||#
-	    (when (and (eq *boot-state* 'complete)
-		       (generic-function-p gf))
-	      (let ((methods (generic-function-methods gf)))
-		(when methods
-		  (let* ((gf-name (generic-function-name gf))
-			 (arg-info (gf-arg-info gf))
-			 (metatypes (arg-info-metatypes arg-info))
-			 (nreq (length metatypes))
-			 (applyp (arg-info-applyp arg-info)))
-		    (when (null applyp)
-		      (cond ((= nreq 1)
-			     (when (some #'standard-reader-method-p methods)
-			       (maybe-optimize-reader)))
-			    ((and (= nreq 2)
-				  (consp gf-name)
-				  (eq (car gf-name) 'setf))
-			     (when (some #'standard-writer-method-p methods)
-			       (maybe-optimize-writer))))))))))))))
+	(when (and (eq *boot-state* 'complete)
+		   (generic-function-p gf))
+	  (let ((methods (generic-function-methods gf)))
+	    (when methods
+	      (let* ((gf-name (generic-function-name gf))
+		     (arg-info (gf-arg-info gf))
+		     (metatypes (arg-info-metatypes arg-info))
+		     (nreq (length metatypes))
+		     (applyp (arg-info-applyp arg-info)))
+		(when (null applyp)
+		  (cond ((= nreq 1)
+			 (when (some #'standard-reader-method-p methods)
+			   (maybe-optimize-reader)))
+			((and (= nreq 2)
+			      (consp gf-name)
+			      (eq (car gf-name) 'setf))
+			 (when (some #'standard-writer-method-p methods)
+			   (maybe-optimize-writer)))))))))))))
 
 (defun optimize-generic-function-call (form
 				       required-parameters
@@ -398,24 +385,6 @@
   (declare (ignore required-parameters env slots calls))
   (or (and (eq (car form) 'make-instance)
 	   (expand-make-instance-form form))
-      #||
-      (maybe-expand-accessor-form form required-parameters slots env)
-      (let* ((fname (car form))
-	     (len (length form))
-	     (gf (if (symbolp fname)
-		     (and (fboundp fname)
-			  (unencapsulated-fdefinition fname))
-		     (and (gboundp fname)
-			  (gdefinition fname))))
-	     (gf-name (and (fsc-instance-p gf)
-			   (if (early-gf-p gf)
-			       (early-gf-name gf)
-			       (generic-function-name gf)))))
-	(when gf-name
-	  (multiple-value-bind (nreq restp)
-	      (get-generic-function-info gf)
-	    (optimize-gf-call slots calls form nreq restp env))))
-      ||#
       form))
 
 (defun can-optimize-access (form required-parameters env)
@@ -427,32 +396,32 @@
 	(slot-name (eval (caddr form)))) ; known to be constant
     (can-optimize-access1 var required-parameters env type slot-name)))
 
-;;; FIXME: This looks like an internal helper function for CAN-OPTIMIZE-ACCESS,
-;;; and it is used that way, but
-;;; it's also called bare from several places in the code. Perhaps
-;;; the two functions should be renamed fo CAN-OPTIMIZE-ACCESS-FOR-FORM
-;;; and CAN-OPTIMIZE-ACCESS-FOR-VAR. If so, I'd just as soon use keyword
+;;; FIXME: This looks like an internal helper function for
+;;; CAN-OPTIMIZE-ACCESS, and it is used that way, but it's also called
+;;; bare from several places in the code. Perhaps the two functions
+;;; should be renamed CAN-OPTIMIZE-ACCESS-FOR-FORM and
+;;; CAN-OPTIMIZE-ACCESS-FOR-VAR. If so, I'd just as soon use keyword
 ;;; args instead of optional ones, too.
 (defun can-optimize-access1 (var required-parameters env
 			     &optional type slot-name)
   (when (and (consp var) (eq 'the (car var)))
-    ;; FIXME: We should assert list of length 3 here. Or maybe we should just
-    ;; define EXTRACT-THE, replace the whole
+    ;; FIXME: We should assert list of length 3 here. Or maybe we
+    ;; should just define EXTRACT-THE, replace the whole
     ;;   (WHEN ..)
     ;; form with
     ;;   (AWHEN (EXTRACT-THE VAR)
     ;;     (SETF VAR IT))
-    ;; and then use EXTRACT-THE similarly to clean up the other tests against
-    ;; 'THE scattered through the PCL code.
+    ;; and then use EXTRACT-THE similarly to clean up the other tests
+    ;; against 'THE scattered through the PCL code.
     (setq var (caddr var)))
   (when (symbolp var)
-    (let* ((rebound? (caddr (variable-declaration 'variable-rebinding
+    (let* ((rebound? (caddr (variable-declaration '%variable-rebinding
 						  var
 						  env)))
 	   (parameter-or-nil (car (memq (or rebound? var)
 					required-parameters))))
       (when parameter-or-nil
-	(let* ((class-name (caddr (variable-declaration 'class
+	(let* ((class-name (caddr (variable-declaration '%class
 							parameter-or-nil
 							env)))
 	       (class (find-class class-name nil)))
@@ -490,19 +459,21 @@
 (defun optimize-slot-boundp (slots sparameter form)
   (if sparameter
       (destructuring-bind
-	  ;; FIXME: In CMU CL ca. 19991205, this binding list had a fourth
-	  ;; element in it, NEW-VALUE. It's hard to see how that could possibly
-	  ;; be right, since SLOT-BOUNDP has no NEW-VALUE. Since it was causing
-	  ;; a failure in building PCL for SBCL, so I changed it to match the
-	  ;; definition of SLOT-BOUNDP (and also to match the list used in the
-	  ;; similar OPTIMIZE-SLOT-VALUE, above). However, I'm weirded out by
-	  ;; this, since this is old code which has worked for ages to build
-	  ;; PCL for CMU CL, so it's hard to see why it should need a patch
-	  ;; like this in order to build PCL for SBCL. I'd like to return to
-	  ;; this and find a test case which exercises this function both in
-	  ;; CMU CL, to see whether it's really a previously-unexercised bug or
-	  ;; whether I've misunderstood something (and, presumably, patched it
-	  ;; wrong).
+	  ;; FIXME: In CMU CL ca. 19991205, this binding list had a
+	  ;; fourth element in it, NEW-VALUE. It's hard to see how
+	  ;; that could possibly be right, since SLOT-BOUNDP has no
+	  ;; NEW-VALUE. Since it was causing a failure in building PCL
+	  ;; for SBCL, so I changed it to match the definition of
+	  ;; SLOT-BOUNDP (and also to match the list used in the
+	  ;; similar OPTIMIZE-SLOT-VALUE, above). However, I'm weirded
+	  ;; out by this, since this is old code which has worked for
+	  ;; ages to build PCL for CMU CL, so it's hard to see why it
+	  ;; should need a patch like this in order to build PCL for
+	  ;; SBCL. I'd like to return to this and find a test case
+	  ;; which exercises this function both in CMU CL, to see
+	  ;; whether it's really a previously-unexercised bug or
+	  ;; whether I've misunderstood something (and, presumably,
+	  ;; patched it wrong).
 	  (slot-boundp-symbol instance slot-name-form)
 	  form
 	(declare (ignore slot-boundp-symbol instance))
@@ -526,10 +497,10 @@
 	(optimize-accessor-call slots :write sparameter gf-name new-value))
       form))
 
-;;; The SLOTS argument is an alist, the CAR of each entry is the name of
-;;; a required parameter to the function. The alist is in order, so the
-;;; position of an entry in the alist corresponds to the argument's position
-;;; in the lambda list.
+;;; The SLOTS argument is an alist, the CAR of each entry is the name
+;;; of a required parameter to the function. The alist is in order, so
+;;; the position of an entry in the alist corresponds to the
+;;; argument's position in the lambda list.
 (defun optimize-instance-access (slots
 				 read/write
 				 sparameter
@@ -603,7 +574,7 @@
 	     (eq (car form) 'the))
     (setq form (caddr form)))
   (or (and (symbolp form)
-	   (let* ((rebound? (caddr (variable-declaration 'variable-rebinding
+	   (let* ((rebound? (caddr (variable-declaration '%variable-rebinding
 							 form env)))
 		  (parameter-or-nil (car (assq (or rebound? form) slots))))
 	     (when parameter-or-nil
@@ -619,7 +590,7 @@
 	  *unspecific-arg*)))
 
 (defun optimize-gf-call (slots calls gf-call-form nreq restp env)
-  (unless (eq (car gf-call-form) 'make-instance) ; needs more work
+  (unless (eq (car gf-call-form) 'make-instance) ; XXX needs more work
     (let* ((args (cdr gf-call-form))
 	   (all-args-p (eq (car gf-call-form) 'make-instance))
 	   (non-required-args (nthcdr nreq args))
@@ -653,8 +624,8 @@
 (define-walker-template instance-accessor-parameter)
 (defmacro instance-accessor-parameter (x) x)
 
-;; It is safe for these two functions to be wrong.
-;; They just try to guess what the most likely case will be.
+;;; It is safe for these two functions to be wrong. They just try to
+;;; guess what the most likely case will be.
 (defun generate-fast-class-slot-access-p (class-form slot-name-form)
   (let ((class (and (constantp class-form) (eval class-form)))
 	(slot-name (and (constantp slot-name-form) (eval slot-name-form))))
@@ -671,7 +642,9 @@
 	 (standard-class-p class)
 	 (not (eq class *the-class-t*)) ; shouldn't happen, though.
 	 (let ((slotd (find-slot-definition class slot-name)))
-	   (and slotd (skip-optimize-slot-value-by-class-p class slot-name type))))))
+	   (and slotd (skip-optimize-slot-value-by-class-p class
+							   slot-name
+							   type))))))
 
 (defun skip-optimize-slot-value-by-class-p (class slot-name type)
   (let ((slotd (find-slot-definition class slot-name)))
@@ -786,18 +759,20 @@
 
 ;;; This magic function has quite a job to do indeed.
 ;;;
-;;; The careful reader will recall that <slots> contains all of the optimized
-;;; slot access forms produced by OPTIMIZE-INSTANCE-ACCESS. Each of these is
-;;; a call to either INSTANCE-READ or INSTANCE-WRITE.
+;;; The careful reader will recall that <slots> contains all of the
+;;; optimized slot access forms produced by OPTIMIZE-INSTANCE-ACCESS.
+;;; Each of these is a call to either INSTANCE-READ or INSTANCE-WRITE.
 ;;;
-;;; At the time these calls were produced, the first argument was specified as
-;;; the symbol .PV-OFFSET.; what we have to do now is convert those pv-offset
-;;; arguments into the actual number that is the correct offset into the pv.
+;;; At the time these calls were produced, the first argument was
+;;; specified as the symbol .PV-OFFSET.; what we have to do now is
+;;; convert those pv-offset arguments into the actual number that is
+;;; the correct offset into the pv.
 ;;;
-;;; But first, oh but first, we sort <slots> a bit so that for each argument we
-;;; have the slots in alphabetical order. This canonicalizes the PV-TABLE's a
-;;; bit and will hopefully lead to having fewer PV's floating around. Even if
-;;; the gain is only modest, it costs nothing.
+;;; But first, oh but first, we sort <slots> a bit so that for each
+;;; argument we have the slots in alphabetical order. This
+;;; canonicalizes the PV-TABLE's a bit and will hopefully lead to
+;;; having fewer PV's floating around. Even if the gain is only
+;;; modest, it costs nothing.
 (defun slot-name-lists-from-slots (slots calls)
   (multiple-value-bind (slots calls) (mutate-slots-and-calls slots calls)
     (let* ((slot-name-lists
@@ -880,19 +855,20 @@
 			(symbol-or-cons-lessp (car a) (car b))))))))
 
 (defun sort-slots (slots)
-  (mapcar #'(lambda (parameter-entry)
-	      (cons (car parameter-entry)
-		    (sort (cdr parameter-entry)	;slot entries
-			  #'symbol-or-cons-lessp
-			  :key #'car)))
+  (mapcar (lambda (parameter-entry)
+	    (cons (car parameter-entry)
+		  (sort (cdr parameter-entry)	;slot entries
+			#'symbol-or-cons-lessp
+			:key #'car)))
 	  slots))
 
 (defun sort-calls (calls)
   (sort calls #'symbol-or-cons-lessp :key #'car))
 
-;;; This needs to work in terms of metatypes and also needs to work for
-;;; automatically generated reader and writer functions.
-;;; -- Automatically generated reader and writer functions use this stuff too.
+;;;; This needs to work in terms of metatypes and also needs to work
+;;;; for automatically generated reader and writer functions.
+;;;; Automatically generated reader and writer functions use this
+;;;; stuff too.
 
 (defmacro pv-binding ((required-parameters slot-name-lists pv-table-symbol)
 		      &body body)
@@ -914,7 +890,7 @@
 	       slot-vars pv-parameters))
 	,@body)))
 
-;This gets used only when the default make-method-lambda is overriden.
+;;; This gets used only when the default MAKE-METHOD-LAMBDA is overridden.
 (defmacro pv-env ((pv calls pv-table-symbol pv-parameters)
 		  &rest forms)
   `(let* ((.pv-table. ,pv-table-symbol)
@@ -933,17 +909,17 @@
   ;; don't *think* CMU CL had, or SBCL has, VALUES declarations. If
   ;; SBCL doesn't have 'em, VALUES should probably be removed from
   ;; this list.
-  '(values method-name method-lambda-list
+  '(values %method-name %method-lambda-list
     optimize ftype inline notinline))
 
 (defvar *variable-declarations-with-argument*
-  '(class
+  '(%class
     type))
 
 (defvar *variable-declarations-without-argument*
   '(ignore
     ignorable special dynamic-extent
-    ;; FIXME: Possibly this entire list and variable should go away.
+    ;; FIXME: Possibly this entire list and variable could go away.
     ;; If not, certainly we should remove all these built-in typenames
     ;; from the list, and replace them with a test for "is it a type
     ;; name?" (CLTL1 allowed only built-in type names as declarations,
@@ -982,9 +958,12 @@
 			;; FIXME: This warning, and perhaps the
 			;; various *VARIABLE-DECLARATIONS-FOO* and/or
 			;; *NON-VARIABLE-DECLARATIONS* variables,
-			;; should probably go away now that we're not
+			;; could probably go away now that we're not
 			;; trying to be portable between different
-			;; CLTL1 hosts the way PCL was.
+			;; CLTL1 hosts the way PCL was. (Note that to
+			;; do this right, we need to be able to handle
+			;; user-defined (DECLAIM (DECLARATION FOO))
+			;; stuff.)
 			(warn "The declaration ~S is not understood by ~S.~@
 			       Please put ~S on one of the lists ~S,~%~S, or~%~S.~@
 			(Assuming it is a variable declaration without argument)."
@@ -1068,10 +1047,11 @@
 	     ,@body)))
 	',initargs))))
 
-;;; Use arrays and hash tables and the fngen stuff to make this much better. It
-;;; doesn't really matter, though, because a function returned by this will get
-;;; called only when the user explicitly funcalls a result of method-function.
-;;; BUT, this is needed to make early methods work.
+;;; Use arrays and hash tables and the fngen stuff to make this much
+;;; better. It doesn't really matter, though, because a function
+;;; returned by this will get called only when the user explicitly
+;;; funcalls a result of method-function. BUT, this is needed to make
+;;; early methods work.
 (defun method-function-from-fast-function (fmf)
   (declare (type function fmf))
   (let* ((method-function nil) (pv-table nil)

@@ -27,26 +27,21 @@
 (in-package "SB-PCL")
 
 (declaim (declaration
-	  ;; FIXME: Since none of these are supported in SBCL, the
-	  ;; declarations using them are just noise now that this is
-	  ;; not a portable package any more, and could be deleted.
-	  values			; I use this so that Zwei can remind
-					; me what values a function returns.
-	  arglist			; Tells me what the pretty arglist
-					; of something (which probably takes
-					; &REST args) is.
-	  indentation			; Tells ZWEI how to indent things
-					; like DEFCLASS.
-	  class
-	  variable-rebinding
-	  pcl-fast-call
-	  method-name
-	  method-lambda-list))
+	  ;; These three nonstandard declarations seem to be used
+	  ;; privately within PCL itself to pass information around,
+	  ;; so we can't just delete them.
+	  %class
+	  %method-name
+	  %method-lambda-list
+	  ;; This declaration may also be used within PCL to pass
+	  ;; information around, I'm not sure. -- WHN 2000-12-30
+	  %variable-rebinding))
 
-;;; These are age-old functions which CommonLisp cleaned-up away. They
-;;; probably exist in other packages in all CommonLisp
-;;; implementations, but I will leave it to the compiler to optimize
-;;; into calls to them.
+;;; comment from CMU CL PCL:
+;;;   These are age-old functions which CommonLisp cleaned-up away. They
+;;;   probably exist in other packages in all CommonLisp
+;;;   implementations, but I will leave it to the compiler to optimize
+;;;   into calls to them.
 ;;;
 ;;; FIXME: MEMQ, ASSQ, and DELQ are already defined in SBCL, and we should
 ;;; use those. POSQ and NEQ aren't defined in SBCL, and are used too often
@@ -59,16 +54,16 @@
 (defmacro posq (item list) `(position ,item ,list :test #'eq))
 (defmacro neq (x y) `(not (eq ,x ,y)))
 
-;;; FIXME: Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and CONSTANTLY-0,
-;;; and boost them up to SB-INT.
+;;; FIXME: Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and
+;;; CONSTANTLY-0, and boost them up to SB-INT.
 (defun true (&rest ignore) (declare (ignore ignore)) t)
 (defun false (&rest ignore) (declare (ignore ignore)) nil)
 (defun zero (&rest ignore) (declare (ignore ignore)) 0)
 
-;;; ONCE-ONLY does the same thing as it does in zetalisp. I should
-;;; have just lifted it from there but I am honest. Not only that but
-;;; this one is written in Common Lisp. I feel a lot like
-;;; bootstrapping, or maybe more like rebuilding Rome.
+;;; comment from original CMU CL PCL: ONCE-ONLY does the same thing as
+;;; it does in zetalisp. I should have just lifted it from there but I
+;;; am honest. Not only that but this one is written in Common Lisp. I
+;;; feel a lot like bootstrapping, or maybe more like rebuilding Rome.
 ;;;
 ;;; FIXME: We should only need one ONCE-ONLY in SBCL, and there's one
 ;;; in SB-INT already. Can we use only one of these in both places?
@@ -130,8 +125,6 @@
 	    body)))
 ) ; EVAL-WHEN
 
-;;; FIXME: This seems to only be used to get 'METHOD-NAME and
-;;; METHOD-LAMBDA-LIST declarations. They aren't ANSI. Are they important?
 (defun get-declaration (name declarations &optional default)
   (dolist (d declarations default)
     (dolist (form (cdr d))
@@ -201,11 +194,6 @@
 ;;;; distinct from PCL:FIND-CLASS, alas. -- WHN 19991203
 
 (defvar *find-class* (make-hash-table :test 'eq))
-
-(defun make-constant-function (value)
-  #'(lambda (object)
-      (declare (ignore object))
-      value))
 
 (defun function-returning-nil (x)
   (declare (ignore x))

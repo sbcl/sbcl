@@ -497,8 +497,8 @@
 	   (ecase (fits-on-line-p stream (block-start-section-end next)
 				  force-newlines-p)
 	     ((t)
-	      ;; Just nuke the whole logical block and make it look like one
-	      ;; nice long literal.
+	      ;; Just nuke the whole logical block and make it look
+	      ;; like one nice long literal.
 	      (let ((end (block-start-block-end next)))
 		(expand-tabs stream end)
 		(setf tail (cdr (member end tail)))))

@@ -1013,7 +1013,7 @@
 ;;; Call a function with some arguments popped off of the interpreter
 ;;; stack, and restore the SP to the specifier value.
 (defun byte-apply (function num-args restore-sp)
-  (declare (function function) (type index num-args))
+  (declare (type function function) (type index num-args))
   (let ((start (- (current-stack-pointer) num-args)))
     (declare (type stack-pointer start))
     (macrolet ((frob ()

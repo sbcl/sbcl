@@ -833,17 +833,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 72:
   (DECLAIM (OPTIMIZE ..)) doesn't work properly inside LOCALLY forms.
 
-73:
-  PROCLAIM and DECLAIM don't recognize the ANSI abbreviated type
-  declaration syntax for user-defined types, although DECLARE does.
-  E.g.
-	(deftype foo () '(integer 3 19))
-	(defvar *foo*)
-	(declaim (foo *foo*)) ; generates warning
-	(defun foo+ (x y)
-	  (declare (foo x y)) ; works OK
-	  (+ x y))
-
 74:
   As noted in the ANSI specification for COERCE, (COERCE 3 'COMPLEX)
   gives a result which isn't COMPLEX. The result type optimizer

@@ -189,8 +189,8 @@
 	(t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
-  ;; Set sane values again, so that the user sees sane values instead of
-  ;; whatever is left over from the last DECLAIM/PROCLAIM.
+  ;; Set sane values again, so that the user sees sane values instead
+  ;; of whatever is left over from the last DECLAIM/PROCLAIM.
   (show-and-call !policy-cold-init-or-resanify)
 
   ;; Only do this after toplevel forms have run, 'cause that's where

@@ -19,11 +19,6 @@
 ;;; a test that the host Lisp object OBJECT translates to a target SBCL
 ;;; type TYPE. (This behavior is needed e.g. to test for the validity of
 ;;; numeric subtype bounds read when cross-compiling.)
-;;;
-;;; KLUDGE: In classic CMU CL this was wrapped in a (DECLAIM (START-BLOCK
-;;; TYPEP %TYPEP CLASS-CELL-TYPEP)) to make calls efficient. Once I straighten
-;;; out bootstrapping and cross-compiling issues it'd likely be a good idea to
-;;; do this again. -- WHN 19990413
 (defun typep (object type)
   #!+sb-doc
   "Return T iff OBJECT is of type TYPE."

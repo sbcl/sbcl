@@ -446,6 +446,8 @@
 
 (defmethod shared-initialize :before ((class class) slot-names &key name)
   (declare (ignore slot-names name))
+  ;; FIXME: Could this just be CLASS instead of `(CLASS ,CLASS)? If not,
+  ;; why not? (See also similar expression in !BOOTSTRAP-INITIALIZE-CLASS.)
   (setf (slot-value class 'type) `(class ,class))
   (setf (slot-value class 'class-eq-specializer)
 	(make-instance 'class-eq-specializer :class class)))

@@ -800,7 +800,7 @@
 ;;; If a lambda-var being bound, we intersect the type with the vars
 ;;; type, otherwise we add a type-restriction on the var. If a symbol
 ;;; macro, we just wrap a THE around the expansion.
-(defun process-type-declaration (decl res vars)
+(defun process-type-decl (decl res vars)
   (declare (list decl vars) (type lexenv res))
   (let ((type (specifier-type (first decl))))
     (collect ((restr nil cons)
@@ -843,12 +843,12 @@
 		       :variables (new-vars))
 	  res))))
 
-;;; Somewhat similar to Process-Type-Declaration, but handles
+;;; This is somewhat similar to PROCESS-TYPE-DECL, but handles
 ;;; declarations for function variables. In addition to allowing
 ;;; declarations for functions being bound, we must also deal with
 ;;; declarations that constrain the type of lexically apparent
 ;;; functions.
-(defun process-ftype-declaration (spec res names fvars)
+(defun process-ftype-decl (spec res names fvars)
   (declare (list spec names fvars) (type lexenv res))
   (let ((type (specifier-type spec)))
     (collect ((res nil cons))
@@ -871,7 +871,7 @@
 ;;; Process a special declaration, returning a new LEXENV. A non-bound
 ;;; special declaration is instantiated by throwing a special variable
 ;;; into the variables.
-(defun process-special-declaration (spec res vars)
+(defun process-special-decl (spec res vars)
   (declare (list spec vars) (type lexenv res))
   (collect ((new-venv nil cons))
     (dolist (name (cdr spec))
@@ -915,7 +915,7 @@
 
 ;;; Parse an inline/notinline declaration. If it's a local function we're
 ;;; defining, set its INLINEP. If a global function, add a new FENV entry.
-(defun process-inline-declaration (spec res fvars)
+(defun process-inline-decl (spec res fvars)
   (let ((sense (cdr (assoc (first spec) *inlinep-translations* :test #'eq)))
 	(new-fenv ()))
     (dolist (name (rest spec))
@@ -952,7 +952,7 @@
 
 ;;; Process an ignore/ignorable declaration, checking for various losing
 ;;; conditions.
-(defun process-ignore-declaration (spec vars fvars)
+(defun process-ignore-decl (spec vars fvars)
   (declare (list spec vars fvars))
   (dolist (name (rest spec))
     (let ((var (find-in-bindings-or-fbindings name vars fvars)))
@@ -985,71 +985,52 @@
   #!+sb-doc
   "If true, processing of the VALUES declaration is inhibited.")
 
-;;; Process a single declaration spec, agumenting the specified LEXENV
-;;; Res and returning it as a result. Vars and Fvars are as described in
+;;; Process a single declaration spec, augmenting the specified LEXENV
+;;; RES and returning it as a result. VARS and FVARS are as described in
 ;;; PROCESS-DECLS.
-(defun process-1-declaration (spec res vars fvars cont)
+(defun process-1-decl (raw-spec res vars fvars cont)
   (declare (list spec vars fvars) (type lexenv res) (type continuation cont))
-  (case (first spec)
-    (special (process-special-declaration spec res vars))
-    (ftype
-     (unless (cdr spec)
-       (compiler-error "No type specified in FTYPE declaration: ~S" spec))
-     (process-ftype-declaration (second spec) res (cddr spec) fvars))
-    (function
-     ;; Handle old style FUNCTION declaration, which is an abbreviation for
-     ;; FTYPE. Args are name, arglist, result type.
-     (cond ((and (proper-list-of-length-p spec 3 4)
-		 (listp (third spec)))
-	    (process-ftype-declaration `(function ,@(cddr spec)) res
-				       (list (second spec))
-				       fvars))
-	   (t
-	    (process-type-declaration spec res vars))))
-    ((inline notinline maybe-inline)
-     (process-inline-declaration spec res fvars))
-    ((ignore ignorable)
-     (process-ignore-declaration spec vars fvars)
-     res)
-    (optimize
-     (make-lexenv
-      :default res
-      :policy (process-optimize-declaration spec (lexenv-policy res))))
-    (optimize-interface
-     (make-lexenv
-      :default res
-      :interface-policy (process-optimize-declaration
-			 spec
-			 (lexenv-interface-policy res))))
-    (type
-     (process-type-declaration (cdr spec) res vars))
-    (values
-     (if *suppress-values-declaration*
-	 res
-	 (let ((types (cdr spec)))
-	   (do-the-stuff (if (eql (length types) 1)
-			     (car types)
-			     `(values ,@types))
-			 cont res 'values))))
-    (dynamic-extent
-     (when (policy nil (> speed inhibit-warnings))
-       (compiler-note
-	"The DYNAMIC-EXTENT declaration is not implemented (ignored)."))
-     res)
-    (t
-     (let ((what (first spec)))
-       (cond ((member what *standard-type-names*)
-	      (process-type-declaration spec res vars))
-	     ((and (not (and (symbolp what)
-			     (string= (symbol-name what) "CLASS"))) ; pcl hack
-		   (or (info :type :kind what)
-		       (and (consp what) (info :type :translator (car what)))))
-	      (process-type-declaration spec res vars))
-	     ((info :declaration :recognized what)
-	      res)
-	     (t
-	      (compiler-warning "unrecognized declaration ~S" spec)
-	      res))))))
+  (let ((spec (canonized-decl-spec raw-spec)))
+    (case (first spec)
+      (special (process-special-decl spec res vars))
+      (ftype
+       (unless (cdr spec)
+	 (compiler-error "No type specified in FTYPE declaration: ~S" spec))
+       (process-ftype-decl (second spec) res (cddr spec) fvars))
+      ((inline notinline maybe-inline)
+       (process-inline-decl spec res fvars))
+      ((ignore ignorable)
+       (process-ignore-decl spec vars fvars)
+       res)
+      (optimize
+       (make-lexenv
+	:default res
+	:policy (process-optimize-decl spec (lexenv-policy res))))
+      (optimize-interface
+       (make-lexenv
+	:default res
+	:interface-policy (process-optimize-decl
+			   spec
+			   (lexenv-interface-policy res))))
+      (type
+       (process-type-decl (cdr spec) res vars))
+      (values
+       (if *suppress-values-declaration*
+	   res
+	   (let ((types (cdr spec)))
+	     (do-the-stuff (if (eql (length types) 1)
+			       (car types)
+			       `(values ,@types))
+			   cont res 'values))))
+      (dynamic-extent
+       (when (policy nil (> speed inhibit-warnings))
+	 (compiler-note
+	  "The DYNAMIC-EXTENT declaration is not implemented (ignored)."))
+       res)
+      (t
+       (unless (info :declaration :recognized (first spec))
+	 (compiler-warning "unrecognized declaration ~S" raw-spec))
+       res))))
 
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
 ;;; and FUNCTIONAL structures which are being bound. In addition to
@@ -1068,10 +1049,10 @@
 	(compiler-error "malformed declaration specifier ~S in ~S"
 			spec
 			decl))
-      (setq env (process-1-declaration spec env vars fvars cont))))
+      (setq env (process-1-decl spec env vars fvars cont))))
   env)
 
-;;; Return the Specvar for Name to use when we see a local SPECIAL
+;;; Return the SPECVAR for NAME to use when we see a local SPECIAL
 ;;; declaration. If there is a global variable of that name, then
 ;;; check that it isn't a constant and return it. Otherwise, create an
 ;;; anonymous GLOBAL-VAR.

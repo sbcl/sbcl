@@ -46,21 +46,20 @@
 	     need to get a fresh lisp (reboot) and then load PCL."))
   ) ; EVAL-WHEN
 
-;;; This is like fdefinition on the Lispm. If Common Lisp had something like
-;;; function specs I wouldn't need this. On the other hand, I don't like the
-;;; way this really works so maybe function specs aren't really right either?
-;;;
-;;; I also don't understand the real implications of a Lisp-1 on this sort of
-;;; thing. Certainly some of the lossage in all of this is because these
-;;; SPECs name global definitions.
-;;;
-;;; Note that this implementation is set up so that an implementation which
-;;; has a 'real' function spec mechanism can use that instead and in that way
-;;; get rid of setf generic function names.
+;;; comments from CMU CL version of PCL:
+;;;     This is like fdefinition on the Lispm. If Common Lisp had
+;;;   something like function specs I wouldn't need this. On the other
+;;;   hand, I don't like the way this really works so maybe function
+;;;   specs aren't really right either?
+;;;     I also don't understand the real implications of a Lisp-1 on this
+;;;   sort of thing. Certainly some of the lossage in all of this is
+;;;   because these SPECs name global definitions.
+;;;     Note that this implementation is set up so that an implementation
+;;;   which has a 'real' function spec mechanism can use that instead
+;;;   and in that way get rid of setf generic function names.
 (defmacro parse-gspec (spec
 		       (non-setf-var . non-setf-case)
 		       (setf-var . setf-case))
-  (declare (indentation 1 1))
   #+setf (declare (ignore setf-var setf-case))
   (once-only (spec)
     `(cond (#-setf (symbolp ,spec) #+setf t
@@ -384,17 +383,17 @@
 	(push (list class-name symbol) *built-in-wrapper-symbols*)
 	symbol)))
 
-(pushnew 'class *variable-declarations*)
-(pushnew 'variable-rebinding *variable-declarations*)
+(pushnew '%class *variable-declarations*)
+(pushnew '%variable-rebinding *variable-declarations*)
 
 (defun variable-class (var env)
   (caddr (variable-declaration 'class var env)))
 
 (defvar *name->class->slotd-table* (make-hash-table))
 
-;;; This is used by combined methods to communicate the next methods to
-;;; the methods they call. This variable is captured by a lexical variable
-;;; of the methods to give it the proper lexical scope.
+;;; This is used by combined methods to communicate the next methods
+;;; to the methods they call. This variable is captured by a lexical
+;;; variable of the methods to give it the proper lexical scope.
 (defvar *next-methods* nil)
 
 (defvar *not-an-eql-specializer* '(not-an-eql-specializer))

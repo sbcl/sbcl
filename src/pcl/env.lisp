@@ -48,7 +48,7 @@
 ;;;   You can also provide a method object in the place of the method
 ;;;   spec, in which case that method object will be traced.
 ;;;
-;;; For untrace-method, if an argument is given, that method is untraced.
+;;; For UNTRACE-METHOD, if an argument is given, that method is untraced.
 ;;; If no argument is given, all traced methods are untraced.
 (defclass traced-method (method)
      ((method :initarg :method)
@@ -107,41 +107,6 @@
   (eval `(trace ,name ,@options))
   (symbol-function name))
 |#
-
-;(defun compile-method (spec)
-;  (multiple-value-bind (gf method name)
-;      (parse-method-or-spec spec)
-;    (declare (ignore gf))
-;    (compile name (method-function method))
-;    (setf (method-function method) (symbol-function name))))
-
-;;; not used in SBCL
-#|
-(defmacro undefmethod (&rest args)
-  (declare (arglist name {method-qualifier}* specializers))
-  `(undefmethod-1 ',args))
-
-(defun undefmethod-1 (args)
-  (multiple-value-bind (gf method)
-      (parse-method-or-spec args)
-    (when (and gf method)
-      (remove-method gf method)
-      method)))
-|#
-
-;;; FIXME: Delete these.
-#|
-(pushnew :pcl *features*)
-(pushnew :portable-commonloops *features*)
-(pushnew :pcl-structures *features*)
-|#
-
-;;; FIXME: This was for some unclean bootstrapping thing we don't
-;;; need in SBCL, right? So we can delete it, right?
-;;; #+cmu
-;;; (when (find-package "OLD-PCL")
-;;;   (setf (symbol-function (find-symbol "PRINT-OBJECT" :old-pcl))
-;;;	(symbol-function 'sb-pcl::print-object)))
 
 ;;;; MAKE-LOAD-FORM
 

@@ -144,8 +144,6 @@
 
 (defmacro !define-type-method ((class method &rest more-methods)
 			      lambda-list &body body)
-  #!+sb-doc
-  "DEFINE-TYPE-METHOD (Class-Name Method-Name+) Lambda-List Form*"
   (let ((name (symbolicate CLASS "-" method "-TYPE-METHOD")))
     `(progn
        (defun ,name ,lambda-list ,@body)

@@ -499,27 +499,16 @@
 	       (arg0-p (funcall function arg0))
 	       (t (funcall function))))))
 
-(defun constantly (value &optional (val1 nil val1-p) (val2 nil val2-p)
-			 &rest more-values)
+(defun constantly (value)
   #!+sb-doc
-  "Builds a function that always returns VALUE, and possibly MORE-VALUES."
-  (cond (more-values
-	 (let ((list (list* value val1 val2 more-values)))
-	   (lambda ()
-	     (declare (optimize-interface (speed 3) (safety 0)))
-	     (values-list list))))
-	(val2-p
-	 (lambda ()
-	   (declare (optimize-interface (speed 3) (safety 0)))
-	   (values value val1 val2)))
-	(val1-p
-	 (lambda ()
-	   (declare (optimize-interface (speed 3) (safety 0)))
-	   (values value val1)))
-	(t
-	 (lambda ()
-	   (declare (optimize-interface (speed 3) (safety 0)))
-	   value))))
+  "Return a function that always returns VALUE."
+  (lambda ()
+    ;; KLUDGE: This declaration is a hack to make the closure ignore
+    ;; all its arguments without consing a &REST list or anything.
+    ;; Perhaps once DYNAMIC-EXTENT is implemented we won't need to
+    ;; screw around with this kind of thing.
+    (declare (optimize-interface (speed 3) (safety 0)))
+    value))
 
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 

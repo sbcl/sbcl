@@ -638,7 +638,7 @@
 ;;; always of the desired class. The second result is any existing
 ;;; LAYOUT for this name.
 (defun insured-find-class (name predicate constructor)
-  (declare (function predicate constructor))
+  (declare (type function predicate constructor))
   (let* ((old (sb!xc:find-class name nil))
 	 (res (if (and old (funcall predicate old))
 		  old

@@ -26,9 +26,9 @@
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s :type t)
 			       (prin1 (namestring (fasl-file-stream x)) s)))))
-  ;; The stream we dump to.
+  ;; the stream we dump to
   (stream (required-argument) :type stream)
-  ;; Hashtables we use to keep track of dumped constants so that we
+  ;; hashtables we use to keep track of dumped constants so that we
   ;; can get them from the table rather than dumping them again. The
   ;; EQUAL-TABLE is used for lists and strings, and the EQ-TABLE is
   ;; used for everything else. We use a separate EQ table to avoid
@@ -37,7 +37,7 @@
   ;; the EQ table.
   (equal-table (make-hash-table :test 'equal) :type hash-table)
   (eq-table (make-hash-table :test 'eq) :type hash-table)
-  ;; The table's current free pointer: the next offset to be used.
+  ;; the table's current free pointer: the next offset to be used
   (table-free 0 :type index)
   ;; an alist (PACKAGE . OFFSET) of the table offsets for each package
   ;; we have currently located.
@@ -111,10 +111,10 @@
     (dotimes (i 4)
       (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
 
-;;; Dump NUM to the fasl stream, represented by N bytes. This works for either
-;;; signed or unsigned integers. There's no range checking -- if you don't
-;;; specify enough bytes for the number to fit, this function cheerfully
-;;; outputs the low bytes.
+;;; Dump NUM to the fasl stream, represented by N bytes. This works
+;;; for either signed or unsigned integers. There's no range checking
+;;; -- if you don't specify enough bytes for the number to fit, this
+;;; function cheerfully outputs the low bytes.
 (defun dump-integer-as-n-bytes  (num bytes file)
   (declare (integer num) (type index bytes) (type fasl-file file))
   (do ((n num (ash n -8))
@@ -124,23 +124,22 @@
     (dump-byte (logand n #xff) file))
   (values))
 
-;;; Setting this variable to an (UNSIGNED-BYTE 32) value causes DUMP-FOP to use
-;;; it as a counter and emit a FOP-NOP4 with the counter value before every
-;;; ordinary fop. This can make it easier to follow the progress of FASLOAD
-;;; when debugging/testing/experimenting.
-#!+sb-show (defvar *fop-nop4-count* 0)
+;;; Setting this variable to an (UNSIGNED-BYTE 32) value causes
+;;; DUMP-FOP to use it as a counter and emit a FOP-NOP4 with the
+;;; counter value before every ordinary fop. This can make it easier
+;;; to follow the progress of FASLOAD when
+;;; debugging/testing/experimenting.
+#!+sb-show (defvar *fop-nop4-count* nil)
 #!+sb-show (declaim (type (or (unsigned-byte 32) null) *fop-nop4-count*))
-;;; FIXME: The default value here should become NIL once I get the system to
-;;; run.
 
 ;;; Dump the FOP code for the named FOP to the specified fasl-file.
 ;;;
-;;; FIXME: This should be a function, with a compiler macro expansion for the
-;;; common constant-FS case. (Among other things, that'll stop it from
-;;; EVALing ,FILE multiple times.)
+;;; FIXME: This should be a function, with a compiler macro expansion
+;;; for the common constant-FS case. (Among other things, that'll stop
+;;; it from EVALing ,FILE multiple times.)
 ;;;
-;;; FIXME: Compiler macros, frozen classes, inlining, and similar optimizations
-;;; should be conditional on #!+SB-FROZEN.
+;;; FIXME: Compiler macros, frozen classes, inlining, and similar
+;;; optimizations should be conditional on #!+SB-FROZEN.
 (defmacro dump-fop (fs file)
   (let* ((fs (eval fs))
 	 (val (get fs 'sb!impl::fop-code)))
@@ -153,11 +152,11 @@
 	 (dump-byte ',val ,file))
       (error "compiler bug: ~S is not a legal fasload operator." fs))))
 
-;;; Dump a FOP-Code along with an integer argument, choosing the FOP based
-;;; on whether the argument will fit in a single byte.
+;;; Dump a FOP-Code along with an integer argument, choosing the FOP
+;;; based on whether the argument will fit in a single byte.
 ;;;
-;;; FIXME: This, like DUMP-FOP, should be a function with a compiler-macro
-;;; expansion.
+;;; FIXME: This, like DUMP-FOP, should be a function with a
+;;; compiler-macro expansion.
 (defmacro dump-fop* (n byte-fop word-fop file)
   (once-only ((n-n n)
 	      (n-file file))
@@ -457,7 +456,8 @@
 
 ;;;; LOAD-TIME-VALUE and MAKE-LOAD-FORM support
 
-;;; Emit a funcall of the function and return the handle for the result.
+;;; Emit a funcall of the function and return the handle for the
+;;; result.
 (defun fasl-dump-load-time-value-lambda (fun file)
   (declare (type clambda fun) (type fasl-file file))
   (let ((handle (gethash (leaf-info fun) (fasl-file-entry-table file))))
@@ -467,8 +467,8 @@
     (dump-byte 0 file))
   (dump-pop file))
 
-;;; Return T iff CONSTANT has not already been dumped. It's been dumped
-;;; if it's in the EQ table.
+;;; Return T iff CONSTANT has not already been dumped. It's been
+;;; dumped if it's in the EQ table.
 (defun fasl-constant-already-dumped (constant file)
   (if (or (gethash constant (fasl-file-eq-table file))
 	  (gethash constant (fasl-file-valid-structures file)))
@@ -484,8 +484,8 @@
     (setf (gethash constant table) handle))
   (values))
 
-;;; Note that the specified structure can just be dumped by enumerating the
-;;; slots.
+;;; Note that the specified structure can just be dumped by
+;;; enumerating the slots.
 (defun fasl-validate-structure (structure file)
   (setf (gethash structure (fasl-file-valid-structures file)) t)
   (values))
@@ -569,12 +569,13 @@
 ;;;; symbol dumping
 
 ;;; Return the table index of PKG, adding the package to the table if
-;;; necessary. During cold load, we read the string as a normal string so that
-;;; we can do the package lookup at cold load time.
+;;; necessary. During cold load, we read the string as a normal string
+;;; so that we can do the package lookup at cold load time.
 ;;;
-;;; KLUDGE: Despite the parallelism in names, the functionality of this
-;;; function is not parallel to other functions DUMP-FOO, e.g. DUMP-SYMBOL
-;;; and DUMP-LIST. -- WHN 19990119
+;;; FIXME: Despite the parallelism in names, the functionality of
+;;; this function is not parallel to other functions DUMP-FOO, e.g.
+;;; DUMP-SYMBOL and DUMP-LIST. The mapping between names and behavior
+;;; should be made more consistent.
 (defun dump-package (pkg file)
   (declare (type package pkg) (type fasl-file file) (values index)
 	   (inline assoc))
@@ -668,7 +669,8 @@
 	 (dump-fop 'sb!impl::fop-list* file)
 	 (dump-byte 255 file)))))
 
-;;; If N > 255, must build list with one list operator, then list* operators.
+;;; If N > 255, must build list with one LIST operator, then LIST*
+;;; operators.
 
 (defun terminate-undotted-list (n file)
   (declare (type index n) (type fasl-file file))
@@ -702,8 +704,9 @@
       (dump-vector x file)
       (dump-multi-dim-array x file)))
 
-;;; Dump the vector object. If it's not simple, then actually dump a simple
-;;; version of it. But we enter the original in the EQ or EQUAL tables.
+;;; Dump the vector object. If it's not simple, then actually dump a
+;;; simple version of it. But we enter the original in the EQ or EQUAL
+;;; tables.
 (defun dump-vector (x file)
   (let ((simple-version (if (array-header-p x)
 			    (coerce x 'simple-array)
@@ -788,10 +791,11 @@
 		     (t ; harder cases, not supported in cross-compiler
 		      (dump-raw-bytes vec bytes file))))
 	     (dump-signed-vector (size bytes)
-	       ;; Note: Dumping specialized signed vectors isn't supported in
-	       ;; the cross-compiler. (All cases here end up trying to call
-	       ;; DUMP-RAW-BYTES, which isn't provided in the cross-compilation
-	       ;; host, only on the target machine.)
+	       ;; Note: Dumping specialized signed vectors isn't
+	       ;; supported in the cross-compiler. (All cases here end
+	       ;; up trying to call DUMP-RAW-BYTES, which isn't
+	       ;; provided in the cross-compilation host, only on the
+	       ;; target machine.)
 	       (unless data-only
 		 (dump-fop 'sb!impl::fop-signed-int-vector file)
 		 (dump-unsigned-32 len file)
@@ -914,11 +918,12 @@
       (error "internal error, code-length=~D, nwritten=~D"
 	     code-length
 	     nwritten)))
-  ;; KLUDGE: It's not clear what this is trying to do, but it looks as though
-  ;; it's an implicit undocumented dependence on a 4-byte wordsize which could
-  ;; be painful in porting. Note also that there are other undocumented
-  ;; modulo-4 things scattered throughout the code and conditionalized
-  ;; with GENGC, and I don't know what those do either. -- WHN 19990323
+  ;; KLUDGE: It's not clear what this is trying to do, but it looks as
+  ;; though it's an implicit undocumented dependence on a 4-byte
+  ;; wordsize which could be painful in porting. Note also that there
+  ;; are other undocumented modulo-4 things scattered throughout the
+  ;; code and conditionalized with GENGC, and I don't know what those
+  ;; do either. -- WHN 19990323
   #!+gengc (unless (zerop (logand code-length 3))
 	     (dotimes (i (- 4 (logand code-length 3)))
 	       (dump-byte 0 fasl-file)))
@@ -932,19 +937,19 @@
   (declare (list fixups) (type fasl-file fasl-file))
   (dolist (info fixups)
     ;; FIXME: Packing data with LIST in NOTE-FIXUP and unpacking them
-    ;; with FIRST, SECOND, and THIRD here is hard to follow and maintain.
-    ;; Perhaps we could define a FIXUP-INFO structure to use instead, and
-    ;; rename *FIXUPS* to *FIXUP-INFO-LIST*?
+    ;; with FIRST, SECOND, and THIRD here is hard to follow and
+    ;; maintain. Perhaps we could define a FIXUP-INFO structure to use
+    ;; instead, and rename *FIXUPS* to *FIXUP-INFO-LIST*?
     (let* ((kind (first info))
 	   (fixup (second info))
 	   (name (fixup-name fixup))
 	   (flavor (fixup-flavor fixup))
 	   (offset (third info)))
-      ;; FIXME: This OFFSET is not what's called OFFSET in
-      ;; the FIXUP structure, it's what's called POSN in NOTE-FIXUP.
-      ;; (As far as I can tell, FIXUP-OFFSET is not actually an offset,
-      ;; it's an internal label used instead of NAME for :CODE-OBJECT
-      ;; fixups. Notice that in the :CODE-OBJECT case, NAME is ignored.)
+      ;; FIXME: This OFFSET is not what's called OFFSET in the FIXUP
+      ;; structure, it's what's called POSN in NOTE-FIXUP. (As far as
+      ;; I can tell, FIXUP-OFFSET is not actually an offset, it's an
+      ;; internal label used instead of NAME for :CODE-OBJECT fixups.
+      ;; Notice that in the :CODE-OBJECT case, NAME is ignored.)
       (dump-fop 'sb!impl::fop-normal-load fasl-file)
       (let ((*cold-load-dump* t))
 	(dump-object kind fasl-file))
@@ -977,12 +982,13 @@
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
 ;;;
-;;; The only tricky thing is handling constant-pool references to functions.
-;;; If we have already dumped the function, then we just push the code pointer.
-;;; Otherwise, we must create back-patching information so that the constant
-;;; will be set when the function is eventually dumped. This is a bit awkward,
-;;; since we don't have the handle for the code object being dumped while we
-;;; are dumping its constants.
+;;; The only tricky thing is handling constant-pool references to
+;;; functions. If we have already dumped the function, then we just
+;;; push the code pointer. Otherwise, we must create back-patching
+;;; information so that the constant will be set when the function is
+;;; eventually dumped. This is a bit awkward, since we don't have the
+;;; handle for the code object being dumped while we are dumping its
+;;; constants.
 ;;;
 ;;; We dump trap objects in any unused slots or forward referenced slots.
 (defun dump-code-object (component
@@ -1017,9 +1023,12 @@
 
       ;; Dump the offset of the trace table.
       (dump-object code-length fasl-file)
-      ;; KLUDGE: Now that we don't have GENGC, the trace table is hardwired
-      ;; to be empty. Could we get rid of trace tables? What are the
-      ;; virtues of GENGC vs. GENCGC vs. whatnot?
+      ;; FIXME: As long as we don't have GENGC, the trace table is
+      ;; hardwired to be empty. So we might be able to get rid of
+      ;; trace tables? However, we should probably wait for the first
+      ;; port to a system where CMU CL uses GENGC to see whether GENGC
+      ;; is really gone. (I.e. maybe other non-X86 ports will want to
+      ;; use it, just as in CMU CL.)
 
       ;; Dump the constants, noting any :entries that have to be fixed up.
       (do ((i sb!vm:code-constants-offset (1+ i)))
@@ -1072,14 +1081,14 @@
 	       (dump-unsigned-32 num-consts fasl-file)
 	       (dump-unsigned-32 total-length fasl-file))))
 
-      ;; These two dumps are only ones which contribute to our TOTAL-LENGTH
-      ;; value.
+      ;; These two dumps are only ones which contribute to our
+      ;; TOTAL-LENGTH value.
       (dump-segment code-segment code-length fasl-file)
       (dump-i-vector packed-trace-table fasl-file :data-only t)
 
-      ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it dumps aren't
-      ;; included in the TOTAL-LENGTH passed to our FOP-CODE/FOP-SMALL-CODE
-      ;; fop.
+      ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it
+      ;; dumps aren't included in the TOTAL-LENGTH passed to our
+      ;; FOP-CODE/FOP-SMALL-CODE fop.
       (dump-fixups fixups fasl-file)
 
       (dump-fop 'sb!impl::fop-sanctify-for-execution fasl-file)
@@ -1106,12 +1115,13 @@
   (dump-fop 'sb!impl::fop-sanctify-for-execution file)
   (dump-pop file))
 
-;;; Dump a function-entry data structure corresponding to Entry to File.
-;;; Code-Handle is the table offset of the code object for the component.
+;;; Dump a function-entry data structure corresponding to ENTRY to
+;;; FILE. CODE-HANDLE is the table offset of the code object for the
+;;; component.
 ;;;
-;;; If the entry is a DEFUN, then we also dump a FOP-FSET so that the cold
-;;; loader can instantiate the definition at cold-load time, allowing forward
-;;; references to functions in top-level forms.
+;;; If the entry is a DEFUN, then we also dump a FOP-FSET so that the
+;;; cold loader can instantiate the definition at cold-load time,
+;;; allowing forward references to functions in top-level forms.
 (defun dump-one-entry (entry code-handle file)
   (declare (type entry-info entry) (type index code-handle)
 	   (type fasl-file file))
@@ -1129,8 +1139,8 @@
 	(dump-fop 'sb!impl::fop-fset file))
       handle)))
 
-;;; Alter the code object referenced by Code-Handle at the specified Offset,
-;;; storing the object referenced by Entry-Handle.
+;;; Alter the code object referenced by CODE-HANDLE at the specified
+;;; OFFSET, storing the object referenced by ENTRY-HANDLE.
 (defun dump-alter-code-object (code-handle offset entry-handle file)
   (declare (type index code-handle entry-handle offset) (type fasl-file file))
   (dump-push code-handle file)
@@ -1141,8 +1151,8 @@
 	     file)
   (values))
 
-;;; Dump the code, constants, etc. for component. We pass in the assembler
-;;; fixups, code vector and node info.
+;;; Dump the code, constants, etc. for component. We pass in the
+;;; assembler fixups, code vector and node info.
 (defun fasl-dump-component (component
 			    code-segment
 			    code-length
@@ -1174,9 +1184,10 @@
 	(setf (gethash entry (fasl-file-entry-table file)) entry-handle)
 
 	(let ((old (gethash entry (fasl-file-patch-table file))))
-	  ;; KLUDGE: All this code is shared with FASL-DUMP-BYTE-COMPONENT,
-	  ;; and should probably be gathered up into a named function
-	  ;; (DUMP-PATCHES?) called from both functions.
+	  ;; FIXME: All this code is shared with
+	  ;; FASL-DUMP-BYTE-COMPONENT, and should probably be gathered
+	  ;; up into a named function (DUMP-PATCHES?) called from both
+	  ;; functions.
 	  (when old
 	    (dolist (patch old)
 	      (dump-alter-code-object (car patch)
@@ -1203,8 +1214,8 @@
 	(dump-push info-handle file)
 	(push info-handle (fasl-file-debug-info file))))
 
-    ;; The "trace table" is initialized by loader to hold a list of all byte
-    ;; functions in this code object (for debug info.)
+    ;; The "trace table" is initialized by loader to hold a list of
+    ;; all byte functions in this code object (for debug info.)
     (dump-object nil file)
 
     ;; Dump the constants.
@@ -1270,8 +1281,8 @@
       code-handle)))
 
 ;;; Dump a BYTE-FUNCTION object. We dump the layout and
-;;; funcallable-instance info, but rely on the loader setting up the correct
-;;; funcallable-instance-function.
+;;; funcallable-instance info, but rely on the loader setting up the
+;;; correct funcallable-instance-function.
 (defun dump-byte-function (xep code-handle file)
   (let ((nslots (- (get-closure-length xep)
 		   ;; 1- for header
@@ -1313,7 +1324,8 @@
 	    (remhash info patch-table))))))
   (values))
 
-;;; Dump a FOP-FUNCALL to call an already dumped top-level lambda at load time.
+;;; Dump a FOP-FUNCALL to call an already dumped top-level lambda at
+;;; load time.
 (defun fasl-dump-top-level-lambda-call (fun file)
   (declare (type clambda fun) (type fasl-file file))
   (let ((handle (gethash (leaf-info fun) (fasl-file-entry-table file))))
@@ -1323,9 +1335,10 @@
     (dump-byte 0 file))
   (values))
 
-;;; Compute the correct list of DEBUG-SOURCE structures and backpatch all of
-;;; the dumped DEBUG-INFO structures. We clear the FASL-FILE-DEBUG-INFO,
-;;; so that subsequent components with different source info may be dumped.
+;;; Compute the correct list of DEBUG-SOURCE structures and backpatch
+;;; all of the dumped DEBUG-INFO structures. We clear the
+;;; FASL-FILE-DEBUG-INFO, so that subsequent components with different
+;;; source info may be dumped.
 (defun fasl-dump-source-info (info file)
   (declare (type source-info info) (type fasl-file file))
   (let ((res (debug-source-for-info info))
@@ -1344,8 +1357,6 @@
 ;;;; dumping structures
 
 (defun dump-structure (struct file)
-  ;; FIXME: Probably *DUMP-ONLY-VALID-STRUCTURES* should become constantly T,
-  ;; right?
   (when *dump-only-valid-structures*
     (unless (gethash struct (fasl-file-valid-structures file))
       (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"

@@ -1225,8 +1225,7 @@
 (defknown identity (t) t (movable foldable flushable unsafe)
   :derive-type #'result-type-first-arg)
 
-;;; &OPTIONAL is to agree with the optimization in the interpreter stub.
-(defknown constantly (t &optional t t &rest t) function (movable flushable))
+(defknown constantly (t) function (movable flushable))
 (defknown complement (function) function (movable flushable))
 
 ;;;; magical compiler frobs
@@ -1283,8 +1282,7 @@
 ;;; describing the actual function called.
 ;;;
 ;;; FIXME: It would be nice to make structure slot accessors be
-;;; ordinary functions (proclaimed as SB-EXT:CONSTANT-FUNCTION, but
-;;; otherwise ordinary).
+;;; ordinary functions.
 (defknown %slot-accessor (t) t (flushable))
 (defknown %slot-setter (t t) t (unsafe))
 

@@ -43,7 +43,7 @@
 
 ;;; built-in symbol type specifiers
 (/show0 "precomputing built-in symbol type specifiers")
-(precompute-types *standard-type-names*)
+(precompute-types *!standard-type-names*)
 
 ;;; FIXME: It should be possible to do this in the cross-compiler,
 ;;; but currently the cross-compiler's type system is too dain-bramaged to

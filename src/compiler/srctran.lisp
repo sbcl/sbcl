@@ -18,11 +18,10 @@
 (def-source-transform not (x) `(if ,x nil t))
 (def-source-transform null (x) `(if ,x nil t))
 
-;;; ENDP is just NULL with a LIST assertion.
+;;; ENDP is just NULL with a LIST assertion. The assertion will be
+;;; optimized away when SAFETY optimization is low; hopefully that
+;;; is consistent with ANSI's "should return an error".
 (def-source-transform endp (x) `(null (the list ,x)))
-;;; FIXME: Is THE LIST a strong enough assertion for ANSI's "should
-;;; return an error"? (THE LIST is optimized away when safety is low;
-;;; does that satisfy the spec?)
 
 ;;; We turn IDENTITY into PROG1 so that it is obvious that it just
 ;;; returns the first value of its argument. Ditto for VALUES with one
@@ -31,15 +30,11 @@
 (def-source-transform values (x) `(prog1 ,x))
 
 ;;; Bind the values and make a closure that returns them.
-(def-source-transform constantly (value &rest values)
-  (let ((temps (make-gensym-list (1+ (length values))))
-	(dum (gensym)))
-    `(let ,(loop for temp in temps and
-		 value in (list* value values)
-		 collect `(,temp ,value))
-       #'(lambda (&rest ,dum)
-	   (declare (ignore ,dum))
-	   (values ,@temps)))))
+(def-source-transform constantly (value)
+  (let ((rest (gensym "CONSTANTLY-REST-")))
+    `(lambda (&rest ,rest)
+       (declare (ignore ,rest))
+       ,value)))
 
 ;;; If the function has a known number of arguments, then return a
 ;;; lambda with the appropriate fixed number of args. If the

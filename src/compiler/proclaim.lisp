@@ -69,8 +69,8 @@
 ;;; Return a new POLICY containing the policy information represented
 ;;; by the optimize declaration SPEC. Any parameters not specified are
 ;;; defaulted from the POLICY argument.
-(declaim (ftype (function (list policy) policy) process-optimize-declaration))
-(defun process-optimize-declaration (spec policy)
+(declaim (ftype (function (list policy) policy) process-optimize-decl))
+(defun process-optimize-decl (spec policy)
   (let ((result policy)) ; may have new entries pushed on it below
     (dolist (q-and-v-or-just-q (cdr spec))
       (multiple-value-bind (quality raw-value)
@@ -90,11 +90,29 @@
 		     result)))))
     result))
 
-(defun sb!xc:proclaim (form)
-  (unless (consp form)
-    (error "malformed PROCLAIM spec: ~S" form))
-  (let ((kind (first form))
-	(args (rest form)))
+;;; ANSI defines the declaration (FOO X Y) to be equivalent to
+;;; (TYPE FOO X Y) when FOO is a type specifier. This function
+;;; implements that by converting (FOO X Y) to (TYPE FOO X Y).
+(defun canonized-decl-spec (decl-spec)
+  (let ((id (first decl-spec)))
+    (unless (symbolp id)
+      (error "The declaration identifier is not a symbol: ~S" what))
+    (let ((id-is-type (info :type :kind id))
+	  (id-is-declared-decl (info :declaration :recognized id)))
+      (cond ((and id-is-type id-is-declared-decl)
+	     (compiler-error
+	      "ambiguous declaration ~S:~%  ~
+              ~S was declared as a DECLARATION, but is also a type name."
+	      decl-spec id))
+	    (id-is-type
+	     (cons 'type decl-spec))
+	    (t
+	     decl-spec)))))
+
+(defun sb!xc:proclaim (raw-form)
+  (let* ((form (canonized-decl-spec raw-form))
+	 (kind (first form))
+	 (args (rest form)))
     (case kind
       (special
        (dolist (name args)
@@ -193,11 +211,10 @@
 		   (declare (ignore layout))
 		   (setf (class-state subclass) :sealed))))))))
       (optimize
-       (setq *default-policy*
-	     (process-optimize-declaration form *default-policy*)))
+       (setq *default-policy* (process-optimize-decl form *default-policy*)))
       (optimize-interface
        (setq *default-interface-policy*
-	     (process-optimize-declaration form *default-interface-policy*)))
+	     (process-optimize-decl form *default-interface-policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
 	 (proclaim-as-function-name name)
@@ -206,21 +223,14 @@
 		 (inline :inline)
 		 (notinline :notinline)
 		 (maybe-inline :maybe-inline)))))
-      (constant-function
-       (let ((info (make-function-info
-		    :attributes (ir1-attributes movable foldable flushable
-						unsafe))))
-	 (dolist (name args)
-	   (proclaim-as-function-name name)
-	   (setf (info :function :info name) info))))
       (declaration
        (dolist (decl args)
 	 (unless (symbolp decl)
-	   (error "The declaration to be recognized is not a symbol: ~S" decl))
+	   (error "In~%  ~S~%the declaration to be recognized is not a ~
+                  symbol:~%  ~S"
+		  form decl))
 	 (setf (info :declaration :recognized decl) t)))
       (t
-       (cond ((member kind *standard-type-names*)
-	      (sb!xc:proclaim `(type ,@form))) ; FIXME: ,@ instead of . ,
-	     ((not (info :declaration :recognized kind))
-	      (warn "unrecognized proclamation: ~S" form))))))
+       (unless (info :declaration :recognized kind)
+	 (compiler-warning "unrecognized declaration ~S" raw-form)))))
   (values))
