@@ -966,7 +966,7 @@
 		  arg-locs nargs)))))
   (values))
 
-;;; stuff to check in CHECK-FULL-CALL
+;;; stuff to check in PONDER-FULL-CALL
 ;;;
 ;;; There are some things which are intended always to be optimized
 ;;; away by DEFTRANSFORMs and such, and so never compiled into full
@@ -987,7 +987,7 @@
     data-vector-set
     data-vector-ref))
 
-;;; more stuff to check in CHECK-FULL-CALL
+;;; more stuff to check in PONDER-FULL-CALL
 ;;;
 ;;; These came in handy when troubleshooting cold boot after making
 ;;; major changes in the package structure: various transforms and
@@ -999,12 +999,15 @@
 #!+sb-show (defvar *show-full-called-fnames-p* nil)
 #!+sb-show (defvar *full-called-fnames* (make-hash-table :test 'equal))
 
-;;; Do some checks on a full call:
+;;; Do some checks (and store some notes relevant for future checks)
+;;; on a full call:
 ;;;   * Is this a full call to something we have reason to know should
-;;;     never be full called?
+;;;     never be full called? (Except as of sbcl-0.7.18 or so, we no
+;;;     longer try to ensure this behavior when *FAILURE-P* has already
+;;;     been detected.)
 ;;;   * Is this a full call to (SETF FOO) which might conflict with
 ;;;     a DEFSETF or some such thing elsewhere in the program?
-(defun check-full-call (node)
+(defun ponder-full-call (node)
   (let* ((cont (basic-combination-fun node))
 	 (fname (continuation-fun-name cont t)))
     (declare (type (or symbol cons) fname))
@@ -1024,10 +1027,16 @@
 					  (basic-combination-args node))))
 		   (/show arg-types)))
 
-    (when (memq fname *always-optimized-away*)
-      (/show (policy node speed) (policy node safety))
-      (/show (policy node compilation-speed))
-      (bug "full call to ~S" fname))
+    ;; When illegal code is compiled, all sorts of perverse paths
+    ;; through the compiler can be taken, and it's much harder -- and
+    ;; probably pointless -- to guarantee that always-optimized-away
+    ;; functions are actually optimized away. Thus, we skip the check
+    ;; in that case.
+    (unless *failure-p*
+      (when (memq fname *always-optimized-away*)
+	(/show (policy node speed) (policy node safety))
+	(/show (policy node compilation-speed))
+	(bug "full call to ~S" fname)))
 
     (when (consp fname)
       (destructuring-bind (setf stem) fname
@@ -1040,7 +1049,7 @@
 ;;; multiple-values call.
 (defun ir2-convert-full-call (node block)
   (declare (type combination node) (type ir2-block block))
-  (check-full-call node)
+  (ponder-full-call node)
   (let ((2cont (continuation-info (node-cont node))))
     (cond ((node-tail-p node)
 	   (ir2-convert-tail-full-call node block))

@@ -113,6 +113,36 @@
 (defun stupid-input-to-smart-array-deftransforms-0-7-5-12 (v)
   (declare (type (and simple-vector fwd-type-ref) v))
   (aref v 0))
+
+;;; Ca. sbcl-0.7.5.15 the compiler would fail an internal consistency
+;;; check on this code because it expected all calls to %INSTANCE-REF
+;;; to be transformed away, but its expectations were dashed by perverse
+;;; code containing app programmer errors like this.
+(defstruct something-known-to-be-a-struct x y)
+(multiple-value-bind (fun warnings-p failure-p)
+    (compile nil
+	     '(lambda ()
+		(labels ((a1 (a2 a3)
+			     (cond (t (a4 a2 a3))))
+			 (a4 (a2 a3 a5 a6)
+			     (declare (type (or simple-vector null) a5 a6))
+			     (something-known-to-be-a-struct-x a5))
+			 (a8 (a2 a3)
+			     (a9 #'a1 a10 a2 a3))
+			 (a11 (a2 a3)
+			      (cond ((and (funcall a12 a2)
+					  (funcall a12 a3))
+				     (funcall a13 a2 a3))
+				    (t
+				     (when a14
+				     (let ((a15 (a1 a2 a3)))
+				       ))
+				     a16))))
+		  (values #'a17 #'a11))))
+  ;; Python sees the structure accessor on the known-not-to-be-a-struct
+  ;; A5 value and is very, very disappointed in you. (But it doesn't
+  ;; signal BUG any more.)
+  (assert failure-p))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

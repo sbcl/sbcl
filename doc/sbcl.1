@@ -492,14 +492,32 @@ As with any software bug report, it's most helpful if you can provide
 enough information to reproduce the symptoms reliably, and if you say
 clearly what the symptoms are. E.g. "There seems to be something wrong
 with TAN of very small negative arguments. When I execute
-(TAN LEAST-NEGATIVE-SINGLE-FLOAT) interactively on sbcl-1.2.3 on my Linux
-4.5 X86 box, I get an UNBOUND-VARIABLE error."
+(TAN LEAST-NEGATIVE-SINGLE-FLOAT) interactively on sbcl-1.2.3 on my
+Linux 4.5 X86 box, I get an UNBOUND-VARIABLE error."
 
 .SH SUPPORT
 
 Various information about SBCL is available at
 <http://sbcl.sourceforge.net/>. The mailing lists there are the
 recommended place to look for support.
+
+.SH FILES
+
+.TP
+.I sbcl
+executable program containing some low-level runtime support and
+a loader, used to read sbcl.core
+.TP
+.I sbcl.core
+dumped memory image containing most of SBCL, to be loaded by the
+'sbcl' executable
+.TP
+.I sbclrc
+optional system-wide startup script (in an etc-ish system
+configuration file directory)
+.TP
+.I .sbclrc
+optional per-user customizable startup script (in user's home directory)
 
 .SH AUTHORS
 
