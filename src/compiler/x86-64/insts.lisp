@@ -495,6 +495,21 @@
   (accum :type 'accum)
   (imm))
 
+;;; A one-byte instruction with a #x66 prefix, used to indicate an
+;;; operand size of :word. 
+(sb!disassem:define-instruction-format (x66-byte 16
+                                        :default-printer '(:name))
+  (x66   :field (byte 8 0) :value #x66)
+  (op    :field (byte 8 8)))
+
+;;; A one-byte instruction with a REX prefix, used to indicate an
+;;; operand size of :qword. REX.W must be 1, the other three bits are
+;;; ignored.
+(sb!disassem:define-instruction-format (rex-byte 16
+                                        :default-printer '(:name))
+  (rex   :field (byte 5 3) :value #b01001)
+  (op    :field (byte 8 8)))
+
 (sb!disassem:define-instruction-format (simple 8)
   (op    :field (byte 7 1))
   (width :field (byte 1 0) :type 'width)
@@ -640,8 +655,6 @@
 					`(:name
 					  :tab
 					  ,(swap-if 'dir 'reg/mem ", " 'reg)))
-  (rex     :field (byte 4 4)    :value #b0100)
-  (wrxb    :field (byte 4 0)    :type 'wrxb)
   (op  :field (byte 6 10))
   (dir :field (byte 1 9)))
 
@@ -704,6 +717,13 @@
      :include 'reg/mem :default-printer '(:name :tab accum ", " reg/mem))
   (reg/mem :type 'reg/mem)		; don't need a size
   (accum :type 'accum))
+
+(sb!disassem:define-instruction-format (rex-accum-reg/mem 24
+                                        :include 'rex-reg/mem
+                                        :default-printer
+                                        '(:name :tab accum ", " reg/mem))
+  (reg/mem :type 'reg/mem)		; don't need a size
+  (accum   :type 'accum))
 
 ;;; Same as reg-reg/mem, but with a prefix of #b00001111
 (sb!disassem:define-instruction-format (ext-reg-reg/mem 24
@@ -889,6 +909,18 @@
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
                                 :type 'reg/mem)
   (reg     :field (byte 3 19)   :type 'reg))
+
+(sb!disassem:define-instruction-format (rex-cond-move 32
+                                     :default-printer
+                                        '('cmov cc :tab reg ", " reg/mem))
+  (rex     :field (byte 4 4)   :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (prefix  :field (byte 8 8)    :value #b00001111)
+  (op      :field (byte 4 20)   :value #b0100)
+  (cc      :field (byte 4 16)    :type 'condition-code)
+  (reg/mem :fields (list (byte 2 30) (byte 3 24))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 27)   :type 'reg))
 
 (sb!disassem:define-instruction-format (enter-format 32
 				     :default-printer '(:name
@@ -1428,7 +1460,14 @@
             ((op #b10110111) (reg/mem nil :type 'sized-word-reg/mem)))
   (:emitter (emit-move-with-extension segment dst src nil)))
 
+;;; The regular use of MOVSXD is with an operand size of :qword. This
+;;; sign-extends the dword source into the qword destination register.
+;;; If the operand size is :dword the instruction zero-extends the dword
+;;; source into the qword destination register, i.e. it does the same as
+;;; a dword MOV into a register.
 (define-instruction movsxd (segment dst src)
+  (:printer reg-reg/mem ((op #b0110001) (width 1)
+                         (reg/mem nil :type 'sized-dword-reg/mem)))
   (:printer rex-reg-reg/mem ((op #b0110001) (width 1)
                              (reg/mem nil :type 'sized-dword-reg/mem)))
   (:emitter (emit-move-with-extension segment dst src :signed)))
@@ -1474,11 +1513,6 @@
 		   (emit-byte segment #b11111111)
 		   (emit-ea segment src #b110 t))))))))
 
-(define-instruction pusha (segment)
-  (:printer byte ((op #b01100000)))
-  (:emitter
-   (emit-byte segment #b01100000)))
-
 (define-instruction pop (segment dst)
   (:printer reg-no-width-default-qword ((op #b01011)))
   (:printer rex-reg-no-width-default-qword ((op #b01011)))
@@ -1494,11 +1528,6 @@
 	   (t
 	    (emit-byte segment #b10001111)
 	    (emit-ea segment dst #b000))))))
-
-(define-instruction popa (segment)
-  (:printer byte ((op #b01100001)))
-  (:emitter
-   (emit-byte segment #b01100001)))
 
 (define-instruction xchg (segment operand1 operand2)
   ;; Register with accumulator.
@@ -1682,8 +1711,8 @@
       ;; therefore we force WIDTH to 1.
       (reg/mem-imm ((op (#b1000001 ,subop)) (width 1)
 		    (imm nil :type signed-imm-byte)))
-      (rex-reg/mem-imm ((op (#b1000001 ,subop))
-		    (imm nil :type signed-imm-byte)))
+      (rex-reg/mem-imm ((op (#b1000001 ,subop)) (width 1)
+                        (imm nil :type signed-imm-byte)))
       (reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))
       (rex-reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))))
   )
@@ -1743,6 +1772,7 @@
 
 (define-instruction neg (segment dst)
   (:printer reg/mem ((op '(#b1111011 #b011))))
+  (:printer rex-reg/mem ((op '(#b1111011 #b011))))
   (:emitter
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
@@ -1752,6 +1782,7 @@
 
 (define-instruction mul (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b100))))
+  (:printer rex-accum-reg/mem ((op '(#b1111011 #b100))))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (aver (accumulator-p dst))
@@ -1762,6 +1793,7 @@
 
 (define-instruction imul (segment dst &optional src1 src2)
   (:printer accum-reg/mem ((op '(#b1111011 #b101))))
+  (:printer rex-accum-reg/mem ((op '(#b1111011 #b101))))
   (:printer ext-reg-reg/mem-no-width ((op #b10101111)))
   (:printer rex-ext-reg-reg/mem-no-width ((op #b10101111)))
   (:printer reg-reg/mem ((op #b0110100) (width 1)
@@ -1807,6 +1839,7 @@
 
 (define-instruction div (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b110))))
+  (:printer rex-accum-reg/mem ((op '(#b1111011 #b110))))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (aver (accumulator-p dst))
@@ -1817,6 +1850,7 @@
 
 (define-instruction idiv (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b111))))
+  (:printer rex-accum-reg/mem ((op '(#b1111011 #b111))))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (aver (accumulator-p dst))
@@ -1835,18 +1869,28 @@
 
 ;;; CBW -- Convert Byte to Word. AX <- sign_xtnd(AL)
 (define-instruction cbw (segment)
+  (:printer x66-byte ((op #b10011000)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :word)
    (emit-byte segment #b10011000)))
 
-;;; CWDE -- Convert Word To Double Word Extened. EAX <- sign_xtnd(AX)
+;;; CWDE -- Convert Word To Double Word Extended. EAX <- sign_xtnd(AX)
 (define-instruction cwde (segment)
+  (:printer byte ((op #b10011000)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :dword)
    (emit-byte segment #b10011000)))
 
+;;; CDQE -- Convert Word To Double Word Extended. RAX <- sign_xtnd(EAX)
+(define-instruction cdqe (segment)
+  (:printer rex-byte ((op #b10011000)))
+  (:emitter
+   (maybe-emit-rex-prefix segment :qword nil nil nil)
+   (emit-byte segment #b10011000)))
+
 ;;; CWD -- Convert Word to Double Word. DX:AX <- sign_xtnd(AX)
 (define-instruction cwd (segment)
+  (:printer x66-byte ((op #b10011001)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :word)
    (emit-byte segment #b10011001)))
@@ -1858,8 +1902,9 @@
    (maybe-emit-operand-size-prefix segment :dword)
    (emit-byte segment #b10011001)))
 
-;;; CQO -- Convert Quad or Octaword. RDX:RAX <- sign_xtnd(RAX)
+;;; CQO -- Convert Quad Word to Octaword. RDX:RAX <- sign_xtnd(RAX)
 (define-instruction cqo (segment)
+  (:printer rex-byte ((op #b10011001)))
   (:emitter
    (maybe-emit-rex-prefix segment :qword nil nil nil)
    (emit-byte segment #b10011001)))
@@ -2041,6 +2086,7 @@
 
 (define-instruction not (segment dst)
   (:printer reg/mem ((op '(#b1111011 #b010))))
+  (:printer rex-reg/mem ((op '(#b1111011 #b010))))
   (:emitter
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
@@ -2139,7 +2185,8 @@
 ;;;; bit manipulation
 
 (define-instruction bsf (segment dst src)
-  (:printer ext-reg-reg/mem ((op #b1011110) (width 0)))
+  (:printer ext-reg-reg/mem-no-width ((op #b10111100)))
+  (:printer rex-ext-reg-reg/mem-no-width ((op #b10111100)))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (when (eq size :byte)
@@ -2151,7 +2198,8 @@
      (emit-ea segment src (reg-tn-encoding dst)))))
 
 (define-instruction bsr (segment dst src)
-  (:printer ext-reg-reg/mem ((op #b1011110) (width 1)))
+  (:printer ext-reg-reg/mem-no-width ((op #b10111101)))
+  (:printer rex-ext-reg-reg/mem-no-width ((op #b10111101)))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (when (eq size :byte)
@@ -2344,6 +2392,7 @@
 ;;;; conditional move
 (define-instruction cmov (segment cond dst src)
   (:printer cond-move ())
+  (:printer rex-cond-move ())
   (:emitter
    (aver (register-p dst))
    (let ((size (matching-operand-size dst src)))

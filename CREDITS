@@ -558,6 +558,9 @@ Miles Egan:
   He creates binary packages of SBCL releases for Red Hat and other
   (which?) platforms.
 
+Lutz Euler:
+  He made a large number of improvements to the x86-64 disassembler.
+
 Andreas Fuchs:
   He provides infrastructure for monitoring build and performance
   regressions of SBCL.  He assisted with the integration of the

@@ -476,7 +476,19 @@
 ;;;; compact info environments
 
 ;;; The upper limit on the size of the ENTRIES vector in a COMPACT-INFO-ENV.
-(def!constant compact-info-env-entries-bits 16)
+;;; 
+;;; "Why (U-B 28)?", you might wonder. Originally this was (U-B 16),
+;;; presumably to ensure that the arrays of :ELEMENT-TYPE 
+;;; COMPACT-INFO-ENTRIES-INDEX could use a more space-efficient representation.
+;;; It turns out that a environment of of only 65536 entries is insufficient in
+;;; the modern world (see message from Cyrus Harmon to sbcl-devel, "Subject:
+;;; purify failure when compact-info-env-entries-bits is too small"). Using
+;;; (U-B 28) instead of (U-B 29) is to avoid the need for bignum overflow 
+;;; checks, a probably pointless micro-optimization. Hardcoding the amount of
+;;; bits instead of deriving it from SB!VM::N-WORD-BITS is done to allow
+;;; use of a more efficient array representation on 64-bit platforms.
+;;;   -- JES, 2005-04-06
+(def!constant compact-info-env-entries-bits 28)
 (deftype compact-info-entries-index () `(unsigned-byte ,compact-info-env-entries-bits))
 
 ;;; the type of the values in COMPACT-INFO-ENTRIES-INFO
