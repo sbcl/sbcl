@@ -713,9 +713,7 @@
 			 (find-free-variable name))))
 	  (etypecase leaf
 	    (leaf
-	     (when (or (constant-p leaf)
-		       (and (global-var-p leaf)
-			    (eq (global-var-kind leaf) :constant)))
+	     (when (constant-p leaf)
 	       (compiler-error "~S is a constant and thus can't be set." name))
 	     (when (and (lambda-var-p leaf)
 			(lambda-var-ignorep leaf))

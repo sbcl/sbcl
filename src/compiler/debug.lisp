@@ -118,7 +118,7 @@
 	       (unless (or (constant-p v)
 			   (and (global-var-p v)
 				(member (global-var-kind v)
-					'(:global :special :constant))))
+					'(:global :special))))
 		 (barf "strange *FREE-VARIABLES* entry: ~S" v))
 	       (dolist (n (leaf-refs v))
 		 (check-node-reached n))

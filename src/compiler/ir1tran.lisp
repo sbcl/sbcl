@@ -1062,8 +1062,7 @@
 	     (compiler-error
 	      "~S is an alien variable and so can't be declared special."
 	      name))
-	   (when (or (not (global-var-p found))
-		     (eq (global-var-kind found) :constant))
+	   (unless (global-var-p found)
 	     (compiler-error
 	      "~S is a constant and so can't be declared special."
 	      name))

@@ -131,7 +131,7 @@
       (global-var
        (let ((unsafe (policy node (zerop safety))))
 	 (ecase (global-var-kind leaf)
-	   ((:special :global :constant)
+	   ((:special :global)
 	    (aver (symbolp name))
 	    (let ((name-tn (emit-constant name)))
 	      (if unsafe

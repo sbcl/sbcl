@@ -1162,8 +1162,7 @@
        (not (eq (defined-fun-inlinep leaf) :notinline)))
       (global-var
        (case (global-var-kind leaf)
-	 (:global-function t)
-	 (:constant t))))))
+	 (:global-function t))))))
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's CONT with the arg continuation.

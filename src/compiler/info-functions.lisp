@@ -55,10 +55,11 @@
 
   ;; scrubbing old data II: dangling forward references
   ;;
-  ;; (This could happen if someone does PROCLAIM FTYPE in macroexpansion,
-  ;; which is bad style, or at compile time, e.g. in EVAL-WHEN (:COMPILE)
-  ;; inside something like DEFSTRUCT, in which case it's reasonable style.
-  ;; Either way, it's no longer a free function.)
+  ;; (This could happen if someone executes PROCLAIM FTYPE at
+  ;; macroexpansion time, which is bad style, or at compile time, e.g.
+  ;; in EVAL-WHEN (:COMPILE) inside something like DEFSTRUCT, in which
+  ;; case it's reasonable style. Either way, NAME is no longer a free
+  ;; function.)
   (when (boundp '*free-functions*) ; when compiling
     (remhash name *free-functions*))
 
