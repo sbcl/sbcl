@@ -243,8 +243,8 @@ This is equivalent to @code{--eval '(sb-ext:disable-debugger)'}.
 @comment  node-name,  next,  previous,  up
 @section Initialization Files
 
-This section covers initialization files loaded at startup, which can
-be used to customize the lisp environment.
+This section covers initialization files processed at startup, which
+can be used to customize the lisp environment.
 
 @menu
 * System Initialization File::  
@@ -276,12 +276,10 @@ No user initialization file is required.
 @comment  node-name,  next,  previous,  up
 @subsection Initialization File Semantics
 
-SBCL uses @code{load} to process its initialization files, which
-has the unfortunate effect of preventing users from changing the
-default startup @code{*package*}, and setting a default optimization
-policy.
-
-This is considered a bug and liable to change in the future.
+SBCL processes initialization files with @code{read} and @code{eval},
+not @code{load}; hence initialization files can be used to set startup
+@code{*package*} and @code{*readtable*}, and for proclaiming a global
+optimization policy.
 
 @node Initialization Examples
 @comment  node-name,  next,  previous,  up
