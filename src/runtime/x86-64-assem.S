@@ -212,7 +212,7 @@ GNAME(fpu_restore):
  * the undefined-function trampoline
  */
 	.text
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 	.global GNAME(undefined_tramp)
 	.type	GNAME(undefined_tramp),@function
 GNAME(undefined_tramp):
@@ -262,7 +262,7 @@ GNAME(alloc_tramp):
  * the closure trampoline
  */
 	.text
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 	.global GNAME(closure_tramp)
 	.type	GNAME(closure_tramp),@function
 GNAME(closure_tramp):

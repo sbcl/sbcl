@@ -319,11 +319,11 @@ void reap_dead_threads()
 #else
 void mark_dead_threads() 
 {
-    warn("mark_dead_threads unimplemented");
+    fprintf(stderr,"mark_dead_threads unimplemented\n");
 }
 void reap_dead_threads()
 {
-    warn("reap_dead_threads unimplemented");
+    fprintf(stderr,"reap_dead_threads unimplemented\n");
 }
 #endif /*  USE_LINUX_CLONE */
 

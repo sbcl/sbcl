@@ -15,6 +15,8 @@
 		       %protect-control-stack-guard-page)
     sb!alien:int (thread-id sb!alien:int) (protect-p sb!alien:int))
 (defun protect-control-stack-guard-page (n)
+  (declare (ignore n))
+  #+nil
   (%protect-control-stack-guard-page 
    (sb!thread:current-thread-id) (if n 1 0)))
 
