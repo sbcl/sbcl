@@ -1,9 +1,15 @@
-2;;;
-;;; Written by Rob MacLachlan
-;;; Sparc conversion by William Lott.
-;;;
-(in-package "SB!VM")
+;;;; floating point support for the PPC
 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!VM")
 
 ;;;; Move functions:
 
@@ -125,7 +131,7 @@
 		  :offset (tn-offset x)))
 (defun complex-double-reg-imag-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-		  :offset (+ (tn-offset x) 2)))
+		  :offset (1+ (tn-offset x))))
 
 
 (define-move-fun (load-complex-single 2) (vop x y)

@@ -3385,7 +3385,7 @@
 	      ((< nargs (min min1 min2))
 	       (compiler-warn "Too few arguments (~D) to ~S ~S ~S: ~
                                requires at least ~D."
-			      nargs 'cerror report control min))
+			      nargs 'cerror report control (min min1 min2)))
 	      ((> nargs (max max1 max2))
 	       (;; to get warned about probably bogus code at
 		;; cross-compile time.
@@ -3394,7 +3394,7 @@
 	        ;; run-time error.
 		#-sb-xc-host compiler-style-warn
 		"Too many arguments (~D) to ~S ~S ~S: uses at most ~D."
-		nargs 'cerror report control max))))))))
+		nargs 'cerror report control (max max1 max2)))))))))
   (give-up-ir1-transform))
 
 (defoptimizer (coerce derive-type) ((value type))

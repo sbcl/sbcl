@@ -96,6 +96,10 @@ VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
   (if (< x 0) x (foo (1- x))))
 
 SBCL generates a full call of FOO (but CMUCL does not).
+
+Partial explanation: CMUCL does generate a full (tail) call to FOO if
+*BLOCK-COMPILE* is NIL.  Maybe this is because in that case CMUCL doesn't 
+generate a temporary(?) function in its IR1-TRANSLATOR for %DEFUN?
 --------------------------------------------------------------------------------
 #8
 (defun foo (d)

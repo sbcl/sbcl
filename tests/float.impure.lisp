@@ -54,5 +54,13 @@
 		  #(2.0d0 2.0d0)
 		  #(3.0d0 3.0d0))))
 
+(defun complex-double-float-ppc (x y)
+  (declare (type (complex double-float) x y))
+  (declare (optimize speed))
+  (+ x y))
+(compile 'complex-double-float-ppc)
+(assert (= (complex-double-float-ppc #c(0.0d0 1.0d0) #c(2.0d0 3.0d0))
+           #c(2.0d0 4.0d0)))
+
 ;;; success
 (quit :unix-status 104)
