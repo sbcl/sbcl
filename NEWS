@@ -1989,6 +1989,10 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     ** ASSOC now ignores NIL elements in an alist.
     ** CEILING now gives the right answer with MOST-NEGATIVE-FIXNUM
        and (1+ MOST-POSITIVE-FIXNUM) answers.
+    ** The addition of a method with invalid qualifiers to a generic
+       function does not cause an error to be signalled immediately;
+       a warning is signalled, and the error is generated only on
+       calling the generic function.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -494,6 +494,33 @@
 		 (setq remove-again-p nil))
 	    (when remove-again-p
 	      (remove-method generic-function method))))
+
+	;; KLUDGE II: ANSI saith that it is not an error to add a
+	;; method with invalid qualifiers to a generic function of the
+	;; wrong kind; it's only an error at generic function
+	;; invocation time; I dunno what the rationale was, and it
+	;; sucks.  Nevertheless, it's probably a programmer error, so
+	;; let's warn anyway. -- CSR, 2003-08-20
+	(let ((mc (generic-function-method-combination generic-functioN)))
+	  (cond
+	    ((eq mc *standard-method-combination*)
+	     (when (and qualifiers
+			(or (cdr qualifiers)
+			    (not (memq (car qualifiers)
+				       '(:around :before :after)))))
+	       (warn "~@<Invalid qualifiers for standard method combination ~
+                      in method ~S:~2I~_~S.~@:>"
+		     method qualifiers)))
+	    ((short-method-combination-p mc)
+	     (let ((mc-name (method-combination-type mc)))
+	       (when (or (null qualifiers)
+			 (cdr qualifiers)
+			 (and (neq (car qualifiers) :around)
+			      (neq (car qualifiers) mc-name)))
+		 (warn "~@<Invalid qualifiers for ~S method combination ~
+                        in method ~S:~2I~_~S.~@:>"
+		       mc-name method qualifiers))))))
+	
 	(unless skip-dfun-update-p
 	  (update-ctors 'add-method
 			:generic-function generic-function

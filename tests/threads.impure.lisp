@@ -125,4 +125,7 @@
     (sleep 5))
   (terminate-thread child))
 
+;; better would be "wait until all child threads have exited"
+(sleep 3)
+
 (sb-ext:quit :unix-status 104)

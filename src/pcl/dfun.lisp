@@ -763,17 +763,19 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; considered as state transitions.
 (defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
+(defvar *max-emf-precomputation-methods* 0)
 
 (defun finalize-specializers (gf)
-  (let ((all-finalized t))
-    (dolist (method (generic-function-methods gf))
-      (dolist (specializer (method-specializers method))
-	(when (and (classp specializer)
-		   (not (class-finalized-p specializer)))
-	  (if (class-has-a-forward-referenced-superclass-p specializer)
-	      (setq all-finalized nil)
-	      (finalize-inheritance specializer)))))
-    all-finalized))
+  (let ((methods (generic-function-methods gf)))
+    (when (< (length methods) *max-emf-precomputation-methods*)
+      (let ((all-finalized t))
+	(dolist (method methods all-finalized)
+	  (dolist (specializer (method-specializers method))
+	    (when (and (classp specializer)
+		       (not (class-finalized-p specializer)))
+	      (if (class-has-a-forward-referenced-superclass-p specializer)
+		  (setq all-finalized nil)
+		  (finalize-inheritance specializer)))))))))
 
 (defun make-initial-dfun (gf)
   (let ((initial-dfun
