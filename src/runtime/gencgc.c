@@ -254,8 +254,11 @@ static int  last_free_page;
 
 /* This lock is to prevent multiple threads from simultaneously
  * allocating new regions which overlap each other.  Note that the
- * majority of GC is single-threaded, but alloc() may be called
- * from >1 thread at a time and must be thread-safe */
+ * majority of GC is single-threaded, but alloc() may be called from
+ * >1 thread at a time and must be thread-safe.  This lock must be
+ * seized before all accesses to generations[] or to parts of
+ * page_table[] that other threads may want to see */
+
 static lispobj free_pages_lock=0;
 
 
@@ -706,8 +709,9 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
     next_page = first_page+1;
 
-    /* Skip if no bytes were allocated. */
+    get_spinlock(&free_pages_lock,alloc_region);
     if (alloc_region->free_pointer != alloc_region->start_addr) {
+	/* some bytes were allocated in the region */
 	orig_first_page_bytes_used = page_table[first_page].bytes_used;
 
 	gc_assert(alloc_region->start_addr == (page_address(first_page) + page_table[first_page].bytes_used));
@@ -809,7 +813,8 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	page_table[next_page].allocated = FREE_PAGE;
 	next_page++;
     }
-
+    free_pages_lock=0;
+    /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
 }
 
@@ -4290,23 +4295,26 @@ gencgc_handle_wp_violation(void* fault_addr)
 	return 0;
 
     } else {
-
-	/* The only acceptable reason for an signal like this from the
-	 * heap is that the generational GC write-protected the page. */
-	if (page_table[page_index].write_protected != 1) {
-	    lose("access failure in heap page not marked as write-protected");
+	if (page_table[page_index].write_protected) {
+	    /* Unprotect the page. */
+	    os_protect(page_address(page_index), PAGE_BYTES, OS_VM_PROT_ALL);
+	    page_table[page_index].write_protected_cleared = 1;
+	    page_table[page_index].write_protected = 0;
+	} else {  
+	    /* The only acceptable reason for this signal on a heap
+	     * access is that GENCGC write-protected the page.
+	     * However, if two CPUs hit a wp page near-simultaneously,
+	     * we had better not have the second one lose here if it
+	     * does this test after the first one has already set wp=0
+	     */
+	    if(page_table[page_index].write_protected_cleared != 1) 
+		lose("fault in heap page not marked as write-protected");
+	    
+	    /* Don't worry, we can handle it. */
+	    return 1;
 	}
-	
-	/* Unprotect the page. */
-	os_protect(page_address(page_index), 4096, OS_VM_PROT_ALL);
-	page_table[page_index].write_protected = 0;
-	page_table[page_index].write_protected_cleared = 1;
-
-	/* Don't worry, we can handle it. */
-	return 1;
     }
 }
-
 /* This is to be called when we catch a SIGSEGV/SIGBUS, determine that
  * it's not just a case of the program hitting the write barrier, and
  * are about to let Lisp deal with it. It's basically just a

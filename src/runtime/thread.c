@@ -245,8 +245,9 @@ void destroy_thread (struct thread *th)
     all_threads_lock=0;
     if(th && th->tls_cookie>=0) arch_os_thread_cleanup(th); 
     os_invalidate((os_vm_address_t) th->control_stack_start,
-		  THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
-		  ALIEN_STACK_SIZE+dynamic_values_bytes+
+		  ((sizeof (lispobj))
+		   * (th->control_stack_end-th->control_stack_start)) +
+		  BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
 		  32*SIGSTKSZ);
 }
 
