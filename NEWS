@@ -2216,6 +2216,7 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
     ** extremely complex negations of CONS types were not being
        sufficiently canonicalized, leading to inconsistencies in
        SUBTYPEP.
+    ** VALUES tranformer lost derive type.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -966,3 +966,14 @@
                 (%f11 -120429363 (%f11 62362 b)))))
    6714367 9645616 -637681868)
   -264223548))
+
+;;; Bug reported by Paul F. Dietz caused by derive type loss in VALUE
+;;; transform
+(assert (equal (multiple-value-list
+                (funcall
+                 (compile nil '(lambda ()
+                                (declare (optimize (speed 1) (space 0) (safety 3) (debug 3) (compilation-speed 1)))
+                                (ceiling
+                                 (ceiling
+                                  (flet ((%f16 () 0)) (%f16))))))))
+               '(0 0)))
