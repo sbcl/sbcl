@@ -1106,6 +1106,11 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
   * bug 147 fixed: The compiler preserves its block link/count
     invariants more correctly now so that it doesn't crash. (thanks
     to Alexey Dejneka)
+  * Dynamic loading of object files in OpenBSD is now supported. (thanks
+    to Pierre Mai)
+  * The fasl file format has changed again, because dynamic loading
+    on OpenBSD (which has non-ELF object files) motivated some cleanups
+    in the way that foreign symbols are transformed and passed around.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

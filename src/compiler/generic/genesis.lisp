@@ -1395,7 +1395,7 @@
 			       sb!vm:fdefn-raw-addr-slot
 			       (make-random-descriptor
 				(cold-foreign-symbol-address-as-integer
-				 "undefined_tramp"))))
+				 (sb!vm:extern-alien-name "undefined_tramp")))))
 	  fdefn))))
 
 ;;; Handle the at-cold-init-time, fset-for-static-linkage operation
@@ -1420,7 +1420,7 @@
 			 (#.sb!vm:closure-header-widetag
 			  (make-random-descriptor
 			   (cold-foreign-symbol-address-as-integer
-			    "closure_tramp")))))
+			    (sb!vm:extern-alien-name "closure_tramp"))))))
     fdefn))
 
 (defun initialize-static-fns ()

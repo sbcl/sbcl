@@ -17,20 +17,12 @@ echo //entering foreign.test.sh
 
 testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
-# FIXME: At least on OpenBSD, the "make $testfilestem.o" puts the
-# output file into the current directory, instead of the 
-# target directory. E.g. "make /tmp/foo.o" causes "./foo.o" to be
-# created (!). Since OpenBSD doesn't support LOAD-FOREIGN, this
-# doesn't matter much, since it punts with UNSUPPORTED-OPERATOR
-# instead of not finding the file. But it'd be nice to straighten
-# this out, if only so that sbcl-foreign-test-*.o clutter
-# doesn't pile up in this directory. Maybe some time when I have
-# several test machines at hand to check the behavior of different
-# versions of "make"...
+# Make a little shared object file to test with.
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
-make $testfilestem.o
+cc -c $testfilestem.c -o $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
+# Test interaction with the shared object file.
 ${SBCL:-sbcl} <<EOF
   (handler-case 
       (load-foreign '("$testfilestem.so"))

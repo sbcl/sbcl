@@ -354,7 +354,7 @@
 (defun find-foreign-symbol-in-table (name table)
   (let ((prefixes
          #!+(or linux freebsd) #("" "ldso_stub__")
-	 #!+openbsd #("" "_")
+	 #!+openbsd #("")
 	 #!+sunos #("" "ldso_stub__")))    
     (declare (notinline some)) ; to suppress bug 117 bogowarning
     (some (lambda (prefix)

@@ -63,7 +63,9 @@
 ;;; dlsym()-based implementation of GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS
 ;;; and functions (e.g. LOAD-FOREIGN) which affect it.  This should 
 ;;; work on any ELF system with dlopen(3) and dlsym(3)
-#-(or linux FreeBSD)
+;;; It also works on OpenBSD, which isn't ELF, but is otherwise modern
+;;; enough to have a fairly well working dlopen/dlsym implementation.
+#-(or linux FreeBSD OpenBSD)
 (macrolet ((define-unsupported-fun (fun-name)
 	     `(defun ,fun-name (&rest rest)
 		"unsupported on this system"
@@ -71,7 +73,7 @@
 		(error 'unsupported-operator :name ',fun-name))))
   (define-unsupported-fun load-1-foreign)
   (define-unsupported-fun load-foreign))
-#+(or linux FreeBSD)
+#+(or linux FreeBSD OpenBSD)
 (progn
 
 ;;; flags for dlopen()
@@ -113,7 +115,7 @@
       *after-save-initializations*)
 
 (defvar *dso-linker* "/usr/bin/ld")
-(defvar *dso-linker-options* '("-G" "-o"))
+(defvar *dso-linker-options* '("-shared" "-o"))
 
 
 (sb-alien:define-alien-routine dlopen system-area-pointer

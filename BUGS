@@ -1252,6 +1252,45 @@ WORKAROUND:
   specialized-element-type slot in the ARRAY-TYPE structure be
   *WILD-TYPE* for UNKNOWN-TYPE element types.
 
+166:
+  Compiling 
+    (in-package :cl-user)
+    (defstruct uustk)
+    (defmethod permanentize ((uustk uustk))
+      (flet ((frob (hash-table test-for-deletion)
+               )
+             (obj-entry.stale? (oe)
+               (destructuring-bind (key . datum) oe
+                 (declare (type simple-vector key))
+                 (deny0 (void? datum))
+                 (some #'stale? key))))
+        (declare (inline frob obj-entry.stale?))
+        (frob (uustk.args-hash->obj-alist uustk)
+              #'obj-entry.stale?)
+        (frob (uustk.hash->memoized-objs-list uustk)
+              #'objs.stale?))
+      (call-next-method))
+  in sbcl-0.7.3.11 causes an assertion failure, 
+    failed AVER:
+      "(NOT
+(AND (NULL (BLOCK-SUCC B))
+      (NOT (BLOCK-DELETE-P B))
+      (NOT (EQ B (COMPONENT-HEAD #)))))"
+
+167:
+  In sbcl-0.7.3.11, compiling the (illegal) code 
+    (in-package :cl-user)
+    (defmethod prove ((uustk uustk))
+      (zap ((frob () nil))
+        (frob)))
+  gives the (not terribly clear) error message
+    ; caught ERROR:
+    ;   (during macroexpansion of (DEFMETHOD PROVE ...))
+    ; can't get template for (FROB NIL NIL)
+  The problem seems to be that the code walker used by the DEFMETHOD
+  macro is unhappy with the illegal syntax in the method body, and
+  is giving an unclear error message.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
