@@ -1094,3 +1094,26 @@
                 :good
                 (values result1 result2))))
          :good))
+;;; MISC.275
+(assert
+ (zerop
+  (funcall
+   (compile
+    nil
+    '(lambda (b)
+      (declare (notinline funcall min coerce))
+      (declare
+       (optimize (speed 1)
+        (space 2)
+        (safety 2)
+        (debug 1)
+        (compilation-speed 1)))
+      (flet ((%f12 (f12-1)
+               (coerce
+                (min
+                 (if f12-1 (multiple-value-prog1
+                               b (return-from %f12 0))
+                     0))
+                'integer)))
+        (funcall #'%f12 0))))
+   -33)))

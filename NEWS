@@ -2246,6 +2246,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** in stack analysys liveness information is propagated from
        non-local entry points.
+    ** pathwise CAST removing failed when the CAST node did not start
+       a block.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

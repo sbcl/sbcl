@@ -1722,7 +1722,8 @@
                            (immediately-used-p value use))
                   (unless next-block
                     (when ctran (ensure-block-start ctran))
-                    (setq next-block (first (block-succ (node-block cast)))))
+                    (setq next-block (first (block-succ (node-block cast))))
+                    (ensure-block-start (node-prev cast)))
                   (%delete-lvar-use use)
                   (add-lvar-use use lvar)
                   (unlink-blocks (node-block use) (node-block cast))

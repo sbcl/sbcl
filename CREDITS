@@ -540,11 +540,12 @@ Alexey Dejneka:
   tremendous amount of work on the compiler in particular, fixing
   bugs and refactoring.
 
-Paul Dietz
-  He is in the process of writing a comprehensive test suite for the
-  requirements of the ANSI Common Lisp standard.  Already, at the
-  halfway stage, it has caught hundreds of bugs in SBCL, and provided
-  simple test cases for them.
+Paul Dietz He is in the process of writing a comprehensive test suite
+  for the requirements of the ANSI Common Lisp standard. Already, at
+  the halfway stage, it has caught hundreds of bugs in SBCL, and
+  provided simple test cases for them. His random crash tester has
+  caught an old deep problem in the implementation of the stack
+  analysis phase in the compiler.
 
 Miles Egan
   He creates binary packages of SBCL releases for Red Hat and other
