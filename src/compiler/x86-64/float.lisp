@@ -828,7 +828,7 @@
 	(inst movsd temp float)
 	(move hi-bits temp))
        (double-stack
-	(loadw hi-bits ebp-tn (- (tn-offset float))))
+	(loadw hi-bits ebp-tn (- (1+ (tn-offset float)))))
        (descriptor-reg
 	(loadw hi-bits float double-float-value-slot
 	       other-pointer-lowtag)))
@@ -850,7 +850,7 @@
 	(inst movsd temp float)
 	(move lo-bits temp))
        (double-stack
-	(loadw lo-bits ebp-tn (- (tn-offset float))))
+	(loadw lo-bits ebp-tn (- (1+ (tn-offset float)))))
        (descriptor-reg
 	(loadw lo-bits float double-float-value-slot
 	       other-pointer-lowtag)))

@@ -20,6 +20,9 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     ** out-of-line type testers for character strings are available.
     ** EQUAL compiler transform understands specialness of objects
        of type BIT-VECTOR.
+    ** accessing double-floats stored on the stack now works on x86-64.
+    ** debugger internals could sometimes create invalid lispobjs, 
+       resulting in GC crashes.
 
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
   * incompatible change: thread support for non-NPTL systems has

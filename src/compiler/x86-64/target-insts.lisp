@@ -61,12 +61,13 @@
 	    (rip-p
 	     (princ offset stream)
 	     (let ((addr (+ offset (sb!disassem:dstate-next-addr dstate))))
-	       (or (nth-value 1
-			      (sb!disassem::note-code-constant-absolute
-			       addr dstate))
-		   (sb!disassem:maybe-note-assembler-routine addr
-							     nil
-							     dstate))))
+	       (when (plusp addr)
+		 (or (nth-value 1
+				(sb!disassem::note-code-constant-absolute
+				 addr dstate))
+		     (sb!disassem:maybe-note-assembler-routine addr
+							       nil
+							       dstate)))))
 	    (firstp
 	     (progn
 	       (sb!disassem:princ16 offset stream)

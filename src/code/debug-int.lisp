@@ -1999,7 +1999,7 @@ register."
        ;; unbound marker
        (= val sb!vm:unbound-marker-widetag)
        ;; pointer
-       (and (logand val 1)
+       (and (logbitp 0 val)
 	    ;; Check that the pointer is valid. XXX Could do a better
 	    ;; job. FIXME: e.g. by calling out to an is_valid_pointer
 	    ;; routine in the C runtime support code
