@@ -37,6 +37,7 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "arch.h"
+#include "fixnump.h"
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"

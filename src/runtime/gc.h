@@ -29,11 +29,6 @@ extern void clear_auto_gc_trigger(void);
 
 extern int maybe_gc_pending;
 
-static inline int fixnump(lispobj obj) {
-    return((obj & 
-	    (LOWTAG_MASK & 
-	     (~(EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG)))) 
-	   == 0);
-}
+#include "fixnump.h"
 
 #endif /* _GC_H_ */

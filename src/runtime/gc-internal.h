@@ -80,6 +80,8 @@ lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);
 lispobj *search_dynamic_space(void *pointer);
 
+#include "fixnump.h"
+
 /* Scan an area looking for an object which encloses the given pointer.
  * Return the object start on success or NULL on failure. */
 static lispobj *

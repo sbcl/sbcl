@@ -37,6 +37,7 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "arch.h"
+#include "fixnump.h"
 #include "gc.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
