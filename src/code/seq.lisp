@@ -98,7 +98,8 @@
 
 (defun signal-index-too-large-error (sequence index)
   (let* ((length (length sequence))
-	 (max-index (and (plusp length) (1- length))))
+	 (max-index (and (plusp length)
+			 (1- length))))
     (error 'index-too-large-error
 	   :datum index
 	   :expected-type (if max-index
@@ -108,7 +109,8 @@
 
 (defun signal-end-too-large-error (sequence end)
   (let* ((length (length sequence))
-	 (max-end (and (not (minusp length) length))))
+	 (max-end (and (not (minusp length))
+		       length)))
     (error 'end-too-large-error
 	   :datum end
 	   :expected-type (if max-index

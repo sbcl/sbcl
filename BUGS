@@ -672,7 +672,9 @@ WORKAROUND:
    (IF (NOT (IGNORE-ERRORS ..))). E.g.
 	(defun foo1i ()
 	  (if (not (ignore-errors
-		     (make-pathname :host "foo" :directory "!bla" :name "bar")))
+		     (make-pathname :host "foo"
+                                    :directory "!bla"
+                                    :name "bar")))
 	      (print "ok")
 	      (error "notunlessnot")))
    The (NOT (IGNORE-ERRORS ..)) form evaluates to T, so this should be
@@ -1350,6 +1352,16 @@ WORKAROUND:
   bad argument value is).
 
 194: "no error from (THE REAL '(1 2 3)) in some cases"
+  (Actually this entry is probably two separate bugs, as
+  Alexey Dejneka commented on sbcl-devel 2002-09-03:)
+	I don't think that placing these two bugs in one entry is
+	a good idea: they have different explanations. The second
+	(min 1 nil) is caused by flushing of unused code--IDENTITY
+	can do nothing with it. So it is really bug 122. The first
+	(min nil) is due to M-V-PROG1: substituting a continuation
+	for the result, it forgets about type assertion. The purpose
+	of IDENTITY is to save the restricted continuation from
+	inaccurate transformations.
   In sbcl-0.7.7.9, 
     (multiple-value-prog1 (progn (the real '(1 2 3))))
   returns (1 2 3) instead of signalling an error. Also in sbcl-0.7.7.9,
@@ -1388,6 +1400,14 @@ WORKAROUND:
   internal implementation knowledge that even with SHORT-FLOAT
   and LONG-FLOAT left out of the union, this type is equal to REAL.
   So it'd be better just to say "This is not a REAL".
+
+196: "confusing error message for unREAL second arg to ATAN"
+  (reported by Alexey Dejneka sbcl-devel 2002-09-04)
+  In sbcl-0.7.7.11,
+    * (atan 1 #c(1 2))
+    debugger invoked on condition of type SIMPLE-TYPE-ERROR:
+      Argument X is not a NUMBER: #C(1 2)
+  (The actual type problem is that argument Y is not a REAL.)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

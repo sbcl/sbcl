@@ -452,11 +452,11 @@
 	((complex)
 	 (complex-atan y)))))
 
-;; It seems that everyone has a C version of sinh, cosh, and
-;; tanh. Let's use these for reals because the original
-;; implementations based on the definitions lose big in round-off
-;; error. These bad definitions also mean that sin and cos for
-;; complex numbers can also lose big.
+;;; It seems that every target system has a C version of sinh, cosh,
+;;; and tanh. Let's use these for reals because the original
+;;; implementations based on the definitions lose big in round-off
+;;; error. These bad definitions also mean that sin and cos for
+;;; complex numbers can also lose big.
 
 (defun sinh (number)
   #!+sb-doc
