@@ -1093,18 +1093,6 @@ bootstrapping.
 	      (null closurep)
 	      (null applyp))
 	 `(let () ,@body))
-	((and (null closurep)
-	      (null applyp))
-	 ;; OK to use MACROLET, and all args are mandatory
-	 ;; (else APPLYP would be true).
-	 `(call-next-method-bind
-	    (macrolet ((call-next-method (&rest cnm-args)
-			 `(call-next-method-body ,',method-name-declaration
-			                         ,(when cnm-args
-						    `(list ,@cnm-args))))
-		       (next-method-p ()
-			 `(next-method-p-body)))
-	       ,@body)))
 	(t
 	 `(call-next-method-bind
 	    (flet (,@(and call-next-method-p

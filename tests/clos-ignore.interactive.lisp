@@ -18,7 +18,7 @@
 
 (in-package :cl-user)
 
-(defgeneric foo ((x t) (y t) &key &allow-other-keys))
+(defgeneric foo (x y &key &allow-other-keys))
 
 ;;; should have no STYLE-WARNINGs (e.g. about unused vars)
 (defmethod foo ((x t) (y t))

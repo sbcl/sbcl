@@ -652,15 +652,6 @@ WORKAROUND:
   forever, even when it is uninterned and all other references to it
   are lost.
 
-136:
-  (reported by Arnaud Rouanet on cmucl-imp 2001-12-18)
-    (defmethod foo ((x integer))
-      x)
-    (defmethod foo :around ((x integer))
-      (let ((x (1+ x)))
-        (call-next-method)))
-  Now (FOO 3) should return 3, but instead it returns 4.
-
 141: 
   Pretty-printing nested backquotes doesn't work right, as 
   reported by Alexey Dejneka sbcl-devel 2002-01-13:

@@ -435,6 +435,15 @@
 (defclass subclass-for-class-allocation (superclass-with-slot) ())
 (make-instance 'subclass-for-class-allocation)
 
+;;; bug #136: CALL-NEXT-METHOD was being a little too lexical,
+;;; resulting in failure in the following:
+(defmethod call-next-method-lexical-args ((x integer))
+  x)
+(defmethod call-next-method-lexical-args :around ((x integer))
+  (let ((x (1+ x)))
+    (call-next-method)))
+(assert (= (call-next-method-lexical-args 3) 3))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

@@ -1403,10 +1403,13 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
   * fixed bug 172: macro lambda lists with required arguments after
     &REST arguments now cause an error to be signalled.  (thanks to
     Matthew Danish)
-  * fixed Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug (thanks
-    to Matthew Danish)
-  * fixed bug 225: STRING-STREAM is now a class (reported by Gilbert
+  * fixed Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM
+    bug. (thanks to Matthew Danish)
+  * fixed bug 225: STRING-STREAM is now a class. (reported by Gilbert
     Baumann)
+  * fixed bug 136: CALL-NEXT-METHOD no longer gets confused when
+    arguments are lexically rebound. (thanks to Gerd Moellmann and
+    Pierre Mai)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
