@@ -1613,8 +1613,8 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
 
 changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * The old distinction between CL:CLASS objects and SB-PCL:CLASS
-    objects has been removed.  The return value from CL:FIND-CLASS is
-    now a CLOS class, and likewise that of CL:CLASS-OF;
+    objects has been eliminated.  The return value from CL:FIND-CLASS
+    is now a CLOS class, and likewise that of CL:CLASS-OF;
     CL:BUILT-IN-CLASS, CL:STRUCTURE-CLASS and CL:STANDARD-CLASS name
     CLOS classes.
   * An interface to the MetaObject Protocol, as described in Kiczales,
@@ -1628,6 +1628,12 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     addresses instead of being hardcoded per-port.  Users affected by
     this probably have to be doing advanced things with shared
     libraries, and will know who they are.
+  * minor incompatible change: Previously, all --eval forms used were
+    processed with READ before any of them were processed with EVAL.
+    Now each --eval form is processed with both READ and EVAL before
+    the next --eval form is processed. (Thus package operations like
+    sbcl --eval "(defpackage :foo)" --eval "(print 'foo::bar)" now work
+    as the user might reasonably expect.)
   * minor incompatible change: *STANDARD-INPUT* is now only an
     INPUT-STREAM, not a BIDIRECTIONAL-STREAM. (thanks to Antonio 
     Martinez)

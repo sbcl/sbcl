@@ -298,12 +298,22 @@
   (/show0 "entering TOPLEVEL-INIT")
   (setf sb!thread::*session-lock* (sb!thread:make-mutex :name "the terminal"))
   (sb!thread::get-foreground)
-  (let ((sysinit nil)        ; value of --sysinit option
-	(userinit nil)       ; value of --userinit option
-	(reversed-evals nil) ; values of --eval options, in reverse order; and
-	                     ; also --load options, translated into --eval
-	(noprint nil)        ; Has a --noprint option been seen?
-	(options (rest *posix-argv*))) ; skipping program name
+  (let (;; value of --sysinit option
+	(sysinit nil)
+	;; value of --userinit option
+	(userinit nil)
+	;; values of --eval options, in reverse order; and also any
+	;; other options (like --load) which're translated into --eval
+	;;
+	;; The values are stored as strings, so that they can be
+	;; passed to READ only after their predecessors have been
+	;; EVALed, so that things work when e.g. REQUIRE in one EVAL
+	;; form creates a package referred to in the next EVAL form.
+	(reversed-evals nil) 
+	;; Has a --noprint option been seen?
+	(noprint nil)        
+	;; everything in *POSIX-ARGV* except for argv[0]=programname
+	(options (rest *posix-argv*))) 
 
     (declare (type list options))
 
@@ -338,22 +348,11 @@
 			 (setf userinit (pop-option))))
 		    ((string= option "--eval")
 		     (pop-option)
-		     (let ((eval-as-string (pop-option)))
-		       (with-input-from-string (eval-stream eval-as-string)
-			 (let* ((eof-marker (cons :eof :eof))
-				(eval (read eval-stream nil eof-marker))
-				(eof (read eval-stream nil eof-marker)))
-			   (cond ((eq eval eof-marker)
-				  (error "unable to parse ~S"
-					 eval-as-string))
-				 ((not (eq eof eof-marker))
-				  (error "more than one expression in ~S"
-					 eval-as-string))
-				 (t
-				  (push eval reversed-evals)))))))
+		     (push (pop-option) reversed-evals))
 		    ((string= option "--load")
 		     (pop-option)
-		     (push `(load ,(pop-option)) reversed-evals))
+		     (push (concatenate 'string "(LOAD \"" (pop-option) "\")")
+			   reversed-evals))
 		    ((string= option "--noprint")
 		     (pop-option)
 		     (setf noprint t))
@@ -363,10 +362,10 @@
 		    ((string= option "--noprogrammer")
 		     (warn "treating deprecated --noprogrammer as --disable-debugger")
 		     (pop-option)
-		     (push '(disable-debugger) reversed-evals))
+		     (push "(DISABLE-DEBUGGER)" reversed-evals))
 		    ((string= option "--disable-debugger")
 		     (pop-option)
-		     (push '(disable-debugger) reversed-evals))
+		     (push "(DISABLE-DEBUGGER)" reversed-evals))
 		    ((string= option "--end-toplevel-options")
 		     (pop-option)
 		     (return))
@@ -387,7 +386,7 @@
 			 (return)))))))
     (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
 
-    ;; Excise all the options that we processed, so that only
+    ;; Delete all the options that we processed, so that only
     ;; user-level options are left visible to user code.
     (setf (rest *posix-argv*) options)
 
@@ -444,10 +443,23 @@
 
 	      ;; Process --eval options.
 	      (/show0 "handling --eval options in TOPLEVEL-INIT")
-	      (dolist (eval (reverse reversed-evals))
+	      (dolist (expr-as-string (reverse reversed-evals))
 		(/show0 "handling one --eval option in TOPLEVEL-INIT")
-		(eval eval)
-		(flush-standard-output-streams)))
+		(let ((expr (with-input-from-string (eval-stream
+						     expr-as-string)
+			      (let* ((eof-marker (cons :eof :eof))
+				     (result (read eval-stream nil eof-marker))
+				     (eof (read eval-stream nil eof-marker)))
+				(cond ((eq result eof-marker)
+				       (error "unable to parse ~S"
+					      expr-as-string))
+				      ((not (eq eof eof-marker))
+				       (error "more than one expression in ~S"
+					      expr-as-string))
+				      (t
+				       result))))))
+		  (eval expr)
+		  (flush-standard-output-streams))))
 	  (continue ()
 	    :report
 	    "Continue anyway (skipping to toplevel read/eval/print loop)."

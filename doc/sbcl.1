@@ -309,9 +309,9 @@ initialization file to be read, but on a Unix system "--userinit
 .TP 3
 .B --eval <command>
 After executing any initialization file, but before starting the
-read-eval-print loop on standard input, evaluate the command given.
-More than one --eval option can be used, and all will be executed, in
-the order they appear on the command line.
+read-eval-print loop on standard input, read and evaluate the command
+given. More than one --eval option can be used, and all will be read
+and executed, in the order they appear on the command line.
 .TP 3
 .B --load <filename>
 This is equivalent to --eval '(load "<filename>")'. The special
@@ -344,10 +344,10 @@ command.)
 Regardless of the order in which --sysinit, --userinit, and --eval
 options appear on the command line, the sysinit file, if it exists, is
 loaded first; then the userinit file, if it exists, is loaded; then
-any --eval commands are executed in sequence; then the read-eval-print
-loop is started on standard input. At any step, error conditions or
-commands such as SB-EXT:QUIT can cause execution to be terminated
-before proceeding to subsequent steps.
+any --eval commands are read and executed in sequence; then the
+read-eval-print loop is started on standard input. At any step, error
+conditions or commands such as SB-EXT:QUIT can cause execution to be
+terminated before proceeding to subsequent steps.
 
 Note that when running SBCL with the --core option, using a core file
 created by a user call to the SB-EXT:SAVE-LISP-AND-DIE, the toplevel
