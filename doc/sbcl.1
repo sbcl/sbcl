@@ -63,8 +63,8 @@ run a nonstandard toplevel which does not accept the standard toplevel options.
 .TP 3
 .B --noinform
 Suppress the printing of any banner or other informational message at
-startup. (Combined with the --noprint toplevel option, this makes it
-straightforward to write Lisp "scripts" which work as Unix pipes.)
+startup. (This makes it easier to write Lisp programs which work in
+Unix pipelines. See also the "--noinform" option.)
 .PP
 
 In the future, runtime options may be added to control behavior such
@@ -101,8 +101,8 @@ in the order they appear on the command line.
 When ordinarily the toplevel "read-eval-print loop" would be
 executed, execute a "read-eval loop" instead, i.e. don't print
 a prompt and don't echo results. (Combined with the --noinform
-runtime option, this makes it straightforward to write Lisp
-"scripts" which work as Unix pipe utilities.)
+runtime option, this makes it easier to write Lisp
+"scripts" which work in Unix pipelines.)
 .TP 3
 .B --noprogrammer
 Ordinarily the system initializes *DEBUG-IO* to *TERMINAL-IO*.

@@ -543,6 +543,19 @@
 		 (addr (deref ptr offset)))
 	       len))
 
+(defun unix-pipe ()
+  #!+sb-doc
+  "Unix-pipe sets up a unix-piping mechanism consisting of
+  an input pipe and an output pipe.  Unix-Pipe returns two
+  values: if no error occurred the first value is the pipe
+  to be read from and the second is can be written to.  If
+  an error occurred the first value is NIL and the second
+  the unix error code."
+  (with-alien ((fds (array int 2)))
+    (syscall ("pipe" (* int))
+	     (values (deref fds 0) (deref fds 1))
+	     (cast fds (* int)))))
+
 ;;; UNIX-CHDIR accepts a directory name and makes that the
 ;;; current working directory.
 (defun unix-chdir (path)
@@ -565,6 +578,14 @@
 						     (function int (* char)))
 				       (cast buf (* char)))))
 	    (cast buf c-string))))
+
+(defun unix-dup (fd)
+  #!+sb-doc
+  "Unix-dup duplicates an existing file descriptor (given as the
+   argument) and returns it.  If FD is not a valid file descriptor, NIL
+   and an error number are returned."
+  (declare (type unix-fd fd))
+  (int-syscall ("dup" int) fd))
 
 ;;; UNIX-EXIT terminates a program.
 (defun unix-exit (&optional (code 0))
@@ -639,15 +660,23 @@
 	     (cast buf c-string)
 	     (cast buf (* char)) 256)))
 
-;;; Unix-fsync writes the core-image of the file described by "fd" to
-;;; permanent storage (i.e. disk).
-
 (defun unix-fsync (fd)
   #!+sb-doc
   "Unix-fsync writes the core image of the file described by
    fd to disk."
   (declare (type unix-fd fd))
   (void-syscall ("fsync" int) fd))
+
+;;;; sys/ioctl.h
+
+(defun unix-ioctl (fd cmd arg)
+  #!+sb-doc
+  "Unix-ioctl performs a variety of operations on open i/o
+   descriptors.  See the UNIX Programmer's Manual for more
+   information."
+  (declare (type unix-fd fd)
+	   (type (unsigned-byte 32) cmd))
+  (void-syscall ("ioctl" int unsigned-int (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
 

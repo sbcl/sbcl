@@ -411,26 +411,26 @@
 	  (unless (load userinit-truename)
 	    (error "~S was not successfully loaded." userinit-truename))
 	  (flush-standard-output-streams))
-	(/show0 "loaded USERINIT-TRUENAME")))
+	(/show0 "loaded USERINIT-TRUENAME"))
 
-    ;; Handle --eval options.
-    (/show0 "handling --eval options in TOPLEVEL")
-    (dolist (eval (reverse evals))
-      (/show0 "handling one --eval option in TOPLEVEL")
-      (eval eval)
-      (flush-standard-output-streams))
+      ;; Handle --eval options.
+      (/show0 "handling --eval options in TOPLEVEL")
+      (dolist (eval (reverse evals))
+	(/show0 "handling one --eval option in TOPLEVEL")
+	(eval eval)
+	(flush-standard-output-streams))
 
-    ;; Handle stream binding controlled by --noprogrammer option.
-    ;;
-    ;; FIXME: When we do actually implement this, shouldn't it go
-    ;; earlier in the sequence, so that its stream bindings will
-    ;; affect the behavior of init files and --eval options?
-    (/show0 "handling --noprogrammer option in TOPLEVEL")
-    (when noprogrammer
-      (warn "stub: --noprogrammer option unimplemented")) ; FIXME
+      ;; Handle stream binding controlled by --noprogrammer option.
+      ;;
+      ;; FIXME: When we do actually implement this, shouldn't it go
+      ;; earlier in the sequence, so that its stream bindings will
+      ;; affect the behavior of init files and --eval options?
+      (/show0 "handling --noprogrammer option in TOPLEVEL")
+      (when noprogrammer
+	(warn "stub: --noprogrammer option unimplemented")) ; FIXME
 
-    (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL")
-    (toplevel-repl noprint)))
+      (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL")
+      (toplevel-repl noprint))))
 
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)

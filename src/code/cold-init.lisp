@@ -282,7 +282,7 @@
 instead (which is another name for the same thing)."))
   (if recklessly-p
       (sb!unix:unix-exit unix-status)
-      (throw '%end-of-the-world unix-code)))
+      (throw '%end-of-the-world unix-status)))
 
 ;;;; initialization functions
 

@@ -3,7 +3,7 @@
 # Run the regression tests in this directory.
 
 # how we invoke SBCL
-sbcl=${1:-sbcl --noprint --noprogrammer}
+sbcl=${1:-sbcl --noinform --noprint --noprogrammer}
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the return value we expect from a successful test.

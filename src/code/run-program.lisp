@@ -333,11 +333,11 @@
   (stdout sb-c-call:int)
   (stderr sb-c-call:int))
 
-;;; RUN-PROGRAM uses fork and execve to run a different program.
-;;; Strange stuff happens to keep the unix state of the world
+;;; RUN-PROGRAM uses fork() and execve() to run a different program.
+;;; Strange stuff happens to keep the Unix state of the world
 ;;; coherent.
 ;;;
-;;; The child process needs to get it's input from somewhere, and send
+;;; The child process needs to get its input from somewhere, and send
 ;;; its output (both standard and error) to somewhere. We have to do
 ;;; different things depending on where these somewheres really are.
 ;;;
@@ -348,8 +348,8 @@
 ;;;     this stream after the child is up and running to free any 
 ;;;     storage used in the parent.
 ;;;  -- NIL: Same as "file", but use "/dev/null" as the file.
-;;;  -- :STREAM: Use unix-pipe to create two descriptors. Use
-;;;     sb-sys:make-fd-stream to create the output stream on the
+;;;  -- :STREAM: Use Unix pipe() to create two descriptors. Use
+;;;     SB-SYS:MAKE-FD-STREAM to create the output stream on the
 ;;;     writeable descriptor, and pass the readable descriptor to
 ;;;     the child. The parent must close the readable descriptor for
 ;;;     EOF to be passed up correctly.
@@ -383,56 +383,56 @@
    Common Lisp Users Manual for details about the PROCESS structure.
 
    The keyword arguments have the following meanings:
-     :env -
+     :ENV
         An A-LIST mapping keyword environment variables to simple-string
 	values.
-     :wait -
+     :WAIT
         If non-NIL (default), wait until the created process finishes.  If
         NIL, continue running Lisp until the program finishes.
-     :pty -
+     :PTY
         Either T, NIL, or a stream.  Unless NIL, the subprocess is established
 	under a PTY.  If :pty is a stream, all output to this pty is sent to
 	this stream, otherwise the PROCESS-PTY slot is filled in with a stream
 	connected to pty that can read output and write input.
-     :input -
+     :INPUT
         Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
 	input for the current process is inherited.  If NIL, /dev/null
 	is used.  If a pathname, the file so specified is used.  If a stream,
 	all the input is read from that stream and send to the subprocess.  If
 	:STREAM, the PROCESS-INPUT slot is filled in with a stream that sends 
 	its output to the process. Defaults to NIL.
-     :if-input-does-not-exist (when :input is the name of a file) -
+     :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
         can be one of:
-           :error - generate an error.
-           :create - create an empty file.
-           nil (default) - return nil from run-program.
-     :output -
+           :ERROR to generate an error
+           :CREATE to create an empty file
+           NIL (the default) to return NIL from RUN-PROGRAM
+     :OUTPUT 
         Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
 	output for the current process is inherited.  If NIL, /dev/null
 	is used.  If a pathname, the file so specified is used.  If a stream,
 	all the output from the process is written to this stream. If
 	:STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
 	be read to get the output. Defaults to NIL.
-     :if-output-exists (when :input is the name of a file) -
+     :IF-OUTPUT-EXISTS (when :OUTPUT is the name of a file)
         can be one of:
-           :error (default) - generates an error if the file already exists.
-           :supersede - output from the program supersedes the file.
-           :append - output from the program is appended to the file.
-           nil - run-program returns nil without doing anything.
-     :error and :if-error-exists - 
-        Same as :output and :if-output-exists, except that :error can also be
-	specified as :output in which case all error output is routed to the
+           :ERROR (the default) to generate an error
+           :SUPERSEDE to supersede the file with output from the program
+           :APPEND to append output from the program to the file 
+           NIL to return NIL from RUN-PROGRAM, without doing anything
+     :ERROR and :IF-ERROR-EXISTS
+        Same as :OUTPUT and :IF-OUTPUT-EXISTS, except that :ERROR can also be
+	specified as :OUTPUT in which case all error output is routed to the
 	same place as normal output.
-     :status-hook -
+     :STATUS-HOOK
         This is a function the system calls whenever the status of the
         process changes.  The function takes the process as an argument."
 
-  ;; Make sure the interrupt handler is installed.
+  ;; Make sure that the interrupt handler is installed.
   (sb-sys:enable-interrupt sb-unix:sigchld #'sigchld-handler)
-  ;; Make sure all the args are okay.
+  ;; Make sure that all the args are okay.
   (unless (every #'simple-string-p args)
     (error "All arguments to program must be simple strings: ~S" args))
-  ;; Pre-pend the program to the argument list.
+  ;; Prepend the program to the argument list.
   (push (namestring program) args)
   ;; Clear various specials used by GET-DESCRIPTOR-FOR to communicate
   ;; cleanup info.  Also, establish proc at this level so we can
