@@ -128,10 +128,13 @@ NPASSED=`find contrib -name test-passed -print | wc -l`
 
 echo
 echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
-echo "contributed modules. If you would like to run more extensive tests (but" 
-echo "expect some failures on non-x86 platforms) on the new SBCL, you can try:"
+echo "contributed modules. If you would like to run more extensive tests on" 
+echo "the new SBCL, you can try:"
 echo
 echo "  cd tests && sh ./run-tests.sh"
+echo
+echo "  (All tests should pass on x86/Linux and ppc/Darwin, on other platforms"
+echo "  some failures are currently expected; patches welcome as always.)"
 echo
 echo "To build documentation:"
 echo

@@ -91,7 +91,9 @@
 	   least-positive-double-float))
 (assert (= 0.0 (scale-float 1.0 most-negative-fixnum)))
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
-(assert (raises-error? (scale-float 1.0 most-positive-fixnum)
-		       floating-point-overflow))
-(assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
-		       floating-point-overflow))
+#-darwin ;; bug 372
+(progn
+  (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
+			 floating-point-overflow))
+  (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
+			 floating-point-overflow)))

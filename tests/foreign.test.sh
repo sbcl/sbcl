@@ -30,8 +30,13 @@ build_so() {
   if [ $(uname -p) = x86_64 ]; then
     CFLAGS="$CFLAGS -fPIC"
   fi
+  if [ $(uname) = Darwin ]; then
+    SO_FLAGS="-bundle"
+  else
+    SO_FLAGS="-shared"
+  fi
   cc -c $1.c -o $1.o $CFLAGS
-  ld -shared -o $1.so $1.o
+  ld $SO_FLAGS -o $1.so $1.o
 }
     
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
@@ -93,7 +98,7 @@ cat > $testfilestem.def.lisp <<EOF
         (lambda (condition hook)
           (print (list :debugger-hook condition))
           (let ((cont (find-restart 'continue condition)))
-            (when cont 
+            (when cont
               (invoke-restart cont)))
           (print :fell-through)
           (invoke-debugger condition)))

@@ -754,6 +754,16 @@ void thread_exit_handler(int num, siginfo_t *info, void *v_context)
 	
 #endif
 
+/* KLUDGE: Theoretically the approach we use for undefined alien
+ * variables should work for functions as well, but on PPC/Darwin
+ * we get bus error at bogus addresses instead, hence this workaround,
+ * that has the added benefit of automatically discriminating between
+ * functions and variables. 
+ */
+void undefined_alien_function() {
+    funcall0(SymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
+}
+
 boolean handle_guard_page_triggered(os_context_t *context,void *addr){
     struct thread *th=arch_os_get_current_thread();
     
@@ -785,7 +795,7 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
     else if (addr >= undefined_alien_address &&
 	     addr < undefined_alien_address + os_vm_page_size) {
 	arrange_return_to_lisp_function
-          (context, SymbolFunction(UNDEFINED_ALIEN_ERROR));
+          (context, SymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
 	return 1;
     }
     else return 0;

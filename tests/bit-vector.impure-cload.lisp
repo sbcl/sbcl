@@ -16,7 +16,7 @@
 
 (declaim (optimize (speed 3) (safety 1) (space 0) (compilation-speed 0)))
 
-(defun bit-vector-test ()
+(defun test-small-bit-vectors ()
   ;; deal with the potential length 0 special case
   (let ((a (make-array 0 :element-type 'bit))
 	(b (make-array 0 :element-type 'bit)))
@@ -31,36 +31,59 @@
     (setf (aref b 1) 1) ; b = #*010..0
     (assert (equal (bit-xor a b) #*001111111111111111111111111111111))
     (assert (equal (bit-and a b) #*010000000000000000000000000000000)))
-  ;; now test the biggy, mostly that it works...
-  #-x86-64 ; except on machines where addressable space is likely to be
-           ; much bigger than physical memory
-  (let ((a (make-array (1- array-dimension-limit) :element-type 'bit :initial-element 0))
-	(b (make-array (1- array-dimension-limit) :element-type 'bit :initial-element 0)))
-    (bit-not a a)
-    (assert (= (aref a 0) 1))
-    (assert (= (aref a (- array-dimension-limit 2)) 1))
-    (bit-and a b a)
-    (assert (= (aref a 0) 0))
-    (assert (= (aref a (- array-dimension-limit 2)) 0)))
   ;; a special COUNT transform on bitvectors; triggers on (>= SPEED SPACE)
   (locally
-   (declare (optimize (speed 3) (space 1)))
-   (let ((bv1 (make-array 5 :element-type 'bit))
-	 (bv2 (make-array 0 :element-type 'bit))
-	 (bv3 (make-array 68 :element-type 'bit)))
-     (declare (type simple-bit-vector bv1 bv2 bv3))
-     (setf (sbit bv3 42) 1)
-     ;; bitvector smaller than the word size
-     (assert (= 0 (count 1 bv1)))
-     (assert (= 5 (count 0 bv1)))
-     ;; special case of 0-length bitvectors
-     (assert (= 0 (count 1 bv2)))
-     (assert (= 0 (count 0 bv2)))
-     ;; bitvector larger than the word size
-     (assert (= 1 (count 1 bv3)))
-     (assert (= 67 (count 0 bv3))))))
+      (declare (optimize (speed 3) (space 1)))
+    (let ((bv1 (make-array 5 :element-type 'bit))
+	  (bv2 (make-array 0 :element-type 'bit))
+	  (bv3 (make-array 68 :element-type 'bit)))
+      (declare (type simple-bit-vector bv1 bv2 bv3))
+      (setf (sbit bv3 42) 1)
+      ;; bitvector smaller than the word size
+      (assert (= 0 (count 1 bv1)))
+      (assert (= 5 (count 0 bv1)))
+      ;; special case of 0-length bitvectors
+      (assert (= 0 (count 1 bv2)))
+      (assert (= 0 (count 0 bv2)))
+      ;; bitvector larger than the word size
+      (assert (= 1 (count 1 bv3)))
+      (assert (= 67 (count 0 bv3))))))
 
-(bit-vector-test)
+(defun inform (msg)
+  (print msg)
+  (force-output))
+
+(defun test-big-bit-vectors ()
+  ;; now test the biggy, mostly that it works...
+  (let ((a (progn 
+	     (inform :make-array-1)
+	     (make-array (1- array-dimension-limit) 
+			 :element-type 'bit :initial-element 0)))
+	(b (progn
+	     (inform :make-array-2)
+	     (make-array (1- array-dimension-limit) 
+			 :element-type 'bit :initial-element 0))))
+    (inform :bit-not)
+    (bit-not a a)
+    (inform :aref-1)
+    (assert (= (aref a 0) 1))
+    (inform :aref-2)
+    (assert (= (aref a (- array-dimension-limit 2)) 1))
+    #-darwin
+    (progn
+      (inform :bit-and)
+      (bit-and a b a)
+      (inform :aref-3)
+      (assert (= (aref a 0) 0))
+      (inform :aref-4)
+      (assert (= (aref a (- array-dimension-limit 2)) 0)))))
+
+(test-small-bit-vectors)
+
+#-x86-64 
+;; except on machines where addressable space is likely to be
+;; much bigger than physical memory
+(test-big-bit-vectors)
 
 ;;; success
 (sb-ext:quit :unix-status 104)

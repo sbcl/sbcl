@@ -161,6 +161,9 @@
 
 ;;; FIXME: !COLD-INIT probably doesn't need
 ;;; to be in the static symbols table any more.
+;;;
+;;; FIXME: some of these symbols are shared by all backends,
+;;; and should be factored out into a common file.
 (defparameter *static-symbols*
   '(t
 
@@ -172,7 +175,8 @@
     sub-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
-    sb!kernel::undefined-alien-error
+    sb!kernel::undefined-alien-variable-error
+    sb!kernel::undefined-alien-function-error
     sb!di::handle-breakpoint
     fdefinition-object
     #!+sb-thread sb!thread::handle-thread-exit

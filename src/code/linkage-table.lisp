@@ -48,7 +48,7 @@
   (let ((table-address (+ (* (hash-table-count *linkage-info*)
 			     sb!vm:linkage-table-entry-size)
 			  sb!vm:linkage-table-space-start))
-	(real-address (get-dynamic-foreign-symbol-address name)))
+	(real-address (get-dynamic-foreign-symbol-address name datap)))
     (aver real-address)
     (unless (< table-address sb!vm:linkage-table-space-end)
       (error "Linkage-table full (~D entries): cannot link ~S."
@@ -74,9 +74,10 @@
 (defun update-linkage-table ()
   ;; Doesn't take care of it's own locking -- callers are responsible
   (maphash (lambda (name info)
-             (let ((datap (linkage-info-datap info))
-                   (table-address (linkage-info-address info))
-                   (real-address (get-dynamic-foreign-symbol-address name)))
+             (let* ((datap (linkage-info-datap info))
+		    (table-address (linkage-info-address info))
+		    (real-address 
+		     (get-dynamic-foreign-symbol-address name datap)))
 	       (aver (and table-address real-address))
 	       (write-linkage-table-entry table-address
 					  real-address

@@ -1104,18 +1104,43 @@
      (schar "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" r) 
      stream)))
 
+;; Algorithm by Harald Hanche-Olsen, sbcl-devel 2005-02-05
 (defun %output-bignum-in-base (n base stream)
-  (labels ((bisect (n power)
-             (if (fixnump n)
-                 (%output-fixnum-in-base n base stream)
-                 (let ((k (truncate power 2)))
-                   (multiple-value-bind (q r) (truncate n (expt base k))
-                     (bisect q (- power k))
-                     (let ((npower (if (zerop r) 0 (truncate (log r base)))))
-                       (dotimes (z (- k npower 1))
-                         (write-char #\0 stream))
-                       (bisect r npower)))))))
-    (bisect n (truncate (log n base)))))
+  (declare (type bignum n) (type fixnum base))
+  (let ((power (make-array 10 :adjustable t :fill-pointer 0)))
+    ;; Here there be the bottleneck for big bignums, in the (* p p).
+    ;; A special purpose SQUARE-BIGNUM might help a bit. See eg: Dan
+    ;; Zuras, "On Squaring and Multiplying Large Integers", ARITH-11:
+    ;; IEEE Symposium on Computer Arithmetic, 1993, pp. 260 to 271.
+    ;; Reprinted as "More on Multiplying and Squaring Large Integers",
+    ;; IEEE Transactions on Computers, volume 43, number 8, August
+    ;; 1994, pp. 899-908.
+    (do ((p base (* p p)))
+	((> p n))
+      (vector-push-extend p power))
+    ;; (aref power k) == (expt base (expt 2 k))
+    (labels ((bisect (n k exactp)
+	       (declare (fixnum k))
+	       ;; N is the number to bisect
+	       ;; K on initial entry BASE^(2^K) > N 
+	       ;; EXACTP is true if 2^K is the exact number of digits
+	       (cond ((zerop n)
+		      (when exactp
+			(loop repeat (ash 1 k) do (write-char #\0 stream))))
+		     ((zerop k)
+		      (write-char 
+		       (schar "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" n)
+		       stream))
+		     (t
+		      (setf k (1- k))
+		      (multiple-value-bind (q r) (truncate n (aref power k))
+			;; EXACTP is NIL only at the head of the
+			;; initial number, as we don't know the number
+			;; of digits there, but we do know that it
+			;; doesn't get any leading zeros.
+			(bisect q k exactp)
+			(bisect r k (or exactp (plusp q))))))))
+      (bisect n (fill-pointer power) nil))))
 
 (defun %output-integer-in-base (integer base stream)
   (when (minusp integer)

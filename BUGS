@@ -2032,12 +2032,31 @@ WORKAROUND:
   (most-positive-short-float or short-float-infinity) or signalling an
   error immediately would seem to make more sense.
 
-371:
-  SBCL 0.8.19 fails on
+372: floating-point overflow not signalled on ppc/darwin
+ The following assertions in float.pure.lisp fail on ppc/darwin 
+ (Mac OS X version 10.3.7):
+   (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
+	                  floating-point-overflow))
+   (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
+                          floating-point-overflow)))
+ as the SCALE-FLOAT just returns 
+ #.SB-EXT:SINGLE/DOUBLE-FLOAT-POSITIVE-INFINITY. These tests have been
+ disabled on Darwin for now.
 
-    (defvar *r* -7043009959286724629649270926654940933664689003233793014518979272497911394287216967075767325693021717277238746020477538876750544587281879084559996466844417586093291189295867052594478662802691926547232838591510540917276694295393715934079679531035912244103731582711556740654671309980075069010778644542022/670550434139267031632063192770201289106737062379324644110801846820471752716238484923370056920388400273070254958650831435834503195629325418985020030706879602898158806736813101434594805676212779217311897830937606064579213895527844045511878668289820732425014254579493444623868748969110751636786165152601)
+373: profiling issues on ppc/darwin
+ The following bit from smoke.impure.lisp fails on ppc/darwin:
+    (progn
+      (defun profiled-fun ()
+        (random 1d0))
+      (profile profiled-fun)
+      (loop repeat 100000 do (profiled-fun))
+      (report))
+ dropping into the debugger with a TYPE-ERROR:
+    The value -1073741382 is not of type UNSIGNED-BYTE.
+ The test has been disabled on Darwin till the bug is fixed.
 
-    (let ((*print-base* 5)
-          (*read-base* 5)
-          (*print-radix* nil))
-      (assert (= *r* (read-from-string (prin1-to-string *r*)))))
+374: BIT-AND problem on ppc/darwin:
+  The BIT-AND test in bit-vector.impure-cload.lisp results in
+    fatal error encountered in SBCL pid 8356:
+    GC invariant lost, file "gc-common.c", line 605
+  on ppc/darwin. Test disabled for the duration.

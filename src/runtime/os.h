@@ -44,7 +44,7 @@
 #define OS_VM_PROT_ALL \
   (OS_VM_PROT_READ | OS_VM_PROT_WRITE | OS_VM_PROT_EXECUTE)
 
-#define OS_VM_PROT_NONE (!OS_VM_PROT_ALL)
+#define OS_VM_PROT_NONE 0
 
 extern os_vm_size_t os_vm_page_size;
 

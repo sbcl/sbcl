@@ -141,7 +141,7 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
 
 (let ((symbols ())
       (undefineds ()))
-  (defun get-dynamic-foreign-symbol-address (symbol)
+  (defun get-dynamic-foreign-symbol-address (symbol &optional datap)
     (dlerror)				; clear old errors
     (unless *runtime-dlhandle*
       (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
@@ -160,7 +160,10 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
               (style-warn "Undefined alien: ~S" symbol)
               (pushnew symbol undefineds :test #'equal)
               (remove symbol symbols :test #'equal)
-              undefined-alien-address)
+	      (if datap
+		  undefined-alien-address
+		  (foreign-symbol-address-as-integer 
+		   (sb!vm:extern-alien-name "undefined_alien_function"))))
              (addr
               (pushnew symbol symbols :test #'equal)
               (remove symbol undefineds :test #'equal)

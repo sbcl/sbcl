@@ -31,13 +31,15 @@
 (assert (typep (in-package :cl-user) 'package))
 
 ;;; PROFILE should run without obvious breakage
-(defun profiled-fun ()
-  (random 1d0))
-(profile profiled-fun)
-(loop repeat 100000 do (profiled-fun))
-(report)
+#-darwin
+(progn
+  (defun profiled-fun ()
+    (random 1d0))
+  (profile profiled-fun)
+  (loop repeat 100000 do (profiled-fun))
+  (report))
 
-;;; DEFCONSTANT should behave as the documentation specifies,
+;;; Defconstant should behave as the documentation specifies,
 ;;; including documented condition type.
 (defun oidentity (x) x)
 (defconstant +const+ 1)

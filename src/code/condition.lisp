@@ -956,11 +956,20 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 ) ; progn
 
-(define-condition undefined-alien-error (error) ()
+(define-condition undefined-alien-error (error) ())
+
+(define-condition undefined-alien-variable-error (undefined-alien-error) ()
   (:report
    (lambda (condition stream)
      (declare (ignore condition))
-     (format stream "Attempt to access an undefined alien value."))))
+     (format stream "Attempt to access an undefined alien variable."))))
+
+(define-condition undefined-alien-function-error (undefined-alien-error) ()
+  (:report
+   (lambda (condition stream)
+     (declare (ignore condition))
+     (format stream "Attempt to call an undefined alien function."))))
+
 
 ;;;; various other (not specified by ANSI) CONDITIONs
 ;;;;

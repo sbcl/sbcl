@@ -4,6 +4,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed bugs 19 and 317: fixed-format floating point printing is
     more accurate.  This also fixes a bug reported by Adam Warner
     related to the ~@F format directive.
+  * fixed bug 371: bignum print/read inconsistency. (thanks to Harald
+    Hanche-Olsen)
   * fixed bug: SET-SYNTAX-FROM-CHAR correctly shallow-copies a
     dispatch table if the from-char is a dispatch macro character.
   * fixed bug: COUNT and EQUAL on bit vectors with lengths divisible

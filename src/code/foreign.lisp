@@ -30,7 +30,7 @@
       (progn
         #-sb-xc-host
         (values #!-linkage-table
-                (get-dynamic-foreign-symbol-address name)
+                (get-dynamic-foreign-symbol-address name datap)
                 #!+linkage-table
                 (ensure-foreign-symbol-linkage name datap)
                 t))))
