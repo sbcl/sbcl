@@ -36,7 +36,7 @@ test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
 
 cp src/runtime/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/
 cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
-cp doc/sbcl.1 $MAN_DIR/man1/
+cp doc/sbcl.1 $BUILD_ROOT$MAN_DIR/man1/
 
 # installing contrib 
 
