@@ -824,17 +824,6 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     int next_page;
     int large = (nbytes >= large_object_size);
 
-    /*
-      if (nbytes > 200000)
-      FSHOW((stderr, "/alloc_large %d\n", nbytes));
-    */
-
-    /*
-      FSHOW((stderr,
-      "/gc_alloc_large() for %d bytes from gen %d\n",
-      nbytes, gc_alloc_generation));
-    */
-
     /* If the object is small, and there is room in the current region
        then allocate it in the current region. */
     if (!large
@@ -965,6 +954,7 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
     int num_pages;
     int large = !alloc_region && (nbytes >= large_object_size);
 
+    gc_assert(free_pages_lock);
     /* Search for a contiguous free space of at least nbytes. If it's a
        large object then align it on a page boundary by searching for a
        free page. */

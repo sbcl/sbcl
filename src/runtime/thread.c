@@ -215,13 +215,13 @@ struct mutex {
 
 void get_spinlock(lispobj *word,int value)
 {
-    u32 new_val=0;
+    u32 eax=0;
     do {
 	asm ("xor %0,%0;cmpxchg %1,%2" 
-	     : "=a" (new_val)
-	     : "r" (value), "m" (word)
+	     : "=a" (eax)
+	     : "r" (value), "m" (*word)
 	     : "memory", "cc");
-    } while(new_val==0);
+    } while(eax!=0);
 }
 
 void add_thread_to_queue(int pid, lispobj mutex_p)
