@@ -875,19 +875,19 @@
 ;;; :DOWNCASE		:CAPITALIZE
 (defun output-capitalize-symbol (pname stream)
   (declare (simple-string pname))
-  (let ((prev-not-alpha t)
+  (let ((prev-not-alphanum t)
 	(up (eq (readtable-case *readtable*) :upcase)))
     (dotimes (i (length pname))
       (let ((char (char pname i)))
 	(write-char (if up
-			(if (or prev-not-alpha (lower-case-p char))
+			(if (or prev-not-alphanum (lower-case-p char))
 			    char
 			    (char-downcase char))
-			(if prev-not-alpha
+			(if prev-not-alphanum
 			    (char-upcase char)
 			    char))
 		    stream)
-	(setq prev-not-alpha (not (alpha-char-p char)))))))
+	(setq prev-not-alphanum (not (alphanumericp char)))))))
 
 ;;; called when:
 ;;; READTABLE-CASE	*PRINT-CASE*

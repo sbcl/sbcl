@@ -2342,6 +2342,9 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        have been read to end-of-file.
     ** CLOSE works as expected on the null CONCATENATED-STREAM, and on
        STRING-STREAMS.
+    ** Printing symbols with *PRINT-CASE* :CAPITALIZE respects the
+       description of determination of which consecutive characters
+       constitute a word.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
