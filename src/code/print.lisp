@@ -470,7 +470,7 @@
 		      *print-object-is-disabled-p*))
 	    (print-object object stream))
 	   ((typep object 'structure-object)
-	    (default-structure-print object stream *current-level*))
+	    (default-structure-print object stream *current-level-in-print*))
 	   (t
 	    (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream))))
     (function
@@ -1054,7 +1054,7 @@
 ;;; use until CLOS is set up (at which time it will be replaced with
 ;;; the real generic function implementation)
 (defun print-object (instance stream)
-  (default-structure-print instance stream *current-level*))
+  (default-structure-print instance stream *current-level-in-print*))
 
 ;;;; integer, ratio, and complex printing (i.e. everything but floats)
 

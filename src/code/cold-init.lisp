@@ -309,7 +309,7 @@ instead (which is another name for the same thing)."))
 #!+sb-show
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
-  (let ((addr (sb!kernel:get-lisp-obj-address thing))
+  (let ((addr (get-lisp-obj-address thing))
 	(str (make-string 10)))
     (/noshow0 "ADDR and STR calculated")
     (setf (char str 0) #\0

@@ -248,7 +248,7 @@
 		    (or (not wherein)
 			(trace-wherein-p frame wherein)))))
        (when conditionp
-	 (let ((sb-kernel:*current-level* 0)
+	 (let ((sb-kernel:*current-level-in-print* 0)
 	       (*standard-output* *trace-output*)
 	       (*in-trace* t))
 	   (fresh-line)
@@ -287,7 +287,7 @@
 		 (or (cdr entry)
 		     (let ((cond (trace-info-condition-after info)))
 		       (and cond (funcall (cdr cond) frame)))))
-	(let ((sb-kernel:*current-level* 0)
+	(let ((sb-kernel:*current-level-in-print* 0)
 	      (*standard-output* *trace-output*)
 	      (*in-trace* t))
 	  (fresh-line)

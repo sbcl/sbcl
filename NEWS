@@ -980,6 +980,13 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
 * The fasl file version number changed again, for dozens of reasons,
   some of which are apparent above.
 
+changes in sbcl-0.7.0 relative to sbcl-0.6.13:
+* various bug fixes, notably:
+  ** DEFGENERIC is now choosier about the methods it redefines, so
+     reLOADing a previously-LOADed file containing DEFGENERICs does
+     the right thing now, so now the Lispy edit/reLOAD-a-little/test
+     cycle works as it should. (thanks to APD)
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

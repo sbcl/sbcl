@@ -2363,8 +2363,7 @@
 				sb!vm:fun-pointer-lowtag))
 	 (next (read-wordindexed code-object sb!vm:code-entry-points-slot)))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
-      ;; FIXME: This should probably become a fatal error.
-      (warn "unaligned function entry: ~S at #X~X" name offset))
+      (error "unaligned function entry: ~S at #X~X" name offset))
     (write-wordindexed code-object sb!vm:code-entry-points-slot fn)
     (write-memory fn
 		  (make-other-immediate-descriptor
@@ -2389,8 +2388,7 @@
 		       ;; code instead of a pointer back to the object
 		       ;; itself.) Ask on the mailing list whether
 		       ;; this is documented somewhere, and if not,
-		       ;; try to reverse engineer some documentation
-		       ;; before release.
+		       ;; try to reverse engineer some documentation.
 		       #!-x86
 		       ;; a pointer back to the function object, as
 		       ;; described in CMU CL
@@ -2625,7 +2623,6 @@
 
   ;; writing codes/strings for internal errors
   (format t "#define ERRORS { \\~%")
-  ;; FIXME: Is this just DOVECTOR?
   (let ((internal-errors sb!c:*backend-internal-errors*))
     (dotimes (i (length internal-errors))
       (format t "    ~S, /*~D*/ \\~%" (cdr (aref internal-errors i)) i)))
@@ -2669,8 +2666,8 @@
 
   ;; writing static symbol offsets
   (dolist (symbol (cons nil sb!vm:*static-symbols*))
-    ;; FIXME: It would be nice to use longer names NIL and (particularly) T
-    ;; in #define statements.
+    ;; FIXME: It would be nice to use longer names than NIL and
+    ;; (particularly) T in #define statements.
     (format t "#define ~A LISPOBJ(0x~X)~%"
 	    (nsubstitute #\_ #\-
 			 (remove-if (lambda (char)
@@ -2763,8 +2760,8 @@ initially undefined function references:~2%")
 (defparameter initial-fun-entry-type-code 3863)
 (defparameter end-entry-type-code 3840)
 
-(declaim (ftype (function (sb!vm:word) sb!vm:word) write-long))
-(defun write-long (num) ; FIXME: WRITE-WORD would be a better name.
+(declaim (ftype (function (sb!vm:word) sb!vm:word) write-word))
+(defun write-word (num)
   (ecase sb!c:*backend-byte-order*
     (:little-endian
      (dotimes (i 4)
@@ -2812,14 +2809,14 @@ initially undefined function references:~2%")
     ;;   DATA PAGE
     ;;   ADDRESS
     ;;   PAGE COUNT
-    (write-long (gspace-identifier gspace))
-    (write-long (gspace-free-word-index gspace))
-    (write-long *data-page*)
+    (write-word (gspace-identifier gspace))
+    (write-word (gspace-free-word-index gspace))
+    (write-word *data-page*)
     (multiple-value-bind (floor rem)
 	(floor (gspace-byte-address gspace) sb!c:*backend-page-size*)
       (aver (zerop rem))
-      (write-long floor))
-    (write-long pages)
+      (write-word floor))
+    (write-word pages)
 
     (incf *data-page* pages)))
 
@@ -2844,24 +2841,24 @@ initially undefined function references:~2%")
 				 :if-exists :rename-and-delete)
 
       ;; Write the magic number.
-      (write-long core-magic)
+      (write-word core-magic)
 
       ;; Write the Version entry.
-      (write-long version-entry-type-code)
-      (write-long 3)
-      (write-long sbcl-core-version-integer)
+      (write-word version-entry-type-code)
+      (write-word 3)
+      (write-word sbcl-core-version-integer)
 
       ;; Write the New Directory entry header.
-      (write-long new-directory-entry-type-code)
-      (write-long 17) ; length = (5 words/space) * 3 spaces + 2 for header.
+      (write-word new-directory-entry-type-code)
+      (write-word 17) ; length = (5 words/space) * 3 spaces + 2 for header.
 
       (output-gspace *read-only*)
       (output-gspace *static*)
       (output-gspace *dynamic*)
 
       ;; Write the initial function.
-      (write-long initial-fun-entry-type-code)
-      (write-long 3)
+      (write-word initial-fun-entry-type-code)
+      (write-word 3)
       (let* ((cold-name (cold-intern '!cold-init))
 	     (cold-fdefn (cold-fdefinition-object cold-name))
 	     (initial-fun (read-wordindexed cold-fdefn
@@ -2869,11 +2866,11 @@ initially undefined function references:~2%")
 	(format t
 		"~&/(DESCRIPTOR-BITS INITIAL-FUN)=#X~X~%"
 		(descriptor-bits initial-fun))
-	(write-long (descriptor-bits initial-fun)))
+	(write-word (descriptor-bits initial-fun)))
 
       ;; Write the End entry.
-      (write-long end-entry-type-code)
-      (write-long 2)))
+      (write-word end-entry-type-code)
+      (write-word 2)))
 
   (format t "done]~%")
   (force-output)

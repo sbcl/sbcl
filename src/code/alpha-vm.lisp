@@ -31,7 +31,7 @@
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
    (let ((sap (truly-the system-area-pointer
-			 (%primitive sb!kernel::code-instructions code))))
+			 (%primitive code-instructions code))))
      (ecase kind
        (:jmp-hint
 	(assert (zerop (ldb (byte 2 0) value)))

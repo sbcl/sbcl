@@ -168,7 +168,8 @@ bootstrapping.
 		    (arglist (elt qab arglist-pos))
 		    (qualifiers (subseq qab 0 arglist-pos))
 		    (body (nthcdr (1+ arglist-pos) qab)))
-	       `(defmethod ,fun-name ,@qualifiers ,arglist ,@body))))
+	       `(push (defmethod ,fun-name ,@qualifiers ,arglist ,@body)
+                      (generic-function-initial-methods #',fun-name)))))
       (macrolet ((initarg (key) `(getf initargs ,key)))
 	(dolist (option options)
 	  (let ((car-option (car option)))
@@ -202,8 +203,8 @@ bootstrapping.
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
 	   (compile-or-load-defgeneric ',fun-name))
          (load-defgeneric ',fun-name ',lambda-list ,@initargs)
-	 ,@(mapcar #'expand-method-definition methods)
-	 `,(function ,fun-name)))))
+        ,@(mapcar #'expand-method-definition methods)
+	 #',fun-name))))
 
 (defun compile-or-load-defgeneric (fun-name)
   (sb-kernel:proclaim-as-fun-name fun-name)
@@ -215,12 +216,17 @@ bootstrapping.
 
 (defun load-defgeneric (fun-name lambda-list &rest initargs)
   (when (fboundp fun-name)
-    (sb-kernel::style-warn "redefining ~S in DEFGENERIC" fun-name))
+    (sb-kernel::style-warn "redefining ~S in DEFGENERIC" fun-name)
+    (let ((fun (fdefinition fun-name)))
+      (when (generic-function-p fun)
+        (loop for method in (generic-function-initial-methods fun)
+              do (remove-method fun method))
+        (setf (generic-function-initial-methods fun) '()))))
   (apply #'ensure-generic-function
-	 fun-name
-	 :lambda-list lambda-list
-	 :definition-source `((defgeneric ,fun-name) ,*load-truename*)
-	 initargs))
+         fun-name
+         :lambda-list lambda-list
+         :definition-source `((defgeneric ,fun-name) ,*load-truename*)
+         initargs))
 
 (defmacro defmethod (&rest args &environment env)
   (multiple-value-bind (name qualifiers lambda-list body)

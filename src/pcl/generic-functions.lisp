@@ -96,6 +96,8 @@
 
 (defgeneric gf-dfun-state (standard-generic-function))
 
+(defgeneric generic-function-initial-methods (standard-generic-function))
+
 (defgeneric long-method-combination-function (long-method-combination))
 
 (defgeneric method-combination-documentation (standard-method-combination))
@@ -180,6 +182,9 @@
 (defgeneric (setf generic-function-name) (new-value standard-generic-function))
 
 (defgeneric (setf gf-dfun-state) (new-value standard-generic-function))
+
+(defgeneric (setf generic-function-initial-methods)
+  (new-value standard-generic-function))
 
 (defgeneric (setf method-generic-function) (new-value standard-method))
 

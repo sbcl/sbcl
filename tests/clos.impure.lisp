@@ -15,8 +15,8 @@
   (:use "CL"))
 (in-package "FOO")
 
-;;;; It should be possible to do DEFGENERIC and DEFMETHOD referring to
-;;;; structure types defined earlier in the file.
+;;; It should be possible to do DEFGENERIC and DEFMETHOD referring to
+;;; structure types defined earlier in the file.
 (defstruct struct-a x y)
 (defstruct struct-b x y z)
 (defmethod wiggle ((a struct-a))
@@ -91,6 +91,29 @@
                'structure-class))
 (assert (typep (make-instance 'structure-class-foo1) 'structure-class-foo1))
 (assert (typep (make-instance 'standard-class-foo1) 'standard-class-foo1))
+
+;;; DEFGENERIC's blow-away-old-methods behavior is specified to have
+;;; special hacks to distinguish between defined-with-DEFGENERIC-:METHOD
+;;; methods and defined-with-DEFMETHOD methods, so that reLOADing
+;;; DEFGENERIC-containing files does the right thing instead of 
+;;; randomly slicing your generic functions. (APD made this work
+;;; in sbcl-0.7.0.2.)
+(defgeneric born-to-be-redefined (x)
+  (:method ((x integer))
+    'integer))
+(defmethod born-to-be-redefined ((x real))
+  'real)
+(assert (eq (born-to-be-redefined 1) 'integer))
+(defgeneric born-to-be-redefined (x))
+(assert (eq (born-to-be-redefined 1) 'real)) ; failed until sbcl-0.7.0.2
+(defgeneric born-to-be-redefined (x)
+  (:method ((x integer))
+    'integer))
+(defmethod born-to-be-redefined ((x integer))
+  'int)
+(assert (eq (born-to-be-redefined 1) 'int))
+(defgeneric born-to-be-redefined (x))
+(assert (eq (born-to-be-redefined 1) 'int))
 
 ;;;; success
 

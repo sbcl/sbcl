@@ -607,7 +607,7 @@ reset to ~S."
 	    ;; the program. WITH-STANDARD-IO-SYNTAX does some of that,
 	    ;; but
 	    ;;   1. It doesn't affect our internal special variables 
-	    ;;      like *CURRENT-LEVEL*.
+	    ;;      like *CURRENT-LEVEL-IN-PRINT*.
 	    ;;   2. It isn't customizable.
 	    ;;   3. It doesn't set *PRINT-READABLY* or *PRINT-PRETTY* 
 	    ;;      to the same value as the toplevel default.
@@ -615,7 +615,7 @@ reset to ~S."
 	    ;;      helpful behavior for a debugger.
 	    ;; We try to remedy all these problems with explicit 
 	    ;; rebindings here.
-	    (sb!kernel:*current-level* 0)
+	    (sb!kernel:*current-level-in-print* 0)
 	    (*print-length* *debug-print-length*)
 	    (*print-level* *debug-print-level*)
 	    (*readtable* *debug-readtable*)
@@ -644,7 +644,12 @@ reset to ~S."
 	   (format *error-output*
   		   "~&(caught ~S trying to print ~S when entering debugger)~%"
 		   (type-of condition)
-		   '*debug-condition*)))
+		   '*debug-condition*)
+	   (when (typep condition 'cell-error)
+	     ;; what we really want to know when it's e.g. an UNBOUND-VARIABLE:
+	     (format *error-output*
+		     "~&(CELL-ERROR-NAME = ~S)~%)"
+		     (cell-error-name *debug-condition*)))))
 
        ;; After the initial error/condition/whatever announcement to
        ;; *ERROR-OUTPUT*, we become interactive, and should talk on

@@ -446,13 +446,13 @@
 	(t
 	 (%default-structure-ugly-print structure stream))))
 (def!method print-object ((x structure-object) stream)
-  (default-structure-print x stream *current-level*))
+  (default-structure-print x stream *current-level-in-print*))
 
 (defun make-load-form-saving-slots (object &key slot-names environment)
   (declare (ignore object environment))
   (if slot-names
-    (error "stub: MAKE-LOAD-FORM-SAVING-SLOTS :SLOT-NAMES not implemented") ; KLUDGE
-    :just-dump-it-normally))
+      (error "stub: MAKE-LOAD-FORM-SAVING-SLOTS :SLOT-NAMES not implemented") ; KLUDGE
+      :just-dump-it-normally))
 
 ;;;; testing structure types
 
@@ -461,9 +461,11 @@
 ;;; which have a handle on the type's LAYOUT.
 ;;;
 ;;; FIXME: This is fairly big, so it should probably become
-;;; MAYBE-INLINE instead of INLINE. Or else we could fix things up so
-;;; that the things which call it are all closures, so that it's
-;;; expanded only in a small number of places.
+;;; MAYBE-INLINE instead of INLINE, or its inlineness should become
+;;; conditional (probably through DEFTRANSFORM) on (> SPEED SPACE). Or
+;;; else we could fix things up so that the things which call it are
+;;; all closures, so that it's expanded only in a small number of
+;;; places.
 #!-sb-fluid (declaim (inline typep-to-layout))
 (defun typep-to-layout (obj layout)
   (declare (type layout layout) (optimize (speed 3) (safety 0)))

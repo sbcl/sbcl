@@ -734,41 +734,41 @@
 (defclass method (standard-object) ())
 
 (defclass standard-method (definition-source-mixin plist-mixin method)
-     ((generic-function
-	:initform nil	
-	:accessor method-generic-function)
-;     (qualifiers
-;	:initform ()
-;	:initarg  :qualifiers
-;	:reader method-qualifiers)
-      (specializers
-	:initform ()
-	:initarg  :specializers
-	:reader method-specializers)
-      (lambda-list
-	:initform ()
-	:initarg  :lambda-list
-	:reader method-lambda-list)
-      (function
-	:initform nil
-	:initarg :function)		;no writer
-      (fast-function
-	:initform nil
-	:initarg :fast-function		;no writer
-	:reader method-fast-function)
-;     (documentation
-;	:initform nil
-;	:initarg  :documentation
-;	:reader method-documentation)
-      ))
+  ((generic-function
+    :initform nil	
+    :accessor method-generic-function)
+;;;     (qualifiers
+;;;	:initform ()
+;;;	:initarg  :qualifiers
+;;;	:reader method-qualifiers)
+   (specializers
+    :initform ()
+    :initarg  :specializers
+    :reader method-specializers)
+   (lambda-list
+    :initform ()
+    :initarg  :lambda-list
+    :reader method-lambda-list)
+   (function
+    :initform nil
+    :initarg :function)			;no writer
+   (fast-function
+    :initform nil
+    :initarg :fast-function		;no writer
+    :reader method-fast-function)
+;;;     (documentation
+;;;	:initform nil
+;;;	:initarg  :documentation
+;;;	:reader method-documentation)
+  ))
 
 (defclass standard-accessor-method (standard-method)
-     ((slot-name :initform nil
-		 :initarg :slot-name
-		 :reader accessor-method-slot-name)
-      (slot-definition :initform nil
-		       :initarg :slot-definition
-		       :reader accessor-method-slot-definition)))
+  ((slot-name :initform nil
+	      :initarg :slot-name
+	      :reader accessor-method-slot-name)
+   (slot-definition :initform nil
+		    :initarg :slot-definition
+		    :reader accessor-method-slot-definition)))
 
 (defclass standard-reader-method (standard-accessor-method) ())
 
@@ -780,30 +780,43 @@
 			    definition-source-mixin
 			    documentation-mixin
 			    funcallable-standard-object)
-     ()
+  (;; We need to make a distinction between the methods initially set
+   ;; up by :METHOD options to DEFGENERIC and the ones set up later by
+   ;; DEFMETHOD, because ANSI's specifies that executing DEFGENERIC on
+   ;; an already-DEFGENERICed function clears the methods set by the
+   ;; previous DEFGENERIC, but not methods set by DEFMETHOD. (Making
+   ;; this distinction seems a little kludgy, but it has the positive
+   ;; effect of making it so that loading a file a.lisp containing
+   ;; DEFGENERIC, then loading a second file b.lisp containing
+   ;; DEFMETHOD, then modifying and reloading a.lisp and/or b.lisp
+   ;; tends to leave the generic function in a state consistent with
+   ;; the most-recently-loaded state of a.lisp and b.lisp.)
+   (initial-methods
+    :initform ()
+    :accessor generic-function-initial-methods))
   (:metaclass funcallable-standard-class))
 
 (defclass standard-generic-function (generic-function)
-      ((name
-	:initform nil
-	:initarg :name
-	:accessor generic-function-name)
-      (methods
-	:initform ()
-	:accessor generic-function-methods
-	:type list)
-      (method-class
-	:initarg :method-class
-	:accessor generic-function-method-class)
-      (method-combination
-	:initarg :method-combination
-	:accessor generic-function-method-combination)
-      (arg-info
-	:initform (make-arg-info)
-	:reader gf-arg-info)
-      (dfun-state
-	:initform ()
-	:accessor gf-dfun-state))
+  ((name
+    :initform nil
+    :initarg :name
+    :accessor generic-function-name)
+   (methods
+    :initform ()
+    :accessor generic-function-methods
+    :type list)
+   (method-class
+    :initarg :method-class
+    :accessor generic-function-method-class)
+   (method-combination
+    :initarg :method-combination
+    :accessor generic-function-method-combination)
+   (arg-info
+    :initform (make-arg-info)
+    :reader gf-arg-info)
+   (dfun-state
+    :initform ()
+    :accessor gf-dfun-state))
   (:metaclass funcallable-standard-class)
   (:default-initargs :method-class *the-class-standard-method*
 		     :method-combination *standard-method-combination*))

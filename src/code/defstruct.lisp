@@ -52,7 +52,7 @@
 	     #-sb-xc-host (:pure t)
 	     (:constructor make-defstruct-description (name)))
   ;; name of the structure
-  (name (missing-arg) :type symbol)
+  (name (missing-arg) :type symbol :read-only t)
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
@@ -274,7 +274,10 @@
 		       fun-name)))
 	      (cond ((not (eql pf 0))
 		     `((def!method print-object ((,x ,name) ,s)
-			 (funcall #',(farg pf) ,x ,s *current-level*))))
+			 (funcall #',(farg pf)
+				  ,x
+				  ,s
+				  *current-level-in-print*))))
 		    ((not (eql po 0))
 		     `((def!method print-object ((,x ,name) ,s)
 			 (funcall #',(farg po) ,x ,s))))

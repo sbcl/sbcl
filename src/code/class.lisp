@@ -52,7 +52,7 @@
   ;; that CL:CLASS-NAME is a generic function.)
   (%name nil :type symbol)
   ;; the current layout for this class, or NIL if none assigned yet
-  (layout nil :type (or sb!kernel::layout null))
+  (layout nil :type (or layout null))
   ;; How sure are we that this class won't be redefined?
   ;;   :READ-ONLY = We are committed to not changing the effective 
   ;;                slots or superclasses.
