@@ -70,6 +70,43 @@
 
 ;;;; Encode and decode universal times.
 
+;;; In August 2003, work was done in this file for more plausible
+;;; timezone handling after the unix timezone database runs out in
+;;; 2038.  We assume that timezone rules are trending sane rather than
+;;; insane, so for all years after the end of time_t we apply the
+;;; rules for 2035/2036 instead of the actual date asked for.  Making
+;;; the same assumption about the early 1900s would be less
+;;; reasonable, however, so please note that we're still broken for
+;;; local time between 1900-1-1 and 1901-12-13
+
+;;; It should be noted that 64 bit machines don't actually fix this
+;;; problem, at least as of 2003, because the Unix zonefiles are
+;;; specified in terms of 32 bit fields even on, say, the Alpha.  So,
+;;; references to the range of time_t elsewhere in this file should
+;;; rightly be read as shorthand for the range of an signed 32 bit
+;;; number of seconds since 1970-01-01
+
+;;; I'm obliged to Erik Naggum's "Long, Painful History of Time" paper
+;;; <http://heim.ifi.uio.no/~enag/lugm-time.html> for the choice of epoch
+;;; here.  By starting the year in March, we avoid having to test the month
+;;; whenever deciding whether to account for a leap day.  2000 is especially
+;;; special, because it's disvisible by 400, hence the start of a 400 year
+;;; leap year cycle
+
+;;; If a universal-time is after time_t runs out, we find its offset
+;;; from 1st March of whichever year it falls in, then add that to
+;;; 2035-3-1.  This date has two relevant properties: (1) somewhere
+;;; near the end of time_t, and (2) preceding a leap year.  Thus a
+;;; date which is e.g. 365.5 days from March 1st in its year will be
+;;; treated for timezone lookup as if it were Feb 29th 2036
+
+;;; This epoch is used only for fixing the timezones-outside-time_t
+;;; problem.  Someday it would be nice to come back to this code and
+;;; see if the rest of the file and its references to Spice Lisp
+;;; history (Perq time base?) could be cleaned up any on this basis.
+;;; -- dan, 2003-08-08
+
+
 ;;; Subtract from the returned Internal-Time to get the universal
 ;;; time. The offset between our time base and the Perq one is 2145
 ;;; weeks and five days.
@@ -98,6 +135,35 @@
    (daylight savings times) or NIL (standard time), and timezone."
   (decode-universal-time (get-universal-time)))
 
+(defconstant +mar-1-2000+ #.(encode-universal-time 0 0 0 1 3 2000 0))
+(defconstant +mar-1-2035+ #.(encode-universal-time 0 0 0 1 3 2035 0))
+
+(defun years-since-mar-2000 (utime)
+  "Returns number of complete years since March 1st 2000, and remainder in seconds" 
+  (let* ((days-in-year (* 86400 365))
+	 (days-in-4year (+ (* 4 days-in-year) 86400))
+	 (days-in-100year (- (* 25 days-in-4year) 86400))
+	 (days-in-400year (+ (* 4 days-in-100year) 86400))
+	 (offset (- utime +mar-1-2000+))
+	 (year 0))
+    (labels ((whole-num (x y inc max)
+	       (let ((w (truncate x y)))
+		 (when (and max (> w max)) (setf w max))
+		 (incf year (* w inc))
+		 (* w y))))
+      (decf offset (whole-num offset days-in-400year 400 nil))
+      (decf offset (whole-num offset days-in-100year 100 3))
+      (decf offset (whole-num offset days-in-4year 4 25))
+      (decf offset (whole-num offset days-in-year 1 3))
+      (values year offset))))
+
+(defun truncate-to-unix-range (utime)
+  (let ((unix-time (- utime unix-to-universal-time)))
+    (if (< unix-time (ash 1 31))
+	unix-time
+	(multiple-value-bind (year offset) (years-since-mar-2000 utime)
+	  (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))))
+  
 (defun decode-universal-time (universal-time &optional time-zone)
   #!+sb-doc
   "Converts a universal-time to decoded time format returning the following
@@ -118,10 +184,9 @@
 	   (daylight NIL)
 	   (timezone (cond
 		       ((null time-zone)
-			(multiple-value-bind
-			      (ignore minwest dst)
-			    (sb!unix::get-timezone (- universal-time
-						      unix-to-universal-time))
+			(multiple-value-bind (ignore minwest dst)
+			    (sb!unix::get-timezone
+			     (truncate-to-unix-range universal-time))
 			  (declare (ignore ignore))
 			  (declare (fixnum minwest))
 			  (setf daylight dst)
@@ -180,6 +245,7 @@
 	(incf sum days-in-month))
       (coerce (nreverse reversed-result) 'simple-vector)))
 
+	    
 (defun encode-universal-time (second minute hour date month year
 				     &optional time-zone)
   #!+sb-doc
@@ -204,14 +270,29 @@
 	 (hours (+ hour (* days 24))))
     (if time-zone
 	(+ second (* (+ minute (* (+ hours time-zone) 60)) 60))
-	(let* ((minwest-guess
-		(sb!unix::unix-get-minutes-west (- (* hours 60 60)
-						  unix-to-universal-time)))
-	       (guess (+ minute (* hours 60) minwest-guess))
-	       (minwest
-		(sb!unix::unix-get-minutes-west (- (* guess 60)
-						  unix-to-universal-time))))
-	  (+ second (* (+ guess (- minwest minwest-guess)) 60))))))
+	;; can't ask unix for times after 2037: this is only a problem
+	;; if we need to query the system timezone
+	(if (> year 2037)
+	    (labels ((leap-year-p (year)
+		       (cond ((zerop (mod year 400)) t)
+			     ((zerop (mod year 100)) t)
+			     ((zerop (mod year 4)) t)
+			     (t nil))))
+	      (let* ((fake-year (if (leap-year-p year) 2036 2037))
+		     (fake-time (encode-universal-time second minute hour
+						       date month fake-year)))
+		(+ fake-time
+		   (* 86400 (+ (* 365 (- year fake-year))
+			       (- (leap-years-before year)
+				  (leap-years-before fake-year)))))))
+	    (let* ((minwest-guess
+		    (sb!unix::unix-get-minutes-west
+		     (- (* hours 60 60) unix-to-universal-time)))
+		   (guess (+ minute (* hours 60) minwest-guess))
+		   (minwest
+		    (sb!unix::unix-get-minutes-west
+		     (- (* guess 60) unix-to-universal-time))))
+	      (+ second (* (+ guess (- minwest minwest-guess)) 60)))))))
 
 ;;;; TIME
 

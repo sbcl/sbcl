@@ -21,7 +21,7 @@
 
 (defvar *exec-header*
   "#!/bin/sh --
-exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type '(unsigned-byte 8)) (read-line i) (read-line i) (load i) (quit))\" --end-toplevel-options ${1+\"$@\"}
+exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type '(unsigned-byte 8)) (loop while (< ret 2) when (= (read-byte i) 10) count 1 into ret) (load i) (quit))\" --end-toplevel-options ${1+\"$@\"}
 ")
 
 (defun make-executable (output-file fasls
