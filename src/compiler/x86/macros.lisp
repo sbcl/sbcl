@@ -280,6 +280,7 @@
 			       :element-type '(unsigned-byte 8)
 			       :fill-pointer 0
 			       :adjustable t))))
+     (declare (type (vector (unsigned-byte 8) 16) ,var))
      (setf (fill-pointer ,var) 0)
      (unwind-protect
 	 (progn

@@ -100,7 +100,7 @@
 ;;; At run time, we represent the type of info that we want by a small
 ;;; non-negative integer.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant type-number-bits 6))
+  (def!constant type-number-bits 6))
 (deftype type-number () `(unsigned-byte ,type-number-bits))
 
 ;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're
@@ -480,7 +480,7 @@
 ;;;; compact info environments
 
 ;;; The upper limit on the size of the ENTRIES vector in a COMPACT-INFO-ENV.
-(defconstant compact-info-env-entries-bits 16)
+(def!constant compact-info-env-entries-bits 16)
 (deftype compact-info-entries-index () `(unsigned-byte ,compact-info-env-entries-bits))
 
 ;;; the type of the values in COMPACT-INFO-ENTRIES-INFO
@@ -516,8 +516,8 @@
   ;; last entry.
   (entries-info (missing-arg) :type (simple-array compact-info-entry (*))))
 
-(defconstant compact-info-entry-type-mask (ldb (byte type-number-bits 0) -1))
-(defconstant compact-info-entry-last (ash 1 type-number-bits))
+(def!constant compact-info-entry-type-mask (ldb (byte type-number-bits 0) -1))
+(def!constant compact-info-entry-last (ash 1 type-number-bits))
 
 ;;; Return the value of the type corresponding to NUMBER for the
 ;;; currently cached name in ENV.
@@ -572,7 +572,7 @@
 
 ;;; the exact density (modulo rounding) of the hashtable in a compact
 ;;; info environment in names/bucket
-(defconstant compact-info-environment-density 65)
+(def!constant compact-info-environment-density 65)
 
 ;;; Return a new compact info environment that holds the same
 ;;; information as ENV.
@@ -882,7 +882,7 @@
 ;;;
 ;;; FIXME: actually seems to be measured in percent, should be
 ;;; converted to be measured in names/bucket
-(defconstant volatile-info-environment-density 50)
+(def!constant volatile-info-environment-density 50)
 
 ;;; Make a new volatile environment of the specified size.
 (defun make-info-environment (&key (size 42) (name "Unknown"))

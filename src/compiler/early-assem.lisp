@@ -28,8 +28,8 @@
 ;;; ASSEMBLY-UNIT-BITS -- the number of bits in the minimum assembly
 ;;; unit, (also referred to as a ``byte''). Hopefully, different
 ;;; instruction sets won't require changing this.
-(defconstant assembly-unit-bits 8)
-(defconstant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))
+(def!constant assembly-unit-bits 8)
+(def!constant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))
 
 (deftype assembly-unit ()
   `(unsigned-byte ,assembly-unit-bits))
@@ -45,7 +45,7 @@
 ;;; the maximum alignment we can guarantee given the object format. If
 ;;; the loader only loads objects 8-byte aligned, we can't do any
 ;;; better then that ourselves.
-(defconstant max-alignment 3)
+(def!constant max-alignment 3)
 
 (deftype alignment ()
   `(integer 0 ,max-alignment))

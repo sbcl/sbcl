@@ -17,7 +17,7 @@
 
 ;;;; compiler constants
 
-(defconstant +backend-fasl-file-implementation+ :sparc)
+(def!constant +backend-fasl-file-implementation+ :sparc)
 
 (setf *backend-register-save-penalty* 3)
 

@@ -51,11 +51,11 @@
 ;;; FIXME: The first two are no longer used in SBCL.
 ;;;(defconstant compiled-debug-var-uninterned		#b00000001)
 ;;;(defconstant compiled-debug-var-packaged		#b00000010)
-(defconstant compiled-debug-var-environment-live	#b00000100)
-(defconstant compiled-debug-var-save-loc-p		#b00001000)
-(defconstant compiled-debug-var-id-p			#b00010000)
-(defconstant compiled-debug-var-minimal-p		#b00100000)
-(defconstant compiled-debug-var-deleted-p		#b01000000)
+(def!constant compiled-debug-var-environment-live	#b00000100)
+(def!constant compiled-debug-var-save-loc-p		#b00001000)
+(def!constant compiled-debug-var-id-p			#b00010000)
+(def!constant compiled-debug-var-minimal-p		#b00100000)
+(def!constant compiled-debug-var-deleted-p		#b01000000)
 
 ;;;; compiled debug blocks
 ;;;;
@@ -74,7 +74,7 @@
 ;;;;       tuples...
 
 (defconstant-eqx compiled-debug-block-nsucc-byte (byte 2 0) #'equalp)
-(defconstant compiled-debug-block-elsewhere-p #b00000100)
+(def!constant compiled-debug-block-elsewhere-p #b00000100)
 
 (defconstant-eqx compiled-code-location-kind-byte (byte 3 0) #'equalp)
 (defparameter *compiled-code-location-kinds*

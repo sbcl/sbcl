@@ -9,14 +9,14 @@
 
 (in-package "SB!IMPL")
 
-(defconstant sb!xc:array-rank-limit 65529
+(def!constant sb!xc:array-rank-limit 65529
   #!+sb-doc
   "the exclusive upper bound on the rank of an array")
 
-(defconstant sb!xc:array-dimension-limit sb!xc:most-positive-fixnum
+(def!constant sb!xc:array-dimension-limit sb!xc:most-positive-fixnum
   #!+sb-doc
   "the exclusive upper bound on any given dimension of an array")
 
-(defconstant sb!xc:array-total-size-limit sb!xc:most-positive-fixnum
+(def!constant sb!xc:array-total-size-limit sb!xc:most-positive-fixnum
   #!+sb-doc
   "the exclusive upper bound on the total number of elements in an array")

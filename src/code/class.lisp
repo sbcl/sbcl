@@ -96,7 +96,7 @@
 ;;; Note: This bound is set somewhat less than MOST-POSITIVE-FIXNUM
 ;;; in order to guarantee that several hash values can be added without
 ;;; overflowing into a bignum.
-(defconstant layout-clos-hash-max (ash most-positive-fixnum -3)
+(def!constant layout-clos-hash-max (ash most-positive-fixnum -3)
   #!+sb-doc
   "the inclusive upper bound on LAYOUT-CLOS-HASH values")
 
@@ -233,7 +233,7 @@
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
-(defconstant layout-clos-hash-length 8)
+(def!constant layout-clos-hash-length 8)
 #!-sb-fluid (declaim (inline layout-clos-hash))
 (defun layout-clos-hash (layout i)
   ;; FIXME: Either this I should be declared to be `(MOD

@@ -684,7 +684,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; bootstrapping magic, to make things happen both in
              ;; the cross-compilation host compiler's environment and
              ;; in the cross-compiler's environment
-             "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
+             "DEF!CONSTANT" "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
 
 	     ;; stuff for hinting to the compiler
 	     "NAMED-LAMBDA"

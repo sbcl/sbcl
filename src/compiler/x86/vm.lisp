@@ -31,7 +31,7 @@
                     ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
-		    (defconstant ,offset-sym ,offset))
+		    (def!constant ,offset-sym ,offset))
 		  (setf (svref ,names-vector ,offset-sym)
 			,(symbol-name name)))))
 	   ;; FIXME: It looks to me as though DEFREGSET should also
@@ -94,7 +94,7 @@
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
-  (defconstant  register-arg-count 3)
+  (def!constant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defparameter *register-arg-names* '(edx edi esi)))
@@ -136,7 +136,7 @@
 	       (constant-name (symbolicate sc-name "-SC-NUMBER")))
 	  (forms `(define-storage-class ,sc-name ,index
 		    ,@(cdr class)))
-	  (forms `(defconstant ,constant-name ,index))
+	  (forms `(def!constant ,constant-name ,index))
 	  (incf index))))
     `(progn
        ,@(forms))))
@@ -160,7 +160,7 @@
 ;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
 ;;; has my gratitude.) (FIXME: Maybe this should be me..)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant kludge-nondeterministic-catch-block-size 6))
+  (def!constant kludge-nondeterministic-catch-block-size 6))
 
 (!define-storage-classes
 
@@ -400,22 +400,22 @@
 ;;;; miscellaneous function call parameters
 
 ;;; offsets of special stack frame locations
-(defconstant ocfp-save-offset 0)
-(defconstant return-pc-save-offset 1)
-(defconstant code-save-offset 2)
+(def!constant ocfp-save-offset 0)
+(def!constant return-pc-save-offset 1)
+(def!constant code-save-offset 2)
 
 ;;; FIXME: This is a bad comment (changed since when?) and there are others
 ;;; like it in this file. It'd be nice to clarify them. Failing that deleting
 ;;; them or flagging them with KLUDGE might be better than nothing.
 ;;;
 ;;; names of these things seem to have changed. these aliases by jrd
-(defconstant lra-save-offset return-pc-save-offset)
+(def!constant lra-save-offset return-pc-save-offset)
 
-(defconstant cfp-offset ebp-offset)	; pfw - needed by stuff in /code
+(def!constant cfp-offset ebp-offset)	; pfw - needed by stuff in /code
 					; related to signal context stuff
 
 ;;; This is used by the debugger.
-(defconstant single-value-return-byte-offset 2)
+(def!constant single-value-return-byte-offset 2)
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.

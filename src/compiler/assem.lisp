@@ -1124,6 +1124,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	      ,@(mapcar (lambda (name)
 			  `(,name (gen-label)))
 			new-labels))
+	(declare (ignorable ,vop-var ,seg-var))
 	(macrolet ((%%current-segment%% () '**current-segment**)
 		   (%%current-vop%% () '**current-vop**))
 	 (symbol-macrolet (,@(when (or inherited-labels nested-labels)
@@ -1166,6 +1167,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	      ,@(mapcar (lambda (name)
 			  `(,name (gen-label)))
 			new-labels))
+	(declare (ignorable ,vop-var ,seg-var))
 	(macrolet ((%%current-segment%% () '**current-segment**)
 		   (%%current-vop%% () '**current-vop**))
 	 (symbol-macrolet (,@(when (or inherited-labels nested-labels)
@@ -1187,16 +1189,15 @@ p	    ;; the branch has two dependents and one of them dpends on
 	  (t
 	   `(,inst (%%current-segment%%) (%%current-vop%%) ,@args)))))
 
-;;; Note: The need to capture SYMBOL-MACROLET bindings of
-;;; **CURRENT-SEGMENT* and **CURRENT-VOP** prevents this from being an
-;;; ordinary function.
+;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
+;;; and %%CURRENT-VOP%% prevents this from being an ordinary function.
 (defmacro emit-label (label)
   #!+sb-doc
   "Emit LABEL at this location in the current segment."
   `(%emit-label (%%current-segment%%) (%%current-vop%%) ,label))
 
-;;; Note: The need to capture SYMBOL-MACROLET bindings of
-;;; **CURRENT-SEGMENT* prevents this from being an ordinary function.
+;;; Note: The need to capture MACROLET bindings of
+;;; %%CURRENT-SEGMENT%% prevents this from being an ordinary function.
 (defmacro emit-postit (function)
   `(%emit-postit (%%current-segment%%) ,function))
 

@@ -129,7 +129,7 @@ about function addresses and register values.")
 				    `(,(eval nn) ,nn)))
 			      names)))
 	 `(eval-when (:compile-toplevel :load-toplevel :execute)
-	   (defconstant header-word-type-alist
+	   (def!constant header-word-type-alist
 	     ',results)))))
   ;; This is the same list as in objdefs.
   (frob bignum
@@ -381,7 +381,7 @@ about function addresses and register values.")
       (error "Unknown branch condition: ~S~%Must be one of: ~S"
 	     condition branch-conditions)))
 
-(defconstant branch-cond-true
+(def!constant branch-cond-true
   #b1000)
 
 (defconstant-eqx branch-fp-conditions
@@ -929,7 +929,7 @@ about function addresses and register values.")
 
 (eval-when (:compile-toplevel :execute)
 
-;;; have to do this because defconstant is evalutated in the null lex env.
+;;; have to do this because def!constant is evalutated in the null lex env.
 (defmacro with-ref-format (printer)
   `(let* ((addend
 	   '(:choose (:plus-integer immed) ("+" rs2)))

@@ -11,7 +11,7 @@
 
 ;;;; the DEF!TYPE macro
 
-;;; DEF!MACRO = cold DEFTYPE, a version of DEFTYPE which at
+;;; DEF!TYPE = cold DEFTYPE, a version of DEFTYPE which at
 ;;; build-the-cross-compiler time defines its macro both in the
 ;;; cross-compilation host Lisp and in the target Lisp. Basically,
 ;;; DEF!TYPE does something like

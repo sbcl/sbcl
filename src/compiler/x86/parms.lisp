@@ -25,79 +25,79 @@
 ;;;; machine architecture parameters
 
 ;;; the number of bits per word, where a word holds one lisp descriptor
-(defconstant n-word-bits 32)
+(def!constant n-word-bits 32)
 
 ;;; the number of bits per byte, where a byte is the smallest
 ;;; addressable object
-(defconstant n-byte-bits 8)
+(def!constant n-byte-bits 8)
 
 ;;; the number of bits to shift between word addresses and byte addresses
-(defconstant word-shift (1- (integer-length (/ n-word-bits n-byte-bits))))
+(def!constant word-shift (1- (integer-length (/ n-word-bits n-byte-bits))))
 
 ;;; the number of bytes in a word
-(defconstant n-word-bytes (/ n-word-bits n-byte-bits))
+(def!constant n-word-bytes (/ n-word-bits n-byte-bits))
 
-(defconstant float-sign-shift 31)
+(def!constant float-sign-shift 31)
 
 ;;; comment from CMU CL:
 ;;;   These values were taken from the alpha code. The values for
 ;;;   bias and exponent min/max are not the same as shown in the 486 book.
 ;;;   They may be correct for how Python uses them.
-(defconstant single-float-bias 126)	; Intel says 127.
+(def!constant single-float-bias 126)	; Intel says 127.
 (defconstant-eqx single-float-exponent-byte    (byte 8 23) #'equalp)
 (defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
 ;;; comment from CMU CL:
 ;;;   The 486 book shows the exponent range -126 to +127. The Lisp
 ;;;   code that uses these values seems to want already biased numbers.
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
+(def!constant single-float-normal-exponent-min 1)
+(def!constant single-float-normal-exponent-max 254)
+(def!constant single-float-hidden-bit (ash 1 23))
+(def!constant single-float-trapping-nan-bit (ash 1 22))
 
-(defconstant double-float-bias 1022)
+(def!constant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte    (byte 11 20) #'equalp)
 (defconstant-eqx double-float-significand-byte (byte 20 0)  #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
+(def!constant double-float-normal-exponent-min 1)
+(def!constant double-float-normal-exponent-max #x7FE)
+(def!constant double-float-hidden-bit (ash 1 20))
+(def!constant double-float-trapping-nan-bit (ash 1 19))
 
-(defconstant long-float-bias 16382)
+(def!constant long-float-bias 16382)
 (defconstant-eqx long-float-exponent-byte    (byte 15 0) #'equalp)
 (defconstant-eqx long-float-significand-byte (byte 31 0) #'equalp)
-(defconstant long-float-normal-exponent-min 1)
-(defconstant long-float-normal-exponent-max #x7FFE)
-(defconstant long-float-hidden-bit (ash 1 31))		; actually not hidden
-(defconstant long-float-trapping-nan-bit (ash 1 30))
+(def!constant long-float-normal-exponent-min 1)
+(def!constant long-float-normal-exponent-max #x7FFE)
+(def!constant long-float-hidden-bit (ash 1 31))		; actually not hidden
+(def!constant long-float-trapping-nan-bit (ash 1 30))
 
-(defconstant single-float-digits
+(def!constant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
 
-(defconstant double-float-digits
+(def!constant double-float-digits
   (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
-(defconstant long-float-digits
+(def!constant long-float-digits
   (+ (byte-size long-float-significand-byte) n-word-bits 1))
 
 ;;; pfw -- from i486 microprocessor programmer's reference manual
-(defconstant float-invalid-trap-bit	   (ash 1 0))
-(defconstant float-denormal-trap-bit       (ash 1 1))
-(defconstant float-divide-by-zero-trap-bit (ash 1 2))
-(defconstant float-overflow-trap-bit       (ash 1 3))
-(defconstant float-underflow-trap-bit      (ash 1 4))
-(defconstant float-inexact-trap-bit	   (ash 1 5))
+(def!constant float-invalid-trap-bit	   (ash 1 0))
+(def!constant float-denormal-trap-bit       (ash 1 1))
+(def!constant float-divide-by-zero-trap-bit (ash 1 2))
+(def!constant float-overflow-trap-bit       (ash 1 3))
+(def!constant float-underflow-trap-bit      (ash 1 4))
+(def!constant float-inexact-trap-bit	   (ash 1 5))
 
-(defconstant float-round-to-nearest  0)
-(defconstant float-round-to-negative 1)
-(defconstant float-round-to-positive 2)
-(defconstant float-round-to-zero     3)
+(def!constant float-round-to-nearest  0)
+(def!constant float-round-to-negative 1)
+(def!constant float-round-to-positive 2)
+(def!constant float-round-to-zero     3)
 
 (defconstant-eqx float-rounding-mode     (byte 2 10) #'equalp)
 (defconstant-eqx float-sticky-bits       (byte 6 16) #'equalp)
 (defconstant-eqx float-traps-byte        (byte 6  0) #'equalp)
 (defconstant-eqx float-exceptions-byte   (byte 6 16) #'equalp)
 (defconstant-eqx float-precision-control (byte 2  8) #'equalp)
-(defconstant float-fast-bit 0) ; no fast mode on x86
+(def!constant float-fast-bit 0) ; no fast mode on x86
 
 ;;;; description of the target address space
 
@@ -135,49 +135,49 @@
 #!+linux
 (progn
 
-  (defconstant read-only-space-start #x01000000)
-  (defconstant read-only-space-end   #x037ff000)
+  (def!constant read-only-space-start #x01000000)
+  (def!constant read-only-space-end   #x037ff000)
 
-  (defconstant static-space-start    #x05000000)
-  (defconstant static-space-end      #x07fff000)
+  (def!constant static-space-start    #x05000000)
+  (def!constant static-space-end      #x07fff000)
 
-  (defconstant dynamic-space-start   #x09000000)
-  (defconstant dynamic-space-end     #x29000000)
+  (def!constant dynamic-space-start   #x09000000)
+  (def!constant dynamic-space-end     #x29000000)
 
-  (defconstant control-stack-start   #x50000000)
-  (defconstant control-stack-end     #x57fff000)
+  (def!constant control-stack-start   #x50000000)
+  (def!constant control-stack-end     #x57fff000)
 
-  (defconstant binding-stack-start   #x60000000)
-  (defconstant binding-stack-end     #x67fff000))
+  (def!constant binding-stack-start   #x60000000)
+  (def!constant binding-stack-end     #x67fff000))
 
 #!+bsd
 (progn
 
-  (defconstant read-only-space-start #x10000000)
-  (defconstant read-only-space-end   #x1ffff000)
+  (def!constant read-only-space-start #x10000000)
+  (def!constant read-only-space-end   #x1ffff000)
 
-  (defconstant static-space-start
+  (def!constant static-space-start
     #!+freebsd #x30000000
     #!+openbsd #x28000000)
-  (defconstant static-space-end      #x37fff000)
+  (def!constant static-space-end      #x37fff000)
 
-  (defconstant binding-stack-start   #x38000000)
-  (defconstant binding-stack-end     #x3ffff000)
+  (def!constant binding-stack-start   #x38000000)
+  (def!constant binding-stack-end     #x3ffff000)
 
-  (defconstant control-stack-start
+  (def!constant control-stack-start
     #!+freebsd #x40000000
     #!+openbsd #x48000000)
-  (defconstant control-stack-end
+  (def!constant control-stack-end
     #!+freebsd #x47fff000
     #!+openbsd #x4ffff000)
-  (defconstant dynamic-space-start
+  (def!constant dynamic-space-start
     #!+freebsd #x48000000
     #!+openbsd #x50000000)
-  (defconstant dynamic-space-end     #x88000000))
+  (def!constant dynamic-space-end     #x88000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
-(defconstant nil-value (+ static-space-start #xb))
+(def!constant nil-value (+ static-space-start #xb))
 
 ;;;; other miscellaneous constants
 

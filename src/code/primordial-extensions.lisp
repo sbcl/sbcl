@@ -46,7 +46,7 @@
 ;;; until SBCL's EVAL-WHEN is fixed, which is waiting for the IR1
 ;;; interpreter to go away, which is waiting for sbcl-0.7.x..
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +empty-ht-slot+ '%empty-ht-slot%))
+  (def!constant +empty-ht-slot+ '%empty-ht-slot%))
 ;;; We shouldn't need this mess now that EVAL-WHEN works.
 #+nil (defconstant +empty-ht-slot+ '#.+empty-ht-slot+) ; egads.. See FIXME above.
 ;;; KLUDGE: Using a private symbol still leaves us vulnerable to users
@@ -224,7 +224,7 @@
 	    (if (consp id)
 		(values (car id) (cdr id))
 		(values id nil))
-	  (push `(defconstant ,(symbolicate prefix root suffix)
+	  (push `(def!constant ,(symbolicate prefix root suffix)
 		   ,(+ start (* step index))
 		   ,@docs)
 		results)))
@@ -254,7 +254,7 @@
 ;;; need to avoid runtime indirection through a symbol, you might be
 ;;; able to do something with LOAD-TIME-VALUE or MAKE-LOAD-FORM.
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
-  `(defconstant ,symbol
+  `(def!constant ,symbol
      (%defconstant-eqx-value ',symbol ,expr ,eqx)
      ,@(when doc (list doc))))
 (defun %defconstant-eqx-value (symbol expr eqx)

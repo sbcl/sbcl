@@ -14,7 +14,7 @@
 
 ;;; the largest number of TNs whose liveness changes that we can have
 ;;; in any block
-(defconstant local-tn-limit 64)
+(def!constant local-tn-limit 64)
 
 (deftype local-tn-number () `(integer 0 (,local-tn-limit)))
 (deftype local-tn-count () `(integer 0 ,local-tn-limit))

@@ -13,7 +13,7 @@
 
 ;;; types and defaults
 
-(defconstant label-column-width 7)
+(def!constant label-column-width 7)
 
 (deftype text-width () '(integer 0 1000))
 (deftype alignment () '(integer 0 64))
@@ -22,7 +22,7 @@
 (deftype length () '(unsigned-byte 24))
 (deftype column () '(integer 0 1000))
 
-(defconstant max-filtered-value-index 32)
+(def!constant max-filtered-value-index 32)
 (deftype filtered-value-index ()
   `(integer 0 ,max-filtered-value-index))
 (deftype filtered-value-vector ()
@@ -132,15 +132,15 @@
                  dchunk=
                  dchunk-count-bits))
 
-(defconstant dchunk-bits 32)
+(def!constant dchunk-bits 32)
 
 (deftype dchunk ()
   `(unsigned-byte ,dchunk-bits))
 (deftype dchunk-index ()
   `(integer 0 ,dchunk-bits))
 
-(defconstant dchunk-zero 0)
-(defconstant dchunk-one #xFFFFFFFF)
+(def!constant dchunk-zero 0)
+(def!constant dchunk-one #xFFFFFFFF)
 
 (defun dchunk-extract (from pos)
   (declare (type dchunk from))

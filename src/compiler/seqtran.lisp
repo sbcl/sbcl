@@ -611,7 +611,7 @@
 ;;; use that here, so that the compiler is born knowing this value.
 ;;; FIXME: Add a comment telling whether this holds for all vectors
 ;;; or only for vectors based on simple arrays (non-adjustable, etc.).
-(defconstant vector-data-bit-offset
+(def!constant vector-data-bit-offset
   (* sb!vm:vector-data-offset sb!vm:n-word-bits))
 
 ;;; FIXME: Shouldn't we be testing for legality of

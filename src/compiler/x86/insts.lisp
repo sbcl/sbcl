@@ -20,7 +20,7 @@
 
 (deftype reg () '(unsigned-byte 3))
 
-(defconstant +default-operand-size+ :dword)
+(def!constant +default-operand-size+ :dword)
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
@@ -793,7 +793,7 @@
 
 ;;;; utilities
 
-(defconstant +operand-size-prefix-byte+ #b01100110)
+(def!constant +operand-size-prefix-byte+ #b01100110)
 
 (defun maybe-emit-operand-size-prefix (segment size)
   (unless (or (eq size :byte) (eq size +default-operand-size+))

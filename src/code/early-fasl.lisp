@@ -34,7 +34,7 @@
 (defparameter *fasl-header-string-start-string* "# FASL")
 
 ;;; the code for a character which terminates a fasl file header
-(defconstant +fasl-header-string-stop-char-code+ 255)
+(def!constant +fasl-header-string-stop-char-code+ 255)
 
 ;;; This value should be incremented when the system changes in such a
 ;;; way that it will no longer work reliably with old fasl files. In
@@ -42,7 +42,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(defconstant +fasl-file-version+ 28)
+(def!constant +fasl-file-version+ 28)
 ;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.

@@ -10,18 +10,18 @@
 (in-package "SB!KERNEL")
 
 ;;; the size of the chunks returned by RANDOM-CHUNK
-(defconstant random-chunk-length 32)
+(def!constant random-chunk-length 32)
 
 ;;; the amount that we overlap chunks by when building a large integer
 ;;; to make up for the loss of randomness in the low bits
-(defconstant random-integer-overlap 3)
+(def!constant random-integer-overlap 3)
 
 ;;; extra bits of randomness that we generate before taking the value MOD the
 ;;; limit, to avoid loss of randomness near the limit
-(defconstant random-integer-extra-bits 10)
+(def!constant random-integer-extra-bits 10)
 
 ;;; the largest fixnum we can compute from one chunk of bits
-(defconstant random-fixnum-max
+(def!constant random-fixnum-max
   (1- (ash 1 (- random-chunk-length random-integer-extra-bits))))
 
 (sb!xc:defstruct (random-state (:constructor %make-random-state)

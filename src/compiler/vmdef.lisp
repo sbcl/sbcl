@@ -102,7 +102,7 @@
   ;; -- AL 20010218
   ;;
   ;; See also the description of VOP-INFO-TARGETS. -- APD, 2002-01-30
-  (defconstant max-vop-tn-refs 256))
+  (def!constant max-vop-tn-refs 256))
 
 (defvar *vop-tn-refs* (make-array max-vop-tn-refs :initial-element nil))
 (defvar *using-vop-tn-refs* nil)
@@ -113,7 +113,7 @@
 
 (pushnew 'flush-vop-tn-refs *before-gc-hooks*)
 
-(defconstant sc-bits (integer-length (1- sc-number-limit)))
+(def!constant sc-bits (integer-length (1- sc-number-limit)))
 
 (defun emit-generic-vop (node block template args results &optional info)
   (%emit-generic-vop node block template args results info))

@@ -213,7 +213,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The EVAL-WHEN is necessary for #.(1+ LIST-TO-HASH-TABLE-THRESHOLD) 
   ;; below. -- AL 20010227
-  (defconstant list-to-hash-table-threshold 32))
+  (def!constant list-to-hash-table-threshold 32))
 (defun maybe-emit-make-load-forms (constant)
   (let ((things-processed nil)
 	(count 0))

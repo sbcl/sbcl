@@ -19,7 +19,7 @@
 (macrolet ((defreg (name offset)
 	       (let ((offset-sym (symbolicate name "-OFFSET")))
 		 `(eval-when (:compile-toplevel :load-toplevel :execute)
-		   (defconstant ,offset-sym ,offset)
+		   (def!constant ,offset-sym ,offset)
 		   (setf (svref *register-names* ,offset-sym)
 		        ,(symbol-name name)))))
 
@@ -99,7 +99,7 @@
 							 "-SC-NUMBER"))))
 		(list* `(define-storage-class ,sc-name ,index
 			  ,@(cdr class))
-		       `(defconstant ,constant-name ,index)
+		       `(def!constant ,constant-name ,index)
                        ;; (The CMU CL version of this macro did
                        ;;   `(EXPORT ',CONSTANT-NAME)
                        ;; here, but in SBCL we try to have package
@@ -118,7 +118,7 @@
 ;;; and seems to be working so far    -dan
 ;;;
 ;;; arbitrarily taken for alpha, too. - Christophe
-(defconstant sb!vm::kludge-nondeterministic-catch-block-size 7)
+(def!constant sb!vm::kludge-nondeterministic-catch-block-size 7)
 
 (!define-storage-classes
 
@@ -316,20 +316,20 @@
 ;;;; function call parameters
 
 ;;; the SC numbers for register and stack arguments/return values.
-(defconstant register-arg-scn (meta-sc-number-or-lose 'descriptor-reg))
-(defconstant immediate-arg-scn (meta-sc-number-or-lose 'any-reg))
-(defconstant control-stack-arg-scn (meta-sc-number-or-lose 'control-stack))
+(def!constant register-arg-scn (meta-sc-number-or-lose 'descriptor-reg))
+(def!constant immediate-arg-scn (meta-sc-number-or-lose 'any-reg))
+(def!constant control-stack-arg-scn (meta-sc-number-or-lose 'control-stack))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
   ;; offsets of special stack frame locations
-  (defconstant ocfp-save-offset 0)
-  (defconstant lra-save-offset 1)
-  (defconstant nfp-save-offset 2)
+  (def!constant ocfp-save-offset 0)
+  (def!constant lra-save-offset 1)
+  (def!constant nfp-save-offset 2)
 
   ;; the number of arguments/return values passed in registers.
   ;;
-  (defconstant register-arg-count 6)
+  (def!constant register-arg-count 6)
 
   ;; names to use for the argument registers.
   ;; 
@@ -346,7 +346,7 @@
 	  *register-arg-offsets*))
 
 ;;; This is used by the debugger.
-(defconstant single-value-return-byte-offset 8)
+(def!constant single-value-return-byte-offset 8)
 
 
 ;;; This function is called by debug output routines that want a

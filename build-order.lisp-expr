@@ -77,6 +77,7 @@
 
  ("src/code/defbangtype")
  ("src/code/defbangmacro")
+ ("src/code/defbangconstant")
 
  ("src/code/primordial-extensions")
 
@@ -91,6 +92,7 @@
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
+ ("src/compiler/defconstant")
  ("src/code/early-alieneval")  ; for vars needed both at build and run time
 
  ("src/code/specializable-array")
@@ -297,6 +299,7 @@
  ("src/compiler/globaldb")
  ("src/compiler/info-functions")
 
+ ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro")
  ("src/code/force-delayed-defbangmacros")
 

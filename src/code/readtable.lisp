@@ -16,19 +16,19 @@
 
 ;;; constants for readtable character attributes. These are all as in
 ;;; the manual.
-(defconstant +char-attr-whitespace+ 0)
-(defconstant +char-attr-terminating-macro+ 1)
-(defconstant +char-attr-escape+ 2)
-(defconstant +char-attr-constituent+ 3)
-(defconstant +char-attr-constituent-dot+ 4)
-(defconstant +char-attr-constituent-expt+ 5)
-(defconstant +char-attr-constituent-slash+ 6)
-(defconstant +char-attr-constituent-digit+ 7)
-(defconstant +char-attr-constituent-sign+ 8)
+(def!constant +char-attr-whitespace+ 0)
+(def!constant +char-attr-terminating-macro+ 1)
+(def!constant +char-attr-escape+ 2)
+(def!constant +char-attr-constituent+ 3)
+(def!constant +char-attr-constituent-dot+ 4)
+(def!constant +char-attr-constituent-expt+ 5)
+(def!constant +char-attr-constituent-slash+ 6)
+(def!constant +char-attr-constituent-digit+ 7)
+(def!constant +char-attr-constituent-sign+ 8)
 ;; the "9" entry intentionally left blank for some reason -- WHN 19990806
-(defconstant +char-attr-multiple-escape+ 10)
-(defconstant +char-attr-package-delimiter+ 11)
-(defconstant +char-attr-delimiter+ 12) ; (a fake for READ-UNQUALIFIED-TOKEN)
+(def!constant +char-attr-multiple-escape+ 10)
+(def!constant +char-attr-package-delimiter+ 11)
+(def!constant +char-attr-delimiter+ 12) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
 (sb!xc:defstruct (readtable (:conc-name nil)
 			    (:predicate readtablep)

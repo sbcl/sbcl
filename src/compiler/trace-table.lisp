@@ -18,11 +18,11 @@
     (push (cons label state) *trace-table-info*))
   (values))
 
-(defconstant tt-bits-per-state 3)
-(defconstant tt-bytes-per-entry 2)
-(defconstant tt-bits-per-entry (* tt-bytes-per-entry sb!vm:n-byte-bits))
-(defconstant tt-bits-per-offset (- tt-bits-per-entry tt-bits-per-state))
-(defconstant tt-max-offset (1- (ash 1 tt-bits-per-offset)))
+(def!constant tt-bits-per-state 3)
+(def!constant tt-bytes-per-entry 2)
+(def!constant tt-bits-per-entry (* tt-bytes-per-entry sb!vm:n-byte-bits))
+(def!constant tt-bits-per-offset (- tt-bits-per-entry tt-bits-per-state))
+(def!constant tt-max-offset (1- (ash 1 tt-bits-per-offset)))
 
 (deftype tt-state ()
   `(unsigned-byte ,tt-bits-per-state))

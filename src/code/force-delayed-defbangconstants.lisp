@@ -1,5 +1,9 @@
-;;;; character implementation stuff which is to be visible at
-;;;; build-the-cross-compiler time
+;;;; Now that all the cross-compiler INFO machinery has been set up, we
+;;;; can feed the stored DEF!CONSTANTS argument lists to it.
+;;;;
+;;;; KLUDGE: There's no real reason for this to be in its own file, except
+;;;; perhaps the parallelism with FORCE-DELAYED-DEF!STRUCTS (which does have a
+;;;; good reason).
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -10,8 +14,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB!KERNEL")
 
-(def!constant sb!xc:char-code-limit 256
-  #!+sb-doc
-  "the upper exclusive bound on values produced by CHAR-CODE")
+#+sb-xc-host (force-delayed-def!constants)

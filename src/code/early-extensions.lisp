@@ -53,7 +53,6 @@
   ;; at load time (so that we don't need to teach the cross-compiler
   ;; how to represent and dump non-STANDARD-CHARs like #\NULL)
   (defparameter *default-init-char-form* '(code-char 0)))
-(defconstant default-init-char #.*default-init-char-form*)
 
 ;;; CHAR-CODE values for ASCII characters which we care about but
 ;;; which aren't defined in section "2.1.3 Standard Characters" of the
@@ -66,14 +65,14 @@
 ;;; if so, perhaps implement a DEFTRANSFORM or something to stop it.
 ;;; (or just find a nicer way of expressing characters portably?) --
 ;;; WHN 19990713
-(defconstant bell-char-code 7)
-(defconstant backspace-char-code 8)
-(defconstant tab-char-code 9)
-(defconstant line-feed-char-code 10)
-(defconstant form-feed-char-code 12)
-(defconstant return-char-code 13)
-(defconstant escape-char-code 27)
-(defconstant rubout-char-code 127)
+(def!constant bell-char-code 7)
+(def!constant backspace-char-code 8)
+(def!constant tab-char-code 9)
+(def!constant line-feed-char-code 10)
+(def!constant form-feed-char-code 12)
+(def!constant return-char-code 13)
+(def!constant escape-char-code 27)
+(def!constant rubout-char-code 127)
 
 ;;;; type-ish predicates
 

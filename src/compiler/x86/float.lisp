@@ -2046,9 +2046,9 @@
 (defknown ((setf floating-point-modes)) (float-modes)
   float-modes)
 
-(defconstant npx-env-size (* 7 n-word-bytes))
-(defconstant npx-cw-offset 0)
-(defconstant npx-sw-offset 4)
+(def!constant npx-env-size (* 7 n-word-bytes))
+(def!constant npx-cw-offset 0)
+(def!constant npx-sw-offset 4)
 
 (define-vop (floating-point-modes)
   (:results (res :scs (unsigned-reg)))

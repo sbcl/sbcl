@@ -84,7 +84,7 @@
 					     '(:docs :rest-p :length))))
 	  (let ((offset-sym (symbolicate name "-" slot-name
 					 (if rest-p "-OFFSET" "-SLOT"))))
-	    (constants `(defconstant ,offset-sym ,offset
+	    (constants `(def!constant ,offset-sym ,offset
 			  ,@(when docs (list docs))))
 	    (exports offset-sym))
 	  (when ref-trans
@@ -107,7 +107,7 @@
 	  (incf offset length)))
       (unless var-length
 	(let ((size (symbolicate name "-SIZE")))
-	  (constants `(defconstant ,size ,offset))
+	  (constants `(def!constant ,size ,offset))
 	  (exports size)))
       (when alloc-trans
 	(forms `(def-alloc ,alloc-trans ,offset ,var-length ,widetag
@@ -148,4 +148,4 @@
 (in-package "SB!C")
 
 ;;; the maximum number of SCs in any implementation
-(defconstant sc-number-limit 32)
+(def!constant sc-number-limit 32)
