@@ -1389,12 +1389,6 @@ WORKAROUND:
     debugger invoked on a SB-INT:BUG in thread 27726:
       fasl stack not empty when it should be
 
-333: "CHECK-TYPE TYPE-ERROR-DATUM place"
-  (reported by Tony Martinez sbcl-devel 2004-05-23)
-  When CHECK-TYPE signals a TYPE-ERROR, the TYPE-ERROR-DATUM holds the
-  lisp symbolic place in question rather than the place's value.  This
-  seems wrong.
-
 334: "COMPUTE-SLOTS used to add slots to classes"
   (reported by Bruno Haible sbcl-devel 2004-06-01)
   a. Adding a local slot does not work:

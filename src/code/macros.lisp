@@ -54,14 +54,6 @@
 ;;; and some things (e.g., READ-CHAR) can't afford this excessive
 ;;; consing, we bend backwards a little.
 ;;;
-;;; FIXME: In reality, this restart cruft is needed hardly anywhere in
-;;; the system. Write NEED and NEED-TYPE to replace ASSERT and
-;;; CHECK-TYPE inside the system. (CL:CHECK-TYPE must still be
-;;; defined, since it's specified by ANSI and it is sometimes nice for
-;;; whipping up little things. But as far as I can tell it's not
-;;; usually very helpful deep inside the guts of a complex system like
-;;; SBCL.)
-;;;
 ;;; CHECK-TYPE-ERROR isn't defined until a later file because it uses
 ;;; the macro RESTART-CASE, which isn't defined until a later file.
 (defmacro-mundanely check-type (place type &optional type-string)

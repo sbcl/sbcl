@@ -2559,6 +2559,9 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     The symbols are also exported from SB-PCL for backwards
     compatibility, but more so than before SB-PCL should be treated as
     an implementation-internal package.
+  * fixed bug #333: CHECK-TYPE now ensures that the type error
+    signalled, if any, has the right object to be accessed by
+    TYPE-ERROR-DATUM.  (reported by Tony Martinez)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

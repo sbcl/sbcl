@@ -114,3 +114,11 @@
   (control-error (c) (format nil "~A" c))
   ;; there had better be an error
   (:no-error (&rest args) (error "No error: ~S" args)))
+
+(handler-case
+    (funcall (lambda (x) (check-type x fixnum) x) t)
+  (type-error (c)
+    (assert (and (subtypep (type-error-expected-type c) 'fixnum)
+		 (subtypep 'fixnum (type-error-expected-type c))))
+    (assert (eq (type-error-datum c) t)))
+  (:no-error (&rest rest) (error "no error: ~S" rest)))

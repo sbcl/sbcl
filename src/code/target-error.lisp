@@ -144,24 +144,15 @@
   (list (eval (read *query-io*))))
 
 (defun check-type-error (place place-value type type-string)
-  (let ((cond (if type-string
-		  (make-condition 'simple-type-error
-				  :datum place
-				  :expected-type type
-				  :format-control
-				  "The value of ~S is ~S, which is not ~A."
-				  :format-arguments (list place
-							  place-value
-							  type-string))
-		  (make-condition 'simple-type-error
-				  :datum place
-				  :expected-type type
-				  :format-control
-			  "The value of ~S is ~S, which is not of type ~S."
-				  :format-arguments (list place
-							  place-value
-							  type)))))
-    (restart-case (error cond)
+  (let ((condition
+	 (make-condition
+	  'simple-type-error
+	  :datum place-value
+	  :expected-type type
+	  :format-control
+	  "The value of ~S is ~S, which is not ~:[of type ~S~;~:*~A~]."
+	  :format-arguments (list place place-value type-string type))))
+    (restart-case (error condition)
       (store-value (value)
 	:report (lambda (stream)
 		  (format stream "Supply a new value for ~S." place))
