@@ -58,7 +58,7 @@
     ((:safe :fast-safe) t)
     ((:small :fast) nil)))
 
-;;; an annotated continuation's primitive-type
+;;; an annotated lvar's primitive-type
 #!-sb-fluid (declaim (inline lvar-ptype))
 (defun lvar-ptype (lvar)
   (declare (type lvar lvar))
@@ -401,7 +401,7 @@
 ;;; T restriction allows any operand type. This is also called by IR2
 ;;; translation when it determines whether a result temporary needs to
 ;;; be made, and by representation selection when it is deciding which
-;;; move VOP to use. CONT and TN are used to test for constant
+;;; move VOP to use. LVAR and TN are used to test for constant
 ;;; arguments.
 (defun operand-restriction-ok (restr type &key lvar tn (t-ok t))
   (declare (type (or (member *) cons) restr)
@@ -492,7 +492,7 @@
 ;;;    destination of the value is an immediately following IF node.
 ;;; -- If either the template is safe or the policy is unsafe (i.e. we
 ;;;    can believe output assertions), then we test against the
-;;;    intersection of the node derived type and the continuation
+;;;    intersection of the node derived type and the lvar
 ;;;    asserted type. Otherwise, we just use the node type. If
 ;;;    TYPE-CHECK is null, there is no point in doing the intersection,
 ;;;    since the node type must be a subtype of the  assertion.

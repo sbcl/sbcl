@@ -233,10 +233,10 @@
 	   (emit-move ref ir2-block entry res))))
   (values))
 
-;;; Convert a SET node. If the NODE's CONT is annotated, then we also
-;;; deliver the value to that continuation. If the var is a lexical
-;;; variable with no refs, then we don't actually set anything, since
-;;; the variable has been deleted.
+;;; Convert a SET node. If the NODE's LVAR is annotated, then we also
+;;; deliver the value to that lvar. If the var is a lexical variable
+;;; with no refs, then we don't actually set anything, since the
+;;; variable has been deleted.
 (defun ir2-convert-set (node block)
   (declare (type cset node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
@@ -265,17 +265,17 @@
 
 ;;;; utilities for receiving fixed values
 
-;;; Return a TN that can be referenced to get the value of CONT. CONT
+;;; Return a TN that can be referenced to get the value of LVAR. LVAR
 ;;; must be LTN-ANNOTATED either as a delayed leaf ref or as a fixed,
-;;; single-value continuation. If a type check is called for, do it.
+;;; single-value lvar.
 ;;;
 ;;; The primitive-type of the result will always be the same as the
-;;; IR2-CONTINUATION-PRIMITIVE-TYPE, ensuring that VOPs are always
-;;; called with TNs that satisfy the operand primitive-type
-;;; restriction. We may have to make a temporary of the desired type
-;;; and move the actual continuation TN into it. This happens when we
-;;; delete a type check in unsafe code or when we locally know
-;;; something about the type of an argument variable.
+;;; IR2-LVAR-PRIMITIVE-TYPE, ensuring that VOPs are always called with
+;;; TNs that satisfy the operand primitive-type restriction. We may
+;;; have to make a temporary of the desired type and move the actual
+;;; lvar TN into it. This happens when we delete a type check in
+;;; unsafe code or when we locally know something about the type of an
+;;; argument variable.
 (defun lvar-tn (node block lvar)
   (declare (type node node) (type ir2-block block) (type lvar lvar))
   (let* ((2lvar (lvar-info lvar))
@@ -295,13 +295,13 @@
 	     (emit-move node block lvar-tn temp)
 	     temp)))))
 
-;;; This is similar to CONTINUATION-TN, but hacks multiple values. We
-;;; return continuations holding the values of CONT with PTYPES as
-;;; their primitive types. CONT must be annotated for the same number
-;;; of fixed values are there are PTYPES.
+;;; This is similar to LVAR-TN, but hacks multiple values. We return
+;;; TNs holding the values of LVAR with PTYPES as their primitive
+;;; types. LVAR must be annotated for the same number of fixed values
+;;; are there are PTYPES.
 ;;;
-;;; If the continuation has a type check, check the values into temps
-;;; and return the temps. When we have more values than assertions, we
+;;; If the lvar has a type check, check the values into temps and
+;;; return the temps. When we have more values than assertions, we
 ;;; move the extra values with no check.
 (defun lvar-tns (node block lvar ptypes)
   (declare (type node node) (type ir2-block block)
@@ -319,24 +319,23 @@
             locs
             ptypes)))
 
-;;;; utilities for delivering values to continuations
+;;;; utilities for delivering values to lvars
 
 ;;; Return a list of TNs with the specifier TYPES that can be used as
-;;; result TNs to evaluate an expression into the continuation CONT.
-;;; This is used together with MOVE-CONTINUATION-RESULT to deliver
-;;; fixed values to a continuation.
+;;; result TNs to evaluate an expression into LVAR. This is used
+;;; together with MOVE-LVAR-RESULT to deliver fixed values to
+;;; an lvar.
 ;;;
-;;; If the continuation isn't annotated (meaning the values are
-;;; discarded) or is unknown-values, the then we make temporaries for
-;;; each supplied value, providing a place to compute the result in
-;;; until we decide what to do with it (if anything.)
+;;; If the lvar isn't annotated (meaning the values are discarded) or
+;;; is unknown-values, the then we make temporaries for each supplied
+;;; value, providing a place to compute the result in until we decide
+;;; what to do with it (if anything.)
 ;;;
-;;; If the continuation is fixed-values, and wants the same number of
-;;; values as the user wants to deliver, then we just return the
-;;; IR2-CONTINUATION-LOCS. Otherwise we make a new list padded as
-;;; necessary by discarded TNs. We always return a TN of the specified
-;;; type, using the continuation locs only when they are of the
-;;; correct type.
+;;; If the lvar is fixed-values, and wants the same number of values
+;;; as the user wants to deliver, then we just return the
+;;; IR2-LVAR-LOCS. Otherwise we make a new list padded as necessary by
+;;; discarded TNs. We always return a TN of the specified type, using
+;;; the lvar locs only when they are of the correct type.
 (defun lvar-result-tns (lvar types)
   (declare (type (or lvar null) lvar) (type list types))
   (if (not lvar)
@@ -378,13 +377,13 @@
 ;;; Return a list of TNs wired to the standard value passing
 ;;; conventions that can be used to receive values according to the
 ;;; unknown-values convention. This is used with together
-;;; MOVE-CONTINUATION-RESULT for delivering unknown values to a fixed
-;;; values continuation.
+;;; MOVE-LVAR-RESULT for delivering unknown values to a fixed values
+;;; lvar.
 ;;;
-;;; If the continuation isn't annotated, then we treat as 0-values,
-;;; returning an empty list of temporaries.
+;;; If the lvar isn't annotated, then we treat as 0-values, returning
+;;; an empty list of temporaries.
 ;;;
-;;; If the continuation is annotated, then it must be :FIXED.
+;;; If the lvar is annotated, then it must be :FIXED.
 (defun standard-result-tns (lvar)
   (declare (type (or lvar null) lvar))
   (if lvar
@@ -433,15 +432,15 @@
   (values))
 
 ;;; If necessary, emit coercion code needed to deliver the RESULTS to
-;;; the specified continuation. NODE and BLOCK provide context for
-;;; emitting code. Although usually obtained from STANDARD-RESULT-TNs
-;;; or CONTINUATION-RESULT-TNs, RESULTS my be a list of any type or
+;;; the specified lvar. NODE and BLOCK provide context for emitting
+;;; code. Although usually obtained from STANDARD-RESULT-TNs or
+;;; LVAR-RESULT-TNs, RESULTS my be a list of any type or
 ;;; number of TNs.
 ;;;
-;;; If the continuation is fixed values, then move the results into
-;;; the continuation locations. If the continuation is unknown values,
-;;; then do the moves into the standard value locations, and use
-;;; PUSH-VALUES to put the values on the stack.
+;;; If the lvar is fixed values, then move the results into the lvar
+;;; locations. If the lvar is unknown values, then do the moves into
+;;; the standard value locations, and use PUSH-VALUES to put the
+;;; values on the stack.
 (defun move-lvar-result (node block results lvar)
   (declare (type node node) (type ir2-block block)
 	   (list results) (type (or lvar null) lvar))
@@ -495,10 +494,10 @@
 ;;;; template conversion
 
 ;;; Build a TN-REFS list that represents access to the values of the
-;;; specified list of continuations ARGS for TEMPLATE. Any :CONSTANT
-;;; arguments are returned in the second value as a list rather than
-;;; being accessed as a normal argument. NODE and BLOCK provide the
-;;; context for emitting any necessary type-checking code.
+;;; specified list of lvars ARGS for TEMPLATE. Any :CONSTANT arguments
+;;; are returned in the second value as a list rather than being
+;;; accessed as a normal argument. NODE and BLOCK provide the context
+;;; for emitting any necessary type-checking code.
 (defun reference-args (node block args template)
   (declare (type node node) (type ir2-block block) (list args)
 	   (type template template))
@@ -552,7 +551,7 @@
 			     test-ref () node t)))
 
 ;;; Return a list of primitive-types that we can pass to
-;;; CONTINUATION-RESULT-TNS describing the result types we want for a
+;;; LVAR-RESULT-TNS describing the result types we want for a
 ;;; template call. We duplicate here the determination of output type
 ;;; that was done in initially selecting the template, so we know that
 ;;; the types we find are allowed by the template output type
@@ -579,10 +578,10 @@
 	     types)))))
 
 ;;; Return a list of TNs usable in a CALL to TEMPLATE delivering
-;;; values to CONT. As an efficiency hack, we pick off the common case
-;;; where the continuation is fixed values and has locations that
-;;; satisfy the result restrictions. This can fail when there is a
-;;; type check or a values count mismatch.
+;;; values to LVAR. As an efficiency hack, we pick off the common case
+;;; where the LVAR is fixed values and has locations that satisfy the
+;;; result restrictions. This can fail when there is a type check or a
+;;; values count mismatch.
 (defun make-template-result-tns (call lvar template rtypes)
   (declare (type combination call) (type (or lvar null) lvar)
 	   (type template template) (list rtypes))
@@ -774,7 +773,7 @@
       (values fp nfp temps (mapcar #'make-alias-tn locs)))))
 
 ;;; Handle a non-TR known-values local call. We emit the call, then
-;;; move the results to the continuation's destination.
+;;; move the results to the lvar's destination.
 (defun ir2-convert-local-known-call (node block fun returns lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
 	   (type return-info returns) (type (or lvar null) lvar)
@@ -790,15 +789,15 @@
   (values))
 
 ;;; Handle a non-TR unknown-values local call. We do different things
-;;; depending on what kind of values the continuation wants.
+;;; depending on what kind of values the lvar wants.
 ;;;
-;;; If CONT is :UNKNOWN, then we use the "multiple-" variant, directly
-;;; specifying the continuation's LOCS as the VOP results so that we
-;;; don't have to do anything after the call.
+;;; If LVAR is :UNKNOWN, then we use the "multiple-" variant, directly
+;;; specifying the lvar's LOCS as the VOP results so that we don't
+;;; have to do anything after the call.
 ;;;
 ;;; Otherwise, we use STANDARD-RESULT-TNS to get wired result TNs, and
-;;; then call MOVE-CONTINUATION-RESULT to do any necessary type checks
-;;; or coercions.
+;;; then call MOVE-LVAR-RESULT to do any necessary type checks or
+;;; coercions.
 (defun ir2-convert-local-unknown-call (node block fun lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
 	   (type (or lvar null) lvar) (type label start))
@@ -849,13 +848,13 @@
 
 ;;;; full call
 
-;;; Given a function continuation FUN, return (VALUES TN-TO-CALL
-;;; NAMED-P), where TN-TO-CALL is a TN holding the thing that we call
-;;; NAMED-P is true if the thing is named (false if it is a function).
+;;; Given a function lvar FUN, return (VALUES TN-TO-CALL NAMED-P),
+;;; where TN-TO-CALL is a TN holding the thing that we call NAMED-P is
+;;; true if the thing is named (false if it is a function).
 ;;;
 ;;; There are two interesting non-named cases:
 ;;;   -- We know it's a function. No check needed: return the
-;;;      continuation LOC.
+;;;      lvar LOC.
 ;;;   -- We don't know what it is.
 (defun fun-lvar-tn (node block lvar)
   (declare (type lvar lvar))
@@ -936,9 +935,8 @@
 	(values fp first (locs) nargs)))))
 
 ;;; Do full call when a fixed number of values are desired. We make
-;;; STANDARD-RESULT-TNS for our continuation, then deliver the result
-;;; using MOVE-CONTINUATION-RESULT. We do named or normal call, as
-;;; appropriate.
+;;; STANDARD-RESULT-TNS for our lvar, then deliver the result using
+;;; MOVE-LVAR-RESULT. We do named or normal call, as appropriate.
 (defun ir2-convert-fixed-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)
@@ -1217,9 +1215,9 @@
 ;;;; multiple values
 
 ;;; This is almost identical to IR2-CONVERT-LET. Since LTN annotates
-;;; the lvarinuation for the correct number of values (with the
-;;; continuation user responsible for defaulting), we can just pick
-;;; them up from the continuation.
+;;; the lvarinuation for the correct number of values (with the lvar
+;;; user responsible for defaulting), we can just pick them up from
+;;; the lvar.
 (defun ir2-convert-mv-bind (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (let* ((lvar (first (basic-combination-args node)))
@@ -1241,7 +1239,7 @@
 
 ;;; Emit the appropriate fixed value, unknown value or tail variant of
 ;;; CALL-VARIABLE. Note that we only need to pass the values start for
-;;; the first argument: all the other argument continuation TNs are
+;;; the first argument: all the other argument lvar TNs are
 ;;; ignored. This is because we require all of the values globs to be
 ;;; contiguous and on stack top.
 (defun ir2-convert-mv-call (node block)
@@ -1274,15 +1272,15 @@
 	  (move-lvar-result node block locs lvar)))))))
 
 ;;; Reset the stack pointer to the start of the specified
-;;; unknown-values continuation (discarding it and all values globs on
-;;; top of it.)
+;;; unknown-values lvar (discarding it and all values globs on top of
+;;; it.)
 (defoptimizer (%pop-values ir2-convert) ((lvar) node block)
   (let ((2lvar (lvar-info (lvar-value lvar))))
     (aver (eq (ir2-lvar-kind 2lvar) :unknown))
     (vop reset-stack-pointer node block
 	 (first (ir2-lvar-locs 2lvar)))))
 
-;;; Deliver the values TNs to CONT using MOVE-CONTINUATION-RESULT.
+;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
   (let ((tns (mapcar (lambda (x)
 		       (lvar-tn node block x))
@@ -1396,8 +1394,8 @@
        (find-in-physenv (lvar-value info) (node-physenv node))
        (emit-constant 0)))
 
-;;; We have to do a spurious move of no values to the result
-;;; continuation so that lifetime analysis won't get confused.
+;;; We have to do a spurious move of no values to the result lvar so
+;;; that lifetime analysis won't get confused.
 (defun ir2-convert-throw (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (let ((args (basic-combination-args node)))
@@ -1412,9 +1410,9 @@
   (values))
 
 ;;; Emit code to set up a non-local exit. INFO is the NLX-INFO for the
-;;; exit, and TAG is the continuation for the catch tag (if any.) We
-;;; get at the target PC by passing in the label to the vop. The vop
-;;; is responsible for building a return-PC object.
+;;; exit, and TAG is the lvar for the catch tag (if any.) We get at
+;;; the target PC by passing in the label to the vop. The vop is
+;;; responsible for building a return-PC object.
 (defun emit-nlx-start (node block info tag)
   (declare (type node node) (type ir2-block block) (type nlx-info info)
 	   (type (or lvar null) tag))
@@ -1470,18 +1468,17 @@
 ;;; Emit the entry code for a non-local exit. We receive values and
 ;;; restore dynamic state.
 ;;;
-;;; In the case of a lexical exit or CATCH, we look at the exit
-;;; continuation's kind to determine which flavor of entry VOP to
-;;; emit. If unknown values, emit the xxx-MULTIPLE variant to the
-;;; continuation locs. If fixed values, make the appropriate number of
-;;; temps in the standard values locations and use the other variant,
-;;; delivering the temps to the continuation using
-;;; MOVE-CONTINUATION-RESULT.
+;;; In the case of a lexical exit or CATCH, we look at the exit lvar's
+;;; kind to determine which flavor of entry VOP to emit. If unknown
+;;; values, emit the xxx-MULTIPLE variant to the lvar locs. If fixed
+;;; values, make the appropriate number of temps in the standard
+;;; values locations and use the other variant, delivering the temps
+;;; to the lvar using MOVE-LVAR-RESULT.
 ;;;
 ;;; In the UNWIND-PROTECT case, we deliver the first register
-;;; argument, the argument count and the argument pointer to our
-;;; continuation as multiple values. These values are the block exited
-;;; to and the values start and count.
+;;; argument, the argument count and the argument pointer to our lvar
+;;; as multiple values. These values are the block exited to and the
+;;; values start and count.
 ;;;
 ;;; After receiving values, we restore dynamic state. Except in the
 ;;; UNWIND-PROTECT case, the values receiving restores the stack

@@ -1344,7 +1344,7 @@
 (defknown %type-check-error (t t) nil)
 
 ;; FIXME: This function does not return, but due to the implementation
-;; of FILTER-CONTINUATION we cannot write it here.
+;; of FILTER-LVAR we cannot write it here.
 (defknown %compile-time-type-error (t t t) *)
 
 (defknown %odd-key-args-error () nil)

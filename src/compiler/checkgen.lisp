@@ -141,9 +141,9 @@
 ;;; Switch to disable check complementing, for evaluation.
 (defvar *complement-type-checks* t)
 
-;;; CONT is a continuation we are doing a type check on and TYPES is a
-;;; list of types that we are checking its values against. If we have
-;;; proven that CONT generates a fixed number of values, then for each
+;;; LVAR is an lvar we are doing a type check on and TYPES is a list
+;;; of types that we are checking its values against. If we have
+;;; proven that LVAR generates a fixed number of values, then for each
 ;;; value, we check whether it is cheaper to then difference between
 ;;; the proven type and the corresponding type in TYPES. If so, we opt
 ;;; for a :HAIRY check with that test negated. Otherwise, we try to do
@@ -184,7 +184,7 @@
                 (t
                  (values :hairy res)))))))
 
-;;; Determines whether CONT's assertion is:
+;;; Determines whether CAST's assertion is:
 ;;;  -- checkable by the back end (:SIMPLE), or
 ;;;  -- not checkable by the back end, but checkable via an explicit 
 ;;;     test in type check conversion (:HAIRY), or
@@ -200,10 +200,10 @@
 ;;; We force a check to be hairy even when there are fixed values if
 ;;; we are in a context where we may be forced to use the unknown
 ;;; values convention anyway. This is because IR2tran can't generate
-;;; type checks for unknown values continuations but people could
-;;; still be depending on the check being done. We only care about
-;;; EXIT and RETURN (not MV-COMBINATION) since these are the only
-;;; contexts where the ultimate values receiver
+;;; type checks for unknown values lvars but people could still be
+;;; depending on the check being done. We only care about EXIT and
+;;; RETURN (not MV-COMBINATION) since these are the only contexts
+;;; where the ultimate values receiver
 ;;;
 ;;; In the :HAIRY case, the second value is a list of triples of
 ;;; the form:
@@ -211,13 +211,13 @@
 ;;;
 ;;; If true, the NOT-P flag indicates a test that the corresponding
 ;;; value is *not* of the specified TYPE. ORIGINAL-TYPE is the type
-;;; asserted on this value in the continuation, for use in error
+;;; asserted on this value in the lvar, for use in error
 ;;; messages. When NOT-P is true, this will be different from TYPE.
 ;;;
-;;; This allows us to take what has been proven about CONT's type into
-;;; consideration. If it is cheaper to test for the difference between
-;;; the derived type and the asserted type, then we check for the
-;;; negation of this type instead.
+;;; This allows us to take what has been proven about CAST's argument
+;;; type into consideration. If it is cheaper to test for the
+;;; difference between the derived type and the asserted type, then we
+;;; check for the negation of this type instead.
 (defun cast-check-types (cast force-hairy)
   (declare (type cast cast))
   (let* ((ctype (coerce-to-values (cast-type-to-check cast)))
@@ -301,14 +301,14 @@
           (t
            t))))
 
-;;; Return true if CONT is a continuation whose type the back end is
+;;; Return true if CAST's value is an lvar whose type the back end is
 ;;; likely to want to check. Since we don't know what template the
 ;;; back end is going to choose to implement the continuation's DEST,
 ;;; we use a heuristic. We always return T unless:
 ;;;  -- nobody uses the value, or
 ;;;  -- safety is totally unimportant, or
-;;;  -- the continuation is an argument to an unknown function, or
-;;;  -- the continuation is an argument to a known function that has
+;;;  -- the lvar is an argument to an unknown function, or
+;;;  -- the lvar is an argument to a known function that has
 ;;;     no IR2-CONVERT method or :FAST-SAFE templates that are
 ;;;     compatible with the call's type.
 (defun probable-type-check-p (cast)
@@ -347,7 +347,7 @@
 
 ;;; Return a lambda form that we can convert to do a hairy type check
 ;;; of the specified TYPES. TYPES is a list of the format returned by
-;;; CONTINUATION-CHECK-TYPES in the :HAIRY case.
+;;; LVAR-CHECK-TYPES in the :HAIRY case.
 ;;;
 ;;; Note that we don't attempt to check for required values being
 ;;; unsupplied. Such checking is impossible to efficiently do at the
@@ -370,10 +370,9 @@
                  types)
        (values ,@temps))))
 
-;;; Splice in explicit type check code immediately before the node
-;;; which is CONT's DEST. This code receives the value(s) that were
-;;; being passed to CONT, checks the type(s) of the value(s), then
-;;; passes them on to CONT.
+;;; Splice in explicit type check code immediately before CAST. This
+;;; code receives the value(s) that were being passed to CAST-VALUE,
+;;; checks the type(s) of the value(s), then passes them further.
 (defun convert-type-check (cast types)
   (declare (type cast cast) (type list types))
   (let ((value (cast-value cast))
@@ -433,18 +432,17 @@
   (values))
 
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,
-;;; looking for continuations with TYPE-CHECK T. We do two mostly
-;;; unrelated things: detect compile-time type errors and determine if
-;;; and how to do run-time type checks.
+;;; looking for CASTs with TYPE-CHECK T. We do two mostly unrelated
+;;; things: detect compile-time type errors and determine if and how
+;;; to do run-time type checks.
 ;;;
-;;; If there is a compile-time type error, then we mark the
-;;; continuation and emit a warning if appropriate. This part loops
-;;; over all the uses of the continuation, since after we convert the
-;;; check, the :DELETED kind will inhibit warnings about the types of
-;;; other uses.
+;;; If there is a compile-time type error, then we mark the CAST and
+;;; emit a warning if appropriate. This part loops over all the uses
+;;; of the continuation, since after we convert the check, the
+;;; :DELETED kind will inhibit warnings about the types of other uses.
 ;;;
-;;; If a continuation is too complex to be checked by the back end, or
-;;; is better checked with explicit code, then convert to an explicit
+;;; If the cast is too complex to be checked by the back end, or is
+;;; better checked with explicit code, then convert to an explicit
 ;;; test. Assertions that can checked by the back end are passed
 ;;; through. Assertions that can't be tested are flamed about and
 ;;; marked as not needing to be checked.

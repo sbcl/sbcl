@@ -207,7 +207,7 @@
            (list body aux-vars aux-vals))
   (if (null aux-vars)
       (ir1-convert-progn-body start next result body)
-      (let ((fun-ctran (make-ctran))
+      (let ((ctran (make-ctran))
             (fun-lvar (make-lvar))
 	    (fun (ir1-convert-lambda-body body
  					  (list (first aux-vars))
@@ -216,8 +216,8 @@
  					  :debug-name (debug-namify
  						       "&AUX bindings ~S"
  						       aux-vars))))
-	(reference-leaf start fun-ctran fun-lvar fun)
-	(ir1-convert-combination-args fun-ctran fun-lvar next result
+	(reference-leaf start ctran fun-lvar fun)
+	(ir1-convert-combination-args fun-lvar ctran next result
 				      (list (first aux-vals)))))
   (values))
 
@@ -227,11 +227,11 @@
 ;;; the body, otherwise we do one special binding and recurse on the
 ;;; rest.
 ;;;
-;;; We make a cleanup and introduce it into the lexical environment.
-;;; If there are multiple special bindings, the cleanup for the blocks
-;;; will end up being the innermost one. We force CONT to start a
-;;; block outside of this cleanup, causing cleanup code to be emitted
-;;; when the scope is exited.
+;;; We make a cleanup and introduce it into the lexical
+;;; environment. If there are multiple special bindings, the cleanup
+;;; for the blocks will end up being the innermost one. We force NEXT
+;;; to start a block outside of this cleanup, causing cleanup code to
+;;; be emitted when the scope is exited.
 (defun ir1-convert-special-bindings
     (start next result body aux-vars aux-vals svars)
   (declare (type ctran start next) (type (or lvar null) result)

@@ -12,20 +12,15 @@
 
 (in-package "SB!C")
 
-;;; The front-end data structure (IR1) is composed of nodes and
-;;; continuations. The general idea is that continuations contain
-;;; top-down information and nodes contain bottom-up, derived
-;;; information. A continuation represents a place in the code, while
-;;; a node represents code that does something.
-;;;
-;;; This representation is more of a flow-graph than an augmented
-;;; syntax tree. The evaluation order is explicitly represented in the
-;;; linkage by continuations, rather than being implicit in the nodes
-;;; which receive the the results of evaluation. This allows us to
-;;; decouple the flow of results from the flow of control. A
-;;; continuation represents both, but the continuation can represent
-;;; the case of a discarded result by having no DEST.
+;;; The front-end data structure (IR1) is composed of nodes,
+;;; representing actual evaluations. Linear sequences of nodes in
+;;; control-flow order are combined into blocks (but see
+;;; JOIN-SUCCESSOR-IF-POSSIBLE for precise conditions); control
+;;; transfers inside a block are represented with CTRANs and between
+;;; blocks -- with BLOCK-SUCC/BLOCK-PRED lists; data transfers are
+;;; represented with LVARs.
 
+;;; "Lead-in" Control TRANsfer [to some node]
 (def!struct (ctran
 	     (:make-load-form-fun ignore-it)
 	     (:constructor make-ctran))
@@ -41,59 +36,50 @@
   ;;	has already been determined.
   ;;
   ;; :BLOCK-START
-  ;;	The continuation that is the START of BLOCK. This is the only kind
-  ;;	of continuation that can have more than one use. The BLOCK's
-  ;;	START-USES is a list of all the uses.
+  ;;	The continuation that is the START of BLOCK.
   ;;
   ;; :INSIDE-BLOCK
   ;;	A continuation that is the NEXT of some node in BLOCK.
   (kind :unused :type (member :unused :inside-block :block-start))
-  ;; If this is a NODE, then it is the node which is to be evaluated
-  ;; next. This is always null in :DELETED and :UNUSED continuations,
-  ;; and will be null in a :INSIDE-BLOCK continuation when this is the
-  ;; CONT of the LAST.
+  ;; A NODE which is to be evaluated next. Null only temporary.
   (next nil :type (or node null))
   ;; the node where this CTRAN is used, if unique. This is always null
-  ;; in :DELETED, :UNUSED and :BLOCK-START CTRANs, and is never null
-  ;; in :INSIDE-BLOCK continuations.
+  ;; in :UNUSED and :BLOCK-START CTRANs, and is never null in
+  ;; :INSIDE-BLOCK continuations.
   (use nil :type (or node null))
   ;; the basic block this continuation is in. This is null only in
-  ;; :DELETED and :UNUSED continuations. Note that blocks that are
-  ;; unreachable but still in the DFO may receive deleted
-  ;; continuations, so it isn't o.k. to assume that any continuation
-  ;; that you pick up out of its DEST node has a BLOCK.
-  (block nil :type (or cblock null))
-  ;; something or other that the back end annotates this continuation with
-  (info nil))
+  ;; :UNUSED continuations.
+  (block nil :type (or cblock null)))
 
+(def!method print-object ((x ctran) stream)
+  (print-unreadable-object (x stream :type t :identity t)
+    (format stream " #~D" (cont-num x))))
+
+;;; Linear VARiable. Multiple-value (possibly of unknown number)
+;;; temporal storage.
 (def!struct (lvar
 	     (:make-load-form-fun ignore-it)
 	     (:constructor make-lvar (&optional dest)))
   ;; The node which receives this value. NIL only temporarily.
   (dest nil :type (or node null))
-  ;; cached type of this continuation's value. If NIL, then this must
-  ;; be recomputed: see CONTINUATION-DERIVED-TYPE.
+  ;; cached type of this lvar's value. If NIL, then this must be
+  ;; recomputed: see LVAR-DERIVED-TYPE.
   (%derived-type nil :type (or ctype null))
-  ;; the node where this continuation is used, if unique. This is always
-  ;; null in :DELETED and :UNUSED continuations, and is never null in
-  ;; :INSIDE-BLOCK continuations. In a :BLOCK-START continuation, the
-  ;; BLOCK's START-USES indicate whether NIL means no uses or more
-  ;; than one use.
+  ;; the node (if unique) or a list of nodes where this lvar is used.
   (uses nil :type (or node list))
-  ;; set to true when something about this continuation's value has
-  ;; changed. See REOPTIMIZE-CONTINUATION. This provides a way for IR1
+  ;; set to true when something about this lvar's value has
+  ;; changed. See REOPTIMIZE-LVAR. This provides a way for IR1
   ;; optimize to determine which operands to a node have changed. If
   ;; the optimizer for this node type doesn't care, it can elect not
   ;; to clear this flag.
   (reoptimize t :type boolean)
   ;; Cached type which is checked by DEST. If NIL, then this must be
-  ;; recomputed: see CONTINUATION-EXTERNALLY-CHECKABLE-TYPE.
+  ;; recomputed: see LVAR-EXTERNALLY-CHECKABLE-TYPE.
   (%externally-checkable-type nil :type (or null ctype))
-  ;; something or other that the back end annotates this continuation with
+  ;; something or other that the back end annotates this lvar with
   (info nil))
 
-#+nil
-(def!method print-object ((x continuation) stream)
+(def!method print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream " #~D" (cont-num x))))
 
@@ -102,16 +88,15 @@
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
   ;; True if this node needs to be optimized. This is set to true
-  ;; whenever something changes about the value of a continuation
-  ;; whose DEST is this node.
+  ;; whenever something changes about the value of an lvar whose DEST
+  ;; is this node.
   (reoptimize t :type boolean)
-  ;; the continuation which receives the value of this node. This also
-  ;; indicates what we do controlwise after evaluating this node. This
-  ;; may be null during IR1 conversion.
+  ;; the ctran indicating what we do controlwise after evaluating this
+  ;; node. This is null if the node is the last in its block.
   (next nil :type (or ctran null))
-  ;; the continuation that this node is the NEXT of. This is null
-  ;; during IR1 conversion when we haven't linked the node in yet or
-  ;; in nodes that have been deleted from the IR1 by UNLINK-NODE.
+  ;; the ctran that this node is the NEXT of. This is null during IR1
+  ;; conversion when we haven't linked the node in yet or in nodes
+  ;; that have been deleted from the IR1 by UNLINK-NODE.
   (prev nil :type (or ctran null))
   ;; the lexical environment this node was converted in
   (lexenv *lexenv* :type lexenv)
@@ -155,7 +140,8 @@
                         (:copier nil))
   ;; the bottom-up derived type for this node.
   (derived-type *wild-type* :type ctype)
-  ;; may be NIL if the value is unused.
+  ;; Lvar, receiving the values, produced by this node. May be NIL if
+  ;; the value is unused.
   (lvar nil :type (or lvar null)))
 
 ;;; Flags that are used to indicate various things about a block, such
@@ -164,7 +150,7 @@
 ;;;    lvar whose DEST is in this block. This indicates that the
 ;;;    value-driven (forward) IR1 optimizations should be done on this block.
 ;;; -- FLUSH-P is set when code in this block becomes potentially flushable,
-;;;    usually due to a continuation's DEST becoming null.
+;;;    usually due to an lvar's DEST becoming null.
 ;;; -- TYPE-CHECK is true when the type check phase should be run on this
 ;;;    block. IR1 optimize can introduce new blocks after type check has
 ;;;    already run. We need to check these blocks, but there is no point in
@@ -174,12 +160,11 @@
 ;;;    phases should not attempt to examine or modify blocks with DELETE-P
 ;;;    set, since they may:
 ;;;     - be in the process of being deleted, or
-;;;     - have no successors, or
-;;;     - receive :DELETED continuations.
+;;;     - have no successors.
 ;;; -- TYPE-ASSERTED, TEST-MODIFIED
 ;;;    These flags are used to indicate that something in this block
 ;;;    might be of interest to constraint propagation. TYPE-ASSERTED
-;;;    is set when a continuation type assertion is strengthened.
+;;;    is set when an lvar type assertion is strengthened.
 ;;;    TEST-MODIFIED is set whenever the test for the ending IF has
 ;;;    changed (may be true when there is no IF.)
 (!def-boolean-attribute block
@@ -217,10 +202,9 @@
   ;;  3. blocks with DELETE-P set (zero)
   (pred nil :type list)
   (succ nil :type list)
-  ;; the ctran which heads this block (either a :BLOCK-START or
-  ;; :DELETED-BLOCK-START), or NIL when we haven't made the start
-  ;; ctran yet (and in the dummy component head and tail
-  ;; blocks)
+  ;; the ctran which heads this block (a :BLOCK-START), or NIL when we
+  ;; haven't made the start ctran yet (and in the dummy component head
+  ;; and tail blocks)
   (start nil :type (or ctran null))
   ;; the last node in this block. This is NIL when we are in the
   ;; process of building a block (and in the dummy component head and
@@ -431,8 +415,8 @@
 ;;; The "mess-up" action is explicitly represented by a funny function
 ;;; call or ENTRY node.
 ;;;
-;;; We guarantee that CLEANUPs only need to be done at block boundaries
-;;; by requiring that the exit continuations initially head their
+;;; We guarantee that CLEANUPs only need to be done at block
+;;; boundaries by requiring that the exit ctrans initially head their
 ;;; blocks, and then by not merging blocks when there is a cleanup
 ;;; change.
 (defstruct (cleanup (:copier nil))
@@ -753,7 +737,7 @@
   ;;	a lambda that is used in only one local call, and has in
   ;;	effect been substituted directly inline. The return node is
   ;;	deleted, and the result is computed with the actual result
-  ;;	continuation for the call.
+  ;;	lvar for the call.
   ;;
   ;;    :MV-LET
   ;;	Similar to :LET (as per FUNCTIONAL-LETLIKE-P), but the call
@@ -896,10 +880,10 @@
   ;; bind (because there are no variables left), but have not yet
   ;; actually deleted the LAMBDA yet.
   (bind nil :type (or bind null))
-  ;; the RETURN node for this LAMBDA, or NIL if it has been deleted.
-  ;; This marks the end of the lambda, receiving the result of the
-  ;; body. In a LET, the return node is deleted, and the body delivers
-  ;; the value to the actual continuation. The return may also be
+  ;; the RETURN node for this LAMBDA, or NIL if it has been
+  ;; deleted. This marks the end of the lambda, receiving the result
+  ;; of the body. In a LET, the return node is deleted, and the body
+  ;; delivers the value to the actual lvar. The return may also be
   ;; deleted if it is unreachable.
   (return nil :type (or creturn null))
   ;; If this CLAMBDA is a LET, then this slot holds the LAMBDA whose
@@ -1113,8 +1097,6 @@
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
-;;; NODE-CONT is a dummy continuation, and is there only to keep
-;;; people happy.
 (defstruct (cif (:include node)
 		(:conc-name if-)
 		(:predicate if-p)
@@ -1149,8 +1131,7 @@
 ;;; The BASIC-COMBINATION structure is used to represent both normal
 ;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
-;;; function appears as the successor. The NODE-CONT remains the
-;;; continuation which receives the value of the call. XXX
+;;; function appears as the successor; the NODE-LVAR is null.
 (defstruct (basic-combination (:include valued-node)
 			      (:constructor nil)
 			      (:copier nil))
@@ -1283,8 +1264,8 @@
 ;;; if necessary. This is interposed between the uses of the exit
 ;;; continuation and the exit continuation's DEST. Instead of using
 ;;; the returned value being delivered directly to the exit
-;;; continuation, it is delivered to our VALUE continuation. The
-;;; original exit continuation is the exit node's CONT.
+;;; continuation, it is delivered to our VALUE lvar. The original exit
+;;; lvar is the exit node's LVAR.
 (defstruct (exit (:include valued-node)
 		 (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a

@@ -52,7 +52,7 @@
         (setf (node-next (block-last block)) nil)
         block))))
 
-;;;; continuation use hacking
+;;;; lvar use hacking
 
 ;;; Return a list of all the nodes which use LVAR.
 (declaim (ftype (sfunction (lvar) list) find-uses))
@@ -68,14 +68,12 @@
         (principal-lvar-use (cast-value use))
         use)))
 
-;;; Update continuation use information so that NODE is no longer a
-;;; use of its CONT. If the old continuation doesn't start its block,
-;;; then we don't update the BLOCK-START-USES, since it will be
-;;; deleted when we are done.
+;;; Update lvar use information so that NODE is no longer a use of its
+;;; LVAR.
 ;;;
 ;;; Note: if you call this function, you may have to do a
-;;; REOPTIMIZE-CONTINUATION to inform IR1 optimization that something
-;;; has changed.
+;;; REOPTIMIZE-LVAR to inform IR1 optimization that something has
+;;; changed.
 (declaim (ftype (sfunction (node) (values))
                 delete-lvar-use
                 %delete-lvar-use))
@@ -93,7 +91,8 @@
           (setf (lvar-uses lvar) nil))
       (setf (node-lvar node) nil)))
   (values))
-;;; Delete NODE from its LVAR uses.
+;;; Delete NODE from its LVAR uses; if LVAR has no other uses, delete
+;;; its DEST's block, which must be unreachable.
 (defun delete-lvar-use (node)
   (let ((lvar (node-lvar node)))
     (when lvar
@@ -106,13 +105,11 @@
           (reoptimize-lvar lvar))))
   (values))
 
-;;; Update continuation use information so that NODE uses CONT. If
-;;; CONT is :UNUSED, then we set its block to NODE's NODE-BLOCK (which
-;;; must be set.)
+;;; Update lvar use information so that NODE uses LVAR.
 ;;;
 ;;; Note: if you call this function, you may have to do a
-;;; REOPTIMIZE-CONTINUATION to inform IR1 optimization that something
-;;; has changed.
+;;; REOPTIMIZE-LVAR to inform IR1 optimization that something has
+;;; changed.
 (declaim (ftype (sfunction (node (or lvar null)) (values)) add-lvar-use))
 (defun add-lvar-use (node lvar)
   (aver (not (node-lvar node)))
@@ -141,7 +138,7 @@
                             (next-block (first (block-succ block))))
                        (block-start-node next-block)))))))
 
-;;;; continuation substitution
+;;;; lvar substitution
 
 ;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
 ;;; NIL. We do not flush OLD's DEST.
@@ -428,8 +425,8 @@
 	(first forms)
 	(values (find-original-source path)))))
 
-;;; Return NODE-SOURCE-FORM, T if continuation has a single use,
-;;; otherwise NIL, NIL.
+;;; Return NODE-SOURCE-FORM, T if lvar has a single use, otherwise
+;;; NIL, NIL.
 (defun lvar-source (lvar)
   (let ((use (lvar-uses lvar)))
     (if (listp use)
@@ -1250,7 +1247,7 @@
 ;;; arguments.
 (defun extract-fun-args (lvar fun num-args)
   #!+sb-doc
-  "If CONT is a call to FUN with NUM-ARGS args, change those arguments
+  "If LVAR is a call to FUN with NUM-ARGS args, change those arguments
    to feed directly to the LVAR-DEST of LVAR, which must be a
    combination."
   (declare (type lvar lvar)
@@ -1442,8 +1439,8 @@
   (aver (functional-letlike-p fun))
   (lvar-dest (node-lvar (first (leaf-refs fun)))))
 
-;;; Return the initial value continuation for a LET variable, or NIL
-;;; if there is none.
+;;; Return the initial value lvar for a LET variable, or NIL if there
+;;; is none.
 (defun let-var-initial-value (var)
   (declare (type lambda-var var))
   (let ((fun (lambda-var-home var)))

@@ -755,9 +755,9 @@
 				      (flatten-helper (cdr x) r))))))
     (flatten-helper x nil)))
 
-;;; Take some type of continuation and massage it so that we get a
-;;; list of the constituent types. If ARG is *EMPTY-TYPE*, return NIL
-;;; to indicate failure.
+;;; Take some type of lvar and massage it so that we get a list of the
+;;; constituent types. If ARG is *EMPTY-TYPE*, return NIL to indicate
+;;; failure.
 (defun prepare-arg-for-derive-type (arg)
   (flet ((listify (arg)
 	   (typecase arg
@@ -976,11 +976,11 @@
 ;;; This is used in defoptimizers for computing the resulting type of
 ;;; a function.
 ;;;
-;;; Given the continuation ARG, derive the resulting type using the
+;;; Given the lvar ARG, derive the resulting type using the
 ;;; DERIVE-FUN. DERIVE-FUN takes exactly one argument which is some
-;;; "atomic" continuation type like numeric-type or member-type
-;;; (containing just one element). It should return the resulting
-;;; type, which can be a list of types.
+;;; "atomic" lvar type like numeric-type or member-type (containing
+;;; just one element). It should return the resulting type, which can
+;;; be a list of types.
 ;;;
 ;;; For the case of member types, if a MEMBER-FUN is given it is
 ;;; called to compute the result otherwise the member type is first
@@ -1029,9 +1029,9 @@
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
 ;;; two arguments. DERIVE-FUN takes 3 args in this case: the two
 ;;; original args and a third which is T to indicate if the two args
-;;; really represent the same continuation. This is useful for
-;;; deriving the type of things like (* x x), which should always be
-;;; positive. If we didn't do this, we wouldn't be able to tell.
+;;; really represent the same lvar. This is useful for deriving the
+;;; type of things like (* x x), which should always be positive. If
+;;; we didn't do this, we wouldn't be able to tell.
 (defun two-arg-derive-type (arg1 arg2 derive-fun fun
 				 &optional (convert-type t))
   (declare (type function derive-fun fun))
@@ -1079,8 +1079,8 @@
       (when (and a1 a2)
 	(let ((results nil))
 	  (if same-arg
-	      ;; Since the args are the same continuation, just run
-	      ;; down the lists.
+	      ;; Since the args are the same LVARs, just run down the
+	      ;; lists.
 	      (dolist (x a1)
 		(let ((result (deriver x x same-arg)))
 		  (if (listp result)
@@ -2400,8 +2400,7 @@
 ;;;
 ;;; and similar for other arguments.
 
-;;; Try to recursively cut all uses of the continuation CONT to WIDTH
-;;; bits.
+;;; Try to recursively cut all uses of LVAR to WIDTH bits.
 ;;;
 ;;; For good functions, we just recursively cut arguments; their
 ;;; "goodness" means that the result will not increase (in the
@@ -2641,8 +2640,8 @@
   "convert (* x 0) to 0"
   0)
 
-;;; Return T if in an arithmetic op including continuations X and Y,
-;;; the result type is not affected by the type of X. That is, Y is at
+;;; Return T if in an arithmetic op including lvars X and Y, the
+;;; result type is not affected by the type of X. That is, Y is at
 ;;; least as contagious as X.
 #+nil
 (defun not-more-contagious (x y)
@@ -2798,7 +2797,7 @@
 
 ;;;; equality predicate transforms
 
-;;; Return true if X and Y are continuations whose only use is a
+;;; Return true if X and Y are lvars whose only use is a
 ;;; reference to the same leaf, and the value of the leaf cannot
 ;;; change.
 (defun same-leaf-ref-p (x y)
@@ -2896,7 +2895,7 @@
 	(give-up-ir1-transform
 	 "The operands might not be the same type."))))
 
-;;; If CONT's type is a numeric type, then return the type, otherwise
+;;; If LVAR's type is a numeric type, then return the type, otherwise
 ;;; GIVE-UP-IR1-TRANSFORM.
 (defun numeric-type-or-lose (lvar)
   (declare (type lvar lvar))
@@ -3203,9 +3202,9 @@
 ;;; "optimizer" (say, DEFOPTIMIZER CONSISTENCY-CHECK).
 ;;;
 ;;; FIXME II: In some cases, type information could be correlated; for
-;;; instance, ~{ ... ~} requires a list argument, so if the
-;;; continuation-type of a corresponding argument is known and does
-;;; not intersect the list type, a warning could be signalled.
+;;; instance, ~{ ... ~} requires a list argument, so if the lvar-type
+;;; of a corresponding argument is known and does not intersect the
+;;; list type, a warning could be signalled.
 (defun check-format-args (string args fun)
   (declare (type string string))
   (unless (typep string 'simple-string)
@@ -3572,15 +3571,15 @@
 ;;; for debugging when transforms are behaving mysteriously,
 ;;; e.g. when debugging a problem with an ASH transform
 ;;;   (defun foo (&optional s)
-;;;     (sb-c::/report-continuation s "S outside WHEN")
+;;;     (sb-c::/report-lvar s "S outside WHEN")
 ;;;     (when (and (integerp s) (> s 3))
-;;;       (sb-c::/report-continuation s "S inside WHEN")
+;;;       (sb-c::/report-lvar s "S inside WHEN")
 ;;;       (let ((bound (ash 1 (1- s))))
-;;;         (sb-c::/report-continuation bound "BOUND")
+;;;         (sb-c::/report-lvar bound "BOUND")
 ;;;         (let ((x (- bound))
 ;;;     	  (y (1- bound)))
-;;;   	      (sb-c::/report-continuation x "X")
-;;;           (sb-c::/report-continuation x "Y"))
+;;;   	      (sb-c::/report-lvar x "X")
+;;;           (sb-c::/report-lvar x "Y"))
 ;;;         `(integer ,(- bound) ,(1- bound)))))
 ;;; (The DEFTRANSFORM doesn't do anything but report at compile time,
 ;;; and the function doesn't do anything at all.)

@@ -84,12 +84,11 @@
 
   (values))
 
-;;; Return true if FUN's result continuation is used in a
-;;; tail-recursive full call. We only consider explicit :FULL calls.
-;;; It is assumed that known calls are never part of a tail-recursive
-;;; loop, so we don't need to enforce tail-recursion. In any case, we
-;;; don't know which known calls will actually be full calls until
-;;; after LTN.
+;;; Return true if FUN's result is used in a tail-recursive full
+;;; call. We only consider explicit :FULL calls. It is assumed that
+;;; known calls are never part of a tail-recursive loop, so we don't
+;;; need to enforce tail-recursion. In any case, we don't know which
+;;; known calls will actually be full calls until after LTN.
 (defun has-full-call-use (fun)
   (declare (type clambda fun))
   (let ((return (lambda-return fun)))

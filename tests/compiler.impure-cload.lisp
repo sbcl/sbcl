@@ -182,5 +182,10 @@
            (min -7580
                 (max (logand a 31365125) d)))))
 
+;;; compiler failure "NIL is not of type LVAR"
+(defun #:foo (x)
+  (progn (truly-the integer x)
+         (1+ x)))
+
 
 (sb-ext:quit :unix-status 104)

@@ -948,11 +948,10 @@
   (values))
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the
-;;; work. We change the CALL's CONT to be the continuation heading the
-;;; BIND block, and also do REOPTIMIZE-LVAR on the args and
-;;; CONT so that LET-specific IR1 optimizations get a chance. We blow
-;;; away any entry for the function in *FREE-FUNS* so that nobody
-;;; will create new references to it.
+;;; work. We do REOPTIMIZE-LVAR on the args and CALL's lvar so that
+;;; LET-specific IR1 optimizations get a chance. We blow away any
+;;; entry for the function in *FREE-FUNS* so that nobody will create
+;;; new references to it.
 (defun let-convert (fun call)
   (declare (type clambda fun) (type basic-combination call))
   (let ((next-block (if (node-tail-p call)

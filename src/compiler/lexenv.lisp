@@ -47,15 +47,14 @@
   (vars nil :type list)
   ;; BLOCKS and TAGS are alists from block and go-tag names to 2-lists
   ;; of the form (<entry> <continuation>), where <continuation> is the
-  ;; continuation to exit to, and <entry> is the corresponding ENTRY node.
+  ;; continuation to exit to, and <entry> is the corresponding ENTRY
+  ;; node.
   (blocks nil :type list)
   (tags nil :type list)
   ;; an alist (THING . CTYPE) which is used to keep track of
   ;; "pervasive" type declarations. When THING is a leaf, this is for
   ;; type declarations that pertain to the type in a syntactic extent
-  ;; which does not correspond to a binding of the affected name. When
-  ;; THING is a continuation, this is used to track the innermost THE
-  ;; type declaration.
+  ;; which does not correspond to a binding of the affected name.
   (type-restrictions nil :type list)
   ;; the lexically enclosing lambda, if any
   ;;

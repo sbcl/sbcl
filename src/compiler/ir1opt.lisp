@@ -18,15 +18,15 @@
 
 ;;;; interface for obtaining results of constant folding
 
-;;; Return true for a CONTINUATION whose sole use is a reference to a
+;;; Return true for an LVAR whose sole use is a reference to a
 ;;; constant leaf.
 (defun constant-lvar-p (thing)
   (and (lvar-p thing)
        (let ((use (principal-lvar-use thing)))
          (and (ref-p use) (constant-p (ref-leaf use))))))
 
-;;; Return the constant value for a continuation whose only use is a
-;;; constant node.
+;;; Return the constant value for an LVAR whose only use is a constant
+;;; node.
 (declaim (ftype (function (lvar) t) lvar-value))
 (defun lvar-value (lvar)
   (let ((use (principal-lvar-use lvar)))
@@ -34,23 +34,13 @@
 
 ;;;; interface for obtaining results of type inference
 
-;;; Our best guess for the type of this continuation's value. Note
-;;; that this may be VALUES or FUNCTION type, which cannot be passed
-;;; as an argument to the normal type operations. See
-;;; CONTINUATION-TYPE. This may be called on deleted continuations,
-;;; always returning *.
+;;; Our best guess for the type of this lvar's value. Note that this
+;;; may be VALUES or FUNCTION type, which cannot be passed as an
+;;; argument to the normal type operations. See LVAR-TYPE.
 ;;;
-;;; What we do is call CONTINUATION-PROVEN-TYPE and check whether the
-;;; result is a subtype of the assertion. If so, return the proven
-;;; type and set TYPE-CHECK to NIL. Otherwise, return the intersection
-;;; of the asserted and proven types, and set TYPE-CHECK T. If
-;;; TYPE-CHECK already has a non-null value, then preserve it. Only in
-;;; the somewhat unusual circumstance of a newly discovered assertion
-;;; will we change TYPE-CHECK from NIL to T.
-;;;
-;;; The result value is cached in the CONTINUATION-%DERIVED-TYPE slot.
-;;; If the slot is true, just return that value, otherwise recompute
-;;; and stash the value there.
+;;; The result value is cached in the LVAR-%DERIVED-TYPE slot. If the
+;;; slot is true, just return that value, otherwise recompute and
+;;; stash the value there.
 #!-sb-fluid (declaim (inline lvar-derived-type))
 (defun lvar-derived-type (lvar)
   (declare (type lvar lvar))
@@ -70,14 +60,14 @@
           (t
            (node-derived-type (lvar-uses lvar))))))
 
-;;; Return the derived type for CONT's first value. This is guaranteed
+;;; Return the derived type for LVAR's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
 (declaim (ftype (sfunction (lvar) ctype) lvar-type))
 (defun lvar-type (lvar)
   (single-value-type (lvar-derived-type lvar)))
 
-;;; If CONT is an argument of a function, return a type which the
-;;; function checks CONT for.
+;;; If LVAR is an argument of a function, return a type which the
+;;; function checks LVAR for.
 #!-sb-fluid (declaim (inline lvar-externally-checkable-type))
 (defun lvar-externally-checkable-type (lvar)
   (or (lvar-%externally-checkable-type lvar)
@@ -483,9 +473,9 @@
 ;;;
 ;;; When we are done, we check whether the new type is different from
 ;;; the old TAIL-SET-TYPE. If so, we set the type and also reoptimize
-;;; all the continuations for references to functions in the tail set.
-;;; This will cause IR1-OPTIMIZE-COMBINATION to derive the new type as
-;;; the results of the calls.
+;;; all the lvars for references to functions in the tail set. This
+;;; will cause IR1-OPTIMIZE-COMBINATION to derive the new type as the
+;;; results of the calls.
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let* ((tails (lambda-tail-set (return-lambda node)))
@@ -699,9 +689,7 @@
   (values))
 
 ;;; If NODE doesn't return (i.e. return type is NIL), then terminate
-;;; the block there, and link it to the component tail. We also change
-;;; the NODE's CONT to be a dummy continuation to prevent the use from
-;;; confusing things.
+;;; the block there, and link it to the component tail.
 ;;;
 ;;; Except when called during IR1 convertion, we delete the
 ;;; continuation if it has no other uses. (If it does have other uses,
@@ -1265,7 +1253,7 @@
                 (info :function :info name)))))))))
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
-;;; replace the variable reference's CONT with the arg continuation.
+;;; replace the variable reference's LVAR with the arg lvar.
 ;;;
 ;;; We change the REF to be a reference to NIL with unused value, and
 ;;; let it be flushed as dead code. A side effect of this substitution
@@ -1313,7 +1301,7 @@
 ;;; Delete a LET, removing the call and bind nodes, and warning about
 ;;; any unreferenced variables. Note that FLUSH-DEAD-CODE will come
 ;;; along right away and delete the REF and then the lambda, since we
-;;; flush the FUN continuation.
+;;; flush the FUN lvar.
 (defun delete-let (clambda)
   (declare (type clambda clambda))
   (aver (functional-letlike-p clambda))
@@ -1481,8 +1469,7 @@
     (:error))
   (values))
 
-;;; Propagate derived type info from the values continuation to the
-;;; vars.
+;;; Propagate derived type info from the values lvar to the vars.
 (defun ir1-optimize-mv-bind (node)
   (declare (type mv-combination node))
   (let* ((arg (first (basic-combination-args node)))
@@ -1656,7 +1643,7 @@
 	       (eq (lvar-fun-name (combination-fun use))
 		   'list))
 
-      ;; FIXME: VALUES might not satisfy an assertion on NODE-CONT.
+      ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.
       (change-ref-leaf (lvar-uses (combination-fun node))
 		       (find-free-fun 'values "in a strange place"))
       (setf (combination-kind node) :full)
@@ -1706,8 +1693,8 @@
          `(%compile-time-type-error 'dummy
                                     ',(type-specifier atype)
                                     ',(type-specifier value-type)))
-        ;; KLUDGE: FILTER-CONTINUATION does not work for
-        ;; non-returning functions, so we declare the return type of
+        ;; KLUDGE: FILTER-LVAR does not work for non-returning
+        ;; functions, so we declare the return type of
         ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
         ;; here.
         (setq value (cast-value cast))

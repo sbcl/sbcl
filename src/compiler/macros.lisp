@@ -41,10 +41,10 @@
 ;;; compiler error happens if the syntax is invalid.
 ;;;
 ;;; Define a function that converts a special form or other magical
-;;; thing into IR1. LAMBDA-LIST is a defmacro style lambda list.
-;;; START-VAR and CONT-VAR are bound to the start and result
-;;; continuations for the resulting IR1. KIND is the function kind to
-;;; associate with NAME.
+;;; thing into IR1. LAMBDA-LIST is a defmacro style lambda
+;;; list. START-VAR, NEXT-VAR and RESULT-VAR are bound to the start and
+;;; result continuations for the resulting IR1. KIND is the function
+;;; kind to associate with NAME.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var
 						&key (kind :special-form))
 				   &body body)
@@ -267,15 +267,16 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; Given a DEFTRANSFORM-style lambda-list, generate code that parses
-;;; the arguments of a combination with respect to that lambda-list.
-;;; BODY is the the list of forms which are to be evaluated within the
-;;; bindings. ARGS is the variable that holds list of argument
-;;; continuations. ERROR-FORM is a form which is evaluated when the
-;;; syntax of the supplied arguments is incorrect or a non-constant
-;;; argument keyword is supplied. Defaults and other gunk are ignored.
-;;; The second value is a list of all the arguments bound. We make the
-;;; variables IGNORABLE so that we don't have to manually declare them
-;;; Ignore if their only purpose is to make the syntax work.
+;;; the arguments of a combination with respect to that
+;;; lambda-list. BODY is the the list of forms which are to be
+;;; evaluated within the bindings. ARGS is the variable that holds
+;;; list of argument lvars. ERROR-FORM is a form which is evaluated
+;;; when the syntax of the supplied arguments is incorrect or a
+;;; non-constant argument keyword is supplied. Defaults and other gunk
+;;; are ignored. The second value is a list of all the arguments
+;;; bound. We make the variables IGNORABLE so that we don't have to
+;;; manually declare them Ignore if their only purpose is to make the
+;;; syntax work.
 (defun parse-deftransform (lambda-list body args error-form)
   (multiple-value-bind (req opt restp rest keyp keys allowp)
       (parse-lambda-list lambda-list)
@@ -347,11 +348,11 @@
 ;;; LAMBDA-LIST for the resulting lambda.
 ;;;
 ;;; We parse the call and bind each of the lambda-list variables to
-;;; the continuation which represents the value of the argument. When
-;;; parsing the call, we ignore the defaults, and always bind the
-;;; variables for unsupplied arguments to NIL. If a required argument
-;;; is missing, an unknown keyword is supplied, or an argument keyword
-;;; is not a constant, then the transform automatically passes. The
+;;; the lvar which represents the value of the argument. When parsing
+;;; the call, we ignore the defaults, and always bind the variables
+;;; for unsupplied arguments to NIL. If a required argument is
+;;; missing, an unknown keyword is supplied, or an argument keyword is
+;;; not a constant, then the transform automatically passes. The
 ;;; DECLARATIONS apply to the bindings made by DEFTRANSFORM at
 ;;; transformation time, rather than to the variables of the resulting
 ;;; lambda. Bound-but-not-referenced warnings are suppressed for the
@@ -378,7 +379,7 @@
 ;;; then it is replaced with the new definition.
 ;;;
 ;;; These are the legal keyword options:
-;;;   :RESULT - A variable which is bound to the result continuation.
+;;;   :RESULT - A variable which is bound to the result lvar.
 ;;;   :NODE   - A variable which is bound to the combination node for the call.
 ;;;   :POLICY - A form which is supplied to the POLICY macro to determine
 ;;;             whether this transformation is appropriate. If the result
@@ -562,7 +563,7 @@
 	   ((eq ,block-var ,n-head) ,result)
 	 ,@body))))
 
-;;; Iterate over the uses of CONTINUATION, binding NODE to each one
+;;; Iterate over the uses of LVAR, binding NODE to each one
 ;;; successively.
 ;;;
 ;;; XXX Could change it not to replicate the code someday perhaps...
@@ -577,24 +578,23 @@
                ,@body))))))
 
 ;;; Iterate over the nodes in BLOCK, binding NODE-VAR to the each node
-;;; and CONT-VAR to the node's CONT. The only keyword option is
+;;; and LVAR-VAR to the node's LVAR. The only keyword option is
 ;;; RESTART-P, which causes iteration to be restarted when a node is
 ;;; deleted out from under us. (If not supplied, this is an error.)
 ;;;
-;;; In the forward case, we terminate on LAST-CONT so that we don't
-;;; have to worry about our termination condition being changed when
-;;; new code is added during the iteration. In the backward case, we
-;;; do NODE-PREV before evaluating the body so that we can keep going
-;;; when the current node is deleted.
+;;; In the forward case, we terminate when NODE does not have NEXT, so
+;;; that we do not have to worry about our termination condition being
+;;; changed when new code is added during the iteration. In the
+;;; backward case, we do NODE-PREV before evaluating the body so that
+;;; we can keep going when the current node is deleted.
 ;;;
 ;;; When RESTART-P is supplied to DO-NODES, we start iterating over
-;;; again at the beginning of the block when we run into a
-;;; continuation whose block differs from the one we are trying to
-;;; iterate over, either because the block was split, or because a
-;;; node was deleted out from under us (hence its block is NIL.) If
-;;; the block start is deleted, we just punt. With RESTART-P, we are
-;;; also more careful about termination, re-indirecting the BLOCK-LAST
-;;; each time.
+;;; again at the beginning of the block when we run into a ctran whose
+;;; block differs from the one we are trying to iterate over, either
+;;; because the block was split, or because a node was deleted out
+;;; from under us (hence its block is NIL.) If the block start is
+;;; deleted, we just punt. With RESTART-P, we are also more careful
+;;; about termination, re-indirecting the BLOCK-LAST each time.
 (defmacro do-nodes ((node-var lvar-var block &key restart-p)
                     &body body)
   (with-unique-names (n-block n-start)

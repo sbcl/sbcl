@@ -58,7 +58,7 @@
 ;;;; node.
 
 ;;; Make a :ENTRY cleanup and emit an ENTRY node, then convert the
-;;; body in the modified environment. We make CONT start a block now,
+;;; body in the modified environment. We make NEXT start a block now,
 ;;; since if it was done later, the block would be in the wrong
 ;;; environment.
 (def-ir1-translator block ((name &rest forms) start next result)
@@ -90,10 +90,10 @@
   Evaluate the Value-Form, returning its values from the lexically enclosing
   BLOCK Block-Name. This is constrained to be used only within the dynamic
   extent of the BLOCK."
-  ;; CMU CL comment:
-  ;;   We make CONT start a block just so that it will have a block
-  ;;   assigned. People assume that when they pass a continuation into
-  ;;   IR1-CONVERT as CONT, it will have a block when it is done.
+  ;; old comment:
+  ;;   We make NEXT start a block just so that it will have a block
+  ;;   assigned. People assume that when they pass a ctran into
+  ;;   IR1-CONVERT as NEXT, it will have a block when it is done.
   ;; KLUDGE: Note that this block is basically fictitious. In the code
   ;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
   ;; it's the block which answers the question "which block is
@@ -463,10 +463,10 @@
   (if (and (consp function) (eq (car function) 'function))
       (ir1-convert start next result
                    `(,(fun-name-leaf (second function)) ,@args))
-      (let ((fun-ctran (make-ctran))
+      (let ((ctran (make-ctran))
             (fun-lvar (make-lvar)))
-        (ir1-convert start fun-ctran fun-lvar `(the function ,function))
-        (ir1-convert-combination-args fun-ctran fun-lvar next result args))))
+        (ir1-convert start ctran fun-lvar `(the function ,function))
+        (ir1-convert-combination-args fun-lvar ctran next result args))))
 
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
@@ -536,7 +536,7 @@
       (multiple-value-bind (forms decls)
           (parse-body body :doc-string-allowed nil)
         (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-          (binding* ((fun-ctran (make-ctran))
+          (binding* ((ctran (make-ctran))
                      (fun-lvar (make-lvar))
                      ((next result)
                       (processing-decls (decls vars nil next result)
@@ -544,9 +544,9 @@
                                     forms vars
                                     :debug-name (debug-namify "LET ~S"
                                                               bindings))))
-                          (reference-leaf start fun-ctran fun-lvar fun))
+                          (reference-leaf start ctran fun-lvar fun))
                         (values next result))))
-            (ir1-convert-combination-args fun-ctran fun-lvar next result values))))))
+            (ir1-convert-combination-args fun-lvar ctran next result values))))))
 
 (def-ir1-translator let* ((bindings &body body)
 			  start next result)
@@ -714,14 +714,14 @@
 (def-ir1-translator truly-the ((type value) start next result)
   #!+sb-doc
   ""
-  (declare (inline member))
   #-nil
   (let ((type (coerce-to-values (compiler-values-specifier-type type)))
-	(old (find-uses result)))
+	(old (when result (find-uses result))))
     (ir1-convert start next result value)
-    (do-uses (use result)
-      (unless (memq use old)
-	(derive-node-type use type))))
+    (when result
+      (do-uses (use result)
+        (unless (memq use old)
+          (derive-node-type use type)))))
   #+nil
   (the-in-policy type value '((type-check . 0)) start cont))
 
@@ -902,7 +902,7 @@
   "MULTIPLE-VALUE-CALL Function Values-Form*
   Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
   values from the first VALUES-FORM making up the first argument, etc."
-  (let* ((fun-ctran (make-ctran))
+  (let* ((ctran (make-ctran))
          (fun-lvar (make-lvar))
 	 (node (if args
 		   ;; If there are arguments, MULTIPLE-VALUE-CALL
@@ -915,13 +915,13 @@
 		   ;; important for simplifying compilation of
 		   ;; MV-COMBINATIONS.
 		   (make-combination fun-lvar))))
-    (ir1-convert start fun-ctran fun-lvar
+    (ir1-convert start ctran fun-lvar
 		 (if (and (consp fun) (eq (car fun) 'function))
 		     fun
 		     `(%coerce-callable-to-fun ,fun)))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
-      (let ((this-start fun-ctran))
+      (let ((this-start ctran))
 	(dolist (arg args)
 	  (let ((this-ctran (make-ctran))
                 (this-lvar (make-lvar node)))
@@ -932,31 +932,6 @@
 	(use-continuation node next result)
 	(setf (basic-combination-args node) (arg-lvars))))))
 
-;;; MULTIPLE-VALUE-PROG1 is represented implicitly in IR1 by having a
-;;; the result code use result continuation (CONT), but transfer
-;;; control to the evaluation of the body. In other words, the result
-;;; continuation isn't IMMEDIATELY-USED-P by the nodes that compute
-;;; the result.
-;;;
-;;; In order to get the control flow right, we convert the result with
-;;; a dummy result continuation, then convert all the uses of the
-;;; dummy to be uses of CONT. If a use is an EXIT, then we also
-;;; substitute CONT for the dummy in the corresponding ENTRY node so
-;;; that they are consistent. Note that this doesn't amount to
-;;; changing the exit target, since the control destination of an exit
-;;; is determined by the block successor; we are just indicating the
-;;; continuation that the result is delivered to.
-;;;
-;;; We then convert the body, using another dummy continuation in its
-;;; own block as the result. After we are done converting the body, we
-;;; move all predecessors of the dummy end block to CONT's block.
-;;;
-;;; Note that we both exploit and maintain the invariant that the CONT
-;;; to an IR1 convert method either has no block or starts the block
-;;; that control should transfer to after completion for the form.
-;;; Nested MV-PROG1's work because during conversion of the result
-;;; form, we use dummy continuation whose block is the true control
-;;; destination.
 (def-ir1-translator multiple-value-prog1
     ((values-form &rest forms) start next result)
   #!+sb-doc

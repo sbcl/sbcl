@@ -303,20 +303,17 @@
 ;;;; some flow-graph hacking utilities
 
 ;;; This function sets up the back link between the node and the
-;;; continuation which continues at it.
+;;; ctran which continues at it.
 (defun link-node-to-previous-ctran (node ctran)
   (declare (type node node) (type ctran ctran))
   (aver (not (ctran-next ctran)))
   (setf (ctran-next ctran) node)
   (setf (node-prev node) ctran))
 
-;;; This function is used to set the continuation for a node, and thus
-;;; determine what receives the value and what is evaluated next. If
-;;; the continuation has no block, then we make it be in the block
-;;; that the node is in. If the continuation heads its block, we end
-;;; our block and link it to that block. If the continuation is not
-;;; currently used, then we set the DERIVED-TYPE for the continuation
-;;; to that of the node, so that a little type propagation gets done.
+;;; This function is used to set the ctran for a node, and thus
+;;; determine what is evaluated next. If the ctran has no block, then
+;;; we make it be in the block that the node is in. If the ctran heads
+;;; its block, we end our block and link it to that block.
 #!-sb-fluid (declaim (inline use-ctran))
 (defun use-ctran (node ctran)
   (declare (type node node) (type ctran ctran))
@@ -340,9 +337,10 @@
     (setf (block-succ node-block) (list block))
     (when (memq node-block (block-pred block))
       (error "~S is already a predecessor of ~S." node-block block))
-    (push node-block (block-pred block))
-    #+nil(reoptimize-ctran ctran))) ; XXX
+    (push node-block (block-pred block))))
 
+;;; This function is used to set the ctran for a node, and thus
+;;; determine what receives the value.
 (defun use-lvar (node lvar)
   (declare (type valued-node node) (type (or lvar null) lvar))
   (aver (not (node-lvar node)))
@@ -778,24 +776,24 @@
 (declaim (ftype (sfunction (ctran ctran (or lvar null) list leaf) combination)
 		ir1-convert-combination))
 (defun ir1-convert-combination (start next result form fun)
-  (let ((fun-ctran (make-ctran))
+  (let ((ctran (make-ctran))
         (fun-lvar (make-lvar)))
-    (ir1-convert start fun-ctran fun-lvar `(the (or function symbol) ,fun))
-    (ir1-convert-combination-args fun-ctran fun-lvar next result (cdr form))))
+    (ir1-convert start ctran fun-lvar `(the (or function symbol) ,fun))
+    (ir1-convert-combination-args fun-lvar ctran next result (cdr form))))
 
 ;;; Convert the arguments to a call and make the COMBINATION
-;;; node. FUN-CONT is the continuation which yields the function to
-;;; call. ARGS is the list of arguments for the call, which defaults
-;;; to the cdr of source. We return the COMBINATION node.
-(defun ir1-convert-combination-args (fun-ctran fun-lvar next result args)
-  (declare (type ctran fun-ctran next)
+;;; node. FUN-LVAR yields the function to call. ARGS is the list of
+;;; arguments for the call, which defaults to the cdr of source. We
+;;; return the COMBINATION node.
+(defun ir1-convert-combination-args (fun-lvar start next result args)
+  (declare (type ctran start next)
            (type lvar fun-lvar)
            (type (or lvar null) result)
            (list args))
   (let ((node (make-combination fun-lvar)))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
-      (let ((this-start fun-ctran))
+      (let ((this-start start))
 	(dolist (arg args)
 	  (let ((this-ctran (make-ctran))
                 (this-lvar (make-lvar node)))
@@ -829,7 +827,7 @@
 		    (ir1-convert start next result transformed)))
               (ir1-convert-maybe-predicate start next result form var))))))
 
-;;; If the function has the PREDICATE attribute, and the CONT's DEST
+;;; If the function has the PREDICATE attribute, and the RESULT's DEST
 ;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
 ;;; predicate always appears in a conditional context.
 ;;;
@@ -858,9 +856,9 @@
 ;;; call is legal.
 ;;;
 ;;; If the call is legal, we also propagate type assertions from the
-;;; function type to the arg and result continuations. We do this now
-;;; so that IR1 optimize doesn't have to redundantly do the check
-;;; later so that it can do the type propagation.
+;;; function type to the arg and result lvars. We do this now so that
+;;; IR1 optimize doesn't have to redundantly do the check later so
+;;; that it can do the type propagation.
 (defun ir1-convert-combination-checking-type (start next result form var)
   (declare (type ctran start next) (type (or lvar null) result)
            (list form)

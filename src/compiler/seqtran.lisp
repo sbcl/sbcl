@@ -122,8 +122,8 @@
 		       bare))))))))
 
 ;;; Return a DO loop, mapping a function FUN to elements of
-;;; sequences. SEQS is a list of continuations, SEQ-NAMES - list of
-;;; variables, bound to sequences, INTO - a variable, which is used in
+;;; sequences. SEQS is a list of lvars, SEQ-NAMES - list of variables,
+;;; bound to sequences, INTO - a variable, which is used in
 ;;; MAP-INTO. RESULT and BODY are forms, which can use variables
 ;;; FUNCALL-RESULT, containing the result of application of FUN, and
 ;;; INDEX, containing the current position in sequences.
@@ -376,7 +376,7 @@
 
 ;;;; utilities
 
-;;; Return true if CONT's only use is a non-NOTINLINE reference to a
+;;; Return true if LVAR's only use is a non-NOTINLINE reference to a
 ;;; global function with one of the specified NAMES.
 (defun lvar-fun-is (lvar names)
   (declare (type lvar lvar) (list names))
@@ -388,9 +388,9 @@
 		(not (null (member (leaf-source-name leaf) names
 				   :test #'equal))))))))
 
-;;; If CONT is a constant continuation, the return the constant value.
-;;; If it is null, then return default, otherwise quietly give up the
-;;; IR1 transform.
+;;; If LVAR is a constant lvar, the return the constant value. If it
+;;; is null, then return default, otherwise quietly give up the IR1
+;;; transform.
 ;;;
 ;;; ### Probably should take an ARG and flame using the NAME.
 (defun constant-value-or-lose (lvar &optional default)
