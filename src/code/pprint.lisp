@@ -689,15 +689,15 @@
   #!+sb-doc
   "Specify the indentation to use in the current logical block if STREAM
    (which defaults to *STANDARD-OUTPUT*) is it is a pretty-printing stream
-   and do nothing if not. (See PPRINT-LOGICAL-BLOCK.)  N is the indention
+   and do nothing if not. (See PPRINT-LOGICAL-BLOCK.)  N is the indentation
    to use (in ems, the width of an ``m'') and RELATIVE-TO can be either:
      :BLOCK - Indent relative to the column the current logical block
 	started on.
      :CURRENT - Indent relative to the current column.
-   The new indention value does not take effect until the following line
+   The new indentation value does not take effect until the following line
    break."
   (declare (type (member :block :current) relative-to)
-	   (type integer n)
+	   (type real n)
 	   (type (or stream (member t nil)) stream)
 	   (values null))
   (let ((stream (case stream
@@ -705,7 +705,7 @@
 		  ((nil) *standard-output*)
 		  (t stream))))
     (when (print-pretty-on-stream-p stream)
-      (enqueue-indent stream relative-to n)))
+      (enqueue-indent stream relative-to (truncate n))))
   nil)
 
 (defun pprint-tab (kind colnum colinc &optional stream)

@@ -1601,3 +1601,14 @@ WORKAROUND:
                (aref (vector x) (incf i)))
       (foo-x x))
     => error
+
+349: PPRINT-INDENT rounding implementation decisions
+  At present, pprint-indent (and indeed the whole pretty printer)
+  more-or-less assumes that it's using a monospace font.  That's
+  probably not too silly an assumption, but one piece of information
+  the current implementation loses is from requests to indent by a
+  non-integral amount.  As of sbcl-0.8.15.9, the system silently
+  truncates the indentation to an integer at the point of request, but
+  maybe the non-integral value should be propagated through the
+  pprinter and only truncated at output?  (So that indenting by 1/2
+  then 3/2 would indent by two spaces, not one?)
