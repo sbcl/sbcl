@@ -1290,6 +1290,62 @@ WORKAROUND:
 179:
   (fixed in sbcl-0.7.4.28)
 
+180:
+  In sbcl-0.7.4.35, PCL seems not to understand the :MOST-SPECIFIC-LAST
+  option for PROGN method combination. It does understand that
+  :MOST-SPECIFIC-FIRST and :MOST-SPECIFIC-LAST belong with PROGN.
+  If I use another keyword, it complains:
+    (defgeneric foo ((x t))
+      (:method-combination progn :most-specific-first))
+  outputs
+    method combination error in CLOS dispatch:
+    Illegal options to a short method combination type.
+    The method combination type PROGN accepts one option which
+    must be either :MOST-SPECIFIC-FIRST or :MOST-SPECIFIC-LAST.
+  And when I use :MOST-SPECIFIC-FIRST, I get the expected default
+  behavior:
+    (defgeneric foo ((x t))
+      (:method-combination progn :most-specific-first))
+    (defmethod foo progn ((x number))
+      (print 'number))
+    (defmethod foo progn ((x fixnum))
+      (print 'fixnum))
+    (foo 14)
+  outputs
+    FIXNUM 
+    NUMBER 
+  and returns
+    NUMBER
+  But with :MOST-SPECIFIC-LAST,
+    (defgeneric foo ((x t))
+      (:method-combination progn :most-specific-last))
+    (defmethod foo progn ((x number))
+      (print 'number))
+    (defmethod foo progn ((x fixnum))
+      (print 'fixnum))
+    (foo 14)
+  the behavior doesn't change, giving output of
+    FIXNUM 
+    NUMBER 
+  and returning
+    NUMBER
+  Raymond Toy reported 2002-06-15 on sbcl-devel that CMU CL's PCL
+  doesn't seem to have this bug, outputting NUMBER before FIXNUM
+  as expected in the last case above.
+
+181:
+  Compiling 
+    (in-package :cl-user)
+    (defun bar (x)
+      (declare (type 0 x))
+      (cons x x))
+  signals 
+    bad thing to be a type specifier: 0
+  which seems fine, but also enters the debugger (instead of having
+  the compiler handle the error, convert it into a COMPILER-ERROR, and
+  continue compiling) which seems wrong.
+
+  
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
