@@ -1,0 +1,18 @@
+CPPFLAGS = -I.
+
+CC = gcc -Wstrict-prototypes -fno-strength-reduce # -Wall
+LD = ld
+CPP = cpp
+CFLAGS =  -g -O2 -DGENCGC -DPOSIX_SIGS
+ASFLAGS = -g -DGENCGC
+LINKFLAGS = -g
+NM = nm -gp
+
+ASSEM_SRC = x86-assem.S 
+ARCH_SRC = x86-arch.c
+
+OS_SRC = bsd-os.c os-common.c undefineds.c
+OS_LINK_FLAGS=-static
+OS_LIBS=-lm # -ldl
+
+GC_SRC= gencgc.c

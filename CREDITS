@@ -1,0 +1,493 @@
+
+      The programmers of old were mysterious and profound.  We
+   cannot fathom their thoughts, so all we do is describe their
+   appearance.
+      Aware, like a fox crossing the water.  Alert, like a general
+   on the battlefield.  Kind, like a hostess greeting her guests.
+      Simple, like uncarved blocks of wood.  Opaque, like black 
+   pools in darkened caves.
+      Who can tell the secrets of their hearts and minds?
+      The answer exists only in the Tao.
+         -- Geoffrey James, "The Tao of Programming"
+
+
+BROAD OUTLINE
+
+SBCL is derived from the 18b version of CMU CL.
+
+Most of CMU CL was originally written as part of the CMU Common Lisp
+project at Carnegie Mellon University. According to the documentation
+in CMU CL 18b,
+    Organizationally, CMU Common Lisp was a small, mostly autonomous
+  part within the Mach operating system project. The CMU CL project
+  was more of a tool development effort than a research project.
+  The project started out as Spice Lisp, which provided a modern
+  Lisp implementation for use in the CMU community.
+and
+  CMU CL has been under continuous development since the early 1980's
+  (concurrent with the Common Lisp standardization effort.) 
+Apparently most of the CMU Common Lisp implementors moved on to
+work on the Gwydion environment for Dylan.
+
+CMU CL's CLOS implementation is derived from the PCL reference
+implementation written at Xerox PARC.
+
+CMU CL's implementation of the LOOP macro was derived from code
+from Symbolics, which was derived from code from MIT.
+
+CMU CL had many individual author credits in the source files. In the
+sometimes-extensive rearrangements which were required to make SBCL
+bootstrap itself cleanly, it was tedious to try keep such credits
+attached to individual source files, so they have been moved here
+instead.
+
+William Harold Newman <william.newman@airmail.net> did this
+transformation, and so any errors made are probably his. Corrections
+would be appreciated.
+
+
+MORE DETAILS ON SBCL'S CLOS CODE
+
+The original headers of the PCL files contained the following text:
+
+;;; Any person obtaining a copy of this software is requested to send their
+;;; name and post office or electronic mail address to:
+;;;   CommonLoops Coordinator
+;;;   Xerox PARC
+;;;   3333 Coyote Hill Rd.
+;;;   Palo Alto, CA 94304
+;;; (or send Arpanet mail to CommonLoops-Coordinator.pa@Xerox.arpa)
+;;;
+;;; Suggestions, comments and requests for improvements are also welcome.
+
+This was intended for the original incarnation of the PCL code as a
+portable reference implementation. Since our version of the code has
+had its portability hacked out of it, it's no longer particularly
+relevant to any coordinated PCL effort (which probably doesn't exist
+any more anyway). Therefore, this contact information has been deleted
+from the PCL file headers.
+
+A few files in the original CMU CL 18b src/pcl/ directory did not
+carry such Xerox copyright notices:
+  * Some code was originally written by Douglas T. Crosher for CMU CL:
+    ** the Gray streams implementation
+    ** the implementation of DOCUMENTATION as methods of a generic
+       function
+  * generic-functions.lisp seems to have been machine-generated.
+
+The comments in the CMU CL 18b version of the PCL code walker,
+src/pcl/walk.lisp, said in part
+;;;   a simple code walker, based IN PART on: (roll the credits)
+;;;      Larry Masinter's Masterscope
+;;;      Moon's Common Lisp code walker
+;;;      Gary Drescher's code walker
+;;;      Larry Masinter's simple code walker
+;;;      .
+;;;      .
+;;;      boy, thats fair (I hope).
+
+
+MORE DETAILS ON SBCL'S LOOP CODE
+
+The src/code/loop.lisp file from CMU CL 18b had the following
+credits-related information in it:
+
+;;;   The LOOP iteration macro is one of a number of pieces of code
+;;;   originally developed at MIT for which free distribution has been
+;;;   permitted, as long as the code is not sold for profit, and as long
+;;;   as notification of MIT's interest in the code is preserved.
+;;;
+;;;   This version of LOOP, which is almost entirely rewritten both as
+;;;   clean-up and to conform with the ANSI Lisp LOOP standard, started
+;;;   life as MIT LOOP version 829 (which was a part of NIL, possibly
+;;;   never released).
+;;;
+;;;   A "light revision" was performed by me (Glenn Burke) while at
+;;;   Palladian Software in April 1986, to make the code run in Common
+;;;   Lisp. This revision was informally distributed to a number of
+;;;   people, and was sort of the "MIT" version of LOOP for running in
+;;;   Common Lisp.
+;;;
+;;;   A later more drastic revision was performed at Palladian perhaps a
+;;;   year later. This version was more thoroughly Common Lisp in style,
+;;;   with a few miscellaneous internal improvements and extensions. I
+;;;   have lost track of this source, apparently never having moved it to
+;;;   the MIT distribution point. I do not remember if it was ever
+;;;   distributed.
+;;;
+;;;   The revision for the ANSI standard is based on the code of my April
+;;;   1986 version, with almost everything redesigned and/or rewritten.
+
+The date of the M.I.T. copyright statement falls around the time
+described in these comments. The dates on the Symbolics copyright
+statement are all later -- the earliest is 1989.
+
+
+MORE DETAILS ON OTHER SBCL CODE FROM CMU CL
+
+CMU CL's symbol (but not package) code (code/symbol.lisp) was
+originally written by Scott Fahlman and updated and maintained
+by Skef Wholey.
+
+The CMU CL reader (code/reader.lisp) was originally the Spice Lisp
+reader, written by David Dill and with support for packages added by
+Lee Schumacher. David Dill also wrote the sharpmacro support
+(code/sharpm.lisp).
+
+CMU CL's package code was rewritten by Rob MacLachlan based on an
+earlier version by Lee Schumacher. It also includes DEFPACKAGE by Dan
+Zigmond, and WITH-PACKAGE-ITERATOR written by Blaine Burks. William
+Lott also rewrote the DEFPACKAGE and DO-FOO-SYMBOLS stuff.
+
+CMU CL's string code (code/string.lisp) was originally written by
+David Dill, then rewritten by Skef Wholey, Bill Chiles, and Rob
+MacLachlan.
+
+Various code in the system originated with "Spice Lisp", which was
+apparently a predecessor to the CMU CL project. Much of that was
+originally written by Skef Wholey:
+	code/seq.lisp, generic sequence functions, and COERCE
+	code/array.lisp, general array stuff
+	SXHASH
+	code/list.lisp, list functions (based on code from Joe Ginder and
+		Carl Ebeling)
+The CMU CL seq.lisp code also gave credits for later work by Jim Muller
+and Bill Chiles.
+
+The modules system (code/module.lisp, containing REQUIRE, PROVIDE,
+and friends, now deprecated by ANSI) was written by Jim Muller and 
+rewritten by Bill Chiles.
+
+The CMU CL garbage collector was credited to "Christopher Hoover,
+Rob MacLachlan, Dave McDonald, et al." in the CMU CL code/gc.lisp file,
+with some extra code for the MIPS port credited to Christopher Hoover
+alone.
+
+Guy Steele wrote the original character functions
+	code/char.lisp
+They were subsequently rewritten by David Dill, speeded up by Scott Fahlman,
+and rewritten without fonts and with a new type system by Rob MachLachlan.
+
+Lee Schumacher made the Spice Lisp version of backquote. The comment
+in the CMU CL sources suggests he based it on someone else's code for
+some other Lisp system, but doesn't say which. A note in the CMU CL
+code to pretty-print backquote expressions says that unparsing support
+was provided by Miles Bader.
+
+The CMU implementations of the Common Lisp query functions Y-OR-N-P
+and YES-OR-NO-P were originally written by Walter van Roggen, and 
+updated and modified by Rob MacLachlan and Bill Chiles.
+
+The CMU CL sort functions (code/sort.lisp) were written by Jim Large,
+hacked on and maintained by Skef Wholey, and rewritten by Bill Chiles.
+
+Most of the internals of the Python compiler seem to have been
+originally written by Robert MacLachlan:
+	the type system and associated "cold load hack magic"
+		code/typedefs.lisp
+		code/class.lisp
+		code/type-init.lisp
+		etc.
+	the lexical environment database
+		compiler/globaldb.lisp, etc.
+	the IR1 representation and optimizer
+		compiler/ir1*.lisp, etc.
+	the IR2 representation and optimizer
+		compiler/ir2*.lisp, etc.
+	many concrete optimizations
+		compiler/srctran.lisp (with some code adapted from
+			CLC by Wholey and Fahlman)
+		compiler/float-tran.lisp, etc.
+	information about optimization of known functions
+		compiler/fndb.lisp
+	debug information representation
+		compiler/debug.lisp, compiler/debug-dump.lisp
+	memory pools to reduce consing by reusing compiler objects
+		compiler/alloc.lisp
+	toplevel interface functions and drivers
+		compiler/main.lisp
+Besides writing the compiler, and various other work mentioned elsewhere,
+Robert MacLachlan was also credited with tuning the implementation of 
+streams for Unix files, and writing
+	various floating point support code
+		code/float-trap.lisp, floating point traps
+		code/float.lisp, misc. support a la INTEGER-DECODE-FLOAT
+	low-level time functions
+		code/time.lisp
+
+William Lott is also credited with writing or heavily maintaining some
+parts of the CMU CL compiler. He was responsible for lifting 
+compiler/meta-vmdef.lisp out of compiler/vmdef.lisp, and also wrote
+	various optimizations
+		compiler/array-tran.lisp
+		compiler/saptran.lisp
+		compiler/seqtran.lisp (with some code adapted from an older
+			seqtran written by Wholey and Fahlman)
+	the separable compiler backend
+		compiler/backend.lisp	
+		compiler/generic/utils.lisp
+	the implementation of LOAD-TIME-VALUE
+		compiler/ltv.lisp
+	the most recent version of the assembler
+		compiler/new-assem.lisp
+	vop statistics gathering
+		compiler/statcount.lisp
+	centralized information about machine-dependent and..
+	..machine-independent FOO, with
+		compiler/generic/vm-fndb.lisp, FOO=function signatures
+		compiler/generic/vm-typetran.lisp, FOO=type ops
+		compiler/generic/objdef.lisp, FOO=object representation
+		compiler/generic/primtype.lisp, FOO=primitive types
+Also, Christopher Hoover and William Lott wrote compiler/generic/vm-macs.lisp 
+to centralize information about machine-dependent macros and constants.
+
+Sean Hallgren converted compiler/generic/primtype.lisp for the Alpha.
+
+The CMU CL machine-independent disassembler (compiler/disassem.lisp)
+was written by Miles Bader.
+
+Parts of the CMU CL system were credited to Skef Wholey and Rob
+MacLachlan jointly, perhaps because they were originally part of Spice
+Lisp and were then heavily modified:
+	code/load.lisp, the loader, including all the FASL stuff
+	code/macros.lisp, various fundamental macros
+	code/mipsstrops.lisp, primitives for hacking strings
+	code/purify.lisp, implementation of PURIFY
+	code/stream.lisp, stream functions
+	code/lispinit.lisp, cold startup
+	code/profile.lisp, the profiler
+
+Bill Chiles also modified code/macros.lisp. Much of the implementation
+of PURIFY was rewritten in C by William Lott.
+
+The CMU CL number functions (code/number.lisp) were written by Rob
+MacLachlan, but acknowledge much code "derived from code written by 
+William Lott, Dave Mcdonald, Jim Large, Scott Fahlman, etc."
+
+CMU CL's weak pointer support (code/weak.lisp) was written by
+Christopher Hoover.
+
+The CMU CL DEFSTRUCT system was credited to Rob MacLachlan, William
+Lott and Skef Wholey jointly.
+
+The FDEFINITION system for handling arbitrary function names (a la
+(SETF FOO)) was originally written by Rob MacLachlan. It was modified
+by Bill Chiles to add encapsulation, and modified more by William Lott
+to add FDEFN objects.
+
+The CMU CL condition system (code/error.lisp) was based on
+some prototyping code written by Ken Pitman at Symbolics.
+
+The CMU CL HASH-TABLE system was originally written by Skef Wholey
+for Spice Lisp, then rewritten by William Lott, then rewritten
+again by Douglas T. Crosher.
+
+The support code for environment queries (a la LONG-SITE-NAME),
+the DOCUMENTATION function, and the DRIBBLE function was written
+and maintained "mostly by Skef Wholey and Rob MacLachlan. Scott
+Fahlman, Dan Aronson, and Steve Handerson did stuff here too."
+The same credit statement was given for the original Mach OS interface code.
+
+The CMU CL printer, print.lisp, was credited as "written by
+Neal Feinberg, Bill Maddox, Steven Handerson, and Skef Wholey, and
+modified by various CMU Common Lisp maintainers." 
+
+The comments in the main body of the CMU CL debugger 
+	code/debug.lisp
+say that it was written by Bill Chiles. Some other related files
+	code/debug-int.lisp, programmer's interface to the debugger
+	code/ntrace.lisp, tracing facility based on breakpoints
+say they were written by Bill Chiles and Rob MacLachlan.
+The related file
+	src/debug-vm.lisp, low-level support for :FUNCTION-END breakpoints
+was written by William Lott.
+
+The CMU CL GENESIS cold load system,
+compiler/generic/new-genesis.lisp, was originally written by Skef
+Wholey, then jazzed up for packages by Rob MacLachlan, then completely
+rewritten by William Lott for the MIPS port.
+
+The CMU CL IR1 interpreter was written by Bill Chiles and Robert
+MacLachlan.
+
+Various CMU CL support code was written by William Lott:
+	the bytecode interpreter
+		code/byte-interp.lisp 
+	bitblt-ish operations a la SYSTEM-AREA-COPY
+		code/bit-bash.lisp
+	Unix interface
+		code/fd-stream.lisp, Unix file descriptors as Lisp streams
+		code/filesys.lisp, other Unix filesystem interface stuff
+	handling errors signalled from assembly code
+		code/interr.lisp
+		compiler/generic/interr.lisp
+	finalization based on weak pointers
+		code/final.lisp
+	irrational numeric functions
+		code/irrat.lisp
+	the pretty printer
+		code/pprint.lisp
+	predicates (both type predicates and EQUAL and friends)
+		code/pred.lisp
+	saving the current Lisp image as a core file
+		code/save.lisp
+	handling Unix signals
+		code/signal.lisp
+	implementing FORMAT
+		code/format.lisp
+
+The ALIEN facility seems to have been written largely by Rob
+MacLachlan and William Lott. The CMU CL comments say "rewritten again,
+this time by William Lott and Rob MacLachlan," but don't identify who
+else might have been involved in earlier versions.
+
+The comments in CMU CL's code/final.lisp say "the idea really was
+Chris Hoover's". The comments in CMU CL's code/pprint.lisp say "Algorithm
+stolen from Richard Waters' XP." The comments in CMU CL's code/format.lisp
+say "with lots of stuff stolen from the previous version by David Adam
+and later rewritten by Bill Maddox."
+
+Jim Muller was credited with fixing seq.lisp.
+
+CMU CL's time printing logic, in code/format-time.lisp, was written
+by Jim Healy.
+
+Bill Chiles was credited with fixing/updating seq.lisp after Jim Muller.
+
+The CMU CL machine/filesystem-independent pathname functions
+(code/pathname.lisp) were written by William Lott, Paul Gleichauf, and
+Rob MacLachlan, based on an earlier version written by Jim Large and
+Rob MacLachlan.
+
+Besides writing the original versions of the things credited to him
+above, William Lott rewrote, updated, and cleaned up various stuff:
+	code/array.lisp
+	code/serve-event.lisp
+
+The INSPECT function was originally written by Blaine Burks.
+
+The CMU CL DESCRIBE facility was originally written by "Skef Wholey or
+Rob MacLachlan", according to the comments in the CMU CL sources. It
+was cleaned up and reorganized by Blaine Burks, then ported and
+cleaned up more by Rob MacLachlan. Also, since the split from CMU CL,
+the SBCL DESCRIBE facility was rewritten as a generic function and so
+become entangled with some DESCRIBE code which was distributed as part
+of PCL.
+
+The implementation of the Mersenne Twister RNG used in SBCL is based
+on an implementation written by Douglas T. Crosher and Raymond Toy,
+which was placed in the public domain with permission from M.
+Matsumoto.
+
+Comments in the CMU CL version of FreeBSD-os.c said it came from
+an OSF version by Sean Hallgren, later hacked by Paul Werkowski,
+with generational conservative GC support added by Douglas Crosher.
+
+Comments in the CMU CL version of linux-os.c said it came from the
+FreeBSD-os.c version, morfed to Linux by Peter Van Eynde in July 1996.
+
+Comments in the CMU CL version of backtrace.c said it was "originally
+from Rob's version" (presumably Robert Maclachlan).
+
+Comments in the CMU CL version of purify.c said it had stack direction
+changes, x86/CGC stack scavenging, and static blue bag stuff (all for
+x86 port?) by Paul Werkowski, 1995, 1996; and bug fixes, x86 code
+movement support, and x86/gencgc stack scavenging by Douglas Crosher,
+1996, 1997, 1998.
+
+According to comments in the source files, much of the CMU CL version
+of the x86 support code
+	assembly/x86/alloc.lisp
+	assembly/x86/arith.lisp
+	assembly/x86/array.lisp
+	assembly/x86/assem-rtns.lisp
+	compiler/x86/alloc.lisp
+	compiler/x86/arith.lisp
+	compiler/x86/c-call.lisp
+	compiler/x86/call.lisp
+	compiler/x86/cell.lisp
+	compiler/x86/char.lisp
+	compiler/x86/debug.lisp
+	compiler/x86/float.lisp
+	compiler/x86/insts.lisp
+	compiler/x86/macros.lisp
+	compiler/x86/memory.lisp
+	compiler/x86/move.lisp
+	compiler/x86/nlx.lisp
+	compiler/x86/parms.lisp
+	compiler/x86/pred.lisp
+	compiler/x86/print.lisp
+	compiler/x86/sap.lisp
+	compiler/x86/static-fn.lisp
+	compiler/x86/subprim.lisp
+	compiler/x86/system.lisp
+	compiler/x86/type-vops.lisp
+	compiler/x86/values.lisp
+	compiler/x86/vm.lisp
+was originally written by William Lott, then debugged by Paul
+Werkowski, and in some cases later enhanced and further debugged by
+Douglas T. Crosher; and the x86 runtime support code,
+	x86-assem.S
+was written by Paul F. Werkowski and Douglas T. Crosher.
+
+The CMU CL user manual (doc/cmu-user/cmu-user.tex) says that the X86
+FreeBSD port was originally contributed by Paul Werkowski, and Peter
+VanEynde took the FreeBSD port and created a Linux version.
+
+According to comments in src/code/bsd-os.lisp, work on the generic BSD
+port was done by Skef Wholey, Rob MacLachlan, Scott Fahlman, Dan
+Aronson, and Steve Handerson.
+
+Douglas Crosher wrote code to support Gray streams, added X86 support
+for the debugger and relocatable code, wrote a conservative
+generational GC for the X86 port, and added X86-specific extensions to
+support stack groups and multiprocessing.
+
+The CMU CL user manual credits Robert MacLachlan as editor. A chapter
+on the CMU CL interprocess communication extensions (not supported in
+SBCL) was contributed by William Lott and Bill Chiles.
+
+Peter VanEynde also contributed a variety of #+HIGH-SECURITY patches
+to CMU CL, to provide additional safety, especially through runtime
+checking on various tricky cases of standard functions (e.g. MAP with
+complicated result types, and interactions of various variants of
+STREAM).
+
+Raymond Toy wrote the propagate-float-type extension and various
+other floating point optimizations.
+
+CMU CL's long float support was written by Douglas T. Crosher.
+
+Paul Werkowski turned the Mach OS support code into Linux OS support code.
+
+Versions of the RUN-PROGRAM extension were written first by David
+McDonald, then by Jim Healy and Bill Chiles, then by William Lott.
+
+
+MORE DETAILS ON THE TRANSITION FROM CMU CL
+
+Bill Newman did the original conversion from CMU CL 18b to a form
+which could bootstrap itself cleanly, on Linux/x86 only. Although they
+may not have realized it at the time, Rob Maclachlan and Peter Van
+Eynde were very helpful, RAM by posting a clear explanation of what
+GENESIS is supposed to be doing and PVE by maintaining a version of
+CMU CL which worked on Debian, so that I had something to refer to
+whenever I got stuck.
+
+
+CREDITS SINCE THE RELEASE OF SBCL
+
+The PSXHASH code used to implement EQUALP hash tables was originally
+copyright (C) 2000 by Cadabra, Inc., then released into the public
+domain.
+
+Daniel Barlow contributed sblisp.lisp, a set of patches to make SBCL
+play nicely with ILISP. (Those patches have since disappeared from the
+SBCL distribution because ILISP has since been patched to play nicely
+with SBCL.) He also figured out how to get the CMU CL dynamic object
+file loading code to work under SBCL.
+
+Raymond Wiker ported sbcl-0.6.3 back to FreeBSD, restoring the
+ancestral CMU CL support for FreeBSD and updating it for the changes
+made from FreeBSD version 3 to FreeBSD version 4.
+

@@ -1,0 +1,32 @@
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB-IMPL")
+
+(file-comment
+  "$Header$")
+
+(macrolet ((force-delayed-def!methods ()
+	     `(progn
+		,@(mapcar (lambda (args)
+			    `(progn
+			       #+sb-show
+			       (format t
+				       "~&/about to do ~S~%"
+				       '(defmethod ,@args))
+			       (defmethod ,@args)
+			       #+sb-show
+			       (format t
+				       "~&/done with DEFMETHOD ~S~%"
+				       ',(first args))))
+			  *delayed-def!method-args*)
+		(defmacro def!method (&rest args) `(defmethod ,@args))
+		;; We're no longer needed, ordinary DEFMETHOD is enough now.
+		(makunbound '*delayed-def!method-args*))))
+  (force-delayed-def!methods))

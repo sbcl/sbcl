@@ -1,0 +1,154 @@
+<chapter id="intro"><title>Introduction</>
+
+<para>&SBCL; is a mostly-conforming implementation of the &ANSI;
+&CommonLisp; standard. This manual focuses on behavior which is
+specific to &SBCL;, not on behavior which is common to all
+implementations of &ANSI; &CommonLisp;.</para>
+
+<sect1><title>More Information on &CommonLisp; in General</>
+
+<para>If you are an experienced programmer in general but need
+information on using &CommonLisp; in particular, <emphasis>ANSI Common
+Lisp</>, by Paul Graham, is a good place to start. <emphasis>Paradigms
+Of Artificial Intelligence Programming</>, by Peter Norvig, also has
+some good information on general &CommonLisp; programming, and many
+nontrivial examples. For CLOS in particular, <emphasis>Object-Oriented
+Programming In Common Lisp</> by Sonya Keene is useful.</para>
+
+<para>Two very useful resources for working with any implementation of
+&CommonLisp; are the
+<ulink url="http://ilisp.cons.org"><application>ILISP</></ulink>
+package for <application>Emacs</> and
+<ulink url="http://www.harlequin.com/books/HyperSpec">the &CommonLisp;
+HyperSpec</>.</para>
+
+</sect1>
+
+<sect1><title>More Information on SBCL</title>
+
+<para>Besides this manual, some other &SBCL;-specific information is
+available:
+<itemizedlist>
+  <listitem><para>There is a Unix <quote>man page</> file
+    <filename>sbcl.1</> in the &SBCL; distribution,
+     describing command options and other usage information
+     for the Unix <function>sbcl</> command which invokes
+     the &SBCL; system.</para></listitem>
+  <listitem><para>Documentation for non-&ANSI; extensions for
+    various commands is available online from the &SBCL; executable
+    itself. The extensions for functions which have their own 
+    command prompts (e.g. the debugger, and <function>inspect</>)
+    are documented in text available by typing <userinput>help</>
+    at their command prompts. The extensions for functions which
+    don't have their own command prompt (e.g. <function>trace</>)
+    are described in their documentation strings,
+    unless your &SBCL was compiled with an option not
+    to include documentation strings, in which case the doc strings
+    are only readable in the source code.</para></listitem>
+  <listitem><para>The <ulink url="http://sbcl.sourceforge.net/">
+    &SBCL; home page</ulink> has some general
+    information, plus links to mailing lists devoted to &SBCL;,
+    and to archives of these mailing lists.</para></listitem>
+  <listitem><para>Some low-level information describing the 
+    programming details of the conversion from &CMUCL; to &SBCL;
+    is available in the <filename>doc/FOR-CMUCL-DEVELOPERS</>
+    file in the &SBCL; distribution.</para></listitem>
+</itemizedlist>
+</para>
+
+</sect1>
+
+<sect1 id="implementation"><title>System Implementation and History</>
+
+<para>You can work productively with SBCL without understanding
+anything about how it was and is implemented, but a little knowledge
+can be helpful in order to better understand error messages,
+troubleshoot problems, to understand why some parts of the system are
+better debugged than others, and to anticipate which known bugs, known
+performance problems, and missing extensions are likely to be fixed,
+tuned, or added.</para>
+
+<para>&SBCL; is descended from &CMUCL;, which is itself descended from
+Spice Lisp. Early implementations for the Mach operating system on the
+IBM RT, back in the 1980s. Design decisions from that time are still
+reflected in the current implementation:
+<itemizedlist>
+  <listitem><para>The system expects to be loaded into a 
+    fixed-at-compile-time location in virtual memory, and also expects
+    the location of all of its heap storage to be specified
+    at compile time.</para></listitem>
+  <listitem><para>The system overcommits memory, allocating large
+    amounts of address space from the system (often more than 
+    the amount of virtual memory available) and then failing 
+    if ends up using too much of the allocated storage.</para></listitem>
+  <listitem><para>A word is a 32-bit quantity. The system has been 
+    ported to many processor architectures without altering this
+    basic principle. Some hacks allow the system to run on the Alpha
+    chip (a 64-bit architecture) but the assumption that a word is
+    32 bits wide is implicit in hundreds of places in the
+    system.</para></listitem>
+  <listitem><para>The system is implemented as a C program which is 
+    responsible for supplying low-level services and loading a 
+    Lisp <quote>.core</quote> file.
+  </para></listitem>    
+</itemizedlist>
+</para>
+
+<para>&SBCL; also inherited some newer architectural features from
+&CMUCL;. The most important is that it has a generational garbage
+collector (<quote>GC</>), which has various implications (mostly good)
+for performance. These are discussed in <link linkend="efficiency">
+another chapter</link>.</para>
+
+<para>The direct ancestor of &SBCL; is the X86 port of &CMUCL;.
+This port is in some ways the least mature of any in the &CMUCL;
+system, and some things (like profiling and backtracing) 
+do not work particularly well there. &SBCL; should be able
+to improve in these areas, but it may take a while.</para>
+
+<para>The &SBCL; GC, like the GC on the X86 port of &CMUCL;, is
+<emphasis>conservative</>. This means that it doesn't maintain a
+strict separation between tagged and untagged data, instead treating
+some untagged data (e.g. raw floating point numbers) as
+possibly-tagged data and so not collecting any Lisp objects that they
+point to. This has some negative consequences for average time
+efficiency (though possibly no worse than the negative consequences of
+trying to implement an exact GC on a processor architecture as
+register-poor as the X86) and also has potentially unlimited
+consequences for worst-case memory efficiency. In practice,
+conservative garbage collectors work reasonably well, not getting
+anywhere near the worst case. But they can occasionally cause
+odd patterns of memory usage.</para>
+
+<para>The fork from &CMUCL; was based on a major rewrite of the system
+bootstrap process. &CMUCL; has for many years tolerated a very unusual
+<quote>build</> procedure which doesn't actually build the complete
+system from scratch, but instead progressively overwrites parts of a
+running system with new versions. This quasi-build procedure can cause
+various bizarre bootstrapping hangups, especially when a major change
+is made to the system. It also makes the connection between the
+current source code and the current executable more tenuous than in
+any other software system I'm aware of -- it's easy to accidentally
+<quote>build</> a &CMUCL; system containing characteristics not
+reflected in the current version of the source code.</para>
+
+<para>Other major changes since the fork from &CMUCL; include
+<itemizedlist>
+  <listitem><para>&SBCL; has dropped support for many &CMUCL; extensions,
+    (e.g. remote procedure call, Unix system interface, and X11
+    interface).</para></listitem>
+  <listitem><para>&SBCL; has deleted or deprecated
+    some nonstandard features and code complexity which helped
+    efficiency at the price of maintainability. For example, the 
+    &SBCL; compiler no longer implements memory pooling internally
+    (and so is simpler and more maintainable, but generates more
+    garbage and runs more slowly), and various block-compilation
+    efficiency-increasing extensions to the language have been
+    deleted or are no longer used in the implementation of &SBCL;
+    itself.</para></listitem>
+</itemizedlist>
+</para>
+
+</sect1>
+
+</chapter>

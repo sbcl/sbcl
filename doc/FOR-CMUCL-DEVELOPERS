@@ -1,0 +1,204 @@
+This document was motivated by a request from Paolo Amoroso for notes
+or other documentation on my work on SBCL. It's intended for
+developers who are familiar with the guts of CMU CL, as an overview of
+the changes made to CMU CL in order to produce SBCL. It was written
+for the initial release (sbcl-0.5.0) and has not been updated since
+then.
+
+There are two sections in this report: 
+  I. non-fundamental changes
+  II. fundamental changes
+In this context, fundamental changes are changes which were
+directly driven by the goal of making the system bootstrap itself.
+
+
+Section I: non-fundamental changes
+
+Before I describe the fundamental changes I had to make in order to
+get the system to bootstrap itself, let me emphasize that there are
+many non-fundamental changes as well. I won't try to summarize them
+all, but I'll mention some to give some idea. (Some more information
+about why I made some of these changes is in the PRINCIPLES file in
+the distribution.)
+
+Many, many extensions have been removed.
+
+Packages have all been renamed; in the final system,
+the system packages have names which begin with "SB-".
+Mostly these correspond closely to CMU CL packages, 
+e.g. the "C" package of CMU CL has become the "SB-C" package,
+and the "EXTENSIONS" package of CMU CL has become the "SB-EXT" 
+package.
+
+Some other definitions and declarations have been centralized, too.
+E.g. the build order is defined in one place, and all the COMMON-LISP
+special variables are declared in one place.
+
+I've made various reformatting changes in the comments, and
+added a number of comments.
+
+INFO is now implemented as a function instead of a macro,
+using keywords as its first and second arguments, and is
+no longer in the extensions package, but is considered a
+private implementation detail.
+
+The expected Lisp function arguments and command line arguments
+for SAVE-LISP (now called SAVE-LISP-AND-DIE) and loading
+the core back into a new Lisp have changed completely.
+
+The SB-UNIX package no longer attempts to be a complete user interface
+to Unix. Instead, it's considered a private part of the implementation
+of SBCL, and tries to implement only what's needed by the current
+implementation of SBCL.
+
+Lots of stale conditional code was deleted, e.g. code to support
+portability to archaic systems in the LOOP and PCL packages. (The
+SB-PCL and SB-LOOP packages no longer aspire to portability.)
+
+Various internal symbols, and even some externally-visible extensions,
+have been given less-ambiguous or more-modern names, with more to
+follow. (E.g. SAVE-LISP becoming SAVE-LISP-AND-DIE, both to avoid
+surprising the user and to reserve the name SAVE-LISP in case we ever
+manage to implement a SAVE-LISP which doesn't cause the system to die
+afterwards. And GIVE-UP and ABORT-TRANSFORM have been renamed
+to GIVE-UP-IR1-TRANSFORM and ABORT-IR1-TRANSFORM. And so on.)
+
+Various internal names "NEW-FOO" have been changed to FOO, generally
+after deleting the obsolete old version of FOO. This has happened both
+with names at the Lisp level (e.g. "NEW-ASSEM") and at the Unix
+filesystem level (e.g. "new-hash.lisp" and "new-assem.lisp").
+
+A cultural change, rather than a technical one: The system no longer
+tries to be binary compatible between releases.
+
+Per-file credits for programs should move into a single
+centralized CREDITS file Real Soon Now.
+
+A lot of spelling errors have been corrected.:-)
+
+
+Section II. fundamental changes
+
+There were a number of things which I changed in order to get the
+system to boot itself.
+
+The source files have been extensively reordered to fix broken forward
+references. In many cases, this required breaking one CMU CL source
+file into more than one SBCL source file, and scattering the multiple
+SBCL source files into multiple places in the build order. (Some of
+the breakups were motivated by reasons which no longer exist, and
+could be undone now, e.g. "class.lisp" could probably go back into
+"classes.lisp". But I think most of the reasons still apply.)
+
+The assembler and genesis were rewritten for portability, using
+vectors for scratch space instead of using SAPs.
+
+We define new readmacro syntax #!+ and #!- which acts like
+the standard #+ and #- syntax, except that it switches on the 
+target feature list instead of the host feature list. We also 
+introduce temporary new features like :XC-HOST ("in the cross-compilation
+host") and :XC ("in the cross-compiler") which will be used
+to control some of the behavior below.
+
+A new package SB-XC ("cross-compiler") was introduced to hold
+affecting-the-target versions of various things like DEFMACRO,
+DEFTYPE, FIND-CLASS, CONSTANTP, CLASS, etc. So e.g. when you're
+building the cross-compiler in the cross-compilation host Lisp,
+SB-XC:DEFMACRO defines a macro in the target Lisp; SB-XC:CONSTANTP
+tells you whether something is known to be constant in the target
+Lisp; and SB-XC:CLASS is the class of an object which represents a
+class in the target Lisp. In order to make everything work out later
+when running the cross-compiler to produce code for the target Lisp,
+SB-XC turns into a sort of nickname for the COMMON-LISP package.
+Except it's a little more complicated than that..
+
+It doesn't quite work to make SB-XC into a nickname for COMMON-LISP
+while building code for the target, because then much of the code in
+EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE) forms would break. Instead, we
+read in code using the ordinary SB-XC package, and then when we
+process code in any situation other than :COMPILE-TOPLEVEL, we run it
+through the function UNCROSS to translate any SB-XC symbols into the
+corresponding CL symbols. (This doesn't seem like a very elegant
+solution, but it does seem to work.:-)
+
+Even after we've implemented the UNCROSS hack, a lot of the code inside
+EVAL-WHEN forms is still broken, because it does things like CL:DEFMACRO
+to define macros which are intended to show up in the target, and
+under the new system we really need it to do SB-XC:DEFMACRO instead
+in order to achieve the desired effect. So we have to go through
+all the EVAL-WHEN forms and convert various CL:FOO operations
+to the corresponding SB-XC:FOO operations. Or sometimes instead we
+convert code a la
+	(EVAL-WHEN (COMPILE EVAL)
+	  (DEFMACRO FOO ..))
+	(code-using-foo)
+into code a la
+	(MACROLET ((FOO ..))
+	  (code-using-foo))
+Or sometimes we even give up and write 
+	(DEFMACRO FOO ..)
+	(code-using-foo)
+instead, figuring it's not *that* important to try to save a few bytes
+in the target Lisp by keeping FOO from being defined. And in a few
+shameful instances we even did things like
+	#+XC (DEFMACRO FOO ..)
+	#-XC (DEFMACRO FOO ..
+or
+	#+XC (code-using-foo)
+	#-XC (other-code-using-foo)
+even though we know that we will burn in hell for it. (The really
+horribly unmaintainable stuff along those lines is three compiler-building
+macros which I hope to fix before anyone else notices them.:-)
+
+In order to avoid trashing the host Common Lisp when cross-compiling
+under another instance of ourself (and in order to avoid coming to
+depend on its internals in various weird ways, like some systems we
+could mention but won't:-) we make the system use different package
+names at cold init time than afterwards. The internal packages are
+named "SB!FOO" while we're building the system, and "SB-FOO"
+afterwards.
+
+In order to make the system work even when we're renaming its packages
+out from underneath it, we need to seek out and destroy any nasty
+hacks which refer to particular package names, like the one in
+%PRIMITIVE which wants to reintern the symbols in its arguments into
+the "C"/"SB-C"/"SB!C" package.
+
+Incidentally, because of the #! readmacros and the "SB!FOO" package
+names, the system sources are unreadable to the running system. (The
+undefined readmacros and package names cause READ-ERRORs.) I'd like
+to make a little hack to fix this for use when experimenting with 
+and maintaining the system, but I haven't gotten around to it,
+despite several false starts. Real Soon Now..
+
+In order to keep track of layouts and other type and structure
+information set up under the cross-compiler, we use a system built
+around the DEF!STRUCT macro. (The #\! character is used to name a lot
+of cold-boot-related stuff.) When building the cross-compiler, the
+DEF!STRUCT macro is a wrapper around portable DEFSTRUCT which builds
+its own portable information about the structures being created, and
+arranges for host Lisp instances of the structures to be dumpable as
+target Lisp instances as necessary. (This system uses MAKE-LOAD-FORM
+heavily and is the reason that I say that bootstrapping under CLISP is
+not likely to happen until CLISP supports MAKE-LOAD-FORM.) When
+running the cross-compiler, DEF!STRUCT basically reduces to the
+DEFSTRUCT macro.
+
+In order to be able to make this system handle target Lisp code,
+we need to be able to test whether a host Lisp value matches a 
+target Lisp type specifier. With the information available from 
+DEF!STRUCT, and various hackery, we can do that, implementing things
+like SB-XC:TYPEP.
+
+Now that we know how to represent target Lisp objects in the
+cross-compiler running under vanilla ANSI Common Lisp, we need to make
+the dump code portable. This is not too hard given that the cases
+which would be hard tend not to be used in the implementation of SBCL
+itself, so the cross-compiler doesn't need to be able to handle them
+anyway. Specialized arrays are an exception, and currently we dodge
+the issue by making the compiler use not-as-specialized-as-possible
+array values. Probably this is fixable by bootstrapping in two passes,
+one pass under vanilla ANSI Common Lisp and then another under the
+SBCL created by the first pass. That way, the problem goes away in the
+second pass pass, since we know that all types represented by the
+target SBCL can be represented in the cross-compilation host SBCL.

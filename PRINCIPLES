@@ -1,0 +1,173 @@
+"In truth, I found myself incorrigible with respect to *Order*; and
+now I am grown old and my memory bad, I feel very sensibly the want of
+it. But, on the whole, though I never arrived at the perfection I had
+been so ambitious of obtaining, but fell far short of it, yet I was,
+by the endeavour, a better and happier man than I otherwise should
+have been if I had not attempted it; as those who aim at perfect
+writing by imitating the engraved copies, though they never reach the
+wished-for excellence of those copies, their hand is mended by the
+endeavor, and is tolerable while it continues fair and legible."
+  -- Benjamin Franklin in his autobiography
+
+"'Signs make humans do things,' said Nisodemus, 'or stop doing things.
+So get to work, good Dorcas. Signs. Um. Signs that say *No*.'"
+  -- Terry Pratchett, _Diggers_
+
+There are some principles which I'd like to see used in the
+maintenance of SBCL:
+1. conforming to the standard
+2. being maintainable
+   a. removing stale code
+   b. When practical, important properties should be made manifest in
+      the code. (Putting them in the comments is a distant second best.)
+      i. Perhaps most importantly, things being the same (in the strong 
+         sense that if you cut X, Y should bleed) should be manifest in
+	 the code. Having code in more than one place to do the same
+	 thing is bad. Having a bunch of manifest constants with hidden
+	 relationships to each other is inexcusable. (Some current
+	 heinous offenders against this principle are the memoizing
+	 caches for various functions, and the LONG-FLOAT code.)
+      ii. Enforcing nontrivial invariants, e.g. by declaring the
+	  types of variables, or by making assertions, can be very
+	  helpful.
+   c. using clearer internal representations 
+      i. clearer names
+	 A. more-up-to-date names, e.g. PACKAGE-DESIGNATOR instead
+	    of PACKAGELIKE (in order to match terminology used in ANSI spec)
+         B. more-informative names, e.g. SAVE-LISP-AND-DIE instead
+	    of SAVE-LISP or WRAPPER-INVALID rather than WRAPPER-STATE
+         C. families of names which correctly suggest parallelism,
+	    e.g. CONS-TO-CORE instead of ALLOCATE-CONS, in order to 
+	    suggest the parallelism with other FOO-TO-CORE functions
+      ii. clearer encodings, e.g. it's confusing that WRAPPER-STATE in PCL
+          returns T for valid and any other value for invalid; could
+          be clarified by changing to WRAPPER-INVALID returning a 
+          generalized boolean; or e.g. it's confusing to encode things
+          as symbols and then use STRING= SYMBOL-NAME instead of EQ 
+          to compare them.
+      iii. clearer implementations, e.g. cached functions being
+	   done with HASH-TABLE instead of hand-coded caches
+   d. informative comments and other documentation
+      i. documenting things like the purposes and required properties
+	 of functions, objects, *FEATURES* options, memory layouts, etc.
+      ii. not using terms like "new" without reference to when.
+          (A smart source code control system which would let you
+          find when the comment was written would help here, but
+          there's no reason to write comments that require a smart
+          source code control system to understand..)
+   e. using functions instead of macros where appropriate
+   f. maximizing the amount of stuff that's (broadly speaking) "table
+      driven". I find this particularly helpful when the table describes 
+      the final shape of the result (e.g. the package-data-list.lisp-expr
+      file), replacing a recipe for constructing the result (e.g. various
+      in-the-flow-of-control package-manipulation forms) in which the
+      final shape of the result is only implicit. But it can also be very
+      helpful any time the table language can be just expressive enough
+      for the problem at hand. 
+   g. using functional operators instead of side-effecting operators
+      where practical
+   h. making it easy to find things in the code
+      i. defining things using constructs which can be understood by etags
+   i. using the standard library where possible
+      i. instead of hand-coding stuff
+	 (My package-data-list.lisp-expr stuff may be a bad example as of
+	 19991208, since the system has evolved to the point where it
+	 might be possible to replace my hand-coded machinery with some
+	 calls to DEFPACKAGE.)
+   j. more-ambitious dreams..
+      i. fixing the build process so that the system can be bootstrapped
+         from scratch, so that the source code alone, and not bits and
+         pieces inherited from the previous executable, determine the 
+         properties of the new executable
+      ii. making package dependencies be a DAG instead of a mess, so 
+          the system could be understood (and rebuilt) in pieces
+      iii. moving enough of the system into C code that the Common Lisp
+           LOAD operator (and all the symbol table and FOP and other
+           machinery that it depends on) is implemented entirely in C, so
+           that GENESIS would become unnecessary (because all files could
+           now be warm loaded)
+3. being portable
+   a. In this vale of tears, some tweaking may be unavoidably required
+      when making software run on more than one machine. But we should
+      try to minimize it, not embrace it. And to the extent that it's
+      unavoidable, where possible it should be handled by making an 
+      abstract value or operation which is used on all systems, then
+      making separate implementations of those values and operations
+      for the various systems. (This is very analogous to object-oriented
+      programming, and is good for the same reasons that method dispatch
+      is better than a bunch of CASE statements.)
+4. making a better programming environment
+   a. Declarations *are* assertions! (For function return values, too!)
+   b. Making the debugger, the profiler, and TRACE work better.
+   c. Making extensions more comprehensible.
+      i. Making a smaller set of core extensions. IMHO the high level
+         ones like ONCE-ONLY and LETF belong in a portable library
+         somewhere, not in the core system.
+      ii. Making more-orthogonal extensions. (e.g. removing the
+          PURIFY option from SAVE-LISP-AND-DIE, on the theory that
+          you can always call PURIFY yourself if you like)
+      iii. If an extension must be complicated, if possible make the
+	   complexity conform to some existing standard. (E.g. if SBCL
+	   supplied a command-line argument parsing facility, I'd want
+	   it to be as much like existing command-line parsing utilities
+	   as possible.)
+5. other nice things
+   a. improving compiled code
+      i. faster CLOS
+      ii. bigger heap
+      iii. better compiler optimizations
+      iv. DYNAMIC-EXTENT
+   b. increasing the performance of the system
+      i. better GC
+      ii. improved ability to compile prototype programs fast, even 
+          at the expense of performance of the compiled program
+   c. improving safety
+      i. more graceful handling of stack overflow and memory exhaustion
+      ii. improving interrupt safety by e.g. locking symbol tables
+   d. decreasing the size of the SBCL executable
+   e. not breaking old extensions which are likely to make it into the
+      new ANSI standard
+6. other maybe not-so-nice things
+   a. adding whizzy new features which make it harder to maintain core 
+      code. (Support for the debugger is important enough that I'll 
+      cheerfully make an exception. Multithreading might also be
+      sufficiently important that it's probably worth making an exception.)
+      The one other class of extensions that I am particularly interested
+      is CORBA or other standard interface support, so that programs can
+      more easily break out of the Lisp/GC box to do things like graphics.
+      ("So why did you drop all the socket support, Bill?" I hear you
+      ask. Fundamentally, because I have 'way too much to maintain
+      already; but also because I think it's too low-level to add much
+      value. People who are prepared to work at that level of abstraction
+      and non-portability could just code their own wrapper layer
+      in C and talk to it through the ALIEN stuff.)
+7. judgment calls
+   a. Sharp, rigid tools are safer than dull or floppy tools. I'm
+      inclined to avoid complicated defaulting behavior (e.g. trying
+      to decide what file to LOAD when extension is not specified) or
+      continuable errors, preferring functions which have simple behavior
+      with no surprises (even surprises which are arguably pleasant).
+
+CMU CL maintenance has been conservative in ways that I would prefer to 
+be flexible, and flexible in ways that I'd prefer to be conservative.
+CMU CL maintainers have been conservative about keeping old code and
+maintaining the old structure, and flexible about allowing a bunch of 
+additional stuff to be tacked onto the old structure.
+
+There are some good things about the way that CMU CL has been
+maintained that I nonetheless propose to jettison. In particular,
+binary compatibility between releases. This is a very handy feature,
+but it's a pain to maintain. At least for a while, I intend to just
+require that programs be recompiled any time they're to be used with a
+new version of the system. After a while things might settle down to
+where recompiles will only be required for new major releases, so
+either all 3.3.x fasl files will work with any 3.3.y runtime, or all
+3.w.x fasl files will work with any 3.y.z runtime. But before trying
+to achieve that kind of stability, I think it's more important to 
+be able to clean up things about the internal structure of the system.
+Aiming for that kind of stability would impair our ability to make 
+changes like
+  * cleaning up DEFUN and DEFMACRO to use EVAL-WHEN instead of IR1 magic;
+  * reducing the separation between PCL classes and COMMON-LISP classes;
+  * fixing bad FOPs (e.g. the CMU CL fops which interact with the *PACKAGE*
+    variable)

@@ -1,0 +1,21 @@
+This directory is for extensions to SBCL. They aren't necessary for
+core SBCL functionality, or else they'd be built into the main SBCL
+binary automatically. And they're not portable Common Lisp, or they'd
+be put elsewhere (e.g. http://clocc.sourceforge.net/).
+
+Some good candidates for future extensions here are:
+  * bindings to existing foreign libraries (e.g. to a regexp library
+    like PCRE, or to a compression library like zlib, or to a graphics
+    library like Tk)
+  * new libraries (e.g. a CORBA interface, or a port of the CMU CL
+    POSIX functions, or a new higher-level POSIX functions)
+  * low-level hooks into SBCL needed to interface it to some wrapper
+    system (e.g. to interface to a graphical debugger of some sort)
+  * a too-alpha-to-be-supported-yet tree shaker
+
+SBCL extensions of less general interest, e.g. a binding to the C
+interface of the Oracle RDBMS, or particularly large extensions, e.g.
+big graphics frameworks, can also be associated with the SBCL project,
+but instead of being included in this directory as part of the
+distribution, they will be made available on the SBCL project web
+site.

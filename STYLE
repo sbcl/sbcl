@@ -1,0 +1,99 @@
+Most of the style hints in the Lisp FAQ apply.
+
+When porting the system, I would really prefer code which factors
+dependencies into a set of interface functions and constants and
+includes implementations of the interface for the different systems.
+Patches which require conditional compilation (like all the old
+#T+HPUX or #T-X86 tests in the sources inherited from CMUCL) might be
+accepted if they're simple, in hopes of factoring out the differences
+more cleanly later, but even if accepted, such code may not be
+maintained for very long.
+
+grammatical fussiness:
+  Phrases are not capitalized.
+  Sentences are capitalized.
+  Periods terminate sentences.
+  Periods separate phrases from succeeding sentences, e.g.
+    ;;; the maximum number of transformations we'll make before
+    ;;; concluding we're in an infinite loop and bailing. This can
+    ;;; be changed, but it is an error to change it while we're
+    ;;; solving a system.
+    (defvar *max-n-transformations* 10)
+  Lisp in comments is capitalized.
+
+usage fussiness:
+  Function documentation can be a description of what the function
+    does, e.g.
+	;;; Parse the arguments for a BDEFSTRUCT call, and return
+	;;;   (VALUES NAME DEFSTRUCT-ARGS MAKE-LOAD-FORM-FUN BDEFSTRUCT-STYPE),
+	;;; where NAME is the name of the new type, DEFSTRUCT-ARGS is the
+	;;; munged result suitable for passing on to DEFSTRUCT,
+	;;; MAKE-LOAD-FORM-FUN is the make load form function, or NIL if
+	;;; there's none, and BDEFSTRUCT-SUPERTYPE is the direct supertype
+	;;; of the type if it is another BDEFSTRUCT-defined type, or NIL
+	;;; otherwise.
+	(defun parse-bdefstruct-args (nameoid &rest rest)
+	  ..)
+    or a remark about the function, e.g.
+	;;; a helper function for BDEFSTRUCT in the #+XC-HOST case
+	(defun uncross-defstruct-args (defstruct-args)
+	  ..)
+    If you're talking about what the function does, ordinarily you
+    should just say what the function does, e.g.
+	;;; Return the first prime number greater than or equal to X.
+	(defun primify (x) ..)
+    instead of telling the reader that you're going to tell him what
+    the function does, e.g.
+	;;; PRIMIFY returns the first prime number greater than or 
+	;;; equal to X.
+	(defun primify (x) ..)
+    or 
+	;;; When you call this function on X, you get back the first
+	;;; prime number greater than or equal to X.
+	(defun primify (x) ..)
+
+In general, if you can express it in the code instead of the comments,
+do so. E.g. the old CMUCL code has many comments above functions foo
+that say things like
+	;;; FOO -- interface
+If we were going to do something like that, we would prefer to do it by
+writing
+	(EXPORT 'FOO)
+(Instead, for various other reasons, we centralize all the exports
+in package declarations.) The old "FOO -- interface" comments are bad
+style because they duplicate information (and they illustrate one
+of the evils of duplicating information by the way that they have
+drifted out of sync with the code).
+
+There are a number of style practices on display in the code
+which are not good examples to follow:
+  * using conditional compilation to support different architectures,
+    instead of factoring the dependencies into interfaces and providing
+    implementations of the interface for different architectures;
+  * in conditional compilation, using a common subexpression over and
+    over again, e.g. #+(OR GENGC GENCGC), when the important thing is
+    that GENGC and GENCGC are (currently) the GCs which support scavenger
+    hooks. If you have to do that, define a SCAVHOOK feature,
+    write #+SCAVHOOK in many places, and arrange for the SCAVHOOK feature
+    to be set once and only once in terms of GENGC and GENCGC. (That way
+    future maintainers won't curse you.)
+  * putting the defined symbol, and information about whether it's 
+    exported or not, into the comments around the definition of the symbol;
+  * naming anything DO-FOO if it isn't an iteration macro
+  * exposing a lot of high-level functionality not in the ANSI standard
+    to the user (as discussed above)
+  * not using a consistent abbreviation style in global names (e.g. 
+    naming some things DEFINE-FOO and other things DEF-BAR, with 
+    no rule to determine whether the abbreviation is used)
+  * using lots of single-colon package prefixes (distracting and hard
+    to read, and obstacles to reaching package nirvana where 
+    package dependencies are a directed acyclic graph) or even
+    double-colon package prefixes (hard to understand and hard
+    to maintain). (One exception: I've sometimes been tempted to
+    add a CL: prefix to the definition of every CL symbol (e.g.
+    (DEFUN CL:CADDDR (..) ..) as reminders that they're required by
+    ANSI and can't be deleted no matter how obscure and useless some
+    of them might look.:-)
+Most of these are common in the code inherited from CMUCL. I've
+eliminated them in some places, but there's a *lot* of code inherited
+from CMUCL..

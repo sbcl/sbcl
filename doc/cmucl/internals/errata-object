@@ -1,0 +1,23 @@
+Look at primtype.lisp and objdef.lisp (and early-objdef.lisp) for more
+up-to-date definitions of various tags. (For example, the simple
+string tag has changed since object.tex was written.)
+
+The string format has changed. According to "object.tex", string length is
+stored in the 24 bits of the string header. Instead, those 24 bits
+are set to zero, and string length is encoded in the same way as the
+other specialized simple-array counts, as a fixnum following the 
+header.
+
+The number of slots for objects has changed since object.tex was
+written. The only reliable source for current slot definitions seems
+to be the primitive object data maintained by the compiler itself. See
+primtype.lisp and objdef.lisp, or look at the genesis code which reads
+this data to generate the various slot offsets in the C header file.
+
+The meaning of the function-self slot has changed in the X86 port:
+it points directly to the code to be executed.
+
+Nothing about FDEFN objects seems to be documented. FDEFN objects
+replace the simple SYMBOL-FUNCTION slot with a much more complicated
+mechanism, which I [WHN] dislike and would like to get rid of, but
+haven't [yet?].

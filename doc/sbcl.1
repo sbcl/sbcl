@@ -1,0 +1,383 @@
+.\" -*- Mode: Text -*-
+.\"
+.\" man page introduction to SBCL
+.\"
+.\" SBCL, including this man page, is derived from CMU Common Lisp, of
+.\" which it was said (ca. 1991)
+.\"   **********************************************************************
+.\"   This code was written as part of the CMU Common Lisp project at
+.\"   Carnegie Mellon University, and has been placed in the public domain.
+.\"   If you want to use this code or any part of CMU Common Lisp, please
+.\"   contact Scott Fahlman or slisp-group@cs.cmu.edu.
+.\"   **********************************************************************
+.\"
+.\" $Header$
+.\" FIXME: The date below should be $Date$.
+.TH SBCL 1 "$Date$"
+.AT 3
+.SH NAME
+SBCL -- "Steel Bank Common Lisp"
+
+.SH DESCRIPTION
+
+SBCL is a free Common Lisp programming environment. It is derived from
+the free CMU CL programming environment. (The name is intended to
+acknowledge the connection: steel and banking are the industries where
+Carnegie and Mellon made the big bucks.)
+
+.SH COMMAND LINE SYNTAX
+
+Command line syntax can be considered an advanced topic; for ordinary
+interactive use, no command line arguments should be necessary.
+
+In order to understand the command line argument syntax for SBCL, it
+is helpful to understand that the SBCL system is implemented as two
+components, a low-level runtime environment written in C and a
+higher-level system written in Common Lisp itself. Some command line
+arguments are processed during the initialization of the low-level
+runtime environment, some command line arguments are processed during
+the initialization of the Common Lisp system, and any remaining
+command line arguments are passed on to user code.
+
+The full, unambiguous syntax for SBCL is
+.TP 3
+.B sbcl [runtime options] --end-runtime-options [toplevel options] --end-toplevel-options [user options]
+.PP
+
+For convenience, the --end-runtime-options and --end-toplevel-options
+elements can be omitted. Omitting these elements can be convenient
+when you are running the program interactively, and you can see that
+no ambiguities are possible with the option values you are using.
+Omitting these elements is probably a bad idea for any batch file
+where any of the options are under user control, since it makes it
+impossible for SBCL to detect erroneous command line input, so that
+erroneous command line arguments will be passed on to the user program
+even if they was intended for the runtime system or the Lisp system.
+
+Supported runtime options are
+.TP 3
+.B --core <corefilename>
+Run the specified Lisp core file instead of the default. (See the FILES
+section.) Note that if the Lisp core file is a user-created core file, it may
+run a nonstandard toplevel which does not accept the standard toplevel options.
+.TP 3
+.B --noinform
+Suppress the printing of any banner or other informational message at
+startup. (Combined with the --noprint toplevel option, this makes it
+straightforward to write Lisp "scripts" which work as Unix pipes.)
+.PP
+
+In the future, runtime options may be added to control behavior such
+as lazy allocation of memory.
+
+Runtime options, including any --end-runtime-options option,
+are stripped out of the command line before the
+Lisp toplevel logic gets a chance to see it.
+
+Supported toplevel options for the standard SBCL core are
+.TP 3
+.B --sysinit <filename>
+Load filename instead of the default system-wide
+initialization file. (See the FILES section.)
+There is no special option to cause
+no system-wide initialization file to be read, but on a Unix
+system "--sysinit /dev/null" can be used to achieve the same effect.
+.TP 3
+.B --userinit <filename>
+Load filename instead of the default user
+initialization file. (See the FILES section.)
+There is no special option to cause
+no user initialization file to be read, but on a Unix
+system "--userinit /dev/null" can be used to achieve the same effect.
+.TP 3
+.B --eval <command>
+After executing any initialization file, but before starting the
+read-eval-print loop on standard input,
+evaluate the command given. More than
+one --eval option can be used, and all will be executed,
+in the order they appear on the command line.
+.TP 3
+.B --noprint
+When ordinarily the toplevel "read-eval-print loop" would be
+executed, execute a "read-eval loop" instead, i.e. don't print
+a prompt and don't echo results. (Combined with the --noinform
+runtime option, this makes it straightforward to write Lisp
+"scripts" which work as Unix pipe utilities.)
+.TP 3
+.B --noprogrammer
+Ordinarily the system initializes *DEBUG-IO* to *TERMINAL-IO*.
+When the --notty option is set, however, *DEBUG-IO* is instead
+set to a stream which sends its output to *ERROR-OUTPUT* and
+which raises an error on input. As a result, any attempt by the
+program to get programmer feedback through the debugger
+causes an error which abnormally terminates the entire
+Lisp environment. (This can be useful behavior for programs
+which are to run without programmer supervision.)
+.PP
+
+Regardless of the order in which --sysinit, --userinit, and --eval
+options appear on the command line, the sysinit file, if it exists, is
+loaded first; then the userinit file, if it exists, is loaded; then
+any --eval commands are executed in sequence; then the read-eval-print
+loop is started on standard input. At any step, error conditions or
+commands such as SB-EXT:QUIT can cause execution to be terminated
+before proceeding to subsequent steps.
+
+Note that when running SBCL from a core file created by a user call to
+the SB-EXT:SAVE-LISP-AND-DIE, the toplevel options may be under the
+control of user code passed as arguments to SB-EXT:SAVE-LISP-AND-DIE.
+For this purpose, the --end-toplevel-options option itself can be
+considered a toplevel option, i.e. the user core, at its option, may
+not support it.
+
+In the standard SBCL startup sequence (i.e. with no user core
+involved) toplevel options and any --end-toplevel-options option are
+stripped out of the command line argument list before user code gets a
+chance to see it.
+
+.SH OVERVIEW
+
+SBCL aims for but has not reached ANSI compliance.
+
+SBCL compiles Lisp to native code, or optionally to more-compact but
+much slower byte code.
+
+SBCL's garbage collector is generational and conservative.
+
+SBCL includes a source level debugger, as well as the ANSI TRACE
+facility and a rudimentary profiler.
+
+.SH DIFFERENCES FROM CMU CL
+
+SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
+system and a C compiler, and all of its properties are specified by
+the version of the source code that it was created from. (This clean
+bootstrappability was the immediate motivation for forking off of the
+CMU CL development tree.)
+
+Many extensions supported by CMU CL, like Motif support,
+the Hemlock editor, search paths, the WIRE protocol, various
+user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
+REQUIRED-ARGUMENT), and many others.
+
+SBCL has retained some extensions of its parent CMU CL. Many
+of them are in three categories:
+.TP 3
+\--
+hooks into the low level workings of the system which can be useful
+for debugging (e.g. a list of functions to be run whenever GC occurs,
+or an operator to cause a particular string to be compiled into a fasl
+file)
+.TP 3
+\--
+non-portable performance hacks (e.g. PURIFY, which causes
+everything currently in existence to become immune to GC)
+.TP 3
+\--
+things which might be in the new ANSI spec (e.g. weak pointers,
+finalization, foreign function interface to C, and Gray streams)
+.PP
+
+There are also various retained extensions which don't fall into
+any particular category, e.g.
+.TP 3
+\--
+the ability to save running Lisp images as executable files
+.PP
+
+Some of the retained extensions have new names and/or different
+options than their CMU CL counterparts. For example, the SBCL function
+which saves a Lisp image to disk and kills it is called
+SAVE-LISP-AND-DIE instead of SAVE-LISP, and it supports fewer keyword
+options than CMU CL's SAVE-LISP.
+
+.SH THE COMPILER
+
+SBCL inherits from CMU CL the "Python" native code compiler. This
+compiler is very clever about understanding the type system of Common
+Lisp and using it to produce efficient code, and about producing notes
+to let the user know when the compiler doesn't have enough type
+information to produce efficient code. It also tries (almost always
+successfully) to follow the unusual but very useful principle that
+type declarations should be checked at runtime unless the user
+explicitly tells the system that speed is more important than safety.
+
+The CMU CL version of this compiler reportedly produces pretty good
+code for modern machines which have lots of registers, but its code
+for the X86 is marred by a lot of extra loads and stores to
+stack-based temporary variables. Because of this, and because of the
+extra levels of indirection in Common Lisp relative to C, we find a
+typical performance decrease by a factor of perhaps 2 to 5 for small
+programs coded in SBCL instead of GCC.
+
+For more information about the compiler, see the user manual.
+
+.SH DOCUMENTATION
+
+Currently, the documentation for the system is
+.TP 3
+\--
+the user manual
+.TP 3
+\--
+this man page
+.TP 3
+\--
+doc strings and online help built into the SBCL executable
+.PP
+
+.SH SYSTEM REQUIREMENTS
+
+Unlike its distinguished ancestor CMU CL, SBCL is currently only
+supported on X86. Linux and FreeBSD are currently available. It would
+probably be straightforward to port the CMU CL support for Alpha or
+SPARC as well, or to OpenBSD or NetBSD, but at the time of this
+writing no such efforts are underway.
+
+As of version 0.6.3, SBCL requires on the order of 16Mb to run. In
+some future version, this number could shrink significantly, since
+large parts of the system are far from execution bottlenecks and could
+reasonably be stored in compact byte compiled form. (CMU CL does this
+routinely; the only reason SBCL doesn't currently do this is a
+combination of bootstrapping technicalities and inertia.)
+
+.SH ENVIRONMENT
+
+.TP 10n
+.BR SBCL_HOME
+If this variable is set, it overrides the default directories for
+files like "sbclrc" and "sbcl.core", so that instead of being searched
+for in e.g. /etc/, /usr/local/etc/, /usr/lib/, and /usr/local/lib/, they
+are searched for only in the directory named by SBCL_HOME. This is
+intended to support users who wish to use their own version of SBCL
+instead of the version which is currently installed as the system
+default.
+.PP
+
+.SH FILES
+
+/usr/lib/sbcl.core and /usr/local/lib/sbcl.core are the standard
+locations for the standard SBCL core, unless overridden by the SBCL_HOME
+variable.
+
+/etc/sbclrc and /usr/local/etc/sbclrc are the standard locations for
+system-wide SBCL initialization files, unless overridden by the
+SBCL_HOME variable.
+
+$HOME/.sbclrc is the standard location for a user's SBCL
+initialization file.
+
+.SH BUGS
+
+Too numerous to list, alas. This section attempts to list the most
+serious known bugs, and a reasonably representative sampling of
+others. For more information on bugs, see the BUGS file in the
+distribution.
+
+It is possible to get in deep trouble by exhausting
+memory. To plagiarize a sadly apt description of a language not
+renowned for the production of bulletproof software, "[The current
+SBCL implementation of] Common Lisp makes it harder for you to shoot
+yourself in the foot, but when you do, the entire universe explodes."
+.TP 3
+\--
+The system doesn't deal well with stack overflow.
+.TP 3
+\--
+The SBCL system overcommits memory at startup. On typical Unix-alikes
+like Linux and *BSD, this can cause other processes to be killed
+randomly (!) if the SBCL system turns out to use more virtual memory
+than the system has available for it.
+.PP
+
+The facility for dumping a running Lisp image to disk gets confused
+when run without the PURIFY option, and creates an unnecessarily large
+core file (apparently representing memory usage up to the previous
+high-water mark). Moreover, when the file is loaded, it confuses the
+GC, so that thereafter memory usage can never be reduced below that
+level.
+
+By default, the compiler is overaggressive about static typing,
+assuming that a function's return type never changes. Thus compiling
+and loading a file containing
+(DEFUN FOO (X) NIL)
+(DEFUN BAR (X) (IF (FOO X) 1 2))
+(DEFUN FOO (X) (PLUSP X))
+then running (FOO 1) gives 2 (because the compiler "knew"
+that FOO's return type is NULL).
+
+The compiler's handling of function return values unnecessarily
+violates the "declarations are assertions" principle that it otherwise
+adheres to. Using PROCLAIM or DECLAIM to specify the return type of a
+function causes the compiler to believe you without checking. Thus
+compiling a file containing
+(DECLAIM (FTYPE (FUNCTION (T) NULL) SOMETIMES))
+(DEFUN SOMETIMES (X) (ODDP X))
+(DEFUN FOO (X) (IF (SOMETIMES X) 'THIS-TIME 'NOT-THIS-TIME))
+then running (FOO 1) gives NOT-THIS-TIME, because the
+never compiled code to check the declaration.
+
+The TRACE facility can't be used on some kinds of functions.
+
+The profiler is flaky, e.g. sometimes it fails by throwing a
+signal instead of giving you a result.
+
+SYMBOL-FUNCTION is much slower than you'd expect, being implemented
+not as a slot access but as a search through the compiler/kernel
+"globaldb" database.
+
+CLOS (based on the PCL reference implementation) is quite slow.
+
+The interpreter's pre-processing freezes in the macro definitions in effect at
+the time an interpreted function is defined.
+
+There are many nagging pre-ANSIisms, e.g.
+.TP 3
+\--
+CLOS (based on the PCL reference implementation) is incompletely
+integrated into the system, so that e.g. SB-PCL::FIND-CLASS is a
+different function than CL::FIND-CLASS. (This is less of a problem in
+practice than the speed, but it's still distasteful.)
+.TP 3
+--
+The ANSI-recommended idiom for creating a function which is only
+sometimes expanded inline,
+(DECLAIM (INLINE F))
+(DEFUN F ...)
+(DECLAIM (NOTINLINE F)),
+doesn't do what you'd expect. (Instead, you have to declare the
+function as SB-EXT:MAYBE-INLINE to get the desired effect.)
+.TP 3
+--
+Compiling DEFSTRUCT in strange places (e.g. inside a DEFUN) doesn't
+do anything like what it should.
+.TP 3
+\--
+The symbol * is the name of a type similar to T. (It's used as part
+of the implementation of compound types like (ARRAY * 1).)
+.TP 3
+\--
+The DESCRIBE facility doesn't use CLOS (PRINT-OBJECT, etc.) as it should.
+Instead it is based on old hardwired TYPECASEs.
+.TP 3
+\--
+The printer doesn't use CLOS (PRINT-OBJECT, etc.) everywhere it should.
+Instead it still uses old hardwired TYPECASEs. (This one is not as
+annoying as it sounds, since the printer does use PRINT-OBJECT in the
+places where it tends to matter most.)
+.PP
+
+.SH SUPPORT
+
+Please send bug reports or other information to
+<william.newman@airmail.net>.
+
+.SH DISTRIBUTION
+
+SBCL is a free implementation of Common Lisp derived from CMU CL. Both
+sources and executables are freely available; this software is "as
+is", and has no warranty of any kind. CMU and the authors assume no
+responsibility for the consequences of any use of this software. See
+the CREDITS file in the distribution for more information about
+history, contributors and permissions.
+

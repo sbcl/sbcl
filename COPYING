@@ -1,0 +1,16 @@
+SBCL is derived from CMU CL, which was released into the public
+domain, subject only to the BSD-style "free, but credit must be given
+and copyright notices must be retained" licenses in the LOOP macro
+(from MIT and Symbolics) and in the PCL implementation of CLOS (from
+Xerox).
+
+After CMU CL was was released into the public domain, it was
+maintained by volunteers, who continued the tradition of releasing
+their work into the public domain.
+
+All changes to SBCL since the fork from CMU CL have been released
+into the public domain.
+
+Thus, there are no known obstacles to copying, using, and modifying
+SBCL freely, as long as the MIT, Symbolics, and Xerox copyright
+notices are retained.

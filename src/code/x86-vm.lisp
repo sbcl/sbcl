@@ -1,0 +1,328 @@
+;;;; X86-specific runtime stuff
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!VM")
+
+(file-comment
+  "$Header$")
+
+;;;; OS-CONTEXT-T
+
+;;; a POSIX signal context, i.e. the type passed as the third 
+;;; argument to an SA_SIGACTION-style signal handler
+;;;
+;;; The real type does have slots, but at Lisp level, we never
+;;; access them, or care about the size of the object. Instead, we
+;;; always refer to these objects by pointers handed to us by the C
+;;; runtime library, and ask the runtime library any time we need
+;;; information about the contents of one of these objects. Thus, it
+;;; works to represent this as an object with no slots.
+;;;
+;;; KLUDGE: It would be nice to have a type definition analogous to
+;;; C's "struct os_context_t;", for an incompletely specified object
+;;; which can only be referred to by reference, but I don't know how
+;;; to do that in the FFI, so instead we just this bogus no-slots
+;;; representation. -- WHN 20000730
+;;;
+;;; FIXME: Since SBCL, unlike CMU CL, uses this as an opaque type,
+;;; it's no longer architecture-dependent, and probably belongs in
+;;; some other package, perhaps SB-KERNEL.
+(def-alien-type os-context-t (struct os-context-t-struct))
+
+;;;; MACHINE-TYPE and MACHINE-VERSION
+
+(defun machine-type ()
+  #!+sb-doc
+  "Returns a string describing the type of the local machine."
+  "X86")
+
+(defun machine-version ()
+  #!+sb-doc
+  "Returns a string describing the version of the local machine."
+  "X86")
+
+;;;; :CODE-OBJECT fixups
+
+;;; a counter to measure the storage overhead of these fixups
+(defvar *num-fixups* 0)
+;;; FIXME: When the system runs, it'd be interesting to see what this is.
+
+;;; This gets called by LOAD to resolve newly positioned objects
+;;; with things (like code instructions) that have to refer to them.
+;;;
+;;; Add a fixup offset to the vector of fixup offsets for the given
+;;; code object.
+(defun fixup-code-object (code offset fixup kind)
+  (declare (type index offset))
+  (flet ((add-fixup (code offset)
+	   ;; Although this could check for and ignore fixups for code
+	   ;; objects in the read-only and static spaces, this should
+	   ;; only be the case when *enable-dynamic-space-code* is
+	   ;; True.
+	   (when sb!impl::*enable-dynamic-space-code*
+	     (incf *num-fixups*)
+	     (let ((fixups (code-header-ref code code-constants-offset)))
+	       (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
+		      (let ((new-fixups
+			     (adjust-array fixups (1+ (length fixups))
+					   :element-type '(unsigned-byte 32))))
+			(setf (aref new-fixups (length fixups)) offset)
+			(setf (code-header-ref code code-constants-offset)
+			      new-fixups)))
+		     (t
+		      (unless (or (eq (get-type fixups)
+				      sb!vm:unbound-marker-type)
+				  (zerop fixups))
+			(format t "** Init. code FU = ~S~%" fixups)) ; FIXME
+		      (setf (code-header-ref code code-constants-offset)
+			    (make-specializable-array
+			     1
+			     :element-type '(unsigned-byte 32)
+			     :initial-element offset))))))))
+    (sb!sys:without-gcing
+     (let* ((sap (truly-the system-area-pointer
+			    (sb!kernel:code-instructions code)))
+	    (obj-start-addr (logand (sb!kernel:get-lisp-obj-address code)
+				    #xfffffff8))
+	    #+nil (const-start-addr (+ obj-start-addr (* 5 4)))
+	    (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
+					      code)))
+	    (ncode-words (sb!kernel:code-header-ref code 1))
+	    (code-end-addr (+ code-start-addr (* ncode-words 4))))
+       (unless (member kind '(:absolute :relative))
+	 (error "Unknown code-object-fixup kind ~S." kind))
+       (ecase kind
+	 (:absolute
+	  ;; Word at sap + offset contains a value to be replaced by
+	  ;; adding that value to fixup.
+	  (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
+	  ;; Record absolute fixups that point within the code object.
+	  (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
+	    (add-fixup code offset)))
+	 (:relative
+	  ;; Fixup is the actual address wanted.
+	  ;;
+	  ;; Record relative fixups that point outside the code
+	  ;; object.
+	  (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
+	    (add-fixup code offset))
+	  ;; Replace word with value to add to that loc to get there.
+	  (let* ((loc-sap (+ (sap-int sap) offset))
+		 (rel-val (- fixup loc-sap 4)))
+	    (declare (type (unsigned-byte 32) loc-sap)
+		     (type (signed-byte 32) rel-val))
+	    (setf (signed-sap-ref-32 sap offset) rel-val))))))
+    nil))
+
+;;; Add a code fixup to a code object generated by GENESIS. The fixup has
+;;; already been applied, it's just a matter of placing the fixup in the code's
+;;; fixup vector if necessary.
+;;;
+;;; KLUDGE: I'd like a good explanation of why this has to be done at
+;;; load time instead of in GENESIS. It's probably simple, I just haven't
+;;; figured it out, or found it written down anywhere. -- WHN 19990908
+#!+gencgc
+(defun do-load-time-code-fixup (code offset fixup kind)
+  (flet ((add-load-time-code-fixup (code offset)
+	   (let ((fixups (code-header-ref code sb!vm:code-constants-offset)))
+	     (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
+		    (let ((new-fixups
+			   (adjust-array fixups (1+ (length fixups))
+					 :element-type '(unsigned-byte 32))))
+		      (setf (aref new-fixups (length fixups)) offset)
+		      (setf (code-header-ref code sb!vm:code-constants-offset)
+			    new-fixups)))
+		   (t
+		    ;; FIXME: This doesn't look like production code, and
+		    ;; should be a fatal error, not just a print.
+		    (unless (or (eq (get-type fixups)
+				    sb!vm:unbound-marker-type)
+				(zerop fixups))
+		      (%primitive print "** Init. code FU"))
+		    (setf (code-header-ref code sb!vm:code-constants-offset)
+			  (make-specializable-array
+			   1
+			   :element-type '(unsigned-byte 32)
+			   :initial-element offset)))))))
+    (let* ((sap (truly-the system-area-pointer
+			   (sb!kernel:code-instructions code)))
+	   (obj-start-addr
+	    ;; FIXME: looks like (LOGANDC2 foo typebits)
+	    (logand (sb!kernel:get-lisp-obj-address code) #xfffffff8))
+	   (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
+					     code)))
+	   (ncode-words (sb!kernel:code-header-ref code 1))
+	 (code-end-addr (+ code-start-addr (* ncode-words 4))))
+      (ecase kind
+	(:absolute
+	 ;; Record absolute fixups that point within the code object.
+	 (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
+	   (add-load-time-code-fixup code offset)))
+	(:relative
+	 ;; Record relative fixups that point outside the code object.
+	 (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
+	   (add-load-time-code-fixup code offset)))))))
+
+;;;; low-level signal context access functions
+;;;;
+;;;; Note: In CMU CL, similar functions were hardwired to access
+;;;; BSD-style sigcontext structures defined as alien objects. Our
+;;;; approach is different in two ways:
+;;;;   1. We use POSIX SA_SIGACTION-style signals, so our context is
+;;;;      whatever the void pointer in the sigaction handler dereferences
+;;;;      to, not necessarily a sigcontext.
+;;;;   2. We don't try to maintain alien definitions of the context
+;;;;      structure at Lisp level, but instead call alien C functions
+;;;;      which take care of access for us. (Since the C functions can
+;;;;      be defined in terms of system standard header files, they
+;;;;      should be easier to maintain; and since Lisp code uses signal
+;;;;      contexts only in interactive or exception code (like the debugger
+;;;;      and internal error handling) the extra runtime cost should be
+;;;;      negligible.
+
+(def-alien-routine ("os_context_pc_addr" context-pc-addr) (* int)
+  (context (* os-context-t)))
+
+(defun context-pc (context)
+  (declare (type (alien (* os-context-t)) context))
+  (int-sap (deref (context-pc-addr context))))
+
+(def-alien-routine ("os_context_register_addr" context-register-addr) (* int)
+  (context (* os-context-t))
+  (index int))
+
+(defun context-register (context index)
+  (declare (type (alien (* os-context-t)) context))
+  (deref (context-register-addr context index)))
+
+(defun %set-context-register (context index new)
+  (declare (type (alien (* os-context-t)) context))
+  (setf (deref (context-register-addr context index))
+	new))
+
+;;; Like CONTEXT-REGISTER, but returns the value of a float register.
+;;; FORMAT is the type of float to return.
+;;;
+;;; As of sbcl-0.6.7, there is no working code which calls this code,
+;;; so it's stubbed out. Someday, in order to make the debugger work
+;;; better, it may be necessary to unstubify it.
+(defun context-float-register (context index format)
+  (declare (ignore context index format))
+  (warn "stub CONTEXT-FLOAT-REGISTER")
+  (coerce 0.0 'format))
+(defun %set-context-float-register (context index format new-value)
+  (declare (ignore context index format))
+  (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
+  (coerce new-value 'format))
+
+;;; Given a signal context, return the floating point modes word in
+;;; the same format as returned by FLOATING-POINT-MODES.
+(defun context-floating-point-modes (context)
+  ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling for
+  ;; POSIXness and (at the Lisp level) opaque signal contexts,
+  ;; this is stubified. It needs to be rewritten as an
+  ;; alien function.
+  (warn "stub CONTEXT-FLOATING-POINT-MODES")
+
+  ;; old code for Linux:
+  #+nil
+  (let ((cw (slot (deref (slot context 'fpstate) 0) 'cw))
+	(sw (slot (deref (slot context 'fpstate) 0) 'sw)))
+    ;;(format t "cw = ~4X~%sw = ~4X~%" cw sw)
+    ;; NOT TESTED -- Clear sticky bits to clear interrupt condition.
+    (setf (slot (deref (slot context 'fpstate) 0) 'sw) (logandc2 sw #x3f))
+    ;;(format t "new sw = ~X~%" (slot (deref (slot context 'fpstate) 0) 'sw))
+    ;; Simulate floating-point-modes VOP.
+    (logior (ash (logand sw #xffff) 16) (logxor (logand cw #xffff) #x3f)))
+
+  0)
+
+;;;; INTERNAL-ERROR-ARGUMENTS
+
+;;; Given a (POSIX) signal context, extract the internal error
+;;; arguments from the instruction stream.
+(defun internal-error-arguments (context)
+  (declare (type (alien (* os-context-t)) context))
+  (let ((pc (context-pc context)))
+    (declare (type system-area-pointer pc))
+    ;; using INT3 the pc is .. INT3 <here> code length bytes...
+    (let* ((length (sap-ref-8 pc 1))
+	   (vector (make-specializable-array
+		    length
+		    :element-type '(unsigned-byte 8))))
+      (declare (type (unsigned-byte 8) length)
+	       (type (simple-array (unsigned-byte 8) (*)) vector))
+      (copy-from-system-area pc (* sb!vm:byte-bits 2)
+			     vector (* sb!vm:word-bits
+				       sb!vm:vector-data-offset)
+			     (* length sb!vm:byte-bits))
+      (let* ((index 0)
+	     (error-number (sb!c::read-var-integer vector index)))
+	(collect ((sc-offsets))
+	  (loop
+	   (when (>= index length)
+	     (return))
+	   (sc-offsets (sb!c::read-var-integer vector index)))
+	  (values error-number (sc-offsets)))))))
+
+;;; Do whatever is necessary to make the given code component
+;;; executable. (This is a no-op on the x86.)
+(defun sanctify-for-execution (component)
+  (declare (ignore component))
+  nil)
+
+;;; FLOAT-WAIT
+;;;
+;;; This is used in error.lisp to insure that floating-point exceptions
+;;; are properly trapped. The compiler translates this to a VOP.
+(defun float-wait ()
+  (float-wait))
+
+;;; FLOAT CONSTANTS
+;;;
+;;; These are used by the FP MOVE-FROM-{SINGLE|DOUBLE} VOPs rather than the
+;;; i387 load constant instructions to avoid consing in some cases. Note these
+;;; are initialized by GENESIS as they are needed early.
+(defvar *fp-constant-0s0*)
+(defvar *fp-constant-1s0*)
+(defvar *fp-constant-0d0*)
+(defvar *fp-constant-1d0*)
+;;; The long-float constants.
+(defvar *fp-constant-0l0*)
+(defvar *fp-constant-1l0*)
+(defvar *fp-constant-pi*)
+(defvar *fp-constant-l2t*)
+(defvar *fp-constant-l2e*)
+(defvar *fp-constant-lg2*)
+(defvar *fp-constant-ln2*)
+
+;;; Enable/disable scavenging of the read-only space.
+(defvar *scavenge-read-only-space* nil)
+;;; FIXME: should be *SCAVENGE-READ-ONLY-SPACE-P*
+
+;;; The current alien stack pointer; saved/restored for non-local exits.
+(defvar *alien-stack*)
+
+(defun sb!kernel::%instance-set-conditional (object slot test-value new-value)
+  (declare (type instance object)
+	   (type index slot))
+  #!+sb-doc
+  "Atomically compare object's slot value to test-value and if EQ store
+   new-value in the slot. The original value of the slot is returned."
+  (sb!kernel::%instance-set-conditional object slot test-value new-value))
+
+;;; Support for the MT19937 random number generator. The update
+;;; function is implemented as an assembly routine. This definition is
+;;; transformed to a call to the assembly routine allowing its use in byte
+;;; compiled code.
+(defun random-mt19937 (state)
+  (declare (type (simple-array (unsigned-byte 32) (627)) state))
+  (random-mt19937 state))

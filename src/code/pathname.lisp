@@ -1,0 +1,122 @@
+;;;; the known-to-the-cross-compiler part of PATHNAME logic
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!IMPL")
+
+(file-comment
+  "$Header$")
+
+;;;; data types used by pathnames
+
+;;; The HOST structure holds the functions that both parse the
+;;; pathname information into structure slot entries, and after
+;;; translation the inverse (unparse) functions.
+(sb!xc:defstruct (host (:constructor nil))
+  (parse (required-argument) :type function)
+  (unparse (required-argument) :type function)
+  (unparse-host (required-argument) :type function)
+  (unparse-directory (required-argument) :type function)
+  (unparse-file (required-argument) :type function)
+  (unparse-enough (required-argument) :type function)
+  (customary-case (required-argument) :type (member :upper :lower)))
+
+(sb!xc:defstruct (logical-host
+		  (:include host
+			    (:parse #'parse-logical-namestring)
+			    (:unparse #'unparse-logical-namestring)
+			    (:unparse-host
+			     (lambda (x)
+			       (logical-host-name (%pathname-host x))))
+			    (:unparse-directory #'unparse-logical-directory)
+			    (:unparse-file #'unparse-unix-file)
+			    (:unparse-enough #'identity)
+			    (:customary-case :upper)))
+  (name "" :type simple-base-string)
+  (translations nil :type list)
+  (canon-transls nil :type list))
+
+;;; A PATTERN is a list of entries and wildcards used for pattern
+;;; matches of translations.
+(sb!xc:defstruct (pattern (:constructor make-pattern (pieces)))
+  (pieces nil :type list))
+
+;;;; PATHNAME structures
+
+;;; the various magic tokens that are allowed to appear in pretty much
+;;; all pathname components
+(sb!xc:deftype component-tokens () ; FIXME: rename to PATHNAME-COMPONENT-TOKENS
+  '(member nil :unspecific :wild))
+
+(sb!xc:defstruct (pathname (:conc-name %pathname-)
+			   (:constructor %make-pathname (host
+							 device
+							 directory
+							 name
+							 type
+							 version))
+			   (:predicate pathnamep))
+  ;; the host (at present either a UNIX or logical host)
+  (host nil :type (or host null))
+  ;; the name of a logical or physical device holding files
+  (device nil :type (or simple-string component-tokens))
+  ;; a list of strings that are the component subdirectory components
+  (directory nil :type list)
+  ;; the filename
+  (name nil :type (or simple-string pattern component-tokens))
+  ;; the type extension of the file
+  (type nil :type (or simple-string pattern component-tokens))
+  ;; the version number of the file, a positive integer (not supported
+  ;; on standard Unix filesystems)
+  (version nil :type (or integer component-tokens (member :newest))))
+
+;;; Logical pathnames have the following format:
+;;;
+;;; logical-namestring ::=
+;;;	 [host ":"] [";"] {directory ";"}* [name] ["." type ["." version]]
+;;;
+;;; host ::= word
+;;; directory ::= word | wildcard-word | **
+;;; name ::= word | wildcard-word
+;;; type ::= word | wildcard-word
+;;; version ::= pos-int | newest | NEWEST | *
+;;; word ::= {uppercase-letter | digit | -}+
+;;; wildcard-word ::= [word] '* {word '*}* [word]
+;;; pos-int ::= integer > 0
+;;;
+;;; Physical pathnames include all these slots and a device slot.
+
+;;; Logical pathnames are a subclass of pathname. Their class
+;;; relations are mimicked using structures for efficency.
+(sb!xc:defstruct (logical-pathname (:conc-name %logical-pathname-)
+				   (:include pathname)
+				   (:constructor %make-logical-pathname
+						 (host
+						  device
+						  directory
+						  name
+						  type
+						  version))))
+
+(defmacro-mundanely enumerate-search-list ((var pathname &optional result)
+					   &body body)
+  #!+sb-doc
+  "Execute BODY with VAR bound to each successive possible expansion for
+   PATHNAME and then return RESULT. Note: if PATHNAME does not contain a
+   search-list, then BODY is executed exactly once. Everything is wrapped
+   in a block named NIL, so RETURN can be used to terminate early. Note:
+   VAR is *not* bound inside of RESULT."
+  (let ((body-name (gensym)))
+    `(block nil
+       (flet ((,body-name (,var)
+		,@body))
+	 (%enumerate-search-list ,pathname #',body-name)
+	 ,result))))
+

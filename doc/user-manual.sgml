@@ -1,0 +1,68 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+
+ <!-- markup for common expressions -->
+ <!ENTITY ANSI       "<acronym>ANSI</>">
+ <!ENTITY CMUCL      "<application>CMU CL</>">
+ <!ENTITY IEEE       "<acronym>IEEE</>">
+ <!ENTITY Python     "<application>Python</>">
+ <!ENTITY SBCL       "<application>SBCL</>">
+
+ <!-- common expressions I haven't figured out how to mark up -->
+ <!-- KLUDGE: There doesn't seem to be any DocBook tag for names of
+      programming languages. Typesetting Lisp Common Lisp as an
+      <application> looks funny. Is there a better way?
+      WHN 20000505 -->
+ <!ENTITY CommonLisp "Common Lisp">
+ <!ENTITY Lisp       "Lisp">
+
+ <!-- common expressions I haven't figured out how to express -->
+ <!ENTITY mdash "-">
+
+ <!-- document components -->
+ <!ENTITY ch-intro       SYSTEM "intro.sgml">
+ <!ENTITY ch-compiler    SYSTEM "compiler.sgml">
+ <!ENTITY ch-efficiency  SYSTEM "efficiency.sgml">
+ <!ENTITY ch-beyond-ansi SYSTEM "beyond-ansi.sgml">
+ <!ENTITY ch-ffi         SYSTEM "ffi.sgml">
+
+ ]>
+
+<book>
+
+<bookinfo>
+  <title>&SBCL; User Manual</title>
+  <legalnotice>
+
+    <para>This manual is part of the &SBCL; software system. See the
+    <filename>README</> file for more information.</para>
+
+    <para>This manual is derived in part from the manual for the &CMUCL;
+    system, which was produced at Carnegie Mellon University and
+    later released into the public domain. This manual is in the
+    public domain and is provided with absolutely no warranty. See the
+    <filename>COPYING</> and <filename>CREDITS</> files for more
+    information.</para>
+
+  </legalnotice>
+</bookinfo>
+
+&ch-intro;
+&ch-compiler;
+&ch-efficiency;
+&ch-beyond-ansi;
+&ch-ffi;
+
+<colophon>
+<para>This manual is maintained in SGML/DocBook, and automatically
+translated into other forms (e.g. HTML or TeX). If you're
+<emphasis>reading</> this manual in one of these non-DocBook
+translated forms, that's fine, but if you want to <emphasis>modify</>
+this manual, you are strongly advised to seek out a DocBook version
+and modify that instead of modifying a translated version. Even
+better might be to seek out <emphasis>the</> DocBook version
+(maintained at the time of this writing as part of
+<ulink url="http://sbcl.sourceforge.net/">the &SBCL; project</>)
+and submit a patch.</para>
+</colophon>
+
+</book>

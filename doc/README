@@ -1,0 +1,8 @@
+SBCL is -- ahem! -- not particularly well documented at this point.
+What can I say? Help with documentation might not be refused.:-)
+
+The old CMUCL documentation, in the cmucl/ subdirectory, is still
+somewhat useful. The old user's manual is very useful. Most of the
+CMUCL extensions to Common Lisp have gone away, but the general
+information about how to use the Python compiler is still very
+relevant.

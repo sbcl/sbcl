@@ -1,0 +1,134 @@
+IF YOU HAVE A BINARY DISTRIBUTION:
+
+The two files that SBCL needs to run are sbcl and sbcl.core.
+They are in 
+	src/runtime/sbcl
+and
+	output/sbcl.core
+
+sbcl is a standard executable, built by compiling and linking an
+ordinary C program. It provides the runtime environment for the
+running Lisp image, but it doesn't know much about high-level Lisp
+stuff (like symbols and printing and objects) so it's pretty useless
+by itself. sbcl.core is a dump file written in a special SBCL format
+which only sbcl understands, and it contains all the high-level Lisp
+stuff.
+
+In order to get a usable system, you need to run sbcl in a way that
+it can find sbcl.core. There are three ways for it to find
+sbcl.core:
+  1. by default, in /usr/lib/sbcl.core or /usr/local/lib/sbcl.core
+  2. by environment variable: 
+     $ export SBCL_HOME=/foo/bar/
+     $ sbcl
+  3. by command line option:
+     $ sbcl --core /foo/bar/sbcl.core"
+The usual, recommended approach is method #1. Method #2 is useful if
+you're installing SBCL on a system in your user account, instead of
+installing SBCL on an entire system. Method #3 is mostly useful for
+testing or other special cases.
+
+So: the standard installation procedure is
+  1. Copy sbcl.core to /usr/lib or /usr/local/lib.
+  2. Copy sbcl to /usr/bin or /usr/local/bin.
+  3. Optionally copy sbcl.1 to /usr/man/man1 or /usr/local/man/man1.
+The script install.sh does these for you (choosing the /usr/local
+subdirectory) in each case.
+
+
+IF YOU HAVE A SOURCE DISTRIBUTION:
+
+This software has been built successfully on these systems:
+	cpu = x86 (Intel 386 or higher, or compatibles like the AMD K6)
+		os = Debian GNU/Linux 2.1 with libc >= 2.1
+			host lisp = CMU CL 2.4.17
+			host lisp = SBCL itself
+		os = RedHat Linux 6.2
+			host lisp = SBCL itself
+		os = FreeBSD 3.4 or 4.0
+			host lisp = CMU CL
+			host lisp = SBCL itself
+		os = OpenBSD 2.6
+			host lisp = SBCL itself
+It is known not to build under CLISP, because CLISP doesn't support
+MAKE-LOAD-FORM. Reports of other systems that it works on, or help in
+making it run on more systems, would be appreciated.
+
+		CAUTION CAUTION CAUTION CAUTION CAUTION
+	    SBCL, like CMU CL, overcommits memory. That is, it
+	asks the OS for more virtual memory address space than
+	it actually intends to use, and the OS is expected to
+	optimistically give it this address space even if the OS
+	doesn't have enough RAM+swap to back it up. This works
+	fine as long as SBCL's memory usage pattern is sparse
+	enough that the OS can actually implement the requested
+	VM usage. Unfortunately, if the OS runs out of RAM+swap to
+	implement the requested VM usage, things get bad. On many
+	systems, including the Linux 2.2.13 kernel that I used for
+	development of SBCL up to version 0.6.0, the kernel kills
+	processes more-or-less randomly when it runs out of
+	resources. You may think your Linux box is very stable, but
+	it is unlikely to be stable if this happens.:-| So be sure
+	to have enough memory available when you build the system.
+	    (This can be considered a bug in SBCL, or a bug in the
+	Unix overcommitment-of-memory architecture, or both. It's
+	not clear what the best fix is. On the SBCL side, Peter Van
+	Eynde has a lazy-allocation patch for CMU CL that lets
+	it run without overcommitting memory, and that could be
+	ported to SBCL, but unfortunately that might introduce
+	new issues, e.g. alien programs allocating memory in the 
+	address space that SBCL thinks of as its own, and later
+	getting trashed when SBCL lazily allocates the memory.
+	On the OS side, there might be some way to address the
+	problem with quotas, I don't know.)
+
+To build the system binaries:
+  1. Make sure that you have enough RAM+swap to build SBCL, as
+     per the CAUTION note above. (As of version 0.6.0, the most
+     memory-intensive operation in make.sh is the second call to
+     GENESIS, which makes the Lisp image grow to nearly 128 Mb RAM+swap.
+     This will probably be reduced somewhat in some later version
+     by allowing cold load of byte-compiled files, so that the cold
+     image can be smaller.)
+  2. If the GNU make command is not available under the name "gmake",
+     then define the environment variable GNUMAKE to a name where it can
+     be found.
+  3. If you like, you can edit the base-features.lisp-expr file
+     to customize the resulting Lisp system. By enabling or disabling
+     features in this file, you can create a smaller system, or one
+     with extra code for debugging output or error-checking or other things.
+  4. Run "sh make.sh" in the same directory where you unpacked the 
+     tarball. If you don't already have a SBCL binary installed
+     as "sbcl" in your path, you'll need to tell make.sh what Lisp
+     system to use as the cross-compilation host. (To use CMU CL
+     as the cross-compilation host, run "sh make.sh 'lisp -batch'",
+     assuming CMU CL has been installed under its default name "lisp".)
+  5. Wait. This can be a slow process. On my test machines, the
+     wall clock time for a build of sbcl-0.6.7 was approximately
+       1.5 hours on a 450MHz K6/3 with 248Mb RAM, running RH Linux 6.2;
+       4 hours on a 200MHz Pentium (P54C) with 64Mb RAM, running FreeBSD 4.0;
+       13 hours on a 133MHz Pentium (P54C) with 48Mb RAM, running OpenBSD 2.6.
+     Around the 48Mb mark, the build process is starved for RAM:
+     on my 48Mb OpenBSD machine with nothing else running, it
+     spent about 2/3 of its wall clock time swapping. Anything which 
+     substantially increases memory use, like running X11, Emacs, or, 
+     God forbid, Netscape, can increase the build time substantially.
+
+Now you should have the same src/runtime/sbcl and output/sbcl.core
+files that come with the binary distribution, and you can install
+them as in the "IF YOU HAVE A BINARY DISTRIBUTION" instructions (above).
+
+To convert the DocBook version of the system documentation (files
+ending in .sgml) to more-readable form (HTML or text):
+  DocBook is an abstract markup system based on SGML. It's intended
+  to be automatically translated to other formats. Tools to do this
+  exist on the web, and are becoming increasingly easy to find as
+  more free software projects move their documentation to DocBook.
+  Any one of these systems should work with the SBCL documentation.
+  If you'd like to have the documentation produced in the same 
+  format as appears in the binary distribution, and you have
+  the jade binary and Norman Walsh's modular DSSSL stylesheets
+  installed, you can try the doc/make-doc.sh script. Otherwise, 
+  your formatted copy of the SBCL documentation should have the
+  same content as in the binary distribution, but details of
+  presentation will probably vary.

@@ -1,0 +1,1720 @@
+;;;; the specifications of SBCL-specific packages, except..
+;;;;   * the creation of the trivial SB-SLOT-ACCESSOR-NAME package
+;;;;   * any SHADOWing hackery
+;;;; The standard, non-SBCL-specific packages COMMON-LISP,
+;;;; COMMON-LISP-USER, and KEYWORD are also handled through other
+;;;; mechanisms.
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(#s(sb-cold:package-data
+    :name "SB!ALIEN"
+    :doc "public: the ALIEN foreign function interface"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!ALIEN-INTERNALS")
+    :reexport ("ARRAY" "BOOLEAN" "DOUBLE-FLOAT" "LONG-FLOAT" "FUNCTION"
+               "INTEGER" "SINGLE-FLOAT" "UNION"  "SYSTEM-AREA-POINTER"
+               "VALUES" "*")
+    :export ("ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP"
+             "ALIEN-SIZE" "ALIEN-BOOLEAN" "CAST" "DEF-ALIEN-ROUTINE"
+             "DEF-ALIEN-TYPE" "DEF-ALIEN-VARIABLE" "DEF-BUILTIN-ALIEN-TYPE"
+             "DEREF" "ENUM" "EXTERN-ALIEN"
+             "SAP-ALIEN" "SIGNED" "SLOT" "STRUCT"
+             "UNSIGNED" "WITH-ALIEN" "FREE-ALIEN" "NULL-ALIEN"
+             "MAKE-ALIEN"
+             "LOAD-FOREIGN" "LOAD-1-FOREIGN"))
+
+ #s(sb-cold:package-data
+    :name "SB!ALIEN-INTERNALS"
+    :doc "private: stuff for implementing ALIENs and friends"
+    :use ("CL")
+    :export ("%CAST" "%DEREF-ADDR" "%HEAP-ALIEN" "%HEAP-ALIEN-ADDR"
+             "%LOCAL-ALIEN-ADDR" "%LOCAL-ALIEN-FORCED-TO-MEMORY-P" "%SAP-ALIEN"
+             "%SET-DEREF" "%SET-HEAP-ALIEN" "%SET-LOCAL-ALIEN" "%SET-SLOT"
+             "%SLOT-ADDR" "*VALUES-TYPE-OKAY*" "ALIEN-ARRAY-TYPE"
+             "ALIEN-ARRAY-TYPE-DIMENSIONS" "ALIEN-ARRAY-TYPE-ELEMENT-TYPE"
+             "ALIEN-ARRAY-TYPE-P" "ALIEN-BOOLEAN-TYPE" "ALIEN-BOOLEAN-TYPE-P"
+             "ALIEN-DOUBLE-FLOAT-TYPE" "ALIEN-DOUBLE-FLOAT-TYPE-P"
+             "ALIEN-ENUM-TYPE" "ALIEN-ENUM-TYPE-P" "ALIEN-FLOAT-TYPE"
+             "ALIEN-FLOAT-TYPE-P" "ALIEN-FUNCTION-TYPE"
+             "ALIEN-FUNCTION-TYPE-ARG-TYPES" "ALIEN-FUNCTION-TYPE-P"
+             "ALIEN-FUNCTION-TYPE-RESULT-TYPE" "ALIEN-INTEGER-TYPE"
+             "ALIEN-INTEGER-TYPE-P" "ALIEN-INTEGER-TYPE-SIGNED"
+             "ALIEN-LONG-FLOAT-TYPE" "ALIEN-LONG-FLOAT-TYPE-P"
+             "ALIEN-POINTER-TYPE" "ALIEN-POINTER-TYPE-P"
+             "ALIEN-POINTER-TYPE-TO" "ALIEN-RECORD-FIELD"
+             "ALIEN-RECORD-FIELD-NAME" "ALIEN-RECORD-FIELD-OFFSET"
+             "ALIEN-RECORD-FIELD-P" "ALIEN-RECORD-FIELD-TYPE"
+             "ALIEN-RECORD-TYPE" "ALIEN-RECORD-TYPE-FIELDS"
+             "ALIEN-RECORD-TYPE-P" "ALIEN-SINGLE-FLOAT-TYPE"
+             "ALIEN-SINGLE-FLOAT-TYPE-P" "ALIEN-SUBTYPE-P" "ALIEN-TYPE"
+             "ALIEN-TYPE-=" "ALIEN-TYPE-ALIGNMENT" "ALIEN-TYPE-BITS"
+             "ALIEN-TYPE-P" "ALIEN-TYPEP"
+	     "ALIEN-VALUE" "ALIEN-VALUE-TYPE"
+             "ALIEN-VALUE-SAP" "ALIEN-VALUE-P"
+             "ALIEN-VALUES-TYPE" "ALIEN-VALUES-TYPE-P"
+             "ALIEN-VALUES-TYPE-VALUES" "ALIGN-OFFSET" "COMPUTE-ALIEN-REP-TYPE"
+             "COMPUTE-DEPORT-LAMBDA" "COMPUTE-DEPOSIT-LAMBDA"
+             "COMPUTE-EXTRACT-LAMBDA" "COMPUTE-LISP-REP-TYPE"
+             "COMPUTE-NATURALIZE-LAMBDA" "DEF-ALIEN-TYPE-CLASS"
+             "DEF-ALIEN-TYPE-METHOD" "DEF-ALIEN-TYPE-TRANSLATOR" "DEPORT"
+             "DEPOSIT-ALIEN-VALUE" "DISPOSE-LOCAL-ALIEN" "EXTRACT-ALIEN-VALUE"
+             "HEAP-ALIEN-INFO" "HEAP-ALIEN-INFO-P" "HEAP-ALIEN-INFO-SAP-FORM"
+             "HEAP-ALIEN-INFO-TYPE" "INVOKE-ALIEN-TYPE-METHOD" "LOCAL-ALIEN"
+             "LOCAL-ALIEN-INFO" "LOCAL-ALIEN-INFO-FORCE-TO-MEMORY-P"
+             "LOCAL-ALIEN-INFO-P" "LOCAL-ALIEN-INFO-TYPE"
+             "MAKE-ALIEN-FUNCTION-TYPE" "MAKE-ALIEN-POINTER-TYPE"
+             "MAKE-ALIEN-VALUE"
+             "MAKE-LOCAL-ALIEN" "NATURALIZE" "NOTE-LOCAL-ALIEN-TYPE"
+             "PARSE-ALIEN-TYPE" "UNPARSE-ALIEN-TYPE"))
+
+ #s(sb-cold:package-data
+    :name "SB!ASSEM"
+    :doc "private: the assembler, used by the compiler"
+    :use ("CL")
+    :export ("ASSEMBLY-UNIT"
+
+             "*ASSEM-SCHEDULER-P*"
+             "*ASSEM-INSTRUCTIONS*"
+             "*ASSEM-MAX-LOCATIONS*"
+
+             "EMIT-BYTE" "EMIT-SKIP" "EMIT-BACK-PATCH"
+             "EMIT-CHOOSER" "DEFINE-BITFIELD-EMITTER"
+             "DEFINE-INSTRUCTION" "DEFINE-INSTRUCTION-MACRO"
+             "DEF-ASSEMBLER-PARAMS" "EMIT-POSTIT"
+
+             "MAKE-SEGMENT" "SEGMENT-NAME" "ASSEMBLE"
+             "ALIGN" "INST" "LABEL" "LABEL-P" "GEN-LABEL"
+             "EMIT-LABEL" "LABEL-POSITION" "APPEND-SEGMENT" "FINALIZE-SEGMENT"
+             "ON-SEGMENT-CONTENTS-VECTORLY" "WRITE-SEGMENT-CONTENTS"
+             "READS" "WRITES" "SEGMENT"
+             "WITHOUT-SCHEDULING"
+             "VARIABLE-LENGTH"
+             "SEGMENT-COLLECT-DYNAMIC-STATISTICS"
+
+             ;; In classic CMU CL, these symbols were explicitly imported by
+             ;; package C. Since package C uses package ASSEM (and no
+             ;; other package does) it seems cleaner to export these symbols
+             ;; from package ASSEM instead. I hope nothing breaks..
+             ;;   -- WHN 19990220
+             "BRANCH" "DO-SSET-ELEMENTS" "FLUSHABLE" "MAKE-SSET" "SSET"
+             "SSET-ADJOIN" "SSET-DELETE" "SSET-ELEMENT" "SSET-EMPTY"))
+
+ #s(sb-cold:package-data
+    :name "SB!BIGNUM"
+    :doc "private: bignum implementation"
+    :use ("CL" "SB!KERNEL" "SB!INT" "SB!EXT")
+    :export ("%ADD-WITH-CARRY" "%ALLOCATE-BIGNUM" "%ASHL" "%ASHR"
+             "%BIGNUM-LENGTH" "%BIGNUM-REF" "%BIGNUM-SET"
+             "%BIGNUM-SET-LENGTH" "%DIGIT-0-OR-PLUSP"
+             "%DIGIT-LOGICAL-SHIFT-RIGHT"
+             "%FIXNUM-DIGIT-WITH-CORRECT-SIGN" "%FIXNUM-TO-DIGIT"
+             "%FLOOR" "%LOGAND" "%LOGIOR" "%LOGNOT" "%LOGXOR"
+             "%MULTIPLY" "%MULTIPLY-AND-ADD"
+             "%SUBTRACT-WITH-BORROW" "ADD-BIGNUMS"
+             "BIGNUM-ASHIFT-LEFT" "BIGNUM-ASHIFT-RIGHT"
+             "BIGNUM-COMPARE" "BIGNUM-DEPOSIT-BYTE"
+             "BIGNUM-ELEMENT-TYPE" "BIGNUM-GCD" "BIGNUM-INDEX"
+             "BIGNUM-INTEGER-LENGTH" "BIGNUM-LOAD-BYTE"
+             "BIGNUM-LOGCOUNT" "BIGNUM-LOGICAL-AND"
+             "BIGNUM-LOGICAL-IOR" "BIGNUM-LOGICAL-NOT"
+             "BIGNUM-LOGICAL-XOR" "BIGNUM-PLUS-P"
+             "BIGNUM-TO-FLOAT" "BIGNUM-TRUNCATE" "BIGNUM-TYPE"
+             "FLOAT-BIGNUM-RATIO" "MAKE-SMALL-BIGNUM"
+             "MULTIPLY-BIGNUM-AND-FIXNUM" "MULTIPLY-BIGNUMS"
+             "MULTIPLY-FIXNUMS" "NEGATE-BIGNUM"
+             "SUBTRACT-BIGNUM" "SXHASH-BIGNUM"))
+
+ #s(sb-cold:package-data
+    :name "SB!C"
+    :doc "private: implementation of the compiler"
+    :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
+          #!+sb-dyncount "SB-DYNCOUNT"
+          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
+    :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
+    :export ("%ALIEN-FUNCALL" "%CATCH-BREAKUP" "%CONTINUE-UNWIND" "&MORE"
+              "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
+              "%UNWIND-PROTECT-BREAKUP"
+
+              "*BACKEND-BYTE-ORDER*" "*BACKEND-DISASSEM-PARAMS*"
+              "*BACKEND-FASL-FILE-IMPLEMENTATION*"
+              "*BACKEND-FASL-FILE-TYPE*" "*BACKEND-FASL-FILE-VERSION*"
+              "*BACKEND-INFO-ENVIRONMENT*"
+              "*BACKEND-INSTRUCTION-FLAVORS*" "*BACKEND-INSTRUCTION-FORMATS*"
+              "*BACKEND-INTERNAL-ERRORS*" "*BACKEND-PAGE-SIZE*"
+              "*BACKEND-REGISTER-SAVE-PENALTY*"
+              "*BACKEND-SB-LIST*" "*BACKEND-SB-NAMES*"
+              "*BACKEND-SC-NAMES*" "*BACKEND-SC-NUMBERS*"
+              "*BACKEND-SPECIAL-ARG-TYPES*"
+              "*BACKEND-T-PRIMITIVE-TYPE*"
+
+              "*CODE-SEGMENT*" 
+              "*COMPILE-TIME-DEFINE-MACROS*"
+              "*COMPILING-FOR-INTERPRETER*" "*CONVERTING-FOR-INTERPRETER*"
+              "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
+              "*FASL-HEADER-STRING-START-STRING*"
+              "*FASL-HEADER-STRING-STOP-CHAR-CODE*"
+	      "*SETF-ASSUMED-FBOUNDP*"
+              "*SUPPRESS-VALUES-DECLARATION*"
+
+              "ALLOC-ALIEN-STACK-SPACE" "ALLOC-NUMBER-STACK-SPACE"
+              "ALLOCATE-CODE-OBJECT" "ALLOCATE-FRAME"
+              "ALLOCATE-DYNAMIC-CODE-OBJECT" "ALLOCATE-FULL-CALL-FRAME"
+              "ANY" "ARGUMENT-COUNT-ERROR" "ASSEMBLE-FILE"
+              "ATTRIBUTES" "ATTRIBUTES-INTERSECTION" "ATTRIBUTES-UNION"
+              "ATTRIBUTES=" "BIND"
+              "BYTE-BLT" ; doesn't logically belong here, but is name of VOP..
+              "CALL" "CALL-LOCAL" "CALL-NAMED" "CALL-OUT" "CALL-VARIABLE"
+              "CALLEE-NFP-TN" "CALLEE-RETURN-PC-TN"
+              "CASE-BODY" "CATCH-BLOCK" "CHECK-CONS"
+              "CHECK-FIXNUM" "CHECK-FUNCTION" "CHECK-FUNCTION-OR-SYMBOL"
+              "CHECK-SIGNED-BYTE-32" "CHECK-SYMBOL" "CHECK-UNSIGNED-BYTE-32"
+              "CLOSURE-INIT" "CLOSURE-REF"
+              "CODE-CONSTANT-REF" "CODE-CONSTANT-SET" 
+              "COMPILE-FOR-EVAL" "COMPONENT" "COMPONENT-HEADER-LENGTH"
+              "COMPONENT-INFO" "COMPONENT-LIVE-TN" "COMPUTE-FUNCTION"
+              "COMPUTE-OLD-NFP" "COPY-MORE-ARG" 
+              "CURRENT-BINDING-POINTER" "CURRENT-NFP-TN"
+              "CURRENT-STACK-POINTER" "DEALLOC-ALIEN-STACK-SPACE"
+              "DEALLOC-NUMBER-STACK-SPACE" "DEF-BOOLEAN-ATTRIBUTE"
+              "DEF-IR1-TRANSLATOR" "DEF-PRIMITIVE-TRANSLATOR"
+              "DEF-PRIMITIVE-TYPE" "DEF-PRIMITIVE-TYPE-ALIAS"
+              "DEF-SOURCE-TRANSFORM" "DEF-VM-SUPPORT-ROUTINE"
+              "DEFINE-ASSEMBLY-ROUTINE" "DEFINE-MOVE-FUNCTION"
+              "DEFINE-MOVE-VOP" "DEFINE-STORAGE-BASE"
+              "DEFINE-STORAGE-CLASS" "DEFINE-VOP"
+              "DEFKNOWN" "DEFOPTIMIZER"
+              "DEFTRANSFORM" "DERIVE-TYPE"
+              "ENTRY-NODE-INFO-NLX-TAG" "ENTRY-NODE-INFO-ST-TOP"
+              "ENVIRONMENT-DEBUG-LIVE-TN" "ENVIRONMENT-LIVE-TN"
+              "FAST-SYMBOL-FUNCTION" "FAST-SYMBOL-VALUE" "FOLDABLE"
+              "FORCE-TN-TO-STACK" "GET-VECTOR-SUBTYPE"
+              "HALT" "IF-EQ" "INSTANCE-REF" "INSTANCE-SET"
+              "IR2-COMPONENT-CONSTANTS" "IR2-CONVERT"
+              "IR2-ENVIRONMENT-NUMBER-STACK-P" "KNOWN-CALL-LOCAL"
+              "KNOWN-RETURN" "LAMBDA-EVAL-INFO-ARGS-PASSED"
+              "LAMBDA-EVAL-INFO-ENTRIES" "LAMBDA-EVAL-INFO-FRAME-SIZE"
+              "LAMBDA-EVAL-INFO-FUNCTION" "LOCATION=" "LTN-ANNOTATE"
+              "MAKE-ALIAS-TN" "MAKE-CATCH-BLOCK"
+              "MAKE-CLOSURE" "MAKE-CONSTANT-TN" "MAKE-FIXNUM"
+              "MAKE-LOAD-TIME-CONSTANT-TN" "MAKE-N-TNS" "MAKE-NORMAL-TN"
+              "MAKE-OTHER-IMMEDIATE-TYPE" "MAKE-RANDOM-TN"
+              "MAKE-REPRESENTATION-TN" "MAKE-RESTRICTED-TN" "MAKE-SC-OFFSET"
+              "MAKE-STACK-POINTER-TN" "MAKE-TN-REF" "MAKE-UNWIND-BLOCK"
+              "MAKE-VALUE-CELL" "MAKE-WIRED-TN" "META-PRIMITIVE-TYPE-OR-LOSE"
+              "META-SB-OR-LOSE" "META-SC-NUMBER-OR-LOSE" "META-SC-OR-LOSE"
+              "MORE-ARG-CONTEXT" "MOVABLE" "MOVE" "MULTIPLE-CALL"
+              "MULTIPLE-CALL-LOCAL" "MULTIPLE-CALL-NAMED"
+              "MULTIPLE-CALL-VARIABLE" "NLX-ENTRY" "NLX-ENTRY-MULTIPLE"
+              "NON-DESCRIPTOR-STACK" "NOTE-ENVIRONMENT-START"
+              "NOTE-THIS-LOCATION" "OPTIMIZER" "PACK-TRACE-TABLE"
+              "POLICY" "PREDICATE" "PRIMITIVE-TYPE" "PRIMITIVE-TYPE-OF"
+              "PRIMITIVE-TYPE-OR-LOSE" "PRIMITIVE-TYPE-VOP"
+              "PRIMITIVE-TYPE-NAME" "PUSH-VALUES"
+              "READ-PACKED-BIT-VECTOR" "READ-VAR-INTEGER" "READ-VAR-STRING"
+              "RESET-STACK-POINTER" "RESTORE-DYNAMIC-STATE"
+              "RETURN-MULTIPLE" "SAVE-DYNAMIC-STATE" "SB"
+              "SB-ALLOCATED-SIZE" "SB-NAME" "SB-OR-LOSE" "SB-P" "SC" "SC-CASE"
+              "SC-IS" "SC-NAME" "SC-NUMBER" "SC-NUMBER-OR-LOSE"
+              "SC-OFFSET-OFFSET" "SC-OFFSET-SCN" "SC-OR-LOSE" "SC-P" "SC-SB"
+              "SET-UNWIND-PROTECT" "SET-VECTOR-SUBTYPE"
+              "SETUP-CLOSURE-ENVIRONMENT" "SETUP-ENVIRONMENT"
+              "SPECIFY-SAVE-TN" "INSTANCE-REF"
+              "INSTANCE-SET" "TAIL-CALL" "TAIL-CALL-NAMED"
+              "TAIL-CALL-VARIABLE" "TEMPLATE-OR-LOSE"
+              "TN" "TN-OFFSET" "TN-P" "TN-REF" "TN-REF-ACROSS" "TN-REF-LOAD-TN"
+              "TN-REF-NEXT" "TN-REF-NEXT-REF" "TN-REF-P" "TN-REF-TARGET"
+              "TN-REF-TN" "TN-REF-VOP" "TN-REF-WRITE-P" "TN-SC" "TN-VALUE"
+              "TRACE-TABLE-ENTRY" "TYPE-CHECK-ERROR" "UNBIND" "UNBIND-TO-HERE"
+              "UNSAFE" "UNWIND" "UWP-ENTRY"
+              "VALUE-CELL-REF" "VALUE-CELL-SET"
+              "VERIFY-ARGUMENT-COUNT" "WRITE-PACKED-BIT-VECTOR"
+              "WRITE-VAR-INTEGER" "WRITE-VAR-STRING" "XEP-ALLOCATE-FRAME"
+              "LABEL-ID" "FIXUP" "FIXUP-FLAVOR" "FIXUP-NAME" "FIXUP-OFFSET"
+              "FIXUP-P" "MAKE-FIXUP"
+              "DEF-ALLOC"
+              "VAR-ALLOC"
+              "SAFE-FDEFN-FUNCTION"
+              "NOTE-FIXUP"
+              "DEF-REFFER"
+              "EMIT-NOP"
+              "DEF-SETTER"
+              "FIXED-ALLOC"
+              "MAKE-UNBOUND-MARKER"
+              "RETURN-SINGLE"
+              "NOTE-NEXT-INSTRUCTION"
+              "SET-SLOT"
+              "LOCATION-NUMBER"
+              "BYTE-FASL-FILE-VERSION"
+              "*COMPONENT-BEING-COMPILED*"
+              "BLOCK-NUMBER"
+              "BACKEND"
+              "BACKEND-BYTE-FASL-FILE-IMPLEMENTATION"
+              "BACKEND-BYTE-FASL-FILE-TYPE"
+              "IR2-BLOCK-BLOCK"
+              "DISASSEM-BYTE-COMPONENT"
+              "FUNCALLABLE-INSTANCE-LEXENV"
+              "DISASSEM-BYTE-FUN"
+              "VOP-BLOCK"
+              "*ASSEMBLY-OPTIMIZE*"
+              "LARGE-ALLOC"
+              "%SET-FUNCTION-SELF"
+              "VM-SUPPORT-ROUTINES-IMMEDIATE-CONSTANT-SC"
+              "VM-SUPPORT-ROUTINES-LOCATION-PRINT-NAME"
+              "VM-SUPPORT-ROUTINES-PRIMITIVE-TYPE-OF"
+              "VM-SUPPORT-ROUTINES-PRIMITIVE-TYPE"
+              "VM-SUPPORT-ROUTINES-MAKE-CALL-OUT-TNS"
+              "VM-SUPPORT-ROUTINES-STANDARD-ARGUMENT-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-RETURN-PC-PASSING-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-OLD-FP-PASSING-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-OLD-FP-SAVE-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-RETURN-PC-SAVE-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-ARGUMENT-COUNT-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-NFP-TN"
+              "VM-SUPPORT-ROUTINES-MAKE-STACK-POINTER-TN"
+              "VM-SUPPORT-ROUTINES-MAKE-NUMBER-STACK-POINTER-TN"
+              "VM-SUPPORT-ROUTINES-MAKE-UNKNOWN-VALUES-LOCATIONS"
+              "VM-SUPPORT-ROUTINES-SELECT-COMPONENT-FORMAT"
+              "VM-SUPPORT-ROUTINES-MAKE-NLX-SP-TN"
+              "VM-SUPPORT-ROUTINES-MAKE-DYNAMIC-STATE-TNS"
+              "VM-SUPPORT-ROUTINES-MAKE-NLX-ENTRY-ARGUMENT-START-LOCATION"
+              "VM-SUPPORT-ROUTINES-GENERATE-CALL-SEQUENCE"
+              "VM-SUPPORT-ROUTINES-GENERATE-RETURN-SEQUENCE"
+              "VM-SUPPORT-ROUTINES-EMIT-NOP"
+              "VM-SUPPORT-ROUTINES-LOCATION-NUMBER"))
+
+ #s(sb-cold:package-data
+    :name "SB!C-CALL"
+    ;; FIXME: Why not just put this stuff into SB-ALIEN? Or maybe
+    ;; just glom this and SB-ALIEN together into SB-FFI?
+    :doc "public: some types used with ALIENs"
+    :use ("CL" "SB!SYS" "SB!ALIEN-INTERNALS" "SB!ALIEN")
+    :reexport ("FLOAT" "CHAR")
+    :export ("C-STRING" "DOUBLE" "INT" "LONG"
+             "SHORT" "UNSIGNED-CHAR" "UNSIGNED-INT"
+             "UNSIGNED-LONG" "UNSIGNED-SHORT" "VOID"))
+
+ #!+sb-dyncount
+ #s(sb-cold:package-data
+    :name "SB!DYNCOUNT"
+    :doc "private: some somewhat-stale code for collecting runtime statistics"
+    :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
+          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
+    :export ("*COLLECT-DYNAMIC-STATISTICS*" "COUNT-ME"
+	     "DYNCOUNT-INFO-COUNTS" "DYNCOUNT-INFO-COSTS"
+             "IR2-COMPONENT-DYNCOUNT-INFO"
+             "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
+
+ ;; This package is a grab bag for things which used to be internal
+ ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
+ ;; with explicit SB!IMPL:: prefixes in the code. It would be nice to
+ ;; reduce the use of this practice, so if symbols from here which are
+ ;; accessed that way are found to belong more appropriately in
+ ;; an existing package (e.g. KERNEL or SYS or EXT) or a new package
+ ;; (e.g. something to collect together all the FOP stuff), I
+ ;; (WHN 19990223) encourage maintainers to move them there..
+ ;;
+ ;; ..except that it's getting so big and crowded that maybe it
+ ;; should be split up, too.
+ #s(sb-cold:package-data
+    :name "SB!IMPL"
+    :doc "private: a grab bag of implementation details"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!DEBUG" "SB!KERNEL" "SB!BIGNUM"))
+
+ ;; FIXME: It seems to me that this could go away, with its contents moved
+ ;; into SB!KERNEL, like the implementation of the rest of the class system.
+ #s(sb-cold:package-data
+    :name "SB!CONDITIONS"
+    :doc "private: the implementation of the condition system"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL"))
+
+ #s(sb-cold:package-data
+    :name "SB!DEBUG"
+    :doc
+"public: (eventually) the debugger interface (but currently) the
+debugger interface mixed with various low-level implementation stuff
+like *STACK-TOP-HINT*"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!SYS")
+    :export ("*AUTO-EVAL-IN-FRAME*" "*DEBUG-CONDITION*"
+	     "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*" "*DEBUG-READTABLE*"
+	     "*DEBUG-PROMPT*" "*DEBUG-HELP-STRING*" "*FLUSH-DEBUG-ERRORS*"
+             "*IN-THE-DEBUGGER*"
+             "*TRACE-INDENTATION-STEP*" "*MAX-TRACE-INDENTATION*"
+             "*TRACE-FRAME*" "*TRACE-PRINT-LENGTH*"
+             "*TRACE-PRINT-LEVEL*" "*TRACED-FUNCTION-LIST*"
+             "ARG" "BACKTRACE" "INTERNAL-DEBUG" "VAR"
+             "*PRINT-LOCATION-KIND*"
+             "*ONLY-BLOCK-START-LOCATIONS*" "*STACK-TOP-HINT*"
+             "*TRACE-VALUES*" "DO-DEBUG-COMMAND"
+             "*TRACE-ENCAPSULATE-DEFAULT*"))
+
+ #s(sb-cold:package-data
+    :name "SB!DI"
+    :doc "private: primitives used to write debuggers"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
+    :import-from (("SB!C"
+                   "DEBUG-SOURCE-FROM" "DEBUG-SOURCE-NAME"
+                   "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
+                   "DEBUG-SOURCE-START-POSITIONS" "MAKE-DEBUG-SOURCE"
+                   "DEBUG-SOURCE" "DEBUG-SOURCE-P"))
+    :reexport ("DEBUG-SOURCE-FROM" "DEBUG-SOURCE-NAME"
+               "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
+               "DEBUG-SOURCE-START-POSITIONS" "DEBUG-SOURCE"
+               "DEBUG-SOURCE-P")
+    :export ("*DEBUGGING-INTERPRETER*" "ACTIVATE-BREAKPOINT"
+             "AMBIGUOUS-DEBUG-VARS" "AMBIGUOUS-VARIABLE-NAME" "BREAKPOINT"
+             "BREAKPOINT-ACTIVE-P" "BREAKPOINT-HOOK-FUNCTION" "BREAKPOINT-INFO"
+             "BREAKPOINT-KIND" "BREAKPOINT-P" "BREAKPOINT-WHAT" "CODE-LOCATION"
+             "CODE-LOCATION-DEBUG-BLOCK" "CODE-LOCATION-DEBUG-FUNCTION"
+             "CODE-LOCATION-DEBUG-SOURCE" "CODE-LOCATION-FORM-NUMBER"
+             "CODE-LOCATION-P" "CODE-LOCATION-TOP-LEVEL-FORM-OFFSET"
+             "CODE-LOCATION-UNKNOWN-P" "CODE-LOCATION=" "DEACTIVATE-BREAKPOINT"
+             "DEBUG-BLOCK" "DEBUG-BLOCK-ELSEWHERE-P" "DEBUG-BLOCK-P"
+             "DEBUG-BLOCK-SUCCESSORS" "DEBUG-CONDITION" "DEBUG-ERROR"
+             "DEBUG-FUNCTION" "DEBUG-FUNCTION-FUNCTION" "DEBUG-FUNCTION-KIND"
+             "DEBUG-FUNCTION-LAMBDA-LIST" "DEBUG-FUNCTION-NAME"
+             "DEBUG-FUNCTION-P" "DEBUG-FUNCTION-START-LOCATION"
+             "DEBUG-FUNCTION-SYMBOL-VARIABLES"
+             "DEBUG-SOURCE-ROOT-NUMBER" "DEBUG-VAR"
+             "DEBUG-VAR-ID" "DEBUG-VAR-INFO-AVAILABLE"
+             "DEBUG-VAR-SYMBOL-NAME" "DEBUG-VAR-P" "DEBUG-VAR-PACKAGE-NAME"
+             "DEBUG-VAR-SYMBOL" "DEBUG-VAR-VALID-VALUE"
+             "DEBUG-VAR-VALIDITY" "DEBUG-VAR-VALUE"
+             "DELETE-BREAKPOINT" "DO-BLOCKS"
+             "DO-DEBUG-BLOCK-LOCATIONS" "DO-DEBUG-FUNCTION-BLOCKS"
+             "DO-DEBUG-FUNCTION-VARIABLES" "EVAL-IN-FRAME"
+             "FORM-NUMBER-TRANSLATIONS" "FRAME" "FRAME-CATCHES"
+             "FRAME-CODE-LOCATION" "FRAME-DEBUG-FUNCTION" "FRAME-DOWN"
+             "FRAME-FUNCTION-MISMATCH" "FRAME-NUMBER" "FRAME-P" "FRAME-UP"
+             "FUNCTION-DEBUG-FUNCTION" "FUNCTION-END-COOKIE-VALID-P"
+             "INVALID-CONTROL-STACK-POINTER" "INVALID-VALUE"
+             "LAMBDA-LIST-UNAVAILABLE" "MAKE-BREAKPOINT" "NO-DEBUG-BLOCKS"
+             "NO-DEBUG-FUNCTION-RETURNS" "NO-DEBUG-INFO" "PREPROCESS-FOR-EVAL"
+             "RETURN-FROM-FRAME" "SOURCE-PATH-CONTEXT"
+             "TOP-FRAME" "UNHANDLED-CONDITION" "UNKNOWN-CODE-LOCATION"
+             "UNKNOWN-CODE-LOCATION-P" "UNKNOWN-DEBUG-VAR"
+             "CODE-LOCATION-KIND" "FLUSH-FRAMES-ABOVE"))
+
+ #s(sb-cold:package-data
+    :name "SB!DISASSEM"
+    :doc "private: stuff related to the implementation of the disassembler"
+    :use ("CL" "SB!EXT" "SB!INT")
+    :export ("*DISASSEM-INST-ALIGNMENT-BYTES*"
+             "*DISASSEM-NOTE-COLUMN*" "*DISASSEM-OPCODE-COLUMN-WIDTH*"
+             "*DISASSEM-SCHEDULER-P*" "*DISASSEM-LOCATION-COLUMN-WIDTH*"
+             "ADD-COMMENT-HOOK" "ADD-HOOK" "ADD-NOTE-HOOK"
+             "ARG-VALUE" "CREATE-DSTATE" "DISASSEM-STATE"
+             "DISASSEMBLE-CODE-COMPONENT"
+             "DISASSEMBLE-FUNCTION" "DISASSEMBLE-MEMORY"
+             "DISASSEMBLE-SEGMENT" "DISASSEMBLE-SEGMENTS"
+             "DSTATE-CODE" "DSTATE-CURPOS" "DSTATE-GET-PROP"
+             "DSTATE-NEXTPOS" "DSTATE-SEGMENT-LENGTH"
+             "DSTATE-SEGMENT-SAP" "DSTATE-SEGMENT-START"
+             "FIELD-TYPE" "FIND-INST" "GEN-FIELD-TYPE-DECL-FORM"
+             "GEN-INST-DECL-FORM" "GEN-INST-FORMAT-DECL-FORM"
+             "GET-CODE-SEGMENTS" "GET-FUNCTION-SEGMENTS"
+             "GET-INST-SPACE" "HANDLE-BREAK-ARGS"
+             "INST" "INST-FORMAT" "LABEL-SEGMENTS"
+             "MAYBE-NOTE-ASSEMBLER-ROUTINE"
+             "MAYBE-NOTE-ASSOCIATED-STORAGE-REF"
+             "MAYBE-NOTE-NIL-INDEXED-OBJECT"
+             "MAYBE-NOTE-NIL-INDEXED-SYMBOL-SLOT-REF"
+             "MAYBE-NOTE-SINGLE-STORAGE-REF" "NOTE"
+             "NOTE-CODE-CONSTANT" "PARAMS" "PRIN1-QUOTED-SHORT"
+             "PRIN1-SHORT" "PRINT-BYTES"
+             "PRINT-CURRENT-ADDRESS" "PRINT-FIELD" "PRINT-INST"
+             "PRINT-INST-USING" "PRINT-NOTES-AND-NEWLINE"
+             "PRINT-WORDS" "SAP-REF-DCHUNK" "SEG-DEBUG-FUNCTION"
+             "SEG-LENGTH" "SEG-START" "SEGMENT"
+             "SET-ADDRESS-PRINTING-RANGE" "SET-DISASSEM-PARAMS"
+             "SET-DSTATE-SEGMENT" "SIGN-EXTEND" "SPECIALIZE"
+             "GEN-PRINTER-DEF-FORMS-DEF-FORM" "MAKE-DSTATE"
+             "DEFINE-ARGUMENT-TYPE" "GEN-ARG-TYPE-DEF-FORM"
+             "READ-SIGNED-SUFFIX" "ADD-OFFS-HOOK"
+             "MAKE-MEMORY-SEGMENT" "GEN-PREAMBLE-FORM"
+             "MAKE-SEGMENT" "SEGMENT-OVERFLOW"
+             "SEG-VIRTUAL-LOCATION" "MAKE-DECODED-INST"
+             "DCHUNK" "*DEFAULT-DSTATE-HOOKS*"
+             "MAKE-CODE-SEGMENT" "MAKE-OFFS-HOOK"
+             "DSTATE-SEGMENT" "DSTATE-CUR-OFFS"
+             "PRINC16" "INSTRUCTION" "DEFINE-INSTRUCTION-FORMAT"
+             "DSTATE-NEXT-OFFS" "INSTALL-INST-FLAVORS"
+             "SEG-SAP-MAKER" "DISASSEMBLE-ASSEM-SEGMENT"
+             "GEN-CLEAR-INFO-FORM" "READ-SUFFIX"
+             "MAP-SEGMENT-INSTRUCTIONS" "GEN-FORMAT-DEF-FORM"
+             "SET-LOCATION-PRINTING-RANGE" "MAKE-VECTOR-SEGMENT"
+             "ADD-OFFS-NOTE-HOOK" "ADD-OFFS-COMMENT-HOOK"
+             "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"))
+
+ #!+sb-interpreter
+ #s(sb-cold:package-data
+    :name "SB!EVAL"
+    :doc "private: the implementation of the IR1 interpreter"
+    :use ("CL" "SB!KERNEL" "SB!INT")
+    :export ("*EVAL-STACK-TRACE*" "*INTERNAL-APPLY-NODE-TRACE*"
+             "FLUSH-INTERPRETED-FUNCTION-CACHE" "INTERNAL-EVAL"
+             "INTERPRETED-FUNCTION"
+             "INTERPRETED-FUNCTION-ARGLIST"
+             "INTERPRETED-FUNCTION-CLOSURE"
+             "INTERPRETED-FUNCTION-LAMBDA-EXPRESSION"
+             "INTERPRETED-FUNCTION-NAME"
+             "INTERPRETED-FUNCTION-P"
+             "INTERPRETED-FUNCTION-TYPE"
+             "MAKE-INTERPRETED-FUNCTION"
+             "PRINT-INTERPRETED-FUNCTION-OBJECT"
+             "TRACE-EVAL"))
+
+ #s(sb-cold:package-data
+    :name "SB!EXT"
+    :doc "public: miscellaneous supported extensions to the ANSI Lisp spec"
+    ;; FIXME: Why don't we just USE-PACKAGE %KERNEL here instead of importing?
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!INT" "SB!SYS")
+    ;; FIXME: If we advertise these as extensions, they should be in the
+    ;; SB!EXT package (and perhaps re-exported from the %KERNEL
+    ;; package) rather than in some other package and reexported from
+    ;; SB!EXT.
+    :import-from (("SB!KERNEL" "WEAK-POINTER-P"))
+    :reexport ("LOAD-FOREIGN" "LOAD-1-FOREIGN" "WEAK-POINTER-P")
+    :export (;; Information about how the program was invoked is
+             ;; nonstandard but very useful.
+             "*POSIX-ARGV*" "POSIX-GETENV"
+
+             ;; People have various good reasons to mess with the GC.
+             "*AFTER-GC-HOOKS*" "*BEFORE-GC-HOOKS*"
+             "*GC-NOTIFY-AFTER*" "*GC-NOTIFY-BEFORE*" "*GC-NOTIFY-STREAM*"
+             "*GC-VERBOSE*"
+             "BYTES-CONSED-BETWEEN-GCS"
+             "GC" "GC-OFF" "GC-ON" "GET-BYTES-CONSED"
+             "*GC-RUN-TIME*"
+             "PURIFY"
+
+             ;; There is no one right way to report progress on
+             ;; hairy compiles.
+             "*COMPILE-PROGRESS*"
+
+             ;; There is no one right way to do DESCRIBE.
+             "*DESCRIBE-INDENTATION-STEP*"
+
+             ;; There is no one right way to do efficiency notes.
+             "*EFFICIENCY-NOTE-COST-THRESHOLD*" "*EFFICIENCY-NOTE-LIMIT*"
+
+             ;; There's no one right way to report errors.
+             "*ENCLOSING-SOURCE-CUTOFF*"
+             "*UNDEFINED-WARNING-LIMIT*"
+
+             ;; and for dedicated users who really want to customize
+             ;; error reporting, we have
+             "DEF-SOURCE-CONTEXT"
+
+             ;; FIXME: These seem like the right thing, but are they
+             ;; consistent with ANSI? (And actually maybe they're not
+             ;; quite the right thing; it might be better to also do
+	     ;; WITH-STANDARD-IO-SYNTAX or something.)
+             "*ERROR-PRINT-LENGTH*" "*ERROR-PRINT-LEVEL*" "*ERROR-PRINT-LINES*"
+
+             ;; KLUDGE: CMU CL had
+             ;; "*IGNORE-FLOATING-POINT-UNDERFLOW*", which seemed
+             ;; like a reasonable idea but doesn't seem to be supported
+             ;; now? -- WHN 19991206
+
+             ;; extended declarations..
+             "CONSTANT-FUNCTION" "END-BLOCK" "FREEZE-TYPE"
+             "INHIBIT-WARNINGS"
+             "MAYBE-INLINE" "OPTIMIZE-INTERFACE" "START-BLOCK"
+
+             ;; ..and variables to control compiler policy
+             "*INLINE-EXPANSION-LIMIT*"
+             "*USE-IMPLEMENTATION-TYPES*"
+             "*BYTE-COMPILE-TOP-LEVEL*"
+             "*BYTE-COMPILE-DEFAULT*"
+             "*DERIVE-FUNCTION-TYPES*" ; FIXME FIXME FIXME FIXME..
+
+             ;; a special form for breaking out of our "declarations
+             ;; are assertions" default
+             "TRULY-THE"
+
+	     ;; This is something which must exist inside any Common Lisp
+	     ;; implementation, and which someone writing a customized toplevel
+	     ;; might well want. It seems perverse to hide it from
+	     ;; them..
+             "INTERACTIVE-EVAL"
+
+             ;; weak pointers and finalization
+             "FINALIZE" "CANCEL-FINALIZATION"
+             ;; FIXME: "WEAK-POINTER-P" here once it moves from %KERNEL
+             "HASH-TABLE-WEAK-P" "MAKE-WEAK-POINTER"
+             "WEAK-POINTER" "WEAK-POINTER-VALUE"
+
+             ;; If the user knows we're doing IEEE, he might reasonably
+             ;; want to do this stuff.
+             "FLOAT-DENORMALIZED-P"
+             "FLOAT-NAN-P" "FLOAT-TRAPPING-NAN-P"
+             "FLOATING-POINT-INVALID"
+             "FLOAT-INFINITY-P"
+             #!+sb-infinities "SHORT-FLOAT-NEGATIVE-INFINITY"
+             #!+sb-infinities "SHORT-FLOAT-POSITIVE-INFINITY"
+             #!+sb-infinities "SINGLE-FLOAT-NEGATIVE-INFINITY"
+             #!+sb-infinities "SINGLE-FLOAT-POSITIVE-INFINITY"
+             #!+sb-infinities "DOUBLE-FLOAT-NEGATIVE-INFINITY"
+             #!+sb-infinities "DOUBLE-FLOAT-POSITIVE-INFINITY"
+             #!+sb-infinities "LONG-FLOAT-NEGATIVE-INFINITY"
+             #!+sb-infinities "LONG-FLOAT-POSITIVE-INFINITY"
+
+             ;; hacks to work around system limitations
+             "*INTEXP-MAXIMUM-EXPONENT*" ; since we crash hard when
+                                         ; memory is exhausted
+
+             ;; saving Lisp images
+             "SAVE-LISP-AND-DIE"
+
+             ;; miscellaneous useful supported extensions
+             "QUIT"
+
+             ;; running a Unix program from Lisp, not quite working
+             ;; in sbcl-0.6.6, but maybe soon..
+             "RUN-PROGRAM"))
+
+ #s(sb-cold:package-data
+    :name "SB!FORMAT"
+    :doc "private: implementation of FORMAT and friends"
+    :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT"))
+
+ #s(sb-cold:package-data
+    :name "SB!GRAY"
+    :doc
+"public: an implementation of the stream-definition-by-user
+Lisp extension proposal by David N. Gray"
+    :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT")
+    :export ("FUNDAMENTAL-BINARY-STREAM" "FUNDAMENTAL-BINARY-INPUT-STREAM"
+             "FUNDAMENTAL-BINARY-OUTPUT-STREAM" "FUNDAMENTAL-CHARACTER-STREAM"
+             "FUNDAMENTAL-CHARACTER-INPUT-STREAM"
+             "FUNDAMENTAL-CHARACTER-OUTPUT-STREAM"
+             "FUNDAMENTAL-INPUT-STREAM" "FUNDAMENTAL-OUTPUT-STREAM"
+             "FUNDAMENTAL-STREAM"
+             "STREAM-ADVANCE-TO-COLUMN" "STREAM-CLEAR-INPUT"
+             "STREAM-CLEAR-OUTPUT" "STREAM-FINISH-OUTPUT" "STREAM-FORCE-OUTPUT"
+             "STREAM-FRESH-LINE" "STREAM-LINE-COLUMN" "STREAM-LINE-LENGTH"
+             "STREAM-LISTEN" "STREAM-PEEK-CHAR" "STREAM-READ-BYTE"
+             "STREAM-READ-CHAR" "STREAM-READ-CHAR-NO-HANG" "STREAM-READ-LINE"
+             "STREAM-START-LINE-P" "STREAM-TERPRI" "STREAM-UNREAD-CHAR"
+             "STREAM-WRITE-BYTE" "STREAM-WRITE-CHAR" "STREAM-WRITE-STRING"))
+
+ ;; FIXME: It looks as though it's no longer important to have INSPECT be
+ ;; a separate package. INSPECT functionality is in the ANSI spec, and we
+ ;; might as well implement it with everything else.
+ #s(sb-cold:package-data
+    :name "SB!INSPECT"
+    :doc "private: implementation of INSPECT"
+    :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT")
+    :export ("*INTERFACE-STYLE*" "REMOVE-ALL-DISPLAYS"
+             "REMOVE-OBJECT-DISPLAY" "SHOW-OBJECT"))
+
+ #s(sb-cold:package-data
+    :name "SB!INT"
+    :doc
+"private: miscellaneous unsupported extensions to the ANSI spec. Most of
+the stuff in here originated in CMU CL's EXTENSIONS package and is
+retained, possibly temporariliy, because it might be used internally."
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS")
+    ;; FIXME: RATIOP should probably not go through this package but be
+    ;; called directly from SB!KERNEL, unless it's implemented as
+    ;; TYPEP X 'RATIO in which case it doesn't need to be in SB!KERNEL.
+    ;; And BIGNUMP and FIXNUMP should probably just be in this package,
+    ;; even if they have low-level-optimized implementations. (Their
+    ;; *meanings* aren't low-level, even if their implementations are.)
+    :import-from (("SB!KERNEL" "BIGNUMP" "FIXNUMP" "RATIOP"))
+    :reexport ("BIGNUMP" "FIXNUMP" "RATIOP")
+    :export ("*AFTER-SAVE-INITIALIZATIONS*" "*BEFORE-SAVE-INITIALIZATIONS*"
+
+             "*ALL-MODIFIER-NAMES*"
+             "*BACKUP-EXTENSION*"
+
+             ;; INFO stuff doesn't belong in a user-visible package, we
+             ;; should be able to change it without apology.
+             "*INFO-ENVIRONMENT*"
+             "CLEAR-INFO"
+             "COMPACT-INFO-ENVIRONMENT"
+             "DEFINE-INFO-CLASS" "DEFINE-INFO-TYPE"
+             "DO-INFO"
+             "INFO"
+             "MAKE-INFO-ENVIRONMENT"
+
+             ;; packages grabbed once and for all
+             "*KEYWORD-PACKAGE*" "*CL-PACKAGE*"
+
+             ;; hash mixing operations
+             "MIX" "MIXF"
+
+             ;; Arguably there's no one right value for the system
+             ;; prompt. But Common Lisp makes it easy for you to write
+             ;; your own REPL if you really care, so I'm not convinced we
+             ;; need this as a supported extension.
+             "*PROMPT*"
+
+             ;; I'm not convinced that FDEFINITIONs are the ideal
+             ;; solution, so exposing ways to peek into the system
+             ;; seems undesirable, since it makes it harder to get
+             ;; rid of FDEFINITIONs entirely later.
+             "*SETF-FDEFINITION-HOOK*"
+
+             ;; useful but non-standard user-level functions..
+             "ASSQ" "DELQ" "MEMQ"
+	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
+
+	     ;; ..and macros
+             "COLLECT"
+             "DO-ANONYMOUS" "DOHASH" "DOVECTOR"
+             "ITERATE"
+             "LETF" "LETF*"
+             "ONCE-ONLY"
+             "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
+
+             ;; encapsulation
+             "ARGUMENT-LIST"
+             "BASIC-DEFINITION"
+             "ENCAPSULATE" "ENCAPSULATED-DEFINITION" "ENCAPSULATED-P"
+             "UNENCAPSULATE"
+
+             ;; various CHAR-CODEs
+             "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE" "FORM-FEED-CHAR-CODE"
+             "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
+
+             ;; nonstandard type predicates
+             "INSTANCEP"
+             "DOUBLE-FLOATP"
+             "LOGICAL-PATHNAME-P"
+             "LONG-FLOATP"
+             "SHORT-FLOATP"
+             "SINGLE-FLOATP"
+
+             ;; symbol-hacking idioms
+             "CONCAT-PNAMES" "KEYWORDICATE" "SYMBOLICATE"
+
+             ;; search lists (FIXME: should go away)
+             "ENUMERATE-SEARCH-LIST"
+             "CLEAR-SEARCH-LIST"
+             "SEARCH-LIST"
+             "SEARCH-LIST-DEFINED-P"
+
+             ;; certainly doesn't belong in public extensions
+             ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
+             "CONSTANT-ARGUMENT"
+
+             ;; not used any more? (and not appropriate in SB!EXT, since
+             ;; SPECIAL things are so obnoxious in Common Lisp)
+             "E"
+
+             ;; various internal defaults
+             "*DEFAULT-PACKAGE-USE-LIST*"
+             "DEFAULT-INIT-CHAR"
+             "*LOAD-SOURCE-TYPES*" "*LOAD-OBJECT-TYPES*"
+
+             ;; hash caches
+             "DEFINE-HASH-CACHE"
+             "DEFUN-CACHED"
+
+             ;; time
+             "FORMAT-DECODED-TIME" "FORMAT-UNIVERSAL-TIME" "PARSE-TIME"
+
+             ;; indenting
+             "MAKE-INDENTING-STREAM"
+             "INDENTING-FURTHER"
+
+             ;; stream commands, used by the debugger
+             "GET-STREAM-COMMAND" "MAKE-STREAM-COMMAND" "STREAM-COMMAND"
+             "STREAM-COMMAND-ARGS" "STREAM-COMMAND-NAME" "STREAM-COMMAND-P"
+
+             ;; used for FORMAT tilde paren
+             "MAKE-CASE-FROB-STREAM"
+
+             ;; Some of these are probably still used for Unix-y processes.
+             ;; -- WHN 19991206
+             "PROCESS-CLOSE"
+             "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
+             "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
+             "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
+             "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
+
+             ;; debuggers' little helpers
+             #!+sb-show "*/SHOW*"
+             "/SHOW"  "/NOSHOW"
+             "/XHOW"  "/NOXHOW"
+             "/SHOW0" "/NOSHOW0"
+
+             ;; cross-compilation bootstrap hacks which turn into
+             ;; placeholders in a target system
+             "UNCROSS" 
+
+             ;; misc. utilities used internally
+             "LEGAL-FUNCTION-NAME-P"
+             "FUNCTION-NAME-BLOCK-NAME"
+             #!-sb-infinities "INFINITE"
+             "LISTEN-SKIP-WHITESPACE"
+             "PACKAGE-INTERNAL-SYMBOL-COUNT" "PACKAGE-EXTERNAL-SYMBOL-COUNT"
+             "PROPER-LIST-OF-LENGTH-P"
+             "LIST-OF-LENGTH-AT-LEAST-P"
+             "READ-SEQUENCE-OR-DIE"
+             "RENAME-KEYWORD-ARGS"
+             "REQUIRED-ARGUMENT"
+             "UNIX-NAMESTRING" ; FIXME: perhaps belongs in package %UNIX
+             "FEATUREP"
+             "FLUSH-STANDARD-OUTPUT"
+
+             ;; These could be moved back into SB!EXT if someone has compelling
+             ;; reasons, but hopefully we can get by without supporting them,
+             ;; at least not as publicly accessible things with fixed
+             ;; interfaces.
+             "DEFAULT-DIRECTORY"
+             "FILE-COMMENT"
+             "GET-FLOATING-POINT-MODES" "SET-FLOATING-POINT-MODES"
+             "WITH-FLOAT-TRAPS-MASKED"
+             "DEFINE-HASH-TABLE-TEST"
+             "*GC-INHIBIT-HOOK*"
+
+             ;; not used any more, I think -- WHN 19991206
+	     #+nil
+             ("SERVE-BUTTON-PRESS"
+              "SERVE-BUTTON-RELEASE" "SERVE-CIRCULATE-NOTIFY"
+              "SERVE-CIRCULATE-REQUEST" "SERVE-CLIENT-MESSAGE"
+              "SERVE-COLORMAP-NOTIFY" "SERVE-CONFIGURE-NOTIFY"
+              "SERVE-CONFIGURE-REQUEST" "SERVE-CREATE-NOTIFY"
+              "SERVE-DESTROY-NOTIFY" "SERVE-ENTER-NOTIFY" "SERVE-EXPOSURE"
+              "SERVE-FOCUS-IN" "SERVE-FOCUS-OUT" "SERVE-GRAPHICS-EXPOSURE"
+              "SERVE-GRAVITY-NOTIFY" "SERVE-KEY-PRESS" "SERVE-KEY-RELEASE"
+              "SERVE-LEAVE-NOTIFY" "SERVE-MAP-NOTIFY" "SERVE-MAP-REQUEST"
+              "SERVE-MOTION-NOTIFY" "SERVE-NO-EXPOSURE" "SERVE-PROPERTY-NOTIFY"
+              "SERVE-REPARENT-NOTIFY" "SERVE-RESIZE-REQUEST"
+              "SERVE-SELECTION-CLEAR" "SERVE-SELECTION-NOTIFY"
+              "SERVE-SELECTION-REQUEST" "SERVE-UNMAP-NOTIFY"
+              "SERVE-VISIBILITY-NOTIFY")))
+
+ #s(sb-cold:package-data
+    :name "SB!ITERATE"
+    :doc "private: implementation of an iteration facility used by PCL"
+    :use ("CL" "SB!WALKER")
+    :export ("ITERATE" "ITERATE*" "GATHERING" "GATHER"
+             "WITH-GATHERING" "INTERVAL" "ELEMENTS"
+             "LIST-ELEMENTS" "LIST-TAILS" "PLIST-ELEMENTS"
+             "EACHTIME" "WHILE" "UNTIL" "COLLECTING" "JOINING"
+             "MAXIMIZING" "MINIMIZING" "SUMMING"
+             "*ITERATE-WARNINGS*"))
+
+ #s(sb-cold:package-data
+    :name "SB!KERNEL"
+    :doc
+"private: Theoretically this 'hides state and types used for package
+integration' (said CMU CL architecture.tex) and that probably was and
+is a good idea, but see SB-SYS for blurring of boundaries."
+    :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!BIGNUM"
+          "SB!EXT" "SB!INT" "SB!SYS")
+    :import-from (("SB!C-CALL" "VOID"))
+    :reexport ("DEF!STRUCT" "DEF!MACRO" "VOID")
+    :export ("%ACOS" "%ACOSH" "%ARRAY-AVAILABLE-ELEMENTS"
+             "%ARRAY-DATA-VECTOR" "%ARRAY-DIMENSION"
+             "%ARRAY-DISPLACED-P"
+             "%ARRAY-DISPLACEMENT" "%ARRAY-FILL-POINTER"
+             "%ARRAY-FILL-POINTER-P" "%ASIN" "%ASINH"
+             "%ATAN" "%ATAN2" "%ATANH"
+             "%CALLER-FRAME-AND-PC" "%CHECK-BOUND" "%CLOSURE-FUNCTION"
+             "%CLOSURE-INDEX-REF" "%COS" "%COS-QUICK"
+             "%COSH" "%DEPOSIT-FIELD"
+             "%DOUBLE-FLOAT" "%DPB" "%EXP" "%EXPM1"
+             "%FUNCTION-HEADER-ARGLIST"
+             "%FUNCTION-HEADER-NAME" "%FUNCTION-HEADER-TYPE"
+             "%HYPOT" "%INSTANCE-SET-CONDITIONAL" "%LDB"
+             "%LOG" "%LOGB" "%LOG10" "%LOG1P" "%LONG-FLOAT"
+             "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE" "%MAKE-RATIO"
+	     "%MAP-TO-SIMPLE-VECTOR-ARITY-1" "%MAP-TO-LIST-ARITY-1"
+	     "%MAP-TO-NIL-ON-SEQUENCE" "%MAP-TO-NIL-ON-SIMPLE-VECTOR"
+             "%MAP-TO-NIL-ON-VECTOR" "%MASK-FIELD" "%NEGATE" "%POW"
+             "%RAW-BITS" "%RAW-REF-COMPLEX-DOUBLE"
+             "%RAW-REF-COMPLEX-LONG"
+             "%RAW-REF-COMPLEX-SINGLE" "%RAW-REF-DOUBLE"
+             "%RAW-REF-LONG"
+             "%RAW-REF-SINGLE" "%RAW-SET-COMPLEX-DOUBLE"
+             "%RAW-SET-COMPLEX-LONG" "%RAW-SET-COMPLEX-SINGLE"
+             "%RAW-SET-DOUBLE" "%RAW-SET-LONG" "%RAW-SET-SINGLE"
+             "%SCALB" "%SCALBN" "%SET-FUNCALLABLE-INSTANCE-FUNCTION"
+             "%SET-FUNCALLABLE-INSTANCE-INFO" "%SET-RAW-BITS"
+             "%SET-SAP-REF-16" "%SET-SAP-REF-32" "%SET-SAP-REF-64"
+             "%SET-SAP-REF-8" "%SET-SAP-REF-DOUBLE" "%SET-SAP-REF-LONG"
+             "%SET-SAP-REF-SAP" "%SET-SAP-REF-SINGLE"
+             "%SET-SIGNED-SAP-REF-16" "%SET-SIGNED-SAP-REF-32"
+             "%SET-SIGNED-SAP-REF-64" "%SET-SIGNED-SAP-REF-8"
+             "%SET-STACK-REF" "%SIN" "%SIN-QUICK"
+             "%SINGLE-FLOAT" "%SINH" "%SP-SET-DEFINITION"
+             "%SP-SET-PLIST"
+             "%SQRT" "%SXHASH-SIMPLE-STRING"
+             "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TAN-QUICK"
+             "%TANH" "%UNARY-ROUND" "%UNARY-TRUNCATE"
+             "%WITH-ARRAY-DATA" "WITH-ARRAY-DATA"
+             "*ALREADY-MAYBE-GCING*"
+             "*CURRENT-LEVEL*" "*EMPTY-TYPE*"
+             "*EVAL-STACK-TOP*" "*GC-INHIBIT*"
+             "*NEED-TO-COLLECT-GARBAGE*"
+             "*PRETTY-PRINTER*" "*UNIVERSAL-TYPE*"
+             "*UNPARSE-FUNCTION-TYPE-SIMPLIFY*" "*WILD-TYPE*"
+             "32BIT-LOGICAL-AND" "32BIT-LOGICAL-ANDC1"
+             "32BIT-LOGICAL-ANDC2"
+             "32BIT-LOGICAL-EQV" "32BIT-LOGICAL-NAND"
+             "32BIT-LOGICAL-NOR"
+             "32BIT-LOGICAL-NOT" "32BIT-LOGICAL-OR"
+             "32BIT-LOGICAL-ORC1"
+             "32BIT-LOGICAL-ORC2" "32BIT-LOGICAL-XOR"
+             "ALIEN-TYPE-TYPE"
+             "ALIEN-TYPE-TYPE-ALIEN-TYPE" "ALIEN-TYPE-TYPE-P"
+             "ALLOCATE-VECTOR"
+             "ALWAYS-SUBTYPEP" "ARGS-TYPE" "ARGS-TYPE-ALLOWP"
+             "ARGS-TYPE-KEYP"
+             "ARGS-TYPE-KEYWORDS" "ARGS-TYPE-OPTIONAL" "ARGS-TYPE-P"
+             "ARGS-TYPE-REQUIRED" "ARGS-TYPE-REST"
+             "ARRAY-HEADER-P" "ARRAY-TYPE" "ARRAY-TYPE-COMPLEXP"
+             "ARRAY-TYPE-DIMENSIONS" "ARRAY-TYPE-ELEMENT-TYPE"
+             "ARRAY-TYPE-P"
+             "ARRAY-TYPE-SPECIALIZED-ELEMENT-TYPE" "ASH-INDEX"
+             "ASSERT-ERROR" "BASE-CHAR-P"
+             "!BEGIN-COLLECTING-COLD-INIT-FORMS"
+             "BINDING-STACK-POINTER-SAP" "BIT-BASH-AND"
+             "BIT-BASH-ANDC1"
+             "BIT-BASH-ANDC2" "BIT-BASH-CLEAR" "BIT-BASH-COPY"
+             "BIT-BASH-EQV"
+             "BIT-BASH-IOR" "BIT-BASH-LOGNAND" "BIT-BASH-LOGNOR"
+             "BIT-BASH-NOT"
+             "BIT-BASH-ORC1" "BIT-BASH-ORC2" "BIT-BASH-SET"
+             "BIT-BASH-XOR"
+             "BIT-INDEX" "BOGUS-ARGUMENT-TO-VALUES-LIST-ERROR"
+             "BOOLE-CODE"
+             "BYTE-SPECIFIER" "CALLABLE" "CASE-BODY-ERROR"
+             "CHECK-FOR-CIRCULARITY" "CHECK-TYPE-ERROR"
+             "CODE-COMPONENT" "CODE-COMPONENT-P"
+             "CODE-DEBUG-INFO" "CODE-HEADER-REF" "CODE-HEADER-SET"
+             "CODE-INSTRUCTIONS" "COERCE-TO-BIT-VECTOR" "COERCE-TO-FUNCTION"
+             "COERCE-TO-LIST" "COERCE-TO-SIMPLE-STRING"
+             "COERCE-TO-SIMPLE-VECTOR" "COERCE-TO-VECTOR"
+             "*COLD-INIT-COMPLETE-P*"
+             "!COLD-INIT-FORMS" "COMPLEX-DOUBLE-FLOAT-P"
+             "COMPLEX-FLOAT-P" "COMPLEX-LONG-FLOAT-P"
+             "COMPLEX-RATIONAL-P" "COMPLEX-SINGLE-FLOAT-P"
+             "COMPLEX-VECTOR-P" "CONSED-SEQUENCE" "CONSTANT" "CONSTANT-TYPE"
+             "CONSTANT-TYPE-P" "CONSTANT-TYPE-TYPE"
+             "CONTAINING-INTEGER-TYPE"
+             "CONTROL-STACK-POINTER-SAP" "COPY-FROM-SYSTEM-AREA"
+             "COPY-NUMERIC-TYPE" "COPY-TO-SYSTEM-AREA"
+	     "COPY-BYTE-VECTOR-TO-SYSTEM-AREA"
+             "CSUBTYPEP" "CTYPE" "TYPE-HASH-VALUE"
+             "CTYPE-OF" "CTYPE-P" "CTYPEP" "CURRENT-FP" "CURRENT-SP"
+             "DATA-VECTOR-REF" "DATA-VECTOR-SET" "DECODE-DOUBLE-FLOAT"
+             "DECODE-LONG-FLOAT" "DECODE-SINGLE-FLOAT" "DESCEND-INTO"
+             "DIVISION-BY-ZERO-ERROR"
+             "DOUBLE-FLOAT-EXPONENT" "DOUBLE-FLOAT-HIGH-BITS"
+             "DOUBLE-FLOAT-INT-EXPONENT" "DOUBLE-FLOAT-LOW-BITS"
+             "DOUBLE-FLOAT-SIGNIFICAND"
+             "DOUBLE-FLOAT-P" "FLOAT-WAIT"
+             "DYNAMIC-SPACE-FREE-POINTER"
+             "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
+             "ERROR-NUMBER-OR-LOSE" "FDOCUMENTATION" "FILENAME"
+             "FIND-AND-INIT-OR-CHECK-LAYOUT"
+             "FLOAT-EXPONENT" "FLOAT-FORMAT-DIGITS" "FLOAT-FORMAT-NAME"
+             "FLOAT-FORMAT-MAX" "FLOATING-POINT-EXCEPTION"
+             "FORM" "FUNCALLABLE-INSTANCE-P"
+             "FUNCTION-CODE-HEADER" "FUNCTION-TYPE"
+             "FUNCTION-TYPE-ALLOWP"
+             "FUNCTION-TYPE-KEYP" "FUNCTION-TYPE-KEYWORDS"
+             "FUNCTION-TYPE-NARGS" "FUNCTION-TYPE-OPTIONAL"
+             "FUNCTION-TYPE-P"
+             "FUNCTION-TYPE-REQUIRED" "FUNCTION-TYPE-REST"
+             "FUNCTION-TYPE-RETURNS" "FUNCTION-TYPE-WILD-ARGS"
+             "FUNCTION-WORD-OFFSET" "GET-CLOSURE-LENGTH"
+             "GET-HEADER-DATA"
+             "GET-LISP-OBJ-ADDRESS" "GET-LOWTAG"
+             "GET-TYPE"
+             "HAIRY-DATA-VECTOR-REF" "HAIRY-DATA-VECTOR-SET" "HAIRY-TYPE"
+             "HAIRY-TYPE-CHECK-TEMPLATE-NAME" "HAIRY-TYPE-SPECIFIER"
+             "HANDLE-CIRCULARITY" "IGNORE-IT"
+             "INDEX" "INDEX-TOO-LARGE-ERROR" "INTEGER-DECODE-DOUBLE-FLOAT"
+             "INTEGER-DECODE-LONG-FLOAT" "INTEGER-DECODE-SINGLE-FLOAT"
+             "INTERNAL-ERROR" "INTERNAL-TIME"
+             "INVALID-ARGUMENT-COUNT-ERROR" "INVALID-ARRAY-INDEX-ERROR"
+             "INVALID-UNWIND-ERROR" "IRRATIONAL"
+             "JUST-DUMP-IT-NORMALLY"
+             "KEY-INFO" "KEY-INFO-NAME"
+             "KEY-INFO-P" "KEY-INFO-TYPE"
+             "LAYOUT-DEPTHOID"
+             "LAYOUT-INVALID-ERROR" "LEXENV"
+             "LIST-TO-SIMPLE-STRING*" "LIST-TO-BIT-VECTOR*"
+             "LIST-TO-VECTOR*" 
+             "LONG-FLOAT-EXPONENT" "LONG-FLOAT-EXP-BITS"
+             "LONG-FLOAT-HIGH-BITS"
+             "LONG-FLOAT-LOW-BITS" "LONG-FLOAT-MID-BITS" "LONG-FLOAT-P"
+             "LRA" "LRA-CODE-HEADER" "LRA-P"
+             "MAKE-ALIEN-TYPE-TYPE" "MAKE-ARGS-TYPE"
+             "MAKE-ARRAY-HEADER" "MAKE-ARRAY-TYPE" "MAKE-DOUBLE-FLOAT"
+             "MAKE-FUNCTION-TYPE"
+             "MAKE-KEY-INFO" "MAKE-LISP-OBJ" "MAKE-LONG-FLOAT"
+             "MAKE-MEMBER-TYPE" "MAKE-NAMED-TYPE"
+             "MAKE-NULL-LEXENV" "MAKE-NUMERIC-TYPE"
+             "MAKE-SINGLE-FLOAT" "MAKE-SPECIALIZABLE-ARRAY"
+             "%MAKE-INSTANCE" "MAKE-UNION-TYPE" "MAKE-VALUES-TYPE"
+             "MAYBE-GC" "MEMBER-TYPE" "MEMBER-TYPE-MEMBERS"
+             "MEMBER-TYPE-P" "MERGE-BITS"
+             "DEFMACRO-MUNDANELY" "MUTATOR-SELF"
+             "NAMED-TYPE" "NAMED-TYPE-NAME" "NAMED-TYPE-P"
+             "NATIVE-BYTE-ORDER" "NEGATE"
+             "NEVER-SUBTYPEP" "NIL-FUNCTION-RETURNED-ERROR"
+             "NOT-<=-ERROR" "NOT-=-ERROR"
+             "NOT-DUMPED-AT-ALL"
+             "NUMERIC-CONTAGION" "NUMERIC-TYPE"
+             "NUMERIC-TYPE-CLASS" "NUMERIC-TYPE-COMPLEXP"
+             "NUMERIC-TYPE-FORMAT"
+             "NUMERIC-TYPE-HIGH" "NUMERIC-TYPE-LOW" "NUMERIC-TYPE-P"
+             "OBJECT-NOT-ARRAY-ERROR" "OBJECT-NOT-BASE-CHAR-ERROR"
+             "OBJECT-NOT-BIGNUM-ERROR" "OBJECT-NOT-BIT-VECTOR-ERROR"
+             "OBJECT-NOT-COERCEABLE-TO-FUNCTION-ERROR"
+             "OBJECT-NOT-COMPLEX-ERROR"
+             "OBJECT-NOT-COMPLEX-FLOAT-ERROR"
+             "OBJECT-NOT-COMPLEX-SINGLE-FLOAT-ERROR"
+             "OBJECT-NOT-COMPLEX-LONG-FLOAT-ERROR"
+             "OBJECT-NOT-COMPLEX-DOUBLE-FLOAT-ERROR"
+             "OBJECT-NOT-COMPLEX-RATIONAL-ERROR"
+             "OBJECT-NOT-CONS-ERROR"
+             "OBJECT-NOT-DOUBLE-FLOAT-ERROR" "OBJECT-NOT-FIXNUM-ERROR"
+             "OBJECT-NOT-FLOAT-ERROR" "OBJECT-NOT-FUNCTION-ERROR"
+             "OBJECT-NOT-FUNCTION-OR-SYMBOL-ERROR"
+             "OBJECT-NOT-INSTANCE-ERROR"
+             "OBJECT-NOT-INTEGER-ERROR"
+             "OBJECT-NOT-LIST-ERROR" "OBJECT-NOT-LONG-FLOAT-ERROR"
+             "OBJECT-NOT-NUMBER-ERROR"
+             "OBJECT-NOT-RATIO-ERROR" "OBJECT-NOT-RATIONAL-ERROR"
+             "OBJECT-NOT-REAL-ERROR" "OBJECT-NOT-SAP-ERROR"
+             "OBJECT-NOT-SIGNED-BYTE-32-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-DOUBLE-FLOAT-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-LONG-FLOAT-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-SINGLE-FLOAT-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-16-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-2-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-32-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-4-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-8-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-16-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-30-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-32-ERROR"
+             "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-8-ERROR"
+             "OBJECT-NOT-SIMPLE-BIT-VECTOR-ERROR"
+             "OBJECT-NOT-SIMPLE-STRING-ERROR"
+             "OBJECT-NOT-SIMPLE-VECTOR-ERROR"
+             "OBJECT-NOT-SINGLE-FLOAT-ERROR" "OBJECT-NOT-STRING-ERROR"
+             "OBJECT-NOT-INSTANCE-ERROR" "OBJECT-NOT-SYMBOL-ERROR"
+             "OBJECT-NOT-TYPE-ERROR"
+             "OBJECT-NOT-UNSIGNED-BYTE-32-ERROR"
+             "OBJECT-NOT-VECTOR-ERROR" "OBJECT-NOT-WEAK-POINTER-ERROR"
+             "ODD-KEYWORD-ARGUMENTS-ERROR"
+             "OUTPUT-OBJECT" "OUTPUT-UGLY-OBJECT"
+             "PARSE-DEFMACRO" "PARSE-LAMBDA-LIST" "PARSE-UNKNOWN-TYPE"
+             "PARSE-UNKNOWN-TYPE-SPECIFIER"
+             "PATHNAME-DESIGNATOR" "PUNT-IF-TOO-LONG"
+             "READER-PACKAGE-ERROR"
+             #!+gengc "*SAVED-STATE-CHAIN*"
+             "SCALE-DOUBLE-FLOAT" "SCALE-LONG-FLOAT"
+             "SCALE-SINGLE-FLOAT"
+             "SEQUENCE-END" "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
+             "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "SIGNED-BYTE-32-P"
+             "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-P"
+             "SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-P"
+             "SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-P"
+             "SIMPLE-ARRAY-DOUBLE-FLOAT-P" "SIMPLE-ARRAY-LONG-FLOAT-P"
+             "SIMPLE-ARRAY-P"
+             "SIMPLE-ARRAY-SINGLE-FLOAT-P"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-16-P"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-2-P"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-32-P"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-4-P"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-8-P"
+             "SIMPLE-ARRAY-SIGNED-BYTE-16-P"
+             "SIMPLE-ARRAY-SIGNED-BYTE-30-P"
+             "SIMPLE-ARRAY-SIGNED-BYTE-32-P"
+             "SIMPLE-ARRAY-SIGNED-BYTE-8-P"
+             "SIMPLE-PACKAGE-ERROR"
+             "SIMPLE-UNBOXED-ARRAY"
+             "SINGLE-FLOAT-BITS" "SINGLE-FLOAT-EXPONENT"
+             "SINGLE-FLOAT-INT-EXPONENT" "SINGLE-FLOAT-P"
+             "SINGLE-FLOAT-SIGNIFICAND"
+             "SINGLE-VALUE-TYPE" "SPECIALIZABLE" "SPECIALIZABLE-VECTOR"
+             "SPECIFIER-TYPE" "STACK-REF"
+             "STREAMLIKE" "STRINGABLE"
+             "STRUCTURE-RAW-SLOT-TYPE-AND-SIZE"
+             "%INSTANCE-LENGTH"
+             "%INSTANCE-REF" "%INSTANCE-SET"
+             "STRING-TO-SIMPLE-STRING"
+             "SYSTEM-AREA-CLEAR"
+             "SYSTEM-AREA-COPY" "TWO-ARG-*"
+             "TRY-TO-RENAME-INTERPRETED-FUNCTION-AS-MACRO"
+             "TWO-ARG-+" "TWO-ARG--"
+             "TWO-ARG-/" "TWO-ARG-/=" "TWO-ARG-<"
+             "TWO-ARG-<=" "TWO-ARG-="
+             "TWO-ARG->" "TWO-ARG->=" "TWO-ARG-AND"
+             "TWO-ARG-GCD" "TWO-ARG-IOR"
+             "TWO-ARG-LCM" "TWO-ARG-XOR"
+             "TYPE-DIFFERENCE" "TYPE-EXPAND"
+             "TYPE-INTERSECT"
+             "TYPE-INTERSECTION" "TYPE-SPECIFIER"
+             "*STANDARD-TYPE-NAMES*" "TYPE-UNION" "TYPE/=" "TYPE="
+             "TYPES-INTERSECT" "UNBOUND-SYMBOL-ERROR" "UNBOXED-ARRAY"
+             "UNDEFINED-SYMBOL-ERROR" "UNION-TYPE" "UNION-TYPE-P"
+             "UNION-TYPE-TYPES" "UNKNOWN-ERROR"
+             "UNKNOWN-KEYWORD-ARGUMENT-ERROR"
+             "UNKNOWN-TYPE" "UNKNOWN-TYPE-P"
+             "UNKNOWN-TYPE-SPECIFIER" "UNSEEN-THROW-TAG-ERROR"
+             "UNSIGNED-BYTE-32-P" "VALUES-SPECIFIER-TYPE"
+             "VALUES-SPECIFIER-TYPE-CACHE-CLEAR" "VALUES-SUBTYPEP"
+             "VALUES-TYPE" "VALUES-TYPE-ALLOWP" "VALUES-TYPE-INTERSECT"
+             "VALUES-TYPE-INTERSECTION" "VALUES-TYPE-KEYP"
+             "VALUES-TYPE-KEYWORDS" "VALUES-TYPE-OPTIONAL"
+             "VALUES-TYPE-P" "VALUES-TYPE-REQUIRED"
+             "VALUES-TYPE-REST" "VALUES-TYPE-UNION"
+             "VALUES-TYPES" "VALUES-TYPES-INTERSECT" "VECTOR-T-P"
+             "VECTOR-TO-VECTOR*" "VECTOR-TO-SIMPLE-STRING*"
+             "VECTOR-TO-BIT-VECTOR*" "VECTOR-TO-SIMPLE-BIT-VECTOR*"
+             "WITH-CIRCULARITY-DETECTION" "WITH-TYPE-CACHES"
+             "WRONG-NUMBER-OF-INDICES-ERROR"
+
+             "FDEFN" "MAKE-FDEFN" "FDEFN-P"
+             "FDEFN-NAME" "FDEFN-FUNCTION"
+             "FDEFN-MAKUNBOUND" "%COERCE-NAME-TO-FUNCTION"
+             "FUNCTION-SUBTYPE" "*MAXIMUM-ERROR-DEPTH*"
+             "%SET-SYMBOL-PLIST" "INFINITE-ERROR-PROTECT"
+             "FIND-CALLER-NAME"
+             "%SET-SYMBOL-VALUE" "%SET-SYMBOL-PACKAGE"
+             "OUTPUT-SYMBOL-NAME"
+             "FSET" "RAW-DEFINITION"
+             "INVOKE-MACROEXPAND-HOOK"
+             "DEFAULT-STRUCTURE-PRINT"
+             "LAYOUT" "LAYOUT-LENGTH" "RATIOP" "FIXNUMP" "TARGET-FIXNUMP"
+             "LAMBDA-WITH-ENVIRONMENT" "LAYOUT-PURE" "DSD-RAW-TYPE"
+             "%COMPILER-DEFSTRUCT"
+             "%COMPILER-ONLY-DEFSTRUCT" "FUNCTION-%COMPILER-ONLY-DEFSTRUCT"
+             "DEFSTRUCT-DESCRIPTION" "UNDEFINE-STRUCTURE"
+             "BIGNUMP" "DD-COPIER" "UNDEFINE-FUNCTION-NAME" "DD-TYPE"
+             "CLASS-STATE" "INSTANCE"
+             "*TYPE-SYSTEM-INITIALIZED*" "WEAK-POINTER-P" "FIND-LAYOUT"
+             "DSD-NAME" "%TYPEP" "DD-RAW-INDEX"
+             "DD-NAME" "CLASS-SUBCLASSES"
+             "CLASS-LAYOUT" "CLASS-%NAME"
+             "DD-RAW-LENGTH" "NOTE-NAME-DEFINED"
+             "%CODE-CODE-SIZE" "DD-SLOTS"
+             "%IMAGPART" "DSD-ACCESSOR"
+             "%CODE-DEBUG-INFO" "DSD-%NAME"
+             "LAYOUT-CLASS" "LAYOUT-INVALID"
+             "%FUNCTION-NAME" "DSD-TYPE" "%INSTANCEP"
+             "DEFSTRUCT-SLOT-DESCRIPTION" "%FUNCTION-ARGLIST"
+             "%FUNCTION-NEXT" "LAYOUT-CLOS-HASH-LENGTH" "DD-PREDICATE"
+             "CLASS-PROPER-NAME" "%NOTE-TYPE-DEFINED" "LAYOUT-INFO"
+             "%SET-INSTANCE-LAYOUT" "DD-DEFAULT-CONSTRUCTOR"
+             "LAYOUT-OF" "%FUNCTION-SELF" "%REALPART"
+             "STRUCTURE-CLASS-P" "DSD-INDEX"
+             "%INSTANCE-LAYOUT" "LAYOUT-CLOS-HASH"
+             "%FUNCTION-TYPE" "PROCLAIM-AS-FUNCTION-NAME"
+             "%%COMPILER-DEFSTRUCT" "%NUMERATOR" "CLASS-TYPEP"
+             "STRUCTURE-CLASS-PRINT-FUNCTION" "DSD-READ-ONLY"
+             "LAYOUT-INHERITS" "DD-LENGTH" "%CODE-ENTRY-POINTS"
+             "%DENOMINATOR"
+             "BYTE-FUNCTION-OR-CLOSURE" "MAKE-STANDARD-CLASS"
+             "BYTE-FUNCTION-NAME" "CLASS-CELL-TYPEP" "BYTE-CLOSURE"
+             "FIND-CLASS-CELL" "EXTRACT-FUNCTION-TYPE"
+             "FUNCALLABLE-STRUCTURE-CLASS"
+             "%RANDOM-DOUBLE-FLOAT" "%RANDOM-LONG-FLOAT"
+             "%RANDOM-SINGLE-FLOAT"
+             "RANDOM-PCL-CLASS" "BASIC-STRUCTURE-CLASS-PRINT-FUNCTION"
+             "%FUNCALLABLE-INSTANCE-INFO" "*EVAL-STACK*" "RANDOM-CHUNK"
+             "MAKE-FUNCALLABLE-STRUCTURE-CLASS" "LAYOUT-CLOS-HASH-MAX"
+             "CLASS-CELL-NAME" "BUILT-IN-CLASS-DIRECT-SUPERCLASSES"
+             "INITIALIZE-BYTE-COMPILED-FUNCTION"
+             "RANDOM-LAYOUT-CLOS-HASH"
+             "CLASS-PCL-CLASS" "FUNCALLABLE-STRUCTURE"
+             "FUNCALLABLE-INSTANCE-FUNCTION"
+             "%FUNCALLABLE-INSTANCE-LAYOUT"
+             "BASIC-STRUCTURE-CLASS" "BYTE-CLOSURE-DATA"
+             "BYTE-CLOSURE-FUNCTION" "BYTE-FUNCTION" "CLASS-CELL-CLASS"
+             "FUNCALLABLE-STRUCTURE-CLASS-P" "REGISTER-LAYOUT"
+             "FUNCALLABLE-INSTANCE" "RANDOM-FIXNUM-MAX"
+             "MAKE-RANDOM-PCL-CLASS" "INSTANCE-LAMBDA"
+             "%FUNCALLABLE-INSTANCE-LEXENV" "%MAKE-SYMBOL"
+             "%FUNCALLABLE-INSTANCE-FUNCTION" "SYMBOL-HASH"
+
+             "MAKE-UNDEFINED-CLASS" "CLASS-DIRECT-SUPERCLASSES" "MAKE-LAYOUT"
+             "BYTE-FUNCTION-TYPE"
+             "REDEFINE-LAYOUT-WARNING" "SLOT-CLASS"
+             "INSURED-FIND-CLASS" "CONDITION-FUNCTION-NAME"
+
+             ;; FIXME: These error-handling things probably belong 
+             ;; the SB-INT package, not here.
+             "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
+             "SIMPLE-PROGRAM-ERROR" "SIMPLE-STYLE-WARNING" "STYLE-WARN"
+
+	     "!COLD-INIT"
+             "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
+             "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
+             "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
+             "!EARLY-TYPE-COLD-INIT" "!LATE-TYPE-COLD-INIT"
+             "!TARGET-TYPE-COLD-INIT" "!RANDOM-COLD-INIT"
+             "!FILESYS-COLD-INIT" "!READER-COLD-INIT"
+             "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
+             "!PACKAGE-COLD-INIT" "SIGNAL-COLD-INIT-OR-REINIT"
+             "!SET-SANE-COOKIE-DEFAULTS" "!VM-TYPE-COLD-INIT"
+             "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
+	     "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
+
+             ;; These belong in an "SB!LOAD" package someday.
+             "*STATIC-FOREIGN-SYMBOLS*" "*ASSEMBLER-ROUTINES*"
+
+             ;; Note: These are out of lexicographical order because in CMU CL
+             ;; they were defined as internal symbols in package "CL"
+             ;; imported into package "C", as opposed to what we're
+             ;; doing here, defining them as external symbols in a package
+             ;; which is used by both "SB!C" and "SB!IMPL". (SBCL's "SB!C" is
+             ;; directly analogous to CMU CL's "C"; and for this purpose,
+             ;; SBCL's "SB!IMPL" is analogous to CMU CL's "CL".) As far
+             ;; as I know there's nothing special about them, so they could
+             ;; be merged into the same order as everything else in the
+             ;; in this package. -- WHN 19990911
+             "STRING>=*" "STRING>*" "STRING=*"
+             "STRING<=*" "STRING<*" "STRING/=*"
+             "SHORT-FLOAT-P" "%SVSET" "%SP-STRING-COMPARE" "%SETNTH"
+             "%SETELT" "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
+             "%SET-FDEFINITION" "%SCHARSET" "%SBITSET" "%RPLACD"
+             "%RPLACA" "%PUT" "%CHARSET" "%BITSET" "%ASET"
+             "%ARRAY-TYPEP" "%SET-SAP-REF-DESCRIPTOR"
+
+             ;; Note: These are out of lexicographical order only because
+             ;; historically in CMU CL they were imported into package VM
+             ;; from LISP instead of being exported from package VM. In
+             ;; SBCL we achieve more or less the same effect by putting them
+             ;; in SB!KERNEL, where they're visible both in SB!IMPL and in
+             ;; SB!VM. But as far as I can tell, though, there's no
+             ;; fundamental reason that they're different from the other
+             ;; exports. -- WHN 19991020
+             "STATIC-SPACE-START" "READ-ONLY-SPACE-START"
+             "DYNAMIC-1-SPACE-START" "DYNAMIC-0-SPACE-START"
+             "CURRENT-DYNAMIC-SPACE-START" "*STATIC-SPACE-FREE-POINTER*"
+             "*READ-ONLY-SPACE-FREE-POINTER*"))
+
+ #s(sb-cold:package-data
+    :name "SB!LOOP"
+    :doc "private: implementation details of LOOP"
+    :use ("CL")
+    :export ())
+
+ #!+mp
+ #s(sb-cold:package-data
+    :name "SB!MP"
+    :doc "public (but unstable): multiprocessing support"
+    :export ("*ALL-PROCESSES*" "*CURRENT-PROCESS*"
+             "*CURRENT-STACK-GROUP*" "*INITIAL-STACK-GROUP*"
+             "*MULTI-PROCESSING*" "ALL-PROCESSES"
+             "ATOMIC-DECF" "ATOMIC-INCF" "ATOMIC-POP"
+             "ATOMIC-PUSH" "CURRENT-PROCESS"
+             "DESTROY-PROCESS" "DISABLE-PROCESS"
+             "ENABLE-PROCESS" "INIT-STACK-GROUPS"
+             "LOCK" "MAKE-STACK-GROUP" "MAKE-LOCK"
+             "MAKE-PROCESS" "PROCESS-ACTIVE-P" "PROCESS-ALIVE-P"
+             "PROCESS-IDLE-TIME" "PROCESS-INTERRUPT"
+             "PROCESS-NAME" "PROCESS-PRESET"
+             "PROCESS-REAL-TIME" "PROCESS-RUN-TIME"
+             "PROCESS-STATE" "PROCESS-WAIT-UNTIL-FD-USABLE"
+             "PROCESS-WAIT" "PROCESS-WAIT-WITH-TIMEOUT"
+             "PROCESS-WHOSTATE" "PROCESS-YIELD" "PROCESSP"
+             "RESTART-PROCESS" "SHOW-PROCESSES"
+             "STACK-GROUP-RESUME" "WITHOUT-SCHEDULING"
+             "WITH-LOCK-HELD"))
+
+ #s(sb-cold:package-data
+    :name "SB!PCL"
+    :doc
+"semi-public: This package includes useful meta-object protocol
+extensions, but even they are not guaranteed to be present in
+later versions of SBCL, and the other stuff in here is
+definitely not guaranteed to be present in later versions of SBCL."
+    :use ("CL" "SB!ITERATE" "SB!WALKER")
+    :import-from (("SB!KERNEL" "FUNCALLABLE-INSTANCE-P" "SB!INT" "SB!EXT"))
+    :reexport ("ADD-METHOD" "ALLOCATE-INSTANCE"
+               "COMPUTE-APPLICABLE-METHODS"
+               "ENSURE-GENERIC-FUNCTION"
+               "MAKE-INSTANCE" "METHOD-QUALIFIERS"
+               "REMOVE-METHOD")
+    :export ("ADD-DEPENDENT"
+             "ADD-DIRECT-METHOD"
+             "ADD-DIRECT-SUBCLASS"
+             "CLASS-DEFAULT-INITARGS"
+             "CLASS-DIRECT-DEFAULT-INITARGS"
+             "CLASS-DIRECT-SLOTS"
+             "CLASS-DIRECT-SUBCLASSES"
+             "CLASS-DIRECT-SUPERCLASSES"
+             "CLASS-FINALIZED-P"
+             "CLASS-PRECEDENCE-LIST"
+             "CLASS-PROTOTYPE"
+             "CLASS-SLOTS"
+             "COMPUTE-APPLICABLE-METHODS-USING-CLASSES"
+             "COMPUTE-CLASS-PRECEDENCE-LIST"
+             "COMPUTE-DISCRIMINATING-FUNCTION"
+             "COMPUTE-EFFECTIVE-METHOD"
+             "COMPUTE-EFFECTIVE-SLOT-DEFINITION"
+             "COMPUTE-SLOTS"
+             "DIRECT-SLOT-DEFINITION-CLASS"
+             "EFFECTIVE-SLOT-DEFINITION-CLASS"
+             "ENSURE-CLASS"
+             "ENSURE-CLASS-USING-CLASS"
+             "ENSURE-GENERIC-FUNCTION-USING-CLASS"
+             "EQL-SPECIALIZER-INSTANCE"
+             "EXTRACT-LAMBDA-LIST"
+             "EXTRACT-SPECIALIZER-NAMES"
+             "FINALIZE-INHERITANCE"
+             "FIND-METHOD-COMBINATION"
+             "FUNCALLABLE-STANDARD-INSTANCE-ACCESS"
+             "GENERIC-FUNCTION-ARGUMENT-PRECEDENCE-ORDER"
+             "GENERIC-FUNCTION-DECLARATIONS"
+             "GENERIC-FUNCTION-LAMBDA-LIST"
+             "GENERIC-FUNCTION-METHOD-CLASS"
+             "GENERIC-FUNCTION-METHOD-COMBINATION"
+             "GENERIC-FUNCTION-METHODS"
+             "GENERIC-FUNCTION-NAME"
+             "INTERN-EQL-SPECIALIZER"
+             "MAKE-METHOD-LAMBDA"
+             "MAP-DEPENDENTS"
+             "METHOD-FUNCTION"
+             "METHOD-GENERIC-FUNCTION"
+             "METHOD-LAMBDA-LIST"
+             "METHOD-SPECIALIZERS"
+             "ACCESSOR-METHOD-SLOT-DEFINITION"
+             "READER-METHOD-CLASS"
+             "REMOVE-DEPENDENT"
+             "REMOVE-DIRECT-METHOD"
+             "REMOVE-DIRECT-SUBCLASS"
+             "SET-FUNCALLABLE-INSTANCE-FUNCTION"
+             "SLOT-BOUNDP-USING-CLASS"
+             "SLOT-DEFINITION-ALLOCATION"
+             "SLOT-DEFINITION-INITARGS"
+             "SLOT-DEFINITION-INITFORM"
+             "SLOT-DEFINITION-INITFUNCTION"
+             "SLOT-DEFINITION-LOCATION"
+             "SLOT-DEFINITION-NAME"
+             "SLOT-DEFINITION-READERS"
+             "SLOT-DEFINITION-WRITERS"
+             "SLOT-DEFINITION-TYPE"
+             "SLOT-MAKUNBOUND-USING-CLASS"
+             "SLOT-VALUE-USING-CLASS"
+             "SPECIALIZER-DIRECT-GENERIC-FUNCTION"
+             "SPECIALIZER-DIRECT-METHODS"
+             "STANDARD-INSTANCE-ACCESS"
+             "UPDATE-DEPENDENT"
+             "VALIDATE-SUPERCLASS"
+             "WRITER-METHOD-CLASS"))
+
+ #s(sb-cold:package-data
+    :name "SB!PRETTY"
+    :doc "private: implementation of pretty-printing"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
+    :export ("PRETTY-STREAM" "PRETTY-STREAM-P" "!PPRINT-COLD-INIT"))
+
+ #s(sb-cold:package-data
+    :name "SB!PROFILE"
+    :doc "public: the interface to the profiler"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
+    :export ("PROFILE" "REPORT" "RESET" "UNPROFILE"))
+
+ #s(sb-cold:package-data
+    :name "SB!SYS"
+    :doc
+"private: In theory, this \"contains functions and information
+necessary for system interfacing\" (said cmu-user.tex at the time
+of the SBCL code fork). That probably was and is a good idea, but in
+practice, the distinctions between this package and SB-KERNEL
+and even SB-VM have become somewhat blurred over the years."
+    :use ("CL" "SB!EXT" "SB!INT")
+    :export ("%ASSEMBLER-CODE-TYPE" "%BIND-ALIGNED-SAP"
+             ;; FIXME: %PRIMITIVE shouldn't be here. (I now know that %SYS
+             ;; is for OS-dependent stuff. %PRIMITIVE should probably be in
+             ;; SB!KERNEL.)
+             "%PRIMITIVE" "%SP-BYTE-BLT" "%SP-FIND-CHARACTER"
+             "%SP-FIND-CHARACTER-WITH-ATTRIBUTE"
+             "%SP-REVERSE-FIND-CHARACTER-WITH-ATTRIBUTE"
+             "%STANDARD-CHAR-P"
+             "*BEEP-FUNCTION*"
+             "*LONG-SITE-NAME*" "*SHORT-SITE-NAME*"
+             "*STDERR*" "*STDIN*"
+             "*STDOUT*" "*TASK-DATA*"
+             "*TASK-NOTIFY*" "*TASK-SELF*" "*TTY*" "*TYPESCRIPTPORT*"
+             "ADD-FD-HANDLER" "ADD-PORT-DEATH-HANDLER"
+             "ADD-PORT-OBJECT"
+             "ALLOCATE-SYSTEM-MEMORY"
+             "BEEP" "BITS" "STRUCTURE!OBJECT"
+             "STRUCTURE!OBJECT-MAKE-LOAD-FORM"
+             "BYTES" "C-PROCEDURE" "CHECK<=" "CHECK="
+             "COMPILER-VERSION"
+             "DEALLOCATE-SYSTEM-MEMORY"
+             "DEFAULT-INTERRUPT" "DEFENUMERATION"
+             "DEFOPERATOR" "DEFRECORD"
+             "DEPORT-BOOLEAN" "DEPORT-INTEGER"
+             "DO-DO-BODY" "DOUBLE-FLOAT-RADIX"
+             "ENABLE-INTERRUPT" "ENUMERATION"
+             "FD-STREAM" "FD-STREAM-FD"
+             "FD-STREAM-P" "FIND-IF-IN-CLOSURE"
+             "FOREIGN-SYMBOL-ADDRESS" "FOREIGN-SYMBOL-ADDRESS-AS-INTEGER"
+             "GET-PAGE-SIZE" "GET-SYSTEM-INFO"
+             "IGNORE-INTERRUPT"
+             "INT-SAP" "INVALIDATE-DESCRIPTOR" "IO-TIMEOUT"
+             "LISP-STREAM" "LONG-FLOAT-RADIX" "LONG-WORDS"
+             "MACRO" "MAKE-FD-STREAM" "MAKE-OBJECT-SET" "MAP-PORT"
+             "NATURALIZE-BOOLEAN" "NATURALIZE-INTEGER"
+             "NULL-TERMINATED-STRING" "OBJECT-SET-OPERATION"
+             "OS-COLD-INIT-OR-REINIT" "OS-CONTEXT-T" "OUTPUT-RAW-BYTES"
+             "PARSE-BODY" "PERQ-STRING" "POINTER"
+             "POINTER<" "POINTER>" "PORT" "POSITIVE-PRIMEP" "PUSH-USING-SETQ"
+             "READ-N-BYTES" "REALLOCATE-SYSTEM-MEMORY" "RECORD-SIZE"
+             "REMOVE-FD-HANDLER" "REMOVE-PORT-DEATH-HANDLER"
+             "REMOVE-PORT-OBJECT"
+             "RESOLVE-LOADED-ASSEMBLER-REFERENCES"
+             "SAP+" "SAP-" "SAP-INT" "SAP-INT-TYPE"
+             "SAP-REF-16" "SAP-REF-32" "SAP-REF-64" "SAP-REF-8"
+             "SAP-REF-DESCRIPTOR"
+             "SAP-REF-DOUBLE" "SAP-REF-LONG"
+             "SAP-REF-SAP" "SAP-REF-SINGLE"
+             "SAP<" "SAP<=" "SAP=" "SAP>" "SAP>="
+             "SCRUB-CONTROL-STACK" "SERVE-ALL-EVENTS"
+             "SERVE-EVENT" "SERVER" "SERVER-MESSAGE"
+             "SHORT-FLOAT-RADIX"
+             "SIGNED-SAP-REF-16" "SIGNED-SAP-REF-32"
+             "SIGNED-SAP-REF-64" "SIGNED-SAP-REF-8"
+             "SINGLE-FLOAT-RADIX" "SYMBOL-MACRO-LET"
+             "SYSTEM-AREA-POINTER" "SYSTEM-AREA-POINTER-P" "VECTOR-SAP"
+             "WAIT-UNTIL-FD-USABLE" "WITH-ENABLED-INTERRUPTS"
+             "WITH-FD-HANDLER"
+             "WITH-INTERRUPTS" "WITH-REPLY-PORT" "WITHOUT-GCING"
+             "WITHOUT-INTERRUPTS" "WORDS"
+             "ALLOCATE-SYSTEM-MEMORY-AT"
+             "GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS"))
+
+ #s(sb-cold:package-data
+    :name "SB!UNIX"
+    :doc
+"private: a wrapper layer for SBCL itself to use when talking
+with an underlying Unix-y operating system.
+This was a public package in CMU CL, but that was different.
+CMU CL's UNIX package tried to provide a comprehensive,
+stable Unix interface suitable for the end user.
+This package only tries to implement what happens to be
+needed by the current implementation of SBCL, and makes
+no guarantees of interface stability."
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS" "SB!EXT" "SB!INT")
+    :export ("CADDR-T" "D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN"
+             "DADDR-T" "DEV-T" "DIRECT" "EXECGRP" "EXECOTH" "EXECOWN" "F-DUPFD"
+             "F-GETFD" "F-GETFL" "F-GETOWN" "F-SETFD" "F-SETFL" "F-SETOWN"
+             "FAPPEND" "FASYNC" "FCREAT" "FEXCL" "FIONREAD" "FNDELAY" "FTRUNC"
+             "F_OK" "GET-UNIX-ERROR-MSG" "GET-ERRNO" "GID-T"
+	     "INO-T" "IT-INTERVAL" "IT-VALUE"
+	     "ITIMERVAL" "UNIX-SETITIMER" "UNIX-GETITIMER"
+             "KBDCGET" "KBDCRESET" "KBDCRST" "KBDCSET"
+             "KBDCSSTD" "KBDGCLICK" "KBDSCLICK" "KBDSGET" "L_INCR" "L_SET"
+             "L_XTND" "OFF-T" "O_APPEND" "O_CREAT" "O_EXCL" "O_RDONLY" "O_RDWR"
+             "O_TRUNC" "O_WRONLY" "READGRP" "READOTH" "READOWN" "RLIM-CUR"
+             "RLIM-MAX" "RLIMIT" "RU-IDRSS" "RU-INBLOCK" "RU-ISRSS" "RU-IXRSS"
+             "RU-MAJFLT" "RU-MAXRSS" "RU-MINFLT" "RU-MSGRCV" "RU-MSGSND"
+             "RU-NIVCSW" "RU-NSIGNALS" "RU-NSWAP" "RU-NVCSW" "RU-OUBLOCK"
+             "RU-STIME" "RU-UTIME" "RUSAGE_CHILDREN" "RUSAGE_SELF" "RUSEAGE"
+             "R_OK" "S-IEXEC" "S-IFBLK" "S-IFCHR" "S-IFDIR" "S-IFLNK" "S-IFMT"
+             "S-IFREG" "S-IFSOCK" "S-IREAD" "S-ISGID" "S-ISUID" "S-ISVTX"
+             "S-IWRITE" "SAVETEXT" "SC-MASK" "SC-ONSTACK" "SC-PC" "SETGIDEXEC"
+             "SETUIDEXEC" "SG-ERASE" "SG-FLAGS" "SG-ISPEED" "SG-KILL"
+             "SG-OSPEED" "SGTTYB" "SIZE-T" "ST-ATIME" "ST-BLKSIZE"
+             "ST-BLOCKS" "ST-CTIME" "ST-DEV" "ST-GID" "ST-MODE" "ST-MTIME"
+             "ST-NLINK" "ST-RDEV" "ST-SIZE" "ST-UID" "STAT" "SWBLK-T" "T-BRKC"
+             "T-DSUSPC" "T-EOFC" "T-FLUSHC" "T-INTRC" "T-LNEXTC" "T-QUITC"
+             "T-RPRNTC" "T-STARTC" "T-STOPC" "T-SUSPC" "T-WERASC" "TCHARS"
+             "TERMINAL-SPEEDS" "TIME-T" "TIMEVAL" "TIMEZONE" "TIOCFLUSH"
+             "TIOCGETC" "TIOCGETP" "TIOCGLTC" "TIOCGPGRP" "TIOCGWINSZ"
+             "TIOCNOTTY" "TIOCSETC" "TIOCSETP" "TIOCSLTC" "TIOCSPGRP"
+             "TIOCSWINSZ" "TTY-CBREAK" "TTY-CRMOD" "TTY-LCASE"
+             "TTY-RAW" "TTY-TANDEM" "TV-SEC" "TV-USEC" "TZ-DSTTIME"
+             "TZ-MINUTESWEST" "UID-T" "UNIX-ACCEPT" "UNIX-ACCESS" "UNIX-BIND"
+             "UNIX-CHDIR" "UNIX-CHMOD" "UNIX-CHOWN" "UNIX-CLOSE" "UNIX-CONNECT"
+             "UNIX-CREAT" "UNIX-CURRENT-DIRECTORY" "UNIX-DUP" "UNIX-DUP2"
+             "UNIX-EXECVE" "UNIX-EXIT" "UNIX-FCHMOD" "UNIX-FCHOWN"
+             "UNIX-FCNTL" "UNIX-FD" "UNIX-FILE-MODE" "UNIX-FORK" "UNIX-FSTAT"
+             "UNIX-FSYNC" "UNIX-FTRUNCATE" "UNIX-GETDTABLESIZE" "UNIX-GETEGID"
+             "UNIX-GETGID" "UNIX-GETHOSTID" "UNIX-GETHOSTNAME"
+             "UNIX-GETPAGESIZE"  "UNIX-GETPEERNAME" "UNIX-GETPGRP"
+             "UNIX-GETPID" "UNIX-GETPPID" "UNIX-GETRUSAGE"
+             "UNIX-GETSOCKNAME" "UNIX-GETTIMEOFDAY" "UNIX-GETUID" "UNIX-GID"
+             "UNIX-IOCTL" "UNIX-ISATTY" "UNIX-LINK" "UNIX-LISTEN" "UNIX-LSEEK"
+             "UNIX-LSTAT" "UNIX-MKDIR" "UNIX-OPEN" "UNIX-PATHNAME" "UNIX-PID"
+             "UNIX-PIPE" "UNIX-READ" "UNIX-READLINK" "UNIX-RECV" "UNIX-RENAME"
+             "UNIX-RMDIR" "UNIX-SELECT" "UNIX-SEND" "UNIX-SETPGRP"
+             "UNIX-SETREGID" "UNIX-SETREUID" "UNIX-SOCKET" "UNIX-STAT"
+             "UNIX-SYMLINK" "UNIX-SYNC"
+             "UNIX-TIMES" "UNIX-TRUNCATE" "UNIX-TTYNAME"
+             "UNIX-UID" "UNIX-UNLINK" "UNIX-UTIMES" "UNIX-WRITE" "WINSIZE"
+             "WRITEGRP" "WRITEOTH" "WRITEOWN" "WS-COL" "WS-ROW" "WS-XPIXEL"
+             "WS-YPIXEL" "W_OK" "X_OK" "SIGSYS" "TCSETPGRP" "FD-ZERO"
+             "SIGEMSG" "SIGQUIT" "SIGCHLD" "SIGSEGV" "FD-CLR" "SIGUSR2"
+             "EALREADY" "SIGPIPE" "EACCES" "CHECK" "SIGXCPU" "EOPNOTSUPP"
+             "SIGFPE" "SIGHUP" "ENOTSOCK" "OPEN-DIR" "SIGMASK" "EINTR"
+             "SIGCONT" "UNIX-RESOLVE-LINKS" "SIGKILL" "EMSGSIZE" "ERANGE"
+             "EPROTOTYPE" "UNIX-SIGNAL-NUMBER" "EPFNOSUPPORT" "SIGILL"
+             "EDOM" "UNIX-SIGPAUSE" "EDQUOT" "FD-SETSIZE" "SIGTSTP"
+             "EAFNOSUPPORT" "TCGETPGRP" "EMFILE" "ECONNRESET"
+             "EADDRNOTAVAIL" "SIGALRM" "ENETDOWN" "EVICEOP"
+             "UNIX-FAST-GETRUSAGE" "EPERM" "SIGINT" "EXDEV" "EDEADLK"
+             "ENOSPC" "ECONNREFUSED" "SIGWINCH" "ENOPROTOOPT" "ESRCH"
+             "EUSERS" "SIGVTALRM" "ENOTCONN" "ESUCCESS" "EPIPE"
+             "UNIX-SIMPLIFY-PATHNAME" "EISCONN" "FD-ISSET" "SIGMSG"
+             "ESHUTDOWN" "EBUSY" "SIGTERM" "ENAMETOOLONG" "EMLINK"
+             "EADDRINUSE" "SIGBUS" "ERESTART" "TTY-PROCESS-GROUP"
+             "UNIX-SIGNAL-NAME" "ETIMEDOUT" "ECHILD" "EFBIG" "SIGTRAP"
+             "UNIX-KILLPG" "ENOTBLK" "SIGIOT" "SIGUSR1" "ECONNABORTED"
+             "EHOSTUNREACH" "EBADF" "EINVAL" "FD-SET" "CLOSE-DIR" "EISDIR"
+             "SIGTTIN" "UNIX-KILL" "ENOTDIR" "EHOSTDOWN" "E2BIG" "ESPIPE"
+             "UNIX-FAST-SELECT" "ENXIO" "ENOTTY" "ELOOP" "LTCHARS"
+             "UNIX-SIGNAL-DESCRIPTION" "SIGXFSZ" "EINPROGRESS" "ENOENT"
+             "EPROTONOSUPPORT" "UNIX-SIGBLOCK" "SIGIO" "ENOMEM" "SIGEMT"
+             "EFAULT" "ENODEV" "EIO" "EVICEERR" "ETXTBSY" "EWOULDBLOCK"
+             "EAGAIN" "EDESTADDRREQ" "ENOEXEC" "ENETUNREACH" "ENOTEMPTY"
+             "READ-DIR" "UNIX-MAYBE-PREPEND-CURRENT-DIRECTORY" "ENFILE"
+             "SIGTTOU" "EEXIST" "SIGPROF" "SIGSTOP" "ENETRESET" "SIGURG"
+             "ENOBUFS" "EPROCLIM" "EROFS" "ETOOMANYREFS" "UNIX-FILE-KIND"
+             "ELOCAL" "UNIX-SIGSETMASK" "EREMOTE" "ESOCKTNOSUPPORT"
+             "TIOCSIGSEND" "SIGWAITING"
+             "C-IFLAG" "UNIX-TCGETATTR" "C-LFLAG" "C-OFLAG"
+             "C-CFLAG" "TCSAFLUSH" "C-CC" "SIOCSPGRP" "TERMIOS"
+             "UNIX-TCSETATTR" "O_NDELAY" "O_NOCTTY"
+             "O_NONBLOCK" "TCSANOW" "TCSADRAIN" "TCIFLUSH" "TCOFLUSH"
+             "TCIOFLUSH" "UNIX-CFGETOSPEED" "UNIX-CFSETOSPEED"
+             "UNIX-CFGETISPEED" "UNIX-CFSETISPEED"
+             "TTY-IGNBRK" "TTY-BRKINT" "TTY-IGNPAR" "TTY-PARMRK"
+             "TTY-INPCK" "TTY-ISTRIP" "TTY-INLCR" "TTY-IGNCR" "TTY-ICRNL"
+             "TTY-IUCLC" "TTY-IXON" "TTY-IXANY" "TTY-IXOFF" "TTY-IENQAK"
+             "TTY-IMAXBEL" "TTY-OPOST" "TTY-OLCUC" "TTY-ONLCR" "TTY-OCRNL"
+             "TTY-ONOCR" "TTY-ONLRET" "TTY-OFILL" "TTY-OFDEL" "TTY-ISIG"
+             "TTY-ICANON" "TTY-XCASE" "TTY-ECHO" "TTY-ECHOE" "TTY-ECHOK"
+             "TTY-ECHONL" "TTY-NOFLSH" "TTY-IEXTEN" "TTY-TOSTOP" "TTY-ECHOCTL"
+             "TTY-ECHOPRT" "TTY-ECHOKE"  "TTY-DEFECHO" "TTY-FLUSHO"
+             "TTY-PENDIN" "TTY-CSTOPB" "TTY-CREAD" "TTY-PARENB" "TTY-PARODD"
+             "TTY-HUPCL" "TTY-CLOCAL" "RCV1EN" "XMT1EN" "TTY-LOBLK" "VINTR"
+             "VQUIT" "VERASE" "VKILL" "VEOF" "VEOL" "VEOL2" "TTY-CBAUD"
+             "TTY-CSIZE" "TTY-CS5" "TTY-CS6" "TTY-CS7" "TTY-CS8" "VMIN" "VTIME"
+             "VSUSP" "VSTART" "VSTOP" "VDSUSP" "UNIX-TCSENDBREAK"
+             "UNIX-TCDRAIN" "UNIX-TCFLUSH" "UNIX-TCFLOW"
+             #!+(or svr4 bsd linux) "O_NDELAY"
+             #!+(or svr4 linux) ("EADDRINUSE" "EADDRNOTAVAIL" "EADV"
+                                 "EAFNOSUPPORT" "EALREADY" "EBADE" "EBADFD"
+                                 "EBADMSG" "EBADR" "EBADRQC"
+                                 "EBADSLT" "EBFONT" #!+svr4 "ECANCELED"
+                                 "ECHRNG" "ECOMM" "ECONNABORTED"
+                                 "ECONNREFUSED" "ECONNRESET" "EDEADLK"
+                                 "EDEADLOCK" "EDESTADDRREQ" #!+linux "EDOTDOT"
+                                 #!+linux "EDQUOT" "EHOSTDOWN" "EHOSTUNREACH"
+                                 "EIDRM" "EILSEQ" "EINPROGRESS"
+                                 "EISCONN" #!+linux "EISNAM" "EL2HLT"
+                                 "EL2NSYNC" "EL3HLT" "EL3RST" "ELIBACC"
+                                 "ELIBBAD" "ELIBEXEC" "ELIBMAX" "ELIBSCN"
+                                 "ELNRNG" "ELOOP" "EMSGSIZE" "EMULTIHOP"
+                                 "ENAMETOOLONG" #!+linux "ENAVAIL"
+                                 "ENETDOWN" "ENETRESET" "ENETUNREACH" "ENOANO"
+                                 "ENOBUFS" "ENOCSI" "ENODATA" "ENOLCK"
+                                 "ENOLINK" "ENOMSG" "ENONET" "ENOPKG"
+                                 "ENOPROTOOPT" "ENOSR" "ENOSTR" "ENOSYS"
+                                 "ENOTCONN" "ENOTEMPTY" #!+linux "ENOTNAM"
+                                 "ENOTSOCK" #!+svr4 "ENOTSUP" "ENOTUNIQ"
+                                 "EOPNOTSUPP" "EOVERFLOW" "EPFNOSUPPORT"
+                                 "EPROTO" "EPROTONOSUPPORT" "EPROTOTYPE"
+                                 "EREMCHG" "EREMOTE" #!+linux "EREMOTEIO"
+                                 "ERESTART" "ESHUTDOWN" "ESOCKTNOSUPPORT"
+                                 "ESRMNT" "ESTALE" "ESTRPIPE" "ETIME"
+                                 "ETIMEDOUT" "ETOOMANYREFS" #!+linux "EUCLEAN"
+                                 "EUNATCH" "EUSERS" "EWOULDBLOCK" "EXFULL")))
+
+ #s(sb-cold:package-data
+    :name "SB!VM"
+    :doc
+"internal: the default place to hide information about the hardware and data
+structure representations"
+    :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!ASSEM"
+          "SB!C" "SB!C-CALL" "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS" "SB!UNIX")
+    :export ("*ASSEMBLY-UNIT-LENGTH*" "*PRIMITIVE-OBJECTS*"
+             "AFTER-BREAKPOINT-TRAP"
+             "ANY-REG-SC-NUMBER" "ARRAY-DATA-SLOT" "ARRAY-DIMENSIONS-OFFSET"
+             "ARRAY-DISPLACED-P-SLOT" "ARRAY-DISPLACEMENT-SLOT"
+             "ARRAY-ELEMENTS-SLOT" "ARRAY-FILL-POINTER-P-SLOT"
+             "ARRAY-FILL-POINTER-SLOT" "ATOMIC-FLAG" "BASE-CHAR-REG-SC-NUMBER"
+             "BASE-CHAR-STACK-SC-NUMBER" "BASE-CHAR-TYPE"
+             "BIGNUM-DIGITS-OFFSET" "BIGNUM-TYPE" "BINDING-SIZE"
+             "BINDING-SYMBOL-SLOT" "BINDING-VALUE-SLOT" "BREAKPOINT-TRAP"
+             "BYTE-CODE-CLOSURE-TYPE" "BYTE-CODE-FUNCTION-TYPE"
+             "BYTE-BITS" "BYTE-REG-SC-NUMBER"
+             "CATCH-BLOCK-CURRENT-CODE-SLOT"
+             "CATCH-BLOCK-CURRENT-CONT-SLOT" "CATCH-BLOCK-CURRENT-UWP-SLOT"
+             "CATCH-BLOCK-ENTRY-PC-SLOT" "CATCH-BLOCK-PREVIOUS-CATCH-SLOT"
+             "CATCH-BLOCK-SC-NUMBER" "CATCH-BLOCK-SIZE" "CATCH-BLOCK-SIZE-SLOT"
+             "CATCH-BLOCK-TAG-SLOT" "CERROR-TRAP"
+             "CLOSURE-FUNCTION-HEADER-TYPE" "CLOSURE-FUNCTION-SLOT"
+             "CLOSURE-HEADER-TYPE" "CLOSURE-INFO-OFFSET"
+             "CODE-CODE-SIZE-SLOT" "CODE-CONSTANTS-OFFSET"
+             "CODE-DEBUG-INFO-SLOT" "CODE-ENTRY-POINTS-SLOT" "CODE-HEADER-TYPE"
+             "CODE-TRACE-TABLE-OFFSET-SLOT" "COMPLEX-ARRAY-TYPE"
+             "COMPLEX-BIT-VECTOR-TYPE" "COMPLEX-DOUBLE-FLOAT-FILLER-SLOT"
+             "COMPLEX-DOUBLE-FLOAT-IMAG-SLOT" "COMPLEX-DOUBLE-FLOAT-REAL-SLOT"
+             "COMPLEX-DOUBLE-FLOAT-SIZE" "COMPLEX-DOUBLE-FLOAT-TYPE"
+             "COMPLEX-DOUBLE-REG-SC-NUMBER" "COMPLEX-DOUBLE-STACK-SC-NUMBER"
+             "COMPLEX-IMAG-SLOT" "COMPLEX-REAL-SLOT"
+             "COMPLEX-LONG-FLOAT-IMAG-SLOT" "COMPLEX-LONG-FLOAT-REAL-SLOT"
+             "COMPLEX-LONG-FLOAT-SIZE" "COMPLEX-LONG-FLOAT-TYPE"
+             "COMPLEX-LONG-REG-SC-NUMBER" "COMPLEX-LONG-STACK-SC-NUMBER"
+             "COMPLEX-SINGLE-FLOAT-IMAG-SLOT" "COMPLEX-SINGLE-FLOAT-REAL-SLOT"
+             "COMPLEX-SINGLE-FLOAT-SIZE" "COMPLEX-SINGLE-FLOAT-TYPE"
+             "COMPLEX-SINGLE-REG-SC-NUMBER" "COMPLEX-SINGLE-STACK-SC-NUMBER"
+             "COMPLEX-SIZE" "COMPLEX-STRING-TYPE" "COMPLEX-TYPE"
+             "COMPLEX-VECTOR-TYPE" "CONS-CAR-SLOT" "CONS-CDR-SLOT"
+             "CONS-SIZE" "CONSTANT-SC-NUMBER"
+             "CONTEXT-FLOATING-POINT-MODES" "CONTEXT-FLOAT-REGISTER"
+             "CONTEXT-PC" "CONTEXT-REGISTER"
+             "CONTROL-STACK-FORK" "CONTROL-STACK-RESUME"
+             "CONTROL-STACK-RETURN" "CONTROL-STACK-SC-NUMBER" "COUNT-NO-OPS"
+             "CURRENT-FLOAT-TRAP" "DEFINE-FOR-EACH-PRIMITIVE-OBJECT"
+             "DESCRIPTOR-REG-SC-NUMBER" "DESCRIPTOR-VS-NON-DESCRIPTOR-STORAGE"
+             "DOUBLE-FLOAT-EXPONENT-BYTE" "DOUBLE-FLOAT-BIAS"
+             "DOUBLE-FLOAT-DIGITS" "DOUBLE-FLOAT-EXPONENT-BYTE"
+             "DOUBLE-FLOAT-FILLER-SLOT" "DOUBLE-FLOAT-HIDDEN-BIT"
+             "DOUBLE-FLOAT-NORMAL-EXPONENT-MAX"
+             "DOUBLE-FLOAT-NORMAL-EXPONENT-MIN" "DOUBLE-FLOAT-SIGNIFICAND-BYTE"
+             "DOUBLE-FLOAT-SIZE" "DOUBLE-FLOAT-TRAPPING-NAN-BIT"
+             "DOUBLE-FLOAT-TYPE" "DOUBLE-FLOAT-VALUE-SLOT"
+             "DOUBLE-INT-CARG-REG-SC-NUMBER" "DOUBLE-REG-SC-NUMBER"
+             "DOUBLE-STACK-SC-NUMBER"
+             "ERROR-TRAP" "EVEN-FIXNUM-TYPE"
+             "EXPORTED-STATIC-SYMBOLS" "EXTERN-ALIEN-NAME"
+             "FDEFN-FUNCTION-SLOT" "FDEFN-NAME-SLOT" "FDEFN-RAW-ADDR-SLOT"
+             "FDEFN-SIZE" "FDEFN-TYPE" "FIND-HOLES" "FIXNUMIZE"
+             "FIXUP-CODE-OBJECT" "FLOAT-DENORMAL-TRAP-BIT"
+             "FLOAT-DIVIDE-BY-ZERO-TRAP-BIT"
+             "FLOAT-IMPRECISE-TRAP-BIT" "FLOAT-INVALID-TRAP-BIT"
+             "FLOAT-OVERFLOW-TRAP-BIT" "FLOAT-SIGN-SHIFT"
+             "FLOAT-UNDERFLOW-TRAP-BIT" "FLOATING-POINT-MODES"
+             "FORWARDING-POINTER-TYPE"
+             "FP-CONSTANT-SC-NUMBER"
+             "FP-DOUBLE-ZERO-SC-NUMBER" "FP-SINGLE-ZERO-SC-NUMBER"
+             "FUNCALLABLE-INSTANCE-FUNCTION-SLOT"
+             "FUNCALLABLE-INSTANCE-HEADER-TYPE"
+             "FUNCALLABLE-INSTANCE-INFO-OFFSET"
+             "FUNCTION-ARGLIST-SLOT" "FUNCTION-CODE-OFFSET"
+             "FUNCTION-END-BREAKPOINT-TRAP" "FUNCTION-HEADER-ARGLIST-SLOT"
+             "FUNCTION-HEADER-CODE-OFFSET" "FUNCTION-HEADER-NAME-SLOT"
+             "FUNCTION-HEADER-NEXT-SLOT" "FUNCTION-HEADER-SELF-SLOT"
+             "FUNCTION-HEADER-TYPE" "FUNCTION-HEADER-TYPE-SLOT"
+             "FUNCTION-NAME-SLOT" "FUNCTION-NEXT-SLOT" "FUNCTION-POINTER-TYPE"
+             "FUNCTION-SELF-SLOT" "FUNCTION-TYPE-SLOT"
+             "FUNCALLABLE-INSTANCE-LAYOUT-SLOT"
+             "FUNCALLABLE-INSTANCE-LEXENV-SLOT"
+             "GENESIS" "HALT-TRAP" "IGNORE-ME-SC-NUMBER"
+             "IMMEDIATE-BASE-CHAR-SC-NUMBER" "IMMEDIATE-SAP-SC-NUMBER"
+             "IMMEDIATE-SC-NUMBER"
+             "INSTANCE-HEADER-TYPE" "INSTANCE-POINTER-TYPE"
+             "INSTANCE-SLOTS-OFFSET" "INSTANCE-USAGE"
+             "INTERIOR-REG-SC-NUMBER" "INTERNAL-ERROR-ARGUMENTS"
+             "INTERRUPTED-FLAG" "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-TYPE"
+             "LONG-FLOAT-BIAS" "LONG-FLOAT-DIGITS" "LONG-FLOAT-EXPONENT-BYTE"
+             "LONG-FLOAT-HIDDEN-BIT" "LONG-FLOAT-NORMAL-EXPONENT-MAX"
+             "LONG-FLOAT-NORMAL-EXPONENT-MIN" "LONG-FLOAT-SIGNIFICAND-BYTE"
+             "LONG-FLOAT-SIZE" "LONG-FLOAT-TRAPPING-NAN-BIT" "LONG-FLOAT-TYPE"
+             "LONG-FLOAT-VALUE-SLOT" "LONG-REG-SC-NUMBER"
+             "LONG-STACK-SC-NUMBER"
+             "LOWTAG-BITS" "LOWTAG-LIMIT" "LOWTAG-MASK"
+             "MEMORY-USAGE" "MOST-POSITIVE-COST"
+             "NEGATIVE-IMMEDIATE-SC-NUMBER" "NON-DESCRIPTOR-REG-SC-NUMBER"
+             "NULL-SC-NUMBER" "OBJECT-NOT-LIST-TRAP" "OBJECT-NOT-INSTANCE-TRAP"
+             "ODD-FIXNUM-TYPE" "OFFSET-STATIC-SYMBOL" "OTHER-IMMEDIATE-0-TYPE"
+             "OTHER-IMMEDIATE-1-TYPE" "OTHER-POINTER-TYPE"
+             "PAD-DATA-BLOCK" "PENDING-INTERRUPT-TRAP"
+             "PRIMITIVE-OBJECT" "PRIMITIVE-OBJECT-HEADER"
+             "PRIMITIVE-OBJECT-LOWTAG" "PRIMITIVE-OBJECT-NAME"
+             "PRIMITIVE-OBJECT-OPTIONS" "PRIMITIVE-OBJECT-P"
+             "PRIMITIVE-OBJECT-SIZE" "PRIMITIVE-OBJECT-SLOTS"
+             "PRIMITIVE-OBJECT-VARIABLE-LENGTH" "PRINT-ALLOCATED-OBJECTS"
+             "RANDOM-IMMEDIATE-SC-NUMBER" "RATIO-DENOMINATOR-SLOT"
+             "RATIO-NUMERATOR-SLOT" "RATIO-SIZE" "RATIO-TYPE"
+             "REGISTER-SAVE-PENALTY" "RETURN-PC-HEADER-TYPE"
+             "RETURN-PC-RETURN-POINT-OFFSET" "SANCTIFY-FOR-EXECUTION"
+             "SAP-POINTER-SLOT" "SAP-REG-SC-NUMBER" "SAP-SIZE"
+             "SAP-STACK-SC-NUMBER" "SAP-TYPE"
+             "SIGFPE-HANDLER" "SIGNED-REG-SC-NUMBER" "SIGNED-STACK-SC-NUMBER"
+             "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-TYPE"
+             "SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-TYPE"
+             "SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-TYPE"
+             "SIMPLE-ARRAY-DOUBLE-FLOAT-TYPE"
+             "SIMPLE-ARRAY-LONG-FLOAT-TYPE"
+             "SIMPLE-ARRAY-SINGLE-FLOAT-TYPE"
+             "SIMPLE-ARRAY-TYPE" "SIMPLE-ARRAY-UNSIGNED-BYTE-16-TYPE"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-2-TYPE"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-32-TYPE"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-4-TYPE"
+             "SIMPLE-ARRAY-UNSIGNED-BYTE-8-TYPE"
+             "SIMPLE-ARRAY-SIGNED-BYTE-16-TYPE"
+             "SIMPLE-ARRAY-SIGNED-BYTE-30-TYPE"
+             "SIMPLE-ARRAY-SIGNED-BYTE-32-TYPE"
+             "SIMPLE-ARRAY-SIGNED-BYTE-8-TYPE"
+             "SIMPLE-BIT-VECTOR-TYPE"
+             "SIMPLE-STRING-TYPE" "SIMPLE-VECTOR-TYPE" "SINGLE-FLOAT-BIAS"
+             "SINGLE-FLOAT-DIGITS" "SINGLE-FLOAT-EXPONENT-BYTE"
+             "SINGLE-FLOAT-HIDDEN-BIT" "SINGLE-FLOAT-NORMAL-EXPONENT-MAX"
+             "SINGLE-FLOAT-NORMAL-EXPONENT-MIN" "SINGLE-FLOAT-SIGNIFICAND-BYTE"
+             "SINGLE-FLOAT-SIZE" "SINGLE-FLOAT-TRAPPING-NAN-BIT"
+             "SINGLE-FLOAT-TYPE" "SINGLE-FLOAT-VALUE-SLOT"
+             "SINGLE-INT-CARG-REG-SC-NUMBER"
+             "SINGLE-REG-SC-NUMBER" "SINGLE-STACK-SC-NUMBER"
+             "SINGLE-STEP-BREAKPOINT-TRAP"
+             "SINGLE-VALUE-RETURN-BYTE-OFFSET" "SLOT-DOCS"
+             "SLOT-LENGTH" "SLOT-NAME" "SLOT-OFFSET" "SLOT-OPTIONS"
+             "SLOT-REST-P" "*STATIC-FUNCTIONS*" "STATIC-FUNCTION-OFFSET"
+             "STATIC-SYMBOL-OFFSET" "STATIC-SYMBOL-P" "*STATIC-SYMBOLS*"
+             "STRUCTURE-USAGE" "SYMBOL-FUNCTION-SLOT"
+             "SYMBOL-HASH-SLOT" "SYMBOL-HEADER-TYPE" "SYMBOL-NAME-SLOT"
+             "SYMBOL-PACKAGE-SLOT" "SYMBOL-PLIST-SLOT"
+             "SYMBOL-RAW-FUNCTION-ADDR-SLOT" "SYMBOL-SETF-FUNCTION-SLOT"
+             "SYMBOL-SIZE" "SYMBOL-UNUSED-SLOT" "SYMBOL-VALUE-SLOT"
+             "TARGET-BINDING-STACK-START" "TARGET-BYTE-ORDER"
+             "TARGET-CONTROL-STACK-START" "*TARGET-DYNAMIC-SPACE-START*"
+             "TARGET-FASL-CODE-FORMAT" "TARGET-FASL-FILE-TYPE"
+             "TARGET-HEAP-ADDRESS-SPACE" "*TARGET-MOST-NEGATIVE-FIXNUM*"
+             "*TARGET-MOST-POSITIVE-FIXNUM*" "*TARGET-READ-ONLY-SPACE-START*"
+             "*TARGET-STATIC-SPACE-START*" "TRACE-TABLE-CALL-SITE"
+             "TRACE-TABLE-FUNCTION-EPILOGUE" "TRACE-TABLE-FUNCTION-PROLOGUE"
+             "TRACE-TABLE-NORMAL" "TYPE-BITS" "TYPE-MASK" "UNBOUND-MARKER-TYPE"
+             "UNSIGNED-IMMEDIATE-SC-NUMBER"
+             "UNSIGNED-REG-SC-NUMBER" "UNSIGNED-STACK-SC-NUMBER"
+             "UNWIND-BLOCK-CURRENT-CODE-SLOT" "UNWIND-BLOCK-CURRENT-CONT-SLOT"
+             "UNWIND-BLOCK-CURRENT-UWP-SLOT" "UNWIND-BLOCK-ENTRY-PC-SLOT"
+             "UNWIND-BLOCK-SIZE" "VALUE-CELL-HEADER-TYPE" "VALUE-CELL-SIZE"
+             "VALUE-CELL-VALUE-SLOT" "VECTOR-DATA-OFFSET" "VECTOR-LENGTH-SLOT"
+             "VECTOR-MUST-REHASH-SUBTYPE" "VECTOR-NORMAL-SUBTYPE"
+             "VECTOR-VALID-HASHING-SUBTYPE"
+             "WEAK-POINTER-BROKEN-SLOT" "WEAK-POINTER-NEXT-SLOT"
+             "WEAK-POINTER-SIZE" "WEAK-POINTER-TYPE" "WEAK-POINTER-VALUE-SLOT"
+             "WORD" "WORD-BITS" "WORD-BYTES" "WORD-REG-SC-NUMBER" "WORD-SHIFT"
+             "ZERO-SC-NUMBER"))
+
+ #s(sb-cold:package-data
+    :name "SB!WALKER"
+    :doc "internal: a code walker used by PCL"
+    :use ("CL")
+    :export ("DEFINE-WALKER-TEMPLATE" "WALK-FORM"
+             "*WALK-FORM-EXPAND-MACROS-P*" "NESTED-WALK-FORM"
+             "VARIABLE-LEXICAL-P" "VARIABLE-SPECIAL-P"
+             "VARIABLE-GLOBALLY-SPECIAL-P"
+             "*VARIABLE-DECLARATIONS*" "VARIABLE-DECLARATION"
+             "MACROEXPAND-ALL")))

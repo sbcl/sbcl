@@ -1,0 +1,16 @@
+the function calling convention
+
+%ECX is used for a count of function argument words, represented as a
+fixnum, so it can also be thought of as a count of function argument
+bytes.
+
+The first three arguments are stored in registers. The remaining
+arguments are stored on the stack.
+
+The comments at the head of DEFINE-VOP (MORE-ARG) explain that
+;;; More args are stored contiguously on the stack, starting immediately at the
+;;; context pointer. The context pointer is not typed, so the lowtag is 0.
+
+?? Once we switch into more-arg arrangement, %ecx no longer seems to be 
+   used for argument count (judging from my walkthrough of kw arg parsing
+   code while troubleshooting cold boot problems)

@@ -1,0 +1,189 @@
+    Accumulation of half-understood design decisions eventually
+    chokes a program as a water weed chokes a canal. By refactoring
+    you can ensure that your full understanding of how the program
+    should be designed is always reflected in the program. As a
+    water weed quickly spreads its tendrils, partially understood
+    design decisions quickly spread their effects throughout your
+    program. No one or two or even ten individual actions will be
+    enough to eradicate the problem.
+       -- Martin Fowler, _Refactoring: Improving the Design
+          of Existing Code_, p. 360 
+===============================================================================
+some things that I'd like to do in 0.6.x, in no particular order:
+-------------------------------------------------------------------------------
+PROBLEM:
+	    The batch-related command line options for SBCL don't work
+	properly.
+	    A small part of making them work properly is making sure that
+	verbose GC messages end up piped to error output.
+	    Make sure that when the system dies due to an unhandled error
+	in batch mode, the error is printed successfully, whether
+	FINISH-OUTPUT or an extra newline or whatever is required.
+	    Make sure that make.sh dies gracefully when one of the SBCLs
+	it's running dies with an error.
+MUSING:
+	    Actually, the ANSI *DEBUGGER-HOOK* variable might be a better
+	place to put the die-on-unhandled-error functionality.
+FIX:
+	??
+-------------------------------------------------------------------------------
+PROBLEM:
+	    As long as I'm working on the batch-related command-line options,
+	it would be reasonable to add one more option to "do what I'd want",
+	testing standard input for TTY-ness and running in no-programmer
+	mode if so.
+FIX:
+	?? Do it.
+-------------------------------------------------------------------------------
+PROBLEM:
+	    In order to make a well-behaved backtrace when a batch program
+	terminates abnormally, it should be limited in length.
+FIX:
+	?? Add a *DEBUG-BACKTRACE-COUNT* variable, initially set to 64,
+	  to provide a default for the COUNT argument to BACKTRACE.
+-------------------------------------------------------------------------------
+PROBLEM:
+	    I used CMU CL for years, and dozens of times I cursed the
+	inadequate breakpoint-based TRACE facility which doesn't work on
+	some functions, and I never realized that there's a wrapper-based
+	facility too until I was wading through the source code for SBCL.
+	    Yes, I know I should have RTFM, but there is a lot of M..
+FIX:
+	?? possibility 1: Add error-handling code in ntrace.lisp to
+	  catch failure to set breakpoints and retry using 
+	  wrapper-based tracing.
+	?? possibility 2: Add error-handling code in ntrace.lisp to
+	  catch failure to catch failure to set breakpoints and output
+	  a message suggesting retrying with wrapper-based breakpoints
+	?? possibility 3: Fix the breakpoint-based TRACE facility so that
+	  it always works.
+-------------------------------------------------------------------------------
+PROBLEM:
+	    When cross-compiling host-byte-comp.lisp, I get bogus
+	warnings
+		caught STYLE-WARNING:
+		  undefined function: %%DEFCONSTANT
+		caught STYLE-WARNING:
+		  This function is undefined:
+		  %%DEFCONSTANT
+MUSING:
+	    The best way to clean this up would be as a side-effect of
+	a larger cleanup, making all the %%DEFFOO stuff use EVAL-WHEN
+	instead of IR1 magic.
+	    There's probably some way to do it with a quick local hack too.
+FIX:
+	??
+-------------------------------------------------------------------------------
+PROBLEM:
+	    My system of parallel build directories doesn't seem to add value.
+FIX:
+	?? Replace it with a system where fasl output files live in the 
+	  same directories as the sources and have names a la
+	  "foo.fasl-from-host and "foo.fasl-from-xc".
+-------------------------------------------------------------------------------
+PROBLEM:
+	    It might be good to use the syntax (DEBUGGER-SPECIAL *PRINT-LEVEL*)
+	etc. to control the in-the-debug-context special variables. Then we 
+	wouldn't have to pick and choose which variables we shadow in the
+	debugger.
+	    The shadowing values could also be made persistent between
+	debugger invocations, so that entering the debugger, doing
+	(SETF *PRINT-LEVEL* 2), and exiting the debugger would leave
+	(DEBUGGER-SPECIAL *PRINT-LEVEL*) set to 2, and upon reentry to the
+	debugger, *PRINT-LEVEL* would be set back to 2.
+FIX:
+	??
+-------------------------------------------------------------------------------
+PROBLEM:
+	    The :SB-TEST target feature should do something.
+FIX:
+	??
+-------------------------------------------------------------------------------
+PROBLEM:
+	    I still haven't cleaned up the cut-and-paste programming in 
+		* DEF-BOOLEAN-ATTRIBUTE, DELETEF-IN, and PUSH-IN
+		* SB!SYS:DEF!MACRO ASSEMBLE and SB!XC:DEFMACRO ASSEMBLE
+FIX:
+	??
+-------------------------------------------------------------------------------
+PROBLEM:
+	    We be able to get rid of the IR1 interpreter, which would
+	not only get rid of all the code in *eval*.lisp, but also allow us to
+	reduce the number of special cases elsewhere in the system. (Try
+	grepping for 'interpret' sometime.:-) Making this usable might
+	require cleaning up %DEFSTRUCT, %DEFUN, etc. to use EVAL-WHEN
+	instead of IR1 transform magic, which would be a good
+	thing in itself, but might be a fair amount of work.)
+FIX:
+	?? Delete, delete, delete.
+-------------------------------------------------------------------------------
+PROBLEM:
+	    The hashing code is new and should be tested.
+FIX:
+	?? Enable the existing test code.
+-------------------------------------------------------------------------------
+PROBLEM:
+	    My ad hoc system of revision control is looking pretty clunky,
+	and I've pretty much stopped doing stuff to confuse CVS (like moving
+	directories around).
+FIX:
+	?? Check into CVS. 
+	?? Make sure that the tags in FILE-COMMENTs expand correctly.
+	?? See about automatically propagating version information 
+	   from CVS into the runtime.c banner message and the 
+	   LISP-IMPLEMENTATION-VERSION string.
+===============================================================================
+other known issues with no particular target date:
+
+user manual including, at a minimum, updated versions of the
+CMU CL user manual information on the compiler and the alien
+interface
+
+bugs listed on the man page
+
+more regression tests
+
+various bugs fixed in CMUCL since this code was forked off of it
+ca. 19980801, since most of these haven't been fixed yet in SBCL
+
+byte compilation of appropriate parts of the system, so that the
+system core isn't so big
+
+uninterning needed-only-at-init-time stuff after init is complete,
+so that the system core isn't so big
+
+Search for unused external symbols (ones which are not bound, fbound,
+types, or whatever, and also have no other uses as e.g. flags) and
+delete them. This should make the system core a little smaller, but
+is mostly useful just to make the source code smaller and simpler.
+
+The eventual plan is for SBCL to bootstrap itself in two phases. In
+the first phase, the cross-compilation host is any old ANSI Common
+Lisp (not necessarily SBCL) and the cross-compiler won't handle some
+optimizations because the code it uses to implement them is not
+portable. In the second phase, the cross-compilation host will be
+required to be a compatible version of SBCL, and the cross-compiler
+will take advantage of that to implement all optimizations. The
+current version of SBCL only knows how to do the first of those two
+phases, with a fully-portable cross-compiler, so some optimizations
+are not done. Probably the most important consequence of this is that
+because the fully-portable cross-compiler isn't very smart about
+dealing with immediate values which are of specialized array type
+(e.g. (SIMPLE-ARRAY (UNSIGNED-BYTE 4) 1)) the system sometimes has to
+use unnecessarily-general array types internally.
+
+adding new FOPs to provide something like CMU CL's FOP-SYMBOL-SAVE and
+FOP-SMALL-SYMBOL-SAVE functionality, so that fasl files will be more
+compact. (FOP-SYMBOL-SAVE used *PACKAGE*, which was concise but allowed
+obscure bugs. Something like FOP-LAST-PACKAGE-SYMBOL-SAVE could have
+much of the same conciseness advantage without the bugs.)
+
+hundreds of FIXME notes in the sources from WHN
+
+various other unfinished business from CMU CL and before, marked with 
+  "XX" or "XXX" or "###" or "***" or "???" or "pfw" or "@@@@" or "zzzzz"
+or probably also other codes that I haven't noticed or have forgotten.
+
+(Things marked as KLUDGE are in general things which are ugly or
+confusing, but that, for whatever reason, may stay that way
+indefinitely.)

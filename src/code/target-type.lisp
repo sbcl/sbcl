@@ -1,0 +1,212 @@
+;;;; type-related stuff which exists only in the target SBCL runtime
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!KERNEL")
+
+(file-comment
+  "$Header$")
+
+(!begin-collecting-cold-init-forms)
+
+;;; Just call %TYPEP.
+;;;
+;;; Note that when cross-compiling, SB!XC:TYPEP is interpreted as
+;;; a test that the host Lisp object OBJECT translates to a target SBCL
+;;; type TYPE. (This behavior is needed e.g. to test for the validity of
+;;; numeric subtype bounds read when cross-compiling.)
+;;;
+;;; KLUDGE: In classic CMU CL this was wrapped in a (DECLAIM (START-BLOCK
+;;; TYPEP %TYPEP CLASS-CELL-TYPEP)) to make calls efficient. Once I straighten
+;;; out bootstrapping and cross-compiling issues it'd likely be a good idea to
+;;; do this again. -- WHN 19990413
+(defun typep (object type)
+  #!+sb-doc
+  "Return T iff OBJECT is of type TYPE."
+  (%typep object type))
+
+;;; If Type is a type that we can do a compile-time test on, then return the
+;;; whether the object is of that type as the first value and second value
+;;; true. Otherwise return NIL, NIL.
+;;;
+;;; We give up on unknown types and pick off FUNCTION and UNION types. For
+;;; structure types, we require that the type be defined in both the current
+;;; and compiler environments, and that the INCLUDES be the same.
+(defun ctypep (obj type)
+  (declare (type ctype type))
+  (etypecase type
+    ((or numeric-type
+	 named-type
+	 member-type
+	 array-type
+	 sb!xc:built-in-class)
+     (values (%typep obj type) t))
+    (sb!xc:class
+     (if (if (csubtypep type (specifier-type 'funcallable-instance))
+	     (funcallable-instance-p obj)
+	     (typep obj 'instance))
+	 (if (eq (class-layout type)
+		 (info :type :compiler-layout (sb!xc:class-name type)))
+	     (values (sb!xc:typep obj type) t)
+	     (values nil nil))
+	 (values nil t)))
+    (union-type
+     (dolist (mem (union-type-types type) (values nil t))
+       (multiple-value-bind (val win) (ctypep obj mem)
+	 (unless win (return (values nil nil)))
+	 (when val (return (values t t))))))
+    (function-type
+     (values (functionp obj) t))
+    (unknown-type
+     (values nil nil))
+    (alien-type-type
+     (values (alien-typep obj (alien-type-type-alien-type type)) t))
+    (hairy-type
+     ;; Now the tricky stuff.
+     (let* ((hairy-spec (hairy-type-specifier type))
+	    (symbol (if (consp hairy-spec) (car hairy-spec) hairy-spec)))
+       (ecase symbol
+	 (and
+	  (if (atom hairy-spec)
+	      (values t t)
+	      (dolist (spec (cdr hairy-spec) (values t t))
+		(multiple-value-bind (res win)
+		    (ctypep obj (specifier-type spec))
+		  (unless win (return (values nil nil)))
+		  (unless res (return (values nil t)))))))
+	 (not
+	  (multiple-value-bind (res win)
+	      (ctypep obj (specifier-type (cadr hairy-spec)))
+	    (if win
+		(values (not res) t)
+		(values nil nil))))
+	 (satisfies
+	  ;; KLUDGE: This stuff might well blow up if we tried to execute it
+	  ;; when cross-compiling. But since for the foreseeable future the
+	  ;; only code we'll try to cross-compile is SBCL itself, and SBCL is
+	  ;; built without using SATISFIES types, it's arguably not important
+	  ;; to worry about this. -- WHN 19990210.
+	  (let ((fun (second hairy-spec)))
+	    (cond ((and (consp fun)
+			(eq (car fun) 'lambda))
+		   (values (not (null (funcall (coerce fun 'function) obj)))
+			   t))
+		  ((and (symbolp fun) (fboundp fun))
+		   (values (not (null (funcall fun obj))) t))
+		  (t
+		   (values nil nil))))))))))
+
+;;; LAYOUT-OF  --  Exported
+;;;
+;;;    Return the layout for an object. This is the basic operation for
+;;; finding out the "type" of an object, and is used for generic function
+;;; dispatch. The standard doesn't seem to say as much as it should about what
+;;; this returns for built-in objects. For example, it seems that we must
+;;; return NULL rather than LIST when X is NIL so that GF's can specialize on
+;;; NULL.
+#!-sb-fluid (declaim (inline layout-of))
+(defun layout-of (x)
+  (declare (optimize (speed 3) (safety 0)))
+  (cond ((typep x 'instance) (%instance-layout x))
+	((funcallable-instance-p x) (%funcallable-instance-layout x))
+	((null x)
+	 ;; Note: was #.((CLASS-LAYOUT (SB!XC:FIND-CLASS 'NULL))).
+	 ;; I (WHN 19990209) replaced this with an expression evaluated at
+	 ;; run time in order to make it easier to build the cross-compiler.
+	 ;; If it doesn't work, something else will be needed..
+	 (locally
+	   ;; KLUDGE: In order to really make it run at run time (instead of
+	   ;; doing some weird broken thing at cold load time),
+	   ;; we need to suppress a DEFTRANSFORM.. -- WHN 19991004
+	   (declare (notinline sb!xc:find-class))
+	   (class-layout (sb!xc:find-class 'null))))
+	(t (svref *built-in-class-codes* (get-type x)))))
+
+#!-sb-fluid (declaim (inline sb!xc:class-of))
+(defun sb!xc:class-of (object)
+  #!+sb-doc
+  "Return the class of the supplied object, which may be any Lisp object, not
+   just a CLOS STANDARD-OBJECT."
+  (layout-class (layout-of object)))
+
+;;; Pull the type specifier out of a function object.
+(defun extract-function-type (fun)
+  (if (sb!eval:interpreted-function-p fun)
+      (sb!eval:interpreted-function-type fun)
+      (typecase fun
+	(byte-function (byte-function-type fun))
+	(byte-closure (byte-function-type (byte-closure-function fun)))
+	(t
+	 (specifier-type (%function-type (%closure-function fun)))))))
+
+;;;; miscellaneous interfaces
+
+;;; Clear memoization of all type system operations that can be altered by
+;;; type definition/redefinition.
+(defun clear-type-caches ()
+  (when *type-system-initialized*
+    (dolist (sym '(values-specifier-type-cache-clear
+		   values-type-union-cache-clear
+		   type-union-cache-clear
+		   values-subtypep-cache-clear
+		   csubtypep-cache-clear
+		   type-intersection-cache-clear
+		   values-type-intersection-cache-clear))
+      (funcall (symbol-function sym))))
+  (values))
+
+;;; Like TYPE-OF, only we return a CTYPE structure instead of a type specifier,
+;;; and we try to return the type most useful for type checking, rather than
+;;; trying to come up with the one that the user might find most informative.
+(declaim (ftype (function (t) ctype) ctype-of))
+(defun-cached (ctype-of
+	       :hash-function (lambda (x) (logand (sxhash x) #x1FF))
+	       :hash-bits 9
+	       :init-wrapper !cold-init-forms)
+	      ((x eq))
+  (typecase x
+    (function
+     (if (funcallable-instance-p x)
+	 (sb!xc:class-of x)
+	 (extract-function-type x)))
+    (symbol
+     (make-member-type :members (list x)))
+    (number
+     (let* ((num (if (complexp x) (realpart x) x))
+	    (res (make-numeric-type
+		  :class (etypecase num
+			   (integer 'integer)
+			   (rational 'rational)
+			   (float 'float))
+		  :format (if (floatp num)
+			      (float-format-name num)
+			      nil))))
+       (cond ((complexp x)
+	      (setf (numeric-type-complexp res) :complex)
+	      (let ((imag (imagpart x)))
+		(setf (numeric-type-low res) (min num imag))
+		(setf (numeric-type-high res) (max num imag))))
+	     (t
+	      (setf (numeric-type-low res) num)
+	      (setf (numeric-type-high res) num)))
+       res))
+    (array
+     (let ((etype (specifier-type (array-element-type x))))
+       (make-array-type :dimensions (array-dimensions x)
+			:complexp (not (typep x 'simple-array))
+			:element-type etype
+			:specialized-element-type etype)))
+    (t
+     (sb!xc:class-of x))))
+
+;;; Clear this cache on GC so that we don't hold onto too much garbage.
+(pushnew 'ctype-of-cache-clear *before-gc-hooks*)
+
+(!defun-from-collected-cold-init-forms !target-type-cold-init)

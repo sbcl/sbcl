@@ -1,0 +1,608 @@
+;;;; a tracing facility based on breakpoints
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB-DEBUG")
+
+(file-comment
+  "$Header$")
+
+;;; FIXME: Why, oh why, doesn't the SB-DEBUG package use the SB-DI package?
+;;; That would let us get rid of a whole lot of stupid prefixes..
+
+(defvar *trace-values* nil
+  #+sb-doc
+  "This is bound to the returned values when evaluating :BREAK-AFTER and
+   :PRINT-AFTER forms.")
+
+(defvar *trace-indentation-step* 2
+  #+sb-doc
+  "the increase in trace indentation at each call level")
+
+(defvar *max-trace-indentation* 40
+  #+sb-doc
+  "If the trace indentation exceeds this value, then indentation restarts at
+   0.")
+
+(defvar *trace-encapsulate-default* :default
+  #+sb-doc
+  "the default value for the :ENCAPSULATE option to TRACE")
+
+;;;; internal state
+
+;;; a hash table that maps each traced function to the TRACE-INFO. The entry
+;;; for a closure is the shared function-entry object.
+(defvar *traced-functions* (make-hash-table :test 'eq))
+
+;;; A TRACE-INFO object represents all the information we need to trace a
+;;; given function.
+(def!struct (trace-info
+	     (:make-load-form-fun sb-kernel:just-dump-it-normally)
+	     (:print-object (lambda (x stream)
+			      (print-unreadable-object (x stream :type t)
+				(prin1 (trace-info-what x) stream)))))
+  ;; the original representation of the thing traced
+  (what nil :type (or function cons symbol))
+  ;; Is WHAT a function name whose definition we should track?
+  (named nil)
+  ;; Is tracing to be done by encapsulation rather than breakpoints?
+  ;; T implies NAMED.
+  (encapsulated *trace-encapsulate-default*)
+  ;; Has this trace been untraced?
+  (untraced nil)
+  ;; breakpoints we set up to trigger tracing
+  (start-breakpoint nil :type (or sb-di:breakpoint null))
+  (end-breakpoint nil :type (or sb-di:breakpoint null))
+  ;; the list of function names for WHEREIN, or NIL if unspecified
+  (wherein nil :type list)
+
+  ;; The following slots represent the forms that we are supposed to evaluate
+  ;; on each iteration. Each form is represented by a cons (Form . Function),
+  ;; where the Function is the cached result of coercing Form to a function.
+  ;; Forms which use the current environment are converted with
+  ;; PREPROCESS-FOR-EVAL, which gives us a one-arg function.
+  ;; Null environment forms also have one-arg functions, but the argument is
+  ;; ignored. NIL means unspecified (the default.)
+
+  ;; current environment forms
+  (condition nil)
+  (break nil)
+  ;; List of current environment forms
+  (print () :type list)
+  ;; null environment forms
+  (condition-after nil)
+  (break-after nil)
+  ;; list of null environment forms
+  (print-after () :type list))
+
+;;; This is a list of conses (function-end-cookie .
+;;; condition-satisfied), which we use to note distinct dynamic
+;;; entries into functions. When we enter a traced function, we add a
+;;; entry to this list holding the new end-cookie and whether the
+;;; trace condition was satisfied. We must save the trace condition so
+;;; that the after breakpoint knows whether to print. The length of
+;;; this list tells us the indentation to use for printing TRACE
+;;; messages.
+;;;
+;;; This list also helps us synchronize the TRACE facility dynamically
+;;; for detecting non-local flow of control. Whenever execution hits a
+;;; :function-end breakpoint used for TRACE'ing, we look for the
+;;; function-end-cookie at the top of *traced-entries*. If it is not
+;;; there, we discard any entries that come before our cookie.
+;;;
+;;; When we trace using encapsulation, we bind this variable and add
+;;; (NIL . CONDITION-SATISFIED), so a NIL "cookie" marks an
+;;; encapsulated tracing.
+(defvar *traced-entries* ())
+(declaim (list *traced-entries*))
+
+;;; This variable is used to discourage infinite recursions when some trace
+;;; action invokes a function that is itself traced. In this case, we quietly
+;;; ignore the inner tracing.
+(defvar *in-trace* nil)
+
+;;;; utilities
+
+;;;    Given a function name, a function or a macro name, return the raw
+;;; definition and some information. "Raw"  means that if the result is a
+;;; closure, we strip off the closure and return the bare code. The second
+;;; value is T if the argument was a function name. The third value is one of
+;;; :COMPILED, :COMPILED-CLOSURE, :INTERPRETED, :INTERPRETED-CLOSURE and
+;;; :FUNCALLABLE-INSTANCE.
+(defun trace-fdefinition (x)
+  (multiple-value-bind (res named-p)
+      (typecase x
+	(symbol
+	 (cond ((special-operator-p x)
+		(error "can't trace special form ~S" x))
+	       ((macro-function x))
+	       (t
+		(values (fdefinition x) t))))
+	(function x)
+	(t (values (fdefinition x) t)))
+    (if (sb-eval:interpreted-function-p res)
+	(values res named-p (if (sb-eval:interpreted-function-closure res)
+				:interpreted-closure :interpreted))
+	(case (sb-kernel:get-type res)
+	  (#.sb-vm:closure-header-type
+	   (values (sb-kernel:%closure-function res)
+		   named-p
+		   :compiled-closure))
+	  (#.sb-vm:funcallable-instance-header-type
+	   (values res named-p :funcallable-instance))
+	  (t (values res named-p :compiled))))))
+
+;;; When a function name is redefined, and we were tracing that name, then
+;;; untrace the old definition and trace the new one.
+(defun trace-redefined-update (fname new-value)
+  (when (fboundp fname)
+    (let* ((fun (trace-fdefinition fname))
+	   (info (gethash fun *traced-functions*)))
+      (when (and info (trace-info-named info))
+	(untrace-1 fname)
+	(trace-1 fname info new-value)))))
+(push #'trace-redefined-update sb-int:*setf-fdefinition-hook*)
+
+;;; Annotate some forms to evaluate with pre-converted functions. Each form
+;;; is really a cons (exp . function). Loc is the code location to use for
+;;; the lexical environment. If Loc is NIL, evaluate in the null environment.
+;;; If Form is NIL, just return NIL.
+(defun coerce-form (form loc)
+  (when form
+    (let ((exp (car form)))
+      (if (sb-di:code-location-p loc)
+	  (let ((fun (sb-di:preprocess-for-eval exp loc)))
+	    (cons exp
+		  #'(lambda (frame)
+		      (let ((*current-frame* frame))
+			(funcall fun frame)))))
+	  (let* ((bod (ecase loc
+			((nil) exp)
+			(:encapsulated
+			 `(flet ((sb-debug:arg (n)
+				   (declare (special argument-list))
+				   (elt argument-list n)))
+			    (declare (ignorable #'sb-debug:arg))
+			    ,exp))))
+		 (fun (coerce `(lambda () ,bod) 'function)))
+	    (cons exp
+		  #'(lambda (frame)
+		      (declare (ignore frame))
+		      (let ((*current-frame* nil))
+			(funcall fun)))))))))
+(defun coerce-form-list (forms loc)
+  (mapcar #'(lambda (x) (coerce-form x loc)) forms))
+
+;;; Print indentation according to the number of trace entries.
+;;; Entries whose condition was false don't count.
+(defun print-trace-indentation ()
+  (let ((depth 0))
+    (dolist (entry *traced-entries*)
+      (when (cdr entry) (incf depth)))
+    (format t
+	    "~@V,0T~D: "
+	    (+ (mod (* depth *trace-indentation-step*)
+		    (- *max-trace-indentation* *trace-indentation-step*))
+	       *trace-indentation-step*)
+	    depth)))
+
+;;; Return true if one of the Names appears on the stack below Frame.
+(defun trace-wherein-p (frame names)
+  (do ((frame (sb-di:frame-down frame) (sb-di:frame-down frame)))
+      ((not frame) nil)
+    (when (member (sb-di:debug-function-name (sb-di:frame-debug-function
+					      frame))
+		  names
+		  :test #'equal)
+      (return t))))
+
+;;; Handle print and print-after options.
+(defun trace-print (frame forms)
+  (dolist (ele forms)
+    (fresh-line)
+    (print-trace-indentation)
+    (format t "~S = ~S" (car ele) (funcall (cdr ele) frame))))
+
+;;; Test a break option, and break if true.
+(defun trace-maybe-break (info break where frame)
+  (when (and break (funcall (cdr break) frame))
+    (sb-di:flush-frames-above frame)
+    (let ((*stack-top-hint* frame))
+      (break "breaking ~A traced call to ~S:"
+	     where
+	     (trace-info-what info)))))
+
+;;; This function discards any invalid cookies on our simulated stack.
+;;; Encapsulated entries are always valid, since we bind *traced-entries* in
+;;; the encapsulation.
+(defun discard-invalid-entries (frame)
+  (loop
+    (when (or (null *traced-entries*)
+	      (let ((cookie (caar *traced-entries*)))
+		(or (not cookie)
+		    (sb-di:function-end-cookie-valid-p frame cookie))))
+      (return))
+    (pop *traced-entries*)))
+
+;;;; hook functions
+
+;;; Return a closure that can be used for a function start breakpoint hook
+;;; function and a closure that can be used as the FUNCTION-END-COOKIE
+;;; function. The first communicates the sense of the Condition to the second
+;;; via a closure variable.
+(defun trace-start-breakpoint-fun (info)
+  (let (conditionp)
+    (values
+     #'(lambda (frame bpt)
+	 (declare (ignore bpt))
+	 (discard-invalid-entries frame)
+	 (let ((condition (trace-info-condition info))
+	       (wherein (trace-info-wherein info)))
+	   (setq conditionp
+		 (and (not *in-trace*)
+		      (or (not condition)
+			  (funcall (cdr condition) frame))
+		      (or (not wherein)
+			  (trace-wherein-p frame wherein)))))
+
+	 (when conditionp
+	   (let ((sb-kernel:*current-level* 0)
+		 (*standard-output* *trace-output*)
+		 (*in-trace* t))
+	     (fresh-line)
+	     (print-trace-indentation)
+	     (if (trace-info-encapsulated info)
+		 (locally (declare (special basic-definition argument-list))
+		   (prin1 `(,(trace-info-what info) ,@argument-list)))
+		 (print-frame-call frame))
+	     (terpri)
+	     (trace-print frame (trace-info-print info)))
+	   (trace-maybe-break info (trace-info-break info) "before" frame)))
+
+     #'(lambda (frame cookie)
+	 (declare (ignore frame))
+	 (push (cons cookie conditionp) *traced-entries*)))))
+
+;;; This prints a representation of the return values delivered.
+;;; First, this checks to see that cookie is at the top of
+;;; *traced-entries*; if it is not, then we need to adjust this list
+;;; to determine the correct indentation for output. We then check to
+;;; see whether the function is still traced and that the condition
+;;; succeeded before printing anything.
+(defun trace-end-breakpoint-fun (info)
+  #'(lambda (frame bpt *trace-values* cookie)
+      (declare (ignore bpt))
+      (unless (eq cookie (caar *traced-entries*))
+	(setf *traced-entries*
+	      (member cookie *traced-entries* :key #'car)))
+
+      (let ((entry (pop *traced-entries*)))
+	(when (and (not (trace-info-untraced info))
+		   (or (cdr entry)
+		       (let ((cond (trace-info-condition-after info)))
+			 (and cond (funcall (cdr cond) frame)))))
+	  (let ((sb-kernel:*current-level* 0)
+		(*standard-output* *trace-output*)
+		(*in-trace* t))
+	    (fresh-line)
+	    (pprint-logical-block (*standard-output* nil)
+	      (print-trace-indentation)
+	      (pprint-indent :current 2)
+	      (format t "~S returned" (trace-info-what info))
+	      (dolist (v *trace-values*)
+		(write-char #\space)
+		(pprint-newline :linear)
+		(prin1 v)))
+	    (terpri)
+	    (trace-print frame (trace-info-print-after info)))
+	  (trace-maybe-break info
+			     (trace-info-break-after info)
+			     "after"
+			     frame)))))
+
+;;; This function is called by the trace encapsulation. It calls the
+;;; breakpoint hook functions with NIL for the breakpoint and cookie, which
+;;; we have cleverly contrived to work for our hook functions.
+(defun trace-call (info)
+  (multiple-value-bind (start cookie) (trace-start-breakpoint-fun info)
+    (let ((frame (sb-di:frame-down (sb-di:top-frame))))
+      (funcall start frame nil)
+      (let ((*traced-entries* *traced-entries*))
+	(declare (special basic-definition argument-list))
+	(funcall cookie frame nil)
+	(let ((vals
+	       (multiple-value-list
+		(apply basic-definition argument-list))))
+	  (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
+	  (values-list vals))))))
+
+;;; Trace one function according to the specified options. We copy the
+;;; trace info (it was a quoted constant), fill in the functions, and then
+;;; install the breakpoints or encapsulation.
+;;;
+;;; If non-null, Definition is the new definition of a function that we are
+;;; automatically retracing.
+(defun trace-1 (function-or-name info &optional definition)
+  (multiple-value-bind (fun named kind)
+      (if definition
+	  (values definition t
+		  (nth-value 2 (trace-fdefinition definition)))
+	  (trace-fdefinition function-or-name))
+    (when (gethash fun *traced-functions*)
+      ;; FIXME: should be STYLE-WARNING
+      (warn "Function ~S is already TRACE'd, retracing it." function-or-name)
+      (untrace-1 fun))
+
+    (let* ((debug-fun (sb-di:function-debug-function fun))
+	   (encapsulated
+	    (if (eq (trace-info-encapsulated info) :default)
+		(ecase kind
+		  (:compiled nil)
+		  (:compiled-closure
+		   (unless (functionp function-or-name)
+		     (warn "Tracing shared code for ~S:~%  ~S"
+			   function-or-name
+			   fun))
+		   nil)
+		  ((:interpreted :interpreted-closure :funcallable-instance)
+		   t))
+		(trace-info-encapsulated info)))
+	   (loc (if encapsulated
+		    :encapsulated
+		    (sb-di:debug-function-start-location debug-fun)))
+	   (info (make-trace-info
+		  :what function-or-name
+		  :named named
+		  :encapsulated encapsulated
+		  :wherein (trace-info-wherein info)
+		  :condition (coerce-form (trace-info-condition info) loc)
+		  :break (coerce-form (trace-info-break info) loc)
+		  :print (coerce-form-list (trace-info-print info) loc)
+		  :break-after (coerce-form (trace-info-break-after info) nil)
+		  :condition-after
+		  (coerce-form (trace-info-condition-after info) nil)
+		  :print-after
+		  (coerce-form-list (trace-info-print-after info) nil))))
+
+      (dolist (wherein (trace-info-wherein info))
+	(unless (or (stringp wherein)
+		    (fboundp wherein))
+	  (warn ":WHEREIN name ~S is not a defined global function."
+		wherein)))
+
+      (cond
+       (encapsulated
+	(unless named
+	  (error "can't use encapsulation to trace anonymous function ~S"
+		 fun))
+	(sb-int:encapsulate function-or-name 'trace `(trace-call ',info)))
+       (t
+	(multiple-value-bind (start-fun cookie-fun)
+	    (trace-start-breakpoint-fun info)
+	  (let ((start (sb-di:make-breakpoint start-fun debug-fun
+					      :kind :function-start))
+		(end (sb-di:make-breakpoint
+		      (trace-end-breakpoint-fun info)
+		      debug-fun :kind :function-end
+		      :function-end-cookie cookie-fun)))
+	    (setf (trace-info-start-breakpoint info) start)
+	    (setf (trace-info-end-breakpoint info) end)
+	    ;; The next two forms must be in the order in which they appear,
+	    ;; since the start breakpoint must run before the function-end
+	    ;; breakpoint's start helper (which calls the cookie function.)
+	    ;; One reason is that cookie function requires that the CONDITIONP
+	    ;; shared closure variable be initialized.
+	    (sb-di:activate-breakpoint start)
+	    (sb-di:activate-breakpoint end)))))
+
+      (setf (gethash fun *traced-functions*) info)))
+
+  function-or-name)
+
+;;;; the TRACE macro
+
+;;; Parse leading trace options off of SPECS, modifying INFO accordingly. The
+;;; remaining portion of the list is returned when we encounter a plausible
+;;; function name.
+(defun parse-trace-options (specs info)
+  (let ((current specs))
+    (loop
+      (when (endp current) (return))
+      (let ((option (first current))
+	    (value (cons (second current) nil)))
+	(case option
+	  (:report (error "stub: The :REPORT option is not yet implemented."))
+	  (:condition (setf (trace-info-condition info) value))
+	  (:condition-after
+	   (setf (trace-info-condition info) (cons nil nil))
+	   (setf (trace-info-condition-after info) value))
+	  (:condition-all
+	   (setf (trace-info-condition info) value)
+	   (setf (trace-info-condition-after info) value))
+	  (:wherein
+	   (setf (trace-info-wherein info)
+		 (if (listp (car value)) (car value) value)))
+	  (:encapsulate
+	   (setf (trace-info-encapsulated info) (car value)))
+	  (:break (setf (trace-info-break info) value))
+	  (:break-after (setf (trace-info-break-after info) value))
+	  (:break-all
+	   (setf (trace-info-break info) value)
+	   (setf (trace-info-break-after info) value))
+	  (:print
+	   (setf (trace-info-print info)
+		 (append (trace-info-print info) (list value))))
+	  (:print-after
+	   (setf (trace-info-print-after info)
+		 (append (trace-info-print-after info) (list value))))
+	  (:print-all
+	   (setf (trace-info-print info)
+		 (append (trace-info-print info) (list value)))
+	   (setf (trace-info-print-after info)
+		 (append (trace-info-print-after info) (list value))))
+	  (t (return)))
+	(pop current)
+	(unless current
+	  (error "missing argument to ~S TRACE option" option))
+	(pop current)))
+    current))
+
+;;; Compute the expansion of TRACE in the non-trivial case (arguments
+;;; specified.)  If there are no :FUNCTION specs, then don't use a LET. This
+;;; allows TRACE to be used without the full interpreter.
+(defun expand-trace (specs)
+  (collect ((binds)
+	    (forms))
+    (let* ((global-options (make-trace-info))
+	   (current (parse-trace-options specs global-options)))
+      (loop
+	(when (endp current) (return))
+	(let ((name (pop current))
+	      (options (copy-trace-info global-options)))
+	  (cond
+	   ((eq name :function)
+	    (let ((temp (gensym)))
+	      (binds `(,temp ,(pop current)))
+	      (forms `(trace-1 ,temp ',options))))
+	   ((and (keywordp name)
+		 (not (or (fboundp name) (macro-function name))))
+	    (error "unknown TRACE option: ~S" name))
+	   (t
+	    (forms `(trace-1 ',name ',options))))
+	  (setq current (parse-trace-options current options)))))
+
+    (if (binds)
+	`(let ,(binds) (list ,@(forms)))
+	`(list ,@(forms)))))
+
+(defun %list-traced-functions ()
+  (loop for x being each hash-value in *traced-functions*
+	collect (trace-info-what x)))
+
+(defmacro trace (&rest specs)
+  #+sb-doc
+  "TRACE {Option Global-Value}* {Name {Option Value}*}*
+   TRACE is a debugging tool that provides information when specified functions
+   are called. In its simplest form:
+       (trace Name-1 Name-2 ...)
+   (The Names are not evaluated.)
+
+   Options allow modification of the default behavior. Each option is a pair
+   of an option keyword and a value form. Global options are specified before
+   the first name, and affect all functions traced by a given use of TRACE.
+   Options may also be interspersed with function names, in which case they
+   act as local options, only affecting tracing of the immediately preceding
+   function name. Local options override global options.
+
+   By default, TRACE causes a printout on *TRACE-OUTPUT* each time that
+   one of the named functions is entered or returns. (This is the
+   basic, ANSI Common Lisp behavior of TRACE.) As an SBCL extension, the
+   :REPORT SB-EXT:PROFILE option can be used to instead cause information
+   to be silently recorded to be inspected later using the SB-EXT:PROFILE
+   function.
+
+   The following options are defined:
+
+   :REPORT Report-Type
+       If Report-Type is TRACE (the default) then information is reported
+       by printing immediately. If Report-Type is SB-EXT:PROFILE, information
+       is recorded for later summary by calls to SB-EXT:PROFILE. If
+       Report-Type is NIL, then the only effect of the trace is to execute
+       other options (e.g. PRINT or BREAK).
+
+   :CONDITION Form
+   :CONDITION-AFTER Form
+   :CONDITION-ALL Form
+       If :CONDITION is specified, then TRACE does nothing unless Form
+       evaluates to true at the time of the call. :CONDITION-AFTER is
+       similar, but suppresses the initial printout, and is tested when the
+       function returns. :CONDITION-ALL tries both before and after.
+
+   :BREAK Form
+   :BREAK-AFTER Form
+   :BREAK-ALL Form
+       If specified, and Form evaluates to true, then the debugger is invoked
+       at the start of the function, at the end of the function, or both,
+       according to the respective option. 
+
+   :PRINT Form
+   :PRINT-AFTER Form
+   :PRINT-ALL Form
+       In addition to the usual printout, the result of evaluating Form is
+       printed at the start of the function, at the end of the function, or
+       both, according to the respective option. Multiple print options cause
+       multiple values to be printed.
+
+   :WHEREIN Names
+       If specified, Names is a function name or list of names. TRACE does
+       nothing unless a call to one of those functions encloses the call to
+       this function (i.e. it would appear in a backtrace.)  Anonymous
+       functions have string names like \"DEFUN FOO\". 
+
+   :ENCAPSULATE {:DEFAULT | T | NIL}
+       If T, the tracing is done via encapsulation (redefining the function
+       name) rather than by modifying the function. :DEFAULT is the default,
+       and means to use encapsulation for interpreted functions and funcallable
+       instances, breakpoints otherwise. When encapsulation is used, forms are
+       *not* evaluated in the function's lexical environment, but SB-DEBUG:ARG
+       can still be used.
+
+   :FUNCTION Function-Form
+       This is a not really an option, but rather another way of specifying
+       what function to trace. The Function-Form is evaluated immediately,
+       and the resulting function is traced.
+
+   :CONDITION, :BREAK and :PRINT forms are evaluated in the lexical environment
+   of the called function; SB-DEBUG:VAR and SB-DEBUG:ARG can be used. The
+   -AFTER and -ALL forms are evaluated in the null environment."
+  (if specs
+      (expand-trace specs)
+      '(%list-traced-functions)))
+
+;;;; untracing
+
+;;; Untrace one function.
+(defun untrace-1 (function-or-name)
+  (let* ((fun (trace-fdefinition function-or-name))
+	 (info (gethash fun *traced-functions*)))
+    (cond
+     ((not info)
+      (warn "Function is not TRACEd: ~S" function-or-name))
+     (t
+      (cond
+       ((trace-info-encapsulated info)
+	(sb-int:unencapsulate (trace-info-what info) 'trace))
+       (t
+	(sb-di:delete-breakpoint (trace-info-start-breakpoint info))
+	(sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
+      (setf (trace-info-untraced info) t)
+      (remhash fun *traced-functions*)))))
+
+;;; Untrace all traced functions.
+(defun untrace-all ()
+  (dolist (fun (%list-traced-functions))
+    (untrace-1 fun))
+  t)
+
+(defmacro untrace (&rest specs)
+  #+sb-doc
+  "Remove tracing from the specified functions. With no args, untrace all
+   functions."
+  (if specs
+      (collect ((res))
+	(let ((current specs))
+	  (loop
+	    (unless current (return))
+	    (let ((name (pop current)))
+	      (res (if (eq name :function)
+		       `(untrace-1 ,(pop current))
+		       `(untrace-1 ',name)))))
+	  `(progn ,@(res) t)))
+      '(untrace-all)))

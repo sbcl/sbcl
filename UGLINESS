@@ -1,0 +1,35 @@
+There are a number of hacks that I've used to make the system work
+that even I can see are ugly. Some which come to mind..
+
+It's dependent on being compiled in a rigid sequence, all in a single
+compilation pass, particularly in the cross-compilation phase.
+There's very little support for compiling modules in parallel
+or recompiling the system incrementally.
+
+The way the cross-compiler uses UNCROSS is ugly.
+
+The heavy use of %PYTHON:DEFMACRO to construct basic macros is
+arguably ugly. But it's better than what I tried before that, and the
+system is still slightly contaminated with fallout from what I tried..
+When I was first trying to bootstrap the system, I went off on a wild
+goose chase of trying to define everything (even fundamental macros
+like DEFUN and DEFMACRO) in terms of ordinary functions and Lisp
+special operators. I later realized that I could do without this, but
+a number of the changes that I made to the code while on that chase
+still live on, and the code is unnecessarily unclear because of them.
+
+The contrapuntal intertwingling of the cross-compiler and 
+target Lisp build sequences is, well, baroque.
+
+Using host floating point numbers to represent target floating point
+numbers, or host characters to represent target characters, is theoretically
+shaky. (The characters are OK as long as the characters are
+in the ANSI-guaranteed character set, though.)
+
+Despite my attempts to make the compiler portable, it still makes assumptions
+about the cross-compilation host Common Lisp:
+	Simple bit vectors are distinct from simple vectors (in
+		DEFINE-STORAGE-BASE and elsewhere). (Actually, I'm not sure
+		that things would really break if this weren't so, but I 
+		strongly suspect that they would.)
+	SINGLE-FLOAT is distinct from DOUBLE-FLOAT.

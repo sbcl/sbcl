@@ -1,0 +1,508 @@
+changes in sbcl-0.6.0 relative to sbcl-0.5.0:
+
+* tidied up "make.sh" script
+* tidied up system directory structure
+* better "clean.sh" behavior
+* added doc/FOR-CMUCL-DEVELOPERS
+* many many small tweaks to output format, e.g. removing possibly-confusing
+  trailing #\. character in DESCRIBE-INSTANCE
+* (EQUALP #\A 'A) no longer signals an error.
+* new hashing code, including EQUALP hashing
+* tidied up Lisp initialization and toplevel
+* initialization files (e.g. /etc/sbclrc and $HOME/.sbclrc)
+* command line argument processing
+* added POSIX-GETENV function to deal with Unix-ish environment variables
+* more-Unixy handling of *STANDARD-INPUT* and other Lisp streams, e.g.
+  terminating SBCL on EOF
+* non-verbose GC by default
+* There is no more "sbcl" shell script; the sbcl file is now the C
+  runtime executable (just like CMU CL).
+* removed some unused fops, e.g. FOP-UNIFORM-VECTOR, FOP-CHARACTER, and 
+  FOP-POP-FOR-EFFECT
+* tweaked debug-info.lisp and debug-int.lisp to make the debugger store
+  symbol and package information as Lisp native symbol and package objects
+  instead of strings naming symbols and strings naming packages. This way,
+  whenever packages are renamed (as in warm init), debug information is
+  transformed along with everything else.
+* tweaked the optimization policy declarations which control the building
+  of SBCL itself. Now, among other things, the system no longer saves
+  source location debugging information. (This helps two problems at once
+  by reducing SBCL size and by keeping SBCL from trying to look for its
+  sources -- which may not exist -- when reporting errors.)
+* added src/cold/chill.lisp, to let SBCL read its own cold sources for
+  debugging and testing purposes
+* cleaned up printing, making the printer call PRINT-OBJECT for
+  instances, and using PRINT-UNREADABLE-OBJECT for most PRINT-OBJECT
+  methods, giving nearly-ANSI behavior
+* converted almost all special variables to use *FOO* naming convention
+* deleted PARSE-TIME functionality, since it can be done portably
+* moved some files out of cold init into warm init
+* deleted DEFUN UNDEFINED-VALUE, replaced (UNDEFINED-VALUE) forms
+  with (VALUES) forms
+* regularized formatting of source files
+* added an install.sh script
+* fixed ridiculous memory usage of cross-compiler by making
+  compiler/alloc.lisp not try to do pooling unless it can hook
+  itself into the GC of the cross-compilation host. Now the system
+  builds nicely on my old laptop.
+* added :SB-ALLOC in target-features.lisp-expr
+* deleted mention of :ANSI-DOC from target-features.lisp-expr (since it
+  was not implemented)
+* re-did condition handling and note reporting in the compiler. Notes
+  are no longer handled by signalling conditions. Style warnings
+  and warnings are handled more correctly and reported in such a way
+  that it's easy to find one or the other in your output (so that you
+  can e.g. figure out which of many problems caused COMPILE-FILE to 
+  return FAILURE-P).
+* changed the severity of several compiler warnings from full WARNING
+  to STYLE-WARNING in order to conform with the ANSI spec; also changed
+  compiler note reporting so that it doesn't use the condition system
+  at all (and hence affects neither FAILURE-P nor WARNINGS-P in the 
+  COMPILE-FILE command)
+* made PROCLAIM and DECLAIM conform to ANSI. PROCLAIM is now an ordinary
+  function. As a consequence, START-BLOCK and END-BLOCK declarations are
+  no longer supported, since their implementation was deeply intertwingled
+  with the magical, non-ANSI treatment that PROCLAIM received in CMU CL.
+* removed bogus "support" for compiler macros named (SETF FOO), and
+  removed the compiler macro for SETF INFO (but only after making a fool
+  of myself on the cmucl-imp mailing list by posting a bogus patch for
+  DEFINE-COMPILER-MACRO..)
+* Compiled files containing forms which have side effects on the Lisp
+  reader (such as DEFPACKAGE forms) are now handled more correctly.
+  (Compiler queuing of top level lambdas has been suppressed by setting
+  *TOP-LEVEL-LAMBDA-MAX* to 0. )
+* deleted various currently-unused source files, e.g. gengc.lisp. They
+  may be added back at some point e.g. when porting to other architectures,
+  but until they are it's distracting to distribute them and to try to
+  maintain them.
+* deleted "UNCROSS couldn't recurse through.." style warnings, since 
+  there were so many of them they're just distractions, and UNCROSS is
+  known to be able to handle the current sources
+* moved PROFILE functionality into TRACE, so that it will be clear
+  how the wrapping and unwrapping of functions when you profile them
+  interacts with the wrapping and unwrapping of functions when you
+  trace them. (Actually, the functionality isn't there yet, but at least
+  the interface specification is there. Hopefully, the functionality will
+  arrive with some future maintenance release.)
+* removed host-oops.lisp
+* changed signature of QUIT function to allow UNIX-CODE argument
+* fixed READ-SEQUENCE bug
+* tweaked verbose GC output so that it looks more like the progress
+  output that ANSI specifies for functions like LOAD
+* set up the system on sourceforge.com, with home pages, mailing lists, etc.
+* added <http://sbcl.sourceforge.com> to the banner information printed by
+  the sbcl executable
+
+changes in sbcl-0.6.1 relative to sbcl-0.6.0:
+
+* changed build optimization from (SAFETY 1) to (SAFETY 3) as a short-term
+  fix for various type-unsafety bugs, e.g. failures with (LENGTH 123) and
+  (MAKE-LIST -1). In the longer term, it ought to become true
+  that declarations are assertions even at SAFETY 1. For now, it's not
+  quite true even at SAFETY 3, but it's at least more nearly true..
+  (Note that this change seems to increases the size of the system by
+  O(5%) and to decrease the speed of the compiler by 20% or more.)
+* changed ALIEN printing to be much more abbreviated, as a short-term fix
+  for the problem of printing dozens of lines of distracting information
+  about low-level system machinery as part of the top stack frame
+  on entry to the debugger when an undefined function was called.
+* tweaked the debugger's use of WITH-STANDARD-IO-SYNTAX so that *PACKAGE*
+  is not reset to COMMON-LISP-USER. 
+* Compilation of stuff related to dyncount.lisp has been made conditional
+  on the :SB-DYNCOUNT target feature, so that the ordinary core system is
+  smaller. The various dyncount-related symbols have been moved into
+  a new "SB-DYNCOUNT" package.
+* tty-inspect.lisp has been renamed to inspect.lisp.
+* unix-glibc2.lisp has been renamed to unix.lisp, and the :GLIBC2
+  feature has gone away. (When we eventually port to other flavors of 
+  libc and/or Unix, we'll try to make the differences between flavors
+  invisible at the user level.)
+* Various other *FEATURES* tags, and/or their associated conditionals,
+  have been removed if obsolescent, or given better documentation, or
+  sometimes given more-mnemonic names.
+
+changes in sbcl-0.6.2 relative to sbcl-0.6.1:
+
+* (Note that the way that the PCL macroexpansions were rewritten
+  to accommodate the change in DEFGENERIC below breaks binary
+  compatibility. That is, fasl files compiled under sbcl-0.6.1 may
+  not run under sbcl-0.6.2. Once we get out of alpha releases,
+  i.e. hit release 1.0.0, we'll probably try to maintain binary
+  compatibility between maintenance releases, e.g. between sbcl-1.4.3
+  and sbcl-1.4.4. Until then, however, it might be fairly common
+  for maintenance releases to break binary compatibility.)
+* A bug in the calculation of WARNINGS-P and FAILURE-P in COMPILE-FILE
+  has been fixed.
+* The reporting of unhandled signals has been changed to print some
+  explanatory text as well as the report form. (Previously only
+  the report form was printed.)
+* The macroexpansion for DEFGENERIC now DECLAIMs the function that
+  it defines, so that the compiler no longer issues undefined function
+  warnings for compiled-but-not-yet-loaded generic functions. 
+* The CLTL-style "LISP" and "USER" nicknames for the "COMMON-LISP"
+  and "COMMON-LISP-USER" packages have been removed. Now only the "CL"
+  and "CL-USER" standard nicknames from the "11.1.2 Standardized Packages"
+  section of the ANSI spec are supported.
+* The "" nickname for the "KEYWORD" package has been removed. 
+  The reader still handles symbol tokens which begin with a package marker
+  as keywords, but it doesn't expose its mechanism for doing so in the
+  (PACKAGE-NICKNAMES (FIND-PACKAGE "KEYWORD")) list.
+* The system now issues STYLE-WARNINGs for contradictory TYPE 
+  proclamations. (Warnings for contradictory FTYPE proclamations would
+  be nice too, but those can't be done usefully unless the type system
+  is made smarter about FUNCTION types.)
+* The names of source files "*host-*.lisp" and "*target-*.lisp" have been 
+  systematized, so that "*target-*.lisp is supposed to exist only on the
+  target and imply that there's a related file which exists on the
+  host, and *host-*.lisp is supposed to exist only on the host and imply
+  that there's a related file which exists on the target. This involves a
+  lot of renaming. Hopefully the acute confusion caused by the renaming
+  will be justified by the reduction in chronic confusion..
+  ** runtime-type.lisp    -> early-target-type.lisp
+  ** target-type.lisp     -> late-target-type.lisp
+  ** early-host-format.lisp -> early-format.lisp
+  ** late-host-format.lisp -> late-format.lisp
+  ** host-error.lisp      -> misc-error.lisp
+  ** early-error.lisp     -> early-target-error.lisp
+  ** late-error.lisp      -> late-target-error.lisp
+  ** host-defboot.lisp    -> early-defboot.lisp
+  ** code/misc.lisp       -> code/target-misc.lisp
+  ** code/host-misc.lisp  -> code/misc.lisp
+  ** code/numbers.lisp    -> code/target-numbers.lisp
+  ** code/early-numbers.lisp -> numbers.lisp
+  ** early-host-type.lisp -> early-type.lisp
+  ** late-host-type.lisp  -> late-type.lisp
+  ** host-typep.lisp      -> typep.lisp
+  ** load.lisp            -> target-load.lisp
+  ** host-load.lisp       -> load.lisp
+  ** host-disassem.lisp   -> disassem.lisp
+  ** host-insts.lisp      -> insts.lisp
+  ** byte-comp.lisp       -> target-byte-comp.lisp
+  ** host-byte-comp.lisp  -> byte-comp.lisp
+  ** host-signal.lisp     -> signal.lisp
+  ** host-defstruct.lisp  -> defstruct.lisp
+  ** late-target-type.lisp -> deftypes-for-target.lisp
+  Furthermore, several other previously target-only files foo.lisp (e.g.
+  hash-table.lisp and random.lisp) have been split into a target-and-host
+  foo.lisp file and a target-only target-foo.lisp file, with their key type
+  definitions in the target-and-host part, so that the cross-compiler will
+  know more about target types.
+* DEFSTRUCT BACKEND, and the BACKEND-valued *BACKEND* variable, have 
+  gone away. In their place are various *BACKEND-FOO* variables
+  corresponding to the slots of the old structure.
+* A bug which caused the SB-COLD bootstrap-time package to be propagated
+  into the target SBCL has been fixed.
+* The chill.lisp system for loading cold code into a running SBCL
+  now works better.
+* Support for the CMU CL "scavenger hook" extension has been removed.
+  (It was undocumented and unused in the CMU CL sources that SBCL was
+  derived from, and stale in sbcl-0.6.1.)
+* Various errors in the cross-compiler type system were detected
+  by running the cross-compiler with *TYPE-SYSTEM-INITIALIZED*
+  (enabling various consistency checks). Many of them were fixed,
+  but some hard problems remain, so the compiler is back to 
+  running without *TYPE-SYSTEM-INITIALIZED* for now.
+* As part of the cross-compiler type system cleanup, I implemented
+  DEF!TYPE and got rid of early-ugly-duplicates.lisp.
+* I have started adding UNCROSS calls throughout the type system
+  and the INFO database. (Thus perhaps eventually the blanket UNCROSS
+  on cross-compiler input files will be able to go away, and various
+  kludges with it).
+* CONSTANTP now returns true for quoted forms (as explicitly required
+  by the ANSI spec).
+
+changes in sbcl-0.6.3 relative to sbcl-0.6.2:
+
+* The system still can't cross-compile itself with
+  *TYPE-SYSTEM-INITIALIZED* (and all the consistency checks that
+  entails), but at least it can compile more of itself that way
+  than it used to be able to, and various buglets which were uncovered
+  by trying to cross-compile itself that way have now been fixed.
+* This release breaks binary compatibility again. This time 
+  at least I've incremented the FASL file format version to 2, so that the
+  problem can be detected reliably instead of just causing weird errors.
+* various new style warnings:
+  ** using DEFUN, DEFMETHOD, or DEFGENERIC to overwrite an old definition
+  ** using the deprecated EVAL/LOAD/COMPILE situation names in EVAL-WHEN
+  ** using the lexical binding of a variable named in the *FOO* style
+* DESCRIBE has been substantially rewritten. It now calls DESCRIBE-OBJECT
+  as specified by ANSI.
+* *RANDOM-STATE* is no longer automatically initialized from 
+  (GET-UNIVERSAL-TIME), but instead from a constant seed. Thus, the
+  default behavior of the system is to repeat its behavior every time
+  it's run. If you'd like to change this behavior, you can always
+  explicitly set the seed from (GET-UNIVERSAL-TIME); whereas under the 
+  old convention there was no comparably easy way to get the system to 
+  repeat its behavior every time it was run.
+* Support for the pre-CLTL2 interpretation of FUNCTION declarations as
+  FTYPE declarations has been removed, in favor of their ANSI
+  interpretation as TYPE FUNCTION declarations. (See p. 228 of CLTL2.)
+* The quantifiers SOME, EVERY, NOTANY, and NOTEVERY no longer cons when
+  the types of their sequence arguments can be determined at compile time.
+  This is done through a new open code expansion for MAP which eliminates
+  consing for (MAP NIL ..), and reduces consing otherwise, when sequence
+  argument types can be determined at compile time.
+* The optimizer now transforms COERCE into an identity operation when it 
+  can prove that the coerced object is already of the correct type. (This 
+  can be a win for machine generated code, including the output of other
+  optimization transforms, such as the MAP transform above.)
+* Credit information has been moved from source file headers into CREDITS.
+* Source file headers have been made more standard.
+* The CASE macro now compiles without complaining even when it has
+  no clauses.
+
+changes in sbcl-0.6.4 relative to sbcl-0.6.3:
+
+* There is now a partial SBCL user manual (with some new text and some
+  text cribbed from the CMU CL manual). 
+* The beginnings of a profiler have been added (starting with the
+  CMU CL profiler and simplifying and cleaning up). Eventually the
+  main interface should be through the TRACE macro, but for now, 
+  it's still accessed through vaguely CMU-CL-style functions and macros
+  exported from the package SB-PROFILE.
+* Some problems left over from porting CMU CL to the new
+  cross-compilation bootstrap process have been cleaned up:
+  ** DISASSEMBLE now works. (There was a problem in using DEFMACRO
+     instead of SB!XC:DEFMACRO, compounded by an oversight on my 
+     part when getting rid of the compiler *BACKEND* stuff.)
+  ** The value of *NULL-TYPE* was screwed up, because it was
+     being initialized before the type system knew the final
+     definition of the 'NULL type. This screwed up several key
+     optimizations in the compiler, causing inefficiency in all sorts
+     of places. (I found it because I wanted to understand why
+     GET-INTERNAL-RUN-TIME was consing.) 
+* fixed a bug in DEFGENERIC which was causing it to overwrite preexisting
+  PROCLAIM FTYPE information. Unfortunately this broke binary 
+  compatibility again, since now the forms output by DEFGENERIC
+  to refer to functions which didn't exist in 0.6.3.
+* added declarations so that SB-PCL::USE-CACHING-DFUN-P 
+  can use the new (as of 0.6.3) transform for SOME into MAP into 
+  inline code
+* changed (MOD 1000000) type declarations for Linux timeval.tv_usec slot
+  values to (INTEGER 0 1000000), so that the time code will no longer
+  occasionally get blown up by Linux returning 1000000 microseconds
+* PRINT-UNREADABLE-OBJECT has been tweaked to make the spacing of
+  its output conform to the ANSI spec. (Alas, this makes its output
+  uglier in the :TYPE T :IDENTITY NIL case, but them's the breaks.)
+* A full call to MAP NIL with a single sequence argument no longer conses.
+* fixes to problems pointed out by Martin Atzmueller:
+  * The manual page no longer talks about multiprocessing as though
+    it were currently supported.
+  * The ILISP support patches have been removed from the distribution,
+    because as of version 5.10.1, ILISP now supports SBCL without us
+    having to maintain patches.
+* added a modified version of Raymond Toy's recent CMU CL patch for
+  EQUALP comparison of HASH-TABLE
+
+changes in sbcl-0.6.5 relative to sbcl-0.6.4:
+
+* Raymond Wiker's patches to port the system to FreeBSD have been merged.
+* The build process now looks for GNU make under the default name "gmake",
+  instead of "make" as it used to. If GNU make is not available as "gmake"
+  on your system, you can change this default behavior by setting the 
+  GNUMAKE environment variable.
+* Replace #+SB-DOC with #!+SB-DOC in seq.lisp so that the system 
+  can build without error under CMU CL.
+
+changes in sbcl-0.6.6 relative to sbcl-0.6.5:
+
+* DESCRIBE no longer tries to call itself recursively to describe
+  bound/fbound values, so that it no longer fails on symbols which are
+  bound to themselves (like keywords, T, and NIL).
+* DESCRIBE now works on generic functions.
+* The printer now prints less-screwed-up representations of closures
+  (not naively trying to bogusly use the %FUNCTION-NAME accessor on them).
+* A private symbol is used instead of the :EMPTY keyword previously 
+  used to mark empty slots in hash tables. Thus 
+	(DEFVAR *HT* (MAKE-HASH-TABLE))
+	(SETF (GETHASH :EMPTY *HT*) :EMPTY)
+	(MAPHASH (LAMBDA (K V) (FORMAT T "~&~S ~S~%" K V)))
+  now does what ANSI says that it should. (You can still get 
+  similar noncompliant behavior if bang on the hash table
+  implementation with all the symbols you get back from 
+  DO-ALL-SYMBOLS, but at least that's a little harder to do.)
+  This breaks binary compatibility, since tests for equality to 
+  :EMPTY are wired into things like the macroexpansion of 
+  WITH-HASH-TABLE-ITERATOR in FASL files produced by earlier
+  implementations.
+* There's now a minimal placeholder implementation for CL:STEP,
+  as required by ANSI.
+* An obscure bug in the interaction of the normal compiler, the byte
+  compiler, inlining, and structure predicates has been patched
+  by setting the flags for the DEFTRANSFORM of %INSTANCE-TYPEP as
+  :WHEN :BOTH (as per Raymond Toy's suggestion on the cmucl-imp@cons.org
+  mailing list).
+* Missing ordinary arguments in a macro call are now detected even
+  when the macro lambda list contains &KEY or &REST.
+* The debugger no longer complains about encountering the top of the
+  stack when you type "FRAME 0" to explicitly instruct it to go to
+  the top of the stack. And it now prints the frame you request even
+  if it's the current frame (instead of saying "You are here.").
+* As specified by ANSI, the system now always prints keywords
+  as #\: followed by SYMBOL-NAME, even when *PACKAGE* is the
+  KEYWORD package.
+* The default initial SIZE of HASH-TABLEs is now smaller.
+* Type information from CLOS class dispatch is now propagated
+  into DEFMETHOD bodies, so that e.g.
+	(DEFMETHOD FOO ((X SINGLE-FLOAT))
+	  (+ X 123.0))
+  is now basically equivalent to 
+	(DEFMETHOD FOO ((X SINGLE-FLOAT))
+	  (DECLARE (TYPE SINGLE-FLOAT X))
+	  (+ X 123.0))
+  and the compiler can compile (+ X 123.0) as a SINGLE-FLOAT-only
+  operation, without having to do run-time type dispatch.
+* The macroexpansion of DEFMETHOD has been tweaked so that it has
+  reasonable behavior when arguments are declared IGNORE or IGNORABLE.
+* Since I don't seem to be making big file reorganizations very often
+  any more (and since my archive of sbcl-x.y.zv.tar.bz2 snapshots
+  is overflowing my ability to conveniently back them up), I've finally
+  checked the system into CVS. (The CVS repository is on my home system,
+  not at SourceForge -- putting it on SourceForge might come later.)
+* SB-EXT:*GC-NOTIFY-STREAM* has been added, to control where the 
+  high-level GC-NOTIFY-FOO functions send their output. (There's
+  still very little control of where low-level verbose GC functions
+  send their output.) The SB-EXT:*GC-VERBOSE* variable now controls
+  less than it used to -- the GC-NOTIFY-FOO functions are now under
+  the control of *GC-NOTIFY-STREAM*, not *GC-VERBOSE*.
+* The system now stores the version string (LISP-IMPLEMENTATION-VERSION)
+  in only one place in the source code, and propagates it automatically
+  everywhere that it's needed. Thus e.g. when I bump the version from
+  0.6.6 to 0.6.7, I'll only need to modify the sources in one place.
+* The C source files now include boilerplate legalese and documentation
+  at the head of each file (just as the Lisp source files already did).
+* At Dan Barlow's suggestion, the hyperlink from the SBCL website
+  to his page will be replaced with a link to his new CLiki service.
+
+changes in sbcl-0.6.7 relative to sbcl-0.6.6:
+
+* The system has been ported to OpenBSD.
+* The system now compiles with a simple "sh make.sh" on the systems
+  that it's supported on. I.e., now you no longer need to tweak 
+  text in the target-features.lisp-expr and symlinks in src/runtime/
+  by hand, the make.sh takes care of it for you.
+* The system is no longer so grossly inefficient when compiling code
+  involving vectors implemented as general (not simple) vectors (VECTOR T),
+  so code which dares to use VECTOR-PUSH-EXTEND and FILL-POINTER, or
+  which dares to use the various sequence functions on non-simple 
+  vectors, takes less of a performance hit.
+  * There is now a primitive type predicate VECTOR-T-P
+    to test for the (VECTOR T) type, so that e.g.
+	(DEFUN FOO (V) (DECLARE (TYPE (VECTOR T) V)) (AREF V 3))
+    can now be compiled with some semblance of efficiency. (The old code
+    turned the type declaration into a full call to %TYPEP at runtime!)
+  * AREF on (VECTOR T) is still not fast, since it's still compiled
+    as a full call to SB-KERNEL:DATA-VECTOR-REF, but at least the
+    ETYPECASE used in DATA-VECTOR-REF is now compiled reasonably
+    efficiently. (The old version made full calls to SUBTYPEP at runtime!)
+  * (MAKE-ARRAY 12 :FILL-POINTER T) is now executed less inefficiently,
+    without making full calls to SUBTYPEP at runtime.
+  (Some analogous efficiency issues for non-simple vectors specialized to
+  element types other than T, or for non-simple multidimensional arrays,
+  have not been addressed. They could almost certainly be handled the
+  same way if anyone is motivated to do so.)
+* The changes in array handling break binary compatibility, so
+  *BACKEND-FASL-FILE-VERSION* has been bumped to 4.
+* (TYPEP (MAKE-ARRAY 12 :FILL-POINTER 4) 'VECTOR) now returns (VALUES T)
+  instead of (VALUES T T).
+* By following the instructions that Dan Barlow posted to sbcl-devel
+  on 2 July 2000, I was able to enable primitive dynamic object
+  file loading code for Linux. The full-blown CMU CL LOAD-FOREIGN
+  functionality is not implemented (since it calls ld to resolve
+  library references automatically, requiring RUN-PROGRAM for its
+  implementation), but a simpler SB-EXT:LOAD-1-FOREIGN (which doesn't
+  try to resolve library references) is now supported.
+* The system now flushes the standard output streams when it terminates,
+  unless QUIT is used with the RECKLESSLY-P option set. It also flushes
+  them at several other probably-convenient times, e.g. in each pass of
+  the toplevel read-eval-print loop, and after evaluating a form given
+  as an "--eval" command-line option. (These changes were motivated by a
+  discussion of stream flushing issues on cmucl-imp in August 2000.) 
+* The source transform for TYPEP of array types no longer assumes
+  that an array whose element type is a not-yet-defined type 
+  is implemented as an array of T, but instead punts, so that the 
+  type will be interpreted at runtime.
+* There is now some support for cross-compiling in make.sh: each of
+  the phases of make.sh has its own script. (This should be transparent
+  to people doing ordinary, non-cross-compile builds.)
+* Since my laptop doesn't have hundreds of megabytes of memory like
+  my desktop machine, I became more motivated to do some items on
+  my to-do list in order to reduce the size of the system a little:
+  ** Arrange for various needed-only-at-cold-init things to be
+     uninterned after cold init. To support this, those things have
+     been renamed from FOO and *FOO* to !FOO and *!FOO* (i.e., all
+     symbols with such names are now uninterned after cold init).
+  ** Bind SB!C::*TOP-LEVEL-LAMBDA-MAX* to a nonzero value when building
+     fasl files for cold load.
+  ** Remove the old compiler structure pooling code (which used to 
+     be conditional on the target feature :SB-ALLOC) completely.
+  ** Redo the representation of some data in cold init to be more compact.
+  (I also looked into supporting byte compiled code at bootstrap time,
+  which would probably reduce the size of the system a lot, but that
+  looked too complicated, so I punted for now.)
+* The maximum signal nesting depth in the src/runtime/ support code has
+  been reduced from 4096 to 256. (I don't know any reason for the very
+  large old value. If the new smaller value turns out to break something,
+  I'll probably just bump it back up.)
+* PPRINT-LOGICAL-BLOCK is now pickier about the types of its arguments,
+  as per ANSI.
+* Many, many bugs reported by Peter Van Eynde have been added to
+  the BUGS list; some have even been fixed.
+* While enabling dynamic object file loading, I tried to make the 
+  code easier to understand, renaming various functions and variables
+  with less ambiguous names, and changing some function calling
+  conventions to be Lispier (e.g. returning NIL instead of 0 for failure).
+* While trying to figure out how to do the OpenBSD port, I tried to 
+  clean up some of the code in src/runtime/. In particular, I dropped
+  support for non-POSIX signal handling, added various comments, 
+  tweaked the code to reduce the number of compilation warnings, and
+  renamed some files to increase consistency.
+* To support the new automatic configuration functionality in make.sh,
+  the source file target-features.lisp-expr has been replaced with the
+  source file base-target-features.lisp-expr and the machine-generated
+  file local-target-features.lisp-expr.
+* fixed a stupid quoting error in make.sh so that using CMU CL
+  "lisp -batch" as cross-compilation host works again
+
+changes in sbcl-0.6.8 relative to sbcl-0.6.7:
+
+?? The system is now under CVS at SourceForge (instead of the
+  CVS repository on my home machine).
+?? The INSTALL file has been updated with some information 
+  about using anonymous CVS to download the most recent version
+  from SourceForge.
+?? There's now code in the tests/ subdirectory to run the system
+  through the clocc/ansi-tests/ suite, and to run additional
+  SBCL-specific regression tests as well. (It's not particularly
+  mature right now, but it's a start.)
+?? The system now uses code based on Colin Walters' O(N)
+  implementation of MAP (from the cmucl-imp@cons.org mailing
+  list, 2 September 2000) when it can't use a DEFTRANSFORM to
+  inline the MAP operation, and there is more than one
+  sequence argument to the MAP call (so that it can't just
+  do ETYPECASE once and for all based on the type of the
+  single sequence argument). (The old non-inline implementation
+  of the general M-argument sequence-of-length-N case required
+  O(M*N*N) time when any of the sequence arguments were LISTs.)
+?? Raymond Wiker's port of CMU CL's RUN-PROGRAM has been added.
+(?? Don't forget to mention Colin Walters and Raymond Wiker in the
+  CREDITS file.)
+?? The debugger now flushes standard output streams before it begins
+  its output ("debugger invoked" and so forth).
+?? The two problem cases reported by Peter Van Eynde on 8 Sep 2000, 
+  (BUTLAST '(1 2 3) -1) and (MAKE-LIST -1), now work, and test cases
+  have now been added to the regression test suite to keep them
+  from appearing again. (This was a repeat appearance, alas!)
+  As the regression test system gets more mature, I intend to add
+  most future fixed bugs to it, but at this point I'm still playing
+  with it.
+?? The patch for the SUBSEQ bug reported on the cmucl-imp mailing
+  list 12 September 2000 has been applied to SBCL.
+?? Martin Atzmueller's versions of two CMU CL patches, as posted on 
+  sbcl-devel 13 September 2000, have been installed. (The patches fix
+  a bug in SUBSEQ and <a bug in ??>.)
+?? A bug in signal handling which kept TRACE from working on OpenBSD
+  has been fixed.
+?? The signal handling bug reported by Martin Atzmueller on 
+  sbcl-devel 13 September 2000, which caused the debugger to 
+  get confused after a Ctrl-C interrupt under ILISP, has been fixed.

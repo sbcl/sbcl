@@ -1,0 +1,642 @@
+;;;; build order
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+;;; This is a linear ordering of system sources which works both to
+;;; compile/load the cross-compiler under the host Common Lisp and to
+;;; cross-compile the compiler into the under-construction target
+;;; Common Lisp.
+;;;
+;;; Of course, it'd be very nice to have this be a dependency DAG
+;;; instead, so that we could do automated incremental recompilation.
+;;; But the dependencies are varied and subtle, and it'd be extremely
+;;; difficult to extract them automatically, and it'd be extremely
+;;; tedious and error-prone to extract them manually, so we don't 
+;;; extract them. (It would be nice to fix this someday. The most
+;;; feasible approach that I can think of would be to make the
+;;; dependencies work on a package level, not an individual file
+;;; level. Doing it at the package level would make the granularity
+;;; coarse enough that it would probably be pretty easy to maintain
+;;; the dependency information manually, and the brittleness of the
+;;; package system would help make most violations of the declared
+;;; dependencies obvious at build time. -- WHN 20000803
+;;;
+;;; FIXME: Perhaps now that a significant number of files are built
+;;; in warm load instead of cold load, this file should now be called
+;;; cold-stems-and-flags.lisp-expr? Also, perhaps this file should move
+;;; into the src/cold/ directory?
+(
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;; miscellaneous
+
+ ;; This comes early because it's useful for debugging everywhere.
+ ("code/show")
+
+ ;; This comes early because the cross-compilation host's backquote logic
+ ;; expand into something which can't be executed on the target Lisp (e.g.
+ ;; in CMU CL where it expands into internal functions like BACKQ-LIST), and
+ ;; by replacing the host backquote logic with our own as early as possible,
+ ;; we minimize the chance of any forms referring to host Lisp internal
+ ;; functions leaking into target Lisp code.
+ ("code/backq")
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; various DEFSETFs and/or other DEFMACROish things, defined as early as
+ ;; possible so we don't need to fiddle with any subtleties of defining them
+ ;; before any possible use
+
+ ;; KLUDGE: It would be nice to reimplement most or all of these as
+ ;; functions (possibly inlined functions) so that we wouldn't need to
+ ;; worry so much about forcing them all to be defined before any possible
+ ;; use. It might be pretty tedious, though, working through any
+ ;; transforms and translators and optimizers and so forth to make sure
+ ;; that they can handle the change. -- WHN 19990919
+ ("code/defsetfs")
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;; cross-compiler-only replacements for stuff which in target Lisp would be
+ ;;; supplied by basic machinery
+
+ ("code/cross-misc"  :not-target)
+ ("code/cross-float" :not-target)
+ ("code/cross-io"    :not-target)
+ ("code/cross-sap"   :not-target)
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;; stuff needed early both in cross-compilation host and in target Lisp
+
+ ("code/uncross")
+ ("code/early-defbangmethod")
+
+ ("code/parse-body")       ; on host for PARSE-BODY
+ ("code/parse-defmacro")   ; on host for PARSE-DEFMACRO
+ ("code/early-defboot")    ; on host for FILE-COMMENT, DO-ANONYMOUS, etc.
+ ("code/boot-extensions")  ; on host for COLLECT etc.
+ ("code/early-extensions") ; on host for SYMBOLICATE etc.
+ ("code/late-extensions")  ; FIXME: maybe no longer needed on host now that
+                           ; we are no longer doing PRINT-HERALD stuff
+ ("compiler/deftype")      ; on host for SB!XC:DEFTYPE
+ ("code/early-alieneval")  ; for vars needed both at build time and at runtime
+
+ ("code/specializable-array")
+
+ ;; for various constants e.g. SB!VM:*TARGET-MOST-POSITIVE-FIXNUM* and
+ ;; SB!VM:LOWTAG-BITS, needed by "early-objdef" and others
+ ("compiler/generic/early-vm")
+ ("compiler/generic/early-vm-macs")
+ ("compiler/generic/early-objdef")
+ ("compiler/target/parms")
+ ("code/early-array") ; needs "early-vm" numbers
+ ("code/early-cl")
+ ("code/early-load")
+
+ ;; mostly needed by stuff from comcom, but also used by "x86-vm"
+ ("code/debug-var-io")
+
+ ("code/cold-init-helper-macros")
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;; basic machinery for the target Lisp. Note that although most of these
+ ;;; files are flagged :NOT-HOST, a few might not be.
+
+ ("code/target-defbangmethod" :not-host)
+
+ ("code/early-print" :not-host)
+ ("code/early-pprint" :not-host)
+ ("code/early-impl" :not-host)
+
+ ("code/target-extensions" :not-host)
+
+ ("code/early-defstructs" :not-host) ; gotta-be-first DEFSTRUCTs
+
+ ("code/defbangstruct")
+
+ ;; This needs DEF!STRUCT, and is itself needed early so that structure
+ ;; accessors and inline functions defined here can be compiled inline
+ ;; later. (Avoiding full calls not only increases efficiency, but also
+ ;; avoids some cold init issues involving full calls to structure
+ ;; accessors.)
+ ("code/type-class")
+
+ ("code/lisp-stream" :not-host)
+
+ ("code/sysmacs" :not-host)
+
+ ;; "assembly/assemfile" was here in the sequence inherited from
+ ;; CMU CL worldcom.lisp, but also appears later in the sequence
+ ;; inherited from CMU CL comcom.lisp. We shouldn't need two versions,
+ ;; so I've deleted the one here. -- WHN 19990620
+
+ ;; FIXME: There are lots of "maybe" notes in this file, e.g.
+ ;; "maybe should be :BYTE-COMPILE T". Once the system is stable,
+ ;; look into them.
+
+ ("code/early-target-error" :not-host) ; maybe should be :BYTE-COMPILE T
+ ;; FIXME: maybe should be called "target-error", with "late-target-error"
+ ;; called "condition"
+
+ ;; a comment from classic CMU CL:
+ ;;   "These guys can supposedly come in any order, but not really.
+ ;;    Some are put at the end so that macros don't run interpreted
+ ;;    and stuff."
+ ;; Dunno exactly what this meant or whether it still holds. -- WHN 19990803
+ ;; FIXME: more informative and up-to-date comment?
+ ("code/globals"     :not-host)
+ ("code/kernel"      :not-host)
+ ("code/toplevel"    :not-host)
+ ("code/cold-error"  :not-host)
+ ("code/fdefinition" :not-host)
+ ;; FIXME: Figure out some way to make the compiler macro for INFO 
+ ;; available for compilation of "code/fdefinition".
+
+ ;; In classic CMU CL, code/type was here. I've since split that into
+ ;; lots of smaller pieces, some of which are here and some of which
+ ;; are handled later in the sequence, when the cross-compiler is
+ ;; built. -- WHN 19990620
+ ("code/target-type" :not-host)
+
+ ("code/pred" :not-host)
+
+ ("code/target-alieneval" :not-host)
+ ("code/target-c-call"    :not-host)
+ ("code/target-sap"       :not-host)
+
+ ("code/array"         :not-host)
+ ("code/target-sxhash" :not-host)
+
+ ("code/list"   :not-host)
+ ("code/seq"    :not-host) ; "code/seq" should come after "code/list".
+ ("code/coerce" :not-host)
+
+ ("code/string"     :not-host)
+ ("code/mipsstrops" :not-host)
+
+ ("code/unix" :not-host)
+
+ #!+mach  ("code/mach"     :not-host)
+ #!+mach  ("code/mach-os"  :not-host)
+ #!+sunos ("code/sunos-os" :not-host)
+ #!+hpux  ("code/hpux-os"  :not-host)
+ #!+osf1  ("code/osf1-os"  :not-host)
+ #!+irix  ("code/irix-os"  :not-host)
+ #!+bsd   ("code/bsd-os"   :not-host)
+ #!+linux ("code/linux-os" :not-host)
+
+ ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
+ ;; instead of a bunch of reader macros. -- WHN 19990308
+ #!+pmax ("code/pmax-vm" :not-host)
+ #!+(and sparc svr4) ("code/sparc-svr4-vm" :not-host)
+ #!+(and sparc (not svr4)) ("code/sparc-vm" :not-host)
+ #!+rt    ("code/rt-vm"    :not-host)
+ #!+hppa  ("code/hppa-vm"  :not-host)
+ #!+x86   ("code/x86-vm"   :not-host)
+ #!+alpha ("code/alpha-vm" :not-host)
+ #!+sgi   ("code/sgi-vm"   :not-host)
+
+ ("code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
+
+ ("code/symbol"         :not-host)
+ ("code/bignum"         :not-host)
+ ("code/target-numbers" :not-host)
+ ("code/float-trap"     :not-host)
+ ("code/float"          :not-host)
+ ("code/irrat"          :not-host)
+
+ ("code/char" :not-host)
+ ("code/target-misc" :not-host)
+ ("code/misc")
+
+ #!-gengc ("code/room"   :not-host)
+ #!-gengc ("code/gc"     :not-host)
+ #!-gengc ("code/purify" :not-host)
+
+ #!+gengc ("code/gengc"    :not-host)
+
+ ("code/stream"            :not-host)
+ ("code/print"             :not-host)
+ ("code/pprint"            :not-host) ; maybe should be :BYTE-COMPILE T
+ ("code/early-format")
+ ("code/target-format"     :not-host) ; maybe should be :BYTE-COMPILE T
+ ("code/defpackage"        :not-host)
+ ("code/pp-backq"          :not-host) ; maybe should be :BYTE-COMPILE T
+
+ ("code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
+
+ ("code/serve-event" :not-host)
+ ("code/fd-stream"   :not-host)
+
+ ("code/module" :not-host) ; maybe should be :BYTE-COMPILE T
+
+ #!+sb-interpreter
+ ("code/eval")
+
+ ("code/target-eval" :not-host) ; FIXME: uses INFO, wants compiler macro
+
+ ("code/interr" :not-host)
+
+ ("code/query"  :not-host) ; maybe should be :BYTE-COMPILE T
+
+ ("code/sort"  :not-host)
+ ("code/time"  :not-host)
+ ("code/weak"  :not-host)
+ ("code/final" :not-host)
+
+ #!+mp ("code/multi-proc" :not-host)
+
+ ("code/setf-funs" :not-host)
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;; compiler (and a few miscellaneous :NOT-HOST files whose
+ ;;; dependencies make it convenient to stick them here)
+
+; replaced with defbangtype.lisp in sbcl-0.6.2
+; ;; There are some things (e.g. the type SB!KERNEL:INDEX) which are
+; ;; used early in the compiler in both host and target forms (i.e.
+; ;; SB!KERNEL:INDEX defined to cross-compilation host and
+; ;; SB!KERNEL:INDEX defined to cross-compiler itself).
+; ("code/early-ugly-duplicates")
+
+ ("code/defbangtype")
+
+ ("compiler/early-c")
+ ("code/numbers")
+
+ ("code/typedefs")
+
+ ("code/defbangmacro")
+
+ ("compiler/macros")
+ ("compiler/generic/vm-macs")
+
+ ;; needed by "compiler/vop"
+ ("compiler/sset")
+
+ ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
+ ("compiler/node")
+
+ ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
+ ("compiler/vop")
+
+ ;; needed by "vm" and "primtype"
+ ("compiler/backend")
+
+ ;; for e.g. MAX-VOP-TN-REFS, needed by "meta-vmdef"
+ ("compiler/vmdef")
+
+ ;; needs "backend"
+ ("compiler/target/backend-parms")
+
+ ;; for INFO and SB!XC:MACRO-FUNCTION, needed by defmacro.lisp
+ ("compiler/globaldb")
+ ("compiler/info-functions")
+
+ ("code/defmacro")
+ ("code/force-delayed-defbangmacros")
+
+ ("compiler/late-macros")
+
+ ;; for e.g. DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
+ ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
+ ("compiler/meta-vmdef")
+
+ ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
+ ("compiler/target/vm")
+
+ ;; for e.g. SPECIFIER-TYPE, needed by primtype.lisp
+ ("code/early-type")
+
+ ;; FIXME: Classic CMU CL had SAFETY 2 DEBUG 2 set around the compilation
+ ;; of "code/class". Why?
+ ("code/class")
+
+ ;; The definitions for CONDITION and CONDITION-CLASS depend on
+ ;; SLOT-CLASS, defined in classes.lisp.
+ ("code/late-target-error" :not-host) ; FIXME: maybe should be :BYTE-COMPILE T
+
+ ("compiler/generic/primtype")
+
+ ;; the implementation of the compiler-affecting part of forms like
+ ;; DEFMACRO and DEFTYPE; must be loaded before we can start
+ ;; defining types
+ ("compiler/parse-lambda-list")
+
+ ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
+ ("code/host-alieneval")
+
+ ;; can't be done until definition of e.g. DEF-ALIEN-TYPE-CLASS in
+ ;; host-alieneval.lisp
+ ("code/host-c-call")
+
+ ;; SB!XC:DEFTYPE is needed in order to compile late-target-type
+ ;; in the host Common Lisp, and in order to run, it needs
+ ;; %COMPILER-DEFTYPE.
+ ("compiler/compiler-deftype")
+
+ ;; These appear here in the build sequence because they require
+ ;;   * the macro INFO, defined in globaldb.lisp, and
+ ;;   * the function PARSE-DEFMACRO, defined in parse-defmacro.lisp,
+ ;; and because they define
+ ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
+ ("code/late-type")
+ ("code/deftypes-for-target")
+
+ ;; The inline definition of TYPEP-TO-LAYOUT here needs inline
+ ;; functions defined in classes.lisp, and is needed in turn by
+ ;; the target version of "code/defstruct".
+ ("code/target-defstruct" :not-host)
+
+ ;; stuff needed by "code/defstruct"
+ ("code/cross-type" :not-target)
+ ("compiler/generic/vm-type")
+
+ ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in 
+ ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
+ ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type".
+ ("code/defstruct")
+
+ ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
+ ;; machinery) before we can set its superclasses here.
+ ("code/alien-type")
+
+ ("compiler/knownfun")
+
+ ;; needs IR1-ATTRIBUTES macro, defined in knownfun.lisp
+ ("compiler/proclaim")
+
+ ;; This needs not just the SB!XC:DEFSTRUCT machinery, but also
+ ;; the TYPE= stuff defined in late-type.lisp, and the
+ ;; CHECK-FUNCTION-NAME defined in proclaim.lisp.
+ ("code/force-delayed-defbangstructs")
+
+ ("code/typep")
+
+ ("compiler/compiler-error")
+
+ ("code/type-init")
+
+ ;; These define target types needed by fndb.lisp.
+ ("code/package")
+ ("code/random")
+ ("code/hash-table")
+ ("code/readtable")
+ ("code/pathname")
+ ("compiler/lexenv")
+
+ ;; KLUDGE: Much stuff above here is the type system and/or the INFO
+ ;; system, not really the compiler proper. It might be easier to
+ ;; understand the system if those things were split off into packages
+ ;; SB-TYPE and SB-INFO and built in their own sections. -- WHN 20000124
+
+ ;; In classic CMU CL (re)build order, these were done later, but
+ ;; in building from scratch, these must be loaded before
+ ;; "compiler/generic/objdef" in order to allow forms like
+ ;; (DEFINE-PRIMITIVE-OBJECT (..) (CAR ..) ..) to work.
+ ("compiler/fndb")
+ ("compiler/generic/vm-fndb")
+
+ ("compiler/generic/objdef")
+
+ ("compiler/generic/interr")
+
+ ("compiler/bit-util")
+
+ ("compiler/early-assem") ; has ASSEMBLY-UNIT-related stuff needed by core.lisp
+
+ ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
+ ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
+ ;; before "compiler/main.lisp" so that those can be coded efficiently
+ ;; (and so that they don't cause lots of annoying compiler warnings
+ ;; about undefined types). 
+ ("compiler/generic/core")
+
+ ("code/load")
+
+ ("code/fop") ; needs macros from code/host-load.lisp
+
+ ("compiler/ctype")
+ ("compiler/disassem")
+ ("compiler/assem")
+
+ ("compiler/trace-table") ; needs EMIT-LABEL macro from compiler/assem.lisp
+
+ ;; Compiling this file requires fop definitions from code/fop.lisp
+ ;; and trace table definitions from compiler/trace-table.lisp.
+ ("compiler/dump")
+
+ ("compiler/main") ; needs DEFSTRUCT FASL-FILE from compiler/dump.lisp
+ ("compiler/target-main" :not-host)
+ ("compiler/ir1tran")
+ ("compiler/ir1util")
+ ("compiler/ir1opt")
+
+ ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
+ ;; SB!ASSEM:EMIT-POST-IT, defined in assem.lisp.
+ ("compiler/late-vmdef")
+
+ ("compiler/ir1final")
+ ("compiler/array-tran")
+ ("compiler/seqtran")
+ ("compiler/typetran")
+ ("compiler/generic/vm-typetran")
+ ("compiler/float-tran")
+ ("compiler/saptran")
+ ("compiler/srctran")
+ ("compiler/locall")
+ ("compiler/dfo")
+ ("compiler/checkgen")
+ ("compiler/constraint")
+ ("compiler/envanal")
+
+ ("compiler/tn")
+ ("compiler/life")
+
+ ("code/debug-info")
+
+ ("compiler/debug-dump")
+ ("compiler/generic/utils")
+ ("assembly/assemfile")
+
+ ("compiler/fixup") ; for DEFSTRUCT FIXUP, used by insts.lisp
+
+ ("compiler/target/insts")
+ ("compiler/target/macros")
+
+ ("assembly/target/support")
+
+ ("compiler/target/move")
+ ("compiler/target/float")
+ ("compiler/target/sap")
+ ("compiler/target/system")
+ ("compiler/target/char")
+ ("compiler/target/memory")
+ ("compiler/target/static-fn")
+ ("compiler/target/arith")
+ ("compiler/target/subprim")
+
+ ("compiler/target/debug")
+ ("compiler/target/c-call")
+ ("compiler/target/cell")
+ ("compiler/target/values")
+ ("compiler/target/alloc")
+ ("compiler/target/call")
+ ("compiler/target/nlx")
+ ("compiler/target/show")
+ ("compiler/target/array"
+  ;; KLUDGE: Compiling this file raises alarming warnings of the form
+  ;;    Argument FOO to VOP CHECK-BOUND has SC restriction
+  ;;    DESCRIPTOR-REG which is not allowed by the operand type:
+  ;;      (:OR POSITIVE-FIXNUM)
+  ;; This seems not to be something that I broke, but rather a "feature"
+  ;; inherited from classic CMU CL. (Debian cmucl_2.4.8.deb compiling
+  ;; Debian cmucl_2.4.8.tar.gz raises the same warning). Thus, even though
+  ;; these warnings are severe enough that they would ordinarily abort
+  ;; compilation, for now we blithely ignore them and press on to more
+  ;; pressing problems. Someday, though, it would be nice to figure out
+  ;; what the problem is and fix it.. -- WHN 19990323
+  ;; FIXME: This problem doesn't seem to occur in the cross-compiler. 
+  ;; Check whether it occurs when compiling with the final target SBCL.
+  ;; If it doesn't, we can punt the KLUDGE message.
+  :ignore-failure-p)
+ ("compiler/target/pred")
+ ("compiler/target/type-vops")
+
+ ("assembly/target/assem-rtns" :assem)
+ ("assembly/target/array"      :assem)
+ ("assembly/target/arith"      :assem)
+ ("assembly/target/alloc"      :assem)
+
+ ("compiler/pseudo-vops")
+
+ ("compiler/aliencomp")
+
+ ("compiler/ltv")
+ ("compiler/gtn")
+ ("compiler/ltn")
+ ("compiler/stack")
+ ("compiler/control")
+ ("compiler/entry")
+ ("compiler/ir2tran")
+
+ ;; KLUDGE: This has #!+GENGC things in it which are intended to
+ ;; overwrite code in ir2tran.lisp, so it has to come after ir2tran.lisp.
+ ;;
+ ;; FIXME: Those things should probably be ir2tran.lisp instead, and the
+ ;; things they now overwrite should instead be #!-GENGC so they're never
+ ;; generated in the first place.
+ ("compiler/generic/vm-ir2tran")
+
+ ("compiler/copyprop")
+ ("compiler/represent")
+ ("compiler/generic/vm-tran")
+ ("compiler/pack")
+ ("compiler/codegen")
+ ("compiler/debug")
+
+ #!+sb-dyncount ("compiler/dyncount")
+ #!+sb-dyncount ("code/dyncount")
+
+ ;; needed by OPEN-FASL-FILE, which is called by COMPILE-FILE
+ ("code/format-time")
+
+ ;; needed by various unhappy-path cases in the cross-compiler
+ ("code/error")
+
+ ;; This wasn't in classic CMU CL "comcom.lisp", but it has some stuff
+ ;; that Python-as-cross-compiler has turned out to need.
+ ("code/macroexpand")
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; files which are only needed in the target system, and/or which are
+ ;; only possible in the target system, and which depend in some way 
+ ;; (directly or indirectly) on stuff compiled as part of the compiler
+
+ ("compiler/generic/target-core" :not-host) ; uses stuff from
+                                            ;   "compiler/generic/core"
+
+ ("code/target-package"    :not-host) ; needs "code/package"
+ ("code/target-random"     :not-host) ; needs "code/random"
+ ("code/target-hash-table" :not-host) ; needs "code/hash-table"
+ ("code/reader"            :not-host) ; needs "code/readtable"
+ ("code/target-pathname"   :not-host) ; needs "code/pathname", maybe 
+                                      ;   should be :BYTE-COMPILE T
+ ("code/filesys"           :not-host) ; needs HOST from "code/pathname",
+                                      ;   maybe should be :BYTE-COMPILE T
+ ("code/save"              :not-host) ; uses the definition of PATHNAME
+                                      ;   from "code/pathname"
+ ("code/sharpm"            :not-host) ; uses stuff from "code/reader"
+
+ ;; stuff for byte compilation. This works only in the target system,
+ ;; because fundamental BYTE-FUNCTION-OR-CLOSURE types are implemented 
+ ;; as nonportable FUNCALLABLE-INSTANCEs.
+ ("code/byte-types" :not-host)
+ ("compiler/byte-comp")
+ ("compiler/target-byte-comp" :not-host)
+ ;; FIXME: Could byte-interp be moved here? It'd be logical..
+
+ ;; defines SB!DI:DO-DEBUG-FUNCTION-BLOCKS, needed by target-disassem.lisp
+ ("code/debug-int" :not-host)
+
+ ;; target-only assemblerish stuff
+ ("compiler/target-disassem"     :not-host)
+ ("compiler/target/target-insts" :not-host)
+
+ ;; the IR1 interpreter (as opposed to the byte code interpreter)
+ #!+sb-interpreter ("compiler/eval-comp" :not-host)
+ #!+sb-interpreter ("compiler/eval"      :not-host)
+
+ ("code/debug" :not-host) ; maybe should be :BYTE-COMPILE T
+ ;; FIXME: This has been moved to warm init, and should be deleted here.
+ #+nil ("code/ntrace" :not-host) ; maybe should be :BYTE-COMPILE T
+
+ ;; These can't be compiled until CONDITION and DEFINE-CONDITION
+ ;; are defined, and they also use SB-DEBUG:*STACK-TOP-HINT*.
+ ("code/parse-defmacro-errors" :not-host)
+
+ ("code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
+
+ ("code/byte-interp" :not-host) ; needs *SYSTEM-CONSTANT-CODES* from byte-comp
+
+ ("code/target-load" :not-host) ; needs specials from code/load.lisp
+
+ ;; FIXME: Does this really need stuff from compiler/dump.lisp?
+ ("compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
+
+ ("code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; target macros and DECLAIMs installed at build-the-cross-compiler time
+
+ ;; Declare all target special variables defined by ANSI now, so that
+ ;; we don't have to worry about any of them being bound incorrectly
+ ;; when the compiler processes code which appears before the appropriate
+ ;; DEFVAR or DEFPARAMETER.
+ ("code/cl-specials")
+
+ ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
+ ;; for them
+ ;;
+ ;; FIXME: Since a lot of this code is just macros, perhaps it should be
+ ;; byte compiled?
+ ("code/defboot")
+ ("code/destructuring-bind")
+ ("code/early-setf")
+ ("code/macros")
+ ("code/loop")
+ ("code/late-setf")
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ ;; other target-code-building stuff which can't be processed until
+ ;; machinery like SB!XC:DEFMACRO exists
+
+ ("code/late-format") ; needs SB!XC:DEFMACRO
+ ("code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
+ ("code/signal")
+ ("code/late-defbangmethod"))

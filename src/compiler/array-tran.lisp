@@ -1,0 +1,572 @@
+;;;; array-specific optimizers and transforms
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!C")
+
+(file-comment
+  "$Header$")
+
+;;;; Derive-Type Optimizers
+
+;;; Array operations that use a specific number of indices implicitly assert
+;;; that the array is of that rank.
+(defun assert-array-rank (array rank)
+  (assert-continuation-type
+   array
+   (specifier-type `(array * ,(make-list rank :initial-element '*)))))
+
+;;; Array access functions return an object from the array, hence its
+;;; type will be asserted to be array element type.
+(defun extract-element-type (array)
+  (let ((type (continuation-type array)))
+    (if (array-type-p type)
+	(array-type-element-type type)
+	*universal-type*)))
+
+;;; Array access functions return an object from the array, hence its
+;;; type is going to be the array upgraded element type.
+(defun extract-upgraded-element-type (array)
+  (let ((type (continuation-type array)))
+    (if (array-type-p type)
+	(array-type-specialized-element-type type)
+	*universal-type*)))
+
+;;; The ``new-value'' for array setters must fit in the array, and the
+;;; return type is going to be the same as the new-value for SETF
+;;; functions.
+(defun assert-new-value-type (new-value array)
+  (let ((type (continuation-type array)))
+    (when (array-type-p type)
+      (assert-continuation-type new-value (array-type-element-type type))))
+  (continuation-type new-value))
+
+;;; Return true if Arg is NIL, or is a constant-continuation whose value is
+;;; NIL, false otherwise.
+(defun unsupplied-or-nil (arg)
+  (declare (type (or continuation null) arg))
+  (or (not arg)
+      (and (constant-continuation-p arg)
+	   (not (continuation-value arg)))))
+
+(defoptimizer (array-in-bounds-p derive-type) ((array &rest indices))
+  (assert-array-rank array (length indices))
+  *universal-type*)
+
+(defoptimizer (aref derive-type) ((array &rest indices) node)
+  (assert-array-rank array (length indices))
+  ;; If the node continuation has a single use then assert its type.
+  (let ((cont (node-cont node)))
+    (when (= (length (find-uses cont)) 1)
+      (assert-continuation-type cont (extract-element-type array))))
+  (extract-upgraded-element-type array))
+
+(defoptimizer (%aset derive-type) ((array &rest stuff))
+  (assert-array-rank array (1- (length stuff)))
+  (assert-new-value-type (car (last stuff)) array))
+
+(defoptimizer (hairy-data-vector-ref derive-type) ((array index))
+  (extract-upgraded-element-type array))
+(defoptimizer (data-vector-ref derive-type) ((array index))
+  (extract-upgraded-element-type array))
+
+(defoptimizer (data-vector-set derive-type) ((array index new-value))
+  (assert-new-value-type new-value array))
+(defoptimizer (hairy-data-vector-set derive-type) ((array index new-value))
+  (assert-new-value-type new-value array))
+
+;;; Figure out the type of the data vector if we know the argument element
+;;; type.
+(defoptimizer (%with-array-data derive-type) ((array start end))
+  (let ((atype (continuation-type array)))
+    (when (array-type-p atype)
+      (values-specifier-type
+       `(values (simple-array ,(type-specifier
+				(array-type-element-type atype))
+			      (*))
+		index index index)))))
+
+(defoptimizer (array-row-major-index derive-type) ((array &rest indices))
+  (assert-array-rank array (length indices))
+  *universal-type*)
+
+(defoptimizer (row-major-aref derive-type) ((array index))
+  (extract-upgraded-element-type array))
+
+(defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
+  (assert-new-value-type new-value array))
+
+(defoptimizer (make-array derive-type)
+	      ((dims &key initial-element element-type initial-contents
+		adjustable fill-pointer displaced-index-offset displaced-to))
+  (let ((simple (and (unsupplied-or-nil adjustable)
+		     (unsupplied-or-nil displaced-to)
+		     (unsupplied-or-nil fill-pointer))))
+    (specifier-type
+     `(,(if simple 'simple-array 'array)
+       ,(cond ((not element-type) 't)
+	      ((constant-continuation-p element-type)
+	       (continuation-value element-type))
+	      (t
+	       '*))
+       ,(cond ((not simple)
+	       '*)
+	      ((constant-continuation-p dims)
+	       (let ((val (continuation-value dims)))
+		 (if (listp val) val (list val))))
+	      ((csubtypep (continuation-type dims)
+			  (specifier-type 'integer))
+	       '(*))
+	      (t
+	       '*))))))
+
+;;;; constructors
+
+;;; Convert VECTOR into a MAKE-ARRAY followed by SETFs of all the
+;;; elements.
+(def-source-transform vector (&rest elements)
+  (if (byte-compiling)
+      (values nil t)
+      (let ((len (length elements))
+	    (n -1))
+	(once-only ((n-vec `(make-array ,len)))
+	  `(progn
+	     ,@(mapcar #'(lambda (el)
+			   (once-only ((n-val el))
+			     `(locally (declare (optimize (safety 0)))
+				       (setf (svref ,n-vec ,(incf n))
+					     ,n-val))))
+		       elements)
+	     ,n-vec)))))
+
+;;; Just convert it into a MAKE-ARRAY.
+(def-source-transform make-string (length &key
+					  (element-type ''base-char)
+					  (initial-element default-init-char))
+  (if (byte-compiling)
+      (values nil t)
+      `(make-array (the index ,length)
+		   :element-type ,element-type
+		   :initial-element ,initial-element)))
+
+(defparameter *array-info*
+  #((base-char #.default-init-char 8 sb!vm:simple-string-type)
+    (single-float 0.0s0 32 sb!vm:simple-array-single-float-type)
+    (double-float 0.0d0 64 sb!vm:simple-array-double-float-type)
+    #!+long-float (long-float 0.0l0 #!+x86 96 #!+sparc 128
+			      sb!vm:simple-array-long-float-type)
+    (bit 0 1 sb!vm:simple-bit-vector-type)
+    ((unsigned-byte 2) 0 2 sb!vm:simple-array-unsigned-byte-2-type)
+    ((unsigned-byte 4) 0 4 sb!vm:simple-array-unsigned-byte-4-type)
+    ((unsigned-byte 8) 0 8 sb!vm:simple-array-unsigned-byte-8-type)
+    ((unsigned-byte 16) 0 16 sb!vm:simple-array-unsigned-byte-16-type)
+    ((unsigned-byte 32) 0 32 sb!vm:simple-array-unsigned-byte-32-type)
+    ((signed-byte 8) 0 8 sb!vm:simple-array-signed-byte-8-type)
+    ((signed-byte 16) 0 16 sb!vm:simple-array-signed-byte-16-type)
+    ((signed-byte 30) 0 32 sb!vm:simple-array-signed-byte-30-type)
+    ((signed-byte 32) 0 32 sb!vm:simple-array-signed-byte-32-type)
+    ((complex single-float) #C(0.0s0 0.0s0) 64
+     sb!vm:simple-array-complex-single-float-type)
+    ((complex double-float) #C(0.0d0 0.0d0) 128
+     sb!vm:simple-array-complex-double-float-type)
+    #!+long-float
+    ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
+     sb!vm:simple-array-complex-long-float-type)
+    (t 0 32 sb!vm:simple-vector-type)))
+
+;;; The integer type restriction on the length ensures that it will be
+;;; a vector. The lack of adjustable, fill-pointer, and displaced-to
+;;; keywords ensures that it will be simple.
+(deftransform make-array ((length &key initial-element element-type)
+			  (integer &rest *))
+  (let* ((eltype (cond ((not element-type) t)
+		       ((not (constant-continuation-p element-type))
+			(give-up-ir1-transform
+			 "ELEMENT-TYPE is not constant."))
+		       (t
+			(continuation-value element-type))))
+	 (len (if (constant-continuation-p length)
+		  (continuation-value length)
+		  '*))
+	 (spec `(simple-array ,eltype (,len)))
+	 (eltype-type (specifier-type eltype)))
+    (multiple-value-bind (default-initial-element element-size typecode)
+	(dovector (info *array-info*
+			(give-up-ir1-transform
+			 "cannot open-code creation of ~S" spec))
+	  (when (csubtypep eltype-type (specifier-type (car info)))
+	    (return (values-list (cdr info)))))
+      (let* ((nwords-form
+	      (if (>= element-size sb!vm:word-bits)
+		  `(* length ,(/ element-size sb!vm:word-bits))
+		  (let ((elements-per-word (/ 32 element-size)))
+		    `(truncate (+ length
+				  ,(if (eq 'sb!vm:simple-string-type typecode)
+				     ;; (Simple strings are stored with an
+				     ;; extra trailing null for convenience
+				     ;; in calling out to C.)
+				     elements-per-word
+				     (1- elements-per-word)))
+			       ,elements-per-word))))
+	     (constructor
+	      `(truly-the ,spec
+			  (allocate-vector ,typecode length ,nwords-form))))
+	(values
+	 (cond ((and default-initial-element
+		     (or (null initial-element)
+			 (and (constant-continuation-p initial-element)
+			      (eql (continuation-value initial-element)
+				   default-initial-element))))
+		(unless (csubtypep (ctype-of default-initial-element)
+				   eltype-type)
+		  ;; This situation arises e.g. in
+		  ;;   (MAKE-ARRAY 4 :ELEMENT-TYPE '(INTEGER 1 5))
+		  ;; ANSI's definition of MAKE-ARRAY says "If
+		  ;; INITIAL-ELEMENT is not supplied, the consequences
+		  ;; of later reading an uninitialized element of
+		  ;; new-array are undefined," so this could be legal
+		  ;; code as long as the user plans to write before he
+		  ;; reads, and if he doesn't we're free to do
+		  ;; anything we like. But in case the user doesn't
+		  ;; know to write before he reads, we'll signal a
+		  ;; STYLE-WARNING in case he didn't realize this.
+		  ;;
+		  ;; FIXME: should be STYLE-WARNING, not note
+		  (compiler-note "The default initial element ~S is not a ~S."
+				 default-initial-element
+				 eltype))
+		constructor)
+	       (t
+		`(truly-the ,spec (fill ,constructor initial-element))))
+	 '((declare (type index length))))))))
+
+;;; The list type restriction does not ensure that the result will be a
+;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
+;;; and displaced-to keywords ensures that it will be simple.
+(deftransform make-array ((dims &key initial-element element-type)
+			  (list &rest *))
+  (unless (or (null element-type) (constant-continuation-p element-type))
+    (give-up-ir1-transform
+     "The element-type is not constant; cannot open code array creation."))
+  (unless (constant-continuation-p dims)
+    (give-up-ir1-transform
+     "The dimension list is not constant; cannot open code array creation."))
+  (let ((dims (continuation-value dims)))
+    (unless (every #'integerp dims)
+      (give-up-ir1-transform
+       "The dimension list contains something other than an integer: ~S"
+       dims))
+    (if (= (length dims) 1)
+	`(make-array ',(car dims)
+		     ,@(when initial-element
+			 '(:initial-element initial-element))
+		     ,@(when element-type
+			 '(:element-type element-type)))
+	(let* ((total-size (reduce #'* dims))
+	       (rank (length dims))
+	       (spec `(simple-array
+		       ,(cond ((null element-type) t)
+			      ((constant-continuation-p element-type)
+			       (continuation-value element-type))
+			      (t '*))
+			   ,(make-list rank :initial-element '*))))
+	  `(let ((header (make-array-header sb!vm:simple-array-type ,rank)))
+	     (setf (%array-fill-pointer header) ,total-size)
+	     (setf (%array-fill-pointer-p header) nil)
+	     (setf (%array-available-elements header) ,total-size)
+	     (setf (%array-data-vector header)
+		   (make-array ,total-size
+			       ,@(when element-type
+				   '(:element-type element-type))
+			       ,@(when initial-element
+				   '(:initial-element initial-element))))
+	     (setf (%array-displaced-p header) nil)
+	     ,@(let ((axis -1))
+		 (mapcar #'(lambda (dim)
+			     `(setf (%array-dimension header ,(incf axis))
+				    ,dim))
+			 dims))
+	     (truly-the ,spec header))))))
+
+;;;; miscellaneous properties of arrays
+
+;;; Transforms for various array properties. If the property is know
+;;; at compile time because of a type spec, use that constant value.
+
+;;; If we can tell the rank from the type info, use it instead.
+(deftransform array-rank ((array))
+  (let ((array-type (continuation-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let ((dims (array-type-dimensions array-type)))
+      (if (not (listp dims))
+	  (give-up-ir1-transform
+	   "The array rank is not known at compile time: ~S"
+	   dims)
+	  (length dims)))))
+
+;;; If we know the dimensions at compile time, just use it. Otherwise,
+;;; if we can tell that the axis is in bounds, convert to
+;;; %ARRAY-DIMENSION (which just indirects the array header) or length
+;;; (if it's simple and a vector).
+(deftransform array-dimension ((array axis)
+			       (array index))
+  (unless (constant-continuation-p axis)
+    (give-up-ir1-transform "The axis is not constant."))
+  (let ((array-type (continuation-type array))
+	(axis (continuation-value axis)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let ((dims (array-type-dimensions array-type)))
+      (unless (listp dims)
+	(give-up-ir1-transform
+	 "The array dimensions are unknown; must call ARRAY-DIMENSION at runtime."))
+      (unless (> (length dims) axis)
+	(abort-ir1-transform "The array has dimensions ~S, ~D is too large."
+			     dims
+			     axis))
+      (let ((dim (nth axis dims)))
+	(cond ((integerp dim)
+	       dim)
+	      ((= (length dims) 1)
+	       (ecase (array-type-complexp array-type)
+		 ((t)
+		  '(%array-dimension array 0))
+		 ((nil)
+		  '(length array))
+		 ((:maybe)
+		  (give-up-ir1-transform
+		   "can't tell whether array is simple"))))
+	      (t
+	       '(%array-dimension array axis)))))))
+
+;;; If the length has been declared and it's simple, just return it.
+(deftransform length ((vector)
+		      ((simple-array * (*))))
+  (let ((type (continuation-type vector)))
+    (unless (array-type-p type)
+      (give-up-ir1-transform))
+    (let ((dims (array-type-dimensions type)))
+      (unless (and (listp dims) (integerp (car dims)))
+	(give-up-ir1-transform
+	 "Vector length is unknown, must call LENGTH at runtime."))
+      (car dims))))
+
+;;; All vectors can get their length by using VECTOR-LENGTH. If it's
+;;; simple, it will extract the length slot from the vector. It it's
+;;; complex, it will extract the fill pointer slot from the array
+;;; header.
+(deftransform length ((vector) (vector))
+  '(vector-length vector))
+
+;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
+;;; compile-time constant.
+(deftransform vector-length ((vector) ((simple-array * (*))))
+  (let ((vtype (continuation-type vector)))
+    (if (array-type-p vtype)
+	(let ((dim (first (array-type-dimensions vtype))))
+	  (when (eq dim '*) (give-up-ir1-transform))
+	  dim)
+	(give-up-ir1-transform))))
+
+;;; Again, if we can tell the results from the type, just use it.
+;;; Otherwise, if we know the rank, convert into a computation based
+;;; on array-dimension. We can wrap a TRULY-THE INDEX around the
+;;; multiplications because we know that the total size must be an
+;;; INDEX.
+(deftransform array-total-size ((array)
+				(array))
+  (let ((array-type (continuation-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let ((dims (array-type-dimensions array-type)))
+      (unless (listp dims)
+	(give-up-ir1-transform "can't tell the rank at compile time"))
+      (if (member '* dims)
+	  (do ((form 1 `(truly-the index
+				   (* (array-dimension array ,i) ,form)))
+	       (i 0 (1+ i)))
+	      ((= i (length dims)) form))
+	  (reduce #'* dims)))))
+
+;;; Only complex vectors have fill pointers.
+(deftransform array-has-fill-pointer-p ((array))
+  (let ((array-type (continuation-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let ((dims (array-type-dimensions array-type)))
+      (if (and (listp dims) (not (= (length dims) 1)))
+	  nil
+	  (ecase (array-type-complexp array-type)
+	    ((t)
+	     t)
+	    ((nil)
+	     nil)
+	    ((:maybe)
+	     (give-up-ir1-transform
+	      "The array type is ambiguous; must call ~
+	      array-has-fill-pointer-p at runtime.")))))))
+
+;;; Primitive used to verify indices into arrays. If we can tell at
+;;; compile-time or we are generating unsafe code, don't bother with
+;;; the VOP.
+(deftransform %check-bound ((array dimension index))
+  (unless (constant-continuation-p dimension)
+    (give-up-ir1-transform))
+  (let ((dim (continuation-value dimension)))
+    `(the (integer 0 ,dim) index)))
+(deftransform %check-bound ((array dimension index) * *
+			    :policy (and (> speed safety) (= safety 0)))
+  'index)
+
+;;;; array accessors
+
+;;; SVREF, %SVSET, SCHAR, %SCHARSET, CHAR,
+;;; %CHARSET, SBIT, %SBITSET, BIT, %BITSET
+;;;   --  source transforms.
+;;;
+;;; We convert all typed array accessors into aref and %aset with type
+;;; assertions on the array.
+(macrolet ((define-frob (reffer setter type)
+	     `(progn
+		(def-source-transform ,reffer (a &rest i)
+		  (if (byte-compiling)
+		      (values nil t)
+		      `(aref (the ,',type ,a) ,@i)))
+		(def-source-transform ,setter (a &rest i)
+		  (if (byte-compiling)
+		      (values nil t)
+		      `(%aset (the ,',type ,a) ,@i))))))
+  (define-frob svref %svset simple-vector)
+  (define-frob schar %scharset simple-string)
+  (define-frob char %charset string)
+  (define-frob sbit %sbitset (simple-array bit))
+  (define-frob bit %bitset (array bit)))
+
+(macrolet (;; This is a handy macro for computing the row-major index
+	   ;; given a set of indices. We wrap each index with a call
+	   ;; to %CHECK-BOUND to ensure that everything works out
+	   ;; correctly. We can wrap all the interior arithmetic with
+	   ;; TRULY-THE INDEX because we know the the resultant
+	   ;; row-major index must be an index.
+	   (with-row-major-index ((array indices index &optional new-value)
+				  &rest body)
+	     `(let (n-indices dims)
+		(dotimes (i (length ,indices))
+		  (push (make-symbol (format nil "INDEX-~D" i)) n-indices)
+		  (push (make-symbol (format nil "DIM-~D" i)) dims))
+		(setf n-indices (nreverse n-indices))
+		(setf dims (nreverse dims))
+		`(lambda (,',array ,@n-indices
+				   ,@',(when new-value (list new-value)))
+		   (let* (,@(let ((,index -1))
+			      (mapcar #'(lambda (name)
+					  `(,name (array-dimension
+						   ,',array
+						   ,(incf ,index))))
+				      dims))
+			    (,',index
+			     ,(if (null dims)
+				  0
+				(do* ((dims dims (cdr dims))
+				      (indices n-indices (cdr indices))
+				      (last-dim nil (car dims))
+				      (form `(%check-bound ,',array
+							   ,(car dims)
+							   ,(car indices))
+					    `(truly-the
+					      index
+					      (+ (truly-the index
+							    (* ,form
+							       ,last-dim))
+						 (%check-bound
+						  ,',array
+						  ,(car dims)
+						  ,(car indices))))))
+				    ((null (cdr dims)) form)))))
+		     ,',@body)))))
+
+  ;; Just return the index after computing it.
+  (deftransform array-row-major-index ((array &rest indices))
+    (with-row-major-index (array indices index)
+      index))
+
+  ;; Convert AREF and %ASET into a HAIRY-DATA-VECTOR-REF (or
+  ;; HAIRY-DATA-VECTOR-SET) with the set of indices replaced with the an
+  ;; expression for the row major index.
+  (deftransform aref ((array &rest indices))
+    (with-row-major-index (array indices index)
+      (hairy-data-vector-ref array index)))
+  (deftransform %aset ((array &rest stuff))
+    (let ((indices (butlast stuff)))
+      (with-row-major-index (array indices index new-value)
+	(hairy-data-vector-set array index new-value)))))
+
+;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
+;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the
+;;; array total size.
+(deftransform row-major-aref ((array index))
+  `(hairy-data-vector-ref array
+			  (%check-bound array (array-total-size array) index)))
+(deftransform %set-row-major-aref ((array index new-value))
+  `(hairy-data-vector-set array
+			  (%check-bound array (array-total-size array) index)
+			  new-value))
+
+;;;; bit-vector array operation canonicalization
+;;;;
+;;;; We convert all bit-vector operations to have the result array
+;;;; specified. This allows any result allocation to be open-coded,
+;;;; and eliminates the need for any VM-dependent transforms to handle
+;;;; these cases.
+
+(dolist (fun '(bit-and bit-ior bit-xor bit-eqv bit-nand bit-nor bit-andc1
+		       bit-andc2 bit-orc1 bit-orc2))
+  ;; Make a result array if result is NIL or unsupplied.
+  (deftransform fun ((bit-array-1 bit-array-2 &optional result-bit-array)
+		     '(bit-vector bit-vector &optional null) '*
+		     :eval-name t
+		     :policy (>= speed space))
+    `(,fun bit-array-1 bit-array-2
+	   (make-array (length bit-array-1) :element-type 'bit)))
+  ;; If result is T, make it the first arg.
+  (deftransform fun ((bit-array-1 bit-array-2 result-bit-array)
+		     '(bit-vector bit-vector (member t)) '*
+		     :eval-name t)
+    `(,fun bit-array-1 bit-array-2 bit-array-1)))
+
+;;; Similar for BIT-NOT, but there is only one arg...
+(deftransform bit-not ((bit-array-1 &optional result-bit-array)
+		       (bit-vector &optional null) *
+		       :policy (>= speed space))
+  '(bit-not bit-array-1
+	    (make-array (length bit-array-1) :element-type 'bit)))
+(deftransform bit-not ((bit-array-1 result-bit-array)
+		       (bit-vector (constant-argument t)))
+  '(bit-not bit-array-1 bit-array-1))
+;;; FIXME: What does (CONSTANT-ARGUMENT T) mean? Is it the same thing
+;;; as (CONSTANT-ARGUMENT (MEMBER T)), or does it mean any constant
+;;; value?
+
+;;; Pick off some constant cases.
+(deftransform array-header-p ((array) (array))
+  (let ((type (continuation-type array)))
+    (declare (optimize (safety 3)))
+    (unless (array-type-p type)
+      (give-up-ir1-transform))
+    (let ((dims (array-type-dimensions type)))
+      (cond ((csubtypep type (specifier-type '(simple-array * (*))))
+	     ;; No array header.
+	     nil)
+	    ((and (listp dims) (> (length dims) 1))
+	     ;; Multi-dimensional array, will have a header.
+	     t)
+	    (t
+	     (give-up-ir1-transform))))))

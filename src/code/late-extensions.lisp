@@ -1,0 +1,96 @@
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!EXT")
+
+(file-comment
+  "$Header$")
+
+(defun featurep (x)
+  #!+sb-doc
+  "If X is an atom, see whether it is present in *FEATURES*. Also
+  handle arbitrary combinations of atoms using NOT, AND, OR."
+  (if (consp x)
+    (case (car x)
+      ((:not not)
+       (if (cddr x)
+	 (error "too many subexpressions in feature expression: ~S" x)
+	 (not (featurep (cadr x)))))
+      ((:and and) (every #'featurep (cdr x)))
+      ((:or or) (some #'featurep (cdr x)))
+      (t
+       (error "unknown operator in feature expression: ~S." x)))
+    (not (null (memq x *features*)))))
+
+;;; KLUDGE: This is a wrapper around stale code for working with floating point
+;;; infinities. I believe that I will eventually eliminate floating point
+;;; infinities from the code, since they're a pain to cross-compile, since they
+;;; significantly increase the number of conditions which need to be tested in
+;;; numeric functions, and since the benefits which they provide (which are
+;;; admittedly significant) are unfortunately not portable. I haven't actually
+;;; done the dirty deed yet, though, and until then, I've wrapped various
+;;; infinity-returning forms in this macro. -- WHN 1999
+(defmacro infinite (x)
+  (declare (ignorable x))
+  #!-sb-infinities '(error 'floating-point-overflow)
+  #!+sb-infinities x)
+
+;;; Given a list of keyword substitutions `(,OLD ,NEW), and a
+;;; keyword-argument-list-style list of alternating keywords and arbitrary
+;;; values, return a new keyword-argument-list-style list with all
+;;; substitutions applied to it.
+;;;
+;;; Note: If efficiency mattered, we could do less consing. (But if efficiency
+;;; mattered, why would we be using keyword arguments at all, much less
+;;; renaming keyword arguments?)
+;;;
+;;; KLUDGE: It would probably be good to get rid of this. -- WHN 19991201
+(defun rename-keyword-args (rename-list keyword-args)
+  (declare (type list rename-list keyword-args))
+  ;; Walk through RENAME-LIST modifying RESULT as per each element in
+  ;; RENAME-LIST.
+  (do ((result (copy-list keyword-args))) ; may be modified below
+      ((null rename-list) result)
+    (destructuring-bind (old new) (pop rename-list)
+      (declare (type keyword old new))
+      ;; Walk through RESULT renaming any OLD keyword argument to NEW.
+      (do ((in-result result (cddr in-result)))
+	  ((null in-result))
+	(declare (type list in-result))
+	(when (eq (car in-result) old)
+	  (setf (car in-result) new))))))
+
+;;; ANSI Common Lisp's READ-SEQUENCE function, unlike most of the
+;;; other ANSI input functions, is defined to communicate end of file
+;;; status with its return value, not by signalling. This is not the
+;;; behavior we usually want. This is a wrapper which give the
+;;; behavior we usually want, causing READ-SEQUENCE to communicate
+;;; end-of-file status by signalling.
+(defun read-sequence-or-die (sequence stream &key start end)
+  ;; implementation using READ-SEQUENCE
+  #-no-ansi-read-sequence
+  (let ((read-end (read-sequence sequence
+				 stream
+				 :start start
+				 :end end)))
+    (unless (= read-end end)
+      (error 'end-of-file :stream stream))
+    (values))
+  ;; workaround for broken READ-SEQUENCE
+  #+no-ansi-read-sequence
+  (progn
+    (assert (<= start end))
+    (let ((etype (stream-element-type stream)))
+    (cond ((equal etype '(unsigned-byte 8))
+	   (do ((i start (1+ i)))
+	       ((>= i end)
+		(values))
+	     (setf (aref sequence i)
+		   (read-byte stream))))
+	  (t (error "unsupported element type ~S" etype))))))

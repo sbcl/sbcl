@@ -1,0 +1,284 @@
+;;;; tags which are set during the build process and which end up in
+;;;; CL:*FEATURES* in the target SBCL, plus some comments about other
+;;;; CL:*FEATURES* tags which have special meaning to SBCL or which
+;;;; have a special conventional meaning
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(
+ ;;
+ ;; features present in all builds
+ ;;
+
+ ;; our standard
+ :ansi-cl :common-lisp
+ ;; FIXME: Isn't there a :x3jsomething feature which we should set too?
+
+ ;; our dialect
+ :sbcl
+
+ ;; Douglas Thomas Crosher's conservative generational GC (the only one
+ ;; we currently support)
+ :gencgc
+
+ ;; We're running under a UNIX. This is sort of redundant, and it was also
+ ;; sort of redundant under CMU CL, which we inherited it from: neither SBCL
+ ;; nor CMU CL supports anything but UNIX (and "technically not UNIX"es
+ ;; such as *BSD and Linux). But someday, maybe we might, and in that case
+ ;; we'd presumably remove this, so its presence conveys the information
+ ;; that the system isn't one which follows such a change.
+ :unix
+
+ ;;
+ ;; features present in this particular build
+ ;;
+
+ ;; Setting this enables the compilation of documentation strings
+ ;; from the system sources into the target Lisp executable.
+ ;; Traditional Common Lisp folk will want this option set.
+ ;; I (WHN) made it optional because I came to Common Lisp from
+ ;; C++ through Scheme, so I'm accustomed to asking
+ ;; Emacs about things that I'm curious about instead of asking
+ ;; the executable I'm running.
+ :sb-doc
+
+ ;; When this is set, EVAL is implemented as an "IR1 interpreter": 
+ ;; code is compiled into the compiler's first internal representation,
+ ;; then the IR1 is interpreted. When this is not set, EVAL is implemented
+ ;; as a little bit of hackery wrapped around a call to COMPILE, i.e.
+ ;; the system becomes a "compiler-only implementation" of Common Lisp.
+ ;; As of sbcl-0.6.7, the compiler-only implementation is prototype code,
+ ;; and much less mature than the old IR1 interpreter. Thus, the safe
+ ;; thing is to leave :SB-INTERPRETER set. However, the compiler-only
+ ;; system is noticeably smaller, so you might want to omit
+ ;; :SB-INTERPRETER if you have a small machine.
+ ;;
+ ;; Probably, the compiler-only implementation will become more
+ ;; stable someday, and support for the IR1 interpreter will then be
+ ;; dropped. This will make the system smaller and easier to maintain
+ ;; not only because we no longer need to support the interpreter,
+ ;; but because code elsewhere in the system (the dumper, the debugger,
+ ;; etc.) no longer needs special cases for interpreted code.
+ :sb-interpreter
+
+ ;; Do regression and other tests when building the system. You
+ ;; might or might not want this if you're not a developer,
+ ;; depending on how paranoid you are. You probably do want it if
+ ;; you are a developer.
+ :sb-test
+
+ ;; Setting this makes more debugging information available.
+ ;; If you aren't hacking or troubleshooting SBCL itself, you
+ ;; probably don't want this set.
+ ;;
+ ;; At least two varieties of debugging information are enabled by this
+ ;; option:
+ ;;   * SBCL is compiled with a higher level of OPTIMIZE DEBUG, so that
+ ;;     the debugger can tell more about the state of the system.
+ ;;   * Various code to print debugging messages, and similar debugging code,
+ ;;     is compiled only when this feature is present.
+ ;;
+ ;; Note that the extra information recorded by the compiler at
+ ;; this higher level of OPTIMIZE DEBUG includes the source location
+ ;; forms. In order for the debugger to use this information, it has to
+ ;; re-READ the source file. In an ordinary installation of SBCL, this
+ ;; re-READing may not work very well, for either of two reasons:
+ ;;   * The sources aren't present on the system in the same location that
+ ;;     they were on the system where SBCL was compiled.
+ ;;   * SBCL is using the standard readtable, without the added hackage
+ ;;     which allows it to handle things like target features.
+ ;; If you want to be able to use the extra debugging information,
+ ;; therefore, be sure to keep the sources around, and run with the
+ ;; readtable configured so that the system sources can be read.
+ ; :sb-show
+
+ ;; Enable extra debugging output in the assem.lisp assembler/scheduler
+ ;; code. (This is the feature which was called :DEBUG in the
+ ;; original CMU CL code.)
+ ; :sb-show-assem
+
+ ;; Setting this makes SBCL more "fluid", i.e. more amenable to
+ ;; modification at runtime, by suppressing various INLINE declarations,
+ ;; compiler macro definitions, FREEZE-TYPE declarations; and by
+ ;; suppressing various burning-our-ships-behind-us actions after
+ ;; initialization is complete; and so forth. This tends to clobber the
+ ;; performance of the system, so unless you have some special need for
+ ;; this when hacking SBCL itself, you don't want this set.
+ ; :sb-fluid
+
+ ;; Enable code for collecting statistics on usage of various operations,
+ ;; useful for performance tuning of the SBCL system itself. This code
+ ;; is probably pretty stale (having not been tested since the fork from
+ ;; base CMU CL) but might nonetheless be a useful starting point for
+ ;; anyone who wants to collect such statistics in the future.
+ ; :sb-dyncount
+
+ ;; Peter Van Eynde's increase-bulletproofness code
+ ;;
+ ;; This is not maintained or tested in current SBCL, but I haven't
+ ;; gone out of my way to remove or break it, either.
+ ;;
+ ; :high-security
+ ; :high-security-support
+
+ ;; multiprocessing support
+ ;;
+ ;; This is not maintained or tested in current SBCL. I haven't gone out
+ ;; of my way to break it, but since it's derived from an old version of 
+ ;; CMU CL where multiprocessing was pretty shaky, it's likely to be very
+ ;; flaky now.
+ ;;   :MP enables multiprocessing
+ ;;   :MP-I486 is used, only within the multiprocessing code, to control
+ ;;            what seems to control processor-version-specific code. It's
+ ;;            probably for 486 or later, i.e. could be set as long as
+ ;;            you know you're not running on a 386, but it doesn't seem
+ ;;            to be documented anywhere, so that's just a guess.
+ ; :mp
+ ; :mp-i486
+
+ ;; KLUDGE: used to suppress stale code related to floating point infinities.
+ ;; I intend to delete this code completely some day, since it was a pain
+ ;; for me to try to work with and since all benefits it provides are
+ ;; non-portable. Until I actually pull the trigger, though, I've left
+ ;; various stale code in place protected with #!-SB-INFINITIES.
+ ; :sb-infinities
+
+ ;; This affects the definition of a lot of things in bignum.lisp. It
+ ;; doesn't seem to be documented anywhere what systems it might apply to.
+ ;; It doesn't seem to be needed for X86 systems anyway.
+ ; :32x16-divide
+
+ ;; This is probably true for some processor types, but not X86. It affects
+ ;; a lot of floating point code.
+ ; :negative-zero-is-not-zero
+
+ ;; This is mentioned in cmu-user.tex, which says that it enables
+ ;; the compiler to reason about integer arithmetic. It also seems to
+ ;; control other fancy numeric reasoning, e.g. knowing the result type of
+ ;; a remainder calculation given the type of its inputs.
+ ;;
+ ;; KLUDGE: Even when this is implemented for the target feature list,
+ ;; the code to implement this feature will not generated in the
+ ;; cross-compiler (i.e. will only be generated in the target compiler).
+ ;; The reason for this is that the interval arithmetic routines used
+ ;; to implement this feature are written under the assumption that
+ ;; Lisp arithmetic supports plus and minus infinity, which isn't guaranteed by
+ ;; ANSI Common Lisp. I've tried to mark the conditionals which implement
+ ;; this kludge with the string CROSS-FLOAT-INFINITY-KLUDGE so that
+ ;; sometime it might be possible to undo them (perhaps by using
+ ;; nice portable :PLUS-INFINITY and :MINUS-INFINITY values instead of
+ ;; implementation dependent floating infinity values, which would
+ ;; admittedly involve extra consing; or perhaps by finding some cleaner
+ ;; way of suppressing the construction of this code in the cross-compiler).
+ ;;
+ ;; KLUDGE: Even after doing the KLUDGE above, the cross-compiler doesn't work,
+ ;; because some interval operations are conditional on PROPAGATE-FUN-TYPE
+ ;; instead of PROPAGATE-FLOAT-TYPE. So for now, I've completely turned off
+ ;; both PROPAGATE-FUN-TYPE and PROPAGATE-FLOAT-TYPE. (After I build
+ ;; a compiler which works, then I can think about getting the optimization
+ ;; to work.) -- WHN 19990702
+ ; :propagate-float-type
+
+ ;; According to cmu-user.tex, this enables the compiler to infer result
+ ;; types for mathematical functions a la SQRT, EXPT, and LOG, allowing
+ ;; it to e.g. eliminate the possibility that a complex result will be
+ ;; generated.
+ ;;
+ ;; KLUDGE: turned off as per the comments for PROPAGATE-FLOAT-TYPE above
+ ; :propagate-fun-type
+
+ ;; It's unclear to me what this does (but it was enabled in the code that I
+ ;; picked up from Peter Van Eynde). -- WHN 19990224
+ :constrain-float-type
+
+ ;; This is set in classic CMU CL, and presumably there it means
+ ;; that the floating point arithmetic implementation
+ ;; conforms to IEEE's standard. Here it definitely means that the
+ ;; floating point arithmetic implementation conforms to IEEE's standard.
+ ;; I (WHN 19990702) haven't tried to verify
+ ;; that it does conform, but it should at least mostly conform (because
+ ;; the underlying x86 hardware tries).
+ :ieee-floating-point
+
+ ;; This seems to be the pre-GENCGC garbage collector for CMU CL, which was
+ ;; AFAIK never supported for the X86.
+ ; :gengc
+
+ ;; CMU CL had, and we inherited, code to support 80-bit LONG-FLOAT on the x86
+ ;; architecture. Nothing has been done to actively destroy the long float
+ ;; support, but it hasn't been thoroughly maintained, and needs at least
+ ;; some maintenance before it will work. (E.g. the LONG-FLOAT-only parts of
+ ;; genesis are still implemented in terms of unportable CMU CL functions
+ ;; which are not longer available at genesis time in SBCL.) A deeper
+ ;; problem is SBCL's bootstrap process implicitly assumes that the
+ ;; cross-compilation host will be able to make the same distinctions
+ ;; between floating point types that it does. This assumption is
+ ;; fundamentally sleazy, even though in practice it's unlikely to break down
+ ;; w.r.t. distinguishing SINGLE-FLOAT from DOUBLE-FLOAT; it's much more
+ ;; likely to break down w.r.t. distinguishing DOUBLE-FLOAT from LONG-FLOAT.
+ ;; Still it's likely to be quite doable to get LONG-FLOAT support working
+ ;; again, if anyone's sufficiently motivated.
+ ; :long-float
+
+ ;;
+ ;; miscellaneous notes on other things which could have special significance
+ ;; in the *FEATURES* list
+ ;;
+
+ ;; notes on the :NIL and :IGNORE features:
+ ;;
+ ;; #+NIL is used to comment out forms. Occasionally #+IGNORE is used
+ ;; for this too. So don't use :NIL or :IGNORE as the names of features..
+
+ ;; notes on :SB-XC and :SB-XC-HOST features (which aren't controlled by this
+ ;; file, but are instead temporarily pushed onto *FEATURES* or
+ ;; *TARGET-FEATURES* during some phases of cross-compilation):
+ ;;
+ ;; :SB-XC-HOST stands for "cross-compilation host" and is in *FEATURES*
+ ;; during the first phase of cross-compilation bootstrapping, when the
+ ;; host Lisp is being used to compile the cross-compiler.
+ ;;
+ ;; :SB-XC stands for "cross compiler", and is in *FEATURES* during the second
+ ;; phase of cross-compilation bootstrapping, when the cross-compiler is
+ ;; being used to create the first target Lisp.
+
+ ;; notes on the :SB-ASSEMBLING feature (which isn't controlled by
+ ;; this file):
+ ;;
+ ;; This is a flag for whether we're in the assembler. It's
+ ;; temporarily pushed onto the *FEATURES* list in the setup for
+ ;; the ASSEMBLE-FILE function. It would be a bad idea
+ ;; to use it as a name for a permanent feature.
+
+ ;; notes on local features (which are set automatically by the
+ ;; configuration script, and should not be set here unless you
+ ;; really, really know what you're doing):
+ ;; 
+ ;; machine architecture features:
+ ;;   :x86 ; any Intel 386 or better, or compatibles like the AMD K6 or K7
+ ;;   (No others are supported by SBCL as of 0.6.7, but :alpha or 
+ ;;   :sparc support could be ported from CMU CL if anyone is
+ ;;   sufficiently motivated to do so.)
+ ;;   (CMU CL also had a :pentium feature, which affected the definition 
+ ;;   of some floating point vops. It was present but not enabled in the
+ ;;   CMU CL code that SBCL is derived from, and is present but stale
+ ;;   in SBCL as of 0.6.7.)
+ ;;
+ ;; operating system features:
+ ;;   :linux   = We're intended to run under some version of Linux.
+ ;;   :bsd     = We're intended to run under some version of BSD Unix. (This
+ ;;              is not exclusive with the features which indicate which
+ ;;              particular version of BSD we're intended to run under.)
+ ;;   :freebsd = We're intended to run under FreeBSD.
+ ;;   :openbsd = We're intended to run under FreeBSD.
+ ;; (No others are supported by SBCL as of 0.6.7, but :hpux or
+ ;; :solaris support could be ported from CMU CL if anyone is
+ ;; sufficiently motivated to do so.)
+ )

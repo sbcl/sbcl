@@ -1,0 +1,18 @@
+;;; This is the master value for LISP-IMPLEMENTATION-VERSION. It's
+;;; separated into its own file here so that it's easy for
+;;; text-munging make-ish or cvs-ish scripts to find and tweak it. For
+;;; the convenience of such scripts, only a trivial subset of Lisp
+;;; reader syntax should be used here: semicolon-delimited comments,
+;;; possible blank lines or other whitespace, and a single
+;;; double-quoted string value alone on its own line.
+;;;
+;;; ANSI says LISP-IMPLEMENTATION-VERSION can be NIL "if no
+;;; appropriate and relevant result can be produced", but as long as
+;;; we control the build, we can always assign an appropriate and
+;;; relevant result, so this must be a string, not NIL.
+;;;
+;;; Conventionally a string a la "0.6.6" is used for released
+;;; versions, and a string a la "0.6.5.12" is used for versions which
+;;; aren't released but correspond only to CVS tags.
+
+"0.6.7.1"

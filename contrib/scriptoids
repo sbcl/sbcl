@@ -1,0 +1,252 @@
+From sbcl-devel-admin@lists.sourceforge.net Sun Jul 16 12:10:07 2000
+Received: from localhost (IDENT:newman@localhost.localdomain [127.0.0.1])
+	by rootless.localdomain (8.9.3/8.9.3) with ESMTP id MAA07245
+	for <newman@localhost>; Sun, 16 Jul 2000 12:10:05 -0500 (CDT)
+Received: from mail.airmail.net
+	by localhost with POP3 (fetchmail-5.1.1)
+	for newman@localhost (single-drop); Sun, 16 Jul 2000 12:10:06 -0500 (CDT)
+Received: from lists.sourceforge.net from [198.186.203.35] by mail.airmail.net 
+	(/\##/\ Smail3.1.30.16 #30.438) with esmtp for <william.newman@airmail.net> sender: <sbcl-devel-admin@lists.sourceforge.net>
+	id <mn/13DanY-000GXOn@mail.airmail.net>; Sat, 15 Jul 2000 17:52:40 -0500 (CDT)
+Received: from mail1.sourceforge.net (localhost [127.0.0.1])
+	by lists.sourceforge.net (8.9.3/8.9.3) with ESMTP id PAA03497;
+	Sat, 15 Jul 2000 15:52:33 -0700
+Received: from tninkpad.telent.net (detached.demon.co.uk [194.222.13.128])
+	by lists.sourceforge.net (8.9.3/8.9.3) with ESMTP id PAA03477
+	for <sbcl-devel@lists.sourceforge.net>; Sat, 15 Jul 2000 15:52:28 -0700
+Received: from dan by tninkpad.telent.net with local (Exim 3.12 #1 (Debian))
+	id 13Daly-0002eu-00; Sat, 15 Jul 2000 23:51:02 +0100
+To: sbcl-devel@lists.sourceforge.net
+From: Daniel Barlow <dan@telent.net>
+Date: 15 Jul 2000 23:51:02 +0100
+Message-ID: <87og3zvwh5.fsf@tninkpad.telent.net>
+User-Agent: Gnus/5.0803 (Gnus v5.8.3) Emacs/20.7
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=-=-="
+Subject: [Sbcl-devel] LINK-SYSTEM - "How big is a `hello world' program in SBCL?"
+Sender: sbcl-devel-admin@lists.sourceforge.net
+Errors-To: sbcl-devel-admin@lists.sourceforge.net
+X-Mailman-Version: 1.1
+Precedence: bulk
+List-Id:  <sbcl-devel.lists.sourceforge.net>
+X-BeenThere: sbcl-devel@lists.sourceforge.net
+X-Airmail-Delivered: Sat, 15 Jul 2000 17:52:40 -0500 (CDT)
+X-Airmail-Spooled:   Sat, 15 Jul 2000 17:52:40 -0500 (CDT)
+Status: RO
+Content-Length: 8179
+Lines: 80
+
+--=-=-=
+
+
+1103 bytes.  :-)
+
+The problem I wanted to solve here is that of making sbcl programs
+that run from the command line and look superficially like normal unix
+executables (in, say, the same way as shell scripts or Perl programs
+do).  The programs in question are expected to run on a system with
+sbcl installed (there's a core file, and a runtime, etc) but have to
+share the same core file and not each dump their own.  Disk may be
+cheap but it's not _that_ cheap ...
+
+This is achieved using shell #! magic and concatenation of fasl files.
+
+STANDALONEIZE-FILE, given a collection of x86f files, makes a single
+file that can be run from the shell prompt.  The file consists of 
+the concatenation of all the x86f files, appended to #! magic which 
+invokes sbcl on them.  
+
+LINK-SYSTEM operates with mk-defsystem (get it from CLOCC) to build a similar
+file from a system definition.  It currently breaks if the system has
+non-Lisp components (e.g. db-sockets, which loads .so objects)
+
+
+Here's how you use it:
+
+    :; cat hello.lisp
+    (in-package :cl-user)
+
+    (format t "hello world ~%")
+    (quit)
+
+    :; sbcl --noinform --core testcore.core --eval '(progn (compile-file "hello.lisp") (standaloneize:standaloneize-file "hello" "hello.x86f") (quit))'
+    compiling "/home/dan/src/telent/lisploader/hello.lisp" (written 15 JUL 2000 10:27:45 PM):
+
+    byte compiling top-level form: 
+    byte compiling top-level form: 
+    byte compiling top-level form: 
+
+    hello.x86f written
+    compilation finished in 0:00:00
+
+    :; ls -l hello
+    -rwxr-xr-x    1 dan      dan          1103 Jul 15 22:43 hello
+
+    :; time ./hello
+    hello world 
+
+    real    0m0.116s
+    user    0m0.040s
+    sys     0m0.060s
+
+It also understands search paths ...
+
+    :; cp hello ~/bin
+    :; type hello
+    hello is /home/dan/bin/hello
+    :; hello
+    hello world 
+
+So how about that?  1k executables and 1/10th second startup times.
+It helps that I already have another instance of sbcl open, of course :-)
+
+The whole thing is only about 5k, so I enclose it here as an
+attachment.  Build instructions are in the comment at the top.  You
+have to dump a core file with it compiled in, but the point is that
+you only have to do so once per sbcl, not once per application.
+
+I hope this will (eventually, anyway) encourage use of SBCL by people
+wanting to solve "scripting" problems.  The unix shell may be ugly,
+but it's not going away any time soon, so it helps if we play nice
+with it.
+
+
+--=-=-=
+Content-Disposition: attachment; filename=heuristic-fasload.lisp
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (defpackage "STANDALONEIZE"
+    (:use :sb-alien :sb-c-call :common-lisp)
+    (:export standaloneize-file)))
+(in-package :standaloneize)
+
+;;;; Functions useful for making sbcl do sensible stuff with #!
+;;;; (STANDALONEIZE-FILE output-file input-files) gloms the input files
+;;;; together and sticks shell magic on top.   FIND-AND-LOAD-FASL and its
+;;;; supporting functions are called when the file is executed
+
+;;;; How to use it.  Compile this file.  Load it into a fresh SBCL image.
+;;;; Dump a core file.  Use that core file.
+
+(defun find-fasl-in-stream (stream)
+   "Search forwards in STREAM for a line starting with the value of sb-c:*fasl-header-string-start-string*.  Leave the stream at the offset of the start of that line, and return the offset"
+  (let ((fasl-cookie sb-c:*fasl-header-string-start-string*))
+    (loop for position = (file-position stream)
+          for text = (read-line stream)
+          ;;do (format t "~A ~A ~A ~%" position text fasl-cookie)
+          if (and text
+                    (>= (length (the simple-string text))
+                        (length fasl-cookie))
+                    (string= text fasl-cookie :end1 (length fasl-cookie)))
+          return (progn (file-position stream position) position))))
+
+
+;;; This courtesy of Pierre Mai in comp.lang.lisp 08 Jan 1999 00:51:44 +0100
+;;; Message-ID: <87lnjebq0f.fsf@orion.dent.isdn.cs.tu-berlin.de>
+
+(defun split (string &optional max (ws '(#\Space #\Tab)))
+  "Split `string' along whitespace as defined by the sequence `ws'.
+The whitespace is elided from the result.  The whole string will be
+split, unless `max' is a non-negative integer, in which case the
+string will be split into `max' tokens at most, the last one
+containing the whole rest of the given `string', if any."
+  (flet ((is-ws (char) (find char ws)))
+    (loop for start = (position-if-not #'is-ws string)
+          then (position-if-not #'is-ws string :start index)
+          for index = (and start
+                           (if (and max (= (1+ word-count) max))
+                               nil
+                             (position-if #'is-ws string :start start)))
+          while start
+          collect (subseq string start index)
+          count 1 into word-count
+          while index)))
+
+(defun find-name-on-path (name)
+  (let* ((search-string (or (sb-ext:posix-getenv "PATH")
+                            ":/bin:/usr/bin"))
+         (search-list (split search-string nil '(#\:))))
+    (or 
+     (loop for p in search-list
+           for directory = (merge-pathnames (make-pathname :directory p))
+           if (probe-file (merge-pathnames name directory))
+           return (merge-pathnames name directory))
+     name)))
+    
+(defun find-and-load-fasl (name)
+  "Attempt to find and load a FASL file from NAME.  FASL data in the file may be preceded by any number of lines of arbitrary text.  If NAME contains no directory portion, it is searched for on the system path in a manner similar to that of execvp(3)"
+  (let ((path 
+         (if (pathname-directory name)
+             name
+           (find-name-on-path name))))
+    (with-open-file (i path :direction :input)
+      (find-fasl-in-stream i)
+      (sb-impl::fasload i nil nil))))
+
+;;;; and now some functions for more easily creating these scuffed fasl files
+
+(defun copy-stream (from to)
+  "Copy into TO from FROM until end of file, without translating or otherwise mauling anything"
+  (let ((buf (make-array 4096 :element-type (stream-element-type from)
+                         :initial-element #\Space)))
+    (do ((pos (read-sequence buf from)  (read-sequence buf from)))
+        ((= 0 pos) nil)
+      (write-sequence buf to :end pos))))
+
+(defparameter *standalone-magic*
+  "#!/bin/sh
+exec /usr/local/bin/sbcl --core testcore.core --noinform --noprint  --eval \"(standaloneize::find-and-load-fasl \\\"$0\\\")\" $*
+"
+  "This text is prepended to the output file created by STANDALONEIZE-FILE")
+
+;;; this syscall seems to have been removed from SBCL.  
+(def-alien-routine chmod int (path c-string) (mode int))
+
+(defun standaloneize-file (output-filename &rest objects)
+  "Make a standalone executable(sic) called OUTPUT-FILENAME out of OBJECTS, through the magic of hash bang."
+  (with-open-file (out output-filename :direction :output)
+    (write-sequence *standalone-magic* out)
+    (dolist (obj objects)
+      (with-open-file (in obj)
+        (copy-stream in out))))
+  (chmod (namestring output-filename) #o755))
+
+;;;; Another way of doing it would be to create a "link" operation for
+;;;; systems defined with mk-defsystem -
+
+#+mk-defsystem
+(defun print-binary-file-operation (component force)
+  "Spit the binary file associated with COMPONENT to *STANDARD-OUTPUT*"
+  (with-open-file (i (compile-file-pathname
+                      (make::component-pathname component :binary))
+                     :direction :input)
+    (copy-stream i *standard-output*))
+  nil)
+
+#+mk-defsystem
+(defun link-system (system output-file)
+  "Create a single executable file from all the files in SYSTEM"
+  (make::component-operation 'print-binary 'print-binary-file-operation)
+  (with-open-file (o output-file :direction :output
+                     :if-exists :rename)
+    (write-sequence *standalone-magic* o)
+    (let ((*standard-output* o))
+      (make::operate-on-system  system 'print-binary))))
+
+
+--=-=-=
+
+
+
+-dan
+
+-- 
+  http://ww.telent.net/cliki/ - CLiki: CL/Unix free software link farm
+
+--=-=-=--
+
+_______________________________________________
+Sbcl-devel mailing list
+Sbcl-devel@lists.sourceforge.net
+http://lists.sourceforge.net/mailman/listinfo/sbcl-devel
+

@@ -1,0 +1,26 @@
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
+/*
+ * $Header$
+ */
+
+#ifndef _ALLOC_H_
+#define _ALLOC_H_
+
+#include "runtime.h"
+
+extern lispobj alloc_cons(lispobj car, lispobj cdr);
+extern lispobj alloc_number(long n);
+extern lispobj alloc_string(char *str);
+extern lispobj alloc_sap(void *ptr);
+
+#endif _ALLOC_H_

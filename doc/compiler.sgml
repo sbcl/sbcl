@@ -1,0 +1,1006 @@
+<chapter id="compiler"><title>The Compiler</>
+
+<para>This chapter will discuss most compiler issues other than
+efficiency, including compiler error messages, the &SBCL compiler's
+unusual approach to type safety in the presence of type declarations,
+the effects of various compiler optimization policies, and the way
+that inlining and open coding may cause optimized code to differ from
+a naive translation. Efficiency issues are sufficiently varied and
+separate that they have <link linkend="efficiency">their own
+chapter</link>.</para>
+
+<sect1><title>Error Messages</>
+<!--INDEX {error messages}{compiler}-->
+<!--INDEX {compiler error messages}-->
+
+<para>The compiler supplies a large amount of source location
+information in error messages. The error messages contain a lot of
+detail in a terse format, so they may be confusing at first. Error
+messages will be illustrated using this example program:
+<programlisting>(defmacro zoq (x)
+  `(roq (ploq (+ ,x 3))))
+
+(defun foo (y)
+  (declare (symbol y))
+  (zoq y))</programlisting>
+The main problem with this program is that it is trying to add
+<literal>3</> to a symbol. Note also that the functions
+<function>roq</> and <function>ploq</> aren't defined anywhere.
+</para>
+
+<sect2><title>The Parts of the Error Message</>
+
+<para>When processing this program, the compiler will produce this warning:
+<screen>file: /tmp/foo.lisp
+
+in: DEFUN FOO
+  (ZOQ Y)
+--> ROQ PLOQ + 
+==>
+  Y
+caught WARNING:
+  Result is a SYMBOL, not a NUMBER.</screen>
+In this example we see each of the six possible parts of a compiler error
+message:
+<orderedlist>
+  <listitem><para><computeroutput>File: /tmp/foo.lisp</>
+    This is the name of the file that the compiler read the
+    relevant code from.  The file name is displayed because it
+    may not be immediately obvious when there is an
+    error during compilation of a large system, especially when
+    <function>with-compilation-unit</> is used to delay undefined
+    warnings.</para></listitem>
+  <listitem><para><computeroutput>in: DEFUN FOO</> This is the
+    definition top-level form responsible for the error. It is
+    obtained by taking the first two elements of the enclosing form
+    whose first element is a symbol beginning with <quote><literal>def</></>.
+    If there is no such enclosing <quote><literal>def</></> form, then the 
+    outermost form is used.  If there are multiple <literal>def</>
+    forms, then they are all printed from the outside in, separated by
+    <literal>=></>'s.  In this example, the problem was in the
+    <function>defun</> for <function>foo</>.</para></listitem>
+  <listitem><para><computeroutput>(ZOQ Y)</> This is the
+    <emphasis>original source</> form responsible for the error.
+    Original source means that the form directly appeared in the
+    original input to the compiler, i.e. in the lambda passed to
+    <function>compile</> or in the top-level form read from the
+    source file. In this example, the expansion of the <function>zoq</>
+    macro was responsible for the error.</para></listitem>
+  <listitem><para><computeroutput>--> ROQ PLOQ +</> This is the
+    <emphasis>processing path</> that the compiler used to produce
+    the errorful code.  The processing path is a representation of
+    the evaluated forms enclosing the actual source that the
+    compiler encountered when processing the original source.
+    The path is the first element of each form, or the form itself
+    if the form is not a list.  These forms result from the
+    expansion of macros or source-to-source transformation done
+    by the compiler.  In this example, the enclosing evaluated forms
+    are the calls to <function>roq</>, <function>ploq</> and
+    <function>+</>.  These calls resulted from the expansion of
+    the <function>zoq</> macro.</para></listitem>
+  <listitem><para><computeroutput>==> Y</> This is the
+    <emphasis>actual source</> responsible for the error. If
+    the actual source appears in the explanation, then
+    we print the next enclosing evaluated form, instead of
+    printing the actual source twice.  (This is the form
+    that would otherwise have been the last form of the processing
+    path.) In this example, the problem is with the evaluation of
+    the reference to the variable <varname>y</>.</para></listitem>
+  <listitem><para>
+    <computeroutput>caught WARNING: Result is a SYMBOL, not a NUMBER.</>
+    This is the <emphasis>explanation</> of the problem. In this
+    example, the problem is that <varname>y</> evaluates to a symbol,
+    but is in a context where a number is required (the argument
+    to <function>+</>).</para></listitem>
+</orderedlist>
+
+Note that each part of the error message is distinctively marked:
+
+<itemizedlist>
+  <listitem><para> <computeroutput>file:</> and <computeroutput>in:</>
+    mark the file and definition, respectively.</para></listitem>
+  <listitem><para> The original source is an indented form with no
+    prefix.</para></listitem>
+  <listitem><para> Each line of the processing path is prefixed with
+   <computeroutput>--></computeroutput></para></listitem>
+  <listitem><para> The actual source form is indented like the original
+    source, but is marked by a preceding <computeroutput>==></> line.
+    </para></listitem>
+  <listitem><para> The explanation is prefixed with the error
+    severity, which can be <computeroutput>caught ERROR:</>,
+    <computeroutput>caught WARNING:</>,
+    <computeroutput>caught STYLE-WARNING:</>, or
+    <computeroutput>note:</>. </para></listitem>
+</itemizedlist>
+</para>
+
+<para>Each part of the error message is more specific than the preceding
+one.  If consecutive error messages are for nearby locations, then the
+front part of the error messages would be the same.  In this case, the
+compiler omits as much of the second message as in common with the
+first.  For example:
+<screen>file: /tmp/foo.lisp
+
+in: DEFUN FOO
+  (ZOQ Y)
+--> ROQ
+==>
+  (PLOQ (+ Y 3))
+caught STYLE-WARNING:
+  undefined function: PLOQ
+
+==>
+  (ROQ (PLOQ (+ Y 3)))
+caught STYLE-WARNING:
+  undefined function: ROQ</screen>
+In this example, the file, definition and original source are
+identical for the two messages, so the compiler omits them in the
+second message.  If consecutive messages are entirely identical, then
+the compiler prints only the first message, followed by:
+<computeroutput>[Last message occurs <replaceable>repeats</> times]</>
+where <replaceable>repeats</> is the number of times the message
+was given.</para>
+
+<para>If the source was not from a file, then no file line is printed.
+If the actual source is the same as the original source, then the
+processing path and actual source will be omitted. If no forms
+intervene between the original source and the actual source, then the
+processing path will also be omitted.</para>
+
+</sect2>
+
+<sect2><title>The Original and Actual Source</>
+
+<para>The <emphasis>original source</> displayed will almost always be
+a list. If the actual source for an error message is a symbol, the
+original source will be the immediately enclosing evaluated list form.
+So even if the offending symbol does appear in the original source,
+the compiler will print the enclosing list and then print the symbol
+as the actual source (as though the symbol were introduced by a
+macro.)</para>
+
+<para>When the <emphasis>actual source</> is displayed
+(and is not a symbol), it will always
+be code that resulted from the expansion of a macro or a source-to-source
+compiler optimization.  This is code that did not appear in the original
+source program; it was introduced by the compiler.</para>
+
+<para>Keep in mind that when the compiler displays a source form
+in an error message, it always displays the most specific (innermost)
+responsible form.  For example, compiling this function
+<programlisting>(defun bar (x)
+  (let (a)
+    (declare (fixnum a))
+    (setq a (foo x))
+    a))</programlisting>
+gives this error message
+<screen>in: DEFUN BAR
+  (LET (A) (DECLARE (FIXNUM A)) (SETQ A (FOO X)) A)
+caught WARNING: The binding of A is not a FIXNUM:
+  NIL</screen>
+This error message is not saying <quote>there is a problem somewhere in
+this <function>let</></quote> &mdash; it is saying that there is a
+problem with the <function>let</> itself. In this example, the problem
+is that <varname>a</>'s <literal>nil</> initial value is not a
+<type>fixnum</>.</para>
+
+</sect2>
+
+<sect2><title>The Processing Path</>
+<!--INDEX processing path-->
+<!--INDEX macroexpansion-->
+<!--INDEX source-to-source transformation-->
+
+<para>The processing path is mainly useful for debugging macros, so if
+you don't write macros, you can probably ignore it. Consider this
+example:
+
+<programlisting>(defun foo (n)
+  (dotimes (i n *undefined*)))
+</programlisting>
+
+Compiling results in this error message:
+
+<screen>in: DEFUN FOO
+  (DOTIMES (I N *UNDEFINED*))
+--> DO BLOCK LET TAGBODY RETURN-FROM
+==>
+  (PROGN *UNDEFINED*)
+caught STYLE-WARNING:
+  undefined variable: *UNDEFINED*</screen>
+
+Note that <function>do</> appears in the processing path. This is because
+<function>dotimes</> expands into:
+
+<programlisting>(do ((i 0 (1+ i)) (#:g1 n))
+    ((>= i #:g1) *undefined*)
+  (declare (type unsigned-byte i)))</programlisting>
+
+The rest of the processing path results from the expansion
+of <function>do</>:
+
+<programlisting>
+(block nil
+  (let ((i 0) (#:g1 n))
+    (declare (type unsigned-byte i))
+    (tagbody (go #:g3)
+     #:g2    (psetq i (1+ i))
+     #:g3    (unless (>= i #:g1) (go #:g2))
+             (return-from nil (progn *undefined*)))))
+</programlisting>
+
+In this example, the compiler descended into the <function>block</>,
+<function>let</>, <function>tagbody</> and <function>return-from</> to
+reach the <function>progn</> printed as the actual source. This is a
+place where the <quote>actual source appears in explanation</> rule
+was applied. The innermost actual source form was the symbol
+<varname>*undefined*</> itself, but that also appeared in the
+explanation, so the compiler backed out one level.</para>
+
+</sect2>
+
+<sect2><title>Error Severity</>
+<!--INDEX severity of compiler errors -->
+<!--INDEX compiler error severity -->
+
+<para>There are four levels of compiler error severity:
+<wordasword>error</>, <wordasword>warning</>, <wordasword>style
+warning</>, and <wordasword>note</>. The first three levels correspond
+to condition classes which are defined in the &ANSI; standard for
+&CommonLisp; and which have special significance to the
+<function>compile</> and <function>compile-file</> functions. These
+levels of compiler error severity occur when the compiler handles
+conditions of these classes. The fourth level of compiler error
+severity, <wordasword>note</>, is used for problems which are too mild
+for the standard condition classes, typically hints about how
+efficiency might be improved.</para>
+
+</sect2>
+
+<sect2><title>Errors During Macroexpansion</>
+<!--INDEX {macroexpansion}{errors during}-->
+
+<para>The compiler handles errors that happen during macroexpansion,
+turning them into compiler errors. If you want to debug the error (to
+debug a macro), you can set <varname>*break-on-signals*</> to
+<literal>error</>. For example, this definition:
+
+<programlisting>(defun foo (e l)
+  (do ((current l (cdr current))
+       ((atom current) nil))
+      (when (eq (car current) e) (return current))))</programlisting>
+
+gives this error:
+
+<screen>in: DEFUN FOO
+  (DO ((CURRENT L #) (# NIL)) (WHEN (EQ # E) (RETURN CURRENT)) )
+caught ERROR: (during macroexpansion)
+
+error in function LISP::DO-DO-BODY:
+   DO step variable is not a symbol: (ATOM CURRENT)</screen>
+</para>
+
+</sect2>
+
+<sect2><title>Read Errors</>
+<!--INDEX {read errors}{compiler}-->
+
+<para>&SBCL;'s compiler (unlike &CMUCL;'s) does not attempt to recover
+from read errors when reading a source file, but instead just reports
+the offending character position and gives up on the entire source
+file.</para>
+
+</sect2>
+
+<!-- FIXME: How much control over error messages is in SBCL?
+_     How much should be? How much of this documentation should
+_     we save or adapt? 
+_ 
+_ %%\node Error Message Parameterization,  , Read Errors, Interpreting Error Messages
+_ \subsection{Error Message Parameterization}
+_ \cpsubindex{error messages}{verbosity}
+_ \cpsubindex{verbosity}{of error messages}
+_ 
+_ There is some control over the verbosity of error messages.  See also
+_ \varref{undefined-warning-limit}, \code{*efficiency-note-limit*} and
+_ \varref{efficiency-note-cost-threshold}.
+_ 
+_ \begin{defvar}{}{enclosing-source-cutoff}
+_ 
+_   This variable specifies the number of enclosing actual source forms
+_   that are printed in full, rather than in the abbreviated processing
+_   path format.  Increasing the value from its default of \code{1}
+_   allows you to see more of the guts of the macroexpanded source,
+_   which is useful when debugging macros.
+_ \end{defvar}
+_ 
+_ \begin{defvar}{}{error-print-length}
+_   \defvarx{error-print-level}
+_ 
+_   These variables are the print level and print length used in
+_   printing error messages.  The default values are \code{5} and
+_   \code{3}.  If null, the global values of \code{*print-level*} and
+_   \code{*print-length*} are used.
+_ \end{defvar}
+_ 
+_ \begin{defmac}{extensions:}{def-source-context}{%
+_     \args{\var{name} \var{lambda-list} \mstar{form}}}
+_ 
+_   This macro defines how to extract an abbreviated source context from
+_   the \var{name}d form when it appears in the compiler input.
+_   \var{lambda-list} is a \code{defmacro} style lambda-list used to
+_   parse the arguments.  The \var{body} should return a list of
+_   subforms that can be printed on about one line.  There are
+_   predefined methods for \code{defstruct}, \code{defmethod}, etc.  If
+_   no method is defined, then the first two subforms are returned.
+_   Note that this facility implicitly determines the string name
+_   associated with anonymous functions.
+_ \end{defmac}
+_ 
+_ -->
+
+</sect1>
+
+<sect1><title>The Compiler's Handling of Types</>
+
+<para>The most unusual features of the &SBCL; compiler (which is
+very similar to the original &CMUCL compiler, also known as
+&Python;) is its unusually sophisticated understanding of the
+&CommonLisp; type system and its unusually conservative approach to
+the implementation of type declarations. These two features reward the
+use of type declarations throughout development, even when high
+performance is not a concern. (Also, as discussed <link
+linkend="efficiency">in the chapter on performance</>, the use of
+appropriate type declarations can be very important for performance as
+well.)</para>
+
+<para>The &SBCL; compiler, like the related compiler in &CMUCL;,
+treats type declarations much differently than other Lisp compilers.
+By default (<emphasis>i.e.</>, at ordinary levels of the
+<parameter>safety</> compiler optimization parameter), the compiler
+doesn't blindly believe most type declarations; it considers them
+assertions about the program that should be checked.</para>
+
+<para>The &SBCL; compiler also has a greater knowledge of the
+&CommonLisp; type system than other compilers.  Support is incomplete
+only for the <type>not</>, <type>and</> and <type>satisfies</>
+types.
+<!-- FIXME: See also sections \ref{advanced-type-stuff}
+     and \ref{type-inference}, once we snarf them from the
+     CMU CL manual. -->
+</para>
+
+<sect2 id=compiler-impl-limitations><title>Implementation Limitations</>
+
+<para>
+Ideally, the compiler would consider <emphasis>all</> type declarations to
+be assertions, so that adding type declarations to a program, no
+matter how incorrect they might be, would <emphasis>never</> cause
+undefined behavior. As of &SBCL; version 0.6.4, the compiler is known to
+fall short of this goal in two areas:
+<itemizedlist>
+  <listitem><para>The compiler trusts function return values which 
+    have been established with <function>proclaim</>.</para></listitem>
+  <listitem><para>There are a few poorly characterized but apparently
+    very uncommon situations where a type declaration in an unexpected
+    location will be trusted and never checked by the
+    compiler.</para></listitem>
+</itemizedlist></para>
+
+<para>These are important bugs, but are not necessarily easy to fix,
+so they may, alas, remain in the system for a while.</para>
+
+</sect2>
+
+<sect2><title>Type Errors at Compile Time</>
+<!--INDEX compile time type errors-->
+<!--INDEX type checking}{at compile time}-->
+
+<para>If the compiler can prove at compile time that some portion of
+the program cannot be executed without a type error, then it will give
+a warning at compile time. It is possible that the offending code
+would never actually be executed at run-time due to some higher level
+consistency constraint unknown to the compiler, so a type warning
+doesn't always indicate an incorrect program. For example, consider
+this code fragment:
+
+<programlisting>(defun raz (foo)
+  (let ((x (case foo
+             (:this 13)
+             (:that 9)
+             (:the-other 42))))
+    (declare (fixnum x))
+    (foo x)))
+</programlisting>
+
+Compilation produces this warning:
+
+<screen>in: DEFUN RAZ
+  (CASE FOO (:THIS 13) (:THAT 9) (:THE-OTHER 42))
+--> LET COND IF COND IF COND IF
+==>
+  (COND)
+caught WARNING: This is not a FIXNUM:
+  NIL</screen>
+
+In this case, the warning means that if <varname>foo</> isn't any of
+<literal>:this</>, <literal>:that</> or <literal>:the-other</>, then
+<varname>x</> will be initialized to <literal>nil</>, which the
+<type>fixnum</> declaration makes illegal. The warning will go away if
+<function>ecase</> is used instead of <function>case</>, or if
+<literal>:the-other</> is changed to <literal>t</>.</para>
+
+<para>This sort of spurious type warning happens moderately often in
+the expansion of complex macros and in inline functions. In such
+cases, there may be dead code that is impossible to correctly execute.
+The compiler can't always prove this code is dead (could never be
+executed), so it compiles the erroneous code (which will always signal
+an error if it is executed) and gives a warning.</para>
+
+<para>
+Type warnings are inhibited when the
+<parameter>extensions:inhibit-warnings</> optimization quality is
+<literal>3</>. (See <link linkend="compiler-policy">the section 
+on compiler policy</>.) This can be used in a local declaration
+to inhibit type warnings in a code fragment that has spurious
+warnings.</para>
+
+</sect2>
+
+<sect2><title>Precise Type Checking</>
+<!--INDEX precise type checking-->
+<!--INDEX {type checking}{precise}-->
+
+<para>With the default compilation policy, all type declarations are
+precisely checked, except in a few situations (such as using
+<function>the</> to constrain the argument type passed to a function)
+where they are simply ignored instead. Precise checking means that the
+check is done as though <function>typep</> had been called with the
+exact type specifier that appeared in the declaration. In &SBCL;,
+adding type declarations makes code safer. (Except that as noted <link
+linkend="compiler-impl-limitations">elsewhere</link>, remaining bugs in
+the compiler's handling of types unfortunately provide some exceptions to
+this rule.)</para>
+
+<para>If a variable is declared to be
+<type>(integer 3 17)</>
+then its
+value must always always be an integer between <literal>3</>
+and <literal>17</>.
+If multiple type declarations apply to a single variable, then all the
+declarations must be correct; it is as though all the types were
+intersected producing a single <type>and</> type specifier.</para>
+
+<para>Argument type declarations are automatically enforced. If you declare
+the type of a function argument, a type check will be done when that
+function is called. In a function call, the called function does the
+argument type checking, which means that a more restrictive type
+assertion in the calling function (e.g., from <function>the</>) may be
+lost.</para>
+
+<para>The types of structure slots are also checked. The value of a
+structure slot must always be of the type indicated in any
+<literal>:type</> slot option. </para>
+
+<para>In traditional &CommonLisp; compilers, not all type assertions
+are checked, and type checks are not precise. Traditional compilers
+blindly trust explicit type declarations, but may check the argument
+type assertions for built-in functions. Type checking is not precise,
+since the argument type checks will be for the most general type legal
+for that argument. In many systems, type declarations suppress what
+little type checking is being done, so adding type declarations makes
+code unsafe. This is a problem since it discourages writing type
+declarations during initial coding. In addition to being more error
+prone, adding type declarations during tuning also loses all the
+benefits of debugging with checked type assertions.</para>
+
+<para>To gain maximum benefit from the compiler's type checking, you
+should always declare the types of function arguments and structure
+slots as precisely as possible. This often involves the use of
+<type>or</>, <type>member</>, and other list-style type specifiers.</para>
+
+</sect2>
+
+<sect2 id="weakened-type-checking"><title>Weakened Type Checking</>
+<!--INDEX weakened type checking-->
+<!--INDEX {type checking}{weakened}-->
+
+<para>At one time, &CMUCL; supported another level of type checking,
+<quote>weakened type checking</>, when the value for the
+<parameter>speed</> optimization quality is greater than
+<parameter>safety</>, and <parameter>safety</> is not <literal>0</>.
+The &CMUCL; manual still has a description of it, but the code no
+longer corresponds to the manual. It sounds like a good thing to have,
+and we might someday be able to restore it in &SBCL; but in the
+meantime, if you ask the compiler to optimize <parameter>speed</> to a
+higher level than <parameter>safety</>, your program is performing
+without a safety net, because &SBCL; may believe any or all type
+declarations without any runtime checking at all.</para>
+
+<!-- (beginning of text adapted from out-of-date CMUCL manual, describing
+_    features it would be nice for SBCL to restore someday)
+_ 
+_ <para>When the value for the <parameter>speed</> optimization quality
+_ is greater than <parameter>safety</>, and <parameter>safety</> is not
+_ <literal>0</>, then type checking is weakened to reduce the speed and
+_ space penalty. In structure-intensive code this can double the speed,
+_ yet still catch most type errors. Weakened type checks provide a level
+_ of safety similar to that of <quote>safe</> code in other &CommonLisp;
+_ compilers.</para>
+_ 
+_ <para>A type check is weakened by changing the check to be for some
+_ convenient supertype of the asserted type. For example, <type>(integer
+_ 3 17)</> is changed to <type>fixnum</>, <type>(simple-vector 17)</> to
+_ <type>simple-vector</>, and structure types are changed to
+_ <type>structure-object</>. A test for a complex type like <type>(or node hunk
+_ (member :foo :bar :baz))</> will be omitted entirely (i.e., the type
+_ is weakened to <type>*</>.) If a precise check can be done for no
+_ extra cost, then no weakening is done.</para>
+_ 
+_ <para>Although weakened type checking is similar to type checking done
+_ by other compilers, it is sometimes safer and sometimes less safe.
+_ Weakened checks are done in the same places is precise checks, so all
+_ the preceding discussion about where checking is done still applies.
+_ Weakened checking is sometimes somewhat unsafe because although the
+_ check is weakened, the precise type is still input into type
+_ inference. In some contexts this will result in type inferences not
+_ justified by the weakened check, and hence deletion of some type
+_ checks that would be done by conventional compilers.</para>
+_ 
+_ <para>For example, if this code was compiled with weakened checks
+_ 
+_ <programlisting>(defstruct foo
+_   (a nil :type simple-string))
+_ 
+_ (defstruct bar
+_   (a nil :type single-float))
+_ 
+_ (defun myfun (x)
+_   (declare (type bar x))
+_   (* (bar-a x) 3.0))</programlisting>
+_ 
+_ and <function>myfun</> was passed a value of
+_ type <type>foo</>, then no type error would be
+_ signaled, and we would try to multiply a <type>simple-vector</> as
+_ though it were a <type>single-float</> (with unpredictable results.)
+_ This is because the check for <type>bar</> was weakened to
+_ <type>structure-object</>, yet when compiling the call to <type>bar-a</>, the
+_ compiler thinks it knows it has a <type>bar</>.</para>
+_ 
+_ <para>Note that normally even weakened type checks report the precise
+_ type in error messages. For example, if <function>myfun</>'s
+_ <type>bar</> check is weakened to <type>structure-object</>, and the argument
+_ is <literal>nil</>, then the error will be:
+_ 
+_ <screen>Type-error in MYFUN:
+_   NIL is not of type BAR</screen>
+_ 
+_ However, there is some speed and space cost for signaling a precise
+_ error, so the weakened type is reported if the <parameter>speed</>
+_ optimization quality is <literal>3</> or <parameter>debug</>
+_ quality is less than <literal>1</>:
+_ 
+_ <screen>Type-error in MYFUN:
+_   NIL is not of type STRUCTURE-OBJECT</screen>
+_ 
+_ </para>
+_ 
+_ (end of text adapted from out-of-date CMUCL manual, describing
+_ features it would be nice for SBCL to restore someday) -->
+
+</sect2>
+
+<sect2><title>Getting Existing Programs to Run</>
+<!--INDEX {existing programs}{to run}-->
+<!--INDEX {types}{portability}-->
+<!--INDEX {compatibility with other Lisps}
+    (should also have an entry in the non-&ANSI;-isms section)-->
+
+<para>Since &SBCL;'s compiler does much more comprehensive type
+checking than other Lisp compilers, &SBCL; will detect type errors in
+many programs that have been debugged using other compilers. These
+errors are mostly incorrect declarations, although compile-time type
+errors can find actual bugs if parts of the program have never been
+tested.</para>
+
+<para>Some incorrect declarations can only be detected by run-time
+type checking. It is very important to initially compile programs with
+full type checks and then test this version. After the checking
+version has been tested, then you can consider weakening or
+eliminating type checks. <emphasis>This applies even to previously
+debugged programs,</emphasis> because the &SBCL; compiler does much
+more type inference than other &CommonLisp; compilers, so an incorrect
+declaration can do more damage.</para>
+
+<para>The most common problem is with variables whose constant initial
+value doesn't match the type declaration. Incorrect constant initial
+values will always be flagged by a compile-time type error, and they
+are simple to fix once located. Consider this code fragment:
+
+<programlisting>(prog (foo)
+  (declare (fixnum foo))
+  (setq foo ...)
+  ...)</programlisting>
+
+Here <varname>foo</> is given an initial value of <literal>nil</>, but
+is declared to be a <type>fixnum</>.  Even if it is never read, the
+initial value of a variable must match the declared type.  There are
+two ways to fix this problem. Change the declaration
+
+<programlisting>(prog (foo)
+  (declare (type (or fixnum null) foo))
+  (setq foo ...)
+  ...)</programlisting>
+
+or change the initial value
+
+<programlisting>(prog ((foo 0))
+  (declare (fixnum foo))
+  (setq foo ...)
+  ...)</programlisting>
+
+It is generally preferable to change to a legal initial value rather
+than to weaken the declaration, but sometimes it is simpler to weaken
+the declaration than to try to make an initial value of the
+appropriate type.</para>
+
+<para>Another declaration problem occasionally encountered is
+incorrect declarations on <function>defmacro</> arguments. This can happen
+when a function is converted into a macro. Consider this macro:
+
+<programlisting>(defmacro my-1+ (x)
+  (declare (fixnum x))
+  `(the fixnum (1+ ,x)))</programlisting>
+
+Although legal and well-defined &CommonLisp; code, this meaning of
+this definition is almost certainly not what the writer intended. For
+example, this call is illegal:
+
+<programlisting>(my-1+ (+ 4 5))</>
+
+This call is illegal because the argument to the macro is
+<literal>(+ 4 5)</>, which is a <type>list</>, not a
+<type>fixnum</>.  Because of
+macro semantics, it is hardly ever useful to declare the types of
+macro arguments.  If you really want to assert something about the
+type of the result of evaluating a macro argument, then put a
+<function>the</> in the expansion:
+
+<programlisting>(defmacro my-1+ (x)
+  `(the fixnum (1+ (the fixnum ,x))))</programlisting>
+
+In this case, it would be stylistically preferable to change this
+macro back to a function and declare it inline. Macros have no
+efficiency advantage over inline functions when using the
+&SBCL; compiler.
+<!--FIXME: <xref>inline-expansion</>, once we crib the 
+    relevant text from the CMU CL manual.-->
+</para>
+
+<para>
+Some more subtle problems are caused by incorrect declarations that
+can't be detected at compile time.  Consider this code:
+
+<programlisting>(do ((pos 0 (position #\a string :start (1+ pos))))
+    ((null pos))
+  (declare (fixnum pos))
+  ...)</programlisting>
+
+Although <varname>pos</> is almost always a <varname>fixnum</>, it is
+<literal>nil</> at the end of the loop. If this example is compiled
+with full type checks (the default), then running it will signal a
+type error at the end of the loop. If compiled without type checks,
+the program will go into an infinite loop (or perhaps
+<function>position</> will complain because <literal>(1+ nil)</> isn't
+a sensible start.) Why? Because if you compile without type checks,
+the compiler just quietly believes the type declaration. Since the
+compiler believes that <varname>pos</> is always a <type>fixnum</>, it
+believes that <varname>pos</> is never <literal>nil</>, so
+<literal>(null pos)</> is never true, and the loop exit test is
+optimized away. Such errors are sometimes flagged by unreachable code
+notes, but it is still important to initially compile and test any
+system with full type checks, even if the system works fine when
+compiled using other compilers.</para>
+
+<para>In this case, the fix is to weaken the type declaration to
+<type>(or fixnum null)</>.
+<footnote><para>Actually, this declaration is unnecessary
+  unnecessary in &SBCL;, since it already knows <function>position</>
+  returns a non-negative <type>fixnum</> or <literal>nil</>.
+  </para></footnote>
+
+Note that there is usually little performance penalty for weakening a
+declaration in this way.  Any numeric operations in the body can still
+assume the variable is a <type>fixnum</>, since <literal>nil</> is not a legal
+numeric argument.  Another possible fix would be to say:
+
+<programlisting>(do ((pos 0 (position #\a string :start (1+ pos))))
+    ((null pos))
+  (let ((pos pos))
+    (declare (fixnum pos))
+    ...))</programlisting>
+
+This would be preferable in some circumstances, since it would allow a
+non-standard representation to be used for the local <varname>pos</>
+variable in the loop body.
+<!-- FIXME: <xref>ND-variables</>, once we crib the text from the 
+     CMU CL manual. -->
+</para>
+
+<para>In summary, remember that <emphasis>all</> values that a variable
+<emphasis>ever</> has must be of the declared type, and that you
+should test using safe compilation options initially.</para>
+
+</sect2>
+
+</sect1>
+
+<sect1 id="compiler-policy"><title>Compiler Policy</>
+
+<para>As of version 0.6.4, &SBCL; still uses most of the &CMUCL; code
+for compiler policy. Thi &CMUCL; code has many features and high-quality
+documentation, but the two unfortunately do not match. So this area of
+the compiler and its interface needs to be cleaned up. Meanwhile, here
+is some rudimentary documentation on the current behavior of the
+system.</para>
+
+<para>Compiler policy is controlled by the <parameter>optimize</>
+declaration. The compiler supports the &ANSI; optimization qualities,
+and also an extension <parameter>sb-ext:inhibit-warnings</>.</para>
+
+<para>Ordinarily, when the <parameter>speed</> quality is high, the
+compiler emits notes to notify the programmer about its inability to
+apply various optimizations. Setting
+<parameter>sb-ext:inhibit-warnings</> to a value at least as large as
+the <parameter>speed</> quality inhibits this notification. This can
+be useful to suppress notes about code which is known to be
+unavoidably inefficient. (For example, the compiler issues notes about
+having to use generic arithmetic instead of fixnum arithmetic, which
+is not useful for code which truly can't guarantee that its arguments
+will always be fixnums.)</para>
+
+<note><para>The basic functionality of the <parameter>optimize
+inhibit-warnings</> extension will probably be supported in all future
+versions of the system, but it will probably be renamed when the
+compiler and its interface are cleaned up. The current name is
+misleading, because it mostly inhibits optimization notes, not
+warnings. And making it an optimization quality is misleading, because
+it shouldn't affect the resulting code at all. It may become a
+declaration identifier with a name like SB-EXT:INHIBIT-NOTES, so that
+what's currently written
+
+<programlisting>(declaim (optimize (sb-ext:inhibit-warnings 2)))</>
+
+would become something like
+
+<programlisting>(declaim (sb-ext:inhibit-notes 2))</>
+
+</para></note>
+
+<para>When <parameter>speed</> is zero, the compiler emits byte code
+instead of native code. Byte code can be substantially more compact
+than native code (on the order of a factor of 2) and is usually much,
+much slower than native code (on the order of a factor of 50).</para>
+
+<para>When <parameter>safety</> is zero, almost all runtime checking
+of types, array bounds, and so forth is suppressed.</para>
+
+<para>When <parameter>safety</> is less than <parameter>speed</>, any
+and all type checks may be suppressed. At some point in the past,
+&CMUCL; had <link linkend="weakened-type-checking">a more nuanced
+interpretation of this.</link> At some point in the future, &SBCL; may
+restore that interpretation, or something like it. Until then, setting
+<parameter>safety</> less than <parameter>speed</> may have roughly
+the same effect as setting <parameter>safety</> to zero.</para>
+
+<para>The value of <parameter>space</> mostly influences the
+compiler's decision whether to inline operations, which tend to
+increase the size of programs. Use the value <literal>0</> with
+caution, since it can cause the compiler to inline operations so
+promiscuously that the net effect is to slow the program by causing
+cache misses or swapping.</para>
+
+<!-- FIXME: old CMU CL compiler policy, should perhaps be adapted
+_    for SBCL. (Unfortunately, the CMU CL docs are out of sync with the
+_    CMU CL code, so adapting this requires not only reformatting
+_    the documentation, but rooting out code rot.)
+_
+_<sect2 id="compiler-policy"><title>Compiler Policy</>
+_  INDEX {policy}{compiler}
+_  INDEX compiler policy
+_
+_<para>The policy is what tells the compiler <emphasis>how</> to
+_compile a program. This is logically (and often textually) distinct
+_from the program itself. Broad control of policy is provided by the
+_<parameter>optimize</> declaration; other declarations and variables
+_control more specific aspects of compilation.</para>
+_
+_\begin{comment}
+_* The Optimize Declaration::
+_* The Optimize-Interface Declaration::
+_\end{comment}
+_
+_%%\node The Optimize Declaration, The Optimize-Interface Declaration, Compiler Policy, Compiler Policy
+_\subsection{The Optimize Declaration}
+_\label{optimize-declaration}
+_\cindex{optimize declaration}
+_\cpsubindex{declarations}{\code{optimize}}
+_
+_The \code{optimize} declaration recognizes six different
+_\var{qualities}.  The qualities are conceptually independent aspects
+_of program performance.  In reality, increasing one quality tends to
+_have adverse effects on other qualities.  The compiler compares the
+_relative values of qualities when it needs to make a trade-off; i.e.,
+_if \code{speed} is greater than \code{safety}, then improve speed at
+_the cost of safety.
+_
+_The default for all qualities (except \code{debug}) is \code{1}.
+_Whenever qualities are equal, ties are broken according to a broad
+_idea of what a good default environment is supposed to be.  Generally
+_this downplays \code{speed}, \code{compile-speed} and \code{space} in
+_favor of \code{safety} and \code{debug}.  Novice and casual users
+_should stick to the default policy.  Advanced users often want to
+_improve speed and memory usage at the cost of safety and
+_debuggability.
+_
+_If the value for a quality is \code{0} or \code{3}, then it may have a
+_special interpretation.  A value of \code{0} means ``totally
+_unimportant'', and a \code{3} means ``ultimately important.''  These
+_extreme optimization values enable ``heroic'' compilation strategies
+_that are not always desirable and sometimes self-defeating.
+_Specifying more than one quality as \code{3} is not desirable, since
+_it doesn't tell the compiler which quality is most important.
+_
+_
+_These are the optimization qualities:
+_\begin{Lentry}
+_
+_\item[\code{speed}] \cindex{speed optimization quality}How fast the
+_  program should is run.  \code{speed 3} enables some optimizations
+_  that hurt debuggability.
+_
+_\item[\code{compilation-speed}] \cindex{compilation-speed optimization
+_    quality}How fast the compiler should run.  Note that increasing
+_  this above \code{safety} weakens type checking.
+_
+_\item[\code{space}] \cindex{space optimization quality}How much space
+_  the compiled code should take up.  Inline expansion is mostly
+_  inhibited when \code{space} is greater than \code{speed}.  A value
+_  of \code{0} enables promiscuous inline expansion.  Wide use of a
+_  \code{0} value is not recommended, as it may waste so much space
+_  that run time is slowed.  \xlref{inline-expansion} for a discussion
+_  of inline expansion.
+_
+_\item[\code{debug}] \cindex{debug optimization quality}How debuggable
+_  the program should be.  The quality is treated differently from the
+_  other qualities: each value indicates a particular level of debugger
+_  information; it is not compared with the other qualities.
+_  \xlref{debugger-policy} for more details.
+_
+_\item[\code{safety}] \cindex{safety optimization quality}How much
+_  error checking should be done.  If \code{speed}, \code{space} or
+_  \code{compilation-speed} is more important than \code{safety}, then
+_  type checking is weakened (\pxlref{weakened-type-checks}).  If
+_  \code{safety} if \code{0}, then no run time error checking is done.
+_  In addition to suppressing type checks, \code{0} also suppresses
+_  argument count checking, unbound-symbol checking and array bounds
+_  checks.
+_
+_\item[\code{extensions:inhibit-warnings}] \cindex{inhibit-warnings
+_    optimization quality}This is a CMU extension that determines how
+_  little (or how much) diagnostic output should be printed during
+_  compilation.  This quality is compared to other qualities to
+_  determine whether to print style notes and warnings concerning those
+_  qualities.  If \code{speed} is greater than \code{inhibit-warnings},
+_  then notes about how to improve speed will be printed, etc.  The
+_  default value is \code{1}, so raising the value for any standard
+_  quality above its default enables notes for that quality.  If
+_  \code{inhibit-warnings} is \code{3}, then all notes and most
+_  non-serious warnings are inhibited.  This is useful with
+_  \code{declare} to suppress warnings about unavoidable problems.
+_\end{Lentry}
+_
+_%%\node The Optimize-Interface Declaration,  , The Optimize Declaration, Compiler Policy
+_\subsection{The Optimize-Interface Declaration}
+_\label{optimize-interface-declaration}
+_\cindex{optimize-interface declaration}
+_\cpsubindex{declarations}{\code{optimize-interface}}
+_
+_The \code{extensions:optimize-interface} declaration is identical in
+_syntax to the \code{optimize} declaration, but it specifies the policy
+_used during compilation of code the compiler automatically generates
+_to check the number and type of arguments supplied to a function.  It
+_is useful to specify this policy separately, since even thoroughly
+_debugged functions are vulnerable to being passed the wrong arguments.
+_The \code{optimize-interface} declaration can specify that arguments
+_should be checked even when the general \code{optimize} policy is
+_unsafe.
+_
+_Note that this argument checking is the checking of user-supplied
+_arguments to any functions defined within the scope of the
+_declaration, \code{not} the checking of arguments to \llisp{}
+_primitives that appear in those definitions.
+_
+_The idea behind this declaration is that it allows the definition of
+_functions that appear fully safe to other callers, but that do no
+_internal error checking.  Of course, it is possible that arguments may
+_be invalid in ways other than having incorrect type.  Functions
+_compiled unsafely must still protect themselves against things like
+_user-supplied array indices that are out of bounds and improper lists.
+_See also the \kwd{context-declarations} option to
+_\macref{with-compilation-unit}.
+_
+_(end of section on compiler policy)
+_-->
+
+</sect1>
+
+<sect1><title>Open Coding and Inline Expansion</>
+<!--INDEX open-coding-->
+<!--INDEX inline expansion-->
+<!--INDEX static functions-->
+
+<para>Since &CommonLisp; forbids the redefinition of standard
+functions, the compiler can have special knowledge of these standard
+functions embedded in it. This special knowledge is used in various
+ways (open coding, inline expansion, source transformation), but the
+implications to the user are basically the same:
+<itemizedlist>
+  <listitem><para> Attempts to redefine standard functions may
+    be frustrated, since the function may never be called. Although
+    it is technically illegal to redefine standard functions, users
+    sometimes want to implicitly redefine these functions when they
+    are debugging using the <function>trace</> macro.  Special-casing
+    of standard functions can be inhibited using the
+    <parameter>notinline</> declaration.</para></listitem>
+  <listitem><para> The compiler can have multiple alternate
+    implementations of standard functions that implement different
+    trade-offs of speed, space and safety.  This selection is
+    based on the <link linkend="compiler-policy">compiler policy</link>.
+    </para></listitem>
+</itemizedlist>
+</para>
+
+<para>When a function call is <emphasis>open coded</>, inline code whose
+effect is equivalent to the function call is substituted for that
+function call. When a function call is <emphasis>closed coded</>, it
+is usually left as is, although it might be turned into a call to a
+different function with different arguments. As an example, if
+<function>nthcdr</> were to be open coded, then
+
+<programlisting>(nthcdr 4 foobar)</programlisting>
+
+might turn into
+
+<programlisting>(cdr (cdr (cdr (cdr foobar))))</>
+
+or even
+
+<programlisting>(do ((i 0 (1+ i))
+     (list foobar (cdr foobar)))
+    ((= i 4) list))</programlisting>
+
+If <function>nth</> is closed coded, then
+
+<programlisting>
+(nth x l)
+</programlisting>
+
+might stay the same, or turn into something like
+
+<programlisting>
+(car (nthcdr x l))
+</programlisting>
+</para>
+
+<para>In general, open coding sacrifices space for speed, but some
+functions (such as <function>car</>) are so simple that they are always
+open-coded. Even when not open-coded, a call to a standard function
+may be transformed into a different function call (as in the last
+example) or compiled as <emphasis>static call</>. Static function call
+uses a more efficient calling convention that forbids
+redefinition.</para>
+
+</sect1>
+
+</chapter>
