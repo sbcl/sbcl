@@ -1561,7 +1561,7 @@ gc_init_tables(void)
 	scav_vector_unsigned_byte_16;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	scav_vector_unsigned_byte_16;
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_29_WIDETAG
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	scav_vector_unsigned_byte_32;
 #endif
@@ -1570,11 +1570,11 @@ gc_init_tables(void)
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	scav_vector_unsigned_byte_32;
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
-    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG] =
 	scav_vector_unsigned_byte_64;
 #endif
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
-    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG] =
 	scav_vector_unsigned_byte_64;
 #endif
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
