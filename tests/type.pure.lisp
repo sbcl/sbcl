@@ -161,3 +161,12 @@
 ;;; signalled an error on this expression.
 (subtypep '(function (fixnum) (values package boolean))
 	  '(function (t) (values package boolean)))
+
+;;; bug reported by Valtteri Vuorik
+(compile nil '(lambda () (member (char "foo" 0) '(#\. #\/) :test #'char=)))
+(assert (not (equal (multiple-value-list
+                     (subtypep '(function ()) '(function (&rest t))))
+                    '(nil t))))
+(assert (not (equal (multiple-value-list
+                     (subtypep '(function (&rest t)) '(function ())))
+                    '(t t))))
