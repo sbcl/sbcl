@@ -140,3 +140,14 @@
   (test t)
   (test 42)
   (test (make-instance 'standard-object)))
+
+;;; If CERROR is given a condition, any remaining arguments are only
+;;; used for the continue format control.
+(let ((x 0))
+  (handler-bind
+      ((simple-error (lambda (c) (incf x) (continue c))))
+    (cerror "Continue from ~A at ~A"
+            (make-condition 'simple-error :format-control "foo"
+                            :format-arguments nil)
+            'cerror (get-universal-time))
+    (assert (= x 1))))

@@ -114,7 +114,7 @@
       (let ((condition (coerce-to-condition datum
 					    arguments
 					    'simple-error
-					    'error))
+					    'cerror))
 	    (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
 	(with-condition-restarts condition (list (find-restart 'continue))
 	  (let ((sb!debug:*stack-top-hint* nil))

@@ -27,14 +27,14 @@
 ;;; single argument that's directly usable by all the other routines.
 (defun coerce-to-condition (datum arguments default-type fun-name)
   (cond ((typep datum 'condition)
-	 (if arguments
-	     (cerror "Ignore the additional arguments."
-		     'simple-type-error
-		     :datum arguments
-		     :expected-type 'null
-		     :format-control "You may not supply additional arguments ~
-                                      when giving ~S to ~S."
-		     :format-arguments (list datum fun-name)))
+	 (when (and arguments (not (eq fun-name 'cerror)))
+           (cerror "Ignore the additional arguments."
+                   'simple-type-error
+                   :datum arguments
+                   :expected-type 'null
+                   :format-control "You may not supply additional arguments ~
+                                    when giving ~S to ~S."
+                   :format-arguments (list datum fun-name)))
 	 datum)
 	((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
 	 (apply #'make-condition datum arguments))
