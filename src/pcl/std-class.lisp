@@ -505,6 +505,26 @@
   (add-direct-subclasses class direct-superclasses)
   (make-class-predicate class predicate-name)
   (update-class class nil)
+  (do* ((slots (slot-value class 'slots) (cdr slots))
+	(dupes nil))
+       ((null slots) (when dupes
+		       (style-warn
+			;; FIXME: the indentation request ("~4I")
+			;; below appears not to do anything.  Finding
+			;; out why would be nice.  -- CSR, 2003-04-24
+			"~@<slot names with the same SYMBOL-NAME but ~
+                         different SYMBOL-PACKAGE (possible package problem) ~
+                         for class ~S:~@:_~4I~<~@{~S~^~:@_~}~:>~@:>"
+			class
+			dupes)))
+    (let* ((slot (car slots))
+	   (oslots (remove (slot-definition-name slot) (cdr slots)
+			   :test-not #'string= :key #'slot-definition-name)))
+      (when oslots
+	(pushnew (cons (slot-definition-name slot)
+		       (mapcar #'slot-definition-name oslots))
+		 dupes
+		 :test #'string= :key #'car))))
   (add-slot-accessors class direct-slots)
   (make-preliminary-layout class))
 

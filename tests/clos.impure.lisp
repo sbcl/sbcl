@@ -598,5 +598,15 @@
 (defclass frc-3 () ())
 (assert (typep (make-instance 'frc-1 :a 2) (find-class 'frc-1)))
 (assert (typep (make-instance 'frc-2 :a 3) (find-class 'frc-2)))
+
+;;; check that we can define classes with two slots of different names
+;;; (even if it STYLE-WARNs).
+(defclass odd-name-class ()
+  ((name :initarg :name)
+   (cl-user::name :initarg :name2)))
+(let ((x (make-instance 'odd-name-class :name 1 :name2 2)))
+  (assert (= (slot-value x 'name) 1))
+  (assert (= (slot-value x 'cl-user::name) 2)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
