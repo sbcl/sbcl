@@ -1360,20 +1360,20 @@
 
 ;;; Apply a function to some arguments, returning a list of the values
 ;;; resulting of the evaluation. If an error is signalled during the
-;;; application, then we print a warning message and return NIL as our
-;;; second value to indicate this. Node is used as the error context
-;;; for any error message, and Context is a string that is spliced
-;;; into the warning.
-(declaim (ftype (function ((or symbol function) list node string)
+;;; application, then we produce a warning message using WARN-FUN and
+;;; return NIL as our second value to indicate this. NODE is used as
+;;; the error context for any error message, and CONTEXT is a string
+;;; that is spliced into the warning.
+(declaim (ftype (function ((or symbol function) list node function string)
 			  (values list boolean))
 		careful-call))
-(defun careful-call (function args node context)
+(defun careful-call (function args node warn-fun context)
   (values
    (multiple-value-list
     (handler-case (apply function args)
       (error (condition)
 	(let ((*compiler-error-context* node))
-	  (compiler-warn "Lisp error during ~A:~%~A" context condition)
+	  (funcall warn-fun "Lisp error during ~A:~%~A" context condition)
 	  (return-from careful-call (values nil nil))))))
    t))
 

@@ -1162,7 +1162,8 @@ argument")
 
 (!def-debug-command-alias "B" "BOTTOM")
 
-(!def-debug-command "FRAME" (&optional (n (read-prompting-maybe)))
+(!def-debug-command "FRAME" (&optional
+			     (n (read-prompting-maybe "frame number: ")))
   (setf *current-frame*
 	(multiple-value-bind (next-frame-fun limit-string)
 	    (if (< n (sb!di:frame-number *current-frame*))

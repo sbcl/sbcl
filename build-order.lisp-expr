@@ -433,23 +433,7 @@
 
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ;; trace table definitions from compiler/trace-table.lisp.
- ("src/compiler/dump"
-  ;; FIXME: When building sbcl-0.pre7.14.flaky4.5 under sbcl-0.6.12.1
-  ;; with :SB-SHOW on the target *FEATURES* list, cross-compilation of
-  ;; this file gives a WARNING in HEXSTR,
-  ;;   Lisp error during constant folding:
-  ;;   Argument X is not a REAL: NIL
-  ;; This seems to come from DEF!MACRO %WITH-ARRAY-DATA-MACRO code
-  ;; which looks like
-  ;;     (cond (,end
-  ;;            (unless (or ,unsafe? (<= ,end ,size))
-  ;;		  ..))
-  ;;           ..)
-  ;; where the system is trying to constant-fold the <= form when the
-  ;; ,END binding is known to be NIL at compile time. Since the <= form 
-  ;; is unreachable in that case, this shouldn't be signalling a WARNING;
-  ;; but as long as it is, we have to ignore it in order to go on.
-  :ignore-failure-p)
+ ("src/compiler/dump")
 
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/target-main" :not-host)
@@ -619,23 +603,7 @@
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
- ("src/code/cold-init" :not-host ; needs (SETF EXTERN-ALIEN) macroexpansion
-  ;; FIXME: When building sbcl-0.pre7.14.flaky4.5 under sbcl-0.6.12.1
-  ;; with :SB-SHOW on the target *FEATURES* list, cross-compilation of
-  ;; this file gives a WARNING in HEXSTR,
-  ;;   Lisp error during constant folding:
-  ;;   Argument X is not a REAL: NIL
-  ;; This seems to come from DEF!MACRO %WITH-ARRAY-DATA-MACRO code
-  ;; which looks like
-  ;;     (cond (,end
-  ;;            (unless (or ,unsafe? (<= ,end ,size))
-  ;;		  ..))
-  ;;           ..)
-  ;; where the system is trying to constant-fold the <= form when the
-  ;; ,END binding is known to be NIL at compile time. Since the <= form 
-  ;; is unreachable in that case, this shouldn't be signalling a WARNING;
-  ;; but as long as it is, we have to ignore it in order to go on.
-  :ignore-failure-p)
+ ("src/code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; target macros and DECLAIMs installed at build-the-cross-compiler time

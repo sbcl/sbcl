@@ -1243,6 +1243,21 @@ WORKAROUND:
   whereas section 3.4.4 of the CLHS doesn't allow required parameters
   to come after the rest argument.
 
+173:
+  The compiler sometimes tries to constant-fold expressions before
+  it checks to see whether they can be reached. This can lead to 
+  bogus warnings about errors in the constant folding, e.g. in code
+  like 
+    (WHEN X
+      (WRITE-STRING (> X 0) "+" "0"))
+  compiled in a context where the compiler can prove that X is NIL,
+  and the compiler complains that (> X 0) causes a type error because
+  NIL isn't a valid argument to #'>. Until sbcl-0.7.4.10 or so this
+  caused a full WARNING, which made the bug really annoying because then 
+  COMPILE and COMPILE-FILE returned FAILURE-P=T for perfectly legal
+  code. Since then the warning has been downgraded to STYLE-WARNING, 
+  so it's still a bug but at least it's a little less annoying.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
