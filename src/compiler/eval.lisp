@@ -578,6 +578,7 @@
 ;;; APPLY on it. If *ALREADY-EVALED-THIS* is true, then we bind it to
 ;;; NIL around the apply to limit the inhibition to the lexical scope
 ;;; of the EVAL-WHEN.
+#!+sb-interpreter
 (defun internal-eval (form)
   (let ((res (sb!c:compile-for-eval form)))
     (if *already-evaled-this*

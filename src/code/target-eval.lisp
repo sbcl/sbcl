@@ -82,7 +82,7 @@
 ;;; EVAL-WHEN.
 (defun eval (original-exp)
   #!+sb-doc
-  "Evaluates its single argument in a null lexical environment, returns the
+  "Evaluate the argument in a null lexical environment, returning the
   result or results."
   (declare (optimize (safety 1)))
   (let ((exp (macroexpand original-exp)))
@@ -157,6 +157,26 @@
 		(sb!eval:internal-eval original-exp))))))
       (t
        exp))))
+
+;;; general case of EVAL (except in that it can't handle toplevel
+;;; EVAL-WHEN magic properly): Delegate to the byte compiler.
+#!-sb-interpreter
+(defun internal-eval (expr)
+  (let ((name (gensym "EVAL-TMPFUN-")))
+    (multiple-value-bind (fun warnings-p failure-p)
+        (compile name
+                 `(lambda ()
+                    (declare (optimize (speed 0) (debug 1))) ; to byte-compile
+                    (declare (optimize (space 1) (safety 1)))
+		    (declare (optimize (compilation-speed 3)))
+                    ,expr))
+      (declare (ignore warnings-p))
+      (if failure-p
+          (error 'simple-program-error
+                 :format-control
+                 "~@<failure when precompiling ~2I~_~S ~I~_ for ~S"
+                 :format-arguments (list expr 'eval))
+          (funcall fun)))))
 
 ;;; Given a function, return three values:
 ;;; 1] A lambda expression that could be used to define the function,
