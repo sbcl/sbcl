@@ -8,6 +8,7 @@ for 0.7.0:
 	** made %COMPILE set up debugging data more like the way the
 		debugger expects (and maybe even completely
 		correctly:-)
+		*** made (DISASSEMBLE 'PRINT) work
 * incompatible changes listed in NEWS:
 	** changed debugger prompt to "5]", "5[2]", "5[3]", etc.
 	** changed default output representation of *PRINT-ESCAPE*-ed

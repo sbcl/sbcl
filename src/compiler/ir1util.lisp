@@ -690,7 +690,8 @@
 
     (cond ((null refs)
 	   (typecase leaf
-	     (lambda-var (delete-lambda-var leaf))
+	     (lambda-var
+	      (delete-lambda-var leaf))
 	     (clambda
 	      (ecase (functional-kind leaf)
 		((nil :let :mv-let :assignment :escape :cleanup)

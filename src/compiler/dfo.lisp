@@ -339,7 +339,7 @@
     ;; between them. Any code that is left in an initial component
     ;; must be unreachable, so we can delete it. Stray links to the
     ;; initial component tail (due NIL function terminated blocks)
-    ;; are moved to the appropriate newc component tail.
+    ;; are moved to the appropriate new component tail.
     (dolist (toplevel-lambda toplevel-lambdas)
       (let* ((block (lambda-block toplevel-lambda))
 	     (old-component (block-component block))

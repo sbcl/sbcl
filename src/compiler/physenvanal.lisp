@@ -266,8 +266,8 @@
 ;;; -- If there isn't any NLX-Info entry in the environment, make
 ;;;    an entry stub, otherwise just move the exit block link to
 ;;;    the component tail.
-;;; -- Close over the NLX-Info in the exit environment.
-;;; -- If the exit is from an :Escape function, then substitute a
+;;; -- Close over the NLX-INFO in the exit environment.
+;;; -- If the exit is from an :ESCAPE function, then substitute a
 ;;;    constant reference to NLX-Info structure for the escape
 ;;;    function reference. This will cause the escape function to
 ;;;    be deleted (although not removed from the DFO.)  The escape
@@ -280,14 +280,12 @@
   (let ((entry (exit-entry exit))
 	(cont (node-cont exit))
 	(exit-fun (node-home-lambda exit)))
-
     (if (find-nlx-info entry cont)
 	(let ((block (node-block exit)))
 	  (aver (= (length (block-succ block)) 1))
 	  (unlink-blocks block (first (block-succ block)))
 	  (link-blocks block (component-tail (block-component block))))
 	(insert-nlx-entry-stub exit env))
-
     (let ((info (find-nlx-info entry cont)))
       (aver info)
       (close-over info (node-physenv exit) env)
@@ -299,7 +297,6 @@
 	(let ((node (block-last (nlx-info-target info))))
 	  (delete-continuation-use node)
 	  (add-continuation-use node (nlx-info-continuation info))))))
-
   (values))
 
 ;;; Iterate over the EXITs in COMPONENT, calling NOTE-NON-LOCAL-EXIT
@@ -312,11 +309,10 @@
   (dolist (lambda (component-lambdas component))
     (dolist (entry (lambda-entries lambda))
       (dolist (exit (entry-exits entry))
-	(let ((target-env (node-physenv entry)))
-	  (if (eq (node-physenv exit) target-env)
+	(let ((target-physenv (node-physenv entry)))
+	  (if (eq (node-physenv exit) target-physenv)
 	      (maybe-delete-exit exit)
-	      (note-non-local-exit target-env exit))))))
-
+	      (note-non-local-exit target-physenv exit))))))
   (values))
 
 ;;;; cleanup emission
@@ -326,7 +322,10 @@
 ;;; in an implicit MV-PROG1. We have to force local call analysis of
 ;;; new references to UNWIND-PROTECT cleanup functions. If we don't
 ;;; actually have to do anything, then we don't insert any cleanup
-;;; code.
+;;; code. (FIXME: There's some confusion here, left over from CMU CL
+;;; comments. CLEANUP1 isn't mentioned in the code of this function.
+;;; It is in code elsewhere, but if the comments for this function
+;;; mention it they should explain the relationship to the other code.)
 ;;;
 ;;; If we do insert cleanup code, we check that BLOCK1 doesn't end in
 ;;; a "tail" local call.

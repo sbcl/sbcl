@@ -24,19 +24,21 @@
 
 ;;;; conflict determination
 
-;;; Return true if the element at the specified offset in SB has a conflict
-;;; with TN:
-;;; -- If an component-live TN (:component kind), then iterate over all the
-;;;    blocks. If the element at Offset is used anywhere in any of the
-;;;    component's blocks (always-live /= 0), then there is a conflict.
-;;; -- If TN is global (Confs true), then iterate over the blocks TN is live in
-;;;    (using TN-Global-Conflicts). If the TN is live everywhere in the block
-;;;    (:Live), then there is a conflict if the element at offset is used
-;;;    anywhere in the block (Always-Live /= 0). Otherwise, we use the local
-;;;    TN number for TN in block to find whether TN has a conflict at Offset in
+;;; Return true if the element at the specified offset in SB has a
+;;; conflict with TN:
+;;; -- If a component-live TN (:component kind), then iterate over
+;;;    all the blocks. If the element at Offset is used anywhere in
+;;;    any of the component's blocks (always-live /= 0), then there
+;;;    is a conflict.
+;;; -- If TN is global (Confs true), then iterate over the blocks TN
+;;;    is live in (using TN-Global-Conflicts). If the TN is live
+;;;    everywhere in the block (:LIVE), then there is a conflict
+;;;    if the element at offset is used anywhere in the block
+;;;    (Always-Live /= 0). Otherwise, we use the local TN number for
+;;;    TN in block to find whether TN has a conflict at Offset in
 ;;;    that block.
-;;; -- If TN is local, then we just check for a conflict in the block it is
-;;;    local to.
+;;; -- If TN is local, then we just check for a conflict in the block
+;;;    it is local to.
 (defun offset-conflicts-in-sb (tn sb offset)
   (declare (type tn tn) (type finite-sb sb) (type index offset))
   (let ((confs (tn-global-conflicts tn))
@@ -76,20 +78,20 @@
       (when (offset-conflicts-in-sb tn sb (+ offset i))
 	(return t)))))
 
-;;; Add TN's conflicts into the conflicts for the location at Offset in SC.
-;;; We iterate over each location in TN, adding to the conflicts for that
-;;; location:
-;;; -- If TN is a :Component TN, then iterate over all the blocks, setting
-;;;    all of the local conflict bits and the always-live bit. This records a
-;;;    conflict with any TN that has a LTN number in the block, as well as with
-;;;    :Always-Live and :Environment TNs.
+;;; Add TN's conflicts into the conflicts for the location at OFFSET
+;;; in SC. We iterate over each location in TN, adding to the
+;;; conflicts for that location:
+;;; -- If TN is a :COMPONENT TN, then iterate over all the blocks,
+;;;    setting all of the local conflict bits and the always-live bit.
+;;;    This records a conflict with any TN that has a LTN number in
+;;;    the block, as well as with :ALWAYS-LIVE and :ENVIRONMENT TNs.
 ;;; -- If TN is global, then iterate over the blocks TN is live in. In
-;;;    addition to setting the always-live bit to represent the conflict with
-;;;    TNs live throughout the block, we also set bits in the local conflicts.
-;;;    If TN is :Always-Live in the block, we set all the bits, otherwise we or
-;;;    in the local conflict bits.
-;;; -- If the TN is local, then we just do the block it is local to, setting
-;;;    always-live and OR'ing in the local conflicts.
+;;;    addition to setting the always-live bit to represent the conflict
+;;;    with TNs live throughout the block, we also set bits in the
+;;;    local conflicts. If TN is :ALWAYS-LIVE in the block, we set all
+;;;    the bits, otherwise we OR in the local conflict bits.
+;;; -- If the TN is local, then we just do the block it is local to,
+;;;    setting always-live and OR'ing in the local conflicts.
 (defun add-location-conflicts (tn sc offset)
   (declare (type tn tn) (type sc sc) (type index offset))
   (let ((confs (tn-global-conflicts tn))
@@ -186,7 +188,7 @@
 	  (setf (finite-sb-last-offset sb) 0))))))
 
 ;;; Expand the :Unbounded SB backing SC by either the initial size or
-;;; the SC element size, whichever is larger. If Needed-Size is
+;;; the SC element size, whichever is larger. If NEEDED-SIZE is
 ;;; larger, then use that size.
 (defun grow-sc (sc &optional (needed-size 0))
   (declare (type sc sc) (type index needed-size))
@@ -257,9 +259,10 @@
 		(make-array size
 			    :initial-element
 			    #-sb-xc #*
-			    ;; The cross-compiler isn't very good at dumping
-			    ;; specialized arrays, so we delay construction of
-			    ;; this SIMPLE-BIT-VECTOR until runtime.
+			    ;; The cross-compiler isn't very good at
+			    ;; dumping specialized arrays, so we delay
+			    ;; construction of this SIMPLE-BIT-VECTOR
+			    ;; until runtime.
 			    #+sb-xc (make-array 0 :element-type 'bit)))
 
 	  (fill nil (finite-sb-conflicts sb))
@@ -275,8 +278,8 @@
 
 ;;;; internal errors
 
-;;; Give someone a hard time because there isn't any load function defined
-;;; to move from Src to Dest.
+;;; Give someone a hard time because there isn't any load function
+;;; defined to move from SRC to DEST.
 (defun no-load-function-error (src dest)
   (let* ((src-sc (tn-sc src))
 	 (src-name (sc-name src-sc))
@@ -439,8 +442,9 @@
       (pushnew tn (gethash vop (ir2-component-spilled-vops 2comp)))))
   (values))
 
-;;; Make a save TN for TN, pack it, and return it. We copy various conflict
-;;; information from the TN so that pack does the right thing.
+;;; Make a save TN for TN, pack it, and return it. We copy various
+;;; conflict information from the TN so that pack does the right
+;;; thing.
 (defun pack-save-tn (tn)
   (declare (type tn tn))
   (let ((res (make-tn 0 :save nil nil)))
@@ -503,7 +507,7 @@
 			   vop))
     (emit-operand-load node block save tn next)))
 
-;;; Return a VOP after which is an o.k. place to save the value of TN.
+;;; Return a VOP after which is an OK place to save the value of TN.
 ;;; For correctness, it is only required that this location be after
 ;;; any possible write and before any possible restore location.
 ;;;
@@ -569,8 +573,8 @@
 	   (save-complex-writer-tn tn vop))))
   (values))
 
-;;; Scan over the VOPs in Block, emiting saving code for TNs noted in the
-;;; codegen info that are packed into saved SCs.
+;;; Scan over the VOPs in BLOCK, emiting saving code for TNs noted in
+;;; the codegen info that are packed into saved SCs.
 (defun emit-saves (block)
   (declare (type ir2-block block))
   (do ((vop (ir2-block-start-vop block) (vop-next vop)))

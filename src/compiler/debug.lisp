@@ -164,9 +164,9 @@
   (unless (gethash fun *seen-functions*)
     (barf "unseen function ~S in ~S" fun where)))
 
-;;; In a lambda, check that the associated nodes are in seen blocks. In an
-;;; optional dispatch, check that the entry points were seen. If the function
-;;; is deleted, ignore it.
+;;; In a CLAMBDA, check that the associated nodes are in seen blocks.
+;;; In an OPTIONAL-DISPATCH, check that the entry points were seen. If
+;;; the function is deleted, ignore it.
 (defun check-function-stuff (functional)
   (ecase (functional-kind functional)
     (:external

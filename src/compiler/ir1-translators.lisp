@@ -789,7 +789,7 @@
 	       `(multiple-value-call #'%throw ,tag ,result)))
 
 ;;; This is a special special form used to instantiate a cleanup as
-;;; the current cleanup within the body. KIND is a the kind of cleanup
+;;; the current cleanup within the body. KIND is the kind of cleanup
 ;;; to make, and MESS-UP is a form that does the mess-up action. We
 ;;; make the MESS-UP be the USE of the MESS-UP form's continuation,
 ;;; and introduce the cleanup into the lexical environment. We
@@ -853,11 +853,11 @@
 	    (%catch (%escape-function ,exit-block) ,tag)
 	  ,@body)))))
 
-;;; UNWIND-PROTECT is similar to CATCH, but more hairy. We make the
+;;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
 ;;; cleanup forms into a local function so that they can be referenced
 ;;; both in the case where we are unwound and in any local exits. We
 ;;; use %CLEANUP-FUNCTION on this to indicate that reference by
-;;; %UNWIND-PROTECT ISN'T "real", and thus doesn't cause creation of
+;;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
 ;;; an XEP.
 (def-ir1-translator unwind-protect ((protected &body cleanup) start cont)
   #!+sb-doc
