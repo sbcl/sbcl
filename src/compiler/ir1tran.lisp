@@ -2014,42 +2014,47 @@
       (ir1-convert-progn-body start cont forms)))
   (values))
 
+;;; common logic for MACROLET and SYMBOL-MACROLET
+;;;
+;;; Call DEFINITIONIZE on each element of DEFINITIONS to find its
+;;; in-lexenv representation, stuff the results into *LEXENV*, and
+;;; call FUN (with no arguments).
+(defun %funcall-in-foomacrolet-lexenv (definitionize definitions fun)
+  (declare (type function process-definitions-fun fun) (type list definitions))
+  (unless (= (length definitions)
+             (length (remove-duplicates definitions :key #'first)))
+    (compiler-style-warning "duplicate definitions in ~S" definitions))
+  (let* ((processed-definitions (mapcar definitionize definitions))
+         (*lexenv* (make-lexenv :functions processed-definitions)))
+    (funcall fun)))
+
 ;;; Tweak *LEXENV* to include the DEFINITIONS from a MACROLET, then
 ;;; call FUN (with no arguments).
 ;;;
 ;;; This is split off from the IR1 convert method so that it can be
 ;;; shared by the special-case top-level MACROLET processing code.
 (defun funcall-in-macrolet-lexenv (definitions fun)
-  (declare (type list definitions) (type function fun))
-  (let* ((whole (gensym "WHOLE"))
-	 (environment (gensym "ENVIRONMENT"))
-	 (processed-definitions
-	  (mapcar (lambda (definition)
-		    (unless (list-of-length-at-least-p definition 2)
-		      (compiler-error
-		       "The list ~S is too short to be a legal ~
-                       local macro definition."
-		       definition))
-		    (destructuring-bind (name arglist &body body) definition
-		      (unless (symbolp name)
-			(compiler-error
-			 "The local macro name ~S is not a symbol." name))
-		      (multiple-value-bind (body local-decls)
-			  (parse-defmacro arglist whole body name 'macrolet
-					  :environment environment)
-			`(,name macro .
-				,(compile nil
-					  `(lambda (,whole ,environment)
-					     ,@local-decls
-					     (block ,name ,body)))))))
-		  definitions))
-	 (*lexenv* (make-lexenv :functions processed-definitions)))
-    (unless (= (length definitions)
-	       (length (remove-duplicates definitions :key #'first)))
-      (compiler-style-warning
-       "duplicate macro names in MACROLET ~S" definitions))
-    (funcall fun))
-  (values))
+  (%funcall-in-foomacrolet-lexenv
+   (lambda (definition)
+     (unless (list-of-length-at-least-p definition 2)
+       (compiler-error
+	"The list ~S is too short to be a legal local macro definition."
+	definition))
+     (destructuring-bind (name arglist &body body) definition
+       (unless (symbolp name)
+	 (compiler-error "The local macro name ~S is not a symbol." name))
+       (let ((whole (gensym "WHOLE"))
+	     (environment (gensym "ENVIRONMENT")))
+	 (multiple-value-bind (body local-decls)
+	     (parse-defmacro arglist whole body name 'macrolet
+			     :environment environment)
+	   `(,name macro .
+		   ,(compile nil
+			     `(lambda (,whole ,environment)
+				,@local-decls
+				(block ,name ,body))))))))
+   definitions
+   fun))
 
 (def-ir1-translator macrolet ((definitions &rest body) start cont)
   #!+sb-doc
