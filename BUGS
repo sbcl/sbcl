@@ -1067,31 +1067,6 @@ WORKAROUND:
 
   Urgh... It's time to write IR1-copier.
 
-262:
-  In 0.8.1.32:
-
-    * (ensure-generic-function 'foo)
-    #<STANDARD-GENERIC-FUNCTION FOO (0)>
-    * (defmethod foo (x) x)
-    debugger invoked on condition of type SIMPLE-ERROR:
-      The generic function #<STANDARD-GENERIC-FUNCTION FOO (0)> takes 0 required
-      arguments; was asked to find a method with specializers (#<BUILT-IN-CLASS T>)
-
-  AMOP seems to say that it should work (first ADD-METHOD initializes
-  GF lambda list).
-
-264:
-  (reported by <dsk> on #lisp 2003-07-16)
-
-    (progv '(foo) '(1)
-      (eval '(symbol-macrolet ((foo 3))
-               (declare (special foo))
-               foo)))
-
-  does not signal an error.
-
-  (fixed in 0.8.1.37)
-
 265:
   SB-EXT:RUN-PROGRAM is currently non-functional on Linux/PPC;
   attempting to use it leads to segmentation violations.  This is
@@ -1116,6 +1091,15 @@ WORKAROUND:
   sbcl does not convert the self-recursive call to a jump, though it
   is allowed to by CLHS 3.2.2.3.  CMUCL, however, does perform this
   optimization.
+
+268: "wrong free declaration scope"
+  The following code must signal type error:
+
+    (locally (declare (optimize (safety 3)))
+      (flet ((foo (x &optional (y (car x)))
+               (declare (optimize (safety 0)))
+               (list x y)))
+        (funcall (eval #'foo) 1)))
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

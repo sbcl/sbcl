@@ -1362,6 +1362,7 @@ bootstrapping.
 	     (fboundp gf-spec))
     (let* ((gf (fdefinition gf-spec))
 	   (method (and (generic-function-p gf)
+                        (generic-function-methods gf)
 			(find-method gf
 				     qualifiers
                                      (parse-specializers specializers)

@@ -676,5 +676,12 @@
   (let ((f (compile nil `(lambda () (make-instance ',class-name)))))
     (assert (typep (funcall f) class-name))))
 
+;;; bug 262: DEFMETHOD failed on a generic function without a lambda
+;;; list
+(ensure-generic-function 'bug262)
+(defmethod bug262 (x y)
+  (list x y))
+(assert (equal (bug262 1 2) '(1 2)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
