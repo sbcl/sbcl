@@ -1300,6 +1300,7 @@
 (defknown %set-symbol-package (symbol t) t (unsafe))
 (defknown %coerce-name-to-function ((or symbol cons)) function (flushable))
 (defknown %coerce-callable-to-function (callable) function (flushable))
+(defknown failed-%with-array-data (t t t) nil)
 
 ;;; Structure slot accessors or setters are magically "known" to be
 ;;; these functions, although the var remains the Slot-Accessor

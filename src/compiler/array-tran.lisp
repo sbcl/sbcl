@@ -11,14 +11,18 @@
 
 (in-package "SB!C")
 
-;;;; DERIVE-TYPE optimizers
+;;;; utilities for optimizing array operations
 
-;;; Array operations that use a specific number of indices implicitly
-;;; assert that the array is of that rank.
-(defun assert-array-rank (array rank)
-  (assert-continuation-type
-   array
-   (specifier-type `(array * ,(make-list rank :initial-element '*)))))
+;;; Return UPGRADED-ARRAY-ELEMENT-TYPE for CONTINUATION, or do
+;;; GIVE-UP-IR1-TRANSFORM if the upgraded element type can't be
+;;; determined.
+(defun upgraded-element-type-specifier-or-give-up (continuation)
+  (let* ((element-ctype (extract-upgraded-element-type continuation))
+	 (element-type-specifier (type-specifier element-ctype)))
+    (if (eq element-type-specifier '*)
+	(give-up-ir1-transform
+	 "upgraded array element type not known at compile time")
+	element-type-specifier)))
 
 ;;; Array access functions return an object from the array, hence its
 ;;; type will be asserted to be array element type.
@@ -52,6 +56,15 @@
   (or (not arg)
       (and (constant-continuation-p arg)
 	   (not (continuation-value arg)))))
+
+;;;; DERIVE-TYPE optimizers
+
+;;; Array operations that use a specific number of indices implicitly
+;;; assert that the array is of that rank.
+(defun assert-array-rank (array rank)
+  (assert-continuation-type
+   array
+   (specifier-type `(array * ,(make-list rank :initial-element '*)))))
 
 (defoptimizer (array-in-bounds-p derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
@@ -479,6 +492,27 @@
 (defun vector-data-end-out-of-range ()
   (error "The end of vector data was out of range."))
 |#
+
+(deftransform %with-array-data ((array start end)
+				;; Note: This transform is limited to
+				;; VECTOR only because I happened to
+				;; create it in order to get sequence
+				;; function operations to be more
+				;; efficient. It might very well be
+				;; reasonable to allow general ARRAY
+				;; here, I just haven't tried to
+				;; understand the performance issues
+				;; involved. -- WHN
+				(vector index (or index null))
+				*
+				:important t
+				:node node
+				:policy (> speed space))
+  "inline non-SIMPLE-vector-handling logic"
+  (let ((element-type (upgraded-element-type-specifier-or-give-up array)))
+    `(%with-array-data-macro array start end
+			     :unsafe? ,(policy node (= safety 0))
+			     :element-type ,element-type)))
 
 ;;; We convert all typed array accessors into AREF and %ASET with type
 ;;; assertions on the array.

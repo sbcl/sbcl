@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
+
 ;;; This checks to see whether the array is simple and the start and
 ;;; end are in bounds. If so, it proceeds with those values.
 ;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that %WITH-ARRAY-DATA
@@ -23,9 +23,20 @@
 ;;; bindings of START-VAR and END-VAR. OFFSET-VAR is the cumulative
 ;;; offset of all displacements encountered, and does not include
 ;;; SVALUE.
+;;;
+;;; When FORCE-INLINE is set, the underlying %WITH-ARRAY-DATA form is
+;;; forced to be inline, overriding the ordinary judgment of the
+;;; %WITH-ARRAY-DATA DEFTRANSFORMs. Ordinarily the DEFTRANSFORMs are
+;;; fairly picky about their arguments, figuring that if you haven't
+;;; bothered to get all your ducks in a row, you probably don't care
+;;; that much about speed anyway! But in some cases it makes sense to
+;;; do type testing inside %WITH-ARRAY-DATA instead of outside, and
+;;; the DEFTRANSFORM can't tell that that's going on, so it can make
+;;; sense to use FORCE-INLINE option in that case.
 (defmacro with-array-data (((data-var array &key offset-var)
 			    (start-var &optional (svalue 0))
-			    (end-var &optional (evalue nil)))
+			    (end-var &optional (evalue nil))
+			    &key force-inline)
 			   &body forms)
   (once-only ((n-array array)
 	      (n-svalue `(the index ,svalue))
@@ -48,9 +59,46 @@
 		       (locally
 			 (declare (notinline %with-array-data))
 			 (%with-array-data ,n-array ,n-svalue ,n-evalue)))))
-	     (%with-array-data ,n-array ,n-svalue ,n-evalue))
+	     (,(if force-inline '%with-array-data-macro '%with-array-data)
+	      ,n-array ,n-svalue ,n-evalue))
        ,@forms)))
 
+;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
+;;; DEFTRANSFORMs and DEFUNs.
+(defmacro %with-array-data-macro (array
+				  start
+				  end
+				  &key
+				  (element-type '*)
+				  unsafe?
+				  fail-inline?)
+  (let ((size (gensym "SIZE-"))
+	(data (gensym "DATA-"))
+	(cumulative-offset (gensym "CUMULATIVE-OFFSET-")))
+    `(let* ((,size (array-total-size ,array))
+	    (,end (cond (,end
+			 (unless (or ,unsafe? (<= ,end ,size))
+			   ,(if fail-inline?
+				`(error "End ~D is greater than total size ~D."
+					,end ,size)
+				`(failed-%with-array-data ,array ,start ,end)))
+			 ,end)
+			(t ,size))))
+       (unless (or ,unsafe? (<= ,start ,end))
+	 ,(if fail-inline?
+	      `(error "Start ~D is greater than end ~D." ,start ,end)
+	      `(failed-%with-array-data ,array ,start ,end)))
+       (do ((,data ,array (%array-data-vector ,data))
+	    (,cumulative-offset 0
+				(+ ,cumulative-offset
+				   (%array-displacement ,data))))
+	   ((not (array-header-p ,data))
+	    (values (the (simple-array ,element-type 1) ,data)
+		    (the index (+ ,cumulative-offset ,start))
+		    (the index (+ ,cumulative-offset ,end))
+		    (the index ,cumulative-offset)))
+	 (declare (type index ,cumulative-offset))))))
+
 #!-gengc
 (defmacro without-gcing (&rest body)
   #!+sb-doc

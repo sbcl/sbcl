@@ -4,9 +4,6 @@
 
 (declaim (optimize (speed 3) (space 1)))
 
-(defun %with-array-data (array start end)
-  (%with-array-data-macro array start end :fail-inline? t))
-
 ;;; Like CMU CL, we use HEAPSORT. However, instead of trying to
 ;;; generalize the CMU CL code to allow START and END values, this
 ;;; code has been written from scratch following Chapter 7 of

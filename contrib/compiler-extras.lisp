@@ -19,8 +19,7 @@
 
 (in-package "SB-KERNEL")
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (export '(%with-array-data-macro
-	    index-or-minus-1
+  (export '(index-or-minus-1
             %find-position %find-position-vector-macro
 	    %find-position-if %find-position-if-vector-macro)))
 
@@ -29,132 +28,6 @@
 (deftype index-or-minus-1 () `(integer -1 ,(1- most-positive-fixnum)))
 
 (declaim (optimize (speed 1) (space 2)))
-
-;;; This checks to see whether the array is simple and the start and
-;;; end are in bounds. If so, it proceeds with those values.
-;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that %WITH-ARRAY-DATA
-;;; may be further optimized.
-;;;
-;;; Given any ARRAY, bind DATA-VAR to the array's data vector and
-;;; START-VAR and END-VAR to the start and end of the designated
-;;; portion of the data vector. SVALUE and EVALUE are any start and
-;;; end specified to the original operation, and are factored into the
-;;; bindings of START-VAR and END-VAR. OFFSET-VAR is the cumulative
-;;; offset of all displacements encountered, and does not include
-;;; SVALUE.
-;;;
-;;; When FORCE-INLINE is set, the underlying %WITH-ARRAY-DATA form is
-;;; forced to be inline, overriding the ordinary judgment of the
-;;; %WITH-ARRAY-DATA DEFTRANSFORMs. Ordinarily the DEFTRANSFORMs are
-;;; fairly picky about their arguments, figuring that if you haven't
-;;; bothered to get all your ducks in a row, you probably don't care
-;;; that much about speed anyway! But in some cases it makes sense to
-;;; do type testing inside %WITH-ARRAY-DATA instead of outside, and
-;;; the DEFTRANSFORM can't tell that that's going on, so it can make
-;;; sense to use FORCE-INLINE option in that case.
-(defmacro with-array-data (((data-var array &key offset-var)
-			    (start-var &optional (svalue 0))
-			    (end-var &optional (evalue nil))
-			    &key force-inline)
-			   &body forms)
-  (once-only ((n-array array)
-	      (n-svalue `(the index ,svalue))
-	      (n-evalue `(the (or index null) ,evalue)))
-    `(multiple-value-bind (,data-var
-			   ,start-var
-			   ,end-var
-			   ,@(when offset-var `(,offset-var)))
-	 (if (not (array-header-p ,n-array))
-	     (let ((,n-array ,n-array))
-	       (declare (type (simple-array * (*)) ,n-array))
-	       ,(once-only ((n-len `(length ,n-array))
-			    (n-end `(or ,n-evalue ,n-len)))
-		  `(if (<= ,n-svalue ,n-end ,n-len)
-		       ;; success
-		       (values ,n-array ,n-svalue ,n-end 0)
-		       ;; failure: Make a NOTINLINE call to
-		       ;; %WITH-ARRAY-DATA with our bad data
-		       ;; to cause the error to be signalled.
-		       (locally
-			 (declare (notinline %with-array-data))
-			 (%with-array-data ,n-array ,n-svalue ,n-evalue)))))
-	     (,(if force-inline '%with-array-data-macro '%with-array-data)
-	      ,n-array ,n-svalue ,n-evalue))
-       ,@forms)))
-
-;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
-;;; DEFTRANSFORMs and DEFUNs.
-(defmacro %with-array-data-macro (array
-				  start
-				  end
-				  &key
-				  (element-type '*)
-				  unsafe?
-				  fail-inline?)
-  (let ((size (gensym "SIZE-"))
-	(data (gensym "DATA-"))
-	(cumulative-offset (gensym "CUMULATIVE-OFFSET-")))
-    `(let* ((,size (array-total-size ,array))
-	    (,end (cond (,end
-			 (unless (or ,unsafe? (<= ,end ,size))
-			   ,(if fail-inline?
-				`(error "End ~D is greater than total size ~D."
-					,end ,size)
-				`(failed-%with-array-data ,array ,start ,end)))
-			 ,end)
-			(t ,size))))
-       (unless (or ,unsafe? (<= ,start ,end))
-	 ,(if fail-inline?
-	      `(error "Start ~D is greater than end ~D." ,start ,end)
-	      `(failed-%with-array-data ,array ,start ,end)))
-       (do ((,data ,array (%array-data-vector ,data))
-	    (,cumulative-offset 0
-				(+ ,cumulative-offset
-				   (%array-displacement ,data))))
-	   ((not (array-header-p ,data))
-	    (values (the (simple-array ,element-type 1) ,data)
-		    (the index (+ ,cumulative-offset ,start))
-		    (the index (+ ,cumulative-offset ,end))
-		    (the index ,cumulative-offset)))
-	 (declare (type index ,cumulative-offset))))))
-
-(defun upgraded-element-type-specifier-or-give-up (continuation)
-  (let* ((element-ctype (extract-upgraded-element-type continuation))
-	 (element-type-specifier (type-specifier element-ctype)))
-    (if (eq element-type-specifier '*)
-	(give-up-ir1-transform
-	 "upgraded array element type not known at compile time")
-	element-type-specifier)))
-
-(deftransform %with-array-data ((array start end)
-				;; Note: This transform is limited to
-				;; VECTOR only because I happened to
-				;; create it in order to get sequence
-				;; function operations to be more
-				;; efficient. It might very well be
-				;; reasonable to allow general ARRAY
-				;; here, I just haven't tried to
-				;; understand the performance issues
-				;; involved. -- WHN
-				(vector index (or index null))
-				*
-				:important t
-				:node node
-				:policy (> speed space))
-  "inline non-SIMPLE-vector-handling logic"
-  (let ((element-type (upgraded-element-type-specifier-or-give-up array)))
-    `(%with-array-data-macro array start end
-			     :unsafe? ,(policy node (= safety 0))
-			     :element-type ,element-type)))
-
-;;; It'd waste space to expand copies of error handling in every
-;;; inline %WITH-ARRAY-DATA, so we have them call this function
-;;; instead. This is just a wrapper which is known never to return.
-(defknown failed-%with-array-data (t t t) nil)
-(defun failed-%with-array-data (array start end)
-  (declare (notinline %with-array-data))
-  (%with-array-data array start end)
-  (error "internal error: shouldn't be here with valid parameters"))
 
 (deftransform fill ((seq item &key (start 0) (end (length seq)))
 		    (vector t &key (:start t) (:end index))

@@ -46,42 +46,16 @@
 	   (fixnum index))
   (%check-bound array bound index))
 
-;;; the guts of the WITH-ARRAY-DATA macro (except when DEFTRANSFORM
-;;; %WITH-ARRAY-DATA takes over)
 (defun %with-array-data (array start end)
-  (declare (array array) (type index start) (type (or index null) end))
-  ;; FIXME: The VALUES declaration here is correct, but as of SBCL
-  ;; 0.6.6, the corresponding runtime assertion is implemented
-  ;; horribly inefficiently, with a full call to %TYPEP for every
-  ;; call to this function. As a quick fix, I commented it out,
-  ;; but the proper fix would be to fix up type checking.
-  ;;
-  ;; A simpler test case for the optimization bug is
-  ;;	(DEFUN FOO (X)
-  ;;	  (DECLARE (TYPE INDEXOID X))
-  ;;	  (THE (VALUES INDEXOID)
-  ;;	    (VALUES X)))
-  ;; which also compiles to a full call to %TYPEP.
-  #+nil (declare (values (simple-array * (*)) index index index))
-  (let* ((size (array-total-size array))
-	 (end (cond (end
-		     (unless (<= end size)
-		       (error "End ~D is greater than total size ~D."
-			      end size))
-		     end)
-		    (t size))))
-    (when (> start end)
-      (error "Start ~D is greater than end ~D." start end))
-    (do ((data array (%array-data-vector data))
-	 (cumulative-offset 0
-			    (+ cumulative-offset
-			       (%array-displacement data))))
-	((not (array-header-p data))
-	 (values (the (simple-array * (*)) data)
-		 (the index (+ cumulative-offset start))
-		 (the index (+ cumulative-offset end))
-		 (the index cumulative-offset)))
-      (declare (type index cumulative-offset)))))
+  (%with-array-data-macro array start end :fail-inline? t))
+
+;;; It'd waste space to expand copies of error handling in every
+;;; inline %WITH-ARRAY-DATA, so we have them call this function
+;;; instead. This is just a wrapper which is known never to return.
+(defun failed-%with-array-data (array start end)
+  (declare (notinline %with-array-data))
+  (%with-array-data array start end)
+  (error "internal error: shouldn't be here with valid parameters"))
 
 ;;;; MAKE-ARRAY
 
