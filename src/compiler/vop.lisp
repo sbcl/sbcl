@@ -419,8 +419,8 @@
 
 ;;; A VOP is a Virtual Operation. It represents an operation and the
 ;;; operands to the operation.
-(defstruct (vop (:constructor make-vop (block node info args results))
-		(:copier nil))
+(def!struct (vop (:constructor make-vop (block node info args results))
+		 (:copier nil))
   ;; VOP-INFO structure containing static info about the operation
   (info nil :type (or vop-info null))
   ;; the IR2-BLOCK this VOP is in
@@ -459,8 +459,8 @@
 ;;; A TN-REF object contains information about a particular reference
 ;;; to a TN. The information in TN-REFs largely determines how TNs are
 ;;; packed.
-(defstruct (tn-ref (:constructor make-tn-ref (tn write-p))
-		   (:copier nil))
+(def!struct (tn-ref (:constructor make-tn-ref (tn write-p))
+		    (:copier nil))
   ;; the TN referenced
   (tn (missing-arg) :type tn)
   ;; Is this is a write reference? (as opposed to a read reference)
@@ -742,7 +742,7 @@
 
 ;;; the SC structure holds the storage base that storage is allocated
 ;;; in and information used to select locations within the SB
-(defstruct (sc (:copier nil))
+(def!struct (sc (:copier nil))
   ;; name, for printing and reference
   (name nil :type symbol)
   ;; the number used to index SC cost vectors
@@ -814,7 +814,7 @@
 
 ;;;; TNs
 
-(defstruct (tn (:include sset-element)
+(def!struct (tn (:include sset-element)
 	       (:constructor make-random-tn)
 	       (:constructor make-tn (number kind primitive-type sc))
 	       (:copier nil))

@@ -185,7 +185,7 @@
   ;; branch delay slot.
   variable-length)
 
-(defstruct (instruction
+(def!struct (instruction
 	    (:include sset-element)
 	    (:conc-name inst-)
 	    (:constructor make-instruction (number emitter attributes delay))
@@ -670,16 +670,16 @@
 ;;;; structure used during output emission
 
 ;;; common supertype for all the different kinds of annotations
-(defstruct (annotation (:constructor nil)
-		       (:copier nil))
+(def!struct (annotation (:constructor nil)
+			(:copier nil))
   ;; Where in the raw output stream was this annotation emitted?
   (index 0 :type index)
   ;; What position does that correspond to?
   (posn nil :type (or index null)))
 
-(defstruct (label (:include annotation)
-		  (:constructor gen-label ())
-		  (:copier nil))
+(def!struct (label (:include annotation)
+		   (:constructor gen-label ())
+		   (:copier nil))
   ;; (doesn't need any additional information beyond what is in the
   ;; annotation structure)
   )
@@ -690,11 +690,11 @@
       (format stream "L~D" (sb!c:label-id label))))
 
 ;;; a constraint on how the output stream must be aligned
-(defstruct (alignment-note (:include annotation)
-			   (:conc-name alignment-)
-			   (:predicate alignment-p)
-			   (:constructor make-alignment (bits size fill-byte))
-			   (:copier nil))
+(def!struct (alignment-note (:include annotation)
+			    (:conc-name alignment-)
+			    (:predicate alignment-p)
+			    (:constructor make-alignment (bits size fill-byte))
+			    (:copier nil))
   ;; the minimum number of low-order bits that must be zero
   (bits 0 :type alignment)
   ;; the amount of filler we are assuming this alignment op will take
@@ -704,9 +704,9 @@
 
 ;;; a reference to someplace that needs to be back-patched when
 ;;; we actually know what label positions, etc. are
-(defstruct (back-patch (:include annotation)
-		       (:constructor make-back-patch (size fun))
-		       (:copier nil))
+(def!struct (back-patch (:include annotation)
+			(:constructor make-back-patch (size fun))
+			(:copier nil))
   ;; the area affected by this back-patch
   (size 0 :type index :read-only t)
   ;; the function to use to generate the real data
@@ -716,10 +716,10 @@
 ;;; amount of stuff output depends on label positions, etc.
 ;;; BACK-PATCHes can't change their mind about how much stuff to emit,
 ;;; but CHOOSERs can.
-(defstruct (chooser (:include annotation)
-		    (:constructor make-chooser
-				  (size alignment maybe-shrink worst-case-fun))
-		    (:copier nil))
+(def!struct (chooser (:include annotation)
+		     (:constructor make-chooser
+				   (size alignment maybe-shrink worst-case-fun))
+		     (:copier nil))
   ;; the worst case size for this chooser. There is this much space
   ;; allocated in the output buffer.
   (size 0 :type index :read-only t)
@@ -735,9 +735,9 @@
 
 ;;; This is used internally when we figure out a chooser or alignment
 ;;; doesn't really need as much space as we initially gave it.
-(defstruct (filler (:include annotation)
-		   (:constructor make-filler (bytes))
-		   (:copier nil))
+(def!struct (filler (:include annotation)
+		    (:constructor make-filler (bytes))
+		    (:copier nil))
   ;; the number of bytes of filler here
   (bytes 0 :type index))
 

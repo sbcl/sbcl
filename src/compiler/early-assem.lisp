@@ -31,14 +31,14 @@
 (def!constant assembly-unit-bits 8)
 (def!constant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))
 
-(deftype assembly-unit ()
+(def!type assembly-unit ()
   `(unsigned-byte ,assembly-unit-bits))
 
 ;;; Some functions which accept assembly units can meaningfully accept
 ;;; signed values with the same number of bits and silently munge them
 ;;; into appropriate unsigned values. (This is handy behavior e.g.
 ;;; when assembling branch instructions on the X86.)
-(deftype possibly-signed-assembly-unit ()
+(def!type possibly-signed-assembly-unit ()
   `(or assembly-unit
        (signed-byte ,assembly-unit-bits)))
 
@@ -47,6 +47,5 @@
 ;;; better then that ourselves.
 (def!constant max-alignment sb!vm:n-lowtag-bits)
 
-
-(deftype alignment ()
+(def!type alignment ()
   `(integer 0 ,max-alignment))

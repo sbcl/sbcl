@@ -661,7 +661,7 @@
 
 ;;; A FILE-INFO structure holds all the source information for a
 ;;; given file.
-(defstruct (file-info (:copier nil))
+(def!struct (file-info (:copier nil))
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. If from a stream, :STREAM.
   (name (missing-arg) :type (or pathname (member :lisp :stream)))
@@ -684,11 +684,11 @@
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.
-(defstruct (source-info
-	    #-no-ansi-print-object
-	    (:print-object (lambda (s stream)
-			     (print-unreadable-object (s stream :type t))))
-	    (:copier nil))
+(def!struct (source-info
+	     #-no-ansi-print-object
+	     (:print-object (lambda (s stream)
+			      (print-unreadable-object (s stream :type t))))
+	     (:copier nil))
   ;; the UT that compilation started at
   (start-time (get-universal-time) :type unsigned-byte)
   ;; the FILE-INFO structure for this compilation

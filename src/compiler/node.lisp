@@ -83,7 +83,7 @@
   (print-unreadable-object (x stream :type t :identity t)
     (format stream " #~D" (cont-num x))))
 
-(defstruct (node (:constructor nil)
+(def!struct (node (:constructor nil)
 		 (:copier nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
@@ -134,7 +134,7 @@
   ;; can null out this slot.
   (tail-p nil :type boolean))
 
-(defstruct (valued-node (:conc-name node-)
+(def!struct (valued-node (:conc-name node-)
                         (:include node)
                         (:constructor nil)
                         (:copier nil))
@@ -189,7 +189,7 @@
 ;;; order. This latter numbering also forms the basis of the block
 ;;; numbering in the debug-info (though that is relative to the start
 ;;; of the function.)
-(defstruct (cblock (:include sset-element)
+(def!struct (cblock (:include sset-element)
 		   (:constructor make-block (start))
 		   (:constructor make-block-key)
 		   (:conc-name block-)
@@ -250,7 +250,7 @@
 ;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
 ;;; different BLOCK-INFO annotation structures so that code
 ;;; (specifically control analysis) can be shared.
-(defstruct (block-annotation (:constructor nil)
+(def!struct (block-annotation (:constructor nil)
 			     (:copier nil))
   ;; The IR1 block that this block is in the INFO for.
   (block (missing-arg) :type cblock)
@@ -272,9 +272,9 @@
 ;;;   size of flow analysis problems, this allows back-end data
 ;;;   structures to be reclaimed after the compilation of each
 ;;;   component.
-(defstruct (component (:copier nil)
-                      (:constructor
-                       make-component (head tail &aux (last-block tail))))
+(def!struct (component (:copier nil)
+		       (:constructor
+			make-component (head tail &aux (last-block tail))))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
   ;; the kind of component
@@ -421,7 +421,7 @@
 ;;; boundaries by requiring that the exit ctrans initially head their
 ;;; blocks, and then by not merging blocks when there is a cleanup
 ;;; change.
-(defstruct (cleanup (:copier nil))
+(def!struct (cleanup (:copier nil))
   ;; the kind of thing that has to be cleaned up
   (kind (missing-arg)
 	:type (member :special-bind :catch :unwind-protect
@@ -460,7 +460,7 @@
 ;;; structure is attached to INFO and used to keep track of
 ;;; associations between these names and less-abstract things (like
 ;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
-(defstruct (physenv (:copier nil))
+(def!struct (physenv (:copier nil))
   ;; the function that allocates this physical environment
   (lambda (missing-arg) :type clambda :read-only t)
   ;; This ultimately converges to a list of all the LAMBDA-VARs and
@@ -494,7 +494,7 @@
 ;;; The tail set is somewhat approximate, because it is too early to
 ;;; be sure which calls will be tail-recursive. Any call that *might*
 ;;; end up tail-recursive causes TAIL-SET merging.
-(defstruct (tail-set)
+(def!struct (tail-set)
   ;; a list of all the LAMBDAs in this tail set
   (funs nil :type list)
   ;; our current best guess of the type returned by these functions.
@@ -1095,7 +1095,7 @@
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
-(defstruct (ref (:include valued-node (reoptimize nil))
+(def!struct (ref (:include valued-node (reoptimize nil))
 		(:constructor make-ref
                               (leaf
                                &aux (leaf-type (leaf-type leaf))
@@ -1109,7 +1109,7 @@
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
-(defstruct (cif (:include node)
+(def!struct (cif (:include node)
 		(:conc-name if-)
 		(:predicate if-p)
 		(:constructor make-if)
@@ -1125,7 +1125,7 @@
   consequent
   alternative)
 
-(defstruct (cset (:include valued-node
+(def!struct (cset (:include valued-node
 			   (derived-type (make-single-value-type
                                           *universal-type*)))
 		 (:conc-name set-)
@@ -1144,7 +1144,7 @@
 ;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
 ;;; function appears as the successor; the NODE-LVAR is null.
-(defstruct (basic-combination (:include valued-node)
+(def!struct (basic-combination (:include valued-node)
 			      (:constructor nil)
 			      (:copier nil))
   ;; LVAR for the function
@@ -1171,7 +1171,7 @@
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that
 ;;; an MV-COMBINATION isn't COMBINATION-P.
-(defstruct (combination (:include basic-combination)
+(def!struct (combination (:include basic-combination)
 			(:constructor make-combination (fun))
 			(:copier nil)))
 (defprinter (combination :identity t)
@@ -1186,7 +1186,7 @@
 ;;; An MV-COMBINATION is to MULTIPLE-VALUE-CALL as a COMBINATION is to
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
-(defstruct (mv-combination (:include basic-combination)
+(def!struct (mv-combination (:include basic-combination)
 			   (:constructor make-mv-combination (fun))
 			   (:copier nil)))
 (defprinter (mv-combination)
@@ -1195,7 +1195,7 @@
 
 ;;; The BIND node marks the beginning of a lambda body and represents
 ;;; the creation and initialization of the variables.
-(defstruct (bind (:include node)
+(def!struct (bind (:include node)
 		 (:copier nil))
   ;; the lambda we are binding variables for. Null when we are
   ;; creating the LAMBDA during IR1 translation.
@@ -1207,7 +1207,7 @@
 ;;; return values and represents the control transfer on return. This
 ;;; is also where we stick information used for TAIL-SET type
 ;;; inference.
-(defstruct (creturn (:include node)
+(def!struct (creturn (:include node)
 		    (:conc-name return-)
 		    (:predicate return-p)
 		    (:constructor make-return)
@@ -1229,7 +1229,7 @@
 ;;; The CAST node represents type assertions. The check for
 ;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
 ;;; type ASSERTED-TYPE.
-(defstruct (cast (:include valued-node)
+(def!struct (cast (:include valued-node)
                  (:constructor %make-cast))
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
@@ -1261,7 +1261,7 @@
 ;;; The ENTRY node serves to mark the start of the dynamic extent of a
 ;;; lexical exit. It is the mess-up node for the corresponding :ENTRY
 ;;; cleanup.
-(defstruct (entry (:include node)
+(def!struct (entry (:include node)
 		  (:copier nil))
   ;; All of the EXIT nodes for potential non-local exits to this point.
   (exits nil :type list)
@@ -1277,7 +1277,7 @@
 ;;; continuation, it is delivered to our VALUE lvar. The original exit
 ;;; lvar is the exit node's LVAR; physenv analysis also makes it the
 ;;; lvar of %NLX-ENTRY call.
-(defstruct (exit (:include valued-node)
+(def!struct (exit (:include valued-node)
 		 (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
@@ -1294,7 +1294,7 @@
 
 ;;;; miscellaneous IR1 structures
 
-(defstruct (undefined-warning
+(def!struct (undefined-warning
 	    #-no-ansi-print-object
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s :type t)
