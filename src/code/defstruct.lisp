@@ -489,7 +489,7 @@
 		(%defstruct ',dd ',inherits)
 		(/show0 "back from %DEFSTRUCT")
 		,@(unless expanding-into-code-for-xc-host-p
-		    (append (raw-accessor-definitions dd)
+		    (append #|(raw-accessor-definitions dd)|# ; REMOVEME
 			    (predicate-definitions dd)
 			    ;; FIXME: We've inherited from CMU CL nonparallel
 			    ;; code for creating copiers for typed and untyped
@@ -550,6 +550,8 @@
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
+;;; REMOVEME: no longer used
+#|
 ;;; Return forms to define readers and writers for raw slots as inline
 ;;; functions.
 (defun raw-accessor-definitions (dd)
@@ -599,6 +601,7 @@
       `((/show0 "beginning RAW-ACCESSOR-DEFINITIONS forms")
 	,@(res)
 	(/show0 "done with RAW-ACCESSOR-DEFINITIONS forms")))))
+|#
 
 ;;; Return a list of forms which create a predicate for an untyped DEFSTRUCT.
 (defun predicate-definitions (dd)
