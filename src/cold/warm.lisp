@@ -13,13 +13,6 @@
 
 ;;;; general warm init compilation policy
 
-#+(and sbcl alpha) ; SBCL/Alpha uses stop-and-copy, and Alphas have lotso RAM.
-(progn
-  (sb!ext::gc-off)
-  (setf (sb!ext::bytes-consed-between-gcs) (* 30 (expt 10 6)))
-  (sb!ext::gc-on)
-  (sb!ext::gc))
-
 
 (proclaim '(optimize (compilation-speed 1)
 		     (debug #+sb-show 2 #-sb-show 1)

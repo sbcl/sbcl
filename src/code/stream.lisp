@@ -1153,7 +1153,6 @@
      (if (null arg1)
 	 (string-output-stream-index stream)))
     (:charpos
-     ;; FIXME there's some reason we can't do this with POSITION?
      (do ((index (1- (the fixnum (string-output-stream-index stream)))
 		 (1- index))
 	  (count 0 (1+ count))
