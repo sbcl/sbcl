@@ -222,6 +222,7 @@
   (assert (null result))
   (assert (typep error 'program-error)))
 
+;;; ECASE should treat a bare T as a literal key
 (multiple-value-bind (result error)
     (ignore-errors (ecase 1 (t 0)))
   (assert (null result))
@@ -247,3 +248,23 @@
   (assert (null result))
   (assert (typep error 'undefined-function))
   (assert (eq (cell-error-name error) 'and)))
+
+;;; PSETQ should behave when given complex symbol-macro arguments
+(multiple-value-bind (sequence index)
+    (symbol-macrolet ((x (aref a (incf i)))
+		      (y (aref a (incf i))))
+	(let ((a (copy-seq #(0 1 2 3 4 5 6 7 8 9)))
+	      (i 0))
+	  (psetq x (aref a (incf i))
+		 y (aref a (incf i)))
+	  (values a i)))
+  (assert (equalp sequence #(0 2 2 4 4 5 6 7 8 9)))
+  (assert (= index 4)))
+
+(multiple-value-bind (result error)
+    (ignore-errors
+      (let ((x (list 1 2)))
+	(psetq (car x) 3)
+	x))
+  (assert (null result))
+  (assert (typep error 'program-error)))

@@ -149,8 +149,6 @@
    ;; the only unsurprising choice.
    (info :function :inline-expansion-designator name)))
 
-;;; Now that we have the definition of MULTIPLE-VALUE-BIND, we can
-;;; make a reasonably readable definition of DEFUN.
 (defmacro-mundanely defun (&environment env name args &body body)
   "Define a function at top level."
   #+sb-xc-host
@@ -249,7 +247,7 @@
 	 `((unless (boundp ',var)
 	     (setq ,var ,val))))
      ,@(when docp
-	 `((funcall #'(setf fdocumentation) ',doc ',var 'variable)))
+	 `((setf (fdocumentation ',var 'variable) ',doc )))
      ',var))
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
@@ -263,10 +261,7 @@
      (declaim (special ,var))
      (setq ,var ,val)
      ,@(when docp
-	 ;; FIXME: The various FUNCALL #'(SETF FDOCUMENTATION) and
-	 ;; other FUNCALL #'(SETF FOO) forms in the code should
-	 ;; unbogobootstrapized back to ordinary SETF forms.
-	 `((funcall #'(setf fdocumentation) ',doc ',var 'variable)))
+	 `((setf (fdocumentation ',var 'variable) ',doc)))
      ',var))
 
 ;;;; iteration constructs
@@ -306,49 +301,40 @@
 ;;; defined that it looks as though it's worth just implementing them
 ;;; ASAP, at the cost of being unable to use the standard
 ;;; destructuring mechanisms.
-(defmacro-mundanely dotimes (var-count-result &body body)
-  (multiple-value-bind ; to roll our own destructuring
-      (var count result)
-      (apply (lambda (var count &optional (result nil))
-	       (values var count result))
-	     var-count-result)
-    (cond ((numberp count)
-	   `(do ((,var 0 (1+ ,var)))
-		((>= ,var ,count) ,result)
-	      (declare (type unsigned-byte ,var))
-	      ,@body))
-	  (t (let ((v1 (gensym)))
-	       `(do ((,var 0 (1+ ,var)) (,v1 ,count))
-		    ((>= ,var ,v1) ,result)
-		  (declare (type unsigned-byte ,var))
-		  ,@body))))))
-(defmacro-mundanely dolist (var-list-result &body body)
-  (multiple-value-bind                 ; to roll our own destructuring
-        (var list result)
-      (apply (lambda (var list &optional (result nil))
-	       (values var list result))
-	     var-list-result)
-    ;; We repeatedly bind the var instead of setting it so that we
-    ;; never have to give the var an arbitrary value such as NIL
-    ;; (which might conflict with a declaration). If there is a result
-    ;; form, we introduce a gratuitous binding of the variable to NIL
-    ;; without the declarations, then evaluate the result form in that
-    ;; environment. We spuriously reference the gratuitous variable,
-    ;; since we don't want to use IGNORABLE on what might be a special
-    ;; var.
-    (multiple-value-bind (forms decls) (parse-body body nil)
-      (let ((n-list (gensym)))
-        `(do* ((,n-list ,list (cdr ,n-list)))
-              ((endp ,n-list)
-               ,@(if result
-                     `((let ((,var nil))
-                         ,var
-                         ,result))
-                     '(nil)))
-           (let ((,var (car ,n-list)))
-             ,@decls
-             (tagbody
-                ,@forms)))))))
+(defmacro-mundanely dotimes ((var count &optional (result nil)) &body body)
+  (cond ((numberp count)
+	 `(do ((,var 0 (1+ ,var)))
+	   ((>= ,var ,count) ,result)
+	   (declare (type unsigned-byte ,var))
+	   ,@body))
+	(t (let ((v1 (gensym)))
+	     `(do ((,var 0 (1+ ,var)) (,v1 ,count))
+	       ((>= ,var ,v1) ,result)
+	       (declare (type unsigned-byte ,var))
+	       ,@body)))))
+
+(defmacro-mundanely dolist ((var list &optional (result nil)) &body body)
+  ;; We repeatedly bind the var instead of setting it so that we never
+  ;; have to give the var an arbitrary value such as NIL (which might
+  ;; conflict with a declaration). If there is a result form, we
+  ;; introduce a gratuitous binding of the variable to NIL without the
+  ;; declarations, then evaluate the result form in that
+  ;; environment. We spuriously reference the gratuitous variable,
+  ;; since we don't want to use IGNORABLE on what might be a special
+  ;; var.
+  (multiple-value-bind (forms decls) (parse-body body nil)
+    (let ((n-list (gensym)))
+      `(do* ((,n-list ,list (cdr ,n-list)))
+	((endp ,n-list)
+	 ,@(if result
+	       `((let ((,var nil))
+		   ,var
+		   ,result))
+	       '(nil)))
+	(let ((,var (car ,n-list)))
+	  ,@decls
+	  (tagbody
+	     ,@forms))))))
 
 ;;;; miscellaneous
 
@@ -361,21 +347,15 @@
    Set the variables to the values, like SETQ, except that assignments
    happen in parallel, i.e. no assignments take place until all the
    forms have been evaluated."
-  ;; (This macro is used in the definition of DO, so we can't use DO in the
-  ;; definition of this macro without getting into confusing bootstrap issues.)
-  (prog ((lets nil)
-	 (setqs nil)
-	 (pairs pairs))
-    :again
-    (when (atom (cdr pairs))
-      (return `(let ,(nreverse lets)
-		 (setq ,@(nreverse setqs))
-		 nil)))
-    (let ((gen (gensym)))
-      (setq lets (cons `(,gen ,(cadr pairs)) lets)
-	    setqs (list* gen (car pairs) setqs)
-	    pairs (cddr pairs)))
-    (go :again)))
+  ;; Given the possibility of symbol-macros, we delegate to PSETF
+  ;; which knows how to deal with them, after checking that syntax is
+  ;; compatible with PSETQ.
+  (do ((pair pairs (cddr pair)))
+      ((endp pair) `(psetf ,@pairs))
+    (unless (symbolp (car pair))
+      (error 'simple-program-error
+	     :format-control "variable ~S in PSETQ is not a SYMBOL"
+	     :format-arguments (list (car pair))))))
 
 (defmacro-mundanely lambda (&whole whole args &body body)
   (declare (ignore args body))

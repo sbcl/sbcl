@@ -1388,6 +1388,8 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
     ** LOOP supports DOWNTO and ABOVE properly (thanks to Matthew Danish)
     ** FUNCALL of special-operators now cause an error of type
        UNDEFINED-FUNCTION;
+    ** PSETQ now works as required in the presence of side-effecting
+       symbol-macro places;
   * fixed bug 166: compiler preserves "there is a way to go"
     invariant when deleting code.
   * fixed bug 172: macro lambda lists with required arguments after
