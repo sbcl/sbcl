@@ -35,3 +35,11 @@
 		     (search "tests/filesys.pure.lisp"
 			     (namestring pathname)))
 		   dir)))
+
+;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
+;;; stream is not a stream associated with a file.
+;;;
+;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
+;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
+(assert (subtypep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
+		  'type-error))

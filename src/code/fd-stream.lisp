@@ -853,6 +853,16 @@
     (:charpos
      (fd-stream-char-pos fd-stream))
     (:file-length
+     (unless (fd-stream-file fd-stream)
+       ;; This is a TYPE-ERROR because ANSI's species FILE-LENGTH
+       ;; "should signal an error of type TYPE-ERROR if stream is not
+       ;; a stream associated with a file". Too bad there's no very
+       ;; appropriate value for the EXPECTED-TYPE slot..
+       (error 'simple-type-error
+              :datum fd-stream
+              :expected-type 'file-stream
+              :format-control "~S is not a stream associated with a file."
+              :format-arguments (list fd-stream)))
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
 			   atime mtime ctime blksize blocks)
 	 (sb!unix:unix-fstat (fd-stream-fd fd-stream))

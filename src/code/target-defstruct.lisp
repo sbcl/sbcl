@@ -211,6 +211,7 @@
 		   (slots (dd-slots dd) (cdr slots)))
 		  ((or (null slots)
 		       (and (not *print-readably*)
+			    *print-length*
 			    (>= index *print-length*)))
 		   (if (null slots)
 		       (write-string ")" stream)

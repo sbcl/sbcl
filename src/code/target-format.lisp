@@ -167,10 +167,15 @@
     (write-string string stream))
   (dotimes (i minpad)
     (write-char padchar stream))
-  (do ((chars (+ (length string) minpad) (+ chars colinc)))
-      ((>= chars mincol))
-    (dotimes (i colinc)
-      (write-char padchar stream)))
+  ;; As of sbcl-0.6.12.34, we could end up here when someone tries to
+  ;; print e.g. (FORMAT T "~F" "NOTFLOAT"), in which case ANSI says
+  ;; we're supposed to soldier on bravely, and so we have to deal with
+  ;; the unsupplied-MINCOL-and-COLINC case without blowing up.
+  (when (and mincol colinc)
+    (do ((chars (+ (length string) minpad) (+ chars colinc)))
+	((>= chars mincol))
+      (dotimes (i colinc)
+	(write-char padchar stream))))
   (when padleft
     (write-string string stream)))
 

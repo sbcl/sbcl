@@ -26,5 +26,11 @@
 		 long-float-positive-infinity long-float-negative-infinity))
   (assert-output x))
  
+;;; Eric Marsden reported that this would blow up in CMU CL (even
+;;; though ANSI says that the mismatch between ~F expected type and
+;;; provided string type is supposed to be handled without signalling
+;;; an error) and provided a fix which was ported to sbcl-0.6.12.35.
+(assert (null (format t "~F" "foo")))
+
 ;;; success
 (quit :unix-status 104)

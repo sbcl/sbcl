@@ -971,6 +971,17 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 105:
   (DESCRIBE 'STREAM-READ-BYTE)
 
+106:
+  (reported by Eric Marsden on cmucl-imp 2001-06-15)
+  Executing 
+    (TYPEP 0 '(COMPLEX (EQL 0)))
+  signals an error in sbcl-0.6.12.34, 
+    The component type for COMPLEX is not numeric: (EQL 0)
+  This is funny since sbcl-0.6.12.34 knows
+    (SUBTYPEP '(EQL 0) 'NUMBER) => T
+
+  
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure
