@@ -28,12 +28,11 @@
 	 (fp (gensym))
 	 (context (gensym))
 	 (sc-offsets (gensym))
-	 (temp (gensym))
 	 (fn-name (symbolicate name "-HANDLER")))
     `(progn
        ;; FIXME: Having a separate full DEFUN for each error doesn't
        ;; seem to add much value, and it takes a lot of space. Perhaps
-       ;; we could make this a big CASE statement instead?
+       ;; we could do this dispatch with a big CASE statement instead?
        (defun ,fn-name (name ,fp ,context ,sc-offsets)
 	 ;; FIXME: Perhaps put in OPTIMIZE declaration to make this
 	 ;; byte coded.
@@ -44,32 +43,24 @@
 	 ;; where his error was detected instead of telling him where
 	 ;; he ended up inside the system error-handling logic.
 	 (declare (ignorable name ,fp ,context ,sc-offsets))
-	 (macrolet ((set-value (var value)
-		      (let ((pos (position var ',required)))
-			(unless pos
-			  (error "~S isn't one of the required args." var))
-			`(let ((,',temp ,value))
-			   (sb!di::sub-set-debug-var-slot
-			    ,',fp (nth ,pos ,',sc-offsets)
-			    ,',temp ,',context)
-			   (setf ,var ,',temp)))))
-	   (let (,@(let ((offset -1))
-		     (mapcar #'(lambda (var)
-				 `(,var (sb!di::sub-access-debug-var-slot
-					 ,fp
-					 (nth ,(incf offset)
-					      ,sc-offsets)
-					 ,context)))
-			     required))
-		   ,@(when rest-pos
-		       `((,(nth (1+ rest-pos) args)
-			  (mapcar #'(lambda (sc-offset)
-				      (sb!di::sub-access-debug-var-slot
+	 (/show0 "about to do outer LETs in DEFERR macroexpanded DEFUN")
+	 (let (,@(let ((offset -1))
+		   (mapcar #'(lambda (var)
+			       `(,var (sb!di::sub-access-debug-var-slot
 				       ,fp
-				       sc-offset
-				       ,context))
-				  (nthcdr ,rest-pos ,sc-offsets))))))
-	     ,@body)))
+				       (nth ,(incf offset)
+					    ,sc-offsets)
+				       ,context)))
+			   required))
+	       ,@(when rest-pos
+		   `((,(nth (1+ rest-pos) args)
+		      (mapcar #'(lambda (sc-offset)
+				  (sb!di::sub-access-debug-var-slot
+				   ,fp
+				   sc-offset
+				   ,context))
+			      (nthcdr ,rest-pos ,sc-offsets))))))
+	   ,@body))
        (setf (svref *internal-errors* ,(error-number-or-lose name))
 	     #',fn-name))))
 
@@ -283,6 +274,9 @@
 	 :operands (list this that)))
 
 (deferr object-not-type-error (object type)
+  (/show0 "entering body of DEFERR OBJECT-NOT-TYPE-ERROR, OBJECT,TYPE=..")
+  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr object))
+  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr type))
   (error (if (and (typep object 'instance)
 		  (layout-invalid (%instance-layout object)))
 	     'layout-invalid
@@ -507,10 +501,12 @@
 
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context) (ignore continuable))
+  (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
+  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr context))
   (infinite-error-protect
    (let ((context (locally
-		   (declare (optimize (inhibit-warnings 3)))
-		   (sb!alien:sap-alien context (* os-context-t)))))
+		    (declare (optimize (inhibit-warnings 3)))
+		    (sb!alien:sap-alien context (* os-context-t)))))
      (multiple-value-bind (error-number arguments)
 	 (sb!vm:internal-error-arguments context)
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
@@ -533,8 +529,7 @@
 		 ((not (functionp handler))
 		  (error 'simple-error
 			 :function-name name
-			 :format-control
-			 "internal error ~D: ~A; args=~S"
+			 :format-control "internal error ~D: ~A; args=~S"
 			 :format-arguments
 			 (list error-number
 			       handler

@@ -22,8 +22,13 @@
 ;;;;    254 => read next two bytes for integer
 ;;;;    255 => read next four bytes for integer
 
-;;; Given a byte vector Vec and an index variable Index, read a variable
-;;; length integer and advance index.
+;;; Given a byte vector VEC and an index variable INDEX, read a
+;;; variable length integer and advance index.
+;;;
+;;; FIXME: This is called O(20) times. It should be reimplemented
+;;; with much of its logic in a single service function which can
+;;; be called by the macro expansion:
+;;;   `(SETF ,INDEX (%READ-VAR-INTEGER ,VEC ,INDEX)).
 (defmacro read-var-integer (vec index)
   (once-only ((val `(aref ,vec ,index)))
     `(cond ((<= ,val 253)

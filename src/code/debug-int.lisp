@@ -2452,6 +2452,39 @@
 	 (or (compiled-debug-var-save-sc-offset debug-var)
 	     (compiled-debug-var-sc-offset debug-var))))))
 
+;;; a helper function for working with possibly-invalid values:
+;;; Do (MAKE-LISP-OBJ VAL) only if the value looks valid.
+;;;
+;;; (Such values can arise in registers on machines with conservative
+;;; GC, and might also arise in debug variable locations when
+;;; those variables are invalid.)
+(defun make-valid-lisp-obj (val)
+  (/show0 "entering MAKE-VALID-LISP-OBJ, VAL=..")
+  #!+sb-show (%primitive print (sb!impl::hexstr val))
+  (if (or
+       ;; fixnum
+       (zerop (logand val 3))
+       ;; character
+       (and (zerop (logand val #xffff0000)) ; Top bits zero
+	    (= (logand val #xff) sb!vm:base-char-type)) ; Char tag
+       ;; unbound marker
+       (= val sb!vm:unbound-marker-type)
+       ;; pointer
+       (and (logand val 1)
+	    ;; Check that the pointer is valid. XXX Could do a better
+	    ;; job. FIXME: e.g. by calling out to an is_valid_pointer
+	    ;; routine in the C runtime support code
+	    (or (< (sb!impl::read-only-space-start) val
+		   (* sb!impl::*read-only-space-free-pointer*
+		      sb!vm:word-bytes))
+		(< (sb!impl::static-space-start) val
+		   (* sb!impl::*static-space-free-pointer*
+		      sb!vm:word-bytes))
+		(< (sb!impl::current-dynamic-space-start) val
+		   (sap-int (dynamic-space-free-pointer))))))
+      (make-lisp-obj val)
+      :invalid-object))
+
 ;;; CMU CL had
 ;;;   (DEFUN SUB-ACCESS-DEBUG-VAR-SLOT (FP SC-OFFSET &OPTIONAL ESCAPED) ..)
 ;;; code for this case.
@@ -2462,102 +2495,100 @@
 #!+x86
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
   (declare (type system-area-pointer fp))
+  (/show0 "entering SUB-ACCESS-DEBUG-VAR-SLOT, FP,SC-OFFSET,ESCAPED=..")
+  #!+sb-show (%primitive print (sb!impl::hexstr fp))
+  #!+sb-show (%primitive print (sb!impl::hexstr sc-offset))
+  #!+sb-show (%primitive print (sb!impl::hexstr escaped))
   (macrolet ((with-escaped-value ((var) &body forms)
 	       `(if escaped
-		 (let ((,var (sb!vm:context-register
-			      escaped (sb!c:sc-offset-offset sc-offset))))
-		   ,@forms)
-		 :invalid-value-for-unescaped-register-storage))
+		    (let ((,var (sb!vm:context-register
+				 escaped
+				 (sb!c:sc-offset-offset sc-offset))))
+		      (/show0 "in escaped case, ,VAR value=..")
+		      #!+sb-show (%primitive print (sb!impl::hexstr ,var))
+		      ,@forms)
+		    :invalid-value-for-unescaped-register-storage))
 	     (escaped-float-value (format)
 	       `(if escaped
-		 (sb!vm:context-float-register
-		  escaped (sb!c:sc-offset-offset sc-offset) ',format)
-		 :invalid-value-for-unescaped-register-storage))
+		    (sb!vm:context-float-register
+		     escaped (sb!c:sc-offset-offset sc-offset) ',format)
+		    :invalid-value-for-unescaped-register-storage))
 	     (escaped-complex-float-value (format)
 	       `(if escaped
-		 (complex
-		  (sb!vm:context-float-register
-		   escaped (sb!c:sc-offset-offset sc-offset) ',format)
-		  (sb!vm:context-float-register
-		   escaped (1+ (sb!c:sc-offset-offset sc-offset)) ',format))
-		 :invalid-value-for-unescaped-register-storage))
-	     ;; The debug variable locations are not always valid, and
-	     ;; on the x86 locations can contain raw values. To
-	     ;; prevent later problems from invalid objects, they are
-	     ;; filtered here.
-	     (make-valid-lisp-obj (val)
-	       `(if (or
-		     ;; fixnum
-		     (zerop (logand ,val 3))
-		     ;; character
-		     (and (zerop (logand ,val #xffff0000)) ; Top bits zero
-		      (= (logand ,val #xff) sb!vm:base-char-type)) ; Char tag
-		     ;; unbound marker
-		     (= ,val sb!vm:unbound-marker-type)
-		     ;; pointer
-		     (and (logand ,val 1)
-		      ;; Check that the pointer is valid. XXX Could do a
-		      ;; better job.
-		      (or (< (sb!impl::read-only-space-start) ,val
-			     (* sb!impl::*read-only-space-free-pointer*
-				sb!vm:word-bytes))
-			  (< (sb!impl::static-space-start) ,val
-			     (* sb!impl::*static-space-free-pointer*
-				sb!vm:word-bytes))
-			  (< (sb!impl::current-dynamic-space-start) ,val
-			     (sap-int (dynamic-space-free-pointer))))))
-		 (make-lisp-obj ,val)
-		 :invalid-object)))
+		    (complex
+		     (sb!vm:context-float-register
+		      escaped (sb!c:sc-offset-offset sc-offset) ',format)
+		     (sb!vm:context-float-register
+		      escaped (1+ (sb!c:sc-offset-offset sc-offset)) ',format))
+		    :invalid-value-for-unescaped-register-storage)))
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number #.sb!vm:descriptor-reg-sc-number)
+       (/show0 "case of ANY-REG-SC-NUMBER or DESCRIPTOR-REG-SC-NUMBER")
        (without-gcing
 	(with-escaped-value (val)
+	  (/show0 "VAL=..")
+	  #!+sb-show (%primitive print (sb!impl::hexstr val))
 	  (make-valid-lisp-obj val))))
       (#.sb!vm:base-char-reg-sc-number
+       (/show0 "case of BASE-CHAR-REG-SC-NUMBER")
        (with-escaped-value (val)
 	 (code-char val)))
       (#.sb!vm:sap-reg-sc-number
+       (/show0 "case of SAP-REG-SC-NUMBER")
        (with-escaped-value (val)
 	 (int-sap val)))
       (#.sb!vm:signed-reg-sc-number
+       (/show0 "case of SIGNED-REG-SC-NUMBER")
        (with-escaped-value (val)
 	 (if (logbitp (1- sb!vm:word-bits) val)
 	     (logior val (ash -1 sb!vm:word-bits))
 	     val)))
       (#.sb!vm:unsigned-reg-sc-number
+       (/show0 "case of UNSIGNED-REG-SC-NUMBER")
        (with-escaped-value (val)
 	 val))
       (#.sb!vm:single-reg-sc-number
+       (/show0 "case of SINGLE-REG-SC-NUMBER")
        (escaped-float-value single-float))
       (#.sb!vm:double-reg-sc-number
+       (/show0 "case of DOUBLE-REG-SC-NUMBER")
        (escaped-float-value double-float))
       #!+long-float
       (#.sb!vm:long-reg-sc-number
+       (/show0 "case of LONG-REG-SC-NUMBER")
        (escaped-float-value long-float))
       (#.sb!vm:complex-single-reg-sc-number
+       (/show0 "case of COMPLEX-SINGLE-REG-SC-NUMBER")
        (escaped-complex-float-value single-float))
       (#.sb!vm:complex-double-reg-sc-number
+       (/show0 "case of COMPLEX-DOUBLE-REG-SC-NUMBER")
        (escaped-complex-float-value double-float))
       #!+long-float
       (#.sb!vm:complex-long-reg-sc-number
+       (/show0 "case of COMPLEX-LONG-REG-SC-NUMBER")
        (escaped-complex-float-value long-float))
       (#.sb!vm:single-stack-sc-number
+       (/show0 "case of SINGLE-STACK-SC-NUMBER")
        (sap-ref-single fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 				sb!vm:word-bytes))))
       (#.sb!vm:double-stack-sc-number
+       (/show0 "case of DOUBLE-STACK-SC-NUMBER")
        (sap-ref-double fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
 				sb!vm:word-bytes))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
+       (/show0 "case of LONG-STACK-SC-NUMBER")
        (sap-ref-long fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 3)
 			      sb!vm:word-bytes))))
       (#.sb!vm:complex-single-stack-sc-number
+       (/show0 "case of COMPLEX-STACK-SC-NUMBER")
        (complex
 	(sap-ref-single fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 				 sb!vm:word-bytes)))
 	(sap-ref-single fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
 				 sb!vm:word-bytes)))))
       (#.sb!vm:complex-double-stack-sc-number
+       (/show0 "case of COMPLEX-DOUBLE-STACK-SC-NUMBER")
        (complex
 	(sap-ref-double fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
 				 sb!vm:word-bytes)))
@@ -2565,24 +2596,30 @@
 				 sb!vm:word-bytes)))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
+       (/show0 "case of COMPLEX-LONG-STACK-SC-NUMBER")
        (complex
 	(sap-ref-long fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 3)
 			       sb!vm:word-bytes)))
 	(sap-ref-long fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 6)
 			       sb!vm:word-bytes)))))
       (#.sb!vm:control-stack-sc-number
+       (/show0 "case of CONTROL-STACK-SC-NUMBER")
        (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
       (#.sb!vm:base-char-stack-sc-number
+       (/show0 "case of BASE-CHAR-STACK-SC-NUMBER")
        (code-char
 	(sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 			     sb!vm:word-bytes)))))
       (#.sb!vm:unsigned-stack-sc-number
+       (/show0 "case of UNSIGNED-STACK-SC-NUMBER")
        (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 			    sb!vm:word-bytes))))
       (#.sb!vm:signed-stack-sc-number
+       (/show0 "case of SIGNED-STACK-SC-NUMBER")
        (signed-sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 				   sb!vm:word-bytes))))
       (#.sb!vm:sap-stack-sc-number
+       (/show0 "case of SAP-STACK-SC-NUMBER")
        (sap-ref-sap fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 			     sb!vm:word-bytes)))))))
 

@@ -16,9 +16,16 @@ for f in *.impure.lisp; do
     echo $f | $sbcl < pure.lisp
 done
 
-# *.test.sh files are scripts to test stuff. A file foo.test.sh
+# *.test.sh files are scripts to test stuff, typically stuff which can't
+# so easily be tested within Lisp itself. A file foo.test.sh
 # may be associated with other files foo*, e.g. foo.lisp, foo-1.lisp,
 # or foo.pl.
 for f in *.test.sh; do
-    sh $f
+    sh $f || exit failed test $f
+done
+
+# *.assertoids files contain ASSERTOID statements to test things
+# interpreted and at various compilation levels.
+for f in *.assertoids; do
+    echo "(load \"$f\")" | $sbcl --eval '(load "assertoid.lisp")'
 done

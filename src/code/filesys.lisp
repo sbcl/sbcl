@@ -567,10 +567,6 @@
 				   function))))
       (%enumerate-files head pathname verify-existence function)))
 
-;;; REMOVEME after finding bug.
-#!+sb-show (defvar *show-directory*)
-#!+sb-show (defvar *show-name*)
-
 (defun %enumerate-files (directory pathname verify-existence function)
   (declare (simple-string directory))
   (/show0 "entering %ENUMERATE-FILES")
@@ -614,13 +610,6 @@
 		 (sb!unix:close-dir dir)))))
 	  (t
 	   (/show0 "default case")
-	   
-	   ;; Put DIRECTORY and NAME somewhere we can find them even when
-	   ;; things are too screwed up for the debugger.
-	   #!+sb-show (progn
-			(setf *show-directory* directory
-			      *show-name* name))
-
 	   (let ((file (concatenate 'string directory name)))
 	     (/show0 "computed basic FILE=..")
 	     #!+sb-show (%primitive print file)

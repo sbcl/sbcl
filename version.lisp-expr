@@ -13,6 +13,6 @@
 ;;;
 ;;; Conventionally a string a la "0.6.6" is used for released
 ;;; versions, and a string a la "0.6.5.12" is used for versions which
-;;; aren't released but correspond only to CVS tags.
+;;; aren't released but correspond only to CVS tags or snapshots.
 
-"0.6.7.1"
+"0.6.7.2"

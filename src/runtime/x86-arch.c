@@ -191,8 +191,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
-    SHOW("entering sigtrap_handler(..)"); /* REMOVEME */
-
     if (single_stepping && (signal==SIGTRAP))
     {
 	/* fprintf(stderr,"* single step trap %x\n", single_stepping); */
@@ -241,7 +239,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	 * here, and restore it after we do our thing, but there
 	 * seems to be no point in doing that, since we're just
 	 * going to lose(..) anyway. */
-	SHOW("in trap_Halt case of sigtrap_handler(..)"); /* REMOVEME */
 	fake_foreign_function_call(context);
 	lose("%%primitive halt called; the party is over.");
 
@@ -268,7 +265,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	interrupt_handle_now(signal, info, context);
 	break;
     }
-    SHOW("leaving sigtrap_handler(..)"); /* REMOVEME */
 }
 
 void

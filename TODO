@@ -30,7 +30,7 @@ FIX:
 PROBLEM:
 	    As long as I'm working on the batch-related command-line options,
 	it would be reasonable to add one more option to "do what I'd want",
-	testing standard input for TTY-ness and running in no-programmer
+	testing standard input for non-TTY-ness and running in no-programmer
 	mode if so.
 FIX:
 	?? Do it.
@@ -48,6 +48,11 @@ PROBLEM:
 	some functions, and I never realized that there's a wrapper-based
 	facility too until I was wading through the source code for SBCL.
 	    Yes, I know I should have RTFM, but there is a lot of M..
+	    (By the way, it would also be nice to have tracing behave
+	better with generic functions. TRACEing a generic function probably
+	shouldn't prevent DEFMETHOD from being used to redefine its
+	methods, and should perhaps trace each of its methods as well
+	as the generic function itself.)
 FIX:
 	?? possibility 1: Add error-handling code in ntrace.lisp to
 	  catch failure to set breakpoints and retry using 
@@ -75,7 +80,8 @@ FIX:
 	??
 -------------------------------------------------------------------------------
 PROBLEM:
-	    My system of parallel build directories doesn't seem to add value.
+	    My system of parallel build directories seems to add
+	complexity without adding value.
 FIX:
 	?? Replace it with a system where fasl output files live in the 
 	  same directories as the sources and have names a la
@@ -121,17 +127,6 @@ PROBLEM:
 	    The hashing code is new and should be tested.
 FIX:
 	?? Enable the existing test code.
--------------------------------------------------------------------------------
-PROBLEM:
-	    My ad hoc system of revision control is looking pretty clunky,
-	and I've pretty much stopped doing stuff to confuse CVS (like moving
-	directories around).
-FIX:
-	?? Check into CVS. 
-	?? Make sure that the tags in FILE-COMMENTs expand correctly.
-	?? See about automatically propagating version information 
-	   from CVS into the runtime.c banner message and the 
-	   LISP-IMPLEMENTATION-VERSION string.
 ===============================================================================
 other known issues with no particular target date:
 

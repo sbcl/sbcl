@@ -188,25 +188,37 @@
 ;;;;      and internal error handling) the extra runtime cost should be
 ;;;;      negligible.
 
-(def-alien-routine ("os_context_pc_addr" context-pc-addr) (* int)
+(def-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
+  ;; (Note: Just as in CONTEXT-REGISTER-ADDR, we intentionally use an
+  ;; 'unsigned *' interpretation for the 32-bit word passed to us by
+  ;; the C code, even though the C code may think it's an 'int *'.)
   (context (* os-context-t)))
 
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
   (int-sap (deref (context-pc-addr context))))
 
-(def-alien-routine ("os_context_register_addr" context-register-addr) (* int)
+(def-alien-routine ("os_context_register_addr" context-register-addr)
+  (* unsigned-int)
+  ;; (Note the mismatch here between the 'int *' value that the C code
+  ;; may think it's giving us and the 'unsigned *' value that we
+  ;; receive. It's intentional: the C header files may think of
+  ;; register values as signed, but the CMU CL code tends to think of
+  ;; register values as unsigned, and might get bewildered if we ask
+  ;; it to work with signed values.)
   (context (* os-context-t))
   (index int))
 
+;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
+;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
   (deref (context-register-addr context index)))
 
 (defun %set-context-register (context index new)
-  (declare (type (alien (* os-context-t)) context))
-  (setf (deref (context-register-addr context index))
-	new))
+(declare (type (alien (* os-context-t)) context))
+(setf (deref (context-register-addr context index))
+      new))
 
 ;;; Like CONTEXT-REGISTER, but returns the value of a float register.
 ;;; FORMAT is the type of float to return.
@@ -215,13 +227,13 @@
 ;;; so it's stubbed out. Someday, in order to make the debugger work
 ;;; better, it may be necessary to unstubify it.
 (defun context-float-register (context index format)
-  (declare (ignore context index format))
+  (declare (ignore context index))
   (warn "stub CONTEXT-FLOAT-REGISTER")
-  (coerce 0.0 'format))
+  (coerce 0.0 format))
 (defun %set-context-float-register (context index format new-value)
-  (declare (ignore context index format))
+  (declare (ignore context index))
   (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
-  (coerce new-value 'format))
+  (coerce new-value format))
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
@@ -251,26 +263,35 @@
 ;;; arguments from the instruction stream.
 (defun internal-error-arguments (context)
   (declare (type (alien (* os-context-t)) context))
+  (/show0 "entering INTERNAL-ERROR-ARGUMENTS, CONTEXT=..")
+  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr context))
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))
     ;; using INT3 the pc is .. INT3 <here> code length bytes...
     (let* ((length (sap-ref-8 pc 1))
-	   (vector (make-specializable-array
-		    length
-		    :element-type '(unsigned-byte 8))))
+	   (vector (make-array length :element-type '(unsigned-byte 8))))
       (declare (type (unsigned-byte 8) length)
 	       (type (simple-array (unsigned-byte 8) (*)) vector))
+      (/show0 "LENGTH,VECTOR,ERROR-NUMBER=..")
+      #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr length))
+      #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr vector))
       (copy-from-system-area pc (* sb!vm:byte-bits 2)
 			     vector (* sb!vm:word-bits
 				       sb!vm:vector-data-offset)
 			     (* length sb!vm:byte-bits))
       (let* ((index 0)
 	     (error-number (sb!c::read-var-integer vector index)))
+	#!+sb-show (sb!sys:%primitive print (sb!impl::hexstr error-number))
 	(collect ((sc-offsets))
 	  (loop
+	   (/show0 "INDEX=..")
+	   #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr index))
 	   (when (>= index length)
 	     (return))
-	   (sc-offsets (sb!c::read-var-integer vector index)))
+	   (let ((sc-offset (sb!c::read-var-integer vector index)))
+	     (/show0 "SC-OFFSET=..")
+	     #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr sc-offset))
+	     (sc-offsets sc-offset)))
 	  (values error-number (sc-offsets)))))))
 
 ;;; Do whatever is necessary to make the given code component

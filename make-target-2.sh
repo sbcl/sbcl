@@ -33,7 +33,7 @@ echo //doing warm init
 	      (*print-level* 5))
           (sb!int:/show "about to LOAD warm.lisp")
 	  (load "src/cold/warm.lisp"))
-        (sb-int:/show "about to SAVE-LISP-AND-DIE")
+        (sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
 	;; Even if /SHOW output was wanted during build, it's probably
 	;; not wanted by default after build is complete. (And if it's
 	;; wanted, it can easily be turned back on.)

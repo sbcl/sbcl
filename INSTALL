@@ -83,6 +83,13 @@ making it run on more systems, would be appreciated.
 	problem with quotas, I don't know.)
 
 To build the system binaries:
+  0. If you want to be on the bleeding edge, you can update your
+     sources to the latest development snapshot (or any previous
+     development snapshot, for that matter) by using anonymous CVS
+     to SourceForge. (This is not recommended if you're just using SBCL
+     as a tool for other work, but if you're interested in working on 
+     SBCL itself, it's a good idea.) Follow the "CVS Repository" link on
+     <http://sourceforge.net/projects/sbcl> for instructions.
   1. Make sure that you have enough RAM+swap to build SBCL, as
      per the CAUTION note above. (As of version 0.6.0, the most
      memory-intensive operation in make.sh is the second call to
@@ -93,7 +100,7 @@ To build the system binaries:
   2. If the GNU make command is not available under the name "gmake",
      then define the environment variable GNUMAKE to a name where it can
      be found.
-  3. If you like, you can edit the base-features.lisp-expr file
+  3. If you like, you can edit the base-target-features.lisp-expr file
      to customize the resulting Lisp system. By enabling or disabling
      features in this file, you can create a smaller system, or one
      with extra code for debugging output or error-checking or other things.

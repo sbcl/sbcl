@@ -466,15 +466,16 @@ changes in sbcl-0.6.7 relative to sbcl-0.6.6:
 
 changes in sbcl-0.6.8 relative to sbcl-0.6.7:
 
-?? The system is now under CVS at SourceForge (instead of the
+* The system is now under CVS at SourceForge (instead of the
   CVS repository on my home machine).
-?? The INSTALL file has been updated with some information 
-  about using anonymous CVS to download the most recent version
-  from SourceForge.
-?? There's now code in the tests/ subdirectory to run the system
-  through the clocc/ansi-tests/ suite, and to run additional
-  SBCL-specific regression tests as well. (It's not particularly
-  mature right now, but it's a start.)
+* The new signal handling code has been tweaked to treat register
+  contents as (UNSIGNED-BYTE 32), as the old CMU CL code did,
+  instead of (SIGNED-BYTE 32), as the C header files have it. (Code 
+  downstream, e.g. in debug-int.lisp, has implicit dependencies
+  on the unsignedness of integer representation of machine words, 
+  and that caused the system to bomb out with infinite regress
+  when trying to recover from type errors involving signed values,
+  e.g. (BUTLAST '(1 2 3) -1).)
 ?? The system now uses code based on Colin Walters' O(N)
   implementation of MAP (from the cmucl-imp@cons.org mailing
   list, 2 September 2000) when it can't use a DEFTRANSFORM to
@@ -489,13 +490,6 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   CREDITS file.)
 ?? The debugger now flushes standard output streams before it begins
   its output ("debugger invoked" and so forth).
-?? The two problem cases reported by Peter Van Eynde on 8 Sep 2000, 
-  (BUTLAST '(1 2 3) -1) and (MAKE-LIST -1), now work, and test cases
-  have now been added to the regression test suite to keep them
-  from appearing again. (This was a repeat appearance, alas!)
-  As the regression test system gets more mature, I intend to add
-  most future fixed bugs to it, but at this point I'm still playing
-  with it.
 ?? The patch for the SUBSEQ bug reported on the cmucl-imp mailing
   list 12 September 2000 has been applied to SBCL.
 ?? Martin Atzmueller's versions of two CMU CL patches, as posted on 
