@@ -17,6 +17,10 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
        passing it through to OPEN.
     ** LOAD on source files likewise passes any EXTERNAL-FORMAT
        argument given to internal calls to OPEN.
+    ** the built-in comment readers (introduced by character sequences
+       ";" and "#|") are more forgiving to encoding errors; they will
+       STYLE-WARN and then attempt to resync the stream at a character
+       boundary.  (thanks to Teemu Kalvas)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** Space, Tab, Linefeed, Return and Page have the invalid
        secondary constituent character trait.

@@ -1716,5 +1716,3 @@
 	    (let ((b (make-array 64 :element-type 'bit :initial-element 0)))
 	      (setf (sbit b 63) 1)
 	      b)))))
-		    
-		   

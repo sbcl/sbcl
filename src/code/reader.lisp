@@ -525,16 +525,22 @@
 
 (defun read-comment (stream ignore)
   (declare (ignore ignore))
-  (let ((stream (in-synonym-of stream)))
-    (if (ansi-stream-p stream)
-	(prepare-for-fast-read-char stream
-	  (do ((char (fast-read-char nil nil)
-		     (fast-read-char nil nil)))
-	      ((or (not char) (char= char #\newline))
-	       (done-with-fast-read-char))))
-	;; CLOS stream
-	(do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
-	    ((or (eq char :eof) (char= char #\newline))))))
+  (handler-bind
+      ((character-decoding-error
+	#'(lambda (decoding-error)
+	    (declare (ignorable decoding-error))
+	    (style-warn "Character decoding error in a ;-comment at position ~A reading source file ~A, resyncing." (file-position stream) stream)
+	    (invoke-restart 'attempt-resync))))
+    (let ((stream (in-synonym-of stream)))
+      (if (ansi-stream-p stream)
+	  (prepare-for-fast-read-char stream
+	   (do ((char (fast-read-char nil nil)
+		      (fast-read-char nil nil)))
+	       ((or (not char) (char= char #\newline))
+		(done-with-fast-read-char))))
+	  ;; CLOS stream
+	  (do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
+	      ((or (eq char :eof) (char= char #\newline)))))))
   ;; Don't return anything.
   (values))
 
