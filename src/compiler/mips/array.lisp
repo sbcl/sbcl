@@ -104,8 +104,8 @@
   (def-full-data-vector-frobs simple-vector *
     descriptor-reg any-reg null zero)
   
-  (def-partial-data-vector-frobs simple-base-string base-char 
-    :byte nil base-char-reg)
+  (def-partial-data-vector-frobs simple-base-string character 
+    :byte nil character-reg)
   #!+sb-unicode
   (def-full-data-vector-frobs simple-character-string character character-reg)
   
