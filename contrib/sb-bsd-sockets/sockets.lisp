@@ -173,24 +173,34 @@ small"))
 	(error "Must supply at least one of BUFFER or LENGTH"))
       (unless length
 	(setf length (length buffer)))
+      (when buffer (setf element-type (array-element-type buffer)))
+      (unless (or (subtypep element-type 'character)
+		  (subtypep element-type 'integer))
+	(error "Buffer element-type must be either a character or an integer subtype."))
       (unless buffer
 	(setf buffer (make-array length :element-type element-type)))
-      (let ((copy-buffer (sb-alien:make-alien (array sb-alien:unsigned 1) length)))
+      ;; really big FIXME: This whole copy-buffer thing is broken.
+      ;; doesn't support characters more than 8 bits wide, or integer
+      ;; types that aren't (unsigned-byte 8).
+      (let ((copy-buffer (sb-alien:make-alien (array (sb-alien:unsigned 8) 1) length)))
 	(unwind-protect
-	    (sb-alien:with-alien ((sa-len (array (sb-alien:unsigned 32) 2)))
-	      (setf (sb-alien:deref sa-len 0) (size-of-sockaddr socket))
+	    (sb-alien:with-alien ((sa-len sockint::socklen-t (size-of-sockaddr socket)))
 	      (let ((len
 		     (sockint::recvfrom (socket-file-descriptor socket)
 					copy-buffer
 					length
 					flags
 					sockaddr
-					(sb-alien:cast sa-len (* integer)))))
+					(sb-alien:addr sa-len))))
 		(cond
 		  ((and (= len -1) (= sockint::EAGAIN (sb-unix::get-errno))) nil)
 		  ((= len -1) (socket-error "recvfrom"))
 		  (t (loop for i from 0 below len
-			   do (setf (elt buffer i) (sb-alien:deref copy-buffer i)))
+			   do (setf (elt buffer i)
+				    (cond
+				      ((or (eql element-type 'character) (eql element-type 'base-char))
+				       (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
+				      (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
 		     (apply #'values buffer len (multiple-value-list
 						 (bits-of-sockaddr socket sockaddr)))))))
 	  (sb-alien:free-alien copy-buffer))))))

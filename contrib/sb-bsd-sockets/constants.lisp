@@ -94,6 +94,9 @@
  (:integer msg-trunc "MSG_TRUNC")
  (:integer msg-waitall "MSG_WAITALL")
 
+ ;; for socket-receive
+ (:type socklen-t "socklen_t")
+
  #|
  ;;; stat is nothing to do with sockets, but I keep it around for testing
  ;;; the ffi glue
@@ -166,7 +169,7 @@
 				 (len integer)
 				 (flags integer)
 				 (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-				 (socklen (* integer))))
+				 (socklen (* socklen-t))))
  (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
  (:function gethostbyaddr ("gethostbyaddr" (* hostent)
 					   (addr (* t))

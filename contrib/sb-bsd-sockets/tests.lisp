@@ -102,6 +102,11 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
         ((or (>= i (length buffer)) (not c) (eq c eof)) i)
       (setf (elt buffer i) c))))
 
+#+internet-available
+(deftest name-service-return-type
+  (vectorp (host-ent-address (get-host-by-address #(127 0 0 1))))
+  t)
+
 ;;; these require that the echo services are turned on in inetd
 #+internet-available
 (deftest simple-tcp-client
@@ -113,6 +118,18 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 	(let ((data (subseq data 0 (read-buf-nonblock data stream))))
 	  (format t "~&Got ~S back from TCP echo server~%" data)
 	  (> (length data) 0))))
+  t)
+
+#+internet-available
+(deftest sockaddr-return-type
+  (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
+    (unwind-protect 
+	 (progn
+	   (socket-connect s #(127 0 0 1) 7)
+	   (multiple-value-bind (host port) (socket-peername s)
+	     (and (vectorp host)
+		  (numberp port))))
+      (socket-close s)))
   t)
 
 #+internet-available

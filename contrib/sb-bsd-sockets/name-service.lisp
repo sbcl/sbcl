@@ -40,8 +40,10 @@ eventually, so that we can do DNS lookups in parallel with other things
 		until (sb-alien:null-alien ad)
 		collect (ecase (sockint::hostent-type h)
 			  (#.sockint::af-inet
-			   (loop for i from 0 below length
-				 collect (sb-alien:deref ad i)))
+			     (assert (= length 4))
+			     (let ((addr (make-array 4 :element-type '(unsigned-byte 8))))
+			       (loop for i from 0 below length
+				     do (setf (elt addr i) (sb-alien:deref ad i)))))
 			  (#.sockint::af-local
 			   (sb-alien:cast ad sb-alien:c-string))))))
     (make-instance 'host-ent

@@ -365,7 +365,7 @@ deeply nested structures."
 					 (symbol-name ',name) "-"
 					 (symbol-name x))
 			    ,(symbol-package name))))
-	   `(let ((,var ,'(,(intern (format nil "ALLOCATE-~A" name)))))
+	   `(sb-alien:with-alien ((,var (* ,',name) ,'(,(intern (format nil "ALLOCATE-~A" name)))))
 	      (unwind-protect
 		  (progn
 		    (progn ,@(mapcar (lambda (pair)
