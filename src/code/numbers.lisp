@@ -194,9 +194,13 @@
       (if (minusp den)
 	  (values (- num) (- den))
 	  (values num den))
-    (if (eql den 1)
-	num
-	(%make-ratio num den))))
+    (cond
+      ((eql den 0)
+       (error 'division-by-zero
+	      :operands (list num den)
+	      :operation 'build-ratio))
+      ((eql den 1) num)
+      (t (%make-ratio num den)))))
 
 ;;; Truncate X and Y, but bum the case where Y is 1.
 #!-sb-fluid (declaim (inline maybe-truncate))

@@ -159,14 +159,14 @@
 
 (define-vop (fast-logand/signed-unsigned=>unsigned
 	     fast-logand/unsigned=>unsigned)
-    (:args (x :target r :scs (signed-reg))
-	   (y :scs (unsigned-reg unsigned-stack)))
+    (:args (x :scs (signed-reg))
+	   (y :target r :scs (unsigned-reg)))
   (:arg-types signed-num unsigned-num))
 
 (define-vop (fast-logand/unsigned-signed=>unsigned
 	     fast-logand/unsigned=>unsigned)
     (:args (x :target r :scs (unsigned-reg))
-	   (y :scs (signed-reg signed-stack)))
+	   (y :scs (signed-reg)))
   (:arg-types unsigned-num signed-num))
     
 ;;; Special case fixnum + and - that trap on overflow.  Useful when we

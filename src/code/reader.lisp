@@ -1414,51 +1414,55 @@
   (default to the beginning and end of the string)  It skips over
   whitespace characters and then tries to parse an integer. The
   radix parameter must be between 2 and 36."
-  (with-array-data ((string string)
-		    (start start)
-		    (end (or end (length string))))
-    (let ((index (do ((i start (1+ i)))
-		     ((= i end)
-		      (if junk-allowed
-			  (return-from parse-integer (values nil end))
-			  (error "no non-whitespace characters in number")))
-		   (declare (fixnum i))
-		   (unless (whitespacep (char string i)) (return i))))
-	  (minusp nil)
-	  (found-digit nil)
-	  (result 0))
-      (declare (fixnum index))
-      (let ((char (char string index)))
-	(cond ((char= char #\-)
-	       (setq minusp t)
-	       (incf index))
-	      ((char= char #\+)
-	       (incf index))))
-      (loop
-	(when (= index end) (return nil))
-	(let* ((char (char string index))
-	       (weight (digit-char-p char radix)))
-	  (cond (weight
-		 (setq result (+ weight (* result radix))
-		       found-digit t))
-		(junk-allowed (return nil))
-		((whitespacep char)
-		 (do ((jndex (1+ index) (1+ jndex)))
-		     ((= jndex end))
-		   (declare (fixnum jndex))
-		   (unless (whitespacep (char string jndex))
-		     (error "junk in string ~S" string)))
-		 (return nil))
-		(t
-		 (error "junk in string ~S" string))))
-	(incf index))
-      (values
-       (if found-digit
-	   (if minusp (- result) result)
-	   (if junk-allowed
-	       nil
-	       (error "no digits in string ~S" string)))
-       index))))
+  (macrolet ((parse-error (format-control)
+	       `(error 'simple-parse-error
+		       :format-control ,format-control
+		       :format-arguments (list string))))
+    (with-array-data ((string string)
+		      (start start)
+		      (end (or end (length string))))
+      (let ((index (do ((i start (1+ i)))
+		       ((= i end)
+			(if junk-allowed
+			    (return-from parse-integer (values nil end))
+			    (parse-error "no non-whitespace characters in string ~S.")))
+		     (declare (fixnum i))
+		     (unless (whitespacep (char string i)) (return i))))
+	    (minusp nil)
+	    (found-digit nil)
+	    (result 0))
+	(declare (fixnum index))
+	(let ((char (char string index)))
+	  (cond ((char= char #\-)
+		 (setq minusp t)
+		 (incf index))
+		((char= char #\+)
+		 (incf index))))
+	(loop
+	 (when (= index end) (return nil))
+	 (let* ((char (char string index))
+		(weight (digit-char-p char radix)))
+	   (cond (weight
+		  (setq result (+ weight (* result radix))
+			found-digit t))
+		 (junk-allowed (return nil))
+		 ((whitespacep char)
+		  (do ((jndex (1+ index) (1+ jndex)))
+		      ((= jndex end))
+		    (declare (fixnum jndex))
+		    (unless (whitespacep (char string jndex))
+		      (parse-error "junk in string ~S")))
+		  (return nil))
+		 (t
+		  (parse-error "junk in string ~S"))))
+	 (incf index))
+	(values
+	 (if found-digit
+	     (if minusp (- result) result)
+	     (if junk-allowed
+		 nil
+		 (parse-error "no digits in string ~S")))
+	 index)))))
 
 ;;;; reader initialization code
 

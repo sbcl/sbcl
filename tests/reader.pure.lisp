@@ -59,3 +59,18 @@
 (let ((*readtable* (copy-readtable)))
   (set-syntax-from-char #\7 #\;)
   (assert (= 1235 (read-from-string "123579"))))
+
+;;; PARSE-INTEGER must signal an error of type PARSE-ERROR if it is
+;;; unable to parse an integer and :JUNK-ALLOWED is NIL.
+(macrolet ((assert-parse-error (form)
+	     `(multiple-value-bind (val cond)
+	          (ignore-errors ,form)
+	        (assert (null val))
+	        (assert (typep cond 'parse-error)))))
+  (assert-parse-error (parse-integer "    "))
+  (assert-parse-error (parse-integer "12 a"))
+  (assert-parse-error (parse-integer "12a"))
+  (assert-parse-error (parse-integer "a"))
+  (assert (= (parse-integer "12") 12))
+  (assert (= (parse-integer "   12   ") 12))
+  (assert (= (parse-integer "   12asdb" :junk-allowed t) 12)))

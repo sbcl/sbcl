@@ -686,6 +686,7 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; error-reporting facilities
              "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
+             "SIMPLE-PARSE-ERROR"
              "SIMPLE-PROGRAM-ERROR" "SIMPLE-STREAM-ERROR"
              "SIMPLE-STYLE-WARNING"
              "STYLE-WARN"

@@ -213,6 +213,14 @@
 		  ((csubtypep type (specifier-type '(complex long-float)))
 		   (complex (%long-float (realpart object))
 			    (%long-float (imagpart object))))
+		  ((and (typep object 'rational)
+			(csubtypep type (specifier-type '(complex float))))
+		   ;; Perhaps somewhat surprisingly, ANSI specifies
+		   ;; that (COERCE FOO 'FLOAT) is a SINGLE-FLOAT, not
+		   ;; dispatching on *READ-DEFAULT-FLOAT-FORMAT*.  By
+		   ;; analogy, we do the same for complex numbers. --
+		   ;; CSR, 2002-08-06
+		   (complex (%single-float object)))
 		  ((csubtypep type (specifier-type 'complex))
 		   (complex object))
 		  (t

@@ -49,6 +49,7 @@
 (define-condition simple-file-error    (simple-condition file-error)    ())
 (define-condition simple-program-error (simple-condition program-error) ())
 (define-condition simple-stream-error  (simple-condition stream-error)  ())
+(define-condition simple-parse-error   (simple-condition parse-error)   ())
 
 ;;; This condition is signalled whenever we make a UNKNOWN-TYPE so that
 ;;; compiler warnings can be emitted as appropriate.

@@ -41,8 +41,8 @@
     (assert (not (<= 6/7 (* 3 -ifni))))
     (assert (not (> +ifni +ifni)))))
 
-;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
-;;; stream is not a stream associated with a file.
+;;; ANSI: FLOAT-RADIX should signal an error if its argument is not a
+;;; float.
 ;;;
 ;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)

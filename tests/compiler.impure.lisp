@@ -143,6 +143,22 @@
   ;; A5 value and is very, very disappointed in you. (But it doesn't
   ;; signal BUG any more.)
   (assert failure-p))
+
+;;; On the SPARC, there was an erroneous definition of some VOPs used
+;;; to compile LOGANDs, which would lead to compilation of the
+;;; following function giving rise to a compile-time error (bug
+;;; spotted and fixed by Raymond Toy for CMUCL)
+(defun logand-sparc-bogons (a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+  (declare (type (unsigned-byte 32) a0)
+	   (type (signed-byte 32) a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+	   ;; to ensure that the call is a candidate for
+	   ;; transformation
+	   (optimize (speed 3) (safety 0) (compilation-speed 0) (debug 0)))
+  (values
+   ;; the call that fails compilation
+   (logand a0 a10)
+   ;; a call to prevent the other arguments from being optimized away
+   (logand a1 a2 a3 a4 a5 a6 a7 a8 a9)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

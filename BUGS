@@ -454,6 +454,8 @@ WORKAROUND:
   doesn't seem to exist for sequence types:
     (DEFTYPE BAR () 'SIMPLE-VECTOR)
     (CONCATENATE 'BAR #(1 2) '(3)) => #(1 2 3)
+  See also bug #46a./b., and discussion and patch sbcl-devel and
+  cmucl-imp 2002-07
 
 67:
   As reported by Winton Davies on a CMU CL mailing list 2000-01-10,
@@ -542,14 +544,6 @@ WORKAROUND:
   the EQ type comparison in the NAMED :SIMPLE-= type method) return NIL.
   (I haven't tried to investigate this bug enough to guess whether
   there might be any user-level symptoms.)
-
-90: 
-  a latent cross-compilation/bootstrapping bug: The cross-compilation
-  host's CL:CHAR-CODE-LIMIT is used in target code in readtable.lisp
-  and possibly elsewhere. Instead, we should use the target system's
-  CHAR-CODE-LIMIT. This will probably cause problems if we try to 
-  bootstrap on a system which uses a different value of CHAR-CODE-LIMIT
-  than SBCL does.
 
 94a: 
   Inconsistencies between derived and declared VALUES return types for
@@ -1337,12 +1331,6 @@ WORKAROUND:
           :ACCRUED-EXCEPTIONS (:INEXACT)
           :FAST-MODE NIL)
 
-184: "division by zero becomes frozen into RATIO"
-  (reported by Wolfhard Buss on cmucl-imp 18 Jun 2002, fails on
-  sbcl-0.7.4.39 too)
-  * (/ 1 (/ 3 2) 0)
-  1/0
-
 185: "top-level forms at the REPL"
   * (locally (defstruct foo (a 0 :type fixnum)))
   gives an error:
@@ -1450,6 +1438,27 @@ WORKAROUND:
   on the PPC/Linux platform, waiting for a zombie env process.  This
   is a classic symptom of buffer filling and deadlock, but it seems
   only sporadically reproducible.
+
+191: "Miscellaneous PCL deficiencies"
+  (reported by Alexey Dejenka sbcl-devel 2002-08-04)
+  a. DEFCLASS does not inform the compiler about generated
+     functions. Compiling a file with
+       (DEFCLASS A-CLASS ()
+         ((A-CLASS-X)))
+       (DEFUN A-CLASS-X (A)
+         (WITH-SLOTS (A-CLASS-X) A
+           A-CLASS-X))
+     results in a STYLE-WARNING:
+       undefined-function 
+         SB-SLOT-ACCESSOR-NAME::|COMMON-LISP-USER A-CLASS-X slot READER|
+  b. DEFGENERIC does not check lambda list syntax; from the REPL:
+       * (defgeneric gf ("a" #p"b"))
+
+       #<STANDARD-GENERIC-FUNCTION GF (0)>
+       * 
+  c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
+     lists and &KEY arguments) do not signal errors when they should.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
