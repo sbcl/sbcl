@@ -100,6 +100,9 @@
 				    (list (length sequence2))
 				    (vector (length sequence2)))))
 	   (new-declarations '(type index length2)))
+	  ((function predicate)
+	   (new-args arg)
+	   (adjustments `(,arg (%coerce-callable-to-fun ,arg))))
 	  (t (let ((info (cdr (assoc arg *sequence-keyword-info*))))
 	       (cond (info
 		      (destructuring-bind (default supplied-p adjuster type) info
@@ -1137,8 +1140,7 @@
     (function sequence &key key from-end start end (initial-value nil ivp))
   (declare (type index start))
   (let ((start start)
-	(end (or end length))
-        (function (%coerce-callable-to-fun function)))
+	(end (or end length)))
     (declare (type index start end))
     (cond ((= end start)
 	   (if ivp initial-value (funcall function)))
@@ -1311,8 +1313,7 @@
   "Return a sequence formed by destructively removing the elements satisfying
   the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
-  (let ((end (or end length))
-	(predicate (%coerce-callable-to-fun predicate)))
+  (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1348,8 +1349,7 @@
   "Return a sequence formed by destructively removing the elements not
   satisfying the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
-  (let ((end (or end length))
-	(predicate (%coerce-callable-to-fun predicate)))
+  (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1509,11 +1509,9 @@
 (define-sequence-traverser remove-if
     (predicate sequence &key from-end start end count key)
   #!+sb-doc
-  "Return a copy of sequence with elements such that predicate(element)
-   is non-null removed"
+  "Return a copy of sequence with elements satisfying PREDICATE removed."
   (declare (fixnum start))
-  (let ((end (or end length))
-	(predicate (%coerce-callable-to-fun predicate)))
+  (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1526,11 +1524,9 @@
 (define-sequence-traverser remove-if-not
     (predicate sequence &key from-end start end count key)
   #!+sb-doc
-  "Return a copy of sequence with elements such that predicate(element)
-   is null removed"
+  "Return a copy of sequence with elements not satisfying PREDICATE removed."
   (declare (fixnum start))
-  (let ((end (or end length))
-	(predicate (%coerce-callable-to-fun predicate)))
+  (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1817,8 +1813,7 @@
          start count end key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements,
-  except that all elements equal to OLD are replaced with NEW. See manual
-  for details."
+  except that all elements equal to OLD are replaced with NEW."
   (declare (fixnum start))
   (let ((end (or end length)))
     (declare (type index end))
@@ -1827,29 +1822,27 @@
 ;;;; SUBSTITUTE-IF, SUBSTITUTE-IF-NOT
 
 (define-sequence-traverser substitute-if
-    (new pred sequence &key from-end start end count key)
+    (new predicate sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-  except that all elements satisfying the PRED are replaced with NEW. See
-  manual for details."
+  except that all elements satisfying the PRED are replaced with NEW."
   (declare (fixnum start))
   (let ((end (or end length))
-        (test (%coerce-callable-to-fun pred))
-	test-not
+        (test predicate)
+	(test-not nil)
 	old)
     (declare (type index length end))
     (subst-dispatch 'if)))
 
 (define-sequence-traverser substitute-if-not
-    (new pred sequence &key from-end start end count key)
+    (new predicate sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-  except that all elements not satisfying the PRED are replaced with NEW.
-  See manual for details."
+  except that all elements not satisfying the PRED are replaced with NEW."
   (declare (fixnum start))
   (let ((end (or end length))
-        (test (%coerce-callable-to-fun pred))
-	test-not
+        (test predicate)
+	(test-not nil)
 	old)
     (declare (type index length end))
     (subst-dispatch 'if-not)))
@@ -1861,8 +1854,8 @@
          end count key start)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-  except that all elements equal to OLD are replaced with NEW. The SEQUENCE
-  may be destructively modified. See manual for details."
+  except that all elements equal to OLD are replaced with NEW. SEQUENCE
+  may be destructively modified."
   (declare (fixnum start))
   (let ((end (or end length)))
     (if (listp sequence)
@@ -1909,27 +1902,26 @@
 ;;;; NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT
 
 (define-sequence-traverser nsubstitute-if
-    (new pred sequence &key from-end start end count key)
+    (new predicate sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-   except that all elements satisfying the PRED are replaced with NEW. 
-   SEQUENCE may be destructively modified. See manual for details."
+   except that all elements satisfying PREDICATE are replaced with NEW. 
+   SEQUENCE may be destructively modified."
   (declare (fixnum start))
-  (let ((end (or end length))
-	(pred (%coerce-callable-to-fun pred)))
+  (let ((end (or end length)))
     (declare (fixnum end))
     (if (listp sequence)
 	(if from-end
 	    (let ((length (length sequence)))
 	      (nreverse (nlist-substitute-if*
-			 new pred (nreverse (the list sequence))
+			 new predicate (nreverse (the list sequence))
 			 (- length end) (- length start) count key)))
-	    (nlist-substitute-if* new pred sequence
+	    (nlist-substitute-if* new predicate sequence
 				  start end count key))
 	(if from-end
-	    (nvector-substitute-if* new pred sequence -1
+	    (nvector-substitute-if* new predicate sequence -1
 				    (1- end) (1- start) count key)
-	    (nvector-substitute-if* new pred sequence 1
+	    (nvector-substitute-if* new predicate sequence 1
 				    start end count key)))))
 
 (defun nlist-substitute-if* (new test sequence start end count key)
@@ -1950,27 +1942,26 @@
       (setq count (1- count)))))
 
 (define-sequence-traverser nsubstitute-if-not
-    (new pred sequence &key from-end start end count key)
+    (new predicate sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-   except that all elements not satisfying the TEST are replaced with NEW.
-   SEQUENCE may be destructively modified. See manual for details."
+   except that all elements not satisfying PREDICATE are replaced with NEW.
+   SEQUENCE may be destructively modified."
   (declare (fixnum start))
-  (let ((end (or end length))
-	(pred (%coerce-callable-to-fun pred)))
+  (let ((end (or end length)))
     (declare (fixnum end))
     (if (listp sequence)
 	(if from-end
 	    (let ((length (length sequence)))
 	      (nreverse (nlist-substitute-if-not*
-			 new pred (nreverse (the list sequence))
+			 new predicate (nreverse (the list sequence))
 			 (- length end) (- length start) count key)))
-	    (nlist-substitute-if-not* new pred sequence
+	    (nlist-substitute-if-not* new predicate sequence
 				      start end count key))
 	(if from-end
-	    (nvector-substitute-if-not* new pred sequence -1
+	    (nvector-substitute-if-not* new predicate sequence -1
 					(1- end) (1- start) count key)
-	    (nvector-substitute-if-not* new pred sequence 1
+	    (nvector-substitute-if-not* new predicate sequence 1
 					start end count key)))))
 
 (defun nlist-substitute-if-not* (new test sequence start end count key)
