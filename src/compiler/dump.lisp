@@ -896,10 +896,10 @@
 	 (dump-unsigned-vector 32 (* 4 len)))
         #-sb-xc-host
         #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (unsigned-byte-63) (*))
+        ((simple-array (unsigned-byte 63) (*))
          (dump-unsigned-vector 63 (* 8 len)))
         #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (unsigned-byte-64) (*))
+        ((simple-array (unsigned-byte 64) (*))
          (dump-unsigned-vector 64 (* 8 len)))
 	((simple-array (signed-byte 8) (*))
 	 (dump-signed-vector 8 len))

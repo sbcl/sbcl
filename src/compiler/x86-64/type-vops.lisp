@@ -176,9 +176,10 @@
     (inst sar rax-tn (+ 32 3 -1))
     (if not-p
 	(progn
-	  (inst jmp :nz target)
+	  (inst jmp :nz maybe)
 	  (inst jmp not-target))
 	(inst jmp :z target))
+    MAYBE
     (inst cmp rax-tn -1)
     (inst jmp (if not-p :ne :eq) target)
     NOT-TARGET))

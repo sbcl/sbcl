@@ -289,8 +289,7 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
-     (with-empty-tn@fp-top(result)
-	(inst fldd (make-ea :dword :base sap :index offset)))))
+     (inst movsd result (make-ea :qword :base sap :index offset))))
 
 (define-vop (sap-ref-double-c)
   (:translate sap-ref-double)
@@ -301,8 +300,7 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 4
-     (with-empty-tn@fp-top(result)
-	(inst fldd (make-ea :dword :base sap :disp offset)))))
+     (inst movsd result (make-ea :qword :base sap :disp offset))))
 
 (define-vop (%set-sap-ref-double)
   (:translate %set-sap-ref-double)
@@ -314,24 +312,8 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fstd (make-ea :dword :base sap :index offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fstd (make-ea :dword :base sap :index offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0.
-		  (unless (location= value result)
-			  (inst fstd result))
-		  (inst fxch value)))))))
+    (inst movsd (make-ea :qword :base sap :index offset) value)
+    (move result value)))
 
 (define-vop (%set-sap-ref-double-c)
   (:translate %set-sap-ref-double)
@@ -343,24 +325,8 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 4
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fstd (make-ea :qword :base sap :disp offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fstd (make-ea :qword :base sap :disp offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0.
-		  (unless (location= value result)
-			  (inst fstd result))
-		  (inst fxch value)))))))
+    (inst movsd (make-ea :qword :base sap :disp offset) value)
+    (move result value)))
 
 ;;;; SAP-REF-SINGLE
 
@@ -373,8 +339,7 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
-     (with-empty-tn@fp-top(result)
-	(inst fld (make-ea :dword :base sap :index offset)))))
+     (inst movss result (make-ea :dword :base sap :index offset))))
 
 (define-vop (sap-ref-single-c)
   (:translate sap-ref-single)
@@ -385,8 +350,7 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
-     (with-empty-tn@fp-top(result)
-	(inst fld (make-ea :dword :base sap :disp offset)))))
+     (inst movss result (make-ea :dword :base sap :disp offset))))
 
 (define-vop (%set-sap-ref-single)
   (:translate %set-sap-ref-single)
@@ -398,24 +362,8 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
-	   (inst fst (make-ea :dword :base sap :index offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fst result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fst (make-ea :dword :base sap :index offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fst value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fst result))
-		  (inst fxch value)))))))
+    (inst movss (make-ea :dword :base sap :index offset) value)
+    (move result value)))
 
 (define-vop (%set-sap-ref-single-c)
   (:translate %set-sap-ref-single)
@@ -427,24 +375,8 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
-	   (inst fst (make-ea :dword :base sap :disp offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fst result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fst (make-ea :dword :base sap :disp offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fst value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fst result))
-		  (inst fxch value)))))))
+    (inst movss (make-ea :dword :base sap :disp offset) value)
+    (move result value)))
 
 ;;;; SAP-REF-LONG
 #+nil
