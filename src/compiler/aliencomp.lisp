@@ -521,7 +521,7 @@
 	 (count-low-order-zeros (lvar-uses thing))))
     (combination
      (case (let ((name (lvar-fun-name (combination-fun thing))))
-             (or (modular-version-info name) name))
+             (or (modular-version-info name :unsigned) name))
        ((+ -)
 	(let ((min most-positive-fixnum)
 	      (itype (specifier-type 'integer)))
@@ -578,7 +578,7 @@
       (give-up-ir1-transform))
     (let ((inside-fun-name (lvar-fun-name (combination-fun value-node))))
       (multiple-value-bind (prototype width)
-          (modular-version-info inside-fun-name)
+          (modular-version-info inside-fun-name :unsigned)
         (unless (eq (or prototype inside-fun-name) 'ash)
           (give-up-ir1-transform))
         (when (and width (not (constant-lvar-p amount)))

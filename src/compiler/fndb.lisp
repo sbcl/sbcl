@@ -1343,6 +1343,8 @@
 ;;;; miscellaneous extensions
 
 (defknown get-bytes-consed () unsigned-byte (flushable))
+(defknown mask-signed-field ((integer 0 *) integer) integer
+          (movable flushable foldable))
 
 ;;; PCOUNTERs
 (defknown incf-pcounter (pcounter unsigned-byte) pcounter)
