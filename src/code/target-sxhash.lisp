@@ -314,7 +314,7 @@
 	       (etypecase key
 		 (single-float (frob single-float))
 		 (double-float (frob double-float))
-		 (short-float (frob short-float))
+		 #!+long-float
 		 (long-float (error "LONG-FLOAT not currently supported")))))
       (rational (if (and (<= most-negative-double-float
 			     key

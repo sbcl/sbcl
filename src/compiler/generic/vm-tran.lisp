@@ -121,19 +121,29 @@
                               (*))
                 index)))))
 
-(deftransform %data-vector-and-index ((array index)
-                                     (simple-array t)
-                                     *
-                                     :important t)
+(deftransform %data-vector-and-index ((%array %index)
+				      (simple-array t)
+				      *
+				      :important t)
+  ;; KLUDGE: why the percent signs?  Well, ARRAY and INDEX are
+  ;; respectively exported from the CL and SB!INT packages, which
+  ;; means that they're visible to all sorts of things.  If the
+  ;; compiler can prove that the call to ARRAY-HEADER-P, below, either
+  ;; returns T or NIL, it will delete the irrelevant branch.  However,
+  ;; user code might have got here with a variable named CL:ARRAY, and
+  ;; quite often compiler code with a variable named SB!INT:INDEX, so
+  ;; this can generate code deletion notes for innocuous user code:
+  ;; (DEFUN F (ARRAY I) (DECLARE (SIMPLE-VECTOR ARRAY)) (AREF ARRAY I))
+  ;; -- CSR, 2003-04-01
 
   ;; We do this solely for the -OR-GIVE-UP side effect, since we want
   ;; to know that the type can be figured out in the end before we
   ;; proceed, but we don't care yet what the type will turn out to be.
-  (upgraded-element-type-specifier-or-give-up array)
+  (upgraded-element-type-specifier-or-give-up %array)
 
-  '(if (array-header-p array)
-       (values (%array-data-vector array) index)
-       (values array index)))
+  '(if (array-header-p %array)
+       (values (%array-data-vector %array) %index)
+       (values %array %index)))
 
 ;;; transforms for getting at simple arrays of (UNSIGNED-BYTE N) when (< N 8)
 ;;;
