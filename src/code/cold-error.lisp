@@ -22,32 +22,57 @@
    ARGUMENTS. If the condition is not handled, NIL is returned. If
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
-  (/noshow0 "entering SIGNAL")
   (let ((condition (coerce-to-condition datum
 					arguments
 					'simple-condition
 					'signal))
-	(*handler-clusters* *handler-clusters*))
-    (let ((old-bos *break-on-signals*)
-	  (*break-on-signals* nil))
-      (when (typep condition old-bos)
-	(/noshow0 "doing BREAK in because of *BREAK-ON-SIGNALS*")
-	(break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* (now rebound to NIL)."
-	       condition)))
+	(*handler-clusters* *handler-clusters*)
+	(old-bos *break-on-signals*))
+    (restart-case
+	(when (typep condition *break-on-signals*)
+	  (let ((*break-on-signals* nil))
+	    (break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* ~
+                    (now rebound to NIL)."
+		   condition)))
+      ;; Give the user a chance to unset *BREAK-ON-SIGNALS* on the
+      ;; way out.
+      ;; 
+      ;; (e.g.: Consider a long compilation. After a failed compile
+      ;; the user sets *BREAK-ON-SIGNALS* to T, and select the
+      ;; RECOMPILE restart. Once the user diagnoses and fixes the
+      ;; problem, he selects RECOMPILE again... and discovers that
+      ;; he's entered the *BREAK-ON-SIGNALS* hell with no escape,
+      ;; unless we provide this restart.)
+      (reassign (new-value)
+	:report
+	"Return from BREAK and assign a new value to *BREAK-ON-SIGNALS*."
+	:interactive
+	(lambda ()
+	  (let (new-value)
+	    (loop
+	     (format *query-io*
+		     "Enter new value for *BREAK-ON-SIGNALS*. ~
+                      Current value is ~S.~%~
+                      > "
+		     old-bos)
+	     (force-output *query-io*)
+	     (let ((*break-on-signals* nil))
+	       (setf new-value (eval (read *query-io*)))
+	       (if (typep new-value 'type-specifier)
+		   (return)
+		   (format *query-io*
+			   "~S is not a valid value for *BREAK-ON-SIGNALS* ~
+                            (must be a type-specifier).~%"
+			   new-value))))
+	    (list new-value)))
+	(setf *break-on-signals* new-value)))
     (loop
       (unless *handler-clusters*
-	(/noshow0 "leaving LOOP because of unbound *HANDLER-CLUSTERS*")
 	(return))
       (let ((cluster (pop *handler-clusters*)))
-	(/noshow0 "got CLUSTER=..")
-	(/nohexstr cluster)
 	(dolist (handler cluster)
-	  (/noshow0 "looking at HANDLER=..")
-	  (/nohexstr handler)
 	  (when (typep condition (car handler))
 	    (funcall (cdr handler) condition)))))
-    
-    (/noshow0 "returning from SIGNAL")
     nil))
 
 ;;; a shared idiom in ERROR, CERROR, and BREAK: The user probably
