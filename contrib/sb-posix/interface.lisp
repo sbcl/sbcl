@@ -52,15 +52,26 @@
 (define-call "sync" void never-fails)
 (define-call "truncate" int minusp (pathname filename) (length sb-posix::off-t))
 (define-call "unlink" int minusp (pathname filename))
+
 (define-call-internally ioctl-without-arg "ioctl" int minusp (fd file-descriptor) (cmd int))
 (define-call-internally ioctl-with-int-arg "ioctl" int minusp (fd file-descriptor) (cmd int) (arg int))
 (define-call-internally ioctl-with-pointer-arg "ioctl" int minusp (fd file-descriptor) (cmd int) (arg alien-pointer-to-anything-or-nil))
-(define-entry-point "ioctl" (fd cmd &optional (arg nil arg-supplied))
-  (if arg-supplied
-    (etypecase arg
-      ((alien int) (ioctl-with-int-arg fd cmd arg))
-      ((or (alien (* t)) null) (ioctl-with-pointer-arg fd cmd arg)))
-    (ioctl-without-arg fd cmd)))
+(define-entry-point "ioctl" (fd cmd &optional (arg nil argp))
+  (if argp
+      (etypecase arg
+	((alien int) (ioctl-with-int-arg fd cmd arg))
+	((or (alien (* t)) null) (ioctl-with-pointer-arg fd cmd arg)))
+      (ioctl-without-arg fd cmd)))
+
+(define-call-internally fcntl-without-arg "fcntl" int minusp (fd file-descriptor) (cmd int))
+(define-call-internally fcntl-with-int-arg "fcntl" int minusp (fd file-descriptor) (cmd int) (arg int))
+(define-call-internally fcntl-with-pointer-arg "fcntl" int minusp (fd file-descriptor) (cmd int) (arg alien-pointer-to-anything-or-nil))
+(define-entry-point "fcntl" (fd cmd &optional (arg nil argp))
+  (if argp
+      (etypecase arg
+	((alien int) (fcntl-with-int-arg fd cmd arg))
+	((or (alien (* t)) null) (fcntl-with-pointer-arg fd cmd arg)))
+      (fcntl-without-arg fd cmd)))
 
 (define-call "opendir" (* t) null-alien (pathname filename))
 (define-call "readdir" (* t)

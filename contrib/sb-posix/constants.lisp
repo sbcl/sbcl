@@ -276,4 +276,16 @@
  (:integer seek-set "SEEK_SET")
  (:integer seek-cur "SEEK_CUR")
  (:integer seek-end "SEEK_END")
+
+ ;; fcntl()
+ (:integer f-dupfd "F_DUPFD")
+ (:integer f-getfd "F_GETFD")
+ (:integer f-setfd "F_SETFD")
+ (:integer f-setfl "F_SETFL")
+ (:integer f-getlk "F_GETLK")
+ (:integer f-setlk "F_SETLK")
+ (:integer f-setlkw "F_SETLKW")
+ (:integer f-getown "F_GETOWN")
+ (:integer f-setown "F_SETOWN")
+ 
  )
