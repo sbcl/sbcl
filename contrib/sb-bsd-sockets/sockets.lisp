@@ -53,7 +53,7 @@ When SOCKADDR is passed, it is used instead of a new object."))
   (:documentation "Deallocate a Socket Address object that was
 created for SOCKET."))
 
-(defmacro with-sockaddr-for ((socket sockaddr sockaddr-args) &body body)
+(defmacro with-sockaddr-for ((socket sockaddr &optional sockaddr-args) &body body)
   `(let ((,sockaddr (apply #'make-sockaddr-for ,socket nil ,sockaddr-args)))
      (unwind-protect (progn ,@body)
        (free-sockaddr-for ,socket ,sockaddr))))
@@ -84,7 +84,7 @@ newly-created connected socket and the peer address as multiple
 values"))
   
 (defmethod socket-accept ((socket socket))
-  (with-sockaddr-for (socket sockaddr nil)
+  (with-sockaddr-for (socket sockaddr)
     (let ((fd (sockint::accept (socket-file-descriptor socket)
 			       sockaddr
 			       (size-of-sockaddr socket))))
@@ -115,7 +115,7 @@ values"))
   family this may return multiple values"))
   
 (defmethod socket-peername ((socket socket))
-  (with-sockaddr-for (socket sockaddr address)
+  (with-sockaddr-for (socket sockaddr)
     (when (= (sockint::getpeername (socket-file-descriptor socket)
 				    sockaddr
 				    (size-of-sockaddr socket))
@@ -128,7 +128,7 @@ values"))
   that the socket is bound to, as multiple values."))
 
 (defmethod socket-name ((socket socket))
-  (with-sockaddr-for (socket sockaddr nil)
+  (with-sockaddr-for (socket sockaddr)
     (when (= (sockint::getsockname (socket-file-descriptor socket)
 				   sockaddr
 				   (size-of-sockaddr socket))
@@ -159,7 +159,7 @@ small"))
 			   &key
 			   oob peek waitall
 			   (element-type 'character))
-  (with-sockaddr-for (socket sockaddr nil)
+  (with-sockaddr-for (socket sockaddr)
     (let ((flags
 	   (logior (if oob sockint::MSG-OOB 0)
 		   (if peek sockint::MSG-PEEK 0)
