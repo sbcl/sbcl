@@ -704,11 +704,11 @@
 ;;; If there is no problem, we return T (even if REALLY-ASSERT was
 ;;; false). If there was a problem, we return NIL.
 (defun assert-definition-type
-       (functional type &key (really-assert t)
-		   ((:lossage-fun *lossage-fun*)
-		    #'compiler-style-warn)
-		   unwinnage-fun
-		   (where "previous declaration"))
+    (functional type &key (really-assert t)
+     ((:lossage-fun *lossage-fun*)
+      #'compiler-style-warn)
+     unwinnage-fun
+     (where "previous declaration"))
   (declare (type functional functional)
 	   (type function *lossage-fun*)
 	   (string where))
@@ -728,34 +728,36 @@
 	     (dtype (when return
                       (continuation-derived-type (return-result return)))))
 	(cond
-	 ((and dtype (not (values-types-equal-or-intersect dtype
-							   type-returns)))
-	  (note-lossage
-	   "The result type from ~A:~%  ~S~@
+          ((and dtype (not (values-types-equal-or-intersect dtype
+                                                            type-returns)))
+           (note-lossage
+            "The result type from ~A:~%  ~S~@
 	   conflicts with the definition's result type:~%  ~S"
-	   where (type-specifier type-returns) (type-specifier dtype))
-	  nil)
-	 (*lossage-detected* nil)
-	 ((not really-assert) t)
-	 (t
-	  (assert-continuation-type (return-result return) type-returns
-                                    (lexenv-policy (functional-lexenv functional)))
-	  (loop for var in vars and type in types do
-	    (cond ((basic-var-sets var)
-		   (when (and unwinnage-fun
-			      (not (csubtypep (leaf-type var) type)))
-		     (funcall unwinnage-fun
-			      "Assignment to argument: ~S~%  ~
+            where (type-specifier type-returns) (type-specifier dtype))
+           nil)
+          (*lossage-detected* nil)
+          ((not really-assert) t)
+          (t
+           (let ((policy (lexenv-policy (functional-lexenv functional))))
+             (when (policy policy (> type-check 0))
+               (assert-continuation-type (return-result return) type-returns
+                                         policy)))
+           (loop for var in vars and type in types do
+                (cond ((basic-var-sets var)
+                       (when (and unwinnage-fun
+                                  (not (csubtypep (leaf-type var) type)))
+                         (funcall unwinnage-fun
+                                  "Assignment to argument: ~S~%  ~
 			       prevents use of assertion from function ~
 			       type ~A:~%  ~S~%"
-			      (leaf-debug-name var)
-			      where
-			      (type-specifier type))))
-		  (t
-		   (setf (leaf-type var) type)
-		   (dolist (ref (leaf-refs var))
-		     (derive-node-type ref (make-single-value-type type))))))
-	  t))))))
+                                  (leaf-debug-name var)
+                                  where
+                                  (type-specifier type))))
+                      (t
+                       (setf (leaf-type var) type)
+                       (dolist (ref (leaf-refs var))
+                         (derive-node-type ref (make-single-value-type type))))))
+           t))))))
 
 (defun assert-global-function-definition-type (name fun)
   (declare (type functional fun))
