@@ -403,6 +403,14 @@
 	 (when restp
 	       `(&rest ,(intern "Discriminating Function &rest Arg")))))
 
+(defmethod generic-function-argument-precedence-order
+    ((gf standard-generic-function))
+  (aver (eq *boot-state* 'complete))
+  (loop with arg-info = (gf-arg-info gf)
+	with lambda-list = (arg-info-lambda-list arg-info)
+	for argument-position in (arg-info-precedence arg-info)
+	collect (nth argument-position lambda-list)))
+
 (defmethod generic-function-lambda-list ((gf generic-function))
   (gf-lambda-list gf))
 
