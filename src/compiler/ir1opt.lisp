@@ -824,10 +824,10 @@
       (let* ((name (leaf-name leaf))
 	     (info (info :function :info
 			 (if (slot-accessor-p leaf)
-			   (if (consp name)
-			     '%slot-setter
-			     '%slot-accessor)
-			   name))))
+			     (if (consp name)
+				 '%slot-setter
+				 '%slot-accessor)
+			     name))))
 	(if info
 	    (values leaf (setf (basic-combination-kind call) info))
 	    (values leaf nil)))))))

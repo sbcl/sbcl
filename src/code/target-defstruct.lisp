@@ -224,6 +224,118 @@
 
   (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
+
+
+;;;; generating out-of-line slot accessor functions
+
+;;; FIXME: Ideally, the presence of the type checks in the functions
+;;; here would be conditional on the optimization policy at the point
+;;; of expansion of DEFSTRUCT. (For now we're just doing the simpler
+;;; thing, putting in the type checks unconditionally.)
+
+;;; Return (VALUES SLOT-READER-FUN SLOT-WRITER-FUN).
+(defun slot-accessor-funs (dd dsd)
+
+  #+sb-xc (/show0 "entering SLOT-ACCESSOR-FUNS")
+
+  ;; various code generators
+  ;;
+  ;; Note: They're only minimally parameterized, and cavalierly grab
+  ;; things like INSTANCE and DSD-INDEX from the namespace they're
+  ;; expanded in.
+  (macrolet (;; code shared between funcallable instance case and the
+	     ;; ordinary STRUCTURE-OBJECT case: Handle native
+	     ;; structures with LAYOUTs and (possibly) raw slots.
+	     (%native-slot-accessor-funs (dd-ref-fun-name)
+	       (let ((instance-type-check-form
+		      '(%check-structure-type-from-layout instance layout)))
+		 (/show "macroexpanding %NATIVE-SLOT-ACCESSOR-FUNS" dd-ref-fun-name instance-type-check-form)
+		 `(let ((layout (dd-layout-or-lose dd))
+			(dsd-raw-type (dsd-raw-type dsd)))
+		    #+sb-xc (/show0 "in %NATIVE-SLOT-ACCESSOR-FUNS macroexpanded code")
+		    ;; Map over all the possible RAW-TYPEs, compiling
+		    ;; a different closure-function for each one, so
+		    ;; that once the COND over RAW-TYPEs happens (at
+		    ;; the time closure is allocated) there are no
+		    ;; more decisions to be made and things execute
+		    ;; reasonably efficiently.
+		    (cond
+		     ;; nonraw slot case
+		     ((eql dsd-raw-type t)
+		      #+sb-xc (/show0 "in nonraw slot case")
+		      (%slotplace-accessor-funs
+		       (,dd-ref-fun-name instance dsd-index)
+		       ,instance-type-check-form))
+		     ;; raw slot cases
+		     ,@(mapcar (lambda (raw-type-and-rawref-fun-name)
+				 (destructuring-bind (raw-type
+						      . rawref-fun-name)
+				     raw-type-and-rawref-fun-name
+				   `((equal dsd-raw-type ',raw-type)
+				     #+sb-xc (/show0 "in raw slot case")
+				     (let ((raw-index (dd-raw-index dd)))
+				       (%slotplace-accessor-funs
+					(,rawref-fun-name (,dd-ref-fun-name
+							   instance
+							   raw-index)
+							  dsd-index)
+					,instance-type-check-form)))))
+			       *raw-type->rawref-fun-name*)
+		     ;; oops
+		     (t
+		      (error "internal error: unexpected DSD-RAW-TYPE ~S"
+			     dsd-raw-type))))))
+	     ;; code shared between DEFSTRUCT :TYPE LIST and
+	     ;; DEFSTRUCT :TYPE VECTOR cases: Handle the "typed
+	     ;; structure" case, with no LAYOUTs and no raw slots.
+	     (%colontyped-slot-accessor-funs () (error "stub")) 
+	     ;; the common structure of the raw-slot and not-raw-slot
+	     ;; cases, defined in terms of the writable SLOTPLACE. All
+	     ;; possible flavors of slot access should be able to pass
+	     ;; through here.
+	     (%slotplace-accessor-funs (slotplace instance-type-check-form)
+	       (/show "macroexpanding %SLOTPLACE-ACCESSOR-FUNS" slotplace instance-type-check-form)
+	       `(values (lambda (instance)
+			  (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
+			  ,instance-type-check-form
+			  (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
+			  ,slotplace)
+			(let ((typecheckfun (typespec-typecheckfun dsd-type)))
+			  (lambda (new-value instance)
+			    (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined writer")
+			    ,instance-type-check-form
+			    (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
+			    (funcall typecheckfun new-value)
+			    (/noshow0 "back from TYPECHECKFUN")
+			    (setf ,slotplace new-value))))))
+
+    (let ((dsd-index (dsd-index dsd))
+	  (dsd-type (dsd-type dsd)))
+	    
+      #+sb-xc (/show0 "got DSD-TYPE=..")
+      #+sb-xc (/hexstr dsd-type)
+      (ecase (dd-type dd)
+
+	;; native structures
+	(structure
+	 #+sb-xc (/show0 "case of DSD-TYPE = STRUCTURE")
+	 (%native-slot-accessor-funs %instance-ref))
+				     
+	;; structures with the :TYPE option
+
+	;; FIXME: Worry about these later..
+	#|
+        ;; In :TYPE LIST and :TYPE VECTOR structures, ANSI specifies the
+        ;; layout completely, so that raw slots are impossible.
+        (list
+         (dd-type-slot-accessor-funs nth-but-with-sane-arg-order
+  	    			 `(%check-structure-type-from-dd
+    		  		 :maybe-raw-p nil))
+        (vector
+         (dd-type-slot-accessor-funs aref
+  	  			 :maybe-raw-p nil)))
+        |#
+	))))
 
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)

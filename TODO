@@ -56,6 +56,10 @@ for early 0.7.x:
 		are now implemented as closures (because
 		they're structure slot accessors) won't be so
 		nasty in the debugger
+	** %SLOT-ACCESSOR/%SLOT-ACCESSOR stuff can probably go away,
+		since we inline expand all slot accessors into 
+		%INSTANCE-REF and the optimizer knows all it needs
+		to know about that.
 * rewrote long-standing confusing error restarts for redefining
 	DEFSTRUCTs
 * outstanding embarrassments
