@@ -1885,6 +1885,9 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * fixed bugs 3cd: structure slot readers perform type check if the
     slot can have an invalid value (i.e. it is either not initialized
     or can be written with a less specific slot writer).
+  * bug fix: the compiler now traps array references to elements off
+    the end of an array; previously, the bounds checking in some
+    circumstances could go off-by-one.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -565,7 +565,7 @@
          (give-up-ir1-transform))
         (t
          (let ((dim (continuation-value dimension)))
-           `(the (integer 0 ,dim) index)))))
+           `(the (integer 0 (,dim)) index)))))
 
 ;;;; WITH-ARRAY-DATA
 

@@ -116,3 +116,14 @@
   (assert (eq (array-element-type a) 'nil)))
 
 (assert (eq (upgraded-array-element-type 'nil) 'nil))
+
+(multiple-value-bind (fun warn fail)
+    (compile nil '(lambda () (aref (make-array 0) 0)))
+  #+nil (assert fail) ; doesn't work, (maybe because ASSERTED-TYPE is NIL?)
+  (assert (raises-error? (funcall fun) type-error)))
+
+(multiple-value-bind (fun warn fail)
+    (compile nil '(lambda () (aref (make-array 1) 1)))
+  (assert fail)
+  (assert (raises-error? (funcall fun) type-error)))
+

@@ -1011,7 +1011,7 @@ WORKAROUND:
   array types, there's no good way to tell it you're doing it
   intentionally so that it should shut up and just compile the code.
 
-  Another poblem is confusing error message "asserted type ARRAY
+  Another problem is confusing error message "asserted type ARRAY
   conflicts with derived type (VALUES SIMPLE-VECTOR &OPTIONAL)" during
   compiling (LAMBDA (V) (VALUES (SVREF V 0) (VECTOR-POP V))).
 
@@ -1023,6 +1023,13 @@ WORKAROUND:
 
 258:
   (fixed in 0.8.1.3)
+
+259:
+  (compile nil '(lambda () (aref (make-array 0) 0))) compiles without
+  warning.  Analogous cases with the index and length being equal and
+  greater than 0 are warned for; the problem here seems to be that the
+  type required for an array reference of this type is (INTEGER 0 (0))
+  which is canonicalized to NIL.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
