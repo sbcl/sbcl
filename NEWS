@@ -2415,6 +2415,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     beginnings of a semantically meaningful condition hierarchy is
     under development, for use in SB-EXT:MUFFLE-CONDITIONS and by
     IDEs.
+  * fixed bug: Displaced arrays whose displaced-to array has become
+    too small now cause ARRAY-DIMENSION to signal an error, providing
+    for safer bounds-checking. (reported by Bruno Haible)
   * fixed bug: DEFCLASS slot definitions with identical :READER and
     :WRITER names now signal a reasonable error. (reported by Thomas
     Burdick)

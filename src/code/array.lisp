@@ -538,7 +538,25 @@
 	 (error "Axis number ~W is too big; ~S only has ~D dimension~:P."
 		axis-number array (%array-rank array)))
 	(t
-	 (%array-dimension array axis-number))))
+	 ;; ANSI sayeth (ADJUST-ARRAY dictionary entry): 
+	 ;; 
+	 ;;   "If A is displaced to B, the consequences are
+	 ;;   unspecified if B is adjusted in such a way that it no
+	 ;;   longer has enough elements to satisfy A.
+	 ;;
+	 ;; In situations where this matters we should be doing a
+	 ;; bounds-check, which in turn uses ARRAY-DIMENSION -- so
+	 ;; this seems like a good place to signal an error.
+	 (multiple-value-bind (target offset) (array-displacement array)
+	   (when (and target 
+		      (> (array-total-size array)
+			 (- (array-total-size target) offset)))
+	       (error 'displaced-to-array-too-small-error
+		      :format-control "~@<The displaced-to array is too small. ~S ~
+                                      elements after offset required, ~S available.~:@>"
+		      :format-arguments (list (array-total-size array) 
+					      (- (array-total-size target) offset))))
+	   (%array-dimension array axis-number)))))
 
 (defun array-dimensions (array)
   #!+sb-doc

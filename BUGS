@@ -1314,32 +1314,6 @@ WORKAROUND:
     Expected: (2 6 15 38)
     Got:      ERROR
 
-315: "no bounds check for access to displaced array"
-  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
-  test suite.
-    (locally (declare (optimize (safety 3) (speed 0)))
-      (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
-                               :initial-element #\space :adjustable t))
-             (y (make-array 10 :fill-pointer 4 :element-type 'character
-                               :displaced-to x)))
-        (adjust-array x '(5))
-        (char y 5)))
-
-  SBCL fails this because (array-dimension y 0) return 10 even after the
-  adjustment, and hence the bounds-check passes. This is strictly
-  speaking legal, since the dictionary entry for ADJUST-ARRAY
-  says:
-
-    "If A is displaced to B, the consequences are unspecified if B is
-    adjusted in such a way that it no longer has enough elements to
-    satisfy A."
-
-  Should this be left as is, or should ARRAY-DIMENSION see if the
-  displaced-to array has shrunk too much and signal an error? An error
-  would probably be preferable, since a test of that form but with
-  (setf (char y 5) #\Space) potentially corrupts the heap and
-  certainly confuses the world if that string is used by C code.
-
 317: "FORMAT of floating point numbers"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
   test suite.
