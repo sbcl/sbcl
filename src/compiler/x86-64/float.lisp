@@ -440,18 +440,20 @@
 	     `(progn
 		(define-vop (,sname single-float-op)
 		  (:translate ,op)
-		  (:results (r :scs (single-reg))) ; FIXME I'm guessing
+		  ;; XXX :from (:argument 0) cargo-culted from x86 vops
+		  ;; that also overwrite one source. Seems to work, but
+		  ;; I might be misunderstanding it's purpose. --JES
+		  (:results (r :scs (single-reg) :from (:argument 0)))
 		  (:generator ,scost
-		    (inst ,sinst x y)
-		    (unless (location= r x)
-		      (inst movq r x))))
+		    (inst movss r x)
+		    (inst ,sinst r y)))
 		(define-vop (,dname double-float-op)
 		  (:translate ,op)
-		  (:results (r :scs (double-reg))) ; and again
+		  ;; ibid
+		  (:results (r :scs (double-reg) :from (:argument 0)))
 		  (:generator ,dcost
-		    (inst ,dinst x y)
-		    (unless (location= r x)
-		      (inst movq r x)))))))
+		    (inst movsd r x)
+		    (inst ,dinst r y))))))
   (frob + addss +/single-float 2 addsd +/double-float 2)
   (frob - subss -/single-float 2 subsd -/double-float 2)
   (frob * mulss */single-float 4 mulsd */double-float 5)
@@ -524,11 +526,11 @@
 ;;; could (should, indeed) extend these to cope with descriptor args
 ;;; and stack args
 
-(define-vop (single-float-compare)
+(define-vop (single-float-compare float-compare)
   (:args (x :scs (single-reg)) (y :scs (single-reg)))
   (:conditional)
   (:arg-types single-float single-float))
-(define-vop (double-float-compare)
+(define-vop (double-float-compare float-compare)
   (:args (x :scs (double-reg)) (y :scs (double-reg)))
   (:conditional)
   (:arg-types double-float double-float))
@@ -583,14 +585,14 @@
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (>double-float double-float-compare)
-  (:translate <)
+  (:translate >)
   (:info target not-p)
   (:generator 2
     (inst comisd x y)
     (inst jmp (if not-p :na :a) target)))
 
 (define-vop (>single-float single-float-compare)
-  (:translate <)
+  (:translate >)
   (:info target not-p)
   (:generator 2
     (inst comiss x y)
@@ -621,9 +623,10 @@
 		    (signed-stack
 		     (note-this-location vop :internal-error)
 		     (inst ,inst y x)))))))
-  (frob %single-float/signed %single-float cvtdq2ps single-reg single-float)
-  (frob %double-float/signed %double-float cvtdq2pd double-reg double-float))
+  (frob %single-float/signed %single-float cvtsi2ss single-reg single-float)
+  (frob %double-float/signed %double-float cvtsi2sd double-reg double-float))
 
+#+nil
 (macrolet ((frob (name translate inst to-sc to-type)
 	     `(define-vop (,name)
 		(:args (x :scs (unsigned-reg)))
