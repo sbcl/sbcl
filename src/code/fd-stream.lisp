@@ -100,6 +100,19 @@
   element-type output, the kind of buffering, the function name, and the number
   of bytes per element.")
 
+;;; common idioms for reporting low-level stream and file problems
+(defun simple-stream-perror (note-format stream errno)
+  (error 'simple-stream-error
+	 :stream stream
+	 :format-control "~@<~?: ~2I~_~A~:>"
+	 :format-arguments (list note-format (list stream) (strerror errno))))
+(defun simple-file-perror (note-format pathname errno)
+  (error 'simple-stream-error
+	 :pathname pathname
+	 :format-control "~@<~?: ~2I~_~A~:>"
+	 :format-arguments
+	 (list note-format (list pathname) (strerror errno))))
+
 ;;; This is called by the server when we can write to the given file
 ;;; descriptor. Attempt to write the data again. If it worked, remove
 ;;; the data from the OUTPUT-LATER list. If it didn't work, something
@@ -120,13 +133,11 @@
       (cond ((not count)
 	     (if (= errno sb!unix:ewouldblock)
 		 (error "Write would have blocked, but SERVER told us to go.")
-		 (error "while writing ~S: ~A"
-			stream
-			(sb!unix:get-unix-error-msg errno))))
+		 (simple-stream-perror "couldn't write to ~S" stream errno)))
 	    ((eql count length) ; Hot damn, it worked.
 	     (when reuse-sap
 	       (push base *available-buffers*)))
-	    ((not (null count)) ; Sorta worked.
+	    ((not (null count)) ; sorta worked..
 	     (push (list base
 			 (the index (+ start count))
 			 end)
@@ -172,11 +183,9 @@
 	  (cond ((not count)
 		 (if (= errno sb!unix:ewouldblock)
 		     (output-later stream base start end reuse-sap)
-		     ;; FIXME: This and various other errors in this file
-		     ;; should probably be STREAM-ERROR.
-		     (error "while writing ~S: ~A"
-			    stream
-			    (sb!unix:get-unix-error-msg errno))))
+		     (simple-stream-perror "couldn't write to ~S"
+					   stream
+					   errno)))
 		((not (eql count length))
 		 (output-later stream base (the index (+ start count))
 			       end reuse-sap)))))))
@@ -451,9 +460,9 @@
 		       fd :input (fd-stream-timeout stream))
 	   (error 'io-timeout :stream stream :direction :read)))
 	(t
-	 (error "problem checking to see whether ~S is readable: ~A"
-		stream
-		(sb!unix:get-unix-error-msg errno)))))
+	 (simple-stream-perror "couldn't check whether ~S is readable"
+			       stream
+			       errno))))
     (multiple-value-bind (count errno)
 	(sb!unix:unix-read fd
 			   (sb!sys:int-sap (+ (sb!sys:sap-int ibuf-sap) tail))
@@ -467,9 +476,7 @@
 				 fd :input (fd-stream-timeout stream))
 		     (error 'io-timeout :stream stream :direction :read))
 		   (do-input stream))
-		 (error "error reading ~S: ~A"
-			stream
-			(sb!unix:get-unix-error-msg errno))))
+		 (simple-stream-perror "couldn't read from ~S" stream errno)))
 	    ((zerop count)
 	     (setf (fd-stream-listen stream) :eof)
 	     (throw 'eof-input-catcher nil))
@@ -633,18 +640,10 @@
 			 (fd-stream-ibuf-length stream))
     (declare (type (or index null) count))
     (when (null count)
-      (error "error reading ~S: ~A"
-	     stream
-	     (sb!unix:get-unix-error-msg err)))
+      (simple-stream-perror "couldn't read from ~S" stream err))
     (setf (fd-stream-listen stream) nil
 	  (fd-stream-ibuf-head stream) 0
 	  (fd-stream-ibuf-tail stream) count)
-;    (format t "~%buffer=~%--~%")
-;    (dotimes (i count)
-;      (write-char (code-char (sap-ref-8 (fd-stream-ibuf-sap stream) i))))
-;    (format t "~%--~%")
-    #+nil
-    (format t "/REFILL-FD-STREAM-BUFFER = ~D~%" count)
     count))
 
 ;;;; utility functions (misc routines, etc)
@@ -780,17 +779,20 @@
 		      (sb!unix:unix-rename (fd-stream-original fd-stream)
 					   (fd-stream-file fd-stream))
 		    (unless okay
-		      (error "~@<could not restore ~S to its original ~
-                              contents: ~2I~_~A~:>"
-			     (fd-stream-file fd-stream)
-			     (sb!unix:get-unix-error-msg err))))
+		      (simple-stream-perror
+		       "couldn't restore ~S to its original contents"
+		       fd-stream
+		       err)))
 		  ;; We can't restore the original, so nuke that puppy.
 		  (multiple-value-bind (okay err)
 		      (sb!unix:unix-unlink (fd-stream-file fd-stream))
 		    (unless okay
-		      (error "~@<could not remove ~S: ~2I~_~A~:>"
-			     (fd-stream-file fd-stream)
-			     (sb!unix:get-unix-error-msg err)))))))
+		      (error 'simple-file-error
+			     :pathname (fd-stream-file fd-stream)
+			     :format-control
+			     "~@<couldn't remove ~S: ~2I~_~A~:>"
+			     :format-arguments (list (fd-stream-file fd-stream)
+						     (strerror err))))))))
 	   (t
 	    (fd-stream-misc-routine fd-stream :finish-output)
 	    (when (and (fd-stream-original fd-stream)
@@ -798,11 +800,15 @@
 	      (multiple-value-bind (okay err)
 		  (sb!unix:unix-unlink (fd-stream-original fd-stream))
 		(unless okay
-		  (error "~@<could not delete ~S during close ~
-                           of ~S: ~2I~_~A~:>"
-			 (fd-stream-original fd-stream)
-			 fd-stream
-			 (sb!unix:get-unix-error-msg err)))))))
+		  (error 'simple-file-error
+			 :pathname (fd-stream-original fd-stream)
+			 :format-control 
+			 "~@<couldn't delete ~S during close of ~S: ~
+                          ~2I~_~A~:>"
+			 :format-arguments
+			 (list (fd-stream-original fd-stream)
+			       fd-stream
+			       (strerror err))))))))
      (when (fboundp 'cancel-finalization)
        (cancel-finalization fd-stream))
      (sb!unix:unix-close (fd-stream-fd fd-stream))
@@ -858,9 +864,7 @@
        (declare (ignore ino nlink uid gid rdev
 			atime mtime ctime blksize blocks))
        (unless okay
-	 (error "error in Unix fstat(2) on ~S: ~A"
-		fd-stream
-		(sb!unix:get-unix-error-msg dev)))
+	 (simple-stream-perror "failed Unix fstat(2) on ~S" fd-stream dev))
        (if (zerop mode)
 	   nil
 	   (truncate size (fd-stream-element-size fd-stream)))))
@@ -902,9 +906,9 @@
 		 nil)
 		(t
 		 (sb!sys:with-interrupts
-		   (error "error LSEEK'ing ~S: ~A"
-			  stream
-			  (sb!unix:get-unix-error-msg errno)))))))
+		   (simple-stream-perror "failure in Unix lseek() on ~S"
+					 stream
+					 errno))))))
       (let ((offset 0) origin)
 	(declare (type index offset))
 	;; Make sure we don't have any output pending, because if we
@@ -930,7 +934,7 @@
 	       (setf offset (* newpos (fd-stream-element-size stream))
 		     origin sb!unix:l_set))
 	      (t
-	       (error "invalid position given to file-position: ~S" newpos)))
+	       (error "invalid position given to FILE-POSITION: ~S" newpos)))
 	(multiple-value-bind (posn errno)
 	    (sb!unix:unix-lseek (fd-stream-fd stream) offset origin)
 	  (cond ((typep posn 'fixnum)
@@ -938,9 +942,9 @@
 		((eq errno sb!unix:espipe)
 		 nil)
 		(t
-		 (error "error lseek'ing ~S: ~A"
-			stream
-			(sb!unix:get-unix-error-msg errno))))))))
+		 (simple-stream-perror "error in Unix lseek() on ~S"
+				       stream
+				       errno)))))))
 
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
 
@@ -1024,13 +1028,13 @@
   (unless (sb!unix:unix-access namestring sb!unix:w_ok)
     (error "~@<The file ~2I~_~S ~I~_is not writable.~:>" namestring))
   (multiple-value-bind (okay err) (sb!unix:unix-rename namestring original)
-    (cond (okay t)
-	  (t
-	   (error "~@<could not rename ~2I~_~S ~I~_to ~2I~_~S: ~4I~_~A~:>"
-		  namestring
-		  original
-		  (sb!unix:get-unix-error-msg err))
-	   nil))))
+    (if okay
+	t
+	(error 'simple-file-error
+	       :pathname namestring
+	       :format-control 
+	       "~@<couldn't rename ~2I~_~S ~I~_to ~2I~_~S: ~4I~_~A~:>"
+	       :format-arguments (list namestring original (strerror err))))))
 
 (defun open (filename
 	     &key
@@ -1133,16 +1137,19 @@
 			 (okay
 			  (when (and output (= (logand orig-mode #o170000)
 					       #o40000))
-			    (error "cannot open ~S for output: is a directory"
-				   namestring))
+			    (error 'simple-file-error
+				   :pathname namestring
+				   :format-control
+				   "can't open ~S for output: is a directory"
+				   :format-arguments (list namestring)))
 			  (setf mode (logand orig-mode #o777))
 			  t)
 			 ((eql err/dev sb!unix:enoent)
 			  nil)
 			 (t
-			  (error "cannot find ~S: ~A"
-				 namestring
-				 (sb!unix:get-unix-error-msg err/dev))))))))
+			  (simple-file-perror "can't find ~S"
+					      namestring
+					      err/dev)))))))
 	    (unless (and exists
 			 (do-old-rename namestring original))
 	      (setf original nil)
@@ -1168,9 +1175,7 @@
 			    :format-control format-control
 			    :format-arguments format-arguments))
 		   (vanilla-open-error ()
-		     (open-error "~@<error opening ~S: ~2I~_~A~:>"
-				 pathname
-				 (sb!unix:get-unix-error-msg errno))))
+		     (simple-file-perror "error opening ~S" pathname errno)))
 	    (cond ((numberp fd)
 		   (case direction
 		     ((:input :output :io)
@@ -1196,9 +1201,8 @@
 		   (case if-does-not-exist
 		     (:error (vanilla-open-error))
 		     (:create
-		      (open-error
-		       "~@<The path ~2I~_~S ~I~_does not exist.~:>"
-		       pathname))
+		      (open-error "~@<The path ~2I~_~S ~I~_does not exist.~:>"
+				  pathname))
 		     (t nil)))
 		  ((and (eql errno sb!unix:eexist) if-exists)
 		   nil)

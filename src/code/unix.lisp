@@ -27,37 +27,6 @@
 
 (/show0 "unix.lisp 21")
 
-;;;; common machine-independent stuff
-
-(eval-when (:compile-toplevel :execute)
-
-(defparameter *compiler-unix-errors* nil)
-
-(/show0 "unix.lisp 29")
-
-(sb!xc:defmacro def-unix-error (name number description)
-  `(progn
-     (defconstant ,name ,number ,description)
-     (eval-when (:compile-toplevel :execute)
-       (push (cons ,number ,description) *compiler-unix-errors*))))
-
-(sb!xc:defmacro emit-unix-errors ()
-  (let* ((max (apply #'max (mapcar #'car *compiler-unix-errors*)))
-	 (array (make-array (1+ max) :initial-element nil)))
-    (dolist (error *compiler-unix-errors*)
-      (setf (svref array (car error)) (cdr error)))
-    `(progn
-       (defvar *unix-errors* ',array)
-       (proclaim '(simple-vector *unix-errors*)))))
-
-) ; EVAL-WHEN
-
-;;; FIXME: Couldn't all the *UNIX-ERRORS*/*COMPILER-UNIX-ERRORS* cruft
-;;; be replaced by POSIX strerror(3)?
-(defvar *unix-errors*)
-
-(/show0 "unix.lisp 52")
-
 (defmacro def-enum (inc cur &rest names)
   (flet ((defform (name)
 	   (prog1 (when name `(defconstant ,name ,cur))
@@ -90,15 +59,6 @@
 
 (/show0 "unix.lisp 74")
 
-(defun get-unix-error-msg (&optional (error-number (get-errno)))
-  #!+sb-doc
-  "Returns a string describing the error number which was returned by a
-  UNIX system call."
-  (declare (type integer error-number))
-  (if (array-in-bounds-p *unix-errors* error-number)
-      (svref *unix-errors* error-number)
-      (format nil "unknown error [~D]" error-number)))
-
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
 ;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
@@ -117,7 +77,7 @@
   `(let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
 				,@args)))
      (if (minusp result)
-	 (error "Syscall ~A failed: ~A" ,name (get-unix-error-msg))
+	 (error "Syscall ~A failed: ~A" ,name (strerror))
 	 ,success-form)))
 
 (/show0 "unix.lisp 109")
@@ -202,74 +162,15 @@
 (def-alien-type nil
   (struct fd-set
 	  (fds-bits (array fd-mask #.(/ fd-setsize 32)))))
-
-;;;; direntry.h
 
 (/show0 "unix.lisp 304")
-
-(def-alien-type nil
-  (struct direct
-    (d-ino long); inode number of entry
-    (d-off off-t)			; offset of next disk directory entry
-    (d-reclen unsigned-short)		; length of this record
-    (d_type unsigned-char)
-    (d-name (array char 256))))		; name must be no longer than this
-
+
+;;;; direntry.h
 ;;;; dirent.h
-
-;;;; FIXME: It might be really nice to implement these in C, so that
-;;;; we don't need to do horrible things like hand-copying the
-;;;; direntry struct slot types into an alien struct.
-
-
-;;; FIXME: DIRECTORY is an external symbol of package CL, so we should
-;;; use some other name for this low-level implementation type.
-(defstruct (directory (:copier nil))
-  name
-  (dir-struct (required-argument) :type system-area-pointer))
-(def!method print-object ((dir directory) stream)
-  (print-unreadable-object (dir stream :type t)
-    (prin1 (directory-name dir) stream)))
-
-(defun open-dir (pathname)
-  (declare (type unix-pathname pathname))
-  (when (string= pathname "")
-    (setf pathname "."))
-  (let ((kind (unix-file-kind pathname)))
-    (case kind
-      (:directory
-       (let ((dir-struct
-	      (alien-funcall (extern-alien "opendir"
-					   (function system-area-pointer
-						     c-string))
-			     pathname)))
-	 (if (zerop (sap-int dir-struct))
-	     (values nil (get-errno))
-	     (make-directory :name pathname :dir-struct dir-struct))))
-      ((nil)
-       (values nil enoent))
-      (t
-       (values nil enotdir)))))
-
-(defun read-dir (dir)
-  (declare (type directory dir))
-  (let ((daddr (alien-funcall (extern-alien "readdir"
-					    (function system-area-pointer
-						      system-area-pointer))
-			      (directory-dir-struct dir))))
-    (declare (type system-area-pointer daddr))
-    (if (zerop (sap-int daddr))
-	nil
-	(with-alien ((direct (* (struct direct)) daddr))
-	  (values (cast (slot direct 'd-name) c-string)
-		  (slot direct 'd-ino))))))
-
-(defun close-dir (dir)
-  (declare (type directory dir))
-  (alien-funcall (extern-alien "closedir"
-			       (function void system-area-pointer))
-		 (directory-dir-struct dir))
-  nil)
+;;;; 
+;;;; (CMU CL copied stuff out of these, but as of 0.6.11.41, SBCL
+;;;; doesn't need to, instead calling C-level wrapper code to handle
+;;;; all the opendir/readdir/closedir stuff.)
 
 ;;;; fcntl.h
 ;;;;
@@ -337,28 +238,28 @@
 
 ;;;; resourcebits.h
 
-(defconstant rusage_self 0 #!+sb-doc "The calling process.")
-(defconstant rusage_children -1 #!+sb-doc "Terminated child processes.")
+(defconstant rusage_self 0) ; the calling process
+(defconstant rusage_children -1) ; terminated child processes
 (defconstant rusage_both -2)
 
 (def-alien-type nil
   (struct rusage
-    (ru-utime (struct timeval))		; user time used
-    (ru-stime (struct timeval))		; system time used.
+    (ru-utime (struct timeval))	    ; user time used
+    (ru-stime (struct timeval))	    ; system time used.
     (ru-maxrss long)		    ; maximum resident set size (in kilobytes)
-    (ru-ixrss long)			; integral shared memory size
-    (ru-idrss long)			; integral unshared data size
-    (ru-isrss long)			; integral unshared stack size
-    (ru-minflt long)			; page reclaims
-    (ru-majflt long)			; page faults
-    (ru-nswap long)			; swaps
-    (ru-inblock long)			; block input operations
-    (ru-oublock long)			; block output operations
-    (ru-msgsnd long)			; messages sent
-    (ru-msgrcv long)			; messages received
-    (ru-nsignals long)			; signals received
-    (ru-nvcsw long)			; voluntary context switches
-    (ru-nivcsw long)))			; involuntary context switches
+    (ru-ixrss long)		    ; integral shared memory size
+    (ru-idrss long)		    ; integral unshared data size
+    (ru-isrss long)		    ; integral unshared stack size
+    (ru-minflt long)		    ; page reclaims
+    (ru-majflt long)		    ; page faults
+    (ru-nswap long)		    ; swaps
+    (ru-inblock long)		    ; block input operations
+    (ru-oublock long)		    ; block output operations
+    (ru-msgsnd long)		    ; messages sent
+    (ru-msgrcv long)		    ; messages received
+    (ru-nsignals long)		    ; signals received
+    (ru-nvcsw long)		    ; voluntary context switches
+    (ru-nivcsw long)))		    ; involuntary context switches
 
 ;;;; statbuf.h
 
@@ -420,51 +321,49 @@
 
 ;; encoding of the file mode
 
-(defconstant s-ifmt   #o0170000 #!+sb-doc "These bits determine file type.")
+;;; These bits determine file type.
+(defconstant s-ifmt   #o0170000)
 
-;; file types
-(defconstant s-ififo  #o0010000 #!+sb-doc "FIFO")
-(defconstant s-ifchr  #o0020000 #!+sb-doc "Character device")
-(defconstant s-ifdir  #o0040000 #!+sb-doc "Directory")
-(defconstant s-ifblk  #o0060000 #!+sb-doc "Block device")
-(defconstant s-ifreg  #o0100000 #!+sb-doc "Regular file")
+;; basic file types, exist even on System V
+(defconstant s-ififo  #o0010000) ; FIFO
+(defconstant s-ifchr  #o0020000) ; Character device
+(defconstant s-ifdir  #o0040000) ; Directory
+(defconstant s-ifblk  #o0060000) ; Block device
+(defconstant s-ifreg  #o0100000) ; Regular file
 
-;; These don't actually exist on System V, but having them doesn't hurt.
-(defconstant s-iflnk  #o0120000 #!+sb-doc "Symbolic link.")
-(defconstant s-ifsock #o0140000 #!+sb-doc "Socket.")
+;; more file types: These don't actually exist on System V, but having
+;; them doesn't hurt.
+(defconstant s-iflnk  #o0120000) ; Symbolic link
+(defconstant s-ifsock #o0140000) ; Socket
 
 ;;;; unistd.h
 
-;;; values for the second argument to access
+;;; Given a file path (a string) and one of four constant modes,
+;;; return T if the file is accessible with that mode and NIL if not.
+;;; When NIL, also return an errno value with NIL which tells why the
+;;; file was not accessible.
+;;; 
+;;; The access modes are:
+;;;   r_ok     Read permission.
+;;;   w_ok     Write permission.
+;;;   x_ok     Execute permission.
+;;;   f_ok     Presence of file.
 (defun unix-access (path mode)
-  #!+sb-doc
-  "Given a file path (a string) and one of four constant modes,
-   UNIX-ACCESS returns T if the file is accessible with that
-   mode and NIL if not. It also returns an errno value with
-   NIL which determines why the file was not accessible.
-
-   The access modes are:
-	r_ok     Read permission.
-	w_ok     Write permission.
-	x_ok     Execute permission.
-	f_ok     Presence of file."
   (declare (type unix-pathname path)
 	   (type (mod 8) mode))
   (void-syscall ("access" c-string int) path mode))
 
-(defconstant l_set 0 #!+sb-doc "set the file pointer")
-(defconstant l_incr 1 #!+sb-doc "increment the file pointer")
-(defconstant l_xtnd 2 #!+sb-doc "extend the file size")
+;;; values for the second argument to UNIX-LSEEK
+(defconstant l_set 0) ; to set the file pointer
+(defconstant l_incr 1) ; to increment the file pointer
+(defconstant l_xtnd 2) ; to extend the file size
 
+;;; Accept a file descriptor and move the file pointer ahead
+;;; a certain offset for that file. WHENCE can be any of the following:
+;;;  L_SET     Set the file pointer.
+;;;  L_INCR    Increment the file pointer.
+;;;  L_XTND    Extend the file size.
 (defun unix-lseek (fd offset whence)
-  #!+sb-doc
-  "Unix-lseek accepts a file descriptor and moves the file pointer ahead
-   a certain offset for that file. Whence can be any of the following:
-
-   l_set	Set the file pointer.
-   l_incr       Increment the file pointer.
-   l_xtnd       Extend the file size.
-  "
   (declare (type unix-fd fd)
 	   (type (unsigned-byte 32) offset)
 	   (type (integer 0 2) whence))
@@ -481,11 +380,6 @@
 ;;; and store them into the buffer. It returns the actual number of
 ;;; bytes read.
 (defun unix-read (fd buf len)
-  #!+sb-doc
-  "Unix-read attempts to read from the file described by fd into
-   the buffer buf until it is full. Len is the length of the buffer.
-   The number of bytes actually read is returned or NIL and an error
-   number if an error occurred."
   (declare (type unix-fd fd)
 	   (type (unsigned-byte 32) len))
 
@@ -496,10 +390,6 @@
 ;;; associated with fd from the the buffer starting at offset. It returns
 ;;; the actual number of bytes written.
 (defun unix-write (fd buf offset len)
-  #!+sb-doc
-  "Unix-write attempts to write a character buffer (buf) of length
-   len to the file described by the file descriptor fd. NIL and an
-   error is returned if the call is unsuccessful."
   (declare (type unix-fd fd)
 	   (type (unsigned-byte 32) offset len))
   (int-syscall ("write" int (* char) int)
@@ -512,12 +402,11 @@
 		 (addr (deref ptr offset)))
 	       len))
 
-;;; Set up a unix-piping mechanism consisting of
-;;; an input pipe and an output pipe.  Return two
-;;; values: if no error occurred the first value is the pipe
-;;; to be read from and the second is can be written to.  If
-;;; an error occurred the first value is NIL and the second
-;;; the unix error code.
+;;; Set up a unix-piping mechanism consisting of an input pipe and an
+;;; output pipe. Return two values: if no error occurred the first
+;;; value is the pipe to be read from and the second is can be written
+;;; to. If an error occurred the first value is NIL and the second the
+;;; unix error code.
 (defun unix-pipe ()
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
@@ -527,15 +416,11 @@
 ;;; UNIX-CHDIR accepts a directory name and makes that the
 ;;; current working directory.
 (defun unix-chdir (path)
-  #!+sb-doc
-  "Given a file path string, unix-chdir changes the current working
-   directory to the one specified."
   (declare (type unix-pathname path))
   (void-syscall ("chdir" c-string) path))
 
+;;; Return the current directory as a SIMPLE-STRING.
 (defun unix-current-directory ()
-  #!+sb-doc
-  "Return the current directory as a SIMPLE-STRING."
   ;; FIXME: Gcc justifiably complains that getwd is dangerous and should
   ;; not be used; especially with a hardwired 1024 buffer size, yecch.
   ;; This should be rewritten to use getcwd(3), perhaps by writing
@@ -547,38 +432,30 @@
 				       (cast buf (* char)))))
 	    (cast buf c-string))))
 
+;;; Duplicate an existing file descriptor (given as the argument) and
+;;; return it. If FD is not a valid file descriptor, NIL and an error
+;;; number are returned.
 (defun unix-dup (fd)
-  #!+sb-doc
-  "Unix-dup duplicates an existing file descriptor (given as the
-   argument) and returns it.  If FD is not a valid file descriptor, NIL
-   and an error number are returned."
   (declare (type unix-fd fd))
   (int-syscall ("dup" int) fd))
 
-;;; UNIX-EXIT terminates a program.
+;;; Terminate the current process with an optional error code. If
+;;; successful, the call doesn't return. If unsuccessful, the call
+;;; returns NIL and an error number.
 (defun unix-exit (&optional (code 0))
-  #!+sb-doc
-  "Unix-exit terminates the current process with an optional
-   error code. If successful, the call doesn't return. If
-   unsuccessful, the call returns NIL and an error number."
   (declare (type (signed-byte 32) code))
   (void-syscall ("exit" int) code))
 
-(def-alien-routine ("getpid" unix-getpid) int
-  #!+sb-doc
-  "Unix-getpid returns the process-id of the current process.")
+;;; Return the process id of the current process.
+(def-alien-routine ("getpid" unix-getpid) int)
 
-(def-alien-routine ("getuid" unix-getuid) int
-  #!+sb-doc
-  "Unix-getuid returns the real user-id associated with the
-   current process.")
+;;; Return the real user-id associated with the current process.
+(def-alien-routine ("getuid" unix-getuid) int)
 
+;;; Invoke readlink(2) on the file name specified by the simple string
+;;; PATH. Return up to two values: the contents of the symbolic link
+;;; if the call is successful, or NIL and the Unix error number.
 (defun unix-readlink (path)
-  #!+sb-doc
-  "Unix-readlink invokes the readlink system call on the file name
-  specified by the simple string path. It returns up to two values:
-  the contents of the symbolic link if the call is successful, or
-  NIL and the Unix error number."
   (declare (type unix-pathname path))
   (with-alien ((buf (array char 1024)))
     (syscall ("readlink" c-string (* char) int)
@@ -591,18 +468,14 @@
 	     path (cast buf (* char)) 1024)))
 
 ;;; UNIX-UNLINK accepts a name and deletes the directory entry for that
-;;; name and the file if this is the last link.
+;;; name and the file if this is the last link. 
 (defun unix-unlink (name)
-  #!+sb-doc
-  "Unix-unlink removes the directory entry for the named file.
-   NIL and an error code is returned if the call fails."
   (declare (type unix-pathname name))
   (void-syscall ("unlink" c-string) name))
 
+;;; Set the tty-process-group for the unix file-descriptor FD to PGRP.
+;;; If not supplied, FD defaults to "/dev/tty".
 (defun %set-tty-process-group (pgrp &optional fd)
-  #!+sb-doc
-  "Set the tty-process-group for the unix file-descriptor FD to PGRP. If not
-  supplied, FD defaults to /dev/tty."
   (let ((old-sigs (unix-sigblock (sigmask :sigttou
 					  :sigttin
 					  :sigtstp
@@ -620,28 +493,24 @@
 		     (values nil errno)))))
       (unix-sigsetmask old-sigs))))
 
+;;; Return the name of the host machine as a string.
 (defun unix-gethostname ()
-  #!+sb-doc
-  "Unix-gethostname returns the name of the host machine as a string."
   (with-alien ((buf (array char 256)))
     (syscall ("gethostname" (* char) int)
 	     (cast buf c-string)
 	     (cast buf (* char)) 256)))
 
+;;; Write the core image of the file described by FD to disk.
 (defun unix-fsync (fd)
-  #!+sb-doc
-  "Unix-fsync writes the core image of the file described by
-   fd to disk."
   (declare (type unix-fd fd))
   (void-syscall ("fsync" int) fd))
 
 ;;;; sys/ioctl.h
 
+;;; UNIX-IOCTL performs a variety of operations on open i/o
+;;; descriptors. See the UNIX Programmer's Manual for more
+;;; information.
 (defun unix-ioctl (fd cmd arg)
-  #!+sb-doc
-  "Unix-ioctl performs a variety of operations on open i/o
-   descriptors.  See the UNIX Programmer's Manual for more
-   information."
   (declare (type unix-fd fd)
 	   (type (unsigned-byte 32) cmd))
   (void-syscall ("ioctl" int unsigned-int (* char)) fd cmd arg))
@@ -649,11 +518,11 @@
 ;;;; sys/resource.h
 
 ;;; FIXME: All we seem to need is the RUSAGE_SELF version of this.
+;;;
+;;; Like getrusage(2), but return only the system and user time,
+;;; and return the seconds and microseconds as separate values.
 #!-sb-fluid (declaim (inline unix-fast-getrusage))
 (defun unix-fast-getrusage (who)
-  #!+sb-doc
-  "Like call getrusage, but return only the system and user time, and returns
-   the seconds and microseconds as separate values."
   (declare (values (member t)
 		   (unsigned-byte 31) (mod 1000000)
 		   (unsigned-byte 31) (mod 1000000)))
@@ -666,13 +535,12 @@
 		      (slot (slot usage 'ru-stime) 'tv-usec))
 	      who (addr usage))))
 
+;;; Return information about the resource usage of the process
+;;; specified by WHO. WHO can be either the current process
+;;; (rusage_self) or all of the terminated child processes
+;;; (rusage_children). NIL and an error number is returned if the call
+;;; fails.
 (defun unix-getrusage (who)
-  #!+sb-doc
-  "Unix-getrusage returns information about the resource usage
-   of the process specified by who. Who can be either the
-   current process (rusage_self) or all of the terminated
-   child processes (rusage_children). NIL and an error number
-   is returned if the call fails."
   (with-alien ((usage (struct rusage)))
     (syscall ("getrusage" int (* (struct rusage)))
 	      (values t
@@ -695,7 +563,6 @@
 		      (slot usage 'ru-nvcsw)
 		      (slot usage 'ru-nivcsw))
 	      who (addr usage))))
-
 
 ;;;; sys/select.h
 
@@ -744,11 +611,10 @@
 	      collect `(ash (deref (slot ,fdset 'fds-bits) ,index)
 			    ,(* index 32))))))
 
+;;; Examine the sets of descriptors passed as arguments to see whether
+;;; they are ready for reading and writing. See the UNIX Programmer's
+;;; Manual for more information.
 (defun unix-select (nfds rdfds wrfds xpfds to-secs &optional (to-usecs 0))
-  #!+sb-doc
-  "Unix-select examines the sets of descriptors passed as arguments
-   to see whether they are ready for reading and writing. See the UNIX
-   Programmers Manual for more information."
   (declare (type (integer 0 #.FD-SETSIZE) nfds)
 	   (type unsigned-byte rdfds wrfds xpfds)
 	   (type (or (unsigned-byte 31) null) to-secs)
@@ -760,7 +626,7 @@
 	       (xpf (struct fd-set)))
     (when to-secs
       (setf (slot tv 'tv-sec) to-secs)
-      (setf (slot tv 'tv-usec) to-usecs))
+     (setf (slot tv 'tv-usec) to-usecs))
     (num-to-fd-set rdf rdfds)
     (num-to-fd-set wrf wrfds)
     (num-to-fd-set xpf xpfds)
@@ -820,13 +686,11 @@
 		 (slot ,buf 'st-blocksh)))
 	   ))
 
+;;; Retrieve information about the specified file returning them in
+;;; the form of multiple values. See the UNIX Programmer's Manual for
+;;; a description of the values returned. If the call fails, then NIL
+;;; and an error number is returned instead.
 (defun unix-stat (name)
-  #!+sb-doc
-  "Unix-stat retrieves information about the specified
-   file returning them in the form of multiple values.
-   See the UNIX Programmer's Manual for a description
-   of the values returned. If the call fails, then NIL
-   and an error number is returned instead."
   (declare (type unix-pathname name))
   (when (string= name "")
     (setf name "."))
@@ -835,20 +699,16 @@
 	     (extract-stat-results buf)
 	     name (addr buf))))
 
+;;; like UNIX-STAT except the file is specified by the file descriptor FD
 (defun unix-fstat (fd)
-  #!+sb-doc
-  "Unix-fstat is similar to unix-stat except the file is specified
-   by the file descriptor fd."
   (declare (type unix-fd fd))
   (with-alien ((buf (struct stat)))
     (syscall ("fstat" int (* (struct stat)))
 	     (extract-stat-results buf)
 	     fd (addr buf))))
 
+;;; like UNIX-STAT except the specified file must be a symbolic link
 (defun unix-lstat (name)
-  #!+sb-doc
-  "Unix-lstat is similar to unix-stat except the specified
-   file must be a symbolic link."
   (declare (type unix-pathname name))
   (with-alien ((buf (struct stat)))
     (syscall ("lstat" c-string (* (struct stat)))
@@ -858,10 +718,6 @@
 ;;; UNIX-MKDIR accepts a name and a mode and attempts to create the
 ;;; corresponding directory with mode mode.
 (defun unix-mkdir (name mode)
-  #!+sb-doc
-  "Unix-mkdir creates a new directory with the specified name and mode.
-   (Same as those for unix-fchmod.)  It returns T upon success, otherwise
-   NIL and an error number."
   (declare (type unix-pathname name)
 	   (type unix-file-mode mode))
   (void-syscall ("mkdir" c-string int) name mode))
@@ -915,13 +771,12 @@
     (tz-minuteswest int)		; minutes west of Greenwich
     (tz-dsttime	int)))			; type of dst correction
 
+;;; If it works, UNIX-GETTIMEOFDAY returns 5 values: T, the seconds
+;;; and microseconds of the current time of day, the timezone (in
+;;; minutes west of Greenwich), and a daylight-savings flag. If it
+;;; doesn't work, it returns NIL and the errno.
 #!-sb-fluid (declaim (inline unix-gettimeofday))
 (defun unix-gettimeofday ()
-  #!+sb-doc
-  "If it works, unix-gettimeofday returns 5 values: T, the seconds and
-   microseconds of the current time of day, the timezone (in minutes west
-   of Greenwich), and a daylight-savings flag. If it doesn't work, it
-   returns NIL and the errno."
   (with-alien ((tv (struct timeval))
 	       (tz (struct timezone)))
     (syscall* ("gettimeofday" (* (struct timeval))
@@ -936,153 +791,18 @@
 
 ;;;; asm/errno.h
 
-#|
-(def-unix-error ESUCCESS 0 "Successful")
-(def-unix-error EPERM 1 "Operation not permitted")
-|#
-(def-unix-error ENOENT 2 "No such file or directory")
-#|
-(def-unix-error ESRCH 3 "No such process")
-|#
-(def-unix-error EINTR 4 "Interrupted system call")
-(def-unix-error EIO 5 "I/O error")
-#|
-(def-unix-error ENXIO 6 "No such device or address")
-(def-unix-error E2BIG 7 "Arg list too long")
-(def-unix-error ENOEXEC 8 "Exec format error")
-(def-unix-error EBADF 9 "Bad file number")
-(def-unix-error ECHILD 10 "No children")
-(def-unix-error EAGAIN 11 "Try again")
-(def-unix-error ENOMEM 12 "Out of memory")
-|#
-(def-unix-error EACCES 13 "Permission denied")
-#|
-(def-unix-error EFAULT 14 "Bad address")
-(def-unix-error ENOTBLK 15 "Block device required")
-(def-unix-error EBUSY 16 "Device or resource busy")
-|#
-(def-unix-error EEXIST 17 "File exists")
-#|
-(def-unix-error EXDEV 18 "Cross-device link")
-(def-unix-error ENODEV 19 "No such device")
-|#
-(def-unix-error ENOTDIR 20 "Not a directory")
-#|
-(def-unix-error EISDIR 21 "Is a directory")
-(def-unix-error EINVAL 22 "Invalid argument")
-(def-unix-error ENFILE 23 "File table overflow")
-(def-unix-error EMFILE 24 "Too many open files")
-(def-unix-error ENOTTY 25 "Not a typewriter")
-(def-unix-error ETXTBSY 26 "Text file busy")
-(def-unix-error EFBIG 27 "File too large")
-(def-unix-error ENOSPC 28 "No space left on device")
-|#
-(def-unix-error ESPIPE 29 "Illegal seek")
-#|
-(def-unix-error EROFS 30 "Read-only file system")
-(def-unix-error EMLINK 31 "Too many links")
-(def-unix-error EPIPE 32 "Broken pipe")
-|#
-
-#|
-;;; Math
-(def-unix-error EDOM 33 "Math argument out of domain")
-(def-unix-error ERANGE 34 "Math result not representable")
-(def-unix-error  EDEADLK	 35     "Resource deadlock would occur")
-(def-unix-error  ENAMETOOLONG    36     "File name too long")
-(def-unix-error  ENOLCK	  37     "No record locks available")
-(def-unix-error  ENOSYS	  38     "Function not implemented")
-(def-unix-error  ENOTEMPTY       39     "Directory not empty")
-(def-unix-error  ELOOP	   40     "Too many symbolic links encountered")
-|#
-(def-unix-error  EWOULDBLOCK     11     "Operation would block")
-(/show0 "unix.lisp 3192")
-#|
-(def-unix-error  ENOMSG	  42     "No message of desired type")
-(def-unix-error  EIDRM	   43     "Identifier removed")
-(def-unix-error  ECHRNG	  44     "Channel number out of range")
-(def-unix-error  EL2NSYNC	45     "Level 2 not synchronized")
-(def-unix-error  EL3HLT	  46     "Level 3 halted")
-(def-unix-error  EL3RST	  47     "Level 3 reset")
-(def-unix-error  ELNRNG	  48     "Link number out of range")
-(def-unix-error  EUNATCH	 49     "Protocol driver not attached")
-(def-unix-error  ENOCSI	  50     "No CSI structure available")
-(def-unix-error  EL2HLT	  51     "Level 2 halted")
-(def-unix-error  EBADE	   52     "Invalid exchange")
-(def-unix-error  EBADR	   53     "Invalid request descriptor")
-(def-unix-error  EXFULL	  54     "Exchange full")
-(def-unix-error  ENOANO	  55     "No anode")
-(def-unix-error  EBADRQC	 56     "Invalid request code")
-(def-unix-error  EBADSLT	 57     "Invalid slot")
-(def-unix-error  EDEADLOCK       EDEADLK     "File locking deadlock error")
-(def-unix-error  EBFONT	  59     "Bad font file format")
-(def-unix-error  ENOSTR	  60     "Device not a stream")
-(def-unix-error  ENODATA	 61     "No data available")
-(def-unix-error  ETIME	   62     "Timer expired")
-(def-unix-error  ENOSR	   63     "Out of streams resources")
-(def-unix-error  ENONET	  64     "Machine is not on the network")
-(def-unix-error  ENOPKG	  65     "Package not installed")
-(def-unix-error  EREMOTE	 66     "Object is remote")
-(def-unix-error  ENOLINK	 67     "Link has been severed")
-(def-unix-error  EADV	    68     "Advertise error")
-(def-unix-error  ESRMNT	  69     "Srmount error")
-(def-unix-error  ECOMM	   70     "Communication error on send")
-(def-unix-error  EPROTO	  71     "Protocol error")
-(def-unix-error  EMULTIHOP       72     "Multihop attempted")
-(def-unix-error  EDOTDOT	 73     "RFS specific error")
-(def-unix-error  EBADMSG	 74     "Not a data message")
-(def-unix-error  EOVERFLOW       75     "Value too large for defined data type")
-(def-unix-error  ENOTUNIQ	76     "Name not unique on network")
-(def-unix-error  EBADFD	  77     "File descriptor in bad state")
-(def-unix-error  EREMCHG	 78     "Remote address changed")
-(def-unix-error  ELIBACC	 79     "Can not access a needed shared library")
-(def-unix-error  ELIBBAD	 80     "Accessing a corrupted shared library")
-(def-unix-error  ELIBSCN	 81     ".lib section in a.out corrupted")
-(def-unix-error  ELIBMAX	 82     "Attempting to link in too many shared libraries")
-(def-unix-error  ELIBEXEC	83     "Cannot exec a shared library directly")
-(def-unix-error  EILSEQ	  84     "Illegal byte sequence")
-(def-unix-error  ERESTART	85     "Interrupted system call should be restarted ")
-(def-unix-error  ESTRPIPE	86     "Streams pipe error")
-(def-unix-error  EUSERS	  87     "Too many users")
-(def-unix-error  ENOTSOCK	88     "Socket operation on non-socket")
-(def-unix-error  EDESTADDRREQ    89     "Destination address required")
-(def-unix-error  EMSGSIZE	90     "Message too long")
-(def-unix-error  EPROTOTYPE      91     "Protocol wrong type for socket")
-(def-unix-error  ENOPROTOOPT     92     "Protocol not available")
-(def-unix-error  EPROTONOSUPPORT 93     "Protocol not supported")
-(def-unix-error  ESOCKTNOSUPPORT 94     "Socket type not supported")
-(def-unix-error  EOPNOTSUPP      95     "Operation not supported on transport endpoint")
-(def-unix-error  EPFNOSUPPORT    96     "Protocol family not supported")
-(def-unix-error  EAFNOSUPPORT    97     "Address family not supported by protocol")
-(def-unix-error  EADDRINUSE      98     "Address already in use")
-(def-unix-error  EADDRNOTAVAIL   99     "Cannot assign requested address")
-(def-unix-error  ENETDOWN	100    "Network is down")
-(def-unix-error  ENETUNREACH     101    "Network is unreachable")
-(def-unix-error  ENETRESET       102    "Network dropped connection because of reset")
-(def-unix-error  ECONNABORTED    103    "Software caused connection abort")
-(def-unix-error  ECONNRESET      104    "Connection reset by peer")
-(def-unix-error  ENOBUFS	 105    "No buffer space available")
-(def-unix-error  EISCONN	 106    "Transport endpoint is already connected")
-(def-unix-error  ENOTCONN	107    "Transport endpoint is not connected")
-(def-unix-error  ESHUTDOWN       108    "Cannot send after transport endpoint shutdown")
-(def-unix-error  ETOOMANYREFS    109    "Too many references: cannot splice")
-(def-unix-error  ETIMEDOUT       110    "Connection timed out")
-(def-unix-error  ECONNREFUSED    111    "Connection refused")
-(def-unix-error  EHOSTDOWN       112    "Host is down")
-(def-unix-error  EHOSTUNREACH    113    "No route to host")
-(def-unix-error  EALREADY	114    "Operation already in progress")
-(def-unix-error  EINPROGRESS     115    "Operation now in progress")
-(def-unix-error  ESTALE	  116    "Stale NFS file handle")
-(def-unix-error  EUCLEAN	 117    "Structure needs cleaning")
-(def-unix-error  ENOTNAM	 118    "Not a XENIX named type file")
-(def-unix-error  ENAVAIL	 119    "No XENIX semaphores available")
-(def-unix-error  EISNAM	  120    "Is a named type file")
-(def-unix-error  EREMOTEIO       121    "Remote I/O error")
-(def-unix-error  EDQUOT	  122    "Quota exceeded")
-|#
-
-;;; And now for something completely different ...
-(emit-unix-errors)
+(defconstant ENOENT 2) ; Unix error code, "No such file or directory"
+(defconstant EINTR 4) ; Unix error code, "Interrupted system call"
+(defconstant EIO 5) ; Unix error code, "I/O error"
+(defconstant EEXIST 17) ; Unix error code, "File exists"
+(defconstant ESPIPE 29) ; Unix error code, "Illegal seek"
+(defconstant EWOULDBLOCK 11) ; Unix error code, "Operation would block"
+;;; FIXME: Many Unix error code definitions were deleted from the old
+;;; CMU CL source code here, but not in the exports of SB-UNIX. I
+;;; (WHN) hope that someday I'll figure out an automatic way to detect
+;;; unused symbols in package exports, but if I don't, there are
+;;; enough of them all in one place here that they should probably be
+;;; removed by hand.
 
 ;;;; support routines for dealing with Unix pathnames
 
@@ -1111,6 +831,8 @@
 	    name))))
 
 ;;; Return the pathname with all symbolic links resolved.
+;;;
+;;; FIXME: Could we just use Unix readlink(2) instead?
 (defun unix-resolve-links (pathname)
   (declare (simple-string pathname))
   (let ((len (length pathname))
@@ -1134,9 +856,13 @@
 		(cond ((eq kind :link)
 		       (multiple-value-bind (link err) (unix-readlink result)
 			 (unless link
-			   (error "error reading link ~S: ~S"
-				  (subseq result 0 fill-ptr)
-				  (get-unix-error-msg err)))
+			   (error 'simple-file-error
+				  :pathname pathname
+				  :format-control
+				  "~@<error reading link ~S: ~2I~_~A~:>"
+				  :format-arguments (list (subseq
+							   result 0 fill-ptr)
+							  (strerror err))))
 			 (cond ((or (zerop (length link))
 				    (char/= (schar link 0) #\/))
 				;; It's a relative link.

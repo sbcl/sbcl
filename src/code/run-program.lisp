@@ -194,8 +194,7 @@
 			    sb-unix:TIOCGPGRP
 			    (sb-alien:alien-sap (sb-alien:addr result)))
       (unless wonp
-	(error "TIOCPGRP ioctl failed: ~S"
-	       (sb-unix:get-unix-error-msg error)))
+	(error "TIOCPGRP ioctl failed: ~S" (strerror error)))
       result))
   (process-pid proc))
 
@@ -366,8 +365,7 @@
       (when (streamp pty)
 	(multiple-value-bind (new-fd errno) (sb-unix:unix-dup master)
 	  (unless new-fd
-	    (error "could not SB-UNIX:UNIX-DUP ~D: ~S"
-		   master (sb-unix:get-unix-error-msg errno)))
+	    (error "couldn't SB-UNIX:UNIX-DUP ~D: ~A" master (strerror errno)))
 	  (push new-fd *close-on-error*)
 	  (copy-descriptor-to-stream new-fd pty cookie)))
       (values name
@@ -616,8 +614,8 @@
 				(spawn pfile args-vec environment-vec pty-name
 				       stdin stdout stderr))))
 			  (when (< child-pid 0)
-			    (error "could not fork child process: ~S"
-				   (sb-unix:get-unix-error-msg)))
+			    (error "couldn't fork child process: ~A"
+				   (strerror)))
 			  (setf proc (make-process :pid child-pid
 						   :%status :running
 						   :pty pty-stream
@@ -659,9 +657,9 @@
 						   (ash 1 descriptor)
 						   0 0 0)
 			    (cond ((null result)
-				   (error "could not select on sub-process: ~S"
-					  (sb-unix:get-unix-error-msg
-					   readable/errno)))
+				   (error "~@<couldn't select on sub-process: ~
+                                           ~2I~_~A~:>"
+					  (strerror readable/errno)))
 				  ((zerop result)
 				   (return))))
 			(sb-alien:with-alien ((buf (sb-alien:array
@@ -684,8 +682,10 @@
 				   (sb-sys:remove-fd-handler handler)
 				   (setf handler nil)
 				   (decf (car cookie))
-				   (error "could not read input from sub-process: ~S"
-					  (sb-unix:get-unix-error-msg errno)))
+				   (error
+				    "~@<couldn't read input from sub-process: ~
+                                     ~2I~_~A~:>"
+				    (strerror errno)))
 				  (t
 				   (sb-kernel:copy-from-system-area
 				    (alien-sap buf) 0
@@ -717,17 +717,14 @@
 				  (t sb-unix:o_rdwr))
 				#o666)
 	   (unless fd
-	     (error "could not open \"/dev/null\": ~S"
-		    (sb-unix:get-unix-error-msg errno)))
+	     (error "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
+		    (strerror errno)))
 	   (push fd *close-in-parent*)
 	   (values fd nil)))
 	((eq object :stream)
-	 (multiple-value-bind
-	       (read-fd write-fd)
-	     (sb-unix:unix-pipe)
+	 (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
 	   (unless read-fd
-	     (error "could not create pipe: ~S"
-		    (sb-unix:get-unix-error-msg write-fd)))
+	     (error "couldn't create pipe: ~A" (strerror write-fd)))
 	   (case direction
 	     (:input
 	      (push read-fd *close-in-parent*)
@@ -753,8 +750,8 @@
 		    (push fd *close-in-parent*)
 		    (values fd nil))
 		   (t
-		    (error "could not duplicate file descriptor: ~S"
-			   (sb-unix:get-unix-error-msg errno)))))))
+		    (error "couldn't duplicate file descriptor: ~A"
+			   (strerror errno)))))))
 	((sb-sys:fd-stream-p object)
 	 (values (sb-sys:fd-stream-fd object) nil))
 	((streamp object)
@@ -791,8 +788,7 @@
 	    (multiple-value-bind (read-fd write-fd)
 		(sb-unix:unix-pipe)
 	      (unless read-fd
-		(error "could not create pipe: ~S"
-		       (sb-unix:get-unix-error-msg write-fd)))
+		(error "couldn't create pipe: ~S" (strerror write-fd)))
 	      (copy-descriptor-to-stream read-fd object cookie)
 	      (push read-fd *close-on-error*)
 	      (push write-fd *close-in-parent*)

@@ -48,9 +48,7 @@
       (sb!unix:unix-getrusage sb!unix:rusage_self)
     (declare (ignore maxrss ixrss idrss isrss minflt))
     (unless err? ; FIXME: nonmnemonic (reversed) name for ERR?
-      (error "Unix system call getrusage failed: ~A."
-	     (sb!unix:get-unix-error-msg utime)))
-
+      (error "Unix system call getrusage failed: ~A." (strerror utime)))
     (values utime stime majflt)))
 
 ;;; Return the system page size.

@@ -45,9 +45,10 @@
 	      (case-failure-name condition)
 	      (case-failure-possibilities condition)))))
 
-(define-condition simple-file-error    (simple-condition file-error)())
-(define-condition simple-program-error (simple-condition program-error)())
-(define-condition simple-control-error (simple-condition control-error)())
+(define-condition simple-control-error (simple-condition control-error) ())
+(define-condition simple-file-error    (simple-condition file-error)    ())
+(define-condition simple-program-error (simple-condition program-error) ())
+(define-condition simple-stream-error  (simple-condition stream-error)  ())
 
 ;;; This condition is signalled whenever we make a UNKNOWN-TYPE so that
 ;;; compiler warnings can be emitted as appropriate.

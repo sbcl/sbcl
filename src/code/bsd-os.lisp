@@ -45,8 +45,7 @@
 		       (sb!unix:unix-getrusage sb!unix:rusage_self)
     (declare (ignore maxrss ixrss idrss isrss minflt))
     (unless err?
-      (error "Unix system call getrusage failed: ~A."
-	     (sb!unix:get-unix-error-msg utime)))
+      (simple-perror "Unix system call getrusage failed" :errno utime))
     
     (values utime stime majflt)))
 

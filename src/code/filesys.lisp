@@ -527,6 +527,7 @@
 
 (/show0 "filesys.lisp 500")
 
+;;; Call FUNCTION on matches.
 (defun %enumerate-matches (pathname verify-existence follow-links function)
   (/show0 "entering %ENUMERATE-MATCHES")
   (when (pathname-type pathname)
@@ -551,6 +552,7 @@
 				   nil function)))
 	(%enumerate-files "" pathname verify-existence function))))
 
+;;; Call FUNCTION on directories.
 (defun %enumerate-directories (head tail pathname verify-existence
 			       follow-links nodes function)
   (declare (simple-string head))
@@ -564,20 +566,7 @@
 		  (when (and res (eql (logand mode sb!unix:s-ifmt)
 				      sb!unix:s-ifdir))
 		    (let ((nodes (cons (cons dev ino) nodes)))
-		      ,@body))))
-	     (do-directory-entries ((name directory) &body body)
-	       `(let ((dir (sb!unix:open-dir ,directory)))
-		  (when dir
-		    (unwind-protect
-			(loop
-			 (let ((,name (sb!unix:read-dir dir)))
-			   (cond ((null ,name)
-				  (return))
-				 ((string= ,name "."))
-				 ((string= ,name ".."))
-				 (t
-				  ,@body))))
-		      (sb!unix:close-dir dir))))))
+		      ,@body)))))
     (if tail
 	(let ((piece (car tail)))
 	  (etypecase piece
@@ -592,7 +581,7 @@
 	     (%enumerate-directories head (rest tail) pathname
 				     verify-existence follow-links
 				     nodes function)
-	     (do-directory-entries (name head)
+	     (dolist (name (ignore-errors (directory-lispy-filenames head)))
 	       (let ((subdir (concatenate 'string head name)))
 		 (multiple-value-bind (res dev ino mode)
 		     (unix-xstat subdir)
@@ -609,7 +598,7 @@
 						 verify-existence follow-links
 						 nodes function))))))))
 	    ((or pattern (member :wild))
-	     (do-directory-entries (name head)
+	     (dolist (name (directory-lispy-filenames head))
 	       (when (or (eq piece :wild) (pattern-matches piece name))
 		 (let ((subdir (concatenate 'string head name)))
 		   (multiple-value-bind (res dev ino mode)
@@ -632,6 +621,7 @@
 					 nodes function))))))
 	(%enumerate-files head pathname verify-existence function))))
 
+;;; Call FUNCTION on files.
 (defun %enumerate-files (directory pathname verify-existence function)
   (declare (simple-string directory))
   (/show0 "entering %ENUMERATE-FILES")
@@ -649,30 +639,27 @@
 	       (eq name :wild)
 	       (eq type :wild))
 	   (/show0 "WILD, more or less")
-	   (let ((dir (sb!unix:open-dir directory)))
-	     (when dir
-	       (unwind-protect
-		   (loop
-		     (/show0 "at head of LOOP")
-		     (let ((file (sb!unix:read-dir dir)))
-		       (if file
-			   (unless (or (string= file ".")
-				       (string= file ".."))
-			     (multiple-value-bind
-				 (file-name file-type file-version)
-				 (let ((*ignore-wildcards* t))
-				   (extract-name-type-and-version
-				    file 0 (length file)))
-			       (when (and (components-match file-name name)
-					  (components-match file-type type)
-					  (components-match file-version
-							    version))
-				 (funcall function
-					  (concatenate 'string
-						       directory
-						       file)))))
-			   (return))))
-		 (sb!unix:close-dir dir)))))
+	   ;; I IGNORE-ERRORS here just because the original CMU CL
+	   ;; code did. I think the intent is that it's not an error
+	   ;; to request matches to a wild pattern when no matches
+	   ;; exist, but I haven't tried to figure out whether
+	   ;; everything is kosher. (E.g. what if we try to match a
+	   ;; wildcard but we don't have permission to read one of the
+	   ;; relevant directories?) -- WHN 2001-04-17
+	   (dolist (complete-filename (ignore-errors
+					(directory-lispy-filenames directory)))
+	     (multiple-value-bind
+		 (file-name file-type file-version)
+		 (let ((*ignore-wildcards* t))
+		   (extract-name-type-and-version
+		    complete-filename 0 (length complete-filename)))
+	       (when (and (components-match file-name name)
+			  (components-match file-type type)
+			  (components-match file-version version))
+		 (funcall function
+			  (concatenate 'string
+				       directory
+				       complete-filename))))))
 	  (t
 	   (/show0 "default case")
 	   (let ((file (concatenate 'string directory name)))
@@ -794,7 +781,7 @@
 
 (defun rename-file (file new-name)
   #!+sb-doc
-  "Rename File to have the specified New-Name. If file is a stream open to a
+  "Rename FILE to have the specified NEW-NAME. If FILE is a stream open to a
   file, then the associated file is renamed."
   (let* ((original (truename file))
 	 (original-namestring (unix-namestring original t))
@@ -810,16 +797,16 @@
       (unless res
 	(error 'simple-file-error
 	       :pathname new-name
-	       :format-control "failed to rename ~A to ~A: ~A"
-	       :format-arguments (list original new-name
-				       (sb!unix:get-unix-error-msg error))))
+	       :format-control "~@<couldn't rename ~2I~_~A ~I~_to ~2I~_~A: ~
+                                ~I~_~A~:>"
+	       :format-arguments (list original new-name (strerror error))))
       (when (streamp file)
 	(file-name file new-namestring))
       (values new-name original (truename new-name)))))
 
 (defun delete-file (file)
   #!+sb-doc
-  "Delete the specified file."
+  "Delete the specified FILE."
   (let ((namestring (unix-namestring file t)))
     (when (streamp file)
       (close file :abort t))
@@ -828,21 +815,17 @@
 	     :pathname file
 	     :format-control "~S doesn't exist."
 	     :format-arguments (list file)))
-
     (multiple-value-bind (res err) (sb!unix:unix-unlink namestring)
       (unless res
-	(error 'simple-file-error
-	       :pathname namestring
-	       :format-control "could not delete ~A: ~A"
-	       :format-arguments (list namestring
-				       (sb!unix:get-unix-error-msg err))))))
+	(simple-file-perror "couldn't delete ~A" namestring err))))
   t)
 
-;;; Return Home:, which is set up for us at initialization time.
+;;; (This is an ANSI Common Lisp function.) 
+;;;
+;;; This is obtained from the logical name \"home:\", which is set
+;;; up for us at initialization time.
 (defun user-homedir-pathname (&optional host)
-  #!+sb-doc
-  "Returns the home directory of the logged in user as a pathname.
-  This is obtained from the logical name \"home:\"."
+  "Return the home directory of the user as a pathname."
   (declare (ignore host))
   ;; Note: CMU CL did #P"home:" here instead of using a call to
   ;; PATHNAME. Delaying construction of the pathname until we're
@@ -1012,6 +995,13 @@
 		(t t)))
 	xn)))
 
+;;;; DEFAULT-DIRECTORY stuff
+;;;;
+;;;; FIXME: *DEFAULT-DIRECTORY-DEFAULTS* seems to be the ANSI way to
+;;;; deal with this, so we should beef up *DEFAULT-DIRECTORY-DEFAULTS*
+;;;; and make all the old DEFAULT-DIRECTORY stuff go away. (At that
+;;;; time the need for UNIX-CHDIR will go away too, I think.)
+
 (defun default-directory ()
   #!+sb-doc
   "Returns the pathname for the default directory. This is the place where
@@ -1030,7 +1020,9 @@
     (multiple-value-bind (gr error) (sb!unix:unix-chdir namestring)
       (if gr
 	  (setf (search-list "default:") (default-directory))
-	  (error (sb!unix:get-unix-error-msg error))))
+	  (simple-file-perror "couldn't set default directory to ~S"
+			      new-val
+			      error)))
     new-val))
 
 (/show0 "filesys.lisp 934")

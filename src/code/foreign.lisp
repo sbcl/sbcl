@@ -33,9 +33,9 @@
 		 (sb-unix:unix-close fd)
 		 (return name))
 		((not (= errno sb-unix:eexist))
-		 (error "could not create temporary file ~S: ~A"
-			name
-			(sb-unix:get-unix-error-msg errno)))
+		 (simple-file-perror "couldn't create temporary file ~S"
+				     name
+				     errno))
 		;; KLUDGE: depends on ASCII character ordering -- WHN 20000128
 		((= code (char-code #\Z))
 		 (setf code (char-code #\a)))
