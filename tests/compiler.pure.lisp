@@ -234,3 +234,16 @@
 	  
 ;;; FTYPE should accept any functional type specifier
 (compile nil '(lambda (x) (declare (ftype function f)) (f x)))
+
+;;; FUNCALL of special operators and macros should signal an
+;;; UNDEFINED-FUNCTION error
+(multiple-value-bind (result error)
+    (ignore-errors (funcall 'quote 1))
+  (assert (null result))
+  (assert (typep error 'undefined-function))
+  (assert (eq (cell-error-name error) 'quote)))
+(multiple-value-bind (result error)
+    (ignore-errors (funcall 'and 1))
+  (assert (null result))
+  (assert (typep error 'undefined-function))
+  (assert (eq (cell-error-name error) 'and)))

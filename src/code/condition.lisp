@@ -604,6 +604,13 @@
 	     "The function ~S is undefined."
 	     (cell-error-name condition)))))
 
+(define-condition special-form-function (undefined-function) ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "Cannot FUNCALL the SYMBOL-FUNCTION of special operator ~S."
+	     (cell-error-name condition)))))
+
 (define-condition arithmetic-error (error)
   ((operation :reader arithmetic-error-operation
 	      :initarg :operation

@@ -693,6 +693,7 @@ retained, possibly temporariliy, because it might be used internally."
              "SIMPLE-PARSE-ERROR"
              "SIMPLE-PROGRAM-ERROR" "SIMPLE-STREAM-ERROR"
              "SIMPLE-STYLE-WARNING"
+	     "SPECIAL-FORM-FUNCTION"
              "STYLE-WARN"
 
              ;; bootstrapping magic, to make things happen both in

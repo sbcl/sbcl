@@ -382,6 +382,9 @@ WORKAROUND:
   LOAD-FOREIGN, and (2) hunt for any other code which uses temporary
   files and make it share the same new safe logic.
 
+  (partially alleviated in sbcl-0.7.9.32 by a fix by Matthew Danish to
+   make the temporary filename less easily guessable)
+
 82: 
   Functions are assigned names based on the context in which they're
   defined. This is less than ideal for the functions which are
@@ -794,14 +797,6 @@ WORKAROUND:
   The problem seems to be that the code walker used by the DEFMETHOD
   macro is unhappy with the illegal syntax in the method body, and
   is giving an unclear error message.
-
-172:
-  sbcl's treatment of at least macro lambda lists is too permissive;
-  e.g., in sbcl-0.7.3.7:
-    (defmacro foo (&rest rest bar) `(,bar ,rest))
-    (macroexpand '(foo quux zot)) -> (QUUX (QUUX ZOT))
-  whereas section 3.4.4 of the CLHS doesn't allow required parameters
-  to come after the rest argument.
 
 173:
   The compiler sometimes tries to constant-fold expressions before

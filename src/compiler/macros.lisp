@@ -78,8 +78,8 @@
 	     `((setf (symbol-function ',name)
 		     (lambda (&rest rest)
 		       (declare (ignore rest))
-		       (error "can't FUNCALL the SYMBOL-FUNCTION of ~
-			       special forms")))))))))
+		       (error 'special-form-function
+			      :name ',name)))))))))
 
 ;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
 ;;; syntax is invalid.)

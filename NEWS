@@ -1362,7 +1362,7 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        FORWARD-REFERENCED-CLASSes; error reporting on
        CLASS-DEFAULT-INITARGS, CLASS-PRECEDENCE-LIST and CLASS-SLOTS
        has been improved;
-  * fixed some bugs, shown by Paul Dietz' test suite:
+  * fixed some bugs shown by Paul Dietz' test suite:
     ** DOLIST puts its body in TAGBODY
     ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the
        correct order
@@ -1376,6 +1376,8 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        is not a valid sequence index;
     ** LOOP signals (at macroexpansion time) an error of type
        PROGRAM-ERROR when duplicate variable names are found;
+    ** FUNCALL of special-operators now cause an error of type
+       UNDEFINED-FUNCTION;
   * fixed bug 166: compiler preserves "there is a way to go"
     invariant when deleting code.
   * fixed bug 172: macro lambda lists with required arguments after
