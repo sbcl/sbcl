@@ -112,6 +112,7 @@ pid_t create_thread(lispobj initial_function) {
 	STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
 	STATIC_TLS_INIT(BINDING_STACK_POINTER,binding_stack_pointer);
 	STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
+	STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
 	STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
@@ -122,6 +123,7 @@ pid_t create_thread(lispobj initial_function) {
     th->control_stack_start = spaces;
     th->binding_stack_start=
 	(lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
+    th->control_stack_end = th->binding_stack_start-1;
     th->alien_stack_start=
 	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;

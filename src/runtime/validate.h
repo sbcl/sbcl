@@ -17,14 +17,15 @@
 #define   DYNAMIC_SPACE_SIZE (  DYNAMIC_SPACE_END -   DYNAMIC_SPACE_START)
 #define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
 #define    STATIC_SPACE_SIZE (   STATIC_SPACE_END -    STATIC_SPACE_START)
-#define THREAD_CONTROL_STACK_SIZE (2*1024*1024)	/* wired elsewhere-watch out */
+#define THREAD_CONTROL_STACK_SIZE (2*1024*1024)	/* eventually this'll be choosable per-thread */
 
 #if !defined(LANGUAGE_ASSEMBLY)
 #include <thread.h>
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD 
 #define CONTROL_STACK_GUARD_PAGE(th) ((void *)(th->control_stack_start))
 #else
-#define CONTROL_STACK_GUARD_PAGE(th) (((void *)(th->control_stack_start))+THREAD_CONTROL_STACK_SIZE - os_vm_page_size)
+#define CONTROL_STACK_GUARD_PAGE(th) \
+     (((void *)(th->control_stack_end)) - os_vm_page_size)
 #endif
 
 extern void validate(void);

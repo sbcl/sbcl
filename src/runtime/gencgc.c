@@ -3672,10 +3672,7 @@ garbage_collect_generation(int generation, int raise)
 	preserve_pointer(regs.ebp);
 	preserve_pointer(regs.eax);
 #endif
-	for (ptr = ((void **)
-		    ((void *)th->control_stack_start
-		     + THREAD_CONTROL_STACK_SIZE)
-		    -1);
+	for (ptr = th->control_stack_end;
 #ifdef LISP_FEATURE_SB_THREAD
 	     ptr > regs.esp;
 #else

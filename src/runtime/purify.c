@@ -1352,15 +1352,12 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	    lose("PTRACE_GETREGS");
 	}
 	setup_i386_stack_scav(regs.ebp,
-			      ((void *)thread->control_stack_start)
-			      +THREAD_CONTROL_STACK_SIZE);
+			      ((void *)thread->control_stack_end));
     }
 #endif
 #endif
     setup_i386_stack_scav(((&static_roots)-2),
-			  ((void *)all_threads->control_stack_start)
-			  +THREAD_CONTROL_STACK_SIZE);
-
+			  ((void *)all_threads->control_stack_end));
 
 
     pscav(&static_roots, 1, 0);

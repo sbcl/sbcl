@@ -373,6 +373,7 @@
   (binding-stack-start :c-type "lispobj *")
   (binding-stack-pointer :c-type "lispobj *")
   (control-stack-start :c-type "lispobj *")
+  (control-stack-end :c-type "lispobj *")
   (alien-stack-start :c-type "lispobj *")
   (alien-stack-pointer :c-type "lispobj *")
   (alloc-region :c-type "struct alloc_region" :length 5)

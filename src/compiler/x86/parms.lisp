@@ -261,6 +261,7 @@
     *binding-stack-pointer*
     *binding-stack-start*
     *control-stack-start*
+    *control-stack-end*
 
     ;; the floating point constants
     *fp-constant-0d0*
