@@ -266,39 +266,7 @@
 	 (without-gcing
 	  (memmove (sap+ (sap ,dst) ,dst-start)
 		   (sap+ (sap ,src) ,src-start)
-		   (- ,dst-end ,dst-start)))))
-
-  ;; REMOVEME when new version works
-  ;;
-  ;; old version, had overflow problems because it converts byte
-  ;; indices to bit indices, which is not good when GENESIS is trying
-  ;; to read into a byte vector which represents the cold image (>16M bytes)
-  #+nil
-  `(let ((src ,src)
-	 (src-start (* ,src-start sb!vm:byte-bits))
-	 (dst ,dst)
-	 (dst-start (* ,dst-start sb!vm:byte-bits))
-	 (dst-end (* ,dst-end sb!vm:byte-bits)))
-     (let ((length (- dst-end dst-start)))
-       (etypecase src
-	 (system-area-pointer
-	  (etypecase dst
-	    (system-area-pointer
-	     (system-area-copy src src-start dst dst-start length))
-	    ((simple-unboxed-array (*))
-	     (copy-from-system-area src src-start
-				    dst (+ dst-start ,vector-data-bit-offset)
-				    length))))
-	 ((simple-unboxed-array (*))
-	  (etypecase dst
-	    (system-area-pointer
-	     (copy-to-system-area src (+ src-start ,vector-data-bit-offset)
-				  dst dst-start
-				  length))
-	    ((simple-unboxed-array (*))
-	     (bit-bash-copy src (+ src-start ,vector-data-bit-offset)
-			    dst (+ dst-start ,vector-data-bit-offset)
-			    length))))))))
+		   (- ,dst-end ,dst-start))))))
 
 ;;;; transforms for EQL of floating point values
 

@@ -723,6 +723,8 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
 * improved support for type intersection and union, fixing bug 12
   (e.g., now (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T) and some other
   more obscure bugs as well
+* some steps toward byte-compiling non-performance-critical
+  parts of the system, courtesy of patches from Martin Atzmueller
 * Christophe Rhodes has made some debian packages of sbcl at
   <http://www-jcsu.jesus.cam.ac.uk/ftp/pub/debian/lisp>.
   From his sbcl-devel e-mail of 2001-04-08 they're not completely
@@ -753,3 +755,5 @@ planned incompatible changes in 0.7.x:
 * MAYBE-INLINE will probably go away at some point, maybe 0.7.x,
   maybe later, in favor of the ANSI-recommended idiom for making
   a function optionally inline.
+* FASL file extensions change to ".fasl", instead of the various
+  CPU-dependent values (".x86f" etc.) inherited from CMU CL.
