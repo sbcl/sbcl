@@ -11,6 +11,44 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
+;;; TODO:
+;;;
+;;; -- documentation
+;;;
+;;; -- MV-BIND, :ASSIGNMENT
+
+;;; Problems:
+;;;
+;;; -- Constraint propagation badly interacts with bottom-up type
+;;; inference. Consider
+;;;
+;;; (defun foo (n &aux (i 42))
+;;;   (declare (optimize speed))
+;;;   (declare (fixnum n)
+;;;            #+nil (type (integer 0) i))
+;;;   (tagbody
+;;;      (setq i 0)
+;;;    :loop
+;;;      (when (>= i n) (go :exit))
+;;;      (setq i (1+ i))
+;;;      (go :loop)
+;;;    :exit))
+;;;
+;;; In this case CP cannot even infer that I is of class INTEGER.
+;;;
+;;; -- In the above example if we place the check after SETQ, CP will
+;;; fail to infer (< I FIXNUM): is does not understand that this
+;;; constraint follows from (TYPEP I (INTEGER 0 0)).
+
+;;; BUGS:
+;;;
+;;; -- this code does not check whether SET appears between REF and a
+;;; test (bug 233b)
+;;;
+;;; -- type check is assumed to be inserted immediately after a node
+;;; producing the value; it disagrees with the rest of Python (bug
+;;; 233a)
+
 (in-package "SB!C")
 
 (defstruct (constraint
@@ -20,11 +58,11 @@
   ;; the kind of constraint we have:
   ;;
   ;; TYPEP
-  ;;     X is a LAMBDA-VAR and Y is a CTYPE. The value of X is 
+  ;;     X is a LAMBDA-VAR and Y is a CTYPE. The value of X is
   ;;     constrained to be of type Y.
   ;;
   ;; > or <
-  ;;     X is a lambda-var and Y is a CTYPE. The relation holds 
+  ;;     X is a lambda-var and Y is a CTYPE. The relation holds
   ;;     between X and some object of type Y.
   ;;
   ;; EQL
@@ -34,7 +72,7 @@
   ;; The operands to the relation.
   (x nil :type lambda-var)
   (y nil :type (or ctype lambda-var constant))
-  ;; If true, negates the sense of the constraint, so the relation 
+  ;; If true, negates the sense of the constraint, so the relation
   ;; does *not* hold.
   (not-p nil :type boolean))
 
@@ -94,6 +132,8 @@
   (let ((use (continuation-use cont)))
     (when (ref-p use)
       (ok-ref-lambda-var use))))
+
+;;;; Searching constraints
 
 ;;; Add the indicated test constraint to BLOCK, marking the block as
 ;;; having a new assertion when the constriant was not already
@@ -192,42 +232,7 @@
   (setf (block-test-modified block) nil)
   (values))
 
-;;; Compute the initial flow analysis sets for BLOCK:
-;;; -- For any lambda-var ref with a type check, add that constraint.
-;;; -- For any LAMBDA-VAR set, delete all constraints on that var, and add
-;;;    those constraints to the set nuked by this block.
-(defun find-block-type-constraints (block)
-  (declare (type cblock block))
-  (let ((gen (make-sset)))
-    (collect ((kill nil adjoin))
-
-      (let ((test (block-test-constraint block)))
-	(when test
-	  (sset-union gen test)))
-
-      (do-nodes (node cont block)
-	(typecase node
-	  (ref
-	   (when (continuation-type-check cont)
-	     (let ((var (ok-ref-lambda-var node)))
-	       (when var
-		 (let* ((atype (continuation-derived-type cont))
-			(con (find-constraint 'typep var atype nil)))
-		   (sset-adjoin con gen))))))
-	  (cset
-	   (let ((var (set-var node)))
-	     (when (lambda-var-p var)
-	       (kill var)
-	       (let ((cons (lambda-var-constraints var)))
-		 (when cons
-		   (sset-difference gen cons))))))))
-
-      (setf (block-in block) nil)
-      (setf (block-gen block) gen)
-      (setf (block-kill-list block) (kill))
-      (setf (block-out block) (copy-sset gen))
-      (setf (block-type-asserted block) nil)
-      (values))))
+;;;; Applying constraints
 
 ;;; Return true if X is an integer NUMERIC-TYPE.
 (defun integer-type-p (x)
@@ -383,38 +388,157 @@
 
   (values))
 
+;;;; Flow analysis
+
+;;; Local propagation
+;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
+;;;    constraint.]
+;;; -- For any LAMBDA-VAR set, delete all constraints on that var; add
+;;;    a type constraint based on the new value type.
+(declaim (ftype (function (cblock sset
+                           &key (:ref-preprocessor function)
+                                (:set-preprocessor function))
+                          sset)
+                constraint-propagate-in-block))
+(defun constraint-propagate-in-block
+    (block gen &key ref-preprocessor set-preprocessor)
+
+  (let ((test (block-test-constraint block)))
+    (when test
+      (sset-union gen test)))
+
+  (do-nodes (node cont block)
+    (typecase node
+      (bind
+       (let ((fun (bind-lambda node)))
+         (when (eq (functional-kind fun) :let)
+           (loop with call = (continuation-dest
+                              (node-cont (first (lambda-refs fun))))
+              for var in (lambda-vars fun)
+              and val in (combination-args call)
+              when (and val
+                        (lambda-var-constraints var)
+                        ;; if VAR has no SETs, type inference is
+                        ;; fully performed by IR1 optimizer
+                        (lambda-var-sets var))
+              do (let* ((type (continuation-type val))
+                        (con (find-constraint 'typep var type nil)))
+                   (sset-adjoin con gen))))))
+      (ref
+       (let ((var (ok-ref-lambda-var node)))
+         (when var
+           (when ref-preprocessor
+             (funcall ref-preprocessor node gen))
+           (when (continuation-type-check cont)
+             (let* ((atype (continuation-derived-type cont))
+                    (con (find-constraint 'typep var atype nil)))
+               (sset-adjoin con gen))))))
+      (cset
+       (let ((var (set-var node)))
+         (when (lambda-var-p var)
+           (when set-preprocessor
+             (funcall set-preprocessor var))
+           (let ((cons (lambda-var-constraints var)))
+             (when cons
+               (sset-difference gen cons)
+               (let* ((type (node-derived-type node))
+                      (con (find-constraint 'typep var type nil)))
+                 (sset-adjoin con gen)))))))))
+
+  gen)
+
+;;; BLOCK-KILL is just a list of the LAMBDA-VARs killed, so we must
+;;; compute the kill set when there are any vars killed. We bum this a
+;;; bit by special-casing when only one var is killed, and just using
+;;; that var's constraints as the kill set. This set could possibly be
+;;; precomputed, but it would have to be invalidated whenever any
+;;; constraint is added, which would be a pain.
+(defun compute-block-out (block)
+  (declare (type cblock block))
+  (let ((in (block-in block))
+        (kill (block-kill block))
+        (out (copy-sset (block-gen block))))
+    (cond ((null kill)
+	   (sset-union out in))
+	  ((null (rest kill))
+	   (let ((con (lambda-var-constraints (first kill))))
+	     (if con
+		 (sset-union-of-difference out in con)
+		 (sset-union out in))))
+	  (t
+	   (let ((kill-set (make-sset)))
+	     (dolist (var kill)
+	       (let ((con (lambda-var-constraints var)))
+		 (when con
+		   (sset-union kill-set con))))
+	     (sset-union-of-difference out in kill-set))))
+    out))
+
+;;; Compute the initial flow analysis sets for BLOCK:
+;;; -- Compute IN/OUT sets; if OUT of a predecessor is not yet
+;;;    computed, assume it to be a universal set (this is only
+;;;    possible in a loop)
+;;;
+;;; Return T if we have found a loop.
+(defun find-block-type-constraints (block)
+  (declare (type cblock block))
+  (collect ((kill nil adjoin))
+    (let ((gen (constraint-propagate-in-block
+                block (make-sset)
+                :set-preprocessor (lambda (var)
+                                    (kill var)))))
+      (setf (block-gen block) gen)
+      (setf (block-kill block) (kill))
+      (setf (block-type-asserted block) nil)
+      (let* ((n (block-number block))
+             (pred (block-pred block))
+             (in nil)
+             (loop-p nil))
+        (dolist (b pred)
+          (cond ((> (block-number b) n)
+                 (if in
+                     (sset-intersection in (block-out b))
+                     (setq in (copy-sset (block-out b)))))
+                (t (setq loop-p t))))
+        (unless in
+          (bug "Unreachable code is found or flow graph is not ~
+                properly depth-first ordered."))
+        (setf (block-in block) in)
+        (setf (block-out block) (compute-block-out block))
+        loop-p))))
+
+;;; BLOCK-IN becomes the intersection of the OUT of the predecessors.
+;;; Our OUT is:
+;;;     gen U (in - kill)
+;;;
+;;; Return True if we have done something.
+(defun flow-propagate-constraints (block)
+  (let* ((pred (block-pred block))
+	 (in (progn (aver pred)
+                    (let ((res (copy-sset (block-out (first pred)))))
+                      (dolist (b (rest pred))
+                        (sset-intersection res (block-out b)))
+                      res))))
+    (setf (block-in block) in)
+    (let ((out (compute-block-out block)))
+      (if (sset= out (block-out block))
+          nil
+          (setf (block-out block) out)))))
+
 ;;; Deliver the results of constraint propagation to REFs in BLOCK.
 ;;; During this pass, we also do local constraint propagation by
 ;;; adding in constraints as we seem them during the pass through the
 ;;; block.
 (defun use-result-constraints (block)
   (declare (type cblock block))
-  (let ((in (block-in block)))
-
-    (let ((test (block-test-constraint block)))
-      (when test
-	(sset-union in test)))
-
-    (do-nodes (node cont block)
-      (typecase node
-	(ref
-	 (let ((var (ref-leaf node)))
-	   (when (lambda-var-p var)
-	     (let ((con (lambda-var-constraints var)))
-	       (when con
-		 (constrain-ref-type node con in)
-		 (when (continuation-type-check cont)
-		   (sset-adjoin
-		    (find-constraint 'typep var
-				     (continuation-asserted-type cont)
-				     nil)
-		    in)))))))
-	(cset
-	 (let ((var (set-var node)))
-	   (when (lambda-var-p var)
-	     (let ((cons (lambda-var-constraints var)))
-	       (when cons
-		 (sset-difference in cons))))))))))
+  (constraint-propagate-in-block
+   block (block-in block)
+   :ref-preprocessor (lambda (node cons)
+                       (let ((var (ref-leaf node)))
+                         (when (lambda-var-p var)
+                           (let ((con (lambda-var-constraints var)))
+                             (when con
+                               (constrain-ref-type node con cons))))))))
 
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different
@@ -446,48 +570,6 @@
       (dolist (let (lambda-lets fun))
 	(frob let)))))
 
-;;; BLOCK-IN becomes the intersection of the OUT of the predecessors.
-;;; Our OUT is:
-;;;     out U (in - kill)
-;;;
-;;; BLOCK-KILL-LIST is just a list of the LAMBDA-VARs killed, so we must
-;;; compute the kill set when there are any vars killed. We bum this a
-;;; bit by special-casing when only one var is killed, and just using
-;;; that var's constraints as the kill set. This set could possibly be
-;;; precomputed, but it would have to be invalidated whenever any
-;;; constraint is added, which would be a pain.
-(defun flow-propagate-constraints (block)
-  (let* ((pred (block-pred block))
-	 (in (cond (pred
-		    (let ((res (copy-sset (block-out (first pred)))))
-		      (dolist (b (rest pred))
-			(sset-intersection res (block-out b)))
-		      res))
-		   (t
-		    (let ((*compiler-error-context* (block-last block)))
-		      (compiler-warn
-		       "unreachable code in constraint ~
-			propagation -- apparent compiler bug"))
-		    (make-sset))))
-	 (kill-list (block-kill-list block))
-	 (out (block-out block)))
-
-    (setf (block-in block) in)
-    (cond ((null kill-list)
-	   (sset-union (block-out block) in))
-	  ((null (rest kill-list))
-	   (let ((con (lambda-var-constraints (first kill-list))))
-	     (if con
-		 (sset-union-of-difference out in con)
-		 (sset-union out in))))
-	  (t
-	   (let ((kill-set (make-sset)))
-	     (dolist (var kill-list)
-	       (let ((con (lambda-var-constraints var)))
-		 (when con
-		   (sset-union kill-set con))))
-	     (sset-union-of-difference (block-out block) in kill-set))))))
-
 ;;; How many blocks does COMPONENT have?
 (defun component-n-blocks (component)
   (let ((result 0))
@@ -496,7 +578,7 @@
       (incf result))
     result))
 
-(defun constraint-propagate (component)
+(defun constraint-propagate (component &aux (loop-p nil))
   (declare (type component component))
   (init-var-constraints component)
 
@@ -504,27 +586,26 @@
     (when (block-test-modified block)
       (find-test-constraints block)))
 
+  (unless (block-out (component-head component))
+    (setf (block-out (component-head component)) (make-sset)))
+
   (do-blocks (block component)
-    (cond ((block-type-asserted block)
-	   (find-block-type-constraints block))
-	  (t
-	   (setf (block-in block) nil)
-	   (setf (block-out block) (copy-sset (block-gen block))))))
+    (when (find-block-type-constraints block)
+      (setq loop-p t)))
 
-  (setf (block-out (component-head component)) (make-sset))
-
-  (let (;; If we have to propagate changes more than this many times,
-	;; something is wrong.
-	(max-n-changes-remaining (component-n-blocks component)))
-    (declare (type fixnum max-n-changes-remaining))
-    (loop (aver (plusp max-n-changes-remaining))
-	  (decf max-n-changes-remaining)
-	  (let ((did-something nil))
-	    (do-blocks (block component)
-	      (when (flow-propagate-constraints block)
-		(setq did-something t)))
-	    (unless did-something
-	      (return)))))
+  (when loop-p
+    (let (;; If we have to propagate changes more than this many times,
+          ;; something is wrong.
+          (max-n-changes-remaining (component-n-blocks component)))
+      (declare (type fixnum max-n-changes-remaining))
+      (loop (aver (>= max-n-changes-remaining 0))
+         (decf max-n-changes-remaining)
+         (let ((did-something nil))
+           (do-blocks (block component)
+             (when (flow-propagate-constraints block)
+               (setq did-something t)))
+           (unless did-something
+             (return))))))
 
   (do-blocks (block component)
     (use-result-constraints block))

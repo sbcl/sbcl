@@ -318,9 +318,9 @@
 			      (simple-string
 			       (check-for pred piece))
 			      (cons
-			       (case (car in)
+			       (case (car piece)
 				 (:character-set
-				  (check-for pred (cdr in))))))
+				  (check-for pred (cdr piece))))))
 			(return t))))
 		   (list
 		    (dolist (x in)
@@ -1474,15 +1474,9 @@ a host-structure or string."
 	  (canonicalize-logical-pathname-translations translations host))
     (setf (logical-host-translations host) translations)))
 
-;;; KLUDGE: Ordinarily known functions aren't defined recursively, and
-;;; it's common for compiler problems (e.g. missing/broken
-;;; optimization transforms) to cause them to recurse inadvertently,
-;;; so the compiler should warn about it. But the natural definition
-;;; of TRANSLATE-LOGICAL-PATHNAME *is* recursive; and we don't want
-;;; the warning, so we hide the definition of T-L-P in this
-;;; differently named function so that the compiler won't warn about
-;;; it. -- WHN 2001-09-16
-(defun %translate-logical-pathname (pathname)
+(defun translate-logical-pathname (pathname &key)
+  #!+sb-doc
+  "Translate PATHNAME to a physical pathname, which is returned."
   (declare (type pathname-designator pathname)
 	   (values (or null pathname)))
   (typecase pathname
@@ -1498,13 +1492,6 @@ a host-structure or string."
 		    (translate-pathname pathname from to)))))))
     (pathname pathname)
     (t (translate-logical-pathname (pathname pathname)))))
-
-(defun translate-logical-pathname (pathname &key)
-  #!+sb-doc
-  "Translate PATHNAME to a physical pathname, which is returned."
-  (declare (type pathname-designator pathname)
-	   (values (or null pathname)))
-  (%translate-logical-pathname pathname))
 
 (defvar *logical-pathname-defaults*
   (%make-logical-pathname (make-logical-host :name "BOGUS")

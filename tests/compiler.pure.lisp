@@ -283,3 +283,12 @@
 	 (function-lambda-expression
 	  (compile nil '(lambda (x) (block nil (print x)))))
 	 '(lambda (x) (block nil (print x)))))
+
+;;; bug 62: too cautious type inference in a loop
+(assert (nth-value
+         2
+         (compile nil
+                  '(lambda (a)
+                    (declare (optimize speed (safety 0)))
+                    (typecase a
+                      (array (loop (print (car a)))))))))

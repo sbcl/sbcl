@@ -1052,7 +1052,8 @@
   ())
 
 (defknown logical-pathname (pathname-designator) logical-pathname ())
-(defknown translate-logical-pathname (pathname-designator &key) pathname ())
+(defknown translate-logical-pathname (pathname-designator &key) pathname
+  (recursive))
 (defknown load-logical-pathname-translations (string) t ())
 (defknown logical-pathname-translations (logical-host-designator) list ())
 

@@ -1483,6 +1483,9 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     change to the DEFSTRUCT-DESCRIPTION structure, and again because
     of the new implementation of DEFINE-COMPILER-MACRO.
 
+changes in sbcl-0.7.12 relative to sbcl-0.7.11:
+  * fixed bug 62: constraints were not propagated into a loop.
+
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, maybe in 0.7.x, maybe later, it might impact TRACE. They both

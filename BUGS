@@ -293,40 +293,6 @@ WORKAROUND:
   then requesting a BACKTRACE at the debugger prompt gives no information
   about where in the user program the problem occurred.
 
-62:
-  The compiler is supposed to do type inference well enough that 
-  the declaration in
-    (TYPECASE X
-      ((SIMPLE-ARRAY SINGLE-FLOAT)
-       (LOCALLY
-         (DECLARE (TYPE (SIMPLE-ARRAY SINGLE-FLOAT) X))
-         ..))
-      ..)
-  is redundant. However, as reported by Juan Jose Garcia Ripoll for
-  CMU CL, it sometimes doesn't. Adding declarations is a pretty good
-  workaround for the problem for now, but can't be done by the TYPECASE
-  macros themselves, since it's too hard for the macro to detect
-  assignments to the variable within the clause. 
-    Note: The compiler *is* smart enough to do the type inference in
-  many cases. This case, derived from a couple of MACROEXPAND-1
-  calls on Ripoll's original test case,
-    (DEFUN NEGMAT (A)
-      (DECLARE (OPTIMIZE SPEED (SAFETY 0)))
-      (COND ((TYPEP A '(SIMPLE-ARRAY SINGLE-FLOAT)) NIL
-             (LET ((LENGTH (ARRAY-TOTAL-SIZE A)))
-               (LET ((I 0) (G2554 LENGTH))
-                 (DECLARE (TYPE REAL G2554) (TYPE REAL I))
-                 (TAGBODY
-                  SB-LOOP::NEXT-LOOP
-                  (WHEN (>= I G2554) (GO SB-LOOP::END-LOOP))
-                  (SETF (ROW-MAJOR-AREF A I) (- (ROW-MAJOR-AREF A I)))
-                  (GO SB-LOOP::NEXT-LOOP)
-                  SB-LOOP::END-LOOP))))))
-  demonstrates the problem; but the problem goes away if the TAGBODY
-  and GO forms are removed (leaving the SETF in ordinary, non-looping
-  code), or if the TAGBODY and GO forms are retained, but the 
-  assigned value becomes 0.0 instead of (- (ROW-MAJOR-AREF A I)).
-
 63:
   Paul Werkowski wrote on cmucl-imp@cons.org 2000-11-15
     I am looking into this problem that showed up on the cmucl-help

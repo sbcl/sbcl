@@ -1296,10 +1296,10 @@ code to be loaded.
 (defun loop-do-repeat ()
   (loop-disallow-conditional :repeat)
   (let ((form (loop-get-form))
-	(type 'real))
-    (let ((var (loop-make-var (gensym "LOOP-REPEAT-") form type)))
-      (push `(when (minusp (decf ,var)) (go end-loop)) *loop-before-loop*)
-      (push `(when (minusp (decf ,var)) (go end-loop)) *loop-after-body*)
+	(type 'integer))
+    (let ((var (loop-make-var (gensym "LOOP-REPEAT-") `(ceiling ,form) type)))
+      (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-before-loop*)
+      (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-after-body*)
       ;; FIXME: What should
       ;;   (loop count t into a
       ;;         repeat 3

@@ -897,7 +897,7 @@
   ;; If a local TN, the block relative number for this TN. Global TNs
   ;; whose liveness changes within a block are also assigned a local
   ;; number during the conflicts analysis of that block. If the TN has
-  ;; no local number within the block, then this is Nil.
+  ;; no local number within the block, then this is NIL.
   (local-number nil :type (or local-tn-number null))
   ;; If this object is a local TN, this slot is a bit-vector with 1
   ;; for the local-number of every TN that we conflict with.
