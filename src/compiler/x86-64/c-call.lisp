@@ -272,7 +272,7 @@
   (:generator 0
     (aver (not (location= result rsp-tn)))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (logandc2 (+ amount 7) 7)))
 	(inst mov temp
 	      (make-ea :dword
 		       :disp (+ nil-value
@@ -286,7 +286,7 @@
   (:generator 0
     (aver (not (location= result rsp-tn)))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (logandc2 (+ amount 7) 7)))
         (inst sub (make-ea :qword
                            :disp (+ nil-value
                                     (static-symbol-offset '*alien-stack*)
@@ -301,7 +301,7 @@
   #!+sb-thread
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (logandc2 (+ amount 7) 7)))
 	(inst mov temp
 	      (make-ea :dword
 			   :disp (+ nil-value
@@ -313,7 +313,7 @@
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (logandc2 (+ amount 7) 7)))
         (inst add (make-ea :qword
                            :disp (+ nil-value
                                     (static-symbol-offset '*alien-stack*)
