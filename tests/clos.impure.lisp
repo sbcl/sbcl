@@ -291,7 +291,15 @@
   (assert-program-error (defclass foo003 ()
 			  ((a :allocation :class :allocation :class))))
   (assert-program-error (defclass foo004 ()
-			  ((a :silly t)))))
+			  ((a :silly t))))
+  ;; and some more, found by Wolfhard Buss and fixed for cmucl by Gerd
+  ;; Moellmann in 0.7.8.x:
+  (assert-program-error (progn
+			  (defmethod odd-key-args-checking (&key (key 42)) key)
+			  (odd-key-args-checking 3)))
+  (assert (= (odd-key-args-checking) 42))
+  (assert (eq (odd-key-args-checking :key t) t)))
+
 
 ;;;; success
 

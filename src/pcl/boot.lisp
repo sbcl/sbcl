@@ -1088,8 +1088,9 @@ bootstrapping.
 						      ,(cadr var)))))))
 		   (rest `((,var ,args-tail)))
 		   (key (cond ((not (consp var))
-			       `((,var (get-key-arg ,(keywordicate var)
-						    ,args-tail))))
+			       `((,var (car
+					(get-key-arg-tail ,(keywordicate var)
+					                  ,args-tail)))))
 			      ((null (cddr var))
 			       (multiple-value-bind (keyword variable)
 				   (if (consp (car var))
@@ -1097,8 +1098,9 @@ bootstrapping.
 					       (cadar var))
 				       (values (keywordicate (car var))
 					       (car var)))
-				 `((,key (get-key-arg1 ',keyword ,args-tail))
-				   (,variable (if (consp ,key)
+				 `((,key (get-key-arg-tail ',keyword
+					                   ,args-tail))
+				   (,variable (if ,key
 						  (car ,key)
 						  ,(cadr var))))))
 			      (t
@@ -1108,9 +1110,10 @@ bootstrapping.
 					       (cadar var))
 				       (values (keywordicate (car var))
 					       (car var)))
-				 `((,key (get-key-arg1 ',keyword ,args-tail))
+				 `((,key (get-key-arg-tail ',keyword
+					                   ,args-tail))
 				   (,(caddr var) ,key)
-				   (,variable (if (consp ,key)
+				   (,variable (if ,key
 						  (car ,key)
 						  ,(cadr var))))))))
 		   (aux `(,var))))))
@@ -1120,15 +1123,14 @@ bootstrapping.
 	   (declare (ignorable ,args-tail))
 	   ,@body)))))
 
-(defun get-key-arg (keyword list)
-  (loop (when (atom list) (return nil))
-	(when (eq (car list) keyword) (return (cadr list)))
-	(setq list (cddr list))))
-
-(defun get-key-arg1 (keyword list)
-  (loop (when (atom list) (return nil))
-	(when (eq (car list) keyword) (return (cdr list)))
-	(setq list (cddr list))))
+(defun get-key-arg-tail (keyword list)
+  (loop for (key . tail) on list by #'cddr
+	when (null tail) do
+	  ;; FIXME: Do we want to export this symbol? Or maybe use an
+	  ;; (ERROR 'SIMPLE-PROGRAM-ERROR) form?
+	  (sb-c::%odd-key-args-error)
+	when (eq key keyword)
+	  return tail))
 
 (defun walk-method-lambda (method-lambda required-parameters env slots calls)
   (let ((call-next-method-p nil)   ; flag indicating that CALL-NEXT-METHOD
