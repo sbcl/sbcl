@@ -98,7 +98,7 @@ be terribly useful.
      it seemed due to a bug rendering FAST-READ-CHAR more-or-less
      exactly the same as READ-CHAR).
   -- nl_langinfo(CODESET) :DEFAULT processing done.
-  -- :ISO-8859-1 and :ISO-8859-15 done (Teemu Kalvas)
+  -- :ISO-8859-1 done (Teemu Kalvas)
 
 ** alter the reader and any similar data structures such that they do
 not scale linearly in size with the number of characters in the
@@ -142,6 +142,10 @@ believe that the kernel understands utf-8 for directory entries and
 the like.  Someone Who Knows might want to check this.)  This might
 make the #.(coerce "foo" 'base-string) in the filesystem / SB-UNIX
 layer go away.
+  -- done, apart from checking the kernel and checking for extra
+     coercions.
+  -- TODO: UTF16-STRING, LATIN1-STRING, LATINX-STRING.
+  -- TODO: OAOOization with stream external formats.
 
 ** possibly retain a CHAR-CODE-LIMIT = 256 build option, with
 character point encoding dependent on locale.  This requires

@@ -63,6 +63,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
 	     "SAP-ALIEN" "SHORT" "SIGNED" "SLOT" "STRUCT"
 	     "UNSIGNED"
 	     "UNSIGNED-CHAR" "UNSIGNED-INT" "UNSIGNED-LONG" "UNSIGNED-SHORT"
+             "UTF8-STRING"
 	     "VOID"
 	     "WITH-ALIEN"))
 
