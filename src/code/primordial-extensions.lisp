@@ -149,9 +149,23 @@
 ;;; producing a symbol in the current package.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun symbolicate (&rest things)
-    (values (intern (apply #'concatenate
-			   'string
-			   (mapcar #'string things))))))
+    (let ((name (case (length things)
+		  ;; why isn't this just the value in the T branch?
+		  ;; Well, this is called early in cold-init, before
+		  ;; the type system is set up; however, now that we
+		  ;; check for bad lengths, the type system is needed
+		  ;; for calls to CONCATENATE. So we need to make sure
+		  ;; that the calls are transformed away:
+		  (1 (concatenate 'string (the simple-string (string (car things)))))
+		  (2 (concatenate 'string 
+				  (the simple-string (string (car things)))
+				  (the simple-string (string (cadr things)))))
+		  (3 (concatenate 'string
+				  (the simple-string (string (car things)))
+				  (the simple-string (string (cadr things)))
+				  (the simple-string (string (caddr things)))))
+		  (t (apply #'concatenate 'string (mapcar #'string things))))))
+    (values (intern name)))))
 
 ;;; like SYMBOLICATE, but producing keywords
 (defun keywordicate (&rest things)

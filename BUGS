@@ -254,14 +254,6 @@ WORKAROUND:
 
 46:
   type safety errors reported by Peter Van Eynde July 25, 2000:
-	a: (COERCE (QUOTE (A B C)) (QUOTE (VECTOR * 4)))
-	   => #(A B C)
-	   In general lengths of array type specifications aren't
-	   checked by COERCE, so it fails when the spec is
-	   (VECTOR 4), (STRING 2), (SIMPLE-BIT-VECTOR 3), or whatever.
-	b: CONCATENATE has the same problem of not checking the length
-	   of specified output array types. MAKE-SEQUENCE and MAP and
-	   MERGE also have the same problem.
 	c: (COERCE 'AND 'FUNCTION) returns something related to
 	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
 	h: (MAKE-CONCATENATED-STREAM (MAKE-STRING-OUTPUT-STREAM))
@@ -370,26 +362,6 @@ WORKAROUND:
   that the user, and therefore the pretty-printer thinks that
   the new output block should start indented 2 or more characters
   rightward of the correct location.
-
-66:
-  ANSI specifies that the RESULT-TYPE argument of CONCATENATE must be
-  a subtype of SEQUENCE, but CONCATENATE doesn't check this properly:
-    (CONCATENATE 'SIMPLE-ARRAY #(1 2) '(3)) => #(1 2 3)
-  This also leads to funny behavior when derived type specifiers
-  are used, as originally reported by Milan Zamazal for CMU CL (on the
-  Debian bugs mailing list (?) 2000-02-27), then reported by Martin
-  Atzmueller for SBCL (2000-10-01 on sbcl-devel@lists.sourceforge.net):
-    (DEFTYPE FOO () 'SIMPLE-ARRAY)
-    (CONCATENATE 'FOO #(1 2) '(3)) 
-      => #<ARRAY-TYPE SIMPLE-ARRAY> is a bad type specifier for
-           sequence functions.
-  The derived type specifier FOO should act the same way as the 
-  built-in type SIMPLE-ARRAY here, but it doesn't. That problem
-  doesn't seem to exist for sequence types:
-    (DEFTYPE BAR () 'SIMPLE-VECTOR)
-    (CONCATENATE 'BAR #(1 2) '(3)) => #(1 2 3)
-  See also bug #46a./b., and discussion and patch sbcl-devel and
-  cmucl-imp 2002-07
 
 67:
   As reported by Winton Davies on a CMU CL mailing list 2000-01-10,

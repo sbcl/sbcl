@@ -652,10 +652,12 @@
 ;;; %CONCATENATE (with a DEFTRANSFORM to translate constant RTYPE to
 ;;; CTYPE before calling %CONCATENATE) which is comparably efficient,
 ;;; at least once DYNAMIC-EXTENT works.
-#+nil ; FIXME: currently commented out because of bug 188
+;;;
+;;; FIXME: currently KLUDGEed because of bug 188
 (deftransform concatenate ((rtype &rest sequences)
 			   (t &rest simple-string)
-			   simple-string)
+			   simple-string
+			   :policy (< safety 3))
   (collect ((lets)
 	    (forms)
 	    (all-lengths)
@@ -670,16 +672,19 @@
 	(forms `(bit-bash-copy ,n-seq ,vector-data-bit-offset
 			       res start
 			       ,n-length))
-	(forms `(setq start (+ start ,n-length)))))
+	(forms `(setq start (opaque-identity (+ start ,n-length))))))
     `(lambda (rtype ,@(args))
        (declare (ignore rtype))
-       (let* (,@(lets)
-	      (res (make-string (truncate (the index (+ ,@(all-lengths)))
-					  sb!vm:n-byte-bits)))
-	      (start ,vector-data-bit-offset))
-	 (declare (type index start ,@(all-lengths)))
-	 ,@(forms)
-	 res))))
+       ;; KLUDGE
+       (flet ((opaque-identity (x) x))
+	 (declare (notinline opaque-identity))
+	 (let* (,@(lets)
+		  (res (make-string (truncate (the index (+ ,@(all-lengths)))
+					      sb!vm:n-byte-bits)))
+		  (start ,vector-data-bit-offset))
+	   (declare (type index start ,@(all-lengths)))
+	   ,@(forms)
+	   res)))))
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 

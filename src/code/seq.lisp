@@ -26,7 +26,7 @@
 ;;;
 ;;; FIXME: It might be worth making three cases here, LIST,
 ;;; SIMPLE-VECTOR, and VECTOR, instead of the current LIST and VECTOR.
-;;; It tend to make code run faster but be bigger; some benchmarking
+;;; It tends to make code run faster but be bigger; some benchmarking
 ;;; is needed to decide.
 (sb!xc:defmacro seq-dispatch (sequence list-form array-form)
   `(if (listp ,sequence)
@@ -36,11 +36,28 @@
 (sb!xc:defmacro make-sequence-like (sequence length)
   #!+sb-doc
   "Return a sequence of the same type as SEQUENCE and the given LENGTH."
-  `(make-sequence-of-type (type-of ,sequence) ,length))
+  (let ((type (gensym "TYPE-")))
+    `(if *type-system-initialized*
+	 (let ((,type (specifier-type (type-of ,sequence))))
+	   (if (csubtypep ,type (specifier-type 'list))
+	       (make-sequence 'list ,length)
+	     (progn
+	       (aver (csubtypep ,type (specifier-type 'vector)))
+	       (aver (array-type-p ,type))
+	       (setf (array-type-dimensions ,type) (list '*))
+	       (make-sequence (type-specifier ,type) ,length))))
+         (if (typep ,sequence 'string)
+	     (make-string ,length)
+	     (error "MAKE-SEQUENCE-LIKE on non-STRING too early in cold-init")))))
 
-(sb!xc:defmacro type-specifier-atom (type)
-  #!+sb-doc "Return the broad class of which TYPE is a specific subclass."
-  `(if (atom ,type) ,type (car ,type)))
+(sb!xc:defmacro bad-sequence-type-error (type-spec)
+  `(error 'simple-type-error
+          :datum ,type-spec
+          ;; FIXME: This is actually wrong, and should be something
+          ;; like (SATISFIES IS-A-VALID-SEQUENCE-TYPE-SPECIFIER-P).
+          :expected-type 'sequence
+          :format-control "~S is a bad type specifier for sequences."
+          :format-arguments (list ,type-spec)))
 
 ) ; EVAL-WHEN
 
@@ -69,33 +86,6 @@
 	      (vector-of-checked-length-given-length sequence
 						     declared-length))))))
 
-;;; Given an arbitrary type specifier, return a sane sequence type
-;;; specifier that we can directly match.
-(defun result-type-or-lose (type &optional nil-ok)
-  (let ((type (specifier-type type)))
-    (cond
-      ((eq type *empty-type*)
-       (if nil-ok
-	   nil
-	   (error 'simple-type-error
-		  :datum type
-		  :expected-type '(or vector cons)
-		  :format-control
-		  "A NIL output type is invalid for this sequence function."
-		  :format-arguments ())))
-      ((dolist (seq-type '(list string simple-vector bit-vector))
-	 (when (csubtypep type (specifier-type seq-type))
-	   (return seq-type))))
-      ((csubtypep type (specifier-type 'vector))
-       (type-specifier type))
-      (t
-       (error 'simple-type-error
-	      :datum type
-	      :expected-type 'sequence
-	      :format-control
-	      "~S is not a legal type specifier for sequence functions."
-	      :format-arguments (list type))))))
-
 (defun signal-index-too-large-error (sequence index)
   (let* ((length (length sequence))
 	 (max-index (and (plusp length)
@@ -117,22 +107,6 @@
 			      `(integer 0 ,max-end)
 			      ;; This seems silly, is there something better?
 			      '(integer (0) 0)))))
-
-(defun make-sequence-of-type (type length)
-  #!+sb-doc "Return a sequence of the given TYPE and LENGTH."
-  (declare (fixnum length))
-  (case (type-specifier-atom type)
-    (list (make-list length))
-    ((bit-vector simple-bit-vector) (make-array length :element-type '(mod 2)))
-    ((string simple-string base-string simple-base-string)
-     (make-string length))
-    (simple-vector (make-array length))
-    ((array simple-array vector)
-     (if (listp type)
-	 (make-array length :element-type (cadr type))
-	 (make-array length)))
-    (t
-     (make-sequence-of-type (result-type-or-lose type) length))))
 
 (defun elt (sequence index)
   #!+sb-doc "Return the element of SEQUENCE specified by INDEX."
@@ -180,42 +154,42 @@
   (let ((type (specifier-type type)))
     (cond ((csubtypep type (specifier-type 'list))
 	   (make-list length :initial-element initial-element))
-	  ((csubtypep type (specifier-type 'string))
-	   (if iep
-	       (make-string length :initial-element initial-element)
-	       (make-string length)))
-	  ((csubtypep type (specifier-type 'simple-vector))
-	   (make-array length :initial-element initial-element))
-	  ((csubtypep type (specifier-type 'bit-vector))
-	   (if iep
-	       (make-array length :element-type '(mod 2)
-			   :initial-element initial-element)
-	       (make-array length :element-type '(mod 2))))
 	  ((csubtypep type (specifier-type 'vector))
 	   (if (typep type 'array-type)
-	       (let ((etype (type-specifier
-			     (array-type-specialized-element-type type)))
-		     (vlen (car (array-type-dimensions type))))
-		 (if (and (numberp vlen) (/= vlen length))
-		   (error 'simple-type-error
-			  ;; These two are under-specified by ANSI.
-			  :datum (type-specifier type)
-			  :expected-type (type-specifier type)
-			  :format-control
-			  "The length of ~S does not match the specified ~
-                           length=~S."
-			  :format-arguments
-			  (list (type-specifier type) length)))
-		 (if iep
-		     (make-array length :element-type etype
-				 :initial-element initial-element)
-		     (make-array length :element-type etype)))
-	       (make-array length :initial-element initial-element)))
-	  (t (error 'simple-type-error
-		    :datum type
-		    :expected-type 'sequence
-		    :format-control "~S is a bad type specifier for sequences."
-		    :format-arguments (list type))))))
+	       ;; KLUDGE: the above test essentially asks "Do we know
+	       ;; what the upgraded-array-element-type is?" [consider
+	       ;; (OR STRING BIT-VECTOR)]
+	       (progn
+		 (aver (= (length (array-type-dimensions type)) 1))
+		 (let ((etype (type-specifier
+			       (array-type-specialized-element-type type)))
+		       (type-length (car (array-type-dimensions type))))
+		   (unless (or (eq type-length '*)
+			       (= type-length length))
+		     (error 'simple-type-error
+			    :datum length
+			    :expected-type `(eql ,type-length)
+			    :format-control "The length requested (~S) ~
+                            does not match the length type restriction in ~S."
+			    :format-arguments (list length 
+						    (type-specifier type))))
+		   ;; FIXME: These calls to MAKE-ARRAY can't be
+		   ;; open-coded, as the :ELEMENT-TYPE argument isn't
+		   ;; constant.  Probably we ought to write a
+		   ;; DEFTRANSFORM for MAKE-SEQUENCE.  -- CSR,
+		   ;; 2002-07-22
+		   (if iep
+		       (make-array length :element-type etype
+				   :initial-element initial-element)
+		       (make-array length :element-type etype))))
+	       ;; We have a subtype of VECTOR, but it isn't an array
+	       ;; type.  Maybe this should be a BUG instead?
+	       (error 'simple-type-error
+		      :datum type
+		      :expected-type 'sequence
+		      :format-control "~S is too hairy for MAKE-SEQUENCE."
+		      :format-arguments (list (type-specifier type)))))
+	  (t (bad-sequence-type-error (type-specifier type))))))
 
 ;;;; SUBSEQ
 ;;;;
@@ -272,11 +246,11 @@
 
 (eval-when (:compile-toplevel :execute)
 
-(sb!xc:defmacro vector-copy-seq (sequence type)
+(sb!xc:defmacro vector-copy-seq (sequence)
   `(let ((length (length (the vector ,sequence))))
      (declare (fixnum length))
      (do ((index 0 (1+ index))
-	  (copy (make-sequence-of-type ,type length)))
+	  (copy (make-sequence-like ,sequence length)))
 	 ((= index length) copy)
        (declare (fixnum index))
        (setf (aref copy index) (aref ,sequence index)))))
@@ -306,16 +280,7 @@
 
 (defun vector-copy-seq* (sequence)
   (declare (type vector sequence))
-  (vector-copy-seq sequence
-		   (typecase sequence
-		     ;; Pick off the common cases so that we don't have to... 
-		     ((vector t) 'simple-vector)
-		     (string 'simple-string)
-		     (bit-vector 'simple-bit-vector)
-		     ((vector single-float) '(simple-array single-float 1))
-		     ((vector double-float) '(simple-array double-float 1))
-		     ;; ...do a full call to TYPE-OF.
-		     (t (type-of sequence)))))
+  (vector-copy-seq sequence))
 
 ;;;; FILL
 
@@ -498,7 +463,7 @@
      (declare (fixnum length))
      (do ((forward-index 0 (1+ forward-index))
 	  (backward-index (1- length) (1- backward-index))
-	  (new-sequence (make-sequence-of-type ,type length)))
+	  (new-sequence (make-sequence ,type length)))
 	 ((= forward-index length) new-sequence)
        (declare (fixnum forward-index backward-index))
        (setf (aref new-sequence forward-index)
@@ -597,7 +562,7 @@
 	(do ((sequences ,sequences (cdr sequences))
 	     (lengths lengths (cdr lengths))
 	     (index 0)
-	     (result (make-sequence-of-type ,output-type-spec total-length)))
+	     (result (make-sequence ,output-type-spec total-length)))
 	    ((= index total-length) result)
 	  (declare (fixnum index))
 	  (let ((sequence (car sequences)))
@@ -620,24 +585,19 @@
 
 ) ; EVAL-WHEN
 
-;;; FIXME: Make a compiler macro or transform for this which efficiently
-;;; handles the case of constant 'STRING first argument. (It's not just time
-;;; efficiency, but space efficiency..)
 (defun concatenate (output-type-spec &rest sequences)
   #!+sb-doc
   "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
   specified OUTPUT-TYPE-SPEC."
-  (case (type-specifier-atom output-type-spec)
-    ((simple-vector simple-string vector string array simple-array
-		    bit-vector simple-bit-vector base-string
-		    simple-base-string) ; FIXME: unifying principle here?
-     (let ((result (apply #'concat-to-simple* output-type-spec sequences)))
-       #!+high-security (aver (typep result output-type-spec))
-       result))
-    (list (apply #'concat-to-list* sequences))
+  (let ((type (specifier-type output-type-spec)))
+  (cond
+    ((csubtypep type (specifier-type 'vector))
+     (apply #'concat-to-simple* output-type-spec sequences))
+    ((csubtypep type (specifier-type 'list))
+     (apply #'concat-to-list* sequences))
     (t
-     (apply #'concatenate (result-type-or-lose output-type-spec) sequences))))
+     (bad-sequence-type-error output-type-spec)))))
 
 ;;; internal frobs
 ;;; FIXME: These are weird. They're never called anywhere except in
@@ -757,7 +717,7 @@
 		       (declare (type index counter))))))
       (declare (type index min-len))
       (with-map-state sequences
-	(let ((result (make-sequence-of-type output-type-spec min-len))
+	(let ((result (make-sequence output-type-spec min-len))
 	      (index 0))
 	  (declare (type index index))
 	  (loop with updated-map-apply-args
@@ -786,7 +746,8 @@
 ;;; length of the output sequence matches any length specified
 ;;; in RESULT-TYPE.
 (defun %map (result-type function first-sequence &rest more-sequences)
-  (let ((really-fun (%coerce-callable-to-fun function)))
+  (let ((really-fun (%coerce-callable-to-fun function))
+	(type (specifier-type result-type)))
     ;; Handle one-argument MAP NIL specially, using ETYPECASE to turn
     ;; it into something which can be DEFTRANSFORMed away. (It's
     ;; fairly important to handle this case efficiently, since
@@ -799,36 +760,21 @@
 	;; approach, consing O(N-ARGS) temporary storage (which can have
 	;; DYNAMIC-EXTENT), then using O(N-ARGS * RESULT-LENGTH) time.
 	(let ((sequences (cons first-sequence more-sequences)))
-	  (case (type-specifier-atom result-type)
-	    ((nil) (%map-for-effect really-fun sequences))
-	    (list (%map-to-list really-fun sequences))
-	    ((simple-vector simple-string vector string array simple-array
-	      bit-vector simple-bit-vector base-string simple-base-string)
+	  (cond
+	    ((eq type *empty-type*) (%map-for-effect really-fun sequences))
+	    ((csubtypep type (specifier-type 'list))
+	     (%map-to-list really-fun sequences))
+	    ((csubtypep type (specifier-type 'vector))
 	     (%map-to-vector result-type really-fun sequences))
 	    (t
-	     (apply #'map
-		    (result-type-or-lose result-type t)
-		    really-fun
-		    sequences)))))))
+	     (bad-sequence-type-error result-type)))))))
 
 (defun map (result-type function first-sequence &rest more-sequences)
-  (sequence-of-checked-length-given-type (apply #'%map
-						result-type
-						function
-						first-sequence
-						more-sequences)
-					 ;; (The RESULT-TYPE isn't
-					 ;; strictly the type of the
-					 ;; result, because when
-					 ;; RESULT-TYPE=NIL, the result
-					 ;; actually has NULL type. But
-					 ;; that special case doesn't
-					 ;; matter here, since we only
-					 ;; look closely at vector
-					 ;; types; so we can just pass
-					 ;; RESULT-TYPE straight through
-					 ;; as a type specifier.)
-					 result-type))
+  (apply #'%map
+	 result-type
+	 function
+	 first-sequence
+	 more-sequences))
 
 ;;; KLUDGE: MAP has been rewritten substantially since the fork from
 ;;; CMU CL in order to give reasonable performance, but this

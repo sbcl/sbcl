@@ -33,14 +33,30 @@
 #!+sb-show (defvar */show* t)
 
 (defun cannot-/show (string)
+  (declare (type simple-string string))
   #+sb-xc-host (error "can't /SHOW: ~A" string)
   ;; We end up in this situation when we execute /SHOW too early in
   ;; cold init. That happens to me often enough that it's really
   ;; annoying for it to cause a hard failure -- which at that point is
   ;; hard to recover from -- instead of just diagnostic output.
-  #-sb-xc-host (sb!sys:%primitive
-		print
-		(concatenate 'string "/can't /SHOW: " string))
+  ;;
+  ;; FIXME: The following is what we'd like to have. However,
+  ;; including it as is causes compilation of make-host-2 to fail,
+  ;; with "caught WARNING: defining setf macro for AREF when (SETF
+  ;; AREF) was previously treated as a function" during compilation of
+  ;; defsetfs.lisp
+  ;; 
+  ;; #-sb-xc-host (sb!sys:%primitive print
+  ;;				  (concatenate 'simple-string "/can't /SHOW:" string))
+  ;;
+  ;; because the CONCATENATE is transformed to an expression involving
+  ;; (SETF AREF). Not declaring the argument as a SIMPLE-STRING (or
+  ;; otherwise inhibiting the transform; e.g. with (SAFETY 3)) would
+  ;; help, but full calls to CONCATENATE don't work this early in
+  ;; cold-init, because they now need the full assistance of the type
+  ;; system. So (KLUDGE):
+  #-sb-xc-host (sb!sys:%primitive print "/can't /SHOW:")
+  #-sb-xc-host (sb!sys:%primitive print string)
   (values))
 
 ;;; Should /SHOW output be suppressed at this point?

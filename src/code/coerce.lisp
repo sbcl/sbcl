@@ -27,21 +27,11 @@
 			   (:list '(pop in-object))
 			   (:vector '(aref in-object index))))))))
 
-  (def list-to-simple-string* (make-string length) schar :list)
-
-  (def list-to-bit-vector* (make-array length :element-type '(mod 2))
-    sbit :list)
-
-  (def list-to-vector* (make-sequence-of-type type length)
+  (def list-to-vector* (make-sequence type length)
     aref :list t)
 
-  (def vector-to-vector* (make-sequence-of-type type length)
-    aref :vector t)
-
-  (def vector-to-simple-string* (make-string length) schar :vector)
-
-  (def vector-to-bit-vector* (make-array length :element-type '(mod 2))
-    sbit :vector))
+  (def vector-to-vector* (make-sequence type length)
+    aref :vector t))
 
 (defun vector-to-list* (object)
   (let ((result (list nil))
@@ -53,24 +43,6 @@
       (declare (fixnum index))
       (rplacd splice (list (aref object index))))))
 
-(defun string-to-simple-string* (object)
-  (if (simple-string-p object)
-      object
-      (with-array-data ((data object)
-			(start)
-			(end (length object)))
-	(declare (simple-string data))
-	(subseq data start end))))
-
-(defun bit-vector-to-simple-bit-vector* (object)
-  (if (simple-bit-vector-p object)
-      object
-      (with-array-data ((data object)
-			(start)
-			(end (length object)))
-	(declare (simple-bit-vector data))
-	(subseq data start end))))
-
 (defvar *offending-datum*); FIXME: Remove after debugging COERCE.
 
 ;;; These are used both by the full DEFUN function and by various
@@ -80,7 +52,7 @@
 ;;; argument type is known. It might be better to do this with
 ;;; DEFTRANSFORMs, though.
 (declaim (inline coerce-to-list))
-(declaim (inline coerce-to-simple-string coerce-to-bit-vector coerce-to-vector))
+(declaim (inline coerce-to-vector))
 (defun coerce-to-fun (object)
   ;; (Unlike the other COERCE-TO-FOOs, this one isn't inline, because
   ;; it's so big and because optimizing away the outer ETYPECASE
@@ -116,22 +88,11 @@
 				   cons)
 	       :format-control "~S can't be coerced to a function."
 	       :format-arguments (list object)))))))
+
 (defun coerce-to-list (object)
   (etypecase object
     (vector (vector-to-list* object))))
-(defun coerce-to-simple-string (object)
-  (etypecase object
-    (list (list-to-simple-string* object))
-    (string (string-to-simple-string* object))
-    (vector (vector-to-simple-string* object))))
-(defun coerce-to-bit-vector (object)
-  (etypecase object
-    (list (list-to-bit-vector* object))
-    (vector (vector-to-bit-vector* object))))
-(defun coerce-to-simple-vector (x)
-  (if (simple-vector-p x)
-      x
-      (replace (make-array (length x)) x)))
+
 (defun coerce-to-vector (object output-type-spec)
   (etypecase object
     (list (list-to-vector* object output-type-spec))
@@ -145,10 +106,7 @@
 	   (/show0 "entering COERCE-ERROR")
 	   (error 'simple-type-error
 		  :format-control "~S can't be converted to type ~S."
-		  :format-arguments (list object output-type-spec)))
-	 (check-result (result)
-	   #!+high-security (aver (typep result output-type-spec))
-	   result))
+		  :format-arguments (list object output-type-spec))))
     (let ((type (specifier-type output-type-spec)))
       (cond
 	((%typep object output-type-spec)
@@ -236,28 +194,12 @@
 	 (if (vectorp object)
 	     (vector-to-list* object)
 	     (coerce-error)))
-	((csubtypep type (specifier-type 'string))
-	 (check-result
-	  (typecase object
-	    (list (list-to-simple-string* object))
-	    (string (string-to-simple-string* object))
-	    (vector (vector-to-simple-string* object))
-	    (t
-	     (coerce-error)))))
-	((csubtypep type (specifier-type 'bit-vector))
-	 (check-result
-	  (typecase object
-	    (list (list-to-bit-vector* object))
-	    (vector (vector-to-bit-vector* object))
-	    (t
-	     (coerce-error)))))
 	((csubtypep type (specifier-type 'vector))
-	 (check-result
-	  (typecase object
-	    (list (list-to-vector* object output-type-spec))
-	    (vector (vector-to-vector* object output-type-spec))
-	    (t
-	     (coerce-error)))))
+	 (typecase object
+	   (list (list-to-vector* object output-type-spec))
+	   (vector (vector-to-vector* object output-type-spec))
+	   (t
+	    (coerce-error))))
 	(t
 	 (coerce-error))))))
 

@@ -540,8 +540,7 @@
 	     ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
 	     ((csubtypep tspec (specifier-type 'float))
 	      '(%single-float x))
-	     ((csubtypep tspec (specifier-type 'simple-vector))
-	      '(coerce-to-simple-vector x))
+	     ;; FIXME: VECTOR types?
 	     (t
 	      (give-up-ir1-transform)))))))
 
