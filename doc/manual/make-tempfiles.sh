@@ -1,7 +1,6 @@
 #!/bin/sh
 
 # Create Texinfo snippets from the documentation of exported symbols.
-# Also create contrib-docs.texi-temp to include documentation in contrib/.
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -41,9 +40,6 @@ DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 
 echo /creating docstring snippets from SBCL=\'$SBCLRUNTIME\' for packages \'$PACKAGES\'
 echo "(progn (load \"docstrings.lisp\") (dolist (module (quote ($MODULES))) (require module)) (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL
-
-echo /creating contrib-docs.texi-temp
-echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL
 
 echo /creating package-locks.texi-temp
 if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-ext))) (quit :unix-status (if (and plp (fboundp plp)) 0 1)))";

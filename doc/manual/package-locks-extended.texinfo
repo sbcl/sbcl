@@ -1,6 +1,4 @@
-@node Package Locks
-@comment  node-name,  next,  previous,  up
-@chapter Package Locks
+@cindex Packages, locked
 
 None of the following sections apply to SBCL built without package
 locksing support.

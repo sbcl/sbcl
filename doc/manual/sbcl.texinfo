@@ -56,31 +56,114 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @insertcopying
 
 @menu
-* Introduction::
-* The Compiler::
-* The Debugger::
-* Efficiency::
-* Beyond The ANSI Standard::
-* The Foreign Function Interface::
-* Package Locks::
-* Contributed Modules::
-* Concept Index::
-* Function Index::
-* Variable Index::
-* Type Index::
-* Colophon::
+* Introduction::                
+* Compiler::                    
+* Debugger::                    
+* Efficiency::                  
+* Beyond the ANSI Standard::    
+* Foreign Function Interface::  
+* Extensible Streams::          
+* Package Locks::               
+* Networking::                  
+* Profiling::                   
+* Contributed Modules::         
+* Concept Index::               
+* Function Index::              
+* Variable Index::              
+* Type Index::                  
+* Colophon::                    
 @end menu
 
 @end ifnottex
 
+@node Introduction
+@comment  node-name,  next,  previous,  up
+@chapter Introduction
 @include intro.texinfo
+
+@node Compiler
+@comment  node-name,  next,  previous,  up
+@chapter Compiler
 @include compiler.texinfo
+
+@node Debugger
+@comment  node-name,  next,  previous,  up
+@chapter Debugger
 @include debugger.texinfo
+
+@node Efficiency
+@comment  node-name,  next,  previous,  up
+@chapter Efficiency
 @include efficiency.texinfo
+
+@node  Beyond the ANSI Standard
+@comment  node-name,  next,  previous,  up
+@chapter Beyond the ANSI Standard
 @include beyond-ansi.texinfo
+
+@node  Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@chapter Foreign Function Interface
 @include ffi.texinfo
+
+@node Extensible Streams
+@comment  node-name,  next,  previous,  up
+@chapter Extensible Streams
+@include streams.texinfo
+
+@node Package Locks
+@comment  node-name,  next,  previous,  up
+@chapter Package Locks
 @include package-locks.texi-temp
+
+@node Networking
+@comment  node-name,  next,  previous,  up
+@chapter Networking
+@include sb-bsd-sockets/sb-bsd-sockets.texinfo
+
+@node Profiling
+@comment  node-name,  next,  previous,  up
+@chapter Profiling
+@include profiling.texinfo
+
+@node Contributed Modules
+@comment  node-name,  next,  previous,  up
+@chapter Contributed Modules
 @include contrib-modules.texinfo
-@include backmatter.texinfo
+
+@node Concept Index
+@comment  node-name,  next,  previous,  up
+@appendix Concept Index
+@printindex cp
+
+@node Function Index
+@comment  node-name,  next,  previous,  up
+@appendix Function Index
+@printindex fn
+
+@node Variable Index
+@comment  node-name,  next,  previous,  up
+@appendix Variable Index
+@printindex vr
+
+@node Type Index
+@comment  node-name,  next,  previous,  up
+@appendix Type Index
+@printindex tp
+
+@node Colophon
+@comment  node-name,  next,  previous,  up
+@unnumbered Colophon
+
+This manual is maintained in Texinfo, and automatically translated
+into other forms (e.g. HTML or pdf). If you're @emph{reading} this
+manual in one of these non-Texinfo translated forms, that's fine, but
+if you want to @emph{modify} this manual, you are strongly advised to
+seek out a Texinfo version and modify that instead of modifying a
+translated version. Even better might be to seek out @emph{the}
+Texinfo version (maintained at the time of this writing as part of the
+SBCL project at @uref{http://sbcl.sourceforge.net/}) and submit a
+patch.
+
 
 @bye

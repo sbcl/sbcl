@@ -1,0 +1,29 @@
+@cindex Profiling
+
+SBCL includes both an accurate profiler, that can collect statistics
+on individual functions, and a more ``modern'' statistical profiler.
+
+Inlined functions do not appear in the results reported by either.
+
+@menu
+* Accurate Profiler::           
+* Statistical Profiler::        
+@end menu
+
+@node Accurate Profiler
+@comment  node-name,  next,  previous,  up
+@section Accurate Profiler
+@cindex Profiling, accurate
+
+The package @code{sb-profile} provides a classic, per-function-call
+profiler.
+
+@include macro-sb-profile-profile.texinfo
+@include macro-sb-profile-unprofile.texinfo
+@include fun-sb-profile-report.texinfo
+@include fun-sb-profile-reset.texinfo
+
+@node Statistical Profiler
+@comment  node-name,  next,  previous,  up
+@section Statistical Profiler
+@include sb-sprof/sb-sprof.texinfo

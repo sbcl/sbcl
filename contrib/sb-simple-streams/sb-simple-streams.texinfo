@@ -1,0 +1,25 @@
+Simple streams are an extensible streams protocol that avoids some
+problems with Gray streams.
+
+Documentation about simple streams is available at:
+
+@uref{http://www.franz.com/support/documentation/6.2/doc/streams.htm}
+
+The implementation should be considered Alpha-quality; the basic
+framework is there, but many classes are just stubs at the moment. 
+
+See @file{SYS:CONTRIB;SB-SIMPLE-STREAMS;SIMPLE-STREAM-TEST.LISP} for
+things that should work.
+
+Known differences to the ACL behaviour:
+
+@itemize
+
+@item
+@code{open} not return a simple-stream by default. This can be
+adjusted; see default-open-class in the file cl.lisp
+
+@item
+@code{write-vector} is unimplemented.
+
+@end itemize

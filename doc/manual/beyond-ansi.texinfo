@@ -1,7 +1,3 @@
-@node  Beyond The ANSI Standard
-@comment  node-name,  next,  previous,  up
-@chapter Beyond The ANSI Standard
-
 SBCL is mostly an implementation of the ANSI standard for
 Common Lisp. However, there's some important behavior which extends
 or clarifies the standard, and various behavior which outright
@@ -38,7 +34,7 @@ implementation.
 Declarations are generally treated as assertions. This general
 principle, and its implications, and the bugs which still keep the
 compiler from quite satisfying this principle, are discussed in
-@ref{The Compiler}.
+@ref{Compiler}.
 
 SBCL is essentially a compiler-only implementation of Common
 Lisp. That is, for all but a few special cases, @code{eval} creates a
@@ -130,8 +126,8 @@ it still has quite a few.  @xref{Contributed Modules}.
 @comment  node-name,  next,  previous,  up
 @subsection Things Which Might Be In The Next ANSI Standard
 
-SBCL provides extensive support for calling external C code, @ref{The
-Foreign Function Interface}.
+SBCL provides extensive support for calling external C code,
+@ref{Foreign Function Interface}.
 
 SBCL provides additional garbage collection functionality not
 specified by ANSI. Weak pointers allow references to objects to be
@@ -417,8 +413,7 @@ SBCL provides a profiler and other extensions to the ANSI @code{trace}
 facility.  For more information, see @ref{macro-common-lisp-trace}.
 
 The debugger supports a number of options. Its documentation is
-accessed by typing @kbd{help} at the debugger prompt.  @xref{The
-Debugger}.
+accessed by typing @kbd{help} at the debugger prompt. @xref{Debugger}.
 
 Documentation for @code{inspect} is accessed by typing @kbd{help} at
 the @code{inspect} prompt.

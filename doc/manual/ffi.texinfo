@@ -1,7 +1,3 @@
-@node    The Foreign Function Interface
-@comment  node-name,  next,  previous,  up
-@chapter The Foreign Function Interface
-
 This chapter describes SBCL's interface to C programs and
 libraries (and, since C interfaces are a sort of @emph{ingua
 franca} of the Unix world, to other programs and libraries in

@@ -1,4 +1,3 @@
-
 DOCFILES:=$(shell echo *.texinfo)
 ROOTFILE:=sbcl.texinfo
 TMPFILES:=sbcl.aux sbcl.cp sbcl.fn sbcl.ky sbcl.log sbcl.pg sbcl.toc sbcl.tp sbcl.vr
@@ -13,6 +12,7 @@ HTMLDIR=$(basename $(ROOTFILE))
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
 # Lisp's `pathname' function).
 DOCSTRINGDIR="docstrings/"
+I_FLAGS=-I $(DOCSTRINGDIR) -I ../../contrib/
 # List of contrib modules that docstring docs will be created for.
 # FIXME: should check test-passed and not load them.
 MODULES=':sb-md5 :sb-rotate-byte :sb-grovel :sb-sprof :sb-bsd-sockets'
@@ -47,7 +47,7 @@ html: html-stamp
 
 html-stamp: variables $(DOCFILES) docstrings
 	@rm -rf $(HTMLDIR)
-	$(MAKEINFO) -I $(DOCSTRINGDIR) --html $(ROOTFILE)
+	$(MAKEINFO) $(I_FLAGS) --html $(ROOTFILE)
 	touch html-stamp
 
 # Postscript documentation
@@ -58,21 +58,21 @@ $(PSFILE): $(DVIFILE)
 	dvips -o $@ $<
 
 $(DVIFILE): variables $(DOCFILES) docstrings
-	texi2dvi -I $(DOCSTRINGDIR) $(ROOTFILE)
+	texi2dvi $(I_FLAGS) $(ROOTFILE)
 
 # PDF documentation
 .PHONY: pdf
 pdf: $(PDFFILE)
 
 $(PDFFILE): variables $(DOCFILES) docstrings
-	texi2pdf -I $(DOCSTRINGDIR) $(ROOTFILE)
+	texi2pdf $(I_FLAGS) $(ROOTFILE)
 
 # info docfiles
 .PHONY: info
 info: $(INFOFILE)
 
 $(INFOFILE): variables $(DOCFILES) docstrings
-	$(MAKEINFO) -I $(DOCSTRINGDIR) $(ROOTFILE)
+	$(MAKEINFO) $(I_FLAGS) $(ROOTFILE)
 
 # contrib-modules.texinfo includes contrib-doc-list.texi-temp
 contrib-modules.texinfo: tempfiles-stamp

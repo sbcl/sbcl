@@ -1,10 +1,11 @@
-@node sb-bsd-sockets
-@section sb-bsd-sockets
+@c This currently appears in the manual as a chapter: if a
+@c higher-level interface appear, it will make sense to lower this
+@c into a section.
 @cindex Sockets, Networking
 
-The @code{sb-bsd-sockets} module provides a thinly disguised BSD socket
-API for SBCL. Ideas stolen from the BSD socket API for C and Graham
-Barr's IO::Socket classes for Perl.
+The @code{sb-bsd-sockets} module provides a thinly disguised BSD
+socket API for SBCL. Ideas have been stolen from the BSD socket API
+for C and Graham Barr's IO::Socket classes for Perl.
 
 Sockets are represented as CLOS objects, and the API naming
 conventions attempt to balance between the BSD names and good lisp style.
@@ -19,7 +20,7 @@ conventions attempt to balance between the BSD names and good lisp style.
 @end menu
 
 @node Sockets Overview
-@subsection Sockets Overview
+@section Sockets Overview
 
 Most of the functions are modelled on the BSD socket API.  BSD sockets
 are widely supported, portably @emph{(``portable'' by Unix standards, at least)}
@@ -50,7 +51,7 @@ than "network-endian integers".
 @end itemize
 
 @node General Sockets
-@subsection General Sockets
+@section General Sockets
 
 @include class-sb-bsd-sockets-socket.texinfo
 
@@ -77,7 +78,7 @@ than "network-endian integers".
 @include fun-sb-bsd-sockets-non-blocking-mode.texinfo
 
 @node Socket Options
-@subsection Socket Options
+@section Socket Options
 
 A subset of socket options are supported, using a fairly general
 framework which should make it simple to add more as required - see
@@ -105,7 +106,7 @@ sockopt-receive-low-water)}.
 @include fun-sb-bsd-sockets-sockopt-tcp-nodelay.texinfo
 
 @node INET Domain Sockets
-@subsection INET Domain Sockets
+@section INET Domain Sockets
 
 The TCP and UDP sockets that you know and love. Some representation
 issues:
@@ -131,7 +132,7 @@ port, so for example, (socket-connect s #(192 168 1 1) 80).
 @include fun-sb-bsd-sockets-get-protocol-by-name.texinfo
 
 @node Local (Unix) Domain Sockets
-@subsection Local (Unix) Domain Sockets
+@section Local (Unix) Domain Sockets
 
 Local domain (@code{AF_LOCAL}) sockets are also known as Unix-domain
 sockets, but were renamed by POSIX presumably on the basis that they
@@ -144,7 +145,7 @@ across a network.
 @include class-sb-bsd-sockets-local-socket.texinfo
 
 @node Name Service
-@subsection Name Service
+@section Name Service
 
 Presently name service is implemented by calling whatever
 @code{gethostbyname(2)} uses. This may be any or all of

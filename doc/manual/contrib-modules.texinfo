@@ -1,11 +1,25 @@
-@node Contributed Modules
-@comment  node-name,  next,  previous,  up
-@chapter Contributed Modules
-
 SBCL comes with a number of modules that are not part of the core
 system.  These are loaded via @code{(require :@var{modulename})}
 (@pxref{Customization Hooks for Users}).  This section contains
 documentation (or pointers to documentation) for the contributed
 modules.
 
-@include contrib-doc-list.texi-temp
+@menu
+* sb-aclrepl::
+* sb-grovel::
+* sb-md5::
+* sb-rotate-byte::
+@end menu
+
+@page
+@include sb-aclrepl/sb-aclrepl.texinfo
+
+@page
+@include sb-grovel/sb-grovel.texinfo
+
+@page
+@include sb-md5/sb-md5.texinfo
+
+@page
+@include sb-rotate-byte/sb-rotate-byte.texinfo
+

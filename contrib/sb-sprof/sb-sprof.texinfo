@@ -1,13 +1,15 @@
-@node sb-sprof
-@section sb-sprof
-@cindex Profiler
+@cindex Profiling, statistical
 
-The @code{sb-sprof} module provides an alternate profiler which works by
-taking samples of the program execution at regular intervals, instead of
-instrumenting functions like @code{profile} does. You might find
-@code{sb-sprof} more useful than @code{profile} when profiling functions
-in the @code{common-lisp}-package, SBCL internals, or code where the
-instrumenting overhead is excessive.
+The @code{sb-sprof} module, loadable by 
+@lisp
+(require :sb-sprof)
+@end lisp
+provides an alternate profiler which works by taking samples of the
+program execution at regular intervals, instead of instrumenting
+functions like @code{sb-profile:profile} does. You might find
+@code{sb-sprof} more useful than accurate profiler when profiling
+functions in the @code{common-lisp}-package, SBCL internals, or code
+where the instrumenting overhead is excessive.
 
 This module is known not to work consistently on the Alpha platform,
 for technical reasons related to the implementation of a machine

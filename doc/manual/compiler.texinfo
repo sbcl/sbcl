@@ -1,7 +1,3 @@
-@node  The Compiler
-@comment  node-name,  next,  previous,  up
-@chapter The Compiler
-
 This chapter will discuss most compiler issues other than
 efficiency, including compiler error messages, the SBCL compiler's
 unusual approach to type safety in the presence of type declarations,
