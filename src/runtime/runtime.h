@@ -15,7 +15,7 @@
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
-#define QSHOW 1 /* Enable low-level debugging output? */
+#define QSHOW 0 /* Enable low-level debugging output? */
 #if QSHOW
 #define FSHOW(args) fprintf args
 #define SHOW(string) FSHOW((stderr, "/%s\n", string))
@@ -30,11 +30,11 @@
  * signal handling.)
  *
  * Note: It may be that doing this is fundamentally unsound, since it
- * causes output from signal handlers, the i/o libraries aren't
+ * causes output from signal handlers, and the i/o libraries aren't
  * necessarily reentrant. But it can still be very convenient for
  * figuring out what's going on when you have a signal handling
  * problem.. */
-#define QSHOW_SIGNALS 1
+#define QSHOW_SIGNALS 0
 
 /* FIXME: There seems to be no reason that LowtagOf can't be defined
  * as a (possibly inline) function instead of a macro. It would also

@@ -325,7 +325,7 @@
 	((fboundp x)
 	 (%describe-function (fdefinition x) s :function x)))
 
-  ;; TO DO: Print out other stuff from the INFO database:
+  ;; FIXME: Print out other stuff from the INFO database:
   ;;   * Does it name a type or class?
   ;;   * Is it a structure accessor? (This is important since those are 
   ;;     magical in some ways, e.g. blasting the structure if you 

@@ -125,7 +125,7 @@
 	    (:copier nil))
   ;; name of this class
   (name nil :type keyword :read-only t)
-  ;; List of Type-Info structures for each type in this class.
+  ;; list of Type-Info structures for each type in this class
   (types () :type list))
 
 ;;; a map from type numbers to TYPE-INFO objects. There is one type

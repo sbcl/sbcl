@@ -157,32 +157,19 @@
       (t
        exp))))
 
-;;; not needed in new from-scratch cross-compilation procedure -- WHN 19990714
-#|
-;;; Dummy stubs for SB!EVAL:INTERNAL-EVAL and SB!EVAL:MAKE-INTERPRETED-FUNCTION
-;;; in case the compiler isn't loaded yet.
-(defun sb!eval:internal-eval (x)
-  (error "attempt to evaluation a complex expression:~%     ~S~@
-	  This expression must be compiled, but the compiler is not loaded."
-	 x))
-(defun sb!eval:make-interpreted-function (x)
-  (error "EVAL called on #'(lambda (x) ...) when the compiler isn't loaded:~
-	  ~%     ~S~%"
-	 x))
-|#
-
+;;; Given a function, return three values:
+;;; 1] A lambda expression that could be used to define the function,
+;;;    or NIL if the definition isn't available.
+;;; 2] NIL if the function was definitely defined in a null lexical
+;;;    environment, and T otherwise.
+;;; 3] Some object that \"names\" the function. Although this is
+;;;    allowed to be any object, CMU CL always returns a valid
+;;;    function name or a string.
+;;;
 ;;; If interpreted, use the interpreter interface. Otherwise, see
 ;;; whether it was compiled with COMPILE. If that fails, check for an
 ;;; inline expansion.
 (defun function-lambda-expression (fun)
-  #!+sb-doc
-  "Given a function, return three values:
-   1] A lambda expression that could be used to define the function, or NIL if
-      the definition isn't available.
-   2] NIL if the function was definitely defined in a null lexical environment,
-      and T otherwise.
-   3] Some object that \"names\" the function. Although this is allowed to be
-      any object, CMU CL always returns a valid function name or a string."
   (declare (type function fun))
   (if (sb!eval:interpreted-function-p fun)
       (sb!eval:interpreted-function-lambda-expression fun)
