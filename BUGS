@@ -973,14 +973,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   This is funny since sbcl-0.6.12.34 knows
     (SUBTYPEP '(EQL 0) 'NUMBER) => T
 
-107:
-  (reported as a CMU CL bug by Erik Naggum on comp.lang.lisp
-  2001-06-11:)
-    * (write #*101 :radix t :base 36)
-    #*#36r1#36r0#36r1
-    #*101
-    * 
-  
 108:
   (TIME (ROOM T)) reports more than 200 Mbytes consed even for
   a clean, just-started SBCL system. And it seems to be right:

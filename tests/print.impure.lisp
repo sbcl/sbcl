@@ -32,5 +32,12 @@
 ;;; an error) and provided a fix which was ported to sbcl-0.6.12.35.
 (assert (null (format t "~F" "foo")))
 
+;;; This was a bug in SBCL until 0.6.12.40 (originally reported as a
+;;; CMU CL bug by Erik Naggum on comp.lang.lisp).
+(loop for *print-base* from 2 to 36
+      with *print-radix* = t
+      do
+      (assert (string= "#*101" (format nil "~S" #*101))))
+
 ;;; success
 (quit :unix-status 104)

@@ -2548,7 +2548,7 @@
 
   ;; writing codes/strings for internal errors
   (format t "#define ERRORS { \\~%")
-  ;; FIXME: Is this just DO-VECTOR?
+  ;; FIXME: Is this just DOVECTOR?
   (let ((internal-errors sb!c:*backend-internal-errors*))
     (dotimes (i (length internal-errors))
       (format t "    ~S, /*~D*/ \\~%" (cdr (aref internal-errors i)) i)))

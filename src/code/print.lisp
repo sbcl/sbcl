@@ -957,8 +957,10 @@
 	 (output-terse-array vector stream))
 	((bit-vector-p vector)
 	 (write-string "#*" stream)
-	 (dotimes (i (length vector))
-	   (output-object (aref vector i) stream)))
+	 (dovector (bit vector)
+	   ;; (Don't use OUTPUT-OBJECT here, since this code
+	   ;; has to work for all possible *PRINT-BASE* values.)
+	   (write-char (if (zerop bit) #\0 #\1) stream)))
 	(t
 	 (when (and *print-readably*
 		    (not (eq (array-element-type vector) t)))
@@ -973,7 +975,7 @@
 		       (write-string ")" stream)))))
 
 ;;; This function outputs a string quoting characters sufficiently
-;;; that so someone can read it in again. Basically, put a slash in
+;;; so that someone can read it in again. Basically, put a slash in
 ;;; front of an character satisfying NEEDS-SLASH-P.
 (defun quote-string (string stream)
   (macrolet ((needs-slash-p (char)
@@ -988,21 +990,20 @@
 	  (when (needs-slash-p char) (write-char #\\ stream))
 	  (write-char char stream))))))
 
+;;; Output the printed representation of any array in either the #< or #A
+;;; form.
 (defun output-array (array stream)
-  #!+sb-doc
-  "Outputs the printed representation of any array in either the #< or #A
-   form."
   (if (or *print-array* *print-readably*)
       (output-array-guts array stream)
       (output-terse-array array stream)))
 
-;;; to output the abbreviated #< form of an array
+;;; Output the abbreviated #< form of an array.
 (defun output-terse-array (array stream)
   (let ((*print-level* nil)
 	(*print-length* nil))
     (print-unreadable-object (array stream :type t :identity t))))
 
-;;; to output the readable #A form of an array
+;;; Output the readable #A form of an array.
 (defun output-array-guts (array stream)
   (when (and *print-readably*
 	     (not (eq (array-element-type array) t)))

@@ -739,16 +739,16 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
 * a port to the Compaq/DEC Alpha CPU, thanks to Dan Barlow
 * Martin Atzmueller ported Tim Moore's marvellous CMU CL DISASSEMBLE
   patch, so that DISASSEMBLE output is much nicer.
-* better error handling in CLOS method combination, thanks to 
-  Martin Atzmueller porting Pierre Mai's CMU CL patches
 * Pathnames are much more ANSI-compliant, thanks to various fixes
   and tests from Dan Barlow.
 * Hash tables can be printed readably, as inspired by CMU CL code
   of Eric Marsden and SBCL code of Martin Atzmueller.
 * Compiler trace output (the :TRACE-FILE option to COMPILE-FILE)
-  is now a supported extension again, since the consensus is that
-  it can be useful for ordinary development work, not just for
-  debugging SBCL itself.
+  is now a supported extension again, since the consensus on
+  sbcl-devel was that it can be useful for ordinary development
+  work, not just for debugging SBCL itself.
+* better error handling in CLOS method combination, thanks to 
+  Martin Atzmueller porting Pierre Mai's CMU CL patches
 * At Dan Barlow's suggestion, TRUENAME on a dangling symbolic
   link now returns the dangling link itself, and for similar reasons,
   TRUENAME on a cyclic symbolic link returns the cyclic link itself.
@@ -756,7 +756,13 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   endlessly, respectively.) As a consequence of this change,
   DIRECTORY now works even in the presence of dangling and cyclic
   symbolic links.
-* more overflow fixes for >16Mbyte i/o buffers
+* more overflow fixes for >16Mbyte I/O buffers
+* fixed bug 107 (reported as a CMU CL bug by Erik Naggum on 
+  comp.lang.lisp 2001-06-11): (WRITE #*101 :RADIX T :BASE 36) now
+  does the right thing.
+* The implementation of some type tests, especially for CONDITION
+  types, is now tidier and maybe faster, due to CMU CL code
+  originally by Douglas Crosher, ported by Martin Atzmueller.
 * There's a new slam.sh hack to shorten the edit/compile/debug
   cycle for low-level changes to SBCL itself, and a new
   :SB-AFTER-XC-CORE target feature to control the generation of
@@ -770,7 +776,7 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   COMPILE-FILE is no longer supported, so that now every function
   gets an entry point, so that block compilation looks a little
   more like the plain vanilla ANSI section 3.2.2.3 scheme.
-?? minor incompatible change: SB-EXT:GET-BYTES-CONSED now
+* minor incompatible change: SB-EXT:GET-BYTES-CONSED now
   returns the number of bytes consed since the system started,
   rather than the number consed since the first time the function
   was called. (The new definition parallels ANSI functions like
