@@ -342,6 +342,30 @@
 (defclass c176-0 (b176) ())
 (assert (= 1 (setf (slot-value (make-instance 'c176-9) 'aslot-176) 1)))
 
+;;; DEFINE-METHOD-COMBINATION was over-eager at checking for duplicate
+;;; primary methods:
+(define-method-combination dmc-test-mc (&optional (order :most-specific-first))
+  ((around (:around))
+   (primary (dmc-test-mc) :order order :required t))
+   (let ((form (if (rest primary)
+                   `(and ,@(mapcar #'(lambda (method)
+                                       `(call-method ,method))
+                                   primary))
+                   `(call-method ,(first primary)))))
+     (if around
+         `(call-method ,(first around)
+                       (,@(rest around)
+                        (make-method ,form)))
+         form)))
+
+(defgeneric dmc-test-mc (&key k)
+  (:method-combination dmc-test-mc))
+
+(defmethod dmc-test-mc dmc-test-mc (&key k)
+	   k)
+
+(dmc-test-mc :k 1)
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

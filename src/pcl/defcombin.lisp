@@ -274,14 +274,15 @@
 	    (push name names)
 	    (push specializer-cache specializer-caches)
 	    (push `((or ,@tests)
-		      (if  (equal ,specializer-cache .specializers.)
-			   (return-from .long-method-combination-function.
-			     '(error "More than one method of type ~S ~
+		    (if (and (equal ,specializer-cache .specializers.)
+			     (not (null .specializers.)))
+			(return-from .long-method-combination-function.
+			  '(error "More than one method of type ~S ~
 				      with the same specializers."
-				     ',name))
-			   (setq ,specializer-cache .specializers.))
-		      (push .method. ,name))
-		    cond-clauses)
+			           ',name))
+			(setq ,specializer-cache .specializers.))
+		    (push .method. ,name))
+		  cond-clauses)
 	    (when required
 	      (push `(when (null ,name)
 			 (return-from .long-method-combination-function.
@@ -304,7 +305,7 @@
       (dolist (.method. .applicable-methods.)
 	(let ((.qualifiers. (method-qualifiers .method.))
 	      (.specializers. (method-specializers .method.)))
-	  (progn .qualifiers. .specializers.)
+	  (declare (ignorable .qualifiers. .specializers.))
 	  (cond ,@(nreverse cond-clauses))))
       ,@(nreverse required-checks)
       ,@(nreverse order-cleanups)

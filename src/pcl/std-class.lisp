@@ -1048,6 +1048,25 @@
     (or (eq new-super-meta-class *the-class-std-class*)
 	(eq (class-of class) new-super-meta-class))))
 
+;;; What this does depends on which of the four possible values of
+;;; LAYOUT-INVALID the PCL wrapper has; the simplest case is when it
+;;; is (:FLUSH <wrapper>) or (:OBSOLETE <wrapper>), when there is
+;;; nothing to do, as the new wrapper has already been created.  If
+;;; LAYOUT-INVALID returns NIL, then we invalidate it (setting it to
+;;; (:FLUSH <wrapper>); UPDATE-SLOTS later gets to choose whether or
+;;; not to "upgrade" this to (:OBSOLETE <wrapper>).
+;;;
+;;; This leaves the case where LAYOUT-INVALID returns T, which happens
+;;; when REGISTER-LAYOUT has invalidated a superclass of CLASS (which
+;;; invalidated all the subclasses in SB-KERNEL land).  Again, here we
+;;; must flush the caches and allow UPDATE-SLOTS to decide whether to
+;;; obsolete the wrapper.
+;;;
+;;; FIXME: either here or in INVALID-WRAPPER-P looks like a good place
+;;; for (AVER (NOT (EQ (SB-KERNEL:LAYOUT-INVALID OWRAPPER)
+;;;                    :UNINITIALIZED)))
+;;;
+;;; Thanks to Gerd Moellmann for the explanation.  -- CSR, 2002-10-29
 (defun force-cache-flushes (class)
   (let* ((owrapper (class-wrapper class)))
     ;; We only need to do something if the wrapper is still valid. If
@@ -1056,10 +1075,10 @@
     ;; particular, we must be sure we never change an OBSOLETE into a
     ;; FLUSH since OBSOLETE means do what FLUSH does and then some.
     (when (or (not (invalid-wrapper-p owrapper))
-	      ;; Ick. LAYOUT-INVALID can return a list (which we can
-	      ;; handle), T (which we can't), NIL (which is handled by
-	      ;; INVALID-WRAPPER-P) or :UNINITIALIZED (which never
-	      ;; gets here (I hope).  -- CSR, 2002-10-28
+	      ;; KLUDGE: despite the observations above, this remains
+	      ;; a violation of locality or what might be considered
+	      ;; good style.  There has to be a better way!  -- CSR,
+	      ;; 2002-10-29
 	      (eq (sb-kernel:layout-invalid owrapper) t))
       (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
 				    class)))
