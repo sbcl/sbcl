@@ -9,9 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (!begin-collecting-cold-init-forms)
 
 ;;; Has the type system been properly initialized? (I.e. is it OK to

@@ -17,9 +17,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;;; storage class and storage base definition
 

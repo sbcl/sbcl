@@ -9,9 +9,6 @@
 
 (in-package "SB!C-CALL")
 
-(sb!int:file-comment
- "$Header$")
-
 (def-alien-type-class (c-string :include pointer :include-args (to)))
 
 (def-alien-type-translator c-string ()

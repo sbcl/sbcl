@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; In copy propagation, we manipulate sets of TNs. We only consider TNs whose
 ;;; sole write is by a MOVE VOP. This allows us to use a degenerate version of
 ;;; reaching definitions: since each such TN has only one definition, the TN

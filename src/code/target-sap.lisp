@@ -12,9 +12,6 @@
 (in-package "SB!SYS")
 ;;; FIXME: Shouldn't these be IN-PACKAGE SB!KERNEL instead? (They're
 ;;; not dependent on the OS, only on the CPU architecture.)
-
-(file-comment
-  "$Header$")
 
 ;;;; primitive SAP operations
 

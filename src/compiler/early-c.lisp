@@ -15,9 +15,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: shouldn't SB-C::&MORE be in this list?
 (defconstant sb!xc:lambda-list-keywords
   '(&optional &rest &key &aux &body &whole &allow-other-keys &environment)

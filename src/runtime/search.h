@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef _SEARCH_H_
 #define _SEARCH_H_
 

@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defconstant sb!xc:array-rank-limit 65529
   #!+sb-doc
   "the exclusive upper bound on the rank of an array")

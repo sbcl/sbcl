@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (defstruct (constraint
 	    (:include sset-element)
 	    (:constructor make-constraint (number kind x y not-p)))

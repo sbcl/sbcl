@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defmacro slot-symbol (slot-name type)
   `(if (and (symbolp ,slot-name) (symbol-package ,slot-name))

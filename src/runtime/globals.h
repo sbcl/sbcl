@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #if !defined(_INCLUDE_GLOBALS_H_)
 #define _INCLUDED_GLOBALS_H_
 

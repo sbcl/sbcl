@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C-CALL")
-
-(sb!int:file-comment
-  "$Header$")
 
 ;;;; extra types
 

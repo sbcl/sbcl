@@ -24,9 +24,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defmacro instance-slot-index (wrapper slot-name)
   `(let ((pos 0))

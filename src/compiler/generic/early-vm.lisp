@@ -9,9 +9,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
-  "$Header$")
-
 (eval-when (:compile-toplevel :execute :load-toplevel)
 
 (defconstant lowtag-bits 3

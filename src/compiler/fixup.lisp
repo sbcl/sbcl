@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXUP -- A fixup of some kind.
 (defstruct (fixup
 	    (:constructor make-fixup (name flavor &optional offset)))

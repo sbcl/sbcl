@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 ;;; We can load/store into fp registers through the top of
 ;;; stack %st(0) (fr0 here). Loads imply a push to an empty register
 ;;; which then changes all the reg numbers. These macros help manage that.

@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 ;;; Make an environment-live stack TN for saving the SP for NLX entry.
 (def-vm-support-routine make-nlx-sp-tn (env)
   (environment-live-tn

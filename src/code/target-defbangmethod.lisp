@@ -9,7 +9,4 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defvar *delayed-def!method-args* nil)

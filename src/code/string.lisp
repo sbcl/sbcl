@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defun string (x)
   #!+sb-doc
   "Coerces X into a string. If X is a string, X is returned. If X is a

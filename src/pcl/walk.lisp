@@ -27,9 +27,6 @@
 ;;;; specification.
 
 (in-package "SB-WALKER")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;;; environment frobbing stuff
 

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (deftype string-stream ()
   '(or string-input-stream string-output-stream
        fill-pointer-output-stream))

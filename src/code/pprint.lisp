@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!PRETTY")
-
-(file-comment
-  "$Header$")
 
 ;;;; pretty streams
 

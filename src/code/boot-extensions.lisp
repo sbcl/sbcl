@@ -11,9 +11,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 ;;; Lots of code wants to get to the KEYWORD package or the COMMON-LISP package
 ;;; without a lot of fuss, so we cache them in variables. TO DO: How much
 ;;; does this actually buy us? It sounds sensible, but I don't know for sure

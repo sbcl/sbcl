@@ -9,9 +9,6 @@
 
 (in-package "SB!EVAL")
 
-(file-comment
-  "$Header$")
-
 ;;; This flag is used by EVAL-WHEN to keep track of when code has already been
 ;;; evaluated so that it can avoid multiple evaluation of nested EVAL-WHEN
 ;;; (COMPILE)s.

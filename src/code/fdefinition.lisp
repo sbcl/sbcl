@@ -14,9 +14,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (sb!int::/show0 "fdefinition.lisp 22")
 
 ;;;; fdefinition (fdefn) objects

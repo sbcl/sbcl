@@ -13,9 +13,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 ;;; ### Note: we simultaneously use ``word'' to mean a 32 bit quantity
 ;;; and a 16 bit quantity depending on context. This is because Intel
 ;;; insists on calling 16 bit things words and 32 bit things

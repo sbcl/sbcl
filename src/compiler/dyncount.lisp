@@ -11,9 +11,6 @@
 
 (in-package "SB!DYNCOUNT")
 
-(file-comment
-  "$Header$")
-
 (defvar *collect-dynamic-statistics* nil
   #!+sb-doc
   "When T, emit extra code to collect dynamic statistics about vop usages.")

@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Generate trace-file output for the byte compiler back-end.
 ;;;
 ;;; (Note: As of sbcl-0.6.7, this is target-only code not because it's

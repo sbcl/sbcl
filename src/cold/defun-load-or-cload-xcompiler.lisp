@@ -9,8 +9,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 ;;; Either load or compile-then-load the cross-compiler into the
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)

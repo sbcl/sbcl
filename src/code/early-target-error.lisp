@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!CONDITIONS")
-
-(sb!int:file-comment
-  "$Header$")
 
 ;;;; restarts
 

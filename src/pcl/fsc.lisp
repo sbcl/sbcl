@@ -32,9 +32,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defmethod wrapper-fetcher ((class funcallable-standard-class))
   'fsc-instance-wrapper)

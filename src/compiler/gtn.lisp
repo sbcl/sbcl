@@ -14,9 +14,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; We make a pass over the component's environments, assigning argument
 ;;; passing locations and return conventions and TNs for local variables.
 (defun gtn-analyze (component)

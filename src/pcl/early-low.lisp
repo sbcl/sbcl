@@ -24,9 +24,6 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(sb-int:file-comment
-  "$Header$")
-
 (in-package "SB-PCL")
 
 ;;; FIXME: The PCL package is internal and is used by code in potential

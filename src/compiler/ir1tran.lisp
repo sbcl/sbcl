@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (declaim (special *compiler-error-bailout*))
 
 ;;; *SOURCE-PATHS* is a hashtable from source code forms to the path

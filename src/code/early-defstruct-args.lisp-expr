@@ -9,8 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;;; $Header$
-
 (;; Define the STRUCTURE-OBJECT class as a subclass of
  ;; INSTANCE. This has to be handled early because the design of the
  ;; DEFSTRUCT system, dating back to pre-1999 CMU CL, requires that

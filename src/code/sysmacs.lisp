@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; This checks to see whether the array is simple and the start and
 ;;; end are in bounds. If so, it proceeds with those values.
 ;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that there is a

@@ -1,7 +1,5 @@
 /*
  * very-low-level utilities for runtime support
- *
- * $Header$
  */
 
 /*

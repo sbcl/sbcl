@@ -26,9 +26,6 @@
 
 (in-package "SB-PCL")
 
-(sb-int:file-comment
-  "$Header$")
-
 (defmethod slots-to-inspect ((class slot-class) (object slot-object))
   (class-slots class))
 

@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; These specials are used by ERROR-ERROR to track the success of recovery
 ;;; attempts.
 (defvar *error-error-depth* 0)

@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!UNIX")
-
-(file-comment
-  "$Header$")
 
 ;;;; macros for dynamically enabling and disabling signal handling
 

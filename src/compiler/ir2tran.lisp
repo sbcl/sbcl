@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;;; moves and type checks
 

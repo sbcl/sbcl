@@ -16,9 +16,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;; Check the legality of a function name that is being introduced.
 ;;; -- If it names a macro, then give a warning and blast the macro

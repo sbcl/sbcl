@@ -13,9 +13,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; There seems to be no portable way to mask float traps, but we shouldn't
 ;;; encounter any float traps when cross-compiling SBCL itself, anyway, so we
 ;;; just make this a no-op.

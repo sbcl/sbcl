@@ -16,8 +16,6 @@
 
 (in-package "SB!INT")
 
-;;;; $Header$
-
 ;;; In the target system's compiler, uncrossing is just identity.
 #-sb-xc-host
 (progn

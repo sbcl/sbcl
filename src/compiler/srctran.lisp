@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Convert into an IF so that IF optimizations will eliminate redundant
 ;;; negations.
 (def-source-transform not (x) `(if ,x nil t))

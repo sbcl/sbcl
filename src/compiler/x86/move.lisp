@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 (define-move-function (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))

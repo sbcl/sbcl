@@ -9,9 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; The actual TYPEP engine. The compiler only generates calls to this
 ;;; function when it can't figure out anything more intelligent to do.
 (defun %typep (object specifier)

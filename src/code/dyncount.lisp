@@ -11,14 +11,12 @@
 
 (in-package "SB!DYNCOUNT")
 
-(file-comment
-  "$Header$")
-
 #|
-Make sure multi-cycle instruction costs are plausible.
-VOP classification.
-  Make tables of %cost for benchmark X class.
-  Could be represented as a sort of bar chart.
+comments from CMU CL:
+  Make sure multi-cycle instruction costs are plausible.
+  VOP classification.
+    Make tables of %cost for benchmark X class.
+    Could be represented as a sort of bar chart.
 |#
 
 (eval-when (:compile-toplevel)

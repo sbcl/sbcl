@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef _GENCGC_H_
 #define _GENCGC_H_
 

@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB-EXT")
-
-(file-comment
-  "$Header$")
 
 ;;;; Import wait3(2) from Unix.
 

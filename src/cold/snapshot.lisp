@@ -11,8 +11,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 (defstruct snapshot
   (hash-table (make-hash-table :test 'eq)
 	      :type hash-table

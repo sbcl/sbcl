@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
- "$Header$")
-
 (defmacro defpackage (package &rest options)
   #!+sb-doc
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the

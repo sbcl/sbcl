@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
-(file-comment
-  "$Header$")
 
 ;;;; the PACKAGE-HASHTABLE structure
 

@@ -12,9 +12,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defun sb!xc:lisp-implementation-type ()
   "SBCL")
 

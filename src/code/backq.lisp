@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; The flags passed back by BACKQUOTIFY can be interpreted as follows:
 ;;;
 ;;;   |`,|: [a] => a

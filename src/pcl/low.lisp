@@ -36,9 +36,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defvar *optimize-speed* '(optimize (speed 3) (safety 0)))

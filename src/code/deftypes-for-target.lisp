@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-
-(file-comment
-  "$Header$")
 
 ;;;; Now that DEFTYPE is set up, any pending requests for it can
 ;;;; be honored.

@@ -11,9 +11,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: Double colons are bad, and there are lots of them in this
 ;;; file, because both dump logic in SB!C and load logic in SB!IMPL
 ;;; need to know about fops. Perhaps all the load/dump logic should be

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defconstant internal-time-units-per-second 100
   #!+sb-doc
   "The number of internal time units that fit into a second. See

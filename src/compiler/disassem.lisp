@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!DISASSEM")
-
-(file-comment
-  "$Header$")
 
 ;;; types and defaults
 

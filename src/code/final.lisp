@@ -11,9 +11,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 (defvar *objects-pending-finalization* nil)
 
 (defun finalize (object function)

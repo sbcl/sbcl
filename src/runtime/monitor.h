@@ -9,9 +9,5 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 extern void ldb_monitor(void);
 extern void throw_to_monitor(void);

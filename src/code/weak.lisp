@@ -11,9 +11,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 (defun make-weak-pointer (object)
   #!+sb-doc
   "Allocates and returns a weak pointer which points to OBJECT."

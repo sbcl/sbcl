@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #include <stdio.h>
 #include <errno.h>
 

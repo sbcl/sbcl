@@ -9,9 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 #.`(progn
      ,@(mapcar (lambda (args)
 		 `(defstruct ,@args))

@@ -9,8 +9,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 ;;; RENAME-PACKAGE in two steps in order to avoid the possibility of undefined
 ;;; behavior when one of the new names is the same as one of the old names.
 ;;; (ANSI on RENAME-PACKAGE: "The consequences are undefined if new-name or any

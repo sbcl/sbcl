@@ -11,9 +11,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (declaim (special *wild-type* *universal-type* *compiler-error-context*))
 
 ;;; An INLINEP value describes how a function is called. The values have these

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (macrolet ((def-frob (name result access src-type &optional typep)
 	     `(defun ,name (object ,@(if typep '(type) ()))
 		(do* ((index 0 (1+ index))

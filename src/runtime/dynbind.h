@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef _DYNBIND_H_
 #define _DYNBIND_H_
 

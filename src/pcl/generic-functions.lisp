@@ -7,9 +7,6 @@
 ;;;; warranty. See the COPYING and CREDITS files for more information.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;;; class predicates
 

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 #!-sb-fluid
 (declaim (inline fill-pointer array-has-fill-pointer-p adjustable-array-p
 		 array-displacement))

@@ -24,9 +24,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defvar *compile-make-instance-functions-p* nil)
 

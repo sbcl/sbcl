@@ -16,9 +16,6 @@
 ;;; FIXME: Perhaps this belongs in the %SYS package like some other
 ;;; cold load stuff.
 
-(file-comment
-  "$Header$")
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *cold-init-forms*))
 

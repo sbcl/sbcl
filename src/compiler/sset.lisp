@@ -15,9 +15,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Each structure that may be placed in a SSet must include the
 ;;; SSet-Element structure. We allow an initial value of NIL to mean
 ;;; that no ordering has been assigned yet (although an ordering must

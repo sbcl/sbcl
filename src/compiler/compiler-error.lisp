@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; a function that is called to unwind out of COMPILER-ERROR
 (declaim (type (function () nil) *compiler-error-bailout*))
 (defvar *compiler-error-bailout*

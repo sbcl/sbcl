@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-(file-comment
-  "$Header$")
 
 ;;;; primitive type definitions
 

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defun sort (sequence predicate &key key)
   #!+sb-doc
   "Destructively sorts sequence. Predicate should return non-Nil if

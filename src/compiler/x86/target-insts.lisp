@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
-  "$Header$")
-
 (defun print-mem-access (value stream print-size-p dstate)
   (declare (type list value)
 	   (type stream stream)

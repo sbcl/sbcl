@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!EVAL")
-
-(file-comment
-  "$Header$")
 
 ;;;; interpreter stack
 

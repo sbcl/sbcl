@@ -12,10 +12,6 @@
  */
 
 /*
- * $Header$
- */
-
-/*
  * FIXME:
  *   1. Ordinary users won't get much out of this code, so it shouldn't
  *      be compiled into the ordinary build of the system. Probably it

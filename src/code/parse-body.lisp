@@ -16,9 +16,6 @@
 
 (in-package "SB!INT")
 
-(file-comment
- "$Header$")
-
 (/show0 "entering parse-body.lisp")
 
 ;;; Given a sequence of declarations (and possibly a documentation

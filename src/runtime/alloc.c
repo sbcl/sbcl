@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #include "runtime.h"
 #include "sbcl.h"
 #include "alloc.h"

@@ -23,9 +23,6 @@
 
 (in-package "SB-PCL")
 
-(sb-int:file-comment
-  "$Header$")
-
 (fix-early-generic-functions)
 (setq *boot-state* 'complete)
 

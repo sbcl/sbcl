@@ -20,9 +20,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (!begin-collecting-cold-init-forms)
 
 (!cold-init-forms

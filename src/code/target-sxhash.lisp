@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; the depthoid explored when calculating hash values
 ;;;
 ;;; "Depthoid" here is a sort of mixture of what Common Lisp ordinarily calls

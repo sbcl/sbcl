@@ -24,9 +24,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (!begin-collecting-cold-init-forms)
 #!+sb-show (!cold-init-forms (/show0 "early in globaldb.lisp cold init"))
 

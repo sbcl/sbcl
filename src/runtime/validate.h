@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #if !defined(_INCLUDE_VALIDATE_H_)
 #define _INCLUDE_VALIDATE_H_
 

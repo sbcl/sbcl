@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 /* All parse routines take a char ** as their only argument */
 extern boolean more_p(char **ptr);
 extern char *parse_token(char **ptr);

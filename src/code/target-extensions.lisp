@@ -17,9 +17,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 ;;; INDENTING-FURTHER is a user-level macro which may be used to locally
 ;;; increment the indentation of a stream.
 (defmacro indenting-further (stream more &rest body)

@@ -14,9 +14,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; cobbled from stuff in describe.lisp.
 (defun function-doc (x)
   (let ((name

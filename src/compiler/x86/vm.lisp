@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 ;;; the size of an INTEGER representation of a SYSTEM-AREA-POINTER, i.e.
 ;;; size of a native memory address
 (deftype sap-int-type () '(unsigned-byte 32))

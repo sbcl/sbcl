@@ -9,9 +9,6 @@
 ;;;; warranty. See the COPYING and CREDITS files for more information.
 
 (in-package "SB-GRAY")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; Bootstrap the FUNDAMENTAL-STREAM class.
 (let ((sb-pcl::*pcl-class-boot* 'fundamental-stream))

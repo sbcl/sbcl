@@ -9,9 +9,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 (def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
     (:raw

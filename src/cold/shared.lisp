@@ -15,8 +15,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;;; $Header$
-
 ;;; TO DO: Might it be possible to increase the efficiency of CMU CL's garbage
 ;;; collection on my large (256Mb) machine by doing larger incremental GC steps
 ;;; than the default 2 Mb of CMU CL 2.4.9? A quick test 19990729, setting this

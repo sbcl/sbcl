@@ -11,9 +11,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (defun trace-table-entry (state)
   (let ((label (gen-label)))
     (emit-label label)

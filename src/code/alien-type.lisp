@@ -13,9 +13,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (!begin-collecting-cold-init-forms)
 
 (defstruct (alien-type-type

@@ -26,9 +26,6 @@
 
 (in-package "SB-PCL")
 
-(sb-int:file-comment
-  "$Header$")
-
 (declaim (declaration
 	  ;; FIXME: Since none of these are supported in SBCL, the
 	  ;; declarations using them are just noise now that this is

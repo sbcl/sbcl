@@ -14,9 +14,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; IR1 boolean function attributes
 ;;;
 ;;; There are a number of boolean attributes of known functions which we like

@@ -8,9 +8,6 @@
 ;;;; files for more information.
 
 (in-package "SB!FORMAT")
-
-(file-comment
-  "$Header$")
 
 (define-condition format-error (error)
   ((complaint :reader format-error-complaint :initarg :complaint)

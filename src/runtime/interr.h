@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef _INTERR_H_
 #define _INTERR_H_
 

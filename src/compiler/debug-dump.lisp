@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (deftype byte-buffer () '(vector (unsigned-byte 8)))
 (defvar *byte-buffer*)
 (declaim (type byte-buffer *byte-buffer*))

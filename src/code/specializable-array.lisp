@@ -12,9 +12,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; It's hard to dump specialized vectors portably, because ANSI
 ;;; doesn't guarantee much about what specialized vectors exist.
 ;;; Thus, if we do

@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; The front-end data structure (IR1) is composed of nodes and
 ;;; continuations. The general idea is that continuations contain
 ;;; top-down information and nodes contain bottom-up, derived

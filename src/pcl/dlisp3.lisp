@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *checking-or-caching-list*

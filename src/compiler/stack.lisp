@@ -13,9 +13,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;; Scan through Block looking for uses of :Unknown continuations that have
 ;;; their Dest outside of the block. We do some checking to verify the

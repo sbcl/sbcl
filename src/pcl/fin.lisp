@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; Each implementation must provide the following functions and macros:
 ;;;

@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #define   BINDING_STACK_SIZE (  BINDING_STACK_END -   BINDING_STACK_START)
 #define   CONTROL_STACK_SIZE (  CONTROL_STACK_END -   CONTROL_STACK_START)
 #define   DYNAMIC_SPACE_SIZE (  DYNAMIC_SPACE_END -   DYNAMIC_SPACE_START)

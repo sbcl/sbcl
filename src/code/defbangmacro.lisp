@@ -17,9 +17,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 #+sb-xc-host
 (progn
   ;; a description of the DEF!MACRO call to be stored until we get enough

@@ -14,10 +14,6 @@
  */
 
 /*
- * $Header$
- */
-
-/*
  * For a review of garbage collection techniques (e.g. generational
  * GC) and terminology (e.g. "scavenging") see Paul R. Wilson,
  * "Uniprocessor Garbage Collection Techniques". As of 20000618, this

@@ -12,8 +12,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 ;;; a helper macro for WITH-ADDITIONAL-NICKNAME and WITHOUT-SOME-NICKNAME
 (defmacro with-given-nicknames ((package-designator nicknames) &body body)
   (let ((p (gensym "P"))

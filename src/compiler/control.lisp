@@ -18,9 +18,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Insert Block in the emission order after the block After.
 (defun add-to-emit-order (block after)
   (declare (type block-annotation block after))

@@ -10,8 +10,6 @@
 ;;;; files for more information.
 
 (in-package "COMMON-LISP-USER")
-
-;;;; $Header$
 
 ;;;; general warm init compilation policy
 

@@ -11,9 +11,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
- "$Header$")
-
 ;;; variables for accumulating the results of parsing a DEFMACRO. (Declarations
 ;;; in DEFMACRO are the reason this isn't as easy as it sounds.)
 (defvar *arg-tests* nil) ; tests that do argument counting at expansion time

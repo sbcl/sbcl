@@ -17,9 +17,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; built-in classes
 (/show0 "beginning type-init.lisp")
 (dolist (x *built-in-classes*)

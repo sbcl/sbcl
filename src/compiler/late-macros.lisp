@@ -17,9 +17,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 #+sb-xc-host
 (sb!xc:defmacro def-boolean-attribute (name &rest attribute-names)
   #!+sb-doc

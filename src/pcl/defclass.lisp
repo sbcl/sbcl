@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; MAKE-TOP-LEVEL-FORM is used by all PCL macros that appear `at top-level'.
 ;;;

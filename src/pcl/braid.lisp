@@ -30,9 +30,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defun allocate-standard-instance (wrapper
 				   &optional (slots-init nil slots-init-p))

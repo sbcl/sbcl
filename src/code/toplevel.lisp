@@ -12,9 +12,6 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
-(file-comment
-  "$Header$")
 
 (defconstant most-positive-fixnum #.sb!vm:*target-most-positive-fixnum*
   #!+sb-doc

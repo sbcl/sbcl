@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; This notes the place at which the environment is properly
 ;;; initialized, for debug-info purposes.
 (define-vop (note-environment-start)

@@ -11,9 +11,6 @@
 
 (in-package "SB-SYS")
 
-(file-comment
-  "$Header$")
-
 ;;; not needed until we implement full-blown LOAD-FOREIGN
 #|
 (defun pick-temporary-file-name (&optional

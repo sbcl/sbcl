@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; Pre-allocate generic function caches. The hope is that this will put
 ;;; them nicely together in memory, and that that may be a win. Of course

@@ -9,9 +9,6 @@
 
 (in-package "SB!ALIEN")
 
-(file-comment
-  "$Header$")
-
 (defvar *alien-type-classes* (make-hash-table :test 'eq))
 
 (defvar *new-auxiliary-types* nil)

@@ -2,9 +2,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE. PUSHP
 ;;; describes what the body does to the fop stack:
 ;;;   :NOPE

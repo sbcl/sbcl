@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; GET-FUNCTION is the main user interface to this code. It is like
 ;;; COMPILE-LAMBDA, only more efficient. It achieves this efficiency by

@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Find the DFO for a component, deleting any unreached blocks and
 ;;; merging any other components we reach. We repeatedly iterate over
 ;;; the entry points, since new ones may show up during the walk.

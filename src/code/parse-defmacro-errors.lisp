@@ -15,9 +15,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; We save space in macro definitions by calling this function.
 (defun do-arg-count-error (error-kind name arg lambda-list minimum maximum)
   (multiple-value-bind (fname sb!debug:*stack-top-hint*) (find-caller-name)

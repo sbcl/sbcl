@@ -25,9 +25,6 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(sb-int:file-comment
-  "$Header$")
-
 (in-package "SB-PCL")
 
 ;;;; the PRINT-OBJECT generic function

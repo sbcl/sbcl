@@ -21,9 +21,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; This function propagates information from the variables in the function
 ;;; Fun to the actual arguments in Call. This is also called by the VALUES IR1
 ;;; optimizer when it sleazily converts MV-BINDs to LETs.

@@ -12,11 +12,8 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
-;;; In correct code, TRULY-THE has only a performance impact and can be
-;;; safely degraded to ordinary THE.
+;;; In correct code, TRULY-THE has only a performance impact and can
+;;; be safely degraded to ordinary THE.
 (defmacro truly-the (type expr)
   `(the ,type ,expr))
 
@@ -24,44 +21,45 @@
 ;;; (possibly at some cost in efficiency).
 (declaim (declaration freeze-type maybe-inline))
 
-;;; INHIBIT-WARNINGS declarations can be safely ignored (although we may then
-;;; have to wade through some irrelevant warnings).
+;;; INHIBIT-WARNINGS declarations can be safely ignored (although we
+;;; may then have to wade through some irrelevant warnings).
 (declaim (declaration inhibit-warnings))
 
-;;; Interrupt control isn't an issue in the cross-compiler: we don't use
-;;; address-dependent (and thus GC-dependent) hashes, and we only have a single
-;;; thread of control.
+;;; Interrupt control isn't an issue in the cross-compiler: we don't
+;;; use address-dependent (and thus GC-dependent) hashes, and we only
+;;; have a single thread of control.
 (defmacro without-interrupts (&rest forms)
   `(progn ,@forms))
 
-;;; When we're running as a cross-compiler in an arbitrary host ANSI Lisp, we
-;;; don't have any hooks available to manipulate the debugging name and
-;;; debugging argument list of an interpreted function object (and don't care
-;;; much about getting debugging name and debugging argument list right
-;;; anyway).
+;;; When we're running as a cross-compiler in an arbitrary host ANSI
+;;; Lisp, we don't have any hooks available to manipulate the
+;;; debugging name and debugging argument list of an interpreted
+;;; function object (and don't care much about getting debugging name
+;;; and debugging argument list right anyway).
 (defun try-to-rename-interpreted-function-as-macro (f name lambda-list)
   (declare (ignore f name lambda-list))
   (values))
 
-;;; When we're running as a cross-compiler in an arbitrary host ANSI Lisp, we
-;;; shouldn't be doing anything which is sensitive to GC. KLUDGE: I (WHN
-;;; 19990131) think the proper long-term solution would be to remove any
-;;; operations from cross-compiler source files (putting them in target-only
-;;; source files) if they refer to these hooks. This is a short-term hack.
+;;; When we're running as a cross-compiler in an arbitrary host ANSI
+;;; Lisp, we shouldn't be doing anything which is sensitive to GC.
+;;; KLUDGE: I (WHN 19990131) think the proper long-term solution would
+;;; be to remove any operations from cross-compiler source files
+;;; (putting them in target-only source files) if they refer to these
+;;; hooks. This is a short-term hack.
 (defvar *before-gc-hooks* nil)
 (defvar *after-gc-hooks* nil)
 
-;;; The GENESIS function works with fasl code which would, in the target SBCL,
-;;; work on LISP-STREAMs. A true LISP-STREAM doesn't seem to be a meaningful
-;;; concept in ANSI Common Lisp, but we can fake it acceptably well using a
-;;; standard STREAM.
+;;; The GENESIS function works with fasl code which would, in the
+;;; target SBCL, work on LISP-STREAMs. A true LISP-STREAM doesn't seem
+;;; to be a meaningful concept in ANSI Common Lisp, but we can fake it
+;;; acceptably well using a standard STREAM.
 (deftype lisp-stream () 'stream)
 
-;;; In the target SBCL, the INSTANCE type refers to a base implementation
-;;; for compound types. There's no way to express exactly that concept
-;;; portably, but we can get essentially the same effect by testing for
-;;; any of the standard types which would, in the target SBCL, be derived
-;;; from INSTANCE:
+;;; In the target SBCL, the INSTANCE type refers to a base
+;;; implementation for compound types. There's no way to express
+;;; exactly that concept portably, but we can get essentially the same
+;;; effect by testing for any of the standard types which would, in
+;;; the target SBCL, be derived from INSTANCE:
 (deftype sb!kernel:instance ()
   '(or condition standard-object structure-object))
 
@@ -69,33 +67,35 @@
 ;;; host Common Lisp.
 (defun funcallable-instance-p (x)
   (if (typep x 'generic-function)
-    ;; In the target SBCL, FUNCALLABLE-INSTANCEs are used to implement generic
-    ;; functions, so any case which tests for this might in fact be trying to
-    ;; test for generic functions. My (WHN 19990313) expectation is that this
-    ;; case won't arise in the cross-compiler, but if it does, it deserves a
-    ;; little thought, rather than reflexively returning NIL.
+    ;; In the target SBCL, FUNCALLABLE-INSTANCEs are used to implement
+    ;; generic functions, so any case which tests for this might in
+    ;; fact be trying to test for generic functions. My (WHN 19990313)
+    ;; expectation is that this case won't arise in the
+    ;; cross-compiler, but if it does, it deserves a little thought,
+    ;; rather than reflexively returning NIL.
     (error "not clear how to handle GENERIC-FUNCTION")
     nil))
 
-;;; This seems to be the portable Common Lisp type test which corresponds
-;;; to the effect of the target SBCL implementation test..
+;;; This seems to be the portable Common Lisp type test which
+;;; corresponds to the effect of the target SBCL implementation test..
 (defun sb!kernel:array-header-p (x)
   (and (typep x 'simple-array)
        (= 1 (array-rank x))))
 
-;;; Genesis needs these at cross-compile time. The target implementation of
-;;; these is reasonably efficient by virtue of its ability to peek into the
-;;; internals of the package implementation; this reimplementation is portable
-;;; but slow.
+;;; Genesis needs these at cross-compile time. The target
+;;; implementation of these is reasonably efficient by virtue of its
+;;; ability to peek into the internals of the package implementation;
+;;; this reimplementation is portable but slow.
 (defun package-internal-symbol-count (package)
   (let ((result 0))
     (declare (type fixnum result))
     (do-symbols (i package)
-      ;; KLUDGE: The ANSI Common Lisp specification warns that DO-SYMBOLS may
-      ;; execute its body more than once for symbols that are inherited from
-      ;; multiple packages, and we currently make no attempt to correct for
-      ;; that here. (The current uses of this function at cross-compile time
-      ;; don't really care if the count is a little too high.) -- WHN 19990826
+      ;; KLUDGE: The ANSI Common Lisp specification warns that
+      ;; DO-SYMBOLS may execute its body more than once for symbols
+      ;; that are inherited from multiple packages, and we currently
+      ;; make no attempt to correct for that here. (The current uses
+      ;; of this function at cross-compile time don't really care if
+      ;; the count is a little too high.) -- WHN 19990826
       (multiple-value-bind (symbol status)
 	  (find-symbol (symbol-name i) package)
 	(declare (ignore symbol))
@@ -110,20 +110,20 @@
       (incf result))
     result))
 
-;;; In the target Lisp, INTERN* is the primitive and INTERN is implemented in
-;;; terms of it. This increases efficiency by letting us reuse a fixed-size
-;;; buffer; the alternative would be particularly painful because we don't
-;;; implement DYNAMIC-EXTENT. In the host Lisp, this is only used at
-;;; cold load time, and we don't care as much about efficiency, so it's fine
-;;; to treat the host Lisp's INTERN as primitive and implement INTERN* in
-;;; terms of it.
+;;; In the target Lisp, INTERN* is the primitive and INTERN is
+;;; implemented in terms of it. This increases efficiency by letting
+;;; us reuse a fixed-size buffer; the alternative would be
+;;; particularly painful because we don't implement DYNAMIC-EXTENT. In
+;;; the host Lisp, this is only used at cold load time, and we don't
+;;; care as much about efficiency, so it's fine to treat the host
+;;; Lisp's INTERN as primitive and implement INTERN* in terms of it.
 (defun intern* (nameoid length package)
   (intern (replace (make-string length) nameoid :end2 length) package))
 
-;;; In the target Lisp this is implemented by reading a fixed slot in the
-;;; symbol. In portable ANSI Common Lisp the same criteria can be met (more
-;;; slowly, and with the extra property of repeatability between runs) by just
-;;; calling SXHASH.
+;;; In the target Lisp this is implemented by reading a fixed slot in
+;;; the symbol. In portable ANSI Common Lisp the same criteria can be
+;;; met (more slowly, and with the extra property of repeatability
+;;; between runs) by just calling SXHASH.
 (defun symbol-hash (symbol)
   (declare (type symbol symbol))
   (sxhash symbol))

@@ -19,10 +19,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>

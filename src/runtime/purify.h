@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #if !defined(_PURIFY_H_)
 #define _PURIFY_H_
 

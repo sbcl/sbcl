@@ -12,14 +12,11 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
-;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the
+;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
-;;; Cell-Setf is similar to Cell-Set, but delivers the new value as
-;;; the result. Cell-Setf-Function takes its arguments as if it were a
-;;; setf function (new value first, as apposed to a setf macro, which
+;;; CELL-SETF is similar to CELL-SET, but delivers the new value as
+;;; the result. CELL-SETF-FUNCTION takes its arguments as if it were a
+;;; SETF function (new value first, as apposed to a SETF macro, which
 ;;; takes the new value last).
 (define-vop (cell-ref)
   (:args (object :scs (descriptor-reg)))
@@ -54,9 +51,9 @@
     (storew value object offset lowtag)
     (move result value)))
 
-;;; Define accessor VOPs for some cells in an object. If the operation name
-;;; is NIL, then that operation isn't defined. If the translate function is
-;;; null, then we don't define a translation.
+;;; Define accessor VOPs for some cells in an object. If the operation
+;;; name is NIL, then that operation isn't defined. If the translate
+;;; function is null, then we don't define a translation.
 (defmacro define-cell-accessors (offset lowtag
 					ref-op ref-trans set-op set-trans)
   `(progn
@@ -85,8 +82,9 @@
 			:disp (- (* offset word-bytes) lowtag))
 	  value)))
 
-;;; Slot-Ref and Slot-Set are used to define VOPs like Closure-Ref, where the
-;;; offset is constant at compile time, but varies for different uses.
+;;; SLOT-REF and SLOT-SET are used to define VOPs like CLOSURE-REF,
+;;; where the offset is constant at compile time, but varies for
+;;; different uses.
 (define-vop (slot-ref)
   (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))

@@ -3,8 +3,6 @@
  *
  * These are needed because the locations of the
  * libraries are filled in by ld.so at runtime.
- *
- * $Header$
  */
 
 /*

@@ -24,9 +24,6 @@
 
 (in-package "SB!UNIX")
 
-(file-comment
-  "$Header$")
-
 (/show0 "unix.lisp 21")
 
 ;;;; common machine-independent structures

@@ -9,8 +9,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 ;;; Return an expression read from the file named PATHNAME-DESIGNATOR.
 (export 'read-from-file)
 (defun read-from-file (pathname-designator)

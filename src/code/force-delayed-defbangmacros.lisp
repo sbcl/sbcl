@@ -16,7 +16,4 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 #+sb-xc-host (force-delayed-def!macros)

@@ -12,9 +12,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;(defun %sp-byte-blt (src-string src-start dst-string dst-start dst-end)
 ;  "Moves bytes from Src-String into Dst-String between Dst-Start (inclusive)
 ;and Dst-End (exclusive) (Dst-Start - Dst-End bytes are moved). Overlap of the

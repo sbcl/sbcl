@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (defvar *args* ()
   #!+sb-doc
   "This variable is bound to the format arguments when an error is signalled

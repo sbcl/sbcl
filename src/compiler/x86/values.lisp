@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 (define-vop (reset-stack-pointer)
   (:args (ptr :scs (any-reg)))
   (:generator 1

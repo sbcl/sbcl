@@ -14,9 +14,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;;; error routines
 ;;;;

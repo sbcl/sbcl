@@ -24,9 +24,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; FIXME: SB-PCL should probably USE-PACKAGE SB-KERNEL, since SB-PCL is built
 ;;; on SB-KERNEL, and in the absence of USE-PACKAGE, it ends up using a

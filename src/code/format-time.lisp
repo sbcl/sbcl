@@ -11,9 +11,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 (defconstant abbrev-weekday-table
   '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun"))
 

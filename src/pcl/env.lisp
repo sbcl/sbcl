@@ -24,9 +24,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; FIXME: This stuff isn't part of the ANSI spec, and isn't even
 ;;; exported from PCL, but it looks as though it might be useful,

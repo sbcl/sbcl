@@ -11,9 +11,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: This probably belongs in SB-INT instead of SB-KERNEL.
 ;;; And couldn't it be limited to FIXNUM arguments?
 (defun positive-primep (x)

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 #!-sb-fluid (declaim (freeze-type logical-pathname logical-host))
 
 ;;; host methods

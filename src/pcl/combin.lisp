@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defun get-method-function (method &optional method-alist wrappers)
   (let ((fn (cadr (assoc method method-alist))))

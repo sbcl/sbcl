@@ -9,9 +9,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
-  "$Header$")
-
 (defmacro defenum ((&key (prefix "") (suffix "") (start 0) (step 1))
 		   &rest identifiers)
   (let ((results nil)

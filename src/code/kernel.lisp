@@ -11,9 +11,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (defun get-header-data (x)
   #!+sb-doc
   "Return the 24 bits of data in the header of object X, which must be an

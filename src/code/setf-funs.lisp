@@ -12,9 +12,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (eval-when (:compile-toplevel :execute)
 
 (defun compute-one-setter (name type)

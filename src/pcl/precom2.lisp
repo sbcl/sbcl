@@ -23,7 +23,4 @@
 
 (in-package "SB-PCL")
 
-(sb-int:file-comment
-  "$Header$")
-
 (precompile-random-code-segments pcl)

@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 /* FIXME: Aren't symbols with underscore prefixes supposed to be
  * reserved for system libraries? Perhaps rename stuff like this
  * to names like INCLUDED_SBCL_RUNTIME_H. */

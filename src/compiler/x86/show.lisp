@@ -12,9 +12,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 ;;; FIXME: should probably become conditional on #!+SB-SHOW
 ;;; FIXME: should be called DEBUG-PRINT or COLD-PRINT
 (define-vop (print)

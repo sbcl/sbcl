@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 (define-vop (debug-cur-sp)
   (:translate current-sp)
   (:policy :fast-safe)

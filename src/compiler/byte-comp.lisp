@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;;; the fasl file format that we use
 (defconstant byte-fasl-file-version 1)
 

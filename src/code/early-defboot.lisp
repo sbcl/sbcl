@@ -12,9 +12,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 ;;; helper function for various macros which expect clauses of a given
 ;;; length, etc. 
 ;;;

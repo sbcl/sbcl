@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>

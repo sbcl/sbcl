@@ -14,9 +14,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; !COLD-INIT calls this twice to initialize the cookies, once before
 ;;; any toplevel forms are executed, then again to undo any lingering
 ;;; effects of toplevel DECLAIMs.

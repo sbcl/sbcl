@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: It's clever using :SUFFIX -TYPE for these things, but it's
 ;;; a pain for people just learning to find their way around the code
 ;;; who want to figure out where things like EVEN-FIXNUM type are

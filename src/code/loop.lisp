@@ -66,9 +66,6 @@
 
 (in-package "SB!LOOP")
 
-(sb!int:file-comment
- "$Header$")
-
 ;;;; The design of this LOOP is intended to permit, using mostly the same
 ;;;; kernel of code, up to three different "loop" macros:
 ;;;;

@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef _BREAKPOINT_H_
 #define _BREAKPOINT_H_
 

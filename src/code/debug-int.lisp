@@ -12,9 +12,6 @@
 
 (in-package "SB!DI")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: There are an awful lot of package prefixes in this code.
 ;;; Couldn't we have SB-DI use the SB-C and SB-VM packages?
 

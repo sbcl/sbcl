@@ -15,9 +15,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (declaim (maybe-inline get %put getf remprop %putf get-properties keywordp))
 
 (defun symbol-value (variable)

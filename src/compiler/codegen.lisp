@@ -13,9 +13,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;;; utilities used during code generation
 

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defun query-readline ()
   (force-output *query-io*)
   (string-trim " 	" (read-line *query-io*)))

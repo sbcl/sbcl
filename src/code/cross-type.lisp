@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; (This was a useful warning when trying to get bootstrapping
 ;;; to work, but it's mostly irrelevant noise now that the system
 ;;; works.)

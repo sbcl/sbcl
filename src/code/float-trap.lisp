@@ -14,9 +14,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
-  "$Header$")
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defconstant float-trap-alist

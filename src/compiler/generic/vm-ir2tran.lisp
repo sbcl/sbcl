@@ -9,9 +9,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((cont (node-cont node))
 	 (locs (continuation-result-tns cont

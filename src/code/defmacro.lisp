@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; the guts of the DEFMACRO macro, pulled out into a separate
 ;;; function in order to make it easier to express the common 
 ;;; bootstrap idiom

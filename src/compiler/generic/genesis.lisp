@@ -25,9 +25,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; a magic number used to identify our core files
 (defconstant core-magic
   (logior (ash (char-code #\S) 24)

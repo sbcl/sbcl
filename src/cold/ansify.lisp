@@ -10,8 +10,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;;; $Header$
-
 #+clisp
 (locally
 

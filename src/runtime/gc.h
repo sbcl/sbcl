@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef _GC_H_
 #define _GC_H_
 

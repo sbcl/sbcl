@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifdef sun
 #ifndef MACH
 #if !defined(SUNOS) && !defined(SOLARIS)

@@ -17,9 +17,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; A bootstrap MAKE-LOAD-FORM method can be a function or the name
 ;;; of a function.
 (deftype def!struct-type-make-load-form-fun () '(or function symbol))

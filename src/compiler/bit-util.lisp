@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 #!-sb-fluid
 (declaim (inline clear-bit-vector set-bit-vector bit-vector-replace
 		 bit-vector-copy))

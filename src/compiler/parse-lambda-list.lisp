@@ -9,9 +9,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Break a lambda-list into its component parts. We return eleven
 ;;; values:
 ;;;  1. A list of the required args.

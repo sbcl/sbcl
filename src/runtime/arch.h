@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #ifndef __ARCH_H__
 #define __ARCH_H__
 

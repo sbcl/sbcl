@@ -9,9 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (sb!alien:def-alien-routine ("purify" %purify) sb!c-call:void
   (static-roots sb!c-call:unsigned-long)
   (read-only-roots sb!c-call:unsigned-long))

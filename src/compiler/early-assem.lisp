@@ -11,9 +11,6 @@
 
 (in-package "SB!ASSEM")
 
-(sb!int:file-comment
-  "$Header$")
-
 ;;; FIXME: It might make sense to use SB!VM:BYTE-FOO values here
 ;;; instead of the various ASSEMBLY-UNIT-FOO things, and then define a
 ;;; BYTE type. One problem: BYTE is exported from the CL package, so

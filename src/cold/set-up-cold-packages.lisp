@@ -9,8 +9,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 ;;; an entry in the table which describes the non-standard part (i.e. not
 ;;; CL/CL-USER/KEYWORD) of the package structure of the SBCL system
 ;;;

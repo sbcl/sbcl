@@ -20,9 +20,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; We compile some trivial character operations via inline expansion.
 #!-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p

@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; DEF!METHOD = cold DEFMETHOD, a version of DEFMETHOD which, when used
 ;;; before real CLOS DEFMETHOD is available, saves up its definition to be
 ;;; executed later when CLOS is available

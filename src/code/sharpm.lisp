@@ -8,9 +8,6 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
-(file-comment
-  "$Header$")
 
 (declaim (special *read-suppress* *standard-readtable* *bq-vector-flag*))
 

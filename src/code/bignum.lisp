@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!BIGNUM")
-
-(file-comment
-  "$Header$")
 
 ;;;; notes
 

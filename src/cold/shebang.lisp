@@ -10,8 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB-COLD")
-
-;;;; $Header$
 
 ;;;; definition of #!+ and #!- as a mechanism analogous to #+/#-,
 ;;;; but redirectable to any list of features. (This is handy when

@@ -15,9 +15,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: The COMMON-LISP specials here are already handled in
 ;;; cl-specials.lisp.
 (declaim (special *keyword-package* *cl-package* *package* *query-io*

@@ -11,11 +11,9 @@
 
 (in-package "SB-DEBUG")
 
-(file-comment
-  "$Header$")
-
-;;; FIXME: Why, oh why, doesn't the SB-DEBUG package use the SB-DI package?
-;;; That would let us get rid of a whole lot of stupid prefixes..
+;;; FIXME: Why, oh why, doesn't the SB-DEBUG package use the SB-DI
+;;; package? That would let us get rid of a whole lot of stupid
+;;; prefixes..
 
 (defvar *trace-values* nil
   #+sb-doc

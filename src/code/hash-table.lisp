@@ -12,9 +12,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; an internal tag for marking empty slots
 ;;;
 ;;; CMU CL 18b used :EMPTY for this purpose, which was somewhat nasty

@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!ALIEN")
-
-(file-comment
-  "$Header$")
 
 ;;;; utility functions
 

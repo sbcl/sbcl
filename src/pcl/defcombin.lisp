@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defmacro define-method-combination (&whole form &rest args)
   (declare (ignore args))

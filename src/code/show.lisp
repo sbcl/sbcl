@@ -44,10 +44,6 @@
   etc."
   (declare (ignore string))
   '(values))
-
-;;; Now that we've got it, we can use it.
-(file-comment
-  "$Header$")
 
 ;;;; various SB-SHOW-dependent forms
 

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (deftype file-stream () 'fd-stream)
 
 ;;;; buffer manipulation routines

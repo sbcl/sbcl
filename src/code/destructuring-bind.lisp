@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defmacro-mundanely destructuring-bind (lambda-list arg-list &rest body)
   #!+sb-doc
   "Bind the variables in LAMBDA-LIST to the contents of ARG-LIST."

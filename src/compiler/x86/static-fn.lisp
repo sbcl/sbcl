@@ -11,9 +11,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
- "$Header$")
-
 (define-vop (static-function-template)
   (:save-p t)
   (:policy :safe)

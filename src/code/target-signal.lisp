@@ -11,9 +11,6 @@
 
 (in-package "SB!UNIX")
 
-(file-comment
-  "$Header$")
-
 ;;; These should probably be somewhere, but I don't know where.
 (defconstant sig_dfl 0)
 (defconstant sig_ign 1)

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; information about non-Lisp-level linkage
 ;;;
 ;;; Note:

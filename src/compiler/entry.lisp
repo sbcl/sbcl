@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; This phase runs before IR2 conversion, initializing each XEP's
 ;;; Entry-Info structure. We call the VM-supplied
 ;;; Select-Component-Format function to make VM-dependent

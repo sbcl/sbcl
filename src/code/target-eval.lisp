@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: These probably belong in some package other than SB!IMPL.
 ;;; Perhaps SB!KERNEL?
 

@@ -9,9 +9,6 @@
 
 (in-package "SB!FORMAT")
 
-(file-comment
-  "$Header$")
-
 (defparameter *format-whitespace-chars*
   (vector #\space
 	  #\newline

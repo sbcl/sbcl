@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; The component that is currently being compiled. TNs are allocated
 ;;; in this component.
 (defvar *component-being-compiled*)

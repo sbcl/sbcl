@@ -22,9 +22,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (!begin-collecting-cold-init-forms)
 
 ;;; Define the translation from a type-specifier to a type structure for

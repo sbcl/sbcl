@@ -4,9 +4,6 @@
 ;;;; Carnegie Mellon University, and has been placed in the public
 ;;;; domain.
 
-(sb!int:file-comment
-  "$Header$")
-
 (in-package "SB!SYS")
 
 ;;;; Check that target machine features are set up consistently with

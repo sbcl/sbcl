@@ -15,9 +15,6 @@
 ;;; I wonder whether the separation of the disassembler from the
 ;;; virtual machine is valid or adds value.
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: In CMU CL, the code in this file seems to be fully
 ;;; compiled, not byte compiled. I'm not sure that's reasonable:
 ;;; there's a lot of code in this file, and considering the overall

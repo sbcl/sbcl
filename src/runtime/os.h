@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #if !defined(_OS_H_INCLUDED_)
 
 #define _OS_H_INCLUDED_

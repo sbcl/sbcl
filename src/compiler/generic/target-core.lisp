@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Make a function entry, filling in slots from the ENTRY-INFO.
 (defun make-function-entry (entry code-obj object)
   (declare (type entry-info entry) (type core-object object))

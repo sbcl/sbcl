@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant in-buffer-length 512 "the size of a stream in-buffer"))
 

@@ -11,9 +11,6 @@
 
 (in-package "SB-INSPECT")
 
-(file-comment
-  "$Header$")
-
 ;;; The inspector views LISP objects as being composed of parts. A
 ;;; list, for example, would be divided into its members, and a
 ;;; instance into its slots. These parts are stored in a list. The

@@ -11,9 +11,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; Common Lisp special variables which have SB-XC versions
 (proclaim '(special sb!xc:*macroexpand-hook*))
 

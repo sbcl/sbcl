@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
- "$Header$")
-
 (def!macro sb!xc:deftype (name arglist &body body)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."

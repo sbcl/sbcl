@@ -11,9 +11,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 
 ;;; The LEXENV represents the lexical environment used for IR1 conversion.

@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; This file is (almost) functionally equivalent to dlap.lisp, but easier to
 ;;; read.

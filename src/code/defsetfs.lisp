@@ -12,9 +12,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(sb!int:file-comment
-  "$Header$")
-
 (sb!int:/show0 "entering defsetfs.lisp")
 
 ;;; from alieneval.lisp

@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 #+sb-xc-host
 (defmacro def!method (&rest args)
   `(defmethod ,@args))

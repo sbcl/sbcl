@@ -14,8 +14,6 @@
 
 (in-package "SB-COLD")
 
-;;;; $Header$
-
 (defvar *target-object-file-names*)
 
 ;;; KLUDGE..

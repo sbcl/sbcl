@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
- "$Header$")
-
 ;;;; fast-read operations
 ;;;;
 ;;;; (Portable versions of these are needed at cross-compile time because

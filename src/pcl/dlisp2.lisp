@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 (defun emit-reader/writer-function (reader/writer 1-or-2-class class-slot-p)
   (values

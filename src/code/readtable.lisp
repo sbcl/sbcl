@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (sb!xc:deftype attribute-table ()
   '(simple-array (unsigned-byte 8) (#.char-code-limit)))
 

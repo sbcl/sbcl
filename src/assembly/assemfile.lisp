@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 (defvar *do-assembly* nil
   #!+sb-doc "If non-NIL, emit assembly code. If NIL, emit VOP templates.")

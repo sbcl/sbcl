@@ -12,9 +12,6 @@
 
 (in-package "SB!CONDITIONS")
 
-(sb!int:file-comment
-  "$Header$")
-
 (defvar *break-on-signals* nil
   #!+sb-doc
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will

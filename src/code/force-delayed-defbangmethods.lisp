@@ -9,9 +9,6 @@
 
 (in-package "SB-IMPL")
 
-(file-comment
-  "$Header$")
-
 (macrolet ((force-delayed-def!methods ()
 	     `(progn
 		,@(mapcar (lambda (args)

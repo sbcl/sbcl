@@ -6,9 +6,6 @@
 ;;;; This software is in the public domain and is provided with absolutely no
 ;;;; warranty. See the COPYING and CREDITS files for more information.
 
-(sb-int:file-comment
-  "$Header$")
-
 (in-package "SB-PCL")
 
 ;;; Note some cases are handled by the documentation methods in

@@ -9,9 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 ;;; the size of the chunks returned by RANDOM-CHUNK
 (defconstant random-chunk-length 32)
 

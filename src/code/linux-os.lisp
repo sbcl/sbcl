@@ -11,10 +11,8 @@
 
 (in-package "SB!SYS")
 
-(file-comment
-  "$Header$")
-
-;;; Check that target machine features are set up consistently with this file.
+;;; Check that target machine features are set up consistently with
+;;; this file.
 #!-linux (error "missing :LINUX feature")
 
 (defun software-type ()

@@ -13,9 +13,6 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 (defun error-number-or-lose (name)
   (or (position name sb!c:*backend-internal-errors* :key #'car)
       (error "unknown internal error: ~S" name)))

@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defun backq-unparse-expr (form splicing)
   (ecase splicing
     ((nil)

@@ -16,7 +16,4 @@
 
 (in-package "SB!KERNEL")
 
-(file-comment
-  "$Header$")
-
 #+sb-xc-host (force-delayed-def!structs)

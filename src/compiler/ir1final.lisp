@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Give the user grief about optimizations that we weren't able to do. It
 ;;; is assumed that they want to hear, or there wouldn't be any entries in the
 ;;; table. If the node has been deleted or is no longer a known call, then do

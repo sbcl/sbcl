@@ -15,9 +15,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Do environment analysis on the code in Component. This involves
 ;;; various things:
 ;;;  1. Make an Environment structure for each non-let lambda, assigning 

@@ -17,9 +17,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defmacro-mundanely psetf (&rest args &environment env)
   #!+sb-doc
   "This is to SETF as PSETQ is to SETQ. Args are alternating place

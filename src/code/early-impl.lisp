@@ -9,9 +9,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
- "$Header$")
-
 ;;; entries in STATIC-SYMBOLS table, references to which can be compiled
 ;;; as though they're special variables
 (declaim (special *posix-argv*

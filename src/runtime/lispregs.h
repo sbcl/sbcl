@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #if defined(mips) || defined(irix)
 #include "mips-lispregs.h"
 #endif

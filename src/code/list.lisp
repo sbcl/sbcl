@@ -11,9 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;;; KLUDGE: comment from CMU CL, what does it mean?
 ;;;;   NSUBLIS, things at the beginning broken.
 ;;;; -- WHN 20000127

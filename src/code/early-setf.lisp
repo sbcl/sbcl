@@ -17,9 +17,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 ;;; The inverse for a generalized-variable reference function is stored in
 ;;; one of two ways:
 ;;;

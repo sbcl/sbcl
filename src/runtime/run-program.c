@@ -13,10 +13,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>

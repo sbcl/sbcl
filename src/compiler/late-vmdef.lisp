@@ -12,9 +12,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (defun note-this-location (vop kind)
   #!+sb-doc
   "NOTE-THIS-LOCATION VOP Kind

@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 /* FIXME: I wonder what this stuff is for. A comment or two would be
  * nice.. */
 

@@ -25,9 +25,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; defconstructor is used to define special purpose functions which just
 ;;; call make-instance with a symbol as the first argument. The semantics

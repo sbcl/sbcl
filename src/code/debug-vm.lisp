@@ -12,9 +12,6 @@
 
 (in-package "SB!VM")
 
-(file-comment
-  "$Header$")
-
 (defconstant bogus-lra-constants 2)
 (defconstant real-lra-slot (+ code-constants-offset 0))
 (defconstant known-return-p-slot (+ code-constants-offset 1))

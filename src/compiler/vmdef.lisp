@@ -12,17 +12,14 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; Return the template having the specified name, or die trying.
 (defun template-or-lose (x)
   (the template
        (or (gethash x *backend-template-names*)
 	   (error "~S is not a defined template." x))))
 
-;;; Return the SC structure, SB structure or SC number corresponding to a
-;;; name, or die trying.
+;;; Return the SC structure, SB structure or SC number corresponding
+;;; to a name, or die trying.
 (defun sc-or-lose (x)
   (the sc
        (or (gethash x *backend-sc-names*)

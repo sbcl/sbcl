@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 #include "lispregs.h"
 
 char *lisp_register_names[] = { REGNAMES, 0 };

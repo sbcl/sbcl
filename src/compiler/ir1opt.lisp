@@ -15,9 +15,6 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
-
-(file-comment
-  "$Header$")
 
 ;;;; interface for obtaining results of constant folding
 

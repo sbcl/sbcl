@@ -16,10 +16,6 @@
  * files for more information.
  */
 
-/*
- * $Header$
- */
-
 /* the number of registers visible as registers in the virtual machine
  * (excludes stuff like segment registers) */
 #define NREGS	(8)

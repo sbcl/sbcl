@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-
-(file-comment
-  "$Header$")
 
 ;;;; internal errors
 

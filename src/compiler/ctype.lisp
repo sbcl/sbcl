@@ -13,9 +13,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; These are the functions that are to be called when a problem is
 ;;; detected. They are passed format arguments. If null, we don't do
 ;;; anything. The error function is called when something is

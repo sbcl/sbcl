@@ -11,9 +11,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 (defknown %load-time-value (t) t (flushable movable))
 
 (def-ir1-translator load-time-value ((form &optional read-only-p) start cont)

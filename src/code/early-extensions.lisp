@@ -18,9 +18,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 ;;; a type used for indexing into arrays, and for related quantities
 ;;; like lengths of lists
 ;;;

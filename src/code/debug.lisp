@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!DEBUG")
-
-(file-comment
-  "$Header$")
 
 ;;;; variables and constants
 

@@ -13,9 +13,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment
-  "$Header$")
-
 (defvar *load-source-types* '("lisp" "l" "cl" "lsp")
   #!+sb-doc
   "The source file types which LOAD recognizes.")

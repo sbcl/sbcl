@@ -12,12 +12,9 @@
 
 (in-package "SB!SYS")
 
-(file-comment
-  "$Header$")
-
-;;; SYSTEM-AREA-POINTER is not a primitive type in ANSI Common Lisp, so we
-;;; need a compound type to represent it in the host Common Lisp at
-;;; cross-compile time:
+;;; SYSTEM-AREA-POINTER is not a primitive type in ANSI Common Lisp,
+;;; so we need a compound type to represent it in the host Common Lisp
+;;; at cross-compile time:
 (defstruct (system-area-pointer (:constructor make-sap) (:conc-name "SAP-"))
   ;; the integer representation of the address
   (int (error "missing SAP-INT argument") :type sap-int-type :read-only t))

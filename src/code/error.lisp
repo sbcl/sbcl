@@ -13,9 +13,6 @@
 
 (in-package "SB!CONDITIONS")
 
-(sb!int:file-comment
-  "$Header$")
-
 (define-condition simple-style-warning (simple-condition style-warning) ())
 
 ;;; not sure this is the right place, but where else?

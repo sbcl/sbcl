@@ -12,9 +12,6 @@
 
 (in-package "COMMON-LISP")
 
-(sb!int:file-comment
-  "$Header$")
-
 (sb!xc:proclaim '(special cl:*
 			  cl:**
 			  cl:***

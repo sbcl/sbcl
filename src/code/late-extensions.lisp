@@ -9,9 +9,6 @@
 
 (in-package "SB!EXT")
 
-(file-comment
-  "$Header$")
-
 (defun featurep (x)
   #!+sb-doc
   "If X is an atom, see whether it is present in *FEATURES*. Also

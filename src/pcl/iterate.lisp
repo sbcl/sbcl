@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-ITERATE")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; Are warnings to be issued for iterate/gather forms that aren't optimized?
 ;;;   NIL   => never

@@ -11,9 +11,6 @@
 
 (in-package "SB!C")
 
-(file-comment
-  "$Header$")
-
 ;;; FIXME: It would be good to implement SB!XC:DEFCONSTANT, and use
 ;;; use that here, so that the compiler is born knowing this value.
 ;;; FIXME: Add a comment telling whether this holds for all vectors

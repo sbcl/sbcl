@@ -22,9 +22,6 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-(sb-int:file-comment
-  "$Header$")
 
 ;;; The built-in method combination types as taken from page 1-31 of 88-002R.
 ;;; Note that the STANDARD method combination type is defined by hand in the

@@ -11,8 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(file-comment "$Header$")
-
 (defun %compiler-deftype (name expander &optional doc)
   (ecase (info :type :kind name)
     (:primitive
