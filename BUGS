@@ -1290,6 +1290,21 @@ WORKAROUND:
   * (baz t)
   1
 
+220: 
+  Sbcl 0.7.9 fails to compile
+
+  (multiple-value-call #'list
+    (the integer (helper))
+    nil)
+
+  Type check for INTEGER is inserted, the result of which serves as
+  the first argument of M-V-C, is inserted after evaluation of NIL. So
+  arguments of M-V-C are pushed in the wrong order. As a temporary
+  workaround type checking was disabled for M-V-Cs in 0.7.9.13. A
+  better solution would be to put a check between evaluation of
+  arguments, but it could be tricky to check result types of PROG1, IF
+  etc.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

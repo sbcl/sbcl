@@ -106,4 +106,14 @@
 	     (make-array 3 :element-type t :initial-element 0))
 	    nil))
 
+;;; bug 220: type check inserted after all arguments in MV-CALL caused
+;;; failure of stack analysis
+(defun bug220-helper ()
+  13)
+(assert (equal (multiple-value-call #'list
+                 (the integer (bug220-helper))
+                 nil)
+               '(13 nil)))
+
 (sb-ext:quit :unix-status 104) ; success
+

@@ -260,6 +260,9 @@
 	   (let ((kind (basic-combination-kind dest)))
 	     (cond ((eq cont (basic-combination-fun dest)) t)
 		   ((eq kind :local) t)
+                   ((mv-combination-p dest)
+                    ;; See bug 220
+                    nil)
                    ((not (eq (continuation-asserted-type cont)
                              (continuation-externally-checkable-type cont)))
                     ;; There is an explicit assertion.
