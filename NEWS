@@ -1397,7 +1397,9 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        symbol-macro places;
     ** NCONC accepts any object as its last argument
     ** :COUNT argument to sequence functions may be BIGNUM (thanks to
-       Gerd Moellman)
+       Gerd Moellman);
+    ** Loop-package does not require a package to be explicitely
+       specified;
   * fixed bug 166: compiler preserves "there is a way to go"
     invariant when deleting code.
   * fixed bug 172: macro lambda lists with required arguments after

@@ -311,7 +311,9 @@
   (test-constraint nil :type (or sset null)))
 (def!method print-object ((cblock cblock) stream)
   (print-unreadable-object (cblock stream :type t :identity t)
-    (format stream ":START c~W" (cont-num (block-start cblock)))))
+    (format stream "~W :START c~W"
+            (block-number cblock)
+            (cont-num (block-start cblock)))))
 
 ;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
 ;;; different BLOCK-INFO annotation structures so that code

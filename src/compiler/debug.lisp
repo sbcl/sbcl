@@ -949,56 +949,58 @@
 ;;; representing what the code does.
 (defun print-nodes (block)
   (setq block (block-or-lose block))
-  (format t "~%block start c~D" (cont-num (block-start block)))
+  (pprint-logical-block (nil nil)
+    (format t "~:@_IR1 block ~D start c~D"
+           (block-number block) (cont-num (block-start block)))
 
-  (let ((last (block-last block)))
-    (terpri)
-    (do ((cont (block-start block) (node-cont (continuation-next cont))))
-	(())
-      (let ((node (continuation-next cont)))
-	(format t "~3D: " (cont-num (node-cont node)))
-	(etypecase node
-	  (ref (print-leaf (ref-leaf node)))
-	  (basic-combination
-	   (let ((kind (basic-combination-kind node)))
-	     (format t "~(~A ~A~) c~D"
-		     (if (fun-info-p kind) "known" kind)
-		     (type-of node)
-		     (cont-num (basic-combination-fun node)))
-	     (dolist (arg (basic-combination-args node))
-	       (if arg
-		   (print-continuation arg)
-		   (format t " <none>")))))
-	  (cset
-	   (write-string "set ")
-	   (print-leaf (set-var node))
-	   (print-continuation (set-value node)))
-	  (cif
-	   (format t "if c~D" (cont-num (if-test node)))
-	   (print-continuation (block-start (if-consequent node)))
-	   (print-continuation (block-start (if-alternative node))))
-	  (bind
-	   (write-string "bind ")
-	   (print-leaf (bind-lambda node)))
-	  (creturn
-	   (format t "return c~D " (cont-num (return-result node)))
-	   (print-leaf (return-lambda node)))
-	  (entry
-	   (format t "entry ~S" (entry-exits node)))
-	  (exit
-	   (let ((value (exit-value node)))
-	     (cond (value
-		    (format t "exit c~D" (cont-num value)))
-		   ((exit-entry node)
-		    (format t "exit <no value>"))
-		   (t
-		    (format t "exit <degenerate>"))))))
-	(terpri)
-	(when (eq node last) (return)))))
+    (let ((last (block-last block)))
+     (pprint-newline :mandatory)
+     (do ((cont (block-start block) (node-cont (continuation-next cont))))
+         ((not cont))
+       (let ((node (continuation-next cont)))
+         (format t "~3D: " (cont-num (node-cont node)))
+         (etypecase node
+           (ref (print-leaf (ref-leaf node)))
+           (basic-combination
+            (let ((kind (basic-combination-kind node)))
+              (format t "~(~A ~A~) c~D"
+                      (if (fun-info-p kind) "known" kind)
+                      (type-of node)
+                      (cont-num (basic-combination-fun node)))
+              (dolist (arg (basic-combination-args node))
+                (if arg
+                    (print-continuation arg)
+                    (format t " <none>")))))
+           (cset
+            (write-string "set ")
+            (print-leaf (set-var node))
+            (print-continuation (set-value node)))
+           (cif
+            (format t "if c~D" (cont-num (if-test node)))
+            (print-continuation (block-start (if-consequent node)))
+            (print-continuation (block-start (if-alternative node))))
+           (bind
+            (write-string "bind ")
+            (print-leaf (bind-lambda node)))
+           (creturn
+            (format t "return c~D " (cont-num (return-result node)))
+            (print-leaf (return-lambda node)))
+           (entry
+            (format t "entry ~S" (entry-exits node)))
+           (exit
+            (let ((value (exit-value node)))
+              (cond (value
+                     (format t "exit c~D" (cont-num value)))
+                    ((exit-entry node)
+                     (format t "exit <no value>"))
+                    (t
+                     (format t "exit <degenerate>"))))))
+         (pprint-newline :mandatory)
+         (when (eq node last) (return)))))
 
-  (let ((succ (block-succ block)))
-    (format t "successors~{ c~D~}~%"
-	    (mapcar (lambda (x) (cont-num (block-start x))) succ)))
+   (let ((succ (block-succ block)))
+     (format t "successors~{ c~D~}~%"
+             (mapcar (lambda (x) (cont-num (block-start x))) succ))))
   (values))
 
 ;;; Print the guts of a TN. (logic shared between PRINT-OBJECT (TN T)
@@ -1050,27 +1052,29 @@
     (when (vop-results vop)
       (princ "=> ")
       (print-operands (vop-results vop))))
-  (terpri))
+  (pprint-newline :mandatory))
 
 ;;; Print the VOPs in the specified IR2 block.
 (defun print-ir2-block (block)
   (declare (type ir2-block block))
-  (cond
-   ((eq (block-info (ir2-block-block block)) block)
-    (format t "~%IR2 block start c~D~%"
-	    (cont-num (block-start (ir2-block-block block))))
-    (let ((label (ir2-block-%label block)))
-      (when label
-	(format t "L~D:~%" (label-id label)))))
-   (t
-    (format t "<overflow>~%")))
+  (pprint-logical-block (*standard-output* nil)
+    (cond
+      ((eq (block-info (ir2-block-block block)) block)
+       (format t "~:@_IR2 block ~D start c~D~:@_"
+               (ir2-block-number block)
+               (cont-num (block-start (ir2-block-block block))))
+       (let ((label (ir2-block-%label block)))
+         (when label
+           (format t "L~D:~:@_" (label-id label)))))
+      (t
+       (format t "<overflow>~:@_")))
 
-  (do ((vop (ir2-block-start-vop block)
-	    (vop-next vop))
-       (number 0 (1+ number)))
-      ((null vop))
-    (format t "~W: " number)
-    (print-vop vop)))
+    (do ((vop (ir2-block-start-vop block)
+              (vop-next vop))
+         (number 0 (1+ number)))
+        ((null vop))
+      (format t "~W: " number)
+      (print-vop vop))))
 
 ;;; This is like PRINT-NODES, but dumps the IR2 representation of the
 ;;; code in BLOCK.
@@ -1084,9 +1088,24 @@
   (values))
 
 ;;; Scan the IR2 blocks in emission order.
-(defun print-ir2-blocks (thing)
-  (do-ir2-blocks (block (block-component (block-or-lose thing)))
-    (print-ir2-block block))
+(defun print-ir2-blocks (thing &optional full)
+  (let* ((block (component-head (block-component (block-or-lose thing))))
+         (2block (block-info block)))
+    (pprint-logical-block (nil nil)
+      (loop while 2block
+         do (setq block (ir2-block-block 2block))
+         do (pprint-logical-block (*standard-output* nil)
+              (if full
+                  (print-nodes block)
+                  (format t "IR1 block ~D start c~D"
+                          (block-number block)
+                          (cont-num (block-start block))))
+              (pprint-indent :block 4)
+              (pprint-newline :mandatory)
+              (loop while (and 2block (eq (ir2-block-block 2block) block))
+                 do (print-ir2-block 2block)
+                 do (setq 2block (ir2-block-next 2block))))
+         do (pprint-newline :mandatory))))
   (values))
 
 ;;; Do a PRINT-NODES on BLOCK and all blocks reachable from it by
@@ -1156,6 +1175,9 @@
 	   (clrhash *list-conflicts-table*)
 	   (do ((conf confs (global-conflicts-next-tnwise conf)))
 	       ((null conf))
+             (format t "~&#<block ~D kind ~S>~%"
+                     (block-number (ir2-block-block (global-conflicts-block conf)))
+                     (global-conflicts-kind conf))
 	     (let ((block (global-conflicts-block conf)))
 	       (add-always-live-tns block tn)
 	       (if (eq (global-conflicts-kind conf) :live)

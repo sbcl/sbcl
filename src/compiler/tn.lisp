@@ -442,6 +442,7 @@
 ;;; Return the value of an immediate constant TN.
 (defun tn-value (tn)
   (declare (type tn tn))
+  ;; FIXME: What is :CACHED-CONSTANT?
   (aver (member (tn-kind tn) '(:constant :cached-constant)))
   (constant-value (tn-leaf tn)))
 
@@ -455,7 +456,7 @@
     (unless (and (not (sc-save-p sc))
 		 (eq (sb-kind (sc-sb sc)) :unbounded))
       (dolist (alt (sc-alternate-scs sc)
-		   (error "SC ~S has no :unbounded :save-p NIL alternate SC."
+		   (error "SC ~S has no :UNBOUNDED :SAVE-P NIL alternate SC."
 			  (sc-name sc)))
 	(when (and (not (sc-save-p alt))
 		   (eq (sb-kind (sc-sb alt)) :unbounded))

@@ -242,6 +242,8 @@
   ;; CONSTANT-TNs are non-packed TNs that represent constants.
   ;; :CONSTANT TNs may eventually be converted to :CACHED-CONSTANT
   ;; normal TNs.
+  ;;
+  ;; FIXME: What is :CACHED-CONSTANT?
   (normal-tns nil :type (or tn null))
   (restricted-tns nil :type (or tn null))
   (wired-tns nil :type (or tn null))
