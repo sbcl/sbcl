@@ -23,7 +23,7 @@
 	      primitive-type-name
 	      &key (n-pad-elements 0) complex-typecode (importance 0)
 	      &aux (typecode
-		    (eval (symbolicate primitive-type-name "-WIDETAG")))))
+		    (symbol-value (symbolicate primitive-type-name "-WIDETAG")))))
 	    (:copier nil))
   ;; the element specifier, e.g. BASE-CHAR or (UNSIGNED-BYTE 4)
   (specifier (missing-arg) :type type-specifier :read-only t)
