@@ -1903,6 +1903,8 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
   * bug fix: CERROR accepts a function as its first argument.
   * bug fix: NTH an NTHCDR accept a bignum as index
     arguments. (reported by Adam Warner)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** LAST and [N]BUTLAST should accept a bignum.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

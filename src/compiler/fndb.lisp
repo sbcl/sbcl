@@ -686,7 +686,7 @@
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
 (defknown nth (unsigned-byte list) t (foldable flushable))
 (defknown nthcdr (unsigned-byte list) t (foldable unsafely-flushable))
-(defknown last (list &optional index) t (foldable flushable))
+(defknown last (list &optional unsigned-byte) t (foldable flushable))
 (defknown list (&rest t) list (movable flushable unsafe))
 (defknown list* (t &rest t) t (movable flushable unsafe))
 (defknown make-list (index &key (:initial-element t)) list
@@ -707,8 +707,8 @@
 (defknown nconc (&rest t) t ())
 
 (defknown nreconc (list t) t ())
-(defknown butlast (list &optional index) list (flushable))
-(defknown nbutlast (list &optional index) list ())
+(defknown butlast (list &optional unsigned-byte) list (flushable))
+(defknown nbutlast (list &optional unsigned-byte) list ())
 (defknown ldiff (list t) list (flushable))
 (defknown (rplaca rplacd) (cons t) list (unsafe))
 

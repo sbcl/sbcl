@@ -11,6 +11,8 @@
 
 (in-package "SB!IMPL")
 
+;;; Limitation: no list might have more than INDEX conses.
+
 ;;;; KLUDGE: comment from CMU CL, what does it mean?
 ;;;;   NSUBLIS, things at the beginning broken.
 ;;;; -- WHN 20000127
@@ -231,14 +233,15 @@
 (defun last (list &optional (n 1))
   #!+sb-doc
   "Return the last N conses (not the last element!) of a list."
-  (declare (type index n))
-  (do ((checked-list list (cdr checked-list))
-       (returned-list list)
-       (index 0 (1+ index)))
-      ((atom checked-list) returned-list)
-    (declare (type index index))
-    (if (>= index n)
-	(pop returned-list))))
+  (if (typep n 'index)
+      (do ((checked-list list (cdr checked-list))
+           (returned-list list)
+           (index 0 (1+ index)))
+          ((atom checked-list) returned-list)
+        (declare (type index index))
+        (if (>= index n)
+            (pop returned-list)))
+      list))
 
 (defun list (&rest args)
   #!+sb-doc
@@ -417,30 +420,34 @@
 	   (declare (type index result)))))
   (declare (ftype (function (t) index) count-conses))
   (defun butlast (list &optional (n 1))
-    (let ((n-conses-in-list (count-conses list)))
-      (cond ((zerop n)
-	     ;; (We can't use SUBSEQ in this case because LIST isn't
-	     ;; necessarily a proper list, but SUBSEQ expects a
-	     ;; proper sequence. COPY-LIST isn't so fussy.)
-	     (copy-list list))
-	    ((>= n n-conses-in-list)
-	     nil)
-	    (t
-	     ;; (LIST isn't necessarily a proper list in this case
-	     ;; either, and technically SUBSEQ wants a proper
-	     ;; sequence, but no reasonable implementation of SUBSEQ
-	     ;; will actually walk down to the end of the list to
-	     ;; check, and since we're calling our own implementation
-	     ;; we know it's reasonable, so it's OK.)
-	     (subseq list 0 (- n-conses-in-list n))))))
+    (if (typep n 'index)
+        (let ((n-conses-in-list (count-conses list)))
+          (cond ((zerop n)
+                 ;; (We can't use SUBSEQ in this case because LIST isn't
+                 ;; necessarily a proper list, but SUBSEQ expects a
+                 ;; proper sequence. COPY-LIST isn't so fussy.)
+                 (copy-list list))
+                ((>= n n-conses-in-list)
+                 nil)
+                (t
+                 ;; (LIST isn't necessarily a proper list in this case
+                 ;; either, and technically SUBSEQ wants a proper
+                 ;; sequence, but no reasonable implementation of SUBSEQ
+                 ;; will actually walk down to the end of the list to
+                 ;; check, and since we're calling our own implementation
+                 ;; we know it's reasonable, so it's OK.)
+                 (subseq list 0 (- n-conses-in-list n)))))
+        nil))
   (defun nbutlast (list &optional (n 1))
-    (if (zerop n)
-	list
-	(let ((n-conses-in-list (count-conses list)))
-	  (unless (<= n-conses-in-list n)
-	    (setf (cdr (nthcdr (- n-conses-in-list n 1) list))
-		  nil)
-	    list)))))
+    (cond ((zerop n)
+           list)
+          ((not (typep n 'index))
+           nil)
+          (t (let ((n-conses-in-list (count-conses list)))
+               (unless (<= n-conses-in-list n)
+                 (setf (cdr (nthcdr (- n-conses-in-list n 1) list))
+                       nil)
+                 list))))))
 
 (defun ldiff (list object)
   "Return a new list, whose elements are those of LIST that appear before

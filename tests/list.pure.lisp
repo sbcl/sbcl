@@ -124,3 +124,8 @@
   (assert (eq (nth (* 1440 most-positive-fixnum) s) 'c))
   (setf (nth (* 1440 most-positive-fixnum) s) 14)
   (assert (eq (nth (* 1440 most-positive-fixnum) s) 14)))
+
+(let ((s (copy-list '(1 2 3))))
+  (assert (eq s (last s (* 1440 most-positive-fixnum))))
+  (assert (null (butlast s (* 1440 most-positive-fixnum))))
+  (assert (null (nbutlast s (* 1440 most-positive-fixnum)))))
