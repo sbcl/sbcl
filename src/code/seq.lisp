@@ -1269,17 +1269,19 @@
   `(let* ((sequence ,(if reverse?
 			 '(reverse (the list sequence))
 			 'sequence))
+	  (%start ,(if reverse? '(- length end) 'start))
+	  (%end ,(if reverse? '(- length start) 'end))
 	  (splice (list nil))
 	  (results (do ((index 0 (1+ index))
 			(before-start splice))
-		       ((= index (the fixnum start)) before-start)
+		       ((= index (the fixnum %start)) before-start)
 		     (declare (fixnum index))
 		     (setq splice
 			   (cdr (rplacd splice (list (pop sequence))))))))
-     (do ((index start (1+ index))
+     (do ((index %start (1+ index))
 	  (this-element)
 	  (number-zapped 0))
-	 ((or (= index (the fixnum end)) (= number-zapped (the fixnum count)))
+	 ((or (= index (the fixnum %end)) (= number-zapped (the fixnum count)))
 	  (do ((index index (1+ index)))
 	      ((null sequence)
 	       ,(if reverse?
