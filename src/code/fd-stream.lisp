@@ -1079,7 +1079,7 @@
 	(:io     (values   t   t sb!unix:o_rdwr))
 	(:probe  (values   t nil sb!unix:o_rdonly)))
     (declare (type index mask))
-    (let* ((pathname (pathname filename))
+    (let* ((pathname (merge-pathnames filename))
 	   (namestring
 	    (cond ((unix-namestring pathname input))
 		  ((and input (eq if-does-not-exist :create))

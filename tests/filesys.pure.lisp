@@ -36,6 +36,22 @@
 			     (namestring pathname)))
 		   dir)))
 
+;;; Set *default-pathname-defaults* to something other than the unix
+;;; cwd, to catch functions which access the filesystem without
+;;; merging properly.  We should test more functions than just OPEN
+;;; here, of course
+
+(let ((*default-pathname-defaults*
+       (make-pathname :directory
+		      (butlast
+		       (pathname-directory *default-pathname-defaults*))
+		      :defaults *default-pathname-defaults*)))
+  ;; SBCL 0.7.1.2 failed to merge on OPEN
+  (with-open-file (i "tests/filesys.pure.lisp")
+      (assert i)))
+  
+
+
 ;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
 ;;; STREAM is not a stream associated with a file.
 ;;;
