@@ -2981,27 +2981,27 @@
 ;;; information. If X's high bound is < Y's low, then X < Y.
 ;;; Similarly, if X's low is >= to Y's high, the X >= Y (so return
 ;;; NIL). If not, at least make sure any constant arg is second.
-(macrolet ((def (name reflexive-p surely-true surely-false)
+(macrolet ((def (name inverse reflexive-p surely-true surely-false)
              `(deftransform ,name ((x y))
                 (if (same-leaf-ref-p x y)
                     ,reflexive-p
-                    (let ((x (or (type-approximate-interval (lvar-type x))
-                                 (give-up-ir1-transform)))
-                          (y (or (type-approximate-interval (lvar-type y))
-                                 (give-up-ir1-transform))))
+                    (let ((ix (or (type-approximate-interval (lvar-type x))
+                                  (give-up-ir1-transform)))
+                          (iy (or (type-approximate-interval (lvar-type y))
+                                  (give-up-ir1-transform))))
                       (cond (,surely-true
                              t)
                             (,surely-false
                              nil)
                             ((and (constant-lvar-p x)
                                   (not (constant-lvar-p y)))
-                             `(,',name y x))
+                             `(,',inverse y x))
                             (t
                              (give-up-ir1-transform))))))))
-  (def < nil (interval-< x y) (interval->= x y))
-  (def > nil (interval-< y x) (interval->= y x))
-  (def <= t (interval->= y x) (interval-< y x))
-  (def >= t (interval->= x y) (interval-< x y)))
+  (def < > nil (interval-< ix iy) (interval->= ix iy))
+  (def > < nil (interval-< iy ix) (interval->= iy ix))
+  (def <= >= t (interval->= iy ix) (interval-< iy ix))
+  (def >= <= t (interval->= ix iy) (interval-< ix iy)))
 
 (defun ir1-transform-char< (x y first second inverse)
   (cond

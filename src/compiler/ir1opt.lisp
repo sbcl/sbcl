@@ -21,6 +21,7 @@
 ;;; Return true for an LVAR whose sole use is a reference to a
 ;;; constant leaf.
 (defun constant-lvar-p (thing)
+  (declare (type (or lvar null) thing))
   (and (lvar-p thing)
        (let ((use (principal-lvar-use thing)))
          (and (ref-p use) (constant-p (ref-leaf use))))))
