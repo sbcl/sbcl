@@ -811,7 +811,7 @@
 	((eq (user-cmd-func user-cmd) :cmd-error)
 	 (format *output* "Unknown top-level command: ~s.~%"
 		 (user-cmd-input user-cmd))
-	 (format *output* "Type `:help' for the list of commands.~%")
+	 (format *output* "Type `~Ahelp' for the list of commands.~%" *command-char*)
 	 t)
 	((eq (user-cmd-func user-cmd) :history-error)
 	 (format *output* "Input numbered ~d is not on the history list~%"
