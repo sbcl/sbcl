@@ -2006,7 +2006,7 @@
 			   (simple-base-string (frob2))
 			   (t (vector*-frob sequence))))
 		     (declare (type (or index null) p))
-		     (values f (and p (the index (+ p offset))))))))))
+		     (values f (and p (the index (- p offset))))))))))
   (defun %find-position (item sequence-arg from-end start end key test)
     (macrolet ((frob (sequence from-end)
 		 `(%find-position item ,sequence

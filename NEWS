@@ -1,3 +1,8 @@
+changes in sbcl-0.8.16 relative to sbcl-0.8.15:
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** POSITION on displaced vectors with non-zero displacement
+       returns the right answer.
+
 changes in sbcl-0.8.15 relative to sbcl-0.8.14:
   * incompatible change: SB-INT:*BEFORE-SAVE-INITIALIZATIONS* and
     SB-INT:*AFTER-SAVE-INITIALIZATIONS* have been renamed

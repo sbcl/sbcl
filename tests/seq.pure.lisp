@@ -168,3 +168,10 @@
        (s2 (fill s1 #\z)))
   (assert s2)
   (assert (string= s2 "zzzzz")))
+
+;;; POSITION on dispaced arrays with non-zero offset has been broken
+;;; for quite a while...
+(let ((fn (compile nil '(lambda (x) (position x)))))
+  (let* ((x #(1 2 3))
+         (y (make-array 2 :displaced-to x :displaced-index-offset 1)))
+    (assert (= (position 2 y) 0))))
