@@ -84,6 +84,7 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))
 	(host (url-host url))
 	(port (url-port url)))
+    (declare (ignore port))
     (socket-connect
      s (car (host-ent-addresses (get-host-by-name (url-host (or *proxy* url)))))
      (url-port (or  *proxy* url)))
@@ -212,6 +213,7 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
 	   (make-pathname :directory
 			  `(:relative ,(subseq tar 0 pos-slash)))
 	   source)))
+    (declare (ignore dummy))
     (loop for asd in (directory
 		      (make-pathname :name :wild :type "asd"))
 	  do (let ((target (merge-pathnames

@@ -10,8 +10,7 @@
 ;;; kind of example.  this shouldn't be a compile-op, or if it is, should
 ;;; define output-files properly instead oif leaving it be the fasl
 (defclass exe-file (cl-source-file) ())
-(defmethod perform ((o compile-op) (c exe-file))
-  (call-next-method)
+(defmethod perform :after ((o compile-op) (c exe-file))
   (sb-executable:make-executable
    (make-pathname :name "asdf-install"
 		  :type nil
@@ -25,8 +24,8 @@
   :depends-on (sb-posix sb-bsd-sockets)
   :version "0.2"
   :components ((:file "defpackage")
-	       (exe-file "loader")
-	       (:file "installer")))
+	       (:exe-file "loader" :depends-on ("installer"))
+	       (:file "installer" :depends-on ("defpackage"))))
 	       
 (defmethod perform :after ((o load-op) (c (eql (find-system :asdf-install))))
   (provide 'asdf-install))
