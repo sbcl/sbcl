@@ -736,7 +736,7 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   support for (AND ..) types, among other things)
 
 changes in sbcl-0.6.13 relative to sbcl-0.6.12:
-* a port to the Alpha CPU, thanks to Dan Barlow
+* a port to the Compaq/DEC Alpha CPU, thanks to Dan Barlow
 * Martin Atzmueller ported Tim Moore's marvellous CMU CL DISASSEMBLE
   patch, so that DISASSEMBLE output is much nicer.
 * better error handling in CLOS method combination, thanks to 
@@ -749,25 +749,36 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   is now a supported extension again, since the consensus is that
   it can be useful for ordinary development work, not just for
   debugging SBCL itself.
-?? more overflow fixes for >16Mbyte i/o buffers
+* At Dan Barlow's suggestion, TRUENAME on a dangling symbolic
+  link now returns the dangling link itself, and for similar reasons,
+  TRUENAME on a cyclic symbolic link returns the cyclic link itself.
+  (In these cases the old code signalled an error and looped
+  endlessly, respectively.) As a consequence of this change,
+  DIRECTORY now works even in the presence of dangling and cyclic
+  symbolic links.
+* more overflow fixes for >16Mbyte i/o buffers
 * There's a new slam.sh hack to shorten the edit/compile/debug
   cycle for low-level changes to SBCL itself, and a new
   :SB-AFTER-XC-CORE target feature to control the generation of
   the after-xc.core file needed by slam.sh.
-* minor incompatible change: The ENTRY-POINTS &KEY argument to 
-  COMPILE-FILE is no longer supported, so that now every function
-  gets an entry point, so that block compilation looks a little
-  more like the plain vanilla ANSI section 3.2.2.3 scheme.
 * Fasl file version numbers are now independent of the target CPU,
   since historically most system changes which required version
   number changes have affected all CPUs equally. Similarly, 
   the byte fasl file version is now equal to the ordinary
   fasl file version.
+* minor incompatible change: The ENTRY-POINTS &KEY argument to 
+  COMPILE-FILE is no longer supported, so that now every function
+  gets an entry point, so that block compilation looks a little
+  more like the plain vanilla ANSI section 3.2.2.3 scheme.
 ?? minor incompatible change: SB-EXT:GET-BYTES-CONSED now
   returns the number of bytes consed since the system started,
   rather than the number consed since the first time the function
   was called. (The new definition parallels ANSI functions like
   CL:GET-INTERNAL-RUN-TIME.)
+* minor incompatible change: The old CMU-CL-style DIRECTORY options,
+  i.e. :ALL, :FOLLOW-LINKS, and :CHECK-FOR-SUBDIRS, are no longer
+  supported. Now DIRECTORY always does the abstract Common-Lisp-y
+  thing, i.e. :ALL T :FOLLOW-LINKS T :CHECK-FOR-SUBDIRS T.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

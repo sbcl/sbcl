@@ -95,7 +95,6 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(getegid)
  LDSO_STUBIFY(getenv)
  LDSO_STUBIFY(getgid)
- LDSO_STUBIFY(gethostid)
  LDSO_STUBIFY(gethostbyaddr)
  LDSO_STUBIFY(gethostbyname)
  LDSO_STUBIFY(gethostname)

@@ -765,7 +765,10 @@
   #!+sb-doc
   "Return the pathname for the actual file described by PATHNAME.
   An error of type FILE-ERROR is signalled if no such file exists,
-  or the pathname is wild."
+  or the pathname is wild.
+
+  Under Unix, the TRUENAME of a broken symlink is considered to be
+  the name of the broken symlink itself."
   (if (wild-pathname-p pathname)
       (error 'simple-file-error
 	     :format-control "can't use a wild pathname here"
@@ -791,11 +794,11 @@
 			      pathname
 			      (sane-default-pathname-defaults)))
 	 (namestring (unix-namestring defaulted-pathname t)))
-    (when (and namestring (sb!unix:unix-file-kind namestring))
-      (let ((truename (sb!unix:unix-resolve-links namestring)))
-	(when truename
+    (when (and namestring (sb!unix:unix-file-kind namestring t))
+      (let ((trueishname (sb!unix:unix-resolve-links namestring)))
+	(when trueishname
 	  (let ((*ignore-wildcards* t))
-	    (pathname (sb!unix:unix-simplify-pathname truename))))))))
+	    (pathname (sb!unix:unix-simplify-pathname trueishname))))))))
 
 ;;;; miscellaneous other operations
 
@@ -883,9 +886,9 @@
 
 (defun file-author (file)
   #!+sb-doc
-  "Returns the file author as a string, or nil if the author cannot be
- determined. Signals an error of type file-error if file doesn't exist,
- or file is a wild pathname."
+  "Return the file author as a string, or nil if the author cannot be
+ determined. Signal an error of type FILE-ERROR if FILE doesn't exist,
+ or FILE is a wild pathname."
   (if (wild-pathname-p file)
       (error 'simple-file-error
 	     :pathname file
@@ -905,38 +908,34 @@
 
 (/show0 "filesys.lisp 800")
 
-(defun directory (pathname &key (all t) (check-for-subdirs t)
-			   (follow-links t))
+(defun directory (pathname &key)
   #!+sb-doc
-  "Returns a list of pathnames, one for each file that matches the given
-   pathname. Supplying :ALL as NIL causes this to ignore Unix dot files. This
-   never includes Unix dot and dot-dot in the result. If :FOLLOW-LINKS is NIL,
-   then symbolic links in the result are not expanded. This is not the
-   default because TRUENAME does follow links, and the result pathnames are
-   defined to be the TRUENAME of the pathname (the truename of a link may well
-   be in another directory.)"
-  (let ((results nil))
+  "Return a list of PATHNAMEs, each the TRUENAME of a file that matched the
+   given pathname. Note that the interaction between this ANSI-specified
+   TRUENAMEing and the semantics of the Unix filesystem (symbolic links..)
+   means this function can sometimes return files which don't have the same
+   directory as PATHNAME."
+  (let ((truenames nil))
     (enumerate-search-list
 	(pathname (merge-pathnames pathname
 				   (make-pathname :name :wild
 						  :type :wild
 						  :version :wild)))
-      (enumerate-matches (name pathname)
-	(when (or all
-		  (let ((slash (position #\/ name :from-end t)))
-		    (or (null slash)
-			(= (1+ slash) (length name))
-			(char/= (schar name (1+ slash)) #\.))))
-	  (push name results))))
-    (let ((*ignore-wildcards* t))
-      (mapcar (lambda (name)
-		(let ((name (if (and check-for-subdirs
-				     (eq (sb!unix:unix-file-kind name)
-					 :directory))
-				(concatenate 'string name "/")
-				name)))
-		  (if follow-links (truename name) (pathname name))))
-	      (sort (delete-duplicates results :test #'string=) #'string<)))))
+      (enumerate-matches (match pathname)
+	(let ((*ignore-wildcards* t))
+	  (push (truename (if (eq (sb!unix:unix-file-kind match) :directory)
+			      (concatenate 'string match "/")
+			      match))
+		truenames))))
+    ;; FIXME: The DELETE-DUPLICATES here requires quadratic time,
+    ;; which is unnecessarily slow. That might not be an issue,
+    ;; though, since the time constant for doing TRUENAME on every
+    ;; directory entry is likely to be (much) larger, and the cost of
+    ;; all those TRUENAMEs on a huge directory might even be quadratic
+    ;; in the directory size. Someone who cares about enormous
+    ;; directories might want to check this. -- WHN 2001-06-19
+    (sort (delete-duplicates truenames :test #'string= :key #'pathname-name)
+	  #'string< :key #'pathname-name)))
 
 ;;;; translating Unix uid's
 ;;;;

@@ -1140,10 +1140,7 @@
    (:external-format (member :default)))
   t)
 
-(defknown directory (pathname-designator &key
-					 (:check-for-subdirs t)
-					 (:all t)
-					 (:follow-links t))
+(defknown directory (pathname-designator &key)
   list (flushable))
 
 ;;;; from the "Errors" chapter:

@@ -34,10 +34,8 @@
 (declaim (ftype (function (&rest t) nil) sb!kernel::do-arg-count-error))
 
 (let ((reversed-target-object-file-names nil))
-  (for-stems-and-flags (stem flags)
-    (unless (find :not-target flags)
-      ;; FIXME: Remove these GC calls after fixing the problem of ridiculous
-      ;; bootstrap memory bloat.
+  (do-stems-and-flags (stem flags)
+    (unless (position :not-target flags)
       (push (target-compile-stem stem
 				 :assem-p (find :assem flags)
 				 :ignore-failure-p (find :ignore-failure-p

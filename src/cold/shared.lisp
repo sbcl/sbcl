@@ -274,7 +274,7 @@
 
 (defparameter *stems-and-flags* (read-from-file "stems-and-flags.lisp-expr"))
 
-(defmacro for-stems-and-flags ((stem flags) &body body)
+(defmacro do-stems-and-flags ((stem flags) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS-")))
     `(dolist (,stem-and-flags *stems-and-flags*)
        (let ((,stem (first ,stem-and-flags))
@@ -283,7 +283,7 @@
 
 ;;; Check for stupid typos in FLAGS list keywords.
 (let ((stems (make-hash-table :test 'equal)))
-  (for-stems-and-flags (stem flags)
+  (do-stems-and-flags (stem flags)
     (if (gethash stem stems)
       (error "duplicate stem ~S in stems-and-flags data" stem)
       (setf (gethash stem stems) t))

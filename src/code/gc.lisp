@@ -81,13 +81,12 @@
 
 (defun room (&optional (verbosity :default))
   #!+sb-doc
-  "Prints to *STANDARD-OUTPUT* information about the state of internal
+  "Print to *STANDARD-OUTPUT* information about the state of internal
   storage and its management. The optional argument controls the
-  verbosity of ROOM. If it is T, ROOM prints out a maximal amount of
+  verbosity of output. If it is T, ROOM prints out a maximal amount of
   information. If it is NIL, ROOM prints out a minimal amount of
   information. If it is :DEFAULT or it is not supplied, ROOM prints out
-  an intermediate amount of information. See also VM:MEMORY-USAGE and
-  VM:INSTANCE-USAGE for finer report control."
+  an intermediate amount of information."
   (fresh-line)
   (ecase verbosity
     ((t)
@@ -158,7 +157,7 @@
 ;;; Presumably someone will call GC-ON later to collect the garbage.
 (defvar *gc-inhibit-hook* nil
   #!+sb-doc
-  "Should be bound to a function or NIL. If it is a function, this
+  "This should be bound to a function or NIL. If it is a function, this
   function should take one argument, the current amount of dynamic
   usage. The function should return NIL if garbage collection should
   continue and non-NIL if it should be inhibited. Use with caution.")
@@ -172,8 +171,8 @@
 
 (defvar *gc-run-time* 0
   #!+sb-doc
-  "The total CPU time spent doing garbage collection (as reported by
-   GET-INTERNAL-RUN-TIME.)")
+  "the total CPU time spent doing garbage collection (as reported by
+   GET-INTERNAL-RUN-TIME)")
 (declaim (type index *gc-run-time*))
 
 ;;; a limit to help catch programs which allocate too much memory,
@@ -403,9 +402,11 @@ has finished GC'ing.")
 
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
   #!+(and sb-doc gencgc)
-  "Initiates a garbage collection.  GEN controls the number of generations to garbage collect"
+  "Initiate a garbage collection. GEN controls the number of generations
+  to garbage collect."
   #!+(and sb-doc (not gencgc))
-  "Initiates a garbage collection.  GEN may be provided for compatibility, but is ignored"
+  "Initiate a garbage collection. GEN may be provided for compatibility, but
+  is ignored."
   (sub-gc :force-p t :gen (if full 6 gen)))
 
 
@@ -435,7 +436,7 @@ has finished GC'ing.")
 
 (defun gc-on ()
   #!+sb-doc
-  "Enables the garbage collector."
+  "Enable the garbage collector."
   (setq *gc-inhibit* nil)
   (when *need-to-collect-garbage*
     (sub-gc))
@@ -443,7 +444,7 @@ has finished GC'ing.")
 
 (defun gc-off ()
   #!+sb-doc
-  "Disables the garbage collector."
+  "Disable the garbage collector."
   (setq *gc-inhibit* t)
   nil)
 

@@ -46,5 +46,5 @@
 ;;;
 ;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
-(assert (subtypep (nth-value 1 (ignore-errors (float-radix "notfloat")))
-		  'type-error))
+(assert (typep (nth-value 1 (ignore-errors (float-radix "notfloat")))
+	       'type-error))

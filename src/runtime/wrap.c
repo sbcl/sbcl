@@ -106,6 +106,35 @@ free_directory_lispy_filenames(char** directory_lispy_filenames)
 }
 
 /*
+ * readlink(2) stuff
+ */
+
+/* a wrapped version of readlink(2):
+ *   -- If path isn't a symlink, or is a broken symlink, return 0.
+ *   -- If path is a symlink, return a newly allocated string holding
+ *      the thing it's linked to.
+ */
+char *
+wrapped_readlink(char *path)
+{
+    int strlen_path = strlen(path);
+    int bufsiz = strlen(path) + 16;
+    while (1) {
+	char *result = malloc(bufsiz);
+	int n_read = readlink(path, result, n_read);
+	if (n_read < 0) {
+	    return 0;
+	} else if (n_read < bufsiz) {
+	    result[n_read] = 0;
+	    return result;
+	} else {
+	    free(result);
+	    bufsiz *= 2;
+	}
+    }
+}
+
+/*
  * stat(2) stuff
  */
 

@@ -129,7 +129,7 @@
   ;; with the ordinary Lisp compiler, and this is intentional, in
   ;; order to make the compiler aware of the definitions of assembly
   ;; routines.
-  (for-stems-and-flags (stem flags)
+  (do-stems-and-flags (stem flags)
     (unless (find :not-host flags)
       (funcall load-or-cload-stem
 	       stem

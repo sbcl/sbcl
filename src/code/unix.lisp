@@ -323,20 +323,22 @@
 ;;; Return the real user-id associated with the current process.
 (def-alien-routine ("getuid" unix-getuid) int)
 
-;;; Invoke readlink(2) on the file name specified by the simple string
-;;; PATH. Return up to two values: the contents of the symbolic link
-;;; if the call is successful, or NIL and the Unix error number.
+;;; Invoke readlink(2) on the file name specified by PATH. Return
+;;; (VALUES LINKSTRING NIL) on success, or (VALUES NIL ERRNO) on
+;;; failure.
 (defun unix-readlink (path)
   (declare (type unix-pathname path))
-  (with-alien ((buf (array char 1024)))
-    (syscall ("readlink" c-string (* char) int)
-	     (let ((string (make-string result)))
-	       (sb!kernel:copy-from-system-area
-		(alien-sap buf) 0
-		string (* sb!vm:vector-data-offset sb!vm:word-bits)
-		(* result sb!vm:byte-bits))
-	       string)
-	     path (cast buf (* char)) 1024)))
+  (with-alien ((ptr (* char)
+		    (alien-funcall (extern-alien
+				    "wrapped_readlink"
+				    (function (* char) c-string))
+				   path)))
+    (if (null-alien ptr)
+	(values nil (get-errno))
+	(multiple-value-prog1
+	    (values (with-alien ((c-string c-string ptr)) c-string)
+		    nil)
+	  (free-alien ptr)))))
 
 ;;; UNIX-UNLINK accepts a name and deletes the directory entry for that
 ;;; name and the file if this is the last link. 
@@ -701,87 +703,71 @@
 	      ((eql kind s-iflnk) :link)
 	      (t :special))))))
 
-;;; Return the pathname with all symbolic links resolved.
-;;;
-;;; FIXME: Could we just use Unix readlink(2) instead?
+;;; Is the Unix pathname PATHNAME relative, instead of absolute? (E.g.
+;;; "passwd" or "etc/passwd" instead of "/etc/passwd"?)
+(defun relative-unix-pathname? (pathname)
+  (declare (type simple-string pathname))
+  (or (zerop (length pathname))
+      (char/= (schar pathname 0) #\/)))
+
+;;; Return PATHNAME with all symbolic links resolved. PATHNAME should
+;;; already be a complete absolute Unix pathname, since at least in
+;;; sbcl-0.6.12.36 we're called only from TRUENAME, and only after
+;;; paths have been converted to absolute paths, so we don't need to
+;;; try to handle any more generality than that.
 (defun unix-resolve-links (pathname)
-  (declare (simple-string pathname))
-  (let ((len (length pathname))
-	(pending pathname))
-    (declare (fixnum len) (simple-string pending))
-    (if (zerop len)
-	pathname
-	(let ((result (make-string 1024 :initial-element (code-char 0)))
-	      (fill-ptr 0)
-	      (name-start 0))
-	  (loop
-	    (let* ((name-end (or (position #\/ pending :start name-start) len))
-		   (new-fill-ptr (+ fill-ptr (- name-end name-start))))
-	      (replace result pending
-		       :start1 fill-ptr
-		       :end1 new-fill-ptr
-		       :start2 name-start
-		       :end2 name-end)
-	      (let ((kind (unix-file-kind (if (zerop name-end) "/" result) t)))
-		(unless kind (return nil))
-		(cond ((eq kind :link)
-		       (multiple-value-bind (link err) (unix-readlink result)
-			 (unless link
-			   (error 'simple-file-error
-				  :pathname pathname
-				  :format-control
-				  "~@<error reading link ~S: ~2I~_~A~:>"
-				  :format-arguments (list (subseq
-							   result 0 fill-ptr)
-							  (strerror err))))
-			 (cond ((or (zerop (length link))
-				    (char/= (schar link 0) #\/))
-				;; It's a relative link.
-				(fill result (code-char 0)
-				      :start fill-ptr
-				      :end new-fill-ptr))
-			       ((string= result "/../" :end1 4)
-				;; It's across the super-root.
-				(let ((slash (or (position #\/ result :start 4)
-						 0)))
-				  (fill result (code-char 0)
-					:start slash
-					:end new-fill-ptr)
-				  (setf fill-ptr slash)))
-			       (t
-				;; It's absolute.
-				(and (> (length link) 0)
-				     (char= (schar link 0) #\/))
-				(fill result (code-char 0) :end new-fill-ptr)
-				(setf fill-ptr 0)))
-			 (setf pending
-			       (if (= name-end len)
-				   link
-				   (concatenate 'simple-string
-						link
-						(subseq pending name-end))))
-			 (setf len (length pending))
-			 (setf name-start 0)))
-		      ((= name-end len)
-		       (return (subseq result 0 new-fill-ptr)))
-		      ((eq kind :directory)
-		       (setf (schar result new-fill-ptr) #\/)
-		       (setf fill-ptr (1+ new-fill-ptr))
-		       (setf name-start (1+ name-end)))
-		      (t
-		       (return nil))))))))))
+  (declare (type simple-string pathname))
+  (aver (not (relative-unix-pathname? pathname)))
+  (/show "entering UNIX-RESOLVE-LINKS")
+  (loop with previous-pathnames = nil do
+	(/show pathname previous-pathnames)
+	(let ((link (unix-readlink pathname)))
+	  (/show link)
+	  ;; Unlike the old CMU CL code, we handle a broken symlink by
+	  ;; returning the link itself. That way, CL:TRUENAME on a
+	  ;; broken link returns the link itself, so that CL:DIRECTORY
+	  ;; can return broken links, so that even without
+	  ;; Unix-specific extensions to do interesting things with
+	  ;; them, at least Lisp programs can see them and, if
+	  ;; necessary, delete them. (This is handy e.g. when your
+	  ;; managed-by-Lisp directories are visited by Emacs, which
+	  ;; creates broken links as notes to itself.)
+	  (if (null link)
+	      (return pathname)
+	      (let ((new-pathname 
+		     (unix-simplify-pathname
+		      (if (relative-unix-pathname? link)
+			  (let* ((dir-len (1+ (position #\/
+							pathname
+							:from-end t)))
+				 (dir (subseq pathname 0 dir-len)))
+			    (/show dir)
+			    (concatenate 'string dir link))
+			  link))))
+		(if (unix-file-kind new-pathname)
+		    (setf pathname new-pathname)
+		    (return pathname)))))
+	;; To generalize the principle that even if portable Lisp code
+	;; can't do anything interesting with a broken symlink, at
+	;; least it should be able to see and delete it, when we
+	;; detect a cyclic link, we return the link itself. (So even
+	;; though portable Lisp code can't do anything interesting
+	;; with a cyclic link, at least it can see it and delete it.)
+	(if (member pathname previous-pathnames :test #'string=)
+	    (return pathname)
+	    (push pathname previous-pathnames))))
 
 (defun unix-simplify-pathname (src)
-  (declare (simple-string src))
+  (declare (type simple-string src))
   (let* ((src-len (length src))
 	 (dst (make-string src-len))
 	 (dst-len 0)
 	 (dots 0)
 	 (last-slash nil))
     (macrolet ((deposit (char)
-			`(progn
-			   (setf (schar dst dst-len) ,char)
-			   (incf dst-len))))
+		 `(progn
+		    (setf (schar dst dst-len) ,char)
+		    (incf dst-len))))
       (dotimes (src-index src-len)
 	(let ((char (schar src src-index)))
 	  (cond ((char= char #\.)
@@ -791,12 +777,12 @@
 		((char= char #\/)
 		 (case dots
 		   (0
-		    ;; Either ``/...' or ``...//...'
+		    ;; either ``/...' or ``...//...'
 		    (unless last-slash
 		      (setf last-slash dst-len)
 		      (deposit char)))
 		   (1
-		    ;; Either ``./...'' or ``..././...''
+		    ;; either ``./...'' or ``..././...''
 		    (decf dst-len))
 		   (2
 		    ;; We've found ..
@@ -824,7 +810,7 @@
 		      (setf last-slash dst-len)
 		      (deposit char))))
 		   (t
-		    ;; Something other than a dot between slashes.
+		    ;; something other than a dot between slashes
 		    (setf last-slash dst-len)
 		    (deposit char)))
 		 (setf dots 0))

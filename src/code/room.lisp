@@ -521,7 +521,7 @@
 	(let ((residual-objects (- total-objects printed-objects))
 	      (residual-bytes (- total-bytes printed-bytes)))
 	  (unless (zerop residual-objects)
-	    (format t "  Other types: ~:D bytes, ~D: object~:P.~%"
+	    (format t "  Other types: ~:D bytes, ~D object~:P.~%"
 		    residual-bytes residual-objects))))
 
       (format t "  ~:(~A~) instance total: ~:D bytes, ~:D object~:P.~%"
