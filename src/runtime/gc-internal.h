@@ -16,6 +16,8 @@
 #ifndef _GC_INTERNAL_H_
 #define _GC_INTERNAL_H_
 
+/* disabling gc assertions made no discernable difference to GC speed,
+ * last I tried it - dan 2003.12.21 */
 #if 1
 #define gc_assert(ex) do { \
 	if (!(ex)) gc_abort(); \

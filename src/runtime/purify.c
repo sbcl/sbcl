@@ -17,10 +17,6 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <strings.h>
-#if (defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_LINUX))
-#include <sys/ptrace.h>
-#include <linux/user.h>
-#endif
 #include <errno.h>
 
 #include "runtime.h"
@@ -105,7 +101,7 @@ forwarding_pointer_p(lispobj obj)
 static boolean
 dynamic_pointer_p(lispobj ptr)
 {
-#ifndef LISP_FEATURE_X86
+#ifndef LISP_FEATURE_GENCGC
     return (ptr >= (lispobj)current_dynamic_space
 	    &&
 	    ptr < (lispobj)dynamic_space_free_pointer);
@@ -116,6 +112,21 @@ dynamic_pointer_p(lispobj ptr)
 	    ptr < (lispobj)dynamic_space_free_pointer);
 #endif
 }
+
+static inline newspace_alloc(int nwords, int constantp) 
+{
+    lispobj *ret;
+    nwords=CEILING(nwords,2);
+    if(constantp) {
+	ret=read_only_free;
+	read_only_free+=nwords;
+    } else {
+	ret=static_free;
+	static_free+=nwords;
+    }
+    return ret;
+}
+
 
 
 #ifdef LISP_FEATURE_X86
@@ -136,7 +147,9 @@ static unsigned pointer_filter_verbose = 0;
 /* FIXME: This is substantially the same code as
  * possibly_valid_dynamic_space_pointer in gencgc.c.  The only
  * relevant difference seems to be that the gencgc code also checks
- * for raw pointers into Code objects */
+ * for raw pointers into Code objects, whereas in purify these are
+ * checked separately in setup_i386_stack_scav - they go onto
+ * valid_stack_ra_locations instead of just valid_stack_locations */
 
 static int
 valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
@@ -463,14 +476,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
-    if (constant) {
-        new = read_only_free;
-        read_only_free += CEILING(nwords, 2);
-    }
-    else {
-        new = static_free;
-        static_free += CEILING(nwords, 2);
-    }
+    new = newspace_alloc(nwords,constant);
 
     /* Copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
@@ -489,7 +495,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
  * class, and only then can we transport as constant. If it is pure,
  * we can ALWAYS transport as a constant. */
 static lispobj
-ptrans_instance(lispobj thing, lispobj header, boolean constant)
+ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 {
     lispobj layout = ((struct instance *)native_pointer(thing))->slots[0];
     lispobj pure = ((struct instance *)native_pointer(layout))->slots[15];
@@ -513,8 +519,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean constant)
 
 	    /* Allocate it */
 	    old = (lispobj *)native_pointer(thing);
-	    new = static_free;
-	    static_free += CEILING(nwords, 2);
+	    new = newspace_alloc(nwords, 0); /*  inconstant */
 
 	    /* Copy it. */
 	    bcopy(old, new, nwords * sizeof(lispobj));
@@ -545,8 +550,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
 
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
-    new = static_free;
-    static_free += CEILING(nwords, 2);
+    new = newspace_alloc(nwords, 0);	/* inconstant */
 
     /* Copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
@@ -575,10 +579,9 @@ ptrans_unboxed(lispobj thing, lispobj header)
     
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
-    new = read_only_free;
-    read_only_free += CEILING(nwords, 2);
+    new = newspace_alloc(nwords,1);	/* always constant */
     
-    /* Copy it. */
+    /* copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
     
     /* Deposit forwarding pointer. */
@@ -599,15 +602,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
     vector = (struct vector *)native_pointer(thing);
     nwords = 2 + (CEILING((fixnum_value(vector->length)+extra)*bits,32)>>5);
 
-    if (boxed && !constant) {
-        new = static_free;
-        static_free += CEILING(nwords, 2);
-    }
-    else {
-        new = read_only_free;
-        read_only_free += CEILING(nwords, 2);
-    }
-
+    new=newspace_alloc(nwords, (constant || !boxed));
     bcopy(vector, new, nwords * sizeof(lispobj));
 
     result = make_lispobj(new, lowtag_of(thing));
@@ -713,8 +708,7 @@ ptrans_code(lispobj thing)
     code = (struct code *)native_pointer(thing);
     nwords = HeaderValue(code->header) + fixnum_value(code->code_size);
 
-    new = (struct code *)read_only_free;
-    read_only_free += CEILING(nwords, 2);
+    new = (struct code *)newspace_alloc(nwords,1); /* constant */
 
     bcopy(code, new, nwords * sizeof(lispobj));
 
@@ -740,11 +734,12 @@ ptrans_code(lispobj thing)
     /* Arrange to scavenge the debug info later. */
     pscav_later(&new->debug_info, 1);
 
-    if (new->trace_table_offset & 0x3)
+    /* FIXME: why would this be a fixnum? */
+    if (!(new->trace_table_offset & (EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG)))
 #if 0
-      pscav(&new->trace_table_offset, 1, 0);
+	pscav(&new->trace_table_offset, 1, 0);
 #else
-      new->trace_table_offset = NIL; /* limit lifetime */
+        new->trace_table_offset = NIL; /* limit lifetime */
 #endif
 
     /* Scavenge the constants. */
@@ -759,7 +754,7 @@ ptrans_code(lispobj thing)
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef LISP_FEATURE_X86
-	/* Temporarly convert the self pointer to a real function pointer. */
+	/* Temporarily convert the self pointer to a real function pointer. */
 	((struct simple_fun *)native_pointer(func))->self
 	    -= FUN_RAW_ADDR_OFFSET;
 #endif
@@ -812,19 +807,12 @@ ptrans_func(lispobj thing, lispobj header)
         nwords = 1 + HeaderValue(header);
         old = (lispobj *)native_pointer(thing);
 
-	/* Allocate the new one. */
-	if (widetag_of(header) == FUNCALLABLE_INSTANCE_HEADER_WIDETAG) {
-	    /* FINs *must* not go in read_only space. */
-	    new = static_free;
-	    static_free += CEILING(nwords, 2);
-	}
-	else {
-	    /* Closures can always go in read-only space, 'cause they
-	     * never change. */
+	/* Allocate the new one.  FINs *must* not go in read_only
+	 * space.  Closures can; they never change */
 
-	    new = read_only_free;
-	    read_only_free += CEILING(nwords, 2);
-	}
+	new = newspace_alloc
+	    (nwords,(widetag_of(header)!=FUNCALLABLE_INSTANCE_HEADER_WIDETAG));
+	     
         /* Copy it. */
         bcopy(old, new, nwords * sizeof(lispobj));
 
@@ -864,23 +852,13 @@ ptrans_list(lispobj thing, boolean constant)
     struct cons *old, *new, *orig;
     int length;
 
-    if (constant)
-        orig = (struct cons *)read_only_free;
-    else
-        orig = (struct cons *)static_free;
+    orig = newspace_alloc(0,constant);
     length = 0;
 
     do {
         /* Allocate a new cons cell. */
         old = (struct cons *)native_pointer(thing);
-        if (constant) {
-            new = (struct cons *)read_only_free;
-            read_only_free += WORDS_PER_CONS;
-        }
-        else {
-            new = (struct cons *)static_free;
-            static_free += WORDS_PER_CONS;
-        }
+	new = (struct cons *) newspace_alloc(WORDS_PER_CONS,constant);
 
         /* Copy the cons cell and keep a pointer to the cdr. */
         new->car = old->car;
@@ -1136,7 +1114,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
             }
             count = 1;
         }
-        else if (thing & 3) {
+        else if (thing & 3) {	/* FIXME: 3?  not 2? */
             /* It's an other immediate. Maybe the header for an unboxed */
             /* object. */
             switch (widetag_of(thing)) {
@@ -1326,6 +1304,14 @@ purify(lispobj static_roots, lispobj read_only_roots)
     struct later *laters, *next;
     struct thread *thread;
 
+    if(all_threads->next) {
+	/* FIXME: there should be _some_ sensible error reporting 
+	 * convention.  See following comment too */
+	fprintf(stderr,"Can't purify when more than one thread exists\n");
+	fflush(stderr);
+	return 0;
+    }
+
 #ifdef PRINTNOISE
     printf("[doing purification:");
     fflush(stdout);
@@ -1358,28 +1344,12 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
-#if 0
-    /* This is what we should do, but can't unless the threads in
-     * question are suspended with ptrace.  That's right, purify is not
-     * threadsafe
-     */
-    for_each_thread(thread) {
-	void **ptr;
-	struct user_regs_struct regs;
-	if(ptrace(PTRACE_GETREGS,thread->pid,0,&regs)){
-	    fprintf(stderr,"child pid %d, %s\n",thread->pid,strerror(errno));
-	    lose("PTRACE_GETREGS");
-	}
-	setup_i386_stack_scav(regs.ebp,
-			      ((void *)thread->control_stack_end));
-    }
-#endif /* 0 */
-    /* stopgap until we can set things up as in preceding comment */
+    /* note this expects only one thread to be active.  We'd have to 
+     * stop all the others in the same way as GC does if we wanted 
+     * PURIFY to work when >1 thread exists */
     setup_i386_stack_scav(((&static_roots)-2),
 			  ((void *)all_threads->control_stack_end));
-#endif
-
+    
     pscav(&static_roots, 1, 0);
     pscav(&read_only_roots, 1, 1);
 

@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <errno.h>
+#include <string.h>
 #include "runtime.h"
 #include "sbcl.h"
 #include "os.h"
@@ -47,7 +48,7 @@
 void do_pending_interrupt(void);
 
 /* forward declarations */
-int gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct alloc_region *alloc_region);
+int gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed);
 void  gc_set_region_empty(struct alloc_region *region);
 void gc_alloc_update_all_page_tables(void);
 static void  gencgc_pickup_dynamic(void);
@@ -82,7 +83,6 @@ boolean gencgc_unmap_zero = 1;
 #endif
 
 /* the minimum size (in bytes) for a large object*/
-/* FIXME: Should this really be PAGE_BYTES? */
 unsigned large_object_size = 4 * PAGE_BYTES;
 
 
@@ -357,7 +357,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 
     /* Print the heap stats. */
     fprintf(stderr,
-	    "   Generation Boxed Unboxed LB   LUB    Alloc  Waste   Trig    WP  GCs Mem-age\n");
+	    "   Gen Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
 
     for (i = 0; i < gens; i++) {
 	int j;
@@ -365,6 +365,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 	int unboxed_cnt = 0;
 	int large_boxed_cnt = 0;
 	int large_unboxed_cnt = 0;
+	int pinned_cnt=0;
 
 	for (j = 0; j < last_free_page; j++)
 	    if (page_table[j].gen == i) {
@@ -377,7 +378,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 		    else
 			boxed_cnt++;
 		}
-
+		if(page_table[j].dont_move) pinned_cnt++;
 		/* Count the number of unboxed pages within the given
 		 * generation. */
 		if (page_table[j].allocated & UNBOXED_PAGE) {
@@ -391,9 +392,10 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 	gc_assert(generations[i].bytes_allocated
 		  == count_generation_bytes_allocated(i));
 	fprintf(stderr,
-		"   %8d: %5d %5d %5d %5d %8d %5d %8d %4d %3d %7.4f\n",
+		"   %1d: %5d %5d %5d %5d %5d %8d %5d %8d %4d %3d %7.4f\n",
 		i,
 		boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
+		pinned_cnt,
 		generations[i].bytes_allocated,
 		(count_generation_pages(i)*PAGE_BYTES
 		 - generations[i].bytes_allocated),
@@ -514,7 +516,7 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	first_page =
 	    generations[gc_alloc_generation].alloc_start_page;
     }
-    last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed,alloc_region);
+    last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed);
     bytes_found=(PAGE_BYTES - page_table[first_page].bytes_used)
 	    + PAGE_BYTES*(last_page-first_page);
 
@@ -696,11 +698,6 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
     int region_size;
     int byte_cnt;
 
-    /*
-    FSHOW((stderr,
-	   "/gc_alloc_update_page_tables() to gen %d:\n",
-	   gc_alloc_generation));
-    */
 
     first_page = alloc_region->first_page;
 
@@ -832,30 +829,6 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     int more;
     int bytes_used;
     int next_page;
-    int large = (nbytes >= large_object_size);
-
-    /*
-    if (nbytes > 200000)
-	FSHOW((stderr, "/alloc_large %d\n", nbytes));
-    */
-
-    /*
-    FSHOW((stderr,
-	   "/gc_alloc_large() for %d bytes from gen %d\n",
-	   nbytes, gc_alloc_generation));
-    */
-
-    /* If the object is small, and there is room in the current region
-       then allocate it in the current region. */
-    if (!large
-	&& ((alloc_region->end_addr-alloc_region->free_pointer) >= nbytes))
-	return gc_quick_alloc(nbytes);
-
-    /* To allow the allocation of small objects without the danger of
-       using a page in the current boxed region, the search starts after
-       the current boxed free region. XX could probably keep a page
-       index ahead of the current region and bumped up here to save a
-       lot of re-scanning. */
 
     get_spinlock(&free_pages_lock,(int) alloc_region);
 
@@ -869,7 +842,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	first_page = alloc_region->last_page+1;
     }
 
-    last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed,0);
+    last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed);
 
     gc_assert(first_page > alloc_region->last_page);
     if (unboxed)
@@ -890,7 +863,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	    page_table[first_page].allocated = BOXED_PAGE;
 	page_table[first_page].gen = gc_alloc_generation;
 	page_table[first_page].first_object_offset = 0;
-	page_table[first_page].large_object = large;
+	page_table[first_page].large_object = 1;
     }
 
     if (unboxed)
@@ -898,7 +871,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     else
 	gc_assert(page_table[first_page].allocated == BOXED_PAGE);
     gc_assert(page_table[first_page].gen == gc_alloc_generation);
-    gc_assert(page_table[first_page].large_object == large);
+    gc_assert(page_table[first_page].large_object == 1);
 
     byte_cnt = 0;
 
@@ -925,7 +898,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	else
 	    page_table[next_page].allocated = BOXED_PAGE;
 	page_table[next_page].gen = gc_alloc_generation;
-	page_table[next_page].large_object = large;
+	page_table[next_page].large_object = 1;
 
 	page_table[next_page].first_object_offset =
 	    orig_first_page_bytes_used - PAGE_BYTES*(next_page-first_page);
@@ -937,8 +910,9 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	    more = 1;
 	}
 	page_table[next_page].bytes_used = bytes_used;
+	page_table[next_page].write_protected=0;
+	page_table[next_page].dont_move=0;
 	byte_cnt += bytes_used;
-
 	next_page++;
     }
 
@@ -963,32 +937,24 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
 }
 
 int
-gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct alloc_region *alloc_region)
+gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed)
 {
-    /* if alloc_region is 0, we assume this is for a potentially large
-       object */
     int first_page;
     int last_page;
     int region_size;
     int restart_page=*restart_page_ptr;
     int bytes_found;
     int num_pages;
-    int large = !alloc_region && (nbytes >= large_object_size);
-
+    int large_p=(nbytes>=large_object_size);
     gc_assert(free_pages_lock);
-    /* Search for a contiguous free space of at least nbytes. If it's a
-       large object then align it on a page boundary by searching for a
-       free page. */
 
-    /* To allow the allocation of small objects without the danger of
-       using a page in the current boxed region, the search starts after
-       the current boxed free region. XX could probably keep a page
-       index ahead of the current region and bumped up here to save a
-       lot of re-scanning. */
+    /* Search for a contiguous free space of at least nbytes. If it's
+     * a large object then align it on a page boundary by searching
+     * for a free page. */
 
     do {
 	first_page = restart_page;
-	if (large)		
+	if (large_p)		
 	    while ((first_page < NUM_PAGES)
 		   && (page_table[first_page].allocated != FREE_PAGE))
 		first_page++;
@@ -996,18 +962,15 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 	    while (first_page < NUM_PAGES) {
 		if(page_table[first_page].allocated == FREE_PAGE)
 		    break;
-		/* I don't know why we need the gen=0 test, but it
-		 * breaks randomly if that's omitted -dan 2003.02.26
-		 */
 		if((page_table[first_page].allocated ==
 		    (unboxed ? UNBOXED_PAGE : BOXED_PAGE)) &&
 		   (page_table[first_page].large_object == 0) &&
-		   (gc_alloc_generation == 0) &&
 		   (page_table[first_page].gen == gc_alloc_generation) &&
 		   (page_table[first_page].bytes_used < (PAGE_BYTES-32)) &&
 		   (page_table[first_page].write_protected == 0) &&
-		   (page_table[first_page].dont_move == 0))
+		   (page_table[first_page].dont_move == 0)) {
 		    break;
+		}
 		first_page++;
 	    }
 	
@@ -1025,7 +988,7 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 	bytes_found = PAGE_BYTES - page_table[first_page].bytes_used;
 	num_pages = 1;
 	while (((bytes_found < nbytes) 
-		|| (alloc_region && (num_pages < 2)))
+		|| (!large_p && (num_pages < 2)))
 	       && (last_page < (NUM_PAGES-1))
 	       && (page_table[last_page+1].allocated == FREE_PAGE)) {
 	    last_page++;
@@ -1054,8 +1017,7 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 }
 
 /* Allocate bytes.  All the rest of the special-purpose allocation
- * functions will eventually call this (instead of just duplicating
- * parts of its code) */
+ * functions will eventually call this  */
 
 void *
 gc_alloc_with_region(int nbytes,int unboxed_p, struct alloc_region *my_region,
@@ -1063,7 +1025,8 @@ gc_alloc_with_region(int nbytes,int unboxed_p, struct alloc_region *my_region,
 {
     void *new_free_pointer;
 
-    /* FSHOW((stderr, "/gc_alloc %d\n", nbytes)); */
+    if(nbytes>=large_object_size)
+	return gc_alloc_large(nbytes,unboxed_p,my_region);
 
     /* Check whether there is room in the current alloc region. */
     new_free_pointer = my_region->free_pointer + nbytes;
@@ -1086,47 +1049,17 @@ gc_alloc_with_region(int nbytes,int unboxed_p, struct alloc_region *my_region,
 	return((void *)new_obj);
     }
 
-    /* Else not enough free space in the current region. */
+    /* Else not enough free space in the current region: retry with a
+     * new region. */
 
-    /* If there some room left in the current region, enough to be worth
-     * saving, then allocate a large object. */
-    /* FIXME: "32" should be a named parameter. */
-    if ((my_region->end_addr-my_region->free_pointer) > 32)
-	return gc_alloc_large(nbytes, unboxed_p, my_region);
-
-    /* Else find a new region. */
-
-    /* Finished with the current region. */
     gc_alloc_update_page_tables(unboxed_p, my_region);
-
-    /* Set up a new region. */
     gc_alloc_new_region(nbytes, unboxed_p, my_region);
-
-    /* Should now be enough room. */
-
-    /* Check whether there is room in the current region. */
-    new_free_pointer = my_region->free_pointer + nbytes;
-
-    if (new_free_pointer <= my_region->end_addr) {
-	/* If so then allocate from the current region. */
-	void *new_obj = my_region->free_pointer;
-	my_region->free_pointer = new_free_pointer;
-	/* Check whether the current region is almost empty. */
-	if ((my_region->end_addr - my_region->free_pointer) <= 32) {
-	    /* If so find, finished with the current region. */
-	    gc_alloc_update_page_tables(unboxed_p, my_region);
-
-	    /* Set up a new region. */
-	    gc_alloc_new_region(32, unboxed_p, my_region);
-	}
-
-	return((void *)new_obj);
-    }
-
-    /* shouldn't happen */
-    gc_assert(0);
-    return((void *) NIL); /* dummy value: return something ... */
+    return gc_alloc_with_region(nbytes,unboxed_p,my_region,0);
 }
+
+/* these are only used during GC: all allocation from the mutator calls
+ * alloc() -> gc_alloc_with_region() with the appropriate per-thread 
+ * region */
 
 void *
 gc_general_alloc(int nbytes,int unboxed_p,int quick_p)
@@ -1136,41 +1069,16 @@ gc_general_alloc(int nbytes,int unboxed_p,int quick_p)
     return gc_alloc_with_region(nbytes,unboxed_p, my_region,quick_p);
 }
 
-
-
-static void *
-gc_alloc(int nbytes,int unboxed_p)
-{
-    /* this is the only function that the external interface to
-     * allocation presently knows how to call: Lisp code will never
-     * allocate large objects, or to unboxed space, or `quick'ly.
-     * Any of that stuff will only ever happen inside of GC */
-    return gc_general_alloc(nbytes,unboxed_p,0);
-}
-
-/* Allocate space from the boxed_region. If there is not enough free
- * space then call gc_alloc to do the job. A pointer to the start of
- * the object is returned. */
 static inline void *
 gc_quick_alloc(int nbytes)
 {
     return gc_general_alloc(nbytes,ALLOC_BOXED,ALLOC_QUICK);
 }
 
-/* Allocate space for the possibly large boxed object. If it is a
- * large object then do a large alloc else use gc_quick_alloc.  Note
- * that gc_quick_alloc will eventually fall through to
- * gc_general_alloc which may allocate the object in a large way
- * anyway, but based on decisions about the free space in the current
- * region, not the object size itself */
-
 static inline void *
 gc_quick_alloc_large(int nbytes)
 {
-    if (nbytes >= large_object_size)
-	return gc_alloc_large(nbytes, ALLOC_BOXED, &boxed_region);
-    else
-	return gc_general_alloc(nbytes,ALLOC_BOXED,ALLOC_QUICK);
+    return gc_general_alloc(nbytes,ALLOC_BOXED,ALLOC_QUICK);
 }
 
 static inline void *
@@ -1185,18 +1093,10 @@ gc_quick_alloc_unboxed(int nbytes)
     return gc_general_alloc(nbytes,ALLOC_UNBOXED,ALLOC_QUICK);
 }
 
-/* Allocate space for the object. If it is a large object then do a
- * large alloc else allocate from the current region. If there is not
- * enough free space then call general gc_alloc_unboxed() to do the job.
- *
- * A pointer to the start of the object is returned. */
 static inline void *
 gc_quick_alloc_large_unboxed(int nbytes)
 {
-    if (nbytes >= large_object_size)
-	return gc_alloc_large(nbytes,ALLOC_UNBOXED,&unboxed_region);
-    else
-	return gc_quick_alloc_unboxed(nbytes);
+    return gc_general_alloc(nbytes,ALLOC_UNBOXED,ALLOC_QUICK);
 }
 
 /*
@@ -1218,7 +1118,6 @@ copy_large_object(lispobj object, int nwords)
 {
     int tag;
     lispobj *new;
-    lispobj *source, *dest;
     int first_page;
 
     gc_assert(is_lisp_pointer(object));
@@ -1226,7 +1125,7 @@ copy_large_object(lispobj object, int nwords)
     gc_assert((nwords & 0x01) == 0);
 
 
-    /* Check whether it's a large object. */
+    /* Check whether it's in a large object region. */
     first_page = find_page_index((void *)object);
     gc_assert(first_page >= 0);
 
@@ -1320,17 +1219,7 @@ copy_large_object(lispobj object, int nwords)
 	/* Allocate space. */
 	new = gc_quick_alloc_large(nwords*4);
 
-	dest = new;
-	source = (lispobj *) native_pointer(object);
-
-	/* Copy the object. */
-	while (nwords > 0) {
-	    dest[0] = source[0];
-	    dest[1] = source[1];
-	    dest += 2;
-	    source += 2;
-	    nwords -= 2;
-	}
+	memcpy(new,native_pointer(object),nwords*4);
 
 	/* Return Lisp pointer of new object. */
 	return ((lispobj) new) | tag;
@@ -1343,7 +1232,6 @@ copy_unboxed_object(lispobj object, int nwords)
 {
     int tag;
     lispobj *new;
-    lispobj *source, *dest;
 
     gc_assert(is_lisp_pointer(object));
     gc_assert(from_space_p(object));
@@ -1355,17 +1243,7 @@ copy_unboxed_object(lispobj object, int nwords)
     /* Allocate space. */
     new = gc_quick_alloc_unboxed(nwords*4);
 
-    dest = new;
-    source = (lispobj *) native_pointer(object);
-
-    /* Copy the object. */
-    while (nwords > 0) {
-	dest[0] = source[0];
-	dest[1] = source[1];
-	dest += 2;
-	source += 2;
-	nwords -= 2;
-    }
+    memcpy(new,native_pointer(object),nwords*4);
 
     /* Return Lisp pointer of new object. */
     return ((lispobj) new) | tag;
@@ -1725,26 +1603,23 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
        code objects. Check. */
     fixups = new_code->constants[0];
 
-    /* It will be 0 or the unbound-marker if there are no fixups, and
-     * will be an other pointer if it is valid. */
+    /* It will be 0 or the unbound-marker if there are no fixups (as
+     * will be the case if the code object has been purified, for
+     * example) and will be an other pointer if it is valid. */
     if ((fixups == 0) || (fixups == UNBOUND_MARKER_WIDETAG) ||
 	!is_lisp_pointer(fixups)) {
 	/* Check for possible errors. */
 	if (check_code_fixups)
 	    sniff_code_object(new_code, displacement);
 
-	/*fprintf(stderr,"Fixups for code object not found!?\n");
-	  fprintf(stderr,"*** Compiled code object at %x: header_words=%d code_words=%d .\n",
-	  new_code, nheader_words, ncode_words);
-	  fprintf(stderr,"*** Const. start = %x; end= %x; Code start = %x; end = %x\n",
-	  constants_start_addr,constants_end_addr,
-	  code_start_addr,code_end_addr);*/
 	return;
     }
 
     fixups_vector = (struct vector *)native_pointer(fixups);
 
     /* Could be pointing to a forwarding pointer. */
+    /* FIXME is this always in from_space?  if so, could replace this code with
+     * forwarding_pointer_p/forwarding_pointer_value */
     if (is_lisp_pointer(fixups) &&
 	(find_page_index((void*)fixups_vector) != -1) &&
 	(fixups_vector->header == 0x01)) {
@@ -2134,7 +2009,7 @@ search_static_space(lispobj *pointer)
 lispobj *
 search_dynamic_space(lispobj *pointer)
 {
-    int  page_index = find_page_index(pointer);
+    int page_index = find_page_index(pointer);
     lispobj *start;
 
     /* The address may be invalid, so do some checks. */
@@ -2537,11 +2412,8 @@ maybe_adjust_large_object(lispobj *where)
  * page_table so that it will not be relocated during a GC.
  *
  * This involves locating the page it points to, then backing up to
- * the first page that has its first object start at offset 0, and
- * then marking all pages dont_move from the first until a page that
- * ends by being full, or having free gen.
- *
- * This ensures that objects spanning pages are not broken.
+ * the start of its region, then marking all pages dont_move from there
+ * up to the first page that's not full or has a different generation
  *
  * It is assumed that all the page static flags have been cleared at
  * the start of a GC.
@@ -2583,18 +2455,20 @@ preserve_pointer(void *addr)
      * a pointer which prevents a page from moving. */
     if (!(possibly_valid_dynamic_space_pointer(addr)))
 	return;
+
+    /* Find the beginning of the region.  Note that there may be
+     * objects in the region preceding the one that we were passed a
+     * pointer to: if this is the case, we will write-protect all the
+     * previous objects' pages too.     */
+
+#if 0
+    /* I think this'd work just as well, but without the assertions.
+     * -dan 2004.01.01 */
+    first_page=
+	find_page_index(page_address(addr_page_index)+
+			page_table[addr_page_index].first_object_offset);
+#else 
     first_page = addr_page_index;
-
-    /* Work backwards to find a page with a first_object_offset of 0.
-     * The pages should be contiguous with all bytes used in the same
-     * gen. Assumes the first_object_offset is negative or zero. */
-
-    /* this is probably needlessly conservative.  The first object in
-     * the page may not even be the one we were passed a pointer to:
-     * if this is the case, we will write-protect all the previous
-     * object's pages too.
-     */
-
     while (page_table[first_page].first_object_offset != 0) {
 	--first_page;
 	/* Do some checks. */
@@ -2602,6 +2476,7 @@ preserve_pointer(void *addr)
 	gc_assert(page_table[first_page].gen == from_space);
 	gc_assert(page_table[first_page].allocated == region_allocation);
     }
+#endif
 
     /* Adjust any large objects before promotion as they won't be
      * copied after promotion. */
@@ -2736,7 +2611,7 @@ update_page_write_prot(int page)
 /* Scavenge a generation.
  *
  * This will not resolve all pointers when generation is the new
- * space, as new objects may be added which are not check here - use
+ * space, as new objects may be added which are not checked here - use
  * scavenge_newspace generation.
  *
  * Write-protected pages should not have any pointers to the
@@ -2781,20 +2656,16 @@ scavenge_generation(int generation)
 	if ((page_table[i].allocated & BOXED_PAGE)
 	    && (page_table[i].bytes_used != 0)
 	    && (page_table[i].gen == generation)) {
-	    int last_page;
+	    int last_page,j;
+	    int write_protected=1;
 
-	    /* This should be the start of a contiguous block. */
+	    /* This should be the start of a region */
 	    gc_assert(page_table[i].first_object_offset == 0);
 
-	    /* We need to find the full extent of this contiguous
-	     * block in case objects span pages. */
-
-	    /* Now work forward until the end of this contiguous area
-	     * is found. A small area is preferred as there is a
-	     * better chance of its pages being write-protected. */
-	    for (last_page = i; ; last_page++)
-		/* Check whether this is the last page in this contiguous
-		 * block. */
+	    /* Now work forward until the end of the region */
+	    for (last_page = i; ; last_page++) {
+		write_protected =
+		    write_protected && page_table[last_page].write_protected;
 		if ((page_table[last_page].bytes_used < PAGE_BYTES)
 		    /* Or it is PAGE_BYTES and is the last in the block */
 		    || (!(page_table[last_page+1].allocated & BOXED_PAGE))
@@ -2802,37 +2673,22 @@ scavenge_generation(int generation)
 		    || (page_table[last_page+1].gen != generation)
 		    || (page_table[last_page+1].first_object_offset == 0))
 		    break;
-
-	    /* Do a limited check for write_protected pages. If all pages
-	     * are write_protected then there is no need to scavenge. */
-	    {
-		int j, all_wp = 1;
-		for (j = i; j <= last_page; j++)
-		    if (page_table[j].write_protected == 0) {
-			all_wp = 0;
-			break;
+	    }
+	    if (!write_protected) {
+		scavenge(page_address(i), (page_table[last_page].bytes_used
+					   + (last_page-i)*PAGE_BYTES)/4);
+		
+		/* Now scan the pages and write protect those that
+		 * don't have pointers to younger generations. */
+		if (enable_page_protection) {
+		    for (j = i; j <= last_page; j++) {
+			num_wp += update_page_write_prot(j);
 		    }
-#if !SC_GEN_CK
-		if (all_wp == 0)
-#endif
-		    {
-			scavenge(page_address(i), (page_table[last_page].bytes_used
-						   + (last_page-i)*PAGE_BYTES)/4);
-
-			/* Now scan the pages and write protect those
-			 * that don't have pointers to younger
-			 * generations. */
-			if (enable_page_protection) {
-			    for (j = i; j <= last_page; j++) {
-				num_wp += update_page_write_prot(j);
-			    }
-			}
-		    }
+		}
 	    }
 	    i = last_page;
 	}
     }
-
     if ((gencgc_verbose > 1) && (num_wp != 0)) {
 	FSHOW((stderr,
 	       "/write protected %d pages within generation %d\n",
@@ -2905,6 +2761,7 @@ scavenge_newspace_generation_one_scan(int generation)
 		 * cleared before promotion.) */
 		|| (page_table[i].dont_move == 1))) {
 	    int last_page;
+	    int all_wp=1;
 
 	    /* The scavenge will start at the first_object_offset of page i.
 	     *
@@ -2915,6 +2772,11 @@ scavenge_newspace_generation_one_scan(int generation)
 	     * is found. A small area is preferred as there is a
 	     * better chance of its pages being write-protected. */
 	    for (last_page = i; ;last_page++) {
+		/* If all pages are write-protected and movable, 
+		 * then no need to scavenge */
+		all_wp=all_wp && page_table[last_page].write_protected && 
+		    !page_table[last_page].dont_move;
+		
 		/* Check whether this is the last page in this
 		 * contiguous block */
 		if ((page_table[last_page].bytes_used < PAGE_BYTES)
@@ -2926,41 +2788,20 @@ scavenge_newspace_generation_one_scan(int generation)
 		    break;
 	    }
 
-	    /* Do a limited check for write-protected pages. If all
-	     * pages are write-protected then no need to scavenge,
-	     * except if the pages are marked dont_move. */
-	    {
-		int j, all_wp = 1;
-		for (j = i; j <= last_page; j++)
-		    if ((page_table[j].write_protected == 0)
-			|| (page_table[j].dont_move != 0)) {
-			all_wp = 0;
-			break;
-		    }
-
-		if (!all_wp) {
-		    int size;
-
-		    /* Calculate the size. */
-		    if (last_page == i)
-			size = (page_table[last_page].bytes_used
-				- page_table[i].first_object_offset)/4;
-		    else
-			size = (page_table[last_page].bytes_used
-				+ (last_page-i)*PAGE_BYTES
-				- page_table[i].first_object_offset)/4;
-		    
-		    {
-			new_areas_ignore_page = last_page;
-			
-			scavenge(page_address(i) +
-				 page_table[i].first_object_offset,
-				 size);
-
-		    }
-		}
+	    /* Do a limited check for write-protected pages.  */
+	    if (!all_wp) {
+		int size;
+		
+		size = (page_table[last_page].bytes_used
+			+ (last_page-i)*PAGE_BYTES
+			- page_table[i].first_object_offset)/4;
+		new_areas_ignore_page = last_page;
+		
+		scavenge(page_address(i) +
+			 page_table[i].first_object_offset,
+			 size);
+		
 	    }
-
 	    i = last_page;
 	}
     }
@@ -2979,7 +2820,7 @@ scavenge_newspace_generation(int generation)
     struct new_area (*current_new_areas)[] = &new_areas_1;
     int current_new_areas_index;
 
-    /* the new_areas created but the previous scavenge cycle */
+    /* the new_areas created by the previous scavenge cycle */
     struct new_area (*previous_new_areas)[] = NULL;
     int previous_new_areas_index;
 
@@ -4146,31 +3987,34 @@ gc_init(void)
 /*  Pick up the dynamic space from after a core load.
  *
  *  The ALLOCATION_POINTER points to the end of the dynamic space.
- *
- *  XX A scan is needed to identify the closest first objects for pages. */
+ */
+
 static void
 gencgc_pickup_dynamic(void)
 {
     int page = 0;
-    int addr = DYNAMIC_SPACE_START;
     int alloc_ptr = SymbolValue(ALLOCATION_POINTER,0);
+    lispobj *prev=(lispobj *)page_address(page);
 
-    /* Initialize the first region. */
     do {
+	lispobj *first,*ptr= (lispobj *)page_address(page);
 	page_table[page].allocated = BOXED_PAGE;
 	page_table[page].gen = 0;
 	page_table[page].bytes_used = PAGE_BYTES;
 	page_table[page].large_object = 0;
+
+	first=search_space(prev,(ptr+2)-prev,ptr);
+	if(ptr == first)  prev=ptr; 
 	page_table[page].first_object_offset =
-	    (void *)DYNAMIC_SPACE_START - page_address(page);
-	addr += PAGE_BYTES;
+	    (void *)prev - page_address(page);
 	page++;
-    } while (addr < alloc_ptr);
+    } while (page_address(page) < alloc_ptr);
 
     generations[0].bytes_allocated = PAGE_BYTES*page;
     bytes_allocated = PAGE_BYTES*page;
 
 }
+
 
 void
 gc_initialize_pointers(void)
@@ -4215,9 +4059,9 @@ alloc(int nbytes)
 	    fprintf(stderr, "fatal error in thread 0x%x, pid=%d\n",
 		    th,getpid());
 	    __asm__("movl %fs,%0" : "=r" (fs)  : );
-	    fprintf(stderr, "fs is %x, th->tls_cookie=%x (should be identical)\n",
+	    fprintf(stderr, "fs is %x, th->tls_cookie=%x \n",
 		    debug_get_fs(),th->tls_cookie);
-	    lose("If you see this message before 2003.12.01, mail details to sbcl-devel\n");
+	    lose("If you see this message before 2004.01.31, mail details to sbcl-devel\n");
 	}
 #else
     gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));

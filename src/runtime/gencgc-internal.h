@@ -72,9 +72,10 @@ struct page {
      * hard to achieve). */
     int  bytes_used;
 
-    /* It is important to know the offset to the first object in the
-     * page. Currently it's only important to know if an object starts
-     * at the beginning of the page in which case the offset would be 0. */
+    /* The name of this field is not well-chosen for its actual use.
+     * This is the offset from the start of the page to the start 
+     * of the alloc_region which contains/contained it.  It's negative or 0
+     */
     int  first_object_offset;
 };
 
@@ -83,6 +84,7 @@ struct page {
 
 /* the number of pages needed for the dynamic space - rounding up */
 #define NUM_PAGES ((DYNAMIC_SPACE_SIZE+PAGE_BYTES-1)/PAGE_BYTES)
+
 extern struct page page_table[NUM_PAGES];
 
 

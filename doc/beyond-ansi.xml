@@ -232,22 +232,11 @@ question uses %fs in an incompatible way.
 
 <para>There are two implementation mechanisms for queueing.  If SBCL
 was built on an NPTL-capable Linux system (2.6 or some vendor 2.4
-ports) with the :SB-FUTEX feature, queuing will be doneusing the
-<function>sys_futex()</function> call.  Otherwise it will fall back to
-using <function>sigtimedwait()</function> to sleep and a signal
+ports) with the :SB-FUTEX feature, queuing will be done using the
+<function>sys_futex()</function> system call if it's available at
+runtime.  Otherwise it will fall back to using
+<function>sigtimedwait()</function> to sleep and a signal
 (SIG_DEQUEUE, one of the POSIX RT signals) to wake.</para>
-
-<para>&SBCL; at present will alway have at least two tasks running as
-seen from Linux: when the first process has done startup
-initialization (mapping files in place, installing signal handlers
-etc) it creates a new thread to run the Lisp startup and initial
-listener.  The original thread stays around to reap it when it's dead
-and deallocate its resources (e.g. stacks) when it exits.
-</para>
-
-<para>It should be noted that the initial thread does less and less in
-each new release of SBCL, and one day soon will probably go away
-altogether.</para>
 
 <para>Garbage collection is done with the existing Conservative
 Generational GC.  Allocation is done in small (typically 8k) regions :

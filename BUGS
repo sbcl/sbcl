@@ -264,6 +264,11 @@ WORKAROUND:
   GC, so that thereafter memory usage can never be reduced below that
   level.
 
+  (As of 0.8.7.3 it's likely that the latter half of this bug is fixed.
+  The interaction between gencgc and the variables used by
+  save-lisp-and-die is still nonoptimal, though, so no respite from
+  big core files yet)
+
 98:
   In sbcl-0.6.11.41 (and in all earlier SBCL, and in CMU
   CL), out-of-line structure slot setters are horribly inefficient
@@ -323,6 +328,15 @@ WORKAROUND:
   (ROOM T) can bring a small computer to its knees for a *long*
   time trying to GC afterwards. Surely there's some more economical
   way to implement (ROOM T).
+
+  Daniel Barlow doesn't know what fixed this, but observes that it 
+  doesn't seem to be the case in 0.8.7.3 any more.  Instead, (ROOM T)
+  in a fresh SBCL causes
+
+    debugger invoked on a SB-INT:BUG in thread 5911:
+        failed AVER: "(SAP= CURRENT END)"
+
+  unless a GC has happened beforehand.
 
 117:
   When the compiler inline expands functions, it may be that different
