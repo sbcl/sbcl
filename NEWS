@@ -2437,6 +2437,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug: as reported by Kalle Olavi Niemitalo on #lisp IRC,
     don't warn on legal loop code involving more than one aggregate
     boolean.  (thanks to Nikodemus Siivola)
+  * fixed bug: as reported by Peter Graves on #lisp IRC, passing a NIL
+    in keyword position to MAKE-PACKAGE was not being reported as
+    invalid.
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by

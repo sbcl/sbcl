@@ -116,5 +116,13 @@
                                  foo)))
                        error))
 
+;;; MAKE-PACKAGE (and other &key functions) should signal an error
+;;; when given a NIL key.  This is kind of a compiler test really, but
+;;; this'll do as a resting place.
+(handler-case
+    (eval '(make-package "FOO" nil nil))
+  (error () :ok)
+  (:no-error (c) (error "MAKE-PACKAGE succeeded: ~S" c)))
+
 ;;; success
 (sb-ext:quit :unix-status 104)

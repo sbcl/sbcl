@@ -595,7 +595,7 @@
                 (tests `((eq ,n-key :allow-other-keys)
                          (setq ,n-allowp ,n-value-temp))))
 	      (tests `(t
-		       (setq ,n-losep ,n-key))))
+		       (setq ,n-losep (list ,n-key)))))
 
 	    (body
 	     `(when (oddp ,n-count)
@@ -614,7 +614,7 @@
 
 	    (unless allowp
 	      (body `(when (and ,n-losep (not ,n-allowp))
-		       (%unknown-key-arg-error ,n-losep)))))))
+		       (%unknown-key-arg-error (car ,n-losep))))))))
 
       (let ((ep (ir1-convert-lambda-body
 		 `((let ,(temps)
