@@ -1,5 +1,6 @@
 depend
 genesis
+ldso-stubs.S
 ppc-linux-mcontext.h
 sbcl
 sbcl.h

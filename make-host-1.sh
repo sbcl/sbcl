@@ -31,6 +31,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	;; low-level representations of things.)
 	(setf *print-level* 5 *print-length* 5)
 	(load "src/cold/shared.lisp")
+	(load "tools-for-build/ldso-stubs.lisp")
 	(in-package "SB-COLD")
 	(setf *host-obj-prefix* "obj/from-host/")
 	(load "src/cold/set-up-cold-packages.lisp")

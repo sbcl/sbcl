@@ -15,15 +15,6 @@
 
 echo //entering make-target-1.sh
 
-# Use a little lisp to write LDSO stubs in correct format for the toolchain. 
-echo //generating ldso-subs.S
-$SBCL_XC_HOST <<-'EOF' || exit 1
-        (load "src/cold/shared.lisp")
-        (load "tools-for-build/ldso-stubs.lisp")
-        #+cmu (ext:quit)
-        #+clisp (ext:quit)
-EOF
-
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get
