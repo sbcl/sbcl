@@ -2173,12 +2173,12 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
     that the various BOOLE-related constants have the same value in
     host and target lisps.  (noted by Paul Dietz' test suite on an
     SBCL binary built from CLISP)
-  * the system can now be dynamically linked on the MIPS platform,
+  * The system can now be dynamically linked on the MIPS platform,
     which enables dynamic loading of foreign code from Lisp.  (thanks
     to Ralf Baechle for discussions on the MIPS ABI)
-  * the system now records its own debugging information in a
-    filesystem-position-independent manner, relative to the "SYS"
-    logical host.
+  * The system now records debugging information for its own source
+    files in a filesystem-position-independent manner, relative to 
+    the "SYS" logical host.
   * fixed a compiler bug: MV-LET convertion did not check references
     to the "max args" entry point.  (reported by Brian Downing)
   * tweaked disassembly notes to be less confident about proclaiming
@@ -2188,8 +2188,8 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
     characteristics.  (thanks to David Lichteblau)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** compiler failure in compiling LOGAND expressions including a
-       constant 0.
-    ** implementation of ASH-MOD32 on X86 and PPC did not work for the
+       constant 0
+    ** Implementation of ASH-MOD32 on X86 and PPC did not work for the
        shift greater than 32.
     ** FLUSH-DEST did not mark blocks for type check regeneration.
     ** HANDLER-CASE failed to accept declarations in handler clauses
