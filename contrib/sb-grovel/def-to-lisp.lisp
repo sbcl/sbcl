@@ -105,8 +105,8 @@ printf(\"(in-package ~S)\\\n\");~%" package-name)
 	     filename tmp-c-source (constants-package component))
     (and		
      (= (run-shell-command "gcc ~A -o ~S ~S"
-			   (if (sb-ext:posix-getenv "CFLAGS")
-			       (sb-ext:posix-getenv "CFLAGS")
+			   (if (sb-ext:posix-getenv "EXTRA_CFLAGS")
+			       (sb-ext:posix-getenv "EXTRA_CFLAGS")
 				"")
 			   (namestring tmp-a-dot-out)
 			   (namestring tmp-c-source)) 0)

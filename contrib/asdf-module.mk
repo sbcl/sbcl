@@ -1,29 +1,19 @@
 CC=gcc
 
-# Need to set CFLAGS and LDFLAGS here. sb-posix, sb-grovel, and
-# sb-bsd-sockets depends upon these being set on x86_64. Setting these
-# in their Makefile's is not adequate since their asd files are
-# invoked when loaded from other modules which don't require these
-# environmental values in their Makefile's.
+# We need to extend flags to the C compiler and the linker
+# here. sb-posix, sb-grovel, and sb-bsd-sockets depends upon these
+# being set on x86_64. Setting these in their Makefiles is not
+# adequate since, while we're building contrib, they can be compiled
+# directly via ASDF from a non-C-aware module which has these tricky
+# ones as dependencies.
 
 UNAME:=$(shell uname -m)
-export CFLAGS=-fPIC
-ifeq (solaris,$(UNAME))
-  export LDFLAGS=-shared -lresolv -lsocket -lnsl
-else
-  ifeq (Darwin,$(UNAME))
-    export LDFLAGS=-bundle
-  else
-    ifeq (x86_64,$(UNAME))
-      export LDFLAGS=-m32 -shared
-      export CFLAGS+= -m32
-    else
-      export LDFLAGS=-shared
-    endif
-  endif
+ifeq (x86_64,$(UNAME))
+    export EXTRA_LDFLAGS=-m32 -shared
+    export EXTRA_CFLAGS+=-m32
 endif
 
-export CC SBCL CFLAGS LDFLAGS
+export CC SBCL EXTRA_CFLAGS EXTRA_LDFLAGS
 
 all: $(EXTRA_ALL_TARGETS)
 	$(MAKE) -C ../asdf

@@ -30,7 +30,7 @@ export SBCL SBCL_BUILDING_CONTRIB
 # as SB-RT and SB-GROVEL, but FIXME: there's probably a better
 # solution.  -- CSR, 2003-05-30
 
-find contrib/ \( -name '*.fasl' -o -name 'foo.c' -o -name 'a.out' \) \
+find contrib/ \( -name '*.fasl' -o -name 'foo.c' -o -name 'a.out' -o -name 'alien.so' -o -name '*.o' \) \
   -print | xargs rm -f
 
 mkdir -p contrib/systems
