@@ -502,6 +502,56 @@ WORKAROUND:
   time trying to GC afterwards. Surely there's some more economical
   way to implement (ROOM T).
 
+115:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    (in-package :cl-user)
+    ;;; The following invokes a compiler error.
+    (declaim (optimize (speed 2) (debug 3)))
+    (defun tst ()
+      (flet ((m1 ()
+               (unwind-protect nil)))
+        (if (catch nil)
+          (m1)
+          (m1))))
+  The error message in sbcl-0.6.12.42 is
+    internal error, failed AVER:
+      "(COMMON-LISP:EQ (SB!C::TN-ENVIRONMENT SB!C:TN) SB!C::TN-ENV)"
+
+  This examples better illustrates the problem:
+
+  (defun tst ()
+    (declare (optimize (speed 2) (debug 3)))
+    (flet ((m1 ()
+             (bar (if (foo) 1 2))
+             (let ((x (foo)))
+               (bar x (list x)))))
+      (if (catch nil)
+          (m1)
+          (m1))))
+
+  (X is allocated in the physical environment of M1; X is :WRITE in
+  the call of LET [convert-to-global]; IF makes sure that a block
+  exists in M1 before this call.)
+
+  Because X is :DEBUG-ENVIRONMENT, it is :LIVE by default in all
+  blocks in the environment, particularly it is :LIVE in the start of
+  M1 (where it is not yet :WRITE) [setup-environment-tn-conflicts].
+
+  Then :LIVE is propagated backwards, i.e. into the caller of M1
+  where X does not exist [lifetime-flow-analysis].
+
+  (CATCH NIL) causes all TNs to be saved; Python fails on saving
+  non-existent variable; if it is replaced with (FOO), the problem
+  appears when debugging TST: LIST-LOCALS says
+
+    debugger invoked on condition of type SB-DI:UNKNOWN-DEBUG-VAR:
+
+    #<SB-DI::COMPILED-DEBUG-VAR X 0
+      {905FF7D}> is not in #<SB-DI::COMPILED-DEBUG-FUNCTION TST>.
+
+  (in those old versions, in which debugger worked :-().
+
 117:
   When the compiler inline expands functions, it may be that different
   kinds of return values are generated from different code branches.
@@ -1272,7 +1322,24 @@ WORKAROUND:
           (ignore-errors (progn (values-list (car (list '(1 . 2)))) t)))
 
 226: "AVER failure in COMPILE-FILE of clocc-ansi-test/tests.lisp"
-  (fixed in 0.7.9.54)
+  (APD points out that this seems to be another symptom of bug #115.)
+  sbcl-0.7.9.43 dies with failed AVER "(EQ (TN-PHYSENV TN) TN-ENV)" when
+  trying to compile clocc-ansi-test/tests.lisp. sbcl-0.7.9.31 was able to
+  to compile it. A smaller test case exhibiting the same problem is
+   (declaim (optimize (speed 0) (safety 3) (debug 3)))
+   (defun c-a-p ()
+     (flet ((safe-format (stream string &rest r)
+              (unless (ignore-errors (progn
+                                       (apply #'format stream string r)
+                                       t))
+	        (format stream "~&foo ~S" string))))
+       (cond
+        ((eq my-result :ERROR)
+         (cond
+          ((ignore-errors (typep condition result))
+           (safe-format t "~&bar ~S" result))
+          (t
+           (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
 
 
 DEFUNCT CATEGORIES OF BUGS
