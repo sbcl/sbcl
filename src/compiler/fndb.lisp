@@ -1318,6 +1318,8 @@
 ;;; ordinary functions.
 (defknown %slot-accessor (t) t (flushable))
 (defknown %slot-setter (t t) t (unsafe))
+
+(defknown sb!kernel::do-arg-count-error (t t t t t t) nil (unsafe))
 
 ;;;; SETF inverses
 

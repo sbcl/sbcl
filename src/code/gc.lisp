@@ -140,7 +140,7 @@ and submit it as a patch."
 ;;;
 ;;; Unlike CMU CL, we don't export this variable. (There's no need to,
 ;;; since our BYTES-CONSED-BETWEEN-GCS function is SETFable.)
-(defvar *bytes-consed-between-gcs* (* 2 (expt 10 6)))
+(defvar *bytes-consed-between-gcs* (* 4 (expt 10 6)))
 (declaim (type index *bytes-consed-between-gcs*))
 
 ;;;; GC hooks

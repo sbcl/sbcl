@@ -827,6 +827,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   is no longer part of the base system. The files which used to 
   be in the doc/cmucl/ directory are now available as
     <ftp://sbcl.sourceforge.net/pub/sbcl/cmucl-docs.tar.bz2>.
+* The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
+  doubled, to 4 million. (If your application spends a lot of time
+  GCing and you have a lot of RAM, you might want to experiment with
+  increasing it even more.)
 ?? lots of tidying up internally: renaming things so that names are
   more systematic and consistent, converting C macros to inline
   functions, systematizing indentation
