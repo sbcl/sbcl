@@ -123,7 +123,7 @@
      (values (int-sap static-space-start)
 	     (int-sap (* *static-space-free-pointer* word-bytes))))
     (:read-only
-     (values (int-sap *read-only-space-start*)
+     (values (int-sap read-only-space-start)
 	     (int-sap (* *read-only-space-free-pointer* word-bytes))))
     (:dynamic
      (values (int-sap (current-dynamic-space-start))

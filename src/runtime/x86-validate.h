@@ -47,14 +47,11 @@
  */
 
 #if defined(__FreeBSD__) || defined(__OpenBSD__)
-#define READ_ONLY_SPACE_START   (0x10000000)
 #define READ_ONLY_SPACE_SIZE    (0x0ffff000) /* 256MB - 1 page */
 
 #if defined __FreeBSD__
-#define STATIC_SPACE_START	(0x30000000)
 #define STATIC_SPACE_SIZE	(0x07fff000) /* 128M - 1 page */
 #elif defined __OpenBSD__
-#define STATIC_SPACE_START      (0x28000000)
 #define STATIC_SPACE_SIZE	(0x0ffff000) /* 256M - 1 page */
 #else
 #error unsupported BSD variant
@@ -87,10 +84,8 @@
  * principles" or "coding principles" file that information like this
  * always flows from Lisp code to C code, through sbcl.h. */
 #ifdef __linux__
-#define READ_ONLY_SPACE_START   (0x01000000)
 #define READ_ONLY_SPACE_SIZE    (0x02800000) /* 40MB */
 
-#define STATIC_SPACE_START	(0x05000000)
 #define STATIC_SPACE_SIZE	(0x02fff000) /* 48MB - 1 page */
 
 #define BINDING_STACK_START	(0x60000000)

@@ -131,14 +131,18 @@
 ;;;     stomping on an address range that the dynamic libraries want to use. 
 ;;;     (They want to use this address range even if we try to reserve it
 ;;;     with a call to validate() as the first operation in main().)
-#!-linux (defparameter *read-only-space-start* #x10000000)
-#!-linux (defconstant static-space-start
-                      #!+freebsd #x30000000
-                      #!+openbsd #x28000000)
-#!-linux (defparameter *dynamic-space-start*   #x48000000)
-#!+linux (defparameter *read-only-space-start* #x01000000)
-#!+linux (defconstant static-space-start    #x05000000)
-#!+linux (defparameter *dynamic-space-start*   #x09000000)
+#!+linux
+(progn
+  (defconstant read-only-space-start #x01000000)
+  (defconstant static-space-start    #x05000000)
+  (defparameter *dynamic-space-start*   #x09000000))
+#!+bsd
+(progn
+  (defconstant read-only-space-start #x10000000)
+  (defconstant static-space-start
+    #!+freebsd #x30000000
+    #!+openbsd #x28000000)
+  (defparameter *dynamic-space-start*   #x48000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:

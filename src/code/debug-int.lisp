@@ -2474,7 +2474,7 @@
 	    ;; Check that the pointer is valid. XXX Could do a better
 	    ;; job. FIXME: e.g. by calling out to an is_valid_pointer
 	    ;; routine in the C runtime support code
-	    (or (< sb!vm:*read-only-space-start* val
+	    (or (< sb!vm:read-only-space-start val
 		   (* sb!vm:*read-only-space-free-pointer*
 		      sb!vm:word-bytes))
 		(< sb!vm::static-space-start val

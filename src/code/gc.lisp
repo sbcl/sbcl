@@ -32,12 +32,6 @@
 (def-c-var-frob sb!vm:current-dynamic-space-start "current_dynamic_space")
 
 #!-sb-fluid (declaim (inline dynamic-usage))
-#!-(or cgc gencgc)
-(defun dynamic-usage ()
-  (the (unsigned-byte 32)
-       (- (sb!sys:sap-int (sb!c::dynamic-space-free-pointer))
-	  (sb!vm:current-dynamic-space-start))))
-#!+(or cgc gencgc)
 (def-c-var-frob dynamic-usage "bytes_allocated")
 
 (defun static-space-usage ()
@@ -46,7 +40,7 @@
 
 (defun read-only-space-usage ()
   (- (* sb!vm::*read-only-space-free-pointer* sb!vm:word-bytes)
-     sb!vm:*read-only-space-start*))
+     sb!vm:read-only-space-start))
 
 (defun control-stack-usage ()
   #!-x86 (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
@@ -254,24 +248,10 @@
 (sb!alien:def-alien-routine collect-garbage sb!c-call:int
   #!+gencgc (last-gen sb!c-call:int))
 
-#!-ibmrt
 (sb!alien:def-alien-routine set-auto-gc-trigger sb!c-call:void
   (dynamic-usage sb!c-call:unsigned-long))
 
-#!+ibmrt
-(defun set-auto-gc-trigger (bytes)
-  (let ((words (ash (+ (sb!vm:current-dynamic-space-start) bytes) -2)))
-    (unless (and (fixnump words) (plusp words))
-      (clear-auto-gc-trigger)
-      (warn "attempt to set GC trigger to something bogus: ~S" bytes))
-    (setf %rt::*internal-gc-trigger* words)))
-
-#!-ibmrt
 (sb!alien:def-alien-routine clear-auto-gc-trigger sb!c-call:void)
-
-#!+ibmrt
-(defun clear-auto-gc-trigger ()
-  (setf %rt::*internal-gc-trigger* -1))
 
 ;;; This variable contains the function that does the real GC. This is
 ;;; for low-level GC experimentation. Do not touch it if you do not

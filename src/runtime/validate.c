@@ -21,6 +21,7 @@
 #include "runtime.h"
 #include "os.h"
 #include "globals.h"
+#include "sbcl.h"
 #include "validate.h"
 
 static void ensure_space(lispobj *start, unsigned long size)

@@ -28,7 +28,7 @@
 (file-comment
   "$Header$")
 
-;;; a magic number used to identify core files
+;;; a magic number used to identify our core files
 (defconstant core-magic
   (logior (ash (char-code #\S) 24)
 	  (ash (char-code #\B) 16)
@@ -2541,34 +2541,49 @@
     (do-external-symbols (symbol (find-package "SB!VM"))
       (when (constantp symbol)
 	(let ((name (symbol-name symbol)))
-	  (labels
-	      ((record (prefix string priority)
-		       (push (list (concatenate
-				    'simple-string
-				    prefix
-				    (delete #\- (string-capitalize string)))
-				   priority
-				   (symbol-value symbol)
-				   (fdocumentation symbol 'variable))
-			     constants))
-	       (test-tail (tail prefix priority)
-			  (when (tail-comp name tail)
-			    (record prefix
-				    (subseq name 0
-					    (- (length name)
-					       (length tail)))
-				    priority)))
-	       (test-head (head prefix priority)
-			  (when (head-comp name head)
-			    (record prefix
-				    (subseq name (length head))
-				    priority))))
+	  (labels (;; shared machinery
+		   (record (string priority)
+		     (push (list string
+				 priority
+				 (symbol-value symbol)
+				 (documentation symbol 'variable))
+			   constants))
+		   ;; machinery for old-style CMU CL Lisp-to-C naming
+		   (record-with-munged-name (prefix string priority)
+		     (record (concatenate
+			      'simple-string
+			      prefix
+			      (delete #\- (string-capitalize string)))
+			     priority))
+		   (test-tail (tail prefix priority)
+		     (when (tail-comp name tail)
+		       (record-with-munged-name prefix
+						(subseq name 0
+							(- (length name)
+							   (length tail)))
+						priority)))
+		   (test-head (head prefix priority)
+		     (when (head-comp name head)
+		       (record-with-munged-name prefix
+						(subseq name (length head))
+						priority)))
+		   ;; machinery for new-style SBCL Lisp-to-C naming
+		   (record-with-translated-name (priority)
+		     (record (substitute #\_ #\- name)
+			     priority)))
+	    ;; This style of munging of names is used in the code
+	    ;; inherited from CMU CL.
 	    (test-tail "-TYPE" "type_" 0)
 	    (test-tail "-FLAG" "flag_" 1)
 	    (test-tail "-TRAP" "trap_" 2)
 	    (test-tail "-SUBTYPE" "subtype_" 3)
 	    (test-head "TRACE-TABLE-" "tracetab_" 4)
-	    (test-tail "-SC-NUMBER" "sc_" 5)))))
+	    (test-tail "-SC-NUMBER" "sc_" 5)
+	    ;; This simpler style of munging of names seems less
+	    ;; confusing, and is used for newer code.
+	    (when (some (lambda (suffix) (tail-comp name suffix))
+			#("-START" "-END"))
+	      (record-with-translated-name 6))))))
     (setf constants
 	  (sort constants
 		#'(lambda (const1 const2)
@@ -2940,7 +2955,7 @@ initially undefined function references:~2%")
 	   (*cold-package-symbols* nil)
 	   (*read-only* (make-gspace :read-only
 				     read-only-space-id
-				     sb!vm:*read-only-space-start*))
+				     sb!vm:read-only-space-start))
 	   (*static*    (make-gspace :static
 				     static-space-id
 				     sb!vm:static-space-start))
