@@ -203,3 +203,11 @@
     (ignore-errors (eval '(macrolet ((foo x `',x)) (foo 1 2 3))))
   (assert (null result))
   (assert (typep error 'error)))
+
+;;; bug 124: environment of MACROLET-introduced macro expanders
+(assert (equal
+         (macrolet ((mext (x) `(cons :mext ,x)))
+           (macrolet ((mint (y) `'(:mint ,(mext y))))
+             (list (mext '(1 2))
+                   (mint (1 2)))))
+         '((:MEXT 1 2) (:MINT (:MEXT 1 2)))))

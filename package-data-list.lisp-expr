@@ -192,8 +192,9 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
               "*BACKEND-SUBFEATURES*"
               "*BACKEND-T-PRIMITIVE-TYPE*"
 
-              "*CODE-SEGMENT*" 
+              "*CODE-SEGMENT*"
               "*COUNT-VOP-USAGES*" "*ELSEWHERE*" "*FREE-FUNS*"
+              "*LEXENV*"
               "*SETF-ASSUMED-FBOUNDP*"
               "*SUPPRESS-VALUES-DECLARATION*"
 
@@ -209,12 +210,13 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
               "CHECK-FIXNUM" "CHECK-FUN"
               "CHECK-SIGNED-BYTE-32" "CHECK-SYMBOL" "CHECK-UNSIGNED-BYTE-32"
               "CLOSURE-INIT" "CLOSURE-REF"
-              "CODE-CONSTANT-REF" "CODE-CONSTANT-SET" 
+              "CODE-CONSTANT-REF" "CODE-CONSTANT-SET"
+              "COMPILE-IN-LEXENV"
 	      "COMPILE-LAMBDA-FOR-DEFUN"
               "%COMPILER-DEFUN" "COMPILER-ERROR"
               "COMPONENT" "COMPONENT-HEADER-LENGTH"
               "COMPONENT-INFO" "COMPONENT-LIVE-TN" "COMPUTE-FUN"
-              "COMPUTE-OLD-NFP" "COPY-MORE-ARG" 
+              "COMPUTE-OLD-NFP" "COPY-MORE-ARG"
               "CURRENT-BINDING-POINTER" "CURRENT-NFP-TN"
               "CURRENT-STACK-POINTER" "DEALLOC-ALIEN-STACK-SPACE"
               "DEALLOC-NUMBER-STACK-SPACE" "DEF-BOOLEAN-ATTRIBUTE"
@@ -238,7 +240,8 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
               "IR2-PHYSENV-NUMBER-STACK-P"
 	      "KNOWN-CALL-LOCAL" "KNOWN-RETURN"
 	      "LAMBDA-INDEPENDENT-OF-LEXENV-P"
-	      "LAMBDA-WITH-LEXENV" "LOCATION=" "LTN-ANNOTATE"
+	      "LAMBDA-WITH-LEXENV" "LEXENV-FIND"
+              "LOCATION=" "LTN-ANNOTATE"
               "MAKE-ALIAS-TN" "MAKE-CATCH-BLOCK"
               "MAKE-CLOSURE" "MAKE-CONSTANT-TN" "MAKE-FIXNUM"
               "MAKE-LOAD-TIME-CONSTANT-TN" "MAKE-N-TNS" "MAKE-NORMAL-TN"
@@ -574,7 +577,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
              ;; weak pointers and finalization
              "CANCEL-FINALIZATION"
-             "FINALIZE"             
+             "FINALIZE"
              "HASH-TABLE-WEAK-P" "MAKE-WEAK-POINTER"
              "WEAK-POINTER" "WEAK-POINTER-P" "WEAK-POINTER-VALUE"
 
@@ -678,7 +681,7 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; hash mixing operations
              "MIX" "MIXF"
-             
+
              ;; I'm not convinced that FDEFINITIONs are the ideal
              ;; solution, so exposing ways to peek into the system
              ;; seems undesirable, since it makes it harder to get
@@ -699,7 +702,7 @@ retained, possibly temporariliy, because it might be used internally."
 
 	     ;; stuff for hinting to the compiler
 	     "NAMED-LAMBDA"
-	     
+
              ;; other variations on DEFFOO stuff useful for bootstrapping
              ;; and cross-compiling
              "DEFMACRO-MUNDANELY"
@@ -714,7 +717,7 @@ retained, possibly temporariliy, because it might be used internally."
              "FASTBIG-INCF-PCOUNTER-OR-FIXNUM"
              "INCF-PCOUNTER"
              "INCF-PCOUNTER-OR-FIXNUM"
-             "MAKE-PCOUNTER"             
+             "MAKE-PCOUNTER"
              "PCOUNTER"
              "PCOUNTER->INTEGER"
              "PCOUNTER-OR-FIXNUM->INTEGER"
@@ -724,7 +727,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; miscellaneous non-standard but handy user-level functions..
              "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
              "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
-             "SANE-PACKAGE" 
+             "SANE-PACKAGE"
              "CYCLIC-LIST-P"
 	     "COMPOUND-OBJECT-P"
              "SWAPPED-ARGS-FUN"
@@ -748,7 +751,7 @@ retained, possibly temporariliy, because it might be used internally."
 	     ;; ..and CONDITIONs..
 	     "BUG"
 	     "UNSUPPORTED-OPERATOR"
-	     
+
              ;; ..and DEFTYPEs..
              "INDEX" "LOAD/STORE-INDEX"
 	     "SIGNED-BYTE-WITH-A-BITE-OUT"
@@ -762,7 +765,7 @@ retained, possibly temporariliy, because it might be used internally."
              "SINGLE-FLOATP"
              "FIXNUMP"
              "BIGNUMP"
-             "RATIOP" 
+             "RATIOP"
 
              ;; encapsulation
              "ARG-LIST"
@@ -818,7 +821,7 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; cross-compilation bootstrap hacks which turn into
              ;; placeholders in a target system
-             "UNCROSS" 
+             "UNCROSS"
 
              ;; might as well be shared among the various files which
              ;; need it:
@@ -849,7 +852,8 @@ retained, possibly temporariliy, because it might be used internally."
 	     "SYMBOL-SELF-EVALUATING-P"
              "PRINT-PRETTY-ON-STREAM-P"
              "LOOKS-LIKE-NAME-OF-SPECIAL-VAR-P"
-             "POSITIVE-PRIMEP" 
+             "POSITIVE-PRIMEP"
+             "EVAL-IN-LEXENV"
 
              ;; These could be moved back into SB!EXT if someone has
              ;; compelling reasons, but hopefully we can get by
@@ -884,7 +888,7 @@ retained, possibly temporariliy, because it might be used internally."
 
 	     ;; hackery to help set up for cold init
              "!BEGIN-COLLECTING-COLD-INIT-FORMS"
-	     "!COLD-INIT-FORMS" 
+	     "!COLD-INIT-FORMS"
 	     "COLD-FSET"
              "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"))
 
@@ -1306,7 +1310,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "SHOW-CONDITION" "CASE-FAILURE"
              "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
              "DESCRIBE-CONDITION"
-             
+
              "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
              "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
              "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"

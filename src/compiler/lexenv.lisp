@@ -50,10 +50,10 @@
   ;; type declaration.
   (type-restrictions nil :type list)
   ;; the lexically enclosing lambda, if any
-  ;; 
+  ;;
   ;; FIXME: This should be :TYPE (OR CLAMBDA NULL), but it was too hard
   ;; to get CLAMBDA defined in time for the cross-compiler.
-  (lambda nil) 
+  (lambda nil)
   ;; the lexically enclosing cleanup, or NIL if none enclosing within Lambda
   (cleanup nil)
   ;; the current OPTIMIZE policy

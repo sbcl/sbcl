@@ -402,8 +402,39 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup policy 
+     lambda cleanup policy
      (frob options lexenv-options))))
+
+;;; Makes a LEXENV, suitable for using in a MACROLET introduced
+;;; macroexpander
+(defun make-restricted-lexenv (lexenv)
+  (flet ((fun-good-p (fun)
+           (destructuring-bind (name . thing) fun
+             (declare (ignore name))
+             (etypecase thing
+               (functional nil)
+               (global-var t)
+               (cons (aver (eq (car thing) 'macro))
+                     t))))
+         (var-good-p (var)
+           (destructuring-bind (name . thing) var
+             (declare (ignore name))
+             (etypecase thing
+               (leaf nil)
+               (cons (aver (eq (car thing) 'macro))
+                     t)
+               (heap-alien-info nil)))))
+    (internal-make-lexenv
+     (remove-if-not #'fun-good-p (lexenv-funs lexenv))
+     (remove-if-not #'var-good-p (lexenv-vars lexenv))
+     nil
+     nil
+     (lexenv-type-restrictions lexenv) ; XXX
+     nil
+     nil
+     (lexenv-policy lexenv)
+     nil ; XXX
+     )))
 
 ;;;; flow/DFO/component hackery
 

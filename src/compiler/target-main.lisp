@@ -28,7 +28,7 @@
 	definition)))
 
 ;;; Handle the nontrivial case of CL:COMPILE.
-(defun actually-compile (name definition)
+(defun actually-compile (name definition *lexenv*)
   (with-compilation-values
     (sb!xc:with-compilation-unit ()
       ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
@@ -44,7 +44,6 @@
 	     ;; rebinding to itself is needed now that SBCL doesn't
 	     ;; need *BACKEND-INFO-ENVIRONMENT*.
 	     (*info-environment* *info-environment*)
-	     (*lexenv* (make-null-lexenv))
 	     (form (get-lambda-to-compile definition))
 	     (*source-info* (make-lisp-source-info form))
 	     (*toplevel-lambdas* ())
@@ -76,6 +75,20 @@
 		  :name name
 		  :path '(original-source-start 0 0))))))
 
+(defun compile-in-lexenv (name definition lexenv)
+  (multiple-value-bind (compiled-definition warnings-p failure-p)
+      (if (compiled-function-p definition)
+	  (values definition nil nil)
+	  (actually-compile name definition lexenv))
+    (cond (name
+	   (if (and (symbolp name)
+                    (macro-function name))
+	       (setf (macro-function name) compiled-definition)
+	       (setf (fdefinition name) compiled-definition))
+	   (values name warnings-p failure-p))
+	  (t
+	   (values compiled-definition warnings-p failure-p)))))
+
 (defun compile (name &optional (definition (or (macro-function name)
 					       (fdefinition name))))
   #!+sb-doc
@@ -85,15 +98,4 @@
   otherwise THING is NAME. When NAME is not NIL, the compiled function
   is also set into (MACRO-FUNCTION NAME) if NAME names a macro, or into
   (FDEFINITION NAME) otherwise."
-  (multiple-value-bind (compiled-definition warnings-p failure-p)
-      (if (compiled-function-p definition)
-	  (values definition nil nil)
-	  (actually-compile name definition))
-    (cond (name
-	   (if (and (symbolp name)
-                    (macro-function name))
-	       (setf (macro-function name) compiled-definition)
-	       (setf (fdefinition name) compiled-definition))
-	   (values name warnings-p failure-p))
-	  (t
-	   (values compiled-definition warnings-p failure-p)))))
+  (compile-in-lexenv name definition (make-null-lexenv)))

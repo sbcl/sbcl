@@ -275,10 +275,12 @@
 	     (parse-defmacro arglist whole body name 'macrolet
 			     :environment environment)
 	   `(,name macro .
-		   ,(compile nil
-			     `(lambda (,whole ,environment)
-				,@local-decls
-				(block ,name ,body))))))))
+		   ,(compile-in-lexenv
+                     nil
+                     `(lambda (,whole ,environment)
+                        ,@local-decls
+                        (block ,name ,body))
+                     (make-restricted-lexenv *lexenv*)))))))
    :funs
    definitions
    fun))

@@ -1,0 +1,6 @@
+(symbol-macrolet ((s1 (push 1 *symbol-macrolet-test-status*))
+                  (s2 (push 2 *symbol-macrolet-test-status*)))
+  (eval-when (:compile-toplevel)
+    s1)
+  (eval-when (:compile-toplevel :load-toplevel)
+    s2))

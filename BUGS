@@ -649,6 +649,12 @@ WORKAROUND:
    but actual specification quoted above says that the actual behavior
    is undefined.
 
+   (Since 0.7.8.23 macroexpanders are defined in a restricted version
+   of the lexical environment, containing no lexical variables and
+   functions, which seems to conform to ANSI and CLtL2, but signalling
+   a STYLE-WARNING for references to variables similar to locals might
+   be a good thing.)
+
 125:
    (as reported by Gabe Garza on cmucl-help 2001-09-21)
 	(defvar *tmp* 3)
@@ -1222,19 +1228,13 @@ WORKAROUND:
   This situation may appear during optimizing away degenerate cases of
   certain functions: see bugs 54, 192b.
 
-204:
-  (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) inside MACROLET evaluates its
-  argument in the null lexical environment. E.g. compiling file with
-
-    (macrolet ((def (x) `(print ,x)))
-      (eval-when (:compile-toplevel)
-        (def 'hello)))
-
-  causes
-
-    debugger invoked on condition of type UNDEFINED-FUNCTION:
-      The function DEF is undefined.
-
+205: "environment issues in cross compiler"
+  (These bugs have no impact on user code, but should be fixed or
+  documented.)
+  a. Macroexpanders introduced with MACROLET are defined in the null
+     lexical environment.
+  b. The body of (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) is evaluated in
+     the null lexical environment.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -461,6 +461,44 @@ BUG 48c, not yet fixed:
 
 (defmacro-test)
 
+;;; bug 204: EVAL-WHEN inside a local environment
+(defvar *bug204-test-status*)
+
+(defun bug204-test ()
+  (let* ((src "bug204-test.lisp")
+         (obj (compile-file-pathname src)))
+    (unwind-protect
+         (progn
+           (setq *bug204-test-status* nil)
+           (compile-file src)
+           (assert (equal *bug204-test-status* '((:expanded :load-toplevel)
+                                                 (:called :compile-toplevel)
+                                                 (:expanded :compile-toplevel))))
+           (setq *bug204-test-status* nil)
+           (load obj)
+           (assert (equal *bug204-test-status* '((:called :load-toplevel)))))
+      (ignore-errors (delete-file obj)))))
+
+(bug204-test)
+
+;;; toplevel SYMBOL-MACROLET
+(defvar *symbol-macrolet-test-status*)
+
+(defun symbol-macrolet-test ()
+  (let* ((src "symbol-macrolet-test.lisp")
+         (obj (compile-file-pathname src)))
+    (unwind-protect
+         (progn
+           (setq *symbol-macrolet-test-status* nil)
+           (compile-file src)
+           (assert (equal *symbol-macrolet-test-status*
+                          '(2 1)))
+           (setq *symbol-macrolet-test-status* nil)
+           (load obj)
+           (assert (equal *symbol-macrolet-test-status* '(2))))
+      (ignore-errors (delete-file obj)))))
+
+(symbol-macrolet-test)
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

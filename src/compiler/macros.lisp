@@ -666,7 +666,9 @@
 ;;; :TEST keyword may be used to determine the name equality
 ;;; predicate.
 (defmacro lexenv-find (name slot &key test)
-  (once-only ((n-res `(assoc ,name (,(symbolicate "LEXENV-" slot) *lexenv*)
+  (once-only ((n-res `(assoc ,name (,(let ((*package* (symbol-package 'lexenv-funs)))
+                                          (symbolicate "LEXENV-" slot))
+                                     *lexenv*)
 			     :test ,(or test '#'eq))))
     `(if ,n-res
 	 (values (cdr ,n-res) t)

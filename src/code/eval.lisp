@@ -13,29 +13,31 @@
 
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
-(defun %eval (expr)
-  (funcall (compile (gensym "EVAL-TMPFUN-")
-		    `(lambda ()
+(defun %eval (expr lexenv)
+  (funcall (sb!c:compile-in-lexenv
+            (gensym "EVAL-TMPFUN-")
+            `(lambda ()
 
-		       ;; The user can reasonably expect that the
-		       ;; interpreter will be safe.
-		       (declare (optimize (safety 3)))
+               ;; The user can reasonably expect that the
+               ;; interpreter will be safe.
+               (declare (optimize (safety 3)))
 
-		       ;; It's also good if the interpreter doesn't
-		       ;; spend too long thinking about each input
-		       ;; form, since if the user'd wanted the
-		       ;; tradeoff to favor quality of compiled code
-		       ;; over compilation speed, he'd've explicitly
-		       ;; asked for compilation.
-		       (declare (optimize (compilation-speed 2)))
+               ;; It's also good if the interpreter doesn't
+               ;; spend too long thinking about each input
+               ;; form, since if the user'd wanted the
+               ;; tradeoff to favor quality of compiled code
+               ;; over compilation speed, he'd've explicitly
+               ;; asked for compilation.
+               (declare (optimize (compilation-speed 2)))
 
-		       ;; Other properties are relatively unimportant.
-		       (declare (optimize (speed 1) (debug 1) (space 1)))
+               ;; Other properties are relatively unimportant.
+               (declare (optimize (speed 1) (debug 1) (space 1)))
 
-		       ,expr))))
+               ,expr)
+            lexenv)))
 
 ;;; Handle PROGN and implicit PROGN.
-(defun eval-progn-body (progn-body)
+(defun eval-progn-body (progn-body lexenv)
   (unless (list-with-length-p progn-body)
     (let ((*print-circle* t))
       (error 'simple-program-error
@@ -52,17 +54,21 @@
 	(rest-i (rest i) (rest i)))
       (nil)
     (if rest-i ; if not last element of list
-	(eval (first i))
-	(return (eval (first i))))))
+	(eval-in-lexenv (first i) lexenv)
+	(return (eval-in-lexenv (first i) lexenv)))))
 
-;;; Pick off a few easy cases, and the various top level EVAL-WHEN
-;;; magical cases, and call %EVAL for the rest. 
 (defun eval (original-exp)
   #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
   result or results."
+  (eval-in-lexenv original-exp (make-null-lexenv)))
+
+;;; Pick off a few easy cases, and the various top level EVAL-WHEN
+;;; magical cases, and call %EVAL for the rest.
+(defun eval-in-lexenv (original-exp lexenv)
   (declare (optimize (safety 1)))
-  (let ((exp (macroexpand original-exp)))
+  ;; (aver (lexenv-simple-p lexenv))
+  (let ((exp (macroexpand original-exp lexenv)))
     (typecase exp
       (symbol
        (ecase (info :variable :kind exp)
@@ -80,7 +86,7 @@
 	 ;; compatibility, it can be implemented with
 	 ;; DEFINE-SYMBOL-MACRO, keeping the code walkers happy.
 	 (:alien
-	  (%eval original-exp))))
+	  (%eval original-exp lexenv))))
       (list
        (let ((name (first exp))
 	     (n-args (1- (length exp))))
@@ -89,11 +95,13 @@
 	    (unless (= n-args 1)
 	      (error "wrong number of args to FUNCTION:~% ~S" exp))
 	    (let ((name (second exp)))
-	      (if (or (atom name)
-		      (and (consp name)
-			   (eq (car name) 'setf)))
+	      (if (and (or (atom name)
+                           (and (consp name)
+                                (eq (car name) 'setf)))
+                       (not (consp (let ((sb!c:*lexenv* lexenv))
+                                     (sb!c:lexenv-find name funs)))))
 		  (fdefinition name)
-		  (%eval original-exp))))
+		  (%eval original-exp lexenv))))
 	   (quote
 	    (unless (= n-args 1)
 	      (error "wrong number of args to QUOTE:~% ~S" exp))
@@ -117,9 +125,9 @@
 		    ;; variable; the code should now act as though that
 		    ;; variable is NIL. This should be tested..
 		    (:special)
-		    (t (return (%eval original-exp))))))))
+		    (t (return (%eval original-exp lexenv))))))))
 	   ((progn)
-	    (eval-progn-body (rest exp)))
+	    (eval-progn-body (rest exp) lexenv))
 	   ((eval-when)
 	    ;; FIXME: DESTRUCTURING-BIND returns ARG-COUNT-ERROR
 	    ;; instead of PROGRAM-ERROR when there's something wrong
@@ -145,15 +153,15 @@
 		;; otherwise, the EVAL-WHEN form returns NIL.
 		(declare (ignore ct lt))
 		(when e
-		  (eval-progn-body body)))))
+		  (eval-progn-body body lexenv)))))
 	   (t
 	    (if (and (symbolp name)
 		     (eq (info :function :kind name) :function))
 		(collect ((args))
-		  (dolist (arg (rest exp))
-		    (args (eval arg)))
-		  (apply (symbol-function name) (args)))
-		(%eval original-exp))))))
+                         (dolist (arg (rest exp))
+                           (args (eval arg)))
+                         (apply (symbol-function name) (args)))
+		(%eval original-exp lexenv))))))
       (t
        exp))))
 
