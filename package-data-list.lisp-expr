@@ -887,7 +887,7 @@ retained, possibly temporariliy, because it might be used internally."
 
 	       ;; various internal defaults
 	       "DEFAULT-INIT-CHAR" "*DEFAULT-INIT-CHAR-FORM*"
-	       "*LOAD-SOURCE-DEFAULT-TYPE*"
+	       "*LOAD-SOURCE-DEFAULT-TYPE*" "BASE-CHAR-CODE-LIMIT"
 
 	       ;; hash caches
 	       "DEFINE-HASH-CACHE"

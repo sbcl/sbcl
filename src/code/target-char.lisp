@@ -164,8 +164,9 @@
 (defun char-code (char)
   #!+sb-doc
   "Return the integer code of CHAR."
+  ;; FIXME: do we actually need this?
   (etypecase char
-    (base-char (char-code (truly-the base-char char)))))
+    (character (char-code (truly-the character char)))))
 
 (defun char-int (char)
   #!+sb-doc
