@@ -37,7 +37,7 @@
 			(lambda (x)
 			  (logical-host-name (%pathname-host x))))
 		       (unparse-directory #'unparse-logical-directory)
-		       (unparse-file #'unparse-unix-file)
+		       (unparse-file #'unparse-logical-file)
 		       (unparse-enough #'unparse-enough-namestring)
 		       (customary-case :upper)))
   (name "" :type simple-base-string)

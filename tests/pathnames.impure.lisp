@@ -264,8 +264,13 @@
 
         ;; FIXME: test version handling in LPNs
         )
-      do (assert (string= (namestring (apply #'merge-pathnames params))
-                          (namestring expected-result))))
+      do (let ((result (apply #'merge-pathnames params)))
+	   (macrolet ((frob (op)
+			`(assert (equal (,op result) (,op expected-result)))))
+	     (frob pathname-host)
+	     (frob pathname-directory)
+	     (frob pathname-name)
+	     (frob pathname-type))))
 
 ;;; host-namestring testing
 (assert (string=
@@ -292,6 +297,22 @@
 		       type-error))
 (assert (raises-error? (merge-pathnames (make-string-output-stream))
 		       type-error))
+
+;;; ensure read/print consistency (or print-not-readable-error) on
+;;; pathnames:
+(let ((pathnames (list
+		  (make-pathname :name "foo" :type "txt" :version :newest)
+		  (make-pathname :name "foo" :type "txt" :version 1)
+		  (make-pathname :name "foo" :type ".txt")
+		  (make-pathname :name "foo." :type "txt")
+		  (parse-namestring "SCRATCH:FOO.TXT.1")
+		  (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
+		  (parse-namestring "SCRATCH:FOO.TXT"))))
+  (dolist (p pathnames)
+    (handler-case
+	(let ((*print-readably* t))
+	  (assert (equal (read-from-string (format nil "~S" p)) p)))
+      (print-not-readable () nil))))
 
 ;;;; success
 (quit :unix-status 104)

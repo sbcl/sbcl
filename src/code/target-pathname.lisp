@@ -1413,6 +1413,36 @@ a host-structure or string."
 		  (t (error "invalid keyword: ~S" piece))))))
        (apply #'concatenate 'simple-string (strings))))))
 
+(defun unparse-logical-file (pathname)
+  (declare (type pathname pathname))
+    (collect ((strings))
+    (let* ((name (%pathname-name pathname))
+	   (type (%pathname-type pathname))
+	   (version (%pathname-version pathname))
+	   (type-supplied (not (or (null type) (eq type :unspecific))))
+	   (version-supplied (not (or (null version)
+				      (eq version :unspecific)))))
+      (when name
+	(when (and (null type) (position #\. name :start 1))
+	  (error "too many dots in the name: ~S" pathname))
+	(strings (unparse-logical-piece name)))
+      (when type-supplied
+	(unless name
+	  (error "cannot specify the type without a file: ~S" pathname))
+	(when (typep type 'simple-base-string)
+	  (when (position #\. type)
+	    (error "type component can't have a #\. inside: ~S" pathname)))
+	(strings ".")
+	(strings (unparse-logical-piece type)))
+      (when version-supplied
+	(unless type-supplied
+	  (error "cannot specify the version without a type: ~S" pathname))
+	(etypecase version
+	  ((member :newest) (strings ".NEWEST"))
+	  ((member :wild) (strings ".*"))
+	  (fixnum (strings ".") (strings (format nil "~D" version))))))
+    (apply #'concatenate 'simple-string (strings))))
+
 ;;; Unparse a logical pathname string.
 (defun unparse-enough-namestring (pathname defaults)
   (let* ((path-directory (pathname-directory pathname))
@@ -1449,7 +1479,7 @@ a host-structure or string."
   (concatenate 'simple-string
 	       (logical-host-name (%pathname-host pathname)) ":"
 	       (unparse-logical-directory pathname)
-	       (unparse-unix-file pathname)))
+	       (unparse-logical-file pathname)))
 
 ;;;; logical pathname translations
 
