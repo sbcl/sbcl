@@ -638,5 +638,28 @@
 (assert (typep (allocate-instance (find-class 'allocatable-structure))
 	       'allocatable-structure))
 
+;;; Bug found by Paul Dietz when devising CPL tests: somewhat
+;;; amazingly, calls to CPL would work a couple of times, and then
+;;; start returning NIL.  A fix was found (relating to the
+;;; applicability of constant-dfun optimization) by Gerd Moellmann.
+(defgeneric cpl (x)
+  (:method-combination list)
+  (:method list ((x broadcast-stream)) 'broadcast-stream)
+  (:method list ((x integer)) 'integer)
+  (:method list ((x number)) 'number)
+  (:method list ((x stream)) 'stream)
+  (:method list ((x structure-object)) 'structure-object))
+(assert (equal (cpl 0) '(integer number)))
+(assert (equal (cpl 0) '(integer number)))
+(assert (equal (cpl 0) '(integer number)))
+(assert (equal (cpl 0) '(integer number)))
+(assert (equal (cpl 0) '(integer number)))
+(assert (equal (cpl (make-broadcast-stream))
+	       '(broadcast-stream stream structure-object)))
+(assert (equal (cpl (make-broadcast-stream))
+	       '(broadcast-stream stream structure-object)))
+(assert (equal (cpl (make-broadcast-stream))
+	       '(broadcast-stream stream structure-object)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

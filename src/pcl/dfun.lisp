@@ -557,21 +557,41 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 	   (default '(unknown)))
       (and (null applyp)
 	   (or (not (eq *boot-state* 'complete))
-	       (compute-applicable-methods-emf-std-p gf))
-	   (notany (lambda (method)
-		     (or (and (eq *boot-state* 'complete)
-			      (some #'eql-specializer-p
-				    (method-specializers method)))
-			 (let ((value (method-function-get
-				       (if early-p
-					   (or (third method) (second method))
-					   (or (method-fast-function method)
-					       (method-function method)))
-				       :constant-value default)))
-			   (if boolean-values-p
-			       (not (or (eq value t) (eq value nil)))
-			       (eq value default)))))
-		   methods)))))
+	       ;; If COMPUTE-APPLICABLE-METHODS is specialized, we
+	       ;; can't use this, of course, because we can't tell
+	       ;; which methods will be considered applicable.
+	       ;;
+	       ;; Also, don't use this dfun method if the generic
+	       ;; function has a non-standard method combination,
+	       ;; because if it has, it's not sure that method
+	       ;; functions are used directly as effective methods,
+	       ;; which CONSTANT-VALUE-MISS depends on.  The
+	       ;; pre-defined method combinations like LIST are
+	       ;; examples of that.
+	       (and (compute-applicable-methods-emf-std-p gf)
+		    (eq (generic-function-method-combination gf)
+			*standard-method-combination*)))
+	   ;; Check that no method is eql-specialized, and that all
+	   ;; methods return a constant value.  If BOOLEAN-VALUES-P,
+	   ;; check that all return T or NIL.  Also, check that no
+	   ;; method has qualifiers, to make sure that emfs are really
+	   ;; method functions; see above.
+	   (dolist (method methods t)
+	     (when (eq *boot-state* 'complete)
+	       (when (or (some #'eql-specializer-p
+			       (method-specializers method))
+			 (method-qualifiers method))
+		 (return nil)))
+	     (let ((value (method-function-get
+			   (if early-p
+			       (or (third method) (second method))
+			       (or (method-fast-function method)
+				   (method-function method)))
+			   :constant-value default)))
+	       (when (or (eq value default)
+			 (and boolean-values-p
+			      (not (member value '(t nil)))))
+		 (return nil))))))))
 
 (defun make-constant-value-dfun (generic-function &optional cache)
   (multiple-value-bind (nreq applyp metatypes nkeys)
@@ -1036,17 +1056,19 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defun constant-value-miss (generic-function args dfun-info)
   (let ((ocache (dfun-info-cache dfun-info)))
     (dfun-miss (generic-function args wrappers invalidp emf nil nil t)
-      (cond (invalidp)
-	    (t
-	     (let* ((function (typecase emf
-				(fast-method-call (fast-method-call-function
-						   emf))
-				(method-call (method-call-function emf))))
-		    (value (method-function-get function :constant-value))
-		    (ncache (fill-cache ocache wrappers value)))
-	       (unless (eq ncache ocache)
-		 (dfun-update generic-function
-			      #'make-constant-value-dfun ncache))))))))
+      (unless invalidp
+	(let* ((function
+		(typecase emf
+		  (fast-method-call (fast-method-call-function emf))
+		  (method-call (method-call-function emf))))
+	       (value (let ((val (method-function-get
+				  function :constant-value '.not-found.)))
+			(aver (not (eq val '.not-found.)))
+			val))
+	       (ncache (fill-cache ocache wrappers value)))
+	  (unless (eq ncache ocache)
+	    (dfun-update generic-function
+			 #'make-constant-value-dfun ncache)))))))
 
 ;;; Given a generic function and a set of arguments to that generic
 ;;; function, return a mess of values.
