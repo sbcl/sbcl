@@ -33,16 +33,16 @@
 (defmacro pprint-logical-block ((stream-symbol
 				 object
 				 &key
-				 prefix
-				 per-line-prefix
-				 (suffix ""))
+				 (prefix nil prefixp)
+				 (per-line-prefix nil per-line-prefix-p)
+				 (suffix "" suffixp))
 				&body body)
   #!+sb-doc
   "Group some output into a logical block. STREAM-SYMBOL should be either a
    stream, T (for *TERMINAL-IO*), or NIL (for *STANDARD-OUTPUT*). The printer
    control variable *PRINT-LEVEL* is automatically handled."
-  (when (and prefix per-line-prefix)
-    (error "cannot specify both PREFIX and a PER-LINE-PREFIX values"))
+  (when (and prefixp per-line-prefix-p)
+    (error "cannot specify values for both PREFIX and PER-LINE-PREFIX."))
   (multiple-value-bind (stream-var stream-expression)
       (case stream-symbol
 	((nil)
@@ -66,14 +66,30 @@
 	    ;; macro too. It might be worth looking at this to make
 	    ;; sure it's not too bloated, since PPRINT-LOGICAL-BLOCK
 	    ;; is called many times from system pretty-printing code.
+	    ;;
+	    ;; FIXME: I think pprint-logical-block is broken wrt
+	    ;; argument order, multiple evaluation, etc. of its
+	    ;; keyword (:PREFIX, :PER-LINE-PREFIX and :SUFFIX)
+	    ;; arguments.  Dunno if that's legal.
 	    `(descend-into (,stream-var)
 	       (let ((,count-name 0))
 		 (declare (type index ,count-name) (ignorable ,count-name))
+		 ,@(when (or prefixp per-line-prefix-p)
+ 		     `((unless (typep ,(or prefix per-line-prefix) 'string)
+			 (error 'type-error
+				:datum ,(or prefix per-line-prefix)
+				:expected-type 'string))))
+		 ,@(when suffixp
+		     `((unless (typep ,suffix 'string)
+			 (error 'type-error
+				:datum ,suffix
+				:expected-type 'string))))
 		 (start-logical-block ,stream-var
-				      (the (or null string)
-					,(or prefix per-line-prefix))
-				      ,(if per-line-prefix t nil)
-				      (the string ,suffix))
+				      ,(if (or prefixp per-line-prefix-p)
+					   (or prefix per-line-prefix)
+					   nil)
+				      ,(if per-line-prefix-p t nil)
+				      ,suffix)
 		 (block ,block-name
 		   (flet ((,pp-pop-name ()
 			    ,@(when object

@@ -1002,7 +1002,7 @@
 	   :offset (caar params)))
   (multiple-value-bind (prefix insides suffix)
       (multiple-value-bind (prefix-default suffix-default)
-	  (if colonp (values "(" ")") (values nil ""))
+	  (if colonp (values "(" ")") (values "" ""))
 	(flet ((extract-string (list prefix-p)
 		 (let ((directive (find-if #'format-directive-p list)))
 		   (if directive
