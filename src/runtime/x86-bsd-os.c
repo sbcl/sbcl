@@ -1,4 +1,5 @@
 #include <signal.h>
+#include "runtime.h"
 #include "target-os.h"
 
 /* KLUDGE: There is strong family resemblance in the signal context
