@@ -72,10 +72,11 @@ int arch_os_thread_init(struct thread *thread) {
 	1, 0, 0, /* index, address, length filled in later */
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
+    int n;
     get_spinlock(&modify_ldt_lock,thread);
-
+    n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     /* get next free ldt entry */
-    int n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
+
     if(n) {
 	u32 *p;
 	for(n=0,p=local_ldt_copy;*p;p+=LDT_ENTRY_SIZE/sizeof(u32))
@@ -89,6 +90,7 @@ int arch_os_thread_init(struct thread *thread) {
 	modify_ldt_lock=0;
 	/* modify_ldt call failed: something magical is not happening */
 	return -1;
+    }
     __asm__ __volatile__ ("movw %w0, %%fs" : : "q" 
 			  ((n << 3) /* selector number */
 			   + (1 << 2) /* TI set = LDT */
