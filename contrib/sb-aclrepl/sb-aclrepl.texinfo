@@ -3,9 +3,11 @@
 @cindex Read-Eval-Print Loop
 @cindex REPL
 
-The @code{sb-aclrepl} module offers an AllegroCL style Read-Eval-Print
-Loop for SBCL. An AllegroCL style inspector is integrated. Adding an
-AllegroCL style debugger is planned.
+@c FIXME: I wanted to use @registeredsymbol{}, but that's 
+@c only available in Texinfo 4.7.  sigh.
+The @code{sb-aclrepl} module offers an Allegro CL-style
+Read-Eval-Print Loop for SBCL, with integrated inspector.  Adding an
+debugger interface is planned.
 
 @subsection Usage
 
@@ -43,3 +45,7 @@ some of the features of @code{sb-aclrepl}:
 
 Questions, comments, or bug reports should be sent to Kevin Rosenberg
 (@email{kevin@@rosenberg.net}).
+
+@subsection Credits
+
+Allegro CL is a registered trademark of Franz Inc.

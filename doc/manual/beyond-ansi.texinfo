@@ -23,8 +23,8 @@ exceptions involve internal inconsistencies in the standard.)  In SBCL
 0.7.6, the master record of known bugs is in the @file{BUGS} file in
 the distribution.  Some highlight information about bugs may also be
 found in the manual page. The recommended way to report bugs is
-through the sbcl-help or sbcl-devel mailings lists.  For mailing list
-addresses, @ref{More SBCL Information}.
+through the sbcl-help or sbcl-devel mailing lists.  For mailing list
+addresses, @xref{More SBCL Information}.
 
 
 @node Idiosyncrasies
@@ -37,8 +37,8 @@ implementation.
 
 Declarations are generally treated as assertions. This general
 principle, and its implications, and the bugs which still keep the
-compiler from quite satisfying this principle, are discussed in the
-chapter on the compiler, @ref{The Compiler}.
+compiler from quite satisfying this principle, are discussed in
+@ref{The Compiler}.
 
 SBCL is essentially a compiler-only implementation of Common
 Lisp. That is, for all but a few special cases, @code{eval} creates a
@@ -48,6 +48,7 @@ resulting function object. This is explicitly allowed by the ANSI
 standard, but leads to some oddities, e.g. collapsing @code{functionp}
 and @code{compiled-function-p} into the same predicate.
 
+@findex defconstant
 SBCL is quite strict about ANSI's definition of
 @code{defconstant}. ANSI says that doing @code{defconstant} of the
 same symbol more than once is undefined unless the new value is
@@ -57,11 +58,9 @@ weaker test like @code{string=} or @code{equal}. It's especially
 annoying because, in SBCL, @code{defconstant} takes effect not only at
 load time but also at compile time, so that just compiling and loading
 reasonable code like
-
 @lisp
 (defconstant +foobyte+ '(1 4))
 @end lisp
-
 runs into this undefined behavior. Many implementations of Common Lisp
 try to help the programmer around this annoyance by silently accepting
 the undefined code and trying to do what the programmer probably
@@ -82,10 +81,10 @@ e.g.
 @itemize
   
 @item
-@code{defmethod} without @code{defgeneric}
+@code{defmethod} without a preceding @code{defgeneric};
   
 @item
-multiple @code{defun}s of the same symbol
+multiple @code{defun}s of the same symbol in different units;
   
 @item
 special variables not named in the conventional @code{*foo*} style,
@@ -393,9 +392,9 @@ generational garbage collectors.
 
 @include fun-sb-ext-purify.texinfo
 
-@code{sb-ext:truly-the} special form declares the type of the result
-of the operations, producing its argument; the declaration is not
-checked. In short: don't use it.
+The @code{sb-ext:truly-the} special form declares the type of the
+result of the operations, producing its argument; the declaration is
+not checked. In short: don't use it.
 
 @include special-operator-sb-ext-truly-the.texinfo
 

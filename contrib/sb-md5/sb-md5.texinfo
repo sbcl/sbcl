@@ -3,7 +3,7 @@
 @cindex Hashing, cryptographic
 
 The @code{sb-md5} module implements the RFC1321 MD5 Message Digest
-Algorithm.
+Algorithm. [FIXME cite]
 
 @include fun-sb-md5-md5sum-file.texinfo
 

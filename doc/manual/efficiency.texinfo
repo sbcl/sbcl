@@ -231,10 +231,9 @@ with versions cutting results to 32 bits, and because terminals
 (here---expressions @code{x} and @code{y}) are also of type
 @code{(unsigned-byte 32)}, 32-bit machine arithmetic can be used.
 
-
 As of SBCL 0.8.5 ``good'' functions are @code{+}, @code{-};
 @code{logand}, @code{logior}, @code{logxor}, @code{lognot} and their
 combinations; and @code{ash} with the positive second
-argument. ``Good'' widths are 32 on HPPA, MIPS, PPC, Sparc and X86 and
-64 on Alpha. While it is possible to support smaller widths as well,
-currently it is not implemented.
+argument. ``Good'' widths are 32 on HPPA, MIPS, PPC, Sparc and x86 and
+64 on Alpha.  While it is possible to support smaller widths as well,
+currently this is not implemented.

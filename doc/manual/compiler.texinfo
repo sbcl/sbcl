@@ -57,15 +57,15 @@ The main problem with this program is that it is trying to add
 When processing this program, the compiler will produce this warning:
 
 @example
-file: /tmp/foo.lisp
-
-in: DEFUN FOO
-(ZOQ Y)
---> ROQ PLOQ + 
-==>
-Y
-caught WARNING:
-Result is a SYMBOL, not a NUMBER.
+; file: /tmp/foo.lisp
+; in: DEFUN FOO
+;     (ZOQ Y)
+; --> ROQ PLOQ
+; ==>
+;   (+ Y 3)
+;
+; caught WARNING:
+;   Asserted type NUMBER conflicts with derived type (VALUES SYMBOL &OPTIONAL).
 @end example
 
 In this example we see each of the six possible parts of a compiler
@@ -74,7 +74,8 @@ error message:
 @enumerate
 
 @item
-@samp{File: /tmp/foo.lisp} This is the name of the file that the
+@findex with-compilation-unit
+@samp{file: /tmp/foo.lisp} This is the name of the file that the
 compiler read the relevant code from.  The file name is displayed
 because it may not be immediately obvious when there is an error
 during compilation of a large system, especially when
@@ -91,6 +92,7 @@ forms, then they are all printed from the outside in, separated by
 @code{foo}.
 
 @item
+@cindex Original Source
 @samp{(ZOQ Y)} This is the @dfn{original source} form responsible for
 the error.  Original source means that the form directly appeared in
 the original input to the compiler, i.e. in the lambda passed to
@@ -99,19 +101,21 @@ this example, the expansion of the @code{zoq} macro was responsible
 for the error.
 
 @item
-@samp{--> ROQ PLOQ +} This is the @dfn{processing path} that the
+@cindex Processing Path
+@samp{--> ROQ PLOQ} This is the @dfn{processing path} that the
 compiler used to produce the errorful code.  The processing path is a
 representation of the evaluated forms enclosing the actual source that
 the compiler encountered when processing the original source.  The
 path is the first element of each form, or the form itself if the form
 is not a list.  These forms result from the expansion of macros or
 source-to-source transformation done by the compiler.  In this
-example, the enclosing evaluated forms are the calls to @code{roq},
-@code{ploq} and @code{+}.  These calls resulted from the expansion of
-the @code{zoq} macro.
+example, the enclosing evaluated forms are the calls to @code{roq} and
+@code{ploq}.  These calls resulted from the expansion of the
+@code{zoq} macro.
 
 @item
-@samp{==> Y} This is the @dfn{actual source} responsible for the
+@cindex Actual Source
+@samp{==> (+ Y 3)} This is the @dfn{actual source} responsible for the
 error. If the actual source appears in the explanation, then we print
 the next enclosing evaluated form, instead of printing the actual
 source twice.  (This is the form that would otherwise have been the
@@ -119,10 +123,13 @@ last form of the processing path.) In this example, the problem is
 with the evaluation of the reference to the variable @code{y}.
 
 @item
-@samp{caught WARNING: Result is a SYMBOL, not a NUMBER.}  This is the
-@dfn{explanation} of the problem. In this example, the problem is that
-@code{y} evaluates to a symbol, but is in a context where a number is
-required (the argument to @code{+}).
+@samp{caught WARNING: Asserted type NUMBER conflicts with derived type
+(VALUES SYMBOL &OPTIONAL).}  This is the @dfn{explanation} of the
+problem. In this example, the problem is that, while the call to
+@code{+} requires that its arguments are all of type @code{number},
+the compiler has derived that @code{y} will evaluate to a
+@code{symbol}.  Note that @samp{(VALUES SYMBOL &OPTIONAL)} expresses
+that @code{y} evaluates to precisely one value.
 
 @end enumerate
 
@@ -143,7 +150,7 @@ Each line of the processing path is prefixed with @samp{-->}
 @item
 The actual source form is indented like the original source, but is
 marked by a preceding @samp{==>} line.
-  
+@comment no it isn't.
 
 @item
 The explanation is prefixed with the error severity, which can be
@@ -159,21 +166,23 @@ compiler omits as much of the second message as in common with the
 first.  For example:
 
 @example
-file: /tmp/foo.lisp
-
-in: DEFUN FOO
-(ZOQ Y)
---> ROQ
-==>
-(PLOQ (+ Y 3))
-caught STYLE-WARNING:
-undefined function: PLOQ
-
-==>
-(ROQ (PLOQ (+ Y 3)))
-caught STYLE-WARNING:
-undefined function: ROQ
+; file: /tmp/foo.lisp
+; in: DEFUN FOO
+;     (ZOQ Y)
+; --> ROQ
+; ==>
+;   (PLOQ (+ Y 3))
+;
+; caught STYLE-WARNING:
+;   undefined function: PLOQ
+ 
+; ==>
+;   (ROQ (PLOQ (+ Y 3)))
+;
+; caught STYLE-WARNING:
+;   undefined function: ROQ
 @end example
+@comment fixing that weird blank line might be good
 
 In this example, the file, definition and original source are
 identical for the two messages, so the compiler omits them in the
@@ -192,6 +201,8 @@ processing path will also be omitted.
 @node  The Original and Actual Source
 @comment  node-name,  next,  previous,  up
 @subsection The Original and Actual Source
+@cindex Original Source
+@cindex Actual Source
 
 The @emph{original source} displayed will almost always be a list. If
 the actual source for an error message is a symbol, the original
@@ -221,10 +232,15 @@ form.  For example, compiling this function
 gives this error message
 
 @example
-in: DEFUN BAR
-(LET (A) (DECLARE (FIXNUM A)) (SETQ A (FOO X)) A)
-caught WARNING: The binding of A is not a FIXNUM:
-NIL
+; file: /tmp/foo.lisp
+; in: DEFUN BAR
+;     (LET (A)
+;     (DECLARE (FIXNUM A))
+;     (SETQ A (FOO X))
+;     A)
+;
+; caught WARNING:
+;   Asserted type FIXNUM conflicts with derived type (VALUES NULL &OPTIONAL).
 @end example
 
 This error message is not saying ``there is a problem somewhere in
@@ -249,13 +265,14 @@ don't write macros, you can probably ignore it. Consider this example:
 Compiling results in this error message:
 
 @example
-in: DEFUN FOO
-(DOTIMES (I N *UNDEFINED*))
---> DO BLOCK LET TAGBODY RETURN-FROM
-==>
-(PROGN *UNDEFINED*)
-caught STYLE-WARNING:
-undefined variable: *UNDEFINED*
+; in: DEFUN FOO
+;     (DOTIMES (I N *UNDEFINED*))
+; --> DO BLOCK LET TAGBODY RETURN-FROM
+; ==>
+;   (PROGN *UNDEFINED*)
+;
+; caught WARNING:
+;   undefined variable: *UNDEFINED*
 @end example
 
 Note that @code{do} appears in the processing path. This is because
@@ -305,7 +322,7 @@ these classes. The fourth level of compiler error severity,
 @emph{note}, is used for problems which are too mild for the standard
 condition classes, typically hints about how efficiency might be
 improved.
-
+@comment mention sb-ext:compiler-note
 
 @node  Errors During Macroexpansion
 @comment  node-name,  next,  previous,  up
@@ -327,12 +344,15 @@ example, this definition:
 gives this error:
 
 @example
-in: DEFUN FOO
-(DO ((CURRENT L #) (# NIL)) (WHEN (EQ # E) (RETURN CURRENT)) )
-caught ERROR: 
-(in macroexpansion of (DO # #))
-(hint: For more precise location, try *BREAK-ON-SIGNALS*.)
-DO step variable is not a symbol: (ATOM CURRENT)
+; in: DEFUN FOO
+;     (DO ((CURRENT L (CDR CURRENT))
+;        ((ATOM CURRENT) NIL))
+;       (WHEN (EQ (CAR CURRENT) E) (RETURN CURRENT)))
+;
+; caught ERROR:
+;   (in macroexpansion of (DO # #))
+;   (hint: For more precise location, try *BREAK-ON-SIGNALS*.)
+;   DO step variable is not a symbol: (ATOM CURRENT)
 @end example
 
 
@@ -341,9 +361,9 @@ DO step variable is not a symbol: (ATOM CURRENT)
 @subsection Read Errors
 @cindex Read errors, compiler
 
-SBCL's compiler (unlike CMUCL's) does not attempt to recover from read
-errors when reading a source file, but instead just reports the
-offending character position and gives up on the entire source file.
+SBCL's compiler does not attempt to recover from read errors when
+reading a source file, but instead just reports the offending
+character position and gives up on the entire source file.
 
 
 @c <!-- FIXME: How much control over error messages is in SBCL?
@@ -408,22 +428,23 @@ concern. Also, as discussed in the chapter on performance
 (@pxref{Efficiency}), the use of appropriate type declarations can be
 very important for performance as well.
 
-The SBCL compiler, like the related compiler in CMUCL, treats type
-declarations much differently than other Lisp compilers.  By default
-(@emph{i.e.}, at ordinary levels of the @code{safety} compiler
-optimization parameter), the compiler doesn't blindly believe most
-type declarations; it considers them assertions about the program that
-should be checked.
+@findex safety
+The SBCL compiler treats type declarations differently from most other
+Lisp compilers.  By default (@emph{i.e.}, at ordinary levels of the
+@code{safety} compiler optimization parameter), the compiler doesn't
+blindly believe most type declarations; it considers them assertions
+about the program that should be checked.
 
+@findex satisfies
 The SBCL compiler also has a greater knowledge of the
 Common Lisp type system than other compilers.  Support is incomplete
-only for the @code{not}, @code{and} and @code{satisfies}
-types.
+only for types involving the @code{satisfies} type specifier.
 
 @c <!-- FIXME: See also sections \ref{advanced-type-stuff}
 @c      and \ref{type-inference}, once we snarf them from the
 @c      CMU CL manual. -->
 
+@c Also see my paper on improving Baker, when I get round to it.
 
 @menu
 * Type Errors at Compile Time::  
@@ -462,13 +483,15 @@ this code fragment:
 Compilation produces this warning:
 
 @example
-in: DEFUN RAZ
-(CASE FOO (:THIS 13) (:THAT 9) (:THE-OTHER 42))
---> LET COND IF COND IF COND IF
-==>
-(COND)
-caught WARNING: This is not a FIXNUM:
-NIL
+; in: DEFUN RAZ
+;     (CASE FOO (:THIS 13) (:THAT 9) (:THE-OTHER 42))
+; --> LET COND IF COND IF COND IF
+; ==>
+;   (COND)
+;
+; caught WARNING:
+;   This is not a FIXNUM:
+;   NIL
 @end example
 
 In this case, the warning means that if @code{foo} isn't any of
@@ -483,7 +506,6 @@ there may be dead code that is impossible to correctly execute.  The
 compiler can't always prove this code is dead (could never be
 executed), so it compiles the erroneous code (which will always signal
 an error if it is executed) and gives a warning.
-
 
 Type warnings are inhibited when the @code{sb-ext:inhibit-warnings}
 optimization quality is @code{3}. @xref{Compiler Policy}.  This
@@ -566,12 +588,11 @@ nonexistent runtime checking.
 @cindex Compatibility with other Lisps
 @c     (should also have an entry in the non-ANSI-isms section)-->
 
-Since SBCL's compiler, like CMUCL's compiler, does much more
-comprehensive type checking than most Lisp compilers, SBCL may detect
-type errors in programs that have been debugged using other
-compilers. These errors are mostly incorrect declarations, although
-compile-time type errors can find actual bugs if parts of the program
-have never been tested.
+Since SBCL's compiler does much more comprehensive type checking than
+most Lisp compilers, SBCL may detect type errors in programs that have
+been debugged using other compilers. These errors are mostly incorrect
+declarations, although compile-time type errors can find actual bugs
+if parts of the program have never been tested.
 
 Some incorrect declarations can only be detected by run-time type
 checking. It is very important to initially compile a program with
@@ -806,7 +827,7 @@ The value of @code{space} mostly influences the compiler's decision
 whether to inline operations, which tend to increase the size of
 programs. Use the value @code{0} with caution, since it can cause the
 compiler to inline operations so indiscriminately that the net effect
-is to slow the program by causing cache misses or swapping.
+is to slow the program by causing cache misses or even swapping.
 
 @c <!-- FIXME: old CMU CL compiler policy, should perhaps be adapted
 @c      _    for SBCL. (Unfortunately, the CMU CL docs are out of sync with the
@@ -963,7 +984,9 @@ function may never be called. Although it is technically illegal to
 redefine standard functions, users sometimes want to implicitly
 redefine these functions when they are debugging using the
 @code{trace} macro.  Special-casing of standard functions can be
-inhibited using the @code{notinline} declaration.
+inhibited using the @code{notinline} declaration, but even then some
+phases of analysis such as type inferencing are applied by the
+compiler.
 
 @item
 The compiler can have multiple alternate implementations of standard

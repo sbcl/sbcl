@@ -8,24 +8,28 @@ not on behavior which is common to all implementations of ANSI Common
 Lisp.
 
 @menu
-* More Common Lisp Information::  
-* More SBCL Information::       
-* Overview::                    
+* More Common Lisp Information::
+* More SBCL Information::
+* Overview::
 @end menu
 
 @node More Common Lisp Information
 @comment  node-name,  next,  previous,  up
-@section Where To Go For More Information about Common Lisp in General
+@section Sources of information about Common Lisp
 
 Regardless of your ability level, two very useful resources for
-working with any implementation of Common Lisp are the ILISP package
-for Emacs at @uref{http://ilisp.cons.org} and the Common Lisp HyperSpec
-at @uref{http://www.lispworks.com/reference/HyperSpec/index.html}.
+working with any implementation of Common Lisp are the SLIME
+package@footnote{Historically, the ILISP package at
+@uref{http://ilisp.cons.org/} provided similar functionality, but it
+does not support modern SBCL versions.}  for Emacs at
+@uref{http://www.common-lisp.net/project/slime} and the Common Lisp
+HyperSpec at
+@uref{http://www.lispworks.com/reference/HyperSpec/index.html}.
 
 If you're not a programmer and you're trying to learn, many
 introductory Lisp books are available. However, we don't have any
 standout favorites. If you can't decide, try checking the Usenet
-comp.lang.lisp FAQ for recent recommendations.
+@uref{news://comp.lang.lisp} FAQ for recent recommendations.
 
 If you are an experienced programmer in other languages but need to
 learn about Lisp, three books stand out.
@@ -58,7 +62,7 @@ culture shock.
 
 @node More SBCL Information
 @comment  node-name,  next,  previous,  up
-@section Where To Go For More Information About SBCL
+@section Sources of more information about SBCL
 
 Before you read this user manual, you should probably read two other
 things.
@@ -87,17 +91,18 @@ SBCL-specific information is available:
 @itemize
 
 @item
-The SBCL home page at @uref{http://sbcl.sourceforge.net/} has some
+The SBCL home page at @uref{http://www.sbcl.org/} has some
 general information, plus links to mailing lists devoted to SBCL, and
 to archives of these mailing lists.
 
 @item
+@findex help
 Documentation for non-ANSI extensions for various commands is
 available online from the SBCL executable itself. The extensions for
 functions which have their own command prompts (e.g. the debugger, and
 @code{inspect}) are documented in text available by typing
 @command{help} at their command prompts. The extensions for functions
-which don't have their own command prompt (like @code{trace} does) are
+which don't have their own command prompt (such as @code{trace}) are
 described in their documentation strings, unless your SBCL was
 compiled with an option not to include documentation strings, in which
 case the doc strings are only readable in the source code.
@@ -113,7 +118,7 @@ distribution.
 
 @node Overview
 @comment  node-name,  next,  previous,  up
-@section Overview Of SBCL, How It Works And Where It Came From
+@section History and Implementation
 
 You can work productively with SBCL without knowing anything
 understanding anything about where it came from, how it is
@@ -143,24 +148,17 @@ available) and then failing if ends up using too much of the allocated
 storage.
 
 @item
-A word is a 32-bit quantity. The system has been ported to many
-processor architectures without altering this basic principle. Some
-hacks allow the system to run on the Alpha chip (a 64-bit
-architecture) but even there 32-bit words are used. The assumption
-that a word is 32 bits wide is implicit in hundreds of places in the
-system.
-
-@item
 The system is implemented as a C program which is responsible for
 supplying low-level services and loading a Lisp @file{.core}
 file.
 
 @end itemize
-  
+
+@cindex Garbage Collection, generational
 SBCL also inherited some newer architectural features from CMUCL. The
 most important is that on some architectures it has a generational
 garbage collector (``GC''), which has various implications (mostly
-good) for performance. These are discussed another chapter,
+good) for performance. These are discussed in another chapter,
 @ref{Efficiency}.
 
 SBCL has diverged from CMUCL in that SBCL is now essentially a
@@ -175,15 +173,15 @@ such as symbols which are @code{boundp}. More complicated forms are
 evaluated by calling @code{compile} and then calling @code{funcall} on
 the returned result.
   
-
-The direct ancestor of SBCL is the X86 port of CMUCL. This port was in
+The direct ancestor of SBCL is the x86 port of CMUCL. This port was in
 some ways the most cobbled-together of all the CMUCL ports, since a
 number of strange changes had to be made to support the register-poor
-X86 architecture. Some things (like tracing and debugging) do not work
+x86 architecture. Some things (like tracing and debugging) do not work
 particularly well there. SBCL should be able to improve in these areas
 (and has already improved in some other areas), but it takes a while.
 
-On the x86, SBCL like the X86 port of CMUCL, uses a
+@cindex Garbage Collection, conservative
+On the x86 SBCL -- like the x86 port of CMUCL -- uses a
 @emph{conservative} GC. This means that it doesn't maintain a strict
 separation between tagged and untagged data, instead treating some
 untagged data (e.g. raw floating point numbers) as possibly-tagged

@@ -92,6 +92,7 @@ commands prompt for additional input.  Debugger commands can be
 abbreviated by any unambiguous prefix: @command{help} can be typed as
 @samp{h}, @samp{he}, etc.  For convenience, some commands have
 ambiguous one-letter abbreviations: @samp{f} for @command{frame}.
+@comment FIXME: what does that last bit mean?
 
 The package is not significant in debugger commands; any symbol with the
 name of a debugger command will work.  If you want to show the value of
@@ -152,15 +153,15 @@ what it is doing.  Frames have:
 @itemize
 
 @item
-@dfn{Variables} (@pxref{Variable Access}), which are the values being operated
-on, and
+@dfn{variables} (@pxref{Variable Access}), which are the values being operated
+on;
 
 @item
-@dfn{Arguments} to the call (which are really just particularly
+@dfn{arguments} to the call (which are really just particularly
 interesting variables), and
 
 @item
-A current location (@pxref{Source Location Printing}), which is the place in
+a current location (@pxref{Source Location Printing}), which is the place in
 the program where the function was running when it stopped to call
 another function, or because of an interrupt or error.
 
@@ -288,6 +289,7 @@ unavailable or not known to be available (@pxref{Variable Access}),
 then @samp{#<unavailable-arg>} will be printed instead of the argument
 value.
 
+@vindex *debug-print-variable-alist*
 Printing of argument values is controlled by
 @code{*debug-print-variable-alist*}.  @xref{Controlling Printing in
 the Debugger}.

@@ -9,10 +9,10 @@ rotation, with an efficient implementation for operations which can be
 performed directly using the platform's arithmetic routines.  It
 implements the specification at
 @uref{http://www.cliki.net/ROTATE-BYTE}.
-@comment except when someone scribbles all over it.  Hmm.
+@comment FIXME: except when someone scribbles all over it.  Hmm.
 
 Bitwise rotation is a component of various cryptographic or hashing
 algorithms: MD5, SHA-1, etc.; often these algorithms are specified on
-32-bit rings.  [cite cite cite].
+32-bit rings.  [FIXME cite cite cite].
 
 @include fun-sb-rotate-byte-rotate-byte.texinfo
