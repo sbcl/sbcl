@@ -68,20 +68,6 @@ boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
  * that don't have pointers to younger generations? */
 boolean enable_page_protection = 1;
 
-/* Should we unmap a page and re-mmap it to have it zero filled? */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-/* comment from cmucl-2.4.8: This can waste a lot of swap on FreeBSD
- * so don't unmap there.
- *
- * The CMU CL comment didn't specify a version, but was probably an
- * old version of FreeBSD (pre-4.0), so this might no longer be true.
- * OTOH, if it is true, this behavior might exist on OpenBSD too, so
- * for now we don't unmap there either. -- WHN 2001-04-07 */
-boolean gencgc_unmap_zero = 0;
-#else
-boolean gencgc_unmap_zero = 1;
-#endif
-
 /* the minimum size (in bytes) for a large object*/
 unsigned large_object_size = 4 * PAGE_BYTES;
 
@@ -153,7 +139,7 @@ static void *heap_base = NULL;
 
 
 /* Calculate the start address for the given page number. */
-inline void *
+static inline void *
 page_address(int page_num)
 {
     return (heap_base + (page_num * PAGE_BYTES));
@@ -2968,7 +2954,6 @@ unprotect_oldspace(void)
  * assumes that all objects have been copied or promoted to an older
  * generation. Bytes_allocated and the generation bytes_allocated
  * counter are updated. The number of bytes freed is returned. */
-extern void i586_bzero(void *addr, int nbytes);
 static int
 free_oldspace(void)
 {
@@ -3016,37 +3001,8 @@ free_oldspace(void)
 	       && (page_table[last_page].bytes_used != 0)
 	       && (page_table[last_page].gen == from_space));
 
-	/* Zero pages from first_page to (last_page-1).
-	 *
-	 * FIXME: Why not use os_zero(..) function instead of
-	 * hand-coding this again? (Check other gencgc_unmap_zero
-	 * stuff too. */
-	if (gencgc_unmap_zero) {
-	    void *page_start, *addr;
-
-	    page_start = (void *)page_address(first_page);
-
-	    os_invalidate(page_start, PAGE_BYTES*(last_page-first_page));
-	    addr = os_validate(page_start, PAGE_BYTES*(last_page-first_page));
-	    if (addr == NULL || addr != page_start) {
-		/* Is this an error condition? I couldn't really tell from
-		 * the old CMU CL code, which fprintf'ed a message with
-		 * an exclamation point at the end. But I've never seen the
-		 * message, so it must at least be unusual..
-		 *
-		 * (The same condition is also tested for in gc_free_heap.)
-		 *
-		 * -- WHN 19991129 */
-		lose("i586_bzero: page moved, 0x%08x ==> 0x%08x",
-		     page_start,
-		     addr);
-	    }
-	} else {
-	    int *page_start;
-
-	    page_start = (int *)page_address(first_page);
-	    i586_bzero(page_start, PAGE_BYTES*(last_page-first_page));
-	}
+	/* Zero pages from first_page to (last_page-1). */
+	memset(page_address(first_page), 0, PAGE_BYTES*(last_page-first_page));
 
 	first_page = last_page;
 

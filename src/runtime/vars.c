@@ -10,7 +10,7 @@
  */
 
 #include <stdio.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/types.h>
 #include <stdlib.h>
 
@@ -74,8 +74,8 @@ void flush_vars()
                 free(var);
             }
         }
-    bzero(NameHash, sizeof(NameHash));
-    bzero(ObjHash, sizeof(ObjHash));
+    memset(NameHash, 0, sizeof(NameHash));
+    memset(ObjHash, 0, sizeof(ObjHash));
     tempcntr = 1;
 
     for (var = perm; var != NULL; var = next) {

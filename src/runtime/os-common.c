@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <strings.h>
+#include <string.h>
 
 #include "sbcl.h"
 #include "os.h"
@@ -22,38 +22,11 @@
  * instead. See hpux-os.c for some useful restrictions on actual
  * usage. */
 
+/* FIXME: this should be turned into a pure inline memset where it is used. */
 void
 os_zero(os_vm_address_t addr, os_vm_size_t length)
 {
-    os_vm_address_t block_start;
-    os_vm_size_t block_size;
-
-#ifdef DEBUG
-    fprintf(stderr,";;; os_zero: addr: 0x%08x, len: 0x%08x\n",addr,length);
-#endif
-
-    block_start = os_round_up_to_page(addr);
-
-    length -= block_start-addr;
-    block_size = os_trunc_size_to_page(length);
-
-    if (block_start > addr)
-	bzero((char *)addr, block_start-addr);
-    if (block_size < length)
-	bzero((char *)block_start+block_size, length-block_size);
-
-    if (block_size != 0) {
-	/* Now deallocate and allocate the block so that it faults in
-	 * zero-filled. */
-
-	os_invalidate(block_start, block_size);
-	addr = os_validate(block_start, block_size);
-
-	if (addr == NULL || addr != block_start)
-	    lose("os_zero: block moved! 0x%08x ==> 0x%08x",
-		 block_start,
-		 addr);
-    }
+    memset(addr, 0, length);
 }
 
 os_vm_address_t
