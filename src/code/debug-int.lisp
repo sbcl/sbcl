@@ -42,13 +42,16 @@
     that must be handled, but they are not programmer errors."))
 
 (define-condition no-debug-info (debug-condition)
-  ()
+  ((code-component :reader no-debug-info-code-component
+		   :initarg :code-component))
   #!+sb-doc
   (:documentation "There is no usable debugging information available.")
   (:report (lambda (condition stream)
 	     (declare (ignore condition))
 	     (fresh-line stream)
-	     (write-line "no debugging information available" stream))))
+	     (format stream
+		     "no debug information available for ~S~%"
+		     (no-debug-info-code-component condition)))))
 
 (define-condition no-debug-function-returns (debug-condition)
   ((debug-function :reader no-debug-function-returns-debug-function
@@ -127,11 +130,11 @@
    "All programmer errors from using the interface for building debugging
     tools inherit from this type."))
 
-(define-condition unhandled-condition (debug-error)
-  ((condition :reader unhandled-condition-condition :initarg :condition))
+(define-condition unhandled-debug-condition (debug-error)
+  ((condition :reader unhandled-debug-condition-condition :initarg :condition))
   (:report (lambda (condition stream)
 	     (format stream "~&unhandled DEBUG-CONDITION:~%~A"
-		     (unhandled-condition-condition condition)))))
+		     (unhandled-debug-condition-condition condition)))))
 
 (define-condition unknown-code-location (debug-error)
   ((code-location :reader unknown-code-location-code-location
@@ -162,20 +165,21 @@
    (frame :reader frame-function-mismatch-frame :initarg :frame)
    (form :reader frame-function-mismatch-form :initarg :form))
   (:report (lambda (condition stream)
-	     (format stream
-		     "~&Form was preprocessed for ~S,~% but called on ~S:~%  ~S"
-		     (frame-function-mismatch-code-location condition)
-		     (frame-function-mismatch-frame condition)
-		     (frame-function-mismatch-form condition)))))
+	     (format
+	      stream
+	      "~&Form was preprocessed for ~S,~% but called on ~S:~%  ~S"
+	      (frame-function-mismatch-code-location condition)
+	      (frame-function-mismatch-frame condition)
+	      (frame-function-mismatch-form condition)))))
 
-;;; This signals debug-conditions. If they go unhandled, then signal an
-;;; unhandled-condition error.
+;;; This signals debug-conditions. If they go unhandled, then signal
+;;; an UNHANDLED-DEBUG-CONDITION error.
 ;;;
 ;;; ??? Get SIGNAL in the right package!
 (defmacro debug-signal (datum &rest arguments)
   `(let ((condition (make-condition ,datum ,@arguments)))
      (signal condition)
-     (error 'unhandled-condition :condition condition)))
+     (error 'unhandled-debug-condition :condition condition)))
 
 ;;;; structures
 ;;;;
@@ -1187,7 +1191,7 @@
   (let ((info (%code-debug-info component)))
     (cond
      ((not info)
-      (debug-signal 'no-debug-info))
+      (debug-signal 'no-debug-info :code-component component))
      ((eq info :bogus-lra)
       (make-bogus-debug-function "function end breakpoint"))
      (t

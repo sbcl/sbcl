@@ -751,3 +751,10 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
+
+61:
+  Compiling and loading
+    (DEFUN FAIL (X) (THROW 'FAIL-TAG X))
+    (FAIL 12)
+  then requesting a BACKTRACE at the debugger prompt gives no information
+  about where in the user program the problem occurred.
