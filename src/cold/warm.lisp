@@ -202,9 +202,7 @@
 		"src/code/inspect" ; FIXME: should be byte compiled
 		"src/code/profile"
 		"src/code/ntrace"
-		#+nil ; REMOVEME (for debugging 0.6.7.6 on OpenBSD only)
 		"src/code/foreign"
-		#+nil ; REMOVEME (for debugging 0.6.7.6 on OpenBSD only)
 		"src/code/run-program"
 		;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
 		;; facility is still used in our ANSI DESCRIBE

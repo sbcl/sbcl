@@ -46,26 +46,29 @@ for d in src/compiler src/assembly; do
 done
 
 echo //setting up OS-dependent information
+original_dir=`pwd`
 cd src/runtime/
 rm -f Config
 if [ `uname` = Linux ]; then
     echo -n ' :linux' >> $ltf
     ln -s Config.x86-linux Config
 elif uname | grep BSD; then
+    echo -n ' :bsd' >> $ltf
     if [ `uname` = FreeBSD ]; then
 	echo -n ' :freebsd' >> $ltf
+	ln -s Config.x86-freebsd Config
     elif [ `uname` = OpenBSD ]; then
 	echo -n ' :openbsd' >> $ltf
+	ln -s Config.x86-openbsd Config
     else
 	echo unsupported BSD variant: `uname`
 	exit 1
     fi
-    echo -n ' :bsd' >> $ltf
-    ln -s Config.x86-bsd Config
 else
     echo unsupported OS type: `uname`
     exit 1
 fi
+cd $original_dir
 
 echo //finishing $ltf
 echo ')' >> $ltf

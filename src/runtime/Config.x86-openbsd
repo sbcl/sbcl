@@ -1,0 +1,10 @@
+include Config.x86-bsd
+
+# KLUDGE: It might seem as though dynamic libraries should work the
+# same way on both systems, but in fact gcc supports the "-export-dynamic"
+# option on FreeBSD but not on OpenBSD. The documentation I've been
+# able to find doesn't seem to begin to explain what's going on (e.g. I
+# have never found documentation for the "-export-dynamic" option),
+# so I've just punted and left link flags for OpenBSD in their
+# pre-dynamic-library-support state. -- WHN 2000-10-02
+OS_LINK_FLAGS = -static

@@ -1,25 +1,7 @@
-CPPFLAGS = -I.
-
-CC = gcc -Wstrict-prototypes -fno-strength-reduce # -Wall
-LD = ld
-CPP = cpp
-CFLAGS =  -g -O2 -DGENCGC -DPOSIX_SIGS
-ASFLAGS = -g -DGENCGC
-LINKFLAGS = -g
-NM = nm -gp
+# stuff shared between various *BSD OSes 
 
 ASSEM_SRC = x86-assem.S 
 ARCH_SRC = x86-arch.c
 
 OS_SRC = bsd-os.c os-common.c undefineds.c
-# Until version 0.6.7.3, we used "OS_LINK_FLAGS=-static" here, which
-# worked fine for most things, but LOAD-FOREIGN & friends require
-# dlopen() etc., which in turn depend on dynamic linking of the
-# runtime.
-#for OpenBSD:
-OS_LINK_FLAGS=-static
-#for FreeBSD:
-#OS_LINK_FLAGS=-dynamic -export-dynamic
 OS_LIBS=-lm # -ldl
-
-GC_SRC= gencgc.c
