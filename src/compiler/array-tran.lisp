@@ -242,11 +242,15 @@
 		 ((not (ctypep value (sb!vm:saetp-ctype saetp)))
 		  ;; this case will cause an error at runtime, so we'd
 		  ;; better WARN about it now.
-		  (compiler-warn "~@<~S is not a ~S (which is the ~
-                                 UPGRADED-ARRAY-ELEMENT-TYPE of ~S).~@:>"
-				 value
-				 (type-specifier (sb!vm:saetp-ctype saetp))
-				 eltype))
+		  (warn 'array-initial-element-mismatch
+			:format-control "~@<~S is not a ~S (which is the ~
+                                         ~S of ~S).~@:>"
+			:format-arguments 
+			(list 
+			 value
+			 (type-specifier (sb!vm:saetp-ctype saetp))
+			 'upgraded-array-element-type
+			 eltype)))
 		 ((not (ctypep value eltype-type))
 		  ;; this case will not cause an error at runtime, but
 		  ;; it's still worth STYLE-WARNing about.

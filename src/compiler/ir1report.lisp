@@ -383,16 +383,9 @@
 		(style-warning 'style-warning)
 		(warning 'warning)
 		((or error compiler-error) 'error))))
-    (multiple-value-bind (format-string format-args)
-	(if (typep condition 'simple-condition)
-	    (values (simple-condition-format-control condition)
-		    (simple-condition-format-arguments condition))
-	    (values "~A"
-		    (list (with-output-to-string (s)
-			    (princ condition s)))))
-      (print-compiler-message
-       (format nil "caught ~S:~%  ~A" what format-string)
-       format-args)))
+    (print-compiler-message
+     (format nil "caught ~S:~%~~@<  ~~@;~~A~~:>" what)
+     (list (with-output-to-string (s) (princ condition s)))))
   (values))
 
 ;;; The act of signalling one of these beasts must not cause WARNINGSP
@@ -425,15 +418,9 @@ has written, having proved that it is unreachable."))
 	(muffle-warning ()
 	  (return-from compiler-notify (values))))
       (incf *compiler-note-count*)
-      (multiple-value-bind (format-string format-args)
-	  (if (typep condition 'simple-condition)
-	      (values (simple-condition-format-control condition)
-		      (simple-condition-format-arguments condition))
-	      (values "~A"
-		      (list (with-output-to-string (s)
-			      (princ condition s)))))
-	(print-compiler-message (format nil "note: ~A" format-string)
-				format-args))))
+      (print-compiler-message 
+       (format nil "note: ~~A")
+       (list (with-output-to-string (s) (princ condition s))))))
   (values))
 
 ;;; Issue a note when we might or might not be in the compiler.

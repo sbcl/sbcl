@@ -850,7 +850,8 @@
       (let ((atype (lvar-value atype))
             (dtype (lvar-value dtype)))
       (unless (eq atype nil)
-        (compiler-warn
-         "~@<Asserted type ~S conflicts with derived type ~S.~@:>"
-         atype dtype))))
+        (warn 'type-warning
+	      :format-control 
+	      "~@<Asserted type ~S conflicts with derived type ~S.~@:>"
+	      :format-arguments (list atype dtype)))))
     (ir2-convert-full-call node block)))

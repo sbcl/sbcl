@@ -1161,8 +1161,8 @@
 	  ;; There's no reason to accept this kind of equivocation
 	  ;; when compiling our own code, though.
 	  #+sb-xc-host
-	  (compiler-warn "The variable ~S is defined but never used."
-			 (leaf-debug-name var)))
+	  (warn "The variable ~S is defined but never used."
+		(leaf-debug-name var)))
 	(setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
   (values))
 

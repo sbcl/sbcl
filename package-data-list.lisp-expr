@@ -799,7 +799,13 @@ retained, possibly temporariliy, because it might be used internally."
 	     ;; ..and CONDITIONs..
 	     "BUG"
 	     "UNSUPPORTED-OPERATOR"
+	     "REFERENCE-CONDITION" "REFERENCE-CONDITION-REFERENCES"
+	     "*PRINT-CONDITION-REFERENCES*"
 
+	     "DUPLICATE-DEFINITION" "DUPLICATE-DEFINITION-NAME"
+	     "PACKAGE-AT-VARIANCE" "ARRAY-INITIAL-ELEMENT-MISMATCH"
+	     "TYPE-WARNING" "LOCAL-ARGUMENT-MISMATCH"
+	     
              ;; ..and DEFTYPEs..
              "INDEX" "LOAD/STORE-INDEX"
 	     "SIGNED-BYTE-WITH-A-BITE-OUT"

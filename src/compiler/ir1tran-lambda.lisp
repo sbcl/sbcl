@@ -1095,9 +1095,7 @@
 
       (aver (fasl-output-p *compile-object*))
       (if (member name *fun-names-in-this-file* :test #'equal)
-	  (compiler-warn "~@<Duplicate definition for ~S found in ~
-                          one static unit (usually a file).~@:>"
-			 name)
+	  (warn 'duplicate-definition :name name)
 	  (push name *fun-names-in-this-file*)))
 
     (become-defined-fun-name name)

@@ -436,12 +436,18 @@
                                    (leaf-source-name (elt (lambda-vars lambda)
                                                           pos)))))))
             (cond ((and (ref-p use) (constant-p (ref-leaf use)))
-                   (compiler-warn "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
-                                  what atype-spec (constant-value (ref-leaf use))))
+                   (warn 'type-warning
+			 :format-control
+			 "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
+			 :format-arguments
+			 (list what atype-spec 
+			       (constant-value (ref-leaf use)))))
                   (t
-                   (compiler-warn
-                    "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
-                    what (type-specifier dtype) atype-spec))))))))
+                   (warn 'type-warning
+			 :format-control
+			 "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
+			 :format-arguments
+			 (list what (type-specifier dtype) atype-spec)))))))))
   (values))
 
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,

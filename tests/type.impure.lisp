@@ -334,24 +334,25 @@
      (assert (eq (car (sb-pcl:class-direct-superclasses
 		       (find-class 'simple-condition)))
 		 (find-class 'condition)))
-
-    (let ((subclasses (mapcar #'find-class
-                              '(simple-type-error
-                                simple-error
-                                simple-warning
-                                sb-int:simple-file-error
-                                sb-int:simple-style-warning))))
-      (assert (null (set-difference
-                     (sb-pcl:class-direct-subclasses (find-class
-                                                      'simple-condition))
-                     subclasses))))
-
+    
+     #+nil ; doesn't look like a good test
+     (let ((subclasses (mapcar #'find-class
+                               '(simple-type-error
+                                 simple-error
+                                 simple-warning
+                                 sb-int:simple-file-error
+                                 sb-int:simple-style-warning))))
+       (assert (null (set-difference
+                      (sb-pcl:class-direct-subclasses (find-class
+                                                       'simple-condition))
+                      subclasses))))
+    
      ;; precedence lists
-     (assert (equal (sb-pcl:class-precedence-list
-		     (find-class 'simple-condition))
-		    (mapcar #'find-class '(simple-condition
-					   condition
-					   sb-pcl::slot-object
+     (assert (equal (sb-pcl:class-precedence-list 
+	 	     (find-class 'simple-condition))
+	            (mapcar #'find-class '(simple-condition
+			 		   condition
+				 	   sb-pcl::slot-object
 					   sb-kernel:instance
 					   t))))
 

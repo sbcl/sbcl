@@ -2398,11 +2398,22 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
        to Bruno Haible)
 
 changes in sbcl-0.8.11 relative to sbcl-0.8.10:
+  * minor incompatible change: the sb-grovel contrib now treats C
+    structures as alien (in the sense of SB-ALIEN) objects rather than
+    as undistinguished (simple-array (unsigned-byte 8) (*))s.  This
+    has implications for memory management of client code
+    (sb-grovel-returned objects must now be manually managed) and for
+    type safety (alien objects now have full types).
   * new feature: the SB-EXT:MUFFLE-CONDITIONS declaration should be
     used to control emission of compiler diagnostics, rather than the
     SB-EXT:INHIBIT-WARNINGS OPTIMIZE quality.  See the manual for
     documentation on this feature.  The SB-EXT:INHIBIT-WARNINGS
     quality should be considered deprecated.
+  * (not quite a new documentable feature, but worth considering in
+    the light of the new SB-EXT:MUFFLE-CONDITIONS declaration): the
+    beginnings of a semantically meaningful condition hierarchy is
+    under development, for use in SB-EXT:MUFFLE-CONDITIONS and by
+    IDEs.
   * fixed bug: DEFCLASS slot definitions with identical :READER and
     :WRITER names now signal a reasonable error. (reported by Thomas
     Burdick)

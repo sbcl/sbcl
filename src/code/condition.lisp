@@ -840,19 +840,7 @@
 	       (reader-error-format-arguments condition)
 	       (reader-impossible-number-error-error condition))))))
 
-(define-condition sb!ext::timeout (serious-condition) ())
-
-(define-condition defconstant-uneql (error)
-  ((name :initarg :name :reader defconstant-uneql-name)
-   (old-value :initarg :old-value :reader defconstant-uneql-old-value)
-   (new-value :initarg :new-value :reader defconstant-uneql-new-value))
-  (:report
-   (lambda (condition stream)
-     (format stream
-	     "~@<The constant ~S is being redefined (from ~S to ~S)~@:>"
-	     (defconstant-uneql-name condition)
-	     (defconstant-uneql-old-value condition)
-	     (defconstant-uneql-new-value condition)))))
+(define-condition timeout (serious-condition) ())
 
 ;;;; special SBCL extension conditions
 
@@ -916,6 +904,90 @@
      (format stream
 	     "unsupported on this platform (OS, CPU, whatever): ~S"
 	     (cell-error-name condition)))))
+
+;;; (:ansi-cl :function remove)
+;;; (:ansi-cl :section (a b c))
+;;; (:ansi-cl :glossary "similar")
+;;;
+;;; (:sbcl :node "...")
+;;;
+;;; FIXME: this is not the right place for this.
+(defun print-reference (reference stream)
+  (ecase (car reference)
+    (:ansi-cl
+     (format stream "The ANSI Standard")
+     (format stream ", ")
+     (destructuring-bind (type data) (cdr reference)
+       (ecase type
+	 (:function (format stream "Function ~S" data))
+	 (:special-operator (format stream "Special Operator ~S" data))
+	 (:macro (format stream "Macro ~S" data))
+	 (:section (format stream "Section ~{~D~^.~}" data))
+	 (:glossary (format stream "Glossary Entry ~S" data)))))
+    (:sbcl
+     (format stream "The SBCL Manual")
+     (format stream ", ")
+     (destructuring-bind (type data) (cdr reference)
+       (ecase type
+	 (:node (format stream "Node ~S" data)))))
+    ;; FIXME: other documents (e.g. AMOP, Franz documentation :-)
+    ))
+(define-condition reference-condition ()
+  ((references :initarg :references :reader reference-condition-references)))
+(defvar *print-condition-references* t)
+(def!method print-object :around ((o reference-condition) s)
+  (call-next-method)
+  (unless (or *print-escape* *print-readably*)
+    (when *print-condition-references*
+      (format s "~&See also:~%")
+      (pprint-logical-block (s nil :per-line-prefix "  ")
+	(do* ((rs (reference-condition-references o) (cdr rs))
+	      (r (car rs) (car rs)))
+	     ((null rs))
+	  (print-reference r s)
+	  (unless (null (cdr rs))
+	    (terpri s)))))))
+    
+(define-condition duplicate-definition (reference-condition warning)
+  ((name :initarg :name :reader duplicate-definition-name))
+  (:report (lambda (c s)
+	     (format s "~@<Duplicate definition for ~S found in ~
+                        one file.~@:>"
+		     (duplicate-definition-name c))))
+  (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+
+(define-condition package-at-variance (reference-condition simple-warning) 
+  ()
+  (:default-initargs :references (list '(:ansi-cl :macro defpackage))))
+
+(define-condition defconstant-uneql (reference-condition error)
+  ((name :initarg :name :reader defconstant-uneql-name)
+   (old-value :initarg :old-value :reader defconstant-uneql-old-value)
+   (new-value :initarg :new-value :reader defconstant-uneql-new-value))
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "~@<The constant ~S is being redefined (from ~S to ~S)~@:>"
+	     (defconstant-uneql-name condition)
+	     (defconstant-uneql-old-value condition)
+	     (defconstant-uneql-new-value condition))))
+  (:default-initargs :references (list '(:ansi-cl :macro defconstant)
+				       '(:sbcl :node "Idiosyncrasies"))))
+
+(define-condition array-initial-element-mismatch 
+    (reference-condition simple-warning)
+  ()
+  (:default-initargs 
+      :references (list '(:ansi-cl :function make-array) 
+			'(:ansi-cl :function upgraded-array-element-type))))
+
+(define-condition type-warning (reference-condition simple-warning)
+  ()
+  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+
+(define-condition local-argument-mismatch (reference-condition simple-warning)
+  ()
+  (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
 
 ;;;; restart definitions
 

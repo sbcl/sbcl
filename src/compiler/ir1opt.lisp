@@ -977,7 +977,7 @@
 	       (:aborted
 		(setf (combination-kind node) :error)
 		(when args
-		  (apply #'compiler-warn args))
+		  (apply #'warn args))
 		(remhash node table)
 		nil)
 	       (:failure

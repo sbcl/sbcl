@@ -57,12 +57,24 @@ for early 0.8.x:
 * Make the system sources understandable to the system, so that
 	searching for sources doesn't error out quite so often
 	(e.g. in error handlers)
-	** provided a location-independent way of referring to source
-		files in the target image, maybe a SYS: logical
-		pathname, and made the build system respect this.
 	** provided a suitable readtable for reading in the source
 		files when necessary, and a mechanism for activating
 		this readtable rather than the standard one.
+* Some work on conditions emitted by the system
+	** eliminated COMPILER-WARN and COMPILER-STYLE-WARN, which
+		were simply limited versions of WARN and STYLE-WARN.
+	** eliminated use of INHIBIT-WARNINGS by code emitted by the
+		system from user code.
+	** caused use of INHIBIT-WARNINGS to signal a STYLE-WARNING.
+	** eliminated use of INHIBIT-WARNINGS within the system
+	** deprecated INHIBIT-WARNINGS, causing its use to signal a
+		full WARNING.
+	** began work on developing a class hierarchy of conditions
+		along semantic lines.
+	** annotated conditions emitted by the system to have
+		references to documentation where applicable, so that
+		users can easily find an explanation for the
+		conditions they're seeing.
 
 =======================================================================
 for 0.9:

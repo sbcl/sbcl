@@ -624,7 +624,7 @@
 	   ;; there's no need for us to accept ANSI's lameness when
 	   ;; processing our own code, though.
 	   #+sb-xc-host
-	   (compiler-warn "reading an ignored variable: ~S" name)))
+	   (warn "reading an ignored variable: ~S" name)))
        (reference-leaf start next result var))
       (cons
        (aver (eq (car var) 'MACRO))
@@ -743,8 +743,8 @@
                                 (muffle-warning-or-die)))
 		     #-(and cmu sb-xc-host)
 		     (warning (lambda (c)
-				(compiler-warn "~@<~A~:@_~A~@:_~A~:>"
-					       (wherestring) hint c)
+				(warn "~@<~A~:@_~A~@:_~A~:>"
+				      (wherestring) hint c)
 				(muffle-warning-or-die)))
                      (error (lambda (c)
                               (compiler-error "~@<~A~:@_~A~@:_~A~:>"
@@ -928,22 +928,29 @@
 			(find-free-var var-name))))
 	  (etypecase var
 	    (leaf
-             (flet ((process-var (var bound-var)
-                      (let* ((old-type (or (lexenv-find var type-restrictions)
-                                           (leaf-type var)))
-                             (int (if (or (fun-type-p type)
-                                          (fun-type-p old-type))
-                                      type
-                                      (type-approx-intersection2 old-type type))))
-                        (cond ((eq int *empty-type*)
-                               (unless (policy *lexenv* (= inhibit-warnings 3))
-                                 (compiler-warn
-                                  "The type declarations ~S and ~S for ~S conflict."
-                                  (type-specifier old-type) (type-specifier type)
-                                  var-name)))
-                              (bound-var (setf (leaf-type bound-var) int))
-                              (t
-                               (restr (cons var int)))))))
+             (flet 
+		 ((process-var (var bound-var)
+		    (let* ((old-type (or (lexenv-find var type-restrictions)
+					 (leaf-type var)))
+			   (int (if (or (fun-type-p type)
+					(fun-type-p old-type))
+				    type
+				    (type-approx-intersection2 
+				     old-type type))))
+		      (cond ((eq int *empty-type*)
+			     (unless (policy *lexenv* (= inhibit-warnings 3))
+			       (warn
+				'type-warning
+				:format-control
+				"The type declarations ~S and ~S for ~S conflict."
+				:format-arguments
+				(list
+				 (type-specifier old-type) 
+				 (type-specifier type)
+				 var-name))))
+			    (bound-var (setf (leaf-type bound-var) int))
+			    (t
+			     (restr (cons var int)))))))
                (process-var var bound-var)
                (awhen (and (lambda-var-p var)
                            (lambda-var-specvar var))

@@ -182,8 +182,9 @@
 	      (shadowing-import sym package)
 	      (setf old-shadows (remove sym old-shadows))))))
       (when old-shadows
-	(warn "~A also shadows the following symbols:~%  ~S"
-	      name old-shadows)))
+	(warn 'package-at-variance
+	      :format-control "~A also shadows the following symbols:~%  ~S"
+	      :format-arguments (list name old-shadows))))
     ;; Handle USE.
     (unless (eq use :default)
       (let ((old-use-list (package-use-list package))
@@ -192,9 +193,9 @@
 	(let ((laterize (set-difference old-use-list new-use-list)))
 	  (when laterize
 	    (unuse-package laterize package)
-	    (warn "~A used to use the following packages:~%  ~S"
-		  name
-		  laterize)))))
+	    (warn 'package-at-variance
+		  :format-control "~A used to use the following packages:~%  ~S"
+		  :format-arguments (list name laterize))))))
     ;; Handle IMPORT and INTERN.
     (dolist (sym-name interns)
       (intern sym-name package))
@@ -213,7 +214,9 @@
       (export exports package)
       (let ((diff (set-difference old-exports exports)))
 	(when diff
-	  (warn "~A also exports the following symbols:~%  ~S" name diff))))
+	  (warn 'package-at-variance
+		:format-control "~A also exports the following symbols:~%  ~S" 
+		:format-arguments (list name diff)))))
     ;; Handle documentation.
     (setf (package-doc-string package) doc-string)
     package))
