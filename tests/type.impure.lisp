@@ -80,14 +80,10 @@
 ;;; part I: TYPEP
 (assert (typep #(11) '(simple-array t 1)))
 (assert (typep #(11) '(simple-array (or integer symbol) 1)))
-;;; FIXME: This is broken because of compiler bug 123: the compiler
-;;; optimizes the type test to T, so it never gets a chance to raise a
-;;; runtime error. (It used to work under the IR1 interpreter just
-;;; because the IR1 interpreter doesn't try to optimize TYPEP as hard
-;;; as the byte compiler does.)
-#+nil (assert (raises-error? (typep #(11) '(simple-array undef-type 1))))
+(assert (raises-error? (typep #(11) '(simple-array undef-type 1))))
 (assert (not (typep 11 '(simple-array undef-type 1))))
 ;;; part II: SUBTYPEP
+
 (assert (subtypep '(vector some-undef-type) 'vector))
 (assert (not (subtypep '(vector some-undef-type) 'integer)))
 (assert-nil-nil (subtypep 'utype-1 'utype-2))
@@ -351,6 +347,16 @@
 (defclass maybe-subclass () ())
 (assert-nil-t (subtypep 'maybe-subclass 'superclass))
 ||#
+
+;;; Prior to sbcl-0.7.6.27, there was some confusion in ARRAY types
+;;; specialized on some as-yet-undefined type which would cause this
+;;; program to fail (bugs #123 and #165). Verify that it doesn't.
+(defun foo (x)
+  (declare (type (vector bar) x))
+  (aref x 1))
+(deftype bar () 'single-float)
+(assert (eql (foo (make-array 3 :element-type 'bar :initial-element 0.0f0))
+	     0.0f0))
 
 ;;; success
 (quit :unix-status 104)

@@ -1816,13 +1816,23 @@
       (array-type-element-type type)))
 
 (!define-type-method (array :simple-=) (type1 type2)
-  (values (and (equal (array-type-dimensions type1)
-		      (array-type-dimensions type2))
-	       (eq (array-type-complexp type1)
-		   (array-type-complexp type2))
-	       (type= (specialized-element-type-maybe type1)
-		      (specialized-element-type-maybe type2)))
-	  t))
+  (if (or (unknown-type-p (array-type-element-type type1))
+	  (unknown-type-p (array-type-element-type type2)))
+      (multiple-value-bind (equalp certainp)
+	  (type= (array-type-element-type type1)
+		 (array-type-element-type type2))
+	;; by its nature, the call to TYPE= should never return NIL,
+	;; T, as we don't know what the UNKNOWN-TYPE will grow up to
+	;; be.  -- CSR, 2002-08-19
+	(aver (not (and (not equalp) certainp)))
+	(values equalp certainp))
+      (values (and (equal (array-type-dimensions type1)
+			  (array-type-dimensions type2))
+		   (eq (array-type-complexp type1)
+		       (array-type-complexp type2))
+		   (type= (specialized-element-type-maybe type1)
+			  (specialized-element-type-maybe type2)))
+	      t)))
 
 (!define-type-method (array :unparse) (type)
   (let ((dims (array-type-dimensions type))
@@ -1928,10 +1938,28 @@
 		    (eq complexp2 :maybe)
 		    (eq complexp1 complexp2)))
 	   (values nil t))
-	  ;; If either element type is wild, then they intersect.
-	  ;; Otherwise, the types must be identical.
-	  ((or (eq (array-type-element-type type1) *wild-type*)
-	       (eq (array-type-element-type type2) *wild-type*)
+	  ;; Old comment:
+	  ;;
+	  ;;   If either element type is wild, then they intersect.
+	  ;;   Otherwise, the types must be identical.
+	  ;;
+	  ;; FIXME: There seems to have been a fair amount of
+	  ;; confusion about the distinction between requested element
+	  ;; type and specialized element type; here is one of
+	  ;; them. If we request an array to hold objects of an
+	  ;; unknown type, we can do no better than represent that
+	  ;; type as an array specialized on wild-type.  We keep the
+	  ;; requested element-type in the -ELEMENT-TYPE slot, and
+	  ;; *WILD-TYPE* in the -SPECIALIZED-ELEMENT-TYPE.  So, here,
+	  ;; we must test for the SPECIALIZED slot being *WILD-TYPE*,
+	  ;; not just the ELEMENT-TYPE slot.  Maybe the return value
+	  ;; in that specific case should be T, NIL?  Or maybe this
+	  ;; function should really be called
+	  ;; ARRAY-TYPES-COULD-POSSIBLY-INTERSECT?  In any case, this
+	  ;; was responsible for bug #123, and this whole issue could
+	  ;; do with a rethink and/or a rewrite.  -- CSR, 2002-08-21
+	  ((or (eq (array-type-specialized-element-type type1) *wild-type*)
+	       (eq (array-type-specialized-element-type type2) *wild-type*)
 	       (type= (specialized-element-type-maybe type1)
 		      (specialized-element-type-maybe type2)))
 

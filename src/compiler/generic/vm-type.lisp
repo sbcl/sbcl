@@ -130,7 +130,12 @@
 (defun specialize-array-type (type)
   (let ((eltype (array-type-element-type type)))
     (setf (array-type-specialized-element-type type)
-	  (if (eq eltype *wild-type*)
+	  (if (or (eq eltype *wild-type*)
+		  ;; This is slightly dubious, but not as dubious as
+		  ;; assuming that the upgraded-element-type should be
+		  ;; equal to T, given the way that the AREF
+		  ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
+		  (unknown-type-p eltype))
 	      *wild-type*
 	      (dolist (stype-name *specialized-array-element-types*
 				  *universal-type*)

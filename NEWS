@@ -1194,7 +1194,10 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
   * An alpha-quality port to the parisc architecture running Linux,
     based on the old CMUCL backend has been made.  This, even more so
     than the other backends, should be considered still a work in
-    progress.
+    progress; known problems include that the Linux kernel in 64-bit
+    mode does not propagate the correct sigcontext structure to
+    userspace, and consequently SBCL on a parisc64 kernel will not
+    work yet.
   * fixed bug 189: The compiler now respects NOTINLINE declarations for
     functions declared in FLET and LABELS. (I.e. "LET conversion" is
     suppressed.) Also now that the compiler is looking at declarations
@@ -1234,6 +1237,8 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
   * Bug 192 fixed: The internal primitive DATA-VECTOR-REF can now be
     constant-folded without failing an assertion. (thanks to Einar
     Floystad Dorum for reporting this)
+  * Bugs 123 and 165 fixed: array specializations on as-yet-undefined
+    types are now dealt with more correctly by the compiler.
   * Minor incompatible change: COMPILE-FILE-PATHNAME now merges its
     OUTPUT-FILE argument with its INPUT-FILE argument, resulting in
     behaviour analogous to RENAME-FILE.  This puts its behaviour more

@@ -1,4 +1,4 @@
-REPORTING BUGS
+tREPORTING BUGS
 
 Bugs can be reported on the help mailing list
   sbcl-help@lists.sourceforge.net
@@ -698,18 +698,6 @@ WORKAROUND:
    #+NIL) and I'd like to go back to see whether this really is
    a compiler bug before I delete this BUGS entry.
 
-123:
-   The *USE-IMPLEMENTATION-TYPES* hack causes bugs, particularly
-     (IN-PACKAGE :SB-KERNEL)
-     (TYPE= (SPECIFIER-TYPE '(VECTOR T))
-	    (SPECIFIER-TYPE '(VECTOR UNDEFTYPE)))
-   Then because of this, the compiler bogusly optimizes
-	(TYPEP #(11) '(SIMPLE-ARRAY UNDEF-TYPE 1))
-   to T. Unfortunately, just setting *USE-IMPLEMENTATION-TYPES* to 
-   NIL around sbcl-0.pre7.14.flaky4.12 didn't work: the compiler complained
-   about type mismatches (probably harmlessly, another instance of bug 117);
-   and then cold init died with a segmentation fault.
-
 124:
    As of version 0.pre7.14, SBCL's implementation of MACROLET makes
    the entire lexical environment at the point of MACROLET available
@@ -1030,27 +1018,6 @@ WORKAROUND:
   (Christophe Rhodes reports that this doesn't occur on the SPARC, which
   isn't too surprising since there are many differences in stack
   implementation and GC conservatism between the X86 and other ports.)
-
-165:
-  Array types with element-types of some unknown type are falsely being
-  assumed to be of type (ARRAY T) by the compiler in some cases. The
-  following code demonstrates the problem:
-
-  (defun foo (x)
-    (declare (type (vector bar) x))
-    (aref x 1))
-  (deftype bar () 'single-float)
-  (foo (make-array 3 :element-type 'bar))
-    -> TYPE-ERROR "The value #(0.0 0.0 0.0) is not of type (VECTOR BAR)."
-  (typep (make-array 3 :element-type 'bar) '(vector bar))
-    -> T
-
-  The easy solution is to make the functions which depend on knowing
-  the upgraded-array-element-type (in compiler/array-tran and
-  compiler/generic/vm-tran as of sbcl-0.7.3.x) be slightly smarter about
-  unknown types; an alternative is to have the
-  specialized-element-type slot in the ARRAY-TYPE structure be
-  *WILD-TYPE* for UNKNOWN-TYPE element types.
 
 166:
   Compiling 

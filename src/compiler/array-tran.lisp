@@ -35,7 +35,11 @@
     ;; array type.
     (if (array-type-p type)
 	(array-type-specialized-element-type type)
-	*universal-type*)))
+	;; KLUDGE: there is no good answer here, but at least
+	;; *wild-type* won't cause HAIRY-DATA-VECTOR-{REF,SET} to be
+	;; erroneously optimized (see generic/vm-tran.lisp) -- CSR,
+	;; 2002-08-21
+	*wild-type*)))
 
 ;;; The ``new-value'' for array setters must fit in the array, and the
 ;;; return type is going to be the same as the new-value for SETF
