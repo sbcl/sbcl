@@ -192,7 +192,7 @@ scavenge(lispobj *start, long n_words)
 	    
 	    if ((scavtab[type]==scav_lose) ||
 		(((scavtab[type])(start,object))>1)) {
-		fprintf(stderr,"warning: attempted to scavenge non-descriptor value %x at %p.  If you can\nreproduce this warning, send a test case to sbcl-devel@lists.sourceforge.net\n",
+		fprintf(stderr,"warning: attempted to scavenge non-descriptor value %x at %p.  If you can\nreproduce this warning, send a bug report (see manual page for details)\n",
 			object,start);
 	    }
 	}
