@@ -306,30 +306,32 @@ GNAME(do_pending_interrupt):
 	ret
 	.size	GNAME(do_pending_interrupt),.-GNAME(do_pending_interrupt)
 
-#ifdef LISP_FEATURE_GENCGC
-/* This is a fast bzero using the FPU. The first argument is the start
- * address which needs to be aligned on an 8 byte boundary, the second
- * argument is the number of bytes, which must be a nonzero multiple
- * of 8 bytes. */
-/* FIXME whether this is still faster than using the OS's bzero or
- * equivalent, we don't know */
-	.text
-	.globl	GNAME(i586_bzero)
-	.type	GNAME(i586_bzero),@function
+	.globl	GNAME(post_signal_tramp)
+	.type	GNAME(post_signal_tramp),@function
 	.align	align_4byte,0x90
-GNAME(i586_bzero):
-	mov	4(%rsp),%rdx	# Load the start address.
-	mov	8(%rsp),%rax	# Load the number of bytes.
-	fldz
-l1:	fstl	0(%rdx)
-	add	$8,%rdx
-	sub	$8,%rax
-	jnz	l1
-	fstp	%st(0)
+GNAME(post_signal_tramp):
+	/* this is notionally the second half of a function whose first half
+ 	 * doesn't exist.  This is where call_into_lisp returns when called 
+	 * using return_to_lisp_function */
+	addq $24,%rsp  	/* clear call_into_lisp args from stack */
+	popq %r15
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rdi
+	popq %rsi
+	popq %rbp
+	popq %rsp
+	popq %rdx
+	popq %rbx
+	popq %rcx
+	popq %rax
+	leave
 	ret
-	.size	GNAME(i586_bzero),.-GNAME(i586_bzero)
-#endif	
+	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)
 
-
-
 	.end

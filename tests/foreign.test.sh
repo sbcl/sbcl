@@ -26,8 +26,11 @@ testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 ## Make a little shared object files to test with.
 
 build_so() {
- echo building $1.so
-  cc -c $1.c -o $1.o
+  echo building $1.so
+  if [ $(uname -p) = x86_64 ]; then
+    CFLAGS="$CFLAGS -fPIC"
+  fi
+  cc -c $1.c -o $1.o $CFLAGS
   ld -shared -o $1.so $1.o
 }
     

@@ -123,7 +123,8 @@
 
 (define-alien-type nil
   (struct fd-set
-	  (fds-bits (array fd-mask #.(/ fd-setsize 32)))))
+	  (fds-bits (array fd-mask #.(/ fd-setsize
+					sb!vm:n-machine-word-bits)))))
 
 (/show0 "unix.lisp 304")
 
@@ -489,19 +490,24 @@
   `(if (fixnump ,num)
        (progn
 	 (setf (deref (slot ,fdset 'fds-bits) 0) ,num)
-	 ,@(loop for index upfrom 1 below (/ fd-setsize 32)
+	 ,@(loop for index upfrom 1 below (/ fd-setsize
+					     sb!vm:n-machine-word-bits)
 	     collect `(setf (deref (slot ,fdset 'fds-bits) ,index) 0)))
        (progn
-	 ,@(loop for index upfrom 0 below (/ fd-setsize 32)
+	 ,@(loop for index upfrom 0 below (/ fd-setsize
+					     sb!vm:n-machine-word-bits)
 	     collect `(setf (deref (slot ,fdset 'fds-bits) ,index)
-			    (ldb (byte 32 ,(* index 32)) ,num))))))
+			    (ldb (byte sb!vm:n-machine-word-bits 
+				       ,(* index sb!vm:n-machine-word-bits))
+				 ,num))))))
 
 (defmacro fd-set-to-num (nfds fdset)
-  `(if (<= ,nfds 32)
+  `(if (<= ,nfds sb!vm:n-machine-word-bits)
        (deref (slot ,fdset 'fds-bits) 0)
-       (+ ,@(loop for index upfrom 0 below (/ fd-setsize 32)
+       (+ ,@(loop for index upfrom 0 below (/ fd-setsize
+					      sb!vm:n-machine-word-bits)
 	      collect `(ash (deref (slot ,fdset 'fds-bits) ,index)
-			    ,(* index 32))))))
+			    ,(* index sb!vm:n-machine-word-bits))))))
 
 ;;; Examine the sets of descriptors passed as arguments to see whether
 ;;; they are ready for reading and writing. See the UNIX Programmer's
@@ -957,34 +963,37 @@ previous timer after the body has finished executing"
 (defmacro fd-set (offset fd-set)
   (let ((word (gensym))
 	(bit (gensym)))
-    `(multiple-value-bind (,word ,bit) (floor ,offset 32)
+    `(multiple-value-bind (,word ,bit) (floor ,offset
+					      sb!vm:n-machine-word-bits)
        (setf (deref (slot ,fd-set 'fds-bits) ,word)
-	     (logior (truly-the (unsigned-byte 32) (ash 1 ,bit))
+	     (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+				(ash 1 ,bit))
 		     (deref (slot ,fd-set 'fds-bits) ,word))))))
 
 ;;; not checked for linux...
 (defmacro fd-clr (offset fd-set)
   (let ((word (gensym))
 	(bit (gensym)))
-    `(multiple-value-bind (,word ,bit) (floor ,offset 32)
+    `(multiple-value-bind (,word ,bit) (floor ,offset
+					      sb!vm:n-machine-word-bits)
        (setf (deref (slot ,fd-set 'fds-bits) ,word)
 	     (logand (deref (slot ,fd-set 'fds-bits) ,word)
-                     ;; FIXME: This may not be quite right for 64-bit
-                     ;; ports of SBCL.  --njf, 2004-08-04
 		     (sb!kernel:word-logical-not
-		      (truly-the (unsigned-byte 32) (ash 1 ,bit))))))))
+		      (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+				 (ash 1 ,bit))))))))
 
 ;;; not checked for linux...
 (defmacro fd-isset (offset fd-set)
   (let ((word (gensym))
 	(bit (gensym)))
-    `(multiple-value-bind (,word ,bit) (floor ,offset 32)
+    `(multiple-value-bind (,word ,bit) (floor ,offset
+					      sb!vm:n-machine-word-bits)
        (logbitp ,bit (deref (slot ,fd-set 'fds-bits) ,word)))))
 
 ;;; not checked for linux...
 (defmacro fd-zero (fd-set)
   `(progn
-     ,@(loop for index upfrom 0 below (/ fd-setsize 32)
+     ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
 	 collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
 
 
