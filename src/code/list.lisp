@@ -406,24 +406,30 @@
 	   (declare (type index result)))))
   (declare (ftype (function (t) index) count-conses))
   (defun butlast (list &optional (n 1))
-    (let* ((n-conses-in-list (count-conses list))
-	   (n-remaining-to-copy (- n-conses-in-list n)))
-      (declare (type fixnum n-remaining-to-copy))
-      (when (plusp n-remaining-to-copy)
-	(do* ((result (list (first list)))
-	      (rest (rest list) (rest rest))
-	      (splice result))
-	    ((zerop (decf n-remaining-to-copy))
-	     result)
-	  (setf splice
-		(setf (cdr splice)
-		      (list (first rest))))))))
-  (defun nbutlast (list &optional (n 1))
     (let ((n-conses-in-list (count-conses list)))
-      (unless (< n-conses-in-list n)
-	(setf (cdr (nthcdr (- n-conses-in-list n 1) list))
-	      nil)
-	list))))
+      (cond ((zerop n)
+	     ;; (We can't use SUBSEQ in this case because LIST isn't
+	     ;; necessarily a proper list, but SUBSEQ expects a
+	     ;; proper sequence. COPY-LIST isn't so fussy.)
+	     (copy-list list))
+	    ((>= n n-conses-in-list)
+	     nil)
+	    (t
+	     ;; (LIST isn't necessarily a proper list in this case
+	     ;; either, and technically SUBSEQ wants a proper
+	     ;; sequence, but no reasonable implementation of SUBSEQ
+	     ;; will actually walk down to the end of the list to
+	     ;; check, and since we're calling our own implementation
+	     ;; we know it's reasonable, so it's OK.)
+	     (subseq list 0 (- n-conses-in-list n))))))
+  (defun nbutlast (list &optional (n 1))
+    (if (zerop n)
+	list
+	(let ((n-conses-in-list (count-conses list)))
+	  (unless (<= n-conses-in-list n)
+	    (setf (cdr (nthcdr (- n-conses-in-list n 1) list))
+		  nil)
+	    list)))))
 
 (defun ldiff (list object)
   "Return a new list, whose elements are those of LIST that appear before
