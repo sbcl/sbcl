@@ -740,7 +740,7 @@ reset to ~S."
        ;; regardless of what the debugger does afterwards.)
        (handler-case
 	   (format *error-output*
-		   "~2&~@<debugger invoked on condition of type ~S in thread ~A: ~
+		   "~2&~@<debugger invoked on a ~S in thread ~A: ~
                     ~2I~_~A~:>~%"
 		   (type-of *debug-condition*)
 		   (sb!thread:current-thread-id)
@@ -775,34 +775,29 @@ reset to ~S."
        ;; been converted to behave this way. -- WHN 2000-11-16)
 
        (unwind-protect
-       (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
-	     ;; violating the principle of least surprise, and making
-	     ;; it impossible for the user to do reasonable things
-	     ;; like using PRINT at the debugger prompt to send output
-	     ;; to the program's ordinary (possibly
-	     ;; redirected-to-a-file) *STANDARD-OUTPUT*. (CMU CL
-	     ;; used to rebind *STANDARD-INPUT* here too, but that's
-	     ;; been fixed already.)
-	     (*standard-output* *debug-io*)
-	     ;; This seems reasonable: e.g. if the user has redirected
-	     ;; *ERROR-OUTPUT* to some log file, it's probably wrong
-	     ;; to send errors which occur in interactive debugging to
-	     ;; that file, and right to send them to *DEBUG-IO*.
-	     (*error-output* *debug-io*))
-	 (unless (typep condition 'step-condition)
-	   (when *debug-beginner-help-p*
-	     (format *debug-io*
-		     "~%~@<Within the debugger, you can type HELP for help. ~
-                      At any command prompt (within the debugger or not) you ~
-                      can type (SB-EXT:QUIT) to terminate the SBCL ~
-                      executable. The condition which caused the debugger to ~
-                      be entered is bound to ~S. You can suppress this ~
-                      message by clearing ~S.~:@>~2%"
-		     '*debug-condition*
-		     '*debug-beginner-help-p*))
-	   (show-restarts *debug-restarts* *debug-io*))
+	    (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
+		  ;; violating the principle of least surprise, and making
+		  ;; it impossible for the user to do reasonable things
+		  ;; like using PRINT at the debugger prompt to send output
+		  ;; to the program's ordinary (possibly
+		  ;; redirected-to-a-file) *STANDARD-OUTPUT*. (CMU CL
+		  ;; used to rebind *STANDARD-INPUT* here too, but that's
+		  ;; been fixed already.)
+		  (*standard-output* *debug-io*)
+		  ;; This seems reasonable: e.g. if the user has redirected
+		  ;; *ERROR-OUTPUT* to some log file, it's probably wrong
+		  ;; to send errors which occur in interactive debugging to
+		  ;; that file, and right to send them to *DEBUG-IO*.
+		  (*error-output* *debug-io*))
+	      (unless (typep condition 'step-condition)
+		(when *debug-beginner-help-p*
+		  (format *debug-io*
+			  "~%~@<You can type HELP for debugger help, or ~
+                                (SB-EXT:QUIT) to exit from SBCL.~:@>~2%"))
+		(show-restarts *debug-restarts* *debug-io*))
 	      (internal-debug))
-	 (when background-p (sb!thread::release-foreground)))))))
+	 (when background-p
+	   (sb!thread::release-foreground)))))))
 
 ;;; this function is for use in *INVOKE-DEBUGGER-HOOK* when ordinary
 ;;; ANSI behavior has been suppressed by command-line

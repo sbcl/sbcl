@@ -166,23 +166,12 @@ print_banner()
 {
     printf(
 "This is SBCL %s, an implementation of ANSI Common Lisp.\n\
+More information about SBCL is available at <http://www.sbcl.org/>.
 \n\
-SBCL is derived from the CMU CL system created at Carnegie Mellon University.\n\
-Besides software and documentation originally created at Carnegie Mellon\n\
-University, SBCL contains some software originally from the Massachusetts\n\
-Institute of Technology, Symbolics Incorporated, and Xerox Corporation, and\n\
-material contributed by volunteers since the release of CMU CL into the\n\
-public domain. See the CREDITS file in the distribution for more information.\n\
-\n\
-SBCL is a free software system, provided as is, with absolutely no warranty.\n\
-It is mostly in the public domain, but also includes some software copyrighted\n\
-  Massachusetts Institute of Technology, 1986;\n\
-  Symbolics, Inc., 1989, 1990, 1991, 1992; and\n\
-  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990\n\
-used under BSD-style licenses allowing copying only under certain conditions.\n\
-See the COPYING file in the distribution for more information.\n\
-\n\
-More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
+SBCL is free software, provided as is, with absolutely no warranty.\n\
+It is mostly in the public domain; some portions are provided under\n\
+BSD-style licenses.  See the CREDITS and COPYING files in the\n\
+distribution for more information.\n\
 ", SBCL_VERSION_STRING);
 }
 
