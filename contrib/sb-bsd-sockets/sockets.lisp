@@ -173,6 +173,8 @@ small"))
 	(error "Must supply at least one of BUFFER or LENGTH"))
       (unless length
 	(setf length (length buffer)))
+      (unless buffer
+	(setf buffer (make-array length :element-type element-type)))
       (let ((copy-buffer (sb-alien:make-alien (array sb-alien:unsigned 1) length)))
 	(unwind-protect
 	    (sb-alien:with-alien ((sa-len (array (sb-alien:unsigned 32) 2)))
