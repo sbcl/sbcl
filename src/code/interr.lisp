@@ -250,10 +250,12 @@
 	 :format-arguments (list key-name)))
 
 (deferr invalid-array-index-error (array bound index)
-  (error 'simple-error
+  (error 'simple-type-error
 	 :format-control
 	 "invalid array index ~W for ~S (should be nonnegative and <~W)"
-	 :format-arguments (list index array bound)))
+	 :format-arguments (list index array bound)
+	 :datum index
+	 :expected-type `(integer 0 (,bound))))
 
 (deferr object-not-simple-array-error (object)
   (error 'type-error

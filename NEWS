@@ -1357,16 +1357,28 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        primary methods with no specializers;
     ** the MOP generic function GENERIC-FUNCTION-DECLARATIONS is now
        implemented;
-   * fixed some bugs, shown by Paul Dietz' test suite:
-     ** DOLIST puts its body in TAGBODY
-     ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the
-        correct order
-     ** MULTIPLE-VALUE-SETQ evaluates side-effectful places before
-        value producing form
-     ** if more variables are given to PROGV than values, extra
-        variables are bound and made to have no value
-   * fixed bug 166: compiler preserves "there is a way to go"
-     invariant when deleting code
+    ** the Readers for Class Metaobjects methods CLASS-DIRECT-SLOTS
+       and CLASS-DIRECT-DEFAULT-INITARGS have been implemented for
+       FORWARD-REFERENCED-CLASSes; error reporting on
+       CLASS-DEFAULT-INITARGS, CLASS-PRECEDENCE-LIST and CLASS-SLOTS
+       has been improved;
+  * fixed some bugs, shown by Paul Dietz' test suite:
+    ** DOLIST puts its body in TAGBODY
+    ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the
+       correct order
+    ** MULTIPLE-VALUE-SETQ evaluates side-effectful places before
+       value producing form
+    ** if more variables are given to PROGV than values, extra
+       variables are bound and made to have no value
+    ** NSUBSTITUTE on list arguments gets the right answer with
+       :FROM-END
+    ** ELT signals an error of type TYPE-ERROR when the index argument
+       is not a valid sequence index;
+  * fixed bug 166: compiler preserves "there is a way to go"
+    invariant when deleting code.
+  * fixed bug 172: macro lambda lists with required arguments after
+    &REST arguments now cause an error to be signalled.  (thanks to
+    Matthew Danish)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

@@ -246,7 +246,7 @@
   (if (null end)
       (setf end (length sequence))
       (unless (<= end (length sequence))
-	(signal-index-too-large-error sequence end)))
+	(signal-end-too-large-error sequence end)))
   (do ((old-index start (1+ old-index))
        (new-index 0 (1+ new-index))
        (copy (make-sequence-like sequence (- end start))))

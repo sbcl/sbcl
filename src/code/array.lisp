@@ -378,15 +378,26 @@
 	    (declare (fixnum index dim))
 	    (unless (< -1 index dim)
 	      (if invalid-index-error-p
-		  (error "invalid index ~W~[~;~:; on axis ~:*~W~] in ~S"
-			 index axis array)
+		  (error 'simple-type-error
+			 :format-control "invalid index ~W~[~;~:; on axis ~:*~W~] in ~S"
+			 :format-arguments (list index axis array)
+			 :datum index
+			 :expected-type `(integer 0 (,dim)))
 		  (return-from %array-row-major-index nil)))
 	    (incf result (* chunk-size index))
 	    (setf chunk-size (* chunk-size dim))))
-	(let ((index (first subscripts)))
-	  (unless (< -1 index (length (the (simple-array * (*)) array)))
+	(let ((index (first subscripts))
+	      (length (length (the (simple-array * (*)) array))))
+	  (unless (< -1 index length)
 	    (if invalid-index-error-p
-		(error "invalid index ~W in ~S" index array)
+		;; FIXME: perhaps this should share a format-string
+		;; with INVALID-ARRAY-INDEX-ERROR or
+		;; INDEX-TOO-LARGE-ERROR?
+		(error 'simple-type-error
+		       :format-control "invalid index ~W in ~S"
+		       :format-arguments (list index array)
+		       :datum index
+		       :expected-type `(integer 0 (,length)))
 		(return-from %array-row-major-index nil)))
 	  index))))
 

@@ -1306,6 +1306,17 @@
   (or (eq s *the-class-t*)
       (eq s *the-class-stream*)))
 
+;;; Some necessary methods for FORWARD-REFERENCED-CLASS
+(defmethod class-direct-slots ((class forward-referenced-class)) ())
+(defmethod class-direct-default-initargs ((class forward-referenced-class)) ())
+(macrolet ((def (method)
+             `(defmethod ,method ((class forward-referenced-class))
+                (error "~@<~I~S was called on a forward referenced class:~2I~_~S~:>"
+                       ',method class))))
+  (def class-default-initargs)
+  (def class-precedence-list)
+  (def class-slots))
+
 (defmethod validate-superclass ((c slot-class)
 				(f forward-referenced-class))
   t)

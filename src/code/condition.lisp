@@ -691,7 +691,12 @@
 
 ;;; Out-of-range &KEY END arguments are similar to, but off by one
 ;;; from out-of-range indices into the sequence.
-(define-condition index-too-large-error (type-error)
+;;;
+;;; FIXME: Uh, but it isn't used for &KEY END things -- in fact, this
+;;; is only used in one place, in SUBSEQ.  Is it really necessary?  Is
+;;; it here so that we can actually go round seq.lisp decorating all
+;;; the sequence functions with extra checks?  -- CSR, 2002-11-01
+(define-condition end-too-large-error (type-error)
   ()
   (:report
    (lambda (condition stream)

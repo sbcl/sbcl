@@ -22,6 +22,13 @@
 
 (in-package "MOP-TEST")
 
+;;; Readers for Class Metaobjects (pp. 212--214 of AMOP)
+(defclass red-herring (forward-ref) ())
+
+(assert (null (sb-pcl:class-direct-slots (sb-pcl:find-class 'forward-ref))))
+(assert (null (sb-pcl:class-direct-default-initargs
+	       (sb-pcl:find-class 'forward-ref))))
+
 ;;; Readers for Generic Function Metaobjects (pp. 216--218 of AMOP)
 (defgeneric fn-with-odd-arg-precedence (a b c)
   (:argument-precedence-order b c a))

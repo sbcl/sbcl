@@ -326,5 +326,15 @@
     ;; the analogous type checking for MAP/%MAP.
     ))
 
+;;; ELT should signal an error of type TYPE-ERROR if its index
+;;; argument isn't a valid sequence index for sequence:
+(defun test-elt-signal (x)
+  (elt x 3))
+(multiple-value-bind (result error)
+    (ignore-errors (test-elt-signal "foo"))
+  (assert (null result))
+  (assert (typep error 'type-error)))
+(assert (eql (test-elt-signal "foob") #\b))
+
 ;;; success
 (quit :unix-status 104)
