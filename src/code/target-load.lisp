@@ -27,10 +27,10 @@
 
 (declaim (type (or pathname null) *load-truename* *load-pathname*))
 
-;;;; SLOLOAD
+;;;; LOAD-AS-SOURCE
 
 ;;; Load a text file.
-(defun sloload (stream verbose print)
+(defun load-as-source (stream verbose print)
   (do-load-verbose stream verbose)
   (do ((sexpr (read stream nil *eof-object*)
 	      (read stream nil *eof-object*)))
@@ -63,13 +63,13 @@
        (with-open-file (stream truename
 			       :direction :input
 			       :if-does-not-exist if-does-not-exist)
-	 (sloload stream verbose print)))
+	 (load-as-source stream verbose print)))
       (:binary
        (with-open-file (stream truename
 			       :direction :input
 			       :if-does-not-exist if-does-not-exist
 			       :element-type '(unsigned-byte 8))
-	 (fasload stream verbose print)))
+	 (load-as-fasl stream verbose print)))
       (t
        (let ((first-line (with-open-file (stream truename :direction :input)
 			   (read-line stream nil)))
@@ -183,20 +183,21 @@
 	;; *PACKAGE* to the values they held before loading the file."
 	(*package* (sane-package))
 	(*readtable* *readtable*)
-	;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST argument of
-	;; (MEMBER :ERROR NIL) type. ANSI constrains us to accept a generalized
-	;; boolean argument value for this externally-visible function, but the
-	;; internal functions still use the old convention.
+	;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST
+	;; argument of (MEMBER :ERROR NIL) type. ANSI constrains us to
+	;; accept a generalized boolean argument value for this
+	;; externally-visible function, but the internal functions
+	;; still use the old convention.
 	(internal-if-does-not-exist (if if-does-not-exist :error nil)))
-    ;; FIXME: This VALUES wrapper is inherited from CMU CL.
-    ;; Once SBCL gets function return type checking right, we can
-    ;; achieve a similar effect better by adding FTYPE declarations.
+    ;; FIXME: This VALUES wrapper is inherited from CMU CL. Once SBCL
+    ;; gets function return type checking right, we can achieve a
+    ;; similar effect better by adding FTYPE declarations.
     (values
      (if (streamp filespec)
 	 (if (or (equal (stream-element-type filespec)
 			'(unsigned-byte 8)))
-	     (fasload filespec verbose print)
-	     (sloload filespec verbose print))
+	     (load-as-fasl filespec verbose print)
+	     (load-as-source filespec verbose print))
 	 (let ((pn (merge-pathnames (pathname filespec)
 				    *default-pathname-defaults*)))
 	   (if (wild-pathname-p pn)
@@ -325,7 +326,8 @@
   (dolist (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol))))
 
-(declaim (ftype (function (string) sb!vm:word) foreign-symbol-address-as-integer))
+(declaim (ftype (function (string) sb!vm:word)
+		foreign-symbol-address-as-integer))
 (defun foreign-symbol-address-as-integer (foreign-symbol)
   (or (gethash foreign-symbol *static-foreign-symbols*)
       (gethash (concatenate 'simple-string
@@ -338,4 +340,5 @@
       (error "unknown foreign symbol: ~S" foreign-symbol)))
 
 (defun foreign-symbol-address (symbol)
-  (int-sap (foreign-symbol-address-as-integer (sb!vm:extern-alien-name symbol))))
+  (int-sap (foreign-symbol-address-as-integer
+	    (sb!vm:extern-alien-name symbol))))

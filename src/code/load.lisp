@@ -34,9 +34,9 @@
 ;;;   fasl file format, the value should not be "FASL FILE", which
 ;;;   is what CMU CL used for the same purpose.
 ;;; * Since its presence at the head of a file is used by LOAD to
-;;;   decide whether a file is to be fasloaded or sloloaded, the value
-;;;   should be something which can't legally appear at the head of a
-;;;   Lisp source file.
+;;;   decide whether a file is to be fasloaded or just loaded
+;;;   ordinarily (as source), the value should be something which
+;;;   can't legally appear at the head of a Lisp source file.
 ;;; * The value should not contain any line-terminating characters,
 ;;;   because they're hard to express portably and because the LOAD
 ;;;   code might reasonably use READ-LINE to get the value to compare
@@ -143,6 +143,7 @@
 	 (prog1
 	  (fast-read-u-integer ,n)
 	  (done-with-fast-read-byte)))))
+
 ;;; FIXME: This deserves a more descriptive name, and should probably
 ;;; be implemented as an ordinary function, not a macro.
 ;;;
@@ -155,9 +156,11 @@
 ;;; offset. We may need to have several, since LOAD can be called
 ;;; recursively.
 
-(defvar *free-fop-tables* (list (make-array 1000))
-  #!+sb-doc
-  "List of free fop tables for the fasloader.")
+;;; a list of free fop tables for the fasloader
+;;;
+;;; FIXME: Is it really a win to have this permanently bound?
+;;; Couldn't we just bind it on entry to LOAD-AS-FASL?
+(defvar *free-fop-tables* (list (make-array 1000)))
 
 ;;; the current fop table
 (defvar *current-fop-table*)
@@ -249,12 +252,12 @@
 		(progn ,@forms)
 		(setq *fop-stack-pointer* ,n-index)))))))
 
-;;;; FASLOAD
+;;;; LOAD-AS-FASL
 ;;;;
-;;;; Note: FASLOAD is used not only by LOAD, but also (after suitable
-;;;; modification of the fop table) in genesis. Therefore, it's needed
-;;;; not only in the target Lisp, but also in the cross-compilation
-;;;; host.
+;;;; Note: LOAD-AS-FASL is used not only by LOAD, but also (with
+;;;; suitable modification of the fop table) in GENESIS. Therefore,
+;;;; it's needed not only in the target Lisp, but also in the
+;;;; cross-compilation host.
 
 ;;; a helper function for LOAD-FASL-GROUP
 ;;;
@@ -316,11 +319,12 @@
 #!+sb-show
 (defvar *show-fops-p* nil)
 
-;;; a helper function for FASLOAD
+;;; a helper function for LOAD-AS-FASL
 ;;;
-;;; Return true if we successfully load a group from the stream, or NIL if EOF
-;;; was encountered while trying to read from the stream. Dispatch to the right
-;;; function for each fop. Special-case FOP-BYTE-PUSH since it is real common.
+;;; Return true if we successfully load a group from the stream, or
+;;; NIL if EOF was encountered while trying to read from the stream.
+;;; Dispatch to the right function for each fop. Special-case
+;;; FOP-BYTE-PUSH since it is real common.
 (defun load-fasl-group (stream)
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
@@ -369,7 +373,7 @@
 		      (svref *current-fop-table* (read-byte stream))))
 	      (funcall (the function (svref *fop-functions* byte))))))))))
 
-(defun fasload (stream verbose print)
+(defun load-as-fasl (stream verbose print)
   ;; KLUDGE: ANSI says it's good to do something with the :PRINT
   ;; argument to LOAD when we're fasloading a file, but currently we
   ;; don't. (CMU CL did, but implemented it in a non-ANSI way, and I

@@ -128,7 +128,7 @@
 ;;; Setting this variable to an (UNSIGNED-BYTE 32) value causes
 ;;; DUMP-FOP to use it as a counter and emit a FOP-NOP4 with the
 ;;; counter value before every ordinary fop. This can make it easier
-;;; to follow the progress of FASLOAD when
+;;; to follow the progress of LOAD-AS-FASL when
 ;;; debugging/testing/experimenting.
 #!+sb-show (defvar *fop-nop4-count* nil)
 #!+sb-show (declaim (type (or (unsigned-byte 32) null) *fop-nop4-count*))

@@ -96,7 +96,7 @@
 
 ;;; Setting this variable causes execution of a FOP-NOP4 to produce
 ;;; output to *DEBUG-IO*. This can be handy when trying to follow the
-;;; progress of FASLOAD.
+;;; progress of FASL loading.
 #!+sb-show
 (defvar *show-fop-nop4-p* nil)
 
@@ -180,8 +180,8 @@
 ;;;   (1) *LOAD-SYMBOL-BUFFER-SIZE* is redundant, should just be
 ;;;       (LENGTH *LOAD-SYMBOL-BUFFER*).
 ;;;   (2) *LOAD-SYMBOL-BUFFER* should not have a global value, but should
-;;;       be bound on entry to FASLOAD, and it should be renamed to
-;;;       *FASLOAD-SYMBOL-BUFFER*.
+;;;       be bound on entry to FASL loading, and it should be renamed to
+;;;       *FASL-SYMBOL-BUFFER*.
 
 (macrolet (;; FIXME: Should all this code really be duplicated inside
 	   ;; each fop? Perhaps it would be better for this shared
@@ -519,8 +519,9 @@
     ;;     (load-fresh-line)
     ;;     (prin1 result)
     ;;     (terpri))
-    ;; Unfortunately, this dependence on the *LOAD-PRINT* global variable is
-    ;; non-ANSI, so for now we've just punted printing in fasload.
+    ;; Unfortunately, this dependence on the *LOAD-PRINT* global
+    ;; variable is non-ANSI, so for now we've just punted printing in
+    ;; fasl loading.
     result))
 
 (define-fop (fop-eval-for-effect 54 nil)

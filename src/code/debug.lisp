@@ -260,7 +260,7 @@ Function and macro commands:
 	 :type (or sb!di:code-location sb!di:debug-function))
   ;; the breakpoint returned by sb!di:make-breakpoint
   (breakpoint (required-argument) :type sb!di:breakpoint)
-  ;; the function returned from sb!di:preprocess-for-eval. If result is
+  ;; the function returned from SB!DI:PREPROCESS-FOR-EVAL. If result is
   ;; non-NIL, drop into the debugger.
   (break #'identity :type function)
   ;; the function returned from sb!di:preprocess-for-eval. If result is

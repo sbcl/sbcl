@@ -583,14 +583,6 @@
 	  (internal-apply res nil '#()))
 	(internal-apply res nil '#()))))
 
-;;; Later this will probably be the same weird internal thing the compiler
-;;; makes to represent these things.
-(defun make-indirect-value-cell (value)
-  (list value))
-;;; FIXME: used only in this file, needn't be in runtime
-(defmacro indirect-value (value-cell)
-  `(car ,value-cell))
-
 ;;; This passes on a node's value appropriately, possibly returning from
 ;;; function to do so. When we are tail-p, don't push the value, return it on
 ;;; the system's actual call stack; when we blow out of function this way, we
@@ -638,7 +630,7 @@
 	(cond ((sb!c::leaf-refs var)
 	       (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
 		     (if (sb!c::lambda-var-indirect var)
-			 (make-indirect-value-cell (pop args))
+			 (sb!c::make-value-cell (pop args))
 			 (pop args))))
 	      (ignore-unused (pop args)))))
     (internal-apply-loop (sb!c::lambda-bind lambda) frame-ptr lambda args
@@ -852,15 +844,15 @@
     (let ((env (sb!c::node-environment node)))
       (cond ((not (eq (sb!c::lambda-environment (sb!c::lambda-var-home var))
                       env))
-	     (setf (indirect-value
-		    (svref closure
-			   (position var (sb!c::environment-closure env)
-				     :test #'eq)))
-		   value))
+	     (sb!c::value-cell-set
+              (svref closure
+                     (position var (sb!c::environment-closure env)
+                               :test #'eq))
+              value))
             ((sb!c::lambda-var-indirect var)
-	     (setf (indirect-value
-		    (eval-stack-local frame-ptr (sb!c::lambda-var-info var)))
-		   value))
+	     (sb!c::value-cell-set
+              (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
+              value))
             (t
 	     (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
 		   value))))))
@@ -952,7 +944,7 @@
 		     (position leaf (sb!c::environment-closure env)
 			       :test #'eq)))))
     (if (sb!c::lambda-var-indirect leaf)
-	(indirect-value temp)
+	(sb!c::value-cell-ref temp)
 	temp)))
 
 ;;; Compute a closure for a local call and for returned call'able
@@ -1084,7 +1076,7 @@
       (when (sb!c::leaf-refs v)
 	(setf (eval-stack-local frame-ptr (sb!c::lambda-var-info v))
 	      (if (sb!c::lambda-var-indirect v)
-		  (make-indirect-value-cell (pop args))
+		  (sb!c::make-value-cell (pop args))
 		  (pop args)))))))
 
 ;;; This is similar to STORE-LET-VARS, but the values for the locals
@@ -1101,7 +1093,7 @@
       (if (sb!c::leaf-refs v)
 	  (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info v))
 		(if (sb!c::lambda-var-indirect v)
-		    (make-indirect-value-cell (pop args))
+		    (sb!c::make-value-cell (pop args))
 		    (pop args)))
 	  (pop args)))))
 
@@ -1129,7 +1121,7 @@
 	(when (sb!c::leaf-refs v)
 	  (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info v))
 		(if (sb!c::lambda-var-indirect v)
-		    (make-indirect-value-cell (car remaining-args))
+		    (sb!c::make-value-cell (car remaining-args))
 		    (car remaining-args))))
 	(cdr remaining-args))
       args))

@@ -1784,7 +1784,7 @@
      (error "The fop ~S is not supported in cold load." ',name)))
 
 ;;; COLD-LOAD loads stuff into the core image being built by calling
-;;; FASLOAD with the fop function table rebound to a table of cold
+;;; LOAD-AS-FASL with the fop function table rebound to a table of cold
 ;;; loading functions.
 (defun cold-load (filename)
   #!+sb-doc
@@ -1795,7 +1795,7 @@
 				 (string filename)
 				 (pathname (namestring filename)))))
     (with-open-file (s filename :element-type '(unsigned-byte 8))
-      (fasload s nil nil))))
+      (load-as-fasl s nil nil))))
 
 ;;;; miscellaneous cold fops
 

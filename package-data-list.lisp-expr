@@ -671,6 +671,7 @@ retained, possibly temporariliy, because it might be used internally."
              "TYPE-BOUND-NUMBER"
              "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
              "PSXHASH"
+             "%BREAK"
 
              ;; ..and macros..
              "COLLECT"

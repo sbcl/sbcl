@@ -66,7 +66,7 @@
 
 ;;;; C routines that actually do all the work of establishing signal handlers
 (sb!alien:def-alien-routine ("install_handler" install-handler)
-			  sb!c-call:unsigned-long
+			    sb!c-call:unsigned-long
   (signal sb!c-call:int)
   (handler sb!c-call:unsigned-long))
 
@@ -96,6 +96,13 @@
 ;;;;
 ;;;; Most of these just call ERROR to report the presence of the signal.
 
+;;; SIGINT is handled like BREAK, except that ANSI BREAK ignores
+;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
+;;; SIGINT in --noprogrammer mode will cleanly terminate the system
+;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
+(defun sigint-%break (format-string &rest format-arguments)
+  (apply #'%break 'sigint format-string format-arguments))
+
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro define-signal-handler (name
 					 what
@@ -108,7 +115,7 @@
 		  (with-alien ((context (* os-context-t) context))
 		    (sap-int (sb!vm:context-pc context)))))))
 
-(define-signal-handler sigint-handler "interrupted" break)
+(define-signal-handler sigint-handler "interrupted" sigint-%break)
 (define-signal-handler sigill-handler "illegal instruction")
 (define-signal-handler sigtrap-handler "breakpoint/trap")
 (define-signal-handler sigiot-handler "SIGIOT")
@@ -142,7 +149,7 @@
   (enable-interrupt :sigsys #'sigsys-handler)
   (enable-interrupt :sigpipe #'sigpipe-handler)
   (enable-interrupt :sigalrm #'sigalrm-handler)
-  nil)
+  (values))
 
 ;;; stale code which I'm insufficiently motivated to test -- WHN 19990714
 #|

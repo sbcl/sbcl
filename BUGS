@@ -890,17 +890,47 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 96:
   The TRACE facility can't be used on some kinds of functions.
-  Basically, the breakpoint facility wasn incompletely implemented
-  in the X86 port of CMU CL, and we haven't fixed it in SBCL.
+  (Basically, the breakpoint facility was incompletely implemented
+  in the X86 port of CMU CL, and hasn't been fixed in SBCL.)
 
-97:
-  FRESH-LINE doesn't seem to work properly within pretty-printed
-  output. E.g. 
-    "~@<unhandled CONDITION (of type ~S): ~2I~_~A~:>~2%"
-  called on a CONDITION whose printer does
-    "~&~@<error in function ~S: ~3I~:_~?~:>"
-  gives two newlines between "unhandled CONDITION" and "error", when
-  (it at least seems as though) correct behavior would be to give one.
+98:
+  In sbcl-0.6.11.41 (and in all earlier SBCL, and in CMU
+  CL), out-of-line structure slot setters are horribly inefficient
+  whenever the type of the slot is declared, because out-of-line
+  structure slot setters are implemented as closures to save space,
+  so the compiler doesn't compile the type test into code, but
+  instead just saves the type in a lexical closure and interprets it
+  at runtime.
+    A proper solution involves deciding whether it's really worth
+  saving space by implementing structure slot accessors as closures.
+  (If it's not worth it, the problem vanishes automatically. If it
+  is worth it, there are hacks we could use to force type tests to
+  be compiled anyway, and even shared. E.g. we could implement
+  an EQUAL hash table mapping from types to compiled type tests, 
+  and save the appropriate compiled type test as part of each lexical
+  closure; or we could make the lexical closures be placeholders
+  which overwrite their old definition as a lexical closure with
+  a new compiled definition the first time that they're called.)
+    As a workaround for the problem, #'(SETF FOO) expressions can
+  be replaced with (EFFICIENT-SETF-FUNCTION FOO), where
+(defmacro efficient-setf-function (place-function-name)
+  (or #+sbcl (and (sb-impl::info :function :accessor-for place-function-name)
+		  ;; a workaround for the problem, encouraging the
+		  ;; inline expansion of the structure accessor, so
+		  ;; that the compiler can optimize its type test
+		  (let ((new-value (gensym "NEW-VALUE-"))
+                        (structure-value (gensym "STRUCTURE-VALUE-")))
+		    `(lambda (,new-value ,structure-value)
+		       (setf (,place-function-name ,structure-value)
+			     ,new-value))))
+      ;; no problem, can just use the ordinary expansion
+      `(function (setf ,place-function-name))))
+
+99:
+  DESCRIBE interacts poorly with *PRINT-CIRCLE*, e.g. the output from 
+    (let ((*print-circle* t)) (describe (make-hash-table)))
+  is weird. (This is likely a pretty-printer problem which happens to
+  be exercised by DESCRIBE, not actually a DESCRIBE problem.)
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

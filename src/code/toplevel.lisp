@@ -485,7 +485,7 @@
 	   (quit :unix-status 1 :recklessly-p recklessly-p)))
     ;; This HANDLER-CASE is here mostly to stop output immediately
     ;; (and fall through to QUIT) when there's an I/O error. Thus,
-    ;; when we're run under a Perl script or something, we can die
+    ;; when we're run under a shell script or something, we can die
     ;; cleanly when the script dies (and our pipes are cut), instead
     ;; of falling into ldb or something messy like that.
     (handler-case
@@ -501,12 +501,29 @@
 	  ;; (Where to truncate the BACKTRACE is of course arbitrary, but
 	  ;; it seems as though we should at least truncate it somewhere.)
 	  (sb!debug:backtrace 128 *error-output*)
-	  (finish-output *error-output*)
 	  (format *error-output*
 		  "~%unhandled condition in --noprogrammer mode, quitting~%")
+	  (finish-output *error-output*)
 	  (failure-quit))
       (condition ()
-        (%primitive print "Argh! error within --noprogrammer error handling")
+	;; We IGNORE-ERRORS here because even %PRIMITIVE PRINT can
+	;; fail when our output streams are blown away, as e.g. when
+	;; we're running under a Unix shell script and it dies somehow
+	;; (e.g. because of a SIGINT). In that case, we might as well
+	;; just give it up for a bad job, and stop trying to notify
+	;; the user of anything.
+        ;;
+        ;; Actually, the only way I've run across to exercise the
+	;; problem is to have more than one layer of shell script.
+	;; I have a shell script which does
+	;;   time nice -10 sh make.sh "$1" 2>&1 | tee make.tmp
+	;; and the problem occurs when I interrupt this with Ctrl-C
+	;; under Linux 2.2.14-5.0 and GNU bash, version 1.14.7(1).
+        ;; I haven't figured out whether it's bash, time, tee, Linux, or
+	;; what that is responsible, but that it's possible at all
+	;; means that we should IGNORE-ERRORS here. -- WHN 2001-04-24
+        (ignore-errors
+         (%primitive print "Argh! error within --noprogrammer error handling"))
 	(failure-quit :recklessly-p t)))))
 
 ;;; a convenient way to get into the assembly-level debugger

@@ -104,10 +104,10 @@ By default, a Common Lisp system tries to ask the programmer for help
 when it gets in trouble (by printing a debug prompt on *DEBUG-IO*).
 However, this is not useful behavior for a system running with no
 programmer available, and this option tries to set up more appropriate
-behavior for that situation. Thus we set *DEBUG-IO* to send its output
-to *ERROR-OUTPUT*, and to raise an error if any input is requested
-from it, and we set *DEBUGGER-HOOK* to output a backtrace, then exit
-the process with a failure code.
+behavior for that situation. Thus we set *DEBUG-IO* to send its
+output to *ERROR-OUTPUT*, and to raise an error if any input is
+requested from it; and we set *DEBUGGER-HOOK* to output a backtrace,
+then exit the process with a failure code.
 .PP
 
 Regardless of the order in which --sysinit, --userinit, and --eval

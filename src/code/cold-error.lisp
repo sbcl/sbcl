@@ -111,17 +111,26 @@
 	  (invoke-debugger condition)))))
   nil)
 
+;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that
+;;; we can use it in system code (e.g. in SIGINT handling) without
+;;; messing up --noprogrammer mode (which works by setting
+;;; *DEBUGGER-HOOK*)
+(defun %break (what &optional (datum "break") &rest arguments)
+  ;; FIXME: Do we really want INFINITE-ERROR-PROTECT in BREAKish stuff?
+  (sb!kernel:infinite-error-protect
+    (with-simple-restart (continue "Return from ~S." what)
+      (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+	(invoke-debugger
+	 (coerce-to-condition datum arguments 'simple-condition what)))))
+  nil)
+
 (defun break (&optional (datum "break") &rest arguments)
   #!+sb-doc
   "Print a message and invoke the debugger without allowing any possibility
    of condition handling occurring."
-  (sb!kernel:infinite-error-protect
-    (with-simple-restart (continue "Return from BREAK.")
-      (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
-	(invoke-debugger
-	 (coerce-to-condition datum arguments 'simple-condition 'break)))))
-  nil)
-
+  (let ((*debugger-hook* nil)) ; as specifically required by ANSI
+    (apply #'%break 'break datum arguments)))
+	    
 (defun warn (datum &rest arguments)
   #!+sb-doc
   "Warn about a situation by signalling a condition formed by DATUM and
