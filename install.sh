@@ -2,7 +2,7 @@
 
 # Install SBCL files into the usual places.
 
-function ensure_dirs () 
+ensure_dirs () 
 {
     for j in $*; do 
 	test -d $j || mkdir $j
@@ -24,9 +24,9 @@ ensure_dirs $INSTALL_ROOT $INSTALL_ROOT/bin $INSTALL_ROOT/lib \
     $INSTALL_ROOT/man $INSTALL_ROOT/man/man1 \
     $SBCL_HOME $SBCL_HOME/systems
 
-test -a $INSTALL_ROOT/bin/sbcl && \
+test -e $INSTALL_ROOT/bin/sbcl && \
     cp $INSTALL_ROOT/bin/sbcl $INSTALL_ROOT/bin/sbcl.old
-test -a $SBCL_HOME/sbcl.core && \
+test -e $SBCL_HOME/sbcl.core && \
     cp $SBCL_HOME/sbcl.core $SBCL_HOME/sbcl.core.old
 
 cp src/runtime/sbcl $INSTALL_ROOT/bin/
@@ -38,8 +38,10 @@ cp doc/sbcl.1 $INSTALL_ROOT/man/man1/
 SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
+
+gnumake=$(GNUMAKE:-gmake}
 for i in contrib/*; do
     test -d $i || continue;
     export INSTALL_DIR=$SBCL_HOME/`basename $i `
-    make -C $i test && ensure_dirs $INSTALL_DIR && make -C $i install
+    $gnumake -C $i test && ensure_dirs $INSTALL_DIR && make -C $i install
 done
