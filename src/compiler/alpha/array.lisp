@@ -31,7 +31,7 @@
     (inst addq rank (fixnumize (1- array-dimensions-offset)) header)
     (inst sll header n-widetag-bits header)
     (inst bis header type header)
-    (inst srl header 2 header)
+    (inst srl header n-fixnum-tag-bits header)
     (pseudo-atomic ()
       (inst bis alloc-tn other-pointer-lowtag result)
       (storew header result 0 other-pointer-lowtag)
@@ -58,7 +58,7 @@
     (loadw temp x 0 other-pointer-lowtag)
     (inst sra temp n-widetag-bits temp)
     (inst subq temp (1- array-dimensions-offset) temp)
-    (inst sll temp 2 res)))
+    (inst sll temp n-fixnum-tag-bits res)))
 
 ;;;; bounds checking routine
 
@@ -128,7 +128,7 @@
 				temp result)
                     (:generator 20
                                 (inst srl index ,bit-shift temp)
-                                (inst sll temp 2 temp)
+                                (inst sll temp n-fixnum-tag-bits temp)
                                 (inst addq object temp lip)
                                 (inst ldl result
                                       (- (* vector-data-offset n-word-bytes)
@@ -140,7 +140,7 @@
 					    ,(1- (integer-length bits)) temp)))
                                 (inst srl result temp result)
                                 (inst and result ,(1- (ash 1 bits)) result)
-                                (inst sll result 2 value)))
+                                (inst sll result n-fixnum-tag-bits value)))
                   (define-vop (,(symbolicate 'data-vector-ref-c/ type))
                     (:translate data-vector-ref)
                     (:policy :fast-safe)
@@ -184,7 +184,7 @@
 				      :from (:argument 1)) shift)
                     (:generator 25
                                 (inst srl index ,bit-shift temp)
-                                (inst sll temp 2 temp)
+                                (inst sll temp n-fixnum-tag-bits temp)
                                 (inst addq object temp lip)
                                 (inst ldl old
                                       (- (* vector-data-offset n-word-bytes)

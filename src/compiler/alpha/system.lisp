@@ -41,7 +41,7 @@
     (inst blbs object done)
 
     ;; Pick off fixnums.
-    (inst and object 3 result)
+    (inst and object fixnum-tag-mask result)
     (inst beq result done)
 
     ;; Must be an other immediate.
@@ -151,8 +151,8 @@
        (inst sll val n-widetag-bits temp)
        (inst bis temp (tn-value type) res))
       (t
-       (inst sra type 2 temp)
-       (inst sll val (- n-widetag-bits 2) res)
+       (inst sra type n-fixnum-tag-bits temp)
+       (inst sll val (- n-widetag-bits n-fixnum-tag-bits) res)
        (inst bis res temp res)))))
 
 

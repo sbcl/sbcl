@@ -151,7 +151,7 @@
   (:arg-types tagged-num)
   (:note "fixnum untagging")
   (:generator 1
-    (inst sra x 2 y)))
+    (inst sra x n-fixnum-tag-bits y)))
 ;;;
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
@@ -175,8 +175,8 @@
   (:temporary (:sc non-descriptor-reg) header)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 3
-    (inst and x 3 temp)
-    (inst sra x 2 y)
+    (inst and x fixnum-tag-mask temp)
+    (inst sra x n-fixnum-tag-bits y)
     (inst beq temp done)
 
     (loadw header x 0 other-pointer-lowtag)
@@ -206,7 +206,7 @@
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (inst sll x 2 y)))
+    (inst sll x n-fixnum-tag-bits y)))
 ;;;
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
@@ -221,8 +221,8 @@
   (:note "signed word to integer coercion")
   (:generator 18
     (move arg x)
-    (inst sra x 29 temp)
-    (inst sll x 2 y)
+    (inst sra x n-positive-fixnum-bits temp)
+    (inst sll x n-fixnum-tag-bits y)
     (inst beq temp done)
     (inst not temp temp)
     (inst beq temp done)
@@ -258,8 +258,8 @@
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move arg x)
-    (inst srl x 29 temp)
-    (inst sll x 2 y)
+    (inst srl x n-positive-fixnum-bits temp)
+    (inst sll x n-fixnum-tag-bits y)
     (inst beq temp done)
       
     (inst li 3 temp)

@@ -83,7 +83,7 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst sll ch 2 res)))
+    (inst sll ch n-fixnum-tag-bits res)))
 
 (define-vop (code-char)
   (:translate code-char)
@@ -93,7 +93,7 @@
   (:results (res :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 1
-    (inst srl code 2 res)))
+    (inst srl code n-fixnum-tag-bits res)))
 
 ;;;; comparison of BASE-CHARs
 

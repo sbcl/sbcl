@@ -13,7 +13,7 @@
 
 (defun %test-fixnum (value target not-p &key temp)
   (assemble ()
-    (inst and value 3 temp)
+    (inst and value fixnum-tag-mask temp)
     (if not-p
         (inst bne temp target)
         (inst beq temp target))))
@@ -21,7 +21,7 @@
 (defun %test-fixnum-and-headers (value target not-p headers &key temp)
   (let ((drop-through (gen-label)))
     (assemble ()
-      (inst and value 3 temp)
+      (inst and value fixnum-tag-mask temp)
       (inst beq temp (if not-p drop-through target)))
     (%test-headers value target not-p nil headers
 		   :drop-through drop-through :temp temp)))
@@ -137,7 +137,7 @@
 	  (values not-target target)
 	  (values target not-target))
     (assemble ()
-      (inst and value 3 temp)
+      (inst and value fixnum-tag-mask temp)
       (inst beq temp yep)
       (inst and value lowtag-mask temp)
       (inst xor temp other-pointer-lowtag temp)
@@ -177,7 +177,7 @@
 			   (values target not-target))
     (assemble ()
       ;; Is it a fixnum?
-      (inst and value 3 temp1)
+      (inst and value fixnum-tag-mask temp1)
       (inst move value temp)
       (inst beq temp1 fixnum)
 
