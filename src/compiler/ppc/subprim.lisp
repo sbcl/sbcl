@@ -31,11 +31,11 @@
       (inst cmpw ptr null-tn)
       (inst beq done)
 
-      (test-type ptr temp not-list t sb!vm:list-pointer-lowtag)
+      (test-type ptr not-list t (list-pointer-lowtag) :temp temp)
 
-      (loadw ptr ptr sb!vm:cons-cdr-slot sb!vm:list-pointer-lowtag)
+      (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst addi count count (fixnumize 1))
-      (test-type ptr temp loop nil sb!vm:list-pointer-lowtag)
+      (test-type ptr loop nil (list-pointer-lowtag) :temp temp)
 
       (cerror-call vop done object-not-list-error ptr)
 

@@ -1,7 +1,15 @@
-;;; 
+;;;; a bunch of handy macros for the PPC
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
 
 ;;; Instruction-like macros.
 
@@ -156,6 +164,8 @@
 ;;; If NOT-P is true, invert the test.  Jumping to NOT-TARGET is the same
 ;;; as falling out the bottom.
 ;;; 
+
+#|
 (defun gen-range-test (reg target not-target not-p min seperation max values)
   (let ((tests nil)
 	(start nil)
@@ -335,7 +345,7 @@
 					 lowtags immediates headers
 					 function-p)))))
 	 (emit-label ,not-target)))))
-
+|#
 
 ;;;; Error Code
 

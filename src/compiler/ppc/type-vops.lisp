@@ -1,11 +1,83 @@
+;;;; type testing and checking VOPs for the PPC VM
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
 
-;;;; Simple type checking and testing:
-;;;
-;;;    These types are represented by a single type code, so are easily
-;;; open-coded as a mask and compare.
+(defun %test-fixnum (value target not-p &key temp)
+  (assemble ()
+    ;; FIXME: again, this 3 should be FIXNUM-MASK
+    (inst andi. temp value 3)
+    (inst b? (if not-p :ne :eq) target)))
 
+(defun %test-fixnum-and-headers (value target not-p headers &key temp)
+  (let ((drop-through (gen-label)))
+    (assemble ()
+      (inst andi. temp value 3)
+      (inst beq (if not-p drop-through target)))
+    (%test-headers value target not-p nil headers
+		   :drop-through drop-through :temp temp)))
+
+(defun %test-immediate (value target not-p immediate &key temp)
+  (assemble ()
+    (inst andi. temp value widetag-mask)
+    (inst cmpwi temp immediate)
+    (inst b? (if not-p :ne :eq) target)))
+
+(defun %test-lowtag (value target not-p lowtag &key temp)
+  (assemble ()
+    (inst andi. temp value lowtag-mask)
+    (inst cmpwi temp lowtag)
+    (inst b? (if not-p :ne :eq) target)))
+
+(defun %test-lowtag-and-headers (value target not-p lowtag function-p headers
+                                 &key temp)
+  (let ((drop-through (gen-label)))
+    (%test-lowtag value (if not-p drop-through target) not-p lowtag
+                  :temp temp)
+    (%test-headers value target not-p function-p headers
+                   :temp temp :drop-through drop-through)))
+
+(defun %test-headers (value target not-p function-p headers
+		      &key temp (drop-through (gen-label)))
+    (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
+    (multiple-value-bind (when-true when-false)
+        (if not-p
+            (values drop-through target)
+            (values target drop-through))
+      (assemble ()
+        (%test-lowtag value when-false t lowtag :temp temp)
+        (load-type temp value (- lowtag))
+        (do ((remaining headers (cdr remaining)))
+            ((null remaining))
+          (let ((header (car remaining))
+                (last (null (cdr remaining))))
+            (cond
+              ((atom header)
+	       (inst cmpwi temp header)
+               (if last
+                   (inst b? (if not-p :ne :eq) target)
+                   (inst beq when-true)))
+              (t
+               (let ((start (car header))
+                     (end (cdr header)))
+                 (unless (= start bignum-widetag)
+                   (inst cmpwi temp start)
+                   (inst blt when-false))
+                 (inst cmpwi temp end)
+                 (if last
+                     (inst b? (if not-p :gt :le) target)
+                     (inst ble when-true)))))))
+        (emit-label drop-through)))))
+
+;;; Simple type checking and testing:
 (define-vop (check-type)
   (:args (value :target result :scs (any-reg descriptor-reg)))
   (:results (result :scs (any-reg descriptor-reg)))
@@ -20,30 +92,46 @@
   (:policy :fast-safe)
   (:temporary (:scs (non-descriptor-reg)) temp))
 
-(eval-when (:compile-toplevel :load-toplevel)
-  (defun cost-to-test-types (type-codes)
-    (+ (* 2 (length type-codes))
-       (if (> (apply #'max type-codes) lowtag-limit) 7 2))))
+(defun cost-to-test-types (type-codes)
+  (+ (* 2 (length type-codes))
+     (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
   
-(macrolet ((def-type-vops (pred-name check-name ptype error-code
-				     &rest type-codes)
-	       (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
+(defmacro !define-type-vops (pred-name check-name ptype error-code
+			     (&rest type-codes)
+			     ;; KLUDGE: ideally, the compiler could
+			     ;; derive that it can use the sneaky trap
+			     ;; twice mechanism itself.  However, one
+			     ;; thing at a time...
+			     &key mask &allow-other-keys)
+  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
     `(progn
        ,@(when pred-name
-	   `((define-vop (,pred-name type-predicate)
+  	   `((define-vop (,pred-name type-predicate)
 	       (:translate ,pred-name)
 	       (:generator ,cost
-		 (test-type value temp target not-p ,@type-codes)))))
+		 (test-type value target not-p (,@type-codes) :temp temp)))))
        ,@(when check-name
 	   `((define-vop (,check-name check-type)
 	       (:generator ,cost
-		 (let ((err-lab
-			(generate-error-code vop ,error-code value)))
-		   (test-type value temp err-lab t ,@type-codes)
-		   (move result value))))))
+		 ,@(if mask
+		       `((inst andi. temp value ,mask)
+			 (inst twi 0 value (error-number-or-lose ',error-code))
+			 (inst twi :ne temp ,@(if ;; KLUDGE: At
+					          ;; present, MASK is
+					          ;; 3 or LOWTAG-MASK
+					          (eql mask 3)
+						  ;; KLUDGE
+						  `(0)
+						  type-codes))
+			 (move result value))
+		       `((let ((err-lab
+				(generate-error-code vop ,error-code value)))
+			   (test-type value err-lab t (,@type-codes) :temp temp)
+			   (move result value))))))))
        ,@(when ptype
-	   `((primitive-type-vop ,check-name (:check) ,ptype)))))))
+	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
 
+#|
   (def-type-vops fixnump nil nil object-not-fixnum-error
 		 sb!vm:even-fixnum-lowtag sb!vm:odd-fixnum-lowtag)
   (define-vop (check-fixnum check-type)
@@ -289,7 +377,7 @@
 (def-type-vops realp check-real nil object-not-real-error
   sb!vm:even-fixnum-lowtag sb!vm:odd-fixnum-lowtag sb!vm:ratio-widetag sb!vm:bignum-widetag
   sb!vm:single-float-widetag sb!vm:double-float-widetag))
-
+|#
 
 ;;;; Other integer ranges.
 
@@ -307,10 +395,10 @@
 	      (values target not-target))
 	(inst andi. temp value #x3)
 	(inst beq yep)
-	(test-type value temp nope t sb!vm:other-pointer-lowtag)
-	(loadw temp value 0 sb!vm:other-pointer-lowtag)
-	(inst cmpwi temp (+ (ash 1 sb!vm:n-widetag-bits)
-			  sb!vm:bignum-widetag))
+	(test-type value nope t (other-pointer-lowtag) :temp temp)
+	(loadw temp value 0 other-pointer-lowtag)
+	(inst cmpwi temp (+ (ash 1 n-widetag-bits)
+			  bignum-widetag))
 	(inst b? (if not-p :ne :eq) target)
 	(emit-label not-target)))))
 
@@ -320,9 +408,9 @@
 	  (yep (gen-label)))
       (inst andi. temp value #x3)
       (inst beq yep)
-      (test-type value temp nope t sb!vm:other-pointer-lowtag)
-      (loadw temp value 0 sb!vm:other-pointer-lowtag)
-      (inst cmpwi temp (+ (ash 1 sb!vm:n-widetag-bits) sb!vm:bignum-widetag))
+      (test-type value nope t (other-pointer-lowtag) :temp temp)
+      (loadw temp value 0 other-pointer-lowtag)
+      (inst cmpwi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst bne nope)
       (emit-label yep)
       (move result value))))
@@ -349,17 +437,17 @@
         (inst beq fixnum)
 
 	;; If not, is it an other pointer?
-	(test-type value temp nope t sb!vm:other-pointer-lowtag)
+	(test-type value nope t (other-pointer-lowtag) :temp temp)
 	;; Get the header.
-	(loadw temp value 0 sb!vm:other-pointer-lowtag)
+	(loadw temp value 0 other-pointer-lowtag)
 	;; Is it one?
-	(inst cmpwi temp (+ (ash 1 sb!vm:n-widetag-bits) sb!vm:bignum-widetag))
+	(inst cmpwi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
 	(inst beq single-word)
 	;; If it's other than two, we can't be an (unsigned-byte 32)
-	(inst cmpwi temp (+ (ash 2 sb!vm:n-widetag-bits) sb!vm:bignum-widetag))
+	(inst cmpwi temp (+ (ash 2 n-widetag-bits) bignum-widetag))
 	(inst bne nope)
 	;; Get the second digit.
-	(loadw temp value (1+ sb!vm:bignum-digits-offset) sb!vm:other-pointer-lowtag)
+	(loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
 	;; All zeros, its an (unsigned-byte 32).
 	(inst cmpwi temp 0)
 	(inst beq yep)
@@ -368,7 +456,7 @@
 	
 	(emit-label single-word)
 	;; Get the single digit.
-	(loadw temp value sb!vm:bignum-digits-offset sb!vm:other-pointer-lowtag)
+	(loadw temp value bignum-digits-offset other-pointer-lowtag)
 	(inst cmpwi :cr1 temp 0)
 
 	;; positive implies (unsigned-byte 32).
@@ -390,17 +478,17 @@
       (inst beq fixnum)
 
       ;; If not, is it an other pointer?
-      (test-type value temp nope t sb!vm:other-pointer-lowtag)
+      (test-type value nope t (other-pointer-lowtag) :temp temp)
       ;; Get the number of digits.
-      (loadw temp value 0 sb!vm:other-pointer-lowtag)
+      (loadw temp value 0 other-pointer-lowtag)
       ;; Is it one?
-      (inst cmpwi temp (+ (ash 1 sb!vm:n-widetag-bits) sb!vm:bignum-widetag))
+      (inst cmpwi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst beq single-word)
       ;; If it's other than two, we can't be an (unsigned-byte 32)
-      (inst cmpwi temp (+ (ash 2 sb!vm:n-widetag-bits) sb!vm:bignum-widetag))
+      (inst cmpwi temp (+ (ash 2 n-widetag-bits) bignum-widetag))
       (inst bne nope)
       ;; Get the second digit.
-      (loadw temp value (1+ sb!vm:bignum-digits-offset) sb!vm:other-pointer-lowtag)
+      (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
       (inst cmpwi temp 0)
       (inst beq yep)
@@ -409,7 +497,7 @@
       
       (emit-label single-word)
       ;; Get the single digit.
-      (loadw temp value sb!vm:bignum-digits-offset sb!vm:other-pointer-lowtag)
+      (loadw temp value bignum-digits-offset other-pointer-lowtag)
       ;; positive implies (unsigned-byte 32).
       (inst cmpwi :cr1 temp 0)
       
@@ -434,7 +522,7 @@
 	   (is-symbol-label (if not-p drop-thru target)))
       (inst cmpw value null-tn)
       (inst beq is-symbol-label)
-      (test-type value temp target not-p sb!vm:symbol-header-widetag)
+      (test-type value target not-p (symbol-header-widetag) :temp temp)
       (emit-label drop-thru))))
 
 (define-vop (check-symbol check-type)
@@ -443,7 +531,7 @@
 	  (error (generate-error-code vop object-not-symbol-error value)))
       (inst cmpw value null-tn)
       (inst beq drop-thru)
-      (test-type value temp error t sb!vm:symbol-header-widetag)
+      (test-type value error t (symbol-header-widetag) :temp temp)
       (emit-label drop-thru)
       (move result value))))
   
@@ -454,7 +542,7 @@
 	   (is-not-cons-label (if not-p target drop-thru)))
       (inst cmpw value null-tn)
       (inst beq is-not-cons-label)
-      (test-type value temp target not-p sb!vm:list-pointer-lowtag)
+      (test-type value target not-p (list-pointer-lowtag) :temp temp)
       (emit-label drop-thru))))
 
 (define-vop (check-cons check-type)
@@ -462,6 +550,6 @@
     (let ((error (generate-error-code vop object-not-cons-error value)))
       (inst cmpw value null-tn)
       (inst beq error)
-      (test-type value temp error t sb!vm:list-pointer-lowtag)
+      (test-type value error t (list-pointer-lowtag) :temp temp)
       (move result value))))
 

@@ -3,16 +3,22 @@
 (!define-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
   (even-fixnum-lowtag odd-fixnum-lowtag)
   ;; we can save a register on the x86.
-  :variant simple)
+  :variant simple
+  ;; we can save a couple of instructions and a branch on the ppc.
+  ;; FIXME: make this be FIXNUM-MASK
+  :mask 3)
 
 (!define-type-vops functionp check-fun function object-not-fun-error
-  (fun-pointer-lowtag))
+  (fun-pointer-lowtag)
+  :mask lowtag-mask)
 
 (!define-type-vops listp check-list list object-not-list-error
-  (list-pointer-lowtag))
+  (list-pointer-lowtag)
+  :mask lowtag-mask)
 
 (!define-type-vops %instancep check-instance instance object-not-instance-error
-  (instance-pointer-lowtag))
+  (instance-pointer-lowtag)
+  :mask lowtag-mask)
 
 (!define-type-vops bignump check-bignum bignum object-not-bignum-error
   (bignum-widetag))

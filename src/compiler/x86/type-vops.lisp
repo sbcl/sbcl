@@ -145,7 +145,7 @@
 
 (defmacro !define-type-vops (pred-name check-name ptype error-code
 			     (&rest type-codes)
-			     &key (variant nil variant-p))
+			     &key (variant nil variant-p) &allow-other-keys)
   ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
   ;; expansion?
   (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))

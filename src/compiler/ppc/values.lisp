@@ -28,7 +28,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
     (inst mr start csp-tn)
-    (inst addi csp-tn csp-tn (* nvals sb!vm:n-word-bytes))
+    (inst addi csp-tn csp-tn (* nvals n-word-bytes))
     (do ((val vals (tn-ref-across val))
 	 (i 0 (1+ i)))
 	((null val))
@@ -64,12 +64,12 @@
 
       (emit-label loop)
       (inst cmpw list null-tn)
-      (loadw temp list sb!vm:cons-car-slot sb!vm:list-pointer-lowtag)
+      (loadw temp list cons-car-slot list-pointer-lowtag)
       (inst beq done)
-      (loadw list list sb!vm:cons-cdr-slot sb!vm:list-pointer-lowtag)
-      (inst addi csp-tn csp-tn sb!vm:n-word-bytes)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst addi csp-tn csp-tn n-word-bytes)
       (storew temp csp-tn -1)
-      (test-type list ndescr loop nil sb!vm:list-pointer-lowtag)
+      (test-type list loop nil (list-pointer-lowtag) :temp ndescr)
       (error-call vop bogus-arg-to-values-list-error list)
 
       (emit-label done)
