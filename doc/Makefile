@@ -1,8 +1,10 @@
+# Makefile for SBCL document generation
+
 DOCFILE_BASE_DEFAULT:=user-manual
 DOCFILE_EXT_DEFAULT:=xml
 
-
-# Standard docfile processing
+# Standard docfile processing as copied from UFFI
+# Placed into public domain by author Kevin Rosenberg
 
 DEBIAN=$(shell expr "`cat /etc/issue`" : '.*Debian.*')
 SUSE=$(shell expr "`cat /etc/issue`" : '.*SuSE.*')
