@@ -63,21 +63,24 @@
 	 ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
 	 (nil #:mu 0 simple-array-nil
 	      :complex-typecode #.sb!vm:complex-vector-nil-widetag
-	      :importance -3)
+	      :importance 0)
 	 (base-char ,(code-char 0) 8 simple-base-string
 		    ;; (SIMPLE-BASE-STRINGs are stored with an extra
 		    ;; trailing #\NULL for convenience in calling out
 		    ;; to C.)
 		    :n-pad-elements 1
 	            :complex-typecode #.sb!vm:complex-base-string-widetag
-	            :importance 2)
-	 (single-float 0.0f0 32 simple-array-single-float)
-	 (double-float 0.0d0 64 simple-array-double-float)
+	            :importance 17)
+	 (single-float 0.0f0 32 simple-array-single-float
+	  :importance 6)
+	 (double-float 0.0d0 64 simple-array-double-float
+	  :importance 5)
 	 #!+long-float
-	 (long-float 0.0l0 #!+x86 96 #!+sparc 128 simple-array-long-float)
+	 (long-float 0.0l0 #!+x86 96 #!+sparc 128 simple-array-long-float
+	  :importance 4)
 	 (bit 0 1 simple-bit-vector
 	      :complex-typecode #.sb!vm:complex-bit-vector-widetag
-	      :importance 1)
+	      :importance 16)
 	 ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
 	 ;; before their SIGNED-BYTE partners is significant in the
 	 ;; implementation of the compiler; some of the cross-compiler
@@ -88,27 +91,37 @@
 	 ;; not careful we could get the wrong specialized array when
 	 ;; we try to FIND-IF, below. -- CSR, 2002-07-08
 	 ((unsigned-byte 2) 0 2 simple-array-unsigned-byte-2
-	                    :importance -2)
+	                    :importance 15)
 	 ((unsigned-byte 4) 0 4 simple-array-unsigned-byte-4
-	                    :importance -1)
-	 ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8)
-	 ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16)
-	 ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32)
-	 ((signed-byte 8) 0 8 simple-array-signed-byte-8)
-	 ((signed-byte 16) 0 16 simple-array-signed-byte-16)
+	                    :importance 14)
+	 ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8
+	  :importance 13)
+	 ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16
+	  :importance 12)
+	 ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32
+	  :importance 11)
+	 ((signed-byte 8) 0 8 simple-array-signed-byte-8
+	  :importance 10)
+	 ((signed-byte 16) 0 16 simple-array-signed-byte-16
+	  :importance 9)
 	 ;; KLUDGE: See the comment in PRIMITIVE-TYPE-AUX,
 	 ;; compiler/generic/primtype.lisp, for why this is FIXNUM and
 	 ;; not (SIGNED-BYTE 30)
-	 (fixnum 0 32 simple-array-signed-byte-30)
-	 ((signed-byte 32) 0 32 simple-array-signed-byte-32)
+	 (fixnum 0 32 simple-array-signed-byte-30
+	  :importance 8)
+	 ((signed-byte 32) 0 32 simple-array-signed-byte-32
+	  :importance 7)
 	 ((complex single-float) #C(0.0f0 0.0f0) 64
-	  simple-array-complex-single-float)
+	  simple-array-complex-single-float
+	  :importance 3)
 	 ((complex double-float) #C(0.0d0 0.0d0) 128
-	  simple-array-complex-double-float)
+	  simple-array-complex-double-float
+	  :importance 2)
 	 #!+long-float
 	 ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
-	  simple-array-complex-long-float)
-	 (t 0 32 simple-vector :importance 3))))
+	  simple-array-complex-long-float
+	  :importance 1)
+	 (t 0 32 simple-vector :importance 18))))
 
 (defvar sb!kernel::*specialized-array-element-types*
   (map 'list

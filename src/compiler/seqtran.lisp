@@ -719,7 +719,8 @@
 ;;;
 ;;; FIXME: currently KLUDGEed because of bug 188
 (deftransform concatenate ((rtype &rest sequences)
-			   (t &rest simple-base-string)
+			   (t &rest (or simple-base-string
+					(simple-array nil (*))))
 			   simple-base-string
 			   :policy (< safety 3))
   (loop for rest-seqs on sequences
@@ -731,8 +732,11 @@
         collect `(,n-length (* (length ,n-seq) sb!vm:n-byte-bits)) into lets
         collect n-length into all-lengths
         collect next-start into starts
-        collect `(bit-bash-copy ,n-seq ,vector-data-bit-offset
-                                res ,start ,n-length)
+        collect `(if (and (typep ,n-seq '(simple-array nil (*)))
+		          (> ,n-length 0))
+		     (error 'nil-array-accessed-error)
+		     (bit-bash-copy ,n-seq ,vector-data-bit-offset
+		                    res ,start ,n-length))
                 into forms
         collect `(setq ,next-start (+ ,start ,n-length)) into forms
         finally
