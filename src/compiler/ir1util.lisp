@@ -510,10 +510,16 @@
 (defun continuation-single-value-p (cont)
   (let ((dest (continuation-dest cont)))
     (typecase dest
-      ((or creturn exit cast)
+      ((or creturn exit)
        nil)
       (mv-combination
        (eq (basic-combination-fun dest) cont))
+      (cast
+       #+nil
+       (locally
+           (declare (notinline continuation-single-value-p))
+         (and (not (values-type-p (cast-asserted-type dest)))
+              (continuation-single-value-p (node-cont dest)))))
       (t
        t))))
 
@@ -911,7 +917,8 @@
 			  (maybe-convert-to-assignment fun)))))))
 
 	(dolist (ep (optional-dispatch-entry-points leaf))
-	  (frob ep))
+          (when (promise-ready-p ep)
+            (frob (force ep))))
 	(when (optional-dispatch-more-entry leaf)
 	  (frob (optional-dispatch-more-entry leaf)))
 	(let ((main (optional-dispatch-main-entry leaf)))

@@ -24,7 +24,7 @@
 ;;; If it is losing, we punt with a COMPILER-ERROR. NAMES-SO-FAR is a
 ;;; list of names which have previously been bound. If the NAME is in
 ;;; this list, then we error out.
-(declaim (ftype (function (t list) lambda-var) varify-lambda-arg))
+(declaim (ftype (sfunction (t list) lambda-var) varify-lambda-arg))
 (defun varify-lambda-arg (name names-so-far)
   (declare (inline member))
   (unless (symbolp name)
@@ -47,7 +47,7 @@
 
 ;;; Make the default keyword for a &KEY arg, checking that the keyword
 ;;; isn't already used by one of the VARS.
-(declaim (ftype (function (symbol list t) keyword) make-keyword-for-arg))
+(declaim (ftype (sfunction (symbol list t) keyword) make-keyword-for-arg))
 (defun make-keyword-for-arg (symbol vars keywordify)
   (let ((key (if (and keywordify (not (keywordp symbol)))
 		 (keywordicate symbol)
@@ -74,7 +74,7 @@
 ;;;  3. a flag indicating whether other &KEY args are allowed;
 ;;;  4. a list of the &AUX variables; and
 ;;;  5. a list of the &AUX values.
-(declaim (ftype (function (list) (values list boolean boolean list list))
+(declaim (ftype (sfunction (list) (values list boolean boolean list list))
 		make-lambda-vars))
 (defun make-lambda-vars (list)
   (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
@@ -351,10 +351,20 @@
 
     lambda))
 
+;;; Entry point CLAMBDAs have a special kind
+(defun register-entry-point (entry dispatcher)
+  (declare (type clambda entry)
+           (type optional-dispatch dispatcher))
+  (setf (functional-kind entry) :optional)
+  (setf (leaf-ever-used entry) t)
+  (setf (lambda-optional-dispatch entry)
+        dispatcher)
+  entry)
+
 ;;; Create the actual entry-point function for an optional entry
 ;;; point. The lambda binds copies of each of the VARS, then calls FUN
 ;;; with the argument VALS and the DEFAULTS. Presumably the VALS refer
-;;; to the VARS by name. The VALS are passed in in reverse order.
+;;; to the VARS by name. The VALS are passed in the reverse order.
 ;;;
 ;;; If any of the copies of the vars are referenced more than once,
 ;;; then we mark the corresponding var as EVER-USED to inhibit
@@ -383,7 +393,9 @@
                                                        ,@(reverse vals)
                                                        ,@(default-vals))))
                                          arg-vars
-                                         :debug-name "&OPTIONAL processor"
+                                         :debug-name
+                                         (debug-namify "&OPTIONAL processor ~D"
+                                                       (random 100))
                                          :note-lexical-bindings nil))))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
@@ -398,10 +410,11 @@
 ;;; var, then we add it into the default vars and throw a T into the
 ;;; entry values. The resulting entry point function is returned.
 (defun generate-optional-default-entry (res default-vars default-vals
-					    entry-vars entry-vals
-					    vars supplied-p-p body
-					    aux-vars aux-vals cont
-					    source-name debug-name)
+                                        entry-vars entry-vals
+                                        vars supplied-p-p body
+                                        aux-vars aux-vals cont
+                                        source-name debug-name
+                                        force)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals vars body
 		 aux-vars aux-vals)
@@ -409,7 +422,10 @@
   (let* ((arg (first vars))
 	 (arg-name (leaf-source-name arg))
 	 (info (lambda-var-arg-info arg))
-	 (supplied-p (arg-info-supplied-p info))
+	 (default (arg-info-default info))
+         (supplied-p (arg-info-supplied-p info))
+         (force (or force
+                    (not (sb!xc:constantp (arg-info-default info)))))
 	 (ep (if supplied-p
 		 (ir1-convert-hairy-args
 		  res
@@ -418,7 +434,8 @@
 		  (cons arg entry-vars)
 		  (list* t arg-name entry-vals)
 		  (rest vars) t body aux-vars aux-vals cont
-		  source-name debug-name)
+		  source-name debug-name
+                  force)
 		 (ir1-convert-hairy-args
 		  res
 		  (cons arg default-vars)
@@ -426,12 +443,29 @@
 		  (cons arg entry-vars)
 		  (cons arg-name entry-vals)
 		  (rest vars) supplied-p-p body aux-vars aux-vals cont
-		  source-name debug-name))))
+		  source-name debug-name
+                  force))))
 
-    (convert-optional-entry ep default-vars default-vals
-			    (if supplied-p
-				(list (arg-info-default info) nil)
-				(list (arg-info-default info))))))
+    ;; We want to delay converting the entry, but there exist
+    ;; problems: hidden references should not be established to
+    ;; lambdas of kind NIL should not have (otherwise the compiler
+    ;; might let-convert or delete them) and to variables.
+    (if (or force
+            supplied-p-p ; this entry will be of kind NIL
+            (and (lambda-p ep) (eq (lambda-kind ep) nil)))
+        (convert-optional-entry ep
+                                default-vars default-vals
+                                (if supplied-p
+                                    (list default nil)
+                                    (list default)))
+        (delay
+         (register-entry-point
+           (convert-optional-entry (force ep)
+                                   default-vars default-vals
+                                   (if supplied-p
+                                       (list default nil)
+                                       (list default)))
+           res)))))
 
 ;;; Create the MORE-ENTRY function for the OPTIONAL-DISPATCH RES.
 ;;; ENTRY-VARS and ENTRY-VALS describe the fixed arguments. REST is
@@ -557,7 +591,8 @@
 		 (arg-vars)
 		 :debug-name (debug-namify "~S processing" '&more)
                  :note-lexical-bindings nil)))
-	(setf (optional-dispatch-more-entry res) ep))))
+	(setf (optional-dispatch-more-entry res)
+              (register-entry-point ep res)))))
 
   (values))
 
@@ -647,12 +682,15 @@
 								 debug-name))))
 	   (last-entry (convert-optional-entry main-entry default-vars
 					       (main-vals) ())))
-      (setf (optional-dispatch-main-entry res) main-entry)
+      (setf (optional-dispatch-main-entry res)
+            (register-entry-point main-entry res))
       (convert-more-entry res entry-vars entry-vals rest more-context keys)
 
-      (push (if supplied-p-p
+      (push (register-entry-point
+             (if supplied-p-p
 		(convert-optional-entry last-entry entry-vars entry-vals ())
 		last-entry)
+             res)
 	    (optional-dispatch-entry-points res))
       last-entry)))
 
@@ -689,10 +727,11 @@
 ;;; When we run into a &REST or &KEY arg, we punt out to
 ;;; IR1-CONVERT-MORE, which finishes for us in this case.
 (defun ir1-convert-hairy-args (res default-vars default-vals
-                                   entry-vars entry-vals
-                                   vars supplied-p-p body aux-vars
-                                   aux-vals cont
-				   source-name debug-name)
+                               entry-vars entry-vals
+                               vars supplied-p-p body aux-vars
+                               aux-vals cont
+                               source-name debug-name
+                               force)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
                  aux-vars aux-vals)
@@ -714,9 +753,12 @@
 				      (as-debug-name source-name
 						     debug-name)))))
                (setf (optional-dispatch-main-entry res) fun)
+               (register-entry-point fun res)
                (push (if supplied-p-p
-                         (convert-optional-entry fun entry-vars entry-vals ())
-                         fun)
+                         (register-entry-point
+                          (convert-optional-entry fun entry-vars entry-vals ())
+                          res)
+                          fun)
                      (optional-dispatch-entry-points res))
                fun)))
         ((not (lambda-var-arg-info (first vars)))
@@ -726,7 +768,8 @@
            (ir1-convert-hairy-args res nvars nvals nvars nvals
                                    (rest vars) nil body aux-vars aux-vals
                                    cont
-				   source-name debug-name)))
+				   source-name debug-name
+                                   nil)))
         (t
          (let* ((arg (first vars))
                 (info (lambda-var-arg-info arg))
@@ -737,10 +780,17 @@
                          res default-vars default-vals
                          entry-vars entry-vals vars supplied-p-p body
                          aux-vars aux-vals cont
-			 source-name debug-name)))
-                (push (if supplied-p-p
-                          (convert-optional-entry ep entry-vars entry-vals ())
-                          ep)
+			 source-name debug-name
+                         force)))
+                ;; See GENERATE-OPTIONAL-DEFAULT-ENTRY.
+                (push (if (lambda-p ep)
+                          (register-entry-point
+                           (if supplied-p-p
+                               (convert-optional-entry ep entry-vars entry-vals ())
+                               ep)
+                           res)
+                          (progn (aver (not supplied-p-p))
+                                 ep))
                       (optional-dispatch-entry-points res))
                 ep))
              (:rest
@@ -776,24 +826,18 @@
 				     :allowp allowp
 				     :keyp keyp
 				     :%source-name source-name
-				     :%debug-name debug-name))
+				     :%debug-name debug-name
+                                     :plist `(:ir1-environment
+                                              (,*lexenv*
+                                               ,*current-path*))))
 	(min (or (position-if #'lambda-var-arg-info vars) (length vars))))
     (aver-live-component *current-component*)
     (push res (component-new-functionals *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
-			    cont source-name debug-name)
+			    cont source-name debug-name nil)
     (setf (optional-dispatch-min-args res) min)
     (setf (optional-dispatch-max-args res)
 	  (+ (1- (length (optional-dispatch-entry-points res))) min))
-
-    (flet ((frob (ep)
-	     (when ep
-	       (setf (functional-kind ep) :optional)
-	       (setf (leaf-ever-used ep) t)
-	       (setf (lambda-optional-dispatch ep) res))))
-      (dolist (ep (optional-dispatch-entry-points res)) (frob ep))
-      (frob (optional-dispatch-more-entry res))
-      (frob (optional-dispatch-main-entry res)))
 
     res))
 
@@ -1035,3 +1079,15 @@
 	    (specifier-type 'function))))
 
   (values))
+
+
+;;; Entry point utilities
+
+;;; Return a function for the Nth entry point.
+(defun optional-dispatch-entry-point-fun (dispatcher n)
+  (declare (type optional-dispatch dispatcher)
+           (type unsigned-byte n))
+  (let* ((env (getf (optional-dispatch-plist dispatcher) :ir1-environment))
+         (*lexenv* (first env))
+         (*current-path* (second env)))
+    (force (nth n (optional-dispatch-entry-points dispatcher)))))

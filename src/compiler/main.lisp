@@ -863,15 +863,16 @@
   (etypecase f
     (clambda (list (lambda-component f)))
     (optional-dispatch (let ((result nil))
-			 (labels ((frob (clambda)
-				    (pushnew (lambda-component clambda)
-					     result))
-				  (maybe-frob (maybe-clambda)
-				    (when maybe-clambda
-				      (frob maybe-clambda))))
-			   (mapc #'frob (optional-dispatch-entry-points f))
+			 (flet ((maybe-frob (maybe-clambda)
+                                  (when (and maybe-clambda
+                                             (promise-ready-p maybe-clambda))
+                                    (pushnew (lambda-component
+                                              (force maybe-clambda))
+					     result))))
+			   (map nil #'maybe-frob (optional-dispatch-entry-points f))
 			   (maybe-frob (optional-dispatch-more-entry f))
-			   (maybe-frob (optional-dispatch-main-entry f)))))))
+			   (maybe-frob (optional-dispatch-main-entry f)))
+                         result))))
 
 (defun make-functional-from-toplevel-lambda (definition
 					     &key

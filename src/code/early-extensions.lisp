@@ -1083,3 +1083,18 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
           `(if ,test
                (let ((it ,test)) (declare (ignorable it)),@body)
                (acond ,@rest))))))
+
+
+;;; Delayed evaluation
+(defmacro delay (form)
+  `(cons nil (lambda () ,form)))
+
+(defun force (promise)
+  (cond ((not (consp promise)) promise)
+        ((car promise) (cdr promise))
+        (t (setf (car promise) t
+                 (cdr promise) (funcall (cdr promise))))))
+
+(defun promise-ready-p (promise)
+  (or (not (consp promise))
+      (car promise)))

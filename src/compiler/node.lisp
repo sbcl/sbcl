@@ -995,10 +995,10 @@
   ;; the total number of required and optional arguments. Args at
   ;; positions >= to this are &REST, &KEY or illegal args.
   (max-args 0 :type unsigned-byte)
-  ;; list of the LAMBDAs which are the entry points for non-rest,
-  ;; non-key calls. The entry for MIN-ARGS is first, MIN-ARGS+1
-  ;; second, ... MAX-ARGS last. The last entry-point always calls the
-  ;; main entry; in simple cases it may be the main entry.
+  ;; list of the (maybe delayed) LAMBDAs which are the entry points
+  ;; for non-rest, non-key calls. The entry for MIN-ARGS is first,
+  ;; MIN-ARGS+1 second, ... MAX-ARGS last. The last entry-point always
+  ;; calls the main entry; in simple cases it may be the main entry.
   (entry-points nil :type list)
   ;; an entry point which takes MAX-ARGS fixed arguments followed by
   ;; an argument context pointer and an argument count. This entry

@@ -874,6 +874,7 @@ retained, possibly temporariliy, because it might be used internally."
              "POSITIVE-PRIMEP"
              "EVAL-IN-LEXENV"
 	     "DEBUG-NAMIFY"
+             "FORCE" "DELAY" "PROMISE-READY-P"
 
              ;; These could be moved back into SB!EXT if someone has
              ;; compelling reasons, but hopefully we can get by

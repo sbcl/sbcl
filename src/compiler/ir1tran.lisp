@@ -550,6 +550,10 @@
                           (when (and functional
                                      (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))
+                   (when (and (lambda-p leaf)
+                              (memq (functional-kind leaf)
+                                    '(nil :optional)))
+                     (maybe-reanalyze-functional leaf))
                    leaf))
          (ref (make-ref leaf)))
     (push ref (leaf-refs leaf))

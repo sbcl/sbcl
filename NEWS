@@ -1798,6 +1798,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * bug fix: defining a generic function with a :METHOD-CLASS being a
     subclass of STANDARD-METHOD no longer causes stack exhaustion.
     (thanks to Gerd Moellmann)
+  * increased compilation speed of long MULTIPLE-VALUES-BIND.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

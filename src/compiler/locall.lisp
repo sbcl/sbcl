@@ -144,11 +144,12 @@
 	    (n-supplied (gensym))
 	    (temps (make-gensym-list max)))
        (collect ((entries))
-	 (do ((eps (optional-dispatch-entry-points fun) (rest eps))
-	      (n min (1+ n)))
-	     ((null eps))
-	   (entries `((= ,n-supplied ,n)
-		      (%funcall ,(first eps) ,@(subseq temps 0 n)))))
+         ;; Force convertion of all entries
+         (optional-dispatch-entry-point-fun fun 0)
+	 (loop for ep in (optional-dispatch-entry-points fun)
+               and n from min
+               do (entries `((= ,n-supplied ,n)
+                             (%funcall ,(force ep) ,@(subseq temps 0 n)))))
 	 `(lambda (,n-supplied ,@temps)
 	    ;; FIXME: Make sure that INDEX type distinguishes between
 	    ;; target and host. (Probably just make the SB!XC:DEFTYPE
@@ -173,7 +174,7 @@
 ;;; then associate this lambda with FUN as its XEP. After the
 ;;; conversion, we iterate over the function's associated lambdas,
 ;;; redoing local call analysis so that the XEP calls will get
-;;; converted. 
+;;; converted.
 ;;;
 ;;; We set REANALYZE and REOPTIMIZE in the component, just in case we
 ;;; discover an XEP after the initial local call analyze pass.
@@ -196,7 +197,7 @@
 	 (locall-analyze-fun-1 fun))
 	(optional-dispatch
 	 (dolist (ep (optional-dispatch-entry-points fun))
-	   (locall-analyze-fun-1 ep))
+	   (locall-analyze-fun-1 (force ep)))
 	 (when (optional-dispatch-more-entry fun)
 	   (locall-analyze-fun-1 (optional-dispatch-more-entry fun)))))
       res)))
@@ -315,7 +316,8 @@
 	 ;; COMPONENT is the only one here. Let's make that explicit.
 	 (aver (= 1 (length (functional-components clambda))))
 	 (aver (eql component (first (functional-components clambda))))
-	 (when (component-new-functionals component)
+	 (when (or (component-new-functionals component)
+                   (component-reanalyze-functionals component))
 	   (setf did-something t)
 	   (locall-analyze-component component))))
      (unless did-something
@@ -431,7 +433,10 @@
 	     (not (functional-entry-fun fun))
 	     (= (length (leaf-refs fun)) 1)
 	     (= (length (basic-combination-args call)) 1))
-    (let ((ep (car (last (optional-dispatch-entry-points fun)))))
+    (let* ((*current-component* (node-component ref))
+           (ep (optional-dispatch-entry-point-fun
+                fun (optional-dispatch-max-args fun))))
+      (aver (= (optional-dispatch-min-args fun) 0))
       (setf (basic-combination-kind call) :local)
       (pushnew ep (lambda-calls-or-closes (node-home-lambda call)))
       (merge-tail-sets call ep)
@@ -498,8 +503,9 @@
 	   (setf (basic-combination-kind call) :error))
 	  ((<= call-args max-args)
 	   (convert-call ref call
-			 (elt (optional-dispatch-entry-points fun)
-			      (- call-args min-args))))
+                         (let ((*current-component* (node-component ref)))
+                           (optional-dispatch-entry-point-fun
+                            fun (- call-args min-args)))))
 	  ((optional-dispatch-more-entry fun)
 	   (convert-more-call ref call fun))
 	  (t
