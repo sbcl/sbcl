@@ -117,28 +117,26 @@ GNAME(call_into_lisp):
 	mov	%rsp,%rbp	# Establish new frame.
 Lstack:
 	/* FIXME x86 saves FPU state here */
-	push	%rbx
-	push	%r12
-	push	%r13
-	push	%r14
-	push	%r15
 
-	push	%rdi
-	push	%rax
-	mov	specials,%rdi
-	call    pthread_getspecific
-	mov	%rax,%r12
-	pop	%rax
-	pop	%rdi
-			
+	push	%rbx  	/* these regs are callee-saved according to C
+	push	%r12	 * so must be preserved and restored when 
+	push	%r13     * the lisp function returns
+	push	%r14     *
+	push	%r15     */
+
 	mov	%rsp,%rbx	# remember current stack
 	push	%rbx		# Save entry stack on (maybe) new stack.
 
-	/* Establish Lisp args. */
-	mov	%rdi,%rax	# lexenv?
-	mov	%rsi,%rbx	# address of arg vec
-	mov	%rdx,%rcx	# num args
-
+	push	%rdi	# args from C
+	push	%rsi	#
+	push	%rdx	#
+	mov	specials,%rdi
+	call    pthread_getspecific
+	mov	%rax,%r12
+	pop	%rcx	# num args
+	pop	%rbx	# arg vector
+	pop	%rax	# function ptr/lexenv
+			
 	xor	%rdx,%rdx	# clear any descriptor registers 
 	xor	%rdi,%rdi	# that we can't be sure we'll 
 	xor	%rsi,%rsi	# initialise properly.  XX do r8-r15 too?
@@ -183,8 +181,9 @@ Lcall:
 	pop	%rbx
 
 /* FIXME Restore the NPX state. */
-	pop	%rbp		# c-sp
+
 	/* return value is already in rax where lisp expects it */
+	leave
 	ret
 	.size	GNAME(call_into_lisp), . - GNAME(call_into_lisp)
 

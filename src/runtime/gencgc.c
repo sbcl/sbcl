@@ -431,7 +431,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
  * e.g. boxed/unboxed, generation, ages; there may need to be many
  * allocation regions.
  *
- * Each allocation region may be start within a partly used page. Many
+ * Each allocation region may start within a partly used page. Many
  * features of memory use are noted on a page wise basis, e.g. the
  * generation; so if a region starts within an existing allocated page
  * it must be consistent with this page.
