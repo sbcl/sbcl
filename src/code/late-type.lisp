@@ -213,10 +213,12 @@
 	    (type-specifier
 	     (fun-type-returns type)))))
 
-;;; Since all function types are equivalent to FUNCTION, they are all
-;;; subtypes of each other.
-(!define-type-method
- (function :simple-subtypep) (type1 type2)
+;;; The meaning of this is a little confused. On the one hand, all
+;;; function objects are represented the same way regardless of the
+;;; arglists and return values, and apps don't get to ask things like
+;;; (TYPEP #'FOO (FUNCTION (FIXNUM) *)) in any meaningful way. On the
+;;; other hand, Python wants to reason about function types. So...
+(!define-type-method (function :simple-subtypep) (type1 type2)
  (flet ((fun-type-simple-p (type)
           (not (or (fun-type-rest type)
                    (fun-type-keyp type))))
@@ -927,12 +929,16 @@
     (if (and (> (length simplified-types) 1)
 	     (some #'union-type-p simplified-types))
 	(let* ((first-union (find-if #'union-type-p simplified-types))
-	       (other-types (coerce (remove first-union simplified-types) 'list))
-	       (distributed (maybe-distribute-one-union first-union other-types)))
+	       (other-types (coerce (remove first-union simplified-types)
+				    'list))
+	       (distributed (maybe-distribute-one-union first-union
+							other-types)))
 	  (if distributed
 	      (apply #'type-union distributed)
 	      (make-hairy-type
-	       :specifier `(and ,@(map 'list #'type-specifier simplified-types)))))
+	       :specifier `(and ,@(map 'list
+				       #'type-specifier
+				       simplified-types)))))
 	(make-compound-type-or-something #'%make-intersection-type
 					 simplified-types
 					 (some #'type-enumerable
@@ -960,7 +966,8 @@
  (macrolet ((frob (name var)
 	      `(progn
 		 (setq ,var (make-named-type :name ',name))
-		 (setf (info :type :kind ',name) #+sb-xc-host :defined #-sb-xc-host :primitive)
+		 (setf (info :type :kind ',name)
+		       #+sb-xc-host :defined #-sb-xc-host :primitive)
 		 (setf (info :type :builtin ',name) ,var))))
    ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
    ;; special symbol which can be stuck in some places where an
@@ -1204,7 +1211,7 @@
       (error 'simple-type-error
 	     :datum predicate-name
 	     :expected-type 'symbol
-	     :format-control "~S is not a symbol."
+	     :format-control "The SATISFIES predicate name is not a symbol: ~S"
 	     :format-arguments (list predicate-name))))
   ;; Create object.
   (make-hairy-type :specifier whole))
@@ -1465,7 +1472,8 @@
 				       >= > t)))))))
 
 (!cold-init-forms
-  (setf (info :type :kind 'number) #+sb-xc-host :defined #-sb-xc-host :primitive)
+  (setf (info :type :kind 'number)
+	#+sb-xc-host :defined #-sb-xc-host :primitive)
   (setf (info :type :builtin 'number)
 	(make-numeric-type :complexp nil)))
 
@@ -1590,7 +1598,10 @@
 	   ;; (error "Lower bound ~S is not less than upper bound ~S." low high))
 	   ;; but it is correct to do
 	   *empty-type*
-	 (make-numeric-type :class ',class :format ',format :low lb :high hb)))))
+	 (make-numeric-type :class ',class
+			    :format ',format
+			    :low lb
+			    :high hb)))))
 
 (!def-bounded-type rational rational nil)
 

@@ -12,18 +12,27 @@
 
 (in-package "SB-ALIEN") ; (SB-ALIEN, not SB!ALIEN, since we're in warm load.)
 
+;;; SEMI-KLUDGE: Preferable would be to use something like O_NOFOLLOW
+;;; which will refuse to open() a file if it is a symlink; but I've
+;;; been told that is a FreeBSD/Linux-only thing.  Meanwhile, this will
+;;; make our filenames a lot less predictable.
+;;; (The man file for open() says O_EXCL should treat even a symlink as
+;;; an existing file.  I wonder if it really does that.)
+;;; Also, no more dependence on ASCII character ordering.
+;;; -- mrd 20021101
+(defun generate-random-string (&optional (len 6))
+  (let* ((characters "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	 (num (length characters))
+	 (string (make-string len)))
+    (dotimes (i len string)
+      (setf (char string i)
+	    (char characters (random num))))))
+
 (defun pick-temporary-file-name (&optional
-				 ;; KLUDGE: There are various security
-				 ;; nastyisms associated with easily
-				 ;; guessable temporary file names,
-				 ;; and we haven't done anything to
-				 ;; work around them here. -- pointed
-				 ;; out by Dan Barlow on sbcl-devel
-				 ;; 20000702
-				 (base "/tmp/sbcl-tmp-~D~C"))
-  (let ((code (char-code #\A)))
+				 (base "/tmp/sbcl-tmp-~D~A"))
+  (let ((code (generate-random-string)))
     (loop
-      (let ((name (format nil base (sb-unix:unix-getpid) (code-char code))))
+      (let ((name (format nil base (sb-unix:unix-getpid) code)))
 	(multiple-value-bind (fd errno)
 	    (sb-unix:unix-open name
 			       (logior sb-unix:o_wronly
@@ -37,14 +46,8 @@
 		 (simple-file-perror "couldn't create temporary file ~S"
 				     name
 				     errno))
-		;; KLUDGE: depends on ASCII character ordering -- WHN 20000128
-		((= code (char-code #\Z))
-		 (setf code (char-code #\a)))
-		((= code (char-code #\z))
-		 (return nil))
 		(t
-		 (incf code))))))))
-
+		 (setf code (generate-random-string)))))))))
 
 ;;; On any OS where we don't support foreign object file loading, any
 ;;; query of a foreign symbol value is answered with "no definition
@@ -117,7 +120,6 @@
 (defvar *dso-linker* "/usr/bin/ld")
 (defvar *dso-linker-options* '("-shared" "-o"))
 
-
 (sb-alien:define-alien-routine dlopen system-area-pointer
   (file sb-alien:c-string) (mode sb-alien:int))
 (sb-alien:define-alien-routine dlsym system-area-pointer
@@ -127,17 +129,16 @@
 
 ;;; Ensure that we've opened our own binary so we can dynamically resolve 
 ;;; symbols in the C runtime.  
-
+;;;
 ;;; Old comment: This used to happen only in
 ;;; GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS, and only if no libraries were
 ;;; dlopen()ed already, but that didn't work if something was
 ;;; dlopen()ed before any problem global vars were used.  So now we do
 ;;; this in any function that can add to the *HANDLES-FROM-DLOPEN*, as
 ;;; well as in GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS.
-
+;;;
 ;;; FIXME: It would work just as well to do it once at startup, actually.
 ;;; Then at least we know it's done.    -dan 2001.05.10
-
 (defun ensure-runtime-symbol-table-opened ()
   (unless *handles-from-dlopen*
     ;; Prevent recursive call if dlopen() isn't defined.
@@ -226,7 +227,7 @@
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let ((output-file (pick-temporary-file-name
-		      (concatenate 'string "/tmp/~D~C" (string (gensym)))))
+		      (concatenate 'string "/tmp/~D~A" (string (gensym)))))
 	(error-output (make-string-output-stream)))
 
     (/show "running" *dso-linker*)
