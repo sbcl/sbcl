@@ -827,8 +827,8 @@
 	     (get-info-value ,name
 			     ,(type-info-number info)
 			     ,@(when env-list-p `(,env-list))) 
-	   (values (the ,(type-info-type info) ,value)
-		   ,foundp)))
+	   (declare (type ,(type-info-type info) ,value))
+	   (values ,value ,foundp)))
       whole))
 (defun (setf info) (new-value
 		    class
@@ -1083,14 +1083,6 @@
   :type :inline-expansion-designator
   :type-spec (or list function)
   :default nil)
-;;; Decode any raw (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
-;;; value into a lambda expression, or return NIL if there is none.
-(declaim (ftype (function ((or symbol cons)) list) fun-name-inline-expansion))
-(defun fun-name-inline-expansion (fun-name)
-  (let ((info (info :function :inline-expansion-designator fun-name)))
-    (if (functionp info)
-	(funcall info)
-	info)))
 
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.

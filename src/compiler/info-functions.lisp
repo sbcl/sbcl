@@ -17,6 +17,8 @@
 
 (in-package "SB!C")
 
+;;;; internal utilities defined in terms of INFO
+
 ;;; Check that NAME is a valid function name, returning the name if
 ;;; OK, and signalling an error if not. In addition to checking for
 ;;; basic well-formedness, we also check that symbol names are not NIL
@@ -107,6 +109,15 @@
     (setf (info :function :where-from name) :defined)
     (if (info :function :assumed-type name)
 	(setf (info :function :assumed-type name) nil))))
+
+;;; Decode any raw (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
+;;; value into a lambda expression, or return NIL if there is none.
+(declaim (ftype (function ((or symbol cons)) list) fun-name-inline-expansion))
+(defun fun-name-inline-expansion (fun-name)
+  (let ((info (info :function :inline-expansion-designator fun-name)))
+    (if (functionp info)
+	(funcall info)
+	info)))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database
