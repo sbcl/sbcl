@@ -3914,9 +3914,11 @@ search_dynamic_space(lispobj *pointer)
 
 /* Is there any possibility that pointer is a valid Lisp object
  * reference, and/or something else (e.g. subroutine call return
- * address) which should prevent us from moving the referred-to thing? */
-static int
-possibly_valid_dynamic_space_pointer(lispobj *pointer)
+ * address) which should prevent us from moving the referred-to thing?
+ * If so, return the address of the beginning of the thing; otherwise
+ * return 0. */
+static void *
+possibly_immobilized_dynamic_space_object(lispobj *pointer)
 {
     lispobj *start_addr;
 
@@ -3930,7 +3932,9 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
      * objects. */
     if (TypeOf(*start_addr) == type_CodeHeader) {
 	/* XXX could do some further checks here */
-	return 1;
+	/* e.g. a raw pointer will have clear lowtag bits; dunno offhand
+	 * what the pointers to functions will have */
+	return start_addr;
     }
 
     /* If it's not a return address then it needs to be a valid Lisp
@@ -4154,7 +4158,7 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
     }
 
     /* looks good */
-    return 1;
+    return start_addr;
 }
 
 /* Adjust large bignum and vector objects. This will adjust the
@@ -4356,7 +4360,7 @@ preserve_pointer(void *addr)
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreter as
      * a pointer which prevents a page from moving. */
-    if (!possibly_valid_dynamic_space_pointer(addr))
+    if (!possibly_immobilized_dynamic_space_object(addr))
 	return;
 
     /* Work backwards to find a page with a first_object_offset of 0.
@@ -5059,7 +5063,7 @@ verify_space(lispobj *start, size_t words)
 		 * it down a lot (so it's commented out).
 		 *
 		 * FIXME: Add a variable to enable this dynamically. */
-		/* if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
+		/* if (!possibly_immobilized_dynamic_space_object((lispobj *)thing)) {
 		 *     lose("ptr %x to invalid object %x", thing, start); */
 	    } else {
 		/* Verify that it points to another valid space. */
