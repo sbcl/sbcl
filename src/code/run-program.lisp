@@ -45,26 +45,10 @@
 ;;;; which (at least in sbcl-0.6.10 on Red Hat Linux 6.2) is not
 ;;;; visible at GENESIS time.
 
-(define-alien-variable "environ" (* c-string))
-(push (lambda ()
-	;; We redo this here to protect ourselves from this scenario:
-	;;   * Build under one version of shared lib, save a core.
-	;;   * Load core under another version of shared lib. ("Now
-	;;     where was environ again?" SIGSEGV, etc.)
-	;; Obviously it's a KLUDGE to do this hack for every alien
-	;; variable, but as it happens, as of sbcl-0.7.0 this is the
-	;; only alien variable used to implement SBCL, so it's not
-	;; worth coming up with a general solution. (A general
-	;; solution would be nice for users who want to have their
-	;; alien code be preserved across a save/load cycle, but this
-	;; problem with alien variables is only one of several
-	;; problems which'd need to be solved before that can happen.)
-        (define-alien-variable "environ" (* c-string)))
-      *after-save-initializations*)
-
+(define-alien-routine wrapped-environ (* c-string))
 (defun posix-environ ()
   "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
-  (c-strings->string-list environ))
+  (c-strings->string-list (wrapped-environ)))
 
 ;;; Convert as best we can from a SBCL representation of a Unix
 ;;; environment to a CMU CL representation.
@@ -108,7 +92,7 @@
 
 ;;;; Import wait3(2) from Unix.
 
-(sb-alien:define-alien-routine ("wait3" c-wait3) sb-alien:int
+(define-alien-routine ("wait3" c-wait3) sb-alien:int
   (status sb-alien:int :out)
   (options sb-alien:int)
   (rusage sb-alien:int))
@@ -202,12 +186,12 @@
 #-hpux
 ;;; Find the current foreground process group id.
 (defun find-current-foreground-process (proc)
-  (sb-alien:with-alien ((result sb-alien:int))
+  (with-alien ((result sb-alien:int))
     (multiple-value-bind
 	  (wonp error)
 	(sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty proc))
 			    sb-unix:TIOCGPGRP
-			    (sb-alien:alien-sap (sb-alien:addr result)))
+			    (alien-sap (sb-alien:addr result)))
       (unless wonp
 	(error "TIOCPGRP ioctl failed: ~S" (strerror error)))
       result))

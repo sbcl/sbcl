@@ -402,20 +402,29 @@
 	      (emit-cleanups block1 block2)))))))
   (values))
 
-;;; Mark all tail-recursive uses of function result continuations with
-;;; the corresponding TAIL-SET. Nodes whose type is NIL (i.e. don't
-;;; return) such as calls to ERROR are never annotated as tail in
-;;; order to preserve debugging information.
+;;; Mark optimizable tail-recursive uses of function result continuations with
+;;; the corresponding TAIL-SET. 
 (defun tail-annotate (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))
     (let ((ret (lambda-return fun)))
+      ;; Nodes whose type is NIL (i.e. don't return) such as calls to
+      ;; ERROR are never annotated as TAIL-P, in order to preserve
+      ;; debugging information.
+      ;;
+      ;; FIXME: It might be better to add another DEFKNOWN property
+      ;; (e.g. NO-TAIL-RECURSION) and use it for error-handling
+      ;; functions like ERROR, instead of spreading this special case
+      ;; net so widely.
       (when ret
 	(let ((result (return-result ret)))
 	  (do-uses (use result)
-	    (when (and (immediately-used-p result use)
+	    (when (and (policy use
+			       (or (> space debug)
+				   (> speed debug)))
+		       (immediately-used-p result use)
 		       (or (not (eq (node-derived-type use) *empty-type*))
 			   (not (basic-combination-p use))
 			   (eq (basic-combination-kind use) :local)))
-		(setf (node-tail-p use) t)))))))
+	      (setf (node-tail-p use) t)))))))
   (values))

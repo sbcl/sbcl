@@ -27,17 +27,18 @@
 ;;;; do belong in cold load and will hopefully make it back there reasonably
 ;;;; soon). -- WHN 19991207
 
-(dolist (stem '(;; FIXME: The files here from outside the src/pcl directory
-		;; probably belong in cold load instead of warm load. They
-		;; ended up here as a quick hack to work around the
-		;; consequences of my misunderstanding how ASSEMBLE-FILE works
-		;; when I wrote the cold build code. The cold build code
-		;; expects only one FASL filename per source file, when it
-		;; turns out we really need one FASL file for ASSEMBLE-FILE
-		;; output and another for COMPILE-FILE output. It would
-		;; probably be good to redo the cold build code so that the
-		;; COMPILE-FILE stuff generated here can be loaded at the same
-		;; time as the ASSEMBLE-FILE stuff generated there.
+(dolist (stem '(;; FIXME: The assembly files here probably belong in
+		;; cold load instead of warm load. They ended up here
+		;; as a quick hack to work around the consequences of
+		;; my misunderstanding how ASSEMBLE-FILE works when I
+		;; wrote the cold build code. The cold build code
+		;; expects only one FASL filename per source file,
+		;; when it turns out we really need one FASL file for
+		;; ASSEMBLE-FILE output and another for COMPILE-FILE
+		;; output. It would probably be good to redo the cold
+		;; build code so that the COMPILE-FILE stuff generated
+		;; here can be loaded at the same time as the
+		;; ASSEMBLE-FILE stuff generated there.
 		"src/assembly/target/assem-rtns"
 		"src/assembly/target/array"
 		"src/assembly/target/arith"

@@ -31,10 +31,13 @@
 #include <unistd.h>
 #include <pwd.h>
 
-
 #include "runtime.h"
 #include "sbcl.h"
 #include "util.h"
+
+/* KLUDGE: Neither the OpenBSD nor the Linux man page give a header
+ * file to find this in (?). -- WHN 2002-02-07 */
+extern char **environ;
    
 /*
  * stuff needed by CL:DIRECTORY and other Lisp directory operations
@@ -249,4 +252,18 @@ uid_username(int uid)
     } else {
 	return 0;
     }
+}
+
+/*
+ * functions to get miscellaneous C-level variables
+ *
+ * (Doing this by calling functions lets us borrow the smarts of the C
+ * linker, so that things don't blow up when libc versions and thus
+ * variable locations change between compile time and run time.)
+ */
+
+char **
+wrapped_environ()
+{
+    return environ;
 }

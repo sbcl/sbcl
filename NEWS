@@ -1005,13 +1005,18 @@ changes in sbcl-0.7.1 relative to sbcl-0.7.0:
   file format number to change again.
 
 changes in sbcl-0.7.2 relative to sbcl-0.7.1:
-  ?? incompatible change: The compiler is now less aggressive about
-    tail call optimization, doing it only when (> SPACE DEBUG). (This
-    is an incompatible change because there are programs which depended
-    on the old CMU-CL-style behavior to optimize away their unbounded
-    recursion which will now die of stack overflow.)
+  * incompatible change: The compiler is now less aggressive about
+    tail call optimization, doing it only when (> SPACE DEBUG) or
+    (> SPEED DEBUG). (This is an incompatible change because there are
+    programs which relied on the old CMU-CL-style behavior to optimize
+    away their unbounded recursion which will now die of stack overflow.)
+  * bug fixes:
+    ** The system now hunts for the C variable "environ" in a more
+       devious way, to avoid segfaults when the C library version
+       differs between compile time and run time. (thanks to Christophe
+       Rhodes)
   * several changes related to debugging:
-    ?? suppression of tail recursion, as noted above
+    ** suppression of tail recursion, as noted above
     ** The default implementation of TRACE has changed. :ENCAPSULATE T
        is now the default. (For some time encapsulation has been more
        reliable than the breakpoint-based :ENCAPSULATE NIL

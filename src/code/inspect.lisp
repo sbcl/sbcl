@@ -41,7 +41,7 @@ evaluated expressions.
 ")
 
 (defun %inspect (*inspected* s)
-  (named-let redisplay () ; "lambda, the ultimate GOTO":-|
+  (named-let redisplay () ; "LAMBDA, the ultimate GOTO":-|
     (multiple-value-bind (description named-p elements)
 	(inspected-parts *inspected*)
       (tty-display-inspected-parts description named-p elements s)
