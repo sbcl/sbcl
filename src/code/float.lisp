@@ -310,15 +310,17 @@
     #!+long-float
     ((long-float) sb!vm:long-float-digits)))
 
-(defun float-radix (x)
-  #!+sb-doc
-  "Return (as an integer) the radix b of its floating-point argument."
-  ;; ANSI says this function "should signal an error if [..] argument
-  ;; is not a float". Since X is otherwise ignored, Python doesn't
-  ;; check the type by default, so we have to do it ourself:
-  (unless (floatp x)
-    (error 'type-error :datum x :expected-type 'float))
-  2)
+(setf (fdefinition 'float-radix)
+      ;; FIXME: Python flushes unused variable X in CLAMBDA, then
+      ;; flushes unused reference to X in XEP together with type
+      ;; check. When this is fixed, rewrite this definition in an
+      ;; ordinary form. -- APD, 2002-10-21
+      (lambda (x)
+        #!+sb-doc
+        "Return (as an integer) the radix b of its floating-point argument."
+        (unless (floatp x)
+          (error 'type-error :datum x :expected-type 'float))
+        2))
 
 ;;;; INTEGER-DECODE-FLOAT and DECODE-FLOAT
 

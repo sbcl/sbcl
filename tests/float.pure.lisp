@@ -48,3 +48,7 @@
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
 (assert (typep (nth-value 1 (ignore-errors (float-radix "notfloat")))
 	       'type-error))
+
+(assert (typep (nth-value 1 (ignore-errors
+                              (funcall (fdefinition 'float-radix) "notfloat")))
+               'type-error))
