@@ -1504,11 +1504,11 @@
 ;;;     are defaulted from the inherited argument (or result) of the same
 ;;;     name. The following operand options are defined:
 ;;;
-;;; :SCs (SC*)
-;;;     :SCs specifies good SCs for this operand. Other SCs will be
-;;;	penalized according to move costs. A load TN will be allocated if
-;;;	necessary, guaranteeing that the operand is always one of the
-;;;	specified SCs.
+;;;     :SCs (SC*)
+;;;         :SCs specifies good SCs for this operand. Other SCs will
+;;;         be penalized according to move costs. A load TN will be
+;;;         allocated if necessary, guaranteeing that the operand is
+;;;         always one of the specified SCs.
 ;;;
 ;;;     :LOAD-TN Load-Name
 ;;;         Load-Name is bound to the load TN allocated for this

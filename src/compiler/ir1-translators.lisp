@@ -77,7 +77,7 @@
     (setf (entry-cleanup entry) cleanup)
     (link-node-to-previous-continuation entry start)
     (use-continuation entry dummy)
-    
+
     (let* ((env-entry (list entry cont))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
 				  :cleanup cleanup)))
@@ -177,7 +177,7 @@
       (starts dummy)
       (dolist (segment (rest segments))
 	(let* ((tag-cont (make-continuation))
-               (tag (list (car segment) entry tag-cont)))          
+               (tag (list (car segment) entry tag-cont)))
 	  (conts tag-cont)
 	  (starts tag-cont)
 	  (continuation-starts-block tag-cont)
@@ -222,7 +222,7 @@
 ;;;   are ignored for non-top-level forms. For non-top-level forms, an
 ;;;   eval-when specifying the :EXECUTE situation is treated as an
 ;;;   implicit PROGN including the forms in the body of the EVAL-WHEN
-;;;   form; otherwise, the forms in the body are ignored. 
+;;;   form; otherwise, the forms in the body are ignored.
 (def-ir1-translator eval-when ((situations &rest forms) start cont)
   #!+sb-doc
   "EVAL-WHEN (Situation*) Form*
@@ -309,7 +309,7 @@
    :vars
    definitions
    fun))
-  
+
 (def-ir1-translator symbol-macrolet ((macrobindings &body body) start cont)
   #!+sb-doc
   "SYMBOL-MACROLET ({(Name Expansion)}*) Decl* Form*
@@ -1049,79 +1049,6 @@
 		(eq first 'original-source-start))
 	(return path)))))
 
-;;; Warn about incompatible or illegal definitions and add the macro
-;;; to the compiler environment.
-;;;
-;;; Someday we could check for macro arguments being incompatibly
-;;; redefined. Doing this right will involve finding the old macro
-;;; lambda-list and comparing it with the new one.
-(def-ir1-translator %defmacro ((qname qdef lambda-list doc) start cont
-			       :kind :function)
-  (let (;; QNAME is typically a quoted name. I think the idea is to
-	;; let %DEFMACRO work as an ordinary function when
-	;; interpreting. Whatever the reason the quote is there, we
-	;; don't want it any more. -- WHN 19990603
-	(name (eval qname))
-	;; QDEF should be a sharp-quoted definition. We don't want to
-	;; make a function of it just yet, so we just drop the
-	;; sharp-quote.
-	(def (progn
-	       (aver (eq 'function (first qdef)))
-	       (aver (proper-list-of-length-p qdef 2))
-	       (second qdef))))
-
-    (/show "doing IR1 translator for %DEFMACRO" name)
-
-    (unless (symbolp name)
-      (compiler-error "The macro name ~S is not a symbol." name))
-
-    (ecase (info :function :kind name)
-      ((nil))
-      (:function
-       (remhash name *free-funs*)
-       (undefine-fun-name name)
-       (compiler-warn
-	"~S is being redefined as a macro when it was ~
-         previously ~(~A~) to be a function."
-	name
-	(info :function :where-from name)))
-      (:macro)
-      (:special-form
-       (compiler-error "The special form ~S can't be redefined as a macro."
-		       name)))
-
-    (setf (info :function :kind name) :macro
-	  (info :function :where-from name) :defined
-	  (info :function :macro-function name) (coerce def 'function))
-
-    (let* ((*current-path* (revert-source-path 'defmacro))
-	   (fun (ir1-convert-lambda def 
-				    :debug-name (debug-namify "DEFMACRO ~S"
-							      name))))
-      (setf (functional-arg-documentation fun) (eval lambda-list))
-
-      (ir1-convert start cont `(%%defmacro ',name ,fun ,doc)))
-
-    (when sb!xc:*compile-print*
-      ;; FIXME: It would be nice to convert this, and the other places
-      ;; which create compiler diagnostic output prefixed by
-      ;; semicolons, to use some common utility which automatically
-      ;; prefixes all its output with semicolons. (The addition of
-      ;; semicolon prefixes was introduced ca. sbcl-0.6.8.10 as the
-      ;; "MNA compiler message patch", and implemented by modifying a
-      ;; bunch of output statements on a case-by-case basis, which
-      ;; seems unnecessarily error-prone and unclear, scattering
-      ;; implicit information about output style throughout the
-      ;; system.) Starting by rewriting COMPILER-MUMBLE to add
-      ;; semicolon prefixes would be a good start, and perhaps also:
-      ;;   * Add semicolon prefixes for "FOO assembled" messages emitted 
-      ;;     when e.g. src/assembly/x86/assem-rtns.lisp is processed.
-      ;;   * At least some debugger output messages deserve semicolon
-      ;;     prefixes too:
-      ;;     ** restarts table
-      ;;     ** "Within the debugger, you can type HELP for help."
-      (compiler-mumble "~&; converted ~S~%" name))))
-
 (def-ir1-translator %define-compiler-macro ((name def lambda-list doc)
 					    start cont
 					    :kind :function)
@@ -1136,7 +1063,7 @@
 	  (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'define-compiler-macro))
-	   (fun (ir1-convert-lambda def 
+	   (fun (ir1-convert-lambda def
 				    :debug-name (debug-namify
 						 "DEFINE-COMPILER-MACRO ~S"
 						 name))))

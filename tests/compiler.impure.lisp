@@ -439,6 +439,28 @@ BUG 48c, not yet fixed:
   (declare (type (and function (satisfies bug199-aux)) f))
   (funcall f x))
 
+;;; check non-toplevel DEFMACRO
+(defvar *defmacro-test-status* nil)
+
+(defun defmacro-test ()
+  (fmakunbound 'defmacro-test-aux)
+  (let* ((src "defmacro-test.lisp")
+         (obj (compile-file-pathname src)))
+    (unwind-protect
+         (progn
+           (compile-file src)
+           (assert (equal *defmacro-test-status* '(function a)))
+           (setq *defmacro-test-status* nil)
+           (load obj)
+           (assert (equal *defmacro-test-status* nil))
+           (macroexpand '(defmacro-test-aux 'a))
+           (assert (equal *defmacro-test-status* '(macro 'a z-value)))
+           (eval '(defmacro-test-aux 'a))
+           (assert (equal *defmacro-test-status* '(expanded 'a z-value))))
+      (ignore-errors (delete-file obj)))))
+
+(defmacro-test)
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

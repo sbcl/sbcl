@@ -1315,6 +1315,8 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     Gerd Moellman's work in CMU CL)
   * fixed bug 202: The compiler no longer fails on functions whose
     derived types contradict their declared type.
+  * DEFMACRO is implemented via EVAL-WHEN instead of IR1 translation,
+    so it can be non-toplevel.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

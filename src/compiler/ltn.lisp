@@ -412,8 +412,7 @@
 ;;; Make sure that a tail local call is linked directly to the bind
 ;;; node. Usually it will be, but calls from XEPs and calls that might have
 ;;; needed a cleanup after them won't have been swung over yet, since we
-;;; weren't sure they would really be TR until now. Also called by byte
-;;; compiler.
+;;; weren't sure they would really be TR until now.
 (defun set-tail-local-call-successor (call)
   (let ((caller (node-home-lambda call))
 	(callee (combination-lambda call)))
@@ -823,7 +822,7 @@
 ;;; unsafe, then we never do any checks. If our policy is safe, and
 ;;; we are using a safe template, then we can also flush arg and
 ;;; result type checks. Result type checks are only flushed when the
-;;; continuation as a single use. Result type checks are not flush if
+;;; continuation has a single use. Result type checks are not flush if
 ;;; the policy is safe because the selection of template for results
 ;;; readers assumes the type check is done (uses the derived type
 ;;; which is the intersection of the proven and asserted types).
