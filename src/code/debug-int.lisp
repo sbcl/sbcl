@@ -780,6 +780,12 @@
 	  (#.lra-save-offset
 	   (setf (sap-ref-sap pointer (- (* (1+ stack-slot) 4))) value))))))
 
+(defun foreign-function-debug-name (sap)
+  (multiple-value-bind (name file base offset) (foreign-symbol-in-address sap)
+    (if name
+	(format nil "foreign function: ~A [~A: #x~X + #x~X]" name file base offset)
+	(format nil "foreign function: #x~X" (sap-int sap)))))
+
 ;;; This returns a frame for the one existing in time immediately
 ;;; prior to the frame referenced by current-fp. This is current-fp's
 ;;; caller or the next frame down the control stack. If there is no
@@ -826,7 +832,7 @@
 			   "undefined function"))
 			 (:foreign-function
 			  (make-bogus-debug-fun
-			   (format nil "foreign function call land:")))
+			   (foreign-function-debug-name (int-sap (get-lisp-obj-address lra)))))
 			 ((nil)
 			  (make-bogus-debug-fun
 			   "bogus stack frame"))
@@ -871,9 +877,7 @@
 		      (make-bogus-debug-fun
 		       "undefined function"))
 		     (:foreign-function
-		      (make-bogus-debug-fun
-		       (format nil "foreign function call land: ra=#x~X"
-				   (sap-int ra))))
+		      (make-bogus-debug-fun (foreign-function-debug-name ra)))
 		     ((nil)
 		      (make-bogus-debug-fun
 		       "bogus stack frame"))

@@ -67,13 +67,14 @@
     (push (lambda () (setq *handles-from-dlopen* nil))
 	  *after-save-initializations*)
 
-    (sb-alien:define-alien-routine dlopen system-area-pointer
-      (file sb-alien:c-string) (mode sb-alien:int))
-    (sb-alien:define-alien-routine dlsym system-area-pointer
-      (lib system-area-pointer)
-      (name sb-alien:c-string))
-    (sb-alien:define-alien-routine dlerror sb-alien:c-string)
-
+    (define-alien-routine dlopen system-area-pointer
+      (file c-string) (mode int))
+    
+    (define-alien-routine dlsym system-area-pointer
+      (lib system-area-pointer) (name c-string))
+    
+    (define-alien-routine dlerror c-string)
+    
 ;;; Ensure that we've opened our own binary so we can dynamically resolve 
 ;;; symbols in the C runtime.  
 ;;;
@@ -135,4 +136,32 @@
 	  (unless (zerop possible-result)
 	    (return possible-result)))))
 
+    (defun foreign-symbol-in-address (sap)
+      (declare (ignore sap)))
+
+    (when (ignore-errors (foreign-symbol-address "dladdr"))
+      (setf (symbol-function 'foreign-symbol-in-address)
+	    ;; KLUDGE: This COMPILE trick is to avoid trying to
+	    ;; compile a reference to dladdr on platforms without it.
+	    (compile nil
+	     '(lambda (sap)
+	       (let ((addr (sap-int sap)))
+		 (with-alien ((info
+			       (struct dl-info
+				       (filename c-string)
+				       (base unsigned)
+				       (symbol c-string)
+				       (symbol-address unsigned)))
+			      (dladdr
+			       (function unsigned
+					 unsigned (* (struct dl-info)))
+			       :extern "dladdr"))
+		   (let ((err (alien-funcall dladdr addr (addr info))))
+		     (if (zerop err)
+			 nil
+			 (values (slot info 'symbol)
+				 (slot info 'filename)
+				 addr
+				 (- addr (slot info 'symbol-address)))))))))))
+    
     ))					; PROGN, MACROLET
