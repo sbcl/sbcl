@@ -236,11 +236,10 @@
     (incf (interpreted-function-gcs fun))))
 (pushnew 'interpreter-gc-hook sb!ext:*before-gc-hooks*)
 
+;;; Clear all entries in the eval function cache. This allows the internal
+;;; representation of the functions to be reclaimed, and also lazily forces
+;;; macroexpansions to be recomputed.
 (defun flush-interpreted-function-cache ()
-  #!+sb-doc
-  "Clear all entries in the eval function cache. This allows the internal
-  representation of the functions to be reclaimed, and also lazily forces
-  macroexpansions to be recomputed."
   (dolist (fun *interpreted-function-cache*)
     (setf (interpreted-function-definition fun) nil))
   (setq *interpreted-function-cache* ()))

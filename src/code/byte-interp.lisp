@@ -113,7 +113,9 @@
 	(new-sp-var (gensym "NEW-SP-"))
 	(decls nil))
     (loop
-      (unless (and (consp body) (consp (car body)) (eq (caar body) 'declare))
+      (unless (and (consp body)
+		   (consp (car body))
+		   (eq (caar body) 'declare))
 	(return))
       (push (pop body) decls))
     `(let ((,new-sp-var (- *eval-stack-top* ,num-vars)))
