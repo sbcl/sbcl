@@ -24,7 +24,7 @@ notably in the name of the @code{SB-ALIEN} package.
 * Operations On Foreign Values::  
 * Foreign Variables::           
 * Foreign Data Structure Examples::  
-* Loading Unix Object Files::   
+* Loading Shared Object Files::  
 * Foreign Function Calls::      
 * Step-By-Step Example of the Foreign Function Interface::  
 @end menu
@@ -711,33 +711,14 @@ which can be manipulated in Lisp like this:
 (setq my-struct (slot my-struct 'n))
 @end lisp
 
-@node  Loading Unix Object Files
+@node  Loading Shared Object Files
 @comment  node-name,  next,  previous,  up
-@section Loading Unix Object Files
+@section Loading Shared Object Files
 
 Foreign object files can be loaded into the running Lisp process by
 calling @code{load-shared-object}.
 
-The @code{sb-alien:load-shared-object} loads a single object file into
-the currently running Lisp. The external symbols defining routines and
-variables are made available for future external references (e.g. by
-@code{extern-alien}). Forward references to foreign symbols aren't
-supported: @code{load-shared-object} must be run before any of the
-defined symbols are referenced.
-
-@quotation
-Note: As of SBCL 0.7.5, all foreign code (code loaded with
-@code{load-shared-object}) is lost when a Lisp
-core is saved with @code{sb-ext:save-lisp-and-die}, and no attempt is
-made to restore it when the core is loaded. Historically this has been
-an annoyance both for SBCL users and for CMUCL users.  It's hard to
-solve this problem completely cleanly, but some generally-reliable
-partial solution might be useful. Once someone in either camp gets
-sufficiently annoyed to create it, SBCL is likely to adopt some
-mechanism for automatically restoring foreign code when a saved core
-is loaded.
-@end quotation
-
+@include fun-sb-alien-load-shared-object.texinfo
 
 @node  Foreign Function Calls
 @comment  node-name,  next,  previous,  up

@@ -504,28 +504,32 @@
 (defmacro trace (&rest specs)
   #+sb-doc
   "TRACE {Option Global-Value}* {Name {Option Value}*}*
-   TRACE is a debugging tool that provides information when specified functions
-   are called. In its simplest form:
+
+TRACE is a debugging tool that provides information when specified
+functions are called. In its simplest form:
+
        (TRACE NAME-1 NAME-2 ...)
-   The NAMEs are not evaluated. Each may be a symbol, denoting an
-   individual function, or a string, denoting all functions fbound
-   to symbols whose home package is the package with the given name.
 
-   Options allow modification of the default behavior. Each option is a pair
-   of an option keyword and a value form. Global options are specified before
-   the first name, and affect all functions traced by a given use of TRACE.
-   Options may also be interspersed with function names, in which case they
-   act as local options, only affecting tracing of the immediately preceding
-   function name. Local options override global options.
+The NAMEs are not evaluated. Each may be a symbol, denoting an
+individual function, or a string, denoting all functions fbound to
+symbols whose home package is the package with the given name.
 
-   By default, TRACE causes a printout on *TRACE-OUTPUT* each time that
-   one of the named functions is entered or returns. (This is the
-   basic, ANSI Common Lisp behavior of TRACE.) As an SBCL extension, the
-   :REPORT SB-EXT:PROFILE option can be used to instead cause information
-   to be silently recorded to be inspected later using the SB-EXT:PROFILE
-   function.
+Options allow modification of the default behavior. Each option is a
+pair of an option keyword and a value form. Global options are
+specified before the first name, and affect all functions traced by a
+given use of TRACE. Options may also be interspersed with function
+names, in which case they act as local options, only affecting tracing
+of the immediately preceding function name. Local options override
+global options.
 
-   The following options are defined:
+By default, TRACE causes a printout on *TRACE-OUTPUT* each time that
+one of the named functions is entered or returns. (This is the basic,
+ANSI Common Lisp behavior of TRACE.) As an SBCL extension, the
+:REPORT SB-EXT:PROFILE option can be used to instead cause information
+to be silently recorded to be inspected later using the SB-EXT:PROFILE
+function.
+
+The following options are defined:
 
    :REPORT Report-Type
        If Report-Type is TRACE (the default) then information is reported
@@ -579,10 +583,10 @@
        and the resulting function is instrumented, i.e. traced or profiled
        as specified in REPORT.
 
-   :CONDITION, :BREAK and :PRINT forms are evaluated in a context which
-   mocks up the lexical environment of the called function, so that
-   SB-DEBUG:VAR and SB-DEBUG:ARG can be used. The -AFTER and -ALL forms
-   are evaluated in the null environment."
+:CONDITION, :BREAK and :PRINT forms are evaluated in a context which
+mocks up the lexical environment of the called function, so that
+SB-DEBUG:VAR and SB-DEBUG:ARG can be used. The -AFTER and -ALL forms
+are evaluated in the null environment."
   (if specs
       (expand-trace specs)
       '(%list-traced-funs)))

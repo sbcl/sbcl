@@ -921,7 +921,7 @@ returning a value from the current stack frame.
 
 If @code{debug} is also at least 2, then  the code is @emph{partially
 steppable}. If @code{debug} is 3, the code is @emph{fully steppable}.
-@xref{Single Stepping} for details.
+@xref{Single Stepping}, for details.
 
 @end table
 
@@ -1186,7 +1186,7 @@ function entry or exit.
 
 SBCL includes an instrumentation based single-stepper for compiled
 code, that can be invoked via the @code{step} macro, or from within
-the debugger. @xref{Debugger Policy Control} for details on enabling
+the debugger. @xref{Debugger Policy Control}, for details on enabling
 stepping for compiled code.
 
 Compiled code can be unsteppable, partially steppable, or fully steppable.

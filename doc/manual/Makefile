@@ -6,7 +6,6 @@ TMPFILES:=$(foreach target,asdf sbcl,$(foreach type,$(TMPTYPES),$(target).$(type
 PSFILES=sbcl.ps asdf.ps
 PDFFILES=sbcl.pdf asdf.pdf
 INFOFILES=sbcl.info asdf.info
-VARSFILE=variables.template
 HTMLDIRS=$(basename $(SBCLTEXI)) $(basename $(ASDFTEXI))
 # Place where generated documentation ends up. The value of
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
@@ -41,14 +40,11 @@ asdf.texinfo:
 	rm -f asdf.texinfo
 	ln -s ../../contrib/asdf/asdf.texinfo
 
-variables: ${VARSFILE}
-	./extract-values.sh < ${VARSFILE} >variables.texinfo
-
 # html documentation; output in $(HTMLDIRS)
 .PHONY: html
 html: html-stamp
 
-html-stamp: variables $(DOCFILES) docstrings
+html-stamp: $(DOCFILES) docstrings
 	@rm -rf $(HTMLDIRS)
 	$(MAKEINFO) $(I_FLAGS) --html $(SBCLTEXI)
 	$(MAKEINFO) --html $(ASDFTEXI)
@@ -62,21 +58,21 @@ ps: $(PSFILES)
 	dvips -o $@ $<
 
 # DVI generation
-%.dvi: %.texinfo variables $(DOCFILES) docstrings
+%.dvi: %.texinfo $(DOCFILES) docstrings
 	texi2dvi $(I_FLAGS) $<
 
 # PDF documentation
 .PHONY: pdf
 pdf: $(PDFFILES)
 
-%.pdf: %.texinfo variables $(DOCFILES) docstrings
+%.pdf: %.texinfo $(DOCFILES) docstrings
 	texi2pdf $(I_FLAGS) $<
 
 # info docfiles
 .PHONY: info
 info: $(INFOFILES)
 
-%.info: %.texinfo variables $(DOCFILES) docstrings
+%.info: %.texinfo $(DOCFILES) docstrings
 	$(MAKEINFO) $(I_FLAGS) $<
 
 # Texinfo docstring snippets

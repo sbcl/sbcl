@@ -769,7 +769,7 @@ Policy Control}.
 Ordinarily, when the @code{speed} quality is high, the compiler emits
 notes to notify the programmer about its inability to apply various
 optimizations. For selective muffling of these notes @xref{Controlling
-Verbosity}
+Verbosity}.
 
 The value of @code{space} mostly influences the compiler's decision
 whether to inline operations, which tend to increase the size of

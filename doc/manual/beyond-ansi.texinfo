@@ -11,7 +11,6 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Support For Unix::            
 * Customization Hooks for Users::  
 * Tools To Help Developers::    
-* Interface To Low-Level SBCL Implementation::  
 * Stale Extensions::            
 * Efficiency Hacks::            
 @end menu
@@ -98,34 +97,13 @@ mechanisms as follows:
 @section Tools To Help Developers
 
 SBCL provides a profiler and other extensions to the ANSI @code{trace}
-facility.  For more information, see @ref{macro-common-lisp-trace}.
+facility.  For more information, see @ref{Macro common-lisp:trace}.
 
 The debugger supports a number of options. Its documentation is
 accessed by typing @kbd{help} at the debugger prompt. @xref{Debugger}.
 
 Documentation for @code{inspect} is accessed by typing @kbd{help} at
 the @code{inspect} prompt.
-
-@node  Interface To Low-Level SBCL Implementation
-@comment  node-name,  next,  previous,  up
-@section Interface To Low-Level SBCL Implementation
-
-SBCL has the ability to save its state as a file for later
-execution. This functionality is important for its bootstrapping
-process, and is also provided as an extension to the user.  
-
-Note that foreign libraries loaded via @code{load-shared-object} don't
-survive this process on all platforms; a core should not be saved in
-this case. Platforms where this is supported as of SBCL 0.8.14.5 are
-x86/Linux, x86/FreeBSD and sparc/SunOS.
-
-@emph{FIXME: what should be done for foreign libraries?}
-
-@emph{FIXME: document load-shared-object somewhere - it's in
-ffi.texinfo?}
-
-@include fun-sb-ext-save-lisp-and-die.texinfo
-
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up

@@ -34,9 +34,52 @@
   #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
+Only global state is preserved: the stack is unwound in the process.
 
-This implementation is not as polished and painless as you might
-like:
+The following &KEY arguments are defined:
+
+  :TOPLEVEL
+     The function to run when the created core file is resumed. The
+     default function handles command line toplevel option processing
+     and runs the top level read-eval-print loop. This function should
+     not return.
+
+  :PURIFY
+     If true (the default), do a purifying GC which moves all
+     dynamically allocated objects into static space. This takes
+     somewhat longer than the normal GC which is otherwise done, but
+     it's only done once, and subsequent GC's will be done less often
+     and will take less time in the resulting core file. See the PURIFY
+     function.
+
+  :ROOT-STRUCTURES
+     This should be a list of the main entry points in any newly loaded
+     systems. This need not be supplied, but locality and/or GC performance
+     may be better if they are. Meaningless if :PURIFY is NIL. See the
+     PURIFY function.
+
+  :ENVIRONMENT-NAME
+     This is also passed to the PURIFY function when :PURIFY is T.
+     (rarely used)
+
+The save/load process changes the values of some global variables:
+
+  *STANDARD-OUTPUT*, *DEBUG-IO*, etc.
+    Everything related to open streams is necessarily changed, since
+    the OS won't let us preserve a stream across save and load.
+
+  *DEFAULT-PATHNAME-DEFAULTS*
+    This is reinitialized to reflect the working directory where the
+    saved core is loaded.
+
+Foreign objects loaded with SB-ALIEN:LOAD-SHARED-OBJECT are
+automatically reloaded on startup, but references to foreign symbols
+do not survive intact on all platforms: in this case a WARNING is
+signalled when saving the core. If no warning is signalled, then the
+foreign symbol references will remain intact. Platforms where this is
+currently the case are x86/FreeBSD, x86/Linux, and sparc/SunOS.
+
+This implementation is not as polished and painless as you might like:
   * It corrupts the current Lisp image enough that the current process
     needs to be killed afterwards. This can be worked around by forking
     another process that saves the core.
@@ -47,37 +90,7 @@ like:
     purpose.
 This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
-sufficiently motivated to do lengthy fixes.
-
-The following &KEY arguments are defined:
-  :TOPLEVEL
-     The function to run when the created core file is resumed. The
-     default function handles command line toplevel option processing
-     and runs the top level read-eval-print loop. This function should
-     not return.
-  :PURIFY
-     If true (the default), do a purifying GC which moves all
-     dynamically allocated objects into static space. This takes
-     somewhat longer than the normal GC which is otherwise done, but
-     it's only done once, and subsequent GC's will be done less often
-     and will take less time in the resulting core file. See the PURIFY
-     function.
-  :ROOT-STRUCTURES
-     This should be a list of the main entry points in any newly loaded
-     systems. This need not be supplied, but locality and/or GC performance
-     may be better if they are. Meaningless if :PURIFY is NIL. See the
-     PURIFY function.
-  :ENVIRONMENT-NAME
-     This is also passed to the PURIFY function when :PURIFY is T.
-     (rarely used)
-
-The save/load process changes the values of some global variables:
-  *STANDARD-OUTPUT*, *DEBUG-IO*, etc.
-    Everything related to open streams is necessarily changed, since
-    the OS won't let us preserve a stream across save and load.
-  *DEFAULT-PATHNAME-DEFAULTS*
-    This is reinitialized to reflect the working directory where the
-    saved core is loaded."
+sufficiently motivated to do lengthy fixes."
   (deinit)
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this
   ;; function, and just do a GC :FULL T here? (Then if the user wanted

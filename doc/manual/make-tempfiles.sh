@@ -15,6 +15,7 @@
 # else an installed sbcl is used.
 sbclsystem=`pwd`/../../src/runtime/sbcl
 sbclcore=`pwd`/../../output/sbcl.core
+
 if [ -e $sbclsystem ] && [ -e $sbclcore ] 
 then
     SBCLRUNTIME="${1:-$sbclsystem --core $sbclcore}"
@@ -24,6 +25,13 @@ else
 fi
 
 SBCL="$SBCLRUNTIME --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger"
+
+# extract version and date
+VERSION=`$SBCL --eval '(write-line (lisp-implementation-version))' --eval '(sb-ext:quit)'`
+MONTH=`date "+%Y-%m"`
+
+sed -e "s/@VERSION@/$VERSION/" \
+    -e "s/@MONTH@/$MONTH/" < variables.template > variables.texinfo || exit 1
 
 # Output directory.  This has to end with a slash (it's interpreted by
 # Lisp's `pathname' function) or you lose.  This is normally set from
@@ -39,7 +47,13 @@ DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 #PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD}"
 
 echo /creating docstring snippets from SBCL=\'$SBCLRUNTIME\' for packages \'$PACKAGES\'
-echo "(progn (load \"docstrings.lisp\") (dolist (module (quote ($MODULES))) (require module)) (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL
+$SBCL <<EOF
+(load "docstrings.lisp") 
+(dolist (module (quote ($MODULES))) 
+  (require module)) 
+(sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES) 
+(sb-ext:quit))
+EOF
 
 echo /creating package-locks.texi-temp
 if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-ext))) (quit :unix-status (if (and plp (fboundp plp)) 0 1)))";
