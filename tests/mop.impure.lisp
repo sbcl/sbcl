@@ -369,6 +369,13 @@
       (assert (null value))
       (assert (typep error 'error)))))
 
+;;; bug reported by David Morse: direct-subclass update protocol was broken
+(defclass vegetable () ())
+(defclass tomato (vegetable) ())
+(assert (equal (list (find-class 'tomato)) (sb-mop:class-direct-subclasses (find-class 'vegetable))))
+(defclass tomato () ())
+(assert (null (sb-mop:class-direct-subclasses (find-class 'vegetable))))
+
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

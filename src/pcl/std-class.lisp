@@ -501,8 +501,9 @@
   (setf (slot-value class 'class-eq-specializer)
 	(make-instance 'class-eq-specializer :class class)))
 
-(defmethod reinitialize-instance :before ((class slot-class) &key)
-  (remove-direct-subclasses class (class-direct-superclasses class))
+(defmethod reinitialize-instance :before ((class slot-class) &key direct-superclasses)
+  (dolist (old-super (set-difference (class-direct-superclasses class) direct-superclasses))
+    (remove-direct-subclass old-super class))
   (remove-slot-accessors    class (class-direct-slots class)))
 
 (defmethod reinitialize-instance :after ((class slot-class)
@@ -769,11 +770,6 @@
     (unless (memq class (class-direct-subclasses class))
       (add-direct-subclass super class))))
 
-(defun remove-direct-subclasses (class supers)
-  (let ((old (class-direct-superclasses class)))
-    (dolist (o (set-difference old supers))
-      (remove-direct-subclass o class))))
-
 (defmethod finalize-inheritance ((class std-class))
   (update-class class t))
 
@@ -942,10 +938,10 @@
   (find-class 'standard-direct-slot-definition))
 
 (defun make-direct-slotd (class initargs)
-  (let ((initargs (list* :class class initargs)))
-    (apply #'make-instance
-	   (apply #'direct-slot-definition-class class initargs)
-	   initargs)))
+  (apply #'make-instance
+         (apply #'direct-slot-definition-class class initargs)
+         :class class
+         initargs))
 
 (defmethod compute-slots ((class std-class))
   ;; As specified, we must call COMPUTE-EFFECTIVE-SLOT-DEFINITION once
