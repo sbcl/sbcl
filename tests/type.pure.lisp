@@ -26,5 +26,3 @@
 	    (nil (or number vector)            nil)
 	    (12  (or null vector)              nil)
 	    (12  (and (or number vector) real) t))))
-
-	    

@@ -101,9 +101,12 @@
 ;;; inline.
 (defmacro fastbig- (x y)
   (once-only ((x x) (y y))
-    `(if (and (typep ,x 'fixnum)
-	      (typep ,y 'fixnum))
+    `(if (and (typep ,x '(and fixnum unsigned-byte))
+	      (typep ,y '(and fixnum unsigned-byte)))
+	 ;; special case: can use fixnum arithmetic and be guaranteed
+	 ;; the result is also a fixnum
 	 (- ,x ,y)
+	 ;; general case
 	 (- ,x ,y))))
 (defmacro fastbig-1+ (x)
   (once-only ((x x))
@@ -161,11 +164,21 @@
 	 (aver (typep dconsing 'unsigned-byte))
 	 (aver (typep inner-enclosed-profiles 'unsigned-byte))
 	 (multiple-value-prog1
-	     (let ((start-ticks (get-internal-ticks))
-		   (start-consing (get-bytes-consed))
-		   (*enclosed-ticks* 0)
-		   (*enclosed-consing* 0)
-		   (*enclosed-profiles* 0))
+	     (let* ((start-ticks (get-internal-ticks))
+		    (*enclosed-ticks* 0)
+		    (*enclosed-consing* 0)
+		    (*enclosed-profiles* 0)
+		    (nbf-pcounter *n-bytes-freed-or-purified-pcounter*)
+		    ;; Typically NBF-PCOUNTER will represent a bignum.
+		    ;; In general we don't want to cons up a new bignum for every
+		    ;; encapsulated call, so instead we keep track of
+		    ;; the PCOUNTER internals, so that as long as we
+		    ;; only cons small amounts, we'll almost always
+		    ;; just do fixnum arithmetic. (And for encapsulated
+		    ;; functions which cons large amounts, then we don't
+		    ;; much care about a single extra consed bignum.)
+		    (start-consing-integer (pcounter-integer nbf-pcounter))
+		    (start-consing-fixnum (pcounter-fixnum nbf-pcounter)))
 	       (declare (inline pcounter-or-fixnum->integer))
 	       (multiple-value-prog1
 		   (multiple-value-call encapsulated-fun
@@ -173,8 +186,14 @@
 							       0
 							       arg-count))
 		 (let ((*computing-profiling-data-for* encapsulated-fun))
-		   (setf dticks (fastbig- (get-internal-ticks) start-ticks)
-			 dconsing (fastbig- (get-bytes-consed) start-consing))
+		   (setf dticks (fastbig- (get-internal-ticks) start-ticks))
+		   (setf dconsing
+			 (if (eq (pcounter-integer nbf-pcounter)
+				 start-consing-integer)
+			     (- (pcounter-fixnum nbf-pcounter)
+				start-consing-fixnum)
+			     (- (get-bytes-consed)
+				(+ pcounter-integer pcounter-fixnum))))
 		   (setf inner-enclosed-profiles
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
@@ -418,8 +437,14 @@ Lisp process."
 ;;;; overhead estimation
 
 ;;; We average the timing overhead over this many iterations.
-(defconstant +timer-overhead-iterations+
-  50000)
+;;;
+;;; (This is a variable, not a constant, so that it can be set in
+;;; .sbclrc if desired. Right now, that's an unsupported extension
+;;; that I (WHN) use for my own experimentation, but it might
+;;; become supported someday. Comments?)
+(declaim (type unsigned-byte *timer-overhead-iterations*))
+(defvar *timer-overhead-iterations*
+  500000)
 
 ;;; a dummy function that we profile to find profiling overhead
 (declaim (notinline compute-overhead-aux))
@@ -428,14 +453,15 @@ Lisp process."
 
 ;;; Return a newly computed OVERHEAD object.
 (defun compute-overhead ()
+  (format *debug-io* "~&measuring PROFILE overhead..")
   (flet ((frob ()
 	   (let ((start (get-internal-ticks))
 	         (fun (symbol-function 'compute-overhead-aux)))
-	     (dotimes (i +timer-overhead-iterations+)
+	     (dotimes (i *timer-overhead-iterations*)
 	       (funcall fun fun))
 	     (/ (float (- (get-internal-ticks) start))
 		(float +ticks-per-second+)
-		(float +timer-overhead-iterations+)))))
+		(float *timer-overhead-iterations*)))))
     (let (;; Measure unprofiled calls to estimate call overhead.
 	  (call-overhead (frob))
 	  total-overhead
@@ -453,14 +479,16 @@ Lisp process."
 	  (setf internal-overhead
 		(/ (float time)
 		   (float +ticks-per-second+)
-		   (float +timer-overhead-iterations+))))
+		   (float *timer-overhead-iterations*))))
 	(unprofile compute-overhead-aux))
-      (make-overhead :call call-overhead
-		     :total total-overhead
-		     :internal internal-overhead))))
+      (prog1
+	  (make-overhead :call call-overhead
+			 :total total-overhead
+			 :internal internal-overhead)
+	(format *debug-io* "done~%")))))
 
 ;;; It would be bad to compute *OVERHEAD*, save it into a .core file,
-;;; then load old *OVERHEAD* value from the .core file into a
+;;; then load the old *OVERHEAD* value from the .core file into a
 ;;; different machine running at a different speed. We avoid this by
 ;;; erasing *CALL-OVERHEAD* whenever we save a .core file.
 (pushnew (lambda ()

@@ -51,6 +51,3 @@
      (unless (= n-actually-read-1 n-to-read)
        (assert (< n-actually-read-1 n-to-read))
        (return)))))
-
-;;; success
-(quit :unix-status 104)

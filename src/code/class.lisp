@@ -180,7 +180,7 @@
 	 ;; be a SB-PCL:CLASS under some circumstances? What goes here
 	 ;; when the LAYOUT is in fact a PCL::WRAPPER?
 	 :type #-sb-xc sb!xc:class #+sb-xc cl:class)
-  ;; The value of this slot can be
+  ;; The value of this slot can be:
   ;;   * :UNINITIALIZED if not initialized yet;
   ;;   * NIL if this is the up-to-date layout for a class; or
   ;;   * T if this layout has been invalidated (by being replaced by 
@@ -188,14 +188,15 @@
   ;;   * something else (probably a list) if the class is a PCL wrapper
   ;;     and PCL has made it invalid and made a note to itself about it
   (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
-  ;; The layouts for all classes we inherit. If hierarchical these are
-  ;; in order from most general down to (but not including) this
-  ;; class.
+  ;; the layouts for all classes we inherit. If hierarchical, i.e. if
+  ;; DEPTHOID >= 0, then these are ordered by ORDER-LAYOUT-INHERITS,
+  ;; so that each inherited layout appears at its expected depth,
+  ;; i.e. at its LAYOUT-DEPTHOID value.
   ;;
-  ;; FIXME: Couldn't this be (SIMPLE-ARRAY LAYOUT 1) instead of
-  ;; SIMPLE-VECTOR?
+  ;; Remaining elements are filled by the non-hierarchical layouts or,
+  ;; if they would otherwise be empty, by copies of succeeding layouts.
   (inherits #() :type simple-vector)
-  ;; If inheritance is hierarchical, this is -1. If inheritance is not
+  ;; If inheritance is not hierarchical, this is -1. If inheritance is 
   ;; hierarchical, this is the inheritance depth, i.e. (LENGTH INHERITS).
   ;; Note:
   ;;  (1) This turns out to be a handy encoding for arithmetically
@@ -516,13 +517,15 @@
 ); EVAL-WHEN
 
 ;;; Arrange the inherited layouts to appear at their expected depth,
-;;; ensuring that hierarchical type tests succeed. Layouts with a
-;;; specific depth are placed first, then the non- hierarchical
-;;; layouts fill remaining elements. Any empty elements are filled
-;;; with layout copies ensuring that all elements have a valid layout.
-;;; This re-ordering may destroy CPL ordering so the inherits should
-;;; not be read as being in CPL order, and further duplicates may be
-;;; introduced.
+;;; ensuring that hierarchical type tests succeed. Layouts with 
+;;; DEPTHOID >= 0 (i.e. hierarchical classes) are placed first,
+;;; at exactly that index in the INHERITS vector. Then, non-hierarchical
+;;; layouts are placed in remaining elements. Then, any still-empty
+;;; elements are filled with their successors, ensuring that each
+;;; element contains a valid layout.
+;;;
+;;; This reordering may destroy CPL ordering, so the inherits should
+;;; not be read as being in CPL order.
 (defun order-layout-inherits (layouts)
   (declare (simple-vector layouts))
   (let ((length (length layouts))
@@ -1256,17 +1259,25 @@
 ;;; is loaded and the class defined.
 (!cold-init-forms
   (/show0 "about to define temporary STANDARD-CLASSes")
-  (dolist (x '(;; FIXME: The mysterious duplication of STREAM in the
-	       ;; list here here was introduced in sbcl-0.6.12.33, in
-	       ;; MNA's port of DTC's inline-type-tests patches for
-	       ;; CMU CL. I'm guessing that it has something to do
-	       ;; with preallocating just enough space in a table
-	       ;; later used by the final definition of
-	       ;; FUNDAMENTAL-STREAM (perhaps for Gray stream stuff?).
-	       ;; It'd be good to document this weirdness both here
-	       ;; and in the REGISTER-LAYOUT code which has to do the
-	       ;; right thing with the duplicates-containing
-	       ;; INHERITS-LIST.
+  (dolist (x '(;; Why is STREAM duplicated in this list? Because, when
+               ;; the inherits-vector of FUNDAMENTAL-STREAM is set up,
+               ;; a vector containing the elements of the list below,
+               ;; i.e. '(T INSTANCE STREAM STREAM), is created, and
+               ;; this is what the function ORDER-LAYOUT-INHERITS
+               ;; would do, too.
+               ;;
+               ;; So, the purpose is to guarantee a valid layout for
+               ;; the FUNDAMENTAL-STREAM class, matching what
+               ;; ORDER-LAYOUT-INHERITS would do.
+               ;; ORDER-LAYOUT-INHERITS would place STREAM at index 3
+               ;; in the INHERITS(-VECTOR). Index 2 would not be
+               ;; filled, so STREAM is duplicated there (as
+               ;; ORDER-LAYOUTS-INHERITS would do). Maybe the
+               ;; duplicate definition could be removed (removing a
+               ;; STREAM element), because FUNDAMENTAL-STREAM is
+               ;; redefined after PCL is set up, anyway. But to play
+               ;; it safely, we define the class with a valid INHERITS
+               ;; vector.
 	       (fundamental-stream (t instance stream stream))))
     (/show0 "defining temporary STANDARD-CLASS")
     (let* ((name (first x))

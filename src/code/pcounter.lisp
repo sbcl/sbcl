@@ -8,10 +8,13 @@
 ;;;; bytes consed in a profiled function are all examples of such
 ;;;; quantities. The name is an abbreviation for "Profiling COUNTER".
 ;;;;
-;;;; It's not one of my more brilliant names, if you have a better
-;;;; suggestion, I might be interested. -- WHN 2001-06-22
+;;;; (This isn't one of my more brilliant names, so if you have a
+;;;; better suggestion, let me know. -- WHN 2001-06-22)
 
-(in-package "SB!IMPL")
+;;; This stuff is implemented in the SB!PROFILE because the profiling
+;;; code is currently the only code which wants to poke around in the
+;;; implementation details.
+(in-package "SB!PROFILE")
 
 ;;;; basic PCOUNTER stuff
 

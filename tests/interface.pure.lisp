@@ -68,4 +68,3 @@
 ;;; (like being an accessor for a structure which has a doc string).
 
 (print "done with interface.pure.lisp")
-

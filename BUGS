@@ -492,23 +492,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   CLOS methods, and then expressing the solutions to stuff like this
   should become much more straightforward. -- WHN 2001-03-14
 
-59:
-  CL:*DEFAULT-PATHNAME-DEFAULTS* doesn't behave as ANSI suggests (reflecting
-  current working directory). And there's no supported way to update
-  or query the current working directory (a la Unix "chdir" and "pwd"),
-  which is functionality that ILISP needs (and currently gets with low-level
-  hacks).
-    When this is fixed, probably the more-or-less-parallel Unix-level
-  hacks
-	DEFAULT-DIRECTORY
-	%SET-DEFAULT-DIRECTORY
-	etc.?
-  should go away. Also we need to figure out what's the proper way to 
-  deal with the interaction of users assigning new values to
-  *DEFAULT-PATHNAME-DEFAULTS* and cores being saved and restored.
-  (Perhaps just make restoring from a save always overwrite the old
-  value with the new Unix-level default directory?)
-
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
 
