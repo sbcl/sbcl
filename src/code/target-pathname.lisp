@@ -51,15 +51,16 @@
   (let ((namestring (handler-case (namestring pathname)
 		      (error nil))))
     (if namestring
-	(format stream "#.(logical-pathname ~S)" namestring)
+	(format stream "#.(CL:LOGICAL-PATHNAME ~S)" namestring)
 	(print-unreadable-object (pathname stream :type t)
-	  (format stream
-		  ":HOST ~S :DIRECTORY ~S :FILE ~S :NAME=~S :VERSION ~S"
-		  (%pathname-host pathname)
-		  (%pathname-directory pathname)
-		  (%pathname-name pathname)
-		  (%pathname-type pathname)
-		  (%pathname-version pathname))))))
+	  (format
+	   stream
+	   "~_:HOST ~S ~_:DIRECTORY ~S ~_:FILE ~S ~_:NAME ~S ~_:VERSION ~S"
+	   (%pathname-host pathname)
+	   (%pathname-directory pathname)
+	   (%pathname-name pathname)
+	   (%pathname-type pathname)
+	   (%pathname-version pathname))))))
 
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
@@ -457,7 +458,8 @@ a host-structure or string."
 	   (type (or string pathname-component-tokens) device)
 	   (type (or list string pattern pathname-component-tokens) directory)
 	   (type (or string pattern pathname-component-tokens) name type)
-	   (type (or integer pathname-component-tokens (member :newest)) version)
+	   (type (or integer pathname-component-tokens (member :newest))
+		 version)
 	   (type (or pathname-designator null) defaults)
 	   (type (member :common :local) case))
   (let* ((defaults (when defaults
@@ -1426,7 +1428,8 @@ a host-structure or string."
 			  :offset (cdadr chunks)))))
 	(parse-host (logical-chunkify namestr start end)))
       (values host :unspecific
-	      (and (not (equal (directory)'(:absolute)))(directory))
+	      (and (not (equal (directory)'(:absolute)))
+		   (directory))
 	      name type version))))
 
 ;;; We can't initialize this yet because not all host methods are loaded yet.
@@ -1558,7 +1561,7 @@ a host-structure or string."
 
 (defun translate-logical-pathname (pathname &key)
   #!+sb-doc
-  "Translates pathname to a physical pathname, which is returned."
+  "Translate PATHNAME to a physical pathname, which is returned."
   (declare (type pathname-designator pathname)
 	   (values (or null pathname)))
   (typecase pathname

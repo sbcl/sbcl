@@ -385,22 +385,17 @@
   (collect ((strings))
     (let* ((name (%pathname-name pathname))
 	   (type (%pathname-type pathname))
-	   (type-supplied (not (or (null type) (eq type :unspecific))))
-	   (version (%pathname-version pathname))
-	   (version-supplied (not (or (null version) (eq version :newest)))))
+	   (type-supplied (not (or (null type) (eq type :unspecific)))))
+      ;; Note: by ANSI 19.3.1.1.5, we ignore the version slot when
+      ;; translating logical pathnames to a filesystem without
+      ;; versions (like Unix).
       (when name
 	(strings (unparse-unix-piece name)))
       (when type-supplied
 	(unless name
 	  (error "cannot specify the type without a file: ~S" pathname))
 	(strings ".")
-	(strings (unparse-unix-piece type)))
-      (when version-supplied
-	(unless type-supplied
-	  (error "cannot specify the version without a type: ~S" pathname))
-	(strings (if (eq version :wild)
-		     ".*"
-		     (format nil ".~D" version)))))
+	(strings (unparse-unix-piece type))))
     (apply #'concatenate 'simple-string (strings))))
 
 (/show0 "filesys.lisp 406")

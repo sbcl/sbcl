@@ -442,12 +442,12 @@
 
 ;;; These functions are called by the expansion of the DEFPRINTER
 ;;; macro to do the actual printing.
-(declaim (ftype (function (symbol t stream &optional t) (values))
+(declaim (ftype (function (symbol t stream) (values))
 		defprinter-prin1 defprinter-princ))
-(defun defprinter-prin1 (name value stream &optional indent)
+(defun defprinter-prin1 (name value stream)
   (declare (ignore indent))
   (defprinter-prinx #'prin1 name value stream))
-(defun defprinter-princ (name value stream &optional indent)
+(defun defprinter-princ (name value stream)
   (declare (ignore indent))
   (defprinter-prinx #'princ name value stream))
 (defun defprinter-prinx (prinx name value stream)
@@ -529,8 +529,6 @@
        ;; FIXME: should probably be byte-compiled
        (pprint-logical-block (,stream nil)
 	 (print-unreadable-object (structure ,stream :type t)
-	   (when *print-pretty*
-	     (pprint-indent :block 2 ,stream))
 	   ,@(nreverse reversed-prints))))))
 
 #|

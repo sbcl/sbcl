@@ -98,13 +98,18 @@
 (let ((cond (grab-condition (logical-pathname-translations "unregistered-host"))))
   (assert (typep cond 'type-error)))
 
-;;; examples from CLHS: Section 19.4, Logical Pathname Translations
-;;; (sometimes converted to the Un*x way of things)
+;;; FIXME: A comment on this section up to sbcl-0.6.11.30 or so said
+;;;   examples from CLHS: Section 19.4, LOGICAL-PATHNAME-TRANSLATIONS
+;;;   (sometimes converted to the Un*x way of things)
+;;; but when I looked it up I didn't see the connection. Presumably
+;;; there's some code in this section which should be attributed
+;;; to something in the ANSI spec, but I don't know what code it is
+;;; or what section of the specification has the related code.
 (setf (logical-pathname-translations "test0")
         '(("**;*.*.*"              "/library/foo/**/")))
 (assert (equal (namestring (translate-logical-pathname
-                            "test0:foo;bar;baz;mum.quux.3"))
-               "/library/foo/foo/bar/baz/mum.quux.3"))
+                            "test0:foo;bar;baz;mum.quux"))
+               "/library/foo/foo/bar/baz/mum.quux"))
 (setf (logical-pathname-translations "prog")
         '(("RELEASED;*.*.*"        "MY-UNIX:/sys/bin/my-prog/")
           ("RELEASED;*;*.*.*"      "MY-UNIX:/sys/bin/my-prog/*/")
@@ -121,6 +126,13 @@
 (assert (equal (namestring (translate-logical-pathname
                             "prog:code;documentation.lisp"))
                "/lib/prog/docum.lisp"))
+
+;;; ANSI section 19.3.1.1.5 specifies that translation to a filesystem
+;;; which doesn't have versions should ignore the version slot. CMU CL
+;;; didn't ignore this as it should, but we do.
+(assert (equal (namestring (translate-logical-pathname
+                            "test0:foo;bar;baz;mum.quux.3"))
+               "/library/foo/foo/bar/baz/mum.quux"))
 
 ;;; success
 (quit :unix-status 104)

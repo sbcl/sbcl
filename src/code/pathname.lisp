@@ -26,19 +26,23 @@
   (customary-case (required-argument) :type (member :upper :lower)))
 
 (def!struct (logical-host
-		  (:include host
-			    (:parse #'parse-logical-namestring)
-			    (:unparse #'unparse-logical-namestring)
-			    (:unparse-host
-			     (lambda (x)
-			       (logical-host-name (%pathname-host x))))
-			    (:unparse-directory #'unparse-logical-directory)
-			    (:unparse-file #'unparse-unix-file)
-			    (:unparse-enough #'unparse-enough-namestring)
-			    (:customary-case :upper)))
+	     (:include host
+		       (:parse #'parse-logical-namestring)
+		       (:unparse #'unparse-logical-namestring)
+		       (:unparse-host
+			(lambda (x)
+			  (logical-host-name (%pathname-host x))))
+		       (:unparse-directory #'unparse-logical-directory)
+		       (:unparse-file #'unparse-unix-file)
+		       (:unparse-enough #'unparse-enough-namestring)
+		       (:customary-case :upper)))
   (name "" :type simple-base-string)
   (translations nil :type list)
   (canon-transls nil :type list))
+
+(def!method print-object ((logical-host logical-host) stream)
+  (print-unreadable-object (logical-host stream :type t)
+    (prin1 (logical-host-name logical-host) stream)))
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
@@ -90,7 +94,7 @@
 ;;;
 ;;; Physical pathnames include all these slots and a device slot.
 
-;;; Logical pathnames are a subclass of pathname. Their class
+;;; Logical pathnames are a subclass of PATHNAME. Their class
 ;;; relations are mimicked using structures for efficency.
 (sb!xc:defstruct (logical-pathname (:conc-name %logical-pathname-)
 				   (:include pathname)

@@ -891,16 +891,17 @@
 	    (:include lisp-stream
 		      (in #'concatenated-in)
 		      (bin #'concatenated-bin)
+		      (n-bin #'concatenated-n-bin)
 		      (misc #'concatenated-misc))
 	    (:constructor
 	     #!-high-security-support make-concatenated-stream
 	     #!+high-security-support %make-concatenated-stream
 		 (&rest streams &aux (current streams)))
 	    (:copier nil))
-  ;; The car of this is the stream we are reading from now.
+  ;; The car of this is the substream we are reading from now.
   current
-  ;; This is a list of all the streams. We need to remember them so that
-  ;; we can close them.
+  ;; This is a list of all the substreams there ever were. We need to
+  ;; remember them so that we can close them.
   ;;
   ;; FIXME: ANSI says this is supposed to be the list of streams that
   ;; we still have to read from. So either this needs to become a
@@ -936,7 +937,8 @@
 
 (macrolet ((in-fun (name fun)
 	     `(defun ,name (stream eof-error-p eof-value)
-		(do ((current (concatenated-stream-current stream) (cdr current)))
+		(do ((current (concatenated-stream-current stream)
+			      (cdr current)))
 		    ((null current)
 		     (eof-or-lose stream eof-error-p eof-value))
 		  (let* ((stream (car current))
@@ -945,6 +947,22 @@
 		  (setf (concatenated-stream-current stream) current)))))
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
+
+(defun concatenated-n-bin (stream buffer start numbytes eof-errorp)
+  (do ((current (concatenated-stream-current stream) (cdr current))
+       (current-start start)
+       (remaining-bytes numbytes))
+      ((null current)
+       (if eof-errorp
+	   (error 'end-of-file :stream stream)
+	   (- numbytes remaining-bytes)))
+    (let* ((stream (car current))
+           (bytes-read (read-n-bytes stream buffer current-start
+	                             remaining-bytes nil)))
+      (incf current-start bytes-read)
+      (decf remaining-bytes bytes-read)
+      (when (zerop remaining-bytes) (return numbytes)))
+    (setf (concatenated-stream-current stream) (cdr current))))
 
 (defun concatenated-misc (stream operation &optional arg1 arg2)
   (let ((left (concatenated-stream-current stream)))
