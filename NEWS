@@ -2367,6 +2367,11 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
   * [placeholder for DX summary]
     ** user code with &REST lists declared dynamic-extent, under high
        speed or space and low safety and debug optimization policy.
+  * The manual has been converted to Texinfo format and the debugger
+    chapter from the cmucl manual has been added
+  * A facility has been added to extract documentation strings from
+    sbcl and store them as Texinfo-formatted snippets for inclusion in
+    the manual (via Texinfo's @include directive)
   * bug fix: compiler emitted division in optimized DEREF.  (thanks for
     the test case to Dave Roberts)
   * bug fix: multidimensional simple arrays loaded from FASLs had fill

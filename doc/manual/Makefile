@@ -7,7 +7,10 @@ PSFILE=sbcl.ps
 PDFFILE=sbcl.pdf
 DVIFILE=sbcl.dvi
 INFOFILE=sbcl.info
-HTMLDIR=sbcl
+HTMLDIR=$(basename $(ROOTFILE))
+# The value of DOCSTRINGDIR has to end with a slash or you lose (it's
+# passed to Lisp's `pathname' function).
+DOCSTRINGDIR="docstrings/"
 
 
 ifeq ($(MAKEINFO),)
@@ -30,46 +33,54 @@ dist: html pdf
 
 
 
-
+# html documentation; output in $(HTMLDIR)
 .PHONY: html
 html: html-stamp
 
-html-stamp: $(DOCFILES)
+html-stamp: $(DOCFILES) docstrings
 	@rm -rf $(HTMLDIR)
-	$(MAKEINFO) --html $(ROOTFILE)
+	$(MAKEINFO) -I $(DOCSTRINGDIR) --html $(ROOTFILE)
 	touch html-stamp
 
-
+# Postscript documentation
 .PHONY: ps
 ps: $(PSFILE)
 
 $(PSFILE): $(DVIFILE)
 	dvips -o $@ $<
 
-$(DVIFILE): $(DOCFILES)
-	texi2dvi $(ROOTFILE)
+$(DVIFILE): $(DOCFILES) docstrings
+	texi2dvi -I $(DOCSTRINGDIR) $(ROOTFILE)
 
-
+# PDF documentation
 .PHONY: pdf
 pdf: $(PDFFILE)
 
-$(PDFFILE): $(DOCFILES)
-	texi2pdf $(ROOTFILE)
+$(PDFFILE): $(DOCFILES) docstrings
+	texi2pdf -I $(DOCSTRINGDIR) $(ROOTFILE)
 
-
+# info docfiles
 .PHONY: info
 info: $(INFOFILE)
 
-$(INFOFILE): $(DOCFILES)
-	$(MAKEINFO) $(ROOTFILE)
+$(INFOFILE): $(DOCFILES) docstrings
+	$(MAKEINFO) -I $(DOCSTRINGDIR) $(ROOTFILE)
+
+# Texinfo docstring snippets; output hardcoded in docstrings/ for now.
+.PHONY: docstrings
+docstrings: docstrings-stamp
+
+docstrings-stamp:
+	DOCSTRINGDIR=$(DOCSTRINGDIR) sh docstrings.sh
+	touch docstrings-stamp
 
 
 
 .PHONY: clean
 clean: 
 	rm -f *~ *.bak *.orig \#*\# .\#* texput.log
-	rm -rf $(HTMLDIR)
-	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp
+	rm -rf $(HTMLDIR) $(DOCSTRINGDIR)
+	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp docstrings-stamp
 	rm -f $(TMPFILES)
 	rm -f sbcl.info sbcl.info-*
 

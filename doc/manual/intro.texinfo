@@ -229,6 +229,3 @@ have been deleted or are no longer used in the implementation of SBCL
 itself.
 
 @end itemize
-  
-
-
