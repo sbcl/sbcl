@@ -27,3 +27,9 @@
 (assert (< 0
 	   (length (apropos-list "PRINT" :cl))
 	   (length (apropos-list "PRINT"))))
+
+;;; DESCRIBE shouldn't fail on rank-0 arrays (bug reported and fixed
+;;; by Lutz Euler sbcl-devel 2002-12-03)
+(describe #0a0)
+(describe #(1 2 3))
+(describe #2a((1 2) (3 4)))

@@ -43,18 +43,18 @@
 
 (defmethod describe-object ((x array) s)
   (let ((rank (array-rank x)))
-    (cond ((> rank 1)
-	   (format s "~S ~_is " x)
-	   (write-string (if (%array-displaced-p x) "a displaced" "an") s)
-	   (format s " array of rank ~S." rank)
-	   (format s "~@:_Its dimensions are ~S." (array-dimensions x)))
-	  (t
+    (cond ((= rank 1)
 	   (format s
 		   "~@:_~S is a ~:[~;displaced ~]vector of length ~S." x
 		   (and (array-header-p x) (%array-displaced-p x)) (length x))
 	   (when (array-has-fill-pointer-p x)
 	     (format s "~@:_It has a fill pointer, currently ~S."
-		     (fill-pointer x))))))
+		     (fill-pointer x))))
+	  (t
+	   (format s "~S ~_is " x)
+	   (write-string (if (%array-displaced-p x) "a displaced" "an") s)
+	   (format s " array of rank ~S." rank)
+	   (format s "~@:_Its dimensions are ~S." (array-dimensions x)))))
   (let ((array-element-type (array-element-type x)))
     (unless (eq array-element-type t)
       (format s

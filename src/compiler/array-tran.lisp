@@ -278,37 +278,41 @@
 	 (saetp (find-if (lambda (saetp)
 			   (csubtypep eltype-type (saetp-ctype saetp)))
 			 *specialized-array-element-type-properties*))
-	 (creation-form `(make-array dims :element-type ',eltype
-			             ,@(when fill-pointer
-				         '(:fill-pointer fill-pointer))
-			             ,@(when adjustable
-				         '(:adjustable adjustable)))))
+	 (creation-form `(make-array dims
+			  :element-type ',(type-specifier (saetp-ctype saetp))
+			  ,@(when fill-pointer
+				  '(:fill-pointer fill-pointer))
+			  ,@(when adjustable
+				  '(:adjustable adjustable)))))
 
     (unless saetp
       (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
 
-    (cond ((or (null initial-element)
-	       (and (constant-continuation-p initial-element)
-		    (eql (continuation-value initial-element)
-			 (saetp-initial-element-default saetp))))
-	   (unless (csubtypep (ctype-of (saetp-initial-element-default saetp))
-			      eltype-type)
-	     ;; This situation arises e.g. in (MAKE-ARRAY 4
-	     ;; :ELEMENT-TYPE '(INTEGER 1 5)) ANSI's definition of
-	     ;; MAKE-ARRAY says "If INITIAL-ELEMENT is not supplied,
-	     ;; the consequences of later reading an uninitialized
-	     ;; element of new-array are undefined," so this could be
-	     ;; legal code as long as the user plans to write before
-	     ;; he reads, and if he doesn't we're free to do anything
-	     ;; we like. But in case the user doesn't know to write
-	     ;; elements before he reads elements (or to read manuals
-	     ;; before he writes code:-), we'll signal a STYLE-WARNING
-	     ;; in case he didn't realize this.
-	     (compiler-style-warn "The default initial element ~S is not a ~S."
-				  (saetp-initial-element-default saetp)
-				  eltype))
+    (cond ((and (constant-continuation-p initial-element)
+		(eql (continuation-value initial-element)
+		     (saetp-initial-element-default saetp)))
 	   creation-form)
 	  (t
+	   ;; error checking for target, disabled on the host because
+	   ;; (CTYPE-OF #\Null) is not possible.
+	   #-sb-xc-host
+	   (when (constant-continuation-p initial-element)
+	     (let ((value (continuation-value initial-element)))
+	       (cond
+		 ((not (csubtypep (ctype-of value)
+				  (saetp-ctype saetp)))
+		  ;; this case will cause an error at runtime, so we'd
+		  ;; better WARN about it now.
+		  (compiler-warn "~@<~S is not a ~S (which is the ~
+                                 UPGRADED-ARRAY-ELEMENT-TYPE of ~S).~@:>"
+				 value
+				 (type-specifier (saetp-ctype saetp))
+				 eltype))
+		 ((not (csubtypep (ctype-of value) eltype-type))
+		  ;; this case will not cause an error at runtime, but
+		  ;; it's still worth STYLE-WARNing about.
+		  (compiler-style-warn "~S is not a ~S."
+				       value eltype)))))
 	   `(let ((array ,creation-form))
 	     (multiple-value-bind (vector)
 		 (%data-vector-and-index array 0)
@@ -339,7 +343,22 @@
     (unless saetp
       (give-up-ir1-transform
        "cannot open-code creation of ~S" result-type-spec))
-
+    #-sb-xc-host
+    (unless (csubtypep (ctype-of (saetp-initial-element-default saetp))
+		       eltype-type)
+      ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE
+      ;; '(INTEGER 1 5)) ANSI's definition of MAKE-ARRAY says "If
+      ;; INITIAL-ELEMENT is not supplied, the consequences of later
+      ;; reading an uninitialized element of new-array are undefined,"
+      ;; so this could be legal code as long as the user plans to
+      ;; write before he reads, and if he doesn't we're free to do
+      ;; anything we like. But in case the user doesn't know to write
+      ;; elements before he reads elements (or to read manuals before
+      ;; he writes code:-), we'll signal a STYLE-WARNING in case he
+      ;; didn't realize this.
+      (compiler-style-warn "The default initial element ~S is not a ~S."
+			   (saetp-initial-element-default saetp)
+			   eltype))
     (let* ((n-bits-per-element (saetp-n-bits saetp))
 	   (typecode (saetp-typecode saetp))
 	   (n-pad-elements (saetp-n-pad-elements saetp))
