@@ -24,6 +24,7 @@
 		  sb!vm::*alien-stack*
 		  #!+sb-thread sb!thread::*foreground-thread-stack*
 		  sb!vm::*control-stack-start*
+		  sb!vm::*control-stack-end*
 		  sb!vm::*binding-stack-start*
 		  ;; FIXME: The pseudo-atomic variable stuff should be
 		  ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which
