@@ -38,7 +38,7 @@
 ;;; are displayed, but are not stale. It displays the names of
 ;;; restarts. Worse, it displays the names of CMUCL-internal constants.
 ;;; These symbols that name constants are not referenced from anywhere
-;;; expect the package datastructures because the compiler can
+;;; except the package datastructures because the compiler can
 ;;; substitute their value wherever they're used in the CMUCL source
 ;;; code, without keeping a reference to the symbol hanging around.
 ;;; There are also a number of PCL-related symbols that are displayed,
@@ -50,9 +50,9 @@
 (defun print-stale-reference (obj stream)
   (cond ((vectorp obj)
          (format stream "vector (probable package internals)"))
-        ((sb-c::compiled-debug-function-p obj)
-         (format stream "#<compiled-debug-function ~a>"
-                 (sb-c::compiled-debug-function-name obj)))
+        ((sb-c::compiled-debug-fun-p obj)
+         (format stream "#<compiled-debug-fun ~a>"
+                 (sb-c::compiled-debug-fun-name obj)))
         (t
          (format stream "~w" obj))))
 

@@ -712,6 +712,32 @@
 			    sb!vm:n-byte-bits)))
      string1))
 
+;;; FIXME: this would be a valid transform for certain excluded cases:
+;;;   * :TEST 'CHAR= or :TEST #'CHAR=
+;;;   * :TEST 'EQL   or :TEST #'EQL
+;;;   * :FROM-END NIL (or :FROM-END non-NIL, with a little ingenuity)
+;;;
+;;; also, it should be noted that there's nothing much in this
+;;; transform (as opposed to the ones for REPLACE and CONCATENATE)
+;;; that particularly limits it to SIMPLE-BASE-STRINGs.
+(deftransform search ((pattern text &key (start1 0) (start2 0) end1 end2)
+		      (simple-base-string simple-base-string &rest t)
+		      *
+		      :policy (> speed (max space safety)))
+  `(block search
+    (let ((end1 (or end1 (length pattern)))
+	  (end2 (or end2 (length text))))
+      (do ((index2 start2 (1+ index2)))
+	  ((>= index2 end2) nil)
+	(when (do ((index1 start1 (1+ index1))
+		   (index2 index2 (1+ index2)))
+		  ((>= index1 end1) t)
+		(when (= index2 end2)
+		  (return-from search nil))
+		(when (char/= (char pattern index1) (char text index2))
+		  (return nil)))
+	  (return index2))))))
+
 ;;; FIXME: It seems as though it should be possible to make a DEFUN
 ;;; %CONCATENATE (with a DEFTRANSFORM to translate constant RTYPE to
 ;;; CTYPE before calling %CONCATENATE) which is comparably efficient,

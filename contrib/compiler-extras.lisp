@@ -77,3 +77,76 @@
 			     (aref seq index2))
 		       (incf index2))))))
        seq1)))
+
+;;; Boyer-Moore search for strings.
+;;;
+;;; TODO:
+;;; * START/END keywords
+;;; * a literal :TEST #'CHAR= or :TEST #'EQL is OK (also #'EQ)
+;;; * fewer hardcoded constants
+;;; * :FROM-END
+;;;
+;;; * investigate whether we can make this work with a hashtable and a
+;;; default for "not in pattern"
+(deftransform search ((pattern text)
+		      (simple-base-string simple-base-string))
+  (unless (constant-lvar-p pattern)
+    (give-up-ir1-transform))
+  (let* ((pattern (lvar-value pattern))
+	 (bad-character (make-array 256 :element-type 'fixnum :initial-element (length pattern)))
+	 (temp (make-array (length pattern) :element-type 'fixnum))
+	 (good-suffix (make-array (length pattern) :element-type 'fixnum :initial-element (1- (length pattern)))))
+
+    (dotimes (i (1- (length pattern)))
+      (setf (aref bad-character (char-code (aref pattern i)))
+	    (- (length pattern) 1 i)))
+
+    (setf (aref temp (1- (length pattern))) (length pattern))
+    (loop with g = (1- (length pattern))
+	  with f = (1- (length pattern)) ; XXXXXX?
+	  for i downfrom (- (length pattern) 2) above 0
+	  if (and (> i g)
+		  (< (aref temp (- (+ i (length pattern)) 1 f)) (- i g)))
+	  do (setf (aref temp i) (aref temp (- (+ i (length pattern)) 1 f)))
+	  else
+	  do (progn
+	       (when (< i g)
+		 (setf g i))
+	       (setf f i)
+	       (do ()
+		   ((not
+		     (and (>= g 0)
+			 (char= (aref pattern g)
+				(aref pattern (- (+ g (length pattern)) 1 f))))))
+		 (decf g))
+	       (setf (aref temp i) (- f g))))
+
+    (loop with j = 0
+	  for i downfrom (1- (length pattern)) to -1
+	  if (or (= i -1) (= (aref temp i) (1+ i)))
+	  do (do ()
+		 ((>= j (- (length pattern) 1 i)))
+	       (when (= (aref good-suffix j) (length pattern))
+		 (setf (aref good-suffix j) (- (length pattern) 1 i)))
+	       (incf j)))
+
+    (loop for i from 0 below (1- (length pattern))
+	  do (setf (aref good-suffix (- (length pattern) 1 (aref temp i)))
+		   (- (length pattern) 1 i)))
+
+    `(let ((good-suffix ,good-suffix)
+	   (bad-character ,bad-character))
+      (declare (optimize speed (safety 0)))
+      (block search
+	(do ((j 0))
+	    ((> j (- (length text) (length pattern))))
+	  (declare (fixnum j))
+	  (do ((i (1- (length pattern)) (1- i)))
+	      ((< i 0) (return-from search j))
+	    (declare (fixnum i))
+	    (when (char/= (aref pattern i) (aref text (+ i j)))
+	      (incf j (max (aref good-suffix i)
+			   (+ (- (aref bad-character (char-code (aref text (+ i j))))
+				 (length pattern))
+			      (1+ i))))
+	      (return))))))))
