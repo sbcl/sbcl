@@ -200,13 +200,13 @@
 ;;; copying GC is in use), then only the active dynamic space gets
 ;;; dumped to core.
 (defvar *dynamic*)
-(defconstant dynamic-space-id 1)
+(defconstant dynamic-core-space-id 1)
 
 (defvar *static*)
-(defconstant static-space-id 2)
+(defconstant static-core-space-id 2)
 
 (defvar *read-only*)
-(defconstant read-only-space-id 3)
+(defconstant read-only-core-space-id 3)
 
 (defconstant descriptor-low-bits 16
   "the number of bits in the low half of the descriptor")
@@ -1625,7 +1625,7 @@
 (defun note-load-time-code-fixup (code-object offset value kind)
   ;; If CODE-OBJECT might be moved
   (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
-	   dynamic-space-id)
+	   dynamic-core-space-id)
     ;; FIXME: pushed thing should be a structure, not just a list
     (push (list code-object offset value kind) *load-time-code-fixups*))
   (values))
@@ -2623,64 +2623,63 @@
 	  (sb!xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)
   (terpri)
-  ;; FIXME: Other things from core.h should be defined here too:
-  ;; #define CORE_END 3840
-  ;; #define CORE_NDIRECTORY 3861
-  ;; #define CORE_VALIDATE 3845
-  ;; #define CORE_VERSION 3860
-  ;; #define CORE_MACHINE_STATE 3862
-  ;; (Except that some of them are obsolete and should be deleted instead.)
-  ;; also
-  ;; #define DYNAMIC_SPACE_ID (1)
-  ;; #define STATIC_SPACE_ID (2)
-  ;; #define READ_ONLY_SPACE_ID (3)
 
-  ;; writing entire families of named constants from SB!VM
+  ;; writing entire families of named constants 
   (let ((constants nil))
-    (do-external-symbols (symbol (find-package "SB!VM"))
-      (when (constantp symbol)
-	(let ((name (symbol-name symbol)))
-	  (labels (;; shared machinery
-		   (record (string priority)
-		     (push (list string
-				 priority
-				 (symbol-value symbol)
-				 (documentation symbol 'variable))
-			   constants))
-		   ;; machinery for old-style CMU CL Lisp-to-C
-		   ;; arbitrary renaming, being phased out in favor of
-		   ;; the newer systematic RECORD-WITH-TRANSLATED-NAME
-		   ;; renaming
-		   (record-with-munged-name (prefix string priority)
-		     (record (concatenate
-			      'simple-string
-			      prefix
-			      (delete #\- (string-capitalize string)))
-			     priority))
-		   (maybe-record-with-munged-name (tail prefix priority)
-		     (when (tailwise-equal name tail)
-		       (record-with-munged-name prefix
-						(subseq name 0
-							(- (length name)
-							   (length tail)))
-						priority)))
-		   ;; machinery for new-style SBCL Lisp-to-C naming
-		   (record-with-translated-name (priority)
-		     (record (substitute #\_ #\- name)
-			     priority))
-		   (maybe-record-with-translated-name (suffixes priority)
-                     (when (some (lambda (suffix)
-				   (tailwise-equal name suffix))
-				 suffixes)
-		       (record-with-translated-name priority))))
-
-	    (maybe-record-with-translated-name '("-LOWTAG") 0)
-	    (maybe-record-with-translated-name '("-WIDETAG") 1)
-	    (maybe-record-with-munged-name "-FLAG" "flag_" 2)
-	    (maybe-record-with-munged-name "-TRAP" "trap_" 3)
-	    (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
-	    (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
-	    (maybe-record-with-translated-name '("-START" "-END") 6)))))
+    (dolist (package-name '(;; Even in CMU CL, constants from VM
+			    ;; were automatically propagated
+			    ;; into the runtime.
+			    "SB!VM"
+			    ;; In SBCL, we also propagate various
+			    ;; magic numbers related to file format,
+			    ;; which live here instead of SB!VM.
+			    "SB!FASL"))
+      (do-external-symbols (symbol (find-package package-name))
+        (when (constantp symbol)
+          (let ((name (symbol-name symbol)))
+            (labels (;; shared machinery
+                     (record (string priority)
+                       (push (list string
+                                   priority
+                                   (symbol-value symbol)
+                                   (documentation symbol 'variable))
+                             constants))
+                     ;; machinery for old-style CMU CL Lisp-to-C
+                     ;; arbitrary renaming, being phased out in favor of
+                     ;; the newer systematic RECORD-WITH-TRANSLATED-NAME
+                     ;; renaming
+                     (record-with-munged-name (prefix string priority)
+                       (record (concatenate
+                                'simple-string
+                                prefix
+                                (delete #\- (string-capitalize string)))
+                               priority))
+                     (maybe-record-with-munged-name (tail prefix priority)
+                       (when (tailwise-equal name tail)
+                         (record-with-munged-name prefix
+                                                  (subseq name 0
+                                                          (- (length name)
+                                                             (length tail)))
+                                                  priority)))
+                     ;; machinery for new-style SBCL Lisp-to-C naming
+                     (record-with-translated-name (priority)
+                       (record (substitute #\_ #\- name)
+                               priority))
+                     (maybe-record-with-translated-name (suffixes priority)
+                       (when (some (lambda (suffix)
+                                     (tailwise-equal name suffix))
+                                   suffixes)
+                         (record-with-translated-name priority))))
+  
+              (maybe-record-with-translated-name '("-LOWTAG") 0)
+              (maybe-record-with-translated-name '("-WIDETAG") 1)
+              (maybe-record-with-munged-name "-FLAG" "flag_" 2)
+              (maybe-record-with-munged-name "-TRAP" "trap_" 3)
+              (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
+              (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
+              (maybe-record-with-translated-name '("-START" "-END") 6)
+              (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 7)
+              (maybe-record-with-translated-name '("-CORE-SPACE-ID") 8))))))
     (setf constants
 	  (sort constants
 		(lambda (const1 const2)
@@ -2869,15 +2868,10 @@ initially undefined function references:~2%")
 (defvar *core-file*)
 (defvar *data-page*)
 
-;;; KLUDGE: These numbers correspond to values in core.h. If they're
-;;; documented anywhere, I haven't found it. (I haven't tried very
-;;; hard yet.) -- WHN 19990826
-(defparameter version-entry-type-code 3860)
-(defparameter validate-entry-type-code 3845)
-(defparameter directory-entry-type-code 3841)
-(defparameter new-directory-entry-type-code 3861)
-(defparameter initial-fun-entry-type-code 3863)
-(defparameter end-entry-type-code 3840)
+(defconstant version-core-entry-type-code 3860)
+(defconstant new-directory-core-entry-type-code 3861)
+(defconstant initial-fun-core-entry-type-code 3863)
+(defconstant end-core-entry-type-code 3840)
 
 (declaim (ftype (function (sb!vm:word) sb!vm:word) write-word))
 (defun write-word (num)
@@ -2965,12 +2959,12 @@ initially undefined function references:~2%")
       (write-word core-magic)
 
       ;; Write the Version entry.
-      (write-word version-entry-type-code)
+      (write-word version-core-entry-type-code)
       (write-word 3)
       (write-word sbcl-core-version-integer)
 
       ;; Write the New Directory entry header.
-      (write-word new-directory-entry-type-code)
+      (write-word new-directory-core-entry-type-code)
       (write-word 17) ; length = (5 words/space) * 3 spaces + 2 for header.
 
       (output-gspace *read-only*)
@@ -2978,7 +2972,7 @@ initially undefined function references:~2%")
       (output-gspace *dynamic*)
 
       ;; Write the initial function.
-      (write-word initial-fun-entry-type-code)
+      (write-word initial-fun-core-entry-type-code)
       (write-word 3)
       (let* ((cold-name (cold-intern '!cold-init))
 	     (cold-fdefn (cold-fdefinition-object cold-name))
@@ -2990,7 +2984,7 @@ initially undefined function references:~2%")
 	(write-word (descriptor-bits initial-fun)))
 
       ;; Write the End entry.
-      (write-word end-entry-type-code)
+      (write-word end-core-entry-type-code)
       (write-word 2)))
 
   (format t "done]~%")
@@ -3072,13 +3066,13 @@ initially undefined function references:~2%")
 	   (*cold-symbols* (make-hash-table :test 'equal))
 	   (*cold-package-symbols* nil)
 	   (*read-only* (make-gspace :read-only
-				     read-only-space-id
+				     read-only-core-space-id
 				     sb!vm:read-only-space-start))
 	   (*static*    (make-gspace :static
-				     static-space-id
+				     static-core-space-id
 				     sb!vm:static-space-start))
 	   (*dynamic*   (make-gspace :dynamic
-				     dynamic-space-id
+				     dynamic-core-space-id
 				     #!+gencgc sb!vm:dynamic-space-start
 				     #!-gencgc sb!vm:dynamic-0-space-start))
 	   (*nil-descriptor* (make-nil-descriptor))

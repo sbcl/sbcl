@@ -466,6 +466,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              "CLOSE-FASL-OUTPUT"
              "DUMP-ASSEMBLER-ROUTINES"
              "DUMP-OBJECT"
+	     "DYNAMIC-CORE-SPACE-ID"
+	     "END-CORE-ENTRY-TYPE-CODE"
              "FASL-CONSTANT-ALREADY-DUMPED-P"
              "+FASL-FILE-VERSION+"
              "FASL-DUMP-COLD-LOAD-FORM" "FASL-DUMP-COMPONENT"
@@ -476,11 +478,16 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              "FASL-OUTPUT" "FASL-OUTPUT-P"
 	     "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
              "FASL-VALIDATE-STRUCTURE"
+	     "INITIAL-FUN-CORE-ENTRY-TYPE-CODE"
              "*!LOAD-TIME-VALUES*"
              "LOAD-TYPE-PREDICATE"
+	     "NEW-DIRECTORY-CORE-ENTRY-TYPE-CODE"
              "OPEN-FASL-OUTPUT"
+	     "READ-ONLY-CORE-SPACE-ID"
              "*!REVERSED-COLD-TOPLEVELS*"
-             "*STATIC-FOREIGN-SYMBOLS*"))
+	     "STATIC-CORE-SPACE-ID"
+             "*STATIC-FOREIGN-SYMBOLS*"
+	     "VERSION-CORE-ENTRY-TYPE-CODE"))
 
  ;; This package is a grab bag for things which used to be internal
  ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
@@ -490,8 +497,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
  ;; an existing package (e.g. KERNEL or SYS or EXT or FASL), I
  ;; (WHN 19990223) encourage maintainers to move them there..
  ;;
- ;; ..except that it's getting so big and crowded that maybe it
- ;; should be split up, too.
+ ;; ..except that it's getting so big and crowded that maybe it should
+ ;; be split up, too.
  #s(sb-cold:package-data
     :name "SB!IMPL"
     :doc "private: a grab bag of implementation details"

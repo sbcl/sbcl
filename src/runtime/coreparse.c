@@ -67,7 +67,7 @@ process_directory(int fd, u32 *ptr, int count)
 	       id, (long)free_pointer));
 
 	switch (id) {
-	case DYNAMIC_SPACE_ID:
+	case DYNAMIC_CORE_SPACE_ID:
 #ifdef GENCGC	  
 	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
 	        fprintf(stderr, "in core: 0x%lx; in runtime: 0x%lx \n",
@@ -98,14 +98,14 @@ process_directory(int fd, u32 *ptr, int count)
 	     * addr==DYNAMIC_SPACE_START.) */
 	    current_dynamic_space = (lispobj *)addr;
 	    break;
-	case STATIC_SPACE_ID:
+	case STATIC_CORE_SPACE_ID:
 	    if (addr != (os_vm_address_t)STATIC_SPACE_START) {
 		fprintf(stderr, "in core: 0x%lx - in runtime: 0x%lx\n",
 			(long)addr, (long)STATIC_SPACE_START);
 		lose("core/runtime address mismatch: STATIC_SPACE_START");
 	    }
 	    break;
-	case READ_ONLY_SPACE_ID:
+	case READ_ONLY_CORE_SPACE_ID:
 	    if (addr != (os_vm_address_t)READ_ONLY_SPACE_START) {
 		fprintf(stderr, "in core: 0x%lx - in runtime: 0x%lx\n",
 			(long)addr, (long)READ_ONLY_SPACE_START);
@@ -150,7 +150,7 @@ load_core_file(char *file)
     }
     SHOW("found CORE_MAGIC");
 
-    while (val != CORE_END) {
+    while (val != END_CORE_ENTRY_TYPE_CODE) {
 	val = *ptr++;
 	len = *ptr++;
 	remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
@@ -159,12 +159,12 @@ load_core_file(char *file)
 
 	switch (val) {
 
-	case CORE_END:
-	    SHOW("CORE_END case");
+	case END_CORE_ENTRY_TYPE_CODE:
+	    SHOW("END_CORE_ENTRY_TYPE_CODE case");
 	    break;
 
-	case CORE_VERSION:
-	    SHOW("CORE_VERSION case");
+	case VERSION_CORE_ENTRY_TYPE_CODE:
+	    SHOW("VERSION_CORE_ENTRY_TYPE_CODE case");
 	    if (*ptr != SBCL_CORE_VERSION_INTEGER) {
 		lose("core file version (%d) != runtime library version (%d)",
 		     *ptr,
@@ -172,8 +172,8 @@ load_core_file(char *file)
 	    }
 	    break;
 
-	case CORE_NDIRECTORY:
-	    SHOW("CORE_NDIRECTORY case");
+	case NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE:
+	    SHOW("NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE case");
 	    process_directory(fd,
 			      ptr,
 #ifndef alpha
@@ -186,8 +186,8 @@ load_core_file(char *file)
 			      );
 	    break;
 
-	case CORE_INITIAL_FUNCTION:
-	    SHOW("CORE_INITIAL_FUNCTION case");
+	case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
+	    SHOW("INITIAL_FUN_CORE_ENTRY_TYPE_CODE case");
 	    initial_function = (lispobj)*ptr;
 	    break;
 

@@ -113,24 +113,24 @@ save(char *filename, lispobj init_function)
 
     putw(CORE_MAGIC, file);
 
-    putw(CORE_VERSION, file);
+    putw(VERSION_CORE_ENTRY_TYPE_CODE, file);
     putw(3, file);
     putw(SBCL_CORE_VERSION_INTEGER, file);
 
-    putw(CORE_NDIRECTORY, file);
+    putw(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
     putw((5*3)+2, file);
 
     output_space(file,
-		 READ_ONLY_SPACE_ID,
+		 READ_ONLY_CORE_SPACE_ID,
 		 (lispobj *)READ_ONLY_SPACE_START,
 		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
     output_space(file,
-		 STATIC_SPACE_ID,
+		 STATIC_CORE_SPACE_ID,
 		 (lispobj *)STATIC_SPACE_START,
 		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER));
 #ifdef reg_ALLOC
     output_space(file,
-		 DYNAMIC_SPACE_ID,
+		 DYNAMIC_CORE_SPACE_ID,
 		 (lispobj *)current_dynamic_space,
 		 dynamic_space_free_pointer);
 #else
@@ -141,16 +141,16 @@ save(char *filename, lispobj init_function)
     update_x86_dynamic_space_free_pointer();
 #endif
     output_space(file,
-		 DYNAMIC_SPACE_ID,
+		 DYNAMIC_CORE_SPACE_ID,
 		 (lispobj *)DYNAMIC_SPACE_START,
 		 (lispobj *)SymbolValue(ALLOCATION_POINTER));
 #endif
 
-    putw(CORE_INITIAL_FUNCTION, file);
+    putw(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
     putw(3, file);
     putw(init_function, file);
 
-    putw(CORE_END, file);
+    putw(END_CORE_ENTRY_TYPE_CODE, file);
 
     fclose(file);
     printf("done]\n");
