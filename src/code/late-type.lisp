@@ -2294,7 +2294,10 @@
 			     (mapcar (lambda (x y) (if (eq x '*) y x))
 				     dims1 dims2)))
 	  :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
-	  :element-type (if (eq eltype1 *wild-type*) eltype2 eltype1))))
+	  :element-type (cond
+			  ((eq eltype1 *wild-type*) eltype2)
+			  ((eq eltype2 *wild-type*) eltype1)
+			  (t (type-intersection eltype1 eltype2))))))
       *empty-type*))
 
 ;;; Check a supplied dimension list to determine whether it is legal,

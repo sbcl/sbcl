@@ -303,6 +303,8 @@
 	;; SIGNED-BYTE arrays, so better make it break now if it ever
 	;; will:
 	#+sb-xc-host
+	;; not SB!XC:UPGRADED-ARRAY-ELEMENT-TYPE, because we are
+	;; worried about whether the host's implementation of arrays.
 	(aver (subtypep (upgraded-array-element-type specializer) 
 			'unsigned-byte))
 	(coerce seq `(simple-array ,specializer (*)))))))

@@ -65,15 +65,6 @@
   (bug "called FAILED-%WITH-ARRAY-DATA with valid array parameters?"))
 
 ;;;; MAKE-ARRAY
-(defun upgraded-array-element-type (spec &optional environment)
-  #!+sb-doc
-  "Return the element type that will actually be used to implement an array
-   with the specifier :ELEMENT-TYPE Spec."
-  (declare (ignore environment))
-  (if (unknown-type-p (specifier-type spec))
-      (error "undefined type: ~S" spec)
-      (type-specifier (array-type-specialized-element-type
-		       (specifier-type `(array ,spec))))))
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro pick-vector-type (type &rest specs)
     `(cond ,@(mapcar (lambda (spec)

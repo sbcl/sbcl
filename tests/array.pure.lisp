@@ -127,3 +127,6 @@
   (assert fail)
   (assert (raises-error? (funcall fun) type-error)))
 
+(multiple-value-bind (fun warn fail)
+    (compile nil '(lambda () (make-array 5 :element-type 'undefined-type)))
+  (assert warn))

@@ -150,6 +150,16 @@
 		    (return stype))))))
     type))
 
+(defun sb!xc:upgraded-array-element-type (spec &optional environment)
+  #!+sb-doc
+  "Return the element type that will actually be used to implement an array
+   with the specifier :ELEMENT-TYPE Spec."
+  (declare (ignore environment))
+  (if (unknown-type-p (specifier-type spec))
+      (error "undefined type: ~S" spec)
+      (type-specifier (array-type-specialized-element-type
+		       (specifier-type `(array ,spec))))))
+
 ;;; Return the most specific integer type that can be quickly checked that
 ;;; includes the given type.
 (defun containing-integer-type (subtype)

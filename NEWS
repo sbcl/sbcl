@@ -1890,6 +1890,14 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     circumstances could go off-by-one.
   * improved MACHINE-VERSION, especially on Linux (thanks to Lars
     Brinkhoff)
+  * type declarations for array element types now obey the description
+    on the CLHS page "Declaration TYPE", as per discussions on
+    sbcl-help around 2003-05-08.  This means that a declaration 
+    (TYPE (ARRAY FOO) BAR) means that, within the scope of the
+    declaration, all references to BAR will be asserted or assumed
+    (with THE, so dependent on compiler policy) to involve objects of
+    type FOO.  Note that no such declaration is implied in 
+    (MAKE-ARRAY .. :ELEMENT-TYPE 'FOO).
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

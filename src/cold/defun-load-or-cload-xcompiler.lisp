@@ -123,6 +123,7 @@
 		    "STRUCTURE-CLASS"
 		    "SUBTYPEP"
 		    "TYPE-OF" "TYPEP"
+		    "UPGRADED-ARRAY-ELEMENT-TYPE"
 		    "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
   ;; don't watch:

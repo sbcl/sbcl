@@ -44,7 +44,7 @@
 (defknown type-of (t) t (foldable flushable))
 
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
-(defknown (upgraded-complex-part-type upgraded-array-element-type)
+(defknown (upgraded-complex-part-type sb!xc:upgraded-array-element-type)
 	  (type-specifier &optional lexenv-designator) type-specifier
   (unsafely-flushable))
 

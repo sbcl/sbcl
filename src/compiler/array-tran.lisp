@@ -41,6 +41,12 @@
 	;; 2002-08-21
 	*wild-type*)))
 
+(defun extract-declared-element-type (array)
+  (let ((type (continuation-type array)))
+    (if (array-type-p type)
+	(array-type-element-type type)
+	*wild-type*)))
+
 ;;; The ``new-value'' for array setters must fit in the array, and the
 ;;; return type is going to be the same as the new-value for SETF
 ;;; functions.
@@ -136,7 +142,12 @@
          `(,(if simple 'simple-array 'array)
             ,(cond ((not element-type) t)
                    ((constant-continuation-p element-type)
-                    (continuation-value element-type))
+		    (let ((ctype (careful-specifier-type
+				  (continuation-value element-type))))
+		      (cond
+			((or (null ctype) (unknown-type-p ctype)) '*)
+			(t (sb!xc:upgraded-array-element-type
+			    (continuation-value element-type))))))
                    (t
                     '*))
             ,(cond ((constant-continuation-p dims)
@@ -338,8 +349,14 @@
 	 (len (if (constant-continuation-p length)
 		  (continuation-value length)
 		  '*))
-	 (result-type-spec `(simple-array ,eltype (,len)))
 	 (eltype-type (ir1-transform-specifier-type eltype))
+	 (result-type-spec
+	  `(simple-array
+	    ,(if (unknown-type-p eltype-type)
+		 (give-up-ir1-transform
+		  "ELEMENT-TYPE is an unknown type: ~S" eltype)
+		 (sb!xc:upgraded-array-element-type eltype))
+	    (,len)))
 	 (saetp (find-if (lambda (saetp)
 			   (csubtypep eltype-type (saetp-ctype saetp)))
 			 *specialized-array-element-type-properties*)))
@@ -415,8 +432,11 @@
 	       (rank (length dims))
 	       (spec `(simple-array
 		       ,(cond ((null element-type) t)
-			      ((constant-continuation-p element-type)
-			       (continuation-value element-type))
+			      ((and (constant-continuation-p element-type)
+				    (ir1-transform-specifier-type
+				     (continuation-value element-type)))
+			       (sb!xc:upgraded-array-element-type
+				(continuation-value element-type)))
 			      (t '*))
 			   ,(make-list rank :initial-element '*))))
 	  `(let ((header (make-array-header sb!vm:simple-array-widetag ,rank)))

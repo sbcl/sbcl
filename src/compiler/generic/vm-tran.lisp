@@ -43,7 +43,8 @@
 
 (deftransform hairy-data-vector-ref ((array index) (array t) * :important t)
   "avoid runtime dispatch on array element type"
-  (let ((element-ctype (extract-upgraded-element-type array)))
+  (let ((element-ctype (extract-upgraded-element-type array))
+	(declared-element-ctype (extract-declared-element-type array)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
@@ -56,7 +57,11 @@
       `(multiple-value-bind (array index)
 	   (%data-vector-and-index array index)
 	 (declare (type (simple-array ,element-type-specifier 1) array))
-	 (data-vector-ref array index)))))
+	 ,(let ((bare-form '(data-vector-ref array index)))
+	    (if (type= element-ctype declared-element-ctype)
+		bare-form
+		`(the ,(type-specifier declared-element-ctype)
+		      ,bare-form)))))))
 
 (deftransform data-vector-ref ((array index)
                                (simple-array t))
@@ -80,7 +85,8 @@
 				     *
 				     :important t)
   "avoid runtime dispatch on array element type"
-  (let ((element-ctype (extract-upgraded-element-type array)))
+  (let ((element-ctype (extract-upgraded-element-type array))
+	(declared-element-ctype (extract-declared-element-type array)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
@@ -90,9 +96,12 @@
 	   (%data-vector-and-index array index)
 	 (declare (type (simple-array ,element-type-specifier 1) array)
 	          (type ,element-type-specifier new-value))
-	 (data-vector-set array
-			  index
-			  new-value)))))
+	 ,(if (type= element-ctype declared-element-ctype)
+	      '(data-vector-set array index new-value)
+	      `(truly-the ,(type-specifier declared-element-ctype)
+		 (data-vector-set array index
+		  (the ,(type-specifier declared-element-ctype)
+		       new-value))))))))
 
 (deftransform data-vector-set ((array index new-value)
                                (simple-array t t))

@@ -103,12 +103,14 @@
 ;;; bug 31 turned out to be a manifestation of non-ANSI array type
 ;;; handling, fixed by CSR in sbcl-0.7.3.8.
 (defun array-element-type-handling (x)
+  (declare (optimize safety))
   (declare (type (vector cons) x))
   (when (consp (aref x 0))
     (aref x 0)))
-(assert (eq (array-element-type-handling
-	     (make-array 3 :element-type t :initial-element 0))
-	    nil))
+(assert (raises-error?
+	 (array-element-type-handling
+	  (make-array 3 :element-type t :initial-element 0))
+	 type-error))
 
 ;;; bug 220: type check inserted after all arguments in MV-CALL caused
 ;;; failure of stack analysis

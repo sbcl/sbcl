@@ -457,3 +457,8 @@
     (assert (equal y #*00))
     (funcall f y 1)
     (assert (equal y #*10))))
+
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil '(lambda (x)
+		 (declare (type (simple-array (simple-string 3) (5)) x))
+		 (aref (aref x 0) 0))))
