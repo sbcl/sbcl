@@ -1,7 +1,10 @@
 ;;;; This file implements the stack analysis phase in the compiler. We
-;;;; do a graph walk to determine which unknown-values lvars are on
-;;;; the stack at each point in the program, and then we insert
-;;;; cleanup code to remove unused values.
+;;;; analyse lifetime of dynamically allocated object packets on stack
+;;;; and insert cleanups where necessary.
+;;;;
+;;;; Currently there are two kinds of interesting stack packets: UVLs,
+;;;; whose use and destination lie in different blocks, and LVARs of
+;;;; constructors of dynamic-extent objects.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -29,14 +32,15 @@
 	  (when (eq node last-pop)
 	    (setq saw-last t))
 
-	  (when lvar
-            (let ((dest (lvar-dest lvar))
-                  (2lvar (lvar-info lvar)))
-              (when (and (not (eq (node-block dest) block))
-                         2lvar
-                         (eq (ir2-lvar-kind 2lvar) :unknown))
-                (aver (or saw-last (not last-pop)))
-                (pushed lvar))))))
+	  (when (and lvar
+                     (or (lvar-dynamic-extent lvar)
+                         (let ((dest (lvar-dest lvar))
+                               (2lvar (lvar-info lvar)))
+                           (and (not (eq (node-block dest) block))
+                                2lvar
+                                (eq (ir2-lvar-kind 2lvar) :unknown)))))
+            (aver (or saw-last (not last-pop)))
+            (pushed lvar))))
 
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
@@ -86,7 +90,25 @@
                                               nle-start-stack)))
                          (setq new-end (merge-uvl-live-sets
                                         new-end next-stack))))
-                     block)
+                     block
+                     (lambda (dx-cleanup)
+                       (dolist (lvar (cleanup-info dx-cleanup))
+                         (let* ((generator (lvar-use lvar))
+                                (block (node-block generator))
+                                (2block (block-info block)))
+                           (aver (eq generator (block-last block)))
+                           ;; DX objects, living in the LVAR, are
+                           ;; alive in the environment, protected by
+                           ;; the CLEANUP. We also cannot move them
+                           ;; (because, in general, we cannot track
+                           ;; all references to them). Therefore,
+                           ;; everything, allocated deeper than a DX
+                           ;; object, should be kept alive until the
+                           ;; object is deallocated.
+                           (setq new-end (merge-uvl-live-sets
+                                          new-end (ir2-block-end-stack 2block)))
+                           (setq new-end (merge-uvl-live-sets
+                                          new-end (ir2-block-pushed 2block)))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
@@ -249,33 +271,37 @@
 ;;;; stack analysis
 
 ;;; Return a list of all the blocks containing genuine uses of one of
-;;; the RECEIVERS. Exits are excluded, since they don't drop through
-;;; to the receiver.
-(defun find-values-generators (receivers)
-  (declare (list receivers))
+;;; the RECEIVERS (blocks) and DX-LVARS. Exits are excluded, since
+;;; they don't drop through to the receiver.
+(defun find-pushing-blocks (receivers dx-lvars)
+  (declare (list receivers dx-lvars))
   (collect ((res nil adjoin))
     (dolist (rec receivers)
       (dolist (pop (ir2-block-popped (block-info rec)))
 	(do-uses (use pop)
 	  (unless (exit-p use)
 	    (res (node-block use))))))
+    (dolist (dx-lvar dx-lvars)
+      (do-uses (use dx-lvar)
+        (res (node-block use))))
     (res)))
 
-;;; Analyze the use of unknown-values lvars in COMPONENT, inserting
-;;; cleanup code to discard values that are generated but never
-;;; received. This phase doesn't need to be run when Values-Receivers
-;;; is null, i.e. there are no unknown-values lvars used across block
-;;; boundaries.
+;;; Analyze the use of unknown-values and DX lvars in COMPONENT,
+;;; inserting cleanup code to discard values that are generated but
+;;; never received. This phase doesn't need to be run when
+;;; Values-Receivers and Dx-Lvars are null, i.e. there are no
+;;; unknown-values lvars used across block boundaries and no DX LVARs.
 (defun stack-analyze (component)
   (declare (type component component))
   (let* ((2comp (component-info component))
 	 (receivers (ir2-component-values-receivers 2comp))
-	 (generators (find-values-generators receivers)))
+	 (generators (find-pushing-blocks receivers
+                                          (component-dx-lvars component))))
 
     (dolist (block generators)
       (find-pushed-lvars block))
 
-    ;;; Compute sets of live UVLs
+    ;;; Compute sets of live UVLs and DX LVARs
     (loop for did-something = nil
           do (do-blocks-backwards (block component)
                (when (update-uvl-live-sets block)

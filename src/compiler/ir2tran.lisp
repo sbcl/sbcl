@@ -623,6 +623,10 @@
 		 (r-refs (reference-tn-list results t)))
 	    (aver (= (length info-args)
 		     (template-info-arg-count template)))
+            #!+stack-grows-downward-not-upward
+            (when (and lvar (lvar-dynamic-extent lvar))
+              (vop current-stack-pointer call block
+                   (ir2-lvar-stack-pointer (lvar-info lvar))))
 	    (if info-args
 		(emit-template call block template args r-refs info-args)
 		(emit-template call block template args r-refs))
@@ -1276,32 +1280,68 @@
 ;;; Reset the stack pointer to the start of the specified
 ;;; unknown-values lvar (discarding it and all values globs on top of
 ;;; it.)
-(defoptimizer (%pop-values ir2-convert) ((lvar) node block)
-  (let ((2lvar (lvar-info (lvar-value lvar))))
-    (aver (eq (ir2-lvar-kind 2lvar) :unknown))
-    (vop reset-stack-pointer node block
-	 (first (ir2-lvar-locs 2lvar)))))
+(defoptimizer (%pop-values ir2-convert) ((%lvar) node block)
+  (let* ((lvar (lvar-value %lvar))
+         (2lvar (lvar-info lvar)))
+    (cond ((eq (ir2-lvar-kind 2lvar) :unknown)
+           (vop reset-stack-pointer node block
+                (first (ir2-lvar-locs 2lvar))))
+          ((lvar-dynamic-extent lvar)
+           #!+stack-grows-downward-not-upward
+           (vop reset-stack-pointer node block
+                (ir2-lvar-stack-pointer 2lvar))
+           #!-stack-grows-downward-not-upward
+           (vop %%pop-dx node block
+                (first (ir2-lvar-locs 2lvar))))
+          (t (bug "Trying to pop a not stack-allocated LVAR ~S."
+                  lvar)))))
 
-(defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved 
+(locally (declare (optimize (debug 3)))
+(defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved
 						      &rest moved)
                                          node block)
-  (let (;; pointer immediately after the nipped block
-	(2after (lvar-info (lvar-value last-nipped)))
-	;; pointer to the first nipped word
-        (2first (lvar-info (lvar-value last-preserved)))
+  (let* ( ;; pointer immediately after the nipped block
+         (after (lvar-value last-nipped))
+         (2after (lvar-info after))
+         ;; pointer to the first nipped word
+         (first (lvar-value last-preserved))
+         (2first (lvar-info first))
 
-        (moved-tns (loop for lvar-ref in moved
-                         for lvar = (lvar-value lvar-ref)
-                         for 2lvar = (lvar-info lvar)
-                         ;when 2lvar
-                         collect (first (ir2-lvar-locs 2lvar)))))
-    (aver (eq (ir2-lvar-kind 2after) :unknown))
+         (moved-tns (loop for lvar-ref in moved
+                          for lvar = (lvar-value lvar-ref)
+                          for 2lvar = (lvar-info lvar)
+                                        ;when 2lvar
+                          collect (first (ir2-lvar-locs 2lvar)))))
+    (aver (or (eq (ir2-lvar-kind 2after) :unknown)
+              (lvar-dynamic-extent after)))
     (aver (eq (ir2-lvar-kind 2first) :unknown))
-    (vop* %%nip-values node block
-	 ((first (ir2-lvar-locs 2after))
-          (first (ir2-lvar-locs 2first))
-          (reference-tn-list moved-tns nil))
-         ((reference-tn-list moved-tns t)))))
+    (when *check-consistency*
+      ;; we cannot move stack-allocated DX objects
+      (dolist (moved-lvar moved)
+        (aver (eq (ir2-lvar-kind (lvar-info (lvar-value moved-lvar)))
+                  :unknown))))
+    (flet ((nip-aligned (nipped)
+             (vop* %%nip-values node block
+                   (nipped
+                    (first (ir2-lvar-locs 2first))
+                    (reference-tn-list moved-tns nil))
+                   ((reference-tn-list moved-tns t))))
+           #!-stack-grows-downward-not-upward
+           (nip-unaligned (nipped)
+             (vop* %%nip-dx node block
+                   (nipped
+                    (first (ir2-lvar-locs 2first))
+                    (reference-tn-list moved-tns nil))
+                   ((reference-tn-list moved-tns t)))))
+      (cond ((eq (ir2-lvar-kind 2after) :unknown)
+             (nip-aligned (first (ir2-lvar-locs 2after))))
+            ((lvar-dynamic-extent after)
+             #!+stack-grows-downward-not-upward
+             (nip-aligned (ir2-lvar-stack-pointer 2after))
+             #!-stack-grows-downward-not-upward
+             (nip-unaligned (ir2-lvar-stack-pointer 2after)))
+            (t
+             (bug "Trying to nip a not stack-allocated LVAR ~S." after)))))))
 
 ;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
@@ -1353,9 +1393,6 @@
 	 (emit-constant name))))
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
   (vop unbind node block))
-
-(defoptimizer (%dynamic-extent-start ir2-convert) (() node block) node block)
-(defoptimizer (%dynamic-extent-end ir2-convert) (() node block) node block)
 
 ;;; ### It's not clear that this really belongs in this file, or
 ;;; should really be done this way, but this is the least violation of
@@ -1562,11 +1599,16 @@
 		       (res (lvar-result-tns
 			     lvar
 			     (list (primitive-type (specifier-type 'list))))))
+                  #!+stack-grows-downward-not-upward
+                  (when (and lvar (lvar-dynamic-extent lvar))
+                    (vop current-stack-pointer node block
+                         (ir2-lvar-stack-pointer (lvar-info lvar))))
 		  (vop* ,name node block (refs) ((first res) nil)
 			(length args))
 		  (move-lvar-result node block res lvar)))))
   (def list)
   (def list*))
+
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)

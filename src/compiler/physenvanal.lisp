@@ -38,6 +38,7 @@
 	(component-lambdas component))
 
   (find-non-local-exits component)
+  (recheck-dynamic-extent-lvars component)
   (find-cleanup-points component)
   (tail-annotate component)
 
@@ -327,6 +328,28 @@
 	      (note-non-local-exit target-physenv exit))))))
   (values))
 
+;;;; final decision on stack allocation of dynamic-extent structores
+(defun recheck-dynamic-extent-lvars (component)
+  (declare (type component component))
+  (dolist (lambda (component-lambdas component))
+    (loop for entry in (lambda-entries lambda)
+            for cleanup = (entry-cleanup entry)
+            do (when (eq (cleanup-kind cleanup) :dynamic-extent)
+                 (collect ((real-dx-lvars))
+                   (loop for lvar in (cleanup-info cleanup)
+                         do (let ((use (lvar-uses lvar)))
+                              (if (and (combination-p use)
+                                       (eq (basic-combination-kind use) :known)
+                                       (awhen (fun-info-stack-allocate-result
+                                               (basic-combination-fun-info use))
+                                         (funcall it use)))
+                                  (real-dx-lvars lvar)
+                                  (setf (lvar-dynamic-extent lvar) nil))))
+                   (setf (cleanup-info cleanup) (real-dx-lvars))
+                   (setf (component-dx-lvars component)
+                         (append (real-dx-lvars) (component-dx-lvars component)))))))
+  (values))
+
 ;;;; cleanup emission
 
 ;;; Zoom up the cleanup nesting until we hit CLEANUP1, accumulating
@@ -370,7 +393,8 @@
 	     (dolist (nlx (cleanup-nlx-info cleanup))
 	       (code `(%lexical-exit-breakup ',nlx))))
 	    (:dynamic-extent
-	     (code `(%dynamic-extent-end))))))
+	     (when (not (null (cleanup-info cleanup)))
+               (code `(%cleanup-point)))))))
 
       (when (code)
 	(aver (not (node-tail-p (block-last block1))))

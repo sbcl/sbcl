@@ -941,6 +941,11 @@
   (format t "v~D " (cont-num cont))
   (values))
 
+(defun print-lvar-stack (stack &optional (stream *standard-output*))
+  (loop for (lvar . rest) on stack
+        do (format stream "~:[u~;d~]v~D~@[ ~]"
+                   (lvar-dynamic-extent lvar) (cont-num lvar) rest)))
+
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.
 (defun print-nodes (block)
@@ -953,8 +958,8 @@
 
     (pprint-newline :mandatory)
     (awhen (block-info block)
-      (format t "start stack:~{ v~D~}"
-              (mapcar #'cont-num (ir2-block-start-stack it)))
+      (format t "start stack: ")
+      (print-lvar-stack (ir2-block-start-stack it))
       (pprint-newline :mandatory))
     (do ((ctran (block-start block) (node-next (ctran-next ctran))))
         ((not ctran))
@@ -996,7 +1001,13 @@
            (print-lvar (return-result node))
            (print-leaf (return-lambda node)))
           (entry
-           (format t "entry ~S" (entry-exits node)))
+           (let ((cleanup (entry-cleanup node)))
+             (case (cleanup-kind cleanup)
+               ((:dynamic-extent)
+                (format t "entry DX~{ v~D~}"
+                        (mapcar #'cont-num (cleanup-info cleanup))))
+               (t
+                (format t "entry ~S" (entry-exits node))))))
           (exit
            (let ((value (exit-value node)))
              (cond (value
@@ -1015,8 +1026,8 @@
         (pprint-newline :mandatory)))
 
     (awhen (block-info block)
-      (format t "end stack:~{ v~D~}"
-              (mapcar #'cont-num (ir2-block-end-stack it)))
+      (format t "end stack: ")
+      (print-lvar-stack (ir2-block-end-stack it))
       (pprint-newline :mandatory))
     (let ((succ (block-succ block)))
       (format t "successors~{ c~D~}~%"

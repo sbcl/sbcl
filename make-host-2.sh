@@ -70,7 +70,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	       ;; stuff (e.g. %DETECT-STACK-EXHAUSTION in sbcl-0.7.2).
 	       (safety 2)
 	       (space 1)
-	       (speed 2)))))
+	       (speed 2)
+               (sb!c::stack-allocate-dynamic-extent 3)))))
         (compile 'proclaim-target-optimization)
 	(defun in-target-cross-compilation-mode (fun)
 	  "Call FUN with everything set up appropriately for cross-compiling

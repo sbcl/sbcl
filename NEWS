@@ -13,6 +13,9 @@ changes in sbcl-0.8.15 relative to sbcl-0.8.14:
     Sean Champ and Raymond Toy)
   * bug fix: incorrect expansion of defgeneric that caused
     a style warning. (thanks for Zach Beane)
+  * on x86 compiler supports stack allocation of results of LIST and
+    LIST*, bound to variables, declared DYNAMIC-EXTENT. (based on
+    CMUCL implementation by Gerd Moellmann)
 
 changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * incompatible change: the internal functions

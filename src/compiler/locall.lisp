@@ -43,6 +43,45 @@
              (setf (car args) nil)))
   (values))
 
+(defun recognize-dynamic-extent-lvars (call fun)
+  (declare (type combination call) (type clambda fun))
+  (loop for arg in (basic-combination-args call)
+        and var in (lambda-vars fun)
+        when (and (lambda-var-dynamic-extent var)
+                  (not (lvar-dynamic-extent arg)))
+        collect arg into dx-lvars
+        and do (let ((use (lvar-uses arg)))
+                 ;; Stack analysis wants DX value generators to end
+                 ;; their blocks. Uses of mupltiple used LVARs already
+                 ;; end their blocks, so we just need to process
+                 ;; used-once LVARs.
+                 (when (node-p use)
+                   (node-ends-block use)))
+        finally (when dx-lvars
+                  (binding* ((before-ctran (node-prev call))
+                             (nil (ensure-block-start before-ctran))
+                             (block (ctran-block before-ctran))
+                             (new-call-ctran (make-ctran :kind :inside-block
+                                                         :next call
+                                                         :block block))
+                             (entry (with-ir1-environment-from-node call
+                                      (make-entry :prev before-ctran
+                                                  :next new-call-ctran)))
+                             (cleanup (make-cleanup :kind :dynamic-extent
+                                                    :mess-up entry
+                                                    :info dx-lvars)))
+                    (setf (node-prev call) new-call-ctran)
+                    (setf (ctran-next before-ctran) entry)
+                    (setf (ctran-use new-call-ctran) entry)
+                    (setf (entry-cleanup entry) cleanup)
+                    (setf (node-lexenv call)
+                          (make-lexenv :default (node-lexenv call)
+                                       :cleanup cleanup))
+                    (push entry (lambda-entries (node-home-lambda entry)))
+                    (dolist (lvar dx-lvars)
+                      (setf (lvar-dynamic-extent lvar) cleanup)))))
+  (values))
+
 ;;; This function handles merging the tail sets if CALL is potentially
 ;;; tail-recursive, and is a call to a function with a different
 ;;; TAIL-SET than CALL's FUN. This must be called whenever we alter
@@ -92,6 +131,7 @@
       (when arg
         (flush-lvar-externally-checkable-type arg))))
   (pushnew fun (lambda-calls-or-closes (node-home-lambda call)))
+  (recognize-dynamic-extent-lvars call fun)
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
   (values))
@@ -846,7 +886,8 @@
         ;; FIXME: Replace the call with unsafe CAST. -- APD, 2003-01-26
         (do-uses (use result)
           (derive-node-type use call-type)))
-      (substitute-lvar-uses lvar result)))
+      (substitute-lvar-uses lvar result
+                            (and lvar (eq (lvar-uses lvar) call)))))
   (values))
 
 ;;; We are converting FUN to be a LET when the call is in a non-tail

@@ -162,14 +162,35 @@ it would not be in the following situation:
 because both the allocation of the @code{&rest} list and the variable
 binding are outside the scope of the @code{optimize} declaration.
 
-There are many cases when dynamic-extent declarations could be useful.
-At present, SBCL implements
+There are many cases when @code{dynamic-extent} declarations could be
+useful. At present, SBCL implements
 
-@itemize 
+@itemize
 
 @item
 Stack allocation of @code{&rest} lists, where these are declared
 @code{dynamic-extent}.
+
+@item
+Stack allocation of @code{list} and @code{list*}, whose result is
+bound to a variable, declared @code{dynamic-extent}, such as
+
+@lisp
+(let ((list (list 1 2 3)))
+  (declare (dynamic-extent list)
+  ...))
+@end lisp
+
+or
+
+@lisp
+(flet ((f (x)
+         (declare (dynamic-extent x))
+         ...))
+  ...
+  (f (list 1 2 3))
+  ...)
+@end lisp
 
 @end itemize
 

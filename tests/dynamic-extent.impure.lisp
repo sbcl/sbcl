@@ -11,13 +11,19 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-;;; &REST lists
+(setq sb-c::*check-consistency* t)
+
 (defmacro defun-with-dx (name arglist &body body)
   `(locally
      (declare (optimize sb-c::stack-allocate-dynamic-extent))
      (defun ,name ,arglist
        ,@body)))
 
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x)
+  x)
+
+;;; &REST lists
 (defun-with-dx dxlength (&rest rest)
   (declare (dynamic-extent rest))
   (length rest))
@@ -35,5 +41,76 @@
   (callee rest))
 
 (assert (= (dxcaller 1 2 3 4 5 6 7) 22))
+
+;;; %NIP-VALUES
+(defun-with-dx test-nip-values ()
+  (flet ((bar (x &rest y)
+           (declare (dynamic-extent y))
+           (if (> x 0)
+               (values x (length y))
+               (values (car y)))))
+    (multiple-value-call #'values
+      (bar 1 2 3 4 5 6)
+      (bar -1 'a 'b))))
+
+(assert (equal (multiple-value-list (test-nip-values)) '(1 5 a)))
+
+;;; LET-variable substitution
+(defun-with-dx test-let-var-subst1 (x)
+  (let ((y (list x (1- x))))
+    (opaque-identity :foo)
+    (let ((z (the list y)))
+      (declare (dynamic-extent z))
+      (length z))))
+(assert (eql (test-let-var-subst1 17) 2))
+
+(defun-with-dx test-let-var-subst2 (x)
+  (let ((y (list x (1- x))))
+    (declare (dynamic-extent y))
+    (opaque-identity :foo)
+    (let ((z (the list y)))
+      (length z))))
+(assert (eql (test-let-var-subst2 17) 2))
+
+;;; DX propagation through LET-return.
+(defun-with-dx test-lvar-subst (x)
+  (let ((y (list x (1- x))))
+    (declare (dynamic-extent y))
+    (second (let ((z (the list y)))
+              (opaque-identity :foo)
+              z))))
+(assert (eql (test-lvar-subst 11) 10))
+
+;;; this code is incorrect, but the compiler should not fail
+(defun-with-dx test-let-var-subst-incorrect (x)
+  (let ((y (list x (1- x))))
+    (opaque-identity :foo)
+    (let ((z (the list y)))
+      (declare (dynamic-extent z))
+      (opaque-identity :bar)
+      z)))
+
+(defmacro assert-no-consing (form &optional times)
+  `(%assert-no-consing (lambda () ,form ,times)))
+(defun %assert-no-consing (thunk &optional times)
+  (let ((before (get-bytes-consed))
+        (times (or times 10000)))
+    (declare (type (integer 1 *) times))
+    (dotimes (i times)
+      (funcall thunk))
+    (assert (< (- (get-bytes-consed) before) times))))
+
+#+x86
+(progn
+  (assert-no-consing (dxlength 1 2 3))
+  (assert-no-consing (dxlength t t t t t t))
+  (assert-no-consing (dxlength))
+  (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
+  (assert-no-consing (test-nip-values))
+  (assert-no-consing (test-let-var-subst1 17))
+  (assert-no-consing (test-let-var-subst2 17))
+  (assert-no-consing (test-lvar-subst 11))
+  )
+
 
 (sb-ext:quit :unix-status 104)

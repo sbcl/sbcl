@@ -1260,13 +1260,15 @@
 
 
 ;;; Turn more arg (context, count) into a list.
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
+
 (define-vop (listify-rest-args)
   (:translate %listify-rest-args)
   (:policy :safe)
   (:args (context :scs (descriptor-reg) :target src)
 	 (count :scs (any-reg) :target ecx))
-  (:info *dynamic-extent*)
-  (:arg-types * tagged-num (:constant t))
+  (:arg-types * tagged-num)
   (:temporary (:sc unsigned-reg :offset esi-offset :from (:argument 0)) src)
   (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
   (:temporary (:sc unsigned-reg :offset eax-offset) eax)
@@ -1276,15 +1278,16 @@
   (:generator 20
     (let ((enter (gen-label))
 	  (loop (gen-label))
-	  (done (gen-label)))
+	  (done (gen-label))
+          (stack-allocate-p (node-stack-allocate-p node)))
       (move src context)
       (move ecx count)
       ;; Check to see whether there are no args, and just return NIL if so.
       (inst mov result nil-value)
       (inst jecxz done)
       (inst lea dst (make-ea :dword :index ecx :scale 2))
-      (pseudo-atomic
-       (allocation dst dst node *dynamic-extent*)
+      (maybe-pseudo-atomic stack-allocate-p
+       (allocation dst dst node stack-allocate-p)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
        ;; Convert the count into a raw value, so that we can use the
        ;; LOOP instruction.

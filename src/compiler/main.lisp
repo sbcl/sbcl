@@ -398,7 +398,8 @@
     (maybe-mumble "control ")
     (control-analyze component #'make-ir2-block)
 
-    (when (ir2-component-values-receivers (component-info component))
+    (when (or (ir2-component-values-receivers (component-info component))
+              (component-dx-lvars component))
       (maybe-mumble "stack ")
       (stack-analyze component)
       ;; Assign BLOCK-NUMBER for any cleanup blocks introduced by

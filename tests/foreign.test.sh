@@ -83,7 +83,7 @@ if [ $? = 22 ]; then
     exit $PUNT # success -- linkage-table not available
 fi
 
-$SBCL_ALLOWING_CORE --core $testfilestem.core --load $testfilestem.testlisp
+$SBCL_ALLOWING_CORE --core $testfilestem.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.testlisp
 if [ $? != 52 ]; then
     rm $testfilestem.*
     echo test failed: $?

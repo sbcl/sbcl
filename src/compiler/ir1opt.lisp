@@ -336,12 +336,16 @@
               ;; thus the control transfer is a non-local exit.
               (not (eq (block-home-lambda block)
                        (block-home-lambda next)))
-              ;; Stack analysis phase wants ENTRY to start a block.
+              ;; Stack analysis phase wants ENTRY to start a block...
               (entry-p (block-start-node next))
               (let ((last (block-last block)))
                 (and (valued-node-p last)
                      (awhen (node-lvar last)
-                       (consp (lvar-uses it))))))
+                       (or 
+                        ;; ... and a DX-allocator to end a block.
+                        (lvar-dynamic-extent it)
+                        ;; FIXME: This is a partial workaround for bug 303.
+                        (consp (lvar-uses it)))))))
              nil)
             (t
              (join-blocks block next)
@@ -1310,7 +1314,8 @@
              (dest (lvar-dest lvar)))
     (when (and
            ;; Think about (LET ((A ...)) (IF ... A ...)): two
-           ;; LVAR-USEs should not be met on one path.
+           ;; LVAR-USEs should not be met on one path. Another problem
+           ;; is with dynamic-extent.
            (eq (lvar-uses lvar) ref)
            (typecase dest
              ;; we should not change lifetime of unknown values lvars
@@ -1335,7 +1340,9 @@
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
       (setf (node-derived-type ref) *wild-type*)
-      (substitute-lvar-uses lvar arg)
+      (substitute-lvar-uses lvar arg
+                            ;; Really it is (EQ (LVAR-USES LVAR) REF):
+                            t)
       (delete-lvar-use ref)
       (change-ref-leaf ref (find-constant nil))
       (delete-ref ref)

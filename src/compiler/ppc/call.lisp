@@ -1100,8 +1100,6 @@ default-value-8
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
 	 (count-arg :target count :scs (any-reg)))
-  (:info dx)
-  (:ignore dx)
   (:arg-types * tagged-num (:constant t))
   (:temporary (:scs (any-reg) :from (:argument 0)) context)
   (:temporary (:scs (any-reg) :from (:argument 1)) count)

@@ -164,16 +164,27 @@
   (values))
 
 ;;; Replace all uses of OLD with uses of NEW, where NEW has an
-;;; arbitary number of uses.
-(defun substitute-lvar-uses (new old)
+;;; arbitary number of uses. NEW is supposed to be "later" than OLD.
+(defun substitute-lvar-uses (new old propagate-dx)
   (declare (type lvar old)
-           (type (or lvar null) new))
+           (type (or lvar null) new)
+           (type boolean propagate-dx))
 
-  (cond (new (do-uses (node old)
-               (%delete-lvar-use node)
-               (add-lvar-use node new))
-             (reoptimize-lvar new))
+  (cond (new
+         (do-uses (node old)
+           (%delete-lvar-use node)
+           (add-lvar-use node new))
+         (reoptimize-lvar new)
+         (awhen (and propagate-dx (lvar-dynamic-extent old))
+           (setf (lvar-dynamic-extent old) nil)
+           (unless (lvar-dynamic-extent new)
+             (setf (lvar-dynamic-extent new) it)
+             (setf (cleanup-info it) (substitute new old (cleanup-info it)))))
+         (when (lvar-dynamic-extent new)
+           (do-uses (node new)
+             (node-ends-block node))))
         (t (flush-dest old)))
+
   (values))
 
 ;;;; block starting/creation
@@ -305,8 +316,9 @@
                     (when (and (basic-combination-p use)
                                (eq (basic-combination-kind use) :local))
                       (merges use))))
+                (substitute-lvar-uses lvar value
+                                      (and lvar (eq (lvar-uses lvar) node)))
                 (%delete-lvar-use node)
-                (substitute-lvar-uses lvar value)
                 (prog1
                     (unlink-node node)
                   (dolist (merge (merges))
@@ -341,6 +353,11 @@
 #!-sb-fluid (declaim (inline node-dest))
 (defun node-dest (node)
   (awhen (node-lvar node) (lvar-dest it)))
+
+#!-sb-fluid (declaim (inline node-stack-allocate-p))
+(defun node-stack-allocate-p (node)
+  (awhen (node-lvar node)
+    (lvar-dynamic-extent it)))
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)
@@ -694,7 +711,7 @@
 ;;; end. The tricky thing is a special cleanup block; all its nodes
 ;;; have the same cleanup info, corresponding to the start, so the
 ;;; same approach returns safe result.
-(defun map-block-nlxes (fun block)
+(defun map-block-nlxes (fun block &optional dx-cleanup-fun)
   (loop for cleanup = (block-end-cleanup block)
         then (node-enclosing-cleanup (cleanup-mess-up cleanup))
         while cleanup
@@ -709,7 +726,10 @@
                 (aver (combination-p mess-up))
                 (let* ((arg-lvar (first (basic-combination-args mess-up)))
                        (nlx-info (constant-value (ref-leaf (lvar-use arg-lvar)))))
-                (funcall fun nlx-info)))))))
+                (funcall fun nlx-info)))
+               ((:dynamic-extent)
+                (when dx-cleanup-fun
+                  (funcall dx-cleanup-fun cleanup)))))))
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.
