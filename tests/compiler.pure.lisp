@@ -232,7 +232,7 @@
     (ignore-errors (ecase 1 (t 0) (1 2)))
   (assert (eql result 2))
   (assert (null error)))
-	  
+
 ;;; FTYPE should accept any functional type specifier
 (compile nil '(lambda (x) (declare (ftype function f)) (f x)))
 
@@ -285,7 +285,6 @@
 	 '(lambda (x) (block nil (print x)))))
 
 ;;; bug 62: too cautious type inference in a loop
-#+nil
 (assert (nth-value
          2
          (compile nil
@@ -333,3 +332,13 @@
        ((lambda (&optional *x* &rest y) (declare (special *x*)) (values *x* y)) nil))
    for real-warns-p = (nth-value 1 (compile nil fun))
    do (assert (eq warns-p real-warns-p)))
+
+(raises-error? (multiple-value-bind (a b c)
+                   (eval '(truncate 3 4))
+                 (declare (integer c))
+                 (list a b c))
+               type-error)
+
+(assert (equal (multiple-value-list (the (values &rest integer)
+                                      (eval '(values 3))))
+               '(3)))

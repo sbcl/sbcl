@@ -1513,9 +1513,9 @@
 		    (propagate-from-sets var type)
 		    (propagate-to-refs var type)))
 	      vars
-		(append types
-			(make-list (max (- (length vars) nvals) 0)
-				   :initial-element (specifier-type 'null))))))
+              (adjust-list types
+                           (length vars)
+                           (specifier-type 'null)))))
     (setf (continuation-reoptimize arg) nil))
   (values))
 

@@ -466,6 +466,21 @@
         (t
          (make-values-type :optional (list type) :rest *universal-type*))))
 
+;;; Return type, corresponding to ANSI short form of VALUES type
+;;; specifier.
+(defun make-short-values-type (types)
+  (declare (list types))
+  (let ((last-required (position-if
+                        (lambda (type)
+                          (not/type (csubtypep (specifier-type 'null) type)))
+                        types
+                        :from-end t)))
+    (if last-required
+        (make-values-type :required (subseq types 0 (1+ last-required))
+                          :optional (subseq types (1+ last-required))
+                          :rest *universal-type*)
+        (make-values-type :optional types :rest *universal-type*))))
+
 ;;; Do the specified OPERATION on TYPE1 and TYPE2, which may be any
 ;;; type, including VALUES types. With VALUES types such as:
 ;;;    (VALUES a0 a1)

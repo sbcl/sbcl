@@ -442,8 +442,7 @@
 
       (assert-continuation-type
        (first (basic-combination-args call))
-       (make-values-type :optional (mapcar #'leaf-type (lambda-vars ep))
-			 :rest *universal-type*)
+       (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
        (lexenv-policy (node-lexenv call)))))
   (values))
 

@@ -948,6 +948,15 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 
 ;;;; utilities for two-VALUES predicates
 
+(defmacro not/type (x)
+  (let ((val (gensym "VAL"))
+        (win (gensym "WIN")))
+    `(multiple-value-bind (,val ,win)
+         ,x
+       (if ,win
+           (values (not ,val) t)
+           (values nil nil)))))
+
 ;;; sort of like ANY and EVERY, except:
 ;;;   * We handle two-VALUES predicate functions, as SUBTYPEP does.
 ;;;     (And if the result is uncertain, then we return (VALUES NIL NIL),
