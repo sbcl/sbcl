@@ -514,6 +514,13 @@
   (test list)
   (test vector))
 
+(let* ((name (gensym))
+       (form `(defstruct ,name
+                (x nil :type (or null (function (integer)
+                                                (values number &optional foo)))))))
+  (eval (copy-tree form))
+  (eval (copy-tree form)))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)

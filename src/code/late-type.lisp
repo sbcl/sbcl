@@ -275,8 +275,36 @@
   (declare (ignore type1 type2))
   (specifier-type 'function))
 (!define-type-method (function :simple-intersection2) (type1 type2)
-  (declare (ignore type1 type2))
-  (specifier-type 'function))
+  (let ((ftype (specifier-type 'function)))
+    (cond ((eq type1 ftype) type2)
+          ((eq type2 ftype) type1)
+          (t (let ((rtype (values-type-intersection (fun-type-returns type1)
+                                                    (fun-type-returns type2))))
+               (flet ((change-returns (ftype rtype)
+                        (declare (type fun-type ftype) (type ctype rtype))
+                        (make-fun-type :required (fun-type-required ftype)
+                                       :optional (fun-type-optional ftype)
+                                       :keyp (fun-type-keyp ftype)
+                                       :keywords (fun-type-keywords ftype)
+                                       :allowp (fun-type-allowp ftype)
+                                       :returns rtype)))
+               (cond
+                 ((fun-type-wild-args type1)
+                  (if (fun-type-wild-args type2)
+                      (make-fun-type :wild-args t
+                                     :returns rtype)
+                      (change-returns type2 rtype)))
+                 ((fun-type-wild-args type2)
+                  (change-returns type1 rtype))
+                 (t (multiple-value-bind (req opt rest)
+                        (args-type-op type1 type2 #'type-intersection #'max)
+                      (make-fun-type :required req
+                                     :optional opt
+                                     :rest rest
+                                     ;; FIXME: :keys
+                                     :allowp (and (fun-type-allowp type1)
+                                                  (fun-type-allowp type2))
+                                     :returns rtype))))))))))
 
 ;;; The union or intersection of a subclass of FUNCTION with a
 ;;; FUNCTION type is somewhat complicated.
@@ -565,11 +593,16 @@
                                (length (args-type-required type2))))
                  (required (subseq res 0 req))
                  (opt (subseq res req)))
-            (values (make-values-type
-                     :required required
-                     :optional opt
-                     :rest rest)
+            (values required opt rest
                     (and rest-exact res-exact))))))))
+
+(defun values-type-op (type1 type2 operation nreq)
+  (multiple-value-bind (required optional rest exactp)
+      (args-type-op type1 type2 operation nreq)
+    (values (make-values-type :required required
+                              :optional optional
+                              :rest rest)
+            exactp)))
 
 ;;; Do a union or intersection operation on types that might be values
 ;;; types. The result is optimized for utility rather than exactness,
@@ -588,7 +621,7 @@
         ((eq type1 *empty-type*) type2)
         ((eq type2 *empty-type*) type1)
         (t
-         (values (args-type-op type1 type2 #'type-union #'min)))))
+         (values (values-type-op type1 type2 #'type-union #'min)))))
 
 (defun-cached (values-type-intersection :hash-function type-cache-hash
 					:hash-bits 8
@@ -611,9 +644,9 @@
                            :rest (values-type-rest type1)
                            :allowp (values-type-allowp type1))))
         (t
-         (args-type-op type1 (coerce-to-values type2)
-                       #'type-intersection
-                       #'max))))
+         (values-type-op type1 (coerce-to-values type2)
+                         #'type-intersection
+                         #'max))))
 
 ;;; This is like TYPES-EQUAL-OR-INTERSECT, except that it sort of
 ;;; works on VALUES types. Note that due to the semantics of

@@ -175,7 +175,14 @@
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type
 			       (class-info (type-class-or-lose 'function)))
-                     (:constructor %make-fun-type))
+                     (:constructor
+                      %make-fun-type (&key required optional rest
+                                           keyp keywords allowp
+                                           wild-args
+                                           returns
+                                      &aux (rest (if (eq rest *empty-type*)
+                                                     nil
+                                                     rest)))))
   ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean)
   ;; type describing the return values. This is a values type
