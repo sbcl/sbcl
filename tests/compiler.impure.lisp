@@ -636,6 +636,41 @@ BUG 48c, not yet fixed:
   (+ y 5))
 (assert (= (call-inlined 3) 6))
 
+;;; DEFINE-COMPILER-MACRO to work as expected, not via weird magical
+;;; IR1 pseudo-:COMPILE-TOPLEVEL handling
+(defvar *bug219-a-expanded-p* nil)
+(defun bug219-a (x)
+  (+ x 1))
+(define-compiler-macro bug219-a (&whole form y)
+  (setf *bug219-a-expanded-p* t)
+  (if (constantp y)
+      (+ (eval y) 2)
+      form))
+(defun bug219-a-aux ()
+  (bug219-a 2))
+(assert (= (bug219-a-aux)
+	   (if *bug219-a-expanded-p* 4 3)))
+(defvar *bug219-a-temp* 3)
+(assert (= (bug219-a *bug219-a-temp*) 4))
+
+(defvar *bug219-b-expanded-p* nil)
+(defun bug219-b-aux1 (x)
+  (when x
+    (define-compiler-macro bug219-b (y)
+      (setf *bug219-b-expanded-p* t)
+      `(+ ,y 2))))
+(defun bug219-b-aux2 (z)
+  (bug219-b z))
+(assert (not *bug219-b-expanded-p*))
+(assert (raises-error? (bug219-b-aux2 1) undefined-function))
+(bug219-b-aux1 t)
+(defun bug219-b-aux2 (z)
+  (bug219-b z))
+(defun bug219-b (x)
+  x)
+(assert (= (bug219-b-aux2 1)
+	   (if *bug219-b-expanded-p* 3 1)))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 

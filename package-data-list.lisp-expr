@@ -858,6 +858,7 @@ retained, possibly temporariliy, because it might be used internally."
              "LOOKS-LIKE-NAME-OF-SPECIAL-VAR-P"
              "POSITIVE-PRIMEP"
              "EVAL-IN-LEXENV"
+	     "DEBUG-NAMIFY"
 
              ;; These could be moved back into SB!EXT if someone has
              ;; compelling reasons, but hopefully we can get by

@@ -124,6 +124,10 @@
     ;; spec, so at least we can warn him...
     (sb!c::compiler-style-warn
      "defining compiler macro of (SETF ...), which will not be expanded"))
+  (when (and (symbolp name) (special-operator-p name))
+    (error 'simple-program-error
+	   :format-control "cannot define a compiler-macro for a special operator: ~S"
+	   :format-arguments (list name)))
   (let ((whole (gensym "WHOLE-"))
 	(environment (gensym "ENV-")))
     (multiple-value-bind (body local-decs doc)
@@ -132,19 +136,45 @@
       (let ((def `(lambda (,whole ,environment)
 		    ,@local-decs
 		    (block ,(fun-name-block-name name)
-		      ,body))))
-	`(sb!c::%define-compiler-macro ',name #',def ',lambda-list ,doc)))))
-(defun sb!c::%define-compiler-macro (name definition lambda-list doc)
-  (declare (ignore lambda-list))
-  (sb!c::%%define-compiler-macro name definition doc))
-(defun sb!c::%%define-compiler-macro (name definition doc)
-  (setf (sb!xc:compiler-macro-function name) definition)
-  ;; FIXME: Add support for (SETF FDOCUMENTATION) when object is a list
-  ;; and type is COMPILER-MACRO. (Until then, we have to discard any
-  ;; compiler macro documentation for (SETF FOO).)
-  (unless (listp name)
-    (setf (fdocumentation name 'compiler-macro) doc))
-  name)
+		      ,body)))
+	    (debug-name (debug-namify "DEFINE-COMPILER-MACRO ~S" name)))
+	`(eval-when (:compile-toplevel :load-toplevel :execute)
+	  (sb!c::%define-compiler-macro ',name #',def ',lambda-list ,doc ,debug-name))))))
+
+;;; FIXME: This will look remarkably similar to those who have already
+;;; seen the code for %DEFMACRO in src/code/defmacro.lisp.  Various
+;;; bits of logic should be shared (notably arglist setting).
+(macrolet
+    ((def (times set-p)
+	 `(eval-when (,@times)
+	   (defun sb!c::%define-compiler-macro
+	       (name definition lambda-list doc debug-name)
+	     ,@(unless set-p
+		 '((declare (ignore lambda-list debug-name))))
+	     ;; FIXME: warn about incompatible lambda list with
+	     ;; respect to parent function?
+	     (setf (sb!xc:compiler-macro-function name) definition)
+	     ;; FIXME: Add support for (SETF FDOCUMENTATION) when
+	     ;; object is a list and type is COMPILER-MACRO. (Until
+	     ;; then, we have to discard any compiler macro
+	     ;; documentation for (SETF FOO).)
+	     (unless (listp name)
+	       (setf (fdocumentation name 'compiler-macro) doc))
+	     ,(when set-p
+		    `(case (widetag-of definition)
+                      (#.sb!vm:closure-header-widetag
+                       (setf (%simple-fun-arglist (%closure-fun definition))
+                             lambda-list
+			     (%simple-fun-name (%closure-fun definition))
+			     debug-name))
+                      ((#.sb!vm:simple-fun-header-widetag
+                        #.sb!vm:closure-fun-header-widetag)
+                       (setf (%simple-fun-arglist definition) lambda-list
+			     (%simple-fun-name definition) debug-name))))
+	     name))))
+  (progn
+    (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
+    (def (:compile-toplevel) nil)))
 
 ;;;; CASE, TYPECASE, and friends
 

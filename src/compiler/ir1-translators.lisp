@@ -1063,20 +1063,17 @@
 
 ;;;; interface to defining macros
 
-;;;; FIXME:
-;;;;   classic CMU CL comment:
-;;;;     DEFMACRO and DEFUN expand into calls to %DEFxxx functions
-;;;;     so that we get a chance to see what is going on. We define
-;;;;     IR1 translators for these functions which look at the
-;;;;     definition and then generate a call to the %%DEFxxx function.
-;;;; Alas, this implementation doesn't do the right thing for
-;;;; non-toplevel uses of these forms, so this should probably
-;;;; be changed to use EVAL-WHEN instead.
-
-;;; Return a new source path with any stuff intervening between the
-;;; current path and the first form beginning with NAME stripped off.
-;;; This is used to hide the guts of DEFmumble macros to prevent
-;;; annoying error messages.
+;;; Old CMUCL comment:
+;;;
+;;;   Return a new source path with any stuff intervening between the
+;;;   current path and the first form beginning with NAME stripped
+;;;   off.  This is used to hide the guts of DEFmumble macros to
+;;;   prevent annoying error messages.
+;;;
+;;; Now that we have implementations of DEFmumble macros in terms of
+;;; EVAL-WHEN, this function is no longer used.  However, it might be
+;;; worth figuring out why it was used, and maybe doing analogous
+;;; munging to the functions created in the expanders for the macros.
 (defun revert-source-path (name)
   (do ((path *current-path* (cdr path)))
       ((null path) *current-path*)
@@ -1084,28 +1081,3 @@
       (when (or (eq first name)
 		(eq first 'original-source-start))
 	(return path)))))
-
-(def-ir1-translator %define-compiler-macro ((name def lambda-list doc)
-					    start cont
-					    :kind :function)
-  (let ((name (eval name))
-	(def (second def))) ; We don't want to make a function just yet...
-
-    (when (eq (info :function :kind name) :special-form)
-      (compiler-error "attempt to define a compiler-macro for special form ~S"
-		      name))
-
-    (setf (info :function :compiler-macro-function name)
-	  (coerce def 'function))
-
-    (let* ((*current-path* (revert-source-path 'define-compiler-macro))
-	   (fun (ir1-convert-lambda def
-				    :debug-name (debug-namify
-						 "DEFINE-COMPILER-MACRO ~S"
-						 name))))
-      (setf (functional-arg-documentation fun) (eval lambda-list))
-
-      (ir1-convert start cont `(%%define-compiler-macro ',name ,fun ,doc)))
-
-    (when sb!xc:*compile-print*
-      (compiler-mumble "~&; converted ~S~%" name))))

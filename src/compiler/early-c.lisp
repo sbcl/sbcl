@@ -165,3 +165,19 @@
 dynamic binding, even though the symbol name follows the usual naming~@
 convention (names like *FOO*) for special variables" symbol))
   (values))
+
+;;; shorthand for creating debug names from source names or other
+;;; stems, e.g.
+;;;   (DEBUG-NAMIFY "FLET ~S" SOURCE-NAME)
+;;;   (DEBUG-NAMIFY "top level form ~S" FORM)
+;;;
+;;; FIXME: This function seems to have a lot in common with
+;;; STRINGIFY-FORM, and perhaps there's some way to merge the two
+;;; functions.
+(defun debug-namify (format-string &rest format-arguments)
+  (with-standard-io-syntax
+   (let ((*print-readably* nil)
+         (*package* *cl-package*)
+         (*print-length* 3)
+         (*print-level* 2))
+     (apply #'format nil format-string format-arguments))))

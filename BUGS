@@ -1191,23 +1191,6 @@ WORKAROUND:
   (defun test (x y) (the (values integer) (truncate x y)))
   (test 10 4) => 2
 
-219: "DEFINE-COMPILER-MACRO in non-toplevel contexts evaluated at compile-time"
-  In sbcl-0.7.9:
-
-  * (defun foo (x)
-      (when x
-        (define-compiler-macro bar (&whole whole)
-          (declare (ignore whole))
-          (print "expanding compiler macro")
-          1)))
-  FOO
-  * (defun baz (x) (bar))
-  [ ... ]
-  "expanding compiler macro"
-  BAZ
-  * (baz t)
-  1
-
 220:
   Sbcl 0.7.9 fails to compile
 

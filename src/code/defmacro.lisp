@@ -30,20 +30,24 @@
 			  :environment environment)
 	(let ((def `(lambda (,whole ,environment)
 		      ,@local-decs
-		      (block ,name
-			,new-body))))
+		      (block ,name 
+			,new-body)))
+	      ;; if we want to move over to list-style names
+	      ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
+	      ;; functionality] here might be a good place to start.
+	      (debug-name (debug-namify "DEFMACRO ~S" name)))
 	  `(eval-when (:compile-toplevel :load-toplevel :execute)
-             (sb!c::%defmacro ',name #',def ',lambda-list ,doc)))))))
+             (sb!c::%defmacro ',name #',def ',lambda-list ,doc ,debug-name)))))))
 
 (macrolet
-    ((def (times set-args-p)
+    ((def (times set-p)
        `(eval-when (,@times)
-          (defun sb!c::%defmacro (name definition lambda-list doc)
+          (defun sb!c::%defmacro (name definition lambda-list doc debug-name)
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."
-            ,@(unless set-args-p
-                '((declare (ignore lambda-list))))
+            ,@(unless set-p
+                '((declare (ignore lambda-list debug-name))))
             (ecase (info :function :kind name)
               ((nil))
               (:function
@@ -75,14 +79,17 @@
                     (style-warn "redefining ~S in DEFMACRO" name))
             (setf (sb!xc:macro-function name) definition
                   (fdocumentation name 'function) doc)
-            ,(when set-args-p
+            ,(when set-p
                    `(case (widetag-of definition)
                       (#.sb!vm:closure-header-widetag
                        (setf (%simple-fun-arglist (%closure-fun definition))
-                             lambda-list))
+                             lambda-list
+			     (%simple-fun-name (%closure-fun definition))
+			     debug-name))
                       ((#.sb!vm:simple-fun-header-widetag
                         #.sb!vm:closure-fun-header-widetag)
-                       (setf (%simple-fun-arglist definition) lambda-list))))
+                       (setf (%simple-fun-arglist definition) lambda-list
+			     (%simple-fun-name definition) debug-name))))
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
