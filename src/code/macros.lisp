@@ -28,7 +28,7 @@
   #!+sb-doc
   "Signals an error if the value of test-form is nil. Continuing from this
    error using the CONTINUE restart will allow the user to alter the value of
-   some locations known to SETF, starting over with test-form. Returns nil."
+   some locations known to SETF, starting over with test-form. Returns NIL."
   `(do () (,test-form)
      (assert-error ',test-form ',places ,datum ,@arguments)
      ,@(mapcar #'(lambda (place)

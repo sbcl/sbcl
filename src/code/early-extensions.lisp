@@ -101,49 +101,40 @@
 #!+sb-show
 (defvar *hash-caches-initialized-p*)
 
-;;; :INIT-WRAPPER is set to COLD-INIT-FORMS in type system definitions
-;;; so that caches will be created before top-level forms run.
+;;; Define a hash cache that associates some number of argument values
+;;; with a result value. The TEST-FUNCTION paired with each ARG-NAME
+;;; is used to compare the value for that arg in a cache entry with a
+;;; supplied arg. The TEST-FUNCTION must not error when passed NIL as
+;;; its first arg, but need not return any particular value.
+;;; TEST-FUNCTION may be any thing that can be placed in CAR position.
+;;;
+;;; NAME is used to define these functions:
+;;; <name>-CACHE-LOOKUP Arg*
+;;;   See whether there is an entry for the specified ARGs in the
+;;;   cache. If not present, the :DEFAULT keyword (default NIL)
+;;;   determines the result(s).
+;;; <name>-CACHE-ENTER Arg* Value*
+;;;   Encache the association of the specified args with VALUE.
+;;; <name>-CACHE-CLEAR
+;;;   Reinitialize the cache, invalidating all entries and allowing
+;;;   the arguments and result values to be GC'd.
+;;;
+;;; These other keywords are defined:
+;;; :HASH-BITS <n>
+;;;   The size of the cache as a power of 2.
+;;; :HASH-FUNCTION function
+;;;   Some thing that can be placed in CAR position which will compute
+;;;   a value between 0 and (1- (expt 2 <hash-bits>)).
+;;; :VALUES <n>
+;;;   the number of return values cached for each function call
+;;; :INIT-WRAPPER <name>
+;;;   The code for initializing the cache is wrapped in a form with
+;;;   the specified name. (:INIT-WRAPPER is set to COLD-INIT-FORMS
+;;;   in type system definitions so that caches will be created
+;;;   before top-level forms run.)
 (defmacro define-hash-cache (name args &key hash-function hash-bits default
 				  (init-wrapper 'progn)
 				  (values 1))
-  #!+sb-doc
-  "DEFINE-HASH-CACHE Name ({(Arg-Name Test-Function)}*) {Key Value}*
-  Define a hash cache that associates some number of argument values to a
-  result value. The Test-Function paired with each Arg-Name is used to compare
-  the value for that arg in a cache entry with a supplied arg. The
-  Test-Function must not error when passed NIL as its first arg, but need not
-  return any particular value. Test-Function may be any thing that can be
-  placed in CAR position.
-
-  Name is used to define these functions:
-
-  <name>-CACHE-LOOKUP Arg*
-      See whether there is an entry for the specified Args in the cache. If
-      not present, the :DEFAULT keyword (default NIL) determines the result(s).
-
-  <name>-CACHE-ENTER Arg* Value*
-      Encache the association of the specified args with Value.
-
-  <name>-CACHE-CLEAR
-      Reinitialize the cache, invalidating all entries and allowing the
-      arguments and result values to be GC'd.
-
-  These other keywords are defined:
-
-  :HASH-BITS <n>
-      The size of the cache as a power of 2.
-
-  :HASH-FUNCTION function
-      Some thing that can be placed in CAR position which will compute a value
-      between 0 and (1- (expt 2 <hash-bits>)).
-
-  :VALUES <n>
-      The number of values cached.
-
-  :INIT-WRAPPER <name>
-      The code for initializing the cache is wrapped in a form with the
-      specified name. Default PROGN."
-
   (let* ((var-name (symbolicate "*" name "-CACHE-VECTOR*"))
 	 (nargs (length args))
 	 (entry-size (+ nargs values))
@@ -251,13 +242,11 @@
 	 ,@(forms)
 	 ',name))))
 
+;;; some syntactic sugar for defining a function whose values are
+;;; cached by DEFINE-HASH-CACHE
 (defmacro defun-cached ((name &rest options &key (values 1) default
 			      &allow-other-keys)
 			args &body body-decls-doc)
-  #!+sb-doc
-  "DEFUN-CACHED (Name {Key Value}*) ({(Arg-Name Test-Function)}*) Form*
-  Some syntactic sugar for defining a function whose values are cached by
-  DEFINE-HASH-CACHE."
   (let ((default-values (if (and (consp default) (eq (car default) 'values))
 			    (cdr default)
 			    (list default)))
@@ -388,13 +377,27 @@
   (declare (type function fun))
   (lambda (x y)
     (funcall fun y x)))
+
+;;; like CL:ASSERT, but lighter-weight
+;;;
+;;; (As of sbcl-0.6.11.20, we were using some 400 calls to CL:ASSERT
+;;; in SBCL. The CL:ASSERT restarts and whatnot expand into a
+;;; significant amount of code when you multiply them by 400, so
+;;; replacing them with this should reduce the size of the system
+;;; by enough to be worthwhile.)
+(defmacro aver (expr)
+  `(unless ,expr
+     (%failed-aver ,(let ((*package* (find-package :keyword)))
+		      (format nil "~S" expr)))))
+(defun %failed-aver (expr)
+  (error "~@<failed AVER: ~2I~_~S~:>" expr))
 
 ;;;; utilities for two-VALUES predicates
 
 ;;; sort of like ANY and EVERY, except:
-;;;   * We handle two-VALUES predicate functions like SUBTYPEP. (And
-;;;     if the result is uncertain, then we return (VALUES NIL NIL),
-;;;     just like SUBTYPEP.)
+;;;   * We handle two-VALUES predicate functions, as SUBTYPEP does.
+;;;     (And if the result is uncertain, then we return (VALUES NIL NIL),
+;;;     as SUBTYPEP does.)
 ;;;   * THING is just an atom, and we apply OP (an arity-2 function)
 ;;;     successively to THING and each element of LIST.
 (defun any/type (op thing list)
@@ -451,7 +454,7 @@
 ;;; keywords are defined:
 ;;;
 ;;; :PRIN1    Print the value of the expression instead of the slot value.
-;;; :PRINC    Like :PRIN1, only princ the value
+;;; :PRINC    Like :PRIN1, only PRINC the value
 ;;; :TEST     Only print something if the test is true.
 ;;;
 ;;; If no printing thing is specified then the slot value is printed

@@ -615,17 +615,9 @@
   ;; %TYPE-INTERSECTION2, there seems to be no need to distinguish
   ;; between not finding a method and having a method return NIL.
   (flet ((1way (x y)
-	   (let ((result (!invoke-type-method :simple-union2 :complex-union2
-					      x y
-					      :default nil)))
-	     ;; UNION2 type methods are supposed to return results
-	     ;; which are better than just brute-forcibly smashing the
-	     ;; terms together into UNION-TYPEs. But they're derived
-	     ;; from old CMU CL UNION type methods which played by
-	     ;; somewhat different rules. Here we check to make sure
-	     ;; we don't get ambushed by diehard old-style code.
-	     (assert (not (union-type-p result)))
-	     result)))
+	   (!invoke-type-method :simple-union2 :complex-union2
+				x y
+				:default nil)))
     (declare (inline 1way))
     (or (1way type1 type2)
 	(1way type2 type1))))
@@ -675,20 +667,9 @@
   ;;
   ;; (Why yes, CLOS probably *would* be nicer..)
   (flet ((1way (x y)
-	   (let ((result
-		  (!invoke-type-method :simple-intersection2
-				       :complex-intersection2
-				       x y
-				       :default :no-type-method-found)))
-	     ;; INTERSECTION2 type methods are supposed to return
-	     ;; results which are better than just brute-forcibly
-	     ;; smashing the terms together into INTERSECTION-TYPEs.
-	     ;; But they're derived from old CMU CL INTERSECTION type
-	     ;; methods which played by somewhat different rules. Here
-	     ;; we check to make sure we don't get ambushed by diehard
-	     ;; old-style code.
-	     (assert (not (intersection-type-p result)))
-	     result)))
+	   (!invoke-type-method :simple-intersection2 :complex-intersection2
+				x y
+				:default :no-type-method-found)))
     (declare (inline 1way))
     (let ((xy (1way type1 type2)))
       (or (and (not (eql xy :no-type-method-found)) xy)
@@ -1964,33 +1945,26 @@
 	((union-complex-subtypep-arg1 type2 type1)
 	 type2)
 	(t 
+	 ;; KLUDGE: This code accumulates a sequence of TYPE-UNION2
+	 ;; operations in a particular order, and gives up if any of
+	 ;; the sub-unions turn out not to be simple. In other cases
+	 ;; ca. sbcl-0.6.11.15, that approach to taking a union was a
+	 ;; bad idea, since it can overlook simplifications which
+	 ;; might occur if the terms were accumulated in a different
+	 ;; order. It's possible that that will be a problem here too.
+	 ;; However, I can't think of a good example to demonstrate
+	 ;; it, and without an example to demonstrate it I can't write
+	 ;; test cases, and without test cases I don't want to
+	 ;; complicate the code to address what's still a hypothetical
+	 ;; problem. So I punted. -- WHN 2001-03-20
 	 (let ((accumulator *empty-type*))
 	   (dolist (t2 (union-type-types type2) accumulator)
 	     (setf accumulator
 		   (type-union2 accumulator
 				(type-intersection type1 t2)))
-	     ;; When our result isn't simple any more
-	     (when (or
-		    ;; (TYPE-UNION2 couldn't find a sufficiently simple
-		    ;; result, so we can't either.)
-		    (null accumulator)
-		    ;; (A result containing an intersection isn't
-		    ;; sufficiently simple for us. FIXME: Maybe it
-		    ;; should be sufficiently simple for us?
-		    ;; UNION-TYPEs aren't supposed to be nested inside
-		    ;; INTERSECTION-TYPEs, so if we punt with NIL,
-		    ;; we're condemning the expression to become a
-		    ;; HAIRY-TYPE. If it were possible for us to
-		    ;; return an INTERSECTION-TYPE, then the
-		    ;; INTERSECTION-TYPE-TYPES could be merged into
-		    ;; the outer INTERSECTION-TYPE which may be under
-		    ;; construction. E.g. if this function could
-		    ;; return an intersection type, and the calling
-		    ;; functions were smart enough to handle it, then
-		    ;; we could simplify (AND (OR FIXNUM KEYWORD)
-		    ;; SYMBOL) to KEYWORD, even though KEYWORD
-		    ;; is an intersection type.)
-		    (intersection-type-p accumulator))
+	     ;; When our result isn't simple any more (because
+	     ;; TYPE-UNION2 was unable to give us a simple result)
+	     (unless accumulator
 	       (return nil)))))))
 
 (!def-type-translator or (&rest type-specifiers)

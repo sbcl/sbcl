@@ -569,8 +569,8 @@
  ;; stuff for byte compilation. Note that although byte code is
  ;; "portable", it'd be hard to make it work on the cross-compilation
  ;; host, because fundamental BYTE-FUNCTION-OR-CLOSURE types are
- ;; implemented as FUNCALLABLE-INSTANCEs, and it's 
- ;; not obvious how to make those portable.
+ ;; implemented as FUNCALLABLE-INSTANCEs, and it's not obvious
+ ;; how to emulate those in a vanilla ANSI Common Lisp.
  ("code/byte-types" :not-host)
  ("compiler/byte-comp")
  ("compiler/target-byte-comp" :not-host)

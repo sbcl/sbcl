@@ -832,13 +832,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   but ordinary COMPILE-FILE of a file containing (DECLAIM (SPEED 0))
   does not.
 
-89:
-  The type system doesn't understand the the intersection of the types
-  KEYWORD and (OR KEYWORD NULL) is KEYWORD, perhaps because KEYWORD
-  is itself an intersection type and that causes technical problems
-  with the simplification. Thus, the optimizer can't make some useful
-  valid type inferences.
-
 90: 
   a latent cross-compilation/bootstrapping bug: The cross-compilation
   host's CL:CHAR-CODE-LIMIT is used in target code in readtable.lisp

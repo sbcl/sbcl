@@ -366,7 +366,7 @@
     (if (lisp-stream-p stream)
 	(or (/= (the fixnum (lisp-stream-in-index stream)) +in-buffer-length+)
 	    ;; Test for T explicitly since misc methods return :EOF sometimes.
-	    (eq (funcall (lisp-stream-misc stream) stream :listen) at))
+	    (eq (funcall (lisp-stream-misc stream) stream :listen) t))
 	;; Fall through to Gray streams FUNDAMENTAL-STREAM case.
 	(stream-listen stream))))
 

@@ -92,12 +92,22 @@
 	    (t
 	     (error "can't handle TYPE-OF ~S in cross-compilation"))))))
 
-;;; Like TYPEP, but asks whether HOST-OBJECT would be of TARGET-TYPE
-;;; when instantiated on the target SBCL. Since this is hard to decide
-;;; in some cases, and since in other cases we just haven't bothered
-;;; to try, it needs to return two values, just like SUBTYPEP: the
-;;; first value for its conservative opinion (never T unless it's
-;;; certain) and the second value to tell whether it's certain.
+;;; Is SYMBOL in the CL package? Note that we're testing this on the
+;;; cross-compilation host, which could do things any old way. In
+;;; particular, it might be in the CL package even though
+;;; SYMBOL-PACKAGE is not (FIND-PACKAGE :CL). So we test things
+;;; another way.
+(defun in-cl-package-p (symbol)
+  (eql (find-symbol (symbol-name symbol) :cl)
+       symbol))
+
+;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
+;;; be of TARGET-TYPE when instantiated on the target SBCL. Since this
+;;; is hard to determine in some cases, and since in other cases we
+;;; just haven't bothered to try, it needs to return two values, just
+;;; like SUBTYPEP: the first value for its conservative opinion (never
+;;; T unless it's certain) and the second value to tell whether it's
+;;; certain.
 (defun cross-typep (host-object target-type)
   (flet ((warn-and-give-up ()
 	   ;; We don't have to keep track of this as long as system performance
@@ -175,6 +185,20 @@
 	       ;; trivial.
 	       (and (every/type #'cross-typep host-object rest))
 	       (or  (any/type   #'cross-typep host-object rest))
+	       ;; If we want to work with the KEYWORD type, we need
+	       ;; to grok (SATISFIES KEYWORDP).
+	       (satisfies
+		(destructuring-bind (predicate-name) rest
+		  (if (and (in-cl-package-p predicate-name)
+			   (fboundp predicate-name))
+		      ;; Many things like KEYWORDP, ODDP, PACKAGEP,
+		      ;; and NULL correspond between host and target.
+		      (values (not (null (funcall predicate-name host-object)))
+			      t)
+		      ;; For symbols not in the CL package, it's not
+		      ;; in general clear how things correspond
+		      ;; between host and target, so we punt.
+		      (warn-and-give-up))))
 	       ;; Some complex types are too hard to handle in the positive
 	       ;; case, but at least we can be confident in a large fraction of
 	       ;; the negative cases..

@@ -2299,12 +2299,12 @@
 (defun mismatch (sequence1 sequence2 &key from-end (test #'eql) test-not
 			   (start1 0) end1 (start2 0) end2 key)
   #!+sb-doc
-  "The specified subsequences of Sequence1 and Sequence2 are compared
+  "The specified subsequences of SEQUENCE1 and SEQUENCE2 are compared
    element-wise. If they are of equal length and match in every element, the
    result is Nil. Otherwise, the result is a non-negative integer, the index
-   within Sequence1 of the leftmost position at which they fail to match; or,
+   within SEQUENCE1 of the leftmost position at which they fail to match; or,
    if one is shorter than and a matching prefix of the other, the index within
-   Sequence1 beyond the last position tested is returned. If a non-NIL
+   SEQUENCE1 beyond the last position tested is returned. If a non-NIL
    :FROM-END argument is given, then one plus the index of the rightmost
    position in which the sequences differ is returned."
   (declare (fixnum start1 start2))
