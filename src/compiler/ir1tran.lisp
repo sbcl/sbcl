@@ -98,16 +98,58 @@
      :for class
      :slot slot)))
 
-;;; If NAME is already entered in *FREE-FUNCTIONS*, then return the
-;;; value. Otherwise, make a new GLOBAL-VAR using information from the
-;;; global environment and enter it in *FREE-FUNCTIONS*. If NAME names
-;;; a macro or special form, then we error out using the supplied
-;;; context which indicates what we were trying to do that demanded a
-;;; function.
+;;; Has the *FREE-FUNCTIONS* entry FREE-FUNCTION become invalid?
+;;;
+;;; In CMU CL, the answer was implicitly always true, so this 
+;;; predicate didn't exist.
+;;;
+;;; This predicate was added to fix bug 138 in SBCL. In some obscure
+;;; circumstances, it was possible for a *FREE-FUNCTIONS* to contain a
+;;; DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object contained IR1
+;;; stuff (NODEs, BLOCKs...) referring to an already compiled (aka
+;;; "dead") component. When this IR1 stuff was reused in a new
+;;; component, under further obscure circumstances it could be used by
+;;; WITH-IR1-ENVIRONMENT-FROM-NODE to generate a binding for
+;;; *CURRENT-COMPONENT*. At that point things got all confused, since
+;;; IR1 conversion was sending code to a component which had already
+;;; been compiled and would never be compiled again.
+(defun invalid-free-function-p (free-function)
+  ;; There might be other reasons that *FREE-FUNCTION* entries could
+  ;; become invalid, but the only one we've been bitten by so far
+  ;; (sbcl-0.pre7.118) is this one:
+  (and (defined-fun-p free-function)
+       (let ((functional (defined-fun-functional free-function)))
+	 (and (lambda-p functional)
+	      (or
+	       ;; (The main reason for this first test is to bail out
+	       ;; early in cases where the LAMBDA-COMPONENT call in
+	       ;; the second test would fail because links it needs
+	       ;; are uninitialized or invalid.)
+	       ;;
+	       ;; If the BIND node for this LAMBDA is null, then
+	       ;; according to the slot comments, the LAMBDA has been
+	       ;; deleted or its call has been deleted. In that case,
+	       ;; it seems rather questionable to reuse it, and
+	       ;; certainly it shouldn't be necessary to reuse it, so
+	       ;; we cheerfully declare it invalid.
+	       (null (lambda-bind functional))
+	       ;; If this IR1 stuff belongs to a dead component, then
+	       ;; we can't reuse it without getting into bizarre
+	       ;; confusion.
+	       (eql (component-info (lambda-component functional)) :dead))))))
+
+;;; If NAME already has a valid entry in *FREE-FUNCTIONS*, then return
+;;; the value. Otherwise, make a new GLOBAL-VAR using information from
+;;; the global environment and enter it in *FREE-FUNCTIONS*. If NAME
+;;; names a macro or special form, then we error out using the
+;;; supplied context which indicates what we were trying to do that
+;;; demanded a function.
 (defun find-free-function (name context)
   (declare (string context))
   (declare (values global-var))
-  (or (gethash name *free-functions*)
+  (or (let ((old-free-function (gethash name *free-functions*)))
+	(and (not (invalid-free-function-p old-free-function))
+	     old-free-function))
       (ecase (info :function :kind name)
 	;; FIXME: The :MACRO and :SPECIAL-FORM cases could be merged.
 	(:macro
@@ -485,19 +527,23 @@
        (use-continuation res cont)))
     (values)))
 
-;;; Add FUN to the COMPONENT-REANALYZE-FUNS, unless it's some
-;;; trivial type for which reanalysis is a trivial no-op. FUN is returned.
+;;; Add FUN to the COMPONENT-REANALYZE-FUNS, unless it's some trivial
+;;; type for which reanalysis is a trivial no-op, or unless it doesn't
+;;; belong in this component at all.
+;;;
+;;; FUN is returned.
 (defun maybe-reanalyze-fun (fun)
   (declare (type functional fun))
 
   (aver-live-component *current-component*)
-  (when (lambda-p fun) ; when it's easy to ask FUN its COMPONENT
-    ;; general sanity check, specifically related to bug 138
-    (aver (eql (lambda-component fun) *current-component*)))
 
-  ;; I *think* this means "unless FUN is of some type for which
-  ;; reanalysis is a no-op". -- WHN 2001-01-06
+  ;; When FUN is of a type for which reanalysis isn't a trivial no-op
   (when (typep fun '(or optional-dispatch clambda))
+
+    ;; When FUN knows its component
+    (when (lambda-p fun) 
+      (aver (eql (lambda-component fun) *current-component*)))
+
     (pushnew fun (component-reanalyze-funs *current-component*)))
 
   fun)

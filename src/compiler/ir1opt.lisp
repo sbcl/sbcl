@@ -715,20 +715,22 @@
 
   (values))
 
-;;; If Call is to a function that doesn't return (i.e. return type is
+;;; If CALL is to a function that doesn't return (i.e. return type is
 ;;; NIL), then terminate the block there, and link it to the component
 ;;; tail. We also change the call's CONT to be a dummy continuation to
 ;;; prevent the use from confusing things.
 ;;;
-;;; Except when called during IR1, we delete the continuation if it
-;;; has no other uses. (If it does have other uses, we reoptimize.)
+;;; Except when called during IR1 [FIXME: What does this mean? Except
+;;; during IR1 conversion? What about IR1 optimization?], we delete
+;;; the continuation if it has no other uses. (If it does have other
+;;; uses, we reoptimize.)
 ;;;
 ;;; Termination on the basis of a continuation type assertion is
 ;;; inhibited when:
 ;;; -- The continuation is deleted (hence the assertion is spurious), or
 ;;; -- We are in IR1 conversion (where THE assertions are subject to
 ;;;    weakening.)
-(defun maybe-terminate-block (call ir1-p)
+(defun maybe-terminate-block (call ir1-converting-not-optimizing-p)
   (declare (type basic-combination call))
   (let* ((block (node-block call))
 	 (cont (node-cont call))
@@ -737,9 +739,10 @@
     (unless (or (and (eq call (block-last block)) (eq succ tail))
 		(block-delete-p block))
       (when (or (and (eq (continuation-asserted-type cont) *empty-type*)
-		     (not (or ir1-p (eq (continuation-kind cont) :deleted))))
+		     (not (or ir1-converting-not-optimizing-p
+			      (eq (continuation-kind cont) :deleted))))
 		(eq (node-derived-type call) *empty-type*))
-	(cond (ir1-p
+	(cond (ir1-converting-not-optimizing-p
 	       (delete-continuation-use call)
 	       (cond
 		((block-last block)
@@ -771,20 +774,28 @@
 ;;;    the expansion and change the call to call it. Expansion is
 ;;;    enabled if :INLINE or if SPACE=0. If the FUNCTIONAL slot is
 ;;;    true, we never expand, since this function has already been
-;;;    converted. Local call analysis will duplicate the definition if
-;;;    necessary. We claim that the parent form is LABELS for context
-;;;    declarations, since we don't want it to be considered a real
-;;;    global function.
+;;;    converted. Local call analysis will duplicate the definition
+;;;    if necessary. We claim that the parent form is LABELS for
+;;;    context declarations, since we don't want it to be considered
+;;;    a real global function.
 ;;; -- In addition to a direct check for the function name in the
 ;;;    table, we also must check for slot accessors. If the function
 ;;;    is a slot accessor, then we set the combination kind to the
-;;;    function info of %Slot-Setter or %Slot-Accessor, as
+;;;    function info of %SLOT-SETTER or %SLOT-ACCESSOR, as
 ;;;    appropriate.
 ;;; -- If it is a known function, mark it as such by setting the KIND.
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
 ;;; FUNCTION-INFO assigned.
-(defun recognize-known-call (call ir1-p)
+;;;
+;;; FIXME: The IR1-CONVERTING-NOT-OPTIMIZING-P argument is what the
+;;; old CMU CL code called IR1-P, without explanation. My (WHN
+;;; 2002-01-09) tentative understanding of it is that we can call this
+;;; operation either in initial IR1 conversion or in later IR1
+;;; optimization, and it tells which is which. But it would be good
+;;; for someone who really understands it to check whether this is
+;;; really right.
+(defun recognize-known-call (call ir1-converting-not-optimizing-p)
   (declare (type combination call))
   (let* ((ref (continuation-use (basic-combination-fun call)))
 	 (leaf (when (ref-p ref) (ref-leaf ref)))
@@ -800,23 +811,23 @@
 	     (:inline t)
 	     (:no-chance nil)
 	     ((nil :maybe-inline) (policy call (zerop space))))
-	   ;; FIXME: In sbcl-0.pre7.87, it looks as though we'll
-	   ;; get here when LEAF is a GLOBAL-VAR (not a DEFINED-FUN)
-	   ;; whenever (ZEROP SPACE), in which case we'll die with
-	   ;; a type error when we try to access LEAF as a DEFINED-FUN.
+	   (defined-fun-p leaf)
 	   (defined-fun-inline-expansion leaf)
 	   (let ((fun (defined-fun-functional leaf)))
 	     (or (not fun)
 		 (and (eq inlinep :inline) (functional-kind fun))))
 	   (inline-expansion-ok call))
-      (flet ((frob ()
+      (flet (;; FIXME: Is this what the old CMU CL internal documentation
+	     ;; called semi-inlining? A more descriptive name would
+	     ;; be nice. -- WHN 2002-01-07
+	     (frob ()
 	       (let ((res (ir1-convert-lambda-for-defun
 			   (defined-fun-inline-expansion leaf)
 			   leaf t
 			   #'ir1-convert-inline-lambda)))
 		 (setf (defined-fun-functional leaf) res)
 		 (change-ref-leaf ref res))))
-	(if ir1-p
+	(if ir1-converting-not-optimizing-p
 	    (frob)
 	    (with-ir1-environment-from-node call
 	      (frob)
@@ -843,13 +854,13 @@
 ;;; syntax check, arg/result type processing, but still call
 ;;; RECOGNIZE-KNOWN-CALL, since the call might be to a known lambda,
 ;;; and that checking is done by local call analysis.
-(defun validate-call-type (call type ir1-p)
+(defun validate-call-type (call type ir1-converting-not-optimizing-p)
   (declare (type combination call) (type ctype type))
   (cond ((not (fun-type-p type))
 	 (aver (multiple-value-bind (val win)
 		   (csubtypep type (specifier-type 'function))
 		 (or val (not win))))
-	 (recognize-known-call call ir1-p))
+	 (recognize-known-call call ir1-converting-not-optimizing-p))
 	((valid-function-use call type
 			     :argument-test #'always-subtypep
 			     :result-test #'always-subtypep
@@ -872,8 +883,8 @@
 			     :error-function #'compiler-style-warning
 			     :warning-function #'compiler-note)
 	 (assert-call-type call type)
-	 (maybe-terminate-block call ir1-p)
-	 (recognize-known-call call ir1-p))
+	 (maybe-terminate-block call ir1-converting-not-optimizing-p)
+	 (recognize-known-call call ir1-converting-not-optimizing-p))
 	(t
 	 (setf (combination-kind call) :error)
 	 (values nil nil))))

@@ -118,9 +118,9 @@
   (let* ((cpl (remove-duplicates
 	       (reverse
 		(reduce #'append
-			(mapcar #'(lambda (x)
-				    (condition-class-cpl
-				     (sb!xc:find-class x)))
+			(mapcar (lambda (x)
+				  (condition-class-cpl
+				   (sb!xc:find-class x)))
 				parent-types)))))
 	 (cond-layout (info :type :compiler-layout 'condition))
 	 (olayout (info :type :compiler-layout name))

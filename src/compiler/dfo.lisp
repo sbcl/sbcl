@@ -100,7 +100,7 @@
 ;;; before it walks the successors. It looks at the home CLAMBDA's
 ;;; BIND block to see whether that block is in some other component:
 ;;; -- If the block is in the initial component, then do
-;;;    DFO-WALK-DEPENDENCY-GRAPH on the home function to move it
+;;;    DFO-SCAVENGE-DEPENDENCY-GRAPH on the home function to move it
 ;;;    into COMPONENT.
 ;;; -- If the block is in some other component, join COMPONENT into
 ;;;    it and return that component.
@@ -197,13 +197,6 @@
 ;;; dependencies, not closure dependencies. That seems to've been by
 ;;; oversight, not by design, as per the bug reported by WHN on
 ;;; cmucl-imp ca. 2001-11-29 and explained by DTC shortly after.)
-;;;
-;;; FIXME: Very likely we should be scavenging NLX-based dependencies
-;;; here too. OTOH, there's a lot of global weirdness in NLX handling,
-;;; so it might be taken care of some other way that I haven't figured
-;;; out yet. Perhaps the best way to address this would be to try to
-;;; construct a NLX-based test case which fails in the same way as the
-;;; closure-based test case on cmucl-imp 2001-11-29.)
 ;;;
 ;;; If the function is in an initial component, then we move its head
 ;;; and tail to COMPONENT and add it to COMPONENT's lambdas. It is

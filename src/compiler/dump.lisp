@@ -1013,14 +1013,6 @@
 		   (handle
 		    (dump-push handle fasl-output))
 		   (t
-
-		    ;; REMOVEME after fixing bug 138b.
-		    #|
-		    (unless (member info (sb!c::ir2-component-entries 2comp))
-		      (format t "~&i=~S~%" i)
-		      (error "bogus FASL-OUTPUT-PATCH-TABLE value ~S" info))
-                    |#
-
 		    (patches (cons info i))
 		    (dump-fop 'fop-misc-trap fasl-output)))))
 	       (:load-time-value
