@@ -1108,10 +1108,16 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
     to Alexey Dejneka)
   * Dynamic loading of object files in OpenBSD is now supported. (thanks
     to Pierre Mai)
+  * COMPILE now works correctly on macros. (thanks to Matthias Hoelzl)
   * GET-MACRO-CHARACTER and SET-MACRO-CHARACTER now represent
     no-value-for-this-character as NIL (as specified by ANSI).
   * HOST-NAMESTRING on physical pathnames now returns a string that is
     valid as a host argument to MERGE-PATHNAMES and to MAKE-PATHNAME.
+    (thanks to Christophe Rhodes)
+  * The Alpha port handles icache flushing more correctly. (thanks to
+    Dan Barlow)
+  * More progress has been made toward bootstrapping under CLISP. (thanks
+    to Christophe Rhodes)
   * The fasl file format has changed again, because dynamic loading
     on OpenBSD (which has non-ELF object files) motivated some cleanups
     in the way that foreign symbols are transformed and passed around.

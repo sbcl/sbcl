@@ -508,12 +508,13 @@ Martin Atzmueller:
 Daniel Barlow:
   He made SBCL play nicely with ILISP. He figured out how to get the
   CMU CL dynamic object file loading code to work under SBCL. He
-  ported CMU CL's support for Alpha and PPC CPUs to SBCL. He wrote
-  code (e.g. grovel_headers.c and stat_wrapper stuff) to handle
-  machine-dependence and OS-dependence automatically, reducing
-  the amount of hand-tweaking required to keep ports synchronized.
-  He's also provided support for SBCL (as well as for free
-  Common Lisp in general) through his CLiki website.
+  ported CMU CL's support for Alpha and PPC CPUs to SBCL, and then
+  continued to improve the ports. He wrote code (e.g. grovel_headers.c
+  and stat_wrapper stuff) to handle machine-dependence and
+  OS-dependence automatically, reducing the amount of hand-tweaking
+  required to keep ports synchronized. He's also provided support
+  for SBCL (as well as for free Common Lisp in general) through
+  his CLiki website.
 
 Cadabra, Inc. (later merged into GoTo.com):
   They hired Bill Newman to do some consulting for them,
@@ -530,10 +531,10 @@ Douglas Crosher:
 
 Alexey Dejneka:
   He has fixed many, many bugs. There's no single summary theme, but
-  he's fixed about a dozen different bugs in LOOP alone, and it appears
-  that a lot of his fixes there and elsewhere reflect systematic
-  public-spiritedness, fixing bugs as they show up in sbcl-devel or as
-  archived in the BUGS file.
+  he's fixed about a dozen different bugs in LOOP alone, and more
+  in the compiler itself. It appears that a lot of his fixes there
+  and elsewhere reflect systematic public-spiritedness, fixing bugs
+  as they show up in sbcl-devel or as archived in the BUGS file.
 
 Nathan Froyd:
   He has fixed various bugs, and also done a lot of internal
@@ -543,16 +544,25 @@ Nathan Froyd:
   read without being an expert in ancient languages and so that
   can delete a thousand lines of implement-ITERATE macrology.)
 
+Matthias Hoelzl:
+  He reported and fixed COMPILE's misbehavior on macros.
+
 Arthur Lemmens:
-  He found and fixed a number of SBCL bugs while partially porting SBCL
-  to bootstrap under <some other Common Lisp system, which could
-  probably be found in the sbcl-devel archives>.
+  He found and fixed a number of SBCL bugs while partially porting
+  SBCL to bootstrap under <some other Common Lisp system -- LispWorks
+  for Windows? -- which could probably be found in the sbcl-devel
+  archives>.
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
   the CMU CL project. Some of these fixes, especially for compiler
   problems, has been invaluable to the CMU CL project and, by
   porting, invaluable to the SBCL project as well.
+
+Pierre Mai:
+  He has continued to work on CMU CL since the SBCL fork, and also
+  patched code to SBCL to enable dynamic loading of object files 
+  under OpenBSD.
 
 Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
@@ -567,10 +577,11 @@ William ("Bill") Newman:
   rid of various functionality (e.g. the byte interpreter).
 
 Christophe Rhodes:
-  He has done various low-level work on SBCL, especially for the
-  SPARC port (and for CPU-architecture-neutral things motivated by
-  it, like *BACKEND-FEATURES*). He's also contributed miscellaneous
-  bug fixes.
+  He ported SBCL to SPARC, made various port-related and SPARC-related
+  changes (like *BACKEND-FEATURES*, made many fixes and improvements
+  in the compiler's type system, has done a substantial amount of work
+  on bootstrapping SBCL under unrelated (non-SBCL, non-CMU-CL) Common
+  Lisps, and contributed in other ways as well.
 
 Stig Erik Sandoe:
   He showed how to convince the GNU toolchain to build SBCL in a way
