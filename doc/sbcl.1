@@ -385,15 +385,11 @@ This section attempts to list the most serious and long-standing bugs.
 For more detailed and current information on bugs, see the BUGS file
 in the distribution.
 
-It is possible to get in deep trouble by exhausting
+It is possible to get in deep trouble by exhausting 
 memory. To plagiarize a sadly apt description of a language not
 renowned for the production of bulletproof software, "[The current
 SBCL implementation of] Common Lisp makes it harder for you to shoot
 yourself in the foot, but when you do, the entire universe explodes."
-.TP 3
-\--
-The system doesn't deal well with stack overflow. (It tends to cause
-a segmentation fault instead of being caught cleanly.)
 .TP 3
 \--
 Like CMU CL, the SBCL system overcommits memory at startup. On typical
@@ -417,7 +413,7 @@ Some things are implemented very inefficiently.
 .TP 3
 \--
 Multidimensional arrays are inefficient, especially
-multidimensional arrays of floating point numbers
+multidimensional arrays of floating point numbers.
 .TP 3
 \--
 The DYNAMIC-EXTENT declaration isn't implemented at all, not even
@@ -431,18 +427,21 @@ SBCL implementation of CLOS doesn't do some important known
 optimizations.)
 .TP 3
 \--
-SBCL, like most implementations of Common Lisp, has trouble
-passing floating point numbers around efficiently, because
-they're larger than a machine word. (Thus, they get "boxed" in
+SBCL, like most (maybe all?) implementations of Common Lisp on 
+stock hardware, has trouble
+passing floating point numbers around efficiently, because a floating
+point number, plus a few extra bits to identify its type,
+is larger than a machine word. (Thus, they get "boxed" in
 heap-allocated storage, causing GC overhead.) Within
 a single compilation unit,
 or when doing built-in operations like SQRT and AREF,
 or some special operations like structure slot accesses,
 this is avoidable: see the user manual for some
 efficiency hints. But for general function calls across
-the boundaries of compilation units, passing a floating point
-number as a function argument (or returning a floating point
-number as a function value) is a fundamentally slow operation.
+the boundaries of compilation units, passing the result of 
+a floating point calculation
+as a function argument (or returning a floating point
+result as a function value) is a fundamentally slow operation.
 .PP
 
 There are still some nagging pre-ANSIisms, notably

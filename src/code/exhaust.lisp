@@ -1,4 +1,5 @@
-;;;; detecting and handling exhaustion of memory (stack or heap)
+;;;; detecting and handling exhaustion of fundamental system resources
+;;;; (stack or heap)
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -11,59 +12,54 @@
 
 (in-package "SB!KERNEL")
 
-;;; A native address on a 4-byte boundary can be thought of (and
-;;; passed around in Lisp code as) a FIXNUM. This function converts
-;;; from a byte address represented as an unsigned integer to such
-;;; a FIXNUM.
+;;; a soft limit on stack overflow; the boundary beyond which the
+;;; control stack will be considered to've overflowed
 ;;;
-;;; FIXME: There should be some better place for this definition to
-;;; go. (Or a redundant definition might already exist. Especially
-;;; since this is essentially just a type pun, so there might be some
-;;; VOP or something which'd do it for us.)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun native-address-encoded-as-fixnum (native-address)
-    (declare (type unsigned-byte native-address))
-    (aver (zerop (logand native-address 3)))
-    (let* (;; naive encoding
-	   (first-try (ash native-address -2))
-	   ;; final encoding
-	   (second-try 
-	    (if (<= first-try sb!xc:most-positive-fixnum)
-		;; looks good
-		first-try
-		;; When the naive encoding fails to make a FIXNUM
-		;; because the sign is wrong, subtracting *T-M-P-F*
-		;; should fix it. 
-		(- first-try sb!xc:most-positive-fixnum))))
-      (aver (<= second-try sb!xc:most-positive-fixnum))
-      second-try)))
-
-;;; a FIXNUM, to be interpreted as a native pointer, which serves
-;;; as a boundary to catch stack overflow
-;;;
-;;; When stack overflow is detected, this is to be bound to a new
-;;; value (allowing some more space for error handling) around the
-;;; call to ERROR.
+;;; When stack overflow is detected, this soft limit is to be bound to
+;;; a new value closer to the hard limit (allowing some more space for
+;;; error handling) around the call to ERROR.
 ;;;
 ;;; FIXME: Maybe (probably?) this should be in SB!VM. And maybe the
 ;;; size of the buffer zone should be set in src/compiler/cpu/parms.lisp
 ;;; instead of constantly 1Mb for all CPU architectures?
-(defvar *stack-exhaustion*
+(defvar *stack-exhaustion-sap*
   ;; (initialized in cold init)
   )
 (defun !exhaust-cold-init ()
-  (setf *stack-exhaustion*
-	#.(native-address-encoded-as-fixnum
-	   #!+stack-grows-downward (+ sb!vm:control-stack-start (expt 2 20))
-	   #!+stack-grows-upward (- sb!vm:control-stack-end (expt 2 20)))))
+  (let (;; initial difference between soft limit and hard limit
+	(initial-slack (expt 2 20)))
+    (setf *stack-exhaustion-sap*
+	  (int-sap #!+stack-grows-downward (+ sb!vm:control-stack-start
+					      initial-slack)
+		   #!+stack-grows-upward (- sb!vm:control-stack-end
+					    initial-slack)))))
   
 ;;; FIXME: Even though this is only called when (> SAFETY (MAX SPEED SPACE))
 ;;; it's still annoyingly wasteful for it to be a full function call.
 ;;; It should probably be a VOP calling an assembly routine or something
 ;;; like that.
 (defun %detect-stack-exhaustion ()
-  ;; FIXME: Check the stack pointer against *STACK-EXHAUSTION*, and if
-  ;; out of range signal an error (in a context where *S-E* has been
-  ;; rebound to give some space to let error handling code do its
-  ;; thing without new exhaustion problems).
-  (values))
+  (when (#!+stack-grows-upward sap>=
+	 #!+stack-grows-downward sap<=
+	 (current-sp)
+	 *stack-exhaustion-sap*)
+    (let ((*stack-exhaustion-sap* (revised-stack-exhaustion-sap)))
+      (warn "~@<ordinary control stack soft limit temporarily displaced to ~
+             allow possible interactive debugging~@:>")
+      (error "The system control stack was exhausted."))))
+
+;;; Return a revised value for the *STACK-EXHAUSTION-SAP* soft limit,
+;;; allocating half the remaining space up to the hard limit in order
+;;; to allow interactive debugging to be used around the point of a
+;;; stack overflow failure without immediately failing again from the
+;;; (continuing) stack overflow.
+(defun revised-stack-exhaustion-sap ()
+  (let* ((old-slack
+	  #!+stack-grows-upward (- sb!vm:control-stack-end
+				   (sap-int *stack-exhaustion-sap*))
+	  #!+stack-grows-downward (- (sap-int *stack-exhaustion-sap*)
+				     sb!vm:control-stack-start))
+	 (new-slack (ash old-slack -1)))
+    (int-sap
+     #!+stack-grows-upward (- sb!vm:control-stack-end new-slack)
+     #!+stack-grows-downward (+ sb!vm:control-stack-start new-slack))))

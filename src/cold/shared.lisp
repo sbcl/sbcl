@@ -236,7 +236,6 @@
 				  (read-from-file customizer-file-name))
 			 #'identity)))
     (funcall customizer default-subfeatures)))
-(export '*shebang-backend-subfeatures*)
 (let ((*print-length* nil)
       (*print-level* nil))
   (format t

@@ -62,6 +62,17 @@
 
 (set-dispatch-macro-character #\# #\! #'shebang-reader)
 
+;;;; variables like *SHEBANG-FEATURES* but different
+
+;;; This variable is declared here (like *SHEBANG-FEATURES*) so that
+;;; things like chill.lisp work (because the variable has properties
+;;; similar to *SHEBANG-FEATURES*, and chill.lisp was set up to work
+;;; for that). For an explanation of what it really does, look
+;;; elsewhere.
+(export '*shebang-backend-subfeatures*)
+(declaim (type list *shebang-features*))
+(defvar *shebang-backend-subfeatures*)
+
 ;;;; FIXME: Would it be worth implementing this?
 #|
 ;;;; readmacro syntax to remove spaces from FORMAT strings at compile time
