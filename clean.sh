@@ -50,7 +50,7 @@ done
 #     probably machine-generated translation of DocBook (*.sgml) files
 #   core
 #     probably a Unix core dump -- not part of the sources anyway
-#   *.o, *.lib, *.nm, a.out
+#   *.o, *.so, *.lib, *.nm, a.out
 #     results of C-style linking, assembling, etc.
 #   *.core, *.map
 #     looks like SBCL SAVE-LISP-AND-DIE or GENESIS output, and
@@ -94,6 +94,7 @@ find . \( \
 	-name '*.tmp' -o \
 	-name '*.lisp-temp' -o \
 	-name '*.o' -o \
+	-name '*.so' -o \
 	-name 'a.out' -o \
 	-name 'sbcl' -o \
 	-name 'sbcl.h' -o \
