@@ -212,3 +212,15 @@ See designator.lisp, add a define-designator form
 The use of DEFINE-CALL macro in interface.lisp should be obvious from
 the existing examples, if less so from the macroexpansion
 
+
+
+
+
+GC issues
+
+buffers that refer to C stuff are probably not movable by GC anyway
+
+a buffer that refers to a Lisp object may have trouble if the Lisp
+object is moved
+
+
