@@ -848,8 +848,8 @@
 (defun setq-var (start cont var value)
   (declare (type continuation start cont) (type basic-var var))
   (let ((dest (make-continuation)))
-    (assert-continuation-type dest (leaf-type var) (lexenv-policy *lexenv*))
     (ir1-convert start dest value)
+    (assert-continuation-type dest (leaf-type var) (lexenv-policy *lexenv*))
     (let ((res (make-set :var var :value dest)))
       (setf (continuation-dest dest) res)
       (setf (leaf-ever-used var) t)
@@ -859,7 +859,7 @@
 
 ;;;; CATCH, THROW and UNWIND-PROTECT
 
-;;; We turn THROW into a multiple-value-call of a magical function,
+;;; We turn THROW into a MULTIPLE-VALUE-CALL of a magical function,
 ;;; since as as far as IR1 is concerned, it has no interesting
 ;;; properties other than receiving multiple-values.
 (def-ir1-translator throw ((tag result) start cont)

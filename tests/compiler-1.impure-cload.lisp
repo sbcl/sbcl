@@ -14,6 +14,9 @@
 
 (cl:in-package :cl-user)
 
+(load "assertoid")
+(use-package "ASSERTOID")
+
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 
 ;;; Until version 0.6.9 or so, SBCL's version of Python couldn't do
@@ -172,5 +175,20 @@
          (t
           (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
 
-(sb-ext:quit :unix-status 104) ; success
+;;; bug 231: SETQ did not check the type of the variable being set
+(defun bug231-1 (x)
+  (declare (optimize safety) (type (integer 0 8) x))
+  (incf x))
+(assert (raises-error? (bug231-1 8) type-error))
 
+(defun bug231-2 (x)
+  (declare (optimize safety) (type (integer 0 8) x))
+  (list (lambda (y) (setq x y))
+        (lambda () x)))
+(destructuring-bind (set get) (bug231-2 0)
+  (funcall set 8)
+  (assert (eql (funcall get) 8))
+  (assert (raises-error? (funcall set 9) type-error))
+  (assert (eql (funcall get) 8)))
+
+(sb-ext:quit :unix-status 104) ; success

@@ -1190,20 +1190,22 @@ WORKAROUND:
 229:
   (subtypep 'function '(function)) => nil, t.
 
-231: "extra binding causes type declaration semantics to be lost"
+231: "SETQ does not correctly check the type of a variable being set"
   (reported by Robert E. Brown sbcl-devel 2002-12-19)
-  in sbcl-0.7.10.19, 
+  in sbcl-0.7.10.19,
     (DEFUN FOO (X)
       (DECLARE (OPTIMIZE SAFETY) (TYPE (INTEGER 0 8) X))
       (INCF X))
     (FOO 8)
   returns 9, rather than (as in CMUCL) signalling an error.  Replacing
-  (INCF X) by (SETQ X (+ X 1)) causes a TYPE-ERROR to be signalled
-  [the difference between the two being that (INCF X) looks like 
-    (LET ((#:G1 (+ X 1))) 
-      (SETQ X #:G1))
-  so suspicion falls on the binding obscuring the type declaration
-  somehow]
+  (INCF X) by (SETQ X (+ X 1)) causes a TYPE-ERROR to be signalled. Or
+    (defun bar (x y)
+      (declare (type (integer 0 8) x))
+      (setq x y)
+      x)
+  Then (BAR 7 9) returns 9.
+
+  (fixed in 0.7.10.28)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

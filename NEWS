@@ -1473,6 +1473,8 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     of the new implementation of DEFINE-COMPILER-MACRO.
   * fixed bug 223: functional binding is considered to be constant
     only for symbols in the CL package.
+  * fixed bug 231: SETQ did not check the type of a variable being set
+    (reported by Robert E. Brown)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
