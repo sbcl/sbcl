@@ -106,6 +106,8 @@
   ;; a list of DEFSTRUCT-SLOT-DESCRIPTION objects for all slots
   ;; (including included ones)
   (slots () :type list)
+  ;; a list of (NAME . INDEX) pairs for accessors of included structures
+  (inherited-accessor-alist () :type list)
   ;; number of elements we've allocated (See also RAW-LENGTH.)
   (length 0 :type index)
   ;; General kind of implementation.
@@ -410,6 +412,11 @@
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
+;;; First, a helper to determine whether a name names an inherited
+;;; accessor.
+(defun accessor-inherited-data (name defstruct)
+  (assoc name (dd-inherited-accessor-alist defstruct) :test #'eq))
+
 ;;; Return a list of forms which create a predicate function for a
 ;;; typed DEFSTRUCT.
 (defun typed-predicate-definitions (defstruct)
@@ -442,18 +449,26 @@
 	      (index (dsd-index slot))
 	      (slot-type `(and ,(dsd-type slot)
 			       ,(dd-element-type defstruct))))
-	  (stuff `(proclaim '(inline ,name (setf ,name))))
-	  ;; FIXME: The arguments in the next two DEFUNs should be
-	  ;; gensyms. (Otherwise e.g. if NEW-VALUE happened to be the
-	  ;; name of a special variable, things could get weird.)
-	  (stuff `(defun ,name (structure)
-		    (declare (type ,ltype structure))
-		    (the ,slot-type (elt structure ,index))))
-	  (unless (dsd-read-only slot)
-	    (stuff
-	     `(defun (setf ,name) (new-value structure)
-		(declare (type ,ltype structure) (type ,slot-type new-value))
-		(setf (elt structure ,index) new-value)))))))
+	  (let ((inherited (accessor-inherited-data name defstruct)))
+	    (cond
+	      ((not inherited)
+	       (stuff `(proclaim '(inline ,name (setf ,name))))
+	       ;; FIXME: The arguments in the next two DEFUNs should
+	       ;; be gensyms. (Otherwise e.g. if NEW-VALUE happened to
+	       ;; be the name of a special variable, things could get
+	       ;; weird.)
+	       (stuff `(defun ,name (structure)
+			(declare (type ,ltype structure))
+			(the ,slot-type (elt structure ,index))))
+	       (unless (dsd-read-only slot)
+		 (stuff
+		  `(defun (setf ,name) (new-value structure)
+		    (declare (type ,ltype structure) (type ,slot-type new-value))
+		    (setf (elt structure ,index) new-value)))))
+	      ((not (= (cdr inherited) index))
+	       (style-warn "~@<Non-overwritten accessor ~S does not access ~
+                            slot with name ~S (accessing an inherited slot ~
+                            instead).~:@>" name (dsd-%name slot))))))))
     (stuff)))
 
 ;;;; parsing
@@ -629,7 +644,11 @@
           accessor, but you can't rely on this behavior, so it'd be wise to ~
           remove the ambiguity in your code.~@:>"
 	 accessor-name)
-	(setf (dd-predicate-name defstruct) nil)))
+	(setf (dd-predicate-name defstruct) nil))
+      #-sb-xc-host
+      (when (and (fboundp accessor-name)
+		 (not (accessor-inherited-data accessor-name defstruct)))
+	(style-warn "redefining ~S in DEFSTRUCT" accessor-name)))
 
     (when default-p
       (setf (dsd-default slot) default))
@@ -760,12 +779,26 @@
 	(setf (dd-raw-index dd) (dd-raw-index included-structure))
 	(setf (dd-raw-length dd) (dd-raw-length included-structure)))
 
+      (setf (dd-inherited-accessor-alist dd)
+	    (dd-inherited-accessor-alist included-structure))
       (dolist (included-slot (dd-slots included-structure))
 	(let* ((included-name (dsd-name included-slot))
 	       (modified (or (find included-name modified-slots
 				   :key (lambda (x) (if (atom x) x (car x)))
 				   :test #'string=)
 			     `(,included-name))))
+	  ;; We stash away an alist of accessors to parents' slots
+	  ;; that have already been created to avoid conflicts later
+	  ;; so that structures with :INCLUDE and :CONC-NAME (and
+	  ;; other edge cases) can work as specified.
+	  (when (dsd-accessor-name included-slot)
+	    ;; the "oldest" (i.e. highest up the tree of inheritance)
+	    ;; will prevail, so don't push new ones on if they
+	    ;; conflict.
+	    (pushnew (cons (dsd-accessor-name included-slot)
+			   (dsd-index included-slot))
+		     (dd-inherited-accessor-alist dd)
+		     :test #'eq :key #'car))
 	  (parse-1-dsd dd
 		       modified
 		       (copy-structure included-slot)))))))
@@ -959,26 +992,35 @@
       (let* ((accessor-name (dsd-accessor-name dsd))
 	     (dsd-type (dsd-type dsd)))
 	(when accessor-name
-	  (multiple-value-bind (reader-designator writer-designator)
-	      (slot-accessor-inline-expansion-designators dd dsd)
-	    (sb!xc:proclaim `(ftype (function (,dtype) ,dsd-type)
-				    ,accessor-name))
-	    (setf (info :function :inline-expansion-designator accessor-name)
-		  reader-designator
-		  (info :function :inlinep accessor-name)
-		  :inline)
-	    (unless (dsd-read-only dsd)
-	      (let ((setf-accessor-name `(setf ,accessor-name)))
-		(sb!xc:proclaim
-		 `(ftype (function (,dsd-type ,dtype) ,dsd-type)
-			 ,setf-accessor-name))
-		(setf (info :function
-			    :inline-expansion-designator
-			    setf-accessor-name)
-		      writer-designator
-		      (info :function :inlinep setf-accessor-name)
-		      :inline))))))))
-
+	  (let ((inherited (accessor-inherited-data accessor-name dd)))
+	    (cond
+	      ((not inherited)
+	       (multiple-value-bind (reader-designator writer-designator)
+		   (slot-accessor-inline-expansion-designators dd dsd)
+		 (sb!xc:proclaim `(ftype (function (,dtype) ,dsd-type)
+				   ,accessor-name))
+		 (setf (info :function :inline-expansion-designator
+			     accessor-name)
+		       reader-designator
+		       (info :function :inlinep accessor-name)
+		       :inline)
+		 (unless (dsd-read-only dsd)
+		   (let ((setf-accessor-name `(setf ,accessor-name)))
+		     (sb!xc:proclaim
+		      `(ftype (function (,dsd-type ,dtype) ,dsd-type)
+			,setf-accessor-name))
+		     (setf (info :function
+				 :inline-expansion-designator
+				 setf-accessor-name)
+			   writer-designator
+			   (info :function :inlinep setf-accessor-name)
+			   :inline)))))
+	      ((not (= (cdr inherited) (dsd-index dsd)))
+	       (style-warn "~@<Non-overwritten accessor ~S does not access ~
+                            slot with name ~S (accessing an inherited slot ~
+                            instead).~:@>"
+			   accessor-name
+			   (dsd-%name dsd)))))))))
   (values))
 
 ;;;; redefinition stuff
@@ -1148,9 +1190,10 @@
 	(undefine-fun-name (dd-predicate-name info))
 	(dolist (slot (dd-slots info))
 	  (let ((fun (dsd-accessor-name slot)))
-	    (undefine-fun-name fun)
-	    (unless (dsd-read-only slot)
-	      (undefine-fun-name `(setf ,fun))))))
+	    (unless (accessor-inherited-data fun info)
+	      (undefine-fun-name fun)
+	      (unless (dsd-read-only slot)
+		(undefine-fun-name `(setf ,fun)))))))
       ;; Clear out the SPECIFIER-TYPE cache so that subsequent
       ;; references are unknown types.
       (values-specifier-type-cache-clear)))

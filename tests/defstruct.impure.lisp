@@ -21,8 +21,8 @@
 (defstruct person age (name 007 :type string)) ; not an error until 007 used
 (make-person :name "James") ; not an error, 007 not used
 (assert (raises-error? (make-person) type-error))
-;;; FIXME: broken structure slot type checking in sbcl-0.pre7.62
-#+nil (assert (raises-error? (setf (person-name (make-person "Q")) 1) type-error))
+(assert (raises-error? (setf (person-name (make-person :name "Q")) 1)
+		       type-error))
 
 ;;; basic inheritance
 (defstruct (astronaut (:include person)
@@ -388,6 +388,33 @@
 (let ((foo-0-7-8-53 (make-foo-0-7-8-53 :x :s)))
   (assert (eq (foo-0-7-8-53-x foo-0-7-8-53) :s))
   (assert (eq (foo-0-7-8-53-y foo-0-7-8-53) :not)))
+
+;;; tests of behaviour of colliding accessors.
+(defstruct (bug127-foo (:conc-name bug127-baz-)) a)
+(assert (= (bug127-baz-a (make-bug127-foo :a 1)) 1))
+(defstruct (bug127-bar (:conc-name bug127-baz-) (:include bug127-foo)) b)
+(assert (= (bug127-baz-a (make-bug127-bar :a 1 :b 2)) 1))
+(assert (= (bug127-baz-b (make-bug127-bar :a 1 :b 2)) 2))
+(assert (= (bug127-baz-a (make-bug127-foo :a 1)) 1))
+
+(defun bug127-flurble (x)
+  x)
+(defstruct bug127 flurble)
+(assert (= (bug127-flurble (make-bug127 :flurble 7)) 7))
+
+(defstruct bug127-a b-c)
+(assert (= (bug127-a-b-c (make-bug127-a :b-c 9)) 9))
+(defstruct (bug127-a-b (:include bug127-a)) c)
+(assert (= (bug127-a-b-c (make-bug127-a :b-c 9)) 9))
+(assert (= (bug127-a-b-c (make-bug127-a-b :b-c 11 :c 13)) 11))
+
+(defstruct (bug127-e (:conc-name bug127--)) foo)
+(assert (= (bug127--foo (make-bug127-e :foo 3)) 3))
+(defstruct (bug127-f (:conc-name bug127--)) foo)
+(assert (= (bug127--foo (make-bug127-f :foo 3)) 3))
+(assert (raises-error? (bug127--foo (make-bug127-e :foo 3)) type-error))
+
+;;; FIXME: should probably do the same tests on DEFSTRUCT :TYPE
 
 ;;; success
 (format t "~&/returning success~%")

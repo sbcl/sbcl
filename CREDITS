@@ -616,7 +616,8 @@ Peter Van Eynde:
   reports as well.
 
 Valtteri Vuorikoski:
-  He ported SBCL to NetBSD.
+  He ported SBCL to NetBSD, and also fixed a long-standing bug in
+  DEFSTRUCT with respect to colliding accessor names.
 
 Colin Walters:
   His O(N) implementation of the general case of MAP, posted on the
