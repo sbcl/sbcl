@@ -1274,7 +1274,64 @@ WORKAROUND:
   in recent refactoring, as can be seen by comparing to the code in e.g. 
   sbcl-0.7.2. Replacing WRAPPER with OWRAPPER (done by WHN in sbcl-0.7.4.22)
   should bring the code back to its behavior as of sbcl-0.7.2, but
-  that still leaves the OBSOLETE-INSTANCE-TRAP bug.
+  that still leaves the OBSOLETE-INSTANCE-TRAP bug. An example of 
+  input which triggers that bug is
+    (dotimes (i 20)
+      (let ((lastname (intern (format nil "C~D" (1- i))))
+            (name (intern (format nil "C~D" i))))
+      (eval `(defclass ,name
+                 (,@(if (= i 0) nil (list lastname)))
+               ()))
+      (eval `(defmethod initialize-instance :after ((x ,name) &rest any)
+               (declare (ignore any))))))
+    (defclass b () ())
+    (defclass c0 (b) ())
+    (make-instance 'c19)
+
+177:
+  reported by Stig E Sandoe 8 Jun 2002 on sbcl-devel:
+  ;;; I am a bit unsure about SBCL's warnings with some of my code.
+  ;;; ASDF seems to die on warnings and SBCL seems to generate one
+  ;;; out of nothing.  I've tried to turn it into an example
+  ;;; (that can be LOADed or COMPILEd to reproduce warnings):
+  (in-package :cl-user)
+  (defclass a ()  ())
+  (defclass b ()  ())
+  (defclass c (b) ())
+  (defgeneric get-price (obj1 obj2))
+  (defmethod get-price (obj1 obj2)
+    0)
+  (defmethod get-price ((obj1 a) (obj2 b))
+    20)
+  (defmethod get-price ((obj1 a) (obj2 c))
+    (* 3 (call-next-method)))
+  (print (get-price (make-instance 'a) (make-instance 'c)))
+  ;;; In the GET-PRICE where I call CALL-NEXT-METHOD, it starts to
+  ;;; generate real WARNINGS:
+  ;;; stig@palomba(9:02)[~] 690> sbcl
+  ;;; This is SBCL 0.7.4, an implementation of ANSI Common Lisp.
+  ;;; ...
+  ;;; * (load "call-next")
+  ;;; ; in: LAMBDA NIL
+  ;;; ;     (CALL-NEXT-METHOD)
+  ;;; ; --> SB-PCL::CALL-NEXT-METHOD-BODY IF IF 
+  ;;; ; --> SB-PCL::INVOKE-EFFECTIVE-METHOD-FUNCTION LOCALLY COND IF COND IF 
+  ;;; PROGN 
+  ;;; ; --> LET WHEN COND IF PROGN SETF LET* MULTIPLE-VALUE-BIND LET FUNCALL 
+  ;;; ; --> SB-C::%FUNCALL BLOCK SETF SB-KERNEL:%SVSET SB-KERNEL:%ASET LET* 
+  ;;; ; --> SB-KERNEL:HAIRY-DATA-VECTOR-SET MULTIPLE-VALUE-BIND 
+  ;;; MULTIPLE-VALUE-CALL 
+  ;;; ; --> FUNCTION 
+  ;;; ; ==>
+  ;;; ;   (SB-KERNEL:DATA-VECTOR-SET (TRULY-THE (SIMPLE-ARRAY T 1) ARRAY)
+  ;;; ;                              SB-INT:INDEX
+  ;;; ;                              SB-C::NEW-VALUE)
+  ;;; ; 
+  ;;; ; caught WARNING:
+  ;;; ;   Result is a A, not a NUMBER.
+  ;;; ...
+  ;;; ; compilation unit finished
+  ;;; ;   caught 4 WARNING conditions
 
 
 DEFUNCT CATEGORIES OF BUGS
