@@ -423,7 +423,7 @@
        (%funcall ,(if (csubtypep (continuation-type function)
 				 (specifier-type 'function))
 		      'function
-		      '(%coerce-callable-to-function function))
+		      '(%coerce-callable-to-fun function))
 		 ,@arg-names))))
 
 (def-ir1-translator %funcall ((function &rest args) start cont)
@@ -441,9 +441,9 @@
       `(%funcall ,function ,@args)
       (values nil t)))
 
-(deftransform %coerce-callable-to-function ((thing) (function) *
-					    :when :both
-					    :important t)
+(deftransform %coerce-callable-to-fun ((thing) (function) *
+				       :when :both
+				       :important t)
   "optimize away possible call to FDEFINITION at runtime"
   'thing)
 
@@ -885,7 +885,7 @@
     (ir1-convert start fun-cont
 		 (if (and (consp fun) (eq (car fun) 'function))
 		     fun
-		     `(%coerce-callable-to-function ,fun)))
+		     `(%coerce-callable-to-fun ,fun)))
     (setf (continuation-dest fun-cont) node)
     (assert-continuation-type fun-cont
 			      (specifier-type '(or function symbol)))

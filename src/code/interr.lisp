@@ -118,11 +118,6 @@
 	 :datum object
 	 :expected-type 'fixnum))
 
-(deferr object-not-function-or-symbol-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(or function symbol)))
-
 (deferr object-not-vector-error (object)
   (error 'type-error
 	 :datum object

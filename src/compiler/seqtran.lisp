@@ -203,7 +203,7 @@
 		 ;; of the &REST vars.)
 		 `(lambda (result-type fun ,@seq-args)
 		    (declare (ignore result-type))
-		    (do ((really-fun (%coerce-callable-to-function fun))
+		    (do ((really-fun (%coerce-callable-to-fun fun))
 			 ,@index-bindingoids
 			 (acc nil))
 		    ((or ,@tests)
@@ -725,16 +725,18 @@
 	   (return (values find position)))
 	 (when (>= index start)
 	   (when (funcall predicate key-i)
-	     ;; This hack of dealing with non-NIL FROM-END for list data
-	     ;; by iterating forward through the list and keeping track of
-	     ;; the last time we found a match might be more screwy than
-	     ;; what the user expects, but it seems to be allowed by the
-	     ;; ANSI standard. (And if the user is screwy enough to ask
-	     ;; for FROM-END behavior on list data, turnabout is fair play.)
+	     ;; This hack of dealing with non-NIL FROM-END for list
+	     ;; data by iterating forward through the list and keeping
+	     ;; track of the last time we found a match might be more
+	     ;; screwy than what the user expects, but it seems to be
+	     ;; allowed by the ANSI standard. (And if the user is
+	     ;; screwy enough to ask for FROM-END behavior on list
+	     ;; data, turnabout is fair play.)
 	     ;;
-	     ;; It's also not enormously efficient, calling PREDICATE and
-	     ;; KEY more often than necessary; but all the alternatives
-	     ;; seem to have their own efficiency problems.
+	     ;; It's also not enormously efficient, calling PREDICATE
+	     ;; and KEY more often than necessary; but all the
+	     ;; alternatives seem to have their own efficiency
+	     ;; problems.
 	     (if from-end
 		 (setf find i
 		       position index)
@@ -750,7 +752,7 @@
 			      :policy (> speed space)
 			      :important t)
   "expand inline"
-  '(%find-position-if (let ((test-fun (%coerce-callable-to-function test)))
+  '(%find-position-if (let ((test-fun (%coerce-callable-to-fun test)))
 			;; I'm having difficulty believing I'm
 			;; reading it right, but as far as I can see,
 			;; the only guidance that ANSI gives for the
@@ -777,7 +779,7 @@
 		      from-end
 		      start
 		      end
-		      (%coerce-callable-to-function key)))
+		      (%coerce-callable-to-fun key)))
 
 ;;; The inline expansions for the VECTOR case are saved as macros so
 ;;; that we can share them between the DEFTRANSFORMs and the default

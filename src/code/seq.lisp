@@ -638,7 +638,7 @@
 		  (vector (dovector (,i sequence) ,@body))))))
   (defun %map-to-list-arity-1 (fun sequence)
     (let ((reversed-result nil)
-	  (really-fun (%coerce-callable-to-function fun)))
+	  (really-fun (%coerce-callable-to-fun fun)))
       (dosequence (element sequence)
 	(push (funcall really-fun element)
 	      reversed-result))
@@ -646,7 +646,7 @@
   (defun %map-to-simple-vector-arity-1 (fun sequence)
     (let ((result (make-array (length sequence)))
 	  (index 0)
-	  (really-fun (%coerce-callable-to-function fun)))
+	  (really-fun (%coerce-callable-to-fun fun)))
       (declare (type index index))
       (dosequence (element sequence)
         (setf (aref result index)
@@ -654,7 +654,7 @@
 	(incf index))
       result))
   (defun %map-for-effect-arity-1 (fun sequence)
-    (let ((really-fun (%coerce-callable-to-function fun)))
+    (let ((really-fun (%coerce-callable-to-fun fun)))
       (dosequence (element sequence)
 	(funcall really-fun element)))
     nil))
@@ -760,7 +760,7 @@
 ;;; length of the output sequence matches any length specified
 ;;; in RESULT-TYPE.
 (defun %map (result-type function first-sequence &rest more-sequences)
-  (let ((really-function (%coerce-callable-to-function function)))
+  (let ((really-function (%coerce-callable-to-fun function)))
     ;; Handle one-argument MAP NIL specially, using ETYPECASE to turn
     ;; it into something which can be DEFTRANSFORMed away. (It's
     ;; fairly important to handle this case efficiently, since
@@ -826,7 +826,7 @@
     (when fp-result
       (setf (fill-pointer result-sequence) len))
 
-    (let ((really-fun (%coerce-callable-to-function function)))
+    (let ((really-fun (%coerce-callable-to-fun function)))
       (dotimes (index len)
 	(setf (elt result-sequence index)
 	      (apply really-fun
@@ -1852,16 +1852,16 @@
 (defun effective-find-position-test (test test-not)
   (cond ((and test test-not)
 	 (error "can't specify both :TEST and :TEST-NOT"))
-	(test (%coerce-callable-to-function test))
+	(test (%coerce-callable-to-fun test))
 	(test-not
 	 ;; (Without DYNAMIC-EXTENT, this is potentially horribly
 	 ;; inefficient, but since the TEST-NOT option is deprecated
 	 ;; anyway, we don't care.)
-	 (complement (%coerce-callable-to-function test-not)))
+	 (complement (%coerce-callable-to-fun test-not)))
 	(t #'eql)))
 (defun effective-find-position-key (key)
   (if key
-      (%coerce-callable-to-function key)
+      (%coerce-callable-to-fun key)
       #'identity))
 
 ;;; shared guts of out-of-line FIND, POSITION, FIND-IF, and POSITION-IF
@@ -1936,7 +1936,7 @@
 				&key from-end (start 0) end key)
 		(nth-value
 		 ,values-index
-		 (%find-position-if (%coerce-callable-to-function predicate)
+		 (%find-position-if (%coerce-callable-to-fun predicate)
 				    sequence
 				    from-end
 				    start
@@ -1976,7 +1976,7 @@
 				&key from-end (start 0) end key)
 		(nth-value
 		 ,values-index
-		 (%find-position-if (complement (%coerce-callable-to-function
+		 (%find-position-if (complement (%coerce-callable-to-fun
 						 predicate))
 				    sequence
 				    from-end

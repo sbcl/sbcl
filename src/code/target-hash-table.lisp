@@ -648,7 +648,7 @@
   #!+sb-doc
   "For each entry in HASH-TABLE, call the designated two-argument function
    on the key and value of the entry. Return NIL."
-  (let ((fun (%coerce-callable-to-function function-designator))
+  (let ((fun (%coerce-callable-to-fun function-designator))
 	(size (length (hash-table-next-vector hash-table))))
     (declare (type function fun))
     (do ((i 1 (1+ i)))

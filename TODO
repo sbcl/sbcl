@@ -83,6 +83,8 @@ for early 0.7.x:
 	to remove dead symbols
 * made system handle stack overflow safely unless SAFETY is dominated
 	by SPEED or SPACE
+* Probably get rid of or at least rework the fdefinition/encapsulation
+	system so that (SYMBOL-FUNCTION 'FOO) = (FDEFINITION 'FOO).
 =======================================================================
 for 1.0:
 

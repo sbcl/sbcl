@@ -104,8 +104,8 @@
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
-  (let ((predicate-function (%coerce-callable-to-function predicate))
-	(key-function (and key (%coerce-callable-to-function key))))
+  (let ((predicate-function (%coerce-callable-to-fun predicate))
+	(key-function (and key (%coerce-callable-to-fun key))))
     (typecase sequence
       (list (sort-list sequence predicate-function key-function))
       (vector

@@ -60,11 +60,11 @@
 (defun symbol-function (symbol)
   #!+sb-doc
   "Return SYMBOL's current function definition. Settable with SETF."
-  (raw-definition symbol))
+  (%coerce-name-to-fun symbol))
 
-(defun fset (symbol new-value)
+(defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))
-  (setf (raw-definition symbol) new-value))
+  (setf (%coerce-name-to-fun symbol) new-value))
 
 (defun symbol-plist (symbol)
   #!+sb-doc

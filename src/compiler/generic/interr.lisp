@@ -20,7 +20,8 @@
 ;;; FIXME: Having each of these error handlers be a full, named function
 ;;; seems to contribute a noticeable amount of bloat and little value.
 ;;; Perhaps we could just make a single error-handling function with a
-;;; big CASE statement inside it?
+;;; big CASE statement inside it? Or at least implement the error handling
+;;; functions as closures instead of DEFUNs?
 (eval-when (:compile-toplevel :execute)
   (def!macro define-internal-errors (&rest errors)
 	     (let ((info (mapcar #'(lambda (x)
@@ -60,8 +61,6 @@
    "Object is not of type SIMPLE-VECTOR.")
   (object-not-fixnum
    "Object is not of type FIXNUM.")
-  (object-not-function-or-symbol
-   "Object is not of type FUNCTION or SYMBOL.")
   (object-not-vector
    "Object is not of type VECTOR.")
   (object-not-string

@@ -50,10 +50,9 @@
   (dolist (fdefn *!initial-fdefn-objects*)
     (setf (info :function :definition (fdefn-name fdefn)) fdefn)))
 
+;;; Return the fdefn object for NAME. If it doesn't already exist and
+;;; CREATE is non-NIL, create a new (unbound) one.
 (defun fdefinition-object (name create)
-  #!+sb-doc
-  "Return the fdefn object for NAME. If it doesn't already exist and CREATE
-   is non-NIL, create a new (unbound) one."
   (declare (values (or fdefn null)))
   (unless (legal-fun-name-p name)
     (error 'simple-type-error
@@ -66,105 +65,22 @@
 	(setf (info :function :definition name) (make-fdefn name))
 	fdefn)))
 
-;;; FIXME: If the fundamental operation performed when
-;;; funcalling a symbol is %COERCE-NAME-TO-FUNCTION, which expands into
-;;; FDEFINITION-OBJECT, which does (INFO :FUNCTION :DEFINITION NAME),
-;;; that's a horrendously heavyweight way to implement SYMBOL-FUNCTION.
-;;; What compelling reason is there for all this hairiness? The only
-;;; thing I can think of is that it does give a place to store
-;;; SETF functions, but I don't think that's a good enough reason.
-;;; It might even be that the FDEFINITION arrangement saves a little
-;;; space, if the proportion of function-less symbols is high enough,
-;;; but I don't think that's a good enough reason, either.
-;;; I'd really like to wipe out FDEFN stuff root and branch, and
-;;; just store SETF functions in the symbol property list.
-;;;
-;;; One problem with just doing the simple thing: What happens when
-;;; people call symbols which have no function definitions?
-;;;   1. Just hit "undefined function" error -- with no clue as to
-;;;      what undefined function it was. (This might actually not be
-;;;      too horrible, since the compiler warns you about undefined
-;;;      functions and the debugger aims, with incomplete success,
-;;;      to show you what form caused an error.)
-;;;   2. various solutions involving closures in the function slot,
-;;;      all of which have the drawback of extra memory use and extra
-;;;      difficulty in detecting when functions are undefined
-;;;   2a. Have every single symbol have an undefined function closure
-;;;       which points back to it to tell you which undefined symbol it
-;;;       was. (4 extra words per undefined symbol)
-;;;   2b. Play tricks with FDEFINITION, where the default SYMBOL-FUNCTION
-;;;       for any function is an anonymous "undefined function" error
-;;;       which doesn't tell you what the problem was, but if FDEFINITION
-;;;       is ever called on an undefined symbol, it helpfully changes the
-;;;       function definition to point to a closure which knows which
-;;;       symbol caused the problem.
-;;;   4. Just don't sweat it except when DEBUG>SPEED, where the calling
-;;;      convention gets tweaked to test for the undefined-function
-;;;      function at call time and bail out with helpful information
-;;;      if it's there.
-;;;   5. Require that the function calling convention be stereotyped
-;;;      along the lines of
-;;;		mov %ebx, local_immediate_3	    ; Point to symbol.
-;;;		mov %eax, symbol_fun_offset(%eax)   ; Point to function.
-;;;		call *function_code_pointer(%eax)   ; Go.
-;;;      That way, it's guaranteed that on entry to a function, %EBX points
-;;;      back to the symbol which was used to indirect into the function,
-;;;      so the undefined function handler can base its complaint on that.
-;;;
-;;; Another problem with doing the simple thing: people will want to
-;;; indirect through something in order to get to SETF functions, in
-;;; order to be able to redefine them. What will they indirect
-;;; through? This could be done with a hack, making an anonymous
-;;; symbol and linking it to the main symbol's SB!KERNEL:SETF-FUNCTION
-;;; property. The anonymous symbol could even point back to the symbol
-;;; it's the SETF function for, so that if the SETF function was
-;;; undefined at the time a call was made, the debugger could say
-;;; which function caused the problem. It'd probably be cleaner,
-;;; though, to use a new type of primitive object (SYMBOLOID?)
-;;; instead. It could probably be like symbol except that its name
-;;; could be any object and its value points back to the symbol which
-;;; owns it. Then the setf functions for FOO could be on the list (GET
-;;; FOO 'SB!KERNEL:SYMBOLOIDS)
-;;;
-;;; FIXME: Oh, my. Now that I've started thinking about it, I
-;;; appreciate more fully how weird and twisted FDEFNs might be. Look
-;;; at the calling sequence for full calls. It goes and reads the
-;;; address of a function object from its own table of immediate
-;;; values, then jumps into that. Consider how weird that is. Not only
-;;; is it not doing indirection through a symbol (which I'd already
-;;; realized) but it's not doing indirection through
-
-;;; The compiler emits calls to this when someone tries to funcall a symbol.
-(defun %coerce-name-to-function (name)
-  #!+sb-doc
-  "Return the definition for name, including any encapsulations. Settable
-   with SETF."
+;;; Return the fdefinition of NAME, including any encapsulations.
+;;; The compiler emits calls to this when someone tries to FUNCALL 
+;;; something. SETFable.
+#!-sb-fluid (declaim (inline %coerce-name-to-fun))
+(defun %coerce-name-to-fun (name)
   (let ((fdefn (fdefinition-object name nil)))
     (or (and fdefn (fdefn-fun fdefn))
 	(error 'undefined-function :name name))))
-
-(defun %coerce-callable-to-function (callable)
-  (if (functionp callable)
-      callable
-      (%coerce-name-to-function callable)))
-
-;;; This is just another name for %COERCE-NAME-TO-FUNCTION.
-#!-sb-fluid (declaim (inline raw-definition))
-(defun raw-definition (name)
-  ;; We know that we are calling %COERCE-NAME-TO-FUNCTION, so don't remind us.
-  (declare (optimize (inhibit-warnings 3)))
-  (%coerce-name-to-function name))
-(defun (setf raw-definition) (function name)
+(defun (setf %coerce-name-to-fun) (function name)
   (let ((fdefn (fdefinition-object name t)))
     (setf (fdefn-fun fdefn) function)))
 
-;;; FIXME: There seems to be no good reason to have both
-;;; %COERCE-NAME-TO-FUNCTION and RAW-DEFINITION names for the same
-;;; thing. And despite what the doc string of %COERCE-NAME-TO-FUNCTION
-;;; says, it's doesn't look settable. Perhaps we could collapse
-;;; %COERCE-TO-FUNCTION, RAW-DEFINITION, and (SETF RAW-DEFINITION)
-;;; into RAW-FDEFINITION and (SETF RAW-FDEFINITION), or
-;;; OUTER-FDEFINITION and (SETF OUTER-FDEFINITION).
+(defun %coerce-callable-to-fun (callable)
+  (if (functionp callable)
+      callable
+      (%coerce-name-to-fun callable)))
 
 ;;;; definition encapsulation
 
@@ -277,10 +193,11 @@
 ;;; KLUDGE: Er, it looks as though this means that
 ;;;    (FUNCALL (FDEFINITION 'FOO))
 ;;; doesn't do the same thing as
-;;;    (FUNCALL 'FOO).
-;;; That doesn't look like ANSI behavior to me. Look e.g. at the
-;;; ANSI definition of TRACE: "Whenever a traced function is invoked,
-;;; information about the call, ..". Try this:
+;;;    (FUNCALL 'FOO),
+;;; and (SYMBOL-FUNCTION 'FOO) isn't in general the same thing
+;;; as (FDEFINITION 'FOO). That doesn't look like ANSI behavior to me.
+;;; Look e.g. at the ANSI definition of TRACE: "Whenever a traced
+;;; function is invoked, information about the call, ..". Try this:
 ;;;   (DEFUN FOO () (PRINT "foo"))
 ;;;   (TRACE FOO)
 ;;;   (FUNCALL 'FOO)
@@ -296,13 +213,16 @@
 ;;; The only problem I can see with not having a wrapper: If tracing
 ;;; EQ, EQL, EQUAL, or EQUALP causes its function address to change,
 ;;; it will mess up the MAKE-HASH-TABLE logic which uses EQ tests
-;;; on those function values. -- WHN 19990906
+;;; on those function values. But given the ANSI statement about
+;;; TRACE causing things to change, that doesn't seem too unreasonable;
+;;; and we might even be able to forbid tracing these functions.
+;;; -- WHN 2001-11-02
 (defun fdefinition (name)
   #!+sb-doc
   "Return name's global function definition taking care to respect any
    encapsulations and to return the innermost encapsulated definition.
    This is SETF'able."
-  (let ((fun (raw-definition name)))
+  (let ((fun (%coerce-name-to-fun name)))
     (loop
       (let ((encap-info (encapsulation-info fun)))
 	(if encap-info
