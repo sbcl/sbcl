@@ -73,3 +73,12 @@
   (loop for (exp res) in tests
         for real-res = (multiple-value-list (eval exp))
         do (assert (equal real-res res))))
+
+;;; bug 45b reported by PVE
+(dolist (type '(short single double long))
+  (dolist (sign '(positive negative))
+    (let* ((name (find-symbol (format nil "LEAST-~A-~A-FLOAT"
+                                      sign type)
+                              :cl))
+           (value (symbol-value name)))
+      (assert (zerop (/ value 2))))))

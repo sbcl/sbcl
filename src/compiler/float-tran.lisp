@@ -693,14 +693,15 @@
 ;;; have too much roundoff. Thus we have to do it the hard way.
 (defun safe-expt (x y)
   (handler-case
-      (expt x y)
+      (when (< (abs y) 10000)
+        (expt x y))
     (error ()
       nil)))
 
 ;;; Handle the case when x >= 1.
 (defun interval-expt-> (x y)
   (case (sb!c::interval-range-info y 0d0)
-    ('+
+    (+
      ;; Y is positive and log X >= 0. The range of exp(y * log(x)) is
      ;; obviously non-negative. We just have to be careful for
      ;; infinite bounds (given by nil).
@@ -709,7 +710,7 @@
 	   (hi (safe-expt (type-bound-number (sb!c::interval-high x))
 			  (type-bound-number (sb!c::interval-high y)))))
        (list (sb!c::make-interval :low (or lo 1) :high hi))))
-    ('-
+    (-
      ;; Y is negative and log x >= 0. The range of exp(y * log(x)) is
      ;; obviously [0, 1]. However, underflow (nil) means 0 is the
      ;; result.
@@ -728,10 +729,10 @@
 ;;; Handle the case when x <= 1
 (defun interval-expt-< (x y)
   (case (sb!c::interval-range-info x 0d0)
-    ('+
+    (+
      ;; The case of 0 <= x <= 1 is easy
      (case (sb!c::interval-range-info y)
-       ('+
+       (+
 	;; Y is positive and log X <= 0. The range of exp(y * log(x)) is
 	;; obviously [0, 1]. We just have to be careful for infinite bounds
 	;; (given by nil).
@@ -740,7 +741,7 @@
 	      (hi (safe-expt (type-bound-number (sb!c::interval-high x))
 			     (type-bound-number (sb!c::interval-low y)))))
 	  (list (sb!c::make-interval :low (or lo 0) :high (or hi 1)))))
-       ('-
+       (-
 	;; Y is negative and log x <= 0. The range of exp(y * log(x)) is
 	;; obviously [1, inf].
 	(let ((hi (safe-expt (type-bound-number (sb!c::interval-low x))
@@ -754,7 +755,7 @@
 	    (sb!c::interval-split 0 y t)
 	  (list (interval-expt-< x y-)
 		(interval-expt-< x y+))))))
-    ('-
+    (-
      ;; The case where x <= 0. Y MUST be an INTEGER for this to work!
      ;; The calling function must insure this! For now we'll just
      ;; return the appropriate unbounded float type.
@@ -768,10 +769,10 @@
 ;;; Compute bounds for (expt x y).
 (defun interval-expt (x y)
   (case (interval-range-info x 1)
-    ('+
+    (+
      ;; X >= 1
 	 (interval-expt-> x y))
-    ('-
+    (-
      ;; X <= 1
      (interval-expt-< x y))
     (t
@@ -983,14 +984,14 @@
 	 (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
 	   (case (interval-range-info (numeric-type->interval arg) 0.0)
-	     ('+
+	     (+
 	      ;; The number is positive, so the phase is 0.
 	      (make-numeric-type :class 'float
 				 :format format
 				 :complexp :real
 				 :low (coerce 0 bound-type)
 				 :high (coerce 0 bound-type)))
-	     ('-
+	     (-
 	      ;; The number is always negative, so the phase is pi.
 	      (make-numeric-type :class 'float
 				 :format format

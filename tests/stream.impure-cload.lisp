@@ -72,3 +72,4 @@
       b))
   (format nil "1234")
   :end1 4))
+(delete-file *scratch-file-name*)

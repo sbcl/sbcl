@@ -1051,10 +1051,6 @@ WORKAROUND:
         (bignum "hip")
         (t "zuz")))
 
-271:
-  Cross-compiler cannot perform constant folding of some internal
-  functions, such as %NEGATE.
-
 272:
   All forms of GC hooks (including notifiers and finalisers) are currently
   (since 0.8.0) broken for gencgc (i.e. x86) users 
@@ -1075,6 +1071,15 @@ WORKAROUND:
 274:
   CLHS says that type declaration of a symbol macro should not affect
   its expansion, but in SBCL it does.
+
+275:
+  The following code (taken from CLOCC) takes a lot of time to compile:
+
+    (defun foo (n)
+      (declare (type (integer 0 #.large-constant) n))
+      (expt 1/10 n))
+
+  (fixed in 0.8.2.51)
 
 
 DEFUNCT CATEGORIES OF BUGS
