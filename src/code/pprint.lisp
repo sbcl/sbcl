@@ -905,6 +905,7 @@
 
 (defun pprint-dispatch (object &optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
+  (/show0 "entering PPRINT-DISPATCH")
   (let* ((table (or table *initial-pprint-dispatch*))
 	 (cons-entry
 	  (and (consp object)
@@ -1251,6 +1252,7 @@
 ;;; OUTPUT-PRETTY-OBJECT is called by OUTPUT-OBJECT when *PRINT-PRETTY* is
 ;;; bound to T.
 (defun output-pretty-object (object stream)
+  (/show0 "entering OUTPUT-PRETTY-OBJECT")
   (with-pretty-stream (stream)
     (funcall (pprint-dispatch object) stream object)))
 

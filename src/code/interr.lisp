@@ -457,9 +457,26 @@
        (/hexstr error-number)
        (/show0 "cold/low ARGUMENTS=..")
        (/hexstr arguments)
-       (/show (mapcar #'type-of arguments))
+
+       ;; REMOVEME
+       (/show0 "cold/low (LENGTH ARGUMENTS)=..")
+       (/hexstr (length arguments))
        (dolist (argument arguments)
-	 (/show argument))
+	 (/show0 "cold/low ARGUMENT=..")
+	 (/hexstr argument)
+	 (if (symbolp argument)
+	     (progn
+	       (/show0 "Argument is a SYMBOL..")
+	       (/primitive-print (symbol-name argument)))
+	     (let ((argument-type (type-of argument)))
+	       (cond ((symbolp argument-type)
+		      (/show0 "Argument type is a SYMBOL..")
+		      (/primitive-print (symbol-name argument-type)))
+		     ((listp argument-type)
+		      (/primitive-print "Argument type is a LIST."))
+		     (t
+		      (/primitive-print "Argument type is not a SYMBOL or LIST."))))))
+
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
 	   (find-interrupted-name)
 	 (/show0 "back from FIND-INTERRUPTED-NAME")

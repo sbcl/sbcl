@@ -388,7 +388,9 @@
 
 ;;; Output OBJECT to STREAM observing all printer control variables.
 (defun output-object (object stream)
+  (/show0 "entering OUTPUT-OBJECT")
   (labels ((print-it (stream)
+	     (/show0 "entering PRINT-IT")
 	     (if *print-pretty*
 		 (if *pretty-printer*
 		     (funcall *pretty-printer* object stream)
@@ -396,6 +398,7 @@
 		       (output-ugly-object object stream)))
 		 (output-ugly-object object stream)))
 	   (check-it (stream)
+	     (/show0 "entering CHECK-IT")
 	     (let ((marker (check-for-circularity object t)))
 	       (case marker
 		 (:initiate
@@ -412,6 +415,7 @@
     (cond (;; Maybe we don't need to bother with circularity detection.
 	   (or (not *print-circle*)
 	       (uniquely-identified-by-print-p object))
+	   (/show0 "in obviously-don't-bother case")
 	   (print-it stream))
 	  (;; If we have already started circularity detection, this
 	   ;; object might be a shared reference. If we have not, then
@@ -419,8 +423,10 @@
 	   ;; reference to itself or multiple shared references.
 	   (or *circularity-hash-table*
 	       (compound-object-p object))
+	   (/show0 "in CHECK-IT case")
 	   (check-it stream))
 	  (t
+	   (/show0 "in don't-bother-after-all case")
 	   (print-it stream)))))
 
 ;;; Output OBJECT to STREAM observing all printer control variables
@@ -428,6 +434,7 @@
 ;;; then the pretty printer will be used for any components of OBJECT,
 ;;; just not for OBJECT itself.
 (defun output-ugly-object (object stream)
+  (/show0 "entering OUTPUT-UGLY-OBJECT")
   (typecase object
     ;; KLUDGE: The TYPECASE approach here is non-ANSI; the ANSI definition of
     ;; PRINT-OBJECT says it provides printing and we're supposed to provide
@@ -492,6 +499,7 @@
     (fdefn
      (output-fdefn object stream))
     (t
+     (/show0 "in OUTPUT-RANDOM case")
      (output-random object stream))))
 
 ;;;; symbols

@@ -787,9 +787,13 @@
 	 (namestring (unix-namestring defaulted-pathname t)))
     (when (and namestring (sb!unix:unix-file-kind namestring t))
       (let ((trueishname (sb!unix:unix-resolve-links namestring)))
+	(/show0 "back from UNIX-RESOLVE-LINKS in PROBE-FILE")
 	(when trueishname
 	  (let ((*ignore-wildcards* t))
-	    (pathname (sb!unix:unix-simplify-pathname trueishname))))))))
+	    (/show0 "calling UNIX-SIMPLIFY-PATHNAME in PROBE-FILE")
+	    (prog1
+		(pathname (sb!unix:unix-simplify-pathname trueishname))
+	      (/show0 "back from UNIX-SIMPLIFY-PATHNAME in PROBE-FILE"))))))))
 
 ;;;; miscellaneous other operations
 

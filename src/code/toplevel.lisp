@@ -386,6 +386,10 @@
 	   ;; return its truename.
 	   (probe-init-files (&rest possible-init-file-names)
 	     (/show0 "entering PROBE-INIT-FILES")
+
+	     ;; REMOVEME: commented out while compiler has problems
+	     #+nil
+
 	     (prog1
 		 (find-if (lambda (x)
 			    (and (stringp x) (probe-file x)))
@@ -459,8 +463,7 @@
   (let ((* nil) (** nil) (*** nil)
 	(- nil)
 	(+ nil) (++ nil) (+++ nil)
-	(/// nil) (// nil) (/ nil)
-	(eof-marker (cons :eof nil)))
+	(/// nil) (// nil) (/ nil))
     (/show0 "about to set up restarts in TOPLEVEL-REPL")
     ;; There should only be one TOPLEVEL restart, and it's here, so
     ;; restarting at TOPLEVEL always bounces you all the way out here.
@@ -478,27 +481,39 @@
 
 (defun repl (noprint)
   (/show0 "entering REPL")
-  (loop
-   ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
-   ;; control stack before each interactive command. Isn't there some
-   ;; way we can convince the GC to just ignore dead areas of the
-   ;; control stack, so that we don't need to rely on this
-   ;; half-measure?
-   (scrub-control-stack)
-   (unless noprint
-     (fresh-line)
-     (princ (if (functionp *prompt*)
-		(funcall *prompt*)
-		*prompt*))
-     (flush-standard-output-streams))
-   (let ((form (read *standard-input* nil eof-marker)))
-     (if (eq form eof-marker)
-	 (quit)
-	 (let ((results (multiple-value-list (interactive-eval form))))
-	   (unless noprint
-	     (dolist (result results)
-	       (fresh-line)
-	       (prin1 result))))))))
+
+
+  ;; REMOVEME after debugging
+  (setf *print-pretty* nil)
+
+  (let ((eof-marker (cons :eof nil)))
+    (loop
+     ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
+     ;; control stack before each interactive command. Isn't there some
+     ;; way we can convince the GC to just ignore dead areas of the
+     ;; control stack, so that we don't need to rely on this
+     ;; half-measure?
+     (/show0 "at head of LOOP")
+     (scrub-control-stack)
+     (/show0 "back from SCRUB-CONTROL-STACK")
+     (unless noprint
+       (fresh-line)
+       (/show0 "back from FRESH-LINE")
+       (princ (if (functionp *prompt*)
+		  (funcall *prompt*)
+		  *prompt*))
+       (/show0 "back from PRINC")
+       (flush-standard-output-streams)
+       (/show0 "back from FLUSH-STANDARD-OUTPUT-STREAMS"))
+     (let ((form (read *standard-input* nil eof-marker)))
+       (/show0 "back from READ")
+       (if (eq form eof-marker)
+	   (quit)
+	   (let ((results (multiple-value-list (interactive-eval form))))
+	     (unless noprint
+	       (dolist (result results)
+		 (fresh-line)
+		 (prin1 result)))))))))
 
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
   (declare (ignore old-debugger-hook))
