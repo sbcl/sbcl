@@ -509,9 +509,10 @@
 
 ;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
 ;;; compile-time constant.
-(deftransform vector-length ((vector) ((simple-array * (*))))
+(deftransform vector-length ((vector))
   (let ((vtype (continuation-type vector)))
-    (if (array-type-p vtype)
+    (if (and (array-type-p vtype)
+	     (not (array-type-complexp vtype)))
 	(let ((dim (first (array-type-dimensions vtype))))
 	  (when (eq dim '*) (give-up-ir1-transform))
 	  dim)
