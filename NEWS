@@ -1,11 +1,17 @@
 changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * bug fix: READ, READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST,
     and READ-FROM-STRING all now return a primary value of NIL if
-    *READ-SUPPRESS* is true. (reported by Bruno Haible for CMUCL)
+    *READ-SUPPRESS* is true.  (reported by Bruno Haible for CMUCL)
   * bug fix: Default value of EOF-ERROR-P in READ-FROM-STRING is true.
     (reported by Bruno Haible for CMUCL)
   * bug fix: ERROR now signals a TYPE-ERROR if the arguments to ERROR
-    do not designate a condition. (reported by Bruno Haible for CMUCL)
+    do not designate a condition.  (reported by Bruno Haible for
+    CMUCL)
+  * bug fix: UNINTERN, USE-PACKAGE, IMPORT and EXPORT all signal an
+    SB-EXT:NAME-CONFLICT condition (subtype of PACKAGE-ERROR) in the
+    name conflict situations in CLHS 11.1.1.2.5, and provide a restart
+    permitting resolution in favour of any of the conflicting symbols.
+    (reported by Bruno Haible for CMUCL)
 
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now

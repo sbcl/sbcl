@@ -11,6 +11,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Support For Unix::            
 * Customization Hooks for Users::  
 * Tools To Help Developers::    
+* Resolution of Name Conflicts::
 * Stale Extensions::            
 * Efficiency Hacks::            
 @end menu
@@ -92,7 +93,7 @@ mechanisms as follows:
 @include fun-common-lisp-ed.texinfo
 @include var-sb-ext-star-ed-functions-star.texinfo
 
-@node  Tools To Help Developers
+@node Tools To Help Developers
 @comment  node-name,  next,  previous,  up
 @section Tools To Help Developers
 
@@ -104,6 +105,17 @@ accessed by typing @kbd{help} at the debugger prompt. @xref{Debugger}.
 
 Documentation for @code{inspect} is accessed by typing @kbd{help} at
 the @code{inspect} prompt.
+
+@node Resolution of Name Conflicts
+@section Resolution of Name Conflicts
+
+The ANSI standard (section 11.1.1.2.5) requires that name conflicts in
+packages be resolvable in favour of any of the conflicting symbols.  In
+the interactive debugger, this is achieved by prompting for the symbol
+in whose favour the conflict should be resolved; for programmatic use,
+the @code{sb-ext:resolve-conflict} restart should be invoked with one
+argument, which should be a member of the list returned by the condition
+accessor @code{sb-ext:name-conflict-symbols}.
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up

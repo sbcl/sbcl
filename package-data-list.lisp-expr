@@ -866,6 +866,10 @@ retained, possibly temporariliy, because it might be used internally."
 	       "FORMAT-ARGS-MISMATCH" "FORMAT-TOO-FEW-ARGS-WARNING"
 	       "FORMAT-TOO-MANY-ARGS-WARNING" "EXTENSION-FAILURE"
 
+               "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
+               "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
+               "RESOLVE-CONFLICT"
+               
 	       ;; ..and DEFTYPEs..
 	       "INDEX" "LOAD/STORE-INDEX"
 	       "SIGNED-BYTE-WITH-A-BITE-OUT"
