@@ -827,7 +827,7 @@
 	((simple-array nil (*))
 	 (dump-unsigned-vector 0 0))
 	(simple-bit-vector
-	 (dump-unsigned-vector 1 (ceiling len 8)))
+	 (dump-unsigned-vector 1 (ceiling len 8))) ; bits to bytes
 	;; KLUDGE: This isn't the best way of expressing that the host
 	;; may not have specializations for (unsigned-byte 2) and
 	;; (unsigned-byte 4), which means that these types are
@@ -837,10 +837,10 @@
 	;; CSR, 2002-05-07
 	#-sb-xc-host
 	((simple-array (unsigned-byte 2) (*))
-	 (dump-unsigned-vector 2 (ceiling len 8)))
+	 (dump-unsigned-vector 2 (ceiling (ash len 1) 8))) ; bits to bytes
 	#-sb-xc-host
 	((simple-array (unsigned-byte 4) (*))
-	 (dump-unsigned-vector 4 (ceiling len 8)))
+	 (dump-unsigned-vector 4 (ceiling (ash len 2) 8))) ; bits to bytes
 	#-sb-xc-host
 	((simple-array (unsigned-byte 7) (*))
 	 (dump-unsigned-vector 7 len))

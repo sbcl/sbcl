@@ -90,4 +90,12 @@
 (assert (eql (savable-structure-d *savable-structure*) 39))
 (assert (eql (savable-structure-e *savable-structure*) 19))
 
+;;; ensure that we can dump and reload specialized arrays whose element
+;;; size is smaller than a byte (caused a few problems circa SBCL
+;;; 0.8.14.4)
+
+(defvar *1-bit* (make-array 5 :element-type 'bit :initial-element 0))
+(defvar *2-bit* (make-array 5 :element-type '(unsigned-byte 2) :initial-element 0))
+(defvar *4-bit* (make-array 5 :element-type '(unsigned-byte 4) :initial-element 1))
+
 (sb-ext:quit :unix-status 104) ; success
