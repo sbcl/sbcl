@@ -485,8 +485,8 @@
 	(when (> words 0)
 	  (print-words words stream dstate))
 	(when (> bytes 0)
-	  (print-inst bytes stream dstate)
-	  (print-bytes bytes stream dstate))))
+	  (print-inst bytes stream dstate)))
+      (print-bytes alignment stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
@@ -526,29 +526,39 @@
 	   (let ((fun-prefix-p (call-fun-hooks chunk stream dstate)))
 	     (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
 		 (setf prefix-p fun-prefix-p)
-		 (let ((inst (find-inst chunk ispace)))
-		   (cond ((null inst)
-			  (handle-bogus-instruction stream dstate))
-			 (t
-			  (setf (dstate-next-offs dstate)
-				(+ (dstate-cur-offs dstate)
-				   (inst-length inst)))
-			  (print-inst (inst-length inst) stream dstate)
+	       (let ((inst (find-inst chunk ispace)))
+		 (cond ((null inst)
+			(handle-bogus-instruction stream dstate))
+		       (t
+			(setf (dstate-next-offs dstate)
+			      (+ (dstate-cur-offs dstate)
+				 (inst-length inst)))
+			(let ((orig-next (dstate-next-offs dstate)))
+			  (print-inst (inst-length inst) stream dstate :trailing-space nil)
 			  (let ((prefilter (inst-prefilter inst))
 				(control (inst-control inst)))
 			    (when prefilter
 			      (funcall prefilter chunk dstate))
-
+			    
+			    ;; print any instruction bytes recognized by the prefilter which calls read-suffix
+			    ;; and updates next-offs
+			    (let ((suffix-len (- (dstate-next-offs dstate) orig-next)))
+			      (when (plusp suffix-len)
+				(print-inst suffix-len stream dstate :offset (inst-length inst) :trailing-space nil))
+			      (dotimes (i (- *disassem-inst-column-width* (* 2 (+ (inst-length inst) suffix-len))))
+				(write-char #\space stream)))
+			    (write-char #\space stream)
+			    
 			    (funcall function chunk inst)
-
+			    
 			    (setf prefix-p (null (inst-printer inst)))
-
+			    
 			    (when control
-			      (funcall control chunk inst stream dstate))))))
-		 )))))
-
+			      (funcall control chunk inst stream dstate))
+			    ))))))))))
+    
       (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
-
+      
       (unless (null stream)
 	(unless prefix-p
 	  (print-notes-and-newline stream dstate))
@@ -730,14 +740,14 @@
     (setf (dstate-notes dstate) nil)))
 
 ;;; Print NUM instruction bytes to STREAM as hex values.
-(defun print-inst (num stream dstate)
-  (let ((width *disassem-inst-column-width*)
-	(sap (dstate-segment-sap dstate))
-	(start-offs (dstate-cur-offs dstate)))
+(defun print-inst (num stream dstate &key (offset 0) (trailing-space t))
+  (let ((sap (dstate-segment-sap dstate))
+	(start-offs (+ offset (dstate-cur-offs dstate))))
     (dotimes (offs num)
-      (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs)))
-      (decf width 2))
-    (dotimes (i width)
+      (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))
+    (when trailing-space
+      (dotimes (i (- *disassem-inst-column-width* (* 2 num)))
+	(write-char #\space stream))
       (write-char #\space stream))))
 
 ;;; Disassemble NUM bytes to STREAM as simple `BYTE' instructions.

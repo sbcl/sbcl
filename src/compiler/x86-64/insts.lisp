@@ -20,7 +20,9 @@
 
 ;;; this type is used mostly in disassembly and represents legacy
 ;;; registers only.  r8-15 are handled separately
-(deftype reg () '(unsigned-byte 3))
+;;(deftype reg () '(unsigned-byte 3))
+;;; KMR: Includes r8-r15
+(deftype reg () '(unsigned-byte 4))
 
 ;;; default word size for the chip: if the operand size !=:dword
 ;;; we need to output #x66 (or REX) prefix
@@ -238,6 +240,18 @@
 (sb!disassem:define-arg-type word-reg
   :printer #'print-word-reg)
 
+(sb!disassem:define-arg-type modrm-word-reg
+  :prefilter (lambda (value dstate)
+	       (declare (type sb!disassem:disassem-state dstate)
+			(list value))
+	       (setf (sb!disassem:dstate-get-prop dstate 'width) :qword)
+	       (let ((rex.r (car value))
+		     (reg (cadr value)))
+		 (declare (type (unsigned-byte 1) rex.r)
+			  (type (unsigned-byte 3) reg))
+		 (+ (ash rex.r 3) reg)))
+  :printer #'print-word-reg)
+
 (sb!disassem:define-arg-type imm-addr
   :prefilter #'read-address
   :printer #'print-label)
@@ -392,6 +406,19 @@
 							:tab accum ", " imm))
   (imm :type 'imm-data))
 
+(sb!disassem:define-instruction-format (modrm-reg-no-width 24
+				     :default-printer '(:name :tab reg))
+  (rex   :field (byte 4 4)  :value #b0100)
+  (rexw   :field (byte 3 1))
+  (rexx   :field (byte 1 1))
+  (op	 :field (byte 8 8))
+  (mod   :field (byte 2 22))
+  (reg   :fields (list (byte 2 1) (byte 3 19)) :type 'modrm-word-reg) ;; includes rex.r
+  (r/m   :fields (list (byte 0 1) (byte 3 16))) ;; includes rex.b
+  ;; optional fields
+  (accum :type 'word-accum)
+  (imm))
+
 (sb!disassem:define-instruction-format (reg-no-width 8
 				     :default-printer '(:name :tab reg))
   (op	 :field (byte 5 3))
@@ -440,6 +467,18 @@
 					  ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (op  :field (byte 6 2))
   (dir :field (byte 1 1)))
+
+(sb!disassem:define-instruction-format (rex-reg/mem 24
+					:default-printer '(:name :tab reg/mem))
+  (rex   :field (byte 4 4)  :value #b0100)
+  (rexw   :field (byte 3 1))
+  (rexx   :field (byte 1 1))
+  (op      :field (byte 8 8))
+  (width   :field (byte 1 8)	:type 'width) ;; KMR: this isn't correct
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+	   			:type 'sized-reg/mem)
+  ;; optional fields
+  (imm))
 
 ;;; Same as reg-rem/mem, but uses the reg field as a second op code.
 (sb!disassem:define-instruction-format (reg/mem 16
@@ -1144,6 +1183,7 @@
 
 (define-instruction pop (segment dst)
   (:printer reg-no-width ((op #b01011)))
+  (:printer rex-reg/mem ((op #b10001111)))
   (:printer reg/mem ((op '(#b1000111 #b000)) (width 1)))
   (:emitter
    (let ((size (operand-size dst)))
@@ -1374,7 +1414,7 @@
 
 (define-instruction dec (segment dst)
   ;; Register.
-  (:printer reg-no-width ((op #b01001)))
+  (:printer modrm-reg-no-width ((op #b11111111) (mod #b11)))
   ;; Register/Memory
   (:printer reg/mem ((op '(#b1111111 #b001))))
   (:emitter

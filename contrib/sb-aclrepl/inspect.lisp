@@ -691,9 +691,8 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 	      (ash (ref32 bignum (+ 4 start)) 32))))))
 
 (defmethod inspected-description ((object bignum))
-  (format nil  "bignum ~W with ~D ~A-bit word~:*~P" object
-	  sb-vm::n-word-bits
-	  (bignum-words object)))
+  (format nil  "bignum ~W with ~D ~A-bit word~P" object
+	  (bignum-words object)	sb-vm::n-word-bits (bignum-words object)))
 
 (defmethod inspected-description ((object ratio))
   (format nil "ratio ~W" object))
