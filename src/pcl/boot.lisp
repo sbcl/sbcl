@@ -112,8 +112,8 @@ bootstrapping.
 	(early-name (cadr fns)))
     (setf (gdefinition name)
             (set-function-name
-             #'(lambda (&rest args)
-                 (apply (the function (name-get-fdefinition early-name)) args))
+             (lambda (&rest args)
+	       (apply (fdefinition early-name) args))
              name))))
 ) ; EVAL-WHEN
 
@@ -556,7 +556,7 @@ bootstrapping.
 		  ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN 2000-12-30
 		  ,@(remove nil
 			    (mapcar (lambda (a s) (and (symbolp s)
-						       (neq s 't)
+						       (neq s t)
 						       `(%class ,a ,s)))
 				    parameters
 				    specializers))
@@ -626,7 +626,7 @@ bootstrapping.
 		(extract-declarations (cddr walked-lambda))
 	      (declare (ignore ignore))
 	      (when (or next-method-p-p call-next-method-p)
-		(setq plist (list* :needs-next-methods-p 't plist)))
+		(setq plist (list* :needs-next-methods-p t plist)))
 	      (when (some #'cdr slots)
 		(multiple-value-bind (slot-name-lists call-list)
 		    (slot-name-lists-from-slots slots calls)
@@ -1079,18 +1079,18 @@ bootstrapping.
 		   ;; like :LOAD-TOPLEVEL.
 		   ((not (listp form)) form)
 		   ((eq (car form) 'call-next-method)
-		    (setq call-next-method-p 't)
+		    (setq call-next-method-p t)
 		    form)
 		   ((eq (car form) 'next-method-p)
-		    (setq next-method-p-p 't)
+		    (setq next-method-p-p t)
 		    form)
 		   ((and (eq (car form) 'function)
 			 (cond ((eq (cadr form) 'call-next-method)
-				(setq call-next-method-p 't)
+				(setq call-next-method-p t)
 				(setq closurep t)
 				form)
 			       ((eq (cadr form) 'next-method-p)
-				(setq next-method-p-p 't)
+				(setq next-method-p-p t)
 				(setq closurep t)
 				form)
 			       (t nil))))
@@ -1205,7 +1205,7 @@ bootstrapping.
 	  pv-table-symbol))
   (when (and (eq *boot-state* 'complete)
 	     (fboundp gf-spec))
-    (let* ((gf (name-get-fdefinition gf-spec))
+    (let* ((gf (fdefinition gf-spec))
 	   (method (and (generic-function-p gf)
 			(find-method gf
 				     qualifiers
@@ -1305,14 +1305,15 @@ bootstrapping.
 	(if (memq x lambda-list-keywords)
 	    (case x
 	      (&optional	 (setq state 'optional))
-	      (&key	      (setq keysp 't
+	      (&key	         (setq keysp t
 				       state 'key))
-	      (&allow-other-keys (setq allow-other-keys-p 't))
-	      (&rest	     (setq restp 't
+	      (&allow-other-keys (setq allow-other-keys-p t))
+	      (&rest             (setq restp t
 				       state 'rest))
 	      (&aux	      (return t))
 	      (otherwise
-		(error "encountered the non-standard lambda list keyword ~S" x)))
+		(error "encountered the non-standard lambda list keyword ~S"
+		       x)))
 	    (ecase state
 	      (required  (incf nrequired))
 	      (optional  (incf noptional))
@@ -1339,14 +1340,16 @@ bootstrapping.
 	   (old-restp (and old-ftype (sb-kernel:function-type-rest old-ftype)))
 	   (old-keys (and old-ftype
 			  (mapcar #'sb-kernel:key-info-name
-				  (sb-kernel:function-type-keywords old-ftype))))
+				  (sb-kernel:function-type-keywords
+				   old-ftype))))
 	   (old-keysp (and old-ftype (sb-kernel:function-type-keyp old-ftype)))
-	   (old-allowp (and old-ftype (sb-kernel:function-type-allowp old-ftype)))
+	   (old-allowp (and old-ftype
+			    (sb-kernel:function-type-allowp old-ftype)))
 	   (keywords (union old-keys (mapcar #'keyword-spec-name keywords))))
-      `(function ,(append (make-list nrequired :initial-element 't)
+      `(function ,(append (make-list nrequired :initial-element t)
 			  (when (plusp noptional)
 			    (append '(&optional)
-				    (make-list noptional :initial-element 't)))
+				    (make-list noptional :initial-element t)))
 			  (when (or restp old-restp)
 			    '(&rest t))
 			  (when (or keysp old-keysp)
@@ -1456,7 +1459,7 @@ bootstrapping.
   (length (arg-info-metatypes arg-info)))
 
 (defun arg-info-nkeys (arg-info)
-  (count-if #'(lambda (x) (neq x 't)) (arg-info-metatypes arg-info)))
+  (count-if #'(lambda (x) (neq x t)) (arg-info-metatypes arg-info)))
 
 ;;; Keep pages clean by not setting if the value is already the same.
 (defmacro esetf (pos val)
@@ -1790,7 +1793,7 @@ bootstrapping.
 		metatypes
 		arg-info))
     (values (length metatypes) applyp metatypes
-	    (count-if #'(lambda (x) (neq x 't)) metatypes)
+	    (count-if #'(lambda (x) (neq x t)) metatypes)
 	    arg-info)))
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
@@ -1809,7 +1812,7 @@ bootstrapping.
     (if (every #'(lambda (s) (not (symbolp s))) specializers)
 	(setq parsed specializers
 	      unparsed (mapcar #'(lambda (s)
-				   (if (eq s 't) 't (class-name s)))
+				   (if (eq s t) t (class-name s)))
 			       specializers))
 	(setq unparsed specializers
 	      parsed ()))
@@ -1877,7 +1880,7 @@ bootstrapping.
 (defun early-method-specializers (early-method &optional objectsp)
   (if (and (listp early-method)
 	   (eq (car early-method) :early-method))
-      (cond ((eq objectsp 't)
+      (cond ((eq objectsp t)
 	     (or (fourth early-method)
 		 (setf (fourth early-method)
 		       (mapcar #'find-class (cadddr (fifth early-method))))))
@@ -1949,7 +1952,7 @@ bootstrapping.
       (or (dolist (m (early-gf-methods generic-function))
 	    (when (and (or (equal (early-method-specializers m nil)
 				  specializers)
-			   (equal (early-method-specializers m 't)
+			   (equal (early-method-specializers m t)
 				  specializers))
 		       (equal (early-method-qualifiers m) qualifiers))
 	      (return m)))
@@ -2010,7 +2013,7 @@ bootstrapping.
 
     (dolist (fn *!early-functions*)
       (sb-int:/show fn)
-      (setf (gdefinition (car fn)) (name-get-fdefinition (caddr fn))))
+      (setf (gdefinition (car fn)) (fdefinition (caddr fn))))
 
     (dolist (fixup *!generic-function-fixups*)
       (sb-int:/show fixup)
@@ -2021,7 +2024,7 @@ bootstrapping.
 					 (specializers (second method))
 					 (method-fn-name (third method))
 					 (fn-name (or method-fn-name fspec))
-					 (fn (name-get-fdefinition fn-name))
+					 (fn (fdefinition fn-name))
 					 (initargs
 					  (list :function
 						(set-function-name
@@ -2184,7 +2187,7 @@ bootstrapping.
 	       (parse-specialized-lambda-list (cdr arglist))
 	     (values (cons (if (listp arg) (car arg) arg) parameters)
 		     (cons (if (listp arg) (car arg) arg) lambda-list)
-		     (cons (if (listp arg) (cadr arg) 't) specializers)
+		     (cons (if (listp arg) (cadr arg) t) specializers)
 		     (cons (if (listp arg) (car arg) arg) required)))))))
 
 (eval-when (:load-toplevel :execute)

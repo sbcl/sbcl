@@ -218,7 +218,11 @@
       (dolist (a alist)
 	(reset-class-initialize-info-1 (cdr a))))))
 
-(defun initialize-info (class initargs &optional (plist-p t) allow-other-keys-arg)
+(defun initialize-info (class
+			initargs
+			&optional
+			(plist-p t)
+			allow-other-keys-arg)
   (let ((info nil))
     (if (and (eq *initialize-info-cache-class* class)
 	     (eq *initialize-info-cache-initargs* initargs))
@@ -272,7 +276,8 @@
       ((initargs-form-list new-keys)
        (multiple-value-bind (initargs-form-list new-keys)
 	   (make-default-initargs-form-list class keys)
-	 (setf (initialize-info-cached-initargs-form-list info) initargs-form-list)
+	 (setf (initialize-info-cached-initargs-form-list info)
+	       initargs-form-list)
 	 (setf (initialize-info-cached-new-keys info) new-keys)))
       ((default-initargs-function)
        (let ((initargs-form-list (initialize-info-initargs-form-list info)))
@@ -371,7 +376,8 @@
       (unless (and (null (cdr make-instance-methods))
 		   (eq (car make-instance-methods) std-mi-meth)
 		   (null (cdr default-initargs-methods))
-		   (eq (car (method-specializers (car default-initargs-methods)))
+		   (eq (car (method-specializers
+			     (car default-initargs-methods)))
 		       *the-class-slot-class*)
 		   (flet ((check-meth (meth)
 			    (let ((quals (method-qualifiers meth)))
@@ -502,7 +508,8 @@
 	    (get-secondary-dispatch-function
 	     #'shared-initialize shared-initialize-methods
 	     `((class-eq ,class) t t)
-	     `((,(find-standard-ii-method shared-initialize-methods 'slot-object)
+	     `((,(find-standard-ii-method shared-initialize-methods
+					  'slot-object)
 		,#'(lambda (instance init-type &rest initargs)
 		     (declare (ignore init-type))
 		     (call-initialize-function initialize-function
@@ -513,7 +520,8 @@
 	    (get-secondary-dispatch-function
 	     #'initialize-instance initialize-instance-methods
 	     `((class-eq ,class) t)
-	     `((,(find-standard-ii-method initialize-instance-methods 'slot-object)
+	     `((,(find-standard-ii-method initialize-instance-methods
+					  'slot-object)
 		,#'(lambda (instance &rest initargs)
 		     (invoke-effective-method-function
 		      shared-initialize t instance t initargs))))
@@ -531,15 +539,21 @@
 		 initialize-instance t instance initargs)
 		instance))))))
 
-(defun get-simple-initialization-function (class keys &optional allow-other-keys-arg)
+(defun get-simple-initialization-function (class
+					   keys
+					   &optional allow-other-keys-arg)
   (let ((info (initialize-info class keys nil allow-other-keys-arg)))
     (values (initialize-info-combined-initialize-function info)
 	    (initialize-info-constants info))))
 
-(defun get-complex-initialization-functions (class keys &optional allow-other-keys-arg
-						   separate-p)
+(defun get-complex-initialization-functions (class
+					     keys
+					     &optional
+					     allow-other-keys-arg
+					     separate-p)
   (let* ((info (initialize-info class keys nil allow-other-keys-arg))
-	 (default-initargs-function (initialize-info-default-initargs-function info)))
+	 (default-initargs-function (initialize-info-default-initargs-function
+				     info)))
     (if separate-p
 	(values default-initargs-function
 		(initialize-info-shared-initialize-t-function info))
@@ -626,7 +640,7 @@
       (let* ((slot (car slot+index))
 	     (name (slot-definition-name slot)))
 	(when (and (eql (cdr slot+index) most-positive-fixnum)
-		   (or (eq si-slot-names 't)
+		   (or (eq si-slot-names t)
 		       (member name si-slot-names)))
 	  (let* ((initform (slot-definition-initform slot))
 		 (initfunction (slot-definition-initfunction slot))
@@ -638,7 +652,8 @@
 			      ((constantp initform)
 			       (let ((value (funcall initfunction)))
 				 (if (and simple-p (integerp location))
-				     (progn (setf (nth location constants) value)
+				     (progn (setf (nth location constants)
+						  value)
 					    nil)
 				     `((const ,value)
 				       (instance-set ,pv-offset ,slot)))))
@@ -900,13 +915,15 @@
 	    initargs))
      (list pv-cell (coerce cvector cvector-type)))))
 
-;;; The effect of this is to cause almost all of the overhead of MAKE-INSTANCE
-;;; to happen at load time (or maybe at precompile time, as explained in a
-;;; previous message) rather than the first time that MAKE-INSTANCE is called
-;;; with a given class-name and sequence of keywords.
+;;; The effect of this is to cause almost all of the overhead of
+;;; MAKE-INSTANCE to happen at load time (or maybe at precompile time,
+;;; as explained in a previous message) rather than the first time
+;;; that MAKE-INSTANCE is called with a given class-name and sequence
+;;; of keywords.
 
-;;; This optimization applies only when the first argument and all the even
-;;; numbered arguments are constants evaluating to interned symbols.
+;;; This optimization applies only when the first argument and all the
+;;; even numbered arguments are constants evaluating to interned
+;;; symbols.
 
 (declaim (ftype (function (t) symbol) get-make-instance-function-symbol))
 
@@ -915,8 +932,8 @@
   (let* ((*make-instance-function-keys* nil)
 	 (expanded-form (expand-make-instance-form form)))
     (if expanded-form
-	`(funcall (name-get-fdefinition
-		   ;; The symbol is guaranteed to be fbound.
+	`(funcall (fdefinition
+		   ;; The name is guaranteed to be fbound.
 		   ;; Is there a way to declare this?
 		   (load-time-value
 		    (get-make-instance-function-symbol

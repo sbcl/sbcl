@@ -333,7 +333,7 @@
 
 (defun parse-qualifier-pattern (name pattern)
   (cond ((eq pattern '()) `(null .qualifiers.))
-	((eq pattern '*) 't)
+	((eq pattern '*) t)
 	((symbolp pattern) `(,pattern .qualifiers.))
 	((listp pattern) `(qualifier-check-runtime ',pattern .qualifiers.))
 	(t (error "In the method group specifier ~S,~%~

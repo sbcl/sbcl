@@ -286,14 +286,10 @@
     `(progn
        (defun ,defun-name (,directive ,directives)
 	 ,@(if lambda-list
-	       `((let ,(mapcar #'(lambda (var)
-				   `(,var
-				     (,(intern (concatenate
-						'string
-						"FORMAT-DIRECTIVE-"
-						(symbol-name var))
-					       (symbol-package 'foo))
-				      ,directive)))
+	       `((let ,(mapcar (lambda (var)
+				 `(,var
+				   (,(symbolicate "FORMAT-DIRECTIVE-" var)
+				    ,directive)))
 			       (butlast lambda-list))
 		   ,@body))
 	       `((declare (ignore ,directive ,directives))

@@ -55,7 +55,7 @@
 ;;; unadvised, traced etc. definition. This lets me get at the generic
 ;;; function object even when it is traced.
 (defun unencapsulated-fdefinition (symbol)
-  (name-get-fdefinition symbol))
+  (fdefinition symbol))
 
 ;;; If symbol names a function which is traced or advised, redefine
 ;;; the `real' definition without affecting the advise.
@@ -64,7 +64,7 @@
     (sb-c::%%defun name new-definition nil)
     (sb-c::note-name-defined name :function)
     new-definition)
-  (name-set-fdefinition name new-definition))
+  (setf (fdefinition name) new-definition))
 
 (defun gboundp (spec)
   (parse-gspec spec
@@ -154,8 +154,8 @@
 
 ;;; interface
 (defun type-from-specializer (specl)
-  (cond ((eq specl 't)
-	 't)
+  (cond ((eq specl t)
+	 t)
 	((consp specl)
 	 (unless (member (car specl) '(class prototype class-eq eql))
 	   (error "~S is not a legal specializer type." specl))
@@ -174,7 +174,7 @@
   (declare (special *the-class-t*))
   (setq type (type-from-specializer type))
   (if (atom type)
-      (if (eq type 't)
+      (if (eq type t)
 	  *the-class-t*
 	  (error "bad argument to type-class"))
       (case (car type)

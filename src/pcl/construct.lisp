@@ -443,7 +443,7 @@
 		 (funcall fn constructor))
 	       (dolist (subclass (class-direct-subclasses class))
 		 (recurse subclass))))
-      (recurse (find-class 't))
+      (recurse (find-class t))
       (values nclasses nconstructors))))
 
 (defun reset-constructors ()
@@ -527,7 +527,7 @@
 	       (when (eq flag ':unsupplied) (setq flag ':constants)))
 	      (t
 	       (push (cons name +slot-unbound+) constants)
-	       (setq flag 't)))))
+	       (setq flag t)))))
     (let* ((constants-alist (sort constants #'(lambda (x y)
 						(memq (car y)
 						      (memq (car x) layout)))))

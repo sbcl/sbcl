@@ -291,7 +291,7 @@
     (cond ((or (null (fboundp generic-function-name))
 	       (not (generic-function-p
 		      (setq generic-function
-			    (name-get-fdefinition generic-function-name)))))
+			    (fdefinition generic-function-name)))))
 	   (error "~S does not name a generic function."
 		  generic-function-name))
 	  ((null (setq method (get-method generic-function
@@ -312,8 +312,7 @@
 			      lambda-list
 			      &rest other-initargs)
   (unless (and (fboundp generic-function-name)
-	       (typep (name-get-fdefinition generic-function-name)
-		      'generic-function))
+	       (typep (fdefinition generic-function-name) 'generic-function))
     (sb-kernel::style-warn "implicitly creating new generic function ~S"
 			   generic-function-name))
   ;; XXX What about changing the class of the generic function if
@@ -623,7 +622,7 @@
 (defun get-wrappers-from-classes (nkeys wrappers classes metatypes)
   (let* ((w wrappers) (w-tail w) (mt-tail metatypes))
     (dolist (class (if (listp classes) classes (list classes)))
-      (unless (eq 't (car mt-tail))
+      (unless (eq t (car mt-tail))
 	(let ((c-w (class-wrapper class)))
 	  (unless c-w (return-from get-wrappers-from-classes nil))
 	  (if (eql nkeys 1)
@@ -911,7 +910,7 @@
 
 (defmacro class-test (arg class)
   (cond ((eq class *the-class-t*)
-	 't)
+	 t)
 	((eq class *the-class-slot-object*)
 	 `(not (cl:typep (cl:class-of ,arg) 'cl:built-in-class)))
 	((eq class *the-class-std-object*)
@@ -1003,7 +1002,7 @@
      #'identity)))
 
 (defun class-from-type (type)
-  (if (or (atom type) (eq (car type) 't))
+  (if (or (atom type) (eq (car type) t))
       *the-class-t*
       (case (car type)
 	(and (dolist (type (cdr type) *the-class-t*)
@@ -1045,7 +1044,7 @@
 
 ;;; We know that known-type implies neither new-type nor `(not ,new-type).
 (defun augment-type (new-type known-type)
-  (if (or (eq known-type 't)
+  (if (or (eq known-type t)
 	  (eq (car new-type) 'eql))
       new-type
       (let ((so-far (if (and (consp known-type) (eq (car known-type) 'and))
@@ -1071,7 +1070,7 @@
 	       (if p-tail
 		   (let* ((position (car p-tail))
 			  (known-type (or (nth position types) t)))
-		     (if (eq (nth position metatypes) 't)
+		     (if (eq (nth position metatypes) t)
 			 (do-column (cdr p-tail) contenders
 				    (cons (cons position known-type)
 					  known-types))
@@ -1132,10 +1131,10 @@
 (defvar *case-table-limit* 10)
 
 (defun compute-mcase-parameters (case-list)
-  (unless (eq 't (caar (last case-list)))
+  (unless (eq t (caar (last case-list)))
     (error "The key for the last case arg to mcase was not T"))
   (let* ((eq-p (dolist (case case-list t)
-		 (unless (or (eq (car case) 't)
+		 (unless (or (eq (car case) t)
 			     (symbolp (caar case)))
 		   (return nil))))
 	 (len (1- (length case-list)))
@@ -1151,7 +1150,7 @@
     (list eq-p type)))
 
 (defmacro mlookup (key info default &optional eq-p type)
-  (unless (or (eq eq-p 't) (null eq-p))
+  (unless (or (eq eq-p t) (null eq-p))
     (error "Invalid eq-p argument"))
   (ecase type
     (:simple
@@ -1508,11 +1507,11 @@
 	(state 'required)
 	(arglist (method-lambda-list method)))
     (dolist (arg arglist)
-      (cond ((eq arg '&optional)	 (setq state 'optional))
-	    ((eq arg '&rest)	     (setq state 'rest))
-	    ((eq arg '&key)	      (setq state 'key))
-	    ((eq arg '&allow-other-keys) (setq allow-other-keys 't))
-	    ((memq arg lambda-list-keywords))
+      (cond ((eq arg '&optional)         (setq state 'optional))
+            ((eq arg '&rest)             (setq state 'rest))
+            ((eq arg '&key)              (setq state 'key))
+            ((eq arg '&allow-other-keys) (setq allow-other-keys t))
+            ((memq arg lambda-list-keywords))
 	    (t
 	     (ecase state
 	       (required (push arg required))

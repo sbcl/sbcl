@@ -161,7 +161,7 @@
 	 (intern (let ((*package* *pcl-package*)
 		       (*print-case* :upcase)
 		       (*print-pretty* nil)
-		       (*print-gensym* 't))
+		       (*print-gensym* t))
 		   (format nil "~S" name))
 		 *pcl-package*))))
 

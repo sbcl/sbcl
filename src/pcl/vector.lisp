@@ -428,7 +428,7 @@
 	  (when (or (not (eq *boot-state* 'complete))
 		    (and class (not (class-finalized-p class))))
 	    (setq class nil))
-	  (when (and class-name (not (eq class-name 't)))
+	  (when (and class-name (not (eq class-name t)))
 	    (when (or (null type)
 		      (not (and class
 				(memq *the-class-structure-object*
@@ -580,7 +580,7 @@
 	     (when parameter-or-nil
 	       (let* ((class-name (caddr (variable-declaration
 					  'class parameter-or-nil env))))
-		 (when (and class-name (not (eq class-name 't)))
+		 (when (and class-name (not (eq class-name t)))
 		   (position parameter-or-nil slots :key #'car))))))
       (if (constantp form)
 	  (let ((form (eval form)))
@@ -1110,7 +1110,7 @@
 	 (w-t pv-wrappers))
     (dolist (arg args)
       (setq w (wrapper-of arg))
-      (unless (eq 't (wrapper-state w)) ; FIXME: should be INVALID-WRAPPER-P
+      (unless (eq t (wrapper-state w)) ; FIXME: should be INVALID-WRAPPER-P
 	(setq w (check-wrapper-validity arg)))
       (setf (car w-t) w))
       (setq w-t (cdr w-t))

@@ -75,7 +75,7 @@
 		  (eq (car method) ':early-method)
 		  (method-p method))
 	      (if method-alist-p
-		  't
+		  t
 		  (multiple-value-bind (mf fmf)
 		      (if (listp method)
 			  (early-method-function method)
@@ -200,7 +200,7 @@
 				   method-alist-p wrappers-p)))
 			  (cdr form))
 		   'fast-method-call
-		   't)
+		   t)
 	   (fast-method-call
 	    '.fast-call-method-list.)
 	   (t
@@ -225,7 +225,7 @@
 					 method-alist-p wrappers-p)))
 				(cdr form))
 			 'fast-method-call
-			 't)))
+			 t)))
 	   (values `(dolist (emf ,gensym nil)
 		      ,(make-emf-call metatypes applyp 'emf type))
 		   (list gensym))))

@@ -122,13 +122,13 @@
 
 (defun make-initfunction (initform)
   (declare (special *initfunctions*))
-  (cond ((or (eq initform 't)
+  (cond ((or (eq initform t)
 	     (equal initform ''t))
 	 '(function constantly-t))
-	((or (eq initform 'nil)
+	((or (eq initform nil)
 	     (equal initform ''nil))
 	 '(function constantly-nil))
-	((or (eql initform '0)
+	((or (eql initform 0)
 	     (equal initform ''0))
 	 '(function constantly-0))
 	(t

@@ -36,12 +36,12 @@
   (when (eq (first x) 'setf)	; Give up if not a setf function name.
     (or (values (sb-int:info :setf :documentation (second x)))
 	;; Try the pcl function documentation.
-	(and (fboundp x) (documentation (fdefinition x) 't)))))
+	(and (fboundp x) (documentation (fdefinition x) t)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
   (or (values (sb-int:info :function :documentation x))
       ;; Try the pcl function documentation.
-      (and (fboundp x) (documentation (fdefinition x) 't))))
+      (and (fboundp x) (documentation (fdefinition x) t))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
   (values (sb-int:info :setf :documentation x)))

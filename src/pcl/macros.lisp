@@ -37,18 +37,6 @@
 	  ;; information around, I'm not sure. -- WHN 2000-12-30
 	  %variable-rebinding))
 
-(defmacro name-get-fdefinition (name)
-  (sb-int:once-only ((name name))
-             `(if (symbolp ,name) ; take care of "setf <fun>"'s
-               (symbol-function ,name)
-               (fdefinition ,name))))
-
-(defmacro name-set-fdefinition (name new-definition)
-  (sb-int:once-only ((name name))
-             `(if (symbolp ,name) ; take care of "setf <fun>"'s
-               (setf (symbol-function ,name) ,new-definition)
-               (setf (fdefinition ,name) ,new-definition))))
-
 ;;; FIXME: CONSTANTLY-FOO should be boosted up to SB-INT too.
 (macrolet ((def-constantly-fun (name constant-expr)
 	     `(setf (symbol-function ',name)
@@ -75,7 +63,7 @@
 		(loop (cond ((not (listp form))
 			     (return-from outer nil))
 			    ((eq (car form) 'declare)
-			     (return-from inner 't))
+			     (return-from inner t))
 			    (t
 			     (multiple-value-bind (newform macrop)
 				  (macroexpand-1 form environment)
@@ -230,10 +218,11 @@
 		  (eq *boot-state* 'braid))
 	  (when (and new-value (class-wrapper new-value))
 	    (setf (find-class-cell-predicate cell)
-		  (name-get-fdefinition (class-predicate-name new-value))))
+		  (fdefinition (class-predicate-name new-value))))
 	  (when (and new-value (not (forward-referenced-class-p new-value)))
 
-	    (dolist (keys+aok (find-class-cell-make-instance-function-keys cell))
+	    (dolist (keys+aok (find-class-cell-make-instance-function-keys
+			       cell))
 	      (update-initialize-info-internal
 	       (initialize-info new-value (car keys+aok) nil (cdr keys+aok))
 	       'make-instance-function))))
@@ -267,8 +256,8 @@
 		       value)))
 	     #'(lambda () result))))
 
-;;; These are augmented definitions of list-elements and list-tails from
-;;; iterate.lisp. These versions provide the extra :by keyword which can
+;;; These are augmented definitions of LIST-ELEMENTS and LIST-TAILS from
+;;; iterate.lisp. These versions provide the extra :BY keyword which can
 ;;; be used to specify the step function through the list.
 (defmacro *list-elements (list &key (by #'cdr))
   `(let ((tail ,list))

@@ -103,9 +103,9 @@
 
 (defun trace-method-internal (ofunction name options)
   (eval `(untrace ,name))
-  (name-set-fdefinition name ofunction)
+  (setf (fdefinition name) ofunction)
   (eval `(trace ,name ,@options))
-  (name-get-fdefinition name))
+  (fdefinition name))
 |#
 
 ;;;; MAKE-LOAD-FORM

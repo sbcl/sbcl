@@ -197,7 +197,7 @@
 				  (t
 				   (boot-make-wrapper (length slots) name))))
 		   (proto nil))
-	      (when (eq name 't) (setq *the-wrapper-of-t* wrapper))
+	      (when (eq name t) (setq *the-wrapper-of-t* wrapper))
 	      (set (intern (format nil "*THE-CLASS-~A*" (symbol-name name))
 			   *pcl-package*)
 		   class)
@@ -277,7 +277,7 @@
 	   (!bootstrap-set-slot metaclass-name class slot-name value)))
     (set-slot 'name name)
     (set-slot 'source source)
-    (set-slot 'type (if (eq class (find-class 't))
+    (set-slot 'type (if (eq class (find-class t))
 			t
 			;; FIXME: Could this just be CLASS instead
 			;; of `(CLASS ,CLASS)? If not, why not?
@@ -410,7 +410,7 @@
 	(writer (values 'standard-writer-method
 			#'make-std-writer-method-function
 			(list 'new-value class-name)
-			(list 't class-name)
+			(list t class-name)
 			"automatically generated writer method"))
 	(boundp (values 'standard-boundp-method
 			#'make-std-boundp-method-function
@@ -473,7 +473,7 @@
   ;; other sorts of brainos.
   (dolist (e *built-in-classes*)
     (dolist (super (cadr e))
-      (unless (or (eq super 't)
+      (unless (or (eq super t)
 		  (assq super *built-in-classes*))
 	(error "in *BUILT-IN-CLASSES*: ~S has ~S as a super,~%~
 		but ~S is not itself a class in *BUILT-IN-CLASSES*."

@@ -120,14 +120,10 @@
        (defun ,defun-name (stream ,directive ,directives orig-args args)
 	 (declare (ignorable stream orig-args args))
 	 ,@(if lambda-list
-	       `((let ,(mapcar #'(lambda (var)
-				   `(,var
-				     (,(intern (concatenate
-						'string
-						"FORMAT-DIRECTIVE-"
-						(symbol-name var))
-					       (symbol-package 'foo))
-				      ,directive)))
+	       `((let ,(mapcar (lambda (var)
+				 `(,var
+				   (,(symbolicate "FORMAT-DIRECTIVE-" var)
+				    ,directive)))
 			       (butlast lambda-list))
 		   (values (progn ,@body) args)))
 	       `((declare (ignore ,directive ,directives))

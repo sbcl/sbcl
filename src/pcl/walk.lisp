@@ -530,7 +530,7 @@
       (relist-internal x args nil)))
 
 (defun relist* (x &rest args)
-  (relist-internal x args 't))
+  (relist-internal x args t))
 
 (defun relist-internal (x args *p)
   (if (null (cdr args))
@@ -626,7 +626,7 @@
 		    (not (symbolp (caddr arg)))
 		    (note-lexical-binding (caddr arg) env))))
 	  (t
-	   (error "Can't understand something in the arglist ~S" arglist))))
+	   (error "can't understand something in the arglist ~S" arglist))))
 
 (defun walk-let (form context env)
   (walk-let/let* form context env nil))
@@ -675,7 +675,7 @@
   (walker-environment-bind (new-env old-env)
     (let* ((possible-block-name (second form))
 	   (blocked-prog (and (symbolp possible-block-name)
-			      (not (eq possible-block-name 'nil)))))
+			      (not (eq possible-block-name nil)))))
       (multiple-value-bind (let/let* block-name bindings body)
 	  (if blocked-prog
 	      (values (car form) (cadr form) (caddr form) (cdddr form))

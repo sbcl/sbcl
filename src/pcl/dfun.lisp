@@ -104,7 +104,7 @@ And so, we are saved.
 	     (member generator '(emit-checking emit-caching
 				 emit-in-checking-cache-p emit-constant-value)))
     (setq args (cons (mapcar #'(lambda (mt)
-				 (if (eq mt 't)
+				 (if (eq mt t)
 				     mt
 				     'class))
 			     (car args))
@@ -112,7 +112,7 @@ And so, we are saved.
   (let* ((generator-entry (assq generator *dfun-constructors*))
 	 (args-entry (assoc args (cdr generator-entry) :test #'equal)))
     (if (null *enable-dfun-constructor-caching*)
-	(apply (name-get-fdefinition generator) args)
+	(apply (fdefinition generator) args)
 	(or (cadr args-entry)
 	    (multiple-value-bind (new not-best-p)
 		(apply (symbol-function generator) args)
@@ -165,7 +165,7 @@ And so, we are saved.
                     ',(car generator-entry)
                     ',(car args-entry)
                     ',system
-                    ,(apply (name-get-fdefinition (car generator-entry))
+                    ,(apply (fdefinition (car generator-entry))
                             (car args-entry)))))))))))
 
 ;;; When all the methods of a generic function are automatically generated
@@ -374,7 +374,7 @@ And so, we are saved.
   (multiple-value-bind (nreq applyp metatypes nkeys)
       (get-generic-function-info generic-function)
     (declare (ignore nreq))
-    (if (every #'(lambda (mt) (eq mt 't)) metatypes)
+    (if (every #'(lambda (mt) (eq mt t)) metatypes)
 	(let ((dfun-info (default-method-only-dfun-info)))
 	  (values
 	   (funcall (get-dfun-constructor 'emit-default-only metatypes applyp)
@@ -395,7 +395,7 @@ And so, we are saved.
 (defun make-final-checking-dfun (generic-function function
 						  classes-list new-class)
   (let ((metatypes (arg-info-metatypes (gf-arg-info generic-function))))
-    (if (every #'(lambda (mt) (eq mt 't)) metatypes)
+    (if (every #'(lambda (mt) (eq mt t)) metatypes)
 	(values #'(lambda (&rest args)
 		    (invoke-emf function args))
 		nil (default-method-only-dfun-info))
@@ -408,7 +408,7 @@ And so, we are saved.
   (multiple-value-bind (nreq applyp metatypes nkeys)
       (get-generic-function-info generic-function)
     (declare (ignore nreq applyp nkeys))
-    (every #'(lambda (mt) (eq mt 't)) metatypes)))
+    (every #'(lambda (mt) (eq mt t)) metatypes)))
 
 (defun use-caching-dfun-p (generic-function)
   (some (lambda (method)
@@ -465,7 +465,7 @@ And so, we are saved.
     (when (and metatypes
 	       (not (null (car metatypes)))
 	       (dolist (mt metatypes nil)
-		 (unless (eq mt 't) (return t))))
+		 (unless (eq mt t) (return t))))
       (get-dfun-constructor 'emit-caching metatypes applyp))))
 
 (defun use-constant-value-dfun-p (gf &optional boolean-values-p)
@@ -491,7 +491,7 @@ And so, we are saved.
 						 (method-function method)))
 					 :constant-value default)))
 			     (if boolean-values-p
-				 (not (or (eq value 't) (eq value nil)))
+				 (not (or (eq value t) (eq value nil)))
 				 (eq value default)))))
 		   methods)))))
 
@@ -1119,7 +1119,7 @@ And so, we are saved.
 		 (dolist (sclass (if early-p
 				    (early-class-precedence-list class)
 				    (class-precedence-list class))
-			  (error "This can't happen"))
+			  (error "This can't happen."))
 		   (let ((a (assq sclass specl+slotd-list)))
 		     (when a
 		       (let* ((slotd (cdr a))
@@ -1378,11 +1378,11 @@ And so, we are saved.
 
 (defun specializer-applicable-using-type-p (specl type)
   (setq specl (type-from-specializer specl))
-  (when (eq specl 't)
+  (when (eq specl t)
     (return-from specializer-applicable-using-type-p (values t t)))
   ;; This is used by c-a-m-u-t and generate-discrimination-net-internal,
   ;; and has only what they need.
-  (if (or (atom type) (eq (car type) 't))
+  (if (or (atom type) (eq (car type) t))
       (values nil t)
       (case (car type)
 	(and	(saut-and specl type))
@@ -1395,7 +1395,7 @@ And so, we are saved.
 			   'specializer-applicable-using-type-p
 			   type)))))
 
-(defun map-all-classes (function &optional (root 't))
+(defun map-all-classes (function &optional (root t))
   (let ((braid-p (or (eq *boot-state* 'braid)
 		     (eq *boot-state* 'complete))))
     (labels ((do-class (class)

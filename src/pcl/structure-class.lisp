@@ -43,7 +43,7 @@
     (if defstruct-constructor
 	(make-instance class)
       (let* ((proto (%allocate-instance--class *empty-vector*)))
-	 (shared-initialize proto T :check-initargs-legality-p NIL)
+	 (shared-initialize proto t :check-initargs-legality-p nil)
 	 (setf (std-instance-wrapper proto) wrapper)
 	 proto))))
 
@@ -61,10 +61,14 @@
     (unless acc-sym-p
       (setf initargs
 	    (list* :defstruct-accessor-symbol
-		   (intern (concatenate 'simple-string conc-name (symbol-name name))
+		   (intern (concatenate 'simple-string
+					conc-name
+					(symbol-name name))
 			   (symbol-package (class-name class)))
 		   initargs)))
-    (apply #'make-instance (direct-slot-definition-class class initargs) initargs)))
+    (apply #'make-instance
+	   (direct-slot-definition-class class initargs)
+	   initargs)))
 
 (defun slot-definition-defstruct-slot-description (slot)
   (let ((type (slot-definition-type slot)))
@@ -121,7 +125,10 @@
 	      (slot-value class 'direct-slots)))
     (when from-defclass-p
       (do-defstruct-from-defclass
-	class direct-superclasses direct-slots conc-name pred-name constructor))
+	class direct-superclasses
+	direct-slots
+	conc-name pred-name
+	constructor))
     (compile-structure-class-internals
 	class direct-slots conc-name pred-name constructor)
     (setf (slot-value class 'predicate-name) pred-name)
@@ -129,7 +136,7 @@
     (unless (extract-required-parameters (second constructor))
       (setf (slot-value class 'defstruct-constructor) (car constructor)))
     (when (and defstruct-predicate (not from-defclass-p))
-      (name-set-fdefinition pred-name (symbol-function defstruct-predicate)))
+      (fdefinition pred-name (symbol-function defstruct-predicate)))
     (unless (or from-defclass-p (slot-value class 'documentation))
       (setf (slot-value class 'documentation)
 	    (format nil "~S structure class made from Defstruct" name)))
@@ -138,7 +145,8 @@
 
 (defun update-structure-class (class direct-superclasses direct-slots)
   (add-direct-subclasses class direct-superclasses)
-  (setf (slot-value class 'class-precedence-list) (compute-class-precedence-list class))
+  (setf (slot-value class 'class-precedence-list)
+	(compute-class-precedence-list class))
   (let* ((eslotds (compute-slots class))
 	 (internal-slotds (mapcar #'slot-definition-internal-slotd eslotds)))
     (setf (slot-value class 'slots) eslotds)
@@ -280,9 +288,12 @@
 (defmethod compute-effective-slot-definition-initargs :around
     ((class structure-class) direct-slotds)
   (let ((slotd (car direct-slotds)))
-    (list* :defstruct-accessor-symbol (slot-definition-defstruct-accessor-symbol slotd)
-	   :internal-reader-function (slot-definition-internal-reader-function slotd)
-	   :internal-writer-function (slot-definition-internal-writer-function slotd)
+    (list* :defstruct-accessor-symbol
+	   (slot-definition-defstruct-accessor-symbol slotd)
+	   :internal-reader-function
+	   (slot-definition-internal-reader-function slotd)
+	   :internal-writer-function
+	   (slot-definition-internal-writer-function slotd)
 	   (call-next-method))))
 
 (defmethod make-optimized-reader-method-function ((class structure-class)

@@ -254,7 +254,7 @@
 (defun emit-dlap (args metatypes hit miss value-reg &optional slot-regs)
   (let* ((index -1)
 	 (wrapper-bindings (mapcan #'(lambda (arg mt)
-				       (unless (eq mt 't)
+				       (unless (eq mt t)
 					 (incf index)
 					 `((,(intern (format nil
 							     "WRAPPER-~D"

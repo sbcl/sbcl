@@ -243,7 +243,8 @@
 (defmethod specializer-method-table ((specializer class-eq-specializer))
   *class-eq-specializer-methods*)
 
-(defmethod add-direct-method ((specializer specializer-with-object) (method method))
+(defmethod add-direct-method ((specializer specializer-with-object)
+			      (method method))
   (let* ((object (specializer-object specializer))
 	 (table (specializer-method-table specializer))
 	 (entry (gethash object table)))
@@ -255,7 +256,8 @@
 	  (cdr entry) ())
     method))
 
-(defmethod remove-direct-method ((specializer specializer-with-object) (method method))
+(defmethod remove-direct-method ((specializer specializer-with-object)
+				 (method method))
   (let* ((object (specializer-object specializer))
 	 (entry (gethash object (specializer-method-table specializer))))
     (when entry
@@ -267,7 +269,8 @@
   (car (gethash (specializer-object specializer)
 		(specializer-method-table specializer))))
 
-(defmethod specializer-direct-generic-functions ((specializer specializer-with-object))
+(defmethod specializer-direct-generic-functions ((specializer
+						  specializer-with-object))
   (let* ((object (specializer-object specializer))
 	 (entry (gethash object (specializer-method-table specializer))))
     (when entry
@@ -294,13 +297,16 @@
 (defun map-all-generic-functions (function)
   (let ((all-generic-functions (make-hash-table :test 'eq)))
     (map-specializers #'(lambda (specl)
-			  (dolist (gf (specializer-direct-generic-functions specl))
+			  (dolist (gf (specializer-direct-generic-functions
+				       specl))
 			    (unless (gethash gf all-generic-functions)
 			      (setf (gethash gf all-generic-functions) t)
 			      (funcall function gf))))))
   nil)
 
-(defmethod shared-initialize :after ((specl class-eq-specializer) slot-names &key)
+(defmethod shared-initialize :after ((specl class-eq-specializer)
+				     slot-names
+				     &key)
   (declare (ignore slot-names))
   (setf (slot-value specl 'type) `(class-eq ,(specializer-class specl))))
 
@@ -418,11 +424,14 @@
   (setq direct-slots
 	(if direct-slots-p
 	    (setf (slot-value class 'direct-slots)
-		  (mapcar #'(lambda (pl) (make-direct-slotd class pl)) direct-slots))
+		  (mapcar (lambda (pl) (make-direct-slotd class pl))
+			  direct-slots))
 	    (slot-value class 'direct-slots)))
   (if direct-default-initargs-p
-      (setf (plist-value class 'direct-default-initargs) direct-default-initargs)
-      (setq direct-default-initargs (plist-value class 'direct-default-initargs)))
+      (setf (plist-value class 'direct-default-initargs)
+	    direct-default-initargs)
+      (setq direct-default-initargs
+	    (plist-value class 'direct-default-initargs)))
   (setf (plist-value class 'class-slot-cells)
 	(gathering1 (collecting)
 	  (dolist (dslotd direct-slots)
@@ -437,7 +446,8 @@
 				 (car predicate-name))
 			   (or (slot-value class 'predicate-name)
 			       (setf (slot-value class 'predicate-name)
-				     (make-class-predicate-name (class-name class))))))
+				     (make-class-predicate-name (class-name
+								 class))))))
   (add-direct-subclasses class direct-superclasses)
   (update-class class nil)
   (make-class-predicate class predicate-name)
@@ -486,11 +496,13 @@
 		    (mapcar #'(lambda (pl)
 				(when defstruct-p
 				  (let* ((slot-name (getf pl :name))
-					 (acc-name (format nil "~S structure class ~A"
-							   name slot-name))
+					 (acc-name
+					  (format nil
+						  "~S structure class ~A"
+						  name slot-name))
 					 (accessor (intern acc-name)))
-				    (setq pl (list* :defstruct-accessor-symbol accessor
-						    pl))))
+				    (setq pl (list* :defstruct-accessor-symbol
+						    accessor pl))))
 				(make-direct-slotd class pl))
 			    direct-slots)))
 	(setq direct-slots (slot-value class 'direct-slots)))
@@ -571,7 +583,8 @@
 				 (car predicate-name))
 			   (or (slot-value class 'predicate-name)
 			       (setf (slot-value class 'predicate-name)
-				     (make-class-predicate-name (class-name class))))))
+				     (make-class-predicate-name
+				      (class-name class))))))
   (make-class-predicate class predicate-name)
   (add-slot-accessors class direct-slots))
 
@@ -666,7 +679,8 @@
     ;; If there is a change in the shape of the instances then the
     ;; old class is now obsolete.
     (let* ((nlayout (mapcar #'slot-definition-name
-			    (sort instance-slots #'< :key #'slot-definition-location)))
+			    (sort instance-slots #'<
+				  :key #'slot-definition-location)))
 	   (nslots (length nlayout))
 	   (nwrapper-class-slots (compute-class-slots class-slots))
 	   (owrapper (class-wrapper class))
@@ -731,7 +745,8 @@
   (when (and (class-finalized-p class)
 	     (let ((cpl (class-precedence-list class)))
 	       (or (member *the-class-slot-class* cpl)
-		   (member *the-class-standard-effective-slot-definition* cpl))))
+		   (member *the-class-standard-effective-slot-definition*
+			   cpl))))
     (let ((gf-table (make-hash-table :test 'eq)))
       (labels ((collect-gfs (class)
 		 (dolist (gf (specializer-direct-generic-functions class))
@@ -864,7 +879,7 @@
 		allocp t))
 	(setq initargs (append (slot-definition-initargs slotd) initargs))
 	(let ((slotd-type (slot-definition-type slotd)))
-	  (setq type (cond ((eq type 't) slotd-type)
+	  (setq type (cond ((eq type t) slotd-type)
 			   ((*subtypep type slotd-type) type)
 			   (t `(and ,type ,slotd-type)))))))
     (list :name name
@@ -878,12 +893,15 @@
 (defmethod compute-effective-slot-definition-initargs :around
     ((class structure-class) direct-slotds)
   (let ((slotd (car direct-slotds)))
-    (list* :defstruct-accessor-symbol (slot-definition-defstruct-accessor-symbol slotd)
-	   :internal-reader-function (slot-definition-internal-reader-function slotd)
-	   :internal-writer-function (slot-definition-internal-writer-function slotd)
+    (list* :defstruct-accessor-symbol
+	   (slot-definition-defstruct-accessor-symbol slotd)
+	   :internal-reader-function
+	   (slot-definition-internal-reader-function slotd)
+	   :internal-writer-function
+	   (slot-definition-internal-writer-function slotd)
 	   (call-next-method))))
 
-;;; NOTE: For bootstrapping considerations, these can't use make-instance
+;;; NOTE: For bootstrapping considerations, these can't use MAKE-INSTANCE
 ;;;       to make the method object. They have to use make-a-method which
 ;;;       is a specially bootstrapped mechanism for making standard methods.
 (defmethod reader-method-class ((class slot-class) direct-slot &rest initargs)
@@ -963,12 +981,12 @@
 ;;;; inform-type-system-about-class
 ;;;; make-type-predicate
 ;;;
-;;; These are NOT part of the standard protocol. They are internal mechanism
-;;; which PCL uses to *try* and tell the type system about class definitions.
-;;; In a more fully integrated implementation of CLOS, the type system would
-;;; know about class objects and class names in a more fundamental way and
-;;; the mechanism used to inform the type system about new classes would be
-;;; different.
+;;; These are NOT part of the standard protocol. They are internal
+;;; mechanism which PCL uses to *try* and tell the type system about
+;;; class definitions. In a more fully integrated implementation of
+;;; CLOS, the type system would know about class objects and class
+;;; names in a more fundamental way and the mechanism used to inform
+;;; the type system about new classes would be different.
 (defmethod inform-type-system-about-class ((class std-class) name)
   (inform-type-system-about-std-class name))
 
@@ -992,7 +1010,7 @@
     ;; will already be doing what we want. In particular, we must be
     ;; sure we never change an OBSOLETE into a FLUSH since OBSOLETE
     ;; means do what FLUSH does and then some.
-    (when (eq state 't) ; FIXME: should be done through INVALID-WRAPPER-P
+    (when (eq state t) ; FIXME: should be done through INVALID-WRAPPER-P
       (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
 				    class)))
 	(setf (wrapper-instance-slots-layout nwrapper)
@@ -1033,19 +1051,19 @@
 ;;;   - when the instance is involved in method lookup
 ;;;   - when attempting to access a slot of an instance
 ;;;
-;;; It is not called by class-of, wrapper-of, or any of the low-level instance
-;;; access macros.
+;;; It is not called by class-of, wrapper-of, or any of the low-level
+;;; instance access macros.
 ;;;
-;;; Of course these times when it is called are an internal implementation
-;;; detail of PCL and are not part of the documented description of when the
-;;; obsolete instance update happens. The documented description is as it
-;;; appears in 88-002R.
+;;; Of course these times when it is called are an internal
+;;; implementation detail of PCL and are not part of the documented
+;;; description of when the obsolete instance update happens. The
+;;; documented description is as it appears in 88-002R.
 ;;;
-;;; This has to return the new wrapper, so it counts on all the methods on
-;;; obsolete-instance-trap-internal to return the new wrapper. It also does
-;;; a little internal error checking to make sure that the traps are only
-;;; happening when they should, and that the trap methods are computing
-;;; appropriate new wrappers.
+;;; This has to return the new wrapper, so it counts on all the
+;;; methods on obsolete-instance-trap-internal to return the new
+;;; wrapper. It also does a little internal error checking to make
+;;; sure that the traps are only happening when they should, and that
+;;; the trap methods are computing appropriate new wrappers.
 
 ;;; obsolete-instance-trap might be called on structure instances
 ;;; after a structure is redefined. In most cases, obsolete-instance-trap
@@ -1225,7 +1243,7 @@
 
 (defmethod validate-superclass ((c slot-class)
 				(f forward-referenced-class))
-  't)
+  t)
 
 (defmethod add-dependent ((metaobject dependent-update-mixin) dependent)
   (pushnew dependent (plist-value metaobject 'dependents)))

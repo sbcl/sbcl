@@ -84,8 +84,7 @@
 ;;; We define a keyword "BOA" constructor so that we can reference the
 ;;; slot names in init forms.
 (def!macro def-alien-type-class ((name &key include include-args) &rest slots)
-  (let ((defstruct-name
-	 (intern (concatenate 'string "ALIEN-" (symbol-name name) "-TYPE"))))
+  (let ((defstruct-name (symbolicate "ALIEN-" name "-TYPE")))
     (multiple-value-bind (include include-defstruct overrides)
 	(etypecase include
 	  (null
@@ -93,14 +92,12 @@
 	  (symbol
 	   (values
 	    include
-	    (intern (concatenate 'string
-				 "ALIEN-" (symbol-name include) "-TYPE"))
+	    (symbolicate "ALIEN-" include "-TYPE")
 	    nil))
 	  (list
 	   (values
 	    (car include)
-	    (intern (concatenate 'string
-				 "ALIEN-" (symbol-name (car include)) "-TYPE"))
+	    (symbolicate "ALIEN-" (car include) "-TYPE")
 	    (cdr include))))
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -110,8 +107,7 @@
 				  (:class ',name)
 				  ,@overrides)
 			(:constructor
-			 ,(intern (concatenate 'string "MAKE-"
-					       (string defstruct-name)))
+			 ,(symbolicate "MAKE-" defstruct-name)
 			 (&key class bits alignment
 			       ,@(mapcar #'(lambda (x)
 					     (if (atom x) x (car x)))
@@ -120,11 +116,7 @@
 	   ,@slots)))))
 
 (def!macro def-alien-type-method ((class method) lambda-list &rest body)
-  (let ((defun-name (intern (concatenate 'string
-					 (symbol-name class)
-					 "-"
-					 (symbol-name method)
-					 "-METHOD"))))
+  (let ((defun-name (symbolicate class "-" method "-METHOD")))
     `(progn
        (defun ,defun-name ,lambda-list
 	 ,@body)

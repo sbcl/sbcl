@@ -334,7 +334,7 @@
 	   invalid))))
 (defun (setf wrapper-state) (new-value wrapper)
   (setf (sb-kernel:layout-invalid wrapper)
-	(if (eq new-value 't)
+	(if (eq new-value t)
 	    nil
 	  new-value)))
 
@@ -442,7 +442,7 @@
 
 ;;; FIXME: could become inline function
 (defmacro invalid-wrapper-p (wrapper)
-  `(neq (wrapper-state ,wrapper) 't))
+  `(neq (wrapper-state ,wrapper) t))
 
 (defvar *previous-nwrappers* (make-hash-table))
 
@@ -476,7 +476,7 @@
 (defun check-wrapper-validity (instance)
   (let* ((owrapper (wrapper-of instance))
 	 (state (wrapper-state owrapper)))
-    (if (eq state 't)
+    (if (eq state t)
 	owrapper
 	(let ((nwrapper
 		(ecase (car state)
@@ -751,8 +751,8 @@
 	      (wrapper nil)
 	      ,@(when wrappers
 		  `((class *the-class-t*)
-		    (type 't))))
-	 (unless (eq mt 't)
+		    (type t))))
+	 (unless (eq mt t)
 	   (setq wrapper (wrapper-of arg))
 	   (when (invalid-wrapper-p wrapper)
 	     (setq ,invalid-wrapper-p t)
