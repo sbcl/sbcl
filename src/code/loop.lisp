@@ -1247,6 +1247,22 @@ code to be loaded.
   (loop-disallow-conditional kwd)
   (loop-pseudo-body `(,(if negate 'when 'unless) ,form (go end-loop))))
 
+(defun loop-do-repeat ()
+  (loop-disallow-conditional :repeat)
+  (let ((form (loop-get-form))
+	(type 'real))
+    (let ((var (loop-make-var (gensym "LOOP-REPEAT-") form type)))
+      (push `(when (minusp (decf ,var)) (go end-loop)) *loop-before-loop*)
+      (push `(when (minusp (decf ,var)) (go end-loop)) *loop-after-body*)
+      ;; FIXME: What should
+      ;;   (loop count t into a
+      ;;         repeat 3
+      ;;         count t into b
+      ;;         finally (return (list a b)))
+      ;; return: (3 3) or (4 3)? PUSHes above are for the former
+      ;; variant, L-P-B below for the latter.
+      #+nil (loop-pseudo-body `(when (minusp (decf ,var)) (go end-loop))))))
+
 (defun loop-do-with ()
   (loop-disallow-conditional :with)
   (do ((var) (val) (dtype)) (nil)
@@ -1347,24 +1363,6 @@ code to be loaded.
       (loop-error "~S is an unknown keyword in FOR or AS clause in LOOP."
 		  keyword))
     (apply (car tem) var first-arg data-type (cdr tem))))
-
-(defun loop-do-repeat ()
-  (let ((form (loop-get-form))
-	(type (loop-check-data-type (loop-optional-type)
-				    'real)))
-    (when (and (consp form)
-	       (eq (car form) 'the)
-	       (sb!xc:subtypep (second form) type))
-      (setq type (second form)))
-    (multiple-value-bind (number constantp value)
-	(loop-constant-fold-if-possible form type)
-      (cond ((and constantp (<= value 1)) `(t () () () ,(<= value 0) () () ()))
-	    (t (let ((var (loop-make-var (gensym "LOOP-REPEAT-") number type)))
-		 (if constantp
-		     `((not (plusp (setq ,var (1- ,var))))
-		       () () () () () () ())
-		     `((minusp (setq ,var (1- ,var)))
-		       () () ()))))))))
 
 (defun loop-when-it-var ()
   (or *loop-when-it-var*
@@ -1883,7 +1881,8 @@ code to be loaded.
 			 (when (loop-do-if when nil))	; Normal, do when
 			 (if (loop-do-if if nil))	; synonymous
 			 (unless (loop-do-if unless t))	; Negate test on when
-			 (with (loop-do-with)))
+			 (with (loop-do-with))
+                         (repeat (loop-do-repeat)))
 	     :for-keywords '((= (loop-ansi-for-equals))
 			     (across (loop-for-across))
 			     (in (loop-for-in))
@@ -1899,8 +1898,7 @@ code to be loaded.
 			     (by (loop-for-arithmetic :by))
 			     (being (loop-for-being)))
 	     :iteration-keywords '((for (loop-do-for))
-				   (as (loop-do-for))
-				   (repeat (loop-do-repeat)))
+				   (as (loop-do-for)))
 	     :type-symbols '(array atom bignum bit bit-vector character
 			     compiled-function complex cons double-float
 			     fixnum float function hash-table integer
