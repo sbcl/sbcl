@@ -12,6 +12,11 @@
 (defvar *current-directory* *default-pathname-defaults*)
 
 (defvar *this-file* *load-truename*)
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (defconstant +mode-rwx-all+ (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
+				      sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp
+				      sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth)))
 
 (deftest chdir.1
   (sb-posix:chdir *test-directory*)
@@ -76,7 +81,8 @@
       (sb-posix:mkdir "/" 0)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::eexist)
+  #-bsd #.sb-posix::eexist
+  #+bsd #.sb-posix::eisdir)
 
 (deftest mkdir.error.3
   (handler-case
@@ -118,7 +124,8 @@
       (sb-posix:rmdir "/")
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::ebusy)
+  #-bsd #.sb-posix::ebusy
+  #+bsd #.sb-posix::eisdir)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
@@ -145,8 +152,8 @@
 	 (dir2 (merge-pathnames
 		(make-pathname :directory '(:relative "unremovable"))
 		dir)))
-    (sb-posix:mkdir dir #xffffffff)
-    (sb-posix:mkdir dir2 #xffffffff)
+    (sb-posix:mkdir dir +mode-rwx-all+)
+    (sb-posix:mkdir dir2 +mode-rwx-all+)
     (sb-posix:chmod dir 0)
     (handler-case
 	(sb-posix:rmdir dir2)
@@ -199,7 +206,7 @@
 	 (file (merge-pathnames
 		(make-pathname :name "unstatable")
 		dir)))
-    (sb-posix:mkdir dir #xffffffff)
+    (sb-posix:mkdir dir +mode-rwx-all+)
     (with-open-file (s file :direction :output)
       (write "" :stream s))
     (sb-posix:chmod dir 0)
