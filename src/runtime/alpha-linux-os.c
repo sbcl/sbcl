@@ -74,6 +74,22 @@ os_context_fp_control(os_context_t *context)
     return ieee_fpcr_to_swcr((context->uc_mcontext).sc_fpcr);
 }
 
+void
+os_restore_fp_control(os_context_t *context)
+{
+    /* FIXME (in two parts):
+       Firstly, what happens in alpha linux inside the signal handler?
+       Does the floating point control state get cleared as in other
+       Linuxes?
+    
+       Secondly, how do we put it back if so? It will probably involve
+       something to do with
+    
+       context->uc_mcontext.sc_fpcr
+
+       (maybe a simple assembly statement will be enough)
+    */ 
+}
 
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {

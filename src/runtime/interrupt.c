@@ -347,23 +347,12 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
     union interrupt_handler handler;
 
-    /* FIXME: The CMU CL we forked off of had this Linux-only
-     * operation here. Newer CMU CLs (e.g. 18c) have hairier
-     * Linux/i386-only logic here. SBCL seems to be more reliable
-     * without anything here. However, if we start supporting code
-     * which sets the rounding mode, then we may want to do something
-     * special to force the rounding mode back to some standard value
-     * here, so that ISRs can have a standard environment. (OTOH, if
-     * rounding modes are under user control, then perhaps we should
-     * leave this up to the user.)
-     *
-     * In the absence of a test case to show that this is really a
-     * problem, we just suppress this code completely (just like the
-     * parallel code in maybe_now_maybe_later).
-     * #ifdef __linux__
-     *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
-     * #endif */
-
+#ifdef LISP_FEATURE_LINUX
+    /* Under Linux, we appear to have to restore the fpu control word
+       from the context, as after the signal is delivered we appear to
+       have a null fpu control word. */
+    os_restore_fp_control(context);
+#endif 
     handler = interrupt_handlers[signal];
 
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
@@ -446,12 +435,12 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
      * interrupt time which should be ported into SBCL. Also see the
      * analogous logic at the head of interrupt_handle_now for
      * more related FIXME stuff. 
-     *
-     * For now, we just suppress this code completely.
-     * #ifdef __linux__
-     *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
-     * #endif */
-
+     */
+    
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif 
+    
     /* see comments at top of code/signal.lisp for what's going on here
      * with INTERRUPTS_ENABLED/INTERRUPT_HANDLE_NOW 
      */

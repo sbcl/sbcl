@@ -2747,6 +2747,14 @@
   ;; pseudo-atomic-trap-number or pseudo-atomic-magic-constant
   ;; [possibly applicable to other platforms])
 
+  (dolist (symbol '(sb!vm::float-traps-byte sb!vm::float-exceptions-byte sb!vm::float-sticky-bits sb!vm::float-rounding-mode))
+    (format t "#define ~A_POSITION ~A /* ~:*0x~X */~%"
+	    (substitute #\_ #\- (symbol-name symbol))
+	    (sb!xc:byte-position (symbol-value symbol)))
+    (format t "#define ~A_MASK 0x~X /* ~:*~A */~%"
+	    (substitute #\_ #\- (symbol-name symbol))
+	    (sb!xc:mask-field (symbol-value symbol) -1)))
+
   ;; writing primitive object layouts
   (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
 		       :key (lambda (obj)

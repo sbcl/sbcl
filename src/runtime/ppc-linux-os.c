@@ -75,10 +75,41 @@ os_context_fp_control(os_context_t *context)
        registers, and PT_FPSCR is an offset that is larger than 32
        (the number of ppc registers), but that happens to get the
        right answer. -- CSR, 2002-07-11 */
-    return &((context->uc_mcontext.regs)->gpr[PT_FPSCR]); 
+    return context->uc_mcontext.regs->gpr[PT_FPSCR]; 
 }
 
-void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
+void 
+os_restore_fp_control(os_context_t *context)
+{
+    unsigned long control;
+    
+    control = os_context_fp_control(context) & 
+      /* FIXME: Should we preserve the user's requested rounding mode?
+
+         Note that doing 
+
+	 ~(FLOAT_STICKY_BITS_MASK | FLOAT_EXCEPTIONS_BYTE_MASK)
+
+	 here leads to infinite SIGFPE for invalid operations, as
+	 there are bits in the control register that need to be
+	 cleared that are let through by that mask. -- CSR, 2002-07-16 */
+      FLOAT_TRAPS_BYTE_MASK;
+    
+    /* FIXME: Shoot me now.
+       
+       Hardcoded nastiness: the "0"s below refer to the first floating
+       point registers -- we should let gcc deal with that. The 8(31)
+       refers to the position on the stack, less one, of control (we
+       need for control to be the high word of the double loaded by
+       lfd; how do I know that r31 contains the stack? I don't, I'm
+       just guessing. The 255, on the other hand, is a valid constant
+       -- it says "move everything in the upper word into the floating
+       point control register. -- CSR, 2002-07-16 */
+    asm ("stw %0, 12(31); lfd 0, 8(31); mtfsf 255, 0" : : "r" (control) : "r31");
+}
+
+void 
+os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* see ppc-arch.c */
     ppc_flush_icache(address,length);

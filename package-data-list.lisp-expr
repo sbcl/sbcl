@@ -552,11 +552,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; WITH-STANDARD-IO-SYNTAX or something.)
              "*ERROR-PRINT-LENGTH*" "*ERROR-PRINT-LEVEL*" "*ERROR-PRINT-LINES*"
 
-             ;; KLUDGE: CMU CL had
-             ;; "*IGNORE-FLOATING-POINT-UNDERFLOW*", which seemed
-             ;; like a reasonable idea but doesn't seem to be supported
-             ;; now? -- WHN 19991206
-
              ;; extended declarations..
              "FREEZE-TYPE" "INHIBIT-WARNINGS"
              "MAYBE-INLINE"
@@ -586,7 +581,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; want to do this stuff.
              "FLOAT-DENORMALIZED-P"
              "FLOAT-NAN-P" "FLOAT-TRAPPING-NAN-P"
-             "FLOATING-POINT-INVALID"
              "FLOAT-INFINITY-P"
              "SHORT-FLOAT-NEGATIVE-INFINITY"
              "SHORT-FLOAT-POSITIVE-INFINITY"

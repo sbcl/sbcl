@@ -137,6 +137,9 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     int badinst;
     u32 code;
     sigset_t *mask;
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif
     mask=(os_context_sigmask_addr(context));
     sigsetmask(mask); 
     code=*((u32 *)(*os_context_pc_addr(context)));

@@ -235,6 +235,7 @@
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
+#!-linux
 (defun context-floating-point-modes (context)
   ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling for
   ;; POSIXness and (at the Lisp level) opaque signal contexts,
@@ -255,6 +256,11 @@
     (logior (ash (logand sw #xffff) 16) (logxor (logand cw #xffff) #x3f)))
 
   0)
+
+#!+linux
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    (sb!alien:unsigned 32)
+  (context (* os-context-t)))
 
 ;;;; INTERNAL-ERROR-ARGS
 

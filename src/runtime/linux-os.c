@@ -80,15 +80,16 @@ void os_init(void)
     }
 
     os_vm_page_size = getpagesize();
-   /* This could just as well be in arch_init(), but it's not. */
+    /* This could just as well be in arch_init(), but it's not. */
 #ifdef __i386__
-    SET_FPU_CONTROL_WORD(0x1372|4|8|16|32); /* no interrupts */
+    /* FIXME: This used to be here.  However, I have just removed it
+       with no apparent ill effects (it may be that earlier kernels
+       started up a process with a different set of traps, or
+       something?) Find out what this was meant to do, and reenable it
+       or delete it if possible. -- CSR, 2002-07-15 */
+    /* SET_FPU_CONTROL_WORD(0x1372|4|8|16|32); /* no interrupts */
 #endif
 }
-
-/* various os_context_*_addr accessors moved to {x86,alpha}-linux-os.c 
- * -dan 20010125
- */
 
 /* In Debian CMU CL ca. 2.4.9, it was possible to get an infinite
  * cascade of errors from do_mmap(..). This variable is a counter to

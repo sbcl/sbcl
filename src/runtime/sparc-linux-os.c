@@ -75,7 +75,22 @@ os_context_sigmask_addr(os_context_t *context)
     return &(context->si_mask);
 }
 
-void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
+void 
+os_restore_fp_control(os_context_t *context)
+{
+    /* Included here, for reference, is an attempt at the PPC
+       variant. If it weren't the case that SPARC/Linux gave a Bus
+       Error on floating point exceptions, something like this would
+       have to be done. -- CSR, 2002-07-13
+
+    asm ("msfsf $255, %0" : : "m" 
+	 (os_context_fp_control(context) & 
+	  ~ (FLOAT_STICKY_BITS_MASK | FLOAT_EXCEPTIONS_BYTE_MASK)));
+    */
+}
+
+void 
+os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* This is the same for linux and solaris, so see sparc-assem.S */
     sparc_flush_icache(address,length);

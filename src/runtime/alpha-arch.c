@@ -280,6 +280,10 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int code;
 
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif
+
     /* Don't disallow recursive breakpoint traps.  Otherwise, we can't */
     /* use debugger breakpoints anywhere in here. */
     sigset_t *mask=(os_context_sigmask_addr(context));

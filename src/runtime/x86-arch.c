@@ -217,6 +217,16 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     current_control_stack_pointer =
 	(lispobj *)*os_context_sp_addr(context);
 
+    /* FIXME: CMUCL puts the float control restoration code here.
+       Thus, it seems to me that single-stepping won't restore the
+       float control.  Since SBCL currently doesn't support
+       single-stepping (as far as I can tell) this is somewhat moot,
+       but it might be worth either moving this code up or deleting
+       the single-stepping code entirely.  -- CSR, 2002-07-15 */
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif
+
     /* On entry %eip points just after the INT3 byte and aims at the
      * 'kind' value (eg trap_Cerror). For error-trap and Cerror-trap a
      * number of bytes will follow, the first is the length of the byte
