@@ -155,7 +155,7 @@
               "*BACKEND-T-PRIMITIVE-TYPE*"
 
               "*CODE-SEGMENT*" 
-              "*COMPILING-FOR-INTERPRETER*" "*CONVERTING-FOR-INTERPRETER*"
+              "*CONVERTING-FOR-INTERPRETER*"
               "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
               "*FASL-HEADER-STRING-START-STRING*"
               "*FASL-HEADER-STRING-STOP-CHAR-CODE*"
@@ -1186,7 +1186,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              ;; newly exported from former SB!CONDITIONS
              "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
              "SHOW-CONDITION" "CASE-FAILURE"
-             "NAMESTRING-PARSE-ERROR"
+             "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
              "DESCRIBE-CONDITION"
              
 	     "!COLD-INIT"

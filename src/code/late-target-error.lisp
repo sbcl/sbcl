@@ -730,7 +730,14 @@
 	      :initform nil)
    (namestring :reader namestring-parse-error-namestring :initarg :namestring)
    (offset :reader namestring-parse-error-offset :initarg :offset))
-  (:report %print-namestring-parse-error))
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "parse error in namestring: ~?~%  ~A~%  ~V@T^"
+	     (namestring-parse-error-complaint condition)
+	     (namestring-parse-error-arguments condition)
+	     (namestring-parse-error-namestring condition)
+	     (namestring-parse-error-offset condition)))))
 
 (define-condition simple-package-error (simple-condition package-error) ())
 

@@ -41,10 +41,12 @@
 (def!method make-load-form ((pathname pathname) &optional environment)
   (make-load-form-saving-slots pathname :environment environment))
 
-;;; The potential conflict with search-lists requires isolating the printed
-;;; representation to use the i/o macro #.(logical-pathname <path-designator>).
+;;; The potential conflict with search lists requires isolating the
+;;; printed representation to use the i/o macro #.(logical-pathname
+;;; <path-designator>).
 ;;;
-;;; FIXME: We don't use search lists any more, so that comment is stale, right?
+;;; FIXME: We don't use search lists any more, so that comment is
+;;; stale, right?
 (def!method print-object ((pathname logical-pathname) stream)
   (let ((namestring (handler-case (namestring pathname)
 		      (error nil))))
@@ -59,16 +61,25 @@
 		  (%pathname-type pathname)
 		  (%pathname-version pathname))))))
 
-;;; A pathname is logical if the host component is a logical-host.
+;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
 ;;; from parsed arguments.
 (defun %make-pathname-object (host device directory name type version)
-  (if (typep host 'logical-host)
-      (%make-logical-pathname host :unspecific directory name type version)
-      (%make-pathname	 host device      directory name type version)))
+  ;; We canonicalize logical pathname components to uppercase. ANSI
+  ;; doesn't strictly require this, leaving it up to the implementor;
+  ;; but the arguments given in the X3J13 cleanup issue
+  ;; PATHNAME-LOGICAL:ADD seem compelling: we should canonicalize the
+  ;; case, and uppercase is the ordinary way to do that.
+  (flet ((upcase-maybe (x) (typecase x (string (string-upcase x)) (t x))))
+    (if (typep host 'logical-host)
+	(%make-logical-pathname
+	 host :unspecific
+	 (mapcar #'upcase-maybe directory)
+	 (upcase-maybe name) (upcase-maybe type) version)
+	(%make-pathname host device directory name type version))))
 
-;;; Hash table searching maps a logical-pathname's host to their physical
-;;; pathname translation.
+;;; Hash table searching maps a logical pathname's host to its
+;;; physical pathname translation.
 (defvar *logical-hosts* (make-hash-table :test 'equal))
 
 ;;;; patterns
@@ -157,10 +168,16 @@
 	  (matches (pattern-pieces pattern) 0 nil nil nil)
 	(values won (reverse subs))))))
 
-;;; Pathname-match-p for directory components.
+;;; PATHNAME-MATCH-P for directory components
 (defun directory-components-match (thing wild)
   (or (eq thing wild)
       (eq wild :wild)
+      ;; If THING has a null directory, assume that it matches
+      ;; (:ABSOLUTE :WILD-INFERIORS) or (:RELATIVE :WILD-INFERIORS).
+      (and (consp wild)
+	   (null thing)
+	   (member (first wild) '(:absolute :relative))
+	   (eq (second wild) :wild-inferiors))
       (and (consp wild)
 	   (let ((wild1 (first wild)))
 	     (if (eq wild1 :wild-inferiors)
@@ -574,20 +591,15 @@ a host-structure or string."
 
 ;;;; namestrings
 
-(defun %print-namestring-parse-error (condition stream)
-  (format stream "Parse error in namestring: ~?~%  ~A~%  ~V@T^"
-	  (namestring-parse-error-complaint condition)
-	  (namestring-parse-error-arguments condition)
-	  (namestring-parse-error-namestring condition)
-	  (namestring-parse-error-offset condition)))
-
 ;;; Handle the case where PARSE-NAMESTRING is actually parsing a
 ;;; namestring. We pick off the :JUNK-ALLOWED case then find a host to
 ;;; use for parsing, call the parser, then check whether the host
 ;;; matches.
 (defun %parse-namestring (namestr host defaults start end junk-allowed)
-  (declare (type (or host null) host) (type string namestr)
-	   (type index start) (type (or index null) end))
+  (declare (type (or host null) host)
+	   (type string namestr)
+	   (type index start)
+	   (type (or index null) end))
   (if junk-allowed
       (handler-case
 	  (%parse-namestring namestr host defaults start end nil)
@@ -598,22 +610,22 @@ a host-structure or string."
 			     (extract-logical-host-prefix namestr start end)
 			     (pathname-host defaults))))
 	(unless parse-host
-	  (error "When HOST argument is not supplied, DEFAULTS arg must ~
-		  have a non-null PATHNAME-HOST."))
+	  (error "When no HOST argument is supplied, the DEFAULTS argument ~
+		  must have a non-null PATHNAME-HOST."))
 
 	(multiple-value-bind (new-host device directory file type version)
 	    (funcall (host-parse parse-host) namestr start end)
 	  (when (and host new-host (not (eq new-host host)))
 	    (error "The host in the namestring, ~S,~@
-		    does not match explicit host argument: ~S"
+		    does not match the explicit host argument: ~S"
 		   host))
 	  (let ((pn-host (or new-host parse-host)))
 	    (values (%make-pathname-object
 		     pn-host device directory file type version)
 		    end))))))
 
-;;; If namestr begins with a colon-terminated, defined, logical host, then
-;;; return that host, otherwise return NIL.
+;;; If namestr begins with a colon-terminated, defined, logical host,
+;;; then return that host, otherwise return NIL.
 (defun extract-logical-host-prefix (namestr start end)
   (declare (type simple-base-string namestr)
 	   (type index start end)
@@ -629,35 +641,73 @@ a host-structure or string."
 			 host
 			 (defaults *default-pathname-defaults*)
 			 &key (start 0) end junk-allowed)
-  #!+sb-doc
-  "Converts pathname, a pathname designator, into a pathname structure,
-   for a physical pathname, returns the printed representation. Host may be
-   a physical host structure or host namestring."
   (declare (type pathname-designator thing)
-	   (type (or null host) host)
+	   (type (or null host string list (member :unspecific)) host)
 	   (type pathname defaults)
 	   (type index start)
 	   (type (or index null) end)
 	   (type (or t null) junk-allowed)
 	   (values (or null pathname) (or null index)))
+  ;; Generally, redundant specification of information in software,
+  ;; whether in code or in comments, is bad. However, the ANSI spec
+  ;; for this is messy enough that it's hard to hold in short-term
+  ;; memory, so I've recorded these redundant notes on the
+  ;; implications of the ANSI spec.
+  ;; 
+  ;; According to the ANSI spec, HOST can be a valid pathname host, or
+  ;; a logical host, or NIL.
+  ;;
+  ;; A valid pathname host can be a valid physical pathname host or a
+  ;; valid logical pathname host.
+  ;; 
+  ;; A valid physical pathname host is "any of a string, a list of
+  ;; strings, or the symbol :UNSPECIFIC, that is recognized by the
+  ;; implementation as the name of a host". In SBCL as of 0.6.9.8,
+  ;; that means :UNSPECIFIC: though someday we might want to
+  ;; generalize it to allow strings like "RTFM.MIT.EDU" or lists like
+  ;; '("RTFM" "MIT" "EDU"), that's not supported now.
+  ;; 
+  ;; A valid logical pathname host is a string which has been defined as
+  ;; the name of a logical host, as with LOAD-LOGICAL-PATHNAME-TRANSLATIONS.
+  ;; 
+  ;; A logical host is an object of implementation-dependent nature. In
+  ;; SBCL, it's a member of the HOST class (a subclass of STRUCTURE-OBJECT).
+  (let ((found-host (etypecase host
+		      (string
+		       ;; In general ANSI-compliant Common Lisps, a
+		       ;; string might also be a physical pathname host,
+		       ;; but ANSI leaves this up to the implementor,
+		       ;; and in SBCL we don't do it, so it must be a
+		       ;; logical host.
+		       (find-logical-host host))
+		      ((or null (member :unspecific))
+		       ;; CLHS says that HOST=:UNSPECIFIC has
+		       ;; implementation-defined behavior. We
+		       ;; just turn it into NIL.
+		       nil)
+		      (host
+		       host))))
+    (declare (type (or null host) found-host))
     (typecase thing
       (simple-string
-       (%parse-namestring thing host defaults start end junk-allowed))
+       (%parse-namestring thing found-host defaults start end junk-allowed))
       (string
        (%parse-namestring (coerce thing 'simple-string)
-			  host defaults start end junk-allowed))
+			  found-host defaults start end junk-allowed))
       (pathname
-       (let ((host (if host host (%pathname-host defaults))))
-	 (unless (eq host (%pathname-host thing))
-	   (error "Hosts do not match: ~S and ~S."
-		  host (%pathname-host thing))))
+       (let ((defaulted-host (or found-host (%pathname-host defaults))))
+	 (declare (type host defaulted-host))
+	 (unless (eq defaulted-host (%pathname-host thing))
+	   (error "The HOST argument doesn't match the pathname host:~%  ~
+                  ~S and ~S."
+		  defaulted-host (%pathname-host thing))))
        (values thing start))
       (stream
        (let ((name (file-name thing)))
 	 (unless name
 	   (error "can't figure out the file associated with stream:~%  ~S"
 		  thing))
-	 name))))
+	 name)))))
 
 (defun namestring (pathname)
   #!+sb-doc
@@ -912,16 +962,21 @@ a host-structure or string."
 	     (didnt-match-error orig-source orig-from)))))
       (subs))))
 
-;;; Called by TRANSLATE-PATHNAME on the directory components of its argument
-;;; pathanames to produce the result directory component. If any leaves the
-;;; directory NIL, we return the source directory. The :RELATIVE or :ABSOLUTE
-;;; is always taken from the source directory.
+;;; This is called by TRANSLATE-PATHNAME on the directory components
+;;; of its argument pathnames to produce the result directory
+;;; component. If this leaves the directory NIL, we return the source
+;;; directory. The :RELATIVE or :ABSOLUTE is taken from the source
+;;; directory, except if TO is :ABSOLUTE, in which case the result
+;;; will be :ABSOLUTE.
 (defun translate-directories (source from to diddle-case)
   (if (not (and source to from))
-      (or to
-	  (mapcar #'(lambda (x) (maybe-diddle-case x diddle-case)) source))
+      (or (and to (null source) (remove :wild-inferiors to))
+	  (mapcar (lambda (x) (maybe-diddle-case x diddle-case)) source))
       (collect ((res))
-	(res (first source))
+	       ;; If TO is :ABSOLUTE, the result should still be :ABSOLUTE.
+	       (res (if (eq (first to) :absolute)
+		 :absolute
+		 (first source)))
 	(let ((subs-left (compute-directory-substitutions (rest source)
 							  (rest from))))
 	  (dolist (to-part (rest to))
@@ -930,7 +985,7 @@ a host-structure or string."
 	       (assert subs-left)
 	       (let ((match (pop subs-left)))
 		 (when (listp match)
-		   (error ":WILD-INFERIORS not paired in from and to ~
+		   (error ":WILD-INFERIORS is not paired in from and to ~
 			   patterns:~%  ~S ~S" from to))
 		 (res (maybe-diddle-case match diddle-case))))
 	      ((member :wild-inferiors)
@@ -942,7 +997,8 @@ a host-structure or string."
 		 (dolist (x match)
 		   (res (maybe-diddle-case x diddle-case)))))
 	      (pattern
-	       (multiple-value-bind (new new-subs-left)
+	       (multiple-value-bind
+		   (new new-subs-left)
 		   (substitute-into to-part subs-left diddle-case)
 		 (setf subs-left new-subs-left)
 		 (res new)))
@@ -1170,8 +1226,8 @@ a host-structure or string."
 		 :namestring word :offset i))))
     word))
 
-;;; Given a logical host or string, return a logical host. If Error-p is
-;;; NIL, then return NIL when no such host exists.
+;;; Given a logical host or string, return a logical host. If ERROR-P
+;;; is NIL, then return NIL when no such host exists.
 (defun find-logical-host (thing &optional (errorp t))
   (etypecase thing
     (string
@@ -1179,14 +1235,21 @@ a host-structure or string."
 			   *logical-hosts*)))
        (if (or found (not errorp))
 	   found
-	   (error 'simple-file-error
-		  :pathname thing
+	   ;; This is the error signalled from e.g.
+	   ;; LOGICAL-PATHNAME-TRANSLATIONS when host is not a defined
+	   ;; host, and ANSI specifies that that's a TYPE-ERROR.
+	   (error 'simple-type-error
+		  :datum thing
+		  ;; God only knows what ANSI expects us to use for
+		  ;; the EXPECTED-TYPE here. Maybe this will be OK..
+		  :expected-type
+		  '(and string (satisfies logical-pathname-translations))
 		  :format-control "logical host not yet defined: ~S"
 		  :format-arguments (list thing)))))
     (logical-host thing)))
 
-;;; Given a logical host name or host, return a logical host, creating a new
-;;; one if necessary.
+;;; Given a logical host name or host, return a logical host, creating
+;;; a new one if necessary.
 (defun intern-logical-host (thing)
   (declare (values logical-host))
   (or (find-logical-host thing nil)
@@ -1265,7 +1328,7 @@ a host-structure or string."
 		 (unless (and chunks (simple-string-p (caar chunks)))
 		   (error 'namestring-parse-error
 			  :complaint "expecting ~A, got ~:[nothing~;~S~]."
-			  :arguments (list what (caar chunks))
+			  :arguments (list what (caar chunks) (caar chunks))
 			  :namestring namestr
 			  :offset (if chunks (cdar chunks) end)))
 		 (caar chunks))
@@ -1399,6 +1462,36 @@ a host-structure or string."
 		  (t (error "invalid keyword: ~S" piece))))))
        (apply #'concatenate 'simple-string (strings))))))
 
+;;; Unparse a logical pathname string.
+(defun unparse-enough-namestring (pathname defaults)
+  (let* ((path-dir (pathname-directory pathname))
+         (def-dir (pathname-directory defaults))
+         (enough-dir
+           ;; Go down the directory lists to see what matches.  What's
+           ;; left is what we want, more or less.
+           (cond ((and (eq (first path-dir) (first def-dir))
+                       (eq (first path-dir) :absolute))
+                   ;; Both paths are :absolute, so find where the common
+                   ;; parts end and return what's left
+                   (do* ((p (rest path-dir) (rest p))
+                         (d (rest def-dir) (rest d)))
+                        ((or (endp p) (endp d)
+                             (not (equal (first p) (first d))))
+                         `(:relative ,@p))))
+                 (t
+                   ;; At least one path is :relative, so just return the
+                   ;; original path.  If the original path is :relative,
+                   ;; then that's the right one.  If PATH-DIR is
+                   ;; :absolute, we want to return that except when
+                   ;; DEF-DIR is :absolute, as handled above. so return
+                   ;; the original directory.
+                   path-dir))))
+    (make-pathname :host (pathname-host pathname)
+                   :directory enough-dir
+                   :name (pathname-name pathname)
+                   :type (pathname-type pathname)
+                   :version (pathname-version pathname))))
+
 (defun unparse-logical-namestring (pathname)
   (declare (type logical-pathname pathname))
   (concatenate 'simple-string
@@ -1446,30 +1539,6 @@ a host-structure or string."
 	  (canonicalize-logical-pathname-translations translations host))
     (setf (logical-host-translations host) translations)))
 
-;;; The search mechanism for loading pathname translations uses the CMU CL
-;;; extension of search-lists. The user can add to the "library:" search-list
-;;; using setf. The file for translations should have the name defined by
-;;; the hostname (a string) and with type component "translations".
-
-(defun load-logical-pathname-translations (host)
-  #!+sb-doc
-  "Search for a logical pathname named host, if not already defined. If already
-   defined no attempt to find or load a definition is attempted and NIL is
-   returned. If host is not already defined, but definition is found and loaded
-   successfully, T is returned, else error."
-  (declare (type string host)
-	   (values (member t nil)))
-  (unless (find-logical-host host nil)
-    (with-open-file (in-str (make-pathname :defaults "library:"
-					   :name host
-					   :type "translations"))
-      (if *load-verbose*
-	  (format *error-output*
-		  ";; loading pathname translations from ~A~%"
-		  (namestring (truename in-str))))
-      (setf (logical-pathname-translations host) (read in-str)))
-    t))
-
 (defun translate-logical-pathname (pathname &key)
   #!+sb-doc
   "Translates pathname to a physical pathname, which is returned."
@@ -1497,3 +1566,14 @@ a host-structure or string."
 			  nil
 			  nil
 			  nil))
+
+(defun load-logical-pathname-translations (host)
+  #!+sb-doc
+  (declare (type string host)
+	   (values (member t nil)))
+  (if (find-logical-host host nil)
+      ;; This host is already defined, all is well and good.
+      t
+      ;; ANSI: "The specific nature of the search is
+      ;; implementation-defined." SBCL: doesn't search at all
+      (error "logical host ~S not found" host)))

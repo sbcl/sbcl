@@ -19,7 +19,7 @@
 
 (setf *backend-fasl-file-type* "x86f")
 (setf *backend-fasl-file-implementation* :x86)
-(setf *backend-fasl-file-version* 6)
+(setf *backend-fasl-file-version* 7)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -31,6 +31,7 @@
 ;;; 5 = sbcl-0.6.8 has rearranged static symbols.
 ;;; 6 = sbcl-0.6.9, got rid of non-ANSI %DEFCONSTANT/%%DEFCONSTANT stuff
 ;;;     and deleted a slot from DEBUG-SOURCE structure.
+;;; 7 = around sbcl-0.6.9.8, merged SB-CONDITIONS package into SB-KERNEL
 
 (setf *backend-register-save-penalty* 3)
 

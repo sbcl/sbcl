@@ -291,18 +291,21 @@
 	     ;; could probably be shared with the read-a-keyword fop.
 	     (version (read-arg 4)))
 	(declare (ignore ignore))
-	(flet ((check-version (impl vers)
-		 (when (string= impl implementation)
-		   (unless (= version vers)
-		     (error "~S was compiled for fasl file format version ~S, ~
-			    but we need version ~S."
+	(flet ((check-version (variant possible-implementation needed-version)
+		 (when (string= possible-implementation implementation)
+		   (unless (= version needed-version)
+		     (error "~S was compiled for ~A fasl file format version ~
+			     ~S, but we need version ~S."
 			    stream
+			    variant
 			    version
-			    vers))
+			    needed-version))
 		   t)))
-	  (or (check-version #.sb!c:*backend-fasl-file-implementation*
+	  (or (check-version "native code"
+			     #.sb!c:*backend-fasl-file-implementation*
 			     #.sb!c:*backend-fasl-file-version*)
-	      (check-version #.(sb!c:backend-byte-fasl-file-implementation)
+	      (check-version "byte code"
+			     #.(sb!c:backend-byte-fasl-file-implementation)
 			     sb!c:byte-fasl-file-version)
 	      (error "~S was compiled for implementation ~A, but this is a ~A."
 		     stream

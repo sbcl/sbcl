@@ -34,7 +34,7 @@
 			       (logical-host-name (%pathname-host x))))
 			    (:unparse-directory #'unparse-logical-directory)
 			    (:unparse-file #'unparse-unix-file)
-			    (:unparse-enough #'identity)
+			    (:unparse-enough #'unparse-enough-namestring)
 			    (:customary-case :upper)))
   (name "" :type simple-base-string)
   (translations nil :type list)

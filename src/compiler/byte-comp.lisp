@@ -13,7 +13,9 @@
 (in-package "SB!C")
 
 ;;;; the fasl file format that we use
-(defconstant byte-fasl-file-version 1)
+(defconstant byte-fasl-file-version 2)
+;;; 1 = before about sbcl-0.6.9.8
+;;; 2 = merged package SB-CONDITIONS into SB-KERNEL around sbcl-0.6.9.8
 
 ;;; ### remaining work:
 ;;;

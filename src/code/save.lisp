@@ -104,8 +104,8 @@
 
 ;;;; functions used by worldload.lisp in CMU CL bootstrapping
 
-;;; If Name has been byte-compiled, and :RUNTIME is a feature, then load the
-;;; byte-compiled version, otherwise just do normal load.
+;;; If NAME has been byte-compiled, and :RUNTIME is a feature, then
+;;; load the byte-compiled version, otherwise just do normal load.
 #+nil ; no longer needed in SBCL.. I think.. -- WHN 19990814
 (defun maybe-byte-load (name &optional (load-native t))
   (let ((bname (make-pathname

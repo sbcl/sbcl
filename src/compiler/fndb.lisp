@@ -1028,14 +1028,22 @@
   pathname
   (flushable))
 
-;;; KLUDGE: There was a comment from CMU CL here, "We need to add the
-;;; logical pathname stuff here." -- WHN 19991213
+;;; FIXME: What about logical pathname stuff?
+;;;   LOGICAL-PATHNAME
+;;;   TRANSLATE-LOGICAL-PATHNAME
+;;;   LOAD-LOGICAL-PATHNAME-TRANSLATIONS
+;;;   LOGICAL-PATHNAME-TRANSLATIONS
 
 (defknown pathname (pathname-designator) pathname (flushable))
 (defknown truename (pathname-designator) pathname ())
 
 (defknown parse-namestring
-  (pathname-designator &optional pathname-host pathname-designator
+  (pathname-designator &optional
+		       ;; ANSI also allows LIST here, but leaves its
+		       ;; interpretation implementation-defined. Our
+		       ;; interpretation is that it's unsupported.:-|
+                       (or pathname-host string (member :unspecific))
+                       pathname-designator
 		       &key
 		       (:start index)
 		       (:end sequence-end)

@@ -623,6 +623,9 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
   and there's no compelling reason to try to stretch the standard
   to allow two different extensions.) Instead, byte-compiled files
   default to the same extension as native-compiled files.
+* Fasl file format version numbers have increased again, because
+  a rearrangement of internal implementation packages made some 
+  dumped symbols in old fasl files unreadable in new cores.
 ?? #'(SETF DOCUMENTATION) is now defined.
 * Bug #17 (differing COMPILE-FILE behavior between logical and 
   physical pathnames) has been fixed, and some related misbehavior too,

@@ -16,17 +16,111 @@
 
 (in-package "CL-USER")
 
-(setf (logical-pathname-translations "foo")
-      '(("REL;*.*.*"       "/tmp/")
-	("MAIL;**;*.MAIL"  "/tmp/subdir/")
-	("PROGGIES;*"      "/tmp/")))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmacro grab-condition (&body body)
+    `(nth-value 1
+      (ignore-errors ,@body))))
 
-(assert (string= (format nil
-			 "~S"
-			 (translate-logical-pathname "foo:proggies;save"))
-		 "#P\"/tmp/save\""))
+(setf (logical-pathname-translations "demo0")
+      '(("**;*.*.*" "/tmp/")))
 
-(compile-file-pathname "foo:proggies;save")
+;;; In case of a parse error we want to get a condition of type
+;;; CL:PARSE-ERROR (or more specifically, of type
+;;; SB-KERNEL:NAMESTRING-PARSE-ERROR).
+(assert
+  (typep (grab-condition (translate-logical-pathname "demo0::bla;file.lisp"))
+         'parse-error))
+
+;;; some things SBCL-0.6.9 used not to parse correctly:
+;;;
+;;; SBCL used to throw an error saying there's no translation.
+(assert (equal (namestring (translate-logical-pathname "demo0:file.lisp"))
+               "/tmp/file.lisp"))
+;;; We do not match a null directory to every wild path:
+(assert (not (pathname-match-p "demo0:file.lisp"
+                               (logical-pathname "demo0:tmp;**;*.*.*"))))
+;;; Remove "**" from our resulting pathname when the source-dir is NIL:
+(setf (logical-pathname-translations "demo1")
+      '(("**;*.*.*" "/tmp/**/*.*") (";**;*.*.*" "/tmp/rel/**/*.*")))
+(assert (not (equal (namestring (translate-logical-pathname "demo1:foo.lisp"))
+                    "/tmp/**/foo.lisp")))
+;;; That should be correct:
+(assert (equal (namestring (translate-logical-pathname "demo1:foo.lisp"))
+               "/tmp/foo.lisp"))
+;;; Check for absolute/relative path confusion:
+(assert (not (equal (namestring (translate-logical-pathname "demo1:;foo.lisp"))
+                     "tmp/rel/foo.lisp")))
+(assert (equal (namestring (translate-logical-pathname "demo1:;foo.lisp"))
+               "/tmp/rel/foo.lisp"))
+                     
+;;; Under SBCL: new function #'UNPARSE-ENOUGH-NAMESTRING, to
+;;; handle the following case exactly (otherwise we get an error:
+;;; "#'IDENTITY CALLED WITH 2 ARGS."
+(setf (logical-pathname-translations "demo2")
+        '(("test;**;*.*" "/tmp/demo2/test/")))
+(enough-namestring "demo2:test;foo.lisp")
+
+;;; When a pathname comes from a logical host, it should be in upper
+;;; case. (This doesn't seem to be specifically required in the ANSI
+;;; spec, but it's left up to the implementors, and the arguments made
+;;; in the cleanup issue PATHNAME-LOGICAL:ADD seem to be a pretty
+;;; compelling reason for the implementors to choose case
+;;; insensitivity and a canonical case.)
+(setf (logical-pathname-translations "FOO") 
+      '(("**;*.*.*" "/full/path/to/foo/**/*.*.*")))
+(let* ((pn1 (make-pathname :host "FOO" :directory "etc" :name "INETD" 
+                           :type "conf"))
+       (pn2 (make-pathname :host "foo" :directory "ETC" :name "inetd" 
+                           :type "CONF"))
+       (pn3 (read-from-string (prin1-to-string pn1))))
+  (assert (equal pn1 pn2))
+  (assert (equal pn1 pn3)))
+
+;;; We may need to parse the host as a LOGICAL-NAMESTRING HOST. The
+;;; HOST in PARSE-NAMESTRING can be either a string or :UNSPECIFIC
+;;; without actually requiring the system to signal an error (apart
+;;; from host mismatches).
+(assert (equal (namestring (parse-namestring "" "FOO")) "FOO:"))
+(assert (equal (namestring (parse-namestring "" :unspecific)) ""))
+
+;;; The third would work if the call were (and it should continue to
+;;; work ...)
+(parse-namestring ""
+                  (pathname-host
+                   (translate-logical-pathname
+                    "FOO:")))
+
+;;; ANSI, in its wisdom, specifies that it's an error (specifically a
+;;; TYPE-ERROR) to query the system about the translations of a string
+;;; which doesn't have any translations. It's not clear why we don't
+;;; just return NIL in that case, but they make the rules..
+(let ((cond (grab-condition (logical-pathname-translations "unregistered-host"))))
+  (assert (typep cond 'type-error)))
+
+;;; examples from CLHS: Section 19.4, Logical Pathname Translations
+;;; (sometimes converted to the Un*x way of things)
+(setf (logical-pathname-translations "test0")
+        '(("**;*.*.*"              "/library/foo/**/")))
+(assert (equal (namestring (translate-logical-pathname
+                            "test0:foo;bar;baz;mum.quux.3"))
+               "/library/foo/foo/bar/baz/mum.quux.3"))
+(setf (logical-pathname-translations "prog")
+        '(("RELEASED;*.*.*"        "MY-UNIX:/sys/bin/my-prog/")
+          ("RELEASED;*;*.*.*"      "MY-UNIX:/sys/bin/my-prog/*/")
+          ("EXPERIMENTAL;*.*.*"    "MY-UNIX:/usr/Joe/development/prog/")
+          ("EXPERIMENTAL;*;*.*.*"  "MY-UNIX:/usr/Joe/development/prog/*/")))
+(setf (logical-pathname-translations "prog")
+        '(("CODE;*.*.*"             "/lib/prog/")))
+(assert (equal (namestring (translate-logical-pathname
+                            "prog:code;documentation.lisp"))
+               "/lib/prog/documentation.lisp"))
+(setf (logical-pathname-translations "prog")
+        '(("CODE;DOCUMENTATION.*.*" "/lib/prog/docum.*")
+          ("CODE;*.*.*"             "/lib/prog/")))
+(assert (equal (namestring (translate-logical-pathname
+                            "prog:code;documentation.lisp"))
+               "/lib/prog/docum.lisp"))
 
 ;;; success
 (quit :unix-status 104)
+(in-package :cl-user)
