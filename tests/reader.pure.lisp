@@ -74,3 +74,12 @@
   (assert (= (parse-integer "12") 12))
   (assert (= (parse-integer "   12   ") 12))
   (assert (= (parse-integer "   12asdb" :junk-allowed t) 12)))
+
+;;; #A notation enforces that once one 0 dimension has been found, all
+;;; subsequent ones are also 0.  
+(assert (equal (array-dimensions (read-from-string "#3A()"))
+	       '(0 0 0)))
+(assert (equal (array-dimensions (read-from-string "#3A(())"))
+	       '(1 0 0)))
+(assert (equal (array-dimensions (read-from-string "#3A((() ()))"))
+	       '(1 2 0)))

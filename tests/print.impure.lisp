@@ -103,5 +103,24 @@
 (assert (raises-error? (format nil "~<~<~A~:>~>" '(foo))))
 (assert (string= (format nil "~<~<~A~>~>" 'foo) "FOO"))
 
+;;; Check that arrays that we print while *PRINT-READABLY* is true are
+;;; in fact generating similar objects.
+(assert (equal (array-dimensions
+		(read-from-string
+		 (with-output-to-string (s)
+		   (let ((*print-readably* t))
+		     (print (make-array '(1 2 0)) s)))))
+	       '(1 2 0)))
+
+(assert (multiple-value-bind (result error)
+	    (ignore-errors (read-from-string
+			    (with-output-to-string (s)
+			      (let ((*print-readably* t))
+				(print (make-array '(1 0 1)) s)))))
+	  ;; it might not be readably-printable
+	  (or (typep error 'print-not-readable)
+	      ;; or else it had better have the same dimensions
+	      (equal (array-dimensions result) '(1 0 1)))))
+
 ;;; success
 (quit :unix-status 104)

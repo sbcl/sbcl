@@ -974,7 +974,8 @@
 	     (stringp array)
 	     (bit-vector-p array))
 	 (output-ugly-object array stream))
-	((and *print-readably* (not (eq (array-element-type array) t)))
+	((and *print-readably*
+	      (not (array-readably-printable-p array)))
 	 (let ((*print-readably* nil))
 	   (error 'print-not-readable :object array)))
 	((vectorp array)

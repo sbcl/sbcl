@@ -973,7 +973,7 @@
 	   (write-char (if (zerop bit) #\0 #\1) stream)))
 	(t
 	 (when (and *print-readably*
-		    (not (eq (array-element-type vector) t)))
+		    (not (array-readably-printable-p array)))
 	   (error 'print-not-readable :object vector))
 	 (descend-into (stream)
 		       (write-string "#(" stream)
@@ -1000,6 +1000,14 @@
 	  (when (needs-slash-p char) (write-char #\\ stream))
 	  (write-char char stream))))))
 
+(defun array-readably-printable-p (array)
+  (and (eq (array-element-type array) t)
+       (let ((zero (position 0 (array-dimensions array)))
+	     (number (position 0 (array-dimensions array)
+			       :test (complement #'eql)
+			       :from-end t)))
+	 (or (null zero) (null number) (> zero number)))))
+
 ;;; Output the printed representation of any array in either the #< or #A
 ;;; form.
 (defun output-array (array stream)
@@ -1016,7 +1024,7 @@
 ;;; Output the readable #A form of an array.
 (defun output-array-guts (array stream)
   (when (and *print-readably*
-	     (not (eq (array-element-type array) t)))
+	     (not (array-readably-printable-p array)))
     (error 'print-not-readable :object array))
   (write-char #\# stream)
   (let ((*print-base* 10))

@@ -96,12 +96,13 @@
 			 dimensions axis seq))
 	(let ((len (length seq)))
 	  (dims len)
-	  (unless (= axis (1- dimensions))
-	    (when (zerop len)
-	      (%reader-error stream
-			     "#~WA axis ~W is empty, but is not ~
-			      the last dimension."
-			     dimensions axis))
+	  (unless (or (= axis (1- dimensions))
+		      ;; ANSI: "If some dimension of the array whose
+		      ;; representation is being parsed is found to be
+		      ;; 0, all dimensions to the right (i.e., the
+		      ;; higher numbered dimensions) are also
+		      ;; considered to be 0."
+		      (= len 0))
 	    (setq seq (elt seq 0))))))))
 
 ;;;; reading structure instances: the #S readmacro
