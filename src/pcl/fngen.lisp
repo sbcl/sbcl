@@ -109,10 +109,10 @@
     new))
 
 (defun fgen-test	     (fgen) (svref fgen 0))
-(defun fgen-gensyms	  (fgen) (svref fgen 1))
-(defun fgen-generator	(fgen) (svref fgen 2))
+(defun fgen-gensyms	     (fgen) (svref fgen 1))
+(defun fgen-generator	     (fgen) (svref fgen 2))
 (defun fgen-generator-lambda (fgen) (svref fgen 3))
-(defun fgen-system	   (fgen) (svref fgen 4))
+(defun fgen-system	     (fgen) (svref fgen 4))
 
 (defun get-function-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))

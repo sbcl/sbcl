@@ -2807,7 +2807,7 @@ initially undefined function references:~2%")
 	(*data-page* 0))
 
     (format t
-	    "[building initial core file in file ~S: ~%"
+	    "[building initial core file in ~S: ~%"
 	    filenamestring)
     (force-output)
 

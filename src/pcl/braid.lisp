@@ -47,7 +47,7 @@
 			(i 0 (1+ i)))
 		       ((>= i no-of-slots)) ;endp rem-slots))
 		     (declare (list rem-slots)
-			      (type sb-kernel:index i))
+			      (type sb-int:index i))
 		     (setf (aref slots i) (first rem-slots)))
 		   slots))
 		(t
