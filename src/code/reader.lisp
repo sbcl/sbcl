@@ -1222,8 +1222,8 @@
 		 (return-from make-float (if negative-fraction
 					     (- num)
 					     num))))))
-	  ;; should never happen:	
-	  (t (error "internal error in floating point reader")))))
+	  ;; should never happen
+	  (t (bug "bad fallthrough in floating point reader")))))
 
 (defun make-float-aux (number divisor float-format)
   (coerce (/ number divisor) float-format))

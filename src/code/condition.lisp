@@ -742,31 +742,65 @@
 
 ;;;; special SBCL extension conditions
 
-;;; a condition for use in stubs for operations which aren't
-;;; unsupported on some OSes/CPUs/whatever
+;;; an error apparently caused by a bug in SBCL itself
 ;;;
-;;; E.g. in sbcl-0.7.0.5, it might be appropriate to do something
-;;; like
+;;; Note that we don't make any serious effort to use this condition
+;;; for *all* errors in SBCL itself. E.g. type errors and array
+;;; indexing errors can occur in functions called from SBCL code, and
+;;; will just end up as ordinary TYPE-ERROR or invalid index error,
+;;; because the signalling code has no good way to know that the
+;;; underlying problem is a bug in SBCL. But in the fairly common case
+;;; that the signalling code does know that it's found a bug in SBCL,
+;;; this condition is appropriate, reusing boilerplate and helping
+;;; users to recognize it as an SBCL bug.
+(define-condition bug (simple-error)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "~@<  ~? ~:@_~?~:>"
+	     (simple-condition-format-control condition)
+	     (simple-condition-format-arguments condition)
+	     "~@<This is probably a bug in SBCL itself. (Alternatively, ~
+              SBCL might have been corrupted by bad user code, e.g. by an ~
+              undefined Lisp operation like ~S, or by stray pointers from ~
+              alien code or from unsafe Lisp code; or there might be a bug ~
+              in the OS or hardware that SBCL is running on.) If it seems to ~
+              be a bug in SBCL itself, the maintainers would like to know ~
+              how to exercise the bug so it can be fixed. Bug reports are ~
+              welcome on the SBCL mailing lists, which you can find at ~
+              <http://sbcl.sourceforge.net/>.~:@>"
+	     '((fmakunbound 'compile))))))
+(defun bug (format-control &rest format-arguments)
+  (error 'bug
+	 :format-control format-control
+	 :format-arguments format-arguments))
+
+;;; a condition for use in stubs for operations which aren't supported
+;;; on some platforms
+;;;
+;;; E.g. in sbcl-0.7.0.5, it might be appropriate to do something like
 ;;;   #-(or freebsd linux)
 ;;;   (defun load-foreign (&rest rest)
 ;;;     (error 'unsupported-operator :name 'load-foreign))
 ;;;   #+(or freebsd linux)
 ;;;   (defun load-foreign ... actual definition ...)
 ;;; By signalling a standard condition in this case, we make it
-;;; possible for test code to distinguish between intentionally not
-;;; implemented and just screwed up somehow. (Before this condition
-;;; was defined, this was dealt with by checking for FBOUNDP, but
-;;; that didn't work reliably. In sbcl-0.7.0, a a package screwup
-;;; left the definition of LOAD-FOREIGN in the wrong package, so
-;;; it was unFBOUNDP even on architectures where it was supposed to
-;;; be supported, and the regression tests cheerfully passed because
-;;; they assumed that unFBOUNDPness meant they were running on an
-;;; system which didn't support the extension.)
+;;; possible for test code to distinguish between (1) intentionally
+;;; unimplemented and (2) unintentionally just screwed up somehow.
+;;; (Before this condition was defined, test code tried to deal with 
+;;; this by checking for FBOUNDP, but that didn't work reliably. In
+;;; sbcl-0.7.0, a a package screwup left the definition of
+;;; LOAD-FOREIGN in the wrong package, so it was unFBOUNDP even on
+;;; architectures where it was supposed to be supported, and the
+;;; regression tests cheerfully passed because they assumed that
+;;; unFBOUNDPness meant they were running on an system which didn't
+;;; support the extension.)
 (define-condition unsupported-operator (cell-error) ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "unsupported on this implementation: ~S"
+	     "unsupported on this platform (OS, CPU, whatever): ~S"
 	     (cell-error-name condition)))))
 
 ;;;; restart definitions

@@ -199,10 +199,7 @@
 		 (typep fcn 'generic-function)
 		 (eq (class-of fcn) *the-class-standard-generic-function*))
 	     (setf (sb-kernel:%funcallable-instance-info fcn 1) new-name)
-	     (error 'simple-type-error
-		    :datum fcn
-		    :expected-type 'generic-function
-		    :format-control "internal error: bad function type"))
+	     (bug "unanticipated function type"))
 	 fcn)
 	(t
 	 ;; pw-- This seems wrong and causes trouble. Tests show

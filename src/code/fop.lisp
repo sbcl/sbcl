@@ -161,10 +161,10 @@
 (define-fop (fop-verify-table-size 62 :stackp nil)
   (let ((expected-index (read-arg 4)))
     (unless (= *current-fop-table-index* expected-index)
-      (error "internal error: fasl table of improper size"))))
+      (bug "fasl table of improper size"))))
 (define-fop (fop-verify-empty-stack 63 :stackp nil)
   (unless (= *fop-stack-pointer* *fop-stack-pointer-on-entry*)
-    (error "internal error: fasl stack not empty when it should be")))
+    (bug "fasl stack not empty when it should be")))
 
 ;;;; fops for loading symbols
 
@@ -478,8 +478,7 @@
 		  (8 (make-array len :element-type '(unsigned-byte 8)))
 		  (16 (make-array len :element-type '(unsigned-byte 16)))
 		  (32 (make-array len :element-type '(unsigned-byte 32)))
-		  (t (error "internal error: losing i-vector element size: ~S"
-			    size)))))
+		  (t (bug "losing i-vector element size: ~S" size)))))
       (declare (type index len))
       (done-with-fast-read-byte)
       (read-n-bytes *fasl-input-stream*
@@ -500,8 +499,7 @@
  		  (16 (make-array len :element-type '(signed-byte 16)))
  		  (30 (make-array len :element-type '(signed-byte 30)))
  		  (32 (make-array len :element-type '(signed-byte 32)))
- 		  (t (error "internal error: losing si-vector element size: ~S"
-			    size)))))
+ 		  (t (bug "losing si-vector element size: ~S" size)))))
       (declare (type index len))
       (done-with-fast-read-byte)
       (read-n-bytes *fasl-input-stream*
@@ -646,8 +644,7 @@ bug.~:@>")
 	(offset (read-arg 4)))
     (declare (type index offset))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
-      (error "internal error: unaligned function object, offset = #X~X"
-	     offset))
+      (bug "unaligned function object, offset = #X~X" offset))
     (let ((fun (%primitive sb!c:compute-fun code-object offset)))
       (setf (%simple-fun-self fun) fun)
       (setf (%simple-fun-next fun) (%code-entry-points code-object))

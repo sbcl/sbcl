@@ -297,8 +297,7 @@
 			       *raw-slot-data-list*)
 		     ;; oops
 		     (t
-		      (error "internal error: unexpected DSD-RAW-TYPE ~S"
-			     dsd-raw-type))))))
+		      (bug "unexpected DSD-RAW-TYPE ~S" dsd-raw-type))))))
 	     ;; code shared between DEFSTRUCT :TYPE LIST and
 	     ;; DEFSTRUCT :TYPE VECTOR cases: Handle the "typed
 	     ;; structure" case, with no LAYOUTs and no raw slots.

@@ -44,8 +44,9 @@
   (sort insts #'> :key #'specializer-rank))
 
 (defun specialization-error (insts)
-  (error "~@<internal disassembler error: ~2I~_Instructions either aren't related or conflict in some way: ~4I~_~S~:>"
-	 insts))
+  (bug
+   "~@<Instructions either aren't related or conflict in some way: ~4I~_~S~:>"
+   insts))
 
 ;;; Given a list of instructions INSTS, Sees if one of these instructions is a
 ;;; more general form of all the others, in which case they are put into its

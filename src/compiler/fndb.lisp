@@ -1145,10 +1145,13 @@
 
 ;;;; from the "Errors" chapter:
 
-(defknown error (t &rest t) nil) ; never returns...
+(defknown error (t &rest t) nil) ; never returns
 (defknown cerror (string t &rest t) null)
 (defknown warn (t &rest t) null)
 (defknown break (&optional t &rest t) null)
+
+;;; and analogous SBCL extension:
+(defknown bug (t &rest t) nil) ; never returns
 
 ;;;; from the "Miscellaneous" Chapter:
 

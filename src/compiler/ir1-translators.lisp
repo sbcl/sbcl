@@ -356,39 +356,32 @@
 ;;; VOP or %VOP.. -- WHN 2001-06-11
 ;;; FIXME: Look at doing this ^, it doesn't look too hard actually.
 (def-ir1-translator %primitive ((name &rest args) start cont)
-  (unless (symbolp name)
-    (compiler-error "internal error: Primitive name ~S is not a symbol." name))
+  (declare (type symbol name))
   (let* ((template (or (gethash name *backend-template-names*)
-		       (compiler-error
-			"internal error: Primitive name ~A is not defined."
-			name)))
+		       (bug "undefined primitive ~A" name)))
 	 (required (length (template-arg-types template)))
 	 (info (template-info-arg-count template))
 	 (min (+ required info))
 	 (nargs (length args)))
     (if (template-more-args-type template)
 	(when (< nargs min)
-	  (compiler-error "internal error: Primitive ~A was called ~
-                           with ~R argument~:P, ~
-	    		   but wants at least ~R."
-			  name
-			  nargs
-			  min))
+	  (bug "Primitive ~A was called with ~R argument~:P, ~
+	    	but wants at least ~R."
+	       name
+	       nargs
+	       min))
 	(unless (= nargs min)
-	  (compiler-error "internal error: Primitive ~A was called ~
-                           with ~R argument~:P, ~
-			   but wants exactly ~R."
-			  name
-			  nargs
-			  min)))
+	  (bug "Primitive ~A was called with ~R argument~:P, ~
+                but wants exactly ~R."
+	       name
+	       nargs
+	       min)))
 
     (when (eq (template-result-types template) :conditional)
-      (compiler-error
-       "%PRIMITIVE was used with a conditional template."))
+      (bug "%PRIMITIVE was used with a conditional template."))
 
     (when (template-more-results-type template)
-      (compiler-error
-       "%PRIMITIVE was used with an unknown values template."))
+      (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start
 		 cont

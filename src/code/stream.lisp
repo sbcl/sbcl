@@ -292,7 +292,7 @@
 		 (unread-char char stream)
 		 char)
 		(t
-		 (error "internal error: impossible case"))))
+		 (bug "impossible case"))))
 	;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
 	(cond ((characterp peek-type)
 	       (do ((char (stream-read-char stream)
@@ -318,7 +318,7 @@
 		     (eof-or-lose stream eof-error-p eof-value)
 		     char)))
 	      (t
-	       (error "internal error: impossible case"))))))
+	       (bug "impossible case"))))))
 
 (defun listen (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))

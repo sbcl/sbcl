@@ -1745,7 +1745,7 @@
 	      (unless (fill-in-code-location code-location)
 		;; This check should be unnecessary. We're missing
 		;; debug info the compiler should have dumped.
-		(error "internal error: unknown code location"))
+		(bug "unknown code location"))
 	      (code-location-%tlf-offset code-location))
 	     ;; (There used to be more cases back before sbcl-0.7.0,,
 	     ;; when we did special tricks to debug the IR1
@@ -1766,7 +1766,7 @@
 	      (unless (fill-in-code-location code-location)
 		;; This check should be unnecessary. We're missing
 		;; debug info the compiler should have dumped.
-		(error "internal error: unknown code location"))
+		(bug "unknown code location"))
 	      (code-location-%form-number code-location))
 	     ;; (There used to be more cases back before sbcl-0.7.0,,
 	     ;; when we did special tricks to debug the IR1
@@ -1788,7 +1788,7 @@
 	     ((not (fill-in-code-location code-location))
 	      ;; This check should be unnecessary. We're missing
 	      ;; debug info the compiler should have dumped.
-	      (error "internal error: unknown code location"))
+	      (bug "unknown code location"))
 	     (t
 	      (compiled-code-location-kind code-location)))))
     ;; (There used to be more cases back before sbcl-0.7.0,,
@@ -1809,7 +1809,7 @@
 		 ;;
 		 ;; FIXME: This error and comment happen over and over again.
 		 ;; Make them a shared function.
-		 (error "internal error: unknown code location"))
+		 (bug "unknown code location"))
 	       (compiled-code-location-%live-set code-location))
 	      (t live-set)))))
 
@@ -3114,7 +3114,7 @@
 ;;; breakpoints.
 (defun handle-breakpoint-aux (breakpoints data offset component signal-context)
   (unless breakpoints
-    (error "internal error: breakpoint that nobody wants"))
+    (bug "breakpoint that nobody wants"))
   (unless (member data *executing-breakpoint-hooks*)
     (let ((*executing-breakpoint-hooks* (cons data
 					      *executing-breakpoint-hooks*)))

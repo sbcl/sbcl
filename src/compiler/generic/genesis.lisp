@@ -1038,8 +1038,8 @@
 	   ;; looks bad: maybe COMMON-LISP-USER? maybe an extension
 	   ;; package in the xc host? something we can't think of
 	   ;; a valid reason to dump, anyway...
-	   (error "internal error: PACKAGE-NAME=~S looks too much like a typo."
-		  package-name))))
+	   (bug "internal error: PACKAGE-NAME=~S looks too much like a typo."
+		package-name))))
 
   (let (;; Information about each cold-interned symbol is stored
 	;; in COLD-INTERN-INFO.

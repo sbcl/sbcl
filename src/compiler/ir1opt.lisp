@@ -276,7 +276,7 @@
 
   (values))
 
-;;; Loop over the nodes in Block, looking for stuff that needs to be
+;;; Loop over the nodes in BLOCK, looking for stuff that needs to be
 ;;; optimized. We dispatch off of the type of each node with its
 ;;; reoptimize flag set:
 
@@ -319,6 +319,9 @@
 	 (ir1-optimize-set node)))))
   (values))
 
+;;; Try to join with a successor block. If we succeed, we return true,
+;;; otherwise false.
+;;;
 ;;; We cannot combine with a successor block if:
 ;;;  1. The successor has more than one predecessor.
 ;;;  2. The last node's CONT is also used somewhere else.
@@ -328,10 +331,8 @@
 ;;;  5. The next block has a different home lambda, and thus the
 ;;;     control transfer is a non-local exit.
 ;;;
-;;; If we succeed, we return true, otherwise false.
-;;;
-;;; Joining is easy when the successor's Start continuation is the
-;;; same from our Last's Cont. If they differ, then we can still join
+;;; Joining is easy when the successor's START continuation is the
+;;; same from our LAST's CONT. If they differ, then we can still join
 ;;; when the last continuation has no next and the next continuation
 ;;; has no uses. In this case, we replace the next continuation with
 ;;; the last before joining the blocks.
@@ -356,7 +357,7 @@
 	      ((and (null (block-start-uses next))
 		    (eq (continuation-kind last-cont) :inside-block))
 	       (let ((next-node (continuation-next next-cont)))
-		 ;; If next-cont does have a dest, it must be
+		 ;; If NEXT-CONT does have a dest, it must be
 		 ;; unreachable, since there are no uses.
 		 ;; DELETE-CONTINUATION will mark the dest block as
 		 ;; DELETE-P [and also this block, unless it is no
@@ -371,7 +372,7 @@
 	       nil))))))
 
 ;;; Join together two blocks which have the same ending/starting
-;;; continuation. The code in Block2 is moved into Block1 and Block2
+;;; continuation. The code in BLOCK2 is moved into BLOCK1 and BLOCK2
 ;;; is deleted from the DFO. We combine the optimize flags for the two
 ;;; blocks so that any indicated optimization gets done.
 (defun join-blocks (block1 block2)

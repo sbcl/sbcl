@@ -375,7 +375,7 @@
 	((continuation-block cont)
 	 (block-home-lambda-or-null (continuation-block cont)))
 	(t
-	 (error "internal error: confused about home lambda for ~S"))))
+	 (bug "confused about home lambda for ~S"))))
 
 ;;; Return the LAMBDA that is CONT's home.
 (defun continuation-home-lambda (cont)

@@ -529,7 +529,7 @@
 	       (position (posq parameter-entry slots))
 	       (pv-offset-form (list 'pv-offset ''.PV-OFFSET.)))
 	  (unless parameter-entry
-	    (error "internal error in slot optimization"))
+	    (bug "slot optimization bewilderment: O-I-A"))
 	  (unless slot-entry
 	    (setq slot-entry (list slot-name))
 	    (push slot-entry (cdr parameter-entry)))
@@ -557,7 +557,7 @@
 	 (position (posq parameter-entry slots))
 	 (pv-offset-form (list 'pv-offset ''.PV-OFFSET.)))
     (unless parameter-entry
-      (error "internal error in slot optimization"))
+      (error "slot optimization bewilderment: O-A-C"))
     (unless slot-entry
       (setq slot-entry (list name))
       (push slot-entry (cdr parameter-entry)))

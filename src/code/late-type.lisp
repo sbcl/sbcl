@@ -1348,9 +1348,9 @@
 		   ;; an intersection type like (AND REAL (SATISFIES ODDP)),
 		   ;; in which case we fall through the logic above and
 		   ;; end up here, stumped.
-		   (error "~@<internal error (bug 145): The type ~S ~
-                           is too hairy to be used for a COMPLEX ~
-                           component.~:@>" typespec)))))))))
+		   (bug "~@<(known bug #145): The type ~S is too hairy to be 
+                         used for a COMPLEX component.~:@>"
+			typespec)))))))))
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
 ;;; member of TYPE or a one-element list of a member of TYPE.

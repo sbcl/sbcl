@@ -161,8 +161,7 @@
 		    (subtypep result-type-value 'vector)
 		    `(coerce (apply #'%map-to-simple-vector-arity-1 fun seqs)
 			     ',result-type-value))
-		   (t (give-up-ir1-transform
-		       "internal error: unexpected sequence type"))))
+		   (t (bug "impossible (?) sequence type"))))
 	    (t
 	     (let* ((seq-args (make-gensym-list (length seqs)))
 		    (index-bindingoids

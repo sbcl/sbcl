@@ -186,7 +186,7 @@
       (setf (gethash typespec *typecheckfuns*) unmemoized-typecheckfun)
       ;; UNMEMOIZED-TYPECHECKFUN shouldn't be NIL unless the compiler
       ;; knew that the memo would exist, so we shouldn't be here.
-      (error "internal error: no typecheckfun memo for ~%  ~S" typespec)))
+      (bug "no typecheckfun memo for ~S" typespec)))
 
 (defun ctype-needs-to-be-interpreted-p (ctype)
   ;; What we should really do is factor out the code in

@@ -1186,8 +1186,7 @@
   ;; instead.
   :default (if (symbol-self-evaluating-p name)
 	       name
-	       (error "internal error: constant lookup of nonconstant ~S"
-		      name)))
+	       (bug "constant lookup of nonconstant ~S" name)))
 
 (define-info-type
   :class :variable

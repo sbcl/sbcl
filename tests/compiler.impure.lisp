@@ -39,5 +39,18 @@
 (assert (equal (ayup-duplicate-keys-are-ok-i-see-the-lite :k 112) 112))
 (assert (equal (ayup-duplicate-keys-are-ok-i-see-the-lite :k 'x :k 'y) 'x))
 
+;;; As reported by Alexey Dejneka (sbcl-devel 2002-01-30), in
+;;; sbcl-0.7.1 plus his patch (i.e. essentially sbcl-0.7.1.2), the
+;;; compiler barfed on this, blowing up in FIND-IN-PHYSENV looking for
+;;; the LAMBDA-VAR named NUM. That was fixed in sbcl-0.7.1.3.
+(defun parse-num (index)
+  (let (num x)
+    (flet ((digs ()
+             (setq num index))
+	   (z ()
+	     (let ()
+	       (setq x nil))))
+      (when (and (digs) (digs)) x))))
+
 ;;; success
 (quit :unix-status 104)

@@ -610,7 +610,7 @@
 
 (defun muffle-warning-or-die ()
   (muffle-warning)
-  (error "internal error -- no MUFFLE-WARNING restart"))
+  (bug "no MUFFLE-WARNING restart"))
 
 ;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
 ;;; errors which occur during the macroexpansion.
@@ -1044,7 +1044,7 @@
       (special (process-special-decl spec res vars))
       (ftype
        (unless (cdr spec)
-	 (compiler-error "No type specified in FTYPE declaration: ~S" spec))
+	 (compiler-error "no type specified in FTYPE declaration: ~S" spec))
        (process-ftype-decl (second spec) res (cddr spec) fvars))
       ((inline notinline maybe-inline)
        (process-inline-decl spec res fvars))
@@ -1092,9 +1092,7 @@
   (dolist (decl decls)
     (dolist (spec (rest decl))
       (unless (consp spec)
-	(compiler-error "malformed declaration specifier ~S in ~S"
-			spec
-			decl))
+	(compiler-error "malformed declaration specifier ~S in ~S" spec decl))
       (setq env (process-1-decl spec env vars fvars cont))))
   env)
 
@@ -1218,7 +1216,8 @@
 	(dolist (spec optional)
 	  (if (atom spec)
 	      (let ((var (varify-lambda-arg spec (names-so-far))))
-		(setf (lambda-var-arg-info var) (make-arg-info :kind :optional))
+		(setf (lambda-var-arg-info var)
+		      (make-arg-info :kind :optional))
 		(vars var)
 		(names-so-far spec))
 	      (let* ((name (first spec))

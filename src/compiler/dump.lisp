@@ -893,14 +893,12 @@
   (declare (type sb!assem:segment segment)
 	   (type fasl-output fasl-output))
   (let* ((stream (fasl-output-stream fasl-output))
-	 (nwritten (write-segment-contents segment stream)))
+	 (n-written (write-segment-contents segment stream)))
     ;; In CMU CL there was no enforced connection between the CODE-LENGTH
     ;; argument and the number of bytes actually written. I added this
     ;; assertion while trying to debug portable genesis. -- WHN 19990902
-    (unless (= code-length nwritten)
-      (error "internal error, code-length=~W, nwritten=~W"
-	     code-length
-	     nwritten)))
+    (unless (= code-length n-written)
+      (bug "code-length=~W, n-written=~W" code-length n-written)))
   (values))
 
 ;;; Dump all the fixups. Currently there are three flavors of fixup:

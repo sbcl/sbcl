@@ -1222,13 +1222,39 @@ WORKAROUND:
                  (let ()
                    (setq x nil))))
           (when (and (digs) (digs)) x))))
-  In sbcl-0.7.1, it failed with the same
+  In sbcl-0.7.1, this second test case failed with the same
     internal error, failed AVER: "(= (LENGTH (BLOCK-SUCC CALL-BLOCK)) 1)" 
-  but after the APD patches in sbcl-0.7.1.2 (new consistency check in
+  After the APD patches in sbcl-0.7.1.2 (new consistency check in
   TARGET-IF-DESIRABLE, plus a fix in meta-vmdef.lisp to keep the
-  new consistency check from failing routinely) it fails in
-  FIND-IN-PHYSENV instead:
+  new consistency check from failing routinely) this second test case
+  failed in FIND-IN-PHYSENV instead. Fixes in sbcl-0.7.1.3 (not
+  closing over unreferenced variables) made this second test case
+  compile without error, but the original test case still fails.
   
+148:
+  In sbcl-0.7.1.3 on x86, COMPILE-FILE on this file
+    (in-package :cl-user)
+    (defvar *thing*)
+    (defvar *zoom*)
+    (defstruct foo bar bletch)
+    (defun %zeep ()
+      (labels ((kidify1 (kid)
+	         )
+               (kid-frob (kid)
+                 (if *thing*
+                    (setf sweptm
+              	           (m+ (frobnicate kid)
+				     sweptm))
+		    (kidify1 kid))))
+      (declare (inline kid-frob))
+      (map nil
+	   #'kid-frob
+	   (the simple-vector (foo-bar perd)))))
+  fails with
+    debugger invoked on condition of type TYPE-ERROR:
+      The value NIL is not of type SB-C::NODE.
+  in IR1-OPTIMIZE-BLOCK.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

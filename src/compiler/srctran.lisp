@@ -630,7 +630,7 @@
 	      :low (bound-mul (interval-low x) (interval-low y))
 	      :high (bound-mul (interval-high x) (interval-high y))))
 	    (t
-	     (error "internal error in INTERVAL-MUL"))))))
+	     (bug "excluded case in INTERVAL-MUL"))))))
 
 ;;; Divide two intervals.
 (defun interval-div (top bot)
@@ -680,7 +680,7 @@
 	      :low (bound-div (interval-low top) (interval-high bot) t)
 	      :high (bound-div (interval-high top) (interval-low bot) nil)))
 	    (t
-	     (error "internal error in INTERVAL-DIV"))))))
+	     (bug "excluded case in INTERVAL-DIV"))))))
 
 ;;; Apply the function F to the interval X. If X = [a, b], then the
 ;;; result is [f(a), f(b)]. It is up to the user to make sure the

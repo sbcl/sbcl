@@ -171,11 +171,22 @@
 	    (setq did-something t)
 	    (close-over var ref-physenv physenv))))
       (dolist (set (basic-var-sets var))
-	(let ((set-physenv (get-node-physenv set)))
-	  (unless (eq set-physenv physenv)
-	    (setq did-something t)
-	    (setf (lambda-var-indirect var) t)
-	    (close-over var set-physenv physenv)))))
+
+	;; Variables which are set but never referenced can be
+	;; optimized away, and closing over them here would just
+	;; interfere with that. (In bug 147, it *did* interfere with
+	;; that, causing confusion later. This UNLESS solves that
+	;; problem, but I (WHN) am not 100% sure it's best to solve
+	;; the problem this way instead of somehow solving it
+	;; somewhere upstream and just doing (AVER (LEAF-REFS VAR))
+	;; here.)
+	(unless (null (leaf-refs var))
+
+	  (let ((set-physenv (get-node-physenv set)))
+	    (unless (eq set-physenv physenv)
+	      (setf did-something t
+		    (lambda-var-indirect var) t)
+	      (close-over var set-physenv physenv))))))
     did-something))
 
 ;;; Find any variables in CLAMBDA -- either directly in LAMBDA-VARS or
@@ -403,8 +414,8 @@
 	(let ((result (return-result ret)))
 	  (do-uses (use result)
 	    (when (and (immediately-used-p result use)
-		     (or (not (eq (node-derived-type use) *empty-type*))
-			 (not (basic-combination-p use))
-			 (eq (basic-combination-kind use) :local)))
+		       (or (not (eq (node-derived-type use) *empty-type*))
+			   (not (basic-combination-p use))
+			   (eq (basic-combination-kind use) :local)))
 		(setf (node-tail-p use) t)))))))
   (values))

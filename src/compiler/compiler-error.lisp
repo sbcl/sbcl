@@ -25,9 +25,14 @@
 (defvar *compiler-error-bailout*
   (lambda () (error "COMPILER-ERROR with no bailout")))
 
-;;; We have a separate COMPILER-ERROR condition to allow us to
-;;; distinguish internal compiler errors from user errors.
-;;; Non-compiler errors put us in the debugger.
+;;; an application programmer's error caught by the compiler
+;;;
+;;; We want a separate condition for application programmer errors so
+;;; that we can distinguish them from system programming errors (bugs
+;;; in SBCL itself). Application programmer errors should be caught
+;;; and turned into diagnostic output and a FAILURE-P return value
+;;; from COMPILE or COMPILE-FILE. Bugs in SBCL itself throw us into
+;;; the debugger.
 (define-condition compiler-error (simple-error) ())
 
 ;;; Signal the appropriate condition. COMPILER-ERROR calls the bailout
@@ -47,9 +52,7 @@
 	  :format-control format-string
 	  :format-arguments format-args)
   (funcall *compiler-error-bailout*)
-  ;; FIXME: It might be nice to define a BUG or OOPS function for "shouldn't
-  ;; happen" cases like this.
-  (error "internal error, control returned from *COMPILER-ERROR-BAILOUT*"))
+  (bug "Control returned from *COMPILER-ERROR-BAILOUT*."))
 (defun compiler-warn (format-string &rest format-args)
   (apply #'warn format-string format-args)
   (values))

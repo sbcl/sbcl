@@ -713,13 +713,13 @@
   `(unless ,expr
      (%failed-aver ,(format nil "~A" expr))))
 (defun %failed-aver (expr-as-string)
-  (error "~@<internal error, failed AVER: ~2I~_~S~:>" expr-as-string))
+  (bug "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
 (defmacro enforce-type (value type)
   (once-only ((value value))
     `(unless (typep ,value ',type)
        (%failed-enforce-type ,value ',type))))
 (defun %failed-enforce-type (value type)
-  (error 'simple-type-error
+  (error 'simple-type-error ; maybe should be TYPE-BUG, subclass of BUG?
 	 :value value
 	 :expected-type type
 	 :format-string "~@<~S ~_is not a ~_~S~:>"

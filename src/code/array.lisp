@@ -55,7 +55,7 @@
 (defun failed-%with-array-data (array start end)
   (declare (notinline %with-array-data))
   (%with-array-data array start end)
-  (error "internal error: shouldn't be here with valid parameters"))
+  (bug "called FAILED-%WITH-ARRAY-DATA with valid array parameters?"))
 
 ;;;; MAKE-ARRAY
 

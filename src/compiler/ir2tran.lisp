@@ -82,8 +82,7 @@
 	(nlx-info
 	 (aver (eq physenv (block-physenv (nlx-info-target thing))))
 	 (ir2-nlx-info-home (nlx-info-info thing))))
-      (error "~@<internal error: ~2I~_~S ~_not found in ~_~S~:>"
-	     thing physenv)))
+      (bug "~@<~2I~_~S ~_not found in ~_~S~:>" thing physenv)))
 
 ;;; If LEAF already has a constant TN, return that, otherwise make a
 ;;; TN for it.
@@ -668,12 +667,10 @@
 (defun emit-psetq-moves (node block fun old-fp)
   (declare (type combination node) (type ir2-block block) (type clambda fun)
 	   (type (or tn null) old-fp))
-  (let* ((called-env (physenv-info (lambda-physenv fun)))
-	 (this-1env (node-physenv node))
-	 (actuals (mapcar (lambda (x)
-			    (when x
-			      (continuation-tn node block x)))
-			  (combination-args node))))
+  (let ((actuals (mapcar (lambda (x)
+			   (when x
+			     (continuation-tn node block x)))
+			 (combination-args node))))
     (collect ((temps)
 	      (locs))
       (dolist (var (lambda-vars fun))
@@ -695,12 +692,13 @@
 	    (locs loc))))
 
       (when old-fp
-	(dolist (thing (ir2-physenv-closure called-env))
-	  (temps (find-in-physenv (car thing) this-1env))
-	  (locs (cdr thing)))
-
-	(temps old-fp)
-	(locs (ir2-physenv-old-fp called-env)))
+	(let ((this-1env (node-physenv node))
+	      (called-env (physenv-info (lambda-physenv fun))))
+	  (dolist (thing (ir2-physenv-closure called-env))
+	    (temps (find-in-physenv (car thing) this-1env))
+	    (locs (cdr thing)))
+	  (temps old-fp)
+	  (locs (ir2-physenv-old-fp called-env))))
 
       (values (temps) (locs)))))
 
@@ -1025,7 +1023,7 @@
     (when (memq fname *always-optimized-away*)
       (/show (policy node speed) (policy node safety))
       (/show (policy node compilation-speed))
-      (error "internal error: full call to ~S" fname))
+      (bug "full call to ~S" fname))
 
     (when (consp fname)
       (destructuring-bind (setf stem) fname
