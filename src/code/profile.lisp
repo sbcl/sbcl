@@ -383,38 +383,7 @@ Lisp process."
 	  (sort time-info-list
 		#'>=
 		:key #'time-info-seconds))
-
-    (format *trace-output*
-	    "~&  seconds  |  consed   |  calls  |  sec/call  |  name~@
-	       ------------------------------------------------------~%")
-
-    (let ((total-time 0.0)
-	  (total-consed 0)
-	  (total-calls 0))
-      (dolist (time-info time-info-list)
-	(incf total-time (time-info-seconds time-info))
-	(incf total-calls (time-info-calls time-info))
-	(incf total-consed (time-info-consing time-info))
-	(format *trace-output*
-		"~10,3F | ~9:D | ~7:D | ~10,6F | ~S~%"
-		(time-info-seconds time-info)
-		(time-info-consing time-info)
-		(time-info-calls time-info)
-		(/ (time-info-seconds time-info)
-		   (float (time-info-calls time-info)))
-		(time-info-name time-info)))
-      (format *trace-output*
-	      "------------------------------------------------------~@
-	      ~10,3F | ~9:D | ~7:D |	    | Total~%"
-	      total-time total-consed total-calls)
-      (format *trace-output*
-	      "~%estimated total profiling overhead: ~4,2F seconds~%"
-	      (* (overhead-total *overhead*) (float total-calls)))
-      (format *trace-output*
-	      "~&overhead estimation parameters:~%  ~Ss/call, ~Ss total profiling, ~Ss internal profiling~%"
-	      (overhead-call *overhead*)
-	      (overhead-total *overhead*)
-	      (overhead-internal *overhead*)))
+    (print-profile-table time-info-list)
 
     (when no-call-name-list
       (format *trace-output*
@@ -424,6 +393,68 @@ Lisp process."
 			   (symbol-name (fun-name-block-name name))))))
 
     (values)))
+
+
+(defun print-profile-table (time-info-list)
+  (let ((total-seconds 0.0)
+        (total-consed 0)
+        (total-calls 0)
+        (seconds-width (length "seconds"))
+        (consed-width (length "consed"))
+        (calls-width (length "calls"))
+        (sec/call-width 10)
+        (name-width 6))
+    (dolist (time-info time-info-list)
+      (incf total-seconds (time-info-seconds time-info))
+      (incf total-consed (time-info-consing time-info))
+      (incf total-calls (time-info-calls time-info)))
+    (setf seconds-width (max (length (format nil "~10,3F" total-seconds))
+                             seconds-width)
+          calls-width (max (length (format nil "~:D" total-calls))
+                           calls-width)
+          consed-width (max (length (format nil "~:D" total-consed))
+                            consed-width))
+
+    (flet ((dashes ()
+             (dotimes (i (+ seconds-width consed-width calls-width
+                            sec/call-width name-width
+                            (* 5 3)))
+               (write-char #\- *trace-output*))
+             (terpri *trace-output*)))
+      (format *trace-output* "~&~@{ ~v:@<~A~>~^|~}~%"
+              seconds-width "seconds"
+              (1+ consed-width) "consed"
+              (1+ calls-width) "calls"
+              (1+ sec/call-width) "sec/call"
+              (1+ name-width) "name")
+
+      (dashes)
+
+      (dolist (time-info time-info-list)
+        (format *trace-output* "~v,3F | ~v:D | ~v:D | ~10,6F | ~S~%"
+                seconds-width (time-info-seconds time-info)
+                consed-width (time-info-consing time-info)
+                calls-width (time-info-calls time-info)
+                (/ (time-info-seconds time-info)
+                   (float (time-info-calls time-info)))
+                (time-info-name time-info)))
+
+      (dashes)
+
+      (format *trace-output* "~v,3F | ~v:D | ~v:D |            | Total~%"
+                seconds-width total-seconds
+                consed-width total-consed
+                calls-width total-calls)
+
+      (format *trace-output*
+	      "~%estimated total profiling overhead: ~4,2F seconds~%"
+	      (* (overhead-total *overhead*) (float total-calls)))
+      (format *trace-output*
+	      "~&overhead estimation parameters:~%  ~Ss/call, ~Ss total profiling, ~Ss internal profiling~%"
+	      (overhead-call *overhead*)
+	      (overhead-total *overhead*)
+	      (overhead-internal *overhead*)))))
+
 
 ;;;; overhead estimation
 
