@@ -93,10 +93,8 @@
 
 ;;; a handy macro so we don't have to keep changing all the numbers
 ;;; whenever we insert a new storage class.
-;;;
-;;; FIXME: This macro is not needed in the runtime target.
 
-(defmacro define-storage-classes (&rest classes)
+(defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
 	      (let* ((class (car classes))
 		     (sc-name (car class))
@@ -124,9 +122,9 @@
 ;;; and seems to be working so far    -dan
 (defconstant sb!vm::kludge-nondeterministic-catch-block-size 7)
 
-(define-storage-classes
+(!define-storage-classes
 
-  ;; Non-immediate contstants in the constant pool
+  ;; non-immediate constants in the constant pool
   (constant constant)
 
   ;; ZERO and NULL are in registers.

@@ -250,18 +250,15 @@
 	   ,error)))))
 
 
-;;; PSEUDO-ATOMIC -- Handy macro for making sequences look atomic.
-;;;
+;;; a handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((&key (extra 0)) &rest forms)
   `(progn
      (inst addq alloc-tn 1 alloc-tn)
      ,@forms
      (inst lda alloc-tn (1- ,extra) alloc-tn)
      (inst stl zero-tn 0 alloc-tn)))
-
-
 
-;;;; Memory accessor vop generators
+;;;; memory accessor vop generators
 
 (deftype load/store-index (scale lowtag min-offset
 				 &optional (max-offset min-offset))

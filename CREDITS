@@ -539,6 +539,11 @@ Nathan Froyd:
   read without being an expert in ancient languages and so that
   can delete a thousand lines of implement-ITERATE macrology.)
 
+Arthur Lemmens:
+  He found and fixed a number of SBCL bugs while partially porting SBCL
+  to bootstrap under <some other Common Lisp system, which could
+  probably be found in the sbcl-devel archives>.
+
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
   the CMU CL project. Some of these fixes, especially for compiler
@@ -561,8 +566,7 @@ Christophe Rhodes:
   He has done various low-level work on SBCL, especially for the
   SPARC port (and for CPU-architecture-neutral things motivated by
   it, like *BACKEND-FEATURES*). He's also contributed miscellaneous
-  bug fixes. As of 2002-01-17, he seems to be mostly done with a port
-  of SBCL to the SPARC CPU.
+  bug fixes.
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on
@@ -589,6 +593,7 @@ Raymond Wiker:
 
 INITIALS GLOSSARY (helpful when reading comments, CVS commit logs, etc.)
 
+AL   Arthur Lemmens
 MNA  Martin Atzmueller
 DB   Daniel Barlow
 DTC  Douglas Crosher

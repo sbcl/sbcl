@@ -1354,14 +1354,14 @@
   (flet ((ash-outer (n s)
 	   (when (and (fixnump s)
 		      (<= s 64)
-		      (> s sb!vm:*target-most-negative-fixnum*))
+		      (> s sb!xc:most-negative-fixnum))
 	     (ash n s)))
          ;; KLUDGE: The bare 64's here should be related to
          ;; symbolic machine word size values somehow.
 
 	 (ash-inner (n s)
 	   (if (and (fixnump s)
-		    (> s sb!vm:*target-most-negative-fixnum*))
+		    (> s sb!xc:most-negative-fixnum))
              (ash n (min s 64))
              (if (minusp n) -1 0))))
     (or (and (csubtypep n-type (specifier-type 'integer))

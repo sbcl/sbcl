@@ -24,15 +24,9 @@
 ;;; a mask to extract the type from a data block header word
 (defconstant widetag-mask (1- (ash 1 n-widetag-bits)))
 
-;;; FIXME: Couldn't/shouldn't these be DEFCONSTANT instead of
-;;; DEFPARAMETER? (It might seem even more tempting to make them
-;;; SB!XC:MOST-POSITIVE-FIXNUM and SB!XC:MOST-NEGATIVE-FIXNUM,
-;;; but that's probably not a good idea, since then we'd need
-;;; to worry about the effect of UNCROSS in expressions like
-;;; (DEFTYPE INDX3 () `(INTEGER 3 ,SB!XC:MOST-POSITIVE-FIXNUM)).)
-(defparameter *target-most-positive-fixnum* (1- (ash 1 29))
+(defconstant sb!xc:most-positive-fixnum (1- (ash 1 29))
   #!+sb-doc
-  "most-positive-fixnum in the target architecture")
-(defparameter *target-most-negative-fixnum* (ash -1 29)
+  "the fixnum closest in value to positive infinity")
+(defconstant sb!xc:most-negative-fixnum (ash -1 29)
   #!+sb-doc
-  "most-negative-fixnum in the target architecture")
+  "the fixnum closest in value to negative infinity")

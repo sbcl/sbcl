@@ -42,6 +42,11 @@
  ;; leaking into target SBCL code.
  ("src/code/backq")
 
+ ;; It's difficult to be too early with a DECLAIM SPECIAL (or DEFVAR
+ ;; or whatever) thanks to the sullenly-do-the-wrong-thing semantics
+ ;; of CL special binding when the variable is undeclared.
+ ("src/code/globals" :not-host)
+
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; various DEFSETFs and/or other DEFMACROish things, defined as early as
  ;; possible so we don't need to fiddle with any subtleties of defining them
@@ -75,7 +80,7 @@
 
  ("src/code/primordial-extensions")
 
- ;; for various constants e.g. SB!VM:*TARGET-MOST-POSITIVE-FIXNUM* and
+ ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
  ;; SB!VM:N-LOWTAG-BITS, needed by "early-objdef" and others
  ("src/compiler/generic/early-vm")
  ("src/compiler/generic/early-objdef")
@@ -142,7 +147,6 @@
  ;;    and stuff."
  ;; Dunno exactly what this meant or whether it still holds. -- WHN 19990803
  ;; FIXME: more informative and up-to-date comment?
- ("src/code/globals"     :not-host)
  ("src/code/kernel"      :not-host)
  ("src/code/toplevel"    :not-host)
  ("src/code/cold-error"  :not-host)
@@ -574,7 +578,7 @@
                                                 ;   "compiler/generic/core"
 
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
- ("src/code/target-sap"        :not-host) ; uses SAP-INT-TYPE
+ ("src/code/target-sap"        :not-host) ; uses SAP-INT type
  ("src/code/target-package"    :not-host) ; needs "code/package"
  ("src/code/target-random"     :not-host) ; needs "code/random"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"

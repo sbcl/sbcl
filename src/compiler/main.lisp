@@ -1115,15 +1115,8 @@
 
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
-(defun compile-load-time-value
-       (form &optional
-	     (name (let ((*print-level* 2) (*print-length* 3))
-		     (format nil "load time value of ~S"
-			     (if (and (listp form)
-				      (eq (car form) 'make-value-cell))
-				 (second form)
-				 form)))))
-  (let ((lambda (compile-load-time-stuff form name t)))
+(defun compile-load-time-value (form)
+  (let ((lambda (compile-load-time-stuff form t)))
     (values
      (fasl-dump-load-time-value-lambda lambda *compile-object*)
      (let ((type (leaf-type lambda)))
@@ -1133,13 +1126,13 @@
 
 ;;; Compile the FORMS and arrange for them to be called (for effect,
 ;;; not value) at load time.
-(defun compile-make-load-form-init-forms (forms name)
-  (let ((lambda (compile-load-time-stuff `(progn ,@forms) name nil)))
+(defun compile-make-load-form-init-forms (forms)
+  (let ((lambda (compile-load-time-stuff `(progn ,@forms) nil)))
     (fasl-dump-toplevel-lambda-call lambda *compile-object*)))
 
 ;;; Do the actual work of COMPILE-LOAD-TIME-VALUE or
 ;;; COMPILE-MAKE-LOAD-FORM-INIT-FORMS.
-(defun compile-load-time-stuff (form name for-value)
+(defun compile-load-time-stuff (form for-value)
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))
 	  (lambda (ir1-toplevel form *current-path* for-value)))
@@ -1630,8 +1623,7 @@
 		   (fasl-note-handle-for-constant
 		    constant
 		    (compile-load-time-value
-		     creation-form
-		     (format nil "creation form for ~A" name))
+		     creation-form)
 		    *compile-object*)
 		   nil)
 	       (compiler-error "circular references in creation form for ~S"

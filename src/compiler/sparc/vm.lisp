@@ -29,7 +29,7 @@
 		    (list ,@(mapcar (lambda (name)
 				      (symbolicate name "-OFFSET"))
 				    regs))))))
-  ;; "c.f. src/runtime/sparc-lispregs.h
+  ;; c.f. src/runtime/sparc-lispregs.h
 
   ;; Globals.  These are difficult to extract from a sigcontext.
   (defreg zero 0)				; %g0
@@ -79,7 +79,7 @@
   (defregset *register-arg-offsets*
       a0 a1 a2 a3 a4 a5))
 
-;;;; SB and SC definition:
+;;;; SB and SC definition
 
 (define-storage-base registers :finite :size 32)
 (define-storage-base float-registers :finite :size 64)
@@ -88,11 +88,9 @@
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
 
-;;; Handy macro so we don't have to keep changing all the numbers whenever
-;;; we insert a new storage class.
-;;; 
-;;; FIXME: This macro is not needed in the runtime target.
-(defmacro define-storage-classes (&rest classes)
+;;; handy macro so we don't have to keep changing all the numbers
+;;; whenever we insert a new storage class
+(defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
 	      (let* ((class (car classes))
 		     (sc-name (car class))
@@ -122,9 +120,9 @@
 ;;; arbitrarily taken for alpha, too. - Christophe
 (defconstant sb!vm::kludge-nondeterministic-catch-block-size 7)
 
-(define-storage-classes
+(!define-storage-classes
 
-  ;; Non-immediate contstants in the constant pool
+  ;; non-immediate constants in the constant pool
   (constant constant)
 
   ;; ZERO and NULL are in registers.
@@ -134,8 +132,9 @@
   ;; Anything else that can be an immediate.
   (immediate immediate-constant)
 
-
-  ;; **** The stacks.
+  ;;
+  ;; the stacks
+  ;;
 
   ;; The control stack.  (Scanned by GC)
   (control-stack control-stack)

@@ -28,14 +28,14 @@
 	   (first-try (ash native-address -2))
 	   ;; final encoding
 	   (second-try 
-	    (if (<= first-try sb!vm:*target-most-positive-fixnum*)
+	    (if (<= first-try sb!xc:most-positive-fixnum)
 		;; looks good
 		first-try
 		;; When the naive encoding fails to make a FIXNUM
 		;; because the sign is wrong, subtracting *T-M-P-F*
 		;; should fix it. 
-		(- first-try sb!vm:*target-most-positive-fixnum*))))
-      (aver (<= second-try sb!vm:*target-most-positive-fixnum*))
+		(- first-try sb!xc:most-positive-fixnum))))
+      (aver (<= second-try sb!xc:most-positive-fixnum))
       second-try)))
 
 ;;; a FIXNUM, to be interpreted as a native pointer, which serves

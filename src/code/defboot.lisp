@@ -176,6 +176,7 @@
 			  (block ,(fun-name-block-name name)
 			    ,@forms)))
 	   (lambda `(lambda ,@lambda-guts))
+           #-sb-xc-host
 	   (named-lambda `(named-lambda ,name ,@lambda-guts))
 	   (inline-lambda
 	    (cond (;; Does the user not even want to inline?

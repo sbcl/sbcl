@@ -232,25 +232,23 @@
 
 
 
-;;; PSEUDO-ATOMIC -- Handy macro for making sequences look atomic.
-;;;
+;;; a handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((&key (extra 0)) &rest forms)
   (let ((n-extra (gensym)))
     `(let ((,n-extra ,extra))
-       ;; Set the pseudo-atomic flag
+       ;; Set the pseudo-atomic flag.
        (without-scheduling ()
 	 (inst add alloc-tn 4))
        ,@forms
-       ;; Reset the pseudo-atomic flag
+       ;; Reset the pseudo-atomic flag.
        (without-scheduling ()
 	 #+nil (inst taddcctv alloc-tn (- ,n-extra 4))
-	;; Remove the pseudo-atomic flag
+	;; Remove the pseudo-atomic flag.
 	(inst add alloc-tn (- ,n-extra 4))
-	;; Check to see if pseudo-atomic interrupted flag is set (bit 0 = 1)
+	;; Check to see if pseudo-atomic interrupted flag is set (bit 0 = 1).
 	(inst andcc zero-tn alloc-tn 3)
 	;; The C code needs to process this correctly and fixup alloc-tn.
-	(inst t :ne pseudo-atomic-trap)
-	))))
+	(inst t :ne pseudo-atomic-trap)))))
 
 ;;; FIXME: test typing macros. Should(?) be in type-vops.lisp, except
 ;;; that they're also used in subprim.lisp

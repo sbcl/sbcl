@@ -310,7 +310,7 @@
 ;;;; symbols
 
 #!+x86
-(defknown symbol-hash (symbol) (integer 0 #.*target-most-positive-fixnum*)
+(defknown symbol-hash (symbol) (integer 0 #.sb!xc:most-positive-fixnum)
   (flushable movable))
 
 (define-primitive-object (symbol :lowtag other-pointer-lowtag

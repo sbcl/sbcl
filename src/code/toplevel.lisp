@@ -13,14 +13,6 @@
 
 (in-package "SB!IMPL")
 
-(defconstant most-positive-fixnum #.sb!vm:*target-most-positive-fixnum*
-  #!+sb-doc
-  "the fixnum closest in value to positive infinity")
-
-(defconstant most-negative-fixnum #.sb!vm:*target-most-negative-fixnum*
-  #!+sb-doc
-  "the fixnum closest in value to negative infinity")
-
 ;;;; magic specials initialized by GENESIS
 
 ;;; FIXME: The DEFVAR here is redundant with the (DECLAIM (SPECIAL ..))

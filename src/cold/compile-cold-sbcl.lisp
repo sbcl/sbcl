@@ -16,24 +16,6 @@
 
 (defvar *target-object-file-names*)
 
-;;; KLUDGE..
-;;;
-;;; CMU CL (as of 2.4.6 for Debian, anyway) issues warnings (and not
-;;; just STYLE-WARNINGs, either, alas) when it tries to interpret code
-;;; containing references to undefined functions. The most common
-;;; problem is that macroexpanded code refers to this function, which
-;;; isn't defined until late.
-;;;
-;;; This
-;;;   #+cmu (defun sb!kernel::arg-count-error (&rest rest)
-;;;	      (error "stub version of ARG-COUNT-ERROR, rest=~S" rest))
-;;; doesn't work, with or without this
-;;;   (compile 'sb!kernel::arg-count-error))
-;;; so perhaps I should try
-;;;   (declaim (ftype ..) ..)
-;;; instead?
-(declaim (ftype (function (&rest t) nil) sb!kernel::arg-count-error))
-
 (let ((reversed-target-object-file-names nil))
   (do-stems-and-flags (stem flags)
     (unless (position :not-target flags)

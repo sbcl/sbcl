@@ -137,7 +137,7 @@
     (declare (type index size))
     (do ((n (1- size) (1- n)))
 	((minusp n))
-      (declare (type (integer -1 #.most-positive-fixnum) n))
+      (declare (type index-or-minus-1 n))
       (setf (%instance-ref res n) (pop-stack)))
     res))
 

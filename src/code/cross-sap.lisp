@@ -18,13 +18,13 @@
 (defstruct (system-area-pointer (:constructor make-sap)
 				(:conc-name "SAP-"))
   ;; the integer representation of the address
-  (int (error "missing SAP-INT argument") :type sap-int-type :read-only t))
+  (int (error "missing SAP-INT argument") :type sap-int :read-only t))
 
 ;;; cross-compilation-host analogues of target-CMU CL primitive SAP operations
 (defun int-sap (int)
   (make-sap :int int))
 (defun sap+ (sap offset)
-  (declare (type system-area-pointer sap) (type sap-int-type offset))
+  (declare (type system-area-pointer sap) (type sap-int offset))
   (make-sap :int (+ (sap-int sap) offset)))
 #.`(progn
      ,@(mapcar (lambda (info)

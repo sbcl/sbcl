@@ -250,11 +250,11 @@
 ;;; values of special variables such as *** and +, anyway). Set up
 ;;; machinery to warn us when/if we change it.
 ;;;
-;;; FIXME: All this machinery should probably be conditional on
-;;; #!+SB-SHOW, i.e. we should be able to wrap #!+SB-SHOW around both
-;;; the LOAD and the DEFVAR here. 
-(load "src/cold/snapshot.lisp")
-(defvar *cl-snapshot* (take-snapshot "COMMON-LISP"))
+;;; All code depending on this is itself dependent on #!+SB-SHOW.
+#!+sb-show
+(progn
+  (load "src/cold/snapshot.lisp")
+  (defvar *cl-snapshot* (take-snapshot "COMMON-LISP")))
 
 ;;;; master list of source files and their properties
 

@@ -13,18 +13,6 @@
 
 (in-package "SB!KERNEL")
 
-;;; We save space in macro definitions by calling this function.
-(defun arg-count-error (error-kind name args lambda-list minimum maximum)
-  (let (#-sb-xc-host
-	(sb!debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
-    (error 'arg-count-error
-	   :kind error-kind
-	   :name name
-	   :args args
-	   :lambda-list lambda-list
-	   :minimum minimum
-	   :maximum maximum)))
-
 (define-condition defmacro-lambda-list-bind-error (error)
   ((kind :reader defmacro-lambda-list-bind-error-kind
 	 :initarg :kind)

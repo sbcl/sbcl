@@ -13,10 +13,7 @@
 
 ;;; the size of an INTEGER representation of a SYSTEM-AREA-POINTER, i.e.
 ;;; size of a native memory address
-(deftype sap-int-type () '(unsigned-byte 32))
-;;; FIXME: This should just named be SAP-INT, not SAP-INT-TYPE. And
-;;; grep for SAPINT in the code and replace it with SAP-INT as
-;;; appropriate.
+(deftype sap-int () '(unsigned-byte 32))
 
 ;;;; register specs
 
@@ -131,8 +128,7 @@
 ;;; a handy macro so we don't have to keep changing all the numbers whenever
 ;;; we insert a new storage class
 ;;;
-;;; FIXME: This macro is not needed in the runtime target.
-(defmacro define-storage-classes (&rest classes)
+(defmacro !define-storage-classes (&rest classes)
   (collect ((forms))
     (let ((index 0))
       (dolist (class classes)
@@ -166,9 +162,9 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant kludge-nondeterministic-catch-block-size 6))
 
-(define-storage-classes
+(!define-storage-classes
 
-  ;; non-immediate contstants in the constant pool
+  ;; non-immediate constants in the constant pool
   (constant constant)
 
   ;; some FP constants can be generated in the i387 silicon

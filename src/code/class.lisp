@@ -1185,8 +1185,8 @@
      :translation integer
      :inherits (rational real number generic-number))
     (fixnum
-     :translation (integer #.sb!vm:*target-most-negative-fixnum*
-			   #.sb!vm:*target-most-positive-fixnum*)
+     :translation (integer #.sb!xc:most-negative-fixnum
+			   #.sb!xc:most-positive-fixnum)
      :inherits (integer rational real number
 		generic-number)
      :codes (#.sb!vm:even-fixnum-lowtag #.sb!vm:odd-fixnum-lowtag))

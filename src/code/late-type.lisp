@@ -1118,8 +1118,8 @@
 				  `(unsigned-byte ,high-length))
 				 (t
 				  `(mod ,(1+ high)))))
-			  ((and (= low sb!vm:*target-most-negative-fixnum*)
-				(= high sb!vm:*target-most-positive-fixnum*))
+			  ((and (= low sb!xc:most-negative-fixnum)
+				(= high sb!xc:most-positive-fixnum))
 			   'fixnum)
 			  ((and (= low (lognot high))
 				(= high-count high-length)

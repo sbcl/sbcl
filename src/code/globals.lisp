@@ -34,7 +34,7 @@
 		assert-prompt check-type-error case-body-error print-object
 		describe-object sb!pcl::check-wrapper-validity))
 
-;;; Gray streams functions not defined until after PCL is loaded.
+;;; Gray streams functions not defined until after PCL is loaded
 (declaim (ftype (function * *)
 		stream-advance-to-column stream-clear-input
 		stream-clear-output stream-finish-output stream-force-output

@@ -890,9 +890,7 @@
 
   (%compiler-set-up-layout dd inherits)
 
-  (let* ((dd-name (dd-name dd))
-	 (dtype (dd-declarable-type dd))
-	 (class (sb!xc:find-class dd-name)))
+  (let* ((dtype (dd-declarable-type dd)))
 
     (let ((copier-name (dd-copier-name dd)))
       (when copier-name
@@ -1409,7 +1407,6 @@
 	      :metaclass-name metaclass-name
 	      :metaclass-constructor metaclass-constructor
 	      :dd-type dd-type))
-	 (conc-name (concatenate 'string (symbol-name class-name) "-"))
 	 (dd-slots (dd-slots dd))
 	 (dd-length (1+ (length slot-names)))
 	 (object-gensym (gensym "OBJECT"))

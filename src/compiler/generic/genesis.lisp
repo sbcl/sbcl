@@ -463,12 +463,13 @@
   (read-wordindexed address 0))
 
 ;;; (Note: In CMU CL, this function expected a SAP-typed ADDRESS
-;;; value, instead of the SAPINT we use here.)
-(declaim (ftype (function (sb!vm:word descriptor) (values)) note-load-time-value-reference))
+;;; value, instead of the SAP-INT we use here.)
+(declaim (ftype (function (sb!vm:word descriptor) (values))
+                note-load-time-value-reference))
 (defun note-load-time-value-reference (address marker)
   (cold-push (cold-cons
 	      (cold-intern :load-time-value-fixup)
-	      (cold-cons (sapint-to-core address)
+	      (cold-cons (sap-int-to-core address)
 			 (cold-cons
 			  (number-to-core (descriptor-word-offset marker))
 			  *nil-descriptor*)))
@@ -719,15 +720,15 @@
     (float (float-to-core number))
     (t (error "~S isn't a cold-loadable number at all!" number))))
 
-(declaim (ftype (function (sb!vm:word) descriptor) sap-to-core))
-(defun sapint-to-core (sapint)
+(declaim (ftype (function (sb!vm:word) descriptor) sap-int-to-core))
+(defun sap-int-to-core (sap-int)
   (let ((des (allocate-unboxed-object *dynamic*
 				      sb!vm:n-word-bits
 				      (1- sb!vm:sap-size)
 				      sb!vm:sap-widetag)))
     (write-wordindexed des
 		       sb!vm:sap-pointer-slot
-		       (make-random-descriptor sapint))
+		       (make-random-descriptor sap-int))
     des))
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
@@ -766,7 +767,7 @@
     (write-wordindexed symbol
 		       sb!vm:symbol-hash-slot
 		       (make-fixnum-descriptor
-			(1+ (random sb!vm:*target-most-positive-fixnum*))))
+			(1+ (random sb!xc:most-positive-fixnum))))
     (write-wordindexed symbol sb!vm:symbol-plist-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
 		       (string-to-core name *dynamic*))
