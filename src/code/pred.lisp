@@ -113,19 +113,35 @@
 (defun type-of (object)
   #!+sb-doc
   "Return the type of OBJECT."
-  (if (typep object '(or function array complex))
-    (type-specifier (ctype-of object))
-    (let* ((classoid (layout-classoid (layout-of object)))
-	   (name (classoid-name classoid)))
-      (if (typep object 'instance)
-      (case name
-	(sb!alien-internals:alien-value
-	 `(sb!alien:alien
-	   ,(sb!alien-internals:unparse-alien-type
-	     (sb!alien-internals:alien-value-type object))))
-	(t
-	 (classoid-proper-name classoid)))
-      name))))
+  (typecase object
+    (fixnum
+     (cond
+       ((<= 0 object 1) 'bit)
+       ((< object 0) 'fixnum)
+       (t '(integer 0 #.sb!xc:most-positive-fixnum))))
+    (integer
+     (if (>= object 0)
+	 '(integer #.(1+ sb!xc:most-positive-fixnum))
+	 'bignum))
+    (standard-char 'standard-char)
+    ((member t) 'boolean)
+    (keyword 'keyword)
+    ((or array complex) (type-specifier (ctype-of object)))
+    (t
+     (let* ((classoid (layout-classoid (layout-of object)))
+	    (name (classoid-name classoid)))
+       (if (typep object 'instance)
+	   (case name
+	     (sb!alien-internals:alien-value
+	      `(sb!alien:alien
+		,(sb!alien-internals:unparse-alien-type
+		  (sb!alien-internals:alien-value-type object))))
+	     (t
+	      (let ((pname (classoid-proper-name classoid)))
+		(if (classoid-p pname)
+		    (classoid-pcl-class pname)
+		    pname))))
+	   name)))))
 
 ;;;; equality predicates
 

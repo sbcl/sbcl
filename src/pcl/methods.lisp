@@ -1485,6 +1485,10 @@
 	     (set-dfun gf dfun cache info) ; lest the cache be freed twice
 	     (update-dfun gf dfun cache info))))))
 
+(defmethod (setf class-name) :before (new-value (class class))
+  (let ((classoid (find-classoid (class-name class))))
+    (setf (classoid-name classoid) new-value)))
+
 (defmethod function-keywords ((method standard-method))
   (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)
       (analyze-lambda-list (if (consp method)
