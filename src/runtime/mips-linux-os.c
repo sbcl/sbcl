@@ -83,8 +83,17 @@ os_context_bd_cause(os_context_t *context)
 {
     /* We need to see if whatever happened, happened because of a
        branch delay event */
-    return (((struct sigcontext *) &(context->uc_mcontext))->sc_cause 
-	    & CAUSEF_BD);
+    /* FIXME: However, I'm not convinced that the values that Linux
+       puts in this slot are actually right; specifically, attempting
+       to compile sbcl with sbcl-0.7.7.7 lead to an "infinite SIGTRAP
+       loop" where a (BREAK 16) not in a branch delay slot would have
+       CAUSEF_BD filled. So, we comment
+
+        return (((struct sigcontext *) &(context->uc_mcontext))->sc_cause 
+	        & CAUSEF_BD);
+
+       out and return 0 always.  -- CSR, 2002-09-02 */
+    return 0;
 }
 
 void 

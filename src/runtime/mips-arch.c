@@ -106,10 +106,18 @@ emulate_branch(os_context_t *context, unsigned long inst)
 void arch_skip_instruction(os_context_t *context)
 {
     /* Skip the offending instruction */
-    if (os_context_bd_cause(context))
+    if (os_context_bd_cause(context)) {
+	/* Currently, we never get here, because Linux' support for
+           bd_cause seems not terribly solid (c.f os_context_bd_cause
+           in mips-linux-os.c).  If a port to Irix comes along, this
+           code will be executed, because presumably Irix' support is
+           better (it can hardly be worse).  We lose() to remind the
+           porter to review this code.  -- CSR, 2002-09-06 */
+	lose("bd_cause branch taken; review code for new OS?\n");
         *os_context_pc_addr(context) = 
 	    emulate_branch(context, 
 			   *(unsigned long *) *os_context_pc_addr(context));
+    }
     else
         *os_context_pc_addr(context) += 4;
 

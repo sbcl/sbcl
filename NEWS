@@ -1251,6 +1251,10 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
     bug fix involving the names of PCL MAKE-INSTANCE functions)
 
 changes in sbcl-0.7.8 relative to sbcl-0.7.7:
+  * A beta-quality port to the mips architecture running Linux,
+    based on the old CMUCL backend, has been made.  It has been tested
+    on a big-endian kernel, and works sufficiently well to be able to
+    rebuild itself; it has not been tested in little-endian mode.
   * fixed bug 120a: The compiler now deals correctly with IFs where
     the consequent is the same as the alternative, instead of
     misderiving the return type. (thanks to Alexey Dejneka)
