@@ -194,7 +194,7 @@
 	 ;; lets not do this...
 	 #+nil
 	 (let ((header (sb-kernel:%closure-function fcn)))
-	   (setf (sb-c::%function-name header) new-name))
+	   (setf (sb-kernel:%function-name header) new-name))
 
 	 ;; XXX Maybe add better scheme here someday.
 	 fcn)))

@@ -29,7 +29,7 @@
 
 (in-package "SB-WALKER")
 
-;;;; environment frobbing stuff
+;;;; environment hacking stuff, necessarily SBCL-specific
 
 ;;; Here in the original PCL were implementations of the
 ;;; implementation-specific environment hacking functions for each of
@@ -75,11 +75,35 @@
 
 ;;; In SBCL, as in CMU CL before it, the environment is represented
 ;;; with a structure that holds alists for the functional things,
-;;; variables, blocks, etc. Only the c::lexenv-functions slot is
-;;; relevant. It holds: Alist (name . what), where What is either a
-;;; Functional (a local function) or a list (MACRO . <function>) (a
+;;; variables, blocks, etc.
+;;; Except for SYMBOL-MACROLET, only the SB-C::LEXENV-FUNCTIONS slot
+;;; is relevant. It holds: Alist (Name . What), where What is either
+;;; a functional (a local function) or a list (MACRO . <function>) (a
 ;;; local macro, with the specifier expander.) Note that Name may be a
 ;;; (SETF <name>) function.
+;;; Accessors are defined below, eg (ENV-WALK-FUNCTION ENV).
+;;;
+;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
+;;; this code hides the WALKER version of an environment
+;;; inside the SB-C::LEXENV structure.
+;;;
+;;; In CMUCL (and former SBCL), This used to be a list of lists of form
+;;; (<gensym-name> MACRO . #<interpreted-function>) in the :functions slot
+;;; in a C::LEXENV.
+;;; This form was accepted by the compiler, but this was a crude hack,
+;;; because the <interpreted-function> was used as a structure to hold the
+;;; bits of interest, {function, form, declarations, lexical-variables},
+;;; a list, which was not really an interpreted function.
+;;; Instead this list was COERCEd to a #<FUNCTION ...>!
+;;;
+;;; Instead, we now use a special sort of "function"-type for that information,
+;;; because the functions slot in SB-C::LEXENV is supposed to have a list of
+;;; <Name MACRO . #<function> elements.
+;;; So, now we hide our bits of interest in the walker-info slot in our new
+;;; BOGO-FUNCTION.
+;;;
+;;; MACROEXPAND-1 is the only SBCL function that gets called with the
+;;; constructed environment argument.
 
 (defmacro with-augmented-environment
     ((new-env old-env &key functions macros) &body body)
@@ -88,29 +112,27 @@
 							,macros)))
      ,@body))
 
-;;; KLUDGE: In CMU CL, when X was an arbitrary list, even one which
-;;; did not name a function or describe a lambda expression, calling
-;;; (EVAL `(FUNCTION ,X)) would still return a FUNCTION object, and no
-;;; error would be signalled until/unless you tried to FUNCALL the
-;;; resulting FUNCTION object. (This behavior was also present in
-;;; (COERCE X 'FUNCTION), which was defined in terms of (EVAL
-;;; `(FUNCTION ,X)).) This function provides roughly the same behavior
-;;; as the old CMU CL (COERCE X 'FUNCTION), for the benefit of PCL
-;;; code which relied on being able to coerce bogus things without
-;;; raising errors as long as it never tried to actually call them.
-(defun bogo-coerce-to-function (x)
-  (or (ignore-errors (coerce x 'function))
-      (lambda (&rest rest)
-	(declare (ignore rest))
-	(error "can't FUNCALL bogo-coerced-to-function ~S" x))))
+(defstruct (bogo-function
+	    (:alternate-metaclass sb-kernel:funcallable-instance
+				  sb-kernel:funcallable-structure-class
+				  sb-kernel:make-funcallable-structure-class)
+	    (:type sb-kernel:funcallable-structure)
+	    (:copier nil))
+  (walker-info (required-argument) :type list))
 
+(defun walker-info-to-bogo-function (x)
+  (make-bogo-function :walker-info x))
+
+(defun bogo-function-to-walker-info (x)
+  (bogo-function-walker-info x))
+   
 (defun with-augmented-environment-internal (env functions macros)
   ;; Note: In order to record the correct function definition, we
   ;; would have to create an interpreted closure, but the
-  ;; with-new-definition macro down below makes no distinction between
+  ;; WITH-NEW-DEFINITION macro down below makes no distinction between
   ;; FLET and LABELS, so we have no idea what to use for the
   ;; environment. So we just blow it off, 'cause anything real we do
-  ;; would be wrong. We still have to make an entry so we can tell
+  ;; would be wrong. But we still have to make an entry so we can tell
   ;; functions from macros.
   (let ((env (or env (sb-kernel:make-null-lexenv))))
     (sb-c::make-lexenv
@@ -122,8 +144,10 @@
 	      (mapcar (lambda (m)
 			(list* (car m)
 			       'sb-c::macro
-			       (bogo-coerce-to-function (cadr m))))
-		      macros)))))
+                               (if (eq (car m) *key-to-walker-environment*)
+                                 (walker-info-to-bogo-function (cadr m))
+                                 (coerce (cadr m) 'function))))
+                      macros)))))
 
 (defun environment-function (env fn)
   (when env
@@ -137,7 +161,12 @@
     (let ((entry (assoc macro (sb-c::lexenv-functions env) :test #'eq)))
       (and entry
 	   (eq (cadr entry) 'sb-c::macro)
-	   (values (function-lambda-expression (cddr entry)))))))
+           (if (eq macro *key-to-walker-environment*)
+             (values (bogo-function-to-walker-info (cddr entry)))
+             (values (function-lambda-expression (cddr entry))))))))
+
+;;;; other environment hacking, not so SBCL-specific as the
+;;;; environment hacking in the previous section
 
 (defmacro with-new-definition-in-environment
 	  ((new-env old-env macrolet/flet/labels-form) &body body)
@@ -165,8 +194,8 @@
     (eval `(defmacro ,gensym ,llist ,@body))
     (macro-function gensym)))
 
-;;; Now comes the real walker.
-;;;
+;;;; the actual walker
+
 ;;; As the walker walks over the code, it communicates information to
 ;;; itself about the walk. This information includes the walk
 ;;; function, variable bindings, declarations in effect etc. This
@@ -314,7 +343,6 @@
 	 '(lambda repeat (eval)))
 	(t
 	 (error "can't get template for ~S" x))))
-
 
 ;;;; the actual templates
 
@@ -356,9 +384,9 @@
 (defun walk-form (form
 		  &optional environment
 			    (walk-function
-			      #'(lambda (subform context env)
-				  (declare (ignore context env))
-				  subform)))
+			     (lambda (subform context env)
+			       (declare (ignore context env))
+			       subform)))
   (walker-environment-bind (new-env environment :walk-function walk-function)
     (walk-form-internal form :eval new-env)))
 
@@ -634,18 +662,6 @@
 (defun walk-let* (form context env)
   (walk-let/let* form context env t))
 
-(defun walk-prog (form context env)
-  (walk-prog/prog* form context env nil))
-
-(defun walk-prog* (form context env)
-  (walk-prog/prog* form context env t))
-
-(defun walk-do (form context env)
-  (walk-do/do* form context env nil))
-
-(defun walk-do* (form context env)
-  (walk-do/do* form context env t))
-
 (defun walk-let/let* (form context old-env sequentialp)
   (walker-environment-bind (new-env old-env)
     (let* ((let/let* (car form))
@@ -670,52 +686,6 @@
 	  (walk-declarations body #'walk-repeat-eval env)))
     (relist*
      form locally walked-body)))
-
-(defun walk-prog/prog* (form context old-env sequentialp)
-  (walker-environment-bind (new-env old-env)
-    (let* ((possible-block-name (second form))
-	   (blocked-prog (and (symbolp possible-block-name)
-			      (not (eq possible-block-name nil)))))
-      (multiple-value-bind (let/let* block-name bindings body)
-	  (if blocked-prog
-	      (values (car form) (cadr form) (caddr form) (cdddr form))
-	      (values (car form) nil	     (cadr  form) (cddr  form)))
-	(let* ((walked-bindings
-		 (walk-bindings-1 bindings
-				  old-env
-				  new-env
-				  context
-				  sequentialp))
-	       (walked-body
-		 (walk-declarations
-		   body
-		   #'(lambda (real-body real-env)
-		       (walk-tagbody-1 real-body context real-env))
-		   new-env)))
-	  (if block-name
-	      (relist*
-		form let/let* block-name walked-bindings walked-body)
-	      (relist*
-		form let/let* walked-bindings walked-body)))))))
-
-(defun walk-do/do* (form context old-env sequentialp)
-  (walker-environment-bind (new-env old-env)
-    (let* ((do/do* (car form))
-	   (bindings (cadr form))
-	   (end-test (caddr form))
-	   (body (cdddr form))
-	   (walked-bindings (walk-bindings-1 bindings
-					     old-env
-					     new-env
-					     context
-					     sequentialp))
-	   (walked-body
-	     (walk-declarations body #'walk-repeat-eval new-env)))
-      (relist* form
-	       do/do*
-	       (walk-bindings-2 bindings walked-bindings context new-env)
-	       (walk-template end-test '(test repeat (eval)) context new-env)
-	       walked-body))))
 
 (defun walk-let-if (form context env)
   (let ((test (cadr form))
@@ -952,33 +922,15 @@
 					 new-env))))))
 
 (defun walk-if (form context env)
-  (let ((predicate (cadr form))
-	(arm1 (caddr form))
-	(arm2
-	  (if (cddddr form)
-	      ;; FIXME: This should go away now that we're no longer trying
-	      ;; to support any old weird CLTL1.
-	      (progn
-		(warn "In the form:~%~S~%~
-		       IF only accepts three arguments, you are using ~D.~%~
-		       It is true that some Common Lisps support this, but ~
-		       it is not~%~
-		       truly legal Common Lisp. For now, this code ~
-		       walker is interpreting ~%~
-		       the extra arguments as extra else clauses. ~
-		       Even if this is what~%~
-		       you intended, you should fix your source code."
-		      form
-		      (length (cdr form)))
-		(cons 'progn (cdddr form)))
-	      (cadddr form))))
+  (destructuring-bind (if predicate arm1 &optional arm2) form
+    (declare (ignore if)) ; should be 'IF
     (relist form
 	    'if
 	    (walk-form-internal predicate context env)
 	    (walk-form-internal arm1 context env)
 	    (walk-form-internal arm2 context env))))
 
-;;;; tests tests tests
+;;;; examples
 
 #|
 ;;; Here are some examples of the kinds of things you should be able
@@ -1006,204 +958,9 @@
     (walk-form (cons 'progn body) :environment new-env)))
 
 (defun expand-rpush (form env)
+  (declare (ignore env))
   `(push ,(caddr form) ,(cadr form)))
 
 (defmacro with-rpush (&body body)
   `(with-lexical-macros ,(list (list 'rpush #'expand-rpush)) ,@body))
-
-;;; Unfortunately, I don't have an automatic tester for the walker.
-;;; Instead there is this set of test cases with a description of
-;;; how each one should go.
-(defmacro take-it-out-for-a-test-walk (form)
-  `(take-it-out-for-a-test-walk-1 ',form))
-
-(defun take-it-out-for-a-test-walk-1 (form)
-  (terpri)
-  (terpri)
-  (let ((copy-of-form (copy-tree form))
-	(result (walk-form form nil
-		  #'(lambda (x y env)
-		      (format t "~&Form: ~S ~3T Context: ~A" x y)
-		      (when (symbolp x)
-			(let ((lexical (variable-lexical-p x env))
-			      (special (variable-special-p x env)))
-			  (when lexical
-			    (format t ";~3T")
-			    (format t "lexically bound"))
-			  (when special
-			    (format t ";~3T")
-			    (format t "declared special"))
-			  (when (boundp x)
-			    (format t ";~3T")
-			    (format t "bound: ~S " (eval x)))))
-		      x))))
-    (cond ((not (equal result copy-of-form))
-	   (format t "~%Warning: Result not EQUAL to copy of start."))
-	  ((not (eq result form))
-	   (format t "~%Warning: Result not EQ to copy of start.")))
-    (pprint result)
-    result))
-
-(defmacro foo (&rest ignore) ''global-foo)
-
-(defmacro bar (&rest ignore) ''global-bar)
-
-(take-it-out-for-a-test-walk (list arg1 arg2 arg3))
-(take-it-out-for-a-test-walk (list (cons 1 2) (list 3 4 5)))
-
-(take-it-out-for-a-test-walk (progn (foo) (bar 1)))
-
-(take-it-out-for-a-test-walk (block block-name a b c))
-(take-it-out-for-a-test-walk (block block-name (list a) b c))
-
-(take-it-out-for-a-test-walk (catch catch-tag (list a) b c))
-;;; This is a fairly simple macrolet case. While walking the body of the
-;;; macro, x should be lexically bound. In the body of the macrolet form
-;;; itself, x should not be bound.
-(take-it-out-for-a-test-walk
-  (macrolet ((foo (x) (list x) ''inner))
-    x
-    (foo 1)))
-
-;;; A slightly more complex macrolet case. In the body of the macro x
-;;; should not be lexically bound. In the body of the macrolet form itself
-;;; x should be bound. Note that THIS CASE WILL CAUSE AN ERROR when it
-;;; tries to macroexpand the call to foo.
-(take-it-out-for-a-test-walk
-     (let ((x 1))
-       (macrolet ((foo () (list x) ''inner))
-	 x
-	 (foo))))
-
-(take-it-out-for-a-test-walk
-  (flet ((foo (x) (list x y))
-	 (bar (x) (list x y)))
-    (foo 1)))
-
-(take-it-out-for-a-test-walk
-  (let ((y 2))
-    (flet ((foo (x) (list x y))
-	   (bar (x) (list x y)))
-      (foo 1))))
-
-(take-it-out-for-a-test-walk
-  (labels ((foo (x) (bar x))
-	   (bar (x) (foo x)))
-    (foo 1)))
-
-(take-it-out-for-a-test-walk
-  (flet ((foo (x) (foo x)))
-    (foo 1)))
-
-(take-it-out-for-a-test-walk
-  (flet ((foo (x) (foo x)))
-    (flet ((bar (x) (foo x)))
-      (bar 1))))
-
-(take-it-out-for-a-test-walk (prog () (declare (special a b))))
-(take-it-out-for-a-test-walk (let (a b c)
-			       (declare (special a b))
-			       (foo a) b c))
-(take-it-out-for-a-test-walk (let (a b c)
-			       (declare (special a) (special b))
-			       (foo a) b c))
-(take-it-out-for-a-test-walk (let (a b c)
-			       (declare (special a))
-			       (declare (special b))
-			       (foo a) b c))
-(take-it-out-for-a-test-walk (let (a b c)
-			       (declare (special a))
-			       (declare (special b))
-			       (let ((a 1))
-				 (foo a) b c)))
-(take-it-out-for-a-test-walk (eval-when ()
-			       a
-			       (foo a)))
-(take-it-out-for-a-test-walk (eval-when (eval when load)
-			       a
-			       (foo a)))
-
-(take-it-out-for-a-test-walk (multiple-value-bind (a b) (foo a b) (list a b)))
-(take-it-out-for-a-test-walk (multiple-value-bind (a b)
-				 (foo a b)
-			       (declare (special a))
-			       (list a b)))
-(take-it-out-for-a-test-walk (progn (function foo)))
-(take-it-out-for-a-test-walk (progn a b (go a)))
-(take-it-out-for-a-test-walk (if a b c))
-(take-it-out-for-a-test-walk (if a b))
-(take-it-out-for-a-test-walk ((lambda (a b) (list a b)) 1 2))
-(take-it-out-for-a-test-walk ((lambda (a b) (declare (special a)) (list a b))
-			      1 2))
-(take-it-out-for-a-test-walk (let ((a a) (b a) (c b)) (list a b c)))
-(take-it-out-for-a-test-walk (let* ((a a) (b a) (c b)) (list a b c)))
-(take-it-out-for-a-test-walk (let ((a a) (b a) (c b))
-			       (declare (special a b))
-			       (list a b c)))
-(take-it-out-for-a-test-walk (let* ((a a) (b a) (c b))
-			       (declare (special a b))
-			       (list a b c)))
-(take-it-out-for-a-test-walk (let ((a 1) (b 2))
-			       (foo bar)
-			       (declare (special a))
-			       (foo a b)))
-(take-it-out-for-a-test-walk (multiple-value-call #'foo a b c))
-(take-it-out-for-a-test-walk (multiple-value-prog1 a b c))
-(take-it-out-for-a-test-walk (progn a b c))
-(take-it-out-for-a-test-walk (progv vars vals a b c))
-(take-it-out-for-a-test-walk (quote a))
-(take-it-out-for-a-test-walk (return-from block-name a b c))
-(take-it-out-for-a-test-walk (setq a 1))
-(take-it-out-for-a-test-walk (setq a (foo 1) b (bar 2) c 3))
-(take-it-out-for-a-test-walk (tagbody a b c (go a)))
-(take-it-out-for-a-test-walk (the foo (foo-form a b c)))
-(take-it-out-for-a-test-walk (throw tag-form a))
-(take-it-out-for-a-test-walk (unwind-protect (foo a b) d e f))
-
-(defmacro flet-1 (a b) ''outer)
-(defmacro labels-1 (a b) ''outer)
-
-(take-it-out-for-a-test-walk
-  (flet ((flet-1 (a b) () (flet-1 a b) (list a b)))
-    (flet-1 1 2)
-    (foo 1 2)))
-(take-it-out-for-a-test-walk
-  (labels ((label-1 (a b) () (label-1 a b)(list a b)))
-    (label-1 1 2)
-    (foo 1 2)))
-(take-it-out-for-a-test-walk (macrolet ((macrolet-1 (a b) (list a b)))
-			       (macrolet-1 a b)
-			       (foo 1 2)))
-
-(take-it-out-for-a-test-walk (macrolet ((foo (a) `(inner-foo-expanded ,a)))
-			       (foo 1)))
-
-(take-it-out-for-a-test-walk (progn (bar 1)
-				    (macrolet ((bar (a)
-						 `(inner-bar-expanded ,a)))
-				      (bar 2))))
-
-(take-it-out-for-a-test-walk (progn (bar 1)
-				    (macrolet ((bar (s)
-						 (bar s)
-						 `(inner-bar-expanded ,s)))
-				      (bar 2))))
-
-(take-it-out-for-a-test-walk (cond (a b)
-				   ((foo bar) a (foo a))))
-
-(let ((the-lexical-variables ()))
-  (walk-form '(let ((a 1) (b 2))
-		#'(lambda (x) (list a b x y)))
-	     ()
-	     #'(lambda (form context env)
-		 (when (and (symbolp form)
-			    (variable-lexical-p form env))
-		   (push form the-lexical-variables))
-		 form))
-  (or (and (= (length the-lexical-variables) 3)
-	   (member 'a the-lexical-variables)
-	   (member 'b the-lexical-variables)
-	   (member 'x the-lexical-variables))
-      (error "Walker didn't do lexical variables of a closure properly.")))
 |#
