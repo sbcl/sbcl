@@ -58,13 +58,6 @@
 (when (subtypep 'single-float 'short-float)
   (assert (eql least-positive-single-float least-positive-short-float)))
 
-#+nil ; bug 269
-(let ((f (eval 'least-positive-double-float)))
-  (assert (eql (multiple-value-bind (signif expon sign)
-                   (integer-decode-float f)
-                 (scale-float (float signif f) expon))
-               f)))
-
 ;;; bug found by Paul Dietz: FFLOOR and similar did not work for integers
 (let ((tests '(((ffloor -8 3) (-3.0 1))
                ((fround -8 3) (-3.0 1))
@@ -85,3 +78,20 @@
 
 ;;; bug found by Paul Dietz: bad rounding on small floats
 (assert (= (fround least-positive-short-float least-positive-short-float) 1.0))
+
+;;; bug found by Peter Seibel: scale-float was only accepting float
+;;; exponents, when it should accept all integers.  (also bug #269)
+(assert (= (multiple-value-bind (significand expt sign)
+	       (integer-decode-float least-positive-double-float)
+	     (* (scale-float (float significand 0.0d0) expt) sign))
+	   least-positive-double-float))
+(assert (= (multiple-value-bind (significand expt sign)
+	       (decode-float least-positive-double-float)
+	     (* (scale-float significand expt) sign))
+	   least-positive-double-float))
+(assert (= 0.0 (scale-float 1.0 most-negative-fixnum)))
+(assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
+(assert (raises-error? (scale-float 1.0 most-positive-fixnum)
+		       floating-point-overflow))
+(assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
+		       floating-point-overflow))

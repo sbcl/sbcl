@@ -24,6 +24,8 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed bug #334: programmatic addition of slots using specialized
     methods on SB-MOP:COMPUTE-SLOTS works for :ALLOCATION :INSTANCE
     and :ALLOCATION :CLASS slots.
+  * fixed bug #269: SCALE-FLOAT scales floats by any integer, not just
+    float exponents.  (rereported by Peter Seibel)
   * fixed a bug: #\Space (and other whitespace characters) are no
     longer considered to be macro characters in standard syntax by
     GET-MACRO-CHARACTER.

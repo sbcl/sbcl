@@ -908,9 +908,6 @@ WORKAROUND:
                (list x y)))
         (funcall (eval #'foo) 1)))
 
-269:
-  SCALE-FLOAT should accept any integer for its second argument.
-
 270:
   In the following function constraint propagator optimizes nothing:
 

@@ -522,43 +522,51 @@
 ;;; Scale a single or double float, calling the correct over/underflow
 ;;; functions.
 (defun scale-single-float (x exp)
-  (declare (single-float x) (fixnum exp))
-  (let* ((bits (single-float-bits x))
-	 (old-exp (ldb sb!vm:single-float-exponent-byte bits))
-	 (new-exp (+ old-exp exp)))
-    (cond
-     ((zerop x) x)
-     ((or (< old-exp sb!vm:single-float-normal-exponent-min)
-	  (< new-exp sb!vm:single-float-normal-exponent-min))
-      (scale-float-maybe-underflow x exp))
-     ((or (> old-exp sb!vm:single-float-normal-exponent-max)
-	  (> new-exp sb!vm:single-float-normal-exponent-max))
-      (scale-float-maybe-overflow x exp))
-     (t
-      (make-single-float (dpb new-exp
-			      sb!vm:single-float-exponent-byte
-			      bits))))))
+  (declare (single-float x) (integer exp))
+  (etypecase exp
+    (fixnum
+     (let* ((bits (single-float-bits x))
+	    (old-exp (ldb sb!vm:single-float-exponent-byte bits))
+	    (new-exp (+ old-exp exp)))
+       (cond
+	 ((zerop x) x)
+	 ((or (< old-exp sb!vm:single-float-normal-exponent-min)
+	      (< new-exp sb!vm:single-float-normal-exponent-min))
+	  (scale-float-maybe-underflow x exp))
+	 ((or (> old-exp sb!vm:single-float-normal-exponent-max)
+	      (> new-exp sb!vm:single-float-normal-exponent-max))
+	  (scale-float-maybe-overflow x exp))
+	 (t
+	  (make-single-float (dpb new-exp
+				  sb!vm:single-float-exponent-byte
+				  bits))))))
+    (unsigned-byte (scale-float-maybe-overflow x exp))
+    ((integer * 0) (scale-float-maybe-underflow x exp))))
 (defun scale-double-float (x exp)
-  (declare (double-float x) (fixnum exp))
-  (let* ((hi (double-float-high-bits x))
-	 (lo (double-float-low-bits x))
-	 (old-exp (ldb sb!vm:double-float-exponent-byte hi))
-	 (new-exp (+ old-exp exp)))
-    (cond
-     ((zerop x) x)
-     ((or (< old-exp sb!vm:double-float-normal-exponent-min)
-	  (< new-exp sb!vm:double-float-normal-exponent-min))
-      (scale-float-maybe-underflow x exp))
-     ((or (> old-exp sb!vm:double-float-normal-exponent-max)
-	  (> new-exp sb!vm:double-float-normal-exponent-max))
-      (scale-float-maybe-overflow x exp))
-     (t
-      (make-double-float (dpb new-exp sb!vm:double-float-exponent-byte hi)
-			 lo)))))
+  (declare (double-float x) (integer exp))
+  (etypecase exp
+    (fixnum
+     (let* ((hi (double-float-high-bits x))
+	    (lo (double-float-low-bits x))
+	    (old-exp (ldb sb!vm:double-float-exponent-byte hi))
+	    (new-exp (+ old-exp exp)))
+       (cond
+	 ((zerop x) x)
+	 ((or (< old-exp sb!vm:double-float-normal-exponent-min)
+	      (< new-exp sb!vm:double-float-normal-exponent-min))
+	  (scale-float-maybe-underflow x exp))
+	 ((or (> old-exp sb!vm:double-float-normal-exponent-max)
+	      (> new-exp sb!vm:double-float-normal-exponent-max))
+	  (scale-float-maybe-overflow x exp))
+	 (t
+	  (make-double-float (dpb new-exp sb!vm:double-float-exponent-byte hi)
+			     lo)))))
+    (unsigned-byte (scale-float-maybe-overflow x exp))
+    ((integer * 0) (scale-float-maybe-underflow x exp))))
 
 #!+(and x86 long-float)
 (defun scale-long-float (x exp)
-  (declare (long-float x) (fixnum exp))
+  (declare (long-float x) (integer exp))
   (scale-float x exp))
 
 ;;; Dispatch to the correct type-specific scale-float function.

@@ -340,7 +340,7 @@
 
 (defknown decode-float (float) (values float float-exponent float)
   (movable foldable flushable explicit-check))
-(defknown scale-float (float float-exponent) float
+(defknown scale-float (float integer) float
   (movable foldable unsafely-flushable explicit-check))
 (defknown float-radix (float) float-radix
   (movable foldable flushable))

@@ -137,10 +137,10 @@
   (values double-float-significand double-float-int-exponent (integer -1 1))
   (movable foldable flushable))
 
-(defknown scale-single-float (single-float fixnum) single-float
+(defknown scale-single-float (single-float integer) single-float
   (movable foldable flushable))
 
-(defknown scale-double-float (double-float fixnum) double-float
+(defknown scale-double-float (double-float integer) double-float
   (movable foldable flushable))
 
 (deftransform decode-float ((x) (single-float) *)
