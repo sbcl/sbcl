@@ -19,7 +19,7 @@
 ;;; generally a PITA, so whatever the failure encountered when
 ;;; wondering about FILE-POSITION within a condition printer, 'tis
 ;;; better silently to give up than to try to complain. 
-(defun file-position-or-nil-for-error (stream)
+(defun file-position-or-nil-for-error (stream &optional (pos nil posp))
   ;; Arguably FILE-POSITION shouldn't be signalling errors at all; but
   ;; "NIL if this cannot be determined" in the ANSI spec doesn't seem
   ;; absolutely unambiguously to prohibit errors when, e.g., STREAM
@@ -29,7 +29,9 @@
   ;; defsystemish operation where the ERROR-STREAM had been CL:CLOSEd,
   ;; I think by nonlocally exiting through a WITH-OPEN-FILE, by the
   ;; time an error was reported.)
-  (ignore-errors (file-position stream)))
+  (if posp
+      (ignore-errors (file-position stream pos))
+      (ignore-errors (file-position stream))))
 
 ;;;; the CONDITION class
 
