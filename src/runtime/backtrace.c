@@ -271,6 +271,8 @@ backtrace(int nframes)
 
 #else
 
+
+
 void
 backtrace(int nframes)
 {

@@ -88,6 +88,13 @@ static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void 
 #endif
 }
 
+static inline os_context_t *get_interrupt_context_for_thread(struct thread *th)
+{
+    return th->interrupt_contexts
+	[fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th)-1)];
+}
+
+
 int arch_os_thread_init(struct thread *thread);
 extern struct thread *arch_os_get_current_thread();
 

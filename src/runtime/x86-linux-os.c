@@ -51,9 +51,8 @@ size_t os_vm_page_size;
 
 u32 local_ldt_copy[LDT_ENTRIES*LDT_ENTRY_SIZE/sizeof(u32)];
 
-/* XXX this could be conditionally compiled based on some
- * "debug-friendly" flag.  But it doesn't really make stuff slower,
- * just the runtime gets fractionally larger */
+/* This is never actually called, but it's great for calling from gdb when
+ * users have thread-related problems that maintainers can't duplicate */
 
 void debug_get_ldt()
 { 

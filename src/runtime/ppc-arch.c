@@ -95,14 +95,6 @@ arch_install_breakpoint(void *pc)
 }
 
 void 
-get_spinlock(lispobj *word,int value)
-{
-    /* FIXME */
-    *word=value;
-}
-
-
-void 
 arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 {
     *(unsigned long *)pc = orig_inst;

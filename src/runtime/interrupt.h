@@ -32,8 +32,9 @@ struct interrupt_data {
     void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) ;
     union interrupt_handler interrupt_handlers[NSIG];
 
-    /* signal number, siginfo_t, and old mask information for pending
-     * signal.  pending_signal=0 when there is no pending signal. */
+    /* signal information for pending signal.  pending_signal=0 when there 
+     * is no pending signal. */
+    void (*pending_handler) (int, siginfo_t*, void*) ;
     int pending_signal ;
     siginfo_t pending_info;
     sigset_t pending_mask;
@@ -50,7 +51,8 @@ extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
 extern boolean handle_control_stack_guard_triggered(os_context_t *,void *);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
 #ifdef LISP_FEATURE_SB_THREAD
-extern boolean handle_rt_signal(int, siginfo_t*, void*);
+extern void handle_rt_signal(int, siginfo_t*, void*);
+extern void sig_stop_for_gc_handler(int, siginfo_t*, void*);
 #endif
 extern void undoably_install_low_level_interrupt_handler (int signal,
 							  void
@@ -71,4 +73,6 @@ void sigaddset_blockable(sigset_t *s);
  * signal(..) handlers have another, and attempting to represent them
  * "cleanly" with union types is in fact a mess. */
 #define ARE_SAME_HANDLER(x, y) ((void*)(x) == (void*)(y))
+
 #endif
+

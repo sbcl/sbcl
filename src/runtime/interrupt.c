@@ -13,56 +13,6 @@
  * files for more information.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-
-#include "runtime.h"
-#include "arch.h"
-#include "sbcl.h"
-#include "os.h"
-#include "interrupt.h"
-#include "globals.h"
-#include "lispregs.h"
-#include "validate.h"
-#include "monitor.h"
-#include "gc.h"
-#include "alloc.h"
-#include "dynbind.h"
-#include "interr.h"
-#include "genesis/fdefn.h"
-#include "genesis/simple-fun.h"
-
-void sigaddset_blockable(sigset_t *s)
-{
-    sigaddset(s, SIGHUP);
-    sigaddset(s, SIGINT);
-    sigaddset(s, SIGQUIT);
-    sigaddset(s, SIGPIPE);
-    sigaddset(s, SIGALRM);
-    sigaddset(s, SIGURG);
-    sigaddset(s, SIGFPE);
-    sigaddset(s, SIGTSTP);
-    sigaddset(s, SIGCHLD);
-    sigaddset(s, SIGIO);
-    sigaddset(s, SIGXCPU);
-    sigaddset(s, SIGXFSZ);
-    sigaddset(s, SIGVTALRM);
-    sigaddset(s, SIGPROF);
-    sigaddset(s, SIGWINCH);
-    sigaddset(s, SIGUSR1);
-    sigaddset(s, SIGUSR2);
-}
-
-/* When we catch an internal error, should we pass it back to Lisp to
- * be handled in a high-level way? (Early in cold init, the answer is
- * 'no', because Lisp is still too brain-dead to handle anything.
- * After sufficient initialization has been completed, the answer
- * becomes 'yes'.) */
-boolean internal_errors_enabled = 0;
-
-struct interrupt_data * global_interrupt_data;
 
 /* As far as I can tell, what's going on here is:
  *
@@ -91,7 +41,83 @@ struct interrupt_data * global_interrupt_data;
  * - WHN 20000728, dan 20010128 */
 
 
-boolean maybe_gc_pending = 0;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+
+#include "runtime.h"
+#include "arch.h"
+#include "sbcl.h"
+#include "os.h"
+#include "interrupt.h"
+#include "globals.h"
+#include "lispregs.h"
+#include "validate.h"
+#include "monitor.h"
+#include "gc.h"
+#include "alloc.h"
+#include "dynbind.h"
+#include "interr.h"
+#include "genesis/fdefn.h"
+#include "genesis/simple-fun.h"
+
+void run_deferred_handler(struct interrupt_data *data, void *v_context) ;
+static void store_signal_data_for_later (struct interrupt_data *data, 
+					 void *handler, int signal,
+					 siginfo_t *info, 
+					 os_context_t *context);
+boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
+
+extern lispobj all_threads_lock;
+extern int countdown_to_gc;
+
+/*
+ * This is a workaround for some slightly silly Linux/GNU Libc
+ * behaviour: glibc defines sigset_t to support 1024 signals, which is
+ * more than the kernel.  This is usually not a problem, but becomes
+ * one when we want to save a signal mask from a ucontext, and restore
+ * it later into another ucontext: the ucontext is allocated on the
+ * stack by the kernel, so copying a libc-sized sigset_t into it will
+ * overflow and cause other data on the stack to be corrupted */
+
+#define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
+
+void sigaddset_blockable(sigset_t *s)
+{
+    sigaddset(s, SIGHUP);
+    sigaddset(s, SIGINT);
+    sigaddset(s, SIGQUIT);
+    sigaddset(s, SIGPIPE);
+    sigaddset(s, SIGALRM);
+    sigaddset(s, SIGURG);
+    sigaddset(s, SIGFPE);
+    sigaddset(s, SIGTSTP);
+    sigaddset(s, SIGCHLD);
+    sigaddset(s, SIGIO);
+    sigaddset(s, SIGXCPU);
+    sigaddset(s, SIGXFSZ);
+    sigaddset(s, SIGVTALRM);
+    sigaddset(s, SIGPROF);
+    sigaddset(s, SIGWINCH);
+    sigaddset(s, SIGUSR1);
+    sigaddset(s, SIGUSR2);
+#ifdef LISP_FEATURE_SB_THREAD
+    /* don't block STOP_FOR_GC, we need to be able to interrupt threads
+     * for GC purposes even when they are blocked on queues etc */
+    sigaddset(s, SIG_INTERRUPT_THREAD);
+#endif
+}
+
+/* When we catch an internal error, should we pass it back to Lisp to
+ * be handled in a high-level way? (Early in cold init, the answer is
+ * 'no', because Lisp is still too brain-dead to handle anything.
+ * After sufficient initialization has been completed, the answer
+ * becomes 'yes'.) */
+boolean internal_errors_enabled = 0;
+
+struct interrupt_data * global_interrupt_data;
+
 
 /*
  * utility routines used by various signal handlers
@@ -189,6 +215,10 @@ fake_foreign_function_call(os_context_t *context)
     foreign_function_call_active = 1;
 }
 
+/* blocks all blockable signals.  If you are calling from a signal handler,
+ * the usual signal mask will be restored from the context when the handler 
+ * finishes.  Otherwise, be careful */
+
 void
 undo_fake_foreign_function_call(os_context_t *context)
 {
@@ -202,13 +232,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* going back into Lisp */
     foreign_function_call_active = 0;
 
-    /* Undo dynamic binding. */
-    /* ### Do I really need to unbind_to_here()? */
-    /* FIXME: Is this to undo the binding of
-     * FREE_INTERRUPT_CONTEXT_INDEX? If so, we should say so. And
-     * perhaps yes, unbind_to_here() really would be clearer and less
-     * fragile.. */
-    /* dan (2001.08.10) thinks the above supposition is probably correct */
+    /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
 
 #ifdef reg_ALLOC
@@ -258,81 +282,29 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
     }
 }
 
-/* This function handles pending interrupts.  Note that in C/kernel
- * terms we dealt with the signal already; we just haven't decided
- * whether to call a Lisp handler or do a GC or something like that.
- * If it helps, you can think of pending_{signal,mask,info} as a
- * one-element queue of signals that we have acknowledged but not
- * processed */
-
 void
 interrupt_handle_pending(os_context_t *context)
 {
     struct thread *thread;
     struct interrupt_data *data;
 
-#ifndef __i386__
-    boolean were_in_lisp = !foreign_function_call_active;
-#endif
-#ifdef LISP_FEATURE_SB_THREAD
-    while(stop_the_world) kill(getpid(),SIGSTOP);
-#endif
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
-    if (maybe_gc_pending) {
-#ifndef __i386__
-	if (were_in_lisp)
-#endif
-	{
-	    fake_foreign_function_call(context);
-	}
-	funcall0(SymbolFunction(SUB_GC));
-#ifndef __i386__
-	if (were_in_lisp)
-#endif
-	{
-	    undo_fake_foreign_function_call(context);
-        }
-    }
+    /* restore the saved signal mask from the original signal (the
+     * one that interrupted us during the critical section) into the
+     * os_context for the signal we're currently in the handler for.
+     * This should ensure that when we return from the handler the
+     * blocked signals are unblocked */
 
-    /* FIXME: This isn't very clear. It would be good to reverse
-     * engineer it and rewrite the code more clearly, or write a clear
-     * explanation of what's going on in the comments, or both.
-     *
-     * WHN's question 1a: How come we unconditionally copy from
-     * pending_mask into the context, and then test whether
-     * pending_signal is set?
-     * 
-     * WHN's question 1b: If pending_signal wasn't set, how could
-     * pending_mask be valid?
-     * 
-     * Dan Barlow's reply (sbcl-devel 2001-03-13): And the answer is -
-     * or appears to be - because interrupt_maybe_gc set it that way
-     * (look in the #ifndef __i386__ bit). We can't GC during a
-     * pseudo-atomic, so we set maybe_gc_pending=1 and
-     * arch_set_pseudo_atomic_interrupted(..) When we come out of
-     * pseudo_atomic we're marked as interrupted, so we call
-     * interrupt_handle_pending, which does the GC using the pending
-     * context (it needs a context so that it has registers to use as
-     * GC roots) then notices there's no actual interrupt handler to
-     * call, so doesn't. That's the second question [1b] answered,
-     * anyway. Why we still need to copy the pending_mask into the
-     * context given that we're now done with the context anyway, I
-     * couldn't say. */
-#if 0
-    memcpy(os_context_sigmask_addr(context), &pending_mask, 
-	   4 /* sizeof(sigset_t) */ );
-#endif
+    memcpy(os_context_sigmask_addr(context), &data->pending_mask, 
+	   REAL_SIGSET_SIZE_BYTES);
+
     sigemptyset(&data->pending_mask);
-    if (data->pending_signal) {
-	int signal = data->pending_signal;
-	siginfo_t info;
-	memcpy(&info, &data->pending_info, sizeof(siginfo_t));
-	data->pending_signal = 0;
-	interrupt_handle_now(signal, &info, context);
-    }
+    /* This will break on sparc linux: the deferred handler really wants
+     * to be called with a void_context */
+    run_deferred_handler(data,(void *)context);	
 }
 
 /*
@@ -394,11 +366,18 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	lose("no handler for signal %d in interrupt_handle_now(..)", signal);
 
     } else if (lowtag_of(handler.lisp) == FUN_POINTER_LOWTAG) {
+	/* Once we've decided what to do about contexts in a 
+	 * return-elsewhere world (the original context will no longer
+	 * be available; should we copy it or was nobody using it anyway?)
+	 * then we should convert this to return-elsewhere */
 
-        /* Allocate the SAPs while the interrupts are still disabled.
-	 * (FIXME: Why? This is the way it was done in CMU CL, and it
-	 * even had the comment noting that this is the way it was
-	 * done, but no motivation..) */
+        /* CMUCL comment said "Allocate the SAPs while the interrupts
+	 * are still disabled.".  I (dan, 2003.08.21) assume this is 
+	 * because we're not in pseudoatomic and allocation shouldn't
+	 * be interrupted.  In which case it's no longer an issue as
+	 * all our allocation from C now goes through a PA wrapper,
+	 * but still, doesn't hurt */
+
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
         /* Allow signals again. */
@@ -438,16 +417,70 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
 }
 
+/* This is called at the end of a critical section if the indications
+ * are that some signal was deferred during the section.  Note that as
+ * far as C or the kernel is concerned we dealt with the signal
+ * already; we're just doing the Lisp-level processing now that we
+ * put off then */
+
+void
+run_deferred_handler(struct interrupt_data *data, void *v_context) {
+    (*(data->pending_handler))
+	(data->pending_signal,&(data->pending_info), v_context);
+}
+
+boolean
+maybe_defer_handler(void *handler, struct interrupt_data *data,
+		    int signal, siginfo_t *info, os_context_t *context)
+{
+    struct thread *thread=arch_os_get_current_thread();
+    if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
+	store_signal_data_for_later(data,handler,signal,info,context);
+        SetSymbolValue(INTERRUPT_PENDING, T,thread);
+	return 1;
+    } 
+    /* a slightly confusing test.  arch_pseudo_atomic_atomic() doesn't
+     * actually use its argument for anything on x86, so this branch
+     * may succeed even when context is null (gencgc alloc()) */
+    if (
+#ifndef __i386__
+	(!foreign_function_call_active) &&
+#endif
+	arch_pseudo_atomic_atomic(context)) {
+	store_signal_data_for_later(data,handler,signal,info,context);
+	arch_set_pseudo_atomic_interrupted(context);
+	return 1;
+    }
+    return 0;
+}
 static void
-store_signal_data_for_later (struct interrupt_data *data, int signal, 
+store_signal_data_for_later (struct interrupt_data *data, void *handler,
+			     int signal, 
 			     siginfo_t *info, os_context_t *context)
 {
+    data->pending_handler = handler;
     data->pending_signal = signal;
-    memcpy(&(data->pending_info), info, sizeof(siginfo_t));
-    memcpy(&(data->pending_mask),
-	   os_context_sigmask_addr(context),
-	   sizeof(sigset_t));
-    sigaddset_blockable(os_context_sigmask_addr(context));
+    if(info)
+	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+    if(context) {
+	/* the signal mask in the context (from before we were
+	 * interrupted) is copied to be restored when
+	 * run_deferred_handler happens.  Then the usually-blocked
+	 * signals are added to the mask in the context so that we are
+	 * running with blocked signals when the handler returns */
+	sigemptyset(&(data->pending_mask));
+	memcpy(&(data->pending_mask),
+	       os_context_sigmask_addr(context),
+	       REAL_SIGSET_SIZE_BYTES);
+	sigaddset_blockable(os_context_sigmask_addr(context));
+    } else {
+	/* this is also called from gencgc alloc(), in which case
+	 * there has been no signal and is therefore no context. */
+	sigset_t new;
+	sigemptyset(&new);
+	sigaddset_blockable(&new);
+	sigprocmask(SIG_BLOCK,&new,&(data->pending_mask));
+    }
 }
 
 
@@ -460,24 +493,35 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif 
-    /* see comments at top of code/signal.lisp for what's going on here
-     * with INTERRUPTS_ENABLED/INTERRUPT_HANDLE_NOW 
-     */
-    if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
-	store_signal_data_for_later(data,signal,info,context);
-        SetSymbolValue(INTERRUPT_PENDING, T,thread);
-    } else if (
-#ifndef __i386__
-	       (!foreign_function_call_active) &&
-#endif
-	       arch_pseudo_atomic_atomic(context)) {
-	store_signal_data_for_later(data,signal,info,context);
-	arch_set_pseudo_atomic_interrupted(context);
-    } else {
-        interrupt_handle_now(signal, info, context);
-    }
+    if(maybe_defer_handler(interrupt_handle_now,data,
+			   signal,info,context))
+	return;
+    interrupt_handle_now(signal, info, context);
 }
-
+
+void
+sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
+{
+    os_context_t *context = arch_os_get_context(&void_context);
+    struct thread *thread=arch_os_get_current_thread();
+    struct interrupt_data *data=thread->interrupt_data;
+    sigset_t block;
+
+    if(maybe_defer_handler(sig_stop_for_gc_handler,data,
+			   signal,info,context)){
+	return;
+    }
+    sigemptyset(&block);
+    sigaddset_blockable(&block);
+    sigprocmask(SIG_BLOCK, &block, 0);
+    get_spinlock(&all_threads_lock,thread->pid);
+    countdown_to_gc--;
+    release_spinlock(&all_threads_lock);
+    /* need the context stored so it can have registers scavenged */
+    fake_foreign_function_call(context); 
+    kill(getpid(),SIGSTOP);
+    undo_fake_foreign_function_call(context);
+}
 
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
@@ -576,16 +620,20 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-boolean handle_rt_signal(int num, siginfo_t *info, void *v_context)
+void handle_rt_signal(int num, siginfo_t *info, void *v_context)
 {
-    struct 
-	os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+    os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+    struct thread *th=arch_os_get_current_thread();
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
+    if(maybe_defer_handler(handle_rt_signal,data,num,info,context)){
+	return ;
+    }
     arrange_return_to_lisp_function(context,info->si_value.sival_int);
 }
 #endif
 
-boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
-{
+boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){
     struct thread *th=arch_os_get_current_thread();
     /* note the os_context hackery here.  When the signal handler returns, 
      * it won't go back to what it was doing ... */
@@ -619,66 +667,35 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 
     if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
 	clear_auto_gc_trigger();
-
-	if (arch_pseudo_atomic_atomic(context)) {
-	    /* don't GC during an atomic operation.  Instead, copy the 
-	     * signal mask somewhere safe.  interrupt_handle_pending
-	     * will detect pending_signal==0 and know to do a GC with the
-	     * signal context instead of calling a Lisp-level handler */
-	    maybe_gc_pending = 1;
-	    if (data->pending_signal == 0) {
-		/* FIXME: This copy-pending_mask-then-sigaddset_blockable
-		 * idiom occurs over and over. It should be factored out
-		 * into a function with a descriptive name. */
-		memcpy(&(data->pending_mask),
-		       os_context_sigmask_addr(context),
-		       sizeof(sigset_t));
-		sigaddset_blockable(os_context_sigmask_addr(context));
-	    }
-	    arch_set_pseudo_atomic_interrupted(context);
-	}
-	else {
-	    fake_foreign_function_call(context);
-	    /* SUB-GC may return without GCing if *GC-INHIBIT* is set,
-	     * in which case we will be running with no gc trigger
-	     * barrier thing for a while.  But it shouldn't be long 
-	     * until the end of WITHOUT-GCING. */
-	    funcall0(SymbolFunction(SUB_GC));
-	    undo_fake_foreign_function_call(context);
-	}       
+	if(!maybe_defer_handler
+	   (interrupt_maybe_gc_int,data,signal,info,void_context))
+	    interrupt_maybe_gc_int(signal,info,void_context);
 	return 1;
-    } else {
-	return 0;
     }
+    return 0;
 }
+
 #endif
+
+/* this is also used by from gencgc.c alloc() */
+boolean
+interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
+{
+    os_context_t *context=(os_context_t *) void_context;
+    fake_foreign_function_call(context);
+    /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
+     * which case we will be running with no gc trigger barrier
+     * thing for a while.  But it shouldn't be long until the end
+     * of WITHOUT-GCING. */
+    funcall0(SymbolFunction(SUB_GC));
+    undo_fake_foreign_function_call(context);
+    return 1;
+}
+
 
 /*
  * noise to install handlers
  */
-
-/* SBCL used to have code to restore signal handlers on exit, which
- * has been removed from the threaded version until we decide: exit of
- * _what_ ? */
-
-/* SBCL comment: The "undoably" aspect is because we also arrange with
- * atexit() for the handler to be restored to its old value. This is
- * for tidiness: it shouldn't matter much ordinarily, but it does
- * remove a window where e.g. memory fault signals (SIGSEGV or SIGBUS,
- * which in ordinary operation of SBCL are sent to the generational
- * garbage collector, then possibly onward to Lisp code) or SIGINT
- * (which is ordinarily passed to Lisp code) could otherwise be
- * handled bizarrely/brokenly because the Lisp code would try to deal
- * with them using machinery (like stream output buffers) which has
- * already been dismantled. */
-
-/* I'm not sure (a) whether this is a real concern, (b) how it helps
-   anyway */
-
-void
-uninstall_low_level_interrupt_handlers_atexit(void)
-{
-}
 
 void
 undoably_install_low_level_interrupt_handler (int signal,

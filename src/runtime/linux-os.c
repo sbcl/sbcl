@@ -28,6 +28,7 @@
 #include "os.h"
 #include "arch.h"
 #include "globals.h"
+#include "sbcl.h"
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
@@ -248,10 +249,12 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 
 void sigcont_handler(int signal, siginfo_t *info, void *void_context)
 {
-    /* we need to have a handler installed for this signal so that
-     * sigwaitinfo() for it actually returns at the appropriate time
-     */
-    fprintf(stderr, "Thread %d received stray SIGCONT\n", getpid());
+    /* We need to have a handler installed for this signal so that
+     * sigwaitinfo() for it actually returns at the appropriate time.
+     * We don't need it to actually do anything.  This mkes it
+     * possibly the only signal handler in SBCL that doesn't depend on
+     * not-guaranteed-by-POSIX features 
+     */    
 }
 
 void
@@ -262,6 +265,8 @@ os_install_interrupt_handlers(void)
 #ifdef LISP_FEATURE_SB_THREAD
     undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
 						 handle_rt_signal);
+    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+						 sig_stop_for_gc_handler);
 #endif
     undoably_install_low_level_interrupt_handler(SIGCONT,
 						 sigcont_handler);

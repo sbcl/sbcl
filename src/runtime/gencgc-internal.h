@@ -80,7 +80,6 @@ struct page {
 extern struct page page_table[NUM_PAGES];
 
 
-void  gencgc_pickup_dynamic(void);
 
 void sniff_code_object(struct code *code, unsigned displacement);
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
