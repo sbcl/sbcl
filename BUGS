@@ -636,6 +636,7 @@ WORKAROUND:
 
   (due to reordering of the compiler this example is compiled
   successfully by 0.7.14, but the bug probably remains)
+  (possibly exercised by bug 254 test case)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 
@@ -1118,6 +1119,37 @@ WORKAROUND:
     (let () (list (the fixnum (the unsigned-byte (eval -1)))))
 
   (fixed in 0.8.0.34)
+
+254: (possibly bug 148 in a new guise)
+  In sbcl-0.8.0.52, COMPILE-FILE on 
+    (cl:in-package :cl-user)
+    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
+    (defstruct foo
+      (uhw2 nil :type (or package null)))
+    (macrolet ((defprojection (variant &key lexpr eexpr)
+                 (let ()
+                   `(defmethod uu ((foo foo))
+                        (let ((uhw2 (foo.uhw2 bar)))
+                          (let ()
+                            (u-flunt uhw2
+                                     (baz (funcall ,lexpr south east 1)))))))))
+      (defprojection h
+        :lexpr (lambda (south east sched)
+                 (flet ((bd (x) (bref x sched)))
+                   (let ((avecname (gafp)))
+                     (declare (type (vector t) avecname))
+                     (multiple-value-prog1
+                         (progn
+                           (setf (avec.count avecname) (length rest))
+                           (setf (aref avecname 0) (bd (h south)))
+                           (setf (aref avecname 1) (bd (h east)))
+                           (stub avecname))
+                       (paip avecname)))))
+        :eexpr (lambda (south east))))
+  fails with 
+    debugger invoked on condition of type TYPE-ERROR:
+      The value NIL is not of type SB-C::NODE.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
