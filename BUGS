@@ -360,6 +360,8 @@ WORKAROUND:
   your pre-0.7.0 state of grace with
     #+sbcl (declaim (notinline find position find-if position-if)) ; bug 117..
 
+  (see also bug 279)
+
 118:
    as reported by Eric Marsden on cmucl-imp@cons.org 2001-08-14:
      (= (FLOAT 1 DOUBLE-FLOAT-EPSILON)
@@ -1116,6 +1118,7 @@ WORKAROUND:
   uses generic arithmetic.
 
   b. For the example above, the compiler does not issue a note.
+     (fixed in 0.8.3.6, but a test case would be good)
 
 279: type propagation error -- correctly inferred type goes astray?
   In sbcl-0.8.3 and sbcl-0.8.1.47, the warning
@@ -1139,6 +1142,8 @@ WORKAROUND:
              (abs-foo (abs (foo x))))
         (declare (type (integer 1 100) abs-foo))
         (print abs-foo)))
+
+ (see also bug 117)
 
 280: bogus WARNING about duplicate function definition 
   In sbcl-0.8.3 and sbcl-0.8.1.47, if BS.MIN is defined inline,

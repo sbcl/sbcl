@@ -627,28 +627,28 @@
 
 (defun-cached (values-type-intersection :hash-function type-cache-hash
 					:hash-bits 8
-					:values 2
-					:default (values nil :empty)
+					:default (values nil)
 					:init-wrapper !cold-init-forms)
     ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
-  (cond ((eq type1 *wild-type*) (values (coerce-to-values type2) t))
+  (cond ((eq type1 *wild-type*)
+         (coerce-to-values type2))
         ((or (eq type2 *wild-type*) (eq type2 *universal-type*))
-         (values type1 t))
+         type1)
         ((or (eq type1 *empty-type*) (eq type2 *empty-type*))
          *empty-type*)
         ((and (not (values-type-p type2))
               (values-type-required type1))
          (let ((req1 (values-type-required type1)))
-         (make-values-type :required (cons (type-intersection (first req1) type2)
-                                           (rest req1))
-                           :optional (values-type-optional type1)
-                           :rest (values-type-rest type1)
-                           :allowp (values-type-allowp type1))))
+           (make-values-type :required (cons (type-intersection (first req1) type2)
+                                             (rest req1))
+                             :optional (values-type-optional type1)
+                             :rest (values-type-rest type1)
+                             :allowp (values-type-allowp type1))))
         (t
-         (values-type-op type1 (coerce-to-values type2)
-                         #'type-intersection
-                         #'max))))
+         (values (values-type-op type1 (coerce-to-values type2)
+                                 #'type-intersection
+                                 #'max)))))
 
 ;;; This is like TYPES-EQUAL-OR-INTERSECT, except that it sort of
 ;;; works on VALUES types. Note that due to the semantics of
@@ -660,9 +660,9 @@
         ((or (eq type1 *wild-type*) (eq type2 *wild-type*))
          (values t t))
 	(t
-	 (multiple-value-bind (res win) (values-type-intersection type1 type2)
+	 (let ((res (values-type-intersection type1 type2)))
 	   (values (not (eq res *empty-type*))
-		   win)))))
+		   t)))))
 
 ;;; a SUBTYPEP-like operation that can be used on any types, including
 ;;; VALUES types

@@ -506,3 +506,16 @@
                          (loop for i from 1 to (the (integer -17 10) n) by 2
                                collect (when (> (random 10) 5)
                                          (the ,type (- i 11)))))))))
+
+;;; bug 278b
+;;;
+;;; We suppose that INTEGER arithmetic cannot be efficient, and the
+;;; compiler has an optimized VOP for +; so this code should cause an
+;;; efficiency note.
+(assert (eq (handler-case
+                (compile nil '(lambda (i)
+                               (declare (optimize speed))
+                               (declare (type integer i))
+                               (+ i 2)))
+              (sb-ext:compiler-note (c) (return :good)))
+            :good))
