@@ -19,4 +19,4 @@ OS_SRC = linux-os.c  ppc-linux-os.c os-common.c
 LINKFLAGS+=-rdynamic 
 OS_LIBS= -ldl
 
-GC_SRC= gc.c
+GC_SRC= cheneygc.c
