@@ -1040,7 +1040,7 @@
 	(location -1))
     (dolist (eslotd eslotds eslotds)
       (setf (slot-definition-location eslotd)
-	    (ecase (slot-definition-allocation eslotd)
+	    (case (slot-definition-allocation eslotd)
 	      (:instance
 	       (incf location))
 	      (:class
@@ -1102,7 +1102,7 @@
 	  (instance-slots ())
 	  (class-slots ()))
       (dolist (slotd all-slotds)
-	(ecase (slot-definition-allocation slotd)
+	(case (slot-definition-allocation slotd)
 	  (:instance (push slotd instance-slots))
 	  (:class (push slotd class-slots))))
       (let ((layout (compute-layout instance-slots)))

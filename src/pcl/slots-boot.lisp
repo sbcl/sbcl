@@ -196,7 +196,14 @@
 	(let ((value (cdr index)))
 	  (if (eq value +slot-unbound+)
 	      (values (slot-unbound (class-of instance) instance slot-name))
-	      value)))))
+	      value))))
+     (null
+      (lambda (instance)
+	;; maybe MOP-ERROR?  You get here by making effective slot
+	;; definitions with :ALLOCATION not :INSTANCE or :CLASS, and
+	;; not defining any methods on SLOT-VALUE-USING-CLASS.
+	(error "~S called on ~S for the slot ~S (with no location information)"
+	       'slot-value instance slot-name))))
    `(reader ,slot-name)))
 
 (defun make-optimized-std-writer-method-function (fsc-p slot-name index)
@@ -214,7 +221,13 @@
 			 nv))))
      (cons   (lambda (nv instance)
 	       (check-obsolete-instance instance)
-	       (setf (cdr index) nv))))
+	       (setf (cdr index) nv)))
+     (null
+      (lambda (nv instance)
+	(declare (ignore nv))
+	;; again, maybe MOP-ERROR (see above)
+	(error "~S called on ~S for the slot ~S (with no location information)"
+	       '(setf slot-value) instance slot-name))))
    `(writer ,slot-name)))
 
 (defun make-optimized-std-boundp-method-function (fsc-p slot-name index)
@@ -234,7 +247,11 @@
 			    +slot-unbound+)))))
      (cons (lambda (instance)
 	     (check-obsolete-instance instance)
-	     (not (eq (cdr index) +slot-unbound+)))))
+	     (not (eq (cdr index) +slot-unbound+))))
+     (null
+      (lambda (instance)
+	(error "~S called on ~S for the slot ~S (with no location information)"
+	       'slot-boundp instance slot-name))))
    `(boundp ,slot-name)))
 
 (defun make-optimized-structure-slot-value-using-class-method-function (function)
@@ -328,7 +345,12 @@
 	      (let ((value (cdr index)))
 		(if (eq value +slot-unbound+)
 		    (values (slot-unbound class instance slot-name))
-		    value))))))
+		    value))))
+    (null
+     (lambda (class instance slotd)
+       ;; FIXME: MOP-ERROR
+       (error "Standard ~S method called on arguments ~S."
+	      'slot-value-using-class (list class instance slotd))))))
 
 (defun make-optimized-std-setf-slot-value-using-class-method-function
     (fsc-p slot-name index)
@@ -349,7 +371,11 @@
     (cons  (lambda (nv class instance slotd)
 	     (declare (ignore class slotd))
 	     (check-obsolete-instance instance)
-	     (setf (cdr index) nv)))))
+	     (setf (cdr index) nv)))
+    (null (lambda (nv class instance slotd)
+	    (error "Standard ~S method called on arguments ~S."
+		   '(setf slot-value-using-class)
+		   (list nv class instance slotd))))))
 
 (defun make-optimized-std-slot-boundp-using-class-method-function
     (fsc-p slot-name index)
@@ -370,7 +396,10 @@
     (cons   (lambda (class instance slotd)
 	      (declare (ignore class slotd))
 	      (check-obsolete-instance instance)
-	      (not (eq (cdr index) +slot-unbound+))))))
+	      (not (eq (cdr index) +slot-unbound+))))
+    (null (lambda (class instance slotd)
+	    (error "Standard ~S method called on arguments ~S."
+		   'slot-boundp-using-class (list class instance slotd))))))
 
 (defun get-accessor-from-svuc-method-function (class slotd sdfun name)
   (macrolet ((emf-funcall (emf &rest args)

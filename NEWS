@@ -9,9 +9,6 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     an implementation-internal package.
   * the SB-SPROF contrib now works on (most) non-x86 architectures.
     It is known as of this release not to work on the Alpha, however.
-  * fixed bug: initialization of condition class metaobjects no longer
-    causes an instance of the condition to be created. (reported by Marco
-    Baringer)
   * fixed bug #167: errors signalled due to illegal syntax in method 
     bodies are now more legible.
   * fixed bug #338: instances of EQL-SPECIFIER are now valid type
@@ -28,6 +25,12 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed a bug: #\Space (and other whitespace characters) are no
     longer considered to be macro characters in standard syntax by
     GET-MACRO-CHARACTER.
+  * fixed bug: initialization of condition class metaobjects no longer
+    causes an instance of the condition to be created.  (reported by
+    Marco Baringer)
+  * fixed bug: it is now possible to have slots such that
+    SB-MOP:SLOT-DEFINITION-ALLOCATION of the effective slot
+    description is neither :INSTANCE nor :CLASS.
 
 changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * minor incompatible change: the system no longer provides
