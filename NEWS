@@ -1346,6 +1346,9 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     :ALLOW-OTHER-KEYS
 
 changes in sbcl-0.7.10 relative to sbcl-0.7.9:
+  * Support for building SBCL for MIPS platforms running in
+    little-endian mode has now been checked in, and basic
+    functionality on said platforms verified.
   * minor incompatible change: PCL now records the pathname of a file
     in which methods and the like are defined, rather than its
     truename.
@@ -1405,7 +1408,7 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
     ** loop-for-as-package does not require a package to be explicitely
        specified;
     ** LOOP WITH now treats NIL in the d-var-spec correctly as an
-       ignored binding;
+       ignored binding.
   * fixed bug 166: compiler preserves "there is a way to go"
     invariant when deleting code.
   * fixed bug 172: macro lambda lists with required arguments after

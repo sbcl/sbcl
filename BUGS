@@ -1317,11 +1317,12 @@ WORKAROUND:
 
 224:
   SBCL 0.7.8 fails to compile
+    (localy (declare (optimize (safety 3)))
+            (ignore-errors (progn (values-list (car (list '(1 . 2)))) t)))
+  (the LOCALY there is not a typo; any unknown function (e.g. FROB)
+  will do).
 
-  (localy (declare (optimize (safety 3)))
-          (ignore-errors (progn (values-list (car (list '(1 . 2)))) t)))
-
- 226: "AVER failure in COMPILE-FILE of clocc-ansi-test/tests.lisp"
+226: "AVER failure in COMPILE-FILE of clocc-ansi-test/tests.lisp"
   (APD points out that this seems to be another symptom of bug #115.)
   sbcl-0.7.9.43 dies with failed AVER "(EQ (TN-PHYSENV TN) TN-ENV)" when
   trying to compile clocc-ansi-test/tests.lisp. sbcl-0.7.9.31 was able to
@@ -1343,6 +1344,15 @@ WORKAROUND:
 
 227: "compiler bewilderment with adjustable vectors and COPY-SEQ"
   (fixed in sbcl-0.7.9.65)
+
+228: "function-lambda-expression problems"
+  in sbcl-0.7.9.6x, from the REPL:
+    * (progn (declaim (inline foo)) (defun foo (x) x))
+    FOO
+    * (function-lambda-expression #'foo)
+    (SB-C:LAMBDA-WITH-LEXENV NIL NIL NIL (X) (BLOCK FOO X)), NIL, FOO
+  but this first return value is not suitable for input to FUNCTION or
+  COMPILE, as required by ANSI.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
