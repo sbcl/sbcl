@@ -61,7 +61,7 @@
   (let ((dso-name (unix-name (car (output-files operation dso)))))
     (unless (zerop
 	     (run-shell-command
-	      #+sunos "gcc -shared -o ~S ~{~S ~} -lresolv"
+	      #+sunos "gcc -shared -lresolv -lsocket -lnsl -o ~S ~{~S ~}"
 	      #-sunos "gcc -shared -o ~S ~{~S ~} "
 	      dso-name
 	      (mapcar #'unix-name
