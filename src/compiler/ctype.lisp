@@ -93,10 +93,8 @@
 ;;; matches the specified result.
 ;;;
 ;;; Unlike the argument test, the result test may be called on values
-;;; or function types. If STRICT-RESULT is true and SAFETY is
-;;; non-zero, then the NODE-DERIVED-TYPE is always used. Otherwise, if
-;;; CONT's TYPE-CHECK is true, then the NODE-DERIVED-TYPE is
-;;; intersected with the CONT's ASSERTED-TYPE.
+;;; or function types. NODE-DERIVED-TYPE is intersected with the
+;;; trusted asserted type.
 ;;;
 ;;; The error and warning functions are functions that are called to
 ;;; explain the result. We bind *COMPILER-ERROR-CONTEXT* to the
@@ -107,7 +105,7 @@
                       (result-test #'values-subtypep)
                       ((:lossage-fun *lossage-fun*))
                       ((:unwinnage-fun *unwinnage-fun*)))
-  (declare (type function result-test) (type combination call)
+  (declare (type (or function null) result-test) (type combination call)
 	   ;; FIXME: Could TYPE here actually be something like
 	   ;; (AND GENERIC-FUNCTION (FUNCTION (T) T))?  How
 	   ;; horrible...  -- CSR, 2003-05-03
@@ -153,17 +151,26 @@
              (when keyp
                (check-key-args args max-args type))))
 
-          (let* ((dtype (node-derived-type call))
-                 (return-type (fun-type-returns type))
-                 (out-type dtype))
-            (multiple-value-bind (int win) (funcall result-test out-type return-type)
-              (cond ((not win)
-                     (note-unwinnage "can't tell whether the result is a ~S"
-                                     (type-specifier return-type)))
-                    ((not int)
-                     (note-lossage "The result is a ~S, not a ~S."
-                                   (type-specifier out-type)
-                                   (type-specifier return-type)))))))
+          (when result-test
+            (let* ((dtype (node-derived-type call))
+                   (out-type (or
+                              (binding* ((lvar (node-lvar call) :exit-if-null)
+                                         (dest (lvar-dest lvar)))
+                                (when (and (cast-p dest)
+                                           (eq (cast-type-to-check dest) *wild-type*)
+                                           (immediately-used-p lvar call))
+                                  (values-type-intersection
+                                   dtype (cast-asserted-type dest))))
+                              dtype))
+                   (return-type (fun-type-returns type)))
+              (multiple-value-bind (int win) (funcall result-test out-type return-type)
+                (cond ((not win)
+                       (note-unwinnage "can't tell whether the result is a ~S"
+                                       (type-specifier return-type)))
+                      ((not int)
+                       (note-lossage "The result is a ~S, not a ~S."
+                                     (type-specifier out-type)
+                                     (type-specifier return-type))))))))
         (loop for arg in args
               and i from 1
               do (check-arg-type arg *wild-type* i)))

@@ -831,7 +831,7 @@
 	 (recognize-known-call call ir1-converting-not-optimizing-p))
 	((valid-fun-use call type
 			:argument-test #'always-subtypep
-			:result-test #'always-subtypep
+			:result-test nil
 			;; KLUDGE: Common Lisp is such a dynamic
 			;; language that all we can do here in
 			;; general is issue a STYLE-WARNING. It

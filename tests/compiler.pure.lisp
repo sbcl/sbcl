@@ -1134,3 +1134,21 @@
               do
               (dolist (x '(nil t))
                 (assert (eql (funcall f1 x) (funcall f2 x)))))))
+
+;;;
+(handler-case (compile nil '(lambda (x)
+                             (declare (optimize (speed 3) (safety 0)))
+                             (the double-float (sqrt (the double-float x)))))
+  (sb-ext:compiler-note ()
+    (error "Compiler does not trust result type assertion.")))
+
+(let ((f (compile nil '(lambda (x)
+                        (declare (optimize speed (safety 0)))
+                        (block nil
+                          (the double-float
+                            (multiple-value-prog1
+                                (sqrt (the double-float x))
+                              (when (< x 0)
+                                (return :minus)))))))))
+  (assert (eql (funcall f -1d0) :minus))
+  (assert (eql (funcall f 4d0) 2d0)))
