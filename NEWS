@@ -2173,6 +2173,9 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
     that the various BOOLE-related constants have the same value in
     host and target lisps.  (noted by Paul Dietz' test suite on an
     SBCL binary built from CLISP)
+  * the system can now be dynamically linked on the MIPS platform,
+    which enables dynamic loading of foreign code from Lisp.  (thanks
+    to Ralf Baechle for discussions on the MIPS ABI)
   * fixed a compiler bug: MV-LET convertion did not check references
     to the "max args" entry point.  (reported by Brian Downing)
   * tweaked disassembly notes to be less confident about proclaiming

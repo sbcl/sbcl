@@ -12,11 +12,10 @@ LD = ld
 LINKFLAGS = -v -g 
 NM = nm -p
 
-ASSEM_SRC = mips-assem.S #hppa-linux-stubs.S
-ARCH_SRC = mips-arch.c undefineds.c
+ASSEM_SRC = mips-assem.S ldso-stubs.S
+ARCH_SRC = mips-arch.c #undefineds.c
 
 OS_SRC = linux-os.c  mips-linux-os.c os-common.c 
-LINKFLAGS+=-static
 OS_LIBS= -ldl
 
 GC_SRC= cheneygc.c

@@ -99,6 +99,33 @@ ldso_stub__ ## fct: ;                           \
 	nop /* delay slot*/	;		\
 .L ## fct ## e1: ;                              \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
+
+#elif defined LISP_FEATURE_MIPS
+
+/* KLUDGE: set up the vital fifth argument, passed on the 
+   stack.  Do this unconditionally, even if the stub is for a
+   function with few arguments: it can't hurt.  We only do this for
+   the fifth argument, as the first four are passed in registers
+   and we apparently don't ever need to pass six arguments to a
+   libc function.  -- CSR, 2003-10-29 */
+
+#define LDSO_STUBIFY(fct)                       \
+.globl ldso_stub__ ## fct ;                     \
+	.type	 ldso_stub__ ## fct,@function ; \
+ldso_stub__ ## fct: ;                           \
+	addiu $29,-48 		; \
+	sw $28,40($29)		; \
+	sw $31,44($29) 		; \
+	lw $25,64($29)		; \
+	sw $25,16($29)		; \
+	la $25,	fct	;		\
+	jalr $25	;				\
+	lw $31,44($29) 		; \
+	lw $28,40($29)		; \
+	addiu $29,48  		; \
+	jr $31 			; \
+.L ## fct ## e1: ;                              \
+	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 	
 #else
 #error unsupported CPU architecture
