@@ -159,7 +159,7 @@
 ;;;; interface routines used by optimizers
 
 ;;; This function is called by optimizers to indicate that something
-;;; interesting has happened to the value of Cont. Optimizers must
+;;; interesting has happened to the value of CONT. Optimizers must
 ;;; make sure that they don't call for reoptimization when nothing has
 ;;; happened, since optimization will fail to terminate.
 ;;;
@@ -168,7 +168,7 @@
 ;;; is deleted (in which case we do nothing.)
 ;;;
 ;;; Since this can get called during IR1 conversion, we have to be
-;;; careful not to fly into space when the Dest's Prev is missing.
+;;; careful not to fly into space when the DEST's PREV is missing.
 (defun reoptimize-continuation (cont)
   (declare (type continuation cont))
   (unless (member (continuation-kind cont) '(:deleted :unused))
@@ -378,6 +378,7 @@
 	     (derive-node-type node (continuation-derived-type value)))))
 	(cset
 	 (ir1-optimize-set node)))))
+
   (values))
 
 ;;; Try to join with a successor block. If we succeed, we return true,
@@ -1184,15 +1185,21 @@
   (values))
 
 ;;; Replace a call to a foldable function of constant arguments with
-;;; the result of evaluating the form. We insert the resulting
-;;; constant node after the call, stealing the call's continuation. We
-;;; give the call a continuation with no DEST, which should cause it
-;;; and its arguments to go away. If there is an error during the
+;;; the result of evaluating the form. If there is an error during the
 ;;; evaluation, we give a warning and leave the call alone, making the
 ;;; call a :ERROR call.
 ;;;
 ;;; If there is more than one value, then we transform the call into a
 ;;; VALUES form.
+;;;
+;;; An old commentary also said:
+;;;
+;;;   We insert the resulting constant node after the call, stealing
+;;;   the call's continuation. We give the call a continuation with no
+;;;   DEST, which should cause it and its arguments to go away.
+;;;
+;;; This seems to be more efficient, than the current code. Maybe we
+;;; should really implement it? -- APD, 2002-12-23
 (defun constant-fold-call (call)
   (let ((args (mapcar #'continuation-value (combination-args call)))
 	(fun-name (combination-fun-source-name call)))
@@ -1226,22 +1233,35 @@
 		      ;; when the compiler tries to constant-fold (<=
 		      ;; END SIZE).
 		      ;;
-		      ;; So, with or without bug 173, it'd be 
+		      ;; So, with or without bug 173, it'd be
 		      ;; unnecessarily evil to do a full
 		      ;; COMPILER-WARNING (and thus return FAILURE-P=T
 		      ;; from COMPILE-FILE) for legal code, so we we
 		      ;; use a wimpier COMPILE-STYLE-WARNING instead.
 		      #'compiler-style-warn
 		      "constant folding")
-      (if (not win)
-	  (setf (combination-kind call) :error)
-	  (let ((dummies (make-gensym-list (length args))))
-	    (transform-call
-	     call
-	     `(lambda ,dummies
-		(declare (ignore ,@dummies))
-		(values ,@(mapcar (lambda (x) `',x) values)))
-	     fun-name)))))
+      (cond ((not win)
+             (setf (combination-kind call) :error))
+            ((and (proper-list-of-length-p values 1)
+                  (eq (continuation-kind (node-cont call)) :inside-block))
+             (with-ir1-environment-from-node call
+               (let* ((cont (node-cont call))
+                      (next (continuation-next cont))
+                      (prev (make-continuation)))
+                 (delete-continuation-use call)
+                 (add-continuation-use call prev)
+                 (reference-constant prev cont (first values))
+                 (setf (continuation-next cont) next)
+                 ;; FIXME: type checking?
+                 (reoptimize-continuation cont)
+                 (reoptimize-continuation prev))))
+            (t (let ((dummies (make-gensym-list (length args))))
+                 (transform-call
+                  call
+                  `(lambda ,dummies
+                     (declare (ignore ,@dummies))
+                     (values ,@(mapcar (lambda (x) `',x) values)))
+                  fun-name))))))
   (values))
 
 ;;;; local call optimization
@@ -1262,13 +1282,16 @@
       (values))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
-;;; the union of the initial value Type and the types of all the set
+;;; the union of the initial value TYPE and the types of all the set
 ;;; values and to a PROPAGATE-TO-REFS with this type.
 (defun propagate-from-sets (var type)
   (collect ((res type type-union))
     (dolist (set (basic-var-sets var))
-      (res (continuation-type (set-value set)))
-      (setf (node-reoptimize set) nil))
+      (let ((type (continuation-type (set-value set))))
+        (res type)
+        (when (node-reoptimize set)
+          (derive-node-type set type)
+          (setf (node-reoptimize set) nil))))
     (propagate-to-refs var (res)))
   (values))
 

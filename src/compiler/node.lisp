@@ -276,19 +276,9 @@
   (flags (block-attributes reoptimize flush-p type-check type-asserted
 			   test-modified)
 	 :type attributes)
-  ;; CMU CL had a KILL slot here, documented as "set used by
-  ;; constraint propagation", which was used in constraint propagation
-  ;; as a list of LAMBDA-VARs killed, and in copy propagation as an
-  ;; SSET, representing I dunno what. I (WHN) found this confusing,
-  ;; and furthermore it caused type errors when I was trying to make
-  ;; the compiler produce fully general LAMBDA functions directly
-  ;; (instead of doing as CMU CL always did, producing extra little
-  ;; functions which return the LAMDBA you need) and therefore taking
-  ;; a new path through the compiler. So I split this into two:
-  ;;   KILL-LIST = list of LAMBDA-VARs killed, used in constraint propagation
-  ;;   KILL-SSET = an SSET value, used in copy propagation
-  (kill-list nil :type list)
-  (kill-sset nil :type (or sset null))
+  ;; in constraint propagation: list of LAMBDA-VARs killed in this block
+  ;; in copy propagation: list of killed TNs
+  (kill nil)
   ;; other sets used in constraint propagation and/or copy propagation
   (gen nil)
   (in nil)
@@ -306,8 +296,8 @@
   (flag nil)
   ;; some kind of info used by the back end
   (info nil)
-  ;; If true, then constraints that hold in this block and its
-  ;; successors by merit of being tested by its IF predecessor.
+  ;; constraints that hold in this block and its successors by merit
+  ;; of being tested by its IF predecessors.
   (test-constraint nil :type (or sset null)))
 (def!method print-object ((cblock cblock) stream)
   (print-unreadable-object (cblock stream :type t :identity t)

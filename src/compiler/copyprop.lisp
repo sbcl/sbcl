@@ -120,7 +120,7 @@
 		      (sset-adjoin y kill))))))))))
 
     (setf (block-out block) (copy-sset gen))
-    (setf (block-kill-sset block) kill)
+    (setf (block-kill block) kill)
     (setf (block-gen block) gen))
   (values))
 
@@ -137,7 +137,7 @@
     (setf (block-in block) in)
     (sset-union-of-difference (block-out block)
 			      in
-			      (block-kill-sset block))))
+			      (block-kill block))))
 
 (defevent copy-deleted-move "Copy propagation deleted a move.")
 

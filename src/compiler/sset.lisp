@@ -73,6 +73,10 @@
   (declare (inline member))
   (not (null (member element (cdr (sset-elements set)) :test #'eq))))
 
+(declaim (ftype (function (sset sset) boolean) sset=))
+(defun sset= (set1 set2)
+  (equal (sset-elements set1) (sset-elements set2)))
+
 ;;; Return true if SET contains no elements, false otherwise.
 (declaim (ftype (function (sset) boolean) sset-empty))
 (defun sset-empty (set)
@@ -152,7 +156,7 @@
 	    (shiftf prev-el1 el1 (cdr el1))))))))
 
 ;;; Destructively modify SET1 to include its union with the difference
-;;; of SET2 and SET3. We return true if Set1 was modified, false
+;;; of SET2 and SET3. We return true if SET1 was modified, false
 ;;; otherwise.
 (declaim (ftype (function (sset sset sset) boolean) sset-union-of-difference))
 (defun sset-union-of-difference (set1 set2 set3)

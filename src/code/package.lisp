@@ -277,6 +277,8 @@
 			     `(if (endp (setf ,',packages (cdr ,',packages)))
 				  (return-from ,',BLOCK)
 				  (,',init-macro ,(car ',ordered-types)))))))
+         (declare (type hash-vector ,hash-vector)
+                  (type simple-vector ,vector))
 	 (when ,packages
 	   ,(when (null symbol-types)
 	      (error 'simple-program-error

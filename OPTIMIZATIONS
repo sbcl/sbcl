@@ -64,3 +64,23 @@ VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
 
 * And why two moves?
 --------------------------------------------------------------------------------
+Constraint propagator does not know initial types of LET-introduced
+variables.
+
+(defun foo (x)
+  (declare (type bit x))
+  (declare (optimize speed))
+  (let ((y x))
+    (list (incf y)
+          (incf y 2))))
+
+This code uses generic arithmetic. Note that the following code
+is compiled cleanly:
+
+(defun foo (x)
+  (declare (type bit x))
+  (declare (optimize speed))
+  (let (y)
+    (list (setq y x)
+          (setq y (+ y 1)))))
+--------------------------------------------------------------------------------
