@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sched.h>
+#include <stddef.h>
 #ifndef CLONE_PARENT		/* lameass glibc 2.2  doesn't define this */
 #define CLONE_PARENT 0x00008000	/* even though the manpage documents it */
 #endif
@@ -63,11 +64,18 @@ struct thread *create_thread(lispobj initial_function) {
      * having to decide what to do if only some of the allocations
      * succeed */
     spaces=os_validate(0,
-		       THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
-		       ALIEN_STACK_SIZE+dynamic_values_bytes);
+		       THREAD_CONTROL_STACK_SIZE+
+		       BINDING_STACK_SIZE+
+		       ALIEN_STACK_SIZE+
+		       dynamic_values_bytes+
+		       32*SIGSTKSZ
+		       );
     if(!spaces) goto cleanup;
     per_thread=(union per_thread_data *)
-	(spaces+THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+ALIEN_STACK_SIZE);
+	(spaces+
+	 THREAD_CONTROL_STACK_SIZE+
+	 BINDING_STACK_SIZE+
+	 ALIEN_STACK_SIZE);
 
     th=&per_thread->thread;
     if(all_threads) {
@@ -87,8 +95,10 @@ struct thread *create_thread(lispobj initial_function) {
 	    ->tls_index=make_fixnum(2);
 	((struct symbol *)(CONTROL_STACK_START-OTHER_POINTER_LOWTAG))
 	    ->tls_index=make_fixnum(3);
-	((struct symbol *)(ALIEN_STACK-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(5);
+	((struct symbol *)(ALIEN_STACK-OTHER_POINTER_LOWTAG))->tls_index=
+	    make_fixnum(THREAD_SLOT_OFFSET_WORDS(alien_stack_pointer));
+	((struct symbol *)(CURRENT_THREAD-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(THREAD_SLOT_OFFSET_WORDS(this));
     }
 
     th->control_stack_start = spaces;
@@ -97,8 +107,13 @@ struct thread *create_thread(lispobj initial_function) {
     th->alien_stack_start=
 	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;
+    th->this=th;
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
+#else
+    th->alien_stack_pointer=((void *)th->alien_stack_start);
+#endif
     gc_set_region_empty(&th->alloc_region);
     
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
@@ -108,17 +123,19 @@ struct thread *create_thread(lispobj initial_function) {
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
-
     th->next=all_threads;
+    protect_control_stack_guard_page(th,1);
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
 
     th->unbound_marker=initial_function;
     th->pid=
-	clone(new_thread_trampoline,th->binding_stack_start-2,
+	clone(new_thread_trampoline,
+	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
 	      (((getpid()!=parent_pid)?CLONE_PARENT:0)
 	       |CLONE_SIGHAND|CLONE_VM),th);
     fprintf(stderr,"child pid is %d\n",th->pid);
     if(th->pid<=0) goto cleanup;
+
 #else
 #error this stuff presently only works on x86 Linux
 #endif

@@ -1,3 +1,7 @@
+
+#if !defined(_INCLUDE_THREAD_H_)
+#define _INCLUDE_THREAD_H_
+
 #include <sys/types.h>
 #include <unistd.h>
 #include "runtime.h"
@@ -9,6 +13,9 @@
 #else
 #error "threading doesn't work with cheney gc yet"
 #endif
+
+#define THREAD_SLOT_OFFSET_WORDS(c) \
+ (offsetof(struct thread,c)/(sizeof (struct thread *)))
 
 struct thread {
     lispobj unbound_marker;	/* tls[0] = UNBOUND_MARKER_WIDETAG */
@@ -76,3 +83,6 @@ static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void 
 	=val;
 }
 
+    
+
+#endif /* _INCLUDE_THREAD_H_ */

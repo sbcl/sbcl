@@ -24,6 +24,7 @@
 		  sb!vm::*alien-stack*
 		  sb!vm::*control-stack-start*
 		  sb!vm::*binding-stack-start*
+		  sb!vm::*current-thread*
 		  ;; FIXME: The pseudo-atomic variable stuff should be
 		  ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which
 		  ;; should be conditional on :X86, instead of the

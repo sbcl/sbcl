@@ -256,6 +256,7 @@
     *free-interrupt-context-index*
 
     *free-tls-index*
+    *current-thread*
     
     *allocation-pointer*
     *binding-stack-pointer*

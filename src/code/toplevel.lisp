@@ -434,7 +434,7 @@
 	   ;; in the event of a control-stack-exhausted-error, we should
 	   ;; have unwound enough stack by the time we get here that this
 	   ;; is now possible
-	   (sb!kernel::protect-control-stack-guard-page 1)
+	   (sb!kernel::protect-control-stack-guard-page t)
 	   (repl noprint)
 	   (critically-unreachable "after REPL")))))))
 

@@ -19,15 +19,16 @@
 #define    STATIC_SPACE_SIZE (   STATIC_SPACE_END -    STATIC_SPACE_START)
 #define THREAD_CONTROL_STACK_SIZE (2*1024*1024)	/* wired elsewhere-watch out */
 
+#if !defined(LANGUAGE_ASSEMBLY)
+#include <thread.h>
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD 
-#define CONTROL_STACK_GUARD_PAGE (CONTROL_STACK_START)
+#define CONTROL_STACK_GUARD_PAGE(th) ((void *)(th->control_stack_start))
 #else
-#define CONTROL_STACK_GUARD_PAGE (CONTROL_STACK_END - os_vm_page_size)
+#define CONTROL_STACK_GUARD_PAGE(th) (((void *)(th->control_stack_start))+THREAD_CONTROL_STACK_SIZE - os_vm_page_size)
 #endif
 
-#if !defined(LANGUAGE_ASSEMBLY)
 extern void validate(void);
-extern void protect_control_stack_guard_page(int protect_p);
+extern void protect_control_stack_guard_page(struct thread *th,int protect_p);
 #endif
 
 /* note for anyone trying to port an architecture's support files

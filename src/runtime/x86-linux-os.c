@@ -60,6 +60,7 @@ int arch_os_thread_init(struct thread *thread) {
     /* this must be called from a function that has an exclusive lock
      * on all_threads
      */
+    stack_t sigstack;
     struct modify_ldt_ldt_s ldt_entry = {
 	1, 0, 0, /* index, address, length filled in later */
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
@@ -85,6 +86,16 @@ int arch_os_thread_init(struct thread *thread) {
 			   + (1 << 2) /* TI set = LDT */
 			   + 3)); /* privilege level */
     thread->tls_cookie=n;
+    if(n<0) return 0;
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    /* Signal handlers are run on the control stack, so if it is exhausted
+     * we had better use an alternate stack for whatever signal tells us
+     * we've exhausted it */
+    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
+    sigstack.ss_flags=0;
+    sigstack.ss_size = 32*SIGSTKSZ;
+    sigaltstack(&sigstack,0);
+#endif
     return (n>=0);
 }
 

@@ -107,7 +107,7 @@ static boolean maybe_gc_pending = 0;
  */
 
 void 
-build_fake_control_stack_frames(os_context_t *context)
+build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 {
 #ifndef LISP_FEATURE_X86
     
@@ -177,7 +177,7 @@ fake_foreign_function_call(os_context_t *context)
 	(lispobj *)(*os_context_register_addr(context, reg_BSP));
 #endif
 
-    build_fake_control_stack_frames(context);
+    build_fake_control_stack_frames(thread,context);
 
     /* Do dynamic binding of the active interrupt context index
      * and save the context in the context array. */
@@ -524,9 +524,57 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
-    /* not thinking too hard about this just now */
-    /* FIXME so think! */
-    return 0;
+    struct thread *th=arch_os_get_current_thread();
+    /* note the os_context hackery here.  When the signal handler returns, 
+     * it won't go back to what it was doing ... */
+    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE(th) && 
+       addr<(void *)(CONTROL_STACK_GUARD_PAGE(th)+os_vm_page_size)) {
+       void *fun;
+       void *code;
+       /* fprintf(stderr, "hit end of control stack\n");  */
+       /* we hit the end of the control stack.  disable protection
+        * temporarily so the error handler has some headroom */
+       protect_control_stack_guard_page(th,0L);
+
+       fun = (void *)
+           native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+       code = &(((struct simple_fun *) fun)->code);
+
+       /* Build a stack frame showing `interrupted' so that the
+        * user's backtrace makes (as much) sense (as usual) */
+       build_fake_control_stack_frames(th,context);
+       /* signal handler will "return" to this error-causing function */
+       *os_context_pc_addr(context) = code;
+#ifdef LISP_FEATURE_X86
+       *os_context_register_addr(context,reg_ECX) = 0; 
+#else
+       /* this much of the calling convention is common to all
+          non-x86 ports */
+       *os_context_register_addr(context,reg_NARGS) = 0; 
+       *os_context_register_addr(context,reg_LIP) = code;
+       *os_context_register_addr(context,reg_CFP) = 
+           current_control_frame_pointer;
+#endif
+#ifdef ARCH_HAS_NPC_REGISTER
+       *os_context_npc_addr(context) =
+           4 + *os_context_pc_addr(context);
+#endif
+#ifdef LISP_FEATURE_SPARC
+       /* Bletch.  This is a feature of the SPARC calling convention,
+          which sadly I'm not going to go into in large detail here,
+          as I don't know it well enough.  Suffice to say that if the
+          line 
+
+          (INST MOVE CODE-TN FUNCTION) 
+
+          in compiler/sparc/call.lisp is changed, then this bit can
+          probably go away.  -- CSR, 2002-07-24 */
+       *os_context_register_addr(context,reg_CODE) = 
+           fun + FUN_POINTER_LOWTAG;
+#endif
+       return 1;
+    }
+    else return 0;
 }
 
 #ifndef LISP_FEATURE_X86
@@ -605,6 +653,7 @@ void
 uninstall_low_level_interrupt_handlers_atexit(void)
 {
     int signal;
+#if 0
     for (signal = 0; signal < NSIG; ++signal) {
 	struct low_level_signal_handler_state
 	    *old_low_level_signal_handler_state =
@@ -617,7 +666,13 @@ uninstall_low_level_interrupt_handlers_atexit(void)
 	    sigaction(signal, &sa, NULL);
 	}
     }
+#endif
 }
+
+/* FIXME the "undoable" below is currently a lie.  We don't want to 
+ * remove any signal handlers while there are still >0 threads left, 
+ * so that atexit thing has been disabled for the moment
+ */
 
 /* Undoably install a special low-level handler for signal; or if
  * handler is SIG_DFL, remove any special handling for signal.
@@ -651,12 +706,9 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    /* XXX this bit got untimely ripped out in pursuit of threads */
+    if(signal==SIG_MEMORY_FAULT) sa.sa_flags|= SA_ONSTACK;
 #endif
-    
+
     /* In the case of interrupt handlers which are modified more than
      * once, we only save the original unmodified copy. */
     if (!old_low_level_signal_handler_state->was_modified) {
@@ -704,7 +756,6 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 	sigemptyset(&sa.sa_mask);
 	sigaddset_blockable(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
-
 	sigaction(signal, &sa, NULL);
     }
 
