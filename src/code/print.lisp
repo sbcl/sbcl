@@ -390,7 +390,7 @@
 (defun output-object (object stream)
   (/show0 "entering OUTPUT-OBJECT")
   (labels ((print-it (stream)
-	     (/show0 "entering PRINT-IT")
+	     (/show0 "entering PRINT-IT in OUTPUT-OBJECT")
 	     (if *print-pretty*
 		 (if *pretty-printer*
 		     (funcall *pretty-printer* object stream)
