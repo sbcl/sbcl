@@ -1404,7 +1404,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	     (when lambda-list
 	       (let ((param (car lambda-list)))
 		 (cond
-		  ((member param lambda-list-keywords)
+		  ((member param sb!xc:lambda-list-keywords)
 		   (new-lambda-list param)
 		   (grovel param (cdr lambda-list)))
 		  (t

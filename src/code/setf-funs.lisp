@@ -21,7 +21,7 @@
 		(values-specifier-type (third type)))))
 	 (arglist (make-gensym-list (1+ (length args)))))
     (cond
-     ((null (intersection args lambda-list-keywords))
+     ((null (intersection args sb!xc:lambda-list-keywords))
       `(defun (setf ,name) ,arglist
 	 (declare ,@(mapcar #'(lambda (arg type)
 				`(type ,type ,arg))

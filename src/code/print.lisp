@@ -1582,7 +1582,7 @@
 	    (case type
 	      (#.sb!vm:value-cell-header-type
 	       (write-string "value cell " stream)
-	       (output-object (sb!c:value-cell-ref object) stream))
+	       (output-object (value-cell-ref object) stream))
 	      (t
 	       (write-string "unknown pointer object, type=" stream)
 	       (let ((*print-base* 16) (*print-radix* t))

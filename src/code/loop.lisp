@@ -581,26 +581,27 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (when (or *loop-duplicate-code* (not rbefore))
       (return-from loop-body (makebody)))
     ;; This outer loop iterates once for each not-first-time flag test
-    ;; generated plus once more for the forms that don't need a flag test
+    ;; generated plus once more for the forms that don't need a flag test.
     (do ((threshold (loop-code-duplication-threshold env))) (nil)
       (declare (fixnum threshold))
-      ;; Go backwards from the ends of before-loop and after-loop merging all
-      ;; the equivalent forms into the body.
+      ;; Go backwards from the ends of before-loop and after-loop
+      ;; merging all the equivalent forms into the body.
       (do () ((or (null rbefore) (not (equal (car rbefore) (car rafter)))))
 	(push (pop rbefore) main-body)
 	(pop rafter))
       (unless rbefore (return (makebody)))
-      ;; The first forms in RBEFORE & RAFTER (which are the chronologically
-      ;; last forms in the list) differ, therefore they cannot be moved
-      ;; into the main body. If everything that chronologically precedes
-      ;; them either differs or is equal but is okay to duplicate, we can
-      ;; just put all of rbefore in the prologue and all of rafter after
-      ;; the body. Otherwise, there is something that is not okay to
-      ;; duplicate, so it and everything chronologically after it in
-      ;; rbefore and rafter must go into the body, with a flag test to
-      ;; distinguish the first time around the loop from later times.
-      ;; What chronologically precedes the non-duplicatable form will
-      ;; be handled the next time around the outer loop.
+      ;; The first forms in RBEFORE & RAFTER (which are the
+      ;; chronologically last forms in the list) differ, therefore
+      ;; they cannot be moved into the main body. If everything that
+      ;; chronologically precedes them either differs or is equal but
+      ;; is okay to duplicate, we can just put all of rbefore in the
+      ;; prologue and all of rafter after the body. Otherwise, there
+      ;; is something that is not okay to duplicate, so it and
+      ;; everything chronologically after it in rbefore and rafter
+      ;; must go into the body, with a flag test to distinguish the
+      ;; first time around the loop from later times. What
+      ;; chronologically precedes the non-duplicatable form will be
+      ;; handled the next time around the outer loop.
       (do ((bb rbefore (cdr bb))
 	   (aa rafter (cdr aa))
 	   (lastdiff nil)
@@ -639,9 +640,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
   (if (null expr) 0
       (let ((ans (estimate-code-size expr env)))
 	(declare (fixnum ans))
-	;; @@@@ Use (DECLARATION-INFORMATION 'OPTIMIZE ENV) here to get an
-	;; alist of optimize quantities back to help quantify how much code we
-	;; are willing to duplicate.
+	;; @@@@ Use (DECLARATION-INFORMATION 'OPTIMIZE ENV) here to
+	;; get an alist of optimize quantities back to help quantify
+	;; how much code we are willing to duplicate.
 	ans)))
 
 (defvar *special-code-sizes*
@@ -910,17 +911,18 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
   (and *loop-source-code* ; Don't get confused by NILs..
        (let ((z (car *loop-source-code*)))
 	 (cond ((loop-tequal z 'of-type)
-		;; This is the syntactically unambigous form in that the form
-		;; of the type specifier does not matter. Also, it is assumed
-		;; that the type specifier is unambiguously, and without need
-		;; of translation, a common lisp type specifier or pattern
-		;; (matching the variable) thereof.
+		;; This is the syntactically unambigous form in that
+		;; the form of the type specifier does not matter.
+		;; Also, it is assumed that the type specifier is
+		;; unambiguously, and without need of translation, a
+		;; common lisp type specifier or pattern (matching the
+		;; variable) thereof.
 		(loop-pop-source)
 		(loop-pop-source))
 
 	       ((symbolp z)
-		;; This is the (sort of) "old" syntax, even though we didn't
-		;; used to support all of these type symbols.
+		;; This is the (sort of) "old" syntax, even though we
+		;; didn't used to support all of these type symbols.
 		(let ((type-spec (or (gethash z
 					      (loop-universe-type-symbols
 					       *loop-universe*))
@@ -931,11 +933,12 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		    (loop-pop-source)
 		    type-spec)))
 	       (t
-		;; This is our sort-of old syntax. But this is only valid for
-		;; when we are destructuring, so we will be compulsive (should
-		;; we really be?) and require that we in fact be doing variable
-		;; destructuring here. We must translate the old keyword
-		;; pattern typespec into a fully-specified pattern of real type
+		;; This is our sort-of old syntax. But this is only
+		;; valid for when we are destructuring, so we will be
+		;; compulsive (should we really be?) and require that
+		;; we in fact be doing variable destructuring here. We
+		;; must translate the old keyword pattern typespec
+		;; into a fully-specified pattern of real type
 		;; specifiers here.
 		(if (consp variable)
 		    (unless (consp z)
@@ -1377,11 +1380,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 ;;;; various FOR/AS subdispatches
 
-;;; ANSI "FOR x = y [THEN z]" is sort of like the old Genera one when the THEN
-;;; is omitted (other than being more stringent in its placement), and like the
-;;; old "FOR x FIRST y THEN z" when the THEN is present. I.e., the first
-;;; initialization occurs in the loop body (first-step), not in the variable
-;;; binding phase.
+;;; ANSI "FOR x = y [THEN z]" is sort of like the old Genera one when
+;;; the THEN is omitted (other than being more stringent in its
+;;; placement), and like the old "FOR x FIRST y THEN z" when the THEN
+;;; is present. I.e., the first initialization occurs in the loop body
+;;; (first-step), not in the variable binding phase.
 (defun loop-ansi-for-equals (var val data-type)
   (loop-make-iteration-variable var nil data-type)
   (cond ((loop-tequal (car *loop-source-code*) :then)
@@ -1427,9 +1430,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 ;;;; list iteration
 
 (defun loop-list-step (listvar)
-  ;; We are not equipped to analyze whether 'FOO is the same as #'FOO here in
-  ;; any sensible fashion, so let's give an obnoxious warning whenever 'FOO is
-  ;; used as the stepping function.
+  ;; We are not equipped to analyze whether 'FOO is the same as #'FOO
+  ;; here in any sensible fashion, so let's give an obnoxious warning
+  ;; whenever 'FOO is used as the stepping function.
   ;;
   ;; While a Discerning Compiler may deal intelligently with
   ;; (FUNCALL 'FOO ...), not recognizing FOO may defeat some LOOP
@@ -1565,8 +1568,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		      (apply fun var data-type preps user-data))))
     (when *loop-named-variables*
       (loop-error "Unused USING variables: ~S." *loop-named-variables*))
-    ;; STUFF is now (bindings prologue-forms . stuff-to-pass-back). Protect the
-    ;; system from the user and the user from himself.
+    ;; STUFF is now (bindings prologue-forms . stuff-to-pass-back).
+    ;; Protect the system from the user and the user from himself.
     (unless (member (length stuff) '(6 10))
       (loop-error "Value passed back by LOOP iteration path function for path ~S has invalid length."
 		  path))
@@ -1796,7 +1799,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(dummy-predicate-var nil)
 	(post-steps nil))
     (multiple-value-bind (other-var other-p)
-	(named-variable (if (eq which 'hash-key) 'hash-value 'hash-key))
+	(named-variable (ecase which
+			  (:hash-key 'hash-value)
+			  (:hash-value 'hash-key)))
       ;; @@@@ NAMED-VARIABLE returns a second value of T if the name
       ;; was actually specified, so clever code can throw away the
       ;; GENSYM'ed-up variable if it isn't really needed. The
@@ -1809,9 +1814,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	    (bindings `((,variable nil ,data-type)
 			(,ht-var ,(cadar prep-phrases))
 			,@(and other-p other-var `((,other-var nil))))))
-	(if (eq which 'hash-key)
-	    (setq key-var variable val-var (and other-p other-var))
-	    (setq key-var (and other-p other-var) val-var variable))
+	(ecase which
+	  (:hash-key (setq key-var variable
+			   val-var (and other-p other-var)))
+	  (:hash-value (setq key-var (and other-p other-var)
+			     val-var variable)))
 	(push `(with-hash-table-iterator (,next-fn ,ht-var)) *loop-wrappers*)
 	(when (consp key-var)
 	  (setq post-steps

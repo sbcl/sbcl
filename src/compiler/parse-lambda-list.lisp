@@ -68,7 +68,7 @@
 	       (unless (member state '(:required :optional))
 		 (compiler-error "misplaced &REST in lambda list: ~S" list))
 	       (setq state :rest))
-	      (sb!c:&more
+	      (&more
 	       (unless (member state '(:required :optional))
 		 (compiler-error "misplaced &MORE in lambda list: ~S" list))
 	       (setq morep t

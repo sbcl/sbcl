@@ -30,11 +30,18 @@
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
 
-;;; FIXME: Shouldn't SB!C::&MORE be in this list?
 (defconstant-eqx sb!xc:lambda-list-keywords
-  '(&optional &rest &key &aux &body &whole &allow-other-keys &environment)
-  #!+sb-doc
+  '(&allow-other-keys
+    &aux
+    &body
+    &environment
+    &key
+    &more
+    &optional
+    &rest
+    &whole)
   #'equal
+  #!+sb-doc
   "symbols which are magical in a lambda list")
 
 ;;;; cross-compiler-only versions of CL special variables, so that we

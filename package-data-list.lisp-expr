@@ -145,6 +145,12 @@
              "SUBTRACT-BIGNUM" "SXHASH-BIGNUM"))
 
  #s(sb-cold:package-data
+    :name "SB!BYTECODE"
+    :doc "private: stuff related to the bytecode interpreter"
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
+    :export ())
+
+ #s(sb-cold:package-data
     :name "SB!C"
     :doc "private: implementation of the compiler"
     ;; (It seems strange to have the compiler USE SB-ALIEN-INTERNALS,
@@ -159,7 +165,7 @@
           #!+sb-dyncount "SB-DYNCOUNT" "SB!EXT" "SB!FASL" "SB!INT"
           "SB!KERNEL" "SB!SYS")
     :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
-    :export ("%ALIEN-FUNCALL" "%CATCH-BREAKUP" "%CONTINUE-UNWIND" "&MORE"
+    :export ("%ALIEN-FUNCALL" "%CATCH-BREAKUP" "%CONTINUE-UNWIND" 
               "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
               "%UNWIND-PROTECT-BREAKUP"
 
@@ -219,7 +225,7 @@
               "MAKE-OTHER-IMMEDIATE-TYPE" "MAKE-RANDOM-TN"
               "MAKE-REPRESENTATION-TN" "MAKE-RESTRICTED-TN" "MAKE-SC-OFFSET"
               "MAKE-STACK-POINTER-TN" "MAKE-TN-REF" "MAKE-UNWIND-BLOCK"
-              "MAKE-VALUE-CELL" "MAKE-WIRED-TN" "MAYBE-COMPILER-NOTE"
+	      "MAKE-WIRED-TN" "MAYBE-COMPILER-NOTE"
               "META-PRIMITIVE-TYPE-OR-LOSE"
               "META-SB-OR-LOSE" "META-SC-NUMBER-OR-LOSE" "META-SC-OR-LOSE"
               "MORE-ARG-CONTEXT" "MOVABLE" "MOVE" "MULTIPLE-CALL"
@@ -247,7 +253,6 @@
               "TN-REF-TN" "TN-REF-VOP" "TN-REF-WRITE-P" "TN-SC" "TN-VALUE"
               "TRACE-TABLE-ENTRY" "TYPE-CHECK-ERROR" "UNBIND" "UNBIND-TO-HERE"
               "UNSAFE" "UNWIND" "UWP-ENTRY"
-              "VALUE-CELL-REF" "VALUE-CELL-SET"
               "VERIFY-ARGUMENT-COUNT" "WRITE-PACKED-BIT-VECTOR"
               "WRITE-VAR-INTEGER" "WRITE-VAR-STRING" "XEP-ALLOCATE-FRAME"
               "LABEL-ID" "FIXUP" "FIXUP-FLAVOR" "FIXUP-NAME" "FIXUP-OFFSET"
@@ -484,12 +489,6 @@ like *STACK-TOP-HINT*"
              "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"))
 
  #s(sb-cold:package-data
-    :name "SB!BYTECODE"
-    :doc "private: stuff related to the bytecode interpreter"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
-    :export ())
-
- #s(sb-cold:package-data
     :name "SB!EXT"
     :doc "public: miscellaneous supported extensions to the ANSI Lisp spec"
     ;; FIXME: Why don't we just USE-PACKAGE %KERNEL here instead of importing?
@@ -642,6 +641,9 @@ retained, possibly temporariliy, because it might be used internally."
 
              "*ALL-MODIFIER-NAMES*"
              "*BACKUP-EXTENSION*"
+
+	     ;; lambda list keyword extensions
+	     "&MORE"
 
              ;; INFO stuff doesn't belong in a user-visible package, we
              ;; should be able to change it without apology.
@@ -886,6 +888,12 @@ retained, possibly temporariliy, because it might be used internally."
              "MAXIMIZING" "MINIMIZING" "SUMMING"
              "*ITERATE-WARNINGS*"))
 
+ ;; FIXME: This package is awfully huge. It'd probably be good to
+ ;; split it. There's at least one natural way to split it: the
+ ;; implementation of the Lisp type system (e.g. TYPE-INTERSECTION and
+ ;; SPECIFIER-TYPE) could move to a separate package SB!TYPE. (There's
+ ;; lots of stuff which currently uses the SB!KERNEL package which
+ ;; doesn't actually use the type system stuff.)
  #s(sb-cold:package-data
     :name "SB!KERNEL"
     :doc
@@ -1074,6 +1082,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "MAKE-NULL-LEXENV" "MAKE-NUMERIC-TYPE"
              "MAKE-SINGLE-FLOAT" "MAKE-SPECIALIZABLE-ARRAY"
              "%MAKE-INSTANCE"
+	     "MAKE-VALUE-CELL"
              "MAKE-VALUES-TYPE"
              "MAYBE-GC" "MEMBER-TYPE" "MEMBER-TYPE-MEMBERS"
              "MEMBER-TYPE-P" "MERGE-BITS" "MODIFIED-NUMERIC-TYPE"
@@ -1199,7 +1208,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "UNKNOWN-KEY-ARGUMENT-ERROR"
              "UNKNOWN-TYPE" "UNKNOWN-TYPE-P"
              "UNKNOWN-TYPE-SPECIFIER" "UNSEEN-THROW-TAG-ERROR"
-             "UNSIGNED-BYTE-32-P" "VALUES-SPECIFIER-TYPE"
+             "UNSIGNED-BYTE-32-P"
+	     "VALUE-CELL-REF" "VALUE-CELL-SET"
+	     "VALUES-SPECIFIER-TYPE"
              "VALUES-SPECIFIER-TYPE-CACHE-CLEAR" "VALUES-SUBTYPEP"
              "VALUES-TYPE"
              "VALUES-TYPE-INTERSECTION" "VALUES-TYPE-KEYP"

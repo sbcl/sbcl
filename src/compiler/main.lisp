@@ -969,8 +969,8 @@
 	       (process-top-level-locally (rest form) path compile-time-too))
 	      ((progn)
 	       (process-top-level-progn (rest form) path compile-time-too))
-	      #+sb-xc-host
-	      ;; Consider: What should we do when we hit e.g.
+	      ;; When we're cross-compiling, consider: what should we
+	      ;; do when we hit e.g.
 	      ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL)
 	      ;;     (DEFUN FOO (X) (+ 7 X)))?
 	      ;; DEFUN has a macro definition in the cross-compiler,
@@ -982,19 +982,40 @@
 	      ;; cross-compilation time. So make sure we do the EVAL
 	      ;; here, before we macroexpand.
 	      ;;
+	      ;; Then things get even dicier with something like
+	      ;;   (DEFCONSTANT-EQX SB!XC:LAMBDA-LIST-KEYWORDS ..)
+	      ;; where we have to make sure that we don't uncross
+	      ;; the SB!XC: prefix before we do EVAL, because otherwise
+	      ;; we'd be trying to redefine the cross-compilation host's
+	      ;; constants.
+	      ;;
 	      ;; (Isn't it fun to cross-compile Common Lisp?:-)
+	      #+sb-xc-host
 	      (t
 	       (when compile-time-too
 		 (eval form)) ; letting xc host EVAL do its own macroexpansion
-	       (let* ((uncrossed (uncross form))
-		      ;; letting our cross-compiler do its macroexpansion too
-		      (expanded (preprocessor-macroexpand uncrossed)))
-		 (if (eq expanded uncrossed)
+	       (let* (;; (We uncross the operator name because things
+		      ;; like SB!XC:DEFCONSTANT and SB!XC:DEFTYPE
+		      ;; should be equivalent to their CL: counterparts
+		      ;; when being compiled as target code. We leave
+		      ;; the rest of the form uncrossed because macros
+		      ;; might yet expand into EVAL-WHEN stuff, and
+		      ;; things inside EVAL-WHEN can't be uncrossed
+		      ;; until after we've EVALed them in the
+		      ;; cross-compilation host.)
+		      (slightly-uncrossed (cons (uncross (first form))
+						(rest form)))
+		      (expanded (preprocessor-macroexpand slightly-uncrossed)))
+		 (if (eq expanded slightly-uncrossed)
+		     ;; (Now that we're no longer processing toplevel
+		     ;; forms, and hence no longer need to worry about
+		     ;; EVAL-WHEN, we can uncross everything.)
 		     (convert-and-maybe-compile expanded path)
-		     ;; Note that we also have to demote
-		     ;; COMPILE-TIME-TOO to NIL, no matter what it was
-		     ;; before, since otherwise we'd tend to EVAL
-		     ;; subforms more than once.
+		     ;; (We have to demote COMPILE-TIME-TOO to NIL
+		     ;; here, no matter what it was before, since
+		     ;; otherwise we'd tend to EVAL subforms more than
+		     ;; once, because of WHEN COMPILE-TIME-TOO form
+		     ;; above.)
 		     (process-top-level-form expanded path nil))))
 	      ;; When we're not cross-compiling, we only need to
 	      ;; macroexpand once, so we can follow the 1-thru-6

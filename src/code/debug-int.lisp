@@ -2201,7 +2201,7 @@
      (aver (typep frame 'compiled-frame))
      (let ((res (access-compiled-debug-var-slot debug-var frame)))
        (if (indirect-value-cell-p res)
-	   (sb!c:value-cell-ref res)
+	   (value-cell-ref res)
 	   res)))
     ;; (This function used to be more interesting, with more type
     ;; cases here, before the IR1 interpreter went away. It might
@@ -2542,7 +2542,7 @@
      (aver (typep frame 'compiled-frame))
      (let ((current-value (access-compiled-debug-var-slot debug-var frame)))
        (if (indirect-value-cell-p current-value)
-	   (sb!c:value-cell-set current-value value)
+	   (value-cell-set current-value value)
 	   (set-compiled-debug-var-slot debug-var frame value))))
     ;; (This function used to be more interesting, with more type
     ;; cases here, before the IR1 interpreter went away. It might

@@ -1419,8 +1419,7 @@
 	 (more-result (when more-results (car (last all-results))))
 	 (conditional (vop-parse-conditional-p parse)))
 
-    `(
-      :type (specifier-type '(function () nil))
+    `(:type (specifier-type '(function () nil))
       :arg-types (list ,@(mapcar #'make-operand-type args))
       :more-args-type ,(when more-args (make-operand-type more-arg))
       :result-types ,(if conditional
@@ -1435,14 +1434,14 @@
   (defparameter *slot-inherit-alist*
     '((:generator-function . vop-info-generator-function))))
 
-;;; Something to help with inheriting VOP-Info slots. We return a
-;;; keyword/value pair that can be passed to the constructor. SLOT is
-;;; the keyword name of the slot, Parse is a form that evaluates to
-;;; the VOP-Parse structure for the VOP inherited. If PARSE is NIL,
-;;; then we do nothing. If the TEST form evaluates to true, then we
-;;; return a form that selects the named slot from the VOP-Info
-;;; structure corresponding to PARSE. Otherwise, we return the FORM so
-;;; that the slot is recomputed.
+;;; This is something to help with inheriting VOP-Info slots. We
+;;; return a keyword/value pair that can be passed to the constructor.
+;;; SLOT is the keyword name of the slot, Parse is a form that
+;;; evaluates to the VOP-Parse structure for the VOP inherited. If
+;;; PARSE is NIL, then we do nothing. If the TEST form evaluates to
+;;; true, then we return a form that selects the named slot from the
+;;; VOP-Info structure corresponding to PARSE. Otherwise, we return
+;;; the FORM so that the slot is recomputed.
 (defmacro inherit-vop-info (slot parse test form)
   `(if (and ,parse ,test)
        (list ,slot `(,',(or (cdr (assoc slot *slot-inherit-alist*))
@@ -1486,10 +1485,11 @@
 	    (make-generator-function parse)))
       :variant (list ,@variant))))
 
-;;; Define the symbol NAME to be a Virtual OPeration in the compiler. If
-;;; specified, INHERITS is the name of a VOP that we default unspecified
-;;; information from. Each SPEC is a list beginning with a keyword indicating
-;;; the interpretation of the other forms in the SPEC:
+;;; Define the symbol NAME to be a Virtual OPeration in the compiler.
+;;; If specified, INHERITS is the name of a VOP that we default
+;;; unspecified information from. Each SPEC is a list beginning with a
+;;; keyword indicating the interpretation of the other forms in the
+;;; SPEC:
 ;;;
 ;;; :Args {(Name {Key Value}*)}*
 ;;; :Results {(Name {Key Value}*)}*

@@ -845,6 +845,8 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   fixes:-). But hopefully any remaining bugs will be simpler, less
   fundamental, and more fixable then the bugs in the old IR1
   interpreter code.
+* A bug in LOOP operations on hash tables has been fixed, thanks
+  to a bug report and patch from Alexey Dejneka.
 * PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry
   and uses that copy, rather than the current dynamic value, when
   it's trying to decide whether to truncate output . Thus e.g.
@@ -861,7 +863,8 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   built into the system.
 * lots of tidying up internally: renaming things so that names are
   more systematic and consistent, converting C macros to inline
-  functions, systematizing indentation
+  functions, systematizing indentation, making symbol packaging
+  more logical, and so forth
 * The fasl file version number changed again, for any number of
   good reasons.
 

@@ -121,8 +121,12 @@
   %name	
   ;; its position in the implementation sequence
   (index (required-argument) :type fixnum)
-  ;; Name of accessor, or NIL if this accessor has the same name as an
-  ;; inherited accessor (which we don't want to shadow.)
+  ;; the name of the accessor function
+  ;;
+  ;; (CMU CL had extra complexity here ("..or NIL if this accessor has
+  ;; the same name as an inherited accessor (which we don't want to
+  ;; shadow)") but that behavior doesn't seem to be specified by (or
+  ;; even particularly consistent with) ANSI, so it's gone in SBCL.)
   (accessor nil)
   default			; default value expression
   (type t)			; declared type specifier
@@ -567,10 +571,7 @@
 ;;; Parse a slot description for DEFSTRUCT, add it to the description
 ;;; and return it. If supplied, ISLOT is a pre-initialized DSD that we
 ;;; modify to get the new slot. This is supplied when handling
-;;; included slots. If the new accessor name is already an accessor
-;;; for same slot in some included structure, then set the
-;;; DSD-ACCESSOR to NIL so that we don't clobber the more general
-;;; accessor.
+;;; included slots. 
 (defun parse-1-dsd (defstruct spec &optional
 		     (islot (make-defstruct-slot-description :%name ""
 							     :index 0
@@ -591,7 +592,7 @@
 	(when (keywordp spec)
 	  ;; FIXME: should be style warning
 	  (warn "Keyword slot name indicates probable syntax ~
-		 error in DEFSTRUCT -- ~S."
+		 error in DEFSTRUCT: ~S."
 		spec))
 	spec))
 
@@ -601,20 +602,8 @@
 	     :format-arguments (list name)))
     (setf (dsd-%name islot) (string name))
     (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list islot)))
-
-    (let* ((accname (symbolicate (or (dd-conc-name defstruct) "") name))
-	   (existing (info :function :accessor-for accname)))
-      (declare (notinline find)) ; to avoid bug 117 bogowarnings
-      (if (and (structure-class-p existing)
-	       (not (eq (sb!xc:class-name existing) (dd-name defstruct)))
-	       (string= (dsd-%name (find accname
-					 (dd-slots
-					  (layout-info
-					   (class-layout existing)))
-					 :key #'dsd-accessor))
-			name))
-	(setf (dsd-accessor islot) nil)
-	(setf (dsd-accessor islot) accname)))
+    (setf (dsd-accessor islot)
+	  (symbolicate (or (dd-conc-name defstruct) "") name))
 
     (when default-p
       (setf (dsd-default islot) default))

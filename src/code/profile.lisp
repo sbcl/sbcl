@@ -145,7 +145,7 @@
     (declare (type (or pcounter fixnum) count ticks consing profiles))
     (values
      ;; ENCAPSULATION-FUN
-     (lambda (sb-c:&more arg-context arg-count)
+     (lambda (&more arg-context arg-count)
        (declare (optimize speed safety))
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)

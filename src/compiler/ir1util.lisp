@@ -25,12 +25,13 @@
     (let ((cup (lexenv-cleanup lexenv)))
       (when cup (return cup)))))
 
-;;; Convert the Form in a block inserted between Block1 and Block2 as an
-;;; implicit MV-Prog1. The inserted block is returned. Node is used for IR1
-;;; context when converting the form. Note that the block is not assigned a
-;;; number, and is linked into the DFO at the beginning. We indicate that we
-;;; have trashed the DFO by setting Component-Reanalyze. If Cleanup is
-;;; supplied, then convert with that cleanup.
+;;; Convert the FORM in a block inserted between BLOCK1 and BLOCK2 as
+;;; an implicit MV-PROG1. The inserted block is returned. NODE is used
+;;; for IR1 context when converting the form. Note that the block is
+;;; not assigned a number, and is linked into the DFO at the
+;;; beginning. We indicate that we have trashed the DFO by setting
+;;; COMPONENT-REANALYZE. If CLEANUP is supplied, then convert with
+;;; that cleanup.
 (defun insert-cleanup-code (block1 block2 node form &optional cleanup)
   (declare (type cblock block1 block2) (type node node)
 	   (type (or cleanup null) cleanup))
@@ -60,9 +61,9 @@
     (:unused nil)
     (:deleted nil)))
 
-;;; Update continuation use information so that Node is no longer a
-;;; use of its Cont. If the old continuation doesn't start its block,
-;;; then we don't update the Block-Start-Uses, since it will be
+;;; Update continuation use information so that NODE is no longer a
+;;; use of its CONT. If the old continuation doesn't start its block,
+;;; then we don't update the BLOCK-START-USES, since it will be
 ;;; deleted when we are done.
 ;;;
 ;;; Note: if you call this function, you may have to do a
@@ -87,8 +88,8 @@
     (setf (node-cont node) nil))
   (values))
 
-;;; Update continuation use information so that Node uses Cont. If
-;;; Cont is :Unused, then we set its block to Node's Node-Block (which
+;;; Update continuation use information so that NODE uses CONT. If
+;;; CONT is :UNUSED, then we set its block to NODE's NODE-BLOCK (which
 ;;; must be set.)
 ;;;
 ;;; Note: if you call this function, you may have to do a
@@ -115,8 +116,8 @@
   (setf (node-cont node) cont)
   (values))
 
-;;; Return true if Cont is the Node-Cont for Node and Cont is transferred to
-;;; immediately after the evaluation of Node.
+;;; Return true if CONT is the NODE-CONT for NODE and CONT is
+;;; transferred to immediately after the evaluation of NODE.
 (defun immediately-used-p (cont node)
   (declare (type continuation cont) (type node node))
   (and (eq (node-cont node) cont)
@@ -130,9 +131,9 @@
 
 ;;;; continuation substitution
 
-;;; In Old's Dest, replace Old with New. New's Dest must initially be NIL.
-;;; When we are done, we call Flush-Dest on Old to clear its Dest and to note
-;;; potential optimization opportunities.
+;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
+;;; NIL. When we are done, we call FLUSH-DEST on OLD to clear its DEST
+;;; and to note potential optimization opportunities.
 (defun substitute-continuation (new old)
   (declare (type continuation old new))
   (aver (not (continuation-dest new)))
@@ -1286,14 +1287,15 @@
   print only the CAR.")
 (declaim (type unsigned-byte *enclosing-source-cutoff*))
 
-;;; We separate the determination of compiler error contexts from the actual
-;;; signalling of those errors by objectifying the error context. This allows
-;;; postponement of the determination of how (and if) to signal the error.
+;;; We separate the determination of compiler error contexts from the
+;;; actual signalling of those errors by objectifying the error
+;;; context. This allows postponement of the determination of how (and
+;;; if) to signal the error.
 ;;;
-;;; We take care not to reference any of the IR1 so that pending potential
-;;; error messages won't prevent the IR1 from being GC'd. To this end, we
-;;; convert source forms to strings so that source forms that contain IR1
-;;; references (e.g. %DEFUN) don't hold onto the IR.
+;;; We take care not to reference any of the IR1 so that pending
+;;; potential error messages won't prevent the IR1 from being GC'd. To
+;;; this end, we convert source forms to strings so that source forms
+;;; that contain IR1 references (e.g. %DEFUN) don't hold onto the IR.
 (defstruct (compiler-error-context
 	    #-no-ansi-print-object
 	    (:print-object (lambda (x stream)
@@ -1335,10 +1337,10 @@
 ;;;   no method is defined, then the first two subforms are returned.
 ;;;   Note that this facility implicitly determines the string name
 ;;;   associated with anonymous functions.
-;;; So even though SBCL itself only uses this macro within this file, it's a
-;;; reasonable thing to put in SB-EXT in case some dedicated user wants to do
-;;; some heavy tweaking to make SBCL give more informative output about his
-;;; code.
+;;; So even though SBCL itself only uses this macro within this file,
+;;; it's a reasonable thing to put in SB-EXT in case some dedicated
+;;; user wants to do some heavy tweaking to make SBCL give more
+;;; informative output about his code.
 (defmacro def-source-context (name lambda-list &body body)
   #!+sb-doc
   "DEF-SOURCE-CONTEXT Name Lambda-List Form*
@@ -1375,17 +1377,19 @@
 	(t
 	 form)))
 
-;;; Given a source path, return the original source form and a description
-;;; of the interesting aspects of the context in which it appeared. The
-;;; context is a list of lists, one sublist per context form. The sublist is a
-;;; list of some of the initial subforms of the context form.
+;;; Given a source path, return the original source form and a
+;;; description of the interesting aspects of the context in which it
+;;; appeared. The context is a list of lists, one sublist per context
+;;; form. The sublist is a list of some of the initial subforms of the
+;;; context form.
 ;;;
-;;; For now, we use the first two subforms of each interesting form. A form is
-;;; interesting if the first element is a symbol beginning with "DEF" and it is
-;;; not the source form. If there is no DEF-mumble, then we use the outermost
-;;; containing form. If the second subform is a list, then in some cases we
-;;; return the car of that form rather than the whole form (i.e. don't show
-;;; defstruct options, etc.)
+;;; For now, we use the first two subforms of each interesting form. A
+;;; form is interesting if the first element is a symbol beginning
+;;; with "DEF" and it is not the source form. If there is no
+;;; DEF-mumble, then we use the outermost containing form. If the
+;;; second subform is a list, then in some cases we return the CAR of
+;;; that form rather than the whole form (i.e. don't show DEFSTRUCT
+;;; options, etc.)
 (defun find-original-source (path)
   (declare (list path))
   (let* ((rpath (reverse (source-path-original-source path)))
@@ -1622,11 +1626,12 @@
   (values))
 
 ;;; COMPILER-NOTE is vaguely like COMPILER-ERROR and the other
-;;; condition-signalling functions, but it just writes some output instead of
-;;; signalling. (In CMU CL, it did signal a condition, but this didn't seem to
-;;; work all that well; it was weird to have COMPILE-FILE return with
-;;; WARNINGS-P set when the only problem was that the compiler couldn't figure
-;;; out how to compile something as efficiently as it liked.)
+;;; condition-signalling functions, but it just writes some output
+;;; instead of signalling. (In CMU CL, it did signal a condition, but
+;;; this didn't seem to work all that well; it was weird to have
+;;; COMPILE-FILE return with WARNINGS-P set when the only problem was
+;;; that the compiler couldn't figure out how to compile something as
+;;; efficiently as it liked.)
 (defun compiler-note (format-string &rest format-args)
   (unless (if *compiler-error-context*
 	      (policy *compiler-error-context* (= inhibit-warnings 3))
