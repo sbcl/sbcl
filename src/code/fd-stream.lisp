@@ -803,12 +803,12 @@
 		 ((< byte #xf0)
 		  (dpb byte (byte 4 12)
 		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 6)
-			    (sap-ref-8 (+ 2 head)))))
+			    (sap-ref-8 sap (+ 2 head)))))
 		 (t
 		  (dpb byte (byte 3 18)
 		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 12)
 			    (dpb (sap-ref-8 sap (+ 2 head)) (byte 6 6)
-				 (sap-ref-8 (+ 3 head))))))))))
+				 (sap-ref-8 sap (+ 3 head))))))))))
 
 ;;; STREAM-IN routine for reading a string char
 (def-input-routine input-character
@@ -1001,10 +1001,19 @@
       (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
       (setf (fd-stream-ibuf-sap fd-stream) nil))
 
-    ;; This isn't strictly necessary, but it'll make STREAM-EXTERNAL-FORMAT
-    ;; return a nice value on binary streams.
-    (unless (subtypep target-type 'character)
-      (setf (fd-stream-external-format fd-stream) :default))
+    (if (and (subtypep target-type 'character)
+             (eq (fd-stream-external-format fd-stream) :default))
+        (setf (fd-stream-external-format fd-stream)
+              (intern (or (alien-funcall
+                           (extern-alien "nl_langinfo"
+                                         (function c-string int))
+                           sb!unix:codeset)
+                          "DEFAULT")
+                      "KEYWORD"))
+        ;; This isn't strictly necessary, but it'll make
+        ;; STREAM-EXTERNAL-FORMAT return a nice value on binary
+        ;; streams.
+        (setf (fd-stream-external-format fd-stream) :default))
 
     (when input-p
       (multiple-value-bind (routine type size)

@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <sched.h>
 #include <errno.h>
+#include <locale.h>
 
 #if defined(SVR4) || defined(__linux__)
 #include <time.h>
@@ -188,6 +189,8 @@ main(int argc, char *argv[], char *envp[])
     boolean end_runtime_options = 0;
 
     lispobj initial_function;
+
+    setlocale(LC_ALL, "");
 
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so

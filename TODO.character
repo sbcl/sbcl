@@ -88,13 +88,17 @@ from gcl/ansi-tests.
      possibilities exist.)
 
 ** implement :UTF-8, :ISO-8859-1 and :POSIX external formats, and make
-:DEFAULT an alias for the approprate one based on nl_langinfo(CHARSET)
+:DEFAULT an alias for the approprate one based on nl_langinfo(CODESET)
 information.  (Rationale: this is the absolute minimum needed to get
 e-acute printed to my terminal, which would be a major milestone.)
 Eventually other :ISO-8859-<N> external formats should be supported,
 even in 8-bit lisps, but attempts to print characters which are not
 representable in those formats should probably error, so it might not
 be terribly useful.
+  -- :UTF-8 external format partially done (easier than it seemed due
+     to a bug rendering FAST-READ-CHAR more-or-less exactly the same
+     as READ-CHAR).
+  -- nl_langinfo(CODESET) :DEFAULT processing done.
 
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
 (Rationale: for calling out to Pango or similar.  Actually, a valid

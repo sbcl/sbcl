@@ -24,6 +24,9 @@
 (define-condition encapsulated-condition (condition)
   ((condition :initarg :condition :reader encapsulated-condition)))
 
+;;; KLUDGE
+(define-condition type-warning (simple-warning) ())
+
 (define-condition bug (simple-error)
   ()
   (:report
