@@ -346,15 +346,6 @@
    macrobindings
    (lambda (&key vars)
      (ir1-translate-locally body start cont :vars vars))))
-
-;;; not really a special form, but..
-(def-ir1-translator declare ((&rest stuff) start cont)
-  (declare (ignore stuff))
-  ;; We ignore START and CONT too, but we can't use DECLARE IGNORE to
-  ;; tell the compiler about it here, because the DEF-IR1-TRANSLATOR
-  ;; macro would put the DECLARE in the wrong place, so..
-  start cont
-  (compiler-error "misplaced declaration"))
 
 ;;;; %PRIMITIVE
 ;;;;

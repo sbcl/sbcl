@@ -44,3 +44,6 @@
 
 ;;; We should have documentation for our extension package:
 (assert (documentation (find-package "SB-EXT") t))
+
+;;; DECLARE should not be a special operator
+(assert (not (special-operator-p 'declare)))
