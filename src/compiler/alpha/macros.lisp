@@ -379,7 +379,7 @@
 	 (:result-types ,el-type)
 	 (:temporary (:sc non-descriptor-reg) temp)
 	 (:temporary (:sc non-descriptor-reg) temp1)
-	 (:generator 5
+	 (:generator 4
 	   ,@(ecase size
 	       (:byte
 		(if signed
@@ -472,32 +472,38 @@
 	 (:temporary (:sc non-descriptor-reg) temp2)
 	 (:results (result :scs ,scs))
 	 (:result-types ,el-type)
-	 (:generator 5
+	 (:generator 4
 	   ,@(ecase size
 	       (:byte
-		`((inst lda temp (- (* ,offset n-word-bytes)
-				    (* index ,scale) ,lowtag)
+		`((inst lda temp (- (+ (* ,offset n-word-bytes)
+				       (* index ,scale))
+				    ,lowtag)
 			object)
-		  (inst ldq_u temp1 (- (* ,offset n-word-bytes) 
-				       (* index ,scale) ,lowtag)
+		  (inst ldq_u temp1 (- (+ (* ,offset n-word-bytes) 
+					  (* index ,scale))
+				       ,lowtag)
 			object)
 		  (inst insbl value temp temp2)
 		  (inst mskbl temp1 temp temp1)
 		  (inst bis temp1 temp2 temp1)
-		  (inst stq_u temp1 (- (* ,offset n-word-bytes)
-				       (* index ,scale) ,lowtag) object)))
+		  (inst stq_u temp1 (- (+ (* ,offset n-word-bytes)
+					  (* index ,scale))
+				       ,lowtag) object)))
 	       (:short
-		`((inst lda temp (- (* ,offset n-word-bytes)
-				    (* index ,scale) ,lowtag)
+		`((inst lda temp (- (+ (* ,offset n-word-bytes)
+				       (* index ,scale))
+				    ,lowtag)
 			object)
-		  (inst ldq_u temp1 (- (* ,offset n-word-bytes)
-				       (* index ,scale) ,lowtag)
+		  (inst ldq_u temp1 (- (+ (* ,offset n-word-bytes)
+					  (* index ,scale))
+				       ,lowtag)
 			object)
 		  (inst mskwl temp1 temp temp1)
 		  (inst inswl value temp temp2)
 		  (inst bis temp1 temp2 temp)
-		  (inst stq_u temp (- (* ,offset n-word-bytes)
-				      (* index ,scale) ,lowtag) object))))
+		  (inst stq_u temp (- (+ (* ,offset n-word-bytes)
+					 (* index ,scale))
+				      ,lowtag) object))))
 	   (move value result))))))
 
 (defmacro sb!sys::with-pinned-objects ((&rest objects) &body body)

@@ -145,3 +145,13 @@
 ;;; Bug reported by Kalle Olavi Niemitalo for CMUCL through Debian BTS
 (let ((array (make-array nil :initial-contents nil)))
   (assert (eql (aref array) nil)))
+
+(let ((f (compile nil '(lambda ()
+			(let ((a (make-array '(4)
+					     :element-type 'base-char
+					     :initial-element #\z)))
+			  (setf (aref a 0) #\a)
+			  (setf (aref a 1) #\b)
+			  (setf (aref a 2) #\c)
+			  a)))))
+  (assert (= (length (funcall f)) 4)))
