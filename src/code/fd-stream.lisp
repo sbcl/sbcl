@@ -210,7 +210,7 @@
       (frob-output stream (fd-stream-obuf-sap stream) 0 length t)
       (setf (fd-stream-obuf-tail stream) 0))))
 
-(defmacro output-wrapper/variable-width ((stream size buffering)
+(defmacro output-wrapper/variable-width ((stream size buffering restart)
 					 &body body)
   (let ((stream-var (gensym)))
     `(let ((,stream-var ,stream)
@@ -224,10 +224,15 @@
 	 `(when (> (fd-stream-ibuf-tail ,stream-var)
 		   (fd-stream-ibuf-head ,stream-var))
             (file-position ,stream-var (file-position ,stream-var))))
-      (with-simple-restart (output-nothing
-			    "~@<Skip output of this character.~@:>")
-	,@body)
-      (incf (fd-stream-obuf-tail ,stream-var) size)
+      ,(if restart
+           
+           `(with-simple-restart (output-nothing
+                                  "~@<Skip output of this character.~@:>")
+             ,@body
+             (incf (fd-stream-obuf-tail ,stream-var) size))
+           `(progn
+             ,@body
+             (incf (fd-stream-obuf-tail ,stream-var) size)))
       ,(ecase (car buffering)
 	 (:none
 	  `(flush-output-buffer ,stream-var))
@@ -237,7 +242,7 @@
 	 (:full))
     (values))))
 
-(defmacro output-wrapper ((stream size buffering) &body body)
+(defmacro output-wrapper ((stream size buffering restart) &body body)
   (let ((stream-var (gensym)))
     `(let ((,stream-var ,stream))
       ,(unless (eq (car buffering) :none)
@@ -249,10 +254,14 @@
 	 `(when (> (fd-stream-ibuf-tail ,stream-var)
 		   (fd-stream-ibuf-head ,stream-var))
             (file-position ,stream-var (file-position ,stream-var))))
-       (with-simple-restart (output-nothing
-			    "~@<Skip output of this character.~@:>")
-	 ,@body
-	 (incf (fd-stream-obuf-tail ,stream-var) ,size))
+      ,(if restart
+           `(with-simple-restart (output-nothing
+                                  "~@<Skip output of this character.~@:>")
+             ,@body
+             (incf (fd-stream-obuf-tail ,stream-var) ,size))
+           `(progn
+             ,@body
+             (incf (fd-stream-obuf-tail ,stream-var) ,size)))
       ,(ecase (car buffering)
 	 (:none
 	  `(flush-output-buffer ,stream-var))
@@ -262,9 +271,9 @@
 	 (:full))
     (values))))
 
-(defmacro def-output-routines/variable-width ((name-fmt size external-format
-							&rest bufferings)
-					      &body body)
+(defmacro def-output-routines/variable-width
+    ((name-fmt size restart external-format &rest bufferings)
+     &body body)
   (declare (optimize (speed 1)))
   (cons 'progn
 	(mapcar
@@ -274,7 +283,7 @@
 			       (format nil name-fmt (car buffering))))))
 		`(progn
 		   (defun ,function (stream byte)
-		     (output-wrapper/variable-width (stream ,size ,buffering)
+		     (output-wrapper/variable-width (stream ,size ,buffering ,restart)
 		       ,@body))
 		   (setf *output-routines*
 			 (nconc *output-routines*
@@ -290,7 +299,8 @@
 
 ;;; Define output routines that output numbers SIZE bytes long for the
 ;;; given bufferings. Use BODY to do the actual output.
-(defmacro def-output-routines ((name-fmt size &rest bufferings) &body body)
+(defmacro def-output-routines ((name-fmt size restart &rest bufferings)
+                               &body body)
   (declare (optimize (speed 1)))
   (cons 'progn
 	(mapcar
@@ -300,7 +310,7 @@
 			       (format nil name-fmt (car buffering))))))
 		`(progn
 		   (defun ,function (stream byte)
-		     (output-wrapper (stream ,size ,buffering)
+		     (output-wrapper (stream ,size ,buffering ,restart)
 		       ,@body))
 		   (setf *output-routines*
 			 (nconc *output-routines*
@@ -314,8 +324,10 @@
 				   (cdr buffering)))))))
 	    bufferings)))
 
+;;; FIXME: is this used anywhere any more?
 (def-output-routines ("OUTPUT-CHAR-~A-BUFFERED"
 		      1
+                      t
 		      (:none character)
 		      (:line character)
 		      (:full character))
@@ -327,6 +339,7 @@
 
 (def-output-routines ("OUTPUT-UNSIGNED-BYTE-~A-BUFFERED"
 		      1
+                      nil
 		      (:none (unsigned-byte 8))
 		      (:full (unsigned-byte 8)))
   (setf (sap-ref-8 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
@@ -334,6 +347,7 @@
 
 (def-output-routines ("OUTPUT-SIGNED-BYTE-~A-BUFFERED"
 		      1
+                      nil
 		      (:none (signed-byte 8))
 		      (:full (signed-byte 8)))
   (setf (signed-sap-ref-8 (fd-stream-obuf-sap stream)
@@ -342,6 +356,7 @@
 
 (def-output-routines ("OUTPUT-UNSIGNED-SHORT-~A-BUFFERED"
 		      2
+                      nil
 		      (:none (unsigned-byte 16))
 		      (:full (unsigned-byte 16)))
   (setf (sap-ref-16 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
@@ -349,6 +364,7 @@
 
 (def-output-routines ("OUTPUT-SIGNED-SHORT-~A-BUFFERED"
 		      2
+                      nil
 		      (:none (signed-byte 16))
 		      (:full (signed-byte 16)))
   (setf (signed-sap-ref-16 (fd-stream-obuf-sap stream)
@@ -357,6 +373,7 @@
 
 (def-output-routines ("OUTPUT-UNSIGNED-LONG-~A-BUFFERED"
 		      4
+                      nil
 		      (:none (unsigned-byte 32))
 		      (:full (unsigned-byte 32)))
   (setf (sap-ref-32 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
@@ -364,6 +381,7 @@
 
 (def-output-routines ("OUTPUT-SIGNED-LONG-~A-BUFFERED"
 		      4
+                      nil
 		      (:none (signed-byte 32))
 		      (:full (signed-byte 32)))
   (setf (signed-sap-ref-32 (fd-stream-obuf-sap stream)
@@ -529,7 +547,7 @@
 	      (ecase buffering
 		(:none
 		 (lambda (stream byte)
-		   (output-wrapper (stream (/ i 8) (:none))
+		   (output-wrapper (stream (/ i 8) (:none) nil)
 		     (loop for j from 0 below (/ i 8)
 			   do (setf (sap-ref-8 
 				     (fd-stream-obuf-sap stream)
@@ -537,7 +555,7 @@
 				    (ldb (byte 8 (- i 8 (* j 8))) byte))))))
 		(:full
 		 (lambda (stream byte)
-		   (output-wrapper (stream (/ i 8) (:full))
+		   (output-wrapper (stream (/ i 8) (:full) nil)
 		     (loop for j from 0 below (/ i 8)
 			   do (setf (sap-ref-8 
 				     (fd-stream-obuf-sap stream)
@@ -552,7 +570,7 @@
 	      (ecase buffering
 		(:none
 		 (lambda (stream byte)
-		   (output-wrapper (stream (/ i 8) (:none))
+		   (output-wrapper (stream (/ i 8) (:none) nil)
 		     (loop for j from 0 below (/ i 8)
 			   do (setf (sap-ref-8 
 				     (fd-stream-obuf-sap stream)
@@ -560,7 +578,7 @@
 				    (ldb (byte 8 (- i 8 (* j 8))) byte))))))
 		(:full
 		 (lambda (stream byte)
-		   (output-wrapper (stream (/ i 8) (:full))
+		   (output-wrapper (stream (/ i 8) (:full) nil)
 		     (loop for j from 0 below (/ i 8)
 			   do (setf (sap-ref-8 
 				     (fd-stream-obuf-sap stream)
@@ -953,7 +971,8 @@
             (fd-stream-ibuf-tail stream) (+ count new-head))
       count)))
 
-(defmacro define-external-format (external-format size out-expr in-expr)
+(defmacro define-external-format (external-format size output-restart
+                                  out-expr in-expr)
   (let* ((name (first external-format))
          (out-function (intern (let ((*print-case* :upcase))
                                  (format nil "OUTPUT-BYTES/~A" name))))
@@ -980,12 +999,17 @@
 			(sap (fd-stream-obuf-sap stream))
 			(tail (fd-stream-obuf-tail stream)))
 		       ((or (= start end) (< (- len tail) 4)) tail)
-		    (with-simple-restart (output-nothing
-					  "~@<Skip output of this character.~@:>")
-		      (let* ((byte (aref string start))
-			     (bits (char-code byte)))
-			,out-expr
-			(incf tail ,size)))
+                    ,(if output-restart
+                         `(with-simple-restart (output-nothing
+                                                "~@<Skip output of this character.~@:>")
+                           (let* ((byte (aref string start))
+                                  (bits (char-code byte)))
+                             ,out-expr
+                             (incf tail ,size)))
+                         `(let* ((byte (aref string start))
+                                  (bits (char-code byte)))
+                             ,out-expr
+                             (incf tail ,size)))
 		    (incf start)))
 	    (when (< start end)
 	      (flush-output-buffer stream)))
@@ -993,6 +1017,7 @@
 	    (flush-output-buffer stream))))
       (def-output-routines (,format
 			    ,size
+                            ,output-restart
 			    (:none character)
 			    (:line character)
 			    (:full character))
@@ -1052,8 +1077,9 @@
 			 '(:none :line :full)))
 	*external-formats*)))))
 
-(defmacro define-external-format/variable-width (external-format out-size-expr
-						 out-expr in-size-expr in-expr)
+(defmacro define-external-format/variable-width
+    (external-format output-restart out-size-expr
+     out-expr in-size-expr in-expr)
   (let* ((name (first external-format))
 	 (out-function (intern (let ((*print-case* :upcase))
 				 (format nil "OUTPUT-BYTES/~A" name))))
@@ -1094,6 +1120,7 @@
 	    (flush-output-buffer fd-stream))))
       (def-output-routines/variable-width (,format
 					   ,out-size-expr
+                                           ,output-restart
 					   ,external-format
 					   (:none character)
 					   (:line character)
@@ -1201,14 +1228,14 @@
 	*external-formats*)))))
 
 (define-external-format (:latin-1 :latin1 :iso-8859-1)
-    1
+    1 t
   (if (>= bits 256)
       (stream-encoding-error stream bits)
       (setf (sap-ref-8 sap tail) bits))
   (code-char byte))
 
 (define-external-format (:ascii :us-ascii :ansi_x3.4-1968)
-    1
+    1 t
   (if (>= bits 128)
       (stream-encoding-error stream bits)
       (setf (sap-ref-8 sap tail) bits))
@@ -1235,7 +1262,7 @@
                                      :element-type '(unsigned-byte 8)
                                      :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0))))
   (define-external-format (:latin-9 :latin9 :iso-8859-15)
-      1
+      1 t
     (setf (sap-ref-8 sap tail)
           (if (< bits 256)
               (if (= bits (char-code (aref latin-9-table bits)))
@@ -1246,7 +1273,7 @@
                   (stream-encoding-error stream byte))))
     (aref latin-9-table byte)))
 
-(define-external-format/variable-width (:utf-8 :utf8)
+(define-external-format/variable-width (:utf-8 :utf8) nil
   (let ((bits (char-code byte)))
     (cond ((< bits #x80) 1)
 	  ((< bits #x800) 2)
