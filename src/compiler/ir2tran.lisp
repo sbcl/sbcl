@@ -1489,7 +1489,7 @@
 ;;; IR2 converted.
 (defun ir2-convert-exit (node block)
   (declare (type exit node) (type ir2-block block))
-  (let ((loc (find-in-physenv (find-nlx-info node)
+  (let ((loc (find-in-physenv (exit-nlx-info node)
 			      (node-physenv node)))
 	(temp (make-stack-pointer-tn))
 	(value (exit-value node)))
@@ -1570,12 +1570,15 @@
 ;;; Scan each of ENTRY's exits, setting up the exit for each lexical exit.
 (defun ir2-convert-entry (node block)
   (declare (type entry node) (type ir2-block block))
-  (dolist (exit (entry-exits node))
-    (let ((info (find-nlx-info exit)))
-      (when (and info
-		 (member (cleanup-kind (nlx-info-cleanup info))
-			 '(:block :tagbody)))
-	(emit-nlx-start node block info nil))))
+  (let ((nlxes '()))
+    (dolist (exit (entry-exits node))
+      (let ((info (exit-nlx-info exit)))
+        (when (and info
+                   (not (memq info nlxes))
+                   (member (cleanup-kind (nlx-info-cleanup info))
+                           '(:block :tagbody)))
+          (push info nlxes)
+          (emit-nlx-start node block info nil)))))
   (values))
 
 ;;; Set up the unwind block for these guys.
@@ -1606,7 +1609,7 @@
 ;;; pointer alone, since the thrown values are still out there.
 (defoptimizer (%nlx-entry ir2-convert) ((info-lvar) node block)
   (let* ((info (lvar-value info-lvar))
-	 (lvar (nlx-info-lvar info))
+	 (lvar (node-lvar node))
 	 (2info (nlx-info-info info))
 	 (top-loc (ir2-nlx-info-save-sp 2info))
 	 (start-loc (make-nlx-entry-arg-start-location))

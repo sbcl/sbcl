@@ -543,7 +543,9 @@
 (def!struct (nlx-info
 	     (:constructor make-nlx-info (cleanup
 					  exit
-					  &aux (lvar (node-lvar exit))))
+					  &aux
+                                          (block (first (block-succ
+                                                         (node-block exit))))))
 	     (:make-load-form-fun ignore-it))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
@@ -551,19 +553,17 @@
   ;; this thus provides a good indication of what kind of exit is
   ;; being done.
   (cleanup (missing-arg) :type cleanup)
-  ;; the continuation exited to (the CONT of the EXIT nodes). If this
-  ;; exit is from an escape function (CATCH or UNWIND-PROTECT), then
-  ;; physical environment analysis deletes the escape function and
-  ;; instead has the %NLX-ENTRY use this continuation.
+  ;; the ``continuation'' exited to (the block, succeeding the EXIT
+  ;; nodes). If this exit is from an escape function (CATCH or
+  ;; UNWIND-PROTECT), then physical environment analysis deletes the
+  ;; escape function and instead has the %NLX-ENTRY use this
+  ;; continuation.
   ;;
-  ;; This slot is primarily an indication of where this exit delivers
-  ;; its values to (if any), but it is also used as a sort of name to
-  ;; allow us to find the NLX-INFO that corresponds to a given exit.
-  ;; For this purpose, the ENTRY must also be used to disambiguate,
-  ;; since exits to different places may deliver their result to the
-  ;; same continuation.
-  (exit (missing-arg) :type exit)
-  (lvar (missing-arg) :type (or lvar null))
+  ;; This slot is used as a sort of name to allow us to find the
+  ;; NLX-INFO that corresponds to a given exit. For this purpose, the
+  ;; ENTRY must also be used to disambiguate, since exits to different
+  ;; places may deliver their result to the same continuation.
+  (block (missing-arg) :type cblock)
   ;; the entry stub inserted by physical environment analysis. This is
   ;; a block containing a call to the %NLX-ENTRY funny function that
   ;; has the original exit destination as its successor. Null only
@@ -572,7 +572,7 @@
   ;; some kind of info used by the back end
   info)
 (defprinter (nlx-info :identity t)
-  exit
+  block
   target
   info)
 
@@ -1319,7 +1319,8 @@
   (entry nil :type (or entry null))
   ;; the lvar yielding the value we are to exit with. If NIL, then no
   ;; value is desired (as in GO).
-  (value nil :type (or lvar null)))
+  (value nil :type (or lvar null))
+  (nlx-info nil :type (or nlx-info null)))
 (defprinter (exit :identity t)
   #!+sb-show id
   (entry :test entry)

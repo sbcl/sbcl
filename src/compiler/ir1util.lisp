@@ -740,7 +740,7 @@
                ((:block :tagbody)
                 (aver (entry-p mess-up))
                 (loop for exit in (entry-exits mess-up)
-                      for nlx-info = (find-nlx-info exit)
+                      for nlx-info = (exit-nlx-info exit)
                       do (funcall fun nlx-info)))
                ((:catch :unwind-protect)
                 (aver (combination-p mess-up))
@@ -1531,10 +1531,17 @@
 ;;; exits to CONT in that entry, then return it, otherwise return NIL.
 (defun find-nlx-info (exit)
   (declare (type exit exit))
-  (let ((entry (exit-entry exit)))
+  (let* ((entry (exit-entry exit))
+         (cleanup (entry-cleanup entry))
+        (block (first (block-succ (node-block exit)))))
     (dolist (nlx (physenv-nlx-info (node-physenv entry)) nil)
-      (when (eq (nlx-info-exit nlx) exit)
+      (when (and (eq (nlx-info-block nlx) block)
+                 (eq (nlx-info-cleanup nlx) cleanup))
 	(return nlx)))))
+
+(defun nlx-info-lvar (nlx)
+  (declare (type nlx-info nlx))
+  (node-lvar (block-last (nlx-info-target nlx))))
 
 ;;;; functional hackery
 
