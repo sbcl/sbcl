@@ -1,6 +1,15 @@
+;;;; the VM definition arithmetic VOPs for HPPA
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
 
 ;;;; Unary operations.
 
@@ -42,8 +51,6 @@
   (:translate lognot)
   (:generator 1
     (inst uaddcm zero-tn x res)))
-
-
 
 ;;;; Binary fixnum operations.
 
@@ -82,7 +89,7 @@
   (:affected)
   (:policy :fast-safe))
 
-(defmacro define-binop (translate cost untagged-cost op)
+(defmacro define-binop (translate cost untagged-cost op &optional arg-swap)
   `(progn
      (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
 		  fast-fixnum-binop)
@@ -90,26 +97,33 @@
 	      (y :target r :scs (any-reg)))
        (:translate ,translate)
        (:generator ,cost
-	 (inst ,op x y r)))
+	 ,(if arg-swap
+	      `(inst ,op y x r)
+	      `(inst ,op x y r))))
      (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
 		  fast-signed-binop)
        (:args (x :target r :scs (signed-reg))
 	      (y :target r :scs (signed-reg)))
        (:translate ,translate)
        (:generator ,untagged-cost
-	 (inst ,op x y r)))
+	 ,(if arg-swap
+	      `(inst ,op y x r)
+	      `(inst ,op x y r))))
      (define-vop (,(symbolicate "FAST-" translate "/UNSIGNED=>UNSIGNED")
 		  fast-unsigned-binop)
        (:args (x :target r :scs (unsigned-reg))
 	      (y :target r :scs (unsigned-reg)))
        (:translate ,translate)
        (:generator ,untagged-cost
-	 (inst ,op x y r)))))
+	 ,(if arg-swap
+	      `(inst ,op y x r)
+	      `(inst ,op x y r))))))
 
 (define-binop + 2 6 add)
 (define-binop - 2 6 sub)
 (define-binop logior 1 2 or)
 (define-binop logand 1 2 and)
+(define-binop logandc1 1 2 andcm t)
 (define-binop logandc2 1 2 andcm)
 (define-binop logxor 1 2 xor)
 
@@ -562,61 +576,87 @@
   (:variant-cost 6))
   
 
-;;;; 32-bit logical operations
+;;;; modular functions
+(define-modular-fun +-mod32 (x y) + 32)
+(define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
+  (:translate +-mod32))
+(define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
+  (:translate +-mod32))
 
-(define-vop (32bit-logical)
-  (:args (x :scs (unsigned-reg))
-	 (y :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe))
-
-(define-vop (32bit-logical-not 32bit-logical)
-  (:translate 32bit-logical-not)
+(define-modular-fun lognot-mod32 (x) lognot 32)
+(define-vop (lognot-mod32/unsigned=>unsigned)
+  (:translate lognot-mod32)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
   (:generator 1
-    (inst uaddcm zero-tn x r)))
+    (inst uaddcm zero-tn x res)))
 
-(define-vop (32bit-logical-and 32bit-logical)
-  (:translate 32bit-logical-and)
-  (:generator 1
-    (inst and x y r)))
+(macrolet
+    ((define-modular-backend (fun)
+       (let ((mfun-name (symbolicate fun '-mod32))
+	     ;; FIXME: if anyone cares, add constant-arg vops.  --
+	     ;; CSR, 2003-09-16
+	     (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
+	     (vop (symbolicate 'fast- fun '/unsigned=>unsigned)))
+	 `(progn
+	    (define-modular-fun ,mfun-name (x y) ,fun 32)
+	    (define-vop (,modvop ,vop)
+	      (:translate ,mfun-name))))))
+  (define-modular-backend logxor)
+  (define-modular-backend logandc1)
+  (define-modular-backend logandc2))
 
-(deftransform 32bit-logical-nand ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-and x y)))
+(define-source-transform logeqv (&rest args)
+  (if (oddp (length args))
+      `(logxor ,@args)
+      `(lognot (logxor ,@args))))
+(define-source-transform logorc1 (x y)
+  `(logior (lognot ,x) ,y))
+(define-source-transform logorc2 (x y)
+  `(logior ,x (lognot ,y)))
+(define-source-transform lognand (x y)
+  `(lognot (logand ,x ,y)))
+(define-source-transform lognor (x y)
+  `(lognot (logior ,x y)))
+   
+;;;; 32-bit logical operations
 
-(define-vop (32bit-logical-or 32bit-logical)
-  (:translate 32bit-logical-or)
-  (:generator 1
-    (inst or x y r)))
+(define-source-transform 32bit-logical-not (x)
+  `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-nor ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-or x y)))
+(deftransform 32bit-logical-and ((x y))
+  '(logand x y))
 
-(define-vop (32bit-logical-xor 32bit-logical)
-  (:translate 32bit-logical-xor)
-  (:generator 1
-    (inst xor x y r)))
+(define-source-transform 32bit-logical-nand (x y)
+  `(32bit-logical-not (32bit-logical-and ,x ,y)))
 
-(deftransform 32bit-logical-eqv ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-xor x y)))
+(deftransform 32bit-logical-or ((x y))
+  '(logior x y))
 
-(deftransform 32bit-logical-andc1 ((x y) (* *))
-  '(32bit-logical-and (32bit-logical-not x) y))
+(define-source-transform 32bit-logical-nor (x y)
+  `(logand (lognor (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y))
+           #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-andc2 32bit-logical)
-  (:translate 32bit-logical-andc2)
-  (:generator 1
-    (inst andcm x y r)))
+(deftransform 32bit-logical-xor ((x y))
+  '(logxor x y))
 
-(deftransform 32bit-logical-orc1 ((x y) (* *))
-  '(32bit-logical-or (32bit-logical-not x) y))
+(define-source-transform 32bit-logical-eqv (x y)
+  `(32bit-logical-not (32bit-logical-xor ,x ,y)))
 
-(deftransform 32bit-logical-orc2 ((x y) (* *))
-  '(32bit-logical-or x (32bit-logical-not y)))
+(define-source-transform 32bit-logical-orc1 (x y)
+  `(32bit-logical-or (32bit-logical-not ,x) ,y))
 
+(define-source-transform 32bit-logical-orc2 (x y)
+  `(32bit-logical-or ,x (32bit-logical-not ,y)))
+
+(deftransform 32bit-logical-andc1 (x y)
+  '(logandc1 x y))
+
+(deftransform 32bit-logical-andc2 (x y)
+  '(logandc2 x y))
 
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)

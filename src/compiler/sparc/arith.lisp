@@ -111,68 +111,75 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defmacro define-binop (translate untagged-penalty op)
+(defmacro define-binop (translate untagged-penalty op
+			&optional arg-swap restore-fixnum-mask)
   `(progn
-     (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
+     (define-vop (,(symbolicate 'fast translate '/fixnum=>fixnum)
 		  fast-fixnum-binop)
+       ,@(when restore-fixnum-mask
+	   `((:temporary (:sc non-descriptor-reg) temp)))
        (:translate ,translate)
        (:generator 2
-	 (inst ,op r x y)))
-     (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-		  fast-fixnum-binop-c)
-       (:translate ,translate)
-       (:generator 1
-	 (inst ,op r x (fixnumize y))))
-     (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
+	 ,(if arg-swap
+	      `(inst ,op ,(if restore-fixnum-mask 'temp 'r) y x)
+	      `(inst ,op ,(if restore-fixnum-mask 'temp 'r) x y))
+	 ,@(when restore-fixnum-mask
+	     `((inst andn r temp fixnum-tag-mask)))))
+     ,@(unless arg-swap
+	 `((define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
+			fast-fixnum-binop-c)
+	     ,@(when restore-fixnum-mask
+		 `((:temporary (:sc non-descriptor-reg) temp)))
+	     (:translate ,translate)
+	     (:generator 1
+	       (inst ,op ,(if restore-fixnum-mask 'temp 'r) x (fixnumize y))
+	       ,@(when restore-fixnum-mask
+		   `((inst andn r temp fixnum-tag-mask)))))))
+     (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
 		  fast-signed-binop)
        (:translate ,translate)
        (:generator ,(1+ untagged-penalty)
-	 (inst ,op r x y)))
-     (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-		  fast-signed-binop-c)
-       (:translate ,translate)
-       (:generator ,untagged-penalty
-	 (inst ,op r x y)))
-     (define-vop (,(symbolicate "FAST-" translate "/UNSIGNED=>UNSIGNED")
+	 ,(if arg-swap
+	      `(inst ,op r y x)
+	      `(inst ,op r x y))))
+     ,@(unless arg-swap
+	 `((define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
+			fast-signed-binop-c)
+	     (:translate ,translate)
+	     (:generator ,untagged-penalty
+	       (inst ,op r x y)))))
+     (define-vop (,(symbolicate 'fast- translate '/unsigned=>unsigned)
 		  fast-unsigned-binop)
        (:translate ,translate)
        (:generator ,(1+ untagged-penalty)
-	 (inst ,op r x y)))
-     (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-		  fast-unsigned-binop-c)
-       (:translate ,translate)
-       (:generator ,untagged-penalty
-	 (inst ,op r x y)))))
+	 ,(if arg-swap
+	      `(inst ,op r y x)
+	      `(inst ,op r x y))))
+     ,@(unless arg-swap
+	 `((define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
+			fast-unsigned-binop-c)
+	     (:translate ,translate)
+	     (:generator ,untagged-penalty
+	       (inst ,op r x y)))))))
 
 ); eval-when
 
 (define-binop + 4 add)
 (define-binop - 4 sub)
 (define-binop logand 2 and)
+(define-binop logandc1 2 andn t)
 (define-binop logandc2 2 andn)
 (define-binop logior 2 or)
-(define-binop logorc2 2 orn)
+(define-binop logorc1 2 orn t t)
+(define-binop logorc2 2 orn nil t)
 (define-binop logxor 2 xor)
-(define-binop logeqv 2 xnor)
+(define-binop logeqv 2 xnor nil t)
 
-;;; Special logand cases: (logand signed unsigned) => unsigned
-
-(define-vop (fast-logand/signed-unsigned=>unsigned
-	     fast-logand/unsigned=>unsigned)
-    (:args (x :scs (signed-reg))
-	   (y :target r :scs (unsigned-reg)))
-  (:arg-types signed-num unsigned-num))
-
-(define-vop (fast-logand/unsigned-signed=>unsigned
-	     fast-logand/unsigned=>unsigned)
-    (:args (x :target r :scs (unsigned-reg))
-	   (y :scs (signed-reg)))
-  (:arg-types unsigned-num signed-num))
-    
 ;;; Special case fixnum + and - that trap on overflow.  Useful when we
 ;;; don't know that the output type is a fixnum.
 
-;;; I (Raymond Toy) took these out. They don't seem to be used anywhere at all.
+;;; I (Raymond Toy) took these out. They don't seem to be used
+;;; anywhere at all.
 #+nil
 (progn
 (define-vop (+/fixnum fast-+/fixnum=>fixnum)
@@ -668,6 +675,45 @@
     (inst mulx r x y)))
 
 
+;;;; Modular functions:
+(define-modular-fun lognot-mod32 (x) lognot 32)
+(define-vop (lognot-mod32/unsigned=>unsigned)
+  (:translate lognot-mod32)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst not res x)))
+
+(macrolet
+    ((define-modular-backend (fun &optional constantp)
+       (let ((mfun-name (symbolicate fun '-mod32))
+             (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun 'mod32-c/unsigned=>unsigned))
+             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
+             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
+         `(progn
+            (define-modular-fun ,mfun-name (x y) ,fun 32)
+            (define-vop (,modvop ,vop)
+              (:translate ,mfun-name))
+	    ,@(when constantp
+		`((define-vop (,modcvop ,cvop)
+		    (:translate ,mfun-name))))))))
+  (define-modular-backend + t)
+  (define-modular-backend logxor t)
+  (define-modular-backend logeqv t)
+  (define-modular-backend logandc1)
+  (define-modular-backend logandc2 t)
+  (define-modular-backend logorc1)
+  (define-modular-backend logorc2 t))
+
+(define-source-transform lognand (x y)
+  `(lognot (logand ,x ,y)))
+(define-source-transform lognor (x y)
+  `(lognot (logior ,x ,y)))
+
 ;;;; Binary conditional VOPs:
 
 (define-vop (fast-conditional)
@@ -804,64 +850,38 @@
       (emit-label done)
       (move result res))))
 
+(define-source-transform 32bit-logical-not (x)
+  `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical)
-  (:args (x :scs (unsigned-reg zero))
-	 (y :scs (unsigned-reg zero)))
-  (:arg-types unsigned-num unsigned-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe))
+(deftransform 32bit-logical-and ((x y))
+  '(logand x y))
 
-(define-vop (32bit-logical-not 32bit-logical)
-  (:translate 32bit-logical-not)
-  (:args (x :scs (unsigned-reg zero)))
-  (:arg-types unsigned-num)
-  (:generator 1
-    (inst not r x)))
+(deftransform 32bit-logical-nand ((x y))
+  '(logand (lognand x y) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-and 32bit-logical)
-  (:translate 32bit-logical-and)
-  (:generator 1
-    (inst and r x y)))
+(deftransform 32bit-logical-or ((x y))
+  '(logior x y))
 
-(deftransform 32bit-logical-nand ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-and x y)))
+(deftransform 32bit-logical-nor ((x y))
+  '(logand (lognor x y) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-or 32bit-logical)
-  (:translate 32bit-logical-or)
-  (:generator 1
-    (inst or r x y)))
+(deftransform 32bit-logical-xor ((x y))
+  '(logxor x y))
 
-(deftransform 32bit-logical-nor ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-or x y)))
+(deftransform 32bit-logical-eqv ((x y))
+  '(logand (logeqv x y) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-xor 32bit-logical)
-  (:translate 32bit-logical-xor)
-  (:generator 1
-    (inst xor r x y)))
+(deftransform 32bit-logical-orc1 ((x y))
+  '(logand (logorc1 x y) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-eqv 32bit-logical)
-  (:translate 32bit-logical-eqv)
-  (:generator 1
-    (inst xnor r x y)))
+(deftransform 32bit-logical-orc2 ((x y))
+  '(logand (logorc2 x y) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-orc2 32bit-logical)
-  (:translate 32bit-logical-orc2)
-  (:generator 1
-    (inst orn r x y)))
+(deftransform 32bit-logical-andc1 ((x y))
+  '(logand (logandc1 x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-orc1 ((x y) (* *))
-  '(32bit-logical-orc2 y x))
-
-(define-vop (32bit-logical-andc2 32bit-logical)
-  (:translate 32bit-logical-andc2)
-  (:generator 1
-    (inst andn r x y)))
-
-(deftransform 32bit-logical-andc1 ((x y) (* *))
-  '(32bit-logical-andc2 y x))
-
+(deftransform 32bit-logical-andc2 ((x y))
+  '(logand (logandc2 x y) #.(1- (ash 1 32))))
 
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
@@ -882,9 +902,6 @@
   (:note "shift-towards-end")
   (:generator 1
     (inst srl r num amount)))
-
-
-
 
 ;;;; Bignum stuff.
 
@@ -1083,15 +1100,8 @@
   (:generator 40
     (emit-multiply x y hi lo)))
 
-(define-vop (bignum-lognot)
-  (:translate sb!bignum::%lognot)
-  (:policy :fast-safe)
-  (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:generator 1
-    (inst not r x)))
+(define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
+  (:translate sb!bignum::%lognot))
 
 (define-vop (fixnum-to-digit)
   (:translate sb!bignum::%fixnum-to-digit)
@@ -1237,6 +1247,7 @@
 (define-static-fun two-arg-and (x y) :translate logand)
 (define-static-fun two-arg-ior (x y) :translate logior)
 (define-static-fun two-arg-xor (x y) :translate logxor)
+(define-static-fun two-arg-eqv (x y) :translate logeqv)
 
 
 ;; Need these so constant folding works with the deftransform.

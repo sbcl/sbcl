@@ -81,10 +81,7 @@ where a is the intended low-order byte and d the high-order byte."
   #+cmu
   (kernel:32bit-logical-or (kernel:32bit-logical-and x y)
 			   (kernel:32bit-logical-andc1 x z))
-  #+sbcl
-  (sb-kernel:32bit-logical-or (sb-kernel:32bit-logical-and x y)
-			      (sb-kernel:32bit-logical-andc1 x z))
-  #-(or cmu sbcl)
+  #-cmu
   (logior (logand x y) (logandc1 x z)))
 
 (defun g (x y z)
@@ -93,10 +90,7 @@ where a is the intended low-order byte and d the high-order byte."
   #+cmu
   (kernel:32bit-logical-or (kernel:32bit-logical-and x z)
 			   (kernel:32bit-logical-andc2 y z))
-  #+sbcl
-  (sb-kernel:32bit-logical-or (sb-kernel:32bit-logical-and x z)
-			      (sb-kernel:32bit-logical-andc2 y z))
-  #-(or cmu sbcl)
+  #-cmu
   (logior (logand x z) (logandc2 y z)))
 
 (defun h (x y z)
@@ -104,9 +98,7 @@ where a is the intended low-order byte and d the high-order byte."
 	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-xor x (kernel:32bit-logical-xor y z))
-  #+sbcl
-  (sb-kernel:32bit-logical-xor x (sb-kernel:32bit-logical-xor y z))  
-  #-(or cmu sbcl)
+  #-cmu
   (logxor x y z))
 
 (defun i (x y z)
@@ -114,9 +106,7 @@ where a is the intended low-order byte and d the high-order byte."
 	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-xor y (kernel:32bit-logical-orc2 x z))
-  #+sbcl
-  (sb-kernel:32bit-logical-xor y (sb-kernel:32bit-logical-orc2 x z))  
-  #-(or cmu sbcl)
+  #-cmu
   (ldb (byte 32 0) (logxor y (logorc2 x z))))
 
 (declaim (inline mod32+)
@@ -129,11 +119,11 @@ where a is the intended low-order byte and d the high-order byte."
 (define-compiler-macro mod32+ (a b)
   `(ext:truly-the ub32 (+ ,a ,b)))
 
+;;; Dunno why we need this, but without it MOD32+ wasn't being
+;;; inlined.  Oh well.  -- CSR, 2003-09-14
 #+sbcl
-;;; FIXME: Check whether this actually does the right thing on the
-;;; alpha.
 (define-compiler-macro mod32+ (a b)
-  `(sb-ext:truly-the ub32 (+ ,a ,b)))
+  `(ldb (byte 32 0) (+ ,a ,b)))
 
 (declaim (inline rol32)
 	 (ftype (function (ub32 (unsigned-byte 5)) ub32) rol32))

@@ -440,27 +440,9 @@
 
 
 ;;;; 32-bit operations
-#!-x86 ; on X86 it is a modular function
-(deftransform lognot ((x) ((unsigned-byte 32)) *
-                      :node node
-                      :result result)
-  "32-bit implementation"
-  (let ((dest (lvar-dest result)))
-    (unless (and (combination-p dest)
-                 (eq (lvar-fun-name (combination-fun dest))
-                     'logand))
-      (give-up-ir1-transform))
-    (unless (some (lambda (arg)
-                    (csubtypep (lvar-type arg)
-                               (specifier-type '(unsigned-byte 32))))
-                  (combination-args dest))
-      (give-up-ir1-transform))
-    (setf (node-derived-type node)
-          (values-specifier-type '(values (unsigned-byte 32) &optional)))
-    '(32bit-logical-not x)))
-
 (define-good-modular-fun logand)
 (define-good-modular-fun logior)
+;;; FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16
 
 ;;; There are two different ways the multiplier can be recoded. The
 ;;; more obvious is to shift X by the correct amount for each bit set

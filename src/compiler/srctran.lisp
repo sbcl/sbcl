@@ -172,12 +172,6 @@
   #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (deffrob ceiling))
 
-(define-source-transform lognand (x y) `(lognot (logand ,x ,y)))
-(define-source-transform lognor (x y) `(lognot (logior ,x ,y)))
-(define-source-transform logandc1 (x y) `(logand (lognot ,x) ,y))
-(define-source-transform logandc2 (x y) `(logand ,x (lognot ,y)))
-(define-source-transform logorc1 (x y) `(logior (lognot ,x) ,y))
-(define-source-transform logorc2 (x y) `(logior ,x (lognot ,y)))
 (define-source-transform logtest (x y) `(not (zerop (logand ,x ,y))))
 
 (deftransform logbitp
@@ -729,21 +723,25 @@
 ;;; the types of both X and Y are integer types, then we compute a new
 ;;; integer type with bounds determined Fun when applied to X and Y.
 ;;; Otherwise, we use Numeric-Contagion.
+(defun derive-integer-type-aux (x y fun)
+  (declare (type function fun))
+  (if (and (numeric-type-p x) (numeric-type-p y)
+	   (eq (numeric-type-class x) 'integer)
+	   (eq (numeric-type-class y) 'integer)
+	   (eq (numeric-type-complexp x) :real)
+	   (eq (numeric-type-complexp y) :real))
+      (multiple-value-bind (low high) (funcall fun x y)
+	(make-numeric-type :class 'integer
+			   :complexp :real
+			   :low low
+			   :high high))
+      (numeric-contagion x y)))
+
 (defun derive-integer-type (x y fun)
   (declare (type lvar x y) (type function fun))
   (let ((x (lvar-type x))
 	(y (lvar-type y)))
-    (if (and (numeric-type-p x) (numeric-type-p y)
-	     (eq (numeric-type-class x) 'integer)
-	     (eq (numeric-type-class y) 'integer)
-	     (eq (numeric-type-complexp x) :real)
-	     (eq (numeric-type-complexp y) :real))
-	(multiple-value-bind (low high) (funcall fun x y)
-	  (make-numeric-type :class 'integer
-			     :complexp :real
-			     :low low
-			     :high high))
-	(numeric-contagion x y))))
+    (derive-integer-type-aux x y fun)))
 
 ;;; simple utility to flatten a list
 (defun flatten-list (x)
@@ -1339,16 +1337,19 @@
   (defoptimizer (%negate derive-type) ((num))
     (derive-integer-type num num (frob -))))
 
+(defun lognot-derive-type-aux (int)
+  (derive-integer-type-aux int int
+			   (lambda (type type2)
+			     (declare (ignore type2))
+			     (let ((lo (numeric-type-low type))
+				   (hi (numeric-type-high type)))
+			       (values (if hi (lognot hi) nil)
+				       (if lo (lognot lo) nil)
+				       (numeric-type-class type)
+				       (numeric-type-format type))))))
+
 (defoptimizer (lognot derive-type) ((int))
-  (derive-integer-type int int
-		       (lambda (type type2)
-			 (declare (ignore type2))
-			 (let ((lo (numeric-type-low type))
-			       (hi (numeric-type-high type)))
-			   (values (if hi (lognot hi) nil)
-				   (if lo (lognot lo) nil)
-				   (numeric-type-class type)
-				   (numeric-type-format type))))))
+  (lognot-derive-type-aux (lvar-type int)))
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (%negate derive-type) ((num))
@@ -2177,7 +2178,7 @@
 					      '*))))
        ((or (and (not x-pos) (not y-neg))
 	    (and (not y-neg) (not y-pos)))
-	;; Either X is negative and Y is positive of vice-versa. The
+	;; Either X is negative and Y is positive or vice-versa. The
 	;; result will be negative.
 	(specifier-type `(integer ,(if (and x-len y-len)
 				       (ash -1 (max x-len y-len))
@@ -2197,6 +2198,43 @@
   (deffrob logand)
   (deffrob logior)
   (deffrob logxor))
+
+;;; FIXME: could actually do stuff with SAME-LEAF
+(defoptimizer (logeqv derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (lognot-derive-type-aux 
+			      (logxor-derive-type-aux x y same-leaf))) 
+		       #'logeqv))
+(defoptimizer (lognand derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (lognot-derive-type-aux
+			      (logand-derive-type-aux x y same-leaf)))
+		       #'lognand))
+(defoptimizer (lognor derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (lognot-derive-type-aux
+			      (logior-derive-type-aux x y same-leaf)))
+		       #'lognor))
+(defoptimizer (logandc1 derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (logand-derive-type-aux
+			      (lognot-derive-type-aux x) y nil))
+		       #'logandc1))
+(defoptimizer (logandc2 derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (logand-derive-type-aux
+			      x (lognot-derive-type-aux y) nil))
+		       #'logandc2))
+(defoptimizer (logorc1 derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (logior-derive-type-aux
+			      (lognot-derive-type-aux x) y nil))
+		       #'logorc1))
+(defoptimizer (logorc2 derive-type) ((x y))
+  (two-arg-derive-type x y (lambda (x y same-leaf)
+			     (logior-derive-type-aux
+			      x (lognot-derive-type-aux y) nil))
+		       #'logorc2))
 
 ;;;; miscellaneous derive-type methods
 
@@ -3131,11 +3169,8 @@
   (source-transform-transitive 'logxor args 0 'integer))
 (define-source-transform logand (&rest args)
   (source-transform-transitive 'logand args -1 'integer))
-
 (define-source-transform logeqv (&rest args)
-  (if (evenp (length args))
-      `(lognot (logxor ,@args))
-      `(logxor ,@args)))
+  (source-transform-transitive 'logeqv args -1 'integer))
 
 ;;; Note: we can't use SOURCE-TRANSFORM-TRANSITIVE for GCD and LCM
 ;;; because when they are given one argument, they return its absolute
