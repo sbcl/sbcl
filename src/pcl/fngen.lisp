@@ -132,43 +132,43 @@
   (let ((*walk-form-expand-macros-p* t))
     (walk-form lambda
 	       nil
-	       #'(lambda (f c e)
-		   (declare (ignore e))
-		   (if (neq c :eval)
-		       f
-		       (let ((converted (funcall test-converter f)))
-			 (values converted (neq converted f))))))))
+	       (lambda (f c e)
+		 (declare (ignore e))
+		 (if (neq c :eval)
+		     f
+		     (let ((converted (funcall test-converter f)))
+		       (values converted (neq converted f))))))))
 
 (defun compute-code (lambda code-converter)
   (let ((*walk-form-expand-macros-p* t)
 	(gensyms ()))
     (values (walk-form lambda
 		       nil
-		       #'(lambda (f c e)
-			   (declare (ignore e))
-			   (if (neq c :eval)
-			       f
-			       (multiple-value-bind (converted gens)
-				   (funcall code-converter f)
-				 (when gens (setq gensyms (append gensyms gens)))
-				 (values converted (neq converted f))))))
-	      gensyms)))
+		       (lambda (f c e)
+			 (declare (ignore e))
+			 (if (neq c :eval)
+			     f
+			     (multiple-value-bind (converted gens)
+				 (funcall code-converter f)
+			       (when gens (setq gensyms (append gensyms gens)))
+			       (values converted (neq converted f))))))
+	    gensyms)))
 
 (defun compute-constants (lambda constant-converter)
   (let ((*walk-form-expand-macros-p* t) ; doesn't matter here.
         collect)
     (walk-form lambda
                nil
-               #'(lambda (f c e)
-                   (declare (ignore e))
-                   (if (neq c :eval)
-                       f
-                       (let ((consts (funcall constant-converter f)))
-                         (if consts
-                             (progn
-                               (setq collect (nconc collect consts))
-                               (values f t))
-                             f)))))
+               (lambda (f c e)
+		 (declare (ignore e))
+		 (if (neq c :eval)
+		     f
+		     (let ((consts (funcall constant-converter f)))
+		       (if consts
+			   (progn
+			     (setq collect (nconc collect consts))
+			     (values f t))
+			   f)))))
     collect))
 
 (defmacro precompile-function-generators (&optional system)

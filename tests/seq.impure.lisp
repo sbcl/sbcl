@@ -172,7 +172,7 @@
     (eql 5 (position-if (lambda (c) (equal #\g c)) seq))
     (eql 5 (position-if (lambda (c) (equal #\g c)) seq :from-end t))
     (find-if #'characterp seq)
-    (find-if #'(lambda (c) (typep c 'base-char)) seq :from-end t)
+    (find-if (lambda (c) (typep c 'base-char)) seq :from-end t)
     (null (find-if 'upper-case-p seq))))
 	 
 ;;; success

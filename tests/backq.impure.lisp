@@ -51,8 +51,8 @@
     ("``(FOO ,@,@*Q*)" . (foo a b c sqrt 9))
     ("``(,@,@*QQ*)" . (3 5 4 6))))
 
-(mapc #'(lambda (test)
-          (test-double-backquote (car test) (cdr test)))
+(mapc (lambda (test)
+	(test-double-backquote (car test) (cdr test)))
       *backquote-tests*)
 
 ;;; success

@@ -1423,9 +1423,9 @@
 
 (defun list-all-fdefn-objects ()
   (let ((result *nil-descriptor*))
-    (maphash #'(lambda (key value)
-		 (declare (ignore key))
-		 (cold-push value result))
+    (maphash (lambda (key value)
+	       (declare (ignore key))
+	       (cold-push value result))
 	     *cold-fdefn-objects*)
     result))
 
@@ -2561,8 +2561,8 @@
 	    (maybe-record-with-translated-name '("-START" "-END") 6)))))
     (setf constants
 	  (sort constants
-		#'(lambda (const1 const2)
-		    (if (= (second const1) (second const2))
+		(lambda (const1 const2)
+		  (if (= (second const1) (second const2))
 		      (< (third const1) (third const2))
 		      (< (second const1) (second const2))))))
     (let ((prev-priority (second (car constants))))
@@ -2612,9 +2612,9 @@
 
   ;; writing primitive object layouts
   (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
-		       :key #'(lambda (obj)
-				(symbol-name
-				 (sb!vm:primitive-object-name obj))))))
+		       :key (lambda (obj)
+			      (symbol-name
+			       (sb!vm:primitive-object-name obj))))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "#define LISPOBJ(x) ((lispobj)x)~2%")
     (dolist (obj structs)
@@ -2651,8 +2651,8 @@
     ;; in #define statements.
     (format t "#define ~A LISPOBJ(0x~X)~%"
 	    (nsubstitute #\_ #\-
-			 (remove-if #'(lambda (char)
-					(member char '(#\% #\* #\. #\!)))
+			 (remove-if (lambda (char)
+				      (member char '(#\% #\* #\. #\!)))
 				    (symbol-name symbol)))
 	    (if *static*		; if we ran GENESIS
 	      ;; We actually ran GENESIS, use the real value.
@@ -2681,16 +2681,16 @@
       (format t "#X~8,'0X: ~S~%" (cdr routine) (car routine)))
     (let ((funs nil)
 	  (undefs nil))
-      (maphash #'(lambda (name fdefn)
-		   (let ((fun (read-wordindexed fdefn
-						sb!vm:fdefn-fun-slot)))
-		     (if (= (descriptor-bits fun)
-			    (descriptor-bits *nil-descriptor*))
-			 (push name undefs)
-			 (let ((addr (read-wordindexed
-				      fdefn sb!vm:fdefn-raw-addr-slot)))
-			   (push (cons name (descriptor-bits addr))
-				 funs)))))
+      (maphash (lambda (name fdefn)
+		 (let ((fun (read-wordindexed fdefn
+					      sb!vm:fdefn-fun-slot)))
+		   (if (= (descriptor-bits fun)
+			  (descriptor-bits *nil-descriptor*))
+		       (push name undefs)
+		       (let ((addr (read-wordindexed
+				    fdefn sb!vm:fdefn-raw-addr-slot)))
+			 (push (cons name (descriptor-bits addr))
+			       funs)))))
 	       *cold-fdefn-objects*)
       (format t "~%~|~%initially defined functions:~2%")
       (setf funs (sort funs #'< :key #'cdr))
@@ -2716,10 +2716,10 @@ initially undefined function references:~2%")
 
     (format t "~%~|~%layout names:~2%")
     (collect ((stuff))
-      (maphash #'(lambda (name gorp)
-                   (declare (ignore name))
-                   (stuff (cons (descriptor-bits (car gorp))
-                                (cdr gorp))))
+      (maphash (lambda (name gorp)
+                 (declare (ignore name))
+                 (stuff (cons (descriptor-bits (car gorp))
+                              (cdr gorp))))
                *cold-layouts*)
       (dolist (x (sort (stuff) #'< :key #'car))
         (apply #'format t "~8,'0X: ~S[~D]~%~10T~S~%" x))))

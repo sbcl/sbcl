@@ -282,27 +282,27 @@
                   (nreverse collect)))))))
 
 (defun map-specializers (function)
-  (map-all-classes #'(lambda (class)
-		       (funcall function (class-eq-specializer class))
-		       (funcall function class)))
-  (maphash #'(lambda (object methods)
-	       (declare (ignore methods))
-	       (intern-eql-specializer object))
+  (map-all-classes (lambda (class)
+		     (funcall function (class-eq-specializer class))
+		     (funcall function class)))
+  (maphash (lambda (object methods)
+	     (declare (ignore methods))
+	     (intern-eql-specializer object))
 	   *eql-specializer-methods*)
-  (maphash #'(lambda (object specl)
-	       (declare (ignore object))
-	       (funcall function specl))
+  (maphash (lambda (object specl)
+	     (declare (ignore object))
+	     (funcall function specl))
 	   *eql-specializer-table*)
   nil)
 
 (defun map-all-generic-functions (function)
   (let ((all-generic-functions (make-hash-table :test 'eq)))
-    (map-specializers #'(lambda (specl)
-			  (dolist (gf (specializer-direct-generic-functions
-				       specl))
-			    (unless (gethash gf all-generic-functions)
-			      (setf (gethash gf all-generic-functions) t)
-			      (funcall function gf))))))
+    (map-specializers (lambda (specl)
+			(dolist (gf (specializer-direct-generic-functions
+				     specl))
+			  (unless (gethash gf all-generic-functions)
+			    (setf (gethash gf all-generic-functions) t)
+			    (funcall function gf))))))
   nil)
 
 (defmethod shared-initialize :after ((specl class-eq-specializer)
@@ -464,8 +464,8 @@
 					 &rest initargs
 					 &key)
   (map-dependents class
-		  #'(lambda (dependent)
-		      (apply #'update-dependent class dependent initargs))))
+		  (lambda (dependent)
+		    (apply #'update-dependent class dependent initargs))))
 
 (defmethod shared-initialize :after ((slotd standard-slot-definition)
 				     slot-names &key)
@@ -556,17 +556,17 @@
     (if direct-slots-p
 	(setf (slot-value class 'direct-slots)
 	      (setq direct-slots
-		    (mapcar #'(lambda (pl)
-				(when defstruct-p
-				  (let* ((slot-name (getf pl :name))
-					 (acc-name
-					  (format nil
-						  "~S structure class ~A"
-						  name slot-name))
-					 (accessor (intern acc-name)))
-				    (setq pl (list* :defstruct-accessor-symbol
-						    accessor pl))))
-				(make-direct-slotd class pl))
+		    (mapcar (lambda (pl)
+			      (when defstruct-p
+				(let* ((slot-name (getf pl :name))
+				       (acc-name
+					(format nil
+						"~S structure class ~A"
+						name slot-name))
+				       (accessor (intern acc-name)))
+				  (setq pl (list* :defstruct-accessor-symbol
+						  accessor pl))))
+			      (make-direct-slotd class pl))
 			    direct-slots)))
 	(setq direct-slots (slot-value class 'direct-slots)))
     (when defstruct-p
@@ -574,14 +574,14 @@
         (multiple-value-bind (defstruct-form constructor reader-names writer-names)
             (make-structure-class-defstruct-form name direct-slots include)
           (unless (structure-type-p name) (eval defstruct-form))
-          (mapc #'(lambda (dslotd reader-name writer-name)
-                    (let* ((reader (gdefinition reader-name))
-                           (writer (when (gboundp writer-name)
-                                     (gdefinition writer-name))))
-                      (setf (slot-value dslotd 'internal-reader-function)
-                              reader)
-                      (setf (slot-value dslotd 'internal-writer-function)
-                              writer)))
+          (mapc (lambda (dslotd reader-name writer-name)
+		  (let* ((reader (gdefinition reader-name))
+			 (writer (when (gboundp writer-name)
+				   (gdefinition writer-name))))
+		    (setf (slot-value dslotd 'internal-reader-function)
+			  reader)
+		    (setf (slot-value dslotd 'internal-writer-function)
+			  writer)))
                 direct-slots reader-names writer-names)
           (setf (slot-value class 'defstruct-form) defstruct-form)
           (setf (slot-value class 'defstruct-constructor) constructor))))
@@ -771,9 +771,9 @@
 		   (setf (gethash gf gf-table) t))
 		 (mapc #'collect-gfs (class-direct-superclasses class))))
 	(collect-gfs class)
-	(maphash #'(lambda (gf ignore)
-		     (declare (ignore ignore))
-		     (update-gf-dfun class gf))
+	(maphash (lambda (gf ignore)
+		   (declare (ignore ignore))
+		   (update-gf-dfun class gf))
 		 gf-table)))))
 
 (defun update-inits (class inits)
@@ -819,9 +819,9 @@
 	    (if entry
 		(push d (cdr entry))
 		(push (list name d) name-dslotds-alist))))))
-    (mapcar #'(lambda (direct)
-		(compute-effective-slot-definition class
-						   (nreverse (cdr direct))))
+    (mapcar (lambda (direct)
+	      (compute-effective-slot-definition class
+						 (nreverse (cdr direct))))
 	    name-dslotds-alist)))
 
 (defmethod compute-slots :around ((class std-class))
@@ -845,11 +845,11 @@
     eslotds))
 
 (defmethod compute-slots ((class structure-class))
-  (mapcan #'(lambda (superclass)
-	      (mapcar #'(lambda (dslotd)
-			  (compute-effective-slot-definition class
-							     (list dslotd)))
-		      (class-direct-slots superclass)))
+  (mapcan (lambda (superclass)
+	    (mapcar (lambda (dslotd)
+		      (compute-effective-slot-definition class
+							 (list dslotd)))
+		    (class-direct-slots superclass)))
 	  (reverse (slot-value class 'class-precedence-list))))
 
 (defmethod compute-slots :around ((class structure-class))

@@ -705,7 +705,7 @@
 	(body (cdddr form)))
     (walk-form-internal
       `(let ()
-	 (declare (special ,@(mapcar #'(lambda (x) (if (listp x) (car x) x))
+	 (declare (special ,@(mapcar (lambda (x) (if (listp x) (car x) x))
 				     bindings)))
 	 (flet ((.let-if-dummy. () ,@body))
 	   (if ,test
@@ -716,14 +716,14 @@
 
 (defun walk-multiple-value-setq (form context env)
   (let ((vars (cadr form)))
-    (if (some #'(lambda (var)
-		  (variable-symbol-macro-p var env))
+    (if (some (lambda (var)
+		(variable-symbol-macro-p var env))
 	      vars)
-	(let* ((temps (mapcar #'(lambda (var)
-				  (declare (ignore var))
-				  (gensym))
+	(let* ((temps (mapcar (lambda (var)
+				(declare (ignore var))
+				(gensym))
 			      vars))
-	       (sets (mapcar #'(lambda (var temp) `(setq ,var ,temp))
+	       (sets (mapcar (lambda (var temp) `(setq ,var ,temp))
 			     vars
 			     temps))
 	       (expanded `(multiple-value-bind ,temps ,(caddr form)
@@ -744,14 +744,14 @@
 	   (walked-body
 	     (walk-declarations
 	       body
-	       #'(lambda (real-body real-env)
-		   (setq walked-bindings
-			 (walk-bindings-1 bindings
-					  old-env
-					  new-env
-					  context
-					  nil))
-		   (walk-repeat-eval real-body real-env))
+	       (lambda (real-body real-env)
+		 (setq walked-bindings
+		       (walk-bindings-1 bindings
+					old-env
+					new-env
+					context
+					nil))
+		 (walk-repeat-eval real-body real-env))
 	       new-env)))
       (relist* form mvb walked-bindings mv-form walked-body))))
 
@@ -856,9 +856,9 @@
     (walker-environment-bind
 	(new-env old-env
 		 :lexical-variables
-		 (append (mapcar #'(lambda (binding)
-				     `(,(car binding)
-				       :macro . ,(cadr binding)))
+		 (append (mapcar (lambda (binding)
+				   `(,(car binding)
+				     :macro . ,(cadr binding)))
 				 bindings)
 			 (env-lexical-variables old-env)))
       (relist* form 'symbol-macrolet bindings

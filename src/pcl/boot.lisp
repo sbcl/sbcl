@@ -341,16 +341,16 @@ bootstrapping.
 	fn-lambda)
     (if (and (interned-symbol-p (fun-name-block-name name))
 	     (every #'interned-symbol-p qualifiers)
-	     (every #'(lambda (s)
-			(if (consp s)
-			    (and (eq (car s) 'eql)
-				 (constantp (cadr s))
-				 (let ((sv (eval (cadr s))))
-				   (or (interned-symbol-p sv)
-				       (integerp sv)
-				       (and (characterp sv)
-					    (standard-char-p sv)))))
-			    (interned-symbol-p s)))
+	     (every (lambda (s)
+		      (if (consp s)
+			  (and (eq (car s) 'eql)
+			       (constantp (cadr s))
+			       (let ((sv (eval (cadr s))))
+				 (or (interned-symbol-p sv)
+				     (integerp sv)
+				     (and (characterp sv)
+					  (standard-char-p sv)))))
+			  (interned-symbol-p s)))
 		    specializers)
 	     (consp initargs-form)
 	     (eq (car initargs-form) 'list*)
@@ -387,11 +387,11 @@ bootstrapping.
 	       pv-table-symbol)))
 	(make-defmethod-form-internal
 	 name qualifiers
-	 `(list ,@(mapcar #'(lambda (specializer)
-			      (if (consp specializer)
-				  ``(,',(car specializer)
-				     ,,(cadr specializer))
-				  `',specializer))
+	 `(list ,@(mapcar (lambda (specializer)
+			    (if (consp specializer)
+				``(,',(car specializer)
+				   ,,(cadr specializer))
+				`',specializer))
 			  specializers))
 	 unspecialized-lambda-list method-class-name
 	 initargs-form
@@ -914,22 +914,22 @@ bootstrapping.
     (fast-method-call (let* ((arg-info (gf-arg-info gf))
 			     (nreq (arg-info-number-required arg-info))
 			     (restp (arg-info-applyp arg-info)))
-			#'(lambda (&rest args)
-			    (trace-emf-call emf t args)
-			    (apply (fast-method-call-function emf)
-				   (fast-method-call-pv-cell emf)
-				   (fast-method-call-next-method-call emf)
-				   (if restp
-				       (let* ((rest-args (nthcdr nreq args))
-					      (req-args (ldiff args
-							       rest-args)))
-					 (nconc req-args rest-args))
-				       args)))))
-    (method-call #'(lambda (&rest args)
-		     (trace-emf-call emf t args)
-		     (apply (method-call-function emf)
-			    args
-			    (method-call-call-method-args emf))))
+			(lambda (&rest args)
+			  (trace-emf-call emf t args)
+			  (apply (fast-method-call-function emf)
+				 (fast-method-call-pv-cell emf)
+				 (fast-method-call-next-method-call emf)
+				 (if restp
+				     (let* ((rest-args (nthcdr nreq args))
+					    (req-args (ldiff args
+							     rest-args)))
+				       (nconc req-args rest-args))
+				     args)))))
+    (method-call (lambda (&rest args)
+		   (trace-emf-call emf t args)
+		   (apply (method-call-function emf)
+			  args
+			  (method-call-call-method-args emf))))
     (function emf)))
 
 (defmacro bind-fast-lexical-method-macros ((args rest-arg next-method-call)
@@ -1361,8 +1361,8 @@ bootstrapping.
 			    '(&rest t))
 			  (when (or keysp old-keysp)
 			    (append '(&key)
-				    (mapcar #'(lambda (key)
-						`(,key t))
+				    (mapcar (lambda (key)
+					      `(,key t))
 					    keywords)
 				    (when (or allow-other-keys-p old-allowp)
 				      '(&allow-other-keys)))))
@@ -1401,13 +1401,13 @@ bootstrapping.
 		     'standard-generic-function))
 
 (defvar *sgf-slots-init*
-  (mapcar #'(lambda (canonical-slot)
-	      (if (memq (getf canonical-slot :name) '(arg-info source))
-		  +slot-unbound+
-		  (let ((initfunction (getf canonical-slot :initfunction)))
-		    (if initfunction
-			(funcall initfunction)
-			+slot-unbound+))))
+  (mapcar (lambda (canonical-slot)
+	    (if (memq (getf canonical-slot :name) '(arg-info source))
+		+slot-unbound+
+		(let ((initfunction (getf canonical-slot :initfunction)))
+		  (if initfunction
+		      (funcall initfunction)
+		      +slot-unbound+))))
 	  (early-collect-inheritance 'standard-generic-function)))
 
 (defvar *sgf-method-class-index*
@@ -1466,7 +1466,7 @@ bootstrapping.
   (length (arg-info-metatypes arg-info)))
 
 (defun arg-info-nkeys (arg-info)
-  (count-if #'(lambda (x) (neq x t)) (arg-info-metatypes arg-info)))
+  (count-if (lambda (x) (neq x t)) (arg-info-metatypes arg-info)))
 
 ;;; Keep pages clean by not setting if the value is already the same.
 (defmacro esetf (pos val)
@@ -1554,7 +1554,7 @@ bootstrapping.
 	(when (consp gf-keywords)
 	  (unless (or (and restp (not keysp))
 		      allow-other-keys-p
-		      (every #'(lambda (k) (memq k keywords)) gf-keywords))
+		      (every (lambda (k) (memq k keywords)) gf-keywords))
 	    (lose "the method does not accept each of the &KEY arguments~%~
 		   ~S."
 		  gf-keywords)))))))
@@ -1805,7 +1805,7 @@ bootstrapping.
 		metatypes
 		arg-info))
     (values (length metatypes) applyp metatypes
-	    (count-if #'(lambda (x) (neq x t)) metatypes)
+	    (count-if (lambda (x) (neq x t)) metatypes)
 	    arg-info)))
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
@@ -1821,10 +1821,10 @@ bootstrapping.
     ;; Note that the use of not symbolp in this call to every should be
     ;; read as 'classp' we can't use classp itself because it doesn't
     ;; exist yet.
-    (if (every #'(lambda (s) (not (symbolp s))) specializers)
+    (if (every (lambda (s) (not (symbolp s))) specializers)
 	(setq parsed specializers
-	      unparsed (mapcar #'(lambda (s)
-				   (if (eq s t) t (class-name s)))
+	      unparsed (mapcar (lambda (s)
+				 (if (eq s t) t (class-name s)))
 			       specializers))
 	(setq unparsed specializers
 	      parsed ()))
@@ -2008,13 +2008,13 @@ bootstrapping.
     (dolist (early-gf-spec *!early-generic-functions*)
       (/show early-gf-spec)
       (let* ((gf (gdefinition early-gf-spec))
-	     (methods (mapcar #'(lambda (early-method)
-				  (let ((args (copy-list (fifth
-							  early-method))))
-				    (setf (fourth args)
-					  (early-method-specializers
-					   early-method t))
-				    (apply #'real-make-a-method args)))
+	     (methods (mapcar (lambda (early-method)
+				(let ((args (copy-list (fifth
+							early-method))))
+				  (setf (fourth args)
+					(early-method-specializers
+					 early-method t))
+				  (apply #'real-make-a-method args)))
 			      (early-gf-methods gf))))
 	(setf (generic-function-method-class gf) *the-class-standard-method*)
 	(setf (generic-function-method-combination gf)
@@ -2029,27 +2029,27 @@ bootstrapping.
       (/show fixup)
       (let* ((fspec (car fixup))
 	     (gf (gdefinition fspec))
-	     (methods (mapcar #'(lambda (method)
-				  (let* ((lambda-list (first method))
-					 (specializers (second method))
-					 (method-fn-name (third method))
-					 (fn-name (or method-fn-name fspec))
-					 (fn (fdefinition fn-name))
-					 (initargs
-					  (list :function
-						(set-fun-name
-						 #'(lambda (args next-methods)
-						     (declare (ignore
-							       next-methods))
-						     (apply fn args))
-						 `(call ,fn-name)))))
-				    (declare (type function fn))
-				    (make-a-method 'standard-method
-						   ()
-						   lambda-list
-						   specializers
-						   initargs
-						   nil)))
+	     (methods (mapcar (lambda (method)
+				(let* ((lambda-list (first method))
+				       (specializers (second method))
+				       (method-fn-name (third method))
+				       (fn-name (or method-fn-name fspec))
+				       (fn (fdefinition fn-name))
+				       (initargs
+					(list :function
+					      (set-fun-name
+					       (lambda (args next-methods)
+						 (declare (ignore
+							   next-methods))
+						 (apply fn args))
+					       `(call ,fn-name)))))
+				  (declare (type function fn))
+				  (make-a-method 'standard-method
+						 ()
+						 lambda-list
+						 specializers
+						 initargs
+						 nil)))
 			      (cdr fixup))))
 	(setf (generic-function-method-class gf) *the-class-standard-method*)
 	(setf (generic-function-method-combination gf)
@@ -2220,17 +2220,17 @@ bootstrapping.
 	   (and (symbolp instance)
 		`((declare (%variable-rebinding ,in ,instance)))))
        ,in
-       (symbol-macrolet ,(mapcar #'(lambda (slot-entry)
-				     (let ((var-name
-					    (if (symbolp slot-entry)
-						slot-entry
-						(car slot-entry)))
-					   (slot-name
-					    (if (symbolp slot-entry)
-						slot-entry
-						(cadr slot-entry))))
-				       `(,var-name
-					  (slot-value ,in ',slot-name))))
+       (symbol-macrolet ,(mapcar (lambda (slot-entry)
+				   (let ((var-name
+					  (if (symbolp slot-entry)
+					      slot-entry
+					      (car slot-entry)))
+					 (slot-name
+					  (if (symbolp slot-entry)
+					      slot-entry
+					      (cadr slot-entry))))
+				     `(,var-name
+				       (slot-value ,in ',slot-name))))
 				 slots)
 			,@body))))
 
@@ -2244,9 +2244,9 @@ bootstrapping.
 	   (and (symbolp instance)
 		`((declare (%variable-rebinding ,in ,instance)))))
        ,in
-       (symbol-macrolet ,(mapcar #'(lambda (slot-entry)
+       (symbol-macrolet ,(mapcar (lambda (slot-entry)
 				   (let ((var-name (car slot-entry))
 					 (accessor-name (cadr slot-entry)))
 				     `(,var-name (,accessor-name ,in))))
-			       slots)
+				 slots)
 	  ,@body))))

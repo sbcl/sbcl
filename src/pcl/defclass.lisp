@@ -71,12 +71,12 @@
             (*writers* ()))             ;to have it to live nicely.
         (declare (special *initfunctions* *readers* *writers*))
         (let ((canonical-slots
-                (mapcar #'(lambda (spec)
-                            (canonicalize-slot-specification name spec))
+                (mapcar (lambda (spec)
+			  (canonicalize-slot-specification name spec))
                         slots))
               (other-initargs
-                (mapcar #'(lambda (option)
-                            (canonicalize-defclass-option name option))
+                (mapcar (lambda (option)
+			  (canonicalize-defclass-option name option))
                         options))
               ;; DEFSTRUCT-P should be true, if the class is defined with a
               ;; metaclass STRUCTURE-CLASS, such that a DEFSTRUCT is compiled

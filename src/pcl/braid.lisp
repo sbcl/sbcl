@@ -95,21 +95,21 @@
 
 (defmacro !initial-classes-and-wrappers (&rest classes)
   `(progn
-     ,@(mapcar #'(lambda (class)
-		   (let ((wr (intern (format nil "~A-WRAPPER" class)
-				     *pcl-package*)))
-		     `(setf ,wr ,(if (eq class 'standard-generic-function)
-				     '*sgf-wrapper*
-				     `(boot-make-wrapper
-				       (early-class-size ',class)
-				       ',class))
-			    ,class (allocate-standard-instance
-				    ,(if (eq class 'standard-generic-function)
-					 'funcallable-standard-class-wrapper
-					 'standard-class-wrapper))
-			    (wrapper-class ,wr) ,class
-			    (find-class ',class) ,class)))
-	      classes)))
+     ,@(mapcar (lambda (class)
+		 (let ((wr (intern (format nil "~A-WRAPPER" class)
+				   *pcl-package*)))
+		   `(setf ,wr ,(if (eq class 'standard-generic-function)
+				   '*sgf-wrapper*
+				   `(boot-make-wrapper
+				     (early-class-size ',class)
+				     ',class))
+			  ,class (allocate-standard-instance
+				  ,(if (eq class 'standard-generic-function)
+				       'funcallable-standard-class-wrapper
+				       'standard-class-wrapper))
+			  (wrapper-class ,wr) ,class
+			  (find-class ',class) ,class)))
+	       classes)))
 
 (defun !bootstrap-meta-braid ()
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)
@@ -511,7 +511,7 @@
 (defvar *find-structure-class* nil)
 
 (defun eval-form (form)
-  #'(lambda () (eval form)))
+  (lambda () (eval form)))
 
 (defun slot-initargs-from-structure-slotd (slotd)
   `(:name ,(structure-slotd-name slotd)

@@ -196,12 +196,12 @@
 	  (check-initargs-2-list initargs class legal error-p)))))
 
 (defun check-initargs-values (class call-list)
-  (let ((methods (mapcan #'(lambda (call)
-			     (if (consp call)
-				 (copy-list (compute-applicable-methods
-					     (gdefinition (car call))
-					     (cdr call)))
-				 (list call)))
+  (let ((methods (mapcan (lambda (call)
+			   (if (consp call)
+			       (copy-list (compute-applicable-methods
+					   (gdefinition (car call))
+					   (cdr call)))
+			       (list call)))
 			 call-list))
 	(legal (apply #'append (mapcar #'slot-definition-initargs
 				       (class-slots class)))))

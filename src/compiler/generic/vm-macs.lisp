@@ -131,8 +131,8 @@
 (defun %def-reffer (name offset lowtag)
   (let ((info (function-info-or-lose name)))
     (setf (function-info-ir2-convert info)
-	  #'(lambda (node block)
-	      (ir2-convert-reffer node block name offset lowtag))))
+	  (lambda (node block)
+	    (ir2-convert-reffer node block name offset lowtag))))
   name)
 
 (defmacro def-reffer (name offset lowtag)
@@ -142,10 +142,10 @@
   (let ((info (function-info-or-lose name)))
     (setf (function-info-ir2-convert info)
 	  (if (listp name)
-	      #'(lambda (node block)
-		  (ir2-convert-setfer node block name offset lowtag))
-	      #'(lambda (node block)
-		  (ir2-convert-setter node block name offset lowtag)))))
+	      (lambda (node block)
+		(ir2-convert-setfer node block name offset lowtag))
+	      (lambda (node block)
+		(ir2-convert-setter node block name offset lowtag)))))
   name)
 
 (defmacro def-setter (name offset lowtag)
@@ -155,12 +155,12 @@
   (let ((info (function-info-or-lose name)))
     (setf (function-info-ir2-convert info)
 	  (if var-length
-	      #'(lambda (node block)
-		  (ir2-convert-variable-allocation node block name words header
-						   lowtag inits))
-	      #'(lambda (node block)
-		  (ir2-convert-fixed-allocation node block name words header
-						lowtag inits)))))
+	      (lambda (node block)
+		(ir2-convert-variable-allocation node block name words header
+						 lowtag inits))
+	      (lambda (node block)
+		(ir2-convert-fixed-allocation node block name words header
+					      lowtag inits)))))
   name)
 
 (defmacro def-alloc (name words var-length header lowtag inits)

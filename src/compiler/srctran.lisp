@@ -2298,8 +2298,8 @@
 
 (defoptimizer (values derive-type) ((&rest values))
   (values-specifier-type
-   `(values ,@(mapcar #'(lambda (x)
-			  (type-specifier (continuation-type x)))
+   `(values ,@(mapcar (lambda (x)
+			(type-specifier (continuation-type x)))
 		      values))))
 
 ;;;; byte operations
@@ -3192,8 +3192,8 @@
 (define-source-transform apply (fun arg &rest more-args)
   (let ((args (cons arg more-args)))
     `(multiple-value-call ,fun
-       ,@(mapcar #'(lambda (x)
-		     `(values ,x))
+       ,@(mapcar (lambda (x)
+		   `(values ,x))
 		 (butlast args))
        (values-list ,(car (last args))))))
 

@@ -247,21 +247,21 @@
 		 (format nil "named ~S" (class-name class))
 		 class))))
     (mapcar
-      #'(lambda (reason)
-	  (ecase (caddr reason)
-	    (:super
-	      (format
-		nil
-		"The class ~A appears in the supers of the class ~A."
-		(class-or-name (cadr reason))
-		(class-or-name (car reason))))
-	    (:in-supers
-	      (format
-		nil
-		"The class ~A follows the class ~A in the supers of the class ~A."
-		(class-or-name (cadr reason))
-		(class-or-name (car reason))
-		(class-or-name (cadddr reason))))))
+      (lambda (reason)
+	(ecase (caddr reason)
+	  (:super
+	   (format
+	    nil
+	    "The class ~A appears in the supers of the class ~A."
+	    (class-or-name (cadr reason))
+	    (class-or-name (car reason))))
+	  (:in-supers
+	   (format
+	    nil
+	    "The class ~A follows the class ~A in the supers of the class ~A."
+	    (class-or-name (cadr reason))
+	    (class-or-name (car reason))
+	    (class-or-name (cadddr reason))))))
       reasons)))
 
 (defun find-cycle-reasons (all-cpds)

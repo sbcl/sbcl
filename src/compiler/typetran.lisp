@@ -271,8 +271,8 @@
 	     (satisfies `(if (funcall #',(second spec) ,object) t nil))
 	     ((not and)
 	      (once-only ((n-obj object))
-		`(,(first spec) ,@(mapcar #'(lambda (x)
-					      `(typep ,n-obj ',x))
+		`(,(first spec) ,@(mapcar (lambda (x)
+					    `(typep ,n-obj ',x))
 					  (rest spec))))))))))
 
 ;;; Do source transformation for TYPEP of a known union type. If a

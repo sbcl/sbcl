@@ -97,8 +97,8 @@
 
 (defun make-structure-slot-boundp-function (slotd)
   (let* ((reader (slot-definition-internal-reader-function slotd))
-	 (fun #'(lambda (object)
-		  (not (eq (funcall reader object) +slot-unbound+)))))
+	 (fun (lambda (object)
+		(not (eq (funcall reader object) +slot-unbound+)))))
     (declare (type function reader))
     fun))
 
@@ -172,17 +172,17 @@
   (set-fun-name
    (etypecase index
      (fixnum (if fsc-p
-		 #'(lambda (instance)
-		     (not (eq (clos-slots-ref (fsc-instance-slots instance)
-					     index)
-			      +slot-unbound+)))
-		 #'(lambda (instance)
-		     (not (eq (clos-slots-ref (std-instance-slots instance)
-					     index)
-			      +slot-unbound+)))))
-     (cons   #'(lambda (instance)
-		 (declare (ignore instance))
-		 (not (eq (cdr index) +slot-unbound+)))))
+		 (lambda (instance)
+		   (not (eq (clos-slots-ref (fsc-instance-slots instance)
+					    index)
+			    +slot-unbound+)))
+		 (lambda (instance)
+		   (not (eq (clos-slots-ref (std-instance-slots instance)
+					    index)
+			    +slot-unbound+)))))
+     (cons (lambda (instance)
+	     (declare (ignore instance))
+	     (not (eq (cdr index) +slot-unbound+)))))
    `(boundp ,slot-name)))
 
 (defun make-optimized-structure-slot-value-using-class-method-function (function)
@@ -195,15 +195,15 @@
 
 (defun make-optimized-structure-setf-slot-value-using-class-method-function (function)
   (declare (type function function))
-  #'(lambda (nv class object slotd)
-      (declare (ignore class slotd))
-      (funcall function nv object)))
+  (lambda (nv class object slotd)
+    (declare (ignore class slotd))
+    (funcall function nv object)))
 
 (defun make-optimized-structure-slot-boundp-using-class-method-function (function)
   (declare (type function function))
-  #'(lambda (class object slotd)
-      (declare (ignore class slotd))
-      (not (eq (funcall function object) +slot-unbound+))))
+  (lambda (class object slotd)
+    (declare (ignore class slotd))
+    (not (eq (funcall function object) +slot-unbound+))))
 
 (defun get-optimized-std-slot-value-using-class-method-function (class
 								 slotd

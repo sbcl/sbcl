@@ -187,8 +187,8 @@
   (declare (ignore call-list wrappers))
   #||
   (map 'vector
-       #'(lambda (call)
-	   (compute-emf-from-wrappers call wrappers))
+       (lambda (call)
+	 (compute-emf-from-wrappers call wrappers))
        call-list)
   ||#
   '#())
@@ -199,18 +199,18 @@
     (destructuring-bind (gf-name nreq restp arg-info) call
       (if (eq gf-name 'make-instance)
 	  (error "should not get here") ; there is another mechanism for this.
-	  #'(lambda (&rest args)
-	      (if (not (eq *boot-state* 'complete))
-		  (apply (gdefinition gf-name) args)
-		  (let* ((gf (gdefinition gf-name))
-			 (arg-info (arg-info-reader gf))
-			 (classes '?)
-			 (types '?)
-			 (emf (cache-miss-values-internal gf arg-info
-							  wrappers classes types
-							  'caching)))
-		    (update-all-pv-tables call wrappers emf)
-		    (invoke-emf emf args))))))))
+	  (lambda (&rest args)
+	    (if (not (eq *boot-state* 'complete))
+		(apply (gdefinition gf-name) args)
+		(let* ((gf (gdefinition gf-name))
+		       (arg-info (arg-info-reader gf))
+		       (classes '?)
+		       (types '?)
+		       (emf (cache-miss-values-internal gf arg-info
+							wrappers classes types
+							'caching)))
+		  (update-all-pv-tables call wrappers emf)
+		  (invoke-emf emf args))))))))
 ||#
 
 (defun make-permutation-vector (indexes)
@@ -271,20 +271,20 @@
 	 (std-p (typep cwrapper 'wrapper))
 	 (class-slots (and std-p (wrapper-class-slots cwrapper)))
 	 (class-slot-p-cell (list nil))
-	 (new-values (mapcar #'(lambda (slot-name)
-				 (cons slot-name
-				       (when std-p
-					 (compute-pv-slot
-					  slot-name cwrapper class
-					  class-slots class-slot-p-cell))))
+	 (new-values (mapcar (lambda (slot-name)
+			       (cons slot-name
+				     (when std-p
+				       (compute-pv-slot
+					slot-name cwrapper class
+					class-slots class-slot-p-cell))))
 			     slot-names))
 	 (pv-tables nil))
     (dolist (slot-name slot-names)
       (map-pv-table-references-of
        slot-name
-       #'(lambda (pv-table pv-offset-list)
-	   (declare (ignore pv-offset-list))
-	   (pushnew pv-table pv-tables))))
+       (lambda (pv-table pv-offset-list)
+	 (declare (ignore pv-offset-list))
+	 (pushnew pv-table pv-tables))))
     (dolist (pv-table pv-tables)
       (let* ((cache (pv-table-cache pv-table))
 	     (slot-name-lists (pv-table-slot-name-lists pv-table))
@@ -299,10 +299,10 @@
 	      (incf map-index))
 	    (incf param-index)))
 	(when cache
-	  (map-cache #'(lambda (wrappers pv-cell)
-			 (setf (car pv-cell)
-			       (update-slots-in-pv wrappers (car pv-cell)
-						   cwrapper pv-size pv-map)))
+	  (map-cache (lambda (wrappers pv-cell)
+		       (setf (car pv-cell)
+			     (update-slots-in-pv wrappers (car pv-cell)
+						 cwrapper pv-size pv-map)))
 		     cache))))))
 
 (defun update-slots-in-pv (wrappers pv cwrapper pv-size pv-map)
@@ -601,8 +601,8 @@
 	   (non-required-args (nthcdr nreq args))
 	   (required-args (ldiff args non-required-args))
 	   (call-spec (list (car gf-call-form) nreq restp
-			    (mapcar #'(lambda (form)
-					(optimize-gf-call-internal form slots env))
+			    (mapcar (lambda (form)
+				      (optimize-gf-call-internal form slots env))
 				    (if all-args-p
 					args
 					required-args))))
@@ -783,8 +783,8 @@
 (defun slot-name-lists-from-slots (slots calls)
   (multiple-value-bind (slots calls) (mutate-slots-and-calls slots calls)
     (let* ((slot-name-lists
-	    (mapcar #'(lambda (parameter-entry)
-			(cons nil (mapcar #'car (cdr parameter-entry))))
+	    (mapcar (lambda (parameter-entry)
+		      (cons nil (mapcar #'car (cdr parameter-entry))))
 		    slots))
 	   (call-list
 	    (mapcar #'car calls)))
@@ -792,22 +792,22 @@
 	(dolist (arg (cdr call))
 	  (when (integerp arg)
 	    (setf (car (nth arg slot-name-lists)) t))))
-      (setq slot-name-lists (mapcar #'(lambda (r+snl)
-					(when (or (car r+snl) (cdr r+snl))
-					  r+snl))
+      (setq slot-name-lists (mapcar (lambda (r+snl)
+				      (when (or (car r+snl) (cdr r+snl))
+					r+snl))
 				    slot-name-lists))
       (let ((cvt (apply #'vector
 			(let ((i -1))
-			  (mapcar #'(lambda (r+snl)
-				      (when r+snl (incf i)))
+			  (mapcar (lambda (r+snl)
+				    (when r+snl (incf i)))
 				  slot-name-lists)))))
-	(setq call-list (mapcar #'(lambda (call)
-				    (cons (car call)
-					  (mapcar #'(lambda (arg)
-						      (if (integerp arg)
-							  (svref cvt arg)
-							  arg))
-						  (cdr call))))
+	(setq call-list (mapcar (lambda (call)
+				  (cons (car call)
+					(mapcar (lambda (arg)
+						  (if (integerp arg)
+						      (svref cvt arg)
+						      arg))
+						(cdr call))))
 				call-list)))
       (values slot-name-lists call-list))))
 
@@ -893,8 +893,8 @@
 (defmacro pv-binding1 ((pv calls pv-table-symbol pv-parameters slot-vars)
 		       &body body)
   `(pv-env (,pv ,calls ,pv-table-symbol ,pv-parameters)
-     (let (,@(mapcar #'(lambda (slot-var p) `(,slot-var (get-slots-or-nil ,p)))
-	       slot-vars pv-parameters))
+     (let (,@(mapcar (lambda (slot-var p) `(,slot-var (get-slots-or-nil ,p)))
+		     slot-vars pv-parameters))
 	,@body)))
 
 ;;; This gets used only when the default MAKE-METHOD-LAMBDA is
@@ -1067,25 +1067,25 @@
 	 (nreq (car arg-info))
 	 (restp (cdr arg-info)))
     (setq method-function
-	  #'(lambda (method-args next-methods)
-	      (unless pv-table
-		(setq pv-table (method-function-pv-table fmf)))
-	      (let* ((pv-cell (when pv-table
-				(get-method-function-pv-cell
-				 method-function method-args pv-table)))
-		     (nm (car next-methods))
-		     (nms (cdr next-methods))
-		     (nmc (when nm
-			    (make-method-call
-			     :function (if (std-instance-p nm)
-					   (method-function nm)
-					   nm)
-			     :call-method-args (list nms)))))
-		(if restp
-		    (let* ((rest (nthcdr nreq method-args))
-			   (args (ldiff method-args rest)))
-		      (apply fmf pv-cell nmc (nconc args (list rest))))
-		    (apply fmf pv-cell nmc method-args)))))
+	  (lambda (method-args next-methods)
+	    (unless pv-table
+	      (setq pv-table (method-function-pv-table fmf)))
+	    (let* ((pv-cell (when pv-table
+			      (get-method-function-pv-cell
+			       method-function method-args pv-table)))
+		   (nm (car next-methods))
+		   (nms (cdr next-methods))
+		   (nmc (when nm
+			  (make-method-call
+			   :function (if (std-instance-p nm)
+					 (method-function nm)
+					 nm)
+			   :call-method-args (list nms)))))
+	      (if restp
+		  (let* ((rest (nthcdr nreq method-args))
+			 (args (ldiff method-args rest)))
+		    (apply fmf pv-cell nmc (nconc args (list rest))))
+		  (apply fmf pv-cell nmc method-args)))))
     (let* ((fname (method-function-get fmf :name))
 	   (name `(,(or (get (car fname) 'method-sym)
 			(setf (get (car fname) 'method-sym)

@@ -98,14 +98,14 @@
   (time (constant-keys-make-instance n)))
 
 (defun expand-all-macros (form)
-  (walk-form form nil #'(lambda (form context env)
-			  (if (and (eq context :eval)
-				   (consp form)
-				   (symbolp (car form))
-				   (not (special-form-p (car form)))
-				   (macro-function (car form)))
-			      (values (macroexpand form env))
-			      form))))
+  (walk-form form nil (lambda (form context env)
+			(if (and (eq context :eval)
+				 (consp form)
+				 (symbolp (car form))
+				 (not (special-form-p (car form)))
+				 (macro-function (car form)))
+			    (values (macroexpand form env))
+			    form))))
 
 (push (cons "Macroexpand meth-structure-slot-value"
 	    '(pprint (multiple-value-bind (pgf pm)
@@ -114,7 +114,7 @@
 		       (expand-defmethod
 			'meth-structure-slot-value pgf pm
 			nil '((object str))
-			'(#'(lambda () (slot-value object 'slot)))
+			'((lambda () (slot-value object 'slot)))
 			nil))))
       *tests*)
 
@@ -122,21 +122,21 @@
 	    '(disassemble (meth-structure-slot-value str)))
       *tests*)
 (defmethod meth-structure-slot-value ((object str))
-  #'(lambda () (slot-value object 'slot)))
+  (lambda () (slot-value object 'slot)))
 
 #|| ; interesting, but long. (produces 100 lines of output)
 (push (cons "Macroexpand meth-standard-slot-value"
 	    '(pprint (expand-all-macros
 		     (expand-defmethod-internal 'meth-standard-slot-value
 		      nil '((object standard-method))
-		      '(#'(lambda () (slot-value object 'function)))
+		      '((lambda () (slot-value object 'function)))
 		      nil))))
       *tests*)
 (push (cons "Show code for slot-value inside a defmethod for a standard-class. Case (4)."
 	    '(disassemble (meth-standard-slot-value m)))
       *tests*)
 (defmethod meth-standard-slot-value ((object standard-method))
-  #'(lambda () (slot-value object 'function)))
+  (lambda () (slot-value object 'function)))
 ||#
 
 (defun do-tests ()

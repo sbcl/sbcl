@@ -194,8 +194,8 @@
 
 (defun make-type-predicate (name)
   (let ((cell (find-class-cell name)))
-    #'(lambda (x)
-	(funcall (the function (find-class-cell-predicate cell)) x))))
+    (lambda (x)
+      (funcall (the function (find-class-cell-predicate cell)) x))))
 
 (defun make-type-predicate-name (name &optional kind)
   (if (symbol-package name)
@@ -327,7 +327,7 @@
 (defmacro define-gf-predicate (predicate-name &rest classes)
   `(progn
      (defmethod ,predicate-name ((x t)) nil)
-     ,@(mapcar #'(lambda (c) `(defmethod ,predicate-name ((x ,c)) t))
+     ,@(mapcar (lambda (c) `(defmethod ,predicate-name ((x ,c)) t))
 	       classes)))
 
 (defun make-class-predicate-name (name)
@@ -704,11 +704,11 @@
   ())
 
 (defclass effective-slot-definition (slot-definition)
-  ((reader-function ; #'(lambda (object) ...)
+  ((reader-function ; (lambda (object) ...)
     :accessor slot-definition-reader-function)
-   (writer-function ; #'(lambda (new-value object) ...)
+   (writer-function ; (lambda (new-value object) ...)
     :accessor slot-definition-writer-function)
-   (boundp-function ; #'(lambda (object) ...)
+   (boundp-function ; (lambda (object) ...)
     :accessor slot-definition-boundp-function)
    (accessor-flags
     :initform 0)))

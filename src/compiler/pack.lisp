@@ -318,7 +318,7 @@
 	     tn (sc-name sc)))
      (t
       (aver (not (find :unbounded scs
-		       :key #'(lambda (x) (sb-kind (sc-sb x))))))
+		       :key (lambda (x) (sb-kind (sc-sb x))))))
       (let ((ptype (tn-primitive-type tn)))
 	(cond
 	 (ptype
@@ -1509,11 +1509,11 @@
       (when *repack-blocks*
 	(loop
 	  (when (zerop (hash-table-count *repack-blocks*)) (return))
-	  (maphash #'(lambda (block v)
-		       (declare (ignore v))
-		       (remhash block *repack-blocks*)
-		       (event repack-block)
-		       (pack-load-tns block))
+	  (maphash (lambda (block v)
+		     (declare (ignore v))
+		     (remhash block *repack-blocks*)
+		     (event repack-block)
+		     (pack-load-tns block))
 		   *repack-blocks*)))))
 
   (values))

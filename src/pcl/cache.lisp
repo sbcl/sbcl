@@ -189,7 +189,7 @@
 #+sb-show
 (defun show-free-cache-vectors ()
   (let ((elements ()))
-    (maphash #'(lambda (s e) (push (list s e) elements)) *free-cache-vectors*)
+    (maphash (lambda (s e) (push (list s e) elements)) *free-cache-vectors*)
     (setq elements (sort elements #'< :key #'car))
     (dolist (e elements)
       (let* ((size (car e))
@@ -735,8 +735,8 @@
 	 (let* (,@(when wrappers
 		    `((,wrappers (nreverse wrappers-rev))
 		      (,classes (nreverse classes-rev))
-		      (,types (mapcar #'(lambda (class)
-					  `(class-eq ,class))
+		      (,types (mapcar (lambda (class)
+					`(class-eq ,class))
 				      ,classes)))))
 	   ,@body))))
 
@@ -1018,12 +1018,12 @@
 (defmacro with-local-cache-functions ((cache) &body body)
   `(let ((.cache. ,cache))
      (declare (type cache .cache.))
-     (macrolet ,(mapcar #'(lambda (fn)
-			    `(,(car fn) ,(cadr fn)
-				`(let (,,@(mapcar #'(lambda (var)
-						      ``(,',var ,,var))
-						  (cadr fn)))
-				    ,@',(cddr fn))))
+     (macrolet ,(mapcar (lambda (fn)
+			  `(,(car fn) ,(cadr fn)
+			    `(let (,,@(mapcar (lambda (var)
+						``(,',var ,,var))
+					      (cadr fn)))
+			       ,@',(cddr fn))))
 			*local-cache-functions*)
        ,@body)))
 
@@ -1363,8 +1363,8 @@
 
 (defun caches-to-allocate ()
   (sort (let ((l nil))
-	  (maphash #'(lambda (size entry)
-		       (push (list (car entry) size) l))
+	  (maphash (lambda (size entry)
+		     (push (list (car entry) size) l))
 		   sb-pcl::*free-caches*)
 	  l)
 	#'>

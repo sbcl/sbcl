@@ -111,9 +111,13 @@
 		     (null (cddr cm-args))))
 	 (method (car cm-args))
 	 (cm-args1 (cdr cm-args)))
-    #'(lambda (method-alist wrappers)
-	(make-effective-method-function-simple1 generic-function method cm-args1 fmf-p
-						method-alist wrappers))))
+    (lambda (method-alist wrappers)
+      (make-effective-method-function-simple1 generic-function
+					      method
+					      cm-args1
+					      fmf-p
+					      method-alist
+					      wrappers))))
 
 (defun make-emf-from-method
     (method cm-args &optional gf fmf-p method-alist wrappers)
@@ -195,11 +199,11 @@
 	   (t
 	    '.call-method.)))
 	((and (consp form) (eq (car form) 'call-method-list))
-	 (case (if (every #'(lambda (form)
-			      (eq 'fast-method-call
-				  (make-effective-method-fun-type
-				   generic-function form
-				   method-alist-p wrappers-p)))
+	 (case (if (every (lambda (form)
+			    (eq 'fast-method-call
+				(make-effective-method-fun-type
+				 generic-function form
+				 method-alist-p wrappers-p)))
 			  (cdr form))
 		   'fast-method-call
 		   t)
@@ -220,11 +224,11 @@
 		   (list gensym))))
 	((and (consp form) (eq (car form) 'call-method-list))
 	 (let ((gensym (get-effective-method-gensym))
-	       (type (if (every #'(lambda (form)
-				    (eq 'fast-method-call
-					(make-effective-method-fun-type
-					 generic-function form
-					 method-alist-p wrappers-p)))
+	       (type (if (every (lambda (form)
+				  (eq 'fast-method-call
+				      (make-effective-method-fun-type
+				       generic-function form
+				       method-alist-p wrappers-p)))
 				(cdr form))
 			 'fast-method-call
 			 t)))
@@ -241,9 +245,9 @@
 		      generic-function form))))
 	((and (consp form) (eq (car form) 'call-method-list))
 	 (list (cons '.meth-list.
-		     (mapcar #'(lambda (form)
-				 (make-effective-method-function-simple
-				  generic-function form))
+		     (mapcar (lambda (form)
+			       (make-effective-method-function-simple
+				generic-function form))
 			     (cdr form)))))
 	(t
 	 (default-constant-converter form))))
@@ -263,44 +267,44 @@
 				     generic-function effective-method)))
       (multiple-value-bind (cfunction constants)
 	  (get-function1 effective-method-lambda
-			 #'(lambda (form)
-			     (memf-test-converter form generic-function
-						  method-alist-p wrappers-p))
-			 #'(lambda (form)
-			     (memf-code-converter form generic-function
-						  metatypes applyp
-						  method-alist-p wrappers-p))
-			 #'(lambda (form)
-			     (memf-constant-converter form generic-function)))
-	#'(lambda (method-alist wrappers)
-	    (let* ((constants
-		    (mapcar #'(lambda (constant)
-				(if (consp constant)
-				    (case (car constant)
-				      (.meth.
-				       (funcall (cdr constant)
-						method-alist wrappers))
-				      (.meth-list.
-				       (mapcar #'(lambda (fn)
-						   (funcall fn
-							    method-alist
-							    wrappers))
-					       (cdr constant)))
-				      (t constant))
-				    constant))
-			    constants))
-		   (function (set-fun-name
-			      (apply cfunction constants)
-			      `(combined-method ,name))))
-	      (make-fast-method-call :function function
-				     :arg-info arg-info)))))))
+			 (lambda (form)
+			   (memf-test-converter form generic-function
+						method-alist-p wrappers-p))
+			 (lambda (form)
+			   (memf-code-converter form generic-function
+						metatypes applyp
+						method-alist-p wrappers-p))
+			 (lambda (form)
+			   (memf-constant-converter form generic-function)))
+	(lambda (method-alist wrappers)
+	  (let* ((constants
+		  (mapcar (lambda (constant)
+			    (if (consp constant)
+				(case (car constant)
+				  (.meth.
+				   (funcall (cdr constant)
+					    method-alist wrappers))
+				  (.meth-list.
+				   (mapcar (lambda (fn)
+					     (funcall fn
+						      method-alist
+						      wrappers))
+					   (cdr constant)))
+				  (t constant))
+				constant))
+			  constants))
+		 (function (set-fun-name
+			    (apply cfunction constants)
+			    `(combined-method ,name))))
+	    (make-fast-method-call :function function
+				   :arg-info arg-info)))))))
 
 (defmacro call-method-list (&rest calls)
   `(progn ,@calls))
 
 (defun make-call-methods (methods)
   `(call-method-list
-    ,@(mapcar #'(lambda (method) `(call-method ,method ())) methods)))
+    ,@(mapcar (lambda (method) `(call-method ,method ())) methods)))
 
 (defun standard-compute-effective-method (generic-function combin applicable-methods)
   (declare (ignore combin))

@@ -87,14 +87,14 @@
 	    :qualifiers ()
 	    :specializers specializers
 	    :lambda-list '(generic-function type options)
-	    :function #'(lambda(args nms &rest cm-args)
-			  (declare (ignore nms cm-args))
-			  (apply
-			   #'(lambda (gf type options)
-			       (declare (ignore gf))
-			       (do-short-method-combination
-				type options operator ioa new-method doc))
-			   args))
+	    :function (lambda (args nms &rest cm-args)
+			(declare (ignore nms cm-args))
+			(apply
+			 (lambda (gf type options)
+			   (declare (ignore gf))
+			   (do-short-method-combination
+			    type options operator ioa new-method doc))
+			 args))
 	    :definition-source `((define-method-combination ,type) ,truename)))
     (when old-method
       (remove-method #'find-method-combination old-method))
@@ -153,7 +153,7 @@
 	    (if (and (null (cdr primary))
 		     (not (null ioa)))
 		`(call-method ,(car primary) ())
-		`(,operator ,@(mapcar #'(lambda (m) `(call-method ,m ()))
+		`(,operator ,@(mapcar (lambda (m) `(call-method ,m ()))
 				      primary)))))
       (cond ((null primary)
 	     `(error "No ~S methods for the generic function ~S."
@@ -200,16 +200,16 @@
 	     :qualifiers ()
 	     :specializers specializers
 	     :lambda-list '(generic-function type options)
-	     :function #'(lambda (args nms &rest cm-args)
-			   (declare (ignore nms cm-args))
-			   (apply
-			    #'(lambda (generic-function type options)
-				(declare (ignore generic-function options))
-				(make-instance 'long-method-combination
-					       :type type
-					       :documentation doc))
-			    args))
-	 :definition-source `((define-method-combination ,type)
+	     :function (lambda (args nms &rest cm-args)
+			 (declare (ignore nms cm-args))
+			 (apply
+			  (lambda (generic-function type options)
+			    (declare (ignore generic-function options))
+			    (make-instance 'long-method-combination
+					   :type type
+					   :documentation doc))
+			  args))
+	     :definition-source `((define-method-combination ,type)
 			      ,*load-truename*))))
     (setf (gethash type *long-method-combination-functions*) function)
     (when old-method (remove-method #'find-method-combination old-method))

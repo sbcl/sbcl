@@ -147,10 +147,10 @@
 
 (macrolet ((frob (&rest names)
 	     `(progn
-		,@(mapcar #'(lambda (name)
-			      `(defmethod ,name ((class cl:class))
-				 (funcall #',name
-					  (coerce-to-pcl-class class))))
+		,@(mapcar (lambda (name)
+			    `(defmethod ,name ((class cl:class))
+			       (funcall #',name
+					(coerce-to-pcl-class class))))
 			  names))))
   (frob
     class-direct-slots

@@ -60,8 +60,8 @@
 ) ; EVAL-WHEN
 
 (defmacro make-checking-or-caching-function-list ()
-  `(list ,@(mapcar #'(lambda (key)
-		       `(cons ',key (emit-checking-or-caching-macro ,@key)))
+  `(list ,@(mapcar (lambda (key)
+		     `(cons ',key (emit-checking-or-caching-macro ,@key)))
 		   *checking-or-caching-list*)))
 
 ;;; Rather than compiling the constructors here, just tickle the range

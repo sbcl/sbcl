@@ -253,15 +253,15 @@
 
 (defun emit-dlap (args metatypes hit miss value-reg &optional slot-regs)
   (let* ((index -1)
-	 (wrapper-bindings (mapcan #'(lambda (arg mt)
-				       (unless (eq mt t)
-					 (incf index)
-					 `((,(intern (format nil
-							     "WRAPPER-~D"
-							     index)
-						     *pcl-package*)
-					    ,(emit-fetch-wrapper mt arg 'miss
-					      (pop slot-regs))))))
+	 (wrapper-bindings (mapcan (lambda (arg mt)
+				     (unless (eq mt t)
+				       (incf index)
+				       `((,(intern (format nil
+							   "WRAPPER-~D"
+							   index)
+						   *pcl-package*)
+					  ,(emit-fetch-wrapper
+					    mt arg 'miss (pop slot-regs))))))
 				   args metatypes))
 	 (wrappers (mapcar #'car wrapper-bindings)))
     (declare (fixnum index))
@@ -341,13 +341,15 @@
 	 (let ((location primary) (next-location 0))
 	   (declare (fixnum location next-location))
 	   (block search
-	     (loop (setq next-location (the fixnum (+ location ,cache-line-size)))
+	     (loop (setq next-location
+			 (the fixnum (+ location ,cache-line-size)))
 		   (when (and ,@(mapcar
-				 #'(lambda (wrapper)
-				     `(eq ,wrapper
-				       (cache-vector-ref cache-vector
-					(setq location
-					 (the fixnum (+ location 1))))))
+				 (lambda (wrapper)
+				   `(eq ,wrapper
+					(cache-vector-ref
+					 cache-vector
+					 (setq location
+					       (the fixnum (+ location 1))))))
 				 wrappers))
 		     ,@(when value
 			 `((setq location (the fixnum (+ location 1)))
@@ -359,8 +361,9 @@
 		   (when (= location primary)
 		     (dolist (entry overflow)
 		       (let ((entry-wrappers (car entry)))
-			 (when (and ,@(mapcar #'(lambda (wrapper)
-						  `(eq ,wrapper (pop entry-wrappers)))
+			 (when (and ,@(mapcar (lambda (wrapper)
+						`(eq ,wrapper
+						     (pop entry-wrappers)))
 					      wrappers))
 			   ,@(when value
 			       `((setq ,value (cdr entry))))
@@ -383,19 +386,20 @@
   `(progn
      ,@(let ((adds 0) (len (length wrappers)))
 	 (declare (fixnum adds len))
-	 (mapcar #'(lambda (wrapper)
-		     `(let ((wrapper-cache-no (wrapper-cache-number-vector-ref
-					       ,wrapper field)))
-			(declare (fixnum wrapper-cache-no))
-			(when (zerop wrapper-cache-no) (go ,miss-label))
-			(setq primary (the fixnum (+ primary wrapper-cache-no)))
-			,@(progn
-			    (incf adds)
-			    (when (or (zerop (mod adds wrapper-cache-number-adds-ok))
-				      (eql adds len))
-			      `((setq primary
-				      ,(let ((form `(logand primary mask)))
-					 `(the fixnum ,form))))))))
+	 (mapcar (lambda (wrapper)
+		   `(let ((wrapper-cache-no (wrapper-cache-number-vector-ref
+					     ,wrapper field)))
+		      (declare (fixnum wrapper-cache-no))
+		      (when (zerop wrapper-cache-no) (go ,miss-label))
+		      (setq primary (the fixnum (+ primary wrapper-cache-no)))
+		      ,@(progn
+			  (incf adds)
+			  (when (or (zerop (mod adds
+						wrapper-cache-number-adds-ok))
+				    (eql adds len))
+			    `((setq primary
+				    ,(let ((form `(logand primary mask)))
+				       `(the fixnum ,form))))))))
 		 wrappers))))
 
 ;;; CMU17 (and SBCL) note: Since STD-INSTANCE-P is weakened in the CMU/SBCL

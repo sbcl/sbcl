@@ -856,11 +856,11 @@
 				     `(vop-temps ,n-vop))
 		  ,@(when (vop-parse-info-args parse)
 		      `((,n-info (vop-codegen-info ,n-vop))
-			,@(mapcar #'(lambda (x) `(,x (pop ,n-info)))
+			,@(mapcar (lambda (x) `(,x (pop ,n-info)))
 				  (vop-parse-info-args parse))))
 		  ,@(when (vop-parse-variant-vars parse)
 		      `((,n-variant (vop-info-variant (vop-info ,n-vop)))
-			,@(mapcar #'(lambda (x) `(,x (pop ,n-variant)))
+			,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
 				  (vop-parse-variant-vars parse))))
 		  ,@(when (vop-parse-node-var parse)
 		      `((,(vop-parse-node-var parse) (vop-node ,n-vop))))
@@ -1304,9 +1304,9 @@
 	   (type (or operand-parse null) more-op))
   (unless (eq types :unspecified)
     (let ((num (+ (length ops) (if more-op 1 0))))
-      (unless (= (count-if-not #'(lambda (x)
-				   (and (consp x)
-					(eq (car x) :constant)))
+      (unless (= (count-if-not (lambda (x)
+				 (and (consp x)
+				      (eq (car x) :constant)))
 			       types)
 		 num)
 	(error "expected ~W ~:[result~;argument~] type~P: ~S"
@@ -1319,12 +1319,12 @@
 
   (when (vop-parse-translate parse)
     (let ((types (specify-operand-types types ops more-op)))
-      (mapc #'(lambda (x y)
-		(check-operand-type-scs parse x y load-p))
+      (mapc (lambda (x y)
+	      (check-operand-type-scs parse x y load-p))
 	    (if more-op (butlast ops) ops)
-	    (remove-if #'(lambda (x)
-			   (and (consp x)
-				(eq (car x) ':constant)))
+	    (remove-if (lambda (x)
+			 (and (consp x)
+			      (eq (car x) ':constant)))
 		       (if more-op (butlast types) types)))))
 
   (values))
@@ -1366,16 +1366,16 @@
 ;;; to the translated is always used in a predicate position.
 (defun set-up-function-translation (parse n-template)
   (declare (type vop-parse parse))
-  (mapcar #'(lambda (name)
-	      `(let ((info (function-info-or-lose ',name)))
-		 (setf (function-info-templates info)
-		       (adjoin-template ,n-template
-					(function-info-templates info)))
-		 ,@(when (vop-parse-conditional-p parse)
-		     '((setf (function-info-attributes info)
-			     (attributes-union
-			      (ir1-attributes predicate)
-			      (function-info-attributes info)))))))
+  (mapcar (lambda (name)
+	    `(let ((info (function-info-or-lose ',name)))
+	       (setf (function-info-templates info)
+		     (adjoin-template ,n-template
+				      (function-info-templates info)))
+	       ,@(when (vop-parse-conditional-p parse)
+		   '((setf (function-info-attributes info)
+			   (attributes-union
+			    (ir1-attributes predicate)
+			    (function-info-attributes info)))))))
 	  (vop-parse-translate parse)))
 
 ;;; Return a form that can be evaluated to get the TEMPLATE operand type
@@ -1387,9 +1387,9 @@
 	(t
 	 (ecase (first type)
 	   (:or
-	    ``(:or ,,@(mapcar #'(lambda (type)
-				   `(primitive-type-or-lose ',type))
-			       (rest type))))
+	    ``(:or ,,@(mapcar (lambda (type)
+				`(primitive-type-or-lose ',type))
+			      (rest type))))
 	   (:constant
 	    ``(:constant ,#'(lambda (x)
 			      (typep x ',(second type)))
@@ -1468,7 +1468,7 @@
       :name ',(vop-parse-name parse)
       ,@(make-vop-info-types parse)
       :guard ,(when (vop-parse-guard parse)
-		`#'(lambda () ,(vop-parse-guard parse)))
+		`(lambda () ,(vop-parse-guard parse)))
       :note ',(vop-parse-note parse)
       :info-arg-count ,(length (vop-parse-info-args parse))
       :ltn-policy ',(vop-parse-ltn-policy parse)
@@ -1856,9 +1856,9 @@
 		(error "T case is not last in SC-Case."))
 	      (clauses `(t nil ,@(rest case)))
 	      (return))
-	    (clauses `((or ,@(mapcar #'(lambda (x)
-					 `(eql ,(meta-sc-number-or-lose x)
-					       ,n-sc))
+	    (clauses `((or ,@(mapcar (lambda (x)
+				       `(eql ,(meta-sc-number-or-lose x)
+					     ,n-sc))
 				     (if (atom head) (list head) head)))
 		       nil ,@(rest case))))))
 
@@ -1869,8 +1869,8 @@
 ;;; Return true if TNs SC is any of the named SCs, false otherwise.
 (defmacro sc-is (tn &rest scs)
   (once-only ((n-sc `(sc-number (tn-sc ,tn))))
-    `(or ,@(mapcar #'(lambda (x)
-		       `(eql ,n-sc ,(meta-sc-number-or-lose x)))
+    `(or ,@(mapcar (lambda (x)
+		     `(eql ,n-sc ,(meta-sc-number-or-lose x)))
 		   scs))))
 
 ;;; Iterate over the IR2 blocks in component, in emission order.

@@ -24,8 +24,8 @@
 ;;; functions as closures instead of DEFUNs?
 (eval-when (:compile-toplevel :execute)
   (def!macro define-internal-errors (&rest errors)
-	     (let ((info (mapcar #'(lambda (x)
-				     (if x
+	     (let ((info (mapcar (lambda (x)
+				   (if x
 				       (cons (symbolicate (first x) "-ERROR")
 					     (second x))
 				       '(nil . "unused")))

@@ -50,10 +50,10 @@
 	     (*toplevel-lambdas* ())
 	     (*block-compile* nil)
 	     (*compiler-error-bailout*
-	      #'(lambda ()
-		  (compiler-mumble
-		   "~2&fatal error, aborting compilation~%")
-		  (return-from actually-compile (values nil t nil))))
+	      (lambda ()
+		(compiler-mumble
+		 "~2&fatal error, aborting compilation~%")
+		(return-from actually-compile (values nil t nil))))
 	     (*current-path* nil)
 	     (*last-source-context* nil)
 	     (*last-original-source* nil)
