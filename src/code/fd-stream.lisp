@@ -1177,12 +1177,14 @@
 		      nil))
 	      (setf (fd-stream-ibuf-head stream) head)
 	      (when (and decode-break-reason
-			 (= head head-start)
-			 (stream-decoding-error-and-handle
-			  stream decode-break-reason))
-		(if eof-error-p
-		    (error 'end-of-file :stream stream)
-		    (return-from ,in-function total-copied)))
+			 (= head head-start))
+		(when (stream-decoding-error-and-handle
+		       stream decode-break-reason)
+		  (if eof-error-p
+		      (error 'end-of-file :stream stream)
+		      (return-from ,in-function total-copied)))
+		(setf head (fd-stream-ibuf-head stream))
+		(setf tail (fd-stream-ibuf-tail stream)))
 	      (when (plusp total-copied)
 		(return-from ,in-function total-copied)))
 	    (setf (fd-stream-ibuf-head stream) head)
