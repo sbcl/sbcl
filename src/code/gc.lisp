@@ -227,18 +227,7 @@ and submit it as a patch."
 
 #!+sb-thread
 (def-c-var-frob gc-thread-pid "gc_thread_pid")
-#!+sb-thread
-(defun other-thread-collect-garbage (gen)
-  (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
-	(1+ gen))
-  (sb!unix:unix-kill (gc-thread-pid) :SIGALRM))
 
-;;; This variable contains the function that does the real GC. This is
-;;; for low-level GC experimentation. Do not touch it if you do not
-;;; know what you are doing.
-(defvar *internal-gc*
-  #!+sb-thread #'other-thread-collect-garbage
-  #!-sb-thread #'collect-garbage)
 	
 
 ;;;; SUB-GC
@@ -265,8 +254,7 @@ and submit it as a patch."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
-
+#!+sb-thread
 (defun sub-gc (&key (gen 0))
   (setf *need-to-collect-garbage* t)
   (when (zerop *gc-inhibit*)
@@ -279,7 +267,23 @@ and submit it as a patch."
 	    (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32)))
        (return nil)))
     (setf *need-to-collect-garbage* nil)
-    (scrub-control-stack)))
+    (scrub-control-stack))
+  (values))
+
+#!-sb-thread
+(defvar *already-in-gc* nil "System is running SUB-GC")
+#!-sb-thread
+(defun sub-gc (&key (gen 0))
+  (when *already-in-gc* (return-from sub-gc nil))
+  (setf *need-to-collect-garbage* t)
+  (when (zerop *gc-inhibit*)
+    (let ((*already-in-gc* t))
+      (without-interrupts (collect-garbage gen))
+      (setf *need-to-collect-garbage* nil))
+    (scrub-control-stack))
+  (values))
+       
+
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
