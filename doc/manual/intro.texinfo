@@ -8,117 +8,475 @@ not on behavior which is common to all implementations of ANSI Common
 Lisp.
 
 @menu
-* More Common Lisp Information::
-* More SBCL Information::
-* Overview::
+* ANSI Conformance::            
+* Extensions::                  
+* Idiosyncrasies::              
+* Development Tools::           
+* More SBCL Information::       
+* More Common Lisp Information::  
+* History and Implementation of SBCL::  
 @end menu
+
+
+
+@node ANSI Conformance
+@comment  node-name,  next,  previous,  up
+@section ANSI Conformance
+
+Essentially every type of non-conformance is considered a bug. (The
+exceptions involve internal inconsistencies in the standard.) In SBCL
+the master record of known bugs is in the @file{BUGS} file in the
+distribution.
+
+The recommended way to report bugs is through the @cite{sbcl-help} or
+@cite{sbcl-devel} mailing lists. For mailing list addresses,
+see @ref{SBCL Homepage}.
+
+
+
+
+@node Extensions
+@comment  node-name,  next,  previous,  up
+@section Extensions
+
+SBCL comes with numerous extensions, some in core and some in modules
+loadable with @code{require}. Unfortunately, not all of these
+extensions have proper documentation yet.
+
+@c FIXME: Once bits and pieces referred to here get real documentation
+@c add xrefs there.
+
+@table @strong
+
+@item System Definition Tool
+@code{asdf} is a flexible and popular protocol-oriented system
+definition tool by Daniel Barlow. 
+
+@item Third-party Extension Installation Tool
+@code{asdf-install} is a tool that can be used to download and install
+third-party libraries and applications, automatically handling
+dependencies, etc.
+
+@item Foreign Function Interface
+@code{sb-alien} package allows interfacing with C-code, loading shared
+object files, etc. @xref{Foreign Function Interface}.
+
+@code{sb-grovel} can be used to partially automate generation of
+foreign function interface definitions. @xref{sb-grovel}.
+
+@item Recursive Event Loop
+SBCL provides a recursive event loop (@code{serve-event}) for doing
+non-blocking IO on multiple streams without using threads.
+
+@item Metaobject Protocol
+@code{sb-mop} package provides a metaobject protocol for the Common
+Lisp Object System as described in @cite{Art of Metaobject Protocol}.
+
+@item Native Threads
+SBCL has native threads on x86/Linux, capable of taking advantage
+of SMP on multiprocessor machines. @xref{Threading}.
+
+@item Network Interface
+@code{sb-bsd-sockets} is a low-level networking interface, providing
+both TCP and UDP sockets. x@ref{Networking}.
+
+@item Introspective Facilities
+@code{sb-introspect} module offers numerous introspective extensions,
+including access to function lambda-lists.
+
+@item Operating System Interface
+@code{sb-ext} contains a number of functions for running external
+processes, accessing environment variables, etc.
+
+@code{sb-posix} module provides a lispy interface to standard POSIX
+facilities.
+
+@item Extensible Streams
+@code{sb-gray} is an implentation of @emph{Gray Streams}. @xref{Gray
+Streams}.
+
+@code{sb-simple-streams} is an implementation of the @emph{simple
+streams} API proposed by Franz Inc. @xref{Simple Streams}.
+
+@item Profiling
+@code{sb-profile} is a exact per-function profiler. @xref{Accurate
+Profiler}.
+
+@code{sb-sprof} is a statistical profiler, capable of call-graph
+generation and instruction level profiling. @xref{Statistical
+Profiler}.
+
+@item Customization Hooks
+SBCL contains a number of extra-standard customization hooks that
+can be used to tweak the behaviour of the system. @xref{Customization
+Hooks for Users}.
+
+@code{sb-aclrepl} provides an Allegro CL -style toplevel for SBCL,
+as an alternative to the classic CMUCL-style one. @xref{sb-aclrepl}.
+
+@item CLTL2 Compatility Layer
+@code{sb-cltl2} module provides @code{compiler-let} and environment
+access functionality described in @cite{Common Lisp The Language, 2nd
+Edition} which were removed from the language during the ANSI
+standardization process.
+
+@item Executable Fasl Packaging
+@code{sb-executable} can be used to concatenate multiple fasls into a
+single executable (though the presense of an SBCL runtime and core
+image is still required to run it).
+
+@item Bitwise Rotation
+@code{sb-rotate-byte} provides an efficient primitive for bitwise
+rotation of integers, an operation required by eg. numerous
+cryptographic algorightms, but not available as a primitive in ANSI
+Common Lisp. @xref{sb-rotate-byte}.
+
+@item Test Harness
+@code{sb-rt} module is a simple yet attractive regression and
+unit-test framework.
+
+@item MD5 Sums
+@code{sb-md5} is an implementation of the MD5 message digest algorithm
+for Common Lisp, using the modular arithmetic optimizations provided
+by SBCL. @xref{sb-md5}.
+
+@end table
+
+
+
+
+@node Idiosyncrasies
+@comment  node-name,  next,  previous,  up
+@section Idiosyncrasies
+
+The information in this section describes some of the ways that SBCL
+deals with choices that the ANSI standard leaves to the
+implementation.
+
+@menu
+* Declarations::                
+* Compiler-only Implementation::  
+* Defining Constants::          
+* Style Warnings::              
+@end menu
+
+@node Declarations
+@comment  node-name,  next,  previous,  up
+@subsection Declarations
+
+Declarations are generally treated as assertions. This general
+principle, and its implications, and the bugs which still keep the
+compiler from quite satisfying this principle, are discussed in
+@ref{Declarations as Assertions}.
+
+@node Compiler-only Implementation
+@comment  node-name,  next,  previous,  up
+@subsection Compiler-only Implementation
+
+SBCL is essentially a compiler-only implementation of Common Lisp.
+That is, for all but a few special cases, @code{eval} creates a lambda
+expression, calls @code{compile} on the lambda expression to create a
+compiled function, and then calls @code{funcall} on the resulting
+function object. This is explicitly allowed by the ANSI standard, but
+leads to some oddities, e.g. collapsing @code{functionp} and
+@code{compiled-function-p} into the same predicate.
+
+@node Defining Constants
+@comment  node-name,  next,  previous,  up
+@subsection Defining Constants
+@findex defconstant
+
+SBCL is quite strict about ANSI's definition of @code{defconstant}.
+ANSI says that doing @code{defconstant} of the same symbol more than
+once is undefined unless the new value is @code{eql} to the old value.
+Conforming to this specification is a nuisance when the ``constant''
+value is only constant under some weaker test like @code{string=} or
+@code{equal}.
+
+It's especially annoying because, in SBCL, @code{defconstant} takes
+effect not only at load time but also at compile time, so that just
+compiling and loading reasonable code like
+@lisp
+(defconstant +foobyte+ '(1 4))
+@end lisp
+runs into this undefined behavior. Many implementations of Common Lisp
+try to help the programmer around this annoyance by silently accepting
+the undefined code and trying to do what the programmer probably
+meant. 
+
+SBCL instead treats the undefined behavior as an error. Often such
+code can be rewritten in portable ANSI Common Lisp which has the
+desired behavior. E.g., the code above can be given an exactly defined
+meaning by replacing @code{defconstant} either with
+@code{defparameter} or with a customized macro which does the right
+thing, eg.
+@lisp
+(defmacro define-constant (name value &optional doc)
+  `(defconstant ,name (if (boundp ',name) (symbol-value ',name) ,value)
+                      ,@@(when doc (list doc))))
+@end lisp
+or possibly along the lines of the @code{defconstant-eqx} macro used
+internally in the implementation of SBCL itself. In circumstances
+where this is not appropriate, the programmer can handle the condition
+type @code{sb-ext:defconstant-uneql}, and choose either the
+@command{continue} or @command{abort} restart as appropriate.
+
+@node Style Warnings
+@comment  node-name,  next,  previous,  up
+@subsection Style Warnings
+
+SBCL gives style warnings about various kinds of perfectly legal code,
+e.g.
+
+@itemize
+  
+@item
+@code{defmethod} without a preceding @code{defgeneric};
+  
+@item
+multiple @code{defun}s of the same symbol in different units;
+  
+@item
+special variables not named in the conventional @code{*foo*} style,
+and lexical variables unconventionally named in the @code{*foo*} style
+
+@end itemize
+
+This causes friction with people who point out that other ways of
+organizing code (especially avoiding the use of @code{defgeneric}) are
+just as aesthetically stylish.  However, these warnings should be read
+not as ``warning, bad aesthetics detected, you have no style'' but
+``warning, this style keeps the compiler from understanding the code
+as well as you might like.'' That is, unless the compiler warns about
+such conditions, there's no way for the compiler to warn about some
+programming errors which would otherwise be easy to overlook. (Related
+bug: The warning about multiple @code{defun}s is pointlessly annoying
+when you compile and then load a function containing @code{defun}
+wrapped in @code{eval-when}, and ideally should be suppressed in that
+case, but still isn't as of SBCL 0.7.6.)
+
+
+
+
+@node Development Tools
+@comment  node-name,  next,  previous,  up
+@section Development Tools
+
+@menu
+* Editor Integration::          
+* Language Reference::          
+@end menu
+
+@node Editor Integration
+@comment  node-name,  next,  previous,  up
+@subsection Editor Integration
+
+Though SBCL can be used running ``bare'', the recommended mode of
+development is with an editor connected to SBCL, supporting not
+only basic lisp editing (paren-matching, etc), but providing among
+other features an integrated debugger, interactive compilation, and
+automated documentation lookup.
+
+Currently @dfn{SLIME}@footnote{Historically, the ILISP package at
+@uref{http://ilisp.cons.org/} provided similar functionality, but it
+does not support modern SBCL versions.} (Superior Lisp Interaction
+Mode for Emacs) togather with Emacs is recommended for use with
+SBCL, though other options exist as well. 
+
+SLIME can be downloaded from
+@uref{http://www.common-lisp.net/project/slime/}.
+
+@node Language Reference
+@comment  node-name,  next,  previous,  up
+@subsection Language Reference
+
+@dfn{CLHS} (Common Lisp Hyperspec) is a hypertext version of the ANSI
+standard, made freely available by @emph{Xanalyst} -- an invaluable
+reference.
+
+See: @uref{http://www.lispworks.com/reference/HyperSpec/index.html}
+
+
+
+
+@node More SBCL Information
+@comment  node-name,  next,  previous,  up
+@section More SBCL Information
+
+@menu
+* SBCL Homepage::               
+* Additional Distributed Documentation::  
+* Online Documentation::        
+* Internals Documentation::     
+@end menu
+
+@node SBCL Homepage
+@comment  node-name,  next,  previous,  up
+@subsection SBCL Homepage
+
+The SBCL website at @uref{http://www.sbcl.org/} has some general
+information, plus links to mailing lists devoted to SBCL, and to
+archives of these mailing lists. Subscribing to the mailing lists
+@cite{sbcl-help} and @cite{sbcl-announce} is recommended: both are
+fairly low-volume, and help you keep abrest with SBCL development.
+
+@node Additional Distributed Documentation
+@comment  node-name,  next,  previous,  up
+@subsection Additional Distributed Documentation
+
+Besides this user manual both SBCL source and binary distributions
+include some other SBCL-specific documentation files, which should be
+installed along with this manual in on your system, eg. in
+@file{/usr/local/share/doc/sbcl/}.
+
+@table @file
+
+@item BUGS
+Lists known bugs in the distribution.
+
+@item COPYING
+Licence and copyright summary.
+
+@item CREDITS
+Authorship information on various parts of SBCL.
+
+@item INSTALL
+Covers installing SBCL from both source and binary distributions on
+your system, and also has some installation related troubleshooting
+information.
+
+@item NEWS
+Summarizes changes between various SBCL versions.
+
+@item SUPPORT
+Lists SBCL developers available for-pay development of SBCL.
+
+@end table
+
+@node Online Documentation
+@comment  node-name,  next,  previous,  up
+@subsection Online Documentation
+
+Documentation for non-ANSI extensions for various commands is
+available online from the SBCL executable itself. The extensions
+for functions which have their own command prompts (e.g. the debugger,
+and @code{inspect}) are documented in text available by typing
+@command{help} at their command prompts. The extensions for functions
+which don't have their own command prompt (such as @code{trace}) are
+described in their documentation strings, unless your SBCL was
+compiled with an option not to include documentation strings, in which
+case the documentation strings are only readable in the source code.
+
+@node Internals Documentation
+@comment  node-name,  next,  previous,  up
+@subsection Internals Documentation
+
+If you're interested in the development of the SBCL system itself,
+then subcribing to @cite{sbcl-devel} is a good idea.
+
+SBCL internals documentation -- besides comments in the source -- is
+currenly maitained as a @emph{wiki-like} website:
+@uref{http://sbcl-internals.cliki.net/}.
+
+Some low-level information describing the programming details of the
+conversion from CMUCL to SBCL is available in the
+@file{doc/FOR-CMUCL-DEVELOPERS} file in the SBCL distribution, though
+it is not installed by default.
 
 @node More Common Lisp Information
 @comment  node-name,  next,  previous,  up
-@section Sources of information about Common Lisp
+@section More Common Lisp Information
 
-Regardless of your ability level, two very useful resources for
-working with any implementation of Common Lisp are the SLIME
-package@footnote{Historically, the ILISP package at
-@uref{http://ilisp.cons.org/} provided similar functionality, but it
-does not support modern SBCL versions.}  for Emacs at
-@uref{http://www.common-lisp.net/project/slime} and the Common Lisp
-HyperSpec at
-@uref{http://www.lispworks.com/reference/HyperSpec/index.html}.
+@menu
+* Internet Community::          
+* Third-party Libraries::       
+* Common Lisp Books::           
+@end menu
+
+@node Internet Community
+@comment  node-name,  next,  previous,  up
+@subsection Internet Community
+
+@c FIXME: Say something smart here
+
+The Common Lisp internet community is fairly diverse:
+@uref{news://comp.lang.lisp} is fairly high volume newsgroup, but has
+a rather poor signal/noise ratio. Various special interest mailing
+lists and IRC tend to provide more content and less flames.
+@uref{http://www.lisp.org} and @uref{http://www.cliki.net} contain
+numerous pointers places in the net where lispers talks shop.
+
+@node Third-party Libraries
+@comment  node-name,  next,  previous,  up
+@subsection Third-party Libraries
+
+For a wealth of information about free Common Lisp libraries and tools
+we recommend checking out @emph{CLiki}: @uref{http://www.cliki.net/}.
+
+@node Common Lisp Books
+@comment  node-name,  next,  previous,  up
+@subsection Common Lisp Books
 
 If you're not a programmer and you're trying to learn, many
 introductory Lisp books are available. However, we don't have any
 standout favorites. If you can't decide, try checking the Usenet
 @uref{news://comp.lang.lisp} FAQ for recent recommendations.
 
+@c FIXME: This non-stance is silly. Maybe we could recommend SICP,
+@c Touretzky, or something at least.
+
 If you are an experienced programmer in other languages but need to
-learn about Lisp, three books stand out.
+learn about Common Lisp, some books stand out:
 
-@itemize
+@table @cite
 
-@item
-@emph{ANSI Common Lisp}, by Paul Graham, will teach you
-about most of the language. (And later it might also be worth checking
-out @emph{On Lisp}, by the same author.)
+@c FIXME: Ask Seibel if he minds us referring to the preview
+@c 
+@c @item Practical Common Lisp, by Peter Seibel
+@c A forthcoming book from APress with a web free preview at
+@c @uref{http://www.gigamonkeys.com/book/}. An excellent introduction to
+@c the language, covering both the basics and ``advanced topics'' like
+@c macros, CLOS, and packages.
 
-@item
-@emph{Paradigms Of Artificial Intelligence
-Programming}, by Peter Norvig, also has some good information on
-general Common Lisp programming, and many nontrivial examples.
-Whether or not your work is AI, it's a very good book to look at.
+@item ANSI Common Lisp, by Paul Graham
+Introduces most of the language, though some parts (eg. CLOS) are
+covered only lightly.
 
-@item 
-Neither of the books above emphasizes CLOS, but @emph{Object-Oriented
-Programming In Common Lisp} by Sonya Keene does. Even if you're very
-knowledgeable about object oriented programming in the abstract, it's
-worth looking at this book if you want to do any OO in Common
+@item On Lisp, by Paul Graham
+An in-depth treatment of macros, but not recommended as a first Common
+Lisp book, since it is slightly pre-ANSI so you need to be on your
+guard against non-standard usages, and since it doesn't really even
+try to cover the language as a whole, focusing solely on macros.
+Downloadable from @uref{http://www.paulgraham.com/onlisp.html}.
+
+@item Paradigms Of Artificial Intelligence Programming, by Peter Norvig
+Good information on general Common Lisp programming, and many
+nontrivial examples. Whether or not your work is AI, it's a very good
+book to look at.
+
+@item Object-Oriented Programming In Common Lisp, by Sonya Keene
+@c With the exception of @cite{Practical Common Lisp} 
+None the books above emphasize CLOS, but this one does. Even if you're
+very knowledgeable about object oriented programming in the abstract,
+it's worth looking at this book if you want to do any OO in Common
 Lisp. Some abstractions in CLOS (especially multiple dispatch) go
 beyond anything you'll see in most OO systems, and there are a number
 of lesser differences as well. This book tends to help with the
 culture shock.
 
-@end itemize
+@item Art Of Metaobject Programming, by Gregor Kiczales et al.
+Currently to prime source of information on the Common Lisp Metaobject
+Protocol, which is supported by SBCL. Section 2 (Chapers 5 and 6) are
+freely available at @uref{http://www.lisp.org/mop/}.
+
+@end table
 
 
-@node More SBCL Information
+
+
+@node History and Implementation of SBCL
 @comment  node-name,  next,  previous,  up
-@section Sources of more information about SBCL
-
-Before you read this user manual, you should probably read two other
-things.
-
-@itemize
-
-@item
-You should know how to program in Common Lisp.  If you don't already
-know how, you should probably read a book on it.  @xref{More Common
-Lisp Information}.
-
-@item
-The Unix ``man page'' for SBCL will tell you
-how to start the SBCL environment, so you can get to the classic
-``hello, world'' level of knowledge. It's the file called
-@file{sbcl.1} in the SBCL distribution. If SBCL is installed on your
-system, you can read a formatted copy by executing the command
-@samp{man sbcl}.
-
-@end itemize
-  
-
-Besides this user manual and the Unix man page, some other
-SBCL-specific information is available:
-
-@itemize
-
-@item
-The SBCL home page at @uref{http://www.sbcl.org/} has some
-general information, plus links to mailing lists devoted to SBCL, and
-to archives of these mailing lists.
-
-@item
-@findex help
-Documentation for non-ANSI extensions for various commands is
-available online from the SBCL executable itself. The extensions for
-functions which have their own command prompts (e.g. the debugger, and
-@code{inspect}) are documented in text available by typing
-@command{help} at their command prompts. The extensions for functions
-which don't have their own command prompt (such as @code{trace}) are
-described in their documentation strings, unless your SBCL was
-compiled with an option not to include documentation strings, in which
-case the doc strings are only readable in the source code.
-
-@item
-Some low-level information describing the programming details of the
-conversion from CMUCL to SBCL is available in the
-@file{doc/FOR-CMUCL-DEVELOPERS} file in the SBCL
-distribution.
-
-@end itemize
-  
-
-@node Overview
-@comment  node-name,  next,  previous,  up
-@section History and Implementation
+@section History and Implementation of SBCL
 
 You can work productively with SBCL without knowing anything
 understanding anything about where it came from, how it is
@@ -215,9 +573,9 @@ Other major changes since the fork from CMUCL include
 @itemize
 
 @item
-SBCL has removed many CMUCL extensions, (e.g. IP networking, remote
-procedure call, Unix system interface, and X11 interface) from the
-core system.  Most of these are available as contributed modules
+SBCL has removed many CMUCL extensions, (e.g. IP networking,
+remote procedure call, Unix system interface, and X11 interface) from
+the core system. Most of these are available as contributed modules
 (distributed with sbcl) or third-party modules instead.
 
 @item

@@ -171,7 +171,7 @@ structure member.
 @item
 @code{:function} - alien function definitions are similar to
 @code{define-alien-routine} definitions, because they expand to such
-forms when the lisp program is loaded. @xref{Foreign Function Calls}
+forms when the lisp program is loaded. @xref{Foreign Function Calls}.
 
 @lisp
 (:function lisp-function-name ("alien_function_name" alien-return-type

@@ -2,118 +2,9 @@
 @comment  node-name,  next,  previous,  up
 @chapter Beyond the ANSI Standard
 
-SBCL is mostly an implementation of the ANSI standard for
-Common Lisp. However, there's some important behavior which extends
-or clarifies the standard, and various behavior which outright
-violates the standard.
-
-
-@menu
-* Non-Conformance With The ANSI Standard::  
-* Idiosyncrasies::              
-* Extensions::                  
-@end menu
-
-@node Non-Conformance With The ANSI Standard
-@comment  node-name,  next,  previous,  up
-@section Non-Conformance With The ANSI Standard
-
-Essentially every type of non-conformance is considered a bug.  (The
-exceptions involve internal inconsistencies in the standard.)  In SBCL
-0.7.6, the master record of known bugs is in the @file{BUGS} file in
-the distribution.  Some highlight information about bugs may also be
-found in the manual page. The recommended way to report bugs is
-through the sbcl-help or sbcl-devel mailing lists.  For mailing list
-addresses, @xref{More SBCL Information}.
-
-
-@node Idiosyncrasies
-@comment  node-name,  next,  previous,  up
-@section Idiosyncrasies
-
-The information in this section describes some of the ways that SBCL
-deals with choices that the ANSI standard leaves to the
-implementation.
-
-Declarations are generally treated as assertions. This general
-principle, and its implications, and the bugs which still keep the
-compiler from quite satisfying this principle, are discussed in
-@ref{Compiler}.
-
-SBCL is essentially a compiler-only implementation of Common
-Lisp. That is, for all but a few special cases, @code{eval} creates a
-lambda expression, calls @code{compile} on the lambda expression to
-create a compiled function, and then calls @code{funcall} on the
-resulting function object. This is explicitly allowed by the ANSI
-standard, but leads to some oddities, e.g. collapsing @code{functionp}
-and @code{compiled-function-p} into the same predicate.
-
-@findex defconstant
-SBCL is quite strict about ANSI's definition of
-@code{defconstant}. ANSI says that doing @code{defconstant} of the
-same symbol more than once is undefined unless the new value is
-@code{eql} to the old value. Conforming to this specification is a
-nuisance when the ``constant'' value is only constant under some
-weaker test like @code{string=} or @code{equal}. It's especially
-annoying because, in SBCL, @code{defconstant} takes effect not only at
-load time but also at compile time, so that just compiling and loading
-reasonable code like
-@lisp
-(defconstant +foobyte+ '(1 4))
-@end lisp
-runs into this undefined behavior. Many implementations of Common Lisp
-try to help the programmer around this annoyance by silently accepting
-the undefined code and trying to do what the programmer probably
-meant. SBCL instead treats the undefined behavior as an error. Often
-such code can be rewritten in portable ANSI Common Lisp which has the
-desired behavior.  E.g., the code above can be given an exactly
-defined meaning by replacing @code{defconstant} either with
-@code{defparameter} or with a customized macro which does the right
-thing, possibly along the lines of the @code{defconstant-eqx} macro
-used internally in the implementation of SBCL itself.  In
-circumstances where this is not appropriate, the programmer can handle
-the condition type @code{sb-ext:defconstant-uneql}, and choose either
-the @command{continue} or @command{abort} restart as appropriate.
-
-SBCL gives style warnings about various kinds of perfectly legal code,
-e.g.
-
-@itemize
-  
-@item
-@code{defmethod} without a preceding @code{defgeneric};
-  
-@item
-multiple @code{defun}s of the same symbol in different units;
-  
-@item
-special variables not named in the conventional @code{*foo*} style,
-and lexical variables unconventionally named in the @code{*foo*} style
-
-@end itemize
-
-This causes friction with people who point out that other ways of
-organizing code (especially avoiding the use of @code{defgeneric}) are
-just as aesthetically stylish.  However, these warnings should be read
-not as ``warning, bad aesthetics detected, you have no style'' but
-``warning, this style keeps the compiler from understanding the code
-as well as you might like.'' That is, unless the compiler warns about
-such conditions, there's no way for the compiler to warn about some
-programming errors which would otherwise be easy to overlook. (Related
-bug: The warning about multiple @code{defun}s is pointlessly annoying
-when you compile and then load a function containing @code{defun}
-wrapped in @code{eval-when}, and ideally should be suppressed in that
-case, but still isn't as of SBCL 0.7.6.)
-
-
-@node  Extensions
-@comment  node-name,  next,  previous,  up
-@section Extensions
-
 SBCL is derived from CMUCL, which implements many extensions to the
 ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
 it still has quite a few.  @xref{Contributed Modules}.
-
 
 @menu
 * Things Which Might Be In The Next ANSI Standard::  
@@ -127,7 +18,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 
 @node  Things Which Might Be In The Next ANSI Standard
 @comment  node-name,  next,  previous,  up
-@subsection Things Which Might Be In The Next ANSI Standard
+@section Things Which Might Be In The Next ANSI Standard
 
 SBCL provides extensive support for calling external C code,
 @ref{Foreign Function Interface}.
@@ -171,7 +62,7 @@ requested order from a user-supplied primary method.
 
 @node  Support For Unix
 @comment  node-name,  next,  previous,  up
-@subsection Support For Unix
+@section Support For Unix
 
 The UNIX command line can be read from the variable
 @code{sb-ext:*posix-argv*}. The UNIX environment can be queried with
@@ -179,17 +70,10 @@ the @code{sb-ext:posix-getenv} function.
 
 @include fun-sb-ext-posix-getenv.texinfo
 
-The SBCL system can be terminated with @code{sb-ext:quit}, (but see
-notes in @ref{Threading} about the interaction between this feature and
-sessions) optionally returning a specified numeric value to the
-calling Unix process. The normal Unix idiom of terminating on end of
-file on input is also supported.
-
-@include fun-sb-ext-quit.texinfo
 
 @node  Customization Hooks for Users
 @comment  node-name,  next,  previous,  up
-@subsection Customization Hooks for Users
+@section Customization Hooks for Users
 
 The toplevel repl prompt may be customized, and the function
 that reads user input may be replaced completely.
@@ -211,7 +95,7 @@ mechanisms as follows:
 
 @node  Tools To Help Developers
 @comment  node-name,  next,  previous,  up
-@subsection Tools To Help Developers
+@section Tools To Help Developers
 
 SBCL provides a profiler and other extensions to the ANSI @code{trace}
 facility.  For more information, see @ref{macro-common-lisp-trace}.
@@ -224,7 +108,7 @@ the @code{inspect} prompt.
 
 @node  Interface To Low-Level SBCL Implementation
 @comment  node-name,  next,  previous,  up
-@subsection Interface To Low-Level SBCL Implementation
+@section Interface To Low-Level SBCL Implementation
 
 SBCL has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
@@ -242,7 +126,7 @@ ffi.texinfo?}
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up
-@subsection Stale Extensions
+@section Stale Extensions
 
 SBCL has inherited from CMUCL various hooks to allow the user to
 tweak and monitor the garbage collection process. These are somewhat
@@ -264,7 +148,7 @@ list.
 
 @node  Efficiency Hacks
 @comment  node-name,  next,  previous,  up
-@subsection Efficiency Hacks
+@section Efficiency Hacks
 
 The @code{sb-ext:purify} function causes SBCL first to collect all
 garbage, then to mark all uncollected objects as permanent, never

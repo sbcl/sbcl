@@ -57,6 +57,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @menu
 * Introduction::                
+* Starting and Stopping::
 * Compiler::                    
 * Debugger::                    
 * Efficiency::                  
@@ -78,6 +79,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @end ifnottex
 
 @include intro.texinfo
+@include start-stop.texinfo
 @include compiler.texinfo
 @include debugger.texinfo
 @include efficiency.texinfo
