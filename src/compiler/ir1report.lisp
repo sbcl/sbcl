@@ -400,7 +400,7 @@
 	(what (etypecase condition
 		(style-warning 'style-warning)
 		(warning 'warning)
-		(error 'error))))
+		((or error compiler-error) 'error))))
     (multiple-value-bind (format-string format-args)
 	(if (typep condition 'simple-condition)
 	    (values (simple-condition-format-control condition)

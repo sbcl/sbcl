@@ -320,7 +320,9 @@
   (assert-program-error (defclass foo008 ()
 			  (a :initarg :a)
 			  (:default-initargs :a 1)
-			  (:default-initargs :a 2))))
+			  (:default-initargs :a 2)))
+  ;; and also BUG 47d, fixed in sbcl-0.8alpha.0.26
+  (assert-program-error (defgeneric if (x))))
 
 ;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
 ;;; preserved through the bootstrap process until sbcl-0.7.8.39.

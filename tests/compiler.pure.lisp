@@ -75,16 +75,16 @@
 
 ;;; another LET-related bug fixed by Alexey Dejneka at the same
 ;;; time as bug 112
-(multiple-value-bind (value error)
-    (ignore-errors
-      ;; should complain about duplicate variable names in LET binding
-      (compile nil
-	       '(lambda ()
-		  (let (x
-			(x 1))
-		    (list x)))))
-  (assert (null value))
-  (assert (typep error 'error)))
+(multiple-value-bind (fun warnings-p failure-p)
+    ;; should complain about duplicate variable names in LET binding
+    (compile nil
+	     '(lambda ()
+	       (let (x
+		     (x 1))
+		 (list x))))
+  (declare (ignore warnings-p))
+  (assert (functionp fun))
+  (assert failure-p))
 
 ;;; bug 169 (reported by Alexey Dejneka 2002-05-12, fixed by David
 ;;; Lichteblau 2002-05-21)

@@ -22,8 +22,7 @@
 
 ;;; a function that is called to unwind out of COMPILER-ERROR
 (declaim (type (function () nil) *compiler-error-bailout*))
-(defvar *compiler-error-bailout*
-  (lambda () (error "COMPILER-ERROR with no bailout")))
+(defvar *compiler-error-bailout*)
 
 ;;; an application programmer's error caught by the compiler
 ;;;
@@ -33,7 +32,51 @@
 ;;; and turned into diagnostic output and a FAILURE-P return value
 ;;; from COMPILE or COMPILE-FILE. Bugs in SBCL itself throw us into
 ;;; the debugger.
-(define-condition compiler-error (simple-error) ())
+;;;
+;;; A further word or two of explanation might be warranted here,
+;;; since I (CSR) have spent the last day or so wandering in a
+;;; confused daze trying to get this to behave nicely before finally
+;;; hitting on the right solution.
+;;;
+;;; These objects obey a slightly involved protocol in order to
+;;; achieve the right dynamic behaviour.  If we signal a
+;;; COMPILER-ERROR from within the compiler, we want that the
+;;; outermost call to COMPILE/COMPILE-FILE cease attempting to compile
+;;; the code in question and instead compile a call to signal a
+;;; PROGRAM-ERROR.  This is achieved by resignalling the condition
+;;; from within the handler, so that the condition travels up the
+;;; handler stack until it finds the outermost handler.  Why the
+;;; outermost?  Well, COMPILE-FILE could call EVAL from an EVAL-WHEN,
+;;; which could recursively call COMPILE, which could then signal an
+;;; error; we want the inner EVAL not to fail so that we can go on
+;;; compiling, so it's the outer COMPILE-FILE that needs to replace
+;;; the erroneous call with a call to ERROR.
+;;;
+;;; This resignalling up the stack means that COMPILER-ERROR should
+;;; not be a generalized instance of ERROR, as otherwise code such as
+;;; (IGNORE-ERRORS (DEFGENERIC IF (X))) will catch and claim to handle
+;;; the COMPILER-ERROR.  So we make COMPILER-ERROR inherit from
+;;; SIMPLE-CONDITION and SERIOUS-CONDITION instead, as of
+;;; sbcl-0.8alpha.0.2x, so that unless the user claims to be able to
+;;; handle SERIOUS-CONDITION (and if he does, he deserves what's going
+;;; to happen :-)
+;;;
+;;; So, what if we're not inside the compiler, then?  Well, in that
+;;; case we're in the evaluator, so we want to convert the
+;;; COMPILER-ERROR into a PROGRAM-ERROR and signal it immediately.  We
+;;; have to signal the PROGRAM-ERROR from the dynamic environment of
+;;; attempting to evaluate the erroneous code, and not from any
+;;; exterior handler, so that user handlers for PROGRAM-ERROR and
+;;; ERROR stand a chance of running, in e.g. (IGNORE-ERRORS
+;;; (DEFGENERIC IF (X))).  So this is where the SIGNAL-PROGRAM-ERROR
+;;; restart comes in; the handler in EVAL-IN-LEXENV chooses this
+;;; restart if it believes that the compiler is not present (which it
+;;; tests using the BOUNDPness of *COMPILER-ERROR-BAILOUT*).  The
+;;; restart executes in the dynamic environment of the original
+;;; COMPILER-ERROR call, and all is well.
+;;;
+;;; CSR, 2003-05-13
+(define-condition compiler-error (simple-condition serious-condition) ())
 
 ;;; Signal the appropriate condition. COMPILER-ERROR calls the bailout
 ;;; function so that it never returns (but compilation continues).
@@ -47,12 +90,18 @@
 	 :format-control format-string
 	 :format-arguments format-args))
 (defun compiler-error (format-string &rest format-args)
-  (cerror "Replace form with call to ERROR."
-	  'compiler-error
-	  :format-control format-string
-	  :format-arguments format-args)
-  (funcall *compiler-error-bailout*)
-  (bug "Control returned from *COMPILER-ERROR-BAILOUT*."))
+  (restart-case
+      (progn
+	(cerror "Replace form with call to ERROR."
+		'compiler-error
+		:format-control format-string
+		:format-arguments format-args)
+	(funcall *compiler-error-bailout*)
+	(bug "Control returned from *COMPILER-ERROR-BAILOUT*."))
+    (signal-program-error ()
+      (error 'simple-program-error
+	     :format-control format-string
+	     :format-arguments format-args))))
 (defun compiler-warn (format-string &rest format-args)
   (apply #'warn format-string format-args)
   (values))

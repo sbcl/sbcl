@@ -1722,6 +1722,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
     specified-by-AMOP lambda list of (CLASS &REST INITARGS).
   * compiler checks for duplicated variables in macro lambda lists.
+  * fixed bug 47.d: (DEFGENERIC IF (X)) now signals a PROGRAM-ERROR,
+    not a COMPILER-ERROR (followed by some other strange error on
+    choosing the CONTINUE restart).
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the GENERIC-FUNCTION type is no longer disjoint from FUNCTION
        types.
