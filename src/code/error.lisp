@@ -51,11 +51,6 @@
 (define-condition simple-stream-error  (simple-condition stream-error)  ())
 (define-condition simple-parse-error   (simple-condition parse-error)   ())
 
-;;; This condition is signalled whenever we make a UNKNOWN-TYPE so that
-;;; compiler warnings can be emitted as appropriate.
-(define-condition parse-unknown-type (condition)
-  ((specifier :reader parse-unknown-type-specifier :initarg :specifier)))
-
 (define-condition control-stack-exhausted (storage-condition)
   ()
   (:report

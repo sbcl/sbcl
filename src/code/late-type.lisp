@@ -25,6 +25,11 @@
 ;;; There are all sorts of nasty problems with open bounds on FLOAT
 ;;; types (and probably FLOAT types in general.)
 
+;;; This condition is signalled whenever we make a UNKNOWN-TYPE so that
+;;; compiler warnings can be emitted as appropriate.
+(define-condition parse-unknown-type (condition)
+  ((specifier :reader parse-unknown-type-specifier :initarg :specifier)))
+
 ;;; FIXME: This really should go away. Alas, it doesn't seem to be so
 ;;; simple to make it go away.. (See bug 123 in BUGS file.)
 (defvar *use-implementation-types* t ; actually initialized in cold init

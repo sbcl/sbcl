@@ -89,3 +89,15 @@
                      (foo () :test (lambda (c) (declare (ignore c)) visible)
                           'in2))
                  (foo () 'ext)))))))
+
+;;; First argument of CERROR is a format control
+(assert
+ (eq (block nil
+       (handler-bind
+           ((type-error (lambda (c) (return :failed)))
+            (simple-error (lambda (c)
+                            (return (if (find-restart 'continue)
+                                        :passed
+                                        :failed)))))
+         (cerror (formatter "Continue from ~A") "bug ~A" :bug)))
+     :passed))

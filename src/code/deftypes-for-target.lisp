@@ -104,6 +104,12 @@
 ;;; semistandard types
 (sb!xc:deftype generalized-boolean () t)
 
+(sb!xc:deftype format-control ()
+  '(or string function))
+
+(sb!xc:deftype restart-designator ()
+  '(or (and symbol (not null)) restart))
+
 ;;; a type specifier
 ;;;
 ;;; FIXME: The SB!KERNEL:INSTANCE here really means CL:CLASS.

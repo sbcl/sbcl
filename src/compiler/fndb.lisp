@@ -1179,12 +1179,32 @@
 (defknown directory (pathname-designator &key)
   list ())
 
-;;;; from the "Errors" chapter:
+;;;; from the "Conditions" chapter:
 
-(defknown error (t &rest t) nil) ; never returns
-(defknown cerror (string t &rest t) null)
+(defknown cell-error-name (cell-error) t)
+(defknown error (t &rest t) nil)
+(defknown cerror (format-control t &rest t) null)
+(defknown invalid-method-error (t format-control &rest t) *) ; FIXME: first arg is METHOD
+(defknown method-combination-error (format-control &rest t) *)
+(defknown signal (t &rest t) null)
+(defknown simple-condition-format-control (condition)
+  format-control)
+(defknown simple-condition-format-arguments (condition)
+  list)
 (defknown warn (t &rest t) null)
-(defknown break (&optional t &rest t) null)
+(defknown invoke-debugger (condition) nil)
+(defknown break (&optional format-control &rest t) null)
+(defknown make-condition (type-specifier &rest t) condition)
+(defknown compute-restarts (&optional (or condition null)) list)
+(defknown find-restart (restart-designator &optional (or condition null))
+  (or restart null))
+(defknown invoke-restart (restart-designator &rest t) *)
+(defknown invoke-restart-interactively (restart-designator) *)
+(defknown restart-name (restart) symbol)
+(defknown (abort muffle-warning) (&optional (or condition null)) nil)
+(defknown continue (&optional (or condition null)) null)
+(defknown (store-value use-value) (t &optional (or condition null))
+  null)
 
 ;;; and analogous SBCL extension:
 (defknown bug (t &rest t) nil) ; never returns

@@ -1898,6 +1898,9 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     (with THE, so dependent on compiler policy) to involve objects of
     type FOO.  Note that no such declaration is implied in 
     (MAKE-ARRAY .. :ELEMENT-TYPE 'FOO).
+  * declared types of functions from the "Conditions"
+    chapter. (reported by Paul Dietz)
+  * bug fix: CERROR accepts a function as its first argument.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
