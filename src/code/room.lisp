@@ -72,7 +72,8 @@
 			    :kind :fixed
 			    :length size))))))
 
-(dolist (code (list complex-base-string-widetag simple-array-widetag
+(dolist (code (list complex-character-string-widetag
+                    complex-base-string-widetag simple-array-widetag
 		    complex-bit-vector-widetag complex-vector-widetag
 		    complex-array-widetag complex-vector-nil-widetag))
   (setf (svref *meta-room-info* code)
@@ -125,7 +126,7 @@
 (setf (svref *meta-room-info* simple-character-string-widetag)
       (make-room-info :name 'simple-character-string
 		      :kind :string
-		      :length 0))
+		      :length 2))
 
 (setf (svref *meta-room-info* simple-array-nil-widetag)
       (make-room-info :name 'simple-array-nil
@@ -181,11 +182,11 @@
 ;;; Return the total size of a vector in bytes, including any pad.
 #!-sb-fluid (declaim (inline vector-total-size))
 (defun vector-total-size (obj info)
-  (let ((shift (room-info-length info))
-	(len (+ (length (the (simple-array * (*)) obj))
-		(ecase (room-info-kind info)
-		  (:vector 0)
-		  (:string 1)))))
+  (let* ((shift (room-info-length info))
+         (len (+ (length (the (simple-array * (*)) obj))
+                 (ecase (room-info-kind info)
+                   (:vector 0)
+                   (:string 1)))))
     (declare (type (integer -3 3) shift))
     (round-to-dualword
      (+ (* vector-data-offset n-word-bytes)
@@ -251,7 +252,7 @@
 		     (size (ecase (room-info-kind info)
 			     (:fixed
 			      (aver (or (eql (room-info-length info)
-					       (1+ (get-header-data obj)))
+                                             (1+ (get-header-data obj)))
 					(floatp obj)
 					(simple-array-nil-p obj)))
 			      (round-to-dualword
@@ -472,6 +473,7 @@
 	     #.single-float-widetag
 	     #.double-float-widetag
 	     #.simple-base-string-widetag
+             #.simple-character-string-widetag
 	     #.simple-array-nil-widetag
 	     #.simple-bit-vector-widetag
 	     #.simple-array-unsigned-byte-2-widetag
