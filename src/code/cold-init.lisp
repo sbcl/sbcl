@@ -212,6 +212,11 @@
 
   ;; FIXME: This list of modes should be defined in one place and
   ;; explicitly shared between here and REINIT.
+  ;;
+  ;; FIXME: In CMU CL, this is done "here" (i.e. in the analogous
+  ;; lispinit.lisp code) for every processor architecture. But Daniel
+  ;; Barlow's Alpha patches suppress it for Alpha. Why the difference?
+  #!+alpha
   (set-floating-point-modes :traps '(:overflow
 				     #!-x86 :underflow
 				     :invalid

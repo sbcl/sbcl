@@ -13,6 +13,21 @@
 (in-package "SB!INT")
 
 ;;;; various SB-SHOW-dependent forms
+;;;;
+;;;; In general, macros named /FOO
+;;;;   * are for debugging/tracing
+;;;;   * expand into nothing unless :SB-SHOW is in the target
+;;;;     features list
+;;;; Often, they also do nothing at runtime if */SHOW* is NIL, but
+;;;; this is not always true for some very-low-level ones.
+;;;;
+;;;; (I follow the "/FOO for debugging/tracing expressions" naming
+;;;; rule and several other naming conventions in all my Lisp
+;;;; programming when possible, and then set Emacs to display comments
+;;;; in one shade of blue, tracing expressions in another shade of
+;;;; blue, and declarations and assertions in a yellowish shade, so
+;;;; that it's easy to separate them from the "real code" which
+;;;; actually does the work of the program. -- WHN 2001-05-07)
 
 ;;; Set this to NIL to suppress output from /SHOW-related forms.
 #!+sb-show (defvar */show* t)

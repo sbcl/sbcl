@@ -17,9 +17,6 @@
 F(accept)
 F(access)
 F(acct)
-#ifndef hpux
-F(adjtime)
-#endif
 F(bind)
 F(brk)
 #if defined(hpux) \
@@ -131,16 +128,6 @@ F(setpgrp)
 #if !defined(SVR4) ||  defined(SOLARIS25)
 F(setpriority)
 #endif
-#if !defined(mach) \
-     && !defined(SOLARIS) \
-     && !defined(__FreeBSD__) \
-     && !defined(__OpenBSD__) \
-     && !defined(SUNOS) \
-     && !defined(osf1) \
-     && !defined(irix) \
-     && !defined(hpux)
-F(setquota)
-#endif
 #if !defined(hpux) && !defined(SVR4) ||  defined(SOLARIS25)
 F(setregid)
 F(setreuid)
@@ -170,9 +157,12 @@ F(swapon)
 F(symlink)
 F(sync)
 F(syscall)
-#if defined(hpux) || defined(SVR4)
+#if defined(hpux) || defined(SVR4) || defined(linux)
 F(closedir)
 F(opendir)
+#if defined(readdir)
+#undef reddir
+#endif
 F(readdir)
 #endif
 #if defined(hpux) \
@@ -262,10 +252,6 @@ D(altzone)
 D(daylight)
 #endif
 D(tzname)
-F(dlopen)
-F(dlsym)
-F(dlclose)
-F(dlerror)
 #endif
 #if !defined (SOLARIS) ||  defined(SOLARIS25)
 F(getwd)
@@ -275,3 +261,8 @@ F(ttyname)
 #ifdef irix
 F(_getpty)
 #endif
+
+F(dlopen)
+F(dlsym)
+F(dlclose)
+F(dlerror)

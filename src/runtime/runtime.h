@@ -54,7 +54,7 @@
 #define HeaderValue(obj) ((unsigned long) ((obj)>>type_Bits))
 
 #define Pointerp(obj) ((obj) & 0x01)
-#define PTR(obj) ((obj)&~lowtag_Mask)
+#define PTR(obj) ((unsigned long)((obj)&~lowtag_Mask))
 
 #define CONS(obj) ((struct cons *)((obj)-type_ListPointer))
 #define SYMBOL(obj) ((struct symbol *)((obj)-type_OtherPointer))
@@ -65,12 +65,13 @@
  * that SBCL runs on as of 0.6.7. If we port to the Alpha or some
  * other non-32-bit machine we'll probably need real machine-dependent
  * and OS-dependent definitions again. */
-#if defined alpha
-/* We need definitions of u32 and s32. */
-#error Alpha code is stale.
+#if ((defined alpha) && !(defined linux))
+#error No u32,s32 definitions for this platform.  Write some.
 #else
+/* int happens to be 4 bytes on linux/alpha.  long is longer. */
 typedef unsigned int u32;
 typedef signed int s32;
+#define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)
 #endif
 
 typedef u32 lispobj;

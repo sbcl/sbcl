@@ -24,8 +24,9 @@ echo '; This is a machine-generated file and should not be edited by hand.' > $l
 echo -n '(' >> $ltf
 
 echo '//setting up "target"-named symlinks to designate target architecture'
-sbcl_arch=x86 # (the only possibility supported, at least as of sbcl-0.6.7)
-echo -n ":x86" >> $ltf # (again, the only possibility supported)
+# Currently supported: x86 alpha
+sbcl_arch=x86
+echo -n ":$sbcl_arch" >> $ltf 
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
     original_dir=`pwd`
@@ -51,15 +52,17 @@ cd src/runtime/
 rm -f Config
 if [ `uname` = Linux ]; then
     echo -n ' :linux' >> $ltf
-    ln -s Config.x86-linux Config
+    ln -s Config.$sbcl_arch-linux Config
+    ( cd ../code && ln -sf $sbcl_arch-linux-types.lisp target-os-types.lisp )
 elif uname | grep BSD; then
     echo -n ' :bsd' >> $ltf
+    ( cd ../code && ln -sf $sbcl_arch-bsd-types.lisp target-os-types.lisp )
     if [ `uname` = FreeBSD ]; then
 	echo -n ' :freebsd' >> $ltf
-	ln -s Config.x86-freebsd Config
+	ln -s Config.$sbcl_arch-freebsd Config
     elif [ `uname` = OpenBSD ]; then
 	echo -n ' :openbsd' >> $ltf
-	ln -s Config.x86-openbsd Config
+	ln -s Config.$sbcl_arch-openbsd Config
     else
 	echo unsupported BSD variant: `uname`
 	exit 1

@@ -273,7 +273,7 @@
       (let* ((fhsss sb!c:*fasl-header-string-start-string*)
 	     (fhsss-length (length fhsss)))
 	(unless (= byte (char-code (schar fhsss 0)))
-	  (error "illegal fasl file header"))
+	  (error "illegal fasl file header: first byte"))
 	(do ((byte (read-byte stream) (read-byte stream))
 	     (count 1 (1+ count)))
 	    ((= byte sb!c:*fasl-header-string-stop-char-code*)
@@ -281,7 +281,7 @@
 	  (declare (fixnum byte count))
 	  (when (and (< count fhsss-length)
 		     (not (eql byte (char-code (schar fhsss count)))))
-	    (error "illegal fasl file header"))))
+	    (error "illegal fasl file header: subsequent byte"))))
 
       ;; Read and validate implementation and version, or die.
       (let* ((implementation-length (read-arg 4))

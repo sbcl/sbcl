@@ -20,8 +20,8 @@
 ;;; In sbcl-0.6.10, Douglas Brebner reported that (SETF EXTERN-ALIEN)
 ;;; was messed up so badly that trying to execute expressions like
 ;;; this signalled an error.
-(setf (sb-alien:extern-alien "gencgc_oldest_gen_to_gc" sb-alien:unsigned)
-      (sb-alien:extern-alien "gencgc_oldest_gen_to_gc" sb-alien:unsigned))
+(setf (sb-alien:extern-alien "current_control_stack_pointer" sb-alien:unsigned)
+      (sb-alien:extern-alien "current_control_stack_pointer" sb-alien:unsigned))
 
 ;;; success
 (quit :unix-status 104)

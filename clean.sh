@@ -44,6 +44,7 @@ find . \( \
 	-name '*~' -or \
 	-name '#*#' -or \
 	-name '?*.x86f' -or \
+	-name '?*.axpf' -or \
 	-name '?*.lbytef' -or \
 	-name 'core' -or \
 	-name '?*.core' -or \

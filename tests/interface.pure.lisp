@@ -22,7 +22,7 @@
   (and (not (typep function 'sb-c::byte-function))
        (sb-kernel:%function-arglist function)))
 (defun check-ext-symbols-arglist (package)
-  (format t "~% Looking at Package: ~A" package)
+  (format t "~% looking at package: ~A" package)
   (do-external-symbols (ext-sym package)
     (when (fboundp ext-sym)
       (let ((fun (symbol-function ext-sym)))

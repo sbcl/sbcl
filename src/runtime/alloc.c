@@ -18,6 +18,7 @@
 #include "alloc.h"
 #include "globals.h"
 #include "gc.h"
+#include <stdio.h>
 
 #ifdef ibmrt
 #define GET_FREE_POINTER() ((lispobj *)SymbolValue(ALLOCATION_POINTER))
@@ -28,7 +29,8 @@
     (SetSymbolValue(INTERNAL_GC_TRIGGER,(lispobj)(new_value)))
 #else
 #define GET_FREE_POINTER() dynamic_space_free_pointer
-#define SET_FREE_POINTER(new_value) (dynamic_space_free_pointer = (new_value))
+#define SET_FREE_POINTER(new_value) \
+  (dynamic_space_free_pointer = (new_value))
 #define GET_GC_TRIGGER() current_auto_gc_trigger
 #define SET_GC_TRIGGER(new_value) \
     clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
@@ -47,13 +49,13 @@ static lispobj *alloc(int bytes)
     bytes = (bytes + lowtag_Mask) & ~lowtag_Mask;
 
     result = GET_FREE_POINTER();
+
     SET_FREE_POINTER(result + (bytes / sizeof(lispobj)));
 
     if (GET_GC_TRIGGER() && GET_FREE_POINTER() > GET_GC_TRIGGER()) {
 	SET_GC_TRIGGER((char *)GET_FREE_POINTER()
-		       - (char *)DYNAMIC_SPACE_START);
+		       - (char *)current_dynamic_space);
     }
-
     return result;
 }
 #endif
@@ -63,9 +65,7 @@ static lispobj *alloc_unboxed(int type, int words)
     lispobj *result;
 
     result = alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)));
-
     *result = (lispobj) (words << type_Bits) | type;
-
     return result;
 }
 
@@ -121,16 +121,10 @@ lispobj alloc_string(char *str)
 
 lispobj alloc_sap(void *ptr)
 {
-    /* FIXME: It would probably be good to grep for "alpha" everywhere
-     * and replace this kind of weirdness with nicer parameterizations
-     * like N_WORDS_IN_POINTER. However, it might be hard to do this
-     * well enough to be useful without an Alpha to test on. What to do? */
-#ifndef alpha
-    struct sap *sap = (struct sap *)alloc_unboxed(type_Sap, 1);
-#else
-    struct sap *sap = (struct sap *)alloc_unboxed(type_Sap, 3);
-#endif
-    sap->pointer = ptr;
+    struct sap *sap = (struct sap *)alloc_unboxed
+	((int)type_Sap, 
+	 ((sizeof (struct sap)) - (sizeof (lispobj))) /  (sizeof (u32)));
 
+    sap->pointer = ptr;
     return (lispobj) sap | type_OtherPointer;
 }

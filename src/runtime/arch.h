@@ -29,7 +29,7 @@ extern unsigned long arch_install_breakpoint(void *pc);
 extern void arch_remove_breakpoint(void *pc, unsigned long orig_inst);
 extern void arch_install_interrupt_handlers(void);
 extern void arch_do_displaced_inst(os_context_t *context,
-				   unsigned long orig_inst);
+				   unsigned int orig_inst);
 extern lispobj funcall0(lispobj function);
 extern lispobj funcall1(lispobj function, lispobj arg0);
 extern lispobj funcall2(lispobj function, lispobj arg0, lispobj arg1);

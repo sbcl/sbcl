@@ -32,12 +32,12 @@ write_bytes(FILE *file, char *addr, long bytes)
 {
     long count, here, data;
 
-    bytes = (bytes+CORE_PAGESIZE-1)&~(CORE_PAGESIZE-1);
+    bytes = (bytes+os_vm_page_size-1)&~(os_vm_page_size-1);
 
     fflush(file);
     here = ftell(file);
     fseek(file, 0, 2);
-    data = (ftell(file)+CORE_PAGESIZE-1)&~(CORE_PAGESIZE-1);
+    data = (ftell(file)+os_vm_page_size-1)&~(os_vm_page_size-1);
     fseek(file, data, 0);
 
     while (bytes > 0) {
@@ -53,7 +53,7 @@ write_bytes(FILE *file, char *addr, long bytes)
     }
     fflush(file);
     fseek(file, here, 0);
-    return data/CORE_PAGESIZE - 1;
+    return data/os_vm_page_size - 1;
 }
 
 static void
@@ -74,8 +74,8 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
     data = write_bytes(file, (char *)addr, bytes);
 
     putw(data, file);
-    putw((long)addr / CORE_PAGESIZE, file);
-    putw((bytes + CORE_PAGESIZE - 1) / CORE_PAGESIZE, file);
+    putw((long)addr / os_vm_page_size, file);
+    putw((bytes + os_vm_page_size - 1) / os_vm_page_size, file);
 }
 
 boolean
@@ -133,7 +133,7 @@ save(char *filename, lispobj init_function)
     output_space(file, STATIC_SPACE_ID, (lispobj *)STATIC_SPACE_START,
 		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER));
 #ifdef reg_ALLOC
-    output_space(file, DYNAMIC_SPACE_ID, (lispobj *)DYNAMIC_SPACE_START,
+    output_space(file, DYNAMIC_SPACE_ID, (lispobj *)current_dynamic_space,
 		 dynamic_space_free_pointer);
 #else
 #ifdef GENCGC

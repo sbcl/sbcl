@@ -23,8 +23,19 @@
        (defun ,lisp-fun ()
 	 (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32))))))
 
+#!+(or cgc gencgc) (progn
 #!-sb-fluid (declaim (inline dynamic-usage))
-(def-c-var-frob dynamic-usage "bytes_allocated")
+(def-c-var-frob dynamic-usage "bytes_allocated"))
+
+#!-(or cgc gencgc)
+(defun dynamic-usage ()
+  (the (unsigned-byte 32)
+       (- (sb!sys:sap-int (sb!c::dynamic-space-free-pointer))
+          (current-dynamic-space-start))))
+
+#!-gencgc (progn
+#!-sb-fluid (declaim (inline current-dynamic-space-start))
+(def-c-var-frob current-dynamic-space-start "current_dynamic_space"))
 
 (defun static-space-usage ()
   (- (* sb!vm:*static-space-free-pointer* sb!vm:word-bytes)
@@ -229,16 +240,17 @@
   (finish-output notify-stream))
 (defparameter *gc-notify-after* #'default-gc-notify-after
   #!+sb-doc
-  "The function bound to this variable is invoked after GC'ing (unless
-  *GC-VERBOSE* is NIL) with the value of *GC-NOTIFY-STREAM*,
-  the amount of dynamic usage (in bytes) now free, the number of
-  bytes freed by the GC, and the new GC trigger threshold. The function
-  should notify the user that the system has finished GC'ing.")
+  "The function bound to this variable is invoked after GC'ing with
+the value of *GC-NOTIFY-STREAM*, the amount of dynamic usage (in
+bytes) now free, the number of bytes freed by the GC, and the new GC
+trigger threshold. The function should notify the user that the system
+has finished GC'ing.")
 
 ;;;; internal GC
 
 (sb!alien:def-alien-routine collect-garbage sb!c-call:int
   #!+gencgc (last-gen sb!c-call:int))
+
 
 (sb!alien:def-alien-routine set-auto-gc-trigger sb!c-call:void
   (dynamic-usage sb!c-call:unsigned-long))
@@ -266,10 +278,9 @@
 ;;;
 ;;; For GENCGC all generations < GEN will be GC'ed.
 ;;;
-(defun sub-gc (&key force-p #!+gencgc (gen 0))
+(defun sub-gc (&key  force-p (gen 0))
   (/show0 "entering SUB-GC")
   (unless *already-maybe-gcing*
-    (/show0 "not *ALREADY-MAYBE-GCING*")
     (let* ((*already-maybe-gcing* t)
 	   (start-time (get-internal-run-time))
 	   (pre-gc-dyn-usage (dynamic-usage))
@@ -311,15 +322,12 @@
 	       default-bytes-consed-between-gcs)
 	(setf *bytes-consed-between-gcs* default-bytes-consed-between-gcs))
       (when (and *gc-trigger* (> pre-gc-dyn-usage *gc-trigger*))
-	(/show0 "setting *NEED-TO-COLLECT-GARBAGE* to T")
 	(setf *need-to-collect-garbage* t))
       (when (or force-p
 		(and *need-to-collect-garbage* (not *gc-inhibit*)))
-	(/show0 "Evidently we ought to collect garbage..")
 	(when (and (not force-p)
 		   *gc-inhibit-hook*
 		   (carefully-funcall *gc-inhibit-hook* pre-gc-dyn-usage))
-	  (/show0 "..but we're inhibited.")
 	  (setf *gc-inhibit* t)
 	  (return-from sub-gc nil))
 	;; KLUDGE: Wow, we really mask interrupts all the time we're
@@ -330,7 +338,6 @@
 	 ;; calls to user-settable GC hook functions.
 	  (let ((*standard-output* *terminal-io*))
 	    (when *gc-notify-stream*
-	      (/show0 "doing the *GC-NOTIFY-BEFORE* thing")
 	      (if (streamp *gc-notify-stream*)
 		  (carefully-funcall *gc-notify-before*
 				     *gc-notify-stream*
@@ -338,11 +345,9 @@
 	          (warn
 		   "*GC-NOTIFY-STREAM* is set, but not a STREAM -- ignored.")))
 	    (dolist (hook *before-gc-hooks*)
-	      (/show0 "doing a hook from *BEFORE-GC-HOOKS*")
 	      (carefully-funcall hook))
 	    (when *gc-trigger*
 	      (clear-auto-gc-trigger))
-	    (/show0 "FUNCALLing *INTERNAL-GC*, one way or another")
 	    #!-gencgc (funcall *internal-gc*)
 	    ;; FIXME: This EQ test is pretty gross. Among its other
 	    ;; nastinesses, it looks as though it could break if we
@@ -350,7 +355,6 @@
 	    #!+gencgc (if (eq *internal-gc* #'collect-garbage)
 			  (funcall *internal-gc* gen)
 			  (funcall *internal-gc*))
-	    (/show0 "back from FUNCALL to *INTERNAL-GC*")
 	    (let* ((post-gc-dyn-usage (dynamic-usage))
 		   (bytes-freed (- pre-gc-dyn-usage post-gc-dyn-usage)))
 	      (/show0 "got (DYNAMIC-USAGE) and BYTES-FREED")
@@ -378,7 +382,6 @@
 		;; e.g. 108% of total memory usage.
 		(carefully-funcall hook))
 	      (when *gc-notify-stream*
-		(/show0 "doing the *GC-NOTIFY-AFTER* thing")
 		(if (streamp *gc-notify-stream*)
 		    (carefully-funcall *gc-notify-after*
 				       *gc-notify-stream*
@@ -387,13 +390,10 @@
 				       *gc-trigger*)
 		    (warn
 		     "*GC-NOTIFY-STREAM* is set, but not a stream -- ignored.")))))
-	  (/show0 "scrubbing control stack")
-	  (scrub-control-stack)))
-      (/show0 "updating *GC-RUN-TIME*")
+	  (scrub-control-stack)))       ;XXX again?  we did this from C ...
       (incf *gc-run-time* (- (get-internal-run-time)
 			     start-time))))
   ;; FIXME: should probably return (VALUES), here and in RETURN-FROM
-  (/show0 "returning from tail of SUB-GC")
   nil)
 
 ;;; This routine is called by the allocation miscops to decide whether
@@ -404,22 +404,14 @@
   object)
 
 ;;; This is the user-advertised garbage collection function.
-;;;
-;;; KLUDGE: GC shouldn't have different parameters depending on what
-;;; garbage collector we use. -- WHN 19991020
-#!-gencgc
-(defun gc ()
-  #!+sb-doc
-  "Initiates a garbage collection."
-  (sub-gc :force-p t))
-#!+gencgc
-(defun gc (&key (gen 0) (full nil))
-  #!+sb-doc
-  "Initiates a garbage collection.
-  GEN controls the number of generations to garbage collect."
-  ;; FIXME: The bare 6 here (corresponding to a bare 6 in
-  ;; the gencgc.c sources) is nasty.
+
+(defun gc (&key (gen 0) (full nil) &allow-other-keys)
+  #!+(and sb-doc gencgc)
+  "Initiates a garbage collection.  GEN controls the number of generations to garbage collect"
+  #!+(and sb-doc (not gencgc))
+  "Initiates a garbage collection.  GEN may be provided for compatibility, but is ignored"
   (sub-gc :force-p t :gen (if full 6 gen)))
+
 
 ;;;; auxiliary functions
 

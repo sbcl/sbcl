@@ -241,7 +241,8 @@ compiler/meta-vmdef.lisp out of compiler/vmdef.lisp, and also wrote
 Also, Christopher Hoover and William Lott wrote compiler/generic/vm-macs.lisp 
 to centralize information about machine-dependent macros and constants.
 
-Sean Hallgren converted compiler/generic/primtype.lisp for the Alpha.
+Sean Hallgren is credited with most of the Alpha backend.  Julian
+Dolby created the CMU CL Alpha/linux port.
 
 The CMU CL machine-independent disassembler (compiler/disassem.lisp)
 was written by Miles Bader.
@@ -501,7 +502,11 @@ Daniel Barlow:
   play nicely with ILISP. (Those patches have since disappeared from the
   SBCL distribution because ILISP has since been patched to play nicely
   with SBCL.) He also figured out how to get the CMU CL dynamic object
-  file loading code to work under SBCL.
+  file loading code to work under SBCL. He ported CMU CL's Alpha
+  port to SBCL. He wrote code (e.g. grovel_headers.c and
+  stat_wrapper stuff) to handle machine-dependence and OS-dependence
+  automatically, reducing the amount of hand-tweaking required to
+  keep ports synchronized. 
 
 Cadabra, Inc. (later merged into GoTo.com):
   They hired Bill Newman to do some consulting for them,

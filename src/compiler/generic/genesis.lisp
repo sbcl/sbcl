@@ -393,30 +393,41 @@
       (logior (ash (ldb (byte 8 0) short) 8)
 	      (ldb (byte 8 8) short))))
 
-;;; like SAP-REF-32, except that instead of a SAP we use a byte vector
-(defun byte-vector-ref-32 (byte-vector byte-index)
+;;; BYTE-VECTOR-REF-32 and friends.  These are like SAP-REF-n, except
+;;; that instead of a SAP we use a byte vector
+(macrolet ((make-byte-vector-ref-n
+            (n)
+            (let* ((name (intern (format nil "BYTE-VECTOR-REF-~A" n)))
+                   (number-octets (/ n 8))
+                   (ash-list
+                    (loop for i from 0 to (1- number-octets)
+                          collect `(ash (aref byte-vector (+ byte-index ,i))
+                                        ,(* i 8))))
+                   (setf-list
+                    (loop for i from 0 to (1- number-octets)
+                          append
+                          `((aref byte-vector (+ byte-index ,i))
+                            (ldb (byte 8 ,(* i 8)) new-value)))))
+              `(progn
+                 (defun ,name (byte-vector byte-index)
   (aver (= sb!vm:word-bits 32))
   (aver (= sb!vm:byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
-     (logior (ash (aref byte-vector (+ byte-index 0)) 0)
-	     (ash (aref byte-vector (+ byte-index 1)) 8)
-	     (ash (aref byte-vector (+ byte-index 2)) 16)
-	     (ash (aref byte-vector (+ byte-index 3)) 24)))
+                      (logior ,@ash-list))
     (:big-endian
      (error "stub: no big-endian ports of SBCL (yet?)"))))
-(defun (setf byte-vector-ref-32) (new-value byte-vector byte-index)
+                 (defun (setf ,name) (new-value byte-vector byte-index)
   (aver (= sb!vm:word-bits 32))
   (aver (= sb!vm:byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
-     (setf (aref byte-vector (+ byte-index 0)) (ldb (byte 8 0) new-value)
-	   (aref byte-vector (+ byte-index 1)) (ldb (byte 8 8) new-value)
-	   (aref byte-vector (+ byte-index 2)) (ldb (byte 8 16) new-value)
-	   (aref byte-vector (+ byte-index 3)) (ldb (byte 8 24) new-value)))
+                      (setf ,@setf-list))
     (:big-endian
-     (error "stub: no big-endian ports of SBCL (yet?)")))
-  new-value)
+                      (error "stub: no big-endian ports of SBCL (yet?)"))))))))
+  (make-byte-vector-ref-n 8)
+  (make-byte-vector-ref-n 16)
+  (make-byte-vector-ref-n 32))
 
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
 (defun read-wordindexed (address index)
@@ -1435,8 +1446,12 @@
 		(setf (gethash name *cold-foreign-symbol-table*) value))))))
     (values)))
 
+;;; FIXME: the relation between #'lookup-foreign-symbol and
+;;; #'lookup-maybe-prefix-foreign-symbol seems more than slightly
+;;; illdefined
+
 (defun lookup-foreign-symbol (name)
-  #!+x86
+  #!+(or alpha x86)
   (let ((prefixes
 	 #!+linux #(;; FIXME: How many of these are actually
 		    ;; needed? The first four are taken from rather
@@ -1464,7 +1479,7 @@
 		   *cold-foreign-symbol-table*)
 	  (format *error-output* "~&The prefix table is: ~S~%" prefixes)
 	  (error "The foreign symbol ~S is undefined." name))))
-  #!-x86 (error "non-x86 unsupported in SBCL (but see old CMU CL code)"))
+  #!-(or x86 alpha) (error "non-x86/alpha unsupported in SBCL (but see old CMU CL code)"))
 
 (defvar *cold-assembler-routines*)
 
@@ -1551,69 +1566,49 @@
 	 (gspace-byte-address (gspace-byte-address
 			       (descriptor-gspace code-object))))
     (ecase sb!c:*backend-fasl-file-implementation*
-      ;; Classic CMU CL supported these, and I haven't gone out of my way
-      ;; to break them, but I have no way of testing them.. -- WHN 19990817
-      #|
-      (#.sb!c:pmax-fasl-file-implementation
-       (ecase kind
-	 (:jump
-	  (aver (zerop (ash value -28)))
-	  (setf (ldb (byte 26 0) (sap-ref-32 sap 0))
-		(ash value -2)))
-	 (:lui
-	  (setf (sap-ref-16 sap 0)
-		(+ (ash value -16)
-		   (if (logbitp 15 value) 1 0))))
-	 (:addi
-	  (setf (sap-ref-16 sap 0)
-		(ldb (byte 16 0) value)))))
-      (#.sb!c:sparc-fasl-file-implementation
-       (let ((inst (maybe-byte-swap (sap-ref-32 sap 0))))
+      ;; See CMUCL source for other formerly-supported architectures
+      ;; (and note that you have to rewrite them to use vector-ref unstead
+      ;; of sap-ref)
+      (:alpha
 	 (ecase kind
-	   (:call
-	    (error "Can't deal with call fixups yet."))
-	   (:sethi
-	    (setf inst
-		  (dpb (ldb (byte 22 10) value)
-		       (byte 22 0)
-		       inst)))
-	   (:add
-	    (setf inst
-		  (dpb (ldb (byte 10 0) value)
-		       (byte 10 0)
-		       inst))))
-	 (setf (sap-ref-32 sap 0)
-	       (maybe-byte-swap inst))))
-      ((#.sb!c:rt-fasl-file-implementation
-	#.sb!c:rt-afpa-fasl-file-implementation)
-       (ecase kind
-	 (:cal
-	  (setf (sap-ref-16 sap 2)
-		(maybe-byte-swap-short
-		 (ldb (byte 16 0) value))))
-	 (:cau
-	  (let ((high (ldb (byte 16 16) value)))
-	    (setf (sap-ref-16 sap 2)
-		  (maybe-byte-swap-short
-		   (if (logbitp 15 value) (1+ high) high)))))
-	 (:ba
-	  (unless (zerop (ash value -24))
-	    (warn "#X~8,'0X out of range for branch-absolute." value))
-	  (let ((inst (maybe-byte-swap-short (sap-ref-16 sap 0))))
+         (:jmp-hint
+          (assert (zerop (ldb (byte 2 0) value)))
+          #+nil ;; was commented out in cmucl source too.  Don't know what
+          ;; it does   -dan 2001.05.03
 	    (setf (sap-ref-16 sap 0)
-		  (maybe-byte-swap-short
-		   (dpb (ldb (byte 8 16) value)
-			(byte 8 0)
-			inst))))
-	  (setf (sap-ref-16 sap 2)
-		(maybe-byte-swap-short (ldb (byte 16 0) value))))))
-      |#
+                (logior (sap-ref-16 sap 0) (ldb (byte 14 0) (ash value -2)))))
+	 (:bits-63-48
+	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
+		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
+		 (value (if (logbitp 47 value) (+ value (ash 1 48)) value)))
+	    (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+                  (ldb (byte 8 48) value)
+                  (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                  (ldb (byte 8 56) value))))
+	 (:bits-47-32
+	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
+		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value)))
+	    (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+                  (ldb (byte 8 32) value)
+                  (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                  (ldb (byte 8 40) value))))
+	 (:ldah
+	  (let ((value (if (logbitp 15 value) (+ value (ash 1 16)) value)))
+	    (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+                  (ldb (byte 8 16) value)
+                  (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                  (ldb (byte 8 24) value))))
+	 (:lda
+	  (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+                (ldb (byte 8 0) value)
+                (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                (ldb (byte 8 8) value)))))
       (:x86
        (let* ((un-fixed-up (byte-vector-ref-32 gspace-bytes
 					       gspace-byte-offset))
 	      (code-object-start-addr (logandc2 (descriptor-bits code-object)
 						sb!vm:lowtag-mask)))
-	 (aver (= code-object-start-addr
+         (assert (= code-object-start-addr
 		  (+ gspace-byte-address
 		     (descriptor-byte-offset code-object))))
 	 (ecase kind
@@ -1649,75 +1644,7 @@
 	      (note-load-time-code-fixup code-object
 					 after-header
 					 value
-					 kind))))))
-      ;; CMU CL supported these, and I haven't gone out of my way to break
-      ;; them, but I have no way of testing them.. -- WHN 19990817
-      #|
-      (#.sb!c:hppa-fasl-file-implementation
-       (let ((inst (maybe-byte-swap (sap-ref-32 sap 0))))
-	 (setf (sap-ref-32 sap 0)
-	       (maybe-byte-swap
-		(ecase kind
-		  (:load
-		   (logior (ash (ldb (byte 11 0) value) 1)
-			   (logand inst #xffffc000)))
-		  (:load-short
-		   (let ((low-bits (ldb (byte 11 0) value)))
-		     (aver (<= 0 low-bits (1- (ash 1 4))))
-		     (logior (ash low-bits 17)
-			     (logand inst #xffe0ffff))))
-		  (:hi
-		   (logior (ash (ldb (byte 5 13) value) 16)
-			   (ash (ldb (byte 2 18) value) 14)
-			   (ash (ldb (byte 2 11) value) 12)
-			   (ash (ldb (byte 11 20) value) 1)
-			   (ldb (byte 1 31) value)
-			   (logand inst #xffe00000)))
-		  (:branch
-		   (let ((bits (ldb (byte 9 2) value)))
-		     (aver (zerop (ldb (byte 2 0) value)))
-		     (logior (ash bits 3)
-			     (logand inst #xffe0e002)))))))))
-      (#.sb!c:alpha-fasl-file-implementation
-       (ecase kind
-	 (:jmp-hint
-	  (aver (zerop (ldb (byte 2 0) value)))
-	  #+nil
-	  (setf (sap-ref-16 sap 0)
-		(logior (sap-ref-16 sap 0) (ldb (byte 14 0) (ash value -2)))))
-	 (:bits-63-48
-	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
-		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
-		 (value (if (logbitp 47 value) (+ value (ash 1 48)) value)))
-	    (setf (sap-ref-8 sap 0) (ldb (byte 8 48) value))
-	    (setf (sap-ref-8 sap 1) (ldb (byte 8 56) value))))
-	 (:bits-47-32
-	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
-		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value)))
-	    (setf (sap-ref-8 sap 0) (ldb (byte 8 32) value))
-	    (setf (sap-ref-8 sap 1) (ldb (byte 8 40) value))))
-	 (:ldah
-	  (let ((value (if (logbitp 15 value) (+ value (ash 1 16)) value)))
-	    (setf (sap-ref-8 sap 0) (ldb (byte 8 16) value))
-	    (setf (sap-ref-8 sap 1) (ldb (byte 8 24) value))))
-	 (:lda
-	  (setf (sap-ref-8 sap 0) (ldb (byte 8 0) value))
-	  (setf (sap-ref-8 sap 1) (ldb (byte 8 8) value)))))
-      (#.sb!c:sgi-fasl-file-implementation
-       (ecase kind
-	 (:jump
-	  (aver (zerop (ash value -28)))
-	  (setf (ldb (byte 26 0) (sap-ref-32 sap 0))
-		(ash value -2)))
-	 (:lui
-	  (setf (sap-ref-16 sap 2)
-		(+ (ash value -16)
-		   (if (logbitp 15 value) 1 0))))
-	 (:addi
-	  (setf (sap-ref-16 sap 2)
-		(ldb (byte 16 0) value)))))
-      |#
-      ))
+					 kind)))))) ))
   (values))
 
 (defun resolve-assembler-fixups ()

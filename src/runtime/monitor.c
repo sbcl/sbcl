@@ -42,6 +42,7 @@ static cmd flush_cmd, search_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
+static cmd kill_cmd;
 
 static struct cmd {
     char *cmd, *help;
@@ -54,16 +55,18 @@ static struct cmd {
     {"catchers", "Print a list of all the active catchers.", catchers_cmd},
     {"context", "Print interrupt context number I.", print_context_cmd},
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
-    {"d", "dump", dump_cmd},
+    {"d", "Alias for dump", dump_cmd},
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
     /* (Classic CMU CL had a "gc" command here, which seems like a
      * reasonable idea, but the code was stale (incompatible with
      * gencgc) so I just flushed it. -- WHN 20000814 */
     {"grab-signals", "Set the signal handlers to call LDB.", grab_sigs_cmd},
+    {"kill", "Kill ourself with signal number N (useful if running under gdb)",
+     kill_cmd},
     {"purify", "Purify. (Caveat purifier!)", purify_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
-    {"p", "print", print_cmd},
+    {"p", "Alias for print", print_cmd},
     {"quit", "Quit.", quit},
     {"regs", "Display current Lisp regs.", regs_cmd},
     {"search", "Search for TYPE starting at ADDRESS for a max of COUNT words.", search_cmd},
@@ -120,7 +123,7 @@ static void dump_cmd(char **ptr)
 #ifndef alpha
             unsigned long *lptr = (unsigned long *)addr;
 #else
-            u32 *lptr = (unsigned long *)addr;
+            u32 *lptr = (u32 *)addr;
 #endif
             unsigned short *sptr = (unsigned short *)addr;
             unsigned char *cptr = (unsigned char *)addr;
@@ -141,6 +144,11 @@ static void print_cmd(char **ptr)
     lispobj obj = parse_lispobj(ptr);
 
     print(obj);
+}
+
+static void kill_cmd(char **ptr)
+{
+    kill(getpid(), parse_number(ptr));
 }
 
 static void regs_cmd(char **ptr)
@@ -352,8 +360,7 @@ static void print_context(os_context_t *context)
 		brief_print((lispobj)(*os_context_register_addr(context,
 								i*2)));
 #else
-		brief_print((lispobj)(*os_context_register_addr(context,
-								i)));
+		brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
 	}
 	printf("PC:\t\t  0x%08lx\n",
@@ -442,6 +449,9 @@ static void grab_sigs_cmd(char **ptr)
     sigint_init();
 }
 
+static FILE *devtty;
+static int devttyfd=-1;
+
 static void sub_monitor(void)
 {
     struct cmd *cmd, *found;
@@ -449,12 +459,16 @@ static void sub_monitor(void)
     char *line, *ptr, *token;
     int ambig;
 
+    if(devtty==0) {
+	devtty=fopen("/dev/tty","r+");
+	devttyfd=fileno(devtty);
+    }
     while (!done) {
         printf("ldb> ");
         fflush(stdout);
-        line = fgets(buf, sizeof(buf), stdin);
+        line = fgets(buf, sizeof(buf), devtty);
         if (line == NULL) {
-	    if (isatty(0)) {
+	    if (isatty(devttyfd)) {
 		putchar('\n');
 	        continue;
 	    }

@@ -18,6 +18,7 @@
 #include "runtime.h"
 #include "sbcl.h"
 #include "globals.h"
+#include "validate.h"
 
 int foreign_function_call_active;
 
@@ -27,12 +28,23 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
+/* ALLOCATION_POINTER is more or less synonymous with RT, it seems.
+ * Anyone want to do an RT port of sbcl?  
+ */
+
 #ifndef ALLOCATION_POINTER
+/* The Object Formerly Known As current_dynamic_space_free_pointer */
 lispobj *dynamic_space_free_pointer;
 #endif
+
 #ifndef INTERNAL_GC_TRIGGER
 lispobj *current_auto_gc_trigger;
 #endif
+
+/* for copying GCs, this points to the start of the dynamic space
+ * currently in use (that will become the from_space when the next GC
+ * is done).  For the GENCGC, it always points to DYNAMIC_0_SPACE_START */
+lispobj *current_dynamic_space;
 
 void globals_init(void)
 {

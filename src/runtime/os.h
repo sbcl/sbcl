@@ -113,15 +113,18 @@ extern boolean is_valid_lisp_addr(os_vm_address_t test);
  * register, of the specified offset, for that context. The offset is
  * defined in the storage class (SC) defined in the Lisp virtual
  * machine (i.e. the file "vm.lisp" for the appropriate architecture). */
-int *os_context_register_addr(os_context_t *context, int offset);
+register_t *os_context_register_addr(os_context_t *context, int offset);
+#ifdef alpha
+register_t *os_context_fpregister_addr(os_context_t *context, int offset);
+#endif
 
 /* Given a signal context, return the address for storage of the
  * program counter for that context. */
-int *os_context_pc_addr(os_context_t *context);
+register_t *os_context_pc_addr(os_context_t *context);
 
 /* Given a signal context, return the address for storage of the
  * system stack pointer for that context. */
-int *os_context_sp_addr(os_context_t *context);
+register_t *os_context_sp_addr(os_context_t *context);
 
 /* Given a signal context, return the address for storage of the
  * signal mask for that context. */

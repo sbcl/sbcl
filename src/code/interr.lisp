@@ -40,7 +40,6 @@
 	 ;; where his error was detected instead of telling him where
 	 ;; he ended up inside the system error-handling logic.
 	 (declare (ignorable name ,fp ,context ,sc-offsets))
-	 (/show0 "about to do outer LETs in DEFERR macroexpanded DEFUN")
 	 (let (,@(let ((offset -1))
 		   (mapcar #'(lambda (var)
 			       `(,var (sb!di::sub-access-debug-var-slot

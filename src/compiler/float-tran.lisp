@@ -394,6 +394,7 @@
 		 (cos %cos %cos-quick)
 		 (tan %tan %tan-quick)))
   (destructuring-bind (name prim prim-quick) stuff
+    (declare (ignorable prim-quick))
     (deftransform name ((x) '(single-float) '* :eval-name t)
       #!+x86 (cond ((csubtypep (continuation-type x)
 			       (specifier-type '(single-float
@@ -466,7 +467,7 @@
        (float pi x)
        (float 0 x)))
 
-#!+(or sb-propagate-float-type sb-propagate-fun-type)
+;; #!+(or propagate-float-type propagate-fun-type)
 (progn
 
 ;;; The number is of type REAL.

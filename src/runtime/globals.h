@@ -25,15 +25,18 @@ extern lispobj *current_binding_stack_pointer;
 #endif
 
 #if !defined(ibmrt) && !defined(__i386__)
+/* FIXME: why doesn't the x86 need this? */
 extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;
 #endif
+extern lispobj *current_dynamic_space;
+
 
 extern void globals_init(void);
 
 #else  LANGUAGE_ASSEMBLY
 
-/* These are needed by ./assem.s */
+/* These are needed by assem.S. */
 
 #ifdef mips
 #define EXTERN(name,bytes) .extern name bytes
@@ -49,6 +52,14 @@ extern void globals_init(void);
 #define EXTERN(name,bytes) .globl _/**/name
 #endif
 
+#ifdef alpha
+#ifdef linux
+#define EXTERN(name,bytes) .globl name 
+#endif
+#endif
+
+/* I'm very dubious about this.  Linux hasn't used _ on external names
+ * since ELF became prevalent - i.e. about 1996, on x86    -dan 20010125 */
 #ifdef __i386__
 #ifdef __linux__
 #define EXTERN(name,bytes) .globl _/**/name
@@ -61,10 +72,9 @@ EXTERN(foreign_function_call_active, 4)
 
 EXTERN(current_control_stack_pointer, 4)
 EXTERN(current_control_frame_pointer, 4)
-#if !defined(ibmrt) && !defined(__i386__)
 EXTERN(current_binding_stack_pointer, 4)
 EXTERN(dynamic_space_free_pointer, 4)
-#endif
+EXTERN(current_dynamic_space, 4)
 
 #ifdef mips
 EXTERN(current_flags_register, 4)

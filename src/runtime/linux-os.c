@@ -1,5 +1,6 @@
 /*
- * the Linux incarnation of OS-dependent routines
+ * the Linux incarnation of OS-dependent routines.  See also
+ * $(sbcl_arch)-linux-os.c
  *
  * This file (along with os.h) exports an OS-independent interface to
  * the operating system VM facilities. Surprise surprise, this
@@ -63,46 +64,15 @@ void os_init(void)
     }
 
     os_vm_page_size = getpagesize();
-
+   /* this could just as well be in arch_init, but it's not  */
+#ifdef i386
     SET_FPU_CONTROL_WORD(0x1372|4|8|16|32); /* no interrupts */
+#endif
 }
 
-/* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
- * <sys/ucontext.h> file to define symbolic names for offsets into
- * gregs[], but it's conditional on __USE_GNU and not defined, so
- * we need to do this nasty absolute index magic number thing
- * instead. */
-int *
-os_context_register_addr(os_context_t *context, int offset)
-{
-    switch(offset) {
-    case  0: return &context->uc_mcontext.gregs[11]; /* EAX */
-    case  2: return &context->uc_mcontext.gregs[10]; /* ECX */
-    case  4: return &context->uc_mcontext.gregs[9]; /* EDX */
-    case  6: return &context->uc_mcontext.gregs[8]; /* EBX */
-    case  8: return &context->uc_mcontext.gregs[7]; /* ESP */
-    case 10: return &context->uc_mcontext.gregs[6]; /* EBP */
-    case 12: return &context->uc_mcontext.gregs[5]; /* ESI */
-    case 14: return &context->uc_mcontext.gregs[4]; /* EDI */
-    default: return 0;
-    }
-}
-int *
-os_context_pc_addr(os_context_t *context)
-{
-    return &context->uc_mcontext.gregs[14];
-}
-int *
-os_context_sp_addr(os_context_t *context)
-{
-    return &context->uc_mcontext.gregs[17];
-}
-
-sigset_t *
-os_context_sigmask_addr(os_context_t *context)
-{
-    return &context->uc_sigmask;
-}
+/* various os_context_*_addr accessors moved to {x86,alpha}-linux-os.c 
+ * -dan 20010125
+ */
 
 /* In Debian CMU CL ca. 2.4.9, it was possible to get an infinite
  * cascade of errors from do_mmap(..). This variable is a counter to
@@ -221,11 +191,6 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 }
 
 void
-os_flush_icache(os_vm_address_t address, os_vm_size_t length)
-{
-}
-
-void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     if (mprotect(address, length, prot) == -1) {
@@ -239,8 +204,8 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 static boolean
 in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 {
-    char* beg = (char*)sbeg;
-    char* end = (char*)sbeg + slen;
+    char* beg = (char*)((long)sbeg);
+    char* end = (char*)((long)sbeg) + slen;
     char* adr = (char*)a;
     return (adr >= beg && adr < end);
 }
@@ -260,13 +225,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * any OS-dependent special low-level handling for signals
  */
 
-#if !defined GENCGC
-
-void
-os_install_interrupt_handlers(void)
-{}
-
-#else
+#if defined GENCGC
 
 /*
  * The GENCGC needs to be hooked into whatever signal is raised for
@@ -281,10 +240,55 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	interrupt_handle_now(signal, info, void_context);
     }
 }
+
+#else
+
+static void
+sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+{
+    os_context_t *context = (os_context_t*)void_context;
+    os_vm_address_t addr;
+
+#ifdef i386
+    interrupt_handle_now(signal,contextstruct);
+#else
+#define CONTROL_STACK_TOP (((char*)CONTROL_STACK_START)+CONTROL_STACK_SIZE)
+    
+    addr = arch_get_bad_addr(signal,info,context);
+
+    if(addr != NULL && 
+       *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
+	/* This is the end of a pseudo-atomic section during which
+	 * a signal was received.  We must deal with the pending interrupt
+	 * (see also interrupt.c, ../code/interrupt.lisp)
+	 */
+
+	/* (how we got here: when interrupting, we set bit 63 in
+	 * reg_Alloc.  At the end of the atomic section we tried to
+	 * write to reg_Alloc, got a SIGSEGV (there's nothing mapped
+	 * there) so ended up here
+	 */
+	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
+	interrupt_handle_pending(context);
+    } else if (addr > CONTROL_STACK_TOP && addr < BINDING_STACK_START) {
+	fprintf(stderr, "Possible stack overflow at 0x%016lX: CONTROL_STACK_TOP=%lx, BINDING_STACK_START=%lx\n",addr, CONTROL_STACK_TOP,BINDING_STACK_START);
+	/* try to fix control frame pointer */
+	while ( ! (CONTROL_STACK_START <= *current_control_frame_pointer &&
+		   *current_control_frame_pointer <= CONTROL_STACK_TOP))
+	    ((char*)current_control_frame_pointer) -= sizeof(lispobj);
+	ldb_monitor();
+    } else if (!interrupt_maybe_gc(signal, info, context)) {
+	interrupt_handle_now(signal, info, context);
+    }
+#endif
+}
+#endif
+
+
+
 void
 os_install_interrupt_handlers(void)
 {
     interrupt_install_low_level_handler(SIGSEGV, sigsegv_handler);
 }
 
-#endif

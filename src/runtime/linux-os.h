@@ -36,6 +36,7 @@ typedef struct ucontext os_context_t;
 #define OS_VM_PROT_WRITE   PROT_WRITE
 #define OS_VM_PROT_EXECUTE PROT_EXEC
 
-#define OS_VM_DEFAULT_PAGESIZE	4096
-
 #define SET_FPU_CONTROL_WORD(cw) asm("fldcw %0" : : "m" (cw))
+
+/* /usr/include/asm/sigcontext.h  */
+typedef long sigcontext_register_t ;

@@ -118,11 +118,6 @@
 (def-alien-type caddr-t (* char))
 (def-alien-type swblk-t long)
 (def-alien-type size-t unsigned-int)
-(def-alien-type time-t long)
-(def-alien-type clock-t
-  #!+linux long
-  #!+bsd   unsigned-long)
-(def-alien-type uid-t unsigned-int)
 (def-alien-type ssize-t int)
 
 ;;; FIXME: We shouldn't hand-copy types from header files into Lisp like this
@@ -131,33 +126,8 @@
 ;;; those functions in C as a wrapper layer.
 (def-alien-type fd-mask unsigned-long)
 
-;;; FIXME: Isn't there some way to use a C wrapper to avoid this hand-copying?
-(def-alien-type dev-t
-  #!+linux uquad-t
-  #!+bsd   unsigned-int)
-(def-alien-type uid-t unsigned-int)
-(def-alien-type gid-t unsigned-int)
-(def-alien-type ino-t
-  #!+linux unsigned-long
-  #!+bsd   unsigned-int)
-(def-alien-type mode-t
-  #!+linux unsigned-int
-  #!+bsd   unsigned-short)
-(def-alien-type nlink-t
-  #!+linux unsigned-int
-  #!+bsd   unsigned-short)
-(/show0 "unix.lisp 263")
-
-;;; FIXME: We shouldn't hand-copy types from header files into Lisp like this
-;;; unless we have extreme provocation. Reading directories is not extreme
-;;; enough, since it doesn't need to be blindingly fast: we can just implement
-;;; those functions in C as a wrapper layer.
-
-(def-alien-type off-t
-  #!+linux long
-  #!+bsd   quad-t)
-
-(defconstant fd-setsize 1024)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant fd-setsize 1024))
 
 (def-alien-type nil
   (struct fd-set
@@ -165,22 +135,10 @@
 
 (/show0 "unix.lisp 304")
 
-;;;; direntry.h
-;;;; dirent.h
-;;;; 
-;;;; (CMU CL copied stuff out of these, but as of 0.6.11.41, SBCL
-;;;; doesn't need to, instead calling C-level wrapper code to handle
-;;;; all the opendir/readdir/closedir stuff.)
 
 ;;;; fcntl.h
 ;;;;
 ;;;; POSIX Standard: 6.5 File Control Operations	<fcntl.h>
-
-(/show0 "unix.lisp 356")
-(defconstant r_ok 4 #!+sb-doc "Test for read permission")
-(defconstant w_ok 2 #!+sb-doc "Test for write permission")
-(defconstant x_ok 1 #!+sb-doc "Test for execute permission")
-(defconstant f_ok 0 #!+sb-doc "Test for presence of file")
 
 ;;; Open the file whose pathname is specified by PATH for reading
 ;;; and/or writing as specified by the FLAGS argument. Various FLAGS
@@ -201,31 +159,6 @@
 (defun unix-close (fd)
   (declare (type unix-fd fd))
   (void-syscall ("close" int) fd))
-
-;;;; fcntlbits.h
-
-(/show0 "unix.lisp 337")
-(defconstant o_rdonly  0) ; read-only flag
-(defconstant o_wronly  1) ; write-only flag
-(defconstant o_rdwr    2) ; read/write flag
-(defconstant o_accmode 3) ; access mode mask
-(defconstant o_creat ; create-if-nonexistent flag (not fcntl)
-  #!+linux #o100
-  #!+bsd   #x0200)
-(/show0 "unix.lisp 345")
-(defconstant o_excl ; error if already exists (not fcntl)
-  #!+linux #o200
-  #!+bsd   #x0800)
-(defconstant o_noctty ; Don't assign controlling tty. (not fcntl)
-  #!+linux #o400
-  #!+bsd   #x8000)
-(defconstant o_trunc ; truncation flag (not fcntl)
-  #!+linux #o1000
-  #!+bsd   #x0400)
-(defconstant o_append ; append flag
-  #!+linux #o2000
-  #!+bsd   #x0008)
-(/show0 "unix.lisp 361")
 
 ;;;; timebits.h
 
@@ -261,81 +194,35 @@
     (ru-nvcsw long)		    ; voluntary context switches
     (ru-nivcsw long)))		    ; involuntary context switches
 
-;;;; statbuf.h
 
-;;; FIXME: This should go into C code so that we don't need to hand-copy
-;;; it from header files.
-#!+Linux
+;;;; runtime/stat-wrapper.h
+
+;;; this looks like "struct stat" according to stat(2).  It may not
+;;; correspond to the real in-memory stat structure that the syscall
+;;; uses, and if it doesn't, shouldn't.  Linux in particular is packed
+;;; full of stat macros, so we do this stuff in runtime/stat-wrapper.c
+
+;;; Note that st-dev is a long, not a dev-t.  This is because dev-t on
+;;; linux 32 bit archs is a 64 bit quantity, but alien doesn's support
+;;; those.  We don't actually access that field anywhere, though, so until
+;;; we can get 64 bit alien support it'll do
+
 (def-alien-type nil
   (struct stat
-    (st-dev dev-t)
-    (st-pad1 unsigned-short)
+    (st-dev unsigned-long)              ;would be dev-t in a real stat
     (st-ino ino-t)
     (st-mode mode-t)
     (st-nlink  nlink-t)
     (st-uid  uid-t)
     (st-gid  gid-t)
-    (st-rdev dev-t)
-    (st-pad2  unsigned-short)
+    (st-rdev unsigned-long)             ;ditto
     (st-size off-t)
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)
-    (unused-1 unsigned-long)
     (st-mtime time-t)
-    (unused-2 unsigned-long)
-    (st-ctime time-t)
-    (unused-3 unsigned-long)
-    (unused-4 unsigned-long)
-    (unused-5 unsigned-long)))
+    (st-ctime time-t)))
 
-#!+bsd
-(def-alien-type nil
-  (struct timespec-t
-    (tv-sec long)
-    (tv-nsec long)))
-
-#!+bsd
-(def-alien-type nil
-  (struct stat
-    (st-dev dev-t)
-    (st-ino ino-t)
-    (st-mode mode-t)
-    (st-nlink nlink-t)
-    (st-uid uid-t)
-    (st-gid gid-t)
-    (st-rdev dev-t)
-    (st-atime (struct timespec-t))
-    (st-mtime (struct timespec-t))
-    (st-ctime (struct timespec-t))
-    (st-size    unsigned-long)		; really quad
-    (st-sizeh   unsigned-long)		;
-    (st-blocks  unsigned-long)		; really quad
-    (st-blocksh unsigned-long)
-    (st-blksize unsigned-long)
-    (st-flags   unsigned-long)
-    (st-gen     unsigned-long)
-    (st-lspare  long)
-    (st-qspare (array long 4))
-    ))
-
-;; encoding of the file mode
-
-;;; These bits determine file type.
-(defconstant s-ifmt   #o0170000)
-
-;; basic file types, exist even on System V
-(defconstant s-ififo  #o0010000) ; FIFO
-(defconstant s-ifchr  #o0020000) ; Character device
-(defconstant s-ifdir  #o0040000) ; Directory
-(defconstant s-ifblk  #o0060000) ; Block device
-(defconstant s-ifreg  #o0100000) ; Regular file
-
-;; more file types: These don't actually exist on System V, but having
-;; them doesn't hurt.
-(defconstant s-iflnk  #o0120000) ; Symbolic link
-(defconstant s-ifsock #o0140000) ; Socket
-
 ;;;; unistd.h
 
 ;;; Given a file path (a string) and one of four constant modes,
@@ -649,53 +536,43 @@
 ;;; runtime. It's also unclear why it needs to be a macro instead of a
 ;;; function. Perhaps it should become a FLET.
 (defmacro extract-stat-results (buf)
-  `(values T
-	   #!+bsd
+  `(values T                            ; result
 	   (slot ,buf 'st-dev)
-	   #!+linux
-	   (+ (deref (slot ,buf 'st-dev) 0)
-	      (* (+ +max-u-long+  1)
-		 (deref (slot ,buf 'st-dev) 1)))   ;;; let's hope this works..
 	   (slot ,buf 'st-ino)
 	   (slot ,buf 'st-mode)
 	   (slot ,buf 'st-nlink)
 	   (slot ,buf 'st-uid)
 	   (slot ,buf 'st-gid)
-	   #!+bsd
 	   (slot ,buf 'st-rdev)
-	   #!+linux
-	   (+ (deref (slot ,buf 'st-rdev) 0)
-	      (* (+ +max-u-long+  1)
-		 (deref (slot ,buf 'st-rdev) 1)))   ;;; let's hope this works..
-	   #!+linux (slot ,buf 'st-size)
-	   #!+bsd
-	   (+ (slot ,buf 'st-size)
-	      (* (+ +max-u-long+ 1)
-		 (slot ,buf 'st-sizeh)))
-	   #!+linux (slot ,buf 'st-atime)
-	   #!+bsd   (slot (slot ,buf 'st-atime) 'tv-sec)
-	   #!+linux (slot ,buf 'st-mtime)
-	   #!+bsd   (slot (slot ,buf 'st-mtime) 'tv-sec)
-	   #!+linux (slot ,buf 'st-ctime)
-	   #!+bsd   (slot (slot ,buf 'st-ctime) 'tv-sec)
+	   (slot ,buf 'st-size)
+           (slot ,buf 'st-atime)
+           (slot ,buf 'st-mtime)
+	   (slot ,buf 'st-ctime)
 	   (slot ,buf 'st-blksize)
-	   #!+linux (slot ,buf 'st-blocks)
-	   #!+bsd
-	   (+ (slot ,buf 'st-blocks)
-	      (* (+ +max-u-long+ 1)
-		 (slot ,buf 'st-blocksh)))
-	   ))
+	   (slot ,buf 'st-blocks)))
 
 ;;; Retrieve information about the specified file returning them in
 ;;; the form of multiple values. See the UNIX Programmer's Manual for
 ;;; a description of the values returned. If the call fails, then NIL
 ;;; and an error number is returned instead.
+
 (defun unix-stat (name)
   (declare (type unix-pathname name))
   (when (string= name "")
     (setf name "."))
   (with-alien ((buf (struct stat)))
-    (syscall ("stat" c-string (* (struct stat)))
+    (syscall ("stat_wrapper" c-string (* (struct stat)))
+	     (extract-stat-results buf)
+	     name (addr buf))))
+
+(defun unix-lstat (name)
+  #!+sb-doc
+  "Unix-lstat is identical to unix-stat, except if NAME is 
+   a symlink, in which case it returns information about the
+   link itself rather than dereferencing it."
+  (declare (type unix-pathname name))
+  (with-alien ((buf (struct stat)))
+    (syscall ("lstat_wrapper" c-string (* (struct stat)))
 	     (extract-stat-results buf)
 	     name (addr buf))))
 
@@ -703,17 +580,10 @@
 (defun unix-fstat (fd)
   (declare (type unix-fd fd))
   (with-alien ((buf (struct stat)))
-    (syscall ("fstat" int (* (struct stat)))
+    (syscall ("fstat_wrapper" int (* (struct stat)))
 	     (extract-stat-results buf)
 	     fd (addr buf))))
 
-;;; like UNIX-STAT except the specified file must be a symbolic link
-(defun unix-lstat (name)
-  (declare (type unix-pathname name))
-  (with-alien ((buf (struct stat)))
-    (syscall ("lstat" c-string (* (struct stat)))
-	     (extract-stat-results buf)
-	     name (addr buf))))
 
 ;;; UNIX-MKDIR accepts a name and a mode and attempts to create the
 ;;; corresponding directory with mode mode.
@@ -789,7 +659,6 @@
 	      (addr tv)
 	      (addr tz))))
 
-;;;; asm/errno.h
 
 (defconstant ENOENT 2) ; Unix error code, "No such file or directory"
 (defconstant EINTR 4) ; Unix error code, "Interrupted system call"
@@ -803,6 +672,7 @@
 ;;; unused symbols in package exports, but if I don't, there are
 ;;; enough of them all in one place here that they should probably be
 ;;; removed by hand.
+
 
 ;;;; support routines for dealing with Unix pathnames
 
@@ -1021,4 +891,4 @@
      ,@(loop for index upfrom 0 below (/ fd-setsize 32)
 	 collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
 
-(/show0 "unix.lisp 3555")
+

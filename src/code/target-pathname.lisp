@@ -1198,27 +1198,20 @@ a host-structure or string."
   values)
 
 (defun %enumerate-search-list (pathname function)
-  (/show0 "entering %ENUMERATE-SEARCH-LIST")
   (let* ((pathname (if (typep pathname 'logical-pathname)
 		       (translate-logical-pathname pathname)
 		       pathname))
 	 (search-list (extract-search-list pathname nil)))
-    (/show0 "PATHNAME and SEARCH-LIST computed")
     (cond
      ((not search-list)
-      (/show0 "no search list")
       (funcall function pathname))
      ((not (search-list-defined search-list))
-      (/show0 "undefined search list")
       (error "undefined search list: ~A"
 	     (search-list-name search-list)))
      (t
-      (/show0 "general case")
       (let ((tail (cddr (pathname-directory pathname))))
-	(/show0 "TAIL computed")
 	(dolist (expansion
 		 (search-list-expansions search-list))
-	  (/show0 "tail recursing in %ENUMERATE-SEARCH-LIST")
 	  (%enumerate-search-list (make-pathname :defaults pathname
 						 :directory
 						 (cons :absolute

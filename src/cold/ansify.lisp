@@ -123,3 +123,8 @@
 		       cl)
 		 (kernel:%set-symbol-package symbol cl))))
 	   standard-ht))
+
+#+(and cmu alpha)
+(unless (ignore-errors (read-from-string "1.0l0"))
+  (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
+

@@ -1,8 +1,9 @@
 ASSEM_SRC = x86-assem.S ldso-stubs.S
 ARCH_SRC = x86-arch.c
 
-OS_SRC = linux-os.c os-common.c
+OS_SRC = linux-os.c x86-linux-os.c os-common.c
 OS_LINK_FLAGS =
 OS_LIBS = -ldl
 
 GC_SRC= gencgc.c
+CFLAGS += -DGENCGC

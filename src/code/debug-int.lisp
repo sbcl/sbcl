@@ -47,7 +47,6 @@
   #!+sb-doc
   (:documentation "There is no usable debugging information available.")
   (:report (lambda (condition stream)
-	     (declare (ignore condition))
 	     (fresh-line stream)
 	     (format stream
 		     "no debug information available for ~S~%"
@@ -187,7 +186,7 @@
 ;;;; data structures created by the compiler. Whenever comments
 ;;;; preface an object or type with "compiler", they refer to the
 ;;;; internal compiler thing, not to the object or type with the same
-;;;; name in the "DI" package.
+;;;; name in the "SB-DI" package.
 
 ;;;; DEBUG-VARs
 
@@ -1107,20 +1106,6 @@
 			       (if up-frame (1+ (frame-number up-frame)) 0)
 			       escaped)))))
 
-#!-(or gengc x86)
-;;; FIXME: The original CMU CL code had support for this case, but it
-;;; must have been fairly stale even in CMU CL, since it had
-;;; references to the MIPS package, and there have been enough
-;;; relevant changes in SBCL (particularly using
-;;; POSIX/SIGACTION0-style signal context instead of BSD-style
-;;; sigcontext) that this code is unmaintainable (since as of
-;;; sbcl-0.6.7, and for the foreseeable future, we can't test it,
-;;; since we only support X86 and its gencgc).
-;;;
-;;; If we restore this case, the best approach would be to go back to
-;;; the original CMU CL code and start from there.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (error "hopelessly stale"))
 #!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
@@ -1156,6 +1141,50 @@
 			 pc-offset code))
 	       (return
 		(values code pc-offset context))))))))))
+
+#!-x86
+(defun find-escaped-frame (frame-pointer)
+  (declare (type system-area-pointer frame-pointer))
+  (dotimes (index sb!impl::*free-interrupt-context-index* (values nil 0 nil))
+    (sb!alien:with-alien
+     ((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
+     (let ((scp (sb!alien:deref lisp-interrupt-contexts index)))
+       (when (= (sap-int frame-pointer)
+                (sb!vm:context-register scp sb!vm::cfp-offset))
+         (without-gcing
+          (let ((code (code-object-from-bits
+                       (sb!vm:context-register scp sb!vm::code-offset))))
+            (when (symbolp code)
+              (return (values code 0 scp)))
+            (let* ((code-header-len (* (get-header-data code)
+                                       sb!vm:word-bytes))
+                   (pc-offset
+                    (- (sap-int (sb!vm:context-pc scp))
+                       (- (get-lisp-obj-address code)
+                          sb!vm:other-pointer-type)
+                       code-header-len)))
+              ;; Check to see whether we were executing in a branch
+              ;; delay slot.
+              #!+(or pmax sgi) ; pmax only (and broken anyway)
+              (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
+                (incf pc-offset sb!vm:word-bytes))
+              (unless (<= 0 pc-offset
+                          (* (code-header-ref code sb!vm:code-code-size-slot)
+                             sb!vm:word-bytes))
+                ;; We were in an assembly routine. Therefore, use the
+                ;; LRA as the pc.
+                (setf pc-offset
+                      (- (sb!vm:context-register scp sb!vm::lra-offset)
+                         (get-lisp-obj-address code)
+                         code-header-len)))
+               (return
+                (if (eq (%code-debug-info code) :bogus-lra)
+                    (let ((real-lra (code-header-ref code
+                                                     real-lra-slot)))
+                      (values (lra-code-header real-lra)
+                              (get-header-data real-lra)
+                              nil))
+                  (values code pc-offset scp)))))))))))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
@@ -2454,16 +2483,17 @@
 ;;; DEBUG-VAR relative to the FRAME. This may be an indirect value
 ;;; cell if the variable is both closed over and set.
 (defun access-compiled-debug-var-slot (debug-var frame)
+  (declare (optimize (speed 1)))
   (let ((escaped (compiled-frame-escaped frame)))
     (if escaped
-	(sub-access-debug-var-slot
-	 (frame-pointer frame)
-	 (compiled-debug-var-sc-offset debug-var)
-	 escaped)
-	(sub-access-debug-var-slot
-	 (frame-pointer frame)
-	 (or (compiled-debug-var-save-sc-offset debug-var)
-	     (compiled-debug-var-sc-offset debug-var))))))
+        (sub-access-debug-var-slot
+         (frame-pointer frame)
+         (compiled-debug-var-sc-offset debug-var)
+         escaped)
+      (sub-access-debug-var-slot
+       (frame-pointer frame)
+       (or (compiled-debug-var-save-sc-offset debug-var)
+           (compiled-debug-var-sc-offset debug-var))))))
 
 ;;; a helper function for working with possibly-invalid values:
 ;;; Do (MAKE-LISP-OBJ VAL) only if the value looks valid.
@@ -2498,12 +2528,148 @@
       (make-lisp-obj val)
       :invalid-object))
 
-;;; CMU CL had
-;;;   (DEFUN SUB-ACCESS-DEBUG-VAR-SLOT (FP SC-OFFSET &OPTIONAL ESCAPED) ..)
-;;; code for this case.
 #!-x86
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (error "hopelessly stale"))
+(defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
+  (macrolet ((with-escaped-value ((var) &body forms)
+               `(if escaped
+                    (let ((,var (sb!vm:context-register
+                                 escaped
+                                 (sb!c:sc-offset-offset sc-offset))))
+                      ,@forms)
+                    :invalid-value-for-unescaped-register-storage))
+             (escaped-float-value (format)
+               `(if escaped
+                    (sb!vm:context-float-register
+                     escaped
+                     (sb!c:sc-offset-offset sc-offset)
+                     ',format)
+                    :invalid-value-for-unescaped-register-storage))
+             (with-nfp ((var) &body body)
+               `(let ((,var (if escaped
+                                (sb!sys:int-sap
+                                 (sb!vm:context-register escaped
+                                                         sb!vm::nfp-offset))
+                                #!-alpha
+                                (sb!sys:sap-ref-sap fp (* sb!vm::nfp-save-offset
+                                                          sb!vm:word-bytes))
+                                #!+alpha
+                                (sb!vm::make-number-stack-pointer
+                                 (sb!sys:sap-ref-32 fp (* sb!vm::nfp-save-offset
+                                                          sb!vm:word-bytes))))))
+                  ,@body)))
+    (ecase (sb!c:sc-offset-scn sc-offset)
+      ((#.sb!vm:any-reg-sc-number
+        #.sb!vm:descriptor-reg-sc-number
+        #!+rt #.sb!vm:word-pointer-reg-sc-number)
+       (sb!sys:without-gcing
+        (with-escaped-value (val) (sb!kernel:make-lisp-obj val))))
+                            
+      (#.sb!vm:base-char-reg-sc-number
+       (with-escaped-value (val)
+         (code-char val)))
+      (#.sb!vm:sap-reg-sc-number
+       (with-escaped-value (val)
+         (sb!sys:int-sap val)))
+      (#.sb!vm:signed-reg-sc-number
+       (with-escaped-value (val)
+         (if (logbitp (1- sb!vm:word-bits) val)
+             (logior val (ash -1 sb!vm:word-bits))
+             val)))
+      (#.sb!vm:unsigned-reg-sc-number
+       (with-escaped-value (val)
+         val))
+      (#.sb!vm:non-descriptor-reg-sc-number
+       (error "Local non-descriptor register access?"))
+      (#.sb!vm:interior-reg-sc-number
+       (error "Local interior register access?"))
+      (#.sb!vm:single-reg-sc-number
+       (escaped-float-value single-float))
+      (#.sb!vm:double-reg-sc-number
+       (escaped-float-value double-float))
+      #!+long-float
+      (#.sb!vm:long-reg-sc-number
+       (escaped-float-value long-float))
+      (#.sb!vm:complex-single-reg-sc-number
+       (if escaped
+           (complex
+            (sb!vm:context-float-register
+             escaped (sb!c:sc-offset-offset sc-offset) 'single-float)
+            (sb!vm:context-float-register
+             escaped (1+ (sb!c:sc-offset-offset sc-offset)) 'single-float))
+           :invalid-value-for-unescaped-register-storage))
+      (#.sb!vm:complex-double-reg-sc-number
+       (if escaped
+           (complex
+            (sb!vm:context-float-register
+             escaped (sb!c:sc-offset-offset sc-offset) 'double-float)
+            (sb!vm:context-float-register
+             escaped (+ (sb!c:sc-offset-offset sc-offset) #!+sparc 2 #-sparc 1)
+             'double-float))
+           :invalid-value-for-unescaped-register-storage))
+      #!+long-float
+      (#.sb!vm:complex-long-reg-sc-number
+       (if escaped
+           (complex
+            (sb!vm:context-float-register
+             escaped (sb!c:sc-offset-offset sc-offset) 'long-float)
+            (sb!vm:context-float-register
+             escaped (+ (sb!c:sc-offset-offset sc-offset) #!+sparc 4)
+             'long-float))
+           :invalid-value-for-unescaped-register-storage))
+      (#.sb!vm:single-stack-sc-number
+       (with-nfp (nfp)
+         (sb!sys:sap-ref-single nfp (* (sb!c:sc-offset-offset sc-offset)
+                                       sb!vm:word-bytes))))
+      (#.sb!vm:double-stack-sc-number
+       (with-nfp (nfp)
+         (sb!sys:sap-ref-double nfp (* (sb!c:sc-offset-offset sc-offset)
+                                       sb!vm:word-bytes))))
+      #!+long-float
+      (#.sb!vm:long-stack-sc-number
+       (with-nfp (nfp)
+         (sb!sys:sap-ref-long nfp (* (sb!c:sc-offset-offset sc-offset)
+                                     sb!vm:word-bytes))))
+      (#.sb!vm:complex-single-stack-sc-number
+       (with-nfp (nfp)
+         (complex
+          (sb!sys:sap-ref-single nfp (* (sb!c:sc-offset-offset sc-offset)
+                                        sb!vm:word-bytes))
+          (sb!sys:sap-ref-single nfp (* (1+ (sb!c:sc-offset-offset sc-offset))
+                                        sb!vm:word-bytes)))))
+      (#.sb!vm:complex-double-stack-sc-number
+       (with-nfp (nfp)
+         (complex
+          (sb!sys:sap-ref-double nfp (* (sb!c:sc-offset-offset sc-offset)
+                                        sb!vm:word-bytes))
+          (sb!sys:sap-ref-double nfp (* (+ (sb!c:sc-offset-offset sc-offset) 2)
+                                        sb!vm:word-bytes)))))
+      #!+long-float
+      (#.sb!vm:complex-long-stack-sc-number
+       (with-nfp (nfp)
+         (complex
+          (sb!sys:sap-ref-long nfp (* (sb!c:sc-offset-offset sc-offset)
+                                      sb!vm:word-bytes))
+          (sb!sys:sap-ref-long nfp (* (+ (sb!c:sc-offset-offset sc-offset)
+                                         #!+sparc 4)
+                                      sb!vm:word-bytes)))))
+      (#.sb!vm:control-stack-sc-number
+       (sb!kernel:stack-ref fp (sb!c:sc-offset-offset sc-offset)))
+      (#.sb!vm:base-char-stack-sc-number
+       (with-nfp (nfp)
+         (code-char (sb!sys:sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
+                                              sb!vm:word-bytes)))))
+      (#.sb!vm:unsigned-stack-sc-number
+       (with-nfp (nfp)
+         (sb!sys:sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
+                                   sb!vm:word-bytes))))
+      (#.sb!vm:signed-stack-sc-number
+       (with-nfp (nfp)
+         (sb!sys:signed-sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
+                                          sb!vm:word-bytes))))
+      (#.sb!vm:sap-stack-sc-number
+       (with-nfp (nfp)
+         (sb!sys:sap-ref-sap nfp (* (sb!c:sc-offset-offset sc-offset)
+                                    sb!vm:word-bytes)))))))
 
 #!+x86
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)

@@ -152,7 +152,7 @@ unsigned int  single_step_save3;
 #endif
 
 void
-arch_do_displaced_inst(os_context_t *context, unsigned long orig_inst)
+arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     unsigned int *pc = (unsigned int*)(*os_context_pc_addr(context));
 

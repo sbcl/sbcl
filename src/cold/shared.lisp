@@ -15,12 +15,19 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; TO DO: Might it be possible to increase the efficiency of CMU CL's garbage
-;;; collection on my large (256Mb) machine by doing larger incremental GC steps
-;;; than the default 2 Mb of CMU CL 2.4.9? A quick test 19990729, setting this
-;;; to 5E6 showed no significant improvement, but it's possible that more
-;;; cleverness might help..
-;#+cmu (setf ext:*bytes-consed-between-gcs* (* 5 (expt 10 6)))
+;;; GC tuning has little effect on the x86 due to the generational
+;;; collector.  For the older stop & copy collector, it assuredly
+;;; does.  GC time is proportional to the amount of non-grabage
+;;; needing collection and copying; when the application involved is
+;;; the SBCL compiler, it doesn't take any longer to collect 20Mb than
+;;; 2              -dan, 20000819
+
+#+sbcl
+(progn
+  (sb-ext:gc-off)
+  (setf sb-KERNEL::*bytes-consed-between-gcs* (* 20 (expt 10 6)))
+  (sb-ext:gc-on)
+  (sb-ext:gc))
 
 ;;; FIXME: I'm now inclined to make all the bootstrap stuff run in CL-USER
 ;;; instead of SB-COLD. If I do so, I should first take care to

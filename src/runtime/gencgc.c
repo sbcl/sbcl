@@ -64,10 +64,13 @@ boolean enable_page_protection = 1;
 
 /* Should we unmap a page and re-mmap it to have it zero filled? */
 #if defined(__FreeBSD__) || defined(__OpenBSD__)
-/* Note: this can waste a lot of swap on FreeBSD so don't unmap there.
+/* comment from cmucl-2.4.8: This can waste a lot of swap on FreeBSD
+ * so don't unmap there.
  *
- * Presumably this behavior exists on OpenBSD too, so don't unmap
- * there either. -- WHN 20000727 */
+ * The CMU CL comment didn't specify a version, but was probably an
+ * old version of FreeBSD (pre-4.0), so this might no longer be true.
+ * OTOH, if it is true, this behavior might exist on OpenBSD too, so
+ * for now we don't unmap there either. -- WHN 2001-04-07 */
 boolean gencgc_unmap_zero = 0;
 #else
 boolean gencgc_unmap_zero = 1;

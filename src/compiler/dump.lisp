@@ -307,21 +307,6 @@
 
 ;;;; main entries to object dumping
 
-;;; KLUDGE: This definition doesn't really belong in this file, but at
-;;; least it can be compiled without error here, and it's used here.
-;;; The definition requires the IGNORE-ERRORS macro, and in
-;;; sbcl-0.6.8.11 that's defined in early-target-error.lisp, and all
-;;; of the files which would otherwise be natural homes for this
-;;; definition (e.g. early-extensions.lisp or late-extensions.lisp)
-;;; are compiled before early-target-error.lisp. -- WHN 2000-11-07
-(defun circular-list-p (list)
-  (and (listp list)
-       (multiple-value-bind (res condition)
-           (ignore-errors (list-length list))
-         (if condition
-           nil
-           (null res)))))
-
 ;;; This function deals with dumping objects that are complex enough
 ;;; so that we want to cache them in the table, rather than repeatedly
 ;;; dumping them. If the object is in the EQ-TABLE, then we push it,
@@ -351,12 +336,12 @@
 	      ;; So if better list coalescing is needed, start here.
 	      ;; -- WHN 2000-11-07
               (if (circular-list-p x)
-                (progn
-                  (dump-list x file)
-                  (eq-save-object x file))
-	      (unless (equal-check-table x file)
-		(dump-list x file)
-                   (equal-save-object x file))))
+		  (progn
+		    (dump-list x file)
+		    (eq-save-object x file))
+		  (unless (equal-check-table x file)
+		    (dump-list x file)
+		    (equal-save-object x file))))
 	     (layout
 	      (dump-layout x file)
 	      (eq-save-object x file))

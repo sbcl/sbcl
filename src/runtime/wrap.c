@@ -25,7 +25,9 @@
 
 #include <sys/types.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "util.h"
    
@@ -86,7 +88,7 @@ alloc_directory_lispy_filenames(const char *directory_name)
     return result;
 }
 
-/* Free a result returned by alloc_directory_lispy_filenames. */
+/* Free a result returned by alloc_directory_lispy_filenames(). */
 void
 free_directory_lispy_filenames(char** directory_lispy_filenames)
 {
@@ -99,4 +101,77 @@ free_directory_lispy_filenames(char** directory_lispy_filenames)
 
     /* Free the table of strings. */
     free(directory_lispy_filenames);
+}
+
+/*
+ * stat(2) stuff
+ */
+
+typedef long my_dev_t;
+
+/* a representation of stat(2) results which doesn't depend on CPU or OS */
+struct stat_wrapper {
+    my_dev_t      st_dev;         /* device */
+    ino_t         st_ino;         /* inode */
+    mode_t        st_mode;        /* protection */
+    nlink_t       st_nlink;       /* number of hard links */
+    uid_t         st_uid;         /* user ID of owner */
+    gid_t         st_gid;         /* group ID of owner */
+    my_dev_t      st_rdev;        /* device type (if inode device) */
+    off_t         st_size;        /* total size, in bytes */
+    unsigned long st_blksize;     /* blocksize for filesystem I/O */
+    unsigned long st_blocks;      /* number of blocks allocated */
+    time_t        st_atime;       /* time of last access */
+    time_t        st_mtime;       /* time of last modification */
+    time_t        st_ctime;       /* time of last change */
+};
+
+static void 
+copy_to_stat_wrapper(struct stat_wrapper *to, struct stat *from)
+{
+#define FROB(stem) to->st_##stem = from->st_##stem
+    FROB(dev);
+    FROB(ino);
+    FROB(mode);
+    FROB(nlink);
+    FROB(uid);
+    FROB(gid);
+    FROB(rdev);
+    FROB(size);
+    FROB(blksize);
+    FROB(blocks);
+    FROB(atime);
+    FROB(mtime);
+    FROB(ctime);
+#undef FROB
+}
+
+int
+stat_wrapper(const char *file_name, struct stat_wrapper *buf)
+{
+    struct stat real_buf;
+    int ret;
+    if ((ret = stat(file_name,&real_buf)) >= 0)
+	copy_to_stat_wrapper(buf, &real_buf); 
+    return ret;
+}
+
+int
+lstat_wrapper(const char *file_name, struct stat_wrapper *buf)
+{
+    struct stat real_buf;
+    int ret;
+    if ((ret = lstat(file_name,&real_buf)) >= 0) 
+	copy_to_stat_wrapper(buf, &real_buf); 
+    return ret;
+}
+
+int
+fstat_wrapper(int filedes, struct stat_wrapper *buf)
+{
+    struct stat real_buf;
+    int ret;
+    if ((ret = fstat(filedes,&real_buf)) >= 0)
+	copy_to_stat_wrapper(buf, &real_buf); 
+    return ret;
 }

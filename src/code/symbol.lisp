@@ -49,10 +49,18 @@
        (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-type))
   variable)
 
+#!+(or x86 mips) ;; only backends for which a symbol-hash vop exists
 (defun symbol-hash (symbol)
   #!+sb-doc
   "Return the built-in hash value for symbol."
   (symbol-hash symbol))
+
+#!-(or x86 mips)
+(defun symbol-hash (symbol)
+  #!+sb-doc
+  "Return the built-in hash value for symbol."
+  (%sxhash-simple-string (symbol-name symbol)))
+
 
 (defun symbol-function (variable)
   #!+sb-doc

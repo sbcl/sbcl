@@ -1,5 +1,6 @@
 # stuff shared between various *BSD OSes 
 
+CFLAGS += -DGENCGC
 ASSEM_SRC = x86-assem.S 
 ARCH_SRC = x86-arch.c
 

@@ -90,7 +90,7 @@ code_pointer(lispobj object)
 static boolean
 cs_valid_pointer_p(struct call_frame *pointer)
 {
-    lose("stub: hasn't been updated for X86");
+  /* lose("stub: hasn't been updated for X86"); */
     return (((char *) CONTROL_STACK_START <= (char *) pointer) &&
 	    ((char *) pointer < (char *) current_control_stack_pointer));
 }

@@ -32,8 +32,11 @@ extern void validate(void);
  *   #include "x86-validate.h"
  *   #endif
  * and so forth. In SBCL, the memory map data are defined at the Lisp
- * level and stuffed into the sbcl.h file created by GENESIS, so
- * there's no longer a need for an architecture-dependent header file
- * of memory map data. */
+ * level (compiler/target/parms.lisp) and stuffed into the sbcl.h file
+ * created by GENESIS, so there's no longer a need for an
+ * architecture-dependent header file of memory map data. 
+ */
+
+
 
 #endif

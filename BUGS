@@ -929,8 +929,23 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 99:
   DESCRIBE interacts poorly with *PRINT-CIRCLE*, e.g. the output from 
     (let ((*print-circle* t)) (describe (make-hash-table)))
-  is weird. (This is likely a pretty-printer problem which happens to
+  is weird,
+    #<HASH-TABLE :TEST EQL :COUNT 0 {90BBFC5}> is an . (EQL)
+    Its SIZE is 16.
+    Its REHASH-SIZE is 1.5. Its REHASH-THRESHOLD is . (1.0)
+    It holds 0 key/value pairs.
+  where the ". (EQL)" and ". (1.0)" substrings are screwups.
+  (This is likely a pretty-printer problem which happens to
   be exercised by DESCRIBE, not actually a DESCRIBE problem.)
+
+100:
+  There's apparently a bug in CEILING optimization which caused 
+  Douglas Crosher to patch the CMU CL version. Martin Atzmueller
+  applied the patches to SBCL and they didn't seem to cause problems
+  (as reported sbcl-devel 2001-05-04). However, since the patches
+  modify nontrivial code which was apparently written incorrectly
+  the first time around, until regression tests are written I'm not 
+  comfortable merging the patches in the CVS version of SBCL.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

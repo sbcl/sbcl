@@ -73,17 +73,25 @@ os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
  * In that case, the Lisp-level handler is stored in interrupt_handlers[..]
  * and interrupt_low_level_handlers[..] is cleared.
  *
- * However, some signals need special handling, e.g. the SIGSEGV (for
- * Linux) or SIGBUS (for FreeBSD) used by the garbage collector to
- * detect violations of write protection, because some cases of such
- * signals (e.g. GC-related violations of write protection) are
- * handled at C level and never passed on to Lisp. For such signals,
- * we still store any Lisp-level handler in interrupt_handlers[..],
- * but for the outermost handle we use the value from
- * interrupt_low_level_handlers[..], instead of the ordinary
- * interrupt_handle_now(..) or interrupt_handle_later(..).
+ * However, some signals need special handling, e.g. 
  *
- * -- WHN 20000728 */
+ * o the SIGSEGV (for Linux) or SIGBUS (for FreeBSD) used by the
+ *   garbage collector to detect violations of write protection,
+ *   because some cases of such signals (e.g. GC-related violations of
+ *   write protection) are handled at C level and never passed on to
+ *   Lisp. For such signals, we still store any Lisp-level handler
+ *   in interrupt_handlers[..], but for the outermost handle we use
+ *   the value from interrupt_low_level_handlers[..], instead of the
+ *   ordinary interrupt_handle_now(..) or interrupt_handle_later(..).
+ *
+ * o the SIGTRAP (Linux/Alpha) which Lisp code uses to handle breakpoints,
+ *   pseudo-atomic sections, and some classes of error (e.g. "function
+ *   not defined").  This never goes anywhere near the Lisp handlers at all.
+ *   See runtime/alpha-arch.c and code/signal.lisp 
+ * 
+ * - WHN 20000728, dan 20010128 */
+
+
 void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) = {0};
 union interrupt_handler interrupt_handlers[NSIG];
 
@@ -234,6 +242,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 
     if (internal_errors_enabled) {
         SHOW("in interrupt_internal_error");
+#define QSHOW 1
 #if QSHOW
 	/* Display some rudimentary debugging information about the
 	 * error, so that even if the Lisp error handler gets badly
@@ -253,6 +262,13 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 	arch_skip_instruction(context);
     }
 }
+
+/* This function handles pending interrupts.  Note that in C/kernel
+ * terms we dealt with the signal already; we just haven't decided
+ * whether to call a Lisp handler or do a GC or something like that.
+ * If it helps, you can think of pending_{signal,mask,info} as a
+ * one-element queue of signals that we have acknowledged but not
+ * processed */
 
 void
 interrupt_handle_pending(os_context_t *context)
@@ -378,9 +394,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	 * (FIXME: Why? This is the way it was done in CMU CL, and it
 	 * even had the comment noting that this is the way it was
 	 * done, but no motivation..) */
-        lispobj context_sap = alloc_sap(context);
-        lispobj info_sap = alloc_sap(info);
-
+        lispobj info_sap,context_sap = alloc_sap(context);
+        info_sap = alloc_sap(info);
         /* Allow signals again. */
         sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
@@ -428,6 +443,9 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
      *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
      * #endif */
 
+    /* see comments at top of code/signal.lisp for what's going on here
+     * with INTERRUPTS_ENABLED/INTERRUPT_HANDLE_NOW 
+     */
     if (SymbolValue(INTERRUPTS_ENABLED) == NIL) {
 
 	/* FIXME: This code is exactly the same as the code in the
@@ -439,7 +457,6 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 	       os_context_sigmask_addr(context),
 	       sizeof(sigset_t));
 	sigaddset_blockable(os_context_sigmask_addr(context));
-
         SetSymbolValue(INTERRUPT_PENDING, T);
 
     } else if (
@@ -483,15 +500,21 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 						      context);
 
 	return (badaddr >= current_auto_gc_trigger &&
-		badaddr < DYNAMIC_SPACE_START + DYNAMIC_SPACE_SIZE);
+		badaddr < current_dynamic_space + DYNAMIC_SPACE_SIZE);
     }
 }
 #endif
 
 #ifndef __i386__
+/* This function gets called from the SIGSEGV (Linux) or SIGBUS (BSD)
+ * handler.  Here we check whether the signal was due to treading on
+ * the mprotect()ed zone - and if so, arrange for a GC to happen.
+ */
 boolean
-interrupt_maybe_gc(int signal, siginfo_t *info, os_context_t *context)
+interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 {
+    os_context_t *context=(os_context_t *) void_context;
+
     if (!foreign_function_call_active
 #ifndef INTERNAL_GC_TRIGGER
 	&& gc_trigger_hit(signal, info, context)
@@ -502,6 +525,10 @@ interrupt_maybe_gc(int signal, siginfo_t *info, os_context_t *context)
 #endif
 
 	if (arch_pseudo_atomic_atomic(context)) {
+	    /* don't GC during an atomic operation.  Instead, copy the 
+	     * signal mask somewhere safe.  interrupt_handle_pending
+	     * will detect pending_signal==0 and know to do a GC with the
+	     * signal context instead of calling a Lisp-level handler */
 	    maybe_gc_pending = 1;
 	    if (pending_signal == 0) {
 		/* FIXME: This copy-pending_mask-then-sigaddset_blockable

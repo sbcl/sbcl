@@ -40,11 +40,11 @@ static void process_directory(int fd, long *ptr, int count)
     for (entry = (struct ndir_entry *) ptr; --count>= 0; ++entry) {
 
 	long id = entry->identifier;
-	long offset = CORE_PAGESIZE * (1 + entry->data_page);
+	long offset = os_vm_page_size * (1 + entry->data_page);
 	os_vm_address_t addr =
-	    (os_vm_address_t) (CORE_PAGESIZE * entry->address);
+	    (os_vm_address_t) (os_vm_page_size * entry->address);
 	lispobj *free_pointer = (lispobj *) addr + entry->nwords;
-	long len = CORE_PAGESIZE * entry->page_count;
+	long len = os_vm_page_size * entry->page_count;
 	
 	if (len != 0) {
 	    os_vm_address_t real_addr;
@@ -63,27 +63,45 @@ static void process_directory(int fd, long *ptr, int count)
 
 	switch (id) {
 	case DYNAMIC_SPACE_ID:
+#ifdef GENCGC	  
 	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
-		lose("core/runtime address mismatch: DYNAMIC_SPACE_START");
+	        fprintf(stderr, "in core: 0x%x - in runtime: 0x%x \n",
+			addr, (os_vm_address_t)DYNAMIC_SPACE_START);
+		fprintf(stderr,"warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
+#else
+	    if ((addr != (os_vm_address_t)DYNAMIC_0_SPACE_START) &&
+		(addr != (os_vm_address_t)DYNAMIC_1_SPACE_START)) {
+		fprintf(stderr, "in core: 0x%x - in runtime: 0x%x or 0x%x\n",
+			addr, (os_vm_address_t)DYNAMIC_0_SPACE_START,
+			(os_vm_address_t)DYNAMIC_1_SPACE_START);
+		fprintf(stderr,"warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
+	    }
+#endif
 #if defined(ibmrt) || defined(__i386__)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
 #else
 	    dynamic_space_free_pointer = free_pointer;
 #endif
+	    /* on the x86, this will always be space 0 */
+	    current_dynamic_space = (lispobj *)addr;
 	    break;
 	case STATIC_SPACE_ID:
 	    if (addr != (os_vm_address_t)STATIC_SPACE_START) {
+		fprintf(stderr, "in core: 0x%p - in runtime: 0x%x\n",
+			addr, (os_vm_address_t)STATIC_SPACE_START);
 		lose("core/runtime address mismatch: STATIC_SPACE_START");
 	    }
 	    break;
 	case READ_ONLY_SPACE_ID:
 	    if (addr != (os_vm_address_t)READ_ONLY_SPACE_START) {
+		fprintf(stderr, "in core: 0x%x - in runtime: 0x%x\n",
+			addr, (os_vm_address_t)READ_ONLY_SPACE_START);
 		lose("core/runtime address mismatch: READ_ONLY_SPACE_START");
 	    }
 	    break;
 	default:
-	    lose("unknown space ID %ld", id);
+	    lose("unknown space ID %ld addr 0x%p", id);
 	}
     }
 }
@@ -97,23 +115,24 @@ lispobj load_core_file(char *file)
      * a typedef like addr_as_int once and for all in each
      * architecture file, then use that everywhere. -- WHN 19990904 */
 #ifndef alpha
-    long header[CORE_PAGESIZE / sizeof(long)], val, len, *ptr;
+    long *header,  val, len, *ptr;
     long remaining_len;
 #else
-    u32 header[CORE_PAGESIZE / sizeof(u32)], val, len, *ptr;
+    u32 *header, val, len, *ptr;
     u32 remaining_len;
 #endif
 
     lispobj initial_function = NIL;
-
     if (fd < 0) {
 	fprintf(stderr, "could not open file \"%s\"\n", file);
 	perror("open");
 	exit(1);
     }
 
-    count = read(fd, header, CORE_PAGESIZE);
-    if (count < CORE_PAGESIZE) {
+    header=calloc(os_vm_page_size / sizeof(u32),sizeof(u32));
+
+    count = read(fd, header, os_vm_page_size);
+    if (count < os_vm_page_size) {
 	lose("premature end of core file");
     }
 
@@ -167,6 +186,6 @@ lispobj load_core_file(char *file)
 
 	ptr += remaining_len;
     }
-
+    free(header);
     return initial_function;
 }

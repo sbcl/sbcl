@@ -29,9 +29,12 @@
 #include "gencgc.h"
 #endif
 
-#undef PRINTNOISE
+#define PRINTNOISE
 
 #if defined(ibmrt) || defined(__i386__)
+/* again, what's so special about the x86 that this is differently
+ * visible there than on other platforms? -dan 20010125 
+ */
 static lispobj *dynamic_space_free_pointer;
 #endif
 
@@ -1430,7 +1433,7 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 #ifndef __i386__
-    pscav((lispobj *)control_stack,
+    pscav((lispobj *)CONTROL_STACK_START,
 	  current_control_stack_pointer - (lispobj *)CONTROL_STACK_START,
 	  0);
 #else
@@ -1513,7 +1516,7 @@ int purify(lispobj static_roots, lispobj read_only_roots)
 		(os_vm_size_t) DYNAMIC_SPACE_SIZE);
     }
 #else
-    os_zero((os_vm_address_t) DYNAMIC_SPACE_START,
+    os_zero((os_vm_address_t) current_dynamic_space,
             (os_vm_size_t) DYNAMIC_SPACE_SIZE);
 #endif
 
@@ -1550,7 +1553,7 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free);
 
 #if !defined(ibmrt) && !defined(__i386__)
-    dynamic_space_free_pointer = DYNAMIC_SPACE_START;
+    dynamic_space_free_pointer = current_dynamic_space;
 #else
 #if defined(WANT_CGC) && defined(X86_CGC_ACTIVE_P)
     /* X86 using CGC */
