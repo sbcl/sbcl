@@ -1263,13 +1263,20 @@
 
 (defun two-arg-lcm (n m)
   (declare (integer n m))
-  (let ((m (abs m))
-        (n (abs n)))
-    (multiple-value-bind (max min)
-        (if (> m n)
-            (values m n)
-            (values n m))
-      (* (truncate max (gcd n m)) min))))
+  (if (or (zerop n) (zerop m))
+      0
+      ;; KLUDGE: I'm going to assume that it was written this way
+      ;; originally for a reason.  However, this is a somewhat
+      ;; complicated way of writing the algorithm in the CLHS page for
+      ;; LCM, and I don't know why.  To be investigated.  -- CSR,
+      ;; 2003-09-11
+      (let ((m (abs m))
+	    (n (abs n)))
+	(multiple-value-bind (max min)
+	    (if (> m n)
+		(values m n)
+		(values n m))
+	  (* (truncate max (gcd n m)) min)))))
 
 ;;; Do the GCD of two integer arguments. With fixnum arguments, we use the
 ;;; binary GCD algorithm from Knuth's seminumerical algorithms (slightly

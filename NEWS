@@ -2048,6 +2048,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
        upper bounding index of a substring in case :JUNK-ALLOWED NIL.
     ** PARSE-INTEGER returned an incorrect index being applied to a
        displaced string.
+    ** LCM with two arguments of 0 returns 0 rather than signalling
+       DIVISION-BY-ZERO.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

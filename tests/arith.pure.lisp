@@ -110,6 +110,7 @@
   (assert (= (gcd 0 x) (abs x))))
 ;;; LCM returns a non-negative number
 (assert (= (lcm 4 -10) 20))
+(assert (= (lcm 0 0) 0))
 
 ;;; PPC bignum arithmetic bug:
 (multiple-value-bind (quo rem)
