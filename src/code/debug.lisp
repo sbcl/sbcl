@@ -447,9 +447,10 @@ Other commands:
 ;;; ANSI specifies that this macro shall exist, even if only as a
 ;;; trivial placeholder like this.
 (defmacro step (form)
-  "a trivial placeholder implementation of the CL:STEP macro required by
-   the ANSI spec"
-  `(progn
+  "This is a trivial placeholder implementation of the CL:STEP macro required
+   by the ANSI spec, simply expanding to `(LET () ,FORM). A more featureful
+   version would be welcome, we just haven't written it."
+  `(let ()
      ,form))
 
 ;;;; BACKTRACE

@@ -29,6 +29,7 @@
 #include "interr.h"
 #include "lispregs.h"
 #include "sbcl.h"
+#include "thread.h"
 
 #include <sys/types.h>
 #include <signal.h>
@@ -251,3 +252,20 @@ os_install_interrupt_handlers(void)
 }
 
 #endif /* defined GENCGC */
+
+/* threads */
+
+/* no threading in any *BSD variant on any CPU (yet? in sbcl-0.8.0 anyway) */
+#ifdef LISP_FEATURE_SB_THREAD
+#error "Define threading support functions"
+#else
+struct thread *arch_os_get_current_thread() {
+    return all_threads;
+}
+int arch_os_thread_init(struct thread *thread) {
+    return 1;                  /* success */
+}
+int arch_os_thread_cleanup(struct thread *thread) {
+    return 1;                  /* success */
+}
+#endif
