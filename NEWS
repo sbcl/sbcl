@@ -1058,6 +1058,13 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
        encapsulation also seems closer to the spirit of the ANSI
        specification.)
 
+changes in sbcl-0.7.2 relative to sbcl-0.7.1:
+  * cleanups on SPARC, both Linux and Solaris, and for gcc>=3 (thanks
+    to Christophe Rhodes and Nathan Froyd)
+  * DESCRIBE on a symbol now says something about DEFTYPE-style
+    expansions associated with the symbol (thanks to Eric Marsden's
+    patch for CMU CL).
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

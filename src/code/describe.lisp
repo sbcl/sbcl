@@ -233,9 +233,9 @@
 	(multiple-value-bind (symbol status)
 	    (find-symbol (symbol-name x) package)
 	  (declare (ignore symbol))
-	  (format s "~S is ~_an ~(~A~) symbol ~_in ~S."
+	  (format s "~@<~S is ~_an ~(~A~) symbol ~_in ~S.~:>"
 		  x status (symbol-package x)))
-	(format s "~S is ~_an uninterned symbol." x)))
+	(format s "~@<~S is ~_an uninterned symbol.~:>" x)))
   ;; TO DO: We could grovel over all packages looking for and
   ;; reporting other phenomena, e.g. IMPORT and SHADOW, or
   ;; availability in some package even after (SYMBOL-PACKAGE X) has
@@ -258,12 +258,13 @@
 	(format s "~@<Its current value is ~3I~:_~S.~:>"
 		(eval x))))
      ((boundp x)
-      (format s "~@:_It is a ~A; its ~_value is ~S." wot (symbol-value x)))
+      (format s "~@:_~@<It is a ~A; its ~_value is ~S.~:>"
+	      wot (symbol-value x)))
      ((not (eq kind :global))
-      (format s "~@:_It is a ~A; no current value." wot)))
+      (format s "~@:_~@<It is a ~A; no current value.~:>" wot)))
 
     (when (eq (info :variable :where-from x) :declared)
-      (format s "~@:_Its declared type ~_is ~S."
+      (format s "~@:_~@<Its declared type ~_is ~S.~:>"
 	      (type-specifier (info :variable :type x))))
 
     (%describe-doc x s 'variable kind))
@@ -279,25 +280,28 @@
 	((fboundp x)
          (describe-symbol-fdefinition (fdefinition x) s :name x)))
 
-  ;; FIXME: Print out other stuff from the INFO database:
-  ;;   * Does it name a type?
-  ;;   * Is it a structure accessor? (This is important since those are 
-  ;;     magical in some ways, e.g. blasting the structure if you 
-  ;;     redefine them.)
-
   ;; Print other documentation.
   (%describe-doc x s 'structure "Structure")
   (%describe-doc x s 'type "Type")
   (%describe-doc x s 'setf "Setf macro")
-
   (dolist (assoc (info :random-documentation :stuff x))
     (format s
 	    "~@:_Documentation on the ~(~A~):~@:_~A"
 	    (car assoc)
 	    (cdr assoc)))
   
-  ;; Describe the associated class, if any.
+  ;; Mention the associated type information, if any.
+  ;;
+  ;; As of sbcl-0.7.2, (INFO :TYPE :KIND X) might be
+  ;;   * :PRIMITIVE, which is handled by the FIND-CLASS case.
+  ;;   * :DEFINED, which is handled specially.
+  ;;   * :INSTANCE, which is handled by the FIND-CLASS case.
+  ;;   * :FORTHCOMING-DEFCLASS-TYPE, which is an internal-to-the-compiler
+  ;;     note that we don't try to report.
+  ;;   * NIL, in which case there's nothing to see here, move along.
+  (when (eq (info :type :kind x) :defined)
+    (format s "~@:_It names a type specifier."))
   (let ((symbol-named-class (cl:find-class x nil)))
     (when symbol-named-class
-      (format s "~&It names a class ~A." symbol-named-class)
-      (describe symbol-named-class))))
+      (format s "~@:_It names a class ~A." symbol-named-class)
+      (describe symbol-named-class s))))
