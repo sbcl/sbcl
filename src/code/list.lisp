@@ -886,32 +886,48 @@
     ;; reached, what is left of LIST2 is tacked onto what is left of
     ;; LIST1. The splicing operation ensures that the correct
     ;; operation is performed depending on whether splice is at the
-    ;; top of the list or not
+    ;; top of the list or not.
     (do ((list1 list1)
          (list2 list2)
          (x list1 (cdr x))
-         (splicex ()))
+         (splicex ())
+         (deleted-y ())
+         ;; elements of LIST2, which are "equal" to some processed
+         ;; earlier elements of LIST1
+         )
         ((endp x)
          (if (null splicex)
              (setq list1 list2)
              (rplacd splicex list2))
          list1)
-      (do ((y list2 (cdr y))
-           (splicey ()))
-          ((endp y) (setq splicex x))
-        (cond ((let ((key-val-x (apply-key key (car x)))
-                     (key-val-y (apply-key key (Car y))))
-                 (if notp
-                     (not (funcall test-not key-val-x key-val-y))
-                     (funcall test key-val-x key-val-y)))
-               (if (null splicex)
-                   (setq list1 (cdr x))
-                   (rplacd splicex (cdr x)))
-               (if (null splicey)
-                   (setq list2 (cdr y))
-                   (rplacd splicey (cdr y)))
-               (return ())) ; assume lists are really sets
-              (t (setq splicey y)))))))
+      (let ((key-val-x (apply-key key (car x)))
+            (found-duplicate nil))
+
+        ;; Move all elements from LIST2, which are "equal" to (CAR X),
+        ;; to DELETED-Y.
+        (do* ((y list2 next-y)
+              (next-y (cdr y) (cdr y))
+              (splicey ()))
+             ((endp y))
+          (cond ((let ((key-val-y (apply-key key (car y))))
+                   (if notp
+                       (not (funcall test-not key-val-x key-val-y))
+                       (funcall test key-val-x key-val-y)))
+                 (if (null splicey)
+                     (setq list2 (cdr y))
+                     (rplacd splicey (cdr y)))
+                 (setq deleted-y (rplacd y deleted-y))
+                 (setq found-duplicate t))
+                (t (setq splicey y))))
+
+        (unless found-duplicate
+          (setq found-duplicate (with-set-keys (member key-val-x deleted-y))))
+
+        (if found-duplicate
+            (if (null splicex)
+                (setq list1 (cdr x))
+                (rplacd splicex (cdr x)))
+            (setq splicex x))))))
 
 (defun subsetp (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc

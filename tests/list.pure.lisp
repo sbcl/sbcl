@@ -110,3 +110,10 @@
 		(copy-alist ((1 . 2) (3 . 4) . 5))))
   (assert (raises-error? (apply (first test) (copy-tree (rest test)))
 			 type-error)))
+
+;;; Bug reported by Paul Dietz: NSET-EXCLUSIVE-OR should not return
+;;; extra elements, even when given "sets" contain duplications
+(assert (equal (remove-duplicates (sort (nset-exclusive-or (list 1 2 1 3)
+                                                           (list 4 1 3 3))
+                                        #'<))
+               '(2 4)))
