@@ -15,34 +15,34 @@
 
 ;;; Move a tagged char to an untagged representation.
 (define-vop (move-to-base-char)
-  (:args (x :scs (any-reg control-stack) :target al))
-  (:temporary (:sc byte-reg :offset al-offset
-		   :from (:argument 0) :to (:eval 0)) al)
-  (:ignore al)
-  (:temporary (:sc byte-reg :offset ah-offset :target y
-		   :from (:argument 0) :to (:result 0)) ah)
-  (:results (y :scs (base-char-reg base-char-stack)))
+  (:args (x :scs (any-reg control-stack)))
+  (:results (y :scs (base-char-reg #+nil base-char-stack)))
   (:note "character untagging")
   (:generator 1
-    (move rax-tn x)
-    (move y ah)))
+    (let ((y-wide-tn (make-random-tn
+		      :kind :normal
+		      :sc (gethash 'any-reg
+				   sb!c::*backend-meta-sc-names*)
+		      :offset (tn-offset y))))
+      (move y-wide-tn x)
+      (inst shr y-wide-tn 8)
+      (inst and y-wide-tn #xff))))
 (define-move-vop move-to-base-char :move
   (any-reg control-stack) (base-char-reg base-char-stack))
 
 ;;; Move an untagged char to a tagged representation.
 (define-vop (move-from-base-char)
-  (:args (x :scs (base-char-reg base-char-stack) :target ah))
-  (:temporary (:sc byte-reg :offset al-offset :target y
-		   :from (:argument 0) :to (:result 0)) al)
-  (:temporary (:sc byte-reg :offset ah-offset
-		   :from (:argument 0) :to (:result 0)) ah)
-  (:results (y :scs (any-reg descriptor-reg control-stack)))
+  (:args (x :scs (base-char-reg base-char-stack)))
+  (:results (y :scs (any-reg descriptor-reg #+nil control-stack)))
   (:note "character tagging")
   (:generator 1
-    (move ah x)				; Maybe move char byte.
-    (inst mov al base-char-widetag)	; x86 to type bits
-    (inst and rax-tn #xffff)		; Remove any junk bits.
-    (move y rax-tn)))
+    (move (make-random-tn :kind :normal :sc (gethash 'base-char-reg
+						     sb!c::*backend-meta-sc-names*)
+			  :offset (tn-offset y))
+	  x)
+    (inst shl y n-widetag-bits)
+    (inst or y base-char-widetag)
+    (inst and y #xffff)))
 (define-move-vop move-from-base-char :move
   (base-char-reg base-char-stack) (any-reg descriptor-reg control-stack))
 

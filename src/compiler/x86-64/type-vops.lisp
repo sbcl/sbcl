@@ -184,7 +184,7 @@
     (inst jmp :ne (if not-p target not-target))
     (inst sar rax-tn (+ 32 3 -1))    
     (inst jmp (if not-p :nz :z) target)
-    (inst cmp rax-tn #xffffffff)
+    (inst cmp rax-tn -1)
     (inst jmp (if not-p :ne :eq) target)
     NOT-TARGET))
 
@@ -199,7 +199,7 @@
       (inst jmp :ne nope)
       (inst sar rax-tn (+ 32 3 -1))      
       (inst jmp :z ok)
-      (inst cmp rax-tn #xffffffff)
+      (inst cmp rax-tn -1)
       (inst jmp :ne nope)
       (emit-label OK)
       (move result value))))

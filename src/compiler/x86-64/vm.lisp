@@ -18,7 +18,7 @@
 ;;;; register specs
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *byte-register-names* (make-array 8 :initial-element nil))
+  (defvar *byte-register-names* (make-array 32 :initial-element nil))
   (defvar *word-register-names* (make-array 16 :initial-element nil))
   (defvar *dword-register-names* (make-array 16 :initial-element nil))
   (defvar *qword-register-names* (make-array 32 :initial-element nil))
@@ -49,15 +49,28 @@
   ;; Note: the encoding here is different than that used by the chip.
   ;; We use this encoding so that the compiler thinks that AX (and
   ;; EAX) overlap AL and AH instead of AL and CL.
-  (defreg al 0 :byte)
-  (defreg ah 1 :byte)
-  (defreg cl 2 :byte)
-  (defreg ch 3 :byte)
-  (defreg dl 4 :byte)
-  (defreg dh 5 :byte)
-  (defreg bl 6 :byte)
-  (defreg bh 7 :byte)
-  (defregset *byte-regs* al ah cl ch dl dh bl bh)
+  ;;
+  ;; High-byte are registers disabled on AMD64, since they can't be
+  ;; encoded for an op that has a REX-prefix. The overlap doesn't
+  ;; therefore exist anymore, but the numbering hasn't been changed
+  ;; to reflect this.
+  (defreg al    0 :byte)
+  (defreg cl    2 :byte)
+  (defreg dl    4 :byte)
+  (defreg bl    6 :byte)
+  (defreg sil  12 :byte)
+  (defreg dil  14 :byte)
+  (defreg r8b  16 :byte)
+  (defreg r9b  18 :byte)
+  (defreg r10b 20 :byte)
+  (defreg r11b 22 :byte)
+  (defreg r12b 24 :byte)
+  (defreg r13b 26 :byte)
+  (defreg r14b 28 :byte)
+  (defreg r15b 30 :byte)
+  (defregset *byte-regs*
+      al cl dl bl sil dil r8b r9b r10b
+      r11b #+nil r12b #+nil r13b r14b r15b)
 
   ;; word registers
   (defreg ax 0 :word)
@@ -252,7 +265,7 @@
   ;; non-descriptor characters
   (base-char-reg registers
 		 :locations #.*byte-regs*
-		 :reserve-locations (#.ah-offset #.al-offset)
+		 :reserve-locations (#.al-offset)
 		 :constant-scs (immediate)
 		 :save-p t
 		 :alternate-scs (base-char-stack))
@@ -363,7 +376,8 @@
 		    r8 r9 r10 r11  r12 r13 r14 r15)
   (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
-  (def-misc-reg-tns byte-reg al ah bl bh cl ch dl dh)
+  (def-misc-reg-tns byte-reg al cl dl bl sil dil r8b r9b r10b
+		    r11b r14b r15b)
   (def-misc-reg-tns single-reg 
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))

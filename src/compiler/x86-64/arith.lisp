@@ -959,6 +959,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) t1)
   (:generator 60
     (move result arg)
+    (move t1 arg)
 
     (inst mov temp result)  
     (inst shr temp 1)
@@ -991,8 +992,7 @@
     (inst add result temp)
 
     ;;; now do the upper half
-    (move t1 arg)
-    (inst bswap t1)
+    (inst shr t1 32)
 
     (inst mov temp t1)  
     (inst shr temp 1)

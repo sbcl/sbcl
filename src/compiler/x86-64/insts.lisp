@@ -40,7 +40,7 @@
   :dword)
 
 (defparameter *byte-reg-names*
-  #(al cl dl bl ah ch dh bh))
+  #(al cl dl bl sil dil r8b r9b r10b r11b r14b r15b))
 (defparameter *word-reg-names*
   #(ax cx dx bx sp bp si di))
 (defparameter *dword-reg-names*
@@ -904,7 +904,8 @@
 	  (rex-r (if-hi r))
 	  (rex-x (if-hi x))
 	  (rex-b (if-hi b)))
-      (when (not (zerop (logior rex-w rex-r rex-x rex-b)))
+      (when (or (eq operand-size :byte) ;; REX needed to access SIL/DIL
+		(not (zerop (logior rex-w rex-r rex-x rex-b))))
 	(emit-rex-byte segment #b0100 rex-w rex-r rex-x rex-b)))))
 
 (defun maybe-emit-rex-for-ea (segment ea reg)

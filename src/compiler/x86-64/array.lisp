@@ -140,15 +140,11 @@
 		  ,element-type data-vector-set)))
 	   )
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
-  #+nil (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
-    unsigned-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
     unsigned-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-61 tagged-num any-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-60
       positive-fixnum any-reg)
-  #+nil (def-full-data-vector-frobs simple-array-signed-byte-32
-      signed-num signed-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-64
       signed-num signed-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
