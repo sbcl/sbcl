@@ -913,6 +913,11 @@
 (define-condition extension-failure (reference-condition simple-error)
   ())
 
+(define-condition structure-initarg-not-keyword
+    (reference-condition simple-style-warning)
+  ()
+  (:default-initargs :references (list '(:ansi-cl :section (2 4 8 13)))))
+
 #!+sb-package-locks
 (progn
 

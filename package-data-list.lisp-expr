@@ -881,6 +881,7 @@ retained, possibly temporariliy, because it might be used internally."
 	       "TYPE-WARNING" "LOCAL-ARGUMENT-MISMATCH"
 	       "FORMAT-ARGS-MISMATCH" "FORMAT-TOO-FEW-ARGS-WARNING"
 	       "FORMAT-TOO-MANY-ARGS-WARNING" "EXTENSION-FAILURE"
+               "STRUCTURE-INITARG-NOT-KEYWORD"
 
                "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
                "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"

@@ -159,9 +159,12 @@
                               designator: ~S."
 			     slot-name))
 			  (when (not (keywordp slot-name))
-			    (style-warn "in #S ~S, the use of non-keywords ~
-                                         as slot specifiers is deprecated: ~S."
-					(car body) slot-name)))
+                            (warn 'structure-initarg-not-keyword
+                                  :format-control
+                                  "in #S ~S, the use of non-keywords ~
+                                   as slot specifiers is deprecated: ~S."
+                                  :format-arguments
+                                  (list (car body) slot-name))))
 		     collect (intern (string (car tail)) *keyword-package*)
 		     collect (cadr tail)))))))
 
