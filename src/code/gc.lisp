@@ -273,7 +273,7 @@ function should notify the user that the system has finished GC'ing.")
 ;;;; internal GC
 
 (sb!alien:define-alien-routine collect-garbage sb!alien:int
-  #!+gencgc (last-gen sb!alien:int))
+  (#!+gencgc last-gen #!-gencgc ignore sb!alien:int))
 
 (sb!alien:define-alien-routine set-auto-gc-trigger sb!alien:void
   (dynamic-usage sb!alien:unsigned-long))

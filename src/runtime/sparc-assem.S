@@ -6,7 +6,10 @@
 #include "lispregs.h"
 #include "globals.h"
 #include "sbcl.h"
-
+#include "genesis/closure.h"
+#include "genesis/fdefn.h"
+#include "genesis/static-symbols.h"
+#include "genesis/simple-fun.h"	
 
 #define load(sym, reg) \
         sethi %hi(sym), reg; ld [reg+%lo(sym)], reg
