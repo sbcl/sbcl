@@ -556,7 +556,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   rightward of the correct location.
 
 65:
-  (probably related to bug #70)
+  (probably related to bug #70; maybe related to bug #109)
   As reported by Carl Witty on submit@bugs.debian.org 1999-05-08,
   compiling this file
 (in-package "CL-USER")
@@ -653,7 +653,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   or at least issue a warning.
 
 70:
-  (probably related to bug #65)
+  (probably related to bug #65; maybe related to bug #109)
   The compiler doesn't like &OPTIONAL arguments in LABELS and FLET
   forms. E.g.
     (DEFUN FIND-BEFORE (ITEM SEQUENCE &KEY (TEST #'EQL))
@@ -962,6 +962,131 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   (ROOM T) can bring a small computer to its knees for a *long*
   time trying to GC afterwards. Surely there's some more economical
   way to implement (ROOM T).
+
+109:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    ;;; This file fails to compile.
+    ;;; Maybe this bug is related to bugs #65, #70 in the BUGS file.
+    (in-package :cl-user)
+    (defun tst2 ()
+      (labels 
+          ((eff (&key trouble)
+             (eff)
+             ;; nil
+             ;; Uncomment and it works
+             ))
+        (eff)))
+  In SBCL 0.6.12.42, the problem is
+    internal error, failed AVER:
+      "(COMMON-LISP:EQ (SB!C::LAMBDA-TAIL-SET SB!C::CALLER)
+                  (SB!C::LAMBDA-TAIL-SET (SB!C::LAMBDA-HOME SB!C::CALLEE)))"
+
+110:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    ;;; The compiler is flushing the argument type test, and the default
+    ;;; case in the cond, so that calling with say a fixnum 0 causes a
+    ;;; SIGBUS.
+    (declaim (optimize (safety 2) (speed 3)))
+    (defun tst (x)
+      (declare (type (or string stream) x))
+      (cond ((typep x 'string) 'string)
+            ((typep x 'stream) 'stream)
+            (t
+             'none)))
+  The symptom in sbcl-0.6.12.42 on OpenBSD is actually (TST 0)=>STREAM
+  (not the SIGBUS reported in the comment) but that's broken too; 
+  type declarations are supposed to be treated as assertions unless
+  SAFETY 0, so we should be getting a TYPE-ERROR.
+
+111:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    (in-package :cl-user)
+    ;;; Produces an assertion failures when compiled.
+    (defun foo (z)
+      (declare (type (or (function (t) t) null) z))
+      (let ((z (or z #'identity)))
+        (declare (type (function (t) t) z))
+        (funcall z 1)))
+  The error in sbcl-0.6.12.42 is
+    internal error, failed AVER:
+      "(COMMON-LISP:NOT (COMMON-LISP:EQ SB!C::CHECK COMMON-LISP:T))"
+
+112:
+  reported by Martin Atzmueller 2001-06-25; taken from CMU CL bugs
+  collection; apparently originally reported by Bruno Haible
+    (in-package :cl-user)
+    ;;; From: Bruno Haible
+    ;;; Subject: scope of SPECIAL declarations
+    ;;; It seems CMUCL has a bug relating to the scope of SPECIAL
+    ;;; declarations.  I observe this with "CMU Common Lisp 18a x86-linux
+    ;;; 1.4.0 cvs".
+    (let ((x 0))
+      (declare (special x))
+      (let ((x 1))
+        (let ((y x))
+          (declare (special x)) y)))
+    ;;; Gives: 0 (this should return 1 according to CLHS)
+    (let ((x 0))
+      (declare (special x))
+      (let ((x 1))
+        (let ((y x) (x 5))
+          (declare (special x)) y)))
+    ;;; Gives: 1 (correct).
+  The reported results match what we get from the interpreter
+  in sbcl-0.6.12.42.
+
+113:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    (in-package :cl-user)
+    ;;; From: David Gadbois <gadbois@cyc.com>
+    ;;;
+    ;;; Logical pathnames aren't externalizable.
+    ;;; Test case:
+    (let ((tempfile "/tmp/test.lisp"))
+      (setf (logical-pathname-translations "XXX")
+            '(("XXX:**;*.*" "/tmp/**/*.*")))
+      (with-open-file (out tempfile :direction :output)
+        (write-string "(defvar *path* #P\"XXX:XXX;FOO.LISP\")" out))
+      (compile-file tempfile))
+  The error message in sbcl-0.6.12.42 is
+    ; caught ERROR:
+    ;   (while making load form for #<SB-IMPL::LOGICAL-HOST "XXX">)
+    ; A logical host can't be dumped as a constant: #<SB-IMPL::LOGICAL-HOST "XXX">
+
+114:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    (in-package :cl-user)
+    ;;; This file causes the byte compiler to fail.
+    (declaim (optimize (speed 0) (safety 1)))
+    (defun tst1 ()
+      (values
+        (multiple-value-list
+         (catch 'a
+          (return-from tst1)))))
+  The error message in sbcl-0.6.12.42 is
+    internal error, failed AVER:
+      "(COMMON-LISP:EQUAL (SB!C::BYTE-BLOCK-INFO-START-STACK SB!INT:INFO) SB!C::STACK)"
+
+115:
+  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
+  collection:
+    (in-package :cl-user)
+    ;;; The following invokes a compiler error.
+    (declaim (optimize (speed 2) (debug 3)))
+    (defun tst ()
+      (flet ((m1 ()
+               (unwind-protect nil)))
+        (if (catch nil)
+          (m1)
+          (m1))))
+  The error message in sbcl-0.6.12.42 is
+    internal error, failed AVER:
+      "(COMMON-LISP:EQ (SB!C::TN-ENVIRONMENT SB!C:TN) SB!C::TN-ENV)"
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

@@ -170,13 +170,14 @@
 		    (*enclosed-profiles* 0)
 		    (nbf-pcounter *n-bytes-freed-or-purified-pcounter*)
 		    ;; Typically NBF-PCOUNTER will represent a bignum.
-		    ;; In general we don't want to cons up a new bignum for every
-		    ;; encapsulated call, so instead we keep track of
-		    ;; the PCOUNTER internals, so that as long as we
-		    ;; only cons small amounts, we'll almost always
-		    ;; just do fixnum arithmetic. (And for encapsulated
-		    ;; functions which cons large amounts, then we don't
-		    ;; much care about a single extra consed bignum.)
+		    ;; In general we don't want to cons up a new
+		    ;; bignum for every encapsulated call, so instead
+		    ;; we keep track of the PCOUNTER internals, so
+		    ;; that as long as we only cons small amounts,
+		    ;; we'll almost always just do fixnum arithmetic.
+		    ;; (And for encapsulated functions which cons
+		    ;; large amounts, then we don't much care about a
+		    ;; single extra consed bignum.)
 		    (start-consing-integer (pcounter-integer nbf-pcounter))
 		    (start-consing-fixnum (pcounter-fixnum nbf-pcounter)))
 	       (declare (inline pcounter-or-fixnum->integer))
@@ -193,7 +194,8 @@
 			     (- (pcounter-fixnum nbf-pcounter)
 				start-consing-fixnum)
 			     (- (get-bytes-consed)
-				(+ pcounter-integer pcounter-fixnum))))
+				(+ (pcounter-integer nbf-pcounter)
+				   (pcounter-fixnum nbf-pcounter)))))
 		   (setf inner-enclosed-profiles
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))

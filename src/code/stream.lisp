@@ -320,7 +320,7 @@
 	(let ((index (1- (lisp-stream-in-index stream)))
 	      (buffer (lisp-stream-in-buffer stream)))
 	  (declare (fixnum index))
-	  (when (minusp index) (error "Nothing to unread."))
+	  (when (minusp index) (error "nothing to unread"))
 	  (cond (buffer
 		 (setf (aref buffer index) (char-code character))
 		 (setf (lisp-stream-in-index stream) index))
@@ -334,8 +334,20 @@
 (defun peek-char (&optional (peek-type nil)
 			    (stream *standard-input*)
 			    (eof-error-p t)
-			    eof-value recursive-p)
+			    eof-value
+			    recursive-p)
   (declare (ignore recursive-p))
+  ;; FIXME: The type of PEEK-TYPE is also declared in a DEFKNOWN, but
+  ;; the compiler doesn't seem to be smart enough to go from there to
+  ;; imposing a type check. Figure out why (because PEEK-TYPE is an
+  ;; &OPTIONAL argument?) and fix it, and then this explicit type
+  ;; check can go away.
+  (unless (typep peek-type '(or character boolean))
+    (error 'simple-type-error
+	   :datum peek-type
+	   :expected-type '(or character boolean)
+	   :format-control "~@<bad PEEK-TYPE=~S, ~_expected ~S~:>"
+	   :format-arguments (list peek-type '(or character boolean))))
   (let ((stream (in-synonym-of stream)))
     (if (lisp-stream-p stream)
 	(let ((char (read-char stream eof-error-p eof-value)))
@@ -352,12 +364,15 @@
 		      (unless (eq char eof-value)
 			(unread-char char stream))
 		      char)))
-		(t
+		((null peek-type)
 		 (unread-char char stream)
-		 char)))
-	;; must be Gray streams FUNDAMENTAL-STREAM
+		 char)
+		(t
+		 (error "internal error: impossible case"))))
+	;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
 	(cond ((characterp peek-type)
-	       (do ((char (stream-read-char stream) (stream-read-char stream)))
+	       (do ((char (stream-read-char stream)
+			  (stream-read-char stream)))
 		   ((or (eq char :eof) (char= char peek-type))
 		    (cond ((eq char :eof)
 			   (eof-or-lose stream eof-error-p eof-value))
@@ -365,18 +380,21 @@
 			   (stream-unread-char stream char)
 			   char)))))
 	      ((eq peek-type t)
-	       (do ((char (stream-read-char stream) (stream-read-char stream)))
+	       (do ((char (stream-read-char stream)
+			  (stream-read-char stream)))
 		   ((or (eq char :eof) (not (whitespace-char-p char)))
 		    (cond ((eq char :eof)
 			   (eof-or-lose stream eof-error-p eof-value))
 			  (t
 			   (stream-unread-char stream char)
 			   char)))))
-	      (t
+	      ((null peek-type)
 	       (let ((char (stream-peek-char stream)))
 		 (if (eq char :eof)
 		     (eof-or-lose stream eof-error-p eof-value)
-		     char)))))))
+		     char)))
+	      (t
+	       (error "internal error: impossible case"))))))
 
 (defun listen (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
