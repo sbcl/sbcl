@@ -464,10 +464,6 @@
 			 specializers
 			 &optional errorp))
 
-(defgeneric remove-named-method (generic-function-name
-				 argument-specifiers
-				 &optional extra))
-
 (defgeneric slot-missing (class
 			  instance
 			  slot-name

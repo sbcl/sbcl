@@ -263,30 +263,7 @@
     (apply #'call-next-method generic-function initargs)))
 ||#
 
-;;; These three are scheduled for demolition.
-
-(defmethod remove-named-method (generic-function-name argument-specifiers
-						      &optional extra)
-  (let ((generic-function ())
-	(method ()))
-    (cond ((or (null (fboundp generic-function-name))
-	       (not (generic-function-p
-		      (setq generic-function
-			    (fdefinition generic-function-name)))))
-	   (error "~S does not name a generic function."
-		  generic-function-name))
-	  ((null (setq method (get-method generic-function
-					  extra
-					  (parse-specializers
-					    argument-specifiers)
-					  nil)))
-	   (error "There is no method for the generic function ~S~%~
-		   which matches the ARGUMENT-SPECIFIERS ~S."
-		  generic-function
-		  argument-specifiers))
-	  (t
-	   (remove-method generic-function method)))))
-
+;;; These two are scheduled for demolition.
 (defun real-add-named-method (generic-function-name
 			      qualifiers
 			      specializers
@@ -308,28 +285,41 @@
 				     :specializers specs
 				     :lambda-list lambda-list
 				     other-initargs)))
-    (add-method generic-function new)))
+    (add-method generic-function new)
+    new))
 
 (defun real-get-method (generic-function qualifiers specializers
 					 &optional (errorp t))
-  (let ((hit 
+  (let* ((lspec (length specializers))
+	 (hit 
 	  (dolist (method (generic-function-methods generic-function))
 	    (let ((mspecializers (method-specializers method)))
+	      (aver (= lspec (length mspecializers)))
 	      (when (and (equal qualifiers (method-qualifiers method))
-			 (= (length specializers) (length mspecializers))
 			 (every #'same-specializer-p specializers
 				(method-specializers method)))
 		(return method))))))
     (cond (hit hit)
 	  ((null errorp) nil)
 	  (t
-	   (error "no method on ~S with qualifiers ~:S and specializers ~:S"
+	   (error "~@<There is no method on ~S with ~
+                   ~:[no qualifiers~;~:*qualifiers ~S~] ~
+                   and specializers ~S.~@:>"
 		  generic-function qualifiers specializers)))))
-
+
 (defmethod find-method ((generic-function standard-generic-function)
 			qualifiers specializers &optional (errorp t))
-  (real-get-method generic-function qualifiers
-		   (parse-specializers specializers) errorp))
+  (let ((nreq (length (arg-info-metatypes (gf-arg-info generic-function)))))
+    ;; ANSI: "The specializers argument contains the parameter
+    ;; specializers for the method. It must correspond in length to
+    ;; the number of required arguments of the generic function, or an
+    ;; error is signaled."
+    (when (/= (length specializers) nreq)
+      (error "~@<The generic function ~S takes ~D required argument~:P; ~
+              was asked to find a method with specializers ~S~@:>"
+	     generic-function nreq specializers))
+    (real-get-method generic-function qualifiers
+		     (parse-specializers specializers) errorp)))
 
 ;;; Compute various information about a generic-function's arglist by looking
 ;;; at the argument lists of the methods. The hair for trying not to use
@@ -458,9 +448,9 @@
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (when (method-generic-function method)
-    (error "The method ~S is already part of the generic~@
-	    function ~S. It can't be added to another generic~@
-	    function until it is removed from the first one."
+    (error "~@<The method ~S is already part of the generic ~
+	    function ~S; it can't be added to another generic ~
+	    function until it is removed from the first one.~@:>"
 	   method (method-generic-function method)))
   (flet ((similar-lambda-lists-p (method-a method-b)
 	   (multiple-value-bind (a-nreq a-nopt a-keyp a-restp)
@@ -509,7 +499,7 @@
 			:generic-function generic-function
 			:method method)
 	  (update-dfun generic-function))
-	method)))
+	generic-function)))
 
 (defun real-remove-method (generic-function method)
   (when  (eq generic-function (method-generic-function method))

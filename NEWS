@@ -1823,6 +1823,11 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** functions [N]SUBST*, LAST, NRECONC, [N]SUBLIS may return any
        object.
     ** DISASSEMBLE works with closures and funcallable instances.
+    ** ADD-METHOD now returns the generic function, not the new
+       method.
+    ** FIND-METHOD signals an error if the lengths of the specializers
+       is incompatible with the generic function, even if the ERRORP
+       argument is true.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

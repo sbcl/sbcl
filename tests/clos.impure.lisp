@@ -433,26 +433,17 @@
 		    form)))
 	    'dmc-test-return))
 
-;;; DEFMETHOD should signal a PROGRAM-ERROR if an incompatible lambda
-;;; list is given:
+;;; DEFMETHOD should signal an ERROR if an incompatible lambda list is
+;;; given:
 (defmethod incompatible-ll-test-1 (x) x)
-(multiple-value-bind (result error)
-    (ignore-errors (defmethod incompatible-ll-test-1 (x y) y))
-  (assert (null result))
-  (assert (typep error 'program-error)))
-(multiple-value-bind (result error)
-    (ignore-errors (defmethod incompatible-ll-test-1 (x &rest y) y))
-  (assert (null result))
-  (assert (typep error 'program-error)))
+(assert (raises-error? (defmethod incompatible-ll-test-1 (x y) y)))
+(assert (raises-error? (defmethod incompatible-ll-test-1 (x &rest y) y)))
 ;;; Sneakily using a bit of MOPness to check some consistency
 (assert (= (length
 	    (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
 
 (defmethod incompatible-ll-test-2 (x &key bar) bar)
-(multiple-value-bind (result error)
-    (ignore-errors (defmethod incompatible-ll-test-2 (x) x))
-  (assert (null result))
-  (assert (typep error 'program-error)))
+(assert (raises-error? (defmethod incompatible-ll-test-2 (x) x)))
 (defmethod incompatible-ll-test-2 (x &rest y) y)
 (assert (= (length
 	    (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
