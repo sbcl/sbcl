@@ -239,7 +239,7 @@
   (:note "safe inline fixnum arithmetic")
   (:generator 4
     (let* ((no-overflow (gen-label)))
-      (inst mcrxr :cr0)
+      (inst mtxer zero-tn)
       (inst addo. r x y)
       (inst bns no-overflow)
       (inst unimp (logior (ash (reg-tn-encoding r) 5)
@@ -254,7 +254,7 @@
   (:note "safe inline fixnum arithmetic")
   (:generator 4
     (let* ((no-overflow (gen-label)))
-      (inst mcrxr :cr0)
+      (inst mtxer zero-tn)
       (inst subo. r x y)
       (inst bns no-overflow)
       (inst unimp (logior (ash (reg-tn-encoding r) 5)

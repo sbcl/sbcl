@@ -208,7 +208,7 @@
   (:generator 20
     (move x arg)
     (let ((done (gen-label)))
-      (inst mcrxr :cr0)                 ; clear sticky overflow bits in XER, CR0
+      (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
       (inst addo temp x x)              ; set XER OV if top two bits differ
       (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
       (inst slwi y x 2)                 ; assume fixnum (tagged ok, maybe lost some high bits)

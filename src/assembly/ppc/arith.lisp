@@ -31,7 +31,7 @@
    (:temp ocfp any-reg ocfp-offset))
  
   ; Clear the damned "sticky overflow" bit in :cr0 and :xer
-  (inst mcrxr :cr0)
+  (inst mtxer zero-tn)
   (inst or temp x y)
   (inst andi. temp temp 3)
   (inst bne DO-STATIC-FUN)
@@ -77,7 +77,7 @@
    (:temp ocfp any-reg ocfp-offset))
 
   ; Clear the damned "sticky overflow" bit in :cr0
-  (inst mcrxr :cr0)
+  (inst mtxer zero-tn)
 
   (inst or temp x y)
   (inst andi. temp temp 3)
@@ -130,7 +130,7 @@
    (:temp ocfp any-reg ocfp-offset))
 
   ;; If either arg is not a fixnum, call the static function.  But first ...
-  (inst mcrxr :cr0)
+  (inst mtxer zero-tn)
 
   (inst or temp x y)
   (inst andi. temp temp 3)
