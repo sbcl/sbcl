@@ -114,7 +114,12 @@
 #!-linux
 (define-signal-handler sigsys-handler "bad argument to a system call")
 (define-signal-handler sigpipe-handler "SIGPIPE")
-(define-signal-handler sigalrm-handler "SIGALRM")
+
+(defun sigalrm-handler (signal info context)
+  (declare (ignore signal info context))
+  (declare (type system-area-pointer context))
+  (cerror "Continue" 'sb!kernel::timeout))
+
 
 (defun sigquit-handler (signal code context)
   (declare (ignore signal code context))

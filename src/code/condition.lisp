@@ -769,6 +769,11 @@
 	       (reader-error-format-control condition)
 	       (reader-error-format-arguments condition)
 	       (reader-impossible-number-error-error condition))))))
+
+;;; should this inherit from error?  good question
+(define-condition timeout (error) ())
+
+
 
 ;;;; special SBCL extension conditions
 
