@@ -51,7 +51,7 @@
 
 ;;; the width of the column in which instruction-bytes are printed. A
 ;;; value of zero disables the printing of instruction bytes.
-(defvar *disassem-inst-column-width* 14
+(defvar *disassem-inst-column-width* 16
   #!+sb-doc
   "The width of instruction bytes.") 
 (declaim (type text-width *disassem-inst-column-width*))

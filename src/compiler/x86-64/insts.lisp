@@ -69,7 +69,8 @@
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
   (print-reg-with-width value
-			(sb!disassem:dstate-get-prop dstate 'width)
+			(or (sb!disassem:dstate-get-prop dstate 'reg-width)
+			    *default-address-size*)
 			stream
 			dstate))
 
@@ -95,7 +96,10 @@
   (declare (type full-reg value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (print-reg-with-width value *default-address-size* stream dstate))
+  (print-reg-with-width value 
+			(or (sb!disassem:dstate-get-prop dstate 'reg-width)
+			    *default-address-size*)
+			stream dstate))
 
 (defun print-rex-reg/mem (value stream dstate)
   (declare (type (or list full-reg) value)
@@ -103,8 +107,7 @@
 	   (type sb!disassem:disassem-state dstate))
   (if (typep value 'full-reg)
       (print-reg value stream dstate)
-    (let ((*default-address-size* :qword))
-      (print-mem-access value stream nil dstate))))
+    (print-mem-access value stream nil dstate)))
 
 (defun print-reg/mem (value stream dstate)
   (declare (type (or list full-reg) value)
@@ -128,9 +131,8 @@
   (declare (type (or list full-reg) value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (setf (sb!disassem:dstate-get-prop dstate 'width) :qword)
-  (let ((*default-address-size* :qword))
-    (print-sized-reg/mem value stream dstate)))
+  (setf (sb!disassem:dstate-get-prop dstate 'reg-width) :qword)
+  (print-sized-reg/mem value stream dstate))
 
 (defun print-byte-reg/mem (value stream dstate)
   (declare (type (or list full-reg) value)
@@ -153,8 +155,7 @@
   (sb!disassem:princ16 value stream))
 
 (defun prefilter-word-reg (value dstate)
-  (declare (ignore dstate)
-	   (type (or full-reg list) value))
+  (declare (type (or full-reg list) value))
   (if (atom value)
       value
     (let ((reg (first value))
@@ -162,10 +163,12 @@
       (declare (type (or null (unsigned-byte 4)) rex.wrxb)
 	       (type (unsigned-byte 3) reg))
       (if rex.wrxb
-	  (list
-	   (if (plusp (logand rex.wrxb #b0100))
-	       (+ 8 reg)
-	     reg))
+	  (progn
+	    (setf (sb!disassem:dstate-get-prop dstate 'reg-width) :qword)
+	    (list
+	     (if (plusp (logand rex.wrxb #b0100))
+		 (+ 8 reg)
+	       reg)))
 	reg))))
   
 ;;; Returns either an integer, meaning a register, or a list of
@@ -183,7 +186,7 @@
 	     (type (or null (unsigned-byte 4)) rex.wrxb))
 
     (when rex.wrxb
-      (setf (sb!disassem:dstate-get-prop dstate 'width) :qword))
+      (setf (sb!disassem:dstate-get-prop dstate 'reg-width) :qword))
 
     (let ((full-reg (if (and rex.wrxb (= 1 (logand rex.wrxb #b0001)))
 			(+ 8 r/m) 
@@ -299,13 +302,16 @@
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (sb!disassem:read-suffix
-		(width-bits (sb!disassem:dstate-get-prop dstate 'width))
+		(width-bits
+		 (or (sb!disassem:dstate-get-prop dstate 'width)
+		     *default-address-size*))
 		dstate)))
 
 (sb!disassem:define-arg-type signed-imm-data
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
-	       (let ((width (sb!disassem:dstate-get-prop dstate 'width)))
+	       (let ((width (or (sb!disassem:dstate-get-prop dstate 'width)
+				*default-address-size*)))
 		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
 
 (sb!disassem:define-arg-type signed-imm-byte
@@ -1775,8 +1781,11 @@
 
 (define-instruction test (segment this that)
   (:printer accum-imm ((op #b1010100)))
+  (:printer rex-accum-imm ((op #b1010100)))
   (:printer reg/mem-imm ((op '(#b1111011 #b000))))
+  (:printer rex-reg/mem-imm ((op '(#b11110111 #b000))))
   (:printer reg-reg/mem ((op #b1000010)))
+  (:printer rex-reg-reg/mem ((op #b10000101)))
   (:emitter
    (let ((size (matching-operand-size this that)))
      (maybe-emit-operand-size-prefix segment size)
