@@ -169,18 +169,7 @@
 		    (*enclosed-ticks* 0)
 		    (*enclosed-consing* 0)
 		    (*enclosed-profiles* 0)
-		    (nbf-pcounter *n-bytes-freed-or-purified-pcounter*)
-		    ;; Typically NBF-PCOUNTER will represent a bignum.
-		    ;; In general we don't want to cons up a new
-		    ;; bignum for every encapsulated call, so instead
-		    ;; we keep track of the PCOUNTER internals, so
-		    ;; that as long as we only cons small amounts,
-		    ;; we'll almost always just do fixnum arithmetic.
-		    ;; (And for encapsulated functions which cons
-		    ;; large amounts, then a single extra consed
-		    ;; bignum tends to be proportionally negligible.)
-		    (nbf0-integer (pcounter-integer nbf-pcounter))
-		    (nbf0-fixnum (pcounter-fixnum nbf-pcounter))
+		    (nbf0 *n-bytes-freed-or-purified*)
 		    (dynamic-usage-0 (sb-kernel:dynamic-usage)))
 	       (declare (inline pcounter-or-fixnum->integer))
 	       (multiple-value-prog1
@@ -192,19 +181,12 @@
 		       (dynamic-usage-1 (sb-kernel:dynamic-usage)))
 		   (setf dticks (fastbig- (get-internal-ticks) start-ticks))
 		   (setf dconsing
-			 (if (and (eq (pcounter-integer nbf-pcounter)
-				      nbf0-integer)
-				  (eq (pcounter-fixnum nbf-pcounter)
-				      nbf0-fixnum))
+			 (if (eql *n-bytes-freed-or-purified* nbf0)
 			     ;; common special case where we can avoid
 			     ;; bignum arithmetic
-			     (- dynamic-usage-1
-				dynamic-usage-0)
+			     (- dynamic-usage-1 dynamic-usage-0)
 			     ;; general case
-			     (- (get-bytes-consed)
-				nbf0-integer
-				nbf0-fixnum
-				dynamic-usage-0)))
+			     (- (get-bytes-consed) nbf0 dynamic-usage-0)))
 		   (setf inner-enclosed-profiles
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))

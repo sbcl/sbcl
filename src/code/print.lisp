@@ -148,13 +148,13 @@
 		     ((:pprint-dispatch *print-pprint-dispatch*)
 		      *print-pprint-dispatch*))
   #!+sb-doc
-  "Outputs OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*"
+  "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*"
   (output-object object (out-synonym-of stream))
   object)
 
 (defun prin1 (object &optional stream)
   #!+sb-doc
-  "Outputs a mostly READable printed representation of OBJECT on the specified
+  "Output a mostly READable printed representation of OBJECT on the specified
   STREAM."
   (let ((*print-escape* T))
     (output-object object (out-synonym-of stream)))
@@ -162,7 +162,7 @@
 
 (defun princ (object &optional stream)
   #!+sb-doc
-  "Outputs an aesthetic but not necessarily READable printed representation
+  "Output an aesthetic but not necessarily READable printed representation
   of OBJECT on the specified STREAM."
   (let ((*print-escape* NIL)
 	(*print-readably* NIL))
@@ -171,7 +171,7 @@
 
 (defun print (object &optional stream)
   #!+sb-doc
-  "Outputs a terpri, the mostly READable printed represenation of OBJECT, and
+  "Output a newline, the mostly READable printed representation of OBJECT, and
   space to the specified STREAM."
   (let ((stream (out-synonym-of stream)))
     (terpri stream)
@@ -181,7 +181,7 @@
 
 (defun pprint (object &optional stream)
   #!+sb-doc
-  "Prettily outputs OBJECT preceded by a newline."
+  "Prettily output OBJECT preceded by a newline."
   (let ((*print-pretty* t)
 	(*print-escape* t)
 	(stream (out-synonym-of stream)))
@@ -208,18 +208,18 @@
 	       ((:pprint-dispatch *print-pprint-dispatch*)
 		*print-pprint-dispatch*))
   #!+sb-doc
-  "Returns the printed representation of OBJECT as a string."
+  "Return the printed representation of OBJECT as a string."
   (stringify-object object))
 
 (defun prin1-to-string (object)
   #!+sb-doc
-  "Returns the printed representation of OBJECT as a string with
+  "Return the printed representation of OBJECT as a string with
    slashification on."
   (stringify-object object t))
 
 (defun princ-to-string (object)
   #!+sb-doc
-  "Returns the printed representation of OBJECT as a string with
+  "Return the printed representation of OBJECT as a string with
   slashification off."
   (stringify-object object nil))
 
@@ -288,18 +288,17 @@
 ;;; marker, it is incremented.
 (defvar *circularity-counter* nil)
 
+;;; Check to see whether OBJECT is a circular reference, and return something
+;;; non-NIL if it is. If ASSIGN is T, then the number to use in the #n= and
+;;; #n# noise is assigned at this time. Note: CHECK-FOR-CIRCULARITY must
+;;; be called *EXACTLY* once with ASSIGN T, or the circularity detection noise
+;;; will get confused about when to use #n= and when to use #n#. If this
+;;; returns non-NIL when ASSIGN is T, then you must call HANDLE-CIRCULARITY
+;;; on it. If you are not using this inside a WITH-CIRCULARITY-DETECTION,
+;;; then you have to be prepared to handle a return value of :INITIATE which
+;;; means it needs to initiate the circularity detection noise. See the
+;;; source for info on how to do that.
 (defun check-for-circularity (object &optional assign)
-  #!+sb-doc
-  "Check to see whether OBJECT is a circular reference, and return something
-   non-NIL if it is. If ASSIGN is T, then the number to use in the #n= and
-   #n# noise is assigned at this time. Note: CHECK-FOR-CIRCULARITY must
-   be called *EXACTLY* once with ASSIGN T, or the circularity detection noise
-   will get confused about when to use #n= and when to use #n#. If this
-   returns non-NIL when ASSIGN is T, then you must call HANDLE-CIRCULARITY
-   on it. If you are not using this inside a WITH-CIRCULARITY-DETECTION,
-   then you have to be prepared to handle a return value of :INITIATE which
-   means it needs to initiate the circularity detection noise. See the
-   source for info on how to do that."
   (cond ((null *print-circle*)
 	 ;; Don't bother, nobody cares.
 	 nil)
@@ -344,11 +343,10 @@
 	      ;; Second or later occurance.
 	      (- value)))))))
 
+;;; Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then
+;;; you should go ahead and print the object. If it returns NIL, then
+;;; you should blow it off.
 (defun handle-circularity (marker stream)
-  #!+sb-doc
-  "Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then
-   you should go ahead and print the object. If it returns NIL, then
-   you should blow it off."
   (case marker
     (:initiate
      ;; Someone forgot to initiate circularity detection.
@@ -379,9 +377,8 @@
    arguments (the object and the stream) or NIL to indicate that there is
    no pretty printer installed.")
 
+;;; Output OBJECT to STREAM observing all printer control variables.
 (defun output-object (object stream)
-  #!+sb-doc
-  "Output OBJECT to STREAM observing all printer control variables."
   (labels ((print-it (stream)
 	     (if *print-pretty*
 		 (if *pretty-printer*
@@ -423,12 +420,11 @@
 	  (t
 	   (print-it stream)))))
 
+;;; Output OBJECT to STREAM observing all printer control variables
+;;; except for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL,
+;;; then the pretty printer will be used for any components of OBJECT,
+;;; just not for OBJECT itself.
 (defun output-ugly-object (object stream)
-  #!+sb-doc
-  "Output OBJECT to STREAM observing all printer control variables except
-   for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL, then the pretty
-   printer will be used for any components of OBJECT, just not for OBJECT
-   itself."
   (typecase object
     ;; KLUDGE: The TYPECASE approach here is non-ANSI; the ANSI definition of
     ;; PRINT-OBJECT says it provides printing and we're supposed to provide
@@ -610,7 +606,7 @@
 (declaim (type (simple-array (unsigned-byte 16) (#.char-code-limit))
 	       *character-attributes*))
 
-;;; Constants which are a bit-mask for each interesting character attribute.
+;;; constants which are a bit-mask for each interesting character attribute
 (defconstant other-attribute		(ash 1 0)) ; Anything else legal.
 (defconstant number-attribute		(ash 1 1)) ; A numeric digit.
 (defconstant uppercase-attribute 	(ash 1 2)) ; An uppercase letter.

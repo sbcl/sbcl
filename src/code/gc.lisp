@@ -109,8 +109,17 @@
 ;;; (We save this so that we can calculate the total number of bytes
 ;;; ever allocated by adding this to the number of bytes currently
 ;;; allocated and never freed.)
-(declaim (type pcounter *n-bytes-freed-or-purified-pcounter*))
-(defvar *n-bytes-freed-or-purified-pcounter* (make-pcounter))
+(declaim (type unsigned-byte *n-bytes-freed-or-purified*))
+(defvar *n-bytes-freed-or-purified* 0)
+(push (lambda ()
+	(setf *n-bytes-freed-or-purified* 0))
+      ;; KLUDGE: It's probably not quite safely right either to do
+      ;; this in *BEFORE-SAVE-INITIALIZATIONS* (since consing, or even
+      ;; worse, something which depended on (GET-BYTES-CONSED), might
+      ;; happen after that) or in *AFTER-SAVE-INITIALIZATIONS*. But
+      ;; it's probably not a big problem, and there seems to be no
+      ;; other obvious time to do it. -- WHN 2001-07-30
+      *after-save-initializations*)
 
 (declaim (ftype (function () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
@@ -122,7 +131,7 @@ probably want either to hack in at a lower level (as the code in the
 SB-PROFILE package does), or to design a more microefficient interface
 and submit it as a patch."
   (+ (dynamic-usage)
-     (pcounter->integer *n-bytes-freed-or-purified-pcounter*)))
+     *n-bytes-freed-or-purified*))
 
 ;;;; variables and constants
 
@@ -338,8 +347,8 @@ has finished GC'ing.")
 		   (eff-n-bytes-freed (max 0 n-bytes-freed)))
 	      (declare (ignore ignore-me))
 	      (/show0 "got (DYNAMIC-USAGE) and EFF-N-BYTES-FREED")
-	      (incf-pcounter *n-bytes-freed-or-purified-pcounter*
-			     eff-n-bytes-freed)
+	      (incf *n-bytes-freed-or-purified*
+		    eff-n-bytes-freed)
 	      (/show0 "clearing *NEED-TO-COLLECT-GARBAGE*")
 	      (setf *need-to-collect-garbage* nil)
 	      (/show0 "calculating NEW-GC-TRIGGER")
