@@ -1,0 +1,227 @@
+@node  Threading
+@comment  node-name,  next,  previous,  up
+@chapter Threading
+
+SBCL supports a fairly low-level threading interface that maps onto
+the host operating system's concept of threads or lightweight
+processes.  This means that threads may take advantage of hardware
+multiprocessing on machines that have more than one CPU, but it does 
+not allow Lisp control of the scheduler.  This is found in the
+SB-THREAD package.
+
+This requires x86 and Linux kernel 2.6 or systems with NPTL backports.
+
+@menu
+* Special Variables::           
+* Mutex Support::               
+* Waitqueue/condition variables::  
+* Sessions/Debugging::          
+* Implementation (Linux x86)::  
+@end menu
+
+@node Special Variables
+@comment  node-name,  next,  previous,  up
+@section Special Variables
+
+The interaction of special variables with multiple threads is mostly
+as one would expect, but users of other Lisps are warned that the
+behaviour of locally bound specials differs in places from what they
+may expect.
+
+@itemize
+@item 
+global special values are visible across all threads;
+@item
+bindings (e.g. using LET) are local to the thread;
+@item
+initial values in a new thread are taken from the thread that created it. 
+@end itemize
+
+@node Mutex Support
+@comment  node-name,  next,  previous,  up
+@section Mutex Support
+
+Mutexes are used for controlling access to a shared resource. One
+thread is allowed to hold the mutex, others which attempt to take it
+will be made to wait until it's free. Threads are woken in the order
+that they go to sleep.
+
+There isn't a timeout on mutex acquisition, but the usual WITH-TIMEOUT
+macro (which throws a TIMEOUT condition after n seconds) can be used
+if you want a bounded wait.
+
+@lisp
+(defpackage :demo (:use "CL" "SB-THREAD" "SB-EXT"))
+
+(in-package :demo)
+
+(defvar *a-mutex* (make-mutex :name "my lock"))
+
+(defun thread-fn ()
+  (let ((id (current-thread-id)))
+    (format t "Thread ~A running ~%" id)
+    (with-mutex (*a-mutex*)
+      (format t "Thread ~A got the lock~%" id)
+      (sleep (random 5)))
+    (format t "Thread ~A dropped lock, dying now~%" id)))
+
+(make-thread #'thread-fn)
+(make-thread #'thread-fn)
+
+@end lisp
+
+@node Waitqueue/condition variables
+@comment  node-name,  next,  previous,  up
+@section Waitqueue/condition variables
+
+These are based on the POSIX condition variable design, hence the
+annoyingly CL-conflicting name. For use when you want to check a
+condition and sleep until it's true. For example: you have a shared
+queue, a writer process checking ``queue is empty'' and one or more
+readers that need to know when ``queue is not empty''. It sounds
+simple, but is astonishingly easy to deadlock if another process runs
+when you weren't expecting it to.
+
+There are three components:
+
+@itemize
+@item 
+the condition itself (not represented in code)
+
+@item 
+the condition variable (a.k.a waitqueue) which proxies for it
+
+@item 
+a lock to hold while testing the condition 
+@end itemize
+
+Important stuff to be aware of:
+
+@itemize
+@item 
+when calling condition-wait, you must hold the mutex. condition-wait
+will drop the mutex while it waits, and obtain it again before
+returning for whatever reason;
+
+@item 
+likewise, you must be holding the mutex around calls to
+condition-notify;
+
+@item 
+a process may return from condition-wait in several circumstances: it
+is not guaranteed that the underlying condition has become true. You
+must check that the resource is ready for whatever you want to do to
+it.
+
+@end itemize
+
+@lisp
+(defvar *buffer-queue* (make-waitqueue))
+(defvar *buffer-lock* (make-mutex :name "buffer lock"))
+
+(defvar *buffer* (list nil))
+
+(defun reader ()
+  (with-mutex (*buffer-lock*)
+    (loop
+     (condition-wait *buffer-queue* *buffer-lock*)
+     (loop
+      (unless *buffer* (return))
+      (let ((head (car *buffer*)))
+        (setf *buffer* (cdr *buffer*))
+        (format t "reader ~A woke, read ~A~%" 
+                (current-thread-id) head))))))
+
+(defun writer ()
+  (loop
+   (sleep (random 5))
+   (with-mutex (*buffer-lock*)
+     (let ((el (intern
+                (string (code-char 
+                         (+ (char-code #\A) (random 26)))))))
+       (setf *buffer* (cons el *buffer*)))
+     (condition-notify *buffer-queue*))))
+
+(make-thread #'writer)
+(make-thread #'reader)
+(make-thread #'reader)       
+
+@end lisp
+
+@node Sessions/Debugging
+@comment  node-name,  next,  previous,  up
+@section Sessions/Debugging
+
+If the user has multiple views onto the same Lisp image (for example,
+using multiple terminals, or a windowing system, or network access)
+they are typically set up as multiple @dfn{sessions} such that each
+view has its own collection of foreground/background/stopped threads.
+A thread which wishes to create a new session can use
+@code{sb-thread:with-new-session} to remove itself from the current
+session (which it shares with its parent and siblings) and create a
+fresh one.  
+# See also @code{sb-thread:make-listener-thread}.
+
+Within a single session, threads arbitrate between themselves for the
+user's attention.  A thread may be in one of three notional states:
+foreground, background, or stopped.  When a background process
+attempts to print a repl prompt or to enter the debugger, it will stop
+and print a message saying that it has stopped.  The user at his
+leisure may switch to that thread to find out what it needs.  If a
+background thread enters the debugger, selecting any restart will put
+it back into the background before it resumes.  Arbitration for the
+input stream is managed by calls to @code{sb-thread:get-foreground}
+(which may block) and @code{sb-thread:release-foreground}.
+
+@code{sb-ext:quit} terminates all threads in the current session, but
+leaves other sessions running.
+
+@node Implementation (Linux x86)
+@comment  node-name,  next,  previous,  up
+@section Implementation (Linux x86)
+
+On Linux x86, threading is implemented using @code{clone()} and does
+not involve pthreads.  This is not because there is anything wrong
+with pthreads @emph{per se}, but there is plenty wrong (from our
+perspective) with LinuxThreads.  SBCL threads are mapped 1:1 onto
+Linux tasks which share a VM but nothing else - each has its own
+process id and can be seen in e.g. @command{ps} output.
+
+Per-thread local bindings for special variables is achieved using the
+%fs segment register to point to a per-thread storage area.  This may
+cause interesting results if you link to foreign code that expects
+threading or creates new threads, and the thread library in question
+uses %fs in an incompatible way.
+
+Queues require the @code{sys_futex()} system call to be available:
+this is the reason for the NPTL requirement.  We test at runtime that
+this system call exists.
+
+Garbage collection is done with the existing Conservative Generational
+GC.  Allocation is done in small (typically 8k) regions: each thread
+has its own region so this involves no stopping. However, when a
+region fills, a lock must be obtained while another is allocated, and
+when a collection is required, all processes are stopped.  This is
+achieved by sending them signals, which may make for interesting
+behaviour if they are interrupted in system calls.  The streams
+interface is believed to handle the required system call restarting
+correctly, but this may be a consideration when making other blocking
+calls e.g. from foreign library code.
+
+Large amounts of the SBCL library have not been inspected for
+thread-safety.  Some of the obviously unsafe areas have large locks
+around them, so compilation and fasl loading, for example, cannot be
+parallelized.  Work is ongoing in this area.
+
+A new thread by default is created in the same POSIX process group and
+session as the thread it was created by.  This has an impact on
+keyboard interrupt handling: pressing your terminal's intr key
+(typically @kbd{Control-C}) will interrupt all processes in the
+foreground process group, including Lisp threads that SBCL considers
+to be notionally `background'.  This is undesirable, so background
+threads are set to ignore the SIGINT signal.
+
+@code{sb-thread:make-listener-thread} in addition to creating a new
+Lisp session makes a new POSIX session, so that pressing
+@kbd{Control-C} in one window will not interrupt another listener -
+this has been found to be embarrassing.
