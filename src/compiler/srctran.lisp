@@ -3173,7 +3173,9 @@
 ;;; Do source transformations for intransitive n-arg functions such as
 ;;; /. With one arg, we form the inverse. With two args we pass.
 ;;; Otherwise we associate into two-arg calls.
-(declaim (ftype (function (symbol list t) list) source-transform-intransitive))
+(declaim (ftype (function (symbol list t)
+                          (values list &optional (member nil t)))
+                source-transform-intransitive))
 (defun source-transform-intransitive (function args inverse)
   (case (length args)
     ((0 2) (values nil t))
