@@ -1325,11 +1325,20 @@ WORKAROUND:
         (adjust-array x '(5))
         (char y 5)))
 
-  SBCL 0.8.10 elides the bounds check somewhere along the line, and
-  returns #\Nul (where an error would be much preferable, since a test
-  of that form but with (setf (char y 5) #\Space) potentially corrupts
-  the heap and certainly confuses the world if that string is used by
-  C code.
+  SBCL fails this because (array-dimension y 0) return 10 even after the
+  adjustment, and hence the bounds-check passes. This is strictly
+  speaking legal, since the dictionary entry for ADJUST-ARRAY
+  says:
+
+    "If A is displaced to B, the consequences are unspecified if B is
+    adjusted in such a way that it no longer has enough elements to
+    satisfy A."
+
+  Should this be left as is, or should ARRAY-DIMENSION see if the
+  displaced-to array has shrunk too much and signal an error? An error
+  would probably be preferable, since a test of that form but with
+  (setf (char y 5) #\Space) potentially corrupts the heap and
+  certainly confuses the world if that string is used by C code.
 
 317: "FORMAT of floating point numbers"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
