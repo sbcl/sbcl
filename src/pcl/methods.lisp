@@ -289,37 +289,48 @@
     new))
 
 (defun real-get-method (generic-function qualifiers specializers
-					 &optional (errorp t))
-  (let* ((lspec (length specializers))
-	 (hit 
-	  (dolist (method (generic-function-methods generic-function))
-	    (let ((mspecializers (method-specializers method)))
-	      (aver (= lspec (length mspecializers)))
-	      (when (and (equal qualifiers (method-qualifiers method))
-			 (every #'same-specializer-p specializers
-				(method-specializers method)))
-		(return method))))))
-    (cond (hit hit)
-	  ((null errorp) nil)
-	  (t
-	   (error "~@<There is no method on ~S with ~
-                   ~:[no qualifiers~;~:*qualifiers ~S~] ~
-                   and specializers ~S.~@:>"
-		  generic-function qualifiers specializers)))))
+			&optional (errorp t) 
+			always-check-specializers)
+  (let ((lspec (length specializers))
+	(methods (generic-function-methods generic-function)))
+    (when (or methods always-check-specializers)
+      (let ((nreq (length (arg-info-metatypes (gf-arg-info generic-function)))))
+	;; Since we internally bypass FIND-METHOD by using GET-METHOD
+	;; instead we need to to this here or users may get hit by a
+	;; failed AVER instead of a sensible error message.
+	(when (/= lspec nreq)
+	  (error "~@<The generic function ~S takes ~D required argument~:P; ~
+                 was asked to find a method with specializers ~S~@:>"
+		 generic-function nreq specializers))))
+    (let ((hit 
+	   (dolist (method methods)
+	     (let ((mspecializers (method-specializers method)))
+	       (aver (= lspec (length mspecializers)))
+	       (when (and (equal qualifiers (method-qualifiers method))
+			  (every #'same-specializer-p specializers
+				 (method-specializers method)))
+		 (return method))))))
+      (cond (hit hit)
+	    ((null errorp) nil)
+	    (t
+	     (error "~@<There is no method on ~S with ~
+                    ~:[no qualifiers~;~:*qualifiers ~S~] ~
+                    and specializers ~S.~@:>"
+		    generic-function qualifiers specializers))))))
 
 (defmethod find-method ((generic-function standard-generic-function)
 			qualifiers specializers &optional (errorp t))
-  (let ((nreq (length (arg-info-metatypes (gf-arg-info generic-function)))))
-    ;; ANSI: "The specializers argument contains the parameter
-    ;; specializers for the method. It must correspond in length to
-    ;; the number of required arguments of the generic function, or an
-    ;; error is signaled."
-    (when (/= (length specializers) nreq)
-      (error "~@<The generic function ~S takes ~D required argument~:P; ~
-              was asked to find a method with specializers ~S~@:>"
-	     generic-function nreq specializers))
-    (real-get-method generic-function qualifiers
-		     (parse-specializers specializers) errorp)))
+  ;; ANSI about FIND-METHOD: "The specializers argument contains the
+  ;; parameter specializers for the method. It must correspond in
+  ;; length to the number of required arguments of the generic
+  ;; function, or an error is signaled."
+  ;;
+  ;; This error checking is done by REAL-GET-METHOD.
+  (real-get-method generic-function 
+		   qualifiers
+		   (parse-specializers specializers) 
+		   errorp 
+		   t))
 
 ;;; Compute various information about a generic-function's arglist by looking
 ;;; at the argument lists of the methods. The hair for trying not to use

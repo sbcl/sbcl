@@ -784,5 +784,13 @@
 (assert (eq (find-class 'one-more-to-obsolete) 
 	    (make-instances-obsolete (find-class 'one-more-to-obsolete))))
 
+;;; Sensible error instead of a BUG. Reported by Thomas Burdick.
+(multiple-value-bind (value err)
+    (ignore-errors
+      (defclass slot-def-with-duplicate-accessors ()
+	((slot :writer get-slot :reader get-slot))))
+  (assert (typep err 'error))
+  (assert (not (typep err 'sb-int:bug))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -2403,6 +2403,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     SB-EXT:INHIBIT-WARNINGS OPTIMIZE quality.  See the manual for
     documentation on this feature.  The SB-EXT:INHIBIT-WARNINGS
     quality should be considered deprecated.
+  * fixed bug: DEFCLASS slot definitions with identical :READER and
+    :WRITER names now signal a reasonable error. (reported by Thomas
+    Burdick)
   * fixed bug: CLOSE :ABORT T on appending stream no longer causes
     file deletion.
   * fixed bug: Invalid slot specification errors now print correctly. 
