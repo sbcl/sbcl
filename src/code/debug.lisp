@@ -34,9 +34,8 @@
   #!+sb-doc
   "This is T while in the debugger.")
 
-(defvar *debug-command-level* 0
-  #!+sb-doc
-  "Pushes and pops/exits inside the debugger change this.")
+;;; nestedness inside debugger command loops
+(defvar *debug-command-level* 0)
 
 (defvar *stack-top-hint* nil
   #!+sb-doc
@@ -47,19 +46,22 @@
 
 (defvar *current-frame* nil)
 
-;;; the default for *DEBUG-PROMPT*
-(defun debug-prompt ()
-  (let ((*standard-output* *debug-io*))
-    (terpri)
-    (prin1 (sb!di:frame-number *current-frame*))
-    (dotimes (i *debug-command-level*) (princ "]"))
-    (princ " ")
-    (force-output)))
+(defun debug-prompt (stream)
 
-(defparameter *debug-prompt* #'debug-prompt
-  #!+sb-doc
-  "a function of no arguments that prints the debugger prompt on *DEBUG-IO*")
+  ;; old behavior, will probably go away in sbcl-0.7.x
+  (format stream "~%~D" (sb!di:frame-number *current-frame*))
+  (dotimes (i *debug-command-level*)
+    (write-char #\] stream))
+  (write-char #\space stream)
 
+  ;; planned new behavior, delayed since it will break ILISP
+  #+nil 
+  (format stream
+	  "~%~D~:[~;[~D~]] "
+	  (sb!di:frame-number *current-frame*)
+	  (> *debug-command-level* 1)
+	  *debug-command-level*))
+  
 (defparameter *debug-help-string*
 "The prompt is right square brackets, the number indicating how many
   recursive command loops you are in. 
@@ -614,14 +616,6 @@ reset to ~S."
     (with-standard-io-syntax
      (let* ((*debug-condition* condition)
 	    (*debug-restarts* (compute-restarts condition))
-	    ;; FIXME: The next two bindings seem flaky, violating the
-	    ;; principle of least surprise. But in order to fix them,
-	    ;; we'd need to go through all the i/o statements in the
-	    ;; debugger, since a lot of them do their thing on
-	    ;; *STANDARD-INPUT* and *STANDARD-OUTPUT* instead of
-	    ;; *DEBUG-IO*.
-	    (*standard-input* *debug-io*) ; in case of setq
-	    (*standard-output* *debug-io*) ; ''  ''  ''  ''
 	    ;; We want the i/o subsystem to be in a known, useful
 	    ;; state, regardless of where the debugger was invoked in
 	    ;; the program. WITH-STANDARD-IO-SYNTAX does some of that,
@@ -642,22 +636,54 @@ reset to ~S."
 	    (*print-readably* nil)
 	    (*print-pretty* t)
 	    (*package* original-package))
+
+       ;; The initial output here goes to *ERROR-OUTPUT*, because the
+       ;; initial output is not interactive, just an error message,
+       ;; and when people redirect *ERROR-OUTPUT*, they could
+       ;; reasonably expect to see error messages logged there,
+       ;; regardless of what the debugger does afterwards.
        #!+sb-show (sb!conditions::show-condition *debug-condition*
 						 *error-output*)
        (format *error-output*
-	       "~2&debugger invoked on ~S of type ~S:~%  "
-	       '*debug-condition*
+	       "~2&debugger invoked on condition of type ~S:~%  "
 	       (type-of *debug-condition*))
        (princ-debug-condition-carefully *error-output*)
        (terpri *error-output*)
-       (let (;; FIXME: like the bindings of *STANDARD-INPUT* and
-	     ;; *STANDARD-OUTPUT* above..
+
+       ;; After the initial error/condition/whatever announcement to
+       ;; *ERROR-OUTPUT*, we become interactive, and should talk on
+       ;; *DEBUG-IO* from now on. (KLUDGE: This is a normative
+       ;; statement, not a description of reality.:-| There's a lot of
+       ;; older debugger code which was written to do i/o on whatever
+       ;; stream was in fashion at the time, and not all of it has
+       ;; been converted to behave this way. -- WHN 2000-11-16)
+       (let (;; FIXME: The first two bindings here seem wrong,
+	     ;; violating the principle of least surprise, and making
+	     ;; it impossible for the user to do reasonable things
+	     ;; like using PRINT to send output to the program's
+	     ;; ordinary (possibly redirected-to-a-file)
+	     ;; *STANDARD-OUTPUT*, or using PEEK-CHAR or some such
+	     ;; thing on the program's ordinary (possibly also
+	     ;; redirected) *STANDARD-INPUT*.
+	     (*standard-input* *debug-io*)
+	     (*standard-output* *debug-io*)
+	     ;; This seems reasonable: e.g. if the user has redirected
+	     ;; *ERROR-OUTPUT* to some log file, it's probably wrong
+	     ;; to send errors which occur in interactive debugging to
+	     ;; that file, and right to send them to *DEBUG-IO*.
 	     (*error-output* *debug-io*))
 	 (unless (typep condition 'step-condition)
-	   (show-restarts *debug-restarts* *error-output*))
+	   (format *debug-io*
+		   "~%~@<entering the debugger because of ~S~:@_~:@_~
+                   Within the debugger, you can type HELP for help. At ~
+                   any command prompt (inside the debugger or not) you can ~
+                   type (SB-EXT:QUIT) to terminate the SBCL executable.~:@>~2%"
+		   '*debug-condition*)
+	   (show-restarts *debug-restarts* *debug-io*)
+	   (terpri *debug-io*))
 	 (internal-debug))))))
 
-(defun show-restarts (restarts &optional (s *error-output*))
+(defun show-restarts (restarts s)
   (when restarts
     (format s "~&restarts:~%")
     (let ((count 0)
@@ -681,18 +707,17 @@ reset to ~S."
 		 (push name names-used))))
 	(incf count)))))
 
-;;; This calls DEBUG-LOOP, performing some simple initializations before doing
-;;; so. INVOKE-DEBUGGER calls this to actually get into the debugger.
-;;; SB!CONDITIONS::ERROR-ERROR calls this in emergencies to get into a debug
-;;; prompt as quickly as possible with as little risk as possible for stepping
-;;; on whatever is causing recursive errors.
+;;; This calls DEBUG-LOOP, performing some simple initializations
+;;; before doing so. INVOKE-DEBUGGER calls this to actually get into
+;;; the debugger. SB!CONDITIONS::ERROR-ERROR calls this in emergencies
+;;; to get into a debug prompt as quickly as possible with as little
+;;; risk as possible for stepping on whatever is causing recursive
+;;; errors.
 (defun internal-debug ()
   (let ((*in-the-debugger* t)
 	(*read-suppress* nil))
     (unless (typep *debug-condition* 'step-condition)
-      (clear-input *debug-io*)
-      (format *debug-io*
-	      "~&Within the debugger, you can type HELP for help.~%"))
+      (clear-input *debug-io*))
     #!-mp (debug-loop)
     #!+mp (sb!mp:without-scheduling (debug-loop))))
 
@@ -736,7 +761,8 @@ reset to ~S."
 	      (with-simple-restart (abort
 				   "Reduce debugger level (to debug level ~D)."
 				    level)
-		(funcall *debug-prompt*)
+		(debug-prompt *debug-io*)
+		(force-output *debug-io*)
 		(let ((input (sb!int:get-stream-command *debug-io*)))
 		  (cond (input
 			 (let ((cmd-fun (debug-command-p
@@ -1124,7 +1150,7 @@ reset to ~S."
 (def-debug-command "RESTART" ()
   (let ((num (read-if-available :prompt)))
     (when (eq num :prompt)
-      (show-restarts *debug-restarts*)
+      (show-restarts *debug-restarts* *debug-io*)
       (write-string "restart: ")
       (force-output)
       (setf num (read *standard-input*)))
@@ -1163,8 +1189,8 @@ reset to ~S."
 (def-debug-command-alias "?" "HELP")
 
 (def-debug-command "ERROR" ()
-  (format t "~A~%" *debug-condition*)
-  (show-restarts *debug-restarts*))
+  (format *debug-io* "~A~%" *debug-condition*)
+  (show-restarts *debug-restarts* *debug-io*))
 
 (def-debug-command "BACKTRACE" ()
   (backtrace (read-if-available most-positive-fixnum)))

@@ -536,18 +536,6 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   into everyone's system when I do a "cvs update".) When no
   customize-target-features.lisp file exists, the target *FEATURES* list
   should be constructed the same way as before.
-* fixed bug 1 (error handling before read-eval-print loop starts), and
-  redid debugger restarts and related debugger commands somewhat while
-  doing so:
-  ** The QUIT debugger command is gone, since it did something
-     rather different than the SB-EXT:QUIT command, and since it never
-     worked properly outside the main toplevel read/eval/print loop.
-     Invoking the new TOPLEVEL restart provides the same functionality.
-  ** The GO debugger command is also gone, since you can just invoke
-     the CONTINUE restart directly instead.
-  ** The TOP debugger command is also gone, since it's redundant with the
-     FRAME 0 command, and since it interfered with abbreviations for the
-     TOPLEVEL restart.
 * fixed bugs in DEFCONSTANT ANSI-compatibility:
   ** DEFCONSTANT now tests reassignments using EQL, not EQUAL, in order to 
      warn about behavior which is undefined under the ANSI spec. Note: This
@@ -568,6 +556,18 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   incremented, because the old noncompliant DEFCONSTANT behavior involved
   calling functions which no longer exist, and because I also took the
   opportunity to chop an unsupported slot out of the DEBUG-SOURCE structure.
+* fixed bug 1 (error handling before read-eval-print loop starts), and
+  redid debugger restarts and related debugger commands somewhat while
+  doing so:
+  ** The QUIT debugger command is gone, since it did something
+     rather different than the SB-EXT:QUIT command, and since it never
+     worked properly outside the main toplevel read/eval/print loop.
+     Invoking the new TOPLEVEL restart provides the same functionality.
+  ** The GO debugger command is also gone, since you can just invoke
+     the CONTINUE restart directly instead.
+  ** The TOP debugger command is also gone, since it's redundant with the
+     FRAME 0 command, and since it interfered with abbreviations for the
+     TOPLEVEL restart.
 * removed bug 21 from BUGS, since Martin Atzmueller points out that 
   it doesn't seem to affect SBCL after all
 * The system now recovers better from non-PACKAGE values of the *PACKAGE*
@@ -576,8 +576,8 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   as required by ANSI. (thanks to Douglas Crosher's CMU CL patches, with
   some porting work by Martin Atzmueller)
 * Martin Atzmueller reviewed the CMU CL mailing lists and came back
-  with a boatload of other patches for SBCL, which he ported to 
-  SBCL. Now that those have been applied,
+  with a boatload of patches which he ported to SBCL. Now that those
+  have been applied,
   ** The system tries to make sure that its low-priority messages
      are prefixed by semicolons, to help people who like to use
      syntax highlighting in their ILISP buffer. (This patch
@@ -598,3 +598,10 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
      files, thanks to a patch originally from Douglas Crosher.
 * Martin Atzmueller also fixed ROOM, so that it no longer fails with an
   undefined function error.
+
+planned incompatible changes in 0.7.x:
+* The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
+  as you get deeper into recursive calls to the debugger command loop,
+  instead of the old "5]", "5]]", "5]]]" sequence. (I was motivated
+  to do this when ILISP and SBCL got into arguments which left me
+  deeply nested in the debugger.)

@@ -341,9 +341,9 @@ debugger interface mixed with various low-level implementation stuff
 like *STACK-TOP-HINT*"
     :use ("CL" "SB!EXT" "SB!INT" "SB!SYS")
     :export ("*AUTO-EVAL-IN-FRAME*" "*DEBUG-CONDITION*"
-	     "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*" "*DEBUG-READTABLE*"
-	     "*DEBUG-PROMPT*" "*DEBUG-HELP-STRING*" "*FLUSH-DEBUG-ERRORS*"
-             "*IN-THE-DEBUGGER*"
+	     "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*"
+             "*DEBUG-READTABLE*" "*DEBUG-HELP-STRING*"
+             "*FLUSH-DEBUG-ERRORS*" "*IN-THE-DEBUGGER*"
              "*TRACE-INDENTATION-STEP*" "*MAX-TRACE-INDENTATION*"
              "*TRACE-FRAME*" "*TRACE-PRINT-LENGTH*"
              "*TRACE-PRINT-LEVEL*" "*TRACED-FUNCTION-LIST*"

@@ -83,7 +83,7 @@
 	(when (and *print-length* (> n *print-length*))
 	  (format s "~:_...")
 	  (return))
-	(format s "~:_(~S ~S)" k v)))))
+	(format s "~:_(~@<~S ~:_~S~:>)" k v)))))
 
 (defmethod describe-object ((condition condition) s)
   (sb-conditions::describe-condition condition s))

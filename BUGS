@@ -27,14 +27,15 @@ NOTES:
 There is also some information on bugs in the manual page and
 in the TODO file. Eventually more such information may move here.
 
-The gaps in the number sequence belong to old bugs which have been
-fixed.
+The gaps in the number sequence belong to old bug descriptions which
+have gone away (typically because they were fixed, but sometimes for
+other reasons, e.g. because they were moved elsewhere).
 
 
 KNOWN BUGS OF NO SPECIAL CLASS:
 
 2:
-  DEFSTRUCT should almost certainly overwrite the old LAYOUT information
+  DEFSTRUCT almost certainly should overwrite the old LAYOUT information
   instead of just punting when a contradictory structure definition
   is loaded. As it is, if you redefine DEFSTRUCTs in a way which 
   changes their layout, you probably have to rebuild your entire

@@ -65,21 +65,7 @@
   (let ((caught (gensym "CAUGHT")))
     `(let ((,caught (catch '%end-of-the-world
 		      (/show0 "inside CATCH '%END-OF-THE-WORLD")
-		      (restart-case (progn ,@body)
-			;; KLUDGE: I'd like to name this restart QUIT,
-			;; but then people would hate me, since in CMU
-			;; CL, even though they have essentially the
-			;; same QUIT function as SBCL, the "QUIT"
-			;; command in the debugger means to return to
-			;; the toplevel, not to actually call QUIT. Oh
-			;; well. -- WHN 2000-11-01
-			(end-of-the-world ()
-			  :report (lambda (s)
-				    (format s
-					    "Terminate the current Lisp, ~
-                                            like #'~S."
-					    'quit))
-			  (quit))))))
+		      ,@body)))
        (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
        (flush-standard-output-streams)
        (/show0 "calling UNIX-EXIT")
