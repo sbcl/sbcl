@@ -77,19 +77,13 @@
 	    (integer
 	     (if (and (zerop val) (sc-is y any-reg descriptor-reg))
 		 (inst xor y y)
-		 (multiple-value-bind (lo hi) (dwords-for-quad (fixnumize val))
-		   (cond ((zerop hi)
-			  (inst mov y lo))
-			 (t
-			  (inst mov y hi)
-			  (inst shl y 32)
-			  (inst or y lo))))))
+		 (inst mov y (fixnumize val))))
 	    (symbol
 	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
 	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
 				 base-char-widetag)))))
-      (move y x))))
+	(move y x))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg immediate)
@@ -121,14 +115,8 @@
 	     (etypecase val
 	       ((integer 0 0)
 		(inst xor y y))
-	       ((or (signed-byte 29) (unsigned-byte 29))
-		(inst mov y (fixnumize val)))
 	       (integer
-		(multiple-value-bind (lo hi)
-		    (dwords-for-quad (fixnumize val))
-		  (inst mov y hi)
-		  (inst shl y 32)
-		  (inst or y lo)))
+		(inst mov y (fixnumize val)))
 	       (symbol
 		(load-symbol y val))
 	       (character

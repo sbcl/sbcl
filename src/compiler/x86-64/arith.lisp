@@ -134,7 +134,7 @@
   (:results (r :scs (signed-reg)
 	       :load-if (not (location= x r))))
   (:result-types signed-num)
-  (:note "inline (signed-byte 64) arithmetic"))
+  (:note "inline (signed-byte 32) arithmetic"))
 
 (macrolet ((define-binop (translate untagged-penalty op)
 	     `(progn

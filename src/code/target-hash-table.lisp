@@ -110,7 +110,6 @@
        don't keep entries if the key would otherwise be garbage."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
-  (/show0 "entering !make-hash-table")
   (when weak-p
     (error "stub: unsupported WEAK-P option"))
   (multiple-value-bind (test test-fun hash-fun)

@@ -204,6 +204,7 @@
    ((<= nvals register-arg-count)
     (let ((regs-defaulted (gen-label)))
       (note-this-location vop :unknown-return)
+      (inst nop)
       (inst jmp-short regs-defaulted)
       ;; Default the unsupplied registers.
       (let* ((2nd-tn-ref (tn-ref-across values))
@@ -228,6 +229,7 @@
 	  (default-stack-slots (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
+      (inst nop)
       (inst jmp-short regs-defaulted)
       ;; Do the single value case.
       ;; Default the register args
@@ -285,6 +287,7 @@
 	  (count-okay (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
+      (inst nop)
       (inst jmp-short regs-defaulted)
 
       ;; Default the register args, and set up the stack as if we
@@ -382,6 +385,7 @@
   (declare (type tn args nargs start count))
   (let ((variable-values (gen-label))
 	(done (gen-label)))
+    (inst nop)
     (inst jmp-short variable-values)
 
     (cond ((location= start (first *register-arg-tns*))
@@ -1262,7 +1266,7 @@
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
        ;; Convert the count into a raw value, so that we can use the
        ;; LOOP instruction.
-       (inst shr rcx (1- n-word-bytes))
+       (inst shr rcx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
        ;; Set up the result.
