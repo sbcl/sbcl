@@ -13,10 +13,30 @@
 
 #!-sb-fluid (declaim (freeze-type logical-pathname logical-host))
 
-;;; host methods
+;;;; UNIX-HOST stuff
 
-(def!method print-object ((host host) stream)
-  (print-unreadable-object (host stream :type t :identity t)))
+(def!struct (unix-host
+	     (:make-load-form-fun make-unix-host-load-form)
+	     (:include host
+		       (parse #'parse-unix-namestring)
+		       (unparse #'unparse-unix-namestring)
+		       (unparse-host #'unparse-unix-host)
+		       (unparse-directory #'unparse-unix-directory)
+		       (unparse-file #'unparse-unix-file)
+		       (unparse-enough #'unparse-unix-enough)
+		       (customary-case :lower))))
+
+(defvar *unix-host* (make-unix-host))
+
+(defun make-unix-host-load-form (host)
+  (declare (ignore host))
+  '*unix-host*)
+
+;;; Return a value suitable, e.g., for preinitializing
+;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
+;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
+(defun make-trivial-default-pathname ()
+  (%make-pathname *unix-host* nil nil nil nil :newest))
 
 ;;; pathname methods
 

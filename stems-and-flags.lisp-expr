@@ -120,6 +120,8 @@
 
  ("src/code/defbangstruct")
 
+ ("src/code/funutils" :not-host)
+
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline
  ;; later. (Avoiding full calls not only increases efficiency, but also
@@ -211,12 +213,12 @@
 
  ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
 
- ("src/code/symbol"         :not-host)
- ("src/code/bignum"         :not-host)
- ("src/code/target-numbers" :not-host)
- ("src/code/float-trap"     :not-host)
- ("src/code/float"          :not-host)
- ("src/code/irrat"          :not-host)
+ ("src/code/symbol"     :not-host)
+ ("src/code/bignum"     :not-host)
+ ("src/code/numbers"    :not-host)
+ ("src/code/float-trap" :not-host)
+ ("src/code/float"      :not-host)
+ ("src/code/irrat"      :not-host)
 
  ("src/code/char")
  ("src/code/target-char" :not-host)
@@ -431,7 +433,9 @@
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
+ ("src/compiler/ir1-translators")
  ("src/compiler/ir1util")
+ ("src/compiler/ir1report")
  ("src/compiler/ir1opt")
 
  ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and

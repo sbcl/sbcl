@@ -23,91 +23,91 @@
 	  assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
 	  subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
-;;; These functions perform basic list operations:
-(defun car (list) #!+sb-doc "Returns the 1st object in a list." (car list))
+;;; These functions perform basic list operations.
+(defun car (list) #!+sb-doc "Return the 1st object in a list." (car list))
 (defun cdr (list)
-  #!+sb-doc "Returns all but the first object in a list."
+  #!+sb-doc "Return all but the first object in a list."
   (cdr list))
-(defun cadr (list) #!+sb-doc "Returns the 2nd object in a list." (cadr list))
-(defun cdar (list) #!+sb-doc "Returns the cdr of the 1st sublist." (cdar list))
-(defun caar (list) #!+sb-doc "Returns the car of the 1st sublist." (caar list))
+(defun cadr (list) #!+sb-doc "Return the 2nd object in a list." (cadr list))
+(defun cdar (list) #!+sb-doc "Return the cdr of the 1st sublist." (cdar list))
+(defun caar (list) #!+sb-doc "Return the car of the 1st sublist." (caar list))
 (defun cddr (list)
-  #!+sb-doc "Returns all but the 1st two objects of a list."
+  #!+sb-doc "Return all but the 1st two objects of a list."
   (cddr list))
 (defun caddr (list)
-  #!+sb-doc "Returns the 1st object in the cddr of a list."
+  #!+sb-doc "Return the 1st object in the cddr of a list."
   (caddr list))
 (defun caadr (list)
-  #!+sb-doc "Returns the 1st object in the cadr of a list."
+  #!+sb-doc "Return the 1st object in the cadr of a list."
   (caadr list))
 (defun caaar (list)
-  #!+sb-doc "Returns the 1st object in the caar of a list."
+  #!+sb-doc "Return the 1st object in the caar of a list."
   (caaar list))
 (defun cdaar (list)
-  #!+sb-doc "Returns the cdr of the caar of a list."
+  #!+sb-doc "Return the cdr of the caar of a list."
   (cdaar list))
 (defun cddar (list)
-  #!+sb-doc "Returns the cdr of the cdar of a list."
+  #!+sb-doc "Return the cdr of the cdar of a list."
   (cddar list))
 (defun cdddr (list)
-  #!+sb-doc "Returns the cdr of the cddr of a list."
+  #!+sb-doc "Return the cdr of the cddr of a list."
   (cdddr list))
 (defun cadar (list)
-  #!+sb-doc "Returns the car of the cdar of a list."
+  #!+sb-doc "Return the car of the cdar of a list."
   (cadar list))
 (defun cdadr (list)
-  #!+sb-doc "Returns the cdr of the cadr of a list."
+  #!+sb-doc "Return the cdr of the cadr of a list."
   (cdadr list))
 (defun caaaar (list)
-  #!+sb-doc "Returns the car of the caaar of a list."
+  #!+sb-doc "Return the car of the caaar of a list."
   (caaaar list))
 (defun caaadr (list)
-  #!+sb-doc "Returns the car of the caadr of a list."
+  #!+sb-doc "Return the car of the caadr of a list."
   (caaadr list))
 (defun caaddr (list)
-  #!+sb-doc "Returns the car of the caddr of a list."
+  #!+sb-doc "Return the car of the caddr of a list."
   (caaddr list))
 (defun cadddr (list)
-  #!+sb-doc "Returns the car of the cdddr of a list."
+  #!+sb-doc "Return the car of the cdddr of a list."
   (cadddr list))
 (defun cddddr (list)
-  #!+sb-doc "Returns the cdr of the cdddr of a list."
+  #!+sb-doc "Return the cdr of the cdddr of a list."
   (cddddr list))
 (defun cdaaar (list)
-  #!+sb-doc "Returns the cdr of the caaar of a list."
+  #!+sb-doc "Return the cdr of the caaar of a list."
   (cdaaar list))
 (defun cddaar (list)
-  #!+sb-doc "Returns the cdr of the cdaar of a list."
+  #!+sb-doc "Return the cdr of the cdaar of a list."
   (cddaar list))
 (defun cdddar (list)
-  #!+sb-doc "Returns the cdr of the cddar of a list."
+  #!+sb-doc "Return the cdr of the cddar of a list."
   (cdddar list))
 (defun caadar (list)
-  #!+sb-doc "Returns the car of the cadar of a list."
+  #!+sb-doc "Return the car of the cadar of a list."
   (caadar list))
 (defun cadaar (list)
-  #!+sb-doc "Returns the car of the cdaar of a list."
+  #!+sb-doc "Return the car of the cdaar of a list."
   (cadaar list))
 (defun cadadr (list)
-  #!+sb-doc "Returns the car of the cdadr of a list."
+  #!+sb-doc "Return the car of the cdadr of a list."
   (cadadr list))
 (defun caddar (list)
-  #!+sb-doc "Returns the car of the cddar of a list."
+  #!+sb-doc "Return the car of the cddar of a list."
   (caddar list))
 (defun cdaadr (list)
-  #!+sb-doc "Returns the cdr of the caadr of a list."
+  #!+sb-doc "Return the cdr of the caadr of a list."
   (cdaadr list))
 (defun cdadar (list)
-  #!+sb-doc "Returns the cdr of the cadar of a list."
+  #!+sb-doc "Return the cdr of the cadar of a list."
   (cdadar list))
 (defun cdaddr (list)
-  #!+sb-doc "Returns the cdr of the caddr of a list."
+  #!+sb-doc "Return the cdr of the caddr of a list."
   (cdaddr list))
 (defun cddadr (list)
-  #!+sb-doc "Returns the cdr of the cdadr of a list."
+  #!+sb-doc "Return the cdr of the cdadr of a list."
   (cddadr list))
 (defun cons (se1 se2)
-  #!+sb-doc "Returns a list with se1 as the car and se2 as the cdr."
+  #!+sb-doc "Return a list with SE1 as the CAR and SE2 as the CDR."
   (cons se1 se2))
 
 (declaim (maybe-inline tree-equal-test tree-equal-test-not))
@@ -479,40 +479,12 @@
 ;;;; :KEY arg optimization to save funcall of IDENTITY
 
 ;;; APPLY-KEY saves us a function call sometimes.
-;;;    This is not wrapped in an (EVAL-WHEN (COMPILE EVAL) ..)
-;;;    because this is used in seq.lisp and sort.lisp.
+;;;    This isn't wrapped in an (EVAL-WHEN (COMPILE EVAL) ..)
+;;;    because it's used in seq.lisp and sort.lisp.
 (defmacro apply-key (key element)
   `(if ,key
        (funcall ,key ,element)
        ,element))
-
-(defun identity (thing)
-  #!+sb-doc
-  "This function simply returns what was passed to it."
-  thing)
-
-(defun complement (function)
-  #!+sb-doc
-  "Return a new function that returns T whenever FUNCTION returns NIL and
-   NIL whenever FUNCTION returns non-NIL."
-  (lambda (&optional (arg0 nil arg0-p) (arg1 nil arg1-p) (arg2 nil arg2-p)
-		     &rest more-args)
-    (not (cond (more-args (apply function arg0 arg1 arg2 more-args))
-	       (arg2-p (funcall function arg0 arg1 arg2))
-	       (arg1-p (funcall function arg0 arg1))
-	       (arg0-p (funcall function arg0))
-	       (t (funcall function))))))
-
-(defun constantly (value)
-  #!+sb-doc
-  "Return a function that always returns VALUE."
-  (lambda ()
-    ;; KLUDGE: This declaration is a hack to make the closure ignore
-    ;; all its arguments without consing a &REST list or anything.
-    ;; Perhaps once DYNAMIC-EXTENT is implemented we won't need to
-    ;; screw around with this kind of thing. -- WHN 2001-04-06
-    (declare (optimize (speed 3) (safety 0)))
-    value))
 
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 

@@ -482,29 +482,6 @@
 	    (t
 	     (lose)))))
       (apply #'concatenate 'simple-string (strings)))))
-
-(/show0 "filesys.lisp 471")
-
-(def!struct (unix-host
-	     (:make-load-form-fun make-unix-host-load-form)
-	     (:include host
-		       (parse #'parse-unix-namestring)
-		       (unparse #'unparse-unix-namestring)
-		       (unparse-host #'unparse-unix-host)
-		       (unparse-directory #'unparse-unix-directory)
-		       (unparse-file #'unparse-unix-file)
-		       (unparse-enough #'unparse-unix-enough)
-		       (customary-case :lower))))
-
-(/show0 "filesys.lisp 486")
-
-(defvar *unix-host* (make-unix-host))
-
-(/show0 "filesys.lisp 488")
-
-(defun make-unix-host-load-form (host)
-  (declare (ignore host))
-  '*unix-host*)
 
 ;;;; wildcard matching stuff
 

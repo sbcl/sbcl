@@ -670,25 +670,11 @@
       (link-blocks call-block bind-block)
       next-block)))
 
-;;; Handle the environment semantics of LET conversion. We add the
-;;; lambda and its LETs to LETs for the CALL's home function. We merge
-;;; the calls for FUN with the calls for the home function, removing
-;;; FUN in the process. We also merge the ENTRIES.
-;;;
-;;; We also unlink the function head from the component head and set
-;;; COMPONENT-REANALYZE to true to indicate that the DFO should be
-;;; recomputed.
-(defun merge-lets (fun call)
-
-  (declare (type clambda fun) (type basic-combination call))
-
-  (let ((component (block-component (node-block call))))
-    (unlink-blocks (component-head component) (node-block (lambda-bind fun)))
-    (setf (component-lambdas component)
-	  (delete fun (component-lambdas component)))
-    (setf (component-reanalyze component) t))
-  (setf (lambda-call-lexenv fun) (node-lexenv call))
-
+;;; Remove FUN from the tail set of anything it used to be in the
+;;; same set as; but leave FUN with a valid tail set value of
+;;; its own, for the benefit of code which might try to pull
+;;; something out of it (e.g. return type).
+(defun depart-from-tail-set (fun)
   ;; Until sbcl-0.pre7.37.flaky5.2, we did
   ;;   (LET ((TAILS (LAMBDA-TAIL-SET FUN)))
   ;;     (SETF (TAIL-SET-FUNCTIONS TAILS)
@@ -711,13 +697,14 @@
   ;; To deal with this problem, we no longer NIL out 
   ;; (LAMBDA-TAIL-SET FUN) here. Instead:
   ;;   * If we're the only function in TAIL-SET-FUNCTIONS, it should
-  ;;     be safe to leave ourself linked to it, and vice versa.
+  ;;     be safe to leave ourself linked to it, and it to you.
   ;;   * If there are other functions in TAIL-SET-FUNCTIONS, then we're
   ;;     afraid of future optimizations on those functions causing
   ;;     the TAIL-SET object no longer to be valid to describe our
   ;;     return value. Thus, we delete ourselves from that object;
-  ;;     but we save a copy of the object for ourselves, for the use of
-  ;;     later code (e.g. FINALIZE-XEP-DEFINITION) which might want to
+  ;;     but we save a newly-allocated tail-set, derived from the old
+  ;;     one, for ourselves, for the use of later code (e.g.
+  ;;     FINALIZE-XEP-DEFINITION) which might want to
   ;;     know about our return type.
   (let* ((old-tail-set (lambda-tail-set fun))
 	 (old-tail-set-functions (tail-set-functions old-tail-set)))
@@ -727,10 +714,32 @@
       (let ((new-tail-set (copy-tail-set old-tail-set)))
 	(setf (lambda-tail-set fun) new-tail-set
 	      (tail-set-functions new-tail-set) (list fun)))))
-  ;; The documentation on TAIL-SET-INFO doesn't tell whether it
-  ;; remains valid in this case, so we nuke it on the theory that
-  ;; missing information is less dangerous than incorrect information.
-  (setf (tail-set-info (lambda-tail-set fun)) nil)
+  ;; The documentation on TAIL-SET-INFO doesn't tell whether it could
+  ;; remain valid in this case, so we nuke it on the theory that
+  ;; missing information tends to be less dangerous than incorrect
+  ;; information.
+  (setf (tail-set-info (lambda-tail-set fun)) nil))
+
+;;; Handle the environment semantics of LET conversion. We add the
+;;; lambda and its LETs to LETs for the CALL's home function. We merge
+;;; the calls for FUN with the calls for the home function, removing
+;;; FUN in the process. We also merge the ENTRIES.
+;;;
+;;; We also unlink the function head from the component head and set
+;;; COMPONENT-REANALYZE to true to indicate that the DFO should be
+;;; recomputed.
+(defun merge-lets (fun call)
+
+  (declare (type clambda fun) (type basic-combination call))
+
+  (let ((component (block-component (node-block call))))
+    (unlink-blocks (component-head component) (node-block (lambda-bind fun)))
+    (setf (component-lambdas component)
+	  (delete fun (component-lambdas component)))
+    (setf (component-reanalyze component) t))
+  (setf (lambda-call-lexenv fun) (node-lexenv call))
+
+  (depart-from-tail-set fun)
 
   (let* ((home (node-home-lambda call))
 	 (home-env (lambda-environment home)))
