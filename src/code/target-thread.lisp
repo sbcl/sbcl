@@ -242,11 +242,12 @@ time we reacquire LOCK and return to the caller."
 (defun maybe-install-futex-functions ()
   #!+sb-futex
   (unless (zerop (extern-alien "linux_supports_futex" int))
-    (setf (fdefinition 'get-mutex) #'get-mutex/futex
-	  (fdefinition 'release-mutex) #'release-mutex/futex
-	  (fdefinition 'condition-wait) #'condition-wait/futex
-	  (fdefinition 'condition-broadcast) #'condition-broadcast/futex
-	  (fdefinition 'condition-notify) #'condition-notify/futex)
+    (sb!ext:without-package-locks
+      (setf (fdefinition 'get-mutex) #'get-mutex/futex
+            (fdefinition 'release-mutex) #'release-mutex/futex
+            (fdefinition 'condition-wait) #'condition-wait/futex
+            (fdefinition 'condition-broadcast) #'condition-broadcast/futex
+            (fdefinition 'condition-notify) #'condition-notify/futex))
     t))
 
 (defun make-thread (function)
