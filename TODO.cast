@@ -9,6 +9,7 @@ important things:
 * good type error diagnostics
 * VALUES declaration
 * do we always check types of unused values?
+* (!) CONTINUATION-EXTERNALLY-CHECKABLE-TYPE
 
 =======================================================================
 for late cast branch or post-merge:

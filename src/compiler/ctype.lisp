@@ -783,3 +783,16 @@
                             use EQ comparison)~@:>"
 			   (continuation-source tag)
 			   (type-specifier (continuation-type tag))))))
+
+(defun %compile-time-type-error (values type)
+  ;; FIXME: Error message.
+  (%type-check-error values type))
+
+(defoptimizer (%compile-time-type-error ir2-convert)
+    ((objects type) node block)
+  (let ((*compiler-error-context* node))
+    ;; FIXME: Asserted type; error context.
+    (compiler-warn
+     "Asserted type ~S conflicts with derived type ???."
+     (continuation-value (second (basic-combination-args node))))
+    (ir2-convert-full-call node block)))

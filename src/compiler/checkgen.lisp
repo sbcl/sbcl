@@ -225,62 +225,63 @@
          (value (cast-value cast))
          (dest (continuation-dest cont)))
     (aver (not (eq ctype *wild-type*)))
-    (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
-      (multiple-value-bind (atypes acount) (no-fun-values-types atype)
-        (aver (eq count acount))
-        (cond ((not (eq count :unknown))
-               (let ((dtype (coerce-to-values (node-derived-type cast))))
-                 (setf (node-derived-type cast)
-                       (make-values-type
-                        :required (adjust-list (values-type-types dtype)
-                                               count
-                                               (or (values-type-rest dtype)
-                                                   *universal-type*)))))
-               (if (or (exit-p dest)
-                       (and (return-p dest)
-                            (multiple-value-bind (ignore count)
-                                (values-types (return-result-type dest))
-                              (declare (ignore ignore))
-                              (eq count :unknown))))
-                   (maybe-negate-check value ctypes atypes t)
-                   (maybe-negate-check value ctypes atypes force-hairy)))
-              ((and (continuation-single-value-p cont)
-                    (or (not (values-type-p ctype))
-                        (not (args-type-rest ctype))
-                        (eq (args-type-rest ctype) *universal-type*)))
-               (when (values-type-p ctype)
-                 (let ((creq (car (args-type-required ctype))))
-                   (multiple-value-setq (ctype atype)
-                     (if creq
-                         (values creq (car (args-type-required atype)))
-                         (values (car (args-type-optional ctype))
-                                 (car (args-type-optional atype)))))
-                   (setf (cast-type-to-check cast)
-                         (make-values-type :required (list ctype)))
-                   (setf (cast-asserted-type cast)
-                         (make-values-type :required (list atype)))))
+    (flet ((adjust-cast-type (length)
+             (let ((dtype (coerce-to-values (node-derived-type cast))))
                (setf (node-derived-type cast)
-                     (single-value-type (node-derived-type cast)))
-               (maybe-negate-check value
-                                   (list ctype) (list atype)
-                                   force-hairy))
-              ((and (mv-combination-p dest)
-                    (eq (mv-combination-kind dest) :local))
-               (aver (values-type-p ctype))
-               (aver (null (args-type-required atype)))
-               (aver (null (args-type-required ctype)))
-               (let* ((fun-ref (continuation-use (mv-combination-fun dest)))
-                      (length (length (lambda-vars (ref-leaf fun-ref)))))
+                     (make-values-type
+                      :required (adjust-list (values-type-types dtype)
+                                             length
+                                             (or (values-type-rest dtype)
+                                                 *universal-type*)))))))
+      (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
+        (multiple-value-bind (atypes acount) (no-fun-values-types atype)
+          (aver (eq count acount))
+          (cond ((not (eq count :unknown))
+                 (adjust-cast-type count)
+                 (if (or (exit-p dest)
+                         (and (return-p dest)
+                              (multiple-value-bind (ignore count)
+                                  (values-types (return-result-type dest))
+                                (declare (ignore ignore))
+                                (eq count :unknown))))
+                     (maybe-negate-check value ctypes atypes t)
+                     (maybe-negate-check value ctypes atypes force-hairy)))
+                ((and (continuation-single-value-p cont)
+                      (or (not (values-type-p ctype))
+                          (not (args-type-rest ctype))
+                          (eq (args-type-rest ctype) *universal-type*)))
+                 (when (values-type-p ctype)
+                   (let ((creq (car (args-type-required ctype))))
+                     (multiple-value-setq (ctype atype)
+                       (if creq
+                           (values creq (car (args-type-required atype)))
+                           (values (car (args-type-optional ctype))
+                                   (car (args-type-optional atype)))))
+                     (setf (cast-type-to-check cast)
+                           (make-values-type :required (list ctype)))
+                     (setf (cast-asserted-type cast)
+                           (make-values-type :required (list atype)))))
+                 (setf (node-derived-type cast)
+                       (single-value-type (node-derived-type cast)))
                  (maybe-negate-check value
-                                     (adjust-list (args-type-optional ctype)
-                                                  length
-                                                  *universal-type*)
-                                     (adjust-list (args-type-optional atype)
-                                                  length
-                                                  *universal-type*)
-                                     force-hairy)))
-              (t
-               (values :too-hairy nil)))))))
+                                     (list ctype) (list atype)
+                                     force-hairy))
+                ((and (mv-combination-p dest)
+                      (eq (mv-combination-kind dest) :local))
+                 (let* ((fun-ref (continuation-use (mv-combination-fun dest)))
+                        (length (length (lambda-vars (ref-leaf fun-ref)))))
+                   (adjust-cast-type length)
+                   (maybe-negate-check value
+                                       ;; FIXME
+                                       (adjust-list (values-type-types ctype)
+                                                    length
+                                                    *universal-type*)
+                                       (adjust-list (values-type-types atype)
+                                                    length
+                                                    *universal-type*)
+                                       force-hairy)))
+                (t
+                 (values :too-hairy nil))))))))
 
 ;;; Do we want to do a type check?
 (defun worth-type-check-p (cast)
@@ -349,33 +350,29 @@
 			  (when (or val (not win)) (return t)))))))))
 	  (t t))))
 
-;;; Return a form that we can convert to do a hairy type check of the
-;;; specified TYPES. TYPES is a list of the format returned by
-;;; CONTINUATION-CHECK-TYPES in the :HAIRY case. In place of the
-;;; actual value(s) we are to check, we use 'DUMMY. This constant
-;;; reference is later replaced with the actual values continuation.
+;;; Return a lambda form that we can convert to do a hairy type check
+;;; of the specified TYPES. TYPES is a list of the format returned by
+;;; CONTINUATION-CHECK-TYPES in the :HAIRY case.
 ;;;
 ;;; Note that we don't attempt to check for required values being
 ;;; unsupplied. Such checking is impossible to efficiently do at the
 ;;; source level because our fixed-values conventions are optimized
 ;;; for the common MV-BIND case.
-;;;
-;;; We can always use MULTIPLE-VALUE-BIND, since the macro is clever
-;;; about binding a single variable.
 (defun make-type-check-form (types)
   (let ((temps (make-gensym-list (length types))))
-    `(multiple-value-bind ,temps 'dummy
+    `(multiple-value-bind ,temps
+         'dummy
        ,@(mapcar (lambda (temp type)
-		   (let* ((spec
-			   (let ((*unparse-fun-type-simplify* t))
-			     (type-specifier (second type))))
-			  (test (if (first type) `(not ,spec) spec)))
-		     `(unless (typep ,temp ',test)
-			(%type-check-error
-			 ,temp
-			 ',(type-specifier (third type))))))
-		 temps
-		 types)
+                   (let* ((spec
+                           (let ((*unparse-fun-type-simplify* t))
+                             (type-specifier (second type))))
+                          (test (if (first type) `(not ,spec) spec)))
+                     `(unless (typep ,temp ',test)
+                        (%type-check-error
+                         ,temp
+                         ',(type-specifier (third type))))))
+                 temps
+                 types)
        (truly-the ,(if (proper-list-of-length-p types 1)
                        (type-specifier (third (car types)))
                        `(values ,@(mapcar #'(lambda (type)
@@ -390,81 +387,10 @@
 (defun convert-type-check (cast types)
   (declare (type cast cast) (type list types))
   (let ((cont (cast-value cast)))
-    (with-ir1-environment-from-node cast
-
-      ;; Ensuring that CONT starts a block lets us freely manipulate its uses.
-      (ensure-block-start cont)
-
-      ;; Make a new continuation and move CONT's uses to it.
-      (let ((new-start (make-continuation))
-            (prev (node-prev cast)))
-        (continuation-starts-block new-start)
-        (substitute-continuation-uses new-start cont)
-
-        ;; Make the CAST node start its block so that we can splice in
-        ;; the type check code.
-        (when (continuation-use prev)
-          (node-ends-block (continuation-use prev)))
-
-        (let* ((prev-block (continuation-block prev))
-               (new-block (continuation-block new-start))
-               (dummy (make-continuation)))
-
-          ;; Splice in the new block before DEST, giving the new block
-          ;; all of DEST's predecessors.
-          (dolist (block (block-pred prev-block))
-            (change-block-successor block prev-block new-block))
-
-          ;; Convert the check form, using the new block start as START
-          ;; and a dummy continuation as CONT.
-          (ir1-convert new-start dummy (make-type-check-form types))
-
-          ;; TO DO: Why should this be true? -- WHN 19990601
-          (aver (eq (continuation-block dummy) new-block))
-
-          ;; KLUDGE: Comments at the head of this function in CMU CL
-          ;; said that somewhere in here we
-          ;;   Set the new block's start and end cleanups to the *start*
-          ;;   cleanup of PREV's block. This overrides the incorrect
-          ;;   default from WITH-IR1-ENVIRONMENT-FROM-NODE.
-          ;; Unfortunately I can't find any code which corresponds to this.
-          ;; Perhaps it was a stale comment? Or perhaps I just don't
-          ;; understand.. -- WHN 19990521
-
-          (let ((node (continuation-use dummy)))
-            (setf (block-last new-block) node)
-            ;; Change the use to a use of CONT. (We need to use the
-            ;; dummy continuation to get the control transfer right,
-            ;; because we want to go to PREV's block, not CONT's.)
-            (delete-continuation-use node)
-            (add-continuation-use node cont))
-          ;; Link the new block to PREV's block.
-          (link-blocks new-block prev-block))
-
-        ;; MAKE-TYPE-CHECK-FORM generated a form which checked the type
-        ;; of 'DUMMY, not a real form. At this point we convert to the
-        ;; real form by finding 'DUMMY and overwriting it with the new
-        ;; continuation. (We can find 'DUMMY because no LET conversion
-        ;; has been done yet.) The [mv-]combination code from the
-        ;; mv-bind in the check form will be the use of the new check
-        ;; continuation. We substitute for the first argument of this
-        ;; node.
-        (let* ((node (continuation-use cont))
-               (args (basic-combination-args node))
-               (victim (first args)))
-          (aver (and (= (length args) 1)
-		     (eq (constant-value
-			  (ref-leaf
-			   (continuation-use victim)))
-			 'dummy)))
-          (substitute-continuation new-start victim)))
-
-      ;; Invoking local call analysis converts this call to a LET.
-      (locall-analyze-component *current-component*)
-
-      (reoptimize-continuation (cast-value cast))
-      (setf (cast-type-to-check cast) *wild-type*)
-      (setf (cast-%type-check cast) nil)))
+    (filter-continuation cont (make-type-check-form types))
+    (reoptimize-continuation (cast-value cast))
+    (setf (cast-type-to-check cast) *wild-type*)
+    (setf (cast-%type-check cast) nil))
 
   (values))
 

@@ -1715,10 +1715,27 @@
       (when (eq int *empty-type*)
         (unless (or (eq value-type *empty-type*)
                     (eq atype *empty-type*))
-          (let ((*compiler-error-context* cast))
-            (compiler-style-warn
-             "Asserted type ~S conflicts with derived type ~S."
-             (type-specifier atype) (type-specifier value-type)))))
+
+          ;; FIXME: Do it in one step.
+          (filter-continuation
+           value
+           `(multiple-value-call #'list 'dummy))
+          (filter-continuation
+           value
+           ;; FIXME: Derived type.
+           `(%compile-time-type-error 'dummy ',(type-specifier atype)))
+          ;; KLUDGE: FILTER-CONTINUATION does not work for
+          ;; non-returning functions, so we declare the return type of
+          ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
+          ;; here.
+          (derive-node-type (continuation-use value) *empty-type*)
+          (maybe-terminate-block (continuation-use value) nil)
+
+          ;; FIXME: Is it necessary?
+          (aver (null (block-pred (node-block cast))))
+          (setf (block-delete-p (node-block cast)) t)
+
+          (return-from ir1-optimize-cast)))
       (when (eq (node-derived-type cast) *empty-type*)
         (maybe-terminate-block cast nil)))
     (cond

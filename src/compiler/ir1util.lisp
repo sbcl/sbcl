@@ -237,6 +237,89 @@
 		(node-ends-block (continuation-use cont))))))))
   (values))
 
+;;;;
+
+;;; Filter values of CONT with a destination through FORM, which must
+;;; be an ordinary/mv call. First argument must be 'DUMMY, which will
+;;; be replaced with CONT. In case of an ordinary call the function
+;;; should not have return type NIL.
+;;;
+;;; TODO: remove preconditions.
+(defun filter-continuation (cont form)
+  (declare (type continuation cont) (type list form))
+  (let ((dest (continuation-dest cont)))
+    (declare (type node dest))
+    (with-ir1-environment-from-node dest
+
+      ;; Ensuring that CONT starts a block lets us freely manipulate its uses.
+      (ensure-block-start cont)
+
+      ;; Make a new continuation and move CONT's uses to it.
+      (let ((new-start (make-continuation))
+            (prev (node-prev dest)))
+        (continuation-starts-block new-start)
+        (substitute-continuation-uses new-start cont)
+
+        ;; Make the DEST node start its block so that we can splice in
+        ;; the LAMBDA code.
+        (when (continuation-use prev)
+          (node-ends-block (continuation-use prev)))
+
+        (let* ((prev-block (continuation-block prev))
+               (new-block (continuation-block new-start))
+               (dummy (make-continuation)))
+
+          ;; Splice in the new block before DEST, giving the new block
+          ;; all of DEST's predecessors.
+          (dolist (block (block-pred prev-block))
+            (change-block-successor block prev-block new-block))
+
+          ;; Convert the lambda form, using the new block start as
+          ;; START and a dummy continuation as CONT.
+          (ir1-convert new-start dummy form)
+
+          ;; TODO: Why should this be true? -- WHN 19990601
+          ;;
+          ;; It is somehow related to the precondition of non-NIL
+          ;; return type of the function. -- APD 2003-3-24
+          (aver (eq (continuation-block dummy) new-block))
+
+          ;; KLUDGE: Comments at the head of this function in CMU CL
+          ;; said that somewhere in here we
+          ;;   Set the new block's start and end cleanups to the *start*
+          ;;   cleanup of PREV's block. This overrides the incorrect
+          ;;   default from WITH-IR1-ENVIRONMENT-FROM-NODE.
+          ;; Unfortunately I can't find any code which corresponds to this.
+          ;; Perhaps it was a stale comment? Or perhaps I just don't
+          ;; understand.. -- WHN 19990521
+
+          (let ((node (continuation-use dummy)))
+            (setf (block-last new-block) node)
+            ;; Change the use to a use of CONT. (We need to use the
+            ;; dummy continuation to get the control transfer right,
+            ;; because we want to go to PREV's block, not CONT's.)
+            (delete-continuation-use node)
+            (add-continuation-use node cont))
+          ;; Link the new block to PREV's block.
+          (link-blocks new-block prev-block))
+
+        ;; Replace 'DUMMY with the new continuation. (We can find
+        ;; 'DUMMY because no LET conversion has been done yet.) The
+        ;; [mv-]combination code from the call in the form will be the
+        ;; use of the new check continuation. We substitute for the
+        ;; first argument of this node.
+        (let* ((node (continuation-use cont))
+               (args (basic-combination-args node))
+               (victim (first args)))
+          (aver (eq (constant-value (ref-leaf (continuation-use victim)))
+                    'dummy))
+          (substitute-continuation new-start victim)))
+
+      ;; Invoking local call analysis converts this call to a LET.
+      (locall-analyze-component *current-component*)
+
+      (values))))
+
 ;;;; miscellaneous shorthand functions
 
 ;;; Return the home (i.e. enclosing non-LET) CLAMBDA for NODE. Since

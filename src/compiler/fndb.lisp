@@ -676,7 +676,7 @@
 
 (defknown tree-equal (t t &key (:test callable) (:test-not callable)) boolean
   (foldable flushable call))
-(defknown endp (t) boolean (foldable unsafely-flushable movable))
+(defknown endp (t) boolean (foldable flushable movable))
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
 (defknown nth (index list) t (foldable flushable))
 (defknown nthcdr (index list) t (foldable unsafely-flushable))
@@ -1311,6 +1311,11 @@
 (defknown %%primitive (t t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %type-check-error (t t) nil)
+
+;; FIXME: This function does not return, but due to the implementation
+;; of FILTER-CONTINUATION we cannot write it here.
+(defknown %compile-time-type-error (t t) *)
+
 (defknown %odd-key-args-error () nil)
 (defknown %unknown-key-arg-error (t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte
