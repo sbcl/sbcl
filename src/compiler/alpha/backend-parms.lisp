@@ -17,7 +17,6 @@
 
 ;;;; compiler constants
 
-(setf *backend-fasl-file-type* "axpf")
 (defconstant +backend-fasl-file-implementation+ :alpha)
 
 (setf *backend-register-save-penalty* 3)

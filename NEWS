@@ -813,6 +813,8 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   fasl file version.
 
 changes in sbcl-0.7.0 relative to sbcl-0.6.13:
+* incompatible change: The default fasl file extension has changed
+  to ".fasl", for all architectures. (No longer ".x86f" and ".axpf".) 
 * There are new compiler optimizations for various functions: FIND,
   POSITION, FIND-IF, POSITION-IF, FILL, COERCE, TRUNCATE, FLOOR, and
   CEILING. Mostly these should be transparent, but there's one 
@@ -851,7 +853,7 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
-?? lots of tidying up internally: renaming things so that names are
+* lots of tidying up internally: renaming things so that names are
   more systematic and consistent, converting C macros to inline
   functions, systematizing indentation
 * The fasl file version number changed again, for any number of
@@ -863,7 +865,6 @@ planned incompatible changes in 0.7.x:
   instead of the old "5]", "5]]", "5]]]" sequence. (I was motivated
   to do this when squabbles between ILISP and SBCL left me
   very deeply nested in the debugger.)
-* The fasl file extension may change, perhaps to ".fasl".
 * The default output representation for unprintable ASCII characters 
   which, unlike e.g. #\Newline, don't have names defined in the 
   ANSI Common Lisp standard, may change to their ASCII symbolic

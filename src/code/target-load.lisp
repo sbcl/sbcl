@@ -80,7 +80,7 @@
 	   (internal-load pathname truename if-does-not-exist verbose print
 			  :binary))
 	  (t
-	   (when (string= (pathname-type truename) *backend-fasl-file-type*)
+	   (when (string= (pathname-type truename) *fasl-file-type*)
 	     (error "File has a fasl file type, but no fasl file header:~%  ~S"
 		    (namestring truename)))
 	   (internal-load pathname truename if-does-not-exist verbose print
@@ -106,7 +106,7 @@
   (multiple-value-bind (src-pn src-tn)
       (try-default-type pathname *load-source-default-type*)
     (multiple-value-bind (obj-pn obj-tn)
-	(try-default-type pathname *backend-fasl-file-type*)
+	(try-default-type pathname *fasl-file-type*)
       (cond
        ((and obj-tn
 	     src-tn

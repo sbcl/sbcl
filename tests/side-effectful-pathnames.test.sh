@@ -39,7 +39,7 @@ $SBCL <<EOF
   (load "TEST:$StudlyCapsStem")
   (assert (eq *loaded* :yes))
   (let ((compiled-file-name (namestring (compile-file "TEST:$StudlyCapsStem")))
-        (expected-file-name "$testdir/$testfilestem.x86f"))
+        (expected-file-name "$testdir/$testfilestem.fasl"))
     (format t "compiled-file-name=~S~%" compiled-file-name)
     (format t "expected-file-name=~S~%" expected-file-name)
     (assert (string= compiled-file-name expected-file-name)))

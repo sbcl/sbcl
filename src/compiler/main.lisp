@@ -1455,8 +1455,7 @@
 ;;; compiled files.
 (defun cfp-output-file-default (input-file)
   (let* ((defaults (merge-pathnames input-file *default-pathname-defaults*))
-	 (retyped (make-pathname :type *backend-fasl-file-type*
-				 :defaults defaults)))
+	 (retyped (make-pathname :type *fasl-file-type* :defaults defaults)))
     retyped))
 	
 ;;; KLUDGE: Part of the ANSI spec for this seems contradictory:

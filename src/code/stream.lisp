@@ -566,7 +566,7 @@
 	(stream-fresh-line stream))))
 
 (defun write-string (string &optional (stream *standard-output*)
-			    &key (start 0) (end (length (the vector string))))
+			    &key (start 0) (end (length (the string string))))
 
   ;; FIXME: These SETFs don't look right to me. Looking at the
   ;; definition of "bounding indices" in the glossary of the ANSI

@@ -67,10 +67,9 @@
 ;;; 15 = sbcl-0.6.12.33 changed the layout of STREAM
 ;;; 16 = sbcl-0.pre7.15 changed the layout of PRETTY-STREAM
 
-;;; the conventional file extension for fasl files on this
-;;; architecture, e.g. "x86f"
-(declaim (type (or simple-string null) *backend-fasl-file-type*))
-(defvar *backend-fasl-file-type* nil)
+;;; the conventional file extension for our fasl files
+(declaim (type simple-string *fasl-file-type*))
+(defvar *fasl-file-type* "fasl")
 
 ;;; This is a sort of pun that we inherited from CMU CL. For ordinary,
 ;;; non-byte-coded fasl files, the "implementation" is basically the

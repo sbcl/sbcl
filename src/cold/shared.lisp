@@ -54,13 +54,14 @@
 (defvar *host-obj-prefix*)
 (defvar *target-obj-prefix*)
 
-;;; suffixes for filename stems when cross-compiling. Everything should work
-;;; fine for any arbitrary string values here. With more work maybe we
-;;; could cause these automatically to become the traditional extensions for
-;;; whatever host and target architectures (e.g. ".x86f" or ".axpf") we're
-;;; currently doing. That would make it easier for a human looking at the
-;;; temporary files to figure out what they're for, but it's not necessary for
-;;; the compilation process to work, so we haven't bothered.
+;;; suffixes for filename stems when cross-compiling. Everything
+;;; should work fine for any arbitrary string values here. With more
+;;; work maybe we could cause these automatically to become the
+;;; traditional extensions for whatever host and target architectures
+;;; (e.g. ".x86f" or ".axpf") we're currently doing. That would make
+;;; it easier for a human looking at the temporary files to figure out
+;;; what they're for, but it's not necessary for the compilation
+;;; process to work, so we haven't bothered.
 (defvar *host-obj-suffix* ".lisp-obj")
 (defvar *target-obj-suffix* ".lisp-obj")
 

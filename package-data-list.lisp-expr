@@ -328,7 +328,7 @@
           "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
     :export ("*ASSEMBLER-ROUTINES*"
              "+BACKEND-FASL-FILE-IMPLEMENTATION+"
-             "*BACKEND-FASL-FILE-TYPE*"
+             "*FASL-FILE-TYPE*"
              "CLOSE-FASL-OUTPUT"
              "DUMP-ASSEMBLER-ROUTINES"
              "DUMP-OBJECT"
