@@ -114,13 +114,6 @@
 	 (args (interactive-restart-arguments real-restart)))
     (apply (restart-function real-restart) args)))
 
-
-
-
-
-;;;; helper functions for restartable error handling which couldn't be
-;;;; defined 'til now 'cause they use the RESTART-CASE macro
-
 (defun assert-error (assertion places datum &rest arguments)
   (let ((cond (if datum
 		(coerce-to-condition datum

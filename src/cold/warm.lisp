@@ -193,7 +193,7 @@
                  (t nil))
 	   (unless (load output-truename)
 	     (error "LOAD of ~S failed." output-truename))
-	   (sb-int:/show "done loading" compiled-truename))))))
+	   (sb-int:/show "done loading" output-truename))))))
 
 ;;;; setting package documentation
 
