@@ -2874,7 +2874,7 @@
 ;;;    it second. These rules make it easier for the back end to match
 ;;;    these interesting cases.
 ;;; -- If Y is a fixnum, then we quietly pass because the back end can
-;;;    handle that case, otherwise give an efficency note.
+;;;    handle that case, otherwise give an efficiency note.
 (deftransform eql ((x y) * * :when :both)
   "convert to simpler equality predicate"
   (let ((x-type (continuation-type x))

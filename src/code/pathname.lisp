@@ -108,7 +108,7 @@
 ;;; Physical pathnames include all these slots and a device slot.
 
 ;;; Logical pathnames are a subclass of PATHNAME. Their class
-;;; relations are mimicked using structures for efficency.
+;;; relations are mimicked using structures for efficiency.
 (sb!xc:defstruct (logical-pathname (:conc-name %logical-pathname-)
 				   (:include pathname)
 				   (:constructor %make-logical-pathname

@@ -500,7 +500,7 @@
     (pushnew fun (component-reanalyze-functions *current-component*)))
   fun)
 
-;;; Generate a Ref node for LEAF, frobbing the LEAF structure as
+;;; Generate a REF node for LEAF, frobbing the LEAF structure as
 ;;; needed. If LEAF represents a defined function which has already
 ;;; been converted, and is not :NOTINLINE, then reference the
 ;;; functional instead.
@@ -3071,29 +3071,3 @@
   ;; the name in place.
   (aver (legal-function-name-p name))
   `(lambda ,args ,@body))
-
-;;; REMOVEME: old way of handling COLD-FSET
-#|
-(defknown cold-fset ..)
-;;; COLD-FSET arranges for GENESIS to set (FDEFINITION NAME) to FUN.
-;;; Toplevel COLD-FSETs are translated into %TOPLEVEL-COLD-FSET to be
-;;; processed here. (It's not clear that non-toplevel COLD-FSETs make
-;;; much sense, so they're treated as errors.)
-#+sb-xc-host
-(def-ir1-translator %toplevel-cold-fset ((fun-name fun) start cont)
-  (/show "translating %TOPLEVEL-COLD-FSET" fun-name fun)
-  (unless (producing-fasl-file)
-    (error "can't COLD-FSET except in a fasl file"))
-  (unless (legal-function-name-p fun-name)
-    (error "not a legal function name: ~S" fun-name))
-  (/show "done translating %TOPLEVEL-COLD-FSET" fun-name fun)
-  ,,
-  (values))
-#+sb-xc-host
-(def-ir1-translator cold-fset ((fun-name fun) start cont)
-  (declare (ignore fun))
-  ;; Toplevel COLD-FSETs are transformed into %TOPLEVEL-COLD-FSET
-  ;; before we get to IR1, so any COLD-FSET left over must be
-  ;; non-toplevel, which isn't allowed.
-  (error "non-toplevel COLD-FSET ~S" fun-name))
-|#

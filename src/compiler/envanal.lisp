@@ -1,6 +1,6 @@
 ;;;; This file implements the environment analysis phase for the
 ;;;; compiler. This phase annotates IR1 with a hierarchy environment
-;;;; structures, determining the environment that each Lambda
+;;;; structures, determining the environment that each LAMBDA 
 ;;;; allocates its variables and finding what values are closed over
 ;;;; by each environment.
 
@@ -15,9 +15,9 @@
 
 (in-package "SB!C")
 
-;;; Do environment analysis on the code in Component. This involves
+;;; Do environment analysis on the code in COMPONENT. This involves
 ;;; various things:
-;;;  1. Make an Environment structure for each non-let lambda, assigning 
+;;;  1. Make an ENVIRONMENT structure for each non-let lambda, assigning 
 ;;;     the lambda-environment for all lambdas.
 ;;;  2. Find all values that need to be closed over by each environment.
 ;;;  3. Scan the blocks in the component closing over non-local-exit
@@ -25,7 +25,7 @@
 ;;;  4. Delete all non-top-level functions with no references. This
 ;;;     should only get functions with non-NULL kinds, since normal
 ;;;     functions are deleted when their references go to zero. If
-;;;     *byte-compiling*, then don't delete optional entries with no
+;;;     *BYTE-COMPILING*, then don't delete optional entries with no
 ;;;     references, since the byte interpreter wants to call entries
 ;;;     that the XEP doesn't.
 (defun environment-analyze (component)
@@ -49,6 +49,7 @@
     (when (null (leaf-refs fun))
       (let ((kind (functional-kind fun)))
 	(unless (or (eq kind :top-level)
+		    (functional-has-external-references-p fun)
 		    (and *byte-compiling* (eq kind :optional)))
 	  (aver (member kind '(:optional :cleanup :escape)))
 	  (setf (functional-kind fun) nil)
@@ -86,10 +87,11 @@
 	    (setf (lambda-environment lambda) res))
 	  res))))
 
-;;; If Fun has no environment, assign one, otherwise clean up variables that
-;;; have no sets or refs. If a var has no references, we remove it from the
-;;; closure. If it has no sets, we clear the INDIRECT flag. This is
-;;; necessary because pre-analysis is done before optimization.
+;;; If FUN has no environment, assign one, otherwise clean up
+;;; variables that have no sets or refs. If a var has no references,
+;;; we remove it from the closure. If it has no sets, we clear the
+;;; INDIRECT flag. This is necessary because pre-analysis is done
+;;; before optimization.
 (defun reinit-lambda-environment (fun)
   (let ((old (lambda-environment (lambda-home fun))))
     (cond (old
@@ -109,17 +111,17 @@
 	   (get-lambda-environment fun))))
   (values))
 
-;;; Get node's environment, assigning one if necessary.
+;;; Get NODE's environment, assigning one if necessary.
 (defun get-node-environment (node)
   (declare (type node node))
   (get-lambda-environment (node-home-lambda node)))
 
-;;; Find any variables in Fun with references outside of the home
-;;; environment and close over them. If a closed over variable is set, then we
-;;; set the Indirect flag so that we will know the closed over value is really
-;;; a pointer to the value cell. We also warn about unreferenced variables
-;;; here, just because it's a convenient place to do it. We return true if we
-;;; close over anything.
+;;; Find any variables in FUN with references outside of the home
+;;; environment and close over them. If a closed over variable is set,
+;;; then we set the INDIRECT flag so that we will know the closed over
+;;; value is really a pointer to the value cell. We also warn about
+;;; unreferenced variables here, just because it's a convenient place
+;;; to do it. We return true if we close over anything.
 (defun compute-closure (fun)
   (declare (type clambda fun))
   (let ((env (get-lambda-environment fun))
@@ -141,10 +143,10 @@
 	    (close-over var set-env env)))))
     did-something))
 
-;;; Make sure that Thing is closed over in Ref-Env and in all environments
-;;; for the functions that reference Ref-Env's function (not just calls.)
-;;; Home-Env is Thing's home environment. When we reach the home environment,
-;;; we stop propagating the closure.
+;;; Make sure that THING is closed over in REF-ENV and in all
+;;; environments for the functions that reference REF-ENV's function
+;;; (not just calls.) HOME-ENV is THING's home environment. When we
+;;; reach the home environment, we stop propagating the closure.
 (defun close-over (thing ref-env home-env)
   (declare (type environment ref-env home-env))
   (cond ((eq ref-env home-env))
@@ -157,22 +159,22 @@
 
 ;;;; non-local exit
 
-;;; Insert the entry stub before the original exit target, and add a new
-;;; entry to the Environment-Nlx-Info. The %NLX-Entry call in the stub is
-;;; passed the NLX-Info as an argument so that the back end knows what entry is
-;;; being done.
+;;; Insert the entry stub before the original exit target, and add a
+;;; new entry to the ENVIRONMENT-NLX-INFO. The %NLX-ENTRY call in the
+;;; stub is passed the NLX-INFO as an argument so that the back end
+;;; knows what entry is being done.
 ;;;
-;;; The link from the Exit block to the entry stub is changed to be a link to
-;;; the component head. Similarly, the Exit block is linked to the component
-;;; tail. This leaves the entry stub reachable, but makes the flow graph less
-;;; confusing to flow analysis.
+;;; The link from the EXIT block to the entry stub is changed to be a
+;;; link to the component head. Similarly, the EXIT block is linked to
+;;; the component tail. This leaves the entry stub reachable, but
+;;; makes the flow graph less confusing to flow analysis.
 ;;;
-;;; If a catch or an unwind-protect, then we set the Lexenv for the last node
-;;; in the cleanup code to be the enclosing environment, to represent the fact
-;;; that the binding was undone as a side-effect of the exit. This will cause
-;;; a lexical exit to be broken up if we are actually exiting the scope (i.e.
-;;; a BLOCK), and will also do any other cleanups that may have to be done on
-;;; the way.
+;;; If a CATCH or an UNWIND-protect, then we set the LEXENV for the
+;;; last node in the cleanup code to be the enclosing environment, to
+;;; represent the fact that the binding was undone as a side-effect of
+;;; the exit. This will cause a lexical exit to be broken up if we are
+;;; actually exiting the scope (i.e. a BLOCK), and will also do any
+;;; other cleanups that may have to be done on the way.
 (defun insert-nlx-entry-stub (exit env)
   (declare (type environment env) (type exit exit))
   (let* ((exit-block (node-block exit))
@@ -199,19 +201,22 @@
 
   (values))
 
-;;; Do stuff necessary to represent a non-local exit from the node Exit into
-;;; Env. This is called for each non-local exit node, of which there may be
-;;; several per exit continuation. This is what we do:
-;;; -- If there isn't any NLX-Info entry in the environment, make an entry
-;;;    stub, otherwise just move the exit block link to the component tail.
+;;; Do stuff necessary to represent a non-local exit from the node
+;;; EXIT into ENV. This is called for each non-local exit node, of
+;;; which there may be several per exit continuation. This is what we
+;;; do:
+;;; -- If there isn't any NLX-Info entry in the environment, make
+;;;    an entry stub, otherwise just move the exit block link to
+;;;    the component tail.
 ;;; -- Close over the NLX-Info in the exit environment.
-;;; -- If the exit is from an :Escape function, then substitute a constant
-;;;    reference to NLX-Info structure for the escape function reference. This
-;;;    will cause the escape function to be deleted (although not removed from
-;;;    the DFO.)  The escape function is no longer needed, and we don't want to
-;;;    emit code for it. We then also change the %NLX-ENTRY call to use
-;;;    the NLX continuation so that there will be a use to represent the NLX
-;;;    use.
+;;; -- If the exit is from an :Escape function, then substitute a
+;;;    constant reference to NLX-Info structure for the escape
+;;;    function reference. This will cause the escape function to
+;;;    be deleted (although not removed from the DFO.)  The escape
+;;;    function is no longer needed, and we don't want to emit code
+;;;    for it. We then also change the %NLX-ENTRY call to use the
+;;;    NLX continuation so that there will be a use to represent
+;;;    the NLX use.
 (defun note-non-local-exit (env exit)
   (declare (type environment env) (type exit exit))
   (let ((entry (exit-entry exit))
@@ -239,10 +244,11 @@
 
   (values))
 
-;;; Iterate over the Exits in Component, calling Note-Non-Local-Exit when we
-;;; find a block that ends in a non-local Exit node. We also ensure that all
-;;; Exit nodes are either non-local or degenerate by calling IR1-Optimize-Exit
-;;; on local exits. This makes life simpler for later phases.
+;;; Iterate over the EXITs in COMPONENT, calling NOTE-NON-LOCAL-EXIT
+;;; when we find a block that ends in a non-local EXIT node. We also
+;;; ensure that all EXIT nodes are either non-local or degenerate by
+;;; calling IR1-OPTIMIZE-EXIT on local exits. This makes life simpler
+;;; for later phases.
 (defun find-non-local-exits (component)
   (declare (type component component))
   (dolist (lambda (component-lambdas component))
@@ -257,18 +263,19 @@
 
 ;;;; cleanup emission
 
-;;; Zoom up the cleanup nesting until we hit Cleanup1, accumulating cleanup
-;;; code as we go. When we are done, convert the cleanup code in an implicit
-;;; MV-Prog1. We have to force local call analysis of new references to
-;;; Unwind-Protect cleanup functions. If we don't actually have to do
-;;; anything, then we don't insert any cleanup code.
+;;; Zoom up the cleanup nesting until we hit CLEANUP1, accumulating
+;;; cleanup code as we go. When we are done, convert the cleanup code
+;;; in an implicit MV-PROG1. We have to force local call analysis of
+;;; new references to UNWIND-PROTECT cleanup functions. If we don't
+;;; actually have to do anything, then we don't insert any cleanup
+;;; code.
 ;;;
-;;; If we do insert cleanup code, we check that Block1 doesn't end in a "tail"
-;;; local call.
+;;; If we do insert cleanup code, we check that BLOCK1 doesn't end in
+;;; a "tail" local call.
 ;;;
-;;; We don't need to adjust the ending cleanup of the cleanup block, since
-;;; the cleanup blocks are inserted at the start of the DFO, and are thus never
-;;; scanned.
+;;; We don't need to adjust the ending cleanup of the cleanup block,
+;;; since the cleanup blocks are inserted at the start of the DFO, and
+;;; are thus never scanned.
 (defun emit-cleanups (block1 block2)
   (declare (type cblock block1 block2))
   (collect ((code)
@@ -304,11 +311,11 @@
 
   (values))
 
-;;; Loop over the blocks in component, calling Emit-Cleanups when we see a
-;;; successor in the same environment with a different cleanup. We ignore the
-;;; cleanup transition if it is to a cleanup enclosed by the current cleanup,
-;;; since in that case we are just messing up the environment, hence this is
-;;; not the place to clean it.
+;;; Loop over the blocks in component, calling Emit-Cleanups when we
+;;; see a successor in the same environment with a different cleanup.
+;;; We ignore the cleanup transition if it is to a cleanup enclosed by
+;;; the current cleanup, since in that case we are just messing up the
+;;; environment, hence this is not the place to clean it.
 (defun find-cleanup-points (component)
   (declare (type component component))
   (do-blocks (block1 component)
@@ -327,10 +334,10 @@
 	      (emit-cleanups block1 block2)))))))
   (values))
 
-;;; Mark all tail-recursive uses of function result continuations with the
-;;; corresponding tail-set. Nodes whose type is NIL (i.e. don't return) such
-;;; as calls to ERROR are never annotated as tail in order to preserve
-;;; debugging information.
+;;; Mark all tail-recursive uses of function result continuations with
+;;; the corresponding tail-set. Nodes whose type is NIL (i.e. don't
+;;; return) such as calls to ERROR are never annotated as tail in
+;;; order to preserve debugging information.
 (defun tail-annotate (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))

@@ -1377,7 +1377,9 @@
 				 "undefined_tramp"))))
 	  fdefn))))
 
-(defun cold-fset (cold-name defn)
+;;; Handle the at-cold-init-time, fset-for-static-linkage operation
+;;; requested by FOP-FSET.
+(defun static-fset (cold-name defn)
   (declare (type descriptor cold-name))
   (let ((fdefn (cold-fdefinition-object cold-name t))
 	(type (logand (descriptor-low (read-memory defn)) sb!vm:type-mask)))
@@ -1862,7 +1864,6 @@
 	 (name (make-string size)))
     (read-string-as-bytes *fasl-input-stream* name)
     (let ((symbol-des (allocate-symbol name)))
-      (/show "doing uninterned symbol save fop" name symbol-des) ; REMOVEME
       (push-fop-table symbol-des))))
 
 ;;;; cold fops for loading lists
@@ -2229,7 +2230,7 @@
 (define-cold-fop (fop-fset nil)
   (let ((fn (pop-stack))
 	(name (pop-stack)))
-    (cold-fset name fn)))
+    (static-fset name fn)))
 
 (define-cold-fop (fop-fdefinition)
   (cold-fdefinition-object (pop-stack)))
@@ -2695,9 +2696,6 @@ cross-compiler knew their inline definition and used that everywhere
 that they were called before the out-of-line definition is installed,
 as is fairly common for structure accessors.)
 initially undefined function references:~2%")
-
-      ;; REMOVEME: for debugging weird SORT problem
-      (setf (symbol-value '*genesis-original-undefs*) (copy-list undefs))
 
       (setf undefs (sort undefs #'string< :key #'function-name-block-name))
       (dolist (name undefs)

@@ -488,12 +488,10 @@
 ;;; generate code. Unreachable closures can cause IR2 conversion to
 ;;; puke on itself, since it is the reference to the closure which
 ;;; normally causes the components to be combined.
-;;;
-;;; FIXME: The original CMU CL comment said "This doesn't really cover
-;;; all cases..." That's a little scary.
 (defun delete-if-no-entries (component)
-  (dolist (fun (component-lambdas component)
-	       (delete-component component))
+  (dolist (fun (component-lambdas component) (delete-component component))
+    (when (functional-has-external-references-p fun)
+      (return))
     (case (functional-kind fun)
       (:top-level (return))
       (:external
@@ -878,55 +876,98 @@
 	  (intersection '(:execute eval) situations)))
 
 
-;;; Arrange for static linkage at cold init time between FUN-NAME and
-;;; the function defined by LAMBDA-EXPRESSION.
-#+sb-xc-host
-(defun process-cold-fset (fun-name lambda-expression path)
-  (/show "doing PROCESS-COLD-FSET" fun-name *policy*)
+;;; utilities for extracting COMPONENTs of FUNCTIONALs
+(defun clambda-component (clambda)
+  (block-component (node-block (lambda-bind clambda))))
+(defun functional-components (f)
+  (declare (type functional f))
+  (etypecase f
+    (clambda (list (clambda-component f)))
+    (optional-dispatch (let ((result nil))
+			 (labels ((frob (clambda)
+				    (pushnew (clambda-component clambda)
+					     result))
+				  (maybe-frob (maybe-clambda)
+				    (when maybe-clambda
+				      (frob maybe-clambda))))
+			   (mapc #'frob (optional-dispatch-entry-points f))
+			   (maybe-frob (optional-dispatch-more-entry f))
+			   (maybe-frob (optional-dispatch-main-entry f)))))))
+
+;;; Process DEFINITION (a lambda expression), returning a FUNCTIONAL
+;;; representing its IR1 translation.
+;;;
+;;; This is similar to IR1-TOP-LEVEL, but with fewer implicit
+;;; assumptions about e.g. the function only being localled and only
+;;; being called for effect. FIXME: It'd be good to factor out the
+;;; basic logic here so that it can be explicitly shared between this
+;;; function and IR1-TOP-LEVEL.
+(defun ir1-top-level-cold-lambda (name definition path)
+  (let* ((*current-path* path)
+	 (component (make-empty-component))
+	 (*current-component* component))
+    (setf (component-name component)
+	  (format nil "IR1-TOP-LEVEL-FOP-DEFUN ~S initial component" name))
+    (setf (component-kind component) :initial)
+    (let* ((locall-fun (ir1-convert-lambda definition
+					   (format nil "locall ~S" name)))
+	   (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
+      (setf (functional-entry-function fun) locall-fun
+	    (functional-kind fun) :external
+	    (functional-has-external-references-p fun) t)
+      fun)))
+
+(defun process-cold-fset (name lambda-expression path)
   (unless (producing-fasl-file)
     (error "can't COLD-FSET except in a fasl file"))
-  (unless (legal-function-name-p fun-name)
-    (error "not a legal function name: ~S" fun-name))
+  (unless (legal-function-name-p name)
+    (error "not a legal function name: ~S" name))
+  (/show "entering PROCESS-COLD-FSET" name)
   (let* ((*lexenv* (make-lexenv :policy *policy*))
-	 (lambda (ir1-top-level lambda-expression path nil))
-	 (lambdas (list lambda))
-	 (original-component
-	  (block-component (node-block (lambda-bind lambda))))
-	 (*all-components* (list original-component)))
-    (/show original-component (component-lambdas original-component))
+	 (fun (ir1-top-level-cold-lambda name lambda-expression path)))
 
-    ;; FIXME: The compile-it code here is a degenerate case of the
-    ;; code in COMPILE-TOP-LEVEL. It'd be better to find a way to
-    ;; share the code there.
-    (loop while (component-new-functions original-component) do
-	  (/show "locall" (component-new-functions original-component))
-	  (local-call-analyze original-component))
-    (/show "doing initial DFO")
+    (/noshow fun)
+
+    ;; FIXME: The compile-it code from here on is sort of a
+    ;; twisted version of the code in COMPILE-TOP-LEVEL. It'd be
+    ;; better to find a way to share the code there; or
+    ;; alternatively, to use this code to replace the code there.
+
+    (loop
+     (/noshow "at head of locall loop")
+     (let ((did-something nil))
+       (let ((*all-components* (functional-components fun)))
+	 (dolist (component *all-components*)
+	   (when (component-new-functions component)
+	     (/noshow (component-new-functions component))
+	     (setf did-something t)
+	     (local-call-analyze component))))
+       (unless did-something (return))))
+
     (multiple-value-bind (components-from-dfo top-components hairy-top)
-	(find-initial-dfo lambdas)
-      (/show components-from-dfo top-components hairy-top)
+	(find-initial-dfo (list fun))
+
       (let ((*all-components* (append components-from-dfo top-components)))
+	(/noshow components-from-dfo top-components *all-components*)
 	;; FIXME: I dunno whether we actually need to do
-	;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL for its side-effects like
-	;; this. (In the original SUB-COMPILE-TOP-LEVEL-LAMBDAS it was
-	;; used for its return value.)
+	;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL for its side-effects
+	;; like this. (In the original SUB-COMPILE-TOP-LEVEL-LAMBDAS
+	;; it was used for its return value.)
 	(mapc #'pre-environment-analyze-top-level
 	      (append hairy-top top-components))
 	(dolist (component-from-dfo components-from-dfo)
+	  (/noshow component-from-dfo)
 	  (compile-component component-from-dfo)
-	  (replace-top-level-xeps component-from-dfo))))
+	  (replace-top-level-xeps component-from-dfo)))
 
-    ;; Here we diverge from COMPILE-TOP-LEVEL. It does
-    ;; COMPILE-TOP-LEVEL-LAMBDAS, which does
-    ;; OBJECT-CALL-TOP-LEVEL-LAMBDA. We don't want to call
-    ;; our LAMBDA, just emit it with a COLD-FSET, so..
-    (let ((final-lambda-component
-	   (block-component (node-block (lambda-bind lambda)))))
-      (/show "getting ready to dump" final-lambda-component)
-      (compile-component final-lambda-component)
-      (clear-ir1-info final-lambda-component))
-    (fasl-dump-cold-fset fun-name lambda *compile-object*)
+      (/noshow "ready to dump" fun)
+      (fasl-dump-cold-fset name fun *compile-object*)
+
+      (mapc #'clear-ir1-info components-from-dfo))
+    
     (clear-stuff))
+
+  (/show "finished with PROCESS-COLD-FSET" name)
   (values))
 
 ;;; Process a top-level FORM with the specified source PATH.
@@ -1266,8 +1307,7 @@
 	    (compile-load-time-value-lambda lambdas)
 	    (compile-top-level-lambdas lambdas top-level-closure)))
 
-      (dolist (component components)
-	(clear-ir1-info component))
+      (mapc #'clear-ir1-info components)
       (clear-stuff)))
   (values))
 

@@ -1607,9 +1607,9 @@
 ;;;
 ;;; :Note {String | NIL}
 ;;;     A short noun-like phrase describing what this VOP "does", i.e.
-;;;     the implementation strategy. If supplied, efficency notes will
+;;;     the implementation strategy. If supplied, efficiency notes will
 ;;;     be generated when type uncertainty prevents :TRANSLATE from
-;;;     working. NIL inhibits any efficency note.
+;;;     working. NIL inhibits any efficiency note.
 ;;;
 ;;; :Arg-Types    {* | PType | (:OR PType*) | (:CONSTANT Type)}*
 ;;; :Result-Types {* | PType | (:OR PType*)}*

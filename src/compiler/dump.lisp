@@ -1038,19 +1038,6 @@
 	       (:load-time-value
 		(dump-push (cdr entry) fasl-output))
 	       (:fdefinition
-
-		;; REMOVEME
-		;;
-		;; What kind of weird things are being dumped here?
-		;; (I added this code when I was having trouble
-		;; getting GENESIS to deal with new DEFUN stuff.
-		;; -- WHN 2001-08-08)
-		#!+sb-show
-		(unless (legal-function-name-p (cdr entry))
-		  (/show "dumping FOP-FDEFINITION with exotic name" entry)
-		  #+(and sbcl sb-xc-host) (sb-debug:backtrace)
-		  #+(and sbcl sb-xc) (sb!debug:backtrace))
-
 		(dump-object (cdr entry) fasl-output)
 		(dump-fop 'fop-fdefinition fasl-output))))
 	    (null
@@ -1235,20 +1222,6 @@
 	     (:load-time-value
 	      (dump-push (cdr entry) file))
 	     (:fdefinition
-
-	      ;; REMOVEME
-	      ;;
-	      ;; What kind of weird things are being dumped here?
-	      ;; (I added this code when I was having trouble
-	      ;; getting GENESIS to deal with new DEFUN stuff.
-	      ;; -- WHN 2001-08-08)
-	      #!+sb-show
-	      (unless (legal-function-name-p (cdr entry))
-		(/show "dumping FOP-FDEFINITION with exotic name" entry)
-		#+(and sbcl sb-xc-host) (sb-debug:backtrace)
-		#+(and sbcl sb-xc) (sb!debug:backtrace))
-
-
 	      (dump-object (cdr entry) file)
 	      (dump-fop 'fop-fdefinition file))
 	     (:type-predicate

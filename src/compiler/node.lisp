@@ -29,7 +29,7 @@
 (def!struct (continuation
 	     (:make-load-form-fun ignore-it)
 	     (:constructor make-continuation (&optional dest)))
-  ;; An indication of the way that this continuation is currently used:
+  ;; an indication of the way that this continuation is currently used
   ;;
   ;; :UNUSED
   ;;	A continuation for which all control-related slots have the
@@ -272,8 +272,20 @@
   (flags (block-attributes reoptimize flush-p type-check type-asserted
 			   test-modified)
 	 :type attributes)
-  ;; Some sets used by constraint propagation.
-  (kill nil)
+  ;; CMU CL had a KILL slot here, documented as "set used by
+  ;; constraint propagation", which was used in constraint propagation
+  ;; as a list of LAMBDA-VARs killed, and in copy propagation as an
+  ;; SSET, representing I dunno what. I (WHN) found this confusing,
+  ;; and furthermore it caused type errors when I was trying to make
+  ;; the compiler produce fully general LAMBDA functions directly
+  ;; (instead of doing as CMU CL always did, producing extra little
+  ;; functions which return the LAMDBA you need) and therefore taking
+  ;; a new path through the compiler. So I split this into two:
+  ;;   KILL-LIST = list of LAMBDA-VARs killed, used in constraint propagation
+  ;;   KILL-SSET = an SSET value, used in copy propagation
+  (kill-list nil :type list)
+  (kill-sset nil :type (or sset null))
+  ;; other sets used in constraint propagation and/or copy propagation
   (gen nil)
   (in nil)
   (out nil)
@@ -285,7 +297,7 @@
   ;; initially NIL so that FIND-INITIAL-DFO doesn't have to scan the
   ;; entire initial component just to clear the flags.
   (flag nil)
-  ;; Some kind of info used by the back end.
+  ;; some kind of info used by the back end
   (info nil)
   ;; If true, then constraints that hold in this block and its
   ;; successors by merit of being tested by its IF predecessor.
@@ -294,8 +306,8 @@
   (print-unreadable-object (cblock stream :type t :identity t)
     (format stream ":START c~D" (cont-num (block-start cblock)))))
 
-;;; The Block-Annotation structure is shared (via :INCLUDE) by
-;;; different block-info annotation structures so that code
+;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
+;;; different BLOCK-INFO annotation structures so that code
 ;;; (specifically control analysis) can be shared.
 (defstruct (block-annotation (:constructor nil)
 			     (:copier nil))
@@ -308,29 +320,39 @@
   (next nil :type (or block-annotation null))
   (prev nil :type (or block-annotation null)))
 
-;;; The Component structure provides a handle on a connected piece of
+;;; A COMPONENT structure provides a handle on a connected piece of
 ;;; the flow graph. Most of the passes in the compiler operate on
-;;; components rather than on the entire flow graph.
+;;; COMPONENTs rather than on the entire flow graph.
 (defstruct (component (:copier nil))
-  ;; The kind of component:
+  ;; the kind of component
   ;;
-  ;; NIL
-  ;;     An ordinary component, containing non-top-level code.
+  ;; (The terminology here is left over from before
+  ;; sbcl-0.pre7.34.flaky5.2, when there was no such thing as
+  ;; FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P, so that Python was
+  ;; incapable of building standalone :EXTERNAL functions, but instead
+  ;; had to implement things like #'CL:COMPILE as FUNCALL of a little
+  ;; toplevel stub whose sole purpose was to return an :EXTERNAL
+  ;; function.)
   ;;
-  ;; :Top-Level
-  ;;     A component containing only load-time code.
   ;;
-  ;; :Complex-Top-Level
-  ;;     A component containing both top-level and run-time code.
-  ;;
-  ;; :Initial
-  ;;     The result of initial IR1 conversion, on which component
-  ;;     analysis has not been done.
-  ;;
-  ;; :Deleted
-  ;;     Debris left over from component analysis.
+  ;; The possibilities are:
+  ;;   NIL
+  ;;     an ordinary component, containing non-top-level code
+  ;;   :TOP-LEVEL
+  ;;     a component containing only load-time code
+  ;;   :COMPLEX-TOP-LEVEL
+  ;;     In the old system, before FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P
+  ;;     was defined, this was necessarily a component containing both
+  ;;     top-level and run-time code. Now this state is also used for
+  ;;     a component with HAS-EXTERNAL-REFERENCES-P functionals in it.
+  ;;   :INITIAL
+  ;;     the result of initial IR1 conversion, on which component
+  ;;     analysis has not been done
+  ;;   :DELETED
+  ;;     debris left over from component analysis
   (kind nil :type (member nil :top-level :complex-top-level :initial :deleted))
-  ;; The blocks that are the dummy head and tail of the DFO.
+  ;; the blocks that are the dummy head and tail of the DFO
+  ;;
   ;; Entry/exit points have these blocks as their
   ;; predecessors/successors. Null temporarily. The start and return
   ;; from each non-deleted function is linked to the component head
@@ -339,73 +361,73 @@
   ;; (i.e. begins with a Bind node.)
   (head nil :type (or null cblock))
   (tail nil :type (or null cblock))
-  ;; A list of the CLambda structures for all functions in this
-  ;; component. Optional-Dispatches are represented only by their XEP
+  ;; a list of the CLAMBDA structures for all functions in this
+  ;; component. OPTIONAL-DISPATCHes are represented only by their XEP
   ;; and other associated lambdas. This doesn't contain any deleted or
-  ;; let lambdas.
+  ;; LET lambdas.
   (lambdas () :type list)
-  ;; A list of Functional structures for functions that are newly
+  ;; a list of FUNCTIONAL structures for functions that are newly
   ;; converted, and haven't been local-call analyzed yet. Initially
-  ;; functions are not in the Lambdas list. LOCAL-CALL-ANALYZE moves
+  ;; functions are not in the LAMBDAS list. LOCAL-CALL-ANALYZE moves
   ;; them there (possibly as LETs, or implicitly as XEPs if an
   ;; OPTIONAL-DISPATCH.) Between runs of LOCAL-CALL-ANALYZE there may
   ;; be some debris of converted or even deleted functions in this
   ;; list.
   (new-functions () :type list)
-  ;; If true, then there is stuff in this component that could benefit
-  ;; from further IR1 optimization.
+  ;; If this is true, then there is stuff in this component that could
+  ;; benefit from further IR1 optimization.
   (reoptimize t :type boolean)
-  ;; If true, then the control flow in this component was messed up by
-  ;; IR1 optimizations. The DFO should be recomputed.
+  ;; If this is true, then the control flow in this component was
+  ;; messed up by IR1 optimizations, so the DFO should be recomputed.
   (reanalyze nil :type boolean)
-  ;; String that is some sort of name for the code in this component.
+  ;; some sort of name for the code in this component
   (name "<unknown>" :type simple-string)
-  ;; Some kind of info used by the back end.
+  ;; some kind of info used by the back end
   (info nil)
-  ;; The Source-Info structure describing where this component was
-  ;; compiled from.
+  ;; the SOURCE-INFO structure describing where this component was
+  ;; compiled from
   (source-info *source-info* :type source-info)
-  ;; Count of the number of inline expansions we have done while
+  ;; count of the number of inline expansions we have done while
   ;; compiling this component, to detect infinite or exponential
-  ;; blowups.
+  ;; blowups
   (inline-expansions 0 :type index)
-  ;; A hashtable from combination nodes to things describing how an
-  ;; optimization of the node failed. The value is an alist (Transform
-  ;; . Args), where Transform is the structure describing the
-  ;; transform that failed, and Args is either a list of format
+  ;; a map from combination nodes to things describing how an
+  ;; optimization of the node failed. The description is an alist
+  ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
+  ;; the transform that failed, and ARGS is either a list of format
   ;; arguments for the note, or the FUNCTION-TYPE that would have
   ;; enabled the transformation but failed to match.
   (failed-optimizations (make-hash-table :test 'eq) :type hash-table)
-  ;; Similar to NEW-FUNCTIONS, but is used when a function has already
-  ;; been analyzed, but new references have been added by inline
-  ;; expansion. Unlike NEW-FUNCTIONS, this is not disjoint from
+  ;; This is similar to NEW-FUNCTIONS, but is used when a function has
+  ;; already been analyzed, but new references have been added by
+  ;; inline expansion. Unlike NEW-FUNCTIONS, this is not disjoint from
   ;; COMPONENT-LAMBDAS.
   (reanalyze-functions nil :type list))
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))
 
-;;; The CLEANUP structure represents some dynamic binding action.
-;;; Blocks are annotated with the current cleanup so that dynamic
-;;; bindings can be removed when control is transferred out of the
-;;; binding environment. We arrange for changes in dynamic bindings to
-;;; happen at block boundaries, so that cleanup code may easily be
-;;; inserted. The "mess-up" action is explicitly represented by a
-;;; funny function call or Entry node.
+;;; A CLEANUP structure represents some dynamic binding action. Blocks
+;;; are annotated with the current CLEANUP so that dynamic bindings
+;;; can be removed when control is transferred out of the binding
+;;; environment. We arrange for changes in dynamic bindings to happen
+;;; at block boundaries, so that cleanup code may easily be inserted.
+;;; The "mess-up" action is explicitly represented by a funny function
+;;; call or ENTRY node.
 ;;;
-;;; We guarantee that cleanups only need to be done at block boundaries
+;;; We guarantee that CLEANUPs only need to be done at block boundaries
 ;;; by requiring that the exit continuations initially head their
 ;;; blocks, and then by not merging blocks when there is a cleanup
 ;;; change.
 (defstruct (cleanup (:copier nil))
-  ;; The kind of thing that has to be cleaned up.
+  ;; the kind of thing that has to be cleaned up
   (kind (required-argument)
 	:type (member :special-bind :catch :unwind-protect :block :tagbody))
-  ;; The node that messes things up. This is the last node in the
+  ;; the node that messes things up. This is the last node in the
   ;; non-messed-up environment. Null only temporarily. This could be
   ;; deleted due to unreachability.
   (mess-up nil :type (or node null))
-  ;; A list of all the NLX-Info structures whose NLX-Info-Cleanup is
+  ;; a list of all the NLX-INFO structures whose NLX-INFO-CLEANUP is
   ;; this cleanup. This is filled in by environment analysis.
   (nlx-info nil :type list))
 (defprinter (cleanup :identity t)
@@ -413,7 +435,7 @@
   mess-up
   (nlx-info :test nlx-info))
 
-;;; The ENVIRONMENT structure represents the result of environment analysis.
+;;; An ENVIRONMENT structure represents the result of environment analysis.
 (defstruct (environment (:copier nil))
   ;; the function that allocates this environment
   (function (required-argument) :type clambda)
@@ -432,7 +454,7 @@
   (closure :test closure)
   (nlx-info :test nlx-info))
 
-;;; The TAIL-SET structure is used to accumulate information about
+;;; An TAIL-SET structure is used to accumulate information about
 ;;; tail-recursive local calls. The "tail set" is effectively the
 ;;; transitive closure of the "is called tail-recursively by"
 ;;; relation.
@@ -443,14 +465,14 @@
 ;;; sets of the called function and the calling function.
 ;;;
 ;;; The tail set is somewhat approximate, because it is too early to
-;;; be sure which calls will be TR. Any call that *might* end up TR
-;;; causes tail-set merging.
-(defstruct (tail-set (:copier nil))
-  ;; a list of all the lambdas in this tail set
+;;; be sure which calls will be tail-recursive. Any call that *might*
+;;; end up tail-recursive causes tail-set merging.
+(defstruct (tail-set)
+  ;; a list of all the LAMBDAs in this tail set
   (functions nil :type list)
   ;; our current best guess of the type returned by these functions.
   ;; This is the union across all the functions of the return node's
-  ;; RESULT-TYPE. excluding local calls.
+  ;; RESULT-TYPE, excluding local calls.
   (type *wild-type* :type ctype)
   ;; some info used by the back end
   (info nil))
@@ -630,7 +652,7 @@
   ;;
   ;;    :EXTERNAL
   ;;	an external entry point lambda. The function it is an entry
-  ;;	for is in the Entry-Function.
+  ;;	for is in the ENTRY-FUNCTION slot.
   ;;
   ;;    :TOP-LEVEL
   ;;	a top-level lambda, holding a compiled top-level form.
@@ -660,16 +682,24 @@
   (kind nil :type (member nil :optional :deleted :external :top-level :escape
 			  :cleanup :let :mv-let :assignment
 			  :top-level-xep))
+  ;; Is this a function that some external entity (e.g. the fasl dumper)
+  ;; refers to, so that even when it appears to have no references, it
+  ;; shouldn't be deleted? In the old days (before
+  ;; sbcl-0.pre7.37.flaky5.2) this was sort of implicitly true when
+  ;; KIND was :TOP-LEVEL. Now it must be set explicitly, both for
+  ;; :TOP-LEVEL functions and for any other kind of functions that we
+  ;; want to dump or return from #'CL:COMPILE or whatever.
+  (has-external-references-p nil) 
   ;; In a normal function, this is the external entry point (XEP)
   ;; lambda for this function, if any. Each function that is used
   ;; other than in a local call has an XEP, and all of the
   ;; non-local-call references are replaced with references to the
   ;; XEP.
   ;;
-  ;; In an XEP lambda (indicated by the :External kind), this is the
+  ;; In an XEP lambda (indicated by the :EXTERNAL kind), this is the
   ;; function that the XEP is an entry-point for. The body contains
   ;; local calls to all the actual entry points in the function. In a
-  ;; :Top-Level lambda (which is its own XEP) this is a self-pointer.
+  ;; :TOP-LEVEL lambda (which is its own XEP) this is a self-pointer.
   ;;
   ;; With all other kinds, this is null.
   (entry-function nil :type (or functional null))
@@ -701,43 +731,50 @@
   ;; List of lambda-var descriptors for args.
   (vars nil :type list)
   ;; If this function was ever a :OPTIONAL function (an entry-point
-  ;; for an optional-dispatch), then this is that optional-dispatch.
+  ;; for an OPTIONAL-DISPATCH), then this is that OPTIONAL-DISPATCH.
   ;; The optional dispatch will be :DELETED if this function is no
   ;; longer :OPTIONAL.
   (optional-dispatch nil :type (or optional-dispatch null))
-  ;; The Bind node for this Lambda. This node marks the beginning of
+  ;; The BIND node for this LAMBDA. This node marks the beginning of
   ;; the lambda, and serves to explicitly represent the lambda binding
-  ;; semantics within the flow graph representation. Null in deleted
-  ;; functions, and also in LETs where we deleted the call & bind
-  ;; (because there are no variables left), but have not yet actually
-  ;; deleted the lambda yet.
+  ;; semantics within the flow graph representation. This is null in
+  ;; deleted functions, and also in LETs where we deleted the call and
+  ;; bind (because there are no variables left), but have not yet
+  ;; actually deleted the LAMBDA yet.
   (bind nil :type (or bind null))
-  ;; The Return node for this Lambda, or NIL if it has been deleted.
+  ;; the Return node for this Lambda, or NIL if it has been deleted.
   ;; This marks the end of the lambda, receiving the result of the
-  ;; body. In a let, the return node is deleted, and the body delivers
+  ;; body. In a LET, the return node is deleted, and the body delivers
   ;; the value to the actual continuation. The return may also be
   ;; deleted if it is unreachable.
   (return nil :type (or creturn null))
-  ;; If this is a let, then the Lambda whose Lets list we are in,
-  ;; otherwise this is a self-pointer.
+  ;; If this CLAMBDA is a LET, then this slot holds the LAMBDA whose
+  ;; LETS list we are in, otherwise it is a self-pointer.
   (home nil :type (or clambda null))
-  ;; A list of all the all the lambdas that have been let-substituted
+  ;; a list of all the all the lambdas that have been LET-substituted
   ;; in this lambda. This is only non-null in lambdas that aren't
-  ;; lets.
+  ;; LETs.
   (lets () :type list)
-  ;; A list of all the Entry nodes in this function and its lets. Null
-  ;; an a let.
+  ;; a list of all the ENTRY nodes in this function and its LETs, or
+  ;; null in a LET
   (entries () :type list)
-  ;; A list of all the functions directly called from this function
+  ;; a list of all the functions directly called from this function
   ;; (or one of its lets) using a non-let local call. May include
   ;; deleted functions because nobody bothers to clear them out.
   (calls () :type list)
-  ;; The Tail-Set that this lambda is in. Null during creation and in
-  ;; let lambdas.
+  ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
+  ;;
+  ;; In CMU CL, and old SBCL, this was also NILed out when LET
+  ;; conversion happened. That caused some problems, so as of
+  ;; sbcl-0.pre7.37.flaky5.2 when I was trying to get the compiler to
+  ;; emit :EXTERNAL functions directly, and so now the value
+  ;; is no longer NILed out in LET conversion, but instead copied
+  ;; (so that any further optimizations on the rest of the tail
+  ;; set won't modify the value) if necessary.
   (tail-set nil :type (or tail-set null))
-  ;; The structure which represents the environment that this
-  ;; Function's variables are allocated in. This is filled in by
-  ;; environment analysis. In a let, this is EQ to our home's
+  ;; the structure which represents the environment that this
+  ;; function's variables are allocated in. This is filled in by
+  ;; environment analysis. In a LET, this is EQ to our home's
   ;; environment.
   (environment nil :type (or environment null))
   ;; In a LET, this is the NODE-LEXENV of the combination node. We
@@ -763,11 +800,11 @@
 ;;; point tail-recursively, passing all the arguments passed in and
 ;;; the default for the argument the entry point is for. The last
 ;;; entry point calls the real body of the function. In the presence
-;;; of supplied-p args and other hair, things are more complicated. In
+;;; of SUPPLIED-P args and other hair, things are more complicated. In
 ;;; general, there is a distinct internal function that takes the
-;;; supplied-p args as parameters. The preceding entry point calls
-;;; this function with NIL filled in for the supplied-p args, while
-;;; the current entry point calls it with T in the supplied-p
+;;; SUPPLIED-P args as parameters. The preceding entry point calls
+;;; this function with NIL filled in for the SUPPLIED-P args, while
+;;; the current entry point calls it with T in the SUPPLIED-P
 ;;; positions.
 ;;;
 ;;; Note that it is easy to turn a call with a known number of
@@ -793,15 +830,15 @@
   ;; second, ... MAX-ARGS last. The last entry-point always calls the
   ;; main entry; in simple cases it may be the main entry.
   (entry-points nil :type list)
-  ;; An entry point which takes MAX-ARGS fixed arguments followed by
+  ;; an entry point which takes MAX-ARGS fixed arguments followed by
   ;; an argument context pointer and an argument count. This entry
   ;; point deals with listifying rest args and parsing keywords. This
   ;; is null when extra arguments aren't legal.
   (more-entry nil :type (or clambda null))
-  ;; The main entry-point into the function, which takes all arguments
+  ;; the main entry-point into the function, which takes all arguments
   ;; including keywords as fixed arguments. The format of the
   ;; arguments must be determined by examining the arglist. This may
-  ;; be used by callers that supply at least Max-Args arguments and
+  ;; be used by callers that supply at least MAX-ARGS arguments and
   ;; know what they are doing.
   (main-entry nil :type (or clambda null)))
 (defprinter (optional-dispatch :identity t)

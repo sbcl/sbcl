@@ -460,7 +460,7 @@
 
     (coerce-to-smallest-eltype (res))))
 
-;;; Return a vector of SC offsets describing Fun's return locations.
+;;; Return a vector of SC offsets describing FUN's return locations.
 ;;; (Must be known values return...)
 (defun compute-debug-returns (fun)
   (coerce-to-smallest-eltype

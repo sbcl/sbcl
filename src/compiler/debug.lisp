@@ -1074,7 +1074,8 @@
     (format t "~D: " number)
     (print-vop vop)))
 
-;;; Like Print-Nodes, but dumps the IR2 representation of the code in Block.
+;;; This is like PRINT-NODES, but dumps the IR2 representation of the
+;;; code in BLOCK.
 (defun print-vops (block)
   (setq block (block-or-lose block))
   (let ((2block (block-info block)))

@@ -125,7 +125,7 @@
   ;; the transformation function. Takes the COMBINATION node and returns a
   ;; lambda, or throws out.
   (function (required-argument) :type function)
-  ;; string used in efficency notes
+  ;; string used in efficiency notes
   (note (required-argument) :type string)
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
   (important nil :type (member t nil))

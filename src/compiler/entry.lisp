@@ -67,20 +67,20 @@
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
   (values))
 
-;;; Replace all references to Component's non-closure XEPS that appear in
-;;; top-level components, changing to :TOP-LEVEL-XEP functionals. If the
-;;; cross-component ref is not in a :TOP-LEVEL component, or is to a closure,
-;;; then substitution is suppressed.
+;;; Replace all references to Component's non-closure XEPs that appear
+;;; in top-level components, changing to :TOP-LEVEL-XEP functionals.
+;;; If the cross-component ref is not in a :TOP-LEVEL component, or is
+;;; to a closure, then substitution is suppressed.
 ;;;
-;;; When a cross-component ref is not substituted, we return T to indicate that
-;;; early deletion of this component's IR1 should not be done. We also return
-;;; T if this component contains :TOP-LEVEL lambdas (though it is not a
-;;; :TOP-LEVEL component.)
+;;; When a cross-component ref is not substituted, we return T to
+;;; indicate that early deletion of this component's IR1 should not be
+;;; done. We also return T if this component contains :TOP-LEVEL
+;;; lambdas (though it is not a :TOP-LEVEL component.)
 ;;;
-;;; We deliberately don't use the normal reference deletion, since we don't
-;;; want to trigger deletion of the XEP (although it shouldn't hurt, since this
-;;; is called after Component is compiled.)  Instead, we just clobber the
-;;; REF-LEAF.
+;;; We deliberately don't use the normal reference deletion, since we
+;;; don't want to trigger deletion of the XEP (although it shouldn't
+;;; hurt, since this is called after Component is compiled.) Instead,
+;;; we just clobber the REF-LEAF.
 (defun replace-top-level-xeps (component)
   (let ((res nil))
     (dolist (lambda (component-lambdas component))

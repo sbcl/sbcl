@@ -310,10 +310,10 @@
 ;;;  1. The successor has more than one predecessor.
 ;;;  2. The last node's CONT is also used somewhere else.
 ;;;  3. The successor is the current block (infinite loop).
-;;;  4. The next block has a different cleanup, and thus we may want to 
-;;;     insert cleanup code between the two blocks at some point.
-;;;  5. The next block has a different home lambda, and thus the control
-;;;     transfer is a non-local exit.
+;;;  4. The next block has a different cleanup, and thus we may want 
+;;;     to insert cleanup code between the two blocks at some point.
+;;;  5. The next block has a different home lambda, and thus the
+;;;     control transfer is a non-local exit.
 ;;;
 ;;; If we succeed, we return true, otherwise false.
 ;;;
@@ -604,14 +604,16 @@
 
 ;;; This function attempts to delete an exit node, returning true if
 ;;; it deletes the block as a consequence:
-;;; -- If the exit is degenerate (has no Entry), then we don't do anything,
-;;;    since there is nothing to be done.
-;;; -- If the exit node and its Entry have the same home lambda then we know
-;;;    the exit is local, and can delete the exit. We change uses of the
-;;;    Exit-Value to be uses of the original continuation, then unlink the
-;;;    node. If the exit is to a TR context, then we must do MERGE-TAIL-SETS
-;;;    on any local calls which delivered their value to this exit.
-;;; -- If there is no value (as in a GO), then we skip the value semantics.
+;;; -- If the exit is degenerate (has no Entry), then we don't do
+;;;    anything, since there is nothing to be done.
+;;; -- If the exit node and its Entry have the same home lambda then
+;;;    we know the exit is local, and can delete the exit. We change
+;;;    uses of the Exit-Value to be uses of the original continuation,
+;;;    then unlink the node. If the exit is to a TR context, then we
+;;;    must do MERGE-TAIL-SETS on any local calls which delivered
+;;;    their value to this exit.
+;;; -- If there is no value (as in a GO), then we skip the value
+;;;    semantics.
 ;;;
 ;;; This function is also called by environment analysis, since it
 ;;; wants all exits to be optimized even if normal optimization was
@@ -762,23 +764,25 @@
 ;;; This is called both by IR1 conversion and IR1 optimization when
 ;;; they have verified the type signature for the call, and are
 ;;; wondering if something should be done to special-case the call. If
-;;; Call is a call to a global function, then see whether it defined
+;;; CALL is a call to a global function, then see whether it defined
 ;;; or known:
-;;; -- If a DEFINED-FUNCTION should be inline expanded, then convert the
-;;;    expansion and change the call to call it. Expansion is enabled if
-;;;    :INLINE or if space=0. If the FUNCTIONAL slot is true, we never expand,
-;;;    since this function has already been converted. Local call analysis
-;;;    will duplicate the definition if necessary. We claim that the parent
-;;;    form is LABELS for context declarations, since we don't want it to be
-;;;    considered a real global function.
-;;; -- In addition to a direct check for the function name in the table, we
-;;;    also must check for slot accessors. If the function is a slot accessor,
-;;;    then we set the combination kind to the function info of %Slot-Setter or
-;;;    %Slot-Accessor, as appropriate.
-;;; -- If it is a known function, mark it as such by setting the Kind.
+;;; -- If a DEFINED-FUNCTION should be inline expanded, then convert
+;;;    the expansion and change the call to call it. Expansion is
+;;;    enabled if :INLINE or if SPACE=0. If the FUNCTIONAL slot is
+;;;    true, we never expand, since this function has already been
+;;;    converted. Local call analysis will duplicate the definition if
+;;;    necessary. We claim that the parent form is LABELS for context
+;;;    declarations, since we don't want it to be considered a real
+;;;    global function.
+;;; -- In addition to a direct check for the function name in the
+;;;    table, we also must check for slot accessors. If the function
+;;;    is a slot accessor, then we set the combination kind to the
+;;;    function info of %Slot-Setter or %Slot-Accessor, as
+;;;    appropriate.
+;;; -- If it is a known function, mark it as such by setting the KIND.
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
-;;; function-info assigned.
+;;; FUNCTION-INFO assigned.
 (defun recognize-known-call (call ir1-p)
   (declare (type combination call))
   (let* ((ref (continuation-use (basic-combination-fun call)))
@@ -913,8 +917,8 @@
 
 ;;;; known function optimization
 
-;;; Add a failed optimization note to FAILED-OPTIMZATIONS for Node,
-;;; Fun and Args. If there is already a note for Node and Transform,
+;;; Add a failed optimization note to FAILED-OPTIMZATIONS for NODE,
+;;; FUN and ARGS. If there is already a note for NODE and TRANSFORM,
 ;;; replace it, otherwise add a new one.
 (defun record-optimization-failure (node transform args)
   (declare (type combination node) (type transform transform)
