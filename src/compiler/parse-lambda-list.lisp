@@ -100,6 +100,8 @@
               (&aux
                (when (member state '(:rest :more-context :more-count))
                  (compiler-error "misplaced &AUX in lambda list: ~S" list))
+               (when auxp
+                 (compiler-error "multiple &AUX in lambda list: ~S" list))
                (setq auxp t
 		     state :aux))
               (t (bug "unknown LAMBDA-LIST-KEYWORD in lambda list: ~S." arg)))

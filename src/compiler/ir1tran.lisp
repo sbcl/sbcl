@@ -749,6 +749,7 @@
 				      (wherestring) hint c)
 				(muffle-warning-or-die)))
                      (error (lambda (c)
+                              (signal c)
                               (compiler-error "~@<~A~:@_~A~@:_~A~:>"
                                               (wherestring) hint c))))
         (funcall sb!xc:*macroexpand-hook* fun form *lexenv*)))))

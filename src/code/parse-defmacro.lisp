@@ -92,6 +92,8 @@
 	 (minimum 0)
 	 (keys ())
 	 (key-seen nil)
+         (aux-seen nil)
+         (optional-seen nil)
 	 ;; ANSI specifies that dotted lists are "treated exactly as if the
 	 ;; parameter name that ends the list had appeared preceded by &rest."
 	 ;; We force this behavior by transforming dotted lists into ordinary
@@ -126,7 +128,7 @@
              (case now-processing
                ((:required)
                 (when restp
-                  (defmacro-error "required argument after &REST/&BODY"
+                  (defmacro-error (format nil "required argument after ~A" restp)
                       context name))
                 (process-sublist var "SUBLIST-" `(car ,path))
                 (setq path `(cdr ,path)
@@ -192,36 +194,54 @@
                 (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
                        (setq rest-of-args (cdr rest-of-args))
                        (check-defmacro-arg (car rest-of-args))
-                       (setq *env-var* (car rest-of-args))
-                       (setq env-arg-used t))
+                       (setq *env-var* (car rest-of-args)
+                             env-arg-used t))
                       (t
                        (defmacro-error "&ENVIRONMENT" context name))))
                ((&rest &body)
-                (cond ((and (not restp) (cdr rest-of-args))
-                       (setq rest-of-args (cdr rest-of-args))
-                       (setq restp t)
+                (cond ((or key-seen aux-seen)
+                       (error "~A after ~A in ~A" var (or key-seen aux-seen) context))
+                      ((and (not restp) (cdr rest-of-args))
+                       (setq rest-of-args (cdr rest-of-args)
+                             restp var)
                        (process-sublist (car rest-of-args) "REST-LIST-" path))
                       (t
                        (defmacro-error (symbol-name var) context name))))
                (&optional
-                (setq now-processing :optionals))
+                (when (or key-seen aux-seen restp)
+                  (error "~A after ~A in ~A lambda-list." var (or key-seen aux-seen restp) context))
+                (when optional-seen
+                  (error "Multiple ~A in ~A lambda list." var context))
+                (setq now-processing :optionals
+                      optional-seen var))
                (&key
-                (setq now-processing :keywords)
-                (setq rest-name (gensym "KEYWORDS-"))
+                (when aux-seen
+                  (error "~A after ~A in ~A lambda-list." '&key '&aux context))
+                (when key-seen
+                  (error "Multiple ~A in ~A lambda-list." '&key context))
+                (setf now-processing :keywords
+                      rest-name (gensym "KEYWORDS-")
+                      restp var
+                      key-seen var)
                 (push rest-name *ignorable-vars*)
-                (setq restp t)
-		(setq key-seen t)
                 (push-let-binding rest-name path t))
                (&allow-other-keys
+                (unless (eq now-processing :keywords)
+                  (error "~A outside ~A section of lambda-list in ~A." var '&key context))
+                (when allow-other-keys-p
+                  (error "Multiple ~A in ~A lambda-list." var context))
                 (setq allow-other-keys-p t))
                (&aux
-                (setq now-processing :auxs))
+                (when aux-seen
+                  (error "Multiple ~A in ~A lambda-list." '&aux context))
+                (setq now-processing :auxs
+                      aux-seen var))
                ;; FIXME: Other lambda list keywords.
                (t
                 (case now-processing
                   ((:required)
                    (when restp
-                     (defmacro-error "required argument after &REST/&BODY"
+                     (defmacro-error (format nil "required argument after ~A" restp)
                          context name))
                    (push-let-binding var `(car ,path) nil)
                    (setq minimum (1+ minimum)
