@@ -2445,6 +2445,8 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by
     approximately 10%.
   * fixed some bugs revealed by Paul Dietz' test suite:
+    ** Fixed an optimization bug related to inheritance of initforms
+       from local to shared slots.
     ** FILE-POSITION works as specified on BROADCAST-STREAMs.
     ** CAST optimizer forgot to flush argument derived type.
     ** print/read consistency on floats is now orders of magnitude

@@ -869,7 +869,7 @@
     ;; (section 5.5.2 of AMOP).
     (update-slots class (compute-slots class))
     (update-gfs-of-class class)
-    (update-inits class (compute-default-initargs class))
+    (update-initargs class (compute-default-initargs class))
     (update-ctors 'finalize-inheritance :class class))
   (unless finalizep
     (dolist (sub (class-direct-subclasses class)) (update-class sub nil))))
@@ -975,7 +975,7 @@
 		   (update-gf-dfun class gf))
 		 gf-table)))))
 
-(defun update-inits (class inits)
+(defun update-initargs (class inits)
   (setf (plist-value class 'default-initargs) inits))
 
 (defmethod compute-default-initargs ((class slot-class))
@@ -1030,7 +1030,13 @@
 		      (from-class (slot-definition-allocation-class eslotd))
 		      (cell (assq name (class-slot-cells from-class))))
 		 (aver (consp cell))
-		 cell))))
+		 (if (eq +slot-unbound+ (cdr cell))
+		     ;; We may have inherited an initfunction
+		     (let ((initfun (slot-definition-initfunction eslotd)))
+		       (if initfun
+			   (rplacd cell (funcall initfun))
+			   cell))
+		     cell)))))
       (initialize-internal-slot-functions eslotd))))
 
 (defmethod compute-slots ((class funcallable-standard-class))

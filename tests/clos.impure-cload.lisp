@@ -94,6 +94,16 @@
 (assert (= (slot-value (make-instance 'definitargs-class) 'a) 1))
 (assert (= (slot-value (make-instance 'definitargs-class :a 0) 'a) 0))
 (assert (= *definitargs-counter* 2))
+
+;;; inherited local -> shared slot initforms
+;;  (adapted from Paul F. Dietz's test suite DEFCLASS-0211.1)
+(defclass shared-to-local-initform-super ()
+  ((redefined :allocation :instance :initform 'orig-initform)))
+(defclass shared-to-local-initform-sub (shared-to-local-initform-super)
+  ((redefined :allocation :class)))
+(assert (slot-boundp (make-instance 'shared-to-local-initform-sub) 'redefined))
+(assert (eq 'orig-initform
+	    (slot-value (make-instance 'shared-to-local-initform-sub) 'redefined)))
 
 ;;; success
 (sb-ext:quit :unix-status 104)
