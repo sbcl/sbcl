@@ -81,6 +81,7 @@
 ;;;; construction and simple accessors
 
 (defconstant +min-hash-table-size+ 16)
+(defconstant +min-hash-table-rehash-threshold+ (float 1/16 1.0))
 
 (defun make-hash-table (&key (test 'eql)
 			     (size +min-hash-table-size+)
@@ -130,15 +131,16 @@
 		      (min size
 			   ;; SIZE is just a hint, so if the user asks
 			   ;; for a SIZE which'd be too big for us to
-			   ;; easily implement, we bump it down.
-			   (floor array-dimension-limit 16))))
+ 			   ;; easily implement, we bump it down.
+			   (floor array-dimension-limit 1024))))
 	   (rehash-size (if (integerp rehash-size)
 			    rehash-size
 			    (float rehash-size 1.0)))
 	   ;; FIXME: Original REHASH-THRESHOLD default should be 1.0,
 	   ;; not 1, to make it easier for the compiler to avoid
 	   ;; boxing.
-	   (rehash-threshold (float rehash-threshold 1.0))
+	   (rehash-threshold (max +min-hash-table-rehash-threshold+
+				  (float rehash-threshold 1.0)))
 	   (size+1 (1+ size))		; The first element is not usable.
            ;; KLUDGE: The most natural way of expressing the below is
            ;; (round (/ (float size+1) rehash-threshold)), and indeed

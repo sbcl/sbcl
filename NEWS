@@ -2202,6 +2202,10 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
   * bug fix: buffered :DIRECTION :IO streams are less likely to become
     confused about their position.  (thanks to Adam Warner and Gerd 
     Moellmann)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** the value of the :REHASH-THRESHOLD argument to MAKE-HASH-TABLE
+       is ignored if it is too small, rather than propagating through
+       to cause DIVIDE-BY-ZERO or FLOATING-POINT-OVERFLOW errors.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
