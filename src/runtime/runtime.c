@@ -254,11 +254,6 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 
     set_lossage_handler(monitor_or_something);
 
-#if 0
-    os_init();
-    gc_init();
-    validate();
-#endif
     globals_init();
 
     initial_function = load_core_file(core);

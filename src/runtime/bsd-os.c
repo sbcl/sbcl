@@ -230,23 +230,19 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 #else
 #error unsupported BSD variant
 #endif
-    if (!gencgc_handle_wp_violation(fault_addr)) {
-	interrupt_handle_now(signal, siginfo, void_context);
-    }
+    os_context_t *context = arch_os_get_context(&void_context);
+   if (!gencgc_handle_wp_violation(fault_addr)) 
+        if(!handle_control_stack_guard_triggered(context,fault_addr))
+	    /* FIXME is this context or void_context?  not that it */
+	    /* makes a difference currently except on linux/sparc */
+	    interrupt_handle_now(signal, siginfo, void_context);
 }
 void
 os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
-#if defined __FreeBSD__
-    undoably_install_low_level_interrupt_handler(SIGBUS,
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
 						 memory_fault_handler);
-#elif defined __OpenBSD__
-    undoably_install_low_level_interrupt_handler(SIGSEGV,
-						 memory_fault_handler);
-#else
-#error unsupported BSD variant
-#endif
     SHOW("leaving os_install_interrupt_handlers()");
 }
 

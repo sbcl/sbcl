@@ -173,10 +173,9 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_vm_address_t addr;
 
     addr = arch_get_bad_addr(signal, info, context);
-    /* There's some complicated recovery code in linux-os.c here
-       that I'm currently too confused to understand. FIXME. */
     if(!interrupt_maybe_gc(signal, info, context)) {
-	interrupt_handle_now(signal, info, context);
+	if(!handle_control_stack_guard_triggered(context,addr))
+	    interrupt_handle_now(signal, info, context);
     }
 }
 
@@ -185,5 +184,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 void
 os_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGSEGV,sigsegv_handler);
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+						 sigsegv_handler);
 }

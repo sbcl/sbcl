@@ -1247,6 +1247,7 @@
 			  (cold-fdefinition-object (cold-intern ',symbol)))))
     (frob maybe-gc)
     (frob internal-error)
+    (frob sb!kernel::control-stack-exhausted-error)
     (frob sb!di::handle-breakpoint)
     (frob sb!di::handle-fun-end-breakpoint))
 

@@ -28,14 +28,17 @@ typedef int os_context_register_t;
  * is an mcontext_t, but according to comments by Raymond Wiker in the
  * original FreeBSD port of SBCL, that's wrong, it's actually a
  * ucontext_t. */
+
 typedef ucontext_t os_context_t;
 /* As the sbcl-devel message from Raymond Wiker 2000-12-01, FreeBSD
  * (unlike Linux and OpenBSD) doesn't let us tweak the CPU's single
  * step flag bit by messing with the flags stored in a signal context,
  * so we need to implement single stepping in a more roundabout way. */
 #define CANNOT_GET_TO_SINGLE_STEP_FLAG
+#define SIG_MEMORY_FAULT SIGBUS
 #elif defined __OpenBSD__
 typedef struct sigcontext os_context_t;
+#define SIG_MEMORY_FAULT SIGSEGV
 #else
 #error unsupported BSD variant
 #endif

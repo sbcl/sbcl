@@ -482,3 +482,12 @@
 				       arguments))))
 		 (t
 		  (funcall handler name fp alien-context arguments)))))))))
+
+(defun control-stack-exhausted-error ()
+  (let ((sb!debug:*stack-top-hint* nil))
+    (infinite-error-protect
+     (format *error-output*
+	     "Control stack guard page temporarily disabled: proceed with caution~%")
+     (error "Control stack exhausted (no more space for function call frames).  This is probably due to heavily nested or infinitely recursive function calls, or a tail call that SBCL cannot or has not optimized away."))))
+
+

@@ -52,9 +52,10 @@ sbcl.nm: sbcl
 sbcl: ${OBJS} 
 	$(CC) ${LINKFLAGS} ${OS_LINK_FLAGS} -o $@ ${OBJS} ${OS_LIBS} -lm
 
+
 .PHONY: clean all
 clean:
-	rm -f depend *.o sbcl sbcl.nm core *.tmp ; true
+	-rm -f depend *.o sbcl sbcl.nm core *.tmp
 
 
 depend: ${C_SRCS} sbcl.h

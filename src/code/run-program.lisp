@@ -425,6 +425,7 @@
   (stderr sb-alien:int))
 
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
+;;; XXX does this actually work for symlinks?
 (defun unix-filename-is-executable-p (unix-filename)
   (declare (type simple-string unix-filename))
   (values (and (eq (sb-unix:unix-file-kind unix-filename) :file)

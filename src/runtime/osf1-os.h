@@ -12,6 +12,8 @@ typedef int os_vm_prot_t;
 #define OS_VM_PROT_WRITE PROT_WRITE
 #define OS_VM_PROT_EXECUTE PROT_EXEC
 
+#define SIG_MEMORY_FAULT SIGSEGV
+
 typedef long os_context_register_t ;
 
 #ifndef NSIG			/* osf1 -D_XOPEN_SOURCE_EXTENDED omits this */

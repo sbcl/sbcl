@@ -32,7 +32,6 @@
 #include "dynbind.h"
 #include "interr.h"
 
-
 void sigaddset_blockable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
@@ -106,31 +105,15 @@ static boolean maybe_gc_pending = 0;
  * utility routines used by various signal handlers
  */
 
-void
-fake_foreign_function_call(os_context_t *context)
+void 
+build_fake_control_stack_frames(os_context_t *context)
 {
-    int context_index;
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
+    
     lispobj oldcont;
-#endif
 
-    /* Get current Lisp state from context. */
-#ifdef reg_ALLOC
-    dynamic_space_free_pointer =
-	(lispobj *)(*os_context_register_addr(context, reg_ALLOC));
-#ifdef alpha
-    if ((long)dynamic_space_free_pointer & 1) {
-	lose("dead in fake_foreign_function_call, context = %x", context);
-    }
-#endif
-#endif
-#ifdef reg_BSP
-    current_binding_stack_pointer =
-	(lispobj *)(*os_context_register_addr(context, reg_BSP));
-#endif
+    /* Build a fake stack frame or frames */
 
-#ifndef __i386__
-    /* Build a fake stack frame. */
     current_control_frame_pointer =
 	(lispobj *)(*os_context_register_addr(context, reg_CSP));
     if ((lispobj *)(*os_context_register_addr(context, reg_CFP))
@@ -155,9 +138,10 @@ fake_foreign_function_call(os_context_t *context)
             oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
         }
     }
-    /* ### We can't tell whether we are still in the caller if it had
-     * to reg_ALLOCate the stack frame due to stack arguments. */
-    /* ### Can anything strange happen during return? */
+    /* We can't tell whether we are still in the caller if it had to
+     * allocate a stack frame due to stack arguments. */
+    /* This observation provoked some past CMUCL maintainer to ask
+     * "Can anything strange happen during return?" */
     else {
         /* normal case */
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
@@ -170,6 +154,29 @@ fake_foreign_function_call(os_context_t *context)
     current_control_frame_pointer[2] =
 	(lispobj)(*os_context_register_addr(context, reg_CODE));
 #endif
+}
+
+void
+fake_foreign_function_call(os_context_t *context)
+{
+    int context_index;
+
+    /* Get current Lisp state from context. */
+#ifdef reg_ALLOC
+    dynamic_space_free_pointer =
+	(lispobj *)(*os_context_register_addr(context, reg_ALLOC));
+#ifdef alpha
+    if ((long)dynamic_space_free_pointer & 1) {
+	lose("dead in fake_foreign_function_call, context = %x", context);
+    }
+#endif
+#endif
+#ifdef reg_BSP
+    current_binding_stack_pointer =
+	(lispobj *)(*os_context_register_addr(context, reg_BSP));
+#endif
+
+    build_fake_control_stack_frames(context);
 
     /* Do dynamic binding of the active interrupt context index
      * and save the context in the context array. */
@@ -180,8 +187,7 @@ fake_foreign_function_call(os_context_t *context)
      * which do bare >> and << for fixnum_value and make_fixnum. */
 
     if (context_index >= MAX_INTERRUPTS) {
-        lose("maximum interrupt nesting depth (%d) exceeded",
-	     MAX_INTERRUPTS);
+        lose("maximum interrupt nesting depth (%d) exceeded", MAX_INTERRUPTS);
     }
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
@@ -493,15 +499,52 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
     if (current_auto_gc_trigger == NULL)
 	return 0;
     else{
-	lispobj *badaddr=(lispobj *)arch_get_bad_addr(signal,
-						      info,
-						      context);
-
-	return (badaddr >= current_auto_gc_trigger &&
-		badaddr < current_dynamic_space + DYNAMIC_SPACE_SIZE);
+	void *badaddr=arch_get_bad_addr(signal,info,context);
+	return (badaddr >= (void *)current_auto_gc_trigger &&
+		badaddr <((void *)current_dynamic_space + DYNAMIC_SPACE_SIZE));
     }
 }
 #endif
+
+/* and similarly for the control stack guard page */
+
+boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
+{
+    /* note the os_context hackery here.  When the signal handler returns, 
+     * it won't go back to what it was doing ... */
+    if(addr>=CONTROL_STACK_GUARD_PAGE && 
+       addr<(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
+	void *function;
+	/* we hit the end of the control stack.  disable protection
+	 * temporarily so the error handler has some headroom */
+	protect_control_stack_guard_page(0);
+	
+	function=
+	    &(((struct simple_fun *)
+	       native_pointer(SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR)))
+	      ->code);
+
+	/* Build a stack frame showing `interrupted' so that the
+	 * user's backtrace makes (as much) sense (as usual) */
+	build_fake_control_stack_frames(context);
+	/* signal handler will "return" to this error-causing function */
+	*os_context_pc_addr(context)= function;
+#ifndef LISP_FEATURE_X86
+	/* this much of the calling convention is common to all
+	   non-x86 ports */
+	*os_context_register_addr(context,reg_NARGS)=0; 
+	*os_context_register_addr(context,reg_LIP)= function;
+	*os_context_register_addr(context,reg_CFP)= 
+	    current_control_frame_pointer;
+#ifdef ARCH_HAS_NPC_REGISTER
+	*os_context_register_addr(context,reg_LIP)=
+	    4+*os_context_pc_addr(context);
+#endif
+#endif
+	return 1;
+    }
+    else return 0;
+}
 
 #ifndef __i386__
 /* This function gets called from the SIGSEGV (for e.g. Linux or
@@ -547,8 +590,8 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 	    if(current_dynamic_space==old_free_space) 
 		/* MAYBE-GC (as the name suggest) might not.  If it
 		 * doesn't, it won't reset the GC trigger either, so we
-		 * have to do it ourselves.  Add small amount of space
-		 * to tide us over while GC is inhibited 
+		 * have to do it ourselves.  Put it near the end of
+		 * dynamic space so we're not running into it continually
 		 */
 		set_auto_gc_trigger(DYNAMIC_SPACE_SIZE
 				    -(u32)os_vm_page_size);
@@ -622,7 +665,20 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigemptyset(&sa.sa_mask);
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
-
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    /* Signal handlers are run on the control stack, so if it is exhausted
+     * we had better use an alternate stack for whatever signal tells us
+     * we've exhausted it */
+    if(signal==SIG_MEMORY_FAULT) {
+	stack_t sigstack;
+	sigstack.ss_sp=(void *) ALTERNATE_SIGNAL_STACK_START;
+	sigstack.ss_flags=0;
+	sigstack.ss_size = SIGSTKSZ;
+	sigaltstack(&sigstack,0);
+	sa.sa_flags|=SA_ONSTACK;
+    }
+#endif
+    
     /* In the case of interrupt handlers which are modified more than
      * once, we only save the original unmodified copy. */
     if (!old_low_level_signal_handler_state->was_modified) {

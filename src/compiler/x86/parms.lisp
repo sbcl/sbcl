@@ -148,7 +148,8 @@
   (def!constant control-stack-end     #x57fff000)
 
   (def!constant binding-stack-start   #x60000000)
-  (def!constant binding-stack-end     #x67fff000))
+  (def!constant binding-stack-end     #x67fff000)
+  (def!constant alternate-signal-stack-start #x58000000))
 
 #!+bsd
 (progn
@@ -168,12 +169,19 @@
     #!+freebsd #x40000000
     #!+openbsd #x48000000)
   (def!constant control-stack-end
-    #!+freebsd #x47fff000
-    #!+openbsd #x4ffff000)
+    #!+freebsd #x43fff000
+    #!+openbsd #x4bfff000)
   (def!constant dynamic-space-start
-    #!+freebsd #x48000000
-    #!+openbsd #x50000000)
-  (def!constant dynamic-space-end     #x88000000))
+    #!+freebsd                             #x48000000
+    #!+openbsd                             #x50000000)
+  (def!constant dynamic-space-end          #x88000000)
+  (def!constant alternate-signal-stack-start
+      #!+freebsd #x44000000
+      #!+openbsd #x4c000000))
+
+
+;;; don't need alternate-signal-stack-end : it's -start+SIGSTKSZ
+
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
@@ -230,9 +238,11 @@
     ;; The C startup code must fill these in.
     *posix-argv*
 
-    ;; functions that the C code needs to call
+    ;; functions that the C code needs to call.  When adding to this list,
+    ;; also add a `frob' form in genesis.lisp finish-symbols.
     maybe-gc
     sb!kernel::internal-error
+    sb!kernel::control-stack-exhausted-error
     sb!di::handle-breakpoint
     fdefinition-object
 

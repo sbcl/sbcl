@@ -87,7 +87,7 @@ void os_init(void)
        started up a process with a different set of traps, or
        something?) Find out what this was meant to do, and reenable it
        or delete it if possible. -- CSR, 2002-07-15 */
-    /* SET_FPU_CONTROL_WORD(0x1372|4|8|16|32); /* no interrupts */
+    /* SET_FPU_CONTROL_WORD(0x1372|4|8|16|32);  no interrupts */
 #endif
 }
 
@@ -242,6 +242,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * any OS-dependent special low-level handling for signals
  */
 
+
 #if defined GENCGC
 
 /*
@@ -253,9 +254,9 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     void* fault_addr = (void*)context->uc_mcontext.cr2;
-    if (!gencgc_handle_wp_violation(fault_addr)) {
-	interrupt_handle_now(signal, info, void_context);
-    }
+    if (!gencgc_handle_wp_violation(fault_addr)) 
+	if(!handle_control_stack_guard_triggered(context,fault_addr))
+	    interrupt_handle_now(signal, info, void_context);
 }
 
 #else
@@ -266,19 +267,14 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     os_vm_address_t addr;
 
-#ifdef __i386__
-    interrupt_handle_now(signal,contextstruct);
-#else
-    char *control_stack_top = (char*)CONTROL_STACK_START + CONTROL_STACK_SIZE;
-    
     addr = arch_get_bad_addr(signal,info,context);
-
     if (addr != NULL && 
-       *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
+	*os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
 	
-	/* This is the end of a pseudo-atomic section during which
-	 * a signal was received.  We must deal with the pending interrupt
-	 * (see also interrupt.c, ../code/interrupt.lisp)
+	/* Alpha stuff: This is the end of a pseudo-atomic section
+	 * during which a signal was received.  We must deal with the
+	 * pending interrupt (see also interrupt.c,
+	 * ../code/interrupt.lisp)
 	 */
 	/* (how we got here: when interrupting, we set bit 63 in
 	 * reg_Alloc.  At the end of the atomic section we tried to
@@ -287,28 +283,18 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	 */
 	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
 	interrupt_handle_pending(context);
-    } else if (addr > control_stack_top && addr < BINDING_STACK_START) {
-	fprintf(stderr,
-		"Possible stack overflow at 0x%016lX:\n"
-		"control_stack_top=%lx, BINDING_STACK_START=%lx\n",
-		addr,
-		control_stack_top,
-		BINDING_STACK_START);
-	/* Try to fix control frame pointer. */
-	while ( ! (CONTROL_STACK_START <= *current_control_frame_pointer &&
-		   *current_control_frame_pointer <= control_stack_top))
-	    ((char*)current_control_frame_pointer) -= sizeof(lispobj);
-	monitor_or_something();
-    } else if (!interrupt_maybe_gc(signal, info, context)) {
-	interrupt_handle_now(signal, info, context);
+    } else {
+	if(!interrupt_maybe_gc(signal, info, context))
+	    if(!handle_control_stack_guard_triggered(context,addr))
+		interrupt_handle_now(signal, info, context);
     }
-#endif
 }
 #endif
 
 void
 os_install_interrupt_handlers(void)
 {
-    undoably_install_low_level_interrupt_handler(SIGSEGV, sigsegv_handler);
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+						 sigsegv_handler);
 }
 

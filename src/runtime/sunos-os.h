@@ -30,5 +30,7 @@ typedef int os_vm_prot_t;
 #define OS_VM_PROT_WRITE   PROT_WRITE
 #define OS_VM_PROT_EXECUTE PROT_EXEC
 
+#define SIG_MEMORY_FAULT SIGSEGV
+
 /* Yaargh?! */
 typedef int os_context_register_t ;

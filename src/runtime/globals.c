@@ -60,10 +60,10 @@ void globals_init(void)
     foreign_function_call_active = 1;
 
     /* Initialize the current Lisp state. */
-#ifndef __i386__ /* if stack grows upward */
-    current_control_stack_pointer = (lispobj *)CONTROL_STACK_START;
-#else
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     current_control_stack_pointer = (lispobj *)CONTROL_STACK_END;
+#else
+    current_control_stack_pointer = (lispobj *)CONTROL_STACK_START;
 #endif
 
     current_control_frame_pointer = (lispobj *)0;

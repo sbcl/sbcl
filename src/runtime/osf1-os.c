@@ -142,7 +142,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	fprintf(stderr, "bad address 0x%p\n",addr);
 	lose("ran off end of dynamic space");
     } else if (!interrupt_maybe_gc(signal, info, context)) {
-	interrupt_handle_now(signal, info, context);
+	if(!handle_control_stack_guard_triggered(context,addr))
+	    interrupt_handle_now(signal, info, context);
     }
 }
 
@@ -150,6 +151,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 void
 os_install_interrupt_handlers(void)
 {
-    undoably_install_low_level_interrupt_handler(SIGSEGV, sigsegv_handler);
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+						 sigsegv_handler);
 }
 

@@ -67,13 +67,19 @@ os_context_register_addr(os_context_t *context, int offset)
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
-    return &context->uc_mcontext.gregs[14];
+    return &context->uc_mcontext.gregs[14]; /*  REG_EIP */
 }
 
 os_context_register_t *
 os_context_sp_addr(os_context_t *context)
+{				
+    return &context->uc_mcontext.gregs[17]; /* REG_UESP */
+}
+
+os_context_register_t *
+os_context_fp_addr(os_context_t *context)
 {
-    return &context->uc_mcontext.gregs[17];
+    return &context->uc_mcontext.gregs[6]; /* REG_EBP */
 }
 
 unsigned long

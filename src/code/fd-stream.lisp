@@ -369,6 +369,9 @@
     (if (stringp thing)
 	(let ((last-newline (and (find #\newline (the simple-string thing)
 				       :start start :end end)
+				 ;; FIXME why do we need both calls?
+				 ;; Is find faster forwards than
+				 ;; position is backwards?
 				 (position #\newline (the simple-string thing)
 					   :from-end t
 					   :start start
@@ -1079,7 +1082,7 @@
 	(:io     (values   t   t sb!unix:o_rdwr))
 	(:probe  (values   t nil sb!unix:o_rdonly)))
     (declare (type index mask))
-    (let* ((pathname (merge-pathnames filename))
+    (let* ((pathname (pathname filename))
 	   (namestring
 	    (cond ((unix-namestring pathname input))
 		  ((and input (eq if-does-not-exist :create))

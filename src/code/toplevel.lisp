@@ -152,75 +152,89 @@
 
 ;;; Zero the unused portion of the control stack so that old objects
 ;;; are not kept alive because of uninitialized stack variables.
-;;;
-;;; FIXME: Why do we need to do this instead of just letting GC read
-;;; the stack pointer and avoid messing with the unused portion of
-;;; the control stack? (Is this a multithreading thing where there's
-;;; one control stack and stack pointer per thread, and it might not
-;;; be easy to tell what a thread's stack pointer value is when
-;;; looking in from another thread?)
+
+;;; "To summarize the problem, since not all allocated stack frame
+;;; slots are guaranteed to be written by the time you call an another
+;;; function or GC, there may be garbage pointers retained in your
+;;; dead stack locations.  The stack scrubbing only affects the part
+;;; of the stack from the SP to the end of the allocated stack."
+;;; - ram, on cmucl-imp, Tue, 25 Sep 2001
+
+;;; So, as an (admittedly lame) workaround, from time to time we call
+;;; scrub-control-stack to zero out all the unused portion.  This is
+;;; supposed to happen when the stack is mostly empty, so that we have
+;;; a chance of clearing more of it: callers are currently (2002.07.18)
+;;; REPL and SUB-GC
+
 (defun scrub-control-stack ()
   (declare (optimize (speed 3) (safety 0))
 	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
 
   #!-stack-grows-downward-not-upward
-  (labels
-      ((scrub (ptr offset count)
-         (declare (type system-area-pointer ptr)
-		  (type (unsigned-byte 16) offset)
-		  (type (unsigned-byte 20) count)
-		  (values (unsigned-byte 20)))
-	 (cond ((= offset bytes-per-scrub-unit)
-		(look (sap+ ptr bytes-per-scrub-unit) 0 count))
-	       (t
-		(setf (sap-ref-32 ptr offset) 0)
-		(scrub ptr (+ offset sb!vm:n-word-bytes) count))))
-       (look (ptr offset count)
-	 (declare (type system-area-pointer ptr)
-		  (type (unsigned-byte 16) offset)
-		  (type (unsigned-byte 20) count)
-		  (values (unsigned-byte 20)))
-	 (cond ((= offset bytes-per-scrub-unit)
-		count)
-	       ((zerop (sap-ref-32 ptr offset))
-		(look ptr (+ offset sb!vm:n-word-bytes) count))
-	       (t
-		(scrub ptr offset (+ count sb!vm:n-word-bytes))))))
-    (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	   (initial-offset (logand csp (1- bytes-per-scrub-unit))))
+  (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
+	 (initial-offset (logand csp (1- bytes-per-scrub-unit)))
+	 (end-of-stack
+	  (- sb!vm:control-stack-end sb!c:*backend-page-size*)))
+    (labels
+	((scrub (ptr offset count)
+	   (declare (type system-area-pointer ptr)
+		    (type (unsigned-byte 16) offset)
+		    (type (unsigned-byte 20) count)
+		    (values (unsigned-byte 20)))
+	   (cond ((>= (sap-int ptr) end-of-stack) 0)
+		 ((= offset bytes-per-scrub-unit)
+		  (look (sap+ ptr bytes-per-scrub-unit) 0 count))
+		 (t
+		  (setf (sap-ref-32 ptr offset) 0)
+		  (scrub ptr (+ offset sb!vm:n-word-bytes) count))))
+	 (look (ptr offset count)
+	   (declare (type system-area-pointer ptr)
+		    (type (unsigned-byte 16) offset)
+		    (type (unsigned-byte 20) count)
+		    (values (unsigned-byte 20)))
+	   (cond ((>= (sap-int ptr) end-of-stack) 0)
+		 ((= offset bytes-per-scrub-unit)
+		  count)
+		 ((zerop (sap-ref-32 ptr offset))
+		  (look ptr (+ offset sb!vm:n-word-bytes) count))
+		 (t
+		  (scrub ptr offset (+ count sb!vm:n-word-bytes))))))
       (declare (type (unsigned-byte 32) csp))
       (scrub (int-sap (- csp initial-offset))
 	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
 	     0)))
 
   #!+stack-grows-downward-not-upward
-  (labels
-      ((scrub (ptr offset count)
-	 (declare (type system-area-pointer ptr)
-		  (type (unsigned-byte 16) offset)
-		  (type (unsigned-byte 20) count)
-		  (values (unsigned-byte 20)))
-	 (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
-	   (cond ((= offset bytes-per-scrub-unit)
-		  (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
-			0 count))
-		 (t ;; need to fix bug in %SET-STACK-REF
-		  (setf (sap-ref-32 loc 0) 0)
-		  (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
-       (look (ptr offset count)
-	 (declare (type system-area-pointer ptr)
-		  (type (unsigned-byte 16) offset)
-		  (type (unsigned-byte 20) count)
-		  (values (unsigned-byte 20)))
-	 (let ((loc (int-sap (- (sap-int ptr) offset))))
-	   (cond ((= offset bytes-per-scrub-unit)
-		  count)
-		 ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
-		  (look ptr (+ offset sb!vm:n-word-bytes) count))
-		 (t
-		  (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
-    (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	   (initial-offset (logand csp (1- bytes-per-scrub-unit))))
+  (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
+	 (end-of-stack (+ sb!vm:control-stack-start sb!c:*backend-page-size*))
+	 (initial-offset (logand csp (1- bytes-per-scrub-unit))))
+    (labels
+	((scrub (ptr offset count)
+	   (declare (type system-area-pointer ptr)
+		    (type (unsigned-byte 16) offset)
+		    (type (unsigned-byte 20) count)
+		    (values (unsigned-byte 20)))
+	   (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
+	     (cond ((<= (sap-int loc) end-of-stack) 0)
+		   ((= offset bytes-per-scrub-unit)
+		    (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
+			  0 count))
+		   (t ;; need to fix bug in %SET-STACK-REF
+		    (setf (sap-ref-32 loc 0) 0)
+		    (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
+	 (look (ptr offset count)
+	   (declare (type system-area-pointer ptr)
+		    (type (unsigned-byte 16) offset)
+		    (type (unsigned-byte 20) count)
+		    (values (unsigned-byte 20)))
+	   (let ((loc (int-sap (- (sap-int ptr) offset))))
+	     (cond ((<= (sap-int loc) end-of-stack) 0)
+		   ((= offset bytes-per-scrub-unit)
+		    count)
+		   ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
+		    (look ptr (+ offset sb!vm:n-word-bytes) count))
+		   (t
+		    (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
       (declare (type (unsigned-byte 32) csp))
       (scrub (int-sap (+ csp initial-offset))
 	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
@@ -485,6 +499,10 @@
 	    "Reduce debugger level (leaving debugger, returning to toplevel).")
 	 (catch 'toplevel-catcher
 	   #!-sunos (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	   ;; in the event of a control-stack-exhausted-error, we should
+	   ;; have unwound enough stack by the time we get here that this
+	   ;; is now possible
+	   (sb!kernel::protect-control-stack-guard-page 1)
 	   (repl noprint)
 	   (critically-unreachable "after REPL")))))))
 
@@ -492,10 +510,7 @@
   (/show0 "entering REPL")
   (let ((eof-marker (cons :eof nil)))
     (loop
-     ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
-     ;; control stack before each interactive command. Isn't there some
-     ;; way we can convince the GC to just ignore dead areas of the
-     ;; control stack, so that we don't need to rely on this half-measure?
+     ;; see comment preceding definition of SCRUB-CONTROL-STACK
      (scrub-control-stack)
      (unless noprint
        (fresh-line)

@@ -195,6 +195,7 @@
     ;; functions that the C code needs to call
     maybe-gc
     sb!kernel::internal-error
+    sb!kernel::control-stack-exhausted-error
     sb!di::handle-breakpoint
     sb!di::handle-fun-end-breakpoint
 

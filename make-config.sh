@@ -60,7 +60,7 @@ printf ":%s" "$sbcl_arch" >> $ltf
 # if we're building for x86. -- CSR, 2002-02-21 Then we do something
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ] ; then
-    printf ' :gencgc :stack-grows-downward-not-upward' >> $ltf
+    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

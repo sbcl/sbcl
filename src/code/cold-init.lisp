@@ -99,7 +99,6 @@
         *cold-init-complete-p* nil
         *type-system-initialized* nil)
 
-  (show-and-call !exhaust-cold-init)
   (show-and-call !typecheckfuns-cold-init)
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
