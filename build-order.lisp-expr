@@ -474,6 +474,7 @@
  ("src/compiler/float-tran")
  ("src/compiler/saptran")
  ("src/compiler/srctran")
+ ("src/compiler/generic/vm-tran")
  ("src/compiler/locall")
  ("src/compiler/dfo")
  ("src/compiler/checkgen")
@@ -580,7 +581,6 @@
 
  ("src/compiler/copyprop")
  ("src/compiler/represent")
- ("src/compiler/generic/vm-tran")
  ("src/compiler/pack")
  ("src/compiler/codegen")
  ("src/compiler/debug")

@@ -439,10 +439,32 @@
 	(= (double-float-high-bits x) (double-float-high-bits y))))
 
 
-;;;; 32-bit operations
+;;;; modular functions
 (define-good-modular-fun logand)
 (define-good-modular-fun logior)
 ;;; FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16
+
+#!-alpha
+(progn
+  (defknown sb!vm::ash-left-mod32 (integer (integer 0)) (unsigned-byte 32)
+            (foldable flushable movable))
+  (define-modular-fun-optimizer ash ((integer count) :width width)
+    (when (and (<= width 32)
+               (constant-lvar-p count)  ; ?
+               (plusp (lvar-value count)))
+      (cut-to-width integer width)
+      'sb!vm::ash-left-mod32)))
+#!+alpha
+(progn
+  (defknown sb!vm::ash-left-mod64 (integer (integer 0)) (unsigned-byte 64)
+            (foldable flushable movable))
+  (define-modular-fun-optimizer ash ((integer count) :width width)
+    (when (and (<= width 64)
+               (constant-lvar-p count)  ; ?
+               (plusp (lvar-value count)))
+      (cut-to-width integer width)
+      'sb!vm::ash-left-mod64)))
+
 
 ;;; There are two different ways the multiplier can be recoded. The
 ;;; more obvious is to shift X by the correct amount for each bit set
@@ -456,13 +478,11 @@
   (declare (type (unsigned-byte 32) num))
   (let ((adds 0) (shifts 0)
 	(result nil) first-one)
-    (labels ((tub32 (x) `(logand ,x #xffffffff)) ; uses modular arithmetic
-	     (add (next-factor)
+    (labels ((add (next-factor)
 	       (setf result
-		     (tub32
-		      (if result
-			  (progn (incf adds) `(+ ,result ,(tub32 next-factor)))
-			  next-factor)))))
+		     (if result
+                         (progn (incf adds) `(+ ,result ,next-factor))
+                         next-factor))))
       (declare (inline add))
       (dotimes (bitpos 32)
 	(if first-one
@@ -474,8 +494,8 @@
 		       (progn
 			 (incf adds)
 			 (incf shifts 2)
-			 `(- ,(tub32 `(ash ,arg ,bitpos))
-			     ,(tub32 `(ash ,arg ,first-one))))))
+			 `(- (ash ,arg ,bitpos)
+			     (ash ,arg ,first-one)))))
 	      (setf first-one nil))
 	    (when (logbitp bitpos num)
 	      (setf first-one bitpos))))
@@ -485,8 +505,12 @@
 	      (t
 	       (incf shifts 2)
 	       (incf adds)
-	       (add `(- ,(tub32 `(ash ,arg 31)) 
-			,(tub32 `(ash ,arg ,first-one))))))
+	       (add `(- (ash ,arg 31)
+			(ash ,arg ,first-one)))))
 	(incf shifts)
 	(add `(ash ,arg 31))))
-    (values result adds shifts)))
+    (values (if (plusp adds)
+                `(logand ,result #.(1- (ash 1 32))) ; using modular arithmetic
+                result)
+            adds
+            shifts)))

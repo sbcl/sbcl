@@ -146,8 +146,8 @@
   (values array start end 0))
 
 #!-alpha
-(defun sb!vm::ash-left-constant-mod32 (integer amount)
+(defun sb!vm::ash-left-mod32 (integer amount)
   (ldb (byte 32 0) (ash integer amount)))
 #!+alpha
-(defun sb!vm::ash-left-constant-mod64 (integer amount)
+(defun sb!vm::ash-left-mod64 (integer amount)
   (ldb (byte 64 0) (ash integer amount)))

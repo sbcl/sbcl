@@ -152,7 +152,9 @@
 
 ;;; Modular functions
 
-;;; hash: name -> { ({(width . fun)}*) | :good }
+;;; For a documentation, see CUT-TO-WIDTH.
+
+;;; hash: name -> { :GOOD | optimizer | ({modular-fun-info}*)}
 (defvar *modular-funs*
   (make-hash-table :test 'eq))
 
@@ -166,11 +168,11 @@
 
 (defun find-modular-version (fun-name width)
   (let ((infos (gethash fun-name *modular-funs*)))
-    (if (eq infos :good)
-        :good
+    (if (listp infos)
         (find-if (lambda (item-width) (>= item-width width))
                  infos
-                 :key #'modular-fun-info-width))))
+                 :key #'modular-fun-info-width)
+        infos)))
 
 (defun %define-modular-fun (name lambda-list prototype width)
   (let* ((infos (the list (gethash prototype *modular-funs*)))
@@ -216,3 +218,22 @@
 (defmacro define-good-modular-fun (name)
   (check-type name symbol)
   `(%define-good-modular-fun ',name))
+
+(defmacro define-modular-fun-optimizer
+    (name ((&rest lambda-list) &key (width (gensym "WIDTH")))
+     &body body)
+  (check-type name symbol)
+  (dolist (arg lambda-list)
+    (when (member arg lambda-list-keywords)
+      (error "Lambda list keyword ~S is not supported for ~
+              modular function lambda lists." arg)))
+  (with-unique-names (call args)
+    `(setf (gethash ',name *modular-funs*)
+           (lambda (,call ,width)
+             (declare (type basic-combination ,call)
+                      (type (integer 0) width))
+             (let ((,args (basic-combination-args ,call)))
+               (when (= (length ,args) ,(length lambda-list))
+                 (destructuring-bind ,lambda-list ,args
+                   (declare (type lvar ,@lambda-list))
+                   ,@body)))))))

@@ -364,11 +364,9 @@
   (:generator 1
     (inst not x res)))
 
-(defknown ash-left-constant-mod64 (integer (integer 0)) (unsigned-byte 64)
-  (foldable flushable movable))
-(define-vop (fast-ash-left-constant-mod64/unsigned=>unsigned
+(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
 	     fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-constant-mod64))
+  (:translate ash-left-mod64))
 
 (macrolet
     ((define-modular-backend (fun &optional constantp)

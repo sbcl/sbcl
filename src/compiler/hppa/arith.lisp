@@ -588,11 +588,9 @@
 (define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
   (:translate --mod32))
 
-(defknown ash-left-constant-mod32 (integer (integer 0)) (unsigned-byte 32)
-  (foldable flushable movable))
-(define-vop (fast-ash-left-constant-mod32/unsigned=>unsigned
+(define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
 	     fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-constant-mod32))
+  (:translate ash-left-mod32))
 
 (define-modular-fun lognot-mod32 (x) lognot 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)

@@ -1369,7 +1369,7 @@
                                collect `(prepare-argument ,arg)))))))
     (loop for infos being each hash-value of sb!c::*modular-funs*
           ;; FIXME: We need to process only "toplevel" functions
-          unless (eq infos :good)
+          when (listp infos)
           do (loop for info in infos
                    for name = (sb!c::modular-fun-info-name info)
                    and width = (sb!c::modular-fun-info-width info)
@@ -1383,16 +1383,15 @@
 ;;; shifts.  See also the comment in (LOGAND OPTIMIZER) for more
 ;;; discussion of this hack.  -- CSR, 2003-10-09
 #!-alpha
-(defun sb!vm::ash-left-constant-mod32 (integer amount)
+(defun sb!vm::ash-left-mod32 (integer amount)
   (etypecase integer
     ((unsigned-byte 32) (ldb (byte 32 0) (ash integer amount)))
     (fixnum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))
     (bignum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))))
 #!+alpha
-(defun sb!vm::ash-left-constant-mod64 (integer amount)
+(defun sb!vm::ash-left-mod64 (integer amount)
   (etypecase integer
     ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))
     (fixnum (ldb (byte 64 0) (ash (logand integer #xffffffffffffffff) amount)))
-    (bignum (ldb (byte 64 0) 
+    (bignum (ldb (byte 64 0)
 		 (ash (logand integer #xffffffffffffffff) amount)))))
-    
