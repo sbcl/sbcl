@@ -170,7 +170,13 @@
     (setf tmp-obj
 	  ;; (Note that this idiom is taken from the ANSI
 	  ;; documentation for TRUENAME.)
-	  (with-open-file (stream tmp-obj :direction :output)
+	  (with-open-file (stream tmp-obj
+                                  :direction :output
+                                  ;; Compilation would overwrite the
+                                  ;; temporary object anyway and overly
+                                  ;; strict implementations default
+                                  ;; to :ERROR.
+                                  :if-exists :supersede)
 	    (close stream)
 	    (truename stream)))
     ;; and some compilers (e.g. OpenMCL) will complain if they're
