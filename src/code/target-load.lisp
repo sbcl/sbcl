@@ -54,8 +54,11 @@
 
 ;;; a helper function for LOAD: Load the stuff in a file when we have
 ;;; the name.
+;;;
+;;; FIXME: with the addition of the EXTERNAL-FORMAT argument, this
+;;; interface has become truly sucky.
 (defun internal-load (pathname truename if-does-not-exist verbose print
-		      &optional contents)
+		      &optional contents external-format)
   (declare (type (member nil :error) if-does-not-exist))
   (unless truename
     (if if-does-not-exist
@@ -71,7 +74,8 @@
       (:source
        (with-open-file (stream truename
 			       :direction :input
-			       :if-does-not-exist if-does-not-exist)
+			       :if-does-not-exist if-does-not-exist
+                               :external-format external-format)
 	 (load-as-source stream verbose print)))
       (:binary
        (with-open-file (stream truename
@@ -94,16 +98,16 @@
 		     ((= i read-length) t)
 		   (when (/= (char-code (aref fhsss i)) (aref first-line i))
 		     (return))))
-	   (internal-load pathname truename if-does-not-exist verbose print
-			  :binary))
-	  (t
-	   (when (string= (pathname-type truename) *fasl-file-type*)
- 	     (error 'fasl-header-missing
- 		    :stream (namestring truename)
- 		    :fhsss first-line
- 		    :expected fhsss))
-	   (internal-load pathname truename if-does-not-exist verbose print
-			  :source))))))))
+            (internal-load pathname truename if-does-not-exist verbose print
+                           :binary))
+           (t
+            (when (string= (pathname-type truename) *fasl-file-type*)
+              (error 'fasl-header-missing
+                     :stream (namestring truename)
+                     :fhsss first-line
+                     :expected fhsss))
+            (internal-load pathname truename if-does-not-exist verbose print
+                           :source external-format))))))))
 
 ;;; a helper function for INTERNAL-LOAD-DEFAULT-TYPE: Try the default
 ;;; file type TYPE and return (VALUES PATHNAME TRUENAME) for a match,
@@ -120,7 +124,8 @@
 
 ;;; a helper function for LOAD: Handle the case of INTERNAL-LOAD where
 ;;; the file does not exist.
-(defun internal-load-default-type (pathname if-does-not-exist verbose print)
+(defun internal-load-default-type
+    (pathname if-does-not-exist verbose print external-format)
   (declare (type (member nil :error) if-does-not-exist))
   (multiple-value-bind (src-pn src-tn)
       (try-default-type pathname *load-source-default-type*)
@@ -135,22 +140,20 @@
                  older than the presumed source:~%  ~A."
 		(namestring obj-tn)
 		(namestring src-tn))
-	 ;; FIXME: In CMU CL one of these was a CONTINUE case.
-	 ;; There's not one now. I don't remember how restart-case
-	 ;; works very well, make sure that it doesn't do anything
-	 ;; weird when we don't specify the CONTINUE case.
 	 (source () :report "load source file"
 	   (internal-load src-pn src-tn if-does-not-exist verbose print
-			  :source))
+			  :source external-format))
 	 (object () :report "load object file"
 	    (internal-load src-pn obj-tn if-does-not-exist verbose print
 			   :binary))))
        (obj-tn
 	(internal-load obj-pn obj-tn if-does-not-exist verbose print :binary))
        (src-pn
-	(internal-load src-pn src-tn if-does-not-exist verbose print :source))
+	(internal-load src-pn src-tn if-does-not-exist
+                       verbose print :source external-format))
        (t
-	(internal-load pathname nil if-does-not-exist verbose print nil))))))
+	(internal-load pathname nil if-does-not-exist
+                       verbose print nil external-format))))))
 
 ;;; This function mainly sets up special bindings and then calls
 ;;; sub-functions. We conditionally bind the switches with PROGV so
@@ -171,7 +174,6 @@
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
-  (declare (ignore external-format))
   (let ((*load-depth* (1+ *load-depth*))
 	;; KLUDGE: I can't find in the ANSI spec where it says that
 	;; DECLAIM/PROCLAIM of optimization policy should have file
@@ -205,15 +207,12 @@
 		(probed-file (probe-file physical-pathname)))
 	   (if (or probed-file
 		   (pathname-type physical-pathname))
-	       (internal-load physical-pathname
-			      probed-file
-			      internal-if-does-not-exist
-			      verbose
-			      print)
-	       (internal-load-default-type pathname
-					   internal-if-does-not-exist
-					   verbose
-					   print)))))))
+	       (internal-load
+                physical-pathname probed-file internal-if-does-not-exist
+                verbose print nil external-format)
+	       (internal-load-default-type
+                pathname internal-if-does-not-exist
+                verbose print external-format)))))))
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
 ;;; the boxed storage section, then SIZE bytes of code are read in.
