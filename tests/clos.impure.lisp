@@ -792,5 +792,24 @@
   (assert (typep err 'error))
   (assert (not (typep err 'sb-int:bug))))
 
+;;; BUG 321: errors in parsing DEFINE-METHOD-COMBINATION arguments
+;;; lambda lists.
+
+(define-method-combination w-args ()
+  ((method-list *))
+  (:arguments arg1 arg2 &aux (extra :extra))
+  `(progn ,@(mapcar (lambda (method) `(call-method ,method)) method-list)))
+(defgeneric mc-test-w-args (p1 p2 s)
+  (:method-combination w-args)
+  (:method ((p1 number) (p2 t) s)
+    (vector-push-extend (list 'number p1 p2) s))
+  (:method ((p1 string) (p2 t) s)
+    (vector-push-extend (list 'string p1 p2) s))
+  (:method ((p1 t) (p2 t) s) (vector-push-extend (list t p1 p2) s)))
+(let ((v (make-array 0 :adjustable t :fill-pointer t)))
+  (assert (= (mc-test-w-args 1 2 v) 1))
+  (assert (equal (aref v 0) '(number 1 2)))
+  (assert (equal (aref v 1) '(t 1 2))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

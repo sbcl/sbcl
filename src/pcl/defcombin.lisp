@@ -409,12 +409,21 @@
 ;;;
 ;;; At compute-effective-method time, the symbols in the :arguments
 ;;; option are bound to the symbols in the intercept lambda list.
+;;;
+;;; FIXME: in here we have not one but two mini-copies of a weird
+;;; hybrid of PARSE-LAMBDA-LIST and PARSE-DEFMACRO-LAMBDA-LIST.
 (defun deal-with-args-option (wrapped-body args-lambda-list)
   (let ((intercept-rebindings
 	 (let (rebindings)
 	   (dolist (arg args-lambda-list (nreverse rebindings))
 	     (unless (member arg lambda-list-keywords)
-	       (push `(,arg ',arg) rebindings)))))
+	       (typecase arg
+		 (symbol (push `(,arg ',arg) rebindings))
+		 (cons
+		  (unless (symbolp (car arg))
+		    (error "invalid lambda-list specifier: ~S." arg))
+		  (push `(,(car arg) ',(car arg)) rebindings))
+		 (t (error "invalid lambda-list-specifier: ~S." arg)))))))
 	(nreq 0)
 	(nopt 0)
 	(whole nil))

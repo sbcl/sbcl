@@ -2458,6 +2458,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug: lambda lists may contain symbols whose names start with
     & but are not lambda-list-keywords; their occurrence triggers a
     STYLE-WARNING.
+  * fixed bug 321: define-method-combination argument lambda lists do
+    not cause invalid code to be generated when &optional or &aux
+    variables have default values.  (reported by Bruno Haible)
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by

@@ -1362,22 +1362,6 @@ WORKAROUND:
     #(1 2 ((SB-IMPL::|,|) + 2 2) 4)
   which probably isn't intentional.
 
-321: "DEFINE-METHOD-COMBINATION lambda list parsing"
-  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
-  test suite.
-    (define-method-combination w-args ()
-      ((method-list *))
-      (:arguments arg1 arg2 &aux (extra :extra))
-     `(progn ,@(mapcar (lambda (method) `(call-method ,method)) method-list)))
-  gives a (caught) compile-time error, which can be exposed by
-    (defgeneric mc-test-w-args (p1 p2 s)
-      (:method-combination w-args)
-      (:method ((p1 number) (p2 t) s)
-        (vector-push-extend (list 'number p1 p2) s))
-      (:method ((p1 string) (p2 t) s)
-        (vector-push-extend (list 'string p1 p2) s))
-      (:method ((p1 t) (p2 t) s) (vector-push-extend (list t p1 p2) s)))
-
 323: "REPLACE, BIT-BASH and large strings"
   The transform for REPLACE on simple-base-strings uses BIT-BASH, which
   at present has an upper limit in size.  Consequently, in sbcl-0.8.10
