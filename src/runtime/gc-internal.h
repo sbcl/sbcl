@@ -106,6 +106,9 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
 	if (is_lisp_pointer(thing)
 	    || (fixnump(thing))
 	    || (widetag_of(thing) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+	    || (widetag_of(thing) == SINGLE_FLOAT_WIDETAG)
+#endif
 	    || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
 	    count = 2;
 	else
