@@ -28,7 +28,7 @@
 
 ;;; In sbcl-0.6.9 DIRECTORY failed on paths with :WILD or
 ;;; :WILD-INFERIORS in their directory components.
-(let ((dir (directory "../**/*")))
+(let ((dir (directory "../**/*.*")))
   ;; We know a little bit about the structure of this result;
   ;; let's test to make sure that this test file is in it.
   (assert (find-if (lambda (pathname)
@@ -37,7 +37,7 @@
 		   dir)))
 
 ;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
-;;; stream is not a stream associated with a file.
+;;; STREAM is not a stream associated with a file.
 ;;;
 ;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)

@@ -32,7 +32,7 @@ expected_truenames=\
    #p\"$testdir/test-2.tmp\")"
 $SBCL <<EOF
   (in-package :cl-user)
-  (let* ((directory (directory "./*"))
+  (let* ((directory (directory "./*.*"))
          (truenames (sort directory #'string< :key #'pathname-name)))
     (format t "~&TRUENAMES=~S~%" truenames)
     (finish-output)
@@ -53,7 +53,7 @@ fi
 cd ..
 $SBCL <<EOF
   (in-package :cl-user)
-  (let* ((directory (directory "$testdir/*"))
+  (let* ((directory (directory "$testdir/*.*"))
          (truenames (sort directory #'string< :key #'pathname-name)))
     (format t "~&TRUENAMES=~S~%" truenames)
     (finish-output)

@@ -90,7 +90,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (/show0 "condition.lisp 103")
   (let ((condition-class (locally
-			   ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for
+			   ;; KLUDGE: There's a DEFTRANSFORM FIND-CLASS for
 			   ;; constant class names which creates fast but
 			   ;; non-cold-loadable, non-compact code. In this
 			   ;; context, we'd rather have compact, cold-loadable
@@ -102,7 +102,7 @@
   (/show0 "condition.lisp 103"))
 
 (setf (condition-class-report (locally
-				;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM
+				;; KLUDGE: There's a DEFTRANSFORM FIND-CLASS 
 				;; for constant class names which creates fast
 				;; but non-cold-loadable, non-compact code. In
 				;; this context, we'd rather have compact,

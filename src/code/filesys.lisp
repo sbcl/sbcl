@@ -531,15 +531,15 @@
   (let ((directory (pathname-directory pathname)))
     (/noshow0 "computed DIRECTORY")
     (if directory
-	(ecase (car directory)
+	(ecase (first directory)
 	  (:absolute
 	   (/noshow0 "absolute directory")
-	   (%enumerate-directories "/" (cdr directory) pathname
+	   (%enumerate-directories "/" (rest directory) pathname
 				   verify-existence follow-links
 				   nil function))
 	  (:relative
 	   (/noshow0 "relative directory")
-	   (%enumerate-directories "" (cdr directory) pathname
+	   (%enumerate-directories "" (rest directory) pathname
 				   verify-existence follow-links
 				   nil function)))
 	(%enumerate-files "" pathname verify-existence function))))
@@ -909,6 +909,7 @@
 	;; can arise when e.g. multiple symlinks map to the same
 	;; truename).
 	(truenames (make-hash-table :test #'equal))
+	;; FIXME: not really right, as per bug 139
         (merged-pathname (merge-pathnames pathname
 					  (make-pathname :name :wild
 							 :type :wild

@@ -368,7 +368,7 @@
   ;; function as far as the debugger is concerned.
   (environment-start nil :type (or label null)))
 (defprinter (ir2-physenv)
-  environment
+  closure
   old-fp
   return-pc
   return-pc-pass)
