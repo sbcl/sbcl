@@ -1268,26 +1268,26 @@
 	 (values (if info
 		     (byte-continuation-info-results info)
 		     0)))
+    (unless (eql values 0)
+      ;; Someone wants the value, so copy it.
+      (output-do-xop segment 'dup))
     (etypecase leaf
-      (global-var
+      (global-var        
        (ecase (global-var-kind leaf)
 	 ((:special :global)
 	  (output-push-constant segment (global-var-name leaf))
 	  (output-do-inline-function segment 'setf-symbol-value))))
       (lambda-var
-       ;; Note: It's important to test for whether there are any
-       ;; references to the variable before we actually try to set it.
-       ;; (Setting a lexical variable with no refs caused bugs ca. CMU
-       ;; CL 18c, because the compiler deletes such variables.)
-       (cond ((leaf-refs leaf)
-	      (unless (eql values 0)
-		;; Someone wants the value, so copy it.
-		(output-do-xop segment 'dup))
-	      (output-set-lambda-var segment leaf (node-environment set)))
-	     ;; If no one wants the value, then pop it, else leave it
-	     ;; for them.
-	     ((eql values 0)
-	      (output-byte-with-operand segment byte-pop-n 1)))))
+        ;; Note: It's important to test for whether there are any
+        ;; references to the variable before we actually try to set it.
+        ;; (Setting a lexical variable with no refs caused bugs ca. CMU
+        ;; CL 18c, because the compiler deletes such variables.)
+        (cond ((leaf-refs leaf)                
+                (output-set-lambda-var segment leaf (node-environment set)))
+              ;; If no one wants the value, then pop it, else leave it
+              ;; for them.
+              ((eql values 0)
+                (output-byte-with-operand segment byte-pop-n 1)))))
     (unless (eql values 0)
       (checked-canonicalize-values segment cont 1)))
   (values))

@@ -280,9 +280,30 @@ interrupt_handle_pending(os_context_t *context)
         }
     }
 
-    /* FIXME: How come we unconditionally copy from pending_mask into
-     * the context, and then test whether pending_signal is set? If
-     * pending_signal wasn't set, how could pending_mask be valid? */
+    /* FIXME: This isn't very clear. It would be good to reverse
+     * engineer it and rewrite the code more clearly, or write a clear
+     * explanation of what's going on in the comments, or both.
+     *
+     * WHN's question 1a: How come we unconditionally copy from
+     * pending_mask into the context, and then test whether
+     * pending_signal is set?
+     * 
+     * WHN's question 1b: If pending_signal wasn't set, how could
+     * pending_mask be valid?
+     * 
+     * Dan Barlow's reply (sbcl-devel 2001-03-13): And the answer is -
+     * or appears to be - because interrupt_maybe_gc set it that way
+     * (look in the #ifndef __i386__ bit). We can't GC during a
+     * pseudo-atomic, so we set maybe_gc_pending=1 and
+     * arch_set_pseudo_atomic_interrupted(..) When we come out of
+     * pseudo_atomic we're marked as interrupted, so we call
+     * interrupt_handle_pending, which does the GC using the pending
+     * context (it needs a context so that it has registers to use as
+     * GC roots) then notices there's no actual interrupt handler to
+     * call, so doesn't. That's the second question [1b] answered,
+     * anyway. Why we still need to copy the pending_mask into the
+     * context given that we're now done with the context anyway, I
+     * couldn't say. */
     memcpy(os_context_sigmask_addr(context), &pending_mask, sizeof(sigset_t));
     sigemptyset(&pending_mask);
     if (pending_signal) {
