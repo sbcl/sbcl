@@ -491,6 +491,7 @@
 		    (:translate ,mfun-name))))))))
   (define-modular-backend + t)
   (define-modular-backend - t)
+  (define-modular-backend * t)
   (define-modular-backend logxor t)
   (define-modular-backend logeqv)
   (define-modular-backend lognand)
