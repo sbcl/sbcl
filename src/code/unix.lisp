@@ -556,14 +556,14 @@
 ;;; longer than 32 bits anyway, right?":-|
 (define-alien-type nil
   (struct wrapped_stat
-    (st-dev unsigned-long)              ; would be dev-t in a real stat
+    (st-dev unsigned-int)              ; would be dev-t in a real stat
     (st-ino ino-t)
     (st-mode mode-t)
     (st-nlink  nlink-t)
     (st-uid  uid-t)
     (st-gid  gid-t)
-    (st-rdev unsigned-long)             ; would be dev-t in a real stat
-    (st-size unsigned-long)		; would be off-t in a real stat
+    (st-rdev unsigned-int)             ; would be dev-t in a real stat
+    (st-size unsigned-int)		; would be off-t in a real stat
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)

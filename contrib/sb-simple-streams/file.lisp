@@ -210,7 +210,7 @@
 	    (sb-ext:cancel-finalization stream)
 	    (error "Error fstating ~S: ~A" stream
 		   (sb-int:strerror dev)))
-	  (when (> size most-positive-fixnum)
+	  (when (>= size most-positive-fixnum)
 	    ;; Or else BUF-LEN has to be a general integer, or
 	    ;; maybe (unsigned-byte 32).  In any case, this means
 	    ;; BUF-MAX and BUF-PTR have to be the same, which means
@@ -219,7 +219,7 @@
 	    ;; bigger files, anyway.  Maybe DEVICE-READ can adjust
 	    ;; the mapped portion of the file when necessary?
 	    (warn "Unable to memory-map entire file.")
-	    (setf size most-positive-fixnum))
+	    (setf size (1- most-positive-fixnum)))
 	  (let ((buffer
 		 (handler-case
                   (sb-posix:mmap nil size prot sb-posix::MAP-SHARED fd 0)
