@@ -1106,6 +1106,8 @@
 	   (namestring
 	    (cond ((unix-namestring pathname input))
 		  ((and input (eq if-does-not-exist :create))
+		   (unix-namestring pathname nil))
+		  ((and (eq direction :io) (not if-does-not-exist-given))
 		   (unix-namestring pathname nil)))))
       ;; Process if-exists argument if we are doing any output.
       (cond (output

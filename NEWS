@@ -2283,6 +2283,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     ** Attempting to use standardized file system operators with a
        pathname with invalid :DIRECTORY components signals a
        FILE-ERROR.
+    ** OPEN :DIRECTION :IO no longer fails to work on non-existent
+       files.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -473,6 +473,8 @@
     (declare (type sb-int:index mask))
     (let ((name (cond ((sb-int:unix-namestring pathname input))
 		      ((and input (eq if-does-not-exist :create))
+		       (sb-int:unix-namestring pathname nil))
+		      ((and (eq direction :io) (not if-does-not-exist-given))
 		       (sb-int:unix-namestring pathname nil)))))
       ;; Process if-exists argument if we are doing any output.
       (cond (output

@@ -93,5 +93,16 @@
   (with-open-file (s p)
     (assert (string= (read-line s) "THESE INSERTMBOLS")))
   (delete-file p))
+
+;;; :DIRECTION :IO didn't work on non-existent pathnames
+(let ((p "direction-io-test"))
+  (ignore-errors (delete-file p))
+  (with-open-file (s p :direction :io)
+    (format s "1")
+    (finish-output s)
+    (file-position s :start)
+    (assert (char= (read-char s) #\1)))
+  (delete-file p))
+
 ;;; success
 (quit :unix-status 104)

@@ -177,11 +177,13 @@ Lisp filename syntax idiosyncrasies)."
     (need-match "animal/vertebrate/**/*.*" vertebrates)
     (need-match "animal/vertebrate/mammal/../**/*.*" vertebrates)
     (need-match "animal/vertebrate/mammal/../**/**/*.*" vertebrates)
+    #+nil
     (need-match "animal/vertebrate/mammal/mythical/../**/../**/*.*"
 		vertebrates))
   (need-match "animal/vertebrate/**/robot.*" nil)
   (need-match "animal/vertebrate/mammal/../**/*.robot" nil)
   (need-match "animal/vertebrate/mammal/../**/robot/*.*" nil)
+  #+nil
   (need-match "animal/vertebrate/mammal/robot/../**/../**/*.*" nil))
 (need-matches)
 (sb-ext:quit :unix-status 52)
