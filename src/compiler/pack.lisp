@@ -26,8 +26,8 @@
 
 ;;; Return true if the element at the specified offset in SB has a
 ;;; conflict with TN:
-;;; -- If a component-live TN (:component kind), then iterate over
-;;;    all the blocks. If the element at Offset is used anywhere in
+;;; -- If a component-live TN (:COMPONENT kind), then iterate over
+;;;    all the blocks. If the element at OFFSET is used anywhere in
 ;;;    any of the component's blocks (always-live /= 0), then there
 ;;;    is a conflict.
 ;;; -- If TN is global (Confs true), then iterate over the blocks TN
@@ -104,7 +104,7 @@
 	     (loc-live (svref (finite-sb-always-live sb) this-offset)))
 	(cond
 	 ((eq kind :component)
-	  (dotimes (num (ir2-block-count *component-being-compiled*) nil)
+	  (dotimes (num (ir2-block-count *component-being-compiled*))
 	    (declare (type index num))
 	    (setf (sbit loc-live num) 1)
 	    (set-bit-vector (svref loc-confs num))))
@@ -590,8 +590,8 @@
 ;;;; optimized saving
 
 ;;; Save TN if it isn't a single-writer TN that has already been
-;;; saved. If multi-write, we insert the save Before the specified
-;;; VOP. Context is a VOP used to tell which node/block to use for the
+;;; saved. If multi-write, we insert the save BEFORE the specified
+;;; VOP. CONTEXT is a VOP used to tell which node/block to use for the
 ;;; new VOP.
 (defun save-if-necessary (tn before context)
   (declare (type tn tn) (type (or vop null) before) (type vop context))
@@ -606,7 +606,7 @@
   (values))
 
 ;;; Load the TN from its save location, allocating one if necessary.
-;;; The load is inserted Before the specifier VOP. Context is a VOP
+;;; The load is inserted BEFORE the specifier VOP. CONTEXT is a VOP
 ;;; used to tell which node/block to use for the new VOP.
 (defun restore-tn (tn before context)
   (declare (type tn tn) (type (or vop null) before) (type vop context))

@@ -210,7 +210,7 @@
 ;;;    CONT of LAST in its block, then we make it the start of a new
 ;;;    deleted block.
 ;;; -- If the continuation is :INSIDE-BLOCK inside a block, then we
-;;;    split the block using Node-Ends-Block, which makes the
+;;;    split the block using NODE-ENDS-BLOCK, which makes the
 ;;;    continuation be a :BLOCK-START.
 (defun ensure-block-start (cont)
   (declare (type continuation cont))

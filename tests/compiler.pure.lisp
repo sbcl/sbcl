@@ -292,3 +292,22 @@
                     (declare (optimize speed (safety 0)))
                     (typecase a
                       (array (loop (print (car a)))))))))
+
+;;; Bug reported by Robert E. Brown sbcl-devel 2003-02-02: compiler
+;;; failure
+(compile nil
+         '(lambda (key tree collect-path-p)
+           (let ((lessp (key-lessp tree))
+                 (equalp (key-equalp tree)))
+             (declare (type (function (t t) boolean) lessp equalp))
+             (let ((path '(nil)))
+               (loop for node = (root-node tree)
+                  then (if (funcall lessp key (node-key node))
+                           (left-child node)
+                           (right-child node))
+                  when (null node)
+                  do (return (values nil nil nil))
+                  do (when collect-path-p
+                       (push node path))
+                  (when (funcall equalp key (node-key node))
+                    (return (values node path t))))))))

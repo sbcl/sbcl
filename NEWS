@@ -1528,6 +1528,8 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     ** the logical bit-array operators such as BIT-AND now accept an
        explicit NIL for their "opt-arg" argument (to indicate a
        freshly-consed result bit-array);
+  * fixed compiler failure related to checking types of functions
+    (reported by Robert E. Brown);
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

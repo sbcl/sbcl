@@ -134,6 +134,7 @@
           (let* ((fun (combination-fun dest))
                  (args (combination-args dest))
                  (fun-type (continuation-type fun)))
+            (setf (continuation-%externally-checkable-type fun) *wild-type*)
             (if (or (not (fun-type-p fun-type))
                     ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
                     (fun-type-wild-args fun-type))
