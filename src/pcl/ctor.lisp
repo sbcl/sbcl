@@ -373,7 +373,7 @@
     (multiple-value-bind (si-around si-before si-primary si-after)
 	(standard-sort-methods si-methods)
       (declare (ignore si-primary))
-      (assert (and (null ii-around) (null si-around)))
+      (aver (and (null ii-around) (null si-around)))
       (let ((initargs (ctor-initargs ctor))
 	    (slot-inits (slot-init-forms ctor (or ii-before si-before))))
 	(values
@@ -437,14 +437,14 @@
 	       (cdr (assoc initarg initarg-locations :test #'eq)))
 
 	     (class-init (location type val)
-	       (assert (consp location))
+	       (aver (consp location))
 	       (unless (assoc location class-inits :test #'eq)
 		 (push (list location type val) class-inits)))
 
 	     (instance-init (location type val)
-	       (assert (integerp location))
-	       (assert (not (instance-slot-initialized-p location)))
-	       (setf (aref slot-vector location) (list type val)))
+	       (aver (integerp location))
+	       (unless (instance-slot-initialized-p location)
+		 (setf (aref slot-vector location) (list type val))))
 
 	     (instance-slot-initialized-p (location)
 	       (not (null (aref slot-vector location)))))

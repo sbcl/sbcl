@@ -1691,6 +1691,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     ** ENDP in safe mode checks its argument to be of type LIST;
     ** COPY-SYMBOL in a threaded build no longer fails when the symbol
        in question is unbound;
+    ** optimized MAKE-INSTANCE functions no longer cause internal
+       assertion failures in the presence of duplicate initargs;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
