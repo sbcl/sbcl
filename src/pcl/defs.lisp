@@ -518,6 +518,16 @@
     :initform nil
     :reader class-predicate-name)))
 
+(def!method make-load-form ((class class) &optional env)
+  ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
+  ;; doesn't matter while all our environments are the same...
+  (declare (ignore env))
+  (let ((name (class-name class)))
+    (unless (and name (eq (find-class name nil) class))
+      (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
+	     class))
+    `(find-class ',name)))
+
 ;;; The class PCL-CLASS is an implementation-specific common
 ;;; superclass of all specified subclasses of the class CLASS.
 (defclass pcl-class (class)
