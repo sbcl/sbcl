@@ -231,43 +231,35 @@
                     (csubtypep a1 a2)
                   (unless res (return (values res sure-p))))
              finally (return (values t t)))))
-   (macrolet ((3and (x y)
-                `(multiple-value-bind (val1 win1) ,x
-                   (if (and (not val1) win1)
-                       (values nil t)
-                       (multiple-value-bind (val2 win2) ,y
-                         (if (and val1 val2)
-                             (values t t)
-                             (values nil (and win2 (not val2)))))))))
-     (3and (values-subtypep (fun-type-returns type1)
-                            (fun-type-returns type2))
-           (cond ((fun-type-wild-args type2) (values t t))
-                 ((fun-type-wild-args type1)
-                  (cond ((fun-type-keyp type2) (values nil nil))
-                        ((not (fun-type-rest type2)) (values nil t))
-                        ((not (null (fun-type-required type2))) (values nil t))
-                        (t (3and (type= *universal-type* (fun-type-rest type2))
-                                 (every/type #'type= *universal-type*
-                                             (fun-type-optional type2))))))
-                 ((not (and (fun-type-simple-p type1)
-                            (fun-type-simple-p type2)))
-                  (values nil nil))
-                 (t (multiple-value-bind (min1 max1) (fun-type-nargs type1)
-                      (multiple-value-bind (min2 max2) (fun-type-nargs type2)
-                        (cond ((or (> max1 max2) (< min1 min2))
-                               (values nil t))
-                              ((and (= min1 min2) (= max1 max2))
-                               (3and (every-csubtypep (fun-type-required type1)
-                                                      (fun-type-required type2))
-                                     (every-csubtypep (fun-type-optional type1)
-                                                      (fun-type-optional type2))))
-                              (t (every-csubtypep
-                                  (concatenate 'list
-                                               (fun-type-required type1)
-                                               (fun-type-optional type1))
-                                  (concatenate 'list
-                                               (fun-type-required type2)
-                                               (fun-type-optional type2)))))))))))))
+   (and/type (values-subtypep (fun-type-returns type1)
+                              (fun-type-returns type2))
+             (cond ((fun-type-wild-args type2) (values t t))
+                   ((fun-type-wild-args type1)
+                    (cond ((fun-type-keyp type2) (values nil nil))
+                          ((not (fun-type-rest type2)) (values nil t))
+                          ((not (null (fun-type-required type2))) (values nil t))
+                          (t (and/type (type= *universal-type* (fun-type-rest type2))
+                                       (every/type #'type= *universal-type*
+                                                   (fun-type-optional type2))))))
+                   ((not (and (fun-type-simple-p type1)
+                              (fun-type-simple-p type2)))
+                    (values nil nil))
+                   (t (multiple-value-bind (min1 max1) (fun-type-nargs type1)
+                        (multiple-value-bind (min2 max2) (fun-type-nargs type2)
+                          (cond ((or (> max1 max2) (< min1 min2))
+                                 (values nil t))
+                                ((and (= min1 min2) (= max1 max2))
+                                 (and/type (every-csubtypep (fun-type-required type1)
+                                                            (fun-type-required type2))
+                                           (every-csubtypep (fun-type-optional type1)
+                                                            (fun-type-optional type2))))
+                                (t (every-csubtypep
+                                    (concatenate 'list
+                                                 (fun-type-required type1)
+                                                 (fun-type-optional type1))
+                                    (concatenate 'list
+                                                 (fun-type-required type2)
+                                                 (fun-type-optional type2))))))))))))
 
 (!define-superclasses function ((function)) !cold-init-forms)
 
@@ -2404,15 +2396,13 @@
 ;;; shared machinery for type equality: true if every type in the set
 ;;; TYPES1 matches a type in the set TYPES2 and vice versa
 (defun type=-set (types1 types2)
-  (flet (;; true if every type in the set X matches a type in the set Y
-	 (type<=-set (x y)
+  (flet ((type<=-set (x y)
 	   (declare (type list x y))
-	   (every (lambda (xelement)
-		    (position xelement y :test #'type=))
-		  x)))
-    (values (and (type<=-set types1 types2)
-		 (type<=-set types2 types1))
-	    t)))
+	   (every/type (lambda (x y-element)
+                         (any/type #'type= y-element x))
+                       x y)))
+    (and/type (type<=-set types1 types2)
+              (type<=-set types2 types1))))
 
 ;;; Two intersection types are equal if their subtypes are equal sets.
 ;;;

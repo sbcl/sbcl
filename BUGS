@@ -845,6 +845,28 @@ WORKAROUND:
            (INTEGER 1296 1296)
            ...)>)[:EXTERNAL]
 
+  In recent SBCL the following example also illustrates this bug:
+
+    (time (compile
+           nil
+           '(lambda ()
+             (declare (optimize (safety 3)))
+             (declare (optimize (compilation-speed 2)))
+             (declare (optimize (speed 1) (debug 1) (space 1)))
+             (let ((start 4))
+               (declare (type (integer 0) start))
+               (print (incf start 22))
+               (print (incf start 26))
+               (print (incf start 28)))
+             (let ((start 6))
+               (declare (type (integer 0) start))
+               (print (incf start 22))
+               (print (incf start 26)))
+             (let ((start 10))
+               (declare (type (integer 0) start))
+               (print (incf start 22))
+               (print (incf start 26))))))
+
 190: "PPC/Linux pipe? buffer? bug"
   In sbcl-0.7.6, the run-program.test.sh test script sometimes hangs
   on the PPC/Linux platform, waiting for a zombie env process.  This

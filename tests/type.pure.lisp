@@ -200,3 +200,6 @@
 			'(cons single-float single-float))))
 (assert (subtypep '(cons integer single-float)
 		  '(or (cons fixnum single-float) (cons bignum single-float))))
+
+(assert (not (nth-value 1 (subtypep '(and null some-unknown-type)
+                                    'another-unknown-type))))
