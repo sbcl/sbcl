@@ -180,7 +180,7 @@
 (defun process-history-search (pattern cmd-args-string)
   (let ((cmd (find-history-matching-pattern pattern)))
     (unless cmd
-      (format *output* "No match on history list with pattern ~S" pattern)
+      (format *output* "No match on history list with pattern ~S~%" pattern)
       (return-from process-history-search *null-cmd*))
     (maybe-return-history-cmd cmd cmd-args-string)))
 
@@ -411,6 +411,7 @@
 
 (defun apropos-cmd (string)
   (apropos (string-upcase string))
+  (fresh-line *output*)
   (values))
 
 (let ((last-files-loaded nil))
