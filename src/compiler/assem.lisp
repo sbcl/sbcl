@@ -473,7 +473,7 @@
 	    ;; nothing to do, then emit a nop. ### Note: despite the
 	    ;; fact that this is a loop, it really won't work for
 	    ;; repetitions other then zero and one. For example, if
-p	    ;; the branch has two dependents and one of them dpends on
+	    ;; the branch has two dependents and one of them dpends on
 	    ;; the other, then the stuff that grabs a dependent could
 	    ;; easily grab the wrong one. But I don't feel like fixing
 	    ;; this because it doesn't matter for any of the
