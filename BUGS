@@ -727,11 +727,7 @@ WORKAROUND:
   all of the arguments are circular is probably desireable).
 
 213: "Sequence functions and type checking"
-  a. MAKE-SEQUENCE, COERCE, MERGE and CONCATENATE cannot deal with
-     various complicated, though recognizeable, CONS types [e.g.
-       (CONS * (CONS * NULL))
-     which according to ANSI should be recognized] (and, in SAFETY 3
-     code, should return a list of LENGTH 2 or signal an error)
+  a. (fixed in 0.8.4.36)
   b. MAP, when given a type argument that is SUBTYPEP LIST, does not
      check that it will return a sequence of the given type.  Fixing
      it along the same lines as the others (cf. work done around

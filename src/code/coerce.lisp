@@ -203,18 +203,25 @@
 	      res))))
 	((csubtypep type (specifier-type 'list))
 	 (if (vectorp object)
-	     (cond ((type= type (specifier-type 'list))
-		    (vector-to-list* object))
-		   ((type= type (specifier-type 'null))
-		    (if (= (length object) 0)
-			'nil
-			(sequence-type-length-mismatch-error type
-							     (length object))))
-		   ((csubtypep (specifier-type '(cons nil t)) type)
-		    (if (> (length object) 0)
-			(vector-to-list* object)
-			(sequence-type-length-mismatch-error type 0)))
-		   (t (sequence-type-too-hairy (type-specifier type))))
+	     (cond
+	       ((type= type (specifier-type 'list))
+		(vector-to-list* object))
+	       ((type= type (specifier-type 'null))
+		(if (= (length object) 0)
+		    'nil
+		    (sequence-type-length-mismatch-error type
+							 (length object))))
+	       ((cons-type-p type)
+		(multiple-value-bind (min exactp)
+		    (sb!kernel::cons-type-length-info type)
+		  (let ((length (length object)))
+		    (if exactp
+			(unless (= length min)
+			  (sequence-type-length-mismatch-error type length))
+			(unless (>= length min)
+			  (sequence-type-length-mismatch-error type length)))
+		    (vector-to-list* object))))
+	       (t (sequence-type-too-hairy (type-specifier type))))
 	     (coerce-error)))
 	((csubtypep type (specifier-type 'vector))
 	 (typecase object

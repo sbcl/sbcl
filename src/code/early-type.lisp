@@ -460,6 +460,24 @@
 	  (eq cdr-type *empty-type*))
       *empty-type*
       (%make-cons-type car-type cdr-type)))
+
+(defun cons-type-length-info (type)
+  (declare (type cons-type type))
+  (do ((min 1 (1+ min))
+       (cdr (cons-type-cdr-type type) (cons-type-cdr-type cdr)))
+      ((not (cons-type-p cdr))
+       (cond
+	 ((csubtypep cdr (specifier-type 'null))
+	  (values min t))
+	 ((csubtypep *universal-type* cdr)
+	  (values min nil))
+	 ((type/= (type-intersection (specifier-type 'cons) cdr) *empty-type*)
+	  (values min nil))
+	 ((type/= (type-intersection (specifier-type 'null) cdr) *empty-type*)
+	  (values min t))
+	 (t (values min :maybe))))
+    ()))
+       
 
 ;;;; type utilities
 

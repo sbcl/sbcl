@@ -264,7 +264,7 @@
 (defun make-sequence (type length &key (initial-element nil iep))
   #!+sb-doc
   "Return a sequence of the given TYPE and LENGTH, with elements initialized
-  to :INITIAL-ELEMENT."
+  to INITIAL-ELEMENT."
   (declare (fixnum length))
   (let* ((adjusted-type
 	  (typecase type
@@ -290,15 +290,15 @@
 	      (if (= length 0)
 		  'nil
 		  (sequence-type-length-mismatch-error type length)))
-	     ((csubtypep (specifier-type '(cons nil t)) type)
-	      ;; The above is quite a neat way of finding out if
-	      ;; there's a type restriction on the CDR of the
-	      ;; CONS... if there is, I think it's probably fair to
-	      ;; give up; if there isn't, then the list to be made
-	      ;; must have a length of more than 0.
-	      (if (> length 0)
-		  (make-list length :initial-element initial-element)
-		  (sequence-type-length-mismatch-error type length)))
+	     ((cons-type-p type)
+	      (multiple-value-bind (min exactp)
+		  (sb!kernel::cons-type-length-info type)
+		(if exactp
+		    (unless (= length min)
+		      (sequence-type-length-mismatch-error type length))
+		    (unless (>= length min)
+		      (sequence-type-length-mismatch-error type length)))
+		(make-list length :initial-element initial-element)))
 	     ;; We'll get here for e.g. (OR NULL (CONS INTEGER *)),
 	     ;; which may seem strange and non-ideal, but then I'd say
 	     ;; it was stranger to feed that type in to MAKE-SEQUENCE.
@@ -736,19 +736,20 @@
 				   (and (vectorp x) (= (length x) 0))))
 		   sequences)
 	    'nil
-	    (sequence-type-length-mismatch-error type
-						 ;; FIXME: circular
-						 ;; list issues.  And
-						 ;; rightward-drift.
-						 (reduce #'+
-							 (mapcar #'length
-								 sequences)))))
-       ((csubtypep (specifier-type '(cons nil t)) type)
-	(if (notevery (lambda (x) (or (null x)
-				      (and (vectorp x) (= (length x) 0))))
-		      sequences)
-	    (apply #'concat-to-list* sequences)
-	    (sequence-type-length-mismatch-error type 0)))
+	    (sequence-type-length-mismatch-error
+	     type
+	     ;; FIXME: circular list issues.
+	     (reduce #'+ sequences :key #'length))))
+       ((cons-type-p type)
+	(multiple-value-bind (min exactp)
+	    (sb!kernel::cons-type-length-info type)
+	  (let ((length (reduce #'+ sequences :key #'length)))
+	    (if exactp
+		(unless (= length min)
+		  (sequence-type-length-mismatch-error type length))
+		(unless (>= length min)
+		  (sequence-type-length-mismatch-error type length)))
+	    (apply #'concat-to-list* sequences))))
        (t (sequence-type-too-hairy (type-specifier type)))))
     ((csubtypep type (specifier-type 'vector))
      (apply #'concat-to-simple* output-type-spec sequences))

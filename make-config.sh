@@ -178,6 +178,14 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     # versions 2.3.1 and 2.3.2
     $GNUMAKE -C tools-for-build where-is-mcontext
     tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
+elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
+    # The default stack ulimit under darwin is too small to run PURIFY.
+    # Best we can do is complain and exit at this stage
+    if [ $(ulimit -s) = "512" ]; then
+        echo "Your stack size limit is too small to build SBCL."
+        echo "See the limit(1) or ulimit(1) commands and the README file."
+        exit 1
+    fi
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

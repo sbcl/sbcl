@@ -299,31 +299,41 @@
     ;; MAKE-SEQUENCE
     (assert-type-error (make-sequence 'cons 0))
     (assert-type-error (make-sequence 'null 1))
+    (assert-type-error (make-sequence '(cons t null) 0))
+    (assert-type-error (make-sequence '(cons t null) 2))
     ;; KLUDGE: I'm not certain that this test actually tests for what
     ;; it should test, in that the type deriver and optimizers might
     ;; be too smart for the good of an exhaustive test system.
     ;; However, it makes me feel good.  -- CSR, 2002-10-18
     (assert (null (make-sequence 'null 0)))
     (assert (= (length (make-sequence 'cons 3)) 3))
+    (assert (= (length (make-sequence '(cons t null) 1)) 1))
     ;; and NIL is not a valid type for MAKE-SEQUENCE
     (assert-type-error (make-sequence 'nil 0))
     ;; COERCE
     (assert-type-error (coerce #(1) 'null))
     (assert-type-error (coerce #() 'cons))
+    (assert-type-error (coerce #() '(cons t null)))
+    (assert-type-error (coerce #(1 2) '(cons t null)))
     (assert (null (coerce #() 'null)))
     (assert (= (length (coerce #(1) 'cons)) 1))
+    (assert (= (length (coerce #(1) '(cons t null))) 1))
     (assert-type-error (coerce #() 'nil))
     ;; MERGE
     (assert-type-error (merge 'null '(1 3) '(2 4) '<))
     (assert-type-error (merge 'cons () () '<))
     (assert (null (merge 'null () () '<)))
     (assert (= (length (merge 'cons '(1 3) '(2 4) '<)) 4))
+    (assert (= (length (merge '(cons t (cons t (cons t (cons t null))))
+			      '(1 3) '(2 4) '<)) 4))
     (assert-type-error (merge 'nil () () '<))
     ;; CONCATENATE
     (assert-type-error (concatenate 'null '(1) "2"))
     (assert-type-error (concatenate 'cons #() ()))
+    (assert-type-error (concatenate '(cons t null) #(1 2 3) #(4 5 6)))
     (assert (null (concatenate 'null () #())))
     (assert (= (length (concatenate 'cons #() '(1) "2 3")) 4))
+    (assert (= (length (concatenate '(cons t cons) '(1) "34")) 3))
     (assert-type-error (concatenate 'nil '(3)))
     ;; FIXME: tests for MAP to come when some brave soul implements
     ;; the analogous type checking for MAP/%MAP.
