@@ -691,7 +691,7 @@
 ;;;     Boxed-Reg: any boxed register (any boxed object)
 ;;;     Unboxed-Reg: any unboxed register (any unboxed object)
 ;;;     Float-Reg, Double-Float-Reg: float in FP register.
-;;;     Stack: boxed object on the stack (on cstack)
+;;;     Stack: boxed object on the stack (on control stack)
 ;;;     Word: any 32bit unboxed object on nstack.
 ;;;     Double: any 64bit unboxed object on nstack.
 

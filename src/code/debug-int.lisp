@@ -524,8 +524,8 @@
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 (defun fun-word-offset (fun) (fun-word-offset fun))
 
-#!-sb-fluid (declaim (inline cstack-pointer-valid-p))
-(defun cstack-pointer-valid-p (x)
+#!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
+(defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
   #!+stack-grows-upward
   (and (sap< x (current-sp))
@@ -575,10 +575,13 @@
 (defun ra-pointer-valid-p (ra)
   (declare (type system-area-pointer ra))
   (and
-   ;; Not the first page which is unmapped.
+   ;; not the first page (which is unmapped)
+   ;;
+   ;; FIXME: Where is this documented? Is it really true of every CPU
+   ;; architecture? Is it even necessarily true in current SBCL?
    (>= (sap-int ra) 4096)
-   ;; Not a Lisp stack pointer.
-   (not (cstack-pointer-valid-p ra))))
+   ;; not a Lisp stack pointer
+   (not (control-stack-pointer-valid-p ra))))
 
 ;;; Try to find a valid previous stack. This is complex on the x86 as
 ;;; it can jump between C and Lisp frames. To help find a valid frame
@@ -594,7 +597,7 @@
 	   (fixnum depth))
   ;;(format t "*CC ~S ~S~%" fp depth)
   (cond
-   ((not (cstack-pointer-valid-p fp))
+   ((not (control-stack-pointer-valid-p fp))
     #+nil (format t "debug invalid fp ~S~%" fp)
     nil)
    (t
@@ -604,9 +607,9 @@
 					 4))))
 	  (c-ocfp (sap-ref-sap fp (* 0 sb!vm:n-word-bytes)))
 	  (c-ra (sap-ref-sap fp (* 1 sb!vm:n-word-bytes))))
-      (cond ((and (sap> lisp-ocfp fp) (cstack-pointer-valid-p lisp-ocfp)
+      (cond ((and (sap> lisp-ocfp fp) (control-stack-pointer-valid-p lisp-ocfp)
 		  (ra-pointer-valid-p lisp-ra)
-		  (sap> c-ocfp fp) (cstack-pointer-valid-p c-ocfp)
+		  (sap> c-ocfp fp) (control-stack-pointer-valid-p c-ocfp)
 		  (ra-pointer-valid-p c-ra))
 	     #+nil (format t
 			   "*C Both valid ~S ~S ~S ~S~%"
@@ -640,12 +643,12 @@
 		      #+nil (format t "debug: no valid2 fp found ~S ~S~%"
 				    lisp-ocfp c-ocfp)
 		      nil))))
-	    ((and (sap> lisp-ocfp fp) (cstack-pointer-valid-p lisp-ocfp)
+	    ((and (sap> lisp-ocfp fp) (control-stack-pointer-valid-p lisp-ocfp)
 		  (ra-pointer-valid-p lisp-ra))
 	     ;; The lisp convention is looking good.
 	     #+nil (format t "*C lisp-ocfp ~S ~S~%" lisp-ocfp lisp-ra)
 	     (values lisp-ra lisp-ocfp))
-	    ((and (sap> c-ocfp fp) (cstack-pointer-valid-p c-ocfp)
+	    ((and (sap> c-ocfp fp) (control-stack-pointer-valid-p c-ocfp)
 		  #!-linux (ra-pointer-valid-p c-ra))
 	     ;; The C convention is looking good.
 	     #+nil (format t "*C c-ocfp ~S ~S~%" c-ocfp c-ra)
@@ -705,7 +708,7 @@
 		      frame)))
 		  (bogus-debug-fun
 		   (let ((fp (frame-pointer frame)))
-		     (when (cstack-pointer-valid-p fp)
+		     (when (control-stack-pointer-valid-p fp)
 		       #!+x86
 			(multiple-value-bind (ra ofp) (x86-call-context fp)
 			  (compute-calling-frame ofp ra frame))
@@ -791,7 +794,7 @@
 #!-x86
 (defun compute-calling-frame (caller lra up-frame)
   (declare (type system-area-pointer caller))
-  (when (cstack-pointer-valid-p caller)
+  (when (control-stack-pointer-valid-p caller)
     (multiple-value-bind (code pc-offset escaped)
 	(if lra
 	    (multiple-value-bind (word-offset code)
@@ -835,7 +838,7 @@
 (defun compute-calling-frame (caller ra up-frame)
   (declare (type system-area-pointer caller ra))
   (/noshow0 "entering COMPUTE-CALLING-FRAME")
-  (when (cstack-pointer-valid-p caller)
+  (when (control-stack-pointer-valid-p caller)
     (/noshow0 "in WHEN")
     ;; First check for an escaped frame.
     (multiple-value-bind (code pc-offset escaped) (find-escaped-frame caller)
