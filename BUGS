@@ -1148,6 +1148,27 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
    The native compiler handles it fine, both in SBCL and in CMU CL.
 
+120a:
+   The compiler incorrectly figures the return type of 
+	(DEFUN FOO (FRAME UP-FRAME)
+	  (IF (OR (NOT FRAME)
+		  T)
+	      FRAME
+	      "BAR"))
+   as NIL.
+
+   This problem exists in CMU CL 18c too. When I reported it on
+   cmucl-imp@cons.org, Raymond Toy replied 23 Aug 2001 with 
+   a partial explanation, but no fix has been found yet.
+
+120b:
+   Even in sbcl-0.pre7.x, which is supposed to be free of the old
+   non-ANSI behavior of treating the function return type inferred
+   from the current function definition as a declaration of the
+   return type from any function of that name, the return type of NIL
+   is attached to FOO in 120a above, and used to optimize code which
+   calls FOO. 
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure

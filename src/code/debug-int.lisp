@@ -966,11 +966,17 @@
 ;;; call to SB!EVAL::INTERNAL-APPLY-LOOP, we make an interpreted frame
 ;;; to replace FRAME. The interpreted frame points to FRAME.
 (defun possibly-an-interpreted-frame (frame up-frame)
+
+  ;; trivial without SB-INTERPRETER
+  #!-sb-interpreter (declare (ignore up-frame))
+  #!-sb-interpreter frame
+
+  ;; nontrivial with SB-INTERPRETER
+  #!+sb-interpreter 
   (if (or (not frame)
-	  #!+sb-interpreter (not (eq (debug-function-name (frame-debug-function
-							   frame))
-				     'sb!eval::internal-apply-loop))
-	  #!-sb-interpreter t
+	  (not (eq (debug-function-name (frame-debug-function
+					 frame))
+		   'sb!eval::internal-apply-loop))
 	  *debugging-interpreter*
 	  (compiled-frame-escaped frame))
       frame

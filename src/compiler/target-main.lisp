@@ -108,14 +108,16 @@
   to a compiled function, returning (VALUES THING WARNINGS-P FAILURE-P),
   where if NAME is NIL, THING is the result of compilation, and
   otherwise THING is NAME. When NAME is not NIL, the compiled function
-  is also set into (FDEFINITION NAME)."
+  is also set into (MACRO-FUNCTION NAME) if NAME names a macro, or into
+  (FDEFINITION NAME) otherwise."
   (multiple-value-bind (compiled-definition warnings-p failure-p)
       (if (compiled-function-p definition)
 	  (values definition nil nil)
 	  (actually-compile name definition))
     (cond (name
-	   (unless failure-p
-	     (setf (fdefinition name) compiled-definition))
+	   (if (macro-function name)
+	       (setf (macro-function name) compiled-definition)
+	       (setf (fdefinition name) compiled-definition))
 	   (values name warnings-p failure-p))
 	  (t
 	   (values compiled-definition warnings-p failure-p)))))

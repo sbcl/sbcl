@@ -312,7 +312,6 @@
 (defun float-radix (x)
   #!+sb-doc
   "Return (as an integer) the radix b of its floating-point argument."
-  (declare (type float x))
   ;; ANSI says this function "should signal an error if [..] argument
   ;; is not a float". Since X is otherwise ignored, Python doesn't
   ;; check the type by default, so we have to do it ourself:
