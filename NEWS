@@ -2014,6 +2014,9 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
   * optimization: restored some effective method precomputation in
     CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.
+  * optimization: compiler-internal data structure use has been
+    reviewed, and changes have been made that should improve the
+    performance of the compiler by about 20%.
   * bug fix: in some situations compiler did not report usage of
     generic arithmetic in (SPEED 3) policy.
 

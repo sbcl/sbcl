@@ -927,65 +927,27 @@
 ;;;; These are fully general operations on CTYPEs: they'll always
 ;;;; return a CTYPE representing the result.
 
-;;; shared logic for unions and intersections: Return a vector of
+;;; shared logic for unions and intersections: Return a list of
 ;;; types representing the same types as INPUT-TYPES, but with
 ;;; COMPOUND-TYPEs satisfying %COMPOUND-TYPE-P broken up into their
 ;;; component types, and with any SIMPLY2 simplifications applied.
-(declaim (inline simplified-compound-types))
-(defun simplified-compound-types (input-types %compound-type-p simplify2)
-  (declare (function %compound-type-p simplify2))
-  (let ((types (make-array (length input-types)
-                           :fill-pointer 0
-                           :adjustable t
-                           :element-type 'ctype)))
-    (labels ((accumulate-compound-type (type)
-               (if (funcall %compound-type-p type)
-                   (dolist (type (compound-type-types type))
-                     (accumulate1-compound-type type))
-                   (accumulate1-compound-type type)))
-             (accumulate1-compound-type (type)
-               (declare (type ctype type))
-               ;; Any input object satisfying %COMPOUND-TYPE-P should've been
-               ;; broken into components before it reached us.
-               (aver (not (funcall %compound-type-p type)))
-               (dotimes (i (length types) (vector-push-extend type types))
-                 (let ((simplified2 (funcall simplify2 type (aref types i))))
-                   (when simplified2
-                     ;; Discard the old (AREF TYPES I).
-                     (setf (aref types i) (vector-pop types))
-                     ;; Merge the new SIMPLIFIED2 into TYPES, by tail recursing.
-                     ;; (Note that the tail recursion is indirect: we go through
-                     ;; ACCUMULATE, not ACCUMULATE1, so that if SIMPLIFIED2 is
-                     ;; handled properly if it satisfies %COMPOUND-TYPE-P.)
-                     (return (accumulate-compound-type simplified2)))))))
-      (dolist (input-type input-types)
-        (accumulate-compound-type input-type)))
-    types))
-
-;;; shared logic for unions and intersections: Make a COMPOUND-TYPE
-;;; object whose components are the types in TYPES, or skip to special
-;;; cases when TYPES is short.
-(defun make-probably-compound-type (constructor types enumerable identity)
-  (declare (type function constructor))
-  (declare (type (vector ctype) types))
-  (declare (type ctype identity))
-  (case (length types)
-    (0 identity)
-    (1 (aref types 0))
-    (t (funcall constructor
-		enumerable
-		;; FIXME: This should be just (COERCE TYPES 'LIST), but as
-		;; of sbcl-0.6.11.17 the COERCE optimizer is really
-		;; brain-dead, so that would generate a full call to
-		;; SPECIFIER-TYPE at runtime, so we get into bootstrap
-		;; problems in cold init because 'LIST is a compound
-		;; type, so we need to MAKE-PROBABLY-COMPOUND-TYPE
-		;; before we know what 'LIST is. Once the COERCE
-		;; optimizer is less brain-dead, we can make this
-		;; (COERCE TYPES 'LIST) again.
-		#+sb-xc-host (coerce types 'list)
-		#-sb-xc-host (coerce-to-list types)))))
-
+(macrolet
+    ((def (name compound-type-p simplify2)
+	 `(defun ,name (types)
+	    (when types
+	      (multiple-value-bind (first rest)
+		  (if (,compound-type-p (car types))
+		      (values (car (compound-type-types (car types)))
+			      (append (cdr (compound-type-types (car types)))
+				      (cdr types)))
+		      (values (car types) (cdr types)))
+		(let ((rest (,name rest)) u)
+		  (dolist (r rest (cons first rest))
+		    (when (setq u (,simplify2 first r))
+		      (return (,name (nsubstitute u r rest)))))))))))
+  (def simplify-intersections intersection-type-p type-intersection2)
+  (def simplify-unions union-type-p type-union2))
+		 
 (defun maybe-distribute-one-union (union-type types)
   (let* ((intersection (apply #'type-intersection types))
 	 (union (mapcar (lambda (x) (type-intersection x intersection))
@@ -1002,10 +964,8 @@
                                   :hash-function (lambda (x)
                                                    (logand (sxhash x) #xff)))
     ((input-types equal))
-  (let ((simplified-types (simplified-compound-types input-types
-						     #'intersection-type-p
-						     #'type-intersection2)))
-    (declare (type (vector ctype) simplified-types))
+  (let ((simplified-types (simplify-intersections input-types)))
+    (declare (type list simplified-types))
     ;; We want to have a canonical representation of types (or failing
     ;; that, punt to HAIRY-TYPE). Canonical representation would have
     ;; intersections inside unions but not vice versa, since you can
@@ -1014,8 +974,7 @@
     ;; to end up with unreasonably huge type expressions. So instead
     ;; we try to generate a simple type by distributing the union; if
     ;; the type can't be made simple, we punt to HAIRY-TYPE.
-    (if (and (> (length simplified-types) 1)
-	     (some #'union-type-p simplified-types))
+    (if (and (cdr simplified-types) (some #'union-type-p simplified-types))
 	(let* ((first-union (find-if #'union-type-p simplified-types))
 	       (other-types (coerce (remove first-union simplified-types)
 				    'list))
@@ -1027,11 +986,12 @@
 	       :specifier `(and ,@(map 'list
 				       #'type-specifier
 				       simplified-types)))))
-	(make-probably-compound-type #'%make-intersection-type
-				     simplified-types
-				     (some #'type-enumerable
-					   simplified-types)
-				     *universal-type*))))
+	(cond
+	  ((null simplified-types) *universal-type*)
+	  ((null (cdr simplified-types)) (car simplified-types))
+	  (t (%make-intersection-type
+	      (some #'type-enumerable simplified-types)
+	      simplified-types))))))
 
 (defun type-union (&rest input-types)
   (%type-union input-types))
@@ -1039,13 +999,13 @@
                            :hash-function (lambda (x)
                                             (logand (sxhash x) #xff)))
     ((input-types equal))
-  (let ((simplified-types (simplified-compound-types input-types
-						     #'union-type-p
-						     #'type-union2)))
-    (make-probably-compound-type #'make-union-type
-				 simplified-types
-				 (every #'type-enumerable simplified-types)
-				 *empty-type*)))
+  (let ((simplified-types (simplify-unions input-types)))
+    (cond
+      ((null simplified-types) *empty-type*)
+      ((null (cdr simplified-types)) (car simplified-types))
+      (t (make-union-type
+	  (every #'type-enumerable simplified-types)
+	  simplified-types)))))
 
 ;;;; built-in types
 
