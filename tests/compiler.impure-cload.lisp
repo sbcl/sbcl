@@ -325,5 +325,20 @@
   (dotimes (k n)
     (princ k)))
 
+;;; bug reported by Brian Downing: incorrect detection of MV-LET
+(DEFUN #:failure-testcase (SESSION)
+  (LABELS ((CONTINUATION-1 ()
+             (PROGN
+               (IF (foobar-1 SESSION)
+                   (CONTINUATION-2))
+               (LET ((CONTINUATION-3
+                      #'(LAMBDA ()
+                          (MULTIPLE-VALUE-CALL #'CONTINUATION-2
+                            (CONTINUATION-1)))))
+                 (foobar-2 CONTINUATION-3))))
+           (CONTINUATION-2 (&REST OTHER-1)
+             (DECLARE (IGNORE OTHER-1))))
+    (continuation-1)))
+
 
 (sb-ext:quit :unix-status 104)

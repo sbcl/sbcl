@@ -438,22 +438,23 @@
 (defun convert-mv-call (ref call fun)
   (declare (type ref ref) (type mv-combination call) (type functional fun))
   (when (and (looks-like-an-mv-bind fun)
-	     (not (functional-entry-fun fun))
 	     (singleton-p (leaf-refs fun))
 	     (singleton-p (basic-combination-args call)))
     (let* ((*current-component* (node-component ref))
            (ep (optional-dispatch-entry-point-fun
                 fun (optional-dispatch-max-args fun))))
-      (aver (= (optional-dispatch-min-args fun) 0))
-      (setf (basic-combination-kind call) :local)
-      (pushnew ep (lambda-calls-or-closes (node-home-lambda call)))
-      (merge-tail-sets call ep)
-      (change-ref-leaf ref ep)
+      (when (null (leaf-refs ep))
+        (aver (= (optional-dispatch-min-args fun) 0))
+        (aver (not (functional-entry-fun fun)))
+        (setf (basic-combination-kind call) :local)
+        (pushnew ep (lambda-calls-or-closes (node-home-lambda call)))
+        (merge-tail-sets call ep)
+        (change-ref-leaf ref ep)
 
-      (assert-lvar-type
-       (first (basic-combination-args call))
-       (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
-       (lexenv-policy (node-lexenv call)))))
+        (assert-lvar-type
+         (first (basic-combination-args call))
+         (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
+         (lexenv-policy (node-lexenv call))))))
   (values))
 
 ;;; Attempt to convert a call to a lambda. If the number of args is

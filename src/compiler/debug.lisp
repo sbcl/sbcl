@@ -466,6 +466,18 @@
 	     (check-fun-reached leaf node)))))
     (basic-combination
      (check-dest (basic-combination-fun node) node)
+     (when (and (mv-combination-p node)
+                (eq (basic-combination-kind node) :local))
+       (let ((fun-lvar (basic-combination-fun node)))
+         (unless (ref-p (lvar-uses fun-lvar))
+           (barf "function in a local mv-combination is not a LEAF: ~S" node))
+         (let ((fun (ref-leaf (lvar-use fun-lvar))))
+           (unless (lambda-p fun)
+             (barf "function ~S in a local mv-combination ~S is not local"
+                   fun node))
+           (unless (eq (functional-kind fun) :mv-let)
+             (barf "function ~S in a local mv-combination ~S is not of kind :MV-LET"
+                   fun node)))))
      (dolist (arg (basic-combination-args node))
        (cond
          (arg (check-dest arg node))
