@@ -53,20 +53,52 @@
                 (last (null (cdr remaining))))
             (cond
               ((atom header)
-	       (inst cmpwi temp header)
-               (if last
-                   (inst b? (if not-p :ne :eq) target)
-                   (inst beq when-true)))
+	       (cond
+		 ((and (not last) (null (cddr remaining))
+		       (atom (cadr remaining))
+		       (= (logcount (logxor header (cadr remaining))) 1))
+		  (inst andi. temp temp (ldb (byte 8 0) (logeqv header (cadr remaining))))
+		  (inst cmpwi temp (ldb (byte 8 0) (logand header (cadr remaining))))
+		  (inst b? (if not-p :ne :eq) target)
+		  (return))
+		 (t
+		  (inst cmpwi temp header)
+		  (if last
+		      (inst b? (if not-p :ne :eq) target)
+		      (inst beq when-true)))))
               (t
                (let ((start (car header))
                      (end (cdr header)))
-                 (unless (= start bignum-widetag)
-                   (inst cmpwi temp start)
-                   (inst blt when-false))
-                 (inst cmpwi temp end)
-                 (if last
-                     (inst b? (if not-p :gt :le) target)
-                     (inst ble when-true)))))))
+		 (cond
+		   ((and last (not (= start bignum-widetag))
+			 (= (+ start 4) end) 
+			 (= (logcount (logxor start end)) 1))
+		    (inst andi. temp temp (ldb (byte 8 0) (logeqv start end)))
+		    (inst cmpwi temp (ldb (byte 8 0) (logand start end)))
+		    (inst b? (if not-p :ne :eq) target))
+		   ((and (not last) (null (cddr remaining))
+			 (= (+ start 4) end) (= (logcount (logxor start end)) 1)
+			 (listp (cadr remaining))
+			 (= (+ (caadr remaining) 4) (cdadr remaining))
+			 (= (logcount (logxor (caadr remaining) (cdadr remaining))) 1)
+			 (= (logcount (logxor (caadr remaining) start)) 1))
+		    (inst andi. temp temp (ldb (byte 8 0) (logeqv start (cdadr remaining))))
+		    (inst cmpwi temp (ldb (byte 8 0) (logand start (cdadr remaining))))
+		    (inst b? (if not-p :ne :eq) target)
+		    (return))
+		   (t
+		    (unless (= start bignum-widetag)
+		      (inst cmpwi temp start)
+		      (if (= end complex-array-widetag)
+			  (progn
+			    (aver last)
+			    (inst b? (if not-p :lt :ge) target))
+			  (inst blt when-false)))
+		    (unless (= end complex-array-widetag)
+		      (inst cmpwi temp end)
+		      (if last
+			  (inst b? (if not-p :gt :le) target)
+			  (inst ble when-true))))))))))
         (emit-label drop-through)))))
 
 ;;; Simple type checking and testing:
