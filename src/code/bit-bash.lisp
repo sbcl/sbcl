@@ -504,7 +504,7 @@
   ;; package CL, and shadowing it would be too ugly; so maybe SB!VM:VMBYTE?
   ;; (And then N-BYTE-BITS would be N-VMBYTE-BITS and so forth?)
   (declare (type (simple-array (unsigned-byte 8) 1) bv))
-  (declare (type sap sap))
+  (declare (type system-area-pointer sap))
   (declare (type fixnum offset))
   ;; FIXME: Actually it looks as though this, and most other calls to
   ;; COPY-TO-SYSTEM-AREA, could be written more concisely with

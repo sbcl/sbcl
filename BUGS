@@ -1354,6 +1354,15 @@ WORKAROUND:
   the bad VECTOR-PUSH-EXTEND frame causes GC problems, though that may
   not be the actual problem. (CMU CL 18c doesn't have problems with this.)
 
+217:
+  In sbcl.0.7.7:
+
+    * (values-type-union (specifier-type '(function (base-char)))
+                         (specifier-type '(function (integer))))
+
+    #<FUN-TYPE (FUNCTION (BASE-CHAR) *)>
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
