@@ -420,6 +420,12 @@ BUG 48c, not yet fixed:
     (ignore-errors (bug110 0))
   (declare (ignore result))
   (assert (typep condition 'type-error)))
+
+;;; bug 202: the compiler failed to compile a function, which derived
+;;; type contradicted declared.
+(declaim (ftype (function () null) bug202))
+(defun bug202 ()
+  t)
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -80,10 +80,11 @@
 	     (let ((declared-ftype (info :function :type source-name)))
 	       (unless (defined-ftype-matches-declared-ftype-p
 			 defined-ftype declared-ftype)
-		 (note-lossage "~@<The previously declared FTYPE~2I ~_~S~I ~_~
-                              conflicts with the definition type ~2I~_~S~:>"
-			       (type-specifier declared-ftype)
-			       (type-specifier defined-ftype)))))
+		 (compiler-style-warn
+                  "~@<The previously declared FTYPE~2I ~_~S~I ~_~
+                   conflicts with the definition type ~2I~_~S~:>"
+                  (type-specifier declared-ftype)
+                  (type-specifier defined-ftype)))))
 	    (:defined
 	     (when global-p
 	       (setf (info :function :type source-name) defined-ftype))))))))

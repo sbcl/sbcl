@@ -1304,6 +1304,8 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     Froyd porting Raymond Toy's fix to CMU CL)
   * improved MOP conformance in PCL (thanks to Nathan Froyd porting
     Gerd Moellman's work in CMU CL)
+  * fixed bug 202: the compiler failed on a function, which derived
+    type contradicted declared.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
