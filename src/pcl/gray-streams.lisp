@@ -60,29 +60,31 @@
 
 (setf (fdefinition 'close) #'pcl-close)
 
-(fmakunbound 'input-stream-p)
+(let ()
+  (fmakunbound 'input-stream-p)
 
-(defgeneric input-stream-p (stream)
-  #+sb-doc
-  (:documentation "Can STREAM perform input operations?"))
+  (defgeneric input-stream-p (stream)
+    #+sb-doc
+    (:documentation "Can STREAM perform input operations?"))
 
-(defmethod input-stream-p ((stream ansi-stream))
-  (ansi-stream-input-stream-p stream))
+  (defmethod input-stream-p ((stream ansi-stream))
+    (ansi-stream-input-stream-p stream))
 
-(defmethod input-stream-p ((stream fundamental-input-stream))
-  t)
+  (defmethod input-stream-p ((stream fundamental-input-stream))
+    t))
 
-(fmakunbound 'output-stream-p)
+(let ()
+  (fmakunbound 'output-stream-p)
 
-(defgeneric output-stream-p (stream)
-  #+sb-doc
-  (:documentation "Can STREAM perform output operations?"))
+  (defgeneric output-stream-p (stream)
+    #+sb-doc
+    (:documentation "Can STREAM perform output operations?"))
 
-(defmethod output-stream-p ((stream ansi-stream))
-  (ansi-stream-output-stream-p stream))
+  (defmethod output-stream-p ((stream ansi-stream))
+    (ansi-stream-output-stream-p stream))
 
-(defmethod output-stream-p ((stream fundamental-output-stream))
-  t)
+  (defmethod output-stream-p ((stream fundamental-output-stream))
+    t))
 
 ;;; character input streams
 ;;;

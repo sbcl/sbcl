@@ -2062,6 +2062,9 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     streams.  (thanks to Nikodemus Siivola)
   * bug fix: result form in DO is not contained in the implicit
     TAGBODY.
+  * incompatible change: ICR structure is changed; the value part of
+    CONTINUATION is now called LVAR; corresponding functions are
+    renamed (e.g. SB-C::CONTINUATION-TYPE has become SB-C::LVAR-TYPE).
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very

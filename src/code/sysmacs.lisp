@@ -59,7 +59,7 @@
 			 :datum ,svar
 			 :expected-type '(satisfies input-stream-p)
 			 :format-control "~S isn't an input stream"
-			 :format-arguments ,(list  svar)))		
+			 :format-arguments (list ,svar)))
 		,svar)))))
 (defmacro out-synonym-of (stream &optional check-type)
   (let ((svar (gensym)))
@@ -73,7 +73,7 @@
 			 :datum ,svar
 			 :expected-type '(satisfies output-stream-p)
 			 :format-control "~S isn't an output stream."
-			 :format-arguments ,(list  svar)))
+			 :format-arguments (list ,svar)))
 		,svar)))))
 
 ;;; WITH-mumble-STREAM calls the function in the given SLOT of the

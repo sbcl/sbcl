@@ -838,7 +838,7 @@
 		  (delete clambda (tail-set-funs tails)))
 	    (setf (lambda-tail-set clambda) nil))
 	  (setf (component-lambdas component)
-		(delete clambda (component-lambdas component)))))
+		(delq clambda (component-lambdas component)))))
 
     ;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
     ;; ENTRY-FUN so that people will know that it is not an entry
@@ -1236,10 +1236,11 @@
   (do-blocks (block component)
     (setf (block-delete-p block) t))
   (dolist (fun (component-lambdas component))
-    (setf (functional-kind fun) nil)
-    (setf (functional-entry-fun fun) nil)
-    (setf (leaf-refs fun) nil)
-    (delete-functional fun))
+    (unless (eq (functional-kind fun) :deleted)
+      (setf (functional-kind fun) nil)
+      (setf (functional-entry-fun fun) nil)
+      (setf (leaf-refs fun) nil)
+      (delete-functional fun)))
   (do-blocks (block component)
     (delete-block block))
   (values))

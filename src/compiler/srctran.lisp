@@ -2268,8 +2268,7 @@
 
 (defoptimizer (integer-length derive-type) ((x))
   (let ((x-type (lvar-type x)))
-    (when (and (numeric-type-p x-type)
-               (csubtypep x-type (specifier-type 'integer)))
+    (when (numeric-type-p x-type)
       ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
       ;; of X is (INTEGER (MIN lo hi) (MAX lo hi), basically.  Be
       ;; careful about LO or HI being NIL, though.  Also, if 0 is

@@ -101,6 +101,11 @@
            (optimize (speed 3) (safety 1) (debug 1)))
   (let ((v3 (min -1720 b))) (max v3 (logcount (if (= v3 b) b b)))))
 
+(defun #:foo (d)
+  (let ((v7 (flet ((%f16 () (labels ((%f3 () -8)) (%f3))))
+              (labels ((%f7 () (%f16)))  d))))
+    132887443))
+
 ;;; RESULT-FORM in DO is not contained in the implicit TAGBODY
 (assert (eq (handler-case (eval `(do ((x '(1 2 3) (cdr x)))
                                      ((endp x) (go :loop))

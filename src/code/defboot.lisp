@@ -304,18 +304,23 @@
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
-    (let ((n-list (gensym)))
-      `(do* ((,n-list ,list (cdr ,n-list)))
-	((endp ,n-list)
-	 ,@(if result
-	       `((let ((,var nil))
-		   ,var
-		   ,result))
-	       '(nil)))
-	(let ((,var (car ,n-list)))
-	  ,@decls
-	  (tagbody
-	     ,@forms))))))
+    (let ((n-list (gensym "N-LIST"))
+          (start (gensym "START")))
+      `(block nil
+         (let ((,n-list ,list))
+           (tagbody
+              ,start
+              (unless (endp ,n-list)
+                (let ((,var (car ,n-list)))
+                  ,@decls
+                  (setq ,n-list (cdr ,n-list))
+                  (tagbody ,@forms))
+                (go ,start))))
+         ,(if result
+              `(let ((,var nil))
+                 ,var
+                 ,result)
+               nil)))))
 
 ;;;; conditions, handlers, restarts
 
