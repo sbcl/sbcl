@@ -1689,6 +1689,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
        arguments contain duplicated elements;
     ** RESTART-CASE understands local macros;
     ** ... and associates exactly its own restarts with a condition;
+    ** ENDP in safe mode checks its argument to be of type LIST;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

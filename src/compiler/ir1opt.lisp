@@ -317,9 +317,15 @@
           (let ((last (block-last block)))
             (typecase last
               (cif
-               (flush-dest (if-test last))
-               (when (unlink-node last)
-                 (return)))
+               (if (memq (continuation-type-check (if-test last))
+                         '(nil :deleted))
+                   ;; FIXME: Remove the test above when the bug 203
+                   ;; will be fixed.
+                   (progn
+                     (flush-dest (if-test last))
+                     (when (unlink-node last)
+                       (return)))
+                   (return)))
               (exit
                (when (maybe-delete-exit last)
                  (return)))))
@@ -633,22 +639,25 @@
 	  (convert-if-if use node)
 	  (when (continuation-use test) (return)))))
 
-    (let* ((type (continuation-type test))
-	   (victim
-	    (cond ((constant-continuation-p test)
-		   (if (continuation-value test)
-		       (if-alternative node)
-		       (if-consequent node)))
-		  ((not (types-equal-or-intersect type (specifier-type 'null)))
-		   (if-alternative node))
-		  ((type= type (specifier-type 'null))
-		   (if-consequent node)))))
-      (when victim
-	(flush-dest test)
-	(when (rest (block-succ block))
-	  (unlink-blocks block victim))
-	(setf (component-reanalyze (node-component node)) t)
-	(unlink-node node))))
+    (when (memq (continuation-type-check test)
+                '(nil :deleted))
+      ;; FIXME: Remove the test above when the bug 203 will be fixed.
+      (let* ((type (continuation-type test))
+             (victim
+              (cond ((constant-continuation-p test)
+                     (if (continuation-value test)
+                         (if-alternative node)
+                         (if-consequent node)))
+                    ((not (types-equal-or-intersect type (specifier-type 'null)))
+                     (if-alternative node))
+                    ((type= type (specifier-type 'null))
+                     (if-consequent node)))))
+        (when victim
+          (flush-dest test)
+          (when (rest (block-succ block))
+            (unlink-blocks block victim))
+          (setf (component-reanalyze (node-component node)) t)
+          (unlink-node node)))))
   (values))
 
 ;;; Create a new copy of an IF node that tests the value of the node

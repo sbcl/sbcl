@@ -676,7 +676,7 @@
 
 (defknown tree-equal (t t &key (:test callable) (:test-not callable)) boolean
   (foldable flushable call))
-(defknown endp (t) boolean (foldable unsafely-flushable movable))
+(defknown endp (list) boolean (foldable flushable movable))
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
 (defknown nth (index list) t (foldable flushable))
 (defknown nthcdr (index list) t (foldable unsafely-flushable))
