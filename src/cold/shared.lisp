@@ -37,11 +37,6 @@
 (defpackage "SB-COLD" (:use "CL"))
 (in-package "SB-COLD")
 
-;;; prefix for source filename stems when cross-compiling
-(defvar *src-prefix* "src/")
-;;; (We don't bother to specify the source suffix here because ".lisp" is such
-;;; a good default value that we never have to specify it explicitly.)
-
 ;;; prefixes for filename stems when cross-compiling. These are quite arbitrary
 ;;; (although of course they shouldn't collide with anything we don't want to
 ;;; write over). In particular, they can be either relative path names (e.g.
@@ -313,7 +308,6 @@
   (load (in-host-compilation-mode
 	  (lambda ()
 	    (compile-stem stem
-			  :src-prefix *src-prefix*
 			  :obj-prefix *host-obj-prefix*
 			  :obj-suffix *host-obj-suffix*
 			  :compile-file #'cl:compile-file
@@ -339,7 +333,6 @@
   (funcall *in-target-compilation-mode-fn*
 	   (lambda ()
 	     (compile-stem stem
-			   :src-prefix *src-prefix*
 			   :obj-prefix *target-obj-prefix*
 			   :obj-suffix *target-obj-suffix*
 			   :ignore-failure-p ignore-failure-p

@@ -1,14 +1,11 @@
-/* get the sizes and signedness of basic system types. Doing this by
- * hand is basically just too tedious.
+/*
+ * Rummage through the system header files using the C compiler itself
+ * as a parser, extracting stuff like preprocessor constants and the
+ * sizes and signedness of basic system types, and write it out as
+ * Lisp code.
+ */
 
- * In the current system this doesn't get built or run automatically,
- * because I (Dan) am lazy and do not want to think too hard about the
- * interaction between generated source files, build trees, and CVS.
- * You have to build it yourself when porting to a new architecture -
- * which I'd guess doesn't happen too often anyway
-
- * The output from this is generally in code/$(architecture)-$(os)-types.h */
-
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/stat.h>
@@ -17,7 +14,12 @@
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(def-alien-type "##lispname##" (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
 
-#define DEFCONSTANT(lispname,cname) { printf("(defconstant %s %d) ;; 0x%x\n",lispname,cname,cname);} 
+void
+defconstant(char* lisp_name, long unix_number)
+{
+    printf("(defconstant %s %ld) ; #x%lx\n",
+	   lisp_name, unix_number, unix_number);
+}
 
 int
 main(int argc, char *argv[])
@@ -32,10 +34,12 @@ main(int argc, char *argv[])
     printf(
 ";;;; This is an automatically generated file, please do not hand-edit it.
 ;;;; See the program \"grovel_headers.c\".
+
 ");
 
     printf("(in-package \"SB!UNIX\")\n\n");
 
+    printf(";;; types, types, types\n");
     DEFTYPE("dev-t",   dev_t);
     DEFTYPE("ino-t",   ino_t);
     DEFTYPE("mode-t",  mode_t);
@@ -45,33 +49,37 @@ main(int argc, char *argv[])
     DEFTYPE("clock-t", clock_t);
     DEFTYPE("off-t",   off_t);
     DEFTYPE("time-t",  time_t);
+    printf("\n");
 
-    /* fcntl.h */
-    DEFCONSTANT("r_ok", R_OK);
-    DEFCONSTANT("w_ok", W_OK);
-    DEFCONSTANT("x_ok", X_OK);
-    DEFCONSTANT("f_ok", F_OK);
+    printf(";;; fcntl.h\n");
+    defconstant("r_ok", R_OK);
+    defconstant("w_ok", W_OK);
+    defconstant("x_ok", X_OK);
+    defconstant("f_ok", F_OK);
+    printf("\n");
 
-    /* fcntlbits.h */
-    DEFCONSTANT("o_rdonly",  O_RDONLY);
-    DEFCONSTANT("o_wronly",  O_WRONLY);
-    DEFCONSTANT("o_rdwr",    O_RDWR);
-    DEFCONSTANT("o_accmode", O_ACCMODE);
-    DEFCONSTANT("o_creat",   O_CREAT);
-    DEFCONSTANT("o_excl",    O_EXCL);
-    DEFCONSTANT("o_noctty",  O_NOCTTY);
-    DEFCONSTANT("o_trunc",   O_TRUNC);
-    DEFCONSTANT("o_append",  O_APPEND);
-    /**/
-    DEFCONSTANT( "s-ifmt",  S_IFMT);
-    DEFCONSTANT( "s-ififo", S_IFIFO);
-    DEFCONSTANT( "s-ifchr", S_IFCHR);
-    DEFCONSTANT( "s-ifdir", S_IFDIR);
-    DEFCONSTANT( "s-ifblk", S_IFBLK);
-    DEFCONSTANT( "s-ifreg", S_IFREG);
+    printf(";;; fcntlbits.h\n");
+    defconstant("o_rdonly",  O_RDONLY);
+    defconstant("o_wronly",  O_WRONLY);
+    defconstant("o_rdwr",    O_RDWR);
+    defconstant("o_accmode", O_ACCMODE);
+    defconstant("o_creat",   O_CREAT);
+    defconstant("o_excl",    O_EXCL);
+    defconstant("o_noctty",  O_NOCTTY);
+    defconstant("o_trunc",   O_TRUNC);
+    defconstant("o_append",  O_APPEND);
+    printf(";;;\n");
+    defconstant( "s-ifmt",  S_IFMT);
+    defconstant( "s-ififo", S_IFIFO);
+    defconstant( "s-ifchr", S_IFCHR);
+    defconstant( "s-ifdir", S_IFDIR);
+    defconstant( "s-ifblk", S_IFBLK);
+    defconstant( "s-ifreg", S_IFREG);
+    printf("\n");
   
-    DEFCONSTANT( "s-iflnk",  S_IFLNK);
-    DEFCONSTANT( "s-ifsock", S_IFSOCK);
+    defconstant( "s-iflnk",  S_IFLNK);
+    defconstant( "s-ifsock", S_IFSOCK);
+    printf("\n");
 
     return 0;
 }

@@ -15,6 +15,10 @@
 
 echo //entering make-target-1.sh
 
+# the GNU dialect of "make" -- easier to find or port it than to
+# try to figure out how to port to the local dialect..
+gnumake=${GNUMAKE:-gmake}
+
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get
@@ -24,6 +28,15 @@ echo //entering make-target-1.sh
 # doesn't matter.)
 echo //building runtime system and symbol table file
 cd src/runtime
-${GNUMAKE:-gmake} clean  || exit 1
-${GNUMAKE:-gmake} depend || exit 1
-${GNUMAKE:-gmake} all    || exit 1
+$gnumake clean  || exit 1
+$gnumake depend || exit 1
+$gnumake all    || exit 1
+cd ../..
+
+# Use a little C program to grab stuff from the C header files and
+# smash it into Lisp source code, so that we won't get all stressed
+# and careworn like the CMU CL maintainers.
+cd tools-for-build
+$gnumake grovel_headers
+cd ..
+tools-for-build/grovel_headers > output/stuff-groveled-from-headers.lisp

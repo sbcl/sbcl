@@ -42,6 +42,6 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	;; to debug cross-compilation if it isn't.)
 	(when (find :sb-test *shebang-features*)
 	  (load "tests/type.before-xc.lisp"))
-        (host-cload-stem "compiler/generic/genesis")
+        (host-cload-stem "src/compiler/generic/genesis")
 	(sb!vm:genesis :c-header-file-name "src/runtime/sbcl.h")
 	EOF

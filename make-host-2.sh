@@ -131,7 +131,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  (with-open-file (s "output/object-filenames-for-genesis.lisp-expr"
 	                     :direction :input)
 	    (read s)))
-	(host-load-stem "compiler/generic/genesis")
+	(host-load-stem "src/compiler/generic/genesis")
 	(sb!vm:genesis :object-file-names *target-object-file-names*
 		       :c-header-file-name "output/sbcl2.h"
 		       :symbol-table-file-name "src/runtime/sbcl.nm"

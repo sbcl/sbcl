@@ -53,10 +53,8 @@ rm -f Config
 if [ `uname` = Linux ]; then
     echo -n ' :linux' >> $ltf
     ln -s Config.$sbcl_arch-linux Config
-    ( cd ../code && ln -sf $sbcl_arch-linux-types.lisp target-os-types.lisp )
 elif uname | grep BSD; then
     echo -n ' :bsd' >> $ltf
-    ( cd ../code && ln -sf $sbcl_arch-bsd-types.lisp target-os-types.lisp )
     if [ `uname` = FreeBSD ]; then
 	echo -n ' :freebsd' >> $ltf
 	ln -s Config.$sbcl_arch-freebsd Config
