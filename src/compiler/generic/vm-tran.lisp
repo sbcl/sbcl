@@ -340,6 +340,38 @@
 		  (declare (type (unsigned-byte 32) numx numy))
 		  (unless (= numx numy)
 		    (return nil))))))))
+
+;;; FIXME: it is probably worth doing something like this for
+;;; SIMPLE-BASE-STRINGs too, if only so that (MAKE-STRING 100000
+;;; :INITIAL-ELEMENT #\Space) doesn't surprise the user with its
+;;; performance characteristics.  Getting it right is harder than with
+;;; bit-vectors, though, as one needs to be more careful with the loop
+;;; epilogue so as not to overwrite the convenient extra null byte
+;;; (for SB-ALIEN/C termination convention convenience).
+(deftransform fill ((sequence item) (simple-bit-vector bit) *
+		    :policy (>= speed space))
+  (let ((value (if (constant-continuation-p item)
+		   (if (= (continuation-value item) 0)
+		       0
+		       #.(1- (ash 1 32)))
+		   `(if (= item 0) 0 #.(1- (ash 1 32))))))
+    `(let ((length (length sequence))
+	   (value ,value))
+       (if (= length 0)
+	   sequence
+	   (do ((index sb!vm:vector-data-offset (1+ index))
+		(end-1 (+ sb!vm:vector-data-offset
+			  ;; bit-vectors of length 1-32 need precisely
+			  ;; one (SETF %RAW-BITS), done here in the
+			  ;; epilogue. - CSR, 2002-04-24
+			  (truncate (truly-the index (1- length))
+				    sb!vm:n-word-bits))))
+	       ((= index end-1)
+		(setf (%raw-bits sequence index) value)
+		sequence)
+	     (declare (optimize (speed 3) (safety 0))
+		      (type index index end-1))
+	     (setf (%raw-bits sequence index) value))))))
 
 ;;;; %BYTE-BLT
 
