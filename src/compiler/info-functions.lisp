@@ -145,7 +145,6 @@
      (second form))
     (t form)))
 
-(declaim (ftype (function (symbol &optional (or null sb!c::lexenv))) sb!xc:macro-function))
 (defun sb!xc:macro-function (symbol &optional env)
   #!+sb-doc
   "If SYMBOL names a macro in ENV, returns the expansion function,

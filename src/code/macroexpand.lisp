@@ -28,7 +28,6 @@
   whenever a runtime expansion is needed. Initially this is set to
   FUNCALL.")
 
-(declaim (ftype (function (t &optional (or null sb!c::lexenv))) sb!xc:macroexpand-1))
 (defun sb!xc:macroexpand-1 (form &optional env)
   #!+sb-doc
   "If form is a macro (or symbol macro), expand it once. Return two values,
@@ -66,7 +65,6 @@
 	(t
 	 (values form nil))))
 
-(declaim (ftype (function (t &optional (or null sb!c::lexenv))) sb!xc:macroexpand))
 (defun sb!xc:macroexpand (form &optional env)
   #!+sb-doc
   "Repetitively call MACROEXPAND-1 until the form can no longer be expanded.

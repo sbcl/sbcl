@@ -700,10 +700,6 @@
       (setf (info :type :classoid name)
 	    (make-classoid-cell name))))
 
-;;; FIXME: When the system is stable, this DECLAIM FTYPE should
-;;; probably go away in favor of the DEFKNOWN for FIND-CLASS.
-(declaim (ftype (function (symbol &optional t (or null sb!c::lexenv)))
-		find-classoid))
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun find-classoid (name &optional (errorp t) environment)
   #!+sb-doc

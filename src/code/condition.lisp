@@ -565,10 +565,12 @@
 
 (define-condition simple-condition ()
   ((format-control :reader simple-condition-format-control
-		   :initarg :format-control)
+		   :initarg :format-control
+                   :type format-control)
    (format-arguments :reader simple-condition-format-arguments
 		     :initarg :format-arguments
-		     :initform '()))
+		     :initform '()
+                     :type list))
   (:report simple-condition-printer))
 
 (define-condition simple-warning (simple-condition warning) ())

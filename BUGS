@@ -1080,11 +1080,15 @@ WORKAROUND:
   AMOP seems to say that it should work (first ADD-METHOD initializes
   GF lambda list).
 
-263:
-  :PREFIX, :PER-LINE-PREFIX and :SUFFIX arguments of
-  PPRINT-LOGICAL-BLOCK may be complex strings.
+264:
+  (reported by <dsk> on #lisp 2003-07-16)
 
-  (fixed in 0.8.1.33)
+    (progv '(foo) '(1)
+      (eval '(symbol-macrolet ((foo 3))
+               (declare (special foo))
+               foo)))
+
+  does not signal an error.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

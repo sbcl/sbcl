@@ -993,7 +993,7 @@
 
     (let ((predicate-name (dd-predicate-name dd)))
       (when predicate-name
-	(sb!xc:proclaim `(ftype (sfunction (t) t) ,predicate-name))
+	(sb!xc:proclaim `(ftype (sfunction (t) boolean) ,predicate-name))
 	;; Provide inline expansion (or not).
 	(ecase (dd-type dd)
 	  ((structure funcallable-structure)
