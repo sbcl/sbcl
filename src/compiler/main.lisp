@@ -1225,7 +1225,11 @@
 					  (node-component (lambda-bind x)))
 					 :toplevel)))
 			      lambdas
-			      :start start)
+			      ;; this used to read ":start start", but
+			      ;; start can be greater than len, which
+			      ;; is an error according to ANSI - CSR,
+			      ;; 2002-04-25
+			      :start (min start len))
 		 len)))
       (do* ((start 0 (1+ loser))
 	    (loser (loser start) (loser start)))

@@ -455,10 +455,6 @@
  ("src/compiler/ir1report")
  ("src/compiler/ir1opt")
 
- ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
- ;; SB!ASSEM:EMIT-POST-IT, defined in assem.lisp.
- ("src/compiler/late-vmdef")
-
  ("src/compiler/ir1final")
  ("src/compiler/array-tran")
  ("src/compiler/seqtran")
@@ -481,6 +477,12 @@
  ("src/compiler/debug-dump")
  ("src/compiler/generic/utils")
  ("src/assembly/assemfile")
+
+ ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
+ ;; SB!ASSEM:EMIT-POST-IT, defined in assem.lisp, and also possibly
+ ;; the definition of the LOCATION-INFO structure (if structures in
+ ;; the host lisp have setf expanders rather than setf functions).
+ ("src/compiler/late-vmdef")
 
  ("src/compiler/fixup") ; for DEFSTRUCT FIXUP, used by insts.lisp
 

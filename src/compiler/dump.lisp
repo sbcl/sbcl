@@ -246,6 +246,17 @@
 
 ;;;; opening and closing fasl files
 
+;;; A utility function to write strings to (unsigned-byte 8) streams.
+;;; We restrict this to ASCII (with the averrance) because of
+;;; ambiguity of higher bytes: Unicode, some ISO-8859-x, or what? This
+;;; could be revisited in the event of doing funky things with stream
+;;; encodings -- CSR, 2002-04-25
+(defun fasl-write-string (string stream)
+  (loop for char across string
+	do (let ((code (char-code char)))
+	     (aver (<= 0 code 127))
+	     (write-byte code stream))))
+
 ;;; Open a fasl file, write its header, and return a FASL-OUTPUT
 ;;; object for dumping to it. Some human-readable information about
 ;;; the source code is given by the string WHERE. If BYTE-P is true,
@@ -261,23 +272,25 @@
 
     ;; Begin the header with the constant machine-readable (and
     ;; semi-human-readable) string which is used to identify fasl files.
-    (write-string *fasl-header-string-start-string* stream)
+    (fasl-write-string *fasl-header-string-start-string* stream)
 
     ;; The constant string which begins the header is followed by
     ;; arbitrary human-readable text, terminated by a special
     ;; character code.
-    (with-standard-io-syntax
-     (format stream
-	     "~%  ~
-	     compiled from ~S~%  ~
-	     at ~A~%  ~
-	     on ~A~%  ~
-	     using ~A version ~A~%"
-	     where
-	     (format-universal-time nil (get-universal-time))
-	     (machine-instance)
-	     (sb!xc:lisp-implementation-type)
-	     (sb!xc:lisp-implementation-version)))
+    (fasl-write-string
+     (with-standard-io-syntax
+       (format nil
+	       "~%  ~
+	        compiled from ~S~%  ~
+	        at ~A~%  ~
+	        on ~A~%  ~
+	        using ~A version ~A~%"
+	        where
+	        (format-universal-time nil (get-universal-time))
+	        (machine-instance)
+	        (sb!xc:lisp-implementation-type)
+	        (sb!xc:lisp-implementation-version)))
+     stream)
     (dump-byte +fasl-header-string-stop-char-code+ res)
 
     ;; Finish the header by outputting fasl file implementation and

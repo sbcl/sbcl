@@ -33,6 +33,24 @@
 	    ,result)
 	 ,@body))))
 
+(defun set-ir2-physenv-live-tns (value instance)
+  (setf (ir2-physenv-live-tns instance) value))
+
+(defun set-ir2-physenv-debug-live-tns (value instance)
+  (setf (ir2-physenv-debug-live-tns instance) value))
+
+(defun set-ir2-component-alias-tns (value instance)
+  (setf (ir2-component-alias-tns instance) value))
+
+(defun set-ir2-component-normal-tns (value instance)
+  (setf (ir2-component-normal-tns instance) value))
+
+(defun set-ir2-component-restricted-tns (value instance)
+  (setf (ir2-component-restricted-tns instance) value))
+
+(defun set-ir2-component-wired-tns (value instance)
+  (setf (ir2-component-wired-tns instance) value))
+
 ;;; Remove all TNs with no references from the lists of unpacked TNs.
 ;;; We null out the Offset so that nobody will mistake deleted wired
 ;;; TNs for properly packed TNs. We mark non-deleted alias TNs so that
@@ -65,26 +83,26 @@
 		 (:environment
 		  (clear-live tn
 			      #'ir2-physenv-live-tns
-			      #'(setf ir2-physenv-live-tns)))
+			      #'set-ir2-physenv-live-tns))
 		 (:debug-environment
 		  (clear-live tn
 			      #'ir2-physenv-debug-live-tns
-			      #'(setf ir2-physenv-debug-live-tns)))))
+			      #'set-ir2-physenv-debug-live-tns))))
 	     (clear-live (tn getter setter)
 	       (let ((env (physenv-info (tn-physenv tn))))
 		 (funcall setter (delete tn (funcall getter env)) env))))
       (declare (inline used-p delete-some delete-1 clear-live))
       (delete-some #'ir2-component-alias-tns
-		   #'(setf ir2-component-alias-tns))
+		   #'set-ir2-component-alias-tns)
       (do ((tn (ir2-component-alias-tns 2comp) (tn-next tn)))
 	  ((null tn))
 	(setf (sbit aliases (tn-number (tn-save-tn tn))) 1))
       (delete-some #'ir2-component-normal-tns
-		   #'(setf ir2-component-normal-tns))
+		   #'set-ir2-component-normal-tns)
       (delete-some #'ir2-component-restricted-tns
-		   #'(setf ir2-component-restricted-tns))
+		   #'set-ir2-component-restricted-tns)
       (delete-some #'ir2-component-wired-tns
-		   #'(setf ir2-component-wired-tns))))
+		   #'set-ir2-component-wired-tns)))
   (values))
 
 ;;;; TN creation
