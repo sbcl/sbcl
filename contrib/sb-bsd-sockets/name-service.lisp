@@ -43,13 +43,13 @@ grisly details."
 	  do (setf (sockint::in-addr-addr packed-addr i) (elt address i)))
     (make-host-ent
      (sb-sys:with-pinned-objects (packed-addr)
-      (sockint::gethostbyaddr (sockint::array-data-address packed-addr)
+      (sockint::gethostbyaddr (sb-grovel::array-data-address packed-addr)
 			      4
 			      sockint::af-inet)))))
 
 (defun make-host-ent (h)
-  (if (sockint::foreign-nullp h) (name-service-error "gethostbyname"))
-  (let* ((local-h (sockint::foreign-vector h 1 sockint::size-of-hostent))
+  (if (sb-grovel::foreign-nullp h) (name-service-error "gethostbyname"))
+  (let* ((local-h (sb-grovel::foreign-vector h 1 sockint::size-of-hostent))
 	 (length (sockint::hostent-length local-h))
 	 (aliases 
 	  (loop for i = 0 then (1+ i)
@@ -64,7 +64,7 @@ grisly details."
 		for ad = (sb-sys:sap-ref-32 address0 i)
 		while (> ad 0)
 		collect
-		(sockint::foreign-vector (sb-sys:sap+ address0 i) 1 length))))
+		(sb-grovel::foreign-vector (sb-sys:sap+ address0 i) 1 length))))
     (make-instance 'host-ent
                    :name (sb-c-call::%naturalize-c-string
 			  (sb-sys:int-sap (sockint::hostent-name local-h)))

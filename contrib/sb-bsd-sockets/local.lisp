@@ -34,7 +34,7 @@ a network.
 (defmethod bits-of-sockaddr ((socket local-socket) sockaddr)
   "Return the file name of the local socket address SOCKADDR."
   (let ((name (sb-c-call::%naturalize-c-string
-	       (sb-sys:sap+ (sockint::array-data-address sockaddr)
+	       (sb-sys:sap+ (sb-grovel::array-data-address sockaddr)
 			    sockint::offset-of-sockaddr-un-path))))
     (if (zerop (length name)) nil name)))
 

@@ -76,26 +76,22 @@
     #+sb-building-contrib "SYS:CONTRIB;SB-BSD-SOCKETS;"
     :components ((:file "defpackage")
 		 (:file "split" :depends-on ("defpackage"))
-                 (:file "array-data" :depends-on ("defpackage"))
 		 (:unix-dso "alien"
 			    :components ((:c-source-file "undefs")
 					 (:c-source-file "get-h-errno")))
 		 (:file "malloc" :depends-on ("defpackage"))
-		 (:file "foreign-glue" :depends-on ("defpackage" "malloc"))
 		 (sb-grovel:grovel-constants-file
 		  "constants"
 		  :package :sockint
-		  :depends-on  ("def-to-lisp" "defpackage" "foreign-glue"))
+		  :depends-on  ("defpackage"))
 		 (:file "sockets"
-			:depends-on ("constants" "array-data"))
+			:depends-on ("constants"))
 		 
 		 (:file "sockopt" :depends-on ("sockets"))
 		 (:file "inet" :depends-on ("sockets" "split"  "constants" ))
 		 (:file "local" :depends-on ("sockets" "split" "constants" ))
 		 (:file "name-service" :depends-on ("sockets" "constants" "alien"))
 		 (:file "misc" :depends-on ("sockets" "constants"))
-
-		 (:file "def-to-lisp")
 
 		 (:static-file "NEWS")
 		 ;; (:static-file "INSTALL")

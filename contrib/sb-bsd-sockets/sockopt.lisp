@@ -62,7 +62,7 @@ Code for options that not every system has should be conditionalised:
 			       :initial-element 0)))
 	  (sb-sys:with-pinned-objects (buf)
 	    (if (= -1 (sockint::getsockopt
-		       fd ,find-level ,number (sockint::array-data-address buf) ,size))
+		       fd ,find-level ,number (sb-grovel::array-data-address buf) ,size))
 		(socket-error "getsockopt")
 		(,mangle-return buf ,size)))))
       (defun (setf ,lisp-name) (new-val socket
@@ -82,7 +82,7 @@ Code for options that not every system has should be conditionalised:
   ;; is a macro and evaluates its second arg at read time
   (let* ((v (make-array size :element-type '(unsigned-byte 8)
 			:initial-element 0))
-	 (d (sockint::array-data-address v))
+	 (d (sb-grovel::array-data-address v))
 	 (alien (sb-alien:sap-alien
 		 d; (sb-sys:int-sap d)
 		 (* (sb-alien:signed #.(* 8 sockint::size-of-int))))))
@@ -92,7 +92,7 @@ Code for options that not every system has should be conditionalised:
 (defun buffer-to-int (x size)
   (declare (ignore size))
   (let ((alien (sb-alien:sap-alien
-		(sockint::array-data-address x)
+		(sb-grovel::array-data-address x)
 		(* (sb-alien:signed #.(* 8 sockint::size-of-int))))))
     (sb-alien:deref alien)))
 
@@ -146,13 +146,13 @@ Code for options that not every system has should be conditionalised:
 
 (defun string-to-foreign (string size)
   (declare (ignore size))
-  (let ((data (sockint::array-data-address string)))
+  (let ((data (sb-grovel::array-data-address string)))
     (sb-alien:sap-alien data (* t))))
                                                          
 (defun buffer-to-string (x size)
   (declare (ignore size))
   (sb-c-call::%naturalize-c-string
-   (sockint::array-data-address x)))
+   (sb-grovel::array-data-address x)))
 
 (define-socket-option sockopt-bind-to-device sockint::sol-socket
   sockint::so-bindtodevice string-to-foreign sockint::ifnamsiz

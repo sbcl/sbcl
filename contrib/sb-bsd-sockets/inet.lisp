@@ -38,8 +38,8 @@
 using getprotobyname(2) which typically looks in NIS or /etc/protocols"
   ;; for extra brownie points, could return canonical protocol name
   ;; and aliases as extra values
-  (let ((ent (sockint::foreign-vector (sockint::getprotobyname name) 1
-				      sockint::size-of-protoent)))
+  (let ((ent (sb-grovel::foreign-vector (sockint::getprotobyname name) 1
+				        sockint::size-of-protoent)))
     (sockint::protoent-proto ent)))
 
 
