@@ -2237,15 +2237,19 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
   * bug fix: DECODE-UNIVERSAL-TIME now accepts timezone arguments with
     second-resolution: integer multiples of 1/3600 between -24 and 24.
     (thanks to Vincent Arkesteijn)
+  * bug fix: functions =, /=, <, <=, >, >= did not check the argument
+    type when called with 1 argument; PEEK-CHAR checked type of
+    PEEK-TYPE only after having read first character from a
+    stream.  (reported by Peter Graves)
+  * bug fix: the garbage collector now has much better locality
+    behaviour, and in particular no longer treats all memory as being
+    exhausted when many small objects point to each other in a deeply
+    recursive manner.
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the x86 backend.
   * optimization: SEARCH on simple-base-strings can now be open-coded.
     (see also contrib/compiler-extras.lisp for inspiration for
     teaching the compiler about the Boyer-Moore algorithm).
-  * bug fix: functions =, /=, <, <=, >, >= did not check the argument
-    type when called with 1 argument; PEEK-CHAR checked type of
-    PEEK-TYPE only after having read first character from a
-    stream. (reported by Peter Graves)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** in stack analysis liveness information is propagated from
        non-local entry points.

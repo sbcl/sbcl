@@ -966,16 +966,6 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed)
 		    (unboxed ? UNBOXED_PAGE : BOXED_PAGE)) &&
 		   (page_table[first_page].large_object == 0) &&
 		   (page_table[first_page].gen == gc_alloc_generation) &&
-		   /* FIXME: Why?  Please tell me why?  Removal of
-		      this test, which restricts opening an allocation
-		      region on a partially-used page to the nursery
-		      generation, causes more or less instant heap
-		      corruption on forms such as 
-                        (loop repeat 2 
-                              do (compile nil '(lambda (x) x)) 
-                              do (gc :full t))
-		      -- CSR, 2003-01-14 */
-		   (gc_alloc_generation == 0) &&
 		   (page_table[first_page].bytes_used < (PAGE_BYTES-32)) &&
 		   (page_table[first_page].write_protected == 0) &&
 		   (page_table[first_page].dont_move == 0)) {
@@ -2763,7 +2753,7 @@ scavenge_newspace_generation_one_scan(int generation)
 	   generation));
     for (i = 0; i < last_free_page; i++) {
 	/* note that this skips over open regions when it encounters them */
-	if ((page_table[i].allocated == BOXED_PAGE)
+	if ((page_table[i].allocated & BOXED_PAGE)
 	    && (page_table[i].bytes_used != 0)
 	    && (page_table[i].gen == generation)
 	    && ((page_table[i].write_protected == 0)
