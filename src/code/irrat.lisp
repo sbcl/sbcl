@@ -436,7 +436,7 @@
 			   (float-sign y pi))
 		       (float-sign y (/ pi 2)))
 		   (%atan2 y x))))
-	(number-dispatch ((y number) (x number))
+	(number-dispatch ((y real) (x real))
 	  ((double-float
 	    (foreach double-float single-float fixnum bignum ratio))
 	   (atan2 y (coerce x 'double-float)))

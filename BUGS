@@ -1370,12 +1370,7 @@ WORKAROUND:
   So it'd be better just to say "This is not a REAL".
 
 196: "confusing error message for unREAL second arg to ATAN"
-  (reported by Alexey Dejneka sbcl-devel 2002-09-04)
-  In sbcl-0.7.7.11,
-    * (atan 1 #c(1 2))
-    debugger invoked on condition of type SIMPLE-TYPE-ERROR:
-      Argument X is not a NUMBER: #C(1 2)
-  (The actual type problem is that argument Y is not a REAL.)
+  (fixed in sbcl-0.7.7.18)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
