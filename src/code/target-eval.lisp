@@ -84,7 +84,7 @@
 ;;;; debuggable macros anyway). In that environment, a stub no-op version of
 ;;;; this function is used.
 (defun try-to-rename-interpreted-function-as-macro (f name lambda-list)
-  (assert (sb!eval:interpreted-function-p f))
+  (aver (sb!eval:interpreted-function-p f))
   (setf (sb!eval:interpreted-function-name f)
 	(format nil "DEFMACRO ~S" name)
 	(sb!eval:interpreted-function-arglist f)

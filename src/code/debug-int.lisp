@@ -1078,7 +1078,7 @@
 				  code (1+ real-lra-slot)))
 		 (setq code (code-header-ref code real-lra-slot))
 ;		 (format t "ccf3 :bogus-lra ~S ~S~%" code pc-offset)
-		 (assert code)))
+		 (aver code)))
 	      (t
 	       ;; Not escaped
 	       (multiple-value-setq (pc-offset code)
@@ -1994,7 +1994,7 @@
 			 0))
 		 (sc-offset (if deleted 0 (geti)))
 		 (save-sc-offset (if save (geti) nil)))
-	    (assert (not (and args-minimal (not minimal))))
+	    (aver (not (and args-minimal (not minimal))))
 	    (vector-push-extend (make-compiled-debug-var symbol
 							 id
 							 live
@@ -3182,7 +3182,7 @@
      (when (code-location-unknown-p what)
        (error "cannot make a breakpoint at an unknown code location: ~S"
 	      what))
-     (assert (eq kind :code-location))
+     (aver (eq kind :code-location))
      (let ((bpt (%make-breakpoint hook-function what kind info)))
        (etypecase what
 	 (interpreted-code-location
@@ -3610,7 +3610,7 @@
 	      offset))
     (let ((breakpoints (breakpoint-data-breakpoints data)))
       (when breakpoints
-	(assert (eq (breakpoint-kind (car breakpoints)) :function-end))
+	(aver (eq (breakpoint-kind (car breakpoints)) :function-end))
 	(handle-function-end-breakpoint-aux breakpoints data context)))))
 
 ;;; Either HANDLE-BREAKPOINT calls this for :FUNCTION-END breakpoints

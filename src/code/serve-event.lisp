@@ -86,9 +86,9 @@
   "Arange to call FUNCTION whenever FD is usable. DIRECTION should be
   either :INPUT or :OUTPUT. The value returned should be passed to
   SYSTEM:REMOVE-FD-HANDLER when it is no longer needed."
-  (assert (member direction '(:input :output))
-	  (direction)
-	  "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction)
+  (unless (member direction '(:input :output))
+    ;; FIXME: should be TYPE-ERROR?
+    (error "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction))
   (let ((handler (make-handler direction fd function)))
     (push handler *descriptor-handlers*)
     handler))

@@ -1198,7 +1198,7 @@
 			  (type stack-pointer more-args-start))
 		 (cond
 		  ((not (hairy-byte-function-keywords-p xep))
-		   (assert restp)
+		   (aver restp)
 		   (setf (current-stack-pointer) (1+ more-args-start))
 		   (setf (eval-stack-ref more-args-start) rest))
 		  (t

@@ -106,7 +106,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
         ;; Let's check that the type system was reasonably sane. (It's
 	;; easy to spend a long time wandering around confused trying
 	;; to debug cold init if it wasn't.)
-	(load "tests/type.after-xc.lisp")
+	(when (find :sb-test *shebang-features*)
+	  (load "tests/type.after-xc.lisp"))
 	;; If you're experimenting with the system under a
         ;; cross-compilation host which supports CMU-CL-style SAVE-LISP,
         ;; this can be a good time to run it. The resulting core isn't

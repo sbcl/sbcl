@@ -60,10 +60,10 @@
   (or (cdr (assoc thing (ir2-environment-environment (environment-info env))))
       (etypecase thing
 	(lambda-var
-	 (assert (eq env (lambda-environment (lambda-var-home thing))))
+	 (aver (eq env (lambda-environment (lambda-var-home thing))))
 	 (leaf-info thing))
 	(nlx-info
-	 (assert (eq env (block-environment (nlx-info-target thing))))
+	 (aver (eq env (block-environment (nlx-info-target thing))))
 	 (ir2-nlx-info-home (nlx-info-info thing))))))
 
 ;;; If LEAF already has a constant TN, return that, otherwise make a
@@ -120,7 +120,7 @@
        (let ((unsafe (policy node (zerop safety))))
 	 (ecase (global-var-kind leaf)
 	   ((:special :global :constant)
-	    (assert (symbolp name))
+	    (aver (symbolp name))
 	    (let ((name-tn (emit-constant name)))
 	      (if unsafe
 		  (vop fast-symbol-value node block name-tn res)
@@ -156,7 +156,7 @@
 		   (clambda
 		    (environment-closure (get-lambda-environment leaf)))
 		   (functional
-		    (assert (eq (functional-kind leaf) :top-level-xep))
+		    (aver (eq (functional-kind leaf) :top-level-xep))
 		    nil))))
     (cond (closure
 	   (let ((this-env (node-environment node)))
@@ -195,7 +195,7 @@
       (global-var
        (ecase (global-var-kind leaf)
 	 ((:special :global)
-	  (assert (symbolp (leaf-name leaf)))
+	  (aver (symbolp (leaf-name leaf)))
 	  (vop set node block (emit-constant (leaf-name leaf)) val)))))
     (when locs
       (emit-move node block val (first locs))
@@ -224,14 +224,14 @@
 	     (let ((ref (continuation-use cont)))
 	       (leaf-tn (ref-leaf ref) (node-environment ref))))
 	    (:fixed
-	     (assert (= (length (ir2-continuation-locs 2cont)) 1))
+	     (aver (= (length (ir2-continuation-locs 2cont)) 1))
 	     (first (ir2-continuation-locs 2cont)))))
 	 (ptype (ir2-continuation-primitive-type 2cont)))
 
     (cond ((and (eq (continuation-type-check cont) t)
 		(multiple-value-bind (check types)
 		    (continuation-check-types cont)
-		  (assert (eq check :simple))
+		  (aver (eq check :simple))
 		  ;; If the proven type is a subtype of the possibly
 		  ;; weakened type check then it's always true and is
 		  ;; flushed.
@@ -260,10 +260,10 @@
 	   (type continuation cont) (list ptypes))
   (let* ((locs (ir2-continuation-locs (continuation-info cont)))
 	 (nlocs (length locs)))
-    (assert (= nlocs (length ptypes)))
+    (aver (= nlocs (length ptypes)))
     (if (eq (continuation-type-check cont) t)
 	(multiple-value-bind (check types) (continuation-check-types cont)
-	  (assert (eq check :simple))
+	  (aver (eq check :simple))
 	  (let ((ntypes (length types)))
 	    (mapcar #'(lambda (from to-type assertion)
 			(let ((temp (make-normal-tn to-type)))
@@ -443,7 +443,7 @@
   (declare (type node node) (type ir2-block block)
 	   (type template template) (type (or tn-ref null) args)
 	   (list info-args) (type cif if) (type boolean not-p))
-  (assert (= (template-info-arg-count template) (+ (length info-args) 2)))
+  (aver (= (template-info-arg-count template) (+ (length info-args) 2)))
   (let ((consequent (if-consequent if))
 	(alternative (if-alternative if)))
     (cond ((drop-thru-p if consequent)
@@ -536,14 +536,14 @@
 	 (rtypes (template-result-types template)))
     (multiple-value-bind (args info-args)
 	(reference-arguments call block (combination-args call) template)
-      (assert (not (template-more-results-type template)))
+      (aver (not (template-more-results-type template)))
       (if (eq rtypes :conditional)
 	  (ir2-convert-conditional call block template args info-args
 				   (continuation-dest cont) nil)
 	  (let* ((results (make-template-result-tns call cont template rtypes))
 		 (r-refs (reference-tn-list results t)))
-	    (assert (= (length info-args)
-		       (template-info-arg-count template)))
+	    (aver (= (length info-args)
+		     (template-info-arg-count template)))
 	    (if info-args
 		(emit-template call block template args r-refs info-args)
 		(emit-template call block template args r-refs))
@@ -564,9 +564,9 @@
     (multiple-value-bind (args info-args)
 	(reference-arguments call block (cddr (combination-args call))
 			     template)
-      (assert (not (template-more-results-type template)))
-      (assert (not (eq rtypes :conditional)))
-      (assert (null info-args))
+      (aver (not (template-more-results-type template)))
+      (aver (not (eq rtypes :conditional)))
+      (aver (null info-args))
 
       (if info
 	  (emit-template call block template args r-refs info)
@@ -782,22 +782,22 @@
   (let ((2cont (continuation-info cont)))
     (if (eq (ir2-continuation-kind 2cont) :delayed)
 	(let ((name (continuation-function-name cont t)))
-	  (assert name)
+	  (aver name)
 	  (values (make-load-time-constant-tn :fdefinition name) t))
 	(let* ((locs (ir2-continuation-locs 2cont))
 	       (loc (first locs))
 	       (check (continuation-type-check cont))
 	       (function-ptype (primitive-type-or-lose 'function)))
-	  (assert (and (eq (ir2-continuation-kind 2cont) :fixed)
-		       (= (length locs) 1)))
+	  (aver (and (eq (ir2-continuation-kind 2cont) :fixed)
+		     (= (length locs) 1)))
 	  (cond ((eq (tn-primitive-type loc) function-ptype)
-		 (assert (not (eq check t)))
+		 (aver (not (eq check t)))
 		 (values loc nil))
 		(t
 		 (let ((temp (make-normal-tn function-ptype)))
-		   (assert (and (eq (ir2-continuation-primitive-type 2cont)
-				    function-ptype)
-				(eq check t)))
+		   (aver (and (eq (ir2-continuation-primitive-type 2cont)
+				  function-ptype)
+			      (eq check t)))
 		   (emit-type-check node block loc temp
 				    (specifier-type 'function))
 		   (values temp nil))))))))
@@ -969,7 +969,7 @@
 
     (when (consp fname)
       (destructuring-bind (setf stem) fname
-	(assert (eq setf 'setf))
+	(aver (eq setf 'setf))
 	(setf (gethash stem *setf-assumed-fboundp*) t)))))
 
 ;;; If the call is in a tail recursive position and the return
@@ -1050,8 +1050,8 @@
   (declare (type bind node) (type ir2-block block))
   (let* ((fun (bind-lambda node))
 	 (env (environment-info (lambda-environment fun))))
-    (assert (member (functional-kind fun)
-		    '(nil :external :optional :top-level :cleanup)))
+    (aver (member (functional-kind fun)
+		  '(nil :external :optional :top-level :cleanup)))
 
     (when (external-entry-point-p fun)
       (init-xep-environment node block fun)
@@ -1113,7 +1113,7 @@
 		  (nil)
 		  nvals))))
      (t
-      (assert (eq cont-kind :unknown))
+      (aver (eq cont-kind :unknown))
       (vop* return-multiple node block
 	    (old-fp return-pc
 		    (reference-tn-list (ir2-continuation-locs 2cont) nil))
@@ -1144,7 +1144,7 @@
   (let* ((cont (first (basic-combination-args node)))
 	 (fun (ref-leaf (continuation-use (basic-combination-fun node))))
 	 (vars (lambda-vars fun)))
-    (assert (eq (functional-kind fun) :mv-let))
+    (aver (eq (functional-kind fun) :mv-let))
     (mapc #'(lambda (src var)
 	      (when (leaf-refs var)
 		(let ((dest (leaf-info var)))
@@ -1165,7 +1165,7 @@
 ;;; contiguous and on stack top.
 (defun ir2-convert-mv-call (node block)
   (declare (type mv-combination node) (type ir2-block block))
-  (assert (basic-combination-args node))
+  (aver (basic-combination-args node))
   (let* ((start-cont (continuation-info (first (basic-combination-args node))))
 	 (start (first (ir2-continuation-locs start-cont)))
 	 (tails (and (node-tail-p node)
@@ -1174,8 +1174,8 @@
 	 (2cont (continuation-info cont)))
     (multiple-value-bind (fun named)
 	(function-continuation-tn node block (basic-combination-fun node))
-      (assert (and (not named)
-		   (eq (ir2-continuation-kind start-cont) :unknown)))
+      (aver (and (not named)
+		 (eq (ir2-continuation-kind start-cont) :unknown)))
       (cond
        (tails
 	(let ((env (environment-info (node-environment node))))
@@ -1197,7 +1197,7 @@
 ;;; top of it.)
 (defoptimizer (%pop-values ir2-convert) ((continuation) node block)
   (let ((2cont (continuation-info (continuation-value continuation))))
-    (assert (eq (ir2-continuation-kind 2cont) :unknown))
+    (aver (eq (ir2-continuation-kind 2cont) :unknown))
     (vop reset-stack-pointer node block
 	 (first (ir2-continuation-locs 2cont)))))
 
@@ -1541,7 +1541,7 @@
 	 (last (block-last block))
 	 (succ (block-succ block)))
     (unless (if-p last)
-      (assert (and succ (null (rest succ))))
+      (aver (and succ (null (rest succ))))
       (let ((target (first succ)))
 	(cond ((eq target (component-tail (block-component block)))
 	       (when (and (basic-combination-p last)
@@ -1557,7 +1557,7 @@
 			      (emit-constant name)
 			      (multiple-value-bind (tn named)
 				  (function-continuation-tn last 2block fun)
-				(assert (not named))
+				(aver (not named))
 				tn)))))))
 	      ((not (eq (ir2-block-next 2block) (block-info target)))
 	       (vop branch last 2block (block-label target)))))))

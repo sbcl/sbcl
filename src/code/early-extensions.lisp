@@ -389,8 +389,8 @@
   `(unless ,expr
      (%failed-aver ,(let ((*package* (find-package :keyword)))
 		      (format nil "~S" expr)))))
-(defun %failed-aver (expr)
-  (error "~@<failed AVER: ~2I~_~S~:>" expr))
+(defun %failed-aver (expr-as-string)
+  (error "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
 
 ;;;; utilities for two-VALUES predicates
 

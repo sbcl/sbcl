@@ -497,7 +497,7 @@
 		 ;; within an XEP, so the lambda has an extra arg.
 		 (more-args (nthcdr fixed-arg-count args)))
 	    (maybe-trace-funny-fun node ,name fixed-arg-count)
-	    (assert (eq (sb!c::continuation-info cont) :multiple))
+	    (aver (eq (sb!c::continuation-info cont) :multiple))
 	    (eval-stack-push (list more-args (length more-args)))))
 	 (sb!c::%unknown-values
 	  (error "SB!C::%UNKNOWN-VALUES should never be in interpreter's IR1."))
@@ -561,10 +561,10 @@
 		     ,@letp-bind)
 		,local-branch))
 	     ((eq (sb!c::continuation-info ,fun) :unused)
-	      (assert (typep ,kind 'sb!c::function-info))
+	      (aver (typep ,kind 'sb!c::function-info))
 	      (do-funny-function (sb!c::continuation-function-name ,fun)))
 	     (t
-	      (assert (typep ,kind 'sb!c::function-info))
+	      (aver (typep ,kind 'sb!c::function-info))
 	      (do-combination :full nil ,type))))))
 
 (defun trace-eval (on)
@@ -607,7 +607,7 @@
 	  (return-from ,function ,value))
 	 ((member ,info '(:multiple :return) :test #'eq)
 	  (eval-stack-push (list ,value)))
-	 (t (assert (eq ,info :single))
+	 (t (aver (eq ,info :single))
 	    (eval-stack-push ,value))))
 
 (defun maybe-trace-nodes (node)
@@ -776,10 +776,10 @@
 						  (sb!c::lambda-info lambda)))))))
 		 (ecase (sb!c::continuation-info cont)
 		   (:single
-		    (assert incoming-values)
+		    (aver incoming-values)
 		    (eval-stack-push (car values)))
 		   ((:multiple :return)
-		    (assert incoming-values)
+		    (aver incoming-values)
 		    (eval-stack-push values))
 		   (:unused)))
 		(t
@@ -1088,14 +1088,15 @@
 		  (make-indirect-value-cell (pop args))
 		  (pop args)))))))
 
-;;; This is similar to STORE-LET-VARS, but the values for the locals appear on
-;;; the stack in a list due to forms that delivered multiple values to this
-;;; lambda/let. Unlike STORE-LET-VARS, there is no control over the delivery
-;;; of a value for an unreferenced var, so we drop the corresponding value on
-;;; the floor when no one references it. INTERNAL-APPLY uses this for
-;;; sb!c::mv-combination nodes representing LET's.
+;;; This is similar to STORE-LET-VARS, but the values for the locals
+;;; appear on the stack in a list due to forms that delivered multiple
+;;; values to this lambda/let. Unlike STORE-LET-VARS, there is no
+;;; control over the delivery of a value for an unreferenced var, so
+;;; we drop the corresponding value on the floor when no one
+;;; references it. INTERNAL-APPLY uses this for sb!c::mv-combination
+;;; nodes representing LET's.
 (defun store-mv-let-vars (lambda frame-ptr count)
-  (assert (= count 1))
+  (aver (= count 1))
   (let ((args (eval-stack-pop)))
     (dolist (v (sb!c::lambda-vars lambda))
       (if (sb!c::leaf-refs v)
@@ -1119,7 +1120,7 @@
 ;;; the recursion. You must do this instead of NREVERSE'ing the args list, so
 ;;; when we run out of values, we store nil's in the correct lambda-vars.
 (defun store-mv-let-vars (lambda frame-ptr count)
-  (assert (= count 1))
+  (aver (= count 1))
   (print  (sb!c::lambda-vars lambda))
   (store-mv-let-vars-aux frame-ptr (sb!c::lambda-vars lambda) (eval-stack-pop)))
 (defun store-mv-let-vars-aux (frame-ptr vars args)

@@ -335,9 +335,9 @@
      (found
       (unless (sb-kernel:class-pcl-class found)
 	(setf (sb-kernel:class-pcl-class found) class))
-      (assert (eq (sb-kernel:class-pcl-class found) class))
+      (aver (eq (sb-kernel:class-pcl-class found) class))
       (let ((layout (sb-kernel:class-layout found)))
-	(assert layout)
+	(aver layout)
 	layout))
      (t
       (make-wrapper-internal
@@ -370,7 +370,7 @@
 		     (let ((found (cl:find-class (slot-value class 'name))))
 		       (unless (sb-kernel:class-pcl-class found)
 			 (setf (sb-kernel:class-pcl-class found) class))
-		       (assert (eq (sb-kernel:class-pcl-class found) class))
+		       (aver (eq (sb-kernel:class-pcl-class found) class))
 		       found))
 		    (t
 		     (sb-kernel:make-standard-class :pcl-class class))))
@@ -381,8 +381,8 @@
 	   (layout (sb-kernel:class-layout found)))
       (unless (sb-kernel:class-pcl-class found)
 	(setf (sb-kernel:class-pcl-class found) class))
-      (assert (eq (sb-kernel:class-pcl-class found) class))
-      (assert layout)
+      (aver (eq (sb-kernel:class-pcl-class found) class))
+      (aver layout)
       layout))))
 
 ;;; FIXME: The immediately following macros could become inline functions.

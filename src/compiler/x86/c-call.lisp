@@ -194,7 +194,7 @@
   (:info amount)
   (:results (result :scs (sap-reg any-reg)))
   (:generator 0
-    (assert (location= result esp-tn))
+    (aver (location= result esp-tn))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
 	(inst sub esp-tn delta)))
@@ -211,7 +211,7 @@
   (:info amount)
   (:results (result :scs (sap-reg any-reg)))
   (:generator 0
-    (assert (not (location= result esp-tn)))
+    (aver (not (location= result esp-tn)))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
 	(inst sub (make-ea :dword

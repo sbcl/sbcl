@@ -690,6 +690,7 @@ retained, possibly temporariliy, because it might be used internally."
              "ONCE-ONLY"
              "DEFENUM"
              "DEFPRINTER"
+             "AVER"
 
              ;; ..and DEFTYPEs..
              "INDEX" 

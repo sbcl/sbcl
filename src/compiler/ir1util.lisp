@@ -96,14 +96,14 @@
 ;;; has changed.
 (declaim (ftype (function (node continuation) (values)) add-continuation-use))
 (defun add-continuation-use (node cont)
-  (assert (not (node-cont node)))
+  (aver (not (node-cont node)))
   (let ((block (continuation-block cont)))
     (ecase (continuation-kind cont)
       (:deleted)
       (:unused
-       (assert (not block))
+       (aver (not block))
        (let ((block (node-block node)))
-	 (assert block)
+	 (aver block)
 	 (setf (continuation-block cont) block))
        (setf (continuation-kind cont) :inside-block)
        (setf (continuation-use cont) node))
@@ -135,7 +135,7 @@
 ;;; potential optimization opportunities.
 (defun substitute-continuation (new old)
   (declare (type continuation old new))
-  (assert (not (continuation-dest new)))
+  (aver (not (continuation-dest new)))
   (let ((dest (continuation-dest old)))
     (etypecase dest
       ((or ref bind))
@@ -187,7 +187,7 @@
   (declare (type continuation cont))
   (ecase (continuation-kind cont)
     (:unused
-     (assert (not (continuation-block cont)))
+     (aver (not (continuation-block cont)))
      (let* ((head (component-head *current-component*))
 	    (next (block-next head))
 	    (new-block (make-block cont)))
@@ -367,7 +367,7 @@
 (defun %link-blocks (block1 block2)
   (declare (type cblock block1 block2) (inline member))
   (let ((succ1 (block-succ block1)))
-    (assert (not (member block2 succ1 :test #'eq)))
+    (aver (not (member block2 succ1 :test #'eq)))
     (cons block2 succ1)))
 
 ;;; Like LINK-BLOCKS, but we separate BLOCK1 and BLOCK2. If this leaves a
@@ -383,7 +383,7 @@
 	     (prev succ1 succ))
 	    ((eq (car succ) block2)
 	     (setf (cdr prev) (cdr succ)))
-	  (assert succ))))
+	  (aver succ))))
 
   (let ((new-pred (delq block1 (block-pred block2))))
     (setf (block-pred block2) new-pred)
@@ -444,7 +444,7 @@
   (declare (type cblock block after))
   (let ((next (block-next after))
 	(comp (block-component after)))
-    (assert (not (eq (component-kind comp) :deleted)))
+    (aver (not (eq (component-kind comp) :deleted)))
     (setf (block-component block) comp)
     (setf (block-next after) block)
     (setf (block-prev block) after)
@@ -488,7 +488,7 @@
 	 (last (block-last block))
 	 (last-cont (node-cont last)))
     (unless (eq last node)
-      (assert (and (eq (continuation-kind start) :inside-block)
+      (aver (and (eq (continuation-kind start) :inside-block)
 		   (not (block-delete-p block))))
       (let* ((succ (block-succ block))
 	     (new-block
@@ -571,8 +571,8 @@
 ;;; be called on functions that never had any references, since otherwise
 ;;; DELETE-REF will handle the deletion.
 (defun delete-functional (fun)
-  (assert (and (null (leaf-refs fun))
-	       (not (functional-entry-function fun))))
+  (aver (and (null (leaf-refs fun))
+	     (not (functional-entry-function fun))))
   (etypecase fun
     (optional-dispatch (delete-optional-dispatch fun))
     (clambda (delete-lambda fun)))
@@ -597,7 +597,7 @@
   (declare (type clambda leaf))
   (let ((kind (functional-kind leaf))
 	(bind (lambda-bind leaf)))
-    (assert (not (member kind '(:deleted :optional :top-level))))
+    (aver (not (member kind '(:deleted :optional :top-level))))
     (setf (functional-kind leaf) :deleted)
     (setf (lambda-bind leaf) nil)
     (dolist (let (lambda-lets leaf))
@@ -610,7 +610,7 @@
 	(let* ((bind-block (node-block bind))
 	       (component (block-component bind-block))
 	       (return (lambda-return leaf)))
-	  (assert (null (leaf-refs leaf)))
+	  (aver (null (leaf-refs leaf)))
 	  (unless (leaf-ever-used leaf)
 	    (let ((*compiler-error-context* bind))
 	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"
@@ -655,12 +655,12 @@
   (declare (type optional-dispatch leaf))
   (let ((entry (functional-entry-function leaf)))
     (unless (and entry (leaf-refs entry))
-      (assert (or (not entry) (eq (functional-kind entry) :deleted)))
+      (aver (or (not entry) (eq (functional-kind entry) :deleted)))
       (setf (functional-kind leaf) :deleted)
 
       (flet ((frob (fun)
 	       (unless (eq (functional-kind fun) :deleted)
-		 (assert (eq (functional-kind fun) :optional))
+		 (aver (eq (functional-kind fun) :optional))
 		 (setf (functional-kind fun) nil)
 		 (let ((refs (leaf-refs fun)))
 		   (cond ((null refs)
@@ -696,7 +696,7 @@
 	     (clambda
 	      (ecase (functional-kind leaf)
 		((nil :let :mv-let :assignment :escape :cleanup)
-		 (assert (not (functional-entry-function leaf)))
+		 (aver (not (functional-entry-function leaf)))
 		 (delete-lambda leaf))
 		(:external
 		 (delete-lambda leaf))
@@ -730,7 +730,7 @@
   (declare (type continuation cont))
 
   (unless (eq (continuation-kind cont) :deleted)
-    (assert (continuation-dest cont))
+    (aver (continuation-dest cont))
     (setf (continuation-dest cont) nil)
     (do-uses (use cont)
       (let ((prev (node-prev use)))
@@ -766,7 +766,7 @@
 ;;; people to ignore them, and to cause them to be deleted eventually.
 (defun delete-continuation (cont)
   (declare (type continuation cont))
-  (assert (not (eq (continuation-kind cont) :deleted)))
+  (aver (not (eq (continuation-kind cont) :deleted)))
 
   (do-uses (use cont)
     (let ((prev (node-prev use)))
@@ -797,16 +797,17 @@
 
   (values))
 
-;;; This function does what is necessary to eliminate the code in it from
-;;; the IR1 representation. This involves unlinking it from its predecessors
-;;; and successors and deleting various node-specific semantic information.
+;;; This function does what is necessary to eliminate the code in it
+;;; from the IR1 representation. This involves unlinking it from its
+;;; predecessors and successors and deleting various node-specific
+;;; semantic information.
 ;;;
-;;; We mark the Start as has having no next and remove the last node from
-;;; its Cont's uses. We also flush the DEST for all continuations whose values
-;;; are received by nodes in the block.
+;;; We mark the START as has having no next and remove the last node
+;;; from its CONT's uses. We also flush the DEST for all continuations
+;;; whose values are received by nodes in the block.
 (defun delete-block (block)
   (declare (type cblock block))
-  (assert (block-component block) () "Block is already deleted.")
+  (aver (block-component block)) ; else block is already deleted!
   (note-block-deletion block)
   (setf (block-delete-p block) t)
 
@@ -847,8 +848,7 @@
       (bind
        (let ((lambda (bind-lambda node)))
 	 (unless (eq (functional-kind lambda) :deleted)
-	   (assert (member (functional-kind lambda)
-			   '(:let :mv-let :assignment)))
+	   (aver (member (functional-kind lambda) '(:let :mv-let :assignment)))
 	   (delete-lambda lambda))))
       (exit
        (let ((value (exit-value node))
@@ -877,7 +877,7 @@
 (defun delete-return (node)
   (declare (type creturn node))
   (let ((fun (return-lambda node)))
-    (assert (lambda-return fun))
+    (aver (lambda-return fun))
     (setf (lambda-return fun) nil))
   (values))
 
@@ -989,7 +989,7 @@
     (unless (eq (continuation-kind cont) :deleted)
       (delete-continuation-use node)
       (when (eq (continuation-kind cont) :unused)
-	(assert (not (continuation-dest cont)))
+	(aver (not (continuation-dest cont)))
 	(delete-continuation cont)))
 
     (setf (block-type-asserted block) t)
@@ -1007,11 +1007,11 @@
 	   (setf (node-prev node) nil)
 	   nil)
 	  (t
-	   (assert (eq prev-kind :block-start))
-	   (assert (eq node last))
+	   (aver (eq prev-kind :block-start))
+	   (aver (eq node last))
 	   (let* ((succ (block-succ block))
 		  (next (first succ)))
-	     (assert (and succ (null (cdr succ))))
+	     (aver (and succ (null (cdr succ))))
 	     (cond
 	      ((member block succ)
 	       (with-ir1-environment node
@@ -1024,8 +1024,8 @@
 	       (setf (node-prev node) nil)
 	       nil)
 	      (t
-	       (assert (eq (block-start-cleanup block)
-			   (block-end-cleanup block)))
+	       (aver (eq (block-start-cleanup block)
+			 (block-end-cleanup block)))
 	       (unlink-blocks block next)
 	       (dolist (pred (block-pred block))
 		 (change-block-successor pred block next))
@@ -1054,7 +1054,7 @@
 ;;; deletion.
 (defun delete-component (component)
   (declare (type component component))
-  (assert (null (component-new-functions component)))
+  (aver (null (component-new-functions component)))
   (setf (component-kind component) :deleted)
   (do-blocks (block component)
     (setf (block-delete-p block) t))
@@ -1087,7 +1087,7 @@
 	   (type index num-args))
   (let ((outside (continuation-dest cont))
 	(inside (continuation-use cont)))
-    (assert (combination-p outside))
+    (aver (combination-p outside))
     (unless (combination-p inside)
       (give-up-ir1-transform))
     (let ((inside-fun (combination-fun inside)))
@@ -1230,7 +1230,7 @@
 ;;; Return the COMBINATION node that is the call to the let Fun.
 (defun let-combination (fun)
   (declare (type clambda fun))
-  (assert (member (functional-kind fun) '(:let :mv-let)))
+  (aver (member (functional-kind fun) '(:let :mv-let)))
   (continuation-dest (node-cont (first (leaf-refs fun)))))
 
 ;;; Return the initial value continuation for a let variable or NIL if none.
@@ -1244,7 +1244,7 @@
 #!-sb-fluid (declaim (inline combination-lambda))
 (defun combination-lambda (call)
   (declare (type basic-combination call))
-  (assert (eq (basic-combination-kind call) :local))
+  (aver (eq (basic-combination-kind call) :local))
   (ref-leaf (continuation-use (basic-combination-fun call))))
 
 (defvar *inline-expansion-limit* 200
@@ -1410,7 +1410,7 @@
 	    (current (rest rpath)))
 	(loop
 	  (when (atom form)
-	    (assert (null current))
+	    (aver (null current))
 	    (return))
 	  (let ((head (first form)))
 	    (when (symbolp head)
@@ -1674,13 +1674,13 @@
   (force-output *error-output*)
   (values))
 
-;;; Return a string that somehow names the code in Component. We use
+;;; Return a string that somehow names the code in COMPONENT. We use
 ;;; the source path for the bind node for an arbitrary entry point to
 ;;; find the source context, then return that as a string.
 (declaim (ftype (function (component) simple-string) find-component-name))
 (defun find-component-name (component)
   (let ((ep (first (block-succ (component-head component)))))
-    (assert ep () "no entry points?")
+    (aver ep) ; else no entry points??
     (multiple-value-bind (form context)
 	(find-original-source
 	 (node-source-path (continuation-next (block-start ep))))

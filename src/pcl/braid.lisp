@@ -636,13 +636,13 @@
 	   (lclass-pcl-class (sb-kernel:class-pcl-class lclass))
 	   (olclass (cl:find-class name nil)))
       (if lclass-pcl-class
-	  (assert (eq class lclass-pcl-class))
+	  (aver (eq class lclass-pcl-class))
 	  (setf (sb-kernel:class-pcl-class lclass) class))
 
       (update-lisp-class-layout class layout)
 
       (cond (olclass
-	     (assert (eq lclass olclass)))
+	     (aver (eq lclass olclass)))
 	    (t
 	     (setf (cl:find-class name) lclass)))))
 

@@ -43,7 +43,7 @@
 		       (info :setf :expander sym))
 		   (not (member sym ignore)))
 	  (let ((type (type-specifier (info :function :type sym))))
-	    (assert (consp type))
+	    (aver (consp type))
 	    #!-sb-fluid (res `(declaim (inline (setf ,sym))))
 	    (res (compute-one-setter sym type))))))
     `(progn ,@(res))))

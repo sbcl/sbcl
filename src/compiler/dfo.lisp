@@ -44,7 +44,7 @@
 ;;; before FIND-INITIAL-DFO runs.]
 (declaim (ftype (function (component component) (values)) join-components))
 (defun join-components (new old)
-  (assert (eq (component-kind new) (component-kind old)))
+  (aver (eq (component-kind new) (component-kind old)))
   (let ((old-head (component-head old))
 	(old-tail (component-tail old))
 	(head (component-head new))
@@ -304,15 +304,15 @@
       (dolist (tll lambdas)
 	(let ((component (block-component (node-block (lambda-bind tll)))))
 	  (dolist (fun (component-lambdas component))
-	    (assert (member (functional-kind fun)
-			    '(:optional :external :top-level nil :escape
-					:cleanup)))
+	    (aver (member (functional-kind fun)
+			  '(:optional :external :top-level nil :escape
+				      :cleanup)))
 	    (let ((res (dfo-walk-call-graph fun new)))
 	      (when (eq res new)
 		(components new)
 		(setq new (make-empty-component)))))
 	  (when (eq (component-kind component) :initial)
-	    (assert (null (component-lambdas component)))
+	    (aver (null (component-lambdas component)))
 	    (let ((tail (component-tail component)))
 	      (dolist (pred (block-pred tail))
 		(let ((pred-component (block-component pred)))
@@ -378,12 +378,12 @@
 	(unlink-blocks pred tail)
 	(let ((last (block-last pred)))
 	  (unless (return-p last)
-	    (assert (basic-combination-p last))
+	    (aver (basic-combination-p last))
 	    (link-blocks pred (component-tail result-component))))))
 
     (let ((lambdas (component-lambdas component)))
-      (assert (and (null (rest lambdas))
-		   (eq (first lambdas) lambda))))
+      (aver (and (null (rest lambdas))
+		 (eq (first lambdas) lambda))))
 
     ;; Switch the end of the code from the return block to the start of
     ;; the next chunk.

@@ -789,7 +789,7 @@
 		 (let* ((bits (ash bits -1))
 			(len (integer-length bits)))
 		   (cond ((> len digits)
-			  (assert (= len (the fixnum (1+ digits))))
+			  (aver (= len (the fixnum (1+ digits))))
 			  (scale-float (floatit (ash bits -1)) (1+ scale)))
 			 (t
 			  (scale-float (floatit bits) scale)))))
@@ -809,7 +809,7 @@
 	    (let ((extra (- (integer-length fraction-and-guard) digits)))
 	      (declare (fixnum extra))
 	      (cond ((/= extra 1)
-		     (assert (> extra 1)))
+		     (aver (> extra 1)))
 		    ((oddp fraction-and-guard)
 		     (return
 		      (if (zerop rem)

@@ -226,7 +226,7 @@
 (defun note-potential-circularity (x file)
   (unless *cold-load-dump*
     (let ((circ (fasl-file-circularity-table file)))
-      (assert (not (gethash x circ)))
+      (aver (not (gethash x circ)))
       (setf (gethash x circ) x)))
   (values))
 
@@ -297,7 +297,7 @@
 ;;; We do various sanity checks, then end the group.
 (defun close-fasl-file (file abort-p)
   (declare (type fasl-file file))
-  (assert (zerop (hash-table-count (fasl-file-patch-table file))))
+  (aver (zerop (hash-table-count (fasl-file-patch-table file))))
   (dump-fop 'sb!impl::fop-verify-empty-stack file)
   (dump-fop 'sb!impl::fop-verify-table-size file)
   (dump-unsigned-32 (fasl-file-table-free file) file)
@@ -462,7 +462,7 @@
 (defun fasl-dump-load-time-value-lambda (fun file)
   (declare (type clambda fun) (type fasl-file file))
   (let ((handle (gethash (leaf-info fun) (fasl-file-entry-table file))))
-    (assert handle)
+    (aver handle)
     (dump-push handle file)
     (dump-fop 'sb!impl::fop-funcall file)
     (dump-byte 0 file))
@@ -612,8 +612,8 @@
 ;;; Marking of the conses is inhibited when *COLD-LOAD-DUMP* is true.
 ;;; This inhibits all circularity detection.
 (defun dump-list (list file)
-  (assert (and list
-	       (not (gethash list (fasl-file-circularity-table file)))))
+  (aver (and list
+	     (not (gethash list (fasl-file-circularity-table file)))))
   (do* ((l list (cdr l))
 	(n 0 (1+ n))
 	(circ (fasl-file-circularity-table file)))
@@ -786,7 +786,7 @@
 	       ;; unportable bit bashing.
 	       (cond ((>= size 8) ; easy cases
 		      (multiple-value-bind (floor rem) (floor size 8)
-			(assert (zerop rem))
+			(aver (zerop rem))
 			(dovector (i vec)
 			  (dump-integer-as-n-bytes i floor file))))
 		     (t ; harder cases, not supported in cross-compiler
@@ -959,22 +959,22 @@
       ;; noise before the offset.
       (ecase flavor
 	(:assembly-routine
-	 (assert (symbolp name))
+	 (aver (symbolp name))
 	 (dump-fop 'sb!impl::fop-normal-load fasl-file)
 	 (let ((*cold-load-dump* t))
 	   (dump-object name fasl-file))
 	 (dump-fop 'sb!impl::fop-maybe-cold-load fasl-file)
 	 (dump-fop 'sb!impl::fop-assembler-fixup fasl-file))
 	(:foreign
-	 (assert (stringp name))
+	 (aver (stringp name))
 	 (dump-fop 'sb!impl::fop-foreign-fixup fasl-file)
 	 (let ((len (length name)))
-	   (assert (< len 256)) ; (limit imposed by fop definition)
+	   (aver (< len 256)) ; (limit imposed by fop definition)
 	   (dump-byte len fasl-file)
 	   (dotimes (i len)
 	     (dump-byte (char-code (schar name i)) fasl-file))))
 	(:code-object
-	 (assert (null name))
+	 (aver (null name))
 	 (dump-fop 'sb!impl::fop-code-object-fixup fasl-file)))
       ;; No matter what the flavor, we'll always dump the offset.
       (dump-unsigned-32 offset fasl-file)))
@@ -1330,7 +1330,7 @@
 (defun fasl-dump-top-level-lambda-call (fun file)
   (declare (type clambda fun) (type fasl-file file))
   (let ((handle (gethash (leaf-info fun) (fasl-file-entry-table file))))
-    (assert handle)
+    (aver handle)
     (dump-push handle file)
     (dump-fop 'sb!impl::fop-funcall-for-effect file)
     (dump-byte 0 file))

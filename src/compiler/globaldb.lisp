@@ -637,7 +637,7 @@
 		    (setf (svref table probe) name)
 		    (setf (aref index probe) entries-idx)
 		    (return))
-		  (assert (not (equal entry name))))))
+		  (aver (not (equal entry name))))))
 
 	    (unless (zerop entries-idx)
 	      (setf (aref entries-info (1- entries-idx))

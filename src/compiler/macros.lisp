@@ -665,7 +665,7 @@
 			,(if restart-p
 			     `(cond
 			       ((eq (continuation-block ,cont-var) ,n-block)
-				(assert (continuation-next ,cont-var))
+				(aver (continuation-next ,cont-var))
 				(continuation-next ,cont-var))
 			       (t
 				(let ((start (block-start ,n-block)))

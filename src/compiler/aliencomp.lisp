@@ -667,10 +667,9 @@
 	       #!-x86 (temp-tn (make-representation-tn (tn-primitive-type tn)
 						       scn))
 	       (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
-	  (assert arg)
-	  (assert (= (length move-arg-vops) 1) ()
-		  "no unique move-arg-vop for moves in SC ~S"
-		  (sc-name sc))
+	  (aver arg)
+	  (unless (= (length move-arg-vops) 1)
+	    (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
 	  #!+x86 (emit-move-arg-template call
 					 block
 					 (first move-arg-vops)
@@ -688,7 +687,7 @@
 					   temp-tn
 					   nsp
 					   tn))))
-      (assert (null args))
+      (aver (null args))
       (unless (listp result-tns)
 	(setf result-tns (list result-tns)))
       (vop* call-out call block

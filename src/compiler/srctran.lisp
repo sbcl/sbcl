@@ -867,8 +867,8 @@
 	  ;; (float +0.0 +0.0) => (member 0.0)
 	  ;; (float -0.0 -0.0) => (member -0.0)
 	  ((and lo-float-zero-p hi-float-zero-p)
-	   ;; Shouldn't have exclusive bounds here.
-	   (assert (and (not (consp lo)) (not (consp hi))))
+	   ;; shouldn't have exclusive bounds here..
+	   (aver (and (not (consp lo)) (not (consp hi))))
 	   (if (= lo-float-zero-p hi-float-zero-p)
 	       ;; (float +0.0 +0.0) => (member 0.0)
 	       ;; (float -0.0 -0.0) => (member -0.0)
@@ -1000,7 +1000,7 @@
   (let* ((members (member-type-members arg))
 	 (member (first members))
 	 (member-type (type-of member)))
-    (assert (not (rest members)))
+    (aver (not (rest members)))
     (specifier-type `(,(if (subtypep member-type 'integer)
 			   'integer
 			   member-type)

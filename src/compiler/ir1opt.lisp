@@ -29,7 +29,7 @@
 ;;; constant node.
 (declaim (ftype (function (continuation) t) continuation-value))
 (defun continuation-value (cont)
-  (assert (constant-continuation-p cont))
+  (aver (constant-continuation-p cont))
   (constant-value (ref-leaf (continuation-use cont))))
 
 ;;;; interface for obtaining results of type inference
@@ -254,11 +254,11 @@
 	  (return)))
 
       (when (and (block-reoptimize block) (block-component block))
-	(assert (not (block-delete-p block)))
+	(aver (not (block-delete-p block)))
 	(ir1-optimize-block block))
 
       (when (and (block-flush-p block) (block-component block))
-	(assert (not (block-delete-p block)))
+	(aver (not (block-delete-p block)))
 	(flush-dead-code block)))))
 
   (values))
@@ -465,8 +465,8 @@
       (do-uses (use result)
 	(cond ((and (basic-combination-p use)
 		    (eq (basic-combination-kind use) :local))
-	       (assert (eq (lambda-tail-set (node-home-lambda use))
-			   (lambda-tail-set (combination-lambda use))))
+	       (aver (eq (lambda-tail-set (node-home-lambda use))
+			 (lambda-tail-set (combination-lambda use))))
 	       (when (combination-p use)
 		 (when (nth-value 1 (maybe-convert-tail-local-call use))
 		   (return-from find-result-type (values)))))
@@ -737,8 +737,8 @@
 	       (delete-continuation-use call)
 	       (cond
 		((block-last block)
-		 (assert (and (eq (block-last block) call)
-			      (eq (continuation-kind cont) :block-start))))
+		 (aver (and (eq (block-last block) call)
+			    (eq (continuation-kind cont) :block-start))))
 		(t
 		 (setf (block-last block) call)
 		 (link-blocks block (continuation-starts-block cont)))))
@@ -751,7 +751,7 @@
 	
 	(unlink-blocks block (first (block-succ block)))
 	(setf (component-reanalyze (block-component block)) t)
-	(assert (not (block-succ block)))
+	(aver (not (block-succ block)))
 	(link-blocks block tail)
 	(add-continuation-use call (make-continuation))
 	t))))
@@ -834,9 +834,9 @@
 (defun validate-call-type (call type ir1-p)
   (declare (type combination call) (type ctype type))
   (cond ((not (function-type-p type))
-	 (assert (multiple-value-bind (val win)
-		     (csubtypep type (specifier-type 'function))
-		   (or val (not win))))
+	 (aver (multiple-value-bind (val win)
+		   (csubtypep type (specifier-type 'function))
+		 (or val (not win))))
 	 (recognize-known-call call ir1-p))
 	((valid-function-use call type
 			     :argument-test #'always-subtypep
@@ -1139,8 +1139,8 @@
 			*empty-type*))
 	       (eq (lexenv-policy (node-lexenv dest))
 		   (lexenv-policy (node-lexenv (continuation-dest arg)))))
-      (assert (member (continuation-kind arg)
-		      '(:block-start :deleted-block-start :inside-block)))
+      (aver (member (continuation-kind arg)
+		    '(:block-start :deleted-block-start :inside-block)))
       (assert-continuation-type arg cont-atype)
       (setf (node-derived-type ref) *wild-type*)
       (change-ref-leaf ref (find-constant nil))
@@ -1154,7 +1154,7 @@
 ;;; flush the FUN continuation.
 (defun delete-let (fun)
   (declare (type clambda fun))
-  (assert (member (functional-kind fun) '(:let :mv-let)))
+  (aver (member (functional-kind fun) '(:let :mv-let)))
   (note-unreferenced-vars fun)
   (let ((call (let-combination fun)))
     (flush-dest (basic-combination-fun call))
@@ -1208,8 +1208,8 @@
 				  this-comp)
 			      t)
 			     (t
-			      (assert (eq (functional-kind (lambda-home fun))
-					  :top-level))
+			      (aver (eq (functional-kind (lambda-home fun))
+					:top-level))
 			      nil)))
 		   leaf var))
 		t)))))
@@ -1416,9 +1416,9 @@
 			      (declare (ignore ,ignore))
 			      (funcall ,(ref-leaf ref) ,@dums)))))
 		(change-ref-leaf ref fun)
-		(assert (eq (basic-combination-kind node) :full))
+		(aver (eq (basic-combination-kind node) :full))
 		(local-call-analyze *current-component*)
-		(assert (eq (basic-combination-kind node) :local)))))))))
+		(aver (eq (basic-combination-kind node) :local)))))))))
   (values))
 
 ;;; If we see:

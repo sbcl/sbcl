@@ -244,7 +244,7 @@
 ;;; we need them or not.
 (defun debug-source-for-info (info)
   (declare (type source-info info))
-  (assert (not (source-info-current-file info)))
+  (aver (not (source-info-current-file info)))
   (mapcar #'(lambda (x)
 	      (let ((res (make-debug-source
 			  :from :file
@@ -346,7 +346,7 @@
 	(vector-push-extend id buffer)))
     (if tn
 	(vector-push-extend (tn-sc-offset tn) buffer)
-	(assert minimal))
+	(aver minimal))
     (when save-tn
       (vector-push-extend (tn-sc-offset save-tn) buffer)))
   (values))
@@ -415,8 +415,8 @@
   (let ((res (gethash var var-locs)))
     (cond (res)
 	  (t
-	   (assert (or (null (leaf-refs var))
-		       (not (tn-offset (leaf-info var)))))
+	   (aver (or (null (leaf-refs var))
+		     (not (tn-offset (leaf-info var)))))
 	   'deleted))))
 
 ;;;; arguments/returns
@@ -567,7 +567,7 @@
 		 minimal-debug-function-name-symbol)
 		(t
 		 minimal-debug-function-name-packaged))))
-    (assert (or (atom name) setf-p))
+    (aver (or (atom name) setf-p))
     (let ((options 0))
       (setf (ldb minimal-debug-function-name-style-byte options) name-rep)
       (setf (ldb minimal-debug-function-kind-byte options)

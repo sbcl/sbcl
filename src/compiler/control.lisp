@@ -73,7 +73,7 @@
 			 (> (block-number pred) current-num))
 		(setq current pred   current-num (block-number pred))
 		(return)))))
-	(assert (not (block-flag current)))
+	(aver (not (block-flag current)))
 	current))
      (t
       block))))
@@ -100,7 +100,7 @@
   (unless (block-flag block)
     (let ((block (find-rotated-loop-head block)))
       (setf (block-flag block) t)
-      (assert (and (block-component block) (not (block-delete-p block))))
+      (aver (and (block-component block) (not (block-delete-p block))))
       (add-to-emit-order (or (block-info block)
 			     (setf (block-info block)
 				   (funcall block-info-constructor block)))

@@ -78,7 +78,7 @@
 ;;; Set the function that is called when FIN is called.
 (defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value))
-  (assert (funcallable-instance-p fin))
+  (aver (funcallable-instance-p fin))
   (setf (sb-kernel:funcallable-instance-function fin) new-value))
 
 ;;; This "works" on non-PCL FINs, which allows us to weaken

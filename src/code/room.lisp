@@ -198,7 +198,7 @@
 			    (* (+ (%instance-length obj) 1) word-bytes))))
 		(declare (fixnum size))
 		(funcall fun obj header-type size)
-		(assert (zerop (logand size lowtag-mask)))
+		(aver (zerop (logand size lowtag-mask)))
 		#+nil
 		(when (> size 200000) (break "implausible size, prev ~S" prev))
 		#+nil
@@ -209,7 +209,7 @@
 			   (logior (sap-int current) other-pointer-type)))
 		     (size (ecase (room-info-kind info)
 			     (:fixed
-			      (assert (or (eql (room-info-length info)
+			      (aver (or (eql (room-info-length info)
 					       (1+ (get-header-data obj)))
 					  (floatp obj)))
 			      (round-to-dualword
@@ -227,7 +227,7 @@
 				     word-bytes)))))))
 		(declare (fixnum size))
 		(funcall fun obj header-type size)
-		(assert (zerop (logand size lowtag-mask)))
+		(aver (zerop (logand size lowtag-mask)))
 		#+nil
 		(when (> size 200000)
 		  (break "Implausible size, prev ~S" prev))
@@ -235,7 +235,7 @@
 		(setq prev current)
 		(setq current (sap+ current size))))))
 	  (unless (sap< current end)
-	    (assert (sap= current end))
+	    (aver (sap= current end))
 	    (return)))
 
 	#+nil

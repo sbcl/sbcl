@@ -280,7 +280,7 @@
   (:note "signed word to integer coercion")
   (:node-var node)
   (:generator 20
-     (assert (not (location= x y)))
+     (aver (not (location= x y)))
      (let ((bignum (gen-label))
 	   (done (gen-label)))
        (inst mov y x)
@@ -341,9 +341,9 @@
   (:node-var node)
   (:note "unsigned word to integer coercion")
   (:generator 20
-    (assert (not (location= x y)))
-    (assert (not (location= x alloc)))
-    (assert (not (location= y alloc)))
+    (aver (not (location= x y)))
+    (aver (not (location= x alloc)))
+    (aver (not (location= y alloc)))
     (let ((bignum (gen-label))
 	  (done (gen-label))
 	  (one-word-bignum (gen-label))

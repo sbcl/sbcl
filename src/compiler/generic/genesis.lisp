@@ -375,8 +375,8 @@
 
 (defun maybe-byte-swap (word)
   (declare (type (unsigned-byte 32) word))
-  (assert (= sb!vm:word-bits 32))
-  (assert (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:byte-bits 8))
   (if (not *genesis-byte-order-swap-p*)
       word
       (logior (ash (ldb (byte 8 0) word) 24)
@@ -386,8 +386,8 @@
 
 (defun maybe-byte-swap-short (short)
   (declare (type (unsigned-byte 16) short))
-  (assert (= sb!vm:word-bits 32))
-  (assert (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:byte-bits 8))
   (if (not *genesis-byte-order-swap-p*)
       short
       (logior (ash (ldb (byte 8 0) short) 8)
@@ -395,8 +395,8 @@
 
 ;;; like SAP-REF-32, except that instead of a SAP we use a byte vector
 (defun byte-vector-ref-32 (byte-vector byte-index)
-  (assert (= sb!vm:word-bits 32))
-  (assert (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
      (logior (ash (aref byte-vector (+ byte-index 0)) 0)
@@ -406,8 +406,8 @@
     (:big-endian
      (error "stub: no big-endian ports of SBCL (yet?)"))))
 (defun (setf byte-vector-ref-32) (new-value byte-vector byte-index)
-  (assert (= sb!vm:word-bits 32))
-  (assert (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:word-bits 32))
+  (aver (= sb!vm:byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
      (setf (aref byte-vector (+ byte-index 0)) (ldb (byte 8 0) new-value)
@@ -1557,7 +1557,7 @@
       (#.sb!c:pmax-fasl-file-implementation
        (ecase kind
 	 (:jump
-	  (assert (zerop (ash value -28)))
+	  (aver (zerop (ash value -28)))
 	  (setf (ldb (byte 26 0) (sap-ref-32 sap 0))
 		(ash value -2)))
 	 (:lui
@@ -1613,9 +1613,9 @@
 					       gspace-byte-offset))
 	      (code-object-start-addr (logandc2 (descriptor-bits code-object)
 						sb!vm:lowtag-mask)))
-	 (assert (= code-object-start-addr
-		    (+ gspace-byte-address
-		       (descriptor-byte-offset code-object))))
+	 (aver (= code-object-start-addr
+		  (+ gspace-byte-address
+		     (descriptor-byte-offset code-object))))
 	 (ecase kind
 	   (:absolute
 	    (let ((fixed-up (+ value un-fixed-up)))
@@ -1663,7 +1663,7 @@
 			   (logand inst #xffffc000)))
 		  (:load-short
 		   (let ((low-bits (ldb (byte 11 0) value)))
-		     (assert (<= 0 low-bits (1- (ash 1 4))))
+		     (aver (<= 0 low-bits (1- (ash 1 4))))
 		     (logior (ash low-bits 17)
 			     (logand inst #xffe0ffff))))
 		  (:hi
@@ -1675,13 +1675,13 @@
 			   (logand inst #xffe00000)))
 		  (:branch
 		   (let ((bits (ldb (byte 9 2) value)))
-		     (assert (zerop (ldb (byte 2 0) value)))
+		     (aver (zerop (ldb (byte 2 0) value)))
 		     (logior (ash bits 3)
 			     (logand inst #xffe0e002)))))))))
       (#.sb!c:alpha-fasl-file-implementation
        (ecase kind
 	 (:jmp-hint
-	  (assert (zerop (ldb (byte 2 0) value)))
+	  (aver (zerop (ldb (byte 2 0) value)))
 	  #+nil
 	  (setf (sap-ref-16 sap 0)
 		(logior (sap-ref-16 sap 0) (ldb (byte 14 0) (ash value -2)))))
@@ -1706,7 +1706,7 @@
       (#.sb!c:sgi-fasl-file-implementation
        (ecase kind
 	 (:jump
-	  (assert (zerop (ash value -28)))
+	  (aver (zerop (ash value -28)))
 	  (setf (ldb (byte 26 0) (sap-ref-32 sap 0))
 		(ash value -2)))
 	 (:lui
@@ -1860,7 +1860,7 @@
 	(declare (type index old-length))
 	(declare (type fixnum old-depthoid))
 	(declare (type list old-inherits-list))
-	(assert (eq name old-name))
+	(aver (eq name old-name))
 	(let ((length (descriptor-fixnum length-des))
 	      (inherits-list (listify-cold-inherits cold-inherits))
 	      (depthoid (descriptor-fixnum depthoid-des)))
@@ -2849,7 +2849,7 @@ initially undefined function references:~2%")
       ;; less expensively (ERROR, not CERROR), and which reports
       ;; "internal error" on failure. Use it here and elsewhere in the
       ;; system.
-      (assert (zerop rem))
+      (aver (zerop rem))
       (write-long floor))
     (write-long pages)
 

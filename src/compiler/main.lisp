@@ -592,8 +592,8 @@
     (clrhash *id-labels*)
     (setq *label-id* 0)
 
-    ;; Clear some Pack data structures (for GC purposes only).
-    (assert (not *in-pack*))
+    ;; Clear some PACK data structures (for GC purposes only).
+    (aver (not *in-pack*))
     (dolist (sb *backend-sb-list*)
       (when (finite-sb-p sb)
 	(fill (finite-sb-live-tns sb) nil))))
@@ -1056,7 +1056,7 @@
 ;;; the name. If not in a :TOP-LEVEL component, then don't bother
 ;;; compiling, because it was merged with a run-time component.
 (defun compile-load-time-value-lambda (lambdas)
-  (assert (null (cdr lambdas)))
+  (aver (null (cdr lambdas)))
   (let* ((lambda (car lambdas))
 	 (component (block-component (node-block (lambda-bind lambda)))))
     (when (eq (component-kind component) :top-level)
@@ -1114,7 +1114,7 @@
 (defvar *constants-created-since-last-init* nil)
 ;;; FIXME: Shouldn't these^ variables be bound in LET forms?
 (defun emit-make-load-form (constant)
-  (assert (fasl-file-p *compile-object*))
+  (aver (fasl-file-p *compile-object*))
   (unless (or (fasl-constant-already-dumped constant *compile-object*)
 	      ;; KLUDGE: This special hack is because I was too lazy
 	      ;; to rework DEF!STRUCT so that the MAKE-LOAD-FORM

@@ -83,7 +83,7 @@
   ;; workaround for broken READ-SEQUENCE
   #+no-ansi-read-sequence
   (progn
-    (assert (<= start end))
+    (aver (<= start end))
     (let ((etype (stream-element-type stream)))
     (cond ((equal etype '(unsigned-byte 8))
 	   (do ((i start (1+ i)))

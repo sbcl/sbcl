@@ -40,7 +40,7 @@
 			 `(value-cell-ref ',(make-value-cell value)))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)
-  (assert (constant-continuation-p handle))
+  (aver (constant-continuation-p handle))
   (let ((cont (node-cont node))
 	(tn (make-load-time-value-tn (continuation-value handle)
 				     *universal-type*)))

@@ -661,7 +661,7 @@
 				  (declare (fixnum esc))
 				  (cond ((< esc i) t)
 					(t
-					 (assert (= esc i))
+					 (aver (= esc i))
 					 (pop escapes)
 					 nil))))
 			(let ((ch (schar *read-buffer* i)))

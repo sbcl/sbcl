@@ -157,7 +157,7 @@
 (defun sb!c::%define-compiler-macro (name definition lambda-list doc)
   ;; FIXME: Why does this have to be an interpreted function? Shouldn't
   ;; it get compiled?
-  (assert (sb!eval:interpreted-function-p definition))
+  (aver (sb!eval:interpreted-function-p definition))
   (setf (sb!eval:interpreted-function-name definition)
 	(format nil "DEFINE-COMPILER-MACRO ~S" name))
   (setf (sb!eval:interpreted-function-arglist definition) lambda-list)

@@ -93,7 +93,8 @@
 	 (slot (find accessor (dd-slots info) :key #'sb!kernel:dsd-accessor))
 	 (type (dd-name info))
 	 (slot-type (dsd-type slot)))
-    (assert slot () "Can't find slot ~S." type)
+    (unless slot
+      (error "can't find slot ~S" type))
     (make-slot-accessor
      :name name
      :type (specifier-type
@@ -155,7 +156,7 @@
   (let ((var (lexenv-find name functions :test #'equal)))
     (cond (var
 	   (unless (leaf-p var)
-	     (assert (and (consp var) (eq (car var) 'macro)))
+	     (aver (and (consp var) (eq (car var) 'macro)))
 	     (compiler-error "found macro name ~S ~A" name context))
 	   var)
 	  (t
@@ -276,7 +277,7 @@
 #!-sb-fluid (declaim (inline prev-link))
 (defun prev-link (node cont)
   (declare (type node node) (type continuation cont))
-  (assert (not (continuation-next cont)))
+  (aver (not (continuation-next cont)))
   (setf (continuation-next cont) node)
   (setf (node-prev node) cont))
 
@@ -307,15 +308,15 @@
   (declare (type node node) (type continuation cont) (inline member))
   (let ((block (continuation-block cont))
 	(node-block (continuation-block (node-prev node))))
-    (assert (eq (continuation-kind cont) :block-start))
-    (assert (not (block-last node-block)) () "~S has already ended."
-	    node-block)
+    (aver (eq (continuation-kind cont) :block-start))
+    (when (block-last node-block)
+      (error "~S has already ended." node-block))
     (setf (block-last node-block) node)
-    (assert (null (block-succ node-block)) () "~S already has successors."
-	    node-block)
+    (when (block-succ node-block)
+      (error "~S already has successors." node-block))
     (setf (block-succ node-block) (list block))
-    (assert (not (member node-block (block-pred block) :test #'eq)) ()
-	    "~S is already a predecessor of ~S." node-block block)
+    (when (memq node-block (block-pred block))
+      (error "~S is already a predecessor of ~S." node-block block))
     (push node-block (block-pred block))
     (add-continuation-use node cont)
     (unless (eq (continuation-asserted-type cont) *wild-type*)
@@ -465,8 +466,8 @@
 		    (global-var
 		     (ir1-convert-srctran start cont lexical-def form))
 		    (t
-		     (assert (and (consp lexical-def)
-				  (eq (car lexical-def) 'macro)))
+		     (aver (and (consp lexical-def)
+				(eq (car lexical-def) 'macro)))
 		     (ir1-convert start cont
 				  (careful-expand-macro (cdr lexical-def)
 							form))))))
@@ -541,7 +542,7 @@
 	 (compiler-style-warning "reading an ignored variable: ~S" name))
        (reference-leaf start cont var))
       (cons
-       (assert (eq (car var) 'MACRO))
+       (aver (eq (car var) 'MACRO))
        (ir1-convert start cont (cdr var)))
       (heap-alien-info
        (ir1-convert start cont `(%heap-alien ',var)))))
@@ -832,7 +833,7 @@
 		      (restr (cons var int))))))
 	    (cons
 	     ;; FIXME: non-ANSI weirdness
-	     (assert (eq (car var) 'MACRO))
+	     (aver (eq (car var) 'MACRO))
 	     (new-vars `(,var-name . (MACRO . (the ,(first decl)
 						   ,(cdr var))))))
 	    (heap-alien-info
@@ -881,7 +882,7 @@
       (let ((var (find-in-bindings vars name)))
 	(etypecase var
 	  (cons
-	   (assert (eq (car var) 'MACRO))
+	   (aver (eq (car var) 'MACRO))
 	   (compiler-error
 	    "~S is a symbol-macro and thus can't be declared special."
 	    name))
@@ -2650,7 +2651,7 @@
 		name))
 	     (set-variable start cont leaf (second things)))
 	    (cons
-	     (assert (eq (car leaf) 'MACRO))
+	     (aver (eq (car leaf) 'MACRO))
 	     (ir1-convert start cont `(setf ,(cdr leaf) ,(second things))))
 	    (heap-alien-info
 	     (ir1-convert start cont
@@ -2729,7 +2730,7 @@
 ;;; referencing it.
 (def-ir1-translator %cleanup-function ((name) start cont)
   (let ((fun (lexenv-find name functions)))
-    (assert (lambda-p fun))
+    (aver (lambda-p fun))
     (setf (functional-kind fun) :cleanup)
     (reference-leaf start cont fun)))
 
@@ -2869,7 +2870,7 @@
       (dolist (pred (block-pred end-block))
 	(unlink-blocks pred end-block)
 	(link-blocks pred cont-block))
-      (assert (not (continuation-dest dummy-result)))
+      (aver (not (continuation-dest dummy-result)))
       (delete-continuation dummy-result)
       (remove-from-dfo end-block))))
 
@@ -2912,8 +2913,8 @@
 	;; QDEF should be a sharp-quoted definition. We don't want to make a
 	;; function of it just yet, so we just drop the sharp-quote.
 	(def (progn
-	       (assert (eq 'function (first qdef)))
-	       (assert (proper-list-of-length-p qdef 2))
+	       (aver (eq 'function (first qdef)))
+	       (aver (proper-list-of-length-p qdef 2))
 	       (second qdef))))
 
     (unless (symbolp name)
@@ -3034,10 +3035,10 @@
 	       (when (eq x (assoc name variables :test #'eq))
 		 (typecase what
 		   (cons
-		    (assert (eq (car what) 'macro))
+		    (aver (eq (car what) 'macro))
 		    (push x symmacs))
 		   (global-var
-		    (assert (eq (global-var-kind what) :special))
+		    (aver (eq (global-var-kind what) :special))
 		    (push `(special ,name) decls))
 		   (t (return t))))))
 	   nil)
@@ -3072,7 +3073,7 @@
 	 (found (find-free-function name "Eh?")))
     (note-name-defined name :function)
     (cond ((not (defined-function-p found))
-	   (assert (not (info :function :inlinep name)))
+	   (aver (not (info :function :inlinep name)))
 	   (let* ((where-from (leaf-where-from found))
 		  (res (make-defined-function
 			:name name

@@ -59,7 +59,7 @@
 		 (let* ((posn (label-position (car entry)))
 			(state (cdr entry)))
 		   (declare (type index posn) (type tt-state state))
-		   (assert (<= last-posn posn))
+		   (aver (<= last-posn posn))
 		   (do ((offset (- posn last-posn) (- offset tt-max-offset)))
 		   ((< offset tt-max-offset)
 		    (push-entry offset state))

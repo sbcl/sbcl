@@ -959,7 +959,7 @@
   ;; nicknames that we don't want in our target SBCL. For that reason,
   ;; we handle it specially, not dumping the host Lisp version at
   ;; genesis time..
-  (assert (not (find-package "COMMON-LISP-USER")))
+  (aver (not (find-package "COMMON-LISP-USER")))
   ;; ..but instead making our own from scratch here.
   (/show0 "about to MAKE-PACKAGE COMMON-LISP-USER")
   (make-package "COMMON-LISP-USER"

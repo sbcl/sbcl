@@ -78,7 +78,7 @@
        (declare (type sb!assem:segment segment)
 		(ignore posn))
        (let ((target (sb!assem:label-position label)))
-	 (assert (<= 0 target (1- (ash 1 24))))
+	 (aver (<= 0 target (1- (ash 1 24))))
 	 (output-byte segment (ldb (byte 8 16) target))
 	 (output-byte segment (ldb (byte 8 8) target))
 	 (output-byte segment (ldb (byte 8 0) target))))))
@@ -116,7 +116,7 @@
        (declare (type sb!assem:segment segment)
 		(ignore posn))
        (let ((target (sb!assem:label-position label)))
-	 (assert (<= 0 target (1- (ash 1 24))))
+	 (aver (<= 0 target (1- (ash 1 24))))
 	 (output-byte segment kind)
 	 (output-byte segment (ldb (byte 8 16) target))
 	 (output-byte segment (ldb (byte 8 8) target))
@@ -362,7 +362,7 @@
   ;; times on the same continuation. So we can't assert that we
   ;; haven't done it.
   #+nil
-  (assert (null (continuation-info cont)))
+  (aver (null (continuation-info cont)))
   (setf (continuation-info cont)
 	(make-byte-continuation-info cont results placeholders))
   (values))
@@ -467,7 +467,7 @@
 	      (if (continuation-function-name fun) :fdefinition 1))))
       (cond ((mv-combination-p call)
 	     (cond ((eq name '%throw)
-		    (assert (= (length args) 2))
+		    (aver (= (length args) 2))
 		    (annotate-continuation (first args) 1)
 		    (annotate-continuation (second args) :unknown)
 		    (setf (node-tail-p call) nil)
@@ -610,7 +610,7 @@
 	     (consume (cont)
 	       (cond ((not (or (eq cont :nlx-entry) (interesting cont))))
 		     (stack
-		      (assert (eq (car stack) cont))
+		      (aver (eq (car stack) cont))
 		      (pop stack))
 		     (t
 		      (adjoin-cont cont total-consumes)
@@ -705,10 +705,10 @@
   (let ((new-stack stack))
     (dolist (cont stuff)
       (cond ((eq cont :nlx-entry)
-	     (assert (find :nlx-entry new-stack))
+	     (aver (find :nlx-entry new-stack))
 	     (setq new-stack (remove :nlx-entry new-stack :count 1)))
 	    (t
-	     (assert (eq (car new-stack) cont))
+	     (aver (eq (car new-stack) cont))
 	     (pop new-stack))))
     new-stack))
 
@@ -756,7 +756,7 @@
 		   (incf fixed results))))))
 	  (flush-fixed)))
       (when (pops)
-	(assert pred)
+	(aver pred)
 	(let ((cleanup-block
 	       (insert-cleanup-code pred block
 				    (continuation-next (block-start block))
@@ -779,7 +779,7 @@
 	  (t
 	   ;; We have already processed the successors of this block. Just
 	   ;; make sure we thing the stack is the same now as before.
-	   (assert (equal (byte-block-info-start-stack info) stack)))))
+	   (aver (equal (byte-block-info-start-stack info) stack)))))
   (values))
 
 ;;; Do lifetime flow analysis on values pushed on the stack, then call
@@ -1003,8 +1003,8 @@
     (cond ((not (eq (lambda-environment (lambda-var-home var)) env))
 	   ;; This is not this guy's home environment. So we need to
 	   ;; get it the value cell out of the closure, and fill it in.
-	   (assert indirect)
-	   (assert (not make-value-cells))
+	   (aver indirect)
+	   (aver (not make-value-cells))
 	   (output-byte-with-operand segment byte-push-arg
 				     (closure-position var env))
 	   (output-do-inline-function segment 'value-cell-setf))
@@ -1012,7 +1012,7 @@
 	   (let* ((pushp (and indirect (not make-value-cells)))
 		  (byte-code (if pushp byte-push-local byte-pop-local))
 		  (info (leaf-info var)))
-	     (assert (not (byte-lambda-var-info-argp info)))
+	     (aver (not (byte-lambda-var-info-argp info)))
 	     (when (and indirect make-value-cells)
 	       ;; Replace the stack top with a value cell holding the
 	       ;; stack top.
@@ -1083,7 +1083,7 @@
 	(let ((desired (byte-continuation-info-results info))
 	      (placeholders (byte-continuation-info-placeholders info)))
 	  (unless (zerop placeholders)
-	    (assert (eql desired (1+ placeholders)))
+	    (aver (eql desired (1+ placeholders)))
 	    (setq desired 1))
 
 	  (flet ((do-check ()
@@ -1207,9 +1207,9 @@
 	    (leaf (ref-leaf ref)))
 	(cond
 	 ((eq values :fdefinition)
-	  (assert (and (global-var-p leaf)
-		       (eq (global-var-kind leaf)
-			   :global-function)))
+	  (aver (and (global-var-p leaf)
+		     (eq (global-var-kind leaf)
+			 :global-function)))
 	  (let* ((name (global-var-name leaf))
 		 (found (gethash name *two-arg-functions*)))
 	    (output-push-fdefinition
@@ -1311,7 +1311,7 @@
 	   (output-set-lambda-var segment var env t))))
       ((nil :optional :cleanup)
        ;; We got us a local call.
-       (assert (not (eq num-args :unknown)))
+       (aver (not (eq num-args :unknown)))
        ;; Push any trailing placeholder args...
        (dolist (x (reverse (basic-combination-args call)))
 	 (when x (return))
@@ -1367,7 +1367,7 @@
     (cond
      (info
       ;; It's an inline function.
-      (assert (not (node-tail-p call)))
+      (aver (not (node-tail-p call)))
       (let* ((type (inline-function-info-type info))
 	     (desired-args (function-type-nargs type))
 	     (supplied-results
@@ -1375,7 +1375,7 @@
 			 (values-types (function-type-returns type))))
 	     (leaf (ref-leaf (continuation-use (basic-combination-fun call)))))
 	(cond ((slot-accessor-p leaf)
-	       (assert (= num-args (1- desired-args)))
+	       (aver (= num-args (1- desired-args)))
 	       (output-push-int segment (dsd-index (slot-accessor-slot leaf))))
 	      (t
 	       (canonicalize-values segment desired-args num-args)))
@@ -1422,10 +1422,10 @@
 		     0))
 	       num-args segment)
       (return))
-    (assert (member (byte-continuation-info-results
-		     (continuation-info
-		      (basic-combination-fun call)))
-		    '(1 :fdefinition)))
+    (aver (member (byte-continuation-info-results
+		   (continuation-info
+		    (basic-combination-fun call)))
+		  '(1 :fdefinition)))
     (generate-byte-code-for-full-call segment call cont num-args))
   (values))
 
@@ -1631,8 +1631,8 @@
   (progn segment) ; ignorable.
   ;; We don't have to do anything, because everything is handled by
   ;; the IF byte-generator.
-  (assert (eq results :eq-test))
-  (assert (eql num-args 2))
+  (aver (eq results :eq-test))
+  (aver (eql num-args 2))
   (values))
 
 (defoptimizer (values byte-compile)
@@ -1642,7 +1642,7 @@
 (defknown %byte-pop-stack (index) (values))
 
 (defoptimizer (%byte-pop-stack byte-annotate) ((count) node)
-  (assert (constant-continuation-p count))
+  (aver (constant-continuation-p count))
   (annotate-continuation count 0)
   (annotate-continuation (basic-combination-fun node) 0)
   (setf (node-tail-p node) nil)
@@ -1650,7 +1650,7 @@
 
 (defoptimizer (%byte-pop-stack byte-compile)
 	      ((count) node results num-args segment)
-  (assert (and (zerop num-args) (zerop results)))
+  (aver (and (zerop num-args) (zerop results)))
   (output-byte-with-operand segment byte-pop-n (continuation-value count)))
 
 (defoptimizer (%special-bind byte-annotate) ((var value) node)
@@ -1662,7 +1662,7 @@
 
 (defoptimizer (%special-bind byte-compile)
 	      ((var value) node results num-args segment)
-  (assert (and (eql num-args 1) (zerop results)))
+  (aver (and (eql num-args 1) (zerop results)))
   (output-push-constant segment (leaf-name (continuation-value var)))
   (output-do-inline-function segment '%byte-special-bind))
 
@@ -1674,7 +1674,7 @@
 
 (defoptimizer (%special-unbind byte-compile)
 	      ((var) node results num-args segment)
-  (assert (and (zerop num-args) (zerop results)))
+  (aver (and (zerop num-args) (zerop results)))
   (output-do-inline-function segment '%byte-special-unbind))
 
 (defoptimizer (%catch byte-annotate) ((nlx-info tag) node)
@@ -1687,18 +1687,18 @@
 (defoptimizer (%catch byte-compile)
 	      ((nlx-info tag) node results num-args segment)
   (progn node) ; ignore
-  (assert (and (= num-args 1) (zerop results)))
+  (aver (and (= num-args 1) (zerop results)))
   (output-do-xop segment 'catch)
   (let ((info (nlx-info-info (continuation-value nlx-info))))
     (output-reference segment (byte-nlx-info-label info))))
 
 (defoptimizer (%cleanup-point byte-compile) (() node results num-args segment)
   (progn node segment) ; ignore
-  (assert (and (zerop num-args) (zerop results))))
+  (aver (and (zerop num-args) (zerop results))))
 
 (defoptimizer (%catch-breakup byte-compile) (() node results num-args segment)
   (progn node) ; ignore
-  (assert (and (zerop num-args) (zerop results)))
+  (aver (and (zerop num-args) (zerop results)))
   (output-do-xop segment 'breakup))
 
 (defoptimizer (%lexical-exit-breakup byte-annotate) ((nlx-info) node)
@@ -1709,7 +1709,7 @@
 
 (defoptimizer (%lexical-exit-breakup byte-compile)
 	      ((nlx-info) node results num-args segment)
-  (assert (and (zerop num-args) (zerop results)))
+  (aver (and (zerop num-args) (zerop results)))
   (let ((nlx-info (continuation-value nlx-info)))
     (when (ecase (cleanup-kind (nlx-info-cleanup nlx-info))
 	    (:block
@@ -1730,7 +1730,7 @@
 (defoptimizer (%nlx-entry byte-compile)
 	      ((nlx-info) node results num-args segment)
   (progn node results) ; ignore
-  (assert (eql num-args 0))
+  (aver (eql num-args 0))
   (let* ((info (continuation-value nlx-info))
 	 (byte-info (nlx-info-info info)))
     (output-label segment (byte-nlx-info-label byte-info))
@@ -1752,7 +1752,7 @@
 
 (defoptimizer (%unwind-protect byte-compile)
 	      ((nlx-info cleanup-fun) node results num-args segment)
-  (assert (and (zerop num-args) (zerop results)))
+  (aver (and (zerop num-args) (zerop results)))
   (output-do-xop segment 'unwind-protect)
   (output-reference segment
 		    (byte-nlx-info-label
@@ -1762,7 +1762,7 @@
 (defoptimizer (%unwind-protect-breakup byte-compile)
 	      (() node results num-args segment)
   (progn node) ; ignore
-  (assert (and (zerop num-args) (zerop results)))
+  (aver (and (zerop num-args) (zerop results)))
   (output-do-xop segment 'breakup))
 
 (defoptimizer (%continue-unwind byte-annotate) ((a b c) node)
@@ -1776,8 +1776,8 @@
 (defoptimizer (%continue-unwind byte-compile)
 	      ((a b c) node results num-args segment)
   (progn node) ; ignore
-  (assert (member results '(0 nil)))
-  (assert (eql num-args 0))
+  (aver (member results '(0 nil)))
+  (aver (eql num-args 0))
   (output-do-xop segment 'breakup))
 
 (defoptimizer (%load-time-value byte-annotate) ((handle) node)
@@ -1789,7 +1789,7 @@
 (defoptimizer (%load-time-value byte-compile)
 	      ((handle) node results num-args segment)
   (progn node) ; ignore
-  (assert (zerop num-args))
+  (aver (zerop num-args))
   (output-push-load-time-constant segment :load-time-value
 				  (continuation-value handle))
   (canonicalize-values segment results 1))
@@ -1798,7 +1798,7 @@
 (defun make-xep-for (lambda)
   (flet ((entry-point-for (entry)
 	   (let ((info (lambda-info entry)))
-	     (assert (byte-lambda-info-interesting info))
+	     (aver (byte-lambda-info-interesting info))
 	     (sb!assem:label-position (byte-lambda-info-label info)))))
     (let ((entry (lambda-entry-function lambda)))
       (etypecase entry
@@ -1810,10 +1810,10 @@
 	     (dolist (var (nthcdr (optional-dispatch-max-args entry)
 				  (optional-dispatch-arglist entry)))
 	       (let ((arg-info (lambda-var-arg-info var)))
-		 (assert arg-info)
+		 (aver arg-info)
 		 (ecase (arg-info-kind arg-info)
 		   (:rest
-		    (assert (not rest-arg-p))
+		    (aver (not rest-arg-p))
 		    (incf num-more)
 		    (setf rest-arg-p t))
 		   (:keyword

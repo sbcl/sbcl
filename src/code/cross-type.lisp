@@ -234,7 +234,7 @@
 	      ;; that we don't continue doing it after we someday patch SBCL's
 	      ;; type system so that * is no longer a type, we make this
 	      ;; assertion:
-	      (assert (typep (specifier-type '*) 'named-type))
+	      (aver (typep (specifier-type '*) 'named-type))
 	      (values t t))
 	     ;; Many simple types are guaranteed to correspond exactly
 	     ;; between any host ANSI Common Lisp and the target
@@ -295,7 +295,7 @@
 ;;; testing that range limits FOO and BAR in (INTEGER FOO BAR) are INTEGERs.
 (defun sb!xc:typep (host-object target-type-spec &optional (env nil env-p))
   (declare (ignore env))
-  (assert (null env-p)) ; 'cause we're too lazy to think about it
+  (aver (null env-p)) ; 'cause we're too lazy to think about it
   (multiple-value-bind (opinion certain-p)
       (cross-typep host-object target-type-spec)
     ;; A program that calls TYPEP doesn't want uncertainty and probably

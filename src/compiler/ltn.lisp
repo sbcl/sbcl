@@ -105,7 +105,7 @@
 (defun annotate-1-value-continuation (cont)
   (declare (type continuation cont))
   (let ((info (continuation-info cont)))
-    (assert (eq (ir2-continuation-kind info) :fixed))
+    (aver (eq (ir2-continuation-kind info) :fixed))
     (cond
      ((continuation-delayed-leaf cont)
       (setf (ir2-continuation-kind info) :delayed))
@@ -419,8 +419,8 @@
 (defun set-tail-local-call-successor (call)
   (let ((caller (node-home-lambda call))
 	(callee (combination-lambda call)))
-    (assert (eq (lambda-tail-set caller)
-		(lambda-tail-set (lambda-home callee))))
+    (aver (eq (lambda-tail-set caller)
+	      (lambda-tail-set (lambda-home callee))))
     (node-ends-block call)
     (let ((block (node-block call)))
       (unlink-blocks block (first (block-succ block)))
@@ -721,7 +721,7 @@
   (funcall frob "This shouldn't happen!  Bug?")
   (multiple-value-bind (win why)
       (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
-    (assert (not win))
+    (aver (not win))
     (ecase why
       (:guard
        (funcall frob "template guard failed"))
@@ -819,11 +819,11 @@
 	       ((and valid strict-valid)
 		(strange-template-failure loser call ltn-policy #'frob))
 	       ((not valid)
-		(assert (not (valid-function-use call type
-						 :error-function #'frob
-						 :warning-function #'frob))))
+		(aver (not (valid-function-use call type
+					       :error-function #'frob
+					       :warning-function #'frob))))
 	       (t
-		(assert (ltn-policy-safe-p ltn-policy))
+		(aver (ltn-policy-safe-p ltn-policy))
 		(frob "can't trust output type assertion under safe policy")))
 	      (count 1))))
 
@@ -976,7 +976,7 @@
   (declare (type component component))
   (let ((2comp (component-info component)))
     (do-blocks (block component)
-      (assert (not (block-info block)))
+      (aver (not (block-info block)))
       (let ((2block (make-ir2-block block)))
 	(setf (block-info block) 2block)
 	(ltn-analyze-block block)
@@ -992,6 +992,6 @@
 (defun ltn-analyze-belated-block (block)
   (declare (type cblock block))
   (ltn-analyze-block block)
-  (assert (not (ir2-block-popped (block-info block))))
+  (aver (not (ir2-block-popped (block-info block))))
   (values))
 

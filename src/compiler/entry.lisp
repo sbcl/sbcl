@@ -40,7 +40,7 @@
 (defun make-arg-names (x)
   (declare (type functional x))
   (let ((args (functional-arg-documentation x)))
-    (assert (not (eq args :unspecified)))
+    (aver (not (eq args :unspecified)))
     (if (null args)
 	"()"
 	(let ((*print-pretty* t)

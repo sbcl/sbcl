@@ -910,7 +910,7 @@
     (optional-dispatch
      (format stream "optional-dispatch ~S" (leaf-name leaf)))
     (functional
-     (assert (eq (functional-kind leaf) :top-level-xep))
+     (aver (eq (functional-kind leaf) :top-level-xep))
      (format stream "TL-XEP ~S"
 	     (let ((info (leaf-info leaf)))
 	       (etypecase info
@@ -1141,11 +1141,10 @@
     (clrhash *list-conflicts-table*)
     (res)))
 
+;;; Return a list of a the TNs that conflict with TN. Sort of, kind
+;;; of. For debugging use only. Probably doesn't work on :COMPONENT TNs.
 (defun list-conflicts (tn)
-  #!+sb-doc
-  "Return a list of a the TNs that conflict with TN. Sort of, kind of. For
-  debugging use only. Probably doesn't work on :COMPONENT TNs."
-  (assert (member (tn-kind tn) '(:normal :environment :debug-environment)))
+  (aver (member (tn-kind tn) '(:normal :environment :debug-environment)))
   (let ((confs (tn-global-conflicts tn)))
     (cond (confs
 	   (clrhash *list-conflicts-table*)

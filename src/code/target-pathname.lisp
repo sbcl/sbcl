@@ -1000,14 +1000,14 @@ a host-structure or string."
 	  (dolist (to-part (rest to))
 	    (typecase to-part
 	      ((member :wild)
-	       (assert subs-left)
+	       (aver subs-left)
 	       (let ((match (pop subs-left)))
 		 (when (listp match)
 		   (error ":WILD-INFERIORS is not paired in from and to ~
 			   patterns:~%  ~S ~S" from to))
 		 (res (maybe-diddle-case match diddle-case))))
 	      ((member :wild-inferiors)
-	       (assert subs-left)
+	       (aver subs-left)
 	       (let ((match (pop subs-left)))
 		 (unless (listp match)
 		   (error ":WILD-INFERIORS not paired in from and to ~
@@ -1304,7 +1304,7 @@ a host-structure or string."
 		(return)
 		(pattern :multi-char-wild))
 	    (setq last-pos (1+ pos)))))
-	(assert (pattern))
+	(aver (pattern))
 	(if (cdr (pattern))
 	    (make-pattern (pattern))
 	    (let ((x (car (pattern))))

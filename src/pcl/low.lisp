@@ -206,7 +206,7 @@
 (defmacro get-wrapper (inst)
   (once-only ((wrapper `(wrapper-of ,inst)))
     `(progn
-       (assert (typep ,wrapper 'wrapper) () "What kind of instance is this?")
+       (aver (typep ,wrapper 'wrapper))
        ,wrapper)))
 
 ;;; FIXME: could be an inline function (like many other things around

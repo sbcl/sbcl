@@ -177,12 +177,12 @@
 		    ((and leaf (typep leaf 'clambda)
 			  (member (functional-kind leaf)
 				  non-closed-function-kinds))
-		     (assert (not (eq (functional-kind leaf) :escape)))
+		     (aver (not (eq (functional-kind leaf) :escape)))
 		     :unused)
 		    (t
 		     (typecase dest
-		       ;; Change locations in eval.lisp that think :RETURN
-		       ;; could occur.
+		       ;; Change locations in eval.lisp that think
+		       ;; :RETURN could occur.
 		       ((or mv-combination creturn exit) :multiple)
 		       (null :unused)
 		       (t :single))))))))

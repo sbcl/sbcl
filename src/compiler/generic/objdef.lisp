@@ -241,7 +241,7 @@
 
 ;;; (For an explanation of this, see the comments at the definition of
 ;;; KLUDGE-NONDETERMINISTIC-CATCH-BLOCK-SIZE.)
-(assert (= sb!vm::kludge-nondeterministic-catch-block-size catch-block-size))
+(aver (= sb!vm::kludge-nondeterministic-catch-block-size catch-block-size))
 
 ;;;; symbols
 

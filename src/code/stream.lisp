@@ -541,7 +541,7 @@
   ;; spec, and extrapolating from the behavior of other operations
   ;; when their operands are the wrong type, it seems that it would be
   ;; more correct to essentially
-  ;;    (ASSERT (<= 0 START END (LENGTH STRING)))
+  ;;    (AVER (<= 0 START END (LENGTH STRING)))
   ;; instead of modifying the incorrect values.
   #!+high-security
   (setf end (min end (length (the vector string))))

@@ -35,7 +35,7 @@
 		       (not (eq (node-block dest) block))
 		       2cont
 		       (eq (ir2-continuation-kind 2cont) :unknown))
-	      (assert (or saw-last (not last-pop)))
+	      (aver (or saw-last (not last-pop)))
 	      (pushed cont)))))
 
       (setf (ir2-block-pushed 2block) (pushed))))
@@ -89,7 +89,7 @@
       (dolist (push (reverse (ir2-block-pushed 2block)))
 	(if (eq (car new-stack) push)
 	    (pop new-stack)
-	    (assert (not (member push new-stack)))))
+	    (aver (not (member push new-stack)))))
 
       (dolist (pop (reverse (ir2-block-popped 2block)))
 	(push pop new-stack))
@@ -99,12 +99,12 @@
       (when new-stack
 	(dolist (pred (block-pred block))
 	  (if (eq pred (component-head (block-component block)))
-	      (assert (find block
-			    (environment-nlx-info (block-environment block))
-			    :key #'nlx-info-target))
+	      (aver (find block
+			  (environment-nlx-info (block-environment block))
+			  :key #'nlx-info-target))
 	      (let ((pred-stack (ir2-block-end-stack (block-info pred))))
 		(unless (tailp new-stack pred-stack)
-		  (assert (search pred-stack new-stack))
+		  (aver (search pred-stack new-stack))
 		  (stack-simulation-walk pred new-stack))))))))
 
   (values))
@@ -134,9 +134,9 @@
 	((null pushes))
       (let ((push (first pushes)))
 	(cond ((member push stack)
-	       (assert (not popping)))
+	       (aver (not popping)))
 	      ((eq push tailp-cont)
-	       (assert (null (rest pushes))))
+	       (aver (null (rest pushes))))
 	      (t
 	       (push push (ir2-block-end-stack 2block))
 	       (setq popping t))))))
@@ -166,7 +166,7 @@
 			   (- (length block1-stack)
 			      (length block2-stack)
 			      1))))
-    (assert (tailp block2-stack block1-stack))
+    (aver (tailp block2-stack block1-stack))
 
     (let* ((block (insert-cleanup-code block1 block2
 				       (continuation-next (block-start block2))

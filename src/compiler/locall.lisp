@@ -175,7 +175,7 @@
 ;;; discover an XEP after the initial local call analyze pass.
 (defun make-external-entry-point (fun)
   (declare (type functional fun))
-  (assert (not (functional-entry-function fun)))
+  (aver (not (functional-entry-function fun)))
   (with-ir1-environment (lambda-bind (main-entry fun))
     (let* ((*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*)))
 	   (res (ir1-convert-lambda (make-xep-lambda fun))))
@@ -332,7 +332,7 @@
   (let* ((block (node-block call))
 	 (component (block-component block))
 	 (original-fun (ref-leaf ref)))
-    (assert (functional-p original-fun))
+    (aver (functional-p original-fun))
     (unless (or (member (basic-combination-kind call) '(:local :error))
 		(block-delete-p block)
 		(eq (functional-kind (block-home-lambda block)) :deleted)
@@ -352,8 +352,8 @@
 		   (rest (leaf-refs original-fun)))
 	  (setq fun (maybe-expand-local-inline fun ref call)))
 
-	(assert (member (functional-kind fun)
-			'(nil :escape :cleanup :optional)))
+	(aver (member (functional-kind fun)
+		      '(nil :escape :cleanup :optional)))
 	(cond ((mv-combination-p call)
 	       (convert-mv-call ref call fun))
 	      ((lambda-p fun)
@@ -636,7 +636,7 @@
 	 (component (block-component call-block)))
     (let ((fun-component (block-component bind-block)))
       (unless (eq fun-component component)
-	(assert (eq (component-kind component) :initial))
+	(aver (eq (component-kind component) :initial))
 	(join-components component fun-component)))
 
     (let ((*current-component* component))
@@ -644,7 +644,7 @@
     ;; FIXME: Use PROPER-LIST-OF-LENGTH-P here, and look for other
     ;; uses of '=.*length' which could also be converted to use
     ;; PROPER-LIST-OF-LENGTH-P.
-    (assert (= (length (block-succ call-block)) 1))
+    (aver (= (length (block-succ call-block)) 1))
     (let ((next-block (first (block-succ call-block))))
       (unlink-blocks call-block next-block)
       (link-blocks call-block bind-block)
@@ -767,7 +767,7 @@
 	       (add-continuation-use this-call cont)))
 	    (:deleted)
 	    (:assignment
-	     (assert (eq called fun))))))))
+	     (aver (eq called fun))))))))
   (values))
 
 ;;; Deal with returning from a LET or assignment that we are
@@ -806,7 +806,7 @@
 	     (move-return-uses fun call
 			       (or next-block (node-block call-return)))))
 	  (t
-	   (assert (node-tail-p call))
+	   (aver (node-tail-p call))
 	   (setf (lambda-return call-fun) return)
 	   (setf (return-lambda return) call-fun))))
   (move-let-call-cont fun)
@@ -922,7 +922,7 @@
 (defun maybe-convert-tail-local-call (call)
   (declare (type combination call))
   (let ((return (continuation-dest (node-cont call))))
-    (assert (return-p return))
+    (aver (return-p return))
     (when (and (not (node-tail-p call))
 	       (immediately-used-p (return-result return) call)
 	       (not (eq (functional-kind (node-home-lambda call))

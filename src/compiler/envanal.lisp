@@ -30,9 +30,9 @@
 ;;;     that the XEP doesn't.
 (defun environment-analyze (component)
   (declare (type component component))
-  (assert (every #'(lambda (x)
-		     (eq (functional-kind x) :deleted))
-		 (component-new-functions component)))
+  (aver (every (lambda (x)
+		 (eq (functional-kind x) :deleted))
+	       (component-new-functions component)))
   (setf (component-new-functions component) ())
   (dolist (fun (component-lambdas component))
     (reinit-lambda-environment fun))
@@ -50,7 +50,7 @@
       (let ((kind (functional-kind fun)))
 	(unless (or (eq kind :top-level)
 		    (and *byte-compiling* (eq kind :optional)))
-	  (assert (member kind '(:optional :cleanup :escape)))
+	  (aver (member kind '(:optional :cleanup :escape)))
 	  (setf (functional-kind fun) nil)
 	  (delete-functional fun)))))
 
@@ -219,13 +219,13 @@
 
     (if (find-nlx-info entry cont)
 	(let ((block (node-block exit)))
-	  (assert (= (length (block-succ block)) 1))
+	  (aver (= (length (block-succ block)) 1))
 	  (unlink-blocks block (first (block-succ block)))
 	  (link-blocks block (component-tail (block-component block))))
 	(insert-nlx-entry-stub exit env))
 
     (let ((info (find-nlx-info entry cont)))
-      (assert info)
+      (aver info)
       (close-over info (node-environment exit) env)
       (when (eq (functional-kind exit-fun) :escape)
 	(mapc #'(lambda (x)
@@ -295,7 +295,7 @@
 	       (code `(%lexical-exit-breakup ',nlx)))))))
 
       (when (code)
-	(assert (not (node-tail-p (block-last block1))))
+	(aver (not (node-tail-p (block-last block1))))
 	(insert-cleanup-code block1 block2
 			     (block-last block1)
 			     `(progn ,@(code)))

@@ -142,14 +142,14 @@
 ;;; code, but may result in the TN sometimes not being live when you want it.
 (defun environment-live-tn (tn env)
   (declare (type tn tn) (type environment env))
-  (assert (eq (tn-kind tn) :normal))
+  (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :environment)
   (setf (tn-environment tn) env)
   (push tn (ir2-environment-live-tns (environment-info env)))
   tn)
 (defun environment-debug-live-tn (tn env)
   (declare (type tn tn) (type environment env))
-  (assert (eq (tn-kind tn) :normal))
+  (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :debug-environment)
   (setf (tn-environment tn) env)
   (push tn (ir2-environment-debug-live-tns (environment-info env)))
@@ -158,7 +158,7 @@
 ;;; Make TN be live throughout the current component. Return TN.
 (defun component-live-tn (tn)
   (declare (type tn tn))
-  (assert (eq (tn-kind tn) :normal))
+  (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :component)
   (push tn (ir2-component-component-tns (component-info
 					 *component-being-compiled*)))
@@ -167,8 +167,8 @@
 ;;; Specify that Save be used as the save location for TN. TN is returned.
 (defun specify-save-tn (tn save)
   (declare (type tn tn save))
-  (assert (eq (tn-kind save) :normal))
-  (assert (and (not (tn-save-tn tn)) (not (tn-save-tn save))))
+  (aver (eq (tn-kind save) :normal))
+  (aver (and (not (tn-save-tn tn)) (not (tn-save-tn save))))
   (setf (tn-kind save) :specified-save)
   (setf (tn-save-tn tn) save)
   (setf (tn-save-tn save) tn)
@@ -360,7 +360,7 @@
 (defun drop-thru-p (node block)
   (declare (type node node) (type cblock block))
   (let ((next-block (ir2-block-next (block-info (node-block node)))))
-    (assert (eq node (block-last (node-block node))))
+    (aver (eq node (block-last (node-block node))))
     (eq next-block (block-info block))))
 
 ;;; Link a list of VOPs from First to Last into Block, Before the specified
@@ -423,7 +423,7 @@
 ;;; Return the value of an immediate constant TN.
 (defun tn-value (tn)
   (declare (type tn tn))
-  (assert (member (tn-kind tn) '(:constant :cached-constant)))
+  (aver (member (tn-kind tn) '(:constant :cached-constant)))
   (constant-value (tn-leaf tn)))
 
 ;;; Force TN to be allocated in a SC that doesn't need to be saved: an

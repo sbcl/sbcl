@@ -679,7 +679,7 @@
 			    (eql yx :no-type-method-found))
 		       *empty-type*)
 		      (t
-		       (assert (and (not xy) (not yx))) ; else handled above
+		       (aver (and (not xy) (not yx))) ; else handled above
 		       nil))))))))
 
 (defun-cached (type-intersection2 :hash-function type-cache-hash
@@ -767,7 +767,7 @@
   (declare (type function simplify2))
   ;; Any input object satisfying %COMPOUND-TYPE-P should've been
   ;; broken into components before it reached us.
-  (assert (not (funcall %compound-type-p type)))
+  (aver (not (funcall %compound-type-p type)))
   (dotimes (i (length types) (vector-push-extend type types))
     (let ((simplified2 (funcall simplify2 type (aref types i))))
       (when simplified2
@@ -900,30 +900,30 @@
   ;; FIXME: BUG 85: This assertion failed when I added it in
   ;; sbcl-0.6.11.13. It probably shouldn't fail; but for now it's
   ;; just commented out.
-  ;;(assert (not (eq type1 *wild-type*))) ; * isn't really a type.
+  ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (eq type1 type2) t))
 
 (!define-type-method (named :simple-subtypep) (type1 type2)
-  (assert (not (eq type1 *wild-type*))) ; * isn't really a type.
+  (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (or (eq type1 *empty-type*) (eq type2 *wild-type*)) t))
 
 (!define-type-method (named :complex-subtypep-arg1) (type1 type2)
-  (assert (not (eq type1 *wild-type*))) ; * isn't really a type.
+  (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   ;; FIXME: Why does this (old CMU CL) assertion hold? Perhaps 'cause
   ;; the HAIRY-TYPE COMPLEX-SUBTYPEP-ARG2 method takes precedence over
   ;; this COMPLEX-SUBTYPE-ARG1 method? (I miss CLOS..)
-  (assert (not (hairy-type-p type2))) 
+  (aver (not (hairy-type-p type2))) 
   ;; Besides the old CMU CL assertion above, we also need to avoid
   ;; compound types, else we could get into trouble with
   ;;   (SUBTYPEP 'T '(OR (SATISFIES FOO) (SATISFIES BAR)))
   ;; or
   ;;   (SUBTYPEP 'T '(AND (SATISFIES FOO) (SATISFIES BAR))).
-  (assert (not (compound-type-p type2))) 
+  (aver (not (compound-type-p type2))) 
   ;; Then, since TYPE2 is reasonably tractable, we're good to go.
   (values (eq type1 *empty-type*) t))
 
 (!define-type-method (named :complex-subtypep-arg2) (type1 type2)
-  (assert (not (eq type2 *wild-type*))) ; * isn't really a type.
+  (aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond ((eq type2 *universal-type*)
 	 (values t t))
 	((hairy-type-p type1)
@@ -938,12 +938,12 @@
 (!define-type-method (named :complex-intersection2) (type1 type2)
   ;; FIXME: This assertion failed when I added it in sbcl-0.6.11.13.
   ;; Perhaps when bug 85 is fixed it can be reenabled.
-  ;;(assert (not (eq type2 *wild-type*))) ; * isn't really a type.
+  ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (hierarchical-intersection2 type1 type2))
 
 (!define-type-method (named :complex-union2) (type1 type2)
   ;; Perhaps when bug 85 is fixed this can be reenabled.
-  ;;(assert (not (eq type2 *wild-type*))) ; * isn't really a type.
+  ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (hierarchical-union2 type1 type2))
 
 (!define-type-method (named :unparse) (x)
@@ -1094,7 +1094,7 @@
 	     'complex
 	     `(complex ,base+bounds)))
 	((nil)
-	 (assert (eq base+bounds 'real))
+	 (aver (eq base+bounds 'real))
 	 'number)))))
 
 ;;; Return true if X is "less than or equal" to Y, taking open bounds
@@ -1896,7 +1896,7 @@
 ;;;;    ;; reasonable definition
 ;;;;    (DEFTYPE KEYWORD () '(AND SYMBOL (SATISFIES KEYWORDP)))
 ;;;;    ;; reasonable behavior
-;;;;    (ASSERT (SUBTYPEP 'KEYWORD 'SYMBOL))
+;;;;    (AVER (SUBTYPEP 'KEYWORD 'SYMBOL))
 ;;;; Without understanding a little about the semantics of AND, we'd
 ;;;; get (SUBTYPEP 'KEYWORD 'SYMBOL)=>NIL,NIL and, for entirely
 ;;;; parallel reasons, (SUBTYPEP 'RATIO 'NUMBER)=>NIL,NIL. That's
@@ -1977,23 +1977,10 @@
 
 ;;; Similarly, a union type is a subtype of another if every element
 ;;; of TYPE1 is a subtype of some element of TYPE2.
-;;;
-;;; KLUDGE: This definition seems redundant, here in UNION-TYPE and
-;;; similarly in INTERSECTION-TYPE, with the logic in the
-;;; corresponding :COMPLEX-SUBTYPEP-ARG1 and :COMPLEX-SUBTYPEP-ARG2
-;;; methods. Ideally there's probably some way to make the
-;;; :SIMPLE-SUBTYPEP method default to the :COMPLEX-SUBTYPEP-FOO
-;;; methods in such a way that this definition could go away, but I
-;;; don't grok the system well enough to tell whether it's simple to
-;;; arrange this. -- WHN 2000-02-03
 (!define-type-method (union :simple-subtypep) (type1 type2)
-  (dolist (t1 (union-type-types type1) (values t t))
-    (multiple-value-bind (subtypep validp)
-	(union-complex-subtypep-arg2 t1 type2)
-      (cond ((not validp)
-	     (return (values nil nil)))
-	    ((not subtypep)
-	     (return (values nil t)))))))
+  (every/type (swapped-args-fun #'union-complex-subtypep-arg2)
+	      type2
+	      (union-type-types type1)))
 
 (defun union-complex-subtypep-arg1 (type1 type2)
   (every/type (swapped-args-fun #'csubtypep)

@@ -465,7 +465,7 @@ Function and macro commands:
 	(:rest ,@rest)
 	(:keyword ,@keyword)))
      (symbol
-      (assert (eq ,element :deleted))
+      (aver (eq ,element :deleted))
       ,@deleted)))
 
 (sb!xc:defmacro lambda-var-dispatch (variable location deleted valid other)

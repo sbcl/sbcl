@@ -616,7 +616,7 @@
 	  (declare (type operand-parse temp))
 	  (let ((sc (operand-parse-sc temp))
 		(offset (operand-parse-offset temp)))
-	    (assert sc)
+	    (aver sc)
 	    (setf (aref results index)
 		  (if offset
 		      (+ (ash offset (1+ sc-bits))

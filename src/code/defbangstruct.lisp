@@ -38,8 +38,8 @@
       value))
   (defun (setf def!struct-supertype) (value type)
     (when (and value #-sb-xc-host *type-system-initialized*)
-      (assert (subtypep value 'structure!object))
-      (assert (subtypep type value)))
+      (aver (subtypep value 'structure!object))
+      (aver (subtypep type value)))
     (setf (gethash type *def!struct-supertype*) value))
 
   ;; (DEF!STRUCT-TYPE-MAKE-LOAD-FORM-FUN TYPE) is the load form
@@ -67,7 +67,7 @@
 		 type)))))
   (defun (setf def!struct-type-make-load-form-fun) (new-value type)
     (when #+sb-xc-host t #-sb-xc-host *type-system-initialized*
-      (assert (subtypep type 'structure!object))
+      (aver (subtypep type 'structure!object))
       (check-type new-value def!struct-type-make-load-form-fun))
     (setf (gethash type *def!struct-type-make-load-form-fun*) new-value)))
 
@@ -129,7 +129,7 @@
 	(when include-clause
 	  (setf def!struct-supertype (second include-clause)))
 	(if (eq name 'structure!object) ; if root of hierarchy
-	  (assert (not include-clause))
+	  (aver (not include-clause))
 	  (unless include-clause
 	    (setf def!struct-supertype 'structure!object)
 	    (push `(:include ,def!struct-supertype) options)))

@@ -223,8 +223,8 @@
       ((null conf)
        (setf (ir2-block-global-tns block) nil))
     (let ((tn (global-conflicts-tn conf)))
-      (assert (eq (tn-current-conflict tn) conf))
-      (assert (null (global-conflicts-tn-next conf)))
+      (aver (eq (tn-current-conflict tn) conf))
+      (aver (null (global-conflicts-tn-next conf)))
       (do ((current (tn-global-conflicts tn)
 		    (global-conflicts-tn-next current))
 	   (prev nil current))
@@ -238,7 +238,7 @@
   (let ((ltns (ir2-block-local-tns block)))
     (dotimes (i local-tn-limit)
       (let ((tn (svref ltns i)))
-	(assert (not (eq tn :more)))
+	(aver (not (eq tn :more)))
 	(let ((conf (tn-global-conflicts tn)))
 	  (setf (tn-local tn)
 		(if conf
@@ -275,7 +275,7 @@
 (defun coalesce-more-ltn-numbers (block ops fixed)
   (declare (type ir2-block block) (type (or tn-ref null) ops) (list fixed))
   (let ((num (ir2-block-local-tn-count block)))
-    (assert (< num local-tn-limit))
+    (aver (< num local-tn-limit))
     (incf (ir2-block-local-tn-count block))
     (setf (svref (ir2-block-local-tns block) num) :more)
 
@@ -295,9 +295,9 @@
 		       (return nil)))))
 	    (and (frob (tn-reads tn)) (frob (tn-writes tn))))
 	  () "More operand ~S used more than once in its VOP." op)
-	(assert (not (find-in #'global-conflicts-next tn
-			      (ir2-block-global-tns block)
-			      :key #'global-conflicts-tn)))
+	(aver (not (find-in #'global-conflicts-next tn
+			    (ir2-block-global-tns block)
+			    :key #'global-conflicts-tn)))
 
 	(add-global-conflict :read-only tn block num)
 	(setf (tn-local tn) block)
@@ -345,12 +345,12 @@
 
 	  (cond
 	   ((vop-next lose)
-	    (assert (not (eq last-lose lose)))
+	    (aver (not (eq last-lose lose)))
 	    (let ((new (split-ir2-blocks 2block lose (incf counter))))
-	      (assert (not (find-local-references new)))
+	      (aver (not (find-local-references new)))
 	      (init-global-conflict-kind new)))
 	   (t
-	    (assert (not (eq lose coalesced)))
+	    (aver (not (eq lose coalesced)))
 	    (setq coalesced lose)
 	    (event coalesce-more-ltn-numbers (vop-node lose))
 	    (let ((info (vop-info lose))
@@ -363,7 +363,7 @@
 	      (coalesce-more-ltn-numbers new (vop-results lose)
 					 (vop-info-result-types info))
 	      (let ((lose (find-local-references new)))
-		(assert (not lose)))
+		(aver (not lose)))
 	      (init-global-conflict-kind new))))))))
 
   (values))
@@ -433,9 +433,9 @@
 ;;; requires adding :LIVE conflicts to all blocks in TN-ENV.
 (defun convert-to-environment-tn (tn tn-env)
   (declare (type tn tn) (type environment tn-env))
-  (assert (member (tn-kind tn) '(:normal :debug-environment)))
+  (aver (member (tn-kind tn) '(:normal :debug-environment)))
   (when (eq (tn-kind tn) :debug-environment)
-    (assert (eq (tn-environment tn) tn-env))
+    (aver (eq (tn-environment tn) tn-env))
     (let ((2env (environment-info tn-env)))
       (setf (ir2-environment-debug-live-tns 2env)
 	    (delete tn (ir2-environment-debug-live-tns 2env)))))
@@ -483,7 +483,7 @@
 	 (let* ((tn (global-conflicts-tn conf2))
 		(tn-conflicts (tn-current-conflict tn))
 		(number1 (ir2-block-number block1)))
-	   (assert tn-conflicts)
+	   (aver tn-conflicts)
 	   (do ((current tn-conflicts (global-conflicts-tn-next current))
 		(prev nil current))
 	       ((or (null current)
@@ -711,7 +711,7 @@
 	   (deletef-in tn-next* live-list tn)
 	   (frob-more-tns (deletef-in tn-next* live-list mtn))))
 	(t
-	 (assert (not (tn-ref-write-p ref)))
+	 (aver (not (tn-ref-write-p ref)))
 	 (note-conflicts live-bits live-list tn num)
 	 (frob-more-tns (note-conflicts live-bits live-list mtn num))
 	 (setf (sbit live-bits num) 1)
@@ -838,21 +838,22 @@
 		  (tn-local-conflicts tn)
 		  t))
 	(t
-	 (assert (and (null (tn-reads tn)) (null (tn-writes tn))))))
+	 (aver (and (null (tn-reads tn)) (null (tn-writes tn))))))
   (values))
 
 ;;; For each :ALIAS TN, destructively merge the conflict info into the
 ;;; original TN and replace the uses of the alias.
 ;;;
-;;; For any block that uses only the alias TN, just insert that conflict into
-;;; the conflicts for the original TN, changing the LTN map to refer to the
-;;; original TN. This gives a result indistinguishable from the what there
-;;; would have been if the original TN had always been referenced. This leaves
-;;; no sign that an alias TN was ever involved.
+;;; For any block that uses only the alias TN, just insert that
+;;; conflict into the conflicts for the original TN, changing the LTN
+;;; map to refer to the original TN. This gives a result
+;;; indistinguishable from the what there would have been if the
+;;; original TN had always been referenced. This leaves no sign that
+;;; an alias TN was ever involved.
 ;;;
-;;; If a block has references to both the alias and the original TN, then we
-;;; call MERGE-ALIAS-BLOCK-CONFLICTS to combine the conflicts into the original
-;;; conflict.
+;;; If a block has references to both the alias and the original TN,
+;;; then we call MERGE-ALIAS-BLOCK-CONFLICTS to combine the conflicts
+;;; into the original conflict.
 (defun merge-alias-conflicts (component)
   (declare (type component component))
   (do ((tn (ir2-component-alias-tns (component-info component))

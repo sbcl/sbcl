@@ -516,7 +516,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun parse-name-and-options (name-and-options)
   (destructuring-bind (name &rest options) name-and-options
-    (assert name) ; A null name doesn't seem to make sense here.
+    (aver name) ; A null name doesn't seem to make sense here.
     (let ((defstruct (make-defstruct-description name)))
       (dolist (option options)
 	(cond ((consp option)

@@ -214,7 +214,7 @@
   (declare (type continuation cont))
   (let ((type (continuation-asserted-type cont))
 	(dest (continuation-dest cont)))
-    (assert (not (eq type *wild-type*)))
+    (aver (not (eq type *wild-type*)))
     (multiple-value-bind (types count) (no-function-values-types type)
       (cond ((not (eq count :unknown))
 	     (if (or (exit-p dest)
@@ -227,7 +227,7 @@
 		 (maybe-negate-check cont types nil)))
 	    ((and (mv-combination-p dest)
 		  (eq (basic-combination-kind dest) :local))
-	     (assert (values-type-p type))
+	     (aver (values-type-p type))
 	     (maybe-negate-check cont (args-type-optional type) nil))
 	    (t
 	     (values :too-hairy nil))))))
@@ -353,7 +353,7 @@
 	(ir1-convert new-start dummy (make-type-check-form types))
 
 	;; TO DO: Why should this be true? -- WHN 19990601
-	(assert (eq (continuation-block dummy) new-block))
+	(aver (eq (continuation-block dummy) new-block))
 
 	;; KLUDGE: Comments at the head of this function in CMU CL
 	;; said that somewhere in here we
@@ -385,7 +385,7 @@
       (let* ((node (continuation-use cont))
 	     (args (basic-combination-args node))
 	     (victim (first args)))
-	(assert (and (= (length args) 1)
+	(aver (and (= (length args) 1)
 		     (eq (constant-value
 			  (ref-leaf
 			   (continuation-use victim)))

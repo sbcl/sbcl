@@ -46,7 +46,7 @@
 	(vop set-slot node block result
 	     (ecase kind
 	       (:arg
-		(assert args)
+		(aver args)
 		(continuation-tn node block (pop args)))
 	       (:unbound
 		(or unbound-marker-tn
@@ -59,7 +59,7 @@
 	       (:null
 		(emit-constant nil)))
 	     name slot lowtag #!+gengc nil))))
-  (assert (null args)))
+  (aver (null args)))
 
 (defun do-fixed-alloc (node block name words type lowtag result)
   #!-gengc
@@ -129,7 +129,7 @@
 		   (clambda
 		    (environment-closure (get-lambda-environment leaf)))
 		   (functional
-		    (assert (eq (functional-kind leaf) :top-level-xep))
+		    (aver (eq (functional-kind leaf) :top-level-xep))
 		    nil))))
     (if closure
 	(let ((this-env (node-environment node)))
@@ -180,7 +180,7 @@
       (global-var
        (ecase (global-var-kind leaf)
 	 ((:special :global)
-	  (assert (symbolp (leaf-name leaf)))
+	  (aver (symbolp (leaf-name leaf)))
 	  (vop set node block (emit-constant (leaf-name leaf)) val-tn
 	       (needs-remembering value))))))
 

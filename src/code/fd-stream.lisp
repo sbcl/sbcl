@@ -628,7 +628,7 @@
 (defun refill-fd-stream-buffer (stream)
   ;; We don't have any logic to preserve leftover bytes in the buffer,
   ;; so we should only be called when the buffer is empty.
-  (assert (= (fd-stream-ibuf-head stream) (fd-stream-ibuf-tail stream)))
+  (aver (= (fd-stream-ibuf-head stream) (fd-stream-ibuf-tail stream)))
   (multiple-value-bind (count err)
       (sb!unix:unix-read (fd-stream-fd stream)
 			 (fd-stream-ibuf-sap stream)

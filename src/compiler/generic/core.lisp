@@ -52,16 +52,16 @@
 	   (offset (third info))
 	   (value (ecase flavor
 		    (:assembly-routine
-		     (assert (symbolp name))
+		     (aver (symbolp name))
 		     (or (gethash name *assembler-routines*)
 			 (error "undefined assembler routine: ~S" name)))
 		    (:foreign
-		     (assert (stringp name))
+		     (aver (stringp name))
 		     (or (sb!impl::foreign-symbol-address-as-integer name)
 			 (error "unknown foreign symbol: ~S")))
 		    #!+x86
 		    (:code-object
-		     (assert (null name))
+		     (aver (null name))
 		     (values (get-lisp-obj-address code) t)))))
       (sb!vm:fixup-code-object code offset value kind))))
 
@@ -91,7 +91,7 @@
 ;;; references to functions.
 (defun fix-core-source-info (info object source-info)
   (declare (type source-info info) (type core-object object))
-  (assert (zerop (hash-table-count (core-object-patch-table object))))
+  (aver (zerop (hash-table-count (core-object-patch-table object))))
   (let ((res (debug-source-for-info info)))
     (dolist (sinfo res)
       (setf (debug-source-info sinfo) source-info))

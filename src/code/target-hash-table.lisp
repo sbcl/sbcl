@@ -429,7 +429,7 @@
 
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
-  (assert (hash-table-index-vector hash-table))
+  (aver (hash-table-index-vector hash-table))
   (without-gcing
    ;; We need to rehash here so that a current key can be found if it
    ;; exists. Check that there is room for one more entry. May not be
@@ -483,7 +483,7 @@
        ;; Pop a KV slot off the free list
        (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
 	 ;; Double-check for overflow.
-	 (assert (not (zerop free-kv-slot)))
+	 (aver (not (zerop free-kv-slot)))
 	 (setf (hash-table-next-free-kv hash-table)
 	       (aref next-vector free-kv-slot))
 	 (incf (hash-table-number-entries hash-table))
@@ -495,7 +495,7 @@
 	 (when hash-vector
 	   (if (not eq-based)
 	       (setf (aref hash-vector free-kv-slot) hashing)
-	       (assert (= (aref hash-vector free-kv-slot) #x80000000))))
+	       (aver (= (aref hash-vector free-kv-slot) #x80000000))))
 
 	 ;; Push this slot into the next chain.
 	 (setf (aref next-vector free-kv-slot) next)
@@ -617,7 +617,7 @@
     (do ((i 2 (1+ i)))
 	((>= i kv-length))
       (setf (aref kv-vector i) +empty-ht-slot+))
-    (assert (eq (aref kv-vector 0) hash-table))
+    (aver (eq (aref kv-vector 0) hash-table))
     ;; Set up the free list, all free.
     (do ((i 1 (1+ i)))
 	((>= i (1- size)))

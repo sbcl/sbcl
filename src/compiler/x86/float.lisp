@@ -100,7 +100,7 @@
 ;;;
 ;;; Using a Pop then load.
 (defun copy-fp-reg-to-fr0 (reg)
-  (assert (not (zerop (tn-offset reg))))
+  (aver (not (zerop (tn-offset reg))))
   (inst fstp fr0-tn)
   (inst fld (make-random-tn :kind :normal
 			    :sc (sc-or-lose 'double-reg)
@@ -108,7 +108,7 @@
 ;;; Using Fxch then Fst to restore the original reg contents.
 #+nil
 (defun copy-fp-reg-to-fr0 (reg)
-  (assert (not (zerop (tn-offset reg))))
+  (aver (not (zerop (tn-offset reg))))
   (inst fxch reg)
   (inst fst  reg))
 
@@ -1821,7 +1821,7 @@
 	  (signed-reg
 	   (inst mov res bits))
 	  (signed-stack
-	   (assert (location= bits res)))))
+	   (aver (location= bits res)))))
        (single-reg
 	(sc-case bits
 	  (signed-reg

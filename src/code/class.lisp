@@ -410,7 +410,7 @@
 (declaim (ftype (function (layout sb!xc:class index simple-vector layout-depthoid))
 		check-layout))
 (defun check-layout (layout class length inherits depthoid)
-  (assert (eq (layout-class layout) class))
+  (aver (eq (layout-class layout) class))
   (when (redefine-layout-warning "current" layout
 				 "compile time" length inherits depthoid)
     ;; Classic CMU CL had more options here. There are several reasons
@@ -468,12 +468,12 @@
     ;; Attempting to register ourselves with a temporary undefined
     ;; class placeholder is almost certainly a programmer error. (I
     ;; should know, I did it.) -- WHN 19990927
-    (assert (not (undefined-class-p class)))
+    (aver (not (undefined-class-p class)))
 
     ;; This assertion dates from classic CMU CL. The rationale is
     ;; probably that calling REGISTER-LAYOUT more than once for the
     ;; same LAYOUT is almost certainly a programmer error.
-    (assert (not (eq class-layout layout)))
+    (aver (not (eq class-layout layout)))
 
     ;; Figure out what classes are affected by the change, and issue
     ;; appropriate warnings and invalidations.
@@ -667,11 +667,11 @@
 ;;; the two classes are equal, since there are EQ checks in those
 ;;; operations.
 (!define-type-method (sb!xc:class :simple-=) (type1 type2)
-  (assert (not (eq type1 type2)))
+  (aver (not (eq type1 type2)))
   (values nil t))
 
 (!define-type-method (sb!xc:class :simple-subtypep) (class1 class2)
-  (assert (not (eq class1 class2)))
+  (aver (not (eq class1 class2)))
   (let ((subclasses (class-subclasses class2)))
     (if (and subclasses (gethash class1 subclasses))
 	(values t t)

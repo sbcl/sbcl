@@ -634,7 +634,7 @@
 
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
-  (assert (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
+  (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
   (let ((offset (tn-offset tn)))
     (logior (ash (logand offset 1) 2)
 	    (ash offset -1))))
@@ -902,7 +902,7 @@
 	    (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
 	    (emit-ea segment dst (reg-tn-encoding src)))
 	   ((fixup-p src)
-	    (assert (eq size :dword))
+	    (aver (eq size :dword))
 	    (emit-byte segment #b11000111)
 	    (emit-ea segment dst #b000)
 	    (emit-absolute-fixup segment src))
@@ -910,12 +910,12 @@
 	    (error "bogus arguments to MOV: ~S ~S" dst src))))))
 
 (defun emit-move-with-extension (segment dst src opcode)
-  (assert (register-p dst))
+  (aver (register-p dst))
   (let ((dst-size (operand-size dst))
 	(src-size (operand-size src)))
     (ecase dst-size
       (:word
-       (assert (eq src-size :byte))
+       (aver (eq src-size :byte))
        (maybe-emit-operand-size-prefix segment :word)
        (emit-byte segment #b00001111)
        (emit-byte segment opcode)
@@ -966,7 +966,7 @@
 	  (emit-absolute-fixup segment src))
 	 (t
 	  (let ((size (operand-size src)))
-	    (assert (not (eq size :byte)))
+	    (aver (not (eq size :byte)))
 	    (maybe-emit-operand-size-prefix segment size)
 	    (cond ((register-p src)
 		   (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
@@ -984,7 +984,7 @@
   (:printer reg/mem ((op '(#b1000111 #b000)) (width 1)))
   (:emitter
    (let ((size (operand-size dst)))
-     (assert (not (eq size :byte)))
+     (aver (not (eq size :byte)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
 	    (emit-byte-with-reg segment #b01011 (reg-tn-encoding dst)))
@@ -1028,7 +1028,7 @@
 (define-instruction lea (segment dst src)
   (:printer reg-reg/mem ((op #b1000110) (width 1)))
   (:emitter
-   (assert (dword-reg-p dst))
+   (aver (dword-reg-p dst))
    (emit-byte segment #b10001101)
    (emit-ea segment src (reg-tn-encoding dst))))
 
@@ -1036,7 +1036,7 @@
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1011000)) '(:name :tab reg/mem ", " reg))
   (:emitter
-   (assert (register-p src))
+   (aver (register-p src))
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment #b00001111)
@@ -1240,7 +1240,7 @@
   (:printer accum-reg/mem ((op '(#b1111011 #b100))))
   (:emitter
    (let ((size (matching-operand-size dst src)))
-     (assert (accumulator-p dst))
+     (aver (accumulator-p dst))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
      (emit-ea segment src #b100))))
@@ -1283,7 +1283,7 @@
   (:printer accum-reg/mem ((op '(#b1111011 #b110))))
   (:emitter
    (let ((size (matching-operand-size dst src)))
-     (assert (accumulator-p dst))
+     (aver (accumulator-p dst))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
      (emit-ea segment src #b110))))
@@ -1292,7 +1292,7 @@
   (:printer accum-reg/mem ((op '(#b1111011 #b111))))
   (:emitter
    (let ((size (matching-operand-size dst src)))
-     (assert (accumulator-p dst))
+     (aver (accumulator-p dst))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
      (emit-ea segment src #b111))))
@@ -1338,7 +1338,7 @@
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1100000)) '(:name :tab reg/mem ", " reg))
   (:emitter
-   (assert (register-p src))
+   (aver (register-p src))
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment #b00001111)
@@ -1516,7 +1516,7 @@
   (:printer string-op ((op #b0110110)))
   (:emitter
    (let ((size (operand-size acc)))
-     (assert (accumulator-p acc))
+     (aver (accumulator-p acc))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b01101100 #b01101101)))))
 
@@ -1524,7 +1524,7 @@
   (:printer string-op ((op #b1010110)))
   (:emitter
    (let ((size (operand-size acc)))
-     (assert (accumulator-p acc))
+     (aver (accumulator-p acc))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b10101100 #b10101101)))))
 
@@ -1538,7 +1538,7 @@
   (:printer string-op ((op #b0110111)))
   (:emitter
    (let ((size (operand-size acc)))
-     (assert (accumulator-p acc))
+     (aver (accumulator-p acc))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b01101110 #b01101111)))))
 
@@ -1546,7 +1546,7 @@
   (:printer string-op ((op #b1010111)))
   (:emitter
    (let ((size (operand-size acc)))
-     (assert (accumulator-p acc))
+     (aver (accumulator-p acc))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b10101110 #b10101111)))))
 
@@ -1554,7 +1554,7 @@
   (:printer string-op ((op #b1010101)))
   (:emitter
    (let ((size (operand-size acc)))
-     (assert (accumulator-p acc))
+     (aver (accumulator-p acc))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment (if (eq size :byte) #b10101010 #b10101011)))))
 
@@ -1658,7 +1658,7 @@
 		   1
 		   #'(lambda (segment posn)
 		       (let ((disp (- (label-position target) (1+ posn))))
-			 (assert (<= -128 disp 127))
+			 (aver (<= -128 disp 127))
 			 (emit-byte segment disp)))))
 
 (define-instruction jmp (segment cond &optional where)
@@ -2045,14 +2045,14 @@
 (define-instruction fadd-sti (segment destination)
   (:printer floating-point-fp ((op '(#b100 #b000))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011100)
    (emit-fp-op segment destination #b000)))
 ;;; with pop
 (define-instruction faddp-sti (segment destination)
   (:printer floating-point-fp ((op '(#b110 #b000))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011110)
    (emit-fp-op segment destination #b000)))
 
@@ -2102,14 +2102,14 @@
 (define-instruction fsub-sti (segment destination)
   (:printer floating-point-fp ((op '(#b100 #b101))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011100)
    (emit-fp-op segment destination #b101)))
 ;;; with a pop
 (define-instruction fsubp-sti (segment destination)
   (:printer floating-point-fp ((op '(#b110 #b101))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011110)
    (emit-fp-op segment destination #b101)))
 
@@ -2121,14 +2121,14 @@
 (define-instruction fsubr-sti (segment destination)
   (:printer floating-point-fp ((op '(#b100 #b100))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011100)
    (emit-fp-op segment destination #b100)))
 ;;; with a pop
 (define-instruction fsubrp-sti (segment destination)
   (:printer floating-point-fp ((op '(#b110 #b100))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011110)
    (emit-fp-op segment destination #b100)))
 
@@ -2156,7 +2156,7 @@
 (define-instruction fmul-sti (segment destination)
   (:printer floating-point-fp ((op '(#b100 #b001))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011100)
    (emit-fp-op segment destination #b001)))
 
@@ -2206,7 +2206,7 @@
 (define-instruction fdiv-sti (segment destination)
   (:printer floating-point-fp ((op '(#b100 #b111))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011100)
    (emit-fp-op segment destination #b111)))
 
@@ -2218,7 +2218,7 @@
 (define-instruction fdivr-sti (segment destination)
   (:printer floating-point-fp ((op '(#b100 #b110))))
   (:emitter
-   (assert (fp-reg-tn-p destination))
+   (aver (fp-reg-tn-p destination))
    (emit-byte segment #b11011100)
    (emit-fp-op segment destination #b110)))
 
@@ -2429,7 +2429,7 @@
   ;; XX Printer conflicts with frstor
   ;; (:printer floating-point ((op '(#b101 #b100))))
   (:emitter
-   (assert (fp-reg-tn-p src))
+   (aver (fp-reg-tn-p src))
    (emit-byte segment #b11011101)
    (emit-fp-op segment src #b100)))
 

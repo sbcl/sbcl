@@ -57,7 +57,7 @@
 		      (t
 		       (storew nil-value ptr cons-cdr-slot
 			       list-pointer-type)))
-		(assert (null (tn-ref-across things)))))
+		(aver (null (tn-ref-across things)))))
 	     (move result res))))))
 
 (define-vop (list list-or-list*)

@@ -311,12 +311,12 @@
 						(inst-write-dependencies inst))
 				(writes write))
 			     (writes)))
-  (assert (segment-run-scheduler segment))
+  (aver (segment-run-scheduler segment))
   (let ((countdown (segment-branch-countdown segment)))
     (when countdown
       (decf countdown)
-      (assert (not (instruction-attributep (inst-attributes inst)
-					   variable-length))))
+      (aver (not (instruction-attributep (inst-attributes inst)
+					 variable-length))))
     (cond ((instruction-attributep (inst-attributes inst) branch)
 	   (unless countdown
 	     (setf countdown (inst-delay inst)))
@@ -336,7 +336,7 @@
 ;;; instructions would sit there until the scheduler was turned back
 ;;; on, and emitted in the wrong place).
 (defun schedule-pending-instructions (segment)
-  (assert (segment-run-scheduler segment))
+  (aver (segment-run-scheduler segment))
 
   ;; Quick blow-out if nothing to do.
   (when (and (sset-empty (segment-emittable-insts-sset segment))
@@ -565,8 +565,8 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; remove this instruction from their dependents list. If we were the
 ;;; last dependent, then that dependency can be emitted now.
 (defun note-resolved-dependencies (segment inst)
-  (assert (sset-empty (inst-read-dependents inst)))
-  (assert (sset-empty (inst-write-dependents inst)))
+  (aver (sset-empty (inst-read-dependents inst)))
+  (aver (sset-empty (inst-write-dependents inst)))
   (do-sset-elements (dep (inst-write-dependencies inst))
     ;; These are the instructions who have to be completed before our
     ;; write fires. Doesn't matter how far before, just before.
@@ -853,7 +853,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	       (emit-skip segment (- (ash 1 alignment) slop) fill-byte)))
 	   (let ((size (logand (1- (ash 1 bits))
 			       (lognot (1- (ash 1 alignment))))))
-	     (assert (> size 0))
+	     (aver (> size 0))
 	     (emit-annotation segment (make-alignment bits size fill-byte))
 	     (emit-skip segment size fill-byte))
 	   (setf (segment-alignment segment) bits)
@@ -998,7 +998,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 		 (size (- new-posn posn))
 		 (old-size (alignment-size note))
 		 (additional-delta (- old-size size)))
-	    (assert (<= 0 size old-size))
+	    (aver (<= 0 size old-size))
 	    (unless (zerop additional-delta)
 	      (setf (segment-last-annotation segment) prev)
 	      (incf delta additional-delta)
@@ -1387,7 +1387,7 @@ p	    ;; the branch has two dependents and one of them dpends on
       (let ((forms nil))
 	(dotimes (i num-bytes)
 	  (let ((pieces (svref bytes i)))
-	    (assert pieces)
+	    (aver pieces)
 	    (push `(emit-byte ,segment-arg
 			      ,(if (cdr pieces)
 				   `(logior ,@pieces)

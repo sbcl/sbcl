@@ -94,7 +94,7 @@
 			  (continuation-use
 			   (basic-combination-fun node))))
 			*backend-predicate-types*)))
-    (assert ctype)
+    (aver ctype)
     (ir1-transform-type-predicate object ctype)))
 
 ;;; If FIND-CLASS is called on a constant class, locate the CLASS-CELL
@@ -398,7 +398,7 @@
 ;;; sometimes be generated when byte compiling inline functions, but
 ;;; it's quite uncommon.) -- WHN 20000523
 (deftransform %instance-typep ((object spec) * * :when :both)
-  (assert (constant-continuation-p spec))
+  (aver (constant-continuation-p spec))
   (let* ((spec (continuation-value spec))
 	 (class (specifier-type spec))
 	 (name (sb!xc:class-name class))

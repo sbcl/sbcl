@@ -157,7 +157,7 @@
 			(load-type-predicate (type-specifier (cdr const))))))
 	       (:xep
 		(let ((xep (cdr (assoc (cdr const) xeps :test #'eq))))
-		  (assert xep)
+		  (aver xep)
 		  (setf (code-header-ref code-obj code-obj-index) xep))))))))))
 
   (values))

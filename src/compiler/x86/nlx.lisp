@@ -22,7 +22,7 @@
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ebx-offset))
 
 (defun catch-block-ea (tn)
-  (assert (sc-is tn catch-block))
+  (aver (sc-is tn catch-block))
   (make-ea :dword :base ebp-tn
 	   :disp (- (* (+ (tn-offset tn) catch-block-size) word-bytes))))
 

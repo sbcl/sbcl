@@ -39,7 +39,7 @@
 		  (load load (cdr load))
 		  (n 0 (1+ n)))
 		 ((null costs)
-		  (assert more-cost)
+		  (aver more-cost)
 		  (values arg-p
 			  (+ n
 			     (or (position-in #'tn-ref-across ref refs)
@@ -525,7 +525,7 @@
 	      (tn-ref-across val))
 	 (pass pass-locs (cdr pass)))
 	((null val)
-	 (assert (null pass)))
+	 (aver (null pass)))
       (let* ((val-tn (tn-ref-tn val))
 	     (pass-tn (first pass))
 	     (pass-sc (tn-sc pass-tn))
@@ -540,7 +540,7 @@
 		(cond ((not (sc-number-stack-p pass-sc)) fp-tn)
 		      (nfp-tn)
 		      (t
-		       (assert (eq how :known-return))
+		       (aver (eq how :known-return))
 		       (setq nfp-tn (make-number-stack-pointer-tn))
 		       (setf (tn-sc nfp-tn)
 			     (svref *backend-sc-numbers*
@@ -550,14 +550,14 @@
 			node block
 			(template-or-lose 'compute-old-nfp)
 			nfp-tn vop)
-		       (assert (not (sc-number-stack-p (tn-sc nfp-tn))))
+		       (aver (not (sc-number-stack-p (tn-sc nfp-tn))))
 		       nfp-tn)))
 	       (new (emit-move-arg-template node block res val-tn this-fp
 					    pass-tn vop))
 	       (after
 		(cond ((eq how :local-call)
-		       (assert (eq (vop-info-name (vop-info prev))
-				   'allocate-frame))
+		       (aver (eq (vop-info-name (vop-info prev))
+				 'allocate-frame))
 		       prev)
 		      (prev (vop-next prev))
 		      (t
@@ -634,7 +634,7 @@
     (do ((tn (ir2-component-normal-tns 2comp)
 	     (tn-next tn)))
 	((null tn))
-      (assert (tn-primitive-type tn))
+      (aver (tn-primitive-type tn))
       (unless (tn-sc tn)
 	(let* ((scs (primitive-type-scs (tn-primitive-type tn))))
 	  (cond ((rest scs)
@@ -649,13 +649,13 @@
     (do ((tn (ir2-component-normal-tns 2comp)
 	     (tn-next tn)))
 	((null tn))
-      (assert (tn-primitive-type tn))
+      (aver (tn-primitive-type tn))
       (unless (tn-sc tn)
 	(let* ((scs (primitive-type-scs (tn-primitive-type tn)))
 	       (sc (if (rest scs)
 		       (select-tn-representation tn scs costs)
 		       (svref *backend-sc-numbers* (first scs)))))
-	  (assert sc)
+	  (aver sc)
 	  (setf (tn-sc tn) sc))))
 
     (do ((alias (ir2-component-alias-tns 2comp)
