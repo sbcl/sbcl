@@ -389,3 +389,22 @@
   '(and (= (double-float-low-bits x) (double-float-low-bits y))
 	(= (double-float-high-bits x) (double-float-high-bits y))))
 
+
+;;;; 32-bit operations
+(deftransform lognot ((x) ((unsigned-byte 32)) *
+                      :node node
+                      :result result)
+  "32-bit implementation"
+  (let ((dest (continuation-dest result)))
+    (unless (and (combination-p dest)
+                 (eq (continuation-fun-name (combination-fun dest))
+                     'logand))
+      (give-up-ir1-transform))
+    (unless (some (lambda (arg)
+                    (csubtypep (continuation-type arg)
+                               (specifier-type '(unsigned-byte 32))))
+                  (combination-args dest))
+      (give-up-ir1-transform))
+    (setf (node-derived-type node)
+          (values-specifier-type '(values (unsigned-byte 32) &optional)))
+    '(32bit-logical-not x)))
