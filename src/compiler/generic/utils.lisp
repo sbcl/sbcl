@@ -1,4 +1,5 @@
-;;;; utility functions needed by the back end to generate code
+;;;; utility functions and macros needed by the back end to generate
+;;;; code
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -58,3 +59,19 @@
        (- list-pointer-lowtag)
        (* static-fun-index (pad-data-block fdefn-size))
        (* fdefn-raw-addr-slot n-word-bytes))))
+
+;;; Various error-code generating helpers
+(defvar *adjustable-vectors* nil)
+
+(defmacro with-adjustable-vector ((var) &rest body)
+  `(let ((,var (or (pop *adjustable-vectors*)
+                   (make-array 16
+                               :element-type '(unsigned-byte 8)
+                               :fill-pointer 0
+                               :adjustable t))))
+     (declare (type (vector (unsigned-byte 8) 16) ,var))
+     (setf (fill-pointer ,var) 0)
+     (unwind-protect
+         (progn
+           ,@body)
+       (push ,var *adjustable-vectors*))))
