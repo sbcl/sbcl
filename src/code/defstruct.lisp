@@ -114,9 +114,22 @@
   (print-unreadable-object (x stream :type t)
     (prin1 (dd-name x) stream)))
 
-;;; Is DD a structure with a class?
-(defun dd-class-p (defstruct)
-  (member (dd-type defstruct) '(structure funcallable-structure)))
+;;; Does DD describe a structure with a class?
+(defun dd-class-p (dd)
+  (member (dd-type dd)
+	  '(structure funcallable-structure)))
+
+;;; a type name which can be used when declaring things which operate
+;;; on structure instances
+(defun dd-declarable-type (dd)
+  (if (dd-class-p dd)
+      ;; Native classes are known to the type system, and we can
+      ;; declare them as types.
+      (dd-name dd)
+      ;; Structures layered on :TYPE LIST or :TYPE VECTOR aren't part
+      ;; of the type system, so all we can declare is the underlying
+      ;; LIST or VECTOR type.
+      (dd-type dd)))
 
 (defun dd-layout-or-lose (dd)
   (compiler-layout-or-lose (dd-name dd)))
@@ -579,7 +592,8 @@
 ;;; Return forms to define readers and writers for raw slots as inline
 ;;; functions.
 (defun raw-accessor-definitions (dd)
-  (let* ((name (dd-name dd)))
+  (let* ((name (dd-name dd))
+	 (dtype (dd-declarable-type dd)))
     (collect ((res))
       (dolist (slot (dd-slots dd))
 	(let ((slot-type (dsd-type slot))
@@ -592,7 +606,7 @@
 	    (when (and accessor-name
 		       (not (eq accessor-name '%instance-ref)))
 	      (res `(declaim (inline ,accessor-name)))
-	      (res `(declaim (ftype (function (,name) ,slot-type)
+	      (res `(declaim (ftype (function (,dtype) ,slot-type)
 				    ,accessor-name)))
 	      (res `(defun ,accessor-name (,argname)
 		      ;; Note: The DECLARE here might seem redundant
@@ -600,17 +614,17 @@
 		      ;; If we're not at toplevel, the PROCLAIM inside
 		      ;; the DECLAIM doesn't get executed until after
 		      ;; this function is compiled.
-		      (declare (type ,name ,argname))
+		      (declare (type ,dtype ,argname))
 		      (truly-the ,slot-type (,accessor ,data ,offset))))
 	      (unless (dsd-read-only slot)
 		(res `(declaim (inline (setf ,accessor-name))))
-		(res `(declaim (ftype (function (,slot-type ,name) ,slot-type)
+		(res `(declaim (ftype (function (,slot-type ,dtype) ,slot-type)
 				      (setf ,accessor-name))))
 		;; FIXME: I rewrote this somewhat from the CMU CL definition.
 		;; Do some basic tests to make sure that reading and writing
 		;; raw slots still works correctly.
 		(res `(defun (setf ,accessor-name) (,nvname ,argname)
-			(declare (type ,name ,argname))
+			(declare (type ,dtype ,argname))
 			(setf (,accessor ,data ,offset) ,nvname)
 			,nvname)))))))
       (res))))
@@ -675,10 +689,10 @@
     `((setf (fdefinition ',(dd-copier-name defstruct)) #'copy-seq)
       (declaim (ftype function ,(dd-copier-name defstruct))))))
 
-;;; Return a list of function definitions for accessing and setting the
-;;; slots of a typed DEFSTRUCT. The functions are proclaimed to be inline,
-;;; and the types of their arguments and results are declared as well. We
-;;; count on the compiler to do clever things with ELT.
+;;; Return a list of function definitions for accessing and setting
+;;; the slots of a typed DEFSTRUCT. The functions are proclaimed to be
+;;; inline, and the types of their arguments and results are declared
+;;; as well. We count on the compiler to do clever things with ELT.
 (defun typed-accessor-definitions (defstruct)
   (collect ((stuff))
     (let ((ltype (dd-lisp-type defstruct)))
@@ -1180,11 +1194,12 @@
     (setf (info :type :compiler-layout (dd-name dd)) layout))
 
   (let* ((dd-name (dd-name dd))
+	 (dtype (dd-declarable-type dd))
 	 (class (sb!xc:find-class dd-name)))
 
     (let ((copier-name (dd-copier-name dd)))
       (when copier-name
-	(sb!xc:proclaim `(ftype (function (,dd-name) ,dd-name) ,copier-name))))
+	(sb!xc:proclaim `(ftype (function (,dtype) ,dtype) ,copier-name))))
 
     (let ((predicate-name (dd-predicate-name dd)))
       (when predicate-name
@@ -1196,7 +1211,7 @@
 	(when accessor-name
 	  (multiple-value-bind (reader-designator writer-designator)
 	      (accessor-inline-expansion-designators dd dsd)
-	    (sb!xc:proclaim `(ftype (function (,dd-name) ,dsd-type)
+	    (sb!xc:proclaim `(ftype (function (,dtype) ,dsd-type)
 				    ,accessor-name))
 	    (setf (info :function
 			:inline-expansion-designator
@@ -1207,7 +1222,7 @@
 	    (unless (dsd-read-only dsd)
 	      (let ((setf-accessor-name `(setf ,accessor-name)))
 		(sb!xc:proclaim
-		 `(ftype (function (,dsd-type ,dd-name) ,dsd-type)
+		 `(ftype (function (,dsd-type ,dtype) ,dsd-type)
 			 ,setf-accessor-name))
 		(setf (info :function
 			    :inline-expansion-designator
