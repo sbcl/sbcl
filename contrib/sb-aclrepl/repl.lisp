@@ -428,7 +428,7 @@
     (values)))
 
 (defun inspect-cmd (arg)
-  (inspector-fun arg nil *output*)
+  (inspector-fun (eval arg) nil *output*)
   (values))
 
 (defun istep-cmd (&optional arg-string)

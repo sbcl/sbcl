@@ -63,7 +63,6 @@ The commands are:
 	(*inspect-raw* nil)
 	(*inspect-length* *inspect-length*)
 	(*skip-address-display* nil))
-    (setq object (eval object))
     (setq *current-inspect* (make-inspect))
     (reset-stack object "(inspect ...)")
     (redisplay output-stream)
