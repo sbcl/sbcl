@@ -85,8 +85,6 @@
 
   (/show0 "entering !COLD-INIT")
 
-  (%primitive print "//entering !COLD-INIT") ; REMOVEME
-
   ;; FIXME: It'd probably be cleaner to have most of the stuff here
   ;; handled by calls like !GC-COLD-INIT, !ERROR-COLD-INIT, and
   ;; !UNIX-COLD-INIT. And *TYPE-SYSTEM-INITIALIZED* could be changed to
@@ -106,8 +104,6 @@
   (setf *current-error-depth* 0)
   (setf *cold-init-complete-p* nil)
   (setf *type-system-initialized* nil)
-
-  (%primitive print "//done with SETFs") ; REMOVEME
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
@@ -139,8 +135,6 @@
   ;; functions are called in the same relative order as the toplevel
   ;; forms of the corresponding source files.
 
-  (%primitive print "//about to !POLICY-COLD-INIT-OR-RESANIFY") ; REMOVEME
-
   ;;(show-and-call !package-cold-init)
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
@@ -160,7 +154,6 @@
 		 (/primitive-print hexstr)))
   (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
-    (%primitive print "//about to DOLIST TOPLEVEL-THING") ; REMOVEME
 
     (dolist (toplevel-thing (prog1
 				(nreverse *!reversed-cold-toplevels*)
@@ -202,7 +195,6 @@
 	    (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
 	(t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
-  (%primitive print "//done with DOLIST TOPLEVEL-THING") ; REMOVEME
 
   ;; Set sane values again, so that the user sees sane values instead
   ;; of whatever is left over from the last DECLAIM/PROCLAIM.
@@ -231,7 +223,6 @@
 				     :invalid
 				     :divide-by-zero))
 
-  (%primitive print "//about to !CLASS-FINALIZE") ; REMOVEME
   (show-and-call !class-finalize)
 
   ;; The reader and printer are initialized very late, so that they
@@ -257,7 +248,6 @@
 
   (/show0 "done initializing, setting *COLD-INIT-COMPLETE-P*")
   (setf *cold-init-complete-p* t)
-  (%primitive print "//set *COLD-INIT-COMPLETE-P*") ; REMOVEME
 
   ;; The system is finally ready for GC.
   #!-gengc (setf *already-maybe-gcing* nil)
@@ -266,8 +256,6 @@
   (/show0 "doing first GC")
   (gc :full t)
   (/show0 "back from first GC")
-
-  (%primitive print "//back from first GC") ; REMOVEME
 
   ;; The show is on.
   (terpri)

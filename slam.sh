@@ -25,7 +25,14 @@
 # files for more information.
 
 
-export SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
+# We don't try to be general about this in this script the way we are
+# in make.sh, since (1) we use our command line args as names of files
+# to recompile, and (2) the idiosyncrasies of SBCL command line
+# argument order dependence, the meaninglessness of duplicate --core
+# arguments, and the SBCL-vs-CMUCL dependence of --core/-core argument
+# syntax make it too messy to try deal with arbitrary SBCL commands.
+# So you have no choice:
+export SBCL_XC_HOST='sbcl --noprogrammer'
 
 # (We don't do make-host-1.sh at all. Hopefully nothing relevant has
 # changed.)
@@ -42,13 +49,8 @@ sh make-target-1.sh || exit 1
 # though, make a point of not calling after-xc.core, since it might
 # not exist, and there's no point in causing a fatal failure (by
 # unsuccessfully trying to execute it) unnecessarily.
-if [ "$*" != "" ] ; then 
-    # Actually, I wrote this script when I needed to do a lot of
-    # tweaking in src/runtime/*.c, and I haven't tried to make it 
-    # work for src/code/*.c yet. -- WHN 2001-05-12
-    echo stub: no support yet for after-xc.core
-    exit 1
-fi
+for f in $*; do echo "(target-compile-stem \"$f\")"; done \
+  | sbcl --core output/after-xc.core || exit 1
 sh make-genesis-2.sh || exit 1 
 
 sh make-target-2.sh || exit 1

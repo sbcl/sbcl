@@ -14,7 +14,12 @@
 # more information.
 
 # how we invoke SBCL in the tests
-export SBCL="${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}"
+#
+# Until sbcl-0.6.12.8, the shell variable SBCL was bound to a relative
+# pathname, but now we take care to bind it to an absolute pathname (still
+# generated relative to `pwd` in the tests/ directory) so that tests
+# can chdir before invoking SBCL and still work.
+export SBCL="${1:-`pwd`/../src/runtime/sbcl --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}"
 echo /running tests on SBCL=\'$SBCL\'
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
@@ -29,7 +34,7 @@ tenfour () {
     if [ $? = 104 ]; then
 	echo ok
     else
-	echo test failed: $?
+	echo test failed, expected 104 return code, got $?
 	exit 1
     fi
 }

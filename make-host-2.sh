@@ -104,11 +104,10 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	;; used in the normal build, but can be handy for experimenting
 	;; with the system.
         
-	;; REMOVEME: should be conditional on :SB-SHOW again
-	;;(when (find :sb-show *shebang-features*)
+	(when (find :sb-show *shebang-features*)
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
-	  ;;)
+	  )
 	EOF
 
 # Run GENESIS (again) in order to create cold-sbcl.core. (The first

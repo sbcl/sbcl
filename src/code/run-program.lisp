@@ -429,6 +429,12 @@
   (stdout sb-c-call:int)
   (stderr sb-c-call:int))
 
+;;; Is UNIX-FILENAME the name of a file that we can execute?
+(defun unix-filename-is-executable-p (unix-filename)
+  (declare (type simple-string unix-filename))
+  (values (and (eq (sb-unix:unix-file-kind unix-filename) :file)
+	       (sb-unix:unix-access unix-filename sb-unix:x_ok))))
+
 ;;; FIXME: There shouldn't be two semiredundant versions of the
 ;;; documentation. Since this is a public extension function, the
 ;;; documentation should be in the doc string. So all information from
@@ -583,10 +589,12 @@
 	       ;; (I don't want to do it with search lists the way
 	       ;; that CMU CL did, because those are a non-ANSI
 	       ;; extension which I'd like to get rid of. -- WHN)
-	       (pfile (unix-namestring program t t))
+	       (pfile (unix-namestring program t))
 	       (cookie (list 0)))
 	   (unless pfile
 	     (error "no such program: ~S" program))
+	   (unless (unix-filename-is-executable-p pfile)
+	     (error "not executable: ~S" program))
 	   (multiple-value-bind (stdin input-stream)
 	       (get-descriptor-for input cookie
 				   :direction :input
