@@ -328,9 +328,6 @@ not as a slot access but as a search through the compiler/kernel
 
 CLOS (based on the PCL reference implementation) is quite slow.
 
-The interpreter's pre-processing freezes in the macro definitions in effect at
-the time an interpreted function is defined.
-
 There are many nagging pre-ANSIisms, e.g.
 .TP 3
 \--
@@ -348,6 +345,11 @@ sometimes expanded inline,
 doesn't do what you'd expect. (Instead, you have to declare the
 function as SB-EXT:MAYBE-INLINE to get the desired effect.)
 .TP 3
+\--
+The DYNAMIC-EXTENT declaration is not implemented, and is simply
+ignored. (This is allowed by the ANSI spec, but can have a large
+efficiency cost in some kinds of code.)
+.TP 3
 --
 Compiling DEFSTRUCT in strange places (e.g. inside a DEFUN) doesn't
 do anything like what it should.
@@ -355,16 +357,6 @@ do anything like what it should.
 \--
 The symbol * is the name of a type similar to T. (It's used as part
 of the implementation of compound types like (ARRAY * 1).)
-.TP 3
-\--
-The DESCRIBE facility doesn't use CLOS (PRINT-OBJECT, etc.) as it should.
-Instead it is based on old hardwired TYPECASEs.
-.TP 3
-\--
-The printer doesn't use CLOS (PRINT-OBJECT, etc.) everywhere it should.
-Instead it still uses old hardwired TYPECASEs. (This one is not as
-annoying as it sounds, since the printer does use PRINT-OBJECT in the
-places where it tends to matter most.)
 .PP
 
 .SH SUPPORT
