@@ -50,6 +50,7 @@
 	  (setf (functional-kind fun) nil)
           (delete-functional fun)))))
 
+  (setf (component-nlx-info-generated-p component) t)
   (values))
 
 ;;; This is to be called on a COMPONENT with top level LAMBDAs before

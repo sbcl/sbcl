@@ -91,6 +91,18 @@
     (setf (block-flag block) t)
     (dolist (succ (block-succ block))
       (find-dfo-aux succ head component))
+    (when (component-nlx-info-generated-p component)
+      ;; FIXME: We also need (and do) this walk before physenv
+      ;; analysis, but at that time we are probably not very
+      ;; interested in the actual DF order.
+      ;;
+      ;; TODO: It is probable that one of successors have the same (or
+      ;; similar) set of NLXes; try to shorten the walk (but think
+      ;; about a loop, the only exit from which is non-local).
+      (map-block-nlxes (lambda (nlx-info)
+                         (let ((nle (nlx-info-target nlx-info)))
+                         (find-dfo-aux nle head component)))
+                       block))
     (remove-from-dfo block)
     (add-to-dfo block head))
   (values))

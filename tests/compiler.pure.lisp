@@ -1169,6 +1169,18 @@
                     nil)))
                 1 2)))
 
+;;; misc.295
+(assert (eql
+         (funcall
+          (compile
+           nil
+           '(lambda ()
+             (declare (optimize (speed 1) (space 0) (safety 0) (debug 0)))
+             (multiple-value-prog1
+                 (the integer (catch 'ct8 (catch 'ct7 15867134)))
+               (catch 'ct1 (throw 'ct1 0))))))
+         15867134))
+
 
 ;;; MISC.275
 (assert

@@ -373,7 +373,8 @@
   ;; inline expansion. Unlike NEW-FUNCTIONALS, this is not disjoint
   ;; from COMPONENT-LAMBDAS.
   (reanalyze-functionals nil :type list)
-  (delete-blocks nil :type list))
+  (delete-blocks nil :type list)
+  (nlx-info-generated-p nil :type boolean))
 (defprinter (component :identity t)
   name
   #!+sb-show id
