@@ -49,6 +49,15 @@
   (:documentation "Return a Socket Address object suitable for use with SOCKET.
 When SOCKADDR is passed, it is used instead of a new object."))
 
+(defgeneric free-sockaddr-for (socket sockaddr)
+  (:documentation "Deallocate a Socket Address object that was
+created for SOCKET."))
+
+(defmacro with-sockaddr-for ((socket sockaddr sockaddr-args) &body body)
+  `(let ((,sockaddr (apply #'make-sockaddr-for ,socket nil ,sockaddr-args)))
+     (unwind-protect (progn ,@body)
+       (free-sockaddr-for ,socket ,sockaddr))))
+
 ;; we deliberately redesign the "bind" interface: instead of passing a
 ;; sockaddr_something as second arg, we pass the elements of one as
 ;; multiple arguments.
@@ -61,11 +70,10 @@ See also bind(2)"))
 
 (defmethod socket-bind ((socket socket)
                         &rest address)
-  (let ((sockaddr (apply #'make-sockaddr-for socket nil address)))
-    (if (= (sb-sys:with-pinned-objects (sockaddr)
-	    (sockint::bind (socket-file-descriptor socket)
-			   (sb-grovel::array-data-address sockaddr)
-			   (size-of-sockaddr socket)))
+  (with-sockaddr-for (socket sockaddr address)
+    (if (= (sockint::bind (socket-file-descriptor socket)
+			  sockaddr
+			  (size-of-sockaddr socket))
            -1)
         (socket-error "bind"))))
 
@@ -76,44 +84,41 @@ newly-created connected socket and the peer address as multiple
 values"))
   
 (defmethod socket-accept ((socket socket))
-  (let ((sockaddr (make-sockaddr-for socket)))
-    (sb-sys:with-pinned-objects (sockaddr)
-      (let ((fd (sockint::accept (socket-file-descriptor socket)
-				 (sb-grovel::array-data-address sockaddr)
-				 (size-of-sockaddr socket))))
-	(apply #'values
-	       (if (= fd -1)
-		   (socket-error "accept")
-		   (let ((s (make-instance (class-of socket)
-					   :type (socket-type socket)
-					   :protocol (socket-protocol socket)
-					   :descriptor fd)))
-		     (sb-ext:finalize s (lambda () (sockint::close fd)))))
-	       (multiple-value-list (bits-of-sockaddr socket sockaddr)))))))
+  (with-sockaddr-for (socket sockaddr nil)
+    (let ((fd (sockint::accept (socket-file-descriptor socket)
+			       sockaddr
+			       (size-of-sockaddr socket))))
+      (apply #'values
+	     (if (= fd -1)
+		 (socket-error "accept")
+		 (let ((s (make-instance (class-of socket)
+			     :type (socket-type socket)
+			     :protocol (socket-protocol socket)
+			     :descriptor fd)))
+		   (sb-ext:finalize s (lambda () (sockint::close fd)))))
+	     (multiple-value-list (bits-of-sockaddr socket sockaddr))))))
     
 (defgeneric socket-connect (socket &rest address)
   (:documentation "Perform the connect(2) call to connect SOCKET to a
   remote PEER.  No useful return value."))
 
 (defmethod socket-connect ((socket socket) &rest peer)
-  (let* ((sockaddr (apply #'make-sockaddr-for socket nil peer)))
-    (if (= (sb-sys:with-pinned-objects (sockaddr)
-	    (sockint::connect (socket-file-descriptor socket)
-			      (sb-grovel::array-data-address sockaddr)
-			      (size-of-sockaddr socket)))
+  (with-sockaddr-for (socket sockaddr peer)
+    (if (= (sockint::connect (socket-file-descriptor socket)
+			     sockaddr
+			     (size-of-sockaddr socket))
 	   -1)
-	(socket-error "connect") )))
+	(socket-error "connect"))))
 
 (defgeneric socket-peername (socket)
   (:documentation "Return the socket's peer; depending on the address
   family this may return multiple values"))
   
 (defmethod socket-peername ((socket socket))
-  (let* ((sockaddr (make-sockaddr-for socket)))
-    (when (= (sb-sys:with-pinned-objects (sockaddr)
-	      (sockint::getpeername (socket-file-descriptor socket)
-				    (sb-grovel::array-data-address sockaddr)
-				    (size-of-sockaddr socket)))
+  (with-sockaddr-for (socket sockaddr address)
+    (when (= (sockint::getpeername (socket-file-descriptor socket)
+				    sockaddr
+				    (size-of-sockaddr socket))
 	     -1)
       (socket-error "getpeername"))
     (bits-of-sockaddr socket sockaddr)))
@@ -123,11 +128,10 @@ values"))
   that the socket is bound to, as multiple values."))
 
 (defmethod socket-name ((socket socket))
-  (let* ((sockaddr (make-sockaddr-for socket)))
-    (when (= (sb-sys:with-pinned-objects (sockaddr)
-	      (sockint::getsockname (socket-file-descriptor socket)
-				    (sb-grovel::array-data-address sockaddr)
-				    (size-of-sockaddr socket)))
+  (with-sockaddr-for (socket sockaddr nil)
+    (when (= (sockint::getsockname (socket-file-descriptor socket)
+				   sockaddr
+				   (size-of-sockaddr socket))
 	     -1)
       (socket-error "getsockname"))
     (bits-of-sockaddr socket sockaddr)))
@@ -152,34 +156,38 @@ so that the actual packet length is returned even if the buffer was too
 small"))
   
 (defmethod socket-receive ((socket socket) buffer length
-			 &key
-			 oob peek waitall
-			 (element-type 'character))
-  (let ((flags
-	 (logior (if oob sockint::MSG-OOB 0)
-		 (if peek sockint::MSG-PEEK 0)
-		 (if waitall sockint::MSG-WAITALL 0)
-		 sockint::MSG-NOSIGNAL	;don't send us SIGPIPE
-		 (if (eql (socket-type socket) :datagram)
-		     sockint::msg-TRUNC 0)))
-	(sockaddr (make-sockaddr-for socket)))
-    (unless (or buffer length)
-      (error "Must supply at least one of BUFFER or LENGTH"))
-    (unless buffer
-      (setf buffer (make-array length :element-type element-type)))
-    (sb-alien:with-alien ((sa-len (array (sb-alien:unsigned 32) 2)))
-      (setf (sb-alien:deref sa-len 0) (size-of-sockaddr socket))
-      (sb-sys:with-pinned-objects (buffer sockaddr) 
-       (let ((len
-	      (sockint::recvfrom (socket-file-descriptor socket)
-				 (sb-grovel::array-data-address buffer)
-				 (or length (length buffer))
-				 flags
-				 (sb-grovel::array-data-address sockaddr)
-				 (sb-alien:cast sa-len (* integer)))))
-	 (when (= len -1) (socket-error "recvfrom"))
-	 (apply #'values buffer len (multiple-value-list
-				     (bits-of-sockaddr socket sockaddr))))))))
+			   &key
+			   oob peek waitall
+			   (element-type 'character))
+  (with-sockaddr-for (socket sockaddr nil)
+    (let ((flags
+	   (logior (if oob sockint::MSG-OOB 0)
+		   (if peek sockint::MSG-PEEK 0)
+		   (if waitall sockint::MSG-WAITALL 0)
+		   #+linux sockint::MSG-NOSIGNAL ;don't send us SIGPIPE
+		   (if (eql (socket-type socket) :datagram)
+		       sockint::msg-TRUNC 0))))
+      (unless (or buffer length)
+	(error "Must supply at least one of BUFFER or LENGTH"))
+      (unless length
+	(setf length (length buffer)))
+      (let ((copy-buffer (sb-alien:make-alien (array sb-alien:unsigned 1) length)))
+	(unwind-protect
+	    (sb-alien:with-alien ((sa-len (array (sb-alien:unsigned 32) 2)))
+	      (setf (sb-alien:deref sa-len 0) (size-of-sockaddr socket))
+	      (let ((len
+		     (sockint::recvfrom (socket-file-descriptor socket)
+					copy-buffer
+					length
+					flags
+					sockaddr
+					(sb-alien:cast sa-len (* integer)))))
+		(when (= len -1) (socket-error "recvfrom"))
+		(loop for i from 0 below len
+		      do (setf (elt buffer i) (sb-alien:deref copy-buffer i)))
+		(apply #'values buffer len (multiple-value-list
+					    (bits-of-sockaddr socket sockaddr)))))
+	  (sb-alien:free-alien copy-buffer))))))
 
 
 

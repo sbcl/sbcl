@@ -104,23 +104,27 @@
  (buf (* t))))
  |#
  (:structure protoent ("struct protoent"
-                       ((* t) name "char *" "p_name")
+                       (c-string-pointer name "char *" "p_name")
                        ((* (* t)) aliases "char **" "p_aliases")
 		       (integer proto "int" "p_proto")))
  (:function getprotobyname ("getprotobyname" (* t)
 					     (name c-string)))
  (:integer inaddr-any "INADDR_ANY")
  (:structure in-addr ("struct in_addr"
-		      ((array (unsigned 8) 4) addr "u_int32_t" "s_addr")))
+		      ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
  (:structure sockaddr-in ("struct sockaddr_in"
                           (integer family "sa_family_t" "sin_family")
-                          ((array (unsigned 8) 2) port "u_int16_t" "sin_port")
-                          ((array (unsigned 8) 4) addr "struct in_addr" "sin_addr")))
+			  ;; These two could be in-port-t and
+			  ;; in-addr-t, but then we'd throw away the
+			  ;; convenience (and byte-order agnosticism)
+			  ;; of the old sb-grovel scheme.
+                          ((array (unsigned 8)) port "u_int16_t" "sin_port")
+                          ((array (unsigned 8)) addr "struct in_addr" "sin_addr")))
  (:structure sockaddr-un ("struct sockaddr_un"
                           (integer family "sa_family_t" "sun_family")
-                          ((array (unsigned 8) 108) path "char" "sun_path")))
+                          (c-string path "char" "sun_path")))
  (:structure hostent ("struct hostent"
-                      ((* t) name "char *" "h_name")
+                      (c-string-pointer name "char *" "h_name")
                       ((* c-string) aliases "char **" "h_aliases")
                       (integer type "int" "h_addrtype")
                       (integer length "int" "h_length")
@@ -131,26 +135,26 @@
                     (protocol integer)))
  (:function bind ("bind" integer
                   (sockfd integer)
-                  (my-addr (* t))
+                  (my-addr (* t))  ; KLUDGE: sockaddr-in or sockaddr-un?
                   (addrlen integer)))
  (:function listen ("listen" integer
                     (socket integer)
                     (backlog integer)))
  (:function accept ("accept" integer
                     (socket integer)
-                    (my-addr (* t))
+                    (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                     (addrlen integer :in-out)))
  (:function getpeername ("getpeername" integer
                          (socket integer)
-                         (her-addr (* t))
+                         (her-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                          (addrlen integer :in-out)))
  (:function getsockname ("getsockname" integer
                          (socket integer)
-                         (my-addr (* t))
+                         (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                          (addrlen integer :in-out)))
  (:function connect ("connect" integer
                     (socket integer)
-                    (his-addr (* t))
+                    (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                     (addrlen integer )))
  
  (:function close ("close" integer
@@ -160,10 +164,10 @@
 				 (buf (* t))
 				 (len integer)
 				 (flags integer)
-				 (sockaddr (* t))
+				 (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
 				 (socklen (* integer))))
- (:function gethostbyname ("gethostbyname" (* t ) (name c-string)))
- (:function gethostbyaddr ("gethostbyaddr" (* t )
+ (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
+ (:function gethostbyaddr ("gethostbyaddr" (* hostent)
 					   (addr (* t))
 					   (len integer)
 					   (af integer)))
@@ -182,5 +186,5 @@
                         (level integer)
                         (optname integer)
                         (optval (* t))
-                        (optlen integer :in-out))))
+                        (optlen (* integer)))))
 )

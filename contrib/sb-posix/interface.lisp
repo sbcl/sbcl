@@ -1,5 +1,26 @@
 (cl:in-package :sb-posix-internal)
 
+(defun make-alien-slot-name (alien-type slot-name)
+  (intern (format nil "~A-~A" alien-type slot-name)
+	  (symbol-package slot-name)))
+
+(declaim (inline alien-to-protocol-class))
+(defun alien-to-protocol-class (alien alien-type instance protocol-class slots)
+  "Copy SLOTS from the alien object ALIEN of type ALIEN-TYPE to INSTANCE, an instance of PROTOCOL-CLASS.
+We assume that SLOT names are the same in the alien object and in
+the protocol-class."
+  (unless instance
+    (setf instance (make-instance protocol-class)))
+  (loop for slot in slots
+	do (setf (slot-value instance slot)
+		 (sb-alien:slot alien slot)))
+  instance)
+
+(defun protocol-class-to-alien (instance protocol-class alien alien-type slots)
+  (loop for slot in slots
+	do (setf (sb-alien:slot alien slot) (slot-value instance slot)))
+  instance)
+
 (define-condition sb-posix:syscall-error (error)
   ((errno :initarg :errno :reader sb-posix:syscall-errno))
   (:report (lambda (c s)
@@ -74,7 +95,7 @@
       (fcntl-without-arg fd cmd)))
 
 (define-call "opendir" (* t) null-alien (pathname filename))
-(define-call "readdir" (* t)
+(define-call "readdir" sb-posix::dirent
   ;; readdir() has the worst error convention in the world.  It's just
   ;; too painful to support.  (return is NULL _and_ errno "unchanged"
   ;; is not an error, it's EOF).
@@ -141,6 +162,18 @@
 
 (define-call "getpagesize" int minusp)
 
+(defclass sb-posix::stat ()
+     ((sb-posix::mode :initarg :mode :accessor sb-posix::stat-mode)
+      (sb-posix::ino :initarg :ino :accessor sb-posix::stat-ino)
+      (sb-posix::dev :initarg :dev :accessor sb-posix::stat-dev)
+      (sb-posix::nlink :initarg :nlink :accessor sb-posix::stat-nlink)
+      (sb-posix::uid :initarg :uid :accessor sb-posix::stat-uid)
+      (sb-posix::gid :initarg :gid :accessor sb-posix::stat-gid)
+      (sb-posix::size :initarg :size :accessor sb-posix::stat-size)
+      (sb-posix::atime :initarg :atime :accessor sb-posix::stat-atime)
+      (sb-posix::mtime :initarg :mtime :accessor sb-posix::stat-mtime)
+      (sb-posix::ctime :initarg :ctime :accessor sb-posix::stat-ctime)))
+
 (defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
@@ -148,31 +181,27 @@
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg &optional stat)
-	(declare (type (or null sb-posix::stat) stat))
-	(unless stat
-	  (setq stat (sb-posix::allocate-stat)))
-	;; FIXME: Hmm.  WITH-PINNED-OBJECTS/WITHOUT-GCING or something
-	;; is probably needed round here.
-	(let* ((s (sb-sys:int-sap
-		   ;; FIXME: WILL NOT WORK ON 64-BIT LISP.  VECTOR-SAP
-		   ;; would be better if the STAT object were
-		   ;; guaranteed to be a vector, but it's not (and may
-		   ;; well turn into an alien soon).
-		   (+ 8 (logandc2 (sb-kernel:get-lisp-obj-address stat) 7))))
-	       (r (alien-funcall
-		   (extern-alien ,name ,type)
-		   (,designator-fun ,arg)
-		   s)))
-	  (when (minusp r)
-	    (syscall-error)))
-	stat))))
+	(declare (type (or null (sb-alien:alien (* sb-posix::alien-stat))) stat))
+	(sb-posix::with-alien-stat a-stat ()
+	  (let ((r (alien-funcall
+		    (extern-alien ,name ,type)
+		    (,designator-fun ,arg)
+		    a-stat)))
+	    (when (minusp r)
+	      (syscall-error))
+	    (alien-to-protocol-class a-stat 'sb-posix::alien-stat
+				     stat 'sb-posix::stat
+				     '(sb-posix::mode sb-posix::ino sb-posix::dev
+				       sb-posix::nlink sb-posix::uid sb-posix::gid
+				       sb-posix::size sb-posix::atime
+				       sb-posix::mtime sb-posix::ctime))))))))
+
 (define-stat-call "stat" pathname sb-posix::filename
-		  ;; FIXME: (* T)?  Ew.  (* STAT) would be preferable
-		  (function int c-string (* t)))
+		  (function int c-string (* sb-posix::alien-stat)))
 (define-stat-call "lstat" pathname sb-posix::filename
-		  (function int c-string (* t)))
+		  (function int c-string (* sb-posix::alien-stat)))
 (define-stat-call "fstat" fd sb-posix::file-descriptor
-		  (function int int (* t)))
+		  (function int int (* sb-posix::alien-stat)))
 
 
 ;;; mode flags
@@ -198,40 +227,50 @@
       (syscall-error)))
   (values (aref filedes2 0) (aref filedes2 1)))
 
+(defclass sb-posix::termios ()
+     ((sb-posix::iflag :initarg :iflag :accessor sb-posix::termios-iflag)
+      (sb-posix::oflag :initarg :oflag :accessor sb-posix::termios-oflag)
+      (sb-posix::cflag :initarg :cflag :accessor sb-posix::termios-cflag)
+      (sb-posix::lflag :initarg :lflag :accessor sb-posix::termios-lflag)
+      (sb-posix::cc :initarg :cc :accessor sb-posix::termios-cc)))
+
 (export 'sb-posix::tcsetattr :sb-posix)
 (declaim (inline sb-posix::tcsetattr))
 (defun sb-posix::tcsetattr (fd actions termios)
-  (let ((fd (sb-posix::file-descriptor fd)))
-    (let* ((s (sb-sys:int-sap
-	       ;; FIXME: WILL NOT WORK ON 64-BIT LISP.  VECTOR-SAP would
-	       ;; be better if the STAT object were guaranteed to be a
-	       ;; vector, but it's not (and may well turn into an alien
-	       ;; soon).
-	       (+ 8 (logandc2 (sb-kernel:get-lisp-obj-address termios) 7))))
-	   (r (alien-funcall
-	       ;; it's the old (* T) problem again :-(
-	       (extern-alien "tcsetattr" (function int int int (* t)))
-	       fd actions s)))
-      (when (minusp r)
-	(syscall-error)))
-    (values)))
+  (sb-posix::with-alien-termios a-termios ()
+    (protocol-class-to-alien termios 'sb-posix::termios
+			     a-termios 'sb-posix::alien-termios
+			     '(sb-posix::iflag sb-posix::oflag
+			       sb-posix::cflag sb-posix::lflag))
+    (loop with ccs = (sb-posix::alien-termios-cc a-termios)
+	    for i from 0 below sb-posix::nccs
+	    do (setf (sb-alien:deref ccs i)
+		     (aref (sb-posix::termios-cc termios) i)))
+    (let ((fd (sb-posix::file-descriptor fd)))
+      (let* ((r (alien-funcall
+		 (extern-alien "tcsetattr" (function int int int sb-posix::alien-termios))
+		 fd actions termios)))
+	(when (minusp r)
+	  (syscall-error)))
+      (values))))
 (export 'sb-posix::tcgetattr :sb-posix)
 (declaim (inline sb-posix::tcgetattr))
 (defun sb-posix::tcgetattr (fd &optional termios)
-  (unless termios
-    (setq termios (sb-posix::allocate-termios)))
-  	;; FIXME: Hmm.  WITH-PINNED-OBJECTS/WITHOUT-GCING or something
-	;; is probably needed round here.
-  (let* ((s (sb-sys:int-sap
-	     ;; FIXME: WILL NOT WORK ON 64-BIT LISP.  VECTOR-SAP would
-	     ;; be better if the STAT object were guaranteed to be a
-	     ;; vector, but it's not (and may well turn into an alien
-	     ;; soon).
-	     (+ 8 (logandc2 (sb-kernel:get-lisp-obj-address termios) 7))))
-	 (r (alien-funcall
-	     (extern-alien "tcgetattr" (function int int (* t)))
-	     (sb-posix::file-descriptor fd)
-	     s)))
-    (when (minusp r)
-      (syscall-error)))
+  (sb-posix::with-alien-termios a-termios ()
+    (let ((r (alien-funcall
+	      (extern-alien "tcgetattr" (function int int sb-posix::alien-termios))
+	      (sb-posix::file-descriptor fd)
+	      a-termios)))
+      (when (minusp r)
+	(syscall-error))
+      (setf termios
+	    (alien-to-protocol-class a-termios 'alien-termios
+				     termios 'termios
+				     '(sb-posix::iflag sb-posix::oflag
+				       sb-posix::cflag sb-posix::lflag)))
+      (setf (sb-posix::termios-cc termios) (make-array sb-posix::nccs))
+      (loop with ccs = (sb-posix::alien-termios-cc a-termios)
+	    for i from 0 below sb-posix::nccs
+	    do (setf (aref (sb-posix::termios-cc termios) i)
+		     (sb-alien:deref ccs i)))))
   termios)

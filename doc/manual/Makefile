@@ -14,7 +14,7 @@ HTMLDIR=$(basename $(ROOTFILE))
 DOCSTRINGDIR="docstrings/"
 # List of contrib modules that docstring docs will be created for.
 # FIXME: should check test-passed and not load them.
-MODULES=':sb-md5 :sb-rotate-byte'
+MODULES=':sb-md5 :sb-rotate-byte :sb-grovel'
 # List of package names that docstring docs will be created for.
 PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD :SB-MD5 :SB-ROTATE-BYTE"
 

@@ -13,149 +13,374 @@
   (&whole it (c-name lisp-name) return-type &rest args)
   (declare (ignorable c-name lisp-name return-type args))
   `(define-alien-routine ,@(cdr it)))
-#||
-(define-c-accessor FOO-PORT SOCKADDR-IN (ARRAY (UNSIGNED 8) 2) 2 2)
-(define-c-accessor SOCKADDR-IN-FAMILY SOCKADDR-IN INTEGER 6 2)
-||#
-;;; define-c-accessor makes us a setter and a getter for changing
-;;; memory at the appropriate offset
-
-;;;    (define-c-accessor STAT-ATIME STAT (INTEGER 32) 56 4)
-
-(defmacro define-c-accessor (el structure type offset length)
-  (declare (ignore structure))
-  (let* ((ty (cond
-	       ((eql type (intern "INTEGER"))
-		`(,type ,(* 8 length)))
-	       ((and (consp type) (eql (car type) (intern "*"))) ; pointer
-		`(unsigned ,(* 8 length)))
-	       ((eql type (intern "C-STRING")) ; c-string as array
-		`(base-char 8))
-	       ((and (consp type) (eql (car type) (intern "ARRAY")))
-		(cadr type))
-	       ((let ((type (sb-alien-internals:unparse-alien-type
-			     (sb-alien-internals:parse-alien-type type nil))))
-		  (cond
-		    ((consp type)
-		     (case (car type)
-		       (signed `(integer ,(cadr type)))
-		       (unsigned type)))
-		    (t (error "foo")))))))
-	 (sap-ref-? (intern (format nil "~ASAP-REF-~A"
-				    (if (member (car ty) '(INTEGER SIGNED))
-					"SIGNED-" "")
-				    (cadr ty))
-			    (find-package "SB-SYS"))))
-    (labels
-	((template (before after)
-	   `(let* ((addr
-		    (the (unsigned-byte ,sb-vm:n-machine-word-bits)
-		      (+ #.(ash 1 sb-vm:n-lowtag-bits)
-			 (logandc1 #.(1- (ash 1 sb-vm:n-lowtag-bits))
-				   (sb-kernel:get-lisp-obj-address ptr)))))
-		   (sap (sb-sys:int-sap
-			 (the (unsigned-byte ,sb-vm:n-machine-word-bits)
-			   (+ addr ,offset)))))
-		 (,before (,sap-ref-? sap index) ,after))))
-      `(progn
-	 ;;(declaim (inline ,el (setf ,el)))
-	 (defun ,el (ptr &optional (index 0))
-	   (declare (optimize (speed 3) (safety 0)))
-	   (sb-sys:without-gcing 
-	    ,(if (eql type (intern "C-STRING"))
-		 `(naturalize-bounded-c-string ptr ,offset ,length)
-		 (template 'prog1 nil))))
-	 (defconstant ,(intern (format nil "OFFSET-OF-~A" el)) ,offset)
-	 (defun (setf ,el) (newval ptr &optional (index 0))
-	   (declare (optimize (speed 3) (safety 0)))
-	   (sb-sys:without-gcing 
-	    ,(if (eql type (intern "C-STRING"))
-		 `(set-bounded-c-string ptr ,offset ,length newval)
-		 (template 'setf 'newval))))))))
 
 
-;;; make memory allocator for appropriately-sized block of memory, and
-;;; a constant to tell us how big it was anyway
-(defmacro define-c-struct (name size)
-  (labels ((p (x) (intern (concatenate 'string x (symbol-name name))
-			  (symbol-package name))))
+
+;;; strctures
+
+#| C structs need: the with-... interface.
+|#
+
+;;; global XXXs:
+#|
+ XXX: :distrust-length t fields are dangerous. they should only be at
+      the end of the structure (they mess up offset/size calculations)
+|#
+
+(defun reintern (symbol &optional (package *package*))
+  (if (symbolp symbol)
+      (intern (symbol-name symbol) package)
+      symbol))
+
+(defparameter alien-type-table (make-hash-table :test 'eql))
+(defparameter lisp-type-table (make-hash-table :test 'eql))
+
+(macrolet ((define-alien-types ((type size) &rest defns)
+	       `(progn
+		  ,@(loop for defn in defns
+			  collect (destructuring-bind (expected-type c-type lisp-type) defn
+				    `(progn
+				       (setf (gethash ',expected-type alien-type-table)
+					     (lambda (,type ,size)
+					       (declare (ignorable type size))
+					       ,c-type))
+				       (setf (gethash ',expected-type lisp-type-table)
+					     (lambda (,type ,size)
+					       (declare (ignorable type size))
+					       ,lisp-type))))))))
+  (define-alien-types (type size)
+      (integer (or (gethash size (symbol-value (intern "*INTEGER-SIZES*")))
+		   `(integer ,(* 8 size)))
+	       `(unsigned-byte ,(* 8 size)))
+      (unsigned `(unsigned ,(* 8 size))
+		`(unsigned-byte ,(* 8 size)))
+      (signed `(signed ,(* 8 size))
+	      `(signed-byte ,(* 8 size)))
+      (c-string `(array char ,size) 'cl:simple-string)
+      (c-string-pointer 'c-string 'cl:simple-string)
+      ;; TODO: multi-dimensional arrays, if they are ever needed.
+      (array (destructuring-bind (array-tag elt-type &optional array-size) type
+	       (declare (ignore array-tag))
+	       ;; XXX: use of EVAL.  alien-size is a macro,
+	       ;; unfortunately; and it will only accept unquoted type
+	       ;; forms.
+	       `(sb-alien:array ,elt-type ,(or array-size
+				  (/ size (eval `(sb-alien:alien-size ,elt-type :bytes))))))
+	     `(vector t))))
+
+(defun retrieve-type-for (type size table)
+  (multiple-value-bind (type-fn found)
+      (gethash (reintern (typecase type
+			   (list (first type))
+			   (t    type))
+			 (find-package '#:sb-grovel))
+	       table)
+    (values
+     (if found
+	 (funcall (the function type-fn) type size)
+	 type)
+     found)))
+
+(defun alien-type-for (type size)
+  (reintern (retrieve-type-for type size alien-type-table)))
+
+(defun lisp-type-for (type size)
+  (multiple-value-bind (val found)
+      (retrieve-type-for type size lisp-type-table)
+    (if found
+	val
+	t)))
+
+
+(defun mk-padding (len offset)
+  (make-instance 'padding
+		 :type `(array char ,len)
+		 :offset offset
+		 :size len
+		 :name (gensym "PADDING")))
+(defun mk-struct (offset &rest children)
+  (make-instance 'struct :name (gensym "STRUCT")
+		 :children (remove nil children)
+		 :offset offset))
+(defun mk-union (offset &rest children)
+  (make-instance 'union :name (gensym "UNION")
+		 :children (remove nil children)
+		 :offset offset))
+(defun mk-val (name type h-type offset size)
+  (declare (ignore h-type))
+  (make-instance 'value-slot :name name
+		 :size size
+		 :offset offset
+		 :type type))
+
+;;; struct tree classes
+
+(defclass slot ()
+  ((offset :initarg :offset :reader offset)
+   (name :initarg :name :reader name)))
+
+(defclass structured-type (slot)
+  ((children :initarg :children :accessor children)))
+
+(defclass union (structured-type)
+  ())
+
+(defclass struct (structured-type)
+  ())
+
+(defclass value-slot (slot)
+  ((size :initarg :size :reader size)
+   (type :initarg :type :reader type)))
+
+(defclass padding (value-slot)
+  ())
+
+(defmethod print-object ((o value-slot) s)
+  (print-unreadable-object (o s :type t)
+    (format s "~S ~A+~A=~A" (name o) (offset o) (size o) (slot-end o))))
+
+(defmethod print-object ((o structured-type) s)
+  (print-unreadable-object (o s :type t)
+    (format s "~S ~A" (name o) (children o))))
+
+(defmethod size ((slot structured-type))
+  (let ((min-offset (offset slot)))
+    (if (null (children slot))
+	0
+	(reduce #'max (mapcar (lambda (child)
+				(+ (- (offset child) min-offset) (size child)))
+			      (children slot))
+		:initial-value 0))))
+
+(defgeneric slot-end (slot))
+(defmethod slot-end ((slot slot))
+  (+ (offset slot) (size slot)))
+
+(defun overlap-p (elt1 elt2)
+  (unless (or (zerop (size elt1))
+	      (zerop (size elt2)))
+    (or
+     (and (<= (offset elt1)
+	      (offset elt2))
+	  (< (offset elt2)
+	     (slot-end elt1)))
+     (and (<= (offset elt2)
+	      (offset elt1))
+	  (< (offset elt1)
+	     (slot-end elt2))))))
+
+(defgeneric find-overlaps (root new-element))
+(defmethod find-overlaps ((root structured-type) new-element)
+  (when (overlap-p root new-element)
+    (let ((overlapping-elts (loop for child in (children root)
+				  for overlap = (find-overlaps child new-element)
+				  when overlap
+				     return overlap)))
+      (cons root overlapping-elts))))
+
+(defmethod find-overlaps ((root value-slot) new-element)
+  (when (overlap-p root new-element)
+    (list root)))
+
+(defgeneric pad-to-offset-of (to-pad parent))
+  (macrolet ((skel (end-form)
+	     `(let* ((end ,end-form)
+		     (len (abs (- (offset to-pad) end))))
+		(cond
+		  ((= end (offset to-pad)) ; we are at the right offset.
+		   nil)
+		  (t		        ; we have to pad between the
+					; old slot's end and the new
+					; slot's offset
+		   (mk-padding len end))))))
+  
+  (defmethod pad-to-offset-of (to-pad (parent struct))
+    (skel (if (null (children parent))
+	      0
+	      (+ (size parent) (offset parent)))))
+  (defmethod pad-to-offset-of (to-pad (parent union))
+    (skel (if (null (children parent))
+	      (offset to-pad)
+	      (offset parent)))))
+
+(defgeneric replace-by-union (in-st element new-element))
+(defmethod replace-by-union ((in-st struct) elt new-elt)
+  (setf (children in-st) (remove elt (children in-st)))
+  (let ((padding (pad-to-offset-of new-elt in-st)))
+    (setf (children in-st)
+	  (nconc (children in-st)
+		 (list (mk-union (offset elt)
+				 elt
+				 (if padding
+				     (mk-struct (offset elt)
+						padding
+						new-elt)
+				     new-elt)))))))
+
+(defmethod replace-by-union ((in-st union) elt new-elt)
+  (let ((padding (pad-to-offset-of new-elt in-st)))
+    (setf (children in-st)
+	  (nconc (children in-st)
+		 (list (if padding
+			   (mk-struct (offset in-st)
+				      padding
+				      new-elt)
+			   new-elt))))))
+
+(defgeneric insert-element (root new-elt))
+(defmethod insert-element ((root struct) (new-elt slot))
+  (let ((overlaps (find-overlaps root new-elt)))
+    (cond
+      (overlaps (let ((last-structure (first (last overlaps 2)))
+		      (last-val (first (last overlaps))))
+		  (replace-by-union last-structure last-val new-elt)
+		  root))
+      (t
+       (let ((padding (pad-to-offset-of new-elt root)))
+	 (setf (children root)
+	       (nconc (children root)
+		      (when padding (list padding))
+		      (list new-elt)))))))
+  root)
+
+(defun sane-slot (alien-var &rest slots)
+  "Emulates the SB-ALIEN:SLOT interface, with useful argument order for
+deeply nested structures."
+  (labels ((rewriter (slots)
+	     (if (null slots)
+		 alien-var
+		 `(sb-alien:slot ,(rewriter (rest slots))
+				 ',(first slots)))))
+    (rewriter slots)))
+
+(defgeneric accessor-modifier-for (element-type accessor-type))
+
+(defun identity-1 (thing &rest ignored)
+  (declare (ignore ignored))
+  thing)
+(defun (setf identity-1) (new-thing place &rest ignored)
+  (declare (ignore ignored))
+  (setf place new-thing))
+
+(defmethod accessor-modifier-for (element-type (accessor-type (eql :getter)))
+  'identity-1)
+(defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
+				  (accessor-type (eql :getter)))
+  'c-string->lisp-string)
+(defmethod accessor-modifier-for (element-type (accessor-type (eql :setter)))
+  nil)
+(defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
+				  (accessor-type (eql :setter)))
+  'c-string->lisp-string)
+(defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
+				  (accessor-type (eql :getter)))
+  'c-string->lisp-string)
+
+(defun c-string->lisp-string (string &optional limit)
+  (declare (ignore limit))
+  (cast string c-string))
+
+(defun (setf c-string->lisp-string) (new-string alien &optional limit)
+  (declare (string new-string))
+  (let* ((upper-bound (or limit (1+ (length new-string))))
+	 (last-elt (min (1- upper-bound) (length new-string))))
+    (loop for i upfrom 0 below last-elt
+	  for char across new-string
+	  do (setf (deref alien i) (char-code char)))
+    (setf (deref alien last-elt) 0)
+    (subseq new-string 0 last-elt)))
+
+(defgeneric accessors-for (struct-name element path))
+(defmethod accessors-for (struct-name (root structured-type) path)
+  nil)
+
+
+(defmethod accessors-for (struct-name (root value-slot) path)
+  (let ((rpath (reverse path))
+	(accessor-name (format nil "~A-~A"
+			       (symbol-name struct-name)
+			       (symbol-name (name root)))))
+    (labels ((accessor (root rpath)
+	       (apply #'sane-slot 'struct (mapcar 'name (append (rest rpath) (list root))))))
+      `((defun ,(intern accessor-name) (struct)
+	  (declare (type (alien ,struct-name) struct)
+		   (optimize (speed 3)))
+	  (,(accessor-modifier-for (reintern (type root) (find-package :sb-grovel))
+				   :getter)
+	    ,(accessor root rpath) ,(size root)))
+	(defun (setf ,(intern accessor-name)) (new-val struct)
+	  (declare (type (alien ,struct-name) struct)
+		   (type ,(lisp-type-for (type root) (size root)) new-val)
+		   (optimize (speed 3)))
+	  ,(let* ((accessor-modifier (accessor-modifier-for (reintern (type root)
+								      (find-package :sb-grovel))
+							    :setter))
+		  (modified-accessor (if accessor-modifier
+					 `(,accessor-modifier ,(accessor root rpath) ,(size root))
+					 (accessor root rpath))))
+	     
+	     `(setf ,modified-accessor new-val)))
+	(defconstant ,(intern (format nil "OFFSET-OF-~A" accessor-name))
+	  ,(offset root))))))
+
+
+
+(defmethod accessors-for (struct (root padding) path)
+  nil)
+
+(defgeneric generate-struct-definition (struct-name root path))
+(defmethod generate-struct-definition (struct-name (root structured-type) path)
+  (let ((naccessors (accessors-for struct-name root path))
+	(nslots nil))
+    (dolist (child (children root))
+      (multiple-value-bind (slots accessors)
+	  (generate-struct-definition struct-name child (cons root path))
+	(setf nslots (nconc nslots slots))
+	(setf naccessors (nconc naccessors accessors))))
+    (values `((,(name root) (,(type-of root) ,(name root) ,@nslots)))
+	    naccessors)))
+
+(defmethod generate-struct-definition (struct-name (root value-slot) path)
+  (values `((,(name root) ,(alien-type-for (type root) (size root))))
+	  (accessors-for struct-name root path)))
+
+(defmacro define-c-struct (name size &rest elements)
+  (multiple-value-bind (struct-elements accessors)
+      (let* ((root (make-instance 'struct :name name :children nil :offset 0)))
+	(loop for e in (sort elements #'< :key #'fourth)
+	      do (insert-element root (apply 'mk-val e))
+	      finally (return root))
+	(setf (children root)
+	      (nconc (children root)
+		     (list
+		      (mk-padding (max 0 (- size
+					    (size root)))
+				  (size root)))))
+	(generate-struct-definition name root nil))
     `(progn
-      (defun ,(p "ALLOCATE-") () (make-array ,size :initial-element 0
-					     :element-type '(unsigned-byte 8)))
-      (defconstant ,(p "SIZE-OF-") ,size)
-      (deftype ,name () '(simple-array (unsigned-byte 8) (,size)))
-      (defun ,(p "FREE-" ) (p) (declare (ignore p)))
-      (defmacro ,(p "WITH-") (var (&rest field-values) &body body)
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+	 (sb-alien:define-alien-type ,@(first struct-elements)))
+       ,@accessors
+       (defmacro ,(intern (format nil "WITH-~A" name)) (var (&rest field-values) &body body)
 	(labels ((field-name (x)
 			     (intern (concatenate 'string
 						  (symbol-name ',name) "-"
 						  (symbol-name x))
 				     ,(symbol-package name))))
-	  (append `(let ((,var ,'(,(p "ALLOCATE-")))))
-		  (mapcar (lambda (pair)
-			    `(setf (,(field-name (car pair)) ,var) ,(cadr pair)))
-			  field-values)
-		  body))))))
+	  `(let ((,var ,'(,(intern (format nil "ALLOCATE-~A" name)))))
+	     (unwind-protect
+		 (progn
+		   (progn ,@(mapcar (lambda (pair)
+				      `(setf (,(field-name (first pair)) ,var) ,(second pair)))
+				    field-values))
+		   ,@body)
+	       (funcall ',',(intern (format nil "FREE-~A" name)) ,var)))))
+       (defconstant ,(intern (format nil "SIZE-OF-~A" name)) ,size)
+       (defun ,(intern (format nil "ALLOCATE-~A" name)) ()
+	 (sb-alien:make-alien ,name))
+       (defun ,(intern (format nil "FREE-~A" name)) (o)
+	 (sb-alien:free-alien o)))))
 
 (defun foreign-nullp (c)
   "C is a pointer to 0?"
-  (= 0 (sb-sys:sap-int (sb-alien:alien-sap  c))))
-
-;;; this could be a lot faster if I cared enough to think about it
-(defun foreign-vector (pointer size length)
-  "Compose a vector of the words found in foreign memory starting at
-POINTER.  Each word is SIZE bytes long; LENGTH gives the number of
-elements of the returned vector.  See also FOREIGN-VECTOR-UNTIL-ZERO"
-  (assert (= size 1))
-  (let ((ptr
-	 (typecase pointer
-	   (sb-sys:system-area-pointer
-	    (sap-alien pointer (* (sb-alien:unsigned 8))))
-	   (t
-	    (sb-alien:cast pointer (* (sb-alien:unsigned 8))))))
-	(result (make-array length :element-type '(unsigned-byte 8))))
-    (loop for i from 0 to (1- length) by size
-	  do (setf (aref result i) (sb-alien:deref ptr i)))
-    result))
-
-(defun naturalize-bounded-c-string (pointer offset &optional max-length)
-  "Return the 0-terminated string starting at (+ POINTER OFFSET) with
-maximum length MAX-LENGTH, as a lisp object."
-  (let* ((ptr
-	  (typecase pointer
-	    (sb-sys:system-area-pointer
-	     (sap-alien (sb-sys:sap+ pointer offset) (* sb-alien:char)))
-	    (t
-	     (sap-alien (sb-sys:sap+ (alien-sap pointer) offset) (* sb-alien:char)))))
-	 (length (loop for i upfrom 0
- 		       until (or (and max-length
-				      (= i (1- max-length)))
-				 (= (sb-alien:deref ptr i) 0))
- 		       finally (return i)))
-	 (result (make-string length
-			      :element-type 'base-char)))
-    (sb-kernel:copy-from-system-area (alien-sap ptr) 0
-				     result (* sb-vm:vector-data-offset
-					       sb-vm:n-word-bits)
-				     (* length sb-vm:n-byte-bits))
-    result))
-
-(defun set-bounded-c-string (pointer offset max-length value)
-  "Set the range from POINTER + OFFSET to at most POINTER + OFFSET +
-MAX-LENGTH to the string contained in VALUE."
-  (assert (numberp max-length) nil
-	  "Structure field must have a grovelable maximum length.")
-  (assert (< (length value) max-length))
-  (let* ((ptr
-	  (typecase pointer
-	    (sb-sys:system-area-pointer
-	     (sap-alien (sb-sys:sap+ pointer offset) (* sb-alien:char)))
-	    (t
-	     (sap-alien (sb-sys:sap+ (alien-sap pointer) offset) (* sb-alien:char)))))
-	 (length (length value)))
-    (sb-kernel:copy-to-system-area value (* sb-vm:vector-data-offset
-					     sb-vm:n-word-bits)
-				   (alien-sap ptr) 0
-				   (* length sb-vm:n-byte-bits))
-    (setf (sb-alien:deref ptr length) 0)
-    value))
+  (null-alien c))

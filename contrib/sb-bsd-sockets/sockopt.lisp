@@ -20,7 +20,7 @@ In terms of providing a useful interface, we have to face up to the
 fact that most of these take different data types - some are integers,
 some are booleans, some are foreign struct instances, etc etc
 
-(define-socket-option lisp-name level number mangle-arg size mangle-return)
+ (define-socket-option lisp-name level number mangle-arg size mangle-return)
 
 macro-expands to two functions that define lisp-name and (setf ,lisp-name)
 and calls the functions mangle-arg and mangle-return on outgoing and incoming
@@ -41,15 +41,15 @@ something that the caller will want.
 
 Code for options that not every system has should be conditionalised:
 
-(if (boundp 'sockint::IP_RECVIF)
-    (define-socket-option so-receive-interface (getprotobyname "ip")
-      sockint::IP_RECVIF  ...  ))
+ (if (boundp 'sockint::IP_RECVIF)
+     (define-socket-option so-receive-interface (getprotobyname "ip")
+       sockint::IP_RECVIF  ...  ))
 
 
 |#
 
 (defmacro define-socket-option
-  (lisp-name level number mangle-arg size mangle-return)
+  (lisp-name level number buffer-type mangle-arg mangle-return mangle-setf-buffer)
   (let ((find-level
 	 (if (numberp (eval level))
 	     level
@@ -57,48 +57,36 @@ Code for options that not every system has should be conditionalised:
     `(progn
       (export ',lisp-name)
       (defun ,lisp-name (socket &aux (fd (socket-file-descriptor socket)))
-	(let ((buf (make-array sockint::size-of-int
-			       :element-type '(unsigned-byte 8)
-			       :initial-element 0)))
-	  (sb-sys:with-pinned-objects (buf)
-	    (if (= -1 (sockint::getsockopt
-		       fd ,find-level ,number (sb-grovel::array-data-address buf) ,size))
-		(socket-error "getsockopt")
-		(,mangle-return buf ,size)))))
+	(sb-alien:with-alien ((size sb-alien:integer)
+			      (buffer ,buffer-type))
+	  (setf size (sb-alien:alien-size ,buffer-type :bytes))
+	  (if (= -1 (sockint::getsockopt fd ,find-level ,number
+					 (sb-alien:addr buffer)
+					 (sb-alien:addr size)))
+	      (socket-error "getsockopt")
+	      (,mangle-return buffer size))))
       (defun (setf ,lisp-name) (new-val socket
 				&aux (fd (socket-file-descriptor socket)))
-	(if (= -1
-	       (sb-sys:without-gcing
-		(sockint::setsockopt
-		 fd ,find-level ,number (funcall (function ,mangle-arg) new-val ,size)
-		 ,size)))
-	    (socket-error "setsockopt"))))))
+	(sb-alien:with-alien ((buffer ,buffer-type))
+	  (setf buffer ,(if mangle-arg
+			    `(,mangle-arg new-val)
+			    `new-val))
+	  (when (= -1 (sockint::setsockopt fd ,find-level ,number
+					   (,mangle-setf-buffer buffer)
+					   ,(if (eql buffer-type 'sb-alien:c-string)
+						`(length new-val)
+						`(sb-alien:alien-size ,buffer-type :bytes))))
+	    (socket-error "setsockopt")))))))
 
 ;;; sockopts that have integer arguments
 
-(defun int-to-foreign (x size)
-  ;; can't use with-alien, as the variables it creates only have
-  ;; dynamic scope.  can't use the passed-in size because sap-alien
-  ;; is a macro and evaluates its second arg at read time
-  (let* ((v (make-array size :element-type '(unsigned-byte 8)
-			:initial-element 0))
-	 (d (sb-grovel::array-data-address v))
-	 (alien (sb-alien:sap-alien
-		 d; (sb-sys:int-sap d)
-		 (* (sb-alien:signed #.(* 8 sockint::size-of-int))))))
-    (setf (sb-alien:deref alien 0) x)
-    alien))
-
-(defun buffer-to-int (x size)
-  (declare (ignore size))
-  (let ((alien (sb-alien:sap-alien
-		(sb-grovel::array-data-address x)
-		(* (sb-alien:signed #.(* 8 sockint::size-of-int))))))
-    (sb-alien:deref alien)))
+(defun foreign-int-to-integer (buffer size)
+  (assert (= size (sb-alien:alien-size sb-alien:integer :bytes)))
+  buffer)
 
 (defmacro define-socket-option-int (name level number)
   `(define-socket-option ,name ,level ,number
-     int-to-foreign sockint::size-of-int buffer-to-int))
+     sb-alien:integer nil foreign-int-to-integer sb-alien:addr))
 
 (define-socket-option-int
   sockopt-receive-low-water sockint::sol-socket sockint::so-rcvlowat)
@@ -110,20 +98,22 @@ Code for options that not every system has should be conditionalised:
   sockopt-send-buffer sockint::sol-socket sockint::so-sndbuf)
 (define-socket-option-int
   sockopt-receive-buffer sockint::sol-socket sockint::so-rcvbuf)
-(define-socket-option-int
+#+linux(define-socket-option-int
   sockopt-priority sockint::sol-socket sockint::so-priority)
 
 ;;; boolean options are integers really
 
-(defun bool-to-foreign (x size)
-  (int-to-foreign (if x 1 0) size))
+(defun foreign-int-to-bool (x size)
+  (if (zerop (foreign-int-to-integer x size))
+      nil
+      t))
 
-(defun buffer-to-bool (x size)
-  (not (= (buffer-to-int x size) 0)))
+(defun bool-to-foreign-int (val)
+  (if val 1 0))
 
 (defmacro define-socket-option-bool (name level number)
   `(define-socket-option ,name ,level ,number
-     bool-to-foreign sockint::size-of-int buffer-to-bool))
+     sb-alien:integer bool-to-foreign-int foreign-int-to-bool sb-alien:addr))
 
 (define-socket-option-bool
   sockopt-reuse-address sockint::sol-socket sockint::so-reuseaddr)
@@ -131,9 +121,9 @@ Code for options that not every system has should be conditionalised:
   sockopt-keep-alive sockint::sol-socket sockint::so-keepalive)
 (define-socket-option-bool
   sockopt-oob-inline sockint::sol-socket sockint::so-oobinline)
-(define-socket-option-bool
+#+linux(define-socket-option-bool
   sockopt-bsd-compatible sockint::sol-socket sockint::so-bsdcompat)
-(define-socket-option-bool
+#+linux(define-socket-option-bool
   sockopt-pass-credentials sockint::sol-socket sockint::so-passcred)
 (define-socket-option-bool
   sockopt-debug sockint::sol-socket sockint::so-debug)
@@ -144,19 +134,12 @@ Code for options that not every system has should be conditionalised:
 
 (define-socket-option-bool sockopt-tcp-nodelay :tcp sockint::tcp-nodelay)
 
-(defun string-to-foreign (string size)
-  (declare (ignore size))
-  (let ((data (sb-grovel::array-data-address string)))
-    (sb-alien:sap-alien data (* t))))
-                                                         
-(defun buffer-to-string (x size)
-  (declare (ignore size))
-  (sb-c-call::%naturalize-c-string
-   (sb-grovel::array-data-address x)))
+(defun identity-1 (x &rest args)
+  (declare (ignore args))
+  x)
 
-(define-socket-option sockopt-bind-to-device sockint::sol-socket
-  sockint::so-bindtodevice string-to-foreign sockint::ifnamsiz
-  buffer-to-string)
+#+linux(define-socket-option sockopt-bind-to-device sockint::sol-socket
+  sockint::so-bindtodevice sb-alien:c-string identity identity-1 identity)
 
 ;;; other kinds of socket option
 

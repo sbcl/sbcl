@@ -1,0 +1,244 @@
+@node sb-grovel
+@section sb-grovel
+@cindex Foreign Function Interface, generation
+
+The @code{sb-grovel} module helps in generation of foreign function
+interfaces. It aids in extracting constants' values from the C
+compiler and in generating SB-ALIEN structure and union types,
+@pxref{Defining Foreign Types}.
+
+The ASDF(@uref{http://www.cliki.net/ASDF}) component type
+GROVEL-CONSTANTS-FILE has its PERFORM
+@c @xref for PERFORM when asdf manual is included?
+operation defined to write out a C source file, compile it, and run
+it.  The output from this program is Lisp, which is then itself
+compiled and loaded.
+
+sb-grovel is used in a few contributed modules, and it is currently
+compatible only to SBCL. However, if you want to use it, here are a
+few directions.
+
+@subsection Using sb-grovel in your own ASDF system
+
+@enumerate
+
+@item
+Create a Lisp package for the foreign constants/functions to go into.
+
+@item
+Make your system depend on the 'sb-grovel system.
+
+@item
+Create a grovel-constants data file - for an example, see
+example-constants.lisp in the contrib/sb-grovel/ directory in the SBCL
+source distribution.
+
+@item
+Add it as a component in your system. e.g.
+
+@lisp
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (require :sb-grovel))
+
+(defpackage :example-package.system
+            (:use :cl :asdf :sb-grovel))
+
+(in-package :example-package.system)
+            
+(defsystem example-system
+    :depends-on (sb-grovel)
+    :components
+    ((:module "sbcl"
+              :components
+              ((:file "defpackage")
+               (grovel-constants-file "example-constants"
+                                      :package :example-package)))))
+@end lisp
+
+Make sure to specify the package you chose in step 1
+
+@item
+Build stuff.
+
+@end enumerate
+
+@subsection Contents of a grovel-constants-file
+
+The grovel-constants-file, typically named @code{constants.lisp},
+comprises lisp expressions describing the foreign things that you want
+to grovel for. A @code{constants.lisp} file contains two sections:
+
+@itemize
+@item
+a list of headers to include in the C program, for example:
+@lisp
+("sys/types.h" "sys/socket.h" "sys/stat.h" "unistd.h" "sys/un.h"
+ "netinet/in.h" "netinet/in_systm.h" "netinet/ip.h" "net/if.h"
+ "netdb.h" "errno.h" "netinet/tcp.h" "fcntl.h" "signal.h" )
+@end lisp
+
+@item
+A list of sb-grovel clauses describing the things you want to grovel
+from the C compiler, for example:
+@lisp
+((:integer af-local
+           #+(or sunos solaris) "AF_UNIX"
+           #-(or sunos solaris) "AF_LOCAL"
+           "Local to host (pipes and file-domain).")
+ (:structure stat ("struct stat"
+                   (integer dev "dev_t" "st_dev")
+                   (integer atime "time_t" "st_atime")))
+ (:function getpid ("getpid" int )))
+@end lisp
+@end itemize
+
+There are two types of things that sb-grovel can sensibly extract from
+the C compiler: constant integers and structure layouts. It is also
+possible to define foreign functions in the constants.lisp file, but
+these definitions don't use any information from the C program; they
+expand directly to @code{sb-alien:define-alien-routine}
+(@pxref{The define-alien-routine Macro}) forms.
+
+Here's how to use the grovel clauses:
+
+@itemize
+@item
+@code{:integer} - constant expressions in C. Used in this form:
+@lisp
+ (:integer lisp-variable-name "C expression")
+@end lisp
+
+@code{"C expression"} will be typically be the name of a constant. But
+other forms are possible.
+
+@item
+@code{:structure} - alien structure definitions look like this:
+@lisp
+ (:structure lisp-struct-name ("struct c_structure"
+                               (type-designator lisp-element-name
+                                "c_element_type" "c_element_name"
+                                :distrust-length nil)
+                               ; ...
+                               ))
+@end lisp
+
+@code{type-designator} is a reference to a type whose size (and type
+constraints) will be groveled for. sb-grovel accepts a form of type
+designator that doesn't quite conform to either lisp nor sb-alien's
+type specifiers. Here's a list of type designators that sb-grovel
+currently accepts:
+@itemize
+@item
+@code{integer} - a C integral type; sb-grovel will infer the exact
+type from size information extracted from the C program. All common C
+integer types can be grovelled for with this type designator, but it
+is not possible to grovel for bit fields yet.
+
+@item
+@code{(unsigned n)} - an unsigned integer variable that is @code{n}
+bytes long. No size information from the C program will be used.
+@item
+@code{(signed n)} - an signed integer variable that is @code{n} bytes
+long. No size information from the C program will be used.
+
+@item
+@code{c-string} - an array of @code{char} in the structure. sb-grovel
+will use the array's length from the C program, unless you pass it the
+@code{:distrust-length} keyword argument with non-@code{nil} value
+(this might be required for structures such as solaris's @code{struct
+dirent}).
+
+@item
+@code{c-string-pointer} - a pointer to a C string, corresponding to
+the @code{sb-alien:c-string} type (@pxref{Foreign Type Specifiers}).
+@item
+@code{(array alien-type)} - An array of the previously-declared alien
+type. The array's size will be determined from the output of the C
+program and the alien type's size.
+@item
+@code{(array alien-type n)} - An array of the previously-declared alien
+type. The array's size will be assumed as being @code{n}.
+@end itemize
+
+
+Note that @code{c-string} and @code{c-string-pointer} do not have the
+same meaning. If you declare that an element is of type
+@code{c-string}, it will be treated as if the string is a part of the
+structure, whereas if you declare that the element is of type
+@code{c-string-pointer}, a @emph{pointer to a string} will be the
+structure member.
+
+@item
+@code{:function} - alien function definitions are similar to
+@code{define-alien-routine} definitions, because they expand to such
+forms when the lisp program is loaded. @xref{Foreign Function Calls}
+
+@lisp
+(:function lisp-function-name ("alien_function_name" alien-return-type
+                                                     (argument alien-type)
+                                                     (argument2 alien-type)))
+@end lisp
+@end itemize
+
+
+@subsection Programming with sb-grovel's structure types
+
+Let us assume that you have a grovelled structure definition:
+@lisp
+ (:structure mystruct ("struct my_structure"
+                       (integer myint "int" "st_int")
+                       (c-string mystring "char[]" "st_str")))
+@end lisp
+
+What can you do with it? Here's a short interface document:
+
+@itemize
+@item
+Creating and destroying objects:
+@itemize
+@item
+Function @code{(allocate-mystruct)} - allocates an object of type @code{mystruct}and
+returns a system area pointer to it.
+@item
+Function @code{(free-mystruct var)} - frees the alien object pointed to by
+@var{var}.
+@item
+Macro @code{(with-mystruct var ((member init) [...]) &body body)} -
+allocates an object of type @code{mystruct} that is valid in
+@var{body}. If @var{body} terminates or control unwinds out of
+@var{body}, the object pointed to by @var{var} will be deallocated.
+@end itemize
+
+@item
+Accessing structure members:
+@itemize
+@item
+@code{(mystruct-myint var)} and @code{(mystruct-mystring var)} return
+the value of the respective fields in @code{mystruct}.
+@item
+@code{(setf (mystruct-myint var) new-val)} and
+@code{(setf (mystruct-mystring var) new-val)} sets the value of the respective
+structure member to the value of @var{new-val}. Notice that in
+@code{(setf (mystruct-mystring var) new-val)}'s case, new-val is a lisp
+string.
+@end itemize
+@end itemize
+
+@subsubsection Traps and Pitfalls
+Basically, you can treat functions and data structure definitions that
+sb-grovel spits out as if they were alien routines and types. This has
+a few implications that might not be immediately obvious (especially
+if you have programmed in a previous version of sb-grovel that didn't
+use alien types):
+
+@itemize
+@item
+You must take care of grovel-allocated structures yourself. They are
+alien types, so the garbage collector will not collect them when you
+drop the last reference.
+
+@item
+If you use the @code{with-mystruct} macro, be sure that no references
+to the variable thus allocated leaks out. It will be deallocated when
+the block exits.
+@end itemize

@@ -9,8 +9,7 @@
     #+sb-building-contrib "SYS:CONTRIB;SB-GROVEL;"
     :components ((:file "defpackage")
 		 (:file "def-to-lisp" :depends-on ("defpackage"))
-		 (:file "foreign-glue" :depends-on ("defpackage"))
-		 (:file "array-data" :depends-on ("defpackage"))))
+		 (:file "foreign-glue" :depends-on ("defpackage"))))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-grovel))))
   (provide 'sb-grovel))

@@ -31,44 +31,42 @@ eventually, so that we can do DNS lookups in parallel with other things
   "Returns a HOST-ENT instance for HOST-NAME or throws some kind of condition.
 HOST-NAME may also be an IP address in dotted quad notation or some other
 weird stuff - see gethostbyname(3) for grisly details."
-  (let ((h (sockint::gethostbyname host-name)))
-    (make-host-ent h)))
+  (make-host-ent (sockint::gethostbyname host-name)))
 
 (defun get-host-by-address (address)
   "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
-(integer 0 255), or throws some kind of error.  See gethostbyaddr(3) for
+ (integer 0 255), or throws some kind of error.  See gethostbyaddr(3) for
 grisly details."
-  (let ((packed-addr (sockint::allocate-in-addr)))
-    (loop for i from 0 to 3 
-	  do (setf (sockint::in-addr-addr packed-addr i) (elt address i)))
-    (make-host-ent
-     (sb-sys:with-pinned-objects (packed-addr)
-      (sockint::gethostbyaddr (sb-grovel::array-data-address packed-addr)
-			      4
-			      sockint::af-inet)))))
+  (sockint::with-in-addr packed-addr ()
+    (let ((addr-vector (coerce address 'vector)))
+      (loop for i from 0 below (length addr-vector)
+	    do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
+		     (elt addr-vector i)))
+      (make-host-ent (sockint::gethostbyaddr packed-addr
+					     4
+					     sockint::af-inet)))))
 
 (defun make-host-ent (h)
   (if (sb-grovel::foreign-nullp h) (name-service-error "gethostbyname"))
-  (let* ((local-h (sb-grovel::foreign-vector h 1 sockint::size-of-hostent))
-	 (length (sockint::hostent-length local-h))
-	 (aliases 
-	  (loop for i = 0 then (1+ i)
-		for al = (sb-sys:sap-ref-sap
-			  (sb-sys:int-sap (sockint::hostent-aliases local-h))
-			  (* i 4))
-		until (= (sb-sys:sap-int al) 0) 
-		collect (sb-c-call::%naturalize-c-string al)))
-	 (address0 (sb-sys:sap-ref-sap (sb-sys:int-sap (sockint::hostent-addresses local-h)) 0))
+  (let* ((length (sockint::hostent-length h))
+	 (aliases (loop for i = 0 then (1+ i)
+			for al = (sb-alien:deref (sockint::hostent-aliases h) i)
+			while al
+			collect al))
+	 (address0 (sockint::hostent-addresses h))
 	 (addresses 
-	  (loop for i = 0 then (+ length i)
-		for ad = (sb-sys:sap-ref-32 address0 i)
-		while (> ad 0)
-		collect
-		(sb-grovel::foreign-vector (sb-sys:sap+ address0 i) 1 length))))
+	  (loop for i = 0 then (1+ i)
+		for ad = (sb-alien:deref address0 i)
+		until (sb-alien:null-alien ad)
+		collect (ecase (sockint::hostent-type h)
+			  (#.sockint::af-inet
+			   (loop for i from 0 below length
+				 collect (sb-alien:deref ad i)))
+			  (#.sockint::af-local
+			   (sb-alien:cast ad sb-alien:c-string))))))
     (make-instance 'host-ent
-                   :name (sb-c-call::%naturalize-c-string
-			  (sb-sys:int-sap (sockint::hostent-name local-h)))
-		   :type (sockint::hostent-type local-h)
+                   :name (sockint::hostent-name h)
+		   :type (sockint::hostent-type h)
                    :aliases aliases
                    :addresses addresses)))
 
@@ -143,4 +141,3 @@ GET-NAME-SERVICE-ERRNO")
   (defun get-name-service-error-message (num)
   (hstrerror num))
 )
-

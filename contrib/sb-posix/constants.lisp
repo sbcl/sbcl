@@ -241,7 +241,7 @@
 	      (:c-string name "char *" "d_name"
 			 :distrust-length #+sunos t #-sunos nil)))
 
- (:structure stat
+ (:structure alien-stat
 	     ("struct stat"
 	      (mode-t mode "mode_t" "st_mode")
 	      (ino-t ino "ino_t" "st_ino")
@@ -297,16 +297,13 @@
  (:type tcflag-t "tcflag_t")
  (:integer nccs "NCCS")
  
- (:structure termios
+ (:structure alien-termios
 	     ("struct termios"
 	      (tcflag-t iflag "tcflag_t" "c_iflag")
 	      (tcflag-t oflag "tcflag_t" "c_oflag")
 	      (tcflag-t cflag "tcflag_t" "c_cflag")
 	      (tcflag-t lflag "tcflag_t" "c_lflag")
-	      ;; Uh, so what's the point of grovelling CC-T if I can't
-	      ;; use it here?  the c_cc field is an array of NCCS
-	      ;; elements of type cc_t.  FIXME
-	      ((array (unsigned 8)) cc "cc_t" "c_cc")))
+	      ((array cc-t) cc "cc_t" "c_cc")))
  
  (:integer veof "VEOF")
  (:integer veol "VEOL")
