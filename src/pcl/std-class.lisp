@@ -338,7 +338,6 @@
       (ensure-class-values class args)
     (setf class (apply #'make-instance meta :name name initargs)
 	  (find-class name) class)
-    (inform-type-system-about-class class name)
     class))
 
 (defmethod ensure-class-using-class (name (class pcl-class) &rest args &key)
@@ -347,7 +346,6 @@
     (unless (eq (class-of class) meta) (change-class class meta))
     (apply #'reinitialize-instance class initargs)
     (setf (find-class name) class)
-    (inform-type-system-about-class class name)
     class))
 
 (defmethod class-predicate-name ((class t))
@@ -631,14 +629,14 @@
 	(dolist (r (slot-definition-readers dslotd)) (fix r slot-name 'r))
 	(dolist (w (slot-definition-writers dslotd)) (fix w slot-name 'w))))))
 
-(defun add-direct-subclasses (class new)
-  (dolist (n new)
+(defun add-direct-subclasses (class supers)
+  (dolist (super supers)
     (unless (memq class (class-direct-subclasses class))
-      (add-direct-subclass n class))))
+      (add-direct-subclass super class))))
 
-(defun remove-direct-subclasses (class new)
+(defun remove-direct-subclasses (class supers)
   (let ((old (class-direct-superclasses class)))
-    (dolist (o (set-difference old new))
+    (dolist (o (set-difference old supers))
       (remove-direct-subclass o class))))
 
 (defmethod finalize-inheritance ((class std-class))
@@ -979,8 +977,7 @@
 ;;;
 ;;; *** This needs work to make type testing by the writer functions which
 ;;; *** do type testing faster. The idea would be to have one constructor
-;;; *** for each possible type test. In order to do this it would be nice
-;;; *** to have help from inform-type-system-about-class and friends.
+;;; *** for each possible type test.
 ;;;
 ;;; *** There is a subtle bug here which is going to have to be fixed.
 ;;; *** Namely, the simplistic use of the template has to be fixed. We
@@ -995,20 +992,6 @@
 
 (defmethod make-boundp-method-function ((class slot-class) slot-name)
   (make-std-boundp-method-function (class-name class) slot-name))
-
-;;;; inform-type-system-about-class
-;;;
-;;; These are NOT part of the standard protocol. They are internal
-;;; mechanism which PCL uses to *try* and tell the type system about
-;;; class definitions. In a more fully integrated implementation of
-;;; CLOS, the type system would know about class objects and class
-;;; names in a more fundamental way and the mechanism used to inform
-;;; the type system about new classes would be different.
-(defmethod inform-type-system-about-class ((class std-class) name)
-  (inform-type-system-about-std-class name))
-
-(defmethod inform-type-system-about-class ((class structure-class) (name t))
-  nil)
 
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))

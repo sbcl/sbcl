@@ -59,7 +59,7 @@
 	  (:class  (push slotd class-slotds))
 	  (otherwise (push slotd other-slotds))))
       (setq max-slot-name-length  (min (+ max-slot-name-length 3) 30))
-      (format stream "~%~@<~S ~_is an instance of class ~S.~:>" object class)
+      (format stream "~&~@<~S ~_is an instance of class ~S.~:>" object class)
 
       ;; Now that we know the width, we can print.
       (when instance-slotds

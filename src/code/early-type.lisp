@@ -304,12 +304,7 @@
 ;;; type is defined (or redefined).
 (defun-cached (values-specifier-type
 	       :hash-function (lambda (x)
-				;; FIXME: The THE FIXNUM stuff is
-				;; redundant in SBCL (or modern CMU
-				;; CL) because of type inference.
-				(the fixnum
-				     (logand (the fixnum (sxhash x))
-					     #x3FF)))
+                                (logand (sxhash x) #x3FF))
 	       :hash-bits 10
 	       :init-wrapper !cold-init-forms)
 	      ((orig eq))
@@ -343,7 +338,9 @@
 		     (funcall fun lspec))
 		    ((or (and (consp spec) (symbolp (car spec)))
 			 (symbolp spec))
-		     (when *type-system-initialized*
+		     (when (and *type-system-initialized*
+                                (not (eq (info :type :kind spec)
+                                         :forthcoming-defclass-type)))
 		       (signal 'parse-unknown-type :specifier spec))
 		     ;; (The RETURN-FROM here inhibits caching.)
 		     (return-from values-specifier-type

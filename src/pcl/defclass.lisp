@@ -23,18 +23,32 @@
 
 (in-package "SB-PCL")
 
-(defun make-progn (&rest forms)
-  (let ((progn-form nil))
-    (labels ((collect-forms (forms)
-	       (unless (null forms)
-		 (collect-forms (cdr forms))
-		 (if (and (listp (car forms))
-			  (eq (caar forms) 'progn))
-		     (collect-forms (cdar forms))
-		     (push (car forms) progn-form)))))
-      (collect-forms forms)
-      (cons 'progn progn-form))))
-
+;;;; DEFCLASS macro and close personal friends
+
+;;; ANSI says (Macro DEFCLASS, section 7.7) that DEFCLASS, if it
+;;; "appears as a top level form, the compiler must make the class
+;;; name be recognized as a valid type name in subsequent declarations
+;;; (as for deftype) and be recognized as a valid class name for
+;;; defmethod parameter specializers and for use as the :metaclass
+;;; option of a subsequent defclass."
+(defun preinform-compiler-about-class-type (name)
+  ;; Unless the type system already has an actual type attached to
+  ;; NAME (in which case (1) writing a placeholder value over that
+  ;; actual type as a compile-time side-effect would probably be a bad
+  ;; idea and (2) anyway we don't need to modify it in order to make
+  ;; NAME be recognized as a valid type name)
+  (unless (info :type :kind name)
+    ;; Tell the compiler to expect a class with the given NAME, by
+    ;; writing a kind of minimal placeholder type information. This
+    ;; placeholder will be overwritten later when the class is defined.
+    (setf (info :type :kind name) :forthcoming-defclass-type))
+  (values))
+
+;;; state for the current DEFCLASS expansion
+(defvar *initfunctions-for-this-defclass*)
+(defvar *readers-for-this-defclass*)
+(defvar *writers-for-this-defclass*)
+
 ;;; Like the DEFMETHOD macro, the expansion of the DEFCLASS macro is
 ;;; fixed. DEFCLASS always expands into a call to LOAD-DEFCLASS. Until
 ;;; the meta-braid is set up, LOAD-DEFCLASS has a special definition
@@ -65,10 +79,9 @@
 	    (setf options (remove option options))
 	    (return t))))
 
-      (let ((*initfunctions* ())
-            (*readers* ())		;Truly a crock, but we got
-            (*writers* ()))             ;to have it to live nicely.
-        (declare (special *initfunctions* *readers* *writers*))
+      (let ((*initfunctions-for-this-defclass* ())
+            (*readers-for-this-defclass* ()) ;Truly a crock, but we got
+            (*writers-for-this-defclass* ())) ;to have it to live nicely.
         (let ((canonical-slots
                 (mapcar (lambda (spec)
 			  (canonicalize-slot-specification name spec))
@@ -77,9 +90,9 @@
                 (mapcar (lambda (option)
 			  (canonicalize-defclass-option name option))
                         options))
-              ;; DEFSTRUCT-P should be true, if the class is defined with a
-              ;; metaclass STRUCTURE-CLASS, such that a DEFSTRUCT is compiled
-              ;; for the class.
+              ;; DEFSTRUCT-P should be true if the class is defined
+              ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
+              ;; is compiled for the class.
               (defstruct-p (and (eq *boot-state* 'complete)
                                 (let ((mclass (find-class metaclass nil)))
                                   (and mclass
@@ -87,70 +100,50 @@
                                         mclass
                                         *the-class-structure-class*))))))
           (let ((defclass-form
-                    `(progn
-                      ,@(mapcar (lambda (x)
-                                  `(declaim (ftype (function (t) t) ,x)))
-                                *readers*)
-                      ,@(mapcar (lambda (x)
-                                  `(declaim (ftype (function (t t) t) ,x)))
-                                *writers*)
-                      (let ,(mapcar #'cdr *initfunctions*)
-                        (load-defclass ',name
-                                       ',metaclass
-                                       ',supers
-                                       (list ,@canonical-slots)
-                                       (list ,@(apply #'append
-                                                      (when defstruct-p
-                                                        '(:from-defclass-p t))
-                                                      other-initargs)))))))
+		  `(progn
+		     ,@(mapcar (lambda (x)
+				 `(declaim (ftype (function (t) t) ,x)))
+			       *readers-for-this-defclass*)
+		     ,@(mapcar (lambda (x)
+				 `(declaim (ftype (function (t t) t) ,x)))
+			       *writers-for-this-defclass*)
+		     (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
+		       (load-defclass ',name
+				      ',metaclass
+				      ',supers
+				      (list ,@canonical-slots)
+				      (list ,@(apply #'append
+						     (when defstruct-p
+						       '(:from-defclass-p t))
+						     other-initargs)))))))
             (if defstruct-p
-              (let* ((include (or (and supers
-                                       (fix-super (car supers)))
-                                  (and (not (eq name 'structure-object))
-                                       *the-class-structure-object*)))
-                     (defstruct-form (make-structure-class-defstruct-form
-				      name slots include)))
-                `(progn
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                    ,defstruct-form) ; really compile the defstruct-form
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                    ,defclass-form)))
-	      `(progn
-		 ;; By telling the type system at compile time about
-		 ;; the existence of a class named NAME, we can avoid
-		 ;; various bogus warnings about "type isn't defined yet"
-		 ;; for code elsewhere in the same file which uses
-		 ;; the name of the type.
-		 ,(when (and
-			 ;; But it's not so important to get rid of
-			 ;; "not defined yet" warnings during
-			 ;; bootstrapping, and machinery like
-			 ;; INFORM-TYPE-SYSTEM-ABOUT-STD-CLASS
-			 ;; mightn't be defined yet. So punt then.
-			 (eq *boot-state* 'complete)
-			 ;; And although we know enough about
-			 ;; STANDARD-CLASS, and ANSI imposes enough
-			 ;; restrictions on the user overloading its
-			 ;; methods, that (1) we can shortcut the
-			 ;; method dispatch and do an ordinary
-			 ;; function call, and (2) be sure we're getting
-			 ;; it right even when we do it at compile
-			 ;; time; we don't in general know how to do
-			 ;; that for other classes. So punt then too.
-			 (eq metaclass 'standard-class))
-                       `(eval-when (:compile-toplevel)
-                         ;; we only need :COMPILE-TOPLEVEL here, because this
-                         ;; should happen in the compile-time environment
-                         ;; only.
-                         ;; Later, INFORM-TYPE-SYSTEM-ABOUT-STD-CLASS is
-                         ;; called by way of LOAD-DEFCLASS (calling
-                         ;; ENSURE-CLASS-USING-CLASS) to establish the 'real'
-                         ;; type predicate.
-                         (inform-type-system-about-std-class ',name)))
-                ,defclass-form))))))))
+		(let* ((include (or (and supers
+					 (fix-super (car supers)))
+				    (and (not (eq name 'structure-object))
+					 *the-class-structure-object*)))
+		       (defstruct-form (make-structure-class-defstruct-form
+					name slots include)))
+		  `(progn
+		     (eval-when (:compile-toplevel :load-toplevel :execute)
+		       ,defstruct-form) ; really compile the defstruct-form
+		     (eval-when (:compile-toplevel :load-toplevel :execute)
+		       ,defclass-form)))
+		`(progn
+		   ;; By telling the type system at compile time about
+		   ;; the existence of a class named NAME, we can avoid
+		   ;; various bogus warnings about "type isn't defined yet"
+		   ;; for code elsewhere in the same file which uses
+		   ;; the name of the type.
+		   ;;
+		   ;; We only need to do this at compile time, because
+		   ;; at load and execute time we write the actual
+		   ;; full-blown class, so the "a class of this name is
+		   ;; coming" note we write here would be irrelevant.
+		   (eval-when (:compile-toplevel)
+		     (preinform-compiler-about-class-type ',name))
+		   ,defclass-form))))))))
 
 (defun make-initfunction (initform)
-  (declare (special *initfunctions*))
   (cond ((or (eq initform t)
 	     (equal initform ''t))
 	 '(function constantly-t))
@@ -161,16 +154,16 @@
 	     (equal initform ''0))
 	 '(function constantly-0))
 	(t
-	 (let ((entry (assoc initform *initfunctions* :test #'equal)))
+	 (let ((entry (assoc initform *initfunctions-for-this-defclass*
+			     :test #'equal)))
 	   (unless entry
 	     (setq entry (list initform
 			       (gensym)
 			       `(function (lambda () ,initform))))
-	     (push entry *initfunctions*))
+	     (push entry *initfunctions-for-this-defclass*))
 	   (cadr entry)))))
 
 (defun canonicalize-slot-specification (class-name spec)
-  (declare (special *readers* *writers*))
   (cond ((and (symbolp spec)
 	      (not (keywordp spec))
 	      (not (memq spec '(t nil))))
@@ -201,8 +194,10 @@
 	   (loop (unless (remf spec :reader)   (return)))
 	   (loop (unless (remf spec :writer)   (return)))
 	   (loop (unless (remf spec :initarg)  (return)))
-	   (setq *writers* (append writers *writers*))
-	   (setq *readers* (append readers *readers*))
+	   (setq *writers-for-this-defclass*
+		 (append writers *writers-for-this-defclass*))
+	   (setq *readers-for-this-defclass*
+		 (append readers *readers-for-this-defclass*))
 	   (setq spec `(:name     ',name
 			:readers  ',readers
 			:writers  ',writers
@@ -228,9 +223,9 @@
     (otherwise
      `(',(car option) ',(cdr option)))))
 
-;;; This is the early definition of load-defclass. It just collects up
-;;; all the class definitions in a list. Later, in the file
-;;; braid1.lisp, these are actually defined.
+;;; This is the early definition of LOAD-DEFCLASS. It just collects up
+;;; all the class definitions in a list. Later, in braid1.lisp, these
+;;; are actually defined.
 
 ;;; Each entry in *EARLY-CLASS-DEFINITIONS* is an EARLY-CLASS-DEFINITION.
 (defparameter *early-class-definitions* ())
@@ -378,8 +373,6 @@
   (setq supers  (copy-tree supers)
 	canonical-slots   (copy-tree canonical-slots)
 	canonical-options (copy-tree canonical-options))
-  (when (eq metaclass 'standard-class)
-    (inform-type-system-about-std-class name))
   (let ((ecd
 	  (make-early-class-definition name
 				       *load-truename*

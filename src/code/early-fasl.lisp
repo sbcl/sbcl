@@ -42,7 +42,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(defconstant +fasl-file-version+ 23)
+(defconstant +fasl-file-version+ 24)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -95,6 +95,8 @@
 ;;;      trouble to increment the counter
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.
+;;; 24 = sbcl-0.7.1.19 changed PCL service routines which might be
+;;;      called from macroexpanded code
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

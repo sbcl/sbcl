@@ -1,8 +1,6 @@
 ;;;; stuff originally from CMU CL's error.lisp which can or should
 ;;;; come late (mostly related to the CONDITION class itself)
 ;;;;
-;;;; FIXME: should perhaps be called condition.lisp, or moved into
-;;;; classes.lisp
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -36,7 +36,7 @@
      ;; since mistakenly redefining a type isn't a common error
      ;; anyway, we just don't worry about trying to warn about it.
      )
-    ((nil)
+    ((nil :forthcoming-defclass-type)
      (setf (info :type :kind name) :defined)))
   (setf (info :type :expander name) expander)
   (when doc

@@ -735,6 +735,10 @@
   #-sb-xc (declare (type sb!xc:class new-value))
   (ecase (info :type :kind name)
     ((nil))
+    (:forthcoming-defclass-type
+     ;; XXX Currently, nothing needs to be done in this case. Later, when
+     ;; PCL is integrated tighter into SBCL, this might need more work.
+     nil)
     (:instance
      (let ((old (class-of (sb!xc:find-class name)))
 	   (new (class-of new-value)))

@@ -1261,17 +1261,6 @@ WORKAROUND:
   issues were cleaned up. As of sbcl-0.7.1.9, it occurs in 
   NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
 
-149:
-  (reported by Stig E Sandoe sbcl-devel 2002-02-02)
-  In sbcl-0.7.1.13, compiling a DEFCLASS FOO form isn't enough to make
-  the class known to the compiler for other forms compiled in the same
-  file, so bogus warnings "undefined type: FOO" are generated, e.g.
-  when compiling 
-    (in-package :cl-user)
-    (defclass foo () ())
-    (defun bar (x)
-      (typep x 'foo))
-
 150:
   In sbcl-0.7.1.15, compiling this code 
     (let* ()
@@ -1297,8 +1286,21 @@ WORKAROUND:
 		          (error "not ~S" '(eql (lo foomax 3.2))))
 		      (values))))
 
+151:
+  From the ANSI description of GET-DISPATCH-MACRO-CHARACTER, it
+  should return NIL when there is no definition, e.g.
+    (GET-DISPATCH-MACRO-CHARACTER #\# #\{) => NIL
+  Instead, in sbcl-0.7.1.17 it returns
+    #<FUNCTION "top level local call SB!IMPL::DISPATCH-CHAR-ERROR">
+
+152:
+  Undefined functions are supposed to be reported as UNDEFINED-FUNCTION
+  conditions, inheriting from CELL-ERROR. Instead sbcl-0.7.1.19 reports
+  them as TYPE-ERRORs (reporting the problem as something not being
+  coerceable to a function).
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
-    These labels were used for bugs related to the old IR1
-    interpreter. The # values reached 6 before the category
-    was closed down.
+    These labels were used for bugs related to the old IR1 interpreter.
+    The # values reached 6 before the category was closed down.

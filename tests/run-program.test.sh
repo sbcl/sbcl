@@ -57,16 +57,5 @@ if [ $? != 52 ]; then
     exit 1
 fi
 
-# known bugs:
-#
-#   sbcl-0.6.8:
-#
-#     (SB-EXT:RUN-PROGRAM "echo" NIL)
-#     => error in function SB-IMPL::%ENUMERATE-SEARCH-LIST:
-#        Undefined search list: path
-#
-#     (SB-EXT:RUN-PROGRAM "/bin/uname" '("-a") :OUTPUT :STREAM)
-#     doesn't return a STREAM (the way doc string claims)
-
 # success convention
 exit 104

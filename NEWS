@@ -1014,10 +1014,13 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
     an alternate notation for --eval '(load "foo.bar")'.
   * bug fixes:
     ** The system now hunts for the C variable "environ" in a more
-       devious way, to avoid segfaults when the C library version
-       differs between compile time and run time. (thanks to Christophe
-       Rhodes)
+       devious way, to avoid segfaults when the C library version differs
+       between compile time and run time. (thanks to Christophe Rhodes)
     ** INTEGER-valued CATCH tags now work. (thanks to Alexey Dejneka)
+    ** The compiler no longer issues bogus style warnings for undefined
+       classes in the same source file as the DEFCLASSes which defined
+       them. (thanks to Stig E Sandoe for reporting and Martin Atzmueller
+       for fixing this)
   * several changes related to debugging:
     ** suppression of tail recursion, as noted above
     ** The default implementation of TRACE has changed. :ENCAPSULATE T

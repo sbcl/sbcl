@@ -1204,11 +1204,14 @@
 (define-info-class :type)
 
 ;;; the kind of type described. We return :INSTANCE for standard types
-;;; that are implemented as structures.
+;;; that are implemented as structures. For PCL classes, that have
+;;; only been compiled, but not loaded yet, we return
+;;; :FORTHCOMING-DEFCLASS-TYPE.
 (define-info-type
   :class :type
   :type :kind
-  :type-spec (member :primitive :defined :instance nil)
+  :type-spec (member :primitive :defined :instance
+		     :forthcoming-defclass-type nil)
   :default nil)
 
 ;;; the expander function for a defined type
@@ -1245,7 +1248,7 @@
 ;;; If this is a class name, then the value is a cons (NAME . CLASS),
 ;;; where CLASS may be null if the class hasn't been defined yet. Note
 ;;; that for built-in classes, the kind may be :PRIMITIVE and not
-;;; :INSTANCE. The the name is in the cons so that we can signal a
+;;; :INSTANCE. The name is in the cons so that we can signal a
 ;;; meaningful error if we only have the cons.
 (define-info-type
   :class :type

@@ -335,8 +335,6 @@
 
 (defgeneric effective-slot-definition-class (class initargs))
 
-(defgeneric inform-type-system-about-class (class name))
-
 (defgeneric legal-documentation-p (object x))
 
 (defgeneric legal-method-function-p (object x))

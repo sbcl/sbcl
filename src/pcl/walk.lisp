@@ -632,7 +632,7 @@
 
 (defun walk-unexpected-declare (form context env)
   (declare (ignore context env))
-  (warn "encountered DECLARE ~S in a place where a DECLARE was not expected"
+  (warn "encountered ~S ~_in a place where a DECLARE was not expected"
 	form)
   form)
 

@@ -196,14 +196,17 @@
      (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class
 							 'simple-condition)))
 		 (sb-pcl:find-class 'condition)))
-     (assert (null (set-difference
-		    (sb-pcl:class-direct-subclasses (sb-pcl:find-class
-						     'simple-condition))
-		    (mapcar #'sb-pcl:find-class
-			    '(simple-type-error
-			      simple-error
-                              sb-int:simple-file-error
-                              sb-int:simple-style-warning)))))
+
+    (let ((subclasses (mapcar #'sb-pcl:find-class
+                              '(simple-type-error
+                                simple-error
+                                simple-warning
+                                sb-int:simple-file-error
+                                sb-int:simple-style-warning))))
+      (assert (null (set-difference
+                     (sb-pcl:class-direct-subclasses (sb-pcl:find-class
+                                                      'simple-condition))
+                     subclasses))))
 
      ;; precedence lists
      (assert (equal (sb-pcl:class-precedence-list

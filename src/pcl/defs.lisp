@@ -187,29 +187,6 @@
 (defun class-eq-type (class)
   (specializer-type (class-eq-specializer class)))
 
-(defun inform-type-system-about-std-class (name)
-  (let ((predicate-name (make-type-predicate-name name)))
-    (setf (gdefinition predicate-name)
-	  (make-type-predicate name))))
-
-(defun make-type-predicate (name)
-  (let ((cell (find-class-cell name)))
-    (lambda (x)
-      (funcall (the function (find-class-cell-predicate cell)) x))))
-
-(defun make-type-predicate-name (name &optional kind)
-  (if (symbol-package name)
-      (intern (format nil
-		      "~@[~A ~]TYPE-PREDICATE ~A ~A"
-		      kind
-		      (package-name (symbol-package name))
-		      (symbol-name name))
-	      *pcl-package*)
-      (make-symbol (format nil
-			   "~@[~A ~]TYPE-PREDICATE ~A"
-			   kind
-			   (symbol-name name)))))
-
 ;;; internal to this file..
 ;;;
 ;;; These functions are a pale imitation of their namesake. They accept
@@ -537,7 +514,7 @@
   (:metaclass std-class))
 
 ;;; The class CLASS is a specified basic class. It is the common
-;;; superclass of any kind of class. That is any class that can be a
+;;; superclass of any kind of class. That is, any class that can be a
 ;;; metaclass must have the class CLASS in its class precedence list.
 (defclass class (documentation-mixin
 		 dependent-update-mixin
@@ -553,6 +530,9 @@
    (direct-superclasses
     :initform ()
     :reader class-direct-superclasses)
+   ;; Note: The (CLASS-)DIRECT-SUBCLASSES for STRUCTURE-CLASSes and
+   ;; CONDITION-CLASSes are lazily computed whenever the subclass info
+   ;; becomes available, i.e. when the PCL class is created.
    (direct-subclasses
     :initform ()
     :reader class-direct-subclasses)
