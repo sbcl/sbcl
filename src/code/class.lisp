@@ -211,7 +211,7 @@
 	    (layout-proper-name layout)
 	    (layout-invalid layout))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun layout-proper-name (layout)
     (classoid-proper-name (layout-classoid layout))))
 
@@ -521,7 +521,11 @@
 	(when (> depth max-depth)
 	  (setf max-depth depth))))
     (let* ((new-length (max (1+ max-depth) length))
-	   (inherits (make-array new-length)))
+	   ;; KLUDGE: 0 here is the "uninitialized" element.  We need
+	   ;; to specify it explicitly for portability purposes, as
+	   ;; elements can be read before being set [ see below, "(EQL
+	   ;; OLD-LAYOUT 0)" ].  -- CSR, 2002-04-20
+	   (inherits (make-array new-length :initial-element 0)))
       (dotimes (i length)
 	(let* ((layout (svref layouts i))
 	       (depth (layout-depthoid layout)))

@@ -245,7 +245,7 @@
 
 (/show0 "about to do test cases in pred.lisp")
 #!+sb-test
-(let ((test-cases '((0.0 -0.0 t)
+(let ((test-cases `((0.0 ,(load-time-value (make-unportable-float :single-float-negative-zero)) t)
 		    (0.0 1.0 nil)
 		    (#c(1 0) #c(1.0 0) t)
 		    (#c(1.1 0) #c(11/10 0) nil) ; due to roundoff error

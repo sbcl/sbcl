@@ -15,7 +15,7 @@
 ;;;; utilities
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant max-hash most-positive-fixnum))
+  (defconstant max-hash sb!xc:most-positive-fixnum))
 
 (deftype hash ()
   `(integer 0 ,max-hash))

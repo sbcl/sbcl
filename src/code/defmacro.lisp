@@ -16,10 +16,18 @@
 ;;; bootstrap idiom
 ;;;   CL:DEFMACRO SB!XC:DEFMACRO
 ;;;   SB!XC:DEFMACRO CL:DEFMACRO
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %expander-for-defmacro (name lambda-list body)
     (unless (symbolp name)
       (error "The macro name ~S is not a symbol." name))
+    ;; When we are building the cross-compiler, we could be in a host
+    ;; lisp which implements CL macros (e.g. CL:AND) as special
+    ;; operators (while still providing a macroexpansion for
+    ;; compliance): therefore can't use the host's SPECIAL-OPERATOR-P
+    ;; as a discriminator, but that's OK because the set of forms the
+    ;; cross-compiler compiles is tightly controlled.  -- CSR,
+    ;; 2003-04-20
+    #-sb-xc-host
     (when (special-operator-p name)
       (error "The special operator ~S can't be redefined as a macro."
              name))
@@ -92,7 +100,7 @@
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
-    (def (:compile-toplevel) nil)))
+    (def (#-sb-xc :compile-toplevel) nil)))
 
 ;;; Parse the definition and make an expander function. The actual
 ;;; definition is done by %DEFMACRO which we expand into. After the

@@ -360,7 +360,7 @@
 	     ,(do-compact-info name class type type-number value
 			       n-env body)))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; Return code to iterate over a compact info environment.
 (defun do-compact-info (name-var class-var type-var type-number-var value-var

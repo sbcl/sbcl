@@ -35,6 +35,8 @@ for early 0.8.x:
 * fixups now feasible because of pre7 changes
 	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE,
 		including e.g. on the man page)
+	** (maybe) allow INLINE of a recursive function, so that the
+		body is inlined once
 * miscellaneous simple refactoring
 	* belated renaming:
 		** renamed %PRIMITIVE to %VOP
@@ -52,6 +54,16 @@ for early 0.8.x:
 * Either get rid of or at least rework the fdefinition/encapsulation
 	system so that (SYMBOL-FUNCTION 'FOO) is identically equal to
 	(FDEFINITION 'FOO).
+* Make the system sources understandable to the system, so that
+	searching for sources doesn't error out quite so often
+	(e.g. in error handlers)
+	** provided a location-independent way of referring to source
+		files in the target image, maybe a SYS: logical
+		pathname, and made the build system respect this.
+	** provided a suitable readtable for reading in the source
+		files when necessary, and a mechanism for activating
+		this readtable rather than the standard one.
+
 =======================================================================
 for 0.9:
 

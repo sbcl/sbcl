@@ -93,4 +93,4 @@ void  gc_alloc_update_page_tables(int unboxed,
 				  struct alloc_region *alloc_region);
 void gc_alloc_update_all_page_tables(void);
 void gc_set_region_empty(struct alloc_region *region);
-#endif _GENCGC_H_
+#endif /* _GENCGC_H_ */

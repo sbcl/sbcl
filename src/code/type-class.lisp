@@ -122,8 +122,8 @@
       (:complex-= . type-class-complex-=)
       (:unparse . type-class-unparse))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  
+(declaim (ftype (function (type-class) type-class) copy-type-class-coldly))
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 ;;; Copy TYPE-CLASS object X, using only operations which will work
 ;;; early in cold load. (COPY-STRUCTURE won't work early in cold load,
 ;;; because it needs RAW-INDEX and RAW-LENGTH information from
@@ -147,7 +147,6 @@
 ;;; the positive effect of removing indirection could be cancelled by
 ;;; the negative effect of imposing an unnecessary GC write barrier on
 ;;; raw data which doesn't actually affect GC.)
-(declaim (ftype (function (type-class) type-class) copy-type-class-coldly))
 (defun copy-type-class-coldly (x)
   ;; KLUDGE: If the slots of TYPE-CLASS ever change in a way not
   ;; reflected in *TYPE-CLASS-FUN-SLOTS*, the slots here will

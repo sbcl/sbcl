@@ -55,17 +55,22 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(load-or-cload-xcompiler #'host-load-stem)
         (defun proclaim-target-optimization ()
           (let ((debug (if (position :sb-show *shebang-features*) 2 1)))
-	    (sb-xc:proclaim `(optimize (compilation-speed 1)
-	                               (debug ,debug)
-				       (sb!ext:inhibit-warnings 2)
-				       ;; SAFETY = SPEED (and < 3) should 
-				       ;; reasonable safety, but might skip 
-				       ;; some unreasonably expensive stuff
-				       ;; (e.g. %DETECT-STACK-EXHAUSTION
-				       ;; in sbcl-0.7.2).
-                                       (safety 2)
-                                       (space 1)
-				       (speed 2)))))
+	    (sb-xc:proclaim 
+             `(optimize
+	       (compilation-speed 1)
+	       (debug ,debug)
+	       ;; CLISP's pretty-printer is fragile and tends to cause
+	       ;; stack corruption or fail internal assertions, as of
+	       ;; 2003-04-20; we therefore turn off as many notes as
+	       ;; possible.
+	       (sb!ext:inhibit-warnings #-clisp 2
+		                        #+clisp 3)
+	       ;; SAFETY = SPEED (and < 3) should provide reasonable
+	       ;; safety, but might skip some unreasonably expensive
+	       ;; stuff (e.g. %DETECT-STACK-EXHAUSTION in sbcl-0.7.2).
+	       (safety 2)
+	       (space 1)
+	       (speed 2)))))
         (compile 'proclaim-target-optimization)
 	(defun in-target-cross-compilation-mode (fun)
 	  "Call FUN with everything set up appropriately for cross-compiling
@@ -122,8 +127,10 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(when (position :sb-after-xc-core *shebang-features*)
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
+          #+clisp (ext:saveinitmem "output/after-xc.core")
 	  )
         #+cmu (ext:quit)
+        #+clisp (ext:quit)
 	EOF
 
 # Run GENESIS (again) in order to create cold-sbcl.core. (The first

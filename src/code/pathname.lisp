@@ -54,15 +54,16 @@
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
-(sb!xc:defstruct (pattern (:constructor make-pattern (pieces)))
+(def!struct (pattern (:constructor make-pattern (pieces)))
   (pieces nil :type list))
 
 ;;;; PATHNAME structures
 
 ;;; the various magic tokens that are allowed to appear in pretty much
 ;;; all pathname components
-(sb!xc:deftype pathname-component-tokens ()
-  '(member nil :unspecific :wild))
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  (def!type pathname-component-tokens ()
+    '(member nil :unspecific :wild)))
 
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
 			   (:constructor %make-pathname (host

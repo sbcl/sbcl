@@ -177,26 +177,30 @@
 ;;; stored in a more precise form on chip. Anyhow, might as well use
 ;;; the feature. It can be turned off by hacking the
 ;;; "immediate-constant-sc" in vm.lisp.
+(eval-when (:compile-toplevel :execute)
+  (setf *read-default-float-format*
+	#!+long-float 'long-float #!-long-float 'double-float))
 (define-move-fun (load-fp-constant 2) (vop x y)
   ((fp-constant) (single-reg double-reg #!+long-float long-reg))
   (let ((value (sb!c::constant-value (sb!c::tn-leaf x))))
     (with-empty-tn@fp-top(y)
       (cond ((zerop value)
 	     (inst fldz))
-	    ((= value 1l0)
+	    ((= value 1e0)
 	     (inst fld1))
-	    ((= value pi)
+	    ((= value (coerce pi *read-default-float-format*))
 	     (inst fldpi))
-	    ((= value (log 10l0 2l0))
+	    ((= value (log 10e0 2e0))
 	     (inst fldl2t))
-	    ((= value (log 2.718281828459045235360287471352662L0 2l0))
+	    ((= value (log 2.718281828459045235360287471352662e0 2e0))
 	     (inst fldl2e))
-	    ((= value (log 2l0 10l0))
+	    ((= value (log 2e0 10e0))
 	     (inst fldlg2))
-	    ((= value (log 2l0 2.718281828459045235360287471352662L0))
+	    ((= value (log 2e0 2.718281828459045235360287471352662e0))
 	     (inst fldln2))
 	    (t (warn "ignoring bogus i387 constant ~A" value))))))
-
+(eval-when (:compile-toplevel :execute)
+  (setf *read-default-float-format* 'single-float))
 
 ;;;; complex float move functions
 

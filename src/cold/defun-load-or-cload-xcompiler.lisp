@@ -147,6 +147,7 @@
 			  "SB!PRETTY"
 			  "SB!PROFILE"
 			  "SB!SYS"
+			  "SB!THREAD"
 			  "SB!UNIX"
 			  "SB!VM"
 			  "SB!WALKER"))

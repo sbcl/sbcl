@@ -14,8 +14,9 @@
 
 ;;;; miscellaneous constants, utility functions, and macros
 
-(defconstant pi 3.14159265358979323846264338327950288419716939937511L0)
-;(defconstant e 2.71828182845904523536028747135266249775724709369996L0)
+(defconstant pi
+  #!+long-float 3.14159265358979323846264338327950288419716939937511l0
+  #!-long-float 3.14159265358979323846264338327950288419716939937511d0)
 
 ;;; Make these INLINE, since the call to C is at least as compact as a
 ;;; Lisp call, and saves number consing to boot.
@@ -903,13 +904,18 @@
       ;; space 0 to get maybe-inline functions inlined
       (declare (optimize (speed 3) (space 0)))
     (cond ((> (abs x)
-	      #-(or linux hpux) #.(/ (asinh most-positive-double-float) 4d0)
-	      ;; This is more accurate under linux.
-	      #+(or linux hpux) #.(/ (+ (log 2.0d0)
-					(log most-positive-double-float))
-				     4d0))
-              (coerce-to-complex-type (float-sign x)
-                                      (float-sign y) z))
+	      ;; FIXME: this form is hideously broken wrt
+	      ;; cross-compilation portability.  Much else in this
+	      ;; file is too, of course, sometimes hidden by
+	      ;; constant-folding, but this one in particular clearly
+	      ;; depends on host and target
+	      ;; MOST-POSITIVE-DOUBLE-FLOATs being equal.  -- CSR,
+	      ;; 2003-04-20
+	      #.(/ (+ (log 2.0d0)
+		      (log most-positive-double-float))
+		   4d0))
+	   (coerce-to-complex-type (float-sign x)
+				   (float-sign y) z))
 	  (t
 	   (let* ((tv (%tan y))
 		  (beta (+ 1.0d0 (* tv tv)))

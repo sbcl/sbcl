@@ -286,7 +286,7 @@
   :printer #'print-word-reg/mem)
 
 ;;; added by jrd
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun print-fp-reg (value stream dstate)
   (declare (ignore dstate))
   (format stream "FR~D" value))

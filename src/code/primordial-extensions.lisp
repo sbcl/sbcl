@@ -57,7 +57,7 @@
 
 ;;;; DO-related stuff which needs to be visible on the cross-compilation host
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun frob-do-body (varlist endlist decls-and-code bind step name block)
     (let* ((r-inits nil) ; accumulator for reversed list
 	   (r-steps nil) ; accumulator for reversed list
@@ -164,7 +164,7 @@
 
 ;;; Concatenate together the names of some strings and symbols,
 ;;; producing a symbol in the current package.
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun symbolicate (&rest things)
     (let ((name (case (length things)
 		  ;; why isn't this just the value in the T branch?

@@ -253,7 +253,7 @@
     ,@forms))
 
 ;;;; error code
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
       `((inst int 3)				; i386 breakpoint instruction

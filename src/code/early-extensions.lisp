@@ -161,7 +161,7 @@
 ;;; COLLECT-LIST-EXPANDER handles the list collection case. N-TAIL
 ;;; is the pointer to the current tail of the list, or NIL if the list
 ;;; is empty.
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun collect-normal-expander (n-value fun forms)
     `(progn
        ,@(mapcar (lambda (form) `(setq ,n-value (,fun ,form ,n-value))) forms)
@@ -616,7 +616,7 @@
 		    (consp (cdr name))
 		    (symbolp (cadr name))
 		    (consp (cddr name))
-		    (symbolp (caddr name))
+		    (or (symbolp (caddr name)) (stringp (caddr name)))
 		    (consp (cdddr name))
 		    (member
 		     (cadddr name)

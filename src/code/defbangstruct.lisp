@@ -104,7 +104,7 @@
   ;; DEF!STRUCT is made to work fully, this list is processed, then
   ;; made unbound, and should no longer be used.
   (defvar *delayed-def!structs* nil))
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;; Parse the arguments for a DEF!STRUCT call, and return
   ;;   (VALUES NAME DEFSTRUCT-ARGS MAKE-LOAD-FORM-FUN DEF!STRUCT-SUPERTYPE),
   ;; where NAME is the name of the new type, DEFSTRUCT-ARGS is the

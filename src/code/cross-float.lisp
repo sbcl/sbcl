@@ -237,3 +237,4 @@
 			       (ash 1 52))
 		       (expt 0.5d0 52))))
 	 (* sign (kludge-opaque-expt 2.0d0 expt) mant)))))
+

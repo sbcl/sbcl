@@ -2021,7 +2021,7 @@
 (defun cold-load-symbol (size package)
   (let ((string (make-string size)))
     (read-string-as-bytes *fasl-input-stream* string)
-    (cold-intern (intern string package) package)))
+    (cold-intern (intern string package))))
 
 (macrolet ((frob (name pname-len package-len)
 	     `(define-cold-fop (,name)

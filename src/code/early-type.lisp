@@ -326,22 +326,22 @@
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
-  (let ((singlep (subsetp '(-0.0f0 0.0f0) members))
-	(doublep (subsetp '(-0.0d0 0.0d0) members))
+  (let ((singlep (subsetp `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0) members))
+	(doublep (subsetp `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0) members))
 	#!+long-float
-	(longp (subsetp '(-0.0l0 0.0l0) members)))
+	(longp (subsetp `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0) members)))
     (if (or singlep doublep #!+long-float longp)
 	(let (union-types)
 	  (when singlep
 	    (push (ctype-of 0.0f0) union-types)
-	    (setf members (set-difference members '(-0.0f0 0.0f0))))
+	    (setf members (set-difference members `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0))))
 	  (when doublep
 	    (push (ctype-of 0.0d0) union-types)
-	    (setf members (set-difference members '(-0.0d0 0.0d0))))
+	    (setf members (set-difference members `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0))))
 	  #!+long-float
 	  (when longp
 	    (push (ctype-of 0.0l0) union-types)
-	    (setf members (set-difference members '(-0.0l0 0.0l0))))
+	    (setf members (set-difference members `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0))))
 	  (aver (not (null union-types)))
 	  (make-union-type t
 			   (if (null members)

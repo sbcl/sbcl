@@ -207,11 +207,14 @@
 
 ;;; Return the name of a defstruct slot as a symbol. We store it as a
 ;;; string to avoid creating lots of worthless symbols at load time.
+;;;
+;;; FIXME: This has horrible package issues.  In many ways, it would
+;;; be very nice to treat the names of structure slots as strings, but
+;;; unfortunately PCL requires slot names to be interned symbols.
+;;; Maybe we want to resurrect something like the old
+;;; SB-SLOT-ACCESSOR-NAME package?
 (defun dsd-name (dsd)
-  (intern (string (dsd-%name dsd))
-	  (if (dsd-accessor-name dsd)
-	      (symbol-package (dsd-accessor-name dsd))
-	      (sane-package))))
+  (intern (dsd-%name dsd)))
 
 ;;;; typed (non-class) structures
 
@@ -223,7 +226,7 @@
 
 ;;;; shared machinery for inline and out-of-line slot accessor functions
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
   ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
   (defstruct raw-slot-data
@@ -1049,16 +1052,16 @@
     (collect ((moved)
 	      (retyped))
       (dolist (name (intersection onames nnames))
-	(let ((os (find name oslots :key #'dsd-name))
-	      (ns (find name nslots :key #'dsd-name)))
-	  (unless (subtypep (dsd-type ns) (dsd-type os))
+	(let ((os (find name oslots :key #'dsd-name :test #'string=))
+	      (ns (find name nslots :key #'dsd-name :test #'string=)))
+	  (unless (sb!xc:subtypep (dsd-type ns) (dsd-type os))
 	    (retyped name))
 	  (unless (and (= (dsd-index os) (dsd-index ns))
 		       (eq (dsd-raw-type os) (dsd-raw-type ns)))
 	    (moved name))))
       (values (moved)
 	      (retyped)
-	      (set-difference onames nnames)))))
+	      (set-difference onames nnames :test #'string=)))))
 
 ;;; If we are redefining a structure with different slots than in the
 ;;; currently loaded version, give a warning and return true.

@@ -55,6 +55,7 @@ This software has been built successfully on these systems:
 		os = Debian GNU/Linux 2.1 with libc >= 2.1
 			host lisp = CMU CL 2.4.17
 			host lisp = SBCL itself
+			host lisp = CLISP CVS as of end of April
 		os = RedHat Linux 6.2
 			host lisp = SBCL itself
 		os = FreeBSD 3.4 or 4.0
@@ -76,9 +77,6 @@ This software has been built successfully on these systems:
 		os = Debian GNU/Linux 2.2 with libc >= 2.1
 			host lisp = OpenMCL 0.12
 			host lisp = SBCL itself
-
-It is known not to build under CLISP (as of early June 2002) because
-of bugs in the CLISP garbage collector.
 
 Reports of other systems that it works on (or doesn't work on, for
 that matter), or help in making it run on more systems, would be

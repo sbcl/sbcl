@@ -538,9 +538,18 @@
     (specifier-type `(or (,float-type ,(or lo '*) ,(or hi '*))
 			 (complex ,float-type)))))
 
+) ; PROGN
+
+(eval-when (:compile-toplevel :execute)
+  ;; So the problem with this hack is that it's actually broken.  If
+  ;; the host does not have long floats, then setting *R-D-F-F* to
+  ;; LONG-FLOAT doesn't actually buy us anything.  FIXME.
+  (setf *read-default-float-format*
+	#!+long-float 'long-float #!-long-float 'double-float))
 ;;; Test whether the numeric-type ARG is within in domain specified by
 ;;; DOMAIN-LOW and DOMAIN-HIGH, consider negative and positive zero to
-;;; be distinct. 
+;;; be distinct.
+#-sb-xc-host  ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun domain-subtypep (arg domain-low domain-high)
   (declare (type numeric-type arg)
 	   (type (or real null) domain-low domain-high))
@@ -552,11 +561,18 @@
     (when (and arg-lo (floatp arg-lo-val) (zerop arg-lo-val) (consp arg-lo)
 	       (minusp (float-sign arg-lo-val)))
       (compiler-note "float zero bound ~S not correctly canonicalized?" arg-lo)
-      (setq arg-lo '(0l0) arg-lo-val 0l0))
+      (setq arg-lo '(0e0) arg-lo-val 0e0))
     (when (and arg-hi (zerop arg-hi-val) (floatp arg-hi-val) (consp arg-hi)
 	       (plusp (float-sign arg-hi-val)))
       (compiler-note "float zero bound ~S not correctly canonicalized?" arg-hi)
-      (setq arg-hi '(-0l0) arg-hi-val -0l0))
+      (setq arg-hi `(,(ecase *read-default-float-format*
+			(double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
+			#!+long-float
+			(long-float (load-time-value (make-unportable-float :long-float-negative-zero)))))
+	    arg-hi-val (ecase *read-default-float-format*
+			 (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
+			 #!+long-float
+			 (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))))
     (and (or (null domain-low)
 	     (and arg-lo (>= arg-lo-val domain-low)
 		  (not (and (zerop domain-low) (floatp domain-low)
@@ -573,6 +589,11 @@
 			    (if (consp arg-hi)
 				(minusp (float-sign arg-hi-val))
 				(plusp (float-sign arg-hi-val))))))))))
+(eval-when (:compile-toplevel :execute)
+  (setf *read-default-float-format* 'single-float))
+
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
+(progn
 
 ;;; Handle monotonic functions of a single variable whose domain is
 ;;; possibly part of the real line. ARG is the variable, FCN is the
@@ -672,7 +693,7 @@
   (frob atanh -1d0 1d0 -1 1)
   ;; Kahan says that (sqrt -0.0) is -0.0, so use a specifier that
   ;; includes -0.0.
-  (frob sqrt -0d0 nil 0 nil))
+  (frob sqrt (load-time-value (make-unportable-float :double-float-negative-zero)) nil 0 nil))
 
 ;;; Compute bounds for (expt x y). This should be easy since (expt x
 ;;; y) = (exp (* y (log x))). However, computations done this way

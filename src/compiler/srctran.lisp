@@ -834,11 +834,11 @@
 	     :low (if lo-float-zero-p
 		      (if (consp lo)
 			  (list (float 0.0 lo-val))
-			  (float -0.0 lo-val))
+			  (float (load-time-value (make-unportable-float :single-float-negative-zero)) lo-val))
 		      lo)
 	     :high (if hi-float-zero-p
 		       (if (consp hi)
-			   (list (float -0.0 hi-val))
+			   (list (float (load-time-value (make-unportable-float :single-float-negative-zero)) hi-val))
 			   (float 0.0 hi-val))
 		       hi))
 	    type))
@@ -956,7 +956,9 @@
 
 ;;; FIXME: MAKE-CANONICAL-UNION-TYPE and CONVERT-MEMBER-TYPE probably
 ;;; belong in the kernel's type logic, invoked always, instead of in
-;;; the compiler, invoked only during some type optimizations.
+;;; the compiler, invoked only during some type optimizations. (In
+;;; fact, as of 0.pre8.100 or so they probably are, under
+;;; MAKE-MEMBER-TYPE, so probably this code can be deleted)
 
 ;;; Take a list of types and return a canonical type specifier,
 ;;; combining any MEMBER types together. If both positive and negative
@@ -971,15 +973,15 @@
 	  (setf members (union members (member-type-members type)))
 	  (push type misc-types)))
     #!+long-float
-    (when (null (set-difference '(-0l0 0l0) members))
-      (push (specifier-type '(long-float 0l0 0l0)) misc-types)
-      (setf members (set-difference members '(-0l0 0l0))))
-    (when (null (set-difference '(-0d0 0d0) members))
-      (push (specifier-type '(double-float 0d0 0d0)) misc-types)
-      (setf members (set-difference members '(-0d0 0d0))))
-    (when (null (set-difference '(-0f0 0f0) members))
-      (push (specifier-type '(single-float 0f0 0f0)) misc-types)
-      (setf members (set-difference members '(-0f0 0f0))))
+    (when (null (set-difference `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0) members))
+      (push (specifier-type '(long-float 0.0l0 0.0l0)) misc-types)
+      (setf members (set-difference members `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0))))
+    (when (null (set-difference `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0) members))
+      (push (specifier-type '(double-float 0.0d0 0.0d0)) misc-types)
+      (setf members (set-difference members `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0))))
+    (when (null (set-difference `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0) members))
+      (push (specifier-type '(single-float 0.0f0 0.0f0)) misc-types)
+      (setf members (set-difference members `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0))))
     (if members
 	(apply #'type-union (make-member-type :members members) misc-types)
 	(apply #'type-union misc-types))))

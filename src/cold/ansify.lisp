@@ -40,7 +40,10 @@
     ;; These problems don't seem deep, and could probably be worked
     ;; around.
     #+nil (clisp-ouch "no (DOCUMENTATION X) when X is a PACKAGE")
-    #+nil (clisp-ouch "no (FUNCTION (SETF SYMBOL-FUNCTION))")))
+    #+nil (clisp-ouch "no (FUNCTION (SETF SYMBOL-FUNCTION))"))
+  
+  (ext:without-package-lock ("SYSTEM")
+    (setf system::*inhibit-floating-point-underflow* t)))
 
 ;;;; CMU CL issues
 

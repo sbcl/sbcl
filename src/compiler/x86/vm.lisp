@@ -375,6 +375,18 @@
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
+  ;; KLUDGE: although this might not look different from the FIXNUM
+  ;; below, in the TYPECASE, SB-INT:FIXNUMP actually tests against the
+  ;; target FIXNUM type, as opposed to TYPECASE FIXNUM which tests
+  ;; against the host FIXNUM range.
+  #+sb-xc-host
+  (when (fixnump value)
+    ;; FIXME: this block name was not obvious.  Also, since this idiom
+    ;; is presumably going to be repeated in all six (current)
+    ;; backends, it would be nice to wrap it up somewhat more nicely.
+    ;; -- CSR, 2003-04-20
+    (return-from impl-of-vm-support-routine-immediate-constant-sc
+      (sc-number-or-lose 'immediate)))
   (typecase value
     ((or fixnum #-sb-xc-host system-area-pointer character)
      (sc-number-or-lose 'immediate))

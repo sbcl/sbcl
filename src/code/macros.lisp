@@ -176,11 +176,11 @@
 	     name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
-    (def (:compile-toplevel) nil)))
+    #-sb-xc (def (:compile-toplevel) nil)))
 
 ;;;; CASE, TYPECASE, and friends
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; CASE-BODY returns code for all the standard "case" macros. NAME is
 ;;; the macro name, and KEYFORM is the thing to case on. MULTI-P

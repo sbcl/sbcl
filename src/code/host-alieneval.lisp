@@ -30,7 +30,7 @@
 
 ;;;; ALIEN-TYPE-INFO stuff
 
-(eval-when (:compile-toplevel :execute :load-toplevel)
+(eval-when (#-sb-xc :compile-toplevel :execute :load-toplevel)
 
 (defstruct (alien-type-class (:copier nil))
   (name nil :type symbol)
@@ -147,7 +147,7 @@
 ;;; COMPILER-LET is no longer supported by ANSI or SBCL. Instead, we
 ;;; follow the suggestion in CLTL2 of using SYMBOL-MACROLET to achieve
 ;;; a similar effect.
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun auxiliary-type-definitions (env)
     (multiple-value-bind (result expanded-p)
 	(sb!xc:macroexpand '&auxiliary-type-definitions& env)
@@ -259,7 +259,7 @@
 	       ,body))
 	   (%define-alien-type-translator ',name #',defun-name ,docs))))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %define-alien-type-translator (name translator docs)
     (declare (ignore docs))
     (setf (info :alien-type :kind name) :primitive)
@@ -285,7 +285,7 @@
   (deprecation-warning 'def-alien-type 'define-alien-type)
   `(define-alien-type ,@rest))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %def-auxiliary-alien-types (types)
     (dolist (info types)
       (destructuring-bind (kind name defn) info

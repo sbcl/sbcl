@@ -22,12 +22,18 @@
 ;;; alists instead.
 (def!type policy () 'list)
 
-(eval-when (#-sb-xc-host :compile-toplevel :load-toplevel :execute)
-  (defstruct policy-dependent-quality
-    name
-    expression
-    getter
-    values-documentation))
+;;; FIXME: the original implementation of this was protected by
+;;;
+;;; (eval-when (#-sb-xc-host :compile-toplevel :load-toplevel :execute)
+;;;
+;;; but I don't know why.  This seems to work, but I don't understand
+;;; why the original wasn't this in the first place.  -- CSR,
+;;; 2003-05-04
+(defstruct policy-dependent-quality
+  name
+  expression
+  getter
+  values-documentation)
 
 ;;; names of recognized optimization policy qualities
 (defvar *policy-qualities*) ; (initialized at cold init)

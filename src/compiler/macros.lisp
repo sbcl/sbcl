@@ -133,7 +133,7 @@
 
 (deftype attributes () 'fixnum)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; Given a list of attribute names and an alist that translates them
 ;;; to masks, return the OR of the masks.
@@ -263,7 +263,7 @@
 ;;;; to parse the IR1 representation of a function call using a
 ;;;; standard function lambda-list.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; Given a DEFTRANSFORM-style lambda-list, generate code that parses
 ;;; the arguments of a combination with respect to that lambda-list.
@@ -707,7 +707,7 @@
 ;;; experimentation, not for ordinary use, so it should probably
 ;;; become conditional on SB-SHOW.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defstruct (event-info (:copier nil))
   ;; The name of this event.

@@ -263,12 +263,12 @@
   (cond
     ((and (fixnump arg) (<= arg random-fixnum-max) (> arg 0))
      (rem (random-chunk state) arg))
-    ((and (typep arg 'single-float) (> arg 0.0S0))
+    ((and (typep arg 'single-float) (> arg 0.0f0))
      (%random-single-float arg state))
-    ((and (typep arg 'double-float) (> arg 0.0D0))
+    ((and (typep arg 'double-float) (> arg 0.0d0))
      (%random-double-float arg state))
     #!+long-float
-    ((and (typep arg 'long-float) (> arg 0.0L0))
+    ((and (typep arg 'long-float) (> arg 0.0l0))
      (%random-long-float arg state))
     ((and (integerp arg) (> arg 0))
      (%random-integer arg state))
