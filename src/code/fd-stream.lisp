@@ -883,27 +883,40 @@
      (setf (fd-stream-unread fd-stream) arg1)
      (setf (fd-stream-listen fd-stream) t))
     (:close
-     (cond (arg1
-	    ;; We got us an abort on our hands.
+     (cond (arg1 ; We got us an abort on our hands.
 	    (when (fd-stream-handler fd-stream)
-		  (sb!sys:remove-fd-handler (fd-stream-handler fd-stream))
-		  (setf (fd-stream-handler fd-stream) nil))
+	      (sb!sys:remove-fd-handler (fd-stream-handler fd-stream))
+	      (setf (fd-stream-handler fd-stream) nil))
+	    ;; We can't do anything unless we know what file were
+	    ;; dealing with, and we don't want to do anything
+	    ;; strange unless we were writing to the file.
 	    (when (and (fd-stream-file fd-stream)
 		       (fd-stream-obuf-sap fd-stream))
-	      ;; We can't do anything unless we know what file were
-	      ;; dealing with, and we don't want to do anything
-	      ;; strange unless we were writing to the file.
 	      (if (fd-stream-original fd-stream)
-		  ;; We have a handle on the original, just revert.
-		  (multiple-value-bind (okay err)
-		      (sb!unix:unix-rename (fd-stream-original fd-stream)
-					   (fd-stream-file fd-stream))
-		    (unless okay
-		      (simple-stream-perror
-		       "couldn't restore ~S to its original contents"
-		       fd-stream
-		       err)))
-		  ;; We can't restore the original, so nuke that puppy.
+		  ;; If the original is EQ to file we are appending
+		  ;; and can just close the file without renaming.
+		  (unless (eq (fd-stream-original fd-stream)
+			      (fd-stream-file fd-stream))
+		    ;; We have a handle on the original, just revert.
+		    (multiple-value-bind (okay err)
+			(sb!unix:unix-rename (fd-stream-original fd-stream)
+					     (fd-stream-file fd-stream))
+		      (unless okay
+			(simple-stream-perror
+			 "couldn't restore ~S to its original contents"
+			 fd-stream
+			 err))))
+		  ;; We can't restore the original, and aren't
+		  ;; appending, so nuke that puppy.
+		  ;;
+		  ;; FIXME: This is currently the fate of superseded
+		  ;; files, and according to the CLOSE spec this is
+		  ;; wrong. However, there seems to be no clean way to
+		  ;; do that that doesn't involve either copying the
+		  ;; data (bad if the :abort resulted from a full
+		  ;; disk), or renaming the old file temporarily
+		  ;; (probably bad because stream opening becomes more
+		  ;; racy).
 		  (multiple-value-bind (okay err)
 		      (sb!unix:unix-unlink (fd-stream-file fd-stream))
 		    (unless okay
@@ -1243,12 +1256,16 @@
       (if (eq if-does-not-exist :create)
 	(setf mask (logior mask sb!unix:o_creat)))
 
-      (let ((original (if (member if-exists
-				  '(:rename :rename-and-delete))
-			  (pick-backup-name namestring)))
+      (let ((original (case if-exists
+			((:rename :rename-and-delete)
+			 (pick-backup-name namestring))
+			((:append)
+			 ;; KLUDGE: Provent CLOSE from deleting
+			 ;; appending streams when called with :ABORT T
+			 namestring)))
 	    (delete-original (eq if-exists :rename-and-delete))
 	    (mode #o666))
-	(when original
+	(when (and original (not (eq original namestring)))
 	  ;; We are doing a :RENAME or :RENAME-AND-DELETE. Determine
 	  ;; whether the file already exists, make sure the original
 	  ;; file is not a directory, and keep the mode.

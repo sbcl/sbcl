@@ -125,5 +125,29 @@
       (assert (= 1 (file-position s))) ; unicode...
       (assert (file-position s 0))))
   (delete-file p))
+
+;;; CLOSING a non-new streams should not delete them, and superseded
+;;; files should be restored.
+(let ((test "test-file-for-close-should-not-delete"))
+  (macrolet ((test-mode (mode)
+	       `(progn
+		 (catch :close-test-exit
+		   (with-open-file (f test :direction :output :if-exists ,mode)
+		     (write-line "test" f)
+		     (throw :close-test-exit t)))
+		 (assert (and (probe-file test) ,mode)))))
+    (unwind-protect
+	 (progn
+	   (with-open-file (f test :direction :output)
+	     (write-line "test" f))
+	   (test-mode :append)
+	   ;; FIXME: We really should recover supersede files as well, according to
+	   ;; CLOSE in CLHS, but at the moment we don't.
+	   ;; (test-mode :supersede)
+	   (test-mode :rename)
+	   (test-mode :rename-and-delete))
+      (when (probe-file test)
+	(delete-file test)))))
+
 ;;; success
 (quit :unix-status 104)

@@ -1443,3 +1443,16 @@ WORKAROUND:
   to about 1024 (and similarly for signed-byte), so
     (open "/dev/zero" :element-type '(unsigned-byte 1025))
   gives an error in sbcl-0.8.10.
+
+325: "CLOSE :ABORT T on supeseding streams"
+  Closing a stream opened with :IF-EXISTS :SUPERSEDE with :ABORT T leaves no
+  file on disk, even if one existed before opening.
+
+  The illegality of this is not crystal clear, as the ANSI dictionary
+  entry for CLOSE says that when :ABORT is T superseded files are not
+  superseded (ie. the original should be restored), whereas the OPEN
+  entry says about :IF-EXISTS :SUPERSEDE "If possible, the
+  implementation should not destroy the old file until the new stream
+  is closed." -- implying that even though undesirable, early deletion
+  is legal. Restoring the original would none the less be the polite
+  thing to do.
