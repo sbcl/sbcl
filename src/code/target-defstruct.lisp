@@ -422,7 +422,7 @@
 	   (pprint-pop)
 	   (let ((slot (pop remaining-slots)))
 	     (write-char #\: stream)
-	     (output-symbol-name (dsd-%name slot) stream)
+	     (output-symbol-name (symbol-name (dsd-name slot)) stream)
 	     (write-char #\space stream)
 	     (pprint-newline :miser stream)
 	     (output-object (funcall (fdefinition (dsd-accessor-name slot))
@@ -452,7 +452,7 @@
 	(write-char #\space stream)
 	(write-char #\: stream)
 	(let ((slot (first remaining-slots)))
-	  (output-symbol-name (dsd-%name slot) stream)
+	  (output-symbol-name (symbol-name (dsd-name slot)) stream)
 	  (write-char #\space stream)
 	  (output-object
 	   (funcall (fdefinition (dsd-accessor-name slot))

@@ -172,7 +172,7 @@ evaluated expressions.
         (info (layout-info (sb-kernel:layout-of object))))
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (dd-slots info) (nreverse parts-list))
-        (push (cons (dsd-%name dd-slot)
+        (push (cons (dsd-name dd-slot)
                     (funcall (dsd-accessor-name dd-slot) object))
               parts-list)))))
 

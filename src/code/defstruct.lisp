@@ -174,8 +174,8 @@
 	     (:conc-name dsd-)
 	     (:copier nil)
 	     #-sb-xc-host (:pure t))
-  ;; string name of slot
-  %name
+  ;; name of slot
+  name
   ;; its position in the implementation sequence
   (index (missing-arg) :type fixnum)
   ;; the name of the accessor function
@@ -204,17 +204,6 @@
 (def!method print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))
-
-;;; Return the name of a defstruct slot as a symbol. We store it as a
-;;; string to avoid creating lots of worthless symbols at load time.
-;;;
-;;; FIXME: This has horrible package issues.  In many ways, it would
-;;; be very nice to treat the names of structure slots as strings, but
-;;; unfortunately PCL requires slot names to be interned symbols.
-;;; Maybe we want to resurrect something like the old
-;;; SB-SLOT-ACCESSOR-NAME package?
-(defun dsd-name (dsd)
-  (intern (dsd-%name dsd)))
 
 ;;;; typed (non-class) structures
 
@@ -482,7 +471,7 @@
 	      ((not (= (cdr inherited) index))
 	       (style-warn "~@<Non-overwritten accessor ~S does not access ~
                             slot with name ~S (accessing an inherited slot ~
-                            instead).~:@>" name (dsd-%name slot))))))))
+                            instead).~:@>" name (dsd-name slot))))))))
     (stuff)))
 
 ;;;; parsing
@@ -611,7 +600,7 @@
 ;;; that we modify to get the new slot. This is supplied when handling
 ;;; included slots.
 (defun parse-1-dsd (defstruct spec &optional
-		    (slot (make-defstruct-slot-description :%name ""
+		    (slot (make-defstruct-slot-description :name ""
 							   :index 0
 							   :type t)))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
@@ -633,11 +622,13 @@
 		      spec))
 	spec))
 
-    (when (find name (dd-slots defstruct) :test #'string= :key #'dsd-%name)
+    (when (find name (dd-slots defstruct)
+		:test #'string=
+		:key (lambda (x) (symbol-name (dsd-name x))))
       (error 'simple-program-error
 	     :format-control "duplicate slot name ~S"
 	     :format-arguments (list name)))
-    (setf (dsd-%name slot) (string name))
+    (setf (dsd-name slot) name)
     (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list slot)))
 
     (let ((accessor-name (if (dd-conc-name defstruct)
@@ -1035,7 +1026,7 @@
                             slot with name ~S (accessing an inherited slot ~
                             instead).~:@>"
 			   accessor-name
-			   (dsd-%name dsd)))))))))
+			   (dsd-name dsd)))))))))
   (values))
 
 ;;;; redefinition stuff
@@ -1501,7 +1492,7 @@
 			 (index 1))
 		     (dolist (slot-name slot-names)
 		       (push (make-defstruct-slot-description
-			      :%name (symbol-name slot-name)
+			      :name slot-name
 			      :index index
 			      :accessor-name (symbolicate conc-name slot-name))
 			     reversed-result)
@@ -1591,7 +1582,8 @@
 	   (let ((,object-gensym ,raw-maker-form))
 	     ,@(mapcar (lambda (slot-name)
 			 (let ((dsd (find (symbol-name slot-name) dd-slots
-					  :key #'dsd-%name
+					  :key (lambda (x)
+						 (symbol-name (dsd-name x)))
 					  :test #'string=)))
 			   ;; KLUDGE: bug 117 bogowarning.  Neither
 			   ;; DECLAREing the type nor TRULY-THE cut
