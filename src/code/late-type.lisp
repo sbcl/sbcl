@@ -1183,7 +1183,12 @@
   (values nil nil))
 
 (!define-type-method (hairy :complex-=) (type1 type2)
-  (if (unknown-type-p type2)
+  (if (and (unknown-type-p type2)
+           (let* ((specifier2 (unknown-type-specifier type2))
+                  (name2 (if (consp specifier2)
+                             (car specifier2)
+                             specifier2)))
+             (info :type :kind name2)))
       (let ((type2 (specifier-type (unknown-type-specifier type2))))
         (if (unknown-type-p type2)
             (values nil nil)

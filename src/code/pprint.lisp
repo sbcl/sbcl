@@ -314,16 +314,17 @@
   ;; (In the PPRINT-LOGICAL-BLOCK form which calls us,
   ;; :PREFIX and :PER-LINE-PREFIX have hairy defaulting behavior,
   ;; and might end up being NIL.)
-  (declare (type (or null string prefix)))
+  (declare (type (or null string) prefix))
   ;; (But the defaulting behavior of PPRINT-LOGICAL-BLOCK :SUFFIX is
   ;; trivial, so it should always be a string.)
   (declare (type string suffix))
   (when prefix
+    (setq prefix (coerce prefix 'simple-string))
     (pretty-sout stream prefix 0 (length prefix)))
   (let* ((pending-blocks (pretty-stream-pending-blocks stream))
 	 (start (enqueue stream block-start
 			 :prefix (and per-line-p prefix)
-			 :suffix suffix
+			 :suffix (coerce suffix 'simple-string)
 			 :depth (length pending-blocks))))
     (setf (pretty-stream-pending-blocks stream)
 	  (cons start pending-blocks))))
@@ -1006,7 +1007,7 @@
 				(index index)
 				(step (reduce #'* dims))
 				(count 0))
-			   (loop				
+			   (loop
 			     (pprint-pop)
 			     (output-guts stream index dims)
 			     (when (= (incf count) dim)

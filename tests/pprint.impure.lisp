@@ -67,5 +67,27 @@
 ;;; way to make an automated test:
 ;;;  (LET ((*PRINT-CIRCLE* T)) (DESCRIBE (MAKE-HASH-TABLE)))
 
+;;; bug 263: :PREFIX, :PER-LINE-PREFIX and :SUFFIX arguments of
+;;; PPRINT-LOGICAL-BLOCK may be complex strings
+(let ((list '(1 2 3))
+      (prefix (make-array 2
+                          :element-type 'character
+                          :displaced-to ";x"
+                          :fill-pointer 1))
+      (suffix (make-array 2
+                          :element-type 'character
+                          :displaced-to ">xy"
+                          :displaced-index-offset 1
+                          :fill-pointer 1)))
+  (assert (equal (with-output-to-string (s)
+                   (pprint-logical-block (s list
+                                            :per-line-prefix prefix
+                                            :suffix suffix)
+                     (format s "~{~W~^~:@_~}" list)))
+                 (format nil ";1~%~
+                              ;2~%~
+                              ;3x"))))
+
+
 ;;; success
 (quit :unix-status 104)

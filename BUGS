@@ -1067,6 +1067,25 @@ WORKAROUND:
 
   Urgh... It's time to write IR1-copier.
 
+262:
+  In 0.8.1.32:
+
+    * (ensure-generic-function 'foo)
+    #<STANDARD-GENERIC-FUNCTION FOO (0)>
+    * (defmethod foo (x) x)
+    debugger invoked on condition of type SIMPLE-ERROR:
+      The generic function #<STANDARD-GENERIC-FUNCTION FOO (0)> takes 0 required
+      arguments; was asked to find a method with specializers (#<BUILT-IN-CLASS T>)
+
+  AMOP seems to say that it should work (first ADD-METHOD initializes
+  GF lambda list).
+
+263:
+  :PREFIX, :PER-LINE-PREFIX and :SUFFIX arguments of
+  PPRINT-LOGICAL-BLOCK may be complex strings.
+
+  (fixed in 0.8.1.33)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -139,8 +139,6 @@
                      :rest rest
                      :allowp allowp))
 
-;;; FIXME: ANSI VALUES has a short form (without lambda list
-;;; keywords), which should be translated into a long one.
 (defun make-values-type (&key (args nil argsp)
                          required optional rest allowp)
   (if argsp

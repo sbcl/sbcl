@@ -833,16 +833,17 @@
 ;;; value?
 
 ;;; Pick off some constant cases.
-(deftransform array-header-p ((array) (array))
+(defoptimizer (array-header-p derive-type) ((array))
   (let ((type (continuation-type array)))
-    (unless (array-type-p type)
-      (give-up-ir1-transform))
-    (let ((dims (array-type-dimensions type)))
-      (cond ((csubtypep type (specifier-type '(simple-array * (*))))
-	     ;; no array header
-	     nil)
-	    ((and (listp dims) (/= (length dims) 1))
-	     ;; multi-dimensional array, will have a header
-	     t)
-	    (t
-	     (give-up-ir1-transform))))))
+    (cond ((not (array-type-p type))
+           nil)
+          (t
+           (let ((dims (array-type-dimensions type)))
+             (cond ((csubtypep type (specifier-type '(simple-array * (*))))
+                    ;; no array header
+                    (specifier-type 'null))
+                   ((and (listp dims) (/= (length dims) 1))
+                    ;; multi-dimensional array, will have a header
+                    (specifier-type '(eql t)))
+                   (t
+                    nil)))))))

@@ -161,7 +161,8 @@
   (def!macro !def-boolean-attribute (name &rest attribute-names)
 
     (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
-	  (test-name (symbolicate name "-ATTRIBUTEP")))
+	  (test-name (symbolicate name "-ATTRIBUTEP"))
+          (decoder-name (symbolicate "DECODE-" name "-ATTRIBUTES")))
       (collect ((alist))
         (do ((mask 1 (ash mask 1))
 	     (names attribute-names (cdr names)))
@@ -186,7 +187,11 @@
 	   ;; building the xc and when building the target compiler.
 	   (!def-boolean-attribute-setter ,test-name
 					  ,translations-name
-					  ,@attribute-names)))))
+					  ,@attribute-names)
+           (defun ,decoder-name (attributes)
+             (loop for (name . mask) in ,translations-name
+                   when (logtest mask attributes)
+                     collect name))))))
 
   ;; It seems to be difficult to express in DEF!MACRO machinery what
   ;; to do with target-vs-host GET-SETF-EXPANSION in here, so we just

@@ -116,6 +116,8 @@
   (predicate-type nil :type (or ctype null)))
 
 (defprinter (fun-info)
+  (attributes :test (not (zerop attributes))
+              :prin1 (decode-ir1-attributes attributes))
   (transforms :test transforms)
   (derive-type :test derive-type)
   (optimizer :test optimizer)
