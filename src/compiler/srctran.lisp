@@ -992,10 +992,13 @@
 	 (member (first members))
 	 (member-type (type-of member)))
     (aver (not (rest members)))
-    (specifier-type `(,(if (subtypep member-type 'integer)
-			   'integer
-			   member-type)
-		      ,member ,member))))
+    (specifier-type (cond ((typep member 'integer)
+                           `(integer ,member ,member))
+                          ((memq member-type '(short-float single-float
+                                               double-float long-float))
+                           `(,member-type ,member ,member))
+                          (t
+                           member-type)))))
 
 ;;; This is used in defoptimizers for computing the resulting type of
 ;;; a function.

@@ -471,7 +471,7 @@
 ;;; the high order bit is bit 31 because shifting by 32 doesn't work
 ;;; too well.
 (defun ub32-strength-reduce-constant-multiply (arg num)
-  (declare (type (unsigned-byte 32) numb))
+  (declare (type (unsigned-byte 32) num))
   (let ((adds 0) (shifts 0)
 	(result nil) first-one)
     (labels ((tub32 (x) `(truly-the (unsigned-byte 32) ,x))

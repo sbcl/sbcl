@@ -156,5 +156,10 @@
      (funcall (eval ''list) y (+ y 2d0) (* y 3d0)))))
 (assert (raises-error? (bug233a 4) type-error))
 
+;;; compiler failure
+(defun bug145b (x)
+  (declare (type (double-float -0d0) x))
+  (declare (optimize speed))
+  (+ x (sqrt (log (random 1d0)))))
 
 (sb-ext:quit :unix-status 104)

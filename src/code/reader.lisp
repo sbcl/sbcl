@@ -1431,7 +1431,7 @@
 	       `(error 'simple-parse-error
 		       :format-control ,format-control
 		       :format-arguments (list string))))
-    (with-array-data ((string string)
+    (with-array-data ((string string :offset-var offset)
 		      (start start)
 		      (end (%check-vector-sequence-bounds string start end)))
       (let ((index (do ((i start (1+ i)))
@@ -1460,10 +1460,10 @@
 			found-digit t))
 		 (junk-allowed (return nil))
 		 ((whitespacep char)
-		  (do ((jndex (1+ index) (1+ jndex)))
-		      ((= jndex end))
-		    (declare (fixnum jndex))
-		    (unless (whitespacep (char string jndex))
+                  (loop
+                   (incf index)
+                   (when (= index end) (return))
+                   (unless (whitespacep (char string index))
 		      (parse-error "junk in string ~S")))
 		  (return nil))
 		 (t
@@ -1475,7 +1475,7 @@
 	     (if junk-allowed
 		 nil
 		 (parse-error "no digits in string ~S")))
-	 index)))))
+	 (- index offset))))))
 
 ;;;; reader initialization code
 

@@ -91,3 +91,19 @@
            (end-of-file (c)
              'good))
          'good))
+
+;;; Bugs found by Paul Dietz
+(assert (equal (multiple-value-list
+                (parse-integer "   123      "))
+               '(123 12)))
+
+(let* ((base "xxx 123  yyy")
+       (intermediate (make-array 8 :element-type (array-element-type base)
+                                 :displaced-to base
+                                 :displaced-index-offset 2))
+       (string (make-array 6 :element-type (array-element-type base)
+                           :displaced-to intermediate
+                           :displaced-index-offset 1)))
+  (assert (equal (multiple-value-list
+                  (parse-integer string))
+                 '(123 6))))

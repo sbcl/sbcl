@@ -2033,6 +2033,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     x86 LEA instruction for multiplication by constants.
   * bug fix: in some situations compiler did not report usage of
     generic arithmetic in (SPEED 3) policy.
+  * bug 145b fix: compiler used wrong type specifier while converting
+    MEMBER-types to numeric.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very
@@ -2042,6 +2044,10 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     ** optimizer for (EXPT X 0) did not work for X not of type FLOAT.
     ** (GCD 0 <negative-integer>) returned <negative-integer>.
     ** LCM should return a non-negative integer.
+    ** PARSE-INTEGER returned the index of a terminator instead of the
+       upper bounding index of a substring in case :JUNK-ALLOWED NIL.
+    ** PARSE-INTEGER returned an incorrect index being applied to a
+       displaced string.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

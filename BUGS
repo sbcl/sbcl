@@ -501,17 +501,7 @@ WORKAROUND:
   conformance problem, since seems hard to construct useful code
   where it matters.)
 
-  b.
-  * (defun foo (x)
-      (declare (type (double-float -0d0) x))
-      (declare (optimize speed))
-      (+ x (sqrt (log (random 1d0)))))
-  debugger invoked on condition of type SIMPLE-ERROR:
-    bad thing to be a type specifier: ((COMPLEX
-                                        (DOUBLE-FLOAT 0.0d0
-                                                      #.SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY))
-                                       #C(0.0d0 #.SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY)
-                                       #C(0.0d0 #.SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY))
+  b. (fixed in 0.8.3.43)
 
 146:
   Floating point errors are reported poorly. E.g. on x86 OpenBSD
