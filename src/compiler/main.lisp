@@ -158,6 +158,12 @@
 		  (incf *aborted-compilation-unit-count*))
 		(summarize-compilation-unit (not succeeded-p)))))))))
 
+;;; Is FUN-NAME something that no conforming program can rely on
+;;; defining as a function?
+(defun fun-name-reserved-by-ansi-p (fun-name)
+  (eq (symbol-package (fun-name-block-name fun-name))
+      *cl-package*))
+
 ;;; This is to be called at the end of a compilation unit. It signals
 ;;; any residual warnings about unknown stuff, then prints the total
 ;;; error counts. ABORT-P should be true when the compilation unit was
@@ -181,11 +187,24 @@
 		(undefined-warning-count (undefined-warning-count undef)))
 	    (dolist (*compiler-error-context* warnings)
               (if #-sb-xc-host (and (eq kind :function)
-                                    (symbolp name) ; FIXME: (SETF CL:fo)
-                                    (eq (symbol-package name) *cl-package*)
+				    (fun-name-reserved-by-ansi-p name)
                                     *flame-on-necessarily-undefined-function*)
                   #+sb-xc-host nil
-                  (compiler-warn "undefined ~(~A~): ~S" kind name)
+		  (case name
+		    ((declare)
+		     (compiler-warn
+		      "~@<There is no function named ~S. References to ~S in ~
+                       some contexts (like starts of blocks) have special ~
+                       meaning, but here it would have to be a function, ~
+                       and that shouldn't be right.~:@>"
+		      name name))
+		    (t
+		     (compiler-warn
+		      "~@<The ~(~A~) ~S is undefined, and its name is ~
+                       reserved by ANSI CL so that even if it it were ~
+                       defined later, the code doing so would not be ~
+                       portable.~:@>"
+		      kind name)))
                   (compiler-style-warn "undefined ~(~A~): ~S" kind name)))
 	    (let ((warn-count (length warnings)))
 	      (when (and warnings (> undefined-warning-count warn-count))

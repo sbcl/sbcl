@@ -118,4 +118,12 @@ sh make-target-1.sh || exit 1
 sh make-host-2.sh   || exit 1
 sh make-target-2.sh || exit 1
 sh make-target-contrib.sh || exit 1
+
+# Sometimes people used to see the "No tests failed." output from the last
+# DEFTEST in contrib self-tests and thing that's all that is. So...
+echo
+echo The build seems to have finished successfully. If you would like
+echo run more extensive tests on the new SBCL, you can try run-tests.sh.
+echo
+
 date
