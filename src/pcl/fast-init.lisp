@@ -51,7 +51,7 @@
 			 (return nil))
 		       (setq key (eval (pop initargs-tail)))
 		       (setq value (pop initargs-tail))
-		       (when (eq ':allow-other-keys key)
+		       (when (eq :allow-other-keys key)
 			 (setq allow-other-keys-p value))
 		       (push key keys))))
       (let* ((class (eval class))
@@ -88,7 +88,7 @@
 		 (walk-form form env
 			    (lambda (subform context env)
 			      (declare (ignore env))
-			      (or (and (eq context ':eval)
+			      (or (and (eq context :eval)
 				       (consp subform)
 				       (eq (car subform) 'make-instance)
 				       (expand-make-instance-form subform))
@@ -141,7 +141,7 @@
 	(cached-name (intern (format nil "~A-CACHED-~A" type name))))
     `(defmacro ,reader-name (info)
        `(let ((value (,',cached-name ,info)))
-	  (if (eq value ':unknown)
+	  (if (eq value :unknown)
 	      (progn
 		(,',trap ,info ',',name)
 		(,',cached-name ,info))
@@ -180,12 +180,12 @@
        (defmacro reset-initialize-info-internal (info)
 	 `(progn
 	    ,@(mapcar (lambda (cname)
-			`(setf (,cname ,info) ':unknown))
+			`(setf (,cname ,info) :unknown))
 		      ',cached-names)))
        (defun initialize-info-bound-slots (info)
 	 (let ((slots nil))
 	   ,@(mapcar (lambda (name cached-name)
-		       `(unless (eq ':unknown (,cached-name info))
+		       `(unless (eq :unknown (,cached-name info))
 			  (push ',name slots)))
 		     *initialize-info-cached-slots* cached-names)
 	   slots))
@@ -391,8 +391,8 @@
 				  (eq (car (method-specializers meth))
 				      *the-class-slot-object*)
 				  (and (null (cdr quals))
-				       (or (eq (car quals) ':before)
-					   (eq (car quals) ':after)))))))
+				       (or (eq (car quals) :before)
+					   (eq (car quals) :after)))))))
 		     (and (every #'check-meth initialize-instance-methods)
 			  (every #'check-meth shared-initialize-methods))))
 	(return-from get-make-instance-function nil))
@@ -431,7 +431,7 @@
 (defun complicated-instance-creation-method (m)
   (let ((qual (method-qualifiers m)))
     (if qual
-	(not (and (null (cdr qual)) (eq (car qual) ':after)))
+	(not (and (null (cdr qual)) (eq (car qual) :after)))
 	(let ((specl (car (method-specializers m))))
 	  (or (not (classp specl))
 	      (not (eq 'slot-object (class-name specl))))))))
@@ -619,7 +619,7 @@
 	 (wrapper (class-wrapper class))
 	 (constants (when simple-p
 		      (make-list (wrapper-no-of-instance-slots wrapper)
-				 ':initial-element +slot-unbound+)))
+				 :initial-element +slot-unbound+)))
 	 (slots (class-slots class))
 	 (slot-names (mapcar #'slot-definition-name slots))
 	 (slots-key (mapcar (lambda (slot)
@@ -856,9 +856,9 @@
 	       `((instance-write-internal pv slots ,(const pv-offset) value
 		  ,default
 		  ,(typecase location
-		     (fixnum ':instance)
-		     (cons ':class)
-		     (t ':default)))))))
+		     (fixnum :instance)
+		     (cons :class)
+		     (t :default)))))))
 	(skip-when-instance-boundp
 	 (let* ((pv-offset (cadr form))
 		(location (pvref pv pv-offset))
@@ -878,9 +878,9 @@
 			    pv slots ,(const pv-offset)
 			    ,default
 			    ,(typecase (pvref pv pv-offset)
-			       (fixnum ':instance)
-			       (cons ':class)
-			       (t ':default))))
+			       (fixnum :instance)
+			       (cons :class)
+			       (t :default))))
 	       ,@(let ((sforms (cons nil nil)))
 		   (dotimes-fixnum (i (cadddr form) (car sforms))
 		     (add-forms (first-form-to-lisp forms cvector pv)

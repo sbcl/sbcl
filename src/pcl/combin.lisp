@@ -74,7 +74,7 @@
 	     (method (car cm-args)))
 	(when method
 	  (if (if (listp method)
-		  (eq (car method) ':early-method)
+		  (eq (car method) :early-method)
 		  (method-p method))
 	      (if method-alist-p
 		  t
@@ -129,7 +129,7 @@
 		      gf (car next-methods)
 		      (list* (cdr next-methods) (cdr cm-args))
 		      fmf-p method-alist wrappers))
-	       (arg-info (method-function-get fmf ':arg-info)))
+	       (arg-info (method-function-get fmf :arg-info)))
 	  (make-fast-method-call :function fmf
 				 :pv-cell pv-cell
 				 :next-method-call next
@@ -143,7 +143,7 @@
     (gf method cm-args fmf-p &optional method-alist wrappers)
   (when method
     (if (if (listp method)
-	    (eq (car method) ':early-method)
+	    (eq (car method) :early-method)
 	    (method-p method))
 	(make-emf-from-method method cm-args gf fmf-p method-alist wrappers)
 	(if (and (consp method) (eq (car method) 'make-method))

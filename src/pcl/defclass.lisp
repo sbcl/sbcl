@@ -53,7 +53,7 @@
       (dolist (option options)
         (if (not (listp option))
 	  (error "~S is not a legal defclass option." option)
-	  (when (eq (car option) ':metaclass)
+	  (when (eq (car option) :metaclass)
 	    (unless (legal-class-name-p (cadr option))
 	      (error "The value of the :metaclass option (~S) is not a~%~
 		      legal class name."
@@ -221,7 +221,7 @@
 		(setq key (pop tail)
 		      val (pop tail))
 		(push ``(,',key ,,(make-initfunction val) ,',val) canonical))
-	  `(':direct-default-initargs (list ,@(nreverse canonical))))))
+	  `(:direct-default-initargs (list ,@(nreverse canonical))))))
     (:documentation
       `(',(car option) ',(cadr option)))
     (otherwise

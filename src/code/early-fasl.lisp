@@ -38,7 +38,7 @@
 
 ;;; This value should be incremented when the system changes in such
 ;;; a way that it will no longer work reliably with old fasl files.
-(defconstant +fasl-file-version+ 21)
+(defconstant +fasl-file-version+ 22)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -86,6 +86,9 @@
 ;;;      renamed, changes in globaldb representation of constants
 ;;;      and inline functions, and change in the value of
 ;;;      INTERNAL-TIME-UNITS-PER-SECOND
+;;; 22 = about a zillion changes between sbcl-0.pre7.62 and
+;;;      sbcl-0.pre7.133, during which time it seemed too much
+;;;      trouble to increment the counter
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

@@ -4,93 +4,17 @@
 
 <sect1 id="non-conformance"><title>Non-Conformance with the &ANSI; Standard</>
 
-<para>&SBCL; is derived from code which was written before the &ANSI;
-standard, and some incompatibilities remain.</para>
-
-<para>The &ANSI; standard defines constructs like
-<function>defstruct</>, <function>defun</>, and <function>declaim</>
-so that they can be implemented as macros which expand into ordinary
-code wrapped in <function>eval-when</> forms. However, the pre-&ANSI;
-&CMUCL; implementation handled these (and some related functions like
-<function>proclaim</>) as special cases in the compiler, with subtly
-(or sometimes not-so-subtly) different semantics. Much of this
-weirdness has been removed in the years since the &ANSI; standard was
-released, but bits and pieces remain, so that e.g., as of &SBCL; 0.6.3
-compiling the function
-
-<programlisting>(defun foo () (defstruct bar))</>
-
-will cause the class <type>BAR</> to be defined, even when the
-function is not executed. These remaining nonconforming behaviors are
-considered bugs, and clean patches will be gratefully accepted, but as
-long as they don't cause as many problems in practice as other known
-issues, they tend not to be actively fixed.</para>
-
-<para>More than any other &Lisp; system I am aware of, &SBCL; (and its
-parent &CMUCL;) store and use a lot of compile-time static type
-information. By and large they conform to the standard in doing so,
-but in one regard they do not &mdash; they consider <function>defun</>s to,
-in effect, implicitly <function>proclaim</> type information about the
-signature of the function being defined. Thus, if you compile and load
-
-<programlisting>(defun foo-p (x)
-  (error "stub, foo-p ~s isn't implemented yet!" x))
-(defun foolike-p (x)
-  (or (foo-p x) (foo-p (car x))))</programlisting>
-
-everything will appear to work correctly, but if you subsequently
-redefine <function>foo-p</>
-
-<programlisting>(defun foo-p (x) (or (null x) (symbolp (car x))))</>
-
-and call
-
-<programlisting>(foolike-p nil)</>
-
-you will not get the correct result, but an error,
-
-<screen>debugger invoked on SB-DEBUG:*DEBUG-CONDITION* of type
-SB-KERNEL:SIMPLE-CONTROL-ERROR:
-  A function with declared result type NIL returned:
-  FOO-P</screen>
-
-because when &SBCL; compiled <function>foolike-p</>, &SBCL; thought it
-knew that <function>foo-p</> would never return. More insidious
-problems are quite possible when &SBCL; thinks it can optimize away e.g.
-particular branches of a <function>case</> because of what it's proved
-to itself about the function's return type. This will probably be
-fixed in the foreseeable future, either with a quick fix, or ideally
-in conjunction with some related fixes to generalize the principle
-that declarations are assertions (see below). But for now it remains a
-gross violation of the &ANSI; spec (and reasonable user
-expectations).</para>
-
-<para>The &CMUCL; <function>defstruct</> implementation treated
-structure accessors and other <function>defstruct</>-related functions
-(e.g. predicates) as having some special properties, not quite like
-ordinary functions. This specialness has been reduced in &SBCL;, but
-some still remains. In particular, redefining a structure accessor
-function may magically cause the entire structure class to be deleted.
-This, too, will probably be fixed in the foreseeable future.</para>
-
-<para>The CLOS implementation used in &SBCL; is based on the
-<application>Portable Common Loops</> (PCL) reference implementation
-from Xerox. Unfortunately, PCL seems never to have quite conformed to
-the final CLOS specification. Moreover, despite the "Portable" in its
-name, it wasn't quite portable. Various implementation-specific hacks
-were made to make it run on &CMUCL;, and then more hacks were added to
-make it less inefficient. The result is a system with mostly tolerable
-performance which mostly conforms to the standard, but which has a few
-remaining weirdnesses which seem to be hard to fix. The most important
-remaining weirdness is that the <type>CL:CLASS</> class is not the
-same as the <type>SB-PCL:CLASS</> type used internally in PCL; and
-there are several other symbols maintained in parallel (e.g.
-<type>SB-PCL:FIND-CLASS</> vs. <type>CL:FIND-CLASS</>). So far, any
-problems this has caused have had workarounds involving consistently
-using the SB-PCL versions or the CL versions of the class hierarchy.
-This is admittedly ugly, but it may not be fixed in the foreseeable
-future, since the required cleanup looks nontrivial, and we don't have
-anyone sufficiently motivated to do it.</para>
+<para>
+This section is essentially a placeholder. There is are
+important areas of non-conformance, like the difference
+between <function>sb-pcl:find-class</> and <function>cl:class</>,
+but progress is made
+and the list changes and I've tired of trying to keep
+the information here up to date. For information on the
+highlights, try the bugs sections of the Unix man page.
+For more detailed information, try the BUGS file in the 
+system distribution.
+</para>
 
 </sect1>
 
@@ -101,24 +25,24 @@ principle, and its implications, and the bugs which still keep the
 compiler from quite satisfying this principle, are discussed in the
 <link linkend="compiler">chapter on the compiler</link>.</para>
 
-<note><para>It's not an idiosyncrasy yet, since we haven't done
-it, but someday soon &SBCL; may become a compiler-only implementation.
-That is, essentially, <function>eval</> will be defined to create
-a lambda expression, call <function>compile</> on the lambda
-expression to create a compiled function, and then
-<function>funcall</> the resulting function. This would allow
-a variety of simplifications in the implementation, while introducing
-some other complexities. It remains to be seen when it will be
-possible to try this, or whether it will work well when it's tried,
-but it looks appealing right now.</para></note>
+<para>&SBCL; is essentially a compiler-only implementation of
+&CommonLisp;. That is, for all but a few special cases,
+<function>eval</> creates a
+lambda expression, calls <function>compile</> on the lambda
+expression to create a compiled function, and then calls
+<function>funcall</> on the resulting function object. This 
+is explicitly allowed by the &ANSI; standard, but leads to some
+oddities, e.g. collapsing <function>functionp</> and 
+<function>compiled-function-p</> into the same predicate.
+</para>
 
 </sect1>
 
 <sect1 id="extensions"><title>Extensions</>
 
-<para>&SBCL; is derived from &CMUCL;, which implements many extensions to the
-&ANSI; standard. &SBCL; doesn't support as many extensions as &CMUCL;, but
-it still has quite a few.</para>
+<para>&SBCL; is derived from &CMUCL;, which implements many extensions
+to the &ANSI; standard. &SBCL; doesn't support as many extensions as
+&CMUCL;, but it still has quite a few.</para>
 
 <sect2><title>Things Which Might Be in the Next &ANSI; Standard</>
 
@@ -132,10 +56,9 @@ maintained without keeping them from being GCed. And "finalization"
 hooks are available to cause code to be executed when an object is
 GCed.</para> <!-- FIXME: Actually documenting these would be good.:-| -->
 
-<para>&SBCL; does not currently provide Gray streams, but may do so in
-the near future. (It has unmaintained code inherited from &CMUCL; to
-do so.) <!-- FIXME: Add citation to Gray streams.-->
-</para>
+<para>&SBCL; supports Gray streams, user-overloadable CLOS classes
+whose instances can be used as Lisp streams (e.g. passed as the
+first argument to <function>format</>).</para>
 
 </sect2>
 

@@ -4,9 +4,8 @@ for 0.7.0:
 	protruding rusty nails and snipped off the trailing razor wire,
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-* more renaming in global external names:
+* more renaming (esp. for global as opposed to lexical names):
 	** reserved DO-FOO-style names for iteration macros
-	** s/VARIABLE/VAR/
 	** s/ARGUMENT/ARG/
 	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
 * Perhaps rename "cold" stuff (e.g. SB-COLD and src/cold/) to "boot".

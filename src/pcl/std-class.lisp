@@ -1040,7 +1040,7 @@
 	(sb-sys:without-interrupts
 	  (update-lisp-class-layout class nwrapper)
 	  (setf (slot-value class 'wrapper) nwrapper)
-	  (invalidate-wrapper owrapper ':flush nwrapper))))))
+	  (invalidate-wrapper owrapper :flush nwrapper))))))
 
 (defun flush-cache-trap (owrapper nwrapper instance)
   (declare (ignore owrapper))
@@ -1060,7 +1060,7 @@
       (sb-sys:without-interrupts
 	(update-lisp-class-layout class nwrapper)
 	(setf (slot-value class 'wrapper) nwrapper)
-	(invalidate-wrapper owrapper ':obsolete nwrapper)
+	(invalidate-wrapper owrapper :obsolete nwrapper)
 	class)))
 
 (defmethod make-instances-obsolete ((class symbol))

@@ -660,16 +660,16 @@
 (defmacro instance-read-internal (pv slots pv-offset default &optional type)
   (unless (member type '(nil :instance :class :default))
     (error "illegal type argument to ~S: ~S" 'instance-read-internal type))
-  (if (eq type ':default)
+  (if (eq type :default)
       default
       (let* ((index (gensym))
 	     (value index))
 	`(locally (declare #.*optimize-speed*)
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (setq ,value (typecase ,index
-			   ,@(when (or (null type) (eq type ':instance))
+			   ,@(when (or (null type) (eq type :instance))
 			       `((fixnum (clos-slots-ref ,slots ,index))))
-			   ,@(when (or (null type) (eq type ':class))
+			   ,@(when (or (null type) (eq type :class))
 			       `((cons (cdr ,index))))
 			   (t +slot-unbound+)))
 	    (if (eq ,value +slot-unbound+)
@@ -682,7 +682,7 @@
       `(instance-read-internal .pv. ,(slot-vector-symbol position)
 	,pv-offset (accessor-slot-value ,parameter ,slot-name)
 	,(if (generate-fast-class-slot-access-p class slot-name)
-	     ':class ':instance))))
+	     :class :instance))))
 
 (defmacro instance-reader (pv-offset parameter position gf-name class)
   (declare (ignore class))
@@ -695,16 +695,16 @@
 				      &optional type)
   (unless (member type '(nil :instance :class :default))
     (error "illegal type argument to ~S: ~S" 'instance-write-internal type))
-  (if (eq type ':default)
+  (if (eq type :default)
       default
       (let* ((index (gensym)))
 	`(locally (declare #.*optimize-speed*)
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
-	      ,@(when (or (null type) (eq type ':instance))
+	      ,@(when (or (null type) (eq type :instance))
                       `((fixnum (setf (clos-slots-ref ,slots ,index)
 				      ,new-value))))
-	      ,@(when (or (null type) (eq type ':class))
+	      ,@(when (or (null type) (eq type :class))
 		  `((cons (setf (cdr ,index) ,new-value))))
 	      (t ,default)))))))
 
@@ -720,7 +720,7 @@
 	,pv-offset ,new-value
 	(accessor-set-slot-value ,parameter ,slot-name ,new-value)
 	,(if (generate-fast-class-slot-access-p class slot-name)
-	     ':class ':instance))))
+	     :class :instance))))
 
 (defmacro instance-writer (pv-offset
 			   parameter
@@ -742,17 +742,17 @@
 				       &optional type)
   (unless (member type '(nil :instance :class :default))
     (error "illegal type argument to ~S: ~S" 'instance-boundp-internal type))
-  (if (eq type ':default)
+  (if (eq type :default)
       default
       (let* ((index (gensym)))
 	`(locally (declare #.*optimize-speed*)
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
-	      ,@(when (or (null type) (eq type ':instance))
+	      ,@(when (or (null type) (eq type :instance))
 		  `((fixnum (not (and ,slots
                                       (eq (clos-slots-ref ,slots ,index)
                                           +slot-unbound+))))))
-	      ,@(when (or (null type) (eq type ':class))
+	      ,@(when (or (null type) (eq type :class))
 		  `((cons (not (eq (cdr ,index) +slot-unbound+)))))
 	      (t ,default)))))))
 
@@ -762,7 +762,7 @@
       `(instance-boundp-internal .pv. ,(slot-vector-symbol position)
 	,pv-offset (accessor-slot-boundp ,parameter ,slot-name)
 	,(if (generate-fast-class-slot-access-p class slot-name)
-	     ':class ':instance))))
+	     :class :instance))))
 
 ;;; This magic function has quite a job to do indeed.
 ;;;
@@ -1022,7 +1022,7 @@
 	    (when (eq arg '&aux) (return nil))
 	    (incf nreq)(push arg args))
 	  (setq args (nreverse args))
-	  (setf (getf (getf initargs ':plist) ':arg-info) (cons nreq restp))
+	  (setf (getf (getf initargs :plist) :arg-info) (cons nreq restp))
 	  (make-method-initargs-form-internal1
 	   initargs (cddr lmf) args lmf-params restp)))))
 
@@ -1063,7 +1063,7 @@
 (defun method-function-from-fast-function (fmf)
   (declare (type function fmf))
   (let* ((method-function nil) (pv-table nil)
-	 (arg-info (method-function-get fmf ':arg-info))
+	 (arg-info (method-function-get fmf :arg-info))
 	 (nreq (car arg-info))
 	 (restp (cdr arg-info)))
     (setq method-function

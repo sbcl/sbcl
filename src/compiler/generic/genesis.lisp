@@ -1706,26 +1706,28 @@
 ;;        DEFINE-FOP) instead of creating a code, and
 ;;;   (2) stores its definition in the *COLD-FOP-FUNS* vector,
 ;;;       instead of storing in the *FOP-FUNS* vector.
-(defmacro define-cold-fop ((name &optional (pushp t)) &rest forms)
-  (aver (member pushp '(nil t :nope)))
+(defmacro define-cold-fop ((name &key (pushp t) (stackp t)) &rest forms)
+  (aver (member pushp '(nil t)))
+  (aver (member stackp '(nil t)))
   (let ((code (get name 'fop-code))
 	(fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
     `(progn
        (defun ,fname ()
-	 ,@(if (eq pushp :nope)
-	     forms
-	     `((with-fop-stack ,pushp ,@forms))))
+	 ,@(if stackp
+               `((with-fop-stack ,pushp ,@forms))
+               forms))
        (setf (svref *cold-fop-funs* ,code) #',fname))))
 
-(defmacro clone-cold-fop ((name &optional (pushp t)) (small-name) &rest forms)
-  (aver (member pushp '(nil t :nope)))
+(defmacro clone-cold-fop ((name &key (pushp t) (stackp t)) (small-name) &rest forms)
+  (aver (member pushp '(nil t)))
+  (aver (member stackp '(nil t)))
   `(progn
     (macrolet ((clone-arg () '(read-arg 4)))
-      (define-cold-fop (,name ,pushp) ,@forms))
+      (define-cold-fop (,name :pushp ,pushp :stackp ,stackp) ,@forms))
     (macrolet ((clone-arg () '(read-arg 1)))
-      (define-cold-fop (,small-name ,pushp) ,@forms))))
+      (define-cold-fop (,small-name :pushp ,pushp :stackp ,stackp) ,@forms))))
 
 ;;; Cause a fop to be undefined in cold load.
 (defmacro not-cold-fop (name)
@@ -1758,14 +1760,14 @@
 (define-cold-fop (fop-empty-list) *nil-descriptor*)
 (define-cold-fop (fop-truth) (cold-intern t))
 
-(define-cold-fop (fop-normal-load :nope)
+(define-cold-fop (fop-normal-load :stackp nil)
   (setq *fop-funs* *normal-fop-funs*))
 
-(define-fop (fop-maybe-cold-load 82 :nope)
+(define-fop (fop-maybe-cold-load 82 :stackp nil)
   (when *cold-load-filename*
     (setq *fop-funs* *cold-fop-funs*)))
 
-(define-cold-fop (fop-maybe-cold-load :nope))
+(define-cold-fop (fop-maybe-cold-load :stackp nil))
 
 (clone-cold-fop (fop-struct)
 		(fop-small-struct)
@@ -2025,7 +2027,7 @@
 ;;;; cold fops for loading numbers
 
 (defmacro define-cold-number-fop (fop)
-  `(define-cold-fop (,fop :nope)
+  `(define-cold-fop (,fop :stackp nil)
      ;; Invoke the ordinary warm version of this fop to push the
      ;; number.
      (,fop)
@@ -2192,7 +2194,7 @@
 				    *load-time-value-counter*
 				    sb!vm:simple-vector-widetag)))
 
-(define-cold-fop (fop-funcall-for-effect nil)
+(define-cold-fop (fop-funcall-for-effect :pushp nil)
   (if (= (read-arg 1) 0)
       (cold-push (pop-stack)
 		 *current-reversed-cold-toplevels*)
@@ -2200,17 +2202,17 @@
 
 ;;;; cold fops for fixing up circularities
 
-(define-cold-fop (fop-rplaca nil)
+(define-cold-fop (fop-rplaca :pushp nil)
   (let ((obj (svref *current-fop-table* (read-arg 4)))
 	(idx (read-arg 4)))
     (write-memory (cold-nthcdr idx obj) (pop-stack))))
 
-(define-cold-fop (fop-rplacd nil)
+(define-cold-fop (fop-rplacd :pushp nil)
   (let ((obj (svref *current-fop-table* (read-arg 4)))
 	(idx (read-arg 4)))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
-(define-cold-fop (fop-svset nil)
+(define-cold-fop (fop-svset :pushp nil)
   (let ((obj (svref *current-fop-table* (read-arg 4)))
 	(idx (read-arg 4)))
     (write-wordindexed obj
@@ -2220,12 +2222,14 @@
 			(#.sb!vm:other-pointer-lowtag 2)))
 		   (pop-stack))))
 
-(define-cold-fop (fop-structset nil)
+(define-cold-fop (fop-structset :pushp nil)
   (let ((obj (svref *current-fop-table* (read-arg 4)))
 	(idx (read-arg 4)))
     (write-wordindexed obj (1+ idx) (pop-stack))))
 
-(define-cold-fop (fop-nthcdr t)
+;;; In the original CMUCL code, this actually explicitly declared PUSHP
+;;; to be T, even though that's what it defaults to in DEFINE-COLD-FOP.
+(define-cold-fop (fop-nthcdr)
   (cold-nthcdr (read-arg 4) (pop-stack)))
 
 (defun cold-nthcdr (index obj)
@@ -2243,7 +2247,7 @@
   ;; (SETF CAR).
   (make-hash-table :test 'equal))
 
-(define-cold-fop (fop-fset nil)
+(define-cold-fop (fop-fset :pushp nil)
   (let* ((fn (pop-stack))
 	 (cold-name (pop-stack))
 	 (warm-name (warm-fun-name cold-name)))
@@ -2323,7 +2327,7 @@
 
 (define-cold-code-fop fop-small-code (read-arg 1) (read-arg 2))
 
-(clone-cold-fop (fop-alter-code nil)
+(clone-cold-fop (fop-alter-code :pushp nil)
 		(fop-byte-alter-code)
   (let ((slot (clone-arg))
 	(value (pop-stack))

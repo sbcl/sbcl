@@ -5,50 +5,86 @@
 specific to &SBCL;, not on behavior which is common to all
 implementations of &ANSI; &CommonLisp;.</para>
 
-<sect1><title>More Information on &CommonLisp; in General</>
+<sect1 id="more-cl-info">
+<title>Where To Go For More Information on &CommonLisp; in General</title>
 
-<para>If you are an experienced programmer in general but need
-information on using &CommonLisp; in particular, <emphasis>ANSI Common
-Lisp</>, by Paul Graham, is a good place to start. <emphasis>Paradigms
-Of Artificial Intelligence Programming</>, by Peter Norvig, also has
-some good information on general &CommonLisp; programming, and many
-nontrivial examples. For CLOS in particular, <emphasis>Object-Oriented
-Programming In Common Lisp</> by Sonya Keene is useful.</para>
-
-<para>Two very useful resources for working with any implementation of
+<para>Regardless of your ability level, two very useful resources
+for working with any implementation of
 &CommonLisp; are the
 <ulink url="http://ilisp.cons.org"><application>ILISP</></ulink>
 package for <application>Emacs</> and
 <ulink url="http://www.harlequin.com/books/HyperSpec">the &CommonLisp;
 HyperSpec</>.</para>
 
+<para>If you're not a programmer and you're trying to learn,
+many introductory Lisp books are available. However, we don't have any
+standout favorites. If you can't decide, try checking the Usenet
+comp.lang.lisp FAQ for recent recommendations.</para>
+
+<para>If you are an experienced programmer in other languages
+but need to learn about Lisp, three books stand out.
+<itemizedlist>
+  <listitem><para><emphasis>ANSI Common Lisp</>, by Paul Graham,
+    will teach you about most of the language. (And later it might
+    also be worth checking out <emphasis>On Lisp</>, by the same
+    author.)</para></listitem>
+  <listitem><para><emphasis>Paradigms Of Artificial Intelligence
+    Programming</>, by Peter Norvig, also has some good information
+    on general &CommonLisp; programming, and many nontrivial examples. 
+    Whether or not your work is AI, it's a very good book to look
+    at.</para></listitem>
+  <listitem><para>
+    Neither of the books above emphasizes CLOS, but
+    <emphasis>Object-Oriented Programming In Common Lisp</> by Sonya Keene
+    does. Even if you're very knowledgeable about object oriented
+    programming in the abstract, it's worth looking at this book
+    if you want to do any OO in &CommonLisp;. Some abstractions
+    in CLOS (especially multiple dispatch) go beyond anything
+    you'll see in most OO systems, and there are a number of lesser
+    differences as well. This book tends to help with the culture shock.
+  </para></listitem>
+  <listitem><para></para></listitem>
+</itemizedlist>
+</para>
+
 </sect1>
 
-<sect1><title>More Information on SBCL</title>
+<sect1>
+<title>Where To Go For More Information On &SBCL;</title>
 
-<para>Besides this manual, some other &SBCL;-specific information is
-available:
+<para>Before you read this user manual, you should probably read
+two other things.
 <itemizedlist>
-  <listitem><para>There is a Unix <quote>man page</> file
-    <filename>sbcl.1</> in the &SBCL; distribution,
-     describing command options and other usage information
-     for the Unix <function>sbcl</> command which invokes
-     the &SBCL; system.</para></listitem>
+  <listitem><para>You should know how to program in &CommonLisp;.
+    If you don't already know how, you should probably read a
+    <link linkend="more-cl-info">book on it</>.</para></listitem>
+  <listitem><para>The Unix <quote>man page</> for &SBCL; will tell you
+    how to start the &SBCL; environment, so you can get to the
+    classic <quote>hello, world</quote> level of knowledge. It's the file
+    called <filename>sbcl.1</> in the &SBCL; distribution. If &SBCL; is
+    installed on your system, you can read a formatted copy by
+    executing the command <command>man sbcl</>.</para></listitem>
+</itemizedlist>
+</para>
+
+<para>Besides this user manual and the Unix man page, some
+other &SBCL;-specific information is available:
+<itemizedlist>
+  <listitem><para>The <ulink url="http://sbcl.sourceforge.net/">
+    &SBCL; home page</ulink> has some general
+    information, plus links to mailing lists devoted to &SBCL;,
+    and to archives of these mailing lists.</para></listitem>
   <listitem><para>Documentation for non-&ANSI; extensions for
     various commands is available online from the &SBCL; executable
     itself. The extensions for functions which have their own 
     command prompts (e.g. the debugger, and <function>inspect</>)
     are documented in text available by typing <userinput>help</>
     at their command prompts. The extensions for functions which
-    don't have their own command prompt (e.g. <function>trace</>)
-    are described in their documentation strings,
+    don't have their own command prompt (like <function>trace</>
+    does) are described in their documentation strings,
     unless your &SBCL was compiled with an option not
     to include documentation strings, in which case the doc strings
     are only readable in the source code.</para></listitem>
-  <listitem><para>The <ulink url="http://sbcl.sourceforge.net/">
-    &SBCL; home page</ulink> has some general
-    information, plus links to mailing lists devoted to &SBCL;,
-    and to archives of these mailing lists.</para></listitem>
   <listitem><para>Some low-level information describing the 
     programming details of the conversion from &CMUCL; to &SBCL;
     is available in the <filename>doc/FOR-CMUCL-DEVELOPERS</>
@@ -58,15 +94,17 @@ available:
 
 </sect1>
 
-<sect1 id="implementation"><title>System Implementation and History</>
+<sect1 id="implementation">
+<title>Overview Of SBCL, How It Works And Where It Came From</>
 
-<para>You can work productively with SBCL without understanding
-anything about how it was and is implemented, but a little knowledge
-can be helpful in order to better understand error messages,
-troubleshoot problems, to understand why some parts of the system are
-better debugged than others, and to anticipate which known bugs, known
-performance problems, and missing extensions are likely to be fixed,
-tuned, or added.</para>
+<para>You can work productively with SBCL without knowing anything
+understanding anything about where it came from, how it is implemented,
+or how it extends the &ANSI; &CommonLisp; standard. However,
+a little knowledge can be helpful in order to understand error
+messages, to troubleshoot problems, to understand why some parts of
+the system are better debugged than others, and to anticipate which
+known bugs, known performance problems, and missing extensions are
+likely to be fixed, tuned, or added. </para>
 
 <para>&SBCL; is descended from &CMUCL;, which is itself descended from
 Spice Lisp. Early implementations for the Mach operating system on the
@@ -100,11 +138,27 @@ collector (<quote>GC</>), which has various implications (mostly good)
 for performance. These are discussed in <link linkend="efficiency">
 another chapter</link>.</para>
 
-<para>The direct ancestor of &SBCL; is the X86 port of &CMUCL;.
-This port is in some ways the least mature of any in the &CMUCL;
-system, and some things (like profiling and backtracing) 
-do not work particularly well there. &SBCL; should be able
-to improve in these areas, but it may take a while.</para>
+<para>&SBCL; has diverged from &CMUCL; in that &SBCL; is now
+essentially a <quote>compiler-only implementation</quote> of
+&CommonLisp;. A &CommonLisp; implementation is permitted to implement
+both a compiler and an interpreter, and there's some special support
+in the standard (e.g. the distinction between <function>functionp</>
+and <function>compiled-function-p</>) to help support that. But &SBCL;
+has only a vestigial, rudimentary true interpreter. In &SBCL;, the
+<function>eval</> function only truly <quote>interprets</quote> a few
+special classes of forms, such as symbols which are
+<function>boundp</>. More complicated forms are evaluated by calling
+<function>compile</> and then calling <function>funcall</> on the
+returned result.
+<para>
+
+<para>The direct ancestor of &SBCL; is the X86 port of &CMUCL;. This
+port was in some ways the most cobbled-together of all the &CMUCL;
+ports, since a number of strange changes had to be made to support the
+register-poor X86 architecture. Some things (like tracing and
+debugging) do not work particularly well there. &SBCL; should be able
+to improve in these areas (and has already improved in some other
+areas), but it takes a while.</para>
 
 <para>The &SBCL; GC, like the GC on the X86 port of &CMUCL;, is
 <emphasis>conservative</>. This means that it doesn't maintain a

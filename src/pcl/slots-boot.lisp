@@ -310,7 +310,7 @@
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
 
 (defun make-internal-reader-method-function (class-name slot-name)
-  (list* ':method-spec `(internal-reader-method ,class-name ,slot-name)
+  (list* :method-spec `(internal-reader-method ,class-name ,slot-name)
 	 (make-method-function
 	  (lambda (instance)
 	    (let ((wrapper (get-instance-wrapper-or-nil instance)))
@@ -352,10 +352,10 @@
 			 (instance-read-internal
 			  .pv. instance-slots 1
 			  (slot-value instance slot-name))))))))
-    (setf (getf (getf initargs ':plist) ':slot-name-lists)
+    (setf (getf (getf initargs :plist) :slot-name-lists)
 	  (list (list nil slot-name)))
-    (setf (getf (getf initargs ':plist) ':pv-table-symbol) pv-table-symbol)
-    (list* ':method-spec `(reader-method ,class-name ,slot-name)
+    (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
+    (list* :method-spec `(reader-method ,class-name ,slot-name)
 	   initargs)))
 
 (defun make-std-writer-method-function (class-name slot-name)
@@ -369,10 +369,10 @@
 			 (instance-write-internal
 			  .pv. instance-slots 1 nv
 			  (setf (slot-value instance slot-name) nv))))))))
-    (setf (getf (getf initargs ':plist) ':slot-name-lists)
+    (setf (getf (getf initargs :plist) :slot-name-lists)
 	  (list nil (list nil slot-name)))
-    (setf (getf (getf initargs ':plist) ':pv-table-symbol) pv-table-symbol)
-    (list* ':method-spec `(writer-method ,class-name ,slot-name)
+    (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
+    (list* :method-spec `(writer-method ,class-name ,slot-name)
 	   initargs)))
 
 (defun make-std-boundp-method-function (class-name slot-name)
@@ -386,10 +386,10 @@
 			  (instance-boundp-internal
 			   .pv. instance-slots 1
 			   (slot-boundp instance slot-name))))))))
-    (setf (getf (getf initargs ':plist) ':slot-name-lists)
+    (setf (getf (getf initargs :plist) :slot-name-lists)
 	  (list (list nil slot-name)))
-    (setf (getf (getf initargs ':plist) ':pv-table-symbol) pv-table-symbol)
-    (list* ':method-spec `(boundp-method ,class-name ,slot-name)
+    (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
+    (list* :method-spec `(boundp-method ,class-name ,slot-name)
 	   initargs)))
 
 (defun initialize-internal-slot-gfs (slot-name &optional type)

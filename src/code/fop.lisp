@@ -4,24 +4,19 @@
 
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE. PUSHP
 ;;; describes what the body does to the fop stack:
-;;;   :NOPE
-;;;     The body neither pushes or pops the fop stack.
 ;;;   T
 ;;;     The body might pop the fop stack. The result of the body is 
 ;;;     pushed on the fop stack.
 ;;;   NIL
 ;;;     The body might pop the fop stack. The result of the body is
 ;;;     discarded.
-;;;
-;;; FIXME: Make PUSHP into a &KEY argument accepting a booleana value.
-;;; Handle the :PUSHP :NOPE case with a separate :STACKP NIL argument,
-;;; meaning "the body doesn't interact with the FOP stack."
-(defmacro define-fop ((name fop-code &optional (pushp t)) &rest forms)
+;;; STACKP describes whether or not the body interacts with the fop stack.
+(defmacro define-fop ((name fop-code &key (pushp t) (stackp t)) &rest forms)
   `(progn
      (defun ,name ()
-       ,(if (eq pushp :nope)
-	  `(progn ,@forms)
-	  `(with-fop-stack ,pushp ,@forms)))
+       ,(if stackp
+            `(with-fop-stack ,pushp ,@forms)
+            `(progn ,@forms)))
      (%define-fop ',name ,fop-code)))
 
 (defun %define-fop (name code)
@@ -62,14 +57,15 @@
 ;;; Some of this logic is already in DUMP-FOP*, but that still requires the
 ;;; caller to know that it's a 1-byte-arg/4-byte-arg cloned fop pair, and to
 ;;; know both the 1-byte-arg and the 4-byte-arg fop names. -- WHN 19990902
-(defmacro define-cloned-fops ((name code &optional (pushp t))
+(defmacro define-cloned-fops ((name code &key (pushp t) (stackp t))
 			      (small-name small-code) &rest forms)
-  (aver (member pushp '(nil t :nope)))
+  (aver (member pushp '(nil t)))
+  (aver (member stackp '(nil t)))
   `(progn
      (macrolet ((clone-arg () '(read-arg 4)))
-       (define-fop (,name ,code ,pushp) ,@forms))
+       (define-fop (,name ,code :pushp ,pushp :stackp ,stackp) ,@forms))
      (macrolet ((clone-arg () '(read-arg 1)))
-       (define-fop (,small-name ,small-code ,pushp) ,@forms))))
+       (define-fop (,small-name ,small-code :pushp ,pushp :stackp stackp) ,@forms))))
 
 ;;; a helper function for reading string values from FASL files: sort
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
@@ -105,15 +101,15 @@
 ;;; into fasl files for debugging purposes. There's no shortage of
 ;;; unused fop codes, so we add this second NOP, which reads 4
 ;;; arbitrary bytes and discards them.
-(define-fop (fop-nop4 137 :nope)
+(define-fop (fop-nop4 137 :stackp nil)
   (let ((arg (read-arg 4)))
     (declare (ignorable arg))
     #!+sb-show
     (when *show-fop-nop4-p*
       (format *debug-io* "~&/FOP-NOP4 ARG=~W=#X~X~%" arg arg))))
 
-(define-fop (fop-nop 0 :nope))
-(define-fop (fop-pop 1 nil) (push-fop-table (pop-stack)))
+(define-fop (fop-nop 0 :stackp nil))
+(define-fop (fop-pop 1 :pushp nil) (push-fop-table (pop-stack)))
 (define-fop (fop-push 2) (svref *current-fop-table* (read-arg 4)))
 (define-fop (fop-byte-push 3) (svref *current-fop-table* (read-arg 1)))
 
@@ -152,21 +148,21 @@
 	(name (pop-stack)))
     (find-and-init-or-check-layout name length inherits depthoid)))
 
-(define-fop (fop-end-group 64 :nope)
+(define-fop (fop-end-group 64 :stackp nil)
   (/show0 "THROWing FASL-GROUP-END")
   (throw 'fasl-group-end t))
 
 ;;; In the normal loader, we just ignore these. GENESIS overwrites
 ;;; FOP-MAYBE-COLD-LOAD with something that knows whether to revert to
 ;;; cold-loading or not.
-(define-fop (fop-normal-load 81 :nope))
-(define-fop (fop-maybe-cold-load 82 :nope))
+(define-fop (fop-normal-load 81 :stackp nil))
+(define-fop (fop-maybe-cold-load 82 :stackp nil))
 
-(define-fop (fop-verify-table-size 62 :nope)
+(define-fop (fop-verify-table-size 62 :stackp nil)
   (let ((expected-index (read-arg 4)))
     (unless (= *current-fop-table-index* expected-index)
       (error "internal error: fasl table of improper size"))))
-(define-fop (fop-verify-empty-stack 63 :nope)
+(define-fop (fop-verify-empty-stack 63 :stackp nil)
   (unless (= *fop-stack-pointer* *fop-stack-pointer-on-entry*)
     (error "internal error: fasl stack not empty when it should be")))
 
@@ -528,7 +524,7 @@
     ;; fasl loading.
     result))
 
-(define-fop (fop-eval-for-effect 54 nil)
+(define-fop (fop-eval-for-effect 54 :pushp nil)
   (let ((result (eval (pop-stack))))
     ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
     (declare (ignore result))
@@ -546,7 +542,7 @@
 	    ((zerop n) (apply (pop-stack) args))
 	  (declare (type index n))))))
 
-(define-fop (fop-funcall-for-effect 56 nil)
+(define-fop (fop-funcall-for-effect 56 :pushp nil)
   (let ((arg (read-arg 1)))
     (if (zerop arg)
 	(funcall (pop-stack))
@@ -557,19 +553,19 @@
 
 ;;;; fops for fixing up circularities
 
-(define-fop (fop-rplaca 200 nil)
+(define-fop (fop-rplaca 200 :pushp nil)
   (let ((obj (svref *current-fop-table* (read-arg 4)))
 	(idx (read-arg 4))
 	(val (pop-stack)))
     (setf (car (nthcdr idx obj)) val)))
 
-(define-fop (fop-rplacd 201 nil)
+(define-fop (fop-rplacd 201 :pushp nil)
   (let ((obj (svref *current-fop-table* (read-arg 4)))
 	(idx (read-arg 4))
 	(val (pop-stack)))
     (setf (cdr (nthcdr idx obj)) val)))
 
-(define-fop (fop-svset 202 nil)
+(define-fop (fop-svset 202 :pushp nil)
   (let* ((obi (read-arg 4))
 	 (obj (svref *current-fop-table* obi))
 	 (idx (read-arg 4))
@@ -578,12 +574,14 @@
 	(setf (%instance-ref obj idx) val)
 	(setf (svref obj idx) val))))
 
-(define-fop (fop-structset 204 nil)
+(define-fop (fop-structset 204 :pushp nil)
   (setf (%instance-ref (svref *current-fop-table* (read-arg 4))
 		       (read-arg 4))
 	(pop-stack)))
 
-(define-fop (fop-nthcdr 203 t)
+;;; In the original CMUCL code, this actually explicitly declared PUSHP
+;;; to be T, even though that's what it defaults to in DEFINE-FOP.
+(define-fop (fop-nthcdr 203)
   (nthcdr (read-arg 4) (pop-stack)))
 
 ;;;; fops for loading functions
@@ -595,10 +593,10 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
-(define-fop (fop-code 58 :nope)
+(define-fop (fop-code 58 :stackp nil)
   (load-code (read-arg 4) (read-arg 4)))
 
-(define-fop (fop-small-code 59 :nope)
+(define-fop (fop-small-code 59 :stackp nil)
   (load-code (read-arg 1) (read-arg 2)))
 
 (define-fop (fop-fdefinition 60)
@@ -609,7 +607,7 @@
     (sb!vm:sanctify-for-execution component)
     component))
 
-(define-fop (fop-fset 74 nil)
+(define-fop (fop-fset 74 :pushp nil)
   ;; Ordinary, not-for-cold-load code shouldn't need to mess with this
   ;; at all, since it's only used as part of the conspiracy between
   ;; the cross-compiler and GENESIS to statically link FDEFINITIONs
@@ -631,7 +629,7 @@ bug.~:@>")
     (setf (fdefinition name) fn)))
 
 ;;; Modify a slot in a CONSTANTS object.
-(define-cloned-fops (fop-alter-code 140 nil) (fop-byte-alter-code 141)
+(define-cloned-fops (fop-alter-code 140 :pushp nil) (fop-byte-alter-code 141)
   (let ((value (pop-stack))
 	(code (pop-stack)))
     (setf (code-header-ref code (clone-arg)) value)

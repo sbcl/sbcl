@@ -252,7 +252,7 @@
 
 (defstruct (offs-hook (:copier nil))
   (offset 0 :type offset)
-  (function (missing-arg) :type function)
+  (fun (missing-arg) :type function)
   (before-address nil :type (member t nil)))
 
 (defstruct (segment (:conc-name seg-)
@@ -314,8 +314,8 @@
   (fun-hooks nil :type list) 		
 
   ;; alist of (address . label-number), popped as it's used
-  (cur-labels nil :type list)		; 
-  ;; list of offs-hook, popped as it's used
+  (cur-labels nil :type list)
+  ;; OFFS-HOOKs, popped as they're used
   (cur-offs-hooks nil :type list) 	
 
   ;; for the current location
@@ -858,7 +858,7 @@
       ((null fun))
     (let ((offset (code-offs-to-segment-offs (fun-offset fun) segment)))
       (when (<= 0 offset length)
-	(push (make-offs-hook :offset offset :function #'fun-header-hook)
+	(push (make-offs-hook :offset offset :fun #'fun-header-hook)
 	      (seg-hooks segment))))))
 
 ;;; A SAP-MAKER is a no-argument function that returns a SAP.
@@ -1236,8 +1236,8 @@
   (let ((last-block-pc -1))
     (flet ((add-hook (pc fun &optional before-address)
 	     (push (make-offs-hook
-		    :offset pc ;; ##### FIX to account for non-zero offs in code
-		    :function fun
+		    :offset pc ;; ### FIX to account for non-zero offs in code
+		    :fun fun
 		    :before-address before-address)
 		   (seg-hooks segment))))
       (handler-case
@@ -1303,20 +1303,20 @@
 	  (storage-info-for-debug-fun debug-fun))
     (add-source-tracking-hooks segment debug-fun sfcache)
     (let ((kind (sb!di:debug-fun-kind debug-fun)))
-      (flet ((anh (n)
+      (flet ((add-new-hook (n)
 	       (push (make-offs-hook
 		      :offset 0
-		      :function (lambda (stream dstate)
-				  (declare (ignore stream))
-				  (note n dstate)))
+		      :fun (lambda (stream dstate)
+			     (declare (ignore stream))
+			     (note n dstate)))
 		     (seg-hooks segment))))
 	(case kind
 	  (:external)
 	  ((nil)
-	   (anh "no-arg-parsing entry point"))
+	   (add-new-hook "no-arg-parsing entry point"))
 	  (t
-	   (anh (lambda (stream)
-		  (format stream "~S entry point" kind)))))))))
+	   (add-new-hook (lambda (stream)
+			   (format stream "~S entry point" kind)))))))))
 
 ;;; Return a list of the segments of memory containing machine code
 ;;; instructions for FUNCTION.

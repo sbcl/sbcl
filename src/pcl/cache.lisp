@@ -420,8 +420,8 @@
        ;; that they will now update directly to NWRAPPER. This
        ;; corresponds to a kind of transitivity of wrapper updates.
        (dolist (previous (gethash owrapper *previous-nwrappers*))
-	 (when (eq state ':obsolete)
-	   (setf (car previous) ':obsolete))
+	 (when (eq state :obsolete)
+	   (setf (car previous) :obsolete))
 	 (setf (cadr previous) nwrapper)
 	 (push previous new-previous))
 

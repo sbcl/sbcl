@@ -328,8 +328,8 @@ bootstrapping.
 				       (class-name (class-of proto-method))
 				       'standard-method)
 				   initargs-form
-				   (getf (getf initargs ':plist)
-					 ':pv-table-symbol))))))))
+				   (getf (getf initargs :plist)
+					 :pv-table-symbol))))))))
 
 (defun interned-symbol-p (x)
   (and (symbolp x) (symbol-package x)))
@@ -364,7 +364,7 @@ bootstrapping.
 				     `(,(car specl) ,(eval (cadr specl)))
 				   specl))
 			       specializers))
-	       (mname `(,(if (eq (cadr initargs-form) ':function)
+	       (mname `(,(if (eq (cadr initargs-form) :function)
 			     'method 'fast-method)
 			,name ,@qualifiers ,specls))
 	       (mname-sym (intern (let ((*print-pretty* nil)
@@ -1073,7 +1073,7 @@ bootstrapping.
 	(next-method-p-p nil))     ; flag indicating that NEXT-METHOD-P
 				   ; should be in the method definition
     (flet ((walk-function (form context env)
-	     (cond ((not (eq context ':eval)) form)
+	     (cond ((not (eq context :eval)) form)
 		   ;; FIXME: Jumping to a conclusion from the way it's used
 		   ;; above, perhaps CONTEXT should be called SITUATION
 		   ;; (after the term used in the ANSI specification of
@@ -1193,9 +1193,9 @@ bootstrapping.
 (defun load-defmethod
     (class name quals specls ll initargs &optional pv-table-symbol)
   (setq initargs (copy-tree initargs))
-  (let ((method-spec (or (getf initargs ':method-spec)
+  (let ((method-spec (or (getf initargs :method-spec)
 			 (make-method-spec name quals specls))))
-    (setf (getf initargs ':method-spec) method-spec)
+    (setf (getf initargs :method-spec) method-spec)
     (load-defmethod-internal class name quals specls
 			     ll initargs pv-table-symbol)))
 
@@ -1203,7 +1203,7 @@ bootstrapping.
     (method-class gf-spec qualifiers specializers lambda-list
 		  initargs pv-table-symbol)
   (when pv-table-symbol
-    (setf (getf (getf initargs ':plist) :pv-table-symbol)
+    (setf (getf (getf initargs :plist) :pv-table-symbol)
 	  pv-table-symbol))
   (when (and (eq *boot-state* 'complete)
 	     (fboundp gf-spec))
@@ -1240,12 +1240,12 @@ bootstrapping.
   `(method ,gf-spec ,@qualifiers ,unparsed-specializers))
 
 (defun initialize-method-function (initargs &optional return-function-p method)
-  (let* ((mf (getf initargs ':function))
-	 (method-spec (getf initargs ':method-spec))
-	 (plist (getf initargs ':plist))
-	 (pv-table-symbol (getf plist ':pv-table-symbol))
+  (let* ((mf (getf initargs :function))
+	 (method-spec (getf initargs :method-spec))
+	 (plist (getf initargs :plist))
+	 (pv-table-symbol (getf plist :pv-table-symbol))
 	 (pv-table nil)
-	 (mff (getf initargs ':fast-function)))
+	 (mff (getf initargs :fast-function)))
     (flet ((set-mf-property (p v)
 	     (when mf
 	       (setf (method-function-get mf p) v))
@@ -1489,7 +1489,7 @@ bootstrapping.
       (setq lambda-list (gf-lambda-list gf)))
     (when (or lambda-list-p
 	      (and first-p
-		   (eq (arg-info-lambda-list arg-info) ':no-lambda-list)))
+		   (eq (arg-info-lambda-list arg-info) :no-lambda-list)))
       (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)
 	  (analyze-lambda-list lambda-list)
 	(when (and methods (not first-p))
@@ -1722,7 +1722,7 @@ bootstrapping.
   (let ((arg-info (if (eq *boot-state* 'complete)
 		      (gf-arg-info gf)
 		      (early-gf-arg-info gf))))
-    (if (eq ':no-lambda-list (arg-info-lambda-list arg-info))
+    (if (eq :no-lambda-list (arg-info-lambda-list arg-info))
 	(let ((methods (if (eq *boot-state* 'complete)
 			   (generic-function-methods gf)
 			   (early-gf-methods gf))))
@@ -1830,8 +1830,8 @@ bootstrapping.
 	      parsed ()))
     (list :early-method		  ;This is an early method dammit!
 
-	  (getf initargs ':function)
-	  (getf initargs ':fast-function)
+	  (getf initargs :function)
+	  (getf initargs :fast-function)
 
 	  parsed		  ;The parsed specializers. This is used
 				  ;by early-method-specializers to cache

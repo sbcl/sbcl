@@ -1204,7 +1204,7 @@
 					     meth generic-function))))
 				  (cddr form)))
 		    (default (car (last list))))
-	       (list (list* ':mcase mp (nbutlast list))
+	       (list (list* :mcase mp (nbutlast list))
 		     (cdr default))))
 	    (t
 	     (default-constant-converter form))))))
@@ -1224,7 +1224,7 @@
 
 (defun convert-table (constant method-alist wrappers)
   (cond ((and (consp constant)
-	      (eq (car constant) ':mcase))
+	      (eq (car constant) :mcase))
 	 (let ((alist (mapcar (lambda (k+m)
 				(cons (car k+m)
 				      (convert-methods (cdr k+m)

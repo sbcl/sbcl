@@ -421,7 +421,7 @@ And so, we are saved.
 	  (let ((fmf (if (listp method)
 			 (third method)
 			 (method-fast-function method))))
-	    (method-function-get fmf ':slot-name-lists)))
+	    (method-function-get fmf :slot-name-lists)))
 	;; KLUDGE: As of sbcl-0.6.4, it's very important for
 	;; efficiency to know the type of the sequence argument to
 	;; quantifiers (SOME/NOTANY/etc.) at compile time, but
