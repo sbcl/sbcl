@@ -97,7 +97,7 @@ GNAME(call_into_lisp_first_time):
 	mov    THREAD_CONTROL_STACK_START_OFFSET(%rax) ,%rsp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
-	add 	$THREAD_CONTROL_STACK_SIZE-8,%rsp
+	add 	$THREAD_CONTROL_STACK_SIZE-16,%rsp
 	jmp     Lstack
 
 	.text	
@@ -123,7 +123,14 @@ Lstack:
 	push	%r14
 	push	%r15
 
-
+	push	%rdi
+	push	%rax
+	mov	specials,%rdi
+	call    pthread_getspecific
+	mov	%rax,%r12
+	pop	%rax
+	pop	%rdi
+			
 	mov	%rsp,%rbx	# remember current stack
 	push	%rbx		# Save entry stack on (maybe) new stack.
 
@@ -149,6 +156,8 @@ Ldone:
 	/* Registers rax, rcx, rdx, rdi, and rsi are now live. */
 	xor	%rbx,%rbx	# available
 
+	
+	
 	/* Alloc new frame. */
 	mov	%rsp,%rbx	# The current sp marks start of new frame.
 	push	%rbp		# fp in save location S0
@@ -219,7 +228,7 @@ GNAME(undefined_tramp):
 	.text
 	.align	align_4byte,0x90
 	.global GNAME(alloc_tramp)
-	.type	GNAME(alooc_tramp),@function
+	.type	GNAME(alloc_tramp),@function
 GNAME(alloc_tramp):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.

@@ -11,4 +11,14 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
 unsigned long os_context_fp_control(os_context_t *context);
 void os_restore_fp_control(os_context_t *context);
 
+#ifdef LISP_FEATURE_SB_THREAD
+static inline int kill_thread(os_thread_t tid,int signal) {
+    return kill((pid_t) tid,signal);
+}
+static inline os_thread_t thread_self() 
+{
+    return (os_thread_t) getpid();
+}
+#endif
+
 #endif /* _X86_LINUX_OS_H */

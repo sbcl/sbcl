@@ -339,11 +339,9 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 
 (declaim (inline current-thread-id))
 (defun current-thread-id ()
-  (logand 
-   (sb!sys:sap-int
-    (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot))
-   ;; KLUDGE pids are 16 bit really.  Avoid boxing the return value
-   (1- (ash 1 16))))
+  (sb!sys:sap-int
+   (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot)))
+
 
 ;;;; iterate over the in-memory threads
 
@@ -360,8 +358,8 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   (let ((thread (alien-sap (extern-alien "all_threads" (* t)))))
     (loop 
      (when (sb!sys:sap= thread (sb!sys:int-sap 0)) (return nil))
-     (let ((pid (sb!sys:sap-ref-32 thread (* sb!vm:n-word-bytes
-					     sb!vm::thread-pid-slot))))
+     (let ((pid (sb!sys:sap-ref-64 thread (* sb!vm:n-word-bytes
+					     sb!vm::thread-os-thread-slot))))
        (when (= pid id) (return thread))
        (setf thread (sb!sys:sap-ref-sap thread (* sb!vm:n-word-bytes
 						  sb!vm::thread-next-slot)))))))

@@ -53,7 +53,7 @@ lose(char *fmt, ...)
     if(all_threads) {
 	struct thread *th1,*th=arch_os_get_current_thread();
 	for_each_thread(th1) {
-	    if(th1!=th) kill(th1->pid,SIGSTOP);
+	    if(th1!=th) kill_thread(th1->os_thread,SIGSTOP);
 	}
     }
 

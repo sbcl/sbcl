@@ -20,6 +20,7 @@
   (do-stems-and-flags (stem flags)
     (unless (position :not-target flags)
       (push (target-compile-stem stem
+                                :trace-file (find :trace-file flags)
 				 :assem-p (find :assem flags)
 				 :ignore-failure-p (find :ignore-failure-p
 							 flags))

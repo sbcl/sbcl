@@ -53,6 +53,16 @@ typedef signed int s32;
 /* this is an integral type the same length as a machine pointer */
 typedef unsigned long pointer_sized_uint_t ;
 
+/* this could, technically, be anything, as POSIX doesn't require
+   thread_t to be an integral type (could be s tructure) */
+#ifdef USE_LINUX_CLONE
+typedef pid_t os_thread_t;
+#else
+#include <pthread.h>
+#include <sys/types.h>
+typedef pthread_t os_thread_t;
+#endif
+
 /* FIXME: we do things this way because of the alpha32 port.  once
    alpha64 has arrived, all this nastiness can go away */
 #if 64 == N_WORD_BITS

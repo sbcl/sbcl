@@ -15,7 +15,7 @@
 static inline void 
 get_spinlock(lispobj *word,int value)
 {
-#if 0
+#ifdef LISP_FEATURE_SB_THREAD
     u32 eax=0;
     do {
 	asm ("xor %0,%0\n\

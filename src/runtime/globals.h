@@ -35,8 +35,11 @@ extern lispobj *current_auto_gc_trigger;
 #endif
 
 extern lispobj *current_dynamic_space;
-extern pid_t parent_pid;
 extern boolean stop_the_world;
+
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(USE_LINUX_CLONE)
+extern pthread_key_t specials;
+#endif
 
 extern void globals_init(void);
 

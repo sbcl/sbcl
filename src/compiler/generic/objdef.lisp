@@ -364,7 +364,7 @@
   ;; unbound_marker is borrowed very briefly at thread startup to 
   ;; pass the address of initial-function into new_thread_trampoline 
   (unbound-marker :init :unbound) ; tls[0] = UNBOUND_MARKER_WIDETAG 
-  (pid :c-type "pid_t")
+  (os-thread :c-type "os_thread_t")
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)

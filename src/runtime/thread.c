@@ -38,7 +38,7 @@ initial_thread_trampoline(struct thread *th)
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
 
-    if(th->pid < 1) lose("th->pid not set up right");
+    if(!th->os_thread) lose("th->os_thread not set up right");
     th->state=STATE_RUNNING;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     return call_into_lisp_first_time(function,args,0);
@@ -63,7 +63,7 @@ new_thread_trampoline(struct thread *th)
     if(arch_os_thread_init(th)==0) return 1;	
 
     /* wait here until our thread is linked into all_threads: see below */
-    while(th->pid<1) sched_yield();
+    while(th->os_thread<1) sched_yield();
 
     th->state=STATE_RUNNING;
     return funcall0(function);
@@ -121,7 +121,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
 	STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
 	STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
 	STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
 #endif
@@ -137,7 +137,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
 	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
-    th->pid=0;
+    th->os_thread=0;
     th->state=STATE_STOPPED;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
@@ -198,7 +198,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
     return 0;
 }
 
-void link_thread(struct thread *th,pid_t kid_pid)
+void link_thread(struct thread *th,os_thread_t kid_pid)
 {
     sigset_t newset,oldset;
     sigemptyset(&newset);
@@ -208,19 +208,20 @@ void link_thread(struct thread *th,pid_t kid_pid)
     get_spinlock(&all_threads_lock,kid_pid);
     th->next=all_threads;
     all_threads=th;
-    /* note that th->pid is 0 at this time.  We rely on all_threads_lock
-     * to ensure that we don't have >1 thread with pid=0 on the list at once
+    /* note that th->os_thread is 0 at this time.  We rely on
+     * all_threads_lock to ensure that we don't have >1 thread with
+     * os_thread=0 on the list at once
      */
-    protect_control_stack_guard_page(th->pid,1);
+    protect_control_stack_guard_page(th->os_thread,1);
     release_spinlock(&all_threads_lock);
 
     sigprocmask(SIG_SETMASK,&oldset,0);
-    th->pid=kid_pid;		/* child will not start until this is set */
+    th->os_thread=kid_pid;		/* child will not start until this is set */
 }
 
 void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
-    pid_t kid_pid=getpid();
+    os_thread_t kid_pid=thread_self();
     if(th && kid_pid>0) {
 	link_thread(th,kid_pid);
 	initial_thread_trampoline(all_threads); /* no return */
@@ -228,19 +229,29 @@ void create_initial_thread(lispobj initial_function) {
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-pid_t create_thread(lispobj initial_function) {
+os_thread_t create_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
-    pid_t kid_pid=0;
+    os_thread_t kid_pid=0;
+#ifndef USE_LINUX_CLONE
+     pthread_attr_t attr;
+#endif
 
     if(th==0) return 0;
+#ifdef USE_LINUX_CLONE
     kid_pid=clone(new_thread_trampoline,
 		  (((void*)th->control_stack_start)+
-		   THREAD_CONTROL_STACK_SIZE-4),
+		   THREAD_CONTROL_STACK_SIZE-16),
 		  CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
-    
+#else
+     if((pthread_attr_init(&attr)) ||
+	(pthread_attr_setstack(&attr,th->control_stack_start,
+			       THREAD_CONTROL_STACK_SIZE-16)) ||
+	(pthread_create(&kid_pid,&attr,new_thread_trampoline,th)))
+	 kid_pid=0;
+#endif
     if(kid_pid>0) {
 	link_thread(th,kid_pid);
-	return th->pid;
+	return th->os_thread;
     } else {
 	os_invalidate((os_vm_address_t) th->control_stack_start,
 		      ((sizeof (lispobj))
@@ -252,47 +263,22 @@ pid_t create_thread(lispobj initial_function) {
 }
 #endif
 
-/* unused */
-void destroy_thread (struct thread *th)
-{
-    /* precondition: the unix task has already been killed and exited.
-     * This is called by the parent or some other thread */
-#ifdef LISP_FEATURE_GENCGC
-    gc_alloc_update_page_tables(0, &th->alloc_region);
-#endif
-    get_spinlock(&all_threads_lock,th->pid);
-    th->unbound_marker=0;	/* for debugging */
-    if(th==all_threads) 
-	all_threads=th->next;
-    else {
-	struct thread *th1=all_threads;
-	while(th1 && th1->next!=th) th1=th1->next;
-	if(th1)	th1->next=th->next;	/* unlink */
-    }
-    release_spinlock(&all_threads_lock);
-    if(th && th->tls_cookie>=0) arch_os_thread_cleanup(th); 
-    os_invalidate((os_vm_address_t) th->control_stack_start,
-		  ((sizeof (lispobj))
-		   * (th->control_stack_end-th->control_stack_start)) +
-		  BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
-		  32*SIGSTKSZ);
-}
-
-struct thread *find_thread_by_pid(pid_t pid) 
+struct thread *find_thread_by_os_thread(os_thread_t pid) 
 {
     struct thread *th;
     for_each_thread(th)
-	if(th->pid==pid) return th;
+	if(th->os_thread==pid) return th;
     return 0;
 }
 
 #if defined LISP_FEATURE_SB_THREAD
 /* This is not needed unless #+SB-THREAD, as there's a trivial null
  * unithread definition. */
+#ifdef USE_LINUX_CLONE
 
 void mark_dead_threads() 
 {
-    pid_t kid;
+    os_thread_t kid;
     int status;
     while(1) {
 	kid=waitpid(-1,&status,__WALL|WNOHANG);
@@ -330,10 +316,26 @@ void reap_dead_threads()
 	th=next;
     }
 }
+#else
+void mark_dead_threads() 
+{
+    warn("mark_dead_threads unimplemented");
+}
+void reap_dead_threads()
+{
+    warn("reap_dead_threads unimplemented");
+}
+#endif /*  USE_LINUX_CLONE */
 
 /* These are not needed unless #+SB-THREAD, and since sigwaitinfo()
  * doesn't seem to be easily available everywhere (OpenBSD...) it's
  * more trouble than it's worth to compile it when not needed. */
+
+/* These won't be any use for pthreads: if we can't use pthread sync
+   things somehow, we need to find another way to do these (or make
+   our requirement "pthreads + futex"...).
+*/
+
 void block_sigcont(void)
 {
     /* don't allow ourselves to receive SIGCONT while we're in the
@@ -357,8 +359,10 @@ void unblock_sigcont_and_sleep(void)
     sigprocmask(SIG_UNBLOCK,&set,0);
 }
 
-int interrupt_thread(pid_t pid, lispobj function)
+
+int interrupt_thread(os_thread_t pid, lispobj function)
 {
+#ifdef USE_LINUX_CLONE
     union sigval sigval;
     struct thread *th;
     sigval.sival_int=function;
@@ -366,11 +370,19 @@ int interrupt_thread(pid_t pid, lispobj function)
 	if((th->pid==pid) && (th->state != STATE_DEAD))
 	    return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
     errno=EPERM; return -1;
+#else
+    lose("interrupt_thread unimplemented");
+#endif
 }
 
-int signal_thread_to_dequeue (pid_t pid)
+int signal_thread_to_dequeue (os_thread_t pid)
 {
+#ifdef USE_LINUX_CLONE
     return kill (pid, SIG_DEQUEUE);
+#else
+    return pthread_kill(pid, SIG_DEQUEUE);
+#endif
+
 }
 
 
@@ -384,15 +396,15 @@ void gc_stop_the_world()
 {
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     struct thread *p,*th=arch_os_get_current_thread();
-    pid_t old_pid;
+    os_thread_t old_pid;
     int finished;
     do {
 	finished=1;
-	for(p=all_threads,old_pid=p->pid; p; p=p->next) {
+	for(p=all_threads,old_pid=p->os_thread; p; p=p->next) {
 	    if(p==th) continue;
 	    if(p->state==STATE_RUNNING) {
 		p->state=STATE_STOPPING;
-		if(kill(p->pid,SIG_STOP_FOR_GC)==-1) {
+		if(kill_thread(p->os_thread,SIG_STOP_FOR_GC)==-1) {
 		    /* we can't kill the process; assume because it
 		     * died already (and its parent is dead so never
 		     * saw the SIGCHLD) */
@@ -404,7 +416,7 @@ void gc_stop_the_world()
 		finished=0;
 	    }
 	}
-	if(old_pid!=all_threads->pid) {
+	if(old_pid!=all_threads->os_thread) {
 	    finished=0;
 	}
     } while(!finished);
@@ -420,7 +432,7 @@ void gc_start_the_world()
     for(p=all_threads;p;p=p->next) {
 	if((p==th) || (p->state==STATE_DEAD)) continue;
 	p->state=STATE_RUNNING;
-	kill(p->pid,SIG_STOP_FOR_GC);
+	kill_thread(p->os_thread,SIG_STOP_FOR_GC);
     }
 }
 #endif

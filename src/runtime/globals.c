@@ -42,7 +42,6 @@ lispobj *current_auto_gc_trigger;
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-pid_t parent_pid;
 boolean stop_the_world=0;
 #endif
 
@@ -50,6 +49,10 @@ boolean stop_the_world=0;
  * currently in use (that will become the from_space when the next GC
  * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
 lispobj *current_dynamic_space;
+
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(USE_LINUX_CLONE)
+pthread_key_t specials=0;
+#endif
 
 void globals_init(void)
 {
@@ -64,7 +67,8 @@ void globals_init(void)
 
     /* Set foreign function call active. */
     foreign_function_call_active = 1;
-#ifdef LISP_FEATURE_SB_THREAD
-    parent_pid=getpid();
-#endif
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(USE_LINUX_CLONE)
+    pthread_key_create(&specials,0);
+#endif    
+
 }

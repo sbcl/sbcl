@@ -112,8 +112,12 @@
   (defreg r13 26 :qword)
   (defreg r14 28 :qword)
   (defreg r15 30 :qword)
+  ;; for no good reason at the time, r12 and r13 were missed from the
+  ;; list of qword registers.  However
+  ;; <jsnell> r13 is already used as temporary [#lisp irc 2005/01/30]
+  ;; and we're now going to use r12 for the struct thread*
   (defregset *qword-regs* rax rcx rdx rbx rsi rdi 
-	     r8 r9 r10 r11 #+nil r12 #+nil r13 r14 r15)
+	     r8 r9 r10 r11      r14 r15)
 
   ;; floating point registers
   (defreg float0 0 :float)
@@ -362,6 +366,7 @@
 
 ;;;; miscellaneous TNs for the various registers
 
+
 (macrolet ((def-misc-reg-tns (sc-name &rest reg-names)
 	     (collect ((forms))
 		      (dolist (reg-name reg-names)
@@ -393,6 +398,9 @@
 	    (symbol-value (symbolicate register-arg-name "-TN")))
 	  *register-arg-names*))
 
+(defparameter thread-base-tn
+  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg )
+		  :offset r12-offset))
 
 (defparameter fp-single-zero-tn
   (make-random-tn :kind :normal

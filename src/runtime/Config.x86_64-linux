@@ -24,7 +24,7 @@ OS_SRC = linux-os.c x86-64-linux-os.c os-common.c
 # interface, though.:-| As far as I (WHN 2002-05-19) know, no one is
 # working on one and it would be a nice thing to have.)
 OS_LINK_FLAGS = -Wl,--export-dynamic
-OS_LIBS = -ldl
+OS_LIBS = -lpthread -ldl
 CFLAGS =  -g -Wall -O3 -fno-omit-frame-pointer
 
 GC_SRC = gencgc.c

@@ -318,7 +318,7 @@
  ("src/compiler/target/backend-parms")
 
  ;; for INFO and SB!XC:MACRO-FUNCTION, needed by defmacro.lisp
- ("src/compiler/globaldb")
+ ("src/compiler/globaldb" :trace-file)
  ("src/compiler/info-functions")
 
  ("src/code/force-delayed-defbangconstants")

@@ -765,8 +765,8 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
-        protect_control_stack_guard_page(th->pid,0);
-        protect_control_stack_return_guard_page(th->pid,1);
+        protect_control_stack_guard_page(th->os_thread,0);
+        protect_control_stack_return_guard_page(th->os_thread,1);
         
         arrange_return_to_lisp_function
             (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
@@ -778,8 +778,8 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        protect_control_stack_guard_page(th->pid,1);
-        protect_control_stack_return_guard_page(th->pid,0);
+        protect_control_stack_guard_page(th->os_thread,1);
+        protect_control_stack_return_guard_page(th->os_thread,0);
         return 1;
     }
     else if (addr >= undefined_alien_address &&
