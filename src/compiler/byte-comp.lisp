@@ -1211,7 +1211,8 @@
 	    (output-push-fdefinition
 	     segment
 	     (if (and found
-		      (= (length (combination-args (continuation-dest cont)))
+		      (= (length (basic-combination-args
+				  (continuation-dest cont)))
 			 2))
 		 found
 		 name))))

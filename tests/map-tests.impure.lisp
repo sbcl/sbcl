@@ -104,7 +104,6 @@
 	 :fun-name oddp
 	 :arg-seqs (*vector-30*)
 	 :arg-types (vector))
-#+nil ; FIXME: dies on some sort of internal compiler error in 0.pre7.15
 (maptest :result-seq '(12 24)
 	 :fun-name +
 	 :arg-seqs (*list-2* *list-2* *vector-30*)

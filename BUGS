@@ -1169,6 +1169,31 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    is attached to FOO in 120a above, and used to optimize code which
    calls FOO. 
 
+121:
+  In sbcl-0.7.14.flaky4.10, the last MAPTEST test case at the end
+  of tests/map-tests.impure.lisp dies with 
+	  The value
+	    #<SB-C::MV-COMBINATION
+	      :FUN #<SB-C::REF
+	             :LEAF #<SB-C::GLOBAL-VAR
+	                     :NAME +
+	                     :TYPE #
+	                     :WHERE-FROM :DECLARED
+	                     :KIND :GLOBAL-FUNCTION>>
+	      :ARGS (#<SB-C::COMBINATION :FUN # :ARGS (#)>)>
+	  is not of type
+	    SB-C::COMBINATION.
+  in 
+	(SB-C::GENERATE-BYTE-CODE-FOR-REF
+	 #<SB-ASSEM:SEGMENT :NAME "Byte Output">
+	 #<SB-C::REF
+	   :LEAF #<SB-C::GLOBAL-VAR
+	           :NAME +
+	           :TYPE #<SB-KERNEL:FUNCTION-TYPE (FUNCTION # NUMBER)>
+	           :WHERE-FROM :DECLARED
+	           :KIND :GLOBAL-FUNCTION>>
+	 #<SB-C::CONTINUATION {506AD995}>)
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure
