@@ -286,5 +286,50 @@
   (funcall fun)
   (assert (= *special-ssvuc-counter-2* 1)))
 
+;;; vicious metacycle detection and resolution wasn't good enough: it
+;;; didn't take account that the slots (and hence the slot readers)
+;;; might be inherited from superclasses.  This example, due to Bruno
+;;; Haible, also tests programmatic addition of accessors.
+(defclass auto-accessors-direct-slot-definition-class (standard-class)
+  ((containing-class-name :initarg :containing-class-name)))
+(defmethod validate-superclass
+    ((c1 auto-accessors-direct-slot-definition-class) (c2 standard-class))
+  t)
+(defclass auto-accessors-class (standard-class)
+  ())
+(defmethod direct-slot-definition-class ((class auto-accessors-class)
+					 &rest initargs)
+  (let ((dsd-class-name (gensym)))
+    (sb-pcl:ensure-class
+     dsd-class-name
+     :metaclass 'auto-accessors-direct-slot-definition-class
+     :direct-superclasses (list (find-class 'standard-direct-slot-definition))
+     :containing-class-name (class-name class))
+    (eval `(defmethod initialize-instance :after ((dsd ,dsd-class-name)
+						  &rest args)
+	    (when (and (null (slot-definition-readers dsd))
+		       (null (slot-definition-writers dsd)))
+	      (let* ((containing-class-name
+		      (slot-value (class-of dsd) 'containing-class-name))
+		     (accessor-name
+		      (intern
+		       (concatenate 'string
+				    (symbol-name containing-class-name)
+				    "-"
+				    (symbol-name (slot-definition-name dsd)))
+		       (symbol-package containing-class-name))))
+		(setf (slot-definition-readers dsd) (list accessor-name))
+		(setf (slot-definition-writers dsd)
+		      (list (list 'setf accessor-name)))))))
+    (find-class dsd-class-name)))
+(defmethod validate-superclass ((c1 auto-accessors-class) (c2 standard-class))
+  t)
+(defclass testclass15 ()
+  ((x :initarg :x) (y))
+  (:metaclass auto-accessors-class))
+(let ((inst (make-instance 'testclass15 :x 12)))
+  (assert (equal (list (testclass15-x inst) (setf (testclass15-y inst) 13))
+		 '(12 13))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

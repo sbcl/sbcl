@@ -1215,15 +1215,22 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; function GF which reads/writes instances of class CLASS.
 ;;; TYPE is one of the symbols READER or WRITER.
 (defun find-standard-class-accessor-method (gf class type)
-  (dolist (method (standard-slot-value/gf gf 'methods))
-    (let ((specializers (standard-slot-value/method method 'specializers))
-	  (qualifiers (plist-value method 'qualifiers)))
-      (when (and (null qualifiers)
-		 (eq (ecase type
-		       (reader (car specializers))
-		       (writer (cadr specializers)))
-		     class))
-	(return method)))))
+  (let ((cpl (standard-slot-value/class class 'class-precedence-list))
+	(found-specializer *the-class-t*)
+	(found-method nil))
+    (dolist (method (standard-slot-value/gf gf 'methods) found-method)
+      (let ((specializers (standard-slot-value/method method 'specializers))
+	    (qualifiers (plist-value method 'qualifiers)))
+	(when (and (null qualifiers)
+		   (let ((subcpl (member (ecase type
+					   (reader (car specializers))
+					   (writer (cadr specializers)))
+					 cpl)))
+		     (and subcpl (member found-specializer subcpl))))
+	  (setf found-specializer (ecase type
+				    (reader (car specializers))
+				    (writer (cadr specializers))))
+	  (setf found-method method))))))
 
 (defun accessor-values (gf arg-info classes methods)
   (declare (ignore gf))

@@ -20,6 +20,9 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     left shifts.
   * bug fix: provide default methods for INPUT-STREAM-P and
     OUTPUT-STREAM-P specialized on SB-GRAY:FUNDAMENTAL-STREAM.
+  * bug fix: improve the detection and resolution of MOP metacycles
+    (where effective method computation depends on the generic function
+    having its effective method computed).  (reported by Bruno Haible)
   * optimization: in taking the GCD of bignums, reduce the two bignums
     to approximately the same size (using Euclid's algorithm) before
     applying the more sophisticated binary GCD.  (thanks to Juho
