@@ -38,6 +38,8 @@ changes in sbcl-0.8.19 relative to sbcl-0.8.18:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the FORMATTER-generated functions for ~V[ conditionals require
        the correct number of arguments.
+    ** READ-FROM-STRING returns the mandated second value when applied
+       to displaced strings.
 
 changes in sbcl-0.8.18 relative to sbcl-0.8.17:
   * new feature: reloading changed shared object files with

@@ -1461,7 +1461,7 @@
    will take effect."
   (declare (string string))
   
-  (with-array-data ((string string)
+  (with-array-data ((string string :offset-var offset)
 		    (start start)
 		    (end (%check-vector-sequence-bounds string start end)))
     (unless *read-from-string-spares*
@@ -1475,7 +1475,7 @@
 	  (values (if preserve-whitespace
 		      (read-preserving-whitespace stream eof-error-p eof-value)
 		      (read stream eof-error-p eof-value))
-		  (string-input-stream-current stream))
+		  (- (string-input-stream-current stream) offset))
 	(push stream *read-from-string-spares*)))))
 
 ;;;; PARSE-INTEGER
