@@ -90,4 +90,30 @@
 (assert (eql (savable-structure-d *savable-structure*) 39))
 (assert (eql (savable-structure-e *savable-structure*) 19))
 
+;;; tests for constant coalescing (and absence of such) in the
+;;; presence of strings.
+(progn
+  (defvar *character-string-1* #.(make-string 5 :initial-element #\a))
+  (defvar *character-string-2* #.(make-string 5 :initial-element #\a))
+  (assert (eq *character-string-1* *character-string-2*))
+  (assert (typep *character-string-1* '(simple-array character (5)))))
+
+(progn
+  (defvar *base-string-1*
+    #.(make-string 5 :initial-element #\b :element-type 'base-char))
+  (defvar *base-string-2*
+    #.(make-string 5 :initial-element #\b :element-type 'base-char))
+  (assert (eq *base-string-1* *base-string-2*))
+  (assert (typep *base-string-1* '(simple-base-string 5))))
+
+#-#.(cl:if (cl:subtypep 'cl:character 'cl:base-char) '(and) '(or))
+(progn
+  (defvar *base-string*
+    #.(make-string 5 :element-type 'base-char :initial-element #\x))
+  (defvar *character-string*
+    #.(make-string 5 :initial-element #\x))
+  (assert (not (eq *base-string* *character-string*)))
+  (assert (typep *base-string* 'base-string))
+  (assert (typep *character-string* '(vector character))))
+
 (sb-ext:quit :unix-status 104) ; success

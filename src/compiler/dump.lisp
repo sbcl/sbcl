@@ -33,7 +33,7 @@
   ;; can get them from the table rather than dumping them again. The
   ;; EQUAL-TABLE is used for lists and strings, and the EQ-TABLE is
   ;; used for everything else. We use a separate EQ table to avoid
-  ;; performance patholigies with objects for which EQUAL degnerates
+  ;; performance pathologies with objects for which EQUAL degenerates
   ;; to EQL. Everything entered in the EQUAL table is also entered in
   ;; the EQ table.
   (equal-table (make-hash-table :test 'equal) :type hash-table)
@@ -191,11 +191,19 @@
   (declare (type fasl-output fasl-output))
   (unless *cold-load-dump*
     (let ((handle (gethash x (fasl-output-equal-table fasl-output))))
-      (cond (handle
-	     (dump-push handle fasl-output)
-	     t)
-	    (t
-	     nil)))))
+      (cond
+        (handle (dump-push handle fasl-output) t)
+        (t nil)))))
+(defun string-check-table (x fasl-output)
+  (declare (type fasl-output fasl-output)
+           (type string x))
+  (unless *cold-load-dump*
+    (let ((handle (cdr (assoc
+                        (array-element-type x)
+                        (gethash x (fasl-output-equal-table fasl-output))))))
+      (cond
+        (handle (dump-push handle fasl-output) t)
+        (t nil)))))
 
 ;;; These functions are called after dumping an object to save the
 ;;; object in the table. The object (also passed in as X) must already
@@ -216,7 +224,16 @@
       (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
       (dump-push handle fasl-output)))
   (values))
-
+(defun string-save-object (x fasl-output)
+  (declare (type fasl-output fasl-output)
+           (type string x))
+  (unless *cold-load-dump*
+    (let ((handle (dump-pop fasl-output)))
+      (push (cons (array-element-type x) handle)
+            (gethash x (fasl-output-equal-table fasl-output)))
+      (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
+      (dump-push handle fasl-output)))
+  (values))
 ;;; Record X in File's CIRCULARITY-TABLE unless *COLD-LOAD-DUMP* is
 ;;; true. This is called on objects that we are about to dump might
 ;;; have a circular path through them.
@@ -369,11 +386,8 @@
 	      (dump-structure x file)
 	      (eq-save-object x file))
 	     (array
-	      ;; FIXME: The comment at the head of
-	      ;; DUMP-NON-IMMEDIATE-OBJECT says it's for objects which
-	      ;; we want to save, instead of repeatedly dumping them.
-	      ;; But then we dump arrays here without doing anything
-	      ;; like EQUAL-SAVE-OBJECT. What gives?
+              ;; DUMP-ARRAY (and its callees) are responsible for
+              ;; updating the EQ and EQUAL hash tables.
 	      (dump-array x file))
 	     (number
 	      (unless (equal-check-table x file)
@@ -721,16 +735,13 @@
 			    x)))
     (typecase simple-version
       (simple-base-string
-       ;; FIXME: these EQUAL-CHECK-TABLE things are broken, because
-       ;; strings compare as EQUAL even if they have different
-       ;; ARRAY-ELEMENT-TYPEs
-       (unless (equal-check-table x file)
+       (unless (string-check-table x file)
 	 (dump-simple-base-string simple-version file)
-	 (equal-save-object x file)))
+	 (string-save-object x file)))
       ((simple-array character (*))
-       (unless (equal-check-table x file)
+       (unless (string-check-table x file)
 	 (dump-simple-character-string simple-version file)
-	 (equal-save-object x file)))
+	 (string-save-object x file)))
       (simple-vector
        (dump-simple-vector simple-version file)
        (eq-save-object x file))

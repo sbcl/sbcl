@@ -69,6 +69,7 @@ partially fixes a theoretical portability bug.)
 ** fix the regular dumper to compute similarity properly for strings,
 rather than simply through an EQUAL hash table.  (Rationale: it's just
 completely broken at present.)
+  -- done, including test cases.
 
 ** define (CHARACTER-SET 128 255) to be the corresponding Latin1 (and
 Unicode) characters at those codepoints.  (Rationale: attempting to
