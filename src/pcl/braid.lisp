@@ -578,8 +578,8 @@
 		     `(:initfunction ,form-or-fun)
 		     `(:initform ,form-or-fun
 		       :initfunction ,(lambda () form-or-fun)))))
-	   :allocation (condition-slot-allocation slot)
-	   :documentation (condition-slot-documentation slot))))
+	   :allocation ,(condition-slot-allocation slot)
+	   :documentation ,(condition-slot-documentation slot))))
     (cond ((structure-type-p name)
 	   (ensure 'structure-class
 		   (mapcar #'slot-initargs-from-structure-slotd
