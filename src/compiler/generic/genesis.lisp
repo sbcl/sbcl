@@ -2422,7 +2422,7 @@
   ;; writing beginning boilerplate
   (format t "/*~%")
   (dolist (line
-	   '("This is a machine-generated file. Do not edit it by hand."
+	   '("This is a machine-generated file. Please do not edit it by hand."
 	     ""
 	     "This file contains low-level information about the"
 	     "internals of a particular version and configuration"
@@ -2435,6 +2435,15 @@
   (format t " */~%")
   (terpri)
   (format t "#ifndef _SBCL_H_~%#define _SBCL_H_~%")
+  (terpri)
+
+  ;; propagating *SHEBANG-FEATURES* into C-level #define's
+  (dolist (shebang-feature-name (sort (mapcar #'symbol-name
+					      sb-cold:*shebang-features*)
+				      #'string<))
+    (format t
+	    "#define LISP_FEATURE_~A~%"
+	    (substitute #\_ #\- shebang-feature-name)))
   (terpri)
 
   ;; writing miscellaneous constants

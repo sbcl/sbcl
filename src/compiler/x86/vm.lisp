@@ -453,4 +453,5 @@
 ;;; the symbol table (for example, prepending an underscore).
 (defun extern-alien-name (name)
   (declare (type simple-string name))
+  ;; On the X86 we don't do anything.
   name)

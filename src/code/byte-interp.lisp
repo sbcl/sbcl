@@ -1033,6 +1033,8 @@
 		      (funcall function ,@(args))))))
       (frob))))
 
+;;; Note: negative RET-PC is a convention for "we need multiple return
+;;; values".
 (defun do-call (old-component call-pc ret-pc old-fp num-args named)
   (declare (type code-component old-component)
 	   (type pc call-pc)

@@ -41,6 +41,14 @@ echo //doing warm init
         ;; in SAVE-LISP-AND-DIE.
         #-sb-fluid (sb-impl::!unintern-init-only-stuff)
 
+	;; FIXME: Why is it that, at least on x86 sbcl-0.6.12.46,
+	;; GC :FULL T isn't nearly as effective as PURIFY here?
+	;; (GC :FULL T gets us down to about 38 Mbytes, but PURIFY
+	;; gets us down to about 19 Mbytes.)
+	(let ((*gc-notify-stream* *standard-output*))
+	  (sb-int:/show "done with warm.lisp, about to GC :FULL T")
+	  (gc :full t))
+
         (sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
 	;; Even if /SHOW output was wanted during build, it's probably
 	;; not wanted by default after build is complete. (And if it's

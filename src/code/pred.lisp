@@ -192,7 +192,7 @@
 (defun equalp (x y)
   #+nil ; KLUDGE: If doc string, should be accurate: Talk about structures
   ; and HASH-TABLEs.
-  "Just like EQUAL, but more liberal in several respects.
+  "This is like EQUAL, except more liberal in several respects.
   Numbers may be of different types, as long as the values are identical
   after coercion. Characters may differ in alphabetic case. Vectors and
   arrays must have identical dimensions and EQUALP elements, but may differ

@@ -24,13 +24,6 @@
  *   <ftp://ftp.cs.utexas.edu/pub/garbage/bigsurv.ps>.
  */
 
-/*
- * FIXME: GC :FULL T seems to be unable to recover a lot of unused
- * space. After cold init is complete, GC :FULL T gets us down to
- * about 44 Mb total used, but PURIFY gets us down to about 17 Mb
- * total used.
- */
-
 #include <stdio.h>
 #include <signal.h>
 #include "runtime.h"
@@ -79,9 +72,24 @@ boolean gencgc_unmap_zero = 1;
 /* the minimum size (in bytes) for a large object*/
 unsigned large_object_size = 4 * 4096;
 
-/* Should we filter stack/register pointers? This could reduce the
- * number of invalid pointers accepted. KLUDGE: It will probably
- * degrades interrupt safety during object initialization. */
+/* Should we filter stack/register pointers? This substantially reduces the
+ * number of invalid pointers accepted.
+ *
+ * FIXME: This is basically constant=1. It will probably degrade
+ * interrupt safety during object initialization. But I don't think we
+ * should do without it -- the possibility of the GC being too
+ * conservative and hence running out of memory is also. Perhaps the
+ * interrupt safety issue could be fixed by making the initialization
+ * code do WITHOUT-GCING or WITHOUT-INTERRUPTS until the appropriate
+ * type bits have been set. (That might be necessary anyway, in order
+ * to keep interrupt code's allocation operations from stepping on the
+ * interrupted code's allocations.) Or perhaps it could be fixed by
+ * making sure that uninitialized memory is zero, reserving the
+ * all-zero case for uninitialized memory, and making the
+ * is-it-possibly-a-valid-pointer code check for all-zero and return
+ * true in that case. Then after either fix, we could get rid of this
+ * variable and simply hardwire the system always to do pointer
+ * filtering. */
 boolean enable_pointer_filter = 1;
 
 /*
@@ -270,28 +278,28 @@ static int
 count_write_protect_generation_pages(int generation)
 {
     int i;
-    int cnt = 0;
+    int count = 0;
 
     for (i = 0; i < last_free_page; i++)
 	if ((page_table[i].allocated != FREE_PAGE)
 	    && (page_table[i].gen == generation)
 	    && (page_table[i].write_protected == 1))
-	    cnt++;
-    return(cnt);
+	    count++;
+    return count;
 }
 
-/* Count the number of pages within the given generation */
+/* Count the number of pages within the given generation. */
 static int
 count_generation_pages(int generation)
 {
     int i;
-    int cnt = 0;
+    int count = 0;
 
     for (i = 0; i < last_free_page; i++)
 	if ((page_table[i].allocated != 0)
 	    && (page_table[i].gen == generation))
-	    cnt++;
-    return(cnt);
+	    count++;
+    return count;
 }
 
 /* Count the number of dont_move pages. */
@@ -299,13 +307,13 @@ static int
 count_dont_move_pages(void)
 {
     int i;
-    int cnt = 0;
+    int count = 0;
 
     for (i = 0; i < last_free_page; i++)
 	if ((page_table[i].allocated != 0)
 	    && (page_table[i].dont_move != 0))
-	    cnt++;
-    return(cnt);
+	    count++;
+    return count;
 }
 
 /* Work through the pages and add up the number of bytes used for the
@@ -794,7 +802,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
     next_page = first_page+1;
 
-    /* Skip if no bytes were allocated */
+    /* Skip if no bytes were allocated. */
     if (alloc_region->free_pointer != alloc_region->start_addr) {
 	orig_first_page_bytes_used = page_table[first_page].bytes_used;
 
@@ -805,7 +813,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	/* Update the first page. */
 
 	/* If the page was free then set up the gen, and
-           first_object_offset. */
+	 * first_object_offset. */
 	if (page_table[first_page].bytes_used == 0)
 	    gc_assert(page_table[first_page].first_object_offset == 0);
 
@@ -818,8 +826,8 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
 	byte_cnt = 0;
 
-	/* Calc. the number of bytes used in this page. This is not always
-	   the number of new bytes, unless it was free. */
+	/* Calculate the number of bytes used in this page. This is not
+	 * always the number of new bytes, unless it was free. */
 	more = 0;
 	if ((bytes_used = (alloc_region->free_pointer - page_address(first_page)))>4096) {
 	    bytes_used = 4096;
@@ -829,9 +837,9 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	byte_cnt += bytes_used;
 
 
-	/* All the rest of the pages should be free. Need to set their
-	   first_object_offset pointer to the start of the region, and set
-	   the bytes_used. */
+	/* All the rest of the pages should be free. We need to set their
+	 * first_object_offset pointer to the start of the region, and set
+	 * the bytes_used. */
 	while (more) {
 	    if (unboxed)
 		gc_assert(page_table[next_page].allocated == UNBOXED_PAGE);
@@ -864,7 +872,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	gc_assert((byte_cnt- orig_first_page_bytes_used) == region_size);
 
 	/* Set the generations alloc restart page to the last page of
-	   the region. */
+	 * the region. */
 	if (unboxed)
 	    generations[gc_alloc_generation].alloc_unboxed_start_page =
 		next_page-1;
@@ -881,12 +889,12 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	       region_size,
 	       gc_alloc_generation));
 	*/
-    }
-    else
-	/* No bytes allocated. Unallocate the first_page if there are 0
-	   bytes_used. */
+    } else {
+	/* There are no bytes allocated. Unallocate the first_page if
+	 * there are 0 bytes_used. */
 	if (page_table[first_page].bytes_used == 0)
 	    page_table[first_page].allocated = FREE_PAGE;
+    }
 
     /* Unallocate any unused pages. */
     while (next_page <= alloc_region->last_page) {
@@ -3853,7 +3861,7 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
 	size_t count = 1;
 	lispobj thing = *start;
 
-	/* If thing is an immediate then this is a cons */
+	/* If thing is an immediate then this is a cons. */
 	if (Pointerp(thing)
 	    || ((thing & 3) == 0) /* fixnum */
 	    || (TypeOf(thing) == type_BaseChar)
@@ -3862,14 +3870,14 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
 	else
 	    count = (sizetab[TypeOf(thing)])(start);
 
-	/* Check whether the pointer is within this object? */
+	/* Check whether the pointer is within this object. */
 	if ((pointer >= start) && (pointer < (start+count))) {
 	    /* found it! */
 	    /*FSHOW((stderr,"/found %x in %x %x\n", pointer, start, thing));*/
 	    return(start);
 	}
 
-	/* Round up the count */
+	/* Round up the count. */
 	count = CEILING(count,2);
 
 	start += count;
@@ -3906,7 +3914,7 @@ search_dynamic_space(lispobj *pointer)
     int  page_index = find_page_index(pointer);
     lispobj *start;
 
-    /* Address may be invalid - do some checks. */
+    /* The address may be invalid, so do some checks. */
     if ((page_index == -1) || (page_table[page_index].allocated == FREE_PAGE))
 	return NULL;
     start = (lispobj *)((void *)page_address(page_index)
@@ -3914,24 +3922,24 @@ search_dynamic_space(lispobj *pointer)
     return (search_space(start, (pointer+2)-start, pointer));
 }
 
-/* FIXME: There is a strong family resemblance between this function
- * and the function of the same name in purify.c. Would it be possible
- * to implement them as exactly the same function? */
+/* Is there any possibility that pointer is a valid Lisp object
+ * reference, and/or something else (e.g. subroutine call return
+ * address) which should prevent us from moving the referred-to thing? */
 static int
-valid_dynamic_space_pointer(lispobj *pointer)
+possibly_valid_dynamic_space_pointer(lispobj *pointer)
 {
     lispobj *start_addr;
 
-    /* Find the object start address */
+    /* Find the object start address. */
     if ((start_addr = search_dynamic_space(pointer)) == NULL) {
 	return 0;
     }
 
     /* We need to allow raw pointers into Code objects for return
-     * addresses. This will also pickup pointers to functions in code
+     * addresses. This will also pick up pointers to functions in code
      * objects. */
     if (TypeOf(*start_addr) == type_CodeHeader) {
-	/* X Could do some further checks here. */
+	/* XXX could do some further checks here */
 	return 1;
     }
 
@@ -3946,7 +3954,7 @@ valid_dynamic_space_pointer(lispobj *pointer)
     switch (LowtagOf((lispobj)pointer)) {
     case type_FunctionPointer:
 	/* Start_addr should be the enclosing code object, or a closure
-	   header. */
+	 * header. */
 	switch (TypeOf(*start_addr)) {
 	case type_CodeHeader:
 	    /* This case is probably caught above. */
@@ -4024,7 +4032,7 @@ valid_dynamic_space_pointer(lispobj *pointer)
 		       pointer, start_addr, *start_addr));
 	    return 0;
 	}
-	/* Is it plausible?  Not a cons. X should check the headers. */
+	/* Is it plausible?  Not a cons. XXX should check the headers. */
 	if (Pointerp(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
 	    if (gencgc_verbose)
 		FSHOW((stderr,
@@ -4148,7 +4156,7 @@ valid_dynamic_space_pointer(lispobj *pointer)
  * region if the size has shrunk, and move unboxed objects into unboxed
  * pages. The pages are not promoted here, and the promoted region is not
  * added to the new_regions; this is really only designed to be called from
- * preserve_pointer. Shouldn't fail if this is missed, just may delay the
+ * preserve_pointer(). Shouldn't fail if this is missed, just may delay the
  * moving of objects to unboxed pages, and the freeing of pages. */
 static void
 maybe_adjust_large_object(lispobj *where)
@@ -4289,8 +4297,8 @@ maybe_adjust_large_object(lispobj *where)
     return;
 }
 
-/* Take a possible pointer to a list object and mark the page_table
- * so that it will not need changing during a GC.
+/* Take a possible pointer to a Lisp object and mark its page in the
+ * page_table so that it will not be relocated during a GC.
  *
  * This involves locating the page it points to, then backing up to
  * the first page that has its first object start at offset 0, and
@@ -4312,18 +4320,20 @@ preserve_pointer(void *addr)
     int i;
     unsigned region_allocation;
 
-    /* Address is quite likely to have been invalid - do some checks. */
+    /* quick check 1: Address is quite likely to have been invalid. */
     if ((addr_page_index == -1)
 	|| (page_table[addr_page_index].allocated == FREE_PAGE)
 	|| (page_table[addr_page_index].bytes_used == 0)
 	|| (page_table[addr_page_index].gen != from_space)
-	/* Skip if already marked dont_move */
+	/* Skip if already marked dont_move. */
 	|| (page_table[addr_page_index].dont_move != 0))
 	return;
 
+    /* (Now that we know that addr_page_index is in range, it's
+     * safe to index into page_table[] with it.) */
     region_allocation = page_table[addr_page_index].allocated;
 
-    /* Check the offset within the page.
+    /* quick check 2: Check the offset within the page.
      *
      * FIXME: The mask should have a symbolic name, and ideally should
      * be derived from page size instead of hardwired to 0xfff.
@@ -4331,7 +4341,13 @@ preserve_pointer(void *addr)
     if (((unsigned)addr & 0xfff) > page_table[addr_page_index].bytes_used)
 	return;
 
-    if (enable_pointer_filter && !valid_dynamic_space_pointer(addr))
+    /* Filter out anything which can't be a pointer to a Lisp object
+     * (or, as a special case which also requires dont_move, a return
+     * address referring to something in a CodeObject). This is
+     * expensive but important, since it vastly reduces the
+     * probability that random garbage will be bogusly interpreter as
+     * a pointer which prevents a page from moving. */
+    if (enable_pointer_filter && !possibly_valid_dynamic_space_pointer(addr))
 	return;
 
     /* Work backwards to find a page with a first_object_offset of 0.
@@ -4339,7 +4355,7 @@ preserve_pointer(void *addr)
      * gen. Assumes the first_object_offset is negative or zero. */
     first_page = addr_page_index;
     while (page_table[first_page].first_object_offset != 0) {
-	first_page--;
+	--first_page;
 	/* Do some checks. */
 	gc_assert(page_table[first_page].bytes_used == 4096);
 	gc_assert(page_table[first_page].gen == from_space);
@@ -5029,6 +5045,7 @@ free_oldspace(void)
     return bytes_freed;
 }
 
+#if 0
 /* Print some information about a pointer at the given address. */
 static void
 print_ptr(lispobj *addr)
@@ -5056,6 +5073,7 @@ print_ptr(lispobj *addr)
 	    *(addr+3),
 	    *(addr+4));
 }
+#endif
 
 extern int undefined_tramp;
 
@@ -5101,7 +5119,7 @@ verify_space(lispobj *start, size_t words)
 		 * it down a lot (so it's commented out).
 		 *
 		 * FIXME: Add a variable to enable this dynamically. */
-		/* if (!valid_dynamic_space_pointer((lispobj *)thing)) {
+		/* if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
 		 *     lose("ptr %x to invalid object %x", thing, start); */
 	    } else {
 		/* Verify that it points to another valid space. */
@@ -5404,7 +5422,7 @@ write_protect_generation_pages(int generation)
     }
 }
 
-/* Garbage collect a generation. If raise is 0 the remains of the
+/* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void
 garbage_collect_generation(int generation, int raise)
@@ -5450,15 +5468,15 @@ garbage_collect_generation(int generation, int raise)
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space
      * which need to be scavenged. It also helps avoid unnecessary page
-     * faults as forwarding pointer are written into them. They need to
+     * faults as forwarding pointers are written into them. They need to
      * be un-protected anyway before unmapping later. */
     unprotect_oldspace();
 
     /* Scavenge the stack's conservative roots. */
     {
-	lispobj **ptr;
-	for (ptr = (lispobj **)CONTROL_STACK_END - 1;
-	     ptr > (lispobj **)&raise;
+	void **ptr;
+	for (ptr = (void **)CONTROL_STACK_END - 1;
+	     ptr > (void **)&raise;
 	     ptr--) {
 	    preserve_pointer(*ptr);
 	}
@@ -5513,6 +5531,7 @@ garbage_collect_generation(int generation, int raise)
     }
 #endif
 
+    /* Scavenge static space. */
     static_space_size =
 	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
 	(lispobj *)STATIC_SPACE_START;
@@ -5533,6 +5552,12 @@ garbage_collect_generation(int generation, int raise)
      * more objects are moved into the new generation */
     scavenge_newspace_generation(new_space);
 
+    /* FIXME: I tried reenabling this check when debugging unrelated
+     * GC weirdness ca. sbcl-0.6.12.45, and it failed immediately.
+     * Since the current GC code seems to work well, I'm guessing that
+     * this debugging code is just stale, but I haven't tried to
+     * figure it out. It should be figured out and then either made to
+     * work or just deleted. */
 #define RESCAN_CHECK 0
 #if RESCAN_CHECK
     /* As a check re-scavenge the newspace once; no new objects should
@@ -5603,7 +5628,7 @@ garbage_collect_generation(int generation, int raise)
 	++generations[generation].num_gc;
 }
 
-/* Update last_free_page then ALLOCATION_POINTER */
+/* Update last_free_page, then SymbolValue(ALLOCATION_POINTER). */
 int
 update_x86_dynamic_space_free_pointer(void)
 {
