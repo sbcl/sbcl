@@ -315,7 +315,20 @@
 
 ;;; CSR inserted a bug into Burger & Dybvig's float printer.  Caught
 ;;; by Raymond Toy
-(assert (string= (format nil "~F" 1d23) "1.0d+23"))
+(assert (string= (format nil "~E" 1d23) "1.0d+23"))
+
+;;; Fixed-format bugs from CLISP's test suite (reported by Bruno
+;;; Haible, bug 317)
+(assert (string= (format nil "~1F" 10) "10."))
+(assert (string= (format nil "~0F" 10) "10."))
+(assert (string= (format nil "~2F" 1234567.1) "1234567."))
+
+;;; here's one that seems to fail most places.  I think this is right,
+;;; and most of the other answers I've seen are definitely wrong.
+(assert (string= (format nil "~G" 1d23) "100000000000000000000000.    "))
+
+;;; Adam Warner's test case
+(assert (string= (format nil "~@F" 1.23) "+1.23"))
 
 ;;; success
 (quit :unix-status 104)

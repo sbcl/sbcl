@@ -1152,10 +1152,10 @@
 ;;;; float printing
 
 ;;; FLONUM-TO-STRING (and its subsidiary function FLOAT-STRING) does
-;;; most of the work for all printing of floating point numbers in the
-;;; printer and in FORMAT. It converts a floating point number to a
-;;; string in a free or fixed format with no exponent. The
-;;; interpretation of the arguments is as follows:
+;;; most of the work for all printing of floating point numbers in
+;;; FORMAT.  It converts a floating point number to a string in a free
+;;; or fixed format with no exponent. The interpretation of the
+;;; arguments is as follows:
 ;;;
 ;;;     X	- The floating point number to convert, which must not be
 ;;;		negative.
@@ -1181,9 +1181,6 @@
 ;;;		significance in the printed value due to a bogus choice of
 ;;;		scale factor.
 ;;;
-;;; Most of the optional arguments are for the benefit for FORMAT and are not
-;;; used by the printer.
-;;;
 ;;; Returns:
 ;;; (VALUES DIGIT-STRING DIGIT-LENGTH LEADING-POINT TRAILING-POINT DECPNT)
 ;;; where the results have the following interpretation:
@@ -1208,14 +1205,14 @@
 ;;; representation. Furthermore, only as many digits as necessary to
 ;;; satisfy this condition will be printed.
 ;;;
-;;; FLOAT-STRING actually generates the digits for positive numbers.
-;;; The algorithm is essentially that of algorithm Dragon4 in "How to
-;;; Print Floating-Point Numbers Accurately" by Steele and White. The
-;;; current (draft) version of this paper may be found in
-;;; [CMUC]<steele>tradix.press. DO NOT EVEN THINK OF ATTEMPTING TO
-;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!
+;;; FLOAT-DIGITS actually generates the digits for positive numbers;
+;;; see below for comments.
 
 (defun flonum-to-string (x &optional width fdigits scale fmin)
+  (declare (type float x))
+  ;; FIXME: I think only FORMAT-DOLLARS calls FLONUM-TO-STRING with
+  ;; possibly-negative X.
+  (setf x (abs x))
   (cond ((zerop x)
 	 ;; Zero is a special case which FLOAT-STRING cannot handle.
 	 (if fdigits
@@ -1224,148 +1221,56 @@
 	       (values s (length s) t (zerop fdigits) 0))
 	     (values "." 1 t t 0)))
 	(t
-	 (multiple-value-bind (sig exp) (integer-decode-float x)
-	   (let* ((precision (float-precision x))
-		  (digits (float-digits x))
-		  (fudge (- digits precision))
-		  (width (if width (max width 1) nil)))
-	   (float-string (ash sig (- fudge)) (+ exp fudge) precision width
-			 fdigits scale fmin))))))
-
-(defun float-string (fraction exponent precision width fdigits scale fmin)
-  (let ((r fraction) (s 1) (m- 1) (m+ 1) (k 0)
-	(digits 0) (decpnt 0) (cutoff nil) (roundup nil) u low high
-        (digit-characters "0123456789")
-	(digit-string (make-array 50
-				  :element-type 'base-char
-				  :fill-pointer 0
-				  :adjustable t)))
-    ;; Represent fraction as r/s, error bounds as m+/s and m-/s.
-    ;; Rational arithmetic avoids loss of precision in subsequent
-    ;; calculations.
-    (cond ((> exponent 0)
-	   (setq r (ash fraction exponent))
-	   (setq m- (ash 1 exponent))
-	   (setq m+ m-))
-	  ((< exponent 0)
-	   (setq s (ash 1 (- exponent)))))
-    ;; Adjust the error bounds m+ and m- for unequal gaps.
-    (when (= fraction (ash 1 precision))
-      (setq m+ (ash m+ 1))
-      (setq r (ash r 1))
-      (setq s (ash s 1)))
-    ;; Scale value by requested amount, and update error bounds.
-    (when scale
-      (if (minusp scale)
-	  (let ((scale-factor (expt 10 (- scale))))
-	    (setq s (* s scale-factor)))
-	  (let ((scale-factor (expt 10 scale)))
-	    (setq r (* r scale-factor))
-	    (setq m+ (* m+ scale-factor))
-	    (setq m- (* m- scale-factor)))))
-    ;; Scale r and s and compute initial k, the base 10 logarithm of r.
-    (do ()
-	((>= r (ceiling s 10)))
-      (decf k)
-      (setq r (* r 10))
-      (setq m- (* m- 10))
-      (setq m+ (* m+ 10)))
-    (do ()(nil)
-      (do ()
-	  ((< (+ (ash r 1) m+) (ash s 1)))
-	(setq s (* s 10))
-	(incf k))
-      ;; Determine number of fraction digits to generate.
-      (cond (fdigits
-	     ;; Use specified number of fraction digits.
-	     (setq cutoff (- fdigits))
-	     ;;don't allow less than fmin fraction digits
-	     (if (and fmin (> cutoff (- fmin))) (setq cutoff (- fmin))))
-	    (width
-	     ;; Use as many fraction digits as width will permit but
-	     ;; force at least fmin digits even if width will be
-	     ;; exceeded.
-	     (if (< k 0)
-		 (setq cutoff (- 1 width))
-		 (setq cutoff (1+ (- k width))))
-	     (if (and fmin (> cutoff (- fmin))) (setq cutoff (- fmin)))))
-      ;; If we decided to cut off digit generation before precision
-      ;; has been exhausted, rounding the last digit may cause a carry
-      ;; propagation. We can prevent this, preserving left-to-right
-      ;; digit generation, with a few magical adjustments to m- and
-      ;; m+. Of course, correct rounding is also preserved.
-      (when (or fdigits width)
-	(let ((a (- cutoff k))
-	      (y s))
-	  (if (>= a 0)
-	      (dotimes (i a) (setq y (* y 10)))
-	      (dotimes (i (- a)) (setq y (ceiling y 10))))
-	  (setq m- (max y m-))
-	  (setq m+ (max y m+))
-	  (when (= m+ y) (setq roundup t))))
-      (when (< (+ (ash r 1) m+) (ash s 1)) (return)))
-    ;; Zero-fill before fraction if no integer part.
-    (when (< k 0)
-      (setq decpnt digits)
-      (vector-push-extend #\. digit-string)
-      (dotimes (i (- k))
-	(incf digits) (vector-push-extend #\0 digit-string)))
-    ;; Generate the significant digits.
-    (do ()(nil)
-      (decf k)
-      (when (= k -1)
-	(vector-push-extend #\. digit-string)
-	(setq decpnt digits))
-      (multiple-value-setq (u r) (truncate (* r 10) s))
-      (setq m- (* m- 10))
-      (setq m+ (* m+ 10))
-      (setq low (< (ash r 1) m-))
-      (if roundup
-	  (setq high (>= (ash r 1) (- (ash s 1) m+)))
-	  (setq high (> (ash r 1) (- (ash s 1) m+))))
-      ;; Stop when either precision is exhausted or we have printed as
-      ;; many fraction digits as permitted.
-      (when (or low high (and cutoff (<= k cutoff))) (return))
-      (vector-push-extend (char digit-characters u) digit-string)
-      (incf digits))
-    ;; If cutoff occurred before first digit, then no digits are
-    ;; generated at all.
-    (when (or (not cutoff) (>= k cutoff))
-      ;; Last digit may need rounding
-      (vector-push-extend (char digit-characters
-				(cond ((and low (not high)) u)
-				      ((and high (not low)) (1+ u))
-				      (t (if (<= (ash r 1) s) u (1+ u)))))
-			  digit-string)
-      (incf digits))
-    ;; Zero-fill after integer part if no fraction.
-    (when (>= k 0)
-      (dotimes (i k) (incf digits) (vector-push-extend #\0 digit-string))
-      (vector-push-extend #\. digit-string)
-      (setq decpnt digits))
-    ;; Add trailing zeroes to pad fraction if fdigits specified.
-    (when fdigits
-      (dotimes (i (- fdigits (- digits decpnt)))
-	(incf digits)
-	(vector-push-extend #\0 digit-string)))
-    ;; all done
-    (values digit-string (1+ digits) (= decpnt 0) (= decpnt digits) decpnt)))
+	 (multiple-value-bind (e string)
+	     (if fdigits
+		 (flonum-to-digits x (min (- fdigits) (- (or fmin 0))))
+		 (if (and width (> width 1))
+		     (let ((w (multiple-value-list (flonum-to-digits x (1- width) t)))
+			   (f (multiple-value-list (flonum-to-digits x (- (or fmin 0))))))
+		       (cond
+			 ((>= (length (cadr w)) (length (cadr f)))
+			  (values-list w))
+			 (t (values-list f))))
+		     (flonum-to-digits x)))
+	   (let ((e (+ e (or scale 0)))
+		 (stream (make-string-output-stream)))
+	     (if (plusp e)
+		 (progn
+		   (write-string string stream :end (min (length string) e))
+		   (dotimes (i (- e (length string)))
+		     (write-char #\0 stream))
+		   (write-char #\. stream)
+		   (write-string string stream :start (min (length string) e))
+		   (when fdigits
+		     (dotimes (i (- fdigits
+				    (- (length string) 
+				       (min (length string) e))))
+		       (write-char #\0 stream))))
+		 (progn
+		   (write-string "." stream)
+		   (dotimes (i (- e))
+		     (write-char #\0 stream))
+		   (write-string string stream)
+		   (when fdigits
+		     (dotimes (i (+ fdigits e (- (length string))))
+		       (write-char #\0 stream)))))
+	     (let ((string (get-output-stream-string stream)))
+	       (values string (length string)
+		       (char= (char string 0) #\.)
+		       (char= (char string (1- (length string))) #\.)
+		       (position #\. string))))))))
 
 ;;; implementation of figure 1 from Burger and Dybvig, 1996.  As the
-;;; implementation of the Dragon from Classic CMUCL (and above,
-;;; FLONUM-TO-STRING) says: "DO NOT EVEN THINK OF ATTEMPTING TO
-;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!", and in this case
-;;; we have to add that even reading the paper might not bring
-;;; immediate illumination as CSR has attempted to turn idiomatic
-;;; Scheme into idiomatic Lisp.
+;;; implementation of the Dragon from Classic CMUCL (and previously in
+;;; SBCL above FLONUM-TO-STRING) says: "DO NOT EVEN THINK OF
+;;; ATTEMPTING TO UNDERSTAND THIS CODE WITHOUT READING THE PAPER!",
+;;; and in this case we have to add that even reading the paper might
+;;; not bring immediate illumination as CSR has attempted to turn
+;;; idiomatic Scheme into idiomatic Lisp.
 ;;;
 ;;; FIXME: figure 1 from Burger and Dybvig is the unoptimized
 ;;; algorithm, noticeably slow at finding the exponent.  Figure 2 has
-;;; an improved algorithm, but CSR ran out of energy
-;;;
-;;; FIXME: Burger and Dybvig also provide an algorithm for
-;;; fixed-format floating point printing.  If it were implemented,
-;;; then we could delete the Dragon altogether (see FLONUM-TO-STRING).
+;;; an improved algorithm, but CSR ran out of energy.
 ;;;
 ;;; possible extension for the enthusiastic: printing floats in bases
 ;;; other than base 10.
@@ -1377,7 +1282,7 @@
 (defconstant long-float-min-e
   (nth-value 1 (decode-float least-positive-long-float)))
 
-(defun flonum-to-digits (v)
+(defun flonum-to-digits (v &optional position relativep)
   (let ((print-base 10) ; B
 	(float-radix 2) ; b
 	(float-digits (float-digits v)) ; p
@@ -1430,18 +1335,54 @@
 				   (t ; (and tc1 tc2)
 				    (if (< (* r 2) s) d (1+ d))))))
 			  (vector-push-extend (char digit-characters d) result)
-			  (return-from generate result))))))
-	  (if (>= e 0)
-	      (if (/= f (expt float-radix (1- float-digits)))
-		  (let ((be (expt float-radix e)))
-		    (scale (* f be 2) 2 be be))
-		  (let* ((be (expt float-radix e))
-			 (be1 (* be float-radix)))
-		    (scale (* f be1 2) (* float-radix 2) be1 be)))
-	      (if (or (= e min-e) (/= f (expt float-radix (1- float-digits))))
-		  (scale (* f 2) (* (expt float-radix (- e)) 2) 1 1)
-		  (scale (* f float-radix 2)
-			 (* (expt float-radix (- 1 e)) 2) float-radix 1))))))))
+			  (return-from generate result)))))
+		 (initialize ()
+		   (let (r s m+ m-)
+		     (if (>= e 0)
+			 (let* ((be (expt float-radix e))
+				(be1 (* be float-radix)))
+			   (if (/= f (expt float-radix (1- float-digits)))
+			       (setf r (* f be 2)
+				     s 2
+				     m+ be
+				     m- be)
+			       (setf r (* f be1 2)
+				     s (* float-radix 2)
+				     m+ be1
+				     m- be)))
+			 (if (or (= e min-e) 
+				 (/= f (expt float-radix (1- float-digits))))
+			     (setf r (* f 2)
+				   s (* (expt float-radix (- e)) 2)
+				   m+ 1
+				   m- 1)
+			     (setf r (* f float-radix 2)
+				   s (* (expt float-radix (- 1 e)) 2)
+				   m+ float-radix
+				   m- 1)))
+		     (when position
+		       (when relativep
+			 (aver (> position 0))
+			 (do ((k 0 (1+ k))
+			      ;; running out of letters here
+			      (l 1 (* l print-base)))
+			     ((>= (* s l) (+ r m+))
+			      ;; k is now \hat{k}
+			      (if (< (+ r (* s (/ (expt print-base (- k position)) 2)))
+				     (* s (expt print-base k)))
+				  (setf position (- k position))
+				  (setf position (- k position 1))))))
+		       (let ((low (max m- (/ (* s (expt print-base position)) 2)))
+			     (high (max m+ (/ (* s (expt print-base position)) 2))))
+			 (when (<= m- low)
+			   (setf m- low)
+			   (setf low-ok t))
+			 (when (<= m+ high)
+			   (setf m+ high)
+			   (setf high-ok t))))
+		     (values r s m+ m-))))
+	  (multiple-value-bind (r s m+ m-) (initialize)
+	    (scale r s m+ m-)))))))
 
 ;;; Given a non-negative floating point number, SCALE-EXPONENT returns
 ;;; a new floating point number Z in the range (0.1, 1.0] and an

@@ -89,12 +89,6 @@ WORKAROUND:
   Perhaps any number of such consecutive lines ought to turn into a
   single "compiling top-level forms:" line.
 
-19:
-  (I *think* this is a bug. It certainly seems like strange behavior. But
-  the ANSI spec is scary, dark, and deep.. -- WHN)
-    (FORMAT NIL  "~,1G" 1.4) => "1.    "
-    (FORMAT NIL "~3,1G" 1.4) => "1.    "
-
 27:
   Sometimes (SB-EXT:QUIT) fails with 
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting
@@ -1151,16 +1145,6 @@ WORKAROUND:
           :until (>= w 100) :collect w)
     Expected: (2 6 15 38)
     Got:      ERROR
-
-317: "FORMAT of floating point numbers"
-  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
-  test suite.
-    (format nil "~1F" 10) => "0." ; "10." expected
-    (format nil "~0F" 10) => "0." ; "10." expected
-    (format nil "~2F" 1234567.1) => "1000000." ; "1234567." expected
-  it would be nice if whatever fixed this also untangled the two
-  competing implementations of floating point printing (Steele and
-  White, and Burger and Dybvig) present in src/code/print.lisp
 
 318: "stack overflow in compiler warning with redefined class"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP

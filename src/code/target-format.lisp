@@ -494,16 +494,17 @@
 ;;; We return true if we overflowed, so that ~G can output the overflow char
 ;;; instead of spaces.
 (defun format-fixed-aux (stream number w d k ovf pad atsign)
+  (declare (type float number))
   (cond
-   ((or (not (or w d))
-	(and (floatp number)
-	     (or (float-infinity-p number)
-		 (float-nan-p number))))
+   ((and (floatp number)
+	 (or (float-infinity-p number)
+	     (float-nan-p number)))
     (prin1 number stream)
     nil)
    (t
     (let ((spaceleft w))
-      (when (and w (or atsign (minusp number))) (decf spaceleft))
+      (when (and w (or atsign (minusp (float-sign number)))) 
+	(decf spaceleft))
       (multiple-value-bind (str len lpoint tpoint)
 	  (sb!impl::flonum-to-string (abs number) spaceleft d k)
 	;;if caller specifically requested no fraction digits, suppress the
@@ -527,7 +528,7 @@
 	       t)
 	      (t
 	       (when w (dotimes (i spaceleft) (write-char pad stream)))
-	       (if (minusp number)
+	       (if (minusp (float-sign number))
 		   (write-char #\- stream)
 		   (if atsign (write-char #\+ stream)))
 	       (when lpoint (write-char #\0 stream))
@@ -580,9 +581,9 @@
 ;;; silent here, so let's just print out infinities and NaN's instead
 ;;; of causing an error.
 (defun format-exp-aux (stream number w d e k ovf pad marker atsign)
-  (if (and (floatp number)
-	   (or (float-infinity-p number)
-	       (float-nan-p number)))
+  (declare (type float number))
+  (if (or (float-infinity-p number)
+	  (float-nan-p number))
       (prin1 number stream)
       (multiple-value-bind (num expt) (sb!impl::scale-exponent (abs number))
 	(let* ((expt (- expt k))
@@ -592,29 +593,35 @@
 	       (fmin (if (minusp k) (- 1 k) nil))
 	       (spaceleft (if w
 			      (- w 2 elen
-				 (if (or atsign (minusp number))
+				 (if (or atsign (minusp (float-sign number)))
 				     1 0))
 			      nil)))
 	  (if (and w ovf e (> elen e)) ;exponent overflow
 	      (dotimes (i w) (write-char ovf stream))
-	      (multiple-value-bind (fstr flen lpoint)
+	      (multiple-value-bind (fstr flen lpoint tpoint)
 		  (sb!impl::flonum-to-string num spaceleft fdig k fmin)
+		(when (and d (zerop d)) (setq tpoint nil))
 		(when w
 		  (decf spaceleft flen)
 		  (when lpoint
+		    (if (or (> spaceleft 0) tpoint)
+			(decf spaceleft)
+			(setq lpoint nil)))
+		  (when tpoint
 		    (if (> spaceleft 0)
 			(decf spaceleft)
-			(setq lpoint nil))))
+			(setq tpoint nil))))
 		(cond ((and w (< spaceleft 0) ovf)
 		       ;;significand overflow
 		       (dotimes (i w) (write-char ovf stream)))
 		      (t (when w
 			   (dotimes (i spaceleft) (write-char pad stream)))
-			 (if (minusp number)
+			 (if (minusp (float-sign number))
 			     (write-char #\- stream)
 			     (if atsign (write-char #\+ stream)))
 			 (when lpoint (write-char #\0 stream))
 			 (write-string fstr stream)
+			 (when tpoint (write-char #\0 stream))
 			 (write-char (if marker
 					 marker
 					 (format-exponent-marker number))
@@ -651,9 +658,9 @@
 
 ;;; Raymond Toy writes: same change as for format-exp-aux
 (defun format-general-aux (stream number w d e k ovf pad marker atsign)
-  (if (and (floatp number)
-	   (or (float-infinity-p number)
-	       (float-nan-p number)))
+  (declare (type float number))
+  (if (or (float-infinity-p number)
+	  (float-nan-p number))
       (prin1 number stream)
       (multiple-value-bind (ignore n) (sb!impl::scale-exponent (abs number))
 	(declare (ignore ignore))
@@ -692,7 +699,9 @@
     ;; thing, and at least the user shouldn't be surprised.
     (setq number (coerce number 'single-float)))
   (if (floatp number)
-      (let* ((signstr (if (minusp number) "-" (if atsign "+" "")))
+      (let* ((signstr (if (minusp (float-sign number)) 
+			  "-" 
+			  (if atsign "+" "")))
 	     (signlen (length signstr)))
 	(multiple-value-bind (str strlen ig2 ig3 pointplace)
             (sb!impl::flonum-to-string number nil d nil)
