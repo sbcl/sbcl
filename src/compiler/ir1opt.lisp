@@ -456,7 +456,7 @@
                            (lambda-tail-set (combination-lambda use))))
                  (when (combination-p use)
                    (when (nth-value 1 (maybe-convert-tail-local-call use))
-                     (return-from find-result-type (values)))))
+                     (return-from find-result-type t))))
                 (t
                  (use-union (node-derived-type use))))))
       (let ((int
@@ -466,7 +466,7 @@
               ;; )
               ))
 	(setf (return-result-type node) int))))
-  (values))
+  nil)
 
 ;;; Do stuff to realize that something has changed about the value
 ;;; delivered to a return node. Since we consider the return values of
@@ -482,22 +482,25 @@
 ;;; results of the calls.
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
-  (let* ((tails (lambda-tail-set (return-lambda node)))
-	 (funs (tail-set-funs tails)))
-    (collect ((res *empty-type* values-type-union))
-      (dolist (fun funs)
-	(let ((return (lambda-return fun)))
-	  (when return
-	    (when (node-reoptimize return)
-	      (setf (node-reoptimize return) nil)
-	      (find-result-type return))
-	    (res (return-result-type return)))))
+  (tagbody
+   :restart
+     (let* ((tails (lambda-tail-set (return-lambda node)))
+            (funs (tail-set-funs tails)))
+       (collect ((res *empty-type* values-type-union))
+                (dolist (fun funs)
+                  (let ((return (lambda-return fun)))
+                    (when return
+                      (when (node-reoptimize return)
+                        (setf (node-reoptimize return) nil)
+                        (when (find-result-type return)
+                          (go :restart)))
+                      (res (return-result-type return)))))
 
-      (when (type/= (res) (tail-set-type tails))
-	(setf (tail-set-type tails) (res))
-	(dolist (fun (tail-set-funs tails))
-	  (dolist (ref (leaf-refs fun))
-	    (reoptimize-lvar (node-lvar ref)))))))
+                (when (type/= (res) (tail-set-type tails))
+                  (setf (tail-set-type tails) (res))
+                  (dolist (fun (tail-set-funs tails))
+                    (dolist (ref (leaf-refs fun))
+                      (reoptimize-lvar (node-lvar ref))))))))
 
   (values))
 

@@ -868,3 +868,75 @@
                      (multiple-value-call #'%f15 (values -519354 a 121 c -1905))))))
               0 0 -5)
              -16))
+
+;;; MISC.172
+(assert (eql (funcall
+              (compile
+               nil
+               '(lambda (a b c)
+                 (declare (notinline list apply))
+                 (declare (optimize (safety 3)))
+                 (declare (optimize (speed 0)))
+                 (declare (optimize (debug 0)))
+                 (labels ((%f12 (f12-1 f12-2)
+                            (labels ((%f2 (f2-1 f2-2)
+                                       (flet ((%f6 ()
+						(flet ((%f18
+                                                           (f18-1
+                                                            &optional (f18-2 a)
+                                                            (f18-3 -207465075)
+                                                            (f18-4 a))
+                                                         (return-from %f12 b)))
+						  (%f18 -3489553
+							-7
+							(%f18 (%f18 150 -64 f12-1)
+							      (%f18 (%f18 -8531)
+								    11410)
+							      b)
+							56362666))))
+                                         (labels ((%f7
+                                                      (f7-1 f7-2
+                                                            &optional (f7-3 (%f6)))
+                                                    7767415))
+                                           f12-1))))
+                              (%f2 b -36582571))))
+                   (apply #'%f12 (list 774 -4413)))))
+              0 1 2)
+             774))
+
+;;; MISC.173
+(assert (eql (funcall
+              (compile
+               nil
+               '(lambda (a b c)
+                 (declare (notinline values))
+                 (declare (optimize (safety 3)))
+                 (declare (optimize (speed 0)))
+                 (declare (optimize (debug 0)))
+                 (flet ((%f11
+                            (f11-1 f11-2
+                                   &optional (f11-3 c) (f11-4 7947114)
+                                   (f11-5
+                                    (flet ((%f3 (f3-1 &optional (f3-2 b) (f3-3 5529))
+                                             8134))
+                                      (multiple-value-call #'%f3
+                                        (values (%f3 -30637724 b) c)))))
+                          (setq c 555910)))
+                   (if (and nil (%f11 a a))
+                       (if (%f11 a 421778 4030 1)
+                           (labels ((%f7
+                                        (f7-1 f7-2
+                                              &optional
+                                              (f7-3
+                                               (%f11 -79192293
+                                                     (%f11 c a c -4 214720)
+                                                     b
+                                                     b
+                                                     (%f11 b 985)))
+                                              (f7-4 a))
+                                      b))
+                             (%f11 c b -25644))
+                           54)
+                       -32326608))))
+              1 2 3)
+             -32326608))
