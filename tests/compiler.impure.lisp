@@ -763,6 +763,21 @@ BUG 48c, not yet fixed:
   (when x
     (assert (= (funcall (compile nil x) 1) 2))))
 
+;;; Bug reported by reported by rif on c.l.l 2003-03-05
+(defun test-type-of-special-1 (x)
+  (declare (special x)
+           (fixnum x)
+           (optimize (safety 3)))
+  (list x))
+(defun test-type-of-special-2 (x)
+  (declare (special x)
+           (fixnum x)
+           (optimize (safety 3)))
+  (list x (setq x (/ x 2)) x))
+(assert (raises-error? (test-type-of-special-1 3/2) type-error))
+(assert (raises-error? (test-type-of-special-2 3) type-error))
+(assert (equal (test-type-of-special-2 8) '(8 4 4)))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 

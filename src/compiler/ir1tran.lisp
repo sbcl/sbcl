@@ -903,7 +903,7 @@
   (declare (list decl vars) (type lexenv res))
   (let ((type (compiler-specifier-type (first decl))))
     (collect ((restr nil cons)
-	      (new-vars nil cons))
+             (new-vars nil cons))
       (dolist (var-name (rest decl))
 	(let* ((bound-var (find-in-bindings vars var-name))
 	       (var (or bound-var
@@ -911,26 +911,31 @@
 			(find-free-var var-name))))
 	  (etypecase var
 	    (leaf
-	     (let* ((old-type (or (lexenv-find var type-restrictions)
-				  (leaf-type var)))
-		    (int (if (or (fun-type-p type)
-				 (fun-type-p old-type))
-			     type
-			     (type-approx-intersection2 old-type type))))
-	       (cond ((eq int *empty-type*)
-		      (unless (policy *lexenv* (= inhibit-warnings 3))
-			(compiler-warn
-			 "The type declarations ~S and ~S for ~S conflict."
-			 (type-specifier old-type) (type-specifier type)
-			 var-name)))
-		     (bound-var (setf (leaf-type bound-var) int))
-		     (t
-		      (restr (cons var int))))))
+             (flet ((process-var (var bound-var)
+                      (let* ((old-type (or (lexenv-find var type-restrictions)
+                                           (leaf-type var)))
+                             (int (if (or (fun-type-p type)
+                                          (fun-type-p old-type))
+                                      type
+                                      (type-approx-intersection2 old-type type))))
+                        (cond ((eq int *empty-type*)
+                               (unless (policy *lexenv* (= inhibit-warnings 3))
+                                 (compiler-warn
+                                  "The type declarations ~S and ~S for ~S conflict."
+                                  (type-specifier old-type) (type-specifier type)
+                                  var-name)))
+                              (bound-var (setf (leaf-type bound-var) int))
+                              (t
+                               (restr (cons var int)))))))
+               (process-var var bound-var)
+               (awhen (and (lambda-var-p var)
+                           (lambda-var-specvar var))
+                      (process-var it nil))))
 	    (cons
 	     ;; FIXME: non-ANSI weirdness
 	     (aver (eq (car var) 'MACRO))
 	     (new-vars `(,var-name . (MACRO . (the ,(first decl)
-						   ,(cdr var))))))
+                                                ,(cdr var))))))
 	    (heap-alien-info
 	     (compiler-error
 	      "~S is an alien variable, so its type can't be declared."
