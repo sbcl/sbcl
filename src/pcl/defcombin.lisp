@@ -233,9 +233,7 @@
        (type ll method-group-specifiers args-option gf-var body)
   (declare (ignore type))
   (multiple-value-bind (real-body declarations documentation)
-      ;; (Note that PARSE-BODY ignores its second arg ENVIRONMENT.)
-      (parse-body body nil)
-
+      (parse-body body)
     (let ((wrapped-body
 	    (wrap-method-group-specifier-bindings method-group-specifiers
 						  declarations

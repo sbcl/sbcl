@@ -1675,6 +1675,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     with a name from the CL package.
   * MAP-INTO for a vector destination is open coded.  (reported by
     Brian Downing on c.l.l)
+  * bug fix: the long form of DEFINE-METHOD-COMBINATION now accepts a
+    documentation string.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;
