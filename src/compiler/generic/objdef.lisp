@@ -72,8 +72,8 @@
 
 (define-primitive-object (double-float :lowtag other-pointer-lowtag
 				       :widetag double-float-widetag)
-  (filler)
-  (value :c-type "double" :length 2))
+  #!-x86-64 (filler)
+  (value :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
 #!+long-float
 (define-primitive-object (long-float :lowtag other-pointer-lowtag
@@ -350,9 +350,9 @@
 (define-primitive-object (complex-double-float
 			  :lowtag other-pointer-lowtag
 			  :widetag complex-double-float-widetag)
-  (filler)
-  (real :c-type "double" :length 2)
-  (imag :c-type "double" :length 2))
+  #!-x86-64 (filler) 
+  (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
+  (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that

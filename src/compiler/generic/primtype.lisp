@@ -25,26 +25,27 @@
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
   :type (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
-#!-x86-64
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or))
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 31))
 (/show0 "primtype.lisp 31")
-#!-x86-64
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or))
 (!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 32))
 (/show0 "primtype.lisp 35")
-#!+x86-64
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
 (!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
-#!+x86-64
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
-; #!-x86-64
+;; x86-64 needs a signed-byte-32 for proper handling of c-call return values.
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or x86-64))
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
-#!+x86-64
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
@@ -157,32 +158,48 @@
 	       (case t1-name
 		 (positive-fixnum
 		  (if (or (eq t2-name 'fixnum)
-			  (eq t2-name #!-x86-64 'signed-byte-32
-				      #!+x86-64 'signed-byte-64)
-			  (eq t2-name #!-x86-64 'unsigned-byte-31
-				      #!+x86-64 'unsigned-byte-63)
-			  (eq t2-name #!-x86-64 'unsigned-byte-32
-				      #!+x86-64 'unsigned-byte-64))
+			  (eq t2-name
+			      (ecase sb!vm::n-machine-word-bits
+				(32 'signed-byte-32)
+				(64 'signed-byte-64)))
+			  (eq t2-name
+			      (ecase sb!vm::n-machine-word-bits
+				(32 'unsigned-byte-31)
+				(64 'unsigned-byte-63)))
+			  (eq t2-name
+			      (ecase sb!vm::n-machine-word-bits
+				(32 'unsigned-byte-32)
+				(64 'unsigned-byte-64))))
 		      t2))
 		 (fixnum
 		  (case t2-name
-		    (#!-x86-64 signed-byte-32
-		     #!+x86-64 signed-byte-64 t2)
-		    (#!-x86-64 unsigned-byte-31
-		     #!+x86-64 unsigned-byte-63
-		     (primitive-type-or-lose
-		      #!-x86-64 'signed-byte-32
-		      #!+x86-64 'signed-byte-64))))
-		 (#!-x86-64 signed-byte-32
-		  #!+x86-64 signed-byte-64
-		  (if (eq t2-name #!-x86-64 'unsigned-byte-31
-				  #!+x86-64 'unsigned-byte-63)
+		    (#.(ecase sb!vm::n-machine-word-bits
+			 (32 'signed-byte-32)
+			 (64 'signed-byte-64))
+		       t2)
+		    (#.(ecase sb!vm::n-machine-word-bits
+			 (32 'unsigned-byte-31)
+			 (64 'unsigned-byte-63))
+		       (primitive-type-or-lose
+			(ecase sb!vm::n-machine-word-bits
+			  (32 'signed-byte-32)
+			  (64 'signed-byte-64))))))
+		 (#.(ecase sb!vm::n-machine-word-bits
+		      (32 'signed-byte-32)
+		      (64 'signed-byte-64))
+		  (if (eq t2-name
+			  (ecase sb!vm::n-machine-word-bits
+			    (32 'unsigned-byte-31)
+			    (64 'unsigned-byte-63)))
 		      t1))
-		 (#!-x86-64 unsigned-byte-31
-		  #!+x86-64 unsigned-byte-63
-		  (if (eq t2-name #!-x86-64 'unsigned-byte-32
-				  #!+x86-64 'unsigned-byte-64)
-		      t2))))))
+		 (#.(ecase sb!vm::n-machine-word-bits
+		      (32 'unsigned-byte-31)
+		      (64 'unsigned-byte-63))
+		    (if (eq t2-name
+			    (ecase sb!vm::n-machine-word-bits
+			      (32 'unsigned-byte-32)
+			      (64 'unsigned-byte-64)))
+			t2))))))
       (etypecase type
 	(numeric-type
 	 (let ((lo (numeric-type-low type))
@@ -194,22 +211,26 @@
 		 (cond ((and hi lo)
 			(dolist (spec
 				  `((positive-fixnum 0 ,sb!xc:most-positive-fixnum)
-				    #!-x86-64
-				    (unsigned-byte-31 0 ,(1- (ash 1 31)))
-				    #!-x86-64
-				    (unsigned-byte-32 0 ,(1- (ash 1 32)))
-				    #!+x86-64
-				    (unsigned-byte-63 0 ,(1- (ash 1 63)))
-				    #!+x86-64
-				    (unsigned-byte-64 0 ,(1- (ash 1 64)))
+				    ,@(ecase sb!vm::n-machine-word-bits
+					(32
+					 `((unsigned-byte-31
+					    0 ,(1- (ash 1 31)))
+					   (unsigned-byte-32
+					    0 ,(1- (ash 1 32)))))
+					(64
+					 `((unsigned-byte-63
+					    0 ,(1- (ash 1 63)))
+					   (unsigned-byte-64
+					    0 ,(1- (ash 1 64))))))
 				    (fixnum ,sb!xc:most-negative-fixnum
 					    ,sb!xc:most-positive-fixnum)
-				    #!-x86-64
-				    (signed-byte-32 ,(ash -1 31)
-							  ,(1- (ash 1 31)))
-				    #!+x86-64
-				    (signed-byte-64 ,(ash -1 63)
-						    ,(1- (ash 1 63))))
+				    ,(ecase sb!vm::n-machine-word-bits
+				       (32
+					`(signed-byte-32 ,(ash -1 31)
+					                 ,(1- (ash 1 31))))
+				       (64
+					`(signed-byte-64 ,(ash -1 63)
+							 ,(1- (ash 1 63))))))
 				 (if (or (< hi sb!xc:most-negative-fixnum)
 					 (> lo sb!xc:most-positive-fixnum))
 				     (part-of bignum)

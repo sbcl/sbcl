@@ -1382,6 +1382,7 @@
 					  (reg-tn-encoding something)))
 		    (xchg-reg-with-something acc something)))
 	      (xchg-reg-with-something (reg something)
+		(maybe-emit-rex-for-ea segment something reg)
 		(emit-byte segment (if (eq size :byte) #b10000110 #b10000111))
 		(emit-ea segment something (reg-tn-encoding reg))))
        (cond ((accumulator-p operand1)

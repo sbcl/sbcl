@@ -141,8 +141,8 @@ unsigned long auto_gc_trigger = 0;
 
 /* the source and destination generations. These are set before a GC starts
  * scavenging. */
-int from_space;
-int new_space;
+long from_space;
+long new_space;
 
 
 /* An array of page structures is statically allocated.
@@ -3734,7 +3734,7 @@ update_x86_dynamic_space_free_pointer(void)
     long last_page = -1;
     long i;
 
-    for (i = 0; i < NUM_PAGES; i++)
+    for (i = 0; i < last_free_page; i++)
 	if ((page_table[i].allocated != FREE_PAGE_FLAG)
 	    && (page_table[i].bytes_used != 0))
 	    last_page = i;

@@ -331,7 +331,8 @@
   (let ((string-bytes 0)
 	;; We need an extra for the null, and an extra 'cause exect
 	;; clobbers argv[-1].
-	(vec-bytes (* sb-vm::n-word-bytes (+ (length string-list) 2))))
+	(vec-bytes (* #.(/ sb-vm::n-machine-word-bits sb-vm::n-byte-bits)
+		      (+ (length string-list) 2))))
     (declare (fixnum string-bytes vec-bytes))
     (dolist (s string-list)
       (enforce-type s simple-string)
