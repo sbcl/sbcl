@@ -86,7 +86,7 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
 void arch_skip_instruction(os_context_t *context)
 {
   ((char *) *os_context_pc_addr(context)) = ((char *) *os_context_npc_addr(context));
-  context->si_regs.npc += 4;
+  ((char *) *os_context_npc_addr(context)) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
@@ -128,7 +128,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
   unsigned long *pc = (unsigned long *)(*os_context_pc_addr(context));
   /* FIXME */
-  unsigned long *npc = &context->si_regs.npc;
+  unsigned long *npc = (unsigned long *)(*os_context_npc_addr(context));
 
   /*  orig_sigmask = context->sigmask;
       sigemptyset(&context->sigmask); */
@@ -142,8 +142,6 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
   *npc = trap_AfterBreakpoint;
   os_flush_icache((os_vm_address_t) npc, sizeof(unsigned long));
 
-  /* How much is this not going to work? */
-  sigreturn(context);
 }
 
 static int pseudo_atomic_trap_p(os_context_t *context)
@@ -187,7 +185,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
   os_context_t *context = arch_os_get_context(&void_context);
 
-  sigprocmask(SIG_SETMASK, &context->si_mask, 0);
+  sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
   if ((siginfo->si_code) == ILL_ILLOPC
 #ifdef linux
@@ -222,7 +220,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 
     case trap_FunEndBreakpoint:
       *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(signal, siginfo, context);
-      context->si_regs.npc = *os_context_pc_addr(context) + 4;
+      *os_context_npc_addr(context) = *os_context_pc_addr(context) + 4;
       break;
 
     case trap_AfterBreakpoint:

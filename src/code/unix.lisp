@@ -281,12 +281,23 @@
   ;; behavior, automatically allocating memory when a null buffer
   ;; pointer is used. On a system which doesn't support that
   ;; extension, it'll have to be rewritten somehow.
-  #!-(or linux openbsd freebsd) (,stub,)
+  ;;
+  ;; SunOS provides almost as useful an extension: if given a null
+  ;; buffer pointer, it will automatically allocate size space. The
+  ;; KLUDGE in this solution arises because we have just read off
+  ;; PATH_MAX+1 from the Solaris header files and stuck it in here as
+  ;; a constant. Going the grovel_headers route doesn't seem to be
+  ;; helpful, either, as Solaris doesn't export PATH_MAX from
+  ;; unistd.h.
+  #!-(or linux openbsd freebsd sunos) (,stub,)
+  #!+(or linux openbsd freebsd sunos)
   (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
 						       (function (* char)
 								 (* char)
 								 size-t))
-					 nil 0))
+					 nil 
+					 #!+(or linux openbsd freebsd) 0
+					 #!+sunos 1025))
       (simple-perror "getcwd")))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated
@@ -835,6 +846,17 @@
 	   dst)
 	  (t
 	   (subseq dst 0 dst-len)))))
+
+;;;; A magic constant for wait3().
+;;;;
+;;;; FIXME: This used to be defined in run-program.lisp as
+;;;; (defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced)
+;;;; According to some of the man pages, the #o177 is part of the API
+;;;; for wait3(); that said, under SunOS there is a WSTOPPED thing in
+;;;; the headers that may or may not be the same thing. To be
+;;;; investigated. -- CSR, 2002-03-25
+(defconstant wstopped #o177)
+
 
 ;;;; stuff not yet found in the header files
 ;;;;

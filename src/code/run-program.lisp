@@ -97,25 +97,21 @@
   (options sb-alien:int)
   (rusage sb-alien:int))
 
-(defconstant wait-wnohang #-svr4 1 #+svr4 #o100)
-(defconstant wait-wuntraced #-svr4 2 #+svr4 4)
-(defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced)
-
 (defun wait3 (&optional do-not-hang check-for-stopped)
   "Return any available status information on child process. "
   (multiple-value-bind (pid status)
       (c-wait3 (logior (if do-not-hang
-			   wait-wnohang
+			   sb-unix:wnohang
 			   0)
 		       (if check-for-stopped
-			   wait-wuntraced
+			   sb-unix:wuntraced
 			   0))
 	       0)
     (cond ((or (minusp pid)
 	       (zerop pid))
 	   nil)
 	  ((eql (ldb (byte 8 0) status)
-		wait-wstopped)
+		sb-unix:wstopped)
 	   (values pid
 		   :stopped
 		   (ldb (byte 8 8) status)))

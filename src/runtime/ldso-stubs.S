@@ -157,7 +157,9 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(send)
  LDSO_STUBIFY(setitimer)
  LDSO_STUBIFY(setpgrp)
+#if !defined(SVR4)
  LDSO_STUBIFY(sigsetmask)
+#endif
  LDSO_STUBIFY(sinh)
  LDSO_STUBIFY(socket)
  LDSO_STUBIFY(stat)

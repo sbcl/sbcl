@@ -47,6 +47,7 @@
 ;;; can pull it out of the CMU CL sources, or the old SBCL sources;
 ;;; but you might also consider doing things the SBCL way and moving
 ;;; this kind of C-level work down to C wrapper functions.)
+#!-sunos
 (sb!alien:define-alien-routine ("sigsetmask" unix-sigsetmask)
 			       sb!alien:unsigned-long
   (mask sb!alien:unsigned-long))

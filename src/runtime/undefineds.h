@@ -148,7 +148,9 @@ F(shutdown)
 #if !defined(hpux) && !defined(SVR4) && !defined(__i386__)
 F(sigreturn)
 #endif
+#if !defined(SVR4)
 F(sigsetmask)
+#endif
 #if !defined(SVR4) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 F(sigstack)
 F(sigvec)

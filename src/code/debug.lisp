@@ -617,7 +617,9 @@ Function and macro commands:
     (when old-hook
       (let ((*debugger-hook* nil))
 	(funcall old-hook condition old-hook))))
-  (sb!unix:unix-sigsetmask 0)
+  ;; FIXME: No-one seems to know what this is for. Nothing is noticeably
+  ;; broken on sunos...
+  #!-sunos (sb!unix:unix-sigsetmask 0)
 
   ;; Elsewhere in the system, we use the SANE-PACKAGE function for
   ;; this, but here causing an exception just as we're trying to handle

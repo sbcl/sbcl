@@ -15,7 +15,8 @@
 
 # Make sure that there's at least something in the environment (for
 # one of the tests below).
-export SOMETHING_IN_THE_ENVIRONMENT='yes there is'
+SOMETHING_IN_THE_ENVIRONMENT='yes there is'
+export SOMETHING_IN_THE_ENVIRONMENT
 
 ${SBCL:-sbcl} <<EOF
   (let ((string (with-output-to-string (stream)

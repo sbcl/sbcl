@@ -1,0 +1,85 @@
+/*
+ * This is the SPARC Linux incarnation of arch-dependent OS-dependent
+ * routines. See also "linux-os.c".
+ */
+
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
+#include <stdio.h>
+#include <sys/param.h>
+#include <sys/file.h>
+#include "./signal.h"
+#include "os.h"
+#include "arch.h"
+#include "globals.h"
+#include "interrupt.h"
+#include "interr.h"
+#include "lispregs.h"
+#include "sbcl.h"
+#include <sys/socket.h>
+#include <sys/utsname.h>
+
+#include <sys/types.h>
+#include <signal.h>
+/* #include <sys/sysinfo.h> */
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "validate.h"
+
+#if defined GENCGC              /* unlikely ... */
+#include "gencgc.h"
+#endif
+
+os_context_register_t   *
+os_context_register_addr(os_context_t *context, int offset)
+{
+    if (offset == 0) {
+	static int zero;
+	zero = 0;
+	return &zero;
+    } else if (offset < 16) {
+	return &context->uc_mcontext.gregs[offset+3];
+    } else if (offset < 32) {
+	/* FIXME: You know, this (int *) stuff looks decidedly
+	   dubious */
+	int *sp = (int*) context->uc_mcontext.gregs[REG_SP];
+	return &(sp[offset-16]);
+    } else {
+	return 0;
+    }
+}
+
+os_context_register_t *
+os_context_pc_addr(os_context_t *context)
+{
+  return &(context->uc_mcontext.gregs[REG_PC]);
+}
+
+os_context_register_t *
+os_context_npc_addr(os_context_t *context)
+{
+  return &(context->uc_mcontext.gregs[REG_nPC]);
+}
+
+sigset_t *
+os_context_sigmask_addr(os_context_t *context)
+{
+  return &(context->uc_sigmask);
+}
+
+void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
+{
+  /* FIXME.  There's a bit of stuff in the CMUCL version. It may or
+     may not be needed */
+}

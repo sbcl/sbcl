@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include "runtime.h"
 #include "os.h"

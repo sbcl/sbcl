@@ -146,11 +146,29 @@
   (defconstant binding-stack-start    #x60000000)
   (defconstant binding-stack-end      #x61000000))
 
-#!+solaris ; maybe someday.
+#!+sunos ; might as well start by trying the same numbers
 (progn
-  (defparameter target-read-only-space-start #x10000000)
-  (defparameter target-static-space-start    #x28000000)
-  (defparameter target-dynamic-space-start   #x40000000))
+  (defconstant read-only-space-start #x10000000)
+  (defconstant read-only-space-end #x15000000)
+  
+  (defconstant static-space-start    #x28000000)
+  (defconstant static-space-end    #x2c000000)
+
+  (defconstant dynamic-space-start   #x30000000)
+  (defconstant dynamic-space-end     #x38000000)
+
+  (defconstant dynamic-0-space-start   #x30000000)
+  (defconstant dynamic-0-space-end     #x38000000)
+  
+  (defconstant dynamic-1-space-start   #x40000000)
+  (defconstant dynamic-1-space-end     #x48000000)
+
+  (defconstant control-stack-start   #x50000000)
+  (defconstant control-stack-end     #x51000000)
+
+  (defconstant binding-stack-start    #x60000000)
+  (defconstant binding-stack-end      #x61000000))  
+
 
 ;;;; other random constants.
 
@@ -224,13 +242,22 @@
 ;;;; Assembler parameters:
 
 ;;; The number of bits per element in the assemblers code vector.
-;;;
 (defparameter *assembly-unit-length* 8)
 
 
 ;;;; Pseudo-atomic trap number
-;;; KLUDGE
+
+;;; KLUDGE: Linux on the SPARC doesn't seem to conform to any kind of
+;;; standards at all. So we use an explicitly undefined trap, because
+;;; that currently does the right thing. Expect this to break
+;;; eventually (but with luck, at that point we'll be able to revert
+;;; to the compliant trap number...
+;;;
+;;; KLUDGE: Maybe this should be called pseudo-atomic-magic-number,
+;;; allowing other architectures (which don't necessarily use traps
+;;; for pseudo-atomic) to propagate a magic number to C land via
+;;; sbcl.h.
 #!-linux
-(defconstant pseudo-atomic-trap 16)
+(defconstant pseudo-atomic-trap #x10)
 #!+linux
 (defconstant pseudo-atomic-trap #x40)

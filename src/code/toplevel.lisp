@@ -477,7 +477,7 @@
 	   (abort
 	    "Reduce debugger level (leaving debugger, returning to toplevel).")
 	 (catch 'toplevel-catcher
-	   (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	   #!-sunos (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
 	   (repl noprint)
 	   (critically-unreachable "after REPL")))))))
 

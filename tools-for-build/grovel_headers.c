@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -94,6 +95,11 @@ main(int argc, char *argv[])
   
     defconstant("s-iflnk",  S_IFLNK);
     defconstant("s-ifsock", S_IFSOCK);
+    printf("\n");
+
+    printf(";;; for wait3(2) in run-program.lisp\n");
+    defconstant("wnohang", WNOHANG);
+    defconstant("wuntraced", WUNTRACED);
     printf("\n");
 
     return 0;

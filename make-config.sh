@@ -26,13 +26,14 @@ echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
 echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
-echo -n '(' >> $ltf
+printf '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in 
     *86) guessed_sbcl_arch=x86 ;; 
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
+    sun*) guessed_sbcl_arch=sparc ;;
     ppc) guessed_sbcl_arch=ppc ;;
     *)
         # If we're not building on a supported target architecture, we
@@ -49,7 +50,7 @@ if [ "$sbcl_arch" = "" ] ; then
     echo "can't guess target SBCL architecture, need SBCL_ARCH environment var"
     exit 1
 fi
-echo -n ":$sbcl_arch" >> $ltf 
+printf ":%s" "$sbcl_arch" >> $ltf 
 # KLUDGE: currently the x86 only works with the generational garbage
 # collector (indicated by the presence of :GENCGC in *FEATURES*) and
 # alpha, sparc and ppc with the stop'n'copy collector (indicated by
@@ -59,7 +60,7 @@ echo -n ":$sbcl_arch" >> $ltf
 # if we're building for x86. -- CSR, 2002-02-21 Then we do something
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ] ; then
-    echo -n ' :gencgc :stack-grows-downward-not-upward' >> $ltf
+    printf ' :gencgc :stack-grows-downward-not-upward' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
@@ -68,9 +69,9 @@ for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
     original_dir=`pwd`
     cd $d
-    if [ -L target ] ; then
+    if [ -h target ] ; then
 	rm target
-    elif [ -e target ] ; then
+    elif [ -w target ] ; then
 	echo "I'm afraid to replace non-symlink $d/target with a symlink."
 	exit 1
     fi
@@ -94,22 +95,22 @@ ln -s $sbcl_arch-arch.h target-arch.h
 ln -s $sbcl_arch-lispregs.h target-lispregs.h
 case `uname` in 
     Linux)
-	echo -n ' :linux' >> $ltf
+	printf ' :linux' >> $ltf
 	ln -s Config.$sbcl_arch-linux Config
 	ln -s $sbcl_arch-linux-os.h target-arch-os.h
 	ln -s linux-os.h target-os.h
 	;;
     *BSD)
-	echo -n ' :bsd' >> $ltf
+	printf ' :bsd' >> $ltf
 	ln -s $sbcl_arch-bsd-os.h target-arch-os.h
 	ln -s bsd-os.h target-os.h
 	case `uname` in
 	    FreeBSD)
-		echo -n ' :freebsd' >> $ltf
+		printf ' :freebsd' >> $ltf
 		ln -s Config.$sbcl_arch-freebsd Config
 		;;
 	    OpenBSD)
-		echo -n ' :openbsd' >> $ltf
+		printf ' :openbsd' >> $ltf
 		ln -s Config.$sbcl_arch-openbsd Config
 		;;
 	    *)
@@ -117,6 +118,12 @@ case `uname` in
 		exit 1
 		;;
 	esac
+	;;
+    SunOS)
+        printf ' :sunos' >> $ltf
+	ln -s Config.$sbcl_arch-sunos Config
+	ln -s $sbcl_arch-sunos-os.h target-arch-os.h
+	ln -s sunos-os.h target-os.h
 	;;
     *)
 	echo unsupported OS type: `uname`
