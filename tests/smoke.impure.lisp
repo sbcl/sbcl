@@ -19,16 +19,6 @@
 (room t)
 (room nil)
 
-;;; DESCRIBE should run without signalling an error.
-(defstruct to-be-described a b)
-(describe (make-to-be-described))
-(describe 12)
-(describe "a string")
-(describe 'symbolism)
-(describe (find-package :cl))
-(describe '(a list))
-(describe #(a vector))
-
 ;;; COPY-SYMBOL should work without signalling an error, even if the
 ;;; symbol is unbound.
 (copy-symbol 'foo)

@@ -219,7 +219,13 @@ symbols exported from PACKAGE"
 (defun start ()
   (with-open-file (*standard-output* "index.html" :direction :output)
       (format t "<html><head><title>SBCL BSD-Sockets API Reference</title></head><body>~%")
-    (asdf:operate 'asdf:load-op 'sb-bsd-sockets)
-    (document-system 'sb-bsd-sockets :package :sb-bsd-sockets)))
+      (format t
+"<!--
+ This is a machine-generated file (from SB-BSD-SOCKETS source code, massaged
+ by doc.lisp), so do not edit it directly.
+ -->
+")
+      (asdf:operate 'asdf:load-op 'sb-bsd-sockets)
+      (document-system 'sb-bsd-sockets :package :sb-bsd-sockets)))
 
 (start)

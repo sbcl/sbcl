@@ -526,7 +526,7 @@
 ;;; methods)
 (defun describe-condition (condition stream)
   (format stream
-	  "~@<~S ~_is a ~S. ~_Its slot values are ~_~S.~:>"
+	  "~&~@<~S ~_is a ~S. ~_Its slot values are ~_~S.~:>~%"
 	  condition
 	  (type-of condition)
 	  (concatenate 'list

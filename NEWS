@@ -1766,7 +1766,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     not a COMPILER-ERROR (followed by some other strange error on
     choosing the CONTINUE restart).
   * bug fix: make.sh and friends are now more consistent in the way that
-    they for GNU "make".
+    they look for GNU "make".
 
 changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * minor incompatible change: some nonsensical specialized lambda
@@ -1787,6 +1787,10 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * STREAM-READ-SEQUENCE and STREAM-WRITE-SEQUENCE now have methods
     defined on the relevant FUNDAMENTAL-BINARY-{INPUT,OUTPUT}-STREAM
     classes.  (thanks to Antonio Martinez)
+  * improved ANSIness in DESCRIBE: The DESCRIBE function no longer
+    outputs FRESH-LINE or TERPRI, and no longer converts its stream
+    argument to a pretty-print stream. Instead, it leaves any such 
+    operations to DESCRIBE-OBJECT methods.
   * bug fix: APROPOS now respects the EXTERNAL-ONLY flag.  (reported
     by Teemu Kalvas)
   * bug fix: NIL is now a valid destructuring argument in DEFMACRO
