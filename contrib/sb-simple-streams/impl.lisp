@@ -1305,37 +1305,3 @@
 	    t)
 	   (t
 	    (sb-impl::fd-stream-pathname stream))))))
-
-;;; bugfix
-
-;;; TODO: Rudi 2003-01-12: What is this for?  Incorporate into sbcl or
-;;; remove it.
-#+nil
-(defun cl::stream-misc-dispatch (stream operation &optional arg1 arg2)
-  (declare (type fundamental-stream stream) ;; this is a lie
-           (ignore arg2))
-  (case operation
-    (:listen
-     (ext:stream-listen stream))
-    (:unread
-     (ext:stream-unread-char stream arg1))
-    (:close
-     (close stream))
-    (:clear-input
-     (ext:stream-clear-input stream))
-    (:force-output
-     (ext:stream-force-output stream))
-    (:finish-output
-     (ext:stream-finish-output stream))
-    (:element-type
-     (stream-element-type stream))
-    (:interactive-p
-     (interactive-stream-p stream))
-    (:line-length
-     (ext:stream-line-length stream))
-    (:charpos
-     (ext:stream-line-column stream))
-    (:file-length
-     (file-length stream))
-    (:file-position
-     (file-position stream arg1))))

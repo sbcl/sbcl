@@ -256,9 +256,9 @@
 		   +char-attr-whitespace+)
 	       (done-with-fast-read-char)
 	       char)))
-	;; fundamental-stream
+	;; CLOS stream
 	(do ((attribute-table (character-attribute-table *readtable*))
-	     (char (stream-read-char stream) (stream-read-char stream)))
+	     (char (read-char stream nil :eof) (read-char stream nil :eof)))
 	    ((or (eq char :eof)
 		 (/= (the fixnum (aref attribute-table (char-code char)))
 		     +char-attr-whitespace+))
@@ -483,8 +483,8 @@
 		     (fast-read-char nil nil)))
 	      ((or (not char) (char= char #\newline))
 	       (done-with-fast-read-char))))
-	;; FUNDAMENTAL-STREAM
-	(do ((char (stream-read-char stream) (stream-read-char stream)))
+	;; CLOS stream
+	(do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
 	    ((or (eq char :eof) (char= char #\newline))))))
   ;; Don't return anything.
   (values))
@@ -547,13 +547,13 @@
 	       (done-with-fast-read-char))
 	    (if (escapep char) (setq char (fast-read-char t)))
 	    (ouch-read-buffer char)))
-	;; FUNDAMENTAL-STREAM
-	(do ((char (stream-read-char stream) (stream-read-char stream)))
+	;; CLOS stream
+	(do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
 	    ((or (eq char :eof) (char= char closech))
 	     (if (eq char :eof)
 		 (error 'end-of-file :stream stream)))
 	  (when (escapep char)
-	    (setq char (stream-read-char stream))
+	    (setq char (read-char stream nil :eof))
 	    (if (eq char :eof)
 		(error 'end-of-file :stream stream)))
 	  (ouch-read-buffer char))))
@@ -927,15 +927,15 @@
 		 (#.+char-attr-package-delimiter+ (done-with-fast-read-char)
 						  (go COLON))
 		 (t (go SYMBOL-LOOP)))))
-	    ;; fundamental-stream
+	    ;; CLOS stream
 	    (prog ()
 	     SYMBOL-LOOP
 	     (ouch-read-buffer char)
-	     (setq char (stream-read-char stream))
+	     (setq char (read-char stream nil :eof))
 	     (when (eq char :eof) (go RETURN-SYMBOL))
 	     (case (char-class char attribute-table)
 	       (#.+char-attr-escape+ (go ESCAPE))
-	       (#.+char-attr-delimiter+ (stream-unread-char stream char)
+	       (#.+char-attr-delimiter+ (unread-char char stream)
 			    (go RETURN-SYMBOL))
 	       (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	       (#.+char-attr-package-delimiter+ (go COLON))

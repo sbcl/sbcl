@@ -2204,6 +2204,9 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
     Moellmann)
   * ASDF-INSTALL bug fix: now parses *PROXY* properly.  (thanks to
     Sean Ross)
+  * SB-SIMPLE-STREAMS enhancement: simple-streams can now be used as
+    streams for the REPL, for the debugger, and so on.  (thanks to
+    David Licteblau)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the value of the :REHASH-THRESHOLD argument to MAKE-HASH-TABLE
        is ignored if it is too small, rather than propagating through

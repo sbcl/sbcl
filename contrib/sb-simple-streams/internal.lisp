@@ -83,7 +83,13 @@
 
 (defun std-dc-newline-in-handler (stream character)
   (with-stream-class (dual-channel-simple-stream stream)
-    (setf (sm charpos stream) -1) ;; set to 0 "if reading" ???
+    ;; FIXME: Currently, -1 is wrong, since callers of CHARPOS expect
+    ;; a result in (or null (and fixnum unsigned-byte)), so they must
+    ;; never see this temporary value.  Note that in
+    ;; STD-NEWLINE-OUT-HANDLER it is correct to use -1, since CHARPOS
+    ;; is incremented to zero before WRITE-CHAR returns.  Perhaps the
+    ;; same should happen for input?
+    (setf (sm charpos stream) 0) ; was -1
     character))
 
 (defvar *std-control-out-table*

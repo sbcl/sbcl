@@ -9,7 +9,7 @@
 
 (defpackage sb-simple-streams
   (:use #:common-lisp)
-  (:import-from #:sb-kernel #:ansi-stream)
+  (:import-from #:sb-kernel #:ansi-stream #:charpos #:line-length)
   (:import-from #:sb-gray #:fundamental-stream)
   (:export ;; Stream classes
    #:STREAM

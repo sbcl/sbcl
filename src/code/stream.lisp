@@ -559,6 +559,12 @@
 	  (t ; must be Gray streams FUNDAMENTAL-STREAM
 	   (stream-write-string stream string start end)))))
 
+;;; A wrapper function for all those (MACROLET OUT-FUN) definitions,
+;;; which cannot deal with keyword arguments.
+(declaim (inline write-string-no-key))
+(defun write-string-no-key (string stream start end)
+  (write-string string stream :start start :end end))
+
 (defun write-line (string &optional (stream *standard-output*)
 			  &key (start 0) end)
   (declare (type string string))
@@ -597,37 +603,43 @@
 		   (stream-write-byte integer))
   integer)
 
+
+;;; (These were inline throughout this file, but that's not appropriate
+;;; globally.  And we must not inline them in the rest of this file if
+;;; dispatch to gray or simple streams is to work, since both redefine
+;;; these functions later.)
+(declaim (maybe-inline read-char unread-char read-byte listen))
+
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
-;;; appropriate Gray stream functions.
+;;; appropriate SIMPLE- or FUNDAMENTAL-STREAM functions.
 (defun stream-misc-dispatch (stream operation &optional arg1 arg2)
-  (declare (type fundamental-stream stream)
-	   (ignore arg2))
-  (case operation
+  (declare (type stream stream) (ignore arg2))
+  (ecase operation
     (:listen
      ;; Return T if input available, :EOF for end-of-file, otherwise NIL.
-     (let ((char (stream-read-char-no-hang stream)))
+     (let ((char (read-char-no-hang stream nil :eof)))
        (when (characterp char)
-	 (stream-unread-char stream char))
+	 (unread-char char stream))
        char))
     (:unread
-     (stream-unread-char stream arg1))
+     (unread-char arg1 stream))
     (:close
      (close stream))
     (:clear-input
-     (stream-clear-input stream))
+     (clear-input stream))
     (:force-output
-     (stream-force-output stream))
+     (force-output stream))
     (:finish-output
-     (stream-finish-output stream))
+     (finish-output stream))
     (:element-type
      (stream-element-type stream))
     (:interactive-p
      (interactive-stream-p stream))
     (:line-length
-     (stream-line-length stream))
+     (line-length stream))
     (:charpos
-     (stream-line-column stream))
+     (charpos stream))
     (:file-length
      (file-length stream))
     (:file-position
@@ -657,16 +669,13 @@
 	     :expected-type '(satisfies output-stream-p))))
   (apply #'%make-broadcast-stream streams))
 
-(macrolet ((out-fun (fun method stream-method &rest args)
-	     `(defun ,fun (stream ,@args)
+(macrolet ((out-fun (name fun &rest args)
+	     `(defun ,name (stream ,@args)
 		(dolist (stream (broadcast-stream-streams stream))
-		  (if (ansi-stream-p stream)
-		      (funcall (,method stream) stream ,@args)
-		      (,stream-method stream ,@args))))))
-  (out-fun broadcast-out ansi-stream-out stream-write-char char)
-  (out-fun broadcast-bout ansi-stream-bout stream-write-byte byte)
-  (out-fun broadcast-sout ansi-stream-sout stream-write-string
-	   string start end))
+		  (,fun ,(car args) stream ,@(cdr args))))))
+  (out-fun broadcast-out write-char char)
+  (out-fun broadcast-bout write-byte byte)
+  (out-fun broadcast-sout write-string-no-key string start end))
 
 (defun broadcast-misc (stream operation &optional arg1 arg2)
   (let ((streams (broadcast-stream-streams stream)))
@@ -712,18 +721,16 @@
   (print-unreadable-object (x stream :type t :identity t)
     (format stream ":SYMBOL ~S" (synonym-stream-symbol x))))
 
-;;; The output simple output methods just call the corresponding method
-;;; in the synonymed stream.
-(macrolet ((out-fun (name slot stream-method &rest args)
+;;; The output simple output methods just call the corresponding
+;;; function on the synonymed stream.
+(macrolet ((out-fun (name fun &rest args)
 	     `(defun ,name (stream ,@args)
 		(declare (optimize (safety 1)))
 		(let ((syn (symbol-value (synonym-stream-symbol stream))))
-		  (if (ansi-stream-p syn)
-		      (funcall (,slot syn) syn ,@args)
-		      (,stream-method syn ,@args))))))
-  (out-fun synonym-out ansi-stream-out stream-write-char ch)
-  (out-fun synonym-bout ansi-stream-bout stream-write-byte n)
-  (out-fun synonym-sout ansi-stream-sout stream-write-string string start end))
+		  (,fun ,(car args) syn ,@(cdr args))))))
+  (out-fun synonym-out write-char ch)
+  (out-fun synonym-bout write-byte n)
+  (out-fun synonym-sout write-string-no-key string start end))
 
 ;;; For the input methods, we just call the corresponding function on the
 ;;; synonymed stream. These functions deal with getting input out of
@@ -794,15 +801,13 @@
 	   :expected-type '(satisfies input-stream-p)))
   (funcall #'%make-two-way-stream input-stream output-stream))
 
-(macrolet ((out-fun (name slot stream-method &rest args)
+(macrolet ((out-fun (name fun &rest args)
 	     `(defun ,name (stream ,@args)
 		(let ((syn (two-way-stream-output-stream stream)))
-		  (if (ansi-stream-p syn)
-		      (funcall (,slot syn) syn ,@args)
-		      (,stream-method syn ,@args))))))
-  (out-fun two-way-out ansi-stream-out stream-write-char ch)
-  (out-fun two-way-bout ansi-stream-bout stream-write-byte n)
-  (out-fun two-way-sout ansi-stream-sout stream-write-string string start end))
+		  (,fun ,(car args) syn ,@(cdr args))))))
+  (out-fun two-way-out write-char ch)
+  (out-fun two-way-bout write-byte n)
+  (out-fun two-way-sout write-string-no-key string start end))
 
 (macrolet ((in-fun (name fun &rest args)
 	     `(defun ,name (stream ,@args)
@@ -989,20 +994,16 @@
 	   :expected-type '(satisfies input-stream-p)))
   (funcall #'%make-echo-stream input-stream output-stream))
 
-(macrolet ((in-fun (name fun out-slot stream-method &rest args)
+(macrolet ((in-fun (name in-fun out-fun &rest args)
 	     `(defun ,name (stream ,@args)
 		(or (pop (echo-stream-unread-stuff stream))
 		    (let* ((in (echo-stream-input-stream stream))
 			   (out (echo-stream-output-stream stream))
-			   (result (,fun in ,@args)))
-		      (if (ansi-stream-p out)
-			  (funcall (,out-slot out) out result)
-			  (,stream-method out result))
+			   (result (,in-fun in ,@args)))
+		      (,out-fun result out)
 		      result)))))
-  (in-fun echo-in read-char ansi-stream-out stream-write-char
-	  eof-error-p eof-value)
-  (in-fun echo-bin read-byte ansi-stream-bout stream-write-byte
-	  eof-error-p eof-value))
+  (in-fun echo-in read-char write-char eof-error-p eof-value)
+  (in-fun echo-bin read-byte write-byte eof-error-p eof-value))
 
 (defun echo-misc (stream operation &optional arg1 arg2)
   (let* ((in (two-way-stream-input-stream stream))
@@ -1866,7 +1867,3 @@
 	   (funcall write-function (aref seq i) stream)))))))
 
 ;;;; etc.
-
-;;; (These were inline throughout this file, but that's not appropriate
-;;; globally.)
-(declaim (maybe-inline read-char unread-char read-byte listen))
