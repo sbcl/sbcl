@@ -444,6 +444,40 @@
     (call-next-method)))
 (assert (= (call-next-method-lexical-args 3) 3))
 
+;;; DEFINE-METHOD-COMBINATION with arguments was hopelessly broken
+;;; until 0.7.9.5x
+(defvar *d-m-c-args-test* nil)
+(define-method-combination progn-with-lock ()
+  ((methods ()))
+  (:arguments object)
+  `(unwind-protect
+    (progn (lock (object-lock ,object))
+	   ,@(mapcar #'(lambda (method)
+			 `(call-method ,method))
+		     methods))
+    (unlock (object-lock ,object))))
+(defun object-lock (obj)
+  (push "object-lock" *d-m-c-args-test*)
+  obj)
+(defun unlock (obj)
+  (push "unlock" *d-m-c-args-test*)
+  obj)
+(defun lock (obj)
+  (push "lock" *d-m-c-args-test*)
+  obj)
+(defgeneric d-m-c-args-test (x)
+  (:method-combination progn-with-lock))
+(defmethod d-m-c-args-test ((x symbol))
+  (push "primary" *d-m-c-args-test*))
+(defmethod d-m-c-args-test ((x number))
+  (error "foo"))
+(assert (equal (d-m-c-args-test t) '("primary" "lock" "object-lock")))
+(assert (equal *d-m-c-args-test*
+	       '("unlock" "object-lock" "primary" "lock" "object-lock")))
+(setf *d-m-c-args-test* nil)
+(ignore-errors (d-m-c-args-test 1))
+(assert (equal *d-m-c-args-test*
+	       '("unlock" "object-lock" "lock" "object-lock")))
+
 ;;;; success
-
 (sb-ext:quit :unix-status 104)

@@ -174,10 +174,13 @@
       (get-generic-fun-info gf)
     (declare (ignore nreq nkeys arg-info))
     (let ((ll (make-fast-method-call-lambda-list metatypes applyp))
-	  ;; When there are no primary methods and a next-method call occurs
-	  ;; effective-method is (error "No mumble..") and the defined
-	  ;; args are not used giving a compiler warning.
-	  (error-p (eq (first effective-method) '%no-primary-method)))
+	  (error-p (eq (first effective-method) '%no-primary-method))
+	  (mc-args-p
+	   (when (eq *boot-state* 'complete)
+	     ;; Otherwise the METHOD-COMBINATION slot is not bound.
+	     (let ((combin (generic-function-method-combination gf)))
+	       (and (long-method-combination-p combin)
+		    (long-method-combination-args-lambda-list combin))))))
       (cond
 	(error-p
 	 `(lambda (.pv-cell. .next-method-call. &rest .args.)
@@ -185,6 +188,20 @@
 	   (flet ((%no-primary-method (gf args)
 		    (apply #'no-primary-method gf args)))
 	     ,effective-method)))
+	(mc-args-p
+	 (let* ((required
+		 ;; FIXME: Ick. Shared idiom, too, with stuff in cache.lisp
+		 (let (req)
+		   (dotimes (i (length metatypes) (nreverse req))
+		     (push (dfun-arg-symbol i) req))))
+		(gf-args (if applyp
+			     `(list* ,@required .dfun-rest-arg.)
+			     `(list ,@required))))
+	   `(lambda ,ll
+	     (declare (ignore .pv-cell. .next-method-call.))
+	     (let ((.gf-args. ,gf-args))
+	       (declare (ignorable .gf-args.))
+	       ,effective-method))))
 	(t
 	 `(lambda ,ll
 	   (declare (ignore ,@(if error-p ll '(.pv-cell. .next-method-call.))))
