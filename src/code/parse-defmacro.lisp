@@ -212,7 +212,7 @@
 		  `(,error-fun 'arg-count-error
 			       :kind ',error-kind
 			       ,@(when name `(:name ',name))
-			       :argument ,path-0
+			       :args ,path-0
 			       :lambda-list ',lambda-list
 			       :minimum ,minimum
 			       ,@(unless restp

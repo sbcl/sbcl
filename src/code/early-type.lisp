@@ -70,10 +70,10 @@
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype))
 
-;;; The CONSTANT-TYPE structure represents a use of the
-;;; CONSTANT-ARGUMENT "type specifier", which is only meaningful in
-;;; function argument type specifiers used within the compiler. (It
-;;; represents something that the compiler knows to be a constant.)
+;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
+;;; "type specifier", which is only meaningful in function argument
+;;; type specifiers used within the compiler. (It represents something
+;;; that the compiler knows to be a constant.)
 (defstruct (constant-type
 	    (:include ctype
 		      (class-info (type-class-or-lose 'constant)))

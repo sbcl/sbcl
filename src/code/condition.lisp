@@ -715,8 +715,7 @@
 
 (define-condition namestring-parse-error (parse-error)
   ((complaint :reader namestring-parse-error-complaint :initarg :complaint)
-   (arguments :reader namestring-parse-error-arguments :initarg :arguments
-	      :initform nil)
+   (args :reader namestring-parse-error-args :initarg :args :initform nil)
    (namestring :reader namestring-parse-error-namestring :initarg :namestring)
    (offset :reader namestring-parse-error-offset :initarg :offset))
   (:report
@@ -724,7 +723,7 @@
      (format stream
 	     "parse error in namestring: ~?~%  ~A~%  ~V@T^"
 	     (namestring-parse-error-complaint condition)
-	     (namestring-parse-error-arguments condition)
+	     (namestring-parse-error-args condition)
 	     (namestring-parse-error-namestring condition)
 	     (namestring-parse-error-offset condition)))))
 

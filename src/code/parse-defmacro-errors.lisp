@@ -14,15 +14,16 @@
 (in-package "SB!KERNEL")
 
 ;;; We save space in macro definitions by calling this function.
-(defun arg-count-error (error-kind name arg lambda-list minimum maximum)
+(defun arg-count-error (error-kind name args lambda-list minimum maximum)
   (let (#-sb-xc-host
 	(sb!debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
     (error 'arg-count-error
 	   :kind error-kind
 	   :name name
-	   :argument arg
+	   :args args
 	   :lambda-list lambda-list
-	   :minimum minimum :maximum maximum)))
+	   :minimum minimum
+	   :maximum maximum)))
 
 (define-condition defmacro-lambda-list-bind-error (error)
   ((kind :reader defmacro-lambda-list-bind-error-kind
@@ -51,7 +52,7 @@
 	     (defmacro-bogus-sublist-error-lambda-list condition)))))
 
 (define-condition arg-count-error (defmacro-lambda-list-bind-error)
-  ((argument :reader arg-count-error-argument :initarg :argument)
+  ((args :reader arg-count-error-args :initarg :args)
    (lambda-list :reader arg-count-error-lambda-list
 		:initarg :lambda-list)
    (minimum :reader arg-count-error-minimum :initarg :minimum)
@@ -62,7 +63,7 @@
      (format stream
 	     "invalid number of elements in:~%  ~:S~%~
 	     to satisfy lambda list:~%  ~:S~%"
-	     (arg-count-error-argument condition)
+	     (arg-count-error-args condition)
 	     (arg-count-error-lambda-list condition))
      (cond ((null (arg-count-error-maximum condition))
 	    (format stream "at least ~W expected"
@@ -76,7 +77,7 @@
 		    (arg-count-error-minimum condition)
 		    (arg-count-error-maximum condition))))
      (format stream ", but ~W found"
-	     (length (arg-count-error-argument condition))))))
+	     (length (arg-count-error-args condition))))))
 
 (define-condition defmacro-ll-broken-key-list-error
 		  (defmacro-lambda-list-bind-error)

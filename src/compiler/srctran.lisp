@@ -2666,7 +2666,7 @@
 ;;; Flush calls to various arith functions that convert to the
 ;;; identity function or a constant.
 (macrolet ((def-frob (name identity result)
-             `(deftransform ,name ((x y) (* (constant-argument (member ,identity)))
+             `(deftransform ,name ((x y) (* (constant-arg (member ,identity)))
                                     * :when :both)
                 "fold identity operations"
                 ',result)))
@@ -2680,11 +2680,11 @@
 
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.
-(deftransform - ((x y) ((constant-argument (member 0)) rational) *
+(deftransform - ((x y) ((constant-arg (member 0)) rational) *
 		 :when :both)
   "convert (- 0 x) to negate"
   '(%negate y))
-(deftransform * ((x y) (rational (constant-argument (member 0))) *
+(deftransform * ((x y) (rational (constant-arg (member 0))) *
 		 :when :both)
   "convert (* x 0) to 0"
   0)
@@ -2727,7 +2727,7 @@
 ;;;
 ;;; If y is not constant, not zerop, or is contagious, or a positive
 ;;; float +0.0 then give up.
-(deftransform + ((x y) (t (constant-argument t)) * :when :both)
+(deftransform + ((x y) (t (constant-arg t)) * :when :both)
   "fold zero arg"
   (let ((val (continuation-value y)))
     (unless (and (zerop val)
@@ -2740,7 +2740,7 @@
 ;;;
 ;;; If y is not constant, not zerop, or is contagious, or a negative
 ;;; float -0.0 then give up.
-(deftransform - ((x y) (t (constant-argument t)) * :when :both)
+(deftransform - ((x y) (t (constant-arg t)) * :when :both)
   "fold zero arg"
   (let ((val (continuation-value y)))
     (unless (and (zerop val)
@@ -2751,7 +2751,7 @@
 
 ;;; Fold (OP x +/-1)
 (macrolet ((def-frob (name result minus-result)
-             `(deftransform ,name ((x y) (t (constant-argument real))
+             `(deftransform ,name ((x y) (t (constant-arg real))
                                     * :when :both)
                 "fold identity operations"
                 (let ((val (continuation-value y)))
@@ -2765,7 +2765,7 @@
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.
-(deftransform expt ((x y) (t (constant-argument real)) *)
+(deftransform expt ((x y) (t (constant-arg real)) *)
   "recode as multiplication or sqrt"
   (let ((val (continuation-value y)))
     ;; If Y would cause the result to be promoted to the same type as
@@ -2788,7 +2788,7 @@
 ;;; Perhaps we should have to prove that the denominator is nonzero before
 ;;; doing them?  -- WHN 19990917
 (macrolet ((def-frob (name)
-             `(deftransform ,name ((x y) ((constant-argument (integer 0 0)) integer)
+             `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    * :when :both)
                 "fold zero arg"
                 0)))
@@ -2796,7 +2796,7 @@
   (def-frob /))
 
 (macrolet ((def-frob (name)
-             `(deftransform ,name ((x y) ((constant-argument (integer 0 0)) integer)
+             `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    * :when :both)
                 "fold zero arg"
                 '(values 0 0))))

@@ -1086,7 +1086,7 @@ a host-structure or string."
 	  (error 'namestring-parse-error
 		 :complaint "logical namestring character which ~
 			     is not alphanumeric or hyphen:~%  ~S"
-		 :arguments (list ch)
+		 :args (list ch)
 		 :namestring word :offset i))))
     word))
 
@@ -1139,7 +1139,7 @@ a host-structure or string."
 		  (error 'namestring-parse-error
 			 :complaint "double asterisk inside of logical ~
 				     word: ~S"
-			 :arguments (list chunk)
+			 :args (list chunk)
 			 :namestring namestring
 			 :offset (+ (cdar chunks) pos)))
 		(pattern (subseq chunk last-pos pos)))
@@ -1173,7 +1173,7 @@ a host-structure or string."
 	  (unless (member ch '(#\; #\: #\.))
 	    (error 'namestring-parse-error
 		   :complaint "illegal character for logical pathname:~%  ~S"
-		   :arguments (list ch)
+		   :args (list ch)
 		   :namestring namestr
 		   :offset i))
 	  (chunks (cons ch i)))))
@@ -1193,7 +1193,7 @@ a host-structure or string."
 		 (unless (and chunks (simple-string-p (caar chunks)))
 		   (error 'namestring-parse-error
 			  :complaint "expecting ~A, got ~:[nothing~;~S~]."
-			  :arguments (list what (caar chunks) (caar chunks))
+			  :args (list what (caar chunks) (caar chunks))
 			  :namestring namestr
 			  :offset (if chunks (cdar chunks) end)))
 		 (caar chunks))
@@ -1235,7 +1235,7 @@ a host-structure or string."
 		   (unless (eql (caar chunks) #\.)
 		     (error 'namestring-parse-error
 			    :complaint "expecting a dot, got ~S."
-			    :arguments (list (caar chunks))
+			    :args (list (caar chunks))
 			    :namestring namestr
 			    :offset (cdar chunks)))
 		   (if type
@@ -1258,7 +1258,7 @@ a host-structure or string."
 			 (error 'namestring-parse-error
 				:complaint "expected a positive integer, ~
 					    got ~S"
-				:arguments (list str)
+				:args (list str)
 				:namestring namestr
 				:offset (+ pos (cdar chunks))))
 		       (setq version res)))))

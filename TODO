@@ -8,6 +8,7 @@ for 0.7.0:
 	** reserved DO-FOO-style names for iteration macros
 	** s/ARGUMENT/ARG/
 	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
+	** merged SB-C-CALL into SB-ALIEN
 * Perhaps rename "cold" stuff (e.g. SB-COLD and src/cold/) to "boot".
 * pending patches and bug reports that go in (or else get handled
 	somehow, rejected/logged/whatever) before 0.7.0:

@@ -153,7 +153,7 @@
 	   (error 'format-error
 		  :complaint
 		  "too many parameters, expected no more than ~W"
-		  :arguments (list ,(length specs))
+		  :args (list ,(length specs))
 		  :offset (caar ,params)))
 	 ,@body))))
 
@@ -834,7 +834,7 @@
 		(error 'format-error
 		       :complaint "Index ~W is out of bounds. (It should ~
 				   have been between 0 and ~W.)"
-		       :arguments (list posn (length orig-args))))))
+		       :args (list posn (length orig-args))))))
       (if colonp
 	  (interpret-bind-defaults ((n 1)) params
 	    (do ((cur-posn 0 (1+ cur-posn))
@@ -847,7 +847,7 @@
 			      :complaint
 			      "Index ~W is out of bounds. (It should 
 			       have been between 0 and ~W.)"
-			      :arguments
+			      :args
 			      (list new-posn (length orig-args))))))))
 	  (interpret-bind-defaults ((n 1)) params
 	    (dotimes (i n)
@@ -866,7 +866,7 @@
 	    (error 'format-error
 		   :complaint
 		   "~A~%while processing indirect format string:"
-		   :arguments (list condition)
+		   :args (list condition)
 		   :print-banner nil
 		   :control-string string
 		   :offset (1- end)))))
@@ -1007,7 +1007,7 @@
 			    'format-error
 			    :complaint
 			    "~A~%while processing indirect format string:"
-			    :arguments (list condition)
+			    :args (list condition)
 			    :print-banner nil
 			    :control-string string
 			    :offset (1- end)))))

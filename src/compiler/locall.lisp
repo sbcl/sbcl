@@ -135,7 +135,7 @@
 	  (declare (type index ,n-supplied))
 	  ,(if (policy *lexenv* (zerop safety))
 	       `(declare (ignore ,n-supplied))
-	       `(%verify-argument-count ,n-supplied ,nargs))
+	       `(%verify-arg-count ,n-supplied ,nargs))
 	  (%funcall ,fun ,@temps))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
@@ -164,7 +164,7 @@
 			    (%more-arg-context ,n-supplied ,max)
 			  (%funcall ,more ,@temps ,n-context ,n-count))))))
 	     (t
-	      (%argument-count-error ,n-supplied)))))))))
+	      (%arg-count-error ,n-supplied)))))))))
 
 ;;; Make an external entry point (XEP) for FUN and return it. We
 ;;; convert the result of MAKE-XEP-LAMBDA in the correct environment,

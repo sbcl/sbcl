@@ -11,7 +11,7 @@
 
 (define-condition format-error (error)
   ((complaint :reader format-error-complaint :initarg :complaint)
-   (arguments :reader format-error-arguments :initarg :arguments :initform nil)
+   (args :reader format-error-args :initarg :args :initform nil)
    (control-string :reader format-error-control-string
 		   :initarg :control-string
 		   :initform *default-format-error-control-string*)
@@ -27,7 +27,7 @@
 		 ~?~@[~%  ~A~%  ~V@T^~]"
 	  (format-error-print-banner condition)
 	  (format-error-complaint condition)
-	  (format-error-arguments condition)
+	  (format-error-args condition)
 	  (format-error-control-string condition)
 	  (format-error-offset condition)))
 
@@ -264,7 +264,7 @@
 			      'format-error
 			      :complaint
 			      "too many parameters, expected no more than ~W"
-			      :arguments (list ,(length specs))
+			      :args (list ,(length specs))
 			      :offset (caar ,params)))
 		       ,,@body)))
 	`(progn
@@ -619,7 +619,7 @@
 		 (error 'format-error
 			:complaint "Index ~W out of bounds. Should have been ~
 				    between 0 and ~W."
-			:arguments (list ,posn (length orig-args))
+			:args (list ,posn (length orig-args))
 			:offset ,(1- end)))))
       (if colonp
 	  (expand-bind-defaults ((n 1)) params
@@ -636,8 +636,7 @@
 			       :complaint
 			       "Index ~W is out of bounds; should have been ~
 				between 0 and ~W."
-			       :arguments
-			       (list new-posn (length orig-args))
+			       :args (list new-posn (length orig-args))
 			       :offset ,(1- end)))))))
 	  (if params
 	      (expand-bind-defaults ((n 1)) params
@@ -659,7 +658,7 @@
 	     (error 'format-error
 		    :complaint
 		    "~A~%while processing indirect format string:"
-		    :arguments (list condition)
+		    :args (list condition)
 		    :print-banner nil
 		    :control-string ,string
 		    :offset ,(1- end)))))
@@ -871,7 +870,7 @@
 			       (error 'format-error
 				      :complaint
 			      "~A~%while processing indirect format string:"
-				      :arguments (list condition)
+				      :args (list condition)
 				      :print-banner nil
 				      :control-string ,string
 				      :offset ,(1- end)))))
@@ -970,7 +969,7 @@
 			      :complaint
 			      "cannot include format directives inside the ~
 			       ~:[suffix~;prefix~] segment of ~~<...~~:>"
-			      :arguments (list prefix-p)
+			      :args (list prefix-p)
 			      :offset (1- (format-directive-end directive)))
 		       (apply #'concatenate 'string list)))))
 	(case (length segments)
@@ -1156,7 +1155,7 @@
 	;; FIND-UNDELETED-PACKAGE-OR-LOSE?
 	(error 'format-error
 	       :complaint "no package named ~S"
-	       :arguments (list package-name)))
+	       :args (list package-name)))
       (intern (if first-colon
 		  (subseq name (1+ first-colon))
 		  name)

@@ -185,7 +185,7 @@
     make-old-fp-passing-location
     make-old-fp-save-location
     make-return-pc-save-location
-    make-argument-count-location
+    make-arg-count-location
     make-nfp-tn
     make-stack-pointer-tn
     make-number-stack-pointer-tn

@@ -137,7 +137,7 @@
 
   0)
 
-;;;; INTERNAL-ERROR-ARGUMENTS
+;;;; INTERNAL-ERROR-ARGS
 
 ;;; Given a (POSIX) signal context, extract the internal error
 ;;; arguments from the instruction stream.  This is e.g.
@@ -147,7 +147,7 @@
 ;;;  (pc)
 ;;; (example from undefined_tramp: "(gdb) x/40ub 0x10148" for yourself
 ;;; to replicate)
-(defun internal-error-arguments (context)
+(defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))

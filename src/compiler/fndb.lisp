@@ -1265,8 +1265,8 @@
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t)
 (defknown %more-arg-values (t index index) * (flushable))
-(defknown %verify-argument-count (index index) (values))
-(defknown %argument-count-error (t) nil)
+(defknown %verify-arg-count (index index) (values))
+(defknown %arg-count-error (t) nil)
 (defknown %unknown-values () *)
 (defknown %catch (t t) t)
 (defknown %unwind-protect (t t) t)
@@ -1278,8 +1278,8 @@
 (defknown %%primitive (t t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %type-check-error (t t) nil)
-(defknown %odd-key-arguments-error () nil)
-(defknown %unknown-key-argument-error (t) nil)
+(defknown %odd-key-args-error () nil)
+(defknown %unknown-key-arg-error (t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte
   (movable foldable flushable explicit-check))
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer

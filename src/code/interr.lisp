@@ -184,12 +184,12 @@
 	 :datum object
 	 :expected-type 'coerceable-to-fun))
 
-(deferr invalid-argument-count-error (nargs)
+(deferr invalid-arg-count-error (nargs)
   (error 'simple-program-error
 	 :format-control "invalid number of arguments: ~S"
 	 :format-arguments (list nargs)))
 
-(deferr bogus-argument-to-values-list-error (list)
+(deferr bogus-arg-to-values-list-error (list)
   (error 'simple-type-error
 	 :datum list
 	 :expected-type 'list
@@ -245,11 +245,11 @@
 	 :datum object
 	 :expected-type (layout-class layout)))
 
-(deferr odd-key-arguments-error ()
+(deferr odd-key-args-error ()
   (error 'simple-program-error
 	 :format-control "odd number of &KEY arguments"))
 
-(deferr unknown-key-argument-error (key-name)
+(deferr unknown-key-arg-error (key-name)
   (error 'simple-program-error
 	 :format-control "unknown &KEY argument: ~S"
 	 :format-arguments (list key-name)))
@@ -438,7 +438,7 @@
 
 ;;;; INTERNAL-ERROR signal handler
 
-(defvar *internal-error-arguments*)
+(defvar *internal-error-args*)
 
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
@@ -452,8 +452,8 @@
 			  (sb!alien:sap-alien context (* os-context-t)))))
      (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
      (multiple-value-bind (error-number arguments)
-	 (sb!vm:internal-error-arguments alien-context)
-       (/show0 "back from INTERNAL-ERROR-ARGUMENTS, ERROR-NUMBER=..")
+	 (sb!vm:internal-error-args alien-context)
+       (/show0 "back from INTERNAL-ERROR-ARGS, ERROR-NUMBER=..")
        (/hexstr error-number)
        (/show0 "cold/low ARGUMENTS=..")
        (/hexstr arguments)

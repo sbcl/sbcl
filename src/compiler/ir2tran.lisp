@@ -1082,7 +1082,7 @@
       (let ((vars (lambda-vars fun))
 	    (n 0))
 	(when (leaf-refs (first vars))
-	  (emit-move node block (make-argument-count-location)
+	  (emit-move node block (make-arg-count-location)
 		     (leaf-info (first vars))))
 	(dolist (arg (rest vars))
 	  (when (leaf-refs arg)
@@ -1460,7 +1460,7 @@
 	 (2info (nlx-info-info info))
 	 (top-loc (ir2-nlx-info-save-sp 2info))
 	 (start-loc (make-nlx-entry-argument-start-location))
-	 (count-loc (make-argument-count-location))
+	 (count-loc (make-arg-count-location))
 	 (target (ir2-nlx-info-target 2info)))
 
     (ecase (cleanup-kind (nlx-info-cleanup info))

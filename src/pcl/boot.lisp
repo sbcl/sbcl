@@ -1289,7 +1289,7 @@ bootstrapping.
 
 (defun analyze-lambda-list (lambda-list)
   (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?
-	 (parse-key-argument (arg)
+	 (parse-key-arg (arg)
 	   (if (listp arg)
 	       (if (listp (car arg))
 		   (caar arg)
@@ -1320,7 +1320,7 @@ bootstrapping.
 	    (ecase state
 	      (required  (incf nrequired))
 	      (optional  (incf noptional))
-	      (key       (push (parse-key-argument x) keywords)
+	      (key       (push (parse-key-arg x) keywords)
 			 (push x keyword-parameters))
 	      (rest      (incf nrest)))))
       (when (and restp (zerop nrest))

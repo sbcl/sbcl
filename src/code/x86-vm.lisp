@@ -256,13 +256,13 @@
 
   0)
 
-;;;; INTERNAL-ERROR-ARGUMENTS
+;;;; INTERNAL-ERROR-ARGS
 
 ;;; Given a (POSIX) signal context, extract the internal error
 ;;; arguments from the instruction stream.
-(defun internal-error-arguments (context)
+(defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
-  (/show0 "entering INTERNAL-ERROR-ARGUMENTS, CONTEXT=..")
+  (/show0 "entering INTERNAL-ERROR-ARGS, CONTEXT=..")
   (/hexstr context)
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))

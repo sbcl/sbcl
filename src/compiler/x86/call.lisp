@@ -64,7 +64,7 @@
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we
 ;;; are using non-standard conventions.
-(!def-vm-support-routine make-argument-count-location ()
+(!def-vm-support-routine make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ecx-offset))
 
 ;;; Make a TN to hold the number-stack frame pointer. This is allocated
@@ -1338,9 +1338,9 @@
       (inst sub count (fixnumize fixed)))))
 
 ;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
-(define-vop (verify-argument-count)
+(define-vop (verify-arg-count)
   (:policy :fast-safe)
-  (:translate sb!c::%verify-argument-count)
+  (:translate sb!c::%verify-arg-count)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t))
   (:info count)
@@ -1348,7 +1348,7 @@
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-	   (generate-error-code vop invalid-argument-count-error nargs)))
+	   (generate-error-code vop invalid-arg-count-error nargs)))
       (if (zerop count)
 	  (inst test nargs nargs)  ; smaller instruction
 	(inst cmp nargs (fixnumize count)))
@@ -1367,14 +1367,14 @@
 		(:save-p :compute-only)
 		(:generator 1000
 		  (error-call vop ,error ,@args)))))
-  (def argument-count-error invalid-argument-count-error
-    sb!c::%argument-count-error nargs)
+  (def arg-count-error invalid-arg-count-error
+    sb!c::%arg-count-error nargs)
   (def type-check-error object-not-type-error sb!c::%type-check-error
     object type)
   (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
     object layout)
-  (def odd-key-arguments-error odd-key-arguments-error
-    sb!c::%odd-key-arguments-error)
-  (def unknown-key-argument-error unknown-key-argument-error
-    sb!c::%unknown-key-argument-error key)
+  (def odd-key-args-error odd-key-args-error
+    sb!c::%odd-key-args-error)
+  (def unknown-key-arg-error unknown-key-arg-error
+    sb!c::%unknown-key-arg-error key)
   (def nil-fun-returned-error nil-fun-returned-error nil fun))

@@ -97,7 +97,7 @@
 
 ;;; If FIND-CLASS is called on a constant class, locate the CLASS-CELL
 ;;; at load time.
-(deftransform find-class ((name) ((constant-argument symbol)) *
+(deftransform find-class ((name) ((constant-arg symbol)) *
 			  :when :both)
   (let* ((name (continuation-value name))
 	 (cell (find-class-cell name)))

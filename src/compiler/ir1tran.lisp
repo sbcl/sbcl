@@ -1620,7 +1620,7 @@
 
 	    (body
 	     `(when (oddp ,n-count)
-		(%odd-key-arguments-error)))
+		(%odd-key-args-error)))
 
 	    (body
 	     `(locally
@@ -1635,7 +1635,7 @@
 
 	    (unless allowp
 	      (body `(when (and ,n-losep (not ,n-allowp))
-		       (%unknown-key-argument-error ,n-losep)))))))
+		       (%unknown-key-arg-error ,n-losep)))))))
 
       (let ((ep (ir1-convert-lambda-body
 		 `((let ,(temps)

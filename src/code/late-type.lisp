@@ -229,12 +229,12 @@
 (!define-type-class constant :inherits values)
 
 (!define-type-method (constant :unparse) (type)
-  `(constant-argument ,(type-specifier (constant-type-type type))))
+  `(constant-arg ,(type-specifier (constant-type-type type))))
 
 (!define-type-method (constant :simple-=) (type1 type2)
   (type= (constant-type-type type1) (constant-type-type type2)))
 
-(!def-type-translator constant-argument (type)
+(!def-type-translator constant-arg (type)
   (make-constant-type :type (specifier-type type)))
 
 ;;; Given a LAMBDA-LIST-like values type specification and an ARGS-TYPE

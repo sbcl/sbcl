@@ -89,9 +89,9 @@
    "An attempt was made to use an undefined FDEFINITION.")
   (object-not-coerceable-to-fun
    "Object is not coerceable to type FUNCTION.")
-  (invalid-argument-count
+  (invalid-arg-count
    "invalid argument count")
-  (bogus-argument-to-values-list
+  (bogus-arg-to-values-list
    "bogus argument to VALUES-LIST")
   (unbound-symbol
    "An attempt was made to use an undefined SYMBOL-VALUE.")
@@ -108,9 +108,9 @@
    "division by zero")
   (object-not-type
    "Object is of the wrong type.")
-  (odd-key-arguments
+  (odd-key-args
    "odd number of &KEY arguments")
-  (unknown-key-argument
+  (unknown-key-arg
    "unknown &KEY argument")
   nil
   nil

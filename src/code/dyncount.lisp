@@ -286,7 +286,7 @@ comments from CMU CL:
     ("List/string utility" "LENGTH/LIST" "SXHASH" "BIT-BASH" "$LENGTH$")
     ("Alien operations" "SAP" "ALLOC-NUMBER-STACK" "$CALL-OUT$")
     ("Function call/return" "CALL" "RETURN" "ALLOCATE-FRAME"
-     "COPY-MORE-ARG" "LISTIFY-REST-ARG" "VERIFY-ARGUMENT-COUNT")
+     "COPY-MORE-ARG" "LISTIFY-REST-ARG" "VERIFY-ARG-COUNT")
     ("Allocation" "MAKE-" "ALLOC" "$CONS$" "$LIST$" "$LIST*$")
     ("Float conversion" "%SINGLE-FLOAT" "%DOUBLE-FLOAT" "-BITS$")
     ("Complex type predicate" "P$")))

@@ -1285,7 +1285,7 @@
 		(defknown ,ufun (real) integer (movable foldable flushable))
 		(deftransform ,fun ((x &optional by)
 				    (* &optional
-				       (constant-argument (member 1))))
+				       (constant-arg (member 1))))
 		  '(let ((res (,ufun x)))
 		     (values res (- x res)))))))
   (define-frobs truncate %unary-truncate)

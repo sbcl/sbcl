@@ -62,7 +62,7 @@
 ;;; Make a TN for the standard argument count passing location. We
 ;;; only need to make the standard location, since a count is never
 ;;; passed when we are using non-standard conventions.
-(!def-vm-support-routine make-argument-count-location ()
+(!def-vm-support-routine make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
 
 
@@ -1177,9 +1177,9 @@ default-value-8
     (inst subq csp-tn count context)))
 
 ;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
-(define-vop (verify-argument-count)
+(define-vop (verify-arg-count)
   (:policy :fast-safe)
-  (:translate sb!c::%verify-argument-count)
+  (:translate sb!c::%verify-arg-count)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t))
   (:temporary (:scs (any-reg) :type fixnum) temp)
@@ -1188,7 +1188,7 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-	   (generate-error-code vop invalid-argument-count-error nargs)))
+	   (generate-error-code vop invalid-arg-count-error nargs)))
       (cond ((zerop count)
 	     (inst bne nargs err-lab))
 	    (t
@@ -1208,14 +1208,14 @@ default-value-8
 		(:save-p :compute-only)
 		(:generator 1000
 		  (error-call vop ,error ,@args)))))
-  (frob argument-count-error invalid-argument-count-error
-    sb!c::%argument-count-error nargs)
+  (frob arg-count-error invalid-arg-count-error
+    sb!c::%arg-count-error nargs)
   (frob type-check-error object-not-type-error sb!c::%type-check-error
     object type)
   (frob layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
     object layout)
-  (frob odd-key-arguments-error odd-key-arguments-error
-    sb!c::%odd-key-arguments-error)
-  (frob unknown-key-argument-error unknown-key-argument-error
-    sb!c::%unknown-key-argument-error key)
+  (frob odd-key-args-error odd-key-args-error
+    sb!c::%odd-key-args-error)
+  (frob unknown-key-arg-error unknown-key-arg-error
+    sb!c::%unknown-key-arg-error key)
   (frob nil-fun-returned-error nil-fun-returned-error nil fun))

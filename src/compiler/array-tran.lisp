@@ -711,10 +711,10 @@
   '(bit-not bit-array-1
 	    (make-array (length bit-array-1) :element-type 'bit)))
 (deftransform bit-not ((bit-array-1 result-bit-array)
-		       (bit-vector (constant-argument t)))
+		       (bit-vector (constant-arg t)))
   '(bit-not bit-array-1 bit-array-1))
-;;; FIXME: What does (CONSTANT-ARGUMENT T) mean? Is it the same thing
-;;; as (CONSTANT-ARGUMENT (MEMBER T)), or does it mean any constant
+;;; FIXME: What does (CONSTANT-ARG T) mean? Is it the same thing
+;;; as (CONSTANT-ARG (MEMBER T)), or does it mean any constant
 ;;; value?
 
 ;;; Pick off some constant cases.

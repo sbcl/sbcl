@@ -208,7 +208,7 @@
 						 (primitive-type-type
 						  type)))
 					      (rest x))))
-			  (:constant `(constant-argument ,(third x)))))))
+			  (:constant `(constant-arg ,(third x)))))))
 	     `(,@(mapcar #'frob types)
 	       ,@(when more-types
 		   `(&rest ,(frob more-types)))))))
