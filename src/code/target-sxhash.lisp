@@ -175,11 +175,19 @@
 	   (sxhash-recurse (x &optional (depthoid +max-hash-depthoid+))
 	     (declare (type index depthoid))
 	     (typecase x
-	       (cons
-		(if (plusp depthoid)
-		    (mix (sxhash-recurse (car x) (1- depthoid))
-			 (sxhash-recurse (cdr x) (1- depthoid)))
-		    261835505))
+	       ;; we test for LIST here, rather than CONS, because the
+	       ;; type test for CONS is in fact the test for
+	       ;; LIST-POINTER-LOWTAG followed by a negated test for
+	       ;; NIL.  If we're going to have to test for NIL anyway,
+	       ;; we might as well do it explicitly and pick off the
+	       ;; answer.  -- CSR, 2004-07-14
+	       (list
+		(if (null x)
+		    (sxhash x) ; through DEFTRANSFORM
+		    (if (plusp depthoid)
+			(mix (sxhash-recurse (car x) (1- depthoid))
+			     (sxhash-recurse (cdr x) (1- depthoid)))
+			261835505)))
 	       (instance
 		(if (or (typep x 'structure-object) (typep x 'condition))
 		    (logxor 422371266

@@ -787,7 +787,7 @@
 (defknown hash-table-size (hash-table) index (flushable))
 (defknown hash-table-test (hash-table) symbol (foldable flushable))
 (defknown sxhash (t) (integer 0 #.sb!xc:most-positive-fixnum)
-  (foldable flushable))
+  (#-sb-xc-host foldable flushable))
 
 ;;;; from the "Arrays" chapter
 

@@ -103,18 +103,29 @@
 (deftransform sxhash ((x) (symbol))
   (if #+sb-xc-host nil #-sb-xc-host (constant-lvar-p x)
       (sxhash (lvar-value x))
-      ;; Cache the value of the symbol's sxhash in the symbol-hash slot.
-      '(let ((result (symbol-hash x)))
-	;; 0 marks uninitialized slot. We can't use negative values
-	;; for the uninitialized slots since NIL might be located so
-	;; high in memory on some platforms that its SYMBOL-HASH
-	;; (which contains NIL itself) is a negative fixnum.
-	(if (= 0 result)
-	    (let ((sxhash (%sxhash-simple-string (symbol-name x))))
-	      ;; We could do a (logior sxhash #x10000000) to ensure
-	      ;; that we never store a 0 in the slot. However, it's
-	      ;; such an unlikely event (1/5e8?) that it makes more
-	      ;; sense to optimize for the common case...
-	      (%set-symbol-hash x sxhash)
-	      sxhash)
-	    result))))
+      (if (csubtypep (lvar-type x) (specifier-type 'null))
+	  ;; FIXME: this isn't in fact as optimized as it could be;
+	  ;; this does a memory load, whereas (because we know the
+	  ;; layout of NIL) we could simply take the address of NIL
+	  ;; (or the contents of NULL-TN) and mask off the appropriate
+	  ;; bits, since SYMBOL-HASH of NIL is also NIL's CDR, which
+	  ;; is NIL.  -- CSR, 2004-07-14
+	  '(symbol-hash x)
+	  ;; Cache the value of the symbol's sxhash in the symbol-hash
+	  ;; slot.
+	  '(let ((result (symbol-hash x)))
+	    ;; 0 marks uninitialized slot. We can't use negative
+	    ;; values for the uninitialized slots since NIL might be
+	    ;; located so high in memory on some platforms that its
+	    ;; SYMBOL-HASH (which contains NIL itself) is a negative
+	    ;; fixnum.
+	    (if (= 0 result)
+		(let ((sxhash (%sxhash-simple-string (symbol-name x))))
+		  ;; We could do a (logior sxhash #x10000000) to
+		  ;; ensure that we never store a 0 in the
+		  ;; slot. However, it's such an unlikely event
+		  ;; (1/5e8?) that it makes more sense to optimize for
+		  ;; the common case...
+		  (%set-symbol-hash x sxhash)
+		  sxhash)
+		result)))))

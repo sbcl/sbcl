@@ -241,13 +241,18 @@
 
 ;;; NIL is both SYMBOL and LIST
 (dolist (fun '(sxhash sb-impl::psxhash))
-  (assert (= (funcall fun nil)
+  (assert (= (eval `(,fun nil))
+	     (funcall fun nil)
              (funcall (compile nil `(lambda (x)
                                       (declare (symbol x))
                                       (,fun x)))
                       nil)
              (funcall (compile nil `(lambda (x)
                                       (declare (list x))
+                                      (,fun x)))
+                      nil)
+             (funcall (compile nil `(lambda (x)
+				      (declare (null x))
                                       (,fun x)))
                       nil))))
 

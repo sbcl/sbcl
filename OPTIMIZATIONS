@@ -185,3 +185,8 @@ sbcl-0.8.12.30, this affects at least DUMP-OBJECT through
 COMPOUND-OBJECT-P, and (LABELS MAYBE-EMIT-MAKE-LOAD-FORMS GROVEL)
 through TYPEP UNBOXED-ARRAY, within the compiler itself.
 --------------------------------------------------------------------------------
+#18
+(lambda (x) (declare (null x)) (sxhash x)) goes through SYMBOL-HASH
+rather than either constant-folding or manipulating NIL-VALUE or
+NULL-TN directly.
+--------------------------------------------------------------------------------
