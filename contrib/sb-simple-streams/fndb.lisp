@@ -10,25 +10,59 @@
 
 ;; .../compiler/knownfun.lisp
 
-;; TODO: I suppose sbcl internals have sufficiently diverged from
-;; cmucl that this does not work after my primitive translation
-;; attempt.  This is used in the cmucl version to compute (via
-;; :derive-type arg to defknown) the return type of open.  For the
-;; time being, the new defknown form for open does not specify its
-;; return type.
-#+nil
+
+#||
+
+Paul Foley (private conversation, 2003-05-17):
+
+BTW, the RESULT-TYPE-OPEN-CLASS function in fndb.lisp is buggy.
+Here's a (smarter) replacement:
+
+;; .../compiler/knownfun.lisp
 (defun result-type-open-class (call)
   (declare (type sb-c::combination call))
-  (do ((args (sb-c::combination-args call) (cdr args)))
-      ((null args))
-    (let ((leaf (sb-c::ref-leaf (sb-c::continuation-use (car args)))))
-      (when (and (typep leaf 'sb-kernel:constant)
-		 (eq (sb-c::constant-value leaf) :class)
-		 (cdr args))
-	(let ((leaf (sb-c::ref-leaf (sb-c::continuation-use (cadr args)))))
-	  (return (if (typep leaf 'sb-kernel:constant)
-		      (find-class (sb-c::constant-value leaf) nil)
-		      nil)))))))
+  (let* ((not-set '#:not-set)
+	 (not-constant '#:not-constant)
+	 (direction not-set)
+	 (if-exists not-set)
+	 (if-does-not-exist not-set)
+	 (class not-set))
+    ;; find (the first occurence of) each interesting keyword argument
+    (do ((args (cdr (combination-args call)) (cddr args)))
+	((null args))
+      (macrolet ((maybe-set (var)
+		   `(when (and (eq ,var not-set) (cadr args))
+		      (if (constant-continuation-p (cadr args))
+			(setq ,var (continuation-value (cadr args)))
+			(setq ,var not-constant)))))
+	(case (continuation-value (car args))
+	  (:direction (maybe-set direction))
+	  (:if-exists (maybe-set if-exists))
+	  (:if-does-not-exist (maybe-set if-does-not-exist))
+	  (:class (maybe-set class)))))
+    ;; and set default values for any that weren't set above
+    (when (eq direction not-set) (setq direction :input))
+    (when (eq if-exists not-constant) (setq if-exists nil))
+    (when (eq if-does-not-exist not-constant) (set if-does-not-exist nil))
+    (when (or (eq class not-set) (eq class not-constant)) (setq class 'stream))
+    ;; now, NIL is a possible result only in the following cases:
+    ;;   direction is :probe or not-constant and :if-does-not-exist is not
+    ;;     :error
+    ;;   direction is :output or :io or not-constant and :if-exists is nil
+    ;;   :if-does-not-exist is nil
+    (if (or (and (or (eq direction :probe) (eq direction not-constant))
+		 (not (eq if-does-not-exist :error)))
+	    (and (or (eq direction :output) (eq direction :io)
+		     (eq direction not-constant))
+		 (eq if-exists nil))
+	    (eq if-does-not-exist nil))
+      (specifier-type `(or null ,class))
+      (specifier-type class))))
+
+TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
+
+||#
+
 
 (handler-bind ((error #'(lambda (condition) (declare (ignore condition))
                                 (continue))))

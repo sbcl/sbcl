@@ -248,13 +248,14 @@
 	(unless (and (< code 32) ctrl (svref ctrl code)
 		     (funcall (the (or symbol function) (svref ctrl code))
 			      stream char))
-	  (if (< ptr max)
-	      (progn
-		(setf (bref buffer ptr) code)
-		(incf ptr))
-	      (progn
-		(sc-flush-buffer stream t)
-		(setf ptr (sm buffpos stream)))))))))
+	  (unless (< ptr max)
+            ;; need to update buffpos before control leaves this
+            ;; function in any way
+            (setf (sm buffpos stream) ptr)
+            (sc-flush-buffer stream t)
+            (setf ptr (sm buffpos stream)))
+          (setf (bref buffer ptr) code)
+          (incf ptr))))))
 
 (declaim (ftype j-listen-fn sc-listen))
 (defun sc-listen (stream)
@@ -398,13 +399,13 @@
 	(unless (and (< code 32) ctrl (svref ctrl code)
 		     (funcall (the (or symbol function) (svref ctrl code))
 			      stream char))
-	  (if (< ptr max)
-	      (progn
-		(setf (bref buffer ptr) code)
-		(incf ptr))
-	      (progn
-		(dc-flush-buffer stream t)
-		(setf ptr (sm outpos stream)))))))))
+	  (unless (< ptr max)
+            (setf (sm outpos stream) ptr)
+            (dc-flush-buffer stream t)
+            (setf ptr (sm outpos stream)))
+          (setf (bref buffer ptr) code)
+          (incf ptr))
+        ))))
 
 (declaim (ftype j-listen-fn dc-listen))
 (defun dc-listen (stream)

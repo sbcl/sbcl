@@ -10,3 +10,6 @@
 
 - Implement string streams.
 
+- Make sure the code examples for stream encapsulation from Franz work
+
+- Test every single output function

@@ -8,11 +8,7 @@
 
 (in-package "SB-SIMPLE-STREAMS")
 
-;;;
-;;; BANNER ADS!!
-;;;
-
-(pushnew :sb-simple-stream *features*)
+;;; (pushnew :sb-simple-stream *features*)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   #+(or X86) (pushnew :little-endian *features*))

@@ -97,3 +97,36 @@
     (sb-bsd-sockets::connection-refused-error () t))
   t)
 
+(deftest write-read-large-sc-1
+  ;; Do write and read with more data than the buffer will hold
+  ;; (single-channel simple-stream)
+  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*))
+         (stream (make-instance 'file-simple-stream
+                                :filename file
+                                :direction :output))
+         (content (make-string (1+ (device-buffer-length stream))
+                               :initial-element #\x)))
+    (with-open-stream (s stream)
+      (write-string content s))
+    (with-open-stream (s (make-instance 'file-simple-stream
+                                        :filename file
+                                        :direction :input))
+      (prog1 (string= content (read-line s))
+        (delete-file file))))
+  t)
+
+(deftest write-read-large-dc-1
+  ;; Do write and read with more data than the buffer will hold
+  ;; (dual-channel simple-stream; we only have socket streams atm)
+  (handler-case
+   (let* ((stream (make-instance 'socket-simple-stream
+                                 :remote-host #(127 0 0 1)
+                                 :remote-port 7))
+          (content (make-string (1+ (device-buffer-length stream))
+                                :initial-element #\x)))
+     (with-open-stream (s stream)
+       (string= (prog1 (write-line content s) (finish-output s))
+                (read-line s))))
+   (sb-bsd-sockets::connection-refused-error () t))
+  t)
+
