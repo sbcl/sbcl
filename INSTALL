@@ -143,9 +143,9 @@ INSTALLING SBCL
   or extra debugging code.
 
   The preferred way to do this is by creating a file
-  "customize-target-features.lisp-expr", containing a lambda
-  expression which is applied to the default *FEATURES* set and which
-  returns the new *FEATURES* set, e.g.
+  "customize-target-features.lisp", containing a lambda expression
+  which is applied to the default *FEATURES* set and which returns the
+  new *FEATURES* set, e.g.
 
     (lambda (features)
       (flet ((enable (x)
