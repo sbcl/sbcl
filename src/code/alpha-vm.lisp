@@ -10,9 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-(defvar *number-of-signals* 64)
-(defvar *bits-per-word* 64)
 
 ;;; See x86-vm.lisp for a description of this.
 (define-alien-type os-context-t (struct os-context-t-struct))

@@ -280,7 +280,7 @@
   (dolist (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol))))
 
-(declaim (ftype (function (string) sb!vm:word)
+(declaim (ftype (function (string) (unsigned-byte #.sb!vm:n-machine-word-bits))
 		foreign-symbol-address-as-integer))
 
 

@@ -259,11 +259,11 @@
                     (:generator 20
                                 (multiple-value-bind (word extra)
 				    (floor index ,elements-per-word)
-                                  (inst ldl object
+                                  (inst ldl old
                                         (- (* (+ word vector-data-offset)
 					      n-word-bytes)
                                            other-pointer-lowtag)
-                                        old)
+                                        object)
                                   (unless (and (sc-is value immediate)
                                                (= (tn-value value)
 						  ,(1- (ash 1 bits))))

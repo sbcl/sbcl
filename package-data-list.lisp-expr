@@ -2086,7 +2086,7 @@ structure representations"
              "WEAK-POINTER-BROKEN-SLOT" "WEAK-POINTER-NEXT-SLOT"
              "WEAK-POINTER-SIZE" "WEAK-POINTER-WIDETAG"
 	     "WEAK-POINTER-VALUE-SLOT"
-             "WORD" "N-WORD-BITS" "N-WORD-BYTES"
+             "WORD" "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS"
 	     "WORD-REG-SC-NUMBER" "WORD-SHIFT"
              "ZERO-SC-NUMBER"))
 

@@ -127,3 +127,37 @@
 (define-vop (fast-char>/base-char base-char-compare)
   (:translate char>)
   (:variant :gt))
+
+(define-vop (base-char-compare/c)
+  (:args (x :scs (base-char-reg)))
+  (:arg-types base-char (:constant base-char))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:conditional)
+  (:info target not-p y)
+  (:policy :fast-safe)
+  (:note "inline constant comparison")
+  (:variant-vars cond)
+  (:generator 2
+    (ecase cond
+      (:eq (inst cmpeq x (sb!xc:char-code y) temp))
+      (:lt (inst cmplt x (sb!xc:char-code y) temp))
+      (:gt (inst cmple x (sb!xc:char-code y) temp)))
+    (if not-p
+	(if (eq cond :gt)
+	    (inst bne temp target)
+	    (inst beq temp target))
+        (if (eq cond :gt)
+	    (inst beq temp target)
+	    (inst bne temp target)))))
+
+(define-vop (fast-char=/base-char/c base-char-compare/c)
+  (:translate char=)
+  (:variant :eq))
+
+(define-vop (fast-char</base-char/c base-char-compare/c)
+  (:translate char<)
+  (:variant :lt))
+
+(define-vop (fast-char>/base-char/c base-char-compare/c)
+  (:translate char>)
+  (:variant :gt))

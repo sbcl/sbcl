@@ -8,6 +8,10 @@
 (def!constant n-word-bits 32
   "Number of bits per word where a word holds one lisp descriptor.")
 
+;;; the natural width of a machine word (as seen in e.g. register width,
+;;; address space)
+(def!constant n-machine-word-bits 32)
+
 (def!constant n-byte-bits 8
   "Number of bits per byte where a byte is the smallest addressable object.")
 

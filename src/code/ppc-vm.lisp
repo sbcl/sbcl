@@ -2,9 +2,6 @@
 ;;;
 (in-package "SB!VM")
 
-(defvar *number-of-signals* 64)
-(defvar *bits-per-word* 32)
-
 (define-alien-type os-context-t (struct os-context-t-struct))
 
 

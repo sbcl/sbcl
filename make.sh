@@ -124,7 +124,7 @@ sh make-target-contrib.sh || exit 1
 echo
 echo The build seems to have finished successfully. If you would like
 echo run more extensive tests on the new SBCL, you can try 
-echo "  cd tests && sh ./run-tests.sh."
+echo "  cd tests && sh ./run-tests.sh"
 echo "(but expect some failures on non-x86 platforms)."
 
 date
