@@ -57,6 +57,10 @@
 
 (let ((string "`(foobar a b ,c ,'(e f g) d ,@'(e f g) (h i j) ,@foo)"))
   (assert (equal (print (read-from-string string)) (read-from-string string))))
+    
+(let ((a '`(1 ,@a ,@b ,.c ,.d)))
+  (let ((*print-circle* t))
+    (assert (equal (read-from-string (write-to-string a)) a))))
 
 ;;; success
 (quit :unix-status 104)

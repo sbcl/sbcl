@@ -46,6 +46,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
        syntax.
     ** WITH-INPUT-FROM-STRING should only update the index place on
        normal termination.
+    ** Pretty-printing backquoted forms when *PRINT-CIRCLE* is true
+       works more reliably.
 
 changes in sbcl-0.8.19 relative to sbcl-0.8.18:
   * new port: SBCL now works in native 64-bit mode on x86-64/Linux

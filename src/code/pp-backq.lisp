@@ -83,9 +83,9 @@
     (backq-comma
      (write-char #\, stream))
     (backq-comma-at
-     (princ ",@" stream))
+     (write-string ",@" stream))
     (backq-comma-dot
-     (princ ",." stream)))
+     (write-string ",." stream)))
   ;; Ha!  an example of where the per-process specials for stream
   ;; attributes rather than per-stream actually makes life easier.
   ;; Since all of the attributes are shared in the dynamic state, we
