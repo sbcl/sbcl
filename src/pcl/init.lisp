@@ -190,7 +190,9 @@
       ;; Now check the supplied-initarg-names and the default initargs
       ;; against the total set that we know are legal.
       (doplist (key val) initargs
-	(unless (memq key legal)
+	(unless (or (memq key legal)
+		    ;; :ALLOW-OTHER-KEYS NIL gets here
+		    (eq key :allow-other-keys))
 	  (push key invalid-keys)))
       (when (and invalid-keys error-p)
 	(error 'initarg-error :class class :initargs invalid-keys)))

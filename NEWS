@@ -1704,6 +1704,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     ** side-effectful :DEFAULT-INITARGS have their side-effects
        propagated even in the ctor optimized implementation of
        MAKE-INSTANCE;
+    ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
