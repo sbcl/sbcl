@@ -130,7 +130,7 @@
 	   (let* ((name (leaf-source-name leaf))
 		  (name-tn (emit-constant name)))
 	     (if (policy node (zerop safety))
-		 (vop fast-symbol-value node block name-tn res)
+		 (vop symbol-value #+nil fast-symbol-value node block name-tn res)
 		 (vop symbol-value node block name-tn res)))))
       (functional
        (ir2-convert-closure node block leaf res))
@@ -142,7 +142,7 @@
 	    (aver (symbolp name))
 	    (let ((name-tn (emit-constant name)))
 	      (if unsafe
-		  (vop fast-symbol-value node block name-tn res)
+		  (vop symbol-value node block name-tn res)
 		  (vop symbol-value node block name-tn res))))
 	   (:global-function
 	    (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))

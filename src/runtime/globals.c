@@ -14,6 +14,8 @@
  */
 
 #include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "runtime.h"
 #include "sbcl.h"
@@ -28,9 +30,7 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-/* ALLOCATION_POINTER is more or less synonymous with RT, it seems.
- * Anyone want to do an RT port of sbcl?  
- */
+/* ALLOCATION_POINTER is x86 or RT.  Anyone want to do an RT port?   */
 
 #ifndef ALLOCATION_POINTER
 /* The Object Formerly Known As current_dynamic_space_free_pointer */
@@ -46,10 +46,13 @@ lispobj *current_auto_gc_trigger;
  * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
 lispobj *current_dynamic_space;
 
+pid_t parent_pid;
+
 void globals_init(void)
 {
     /* Space, stack, and free pointer vars are initialized by
      * validate() and coreparse(). */
+    current_control_frame_pointer = (lispobj *)0;
 
 #ifndef LISP_FEATURE_GENCGC 
     /* no GC trigger yet */
@@ -59,15 +62,5 @@ void globals_init(void)
     /* Set foreign function call active. */
     foreign_function_call_active = 1;
 
-    /* Initialize the current Lisp state. */
-#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
-    current_control_stack_pointer = (lispobj *)CONTROL_STACK_END;
-#else
-    current_control_stack_pointer = (lispobj *)CONTROL_STACK_START;
-#endif
-
-    current_control_frame_pointer = (lispobj *)0;
-#ifndef BINDING_STACK_POINTER
-    current_binding_stack_pointer = native_pointer(BINDING_STACK_START);
-#endif
+    parent_pid=getpid();
 }

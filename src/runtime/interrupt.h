@@ -19,9 +19,7 @@
  * Note: In CMU CL, this was 4096, but there was no explanation given,
  * and it's hard to see why we'd need that many nested interrupts, so
  * I've scaled it back to see what happens. -- WHN 20000730 */
-#define MAX_INTERRUPTS 256
-
-extern os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
+#define MAX_INTERRUPTS 8
 
 union interrupt_handler {
     lispobj lisp;

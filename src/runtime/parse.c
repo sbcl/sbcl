@@ -29,6 +29,7 @@
 #include "monitor.h"
 #include "arch.h"
 #include "search.h"
+#include "thread.h"
 
 static void skip_ws(char **ptr)
 {
@@ -243,7 +244,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
     /* Search static space. */
     headerptr = (lispobj *)STATIC_SPACE_START;
     count =
-	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
+	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
 	(lispobj *)STATIC_SPACE_START;
     if (search_for_symbol(name, &headerptr, &count)) {
         *result = make_lispobj(headerptr,OTHER_POINTER_LOWTAG);
@@ -258,7 +259,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
 	(lispobj *)DYNAMIC_SPACE_START;
 #else
     count =
-	(lispobj *)SymbolValue(ALLOCATION_POINTER) -
+	(lispobj *)SymbolValue(ALLOCATION_POINTER,0) -
 	(lispobj *)DYNAMIC_SPACE_START;
 #endif
     if (search_for_symbol(name, &headerptr, &count)) {
@@ -302,6 +303,7 @@ parse_regnum(char *s)
 lispobj parse_lispobj(ptr)
 char **ptr;
 {
+    struct thread *thread=arch_os_get_current_thread();
     char *token = parse_token(ptr);
     long pointer;
     lispobj result;
@@ -315,14 +317,14 @@ char **ptr;
 	    int regnum;
 	    os_context_t *context;
 
-	    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+	    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
 
 	    if (free == 0) {
 		printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
 		throw_to_monitor();
 	    }
 
-	    context = lisp_interrupt_contexts[free - 1];
+	    context = thread->interrupt_contexts[free - 1];
 
 	    regnum = parse_regnum(token);
 	    if (regnum < 0) {

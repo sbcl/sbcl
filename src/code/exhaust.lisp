@@ -11,6 +11,14 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-(define-alien-routine "protect_control_stack_guard_page"
-    sb!alien:int (protect-p sb!alien:int))
+(define-alien-routine 
+    ("protect_control_stack_guard_page" %protect-control-stack-guard-page)
+    sb!alien:int 
+  (pid sb!alien:int) (protect-p sb!alien:int))
+
+(defun protect-control-stack-guard-page (protect-p)
+  #+nil 
+  (%protect-control-stack-guard-page (current-thread-id) (if protect-p 1 0)))
+
+
 

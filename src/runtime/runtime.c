@@ -16,11 +16,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sched.h>
 
 #if defined(SVR4) || defined(__linux__)
 #include <time.h>
@@ -43,6 +47,7 @@
 #include "core.h"
 #include "save.h"
 #include "lispregs.h"
+#include "thread.h"
 
 #ifdef irix
 #include <string.h>
@@ -113,6 +118,8 @@ alloc_string_list(char *array_ptr[])
     }
 }
 
+int gc_thread_pid;
+
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -125,6 +132,8 @@ main(int argc, char *argv[], char *envp[])
     boolean end_runtime_options = 0;
 
     lispobj initial_function;
+
+    sigset_t sigset;
 
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
@@ -262,35 +271,79 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 
     gc_initialize_pointers();
 
-#ifdef BINDING_STACK_POINTER
-    SetSymbolValue(BINDING_STACK_POINTER, BINDING_STACK_START);
-#endif
-
     interrupt_init();
 
     arch_install_interrupt_handlers();
     os_install_interrupt_handlers();
 
-#ifdef PSEUDO_ATOMIC_ATOMIC
-    /* Turn on pseudo atomic for when we call into Lisp. */
-    SHOW("turning on pseudo atomic");
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1));
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0));
-#endif
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");
-    SetSymbolValue(POSIX_ARGV, alloc_string_list(argv));
+    SetSymbolValue(POSIX_ARGV, alloc_string_list(argv),0);
 
     /* Install a handler to pick off SIGINT until the Lisp system gets
      * far enough along to install its own handler. */
     sigint_init();
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
-    funcall0(initial_function);
+    create_thread(initial_function);
+    fprintf(stderr,"started lisp thread\n");
+    gc_thread_pid=getpid();
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGCHLD);
+    sigaddset(&sigset, SIGSEGV);
+    sigaddset(&sigset, SIGTERM);
+    sigprocmask(SIG_BLOCK,&sigset,0);
+    while(all_threads) {
+	int signal;
+	siginfo_t info;
+	fprintf(stderr,"parent thread waiting for a signal\n");
+	sigwaitinfo(&sigset,&info);
+	fprintf(stderr,"parent thread got signal %d %x, maybe_gc_pending=%d\n",info.si_signo ,info.si_code , maybe_gc_pending);
+	if((info.si_signo==SIGTERM) && 
+	   ((info.si_code==CLD_EXITED) ||
+	    (info.si_code==CLD_KILLED) ||
+	    (info.si_code==CLD_DUMPED))) {
+	    struct thread *th=find_thread_by_pid(info.si_pid);
+	    fprintf(stderr,"need to reap child %d %x\n",info.si_pid,th);
+	    if(th) destroy_thread(th);
+	}
+	if(maybe_gc_pending) {
+	    /* someone asked for a garbage collection */
+	    int pa_thread;
+	    struct thread *th;
+	    do {
+		pa_thread=0;
+		/* FIXME this is full of races, but it shows in
+		 * outline what needs doing */
+		for_each_thread(th) {
+		    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) {
+			pa_thread++;
+			SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,
+					 make_fixnum(1),th);
 
-    /* initial_function() is not supposed to return. */
-    lose("Lisp initial_function gave up control.");
-    return 0; /* dummy value: return something */
+		    } else {
+			int status;
+			fprintf(stderr,"attaching to %d ...",th->pid);
+			if(ptrace(PTRACE_ATTACH,th->pid,0,0))
+			    perror("PTRACE_ATTACH");
+			sched_yield();
+			do {
+			    waitpid(th->pid,&status,__WALL);
+			    fprintf(stderr,"%d %d %d\n", 
+				    status,WIFSTOPPED(status),
+				    WSTOPSIG(status));
+			}while (WIFSTOPPED(status)==0);
+		    }
+		}
+	    } while(pa_thread);
+	    /* do the GC */
+	    collect_garbage(maybe_gc_pending-1);
+	    maybe_gc_pending=0;
+	    for_each_thread(th) 
+		if(ptrace(PTRACE_DETACH,th->pid,0,0))
+		    perror("PTRACE_DETACH");
+	}
+    }
 }
 

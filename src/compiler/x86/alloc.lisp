@@ -258,5 +258,7 @@
       (inst shr temp 1)
       (inst and temp #xfffffffc)
       (storew temp result symbol-hash-slot other-pointer-lowtag)
+      (inst xor temp temp)
+      (storew temp result symbol-tls-index-slot other-pointer-lowtag)
       (storew nil-value result symbol-plist-slot other-pointer-lowtag)
       (storew nil-value result symbol-package-slot other-pointer-lowtag))))

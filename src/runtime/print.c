@@ -31,6 +31,10 @@
 #include "vars.h"
 #include "os.h"
 
+#include "genesis/static-symbols.h"
+#include "gencgc-alloc-region.h" /* genesis/thread.h needs this */
+#include "primitive-objects.h"
+
 static int max_lines = 20, cur_lines = 0;
 static int max_depth = 5, brief_depth = 2, cur_depth = 0;
 static int max_length = 5;
@@ -411,7 +415,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
  * on the values in sbcl.h (or perhaps be generated automatically
  * by GENESIS as part of sbcl.h). */
 static char *symbol_slots[] = {"value: ", "unused: ",
-    "plist: ", "name: ", "package: ", NULL};
+    "plist: ", "name: ", "package: ", "tls-index: " , NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
 static char *code_slots[] = {"words: ", "entry: ", "debug: ", NULL};

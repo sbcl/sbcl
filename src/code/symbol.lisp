@@ -35,8 +35,10 @@
   (about-to-modify-symbol-value symbol)
   (%set-symbol-value symbol new-value))
 
-(defun %set-symbol-value (symbol new-value)
-  (%set-symbol-value symbol new-value))
+;;; can't do this yet, the appropriate vop only gets defined in
+;;; compiler/target/cell, 400 lines hence
+;;;(defun %set-symbol-value (symbol new-value)
+;;;  (%set-symbol-value symbol new-value))
 
 (defun makunbound (symbol)
   #!+sb-doc
@@ -193,7 +195,7 @@
   (setq new-symbol (make-symbol (symbol-name symbol)))
   (when copy-props
     (%set-symbol-value new-symbol
-		       (%primitive sb!c:fast-symbol-value symbol))
+		       (%primitive #+nil sb!c:fast-symbol-value sb!vm::symbol-value symbol))
     (setf (symbol-plist new-symbol)
 	  (copy-list (symbol-plist symbol)))
     (when (fboundp symbol)

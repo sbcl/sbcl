@@ -99,14 +99,14 @@ static int pending_signal = 0;
 static siginfo_t pending_info;
 static sigset_t pending_mask;
 
-static boolean maybe_gc_pending = 0;
+boolean maybe_gc_pending = 0;
 
 /*
  * utility routines used by various signal handlers
  */
 
 void 
-build_fake_control_stack_frames(os_context_t *context)
+build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 {
 #ifndef LISP_FEATURE_X86
     
@@ -160,6 +160,7 @@ void
 fake_foreign_function_call(os_context_t *context)
 {
     int context_index;
+    struct thread *thread=arch_os_get_current_thread();
 
     /* Get current Lisp state from context. */
 #ifdef reg_ALLOC
@@ -176,11 +177,11 @@ fake_foreign_function_call(os_context_t *context)
 	(lispobj *)(*os_context_register_addr(context, reg_BSP));
 #endif
 
-    build_fake_control_stack_frames(context);
+    build_fake_control_stack_frames(thread,context);
 
     /* Do dynamic binding of the active interrupt context index
      * and save the context in the context array. */
-    context_index = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+    context_index = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
     /* FIXME: Ick! Why use abstract "make_fixnum" in some places if
      * you're going to convert from fixnum by bare >>2 in other
      * places? Use fixnum_value(..) here, and look for other places
@@ -191,9 +192,9 @@ fake_foreign_function_call(os_context_t *context)
     }
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
-		  make_fixnum(context_index + 1));
+		  make_fixnum(context_index + 1),thread);
 
-    lisp_interrupt_contexts[context_index] = context;
+    thread->interrupt_contexts[context_index] = context;
 
     /* no longer in Lisp now */
     foreign_function_call_active = 1;
@@ -202,6 +203,7 @@ fake_foreign_function_call(os_context_t *context)
 void
 undo_fake_foreign_function_call(os_context_t *context)
 {
+    struct thread *thread=arch_os_get_current_thread();
     /* Block all blockable signals. */
     sigset_t block;
     sigemptyset(&block);
@@ -218,7 +220,7 @@ undo_fake_foreign_function_call(os_context_t *context)
      * perhaps yes, unbind_to_here() really would be clearer and less
      * fragile.. */
     /* dan (2001.08.10) thinks the above supposition is probably correct */
-    unbind();
+    unbind(thread);
 
 #ifdef reg_ALLOC
     /* Put the dynamic space free pointer back into the context. */
@@ -280,11 +282,10 @@ interrupt_handle_pending(os_context_t *context)
 #ifndef __i386__
     boolean were_in_lisp = !foreign_function_call_active;
 #endif
-
-    SetSymbolValue(INTERRUPT_PENDING, NIL);
+    struct thread *thread=arch_os_get_current_thread();
+    SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
     if (maybe_gc_pending) {
-	maybe_gc_pending = 0;
 #ifndef __i386__
 	if (were_in_lisp)
 #endif
@@ -444,6 +445,7 @@ static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
+    struct thread *thread=arch_os_get_current_thread();
 
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
@@ -452,7 +454,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     /* see comments at top of code/signal.lisp for what's going on here
      * with INTERRUPTS_ENABLED/INTERRUPT_HANDLE_NOW 
      */
-    if (SymbolValue(INTERRUPTS_ENABLED) == NIL) {
+    if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
 
 	/* FIXME: This code is exactly the same as the code in the
 	 * other leg of the if(..), and should be factored out into
@@ -463,7 +465,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 	       os_context_sigmask_addr(context),
 	       sizeof(sigset_t));
 	sigaddset_blockable(os_context_sigmask_addr(context));
-        SetSymbolValue(INTERRUPT_PENDING, T);
+        SetSymbolValue(INTERRUPT_PENDING, T,thread);
 
     } else if (
 #ifndef __i386__
@@ -521,16 +523,17 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
+    struct thread *th=arch_os_get_current_thread();
     /* note the os_context hackery here.  When the signal handler returns, 
      * it won't go back to what it was doing ... */
-    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE && 
-       addr<(void *)(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
+    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE(th) && 
+       addr<(void *)(CONTROL_STACK_GUARD_PAGE(th)+os_vm_page_size)) {
 	void *fun;
 	void *code;
-	
+       /* fprintf(stderr, "hit end of control stack\n");  */
 	/* we hit the end of the control stack.  disable protection
 	 * temporarily so the error handler has some headroom */
-	protect_control_stack_guard_page(0);
+       protect_control_stack_guard_page(th->pid,0L);
 	
 	fun = (void *)
 	    native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
@@ -538,7 +541,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 
 	/* Build a stack frame showing `interrupted' so that the
 	 * user's backtrace makes (as much) sense (as usual) */
-	build_fake_control_stack_frames(context);
+       build_fake_control_stack_frames(th,context);
 	/* signal handler will "return" to this error-causing function */
 	*os_context_pc_addr(context) = code;
 #ifdef LISP_FEATURE_X86
@@ -648,7 +651,9 @@ struct low_level_signal_handler_state {
 void
 uninstall_low_level_interrupt_handlers_atexit(void)
 {
+#if 0
     int signal;
+
     for (signal = 0; signal < NSIG; ++signal) {
 	struct low_level_signal_handler_state
 	    *old_low_level_signal_handler_state =
@@ -661,7 +666,13 @@ uninstall_low_level_interrupt_handlers_atexit(void)
 	    sigaction(signal, &sa, NULL);
 	}
     }
+#endif
 }
+
+/* FIXME the "undoable" below is currently a lie.  We don't want to 
+ * remove any signal handlers while there are still >0 threads left, 
+ * so that atexit thing has been disabled for the moment
+ */
 
 /* Undoably install a special low-level handler for signal; or if
  * handler is SIG_DFL, remove any special handling for signal.
@@ -695,17 +706,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    if(signal==SIG_MEMORY_FAULT) {
-	stack_t sigstack;
-	sigstack.ss_sp=(void *) ALTERNATE_SIGNAL_STACK_START;
-	sigstack.ss_flags=0;
-	sigstack.ss_size = SIGSTKSZ;
-	sigaltstack(&sigstack,0);
-	sa.sa_flags|=SA_ONSTACK;
-    }
+    if(signal==SIG_MEMORY_FAULT) sa.sa_flags|= SA_ONSTACK;
 #endif
     
     /* In the case of interrupt handlers which are modified more than
@@ -755,7 +756,6 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 	sigemptyset(&sa.sa_mask);
 	sigaddset_blockable(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
-
 	sigaction(signal, &sa, NULL);
     }
 

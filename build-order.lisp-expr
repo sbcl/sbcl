@@ -508,6 +508,7 @@
  ("src/compiler/early-aliencomp")
  ("src/compiler/target/c-call")
  ("src/compiler/target/cell")
+ ("src/code/late-symbol" :not-host)
  ("src/compiler/target/values")
  ("src/compiler/target/alloc")
  ("src/compiler/target/call")
@@ -601,6 +602,7 @@
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
+ ("src/code/target-thread"     :not-host)
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
 

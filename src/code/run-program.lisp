@@ -284,21 +284,6 @@
 ;;; list of handlers installed by RUN-PROGRAM
 (defvar *handlers-installed* nil)
 
-#+FreeBSD
-(define-alien-type nil
-  (struct sgttyb
-	  (sg-ispeed sb-alien:char)	; input speed
-	  (sg-ospeed sb-alien:char)	; output speed
-	  (sg-erase sb-alien:char)	; erase character
-	  (sg-kill sb-alien:char)	; kill character
-	  (sg-flags sb-alien:short)))	; mode flags
-#+OpenBSD
-(define-alien-type nil
-  (struct sgttyb
-	  (sg-four sb-alien:int)
-	  (sg-chars (array sb-alien:char 4))
-	  (sg-flags sb-alien:int)))
-
 ;;; Find an unused pty. Return three values: the file descriptor for
 ;;; the master side of the pty, the file descriptor for the slave side
 ;;; of the pty, and the name of the tty device for the slave side.
@@ -315,34 +300,6 @@
 					      sb-unix:o_rdwr
 					      #o666)))
 	    (when slave-fd
-	      ;; comment from classic CMU CL:
-	      ;;   Maybe put a vhangup here?
-	      ;;
-	      ;; FIXME: It seems as though this logic should be in
-	      ;; OPEN-PTY, not FIND-A-PTY (both from the comments
-	      ;; documenting DEFUN FIND-A-PTY, and from the
-	      ;; connotations of the function names).
-	      ;;
-	      ;; FIXME: It would be nice to have a note, and/or a pointer
-	      ;; to some reference material somewhere, explaining
-	      ;; why we need this on *BSD and not on Linux.
-              #+bsd
-	      (sb-alien:with-alien ((stuff (sb-alien:struct sgttyb)))
-		(let ((sap (sb-alien:alien-sap stuff)))
-		  (sb-unix:unix-ioctl slave-fd sb-unix:TIOCGETP sap)
-		  (setf (sb-alien:slot stuff 'sg-flags)
-			;; This is EVENP|ODDP, the same numeric code
-			;; both on FreeBSD and on OpenBSD. -- WHN 20000929
-			#o300) ; EVENP|ODDP
-		  (sb-unix:unix-ioctl slave-fd sb-unix:TIOCSETP sap)
-		  (sb-unix:unix-ioctl master-fd sb-unix:TIOCGETP sap)
-		  (setf (sb-alien:slot stuff 'sg-flags)
-			(logand (sb-alien:slot stuff 'sg-flags)
-				;; This is ~ECHO, the same numeric
-				;; code both on FreeBSD and on OpenBSD.
-				;; -- WHN 20000929
-				(lognot 8))) ; ~ECHO
-		  (sb-unix:unix-ioctl master-fd sb-unix:TIOCSETP sap)))
 	      (return-from find-a-pty
 		(values master-fd
 			slave-fd

@@ -49,17 +49,6 @@
   (- (* sb!vm::*read-only-space-free-pointer* sb!vm:n-word-bytes)
      sb!vm:read-only-space-start))
 
-(defun control-stack-usage ()
-  #!-stack-grows-downward-not-upward
-  (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-     sb!vm:control-stack-start)
-  #!+stack-grows-downward-not-upward
-  (- sb!vm:control-stack-end
-     (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
-
-(defun binding-stack-usage ()
-  (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
-     sb!vm:binding-stack-start))
 
 ;;;; ROOM
 
@@ -67,8 +56,8 @@
   (format t "Dynamic space usage is:   ~10:D bytes.~%" (dynamic-usage))
   (format t "Read-only space usage is: ~10:D bytes.~%" (read-only-space-usage))
   (format t "Static space usage is:    ~10:D bytes.~%" (static-space-usage))
-  (format t "Control stack usage is:   ~10:D bytes.~%" (control-stack-usage))
-  (format t "Binding stack usage is:   ~10:D bytes.~%" (binding-stack-usage))
+  (format t "Dunno Control stack usage~%")
+  (format t "Dunno Binding stack usage~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
 	  *gc-inhibit*))
 
@@ -280,10 +269,17 @@ function should notify the user that the system has finished GC'ing.")
 
 (sb!alien:define-alien-routine clear-auto-gc-trigger sb!alien:void)
 
+(def-c-var-frob gc-thread-pid "gc_thread_pid")
+
+(defun other-thread-collect-garbage (gen)
+  (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
+	(1+ gen))
+  (sb!unix:unix-kill (gc-thread-pid) 11))
+
 ;;; This variable contains the function that does the real GC. This is
 ;;; for low-level GC experimentation. Do not touch it if you do not
 ;;; know what you are doing.
-(defvar *internal-gc* #'collect-garbage)
+(defvar *internal-gc* #'other-thread-collect-garbage)
 
 ;;;; SUB-GC
 
@@ -300,6 +296,13 @@ function should notify the user that the system has finished GC'ing.")
 ;;; is not greater than *GC-TRIGGER*.
 ;;;
 ;;; For GENCGC all generations < GEN will be GC'ed.
+
+;;; XXX need (1) some kind of locking to ensure that only one thread
+;;; at a time is trying to GC, (2) to look at all these specials and
+;;; work out how much of this "do we really need to GC now?" crap is
+;;; actually necessary: I think we actually end up GCing every time we
+;;; hit this code
+
 (defun sub-gc (&key force-p (gen 0))
   (/show0 "entering SUB-GC")
   (unless *already-maybe-gcing*
@@ -349,17 +352,7 @@ function should notify the user that the system has finished GC'ing.")
 		   ;; triggered GC could've done a fair amount of
 		   ;; consing.)
 		   (pre-internal-gc-dynamic-usage (dynamic-usage))
-		   (ignore-me
-		    #!-gencgc (funcall *internal-gc*)
-		    ;; FIXME: This EQ test is pretty gross. Among its other
-		    ;; nastinesses, it looks as though it could break if we
-		    ;; recompile COLLECT-GARBAGE. We should probably just
-		    ;; straighten out the interface so that all *INTERNAL-GC*
-		    ;; functions accept a GEN argument (and then the
-		    ;; non-generational ones just ignore it).
-		    #!+gencgc (if (eq *internal-gc* #'collect-garbage)
-				  (funcall *internal-gc* gen)
-				  (funcall *internal-gc*)))
+		   (ignore-me (funcall *internal-gc* gen))
 		   (post-gc-dynamic-usage (dynamic-usage))
 		   (n-bytes-freed (- pre-internal-gc-dynamic-usage
 				     post-gc-dynamic-usage))

@@ -163,7 +163,7 @@
   (:translate binding-stack-pointer-sap)
   (:policy :fast-safe)
   (:generator 1
-    (load-symbol-value int *binding-stack-pointer*)))
+    (load-tl-symbol-value int *binding-stack-pointer*)))
 
 (defknown (setf binding-stack-pointer-sap)
     (system-area-pointer) system-area-pointer ())
@@ -176,7 +176,7 @@
   (:translate (setf binding-stack-pointer-sap))
   (:policy :fast-safe)
   (:generator 1
-    (store-symbol-value new-value *binding-stack-pointer*)
+    (store-tl-symbol-value new-value *binding-stack-pointer*)
     (move int new-value)))
 
 (define-vop (control-stack-pointer-sap)
@@ -272,6 +272,21 @@
   (:translate sb!unix::receive-pending-interrupt)
   (:generator 1
     (inst break pending-interrupt-trap)))
+
+(defknown current-thread-offset-sap ((unsigned-byte 32))  
+  system-area-pointer (flushable))
+
+(define-vop (current-thread-offset-sap)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:args (n :scs (unsigned-reg) :target sap))
+  (:arg-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst gs-segment-prefix)
+    (inst mov sap (make-ea :dword :disp 0
+			   :index n :scale 4))))
 
 (define-vop (halt)
   (:generator 1

@@ -142,7 +142,6 @@ struct thread *create_thread(lispobj initial_function) {
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
 	      (((getpid()!=parent_pid)?(CLONE_SIGHAND|CLONE_PARENT):0)
 	       |SIGTERM|CLONE_VM),th);
-    fprintf(stderr,"child pid is %d\n",kid_pid);
     if(kid_pid<=0) goto cleanup;
 #else
 #error this stuff presently only works on x86 Linux
@@ -154,7 +153,6 @@ struct thread *create_thread(lispobj initial_function) {
      * (Access to this function is supposed to be serialised anyway
      * though, for the all_threads manipulation) */
     protect_control_stack_guard_page(th->pid,1);
-    fprintf(stderr,"all_threads,th = 0x%x, 0x%x\n",all_threads,th);
     th->pid=kid_pid;		/* child will not start until this is set */
     return th->pid;
  cleanup:

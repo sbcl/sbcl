@@ -15,7 +15,7 @@
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
-#define QSHOW 0 /* Enable low-level debugging output? */
+#define QSHOW 1 /* Enable low-level debugging output? */
 #if QSHOW
 #define FSHOW(args) fprintf args
 #define SHOW(string) FSHOW((stderr, "/%s\n", string))
@@ -102,19 +102,15 @@ native_pointer(lispobj obj)
 /* Too bad ANSI C doesn't define "bool" as C++ does.. */
 typedef int boolean;
 
-/* FIXME: There seems to be no reason that SymbolValue, SetSymbolValue,
- * and SymbolFunction can't be defined as (possibly inline) functions
- * instead of macros. */
+/* FIXME: There seems to be no reason that SymbolFunction can't be
+ * defined as (possibly inline) functions instead of macros. */
 
-#define SymbolValue(sym) \
-    (((struct symbol *)((sym)-OTHER_POINTER_LOWTAG))->value)
-#define SetSymbolValue(sym,val) \
-    (((struct symbol *)((sym)-OTHER_POINTER_LOWTAG))->value = (val))
-
+static inline lispobj SymbolValue(u32 sym, void *thread);
+static inline void SetSymbolValue(u32 sym, lispobj val, void *thread);
 /* This only works for static symbols. */
 /* FIXME: should be called StaticSymbolFunction, right? */
 #define SymbolFunction(sym) \
-    (((struct fdefn *)(native_pointer(SymbolValue(sym))))->fun)
+    (((struct fdefn *)(native_pointer(SymbolValue(sym,0))))->fun)
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it

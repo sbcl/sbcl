@@ -1,5 +1,6 @@
 /*
- * allocation routines
+ * allocation routines for C code.  For allocation done by Lisp look 
+ * instead at src/compiler/target/alloc.lisp and .../macros.lisp
  */
 
 /*
@@ -13,13 +14,20 @@
  * files for more information.
  */
 
+#include <stdio.h>
+#include <string.h>
+
 #include "runtime.h"
+#include "os.h"
 #include "sbcl.h"
 #include "alloc.h"
 #include "globals.h"
 #include "gc.h"
-#include <stdio.h>
-#include <string.h>
+#include "thread.h"
+#include "genesis/vector.h"
+#include "genesis/cons.h"
+#include "genesis/bignum.h"
+#include "genesis/sap.h"
 
 #define GET_FREE_POINTER() dynamic_space_free_pointer
 #define SET_FREE_POINTER(new_value) \
@@ -32,9 +40,26 @@
 
 #if defined LISP_FEATURE_GENCGC
 extern lispobj *alloc(int bytes);
+lispobj *
+pa_alloc(int bytes) 
+{
+    lispobj *result=0;
+    struct thread *th=arch_os_get_current_thread();
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
+    result=alloc(bytes);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)) 
+	/* even if we gc at this point, the new allocation will be
+	 * protected from being moved, because result is on the c stack
+	 * and points to it */
+	do_pending_interrupt(); 
+    return result; 
+}
+
 #else
 static lispobj *
-alloc(int bytes)
+pa_alloc(int bytes)
 {
     char *result;
 
@@ -53,12 +78,13 @@ alloc(int bytes)
 }
 #endif
 
+
 lispobj *
 alloc_unboxed(int type, int words)
 {
     lispobj *result;
 
-    result = alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)));
+    result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)));
     *result = (lispobj) (words << N_WIDETAG_BITS) | type;
     return result;
 }
@@ -69,7 +95,7 @@ alloc_vector(int type, int length, int size)
     struct vector *result;
 
     result = (struct vector *)
-      alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)));
+      pa_alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)));
 
     result->header = type;
     result->length = make_fixnum(length);
@@ -80,7 +106,7 @@ alloc_vector(int type, int length, int size)
 lispobj
 alloc_cons(lispobj car, lispobj cdr)
 {
-    struct cons *ptr = (struct cons *)alloc(ALIGNED_SIZE(sizeof(struct cons)));
+    struct cons *ptr = (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)));
 
     ptr->car = car;
     ptr->cdr = cdr;

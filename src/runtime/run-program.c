@@ -23,6 +23,34 @@
 #include <unistd.h>
 #endif
 
+#include <sys/ioctl.h>
+#include <termios.h>
+
+
+/* borrowed from detachtty's detachtty.c, in turn borrowed from APUE
+ * example code found at
+ * http://www.yendor.com/programming/unix/apue/pty/main.c
+
+-brkint 
+
+ */
+
+int set_noecho(int fd) 
+{
+    struct termios  stermios;
+    
+    if (tcgetattr(fd, &stermios) < 0) return 0;
+    
+    stermios.c_lflag &= ~(  ECHO | /* ECHOE |  ECHOK | */  ECHONL);
+    stermios.c_oflag |= (ONLCR); 
+    stermios.c_iflag &= ~(BRKINT);
+    stermios.c_iflag |= (ICANON|ICRNL); 
+
+    stermios.c_cc[VERASE]=0177;
+    if (tcsetattr(fd, TCSANOW, &stermios) < 0) return 0;
+    return 1;
+}
+
 int spawn(char *program, char *argv[], char *envp[], char *pty_name,
 	  int stdin, int stdout, int stderr)
 {
@@ -50,14 +78,13 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
 	    close(fd);
 	}
 #endif
-
 	fd = open(pty_name, O_RDWR, 0);
 	dup2(fd, 0);
+	set_noecho(0);
 	dup2(fd, 1);
 	dup2(fd, 2);
 	close(fd);
-    }
-
+    } else{
     /* Set up stdin, stdout, and stderr */
     if (stdin >= 0)
 	dup2(stdin, 0);
@@ -65,7 +92,7 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
 	dup2(stdout, 1);
     if (stderr >= 0)
 	dup2(stderr, 2);
-
+    }
     /* Close all other fds. */
 #ifdef SVR4
     for (fd = sysconf(_SC_OPEN_MAX)-1; fd >= 3; fd--)

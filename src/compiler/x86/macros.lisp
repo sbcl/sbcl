@@ -84,6 +84,27 @@
 			   (- other-pointer-lowtag)))
 	 ,reg))
 
+(defmacro load-tl-symbol-value (reg symbol)
+  `(progn
+    (inst mov ,reg
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst gs-segment-prefix)
+    (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
+
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(progn
+    (inst mov ,temp
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst gs-segment-prefix)
+    (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
 
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
@@ -145,52 +166,6 @@
 	   (unless (and (tn-p size) (location= alloc-tn size))
 	     (inst mov dst-tn size))))
     (let ((alloc-tn-offset (tn-offset alloc-tn)))
-      ;; FIXME: All these (MAKE-FIXUP (EXTERN-ALIEN-NAME "foo") :FOREIGN)
-      ;; expressions should be moved into MACROLET ((ALIEN-FIXUP ..)),
-      ;; and INST CALL (MAKE-FIXUP ..) should become CALL-ALIEN-FIXUP.
-      (if (and #!+gencgc t #!-gencgc nil
-	       *maybe-use-inline-allocation*
-	       (or (null inline) (policy inline (>= speed space))))
-	  ;; Inline allocation with GENCGC.
-	  (let ((ok (gen-label)))
-	    ;; Load the size first so that the size can be in the same
-	    ;; register as alloc-tn.
-	    (load-size alloc-tn size)
-	    (inst add alloc-tn
-		  (make-fixup (extern-alien-name "current_region_free_pointer")
-			      :foreign))
-	    (inst cmp alloc-tn
-		  (make-fixup (extern-alien-name "current_region_end_addr")
-			      :foreign))
-	    (inst jmp :be OK)
-	    ;; Dispatch to the appropriate overflow routine. There is a
-	    ;; routine for each destination.
-	    ;; FIXME: Could we use an alist here instead of an ECASE with lots
-	    ;; of duplicate code? (and similar question for next ECASE, too)
-	    (ecase alloc-tn-offset
-	      (#.eax-offset ;; FIXME: Why the #\# #\.?
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_eax")
-				      :foreign)))
-	      (#.ecx-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_ecx")
-				      :foreign)))
-	      (#.edx-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_edx")
-				      :foreign)))
-	      (#.ebx-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_ebx")
-				      :foreign)))
-	      (#.esi-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_esi")
-				      :foreign)))
-	      (#.edi-offset
-	       (inst call (make-fixup (extern-alien-name "alloc_overflow_edi")
-				      :foreign))))
-	    (emit-label ok)
-	    (inst xchg (make-fixup
-			(extern-alien-name "current_region_free_pointer")
-			:foreign)
-		  alloc-tn))
 	  ;; C call to allocate via dispatch routines. Each
 	  ;; destination has a special entry point. The size may be a
 	  ;; register or a constant.
@@ -254,7 +229,7 @@
 	       (t
 		(load-size edi-tn size)
 		(inst call (make-fixup (extern-alien-name "alloc_to_edi")
-				       :foreign)))))))))
+				   :foreign))))))))
   (values))
 
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
@@ -345,13 +320,6 @@
 
 ;;;; PSEUDO-ATOMIC
 
-;;; FIXME: This should be a compile-time option, not a runtime option. Doing it
-;;; at runtime is bizarre. As I understand it, the default should definitely be
-;;; to have pseudo-atomic behavior, but for a performance-critical program
-;;; which is guaranteed not to have asynchronous exceptions, it could be worth
-;;; something to compile with :SB-NO-PSEUDO-ATOMIC.
-(defvar *enable-pseudo-atomic* t)
-
 ;;; FIXME: *PSEUDO-ATOMIC-FOO* could be made into *PSEUDO-ATOMIC-BITS*,
 ;;; set with a single operation and cleared with SHR *PSEUDO-ATOMIC-BITS*,-2;
 ;;; the ATOMIC bit is bit 0, the INTERRUPTED bit is bit 1, and you check
@@ -362,47 +330,22 @@
 (defmacro pseudo-atomic (&rest forms)
   (let ((label (gensym "LABEL-")))
     `(let ((,label (gen-label)))
-       (when *enable-pseudo-atomic*
-	 ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
-	 ;; something. (perhaps SVLB, for static variable low byte)
-	 (inst mov (make-ea :byte :disp (+ nil-value
-					   (static-symbol-offset
-					    '*pseudo-atomic-interrupted*)
-					   (ash symbol-value-slot word-shift)
-					   ;; FIXME: Use mask, not minus, to
-					   ;; take out type bits.
-					   (- other-pointer-lowtag)))
-	       0)
-	 (inst mov (make-ea :byte :disp (+ nil-value
-					   (static-symbol-offset
-					    '*pseudo-atomic-atomic*)
-					   (ash symbol-value-slot word-shift)
-					   (- other-pointer-lowtag)))
-	       (fixnumize 1)))
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :byte 
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0) 
        ,@forms
-       (when *enable-pseudo-atomic*
-	 (inst mov (make-ea :byte :disp (+ nil-value
-					   (static-symbol-offset
-					    '*pseudo-atomic-atomic*)
-					   (ash symbol-value-slot word-shift)
-					   (- other-pointer-lowtag)))
-	       0)
-	 ;; KLUDGE: Is there any requirement for interrupts to be
-	 ;; handled in order? It seems as though an interrupt coming
-	 ;; in at this point will be executed before any pending interrupts.
-	 ;; Or do incoming interrupts check to see whether any interrupts
-	 ;; are pending? I wish I could find the documentation for
-	 ;; pseudo-atomics.. -- WHN 19991130
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
+      (inst gs-segment-prefix)
 	 (inst cmp (make-ea :byte
-			    :disp (+ nil-value
-				     (static-symbol-offset
-				      '*pseudo-atomic-interrupted*)
-				     (ash symbol-value-slot word-shift)
-				     (- other-pointer-lowtag)))
-	       0)
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
 	 (inst jmp :eq ,label)
+      ;; if PAI was set, interrupts were disabled at the same time
+      ;; using the process signal mask.  
 	 (inst break pending-interrupt-trap)
-	 (emit-label ,label)))))
+      (emit-label ,label))))
 
 ;;;; indexed references
 
