@@ -38,20 +38,20 @@
 	 ;; he ended up inside the system error-handling logic.
 	 (declare (ignorable name ,fp ,context ,sc-offsets))
 	 (let (,@(let ((offset -1))
-		   (mapcar #'(lambda (var)
-			       `(,var (sb!di::sub-access-debug-var-slot
-				       ,fp
-				       (nth ,(incf offset)
-					    ,sc-offsets)
-				       ,context)))
+		   (mapcar (lambda (var)
+			     `(,var (sb!di::sub-access-debug-var-slot
+				     ,fp
+				     (nth ,(incf offset)
+					  ,sc-offsets)
+				     ,context)))
 			   required))
 	       ,@(when rest-pos
 		   `((,(nth (1+ rest-pos) args)
-		      (mapcar #'(lambda (sc-offset)
-				  (sb!di::sub-access-debug-var-slot
-				   ,fp
-				   sc-offset
-				   ,context))
+		      (mapcar (lambda (sc-offset)
+				(sb!di::sub-access-debug-var-slot
+				 ,fp
+				 sc-offset
+				 ,context))
 			      (nthcdr ,rest-pos ,sc-offsets))))))
 	   ,@body))
        (setf (svref *internal-errors* ,(error-number-or-lose name))
@@ -471,9 +471,9 @@
 			 "unknown internal error, ~D, args=~S"
 			 :format-arguments
 			 (list error-number
-			       (mapcar #'(lambda (sc-offset)
-					   (sb!di::sub-access-debug-var-slot
-					    fp sc-offset alien-context))
+			       (mapcar (lambda (sc-offset)
+					 (sb!di::sub-access-debug-var-slot
+					  fp sc-offset alien-context))
 				       arguments))))
 		 ((not (functionp handler))
 		  (error 'simple-error
@@ -481,9 +481,9 @@
 			 :format-arguments
 			 (list error-number
 			       handler
-			       (mapcar #'(lambda (sc-offset)
-					   (sb!di::sub-access-debug-var-slot
-					    fp sc-offset alien-context))
+			       (mapcar (lambda (sc-offset)
+					 (sb!di::sub-access-debug-var-slot
+					  fp sc-offset alien-context))
 				       arguments))))
 		 (t
 		  (funcall handler name fp alien-context arguments)))))))))

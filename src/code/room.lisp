@@ -249,10 +249,10 @@
   (let ((sizes (make-array 256 :initial-element 0 :element-type 'fixnum))
 	(counts (make-array 256 :initial-element 0 :element-type 'fixnum)))
     (map-allocated-objects
-     #'(lambda (obj type size)
-	 (declare (fixnum size) (optimize (speed 3) (safety 0)) (ignore obj))
-	 (incf (aref sizes type) size)
-	 (incf (aref counts type)))
+     (lambda (obj type size)
+       (declare (fixnum size) (optimize (speed 3) (safety 0)) (ignore obj))
+       (incf (aref sizes type) size)
+       (incf (aref counts type)))
      space)
 
     (let ((totals (make-hash-table :test 'eq)))
@@ -270,9 +270,9 @@
 			   (list total-size total-count name))))))))
 
       (collect ((totals-list))
-	(maphash #'(lambda (k v)
-		     (declare (ignore k))
-		     (totals-list v))
+	(maphash (lambda (k v)
+		   (declare (ignore k))
+		   (totals-list v))
 		 totals)
 	(sort (totals-list) #'> :key #'first)))))
 
@@ -287,13 +287,13 @@
 	      (gethash (third total) summary))))
 
     (collect ((summary-totals))
-      (maphash #'(lambda (k v)
-		   (declare (ignore k))
-		   (let ((sum 0))
-		     (declare (fixnum sum))
-		     (dolist (space-total v)
-		       (incf sum (first (cdr space-total))))
-		     (summary-totals (cons sum v))))
+      (maphash (lambda (k v)
+		 (declare (ignore k))
+		 (let ((sum 0))
+		   (declare (fixnum sum))
+		   (dolist (space-total v)
+		     (incf sum (first (cdr space-total))))
+		   (summary-totals (cons sum v))))
 	       summary)
 
       (format t "~2&Summary of spaces: ~(~{~A ~}~)~%" spaces)
@@ -366,8 +366,8 @@
   (let* ((spaces (if (eq count-spaces t)
 		     '(:static :dynamic :read-only)
 		     count-spaces))
-	 (totals (mapcar #'(lambda (space)
-			     (cons space (type-breakdown space)))
+	 (totals (mapcar (lambda (space)
+			   (cons space (type-breakdown space)))
 			 spaces)))
 
     (dolist (space-total totals)
@@ -388,17 +388,17 @@
     (declare (fixnum code-words no-ops)
 	     (type unsigned-byte total-bytes))
     (map-allocated-objects
-     #'(lambda (obj type size)
- 	 (declare (fixnum size) (optimize (safety 0)))
-	 (when (eql type code-header-widetag)
-	   (incf total-bytes size)
-	   (let ((words (truly-the fixnum (%code-code-size obj)))
-		 (sap (truly-the system-area-pointer
-				 (%primitive code-instructions obj))))
-	     (incf code-words words)
-	     (dotimes (i words)
-	       (when (zerop (sap-ref-32 sap (* i n-word-bytes)))
-		 (incf no-ops))))))
+     (lambda (obj type size)
+       (declare (fixnum size) (optimize (safety 0)))
+       (when (eql type code-header-widetag)
+	 (incf total-bytes size)
+	 (let ((words (truly-the fixnum (%code-code-size obj)))
+	       (sap (truly-the system-area-pointer
+			       (%primitive code-instructions obj))))
+	   (incf code-words words)
+	   (dotimes (i words)
+	     (when (zerop (sap-ref-32 sap (* i n-word-bytes)))
+	       (incf no-ops))))))
      space)
 
     (format t
@@ -417,55 +417,55 @@
     (dolist (space (or spaces '(:read-only :static :dynamic)))
       (declare (inline map-allocated-objects))
       (map-allocated-objects
-       #'(lambda (obj type size)
-	   (declare (fixnum size) (optimize (safety 0)))
-	   (case type
-	     (#.code-header-widetag
-	      (let ((inst-words (truly-the fixnum (%code-code-size obj))))
-		(declare (type fixnum inst-words))
-		(incf non-descriptor-bytes (* inst-words n-word-bytes))
-		(incf descriptor-words
-		      (- (truncate size n-word-bytes) inst-words))))
-	     ((#.bignum-widetag
-	       #.single-float-widetag
-	       #.double-float-widetag
-	       #.simple-string-widetag
-	       #.simple-bit-vector-widetag
-	       #.simple-array-unsigned-byte-2-widetag
-	       #.simple-array-unsigned-byte-4-widetag
-	       #.simple-array-unsigned-byte-8-widetag
-	       #.simple-array-unsigned-byte-16-widetag
-	       #.simple-array-unsigned-byte-32-widetag
-	       #.simple-array-signed-byte-8-widetag
-	       #.simple-array-signed-byte-16-widetag
-	       #.simple-array-signed-byte-30-widetag
-	       #.simple-array-signed-byte-32-widetag
-	       #.simple-array-single-float-widetag
-	       #.simple-array-double-float-widetag
-	       #.simple-array-complex-single-float-widetag
-	       #.simple-array-complex-double-float-widetag)
-	      (incf non-descriptor-headers)
-	      (incf non-descriptor-bytes (- size n-word-bytes)))
-	     ((#.list-pointer-lowtag
-	       #.instance-pointer-lowtag
-	       #.ratio-widetag
-	       #.complex-widetag
-	       #.simple-array-widetag
-	       #.simple-vector-widetag
-	       #.complex-string-widetag
-	       #.complex-bit-vector-widetag
-	       #.complex-vector-widetag
-	       #.complex-array-widetag
-	       #.closure-header-widetag
-	       #.funcallable-instance-header-widetag
-	       #.value-cell-header-widetag
-	       #.symbol-header-widetag
-	       #.sap-widetag
-	       #.weak-pointer-widetag
-	       #.instance-header-widetag)
-	      (incf descriptor-words (truncate size n-word-bytes)))
-	     (t
-	      (error "bogus widetag: ~W" type))))
+       (lambda (obj type size)
+	 (declare (fixnum size) (optimize (safety 0)))
+	 (case type
+	   (#.code-header-widetag
+	    (let ((inst-words (truly-the fixnum (%code-code-size obj))))
+	      (declare (type fixnum inst-words))
+	      (incf non-descriptor-bytes (* inst-words n-word-bytes))
+	      (incf descriptor-words
+		    (- (truncate size n-word-bytes) inst-words))))
+	   ((#.bignum-widetag
+	     #.single-float-widetag
+	     #.double-float-widetag
+	     #.simple-string-widetag
+	     #.simple-bit-vector-widetag
+	     #.simple-array-unsigned-byte-2-widetag
+	     #.simple-array-unsigned-byte-4-widetag
+	     #.simple-array-unsigned-byte-8-widetag
+	     #.simple-array-unsigned-byte-16-widetag
+	     #.simple-array-unsigned-byte-32-widetag
+	     #.simple-array-signed-byte-8-widetag
+	     #.simple-array-signed-byte-16-widetag
+	     #.simple-array-signed-byte-30-widetag
+	     #.simple-array-signed-byte-32-widetag
+	     #.simple-array-single-float-widetag
+	     #.simple-array-double-float-widetag
+	     #.simple-array-complex-single-float-widetag
+	     #.simple-array-complex-double-float-widetag)
+	    (incf non-descriptor-headers)
+	    (incf non-descriptor-bytes (- size n-word-bytes)))
+	   ((#.list-pointer-lowtag
+	     #.instance-pointer-lowtag
+	     #.ratio-widetag
+	     #.complex-widetag
+	     #.simple-array-widetag
+	     #.simple-vector-widetag
+	     #.complex-string-widetag
+	     #.complex-bit-vector-widetag
+	     #.complex-vector-widetag
+	     #.complex-array-widetag
+	     #.closure-header-widetag
+	     #.funcallable-instance-header-widetag
+	     #.value-cell-header-widetag
+	     #.symbol-header-widetag
+	     #.sap-widetag
+	     #.weak-pointer-widetag
+	     #.instance-header-widetag)
+	    (incf descriptor-words (truncate size n-word-bytes)))
+	   (t
+	    (error "bogus widetag: ~W" type))))
        space))
     (format t "~:D words allocated for descriptor objects.~%"
 	    descriptor-words)
@@ -484,25 +484,25 @@
 	(total-bytes 0))
     (declare (fixnum total-objects total-bytes))
     (map-allocated-objects
-     #'(lambda (obj type size)
-	 (declare (fixnum size) (optimize (speed 3) (safety 0)))
-	 (when (eql type instance-header-widetag)
-	   (incf total-objects)
-	   (incf total-bytes size)
-	   (let* ((class (layout-class (%instance-ref obj 0)))
-		  (found (gethash class totals)))
-	     (cond (found
-		    (incf (the fixnum (car found)))
-		    (incf (the fixnum (cdr found)) size))
-		   (t
-		    (setf (gethash class totals) (cons 1 size)))))))
+     (lambda (obj type size)
+       (declare (fixnum size) (optimize (speed 3) (safety 0)))
+       (when (eql type instance-header-widetag)
+	 (incf total-objects)
+	 (incf total-bytes size)
+	 (let* ((class (layout-class (%instance-ref obj 0)))
+		(found (gethash class totals)))
+	   (cond (found
+		  (incf (the fixnum (car found)))
+		  (incf (the fixnum (cdr found)) size))
+		 (t
+		  (setf (gethash class totals) (cons 1 size)))))))
      space)
 
     (collect ((totals-list))
-      (maphash #'(lambda (class what)
-		   (totals-list (cons (prin1-to-string
-				       (class-proper-name class))
-				      what)))
+      (maphash (lambda (class what)
+		 (totals-list (cons (prin1-to-string
+				     (class-proper-name class))
+				    what)))
 	       totals)
       (let ((sorted (sort (totals-list) #'> :key #'cddr))
 	    (printed-bytes 0)
@@ -537,19 +537,19 @@
       (declare (type (or null (unsigned-byte 32)) start-addr)
 	       (type (unsigned-byte 32) total-bytes))
       (map-allocated-objects
-       #'(lambda (object typecode bytes)
-	   (declare (ignore typecode)
-		    (type (unsigned-byte 32) bytes))
-	   (if (and (consp object)
-		    (eql (car object) 0)
-		    (eql (cdr object) 0))
-	       (if start-addr
-		   (incf total-bytes bytes)
-		   (setf start-addr (sb!di::get-lisp-obj-address object)
-			 total-bytes bytes))
-	       (when start-addr
-		 (format t "~:D bytes at #X~X~%" total-bytes start-addr)
-		 (setf start-addr nil))))
+       (lambda (object typecode bytes)
+	 (declare (ignore typecode)
+		  (type (unsigned-byte 32) bytes))
+	 (if (and (consp object)
+		  (eql (car object) 0)
+		  (eql (cdr object) 0))
+	     (if start-addr
+		 (incf total-bytes bytes)
+		 (setf start-addr (sb!di::get-lisp-obj-address object)
+		       total-bytes bytes))
+	     (when start-addr
+	       (format t "~:D bytes at #X~X~%" total-bytes start-addr)
+	       (setf start-addr nil))))
        space)
       (when start-addr
 	(format t "~:D bytes at #X~X~%" total-bytes start-addr))))
@@ -581,58 +581,58 @@
 		   (note-conses (car x))
 		   (note-conses (cdr x)))))
 	(map-allocated-objects
-	 #'(lambda (obj obj-type size)
-	     (declare (optimize (safety 0)))
-	     (let ((addr (get-lisp-obj-address obj)))
-	       (when (>= addr start)
-		 (when (if count
-			   (> count-so-far count)
-			   (> pages-so-far pages))
-		   (return-from print-allocated-objects (values)))
+	 (lambda (obj obj-type size)
+	   (declare (optimize (safety 0)))
+	   (let ((addr (get-lisp-obj-address obj)))
+	     (when (>= addr start)
+	       (when (if count
+			 (> count-so-far count)
+			 (> pages-so-far pages))
+		 (return-from print-allocated-objects (values)))
 
-		 (unless count
-		   (let ((this-page (* (the (values (unsigned-byte 32) t)
-                                         (truncate addr pagesize))
-				       pagesize)))
-		     (declare (type (unsigned-byte 32) this-page))
-		     (when (/= this-page last-page)
-		       (when (< pages-so-far pages)
-			 ;; FIXME: What is this? (ERROR "Argh..")? or
-			 ;; a warning? or code that can be removed
-			 ;; once the system is stable? or what?
-			 (format stream "~2&**** Page ~W, address ~X:~%"
-				 pages-so-far addr))
-		       (setq last-page this-page)
-		       (incf pages-so-far))))
+	       (unless count
+		 (let ((this-page (* (the (values (unsigned-byte 32) t)
+				       (truncate addr pagesize))
+				     pagesize)))
+		   (declare (type (unsigned-byte 32) this-page))
+		   (when (/= this-page last-page)
+		     (when (< pages-so-far pages)
+		       ;; FIXME: What is this? (ERROR "Argh..")? or
+		       ;; a warning? or code that can be removed
+		       ;; once the system is stable? or what?
+		       (format stream "~2&**** Page ~W, address ~X:~%"
+			       pages-so-far addr))
+		     (setq last-page this-page)
+		     (incf pages-so-far))))
 
-		 (when (and (or (not type) (eql obj-type type))
-			    (or (not smaller) (<= size smaller))
-			    (or (not larger) (>= size larger)))
-		   (incf count-so-far)
-		   (case type
-		     (#.code-header-widetag
-		      (let ((dinfo (%code-debug-info obj)))
-			(format stream "~&Code object: ~S~%"
-				(if dinfo
-				    (sb!c::compiled-debug-info-name dinfo)
-				    "No debug info."))))
-		     (#.symbol-header-widetag
-		      (format stream "~&~S~%" obj))
-		     (#.list-pointer-lowtag
-		      (unless (gethash obj printed-conses)
-			(note-conses obj)
-			(let ((*print-circle* t)
-			      (*print-level* 5)
-			      (*print-length* 10))
-			  (format stream "~&~S~%" obj))))
-		     (t
-		      (fresh-line stream)
-		      (let ((str (write-to-string obj :level 5 :length 10
-						  :pretty nil)))
-			(unless (eql type instance-header-widetag)
-			  (format stream "~S: " (type-of obj)))
-			(format stream "~A~%"
-				(subseq str 0 (min (length str) 60))))))))))
+	       (when (and (or (not type) (eql obj-type type))
+			  (or (not smaller) (<= size smaller))
+			  (or (not larger) (>= size larger)))
+		 (incf count-so-far)
+		 (case type
+		   (#.code-header-widetag
+		    (let ((dinfo (%code-debug-info obj)))
+		      (format stream "~&Code object: ~S~%"
+			      (if dinfo
+				  (sb!c::compiled-debug-info-name dinfo)
+				  "No debug info."))))
+		   (#.symbol-header-widetag
+		    (format stream "~&~S~%" obj))
+		   (#.list-pointer-lowtag
+		    (unless (gethash obj printed-conses)
+		      (note-conses obj)
+		      (let ((*print-circle* t)
+			    (*print-level* 5)
+			    (*print-length* 10))
+			(format stream "~&~S~%" obj))))
+		   (t
+		    (fresh-line stream)
+		    (let ((str (write-to-string obj :level 5 :length 10
+						:pretty nil)))
+		      (unless (eql type instance-header-widetag)
+			(format stream "~S: " (type-of obj)))
+		      (format stream "~A~%"
+			      (subseq str 0 (min (length str) 60))))))))))
 	 space))))
   (values))
 
@@ -656,15 +656,15 @@
   (collect ((counted 0 1+))
     (let ((res ()))
       (map-allocated-objects
-       #'(lambda (obj obj-type size)
-	   (declare (optimize (safety 0)))
-	   (when (and (or (not type) (eql obj-type type))
-		      (or (not smaller) (<= size smaller))
-		      (or (not larger) (>= size larger))
-		      (or (not test) (funcall test obj)))
-	     (setq res (maybe-cons space obj res))
-	     (when (and count (>= (counted) count))
-	       (return-from list-allocated-objects res))))
+       (lambda (obj obj-type size)
+	 (declare (optimize (safety 0)))
+	 (when (and (or (not type) (eql obj-type type))
+		    (or (not smaller) (<= size smaller))
+		    (or (not larger) (>= size larger))
+		    (or (not test) (funcall test obj)))
+	   (setq res (maybe-cons space obj res))
+	   (when (and count (>= (counted) count))
+	     (return-from list-allocated-objects res))))
        space)
       res)))
 
@@ -675,27 +675,27 @@
     (flet ((res (x)
 	     (setq res (maybe-cons space x res))))
       (map-allocated-objects
-       #'(lambda (obj obj-type size)
-	   (declare (optimize (safety 0)) (ignore obj-type size))
-	   (typecase obj
-	     (cons
-	      (when (or (eq (car obj) object) (eq (cdr obj) object))
-		(res obj)))
-	     (instance
-	      (dotimes (i (%instance-length obj))
-		(when (eq (%instance-ref obj i) object)
-		  (res obj)
-		  (return))))
-	     (simple-vector
-	      (dotimes (i (length obj))
-		(when (eq (svref obj i) object)
-		  (res obj)
-		  (return))))
-	     (symbol
-	      (when (or (eq (symbol-name obj) object)
-			(eq (symbol-package obj) object)
-			(eq (symbol-plist obj) object)
-			(eq (symbol-value obj) object))
-		(res obj)))))
+       (lambda (obj obj-type size)
+	 (declare (optimize (safety 0)) (ignore obj-type size))
+	 (typecase obj
+	   (cons
+	    (when (or (eq (car obj) object) (eq (cdr obj) object))
+	      (res obj)))
+	   (instance
+	    (dotimes (i (%instance-length obj))
+	      (when (eq (%instance-ref obj i) object)
+		(res obj)
+		(return))))
+	   (simple-vector
+	    (dotimes (i (length obj))
+	      (when (eq (svref obj i) object)
+		(res obj)
+		(return))))
+	   (symbol
+	    (when (or (eq (symbol-name obj) object)
+		      (eq (symbol-package obj) object)
+		      (eq (symbol-plist obj) object)
+		      (eq (symbol-value obj) object))
+	      (res obj)))))
        space))
     res))

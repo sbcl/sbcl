@@ -49,10 +49,10 @@
 		   (backq-unparse (car tail) t)))
 	 (push (backq-unparse (car tail)) accum)))
       (backq-append
-       (mapcan #'(lambda (el) (backq-unparse el t))
+       (mapcan (lambda (el) (backq-unparse el t))
 	       (cdr form)))
       (backq-nconc
-       (mapcan #'(lambda (el) (backq-unparse el :nconc))
+       (mapcan (lambda (el) (backq-unparse el :nconc))
 	       (cdr form)))
       (backq-cons
        (cons (backq-unparse (cadr form) nil)

@@ -200,12 +200,12 @@
 	(inst gentrap ,kind)
 	(with-adjustable-vector (,vector)
 	  (write-var-integer (error-number-or-lose ',code) ,vector)
-	  ,@(mapcar #'(lambda (tn)
-			`(let ((tn ,tn))
-			   (write-var-integer (make-sc-offset (sc-number
-							       (tn-sc tn))
-							      (tn-offset tn))
-					      ,vector)))
+	  ,@(mapcar (lambda (tn)
+		      `(let ((tn ,tn))
+			 (write-var-integer (make-sc-offset (sc-number
+							     (tn-sc tn))
+							    (tn-offset tn))
+					    ,vector)))
 		    values)
 	  (inst byte (length ,vector))
 	  (dotimes (i (length ,vector))

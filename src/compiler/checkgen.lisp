@@ -113,10 +113,10 @@
 (defun no-function-values-types (type)
   (declare (type ctype type))
   (multiple-value-bind (res count) (values-types type)
-    (values (mapcar #'(lambda (type)
-			(if (fun-type-p type)
-			    (specifier-type 'function)
-			    type))
+    (values (mapcar (lambda (type)
+		      (if (fun-type-p type)
+			  (specifier-type 'function)
+			  type))
 		    res)
 	    count)))
 
@@ -150,18 +150,18 @@
 	(if (and (every #'type-check-template types) (not force-hairy))
 	    (values :simple types)
 	    (values :hairy
-		    (mapcar #'(lambda (x)
-				(list nil (maybe-weaken-check x cont) x))
+		    (mapcar (lambda (x)
+			      (list nil (maybe-weaken-check x cont) x))
 			    types)))
-	(let ((res (mapcar #'(lambda (p c)
-			       (let ((diff (type-difference p c))
-				     (weak (maybe-weaken-check c cont)))
-				 (if (and diff
-					  (< (type-test-cost diff)
-					     (type-test-cost weak))
-					  *complement-type-checks*)
-				     (list t diff c)
-				     (list nil weak c))))
+	(let ((res (mapcar (lambda (p c)
+			     (let ((diff (type-difference p c))
+				   (weak (maybe-weaken-check c cont)))
+			       (if (and diff
+					(< (type-test-cost diff)
+					   (type-test-cost weak))
+					*complement-type-checks*)
+				   (list t diff c)
+				   (list nil weak c))))
 			   ptypes types)))
 	  (cond ((or force-hairy (find-if #'first res))
 		 (values :hairy res))
@@ -300,15 +300,15 @@
 (defun make-type-check-form (types)
   (let ((temps (make-gensym-list (length types))))
     `(multiple-value-bind ,temps 'dummy
-       ,@(mapcar #'(lambda (temp type)
-		     (let* ((spec
-			     (let ((*unparse-fun-type-simplify* t))
-			       (type-specifier (second type))))
-			    (test (if (first type) `(not ,spec) spec)))
-		       `(unless (typep ,temp ',test)
-			  (%type-check-error
-			   ,temp
-			   ',(type-specifier (third type))))))
+       ,@(mapcar (lambda (temp type)
+		   (let* ((spec
+			   (let ((*unparse-fun-type-simplify* t))
+			     (type-specifier (second type))))
+			  (test (if (first type) `(not ,spec) spec)))
+		     `(unless (typep ,temp ',test)
+			(%type-check-error
+			 ,temp
+			 ',(type-specifier (third type))))))
 		 temps
 		 types)
        (values ,@temps))))

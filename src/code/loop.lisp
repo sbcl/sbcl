@@ -356,17 +356,17 @@ code to be loaded.
 	     (typecase var
 	       (null
 		 (when (consp val)
-		   ;; don't lose possible side-effects
+		   ;; Don't lose possible side-effects.
 		   (if (eq (car val) 'prog1)
-		       ;; these can come from psetq or desetq below.
-		       ;; throw away the value, keep the side-effects.
-		       ;;Special case is for handling an expanded POP.
-		       (mapcan #'(lambda (x)
-				   (and (consp x)
-					(or (not (eq (car x) 'car))
-					    (not (symbolp (cadr x)))
-					    (not (symbolp (setq x (sb!xc:macroexpand x env)))))
-					(cons x nil)))
+		       ;; These can come from psetq or desetq below.
+		       ;; Throw away the value, keep the side-effects.
+		       ;; Special case is for handling an expanded POP.
+		       (mapcan (lambda (x)
+				 (and (consp x)
+				      (or (not (eq (car x) 'car))
+					  (not (symbolp (cadr x)))
+					  (not (symbolp (setq x (sb!xc:macroexpand x env)))))
+				      (cons x nil)))
 			       (cdr val))
 		       `(,val))))
 	       (cons
@@ -1594,9 +1594,9 @@ code to be loaded.
 	 (this-group nil nil)
 	 (this-prep nil nil)
 	 (disallowed-prepositions
-	   (mapcan #'(lambda (x)
-		       (copy-list
-			 (find (car x) preposition-groups :test #'in-group-p)))
+	   (mapcan (lambda (x)
+		     (copy-list
+		      (find (car x) preposition-groups :test #'in-group-p)))
 		   initial-phrases))
 	 (used-prepositions (mapcar #'car initial-phrases)))
 	((null *loop-source-code*) (nreverse prepositional-phrases))

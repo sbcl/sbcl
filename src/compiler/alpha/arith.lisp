@@ -338,20 +338,20 @@
 
 (defmacro define-conditional-vop (translate &rest generator)
   `(progn
-     ,@(mapcar #'(lambda (suffix cost signed)
-		   (unless (and (member suffix '(/fixnum -c/fixnum))
-				(eq translate 'eql))
-		     `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
-						    translate suffix))
-				   ,(intern
-				     (format nil "~:@(FAST-CONDITIONAL~A~)"
-					     suffix)))
-			(:translate ,translate)
-			(:generator ,cost
-			  (let* ((signed ,signed)
-				 (-c/fixnum ,(eq suffix '-c/fixnum))
-				 (y (if -c/fixnum (fixnumize y) y)))
-			    ,@generator)))))
+     ,@(mapcar (lambda (suffix cost signed)
+		 (unless (and (member suffix '(/fixnum -c/fixnum))
+			      (eq translate 'eql))
+		   `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
+						  translate suffix))
+				 ,(intern
+				   (format nil "~:@(FAST-CONDITIONAL~A~)"
+					   suffix)))
+		      (:translate ,translate)
+		      (:generator ,cost
+				  (let* ((signed ,signed)
+					 (-c/fixnum ,(eq suffix '-c/fixnum))
+					 (y (if -c/fixnum (fixnumize y) y)))
+				    ,@generator)))))
 	       '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
 	       '(3 2 5 4 5 4)
 	       '(t t t t nil nil))))

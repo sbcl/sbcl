@@ -67,11 +67,11 @@
       (let ((var (first vars))
 	    (cases (sort cases #'type-test-order :key #'car)))
 	`((typecase ,var
-	    ,@(mapcar #'(lambda (case)
-			  `(,(first case)
-			    ,@(generate-number-dispatch (rest vars)
-							(rest error-tags)
-							(cdr case))))
+	    ,@(mapcar (lambda (case)
+			`(,(first case)
+			  ,@(generate-number-dispatch (rest vars)
+						      (rest error-tags)
+						      (cdr case))))
 		      cases)
 	    (t (go ,(first error-tags))))))
       cases))
@@ -879,12 +879,12 @@
 	  nil
 	  (macrolet ((foo (&rest stuff)
 		       `(typecase obj2
-			  ,@(mapcar #'(lambda (foo)
-					(let ((type (car foo))
-					      (fn (cadr foo)))
-					  `(,type
-					    (and (typep obj1 ',type)
-						 (,fn obj1 obj2)))))
+			  ,@(mapcar (lambda (foo)
+				      (let ((type (car foo))
+					    (fn (cadr foo)))
+					`(,type
+					  (and (typep obj1 ',type)
+					       (,fn obj1 obj2)))))
 				    stuff))))
 	    (foo
 	      (single-float eql)

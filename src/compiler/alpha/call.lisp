@@ -661,11 +661,11 @@ default-value-8
 		 nargs-pass)
 
      ,@(when variable
-	 (mapcar #'(lambda (name offset)
-		     `(:temporary (:sc descriptor-reg
-				   :offset ,offset
-				   :to :eval)
-			 ,name))
+	 (mapcar (lambda (name offset)
+		   `(:temporary (:sc descriptor-reg
+				     :offset ,offset
+				     :to :eval)
+				,name))
 		 register-arg-names *register-arg-offsets*))
      ,@(when (eq return :fixed)
 	 '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
@@ -709,11 +709,11 @@ default-value-8
 		       ,@(if variable
 			     `((inst subq csp-tn new-fp nargs-pass)
 			       ,@(let ((index -1))
-				   (mapcar #'(lambda (name)
-					       `(inst ldl ,name
-						      ,(ash (incf index)
-							    word-shift)
-						      new-fp))
+				   (mapcar (lambda (name)
+					     `(inst ldl ,name
+						    ,(ash (incf index)
+							  word-shift)
+						    new-fp))
 					   register-arg-names)))
 			     '((inst li (fixnumize nargs) nargs-pass))))
 		      ,@(if (eq return :tail)
@@ -1201,8 +1201,8 @@ default-value-8
 		,@(when translate
 		    `((:policy :fast-safe)
 		      (:translate ,translate)))
-		(:args ,@(mapcar #'(lambda (arg)
-				     `(,arg :scs (any-reg descriptor-reg)))
+		(:args ,@(mapcar (lambda (arg)
+				   `(,arg :scs (any-reg descriptor-reg)))
 				 args))
 		(:vop-var vop)
 		(:save-p :compute-only)

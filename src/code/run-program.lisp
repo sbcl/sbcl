@@ -669,54 +669,54 @@
     (setf handler
 	  (sb-sys:add-fd-handler
 	   descriptor
-	   :input #'(lambda (fd)
-		      (declare (ignore fd))
-		      (loop
-			  (unless handler
-			    (return))
-			  (multiple-value-bind
-				(result readable/errno)
-			      (sb-unix:unix-select (1+ descriptor)
-						   (ash 1 descriptor)
-						   0 0 0)
-			    (cond ((null result)
-				   (error "~@<couldn't select on sub-process: ~
+	   :input (lambda (fd)
+		    (declare (ignore fd))
+		    (loop
+		     (unless handler
+		       (return))
+		     (multiple-value-bind
+			 (result readable/errno)
+			 (sb-unix:unix-select (1+ descriptor)
+					      (ash 1 descriptor)
+					      0 0 0)
+		       (cond ((null result)
+			      (error "~@<couldn't select on sub-process: ~
                                            ~2I~_~A~:>"
-					  (strerror readable/errno)))
-				  ((zerop result)
-				   (return))))
-			(sb-alien:with-alien ((buf (sb-alien:array
-						    sb-c-call:char
-						    256)))
-			  (multiple-value-bind
-				(count errno)
-			      (sb-unix:unix-read descriptor
-						 (alien-sap buf)
-						 256)
-			    (cond ((or (and (null count)
-					    (eql errno sb-unix:eio))
-				       (eql count 0))
-				   (sb-sys:remove-fd-handler handler)
-				   (setf handler nil)
-				   (decf (car cookie))
-				   (sb-unix:unix-close descriptor)
-				   (return))
-				  ((null count)
-				   (sb-sys:remove-fd-handler handler)
-				   (setf handler nil)
-				   (decf (car cookie))
-				   (error
-				    "~@<couldn't read input from sub-process: ~
+				     (strerror readable/errno)))
+			     ((zerop result)
+			      (return))))
+		     (sb-alien:with-alien ((buf (sb-alien:array
+						 sb-c-call:char
+						 256)))
+		       (multiple-value-bind
+			   (count errno)
+			   (sb-unix:unix-read descriptor
+					      (alien-sap buf)
+					      256)
+			 (cond ((or (and (null count)
+					 (eql errno sb-unix:eio))
+				    (eql count 0))
+				(sb-sys:remove-fd-handler handler)
+				(setf handler nil)
+				(decf (car cookie))
+				(sb-unix:unix-close descriptor)
+				(return))
+			       ((null count)
+				(sb-sys:remove-fd-handler handler)
+				(setf handler nil)
+				(decf (car cookie))
+				(error
+				 "~@<couldn't read input from sub-process: ~
                                      ~2I~_~A~:>"
-				    (strerror errno)))
-				  (t
-				   (sb-kernel:copy-from-system-area
-				    (alien-sap buf) 0
-				    string (* sb-vm:vector-data-offset
-					      sb-vm:n-word-bits)
-				    (* count sb-vm:n-byte-bits))
-				   (write-string string stream
-						 :end count)))))))))))
+				 (strerror errno)))
+			       (t
+				(sb-kernel:copy-from-system-area
+				 (alien-sap buf) 0
+				 string (* sb-vm:vector-data-offset
+					   sb-vm:n-word-bits)
+				 (* count sb-vm:n-byte-bits))
+				(write-string string stream
+					      :end count)))))))))))
 
 ;;; Find a file descriptor to use for object given the direction.
 ;;; Returns the descriptor. If object is :STREAM, returns the created

@@ -436,10 +436,10 @@
 	 (alien-sap (alien-sap alien)))
     (finalize
      alien
-     #'(lambda ()
-	 (alien-funcall
-	  (extern-alien "free" (function (values) system-area-pointer))
-	  alien-sap)))
+     (lambda ()
+       (alien-funcall
+	(extern-alien "free" (function (values) system-area-pointer))
+	alien-sap)))
     alien))
 
 (defun note-local-alien-type (info alien)

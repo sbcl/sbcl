@@ -830,7 +830,7 @@
       (dotimes (index len)
 	(setf (elt result-sequence index)
 	      (apply really-fun
-		     (mapcar #'(lambda (seq) (elt seq index))
+		     (mapcar (lambda (seq) (elt seq index))
 			     sequences))))))
   result-sequence)
 

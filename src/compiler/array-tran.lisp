@@ -146,11 +146,11 @@
 	(n -1))
     (once-only ((n-vec `(make-array ,len)))
       `(progn
-	 ,@(mapcar #'(lambda (el)
-		       (once-only ((n-val el))
-			 `(locally (declare (optimize (safety 0)))
-				   (setf (svref ,n-vec ,(incf n))
-					 ,n-val))))
+	 ,@(mapcar (lambda (el)
+		     (once-only ((n-val el))
+		       `(locally (declare (optimize (safety 0)))
+				 (setf (svref ,n-vec ,(incf n))
+				       ,n-val))))
 		   elements)
 	 ,n-vec))))
 
@@ -339,9 +339,9 @@
 				   '(:initial-element initial-element))))
 	     (setf (%array-displaced-p header) nil)
 	     ,@(let ((axis -1))
-		 (mapcar #'(lambda (dim)
-			     `(setf (%array-dimension header ,(incf axis))
-				    ,dim))
+		 (mapcar (lambda (dim)
+			   `(setf (%array-dimension header ,(incf axis))
+				  ,dim))
 			 dims))
 	     (truly-the ,spec header))))))
 

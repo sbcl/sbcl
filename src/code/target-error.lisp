@@ -26,7 +26,7 @@
   function
   report-function
   interactive-function
-  (test-function #'(lambda (cond) (declare (ignore cond)) t)))
+  (test-function (lambda (cond) (declare (ignore cond)) t)))
 (def!method print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
@@ -62,9 +62,9 @@
 (defun restart-report (restart stream)
   (funcall (or (restart-report-function restart)
 	       (let ((name (restart-name restart)))
-		 #'(lambda (stream)
-		     (if name (format stream "~S" name)
-			      (format stream "~S" restart)))))
+		 (lambda (stream)
+		   (if name (format stream "~S" name)
+		       (format stream "~S" restart)))))
 	   stream))
 
 (defmacro with-condition-restarts (condition-form restarts-form &body body)
@@ -90,18 +90,18 @@
    the same restart name, FIND-RESTART will find the first such clause."
   `(let ((*restart-clusters*
 	  (cons (list
-		 ,@(mapcar #'(lambda (binding)
-			       (unless (or (car binding)
-					   (member :report-function
-						   binding
-						   :test #'eq))
-				 (warn "Unnamed restart does not have a ~
+		 ,@(mapcar (lambda (binding)
+			     (unless (or (car binding)
+					 (member :report-function
+						 binding
+						 :test #'eq))
+			       (warn "Unnamed restart does not have a ~
 					report function: ~S"
-				       binding))
-			       `(make-restart :name ',(car binding)
-					      :function ,(cadr binding)
-					      ,@(cddr binding)))
-			       bindings))
+				     binding))
+			     `(make-restart :name ',(car binding)
+					    :function ,(cadr binding)
+					    ,@(cddr binding)))
+			   bindings))
 		*restart-clusters*)))
      ,@forms))
 
@@ -112,9 +112,9 @@
    returned. It is an error to supply NIL as a name. If CONDITION is specified
    and not NIL, then only restarts associated with that condition (or with no
    condition) will be returned."
-  (find-if #'(lambda (x)
-	       (or (eq x name)
-		   (eq (restart-name x) name)))
+  (find-if (lambda (x)
+	     (or (eq x name)
+		 (eq (restart-name x) name)))
 	   (compute-restarts condition)))
 
 (defun invoke-restart (restart &rest values)
@@ -259,25 +259,25 @@
 	 (let ((,temp-var nil))
 	   (tagbody
 	    (restart-bind
-		,(mapcar #'(lambda (datum)
-			     (let ((name (nth 0 datum))
-				   (tag  (nth 1 datum))
-				   (keys (nth 2 datum)))
-			       `(,name #'(lambda (&rest temp)
-					   (setq ,temp-var temp)
-					   (go ,tag))
-				       ,@keys)))
+		,(mapcar (lambda (datum)
+			   (let ((name (nth 0 datum))
+				 (tag  (nth 1 datum))
+				 (keys (nth 2 datum)))
+			     `(,name #'(lambda (&rest temp)
+					 (setq ,temp-var temp)
+					 (go ,tag))
+				     ,@keys)))
 			 data)
 	      (return-from ,block-tag
 			   ,(munge-restart-case-expression expression data)))
-	    ,@(mapcan #'(lambda (datum)
-			  (let ((tag  (nth 1 datum))
-				(bvl  (nth 3 datum))
-				(body (nth 4 datum)))
-			    (list tag
-				  `(return-from ,block-tag
-						(apply #'(lambda ,bvl ,@body)
-						       ,temp-var)))))
+	    ,@(mapcan (lambda (datum)
+			(let ((tag  (nth 1 datum))
+			      (bvl  (nth 3 datum))
+			      (body (nth 4 datum)))
+			  (list tag
+				`(return-from ,block-tag
+				   (apply (lambda ,bvl ,@body)
+					  ,temp-var)))))
 		      data)))))))
 
 (defmacro with-simple-restart ((restart-name format-string
@@ -315,7 +315,7 @@
     (when member-if
       (error "ill-formed handler binding: ~S" (first member-if))))
   `(let ((*handler-clusters*
-	  (cons (list ,@(mapcar #'(lambda (x) `(cons ',(car x) ,(cadr x)))
+	  (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
 				bindings))
 		*handler-clusters*)))
      (multiple-value-prog1

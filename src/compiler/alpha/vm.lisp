@@ -20,12 +20,13 @@
              (let ((offset-sym (symbolicate name "-OFFSET")))
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                   (defconstant ,offset-sym ,offset)
-                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
+                  (setf (svref *register-names* ,offset-sym)
+			,(symbol-name name)))))
            (defregset (name &rest regs)
              `(eval-when  (:compile-toplevel :load-toplevel :execute)
                 (defparameter ,name
-                  (list ,@(mapcar #'(lambda (name)
-                                      (symbolicate name "-OFFSET"))
+                  (list ,@(mapcar (lambda (name)
+				    (symbolicate name "-OFFSET"))
                                   regs))))))
   ;; c.f. src/runtime/alpha-lispregs.h
   
@@ -329,10 +330,10 @@
 
 ;;; a list of TN's describing the register arguments
 (defparameter *register-arg-tns*
-  (mapcar #'(lambda (n)
-	      (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'descriptor-reg)
-			      :offset n))
+  (mapcar (lambda (n)
+	    (make-random-tn :kind :normal
+			    :sc (sc-or-lose 'descriptor-reg)
+			    :offset n))
 	  *register-arg-offsets*))
 
 ;;; This is used by the debugger.

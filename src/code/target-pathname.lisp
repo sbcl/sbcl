@@ -120,22 +120,22 @@
   (let ((pieces1 (pattern-pieces pattern1))
 	(pieces2 (pattern-pieces pattern2)))
     (and (= (length pieces1) (length pieces2))
-	 (every #'(lambda (piece1 piece2)
-		    (typecase piece1
-		      (simple-string
-		       (and (simple-string-p piece2)
-			    (string= piece1 piece2)))
-		      (cons
-		       (and (consp piece2)
-			    (eq (car piece1) (car piece2))
-			    (string= (cdr piece1) (cdr piece2))))
-		      (t
-		       (eq piece1 piece2))))
+	 (every (lambda (piece1 piece2)
+		  (typecase piece1
+		    (simple-string
+		     (and (simple-string-p piece2)
+			  (string= piece1 piece2)))
+		    (cons
+		     (and (consp piece2)
+			  (eq (car piece1) (car piece2))
+			  (string= (cdr piece1) (cdr piece2))))
+		    (t
+		     (eq piece1 piece2))))
 		pieces1
 		pieces2))))
 
-;;; If the string matches the pattern returns the multiple values T and a
-;;; list of the matched strings.
+;;; If the string matches the pattern returns the multiple values T
+;;; and a list of the matched strings.
 (defun pattern-matches (pattern string)
   (declare (type pattern pattern)
 	   (type simple-string string))
@@ -335,19 +335,19 @@
 		 (typecase thing
 		   (pattern
 		    (make-pattern
-		     (mapcar #'(lambda (piece)
-				 (typecase piece
-				   (simple-base-string
-				    (funcall fun piece))
-				   (cons
-				    (case (car piece)
-				      (:character-set
-				       (cons :character-set
-					     (funcall fun (cdr piece))))
-				      (t
-				       piece)))
-				   (t
-				    piece)))
+		     (mapcar (lambda (piece)
+			       (typecase piece
+				 (simple-base-string
+				  (funcall fun piece))
+				 (cons
+				  (case (car piece)
+				    (:character-set
+				     (cons :character-set
+					   (funcall fun (cdr piece))))
+				    (t
+				     piece)))
+				 (t
+				  piece)))
 			     (pattern-pieces thing))))
 		   (list
 		    (mapcar fun thing))
@@ -358,20 +358,20 @@
 	(let ((any-uppers (check-for #'upper-case-p thing))
 	      (any-lowers (check-for #'lower-case-p thing)))
 	  (cond ((and any-uppers any-lowers)
-		 ;; Mixed case, stays the same.
+		 ;; mixed case, stays the same
 		 thing)
 		(any-uppers
-		 ;; All uppercase, becomes all lower case.
-		 (diddle-with #'(lambda (x) (if (stringp x)
-						(string-downcase x)
-						x)) thing))
+		 ;; all uppercase, becomes all lower case
+		 (diddle-with (lambda (x) (if (stringp x)
+					      (string-downcase x)
+					      x)) thing))
 		(any-lowers
-		 ;; All lowercase, becomes all upper case.
+		 ;; all lowercase, becomes all upper case
 		 (diddle-with #'(lambda (x) (if (stringp x)
 						(string-upcase x)
 						x)) thing))
 		(t
-		 ;; No letters?  I guess just leave it.
+		 ;; no letters?  I guess just leave it.
 		 thing))))
       thing))
 
@@ -950,7 +950,7 @@ a host-structure or string."
     (collect ((subs))
       (loop
 	(unless source
-	  (unless (every #'(lambda (x) (eq x :wild-inferiors)) from)
+	  (unless (every (lambda (x) (eq x :wild-inferiors)) from)
 	    (didnt-match-error orig-source orig-from))
 	  (subs ())
 	  (return))

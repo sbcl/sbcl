@@ -387,8 +387,8 @@
 		     (let ((n (svref ,vec i)))
 		       (push (cons (svref *fop-names* i) n) ,lvar)
 		       (incf ,tvar n)))
-		   (setq ,lvar (subseq (sort ,lvar #'(lambda (x y)
-						       (> (cdr x) (cdr y))))
+		   (setq ,lvar (subseq (sort ,lvar (lambda (x y)
+						     (> (cdr x) (cdr y))))
 				       0 10)))))
 
       (breakdown counts total-count *fop-counts*)

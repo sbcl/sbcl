@@ -381,12 +381,12 @@
 (defun fixed-values-op (types1 types2 rest2 operation)
   (declare (list types1 types2) (type ctype rest2) (type function operation))
   (let ((exact t))
-    (values (mapcar #'(lambda (t1 t2)
-			(multiple-value-bind (res win)
-			    (funcall operation t1 t2)
-			  (unless win
-			    (setq exact nil))
-			  res))
+    (values (mapcar (lambda (t1 t2)
+		      (multiple-value-bind (res win)
+			  (funcall operation t1 t2)
+			(unless win
+			  (setq exact nil))
+			res))
 		    types1
 		    (append types2
 			    (make-list (- (length types1) (length types2))
@@ -1714,8 +1714,8 @@
     ;; See whether dimensions are compatible.
     (cond ((not (or (eq dims1 '*) (eq dims2 '*)
 		    (and (= (length dims1) (length dims2))
-			 (every #'(lambda (x y)
-				    (or (eq x '*) (eq y '*) (= x y)))
+			 (every (lambda (x y)
+				  (or (eq x '*) (eq y '*) (= x y)))
 				dims1 dims2))))
 	   (values nil t))
 	  ;; See whether complexpness is compatible.

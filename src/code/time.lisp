@@ -235,7 +235,7 @@
 (defmacro time (form)
   #!+sb-doc
   "Execute FORM and print timing information on *TRACE-OUTPUT*."
-  `(%time #'(lambda () ,form)))
+  `(%time (lambda () ,form)))
 
 ;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()

@@ -151,19 +151,19 @@
 		(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (defparameter *vm-support-routines* ',routines))
 		(defstruct (vm-support-routines (:copier nil))
-		  ,@(mapcar #'(lambda (routine)
-				`(,routine nil :type (or function null)))
+		  ,@(mapcar (lambda (routine)
+			      `(,routine nil :type (or function null)))
 			    routines))
 		,@(mapcar
-		   #'(lambda (name)
-		       `(defun ,name (&rest args)
-			  (apply (or (,(symbolicate "VM-SUPPORT-ROUTINES-"
-						    name)
-				      *backend-support-routines*)
-				     (error "machine-specific support ~S ~
+		   (lambda (name)
+		     `(defun ,name (&rest args)
+			(apply (or (,(symbolicate "VM-SUPPORT-ROUTINES-"
+						  name)
+				    *backend-support-routines*)
+				   (error "machine-specific support ~S ~
 					    routine undefined"
-					    ',name))
-				 args)))
+					  ',name))
+			       args)))
 		   routines))))
 
   (def-vm-support-routines

@@ -47,17 +47,17 @@
   (when environment-name (compact-environment-aux environment-name 200))
 
   (let ((*gc-notify-before*
-	 #'(lambda (notify-stream bytes-in-use)
-	     (declare (ignore bytes-in-use))
-	     (write-string "[doing purification: " notify-stream)
-	     (force-output notify-stream)))
+	 (lambda (notify-stream bytes-in-use)
+	   (declare (ignore bytes-in-use))
+	   (write-string "[doing purification: " notify-stream)
+	   (force-output notify-stream)))
 	(*internal-gc*
-	 #'(lambda ()
-	     (%purify (get-lisp-obj-address root-structures)
-		      (get-lisp-obj-address nil))))
+	 (lambda ()
+	   (%purify (get-lisp-obj-address root-structures)
+		    (get-lisp-obj-address nil))))
 	(*gc-notify-after*
-	 #'(lambda (notify-stream &rest ignore)
-	     (declare (ignore ignore))
-	     (write-line "done]" notify-stream))))
+	 (lambda (notify-stream &rest ignore)
+	   (declare (ignore ignore))
+	   (write-line "done]" notify-stream))))
     (gc))
   nil)

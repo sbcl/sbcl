@@ -655,14 +655,14 @@
   (expand-bind-defaults () params
     `(handler-bind
 	 ((format-error
-	   #'(lambda (condition)
-	       (error 'format-error
-		      :complaint
-		      "~A~%while processing indirect format string:"
-		      :arguments (list condition)
-		      :print-banner nil
-		      :control-string ,string
-		      :offset ,(1- end)))))
+	   (lambda (condition)
+	     (error 'format-error
+		    :complaint
+		    "~A~%while processing indirect format string:"
+		    :arguments (list condition)
+		    :print-banner nil
+		    :control-string ,string
+		    :offset ,(1- end)))))
        ,(if atsignp
 	    (if *orig-args-available*
 		`(setf args (%format stream ,(expand-next-arg) orig-args args))
@@ -867,14 +867,14 @@
 		 (if *orig-args-available*
 		     `((handler-bind
 			   ((format-error
-			     #'(lambda (condition)
-				 (error 'format-error
-					:complaint
-			"~A~%while processing indirect format string:"
-					:arguments (list condition)
-					:print-banner nil
-					:control-string ,string
-					:offset ,(1- end)))))
+			     (lambda (condition)
+			       (error 'format-error
+				      :complaint
+			      "~A~%while processing indirect format string:"
+				      :arguments (list condition)
+				      :print-banner nil
+				      :control-string ,string
+				      :offset ,(1- end)))))
 			 (setf args
 			       (%format stream inside-string orig-args args))))
 		     (throw 'need-orig-args nil))
@@ -1104,10 +1104,10 @@
 		       (line-len '(or (sb!impl::line-length stream) 72)))
 		      (format-directive-params first-semi)
 		    `(setf extra-space ,extra line-len ,line-len))))
-	   ,@(mapcar #'(lambda (segment)
-			 `(push (with-output-to-string (stream)
-				  ,@(expand-directive-list segment))
-				segments))
+	   ,@(mapcar (lambda (segment)
+		       `(push (with-output-to-string (stream)
+				,@(expand-directive-list segment))
+			      segments))
 		     segments))
 	 (format-justification stream
 			       ,@(if newline-segment-p

@@ -862,14 +862,14 @@
   (interpret-bind-defaults () params
     (handler-bind
 	((format-error
-	  #'(lambda (condition)
-	      (error 'format-error
-		     :complaint
-		     "~A~%while processing indirect format string:"
-		     :arguments (list condition)
-		     :print-banner nil
-		     :control-string string
-		     :offset (1- end)))))
+	  (lambda (condition)
+	    (error 'format-error
+		   :complaint
+		   "~A~%while processing indirect format string:"
+		   :arguments (list condition)
+		   :print-banner nil
+		   :control-string string
+		   :offset (1- end)))))
       (if atsignp
 	  (setf args (%format stream (next-arg) orig-args args))
 	  (%format stream (next-arg) (next-arg))))))
@@ -1002,14 +1002,15 @@
 	       (if (zerop posn)
 		   (handler-bind
 		       ((format-error
-			 #'(lambda (condition)
-			     (error 'format-error
-				    :complaint
+			 (lambda (condition)
+			   (error
+			    'format-error
+			    :complaint
 			    "~A~%while processing indirect format string:"
-				    :arguments (list condition)
-				    :print-banner nil
-				    :control-string string
-				    :offset (1- end)))))
+			    :arguments (list condition)
+			    :print-banner nil
+			    :control-string string
+			    :offset (1- end)))))
 		     (%format stream insides orig-args args))
 		   (interpret-directive-list stream insides
 					     orig-args args)))
@@ -1141,13 +1142,13 @@
     (if per-line-p
 	(pprint-logical-block
 	    (stream arg :per-line-prefix prefix :suffix suffix)
-	  (let ((*logical-block-popper* #'(lambda () (pprint-pop))))
+	  (let ((*logical-block-popper* (lambda () (pprint-pop))))
 	    (catch 'up-and-out
 	      (interpret-directive-list stream insides
 					(if atsignp orig-args arg)
 					arg))))
 	(pprint-logical-block (stream arg :prefix prefix :suffix suffix)
-	  (let ((*logical-block-popper* #'(lambda () (pprint-pop))))
+	  (let ((*logical-block-popper* (lambda () (pprint-pop))))
 	    (catch 'up-and-out
 	      (interpret-directive-list stream insides
 					(if atsignp orig-args arg)

@@ -94,7 +94,7 @@
        *READ-EVAL*			T
        *READ-SUPPRESS*			NIL
        *READTABLE*			the standard readtable"
-  `(%with-standard-io-syntax #'(lambda () ,@body)))
+  `(%with-standard-io-syntax (lambda () ,@body)))
 
 (defun %with-standard-io-syntax (function)
   (let ((*package* (find-package "COMMON-LISP-USER"))

@@ -847,7 +847,7 @@
 	     (pprint-dispatch-entry-priority e2)))))
 
 (macrolet ((frob (x)
-	     `(cons ',x #'(lambda (object) ,x))))
+	     `(cons ',x (lambda (object) ,x))))
   (defvar *precompiled-pprint-dispatch-funs*
     (list (frob (typep object 'array))
 	  (frob (and (consp object)
@@ -876,12 +876,12 @@
 		      (destructuring-bind (type) (cdr type)
 			`(not ,(compute-test-expr type object))))
 		     (and
-		      `(and ,@(mapcar #'(lambda (type)
-					  (compute-test-expr type object))
+		      `(and ,@(mapcar (lambda (type)
+					(compute-test-expr type object))
 				      (cdr type))))
 		     (or
-		      `(or ,@(mapcar #'(lambda (type)
-					 (compute-test-expr type object))
+		      `(or ,@(mapcar (lambda (type)
+				       (compute-test-expr type object))
 				     (cdr type))))
 		     (t
 		      `(typep ,object ',type)))
@@ -898,8 +898,8 @@
 	 (new (make-pprint-dispatch-table
 	       :entries (copy-list (pprint-dispatch-table-entries orig))))
 	 (new-cons-entries (pprint-dispatch-table-cons-entries new)))
-    (maphash #'(lambda (key value)
-		 (setf (gethash key new-cons-entries) value))
+    (maphash (lambda (key value)
+	       (setf (gethash key new-cons-entries) value))
 	     (pprint-dispatch-table-cons-entries orig))
     new))
 
@@ -919,8 +919,8 @@
 	      (return entry)))))
     (if entry
 	(values (pprint-dispatch-entry-fun entry) t)
-	(values #'(lambda (stream object)
-		    (output-ugly-object object stream))
+	(values (lambda (stream object)
+		  (output-ugly-object object stream))
 		nil))))
 
 (defun set-pprint-dispatch (type function &optional

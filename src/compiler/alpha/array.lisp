@@ -100,7 +100,7 @@
                 (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type)
 		  ,type
                   vector-data-offset other-pointer-lowtag
-                  ,(remove-if #'(lambda (x) (member x '(null zero))) scs)
+                  ,(remove-if (lambda (x) (member x '(null zero))) scs)
                   ,element-type
                   data-vector-ref)
                 (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type)

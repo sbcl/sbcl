@@ -427,9 +427,9 @@
   #!+sb-doc
   "Return a list of all existing packages."
   (let ((res ()))
-    (maphash #'(lambda (k v)
-		 (declare (ignore k))
-		 (pushnew v res))
+    (maphash (lambda (k v)
+	       (declare (ignore k))
+	       (pushnew v res))
 	     *package-names*)
     res))
 
@@ -851,10 +851,10 @@
   "Return a list of all symbols in the system having the specified name."
   (let ((string (string string-or-symbol))
 	(res ()))
-    (maphash #'(lambda (k v)
-		 (declare (ignore k))
-		 (multiple-value-bind (s w) (find-symbol string v)
-		   (when w (pushnew s res))))
+    (maphash (lambda (k v)
+	       (declare (ignore k))
+	       (multiple-value-bind (s w) (find-symbol string v)
+		 (when w (pushnew s res))))
 	     *package-names*)
     res))
 

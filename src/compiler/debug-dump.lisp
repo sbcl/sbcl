@@ -375,8 +375,8 @@
 	  (frob-lambda let (= level 3)))))
 
     (let ((sorted (sort (vars) #'string<
-			:key #'(lambda (x)
-				 (symbol-name (leaf-debug-name (car x))))))
+			:key (lambda (x)
+			       (symbol-name (leaf-debug-name (car x))))))
 	  (prev-name nil)
 	  (id 0)
 	  (i 0)

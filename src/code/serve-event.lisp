@@ -185,9 +185,9 @@
 		      (values sec usec))))
 	      (values 0 0))
 	(declare (type (unsigned-byte 31) stop-sec stop-usec))
-	(with-fd-handler (fd direction #'(lambda (fd)
-					   (declare (ignore fd))
-					   (setf usable t)))
+	(with-fd-handler (fd direction (lambda (fd)
+					 (declare (ignore fd))
+					 (setf usable t)))
 	  (loop
 	    (sub-serve-event to-sec to-usec)
 

@@ -23,8 +23,8 @@
     (cond
      ((null (intersection args sb!xc:lambda-list-keywords))
       `(defun (setf ,name) ,arglist
-	 (declare ,@(mapcar #'(lambda (arg type)
-				`(type ,type ,arg))
+	 (declare ,@(mapcar (lambda (arg type)
+			      `(type ,type ,arg))
 			    arglist
 			    (cons res args)))
 	 (setf (,name ,@(rest arglist)) ,(first arglist))))

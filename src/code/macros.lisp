@@ -31,8 +31,8 @@
    some locations known to SETF, starting over with test-form. Returns NIL."
   `(do () (,test-form)
      (assert-error ',test-form ',places ,datum ,@arguments)
-     ,@(mapcar #'(lambda (place)
-		   `(setf ,place (assert-prompt ',place ,place)))
+     ,@(mapcar (lambda (place)
+		 `(setf ,place (assert-prompt ',place ,place)))
 	       places)))
 
 (defun assert-prompt (name value)
@@ -448,7 +448,7 @@ the usual naming convention (names like *FOO*) for special variables"
   code in BODY to provide possible further output."
   `(%print-unreadable-object ,object ,stream ,type ,identity
 			     ,(if body
-				  `#'(lambda () ,@body)
+				  `(lambda () ,@body)
 				  nil)))
 
 (defmacro-mundanely ignore-errors (&rest forms)

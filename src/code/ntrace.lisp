@@ -155,9 +155,9 @@
       (if (sb-di:code-location-p loc)
 	  (let ((fun (sb-di:preprocess-for-eval exp loc)))
 	    (cons exp
-		  #'(lambda (frame)
-		      (let ((*current-frame* frame))
-			(funcall fun frame)))))
+		  (lambda (frame)
+		    (let ((*current-frame* frame))
+		      (funcall fun frame)))))
 	  (let* ((bod (ecase loc
 			((nil) exp)
 			(:encapsulated
@@ -168,13 +168,13 @@
 			    ,exp))))
 		 (fun (coerce `(lambda () ,bod) 'function)))
 	    (cons exp
-		  #'(lambda (frame)
-		      (declare (ignore frame))
-		      (let ((*current-frame* nil))
-			(funcall fun)))))))))
+		  (lambda (frame)
+		    (declare (ignore frame))
+		    (let ((*current-frame* nil))
+		      (funcall fun)))))))))
 
 (defun coerce-form-list (forms loc)
-  (mapcar #'(lambda (x) (coerce-form x loc)) forms))
+  (mapcar (lambda (x) (coerce-form x loc)) forms))
 
 ;;; Print indentation according to the number of trace entries.
 ;;; Entries whose condition was false don't count.
@@ -236,34 +236,34 @@
   (let (conditionp)
     (values
 
-     #'(lambda (frame bpt)
-	 (declare (ignore bpt))
-	 (discard-invalid-entries frame)
-	 (let ((condition (trace-info-condition info))
-	       (wherein (trace-info-wherein info)))
-	   (setq conditionp
-		 (and (not *in-trace*)
-		      (or (not condition)
-			  (funcall (cdr condition) frame))
-		      (or (not wherein)
-			  (trace-wherein-p frame wherein)))))
-	 (when conditionp
-	   (let ((sb-kernel:*current-level* 0)
-		 (*standard-output* *trace-output*)
-		 (*in-trace* t))
-	     (fresh-line)
-	     (print-trace-indentation)
-	     (if (trace-info-encapsulated info)
-		 (locally (declare (special basic-definition argument-list))
-		   (prin1 `(,(trace-info-what info) ,@argument-list)))
-		 (print-frame-call frame))
-	     (terpri)
-	     (trace-print frame (trace-info-print info)))
-	   (trace-maybe-break info (trace-info-break info) "before" frame)))
+     (lambda (frame bpt)
+       (declare (ignore bpt))
+       (discard-invalid-entries frame)
+       (let ((condition (trace-info-condition info))
+	     (wherein (trace-info-wherein info)))
+	 (setq conditionp
+	       (and (not *in-trace*)
+		    (or (not condition)
+			(funcall (cdr condition) frame))
+		    (or (not wherein)
+			(trace-wherein-p frame wherein)))))
+       (when conditionp
+	 (let ((sb-kernel:*current-level* 0)
+	       (*standard-output* *trace-output*)
+	       (*in-trace* t))
+	   (fresh-line)
+	   (print-trace-indentation)
+	   (if (trace-info-encapsulated info)
+	       (locally (declare (special basic-definition argument-list))
+			(prin1 `(,(trace-info-what info) ,@argument-list)))
+	       (print-frame-call frame))
+	   (terpri)
+	   (trace-print frame (trace-info-print info)))
+	 (trace-maybe-break info (trace-info-break info) "before" frame)))
 
-     #'(lambda (frame cookie)
-	 (declare (ignore frame))
-	 (push (cons cookie conditionp) *traced-entries*)))))
+     (lambda (frame cookie)
+       (declare (ignore frame))
+       (push (cons cookie conditionp) *traced-entries*)))))
 
 ;;; This prints a representation of the return values delivered.
 ;;; First, this checks to see that cookie is at the top of
@@ -272,35 +272,35 @@
 ;;; see whether the function is still traced and that the condition
 ;;; succeeded before printing anything.
 (defun trace-end-breakpoint-fun (info)
-  #'(lambda (frame bpt *trace-values* cookie)
-      (declare (ignore bpt))
-      (unless (eq cookie (caar *traced-entries*))
-	(setf *traced-entries*
-	      (member cookie *traced-entries* :key #'car)))
+  (lambda (frame bpt *trace-values* cookie)
+    (declare (ignore bpt))
+    (unless (eq cookie (caar *traced-entries*))
+      (setf *traced-entries*
+	    (member cookie *traced-entries* :key #'car)))
 
-      (let ((entry (pop *traced-entries*)))
-	(when (and (not (trace-info-untraced info))
-		   (or (cdr entry)
-		       (let ((cond (trace-info-condition-after info)))
-			 (and cond (funcall (cdr cond) frame)))))
-	  (let ((sb-kernel:*current-level* 0)
-		(*standard-output* *trace-output*)
-		(*in-trace* t))
-	    (fresh-line)
-	    (pprint-logical-block (*standard-output* nil)
-	      (print-trace-indentation)
-	      (pprint-indent :current 2)
-	      (format t "~S returned" (trace-info-what info))
-	      (dolist (v *trace-values*)
-		(write-char #\space)
-		(pprint-newline :linear)
-		(prin1 v)))
-	    (terpri)
-	    (trace-print frame (trace-info-print-after info)))
-	  (trace-maybe-break info
-			     (trace-info-break-after info)
-			     "after"
-			     frame)))))
+    (let ((entry (pop *traced-entries*)))
+      (when (and (not (trace-info-untraced info))
+		 (or (cdr entry)
+		     (let ((cond (trace-info-condition-after info)))
+		       (and cond (funcall (cdr cond) frame)))))
+	(let ((sb-kernel:*current-level* 0)
+	      (*standard-output* *trace-output*)
+	      (*in-trace* t))
+	  (fresh-line)
+	  (pprint-logical-block (*standard-output* nil)
+	    (print-trace-indentation)
+	    (pprint-indent :current 2)
+	    (format t "~S returned" (trace-info-what info))
+	    (dolist (v *trace-values*)
+	      (write-char #\space)
+	      (pprint-newline :linear)
+	      (prin1 v)))
+	  (terpri)
+	  (trace-print frame (trace-info-print-after info)))
+	(trace-maybe-break info
+			   (trace-info-break-after info)
+			   "after"
+			   frame)))))
 
 ;;; This function is called by the trace encapsulation. It calls the
 ;;; breakpoint hook functions with NIL for the breakpoint and cookie,

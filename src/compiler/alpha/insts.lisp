@@ -49,21 +49,21 @@
 
 (defparameter reg-symbols
   (map 'vector
-       #'(lambda (name)
-           (cond ((null name) nil)
-                 (t (make-symbol (concatenate 'string "$" name)))))
+       (lambda (name)
+	 (cond ((null name) nil)
+	       (t (make-symbol (concatenate 'string "$" name)))))
        *register-names*))
 
 (sb!disassem:define-argument-type reg
-  :printer #'(lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
-               (let ((regname (aref reg-symbols value)))
-                 (princ regname stream)
-                 (sb!disassem:maybe-note-associated-storage-ref
-                  value
-                  'registers
-                  regname
-                  dstate))))
+  :printer (lambda (value stream dstate)
+	     (declare (stream stream) (fixnum value))
+	     (let ((regname (aref reg-symbols value)))
+	       (princ regname stream)
+	       (sb!disassem:maybe-note-associated-storage-ref
+		value
+		'registers
+		regname
+		dstate))))
 
 (defparameter float-reg-symbols
   (coerce
@@ -71,22 +71,22 @@
    'vector))
 
 (sb!disassem:define-argument-type fp-reg
-  :printer #'(lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
-               (let ((regname (aref float-reg-symbols value)))
-                 (princ regname stream)
-                 (sb!disassem:maybe-note-associated-storage-ref
-                  value
-                  'float-registers
-                  regname
-                  dstate))))
+  :printer (lambda (value stream dstate)
+	     (declare (stream stream) (fixnum value))
+	     (let ((regname (aref float-reg-symbols value)))
+	       (princ regname stream)
+	       (sb!disassem:maybe-note-associated-storage-ref
+		value
+		'float-registers
+		regname
+		dstate))))
 
 (sb!disassem:define-argument-type relative-label
   :sign-extend t
-  :use-label #'(lambda (value dstate)
-		 (declare (type (signed-byte 21) value)
-			  (type sb!disassem:disassem-state dstate))
-		 (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+  :use-label (lambda (value dstate)
+	       (declare (type (signed-byte 21) value)
+			(type sb!disassem:disassem-state dstate))
+	       (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
 
 
 
@@ -244,14 +244,14 @@
                                       '((ra nil :type 'fp-reg)))))
                 (:emitter
                  (emit-back-patch segment 4
-                                  #'(lambda (segment posn)
-                                      (emit-branch segment ,op
-                                                   ,@(if float
-                                                         '((fp-reg-tn-encoding ra))
+                                  (lambda (segment posn)
+				    (emit-branch segment ,op
+						 ,@(if float
+						       '((fp-reg-tn-encoding ra))
                                                        '((reg-tn-encoding ra)))
-                                                   (ash (- (label-position target)
-                                                           (+ posn 4))
-                                                        -2))))))))
+						 (ash (- (label-position target)
+							 (+ posn 4))
+						      -2))))))))
   (define-branch br   #x30)
   (define-branch bsr  #x34)
   (define-branch blbc #x38)
@@ -533,11 +533,11 @@
 (defun emit-header-data (segment type)
   (emit-back-patch
    segment 4
-   #'(lambda (segment posn)
-       (emit-lword segment
-		  (logior type
-			  (ash (+ posn (component-header-length))
-			       (- n-widetag-bits word-shift)))))))
+   (lambda (segment posn)
+     (emit-lword segment
+		 (logior type
+			 (ash (+ posn (component-header-length))
+			      (- n-widetag-bits word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   (:cost 0)
@@ -554,36 +554,36 @@
   (emit-chooser
    ;; We emit either 12 or 4 bytes, so we maintain 8 byte alignments.
    segment 12 3
-   #'(lambda (segment posn delta-if-after)
-       (let ((delta (funcall calc label posn delta-if-after)))
-	  (when (<= (- (ash 1 15)) delta (1- (ash 1 15)))
-	    (emit-back-patch segment 4
-			     #'(lambda (segment posn)
-				 (assemble (segment vop)
-					   (inst lda dst
-						 (funcall calc label posn 0)
-						 src))))
-	    t)))
-   #'(lambda (segment posn)
-       (assemble (segment vop)
-	 (flet ((se (x n)
-		  (let ((x (logand x (lognot (ash -1 n)))))
-		    (if (logbitp (1- n) x)
-			(logior (ash -1 (1- n)) x)
-			x))))
-	   (let* ((value (se (funcall calc label posn 0) 32))
-		  (low (ldb (byte 16 0) value))
-		  (tmp1 (- value (se low 16)))
-		  (high (ldb (byte 16 16) tmp1))
-		  (tmp2 (- tmp1 (se (ash high 16) 32)))
-		  (extra 0))
-	     (unless (= tmp2 0)
-	       (setf extra #x4000)
-	       (setf tmp1 (- tmp1 #x40000000))
-	       (setf high (ldb (byte 16 16) tmp1)))
-	     (inst lda dst low src)
-	     (inst ldah dst extra dst)
-	     (inst ldah dst high dst)))))))
+   (lambda (segment posn delta-if-after)
+     (let ((delta (funcall calc label posn delta-if-after)))
+       (when (<= (- (ash 1 15)) delta (1- (ash 1 15)))
+	 (emit-back-patch segment 4
+			  (lambda (segment posn)
+			    (assemble (segment vop)
+				      (inst lda dst
+					    (funcall calc label posn 0)
+					    src))))
+	 t)))
+   (lambda (segment posn)
+     (assemble (segment vop)
+	       (flet ((se (x n)
+			  (let ((x (logand x (lognot (ash -1 n)))))
+			    (if (logbitp (1- n) x)
+				(logior (ash -1 (1- n)) x)
+				x))))
+		 (let* ((value (se (funcall calc label posn 0) 32))
+			(low (ldb (byte 16 0) value))
+			(tmp1 (- value (se low 16)))
+			(high (ldb (byte 16 16) tmp1))
+			(tmp2 (- tmp1 (se (ash high 16) 32)))
+			(extra 0))
+		   (unless (= tmp2 0)
+		     (setf extra #x4000)
+		     (setf tmp1 (- tmp1 #x40000000))
+		     (setf high (ldb (byte 16 16) tmp1)))
+		   (inst lda dst low src)
+		   (inst ldah dst extra dst)
+		   (inst ldah dst high dst)))))))
 
 ;; code = fn - header - label-offset + other-pointer-tag
 (define-instruction compute-code-from-fn (segment dst src label temp)
@@ -591,10 +591,10 @@
   (:vop-var vop)
   (:emitter
    (emit-compute-inst segment vop dst src label temp
-		      #'(lambda (label posn delta-if-after)
-			  (- other-pointer-lowtag
-			     (label-position label posn delta-if-after)
-			     (component-header-length))))))
+		      (lambda (label posn delta-if-after)
+			(- other-pointer-lowtag
+			   (label-position label posn delta-if-after)
+			   (component-header-length))))))
 
 ;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tag
 ;;      = lra - (header + label-offset)
@@ -603,9 +603,9 @@
   (:vop-var vop)
   (:emitter
    (emit-compute-inst segment vop dst src label temp
-		      #'(lambda (label posn delta-if-after)
-			  (- (+ (label-position label posn delta-if-after)
-				(component-header-length)))))))
+		      (lambda (label posn delta-if-after)
+			(- (+ (label-position label posn delta-if-after)
+			      (component-header-length)))))))
 
 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
 (define-instruction compute-lra-from-code (segment dst src label temp)
@@ -613,6 +613,6 @@
   (:vop-var vop)
   (:emitter
    (emit-compute-inst segment vop dst src label temp
-		      #'(lambda (label posn delta-if-after)
-			  (+ (label-position label posn delta-if-after)
-			     (component-header-length))))))
+		      (lambda (label posn delta-if-after)
+			(+ (label-position label posn delta-if-after)
+			   (component-header-length))))))

@@ -1110,17 +1110,17 @@ p	    ;; the branch has two dependents and one of them dpends on
 		  `((**current-segment** ,seg-var)))
 	      ,@(when vop
 		  `((**current-vop** ,vop-var)))
-	      ,@(mapcar #'(lambda (name)
-			    `(,name (gen-label)))
+	      ,@(mapcar (lambda (name)
+			  `(,name (gen-label)))
 			new-labels))
 	 (symbol-macrolet ((**current-segment** ,seg-var)
 			   (**current-vop** ,vop-var)
 			   ,@(when (or inherited-labels nested-labels)
 			       `((..inherited-labels.. ,nested-labels))))
-	   ,@(mapcar #'(lambda (form)
-			 (if (label-name-p form)
-			     `(emit-label ,form)
-			     form))
+	   ,@(mapcar (lambda (form)
+		       (if (label-name-p form)
+			   `(emit-label ,form)
+			   form))
 		     body))))))
 #+sb-xc-host
 (sb!xc:defmacro assemble ((&optional segment vop &key labels)
@@ -1152,17 +1152,17 @@ p	    ;; the branch has two dependents and one of them dpends on
 		  `((**current-segment** ,seg-var)))
 	      ,@(when vop
 		  `((**current-vop** ,vop-var)))
-	      ,@(mapcar #'(lambda (name)
-			    `(,name (gen-label)))
+	      ,@(mapcar (lambda (name)
+			  `(,name (gen-label)))
 			new-labels))
 	 (symbol-macrolet ((**current-segment** ,seg-var)
 			   (**current-vop** ,vop-var)
 			   ,@(when (or inherited-labels nested-labels)
 			       `((..inherited-labels.. ,nested-labels))))
-	   ,@(mapcar #'(lambda (form)
-			 (if (label-name-p form)
-			     `(emit-label ,form)
-			     form))
+	   ,@(mapcar (lambda (form)
+		       (if (label-name-p form)
+			   `(emit-label ,form)
+			   form))
 		     body))))))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
@@ -1452,11 +1452,11 @@ p	    ;; the branch has two dependents and one of them dpends on
 		  reconstructor))))))
 
 (defun extract-nths (index glue list-of-lists-of-lists)
-  (mapcar #'(lambda (list-of-lists)
-	      (cons glue
-		    (mapcar #'(lambda (list)
-				(nth index list))
-			    list-of-lists)))
+  (mapcar (lambda (list-of-lists)
+	    (cons glue
+		  (mapcar (lambda (list)
+			    (nth index list))
+			  list-of-lists)))
 	  list-of-lists-of-lists))
 
 (defmacro define-instruction (name lambda-list &rest options)
@@ -1624,10 +1624,10 @@ p	    ;; the branch has two dependents and one of them dpends on
 				  :environment env)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
 	 (%define-instruction ,(symbol-name name)
-			      #'(lambda (,whole ,env)
-				  ,@local-defs
-				  (block ,name
-				    ,body)))))))
+			      (lambda (,whole ,env)
+				,@local-defs
+				(block ,name
+				  ,body)))))))
 
 (defun %define-instruction (name defun)
   (setf (gethash name *assem-instructions*) defun)

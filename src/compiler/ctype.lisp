@@ -362,10 +362,10 @@
 	 (types (approximate-fun-type-types type))
 	 (args (combination-args call))
 	 (nargs (length args))
-	 (allowp (some #'(lambda (x)
-			   (and (constant-continuation-p x)
-				(eq (continuation-value x) :allow-other-keys)))
-			  args)))
+	 (allowp (some (lambda (x)
+			 (and (constant-continuation-p x)
+			      (eq (continuation-value x) :allow-other-keys)))
+		       args)))
 
     (setf (approximate-fun-type-min-args type)
 	  (min (approximate-fun-type-min-args type) nargs))
@@ -377,8 +377,8 @@
 	((null old)
 	 (setf (approximate-fun-type-types type)
 	       (nconc types
-		      (mapcar #'(lambda (x)
-				  (list (continuation-type x)))
+		      (mapcar (lambda (x)
+				(list (continuation-type x)))
 			      arg))))
       (when (null arg) (return))
       (pushnew (continuation-type (car arg))
@@ -396,10 +396,10 @@
 	    (let ((name (continuation-value key)))
 	      (when (keywordp name)
 		(let ((old (find-if
-			    #'(lambda (x)
-				(and (eq (approximate-key-info-name x) name)
-				     (= (approximate-key-info-position x)
-					pos)))
+			    (lambda (x)
+			      (and (eq (approximate-key-info-name x) name)
+				   (= (approximate-key-info-position x)
+				      pos)))
 			    (keys)))
 		      (val-type (continuation-type val)))
 		  (cond (old
@@ -664,10 +664,10 @@
 
 	(dolist (key keys)
 	  (unless (find (key-info-name key) arglist
-			:key #'(lambda (x)
-				 (let ((info (lambda-var-arg-info x)))
-				   (when info
-				     (arg-info-key info)))))
+			:key (lambda (x)
+			       (let ((info (lambda-var-arg-info x)))
+				 (when info
+				   (arg-info-key info)))))
 	    (note-lossage
 	     "The definition lacks the ~S key present in ~A."
 	     (key-info-name key) where))))

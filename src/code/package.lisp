@@ -227,10 +227,10 @@
 	 (inherited-symbol-p (gensym))
 	 (BLOCK (gensym)))
     `(let* ((,these-packages ,package-list)
-	    (,packages `,(mapcar #'(lambda (package)
-				     (if (packagep package)
-					 package
-					 (find-package package)))
+	    (,packages `,(mapcar (lambda (package)
+				   (if (packagep package)
+				       package
+				       (find-package package)))
 				 (if (consp ,these-packages)
 				     ,these-packages
 				     (list ,these-packages))))
@@ -253,7 +253,8 @@
 				    (car ,',packages))))
 		     (when ,symbols
 		       (setf ,',vector (package-hashtable-table ,symbols))
-		       (setf ,',hash-vector (package-hashtable-hash ,symbols)))))
+		       (setf ,',hash-vector
+			     (package-hashtable-hash ,symbols)))))
 		 (:external
 		  `(let ((,symbols (package-external-symbols
 				    (car ,',packages))))
