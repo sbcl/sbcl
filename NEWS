@@ -2130,6 +2130,9 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
     of its result.
   * type declarations inside WITH-SLOTS are checked.  (reported by
     salex on #lisp)
+  * loading incompatible FASLs, e.g. those produced by an incompatible
+    lisp implementation, cause a condition of type SB-EXT:INVALID-FASL
+    (a subtype of ERROR) to be raised.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** incorrect optimization of TRUNCATE for a positive first
        argument and negative second.

@@ -205,6 +205,70 @@
 		(progn ,@forms)
 		(setq *fop-stack-pointer* ,n-index)))))))
 
+;;;; Conditions signalled on invalid fasls (wrong fasl version, etc),
+;;;; so that user code (esp. ASDF) can reasonably handle attempts to
+;;;; load such fasls by recompiling them, etc. For simplicity's sake
+;;;; make only condition INVALID-FASL part of the public interface,
+;;;; and keep the guts internal.
+
+(define-condition sb!ext::invalid-fasl (error)
+  ((stream :reader invalid-fasl-stream :initarg :stream)
+   (expected :reader invalid-fasl-expected :initarg :expected))
+  (:report
+   (lambda (condition stream)
+     (format stream "~S is an invalid fasl file."
+	     (invalid-fasl-stream condition)))))
+
+(define-condition invalid-fasl-header (sb!ext::invalid-fasl)
+  ((byte :reader invalid-fasl-byte :initarg :byte)
+   (byte-nr :reader invalid-fasl-byte-nr :initarg :byte-nr))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<~S contains an illegal byte in the FASL header at ~
+                     position ~A: Expected ~A, got ~A.~:@>"
+	     (invalid-fasl-stream condition)
+	     (invalid-fasl-byte-nr condition)
+	     (invalid-fasl-byte condition)
+	     (invalid-fasl-expected condition)))))
+
+(define-condition invalid-fasl-version (sb!ext::invalid-fasl)
+  ((variant :reader invalid-fasl-variant :initarg :variant)
+   (version :reader invalid-fasl-version :initarg :version))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<~S is in ~A fasl file format version ~W, ~
+                    but this version of SBCL uses format version ~W.~:@>"
+	     (invalid-fasl-stream condition)
+	     (invalid-fasl-variant condition)
+	     (invalid-fasl-version condition)
+	     (invalid-fasl-expected condition)))))
+
+(define-condition invalid-fasl-implementation (sb!ext::invalid-fasl)
+  ((implementation :reader invalid-fasl-implementation
+		   :initarg :implementation))
+  (:report 
+   (lambda (condition stream)
+     (format stream "~S was compiled for implementation ~A, but this is a ~A."
+	     (invalid-fasl-stream condition)
+	     (invalid-fasl-implementation condition)
+	     (invalid-fasl-expected condition)))))
+
+(define-condition invalid-fasl-features (sb!ext::invalid-fasl)
+  ((potential-features :reader invalid-fasl-potential-features
+		       :initarg :potential-features)
+   (features :reader invalid-fasl-features :initarg :features))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<incompatible ~S in fasl file ~S: ~2I~_~
+                     Of features affecting binary compatibility, ~4I~_~S~2I~_~
+                     the fasl has ~4I~_~A,~2I~_~
+                     while the runtime expects ~4I~_~A.~:>"
+	     '*features* 
+	     (invalid-fasl-stream condition)
+	     (invalid-fasl-potential-features condition)
+	     (invalid-fasl-features condition)
+	     (invalid-fasl-expected condition)))))
+
 ;;;; LOAD-AS-FASL
 ;;;;
 ;;;; Note: LOAD-AS-FASL is used not only by LOAD, but also (with
@@ -226,7 +290,11 @@
       (let* ((fhsss *fasl-header-string-start-string*)
 	     (fhsss-length (length fhsss)))
 	(unless (= byte (char-code (schar fhsss 0)))
-	  (error "illegal first byte in fasl file header"))
+	  (error 'invalid-fasl-header
+		 :stream stream
+		 :first-byte-p t
+		 :byte byte
+		 :expected (char-code (schar fhsss 0))))
 	(do ((byte (read-byte stream) (read-byte stream))
 	     (count 1 (1+ count)))
 	    ((= byte +fasl-header-string-stop-char-code+)
@@ -234,8 +302,11 @@
 	  (declare (fixnum byte count))
 	  (when (and (< count fhsss-length)
 		     (not (eql byte (char-code (schar fhsss count)))))
-	    (error
-	     "illegal subsequent (not first) byte in fasl file header"))))
+	    (error 'invalid-fasl-header
+		   :stream stream
+		   :byte-nr count
+		   :byte byte
+		   :expected (char-code (schar fhsss count))))))
 
       ;; Read and validate version-specific compatibility stuff.
       (flet ((string-from-stream ()
@@ -253,34 +324,27 @@
 				 needed-version)
 		   (when (string= possible-implementation implementation)
 		     (or (= version needed-version)
-			 (error "~@<~S is in ~A fasl file format version ~W, ~
-                                 but this version of SBCL uses ~
-                                 format version ~W.~:@>"
-				stream
-				variant
-				version
-				needed-version)))))
+			 (error 'invalid-fasl-version
+				;; :error :wrong-version
+				:stream stream
+				:variant variant
+				:version version
+				:expected needed-version)))))
 	    (or (check-version "native code"
 			       +backend-fasl-file-implementation+
 			       +fasl-file-version+)
-		(error "~S was compiled for implementation ~A, ~
-                        but this is a ~A."
-		       stream
-		       implementation
-		       +backend-fasl-file-implementation+))))
+		(error 'invalid-fasl-implementation
+		       :stream stream
+		       :implementation implementation
+		       :expected +backend-fasl-file-implementation+))))
 	;; Read and validate *FEATURES* which affect binary compatibility.
 	(let ((faff-in-this-file (string-from-stream)))
 	  (unless (string= faff-in-this-file *features-affecting-fasl-format*)
-	    (error
-	     "~@<incompatible ~S in fasl file ~S: ~2I~_~
-              Of features affecting binary compatibility, ~4I~_~S~2I~_~
-              this runtime has ~4I~_~A,~2I~_~
-              while the fasl expects ~4I~_~A.~:>"
-	     '*features* 
-	     stream
-	     *features-potentially-affecting-fasl-format*
-	     *features-affecting-fasl-format*
-	     faff-in-this-file)))
+	    (error 'invalid-fasl-features
+		   :stream stream
+		   :potential-features *features-potentially-affecting-fasl-format*
+		   :expected *features-affecting-fasl-format*
+		   :features faff-in-this-file)))
 	;; success
 	t))))
 

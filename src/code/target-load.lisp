@@ -42,6 +42,16 @@
 
 ;;;; LOAD itself
 
+(define-condition fasl-header-missing (sb!ext::invalid-fasl)
+  ((fhsss :reader invalid-fasl-fhsss :initarg :fhsss))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<File ~S has a fasl file type, but no fasl header:~%~
+                     Expected ~S, but got ~S.~:@>"
+	     (invalid-fasl-stream condition)
+	     (invalid-fasl-expected condition)
+	     (invalid-fasl-fhsss condition)))))
+
 ;;; a helper function for LOAD: Load the stuff in a file when we have
 ;;; the name.
 (defun internal-load (pathname truename if-does-not-exist verbose print
@@ -82,8 +92,10 @@
 			  :binary))
 	  (t
 	   (when (string= (pathname-type truename) *fasl-file-type*)
-	     (error "File has a fasl file type, but no fasl file header:~%  ~S"
-		    (namestring truename)))
+ 	     (error 'fasl-header-missing
+ 		    :stream (namestring truename)
+ 		    :fhsss first-line
+ 		    :expected fhsss))
 	   (internal-load pathname truename if-does-not-exist verbose print
 			  :source))))))))
 

@@ -591,6 +591,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; to hide it from them..
              "INTERACTIVE-EVAL"
 
+	     ;; Subtype of SIMPLE-ERROR signalled when attempt to
+ 	     ;; load an invalid fasl is made, so that user-code can
+ 	     ;; try to recompile, etc.
+ 	     "INVALID-FASL"
+
              ;; weak pointers and finalization
              "CANCEL-FINALIZATION"
              "FINALIZE"
