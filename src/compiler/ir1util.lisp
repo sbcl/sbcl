@@ -305,7 +305,7 @@
   (declare (type node node))
   (do ((fun (lexenv-lambda (node-lexenv node))
 	    (lexenv-lambda (lambda-call-lexenv fun))))
-      ((not (eq (functional-kind fun) :deleted))
+      ((not (memq (functional-kind fun) '(:deleted :zombie)))
        (lambda-home fun))
     (when (eq (lambda-home fun) fun)
       (return fun))))
@@ -323,12 +323,15 @@
 (defun node-dest (node)
   (awhen (node-lvar node) (lvar-dest it)))
 
+(declaim (inline block-to-be-deleted-p))
+(defun block-to-be-deleted-p (block)
+  (or (block-delete-p block)
+      (eq (functional-kind (block-home-lambda block)) :deleted)))
+
 ;;; Checks whether NODE is in a block to be deleted
 (declaim (inline node-to-be-deleted-p))
 (defun node-to-be-deleted-p (node)
-  (let ((block (node-block node)))
-    (or (block-delete-p block)
-        (eq (functional-kind (block-home-lambda block)) :deleted))))
+  (block-to-be-deleted-p (node-block node)))
 
 (declaim (ftype (sfunction (clambda) cblock) lambda-block))
 (defun lambda-block (clambda)
@@ -778,74 +781,71 @@
     (clambda (delete-lambda fun)))
   (values))
 
-;;; Deal with deleting the last reference to a CLAMBDA. It is called
-;;; in two situations: when the lambda is unreachable (so that its
-;;; body may be deleted), and when it is an effectless LET (in this
-;;; case its body is reachable and is not completely "its"). We set
-;;; FUNCTIONAL-KIND to :DELETED and rely on IR1-OPTIMIZE to delete its
-;;; blocks.
+;;; Deal with deleting the last reference to a CLAMBDA, which means
+;;; that the lambda is unreachable, so that its body may be
+;;; deleted. We set FUNCTIONAL-KIND to :DELETED and rely on
+;;; IR1-OPTIMIZE to delete its blocks.
 (defun delete-lambda (clambda)
   (declare (type clambda clambda))
   (let ((original-kind (functional-kind clambda))
 	(bind (lambda-bind clambda)))
     (aver (not (member original-kind '(:deleted :toplevel))))
     (aver (not (functional-has-external-references-p clambda)))
+    (aver (or (eq original-kind :zombie) bind))
     (setf (functional-kind clambda) :deleted)
     (setf (lambda-bind clambda) nil)
 
-    (when bind              ; CLAMBDA is deleted due to unreachability
-      (labels ((delete-children (lambda)
-                 (dolist (child (lambda-children lambda))
-                   (cond ((eq (functional-kind child) :deleted)
-                          (delete-children child))
-                         (t
-                          (delete-lambda child))))
-                 (setf (lambda-children lambda) nil)
-                 (setf (lambda-parent lambda) nil)))
-        (delete-children clambda)))
-    (dolist (let (lambda-lets clambda))
-      (setf (lambda-bind let) nil)
-      (setf (functional-kind let) :deleted))
-
-    ;; LET may be deleted if its BIND is unreachable. Autonomous
-    ;; function may be deleted if it has no reachable references.
-    (unless (member original-kind '(:let :mv-let :assignment))
-      (dolist (ref (lambda-refs clambda))
-        (mark-for-deletion (node-block ref))))
+    (labels ((delete-children (lambda)
+               (dolist (child (lambda-children lambda))
+                 (cond ((eq (functional-kind child) :deleted)
+                        (delete-children child))
+                       (t
+                        (delete-lambda child))))
+               (setf (lambda-children lambda) nil)
+               (setf (lambda-parent lambda) nil)))
+      (delete-children clambda))
 
     ;; (The IF test is (FUNCTIONAL-SOMEWHAT-LETLIKE-P CLAMBDA), except
     ;; that we're using the old value of the KIND slot, not the
     ;; current slot value, which has now been set to :DELETED.)
-    (if (member original-kind '(:let :mv-let :assignment))
-	(let ((home (lambda-home clambda)))
-	  (setf (lambda-lets home) (delete clambda (lambda-lets home))))
-	;; If the function isn't a LET, we unlink the function head
-	;; and tail from the component head and tail to indicate that
-	;; the code is unreachable. We also delete the function from
-	;; COMPONENT-LAMBDAS (it won't be there before local call
-	;; analysis, but no matter.) If the lambda was never
-	;; referenced, we give a note.
-	(let* ((bind-block (node-block bind))
-	       (component (block-component bind-block))
-	       (return (lambda-return clambda))
-               (return-block (and return (node-block return))))
-	  (unless (leaf-ever-used clambda)
-	    (let ((*compiler-error-context* bind))
-	      (compiler-notify 'code-deletion-note
-			       :format-control "deleting unused function~:[.~;~:*~%  ~S~]"
-			       :format-arguments (list (leaf-debug-name clambda)))))
-          (unless (block-delete-p bind-block)
-            (unlink-blocks (component-head component) bind-block))
-	  (when (and return-block (not (block-delete-p return-block)))
-            (mark-for-deletion return-block)
-	    (unlink-blocks return-block (component-tail component)))
-	  (setf (component-reanalyze component) t)
-	  (let ((tails (lambda-tail-set clambda)))
-	    (setf (tail-set-funs tails)
-		  (delete clambda (tail-set-funs tails)))
-	    (setf (lambda-tail-set clambda) nil))
-	  (setf (component-lambdas component)
-		(delq clambda (component-lambdas component)))))
+    (case original-kind
+      (:zombie)
+      ((:let :mv-let :assignment)
+       (let ((bind-block (node-block bind)))
+         (mark-for-deletion bind-block))
+       (let ((home (lambda-home clambda)))
+         (setf (lambda-lets home) (delete clambda (lambda-lets home)))))
+      (t
+       ;; Function has no reachable references.
+       (dolist (ref (lambda-refs clambda))
+         (mark-for-deletion (node-block ref)))
+       ;; If the function isn't a LET, we unlink the function head
+       ;; and tail from the component head and tail to indicate that
+       ;; the code is unreachable. We also delete the function from
+       ;; COMPONENT-LAMBDAS (it won't be there before local call
+       ;; analysis, but no matter.) If the lambda was never
+       ;; referenced, we give a note.
+       (let* ((bind-block (node-block bind))
+              (component (block-component bind-block))
+              (return (lambda-return clambda))
+              (return-block (and return (node-block return))))
+         (unless (leaf-ever-used clambda)
+           (let ((*compiler-error-context* bind))
+             (compiler-notify 'code-deletion-note
+                              :format-control "deleting unused function~:[.~;~:*~%  ~S~]"
+                              :format-arguments (list (leaf-debug-name clambda)))))
+         (unless (block-delete-p bind-block)
+           (unlink-blocks (component-head component) bind-block))
+         (when (and return-block (not (block-delete-p return-block)))
+           (mark-for-deletion return-block)
+           (unlink-blocks return-block (component-tail component)))
+         (setf (component-reanalyze component) t)
+         (let ((tails (lambda-tail-set clambda)))
+           (setf (tail-set-funs tails)
+                 (delete clambda (tail-set-funs tails)))
+           (setf (lambda-tail-set clambda) nil))
+         (setf (component-lambdas component)
+               (delq clambda (component-lambdas component))))))
 
     ;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
     ;; ENTRY-FUN so that people will know that it is not an entry
@@ -927,7 +927,7 @@
 		 (delete-lambda leaf))
 		(:external
 		 (delete-lambda leaf))
-		((:deleted :optional))))
+		((:deleted :zombie :optional))))
 	     (optional-dispatch
 	      (unless (eq (functional-kind leaf) :deleted)
 		(delete-optional-dispatch leaf)))))
@@ -1542,7 +1542,7 @@
               ;; analysis, it is LET-converted: LET-converted functionals
               ;; are too badly trashed to expand them inline, and deleted
               ;; LET-converted functionals are even worse.
-              (eql (functional-kind functional) :deleted)))
+              (memq (functional-kind functional) '(:deleted :zombie))))
     (throw 'locall-already-let-converted functional)))
 
 (defun call-full-like-p (call)

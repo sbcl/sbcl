@@ -785,9 +785,12 @@
   ;;    :DELETED
   ;;	This function has been found to be uncallable, and has been
   ;;	marked for deletion.
+  ;;
+  ;;    :ZOMBIE
+  ;;    Effectless [MV-]LET; has no BIND node.
   (kind nil :type (member nil :optional :deleted :external :toplevel
 			  :escape :cleanup :let :mv-let :assignment
-			  :toplevel-xep))
+                          :zombie :toplevel-xep))
   ;; Is this a function that some external entity (e.g. the fasl dumper)
   ;; refers to, so that even when it appears to have no references, it
   ;; shouldn't be deleted? In the old days (before

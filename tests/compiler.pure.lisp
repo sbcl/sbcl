@@ -977,3 +977,29 @@
                                  (ceiling
                                   (flet ((%f16 () 0)) (%f16))))))))
                '(0 0)))
+
+;;; MISC.184
+(assert (zerop
+         (funcall
+          (compile
+           nil
+           '(lambda (a b c)
+             (declare (type (integer 867934833 3293695878) a))
+             (declare (type (integer -82111 1776797) b))
+             (declare (type (integer -1432413516 54121964) c))
+             (declare (optimize (speed 3)))
+             (declare (optimize (safety 1)))
+             (declare (optimize (debug 1)))
+             (if nil
+                 (flet ((%f15 (f15-1 &optional (f15-2 c))
+                          (labels ((%f1 (f1-1 f1-2) 0))
+                            (%f1 a 0))))
+                   (flet ((%f4 ()
+                            (multiple-value-call #'%f15
+                              (values (%f15 c 0) (%f15 0)))))
+                     (if nil (%f4)
+                         (flet ((%f8 (f8-1 &optional (f8-2 (%f4)) (f8-3 0))
+                                  f8-3))
+                           0))))
+                 0)))
+          3040851270 1664281 -1340106197)))

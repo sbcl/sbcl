@@ -281,7 +281,7 @@
 	(return))
       (let ((kind (functional-kind functional)))
 	(cond ((or (functional-somewhat-letlike-p functional)
-		   (eql kind :deleted))
+		   (memq kind '(:deleted :zombie)))
 	       (values)) ; nothing to do
 	      ((and (null (leaf-refs functional)) (eq kind nil)
 		    (not (functional-entry-fun functional)))

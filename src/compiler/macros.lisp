@@ -644,7 +644,9 @@
            for ,n-prev = (when ,node-var (node-prev ,node-var))
            and ,lvar = (when (and ,node-var (valued-node-p ,node-var))
 			 (node-lvar ,node-var))
-           while ,node-var
+           while ,(if restart-p
+                      `(and ,node-var (not (block-to-be-deleted-p ,n-block)))
+                      node-var)
            do (progn
                 ,@body))))
 

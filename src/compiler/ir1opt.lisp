@@ -1326,6 +1326,9 @@
     (unlink-node call)
     (unlink-node (lambda-bind clambda))
     (setf (lambda-bind clambda) nil))
+  (setf (functional-kind clambda) :zombie)
+  (let ((home (lambda-home clambda)))
+    (setf (lambda-lets home) (delete clambda (lambda-lets home))))
   (values))
 
 ;;; This function is called when one of the arguments to a LET
