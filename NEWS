@@ -2049,6 +2049,10 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     MEMBER-types to numeric.
   * bug fix: COMPILE-FILE must bind *READTABLE*. (reported by Doug
     McNaught)
+  * bug fix: (SETF AREF) on byte-sized-element arrays with constant index
+    argument now works properly on the Alpha platform.
+  * bug fix: floating point exception treatment on the Alpha platform
+    is improved.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very

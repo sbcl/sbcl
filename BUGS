@@ -1245,3 +1245,13 @@ WORKAROUND:
   requires less registers than [x y z + +]. This transformation is
   currently performed with source transforms, but it would be good to
   also perform it in IR1 optimization phase.
+
+290: Alpha floating point and denormalized traps
+  In SBCL 0.8.3.6x on the alpha, we work around what appears to be a
+  hardware or kernel deficiency: the status of the enable/disable
+  denormalized-float traps bit seems to be ambiguous; by the time we
+  get to os_restore_fp_control after a trap, denormalized traps seem
+  to be enabled.  Since we don't want a trap every time someone uses a
+  denormalized float, in general, we mask out that bit when we restore
+  the control word; however, this clobbers any change the user might
+  have made.

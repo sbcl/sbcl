@@ -587,6 +587,7 @@
 ;;; Alpha floating point modes weren't being reset after an exception,
 ;;; leading to an exception on the second compile, below.
 (compile nil '(lambda (x y) (declare (type (double-float 0.0d0) x y)) (/ x y)))
-(handler-bind ((division-by-zero #'abort))
+(handler-bind ((arithmetic-error #'abort))
+  ;; provoke an exception
   (/ 1.0 0.0))
 (compile nil '(lambda (x y) (declare (type (double-float 0.0d0) x y)) (/ x y)))
