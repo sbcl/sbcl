@@ -372,7 +372,8 @@
   ;; has already been analyzed, but new references have been added by
   ;; inline expansion. Unlike NEW-FUNCTIONALS, this is not disjoint
   ;; from COMPONENT-LAMBDAS.
-  (reanalyze-functionals nil :type list))
+  (reanalyze-functionals nil :type list)
+  (delete-blocks nil :type list))
 (defprinter (component :identity t)
   name
   #!+sb-show id

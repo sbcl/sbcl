@@ -971,6 +971,13 @@
         (unless (block-delete-p block)
           (mark-for-deletion block))))))
 
+;;; Queue the block for deletion
+(defun delete-block-lazily (block)
+  (declare (type cblock block))
+  (unless (block-delete-p block)
+    (setf (block-delete-p block) t)
+    (push block (component-delete-blocks (block-component block)))))
+
 ;;; Do a graph walk backward from BLOCK, marking all predecessor
 ;;; blocks with the DELETE-P flag.
 (defun mark-for-deletion (block)
@@ -978,7 +985,7 @@
   (let* ((component (block-component block))
          (head (component-head component)))
     (labels ((helper (block)
-               (setf (block-delete-p block) t)
+               (delete-block-lazily block)
                (dolist (pred (block-pred block))
                  (unless (or (block-delete-p pred)
                              (eq pred head))
@@ -991,10 +998,12 @@
 ;;; This function does what is necessary to eliminate the code in it
 ;;; from the IR1 representation. This involves unlinking it from its
 ;;; predecessors and successors and deleting various node-specific
-;;; semantic information.
+;;; semantic information. BLOCK must be already removed from
+;;; COMPONENT-DELETE-BLOCKS.
 (defun delete-block (block &optional silent)
   (declare (type cblock block))
   (aver (block-component block))      ; else block is already deleted!
+  #!+high-security (aver (not (memq block (component-delete-blocks (block-component block)))))
   (unless silent
     (note-block-deletion block))
   (setf (block-delete-p block) t)
@@ -1225,7 +1234,11 @@
 	       (unlink-blocks block next)
 	       (dolist (pred (block-pred block))
 		 (change-block-successor pred block next))
-	       (remove-from-dfo block)
+	       (when (block-delete-p block)
+                 (let ((component (block-component block)))
+                   (setf (component-delete-blocks component)
+                         (delq block (component-delete-blocks component)))))
+               (remove-from-dfo block)
                (setf (block-delete-p block) t)
 	       (setf (node-prev node) nil)
 	       t)))))))
@@ -1248,16 +1261,26 @@
   (aver (null (component-new-functionals component)))
   (setf (component-kind component) :deleted)
   (do-blocks (block component)
-    (setf (block-delete-p block) t))
+    (delete-block-lazily block))
   (dolist (fun (component-lambdas component))
     (unless (eq (functional-kind fun) :deleted)
       (setf (functional-kind fun) nil)
       (setf (functional-entry-fun fun) nil)
       (setf (leaf-refs fun) nil)
       (delete-functional fun)))
-  (do-blocks (block component)
-    (delete-block block))
+  (clean-component component)
   (values))
+
+;;; Remove all pending blocks to be deleted. Return the nearest live
+;;; block after or equal to BLOCK.
+(defun clean-component (component &optional block)
+  (loop while (component-delete-blocks component)
+        ;; actual deletion of a block may queue new blocks
+        do (let ((current (pop (component-delete-blocks component))))
+             (when (eq block current)
+               (setq block (block-next block)))
+             (delete-block current)))
+  block)
 
 ;;; Convert code of the form
 ;;;   (FOO ... (FUN ...) ...)

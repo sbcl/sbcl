@@ -216,49 +216,55 @@
 (defun ir1-optimize (component)
   (declare (type component component))
   (setf (component-reoptimize component) nil)
-  (do-blocks (block component)
-    (cond
-      ;; We delete blocks when there is either no predecessor or the
-      ;; block is in a lambda that has been deleted. These blocks
-      ;; would eventually be deleted by DFO recomputation, but doing
-      ;; it here immediately makes the effect available to IR1
-      ;; optimization.
-      ((or (block-delete-p block)
-           (null (block-pred block)))
-       (delete-block block))
-      ((eq (functional-kind (block-home-lambda block)) :deleted)
-       ;; Preserve the BLOCK-SUCC invariant that almost every block has
-       ;; one successor (and a block with DELETE-P set is an acceptable
-       ;; exception).
-       (mark-for-deletion block)
-       (delete-block block))
-      (t
-       (loop
-          (let ((succ (block-succ block)))
-            (unless (singleton-p succ)
-              (return)))
+  (loop with block = (block-next (component-head component))
+        with tail = (component-tail component)
+        for last-block = block
+        until (eq block tail)
+        do (cond
+             ;; We delete blocks when there is either no predecessor or the
+             ;; block is in a lambda that has been deleted. These blocks
+             ;; would eventually be deleted by DFO recomputation, but doing
+             ;; it here immediately makes the effect available to IR1
+             ;; optimization.
+             ((or (block-delete-p block)
+                  (null (block-pred block)))
+              (delete-block-lazily block)
+              (setq block (clean-component component block)))
+             ((eq (functional-kind (block-home-lambda block)) :deleted)
+              ;; Preserve the BLOCK-SUCC invariant that almost every block has
+              ;; one successor (and a block with DELETE-P set is an acceptable
+              ;; exception).
+              (mark-for-deletion block)
+              (setq block (clean-component component block)))
+             (t
+              (loop
+                 (let ((succ (block-succ block)))
+                   (unless (singleton-p succ)
+                     (return)))
 
-          (let ((last (block-last block)))
-            (typecase last
-              (cif
-               (flush-dest (if-test last))
-               (when (unlink-node last)
-                 (return)))
-              (exit
-               (when (maybe-delete-exit last)
-                 (return)))))
+                 (let ((last (block-last block)))
+                   (typecase last
+                     (cif
+                      (flush-dest (if-test last))
+                      (when (unlink-node last)
+                        (return)))
+                     (exit
+                      (when (maybe-delete-exit last)
+                        (return)))))
 
-          (unless (join-successor-if-possible block)
-            (return)))
+                 (unless (join-successor-if-possible block)
+                   (return)))
 
-       (when (and (block-reoptimize block) (block-component block))
-         (aver (not (block-delete-p block)))
-         (ir1-optimize-block block))
+              (when (and (block-reoptimize block) (block-component block))
+                (aver (not (block-delete-p block)))
+                (ir1-optimize-block block))
 
-       (cond ((and (block-delete-p block) (block-component block))
-              (delete-block block))
-             ((and (block-flush-p block) (block-component block))
-              (flush-dead-code block))))))
+              (cond ((and (block-delete-p block) (block-component block))
+                     (setq block (clean-component component block)))
+                    ((and (block-flush-p block) (block-component block))
+                     (flush-dead-code block)))))
+        do (when (eq block last-block)
+             (setq block (block-next block))))
 
   (values))
 
@@ -1746,7 +1752,7 @@
           (maybe-terminate-block (lvar-uses value) nil)
           ;; FIXME: Is it necessary?
           (aver (null (block-pred (node-block cast))))
-          (setf (block-delete-p (node-block cast)) t)
+          (delete-block-lazily (node-block cast))
           (return-from ir1-optimize-cast)))
       (when (eq (node-derived-type cast) *empty-type*)
         (maybe-terminate-block cast nil))

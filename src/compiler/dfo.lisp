@@ -30,10 +30,8 @@
     (do-blocks-backwards (block component :both)
       (if (block-flag block)
 	  (setf (block-number block) (incf num))
-	  (setf (block-delete-p block) t)))
-    (do-blocks (block component)
-      (when (block-delete-p block)
-	(delete-block block))))
+	  (delete-block-lazily block)))
+    (clean-component component (component-head component)))
   (values))
 
 ;;; Move all the code and entry points from OLD to NEW. The code in
