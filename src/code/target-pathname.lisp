@@ -909,7 +909,7 @@ a host-structure or string."
   (declare (type pathname-designator in-pathname))
   (with-pathname (pathname in-pathname)
     (with-pathname (wildname in-wildname)
-      (macrolet ((frob (field &optional (op 'components-match ))
+      (macrolet ((frob (field &optional (op 'components-match))
 		   `(or (null (,field wildname))
 			(,op (,field pathname) (,field wildname)))))
 	(and (or (null (%pathname-host wildname))

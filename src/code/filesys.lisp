@@ -725,8 +725,11 @@
     (when (and namestring (sb!unix:unix-file-kind namestring t))
       (let ((trueishname (sb!unix:unix-resolve-links namestring)))
 	(when trueishname
-	  (let ((*ignore-wildcards* t))
-	    (pathname (sb!unix:unix-simplify-pathname trueishname))))))))
+	  (let* ((*ignore-wildcards* t)
+		 (name (sb!unix:unix-simplify-pathname trueishname))) 
+	    (if (eq (sb!unix:unix-file-kind name) :directory)
+		(pathname (concatenate 'string name "/"))
+		(pathname name))))))))
 
 ;;;; miscellaneous other operations
 
@@ -824,14 +827,10 @@
 	;; (which can arise when e.g. multiple symlinks map to the
 	;; same truename).
 	(truenames (make-hash-table :test #'equal))
-        (merged-pathname (merge-pathnames pathname
-					  *default-pathname-defaults*)))
+        (merged-pathname (merge-pathnames pathname)))
     (!enumerate-matches (match merged-pathname)
       (let* ((*ignore-wildcards* t)
-	     (truename (truename (if (eq (sb!unix:unix-file-kind match)
-					 :directory)
-				     (concatenate 'string match "/")
-				     match))))
+	     (truename (truename match)))
         (setf (gethash (namestring truename) truenames)
 	      truename)))
     (mapcar #'cdr
