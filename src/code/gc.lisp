@@ -26,9 +26,6 @@
        (defun ,lisp-fun ()
 	 (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32))))))
 
-(def-c-var-frob sb!vm:control-stack-start	    "control_stack")
-#!+x86 (def-c-var-frob control-stack-end            "control_stack_end")
-
 #!-sb-fluid (declaim (inline dynamic-usage))
 (def-c-var-frob dynamic-usage "bytes_allocated")
 
@@ -42,8 +39,8 @@
 
 (defun control-stack-usage ()
   #!-x86 (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-	    (control-stack-start))
-  #!+x86 (- (control-stack-end)
+	    control-stack-start)
+  #!+x86 (- control-stack-end
 	    (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()

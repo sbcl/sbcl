@@ -28,10 +28,6 @@ extern lispobj *current_control_frame_pointer;
 extern lispobj *current_binding_stack_pointer;
 #endif
 
-extern lispobj *control_stack;
-#ifdef __i386__
-extern lispobj *control_stack_end;
-#endif
 #if !defined(ibmrt) && !defined(__i386__)
 extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;

@@ -31,11 +31,6 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-lispobj *control_stack;
-#ifdef __i386__
-lispobj *control_stack_end;
-#endif
-
 #ifndef ALLOCATION_POINTER
 lispobj *dynamic_space_free_pointer;
 #endif
@@ -58,9 +53,9 @@ void globals_init(void)
 
     /* Initialize the current Lisp state. */
 #ifndef __i386__
-    current_control_stack_pointer = control_stack;
+    current_control_stack_pointer = (lispobj *)CONTROL_STACK_START;
 #else
-    current_control_stack_pointer = control_stack_end;
+    current_control_stack_pointer = (lispobj *)CONTROL_STACK_END;
 #endif
 
     current_control_frame_pointer = (lispobj *)0;

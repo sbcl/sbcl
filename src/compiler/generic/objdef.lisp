@@ -245,43 +245,6 @@
 ;;; (For an explanation of this, see the comments at the definition of
 ;;; KLUDGE-NONDETERMINISTIC-CATCH-BLOCK-SIZE.)
 (assert (= sb!vm::kludge-nondeterministic-catch-block-size catch-block-size))
-
-#!+gengc
-(define-primitive-object (mutator)
-  ;; Holds the lisp thread structure, if any.
-  (thread)
-  ;; Signal control magic.
-  (foreign-fn-call-active :c-type "boolean")
-  (interrupts-disabled-count :c-type "int")
-  (interrupt-pending :c-type "boolean")
-  (pending-signal :c-type "int")
-  (pending-code :c-type "int")
-  (pending-mask :c-type "int")
-  (gc-pending :c-type "boolean")
-  ;; Stacks.
-  (control-stack-base :c-type "lispobj *")
-  (control-stack-pointer :c-type "lispobj *")
-  (control-stack-end :c-type "lispobj *")
-  (control-frame-pointer :c-type "lispobj *")
-  (current-unwind-protect :c-type "struct unwind_block *")
-  (current-catch-block :c-type "struct catch_block *")
-  (binding-stack-base :c-type "struct binding *")
-  (binding-stack-pointer :c-type "struct binding *")
-  (binding-stack-end :c-type "struct binding *")
-  (number-stack-base :c-type "char *")
-  (number-stack-pointer :c-type "char *")
-  (number-stack-end :c-type "char *")
-  (eval-stack)
-  (eval-stack-top)
-  ;; Allocation stuff.
-  (nursery-start :c-type "lispobj *")
-  (nursery-fill-pointer :c-type "lispobj *")
-  (nursery-end :c-type "lispobj *")
-  (storebuf-start :c-type "lispobj **")
-  (storebuf-fill-pointer :c-type "lispobj **")
-  (storebuf-end :c-type "lispobj **")
-  (words-consed :c-type "unsigned long"))
-
 
 ;;;; symbols
 
@@ -289,11 +252,11 @@
 (defknown %make-symbol (index simple-string) symbol
   (flushable movable))
 
-#+gengc
+#!+gengc
 (defknown symbol-hash (symbol) index
   (flushable movable))
 
-#+x86
+#!+x86
 (defknown symbol-hash (symbol) (integer 0 #.*target-most-positive-fixnum*)
   (flushable movable))
 

@@ -64,19 +64,10 @@ void validate(void)
 #endif
 
 	ensure_space(READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
-
-	ensure_space(STATIC_SPACE_START, STATIC_SPACE_SIZE);
-
-	ensure_space(DYNAMIC_SPACE_START, DYNAMIC_SPACE_SIZE);
-
-	control_stack = (lispobj *) CONTROL_STACK_START;
-#ifdef __i386__
-	control_stack_end = (lispobj *) (CONTROL_STACK_START
-					 + CONTROL_STACK_SIZE);
-#endif
-	ensure_space(control_stack, CONTROL_STACK_SIZE);
-
-	ensure_space(BINDING_STACK_START, BINDING_STACK_SIZE);
+	ensure_space(STATIC_SPACE_START   , STATIC_SPACE_SIZE);
+	ensure_space(DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
+	ensure_space(CONTROL_STACK_START  , CONTROL_STACK_SIZE);
+	ensure_space(BINDING_STACK_START  , BINDING_STACK_SIZE);
 
 #ifdef HOLES
 	make_holes();

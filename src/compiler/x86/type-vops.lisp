@@ -109,7 +109,7 @@
 ;;; Emit the most compact form of the test immediate instruction,
 ;;; using an 8 bit test when the immediate is only 8 bits and the
 ;;; value is one of the four low registers (eax, ebx, ecx, edx) or the
-;;; control-stack.
+;;; control stack.
 (defun generate-fixnum-test (value)
   (let ((offset (tn-offset value)))
     (cond ((and (sc-is value any-reg descriptor-reg)

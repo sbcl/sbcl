@@ -674,18 +674,15 @@
 #!-sb-fluid (declaim (inline cstack-pointer-valid-p))
 (defun cstack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  #!-x86
+  #!-x86 ; stack grows toward high address values
   (and (sap< x (current-sp))
-       (sap<= #!-gengc (sb!alien:alien-sap
-			(sb!alien:extern-alien "control_stack" (* t)))
+       (sap<= #!-gengc (int-sap control-stack-start)
 	      #!+gengc (mutator-control-stack-base)
 	      x)
        (zerop (logand (sap-int x) #b11)))
-  #!+x86 ;; stack grows to low address values
+  #!+x86 ; stack grows toward low address values
   (and (sap>= x (current-sp))
-       (sap> (sb!alien:alien-sap (sb!alien:extern-alien "control_stack_end"
-							(* t)))
-	     x)
+       (sap> (int-sap control-stack-end) x)
        (zerop (logand (sap-int x) #b11))))
 
 #!+(or gengc x86)
@@ -729,9 +726,7 @@
    ;; Not the first page which is unmapped.
    (>= (sap-int ra) 4096)
    ;; Not a Lisp stack pointer.
-   (or (sap< ra (current-sp))
-       (sap>= ra (sb!alien:alien-sap
-		  (sb!alien:extern-alien "control_stack_end" (* t)))))))
+   (not (cstack-pointer-valid-p ra))))
 
 ;;; Try to find a valid previous stack. This is complex on the x86 as
 ;;; it can jump between C and Lisp frames. To help find a valid frame

@@ -1401,8 +1401,8 @@ int purify(lispobj static_roots, lispobj read_only_roots)
 #endif
 
 #ifdef GENCGC
-    gc_assert(control_stack_end > ((&read_only_roots)+1));
-    setup_i386_stack_scav(((&static_roots)-2), control_stack_end);
+    gc_assert((lispobj *)CONTROL_STACK_END > ((&read_only_roots)+1));
+    setup_i386_stack_scav(((&static_roots)-2), (lispobj *)CONTROL_STACK_END);
 #endif
 
     pscav(&static_roots, 1, 0);
@@ -1421,14 +1421,17 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 #ifndef __i386__
-    pscav(control_stack, current_control_stack_pointer - control_stack, 0);
+    pscav((lispobj *)control_stack,
+	  current_control_stack_pointer - (lispobj *)CONTROL_STACK_START,
+	  0);
 #else
 #ifdef GENCGC
     pscav_i386_stack();
 #endif
 #ifdef WANT_CGC
-    gc_assert(control_stack_end > ((&read_only_roots)+1));
-    carefully_pscav_stack(((&read_only_roots)+1), control_stack_end);
+    gc_assert((lispobj *)control_stack_end > ((&read_only_roots)+1));
+    carefully_pscav_stack(((&read_only_roots)+1),
+			  (lispobj *)CONTROL_STACK_END);
 #endif
 #endif
 
@@ -1510,7 +1513,8 @@ int purify(lispobj static_roots, lispobj read_only_roots)
 #ifndef __i386__
     os_zero((os_vm_address_t) current_control_stack_pointer,
             (os_vm_size_t) (CONTROL_STACK_SIZE -
-                            ((current_control_stack_pointer - control_stack) *
+                            ((current_control_stack_pointer -
+			      (lispobj *)CONTROL_STACK_START) *
                              sizeof(lispobj))));
 #endif
 

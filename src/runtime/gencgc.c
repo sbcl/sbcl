@@ -4604,19 +4604,19 @@ scavenge_thread_stacks(void)
 			   vector_length));
 		if (vector_length > 0) {
 		    lispobj *stack_pointer = (lispobj*)stack->data[0];
-		    if ((stack_pointer < control_stack) ||
-			(stack_pointer > control_stack_end))
+		    if ((stack_pointer < (lispobj *)CONTROL_STACK_START) ||
+			(stack_pointer > (lispobj *)CONTROL_STACK_END))
 			lose("invalid stack pointer %x",
 			     (unsigned)stack_pointer);
-		    if ((stack_pointer > control_stack) &&
-			(stack_pointer < control_stack_end)) {
+		    if ((stack_pointer > (lispobj *)CONTROL_STACK_START) &&
+			(stack_pointer < (lispobj *)CONTROL_STACK_END)) {
 			/* FIXME: Ick!
 			 *   (1) hardwired word length = 4; and as usual,
 			 *       when fixing this, check for other places
 			 *       with the same problem
 			 *   (2) calling it 'length' suggests bytes;
 			 *       perhaps 'size' instead? */
-			unsigned int length = ((unsigned)control_stack_end -
+			unsigned int length = ((unsigned)CONTROL_STACK_END -
 					       (unsigned)stack_pointer) / 4;
 			int j;
 			if (length >= vector_length) {
@@ -5663,9 +5663,11 @@ garbage_collect_generation(int generation, int raise)
     /* Scavenge the stack's conservative roots. */
     {
 	lispobj **ptr;
-	for (ptr = (lispobj **)CONTROL_STACK_END-1;
-	     ptr > (lispobj **)&raise; ptr--)
+	for (ptr = (lispobj **)CONTROL_STACK_END - 1;
+	     ptr > (lispobj **)&raise;
+	     ptr--) {
 	    preserve_pointer(*ptr);
+	}
     }
 #ifdef CONTROL_STACKS
     scavenge_thread_stacks();

@@ -123,25 +123,45 @@
 ;;; duplicated between this file and runtime/x86-validate.h.
 ;;;
 ;;; Note: Mostly these values are black magic, inherited from CMU CL
-;;; without any documentation. However, there have been a few changes
-;;; since the fork:
-;;;   * The FreeBSD STATIC-SPACE-START value was bumped up
-;;;     from #x28000000 to #x30000000 when FreeBSD ld.so dynamic linking
+;;; without any documentation. However, there were a few explanatory
+;;; comments in the CMU CL sources:
+;;;   * On Linux,
+;;;     ** The space 0x08000000-0x10000000 is "C program and memory allocation".
+;;;     ** The space 0x40000000-0x48000000 is reserved for shared libs.
+;;;     ** The space >0xE0000000 is "C stack - Alien stack".
+;;;   * On FreeBSD,
+;;;     ** The space 0x0E000000-0x10000000 is "Foreign segment".
+;;;     ** The space 0x20000000-0x30000000 is reserved for shared libs.
+;;; And there have been a few changes since the fork:
+;;;   * The FreeBSD STATIC-SPACE-START value was bumped up from
+;;;     #x28000000 to #x30000000 when FreeBSD ld.so dynamic linking
 ;;;     support was added for FreeBSD ca. 20000910. This was to keep from
 ;;;     stomping on an address range that the dynamic libraries want to use. 
 ;;;     (They want to use this address range even if we try to reserve it
 ;;;     with a call to validate() as the first operation in main().)
 #!+linux
 (progn
+
   (defconstant read-only-space-start #x01000000)
+
   (defconstant static-space-start    #x05000000)
-  (defconstant dynamic-space-start   #x09000000))
+
+  (defconstant dynamic-space-start   #x09000000)
+
+  (defconstant control-stack-start   #x50000000)
+  (defconstant control-stack-end     #x57fff000))
 #!+bsd
 (progn
+
   (defconstant read-only-space-start #x10000000)
+
   (defconstant static-space-start
     #!+freebsd #x30000000
     #!+openbsd #x28000000)
+
+  (defconstant control-stack-start   #x40000000)
+  (defconstant control-stack-end     #x07fff000)
+
   (defconstant dynamic-space-start   #x48000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we

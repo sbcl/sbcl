@@ -236,6 +236,9 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     }
 }
 
+/* FIXME: Now that FOO_END, rather than FOO_SIZE, is the fundamental
+ * description of a space, we could probably punt this and just do
+ * (FOO_START <= x && x < FOO_END) everywhere it's called. */
 static boolean
 in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 {

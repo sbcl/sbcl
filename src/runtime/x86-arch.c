@@ -219,7 +219,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     /* This is just for info in case the monitor wants to print an
      * approximation. */
     current_control_stack_pointer =
-	(lispobj*)*os_context_sp_addr(context);
+	(lispobj *)*os_context_sp_addr(context);
 
     /* On entry %eip points just after the INT3 byte and aims at the
      * 'kind' value (eg trap_Cerror). For error-trap and Cerror-trap a
