@@ -224,3 +224,8 @@
 	(y (list nil 2 nil)))
     (declare (special x y))
     (assert (= (funcall fn) 2))))
+
+;;; Incorrect LIST type declaration, reported and patched by Teemu
+;;; Kalvas: end testing is done "as if by atom" so this is supposed
+;;; to work.
+(assert (equal '(1 2) (loop for (a . b) on '(1 2 . 3)  collect a)))

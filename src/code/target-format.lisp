@@ -1022,8 +1022,8 @@
 			  (*logical-block-popper* nil)
 			  (*outside-args* args))
 		     (catch 'up-and-out
-		       (do-guts arg arg)
-		       args))
+		       (do-guts arg arg))
+                     args)
 		   (do-guts orig-args args)))
 	     (do-loop (orig-args args)
 	       (catch (if colonp 'up-up-and-out 'up-and-out)

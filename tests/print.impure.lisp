@@ -247,5 +247,9 @@
   (assert (string= (princ-to-string #\7)
 		   (write-to-string #\7 :escape nil :readably nil))))
 
+;;; in FORMAT, ~^ inside ~:{ should go to the next case, not break
+;;; iteration, even if one argument is just a one-element list.
+(assert (string= (format nil "~:{~A~^~}" '((A) (C D))) "AC"))
+
 ;;; success
 (quit :unix-status 104)

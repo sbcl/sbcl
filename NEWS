@@ -6,6 +6,11 @@ changes in sbcl-0.8.15 relative to sbcl-0.8.14:
   * new feature: saving cores with foreign code loaded is now
     supported on x86/FreeBSD, x86/Linux, and sparc/SunOS. (based
     on Timothy Moore's work for CMUCL)
+  * bug fix: FOR ... ON ... -clauses in LOOP now work on dotted lists
+    (thanks for Teemu Kalvas)
+  * bug fix: in FORMAT ~^ inside ~:{ now correctly steps to the next
+    case instead of terminating the iteration (thanks for Julian Squires,
+    Sean Champ and Raymond Toy)
   * bug fix: incorrect expansion of defgeneric that caused
     a style warning. (thanks for Zach Beane)
 

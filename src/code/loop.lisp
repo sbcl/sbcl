@@ -1495,7 +1495,7 @@ code to be loaded.
     (let ((listvar var))
       (cond ((and var (symbolp var))
 	     (loop-make-iteration-var var list data-type))
-	    (t (loop-make-var (setq listvar (gensym)) list 'list)
+	    (t (loop-make-var (setq listvar (gensym)) list 't)
 	       (loop-make-iteration-var var nil data-type)))
       (let ((list-step (loop-list-step listvar)))
 	(let* ((first-endtest
