@@ -1330,15 +1330,21 @@
 	       (setf (node-prev node) nil)
 	       t)))))))
 
+;;; Return true if CTRAN has been deleted, false if it is still a valid
+;;; part of IR1.
+(defun ctran-deleted-p (ctran)
+  (declare (type ctran ctran))
+  (let ((block (ctran-block ctran)))
+    (or (not (block-component block))
+        (block-delete-p block))))
+
 ;;; Return true if NODE has been deleted, false if it is still a valid
 ;;; part of IR1.
 (defun node-deleted (node)
   (declare (type node node))
   (let ((prev (node-prev node)))
-    (not (and prev
-	      (let ((block (ctran-block prev)))
-		(and (block-component block)
-		     (not (block-delete-p block))))))))
+    (or (not prev)
+        (ctran-deleted-p prev))))
 
 ;;; Delete all the blocks and functions in COMPONENT. We scan first
 ;;; marking the blocks as DELETE-P to prevent weird stuff from being

@@ -861,26 +861,12 @@ WORKAROUND:
   b. The same for CSUBTYPEP.
 
 262: "yet another bug in inline expansion of local functions"
-  Compiler fails on
-
-    (defun foo (x y)
-      (declare (integer x y))
-      (+ (block nil
-            (flet ((xyz (u)
-                     (declare (integer u))
-                     (if (> (1+ (the unsigned-byte u)) 0)
-                         (+ 1 u)
-                         (return (+ 38 (cos (/ u 78)))))))
-              (declare (inline xyz))
-              (return-from foo
-                (* (funcall (eval #'xyz) x)
-                   (if (> x 30)
-                       (funcall (if (> x 5) #'xyz #'identity)
-                                (+ x 13))
-                       38)))))
-         (sin (* x y))))
-
-  Urgh... It's time to write IR1-copier.
+  During inline expansion of a local function Python can try to
+  reference optimized away objects (functions, variables, CTRANs from
+  tags and blocks), which later may lead to problems. Some of the
+  cases are worked around by forbidding expansion in such cases, but
+  the better way would be to reimplement inline expansion by copying
+  IR1 structures.
 
 266:
   David Lichteblau provided (sbcl-devel 2003-06-01) a patch to fix

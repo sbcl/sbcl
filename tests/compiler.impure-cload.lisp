@@ -382,5 +382,14 @@
    (defvar caar))
 (defun srctran-lisp1-2 (caar) (funcall (sb-ext:truly-the function caar) 1))
 (assert (eql (funcall (eval #'srctran-lisp1-2) #'identity) 1))
+
+;;; partial bug 262: reference of deleted CTRAN (in RETURN-FROM)
+;;; during inline expansion. Bug report by Peter Denno, simplified
+;;; test case by David Wragg.
+(defun bug262-return-from (x &aux (y nil))
+  (labels ((foo-a (z) (return-from bug262-return-from z))
+           (foo-b (z) (foo-a z)))
+    (declare (inline foo-a))
+    (foo-a x)))
 
 (sb-ext:quit :unix-status 104)

@@ -109,11 +109,14 @@
   (ctran-starts-block next)
   (let* ((found (or (lexenv-find name blocks)
 		    (compiler-error "return for unknown block: ~S" name)))
+         (exit-ctran (second found))
 	 (value-ctran (make-ctran))
          (value-lvar (make-lvar))
 	 (entry (first found))
 	 (exit (make-exit :entry entry
 			  :value value-lvar)))
+    (when (ctran-deleted-p exit-ctran)
+      (throw 'locall-already-let-converted exit-ctran))
     (push exit (entry-exits entry))
     (setf (lvar-dest value-lvar) exit)
     (ir1-convert start value-ctran value-lvar value)
@@ -121,7 +124,7 @@
     (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
 	(push entry (lambda-calls-or-closes home-lambda))))
-    (use-continuation exit (second found) (third found))))
+    (use-continuation exit exit-ctran (third found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
 ;;; like (<tag> <form>* (go <next tag>)). That is, we break up the

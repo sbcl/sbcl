@@ -378,7 +378,7 @@
 	   (inline-expansion-ok call))
       (let* ((end (component-last-block (node-component call)))
              (pred (block-prev end)))
-        (multiple-value-bind (losing-local-functional converted-lambda)
+        (multiple-value-bind (losing-local-object converted-lambda)
             (catch 'locall-already-let-converted
               (with-ir1-environment-from-node call
                 (let ((*lexenv* (functional-lexenv original-functional)))
@@ -389,12 +389,18 @@
                                         "local inline "
                                         (leaf-debug-name
                                          original-functional)))))))
-          (cond (losing-local-functional
-                 (let ((*compiler-error-context* call))
-                   (compiler-notify "couldn't inline expand because expansion ~
-                                     calls this LET-converted local function:~
-                                     ~%  ~S"
-                                    (leaf-debug-name losing-local-functional)))
+          (cond (losing-local-object
+                 (if (functional-p losing-local-object)
+                     (let ((*compiler-error-context* call))
+                       (compiler-notify "couldn't inline expand because expansion ~
+                                         calls this LET-converted local function:~
+                                         ~%  ~S"
+                                        (leaf-debug-name losing-local-object)))
+                     (let ((*compiler-error-context* call))
+                       (compiler-notify "implementation limitation: couldn't inline ~
+                                         expand because expansion refers to ~
+                                         the optimized away object ~S."
+                                        losing-local-object)))
                  (loop for block = (block-next pred) then (block-next block)
                        until (eq block end)
                        do (setf (block-delete-p block) t))
