@@ -524,8 +524,9 @@
     (etypecase var
       (leaf
        (when (lambda-var-p var)
-	 (pushnew var
-		  (lambda-refers-to-vars (continuation-home-lambda start)))
+	 (let ((home (continuation-home-lambda-or-null start)))
+	   (when home
+	     (pushnew var (lambda-refers-to-vars home))))
 	 (when (lambda-var-ignorep var)
 	   ;; (ANSI's specification for the IGNORE declaration requires
 	   ;; that this be a STYLE-WARNING, not a full WARNING.)
@@ -556,8 +557,8 @@
 	  (t
 	   (ir1-convert-global-functoid-no-cmacro start cont form fun)))))
 
-;;; Handle the case of where the call was not a compiler macro, or was a
-;;; compiler macro and passed.
+;;; Handle the case of where the call was not a compiler macro, or was
+;;; a compiler macro and passed.
 (defun ir1-convert-global-functoid-no-cmacro (start cont form fun)
   (declare (type continuation start cont) (list form))
   ;; FIXME: Couldn't all the INFO calls here be converted into
@@ -675,7 +676,8 @@
 	      (return))
 	    (let ((this-cont (make-continuation)))
 	      (ir1-convert this-start this-cont form)
-	      (setq this-start this-cont  forms (cdr forms)))))))
+	      (setq this-start this-cont
+		    forms (cdr forms)))))))
   (values))
 
 ;;;; converting combinations

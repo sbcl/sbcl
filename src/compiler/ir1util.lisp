@@ -266,25 +266,48 @@
   (declare (type cblock block))
   (node-enclosing-cleanup (block-last block)))
 
-;;; Return the non-LET LAMBDA that holds BLOCK's code.
-(defun block-home-lambda (block)
+;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
+;;; if there is none.
+;;;
+;;; There can legitimately be no home lambda in dead code early in the
+;;; IR1 conversion process, e.g. when IR1-converting the SETQ form in
+;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
+;;; where the block is just a placeholder during parsing and doesn't
+;;; actually correspond to code which will be written anywhere.
+(defun block-home-lambda-or-null (block)
   (declare (type cblock block))
   (if (node-p (block-last block))
       ;; This is the old CMU CL way of doing it.
       (node-home-lambda (block-last block))
-      ;; The CMU CL approach sometimes fails, e.g. in IR1-CONVERT of
-      ;; one of the legs of an IF, now that SBCL uses this operation
-      ;; more aggressively than CMU CL did. 
-      ;;
-      ;; In this case we reason that previous-in-target-execution-order
-      ;; blocks should be in the same lambda, and that they seem in
-      ;; practice to be previous-in-compilation-order blocks too,
-      ;; so we look back to find one which is sufficiently
-      ;; initialized to tell us what the home lambda is. We could
-      ;; get fancy about this, flooding the graph of all the
-      ;; previous blocks, but in practice it seems to work just
-      ;; to grab the first previous block and use it.
-      (node-home-lambda (block-last (first (block-pred block))))))
+      ;; Now that SBCL uses this operation more aggressively than CMU
+      ;; CL did, the old CMU CL way of doing it can fail in two ways.
+      ;;   1. It can fail in a few cases even when a meaningful home
+      ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
+      ;;      an IF.
+      ;;   2. It can fail when converting a form which is born orphaned 
+      ;;      so that it never had a meaningful home lambda, e.g. a form
+      ;;      which follows a RETURN-FROM or GO form.
+      (let ((pred-list (block-pred block)))
+	;; To deal with case 1, we reason that
+	;; previous-in-target-execution-order blocks should be in the
+	;; same lambda, and that they seem in practice to be
+	;; previous-in-compilation-order blocks too, so we look back
+	;; to find one which is sufficiently initialized to tell us
+	;; what the home lambda is.
+	(if pred-list
+	    ;; We could get fancy about this, flooding through the
+	    ;; graph of all the previous blocks, but in practice it
+	    ;; seems to work just to grab the first previous block and
+	    ;; use it.
+	    (node-home-lambda (block-last (first pred-list)))
+	    ;; In case 2, we end up with an empty PRED-LIST and
+	    ;; have to punt: There's no home lambda.
+	    nil))))
+
+;;; Return the non-LET LAMBDA that holds BLOCK's code.
+(defun block-home-lambda (block)
+  (the clambda
+    (block-home-lambda-or-null block)))
 
 ;;; Return the IR1 physical environment for BLOCK.
 (defun block-physenv (block)
@@ -333,22 +356,28 @@
 	(values (node-source-form use) t)
 	(values nil nil))))
 
-;;; Return the LAMBDA that is CONT's home.
-(defun continuation-home-lambda (cont)
+;;; Return the LAMBDA that is CONT's home, or NIL if there is none.
+(defun continuation-home-lambda-or-null (cont)
   ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
   ;; implementation might not be quite right, or might be uglier than
   ;; necessary. It appears that the original Python never found a need
   ;; to do this operation. The obvious things based on
-  ;; NODE-HOME-LAMBDA of CONTINUATION-USE usually works; then if that
+  ;; NODE-HOME-LAMBDA of CONTINUATION-USE usually work; then if that
   ;; fails, BLOCK-HOME-LAMBDA of CONTINUATION-BLOCK works, given that
-  ;; generalize it enough to grovel harder when the simple CMU CL
-  ;; approach fails. -- WHN 2001-12-02
+  ;; we generalize it enough to grovel harder when the simple CMU CL
+  ;; approach fails, and furthermore realize that in some exceptional
+  ;; cases it might return NIL. -- WHN 2001-12-04
   (cond ((continuation-use cont)
 	 (node-home-lambda (continuation-use cont)))
 	((continuation-block cont)
-	 (block-home-lambda (continuation-block cont)))
+	 (block-home-lambda-or-null (continuation-block cont)))
 	(t
-	 (error "internal error: can't find home lambda for ~S"))))
+	 (error "internal error: confused about home lambda for ~S"))))
+
+;;; Return the LAMBDA that is CONT's home.
+(defun continuation-home-lambda (cont)
+  (the clambda
+    (continuation-home-lambda-or-null cont)))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are NCONCed to the

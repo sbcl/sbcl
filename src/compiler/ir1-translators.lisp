@@ -85,9 +85,6 @@
       (ir1-convert-progn-body dummy cont forms))))
 
 
-;;; We make CONT start a block just so that it will have a block
-;;; assigned. People assume that when they pass a continuation into
-;;; IR1-CONVERT as CONT, it will have a block when it is done.
 (def-ir1-translator return-from ((name &optional value)
 				 start cont)
   #!+sb-doc
@@ -95,6 +92,20 @@
   Evaluate the Value-Form, returning its values from the lexically enclosing
   BLOCK Block-Name. This is constrained to be used only within the dynamic
   extent of the BLOCK."
+  ;; CMU CL comment:
+  ;;   We make CONT start a block just so that it will have a block
+  ;;   assigned. People assume that when they pass a continuation into
+  ;;   IR1-CONVERT as CONT, it will have a block when it is done.
+  ;; KLUDGE: Note that this block is basically fictitious. In the code
+  ;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
+  ;; it's the block which answers the question "which block is
+  ;; the (SETQ X 3) in?" when the right answer is that (SETQ X 3) is
+  ;; dead code and so doesn't really have a block at all. The existence
+  ;; of this block, and that way that it doesn't explicitly say
+  ;; "I'm actually nowhere at all" makes some logic (e.g.
+  ;; BLOCK-HOME-LAMBDA-OR-NULL) more obscure, and it might be better
+  ;; to get rid of it, perhaps using a special placeholder value
+  ;; to indicate the orphanedness of the code.
   (continuation-starts-block cont)
   (let* ((found (or (lexenv-find name blocks)
 		    (compiler-error "return for unknown block: ~S" name)))
@@ -742,8 +753,9 @@
 	     (when (constant-p leaf)
 	       (compiler-error "~S is a constant and thus can't be set." name))
 	     (when (lambda-var-p leaf)
-	       (let ((home-lambda (continuation-home-lambda start)))
-		 (pushnew leaf (lambda-refers-to-vars home-lambda)))
+	       (let ((home-lambda (continuation-home-lambda-or-null start)))
+		 (when home-lambda
+		   (pushnew leaf (lambda-refers-to-vars home-lambda))))
 	       (when (lambda-var-ignorep leaf)
 		 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
 		 ;; requires that this be a STYLE-WARNING, not a full warning.
