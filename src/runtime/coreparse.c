@@ -69,7 +69,7 @@ process_directory(int fd, long *ptr, int count)
 	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
 	        fprintf(stderr, "in core: 0x%x - in runtime: 0x%x \n",
 			addr, (os_vm_address_t)DYNAMIC_SPACE_START);
-		fprintf(stderr,"warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
+		lose("core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #else
 	    if ((addr != (os_vm_address_t)DYNAMIC_0_SPACE_START) &&
@@ -77,7 +77,7 @@ process_directory(int fd, long *ptr, int count)
 		fprintf(stderr, "in core: 0x%x - in runtime: 0x%x or 0x%x\n",
 			addr, (os_vm_address_t)DYNAMIC_0_SPACE_START,
 			(os_vm_address_t)DYNAMIC_1_SPACE_START);
-		fprintf(stderr,"warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
+		lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #endif
 /* FIXME: Should the conditional here be reg_ALLOC instead of

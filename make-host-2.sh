@@ -102,9 +102,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
         ;; cross-compilation host which supports CMU-CL-style SAVE-LISP,
         ;; this can be a good time to run it. The resulting core isn't
 	;; used in the normal build, but can be handy for experimenting
-	;; with the system.
-        
-	(when (find :sb-show *shebang-features*)
+	;; with the system. (See slam.sh for an example.)
+	(when (find :sb-after-xc-core *shebang-features*)
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
 	  )
