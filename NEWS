@@ -1163,6 +1163,8 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
     Instead, an error of type FILE-ERROR is signalled.
 
 changes in sbcl-0.7.6 relative to sbcl-0.7.5:
+  * bug fix: Floating point exceptions are treated much more
+    consistently on the x86/Linux and PPC/Linux platforms.
   * Array initialization with :INITIAL-ELEMENT is now much faster for
     cases when the compiler cannot open code the array creation, but
     does know what the UPGRADED-ARRAY-ELEMENT-TYPE will be. General
@@ -1171,12 +1173,22 @@ changes in sbcl-0.7.6 relative to sbcl-0.7.5:
     specified. (This was at the root of some bad interactions between
     SBCL and ILISP: thanks to Gregory Wright for diagnosing this and
     reporting the bug.)
-  * bug fix: Floating point exceptions are treated much more
-    consistently on the x86/Linux and PPC/Linux platforms.
   * bug fix: Internal error arguments for undefined functions are now
     computed correctly on the PPC/Linux platform.
+  * bug fix: Bad &REST syntax is now checked correctly. (thanks to 
+    Raymond Toy's patch for CMU CL)
   * Support for the Solaris 9 operating environment has been included
     (thanks to Daniel Merritt)
+  * A very ugly but hopefully complete draft of the missing FFI chapter
+    of the manual has been created by reformatting the corresponding
+    CMU CL manual chapter into (currently very ugly and incoherent)
+    DocBook and bringing it up to date for SBCL behavior. Thus, the
+    manual is now essentially complete, at least by my extreme
+    once-and-only-once standards, whereby it's acceptable to refer to
+    the doc strings of SB-EXT functions as the primary documentation.
+  * The fasl file version number has changed again, due to cleanup of
+    (user-invisible) bitrotted stuff. (E.g. *!INITIAL-FDEFN-OBJECTS*
+    is no longer a static symbol.)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

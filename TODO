@@ -34,7 +34,6 @@ for early 0.7.x:
 * outstanding embarrassments
 	** cut-and-pasted DEF-BOOLEAN-ATTRIBUTE (maybe easier to fix
 		now that EVAL-WHEN works correctly..)
-	** incomplete manual
 	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr. (It's
 		reasonable to support this as a crutch when initially
 		bootstrapping from balky xc hosts with their own
