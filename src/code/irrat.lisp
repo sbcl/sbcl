@@ -118,7 +118,10 @@
   #!+sb-doc
   "Return BASE raised to the POWER."
   (if (zerop power)
-      (1+ (* base power))
+      (let ((result (1+ (* base power))))
+	(if (and (floatp result) (float-nan-p result))
+	    (float 1 result)
+	    result))
     (labels (;; determine if the double float is an integer.
 	     ;;  0 - not an integer
 	     ;;  1 - an odd int
