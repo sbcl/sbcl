@@ -154,9 +154,8 @@
   signal number or a keyword of the standard UNIX signal name."
   (unix-signal-%number (unix-signal-or-lose signal)))
 
-;;; Known signals
+;;; known signals
 (def-unix-signal :CHECK 0 "Check")
-
 (def-unix-signal :SIGHUP 1 "Hangup")
 (def-unix-signal :SIGINT 2 "Interrupt")
 (def-unix-signal :SIGQUIT 3 "Quit")

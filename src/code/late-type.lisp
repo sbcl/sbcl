@@ -1503,10 +1503,11 @@
 	  t))
 
 (!define-type-method (member :complex-subtypep-arg1) (type1 type2)
-  (block punt-type-method
-    (values (every-type-op ctypep type2 (member-type-members type1)
-			   :list-first t)
-	    t)))
+  (values (every-type-op ctypep
+			 type2
+			 (member-type-members type1)
+			 :list-first t)
+	  t))
 
 ;;; We punt if the odd type is enumerable and intersects with the
 ;;; MEMBER type. If not enumerable, then it is definitely not a
@@ -1530,20 +1531,19 @@
 	    t)))
 
 (!define-type-method (member :complex-intersection) (type1 type2)
-  (block punt-type-method
-    (collect ((members))
-      (let ((mem2 (member-type-members type2)))
-	(dolist (member mem2)
-	  (multiple-value-bind (val win) (ctypep member type1)
-	    (unless win
-	      (return-from punt-type-method (values type2 nil)))
-	    (when val (members member))))
+  (collect ((members))
+    (let ((mem2 (member-type-members type2)))
+      (dolist (member mem2)
+	(multiple-value-bind (val win) (ctypep member type1)
+	  (unless win
+	    (return-from punt-type-method (values type2 nil)))
+	  (when val (members member))))
 
-	(values (cond ((subsetp mem2 (members)) type2)
-		      ((null (members)) *empty-type*)
-		      (t
-		       (make-member-type :members (members))))
-		t)))))
+      (values (cond ((subsetp mem2 (members)) type2)
+		    ((null (members)) *empty-type*)
+		    (t
+		     (make-member-type :members (members))))
+	      t))))
 
 ;;; We don't need a :COMPLEX-UNION, since the only interesting case is a union
 ;;; type, and the member/union interaction is handled by the union type
@@ -1592,22 +1592,29 @@
 ;;;; (to the opaque HAIRY-TYPE) on sufficiently complicated types
 ;;;; involving AND.
 
-;;; Make a union type from the specifier types; or punt (to opaque
-;;; HAIRY-TYPE) if the class looks as though it might get too hairy. 
-(defun make-intersection-type (types)
+;;; In general, make an INTERSECTION-TYPE object from the specifier
+;;; types. But in various special cases, dodge instead, representing
+;;; the intersection type in some other way.
+(defun make-intersection-type-or-something (types)
   (declare (list types))
-  ;; "If potentially too hairy.."
-  ;;
-  ;; (CMU CL punted for all AND-based types, and we'd like to avoid
-  ;; any really unreasonable cases which might have motivated them to
-  ;; do this, while still being reasonably effective on simple
-  ;; intersection types like KEYWORD.)
-  (if (any (lambda (type)
-	     (or (union-type-p type)
-		 (hairy-type-p type)))
-	   types)
-      (make-hairy-type :specifier (mapcar #'type-specifier types))
-      (%make-intersection-type (some #'type-enumerable types) types)))
+  (cond ((null types)
+	 *universal-type*)
+	((null (cdr types))
+	 (first types))
+	(;; if potentially too hairy
+	 (some (lambda (type)
+		 (or (union-type-p type)
+		     (hairy-type-p type)))
+	       types)
+	 ;; (CMU CL punted to HAIRY-TYPE like this for all AND-based
+	 ;; types. We don't want to do that for simple intersection
+	 ;; types like the definition of KEYWORD, hence the guard
+	 ;; clause above. But we do want to punt for any really
+	 ;; unreasonable cases which might have motivated them to punt
+	 ;; in all cases, hence the punt-to-HAIRY-TYPE code below.)
+	 (make-hairy-type :specifier `(and ,@(mapcar #'type-specifier types))))
+	(t
+	 (%make-intersection-type (some #'type-enumerable types) types))))
 
 (!define-type-class intersection)
 
@@ -1631,36 +1638,35 @@
 ;;; Two union types are equal if every type in one is equal to some
 ;;; type in the other.
 (!define-type-method (union :simple-=) (type1 type2)
-  (block punt-type-method
-    (let ((types1 (union-type-types type1))
-	  (types2 (union-type-types type2)))
-      (values (and (dolist (type1 types1 t)
-		     (unless (any-type-op type= type1 types2)
-		       (return nil)))
-		   (dolist (type2 types2 t)
-		     (unless (any-type-op type= type2 types1)
-		       (return nil))))
-	      t))))
+  (let ((types1 (union-type-types type1))
+	(types2 (union-type-types type2)))
+    (values (and (dolist (type1 types1 t)
+		   (unless (any-type-op type= type1 types2)
+		     (return nil)))
+		 (dolist (type2 types2 t)
+		   (unless (any-type-op type= type2 types1)
+		     (return nil))))
+	    t)))
 
 ;;; Similarly, a union type is a subtype of another if every element
 ;;; of TYPE1 is a subtype of some element of TYPE2.
 (!define-type-method (union :simple-subtypep) (type1 type2)
-  (block punt-type-method
-    (let ((types2 (union-type-types type2)))
-      (values (dolist (type1 (union-type-types type1) t)
-		(unless (any-type-op csubtypep type1 types2)
-		  (return nil)))
-	      t))))
-
-(!define-type-method (union :complex-subtypep-arg1) (type1 type2)
-  (block punt-type-method
-    (values (every-type-op csubtypep type2 (union-type-types type1)
-			   :list-first t)
+  (let ((types2 (union-type-types type2)))
+    (values (dolist (type1 (union-type-types type1) t)
+	      (unless (any-type-op csubtypep type1 types2)
+		(return nil)))
 	    t)))
 
+(!define-type-method (union :complex-subtypep-arg1) (type1 type2)
+  (values (every-type-op csubtypep
+			 type2
+			 (union-type-types type1)
+			 :list-first t)
+	  t))
+
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
-  (block punt-type-method
-    (values (any-type-op csubtypep type1 (union-type-types type2)) t)))
+  (values (any-type-op csubtypep type1 (union-type-types type2))
+	  t))
 
 (!define-type-method (union :complex-union) (type1 type2)
   (let* ((class1 (type-class-info type1)))
@@ -1697,23 +1703,39 @@
 	(setq res (type-union res int))
 	(unless w (setq win nil))))))
 
-(!def-type-translator or (&rest types)
+(!def-type-translator or (&rest type-specifiers)
   (reduce #'type-union
-	  (mapcar #'specifier-type types)
+	  (mapcar #'specifier-type type-specifiers)
 	  :initial-value *empty-type*))
 
-;;; We don't actually have intersection types, since the result of
-;;; reasonable type intersections is always describable as a union of
-;;; simple types. If something is too hairy to fit this mold, then we
-;;; make a hairy type.
-(!def-type-translator and (&whole spec &rest types)
-  (let ((res *wild-type*))
-    (dolist (type types res)
-      (let ((ctype (specifier-type type)))
-	(multiple-value-bind (int win) (type-intersection res ctype)
-	  (unless win
-	    (return (make-hairy-type :specifier spec)))
-	  (setq res int))))))
+;;; (Destructively) replace pairs of types which have simple
+;;; intersections with their simple intersection.
+(defun simplify-intersection-type-types (types)
+  (do* ((i-types types (cdr i-types))
+	(i-type (car i-types) (car i-types))) 
+      ((null i-types))
+    (do* ((pre-j-types i-types (cdr pre-j-types))
+	  (j-types (cdr pre-j-types) (cdr pre-j-types))
+	  (j-type (car j-types) (car j-types)))
+	((null j-types))
+      (multiple-value-bind (isect win) (type-intersection i-type j-type)
+	(when win
+	  ;; Overwrite I-TYPES with the intersection, and delete
+	  ;; J-TYPES from the list.
+	  (setf (car i-types) isect
+		(cdr pre-j-types) (cdr j-types))))))
+  types)
+    
+(!def-type-translator and (&rest type-specifiers)
+  ;; Note: Between the behavior of SIMPLIFY-INTERSECTION-TYPE (which
+  ;; will reduce to a 1-element list any list of types which CMU CL
+  ;; could've represented) and MAKE-INTERSECTION-TYPE-OR-SOMETHING
+  ;; (which knows to treat a 1-element intersection as the element
+  ;; itself) we should recover CMU CL's behavior for anything which it
+  ;; could handle usefully (i.e. could without punting to HAIRY-TYPE).
+  (make-intersection-type-or-something
+   (simplify-intersection-type-types
+    (mapcar #'specifier-type type-specifiers))))
 
 ;;;; CONS types
 
