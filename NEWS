@@ -2388,6 +2388,8 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     greater than 32 handle EOF correctly.
   * bug fix: class slots in redefined classes preserve their old
     values.  (thanks to Bruno Haible and Nikodemus Siivola)
+  * bug fix: compilation of funcalls of CXX+R (e.g. CDDR) now
+    succeeds.  (reported by Marco Baringer)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** READ-SEQUENCE now works on ECHO-STREAMs.
     ** RATIONALIZE works more according to its specification.  (thanks

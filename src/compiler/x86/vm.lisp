@@ -451,5 +451,5 @@
 ;;; the symbol table (for example, prepending an underscore).
 (defun extern-alien-name (name)
   (declare (type simple-base-string name))
-  ;; non-ELF ports currently don't need any prefix
+  ;; ELF ports currently don't need any prefix
   name)
