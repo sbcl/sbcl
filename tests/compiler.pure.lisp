@@ -806,3 +806,43 @@
                                                  (common-lisp:handler-case
                                                      (ash a (min 36 22477)))))))))
                 100000 0 0)))
+
+;;; MISC.152, 153: deleted code and iteration var type inference
+(assert (eql (funcall
+              (compile nil
+                       '(lambda (a)
+                         (block b5
+                           (let ((v1 (let ((v8 (unwind-protect 9365)))
+                                       8862008)))
+                             (*
+                              (return-from b5
+                                (labels ((%f11 (f11-1) f11-1))
+                                  (%f11 87246015)))
+                              (return-from b5
+                                (setq v1
+                                      (labels ((%f6 (f6-1 f6-2 f6-3) v1))
+                                        (dpb (unwind-protect a)
+                                             (byte 18 13)
+                                             (labels ((%f4 () 27322826))
+                                               (%f6 -2 -108626545 (%f4))))))))))))
+              -6)
+             87246015))
+
+(assert (eql (funcall
+              (compile nil
+                       '(lambda (a)
+                         (if (logbitp 3
+                                      (case -2
+                                        ((-96879 -1035 -57680 -106404 -94516 -125088)
+                                         (unwind-protect 90309179))
+                                        ((-20811 -86901 -9368 -98520 -71594)
+                                         (let ((v9 (unwind-protect 136707)))
+                                           (block b3
+                                             (setq v9
+                                                   (let ((v4 (return-from b3 v9)))
+                                                     (- (ignore-errors (return-from b3 v4))))))))
+                                        (t -50)))
+                             -20343
+                             a)))
+              0)
+             -20343))

@@ -1160,6 +1160,7 @@
              (set-use (principal-lvar-use (set-value set)))
              (() (and (combination-p set-use)
                       (fun-info-p (combination-kind set-use))
+                      (not (node-to-be-deleted-p set-use))
                       (eq (combination-fun-source-name set-use) '+))
                :exit-if-null)
              (+-args (basic-combination-args set-use))
