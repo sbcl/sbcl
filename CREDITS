@@ -595,9 +595,10 @@ Antonio Martinez-Shotton:
   He has contributed a number of bug fixes and bug reports to SBCL.
 
 Brian Mastenbrook:
-  He contributed to the port of SBCL to MacOS X.  He found a way to
-  overcome binary compatibility issues between different versions of
-  dlcompat on Darwin.
+  He contributed to and extensively maintained the port of SBCL to
+  MacOS X. His contributions include overcoming binary compatibility
+  issues between different versions of dlcompat on Darwin, other 
+  linker fixes, and signal handler bugfixes.
 
 Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable

@@ -4,13 +4,13 @@ Overview
 ========
 
 SBCL's documentation is written in XML DocBook which is a semantically
-marked document not meant for reading. Rather, a DocBook file is meant
-to be transformed into presentation formats such as HTML, PDF, and
-plain text. To perform such translation, you'll need tools beyond what
-is included in the SBCL distribution:
+marked document not meant for humans to read directly. Rather, a
+DocBook file is meant to be transformed into presentation formats such
+as HTML, PDF, and plain text. To perform such translation, you'll need
+tools beyond what is included in the SBCL distribution:
 
 1) To verify the correctness of the XML documentation, you'll need the
-DocBook DTD files and an XML verification tools.
+DocBook DTD files and an XML verification tool.
 
 2) To transform the main XML DocBook file (user-manual.xml), you need
 an XSL Transformer and the Docbook XSL Stylesheets. The stylesheets
@@ -23,12 +23,12 @@ Catalog Files
 =============
 
 Catalog files are used to map URLs used in the SBCL Docbook and
-stylesheet files into local file names. By using catalog, processing
+stylesheet files into local file names. By using a catalog, processing
 is faster and a network connection is not necessary. Catalog files are
 specific to an operating system since they embed file locations. The
 SBCL Makefile attempts to determine the correct catalog for your
 system. If SBCL does not supply a catalog for your system, processing
-the DocBook files will require a network connections.
+the DocBook files will require a network connection.
 
 Default Processing
 ==================
