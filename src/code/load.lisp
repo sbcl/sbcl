@@ -222,7 +222,7 @@
   (let ((byte (read-byte stream nil)))
     (when byte
 
-      ;; Read the string part of the fasl header, or die.
+      ;; Read and validate constant string prefix in fasl header.
       (let* ((fhsss *fasl-header-string-start-string*)
 	     (fhsss-length (length fhsss)))
 	(unless (= byte (char-code (schar fhsss 0)))
@@ -237,33 +237,40 @@
 	    (error
 	     "illegal subsequent (not first) byte in fasl file header"))))
 
-      ;; Read and validate implementation and version, or die.
-      (let* ((implementation-length (read-arg 4))
-	     (implementation-string (make-string implementation-length))
-	     (ignore (read-string-as-bytes stream implementation-string))
-	     (implementation (keywordicate implementation-string))
-	     ;; FIXME: The logic above to read a keyword from the fasl file
-	     ;; could probably be shared with the read-a-keyword fop.
-	     (version (read-arg 4)))
-	(declare (ignore ignore))
-	(flet ((check-version (variant possible-implementation needed-version)
-		 (when (string= possible-implementation implementation)
-		   (unless (= version needed-version)
-		     (error "~@<~S is in ~A fasl file format version ~W, ~
-                             but this version of SBCL uses ~
-                             format version ~W.~:@>"
-			    stream
-			    variant
-			    version
-			    needed-version))
-		   t)))
-	  (or (check-version "native code"
-			     +backend-fasl-file-implementation+
-			     +fasl-file-version+)
-	      (error "~S was compiled for implementation ~A, but this is a ~A."
-		     stream
-		     implementation
-		     +backend-fasl-file-implementation+)))))))
+      ;; Read and validate version-specific compatibility stuff.
+      (flet ((string-from-stream ()
+               (let* ((length (read-arg 4))
+		      (result (make-string length)))
+		 (read-string-as-bytes stream result)
+		 result)))
+	;; Read and validate implementation and version.
+	(let* ((implementation (keywordicate (string-from-stream)))
+	       ;; FIXME: The logic above to read a keyword from the fasl file
+	       ;; could probably be shared with the read-a-keyword fop.
+	       (version (read-arg 4)))
+	  (flet ((check-version (variant
+				 possible-implementation
+				 needed-version)
+		   (when (string= possible-implementation implementation)
+		     (or (= version needed-version)
+			 (error "~@<~S is in ~A fasl file format version ~W, ~
+                                 but this version of SBCL uses ~
+                                 format version ~W.~:@>"
+				stream
+				variant
+				version
+				needed-version)))))
+	    (or (check-version "native code"
+			       +backend-fasl-file-implementation+
+			       +fasl-file-version+)
+		(error "~S was compiled for implementation ~A, ~
+                        but this is a ~A."
+		       stream
+		       implementation
+		       +backend-fasl-file-implementation+))))
+	;; TO DO: Check for *FEATURES* which affect binary compatibility.
+	;; (And don't forget to return T.:-)
+	))))
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.

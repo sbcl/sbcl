@@ -792,7 +792,8 @@ reset to ~S."
 		 "~&(no restarts: If you didn't do this on purpose, ~
                   please report it as a bug.)~%"))
 	(t
-	 (format s "~&restarts:~%")
+	 (format s "~&restarts (invokable by number or by ~
+                    possibly-abbreviated name):~%")
 	 (let ((count 0)
 	       (names-used '(nil))
 	       (max-name-len 0))

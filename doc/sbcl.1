@@ -466,15 +466,6 @@ result as a function value) is a fundamentally slow operation.
 
 There are still some nagging pre-ANSIisms, notably
 .TP 3
-\--
-CLOS (based on the PCL reference implementation) is incompletely
-integrated into the system, so that e.g. SB-PCL::FIND-CLASS is a
-different function than CL::FIND-CLASS. (In practice, you need to
-be a pretty advanced user before this is a serious problem, and
-by then you can usually work around it, but it's still distasteful.
-It's arguably the outstanding "This should be fixed by version 1.0"
-issue.)
-.TP 3
 --
 The ANSI-recommended idiom for creating a function which is only
 sometimes expanded inline,
