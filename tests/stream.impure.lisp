@@ -104,5 +104,26 @@
     (assert (char= (read-char s) #\1)))
   (delete-file p))
 
+;;; FILE-POSITION on broadcast-streams is mostly uncontroversial
+(assert (= 0 (file-position (make-broadcast-stream))))
+(assert (file-position (make-broadcast-stream) :start))
+(assert (file-position (make-broadcast-stream) 0))
+(assert (not (file-position (make-broadcast-stream) 1)))
+(let ((s (make-broadcast-stream)))
+  (write-char #\a s)
+  (assert (not (file-position s 1)))
+  (assert (= 0 (file-position s))))
+
+(let ((p "broadcast-stream-test"))
+  (ignore-errors (delete-file p))
+  (with-open-file (f p :direction :output)
+    (let ((s (make-broadcast-stream f)))
+      (assert (= 0 (file-position s)))
+      (assert (file-position s :start))
+      (assert (file-position s 0))
+      (write-char #\a s)
+      (assert (= 1 (file-position s))) ; unicode...
+      (assert (file-position s 0))))
+  (delete-file p))
 ;;; success
 (quit :unix-status 104)

@@ -629,6 +629,14 @@
 	     ((null streams) res)
 	   (when (null (cdr streams))
 	     (setq res (stream-element-type (car streams)))))))
+      (:file-position
+       (if arg1
+	   (let ((res (or (eql arg1 :start) (eql arg1 0))))
+	     (dolist (stream streams res)
+	       (setq res (file-position stream arg1))))
+	   (let ((res 0))
+	     (dolist (stream streams res)
+	       (setq res (file-position stream))))))
       (:close
        (set-closed-flame stream))
       (t
