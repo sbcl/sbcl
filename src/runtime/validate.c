@@ -76,6 +76,9 @@ validate(void)
 #ifdef HOLES
 	make_holes();
 #endif
+#ifndef GENCGC
+        current_dynamic_space = DYNAMIC_0_SPACE_START;
+#endif
 
 #ifdef PRINTNOISE
 	printf(" done.\n");

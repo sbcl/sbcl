@@ -88,8 +88,10 @@ process_directory(int fd, long *ptr, int count)
 #else
 	    dynamic_space_free_pointer = free_pointer;
 #endif
-	    /* With GENCGC, this will always be space 0. (We checked 
-	     * above that addr==DYNAMIC_SPACE_START.) */
+	    /* For stop-and-copy GC, this will be whatever the GC was
+	     * using at the time. With GENCGC, this will always be
+	     * space 0. (We checked above that for GENCGC,
+	     * addr==DYNAMIC_SPACE_START.) */
 	    current_dynamic_space = (lispobj *)addr;
 	    break;
 	case STATIC_SPACE_ID:
@@ -137,7 +139,7 @@ load_core_file(char *file)
 	exit(1);
     }
 
-    header = calloc(os_vm_page_size / sizeof(u32),sizeof(u32));
+    header = calloc(os_vm_page_size / sizeof(u32), sizeof(u32));
 
     count = read(fd, header, os_vm_page_size);
     if (count < os_vm_page_size) {

@@ -111,6 +111,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  ;;)
 	EOF
 
-# Run GENESIS (again) (The first time was before we ran the
-# cross-compiler.) in order to create cold-sbcl.core.
+# Run GENESIS (again) in order to create cold-sbcl.core. (The first
+# time was before we ran the cross-compiler, in order to create the
+# header file which was needed in order to run gcc on the runtime
+# code.)
 sh make-genesis-2.sh

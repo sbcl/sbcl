@@ -26,7 +26,12 @@ rm -rf obj/* output/* doc/user-manual \
 pwd=`pwd`
 for d in tools-for-build; do
     cd $d
-    make clean
+    # I hope the -s option is standard. At least GNU make and BSD make
+    # support it. It silences make, since otherwise the output from
+    # this script is just the operations done by these make's, which
+    # is misleading when this script does lotso other operations too.
+    # -- WHN
+    make -s clean
     cd $pwd
 done
 

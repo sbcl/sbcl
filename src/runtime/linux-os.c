@@ -84,15 +84,15 @@ int n_do_mmap_ignorable_errors = 3;
 static int
 do_mmap(os_vm_address_t *addr, os_vm_size_t len, int flags)
 {
-    /* We *must* have the memory where we want it. */
-    os_vm_address_t old_addr=*addr;
+    /* We *must* have the memory where we expect it. */
+    os_vm_address_t old_addr = *addr;
 
     *addr = mmap(*addr, len, OS_VM_PROT_ALL, flags, -1, 0);
     if (*addr == MAP_FAILED ||
 	((old_addr != NULL) && (*addr != old_addr))) {
         FSHOW((stderr,
-	       "/error in allocating memory from the OS\n"
-	       "(addr=%lx, len=%lx, flags=%lx)\n",
+	       "/retryable error in allocating memory from the OS\n"
+	       "(addr=0x%lx, len=0x%lx, flags=0x%lx)\n",
 	       (long) addr,
 	       (long) len,
 	       (long) flags));

@@ -122,9 +122,12 @@
 ;;; on DYNAMIC-EXTENT would probably give a better payoff.)
 (defvar *maybe-use-inline-allocation* t)
 
-;;; Call into C.
+;;; Emit code to allocate an object with a size in bytes given by
+;;; Size. The size may be an integer of a TN. If Inline is a VOP
+;;; node-var then it is used to make an appropriate speed vs size
+;;; decision.
 ;;;
-;;; FIXME: Except when inline allocation is enabled..?
+;;; FIXME: We call into C.. except when inline allocation is enabled..?
 ;;;
 ;;; FIXME: Also, calls to
 ;;; ALLOCATION are always wrapped with PSEUDO-ATOMIC -- why? Is it to
@@ -138,11 +141,6 @@
 ;;; formalized, in documentation and in macro definition,
 ;;; with the macro becoming e.g. PSEUDO-ATOMIC-ALLOCATION.
 (defun allocation (alloc-tn size &optional inline)
-  #!+sb-doc
-  "Emit code to allocate an object with a size in bytes given by Size.
-   The size may be an integer of a TN.
-   If Inline is a VOP node-var then it is used to make an appropriate
-   speed vs size decision."
   (flet ((load-size (dst-tn size)
 	   (unless (and (tn-p size) (location= alloc-tn size))
 	     (inst mov dst-tn size))))
@@ -271,7 +269,6 @@
     (inst lea ,result-tn
      (make-ea :byte :base ,result-tn :disp other-pointer-type))
     ,@forms))
-
 
 ;;;; error code
 

@@ -33,22 +33,22 @@
   (file sb!c-call:c-string)
   (initial-function (sb!alien:unsigned #.sb!vm:word-bits)))
 
-;;; FIXME: When this is run without the PURIFY option under GENCGC, it
-;;; seems to save memory all the way up to the high-water mark, not
-;;; just what's currently used; and then after loading the image to
-;;; make a running Lisp, the memory never gets reclaimed. (But with
-;;; the PURIFY option it seems to work OK.)
+;;; FIXME: When this is run without the PURIFY option,
+;;; it seems to save memory all the way up to the high-water mark,
+;;; not just what's currently used; and then after loading the
+;;; image to make a running Lisp, the memory never gets reclaimed.
+;;; (But with the PURIFY option it seems to work OK.)
 (defun save-lisp-and-die (core-file-name &key
 					 (toplevel #'toplevel-init)
 					 (purify nil)
 					 (root-structures ())
 					 (environment-name "auxiliary"))
   #!+sb-doc
-  "Save a CMU Common Lisp core image in the file of the specified name,
+  "Saves a CMU Common Lisp core image in the file of the specified name,
   killing the current Lisp invocation in the process (unless it bails
   out early because of some argument error or something).
 
-  The following &KEY arguments are defined:
+  The following &KEY args are defined:
 
   :TOPLEVEL
       The function to run when the created core file is resumed.
@@ -57,10 +57,10 @@
   function should not return.
 
   :PURIFY
-      If true, do a purifying GC which moves all dynamically allocated
-  objects into static space so that they stay pure. This takes somewhat
-  longer than the normal GC which is otherwise done, but it's only done
-  once, and subsequent GC's will be done less often and will take less
+      If true (the default), do a purifying GC which moves all dynamically
+  allocated objects into static space so that they stay pure. This takes
+  somewhat longer than the normal GC which is otherwise done, but it's only
+  done once, and subsequent GC's will be done less often and will take less
   time in the resulting core file. See PURIFY.
 
   :ROOT-STRUCTURES
@@ -95,9 +95,9 @@
 	     (dolist (f *after-save-initializations*)
 	       (funcall f))
 	     (funcall toplevel))))
-    ;; FIXME: Perhaps WITHOUT-GCING should be wrapped around the LET
-    ;; as well, to avoid the off chance of an interrupt triggering GC
-    ;; and making our saved RESTART-LISP address invalid?
+    ;; FIXME: Perhaps WITHOUT-GCING should be wrapped around the
+    ;; LET as well, to avoid the off chance of an interrupt triggering
+    ;; GC and making our saved RESTART-LISP address invalid?
     (without-gcing
       (save (unix-namestring core-file-name nil)
 	    (get-lisp-obj-address #'restart-lisp)))))
@@ -117,8 +117,8 @@
 	  (load-native
 	   (load name)))))
 
-;;; Replace a cold-loaded native object file with a byte-compiled one,
-;;; if it exists.
+;;; Replace a cold-loaded native object file with a byte-compiled one, if it
+;;; exists.
 #+nil ; no longer needed in SBCL.. I think.. -- WHN 19990814
 (defun byte-load-over (name)
   (load (make-pathname

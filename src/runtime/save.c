@@ -68,8 +68,8 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
 
     bytes = words * sizeof(lispobj);
 
-    printf("writing %ld(0x%lx) bytes from the %s(%d) space at 0x%08lx\n",
-           (long)bytes, (long)bytes, names[id], id, (unsigned long)addr);
+    printf("writing %d bytes from the %s space at 0x%08lx\n",
+           bytes, names[id], (unsigned long)addr);
 
     data = write_bytes(file, (char *)addr, bytes);
 
@@ -97,9 +97,8 @@ save(char *filename, lispobj init_function)
     init_function = *func_ptr;
     /* Set dynamic space pointer to base value so we don't write out
      * MBs of just cleared heap. */
-    if(SymbolValue(X86_CGC_ACTIVE_P) != NIL) {
-	SetSymbolValue(ALLOCATION_POINTER, DYNAMIC_SPACE_START);
-    }
+    if(SymbolValue(X86_CGC_ACTIVE_P) != NIL)
+      SetSymbolValue(ALLOCATION_POINTER, DYNAMIC_SPACE_START);
 #endif
     /* Open the file: */
     unlink(filename);
@@ -127,7 +126,7 @@ save(char *filename, lispobj init_function)
     putw(SBCL_CORE_VERSION_INTEGER, file);
 
     putw(CORE_NDIRECTORY, file);
-    putw((5*3)+2, file); /* 3 5-word space descriptors, plus code and count */
+    putw((5*3)+2, file);
 
     output_space(file, READ_ONLY_SPACE_ID, (lispobj *)READ_ONLY_SPACE_START,
 		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
@@ -147,9 +146,6 @@ save(char *filename, lispobj init_function)
 		 (lispobj *)SymbolValue(ALLOCATION_POINTER));
 #endif
 
-    FSHOW((stderr, "/writing init_function=0x%lx\n", (long)init_function));
-    FSHOW((stderr, "/(SymbolValue(ALLOCATION_POINTER)=0x%lx\n",
-	   (long)SymbolValue(ALLOCATION_POINTER)));
     putw(CORE_INITIAL_FUNCTION, file);
     putw(3, file);
     putw(init_function, file);

@@ -131,7 +131,7 @@ alloc_sap(void *ptr)
     int n_words_to_alloc =
 	(sizeof(struct sap) - sizeof(lispobj)) / sizeof(u32);
     struct sap *sap =
-	(struct sap *)alloc_unboxed ((int)type_Sap, n_words_to_alloc);
+	(struct sap *)alloc_unboxed((int)type_Sap, n_words_to_alloc);
     sap->pointer = ptr;
     return (lispobj) sap | type_OtherPointer;
 }

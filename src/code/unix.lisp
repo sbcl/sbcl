@@ -522,13 +522,13 @@
 ;;; until we can get 64 bit alien support it'll do.
 (def-alien-type nil
   (struct wrapped_stat
-    (st-dev unsigned-long)              ;would be dev-t in a real stat
+    (st-dev unsigned-long)              ; would be dev-t in a real stat
     (st-ino ino-t)
     (st-mode mode-t)
     (st-nlink  nlink-t)
     (st-uid  uid-t)
     (st-gid  gid-t)
-    (st-rdev unsigned-long)             ;ditto
+    (st-rdev unsigned-long)             ; would be dev-t in a real stat
     (st-size off-t)
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
@@ -538,8 +538,19 @@
 
 ;;; shared C-struct-to-multiple-VALUES conversion for the stat(2)
 ;;; family of Unix system calls
+;;;
+;;; FIXME: I think this should probably not be INLINE. However, when
+;;; this was not inline, it seemed to cause memory corruption
+;;; problems. My first guess is that it's a bug in the FFI code, where
+;;; the WITH-ALIEN expansion doesn't deal well with being wrapped
+;;; around a call to a function returning >10 values. But I didn't try
+;;; to figure it out, just inlined it as a quick fix. Perhaps someone
+;;; who's motivated to debug the FFI code can go over the DISASSEMBLE
+;;; output in the not-inlined case and see whether there's a problem,
+;;; and maybe even find a fix..
+(declaim (inline %extract-stat-results))
 (defun %extract-stat-results (wrapped-stat)
-  (declare (type (alien (* (struct wrapped_stat)))))
+  (declare (type (alien (* (struct wrapped_stat))) wrapped-stat))
   (values t
 	  (slot wrapped-stat 'st-dev)
 	  (slot wrapped-stat 'st-ino)
@@ -563,33 +574,29 @@
 	  (slot wrapped-stat 'st-blksize)
 	  (slot wrapped-stat 'st-blocks)))
 
-;;; The stat(2) family of Unix system calls are implemented as calls
-;;; to C-level wrapper functions which copies all the raw "struct
-;;; stat" slots into a system-independent format, so that we don't
-;;; need to mess around with tweaking the Lisp code to correspond to
-;;; different OS/CPU combinations.
+;;; Unix system calls in the stat(2) family are implemented as calls
+;;; to C-level wrapper functions which copy all the raw "struct
+;;; stat" slots into the system-independent wrapped_stat format.
 ;;;    stat(2) <->  stat_wrapper()
 ;;;   fstat(2) <-> fstat_wrapper()
 ;;;   lstat(2) <-> lstat_wrapper()
-;;; Then this function is used to convert all the stat slots into
-;;; multiple return values.
 (defun unix-stat (name)
   (declare (type unix-pathname name))
   (with-alien ((buf (struct wrapped_stat)))
     (syscall ("stat_wrapper" c-string (* (struct wrapped_stat)))
-	     (%extract-stat-results buf)
+	     (%extract-stat-results (addr buf))
 	     name (addr buf))))
 (defun unix-lstat (name)
   (declare (type unix-pathname name))
   (with-alien ((buf (struct wrapped_stat)))
     (syscall ("lstat_wrapper" c-string (* (struct wrapped_stat)))
-	     (%extract-stat-results buf)
+	     (%extract-stat-results (addr buf))
 	     name (addr buf))))
 (defun unix-fstat (fd)
   (declare (type unix-fd fd))
   (with-alien ((buf (struct wrapped_stat)))
     (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
-	     (%extract-stat-results buf)
+	     (%extract-stat-results (addr buf))
 	     fd (addr buf))))
 
 ;;;; time.h

@@ -15,6 +15,7 @@
 
 # how we invoke SBCL in the tests
 export SBCL="${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}"
+echo /running tests on SBCL=\'$SBCL\'
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the Unix status value that we expect from a successful test.

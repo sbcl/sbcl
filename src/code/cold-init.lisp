@@ -255,7 +255,7 @@
   ;; could be typed directly, with no parentheses, at the debug prompt
   ;; the way that e.g. F or BACKTRACE can be?)
 
-  (/show0 "done initializing")
+  (/show0 "done initializing, setting *COLD-INIT-COMPLETE-P*")
   (setf *cold-init-complete-p* t)
   (%primitive print "//set *COLD-INIT-COMPLETE-P*") ; REMOVEME
 

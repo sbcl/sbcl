@@ -10,4 +10,4 @@
 all: grovel_headers
 
 clean: 
-	-rm -f *.o grovel_headers
+	rm -f *.o grovel_headers
