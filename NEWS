@@ -1543,6 +1543,14 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
        freshly-consed result bit-array);
     ** ELT now signals an error on an invalid sequence index in safe
        code;
+  * incompatible packaging change: in line with Unix convention, 
+    SBCL now looks for its core file in /usr/{local/,}lib/sbcl/sbcl.core 
+    if it's not in $SBCL_HOME.  It also sets SBCL_HOME to match
+  * REQUIRE and PROVIDE are now optionally capable of doing something
+    useful: see the documentation string for REQUIRE
+  * infrastructure for a managed SBCL contrib system: contributed 
+    modules in this release include a copy of the ASDF system definition
+    facility, and an interface to the BSD Sockets API
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
