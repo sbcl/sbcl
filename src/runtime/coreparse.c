@@ -26,13 +26,13 @@
 #include <fcntl.h>
 #endif
 
+#include "sbcl.h"
 #include "os.h"
 #include "runtime.h"
 #include "globals.h"
 #include "core.h"
 #include "arch.h"
 #include "interr.h"
-#include "sbcl.h"
 #include "thread.h"
 
 unsigned char build_id[] =

@@ -17,11 +17,11 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+#include "sbcl.h"
 #include "arch.h"
 #include "signal.h"
 
 #include "runtime.h"
-#include "sbcl.h"
 #include "interr.h"
 #include "print.h"
 #include "lispregs.h"

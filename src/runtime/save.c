@@ -14,9 +14,9 @@
 #include <signal.h>
 #include <sys/file.h>
 
+#include "sbcl.h"
 #include "runtime.h"
 #include "os.h"
-#include "sbcl.h"
 #include "core.h"
 #include "globals.h"
 #include "save.h"

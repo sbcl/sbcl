@@ -48,9 +48,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include "sbcl.h"
 #include "runtime.h"
 #include "arch.h"
-#include "sbcl.h"
 #include "os.h"
 #include "interrupt.h"
 #include "globals.h"
@@ -536,6 +536,10 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 			   signal,info,context))
 	return;
     interrupt_handle_now(signal, info, context);
+#ifdef LISP_FEATURE_DARWIN
+    /* Work around G5 bug */
+    sigreturn(void_context);
+#endif
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -575,6 +579,9 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     interrupt_handle_now(signal, info, context);
+#ifdef LISP_FEATURE_DARWIN
+    sigreturn(void_context);
+#endif
 }
 
 /*

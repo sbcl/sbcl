@@ -9,13 +9,13 @@
 #include "genesis/closure.h"
 #include "genesis/static-symbols.h"
 
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 #define CSYMBOL(x) _ ## x
 #else
 #define CSYMBOL(x) x
 #endif
 
-#if defined DARWIN
+#if defined LISP_FEATURE_DARWIN
 #define FUNCDEF(x)	.text @ \
 			.align 3 @ \
 _##x:
@@ -32,7 +32,7 @@ x:
 	FUNCDEF(x)
 #endif
 
-#if defined DARWIN
+#if defined LISP_FEATURE_DARWIN
 #define SET_SIZE(x)
 #else
 #define SET_SIZE(x) .size x,.-x
@@ -41,7 +41,7 @@ x:
 /* Load a register from a global, using the register as an intermediary */
 /* The register will be a fixnum for one instruction, so this is gc-safe */
 
-#if defined DARWIN
+#if defined LISP_FEATURE_DARWIN
 #define load(reg,global) \
 	lis reg,ha16(global) @ \
 	lwz reg,lo16(global)(reg) ; Comment
@@ -56,7 +56,7 @@ x:
 #endif
 	
 #define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 #define	FIRST_SAVE_GPR	13	/* lowest-numbered non-volatile GPR */
 #define NGPR_SAVE_BYTES(n) ((32-(n))*4)
 #define FRAME_ARG_BYTES(n)  (((((n)+6)*4)+15)&~15)
@@ -67,7 +67,7 @@ x:
 #endif
 #define	NFPR_SAVE_BYTES(n) ((32-(n))*8)
 
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 #define FRAME_SIZE(first_g,first_f,out_arg_words,savecr) \
 (NFPR_SAVE_BYTES(first_f)+ NGPR_SAVE_BYTES(first_g)+ FRAME_ARG_BYTES(out_arg_words))
 #define SAVE_FPR(n) stfd f##n,-8*(32- n)(r11)
@@ -86,7 +86,7 @@ x:
 #define RESTORE_GPR(n) lwz n,-4*(32-(n))(11)
 #endif
 
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 #define C_FULL_PROLOG \
 	nop @\
 	nop @ \
@@ -302,7 +302,7 @@ x:
 	li reg_L1,0
 	li reg_L2,0
 	li reg_LIP,0
-#ifdef DARWIN	
+#ifdef LISP_FEATURE_DARWIN	
 	lis reg_NULL,hi16(NIL)
 	ori reg_NULL,reg_NULL,lo16(NIL)
 #else
@@ -334,7 +334,7 @@ x:
 	lwz reg_A3,12(reg_CFP)
 
 	/* Calculate LRA */
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 	lis reg_LRA,ha16(lra)
 	addi reg_LRA,reg_LRA,lo16(lra)
 #else
@@ -436,7 +436,7 @@ lra:
 	twlti reg_ALLOC,0
 	mr reg_NL3,reg_NARGS
 
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 	/* PowerOpen (i.e. OS X) requires the callee address in r12
            (a.k.a. CFUNC), so move it back there, too. */
 	mfctr reg_CFUNC
@@ -445,7 +445,7 @@ lra:
 	bctrl
 
 	/* Re-establish NIL */
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 	lis reg_NULL,hi16(NIL)
 	ori reg_NULL,reg_NULL,lo16(NIL)
 #else

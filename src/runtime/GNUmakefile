@@ -55,7 +55,7 @@ sbcl: ${OBJS}
 
 .PHONY: clean all
 clean:
-	-rm -f depend *.o sbcl sbcl.nm core *.tmp
+	-rm -f depend *.o sbcl sbcl.nm core *.tmp $(CLEAN_FILES)
 
 TAGS: $(SRCS)
 	etags $(SRCS)

@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "sbcl.h"
 #include "arch.h"
 #include "sbcl.h"
 #include "globals.h"
@@ -185,14 +186,24 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 	    interrupt_handle_now(signal, code, context);
 	    break;
 	}
+#ifdef LISP_FEATURE_DARWIN
+	sigreturn(context);
+#endif
 	return;
     }
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24)) {
 	interrupt_internal_error(signal, code, context, 0);
+#ifdef LISP_FEATURE_DARWIN
+	sigreturn(context);
+#endif
 	return;
     }
     
     interrupt_handle_now(signal, code, context);
+#ifdef LISP_FEATURE_DARWIN
+    /* Work around G5 bug */
+    sigreturn(context);
+#endif
 }
 
 

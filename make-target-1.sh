@@ -35,3 +35,9 @@ cd tools-for-build
 $GNUMAKE -I../src/runtime grovel-headers || exit 1
 cd ..
 tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
+
+# after-grovel-headers may not exist for all platforms (used for
+# Darwin hacks)
+cd src/runtime
+$GNUMAKE after-grovel-headers || true
+cd ..

@@ -1,4 +1,4 @@
-#if defined DARWIN
+#if defined LISP_FEATURE_DARWIN
 #if defined LANGUAGE_ASSEMBLY
 #define REG(num) r##num
 #else
@@ -22,7 +22,7 @@
 #define reg_NL6       REG(9) 	/* Last (7th) FF param */
 #define reg_FDEFN     REG(10)   /* was NL7 until recently -dan */
 #define reg_NARGS     REG(11)
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 #define reg_CFUNC     REG(12)	/* Silly to blow a reg on FF-name */
 #define reg_NFP       REG(13)	/* Lisp may save around FF-call */
 #else

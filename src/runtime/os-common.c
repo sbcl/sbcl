@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <strings.h>
 
+#include "sbcl.h"
 #include "os.h"
 #include "interr.h"
 

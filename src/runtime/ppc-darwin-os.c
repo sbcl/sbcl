@@ -14,7 +14,7 @@
  * files for more information.
  */
 
-
+#include "sbcl.h"
 #include "globals.h"
 #include <signal.h>
 #include <ucontext.h>

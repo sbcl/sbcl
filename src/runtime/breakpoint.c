@@ -12,9 +12,9 @@
 #include <stdio.h>
 #include <signal.h>
 
+#include "sbcl.h"
 #include "runtime.h"
 #include "os.h"
-#include "sbcl.h"
 #include "interrupt.h"
 #include "arch.h"
 #include "lispregs.h"

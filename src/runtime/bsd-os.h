@@ -48,7 +48,7 @@ typedef ucontext_t os_context_t;
 #elif defined __OpenBSD__
 typedef struct sigcontext os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
-#elif defined DARWIN
+#elif defined LISP_FEATURE_DARWIN
   /* man pages claim that the third argument is a sigcontext struct,
      but ucontext_t is defined, matches sigcontext where sensible,
      offers better access to mcontext, and is of course the SUSv2-

@@ -249,7 +249,8 @@
   (let* ((tar
 	  (with-output-to-string (o)
 	    (or
-	     (sb-ext:run-program "tar"
+	     (sb-ext:run-program #-darwin "tar"
+				 #+darwin "gnutar"
 				 (list "-C" (namestring source)
 				       "-xzvf" (namestring packagename))
 				 :output o

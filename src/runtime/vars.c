@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
+#include "sbcl.h"
 #include "runtime.h"
 #include "vars.h"
 #include "os.h"

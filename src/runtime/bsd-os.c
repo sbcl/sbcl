@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>
+#include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
 #include "arch.h"
@@ -28,7 +29,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include "sbcl.h"
 #include "thread.h"
 
 #include <sys/types.h>
@@ -50,7 +50,7 @@ int *os_context_pc_addr(os_context_t *context)
     return CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined __OpenBSD__
     return CONTEXT_ADDR_FROM_STEM(pc);
-#elif defined DARWIN
+#elif defined LISP_FEATURE_DARWIN
     return &context->uc_mcontext->ss.srr0;
 #else
 #error unsupported BSD variant
@@ -63,7 +63,7 @@ os_context_sigmask_addr(os_context_t *context)
     /* (Unlike most of the other context fields that we access, the
      * signal mask field is a field of the basic, outermost context
      * struct itself both in FreeBSD 4.0 and in OpenBSD 2.6.) */
-#if defined __FreeBSD__ || defined DARWIN
+#if defined __FreeBSD__ || defined LISP_FEATURE_DARWIN
     return &context->uc_sigmask;
 #elif defined __OpenBSD__
     return &context->sc_mask;
@@ -166,7 +166,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     void *fault_addr = siginfo->si_addr;
 #elif defined __OpenBSD__
     void *fault_addr = siginfo->si_addr;
-#elif defined DARWIN
+#elif defined LISP_FEATURE_DARWIN
     void *fault_addr = siginfo->si_addr;
 #else
 #error unsupported BSD variant
@@ -200,6 +200,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     if(!interrupt_maybe_gc(signal, info, context))
 	if(!handle_control_stack_guard_triggered(context,addr))
 	    interrupt_handle_now(signal, info, context);
+    /* Work around G5 bug; fix courtesy gbyers */
+    sigreturn(void_context);
 }
 
 void

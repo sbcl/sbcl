@@ -59,7 +59,7 @@ extern void globals_init(void);
 #endif
 #endif
 #ifdef ppc
-#ifdef DARWIN
+#ifdef LISP_FEATURE_DARWIN
 #define EXTERN(name,bytes) .globl _/**/name
 #else
 #define EXTERN(name,bytes) .globl name 
