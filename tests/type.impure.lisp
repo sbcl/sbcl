@@ -57,6 +57,11 @@
 
 (assert (type-evidently-= '(integer 0 10) '(or (integer 0 5) (integer 4 10))))
 
+;;; Bug 50(c,d): numeric types with empty ranges should be NIL
+(assert (type-evidently-= 'nil '(integer (0) (0))))
+(assert (type-evidently-= 'nil '(rational (0) (0))))
+(assert (type-evidently-= 'nil '(float (0.0) (0.0))))
+
 ;;; sbcl-0.6.10 did (UPGRADED-ARRAY-ELEMENT-TYPE 'SOME-UNDEF-TYPE)=>T
 ;;; and (UPGRADED-COMPLEX-PART-TYPE 'SOME-UNDEF-TYPE)=>T.
 (assert (raises-error? (upgraded-array-element-type 'some-undef-type)))
@@ -131,6 +136,11 @@
 #||
 (assert-t-t (subtypep '(and zilch integer) 'zilch))
 ||#
+;;; Bug 84: SB-KERNEL:CSUBTYPEP was a bit enthusiastic at
+;;; special-casing calls to subtypep involving *EMPTY-TYPE*,
+;;; corresponding to the NIL type-specifier; we were bogusly returning
+;;; NIL, T (indicating surety) for the following:
+(assert-nil-nil (subtypep '(satisfies some-undefined-fun) 'nil))
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and

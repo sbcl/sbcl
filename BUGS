@@ -332,16 +332,12 @@ WORKAROUND:
 
 50:
   type system errors reported by Peter Van Eynde July 25, 2000:
-	c: (SUBTYPEP '(INTEGER (0) (0)) 'NIL) dies with nested errors.
-	d: In general, the system doesn't like '(INTEGER (0) (0)) -- it
-	   blows up at the level of SPECIFIER-TYPE with
-	   "Lower bound (0) is greater than upper bound (0)." Probably
-	   SPECIFIER-TYPE should return the NIL type instead.
 	g: The type system [still] isn't all that smart about relationships
 	   between hairy types. [The original example from PVE was
 	   (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL, which was fixed
 	   by CSR in sbcl-0.7.1.28, but there are still
-           plenty of corner cases out there.]
+           plenty of corner cases out there: (SUBTYPEP 'ATOM 'LIST)
+           returns NIL, NIL in sbcl-0.7.1.31.]
 
 51:
   miscellaneous errors reported by Peter Van Eynde July 25, 2000:
@@ -531,18 +527,6 @@ WORKAROUND:
   it should probably look at the class name, the way that it does
   for STRUCTURE-OBJECTs.
 
-69:
-  As reported by Martin Atzmueller on the sbcl-devel list 2000-11-22,
-  > There remains one issue, that is a bug in SBCL:
-  > According to my interpretation of the spec, the ":" and "@" modifiers
-  > should appear _after_ the comma-seperated arguments.
-  > Well, SBCL (and CMUCL for that matter) accept 
-  > (ASSERT (STRING= (FORMAT NIL "~:8D" 1) "   1"))
-  > where the correct way (IMHO) should be
-  > (ASSERT (STRING= (FORMAT NIL "~8:D" 1) "   1"))
-  Probably SBCL should stop accepting the "~:8D"-style format arguments,
-  or at least issue a warning.
-
 70:
   (probably related to bug #65; maybe related to bug #109)
   The compiler doesn't like &OPTIONAL arguments in LABELS and FLET
@@ -618,9 +602,6 @@ WORKAROUND:
   Just increasing R-I-E-B is probably not a good solution, since
   it would decrease efficiency more than is probably necessary. Perhaps
   using some sort of accept/reject method would be better.
-
-84:
-  (SUBTYPEP '(SATISFIES SOME-UNDEFINED-FUN) NIL)=>NIL,T (should be NIL,NIL)
 
 85:
   Internally the compiler sometimes evaluates

@@ -560,8 +560,7 @@
 	     (eq type1 *empty-type*)
 	     (eq type2 *wild-type*))
 	 (values t t))
-	((or (eq type1 *wild-type*)
-	     (eq type2 *empty-type*))
+	((eq type1 *wild-type*)
 	 (values nil t))
 	(t
 	 (!invoke-type-method :simple-subtypep :complex-subtypep-arg2
@@ -1445,21 +1444,27 @@
 	 (lb (if (consp l) (1+ (car l)) l))
 	 (h (canonicalized-bound high 'integer))
 	 (hb (if (consp h) (1- (car h)) h)))
-    (when (and hb lb (< hb lb))
-      (error "Lower bound ~S is greater than upper bound ~S." l h))
-    (make-numeric-type :class 'integer
-		       :complexp :real
-		       :enumerable (not (null (and l h)))
-		       :low lb
-		       :high hb)))
+    (if (and hb lb (< hb lb))
+	;; previously we threw an error here:
+	;; (error "Lower bound ~S is greater than upper bound ~S." l h))
+	;; but ANSI doesn't say anything about that, so:
+	(specifier-type 'nil)
+      (make-numeric-type :class 'integer
+			 :complexp :real
+			 :enumerable (not (null (and l h)))
+			 :low lb
+			 :high hb))))
 
 (defmacro !def-bounded-type (type class format)
   `(!def-type-translator ,type (&optional (low '*) (high '*))
      (let ((lb (canonicalized-bound low ',type))
 	   (hb (canonicalized-bound high ',type)))
-       (unless (numeric-bound-test* lb hb <= <)
-	 (error "Lower bound ~S is not less than upper bound ~S." low high))
-       (make-numeric-type :class ',class :format ',format :low lb :high hb))))
+       (if (not (numeric-bound-test* lb hb <= <))
+	   ;; as above, previously we did
+	   ;; (error "Lower bound ~S is not less than upper bound ~S." low high))
+	   ;; but it is correct to do
+	   (specifier-type 'nil)
+	 (make-numeric-type :class ',class :format ',format :low lb :high hb)))))
 
 (!def-bounded-type rational rational nil)
 

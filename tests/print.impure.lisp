@@ -1,5 +1,7 @@
 (in-package :cl-user)
 
+(load "assertoid.lisp")
+
 ;;; We should be able to output X readably (at least when *READ-EVAL*).
 (defun assert-readable-output (x)
   (assert (eql x
@@ -41,6 +43,10 @@
 
 ;;; bug in sbcl-0.7.1.25, reported by DB sbcl-devel 2002-02-25
 (assert (string= "0.5" (format nil "~2D" 0.5)))
+
+;;; we want malformed format strings to cause errors rather than have
+;;; some DWIM "functionality".
+(assert (raises-error? (format nil "~:2T")))
 
 ;;; success
 (quit :unix-status 104)
