@@ -65,6 +65,7 @@
  (:integer EAGAIN "EAGAIN")
  (:integer EBADF "EBADF")
  (:integer ECONNREFUSED "ECONNREFUSED")
+ (:integer ETIMEDOUT "ETIMEDOUT")
  (:integer EINTR "EINTR")
  (:integer EINVAL "EINVAL")
  (:integer ENOBUFS "ENOBUFS")

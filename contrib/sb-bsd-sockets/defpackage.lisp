@@ -35,8 +35,9 @@
            socket-bind socket-accept socket-connect
            socket-send socket-receive socket-recv
            socket-name socket-peername socket-listen
-           socket-close socket-file-descriptor socket-make-stream
-           get-protocol-by-name
+           socket-close socket-file-descriptor
+	   socket-family socket-protocol socket-type
+	   socket-make-stream get-protocol-by-name
 
            get-host-by-name get-host-by-address
            host-ent
@@ -53,17 +54,11 @@
 	   ;; all socket options are also exported, by code in
 	   ;; sockopt.lisp
 
-           bad-file-descriptor-error
-           address-in-use-error
-           interrupted-error
-           invalid-argument-error
-           out-of-memory-error
-           operation-not-supported-error
-           operation-not-permitted-error
-           protocol-not-supported-error
-	   socket-type-not-supported-error
-           network-unreachable-error
-           
+	   socket-error
+
+	   ;; other errno-based socket errors are exported by code in
+	   ;; sockets.lisp
+	   
            make-inet-address
 
            non-blocking-mode

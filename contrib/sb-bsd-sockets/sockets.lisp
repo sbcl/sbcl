@@ -88,15 +88,17 @@ values"))
     (let ((fd (sockint::accept (socket-file-descriptor socket)
 			       sockaddr
 			       (size-of-sockaddr socket))))
-      (apply #'values
-	     (if (= fd -1)
-		 (socket-error "accept")
-		 (let ((s (make-instance (class-of socket)
-			     :type (socket-type socket)
-			     :protocol (socket-protocol socket)
-			     :descriptor fd)))
-		   (sb-ext:finalize s (lambda () (sockint::close fd)))))
-	     (multiple-value-list (bits-of-sockaddr socket sockaddr))))))
+      (cond
+	((and (= fd -1) (= sockint::EAGAIN (sb-unix::get-errno)))
+	 nil)
+	((= fd -1) (socket-error "accept"))
+	(t (apply #'values
+		  (let ((s (make-instance (class-of socket)
+			      :type (socket-type socket)
+			      :protocol (socket-protocol socket)
+			      :descriptor fd)))
+		    (sb-ext:finalize s (lambda () (sockint::close fd))))
+		  (multiple-value-list (bits-of-sockaddr socket sockaddr))))))))
     
 (defgeneric socket-connect (socket &rest address)
   (:documentation "Perform the connect(2) call to connect SOCKET to a
@@ -182,11 +184,13 @@ small"))
 					flags
 					sockaddr
 					(sb-alien:cast sa-len (* integer)))))
-		(when (= len -1) (socket-error "recvfrom"))
-		(loop for i from 0 below len
-		      do (setf (elt buffer i) (sb-alien:deref copy-buffer i)))
-		(apply #'values buffer len (multiple-value-list
-					    (bits-of-sockaddr socket sockaddr)))))
+		(cond
+		  ((and (= len -1) (= sockint::EAGAIN (sb-unix::get-errno))) nil)
+		  ((= len -1) (socket-error "recvfrom"))
+		  (t (loop for i from 0 below len
+			   do (setf (elt buffer i) (sb-alien:deref copy-buffer i)))
+		     (apply #'values buffer len (multiple-value-list
+						 (bits-of-sockaddr socket sockaddr)))))))
 	  (sb-alien:free-alien copy-buffer))))))
 
 
@@ -278,19 +282,19 @@ SB-SYS:MAKE-FD-STREAM."))
   `(progn
      (define-condition ,name (socket-error)
        ((symbol :reader socket-error-symbol :initform (quote ,symbol))))
+     (export ',name)
      (push (cons ,symbol (quote ,name)) *conditions-for-errno*)))
 
 (defparameter *conditions-for-errno* nil)
 ;;; this needs the rest of the list adding to it, really.  They also
-;;; need
-;;; - conditions to be exported in the DEFPACKAGE form
-;;; - symbols to be added to constants.ccon
+;;; need symbols to be added to constants.ccon
 ;;; I haven't yet thought of a non-kludgey way of keeping all this in
 ;;; the same place
 (define-socket-condition sockint::EADDRINUSE address-in-use-error)
 (define-socket-condition sockint::EAGAIN interrupted-error)
 (define-socket-condition sockint::EBADF bad-file-descriptor-error)
 (define-socket-condition sockint::ECONNREFUSED connection-refused-error)
+(define-socket-condition sockint::ETIMEDOUT operation-timeout-error)
 (define-socket-condition sockint::EINTR interrupted-error)
 (define-socket-condition sockint::EINVAL invalid-argument-error)
 (define-socket-condition sockint::ENOBUFS no-buffers-error)
