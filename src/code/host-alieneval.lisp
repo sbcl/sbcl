@@ -1070,6 +1070,13 @@
 
 ;;;; the FUNCTION and VALUES alien types
 
+;;; not documented in CMU CL:-(
+;;;
+;;; reverse engineering observations:
+;;;   * seems to be set when translating return values
+;;;   * seems to enable the translation of (VALUES), which is the
+;;;     Lisp idiom for C's return type "void" (which is likely
+;;;     why it's set when when translating return values)
 (defvar *values-type-okay* nil)
 
 (define-alien-type-class (fun :include mem-block)
@@ -1078,7 +1085,7 @@
   (stub nil :type (or null function)))
 
 (define-alien-type-translator function (result-type &rest arg-types
-						 &environment env)
+						    &environment env)
   (make-alien-fun-type
    :result-type (let ((*values-type-okay* t))
 		  (parse-alien-type result-type env))

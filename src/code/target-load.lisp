@@ -318,7 +318,7 @@
 		foreign-symbol-address-as-integer))
 
 
-;;; sb!sys:get-dynamic-foreign-symbol-address is in foreign.lisp, on
+;;; SB!SYS:GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS is in foreign.lisp, on
 ;;; platforms that have dynamic loading
 (defun foreign-symbol-address-as-integer (foreign-symbol)
   (or (find-foreign-symbol-in-table  foreign-symbol *static-foreign-symbols*)

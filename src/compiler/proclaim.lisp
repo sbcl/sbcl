@@ -123,8 +123,8 @@
        ;; when we have to ignore a PROCLAIM because the type system is
        ;; uninitialized.
        (when *type-system-initialized*
-	 (let ((type (specifier-type (first args))))
-	   (unless (csubtypep type (specifier-type 'function))
+	 (let ((ctype (specifier-type (first args))))
+	   (unless (csubtypep ctype (specifier-type 'function))
 	     (error "not a function type: ~S" (first args)))
 	   (dolist (name (rest args))
 
@@ -142,13 +142,13 @@
 	     #|
 	     (when (eq (info :function :where-from name) :declared)
 	       (let ((old-type (info :function :type name)))
-		 (when (type/= type old-type)
+		 (when (type/= ctype old-type)
 		   (style-warn
 		    "new FTYPE proclamation~@
                      ~S~@
                      for ~S does not match old FTYPE proclamation~@
                      ~S"
-		    (list type name old-type)))))
+		    (list ctype name old-type)))))
              |#
 
 	     ;; Now references to this function shouldn't be warned
@@ -161,7 +161,7 @@
 	     (note-name-defined name :function)
 
 	     ;; the actual type declaration
-	     (setf (info :function :type name) type
+	     (setf (info :function :type name) ctype
 		   (info :function :where-from name) :declared)))))
       (freeze-type
        (dolist (type args)

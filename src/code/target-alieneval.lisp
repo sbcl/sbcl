@@ -659,9 +659,25 @@
 	 ;; anyway, and (2) such a declamation can be (especially for
 	 ;; alien values) both messy to do by hand and very important
 	 ;; for performance of later code which uses the return value.
-	 (declaim (ftype (function ,(mapcar (constantly t) args)
-				   (alien ,result-type))
-			 ,lisp-name))
+	 ,(let (;; FIXME: Ideally, we'd actually declare useful types
+		;; here, so e.g. an alien function of "int" and "char"
+		;; arguments would get Lisp arg types WORD and CHARACTER
+		;; or something. Meanwhile, for now we just punt.
+		(lisp-arg-types (mapcar (constantly t) args))
+		;; KLUDGE: This is a quick hack to solve bug 133,
+		;; where PROCLAIM trying to translate alien void result
+		;; types would signal an error here ("cannot use values
+		;; types here"), and the kludgy SB!ALIEN::*VALUE-TYPE-OKAY*
+		;; flag to enable values types didn't fit into PROCLAIM
+		;; in any reasonable way. But there's likely a better
+		;; way to do this. (If there isn't a suitable utility
+		;; to systematically translate C return types into
+		;; Lisp return types, there should be.) -- WHN 2002-01-22
+		(lisp-result-type (if (eql result-type 'void)
+				      '(values)
+				      `(alien ,result-type))))
+	    `(declaim (ftype (function ,lisp-arg-types ,lisp-result-type)
+			     ,lisp-name)))
 
 	 (defun ,lisp-name ,(lisp-args)
 	   ,@(docs)

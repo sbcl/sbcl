@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-SYS") ; (SB-SYS, not SB!SYS, since we're built in warm load.)
+(in-package "SB-ALIEN") ; (SB-ALIEN, not SB!ALIEN, since we're in warm load.)
 
 (defun pick-temporary-file-name (&optional
 				 ;; KLUDGE: There are various security
@@ -54,7 +54,7 @@
 ;;; placeholder implementation is overwritten by a subsequent real
 ;;; implementation.)
 ;;;
-;;; You may want to use sb-sys:foreign-symbol-address instead of
+;;; You may want to use SB-SYS:FOREIGN-SYMBOL-ADDRESS instead of
 ;;; calling this directly; see code/target-load.lisp.
 (defun get-dynamic-foreign-symbol-address (symbol)
   (declare (type simple-string symbol) (ignore symbol))
@@ -63,6 +63,14 @@
 ;;; dlsym()-based implementation of GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS
 ;;; and functions (e.g. LOAD-FOREIGN) which affect it.  This should 
 ;;; work on any ELF system with dlopen(3) and dlsym(3)
+#-(or linux FreeBSD)
+(macrolet ((define-unsupported-fun (fun-name)
+	     `(defun ,fun-name (&rest rest)
+		"unsupported on this system"
+                (declare (ignore rest))
+		(error 'unsupported-operator :name ',fun-name))))
+  (define-unsupported-fun load-1-foreign)
+  (define-unsupported-fun load-foreign))
 #+(or linux FreeBSD)
 (progn
 

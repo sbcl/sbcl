@@ -20,9 +20,13 @@ make $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
 ${SBCL:-sbcl} <<EOF
-  (unless (fboundp 'load-foreign) ; not necessarily supported on all OSes..
-    (sb-ext:quit :unix-status 52)) ; successfully unsupported:-|
-  (load-foreign '("$testfilestem.so"))
+  (handler-case 
+      (load-foreign '("$testfilestem.so"))
+    (sb-int:unsupported-operator ()
+     ;; At least as of sbcl-0.7.0.5, LOAD-FOREIGN isn't supported
+     ;; on every OS. In that case, there's nothing to test, and we
+     ;; can just fall through to success.
+     (sb-ext:quit :unix-status 52))) ; success convention for Lisp program
   (define-alien-routine summish int (x int) (y int))
   (assert (= (summish 10 20) 31))
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program

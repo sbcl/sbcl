@@ -740,6 +740,35 @@
 	     (stream-error-stream condition)
 	     (reader-eof-error-context condition)))))
 
+;;;; special SBCL extension conditions
+
+;;; a condition for use in stubs for operations which aren't
+;;; unsupported on some OSes/CPUs/whatever
+;;;
+;;; E.g. in sbcl-0.7.0.5, it might be appropriate to do something
+;;; like
+;;;   #-(or freebsd linux)
+;;;   (defun load-foreign (&rest rest)
+;;;     (error 'unsupported-operator :name 'load-foreign))
+;;;   #+(or freebsd linux)
+;;;   (defun load-foreign ... actual definition ...)
+;;; By signalling a standard condition in this case, we make it
+;;; possible for test code to distinguish between intentionally not
+;;; implemented and just screwed up somehow. (Before this condition
+;;; was defined, this was dealt with by checking for FBOUNDP, but
+;;; that didn't work reliably. In sbcl-0.7.0, a a package screwup
+;;; left the definition of LOAD-FOREIGN in the wrong package, so
+;;; it was unFBOUNDP even on architectures where it was supposed to
+;;; be supported, and the regression tests cheerfully passed because
+;;; they assumed that unFBOUNDPness meant they were running on an
+;;; system which didn't support the extension.)
+(define-condition unsupported-operator (cell-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "unsupported on this implementation: ~S"
+	     (cell-error-name condition)))))
+
 ;;;; restart definitions
 
 (define-condition abort-failure (control-error) ()
