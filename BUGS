@@ -1544,3 +1544,49 @@ WORKAROUND:
 
 340: SETF of VALUES using too many values
   (fixed in sbcl-0.8.12.10)
+
+341: PPRINT-LOGICAL-BLOCK / PPRINT-FILL / PPRINT-LINEAR sharing detection.
+  (from Paul Dietz' test suite)
+
+  CLHS on PPRINT-LINEAR and PPRINT-FILL (and PPRINT-TABULAR, though
+  that's slightly different) states that these functions perform
+  circular and shared structure detection on their object.  Therefore,
+
+  a.(let ((*print-circle* t))
+      (pprint-linear *standard-output* (let ((x '(a))) (list x x))))
+    should print "(#1=(A) #1#)"
+
+  b.(let ((*print-circle* t))
+      (pprint-linear *standard-output* 
+                     (let ((x (cons nil nil))) (setf (cdr x) x) x)))
+    should print "#1=(NIL . #1#)"
+
+  (it is likely that the fault lies in PPRINT-LOGICAL-BLOCK, as
+  suggested by the suggested implementation of PPRINT-TABULAR)
+
+342: PPRINT-TABULAR / PPRINT-LOGICAL-BLOCK logical block start position
+  The logical block introduced by PPRINT-LOGICAL-BLOCK should not
+  include the prefix, so that
+    (pprint-tabular *standard-output* '(1 2 3) t nil 2)
+  should print
+  "(1 2 3)" rather than "(1  2 3)".
+
+343: MOP:COMPUTE-DISCRIMINATING-FUNCTION overriding causes error
+  Even the simplest possible overriding of
+  COMPUTE-DISCRIMINATING-FUNCTION, suggested in the PCL implementation
+  as "canonical", does not work:
+    (defclass my-generic-function (standard-generic-function) ()
+      (:metaclass funcallable-standard-class))
+    (defmethod compute-discriminating-function ((gf my-generic-function))
+      (let ((dfun (call-next-method)))
+        (lambda (&rest args)
+          (apply dfun args))))
+    (defgeneric foo (x)
+      (:generic-function-class my-generic-function))
+    (defmethod foo (x) (+ x x))
+    (foo 5)
+  signals an error.  This error is the same even if the LAMBDA is
+  replaced by (FUNCTION (SB-KERNEL:INSTANCE-LAMBDA ...)).  Maybe the
+  SET-FUNCALLABLE-INSTANCE-FUN scary stuff in
+  src/code/target-defstruct.lisp is broken?  This seems to be broken
+  in CMUCL 18e, so it's not caused by a recent change.
