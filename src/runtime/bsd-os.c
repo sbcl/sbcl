@@ -34,7 +34,6 @@
 #include <sys/types.h>
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
-#include <sys/proc.h>
 #include "validate.h"
 vm_size_t os_vm_page_size;
 
@@ -263,6 +262,16 @@ struct thread *arch_os_get_current_thread() {
     return all_threads;
 }
 int arch_os_thread_init(struct thread *thread) {
+  stack_t sigstack;
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    /* Signal handlers are run on the control stack, so if it is exhausted
+     * we had better use an alternate stack for whatever signal tells us
+     * we've exhausted it */
+    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
+    sigstack.ss_flags=0;
+    sigstack.ss_size = 32*SIGSTKSZ;
+    sigaltstack(&sigstack,0);
+#endif
     return 1;                  /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {
