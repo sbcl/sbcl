@@ -1083,7 +1083,13 @@
              (:include ansi-stream)
              (:constructor nil)
              (:copier nil))
-  (string nil :type string))
+  ;; FIXME: This type declaration is true, and will probably continue
+  ;; to be true.  However, note well the comments in DEFTRANSFORM
+  ;; REPLACE, implying that performance of REPLACE is somewhat
+  ;; critical to performance of string streams.  If (VECTOR CHARACTER)
+  ;; ever becomes different from (VECTOR BASE-CHAR), the transform
+  ;; probably needs to be extended.
+  (string (missing-arg) :type (vector character)))
 
 ;;;; STRING-INPUT-STREAM stuff
 
@@ -1093,7 +1099,8 @@
 		       (bin #'string-binch)
 		       (n-bin #'string-stream-read-n-bytes)
 		       (misc #'string-in-misc)
-                       (string nil :type simple-string))
+                       (string (missing-arg)
+			       :type (simple-array character (*))))
 	     (:constructor internal-make-string-input-stream
 			   (string current end))
 	     (:copier nil))
@@ -1103,7 +1110,8 @@
 (defun string-inch (stream eof-error-p eof-value)
   (let ((string (string-input-stream-string stream))
 	(index (string-input-stream-current stream)))
-    (declare (simple-string string) (fixnum index))
+    (declare (type (simple-array character (*)) string)
+	     (type fixnum index))
     (cond ((= index (the index (string-input-stream-end stream)))
 	   (eof-or-lose stream eof-error-p eof-value))
 	  (t
@@ -1113,7 +1121,7 @@
 (defun string-binch (stream eof-error-p eof-value)
   (let ((string (string-input-stream-string stream))
 	(index (string-input-stream-current stream)))
-    (declare (simple-string string)
+    (declare (type (simple-array character (*)) string)
 	     (type index index))
     (cond ((= index (the index (string-input-stream-end stream)))
 	   (eof-or-lose stream eof-error-p eof-value))
@@ -1128,7 +1136,7 @@
 	 (index (string-input-stream-current stream))
 	 (available (- (string-input-stream-end stream) index))
 	 (copy (min available requested)))
-    (declare (simple-string string)
+    (declare (type (simple-array character (*)) string)
 	     (type index index available copy))
     (when (plusp copy)
       (setf (string-input-stream-current stream)
@@ -1181,7 +1189,8 @@
 		      (sout #'string-sout)
 		      (misc #'string-out-misc)
                       ;; The string we throw stuff in.
-                      (string (make-string 40) :type simple-string))
+                      (string (make-string 40)
+			      :type (simple-array character (*))))
 	    (:constructor make-string-output-stream ())
 	    (:copier nil))
   ;; Index of the next location to use.
@@ -1195,7 +1204,8 @@
 (defun string-ouch (stream character)
   (let ((current (string-output-stream-index stream))
 	(workspace (string-output-stream-string stream)))
-    (declare (simple-string workspace) (fixnum current))
+    (declare (type (simple-array character (*)) workspace)
+	     (type fixnum current))
     (if (= current (the fixnum (length workspace)))
 	(let ((new-workspace (make-string (* current 2))))
 	  (replace new-workspace workspace)
@@ -1205,13 +1215,17 @@
     (setf (string-output-stream-index stream) (1+ current))))
 
 (defun string-sout (stream string start end)
-  (declare (simple-string string) (fixnum start end))
-  (let* ((current (string-output-stream-index stream))
+  (declare (type simple-string string)
+	   (type fixnum start end))
+  (let* ((string (if (typep string '(simple-array character (*)))
+		     string
+		     (coerce string '(simple-array character (*)))))
+	 (current (string-output-stream-index stream))
 	 (length (- end start))
 	 (dst-end (+ length current))
 	 (workspace (string-output-stream-string stream)))
-    (declare (simple-string workspace)
-	     (fixnum current length dst-end))
+    (declare (type (simple-array character (*)) workspace string)
+	     (type fixnum current length dst-end))
     (if (> dst-end (the fixnum (length workspace)))
 	(let ((new-workspace (make-string (+ (* current 2) length))))
 	  (replace new-workspace workspace :end2 current)
@@ -1236,8 +1250,8 @@
 	  (count 0 (1+ count))
 	  (string (string-output-stream-string stream)))
 	 ((< index 0) count)
-       (declare (simple-string string)
-		(fixnum index count))
+       (declare (type (simple-array character (*)) string)
+		(type fixnum index count))
        (if (char= (schar string index) #\newline)
 	   (return count))))
     (:element-type 'base-char)))
@@ -1268,7 +1282,7 @@
 ;;; WITH-OUTPUT-TO-STRING.
 
 (deftype string-with-fill-pointer ()
-  '(and string
+  '(and (vector character)
 	(satisfies array-has-fill-pointer-p)))
 
 (defstruct (fill-pointer-output-stream
@@ -1290,7 +1304,7 @@
 	 (current+1 (1+ current)))
     (declare (fixnum current))
     (with-array-data ((workspace buffer) (start) (end))
-      (declare (simple-string workspace))
+      (declare (type (simple-array character (*)) workspace))
       (let ((offset-current (+ start current)))
 	(declare (fixnum offset-current))
 	(if (= offset-current end)
@@ -1309,20 +1323,23 @@
 
 (defun fill-pointer-sout (stream string start end)
   (declare (simple-string string) (fixnum start end))
-  (let* ((buffer (fill-pointer-output-stream-string stream))
+  (let* ((string (if (typep string '(simple-array character (*)))
+		     string
+		     (coerce string '(simple-array character (*)))))
+	 (buffer (fill-pointer-output-stream-string stream))
 	 (current (fill-pointer buffer))
 	 (string-len (- end start))
 	 (dst-end (+ string-len current)))
     (declare (fixnum current dst-end string-len))
     (with-array-data ((workspace buffer) (dst-start) (dst-length))
-      (declare (simple-string workspace))
+      (declare (type (simple-array character (*)) workspace))
       (let ((offset-dst-end (+ dst-start dst-end))
 	    (offset-current (+ dst-start current)))
 	(declare (fixnum offset-dst-end offset-current))
 	(if (> offset-dst-end dst-length)
 	    (let* ((new-length (+ (the fixnum (* current 2)) string-len))
 		   (new-workspace (make-string new-length)))
-	      (declare (simple-string new-workspace))
+	      (declare (type (simple-array character (*)) new-workspace))
 	      (%byte-blt workspace dst-start
 			 new-workspace 0 current)
 	      (setf workspace new-workspace)
