@@ -90,7 +90,7 @@
 	  "~&~@<Its REHASH-SIZE is ~S. ~_Its REHASH-THRESHOLD is ~S.~:>"
 	  (hash-table-rehash-size x)
 	  (hash-table-rehash-threshold x))
-  (fresh-line)
+  (fresh-line s)
   (pprint-logical-block (s nil)
     (let ((count (hash-table-count x)))
       (format s "It holds ~S key/value pair~:P~:[: ~2I~_~;.~]"
