@@ -293,12 +293,6 @@
 	     (sc-offsets sc-offset)))
 	  (values error-number (sc-offsets)))))))
 
-;;; Do whatever is necessary to make the given code component
-;;; executable. (This is a no-op on the x86.)
-(defun sanctify-for-execution (component)
-  (declare (ignore component))
-  nil)
-
 ;;; This is used in error.lisp to insure that floating-point exceptions
 ;;; are properly trapped. The compiler translates this to a VOP.
 (defun float-wait ()

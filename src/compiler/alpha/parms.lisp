@@ -125,13 +125,13 @@
   ;; is in dynamic space.  Chocolate brownie for the first person to fix it
   ;; -dan 20010502
   (defconstant dynamic-space-start   #x30000000)
-  (defconstant dynamic-space-end     #x38000000)
+  (defconstant dynamic-space-end     #x3fff0000)
 
   (defconstant dynamic-0-space-start   #x30000000)
-  (defconstant dynamic-0-space-end     #x38000000)
+  (defconstant dynamic-0-space-end     #x3fff0000)
   
   (defconstant dynamic-1-space-start   #x40000000)
-  (defconstant dynamic-1-space-end     #x48000000)
+  (defconstant dynamic-1-space-end     #x4fff0000)
 
   (defconstant control-stack-start   #x50000000)
   (defconstant control-stack-end     #x51000000)

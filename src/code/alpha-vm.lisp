@@ -178,12 +178,4 @@
   (declare (type simple-base-string name))
   ;; On the Alpha we don't do anything.
   name)
-
-;;;; Do whatever is necessary to make the given code component
-;;;; executable.
-;;;;
-;;;; XXX do we really not have to flush caches or something here? I
-;;;; need an architecture manual
-(defun sanctify-for-execution (component)
-  (declare (ignore component))
-  nil)
+

@@ -192,10 +192,3 @@
 	       #.(error-number-or-lose 'unknown-error)))
 	    (list (sb!c::make-sc-offset descriptor-reg-sc-number reg)))))
 
-
-;;; Do whatever is necessary to make the given code component
-;;; executable.  On the sparc, we don't need to do anything, because
-;;; the i and d caches are unified.
-(defun sanctify-for-execution (component)
-  (declare (ignore component))
-  nil)

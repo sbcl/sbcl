@@ -8,15 +8,15 @@
 # files for more information.
 
 CFLAGS += -g -Dppc
-LD = ld #-taso
-LINKFLAGS = -v -g # -Wl,-T  -Wl,ld-script.alpha-linux
+LD = ld 
+LINKFLAGS = -v -g 
 NM = nm -p
 
 ASSEM_SRC = ppc-assem.S ldso-stubs.S
 ARCH_SRC = ppc-arch.c
 
 OS_SRC = linux-os.c  ppc-linux-os.c os-common.c 
-LINKFLAGS+=-rdynamic # -static
+LINKFLAGS+=-rdynamic 
 OS_LIBS= -ldl
 
 GC_SRC= gc.c

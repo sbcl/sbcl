@@ -610,7 +610,8 @@
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
 
  ("src/code/target-load" :not-host) ; needs special vars from code/load.lisp
-
+ ("src/compiler/target/sanctify" :not-host) 
+ 
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 

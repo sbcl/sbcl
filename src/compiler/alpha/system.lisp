@@ -226,6 +226,10 @@
 (define-vop (halt)
   (:generator 1
     (inst gentrap halt-trap)))
+
+(define-vop (istream-memory-barrier)
+  (:generator 1
+    (inst imb)))
 
 ;;;; dynamic vop count collection support
 

@@ -442,6 +442,9 @@
 (define-instruction trapb (segment)
   (:emitter (emit-lword segment #x63ff0000)))
 
+(define-instruction imb (segment)
+  (:emitter (emit-lword segment #x00000086)))
+
 (define-instruction gentrap (segment code)
   (:printer call-pal ((palcode #xaa0000)))
   (:emitter
