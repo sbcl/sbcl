@@ -33,51 +33,6 @@
 	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
 	  collect (funcall function thread))))
 
-#+nil
-(defun thread-stopped-p (thread)
-  (sb!kernel:make-lisp-obj
-   (sb!sys:sap-ref-32 thread
-		      (* 4 sb!vm::thread-stopped-p-slot))))
- ; (declare (optimize (speed 3) (safety 0)))
-;  (thread-stopped-p thread))
-
-
-(defvar *foreground-thread-stack* nil)
-
-#+nil
-(defun background-thread (&optional restart)
-  (if restart
-    (let* ((real-restart (sb!kernel::find-restart-or-lose restart))
-	   (args (sb!kernel::interactive-restart-arguments real-restart)))
-      (thread-to-tty (pop *foreground-thread-stack*))
-      (apply (sb!kernel::restart-function real-restart) args))
-    (thread-to-tty (pop *foreground-thread-stack*))))
-
-#+nil
-(defun make-listener-thread (tty-name)
-  (assert (probe-file tty-name))
-  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
-	 (out (sb!unix:unix-dup in))
-	 (err (sb!unix:unix-dup in)))
-    (labels ((thread-repl () 
-	       ;;; XXX also need to set up new *foreground-thread-stack*
-	       (let* ((sb!impl::*stdin* 
-		       (sb!sys:make-fd-stream in :input t :buffering :line))
-		      (sb!impl::*stdout* 
-		       (sb!sys:make-fd-stream out :output t :buffering :line))
-		      (sb!impl::*stderr* 
-		       (sb!sys:make-fd-stream err :output t :buffering :line))
-		      (sb!impl::*tty* 
-		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
-		      (sb!impl::*descriptor-handlers* nil))
-		 (sb!impl::handling-end-of-the-world
-		  (with-simple-restart 
-		      (destroy-thread
-		       (format nil "~~@<Destroy this thread (~A)~~@:>"
-			       (current-thread-id)))
-		    (sb!impl::toplevel-repl nil))))))
-      (make-thread #'thread-repl))))
-
 ;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp
 
 ;;; in true OOAOM style, this is also defined in C.  Don't change this
@@ -140,26 +95,43 @@
 ;;;; job control
 
 (defvar *background-threads-wait-for-debugger* t)
-;;; may be T, NIL, or a function called with sb-sys::*stdin* and thread id 
-;;; as its two arguments, returns NIL or T
+;;; may be T, NIL, or a function called with an fd-stream and thread id 
+;;; as its two arguments, returning NIl or T
 
 ;;; called from top of invoke-debugger
-
-(defun maybe-wait-until-foreground-thread ()
-  (when (not (eql (mutex-value
-		   (sb!impl::fd-stream-owner-thread sb!sys::*stdin*))
-		  (CURRENT-THREAD-ID)))
-    (let* ((wait-p *background-threads-wait-for-debugger*)
-	   (*background-threads-wait-for-debugger* nil))
+(defun debugger-wait-until-foreground-thread (stream)
+  "Returns T if thread had been running in background, NIL if it was
+already the foreground thread, or transfers control to the first applicable
+restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
+  (let* ((wait-p *background-threads-wait-for-debugger*)
+	 (*background-threads-wait-for-debugger* nil)
+	 (fd-stream (sb!impl::get-underlying-stream stream :input)))
+    (when (not (eql (mutex-value
+		     (sb!impl::fd-stream-owner-thread fd-stream))
+		    (CURRENT-THREAD-ID)))
       (when (functionp wait-p) 
 	(setf wait-p 
-	      (funcall wait-p sb!sys::*stdin* (CURRENT-THREAD-ID))))
+	      (funcall wait-p fd-stream (CURRENT-THREAD-ID))))
       (cond (wait-p
-	     (get-mutex (sb!impl::fd-stream-owner-thread sb!sys::*stdin*))
+	     (get-mutex (sb!impl::fd-stream-owner-thread fd-stream))
 	     #+nil
-	     (sb!sys:enable-interrupt :sigint *sigint-handler*))
+	     (sb!sys:enable-interrupt :sigint *sigint-handler*)
+	     t)
 	    (t
 	     (invoke-restart (car (compute-restarts))))))))
+
+(defun thread-repl-prompt-fun (in-stream out-stream)
+  (let* ((stream (sb!impl::get-underlying-stream in-stream :input))
+	 (lock (sb!impl::fd-stream-owner-thread stream)))
+    (unless (eql (mutex-value lock) (current-thread-id))
+      (get-mutex lock))
+    (let ((stopped (mutex-queue lock)))
+      (when stopped
+	(format stream "~{~&Thread ~A suspended~}~%" stopped))
+      (sb!impl::repl-prompt-fun in-stream out-stream))))
+
+;;; install this with (setf SB!INT:*REPL-PROMPT-FUN* #'thread-prompt-fun)
+;;; One day it will be default
 
 
 (defstruct rwlock
@@ -217,6 +189,8 @@
   (ecase direction
     (:read (%unlock-for-reading lock))
     (:write (%unlock-for-writing lock))))
+
+;;;; beyond this point all is commented.
 
 ;;; Lock-Wait-With-Timeout  --  Internal
 ;;;
@@ -287,4 +261,29 @@
 		  ,lock 2 *current-process* nil)
 	  #-i486 (when (eq (lock-process ,lock) *current-process*)
 		   (setf (lock-process ,lock) nil)))))))
+
+#+nil
+(defun make-listener-thread (tty-name)
+  (assert (probe-file tty-name))
+  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
+	 (out (sb!unix:unix-dup in))
+	 (err (sb!unix:unix-dup in)))
+    (labels ((thread-repl () 
+	       ;;; XXX also need to set up new *foreground-thread-stack*
+	       (let* ((sb!impl::*stdin* 
+		       (sb!sys:make-fd-stream in :input t :buffering :line))
+		      (sb!impl::*stdout* 
+		       (sb!sys:make-fd-stream out :output t :buffering :line))
+		      (sb!impl::*stderr* 
+		       (sb!sys:make-fd-stream err :output t :buffering :line))
+		      (sb!impl::*tty* 
+		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
+		      (sb!impl::*descriptor-handlers* nil))
+		 (sb!impl::handling-end-of-the-world
+		  (with-simple-restart 
+		      (destroy-thread
+		       (format nil "~~@<Destroy this thread (~A)~~@:>"
+			       (current-thread-id)))
+		    (sb!impl::toplevel-repl nil))))))
+      (make-thread #'thread-repl))))
 

@@ -441,9 +441,10 @@
 	   (critically-unreachable "after REPL")))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
-(defun repl-prompt-fun (stream)
-  (fresh-line stream)
-  (write-string "* " stream)) ; arbitrary but customary REPL prompt
+(defun repl-prompt-fun (in out)
+  (declare (type stream in out) (ignore in))
+  (fresh-line out)
+  (write-string "* " out)) ; arbitrary but customary REPL prompt
 
 ;;; Our default form reader does relatively little magic, but does
 ;;; handle the Unix-style EOF-is-end-of-process convention.
@@ -464,8 +465,8 @@
   Lisp form). The OUT stream is there to support magic which requires
   issuing new prompts.")
 (defvar *repl-prompt-fun* #'repl-prompt-fun
-  "a function of one argument STREAM for the toplevel REPL to call: Prompt
-  the user for input.")
+  "a function of two stream arguments IN and OUT for the toplevel REPL
+to call: Prompt the user for input.")
 
 (defun repl (noprint)
   (/show0 "entering REPL")
@@ -474,7 +475,7 @@
      ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
      (scrub-control-stack)
      (unless noprint
-       (funcall *repl-prompt-fun* *standard-output*)
+       (funcall *repl-prompt-fun* *standard-input* *standard-output*)
        ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
        ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
        ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
