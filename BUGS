@@ -1228,21 +1228,6 @@ WORKAROUND:
   returns, values returned by (EXT) must be removed from under that of
   (INT).
 
-299: (aka PFD MISC.186)
-    * (defun foo ()
-        (declare (optimize (debug 1)))
-        (multiple-value-call #'list
-          (if (eval t) (eval '(values :a :b :c)) nil) ; (*)
-          (catch 'foo (throw 'foo (values :x :y)))))
-    FOO
-    * (foo)
-    (:X :Y)
-
-  Operator THROW is represented with a call of a not returning funny
-  function %THROW, unknown values stack after the call is empty, so
-  the unknown values LVAR (*) is considered to be dead after the call
-  and, thus, before it and is popped by the stack analysis.
-
 300: (reported by Peter Graves) Function PEEK-CHAR checks PEEK-TYPE
   argument type only after having read a character. This is caused
   with EXPLICIT-CHECK attribute in DEFKNOWN. The similar problem

@@ -69,6 +69,7 @@
   result of Value-Form."
   (unless (symbolp name)
     (compiler-error "The block name ~S is not a symbol." name))
+  (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
 	 (entry (make-entry))
@@ -162,6 +163,7 @@
   to the next statement following that tag. A Tag must an integer or a
   symbol. A statement must be a list. Other objects are illegal within the
   body."
+  (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
 	 (entry (make-entry))

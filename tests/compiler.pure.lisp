@@ -1033,3 +1033,64 @@
      215067723)
     13739018))
 
+;;; bug 299 (reported by PFD)
+(assert
+ (equal (funcall
+         (compile
+          nil
+          '(lambda ()
+            (declare (optimize (debug 1)))
+            (multiple-value-call #'list
+              (if (eval t) (eval '(values :a :b :c)) nil)
+              (catch 'foo (throw 'foo (values :x :y)))))))
+        '(:a :b :c :x :y)))
+;;; MISC.185
+(assert (equal
+         (funcall
+          (compile
+           nil
+           '(lambda (a b c)
+             (declare (type (integer 5 155656586618) a))
+             (declare (type (integer -15492 196529) b))
+             (declare (type (integer 7 10) c))
+             (declare (optimize (speed 3)))
+             (declare (optimize (safety 1)))
+             (declare (optimize (debug 1)))
+             (flet ((%f3
+                        (f3-1 f3-2 f3-3
+                              &optional (f3-4 a) (f3-5 0)
+                              (f3-6
+                               (labels ((%f10 (f10-1 f10-2 f10-3)
+                                          0))
+                                 (apply #'%f10
+                                        0
+                                        a
+                                        (- (if (equal a b) b (%f10 c a 0))
+                                           (catch 'ct2 (throw 'ct2 c)))
+                                        nil))))
+                      0))
+               (%f3 (%f3 (%f3 b 0 0 0) a 0) a b b b c)))) 5 0 7)
+         0))
+;;; MISC.186
+(assert (eq
+         (eval
+          '(let* ((form '(labels ((%f3 (f3-1 f3-2) f3-1))
+                          (apply #'%f3 b (catch 'ct8 (throw 'ct8 (logeqv (%f3 c 0)))) nil)))
+                  (vars '(b c))
+                  (fn1 `(lambda ,vars
+                          (declare (type (integer -2 19) b)
+                                   (type (integer -1520 218978) c)
+                                   (optimize (speed 3) (safety 1) (debug 1)))
+                          ,form))
+                  (fn2 `(lambda ,vars
+                          (declare (notinline logeqv apply)
+                                   (optimize (safety 3) (speed 0) (debug 0)))
+                          ,form))
+                  (cf1 (compile nil fn1))
+                  (cf2 (compile nil fn2))
+                  (result1 (multiple-value-list (funcall cf1 2 18886)))
+                  (result2 (multiple-value-list (funcall cf2 2 18886))))
+            (if (equal result1 result2)
+                :good
+                (values result1 result2))))
+         :good))

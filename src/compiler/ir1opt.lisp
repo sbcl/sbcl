@@ -323,19 +323,21 @@
     (when (block-start next)  ; NEXT is not an END-OF-COMPONENT marker
       (cond ( ;; We cannot combine with a successor block if:
              (or
-              ;; The successor has more than one predecessor.
+              ;; the successor has more than one predecessor;
               (rest (block-pred next))
-              ;; The successor is the current block (infinite loop).
+              ;; the successor is the current block (infinite loop);
               (eq next block)
-              ;; The next block has a different cleanup, and thus
+              ;; the next block has a different cleanup, and thus
               ;; we may want to insert cleanup code between the
-              ;; two blocks at some point.
+              ;; two blocks at some point;
               (not (eq (block-end-cleanup block)
                        (block-start-cleanup next)))
-              ;; The next block has a different home lambda, and
+              ;; the next block has a different home lambda, and
               ;; thus the control transfer is a non-local exit.
               (not (eq (block-home-lambda block)
-                       (block-home-lambda next))))
+                       (block-home-lambda next)))
+              ;; Stack analysis phase wants ENTRY to start a block.
+              (entry-p (block-start-node next)))
              nil)
             (t
              (join-blocks block next)

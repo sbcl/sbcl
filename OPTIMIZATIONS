@@ -169,3 +169,11 @@ then cons up a bignum for it:
     ((89 125 16) (ASH A (MIN 18 -706)))
     (T (DPB -3 (BYTE 30 30) -1))))
 --------------------------------------------------------------------------------
+#16
+(do ((i 0 (1+ i)))
+    ((= i (the (integer 0 100) n)))
+  ...)
+
+It is commonly expected for Python to derive (FIXNUMP I). (If ``='' is
+replaced with ``>='', Python will do.)
+--------------------------------------------------------------------------------

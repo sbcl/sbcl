@@ -2243,6 +2243,9 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     type when called with 1 argument; PEEK-CHAR checked type of
     PEEK-TYPE only after having read first character from a
     stream. (reported by Peter Graves)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** in stack analysys liveness information is propagated from
+       non-local entry points.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -220,6 +220,25 @@
       ((:inside-block)
        (node-ends-block (ctran-use ctran)))))
   (values))
+
+;;; CTRAN must be the last ctran in an incomplete block; finish the
+;;; block and start a new one if necessary.
+(defun start-block (ctran)
+  (declare (type ctran ctran))
+  (aver (not (ctran-next ctran)))
+  (ecase (ctran-kind ctran)
+    (:inside-block
+     (let ((block (ctran-block ctran))
+           (node (ctran-use ctran)))
+       (aver (not (block-last block)))
+       (aver node)
+       (setf (block-last block) node)
+       (setf (node-next node) nil)
+       (setf (ctran-use ctran) nil)
+       (setf (ctran-kind ctran) :unused)
+       (setf (ctran-block ctran) nil)
+       (link-blocks block (ctran-starts-block ctran))))
+    (:block-start)))
 
 ;;;;
 
@@ -657,6 +676,30 @@
     (setf (block-next block) next)
     (setf (block-prev next) block))
   (values))
+
+;;; List all NLX-INFOs which BLOCK can exit to.
+;;;
+;;; We hope that no cleanup actions are performed in the middle of
+;;; BLOCK, so it is enough to look only at cleanups in the block
+;;; end. The tricky thing is a special cleanup block; all its nodes
+;;; have the same cleanup info, corresponding to the start, so the
+;;; same approach returns safe result.
+(defun map-block-nlxes (fun block)
+  (loop for cleanup = (block-end-cleanup block)
+        then (node-enclosing-cleanup (cleanup-mess-up cleanup))
+        while cleanup
+        do (let ((mess-up (cleanup-mess-up cleanup)))
+             (case (cleanup-kind cleanup)
+               ((:block :tagbody)
+                (aver (entry-p mess-up))
+                (loop for exit in (entry-exits mess-up)
+                      for nlx-info = (find-nlx-info exit)
+                      do (funcall fun nlx-info)))
+               ((:catch :unwind-protect)
+                (aver (combination-p mess-up))
+                (let* ((arg-lvar (first (basic-combination-args mess-up)))
+                       (nlx-info (constant-value (ref-leaf (lvar-use arg-lvar)))))
+                (funcall fun nlx-info)))))))
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.
