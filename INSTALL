@@ -232,7 +232,7 @@ INSTALLING SBCL
                            x86 PPC Alpha Sparc HPPA MIPS MIPSel
     Linux 2.2, 2.4, 2.6     X   X    X     X    X    X     X 
     FreeBSD                 X
-    OpenBSD 3.4, 3.5            X
+    OpenBSD 3.4, 3.5        X
     NetBSD                  X
     Solaris                                X
     Tru64                            X
