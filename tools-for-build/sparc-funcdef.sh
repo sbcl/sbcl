@@ -1,4 +1,4 @@
-cd tools-for-build
+cd ./tools-for-build
 
 TMP=sparc-funcdef.S
 

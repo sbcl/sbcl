@@ -156,7 +156,7 @@
   bigvec)
 
 ;;;; looking up bytes and multi-byte values in a BIGVEC (considering
-;;;; it as an image of machine memory)
+;;;; it as an image of machine memory on the cross-compilation target)
 
 ;;; BVREF-32 and friends. These are like SAP-REF-n, except that
 ;;; instead of a SAP we use a BIGVEC.
@@ -2489,6 +2489,7 @@
       (do-cold-fixup code-object offset value kind))
    code-object))
 
+#!+linkage-table
 (define-cold-fop (fop-foreign-dataref-fixup)
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
@@ -2566,6 +2567,7 @@
   (format t "/*~%")
   (dolist (line
 	   '("This is a machine-generated file. Please do not edit it by hand."
+             "(As of sbcl-0.8.14, it came from WRITE-CONFIG-H in genesis.lisp.)"
 	     ""
 	     "This file contains low-level information about the"
 	     "internals of a particular version and configuration"

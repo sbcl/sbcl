@@ -5,11 +5,11 @@
 #ifndef _X86_ARCH_H
 #define _X86_ARCH_H
 #ifndef SBCL_GENESIS_CONFIG
-#error genesis/config.h (or sbcl.h) must be incuded before this file
+#error genesis/config.h (or sbcl.h) must be included before this file
 #endif
 
 #ifndef SBCL_GENESIS_CONFIG
-#error genesis/config.h (or sbcl.h) must be incuded before this file
+#error genesis/config.h (or sbcl.h) must be included before this file
 #endif
 
 #define ARCH_HAS_STACK_POINTER

@@ -58,7 +58,7 @@ printf ":%s" "$sbcl_arch" >> $ltf
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
     original_dir=`pwd`
-    cd $d
+    cd ./$d
     if [ -h target ] ; then
 	rm target
     elif [ -w target ] ; then
@@ -85,7 +85,7 @@ ln -s ../assembly src/compiler/assembly
 
 echo //setting up OS-dependent information
 original_dir=`pwd`
-cd src/runtime/
+cd ./src/runtime/
 rm -f Config target-arch-os.h target-arch.h target-os.h target-lispregs.h
 # KLUDGE: these two logically belong in the previous section
 # ("architecture-dependent"); it seems silly to enforce this in terms

@@ -107,10 +107,10 @@
  ;; readtable configured so that the system sources can be read.
  ; :sb-show
 
- ;; Build SBCL with the old CMU CL low level debugger, "ldb". If 
- ;; are aren't messing with CMU CL at a very low level (e.g. 
- ;; trying to diagnose GC problems, or trying to debug assembly
- ;; code for a port to a new CPU) you shouldn't need this.
+ ;; Build SBCL with the old CMU CL low level debugger, "ldb". If are
+ ;; aren't messing with SBCL at a very low level (e.g., trying to
+ ;; diagnose GC problems, or trying to debug assembly code for a port
+ ;; to a new CPU) you shouldn't need this.
  ; :sb-ldb
 
  ;; This isn't really a target Lisp feature at all, but controls

@@ -23,7 +23,7 @@ echo //entering make-target-1.sh
 # could come either before or after running the cross compiler; that
 # doesn't matter.)
 echo //building runtime system and symbol table file
-cd src/runtime
+cd ./src/runtime
 $GNUMAKE clean  || exit 1
 $GNUMAKE depend || exit 1
 $GNUMAKE all    || exit 1
@@ -31,13 +31,13 @@ cd ../..
 
 # Use a little C program to grab stuff from the C header files and
 # smash it into Lisp source code.
-cd tools-for-build
+cd ./tools-for-build
 $GNUMAKE -I../src/runtime grovel-headers || exit 1
 cd ..
 tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
 
 # after-grovel-headers may not exist for all platforms (used for
 # Darwin hacks)
-cd src/runtime
+cd ./src/runtime
 $GNUMAKE after-grovel-headers || true
 cd ..
