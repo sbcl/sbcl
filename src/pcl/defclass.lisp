@@ -44,6 +44,28 @@
     (setf (info :type :kind name) :forthcoming-defclass-type))
   (values))
 
+(defun preinform-compiler-about-accessors (readers writers slots)
+  (flet ((inform (name type)
+           ;; FIXME: This matches what PROCLAIM FTYPE does, except
+           ;; that :WHERE-FROM is :DEFINED, not :DECLARED, and should
+           ;; probably be factored into a common function -- eg.
+           ;; (%proclaim-ftype name declared-or-defined).
+           (when (eq (info :function :where-from name) :assumed)
+             (proclaim-as-fun-name name)
+             (note-name-defined name :function)
+             (setf (info :function :where-from name) :defined
+                   (info :function :type name) type))))
+    (let ((rtype (specifier-type '(function (t) t)))
+          (wtype (specifier-type '(function (t t) t))))
+      (dolist (reader readers)
+        (inform reader rtype))
+      (dolist (writer writers)
+        (inform writer wtype))
+      (dolist (slot slots)
+        (inform (slot-reader-name slot) rtype)
+        (inform (slot-boundp-name slot) rtype)
+        (inform (slot-writer-name slot) wtype)))))
+
 ;;; state for the current DEFCLASS expansion
 (defvar *initfunctions-for-this-defclass*)
 (defvar *readers-for-this-defclass*)
@@ -97,21 +119,19 @@
                                        (*subtypep
                                         mclass
                                         *the-class-structure-class*))))))
-          (let ((defclass-form
-		    `(progn
-		      (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
-			(%compiler-defclass ',name
-					    ',*readers-for-this-defclass*
-					    ',*writers-for-this-defclass*
-					    ',*slot-names-for-this-defclass*)
-			(load-defclass ',name
-				       ',metaclass
-				       ',supers
-				       (list ,@canonical-slots)
-				       (list ,@(apply #'append
-						      (when defstruct-p
-							'(:from-defclass-p t))
-						      other-initargs)))))))
+          (let* ((defclass-form
+                     `(let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
+                         (load-defclass ',name
+                                        ',metaclass
+                                        ',supers
+                                        (list ,@canonical-slots)
+                                        (list ,@(apply #'append
+                                                       (when defstruct-p
+                                                         '(:from-defclass-p t))
+                                                       other-initargs))
+                                        ',*readers-for-this-defclass*
+                                        ',*writers-for-this-defclass*
+                                        ',*slot-names-for-this-defclass*))))
             (if defstruct-p
 		(progn
 		  ;; FIXME: (YUK!) Why do we do this? Because in order
@@ -150,22 +170,16 @@
 		   ;; full-blown class, so the "a class of this name is
 		   ;; coming" note we write here would be irrelevant.
 		   (eval-when (:compile-toplevel)
-		     (%compiler-defclass ',name
-					 ',*readers-for-this-defclass*
-					 ',*writers-for-this-defclass*
-					 ',*slot-names-for-this-defclass*))
+		     (%compiler-defclass ',name 
+                                         ',*readers-for-this-defclass*
+                                         ',*writers-for-this-defclass*
+                                         ',*slot-names-for-this-defclass*))
 		   (eval-when (:load-toplevel :execute)
 		     ,defclass-form)))))))))
 
-(defun %compiler-defclass (name readers writers slot-names)
-  (with-single-package-locked-error (:symbol name "defining ~A as a class")
-    (preinform-compiler-about-class-type name)
-    (proclaim `(ftype (function (t) t)
-		,@readers
-		,@(mapcar #'slot-reader-name slot-names)
-		,@(mapcar #'slot-boundp-name slot-names)))
-    (proclaim `(ftype (function (t t) t)
-		,@writers ,@(mapcar #'slot-writer-name slot-names)))))
+(defun %compiler-defclass (name readers writers slots)
+  (preinform-compiler-about-class-type name)
+  (preinform-compiler-about-accessors readers writers slots))
 
 (defun make-initfunction (initform)
   (cond ((or (eq initform t)
@@ -416,7 +430,10 @@
   (!bootstrap-get-slot 'class class 'direct-subclasses))
 
 (declaim (notinline load-defclass))
-(defun load-defclass (name metaclass supers canonical-slots canonical-options)
+(defun load-defclass (name metaclass supers canonical-slots canonical-options
+                      readers writers slot-names)
+  (%compiler-defclass name readers writers slot-names)
+  (preinform-compiler-about-accessors readers writers slot-names)
   (setq supers  (copy-tree supers)
 	canonical-slots   (copy-tree canonical-slots)
 	canonical-options (copy-tree canonical-options))

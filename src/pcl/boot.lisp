@@ -607,6 +607,17 @@ bootstrapping.
 	 ;; second argument.) Hopefully it only does this kind of
 	 ;; weirdness when bootstrapping.. -- WHN 20000610
 	 '(ignorable))
+	((var-globally-special-p parameter)
+	 ;; KLUDGE: Don't declare types for global special variables
+	 ;; -- our rebinding magic for SETQ cases don't work right
+	 ;; there.
+	 ;;
+	 ;; FIXME: It would be better to detect the SETQ earlier and
+	 ;; skip declarations for specials only when needed, not
+	 ;; always.
+	 ;;
+	 ;; --NS 2004-10-14
+	 '(ignoreable))
 	(t
 	 ;; Otherwise, we can usually make Python very happy.
 	 (let ((type (info :type :kind specializer)))

@@ -917,8 +917,8 @@
              (new-vars nil cons))
       (dolist (var-name (rest decl))
 	(when (boundp var-name)
-          (compiler-assert-symbol-home-package-unlocked var-name
-                                                        "declaring the type of ~A"))
+          (compiler-assert-symbol-home-package-unlocked
+	   var-name "declaring the type of ~A"))
 	(let* ((bound-var (find-in-bindings vars var-name))
 	       (var (or bound-var
 			(lexenv-find var-name vars)

@@ -291,14 +291,17 @@
         (constantly (make-member-type :members (list (specializer-object specl))))))
 
 
-(defun real-load-defclass (name metaclass-name supers slots other)
-  (let ((res (apply #'ensure-class name :metaclass metaclass-name
-		    :direct-superclasses supers
-		    :direct-slots slots
-		    :definition-source `((defclass ,name)
-					 ,*load-pathname*)
-		    other)))
-    res))
+(defun real-load-defclass (name metaclass-name supers slots other
+                           readers writers slot-names)
+  (with-single-package-locked-error (:symbol name "defining ~S as a class")
+    (%compiler-defclass name readers writers slot-names)
+    (let ((res (apply #'ensure-class name :metaclass metaclass-name
+                      :direct-superclasses supers
+                      :direct-slots slots
+                      :definition-source `((defclass ,name)
+                                           ,*load-pathname*)
+                      other)))
+      res)))
 
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
@@ -312,25 +315,25 @@
 	 args))
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
-  (without-package-locks
-   (multiple-value-bind (meta initargs)
-       (ensure-class-values class args)
-     (set-class-type-translation (class-prototype meta) name)
-     (setf class (apply #'make-instance meta :name name initargs)
-	   (find-class name) class)
-     (set-class-type-translation class name)
-     class)))
+  (multiple-value-bind (meta initargs)
+      (ensure-class-values class args)
+    (set-class-type-translation (class-prototype meta) name)
+    (setf class (apply #'make-instance meta :name name initargs))
+    (without-package-locks
+      (setf (find-class name) class))
+    (set-class-type-translation class name)
+    class))
 
 (defmethod ensure-class-using-class ((class pcl-class) name &rest args &key)
-  (without-package-locks
-   (multiple-value-bind (meta initargs)
-       (ensure-class-values class args)
-     (unless (eq (class-of class) meta)
-       (apply #'change-class class meta initargs))
-     (apply #'reinitialize-instance class initargs)
-     (setf (find-class name) class)
-     (set-class-type-translation class name)
-     class)))
+  (multiple-value-bind (meta initargs)
+      (ensure-class-values class args)
+    (unless (eq (class-of class) meta)
+      (apply #'change-class class meta initargs))
+    (apply #'reinitialize-instance class initargs)
+    (without-package-locks
+      (setf (find-class name) class))
+    (set-class-type-translation class name)
+    class))
 
 (defmethod class-predicate-name ((class t))
   'constantly-nil)
@@ -813,28 +816,27 @@
   (fix-slot-accessors class dslotds 'remove))
 
 (defun fix-slot-accessors (class dslotds add/remove)
-  ;; We disable package locks here, since defining a class can trigger
-  ;; the update of the accessors of another class -- which might lead
-  ;; to package lock violations if we didn't.
-  (without-package-locks
-      (flet ((fix (gfspec name r/w)
-	       (let* ((ll (case r/w (r '(object)) (w '(new-value object))))
-		      (gf (if (fboundp gfspec)
-			      (ensure-generic-function gfspec)
-			      (ensure-generic-function gfspec :lambda-list ll))))
-		 (case r/w
-		   (r (if (eq add/remove 'add)
-			  (add-reader-method class gf name)
-			  (remove-reader-method class gf)))
-		   (w (if (eq add/remove 'add)
-			  (add-writer-method class gf name)
-			  (remove-writer-method class gf)))))))
-	(dolist (dslotd dslotds)
-	  (let ((slot-name (slot-definition-name dslotd)))
-	    (dolist (r (slot-definition-readers dslotd)) 
-	      (fix r slot-name 'r))
-	    (dolist (w (slot-definition-writers dslotd)) 
-	      (fix w slot-name 'w)))))))
+  (flet ((fix (gfspec name r/w)
+           (let ((gf (if (fboundp gfspec)
+                         (without-package-locks 
+                           (ensure-generic-function gfspec))
+                         (ensure-generic-function 
+                          gfspec :lambda-list (case r/w 
+                                                (r '(object)) 
+                                                (w '(new-value object)))))))
+             (case r/w
+               (r (if (eq add/remove 'add)
+                      (add-reader-method class gf name)
+                      (remove-reader-method class gf)))
+               (w (if (eq add/remove 'add)
+                      (add-writer-method class gf name)
+                      (remove-writer-method class gf)))))))
+    (dolist (dslotd dslotds)
+      (let ((slot-name (slot-definition-name dslotd)))
+        (dolist (r (slot-definition-readers dslotd)) 
+          (fix r slot-name 'r))
+        (dolist (w (slot-definition-writers dslotd)) 
+          (fix w slot-name 'w))))))
 
 (defun add-direct-subclasses (class supers)
   (dolist (super supers)

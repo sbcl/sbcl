@@ -1,4 +1,10 @@
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
+  * bug fix: defining classes whose accessors are methods on existing
+    generic functions in other (locked) packages no longer signals
+    bogus package lock violations. (reported by François-René Rideau)
+  * bug fix: special variables as DEFMETHOD parameters no longer have
+    associated bogus type declarations. (reported by David Wragg and
+    Bruno Haible)
   * bug fix: read-write consistency on streams of element-type
     (SIGNED-BYTE N) for N > 32.  (reported by Bruno Haible for CMUCL)
   * bug fix: redefiniton of the only method of a generic function with

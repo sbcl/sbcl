@@ -25,7 +25,7 @@
 
 (defpackage :test-unused)
 
-(defpackage :test-aux (:export #:noslot))
+(defpackage :test-aux (:export #:noslot #:noslot2))
 
 (defpackage :test
   (:use :test-used)
@@ -94,7 +94,7 @@
     (defconstant test:constant 'test:constant)
     (intern "UNUSED" :test)
     (dolist (s '(test:nocondition-slot test:noclass-slot test:nostruct-slot
-		 test-aux:noslot))
+		 test-aux:noslot test-aux:noslot2))
       (fmakunbound s))
     (ignore-errors (progn
 		     (fmakunbound 'test:unused)
@@ -265,7 +265,7 @@
 (defvar *illegal-double-forms*
   '((defclass test:noclass () ((x :accessor test-aux:noslot)))
     (define-condition test:nocondition (error)
-      ((x :accessor test-aux:noslot)))))
+      ((x :accessor test-aux:noslot2)))))
 
 ;;; A collection of forms that cause compile-time package lock
 ;;; violations on TEST, and will not signal an error on LOAD if first
@@ -376,7 +376,7 @@
 (reset-test)
 (set-test-locks t)
 (dolist (form (append *illegal-runtime-forms* *illegal-compile-time-forms*))
-  (with-error-info ("one error per form: ~S~%")
+  (with-error-info ("one error per form: ~S~%" form)
     (let ((errorp nil))
       (handler-bind ((package-lock-violation (lambda (e)
                                                (when errorp
@@ -448,6 +448,34 @@
 ;;;; See that trace on functions in locked packages doesn't break
 ;;;; anything.
 (assert (trace test:function :break t))
+
+;;;; No bogus violations from defclass with accessors in a locked
+;;;; package. Reported by by François-René Rideau.
+(assert (package-locked-p :sb-gray))
+(multiple-value-bind (fun compile-errors)
+    (ignore-errors 
+      (compile nil 
+               '(lambda ()
+                 (defclass fare-class ()
+                   ((line-column :initform 0 :reader sb-gray:stream-line-column))))))
+  (assert (not compile-errors))
+  (assert fun)
+  (multiple-value-bind (class run-errors) (ignore-errors (funcall fun))
+    (assert (not run-errors))
+    (assert (eq class (find-class 'fare-class)))))
+
+;;;; No bogus violations from DECLARE's done by PCL behind the
+;;;; scenes. Reported by David Wragg on sbcl-help.
+(reset-test)
+(set-test-locks t)
+(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
+  test:*special*)
+(assert (eq *terminal-io* (pcl-type-declaration-method-bug *terminal-io*)))
+(assert (raises-error?
+	 (eval '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
+		 (declare (type stream test:*special*))
+		 test:*special*))
+	 package-lock-violation))
 
 ;;; WOOT! Done.
 (sb-ext:quit :unix-status 104)

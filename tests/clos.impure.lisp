@@ -831,6 +831,17 @@
   (setf x (/ x 2))
   x)
 (assert (= (fum 3) 3/2))
+(defmethod fii ((x fixnum))
+  (declare (special x))
+  (setf x (/ x 2))
+  x)
+(assert (= (fii 1) 1/2))
+(defvar *faa*)
+(defmethod faa ((*faa* string-stream))
+  (setq *faa* (make-broadcast-stream *faa*))
+  (write-line "Break, you sucker!" *faa*)
+  'ok)
+(assert (eq 'ok (faa (make-string-output-stream))))
 
 ;;; Bug reported by Zach Beane; incorrect return of (function
 ;;; ',fun-name) in defgeneric
