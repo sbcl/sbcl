@@ -860,7 +860,8 @@
           (format nil "~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda definition
-                                           (format nil "locall ~S" name)))
+					   (let ((*package* *keyword-package*))
+					     (format nil "locall ~S" name))))
            (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
       (setf (functional-entry-function fun) locall-fun
             (functional-kind fun) :external

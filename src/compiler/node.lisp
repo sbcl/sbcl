@@ -587,6 +587,11 @@
   ;; GLOBAL-VAR, this is the symbol name of the variable. In a
   ;; functional that is from a DEFUN, this is the defined name. In
   ;; other functionals, this is a descriptive string.
+  ;;
+  ;; KLUDGE: Note that at least for LAMBDA-VARs, this is important not
+  ;; just for debugging but for ordinary compilation as well. In
+  ;; particular, in RECOGNIZE-KNOWN-CALL function calls are compiled
+  ;; differently based on the LEAF-NAME.
   (name nil :type t)
   ;; the type which values of this leaf must have
   (type *universal-type* :type ctype)
