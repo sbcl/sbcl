@@ -162,11 +162,13 @@
 	  (let* ((bod (ecase loc
 			((nil) exp)
 			(:encapsulated
-			 `(flet ((sb-debug:arg (n)
-				   (declare (special arg-list))
-				   (elt arg-list n)))
-			    (declare (ignorable #'sb-debug:arg))
-			    ,exp))))
+			 `(locally (declare (disable-package-locks sb-debug:arg arg-list))
+                           (flet ((sb-debug:arg (n)
+                                    (declare (special arg-list))
+                                    (elt arg-list n)))
+                             (declare (ignorable #'sb-debug:arg)
+                                      (enable-package-locks sb-debug:arg arg-list))
+                             ,exp)))))
 		 (fun (coerce `(lambda () ,bod) 'function)))
 	    (cons exp
 		  (lambda (frame)

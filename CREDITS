@@ -668,7 +668,8 @@ Rudi Schlatte:
 
 Nikodemus Siivola:
   He provided build fixes, in particular to tame the SunOS toolchain,
-  and has fixed many (stream-related and other) bugs besides.
+  implemented package locks, and has fixed many (stream-related and 
+  other) bugs besides.
 
 Juho Snellman:
   He provided several performance enhancements, including a better hash
@@ -719,5 +720,6 @@ RAM  Robert MacLachlan
 PRM  Pierre Mai
 WHN  William ("Bill") Newman
 CSR  Christophe Rhodes
+NS   Nikodemus Siivola
 PVE  Peter Van Eynde
 PW   Paul Werkowski

@@ -435,5 +435,9 @@
                        ,form)))
              package-lock-violation))))
 
+;;;; See that trace on functions in locked packages doesn't break
+;;;; anything.
+(assert (trace test:function :break t))
+
 ;;; WOOT! Done.
 (sb-ext:quit :unix-status 104)
