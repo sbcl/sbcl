@@ -291,11 +291,11 @@
 
   (/show0 "entering TOPLEVEL-INIT")
   
-  (let ((sysinit nil)      ; value of --sysinit option
-	(userinit nil)     ; value of --userinit option
-	(evals nil)	   ; values of --eval options (in reverse order)
-	(noprint nil)      ; Has a --noprint option been seen?
-	(noprogrammer nil) ; Has a --noprogammer option been seen?
+  (let ((sysinit nil)        ; value of --sysinit option
+	(userinit nil)       ; value of --userinit option
+	(reversed-evals nil) ; values of --eval options, in reverse order
+	(noprint nil)        ; Has a --noprint option been seen?
+	(noprogrammer nil)   ; Has a --noprogammer option been seen?
 	(options (rest *posix-argv*))) ; skipping program name
 
     (/show0 "done with outer LET in TOPLEVEL-INIT")
@@ -339,7 +339,7 @@
 				  (error "more than one expression in ~S"
 					 eval-as-string))
 				 (t
-				  (push eval evals)))))))
+				  (push eval reversed-evals)))))))
 		    ((string= option "--noprint")
 		     (pop-option)
 		     (setf noprint t))
@@ -411,23 +411,45 @@
 						   user-home
 						   "/.sbclrc"))))
 	(/show0 "assigned SYSINIT-TRUENAME and USERINIT-TRUENAME")
-	(when sysinit-truename
-	  (unless (load sysinit-truename)
-	    (error "~S was not successfully loaded." sysinit-truename))
-	  (flush-standard-output-streams))
-	(/show0 "loaded SYSINIT-TRUENAME")
-	(when userinit-truename
-	  (unless (load userinit-truename)
-	    (error "~S was not successfully loaded." userinit-truename))
-	  (flush-standard-output-streams))
-	(/show0 "loaded USERINIT-TRUENAME"))
 
-      ;; Handle --eval options.
-      (/show0 "handling --eval options in TOPLEVEL-INIT")
-      (dolist (eval (reverse evals))
-	(/show0 "handling one --eval option in TOPLEVEL-INIT")
-	(eval eval)
-	(flush-standard-output-streams))
+
+	;; We wrap all the pre-REPL user/system customized startup code 
+	;; in a restart.
+	;;
+	;; (Why not wrap everything, even the stuff above, in this
+	;; restart? Errors above here are basically command line or
+	;; Unix environment errors, e.g. a missing file or a typo on
+	;; the Unix command line, and you don't need to get into Lisp
+	;; to debug them, you should just start over and do it right
+	;; at the Unix level. Errors below here are usually errors in
+	;; user Lisp code, and it might be helpful to let the user
+	;; reach the REPL in order to help figure out what's going on.)
+	(restart-case
+	    (flet ((process-init-file (truename)
+		     (when truename
+		       (unless (load truename)
+			 (error "~S was not successfully loaded." truename))
+		       (flush-standard-output-streams))))
+	      (process-init-file sysinit-truename)
+	      (process-init-file userinit-truename)
+
+	      ;; Process --eval options.
+	      (/show0 "handling --eval options in TOPLEVEL-INIT")
+	      (dolist (eval (reverse reversed-evals))
+		(/show0 "handling one --eval option in TOPLEVEL-INIT")
+		(eval eval)
+		(flush-standard-output-streams)))
+	  (continue ()
+		    :report "Continue anyway (skipping to toplevel read/eval/print loop)."
+		    (values)) ; (no-op, just fall through)
+	  (quit ()
+		:report "Quit SBCL (calling #'QUIT, killing the process)."
+		(quit))))
+
+      ;; one more time for good measure, in case we fell out of the
+      ;; RESTART-CASE above before one of the flushes in the ordinary
+      ;; flow of control had a chance to operate
+      (flush-standard-output-streams)
 
       (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
       (toplevel-repl noprint))))

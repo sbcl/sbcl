@@ -1537,7 +1537,7 @@ bootstrapping.
 	      method
 	      gf
 	      (apply #'format nil string args)))
-	   (compare (x y)
+	   (comparison-description (x y)
 	     (if (> x y) "more" "fewer")))
       (let ((gf-nreq (arg-info-number-required arg-info))
 	    (gf-nopt (arg-info-number-optional arg-info))
@@ -1546,11 +1546,11 @@ bootstrapping.
 	(unless (= nreq gf-nreq)
 	  (lose
 	   "the method has ~A required arguments than the generic function."
-	   (compare nreq gf-nreq)))
+	   (comparison-description nreq gf-nreq)))
 	(unless (= nopt gf-nopt)
 	  (lose
-	   "the method has ~S optional arguments than the generic function."
-	   (compare nopt gf-nopt)))
+	   "the method has ~A optional arguments than the generic function."
+	   (comparison-description nopt gf-nopt)))
 	(unless (eq (or keysp restp) gf-key/rest-p)
 	  (error
 	   "The method and generic function differ in whether they accept~%~

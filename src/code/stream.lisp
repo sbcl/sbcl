@@ -783,16 +783,19 @@
   (in-fun synonym-bin read-byte eof-error-p eof-value)
   (in-fun synonym-n-bin read-n-bytes buffer start numbytes eof-error-p))
 
-;;; We have to special-case the operations which could look at stuff in
-;;; the in-buffer.
 (defun synonym-misc (stream operation &optional arg1 arg2)
   (declare (optimize (safety 1)))
   (let ((syn (symbol-value (synonym-stream-symbol stream))))
     (if (lisp-stream-p syn)
-	(case operation
+	;; We have to special-case some operations which interact with
+	;; the in-buffer of the wrapped stream, since just calling
+	;; LISP-STREAM-MISC on them
+ 	(case operation
 	  (:listen (or (/= (the fixnum (lisp-stream-in-index syn))
 			   +in-buffer-length+)
 		       (funcall (lisp-stream-misc syn) syn :listen)))
+          (:clear-input (clear-input syn))
+          (:unread (unread-char arg1 syn))
 	  (t
 	   (funcall (lisp-stream-misc syn) syn operation arg1 arg2)))
 	(stream-misc-dispatch syn operation arg1 arg2))))
@@ -878,10 +881,8 @@
        (if out-lisp-stream-p
 	   (funcall (lisp-stream-misc out) out operation arg1 arg2)
 	   (stream-misc-dispatch out operation arg1 arg2)))
-      ((:clear-input :unread)
-       (if in-lisp-stream-p
-	   (funcall (lisp-stream-misc in) in operation arg1 arg2)
-	   (stream-misc-dispatch in operation arg1 arg2)))
+      (:clear-input (clear-input in))
+      (:unread (unread-char arg1 in))
       (:element-type
        (let ((in-type (stream-element-type in))
 	     (out-type (stream-element-type out)))
@@ -1001,7 +1002,9 @@
 		     (t
 		      ;; Nothing is available yet.
 		      (return nil))))))
-	  (:close
+          (:clear-input (clear-input current))
+          (:unread (unread-char arg1 current))
+          (:close
 	   (set-closed-flame stream))
 	  (t
 	   (if (lisp-stream-p current)

@@ -26,6 +26,7 @@
   (customary-case (required-argument) :type (member :upper :lower)))
 
 (def!struct (logical-host
+	     (:make-load-form-fun make-logical-host-load-form-fun)
 	     (:include host
 		       (:parse #'parse-logical-namestring)
 		       (:unparse #'unparse-logical-namestring)
@@ -43,6 +44,12 @@
 (def!method print-object ((logical-host logical-host) stream)
   (print-unreadable-object (logical-host stream :type t)
     (prin1 (logical-host-name logical-host) stream)))
+
+;;; What would it mean to dump a logical host and reload it into
+;;; another Lisp image? It's not clear, so we don't support it.
+(defun make-logical-host-load-form-fun (logical-host)
+  (error "~@<A logical host can't be dumped as a constant: ~2I~_~S~:>"
+         logical-host))
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
