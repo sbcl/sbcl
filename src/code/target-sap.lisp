@@ -10,8 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-
-;;;; primitive SAP operations
 
 ;;; Return T iff the SAP X points to a smaller address then the SAP Y.
 (defun sap< (x y)
@@ -209,25 +207,3 @@
 	   (fixnum offset)
 	   (type long-float new-value))
   (setf (sap-ref-long sap offset) new-value))
-
-;;;; system memory allocation
-
-(sb!alien:def-alien-routine ("os_allocate" allocate-system-memory)
-			    system-area-pointer
-  (bytes sb!c-call:unsigned-long))
-
-(sb!alien:def-alien-routine ("os_allocate_at" allocate-system-memory-at)
-			    system-area-pointer
-  (address system-area-pointer)
-  (bytes sb!c-call:unsigned-long))
-
-(sb!alien:def-alien-routine ("os_reallocate" reallocate-system-memory)
-			    system-area-pointer
-  (old system-area-pointer)
-  (old-size sb!c-call:unsigned-long)
-  (new-size sb!c-call:unsigned-long))
-
-(sb!alien:def-alien-routine ("os_deallocate" deallocate-system-memory)
-			    sb!c-call:void
-  (addr system-area-pointer)
-  (bytes sb!c-call:unsigned-long))

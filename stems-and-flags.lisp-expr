@@ -170,7 +170,7 @@
 
  ("code/target-alieneval" :not-host)
  ("code/target-c-call"    :not-host)
- ("code/target-sap"       :not-host)
+ ("code/target-allocate"  :not-host)
 
  ("code/array"         :not-host)
  ("code/target-sxhash" :not-host)
@@ -553,6 +553,7 @@
  ("compiler/generic/target-core" :not-host) ; uses stuff from
                                             ;   "compiler/generic/core"
 
+ ("code/target-sap"        :not-host) ; uses SAP-INT-TYPE
  ("code/target-package"    :not-host) ; needs "code/package"
  ("code/target-random"     :not-host) ; needs "code/random"
  ("code/target-hash-table" :not-host) ; needs "code/hash-table"
