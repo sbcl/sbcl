@@ -498,7 +498,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     long nwords;
     lispobj result, *new, *old;
 
-    nwords = 1 + HeaderValue(header);
+    nwords = CEILING(1 + HeaderValue(header), 2);
 
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
@@ -541,7 +541,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 	    long nwords;
 	    lispobj result, *new, *old;
 
-	    nwords = 1 + HeaderValue(header);
+	    nwords = CEILING(1 + HeaderValue(header), 2);
 
 	    /* Allocate it */
 	    old = (lispobj *)native_pointer(thing);
@@ -572,7 +572,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     lispobj result, *new, *old, oldfn;
     struct fdefn *fdefn;
 
-    nwords = 1 + HeaderValue(header);
+    nwords = CEILING(1 + HeaderValue(header), 2);
 
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
@@ -601,7 +601,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
     long nwords;
     lispobj result, *new, *old;
     
-    nwords = 1 + HeaderValue(header);
+    nwords = CEILING(1 + HeaderValue(header), 2);
     
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
@@ -624,10 +624,16 @@ ptrans_vector(lispobj thing, long bits, long extra,
     struct vector *vector;
     long nwords;
     lispobj result, *new;
+    long length;
 
     vector = (struct vector *)native_pointer(thing);
-    nwords = 2 + (CEILING((fixnum_value(vector->length)+extra)*bits,
-			  N_WORD_BITS)>>5);
+    length = fixnum_value(vector->length)+extra;
+    // Argh, handle simple-vector-nil separately.
+    if (bits == 0) {
+      nwords = 2;
+    } else {
+      nwords = CEILING(NWORDS(length, bits) + 2, 2);
+    } 
 
     new=newspace_alloc(nwords, (constant || !boxed));
     bcopy(vector, new, nwords * sizeof(lispobj));
@@ -732,7 +738,8 @@ ptrans_code(lispobj thing)
     lispobj func, result;
 
     code = (struct code *)native_pointer(thing);
-    nwords = HeaderValue(code->header) + fixnum_value(code->code_size);
+    nwords = CEILING(HeaderValue(code->header) + fixnum_value(code->code_size),
+		     2);
 
     new = (struct code *)newspace_alloc(nwords,1); /* constant */
 
@@ -834,7 +841,7 @@ ptrans_func(lispobj thing, lispobj header)
     }
     else {
 	/* It's some kind of closure-like thing. */
-        nwords = 1 + HeaderValue(header);
+        nwords = CEILING(1 + HeaderValue(header), 2);
         old = (lispobj *)native_pointer(thing);
 
 	/* Allocate the new one.  FINs *must* not go in read_only
@@ -959,7 +966,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
         return ptrans_vector(thing, 1, 0, 0, constant);
 
       case SIMPLE_VECTOR_WIDETAG:
-        return ptrans_vector(thing, 32, 0, 1, constant);
+        return ptrans_vector(thing, N_WORD_BITS, 0, 1, constant);
 
       case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
         return ptrans_vector(thing, 2, 0, 0, constant);
@@ -1084,7 +1091,8 @@ pscav_code(struct code*code)
 {
     long nwords;
     lispobj func;
-    nwords = HeaderValue(code->header) + fixnum_value(code->code_size);
+    nwords = CEILING(HeaderValue(code->header) + fixnum_value(code->code_size),
+		     2);
 
     /* Arrange to scavenge the debug info later. */
     pscav_later(&code->debug_info, 1);
@@ -1164,7 +1172,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
             }
             count = 1;
         }
-        else if (thing & 3) {	/* FIXME: 3?  not 2? */
+        else if (thing & FIXNUM_TAG_MASK) {
             /* It's an other immediate. Maybe the header for an unboxed */
             /* object. */
             switch (widetag_of(thing)) {
@@ -1176,7 +1184,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
 #endif
               case SAP_WIDETAG:
                 /* It's an unboxed simple object. */
-                count = HeaderValue(thing)+1;
+                count = CEILING(HeaderValue(thing)+1, 2);
                 break;
 
               case SIMPLE_VECTOR_WIDETAG:
@@ -1184,7 +1192,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                     *addr = (subtype_VectorMustRehash << N_WIDETAG_BITS) |
                         SIMPLE_VECTOR_WIDETAG;
 		  }
-                count = 1;
+                count = 2;
                 break;
 
 	      case SIMPLE_ARRAY_NIL_WIDETAG:
@@ -1259,7 +1267,8 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
-                count = CEILING(fixnum_value(vector->length)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length), 32) + 2, 
+				2);
                 break;
 
               case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
@@ -1267,7 +1276,8 @@ pscav(lispobj *addr, long nwords, boolean constant)
               case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
-                count = fixnum_value(vector->length)*2+2;
+                count = CEILING(NWORDS(fixnum_value(vector->length), 64) + 2, 
+				2);
                 break;
 
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
@@ -1285,7 +1295,8 @@ pscav(lispobj *addr, long nwords, boolean constant)
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
               case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
-                count = fixnum_value(vector->length)*4+2;
+                count = CEILING(NWORDS(fixnum_value(vector->length), 128) + 2, 
+				2);
                 break;
 #endif
 

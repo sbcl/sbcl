@@ -598,18 +598,21 @@
 (defun x86-call-context (fp &key (depth 0))
   (declare (type system-area-pointer fp)
 	   (fixnum depth))
-  ;;(format t "*CC ~S ~S~%" fp depth)
+;;  (format t "*CC ~S ~S~%" fp depth)
   (cond
    ((not (control-stack-pointer-valid-p fp))
     #+nil (format t "debug invalid fp ~S~%" fp)
     nil)
    (t
     ;; Check the two possible frame pointers.
-    (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ ocfp-save-offset) 4))))
+    (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ ocfp-save-offset)
+					   sb!vm::n-word-bytes))))
 	  (lisp-ra (sap-ref-sap fp (- (* (1+ return-pc-save-offset)
-					 4))))
+					 sb!vm::n-word-bytes))))
 	  (c-ocfp (sap-ref-sap fp (* 0 sb!vm:n-word-bytes)))
 	  (c-ra (sap-ref-sap fp (* 1 sb!vm:n-word-bytes))))
+      #+nil (format t "  lisp-ocfp=~S~%  lisp-ra=~S~%  c-ocfp=~S~%  c-ra=~S~%"
+	      lisp-ocfp lisp-ra c-ocfp c-ra)
       (cond ((and (sap> lisp-ocfp fp) (control-stack-pointer-valid-p lisp-ocfp)
 		  (ra-pointer-valid-p lisp-ra)
 		  (sap> c-ocfp fp) (control-stack-pointer-valid-p c-ocfp)
@@ -754,7 +757,8 @@
 	  (#.ocfp-save-offset
 	   (stack-ref pointer stack-slot))
 	  (#.lra-save-offset
-	   (sap-ref-sap pointer (- (* (1+ stack-slot) 4))))))))
+	   (sap-ref-sap pointer (- (* (1+ stack-slot)
+				      sb!vm::n-word-bytes))))))))
 
 #!-(or x86 x86-64)
 (defun (setf get-context-value) (value frame stack-slot loc)
@@ -778,7 +782,8 @@
 	  (#.ocfp-save-offset
 	   (setf (stack-ref pointer stack-slot) value))
 	  (#.lra-save-offset
-	   (setf (sap-ref-sap pointer (- (* (1+ stack-slot) 4))) value))))))
+	   (setf (sap-ref-sap pointer (- (* (1+ stack-slot)
+					    sb!vm::n-word-bytes))) value))))))
 
 (defun foreign-function-backtrace-name (sap)
   (let ((name (foreign-symbol-in-address sap)))

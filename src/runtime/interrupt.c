@@ -364,7 +364,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
     struct thread *thread=arch_os_get_current_thread();
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
@@ -381,7 +381,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	return;
     }
     
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     were_in_lisp = !foreign_function_call_active;
     if (were_in_lisp)
 #endif
@@ -440,7 +440,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         (*handler.c)(signal, info, void_context);
     }
 
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     if (were_in_lisp)
 #endif
     {
