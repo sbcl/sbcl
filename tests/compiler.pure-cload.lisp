@@ -69,6 +69,20 @@
   (assert (equal (foo '(1 2 #\a 3)) '((1) (2))))
   (assert (equal (foo '(1 2 x 3)) 'x)))
 
+;;; compiler failure found by Paul Dietz' randomized tortuter
+(defun #:foo (a b c d)
+  (declare (type (integer 240 100434465) a)
+           (optimize (speed 3) (safety 1) (debug 1)))
+  (logxor
+   (if (ldb-test (byte 27 4) d)
+       -1
+       (max 55546856 -431))
+   (logorc2
+    (if (>= 0 b)
+        (if (> b c) (logandc2 c d) (if (> d 224002) 0 d))
+        (signum (logior c b)))
+    (logior a -1))))
+
 ;;; bug 282
 ;;;
 ;;; Verify type checking policy in full calls: the callee is supposed
