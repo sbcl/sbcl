@@ -244,16 +244,18 @@ and submit it as a patch."
       (let ((*already-in-gc* t))
 	(without-interrupts
 	 (gc-stop-the-world)
+	 #+nil
 	 (dolist (h *before-gc-hooks*)
 	   (carefully-funcall h))
 	 (collect-garbage gen)
 	 (incf *n-bytes-freed-or-purified*
 	       (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
 	 (setf *need-to-collect-garbage* nil)
-	 (dolist (h *after-gc-hooks*)
-	   (carefully-funcall h))
+
 	 (gc-start-the-world)))
-      (scrub-control-stack)))
+      (scrub-control-stack))
+    (dolist (h *after-gc-hooks*)
+      (carefully-funcall h)))
   (values))
        
 
