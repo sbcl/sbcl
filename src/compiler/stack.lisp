@@ -155,8 +155,8 @@
           (when (and exit-lvar
                      (eq exit-lvar (car start-stack)))
             (when *check-consistency*
-              (aver (not (memq exit-var entry-stack))))
-            (push exit-var entry-stack))
+              (aver (not (memq exit-lvar entry-stack))))
+            (push exit-lvar entry-stack))
           (when *check-consistency*
             (aver (subsetp start-stack entry-stack)))
           (setf (ir2-block-start-stack 2block) entry-stack)
