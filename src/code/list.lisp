@@ -257,45 +257,36 @@
       ((zerop count) result)
     (declare (type index count))))
 
-;;; The outer loop finds the first non-null list and the result is
-;;; started. The remaining lists in the arguments are tacked to the
-;;; end of the result using splice which cdr's down the end of the new
-;;; list.
 (defun append (&rest lists)
   #!+sb-doc
   "Construct a new list by concatenating the list arguments"
-  (flet ((fail (object)
-           (error 'type-error
-                  :datum object
-                  :expected-type 'list)))
-    (do ((top lists (cdr top))) ; CDR to first non-null list.
-        ((atom top) '())
-      (cond ((null (car top)))          ; NIL -> Keep looping
-            ((not (consp (car top)))    ; Non CONS
-             (if (cdr top)
-                 (fail (car top))
-                 (return (car top))))
-            (t                          ; Start appending
-             (return
-               (if (atom (cdr top))
-                   (car top)            ; Special case.
-                   (let* ((result (cons (caar top) '()))
-                          (splice result))
-                     (do ((x (cdar top) (cdr x))) ; Copy first list
-                         ((atom x))
-                       (setq splice
-                             (cdr (rplacd splice (cons (car x) ()) ))) )
-                     (do ((y (cdr top) (cdr y))) ; Copy rest of lists.
-                         ((atom (cdr y))
-                          (setq splice (rplacd splice (car y)))
-                          result)
-                       (if (listp (car y))
-                           (do ((x (car y) (cdr x))) ; Inner copy loop.
-                               ((atom x))
-                             (setq
-                              splice
-                              (cdr (rplacd splice (cons (car x) ())))))
-                           (fail (car y))))))))))))
+  (labels ((fail (object)
+             (error 'type-error
+                    :datum object
+                    :expected-type 'list))
+           (append-into (last-cons current rest)
+             "Set (CDR LAST-CONS) to (APPLY #'APPEND CURRENT REST)."
+             (declare (cons last-cons rest))
+             (cond ((consp current)
+                    (append-into (setf (cdr last-cons) (list (car current)))
+                                (cdr current)
+                                rest))
+                   ((not (null current)) (fail current))
+                   ((null (cdr rest)) (setf (cdr last-cons) (car rest)))
+                   (t (append-into last-cons (car rest) (cdr rest)))))
+           (append1 (lists)
+             (let ((current (car lists))
+                   (rest (cdr lists)))
+               (cond ((null rest) current)
+                     ((consp current)
+                      (let ((result (truly-the cons (list (car current)))))
+                        (append-into result
+                                    (cdr current)
+                                    rest)
+                        result))
+                     ((null current) (append1 rest))
+                     (t (fail current))))))
+    (append1 lists)))
 
 ;;;; list copying functions
 
