@@ -112,13 +112,13 @@ copied_existing_filename_or_null(char *filename)
 }
 
 /* Convert a null-terminated array of null-terminated strings (e.g.
- * argv or envp) into a Lisp list of Lisp strings. */
+ * argv or envp) into a Lisp list of Lisp base-strings. */
 static lispobj
-alloc_string_list(char *array_ptr[])
+alloc_base_string_list(char *array_ptr[])
 {
     if (*array_ptr) {
-	return alloc_cons(alloc_string(*array_ptr),
-			  alloc_string_list(1 + array_ptr));
+	return alloc_cons(alloc_base_string(*array_ptr),
+			  alloc_base_string_list(1 + array_ptr));
     } else {
 	return NIL;
     }
@@ -349,7 +349,7 @@ main(int argc, char *argv[], char *envp[])
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");
-    SetSymbolValue(POSIX_ARGV, alloc_string_list(argv),0);
+    SetSymbolValue(POSIX_ARGV, alloc_base_string_list(argv),0);
 
     /* Install a handler to pick off SIGINT until the Lisp system gets
      * far enough along to install its own handler. */

@@ -41,6 +41,15 @@
 
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 
+(deftransform hairy-data-vector-ref ((string index) (simple-string t))
+  (let ((ctype (continuation-type string)))
+    (if (array-type-p ctype)
+	;; the other transform will kick in, so that's OK
+	(give-up-ir1-transform)
+	`(typecase string
+	  ((simple-array character (*)) (data-vector-ref string index))
+	  ((simple-array nil (*)) (data-vector-ref string index))))))
+
 (deftransform hairy-data-vector-ref ((array index) (array t) * :important t)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
@@ -79,6 +88,18 @@
                                                    (,total-size))
                                      (%array-data-vector array))
                           index)))))
+
+(deftransform hairy-data-vector-set ((string index new-value)
+				     (simple-string t t))
+  (let ((ctype (continuation-type string)))
+    (if (array-type-p ctype)
+	;; the other transform will kick in, so that's OK
+	(give-up-ir1-transform)
+	`(typecase string
+	  ((simple-array character (*))
+	   (data-vector-set string index new-value))
+	  ((simple-array nil (*))
+	   (data-vector-set string index new-value))))))
 
 (deftransform hairy-data-vector-set ((array index new-value)
 				     (array t t)

@@ -262,12 +262,37 @@
 		(when (csubtypep type ltype)
 		  ltype))))))))
 
-;;; Derive the type to be the type specifier which is the N'th arg.
+;;; Derive the type to be the type specifier which is the Nth arg.
 (defun result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
     (let ((cont (nth (1- n) (combination-args call))))
       (when (and cont (constant-continuation-p cont))
 	(careful-specifier-type (continuation-value cont))))))
+
+;;; Derive the type to be the type specifier which is the Nth arg,
+;;; with the additional restriptions noted in the CLHS for STRING and
+;;; SIMPLE-STRING.
+(defun creation-result-type-specifier-nth-arg (n)
+  (lambda (call)
+    (declare (type combination call))
+    (let ((cont (nth (1- n) (combination-args call))))
+      (when (and cont (constant-continuation-p cont))
+	(let* ((specifier (continuation-value cont))
+	       (lspecifier (if (atom specifier) (list specifier) specifier)))
+	  (cond
+	    ((eq (car lspecifier) 'string)
+	     (destructuring-bind (string &rest size)
+		 lspecifier
+	       (declare (ignore string))
+	       (careful-specifier-type
+		`(vector character ,@(when size size)))))
+	    ((eq (car lspecifier) 'simple-string)
+	     (destructuring-bind (simple-string &rest size)
+		 lspecifier
+	       (declare (ignore simple-string))
+	       (careful-specifier-type
+		`(simple-array character ,@(if size (list size) '((*)))))))
+	    (t (careful-specifier-type specifier))))))))
 
 (/show0 "knownfun.lisp end of file")

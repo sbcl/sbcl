@@ -136,8 +136,8 @@
 
 (defun stringify-name (name kind)
   (typecase name
-    (simple-string name)
-    (string (coerce name 'simple-string))
+    (simple-base-string name)
+    (string (coerce name 'simple-base-string))
     (symbol (symbol-name name))
     (base-char (string name))
     (t

@@ -316,7 +316,7 @@
 (defvar *ouch-ptr*)
 
 (declaim (type index *read-buffer-length* *inch-ptr* *ouch-ptr*))
-(declaim (simple-string *read-buffer*))
+(declaim (type (simple-array character (*)) *read-buffer*))
 
 (defmacro reset-read-buffer ()
   ;; Turn *READ-BUFFER* into an empty read buffer.

@@ -275,8 +275,7 @@
 ;;; type descriptor for the Lisp type that is equivalent to this type.
 (defmacro !def-primitive-type (name scs &key (type name))
   (declare (type symbol name) (type list scs))
-  (let ((scns (mapcar #'meta-sc-number-or-lose scs))
-	(ctype-form `(specifier-type ',type)))
+  (let ((scns (mapcar #'meta-sc-number-or-lose scs)))
     `(progn
        (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
        (/primitive-print ,(symbol-name name))
@@ -284,9 +283,8 @@
 	 (setf (gethash ',name *backend-meta-primitive-type-names*)
 	       (make-primitive-type :name ',name
 				    :scs ',scns
-				    :type ,ctype-form)))
-       ,(once-only ((n-old `(gethash ',name *backend-primitive-type-names*))
-		    (n-type ctype-form))
+				    :specifier ',type)))
+       ,(once-only ((n-old `(gethash ',name *backend-primitive-type-names*)))
 	  `(progn
 	     ;; If the PRIMITIVE-TYPE structure already exists, we
 	     ;; destructively modify it so that existing references in
@@ -300,13 +298,13 @@
 	     (cond (,n-old
 		    (/show0 "in ,N-OLD clause of COND")
 		    (setf (primitive-type-scs ,n-old) ',scns)
-		    (setf (primitive-type-type ,n-old) ,n-type))
+		    (setf (primitive-type-specifier ,n-old) ',type))
 		   (t
 		    (/show0 "in T clause of COND")
 		    (setf (gethash ',name *backend-primitive-type-names*)
 			  (make-primitive-type :name ',name
 					       :scs ',scns
-					       :type ,n-type))))
+					       :specifier ',type))))
 	     (/show0 "done with !DEF-PRIMITIVE-TYPE")
 	     ',name)))))
 

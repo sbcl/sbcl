@@ -455,11 +455,11 @@
 					(:initial-element t))
   consed-sequence
   (movable unsafe)
-  :derive-type (result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown concatenate (type-specifier &rest sequence) consed-sequence
   ()
-  :derive-type (result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown (map %map) (type-specifier callable sequence &rest sequence)
   consed-sequence
@@ -642,7 +642,7 @@
 				&key (:key callable))
   sequence
   (call)
-  :derive-type (result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 1))
 
 ;;; not FLUSHABLE, despite what CMU CL's DEFKNOWN said..
 (defknown read-sequence (sequence stream

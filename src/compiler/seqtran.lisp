@@ -621,10 +621,10 @@
 ;;; Return a form that tests the free variables STRING1 and STRING2
 ;;; for the ordering relationship specified by LESSP and EQUALP. The
 ;;; start and end are also gotten from the environment. Both strings
-;;; must be SIMPLE-STRINGs.
+;;; must be SIMPLE-BASE-STRINGs.
 (macrolet ((def (name lessp equalp)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
-                                    (simple-string simple-string t t t t) *)
+                                    (simple-base-string simple-base-string t t t t) *)
                 `(let* ((end1 (if (not end1) (length string1) end1))
                         (end2 (if (not end2) (length string2) end2))
                         (index (sb!impl::%sp-string-compare
@@ -650,7 +650,7 @@
 
 (macrolet ((def (name result-fun)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
-                                   (simple-string simple-string t t t t) *)
+                                   (simple-base-string simple-base-string t t t t) *)
                 `(,',result-fun
                   (sb!impl::%sp-string-compare
                    string1 start1 (or end1 (length string1))
@@ -683,7 +683,7 @@
 
 (deftransform replace ((string1 string2 &key (start1 0) (start2 0)
 				end1 end2)
-		       (simple-string simple-string &rest t)
+		       (simple-base-string simple-base-string &rest t)
 		       *
 		       ;; FIXME: consider replacing this policy test
 		       ;; with some tests for the STARTx and ENDx
@@ -719,8 +719,9 @@
 ;;;
 ;;; FIXME: currently KLUDGEed because of bug 188
 (deftransform concatenate ((rtype &rest sequences)
-			   (t &rest simple-string)
-			   simple-string
+			   (t &rest (or simple-base-string
+					(simple-array nil (*))))
+			   simple-base-string
 			   :policy (< safety 3))
   (loop for rest-seqs on sequences
         for n-seq = (gensym "N-SEQ")
@@ -731,8 +732,11 @@
         collect `(,n-length (* (length ,n-seq) sb!vm:n-byte-bits)) into lets
         collect n-length into all-lengths
         collect next-start into starts
-        collect `(bit-bash-copy ,n-seq ,vector-data-bit-offset
-                                res ,start ,n-length)
+        collect `(if (and (typep ,n-seq '(simple-array nil (*)))
+		          (> ,n-length 0))
+		     (error 'nil-array-accessed-error)
+		     (bit-bash-copy ,n-seq ,vector-data-bit-offset
+		                    res ,start ,n-length))
                 into forms
         collect `(setq ,next-start (+ ,start ,n-length)) into forms
         finally

@@ -84,11 +84,12 @@
   (declare (type index count))
   (let ((result 408967240))
     (declare (type fixnum result))
-    (dotimes (i count)
-      (declare (type index i))
-      (mixf result
-	    (the fixnum
-		 (ash (char-code (aref string i)) 5))))
+    (unless (typep string '(vector nil))
+      (dotimes (i count)
+	(declare (type index i))
+	(mixf result
+	      (the fixnum
+		(ash (char-code (aref string i)) 5)))))
     result))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))

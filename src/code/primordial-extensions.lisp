@@ -173,14 +173,15 @@
 		  ;; check for bad lengths, the type system is needed
 		  ;; for calls to CONCATENATE. So we need to make sure
 		  ;; that the calls are transformed away:
-		  (1 (concatenate 'string (the simple-string (string (car things)))))
+		  (1 (concatenate 'string
+				  (the simple-base-string (string (car things)))))
 		  (2 (concatenate 'string 
-				  (the simple-string (string (car things)))
-				  (the simple-string (string (cadr things)))))
+				  (the simple-base-string (string (car things)))
+				  (the simple-base-string (string (cadr things)))))
 		  (3 (concatenate 'string
-				  (the simple-string (string (car things)))
-				  (the simple-string (string (cadr things)))
-				  (the simple-string (string (caddr things)))))
+				  (the simple-base-string (string (car things)))
+				  (the simple-base-string (string (cadr things)))
+				  (the simple-base-string (string (caddr things)))))
 		  (t (apply #'concatenate 'string (mapcar #'string things))))))
     (values (intern name)))))
 

@@ -54,7 +54,7 @@
 
 (sb!xc:deftype extended-char ()
   #!+sb-doc
-  "Type of characters that aren't base-char's. None in CMU CL."
+  "Type of CHARACTERs that aren't BASE-CHARs."
   '(and character (not base-char)))
 
 (sb!xc:deftype standard-char ()
@@ -87,10 +87,12 @@
   `(simple-array base-char (,size)))
 (sb!xc:deftype string (&optional size)
   `(or (array character (,size))
-	    (base-string ,size)))
+       (array nil (,size))
+       (base-string ,size)))
 (sb!xc:deftype simple-string (&optional size)
   `(or (simple-array character (,size))
-	    (simple-base-string ,size)))
+       (simple-array nil (,size))
+       (simple-base-string ,size)))
 
 (sb!xc:deftype bit-vector (&optional size)
   `(array bit (,size)))
@@ -109,14 +111,6 @@
 
 (sb!xc:deftype restart-designator ()
   '(or (and symbol (not null)) restart))
-
-;;; a type specifier
-;;;
-;;; FIXME: The SB!KERNEL:INSTANCE here really means CL:CLASS.
-;;; However, the CL:CLASS type is only defined once PCL is loaded,
-;;; which is before this is evaluated.  Once PCL is moved into cold
-;;; init, this might be fixable.
-(sb!xc:deftype type-specifier () '(or list symbol sb!kernel:instance))
 
 ;;; array rank, total size...
 (sb!xc:deftype array-rank () `(integer 0 (,sb!xc:array-rank-limit)))

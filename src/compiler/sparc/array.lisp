@@ -103,24 +103,16 @@
 
 (macrolet ((def-data-vector-frobs (type variant element-type &rest scs)
   `(progn
-     (define-vop (,(intern (concatenate 'simple-string
-					"DATA-VECTOR-REF/"
-					(string type)))
-		  ,(intern (concatenate 'simple-string
-					(string variant)
-					"-REF")))
+     (define-vop (,(symbolicate "DATA-VECTOR-REF/" (string type))
+		  ,(symbolicate (string variant) "-REF"))
        (:note "inline array access")
        (:variant vector-data-offset other-pointer-lowtag)
        (:translate data-vector-ref)
        (:arg-types ,type positive-fixnum)
        (:results (value :scs ,scs))
        (:result-types ,element-type))
-     (define-vop (,(intern (concatenate 'simple-string
-					"DATA-VECTOR-SET/"
-					(string type)))
-		  ,(intern (concatenate 'simple-string
-					(string variant)
-					"-SET")))
+     (define-vop (,(symbolicate "DATA-VECTOR-SET/" (string type))
+		  ,(symbolicate (string variant) "-SET"))
        (:note "inline array store")
        (:variant vector-data-offset other-pointer-lowtag)
        (:translate data-vector-set)
@@ -131,7 +123,7 @@
        (:results (result :scs ,scs))
        (:result-types ,element-type)))))
 
-  (def-data-vector-frobs simple-string byte-index
+  (def-data-vector-frobs simple-base-string byte-index
     base-char base-char-reg)
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)
@@ -146,17 +138,15 @@
   (def-data-vector-frobs simple-array-signed-byte-30 word-index
     tagged-num any-reg)
   (def-data-vector-frobs simple-array-signed-byte-32 word-index
-    signed-num signed-reg)
-) ; MACROLET
-;;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
-;;; and 4-bit vectors.
-;;; 
+    signed-num signed-reg))
 
+;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
+;;; and 4-bit vectors.
 (macrolet ((def-small-data-vector-frobs (type bits)
   (let* ((elements-per-word (floor n-word-bits bits))
 	 (bit-shift (1- (integer-length elements-per-word))))
     `(progn
-       (define-vop (,(symbolicate 'data-vector-ref/ type))
+       (define-vop (,(symbolicate "DATA-VECTOR-REF/" type))
 	 (:note "inline array access")
 	 (:translate data-vector-ref)
 	 (:policy :fast-safe)
@@ -179,7 +169,7 @@
 	   (inst srl result temp)
 	   (inst and result ,(1- (ash 1 bits)))
 	   (inst sll value result 2)))
-       (define-vop (,(symbolicate 'data-vector-ref-c/ type))
+       (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" type))
 	 (:translate data-vector-ref)
 	 (:policy :fast-safe)
 	 (:args (object :scs (descriptor-reg)))
@@ -203,7 +193,7 @@
 	       (inst srl result (* extra ,bits)))
 	     (unless (= extra ,(1- elements-per-word))
 	       (inst and result ,(1- (ash 1 bits)))))))
-       (define-vop (,(symbolicate 'data-vector-set/ type))
+       (define-vop (,(symbolicate "DATA-VECTOR-SET/" type))
 	 (:note "inline array store")
 	 (:translate data-vector-set)
 	 (:policy :fast-safe)
@@ -245,7 +235,7 @@
 	      (inst li result (tn-value value)))
 	     (t
 	      (move result value)))))
-       (define-vop (,(symbolicate 'data-vector-set-c/ type))
+       (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" type))
 	 (:translate data-vector-set)
 	 (:policy :fast-safe)
 	 (:args (object :scs (descriptor-reg))
@@ -306,14 +296,9 @@
 
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
-  (def-small-data-vector-frobs simple-array-unsigned-byte-4 4)
-
-) ; MACROLET
-
+  (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 
 ;;; And the float variants.
-;;; 
-
 (define-vop (data-vector-ref/simple-array-single-float)
   (:note "inline array access")
   (:translate data-vector-ref)
@@ -437,7 +422,7 @@
 (define-vop (set-vector-subtype set-header-data))
 
 
-;;;
+;;; XXX FIXME: Don't we have these above, in DEF-DATA-VECTOR-FROBS?
 (define-vop (data-vector-ref/simple-array-signed-byte-8 signed-byte-index-ref)
   (:note "inline array access")
   (:variant vector-data-offset other-pointer-lowtag)

@@ -956,6 +956,61 @@
       :inherits (function)
       :state :read-only)
 
+     (number :translation number)
+     (complex
+      :translation complex
+      :inherits (number)
+      :codes (#.sb!vm:complex-widetag))
+     (complex-single-float
+      :translation (complex single-float)
+      :inherits (complex number)
+      :codes (#.sb!vm:complex-single-float-widetag))
+     (complex-double-float
+      :translation (complex double-float)
+      :inherits (complex number)
+      :codes (#.sb!vm:complex-double-float-widetag))
+     #!+long-float
+     (complex-long-float
+      :translation (complex long-float)
+      :inherits (complex number)
+      :codes (#.sb!vm:complex-long-float-widetag))
+     (real :translation real :inherits (number))
+     (float
+      :translation float
+      :inherits (real number))
+     (single-float
+      :translation single-float
+      :inherits (float real number)
+      :codes (#.sb!vm:single-float-widetag))
+     (double-float
+      :translation double-float
+      :inherits (float real number)
+      :codes (#.sb!vm:double-float-widetag))
+     #!+long-float
+     (long-float
+      :translation long-float
+      :inherits (float real number)
+      :codes (#.sb!vm:long-float-widetag))
+     (rational
+      :translation rational
+      :inherits (real number))
+     (ratio
+      :translation (and rational (not integer))
+      :inherits (rational real number)
+      :codes (#.sb!vm:ratio-widetag))
+     (integer
+      :translation integer
+      :inherits (rational real number))
+     (fixnum
+      :translation (integer #.sb!xc:most-negative-fixnum
+		    #.sb!xc:most-positive-fixnum)
+      :inherits (integer rational real number)
+      :codes (#.sb!vm:even-fixnum-lowtag #.sb!vm:odd-fixnum-lowtag))
+     (bignum
+      :translation (and integer (not fixnum))
+      :inherits (integer rational real number)
+      :codes (#.sb!vm:bignum-widetag))
+
      (array :translation array :codes (#.sb!vm:complex-array-widetag)
             :hierarchical-p nil)
      (simple-array
@@ -995,151 +1050,116 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence))
      (simple-array-unsigned-byte-16
-     :translation (simple-array (unsigned-byte 16) (*))
-     :codes (#.sb!vm:simple-array-unsigned-byte-16-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array (unsigned-byte 16) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-16-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-unsigned-byte-32
-     :translation (simple-array (unsigned-byte 32) (*))
-     :codes (#.sb!vm:simple-array-unsigned-byte-32-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array (unsigned-byte 32) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-32-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-signed-byte-8
-     :translation (simple-array (signed-byte 8) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-8-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array (signed-byte 8) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-8-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-signed-byte-16
-     :translation (simple-array (signed-byte 16) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-16-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array (signed-byte 16) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-16-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-signed-byte-30
-     :translation (simple-array (signed-byte 30) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-30-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array (signed-byte 30) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-30-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-signed-byte-32
-     :translation (simple-array (signed-byte 32) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-32-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array (signed-byte 32) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-32-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-single-float
-     :translation (simple-array single-float (*))
-     :codes (#.sb!vm:simple-array-single-float-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
+      :translation (simple-array single-float (*))
+      :codes (#.sb!vm:simple-array-single-float-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
      (simple-array-double-float
-     :translation (simple-array double-float (*))
-     :codes (#.sb!vm:simple-array-double-float-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
-    #!+long-float
-    (simple-array-long-float
-     :translation (simple-array long-float (*))
-     :codes (#.sb!vm:simple-array-long-float-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
-    (simple-array-complex-single-float
-     :translation (simple-array (complex single-float) (*))
-     :codes (#.sb!vm:simple-array-complex-single-float-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
-    (simple-array-complex-double-float
-     :translation (simple-array (complex double-float) (*))
-     :codes (#.sb!vm:simple-array-complex-double-float-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
-    #!+long-float
-    (simple-array-complex-long-float
-     :translation (simple-array (complex long-float) (*))
-     :codes (#.sb!vm:simple-array-complex-long-float-widetag)
-     :direct-superclasses (vector simple-array)
-     :inherits (vector simple-array array sequence))
-    (string
-     :translation string
-     :codes (#.sb!vm:complex-string-widetag)
-     :direct-superclasses (vector)
-     :inherits (vector array sequence))
-    (simple-string
-     :translation simple-string
-     :codes (#.sb!vm:simple-string-widetag)
-     :direct-superclasses (string simple-array)
-     :inherits (string vector simple-array
-		array sequence))
-    (list
-     :translation (or cons (member nil))
-     :inherits (sequence))
-    (cons
-     :codes (#.sb!vm:list-pointer-lowtag)
-     :translation cons
-     :inherits (list sequence))
-    (null
-     :translation (member nil)
-     :inherits (symbol list sequence)
-     :direct-superclasses (symbol list))
-    (number :translation number)
-    (complex
-     :translation complex
-     :inherits (number)
-     :codes (#.sb!vm:complex-widetag))
-    (complex-single-float
-     :translation (complex single-float)
-     :inherits (complex number)
-     :codes (#.sb!vm:complex-single-float-widetag))
-    (complex-double-float
-     :translation (complex double-float)
-     :inherits (complex number)
-     :codes (#.sb!vm:complex-double-float-widetag))
-    #!+long-float
-    (complex-long-float
-     :translation (complex long-float)
-     :inherits (complex number)
-     :codes (#.sb!vm:complex-long-float-widetag))
-    (real :translation real :inherits (number))
-    (float
-     :translation float
-     :inherits (real number))
-    (single-float
-     :translation single-float
-     :inherits (float real number)
-     :codes (#.sb!vm:single-float-widetag))
-    (double-float
-     :translation double-float
-     :inherits (float real number)
-     :codes (#.sb!vm:double-float-widetag))
-    #!+long-float
-    (long-float
-     :translation long-float
-     :inherits (float real number)
-     :codes (#.sb!vm:long-float-widetag))
-    (rational
-     :translation rational
-     :inherits (real number))
-    (ratio
-     :translation (and rational (not integer))
-     :inherits (rational real number)
-     :codes (#.sb!vm:ratio-widetag))
-    (integer
-     :translation integer
-     :inherits (rational real number))
-    (fixnum
-     :translation (integer #.sb!xc:most-negative-fixnum
-			   #.sb!xc:most-positive-fixnum)
-     :inherits (integer rational real number)
-     :codes (#.sb!vm:even-fixnum-lowtag #.sb!vm:odd-fixnum-lowtag))
-    (bignum
-     :translation (and integer (not fixnum))
-     :inherits (integer rational real number)
-     :codes (#.sb!vm:bignum-widetag))
-    (stream
-     :state :read-only
-     :depth 3
-     :inherits (instance)))))
+      :translation (simple-array double-float (*))
+      :codes (#.sb!vm:simple-array-double-float-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
+     #!+long-float
+     (simple-array-long-float
+      :translation (simple-array long-float (*))
+      :codes (#.sb!vm:simple-array-long-float-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
+     (simple-array-complex-single-float
+      :translation (simple-array (complex single-float) (*))
+      :codes (#.sb!vm:simple-array-complex-single-float-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
+     (simple-array-complex-double-float
+      :translation (simple-array (complex double-float) (*))
+      :codes (#.sb!vm:simple-array-complex-double-float-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
+     #!+long-float
+     (simple-array-complex-long-float
+      :translation (simple-array (complex long-float) (*))
+      :codes (#.sb!vm:simple-array-complex-long-float-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence))
+     (string
+      :translation string
+      :direct-superclasses (vector)
+      :inherits (vector array sequence))
+     (simple-string
+      :translation simple-string
+      :direct-superclasses (string simple-array)
+      :inherits (string vector simple-array array sequence))
+     (vector-nil
+      ;; FIXME: Should this be (AND (VECTOR NIL) (NOT (SIMPLE-ARRAY NIL (*))))?
+      :translation (vector nil)
+      :codes (#.sb!vm:complex-vector-nil-widetag)
+      :direct-superclasses (string)
+      :inherits (string vector array sequence))
+     (simple-array-nil
+      :translation (simple-array nil (*))
+      :codes (#.sb!vm:simple-array-nil-widetag)
+      :direct-superclasses (vector-nil simple-string)
+      :inherits (vector-nil simple-string string vector simple-array array sequence))
+     (base-string
+      :translation base-string
+      :codes (#.sb!vm:complex-base-string-widetag)
+      :direct-superclasses (string)
+      :inherits (string vector array sequence))
+     (simple-base-string
+      :translation simple-base-string
+      :codes (#.sb!vm:simple-base-string-widetag)
+      :direct-superclasses (base-string simple-string)
+      :inherits (base-string simple-string string vector simple-array
+		 array sequence))
+     (list
+      :translation (or cons (member nil))
+      :inherits (sequence))
+     (cons
+      :codes (#.sb!vm:list-pointer-lowtag)
+      :translation cons
+      :inherits (list sequence))
+     (null
+      :translation (member nil)
+      :inherits (symbol list sequence)
+      :direct-superclasses (symbol list))
+     
+     (stream
+      :state :read-only
+      :depth 3
+      :inherits (instance)))))
 
-;;; comment from CMU CL:
-;;;   See also type-init.lisp where we finish setting up the
-;;;   translations for built-in types.
+;;; See also src/code/class-init.lisp where we finish setting up the
+;;; translations for built-in types.
 (!cold-init-forms
   (dolist (x *built-in-classes*)
     #-sb-xc-host (/show0 "at head of loop over *BUILT-IN-CLASSES*")

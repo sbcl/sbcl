@@ -45,3 +45,34 @@
   (assert (string= nstring "CaT"))
   (nstring-capitalize nstring)
   (assert (string= nstring "Cat")))
+
+;;; (VECTOR NIL)s are strings.  Tests for that and issues uncovered in
+;;; the process.
+(assert (typep (make-array 1 :element-type nil) 'string))
+(assert (not (typep (make-array 2 :element-type nil) 'base-string)))
+(assert (typep (make-string 3 :element-type nil) 'simple-string))
+(assert (not (typep (make-string 4 :element-type nil) 'simple-base-string)))
+
+(assert (subtypep (class-of (make-array 1 :element-type nil))
+		  (find-class 'string)))
+(assert (subtypep (class-of (make-array 2 :element-type nil :fill-pointer 1))
+		  (find-class 'string)))
+
+(assert (string= "" (make-array 0 :element-type nil)))
+(assert (string/= "a" (make-array 0 :element-type nil)))
+(assert (string= "" (make-array 5 :element-type nil :fill-pointer 0)))
+
+(assert (= (sxhash "")
+	   (sxhash (make-array 0 :element-type nil))
+	   (sxhash (make-array 5 :element-type nil :fill-pointer 0))
+	   (sxhash (make-string 0 :element-type nil))))
+(assert (subtypep (type-of (make-array 2 :element-type nil)) 'simple-string))
+(assert (subtypep (type-of (make-array 4 :element-type nil :fill-pointer t))
+		  'string))
+
+(assert (eq (intern "") (intern (make-array 0 :element-type nil))))
+(assert (eq (intern "")
+	    (intern (make-array 5 :element-type nil :fill-pointer 0))))
+
+(assert (raises-error? (make-string 5 :element-type t)))
+(assert (raises-error? (let () (make-string 5 :element-type t))))

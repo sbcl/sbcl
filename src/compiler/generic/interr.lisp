@@ -25,14 +25,8 @@
 (eval-when (:compile-toplevel :execute)
   (def!macro define-internal-errors (&rest errors)
 	     (let ((info (mapcar (lambda (x)
-                                   ;; FIXME: We shouldn't need placeholder
-                                   ;; NIL entries any more now that we
-                                   ;; pass our magic numbers cleanly
-                                   ;; through sbcl.h.
-				   (if x
-				       (cons (symbolicate (first x) "-ERROR")
-					     (second x))
-				       '(nil . "unused")))
+				   (cons (symbolicate (first x) "-ERROR")
+					 (second x)))
 				 errors)))
 	       `(progn
 		  (setf sb!c:*backend-internal-errors*
@@ -59,16 +53,14 @@
    "Object is not of type LONG-FLOAT.")
   (object-not-simple-string
    "Object is not of type SIMPLE-STRING.")
-  (object-not-simple-bit-vector
-   "Object is not of type SIMPLE-BIT-VECTOR.")
-  (object-not-simple-vector
-   "Object is not of type SIMPLE-VECTOR.")
   (object-not-fixnum
    "Object is not of type FIXNUM.")
   (object-not-vector
    "Object is not of type VECTOR.")
   (object-not-string
    "Object is not of type STRING.")
+  (object-not-base-string
+   "Object is not of type BASE-STRING.")
   (object-not-bit-vector
    "Object is not of type BIT-VECTOR.")
   (object-not-array
@@ -121,40 +113,6 @@
    "Object is not of type (SIGNED-BYTE 32).")
   (object-not-unsigned-byte-32
    "Object is not of type (UNSIGNED-BYTE 32).")
-  (object-not-simple-array-nil
-   "Object is not of type (SIMPLE-ARRAY NIL (*)).")
-  (object-not-simple-array-unsigned-byte-2
-   "Object is not of type (SIMPLE-ARRAY (UNSIGNED-BYTE 2) (*)).")
-  (object-not-simple-array-unsigned-byte-4
-   "Object is not of type (SIMPLE-ARRAY (UNSIGNED-BYTE 4) (*)).")
-  (object-not-simple-array-unsigned-byte-8
-   "Object is not of type (SIMPLE-ARRAY (UNSIGNED-BYTE 8) (*)).")
-  (object-not-simple-array-unsigned-byte-16
-   "Object is not of type (SIMPLE-ARRAY (UNSIGNED-BYTE 16) (*)).")
-  (object-not-simple-array-unsigned-byte-32
-   "Object is not of type (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*)).")
-  (object-not-simple-array-signed-byte-8
-   "Object is not of type (SIMPLE-ARRAY (SIGNED-BYTE 8) (*)).")
-  (object-not-simple-array-signed-byte-16
-   "Object is not of type (SIMPLE-ARRAY (SIGNED-BYTE 16) (*)).")
-  (object-not-simple-array-signed-byte-30
-   "Object is not of type (SIMPLE-ARRAY FIXNUM (*)).")
-  (object-not-simple-array-signed-byte-32
-   "Object is not of type (SIMPLE-ARRAY (SIGNED-BYTE 32) (*)).")
-  (object-not-simple-array-single-float
-   "Object is not of type (SIMPLE-ARRAY SINGLE-FLOAT (*)).")
-  (object-not-simple-array-double-float
-   "Object is not of type (SIMPLE-ARRAY DOUBLE-FLOAT (*)).")
-  #!+long-float
-  (object-not-simple-array-long-float
-   "Object is not of type (SIMPLE-ARRAY LONG-FLOAT (*)).")
-  (object-not-simple-array-complex-single-float
-   "Object is not of type (SIMPLE-ARRAY (COMPLEX SINGLE-FLOAT) (*)).")
-  (object-not-simple-array-complex-double-float
-   "Object is not of type (SIMPLE-ARRAY (COMPLEX DOUBLE-FLOAT) (*)).")
-  #!+long-float
-  (object-not-simple-array-complex-long-float
-   "Object is not of type (SIMPLE-ARRAY (COMPLEX LONG-FLOAT) (*)).")
   (object-not-complex
    "Object is not of type COMPLEX.")
   (object-not-complex-rational
@@ -181,4 +139,14 @@
   (layout-invalid
    "Object layout is invalid. (indicates obsolete instance)")
   (object-not-complex-vector
-   "Object is not a complex (non-SIMPLE-ARRAY) vector."))
+   "Object is not a complex (non-SIMPLE-ARRAY) vector.")
+  .
+  #.(map 'list
+	 (lambda (saetp)
+	   (list
+	    (symbolicate "OBJECT-NOT-" (sb!vm:saetp-primitive-type-name saetp))
+	    (format nil "Object is not of type ~A."
+		    (specifier-type
+		     `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))))
+	 sb!vm:*specialized-array-element-type-properties*))
+

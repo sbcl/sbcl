@@ -75,112 +75,24 @@
     object-not-long-float-error
   (long-float-widetag))
 
-(!define-type-vops simple-string-p check-simple-string simple-string
+(!define-type-vops simple-string-p check-simple-string nil
     object-not-simple-string-error
-  (simple-string-widetag))
+  (simple-base-string-widetag simple-array-nil-widetag))
 
-(!define-type-vops simple-bit-vector-p check-simple-bit-vector simple-bit-vector
-    object-not-simple-bit-vector-error
-  (simple-bit-vector-widetag))
-
-(!define-type-vops simple-vector-p check-simple-vector simple-vector
-    object-not-simple-vector-error
-  (simple-vector-widetag))
-
-(!define-type-vops simple-array-nil-p
-		   check-simple-array-nil
-		   simple-array-nil
-		   object-not-simple-array-nil-error
-  (simple-array-nil-widetag))
-		   
-(!define-type-vops simple-array-unsigned-byte-2-p
-      check-simple-array-unsigned-byte-2
-      simple-array-unsigned-byte-2
-    object-not-simple-array-unsigned-byte-2-error
-  (simple-array-unsigned-byte-2-widetag))
-
-(!define-type-vops simple-array-unsigned-byte-4-p
-      check-simple-array-unsigned-byte-4
-      simple-array-unsigned-byte-4
-    object-not-simple-array-unsigned-byte-4-error
-  (simple-array-unsigned-byte-4-widetag))
-
-(!define-type-vops simple-array-unsigned-byte-8-p
-      check-simple-array-unsigned-byte-8
-      simple-array-unsigned-byte-8
-    object-not-simple-array-unsigned-byte-8-error
-  (simple-array-unsigned-byte-8-widetag))
-
-(!define-type-vops simple-array-unsigned-byte-16-p
-      check-simple-array-unsigned-byte-16
-      simple-array-unsigned-byte-16
-    object-not-simple-array-unsigned-byte-16-error
-  (simple-array-unsigned-byte-16-widetag))
-
-(!define-type-vops simple-array-unsigned-byte-32-p
-      check-simple-array-unsigned-byte-32
-      simple-array-unsigned-byte-32
-    object-not-simple-array-unsigned-byte-32-error
-  (simple-array-unsigned-byte-32-widetag))
-
-(!define-type-vops simple-array-signed-byte-8-p
-      check-simple-array-signed-byte-8
-      simple-array-signed-byte-8
-    object-not-simple-array-signed-byte-8-error
-  (simple-array-signed-byte-8-widetag))
-
-(!define-type-vops simple-array-signed-byte-16-p
-      check-simple-array-signed-byte-16
-      simple-array-signed-byte-16
-    object-not-simple-array-signed-byte-16-error
-  (simple-array-signed-byte-16-widetag))
-
-(!define-type-vops simple-array-signed-byte-30-p
-      check-simple-array-signed-byte-30
-      simple-array-signed-byte-30
-    object-not-simple-array-signed-byte-30-error
-  (simple-array-signed-byte-30-widetag))
-
-(!define-type-vops simple-array-signed-byte-32-p
-      check-simple-array-signed-byte-32
-      simple-array-signed-byte-32
-    object-not-simple-array-signed-byte-32-error
-  (simple-array-signed-byte-32-widetag))
-
-(!define-type-vops simple-array-single-float-p check-simple-array-single-float
-      simple-array-single-float
-    object-not-simple-array-single-float-error
-  (simple-array-single-float-widetag))
-
-(!define-type-vops simple-array-double-float-p check-simple-array-double-float
-      simple-array-double-float
-    object-not-simple-array-double-float-error
-  (simple-array-double-float-widetag))
-
-#!+long-float
-(!define-type-vops simple-array-long-float-p check-simple-array-long-float
-      simple-array-long-float
-    object-not-simple-array-long-float-error
-  (simple-array-long-float-widetag))
-
-(!define-type-vops simple-array-complex-single-float-p
-      check-simple-array-complex-single-float
-      simple-array-complex-single-float
-    object-not-simple-array-complex-single-float-error
-  (simple-array-complex-single-float-widetag))
-
-(!define-type-vops simple-array-complex-double-float-p
-      check-simple-array-complex-double-float
-      simple-array-complex-double-float
-    object-not-simple-array-complex-double-float-error
-  (simple-array-complex-double-float-widetag))
-
-#!+long-float
-(!define-type-vops simple-array-complex-long-float-p
-      check-simple-array-complex-long-float
-      simple-array-complex-long-float
-    object-not-simple-array-complex-long-float-error
-  (simple-array-complex-long-float-widetag))
+(macrolet
+    ((define-simple-array-type-vops ()
+	 `(progn
+	   ,@(map 'list
+		  (lambda (saetp)
+		    (let ((primtype (saetp-primitive-type-name saetp)))
+		    `(!define-type-vops
+		      ,(symbolicate primtype "-P")
+		      ,(symbolicate "CHECK-" primtype)
+		      ,primtype
+		      ,(symbolicate "OBJECT-NOT-" primtype "-ERROR")
+		      (,(saetp-typecode saetp)))))
+		  *specialized-array-element-type-properties*))))
+  (define-simple-array-type-vops))
 
 (!define-type-vops base-char-p check-base-char base-char
     object-not-base-char-error
@@ -208,39 +120,34 @@
   (funcallable-instance-header-widetag))
 
 (!define-type-vops array-header-p nil nil nil
-  (simple-array-widetag complex-string-widetag complex-bit-vector-widetag
-			complex-vector-widetag complex-array-widetag))
+  (simple-array-widetag complex-base-string-widetag complex-bit-vector-widetag
+   complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
 (!define-type-vops stringp check-string nil object-not-string-error
-  (simple-string-widetag complex-string-widetag))
+  (simple-base-string-widetag complex-base-string-widetag
+   simple-array-nil-widetag complex-vector-nil-widetag))
+
+(!define-type-vops base-string-p check-base-string nil object-not-base-string-error
+  (simple-base-string-widetag complex-base-string-widetag))
 
 (!define-type-vops bit-vector-p check-bit-vector nil
     object-not-bit-vector-error
   (simple-bit-vector-widetag complex-bit-vector-widetag))
 
+(!define-type-vops vector-nil-p check-vector-nil nil
+    object-not-vector-nil-error
+  (simple-array-nil-widetag complex-vector-nil-widetag))
+
 (!define-type-vops vectorp check-vector nil object-not-vector-error
-  (simple-string-widetag
-   simple-array-nil-widetag
-   simple-bit-vector-widetag
-   simple-vector-widetag
-   simple-array-unsigned-byte-2-widetag
-   simple-array-unsigned-byte-4-widetag
-   simple-array-unsigned-byte-8-widetag
-   simple-array-unsigned-byte-16-widetag
-   simple-array-unsigned-byte-32-widetag
-   simple-array-signed-byte-8-widetag
-   simple-array-signed-byte-16-widetag
-   simple-array-signed-byte-30-widetag
-   simple-array-signed-byte-32-widetag
-   simple-array-single-float-widetag
-   simple-array-double-float-widetag
-   #!+long-float simple-array-long-float-widetag
-   simple-array-complex-single-float-widetag
-   simple-array-complex-double-float-widetag
-   #!+long-float simple-array-complex-long-float-widetag
-   complex-string-widetag
-   complex-bit-vector-widetag
-   complex-vector-widetag))
+  (complex-vector-widetag .
+   #.(append
+      (map 'list
+	   #'saetp-typecode
+	   *specialized-array-element-type-properties*)
+      (mapcan (lambda (saetp)
+		(when (saetp-complex-typecode saetp)
+		  (list (saetp-complex-typecode saetp))))
+	      (coerce *specialized-array-element-type-properties* 'list)))))
 
 ;;; Note that this "type VOP" is sort of an oddball; it doesn't so
 ;;; much test for a Lisp-level type as just expose a low-level type
@@ -258,52 +165,23 @@
 
 (!define-type-vops simple-array-p check-simple-array nil
     object-not-simple-array-error
-  (simple-array-widetag
-   simple-string-widetag
-   simple-array-nil-widetag
-   simple-bit-vector-widetag
-   simple-vector-widetag
-   simple-array-unsigned-byte-2-widetag
-   simple-array-unsigned-byte-4-widetag
-   simple-array-unsigned-byte-8-widetag
-   simple-array-unsigned-byte-16-widetag
-   simple-array-unsigned-byte-32-widetag
-   simple-array-signed-byte-8-widetag
-   simple-array-signed-byte-16-widetag
-   simple-array-signed-byte-30-widetag
-   simple-array-signed-byte-32-widetag
-   simple-array-single-float-widetag
-   simple-array-double-float-widetag
-   #!+long-float simple-array-long-float-widetag
-   simple-array-complex-single-float-widetag
-   simple-array-complex-double-float-widetag
-   #!+long-float simple-array-complex-long-float-widetag))
+  (simple-array-widetag .
+   #.(map 'list
+	  #'saetp-typecode
+	  *specialized-array-element-type-properties*)))
 
 (!define-type-vops arrayp check-array nil object-not-array-error
   (simple-array-widetag
-   simple-string-widetag
-   simple-array-nil-widetag
-   simple-bit-vector-widetag
-   simple-vector-widetag
-   simple-array-unsigned-byte-2-widetag
-   simple-array-unsigned-byte-4-widetag
-   simple-array-unsigned-byte-8-widetag
-   simple-array-unsigned-byte-16-widetag
-   simple-array-unsigned-byte-32-widetag
-   simple-array-signed-byte-8-widetag
-   simple-array-signed-byte-16-widetag
-   simple-array-signed-byte-30-widetag
-   simple-array-signed-byte-32-widetag
-   simple-array-single-float-widetag
-   simple-array-double-float-widetag
-   #!+long-float simple-array-long-float-widetag
-   simple-array-complex-single-float-widetag
-   simple-array-complex-double-float-widetag
-   #!+long-float simple-array-complex-long-float-widetag
-   complex-string-widetag
-   complex-bit-vector-widetag
-   complex-vector-widetag
-   complex-array-widetag))
+   complex-array-widetag
+   complex-vector-widetag .
+   #.(append
+      (map 'list
+	   #'saetp-typecode
+	   *specialized-array-element-type-properties*)
+      (mapcan (lambda (saetp)
+		(when (saetp-complex-typecode saetp)
+		  (list (saetp-complex-typecode saetp))))
+	      (coerce *specialized-array-element-type-properties* 'list)))))
 
 (!define-type-vops numberp check-number nil object-not-number-error
   (even-fixnum-lowtag

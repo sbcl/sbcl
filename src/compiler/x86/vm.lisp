@@ -450,7 +450,7 @@
 ;;; The loader uses this to convert alien names to the form they need in
 ;;; the symbol table (for example, prepending an underscore).
 (defun extern-alien-name (name)
-  (declare (type simple-string name))
+  (declare (type simple-base-string name))
   ;; OpenBSD is non-ELF, and needs a _ prefix
   #!+openbsd (concatenate 'string "_" name)
   ;; The other (ELF) ports currently don't need any prefix

@@ -199,7 +199,7 @@
 	#'<=
 	:key #'template-cost))
 
-;;; Return a function type specifier describing Template's type computed
+;;; Return a function type specifier describing TEMPLATE's type computed
 ;;; from the operand type restrictions.
 (defun template-type-specifier (template)
   (declare (type template template))
@@ -208,10 +208,7 @@
 		    (if (eq x '*)
 			t
 			(ecase (first x)
-			  (:or `(or ,@(mapcar (lambda (type)
-						(type-specifier
-						 (primitive-type-type
-						  type)))
+			  (:or `(or ,@(mapcar #'primitive-type-specifier
 					      (rest x))))
 			  (:constant `(constant-arg ,(third x)))))))
 	     `(,@(mapcar #'frob types)

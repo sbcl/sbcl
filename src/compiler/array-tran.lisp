@@ -200,83 +200,13 @@
 
 ;;; Just convert it into a MAKE-ARRAY.
 (deftransform make-string ((length &key
-				   (element-type 'base-char)
+				   (element-type 'character)
 				   (initial-element
 				    #.*default-init-char-form*)))
-  '(make-array (the index length)
-               :element-type element-type
-               :initial-element initial-element))
-
-(defstruct (specialized-array-element-type-properties
-	    (:conc-name saetp-)
-	    (:constructor !make-saetp (ctype
-				       initial-element-default
-				       n-bits
-				       typecode
-				       &key
-				       (n-pad-elements 0)))
-	    (:copier nil))
-  ;; the element type, e.g. #<BUILT-IN-CLASS BASE-CHAR (sealed)> or
-  ;; #<SB-KERNEL:NUMERIC-TYPE (UNSIGNED-BYTE 4)>
-  (ctype (missing-arg) :type ctype :read-only t)
-  ;; what we get when the low-level vector-creation logic zeroes all
-  ;; the bits (which also serves as the default value of MAKE-ARRAY's
-  ;; :INITIAL-ELEMENT keyword)
-  (initial-element-default (missing-arg) :read-only t)
-  ;; how many bits per element
-  (n-bits (missing-arg) :type index :read-only t)
-  ;; the low-level type code
-  (typecode (missing-arg) :type index :read-only t)
-  ;; the number of extra elements we use at the end of the array for
-  ;; low level hackery (e.g., one element for arrays of BASE-CHAR,
-  ;; which is used for a fixed #\NULL so that when we call out to C
-  ;; we don't need to cons a new copy)
-  (n-pad-elements (missing-arg) :type index :read-only t))
-
-(defparameter *specialized-array-element-type-properties*
-  (map 'simple-vector
-       (lambda (args)
-	 (destructuring-bind (type-spec &rest rest) args
-	   (let ((ctype (specifier-type type-spec)))
-	     (apply #'!make-saetp ctype rest))))
-       `(;; Erm.  Yeah.  There aren't a lot of things that make sense
-	 ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
-	 (nil '#:mu 0 ,sb!vm:simple-array-nil-widetag)
-	 (base-char ,(code-char 0) 8 ,sb!vm:simple-string-widetag
-		    ;; (SIMPLE-STRINGs are stored with an extra trailing
-		    ;; #\NULL for convenience in calling out to C.)
-		    :n-pad-elements 1)
-	 (single-float 0.0f0 32 ,sb!vm:simple-array-single-float-widetag)
-	 (double-float 0.0d0 64 ,sb!vm:simple-array-double-float-widetag)
-	 #!+long-float (long-float 0.0L0 #!+x86 96 #!+sparc 128
-				   ,sb!vm:simple-array-long-float-widetag)
-	 (bit 0 1 ,sb!vm:simple-bit-vector-widetag)
-	 ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
-	 ;; before their SIGNED-BYTE partners is significant in the
-	 ;; implementation of the compiler; some of the cross-compiler
-	 ;; code (see e.g. COERCE-TO-SMALLEST-ELTYPE in
-	 ;; src/compiler/debug-dump.lisp) attempts to create an array
-	 ;; specialized on (UNSIGNED-BYTE FOO), where FOO could be 7;
-	 ;; (UNSIGNED-BYTE 7) is SUBTYPEP (SIGNED-BYTE 8), so if we're
-	 ;; not careful we could get the wrong specialized array when
-	 ;; we try to FIND-IF, below. -- CSR, 2002-07-08
-	 ((unsigned-byte 2) 0 2 ,sb!vm:simple-array-unsigned-byte-2-widetag)
-	 ((unsigned-byte 4) 0 4 ,sb!vm:simple-array-unsigned-byte-4-widetag)
-	 ((unsigned-byte 8) 0 8 ,sb!vm:simple-array-unsigned-byte-8-widetag)
-	 ((unsigned-byte 16) 0 16 ,sb!vm:simple-array-unsigned-byte-16-widetag)
-	 ((unsigned-byte 32) 0 32 ,sb!vm:simple-array-unsigned-byte-32-widetag)
-	 ((signed-byte 8) 0 8 ,sb!vm:simple-array-signed-byte-8-widetag)
-	 ((signed-byte 16) 0 16 ,sb!vm:simple-array-signed-byte-16-widetag)
-	 ((signed-byte 30) 0 32 ,sb!vm:simple-array-signed-byte-30-widetag)
-	 ((signed-byte 32) 0 32 ,sb!vm:simple-array-signed-byte-32-widetag)
-	 ((complex single-float) #C(0.0f0 0.0f0) 64
-	  ,sb!vm:simple-array-complex-single-float-widetag)
-	 ((complex double-float) #C(0.0d0 0.0d0) 128
-	  ,sb!vm:simple-array-complex-double-float-widetag)
-	 #!+long-float ((complex long-float) #C(0.0L0 0.0L0)
-			#!+x86 192 #!+sparc 256
-			,sb!vm:simple-array-complex-long-float-widetag)
-	 (t 0 32 ,sb!vm:simple-vector-widetag))))
+  `(the simple-string (make-array (the index length)
+		       :element-type element-type
+		       ,@(when initial-element
+			   '(:initial-element initial-element)))))
 
 (deftransform make-array ((dims &key initial-element element-type
 				     adjustable fill-pointer)
@@ -291,10 +221,10 @@
 			(continuation-value element-type))))
 	 (eltype-type (ir1-transform-specifier-type eltype))
 	 (saetp (find-if (lambda (saetp)
-			   (csubtypep eltype-type (saetp-ctype saetp)))
-			 *specialized-array-element-type-properties*))
+			   (csubtypep eltype-type (sb!vm:saetp-ctype saetp)))
+			 sb!vm:*specialized-array-element-type-properties*))
 	 (creation-form `(make-array dims
-			  :element-type ',(type-specifier (saetp-ctype saetp))
+			  :element-type ',(type-specifier (sb!vm:saetp-ctype saetp))
 			  ,@(when fill-pointer
 				  '(:fill-pointer fill-pointer))
 			  ,@(when adjustable
@@ -305,7 +235,7 @@
 
     (cond ((and (constant-continuation-p initial-element)
 		(eql (continuation-value initial-element)
-		     (saetp-initial-element-default saetp)))
+		     (sb!vm:saetp-initial-element-default saetp)))
 	   creation-form)
 	  (t
 	   ;; error checking for target, disabled on the host because
@@ -314,13 +244,13 @@
 	   (when (constant-continuation-p initial-element)
 	     (let ((value (continuation-value initial-element)))
 	       (cond
-		 ((not (ctypep value (saetp-ctype saetp)))
+		 ((not (ctypep value (sb!vm:saetp-ctype saetp)))
 		  ;; this case will cause an error at runtime, so we'd
 		  ;; better WARN about it now.
 		  (compiler-warn "~@<~S is not a ~S (which is the ~
                                  UPGRADED-ARRAY-ELEMENT-TYPE of ~S).~@:>"
 				 value
-				 (type-specifier (saetp-ctype saetp))
+				 (type-specifier (sb!vm:saetp-ctype saetp))
 				 eltype))
 		 ((not (ctypep value eltype-type))
 		  ;; this case will not cause an error at runtime, but
@@ -358,13 +288,13 @@
 		 (sb!xc:upgraded-array-element-type eltype))
 	    (,len)))
 	 (saetp (find-if (lambda (saetp)
-			   (csubtypep eltype-type (saetp-ctype saetp)))
-			 *specialized-array-element-type-properties*)))
+			   (csubtypep eltype-type (sb!vm:saetp-ctype saetp)))
+			 sb!vm:*specialized-array-element-type-properties*)))
     (unless saetp
       (give-up-ir1-transform
        "cannot open-code creation of ~S" result-type-spec))
     #-sb-xc-host
-    (unless (csubtypep (ctype-of (saetp-initial-element-default saetp))
+    (unless (csubtypep (ctype-of (sb!vm:saetp-initial-element-default saetp))
 		       eltype-type)
       ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE
       ;; '(INTEGER 1 5)) ANSI's definition of MAKE-ARRAY says "If
@@ -377,11 +307,11 @@
       ;; he writes code:-), we'll signal a STYLE-WARNING in case he
       ;; didn't realize this.
       (compiler-style-warn "The default initial element ~S is not a ~S."
-			   (saetp-initial-element-default saetp)
+			   (sb!vm:saetp-initial-element-default saetp)
 			   eltype))
-    (let* ((n-bits-per-element (saetp-n-bits saetp))
-	   (typecode (saetp-typecode saetp))
-	   (n-pad-elements (saetp-n-pad-elements saetp))
+    (let* ((n-bits-per-element (sb!vm:saetp-n-bits saetp))
+	   (typecode (sb!vm:saetp-typecode saetp))
+	   (n-pad-elements (sb!vm:saetp-n-pad-elements saetp))
 	   (padded-length-form (if (zerop n-pad-elements)
 				   'length
 				   `(+ length ,n-pad-elements)))

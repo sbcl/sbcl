@@ -342,19 +342,16 @@
   (using char-equal) of the two strings. Otherwise, returns ()."
   (string-not-greaterp* string1 string2 start1 end1 start2 end2))
 
-(defun make-string (count &key element-type ((:initial-element fill-char)))
+(defun make-string (count &key
+		    (element-type 'character)
+		    ((:initial-element fill-char)))
   #!+sb-doc
   "Given a character count and an optional fill character, makes and returns
-   a new string Count long filled with the fill character."
-  (declare (fixnum count)
-	   (ignore element-type))
+   a new string COUNT long filled with the fill character."
+  (declare (fixnum count))
   (if fill-char
-      (do ((i 0 (1+ i))
-	   (string (make-string count)))
-	  ((= i count) string)
-	(declare (fixnum i))
-	(setf (schar string i) fill-char))
-      (make-string count)))
+      (make-string count :element-type element-type :initial-element fill-char)
+      (make-string count :element-type element-type)))
 
 (flet ((%upcase (string start end)
 	 (declare (string string) (index start) (type sequence-end end))

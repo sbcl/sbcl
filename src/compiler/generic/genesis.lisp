@@ -598,7 +598,7 @@
 	 (des (allocate-vector-object gspace
 				      sb!vm:n-byte-bits
 				      (1+ length)
-				      sb!vm:simple-string-widetag))
+				      sb!vm:simple-base-string-widetag))
 	 (bytes (gspace-bytes gspace))
 	 (offset (+ (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
 		    (descriptor-byte-offset des))))

@@ -91,65 +91,36 @@
     ;; and for all in any reasonable user programs.)
     ((t)
      (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
-    ((character base-char standard-char)
-     (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
+    ((base-char standard-char)
+     (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
-     ;; FIXME: The data here are redundant with
-     ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
-     (pick-vector-type type
-       (nil (values #.sb!vm:simple-array-nil-widetag 0))
-       (base-char (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
-       (bit (values #.sb!vm:simple-bit-vector-widetag 1))
-       ((unsigned-byte 2)
-	(values #.sb!vm:simple-array-unsigned-byte-2-widetag 2))
-       ((unsigned-byte 4)
-	(values #.sb!vm:simple-array-unsigned-byte-4-widetag 4))
-       ((unsigned-byte 8)
-	(values #.sb!vm:simple-array-unsigned-byte-8-widetag 8))
-       ((unsigned-byte 16)
-	(values #.sb!vm:simple-array-unsigned-byte-16-widetag 16))
-       ((unsigned-byte 32)
-	(values #.sb!vm:simple-array-unsigned-byte-32-widetag 32))
-       ((signed-byte 8)
-	(values #.sb!vm:simple-array-signed-byte-8-widetag 8))
-       ((signed-byte 16)
-	(values #.sb!vm:simple-array-signed-byte-16-widetag 16))
-       ((signed-byte 30)
-	(values #.sb!vm:simple-array-signed-byte-30-widetag 32))
-       ((signed-byte 32)
-	(values #.sb!vm:simple-array-signed-byte-32-widetag 32))
-       (single-float (values #.sb!vm:simple-array-single-float-widetag 32))
-       (double-float (values #.sb!vm:simple-array-double-float-widetag 64))
-       #!+long-float
-       (long-float
-	(values #.sb!vm:simple-array-long-float-widetag
-		#!+x86 96 #!+sparc 128))
-       ((complex single-float)
-	(values #.sb!vm:simple-array-complex-single-float-widetag 64))
-       ((complex double-float)
-	(values #.sb!vm:simple-array-complex-double-float-widetag 128))
-       #!+long-float
-       ((complex long-float)
-	(values #.sb!vm:simple-array-complex-long-float-widetag
-		#!+x86 192
-		#!+sparc 256))
-       (t (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))))))
+     #.`(pick-vector-type type
+	 ,@(map 'list
+		(lambda (saetp)
+		  `(,(sb!vm:saetp-specifier saetp)
+		    (values ,(sb!vm:saetp-typecode saetp)
+		            ,(sb!vm:saetp-n-bits saetp))))
+		sb!vm:*specialized-array-element-type-properties*)))))
+
 (defun %complex-vector-widetag (type)
   (case type
     ;; Pick off some easy common cases.
     ((t)
      #.sb!vm:complex-vector-widetag)
-    ((character base-char)
-     #.sb!vm:complex-string-widetag) 
+    ((base-char)
+     #.sb!vm:complex-base-string-widetag)
+    ((nil)
+     #.sb!vm:complex-vector-nil-widetag)
     ((bit)
      #.sb!vm:complex-bit-vector-widetag)
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
      (pick-vector-type type
-       (base-char #.sb!vm:complex-string-widetag)
+       (nil #.sb!vm:complex-vector-nil-widetag)
+       (base-char #.sb!vm:complex-base-string-widetag)
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
@@ -176,7 +147,7 @@
 		 (array (allocate-vector
 			 type
 			 length
-			 (ceiling (* (if (= type sb!vm:simple-string-widetag)
+			 (ceiling (* (if (= type sb!vm:simple-base-string-widetag)
 					 (1+ length)
 					 length)
 				     n-bits)
@@ -302,39 +273,20 @@
   (coerce (the list objects) 'simple-vector))
 
 ;;;; accessor/setter functions
-
-(eval-when (:compile-toplevel :execute)
-  (defparameter *specialized-array-element-types*
-    '(t
-      character
-      bit
-      (unsigned-byte 2)
-      (unsigned-byte 4)
-      (unsigned-byte 8)
-      (unsigned-byte 16)
-      (unsigned-byte 32)
-      (signed-byte 8)
-      (signed-byte 16)
-      (signed-byte 30)
-      (signed-byte 32)
-      single-float
-      double-float
-      #!+long-float long-float
-      (complex single-float)
-      (complex double-float)
-      #!+long-float (complex long-float)
-      nil)))
-    
 (defun hairy-data-vector-ref (array index)
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end))
     (etypecase vector .
-	       #.(mapcar (lambda (type)
-			   (let ((atype `(simple-array ,type (*))))
-			     `(,atype
-			       (data-vector-ref (the ,atype vector)
-						index))))
-			 *specialized-array-element-types*))))
+	       #.(map 'list
+		      (lambda (saetp)
+			(let* ((type (sb!vm:saetp-specifier saetp))
+			       (atype `(simple-array ,type (*))))
+			  `(,atype
+			    (data-vector-ref (the ,atype vector) index))))
+		      (sort
+		       (copy-seq
+			sb!vm:*specialized-array-element-type-properties*)
+		       #'> :key #'sb!vm:saetp-importance)))))
 
 ;;; (Ordinary DATA-VECTOR-REF usage compiles into a vop, but
 ;;; DATA-VECTOR-REF is also FOLDABLE, and this ordinary function
@@ -346,20 +298,23 @@
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end))
     (etypecase vector .
-	       #.(mapcar (lambda (type)
-			   (let ((atype `(simple-array ,type (*))))
-			     `(,atype
-			       (data-vector-set (the ,atype vector)
-						index
-						(the ,type
-						  new-value))
-			       ;; For specialized arrays, the return
-			       ;; from data-vector-set would have to
-			       ;; be reboxed to be a (Lisp) return
-			       ;; value; instead, we use the
-			       ;; already-boxed value as the return.
-			       new-value)))
-			 *specialized-array-element-types*))))
+	       #.(map 'list
+		      (lambda (saetp)
+			(let* ((type (sb!vm:saetp-specifier saetp))
+			       (atype `(simple-array ,type (*))))
+			  `(,atype
+			    (data-vector-set (the ,atype vector) index
+			                     (the ,type new-value))
+			    ;; For specialized arrays, the return from
+			    ;; data-vector-set would have to be
+			    ;; reboxed to be a (Lisp) return value;
+			    ;; instead, we use the already-boxed value
+			    ;; as the return.
+			    new-value)))
+		      (sort
+		       (copy-seq
+			sb!vm:*specialized-array-element-type-properties*)
+		       #'> :key #'sb!vm:saetp-importance)))))
 
 (defun %array-row-major-index (array subscripts
 				     &optional (invalid-index-error-p t))
@@ -544,41 +499,23 @@
 					      `(= widetag ,item))))
 				     (cdr stuff)))
 				  stuff))))
-      ;; FIXME: The data here are redundant with
-      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
-      (pick-element-type
-       (sb!vm:simple-array-nil-widetag nil)
-       ((sb!vm:simple-string-widetag sb!vm:complex-string-widetag) 'base-char)
-       ((sb!vm:simple-bit-vector-widetag
-	 sb!vm:complex-bit-vector-widetag) 'bit)
-       (sb!vm:simple-vector-widetag t)
-       (sb!vm:simple-array-unsigned-byte-2-widetag '(unsigned-byte 2))
-       (sb!vm:simple-array-unsigned-byte-4-widetag '(unsigned-byte 4))
-       (sb!vm:simple-array-unsigned-byte-8-widetag '(unsigned-byte 8))
-       (sb!vm:simple-array-unsigned-byte-16-widetag '(unsigned-byte 16))
-       (sb!vm:simple-array-unsigned-byte-32-widetag '(unsigned-byte 32))
-       (sb!vm:simple-array-signed-byte-8-widetag '(signed-byte 8))
-       (sb!vm:simple-array-signed-byte-16-widetag '(signed-byte 16))
-       (sb!vm:simple-array-signed-byte-30-widetag '(signed-byte 30))
-       (sb!vm:simple-array-signed-byte-32-widetag '(signed-byte 32))
-       (sb!vm:simple-array-single-float-widetag 'single-float)
-       (sb!vm:simple-array-double-float-widetag 'double-float)
-       #!+long-float
-       (sb!vm:simple-array-long-float-widetag 'long-float)
-       (sb!vm:simple-array-complex-single-float-widetag
-	'(complex single-float))
-       (sb!vm:simple-array-complex-double-float-widetag
-	'(complex double-float))
-       #!+long-float
-       (sb!vm:simple-array-complex-long-float-widetag '(complex long-float))
-       ((sb!vm:simple-array-widetag
-	 sb!vm:complex-vector-widetag
-	 sb!vm:complex-array-widetag)
-	(with-array-data ((array array) (start) (end))
-	  (declare (ignore start end))
-	  (array-element-type array)))
-       (t
-	(error 'type-error :datum array :expected-type 'array))))))
+      #.`(pick-element-type
+	  ,@(map 'list
+		 (lambda (saetp)
+		   `(,(if (sb!vm:saetp-complex-typecode saetp)
+			  (list (sb!vm:saetp-typecode saetp)
+				(sb!vm:saetp-complex-typecode saetp))
+			  (sb!vm:saetp-typecode saetp))
+		     ',(sb!vm:saetp-specifier saetp)))
+		 sb!vm:*specialized-array-element-type-properties*)
+	  ((sb!vm:simple-array-widetag
+	    sb!vm:complex-vector-widetag
+	    sb!vm:complex-array-widetag)
+	   (with-array-data ((array array) (start) (end))
+	     (declare (ignore start end))
+	     (array-element-type array)))
+	  (t
+	   (error 'type-error :datum array :expected-type 'array))))))
 
 (defun array-rank (array)
   #!+sb-doc
@@ -866,8 +803,7 @@
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
 		 `(etypecase ,name
-		    ((simple-array nil (*)) (error 'cell-error
-					     :name 'nil-array-element))
+		    ((simple-array nil (*)) (error 'nil-array-accessed-error))
 		    ,@(mapcar (lambda (thing)
 				(destructuring-bind (type-spec fill-value)
 				    thing
@@ -876,33 +812,16 @@
 					  ,fill-value
 					  :start new-length))))
 			      things))))
-      ;; FIXME: The associations between vector types and initial
-      ;; values here are redundant with
-      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
-      (frob vector
-	(simple-vector 0)
-	(simple-base-string #.*default-init-char-form*)
-	(simple-bit-vector 0)
-	((simple-array (unsigned-byte 2) (*)) 0)
-	((simple-array (unsigned-byte 4) (*)) 0)
-	((simple-array (unsigned-byte 8) (*)) 0)
-	((simple-array (unsigned-byte 16) (*)) 0)
-	((simple-array (unsigned-byte 32) (*)) 0)
-	((simple-array (signed-byte 8) (*)) 0)
-	((simple-array (signed-byte 16) (*)) 0)
-	((simple-array (signed-byte 30) (*)) 0)
-	((simple-array (signed-byte 32) (*)) 0)
-	((simple-array single-float (*)) (coerce 0 'single-float))
-	((simple-array double-float (*)) (coerce 0 'double-float))
-	#!+long-float
-	((simple-array long-float (*)) (coerce 0 'long-float))
-	((simple-array (complex single-float) (*))
-	 (coerce 0 '(complex single-float)))
-	((simple-array (complex double-float) (*))
-	 (coerce 0 '(complex double-float)))
-	#!+long-float
-	((simple-array (complex long-float) (*))
-	 (coerce 0 '(complex long-float))))))
+      #.`(frob vector
+	  ,@(map 'list
+		 (lambda (saetp)
+		   `((simple-array ,(sb!vm:saetp-specifier saetp) (*))
+		     ,(if (eq (sb!vm:saetp-specifier saetp) 'base-char)
+			  *default-init-char-form*
+			  (sb!vm:saetp-initial-element-default saetp))))
+		 (remove-if-not
+		  #'sb!vm:saetp-specifier
+		  sb!vm:*specialized-array-element-type-properties*)))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)

@@ -102,24 +102,16 @@
 
 (macrolet ((def-data-vector-frobs (type variant element-type &rest scs)
   `(progn
-     (define-vop (,(intern (concatenate 'simple-string
-					"DATA-VECTOR-REF/"
-					(string type)))
-		  ,(intern (concatenate 'simple-string
-					(string variant)
-					"-REF")))
+     (define-vop (,(symbolicate "DATA-VECTOR-REF/" (string type))
+		  ,(symbolicate (string variant) "-REF"))
        (:note "inline array access")
        (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
        (:translate data-vector-ref)
        (:arg-types ,type positive-fixnum)
        (:results (value :scs ,scs))
        (:result-types ,element-type))
-     (define-vop (,(intern (concatenate 'simple-string
-					"DATA-VECTOR-SET/"
-					(string type)))
-		  ,(intern (concatenate 'simple-string
-					(string variant)
-					"-SET")))
+     (define-vop (,(symbolicate "DATA-VECTOR-SET/" (string type))
+		  ,(symbolicate (string variant) "-SET"))
        (:note "inline array store")
        (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
        (:translate data-vector-set)
@@ -129,7 +121,7 @@
 	      (value :scs ,scs))
        (:results (result :scs ,scs))
        (:result-types ,element-type)))))
-  (def-data-vector-frobs simple-string byte-index
+  (def-data-vector-frobs simple-base-string byte-index
     base-char base-char-reg)
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)

@@ -266,7 +266,20 @@
   "Return a sequence of the given TYPE and LENGTH, with elements initialized
   to :INITIAL-ELEMENT."
   (declare (fixnum length))
-  (let ((type (specifier-type type)))
+  (let* ((adjusted-type
+	  (typecase type
+	    (atom (cond
+		    ((eq type 'string) '(vector character))
+		    ((eq type 'simple-string) '(simple-array character (*)))
+		    (t type)))
+	    (cons (cond
+		    ((eq (car type) 'string) `(vector character ,@(cdr type)))
+		    ((eq (car type) 'simple-string)
+		     `(simple-array character ,@(when (cdr type)
+						      (list (cdr type)))))
+		    (t type)))
+	    (t type)))
+	 (type (specifier-type adjusted-type)))
     (cond ((csubtypep type (specifier-type 'list))
 	   (cond
 	     ((type= type (specifier-type 'list))
@@ -291,29 +304,28 @@
 	     ;; it was stranger to feed that type in to MAKE-SEQUENCE.
 	     (t (sequence-type-too-hairy (type-specifier type)))))
 	  ((csubtypep type (specifier-type 'vector))
-	   (if (typep type 'array-type)
-	       ;; KLUDGE: the above test essentially asks "Do we know
-	       ;; what the upgraded-array-element-type is?" [consider
-	       ;; (OR STRING BIT-VECTOR)]
-	       (progn
-		 (aver (= (length (array-type-dimensions type)) 1))
-		 (let* ((etype (type-specifier
-                                (array-type-specialized-element-type type)))
-                        (etype (if (eq etype '*) t etype))
+	   (cond
+	     (;; is it immediately obvious what the result type is?
+	      (typep type 'array-type)
+	      (progn
+		(aver (= (length (array-type-dimensions type)) 1))
+		(let* ((etype (type-specifier
+			       (array-type-specialized-element-type type)))
+		       (etype (if (eq etype '*) t etype))
 		       (type-length (car (array-type-dimensions type))))
-		   (unless (or (eq type-length '*)
-			       (= type-length length))
-		     (sequence-type-length-mismatch-error type length))
-		   ;; FIXME: These calls to MAKE-ARRAY can't be
-		   ;; open-coded, as the :ELEMENT-TYPE argument isn't
-		   ;; constant.  Probably we ought to write a
-		   ;; DEFTRANSFORM for MAKE-SEQUENCE.  -- CSR,
-		   ;; 2002-07-22
-		   (if iep
-		       (make-array length :element-type etype
-				   :initial-element initial-element)
-		       (make-array length :element-type etype))))
-	       (sequence-type-too-hairy (type-specifier type))))
+		  (unless (or (eq type-length '*)
+			      (= type-length length))
+		    (sequence-type-length-mismatch-error type length))
+		  ;; FIXME: These calls to MAKE-ARRAY can't be
+		  ;; open-coded, as the :ELEMENT-TYPE argument isn't
+		  ;; constant.  Probably we ought to write a
+		  ;; DEFTRANSFORM for MAKE-SEQUENCE.  -- CSR,
+		  ;; 2002-07-22
+		  (if iep
+		      (make-array length :element-type etype
+				  :initial-element initial-element)
+		      (make-array length :element-type etype)))))
+	     (t (sequence-type-too-hairy (type-specifier type)))))
 	  (t (bad-sequence-type-error (type-specifier type))))))
 
 ;;;; SUBSEQ
@@ -1986,7 +1998,7 @@
 						 (frob sequence nil))))
 			 (typecase sequence
 			   (simple-vector (frob2))
-			   (simple-string (frob2))
+			   (simple-base-string (frob2))
 			   (t (vector*-frob sequence))))
 		     (declare (type (or index null) p))
 		     (values f (and p (the index (+ p offset))))))))))

@@ -47,7 +47,7 @@
   (scs nil :type list)
   ;; the Lisp type equivalent to this type. If this type could never be
   ;; returned by PRIMITIVE-TYPE, then this is the NIL (or empty) type
-  (type (missing-arg) :type ctype)
+  (specifier (missing-arg) :type type-specifier)
   ;; the template used to check that an object is of this type. This is a
   ;; template of one argument and one result, both of primitive-type T. If
   ;; the argument is of the correct type, then it is delivered into the
