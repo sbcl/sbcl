@@ -6,7 +6,10 @@ The scope of this interface is "operating system calls on a typical
 Unixlike platform".  This is section 2 of the Unix manual, plus
 section 3 calls that are (a) typically found in libc, but (b) not part
 of the C standard.  For example, we intend to provide support for
-opendir() and readdir() , but not for printf()
+opendir() and readdir(), but not for printf().  Note that we do not
+assert or imply any claim of conformance with the official standards
+issued by POSIX groups or SVID or anyone else: we're simply using
+"POSIX" in a generic sense to refer to Unix and Unix-like systems.
 
 Some facilities are omitted where they offer absolutely no additional
 use over some portable function, or would be actively dangerous to the
@@ -21,13 +24,18 @@ disagreements about what it should look like, and the work of
 implementing it is easily parallelisable - and in fact, can be
 attempted on an as-needed basis by the various people who want it.
 
-* Function names
+* Symbol names
 
-The package name for this interface is SB-POSIX.  In this package
-there is a Lisp function for each supported Unix function, and a
+In SBCL this interface is in the SB-POSIX package.  This package
+contains a Lisp function for each supported Unix function, and a
 variable or constant for each supported unix constant.  A symbol name
 is derived from the C binding's name, by (a) uppercasing, then (b)
-replacing underscore (#\_) characters with the hyphen (#\-)
+removing leading underscores (#\_) then replacing remaining underscore
+characters with the hyphen (#\-). The requirement to uppercase is so
+that in a standard upcasing reader the user may write posix:creat
+instead of posix:|creat| as would otherise be required - some
+extra-standard implementations may have alternative means to achieve
+the same effect.
 
 No other changes to "Lispify" symbol names are made, so creat()
 becomes CREAT, not CREATE
@@ -51,10 +59,99 @@ slightly tacky, when there's a package system available to do it more
 cleanly ]
 
 
-* Parameters
+* Types
+
+Some functions accept objects such as filenames or file
+descriptors. In the C binding to POSIX these are represented as
+strings and small integers respectively. For the Lisp programmer's
+convenience we introduce designators such that CL pathnames or open
+streams can be passed to these functions.
+
+** file-descriptor
+
+A file-descriptor is a non-negative small integer.  
+
+A file-stream is a designator for a file-descriptor: the streams file
+descriptor is extracted.  Note that mixing io operations on a stream 
+with operations directly on its descriptor may produce unexpected
+results if the stream is buffered.
+
+** filename
+
+A filename is a string.  
+
+A pathname is a designator for a file-descriptor: the filename is
+computed as if by NAMESTRING
+
+** buffer
+
+A buffer is an opaque object with accessors BUFFER-START and
+BUFFER-LENGTH, which represents an area of memory that system calls
+may access.  A buffer can be created using ALLOCATE-BUFFER or GET-BUFFER.
+
+[ TODO: GET-BUFFER is a silly name.  Come up with a better one ]
+
+The object NIL is a designator for a buffer, meaning a NULL pointer.
+
+A vector of (UNSIGNED-BYTE 8) is a designator for a buffer: it is
+converted to a buffer of appropriate start and length using an
+identity mapping.  This may or may not involve creating a copy of the
+data.
+
+A vector of CHARACTER is a designator for a buffer: it is converted to
+a buffer of appropriate start and length using an implementation-
+defined transformation that obviously depends on the implementation's
+representation of characters.  This may or may not involve creating a
+copy of the data.  
+
+Implementations may optionally extend these designators to include
+other types - for example, types that already exist in the
+implementation's FFI.
+
+** Structures, unions
+
+C structures and unions are opaque to Lisp and may be implemented
+using any appropriate method. Structure names are chosen according to
+the general rules for symbols.
+
+Accessors must be provided for each documented field in the
+structure. These are named structure-name-field-name where the two
+components are chosen according to the general rules, with the
+exception that in cases where all fields in a given structure have a
+common prefix, that prefix is omitted. For example, stat.st_dev in C
+becomes STAT-DEV in Lisp.
+
+For any structure that the user may need to allocate himself, there
+must also be a MAKE-structure-name function. This takes keyword
+arguments with names deriving from each documented field name
+according to the general rules for symbols.
+
+[ TDB: GC issues for buffers/structures/unions: probably a
+WITHOUT-MOVING macro or similar that will stop them from being moved
+or collected during its extent ]
+
+
+** Type conversion functions
+
+For each of these types there is a function of the same name that
+converts any valid designator for the type into an object of said type.
+
+This example is merely an example: actual output will vary between
+systems, implementations and environments
+
+(with-open-file (o "/tmp/foo" :direction :output) 
+  (sb-posix:file-descriptor o)) 
+=> 4
+
+[ TBD: some memorable and nicely uniform protocol for transforming
+objects of these new types into instances of the Lisp-friendly types
+that may designate them: e.g how to get a stream from a fd ]
+
+
+* Function parameters
 
 The calling convention is modelled after that of CMUCL's UNIX package:
-in particular, it's like the C interface except
+in particular, it's like the C interface except that
 
 a) length arguments are omitted or optional where the sensible value
 is obvious.  For example, 
@@ -66,17 +163,16 @@ pipe() or socketpair()) we may use multiple return values instead.
 This doesn't apply to data transfer functions that fill buffers.
 
 c) some functions accept objects such as filenames or file
-descriptors.  In the C bindings these are strings and small integers
-respectively.  For the Lisp programmer's convenience we introduce
-"filename designators" and "file descriptor designator" concepts such
-that CL pathnames or open streams can be passed to these functions.
+descriptors.  Wherver these are specified as such in the C bindings,
+the Lisp interface accepts designators for them as specified in the
+'Types' section above
 
 [ Rationale: Keeping exact 1:1 correspondence with C conventions is
 less important here, as the function argument list can easily be
 accessed to find out exactly what the arguments are.  Designators
 are primarily a convenience feature ]
 
-* Return values
+* Function return values
 
 The return value is usually the same as for the C binding, except in
 error cases: where the C function is defined as returning some

@@ -7,192 +7,47 @@ have the ones we've already got bindings for, but even so, inclusion
 in this list does _not_ imply we've definitely decided something needs
 adding.
 
-FD_CLR
-FD_ISSET
-FD_SET
-FD_ZERO
-accept
-acct
-adjtime
-adjtimex
-bdflush
-bind
-break
-brk
-cacheflush
-capget
-capset
-chroot
-clone
-connect
-creat
-create_module
-delete_module
-execve
-exit
-fcntl
-fdatasync
-flock
-fork
-fstat
-fstatfs
-fsync
-ftime
-ftruncate
-getcontext
-getdents
-getdomainname
-getdtablesize
-getgroups
-gethostid
-gethostname
-getitimer
-getpagesize
-getpeername
-getpriority
-getrlimit
-getrusage
-getsockname
-getsockopt
-gettimeofday
-gtty
-idle
-init_module
-ioctl
-ioctl_list
-ioperm
-iopl
-listen
-llseek
-lock
-lseek
-lstat
-madvise
-mincore
-mknod
-mlock
-mlockall
-mmap
-modify_ldt
-mount
-mprotect
-mpx
-mremap
-msgctl
-msgget
-msgop
-msgrcv
-msgsnd
-msync
-munlock
-munlockall
-munmap
-nanosleep
-nice
-open
-pause
-pipe
-poll
-prctl
-pread
-prof
-profil
-pselect
-ptrace
-pwrite
-query_module
-quotactl
-read
-readdir
-readlink
-readv
-reboot
-recv
-recvfrom
-recvmsg
-rename
-rmdir
-sbrk
-sched_get_priority_max
-sched_get_priority_min
-sched_getparam
-sched_getscheduler
-sched_rr_get_interval
-sched_setparam
-sched_setscheduler
-sched_yield
-select
-semctl
-semget
-semop
-send
-sendfile
-sendmsg
-sendto
-setcontext
-setdomainname
-setgroups
-sethostid
-sethostname
-setitimer
-setpgrp
-setpriority
-setrlimit
-setsid
-setsockopt
-settimeofday
-sgetmask
-shmat
-shmctl
-shmdt
-shmget
-shmop
-shutdown
-sigaction
-sigaltstack
-sigblock
-siggetmask
-sigmask
-signal
-sigpause
-sigpending
-sigprocmask
-sigreturn
-sigsetmask
-sigsuspend
-sigvec
-socket
-socketcall
-socketpair
-ssetmask
-stat
-statfs
-stime
-stty
-swapoff
-swapon
-symlink
-sync
-syscalls
-sysctl
-sysfs
-sysinfo
-syslog
-time
-times
-truncate
-ulimit
-umask
-umount
-uname
-ustat
-utime
-utimes
-vfork
-vhangup
-wait
-wait3
-wait4
-waitpid
-write
-writev
+FD_CLR FD_ISSET FD_SET FD_ZERO accept acct adjtime adjtimex bdflush
+bind break brk cacheflush capget capset chroot clone connect creat
+create_module delete_module execve exit fcntl fdatasync flock fork
+fstat fstatfs fsync ftime ftruncate getcontext getdents getdomainname
+getdtablesize getgroups gethostid gethostname getitimer getpagesize
+getpeername getpriority getrlimit getrusage getsockname getsockopt
+gettimeofday gtty idle init_module ioctl ioctl_list ioperm iopl listen
+llseek lock lseek lstat madvise mincore mknod mlock mlockall mmap
+modify_ldt mount mprotect mpx mremap msgctl msgget msgop msgrcv msgsnd
+msync munlock munlockall munmap nanosleep nice open pause pipe poll
+prctl pread prof profil pselect ptrace pwrite query_module quotactl
+read readdir readlink readv reboot recv recvfrom recvmsg rename rmdir
+sbrk sched_get_priority_max sched_get_priority_min sched_getparam
+sched_getscheduler sched_rr_get_interval sched_setparam
+sched_setscheduler sched_yield select semctl semget semop send
+sendfile sendmsg sendto setcontext setdomainname setgroups sethostid
+sethostname setitimer setpgrp setpriority setrlimit setsid setsockopt
+settimeofday sgetmask shmat shmctl shmdt shmget shmop shutdown
+sigaction sigaltstack sigblock siggetmask sigmask signal sigpause
+sigpending sigprocmask sigreturn sigsetmask sigsuspend sigvec socket
+socketcall socketpair ssetmask stat statfs stime stty swapoff swapon
+symlink sync syscalls sysctl sysfs sysinfo syslog time times truncate
+ulimit umask umount uname ustat utime utimes vfork vhangup wait wait3
+wait4 waitpid write writev
+
+4) In the spec but not implemented: 
+
+- buffers
+
+5) fill out TODO/TBD stuff in the spec
+
+6) sort out exports.  All interface functions, all constants, all
+  type coercion functions
+
+7) variable-length functions > like execvp()? Do they take a list, or
+vector or either? "Either" sounds good. Which is to say, a sequence.
+
+8) In some cases, errno is used for "normal" exit, not just for
+exceptional exit. For example, EINTR, EAGAIN, reading or writing big
+buffers, etc... It may be more efficient to just compare two integers
+than going thru an exception mechanism that will be invoked everytime.
+
+
+

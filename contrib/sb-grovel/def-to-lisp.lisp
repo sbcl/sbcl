@@ -34,7 +34,7 @@
   (let ((*print-right-margin* nil))
     (format stream "#define SIGNEDP(x) (((x)-1)<0)~%")
     (format stream "#define SIGNED_(x) (SIGNEDP(x)?\"\":\"un\")~%")
-    (loop for i in headers
+    (loop for i in (cons "stdio.h" headers)
           do (format stream "#include <~A>~%" i))
     (format stream "main() { ~%
 printf(\"(in-package ~S)\\\n\");~%" package-name)  
