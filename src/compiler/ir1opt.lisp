@@ -580,7 +580,7 @@
 ;;; all functions in the tail set to be equivalent, this amounts to
 ;;; bringing the entire tail set up to date. We iterate over the
 ;;; returns for all the functions in the tail set, reanalyzing them
-;;; all (not treating Node specially.)
+;;; all (not treating NODE specially.)
 ;;;
 ;;; When we are done, we check whether the new type is different from
 ;;; the old TAIL-SET-TYPE. If so, we set the type and also reoptimize
@@ -1680,7 +1680,7 @@
 		   (setf (node-prev use) nil)
 		   (setf (continuation-next node-prev) nil)
 		   (collect ((res vals))
-		     (loop as cont = (make-continuation use)
+		     (loop for cont = (make-continuation use)
 			   and prev = node-prev then cont
 			   repeat (- nvars nvals)
 			   do (reference-constant prev cont nil)

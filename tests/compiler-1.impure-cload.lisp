@@ -177,19 +177,29 @@
           (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
 
 ;;; bug 231: SETQ did not check the type of the variable being set
-(defun bug231-1 (x)
+(defun bug231a-1 (x)
   (declare (optimize safety) (type (integer 0 8) x))
   (incf x))
-(assert (raises-error? (bug231-1 8) type-error))
+(assert (raises-error? (bug231a-1 8) type-error))
 
-(defun bug231-2 (x)
+(defun bug231a-2 (x)
   (declare (optimize safety) (type (integer 0 8) x))
   (list (lambda (y) (setq x y))
         (lambda () x)))
-(destructuring-bind (set get) (bug231-2 0)
+(destructuring-bind (set get) (bug231a-2 0)
   (funcall set 8)
   (assert (eql (funcall get) 8))
   (assert (raises-error? (funcall set 9) type-error))
   (assert (eql (funcall get) 8)))
+
+(defun bug231b (x z)
+  (declare (optimize safety) (type integer x))
+  (locally
+      (declare (type (real 1) x))
+    (setq x z))
+  (list x z))
+(assert (raises-error? (bug231b nil 1) type-error))
+(assert (raises-error? (bug231b 0 1.5) type-error))
+(assert (raises-error? (bug231b 0 0) type-error))
 
 (sb-ext:quit :unix-status 104) ; success

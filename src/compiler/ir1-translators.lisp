@@ -35,6 +35,8 @@
 	 (node (make-if :test pred
 			:consequent then-block
 			:alternative else-block)))
+    ;; IR1-CONVERT-MAYBE-PREDICATE requires DEST to be CIF, so the
+    ;; order of the following two forms is important
     (setf (continuation-dest pred) node)
     (ir1-convert start pred test)
     (link-node-to-previous-continuation node pred)
@@ -813,7 +815,10 @@
   (declare (type continuation start cont) (type basic-var var))
   (let ((dest (make-continuation)))
     (ir1-convert start dest value)
-    (assert-continuation-type dest (leaf-type var) (lexenv-policy *lexenv*))
+    (assert-continuation-type dest
+                              (or (lexenv-find var type-restrictions)
+                                  (leaf-type var))
+                              (lexenv-policy *lexenv*))
     (let ((res (make-set :var var :value dest)))
       (setf (continuation-dest dest) res)
       (setf (leaf-ever-used var) t)
@@ -958,9 +963,6 @@
 		     fun
 		     `(%coerce-callable-to-fun ,fun)))
     (setf (continuation-dest fun-cont) node)
-    (assert-continuation-type fun-cont
-			      (specifier-type '(or function symbol))
-                              (lexenv-policy *lexenv*))
     (collect ((arg-conts))
       (let ((this-start fun-cont))
 	(dolist (arg args)

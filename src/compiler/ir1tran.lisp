@@ -1703,7 +1703,7 @@
 		 `((let ,(temps)
 		     ,@(body)
 		     (%funcall ,(optional-dispatch-main-entry res)
-			       . ,(arg-vals)))) ; FIXME: What is the '.'? ,@?
+			       ,@(arg-vals))))
 		 (arg-vars)
 		 :debug-name (debug-namify "~S processing" '&more))))
 	(setf (optional-dispatch-more-entry res) ep))))

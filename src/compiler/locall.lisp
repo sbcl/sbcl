@@ -537,8 +537,8 @@
 	 (with-ir1-environment-from-node call
 	   (ir1-convert-lambda
 	    `(lambda ,vars
-	       (declare (ignorable . ,ignores))
-	       (%funcall ,entry . ,args))
+	       (declare (ignorable ,@ignores))
+	       (%funcall ,entry ,@args))
 	    :debug-name (debug-namify "hairy function entry ~S"
 				      (continuation-fun-name
 				       (basic-combination-fun call)))))))
