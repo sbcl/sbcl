@@ -2023,6 +2023,10 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     x86 LEA instruction for multiplication by constants.
   * bug fix: in some situations compiler did not report usage of
     generic arithmetic in (SPEED 3) policy.
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
+    ** ROUND and FROUND now give the right answer when given very
+       small float arguments.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -82,3 +82,6 @@
                               :cl))
            (value (symbol-value name)))
       (assert (zerop (/ value 2))))))
+
+;;; bug found by Paul Dietz: bad rounding on small floats
+(assert (= (fround least-positive-short-float least-positive-short-float) 1.0))
