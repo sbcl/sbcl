@@ -286,6 +286,12 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+# This should be clean
+cat > $tmpfilename <<EOF
+(defvar *string* (make-string 10 :element-type 'base-char))
+EOF
+expect_clean_compile $tmpfilename
+
 # This should style-warn (but not warn or otherwise fail) as the call
 # to FORMAT has too many arguments, which is bad style but not
 # otherwise fatal.

@@ -362,24 +362,45 @@
 ;;; KLUDGE: not all in one big form because that causes SBCL to spend
 ;;; an absolute age trying to compile it.
 (defmacro sequence-bounding-indices-test (&body body)
-  `(locally
+  `(progn
+    (locally
     ;; See Issues 332 [and 333(!)] in the CLHS
     (declare (optimize (safety 3)))
     (let ((string (make-array 10
 			      :fill-pointer 5
 			      :initial-element #\a
 			      :element-type 'base-char)))
+	,(car body)
+	(format t "... BASE-CHAR")
+	(finish-output)
+	(flet ((reset ()
+		 (setf (fill-pointer string) 10)
+		 (fill string #\a)
+		 (setf (fill-pointer string) 5)))
+	  (declare (ignorable #'reset))
+	  ,@(cdr body))))
+    (locally
+      ;; See Issues 332 [and 333(!)] in the CLHS
+      (declare (optimize (safety 3)))
+      (let ((string (make-array 10
+				:fill-pointer 5
+				:initial-element #\a
+				:element-type 'character)))
+	,(car body)
+	(format t "... CHARACTER")
+	(finish-output)
       (flet ((reset ()
 	       (setf (fill-pointer string) 10)
 	       (fill string #\a)
 	       (setf (fill-pointer string) 5)))
 	(declare (ignorable #'reset))
-	,@body))))
+	  ,@(cdr body))))))
+
 (declaim (notinline opaque-identity))
 (defun opaque-identity (x) x)
 ;;; Accessor SUBSEQ
 (sequence-bounding-indices-test
- (format t "~&/Accessor SUBSEQ~%")
+ (format t "~&/Accessor SUBSEQ") 
  (assert (string= (subseq string 0 5) "aaaaa"))
  (assert (raises-error? (subseq string 0 6)))
  (assert (raises-error? (subseq string (opaque-identity -1) 5)))
