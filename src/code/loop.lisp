@@ -760,9 +760,27 @@ code to be loaded.
 			   specified-type required-type)))
 	specified-type)))
 
+(defun subst-gensyms-for-nil (tree)
+  (declare (special *ignores*))
+  (cond
+    ((null tree) (car (push (gensym "LOOP-IGNORED-VAR-") *ignores*)))
+    ((atom tree) tree)
+    (t (cons (subst-gensyms-for-nil (car tree))
+	     (subst-gensyms-for-nil (cdr tree))))))
+    
+(sb!int:defmacro-mundanely loop-destructuring-bind
+    (lambda-list arg-list &rest body)
+  (let ((*ignores* nil))
+    (declare (special *ignores*))
+    (let ((d-var-lambda-list (subst-gensyms-for-nil lambda-list)))
+      `(destructuring-bind ,d-var-lambda-list
+	   ,arg-list
+	 (declare (ignore ,@*ignores*))
+         ,@body))))
+
 (defun loop-build-destructuring-bindings (crocks forms)
   (if crocks
-      `((destructuring-bind ,(car crocks) ,(cadr crocks)
+      `((loop-destructuring-bind ,(car crocks) ,(cadr crocks)
         ,@(loop-build-destructuring-bindings (cddr crocks) forms)))
       forms))
 

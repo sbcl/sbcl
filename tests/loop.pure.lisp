@@ -110,3 +110,8 @@
 	      (loop named foo do (loop-finish) finally (return :good))
 	      :bad)
 	    :good))
+
+(assert (= (loop with (a nil) = '(1 2) return a) 1))
+(assert (= (loop with (nil a) = '(1 2) return a) 2))
+(assert (= (loop with (a . nil) = '(1 2) return a) 1))
+(assert (equal (loop with (nil . a) = '(1 2) return a) '(2)))
