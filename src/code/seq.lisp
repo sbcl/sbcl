@@ -1548,7 +1548,7 @@
       (declare (fixnum index))
       (setq splice (cdr (rplacd splice (list (car current)))))
       (setq current (cdr current)))
-    (do ((index 0 (1+ index)))
+    (do ((index start (1+ index)))
 	((or (and end (= index (the fixnum end)))
 	     (atom current)))
       (declare (fixnum index))

@@ -64,6 +64,13 @@
 				     (make-list (- 10 j)
 						:initial-element 'a))))))))
 
+;;; And equally similarly, REMOVE-DUPLICATES misbehaved when given
+;;; :START arguments:
+
+(let ((orig (list 0 1 2 0 1 2 0 1 2 0 1 2)))
+  (assert (equalp (remove-duplicates orig :start 3 :end 9) '(0 1 2 0 1 2 0 1 2)))
+  (assert (equalp (delete-duplicates orig :start 3 :end 9) '(0 1 2 0 1 2 0 1 2))))
+
 ;;; tests of COUNT
 (assert (= 1 (count 1 '(1 2 3))))
 (assert (= 2 (count 'z #(z 1 2 3 z))))
