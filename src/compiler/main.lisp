@@ -1575,7 +1575,7 @@
 ;;; deal with it.
 (defvar *constants-being-created* nil)
 (defvar *constants-created-since-last-init* nil)
-;;; FIXME: Shouldn't these^ variables be bound in LET forms?
+;;; FIXME: Shouldn't these^ variables be unbound outside LET forms?
 (defun emit-make-load-form (constant)
   (aver (fasl-output-p *compile-object*))
   (unless (or (fasl-constant-already-dumped-p constant *compile-object*)
@@ -1635,11 +1635,7 @@
 		       (loop for (name form) on (cdr info) by #'cddr
 			 collect name into names
 			 collect form into forms
-			 finally
-			 (compile-make-load-form-init-forms
-			  forms
-			  (format nil "init form~:[~;s~] for ~{~A~^, ~}"
-				  (cdr forms) names)))
+			 finally (compile-make-load-form-init-forms forms))
 		       nil)))
 	       (when circular-ref
 		 (setf (cdr circular-ref)

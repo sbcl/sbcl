@@ -43,21 +43,6 @@
     (+ i f)))
 (assert (= (exercise-valuesify 1.25) 2.25))
 
-;;; Don Geddis reported this test case 25 December 1999 on a CMU CL
-;;; mailing list: dumping circular lists caused the compiler to enter
-;;; an infinite loop. Douglas Crosher reported a patch 27 Dec 1999.
-;;; The patch was tested on SBCL by Martin Atzmueller 2 Nov 2000, and
-;;; merged in sbcl-0.6.8.11.
-(defun q-dg1999-1 () (dolist (x '#1=("A" "B" . #1#)) x))
-(defun q-dg1999-2 () (dolist (x '#1=("C" "D" . #1#)) x))
-(defun q-dg1999-3 () (dolist (x '#1=("E" "F" . #1#)) x))
-(defun q-dg1999-4 () (dolist (x '#1=("C" "D" . #1#)) x))
-(defun useful-dg1999 (keys)
-  (declare (type list keys))
-  (loop
-      for c in '#1=("Red" "Blue" . #1#)
-      for key in keys ))
-
 ;;; An early version (sbcl-0.6.11.33) of code to check FTYPEs from DEFUN
 ;;; against DECLAIMed FTYPEs blew up when an FTYPE was DECLAIMed
 ;;; to be pure FUNCTION, because the internal representation of
