@@ -42,7 +42,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 32)
+(def!constant +fasl-file-version+ 33)
 ;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.
@@ -62,6 +62,8 @@
 ;;;     function names so they're insensitive to whether the class name
 ;;;     is currently external to its package
 ;;; 32: (2002-09-21) changes in implementation of sequence functions,
+;;;     causing old utility functions like COERCE-TO-SIMPLE-VECTOR to go away
+;;; 33: (2002-10-02) (again) changes in implementation of sequence functions,
 ;;;     causing old utility functions like COERCE-TO-SIMPLE-VECTOR to go away
 
 ;;; the conventional file extension for our fasl files

@@ -1203,6 +1203,8 @@
 	   (inherits-list (second x))
 	   (class (make-standard-class :name name))
 	   (class-cell (find-class-cell name)))
+      ;; Needed to open-code the MAP, below
+      (declare (type list inherits-list))
       (setf (class-cell-class class-cell) class
 	    (info :type :class name) class-cell
 	    (info :type :kind name) :instance)

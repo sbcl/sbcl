@@ -529,7 +529,7 @@
 
 ;;;; coercion
 
-(deftransform coerce ((x type) (* *) *)
+(deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-continuation-p type)
     (give-up-ir1-transform))
   (let ((tspec (ir1-transform-specifier-type (continuation-value type))))
@@ -544,8 +544,12 @@
 	     ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
 	     ((csubtypep tspec (specifier-type 'float))
 	      '(%single-float x))
-	     ((csubtypep tspec (specifier-type 'simple-vector))
-	      '(coerce-to-simple-vector x))
+	     ((and (csubtypep tspec (specifier-type 'simple-vector))
+		   (policy node (< safety 3)))
+	      `(if (simple-vector-p x)
+		   x
+		   (replace (make-array (length x)) x)))
+	     ;; FIXME: other VECTOR types?
 	     (t
 	      (give-up-ir1-transform)))))))
 

@@ -36,12 +36,8 @@
   ;; is FOLDABLE at all. Check this.
   (movable #-sb-xc-host foldable)
   :derive-type (result-type-specifier-nth-arg 2))
-(defknown list-to-simple-string* (list) simple-string)
-(defknown list-to-bit-vector* (list) bit-vector)
 (defknown list-to-vector* (list type-specifier) vector)
-(defknown list-to-simple-vector* (list) simple-vector)
 (defknown vector-to-vector* (vector type-specifier) vector)
-(defknown vector-to-simple-string* (vector) vector)
 
 (defknown type-of (t) t (foldable flushable))
 
