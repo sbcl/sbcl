@@ -521,12 +521,15 @@
   (format *repl-output* "~&Threads are not supported in this version of sbcl")
   (values))
 
-(defun release-foreground-cmd ()
+(defun focus-cmd (&optional process)
   #+sb-thread
+  (when process
+    (format *repl-output* "~&Focusing on next thread waiting waiting for the debugger~%"))
   (progn
     (sb-thread:release-foreground)
     (sleep 1))
   #-sb-thread
+  (declare (ignore process))
   #-sb-thread
   (format *repl-output* "~&Threads are not supported in this version of sbcl")
   (values))
@@ -565,7 +568,7 @@
 	 ("istep" 1 istep-cmd "navigate within inspection of a lisp object" :parsing :string)
 	 #+sb-thread ("kill" 2 kill-cmd "kill (destroy) processes")
 	 #+sb-thread ("signal" 2 signal-cmd "send a signal to processes")
-	 #+sb-thread ("rf" 2 release-foreground-cmd "release foreground")
+	 #+sb-thread ("focus" 2 focus-cmd "focus the top level on a process")
 	 #+aclrepl-debugger("local" 3 local-cmd "print the value of a local variable")
 	 ("pwd" 3 pwd-cmd "print current directory")
 	 ("pushd" 2 pushd-cmd "push directory on stack" :parsing :string)
