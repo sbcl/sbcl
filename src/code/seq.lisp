@@ -113,7 +113,7 @@
 		       length)))
     (error 'end-too-large-error
 	   :datum end
-	   :expected-type (if max-index
+	   :expected-type (if max-end
 			      `(integer 0 ,max-end)
 			      ;; This seems silly, is there something better?
 			      '(integer (0) 0)))))
