@@ -245,23 +245,16 @@
 		 (greater (1+ x))
 		 (t (1- x))))
 	 (bound (x)
-	   (if greater (numeric-type-low x) (numeric-type-high x)))
-	 (validate (x)
-	   (if (and (numeric-type-low x) (numeric-type-high x)
-		    (> (numeric-type-low x) (numeric-type-high x)))
-	       *empty-type*
-	       x)))
+	   (if greater (numeric-type-low x) (numeric-type-high x))))
     (let* ((x-bound (bound x))
 	   (y-bound (exclude (bound y)))
 	   (new-bound (cond ((not x-bound) y-bound)
 			    ((not y-bound) x-bound)
 			    (greater (max x-bound y-bound))
-			    (t (min x-bound y-bound))))
-	   (res (copy-numeric-type x)))
+			    (t (min x-bound y-bound)))))
       (if greater
-	  (setf (numeric-type-low res) new-bound)
-	  (setf (numeric-type-high res) new-bound))
-      (validate res))))
+	  (modified-numeric-type x :low new-bound)
+	  (modified-numeric-type x :high new-bound)))))
 
 ;;; Return true if X is a float NUMERIC-TYPE.
 (defun float-type-p (x)
@@ -273,12 +266,18 @@
 ;;; Exactly the same as CONSTRAIN-INTEGER-TYPE, but for float numbers.
 (defun constrain-float-type (x y greater or-equal)
   (declare (type numeric-type x y))
-  ;; Unless :PROPAGATE-FLOAT-TYPE is in target features, then
-  ;; SB!C::BOUND-VALUE (used in the code below) is not defined, so we
-  ;; just return X without trying to calculate additional constraints.
-  #!-propagate-float-type (declare (ignore y greater or-equal))
-  #!-propagate-float-type x
-  #!+propagate-float-type
+  ;; FIXME: The comment here used to say
+  ;;   Unless #!+SB-PROPAGATE-FLOAT-TYPE, then SB!C::BOUND-VALUE (used in
+  ;;   the code below) is not defined, so we just return X without
+  ;;   trying to calculate additional constraints.
+  ;; But as of sbcl-0.6.11.26, SB!C::BOUND-VALUE has been renamed to
+  ;; SB!INT:TYPE-BOUND-NUMBER and is always defined, so probably the
+  ;; conditionalization should go away.
+  #!-sb-propagate-float-type (declare (ignore greater or-equal))
+  (aver (eql (numeric-type-class x) 'float))
+  (aver (eql (numeric-type-class y) 'float))
+  #!-sb-propagate-float-type x
+  #!+sb-propagate-float-type
   (labels ((exclude (x)
 	     (cond ((not x) nil)
 		   (or-equal x)
@@ -293,8 +292,8 @@
 	   (bound (x)
 	     (if greater (numeric-type-low x) (numeric-type-high x)))
 	   (max-lower-bound (x y)
-	     ;; Both x and y are not null. Find the max.
-	     (let ((res (max (bound-value x) (bound-value y))))
+	     ;; Both X and Y are not null. Find the max.
+	     (let ((res (max (type-bound-number x) (type-bound-number y))))
 	       ;; An open lower bound is greater than a close
 	       ;; lower bound because the open bound doesn't
 	       ;; contain the bound, so choose an open lower
@@ -302,19 +301,13 @@
 	       (set-bound res (or (consp x) (consp y)))))
 	   (min-upper-bound (x y)
 	     ;; Same as above, but for the min of upper bounds
-	     ;; Both x and y are not null. Find the min.
-	     (let ((res (min (bound-value x) (bound-value y))))
+	     ;; Both X and Y are not null. Find the min.
+	     (let ((res (min (type-bound-number x) (type-bound-number y))))
 	       ;; An open upper bound is less than a closed
 	       ;; upper bound because the open bound doesn't
 	       ;; contain the bound, so choose an open lower
 	       ;; bound.
-	       (set-bound res (or (consp x) (consp y)))))
-	   (validate (x)
-	     (let ((x-lo (numeric-type-low x))
-		   (x-hi (numeric-type-high x)))
-	       (if (and x-lo x-hi (> (bound-value x-lo) (bound-value x-hi)))
-		   *empty-type*
-		   x))))
+	       (set-bound res (or (consp x) (consp y))))))
     (let* ((x-bound (bound x))
 	   (y-bound (exclude (bound y)))
 	   (new-bound (cond ((not x-bound)
@@ -324,12 +317,10 @@
 			    (greater
 			     (max-lower-bound x-bound y-bound))
 			    (t
-			     (min-upper-bound x-bound y-bound))))
-	   (res (copy-numeric-type x)))
+			     (min-upper-bound x-bound y-bound)))))
       (if greater
-	  (setf (numeric-type-low res) new-bound)
-	  (setf (numeric-type-high res) new-bound))
-      (validate res))))
+	  (modified-numeric-type x :low new-bound)
+	  (modified-numeric-type x :high new-bound)))))
 
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
@@ -370,7 +361,7 @@
 		      (let ((greater (if not-p (not greater) greater)))
 			(setq res
 			      (constrain-integer-type res y greater not-p)))))
-		   #!+constrain-float-type
+		   #!+sb-constrain-float-type
 		   ((and (float-type-p res) (float-type-p y))
 		    (let ((greater (eq kind '>)))
 		      (let ((greater (if not-p (not greater) greater)))

@@ -690,7 +690,7 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   complex special functions have been merged from CMU CL sources.
   (When I was first setting up SBCL, I misunderstood a compile-time
   conditional #-OLD-SPECFUN, and so accidentally deleted them.)
-?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
+* The :SB-PROPAGATE-FLOAT-TYPE and :SB-PROPAGATE-FUN-TYPE features
   are now supported, and enabled by default. Thus, the compiler can
   handle many floating point and complex operations much less
   inefficiently. (Thus e.g. you can implement a complex FFT

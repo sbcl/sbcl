@@ -7,28 +7,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
-
-;;; FIXME: These probably belong in some package other than SB!IMPL.
-;;; Perhaps SB!KERNEL?
-
-(defconstant call-arguments-limit most-positive-fixnum
-  #!+sb-doc
-  "The exclusive upper bound on the number of arguments which may be passed
-  to a function, including rest args.")
-
-(defconstant lambda-parameters-limit most-positive-fixnum
-  #!+sb-doc
-  "The exclusive upper bound on the number of parameters which may be specifed
-  in a given lambda list. This is actually the limit on required and optional
-  parameters. With &key and &aux you can get more.")
-
-(defconstant multiple-values-limit most-positive-fixnum
-  #!+sb-doc
-  "The exclusive upper bound on the number of multiple-values that you can
-  have.")
-
-;;; FIXME: more than one IN-PACKAGE in one file, ick
 (in-package "SB!EVAL")
 
 ;;; This is defined here so that the printer etc. can call

@@ -575,7 +575,7 @@ static lispobj ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	return (ptrans_boxed(thing, header, 0));
     case 0:
 	{
-	    /* Substructure: special case for the compact-info-envs, where
+	    /* Substructure: special case for the COMPACT-INFO-ENVs, where
 	     * the instance may have a point to the dynamic space placed
 	     * into it (e.g. the cache-name slot), but the lists and arrays
 	     * at the time of a purify can be moved to the RO space. */

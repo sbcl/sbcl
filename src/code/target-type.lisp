@@ -57,28 +57,12 @@
 	     (values nil nil))
 	 (values nil t)))
     (compound-type
-     ;; REMOVEME: old version
-     #|
-     (let ((certain? t))
-       (etypecase type
-	 (union-type
-	  (dolist (mem (union-type-types type) (values nil certain?))
-	    (multiple-value-bind (val win) (ctypep obj mem)
-	      (if win
-		  (when val (return (values t t)))
-		  (setf certain? nil)))))
-	 (intersection-type
-	  (dolist (mem (intersection-type-types type)
-		       (if certain? (values t t) (values nil nil)))
-	    (multiple-value-bind (val win) (ctypep obj mem)
-	      (if win
-		  (unless val (return (values nil t)))
-		  (setf certain? nil)))))))
-     |#
-     (let ((types (compound-type-types type)))
-       (etypecase type
-	 (intersection-type (every/type #'ctypep obj types))
-	 (union-type        (any/type   #'ctypep obj types)))))
+     (funcall (etypecase type
+		(intersection-type #'every/type)
+		(union-type #'any/type))
+	      #'ctypep
+	      obj
+	      (compound-type-types type)))
     (function-type
      (values (functionp obj) t))
     (unknown-type
@@ -128,9 +112,9 @@
 	 ;; run time in order to make it easier to build the cross-compiler.
 	 ;; If it doesn't work, something else will be needed..
 	 (locally
-	   ;; KLUDGE: In order to really make it run at run time (instead of
-	   ;; doing some weird broken thing at cold load time),
-	   ;; we need to suppress a DEFTRANSFORM.. -- WHN 19991004
+	   ;; KLUDGE: In order to really make this run at run time
+	   ;; (instead of doing some weird broken thing at cold load
+	   ;; time), we need to suppress a DEFTRANSFORM.. -- WHN 19991004
 	   (declare (notinline sb!xc:find-class))
 	   (class-layout (sb!xc:find-class 'null))))
 	(t (svref *built-in-class-codes* (get-type x)))))
@@ -186,24 +170,7 @@
     (symbol
      (make-member-type :members (list x)))
     (number
-     (let* ((num (if (complexp x) (realpart x) x))
-	    (res (make-numeric-type
-		  :class (etypecase num
-			   (integer 'integer)
-			   (rational 'rational)
-			   (float 'float))
-		  :format (if (floatp num)
-			      (float-format-name num)
-			      nil))))
-       (cond ((complexp x)
-	      (setf (numeric-type-complexp res) :complex)
-	      (let ((imag (imagpart x)))
-		(setf (numeric-type-low res) (min num imag))
-		(setf (numeric-type-high res) (max num imag))))
-	     (t
-	      (setf (numeric-type-low res) num)
-	      (setf (numeric-type-high res) num)))
-       res))
+     (ctype-of-number x))
     (array
      (let ((etype (specifier-type (array-element-type x))))
        (make-array-type :dimensions (array-dimensions x)

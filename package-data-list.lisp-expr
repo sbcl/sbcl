@@ -57,7 +57,7 @@
              "ALIEN-SINGLE-FLOAT-TYPE-P" "ALIEN-SUBTYPE-P" "ALIEN-TYPE"
              "ALIEN-TYPE-=" "ALIEN-TYPE-ALIGNMENT" "ALIEN-TYPE-BITS"
              "ALIEN-TYPE-P" "ALIEN-TYPEP"
-	     "ALIEN-VALUE" "ALIEN-VALUE-TYPE"
+             "ALIEN-VALUE" "ALIEN-VALUE-TYPE"
              "ALIEN-VALUE-SAP" "ALIEN-VALUE-P"
              "ALIEN-VALUES-TYPE" "ALIEN-VALUES-TYPE-P"
              "ALIEN-VALUES-TYPE-VALUES" "ALIGN-OFFSET" "COMPUTE-ALIEN-REP-TYPE"
@@ -99,7 +99,7 @@
              "VARIABLE-LENGTH"
              "SEGMENT-COLLECT-DYNAMIC-STATISTICS"
 
-	     ;; FIXME: These are in the SB-ASSEM package now, but
+             ;; FIXME: These are in the SB-ASSEM package now, but
              ;; (left over from CMU CL) are defined in files which
              ;; are IN-PACKAGE SB-C. It would probably be cleaner
              ;; to move at least most of them to files which are
@@ -160,7 +160,7 @@
               "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
               "*FASL-HEADER-STRING-START-STRING*"
               "*FASL-HEADER-STRING-STOP-CHAR-CODE*"
-	      "*SETF-ASSUMED-FBOUNDP*"
+              "*SETF-ASSUMED-FBOUNDP*"
               "*SUPPRESS-VALUES-DECLARATION*"
 
               "ALLOC-ALIEN-STACK-SPACE" "ALLOC-NUMBER-STACK-SPACE"
@@ -307,7 +307,7 @@
     :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
           "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
     :export ("*COLLECT-DYNAMIC-STATISTICS*" "COUNT-ME"
-	     "DYNCOUNT-INFO-COUNTS" "DYNCOUNT-INFO-COSTS"
+             "DYNCOUNT-INFO-COUNTS" "DYNCOUNT-INFO-COSTS"
              "IR2-COMPONENT-DYNCOUNT-INFO"
              "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
 
@@ -343,7 +343,7 @@ debugger interface mixed with various low-level implementation stuff
 like *STACK-TOP-HINT*"
     :use ("CL" "SB!EXT" "SB!INT" "SB!SYS")
     :export ("*AUTO-EVAL-IN-FRAME*" "*DEBUG-CONDITION*"
-	     "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*"
+             "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*"
              "*DEBUG-READTABLE*" "*DEBUG-HELP-STRING*"
              "*FLUSH-DEBUG-ERRORS*" "*IN-THE-DEBUGGER*"
              "*TRACE-INDENTATION-STEP*" "*MAX-TRACE-INDENTATION*"
@@ -516,7 +516,7 @@ like *STACK-TOP-HINT*"
              ;; FIXME: These seem like the right thing, but are they
              ;; consistent with ANSI? (And actually maybe they're not
              ;; quite the right thing; it might be better to also do
-	     ;; WITH-STANDARD-IO-SYNTAX or something.)
+             ;; WITH-STANDARD-IO-SYNTAX or something.)
              "*ERROR-PRINT-LENGTH*" "*ERROR-PRINT-LEVEL*" "*ERROR-PRINT-LINES*"
 
              ;; KLUDGE: CMU CL had
@@ -539,10 +539,10 @@ like *STACK-TOP-HINT*"
              ;; are assertions" default
              "TRULY-THE"
 
-	     ;; This is something which must exist inside any Common Lisp
-	     ;; implementation, and which someone writing a customized toplevel
-	     ;; might well want. It seems perverse to hide it from
-	     ;; them..
+             ;; This is something which must exist inside any Common Lisp
+             ;; implementation, and which someone writing a customized toplevel
+             ;; might well want. It seems perverse to hide it from
+             ;; them..
              "INTERACTIVE-EVAL"
 
              ;; weak pointers and finalization
@@ -677,13 +677,14 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; miscellaneous non-standard but handy user-level functions..
              "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
-	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
+             "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
              "SANE-PACKAGE"
              "CIRCULAR-LIST-P"
              "SWAPPED-ARGS-FUN"
              "ANY/TYPE" "EVERY/TYPE"
+             "TYPE-BOUND-NUMBER"
 
-	     ;; ..and macros..
+             ;; ..and macros..
              "COLLECT"
              "DO-ANONYMOUS" "DOHASH" "DOVECTOR"
              "NAMED-LET"
@@ -807,7 +808,7 @@ retained, possibly temporariliy, because it might be used internally."
              "+EMPTY-HT-SLOT+"
 
              ;; not used any more, I think -- WHN 19991206
-	     #+nil
+             #+nil
              ("SERVE-BUTTON-PRESS"
               "SERVE-BUTTON-RELEASE" "SERVE-CIRCULATE-NOTIFY"
               "SERVE-CIRCULATE-REQUEST" "SERVE-CLIENT-MESSAGE"
@@ -859,7 +860,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "%LOG" "%LOGB" "%LOG10" "%LOG1P" "%LONG-FLOAT"
              "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE" "%MAKE-RATIO"
              "%MAP" "%MAP-TO-SIMPLE-VECTOR-ARITY-1" "%MAP-TO-LIST-ARITY-1"
-	     "%MAP-TO-NIL-ON-SEQUENCE" "%MAP-TO-NIL-ON-SIMPLE-VECTOR"
+             "%MAP-TO-NIL-ON-SEQUENCE" "%MAP-TO-NIL-ON-SIMPLE-VECTOR"
              "%MAP-TO-NIL-ON-VECTOR" "%MASK-FIELD" "%NEGATE" "%POW"
              "%PUTHASH" "%RAW-BITS" "%RAW-REF-COMPLEX-DOUBLE"
              "%RAW-REF-COMPLEX-LONG"
@@ -939,8 +940,8 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "CONSTANT-TYPE-P" "CONSTANT-TYPE-TYPE"
              "CONTAINING-INTEGER-TYPE"
              "CONTROL-STACK-POINTER-SAP" "COPY-FROM-SYSTEM-AREA"
-             "COPY-NUMERIC-TYPE" "COPY-TO-SYSTEM-AREA"
-	     "COPY-BYTE-VECTOR-TO-SYSTEM-AREA"
+             "COPY-TO-SYSTEM-AREA"
+             "COPY-BYTE-VECTOR-TO-SYSTEM-AREA"
              "CSUBTYPEP" "CTYPE" "TYPE-HASH-VALUE"
              "CTYPE-OF" "CTYPE-P" "CTYPEP" "CURRENT-FP" "CURRENT-SP"
              "DATA-VECTOR-REF" "DATA-VECTOR-SET" "DECODE-DOUBLE-FLOAT"
@@ -1009,7 +1010,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "%MAKE-INSTANCE"
              "MAKE-VALUES-TYPE"
              "MAYBE-GC" "MEMBER-TYPE" "MEMBER-TYPE-MEMBERS"
-             "MEMBER-TYPE-P" "MERGE-BITS"
+             "MEMBER-TYPE-P" "MERGE-BITS" "MODIFIED-NUMERIC-TYPE"
              "DEFMACRO-MUNDANELY" "MUTATOR-SELF"
              "NAMED-TYPE" "NAMED-TYPE-NAME" "NAMED-TYPE-P"
              "NATIVE-BYTE-ORDER" "NEGATE"
@@ -1221,7 +1222,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
              "DESCRIBE-CONDITION"
              
-	     "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
+             "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
              "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
              "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
              "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
@@ -1230,9 +1231,9 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "!READER-COLD-INIT"
              "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
              "!PACKAGE-COLD-INIT" "SIGNAL-COLD-INIT-OR-REINIT"
-   	     "!POLICY-COLD-INIT-OR-RESANIFY" "!VM-TYPE-COLD-INIT"
+             "!POLICY-COLD-INIT-OR-RESANIFY" "!VM-TYPE-COLD-INIT"
              "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
-	     "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
+             "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
 
              ;; These belong in an "SB!LOAD" package someday.
              "*STATIC-FOREIGN-SYMBOLS*" "*ASSEMBLER-ROUTINES*"
@@ -1475,7 +1476,7 @@ no guarantees of interface stability."
              "F-GETFD" "F-GETFL" "F-GETOWN" "F-SETFD" "F-SETFL" "F-SETOWN"
              "FAPPEND" "FASYNC" "FCREAT" "FEXCL" "FIONREAD" "FNDELAY" "FTRUNC"
              "F_OK" "GET-UNIX-ERROR-MSG" "GET-ERRNO" "GID-T"
-	     "INO-T" "UNIX-SETITIMER" "UNIX-GETITIMER"
+             "INO-T" "UNIX-SETITIMER" "UNIX-GETITIMER"
              "KBDCGET" "KBDCRESET" "KBDCRST" "KBDCSET"
              "KBDCSSTD" "KBDGCLICK" "KBDSCLICK" "KBDSGET" "L_INCR" "L_SET"
              "L_XTND" "OFF-T" "O_APPEND" "O_CREAT" "O_EXCL" "O_RDONLY" "O_RDWR"

@@ -391,6 +391,19 @@
 		      (format nil "~S" expr)))))
 (defun %failed-aver (expr-as-string)
   (error "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
+
+;;; Return the numeric value of a type bound, i.e. an interval bound
+;;; more or less in the format of bounds in ANSI's type specifiers,
+;;; where a bare numeric value is a closed bound and a list of a
+;;; single numeric value is an open bound.
+;;;
+;;; The "more or less" bit is that the no-bound-at-all case is
+;;; represented by NIL (not by * as in ANSI type specifiers); and in
+;;; this case we return NIL.
+(defun type-bound-number (x)
+  (if (consp x)
+      (destructuring-bind (result) x result)
+      x))
 
 ;;;; utilities for two-VALUES predicates
 

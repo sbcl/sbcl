@@ -283,15 +283,21 @@
 	(error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
 	       set-difference)))))
 
-;;;; compiling SBCL sources to create the cross-compiler
+;;;; tools to compile SBCL sources to create the cross-compiler
 
 ;;; Execute function FN in an environment appropriate for compiling the
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
-  (let ((*features* (cons :sb-xc-host *features*)))
+  (let ((*features* (cons :sb-xc-host *features*))
+	;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
+	;; base-target-features.lisp-expr:
+	(*shebang-features* (set-difference *shebang-features*
+					    '(:sb-propagate-float-type
+					      :sb-propagate-fun-type))))
     (with-additional-nickname ("SB-XC" "SB!XC")
       (funcall fn))))
-(compile 'in-host-compilation-mode)
+;;; FIXME: This COMPILE caused problems in sbcl-0.6.11.26. (bug 93)
+;;;(compile 'in-host-compilation-mode)
 
 ;;; Process a file as source code for the cross-compiler, compiling it
 ;;; (if necessary) in the appropriate environment, then loading it
@@ -317,8 +323,8 @@
   (load (concatenate 'simple-string *host-obj-prefix* stem *host-obj-suffix*)))
 (compile 'host-load-stem)
 
-;;;; compiling SBCL sources to create object files which will be used
-;;;; to create the target SBCL .core file
+;;;; tools to compile SBCL sources to create object files which will
+;;;; be used to create the target SBCL .core file
 
 ;;; Run the cross-compiler on a file in the source directory tree to
 ;;; produce a corresponding file in the target object directory tree.

@@ -165,8 +165,8 @@
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB!XC:DEFSTRUCT)
 
-;;; Return a list of forms to install print and make-load-form funs, mentioning
-;;; them in the expansion so that they can be compiled.
+;;; Return a list of forms to install PRINT and MAKE-LOAD-FORM funs,
+;;; mentioning them in the expansion so that they can be compiled.
 (defun class-method-definitions (defstruct)
   (let ((name (dd-name defstruct)))
     `((locally

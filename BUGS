@@ -833,7 +833,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
                  unsigned-byte
                  (integer -1 1))) => NIL,T
   An analogous problem with SINGLE-FLOAT and REAL types was fixed in 
-  sbcl-0.6.11.22, but some peculiarites of the RATIO type makes it 
+  sbcl-0.6.11.22, but some peculiarites of the RATIO type make it 
   awkward to generalize the fix to INTEGER and RATIONAL. It's not 
   clear what's the best fix. (See the "bug in type handling" discussion
   on cmucl-imp ca. 2001-03-22 and ca. 2001-02-12.)
@@ -845,6 +845,24 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   This is a bug in the original CMU CL code. I reported it to cmucl-imp
   2001-03-22 in hopes that they'll fix it for us.
 
+93:
+  In sbcl-0.6.11.26, (COMPILE 'IN-HOST-COMPILATION-MODE) in
+  src/cold/shared.lisp doesn't correctly translate the
+  interpreted function
+    (defun in-host-compilation-mode (fn)
+      (let ((*features* (cons :sb-xc-host *features*))
+            ;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
+            ;; base-target-features.lisp-expr:
+            (*shebang-features* (set-difference *shebang-features*
+                                                '(:sb-propagate-float-type
+                                                  :sb-propagate-fun-type))))
+        (with-additional-nickname ("SB-XC" "SB!XC")
+          (funcall fn))))
+  No error is reported by the compiler, but when the function is executed,
+  it causes an error
+    TYPE-ERROR in SB-KERNEL::OBJECT-NOT-TYPE-ERROR-HANDLER:
+      (:LINUX :X86 :IEEE-FLOATING-POINT :SB-CONSTRAIN-FLOAT-TYPE :SB-TEST
+       :SB-INTERPRETER :SB-DOC :UNIX ...) is not of type SYMBOL.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

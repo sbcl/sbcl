@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB!KERNEL")
 
 ;;; Is X a fixnum in the target Lisp?
 (defun fixnump (x)
@@ -306,7 +306,7 @@
 	       host-object
 	       target-type-spec))))
 
-;;; This implementation is an incomplete, portable version for use at
+;;; This is an incomplete, portable implementation for use at
 ;;; cross-compile time only.
 (defun ctypep (obj ctype)
   (check-type ctype ctype)
@@ -334,24 +334,7 @@
     (symbol
      (make-member-type :members (list x)))
     (number
-     (let* ((num (if (complexp x) (realpart x) x))
-	    (res (make-numeric-type
-		  :class (etypecase num
-			   (integer 'integer)
-			   (rational 'rational)
-			   (float 'float))
-		  :format (if (floatp num)
-			      (float-format-name num)
-			      nil))))
-       (cond ((complexp x)
-	      (setf (numeric-type-complexp res) :complex)
-	      (let ((imag (imagpart x)))
-		(setf (numeric-type-low res) (min num imag))
-		(setf (numeric-type-high res) (max num imag))))
-	     (t
-	      (setf (numeric-type-low res) num)
-	      (setf (numeric-type-high res) num)))
-       res))
+     (ctype-of-number x))
     (array
      (let ((etype (specifier-type (array-element-type x))))
        (make-array-type :dimensions (array-dimensions x)

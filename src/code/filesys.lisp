@@ -985,7 +985,7 @@
 
 (/show0 "filesys.lisp 899")
 
-;;; Predicate to order pathnames by. Goes by name.
+;;; predicate to order pathnames by; goes by name
 (defun pathname-order (x y)
   (let ((xn (%pathname-name x))
 	(yn (%pathname-name y)))

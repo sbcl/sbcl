@@ -78,6 +78,31 @@
  ;; you are a developer.
  :sb-test
 
+ ;; :SB-PROPAGATE-FLOAT-TYPE and :SB-PROPAGATE-FUN-TYPE enable
+ ;; some numeric optimizer code in the target compiler. They 
+ ;; correspond to the :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE
+ ;; features in the original CMU CL code, and while documentation 
+ ;; existed for those, it seemed a little inconsistent. Despite the
+ ;; name, :SB-PROPAGATE-FLOAT-TYPE seems to control not only
+ ;; floating point optimizations, but some integer optimizations as
+ ;; well.
+ ;; 
+ ;; CROSS-FLOAT-INFINITY-KLUDGE:
+ ;;   * Even when these target features are enabled, the optimizations 
+ ;;     aren't enabled in the cross-compiler, because some of them
+ ;;     depend on floating point infinities, which aren't in general
+ ;;     supported on the cross-compilation host.
+ ;;   * This is supported by hacking the features out of the 
+ ;;     *SHEBANG-FEATURES* list while we're building the cross-compiler.
+ ;;     This is ugly and confusing and weird, but all the alternatives
+ ;;     that I could think of seem messy and error-prone. That doesn't
+ ;;     mean there's not a better way, though. Suggestions are welcome;
+ ;;     or if you'd like to submit patches to make this code work
+ ;;     without requiring floating point infinities, so that the entire
+ ;;     problem goes away, that might be even better! -- WHN 2001-03-22
+ :sb-propagate-float-type
+ :sb-propagate-fun-type
+
  ;; Setting this makes more debugging information available.
  ;; If you aren't hacking or troubleshooting SBCL itself, you
  ;; probably don't want this set.
@@ -148,41 +173,18 @@
  ; :mp-i486
 
  ;; This affects the definition of a lot of things in bignum.lisp. It
- ;; doesn't seem to be documented anywhere what systems it might apply to.
- ;; It doesn't seem to be needed for X86 systems anyway.
+ ;; doesn't seem to be documented anywhere what systems it might apply
+ ;; to. It doesn't seem to be needed for X86 systems anyway.
  ; :32x16-divide
 
- ;; This is probably true for some processor types, but not X86. It affects
- ;; a lot of floating point code.
+ ;; This is probably true for some processor types, but not X86. It
+ ;; affects a lot of floating point code.
  ; :negative-zero-is-not-zero
 
- ;; This is mentioned in cmu-user.tex, which says that it enables
- ;; the compiler to reason about integer arithmetic. It also seems to
- ;; control other fancy numeric reasoning, e.g. knowing the result type of
- ;; a remainder calculation given the type of its inputs.
- ;;
- ;; CROSS-FLOAT-INFINITY-KLUDGE: The :PROPAGATE-FLOAT-TYPE and 
- ;; :PROPAGATE-FUN-TYPE features are problematic when building 
- ;; the cross-compiler itself. Their implementation depends on 
- ;; floating point infinities, which might not be supported in the
- ;; cross-compilation host. In order to avoid this problem, while
- ;; still supporting these features in the target Lisp compiler,
- ;; we use the :WILL-PROPAGATE-FLOAT-TYPE feature when building
- ;; the cross-compiler, and munge it into :PROPAGATE-FLOAT-TYPE
- ;; only when building the target compiler; and similarly for
- ;; :WILL-PROPAGATE-FUN-TYPE. 
- ;:will-propagate-float-type ; (becomes :PROPAGATE-FLOAT-TYPE)
-
- ;; According to cmu-user.tex, this enables the compiler to infer result
- ;; types for mathematical functions like SQRT, EXPT, and LOG, allowing
- ;; it to e.g. eliminate the possibility that a complex result will be
- ;; generated. This applies only to the target compiler, not the 
- ;; cross-compiler: see CROSS-FLOAT-INFINITY-KLUDGE.
- ;:will-propagate-fun-type ; (becomes :PROPAGATE-FUN-TYPE)
-
- ;; It's unclear to me what this does (but it was enabled in the code that I
- ;; picked up from Peter Van Eynde). -- WHN 19990224
- :constrain-float-type
+ ;; It's unclear to me what this does (but it was enabled in the code
+ ;; that I picked up from Peter Van Eynde, called CONSTRAIN-FLOAT-TYPE
+ ;; instead of SB-CONSTRAIN-FLOAT-TYPE). -- WHN 19990224
+ :sb-constrain-float-type
 
  ;; This is set in classic CMU CL, and presumably there it means
  ;; that the floating point arithmetic implementation
@@ -234,9 +236,6 @@
  ;; :SB-XC stands for "cross compiler", and is in *FEATURES* during the second
  ;; phase of cross-compilation bootstrapping, when the cross-compiler is
  ;; being used to create the first target Lisp.
-
- ;; notes on the :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE
- ;; features: See the comments on CROSS-FLOAT-INFINITY-KLUDGE.
 
  ;; notes on the :SB-ASSEMBLING feature (which isn't controlled by
  ;; this file):

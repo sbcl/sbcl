@@ -198,18 +198,18 @@
 	       (type bit-offset src-bit-offset))
       (cond
        ((<= (+ dst-bit-offset length) unit-bits)
-	;; We are only writing one word, so it doesn't matter what order
-	;; we do it in. But we might be reading from multiple words, so take
-	;; care.
+	;; We are only writing one word, so it doesn't matter what
+	;; order we do it in. But we might be reading from multiple
+	;; words, so take care.
 	(cond
 	 ((zerop length)
 	  ;; Actually, we aren't even writing one word. This is really easy.
 	  )
 	 ((= length unit-bits)
-	  ;; DST-BIT-OFFSET must be equal to zero, or we would be writing
-	  ;; multiple words. If SRC-BIT-OFFSET is also zero, then we
-	  ;; just transfer the single word. Otherwise we have to extract bits
-	  ;; from two src words.
+	  ;; DST-BIT-OFFSET must be equal to zero, or we would be
+	  ;; writing multiple words. If SRC-BIT-OFFSET is also zero,
+	  ;; then we just transfer the single word. Otherwise we have
+	  ;; to extract bits from two src words.
 	  (funcall dst-set-fn dst dst-word-offset
 		   (if (zerop src-bit-offset)
 		       (funcall src-ref-fn src src-word-offset)
@@ -221,17 +221,18 @@
 			 (funcall src-ref-fn src (1+ src-word-offset))
 			 (- src-bit-offset))))))
 	 (t
-	  ;; We are only writing some portion of the dst word, so we need to
-	  ;; preserve the extra bits. Also, we still don't know whether we need
-	  ;; one or two source words.
+	  ;; We are only writing some portion of the dst word, so we
+	  ;; need to preserve the extra bits. Also, we still don't
+	  ;; know whether we need one or two source words.
 	  (let ((mask (shift-towards-end (start-mask length) dst-bit-offset))
 		(orig (funcall dst-ref-fn dst dst-word-offset))
 		(value
 		 (if (> src-bit-offset dst-bit-offset)
-		     ;; The source starts further into the word than does
-		     ;; the dst, so the source could extend into the next
-		     ;; word. If it does, we have to merge the two words,
-		     ;; and if not, we can just shift the first word.
+		     ;; The source starts further into the word than
+		     ;; does the dst, so the source could extend into
+		     ;; the next word. If it does, we have to merge
+		     ;; the two words, and if not, we can just shift
+		     ;; the first word.
 		     (let ((src-bit-shift (- src-bit-offset dst-bit-offset)))
 		       (if (> (+ src-bit-offset length) unit-bits)
 			   (32bit-logical-or
@@ -244,10 +245,10 @@
 			   (shift-towards-start
 			    (funcall src-ref-fn src src-word-offset)
 			    src-bit-shift)))
-		     ;; The dst starts further into the word than does the
-		     ;; source, so we know the source can not extend into
-		     ;; a second word (or else the dst would too, and we
-		     ;; wouldn't be in this branch.
+		     ;; The dst starts further into the word than does
+		     ;; the source, so we know the source can not
+		     ;; extend into a second word (or else the dst
+		     ;; would too, and we wouldn't be in this branch.
 		     (shift-towards-end
 		      (funcall src-ref-fn src src-word-offset)
 		      (- dst-bit-offset src-bit-offset)))))
@@ -259,8 +260,8 @@
 		      (32bit-logical-andc2 orig mask)))))))
        ((= src-bit-offset dst-bit-offset)
 	;; The source and dst are aligned, so we don't need to shift
-	;; anything. But we have to pick the direction of the loop
-	;; in case the source and dst are really the same thing.
+	;; anything. But we have to pick the direction of the loop in
+	;; case the source and dst are really the same thing.
 	(multiple-value-bind (words final-bits)
 	    (floor (+ dst-bit-offset length) unit-bits)
 	  (declare (type word-offset words) (type bit-offset final-bits))
@@ -270,8 +271,8 @@
 	     ((<= dst-offset src-offset)
 	      ;; We need to loop from left to right
 	      (unless (zerop dst-bit-offset)
-		;; We are only writing part of the first word, so mask off the
-		;; bits we want to preserve.
+		;; We are only writing part of the first word, so mask
+		;; off the bits we want to preserve.
 		(let ((mask (end-mask (- dst-bit-offset)))
 		      (orig (funcall dst-ref-fn dst dst-word-offset))
 		      (value (funcall src-ref-fn src src-word-offset)))

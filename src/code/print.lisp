@@ -612,7 +612,8 @@
 ;;; character has. At characters have at least one bit set, so we can
 ;;; search for any character with a positive test.
 (defvar *character-attributes*
-  (make-array char-code-limit :element-type '(unsigned-byte 16)
+  (make-array char-code-limit
+	      :element-type '(unsigned-byte 16)
 	      :initial-element 0))
 (declaim (type (simple-array (unsigned-byte 16) (#.char-code-limit))
 	       *character-attributes*))

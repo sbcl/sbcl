@@ -14,13 +14,6 @@
 ;;; Has the type system been properly initialized? (I.e. is it OK to
 ;;; use it?)
 (defvar *type-system-initialized* #+sb-xc-host nil) ; (set in cold load)
-
-;;; Use experimental type functionality?
-;;;
-;;; REMOVEME: Eventually the new type functionality should be stable
-;;; enough that nothing depends on this, and we can remove it again.
-(defvar *xtype?*)
-(!cold-init-forms (setf *xtype?* nil))
 
 ;;; Return the type structure corresponding to a type specifier. We
 ;;; pick off structure types as a special case.
@@ -184,8 +177,8 @@
 ;;; such as FIXNUM.
 (defstruct (numeric-type (:include ctype
 				   (class-info (type-class-or-lose 'number)))
-			 #!+negative-zero-is-not-zero
-			 (:constructor %make-numeric-type))
+			 (:constructor %make-numeric-type)
+			 (:copier nil))
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
   ;;
@@ -195,23 +188,92 @@
   ;; weird that comment above says "Numeric-Type is used to represent
   ;; all numeric types" but this slot doesn't allow COMPLEX as an
   ;; option.. how does this fall into "not specified" NIL case above?
-  (class nil :type (member integer rational float nil))
+  ;; Perhaps someday we can switch to CLOS and make NUMERIC-TYPE
+  ;; be an abstract base class and INTEGER-TYPE, RATIONAL-TYPE, and
+  ;; whatnot be concrete subclasses..
+  (class nil :type (member integer rational float nil) :read-only t)
   ;; "format" for a float type (i.e. type specifier for a CPU
   ;; representation of floating point, e.g. 'SINGLE-FLOAT -- nothing
   ;; to do with #'FORMAT), or NIL if not specified or not a float.
   ;; Formats which don't exist in a given implementation don't appear
   ;; here.
-  (format nil :type (or float-format null))
+  (format nil :type (or float-format null) :read-only t)
   ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
   ;;
   ;; FIXME: I'm bewildered by FOO-P names for things not intended to
   ;; interpreted as truth values. Perhaps rename this COMPLEXNESS?
-  (complexp :real :type (member :real :complex nil))
+  (complexp :real :type (member :real :complex nil) :read-only t)
   ;; The upper and lower bounds on the value, or NIL if there is no
   ;; bound. If a list of a number, the bound is exclusive. Integer
-  ;; types never have exclusive bounds.
-  (low nil :type (or number cons null))
-  (high nil :type (or number cons null)))
+  ;; types never have exclusive bounds, i.e. they may have them on
+  ;; input, but they're canonicalized to inclusive bounds before we
+  ;; store them here.
+  (low nil :type (or number cons null) :read-only t)
+  (high nil :type (or number cons null) :read-only t))
+
+;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
+;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
+;;; NUMERIC-TYPE.
+(defun make-numeric-type (&key class format (complexp :real) low high
+			       enumerable)
+  ;; if interval is empty
+  (if (and low
+	   high
+	   (if (or (consp low) (consp high)) ; if either bound is exclusive
+	       (>= (type-bound-number low) (type-bound-number high))
+	       (> low high)))
+      *empty-type*
+      (multiple-value-bind (canonical-low canonical-high)
+	  (case class
+	    (integer
+	     ;; INTEGER types always have their LOW and HIGH bounds
+	     ;; represented as inclusive, not exclusive values.
+	     (values (if (consp low)
+			 (1+ (type-bound-number low))
+			 low)
+		     (if (consp high)
+			 (1- (type-bound-number high))
+			 high)))
+	    #!+negative-zero-is-not-zero
+	    (float
+	     ;; Canonicalize a low bound of (-0.0) to 0.0, and a high
+	     ;; bound of (+0.0) to -0.0.
+	     (values (if (and (consp low)
+			      (floatp (car low))
+			      (zerop (car low))
+			      (minusp (float-sign (car low))))
+			 (float 0.0 (car low))
+			 low)
+		     (if (and (consp high)
+			      (floatp (car high))
+			      (zerop (car high))
+			      (plusp (float-sign (car high))))
+			 (float -0.0 (car high))
+			 high)))
+	    (t 
+	     ;; no canonicalization necessary
+	     (values low high)))
+	(%make-numeric-type :class class
+			    :format format
+			    :complexp complexp
+			    :low canonical-low
+			    :high canonical-high
+			    :enumerable enumerable))))
+
+(defun modified-numeric-type (base
+			      &key
+			      (class      (numeric-type-class      base))
+			      (format     (numeric-type-format     base))
+			      (complexp   (numeric-type-complexp   base))
+			      (low        (numeric-type-low        base))
+			      (high       (numeric-type-high       base))
+			      (enumerable (numeric-type-enumerable base)))
+  (make-numeric-type :class class
+		     :format format
+		     :complexp complexp
+		     :low low
+		     :high high
+		     :enumerable enumerable))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-STRING.

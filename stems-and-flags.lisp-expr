@@ -213,7 +213,8 @@
  ("code/float"          :not-host)
  ("code/irrat"          :not-host)
 
- ("code/char" :not-host)
+ ("code/char")
+ ("code/target-char" :not-host)
  ("code/target-misc" :not-host)
  ("code/misc")
 

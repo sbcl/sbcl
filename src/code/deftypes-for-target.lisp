@@ -131,7 +131,7 @@
   '(or float (complex float)))
 
 ;;; character components
-(sb!xc:deftype char-code () `(integer 0 (,char-code-limit)))
+(sb!xc:deftype char-code () `(integer 0 (,sb!xc:char-code-limit)))
 
 ;;; a consed sequence result. If a vector, is a simple array.
 (sb!xc:deftype consed-sequence () '(or list (simple-array * (*))))

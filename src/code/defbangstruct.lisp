@@ -4,7 +4,10 @@
 ;;;;     retained in such a way that we can get to it even on vanilla
 ;;;;     ANSI Common Lisp at cross-compiler build time.
 ;;;;  2. MAKE-LOAD-FORM information is stored in such a way that we can
-;;;;     get to it at bootstrap time before CLOS is built.
+;;;;     get to it at bootstrap time before CLOS is built. This is
+;;;;     important because at least as of sbcl-0.6.11.26, CLOS is built
+;;;;     (compiled) after cold init, so we need to have the compiler
+;;;;     even before CLOS runs.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -271,14 +274,17 @@
     (warn "*DELAYED-DEF!STRUCTS* is already unbound.")))
 
 ;;; The STRUCTURE!OBJECT abstract class is the base of the type
-;;; hierarchy for objects which use DEF!STRUCT functionality.
+;;; hierarchy for objects which have/use DEF!STRUCT functionality.
+;;; (The extra hackery in DEF!STRUCT-defined things isn't needed for
+;;; STRUCTURE-OBJECTs defined by ordinary, post-warm-init programs, so
+;;; it's only put into STRUCTURE-OBJECTs which inherit from
+;;; STRUCTURE!OBJECT.)
 (def!struct (structure!object (:constructor nil)))
 
 ;;;; hooking this all into the standard MAKE-LOAD-FORM system
 
+;;; MAKE-LOAD-FORM for DEF!STRUCT-defined types
 (defun structure!object-make-load-form (object &optional env)
-  #!+sb-doc
-  "MAKE-LOAD-FORM for DEF!STRUCT-defined types"
   (declare (ignore env))
   (funcall (def!struct-type-make-load-form-fun (type-of object))
 	   object))

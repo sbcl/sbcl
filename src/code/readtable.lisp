@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 (sb!xc:deftype attribute-table ()
-  '(simple-array (unsigned-byte 8) (#.char-code-limit)))
+  '(simple-array (unsigned-byte 8) (#.sb!xc:char-code-limit)))
 
 ;;; constants for readtable character attributes. These are all as in
 ;;; the manual.
@@ -31,7 +31,11 @@
 (defconstant +char-attr-delimiter+ 12) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
 (sb!xc:defstruct (readtable (:conc-name nil)
-			    (:predicate readtablep))
+			    (:predicate readtablep)
+			    ;; ANSI requires a CL:COPY-READTABLE to do
+			    ;; a deep copy, so the DEFSTRUCT-generated
+			    ;; default is not suitable.
+			    (:copier nil))
   #!+sb-doc
   "A READTABLE is a data structure that maps characters into syntax
    types for the Common Lisp expression reader."
@@ -47,7 +51,7 @@
   ;; in the character attribute table by having different varieties of
   ;; constituents.
   (character-attribute-table
-   (make-array char-code-limit
+   (make-array sb!xc:char-code-limit
 	       :element-type '(unsigned-byte 8)
 	       :initial-element +char-attr-constituent+)
    :type attribute-table)
@@ -58,8 +62,8 @@
   ;; implement user-defined read-macros, system read-macros, and the
   ;; number-symbol reader.
   (character-macro-table
-   (make-array char-code-limit :initial-element #'undefined-macro-char)
-   :type (simple-vector #.char-code-limit))
+   (make-array sb!xc:char-code-limit :initial-element #'undefined-macro-char)
+   :type (simple-vector #.sb!xc:char-code-limit))
   ;; an alist from dispatch characters to vectors of CHAR-CODE-LIMIT
   ;; functions, for use in defining dispatching macros (like #-macro)
   (dispatch-tables () :type list)

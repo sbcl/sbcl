@@ -1017,28 +1017,6 @@
 
 ;;;; numeric types
 
-#!+negative-zero-is-not-zero
-(defun make-numeric-type (&key class format (complexp :real) low high
-			       enumerable)
-  (flet ((canonicalise-low-bound (x)
-	   ;; Canonicalise a low bound of (-0.0) to 0.0.
-	   (if (and (consp x) (floatp (car x)) (zerop (car x))
-		    (minusp (float-sign (car x))))
-	       (float 0.0 (car x))
-	       x))
-	 (canonicalise-high-bound (x)
-	   ;; Canonicalise a high bound of (+0.0) to -0.0.
-	   (if (and (consp x) (floatp (car x)) (zerop (car x))
-		    (plusp (float-sign (car x))))
-	       (float -0.0 (car x))
-	       x)))
-    (%make-numeric-type :class class
-			:format format
-			:complexp complexp
-			:low (canonicalise-low-bound low)
-			:high (canonicalise-high-bound high)
-			:enumerable enumerable)))
-
 (!define-type-class number)
 
 (!define-type-method (number :simple-=) (type1 type2)
@@ -1313,9 +1291,7 @@
 		 (when (eq (numeric-type-complexp component-type) :complex)
 		   (error "The component type for COMPLEX is complex: ~S"
 			  typespec))
-		 (let ((result (copy-numeric-type component-type)))
-		   (setf (numeric-type-complexp result) :complex)
-		   result)))
+		 (modified-numeric-type component-type :complexp :complex)))
 	(let ((type (specifier-type typespec)))
 	  (typecase type
 	    ;; This is all that CMU CL handled.
@@ -2156,6 +2132,26 @@
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
 		    :element-type (specifier-type element-type)
 		    :complexp nil)))
+
+;;;; utilities shared between cross-compiler and target system
+
+;;; This messy case of CTYPE for NUMBER is shared between the
+;;; cross-compiler and the target system.
+(defun ctype-of-number (x)
+  (let ((num (if (complexp x) (realpart x) x)))
+    (multiple-value-bind (complexp low high)
+	(if (complexp x)
+	    (let ((imag (imagpart x)))
+	      (values :complex (min num imag) (max num imag)))
+	    (values :real num num))
+      (make-numeric-type :class (etypecase num
+				  (integer 'integer)
+				  (rational 'rational)
+				  (float 'float))
+			 :format (and (floatp num) (float-format-name num))
+			 :complexp complexp
+			 :low low
+			 :high high))))
 
 (!defun-from-collected-cold-init-forms !late-type-cold-init)
 

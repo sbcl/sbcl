@@ -195,13 +195,12 @@
     (let ((ctype (continuation-type cont)))
       (multiple-value-bind (int win) (funcall *test-function* ctype type)
 	(cond ((not win)
-	       (note-slime "can't tell whether the ~:R argument is a ~S" n
-			   (type-specifier type))
+	       (note-slime "can't tell whether the ~:R argument is a ~S"
+			   n (type-specifier type))
 	       nil)
 	      ((not int)
-	       (note-lossage "The ~:R argument is a ~S, not a ~S." n
-			     (type-specifier ctype)
-			     (type-specifier type))
+	       (note-lossage "The ~:R argument is a ~S, not a ~S."
+			     n (type-specifier ctype) (type-specifier type))
 	       nil)
 	      ((eq ctype *empty-type*)
 	       (note-slime "The ~:R argument never returns a value." n)
@@ -326,10 +325,10 @@
 (defstruct (approximate-function-type (:copier nil))
   ;; the smallest and largest numbers of arguments that this function
   ;; has been called with.
-  (min-args call-arguments-limit :type fixnum)
+  (min-args sb!xc:call-arguments-limit :type fixnum)
   (max-args 0 :type fixnum)
-  ;; A list of lists of the all the types that have been used in each argument
-  ;; position.
+  ;; a list of lists of the all the types that have been used in each
+  ;; argument position
   (types () :type list)
   ;; A list of APPROXIMATE-KEY-INFO structures describing all the
   ;; things that looked like &KEY arguments. There are distinct
@@ -345,10 +344,10 @@
   ;; The position at which this keyword appeared. 0 if it appeared as the
   ;; first argument, etc.
   (position (required-argument) :type fixnum)
-  ;; A list of all the argument types that have been used with this keyword.
+  ;; a list of all the argument types that have been used with this keyword
   (types nil :type list)
-  ;; True if this keyword has appeared only in calls with an obvious
-  ;; :allow-other-keys.
+  ;; true if this keyword has appeared only in calls with an obvious
+  ;; :ALLOW-OTHER-KEYS
   (allowp nil :type (member t nil)))
 
 ;;; Return an APPROXIMATE-FUNCTION-TYPE representing the context of

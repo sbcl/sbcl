@@ -42,7 +42,7 @@
 ;;; a list of toplevel things set by GENESIS
 (defvar *!reversed-cold-toplevels*)
 
-;;; a SIMPLE-VECTOR set by genesis
+;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
 
 (defun !cold-lose (msg)

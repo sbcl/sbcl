@@ -453,7 +453,7 @@ checking on various tricky cases of standard functions (e.g. MAP with
 complicated result types, and interactions of various variants of
 STREAM).
 
-Raymond Toy wrote the propagate-float-type extension and various
+Raymond Toy wrote the PROPAGATE-FLOAT-TYPE extension and various
 other floating point optimizations.
 
 CMU CL's long float support was written by Douglas T. Crosher.

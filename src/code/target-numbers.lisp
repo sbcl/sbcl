@@ -15,10 +15,10 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-;;; Grovel an individual case to NUMBER-DISPATCH, augmenting Result with the
-;;; type dispatches and bodies. Result is a tree built of alists representing
-;;; the dispatching off each arg (in order). The leaf is the body to be
-;;; executed in that case.
+;;; Grovel an individual case to NUMBER-DISPATCH, augmenting RESULT
+;;; with the type dispatches and bodies. Result is a tree built of
+;;; alists representing the dispatching off each arg (in order). The
+;;; leaf is the body to be executed in that case.
 (defun parse-number-dispatch (vars result types var-types body)
   (cond ((null vars)
 	 (unless (null types) (error "More types than vars."))
@@ -60,8 +60,8 @@
 	  (t
 	   (< o1 o2)))))
 
-;;; Return an ETYPECASE form that does the type dispatch, ordering the cases
-;;; for efficiency.
+;;; Return an ETYPECASE form that does the type dispatch, ordering the
+;;; cases for efficiency.
 (defun generate-number-dispatch (vars error-tags cases)
   (if vars
       (let ((var (first vars))
@@ -78,21 +78,21 @@
 
 ) ; EVAL-WHEN
 
+;;; This is a vaguely case-like macro that does number cross-product
+;;; dispatches. The Vars are the variables we are dispatching off of.
+;;; The Type paired with each Var is used in the error message when no
+;;; case matches. Each case specifies a Type for each var, and is
+;;; executed when that signature holds. A type may be a list
+;;; (FOREACH Each-Type*), causing that case to be repeatedly
+;;; instantiated for every Each-Type. In the body of each case, any
+;;; list of the form (DISPATCH-TYPE Var-Name) is substituted with the
+;;; type of that var in that instance of the case.
+;;;
+;;; As an alternate to a case spec, there may be a form whose CAR is a
+;;; symbol. In this case, we apply the CAR of the form to the CDR and
+;;; treat the result of the call as a list of cases. This process is
+;;; not applied recursively.
 (defmacro number-dispatch (var-specs &body cases)
-  #!+sb-doc
-  "NUMBER-DISPATCH ({(Var Type)}*) {((Type*) Form*) | (Symbol Arg*)}*
-  A vaguely case-like macro that does number cross-product dispatches. The
-  Vars are the variables we are dispatching off of. The Type paired with each
-  Var is used in the error message when no case matches. Each case specifies a
-  Type for each var, and is executed when that signature holds. A type may be
-  a list (FOREACH Each-Type*), causing that case to be repeatedly instantiated
-  for every Each-Type. In the body of each case, any list of the form
-  (DISPATCH-TYPE Var-Name) is substituted with the type of that var in that
-  instance of the case.
-
-  As an alternate to a case spec, there may be a form whose CAR is a symbol.
-  In this case, we apply the CAR of the form to the CDR and treat the result of
-  the call as a list of cases. This process is not applied recursively."
   (let ((res (list nil))
 	(vars (mapcar #'car var-specs))
 	(block (gensym)))
@@ -165,8 +165,8 @@
 
 ;;;; canonicalization utilities
 
-;;; If imagpart is 0, return realpart, otherwise make a complex. This is
-;;; used when we know that realpart and imagpart are the same type, but
+;;; If IMAGPART is 0, return REALPART, otherwise make a complex. This is
+;;; used when we know that REALPART and IMAGPART are the same type, but
 ;;; rational canonicalization might still need to be done.
 #!-sb-fluid (declaim (inline canonical-complex))
 (defun canonical-complex (realpart imagpart)
@@ -185,9 +185,9 @@
 	    (t
 	     (%make-complex realpart imagpart)))))
 
-;;; Given a numerator and denominator with the GCD already divided out, make
-;;; a canonical rational. We make the denominator positive, and check whether
-;;; it is 1.
+;;; Given a numerator and denominator with the GCD already divided
+;;; out, make a canonical rational. We make the denominator positive,
+;;; and check whether it is 1.
 #!-sb-fluid (declaim (inline build-ratio))
 (defun build-ratio (num den)
   (multiple-value-bind (num den)
@@ -460,10 +460,10 @@
 		      (* (maybe-truncate dx g2)
 			 (maybe-truncate dy g1))))))))
 
-;;; Divide two integers, producing a canonical rational. If a fixnum, we see
-;;; whether they divide evenly before trying the GCD. In the bignum case, we
-;;; don't bother, since bignum division is expensive, and the test is not very
-;;; likely to succeed.
+;;; Divide two integers, producing a canonical rational. If a fixnum,
+;;; we see whether they divide evenly before trying the GCD. In the
+;;; bignum case, we don't bother, since bignum division is expensive,
+;;; and the test is not very likely to succeed.
 (defun integer-/-integer (x y)
   (if (and (typep x 'fixnum) (typep y 'fixnum))
       (multiple-value-bind (quo rem) (truncate x y)
@@ -601,22 +601,22 @@
 	(foreach single-float double-float #!+long-float long-float))
        (truncate-float (dispatch-type divisor))))))
 
-;;; Declare these guys inline to let them get optimized a little. ROUND and
-;;; FROUND are not declared inline since they seem too obscure and too
-;;; big to inline-expand by default. Also, this gives the compiler a chance to
-;;; pick off the unary float case. Similarly, CEILING and FLOOR are only
-;;; maybe-inline for now, so that the power-of-2 CEILING and FLOOR transforms
-;;; get a chance.
+;;; Declare these guys inline to let them get optimized a little.
+;;; ROUND and FROUND are not declared inline since they seem too
+;;; obscure and too big to inline-expand by default. Also, this gives
+;;; the compiler a chance to pick off the unary float case. Similarly,
+;;; CEILING and FLOOR are only maybe-inline for now, so that the
+;;; power-of-2 CEILING and FLOOR transforms get a chance.
 #!-sb-fluid (declaim (inline rem mod fceiling ffloor ftruncate))
 (declaim (maybe-inline ceiling floor))
 
-;;; If the numbers do not divide exactly and the result of (/ number divisor)
-;;; would be negative then decrement the quotient and augment the remainder by
-;;; the divisor.
 (defun floor (number &optional (divisor 1))
   #!+sb-doc
   "Returns the greatest integer not greater than number, or number/divisor.
   The second returned value is (mod number divisor)."
+  ;; If the numbers do not divide exactly and the result of
+  ;; (/ NUMBER DIVISOR) would be negative then decrement the quotient
+  ;; and augment the remainder by the divisor.
   (multiple-value-bind (tru rem) (truncate number divisor)
     (if (and (not (zerop rem))
 	     (if (minusp divisor)
@@ -625,13 +625,13 @@
 	(values (1- tru) (+ rem divisor))
 	(values tru rem))))
 
-;;; If the numbers do not divide exactly and the result of (/ number divisor)
-;;; would be positive then increment the quotient and decrement the remainder
-;;; by the divisor.
 (defun ceiling (number &optional (divisor 1))
   #!+sb-doc
   "Returns the smallest integer not less than number, or number/divisor.
   The second returned value is the remainder."
+  ;; If the numbers do not divide exactly and the result of
+  ;; (/ NUMBER DIVISOR) would be positive then increment the quotient
+  ;; and decrement the remainder by the divisor.
   (multiple-value-bind (tru rem) (truncate number divisor)
     (if (and (not (zerop rem))
 	     (if (minusp divisor)

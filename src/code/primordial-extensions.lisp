@@ -108,8 +108,6 @@
 		   (unless ,(first endlist) (go ,label-1))
 		   (return-from ,block (progn ,@(rest endlist))))))))))
 
-;;; DO-ANONYMOUS ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
-;;;
 ;;; This is like DO, except it has no implicit NIL block. Each VAR is
 ;;; initialized in parallel to the value of the specified INIT form.
 ;;; On subsequent iterations, the VARS are assigned the value of the
@@ -160,10 +158,13 @@
 	     ;; Then complain.
 	     (error 'simple-type-error
 		    :datum maybe-package
-		    :expected-type 'package
+		    :expected-type '(and package (satisfies package-name))
 		    :format-control
-		    "~@<~S can't be a ~S: ~2I~_~S has been reset to ~S.~:>"
-		    :format-arguments (list '*package* (type-of maybe-package)
+		    "~@<~S can't be a ~A: ~2I~_~S has been reset to ~S.~:>"
+		    :format-arguments (list '*package*
+					    (if (packagep maybe-package)
+						"deleted package"
+						(type-of maybe-package))
 					    '*package* really-package)))))))
 
 ;;; Give names to elements of a numeric sequence.
