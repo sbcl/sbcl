@@ -60,6 +60,15 @@
                        a b)
                  '(1 2 :a 1 2))))
 
+;;; bug in LOOP, reported by ??? on c.l.l
+(flet ((foo (l)
+         (loop for x in l
+               when (symbolp x) return x
+               while (numberp x)
+               collect (list x))))
+  (assert (equal (foo '(1 2 #\a 3)) '((1) (2))))
+  (assert (equal (foo '(1 2 x 3)) 'x)))
+
 ;;; bug 282
 ;;;
 ;;; Verify type checking policy in full calls: the callee is supposed

@@ -1,5 +1,6 @@
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (load "assertoid.lisp")
+  (use-package "ASSERTOID"))
 
 ;;; bug 254: compiler falure
 (defpackage :bug254 (:use :cl))
@@ -141,6 +142,8 @@
                '((4 9 7) (3 8 6) (6 8 3))))
 
 (delete-package :bug258)
+
+(in-package :cl-user)
 
 ;;;
 (defun bug233a (x)

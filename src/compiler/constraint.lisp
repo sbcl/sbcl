@@ -411,16 +411,16 @@
          (when (eq (functional-kind fun) :let)
            (loop with call = (continuation-dest
                               (node-cont (first (lambda-refs fun))))
-              for var in (lambda-vars fun)
-              and val in (combination-args call)
-              when (and val
-                        (lambda-var-constraints var)
-                        ;; if VAR has no SETs, type inference is
-                        ;; fully performed by IR1 optimizer
-                        (lambda-var-sets var))
-              do (let* ((type (continuation-type val))
-                        (con (find-constraint 'typep var type nil)))
-                   (sset-adjoin con gen))))))
+                 for var in (lambda-vars fun)
+                 and val in (combination-args call)
+                 when (and val
+                           (lambda-var-constraints var)
+                           ;; if VAR has no SETs, type inference is
+                           ;; fully performed by IR1 optimizer
+                           (lambda-var-sets var))
+                 do (let* ((type (continuation-type val))
+                           (con (find-constraint 'typep var type nil)))
+                      (sset-adjoin con gen))))))
       (ref
        (let ((var (ok-ref-lambda-var node)))
          (when var
@@ -432,16 +432,15 @@
                       (con (find-constraint 'typep var atype nil)))
                  (sset-adjoin con gen)))))))
       (cset
-       (let ((var (set-var node)))
-         (when (lambda-var-p var)
-           (when set-preprocessor
-             (funcall set-preprocessor var))
-           (let ((cons (lambda-var-constraints var)))
-             (when cons
-               (sset-difference gen cons)
-               (let* ((type (single-value-type (node-derived-type node)))
-                      (con (find-constraint 'typep var type nil)))
-                 (sset-adjoin con gen)))))))))
+       (binding* ((var (set-var node))
+                  (nil (lambda-var-p var) :exit-if-null)
+                  (cons (lambda-var-constraints var) :exit-if-null))
+         (when set-preprocessor
+           (funcall set-preprocessor var))
+         (sset-difference gen cons)
+         (let* ((type (single-value-type (node-derived-type node)))
+                (con (find-constraint 'typep var type nil)))
+           (sset-adjoin con gen))))))
 
   gen)
 
@@ -532,11 +531,9 @@
   (constraint-propagate-in-block
    block (block-in block)
    :ref-preprocessor (lambda (node cons)
-                       (let ((var (ref-leaf node)))
-                         (when (lambda-var-p var)
-                           (let ((con (lambda-var-constraints var)))
-                             (when con
-                               (constrain-ref-type node con cons))))))))
+                       (let* ((var (ref-leaf node))
+                              (con (lambda-var-constraints var)))
+                         (constrain-ref-type node con cons)))))
 
 ;;; Give an empty constraints set to any var that doesn't have one and
 ;;; isn't a set closure var. Since a var that we previously rejected

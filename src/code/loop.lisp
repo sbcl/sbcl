@@ -1156,7 +1156,7 @@ code to be loaded.
     (setq *loop-names* (list name))))
 
 (defun loop-do-return ()
-  (loop-pseudo-body (loop-construct-return (loop-get-form))))
+  (loop-emit-body (loop-construct-return (loop-get-form))))
 
 ;;;; value accumulation: LIST
 
