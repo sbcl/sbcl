@@ -122,7 +122,9 @@
 
 ;;; These functions are needed for constant-folding.
 (defun sb!kernel:simple-array-nil-p (object)
-  (typep object '(simple-array nil)))
+  (when (typep object 'array)
+    (aver (not (null (array-element-type object)))))
+  nil)
 
 (defun sb!kernel:%negate (number)
   (- number))

@@ -89,7 +89,7 @@
     (flet ((frob (evaloid)
 		 (let ((result (funcall evaloid expr)))
 		   (unless (funcall eval-expected-lambda result)
-		     (error "failed assertoid" expr))))
+		     (error "failed assertoid ~S" expr))))
 	   (compile-as-evaloid (optimizations)
              (lambda (expr)
 	       (funcall (compile nil

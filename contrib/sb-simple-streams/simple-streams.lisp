@@ -278,7 +278,7 @@
         ;; Handle encapsulated stream.  FIXME: perhaps handle
         ;; sbcl-vintage ansi-stream type in write-octets too?
         (stream (write-octets fd buffer start end blocking))
-	(t (error "Don't know how to handle output handle &A" fd))))))
+	(t (error "Don't know how to handle output handle ~A" fd))))))
 
 
 ;;;

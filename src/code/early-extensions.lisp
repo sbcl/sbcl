@@ -288,7 +288,12 @@
   ;; just define ASSQ explicitly in terms of more primitive
   ;; operations:
   (dolist (pair alist)
-    (when (and pair (eq (car pair) item))
+    ;; though it may look more natural to write this as 
+    ;;   (AND PAIR (EQ (CAR PAIR) ITEM))
+    ;; the temptation to do so should be resisted, as pointed out by PFD
+    ;; sbcl-devel 2003-08-16, as NIL elements are rare in association
+    ;; lists.  -- CSR, 2003-08-16
+    (when (and (eq (car pair) item) (not (null pair)))
       (return pair))))
 
 ;;; like (DELETE .. :TEST #'EQ):

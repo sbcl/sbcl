@@ -123,10 +123,12 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(connect)
  LDSO_STUBIFY(cosh)
  LDSO_STUBIFY(creat)
+#ifndef LISP_FEATURE_DARWIN
  LDSO_STUBIFY(dlclose)
  LDSO_STUBIFY(dlerror)
  LDSO_STUBIFY(dlopen)
  LDSO_STUBIFY(dlsym)
+#endif
  LDSO_STUBIFY(dup)
  LDSO_STUBIFY(dup2)
  LDSO_STUBIFY(execve)
