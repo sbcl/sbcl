@@ -1305,6 +1305,18 @@ WORKAROUND:
   arguments, but it could be tricky to check result types of PROG1, IF
   etc.
 
+221: 
+  Sometime between sbcl-0.7.8.51 and sbcl-0.7.9.5 the system lost the
+  ability to compile
+    (declaim (ftype (function (fixnum) (values package boolean)) f1))
+    (declaim (ftype (function (t) (values package boolean)) f2))
+    (defun ow (b x)
+      (funcall (if b #'f1 #'f2) x))
+  Now the compiler dies with
+    SUBTYPEP is illegal on this type: (VALUES PACKAGE (MEMBER T NIL))
+  apparently when attempting to infer the type of the IF expression.
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
