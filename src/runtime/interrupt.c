@@ -612,9 +612,11 @@ extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
 void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
+#ifndef LISP_FEATURE_X86
     void * fun=native_pointer(function);
-    char *code = &(((struct simple_fun *) fun)->code);
-    
+    void *code = &(((struct simple_fun *) fun)->code);
+#endif    
+
     /* Build a stack frame showing `interrupted' so that the
      * user's backtrace makes (as much) sense (as usual) */
 #ifdef LISP_FEATURE_X86

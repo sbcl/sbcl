@@ -395,6 +395,7 @@ size_code_header(lispobj *where)
     return nwords;
 }
 
+#ifndef LISP_FEATURE_X86
 static int
 scav_return_pc_header(lispobj *where, lispobj object)
 {
@@ -403,6 +404,7 @@ scav_return_pc_header(lispobj *where, lispobj object)
 	 (unsigned long) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
+#endif /* LISP_FEATURE_X86 */
 
 static lispobj
 trans_return_pc_header(lispobj object)
@@ -447,6 +449,7 @@ scav_closure_header(lispobj *where, lispobj object)
 }
 #endif
 
+#ifndef LISP_FEATURE_X86
 static int
 scav_fun_header(lispobj *where, lispobj object)
 {
@@ -455,6 +458,7 @@ scav_fun_header(lispobj *where, lispobj object)
 	 (unsigned long) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
+#endif /* LISP_FEATURE_X86 */
 
 static lispobj
 trans_fun_header(lispobj object)

@@ -204,7 +204,7 @@ void link_thread(struct thread *th,pid_t kid_pid)
     th->pid=kid_pid;		/* child will not start until this is set */
 }
 
-pid_t create_initial_thread(lispobj initial_function) {
+void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     pid_t kid_pid=getpid();
     if(th && kid_pid>0) {

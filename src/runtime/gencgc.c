@@ -295,7 +295,7 @@ count_generation_pages(int generation)
     return count;
 }
 
-/* Count the number of dont_move pages. */
+#if QSHOW
 static int
 count_dont_move_pages(void)
 {
@@ -308,6 +308,7 @@ count_dont_move_pages(void)
     }
     return count;
 }
+#endif /* QSHOW */
 
 /* Work through the pages and add up the number of bytes used for the
  * given generation. */
@@ -3518,8 +3519,8 @@ garbage_collect_generation(int generation, int raise)
     for_each_thread(th) {
 	void **ptr;
 	void **esp=(void **)-1;
-	int i,free;
 #ifdef LISP_FEATURE_SB_THREAD
+	int i,free;
 	if(th==arch_os_get_current_thread()) {
 	    esp = (void **) &raise;
 	} else {

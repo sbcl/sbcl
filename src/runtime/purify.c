@@ -113,7 +113,8 @@ dynamic_pointer_p(lispobj ptr)
 #endif
 }
 
-static inline newspace_alloc(int nwords, int constantp) 
+static inline lispobj *
+newspace_alloc(int nwords, int constantp) 
 {
     lispobj *ret;
     nwords=CEILING(nwords,2);
