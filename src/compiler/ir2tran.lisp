@@ -146,28 +146,39 @@
     (move-continuation-result node block locs cont))
   (values))
 
-;;; Emit code to load a function object representing LEAF into RES.
-;;; This gets interesting when the referenced function is a closure:
-;;; we must make the closure and move the closed-over values into it.
+;;; Emit code to load a function object implementing FUN into
+;;; RES. This gets interesting when the referenced function is a
+;;; closure: we must make the closure and move the closed-over values
+;;; into it.
 ;;;
-;;; LEAF is either a :TOPLEVEL-XEP functional or the XEP lambda for
-;;; the called function, since local call analysis converts all
-;;; closure references. If a :TOPLEVEL-XEP, we know it is not a closure.
+;;; FUN is either a :TOPLEVEL-XEP functional or the XEP lambda for the
+;;; called function, since local call analysis converts all closure
+;;; references. If a :TOPLEVEL-XEP, we know it is not a closure.
 ;;;
 ;;; If a closed-over LAMBDA-VAR has no refs (is deleted), then we
 ;;; don't initialize that slot. This can happen with closures over
 ;;; top level variables, where optimization of the closure deleted the
 ;;; variable. Since we committed to the closure format when we
 ;;; pre-analyzed the top level code, we just leave an empty slot.
-(defun ir2-convert-closure (node block leaf res)
-  (declare (type ref node) (type ir2-block block)
-	   (type functional leaf) (type tn res))
-  (unless (leaf-info leaf)
-    (setf (leaf-info leaf)
-	  (make-entry-info :name (functional-debug-name leaf))))
-  (let ((entry (make-load-time-constant-tn :entry leaf))
-	(closure (etypecase leaf
+(defun ir2-convert-closure (ref ir2-block fun res)
+  (declare (type ref ref) (type ir2-block ir2-block)
+	   (type functional fun) (type tn res))
+
+  (unless (leaf-info fun)
+    (setf (leaf-info fun)
+	  (make-entry-info :name (functional-debug-name fun))))
+  (let ((entry (make-load-time-constant-tn :entry fun))
+	(closure (etypecase fun
 		   (clambda
+
+		    ;; This assertion was sort of an experiment. It
+		    ;; would be nice and sane and easier to understand
+		    ;; things if it were *always* true, but
+		    ;; experimentally I observe that it's only
+		    ;; *almost* always true. -- WHN 2001-01-02
+		    #+nil 
+		    (aver (eql (lambda-component fun)
+			       (block-component (ir2-block-block ir2-block))))
 
 		    ;; Check for some weirdness which came up in bug
 		    ;; 138, 2002-01-02.
@@ -187,26 +198,31 @@
 		    ;; IR2-COMPONENT-ENTRIES record. That problem is
 		    ;; hard to debug when it's caught at dump time, so
 		    ;; this assertion tries to catch it here.
-		    (aver (member leaf
-				  (component-lambdas (lambda-component leaf))))
+		    (aver (member fun
+				  (component-lambdas (lambda-component fun))))
 
-		    (physenv-closure (get-lambda-physenv leaf)))
+		    ;; another bug-138-related issue: COMPONENT-NEW-FUNS
+		    ;; is an IR1 temporary, and now that we're doing IR2
+		    ;; it should've been completely flushed (but wasn't).
+		    (aver (null (component-new-funs (lambda-component fun))))
+
+		    (physenv-closure (get-lambda-physenv fun)))
 		   (functional
-		    (aver (eq (functional-kind leaf) :toplevel-xep))
+		    (aver (eq (functional-kind fun) :toplevel-xep))
 		    nil))))
 
     (cond (closure
-	   (let ((this-env (node-physenv node)))
-	     (vop make-closure node block entry (length closure) res)
+	   (let ((this-env (node-physenv ref)))
+	     (vop make-closure ref ir2-block entry (length closure) res)
 	     (loop for what in closure and n from 0 do
 	       (unless (and (lambda-var-p what)
 			    (null (leaf-refs what)))
-		 (vop closure-init node block
+		 (vop closure-init ref ir2-block
 		      res
 		      (find-in-physenv what this-env)
 		      n)))))
 	  (t
-	   (emit-move node block entry res))))
+	   (emit-move ref ir2-block entry res))))
   (values))
 
 ;;; Convert a SET node. If the node's CONT is annotated, then we also

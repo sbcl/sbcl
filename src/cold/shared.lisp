@@ -144,16 +144,16 @@
 		     ignore-failure-p)
 
   (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
-	;; Lisp Way, although it works just fine for common UNIX environments.
-	;; Should it come to pass that the system is ported to environments
-	;; where version numbers and so forth become an issue, it might become
-	;; urgent to rewrite this using the fancy Common Lisp PATHNAME
-	;; machinery instead of just using strings. In the absence of such a
-	;; port, it might or might be a good idea to do the rewrite.
-	;; -- WHN 19990815
-	(src (concatenate 'string src-prefix stem src-suffix))
-	(obj (concatenate 'string obj-prefix stem obj-suffix))
-	(tmp-obj (concatenate 'string obj tmp-obj-suffix-suffix)))
+	 ;; Lisp Way, although it works just fine for common UNIX environments.
+	 ;; Should it come to pass that the system is ported to environments
+	 ;; where version numbers and so forth become an issue, it might become
+	 ;; urgent to rewrite this using the fancy Common Lisp PATHNAME
+	 ;; machinery instead of just using strings. In the absence of such a
+	 ;; port, it might or might be a good idea to do the rewrite.
+	 ;; -- WHN 19990815
+	 (src (concatenate 'string src-prefix stem src-suffix))
+	 (obj (concatenate 'string obj-prefix stem obj-suffix))
+	 (tmp-obj (concatenate 'string obj tmp-obj-suffix-suffix)))
 
     (ensure-directories-exist obj :verbose t)
 

@@ -108,7 +108,7 @@
 (defstruct (ir2-block (:include block-annotation)
 		      (:constructor make-ir2-block (block))
 		      (:copier nil))
-  ;; the IR2-Block's number, which differs from Block's Block-Number
+  ;; the IR2-BLOCK's number, which differs from BLOCK's BLOCK-NUMBER
   ;; if any blocks are split. This is assigned by lifetime analysis.
   (number nil :type (or index null))
   ;; information about unknown-values continuations that is used by
@@ -169,7 +169,7 @@
   ;; the assembler label that points to the beginning of the code for
   ;; this block, or NIL when we haven't assigned a label yet
   (%label nil)
-  ;; list of Location-Info structures describing all the interesting
+  ;; list of LOCATION-INFO structures describing all the interesting
   ;; (to the debugger) locations in this block
   (locations nil :type list))
 
