@@ -38,9 +38,9 @@
 #include "gc.h"
 #include "gc-internal.h"
 
-/* a function defined externally in assembly language, called from
- * this file */
+/* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
+
 
 /*
  * GC parameters

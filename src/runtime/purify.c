@@ -109,7 +109,7 @@ dynamic_pointer_p(lispobj ptr)
 
 #ifdef __i386__
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
 /*
  * enhanced x86/GENCGC stack scavenging by Douglas Crosher
  *
@@ -632,7 +632,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     if ((fixups==0) ||
 	(fixups==UNBOUND_MARKER_WIDETAG) ||
 	!is_lisp_pointer(fixups)) {
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
 	/* Check for a possible errors. */
 	sniff_code_object(new_code,displacement);
 #endif
@@ -680,7 +680,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     /* No longer need the fixups. */
     new_code->constants[0] = 0;
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     /* Check for possible errors. */
     sniff_code_object(new_code,displacement);
 #endif
@@ -1322,7 +1322,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     gc_assert((lispobj *)CONTROL_STACK_END > ((&read_only_roots)+1));
     setup_i386_stack_scav(((&static_roots)-2), (lispobj *)CONTROL_STACK_END);
 #endif
@@ -1347,7 +1347,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  current_control_stack_pointer - (lispobj *)CONTROL_STACK_START,
 	  0);
 #else
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     pscav_i386_stack();
 #endif
 #endif
