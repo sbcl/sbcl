@@ -97,8 +97,7 @@
 (defun make-symbol (string)
   #!+sb-doc
   "Make and return a new symbol with the STRING as its print name."
-  #!-gengc (make-symbol string)
-  #!+gengc (%make-symbol (random most-positive-fixnum) string))
+  (make-symbol string))
 
 (defun get (symbol indicator &optional (default nil))
   #!+sb-doc

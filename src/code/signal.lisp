@@ -30,14 +30,12 @@
 ;;; saved value. When that hander returns, the original signal mask is
 ;;; installed, allowing any other pending signals to be handled.
 ;;;
-;;; This means that the cost of without-interrupts is just a special
+;;; This means that the cost of WITHOUT-INTERRUPTS is just a special
 ;;; binding in the case when no signals are delivered (the normal
 ;;; case). It's only when a signal is actually delivered that we use
 ;;; any system calls, and by then the cost of the extra system calls
 ;;; are lost in the noise when compared with the cost of delivering
 ;;; the signal in the first place.
-
-#!-gengc (progn
 
 (defvar *interrupts-enabled* t)
 (defvar *interrupt-pending* nil)
@@ -72,30 +70,6 @@
 	     (when *interrupt-pending*
 	       (do-pending-interrupt))
 	     (,name))))))
-
-) ; PROGN
-
-;;; On the GENGC system, we have to do it slightly differently because of the
-;;; existence of threads. Each thread has a suspends_disabled_count in its
-;;; mutator structure. When this value is other then zero, the low level stuff
-;;; will not suspend the thread, but will instead set the suspend_pending flag
-;;; (also in the mutator). So when we finish the without-interrupts, we just
-;;; check the suspend_pending flag and trigger a do-pending-interrupt if
-;;; necessary.
-
-#!+gengc
-(defmacro without-interrupts (&body body)
-  `(unwind-protect
-       (progn
-	 (locally
-	   (declare (optimize (speed 3) (safety 0)))
-	   (incf (sb!kernel:mutator-interrupts-disabled-count)))
-	 ,@body)
-     (locally
-       (declare (optimize (speed 3) (safety 0)))
-       (when (and (zerop (decf (sb!kernel:mutator-interrupts-disabled-count)))
-		  (not (zerop (sb!kernel:mutator-interrupt-pending))))
-	 (do-pending-interrupt)))))
 
 ;;;; utilities for dealing with signal names and numbers
 

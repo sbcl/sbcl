@@ -33,24 +33,16 @@
 
 ;;; specials initialized by !COLD-INIT
 
-;;; FIXME: These could be converted to DEFVARs, and the stuff shared
-;;; in both #!+GENGC and #!-GENGC (actually everything in #!+GENGC)
-;;; could be made non-conditional.
-(declaim
-  #!-gengc
-  (special *gc-inhibit* *already-maybe-gcing*
-	   *need-to-collect-garbage*
-	   *gc-notify-stream*
-	   *before-gc-hooks* *after-gc-hooks*
-	   #!+x86 *pseudo-atomic-atomic*
-	   #!+x86 *pseudo-atomic-interrupted*
-	   sb!unix::*interrupts-enabled*
-	   sb!unix::*interrupt-pending*
-	   *type-system-initialized*)
-  #!+gengc
-  (special *before-gc-hooks* *after-gc-hooks*
-	   *gc-notify-stream*
-	   *type-system-initialized*))
+;;; FIXME: These could be converted to DEFVARs.
+(declaim (special *gc-inhibit* *already-maybe-gcing*
+		  *need-to-collect-garbage*
+		  *gc-notify-stream*
+		  *before-gc-hooks* *after-gc-hooks*
+		  #!+x86 *pseudo-atomic-atomic*
+		  #!+x86 *pseudo-atomic-interrupted*
+		  sb!unix::*interrupts-enabled*
+		  sb!unix::*interrupt-pending*
+		  *type-system-initialized*))
 
 (defvar *cold-init-complete-p*)
 

@@ -906,15 +906,6 @@
       (error "internal error, code-length=~D, nwritten=~D"
 	     code-length
 	     nwritten)))
-  ;; KLUDGE: It's not clear what this is trying to do, but it looks as
-  ;; though it's an implicit undocumented dependence on a 4-byte
-  ;; wordsize which could be painful in porting. Note also that there
-  ;; are other undocumented modulo-4 things scattered throughout the
-  ;; code and conditionalized with GENGC, and I don't know what those
-  ;; do either. -- WHN 19990323
-  #!+gengc (unless (zerop (logand code-length 3))
-	     (dotimes (i (- 4 (logand code-length 3)))
-	       (dump-byte 0 fasl-output)))
   (values))
 
 ;;; Dump all the fixups. Currently there are three flavors of fixup:
@@ -1001,15 +992,6 @@
 
     (collect ((patches))
 
-      ;; Dump the debug info.
-      #!+gengc
-      (let ((info (sb!c::debug-info-for-component component))
-	    (*dump-only-valid-structures* nil))
-	(dump-object info fasl-output)
-	(let ((info-handle (dump-pop fasl-output)))
-	  (dump-push info-handle fasl-output)
-	  (push info-handle (fasl-output-debug-info fasl-output))))
-
       ;; Dump the offset of the trace table.
       (dump-object code-length fasl-output)
       ;; FIXME: As long as we don't have GENGC, the trace table is
@@ -1048,7 +1030,6 @@
 	     (dump-fop 'fop-misc-trap fasl-output)))))
 
       ;; Dump the debug info.
-      #!-gengc
       (let ((info (sb!c::debug-info-for-component component))
 	    (*dump-only-valid-structures* nil))
 	(dump-object info fasl-output)
@@ -1056,12 +1037,7 @@
 	  (dump-push info-handle fasl-output)
 	  (push info-handle (fasl-output-debug-info fasl-output))))
 
-      (let ((num-consts #!+gengc (- header-length
-				    sb!vm:code-debug-info-slot)
-			#!-gengc (- header-length
-				    sb!vm:code-trace-table-offset-slot))
-	    (total-length #!+gengc (ceiling total-length 4)
-			  #!-gengc total-length))
+      (let ((num-consts (- header-length sb!vm:code-trace-table-offset-slot)))
 	(cond ((and (< num-consts #x100) (< total-length #x10000))
 	       (dump-fop 'fop-small-code fasl-output)
 	       (dump-byte num-consts fasl-output)

@@ -922,7 +922,7 @@
      (system-area-pointer :codes (#.sb!vm:sap-type))
      (weak-pointer :codes (#.sb!vm:weak-pointer-type))
      (code-component :codes (#.sb!vm:code-header-type))
-     #!-gengc (lra :codes (#.sb!vm:return-pc-header-type))
+     (lra :codes (#.sb!vm:return-pc-header-type))
      (fdefn :codes (#.sb!vm:fdefn-type))
      (random-class) ; used for unknown type codes
 

@@ -225,11 +225,9 @@
  ("src/code/target-misc" :not-host)
  ("src/code/misc")
 
- #!-gengc ("src/code/room"   :not-host)
- #!-gengc ("src/code/gc"     :not-host)
- #!-gengc ("src/code/purify" :not-host)
-
- #!+gengc ("src/code/gengc" :not-host)
+ ("src/code/room"   :not-host)
+ ("src/code/gc"     :not-host)
+ ("src/code/purify" :not-host)
 
  ("src/code/stream"        :not-host)
  ("src/code/print"         :not-host)
@@ -523,12 +521,6 @@
  ("src/compiler/entry")
  ("src/compiler/ir2tran")
 
- ;; KLUDGE: This has #!+GENGC things in it which are intended to
- ;; overwrite code in ir2tran.lisp, so it has to come after ir2tran.lisp.
- ;;
- ;; FIXME: Those things should probably be ir2tran.lisp instead, and the
- ;; things they now overwrite should instead be #!-GENGC so they're never
- ;; generated in the first place.
  ("src/compiler/generic/vm-ir2tran")
 
  ("src/compiler/copyprop")

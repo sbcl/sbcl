@@ -174,10 +174,6 @@
  ;; the underlying x86 hardware tries).
  :ieee-floating-point
 
- ;; This seems to be the pre-GENCGC garbage collector for CMU CL, which was
- ;; AFAIK never supported for the X86.
- ; :gengc
-
  ;; CMU CL had, and we inherited, code to support 80-bit LONG-FLOAT on the x86
  ;; architecture. Nothing has been done to actively destroy the long float
  ;; support, but it hasn't been thoroughly maintained, and needs at least

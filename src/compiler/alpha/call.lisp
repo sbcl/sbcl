@@ -15,7 +15,6 @@
 
 ;;; Return a wired TN describing the N'th full call argument passing
 ;;; location.
-;;;
 (!def-vm-support-routine standard-argument-location (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
@@ -30,22 +29,16 @@
 ;;; is true, then use the standard (full call) location, otherwise use
 ;;; any legal location. Even in the non-standard case, this may be
 ;;; restricted by a desire to use a subroutine call instruction.
-;;;
 (!def-vm-support-routine make-return-pc-passing-location (standard)
-  #!+gengc (declare (ignore standard))
-  #!-gengc
   (if standard
       (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
-      (make-restricted-tn *backend-t-primitive-type* register-arg-scn))
-  #!+gengc
-  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ra-offset))
+      (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
 
-;;; This is similar to Make-Return-PC-Passing-Location, but makes a
-;;; location to pass Old-FP in. This is (obviously) wired in the
+;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
+;;; location to pass OLD-FP in. This is (obviously) wired in the
 ;;; standard convention, but is totally unrestricted in non-standard
 ;;; conventions, since we can always fetch it off of the stack using
 ;;; the arg pointer.
-;;;
 (!def-vm-support-routine make-old-fp-passing-location (standard)
   (if standard
       (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset)
@@ -61,12 +54,10 @@
 		  control-stack-arg-scn
 		  ocfp-save-offset)))
 (!def-vm-support-routine make-return-pc-save-location (env)
-  (let ((ptype #!-gengc *backend-t-primitive-type*
-	       #!+gengc *fixnum-primitive-type*))
+  (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
      (environment-debug-live-tn (make-normal-tn ptype) env)
-     (make-wired-tn ptype control-stack-arg-scn
-		    #!-gengc lra-save-offset #!+gengc ra-save-offset))))
+     (make-wired-tn ptype control-stack-arg-scn lra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location. We
 ;;; only need to make the standard location, since a count is never
@@ -269,8 +260,7 @@ default-value-8
 	  (move ocfp-tn csp-tn)
 	  (inst nop))
 	(when lra-label
-	  #!-gengc (inst compute-code-from-lra code-tn code-tn lra-label temp)
-	  #!+gengc (inst compute-code-from-ra code-tn ra-tn lra-label temp)))
+	  (inst compute-code-from-lra code-tn code-tn lra-label temp)))
       (let ((regs-defaulted (gen-label))
 	    (defaulting-done (gen-label))
 	    (default-stack-vals (gen-label)))
@@ -331,8 +321,7 @@ default-value-8
 		    (store-stack-tn (cdr def) null-tn)))))))
 
 	(when lra-label
-	  #!-gengc (inst compute-code-from-lra code-tn code-tn lra-label temp)
-	  #!+gengc (inst compute-code-from-ra code-tn ra-tn lra-label temp))))
+	  (inst compute-code-from-lra code-tn code-tn lra-label temp))))
   (values))
 
 ;;;; unknown values receiving
@@ -363,8 +352,7 @@ default-value-8
       (inst nop))
 
     (when lra-label
-      #!-gengc (inst compute-code-from-lra code-tn code-tn lra-label temp)
-      #!+gengc (inst compute-code-from-ra code-tn ra-tn lra-label temp))
+      (inst compute-code-from-lra code-tn code-tn lra-label temp))
     (inst addq csp-tn 4 csp-tn)
     (storew (first *register-arg-tns*) csp-tn -1)
     (inst subq csp-tn 4 start)
@@ -375,8 +363,7 @@ default-value-8
     (assemble (*elsewhere*)
       (emit-label variable-values)
       (when lra-label
-	#!-gengc (inst compute-code-from-lra code-tn code-tn lra-label temp)
-	#!+gengc (inst compute-code-from-ra code-tn ra-tn lra-label temp))
+	(inst compute-code-from-lra code-tn code-tn lra-label temp))
       (do ((arg *register-arg-tns* (rest arg))
 	   (i 0 (1+ i)))
 	  ((null arg))
@@ -540,10 +527,9 @@ default-value-8
 	 (return-pc :target return-pc-temp)
 	 (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) ocfp-temp)
-  (:temporary (:sc #!-gengc descriptor-reg #!+gengc any-reg
-		   :from (:argument 1))
+  (:temporary (:sc descriptor-reg any-reg :from (:argument 1))
 	      return-pc-temp)
-  #!-gengc (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (interior-reg)) lip)
   (:move-args :known-return)
   (:info val-locs)
   (:ignore val-locs vals)
@@ -561,7 +547,6 @@ default-value-8
     (move ocfp-temp cfp-tn)
     (inst ret zero-tn lip 1)
     (trace-table-entry trace-table-normal)))
-
 
 ;;;; full call:
 ;;;;

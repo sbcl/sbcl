@@ -50,26 +50,6 @@
   (%primitive print "too early in cold init to recover from errors")
   (%halt))
 
-#!+gengc
-(defun !do-load-time-value-fixup (object offset index)
-  (declare (type index offset))
-  (let ((value (svref *!load-time-values* index)))
-    (typecase object
-      (list
-       (case offset
-	 (0 (setf (car object) value))
-	 (1 (setf (cdr object) value))
-	 (t (!cold-lose "bogus offset in cons cell"))))
-      (instance
-       (setf (%instance-ref object (- offset sb!vm:instance-slots-offset))
-	     value))
-      (code-component
-       (setf (code-header-ref object offset) value))
-      (simple-vector
-       (setf (svref object (- offset sb!vm:vector-data-offset)) value))
-      (t
-       (!cold-lose "unknown kind of object for load-time-value fixup")))))
-
 (eval-when (:compile-toplevel :execute)
   ;; FIXME: Perhaps we should make SHOW-AND-CALL-AND-FMAKUNBOUND, too,
   ;; and use it for most of the cold-init functions. (Just be careful
@@ -90,20 +70,19 @@
   ;; !UNIX-COLD-INIT. And *TYPE-SYSTEM-INITIALIZED* could be changed to
   ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
   ;; be explicitly set in order to be meaningful.
-  (setf *gc-notify-stream* nil)
-  (setf *before-gc-hooks* nil)
-  (setf *after-gc-hooks* nil)
-  #!+gengc (setf *handler-clusters* nil)
-  #!-gengc (setf *already-maybe-gcing* t
-		 *gc-inhibit* t
-		 *need-to-collect-garbage* nil
-		 sb!unix::*interrupts-enabled* t
-		 sb!unix::*interrupt-pending* nil)
-  (setf *break-on-signals* nil)
-  (setf *maximum-error-depth* 10)
-  (setf *current-error-depth* 0)
-  (setf *cold-init-complete-p* nil)
-  (setf *type-system-initialized* nil)
+  (setf *gc-notify-stream* nil
+        *before-gc-hooks* nil
+        *after-gc-hooks* nil
+        *already-maybe-gcing* t
+	*gc-inhibit* t
+	*need-to-collect-garbage* nil
+	sb!unix::*interrupts-enabled* t
+	sb!unix::*interrupt-pending* nil
+        *break-on-signals* nil
+        *maximum-error-depth* 10
+        *current-error-depth* 0
+        *cold-init-complete-p* nil
+        *type-system-initialized* nil)
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
@@ -180,11 +159,7 @@
 	    #!-gengc
 	    (setf (sap-ref-32 (second toplevel-thing) 0)
 		  (get-lisp-obj-address
-		   (svref *!load-time-values* (third toplevel-thing))))
-	    #!+gengc
-	    (!do-load-time-value-fixup (second toplevel-thing)
-				       (third  toplevel-thing)
-				       (fourth toplevel-thing)))
+		   (svref *!load-time-values* (third toplevel-thing)))))
 	   #!+(and x86 gencgc)
 	   (:load-time-code-fixup
 	    (sb!vm::!do-load-time-code-fixup (second toplevel-thing)

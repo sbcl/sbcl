@@ -225,9 +225,7 @@
   (declare (fixnum box-num code-length))
   (with-fop-stack t
     (let ((code (%primitive sb!c:allocate-code-object box-num code-length))
-	  (index (+ #!-gengc sb!vm:code-trace-table-offset-slot
-		    #!+gengc sb!vm:code-debug-info-slot
-		    box-num)))
+	  (index (+ sb!vm:code-trace-table-offset-slot box-num)))
       (declare (type index index))
       #!-gengc (setf (%code-debug-info code) (pop-stack))
       (dotimes (i box-num)
@@ -237,8 +235,7 @@
 	(read-n-bytes *fasl-input-stream*
 		      (code-instructions code)
 		      0
-		      #!-gengc code-length
-		      #!+gengc (* code-length sb!vm:word-bytes)))
+		      code-length))
       code)))
 
 ;;; Moving native code during a GC or purify is not so trivial on the

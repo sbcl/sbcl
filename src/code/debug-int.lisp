@@ -268,20 +268,13 @@
 	    (:include frame)
 	    (:constructor make-compiled-frame
 			  (pointer up debug-function code-location number
-				   #!+gengc saved-state-chain
 				   &optional escaped))
 	    (:copier nil))
   ;; This indicates whether someone interrupted the frame.
   ;; (unexported). If escaped, this is a pointer to the state that was
-  ;; saved when we were interrupted. On the non-gengc system, this is
-  ;; a pointer to an os_context_t, i.e. the third argument to an
-  ;; SA_SIGACTION-style signal handler. On the gengc system, this is a
-  ;; state pointer from SAVED-STATE-CHAIN.
-  escaped
-  ;; a list of SAPs to saved states. Each time we unwind past an
-  ;; exception, we pop the next entry off this list. When we get to
-  ;; the end of the list, there is nothing else on the stack.
-  #!+gengc (saved-state-chain nil :type list))
+  ;; saved when we were interrupted, an os_context_t, i.e. the third
+  ;; argument to an SA_SIGACTION-style signal handler.
+  escaped)
 (def!method print-object ((obj compiled-frame) str)
   (print-unreadable-object (obj str :type t)
     (format str
@@ -581,8 +574,7 @@
   (declare (type system-area-pointer x))
   #!-x86 ; stack grows toward high address values
   (and (sap< x (current-sp))
-       (sap<= #!-gengc (int-sap control-stack-start)
-	      #!+gengc (mutator-control-stack-base)
+       (sap<= (int-sap control-stack-start)
 	      x)
        (zerop (logand (sap-int x) #b11)))
   #!+x86 ; stack grows toward low address values
@@ -722,9 +714,7 @@
   (/show0 "entering TOP-FRAME")
   (multiple-value-bind (fp pc) (%caller-frame-and-pc)
     (possibly-an-interpreted-frame
-     (compute-calling-frame (descriptor-sap fp)
-			    #!-gengc pc #!+gengc (descriptor-sap pc)
-			    nil)
+     (compute-calling-frame (descriptor-sap fp) pc nil)
      nil)))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
@@ -758,15 +748,9 @@
 			(get-context-value
 			 real sb!vm::ocfp-save-offset
 			 (sb!c::compiled-debug-function-old-fp c-d-f)))
-		       #!-gengc
 		       (get-context-value
 			real sb!vm::lra-save-offset
 			(sb!c::compiled-debug-function-return-pc c-d-f))
-		       #!+gengc
-		       (descriptor-sap
-			(get-context-value
-			 real sb!vm::ra-save-offset
-			 (sb!c::compiled-debug-function-return-pc c-d-f)))
 		       frame)
 		      frame)))
 		  (bogus-debug-function
@@ -785,11 +769,8 @@
 			 (sap-ref-32 fp (* sb!vm::ocfp-save-offset
 					   sb!vm:word-bytes)))
 
-			#!-gengc
 			(stack-ref fp sb!vm::lra-save-offset)
-			#!+gengc
-			(sap-ref-sap fp (* sb!vm::ra-save-offset
-					   sb!vm:word-bytes))
+
 			frame)))))))
 	down)))
 
@@ -1128,32 +1109,6 @@
 		       (lra-code-header object))
 		      (t
 		       nil))))))))
-
-;;; SB!KERNEL:*SAVED-STATE-CHAIN* -- maintained by the C code as a
-;;; list of SAPs, each SAP pointing to a saved exception state.
-#!+gengc
-(declaim (special *saved-state-chain*))
-
-;;; CMU CL had
-;;;   (DEFUN LOOKUP-TRACE-TABLE-ENTRY (COMPONENT PC) ..)
-;;; for this case, but it hasn't been maintained in SBCL.
-#!+gengc
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (error "hopelessly stale"))
-
-;;; CMU CL had
-;;;   (DEFUN EXTRACT-INFO-FROM-STATE (STATE) ..)
-;;; for this case, but it hasn't been maintained in SBCL.
-#!+gengc
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (error "hopelessly stale"))
-
-;;; CMU CL had
-;;;   (DEFUN COMPUTE-CALLING-FRAME (OCFP RA UP-FRAME) ..)
-;;; for this case, but it hasn't been maintained in SBCL.
-#!+gengc
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (error "hopelessly stale"))
 
 ;;;; frame utilities
 
@@ -1213,9 +1168,7 @@
 ;;; CODE-LOCATIONs at which execution would continue with frame as the
 ;;; top frame if someone threw to the corresponding tag.
 (defun frame-catches (frame)
-  (let ((catch
-	 #!-gengc (descriptor-sap *current-catch-block*)
-	 #!+gengc (mutator-current-catch-block))
+  (let ((catch (descriptor-sap *current-catch-block*))
 	(res nil)
 	(fp (frame-pointer (frame-real-frame frame))))
     (loop
@@ -1243,15 +1196,10 @@
 	       (component (component-from-component-ptr
 			   (component-ptr-from-pc ra)))
 	       (offset
-		#!-(or gengc x86)
+		#!-x86
 		(* (- (1+ (get-header-data lra))
 		      (get-header-data component))
 		   sb!vm:word-bytes)
-		#!+gengc
-		(+ (- (sap-int ra)
-		      (get-lisp-obj-address component)
-		      (get-header-data component))
-		   sb!vm:other-pointer-type)
 		#!+x86
 		(- (sap-int ra)
 		   (- (get-lisp-obj-address component)
@@ -3164,12 +3112,10 @@
 	(multiple-value-bind (lra component offset)
 	    (make-bogus-lra
 	     (get-context-value frame
-				#!-gengc sb!vm::lra-save-offset
-				#!+gengc sb!vm::ra-save-offset
+				sb!vm::lra-save-offset
 				lra-sc-offset))
 	  (setf (get-context-value frame
-				   #!-gengc sb!vm::lra-save-offset
-				   #!+gengc sb!vm::ra-save-offset
+				   sb!vm::lra-save-offset
 				   lra-sc-offset)
 		lra)
 	  (let ((end-bpts (breakpoint-%info starter-bpt)))
@@ -3203,8 +3149,7 @@
       (when (and (compiled-frame-p frame)
 		 (eq lra
 		     (get-context-value frame
-					#!-gengc sb!vm::lra-save-offset
-					#!+gengc sb!vm::ra-save-offset
+					sb!vm::lra-save-offset
 					lra-sc-offset)))
 	(return t)))))
 
