@@ -790,6 +790,8 @@
   (let* ((home (node-home-lambda call))
 	 (home-env (lambda-physenv home)))
 
+    (aver (not (eq home clambda)))
+
     ;; CLAMBDA belongs to HOME now.
     (push clambda (lambda-lets home))
     (setf (lambda-home clambda) home)
@@ -798,8 +800,8 @@
     ;; All of CLAMBDA's LETs belong to HOME now.
     (let ((lets (lambda-lets clambda)))
       (dolist (let lets)
-	(setf (lambda-home let) home)
-	(setf (lambda-physenv let) home-env))
+        (setf (lambda-home let) home)
+        (setf (lambda-physenv let) home-env))
       (setf (lambda-lets home) (nconc lets (lambda-lets home))))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; which has LETs.
@@ -808,17 +810,17 @@
     ;; HOME no longer calls CLAMBDA, and owns all of CLAMBDA's old
     ;; DFO dependencies.
     (setf (lambda-calls-or-closes home)
-	  (delete clambda
-		  (nunion (lambda-calls-or-closes clambda)
-			  (lambda-calls-or-closes home))))
+          (delete clambda
+                  (nunion (lambda-calls-or-closes clambda)
+                          (lambda-calls-or-closes home))))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; which calls things or has DFO dependencies.
     (setf (lambda-calls-or-closes clambda) nil)
 
     ;; All of CLAMBDA's ENTRIES belong to HOME now.
     (setf (lambda-entries home)
-	  (nconc (lambda-entries clambda)
-		 (lambda-entries home)))
+          (nconc (lambda-entries clambda)
+                 (lambda-entries home)))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; with ENTRIES.
     (setf (lambda-entries clambda) nil))
@@ -1026,7 +1028,8 @@
 		 (null (rest refs))
 		 (member (functional-kind clambda) '(nil :assignment))
 		 (not (functional-entry-fun clambda)))
-	(let* ((ref-cont (node-cont (first refs)))
+	(let* ((ref (first refs))
+               (ref-cont (node-cont ref))
 	       (dest (continuation-dest ref-cont)))
 	  (when (and dest
 		     (basic-combination-p dest)
@@ -1037,8 +1040,11 @@
 			   (t
 			    (reoptimize-continuation ref-cont)
 			    nil)))
+            (when (eq clambda (node-home-lambda dest))
+              (delete-lambda clambda)
+              (return-from maybe-let-convert nil))
 	    (unless (eq (functional-kind clambda) :assignment)
-	      (let-convert clambda dest))
+              (let-convert clambda dest))
 	    (reoptimize-call dest)
 	    (setf (functional-kind clambda)
 		  (if (mv-combination-p dest) :mv-let :let))))
@@ -1117,8 +1123,8 @@
   (declare (type clambda clambda))
   (when (and (not (functional-kind clambda))
 	     (not (functional-entry-fun clambda)))
-    (let ((non-tail nil)
-	  (call-fun nil))
+    (let ((outside-non-tail-call nil)
+	  (outside-call nil))
       (when (and (dolist (ref (leaf-refs clambda) t)
 		   (let ((dest (continuation-dest (node-cont ref))))
 		     (when (or (not dest)
@@ -1126,19 +1132,18 @@
                        (return nil))
 		     (let ((home (node-home-lambda ref)))
 		       (unless (eq home clambda)
-			 (when call-fun
+			 (when outside-call
 			   (return nil))
-			 (setq call-fun home))
+			 (setq outside-call dest))
 		       (unless (node-tail-p dest)
-			 (when (or non-tail (eq home clambda))
+			 (when (or outside-non-tail-call (eq home clambda))
 			   (return nil))
-			 (setq non-tail dest)))))
+			 (setq outside-non-tail-call dest)))))
 		 (ok-initial-convert-p clambda))
-	(setf (functional-kind clambda) :assignment)
-	(let-convert clambda
-		     (or non-tail
-			 (continuation-dest
-			  (node-cont (first (leaf-refs clambda))))))
-	(when non-tail
-	  (reoptimize-call non-tail))
-	t))))
+        (cond (outside-call (setf (functional-kind clambda) :assignment)
+                            (let-convert clambda outside-call)
+                            (when outside-non-tail-call
+                              (reoptimize-call outside-non-tail-call))
+                            t)
+              (t (delete-lambda clambda)
+                 nil))))))

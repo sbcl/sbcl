@@ -662,7 +662,9 @@
 	(let* ((bind-block (node-block bind))
 	       (component (block-component bind-block))
 	       (return (lambda-return clambda)))
-	  (aver (null (leaf-refs clambda)))
+          (dolist (ref (lambda-refs clambda))
+            (let ((home (node-home-lambda ref)))
+              (aver (eq home clambda))))
 	  (unless (leaf-ever-used clambda)
 	    (let ((*compiler-error-context* bind))
 	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"

@@ -380,59 +380,6 @@ WORKAROUND:
   the new output block should start indented 2 or more characters
   rightward of the correct location.
 
-65:
-  (probably related to bug #70; maybe related to bug #109)
-  As reported by Carl Witty on submit@bugs.debian.org 1999-05-08,
-  compiling this file
-(in-package "CL-USER")
-(defun equal-terms (termx termy)
-  (labels
-    ((alpha-equal-bound-term-lists (listx listy)
-       (or (and (null listx) (null listy))
-	   (and listx listy
-		(let ((bindings-x (bindings-of-bound-term (car listx)))
-		      (bindings-y (bindings-of-bound-term (car listy))))
-		  (if (and (null bindings-x) (null bindings-y))
-		      (alpha-equal-terms (term-of-bound-term (car listx))
-					 (term-of-bound-term (car listy)))
-		      (and (= (length bindings-x) (length bindings-y))
-			   (prog2
-			       (enter-binding-pairs (bindings-of-bound-term (car listx))
-						    (bindings-of-bound-term (car listy)))
-			       (alpha-equal-terms (term-of-bound-term (car listx))
-						  (term-of-bound-term (car listy)))
-			     (exit-binding-pairs (bindings-of-bound-term (car listx))
-						 (bindings-of-bound-term (car listy)))))))
-		(alpha-equal-bound-term-lists (cdr listx) (cdr listy)))))
-
-     (alpha-equal-terms (termx termy)
-       (if (and (variable-p termx)
-		(variable-p termy))
-	   (equal-bindings (id-of-variable-term termx)
-			   (id-of-variable-term termy))
-	   (and (equal-operators-p (operator-of-term termx) (operator-of-term termy))
-		(alpha-equal-bound-term-lists (bound-terms-of-term termx)
-					      (bound-terms-of-term termy))))))
-
-    (or (eq termx termy)
-	(and termx termy
-	     (with-variable-invocation (alpha-equal-terms termx termy))))))
-  causes an assertion failure
-    The assertion (EQ (C::LAMBDA-TAIL-SET C::CALLER)
-                      (C::LAMBDA-TAIL-SET (C::LAMBDA-HOME C::CALLEE))) failed.
-
-  Bob Rogers reports (1999-07-28 on cmucl-imp@cons.org) a smaller test
-  case with the same problem:
-(defun parse-fssp-alignment ()
-  ;; Given an FSSP alignment file named by the argument . . .
-  (labels ((get-fssp-char ()
-	     (get-fssp-char))
-	   (read-fssp-char ()
-	     (get-fssp-char)))
-    ;; Stub body, enough to tickle the bug.
-    (list (read-fssp-char)
-	  (read-fssp-char))))
-
 66:
   ANSI specifies that the RESULT-TYPE argument of CONCATENATE must be
   a subtype of SEQUENCE, but CONCATENATE doesn't check this properly:
@@ -458,27 +405,6 @@ WORKAROUND:
   and reported for SBCL by Martin Atzmueller 2000-10-20: (TRACE GETHASH)
   crashes SBCL. In general tracing anything which is used in the 
   implementation of TRACE is likely to have the same problem.
-
-70:
-  (probably related to bug #65; maybe related to bug #109)
-  The compiler doesn't like &OPTIONAL arguments in LABELS and FLET
-  forms. E.g.
-    (DEFUN FIND-BEFORE (ITEM SEQUENCE &KEY (TEST #'EQL))
-      (LABELS ((FIND-ITEM (OBJ SEQ TEST &OPTIONAL (VAL NIL))
-                 (LET ((ITEM (FIRST SEQ)))
-		   (COND ((NULL SEQ)
-			  (VALUES NIL NIL))
-			 ((FUNCALL TEST OBJ ITEM)
-			  (VALUES VAL SEQ))
-			 (T	
-			  (FIND-ITEM OBJ (REST SEQ) TEST (NCONC VAL `(,ITEM))))))))
-      (FIND-ITEM ITEM SEQUENCE TEST)))
-  from David Young's bug report on cmucl-help@cons.org 30 Nov 2000
-  causes sbcl-0.6.9 to fail with
-    error in function SB-KERNEL:ASSERT-ERROR:
-       The assertion (EQ (SB-C::LAMBDA-TAIL-SET SB-C::CALLER)
-                         (SB-C::LAMBDA-TAIL-SET
-                          (SB-C::LAMBDA-HOME SB-C::CALLEE))) failed.
 
 72:
   (DECLAIM (OPTIMIZE ..)) doesn't work properly inside LOCALLY forms.
@@ -637,25 +563,6 @@ WORKAROUND:
   (ROOM T) can bring a small computer to its knees for a *long*
   time trying to GC afterwards. Surely there's some more economical
   way to implement (ROOM T).
-
-109:
-  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
-  collection:
-    ;;; This file fails to compile.
-    ;;; Maybe this bug is related to bugs #65, #70 in the BUGS file.
-    (in-package :cl-user)
-    (defun tst2 ()
-      (labels 
-          ((eff (&key trouble)
-             (eff)
-             ;; nil
-             ;; Uncomment and it works
-             ))
-        (eff)))
-  In SBCL 0.6.12.42, the problem is
-    internal error, failed AVER:
-      "(COMMON-LISP:EQ (SB!C::LAMBDA-TAIL-SET SB!C::CALLER)
-                  (SB!C::LAMBDA-TAIL-SET (SB!C::LAMBDA-HOME SB!C::CALLEE)))"
 
 110:
   reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs

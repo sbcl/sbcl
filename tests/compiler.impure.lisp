@@ -160,10 +160,11 @@
    ;; a call to prevent the other arguments from being optimized away
    (logand a1 a2 a3 a4 a5 a6 a7 a8 a9)))
 
-;;; bug 192, reported by Einar Floystad Dorum: Compiling this in 0.7.6
-;;; caused the compiler to try to constant-fold DATA-VECTOR-REF, which
-;;; is OK, except that there was no non-VOP definition of
-;;; DATA-VECTOR-REF, so it would fail.
+;;; bug 192, reported by Einar Floystad Dorum sbcl-devel 2002-08-14,
+;;; fixed in sbcl-0.7.6.26: Compiling this function in 0.7.6 caused
+;;; the compiler to try to constant-fold DATA-VECTOR-REF, which is OK,
+;;; except that there was no non-VOP definition of DATA-VECTOR-REF, so
+;;; it would fail.
 (defun bug192 ()
       (funcall 
        (LAMBDA (TEXT I L )
@@ -196,6 +197,78 @@
                                   (WHEN T I))))))
                       INDEX)))
            (G908 I))) "abcdefg" 0 (length "abcdefg")))
+
+;;; bugs #65, #70, and #109, closed by APD's patch sbcl-devel 2002-08-17
+;;;
+;;; This was "YA code deletion bug" whose symptom was the failure of
+;;; the assertion
+;;;   (EQ (C::LAMBDA-TAIL-SET C::CALLER)
+;;;       (C::LAMBDA-TAIL-SET (C::LAMBDA-HOME C::CALLEE)))
+;;; at compile time.
+(defun bug65-1 (termx termy) ; from Carl Witty on submit bugs list, debian.org
+  (labels
+    ((alpha-equal-bound-term-lists (listx listy)
+       (or (and (null listx) (null listy))
+	   (and listx listy
+		(let ((bindings-x (bindings-of-bound-term (car listx)))
+		      (bindings-y (bindings-of-bound-term (car listy))))
+		  (if (and (null bindings-x) (null bindings-y))
+		      (alpha-equal-terms (term-of-bound-term (car listx))
+					 (term-of-bound-term (car listy)))
+		      (and (= (length bindings-x) (length bindings-y))
+			   (prog2
+			       (enter-binding-pairs (bindings-of-bound-term (car listx))
+						    (bindings-of-bound-term (car listy)))
+			       (alpha-equal-terms (term-of-bound-term (car listx))
+						  (term-of-bound-term (car listy)))
+			     (exit-binding-pairs (bindings-of-bound-term (car listx))
+						 (bindings-of-bound-term (car listy)))))))
+		(alpha-equal-bound-term-lists (cdr listx) (cdr listy)))))
+
+     (alpha-equal-terms (termx termy)
+       (if (and (variable-p termx)
+		(variable-p termy))
+	   (equal-bindings (id-of-variable-term termx)
+			   (id-of-variable-term termy))
+	   (and (equal-operators-p (operator-of-term termx) (operator-of-term termy))
+		(alpha-equal-bound-term-lists (bound-terms-of-term termx)
+					      (bound-terms-of-term termy))))))
+
+    (or (eq termx termy)
+	(and termx termy
+	     (with-variable-invocation (alpha-equal-terms termx termy))))))
+(defun bug65-2 () ; from Bob Rogers cmucl-imp 1999-07-28
+  ;; Given an FSSP alignment file named by the argument . . .
+  (labels ((get-fssp-char ()
+	     (get-fssp-char))
+	   (read-fssp-char ()
+	     (get-fssp-char)))
+    ;; Stub body, enough to tickle the bug.
+    (list (read-fssp-char)
+	  (read-fssp-char))))
+(defun bug70 ; from David Young cmucl-help 30 Nov 2000
+    (item sequence &key (test #'eql))
+  (labels ((find-item (obj seq test &optional (val nil))
+		      (let ((item (first seq)))
+			(cond ((null seq)
+			       (values nil nil))
+			      ((funcall test obj item)
+			       (values val seq))
+			      (t	
+			       (find-item obj
+					  (rest seq)
+					  test
+					  (nconc val `(,item))))))))
+    (find-item item sequence test)))
+(defun bug109 () ; originally from CMU CL bugs collection, reported as
+                 ; SBCL bug by MNA 2001-06-25
+  (labels 
+      ((eff (&key trouble)
+	    (eff)
+	    ;; nil
+	    ;; Uncomment and it works
+	    ))
+    (eff)))
 
 ;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
 ;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.
