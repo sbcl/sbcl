@@ -49,7 +49,7 @@
 
 ;;;; putting ourselves out of our misery when things become too much to bear
 
-(declaim (ftype (function (simple-string) nil) critically-unreachable))
+(declaim (ftype (function (simple-string) nil) !cold-lose))
 (defun !cold-lose (msg)
   (%primitive print msg)
   (%primitive print "too early in cold init to recover from errors")

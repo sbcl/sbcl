@@ -34,28 +34,6 @@ ensure_space(lispobj *start, unsigned long size)
     }
 }
 
-#ifdef HOLES
-
-static os_vm_address_t holes[] = HOLES;
-
-static void
-make_holes(void)
-{
-    int i;
-
-    for (i = 0; i < sizeof(holes)/sizeof(holes[0]); i++) {
-	if (os_validate(holes[i], HOLE_SIZE) == NULL) {
-	    fprintf(stderr,
-		    "make_holes: failed to validate %ld bytes at 0x%08X\n",
-		    HOLE_SIZE,
-		    (unsigned long)holes[i]);
-	    exit(1);
-	}
-	os_protect(holes[i], HOLE_SIZE, 0);
-    }
-}
-#endif
-
 void
 validate(void)
 {
@@ -73,10 +51,6 @@ validate(void)
     ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #endif
 
-#ifdef HOLES
-    make_holes();
-#endif
-    
 #ifdef PRINTNOISE
     printf(" done.\n");
 #endif

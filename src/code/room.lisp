@@ -568,32 +568,6 @@
 
   (values))
 
-(defun find-holes (&rest spaces)
-  (dolist (space (or spaces '(:read-only :static :dynamic)))
-    (format t "In ~A space:~%" space)
-    (let ((start-addr nil)
-	  (total-bytes 0))
-      (declare (type (or null (unsigned-byte 32)) start-addr)
-	       (type (unsigned-byte 32) total-bytes))
-      (map-allocated-objects
-       (lambda (object typecode bytes)
-	 (declare (ignore typecode)
-		  (type (unsigned-byte 32) bytes))
-	 (if (and (consp object)
-		  (eql (car object) 0)
-		  (eql (cdr object) 0))
-	     (if start-addr
-		 (incf total-bytes bytes)
-		 (setf start-addr (sb!di::get-lisp-obj-address object)
-		       total-bytes bytes))
-	     (when start-addr
-	       (format t "~:D bytes at #X~X~%" total-bytes start-addr)
-	       (setf start-addr nil))))
-       space)
-      (when start-addr
-	(format t "~:D bytes at #X~X~%" total-bytes start-addr))))
-  (values))
-
 ;;;; PRINT-ALLOCATED-OBJECTS
 
 (defun print-allocated-objects (space &key (percent 0) (pages 5)

@@ -263,7 +263,7 @@
 ;;; order in which the TYPE-INFO-creation forms are generated doesn't
 ;;; match the relative order in which the forms need to be executed at
 ;;; cold load time.
-(defparameter *reversed-type-info-init-forms* nil)
+(defparameter *!reversed-type-info-init-forms* nil)
 
 ;;; Define a new type of global information for CLASS. TYPE is the
 ;;; name of the type, DEFAULT is the value for that type when it
@@ -320,7 +320,7 @@
 			 (declare (ignorable name))
 			 ,',default))
 		(setf (type-info-type type-info) ',',type-spec))
-	     *reversed-type-info-init-forms*))
+	     *!reversed-type-info-init-forms*))
      ',type))
 
 ) ; EVAL-WHEN
@@ -1400,7 +1400,7 @@
 ;;; we can set their DEFAULT and TYPE slots.
 (macrolet ((frob ()
 	     `(!cold-init-forms
-		,@(reverse *reversed-type-info-init-forms*))))
+		,@(reverse *!reversed-type-info-init-forms*))))
   (frob))
 
 ;;;; a hack for detecting
