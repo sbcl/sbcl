@@ -2258,8 +2258,10 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
        host is already defined.
     ** RENAME-FILE works on streams instead of signalling an internal
        type error.
-    ** PEEK-CHAR now uses the current readtable when determining
-       whether a character is whitespace.
+    ** PEEK-CHAR uses the current readtable when determining whether
+       or not a character is whitespace.
+    ** MERGE-PATHNAMES handles the case when the pathname does not
+       specify a name while the default-pathname specifies a version.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

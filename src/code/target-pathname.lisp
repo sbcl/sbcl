@@ -426,6 +426,7 @@
 	     (maybe-diddle-case (%pathname-type defaults)
 				diddle-case))
 	 (or (%pathname-version pathname)
+	     (and (not (%pathname-name pathname)) (%pathname-version defaults))
 	     default-version))))))
 
 (defun import-directory (directory diddle-case)
