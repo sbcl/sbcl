@@ -215,6 +215,8 @@
 (assert (subtypep 'complex '(complex real)))
 (assert (subtypep '(complex real) 'complex))
 (assert (subtypep '(complex (eql 1)) '(complex (member 1 2))))
+(assert (subtypep '(complex ratio) '(complex rational)))
+(assert (subtypep '(complex ratio) 'complex))
 (assert (equal (multiple-value-list
 		(subtypep '(complex (integer 1 2))
 			  '(member #c(1 1) #c(1 2) #c(2 1) #c(2 2))))

@@ -1736,6 +1736,21 @@
 	     (apply #'type-union
 		    (mapcar (lambda (x) (complex1 (ctype-of x)))
 			    (member-type-members ctype))))
+            ((and (typep ctype 'intersection-type)
+                  ;; FIXME: This is very much a
+                  ;; not-quite-worst-effort, but we are required to do
+                  ;; something here because of our representation of
+                  ;; RATIO as (AND RATIONAL (NOT INTEGER)): we must
+                  ;; allow users to ask about (COMPLEX RATIO).  This
+                  ;; will of course fail to work right on such types
+                  ;; as (AND INTEGER (SATISFIES ZEROP))...
+                  (let ((numbers (remove-if-not
+                                  #'numeric-type-p
+                                  (intersection-type-types ctype))))
+                    (and (car numbers)
+                         (null (cdr numbers))
+                         (eq (numeric-type-complexp (car numbers)) :real)
+                         (complex1 (car numbers))))))
 	    (t
 	     (multiple-value-bind (subtypep certainly)
 		 (csubtypep ctype (specifier-type 'real))
@@ -1743,11 +1758,12 @@
 		   (not-real)
 		   ;; ANSI just says that TYPESPEC is any subtype of
 		   ;; type REAL, not necessarily a NUMERIC-TYPE. In
-		   ;; particular, at this point TYPESPEC could legally be
-		   ;; an intersection type like (AND REAL (SATISFIES ODDP)),
-		   ;; in which case we fall through the logic above and
-		   ;; end up here, stumped.
-		   (bug "~@<(known bug #145): The type ~S is too hairy to be 
+		   ;; particular, at this point TYPESPEC could legally
+		   ;; be a hairy type like (AND NUMBER (SATISFIES
+		   ;; REALP) (SATISFIES ZEROP)), in which case we fall
+		   ;; through the logic above and end up here,
+		   ;; stumped.
+		   (bug "~@<(known bug #145): The type ~S is too hairy to be ~
                          used for a COMPLEX component.~:@>"
 			typespec)))))))))
 

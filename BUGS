@@ -437,6 +437,10 @@ WORKAROUND:
   conformance problem, since seems hard to construct useful code
   where it matters.)
 
+  [ partially fixed by CSR in 0.8.17.17 because of a PFD ansi-tests
+    report that (COMPLEX RATIO) was failing; still failing on types of
+    the form (AND NUMBER (SATISFIES REALP) (SATISFIES ZEROP)). ]
+
   b. (fixed in 0.8.3.43)
 
 146:

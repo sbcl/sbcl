@@ -23,6 +23,8 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
        parameters correctly.
     ** FORMATTER deals with the ~@[ ~] conditional directive where the
        consequent uses no arguments correctly.
+    ** the system has a partial understanding of the (COMPLEX RATIO)
+       type specifier.
 
 changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * new feature: a build-time option (controlled by the :SB-UNICODE
