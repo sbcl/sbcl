@@ -240,7 +240,7 @@
         ;; Handle encapsulated stream.  FIXME: perhaps handle
         ;; sbcl-vintage ansi-stream type in read-octets too?
         (stream (read-octets fd buffer start end blocking))
-	(t (error "Don't know how to handle input handle &S" fd))))))
+	(t (error "Don't know how to handle input handle ~S" fd))))))
 
 (defun write-octets (stream buffer start end blocking)
   (declare (type simple-stream stream)

@@ -651,7 +651,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defmethod inspected-description ((object fixnum))
   (description-maybe-internals "fixnum ~W" (list object)
 			       "[#x~8,'0X]"
-			       (sb-kernel:get-lisp-obj-address object)))
+			       (ash object (1- sb-vm:n-lowtag-bits))))
 
 (defmethod inspected-description ((object complex))
   (format nil "complex number ~W" object))
@@ -678,10 +678,14 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
   (format nil "ratio ~W" object))
 
 (defmethod inspected-description ((object character))
-  (description-maybe-internals "character ~W char-code #x~4,'0X"
+  ;; FIXME: This will need to change as and when we get more characters
+  ;; than just the 256 we have today.
+  (description-maybe-internals "character ~W char-code #x~2,'0X"
 			       (list object (char-code object))
 			       "[#x~8,'0X]"
-			       (sb-kernel:get-lisp-obj-address object)))
+			       (logior sb-vm:base-char-widetag 
+				       (ash (char-code object)
+					    sb-vm:n-widetag-bits))))
 
 (defmethod inspected-description ((object t))
   (format nil "a generic object ~W" object))

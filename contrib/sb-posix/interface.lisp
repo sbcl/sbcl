@@ -37,26 +37,26 @@
 ;;; uid, gid
 
 (define-call "geteuid" sb-posix::uid-t not)	;"always successful", it says
-(define-call "getresuid" sb-posix::uid-t not)
+#+linux (define-call "getresuid" sb-posix::uid-t not)
 (define-call "getuid" sb-posix::uid-t not)
 (define-call "seteuid" int minusp (uid sb-posix::uid-t))
 #+linux (define-call "setfsuid" int minusp (uid sb-posix::uid-t))
 (define-call "setreuid" int minusp
 	     (ruid sb-posix::uid-t) (euid sb-posix::uid-t))
-(define-call "setresuid" int minusp
+#+linux (define-call "setresuid" int minusp
 	     (ruid sb-posix::uid-t) (euid sb-posix::uid-t)
 	     (suid sb-posix::uid-t))
 (define-call "setuid" int minusp (uid sb-posix::uid-t))
 
 (define-call "getegid" sb-posix::gid-t not)
 (define-call "getgid" sb-posix::gid-t not)
-(define-call "getresgid" sb-posix::gid-t not)
+#+linux (define-call "getresgid" sb-posix::gid-t not)
 (define-call "setegid" int minusp (gid sb-posix::gid-t))
 #+linux (define-call "setfsgid" int minusp (gid sb-posix::gid-t))
 (define-call "setgid" int minusp (gid sb-posix::gid-t))
 (define-call "setregid" int minusp
 	     (rgid sb-posix::gid-t) (egid sb-posix::gid-t))
-(define-call "setresgid" int minusp
+#+linux (define-call "setresgid" int minusp
 	     (rgid sb-posix::gid-t)
 	     (egid sb-posix::gid-t) (sgid sb-posix::gid-t))
 
