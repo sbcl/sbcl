@@ -98,8 +98,7 @@
 
 ;;;; profile encapsulations
 
-;;; Trade off space for time by handling the usual all-FIXNUM cases
-;;; inline.
+;;; Trade off space for time by handling the usual all-FIXNUM cases inline.
 (defmacro fastbig- (x y)
   (once-only ((x x) (y y))
     `(if (and (typep ,x '(and fixnum unsigned-byte))
@@ -164,7 +163,7 @@
 	 (aver (typep dticks 'unsigned-byte))
 	 (aver (typep dconsing 'unsigned-byte))
 	 (aver (typep inner-enclosed-profiles 'unsigned-byte))
-	 (multiple-value-prog1
+	 (unwind-protect
 	     (let* ((start-ticks (get-internal-ticks))
 		    (*enclosed-ticks* 0)
 		    (*enclosed-consing* 0)
@@ -172,7 +171,7 @@
 		    (nbf0 *n-bytes-freed-or-purified*)
 		    (dynamic-usage-0 (sb-kernel:dynamic-usage)))
 	       (declare (inline pcounter-or-fixnum->integer))
-	       (multiple-value-prog1
+	       (unwind-protect
 		   (multiple-value-call encapsulated-fun
 					(sb-c:%more-arg-values arg-context
 							       0
@@ -191,7 +190,9 @@
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
 		     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
-		   (let ((net-dconsing (fastbig- dconsing *enclosed-consing*)))
+		   (let ((net-dconsing (fastbig- dconsing
+						 (pcounter-or-fixnum->integer
+						  *enclosed-consing*))))
 		     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
 		   (fastbig-incf-pcounter-or-fixnum profiles
 						    inner-enclosed-profiles))))

@@ -547,7 +547,7 @@
 	     :defstruct-accessor-symbol ,accessor
 	     ,@(when (fboundp accessor)
 		 `(:internal-reader-function
-		   (structure-slotd-reader-function slotd)
+		   ,(structure-slotd-reader-function slotd)
 		   :internal-writer-function
 		   ,(structure-slotd-writer-function slotd)))
 	     :type ,(or (structure-slotd-type slotd) t)

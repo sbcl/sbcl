@@ -1308,6 +1308,13 @@ WORKAROUND:
   (NTH-VALUE 1000 (VALUES-LIST (MAKE-LIST 1001))) takes several hours
   to compile.
 
+247: "incomplete conversion of stack parameters in #-SB-THREAD code"
+  In 0.pre8.67/x86/nothreads, executing (ROOM) causes an error to
+  be signalled:
+    The variable SB-VM:CONTROL-STACK-END is unbound.
+  (When this is fixed, the ROOM entries in tests/smoke.impure.lisp
+  should be uncommented.)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

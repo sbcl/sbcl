@@ -554,11 +554,17 @@
 	     ((csubtypep tspec (specifier-type 'float))
 	      '(%single-float x))
 	     ((and (csubtypep tspec (specifier-type 'simple-vector))
-		   (policy node (< safety 3)))
+		   ;; Can we avoid checking for dimension issues like
+		   ;; (COERCE FOO '(SIMPLE-VECTOR 5)) returning a
+		   ;; vector of length 6?
+		   (or (policy node (< safety 3)) ; no need in unsafe code
+		       (and (array-type-p tspec) ; no need when no dimensions
+			    (equal (array-type-dimensions tspec) '(*)))))
 	      `(if (simple-vector-p x)
 		   x
 		   (replace (make-array (length x)) x)))
 	     ;; FIXME: other VECTOR types?
 	     (t
 	      (give-up-ir1-transform)))))))
+
 
