@@ -13,6 +13,8 @@ changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
     no longer processed with LOAD, but by READ and EVAL; hence the
     global optimization policy, startup package, readtable, etc, 
     can be set by them.
+  * The .fasl file format number has been incremented because of 
+    various incompatible changes.
   * internal entry point details and argument counts no longer appear
     in backtraces unless explicitly requested by setting
     SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*.
