@@ -21,6 +21,7 @@
 #include "sbcl.h"
 #include "os.h"
 #include "gc.h"
+#include "gc-internal.h"
 #include "globals.h"
 #include "interrupt.h"
 #include "validate.h"
@@ -36,32 +37,21 @@
 #define DEBUG_CODE_GC
 #endif
 
-static lispobj *from_space;
-static lispobj *from_space_free_pointer;
+lispobj *from_space;
+lispobj *from_space_free_pointer;
 
-static lispobj *new_space;
-static lispobj *new_space_free_pointer;
+lispobj *new_space;
+lispobj *new_space_free_pointer;
 
 static struct weak_pointer *weak_pointers;
 
-static void scavenge(lispobj *start, u32 nwords);
 static void scavenge_newspace(void);
 static void scavenge_interrupt_contexts(void);
+#if 0
+static void scavenge(lispobj *start, u32 nwords);
 static void scan_weak_pointers(void);
 static int scav_lose(lispobj *where, lispobj object);
-
-#define gc_abort() lose("GC invariant lost!  File \"%s\", line %d\n", \
-			__FILE__, __LINE__)
-
-#if 1
-#define gc_assert(ex) do { \
-	if (!(ex)) gc_abort(); \
-} while (0)
-#else
-#define gc_assert(ex)
 #endif
-
-#include "gc-common.c"
 
 
 /* collecting garbage */
@@ -102,6 +92,23 @@ zero_stack(void)
 }
 #undef U32
 
+
+void *
+gc_general_alloc(int bytes, int unboxed_p, int quick_p) {
+    lispobj *new=new_space_free_pointer;
+    new_space_free_pointer+=(bytes/4);
+    return new;
+}
+
+lispobj  copy_large_unboxed_object(lispobj object, int nwords) {
+    return copy_object(object,nwords);
+}
+lispobj  copy_unboxed_object(lispobj object, int nwords) {
+    return copy_object(object,nwords);
+}
+lispobj  copy_large_object(lispobj object, int nwords) {
+    return copy_object(object,nwords);
+}
 
 /* Note: The generic GC interface we're implementing passes us a
  * last_generation argument. That's meaningless for us, since we're
@@ -494,6 +501,8 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 		header = *pointer;
 		type = widetag_of(header);
 		nwords = (sizetab[type])(pointer);
+		break;
+	    default: nwords=1;	/* shut yer whinging, gcc */
 	    }
 	} else {
 	    type = widetag_of(object);
@@ -515,8 +524,8 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 /* FIXME: Shouldn't this be defined in sbcl.h? */
 
 
-static lispobj trans_fun_header(lispobj object);
-static lispobj trans_boxed(lispobj object);
+/* static lispobj trans_fun_header(lispobj object); */
+/* static lispobj trans_boxed(lispobj object); */
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
@@ -583,8 +592,6 @@ gc_init(void)
     gc_init_tables();
     scavtab[SIMPLE_VECTOR_WIDETAG] = scav_vector;
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
-    transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed;
-    sizetab[SIMPLE_VECTOR_WIDETAG] = size_vector;
 }
 
 

@@ -70,14 +70,6 @@ struct page {
 };
 
 /* values for the page.allocated field */
-#define FREE_PAGE 0
-#define BOXED_PAGE 1
-#define UNBOXED_PAGE 2
-
-/* values for the *_alloc_* parameters */
-#define ALLOC_BOXED 0
-#define ALLOC_UNBOXED 1
-#define ALLOC_QUICK 1
 
 
 /* the number of pages needed for the dynamic space - rounding up */

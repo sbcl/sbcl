@@ -1267,8 +1267,6 @@ extern int (*scavtab[256])(lispobj *where, lispobj object);
 extern lispobj (*transother[256])(lispobj object);
 extern int (*sizetab[256])(lispobj *where);
 
-struct weak_pointer *weak_pointers;
-
 /* Copy a large boxed object. If the object is in a large object
  * region then it is simply promoted, else it is copied. If it's large
  * enough then it's copied to a large object region.

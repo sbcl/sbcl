@@ -1,3 +1,10 @@
+extern lispobj *from_space;
+extern lispobj *from_space_free_pointer;
+
+extern lispobj *new_space;
+extern lispobj *new_space_free_pointer;
+
+
 /* predicates */
 #if defined(DEBUG_SPACE_PREDICATES)
 
@@ -41,19 +48,3 @@ new_space_p(lispobj object)
 
 #endif
 
-static inline lispobj *
-gc_quick_alloc(bytes) {
-    lispobj *new=new_space_free_pointer;
-    new_space_free_pointer+=(bytes/4);
-    return new;
-}
-
-static inline lispobj  copy_large_unboxed_object(object, nwords) {
-    return copy_object(object,nwords);
-}
-static inline lispobj  copy_unboxed_object(object, nwords) {
-    return copy_object(object,nwords);
-}
-static inline lispobj  copy_large_object(object, nwords) {
-    return copy_object(object,nwords);
-}

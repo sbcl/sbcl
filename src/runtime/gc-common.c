@@ -68,7 +68,8 @@ forwarding_pointer_p(lispobj *pointer) {
 #ifdef LISP_FEATURE_GENCGC
     return (first_word == 0x01);
 #else
-    return (is_lisp_pointer(first_word) && new_space_p(first_word))
+    return (is_lisp_pointer((lispobj *)first_word)
+	    && new_space_p((lispobj *)first_word));
 #endif
 }
 
@@ -94,6 +95,7 @@ set_forwarding_pointer(lispobj * pointer, lispobj newspace_copy) {
 int (*scavtab[256])(lispobj *where, lispobj object);
 lispobj (*transother[256])(lispobj object);
 int (*sizetab[256])(lispobj *where);
+struct weak_pointer *weak_pointers;
 
 /*
  * copying objects
@@ -107,8 +109,8 @@ copy_object(lispobj object, int nwords)
     lispobj *new;
     lispobj *source, *dest;
 
-    gc_assert(is_lisp_pointer(object));
-    gc_assert(from_space_p(object));
+    gc_assert(is_lisp_pointer((lispobj *)object));
+    gc_assert(from_space_p((lispobj *)object));
     gc_assert((nwords & 0x01) == 0);
 
     /* Get tag of object. */
@@ -133,6 +135,7 @@ copy_object(lispobj object, int nwords)
     return ((lispobj) new) | tag;
 }
 
+static int scav_lose(lispobj *where, lispobj object); /* forward decl */
 
 /* FIXME: Most calls end up going to some trouble to compute an
  * 'n_words' value for this function. The system might be a little
@@ -176,7 +179,7 @@ scavenge(lispobj *start, long n_words)
 #ifndef LISP_FEATURE_GENCGC
 	/* this workaround is probably not necessary for gencgc; at least, the
 	 * behaviour it describes has never been reported */
-	else if (nwords==1) {
+	else if (n_words==1) {
 	    /* there are some situations where an
 	       other-immediate may end up in a descriptor
 	       register.  I'm not sure whether this is
@@ -185,8 +188,9 @@ scavenge(lispobj *start, long n_words)
 	       data-block, because there isn't one.  So, if
 	       we're checking a single word and it's anything
 	       other than a pointer, just hush it up */
-
-	    words_scavenged=1;
+	    int type=widetag_of(object);
+	    n_words_scavenged=1;
+	    
 	    if ((scavtab[type]==scav_lose) ||
 		(((scavtab[type])(start,object))>1)) {
 		fprintf(stderr,"warning: attempted to scavenge non-descriptor value %x at %p.  If you can\nreproduce this warning, send a test case to sbcl-devel@lists.sourceforge.net\n",

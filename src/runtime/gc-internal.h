@@ -32,8 +32,25 @@
 /* FIXME: Shouldn't this be defined in sbcl.h? */
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
 
+/* values for the *_alloc_* parameters */
+#define FREE_PAGE 0
+#define BOXED_PAGE 1
+#define UNBOXED_PAGE 2
+
+#define ALLOC_BOXED 0
+#define ALLOC_UNBOXED 1
+#define ALLOC_QUICK 1
+
+
 void *gc_general_alloc(int nbytes,int unboxed_p,int quick_p);
 void gc_init(void);
+
+extern int (*scavtab[256])(lispobj *where, lispobj object);
+extern lispobj (*transother[256])(lispobj object);
+extern int (*sizetab[256])(lispobj *where);
+
+extern struct weak_pointer *weak_pointers; /* in gc-common.c */
+
 
 lispobj  copy_large_unboxed_object(lispobj object, int nwords);
 lispobj  copy_unboxed_object(lispobj object, int nwords);
