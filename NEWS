@@ -1580,6 +1580,8 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
        all cases;
     ** DECLARE is no longer treated as a special-operator; in
        particular, SPECIAL-OPERATOR-P no longer returns T for DECLARE;
+  * incremented fasl file version number due to the change in the
+    DEFSTRUCT-SLOT-DESCRIPTION structure.
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
