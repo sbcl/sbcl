@@ -28,8 +28,8 @@
 #include "interr.h"
 
 /* So you need to debug? */
-#define PRINTNOISE
 #if 0
+#define PRINTNOISE
 #define DEBUG_SPACE_PREDICATES
 #define DEBUG_SCAVENGE_VERBOSE
 #define DEBUG_COPY_VERBOSE

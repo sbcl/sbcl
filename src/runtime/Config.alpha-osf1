@@ -1,0 +1,30 @@
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS += -Dalpha -Dosf1 -O0 -g -D_XOPEN_SOURCE=500 -D_OSF_SOURCE=500
+ASFLAGS += -Dalpha -Dosf1 #-ULANGUAGE_ASSEMBLY
+LD = ld -taso 
+LINKFLAGS = -non_shared # dynamic -v -g  -Wl,-T  -Wl,ld-script.alpha-linux
+NM = nm -B
+
+ASSEM_SRC = alpha-assem.s # ldso-stubs.s
+ARCH_SRC = alpha-arch.c undefineds.c
+
+# cancel gnumake's builtin rule for .S files, because digital's cc doesn't
+# know what to do with them
+%.o: %.S
+
+# copy .S files to .s, because digital cc does know what to do with _those_
+%.s:%.S
+	cp $^ $@
+
+OS_SRC = osf1-os.c  alpha-osf1-os.c os-common.c 
+OS_LIBS= #-ldl
+
+GC_SRC= gc.c
