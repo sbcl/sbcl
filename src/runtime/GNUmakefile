@@ -16,7 +16,6 @@ all: sbcl sbcl.nm
 # Config file
 CFLAGS =  -g -Wall -O3
 ASFLAGS = $(CFLAGS)
-DEPEND_FLAGS =
 CPPFLAGS = -I.
 
 # Some of these things might be Config-dependent in future versions,

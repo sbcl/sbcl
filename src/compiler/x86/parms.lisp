@@ -135,6 +135,19 @@
 ;;;     use. (They want to use this address range even if we try to
 ;;;     reserve it with a call to validate() as the first operation in
 ;;;     main().)
+;;;   * For NetBSD 2.0, the following ranges are used by normal
+;;;     executables and mmap:
+;;;     ** Executables are (by default) loaded at 0x08048000.
+;;;     ** The break for the sbcl runtime seems to end around 0x08400000
+;;;     We set read only space around 0x20000000, static
+;;;     space around 0x30000000, all ending below 0x37fff000
+;;;     ** ld.so and other mmap'ed stuff like shared libs start around
+;;;        0x48000000
+;;;     We set dynamic space between 0x60000000 and 0x98000000
+;;;     ** Bottom of the stack is typically not below 0xb0000000
+;;;     FYI, this can be looked at with the "pmap" program, and if you
+;;;     set the top-down mmap allocation option in the kernel (not yet
+;;;     the default), all bets are totally off!
 
 #!+linux
 (progn
@@ -148,7 +161,7 @@
   (def!constant dynamic-space-start   #x09000000)
   (def!constant dynamic-space-end     #x29000000))
 
-#!+bsd
+#!+(or freebsd openbsd)
 (progn
 
   (def!constant read-only-space-start #x10000000)
@@ -163,6 +176,19 @@
     #!+freebsd                             #x48000000
     #!+openbsd                             #x50000000)
   (def!constant dynamic-space-end          #x88000000))
+
+#!+netbsd
+(progn
+
+  (def!constant read-only-space-start #x20000000)
+  (def!constant read-only-space-end   #x2ffff000)
+
+  (def!constant static-space-start    #x30000000)
+  (def!constant static-space-end      #x37fff000)
+
+  (def!constant dynamic-space-start   #x60000000)
+  (def!constant dynamic-space-end     #x98000000))
+
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:

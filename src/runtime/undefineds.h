@@ -257,6 +257,7 @@ F(gethostbyname)
 F(gethostbyaddr)
 
 /* other miscellaneous things */
+/* FIXME: NetBSD needs to get fixed here too PEM 2004-03-27 */
 #if defined(SVR4) || defined(__FreeBSD__)
 F(setpgid)
 F(getpgid)

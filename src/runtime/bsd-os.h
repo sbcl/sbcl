@@ -49,9 +49,18 @@ typedef ucontext_t os_context_t;
  * so we need to implement single stepping in a more roundabout way. */
 #define CANNOT_GET_TO_SINGLE_STEP_FLAG
 #define SIG_MEMORY_FAULT SIGBUS
+
 #elif defined __OpenBSD__
+
 typedef struct sigcontext os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
+
+#elif defined __NetBSD__
+
+#include <ucontext.h>
+typedef ucontext_t os_context_t;
+#define SIG_MEMORY_FAULT SIGSEGV
+
 #elif defined LISP_FEATURE_DARWIN
   /* man pages claim that the third argument is a sigcontext struct,
      but ucontext_t is defined, matches sigcontext where sensible,
@@ -63,6 +72,7 @@ typedef struct sigcontext os_context_t;
 #include <ucontext.h>
 typedef ucontext_t os_context_t;
 #define SIG_MEMORY_FAULT SIGBUS
+
 #else
 #error unsupported BSD variant
 #endif

@@ -608,6 +608,10 @@ Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
   under CLISP.
 
+Perry E. Metzger:
+  He ported SBCL to NetBSD with newer signals, building on the
+  work of Valtteri Vuorikoski.
+
 Gerd Moellman:
   He has made many cleanups and improvements, small and large, in
   CMU CL (mostly in PCL), which we have gratefully ported to SBCL.  Of
