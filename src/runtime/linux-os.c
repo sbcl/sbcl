@@ -73,6 +73,7 @@ _syscall4(int,sys_futex,
 #include "gc.h"
 
 int linux_sparc_siginfo_bug = 0;
+int linux_no_threads_p = 0;
 
 void os_init(void)
 {
@@ -100,9 +101,9 @@ void os_init(void)
     }
 #ifdef LISP_FEATURE_SB_THREAD
     futex_wait(futex,-1);
-    if(errno==ENOSYS) {
-	lose("linux with NPTL support (e.g. kernel 2.6 or newer) required for thread-enabled SBCL");
-    }
+    if(errno==ENOSYS)  linux_no_threads_p = 1;
+    if(linux_no_threads_p) 
+	fprintf(stderr,"Linux with NPTL support (e.g. kernel 2.6 or newer) required for \nthread-enabled SBCL.  Disabling thread support.\n\n");
 #endif
     os_vm_page_size = getpagesize();
 }

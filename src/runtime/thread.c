@@ -28,6 +28,7 @@ int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
+extern int linux_no_threads_p;
 
 int
 initial_thread_trampoline(struct thread *th)
@@ -230,9 +231,11 @@ void create_initial_thread(lispobj initial_function) {
 
 #ifdef LISP_FEATURE_SB_THREAD
 pid_t create_thread(lispobj initial_function) {
-    struct thread *th=create_thread_struct(initial_function);
+    struct thread *th;
     pid_t kid_pid=0;
 
+    if(linux_no_threads_p) return 0;
+    th=create_thread_struct(initial_function);
     if(th==0) return 0;
     kid_pid=clone(new_thread_trampoline,
 		  (((void*)th->control_stack_start)+

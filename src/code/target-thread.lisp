@@ -185,6 +185,7 @@ time we reacquire LOCK and return to the caller."
 		    (funcall real-function))
 		  0))
 	      (values))))))
+    (when (zerop tid) (error "Can't create a new thread"))
     (with-mutex ((session-lock *session*))
       (pushnew tid (session-threads *session*)))
     tid))
