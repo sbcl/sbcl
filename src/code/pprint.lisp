@@ -875,15 +875,8 @@
       (let ((expr (compute-test-expr type 'object)))
 	(cond ((cdr (assoc expr *precompiled-pprint-dispatch-funs*
 			   :test #'equal)))
-	      ((fboundp 'compile)
-	       (compile nil `(lambda (object) ,expr)))
-	      (was-cons
-	       (warn "CONS PPRINT dispatch ignored w/o compiler loaded:~%  ~S"
-		     type)
-	       #'(lambda (object) (declare (ignore object)) nil))
 	      (t
-	       (let ((ttype (sb!kernel:specifier-type type)))
-		 #'(lambda (object) (sb!kernel:%typep object ttype)))))))))
+	       (compile nil `(lambda (object) ,expr))))))))
 
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))

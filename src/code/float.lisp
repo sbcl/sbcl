@@ -828,9 +828,9 @@
 	    (incf scale)))))))
 
 #|
-These might be useful if we ever have a machine w/o float/integer conversion
-hardware. For now, we'll use special ops that uninterruptibly frob the
-rounding modes & do ieee round-to-integer.
+These might be useful if we ever have a machine without float/integer
+conversion hardware. For now, we'll use special ops that
+uninterruptibly frob the rounding modes & do ieee round-to-integer.
 
 ;;; The compiler compiles a call to this when we are doing %UNARY-TRUNCATE
 ;;; and the result is known to be a fixnum. We can avoid some generic

@@ -261,7 +261,7 @@
 	 DOIT
 	 (return (progn ,@forms))))))
 
-;;; Delete the entry for String in Table. The entry must exist.
+;;; Delete the entry for STRING in TABLE. The entry must exist.
 (defun nuke-symbol (table string)
   (declare (simple-string string))
   (let* ((length (length string))
@@ -273,7 +273,7 @@
       (setf (aref (package-hashtable-table table) index) nil)
       (incf (package-hashtable-deleted table)))))
 
-;;; Enter any new Nicknames for Package into *package-names*.
+;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*.
 ;;; If there is a conflict then give the user a chance to do
 ;;; something about it.
 (defun enter-new-nicknames (package nicknames)

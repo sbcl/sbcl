@@ -1065,7 +1065,7 @@
 ;;; values to a continuation. If this continuation needs a type check,
 ;;; and has a single value, then we do a type check. We also
 ;;; CANONICALIZE-VALUES for the continuation's desired number of
-;;; values (w/o the placeholders.)
+;;; values (without the placeholders.)
 ;;;
 ;;; Somewhat unrelatedly, we also push placeholders for deleted
 ;;; arguments to local calls. Although we check first, the actual

@@ -361,7 +361,7 @@
 	      (res `(= (array-dimension ,obj ,i) ,dim)))))
 	(res)))))
 
-;;; If we can find a type predicate that tests for the type w/o
+;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
 ;;; Otherwise, just do %TYPEP.
 (defun source-transform-array-typep (obj type)

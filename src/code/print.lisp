@@ -763,15 +763,15 @@
       (when (test letter) (advance OTHER nil))
       (go START-STUFF)
 
-     START-DOT-STUFF ; leading stuff containing dot w/o digit...
+     START-DOT-STUFF ; leading stuff containing dot without digit...
       (when (test letter) (advance START-DOT-STUFF nil))
       (when (digitp) (advance DOT-DIGIT))
       (when (test sign extension dot slash) (advance START-DOT-STUFF nil))
       (when (test number other) (advance OTHER nil))
       (return t)
 
-     START-DOT-MARKER ; number marker in leading stuff w/ dot..
-      ;; leading stuff containing dot w/o digit followed by letter...
+     START-DOT-MARKER ; number marker in leading stuff with dot..
+      ;; leading stuff containing dot without digit followed by letter...
       (when (test letter) (advance OTHER nil))
       (go START-DOT-STUFF)
 

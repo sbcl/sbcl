@@ -264,12 +264,13 @@
   allowing RETURN to be used as an laternate exit mechanism."
   (do-do-body varlist endlist body 'let* 'setq 'do* nil))
 
-;;; DOTIMES and DOLIST could be defined more concisely using destructuring
-;;; macro lambda lists or DESTRUCTURING-BIND, but then it'd be tricky to use
-;;; them before those things were defined. They're used enough times before
-;;; destructuring mechanisms are defined that it looks as though it's worth
-;;; just implementing them ASAP, at the cost of being unable to use the
-;;; standard destructuring mechanisms.
+;;; DOTIMES and DOLIST could be defined more concisely using
+;;; destructuring macro lambda lists or DESTRUCTURING-BIND, but then
+;;; it'd be tricky to use them before those things were defined.
+;;; They're used enough times before destructuring mechanisms are
+;;; defined that it looks as though it's worth just implementing them
+;;; ASAP, at the cost of being unable to use the standard
+;;; destructuring mechanisms.
 (defmacro-mundanely dotimes (var-count-result &body body)
   (multiple-value-bind ; to roll our own destructuring
       (var count result)
@@ -292,13 +293,14 @@
       (apply (lambda (var list &optional (result nil))
 	       (values var list result))
 	     var-list-result)
-    ;; We repeatedly bind the var instead of setting it so that we never have
-    ;; to give the var an arbitrary value such as NIL (which might conflict
-    ;; with a declaration). If there is a result form, we introduce a
-    ;; gratuitous binding of the variable to NIL w/o the declarations, then
-    ;; evaluate the result form in that environment. We spuriously reference
-    ;; the gratuitous variable, since we don't want to use IGNORABLE on what
-    ;; might be a special var.
+    ;; We repeatedly bind the var instead of setting it so that we
+    ;; never have to give the var an arbitrary value such as NIL
+    ;; (which might conflict with a declaration). If there is a result
+    ;; form, we introduce a gratuitous binding of the variable to NIL
+    ;; without the declarations, then evaluate the result form in that
+    ;; environment. We spuriously reference the gratuitous variable,
+    ;; since we don't want to use IGNORABLE on what might be a special
+    ;; var.
     (let ((n-list (gensym)))
       `(do ((,n-list ,list (cdr ,n-list)))
 	   ((endp ,n-list)

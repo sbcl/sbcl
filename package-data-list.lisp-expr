@@ -517,6 +517,10 @@ like *STACK-TOP-HINT*"
              ;; There is no one right way to do DESCRIBE.
              "*DESCRIBE-INDENTATION-STEP*"
 
+             ;; It can be handy to be able to evaluate expressions involving
+             ;; the thing under examination by CL:INSPECT.
+             "*INSPECTED*"
+
              ;; There is no one right way to do efficiency notes.
              "*EFFICIENCY-NOTE-COST-THRESHOLD*" "*EFFICIENCY-NOTE-LIMIT*"
 
