@@ -2166,6 +2166,7 @@
 	      (values nil certain?))))))
 
 (!define-type-method (union :complex-=) (type1 type2)
+  (declare (ignore type1))
   (if (some #'hairy-type-p (union-type-types type2))
       (values nil nil)
       (values nil t)))

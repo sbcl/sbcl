@@ -163,29 +163,37 @@
 	    (truename stream)))
 
     ;; Try to use the compiler to generate a new temporary object file.
-    (multiple-value-bind (output-truename warnings-p failure-p)
-	(funcall compile-file src :output-file tmp-obj)
-      (declare (ignore warnings-p))
-      (cond ((not output-truename)
-	     (error "couldn't compile ~S" src))
-	    (failure-p
-	     (if ignore-failure-p
-		 (warn "ignoring FAILURE-P return value from compilation of ~S"
-		       src)
-		 (unwind-protect
-		     (progn
-		       ;; FIXME: This should have another option,
-		       ;; redoing compilation.
-		       (cerror "Continue, using possibly-bogus ~S."
-			       "FAILURE-P was set when creating ~S."
-			       obj)
-		       (setf failure-p nil))
-		   ;; Don't leave failed object files lying around.
-		   (when (and failure-p (probe-file tmp-obj))
-		     (delete-file tmp-obj)
-		     (format t "~&deleted ~S~%" tmp-obj)))))
-	    ;; Otherwise: success, just fall through.
-	    (t nil)))
+    (flet ((report-recompile-restart (stream)
+             (format stream "Recompile file ~S" src))
+           (report-continue-restart (stream)
+             (format stream "Continue, using possibly bogus file ~S" obj)))
+      (tagbody
+       retry-compile-file
+         (multiple-value-bind (output-truename warnings-p failure-p)
+             (funcall compile-file src :output-file tmp-obj)
+           (declare (ignore warnings-p))
+           (cond ((not output-truename)
+                  (error "couldn't compile ~S" src))
+                 (failure-p
+                  (if ignore-failure-p
+                      (warn "ignoring FAILURE-P return value from compilation of ~S"
+                            src)
+                      (unwind-protect
+                           (restart-case
+                               (error "FAILURE-P was set when creating ~S."
+                                      obj)
+                             (recompile ()
+                               :report report-recompile-restart
+                               (go retry-compile-file))
+                             (continue ()
+                               :report report-continue-restart
+                               (setf failure-p nil)))
+                        ;; Don't leave failed object files lying around.
+                        (when (and failure-p (probe-file tmp-obj))
+                          (delete-file tmp-obj)
+                          (format t "~&deleted ~S~%" tmp-obj)))))
+                 ;; Otherwise: success, just fall through.
+                 (t nil)))))
 
     ;; If we get to here, compilation succeeded, so it's OK to rename
     ;; the temporary output file to the permanent object file.
