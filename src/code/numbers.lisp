@@ -1358,8 +1358,8 @@
 #.
 (collect ((forms))
   (flet ((definition (name lambda-list width pattern)
-           ;; We rely on (SUBTYPEP `(UNSIGNED-BYTE ,WIDTH)
-           ;;                      'BIGNUM-ELEMENT-TYPE)
+           (assert (sb!xc:subtypep `(unsigned-byte ,width)
+                                   'bignum-element-type))
            `(defun ,name ,lambda-list
               (flet ((prepare-argument (x)
                        (declare (integer x))

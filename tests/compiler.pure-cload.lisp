@@ -101,6 +101,20 @@
            (optimize (speed 3) (safety 1) (debug 1)))
   (let ((v3 (min -1720 b))) (max v3 (logcount (if (= v3 b) b b)))))
 
+;;; RESULT-FORM in DO is not contained in the implicit TAGBODY
+(assert (eq (handler-case (eval `(do ((x '(1 2 3) (cdr x)))
+                                     ((endp x) (go :loop))
+                                  :loop
+                                   (unless x (return :bad))))
+              (error () :good))
+            :good))
+(assert (eq (handler-case (eval `(do* ((x '(1 2 3) (cdr x)))
+                                      ((endp x) (go :loop))
+                                  :loop
+                                   (unless x (return :bad))))
+              (error () :good))
+            :good))
+
 ;;; bug 282
 ;;;
 ;;; Verify type checking policy in full calls: the callee is supposed

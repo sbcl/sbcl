@@ -1985,6 +1985,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     used when the result is truncated to 32 bits.
   * VALUES declaration is partially enabled.
   * fixes in SB-GROVEL (thanks to Andreas Fuchs)
+  * bug fix: result form in DO is not contained in the implicit
+    TAGBODY.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** The system now obeys the constraint imposed by
        UPGRADED-ARRAY-ELEMENT-TYPE that the upgraded array element

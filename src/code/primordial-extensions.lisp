@@ -104,13 +104,13 @@
 	   (,bind ,(nreverse r-inits)
 		  ,@decls
 		  (tagbody
-		   (go ,label-2)
-		   ,label-1
-		   ,@code
-		   (,step ,@(nreverse r-steps))
-		   ,label-2
-		   (unless ,(first endlist) (go ,label-1))
-		   (return-from ,block (progn ,@(rest endlist))))))))))
+                     (go ,label-2)
+                     ,label-1
+                     (tagbody ,@code)
+                     (,step ,@(nreverse r-steps))
+                     ,label-2
+                     (unless ,(first endlist) (go ,label-1))
+                     (return-from ,block (progn ,@(rest endlist))))))))))
 
 ;;; This is like DO, except it has no implicit NIL block. Each VAR is
 ;;; initialized in parallel to the value of the specified INIT form.
