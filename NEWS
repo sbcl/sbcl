@@ -1196,6 +1196,9 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
     suppressed.) Also now that the compiler is looking at declarations
     in the environment, it checks optimization declarations as well,
     and suppresses inlining when (> DEBUG SPEED).
+  * More fixes have been made to treatment of floating point exception
+    treatment and other Unix signals.  In particular, floating point
+    exceptions no longer cause Bus errors on the SPARC/Linux platform.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

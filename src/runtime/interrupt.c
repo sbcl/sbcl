@@ -342,6 +342,15 @@ interrupt_handle_pending(os_context_t *context)
  * the two main signal handlers:
  *   interrupt_handle_now(..)
  *   maybe_now_maybe_later(..)
+ *
+ * to which we have added interrupt_handle_now_handler(..).  Why?
+ * Well, mostly because the SPARC/Linux platform doesn't quite do
+ * signals the way we want them done.  The third argument in the
+ * handler isn't filled in by the kernel properly, so we fix it up
+ * ourselves in the arch_os_get_context(..) function; however, we only
+ * want to do this when we first hit the handler, and not when
+ * interrupt_handle_now(..) is being called from some other handler
+ * (when the fixup will already have been done). -- CSR, 2002-07-23
  */
 
 void
@@ -354,9 +363,9 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     union interrupt_handler handler;
 
 #ifdef LISP_FEATURE_LINUX
-    /* Under Linux, we appear to have to restore the fpu control word
-       from the context, as after the signal is delivered we appear to
-       have a null fpu control word. */
+    /* Under Linux on some architectures, we appear to have to restore
+       the FPU control word from the context, as after the signal is
+       delivered we appear to have a null FPU control word. */
     os_restore_fp_control(context);
 #endif 
     handler = interrupt_handlers[signal];
@@ -434,15 +443,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
-    os_context_t *context = (os_context_t*)void_context;
+    os_context_t *context = arch_os_get_context(&void_context);
 
-    /* FIXME: See Debian cmucl 2.4.17, and mail from DTC on the CMU CL
-     * mailing list 23 Oct 1999, for changes in FPU handling at
-     * interrupt time which should be ported into SBCL. Also see the
-     * analogous logic at the head of interrupt_handle_now for
-     * more related FIXME stuff. 
-     */
-    
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif 
@@ -488,6 +490,14 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     }
 }
 
+
+void
+interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
+{
+    os_context_t *context = arch_os_get_context(&void_context);
+    interrupt_handle_now(signal, info, context);
+}
+
 /*
  * stuff to detect and handle hitting the GC trigger
  */
@@ -528,18 +538,31 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 	 * user's backtrace makes (as much) sense (as usual) */
 	build_fake_control_stack_frames(context);
 	/* signal handler will "return" to this error-causing function */
-	*os_context_pc_addr(context)= function;
+	*os_context_pc_addr(context) = function;
 #ifndef LISP_FEATURE_X86
 	/* this much of the calling convention is common to all
 	   non-x86 ports */
-	*os_context_register_addr(context,reg_NARGS)=0; 
-	*os_context_register_addr(context,reg_LIP)= function;
-	*os_context_register_addr(context,reg_CFP)= 
+	*os_context_register_addr(context,reg_NARGS) = 0; 
+	*os_context_register_addr(context,reg_LIP) = function;
+	*os_context_register_addr(context,reg_CFP) = 
 	    current_control_frame_pointer;
-#ifdef ARCH_HAS_NPC_REGISTER
-	*os_context_register_addr(context,reg_LIP)=
-	    4+*os_context_pc_addr(context);
 #endif
+#ifdef ARCH_HAS_NPC_REGISTER
+	*os_context_npc_addr(context) =
+	    4 + *os_context_pc_addr(context);
+#endif
+#ifdef LISP_FEATURE_SPARC
+	/* Bletch.  This is a feature of the SPARC calling convention,
+	   which sadly I'm not going to go into in large detail here,
+	   as I don't know it well enough.  Suffice to say that if the
+	   line 
+
+	   (INST MOVE CODE-TN FUNCTION) 
+
+	   in compiler/sparc/call.lisp is changed, then this bit can
+	   probably go away. -- CSR, 2002-07-24 */
+	*os_context_register_addr(context,reg_CODE) = 
+	    function - SIMPLE_FUN_CODE_OFFSET;
 #endif
 	return 1;
     }
@@ -720,7 +743,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 	} else if (sigismember(&new, signal)) {
 	    sa.sa_sigaction = maybe_now_maybe_later;
 	} else {
-	    sa.sa_sigaction = interrupt_handle_now;
+	    sa.sa_sigaction = interrupt_handle_now_handler;
 	}
 
 	sigemptyset(&sa.sa_mask);

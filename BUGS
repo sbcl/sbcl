@@ -1319,12 +1319,6 @@ WORKAROUND:
   the compiler handle the error, convert it into a COMPILER-ERROR, and
   continue compiling) which seems wrong.
 
-182: "SPARC/Linux floating point"
-  Evaluating (/ 1.0 0.0) at the prompt causes a Bus error and complete
-  death of the environment. Other floating point operations sometimes
-  return infinities when they should raise traps (e.g. the test case
-  for bug #146, (expt 2.0 12777)).
-
 183: "IEEE floating point issues"
   Even where floating point handling is being dealt with relatively
   well (as of sbcl-0.7.5, on sparc/sunos and alpha; see bug #146), the
