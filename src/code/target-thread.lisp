@@ -1,16 +1,27 @@
+;;;; support for threads in the target machine
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!THREAD")
 
 ;;; FIXME it would be good to define what a thread id is or isn't (our
 ;;; current assumption is that it's a fixnum).  It so happens that on
 ;;; Linux it's a pid, but it might not be on posix thread implementations
 
-(sb!alien::define-alien-routine ("create_thread" %create-thread)
-     sb!alien:unsigned-long
-  (lisp-fun-address sb!alien:unsigned-long))
+(define-alien-routine ("create_thread" %create-thread)
+    unsigned-long
+  (lisp-fun-address unsigned-long))
 
-(sb!alien::define-alien-routine "signal_thread_to_dequeue"
-    sb!alien:unsigned-int
-  (thread-id sb!alien:unsigned-long))
+(define-alien-routine "signal_thread_to_dequeue"
+    unsigned-int
+  (thread-id unsigned-long))
 
 (defvar *session* nil)
 
@@ -154,16 +165,6 @@
   (declare (type mutex lock))
   (setf (mutex-value lock) nil)
   (futex-wake (mutex-value-address lock) 1))
-
-
-(defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
-  (with-unique-names (got)
-    `(let ((,got (get-mutex ,mutex ,value ,wait-p)))
-      (when ,got
-	(unwind-protect
-	     (progn ,@body)
-	  (release-mutex ,mutex))))))
-
 
 ;;;; condition variables
 

@@ -1,3 +1,14 @@
+;;;; unithread stub support for threads in the target machine
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!THREAD")
 
 ;;; used bu debug-int.lisp to access interrupt contexts
@@ -92,16 +103,19 @@
        (return t))
      (setf old-value t1))))
 
-(defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
-  (cond ((not wait-p)
-	 `(unless (mutex-value ,mutex)
-	   (unwind-protect
-		(progn
-		  (setf (mutex-value ,mutex) (or ,value t))
-		  ,@body)
-	     (setf (mutex-value ,mutex) nil))))
-	(t 
-	 `(progn ,@body))))
+(defun get-mutex (lock &optional new-value (wait-p t))
+  (declare (type mutex lock))
+  (let ((old-value (mutex-value lock)))
+    (when (and old-value wait-p)
+      (error "In unithread mode, mutex ~S was requested with WAIT-P ~S and ~
+              new-value ~S, but has already been acquired (with value ~S)."
+	     lock wait-p new-value old-value))
+    (setf (mutex-value lock) new-value)
+    t))
+
+(defun release-mutex (lock)
+  (declare (type mutex lock))
+  (setf (mutex-value lock) nil))
 
 ;;; what's the best thing to do with these on unithread?  commented
 ;;; functions are the thread versions, just to remind me what they do
