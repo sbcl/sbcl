@@ -11,6 +11,11 @@
 
 (in-package "SB!VM")
 
+
+;; For use in constant indexing; we can't use INDEX since the displacement
+;; field of an EA can't contain 64 bit values.
+(deftype low-index () '(signed-byte 29))
+
 ;;;; allocator for the array header
 
 (define-vop (make-array-header)
@@ -184,7 +189,7 @@
 	 (:translate data-vector-ref)
 	 (:policy :fast-safe)
 	 (:args (object :scs (descriptor-reg)))
-	 (:arg-types ,type (:constant index))
+	 (:arg-types ,type (:constant low-index))
 	 (:info index)
 	 (:results (result :scs (unsigned-reg)))
 	 (:result-types positive-fixnum)
@@ -245,7 +250,7 @@
 	 (:policy :fast-safe)
 	 (:args (object :scs (descriptor-reg))
 		(value :scs (unsigned-reg immediate) :target result))
-	 (:arg-types ,type (:constant index) positive-fixnum)
+	 (:arg-types ,type (:constant low-index) positive-fixnum)
 	 (:temporary (:sc unsigned-reg) mask-tn)
 	 (:info index)
 	 (:results (result :scs (unsigned-reg)))
@@ -317,7 +322,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-single-float (:constant (signed-byte 61)))
+  (:arg-types simple-array-single-float (:constant low-index))
   (:results (value :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
@@ -356,7 +361,7 @@
   (:args (object :scs (descriptor-reg))
 	 (value :scs (single-reg) :target result))
   (:info index)
-  (:arg-types simple-array-single-float (:constant (signed-byte 29))
+  (:arg-types simple-array-single-float (:constant low-index)
 	      single-float)
   (:results (result :scs (single-reg)))
   (:result-types single-float)
@@ -391,7 +396,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-double-float (:constant (signed-byte 29)))
+  (:arg-types simple-array-double-float (:constant low-index))
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 6
@@ -427,7 +432,7 @@
   (:args (object :scs (descriptor-reg))
 	 (value :scs (double-reg) :target result))
   (:info index)
-  (:arg-types simple-array-double-float (:constant (signed-byte 61))
+  (:arg-types simple-array-double-float (:constant low-index)
 	      double-float)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
@@ -472,7 +477,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-complex-single-float (:constant (signed-byte 29)))
+  (:arg-types simple-array-complex-single-float (:constant low-index))
   (:results (value :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 4
@@ -528,7 +533,7 @@
   (:args (object :scs (descriptor-reg))
 	 (value :scs (complex-single-reg) :target result))
   (:info index)
-  (:arg-types simple-array-complex-single-float (:constant (signed-byte 61))
+  (:arg-types simple-array-complex-single-float (:constant low-index)
 	      complex-single-float)
   (:results (result :scs (complex-single-reg)))
   (:result-types complex-single-float)
@@ -582,7 +587,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-complex-double-float (:constant (signed-byte 29)))
+  (:arg-types simple-array-complex-double-float (:constant low-index))
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 6
@@ -638,7 +643,7 @@
   (:args (object :scs (descriptor-reg))
 	 (value :scs (complex-double-reg) :target result))
   (:info index)
-  (:arg-types simple-array-complex-double-float (:constant (signed-byte 61))
+  (:arg-types simple-array-complex-double-float (:constant low-index)
 	      complex-double-float)
   (:results (result :scs (complex-double-reg)))
   (:result-types complex-double-float)
@@ -687,7 +692,7 @@
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg)))
       (:info index)
-      (:arg-types ,ptype (:constant (signed-byte 61)))
+      (:arg-types ,ptype (:constant low-index))
       (:results (value :scs (unsigned-reg signed-reg)))
       (:result-types positive-fixnum)
       (:generator 4
@@ -720,7 +725,7 @@
       (:args (object :scs (descriptor-reg) :to (:eval 0))
 	     (value :scs (unsigned-reg signed-reg) :target eax))
       (:info index)
-      (:arg-types ,ptype (:constant (signed-byte 61))
+      (:arg-types ,ptype (:constant low-index)
 		  positive-fixnum)
       (:temporary (:sc unsigned-reg :offset eax-offset :target result
 		       :from (:argument 1) :to (:result 0))
@@ -758,7 +763,7 @@
 	(:policy :fast-safe)
 	(:args (object :scs (descriptor-reg)))
 	(:info index)
-	(:arg-types ,ptype (:constant (signed-byte 29)))
+	(:arg-types ,ptype (:constant low-index))
 	(:results (value :scs (unsigned-reg signed-reg)))
 	(:result-types positive-fixnum)
 	(:generator 4
@@ -792,7 +797,7 @@
 	(:args (object :scs (descriptor-reg) :to (:eval 0))
 	       (value :scs (unsigned-reg signed-reg) :target eax))
 	(:info index)
-	(:arg-types ,ptype (:constant (signed-byte 29))
+	(:arg-types ,ptype (:constant low-index)
 		    positive-fixnum)
 	(:temporary (:sc unsigned-reg :offset eax-offset :target result
 			 :from (:argument 1) :to (:result 0))
@@ -830,7 +835,7 @@
 	(:policy :fast-safe)
 	(:args (object :scs (descriptor-reg)))
 	(:info index)
-	(:arg-types ,ptype (:constant (signed-byte 61)))
+	(:arg-types ,ptype (:constant low-index))
 	(:results (value :scs (unsigned-reg signed-reg)))
 	(:result-types positive-fixnum)
 	(:generator 4
@@ -865,7 +870,7 @@
 	(:args (object :scs (descriptor-reg) :to (:eval 0))
 	       (value :scs (unsigned-reg signed-reg) :target rax))
 	(:info index)
-	(:arg-types ,ptype (:constant (signed-byte 61))
+	(:arg-types ,ptype (:constant low-index)
 		    positive-fixnum)
 	(:temporary (:sc unsigned-reg :offset rax-offset :target result
 			 :from (:argument 1) :to (:result 0))
@@ -904,7 +909,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 61)))
+  (:arg-types simple-base-string (:constant low-index))
   (:results (value :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 4
@@ -935,7 +940,7 @@
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (value :scs (base-char-reg)))
   (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 61)) base-char)
+  (:arg-types simple-base-string (:constant low-index) base-char)
   (:results (result :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 4
@@ -966,7 +971,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-signed-byte-8 (:constant (signed-byte 61)))
+  (:arg-types simple-array-signed-byte-8 (:constant low-index))
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num)
   (:generator 4
@@ -1001,7 +1006,7 @@
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (value :scs (signed-reg) :target eax))
   (:info index)
-  (:arg-types simple-array-signed-byte-8 (:constant (signed-byte 61))
+  (:arg-types simple-array-signed-byte-8 (:constant low-index)
 	      tagged-num)
   (:temporary (:sc unsigned-reg :offset eax-offset :target result
 		   :from (:argument 1) :to (:result 0))
@@ -1037,7 +1042,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-signed-byte-16 (:constant (signed-byte 61)))
+  (:arg-types simple-array-signed-byte-16 (:constant low-index))
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num)
   (:generator 4
@@ -1073,7 +1078,7 @@
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (value :scs (signed-reg) :target eax))
   (:info index)
-  (:arg-types simple-array-signed-byte-16 (:constant (signed-byte 61)) tagged-num)
+  (:arg-types simple-array-signed-byte-16 (:constant low-index) tagged-num)
   (:temporary (:sc signed-reg :offset eax-offset :target result
 		   :from (:argument 1) :to (:result 0))
 	      eax)
@@ -1109,7 +1114,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-array-signed-byte-32 (:constant (signed-byte 61)))
+  (:arg-types simple-array-signed-byte-32 (:constant low-index))
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num)
   (:generator 4
@@ -1145,7 +1150,7 @@
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (value :scs (signed-reg) :target eax))
   (:info index)
-  (:arg-types simple-array-signed-byte-32 (:constant (signed-byte 61)) tagged-num)
+  (:arg-types simple-array-signed-byte-32 (:constant low-index) tagged-num)
   (:temporary (:sc signed-reg :offset eax-offset :target result
 		   :from (:argument 1) :to (:result 0))
 	      eax)
@@ -1168,25 +1173,25 @@
   (:arg-types sb!c::raw-vector positive-fixnum))
 (define-vop (raw-ref-single-c data-vector-ref-c/simple-array-single-float)
   (:translate %raw-ref-single)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant low-index)))
 (define-vop (raw-set-single data-vector-set/simple-array-single-float)
   (:translate %raw-set-single)
   (:arg-types sb!c::raw-vector positive-fixnum single-float))
 (define-vop (raw-set-single-c data-vector-set-c/simple-array-single-float)
   (:translate %raw-set-single)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61)) single-float))
+  (:arg-types sb!c::raw-vector (:constant low-index) single-float))
 (define-vop (raw-ref-double data-vector-ref/simple-array-double-float)
   (:translate %raw-ref-double)
   (:arg-types sb!c::raw-vector positive-fixnum))
 (define-vop (raw-ref-double-c data-vector-ref-c/simple-array-double-float)
   (:translate %raw-ref-double)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant low-index)))
 (define-vop (raw-set-double data-vector-set/simple-array-double-float)
   (:translate %raw-set-double)
   (:arg-types sb!c::raw-vector positive-fixnum double-float))
 (define-vop (raw-set-double-c data-vector-set-c/simple-array-double-float)
   (:translate %raw-set-double)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61)) double-float))
+  (:arg-types sb!c::raw-vector (:constant low-index) double-float))
 
 
 ;;;; complex-float raw structure slot accessors
@@ -1198,7 +1203,7 @@
 (define-vop (raw-ref-complex-single-c
 	     data-vector-ref-c/simple-array-complex-single-float)
   (:translate %raw-ref-complex-single)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant low-index)))
 (define-vop (raw-set-complex-single
 	     data-vector-set/simple-array-complex-single-float)
   (:translate %raw-set-complex-single)
@@ -1206,7 +1211,7 @@
 (define-vop (raw-set-complex-single-c
 	     data-vector-set-c/simple-array-complex-single-float)
   (:translate %raw-set-complex-single)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))
+  (:arg-types sb!c::raw-vector (:constant low-index)
 	      complex-single-float))
 (define-vop (raw-ref-complex-double
 	     data-vector-ref/simple-array-complex-double-float)
@@ -1215,7 +1220,7 @@
 (define-vop (raw-ref-complex-double-c
 	     data-vector-ref-c/simple-array-complex-double-float)
   (:translate %raw-ref-complex-double)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))))
+  (:arg-types sb!c::raw-vector (:constant low-index)))
 (define-vop (raw-set-complex-double
 	     data-vector-set/simple-array-complex-double-float)
   (:translate %raw-set-complex-double)
@@ -1223,7 +1228,7 @@
 (define-vop (raw-set-complex-double-c
 	     data-vector-set-c/simple-array-complex-double-float)
   (:translate %raw-set-complex-double)
-  (:arg-types sb!c::raw-vector (:constant (signed-byte 61))
+  (:arg-types sb!c::raw-vector (:constant low-index)
 	      complex-double-float))
 
 

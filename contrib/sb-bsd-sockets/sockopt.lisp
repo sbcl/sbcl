@@ -49,7 +49,7 @@ Code for options that not every system has should be conditionalised:
       (defun ,lisp-name (socket)
 	,@(when documentation (list (concatenate 'string documentation " " info)))
 	,(if supportedp
-	     `(sb-alien:with-alien ((size sb-alien:integer)
+	     `(sb-alien:with-alien ((size sb-alien:int)
 				      (buffer ,buffer-type))
 		  (setf size (sb-alien:alien-size ,buffer-type :bytes))
 		  (if (= -1 (sockint::getsockopt (socket-file-descriptor socket)
@@ -81,12 +81,12 @@ Code for options that not every system has should be conditionalised:
 ;;; sockopts that have integer arguments
 
 (defun foreign-int-to-integer (buffer size)
-  (assert (= size (sb-alien:alien-size sb-alien:integer :bytes)))
+  (assert (= size (sb-alien:alien-size sb-alien:int :bytes)))
   buffer)
 
 (defmacro define-socket-option-int (name level number &optional features (info ""))
   `(define-socket-option ,name nil ,level ,number
-     sb-alien:integer nil foreign-int-to-integer sb-alien:addr ,features ,info))
+     sb-alien:int nil foreign-int-to-integer sb-alien:addr ,features ,info))
 
 (define-socket-option-int
   sockopt-receive-low-water sockint::sol-socket sockint::so-rcvlowat)
@@ -118,7 +118,7 @@ Code for options that not every system has should be conditionalised:
                  This can also be updated with SETF.~:@>"
 	     (symbol-name c-name))
     ,level ,c-name
-    sb-alien:integer bool-to-foreign-int foreign-int-to-bool sb-alien:addr
+    sb-alien:int bool-to-foreign-int foreign-int-to-bool sb-alien:addr
     ,features ,info))
 
 (define-socket-option-bool

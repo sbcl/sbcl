@@ -1819,6 +1819,7 @@
      (maybe-emit-operand-size-prefix segment size)
      (flet ((test-immed-and-something (immed something)
 	      (cond ((accumulator-p something)
+		     (maybe-emit-rex-for-ea segment something nil)
 		     (emit-byte segment
 				(if (eq size :byte) #b10101000 #b10101001))
 		     (emit-sized-immediate segment size immed))

@@ -133,62 +133,62 @@
                       (integer type "int" "h_addrtype")
                       (integer length "int" "h_length")
                       ((* (* (unsigned 8))) addresses "char **" "h_addr_list")))
- (:function socket ("socket" integer
-                    (domain integer)
-                    (type integer)
-                    (protocol integer)))
- (:function bind ("bind" integer
-                  (sockfd integer)
+ (:function socket ("socket" int
+                    (domain int)
+                    (type int)
+                    (protocol int)))
+ (:function bind ("bind" int
+                  (sockfd int)
                   (my-addr (* t))  ; KLUDGE: sockaddr-in or sockaddr-un?
-                  (addrlen integer)))
- (:function listen ("listen" integer
-                    (socket integer)
-                    (backlog integer)))
- (:function accept ("accept" integer
-                    (socket integer)
+                  (addrlen int)))
+ (:function listen ("listen" int
+                    (socket int)
+                    (backlog int)))
+ (:function accept ("accept" int
+                    (socket int)
                     (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                    (addrlen integer :in-out)))
- (:function getpeername ("getpeername" integer
-                         (socket integer)
+                    (addrlen int :in-out)))
+ (:function getpeername ("getpeername" int
+                         (socket int)
                          (her-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                         (addrlen integer :in-out)))
- (:function getsockname ("getsockname" integer
-                         (socket integer)
+                         (addrlen int :in-out)))
+ (:function getsockname ("getsockname" int
+                         (socket int)
                          (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                         (addrlen integer :in-out)))
- (:function connect ("connect" integer
-                    (socket integer)
+                         (addrlen int :in-out)))
+ (:function connect ("connect" int
+                    (socket int)
                     (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                    (addrlen integer )))
+                    (addrlen int )))
  
- (:function close ("close" integer
-                   (fd integer)))
- (:function recvfrom ("recvfrom" integer
-				 (socket integer)
+ (:function close ("close" int
+                   (fd int)))
+ (:function recvfrom ("recvfrom" int
+				 (socket int)
 				 (buf (* t))
 				 (len integer)
-				 (flags integer)
+				 (flags int)
 				 (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
 				 (socklen (* socklen-t))))
  (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
  (:function gethostbyaddr ("gethostbyaddr" (* hostent)
 					   (addr (* t))
-					   (len integer)
-					   (af integer)))
- (:function setsockopt ("setsockopt" integer
-                        (socket integer)
-                        (level integer)
-                        (optname integer)
+					   (len int)
+					   (af int)))
+ (:function setsockopt ("setsockopt" int
+                        (socket int)
+                        (level int)
+                        (optname int)
                         (optval (* t))
-                        (optlen integer)))
- (:function fcntl ("fcntl" integer
-                   (fd integer)
-                   (cmd integer)
-                   (arg integer)))
- (:function getsockopt ("getsockopt" integer
-                        (socket integer)
-                        (level integer)
-                        (optname integer)
+                        (optlen int)))
+ (:function fcntl ("fcntl" int
+                   (fd int)
+                   (cmd int)
+                   (arg long)))
+ (:function getsockopt ("getsockopt" int
+                        (socket int)
+                        (level int)
+                        (optname int)
                         (optval (* t))
-                        (optlen (* integer)))))
+                        (optlen (* int)))))
 )
