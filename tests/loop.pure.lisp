@@ -179,3 +179,27 @@
   (assert (= (loop for v fixnum being each hash-value in ht sum v) 18))
   (assert (raises-error? (loop for v float being each hash-value in ht sum v)
                          type-error)))
+
+;; arithmetic indexes can be NIL or symbols.
+(assert (equal (loop for nil from 0 to 2 collect nil)
+	       '(nil nil nil)))
+(assert (equal (loop for nil to 2 collect nil)
+	       '(nil nil nil)))
+
+;; although allowed by the loop syntax definition in 6.2/LOOP,
+;; 6.1.2.1.1 says: "The variable var is bound to the value of form1 in
+;; the first iteration[...]"; since we can't bind (i j) to anything,
+;; we give a program error.
+(multiple-value-bind (function warnings-p failure-p)
+    (compile nil
+	     `(lambda ()
+		(loop for (i j) from 4 to 6 collect nil)))
+  (assert failure-p))
+
+;; ...and another for indexes without FROM forms (these are treated
+;; differently by the loop code right now
+(multiple-value-bind (function warnings-p failure-p)
+    (compile nil
+	     `(lambda ()
+		(loop for (i j) to 6 collect nil)))
+  (assert failure-p))

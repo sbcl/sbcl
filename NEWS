@@ -2126,6 +2126,9 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
     with values NIL and :ERROR.  (thanks to Milan Zamazal)
   * fixed bug 191c: CLOS now does proper keyword argument checking as
     described in CLHS 7.6.5 and 7.6.5.1.
+  * bug fix: LOOP forms using NIL as a for-as-arithmetic counter no
+    longer raise an error; further, using a list as a for-as-arithmetic
+    counter now raises a meaningful error.
   * compiler enhancement: SIGNUM is now better able to derive the type
     of its result.
   * type declarations inside WITH-SLOTS are checked.  (reported by

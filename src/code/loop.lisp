@@ -1026,11 +1026,11 @@ code to be loaded.
 
 (defun loop-make-var (name initialization dtype &optional iteration-var-p)
   (cond ((null name)
-	 (cond ((not (null initialization))
-		(push (list (setq name (gensym "LOOP-IGNORE-"))
-			    initialization)
-		      *loop-vars*)
-		(push `(ignore ,name) *loop-declarations*))))
+	 (setq name (gensym "LOOP-IGNORE-"))
+	 (push (list name initialization) *loop-vars*)
+	 (if (null initialization)
+	     (push `(ignore ,name) *loop-declarations*)
+	     (loop-declare-var name dtype)))
 	((atom name)
 	 (cond (iteration-var-p
 		(if (member name *loop-iteration-vars*)
@@ -1699,109 +1699,122 @@ code to be loaded.
 	 (limit-constantp nil)
 	 (limit-value nil)
 	 )
-     (when variable (loop-make-iteration-var variable nil variable-type))
-     (do ((l prep-phrases (cdr l)) (prep) (form) (odir)) ((null l))
-       (setq prep (caar l) form (cadar l))
-       (case prep
-	 ((:of :in)
-	  (setq sequencep t)
-	  (loop-make-var sequence-variable form sequence-type))
-	 ((:from :downfrom :upfrom)
-	  (setq start-given t)
-	  (cond ((eq prep :downfrom) (setq dir ':down))
-		((eq prep :upfrom) (setq dir ':up)))
-	  (multiple-value-setq (form start-constantp start-value)
-	    (loop-constant-fold-if-possible form indexv-type))
-	  (loop-make-iteration-var indexv form indexv-type))
-	 ((:upto :to :downto :above :below)
-	  (cond ((loop-tequal prep :upto) (setq inclusive-iteration
-						(setq dir ':up)))
-		((loop-tequal prep :to) (setq inclusive-iteration t))
-		((loop-tequal prep :downto) (setq inclusive-iteration
-						  (setq dir ':down)))
-		((loop-tequal prep :above) (setq dir ':down))
-		((loop-tequal prep :below) (setq dir ':up)))
-	  (setq limit-given t)
-	  (multiple-value-setq (form limit-constantp limit-value)
-	    (loop-constant-fold-if-possible form `(and ,indexv-type real)))
-	  (setq endform (if limit-constantp
-			    `',limit-value
-			    (loop-make-var
-			     (gensym "LOOP-LIMIT-") form
-			      `(and ,indexv-type real)))))
-	 (:by
-	  (multiple-value-setq (form stepby-constantp stepby)
-	    (loop-constant-fold-if-possible form `(and ,indexv-type (real (0)))))
-	  (unless stepby-constantp
-	    (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
-			   form
-			   `(and ,indexv-type (real (0))))))
-	 (t (loop-error
-	     "~S invalid preposition in sequencing or sequence path;~@
+     (flet ((assert-index-for-arithmetic (index)
+	      (unless (atom indexv)
+		(loop-error "Arithmetic index must be an atom."))))
+       (when variable (loop-make-iteration-var variable nil variable-type))
+       (do ((l prep-phrases (cdr l)) (prep) (form) (odir)) ((null l))
+	 (setq prep (caar l) form (cadar l))
+	 (case prep
+	   ((:of :in)
+	    (setq sequencep t)
+	    (loop-make-var sequence-variable form sequence-type))
+	   ((:from :downfrom :upfrom)
+	    (setq start-given t)
+	    (cond ((eq prep :downfrom) (setq dir ':down))
+		  ((eq prep :upfrom) (setq dir ':up)))
+	    (multiple-value-setq (form start-constantp start-value)
+	      (loop-constant-fold-if-possible form indexv-type))
+	    (assert-index-for-arithmetic indexv)
+	    ;; KLUDGE: loop-make-var generates a temporary symbol for
+	    ;; indexv if it is NIL. We have to use it to have the index
+	    ;; actually count
+	    (setq indexv (loop-make-iteration-var indexv form indexv-type)))
+	   ((:upto :to :downto :above :below)
+	    (cond ((loop-tequal prep :upto) (setq inclusive-iteration
+						  (setq dir ':up)))
+		  ((loop-tequal prep :to) (setq inclusive-iteration t))
+		  ((loop-tequal prep :downto) (setq inclusive-iteration
+						    (setq dir ':down)))
+		  ((loop-tequal prep :above) (setq dir ':down))
+		  ((loop-tequal prep :below) (setq dir ':up)))
+	    (setq limit-given t)
+	    (multiple-value-setq (form limit-constantp limit-value)
+	      (loop-constant-fold-if-possible form `(and ,indexv-type real)))
+	    (setq endform (if limit-constantp
+			      `',limit-value
+			      (loop-make-var
+				 (gensym "LOOP-LIMIT-") form
+				 `(and ,indexv-type real)))))
+	   (:by
+	    (multiple-value-setq (form stepby-constantp stepby)
+	      (loop-constant-fold-if-possible form `(and ,indexv-type (real (0)))))
+	    (unless stepby-constantp
+	      (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
+		 form
+		 `(and ,indexv-type (real (0))))))
+	   (t (loop-error
+		 "~S invalid preposition in sequencing or sequence path;~@
 	      maybe invalid prepositions were specified in iteration path descriptor?"
-	      prep)))
-       (when (and odir dir (not (eq dir odir)))
-	 (loop-error "conflicting stepping directions in LOOP sequencing path"))
-       (setq odir dir))
-     (when (and sequence-variable (not sequencep))
-       (loop-error "missing OF or IN phrase in sequence path"))
-     ;; Now fill in the defaults.
-     (if start-given
-	 (when limit-given
-	   ;; if both start and limit are given, they had better both
-	   ;; be REAL.  We already enforce the REALness of LIMIT,
-	   ;; above; here's the KLUDGE to enforce the type of START.
-	   (flet ((type-declaration-of (x)
-		    (and (eq (car x) 'type) (caddr x))))
-	     (let ((decl (find indexv *loop-declarations*
-			       :key #'type-declaration-of))
-		   (%decl (find indexv *loop-declarations*
-				:key #'type-declaration-of
-				:from-end t)))
-	       (sb!int:aver (eq decl %decl))
-	       (setf (cadr decl)
-		     `(and real ,(cadr decl))))))
-	 ;; default start
-	 (loop-make-iteration-var
-	  indexv
-	  (setq start-constantp t
-		start-value (or (loop-typed-init indexv-type) 0))
-	  `(and ,indexv-type real)))
-     (cond ((member dir '(nil :up))
-	    (when (or limit-given default-top)
-	      (unless limit-given
-		(loop-make-var (setq endform (gensym "LOOP-SEQ-LIMIT-"))
-			       nil
-			       indexv-type)
-		(push `(setq ,endform ,default-top) *loop-prologue*))
-	      (setq testfn (if inclusive-iteration '> '>=)))
-	    (setq step (if (eql stepby 1) `(1+ ,indexv) `(+ ,indexv ,stepby))))
-	   (t (unless start-given
-		(unless default-top
-		  (loop-error "don't know where to start stepping"))
-		(push `(setq ,indexv (1- ,default-top)) *loop-prologue*))
-	      (when (and default-top (not endform))
-		(setq endform (loop-typed-init indexv-type)
-		      inclusive-iteration t))
-	      (when endform (setq testfn (if inclusive-iteration  '< '<=)))
-	      (setq step
-		    (if (eql stepby 1) `(1- ,indexv) `(- ,indexv ,stepby)))))
-     (when testfn
-       (setq test
-	     `(,testfn ,indexv ,endform)))
-     (when step-hack
-       (setq step-hack
-	     `(,variable ,step-hack)))
-     (let ((first-test test) (remaining-tests test))
-       (when (and stepby-constantp start-constantp limit-constantp
-		  (realp start-value) (realp limit-value))
-	 (when (setq first-test
-		     (funcall (symbol-function testfn)
-			      start-value
-			      limit-value))
-	   (setq remaining-tests t)))
-       `(() (,indexv ,step)
-	 ,remaining-tests ,step-hack () () ,first-test ,step-hack))))
+		 prep)))
+	 (when (and odir dir (not (eq dir odir)))
+	   (loop-error "conflicting stepping directions in LOOP sequencing path"))
+	 (setq odir dir))
+       (when (and sequence-variable (not sequencep))
+	 (loop-error "missing OF or IN phrase in sequence path"))
+       ;; Now fill in the defaults.
+       (if start-given
+	   (when limit-given
+	     ;; if both start and limit are given, they had better both
+	     ;; be REAL.  We already enforce the REALness of LIMIT,
+	     ;; above; here's the KLUDGE to enforce the type of START.
+	     (flet ((type-declaration-of (x)
+		      (and (eq (car x) 'type) (caddr x))))
+	       (let ((decl (find indexv *loop-declarations*
+				 :key #'type-declaration-of))
+		     (%decl (find indexv *loop-declarations*
+				  :key #'type-declaration-of
+				  :from-end t)))
+		 (sb!int:aver (eq decl %decl))
+		 (setf (cadr decl)
+		       `(and real ,(cadr decl))))))
+	   ;; default start
+	   ;; DUPLICATE KLUDGE: loop-make-var generates a temporary
+	   ;; symbol for indexv if it is NIL. See also the comment in
+	   ;; the (:from :downfrom :upfrom) case
+	   (progn
+	     (assert-index-for-arithmetic indexv)
+	     (setq indexv
+		   (loop-make-iteration-var
+		      indexv
+		      (setq start-constantp t
+			    start-value (or (loop-typed-init indexv-type) 0))
+		      `(and ,indexv-type real)))))
+       (cond ((member dir '(nil :up))
+	      (when (or limit-given default-top)
+		(unless limit-given
+		  (loop-make-var (setq endform (gensym "LOOP-SEQ-LIMIT-"))
+		     nil
+		     indexv-type)
+		  (push `(setq ,endform ,default-top) *loop-prologue*))
+		(setq testfn (if inclusive-iteration '> '>=)))
+	      (setq step (if (eql stepby 1) `(1+ ,indexv) `(+ ,indexv ,stepby))))
+	     (t (unless start-given
+		  (unless default-top
+		    (loop-error "don't know where to start stepping"))
+		  (push `(setq ,indexv (1- ,default-top)) *loop-prologue*))
+		(when (and default-top (not endform))
+		  (setq endform (loop-typed-init indexv-type)
+			inclusive-iteration t))
+		(when endform (setq testfn (if inclusive-iteration  '< '<=)))
+		(setq step
+		      (if (eql stepby 1) `(1- ,indexv) `(- ,indexv ,stepby)))))
+       (when testfn
+	 (setq test
+	       `(,testfn ,indexv ,endform)))
+       (when step-hack
+	 (setq step-hack
+	       `(,variable ,step-hack)))
+       (let ((first-test test) (remaining-tests test))
+	 (when (and stepby-constantp start-constantp limit-constantp
+		    (realp start-value) (realp limit-value))
+	   (when (setq first-test
+		       (funcall (symbol-function testfn)
+				start-value
+				limit-value))
+	     (setq remaining-tests t)))
+	 `(() (,indexv ,step)
+	   ,remaining-tests ,step-hack () () ,first-test ,step-hack)))))
 
 ;;;; interfaces to the master sequencer
 
