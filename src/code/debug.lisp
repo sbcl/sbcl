@@ -126,8 +126,8 @@ Function and macro commands:
   #!+sb-doc
   "When true, list the code location type in the LIST-LOCATIONS command.")
 
-;;; a list of the types of code-locations that should not be stepped to and
-;;; should not be listed when listing breakpoints
+;;; a list of the types of code-locations that should not be stepped
+;;; to and should not be listed when listing breakpoints
 (defvar *bad-code-location-types* '(:call-site :internal-error))
 (declaim (type list *bad-code-location-types*))
 
@@ -135,12 +135,12 @@ Function and macro commands:
 (defvar *possible-breakpoints*)
 (declaim (type list *possible-breakpoints*))
 
-;;; a list of the made and active breakpoints, each is a breakpoint-info
-;;; structure
+;;; a list of the made and active breakpoints, each is a
+;;; BREAKPOINT-INFO structure
 (defvar *breakpoints* nil)
 (declaim (type list *breakpoints*))
 
-;;; a list of breakpoint-info structures of the made and active step
+;;; a list of BREAKPOINT-INFO structures of the made and active step
 ;;; breakpoints
 (defvar *step-breakpoints* nil)
 (declaim (type list *step-breakpoints*))
@@ -165,8 +165,8 @@ Function and macro commands:
 	(setf found t)))
     first-code-location))
 
-;;; Return a list of the next code-locations following the one passed. One of
-;;; the *BAD-CODE-LOCATION-TYPES* will not be returned.
+;;; Return a list of the next code-locations following the one passed.
+;;; One of the *BAD-CODE-LOCATION-TYPES* will not be returned.
 (defun next-code-locations (code-location)
   (let ((debug-block (sb!di:code-location-debug-block code-location))
 	(block-code-locations nil))
@@ -201,11 +201,11 @@ Function and macro commands:
 		(push code-location possible-breakpoints))))))
     (nreverse possible-breakpoints)))
 
-;;; Searches the info-list for the item passed (code-location, debug-function,
-;;; or breakpoint-info). If the item passed is a debug function then kind will
-;;; be compared if it was specified. The kind if also compared if a
-;;; breakpoint-info is passed since it's in the breakpoint. The info structure
-;;; is returned if found.
+;;; Searches the info-list for the item passed (code-location,
+;;; debug-function, or breakpoint-info). If the item passed is a debug
+;;; function then kind will be compared if it was specified. The kind
+;;; if also compared if a breakpoint-info is passed since it's in the
+;;; breakpoint. The info structure is returned if found.
 (defun location-in-list (place info-list &optional (kind nil))
   (when (breakpoint-info-p place)
     (setf kind (sb!di:breakpoint-kind (breakpoint-info-breakpoint place)))
@@ -227,8 +227,9 @@ Function and macro commands:
 				    (eq kind (sb!di:breakpoint-kind
 					      y-breakpoint))))))))))
 
-;;; If Loc is an unknown location, then try to find the block start location.
-;;; Used by source printing to some information instead of none for the user.
+;;; If LOC is an unknown location, then try to find the block start
+;;; location. Used by source printing to some information instead of
+;;; none for the user.
 (defun maybe-block-start-location (loc)
   (if (sb!di:code-location-unknown-p loc)
       (let* ((block (sb!di:code-location-debug-block loc))
@@ -258,12 +259,12 @@ Function and macro commands:
   ;; the function returned from sb!di:preprocess-for-eval. If result is
   ;; non-NIL, eval (each) print and print results.
   (condition #'identity :type function)
-  ;; the list of functions from sb!di:preprocess-for-eval to evaluate. Results
-  ;; are conditionally printed. Car of each element is the function, cdr is the
-  ;; form it goes with.
+  ;; the list of functions from sb!di:preprocess-for-eval to evaluate.
+  ;; Results are conditionally printed. Car of each element is the
+  ;; function, cdr is the form it goes with.
   (print nil :type list)
-  ;; the number used when listing the possible breakpoints within a function.
-  ;; Could also be a symbol such as start or end.
+  ;; the number used when listing the possible breakpoints within a
+  ;; function. Could also be a symbol such as start or end.
   (code-location-number (required-argument) :type (or symbol integer))
   ;; the number used when listing the breakpoints active and to delete
   ;; breakpoints
@@ -310,8 +311,8 @@ Function and macro commands:
 
 ;;;; MAIN-HOOK-FUNCTION for steps and breakpoints
 
-;;; This must be passed as the hook function. It keeps track of where step
-;;; breakpoints are.
+;;; This must be passed as the hook function. It keeps track of where
+;;; STEP breakpoints are.
 (defun main-hook-function (current-frame breakpoint &optional return-vals
 					 function-end-cookie)
   (setf *default-breakpoint-debug-function*
@@ -446,8 +447,8 @@ Function and macro commands:
 
 (eval-when (:compile-toplevel :execute)
 
-;;; This is a convenient way to express what to do for each type of lambda-list
-;;; element.
+;;; This is a convenient way to express what to do for each type of
+;;; lambda-list element.
 (sb!xc:defmacro lambda-list-element-dispatch (element
 					      &key
 					      required
@@ -796,20 +797,34 @@ reset to ~S."
 				 (t
 				  (funcall cmd-fun)))))))))))))))
 
-(defvar *auto-eval-in-frame* t
+;;; FIXME: As far as I know, the CMU CL X86 codebase has never
+;;; supported access to the environment of the debugged function. It
+;;; would be really, really nice to make that work! (Until then,
+;;; non-NIL *AUTO-EVAL-IN-FRAME* seems to be useless, and as of
+;;; sbcl-0.6.10 it even seemed to be actively harmful, since the
+;;; debugger gets confused when trying to unwind the frames which
+;;; arise in SIGINT interrupts. So it's set to NIL.)
+(defvar *auto-eval-in-frame* nil
   #!+sb-doc
-  "When set (the default), evaluations in the debugger's command loop occur
-   relative to the current frame's environment without the need of debugger
-   forms that explicitly control this kind of evaluation.")
+  "When set, evaluations in the debugger's command loop occur relative
+   to the current frame's environment without the need of debugger
+   forms that explicitly control this kind of evaluation. In an ideal
+   world, the default would be T, but since unfortunately the X86
+   debugger support isn't good enough to make this useful, the
+   default is NIL instead.")
 
 ;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
-(defun debug-eval-print (exp)
-  (setq +++ ++ ++ + + - - exp)
+(defun debug-eval-print (expr)
+  (/noshow "entering DEBUG-EVAL-PRINT" expr)
+  (/noshow (fboundp 'compile))
+  (/noshow (and (fboundp 'compile) *auto-eval-in-frame*))
+  (setq +++ ++ ++ + + - - expr)
   (let* ((values (multiple-value-list
 		  (if (and (fboundp 'compile) *auto-eval-in-frame*)
 		      (sb!di:eval-in-frame *current-frame* -)
 		      (eval -))))
 	 (*standard-output* *debug-io*))
+    (/noshow "done with EVAL in DEBUG-EVAL-PRINT")
     (fresh-line)
     (if values (prin1 (car values)))
     (dolist (x (cdr values))
@@ -826,8 +841,8 @@ reset to ~S."
 
 ;;;; debug loop functions
 
-;;; These commands are functions, not really commands, so that users can get
-;;; their hands on the values returned.
+;;; These commands are functions, not really commands, so that users
+;;; can get their hands on the values returned.
 
 (eval-when (:execute :compile-toplevel)
 
@@ -856,8 +871,8 @@ reset to ~S."
 		`(setf (sb!di:debug-var-value (car vars) *current-frame*)
 		       ,value-var))))
 	   (t
-	    ;; Since we have more than one, first see whether we have any
-	    ;; variables that exactly match the specification.
+	    ;; Since we have more than one, first see whether we have
+	    ;; any variables that exactly match the specification.
 	    (let* ((name (etypecase name
 			   (symbol (symbol-name name))
 			   (simple-string name)))
@@ -915,9 +930,11 @@ reset to ~S."
 
 ) ; EVAL-WHEN
 
+;;; FIXME: This doesn't work. It would be real nice we could make it
+;;; work! Alas, it doesn't seem to work in CMU CL X86 either..
 (defun var (name &optional (id 0 id-supplied))
   #!+sb-doc
-  "Returns a variable's value if possible. Name is a simple-string or symbol.
+  "Return a variable's value if possible. NAME is a simple-string or symbol.
    If it is a simple-string, it is an initial substring of the variable's name.
    If name is a symbol, it has the same name and package as the variable whose
    value this function returns. If the symbol is uninterned, then the variable
@@ -957,7 +974,8 @@ reset to ~S."
 	:rest ((let ((var (second ele)))
 		 (lambda-var-dispatch var (sb!di:frame-code-location
 					   *current-frame*)
-		   (error "unused &REST argument before n'th argument")
+		   (error "unused &REST argument before n'th
+argument")
 		   (dolist (value
 			    (sb!di:debug-var-value var *current-frame*)
 			    (error
@@ -1012,12 +1030,13 @@ reset to ~S."
     (push (cons new-name (cdr pair)) *debug-commands*))
   new-name)
 
-;;; This takes a symbol and uses its name to find a debugger command, using
-;;; initial substring matching. It returns the command function if form
-;;; identifies only one command, but if form is ambiguous, this returns a list
-;;; of the command names. If there are no matches, this returns nil. Whenever
-;;; the loop that looks for a set of possibilities encounters an exact name
-;;; match, we return that command function immediately.
+;;; This takes a symbol and uses its name to find a debugger command,
+;;; using initial substring matching. It returns the command function
+;;; if form identifies only one command, but if form is ambiguous,
+;;; this returns a list of the command names. If there are no matches,
+;;; this returns nil. Whenever the loop that looks for a set of
+;;; possibilities encounters an exact name match, we return that
+;;; command function immediately.
 (defun debug-command-p (form &optional other-commands)
   (if (or (symbolp form) (integerp form))
       (let* ((name
@@ -1054,12 +1073,12 @@ reset to ~S."
 		   ((not cmds) res)
 		 (setf (car cmds) (caar cmds))))))))
 
-;;; Returns a list of debug commands (in the same format as *debug-commands*)
-;;; that invoke each active restart.
+;;; Return a list of debug commands (in the same format as
+;;; *debug-commands*) that invoke each active restart.
 ;;;
-;;; Two commands are made for each restart: one for the number, and one for
-;;; the restart name (unless it's been shadowed by an earlier restart of the
-;;; same name).
+;;; Two commands are made for each restart: one for the number, and
+;;; one for the restart name (unless it's been shadowed by an earlier
+;;; restart of the same name).
 (defun make-restart-commands (&optional (restarts *debug-restarts*))
   (let ((commands)
 	(num 0))			; better be the same as show-restarts!
@@ -1094,9 +1113,9 @@ reset to ~S."
 
 (def-debug-command-alias "D" "DOWN")
 
-;;; CMU CL had this command, but SBCL doesn't, since
-;;; it's redundant with "FRAME 0", and it interferes with abbreviations
-;;; for the TOPLEVEL restart.
+;;; CMU CL had this command, but SBCL doesn't, since it's redundant
+;;; with "FRAME 0", and it interferes with abbreviations for the
+;;; TOPLEVEL restart.
 ;;;(def-debug-command "TOP" ()
 ;;;  (do ((prev *current-frame* lead)
 ;;;       (lead (sb!di:frame-up *current-frame*) (sb!di:frame-up lead)))
