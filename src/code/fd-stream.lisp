@@ -888,22 +888,22 @@
 
 (defun fd-stream-file-position (stream &optional newpos)
   (declare (type file-stream stream)
-	   (type (or index (member nil :start :end)) newpos))
+	   (type (or (alien sb!unix:off-t) (member nil :start :end)) newpos))
   (if (null newpos)
       (sb!sys:without-interrupts
 	;; First, find the position of the UNIX file descriptor in the file.
 	(multiple-value-bind (posn errno)
 	    (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)
-	  (declare (type (or index null) posn))
-	  (cond ((fixnump posn)
+	  (declare (type (or (alien sb!unix:off-t) null) posn))
+	  (cond ((integerp posn)
 		 ;; Adjust for buffered output: If there is any output
 		 ;; buffered, the *real* file position will be larger
 		 ;; than reported by lseek() because lseek() obviously
 		 ;; cannot take into account output we have not sent
 		 ;; yet.
 		 (dolist (later (fd-stream-output-later stream))
-		   (incf posn (- (the index (caddr later))
-				 (the index (cadr later)))))
+		   (incf posn (- (caddr later)
+				 (cadr later))))
 		 (incf posn (fd-stream-obuf-tail stream))
 		 ;; Adjust for unread input: If there is any input
 		 ;; read from UNIX but not supplied to the user of the
@@ -924,7 +924,7 @@
 					 stream
 					 errno))))))
       (let ((offset 0) origin)
-	(declare (type index offset))
+	(declare (type (alien sb!unix:off-t) offset))
 	;; Make sure we don't have any output pending, because if we
 	;; move the file pointer before writing this stuff, it will be
 	;; written in the wrong location.
@@ -944,14 +944,14 @@
 	       (setf offset 0 origin sb!unix:l_set))
 	      ((eq newpos :end)
 	       (setf offset 0 origin sb!unix:l_xtnd))
-	      ((typep newpos 'index)
+	      ((typep newpos '(alien sb!unix:off-t))
 	       (setf offset (* newpos (fd-stream-element-size stream))
 		     origin sb!unix:l_set))
 	      (t
 	       (error "invalid position given to FILE-POSITION: ~S" newpos)))
 	(multiple-value-bind (posn errno)
 	    (sb!unix:unix-lseek (fd-stream-fd stream) offset origin)
-	  (cond ((typep posn 'fixnum)
+	  (cond ((typep posn '(alien sb!unix:off-t))
 		 t)
 		((eq errno sb!unix:espipe)
 		 nil)

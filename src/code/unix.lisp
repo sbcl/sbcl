@@ -68,7 +68,7 @@
 				,@args)))
      (if (minusp result)
 	 (values nil (get-errno))
-	 ,success-form)))
+        ,success-form)))
 
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
@@ -219,7 +219,11 @@
   "
   (declare (type unix-fd fd)
 	   (type (integer 0 2) whence))
-  (int-syscall ("lseek" int off-t int) fd offset whence))
+  (let ((result (alien-funcall (extern-alien "lseek" (function off-t int off-t int))
+		 fd offset whence)))
+    (if (minusp result )
+	(values nil (get-errno))
+      (values result 0))))
 
 ;;; UNIX-READ accepts a file descriptor, a buffer, and the length to read.
 ;;; It attempts to read len bytes from the device associated with fd

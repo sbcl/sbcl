@@ -145,7 +145,7 @@
 ;;; Call the MISC method with the :FILE-POSITION operation.
 (defun file-position (stream &optional position)
   (declare (type stream stream))
-  (declare (type (or index (member nil :start :end)) position))
+  (declare (type (or index (alien sb!unix:off-t) (member nil :start :end)) position))
   (cond
    (position
     (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
