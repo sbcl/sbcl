@@ -405,13 +405,17 @@ system."))
 (defmethod source-file-type ((c static-file) (s module)) nil)
 
 (defmethod component-relative-pathname ((component source-file))
-  (let ((*default-pathname-defaults* (component-parent-pathname component)))
-    (or (slot-value component 'relative-pathname)
-	(make-pathname :name (component-name component)
-		       :type
-		       (source-file-type component
-					 (component-system component))))))
-
+  (let* ((*default-pathname-defaults* (component-parent-pathname component))
+	 (name-type
+	  (make-pathname
+	   :name (component-name component)
+	   :type (source-file-type component
+				   (component-system component)))))
+    (if (slot-value component 'relative-pathname)
+	(merge-pathnames
+	 (slot-value component 'relative-pathname)
+	 name-type)
+	name-type)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; operations
