@@ -170,8 +170,8 @@
        source, the result of evaluating each top-level form is printed.
        The default is *LOAD-PRINT*."
 
-  (let ((sb!c::*default-policy* sb!c::*default-policy*)
-	(sb!c::*default-interface-policy* sb!c::*default-interface-policy*)
+  (let ((sb!c::*policy* sb!c::*policy*)
+	(sb!c::*interface-policy* sb!c::*interface-policy*)
 	(*package* (sane-package))
 	(*readtable* *readtable*)
 	(*load-depth* (1+ *load-depth*))

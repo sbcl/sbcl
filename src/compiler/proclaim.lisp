@@ -71,7 +71,8 @@
 ;;; defaulted from the POLICY argument.
 (declaim (ftype (function (list policy) policy) process-optimize-decl))
 (defun process-optimize-decl (spec policy)
-  (let ((result policy)) ; may have new entries pushed on it below
+  (let ((result nil))
+    ;; Add new entries from SPEC.
     (dolist (q-and-v-or-just-q (cdr spec))
       (multiple-value-bind (quality raw-value)
 	  (if (atom q-and-v-or-just-q)
@@ -88,6 +89,11 @@
 	      (t
 	       (push (cons quality (rational raw-value))
 		     result)))))
+    ;; Add any nonredundant entries from old POLICY.
+    (dolist (old-entry policy)
+      (unless (assq (car old-entry) result)
+	(push old-entry result)))
+    ;; Voila.
     result))
 
 ;;; ANSI defines the declaration (FOO X Y) to be equivalent to
@@ -211,10 +217,10 @@
 		   (declare (ignore layout))
 		   (setf (class-state subclass) :sealed))))))))
       (optimize
-       (setq *default-policy* (process-optimize-decl form *default-policy*)))
+       (setq *policy* (process-optimize-decl form *policy*)))
       (optimize-interface
-       (setq *default-interface-policy*
-	     (process-optimize-decl form *default-interface-policy*)))
+       (setq *interface-policy*
+	     (process-optimize-decl form *interface-policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
 	 (proclaim-as-function-name name)

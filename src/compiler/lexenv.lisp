@@ -62,11 +62,11 @@
   ;; to get CLEANUP defined in time for the cross-compiler.
   (cleanup nil)
   ;; the current OPTIMIZE policy
-  (policy *default-policy* :type policy)
+  (policy *policy* :type policy)
   ;; the policy that takes effect in XEPs and related syntax parsing
   ;; functions. Slots in this policy may be null to indicate that the
   ;; normal value in effect.
-  (interface-policy *default-interface-policy* :type policy)
+  (interface-policy *interface-policy* :type policy)
   ;; an alist of miscellaneous options that are associated with the
   ;; lexical environment
   (options nil :type list))

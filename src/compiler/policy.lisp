@@ -16,9 +16,10 @@
 
 ;;; CMU CL used a special STRUCTURE-OBJECT type POLICY to represent
 ;;; the state of optimization policy at any point in compilation. This
-;;; became a little unwieldy, especially because of cold init issues
-;;; for structures and structure accessors, so in SBCL we use an alist
-;;; instead.
+;;; was a natural choice, but in SBCL it became a little troublesome
+;;; because of stupid technicalities involving the cold initialization
+;;; of structure LAYOUTs and structure accessors, so now we just use
+;;; alists instead.
 (def!type policy () 'list)
 
 ;;; names of recognized optimization qualities which don't have
@@ -39,16 +40,16 @@
       ;; FIXME: Uncomment this when OPTIMIZE-INTERFACE goes away.
       #|(member name *policy-defaulting-qualities* :key #'car)|#))
 
-;;; *DEFAULT-POLICY* holds the current global compiler policy
-;;; information, as an alist mapping from optimization quality name to
-;;; quality value. Inside the scope of declarations, new entries are
-;;; added at the head of the alist.
+;;; *POLICY* holds the current global compiler policy information, as
+;;; an alist mapping from optimization quality name to quality value.
+;;; Inside the scope of declarations, new entries are added at the
+;;; head of the alist.
 ;;;
-;;; *DEFAULT-INTERFACE-POLICY* holds any values specified by an
-;;; OPTIMIZE-INTERFACE declaration.
-(declaim (type policy *default-policy* *default-interface-policy*))
-(defvar *default-policy*)	   ; initialized in cold init
-(defvar *default-interface-policy*) ; initialized in cold init
+;;; *INTERFACE-POLICY* holds global interface policy, represented the
+;;; same way as in *DEFAULT-POLICY*.
+(declaim (type policy *policy* *interface-policy*))
+(defvar *policy*)	   ; initialized in cold init
+(defvar *interface-policy*) ; initialized in cold init
 
 ;;; This is to be called early in cold init to set things up, and may
 ;;; also be called again later in cold init in order to reset default
@@ -76,14 +77,14 @@
 	'((interface-speed . speed)
 	  (interface-safety . safety)))
   |#
-  (setf *default-policy*
+  (setf *policy*
 	(mapcar (lambda (name)
 		  ;; CMU CL didn't use 1 as the default for everything,
 		  ;; but since ANSI says 1 is the ordinary value, we do.
 		  (cons name 1))
 		*policy-basic-qualities*))
-  (setf *default-interface-policy*
-	*default-policy*))
+  (setf *interface-policy*
+	*policy*))
 ;;; On the cross-compilation host, we initialize immediately (not
 ;;; waiting for "cold init", since cold init doesn't exist on
 ;;; cross-compilation host).
@@ -125,8 +126,8 @@
 ;;;
 ;;; Evaluate EXPR in terms of the current optimization policy for
 ;;; NODE, or if NODE is NIL, in terms of the current policy as defined
-;;; by *DEFAULT-POLICY* and *CURRENT-POLICY*. (Using NODE=NIL is only
-;;; well-defined during IR1 conversion.)
+;;; by *POLICY*. (Using NODE=NIL is only well-defined during
+;;; IR1 conversion.)
 ;;;
 ;;; EXPR is a form which accesses the policy values by referring to
 ;;; them by name, e.g. (> SPEED SPACE).

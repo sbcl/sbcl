@@ -101,18 +101,13 @@
 	       sb!xc:*compile-file-pathname*
 	       sb!xc:*compile-file-truename*))
 
-;;; the values of *PACKAGE* and policy when compilation started
-(defvar *initial-package*)
-(defvar *initial-policy*)
-(defvar *initial-interface-policy*)
-
-;;; The source-info structure for the current compilation. This is null
-;;; globally to indicate that we aren't currently in any identifiable
-;;; compilation.
+;;; the SOURCE-INFO structure for the current compilation. This is
+;;; null globally to indicate that we aren't currently in any
+;;; identifiable compilation.
 (defvar *source-info* nil)
 
-;;; True if we are within a WITH-COMPILATION-UNIT form (which normally
-;;; causes nested uses to be no-ops).
+;;; This is true if we are within a WITH-COMPILATION-UNIT form (which
+;;; normally causes nested uses to be no-ops).
 (defvar *in-compilation-unit* nil)
 
 ;;; Count of the number of compilation units dynamically enclosed by
@@ -806,15 +801,13 @@
 ;;; rebinding around each file.
 ;;;
 ;;; FIXME: Since we now do the standard ANSI thing of only one file
-;;; per compile (unlike the CMU CL extended COMPILE-FILE) can't this
-;;; complexity (including ADVANCE-SOURCE-FILE) go away?
+;;; per compile (unlike the CMU CL extended COMPILE-FILE) this code is
+;;; becoming stale, and the remaining bits of it (and the related code
+;;; in ADVANCE-SOURCE-FILE) can go away.
 (defun get-source-stream (info)
   (declare (type source-info info))
   (cond ((source-info-stream info))
 	(t
-	 (setf *package* *initial-package*
-	       *default-policy* *initial-policy*
-	       *default-interface-policy* *initial-interface-policy*)
 	 (let* ((finfo (first (source-info-current-file info)))
 		(name (file-info-name finfo)))
 	   (setq sb!xc:*compile-file-truename* name)
@@ -892,8 +885,8 @@
 ;;; *TOP-LEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
-  (let* ((*lexenv* (make-lexenv :policy *default-policy*
-				:interface-policy *default-interface-policy*))
+  (let* ((*lexenv* (make-lexenv :policy *policy*
+				:interface-policy *interface-policy*))
 	 (tll (ir1-top-level form path nil)))
     (cond ((eq *block-compile* t) (push tll *top-level-lambdas*))
 	  (t (compile-top-level (list tll) nil)))))
@@ -915,23 +908,22 @@
 
 ;;; Process a top-level use of LOCALLY. We parse declarations and then
 ;;; recursively process the body.
-;;;
-;;; Binding *DEFAULT-xxx-POLICY* is pretty much of a hack, since it
-;;; causes LOCALLY to "capture" enclosed proclamations. It is
-;;; necessary because CONVERT-AND-MAYBE-COMPILE uses the value of
-;;; *DEFAULT-POLICY* as the policy. The need for this hack is due to
-;;; the quirk that there is no way to represent in a POLICY that an
-;;; optimize quality came from the default.
-;;; FIXME: Ideally, something should be done so that DECLAIM inside LOCALLY
-;;; works OK. Failing that, at least we could issue a warning instead
-;;; of silently screwing up.
 (defun process-top-level-locally (form path)
   (declare (list path))
   (multiple-value-bind (forms decls) (sb!sys:parse-body (cdr form) nil)
     (let* ((*lexenv*
 	    (process-decls decls nil nil (make-continuation)))
-	   (*default-policy* (lexenv-policy *lexenv*))
-	   (*default-interface-policy* (lexenv-interface-policy *lexenv*)))
+	   ;; Binding *xxx-POLICY* is pretty much of a hack, since it
+	   ;; causes LOCALLY to "capture" enclosed proclamations. It
+	   ;; is necessary because CONVERT-AND-MAYBE-COMPILE uses the
+	   ;; value of *POLICY* as the policy. The need for this hack
+	   ;; is due to the quirk that there is no way to represent in
+	   ;; a POLICY that an optimize quality came from the default.
+	   ;; FIXME: Ideally, something should be done so that DECLAIM
+	   ;; inside LOCALLY works OK. Failing that, at least we could
+	   ;; issue a warning instead of silently screwing up.
+	   (*policy* (lexenv-policy *lexenv*))
+	   (*interface-policy* (lexenv-interface-policy *lexenv*)))
       (process-top-level-progn forms path))))
 
 ;;; Force any pending top-level forms to be compiled and dumped so
@@ -1356,11 +1348,8 @@
 	 #+nil (*compiler-note-count* 0)
 	 (*block-compile* *block-compile-argument*)
 	 (*package* (sane-package))
-	 (*initial-package* (sane-package))
-	 (*initial-policy* *default-policy*)
-	 (*initial-interface-policy* *default-interface-policy*)
-	 (*default-policy* *initial-policy*)
-	 (*default-interface-policy* *initial-interface-policy*)
+	 (*policy* *policy*)
+	 (*interface-policy* *interface-policy*)
 	 (*lexenv* (make-null-lexenv))
 	 (*converting-for-interpreter* nil)
 	 (*source-info* info)
