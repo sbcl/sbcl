@@ -128,6 +128,7 @@ Source Location Printing
 
 Efficiency
 
+* Dynamic-extent allocation::   
 * Modular arithmetic::          
 
 Beyond The ANSI Standard

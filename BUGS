@@ -1279,3 +1279,19 @@ WORKAROUND:
       (1+ (fee)))
 
   uses generic arithmetic with INLINE and fixnum without.
+
+306: "Imprecise unions of array types"
+  a.(defun foo (x)
+      (declare (optimize speed)
+               (type (or (array cons) (array vector)) x))
+      (elt (aref x 0) 0))
+    (foo #((0))) => TYPE-ERROR
+
+  relatedly,
+
+  b.(subtypep 
+     'array
+     `(or
+       ,@(loop for x across sb-vm:*specialized-array-element-type-properties*
+               collect `(array ,(sb-vm:saetp-specifier x)))))
+    => NIL, T (when it should be T, T)

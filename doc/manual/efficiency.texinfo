@@ -62,8 +62,8 @@ important are
 @itemize @minus
       
 @item
-There is no support for the ANSI @code{dynamic-extent} declaration,
-not even for closures or @code{&rest} lists.
+There is only limited support for the ANSI @code{dynamic-extent}
+declaration.  @xref{Dynamic-extent allocation}
       
 @item
 The garbage collector is not particularly efficient, at least on
@@ -98,6 +98,15 @@ time
 various bit vector operations, e.g.  @code{(position 0
 some-bit-vector)}
 
+@item
+specialized sequence idioms, e.g.  @code{(remove item list :count 1)}
+
+@item
+cases where local compilation policy does not require excessive type
+checking, e.g.  @code{(locally (declare (safety 1)) (assoc item
+list))} (which currently performs safe @code{endp} checking internal
+to assoc).
+
 @end itemize
 
 If your system's performance is suffering because of some construct
@@ -109,12 +118,91 @@ search the sources for the string ``@code{deftransform}'' to find many
 examples (some straightforward, some less so).
 
 @menu
+* Dynamic-extent allocation::   
 * Modular arithmetic::          
 @end menu
 
-@node  Modular arithmetic,  , Efficiency, Efficiency
+@node  Dynamic-extent allocation, Modular arithmetic, Efficiency, Efficiency
+@comment  node-name,  next,  previous,  up
+@section Dynamic-extent allocation
+@cindex Dynamic-extent declaration
+
+SBCL has limited support for performing allocation on the stack when a
+variable is declared @code{dynamic-extent}.  The @code{dynamic-extent}
+declarations are not verified, but are simply trusted; if the
+constraints in the Common Lisp standard are violated, the best that
+can happen is for the program to have garbage in variables and return
+values; more commonly, the system will crash.
+
+As a consequence of this, the condition for performing stack
+allocation is stringent: either of the @code{speed} or @code{space}
+optimization qualities must be higher than the maximum of
+@code{safety} and @code{debug} at the point of the allocation.  For
+example:
+
+@lisp
+(locally
+  (declare (optimize speed (safety 1) (debug 1)))
+  (defun foo (&rest rest)
+    (declare (dynamic-extent rest))
+    (length rest)))
+@end lisp
+
+Here the @code{&rest} list will be allocated on the stack.  Note that
+it would not be in the following situation:
+
+@lisp
+(defun foo (&rest rest)
+  (declare (optimize speed (safety 1) (debug 1)))
+  (declare (dynamic-extent rest))
+  (length rest))
+@end lisp
+
+because the @code{optimize} declaration affects the binding, not the
+allocation.
+
+There are many cases when dynamic-extent declarations could be useful.
+At present, SBCL implements
+
+@itemize 
+
+@item
+Stack allocation of @code{&rest} lists, where these are declared
+@code{dynamic-extent}.
+
+@end itemize
+
+Future plans include
+
+@itemize
+
+@item
+Stack allocation of closures, where these are declared
+@code{dynamic-extent};
+
+@item
+Stack allocation of @code{list}, @code{list*} and @code{cons}
+(including following chains during initialization, and also for
+binding mutation), where the allocation is declared
+@code{dynamic-extent};
+
+@item
+Automatic detection of the common idiom of applying a function to some
+defaults and a @code{&rest} list, even when this is not declared
+@code{dynamic-extent};
+
+@item
+Automatic detection of the common idiom of calling quantifiers with a
+closure, even when the closure is not declared @code{dynamic-extent}.
+
+@end itemize
+
+@node  Modular arithmetic,  , Dynamic-extent allocation, Efficiency
 @comment  node-name,  next,  previous,  up
 @section Modular arithmetic
+@cindex Modular arithmetic
+@cindex Arithmetic, modular
+@cindex Arithmetic, hardware
 
 Some numeric functions have a property: @var{N} lower bits of the
 result depend only on @var{N} lower bits of (all or some)
