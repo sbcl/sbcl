@@ -154,6 +154,7 @@
 		 (/primitive-print hexstr)))
   (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
+
     (dolist (toplevel-thing (prog1
 				(nreverse *!reversed-cold-toplevels*)
 			      ;; (Now that we've NREVERSEd it, it's
@@ -245,7 +246,7 @@
   ;; could be typed directly, with no parentheses, at the debug prompt
   ;; the way that e.g. F or BACKTRACE can be?)
 
-  (/show0 "done initializing")
+  (/show0 "done initializing, setting *COLD-INIT-COMPLETE-P*")
   (setf *cold-init-complete-p* t)
 
   ;; The system is finally ready for GC.

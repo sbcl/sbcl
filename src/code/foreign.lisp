@@ -197,7 +197,7 @@
   environment (\"man environ\") definitions for the invocation of the linker.
   The default is the environment that Lisp is itself running in. Instead of
   using the ENVIRONMENT argument, it is also possible to use the ENV argument,
-  using the alternate, lossy representation used by CMU CL."
+  using the older, lossy CMU CL representation."
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let ((output-file (pick-temporary-file-name
@@ -211,8 +211,8 @@
 		     *dso-linker*
 		     (append *dso-linker-options*
 			     (list output-file)
-			     (append (mapcar #'(lambda (name)
-						 (unix-namestring name nil))
+			     (append (mapcar (lambda (name)
+					       (unix-namestring name nil))
 					     (if (atom files)
 						 (list files)
 					       files))

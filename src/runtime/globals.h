@@ -29,8 +29,8 @@ extern lispobj *current_binding_stack_pointer;
 extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;
 #endif
-extern lispobj *current_dynamic_space;
 
+extern lispobj *current_dynamic_space;
 
 extern void globals_init(void);
 

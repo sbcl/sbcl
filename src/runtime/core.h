@@ -14,7 +14,6 @@
 
 #include "runtime.h"
 
-#define CORE_PAGESIZE OS_VM_DEFAULT_PAGESIZE
 #define CORE_END 3840
 #define CORE_NDIRECTORY 3861
 #define CORE_VALIDATE 3845

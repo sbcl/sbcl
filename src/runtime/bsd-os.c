@@ -204,7 +204,9 @@ is_valid_lisp_addr(os_vm_address_t addr)
 
 void
 os_install_interrupt_handlers(void)
-{}
+{
+    SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
+}
 
 #else
 
@@ -231,13 +233,17 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 void
 os_install_interrupt_handlers(void)
 {
+    SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
 #if defined __FreeBSD__
+    SHOW("__FreeBSD__ case");
     interrupt_install_low_level_handler(SIGBUS, memory_fault_handler);
 #elif defined __OpenBSD__
+    FSHOW((stderr, "/__OpenBSD__ case, SIGSEGV=%d\n", SIGSEGV));
     interrupt_install_low_level_handler(SIGSEGV, memory_fault_handler);
 #else
 #error unsupported BSD variant
 #endif
+    SHOW("leaving os_install_interrupt_handlers()");
 }
 
 #endif /* !defined GENCGC */

@@ -28,11 +28,6 @@
  * os_vm_prot_t
  *   type used for flags for mmap, mprotect, etc.
  *
- * OS_VM_DEFAULT_PAGESIZE
- *   used by core dumping and loading logic (but dunno its exact
- *   definition, in particular why we can't just use getpagesize()
- *   instead)
- *
  * os_vm_address_t
  *   the type used to represent addresses? (dunno why not just void*)
  * os_vm_size_t, os_vm_off_t

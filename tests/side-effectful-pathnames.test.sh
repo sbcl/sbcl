@@ -11,6 +11,8 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+original_pwd=`pwd`
+
 # LOADing and COMPILEing files with logical pathnames
 testdir=`pwd`"/side-effectful-pathnames-test-$$"
 testfilestem="load-test"
@@ -43,10 +45,55 @@ $SBCL <<EOF
   (sb-ext:quit :unix-status 52)
 EOF
 if [ $? != 52 ]; then
-    echo test failed: $?
+    echo LOAD/COMPILE test failed, unexpected Lisp return code=$?
     exit 1
 fi
+# We don't need the test directory any more.
 rm -r $testdir
 
-# success
+# In the flaky1 branch, Dan Barlow pointed out that
+# ENSURE-DIRECTORIES-EXIST failed for these relative pathname
+# operations when the mysterious special case handling of "" pathnames
+# was removed from UNIX-STAT. Let's make sure that it works now.
+#
+# Set up an empty directory to work with.
+testfilestem=$TMPDIR/sbcl-mkdir-test-$$
+if ! rm -rf $testfilestem ; then
+  echo "$testfilestem already exists and cannot be deleted"
+  exit 1;
+fi
+mkdir $testfilestem
+cd  $testfilestem
+#
+# Provoke failure.
+$SBCL <<EOF
+(let ((rel-name #p"foo/bar/")
+      (abs-name (merge-pathnames #p"baz/quux/" (truename "."))))
+  (and
+   (ensure-directories-exist abs-name)
+   (ensure-directories-exist rel-name)
+   (sb-ext:quit :unix-status 52)))
+EOF
+if [ $? != 52 ]; then
+    echo ENSURE-DIRECTORIES-EXIST test failed, unexpected SBCL return code=$?
+    find $testfilestem -print
+    exit 1
+fi
+if [ ! -d $testfilestem/foo/bar ] ; then
+    echo test failed: $testfilestem/foo/bar is not a directory
+    find $testfilestem -print
+    exit 1
+fi;
+if [ ! -d $testfilestem/baz/quux ] ; then
+    echo test failed: $testfilestem/baz/quux is not a directory
+    find $testfilestem -print
+    exit 1
+fi;
+#
+# We succeeded, life is good. Now we don't need the test directory
+# any more; and come back home.
+rm -r $testfilestem
+cd $original_pwd
+
+# success convention for script
 exit 104

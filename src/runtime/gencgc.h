@@ -30,11 +30,12 @@ struct page {
 	 * (If the page is written into, we catch the exception, make
 	 * the page writable, and clear this flag.) */
         write_protected :1,
-	/* This flag is set when the above write_protected flag is
-         * cleared by the sigbus handler. This is useful for
-         * re-scavenging pages that are written during a GC. */
+	/* This flag is set when the above write_protected flag is 
+	 * cleared by the SIGBUS handler (or SIGSEGV handler, for some
+	 * OSes). This is useful for * re-scavenging pages that are
+	 * written during a GC. */
 	write_protected_cleared :1,
-	/* The region the page is allocated to: 0 for a free page; 1
+	/* the region the page is allocated to: 0 for a free page; 1
          * for boxed objects; 2 for unboxed objects. If the page is
          * free the following slots are invalid (well the bytes_used
          * must be 0). */
@@ -65,6 +66,7 @@ struct page {
     int  first_object_offset;
 };
 
+/* values for the page.allocated field */
 #define FREE_PAGE 0
 #define BOXED_PAGE 1
 #define UNBOXED_PAGE 2
@@ -81,7 +83,7 @@ struct alloc_region {
     void  *free_pointer;
     void  *end_addr; /* pointer to the byte after the last usable byte */
 
-    /* needed when closing the region */
+    /* These are needed when closing the region. */
     int  first_page;
     int  last_page;
     void  *start_addr;

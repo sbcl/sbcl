@@ -708,46 +708,73 @@
 
 ;;;; UNIX-NAMESTRING
 
-(defun unix-namestring (pathname &optional (for-input t) executable-only)
-  #!+sb-doc
-  "Convert PATHNAME into a string that can be used with UNIX system calls.
-   Search-lists and wild-cards are expanded."
-  ;; toy@rtp.ericsson.se: Let unix-namestring also handle logical
-  ;; pathnames too.
-  ;; FIXME: What does this ^ mean? A bug? A remark on a change already made?
-  (let ((path (let ((lpn (pathname pathname)))
-		(if (typep lpn 'logical-pathname)
-		    (namestring (translate-logical-pathname lpn))
-		    pathname))))
-    (enumerate-search-list
-      (pathname path)
-      (collect ((names))
-	(enumerate-matches (name pathname nil :verify-existence for-input)
-			   (when (or (not executable-only)
-				     (and (eq (sb!unix:unix-file-kind name)
-					      :file)
-					  (sb!unix:unix-access name
-							       sb!unix:x_ok)))
-			     (names name)))
-	(let ((names (names)))
-	  (when names
-	    (when (cdr names)
-	      (error 'simple-file-error
-		     :format-control "~S is ambiguous:~{~%  ~A~}"
-		     :format-arguments (list pathname names)))
-	    (return (car names))))))))
+(defun empty-relative-pathname-spec-p (x)
+  (or (equal x "")
+      (and (pathnamep x)
+	   (or (equal (pathname-directory x) '(:relative))
+	       ;; KLUDGE: I'm not sure this second check should really
+	       ;; have to be here. But on sbcl-0.6.12.7,
+	       ;; (PATHNAME-DIRECTORY (PATHNAME "")) is NIL, and
+	       ;; (PATHNAME "") seems to act like an empty relative
+	       ;; pathname, so in order to work with that, I test
+	       ;; for NIL here. -- WHN 2001-05-18
+	       (null (pathname-directory x)))
+	   (null (pathname-name x))
+	   (null (pathname-type x)))
+      ;; (The ANSI definition of "pathname specifier" has 
+      ;; other cases, but none of them seem to admit the possibility
+      ;; of being empty and relative.)
+      ))
+
+;;; Convert PATHNAME into a string that can be used with UNIX system
+;;; calls, or return NIL if no match is found. Search-lists and
+;;; wild-cards are expanded.
+(defun unix-namestring (pathname-spec &optional (for-input t))
+  ;; The ordinary rules of converting Lispy paths to Unix paths break
+  ;; down for the current working directory, which Lisp thinks of as
+  ;; "" (more or less, and modulo ANSI's *DEFAULT-PATHNAME-DEFAULTS*,
+  ;; which unfortunately SBCL, as of sbcl-0.6.12.8, basically ignores)
+  ;; and Unix thinks of as ".". Since we're at the interface between
+  ;; Unix system calls and things like ENSURE-DIRECTORIES-EXIST which
+  ;; think the Lisp way, we perform the conversion.
+  ;;
+  ;; (FIXME: The *right* way to deal with this special case is to
+  ;; merge PATHNAME-SPEC with *DEFAULT-PATHNAME-DEFAULTS* here, after
+  ;; which it's not a relative pathname any more so the special case
+  ;; is no longer an issue. But until *DEFAULT-PATHNAME-DEFAULTS*
+  ;; works, we use this hack.)
+  (if (empty-relative-pathname-spec-p pathname-spec)
+      "."
+      ;; Otherwise, the ordinary rules apply.
+      (let* ((possibly-logical-pathname (pathname pathname-spec))
+	     (physical-pathname (if (typep possibly-logical-pathname
+					   'logical-pathname)
+				    (namestring (translate-logical-pathname
+						 possibly-logical-pathname))
+				    possibly-logical-pathname))
+	     (matches nil)) ; an accumulator for actual matches
+	(enumerate-matches (match physical-pathname nil
+				  :verify-existence for-input)
+          (push match matches))
+	(case (length matches)
+	  (0 nil)
+	  (1 (first matches))
+	  (t (error 'simple-file-error
+		    :format-control "~S is ambiguous:~{~%  ~A~}"
+		    :format-arguments (list pathname-spec matches)))))))
 
 ;;;; TRUENAME and PROBE-FILE
 
-;;; Another silly file function trivially different from another function.
+;;; This is only trivially different from PROBE-FILE, which is silly
+;;; but ANSI.
 (defun truename (pathname)
   #!+sb-doc
-  "Return the pathname for the actual file described by the pathname
-  An error of type file-error is signalled if no such file exists,
+  "Return the pathname for the actual file described by PATHNAME.
+  An error of type FILE-ERROR is signalled if no such file exists,
   or the pathname is wild."
   (if (wild-pathname-p pathname)
       (error 'simple-file-error
-	     :format-control "bad place for a wild pathname"
+	     :format-control "can't use a wild pathname here"
 	     :pathname pathname)
       (let ((result (probe-file pathname)))
 	(unless result
@@ -760,20 +787,20 @@
 ;;; If PATHNAME exists, return its truename, otherwise NIL.
 (defun probe-file (pathname)
   #!+sb-doc
-  "Return a pathname which is the truename of the file if it exists, NIL
+  "Return a pathname which is the truename of the file if it exists, or NIL
   otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
-  (if (wild-pathname-p pathname)
-      (error 'simple-file-error
-	     :pathname pathname
-	     :format-control "bad place for a wild pathname")
-      (let ((namestring (unix-namestring pathname t)))
-	(when (and namestring (sb!unix:unix-file-kind namestring))
-	  (let ((truename (sb!unix:unix-resolve-links
-			   (sb!unix:unix-maybe-prepend-current-directory
-			    namestring))))
-	    (when truename
-	      (let ((*ignore-wildcards* t))
-		(pathname (sb!unix:unix-simplify-pathname truename)))))))))
+  (when (wild-pathname-p pathname)
+    (error 'simple-file-error
+	   :pathname pathname
+	   :format-control "can't use a wild pathname here"))
+  (let ((namestring (unix-namestring pathname t)))
+    (when (and namestring (sb!unix:unix-file-kind namestring))
+      (let ((truename (sb!unix:unix-resolve-links
+		       (sb!unix:unix-maybe-prepend-current-directory
+			namestring))))
+	(when truename
+	  (let ((*ignore-wildcards* t))
+	    (pathname (sb!unix:unix-simplify-pathname truename))))))))
 
 ;;;; miscellaneous other operations
 
@@ -1035,9 +1062,10 @@
 
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
   #!+sb-doc
-  "Tests whether the directories containing the specified file
-  actually exist, and attempts to create them if they do not.
-  Portable programs should avoid using the :MODE argument."
+  "Test whether the directories containing the specified file
+  actually exist, and attempt to create them if they do not.
+  The MODE argument is a CMUCL/SBCL-specific extension to control
+  the Unix permission bits."
   (let* ((pathname (pathname pathspec))
 	 (pathname (if (typep pathname 'logical-pathname)
 		       (translate-logical-pathname pathname)

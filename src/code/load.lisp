@@ -273,7 +273,7 @@
       (let* ((fhsss sb!c:*fasl-header-string-start-string*)
 	     (fhsss-length (length fhsss)))
 	(unless (= byte (char-code (schar fhsss 0)))
-	  (error "illegal fasl file header: first byte"))
+	  (error "illegal first byte in fasl file header"))
 	(do ((byte (read-byte stream) (read-byte stream))
 	     (count 1 (1+ count)))
 	    ((= byte sb!c:*fasl-header-string-stop-char-code*)
@@ -281,7 +281,8 @@
 	  (declare (fixnum byte count))
 	  (when (and (< count fhsss-length)
 		     (not (eql byte (char-code (schar fhsss count)))))
-	    (error "illegal fasl file header: subsequent byte"))))
+	    (error
+	     "illegal subsequent (not first) byte in fasl file header"))))
 
       ;; Read and validate implementation and version, or die.
       (let* ((implementation-length (read-arg 4))
@@ -379,8 +380,15 @@
   ;; don't. (CMU CL did, but implemented it in a non-ANSI way, and I
   ;; just disabled that instead of rewriting it.) -- WHN 20000131
   (declare (ignore print))
+
+  ;; FIXME: In sbcl-0.6.12.8 the OpenBSD implementation of FILE-LENGTH
+  ;; broke because changed handling of Unix stat(2) stuff couldn't
+  ;; deal with OpenBSD's 64-bit size slot. Once that's fixed, this
+  ;; code can be restored.
+  #!-openbsd
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
+
   (do-load-verbose stream verbose)
   (let* ((*fasl-file* stream)
 	 (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))

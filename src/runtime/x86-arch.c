@@ -67,7 +67,7 @@ void arch_skip_instruction(os_context_t *context)
     int vlen;
     int code;
 
-    FSHOW((stderr, "[arch_skip_inst at %x]\n", *os_context_pc_addr(context)));
+    FSHOW((stderr, "/[arch_skip_inst at %x]\n", *os_context_pc_addr(context)));
 
     /* Get and skip the Lisp interrupt code. */
     code = *(char*)(*os_context_pc_addr(context))++;
@@ -98,7 +98,7 @@ void arch_skip_instruction(os_context_t *context)
 	}
 
     FSHOW((stderr,
-	   "[arch_skip_inst resuming at %x]\n",
+	   "/[arch_skip_inst resuming at %x]\n",
 	   *os_context_pc_addr(context)));
 }
 
@@ -224,7 +224,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     switch (trap) {
 
     case trap_PendingInterrupt:
-	FSHOW((stderr, "<trap pending interrupt>\n"));
+	FSHOW((stderr, "/<trap pending interrupt>\n"));
 	arch_skip_instruction(context);
 	interrupt_handle_pending(context);
 	break;
@@ -255,7 +255,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	break;
 
     default:
-	FSHOW((stderr,"[C--trap default %d %d %x]\n",
+	FSHOW((stderr,"/[C--trap default %d %d %x]\n",
 	       signal, code, context));
 	interrupt_handle_now(signal, info, context);
 	break;
@@ -265,8 +265,10 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 void
 arch_install_interrupt_handlers()
 {
+    SHOW("entering arch_install_interrupt_handlers()");
     interrupt_install_low_level_handler(SIGILL , sigtrap_handler);
     interrupt_install_low_level_handler(SIGTRAP, sigtrap_handler);
+    SHOW("returning from arch_install_interrupt_handlers()");
 }
 
 /* This is implemented in assembly language and called from C: */
@@ -286,6 +288,7 @@ funcall0(lispobj function)
 {
     lispobj *args = NULL;
 
+    FSHOW((stderr, "/entering funcall0(0x%lx)\n", (long)function));
     return call_into_lisp(function, args, 0);
 }
 lispobj

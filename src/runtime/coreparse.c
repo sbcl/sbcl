@@ -31,11 +31,12 @@
 #include "interr.h"
 #include "sbcl.h"
 
-static void process_directory(int fd, long *ptr, int count)
+static void
+process_directory(int fd, long *ptr, int count)
 {
     struct ndir_entry *entry;
 
-    FSHOW((stderr, "process_directory(..), count=%d\n", count));
+    FSHOW((stderr, "/process_directory(..), count=%d\n", count));
     
     for (entry = (struct ndir_entry *) ptr; --count>= 0; ++entry) {
 
@@ -48,7 +49,8 @@ static void process_directory(int fd, long *ptr, int count)
 	
 	if (len != 0) {
 	    os_vm_address_t real_addr;
-	    FSHOW((stderr, "mapping %ld bytes at 0x%lx\n", len, addr));
+	    FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
+		   (long)len, (long)len, addr));
 	    real_addr = os_map(fd, offset, addr, len);
 	    if (real_addr != addr) {
 		lose("file mapped in wrong place! "
@@ -58,8 +60,8 @@ static void process_directory(int fd, long *ptr, int count)
 	    }
 	}
 
-	FSHOW((stderr, "space id = %d, free pointer = 0x%08x\n",
-	       id, free_pointer));
+	FSHOW((stderr, "/space id = %d, free pointer = 0x%08x\n",
+	       id, (long)free_pointer));
 
 	switch (id) {
 	case DYNAMIC_SPACE_ID:
@@ -78,12 +80,18 @@ static void process_directory(int fd, long *ptr, int count)
 		fprintf(stderr,"warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #endif
+/* FIXME: Should the conditional here be reg_ALLOC instead of
+ *   defined(ibmrt) || defined(__i386__)
+ * ? */
 #if defined(ibmrt) || defined(__i386__)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
 #else
 	    dynamic_space_free_pointer = free_pointer;
 #endif
-	    /* on the x86, this will always be space 0 */
+	    /* For stop-and-copy GC, this will be whatever the GC was
+	     * using at the time. With GENCGC, this will always be
+	     * space 0. (We checked above that for GENCGC,
+	     * addr==DYNAMIC_SPACE_START.) */
 	    current_dynamic_space = (lispobj *)addr;
 	    break;
 	case STATIC_SPACE_ID:
@@ -106,7 +114,8 @@ static void process_directory(int fd, long *ptr, int count)
     }
 }
 
-lispobj load_core_file(char *file)
+lispobj
+load_core_file(char *file)
 {
     int fd = open(file, O_RDONLY), count;
 
@@ -123,18 +132,20 @@ lispobj load_core_file(char *file)
 #endif
 
     lispobj initial_function = NIL;
+    FSHOW((stderr, "/entering load_core_file(%s)\n", file));
     if (fd < 0) {
 	fprintf(stderr, "could not open file \"%s\"\n", file);
 	perror("open");
 	exit(1);
     }
 
-    header=calloc(os_vm_page_size / sizeof(u32),sizeof(u32));
+    header = calloc(os_vm_page_size / sizeof(u32), sizeof(u32));
 
     count = read(fd, header, os_vm_page_size);
     if (count < os_vm_page_size) {
 	lose("premature end of core file");
     }
+    SHOW("successfully read first page of core");
 
     ptr = header;
     val = *ptr++;
@@ -144,18 +155,23 @@ lispobj load_core_file(char *file)
 	     val,
 	     CORE_MAGIC);
     }
+    SHOW("found CORE_MAGIC");
 
     while (val != CORE_END) {
 	val = *ptr++;
 	len = *ptr++;
 	remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
+	FSHOW((stderr, "/val=0x%ld, remaining_len=0x%ld\n",
+	       (long)val, (long)remaining_len));
 
 	switch (val) {
 
 	case CORE_END:
+	    SHOW("CORE_END case");
 	    break;
 
 	case CORE_VERSION:
+	    SHOW("CORE_VERSION case");
 	    if (*ptr != SBCL_CORE_VERSION_INTEGER) {
 		lose("core file version (%d) != runtime library version (%d)",
 		     *ptr,
@@ -164,6 +180,7 @@ lispobj load_core_file(char *file)
 	    break;
 
 	case CORE_NDIRECTORY:
+	    SHOW("CORE_NDIRECTORY case");
 	    process_directory(fd,
 			      ptr,
 #ifndef alpha
@@ -177,15 +194,19 @@ lispobj load_core_file(char *file)
 	    break;
 
 	case CORE_INITIAL_FUNCTION:
+	    SHOW("CORE_INITIAL_FUNCTION case");
 	    initial_function = (lispobj)*ptr;
 	    break;
 
 	default:
-	    lose("unknown core file entry: %ld", val);
+	    lose("unknown core file entry: %ld", (long)val);
 	}
 
 	ptr += remaining_len;
+	FSHOW((stderr, "/new ptr=%x\n", ptr));
     }
+    SHOW("about to free(header)");
     free(header);
+    SHOW("returning from load_core_file(..)");
     return initial_function;
 }

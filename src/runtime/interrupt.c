@@ -377,7 +377,9 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     }
 
 #ifdef QSHOW_SIGNALS
-    FSHOW((stderr, "in interrupt_handle_now(%d, info, context)\n", signal));
+    FSHOW((stderr,
+	   "/entering interrupt_handle_now(%d, info, context)\n",
+	   signal));
 #endif
 
     if (ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
@@ -424,6 +426,12 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     {
         undo_fake_foreign_function_call(context);
     }
+
+#ifdef QSHOW_SIGNALS
+    FSHOW((stderr,
+	   "/returning from interrupt_handle_now(%d, info, context)\n",
+	   signal));
+#endif
 }
 
 static void
@@ -583,7 +591,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigset_t old, new;
     union interrupt_handler oldhandler;
 
-    FSHOW((stderr, "entering POSIX install_handler(%d, ..)\n", signal));
+    FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
 
     sigemptyset(&new);
     sigaddset(&new, signal);
@@ -592,7 +600,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigemptyset(&new);
     sigaddset_blockable(&new);
 
-    FSHOW((stderr, "interrupt_low_level_handlers[signal]=%d\n",
+    FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%d\n",
 	   interrupt_low_level_handlers[signal]));
     if (interrupt_low_level_handlers[signal]==0) {
 	if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
@@ -616,7 +624,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 
     sigprocmask(SIG_SETMASK, &old, 0);
 
-    FSHOW((stderr, "leaving POSIX install_handler(%d, ..)\n", signal));
+    FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 
     return (unsigned long)oldhandler.lisp;
 }
@@ -626,6 +634,7 @@ interrupt_init(void)
 {
     int i;
 
+    SHOW("entering interrupt_init()");
     for (i = 0; i < NSIG; i++) {
         interrupt_handlers[i].c =
 	    /* (The cast here blasts away the distinction between
@@ -635,4 +644,5 @@ interrupt_init(void)
 	     * 3-argument form is expected.) */
 	    (void (*)(int, siginfo_t*, void*))SIG_DFL;
     }
+    SHOW("returning from interrupt_init()");
 }

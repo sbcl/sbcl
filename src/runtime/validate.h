@@ -37,6 +37,4 @@ extern void validate(void);
  * architecture-dependent header file of memory map data. 
  */
 
-
-
 #endif

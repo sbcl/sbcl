@@ -858,6 +858,12 @@
     (:charpos
      (fd-stream-char-pos fd-stream))
     (:file-length
+     ;; FIXME: This is broken on OpenBSD until the FFI, or at least
+     ;; UNIX-FSTAT, learns to extract 64-bit values. (As of sbcl-0.6.12.8,
+     ;; UNIX-FSTAT returns a 0 placeholder instead.)
+     #!+openbsd
+     (error "FIXME: internal error, FILE-LENGTH is broken on OpenBSD")
+     #!-openbsd
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
 			   atime mtime ctime blksize blocks)
 	 (sb!unix:unix-fstat (fd-stream-fd fd-stream))
@@ -1124,8 +1130,8 @@
 	    (delete-original (eq if-exists :rename-and-delete))
 	    (mode #o666))
 	(when original
-	  ;; We are doing a :RENAME or :RENAME-AND-DELETE.
-	  ;; Determine whether the file already exists, make sure the original
+	  ;; We are doing a :RENAME or :RENAME-AND-DELETE. Determine
+	  ;; whether the file already exists, make sure the original
 	  ;; file is not a directory, and keep the mode.
 	  (let ((exists
 		 (and namestring
@@ -1154,10 +1160,10 @@
 			 (do-old-rename namestring original))
 	      (setf original nil)
 	      (setf delete-original nil)
-	      ;; In order to use :SUPERSEDE instead, we have to make sure
-	      ;; SB!UNIX:O_CREAT corresponds to IF-DOES-NOT-EXIST.
-	      ;; SB!UNIX:O_CREAT was set before because of IF-EXISTS being
-	      ;; :RENAME.
+	      ;; In order to use :SUPERSEDE instead, we have to make
+	      ;; sure SB!UNIX:O_CREAT corresponds to
+	      ;; IF-DOES-NOT-EXIST. SB!UNIX:O_CREAT was set before
+	      ;; because of IF-EXISTS being :RENAME.
 	      (unless (eq if-does-not-exist :create)
 		(setf mask
 		      (logior (logandc2 mask sb!unix:o_creat)
