@@ -693,6 +693,8 @@
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. If from a stream, :STREAM.
   (name (missing-arg) :type (or pathname (member :lisp :stream)))
+  ;; the external format that we'll call OPEN with, if NAME is a file.
+  (external-format nil)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
   ;; to TRUENAME call.) Null if not a file. This is used to set
   ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the
@@ -726,9 +728,10 @@
   (stream nil :type (or stream null)))
 
 ;;; Given a pathname, return a SOURCE-INFO structure.
-(defun make-file-source-info (file)
+(defun make-file-source-info (file external-format)
   (let ((file-info (make-file-info :name (truename file)
 				   :untruename file
+                                   :external-format external-format
 				   :write-date (file-write-date file))))
 
     (make-source-info :file-info file-info)))
@@ -785,10 +788,13 @@
   (declare (type source-info info))
   (or (source-info-stream info)
       (let* ((file-info (source-info-file-info info))
-	     (name (file-info-name file-info)))
+	     (name (file-info-name file-info))
+             (external-format (file-info-external-format file-info)))
 	(setf sb!xc:*compile-file-truename* name
 	      sb!xc:*compile-file-pathname* (file-info-untruename file-info)
-	      (source-info-stream info) (open name :direction :input)))))
+	      (source-info-stream info)
+              (open name :direction :input
+                    :external-format external-format)))))
 
 ;;; Close the stream in INFO if it is open.
 (defun close-source-info (info)
@@ -1533,7 +1539,7 @@
   #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and returning
    its filename. Besides the ANSI &KEY arguments :OUTPUT-FILE, :VERBOSE,
-   :PRINT, and :EXTERNAL-FORMAT,the following extensions are supported:
+   :PRINT, and :EXTERNAL-FORMAT, the following extensions are supported:
      :TRACE-FILE
         If given, internal data structures are dumped to the specified
         file, or if a value of T is given, to a file of *.trace type
@@ -1552,15 +1558,13 @@
    optimization values, and the :BLOCK-COMPILE argument will probably
    become deprecated."
 
-  (unless (eq external-format :default)
-    (error "Non-:DEFAULT EXTERNAL-FORMAT values are not supported."))
   (let* ((fasl-output nil)
 	 (output-file-name nil)
 	 (compile-won nil)
 	 (warnings-p nil)
 	 (failure-p t) ; T in case error keeps this from being set later
 	 (input-pathname (verify-source-file input-file))
-	 (source-info (make-file-source-info input-pathname))
+	 (source-info (make-file-source-info input-pathname external-format))
 	 (*compiler-trace-output* nil)) ; might be modified below
 
     (unwind-protect

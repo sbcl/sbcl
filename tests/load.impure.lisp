@@ -11,10 +11,12 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(defvar *tmp-filename* "load-test.tmp")
+
 ;;; Bug reported by Sean Ross: FASL loader set fill pointer to loaded
 ;;; simple arrays.
+
 (defvar *array*)
-(defvar *tmp-filename* "load-test.tmp")
 
 (progn
   (with-open-file (s *tmp-filename*
@@ -31,6 +33,23 @@
              (assert (arrayp *array*))
              (assert (= (array-rank *array*) 3))
              (assert (not (array-has-fill-pointer-p *array*)))))
+      (when tmp-fasl (delete-file tmp-fasl))
+      (delete-file *tmp-filename*))))
+
+;;; rudimentary external-format test
+(dolist (ef '(:default :ascii :latin-1 :utf-8))
+  (with-open-file (s *tmp-filename*
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (print '(defun foo (x) (1+ x)) s))
+  (fmakunbound 'foo)
+  (let (tmp-fasl)
+    (unwind-protect
+         (progn
+           (setq tmp-fasl (compile-file *tmp-filename* :external-format ef))
+           (load tmp-fasl)
+           (assert (= (foo 1) 2)))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
 

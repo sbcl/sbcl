@@ -8,6 +8,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.18:
     ** portions of multibyte characters at the end of buffers for
        character-based file input are correctly transferred to the
        start of the buffer at the next read.
+    ** COMPILE-FILE now respects any EXTERNAL-FORMAT argument given,
+       passing it through to OPEN.
 
 changes in sbcl-0.8.19 relative to sbcl-0.8.18:
   * new port: SBCL now works in native 64-bit mode on x86-64/Linux

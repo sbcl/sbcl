@@ -275,7 +275,6 @@
 		    name))))))
     (list res)))
 
-
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
 ;;; possible. Ordinarily we coerce it to the smallest specialized
 ;;; vector we can. However, we also have a special hack for
