@@ -264,6 +264,14 @@
 			  +default-operand-size+)))
 		 (sb!disassem:read-suffix (width-bits width) dstate))))
 
+(sb!disassem:define-arg-type signed-imm-word
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (let ((width
+		      (or (sb!disassem:dstate-get-prop dstate 'word-width)
+			  +default-operand-size+)))
+		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
+
 ;;; needed for the ret imm16 instruction
 (sb!disassem:define-arg-type imm-word-16
   :prefilter (lambda (value dstate)
@@ -1272,7 +1280,8 @@
 (define-instruction imul (segment dst &optional src1 src2)
   (:printer accum-reg/mem ((op '(#b1111011 #b101))))
   (:printer ext-reg-reg/mem ((op #b1010111)))
-  (:printer reg-reg/mem ((op #b0110100) (width 1) (imm nil :type 'imm-word))
+  (:printer reg-reg/mem ((op #b0110100) (width 1)
+                         (imm nil :type 'signed-imm-word))
 	    '(:name :tab reg ", " reg/mem ", " imm))
   (:printer reg-reg/mem ((op #b0110101) (width 1)
 			 (imm nil :type 'signed-imm-byte))

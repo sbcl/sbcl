@@ -347,6 +347,7 @@
 	   (let* ((old-arg (car this-arg-temps))
 		  (new-arg (find (arg-name old-arg) args :key #'arg-name)))
 	     (and new-arg
+                  (= (arg-position old-arg) (arg-position new-arg))
 		  (every (lambda (this-kind-temps)
 			   (funcall (find-arg-form-checker
 				     (car this-kind-temps))

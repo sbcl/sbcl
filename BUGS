@@ -882,7 +882,6 @@ WORKAROUND:
   ;   The variable Y is defined but never used.
 
 245: bugs in disassembler
-  a. On X86 an immediate operand for IMUL is printed incorrectly.
   b. On X86 operand size prefix is not recognized.
 
 251:
