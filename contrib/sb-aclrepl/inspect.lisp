@@ -56,7 +56,6 @@ The commands are:
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-")))
 
-
 (defun inspector-fun (object input-stream output-stream)
   (declare (ignore input-stream))
   (let ((*current-inspect* nil)

@@ -809,12 +809,6 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 	 :format-string "~@<~S ~_is not a ~_~S~:>"
 	 :format-arguments (list value type)))
 
-;;; Return a list of N gensyms. (This is a common suboperation in
-;;; macros and other code-manipulating code.)
-(declaim (ftype (function (index) list) make-gensym-list))
-(defun make-gensym-list (n)
-  (loop repeat n collect (gensym)))
-
 ;;; Return a function like FUN, but expecting its (two) arguments in
 ;;; the opposite order that FUN does.
 (declaim (inline swapped-args-fun))

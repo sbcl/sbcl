@@ -444,7 +444,7 @@
 					  :format-control "execution of a form compiled with errors:~% ~S"
 					  :format-arguments (list ',,form))))
 			       &body body)
-			      (let ((skip (gensym "SKIP")))
+			      (with-unique-names (skip)
 				`(block ,skip
 				   (catch 'ir1-error-abort
 				     (let ((*compiler-error-bailout*

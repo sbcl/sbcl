@@ -224,8 +224,7 @@
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after
   the GENERATE-CERROR-CODE form."
-  (let ((continue (gensym "CONTINUE-LABEL-"))
-	(error (gensym "ERROR-LABEL-")))
+  (with-unique-names (continue error)
     `(let ((,continue (gen-label)))
        (emit-label ,continue)
        (assemble (*elsewhere*)

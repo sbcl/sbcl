@@ -31,8 +31,7 @@
 
 ;;; Bind the value and make a closure that returns it.
 (define-source-transform constantly (value)
-  (let ((rest (gensym "CONSTANTLY-REST-"))
-	(n-value (gensym "CONSTANTLY-VALUE-")))
+  (with-unique-names (rest n-value)
     `(let ((,n-value ,value))
       (lambda (&rest ,rest)
 	(declare (ignore ,rest))

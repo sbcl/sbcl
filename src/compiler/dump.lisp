@@ -1259,7 +1259,7 @@
 (defun dump-layout (obj file)
   (when (layout-invalid obj)
     (compiler-error "attempt to dump reference to obsolete class: ~S"
-		    (layout-class obj)))
+		    (layout-classoid obj)))
   (let ((name (classoid-name (layout-classoid obj))))
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))

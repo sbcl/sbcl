@@ -311,7 +311,7 @@
 (defparameter *stems-and-flags* (read-from-file "build-order.lisp-expr"))
 
 (defmacro do-stems-and-flags ((stem flags) &body body)
-  (let ((stem-and-flags (gensym "STEM-AND-FLAGS-")))
+  (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
     `(dolist (,stem-and-flags *stems-and-flags*)
        (let ((,stem (first ,stem-and-flags))
 	     (,flags (rest ,stem-and-flags)))

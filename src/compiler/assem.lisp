@@ -156,9 +156,7 @@
 ;;; BACK-PATCH-FUN so we can avoid this nastiness altogether.
 (defmacro with-modified-segment-index-and-posn ((segment index posn)
 						&body body)
-  (let ((n-segment (gensym "SEGMENT"))
-	(old-index (gensym "OLD-INDEX-"))
-	(old-posn (gensym "OLD-POSN-")))
+  (with-unique-names (n-segment old-index old-posn)
     `(let* ((,n-segment ,segment)
 	    (,old-index (segment-current-index ,n-segment))
 	    (,old-posn (segment-current-posn ,n-segment)))
@@ -1654,8 +1652,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 		(append ,@(extract-nths 0 'list pdefs)))))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
-  (let ((whole (gensym "WHOLE-"))
-	(env (gensym "ENV-")))
+  (with-unique-names (whole env)
     (multiple-value-bind (body local-defs)
 	(sb!kernel:parse-defmacro lambda-list
 				  whole

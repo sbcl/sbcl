@@ -4,7 +4,7 @@
 (!def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
     (:raw
-     (let ((fixup (gensym "FIXUP-")))
+     (with-unique-names (fixup)
        (values
 	`((let ((fixup (make-fixup ',name :assembly-routine)))
 	    (inst ldil fixup ,fixup)
@@ -41,7 +41,7 @@
 		      ,nfp-save)
 	  (:save-p :compute-only)))))
     (:none
-     (let ((fixup (gensym "FIXUP-")))
+     (with-unique-names (fixup)
        (values
 	`((let ((fixup (make-fixup ',name :assembly-routine)))
 	    (inst ldil fixup ,fixup)

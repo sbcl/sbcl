@@ -14,7 +14,7 @@
   "Define a new type, with syntax like DEFMACRO."
   (unless (symbolp name)
     (error "type name not a symbol: ~S" name))
-  (let ((whole (gensym "WHOLE-")))
+  (with-unique-names (whole)
     (multiple-value-bind (body local-decs doc)
 	(parse-defmacro arglist whole body name 'deftype :default-default ''*)
       `(eval-when (:compile-toplevel :load-toplevel :execute)

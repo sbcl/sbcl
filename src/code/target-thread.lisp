@@ -63,7 +63,7 @@
 	(eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
 
 (defmacro with-spinlock ((queue) &body body)
-  (let ((pid (gensym "PID")))
+  (with-unique-names (pid)
     `(unwind-protect
       (let ((,pid (current-thread-id)))
 	(get-spinlock ,queue 2 ,pid)
@@ -140,8 +140,7 @@
      (setf old-value t1))))
 
 (defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
-  (let ((block (gensym "NIL"))
-	(got (gensym "GOT")))
+  (with-unique-names (got)
     `(let ((,got (get-mutex ,mutex ,value ,wait-p)))
       (when ,got
 	(unwind-protect

@@ -764,9 +764,7 @@
   "Execute the body, interrupting it with a SIGALRM after at least
 EXPIRES seconds have passed.  Uses Unix setitimer(), restoring any
 previous timer after the body has finished executing"
-  (let ((saved-seconds (gensym "SAVED-SECONDS"))
-	(saved-useconds (gensym "SAVED-USECONDS"))
-	(s (gensym "S")) (u (gensym "U")))
+  (with-unique-names (saved-seconds saved-useconds s u)
     `(let (- ,saved-seconds ,saved-useconds)
       (multiple-value-setq (- - - ,saved-seconds ,saved-useconds)
 	(unix-getitimer :real))

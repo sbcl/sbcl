@@ -860,7 +860,7 @@ retained, possibly temporariliy, because it might be used internally."
              "UNIX-NAMESTRING" ; FIXME: perhaps belongs in package SB!UNIX
              "FEATUREP"
              "FLUSH-STANDARD-OUTPUT-STREAMS"
-             "MAKE-GENSYM-LIST"
+             "WITH-UNIQUE-NAMES" "MAKE-GENSYM-LIST" 
              "ABOUT-TO-MODIFY-SYMBOL-VALUE"
 	     "SYMBOL-SELF-EVALUATING-P"
              "PRINT-PRETTY-ON-STREAM-P"

@@ -122,7 +122,7 @@
 
 ;;; Memoize the FORM which returns a typecheckfun for TYPESPEC.
 (defmacro memoized-typecheckfun-form (form typespec)
-  (let ((n-typespec (gensym "TYPESPEC")))
+  (with-unique-names (n-typespec)
     `(let ((,n-typespec ,typespec))
        (or (gethash ,n-typespec *typecheckfuns*)
 	   (setf (gethash ,n-typespec *typecheckfuns*)

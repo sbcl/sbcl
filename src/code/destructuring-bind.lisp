@@ -12,7 +12,7 @@
 (defmacro-mundanely destructuring-bind (lambda-list arg-list &rest body)
   #!+sb-doc
   "Bind the variables in LAMBDA-LIST to the contents of ARG-LIST."
-  (let* ((arg-list-name (gensym "ARG-LIST-")))
+  (let ((arg-list-name (gensym "ARG-LIST-")))
     (multiple-value-bind (body local-decls)
 	(parse-defmacro lambda-list arg-list-name body nil 'destructuring-bind
 			:anonymousp t

@@ -46,7 +46,7 @@
 		   (defun ,name (sap offset)
 		     (declare (ignore sap offset))
 		     (sap-ref-stub ',name))
-		   ,@(let ((setter-stub (gensym "SAP-SETTER-STUB-")))
+		   ,@(let ((setter-stub (gensym "SETTER-STUB-")))
 		       `((defun ,setter-stub (foo sap offset)
 			   (declare (ignore foo sap offset))
 			   (sap-ref-stub '(setf ,name)))

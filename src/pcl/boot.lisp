@@ -1584,7 +1584,7 @@ bootstrapping.
 
 ;;; Keep pages clean by not setting if the value is already the same.
 (defmacro esetf (pos val)
-  (let ((valsym (gensym "value")))
+  (with-unique-names (valsym)
     `(let ((,valsym ,val))
        (unless (equal ,pos ,valsym)
 	 (setf ,pos ,valsym)))))

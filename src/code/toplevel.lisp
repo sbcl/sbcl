@@ -46,7 +46,7 @@
 ;;; by QUIT) is caught and any final processing and return codes are
 ;;; handled appropriately.
 (defmacro handling-end-of-the-world (&body body)
-  (let ((caught (gensym "CAUGHT")))
+  (with-unique-names (caught)
     `(let ((,caught (catch '%end-of-the-world
 		      (/show0 "inside CATCH '%END-OF-THE-WORLD")
 		      ,@body)))

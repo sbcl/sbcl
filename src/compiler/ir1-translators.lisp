@@ -276,8 +276,7 @@
 	  ,(make-error-form "The local macro name ~S is not a symbol." 'name))
 	(unless (listp arglist)
 	  ,(make-error-form "The local macro argument list ~S is not a list." 'arglist))
-	(let ((whole (gensym "WHOLE"))
-	      (environment (gensym "ENVIRONMENT")))
+	(with-unique-names (whole environment)
 	  (multiple-value-bind (body local-decls)
 	      (parse-defmacro arglist whole body name 'macrolet
 			      :environment environment)
@@ -878,45 +877,40 @@
     (setf (functional-kind fun) :cleanup)
     (reference-leaf start cont fun)))
 
-;;; We represent the possibility of the control transfer by making an
-;;; "escape function" that does a lexical exit, and instantiate the
-;;; cleanup using %WITHIN-CLEANUP.
 (def-ir1-translator catch ((tag &body body) start cont)
   #!+sb-doc
   "Catch Tag Form*
-  Evaluates Tag and instantiates it as a catcher while the body forms are
-  evaluated in an implicit PROGN. If a THROW is done to Tag within the dynamic
+  Evaluate TAG and instantiate it as a catcher while the body forms are
+  evaluated in an implicit PROGN. If a THROW is done to TAG within the dynamic
   scope of the body, then control will be transferred to the end of the body
   and the thrown values will be returned."
+  ;; We represent the possibility of the control transfer by making an
+  ;; "escape function" that does a lexical exit, and instantiate the
+  ;; cleanup using %WITHIN-CLEANUP.
   (ir1-convert
    start cont
-   (let ((exit-block (gensym "EXIT-BLOCK-")))
+   (with-unique-names (exit-block)
      `(block ,exit-block
 	(%within-cleanup
 	    :catch
 	    (%catch (%escape-fun ,exit-block) ,tag)
 	  ,@body)))))
 
-;;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
-;;; cleanup forms into a local function so that they can be referenced
-;;; both in the case where we are unwound and in any local exits. We
-;;; use %CLEANUP-FUN on this to indicate that reference by
-;;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
-;;; an XEP.
 (def-ir1-translator unwind-protect ((protected &body cleanup) start cont)
   #!+sb-doc
   "Unwind-Protect Protected Cleanup*
-  Evaluate the form Protected, returning its values. The cleanup forms are
-  evaluated whenever the dynamic scope of the Protected form is exited (either
+  Evaluate the form PROTECTED, returning its values. The CLEANUP forms are
+  evaluated whenever the dynamic scope of the PROTECTED form is exited (either
   due to normal completion or a non-local exit such as THROW)."
+  ;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
+  ;; cleanup forms into a local function so that they can be referenced
+  ;; both in the case where we are unwound and in any local exits. We
+  ;; use %CLEANUP-FUN on this to indicate that reference by
+  ;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
+  ;; an XEP.
   (ir1-convert
    start cont
-   (let ((cleanup-fun (gensym "CLEANUP-FUN-"))
-	 (drop-thru-tag (gensym "DROP-THRU-TAG-"))
-	 (exit-tag (gensym "EXIT-TAG-"))
-	 (next (gensym "NEXT"))
-	 (start (gensym "START"))
-	 (count (gensym "COUNT")))
+   (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
      `(flet ((,cleanup-fun () ,@cleanup nil))
 	;; FIXME: If we ever get DYNAMIC-EXTENT working, then
 	;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
@@ -935,21 +929,22 @@
 
 ;;;; multiple-value stuff
 
-;;; If there are arguments, MULTIPLE-VALUE-CALL turns into an
-;;; MV-COMBINATION.
-;;;
-;;; If there are no arguments, then we convert to a normal
-;;; combination, ensuring that a MV-COMBINATION always has at least
-;;; one argument. This can be regarded as an optimization, but it is
-;;; more important for simplifying compilation of MV-COMBINATIONS.
 (def-ir1-translator multiple-value-call ((fun &rest args) start cont)
   #!+sb-doc
   "MULTIPLE-VALUE-CALL Function Values-Form*
-  Call Function, passing all the values of each Values-Form as arguments,
-  values from the first Values-Form making up the first argument, etc."
+  Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
+  values from the first VALUES-FORM making up the first argument, etc."
   (let* ((fun-cont (make-continuation))
 	 (node (if args
+		   ;; If there are arguments, MULTIPLE-VALUE-CALL
+		   ;; turns into an MV-COMBINATION.
 		   (make-mv-combination fun-cont)
+		   ;; If there are no arguments, then we convert to a
+		   ;; normal combination, ensuring that a MV-COMBINATION
+		   ;; always has at least one argument. This can be
+		   ;; regarded as an optimization, but it is more
+		   ;; important for simplifying compilation of
+		   ;; MV-COMBINATIONS.
 		   (make-combination fun-cont))))
     (ir1-convert start fun-cont
 		 (if (and (consp fun) (eq (car fun) 'function))

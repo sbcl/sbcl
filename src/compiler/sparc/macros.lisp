@@ -198,8 +198,7 @@
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after
   the GENERATE-CERROR-CODE form."
-  (let ((continue (gensym "CONTINUE-LABEL-"))
-	(error (gensym "ERROR-LABEL-")))
+  (with-unique-names (continue error)
     `(let ((,continue (gen-label)))
        (emit-label ,continue)
        (assemble (*elsewhere*)
@@ -207,8 +206,6 @@
 	   (emit-label ,error)
 	   (cerror-call ,vop ,continue ,error-code ,@values)
 	   ,error)))))
-
-
 
 ;;; a handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((&key (extra 0)) &rest forms)
@@ -227,4 +224,3 @@
 	(inst andcc zero-tn alloc-tn 3)
 	;; The C code needs to process this correctly and fixup alloc-tn.
 	(inst t :ne pseudo-atomic-trap)))))
-

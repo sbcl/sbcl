@@ -130,7 +130,7 @@
   (declare (type list seqs seq-names)
            (type symbol into))
   (collect ((bindings)
-           (declarations)
+	    (declarations)
             (vector-lengths)
             (tests)
             (places))
@@ -145,7 +145,7 @@
            for seq-name in seq-names
            for type = (continuation-type seq)
            do (cond ((csubtypep type (specifier-type 'list))
-                     (let ((index (gensym "I")))
+		     (with-unique-names (index)
                        (bindings `(,index ,seq-name (cdr ,index)))
                        (declarations `(type list ,index))
                        (places `(car ,index))
@@ -866,13 +866,7 @@
 							    end-arg
 							    element
 							    done-p-expr)
-  (let ((offset (gensym "OFFSET"))
-	(block (gensym "BLOCK"))
-	(index (gensym "INDEX"))
-	(n-sequence (gensym "N-SEQUENCE-"))
-	(sequence (gensym "SEQUENCE"))
-	(n-end (gensym "N-END-"))
-	(end (gensym "END-")))
+  (with-unique-names (offset block index n-sequence sequence n-end end)
     `(let ((,n-sequence ,sequence-arg)
 	   (,n-end ,end-arg))
        (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
@@ -901,7 +895,7 @@
 
 (def!macro %find-position-vector-macro (item sequence
 					     from-end start end key test)
-  (let ((element (gensym "ELEMENT")))
+  (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
      from-end
@@ -915,7 +909,7 @@
 
 (def!macro %find-position-if-vector-macro (predicate sequence
 						     from-end start end key)
-  (let ((element (gensym "ELEMENT")))
+  (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
      from-end
@@ -926,7 +920,7 @@
 
 (def!macro %find-position-if-not-vector-macro (predicate sequence
 							 from-end start end key)
-  (let ((element (gensym "ELEMENT")))
+  (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
      from-end

@@ -626,10 +626,7 @@
 				   (element-type '*)
 				   unsafe?
 				   fail-inline?)
-  (let ((size (gensym "SIZE-"))
-	(defaulted-end (gensym "DEFAULTED-END-"))
-	(data (gensym "DATA-"))
-	(cumulative-offset (gensym "CUMULATIVE-OFFSET-")))
+  (with-unique-names (size defaulted-end data cumulative-offset)
     `(let* ((,size (array-total-size ,array))
 	    (,defaulted-end
 	      (cond (,end

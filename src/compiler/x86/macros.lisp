@@ -307,7 +307,7 @@
 ;;; untagged memory lying around, but some documentation would be nice.
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
-  (let ((label (gensym "LABEL-")))
+  (with-unique-names (label)
     `(let ((,label (gen-label)))
       (inst fs-segment-prefix)
       (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
@@ -328,7 +328,7 @@
 
 #!-sb-thread
 (defmacro pseudo-atomic (&rest forms)
-  (let ((label (gensym "LABEL-")))
+  (with-unique-names (label)
     `(let ((,label (gen-label)))
       ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
       ;; something. (perhaps SVLB, for static variable low byte)

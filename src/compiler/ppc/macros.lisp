@@ -197,8 +197,7 @@
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after
   the GENERATE-CERROR-CODE form."
-  (let ((continue (gensym "CONTINUE-LABEL-"))
-	(error (gensym "ERROR-LABEL-")))
+  (with-unique-names (continue error)
     `(let ((,continue (gen-label)))
        (emit-label ,continue)
        (assemble (*elsewhere*)
@@ -206,18 +205,17 @@
 	   (emit-label ,error)
 	   (cerror-call ,vop ,continue ,error-code ,@values)
 	   ,error)))))
-
-
 
-;;; PSEUDO-ATOMIC -- Handy macro for making sequences look atomic.
+;;;; PSEUDO-ATOMIC
+
+;;; handy macro for making sequences look atomic
 ;;;
-;;; flag-tn must be wired to NL3. If a deferred interrupt happens
-;;; while we have the low bits of alloc-tn set, we add a "large"
-;;; constant to flag-tn.  On exit, we add flag-tn to alloc-tn
-;;; which (a) aligns alloc-tn again and (b) makes alloc-tn go
-;;; negative.  We then trap if alloc-tn's negative (handling the
-;;; deferred interrupt) and using flag-tn - minus the large constant -
-;;; to correct alloc-tn.
+;;; FLAG-TN must be wired to NL3. If a deferred interrupt happens
+;;; while we have the low bits of ALLOC-TN set, we add a "large"
+;;; constant to FLAG-TN. On exit, we add FLAG-TN to ALLOC-TN which (a)
+;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
+;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
+;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
 (defmacro pseudo-atomic ((flag-tn &key (extra 0)) &rest forms)
   (let ((n-extra (gensym)))
     `(let ((,n-extra ,extra))

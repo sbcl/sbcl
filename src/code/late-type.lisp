@@ -97,8 +97,7 @@
 ;;;
 ;;; WHEN controls when the forms are executed.
 (defmacro !define-superclasses (type-class-name specs when)
-  (let ((type-class (gensym "TYPE-CLASS-"))
-	(info (gensym "INFO")))
+  (with-unique-names (type-class info)
     `(,when
        (let ((,type-class (type-class-or-lose ',type-class-name))
 	     (,info (mapcar (lambda (spec)

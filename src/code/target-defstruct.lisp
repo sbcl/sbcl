@@ -535,7 +535,7 @@
 	 ,x
 	 ,(compiler-layout-or-lose class-name)))
       ((vector)
-       (let ((xx (gensym "X")))
+       (with-unique-names (xx)
 	 `(let ((,xx ,x))
 	    (declare (type vector ,xx))
 	    ,@(when (dd-named dd)
@@ -550,7 +550,7 @@
 		     :format-arguments (list ',class-name ,xx)))))
 	    (values))))
       ((list)
-       (let ((xx (gensym "X")))
+       (with-unique-names (xx)
 	 `(let ((,xx ,x))
 	    (declare (type list ,xx))
 	    ,@(when (dd-named dd)

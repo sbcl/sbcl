@@ -23,8 +23,7 @@
     (when (special-operator-p name)
       (error "The special operator ~S can't be redefined as a macro."
              name))
-    (let ((whole (gensym "WHOLE-"))
-	  (environment (gensym "ENV-")))
+    (with-unique-names (whole environment)
       (multiple-value-bind (new-body local-decs doc)
 	  (parse-defmacro lambda-list whole body name 'defmacro
 			  :environment environment)

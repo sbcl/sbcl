@@ -100,7 +100,6 @@
 	    :format-control "Symbol macro name already declared constant: ~S."
 	    :format-arguments (list name))))
   name)
-
 
 ;;;; DEFINE-COMPILER-MACRO
 
@@ -128,8 +127,7 @@
     (error 'simple-program-error
 	   :format-control "cannot define a compiler-macro for a special operator: ~S"
 	   :format-arguments (list name)))
-  (let ((whole (gensym "WHOLE-"))
-	(environment (gensym "ENV-")))
+  (with-unique-names (whole environment)
     (multiple-value-bind (body local-decs doc)
 	(parse-defmacro lambda-list whole body name 'define-compiler-macro
 			:environment environment)
@@ -139,7 +137,11 @@
 		      ,body)))
 	    (debug-name (debug-namify "DEFINE-COMPILER-MACRO ~S" name)))
 	`(eval-when (:compile-toplevel :load-toplevel :execute)
-	  (sb!c::%define-compiler-macro ',name #',def ',lambda-list ,doc ,debug-name))))))
+	  (sb!c::%define-compiler-macro ',name
+					#',def
+					',lambda-list
+					,doc
+					,debug-name))))))
 
 ;;; FIXME: This will look remarkably similar to those who have already
 ;;; seen the code for %DEFMACRO in src/code/defmacro.lisp.  Various

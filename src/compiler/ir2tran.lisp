@@ -1335,8 +1335,7 @@
 (def-ir1-translator progv ((vars vals &body body) start cont)
   (ir1-convert
    start cont
-   (let ((bind (gensym "BIND"))
-         (unbind (gensym "UNBIND")))
+   (with-unique-names (bind unbind)
      (once-only ((n-save-bs '(%primitive current-binding-pointer)))
                 `(unwind-protect
                       (progn
@@ -1349,7 +1348,9 @@
                                    (declare (optimize (speed 2) (debug 0)))
                                    (cond ((null vars))
                                          ((null vals) (,unbind vars))
-                                         (t (%primitive bind (car vals) (car vars))
+                                         (t (%primitive bind
+							(car vals)
+							(car vars))
                                             (,bind (cdr vars) (cdr vals))))))
                           (,bind ,vars ,vals))
                         nil

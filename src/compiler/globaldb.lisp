@@ -819,15 +819,14 @@
   ;; Constant CLASS and TYPE is an overwhelmingly common special case,
   ;; and we can implement it much more efficiently than the general case.
   (if (and (constantp class) (constantp type))
-      (let ((info (type-info-or-lose class type))
-	    (value (gensym "VALUE"))
-	    (foundp (gensym "FOUNDP")))
-	`(multiple-value-bind (,value ,foundp)
-	     (get-info-value ,name
-			     ,(type-info-number info)
-			     ,@(when env-list-p `(,env-list))) 
-	   (declare (type ,(type-info-type info) ,value))
-	   (values ,value ,foundp)))
+      (let ((info (type-info-or-lose class type)))
+	(with-unique-names (value foundp)
+	  `(multiple-value-bind (,value ,foundp)
+	       (get-info-value ,name
+			       ,(type-info-number info)
+			       ,@(when env-list-p `(,env-list))) 
+	     (declare (type ,(type-info-type info) ,value))
+	     (values ,value ,foundp))))
       whole))
 (defun (setf info) (new-value
 		    class

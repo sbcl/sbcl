@@ -121,6 +121,33 @@
 (defmacro do-anonymous (varlist endlist &rest body)
   (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
+;;;; GENSYM tricks
+
+;;; Automate an idiom often found in macros:
+;;;   (LET ((FOO (GENSYM "FOO"))
+;;;         (MAX-INDEX (GENSYM "MAX-INDEX-")))
+;;;     ...)
+;;;
+;;; "Good notation eliminates thought." -- Eric Siggia
+;;;
+;;; Incidentally, this is essentially the same operator which
+;;; _On Lisp_ calls WITH-GENSYMS.
+(defmacro with-unique-names (symbols &body body)
+  `(let ,(mapcar (lambda (symbol)
+		   (let* ((symbol-name (symbol-name symbol))
+			  (stem (if (every #'alpha-char-p symbol-name)
+				    symbol-name
+				    (concatenate 'string symbol-name "-"))))
+		     `(,symbol (gensym ,stem))))
+		 symbols)
+     ,@body))
+
+;;; Return a list of N gensyms. (This is a common suboperation in
+;;; macros and other code-manipulating code.)
+(declaim (ftype (function (index) list) make-gensym-list))
+(defun make-gensym-list (n)
+  (loop repeat n collect (gensym)))
+
 ;;;; miscellany
 
 ;;; Lots of code wants to get to the KEYWORD package or the

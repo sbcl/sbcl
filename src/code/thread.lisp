@@ -2,7 +2,7 @@
 
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-thread
-  (let ((cfp (gensym "CFP")))
+  (with-unique-names (cfp)
     `(let ((,cfp (ash (sb!sys:sap-int (sb!vm::current-fp) ) -2)))
       (unless (and (mutex-value ,mutex)
 		   (SB!DI::control-stack-pointer-valid-p

@@ -414,8 +414,7 @@ GET-SETF-EXPANSION directly."
   (unless (symbolp access-fn)
     (error "DEFINE-SETF-EXPANDER access-function name ~S is not a symbol."
 	   access-fn))
-  (let ((whole (gensym "WHOLE-"))
-	(environment (gensym "ENV-")))
+  (with-unique-names (whole environment)
     (multiple-value-bind (body local-decs doc)
 	(parse-defmacro lambda-list whole body access-fn
 			'sb!xc:define-setf-expander

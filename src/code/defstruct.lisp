@@ -52,7 +52,7 @@
 	   (sb!c::compiler-note
 	    "implementation limitation: ~
              Non-toplevel DEFSTRUCT constructors are slow.")
-	   (let ((layout (gensym "LAYOUT")))
+	   (with-unique-names (layout)
 	     `(let ((,layout (info :type :compiler-layout ',name)))
 		(unless (typep (layout-info ,layout) 'defstruct-description)
 		  (error "Class is not a structure class: ~S" ',name))

@@ -689,7 +689,7 @@
      ,@body))
 
 (defmacro with-component-last-block ((component block) &body body)
-  (let ((old-last-block (gensym "OLD-LAST-BLOCK")))
+  (with-unique-names (old-last-block)
     (once-only ((component component)
                 (block block))
       `(let ((,old-last-block (component-last-block ,component)))

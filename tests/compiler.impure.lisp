@@ -778,6 +778,19 @@ BUG 48c, not yet fixed:
 (assert (raises-error? (test-type-of-special-2 3) type-error))
 (assert (equal (test-type-of-special-2 8) '(8 4 4)))
 
+;;; bug which existed in 0.8alpha.0.4 for several milliseconds before
+;;; APD fixed it in 0.8alpha.0.5
+(defun frob8alpha04 (x y)
+  (+ x y))
+(defun baz8alpha04 (this kids)
+  (flet ((n-i (&rest rest)
+	   ;; Removing the #+NIL here makes the bug go away.
+	   #+nil (format t "~&in N-I REST=~S~%" rest)
+	   (apply #'frob8alpha04 this rest)))
+    (n-i kids)))
+;;; failed in 0.8alpha.0.4 with "The value 13 is not of type LIST."
+(assert (= (baz8alpha04 12 13) 25))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 

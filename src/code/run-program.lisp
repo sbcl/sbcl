@@ -362,8 +362,7 @@
       (values vec-sap (sap+ vec-sap #-alpha 4 #+alpha 8) total-bytes))))
 
 (defmacro with-c-strvec ((var str-list) &body body)
-  (let ((sap (gensym "SAP-"))
-	(size (gensym "SIZE-")))
+  (with-unique-names (sap size)
     `(multiple-value-bind
       (,sap ,var ,size)
       (string-list-to-c-strvec ,str-list)
