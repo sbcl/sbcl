@@ -1268,31 +1268,6 @@ WORKAROUND:
   issues were cleaned up. As of sbcl-0.7.1.9, it occurs in 
   NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
 
-150:
-  In sbcl-0.7.1.15, compiling this code 
-    (let* ()
-      (flet ((wufn () (glorp table1 4.9)))
-        (gleep *uustk* #'wufn "#1" (list)))
-      (if (eql (lo foomax 3.2))
-          (values)
-          (error "not ~S" '(eql (lo foomax 3.2))))
-      (values))
-  causes a failure in SB-C::ADD-TEST-CONSTRAINTS:
-    The value NIL is not of type SB-C::CONTINUATION.
-  other notes:
-    * The problem appears to be tied to the way that EQL is given only
-      one argument, and goes away when we give EQL a second argument.
-    * CMU CL 18c has this problem too, exercised by 
-	(compile nil
-	         '(lambda ()
-                    (let* ()
-		      (flet ((wufn () (glorp table1 4.9)))
-		        (gleep *uustk* #'wufn "#1" (list)))
-		      (if (eql (lo foomax 3.2))
-		          (values)
-		          (error "not ~S" '(eql (lo foomax 3.2))))
-		      (values))))
-
 151:
   From the ANSI description of GET-DISPATCH-MACRO-CHARACTER, it
   should return NIL when there is no definition, e.g.
