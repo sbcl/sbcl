@@ -171,5 +171,5 @@ echo ')' >> $ltf
 
 # Make a unique ID for this build (to discourage people from
 # mismatching sbcl and *.core files).
-echo '"'`hostname -s`-`whoami`-`date +%F-%H-%M-%S`'"' > output/build-id.tmp
+echo '"'`hostname`-`whoami`-`date +%F-%H-%M-%S`'"' > output/build-id.tmp
 
