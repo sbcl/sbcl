@@ -209,14 +209,13 @@ struct mutex {
 
 void spinlock_get(lispobj *word,int value)
 {
-    /* FIXME have to spend some time figuring out the gcc inline
-     * assembly syntax here.  Obviously this should be using
-     * some kind of atomic test and set */
-#if 0
-    while(*word)
-	;
-#endif
-    *word=value;			/* XXX !!! FIXME @@@##### */
+    u32 new_val=0;
+    do {
+	asm ("xor %0,%0;cmpxchg %1,%2" 
+	     : "=a" (new_val)
+	     : "r" (value), "m" (word)
+	     : "memory", "cc");
+    } while(new_val==0);
 }
 
 void add_thread_to_queue(int pid, lispobj mutex_p)
