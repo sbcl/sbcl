@@ -502,7 +502,6 @@ bootstrapping.
   (declare (ignore env))
   (multiple-value-bind (parameters unspecialized-lambda-list specializers)
       (parse-specialized-lambda-list lambda-list)
-    (declare (ignore parameters))
     (multiple-value-bind (real-body declarations documentation)
 	(parse-body body)
       (values `(lambda ,unspecialized-lambda-list
@@ -670,8 +669,9 @@ bootstrapping.
 		  ;; it can avoid run-time type dispatch overhead,
 		  ;; which can be a huge win for Python.)
 		  ;;
-		  ;; FIXME: Perhaps these belong in
-		  ;; ADD-METHOD-DECLARATIONS instead of here?
+		  ;; KLUDGE: when I tried moving these to
+		  ;; ADD-METHOD-DECLARATIONS, things broke.  No idea
+		  ;; why.  -- CSR, 2004-06-16
 		  ,@(mapcar #'parameter-specializer-declaration-in-defmethod
 			    parameters
 			    specializers)))
@@ -717,7 +717,8 @@ bootstrapping.
 			       ((eq p '&aux)
 				(return nil))))))
 	  (multiple-value-bind
-	      (walked-lambda call-next-method-p closurep next-method-p-p)
+		(walked-lambda call-next-method-p closurep
+			       next-method-p-p setq-p)
 	      (walk-method-lambda method-lambda
 				  required-parameters
 				  env
@@ -758,6 +759,7 @@ bootstrapping.
 					:call-next-method-p
 					,call-next-method-p
 					:next-method-p-p ,next-method-p-p
+			                :setq-p ,setq-p
 			                ;; we need to pass this along
 			                ;; so that NO-NEXT-METHOD can
 			                ;; be given a suitable METHOD
@@ -820,8 +822,9 @@ bootstrapping.
 		            (or ,cnm-args ,',method-args))))
 	      (next-method-p-body ()
 	       `(not (null .next-method.)))
-	      (with-rebound-original-args ((call-next-method-p) &body body)
-		(declare (ignore call-next-method-p))
+	      (with-rebound-original-args ((call-next-method-p setq-p)
+					   &body body)
+		(declare (ignore call-next-method-p setq-p))
 		`(let () ,@body)))
     ,@body))
 
@@ -1114,8 +1117,8 @@ bootstrapping.
 					`(,rest-arg)))))))
 		(next-method-p-body ()
 		 `(not (null ,',next-method-call)))
-		(with-rebound-original-args ((cnm-p) &body body)
-		  (if cnm-p
+		(with-rebound-original-args ((cnm-p setq-p) &body body)
+		  (if (or cnm-p setq-p)
 		      `(let ,',rebindings
 			(declare (ignorable ,@',all-params))
 			,@body)
@@ -1123,11 +1126,11 @@ bootstrapping.
       ,@body)))
 
 (defmacro bind-lexical-method-functions
-    ((&key call-next-method-p next-method-p-p
+    ((&key call-next-method-p next-method-p-p setq-p
 	   closurep applyp method-name-declaration)
      &body body)
   (cond ((and (null call-next-method-p) (null next-method-p-p)
-	      (null closurep) (null applyp))
+	      (null closurep) (null applyp) (null setq-p))
 	 `(let () ,@body))
 	(t
 	 `(call-next-method-bind
@@ -1139,7 +1142,7 @@ bootstrapping.
 		   ,@(and next-method-p-p
 			  '((next-method-p ()
 			     (next-method-p-body)))))
-	      (with-rebound-original-args (,call-next-method-p)
+	      (with-rebound-original-args (,call-next-method-p ,setq-p)
 		,@body))))))
 
 (defmacro bind-args ((lambda-list args) &body body)
@@ -1231,8 +1234,9 @@ bootstrapping.
 				   ; should be in the method definition
 	(closurep nil)		   ; flag indicating that #'CALL-NEXT-METHOD
 				   ; was seen in the body of a method
-	(next-method-p-p nil))     ; flag indicating that NEXT-METHOD-P
+	(next-method-p-p nil)      ; flag indicating that NEXT-METHOD-P
 				   ; should be in the method definition
+	(setq-p nil))
     (flet ((walk-function (form context env)
 	     (cond ((not (eq context :eval)) form)
 		   ;; FIXME: Jumping to a conclusion from the way it's used
@@ -1246,6 +1250,9 @@ bootstrapping.
 		    form)
 		   ((eq (car form) 'next-method-p)
 		    (setq next-method-p-p t)
+		    form)
+		   ((eq (car form) 'setq)
+		    (setq setq-p t)
 		    form)
 		   ((and (eq (car form) 'function)
 			 (cond ((eq (cadr form) 'call-next-method)
@@ -1283,7 +1290,8 @@ bootstrapping.
 	(values walked-lambda
 		call-next-method-p
 		closurep
-		next-method-p-p)))))
+		next-method-p-p
+		setq-p)))))
 
 (defun generic-function-name-p (name)
   (and (legal-fun-name-p name)

@@ -2530,6 +2530,9 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * the compiler no longer emits efficiency notes for (FUNCALL X)
     when the type of X is uncertain under default optimization
     settings.
+  * fixed bug 276: mutating a binding of a specialized parameter to a
+    method to something that is not TYPEP the specializer is now
+    possible.
   * fixed bugs 45d and 118: DOUBLE-FLOAT[-NEGATIVE]-EPSILON now
     exhibit the required behaviour on the x86 platform.  (thanks to
     Peter van Eynde, Eric Marsden and Bruno Haible)

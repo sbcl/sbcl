@@ -965,14 +965,6 @@ WORKAROUND:
 
   (fixed in 0.8.2.51, but a test case would be good)
 
-276:
-    (defmethod fee ((x fixnum))
-      (setq x (/ x 2))
-      x)
-    (fee 1) => type error
-
-  (taken from CLOCC)
-
 278:
   a.
     (defun foo ()
@@ -1325,13 +1317,13 @@ WORKAROUND:
     (let ((tsos (make-string-output-stream))
           (ssos (make-string-output-stream)))
       (let ((*print-circle* t)
-    	(*trace-output* tsos)
-    	(*standard-output* ssos))
+    	    (*trace-output* tsos)
+    	    (*standard-output* ssos))
         (prin1 *tangle* *standard-output*))
       (let ((string (get-output-stream-string ssos)))
         (unless (string= string "(#1=[FOO 4] #S(BAR) #1#)")
           ;; In sbcl-0.8.10.48 STRING was "(#1=[FOO 4] #2# #1#)".:-(
-          (error "oops: ~S" string))))
+          (error "oops: ~S" string)))))
   It might be straightforward to fix this by turning the
   *CIRCULARITY-HASH-TABLE* and *CIRCULARITY-COUNTER* variables into
   per-stream slots, but (1) it would probably be sort of messy faking
@@ -1458,3 +1450,112 @@ WORKAROUND:
 
   Fixing this should also fix a subset of #328 -- update the
   description with a new test-case then.
+
+337: MAKE-METHOD and user-defined method classes
+  (reported by Bruno Haible sbcl-devel 2004-06-11)
+
+  In the presence of  
+
+(defclass user-method (standard-method) (myslot))
+(defmacro def-user-method (name &rest rest)
+  (let* ((lambdalist-position (position-if #'listp rest))
+         (qualifiers (subseq rest 0 lambdalist-position))
+         (lambdalist (elt rest lambdalist-position))
+         (body (subseq rest (+ lambdalist-position 1)))
+         (required-part 
+          (subseq lambdalist 0 (or 
+                                (position-if 
+                                 (lambda (x) (member x lambda-list-keywords))
+                                 lambdalist)
+                                (length lambdalist))))
+         (specializers (mapcar #'find-class 
+                               (mapcar (lambda (x) (if (consp x) (second x) t))
+                                       required-part)))
+         (unspecialized-required-part 
+          (mapcar (lambda (x) (if (consp x) (first x) x)) required-part))
+         (unspecialized-lambdalist 
+          (append unspecialized-required-part 
+           (subseq lambdalist (length required-part)))))
+    `(PROGN
+       (ADD-METHOD #',name
+         (MAKE-INSTANCE 'USER-METHOD
+          :QUALIFIERS ',qualifiers
+          :LAMBDA-LIST ',unspecialized-lambdalist
+          :SPECIALIZERS ',specializers
+          :FUNCTION
+          (LAMBDA (ARGUMENTS NEXT-METHODS-LIST)
+            (FLET ((NEXT-METHOD-P () NEXT-METHODS-LIST)
+                   (CALL-NEXT-METHOD (&REST NEW-ARGUMENTS)
+                     (UNLESS NEW-ARGUMENTS (SETQ NEW-ARGUMENTS ARGUMENTS))
+                     (IF (NULL NEXT-METHODS-LIST)
+                         (ERROR "no next method for arguments ~:S" ARGUMENTS)
+                         (FUNCALL (SB-PCL:METHOD-FUNCTION 
+                                   (FIRST NEXT-METHODS-LIST))
+                                  NEW-ARGUMENTS (REST NEXT-METHODS-LIST)))))
+              (APPLY #'(LAMBDA ,unspecialized-lambdalist ,@body) ARGUMENTS)))))
+       ',name)))
+
+  (progn
+    (defgeneric test-um03 (x))
+    (defmethod test-um03 ((x integer))
+      (list* 'integer x (not (null (next-method-p))) (call-next-method)))
+    (def-user-method test-um03 ((x rational))
+      (list* 'rational x (not (null (next-method-p))) (call-next-method)))
+    (defmethod test-um03 ((x real))
+      (list 'real x (not (null (next-method-p)))))
+    (test-um03 17))
+  works, but
+
+  a.(progn
+      (defgeneric test-um10 (x))
+      (defmethod test-um10 ((x integer))
+        (list* 'integer x (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um10 ((x rational))
+        (list* 'rational x (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um10 ((x real))
+        (list 'real x (not (null (next-method-p)))))
+      (defmethod test-um10 :after ((x real)))
+      (def-user-method test-um10 :around ((x integer))
+        (list* 'around-integer x 
+         (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um10 :around ((x rational))
+        (list* 'around-rational x 
+         (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um10 :around ((x real))
+        (list* 'around-real x (not (null (next-method-p))) (call-next-method)))
+      (test-um10 17))
+    fails with a type error, and
+
+  b.(progn
+      (defgeneric test-um12 (x))
+      (defmethod test-um12 ((x integer))
+        (list* 'integer x (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um12 ((x rational))
+        (list* 'rational x (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um12 ((x real))
+        (list 'real x (not (null (next-method-p)))))
+      (defmethod test-um12 :after ((x real)))
+      (defmethod test-um12 :around ((x integer))
+        (list* 'around-integer x 
+         (not (null (next-method-p))) (call-next-method)))
+      (defmethod test-um12 :around ((x rational))
+        (list* 'around-rational x 
+         (not (null (next-method-p))) (call-next-method)))
+      (def-user-method test-um12 :around ((x real))
+        (list* 'around-real x (not (null (next-method-p))) (call-next-method)))
+      (test-um12 17))
+    fails with NO-APPLICABLE-METHOD.
+
+338: "MOP specializers as type specifiers"
+  (reported by Bruno Haible sbcl-devel 2004-06-11)
+
+  ANSI 7.6.2 says: 
+    Because every valid parameter specializer is also a valid type
+    specifier, the function typep can be used during method selection
+    to determine whether an argument satisfies a parameter
+    specializer.
+
+  however, SBCL's EQL specializers are not type specifiers:
+    (defmethod foo ((x (eql 4.0))) 3.0)
+    (typep 1 (first (sb-pcl:method-specializers *)))
+  gives an error.

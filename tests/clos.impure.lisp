@@ -811,5 +811,15 @@
   (assert (equal (aref v 0) '(number 1 2)))
   (assert (equal (aref v 1) '(t 1 2))))
 
+;;; BUG 276: declarations and mutation.
+(defmethod fee ((x fixnum))
+  (setq x (/ x 2))
+  x)
+(assert (= (fee 1) 1/2))
+(defmethod fum ((x fixnum))
+  (setf x (/ x 2))
+  x)
+(assert (= (fum 3) 3/2))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
