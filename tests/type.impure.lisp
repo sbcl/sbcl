@@ -343,12 +343,14 @@
 (tests-of-inline-type-tests)
 (format t "~&/done with compiled (TESTS-OF-INLINE-TYPE-TESTS)~%")
 
+#|| Pending fix for bug 176, bug 140 has been unfixed
 ;;; Redefinition of classes should alter the type hierarchy (BUG 140):
 (defclass superclass () ())
 (defclass maybe-subclass (superclass) ())
 (assert-t-t (subtypep 'maybe-subclass 'superclass))
 (defclass maybe-subclass () ())
 (assert-nil-t (subtypep 'maybe-subclass 'superclass))
+||#
 
 ;;; success
 (quit :unix-status 104)

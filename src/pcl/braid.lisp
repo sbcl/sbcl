@@ -578,7 +578,7 @@
               (sb-kernel:order-layout-inherits
                (map 'simple-vector #'class-wrapper
                     (reverse (rest (class-precedence-list class))))))
-      (sb-kernel:register-layout layout)
+      (sb-kernel:register-layout layout :invalidate nil)
 
       ;; Subclasses of formerly forward-referenced-class may be
       ;; unknown to CL:FIND-CLASS and also anonymous. This
