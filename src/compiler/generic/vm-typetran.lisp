@@ -17,7 +17,6 @@
 
 ;;; These type predicates are used to implement simple cases of TYPEP.
 ;;; They shouldn't be used explicitly.
-(define-type-predicate base-char-p base-char)
 (define-type-predicate base-string-p base-string)
 (define-type-predicate bignump bignum)
 (define-type-predicate complex-double-float-p (complex double-float))

@@ -11,7 +11,7 @@
 (in-package "SB!VM")
 
 (defparameter *immediate-types*
-  (list unbound-marker-widetag base-char-widetag))
+  (list unbound-marker-widetag character-widetag))
 
 (defparameter *fun-header-widetags*
   (list funcallable-instance-header-widetag

@@ -2096,22 +2096,22 @@
 	       (if (eq (car dims) '*)
 		   (case eltype
 		     (bit 'bit-vector)
-		     (base-char 'base-string)
+		     ((base-char character) 'base-string)
 		     (* 'vector)
 		     (t `(vector ,eltype)))
 		   (case eltype
 		     (bit `(bit-vector ,(car dims)))
-		     (base-char `(base-string ,(car dims)))
+		     ((base-char character) `(base-string ,(car dims)))
 		     (t `(vector ,eltype ,(car dims)))))
 	       (if (eq (car dims) '*)
 		   (case eltype
 		     (bit 'simple-bit-vector)
-		     (base-char 'simple-base-string)
+		     ((base-char character) 'simple-base-string)
 		     ((t) 'simple-vector)
 		     (t `(simple-array ,eltype (*))))
 		   (case eltype
 		     (bit `(simple-bit-vector ,(car dims)))
-		     (base-char `(simple-base-string ,(car dims)))
+		     ((base-char character) `(simple-base-string ,(car dims)))
 		     ((t) `(simple-vector ,(car dims)))
 		     (t `(simple-array ,eltype ,dims))))))
 	  (t

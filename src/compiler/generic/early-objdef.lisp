@@ -136,7 +136,7 @@
   return-pc-header                  ; 00110110
   value-cell-header                 ; 00111010
   symbol-header                     ; 00111110
-  base-char                         ; 01000010
+  character                         ; 01000010
   sap                               ; 01000110
   unbound-marker                    ; 01001010
   weak-pointer                      ; 01001110

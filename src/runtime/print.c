@@ -218,7 +218,7 @@ static void brief_otherimm(lispobj obj)
 
     type = widetag_of(obj);
     switch (type) {
-        case BASE_CHAR_WIDETAG:
+        case CHARACTER_WIDETAG:
             c = (obj>>8)&0xff;
             switch (c) {
                 case '\0':
@@ -275,7 +275,7 @@ static void print_otherimm(lispobj obj)
 	    printf(", unknown type (0x%0x)", type);
 
     switch (widetag_of(obj)) {
-        case BASE_CHAR_WIDETAG:
+        case CHARACTER_WIDETAG:
             printf(": ");
             brief_otherimm(obj);
             break;
@@ -642,7 +642,7 @@ static void print_otherptr(lispobj obj)
 		print_slots(weak_pointer_slots, 1, ptr);
                 break;
 
-            case BASE_CHAR_WIDETAG:
+            case CHARACTER_WIDETAG:
             case UNBOUND_MARKER_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("pointer to an immediate?");

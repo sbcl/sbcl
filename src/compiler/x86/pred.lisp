@@ -50,7 +50,7 @@
 	   (inst cmp x (+ nil-value (static-symbol-offset val))))
 	  (character
 	   (inst cmp x (logior (ash (char-code val) n-widetag-bits)
-			       base-char-widetag))))))
+			       character-widetag))))))
      ((sc-is x immediate) ; and y not immediate
       ;; Swap the order to fit the compare instruction.
       (let ((val (tn-value x)))
@@ -63,7 +63,7 @@
 	   (inst cmp y (+ nil-value (static-symbol-offset val))))
 	  (character
 	   (inst cmp y (logior (ash (char-code val) n-widetag-bits)
-			       base-char-widetag))))))
+			       character-widetag))))))
       (t
        (inst cmp x y)))
 

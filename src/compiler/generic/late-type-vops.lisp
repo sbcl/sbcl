@@ -83,9 +83,9 @@
 		  *specialized-array-element-type-properties*))))
   (define-simple-array-type-vops))
 
-(!define-type-vops base-char-p check-base-char base-char
-    object-not-base-char-error
-  (base-char-widetag))
+(!define-type-vops characterp check-character character
+    object-not-character-error
+  (character-widetag))
 
 (!define-type-vops system-area-pointer-p check-system-area-pointer
       system-area-pointer

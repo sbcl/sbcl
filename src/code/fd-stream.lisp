@@ -251,7 +251,7 @@
 		      (:none character)
 		      (:line character)
 		      (:full character))
-  (if (and (base-char-p byte) (char= byte #\Newline))
+  (if (char= byte #\Newline)
       (setf (fd-stream-char-pos stream) 0)
       (incf (fd-stream-char-pos stream)))
   (setf (sap-ref-8 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))

@@ -108,7 +108,7 @@
        (:result-types ,element-type)))))
 
   (def-data-vector-frobs simple-base-string byte-index
-    base-char base-char-reg)
+    character character-reg)
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)
 

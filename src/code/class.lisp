@@ -935,11 +935,8 @@ NIL is returned when no such class exists."
   (setq
    *built-in-classes*
    '((t :state :read-only :translation t)
-     (character :enumerable t :translation base-char
-                :prototype-form (code-char 42))
-     (base-char :enumerable t
-		:inherits (character)
-		:codes (#.sb!vm:base-char-widetag)
+     (character :enumerable t 
+                :codes (#.sb!vm:character-widetag)
                 :prototype-form (code-char 42))
      (symbol :codes (#.sb!vm:symbol-header-widetag)
              :prototype-form '#:mu)

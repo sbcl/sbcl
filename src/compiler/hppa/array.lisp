@@ -106,7 +106,7 @@
 
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
   
-  (def-partial-data-vector-frobs simple-base-string base-char :byte nil base-char-reg)
+  (def-partial-data-vector-frobs simple-base-string character :byte nil character-reg)
   
   (def-partial-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
     :byte nil unsigned-reg signed-reg)

@@ -1,4 +1,4 @@
-;;;; the MIPS VM definition of SAP operations
+;;;; the HPPA VM definition of SAP operations
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -20,10 +20,8 @@
   (:note "system area pointer indirection")
   (:generator 1
     (loadw y x sap-pointer-slot other-pointer-lowtag)))
-
 (define-move-vop move-to-sap :move
   (descriptor-reg) (sap-reg))
-
 
 ;;; Move an untagged SAP to a tagged representation.
 (define-vop (move-from-sap)
@@ -34,7 +32,6 @@
   (:generator 20
     (with-fixed-allocation (y ndescr sap-widetag sap-size)
       (storew x y sap-pointer-slot other-pointer-lowtag))))
-
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
@@ -49,12 +46,11 @@
   (:affected)
   (:generator 0
     (move x y)))
-
 (define-move-vop sap-move :move
   (sap-reg) (sap-reg))
 
-;;; Move untagged sap arguments/return-values.
-(define-vop (move-sap-argument)
+;;; Move untagged sap args/return-values.
+(define-vop (move-sap-arg)
   (:args (x :target y
 	    :scs (sap-reg))
 	 (fp :scs (any-reg)
@@ -66,13 +62,12 @@
        (move x y))
       (sap-stack
        (storew x fp (tn-offset y))))))
-
-(define-move-vop move-sap-argument :move-arg
+(define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 
 ;;; Use standard MOVE-ARG + coercion to move an untagged sap to a
 ;;; descriptor passing location.
-(define-move-vop move-argument :move-arg
+(define-move-vop move-arg :move-arg
   (sap-reg) (descriptor-reg))
 
 ;;;; SAP-INT and INT-SAP

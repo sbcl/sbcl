@@ -1245,8 +1245,8 @@
   (:args (object :scs (descriptor-reg))
 	 (index :scs (unsigned-reg)))
   (:arg-types simple-base-string positive-fixnum)
-  (:results (value :scs (base-char-reg)))
-  (:result-types base-char)
+  (:results (value :scs (character-reg)))
+  (:result-types character)
   (:generator 5
     (inst mov value
 	  (make-ea :byte :base object :index index :scale 1
@@ -1259,8 +1259,8 @@
   (:args (object :scs (descriptor-reg)))
   (:info index)
   (:arg-types simple-base-string (:constant (signed-byte 30)))
-  (:results (value :scs (base-char-reg)))
-  (:result-types base-char)
+  (:results (value :scs (character-reg)))
+  (:result-types character)
   (:generator 4
     (inst mov value
 	  (make-ea :byte :base object
@@ -1272,10 +1272,10 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (index :scs (unsigned-reg) :to (:eval 0))
-	 (value :scs (base-char-reg) :target result))
-  (:arg-types simple-base-string positive-fixnum base-char)
-  (:results (result :scs (base-char-reg)))
-  (:result-types base-char)
+	 (value :scs (character-reg) :target result))
+  (:arg-types simple-base-string positive-fixnum character)
+  (:results (result :scs (character-reg)))
+  (:result-types character)
   (:generator 5
     (inst mov (make-ea :byte :base object :index index :scale 1
 		       :disp (- (* vector-data-offset n-word-bytes)
@@ -1287,11 +1287,11 @@
   (:translate data-vector-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
-	 (value :scs (base-char-reg)))
+	 (value :scs (character-reg)))
   (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 30)) base-char)
-  (:results (result :scs (base-char-reg)))
-  (:result-types base-char)
+  (:arg-types simple-base-string (:constant (signed-byte 30)) character)
+  (:results (result :scs (character-reg)))
+  (:result-types character)
   (:generator 4
    (inst mov (make-ea :byte :base object
 		      :disp (- (+ (* vector-data-offset n-word-bytes) index)

@@ -1,4 +1,6 @@
 changes in sbcl-0.8.17 relative to sbcl-0.8.16:
+  * minor incompatible change: BASE-CHAR no longer names a class;
+    however, CHARACTER continues to do so, as required by ANSI.
   * bug fix: READ, READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST,
     and READ-FROM-STRING all now return a primary value of NIL if
     *READ-SUPPRESS* is true.  (reported by Bruno Haible for CMUCL)

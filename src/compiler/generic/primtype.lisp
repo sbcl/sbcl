@@ -66,7 +66,7 @@
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")
-(!def-primitive-type base-char (base-char-reg any-reg))
+(!def-primitive-type character (character-reg any-reg))
 
 ;;; primitive pointer types
 (/show0 "primtype.lisp 73")
@@ -311,8 +311,8 @@
 	    (values (primitive-type-or-lose (classoid-name type)) t))
 	   (funcallable-instance
 	    (part-of function))
-	   (base-char
-	    (exactly base-char))
+	   (character
+	    (exactly character))
 	   (cons-type
 	    (part-of list))
 	   (t

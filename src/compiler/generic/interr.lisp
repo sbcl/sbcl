@@ -130,8 +130,8 @@
    "Object is not a WEAK-POINTER.")
   (object-not-instance
    "Object is not a INSTANCE.")
-  (object-not-base-char
-   "Object is not of type BASE-CHAR.")
+  (object-not-character
+   "Object is not a CHARACTER.")
   (nil-fun-returned
    "A function with declared result type NIL returned.")
   (nil-array-accessed

@@ -46,7 +46,7 @@
 		     (make-ea :dword :base object
 			      :disp (- (* offset n-word-bytes) lowtag))
 		     (logior (ash (char-code val) n-widetag-bits)
-			     base-char-widetag)))))
+			     character-widetag)))))
        ;; Else, value not immediate.
        (storew value object offset lowtag))))
 

@@ -1643,7 +1643,7 @@ gc_init_tables(void)
 #endif
     scavtab[VALUE_CELL_HEADER_WIDETAG] = scav_boxed;
     scavtab[SYMBOL_HEADER_WIDETAG] = scav_boxed;
-    scavtab[BASE_CHAR_WIDETAG] = scav_immediate;
+    scavtab[CHARACTER_WIDETAG] = scav_immediate;
     scavtab[SAP_WIDETAG] = scav_unboxed;
     scavtab[UNBOUND_MARKER_WIDETAG] = scav_immediate;
     scavtab[INSTANCE_HEADER_WIDETAG] = scav_boxed;
@@ -1766,7 +1766,7 @@ gc_init_tables(void)
     transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_boxed;
     transother[VALUE_CELL_HEADER_WIDETAG] = trans_boxed;
     transother[SYMBOL_HEADER_WIDETAG] = trans_boxed;
-    transother[BASE_CHAR_WIDETAG] = trans_immediate;
+    transother[CHARACTER_WIDETAG] = trans_immediate;
     transother[SAP_WIDETAG] = trans_unboxed;
     transother[UNBOUND_MARKER_WIDETAG] = trans_immediate;
     transother[WEAK_POINTER_WIDETAG] = trans_weak_pointer;
@@ -1895,7 +1895,7 @@ gc_init_tables(void)
     sizetab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = size_boxed;
     sizetab[VALUE_CELL_HEADER_WIDETAG] = size_boxed;
     sizetab[SYMBOL_HEADER_WIDETAG] = size_boxed;
-    sizetab[BASE_CHAR_WIDETAG] = size_immediate;
+    sizetab[CHARACTER_WIDETAG] = size_immediate;
     sizetab[SAP_WIDETAG] = size_unboxed;
     sizetab[UNBOUND_MARKER_WIDETAG] = size_immediate;
     sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;

@@ -64,6 +64,7 @@
   ;; the type it tests for in the Common Lisp type system, and since it's
   ;; only used in the implementation of a few specialized things.)
   (def-type-predicate-wrapper double-float-p)
+  (def-type-predicate-wrapper extended-char-p)
   (def-type-predicate-wrapper fdefn-p)
   (def-type-predicate-wrapper fixnump)
   (def-type-predicate-wrapper floatp)
@@ -78,7 +79,7 @@
   (def-type-predicate-wrapper ratiop)
   (def-type-predicate-wrapper realp)
   (def-type-predicate-wrapper short-float-p)
-  (def-type-predicate-wrapper sb!kernel:simple-array-p)
+  (def-type-predicate-wrapper simple-array-p)
   (def-type-predicate-wrapper simple-bit-vector-p)
   (def-type-predicate-wrapper simple-base-string-p)
   (def-type-predicate-wrapper simple-string-p)

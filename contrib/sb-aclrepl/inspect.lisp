@@ -681,7 +681,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
   (description-maybe-internals "character ~W char-code #x~2,'0X"
 			       (list object (char-code object))
 			       "[#x~8,'0X]"
-			       (logior sb-vm:base-char-widetag 
+			       (logior sb-vm:character-widetag 
 				       (ash (char-code object)
 					    sb-vm:n-widetag-bits))))
 

@@ -2057,11 +2057,11 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	/* Is it plausible cons? */
 	if ((is_lisp_pointer(start_addr[0])
 	    || (fixnump(start_addr[0]))
-	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
+	    || (widetag_of(start_addr[0]) == CHARACTER_WIDETAG)
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
 	       || (fixnump(start_addr[1]))
-	       || (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
+	       || (widetag_of(start_addr[1]) == CHARACTER_WIDETAG)
 	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
 	    break;
 	else {
@@ -2107,7 +2107,7 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	}
 	switch (widetag_of(start_addr[0])) {
 	case UNBOUND_MARKER_WIDETAG:
-	case BASE_CHAR_WIDETAG:
+	case CHARACTER_WIDETAG:
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "*Wo3: %x %x %x\n",
@@ -3119,7 +3119,7 @@ verify_space(lispobj *start, size_t words)
 		case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 		case VALUE_CELL_HEADER_WIDETAG:
 		case SYMBOL_HEADER_WIDETAG:
-		case BASE_CHAR_WIDETAG:
+		case CHARACTER_WIDETAG:
 		case UNBOUND_MARKER_WIDETAG:
 		case INSTANCE_HEADER_WIDETAG:
 		case FDEFN_WIDETAG:

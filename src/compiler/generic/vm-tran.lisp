@@ -36,6 +36,7 @@
 ;;;; character support
 
 ;;; In our implementation there are really only BASE-CHARs.
+#+nil
 (define-source-transform characterp (obj)
   `(base-char-p ,obj))
 

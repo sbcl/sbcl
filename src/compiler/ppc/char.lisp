@@ -14,78 +14,70 @@
 ;;;; Moves and coercions:
 
 ;;; Move a tagged char to an untagged representation.
-(define-vop (move-to-base-char)
+(define-vop (move-to-character)
   (:args (x :scs (any-reg descriptor-reg)))
-  (:results (y :scs (base-char-reg)))
+  (:results (y :scs (character-reg)))
   (:note "character untagging")
   (:generator 1
     (inst srwi y x n-widetag-bits)))
-
-(define-move-vop move-to-base-char :move
-  (any-reg descriptor-reg) (base-char-reg))
-
+(define-move-vop move-to-character :move
+  (any-reg descriptor-reg) (character-reg))
 
 ;;; Move an untagged char to a tagged representation.
-(define-vop (move-from-base-char)
-  (:args (x :scs (base-char-reg)))
+(define-vop (move-from-character)
+  (:args (x :scs (character-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
     (inst slwi y x n-widetag-bits)
-    (inst ori y y base-char-widetag)))
+    (inst ori y y character-widetag)))
+(define-move-vop move-from-character :move
+  (character-reg) (any-reg descriptor-reg))
 
-(define-move-vop move-from-base-char :move
-  (base-char-reg) (any-reg descriptor-reg))
-
-;;; Move untagged base-char values.
-(define-vop (base-char-move)
+;;; Move untagged character values.
+(define-vop (character-move)
   (:args (x :target y
-	    :scs (base-char-reg)
+	    :scs (character-reg)
 	    :load-if (not (location= x y))))
-  (:results (y :scs (base-char-reg)
+  (:results (y :scs (character-reg)
 	       :load-if (not (location= x y))))
   (:note "character move")
   (:effects)
   (:affected)
   (:generator 0
     (move y x)))
+(define-move-vop character-move :move
+  (character-reg) (character-reg))
 
-(define-move-vop base-char-move :move
-  (base-char-reg) (base-char-reg))
-
-;;; Move untagged base-char arguments/return-values.
-(define-vop (move-base-char-arg)
+;;; Move untagged character arguments/return-values.
+(define-vop (move-character-arg)
   (:args (x :target y
-	    :scs (base-char-reg))
+	    :scs (character-reg))
 	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y base-char-reg))))
+	     :load-if (not (sc-is y character-reg))))
   (:results (y))
   (:note "character arg move")
   (:generator 0
     (sc-case y
-      (base-char-reg
+      (character-reg
        (move y x))
-      (base-char-stack
+      (character-stack
        (storew x fp (tn-offset y))))))
+(define-move-vop move-character-arg :move-arg
+  (any-reg character-reg) (character-reg))
 
-(define-move-vop move-base-char-arg :move-arg
-  (any-reg base-char-reg) (base-char-reg))
-
-
-;;; Use standard MOVE-ARG + coercion to move an untagged base-char
+;;; Use standard MOVE-ARG + coercion to move an untagged character
 ;;; to a descriptor passing location.
 (define-move-vop move-arg :move-arg
-  (base-char-reg) (any-reg descriptor-reg))
-
-
+  (character-reg) (any-reg descriptor-reg))
 
 ;;;; Other operations:
 
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args (ch :scs (base-char-reg) :target res))
-  (:arg-types base-char)
+  (:args (ch :scs (character-reg) :target res))
+  (:arg-types character)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 1
@@ -96,17 +88,16 @@
   (:policy :fast-safe)
   (:args (code :scs (any-reg) :target res))
   (:arg-types positive-fixnum)
-  (:results (res :scs (base-char-reg)))
-  (:result-types base-char)
+  (:results (res :scs (character-reg)))
+  (:result-types character)
   (:generator 1
     (inst srwi res code 2)))
-
 
-;;; Comparison of base-chars.
-(define-vop (base-char-compare)
-  (:args (x :scs (base-char-reg))
-	 (y :scs (base-char-reg)))
-  (:arg-types base-char base-char)
+;;; Comparison of characters.
+(define-vop (character-compare)
+  (:args (x :scs (character-reg))
+	 (y :scs (character-reg)))
+  (:arg-types character character)
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
@@ -116,21 +107,21 @@
     (inst cmplw x y)
     (inst b? (if not-p not-condition condition) target)))
 
-(define-vop (fast-char=/base-char base-char-compare)
+(define-vop (fast-char=/character character-compare)
   (:translate char=)
   (:variant :eq :ne))
 
-(define-vop (fast-char</base-char base-char-compare)
+(define-vop (fast-char</character character-compare)
   (:translate char<)
   (:variant :lt :ge))
 
-(define-vop (fast-char>/base-char base-char-compare)
+(define-vop (fast-char>/character character-compare)
   (:translate char>)
   (:variant :gt :le))
 
-(define-vop (base-char-compare/c)
-  (:args (x :scs (base-char-reg)))
-  (:arg-types base-char (:constant base-char))
+(define-vop (character-compare/c)
+  (:args (x :scs (character-reg)))
+  (:arg-types character (:constant character))
   (:conditional)
   (:info target not-p y)
   (:policy :fast-safe)
@@ -140,15 +131,14 @@
     (inst cmplwi x (sb!xc:char-code y))
     (inst b? (if not-p not-condition condition) target)))
 
-(define-vop (fast-char=/base-char/c base-char-compare/c)
+(define-vop (fast-char=/character/c character-compare/c)
   (:translate char=)
   (:variant :eq :ne))
 
-(define-vop (fast-char</base-char/c base-char-compare/c)
+(define-vop (fast-char</character/c character-compare/c)
   (:translate char<)
   (:variant :lt :ge))
 
-(define-vop (fast-char>/base-char/c base-char-compare/c)
+(define-vop (fast-char>/character/c character-compare/c)
   (:translate char>)
   (:variant :gt :le))
-

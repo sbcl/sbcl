@@ -1,8 +1,17 @@
-(in-package "SB!VM")
+;;;; the HPPA VM definition of floating point operations
 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!VM")
 
 ;;;; Move functions.
-
 (define-move-fun (load-fp-zero 1) (vop x y)
   ((fp-single-zero) (single-reg)
    (fp-double-zero) (double-reg))
@@ -33,10 +42,8 @@
    (double-reg) (double-stack))
   (let ((offset (* (tn-offset y) n-word-bytes)))
     (str-float x offset (current-nfp-tn vop))))
-
 
 ;;;; Move VOPs
-
 (define-vop (move-float)
   (:args (x :scs (single-reg double-reg)
 	    :target y
@@ -47,10 +54,8 @@
   (:generator 0
     (unless (location= y x)
       (inst funop :copy x y))))
-
 (define-move-vop move-float :move (single-reg) (single-reg))
 (define-move-vop move-float :move (double-reg) (double-reg))
-
 
 (define-vop (move-from-float)
   (:args (x :to :save))
@@ -90,8 +95,7 @@
   (frob move-to-single single-reg single-float-value-slot)
   (frob move-to-double double-reg double-float-value-slot))
 
-
-(define-vop (move-float-argument)
+(define-vop (move-float-arg)
   (:args (x :scs (single-reg double-reg) :target y)
 	 (nfp :scs (any-reg)
 	      :load-if (not (sc-is y single-reg double-reg))))
@@ -105,15 +109,12 @@
       ((single-stack double-stack)
        (let ((offset (* (tn-offset y) n-word-bytes)))
 	 (str-float x offset nfp))))))
-
-(define-move-vop move-float-argument :move-arg
+(define-move-vop move-float-arg :move-arg
   (single-reg descriptor-reg) (single-reg))
-(define-move-vop move-float-argument :move-arg
+(define-move-vop move-float-arg :move-arg
   (double-reg descriptor-reg) (double-reg))
-
 
 ;;;; Complex float move functions
-
 (defun complex-single-reg-real-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
 		  :offset (tn-offset x)))
@@ -127,7 +128,6 @@
 (defun complex-double-reg-imag-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
 		  :offset (1+ (tn-offset x))))
-
 
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
@@ -147,7 +147,6 @@
     (let ((imag-tn (complex-single-reg-imag-tn x)))
       (str-float imag-tn (+ offset n-word-bytes) nfp))))
 
-
 (define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((nfp (current-nfp-tn vop))
@@ -166,9 +165,7 @@
     (let ((imag-tn (complex-double-reg-imag-tn x)))
       (str-float imag-tn (+ offset (* 2 n-word-bytes)) nfp))))
 
-;;;
 ;;; Complex float register to register moves.
-;;;
 (define-vop (complex-single-move)
   (:args (x :scs (complex-single-reg) :target y
 	    :load-if (not (location= x y))))
@@ -184,7 +181,6 @@
        (let ((x-imag (complex-single-reg-imag-tn x))
 	     (y-imag (complex-single-reg-imag-tn y)))
 	 (inst funop :copy x-imag y-imag)))))
-;;;
 (define-move-vop complex-single-move :move
   (complex-single-reg) (complex-single-reg))
 
@@ -203,14 +199,11 @@
        (let ((x-imag (complex-double-reg-imag-tn x))
 	     (y-imag (complex-double-reg-imag-tn y)))
 	 (inst funop :copy x-imag y-imag)))))
-;;;
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
-;;;
 ;;; Move from a complex float to a descriptor register allocating a
 ;;; new complex float object in the process.
-;;;
 (define-vop (move-from-complex-single)
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
@@ -227,7 +220,6 @@
        (inst fsts imag-tn (- (* complex-single-float-imag-slot n-word-bytes)
 			     other-pointer-lowtag)
 	     y))))
-;;;
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -247,13 +239,10 @@
        (inst fsts imag-tn (- (* complex-double-float-imag-slot n-word-bytes)
 			     other-pointer-lowtag)
 	     y))))
-;;;
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
-;;;
 ;;; Move from a descriptor to a complex float register
-;;;
 (define-vop (move-to-complex-single)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (complex-single-reg)))
@@ -286,10 +275,8 @@
 (define-move-vop move-to-complex-double :move
   (descriptor-reg) (complex-double-reg))
 
-;;;
-;;; Complex float move-argument vop
-;;;
-(define-vop (move-complex-single-float-argument)
+;;; Complex float move-arg vop
+(define-vop (move-complex-single-float-arg)
   (:args (x :scs (complex-single-reg) :target y)
 	 (nfp :scs (any-reg) :load-if (not (sc-is y complex-single-reg))))
   (:results (y))
@@ -310,11 +297,10 @@
 	   (str-float real-tn offset nfp))
 	 (let ((imag-tn (complex-single-reg-imag-tn x)))
 	   (str-float imag-tn (+ offset n-word-bytes) nfp)))))))
-;;;
-(define-move-vop move-complex-single-float-argument :move-arg
+(define-move-vop move-complex-single-float-arg :move-arg
   (complex-single-reg descriptor-reg) (complex-single-reg))
 
-(define-vop (move-complex-double-float-argument)
+(define-vop (move-complex-double-float-arg)
   (:args (x :scs (complex-double-reg) :target y)
 	 (nfp :scs (any-reg) :load-if (not (sc-is y complex-double-reg))))
   (:results (y))
@@ -335,15 +321,12 @@
 	   (str-float real-tn offset nfp))
 	 (let ((imag-tn (complex-double-reg-imag-tn x)))
 	   (str-float imag-tn (+ offset (* 2 n-word-bytes)) nfp)))))))
-;;;
-(define-move-vop move-complex-double-float-argument :move-arg
+(define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
 
-
-(define-move-vop move-argument :move-arg
+(define-move-vop move-arg :move-arg
   (single-reg double-reg complex-single-reg complex-double-reg)
   (descriptor-reg))
-
 
 ;;;; Arithmetic VOPs.
 
