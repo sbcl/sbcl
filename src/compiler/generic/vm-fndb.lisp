@@ -174,14 +174,14 @@
   sb!vm:word
   (foldable flushable movable))
 
-(defknown 32bit-logical-not (sb!vm:word) sb!vm:word
+(defknown word-logical-not (sb!vm:word) sb!vm:word
   (foldable flushable movable))
 
-(defknown (32bit-logical-and 32bit-logical-nand
-	   32bit-logical-or 32bit-logical-nor
-	   32bit-logical-xor 32bit-logical-eqv
-	   32bit-logical-andc1 32bit-logical-andc2
-	   32bit-logical-orc1 32bit-logical-orc2)
+(defknown (word-logical-and word-logical-nand
+	   word-logical-or word-logical-nor
+	   word-logical-xor word-logical-eqv
+	   word-logical-andc1 word-logical-andc2
+	   word-logical-orc1 word-logical-orc2)
 	  (sb!vm:word sb!vm:word) sb!vm:word
   (foldable flushable movable))
 

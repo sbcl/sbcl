@@ -1164,38 +1164,38 @@
     (move result prev)
     (inst shrd result next :cl)))
 
-(define-source-transform 32bit-logical-not (x)
+(define-source-transform word-logical-not (x)
   `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-and ((x y))
+(deftransform word-logical-and ((x y))
   '(logand x y))
 
-(define-source-transform 32bit-logical-nand (x y)
-  `(32bit-logical-not (32bit-logical-and ,x ,y)))
+(define-source-transform word-logical-nand (x y)
+  `(word-logical-not (word-logical-and ,x ,y)))
 
-(deftransform 32bit-logical-or ((x y))
+(deftransform word-logical-or ((x y))
   '(logior x y))
 
-(define-source-transform 32bit-logical-nor (x y)
-  `(32bit-logical-not (32bit-logical-or ,x ,y)))
+(define-source-transform word-logical-nor (x y)
+  `(word-logical-not (word-logical-or ,x ,y)))
 
-(deftransform 32bit-logical-xor ((x y))
+(deftransform word-logical-xor ((x y))
   '(logxor x y))
 
-(define-source-transform 32bit-logical-eqv (x y)
-  `(32bit-logical-not (32bit-logical-xor ,x ,y)))
+(define-source-transform word-logical-eqv (x y)
+  `(word-logical-not (word-logical-xor ,x ,y)))
 
-(define-source-transform 32bit-logical-orc1 (x y)
-  `(32bit-logical-or (32bit-logical-not ,x) ,y))
+(define-source-transform word-logical-orc1 (x y)
+  `(word-logical-or (word-logical-not ,x) ,y))
 
-(define-source-transform 32bit-logical-orc2 (x y)
-  `(32bit-logical-or ,x (32bit-logical-not ,y)))
+(define-source-transform word-logical-orc2 (x y)
+  `(word-logical-or ,x (word-logical-not ,y)))
 
-(define-source-transform 32bit-logical-andc1 (x y)
-  `(32bit-logical-and (32bit-logical-not ,x) ,y))
+(define-source-transform word-logical-andc1 (x y)
+  `(word-logical-and (word-logical-not ,x) ,y))
 
-(define-source-transform 32bit-logical-andc2 (x y)
-  `(32bit-logical-and ,x (32bit-logical-not ,y)))
+(define-source-transform word-logical-andc2 (x y)
+  `(word-logical-and ,x (word-logical-not ,y)))
 
 ;;; Only the lower 5 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)

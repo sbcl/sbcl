@@ -1001,7 +1001,7 @@ retained, possibly temporariliy, because it might be used internally."
    ;;   * Pull special case implementations of sequence functions (e.g.
    ;;     %MAP-TO-LIST-ARITY-1 and %FIND-POSITION-IF-NOT) and 
    ;;     other sequence function implementation grot into SB-SEQ.
-   ;;   * Pull all the math stuff (%ACOS, %COSH, 32BIT-LOGICAL-AND...)
+   ;;   * Pull all the math stuff (%ACOS, %COSH, WORD-LOGICAL-AND...)
    ;;     into SB-MATH.
    ;;   * Pull all the array stuff (%ARRAY-DATA-VECTOR, %RAW-REF-LONG,
    ;;     WITH-ARRAY-DATA, ALLOCATE-VECTOR, HAIRY-DATA-VECTOR-REF...)
@@ -1071,13 +1071,13 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 		       "*CONTROL-STACK-EXHAUSTION-SAP*"
 		       "*UNIVERSAL-TYPE*" "*UNIVERSAL-FUN-TYPE*"
 		       "*UNPARSE-FUN-TYPE-SIMPLIFY*" "*WILD-TYPE*"
-		       "32BIT-LOGICAL-AND" "32BIT-LOGICAL-ANDC1"
-		       "32BIT-LOGICAL-ANDC2"
-		       "32BIT-LOGICAL-EQV" "32BIT-LOGICAL-NAND"
-		       "32BIT-LOGICAL-NOR"
-		       "32BIT-LOGICAL-NOT" "32BIT-LOGICAL-OR"
-		       "32BIT-LOGICAL-ORC1"
-		       "32BIT-LOGICAL-ORC2" "32BIT-LOGICAL-XOR"
+		       "WORD-LOGICAL-AND" "WORD-LOGICAL-ANDC1"
+		       "WORD-LOGICAL-ANDC2"
+		       "WORD-LOGICAL-EQV" "WORD-LOGICAL-NAND"
+		       "WORD-LOGICAL-NOR"
+		       "WORD-LOGICAL-NOT" "WORD-LOGICAL-OR"
+		       "WORD-LOGICAL-ORC1"
+		       "WORD-LOGICAL-ORC2" "WORD-LOGICAL-XOR"
 		       "ALIEN-TYPE-TYPE"
 		       "ALIEN-TYPE-TYPE-ALIEN-TYPE" "ALIEN-TYPE-TYPE-P"
 		       "ALLOCATE-VECTOR"

@@ -825,37 +825,37 @@
       (emit-label done)
       (move result res))))
 
-(define-source-transform 32bit-logical-not (x)
+(define-source-transform word-logical-not (x)
   `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-and ((x y))
+(deftransform word-logical-and ((x y))
   '(logand x y))
 
-(deftransform 32bit-logical-nand ((x y))
+(deftransform word-logical-nand ((x y))
   '(logand (lognand x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-or ((x y))
+(deftransform word-logical-or ((x y))
   '(logior x y))
 
-(deftransform 32bit-logical-nor ((x y))
+(deftransform word-logical-nor ((x y))
   '(logand (lognor x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-xor ((x y))
+(deftransform word-logical-xor ((x y))
   '(logxor x y))
 
-(deftransform 32bit-logical-eqv ((x y))
+(deftransform word-logical-eqv ((x y))
   '(logand (logeqv x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-orc1 ((x y))
+(deftransform word-logical-orc1 ((x y))
   '(logand (logorc1 x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-orc2 ((x y))
+(deftransform word-logical-orc2 ((x y))
   '(logand (logorc2 x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-andc1 ((x y))
+(deftransform word-logical-andc1 ((x y))
   '(logand (logandc1 x y) #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-andc2 ((x y))
+(deftransform word-logical-andc2 ((x y))
   '(logand (logandc2 x y) #.(1- (ash 1 32))))
 
 (define-vop (shift-towards-someplace)

@@ -1,4 +1,9 @@
 changes in sbcl-0.8.14 relative to sbcl-0.8.13:
+  * incompatible change: the internal functions
+    SB-KERNEL:32BIT-LOGICAL-FOO, intended for providing efficient
+    logical operations on (UNSIGNED-BYTE 32) values, have been renamed
+    to SB-KERNEL:WORD-LOGICAL-FOO.  Modular arithmetic should be used
+    instead of the old functions.
   * new feature: on platforms where "dladdr" is available foreign
     function names now appear in backtraces.  (based on Helmut Eller's
     work for CMUCL)

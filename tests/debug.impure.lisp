@@ -126,7 +126,7 @@
 #-alpha ; bug 346
 (progn
   (flet ((test-function ()
-	   (declare (optimize (speed 1) (debug 2))) ; tail call elimination
+	   (declare (optimize (speed 2) (debug 1))) ; tail call elimination
 	   (/ 42 0)))
     (assert (verify-backtrace #'test-function '/)))
 
@@ -136,9 +136,10 @@
     (assert (verify-backtrace #'test-function '/))))
 
 #-(or x86 alpha) ; bug 61
-(defun throw-test ()
-  (throw 'no-such-tag t))
-(assert (verify-backtrace #'throw-test 'throw-test))
+(progn
+  (defun throw-test ()
+    (throw 'no-such-tag t))
+  (assert (verify-backtrace #'throw-test 'throw-test)))
 
 ;;; success
 (quit :unix-status 104)
