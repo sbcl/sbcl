@@ -267,6 +267,8 @@
      (destructuring-bind (name arglist &body body) definition
        (unless (symbolp name)
 	 (compiler-error "The local macro name ~S is not a symbol." name))
+       (unless (listp arglist)
+	 (compiler-error "The local macro argument list ~S is not a list." arglist))
        (let ((whole (gensym "WHOLE"))
 	     (environment (gensym "ENVIRONMENT")))
 	 (multiple-value-bind (body local-decls)

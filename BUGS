@@ -615,11 +615,11 @@ WORKAROUND:
 124:
    As of version 0.pre7.14, SBCL's implementation of MACROLET makes
    the entire lexical environment at the point of MACROLET available
-   in the bodies of the macroexpander functions. In particular, it 
-   allows the function bodies (which run at compile time) to try to 
+   in the bodies of the macroexpander functions. In particular, it
+   allows the function bodies (which run at compile time) to try to
    access lexical variables (which are only defined at runtime).
    It doesn't even issue a warning, which is bad.
-  
+
    The SBCL behavior arguably conforms to the ANSI spec (since the
    spec says that the behavior is undefined, ergo anything conforms).
    However, it would be better to issue a compile-time error.
@@ -635,7 +635,7 @@ WORKAROUND:
        the local macro definitions in a MACROLET, but the consequences
        are undefined if the local macro definitions reference any
        local variable or function bindings that are visible in that
-       lexical environment. 
+       lexical environment.
    Then it seems to contradict itself by giving the example
 	(defun foo (x flag)
 	   (macrolet ((fudge (z)
@@ -676,22 +676,15 @@ WORKAROUND:
   structure classes related by inheritance. As of 0.7.0, SBCL still 
   doesn't follow it.
 
-129:
-  insufficient syntax checking in MACROLET:
-   (defun foo (x)
-     (macrolet ((defmacro bar (z) `(+ z z)))
-       (bar x)))
-  shouldn't compile without error (because of the extra DEFMACRO symbol).
-
 135:
   Ideally, uninterning a symbol would allow it, and its associated
-  FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However, 
+  FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However,
   at least as of sbcl-0.7.0, this isn't the case. Information about
   FDEFINITIONs and PROCLAIMed properties is stored in globaldb.lisp
   essentially in ordinary (non-weak) hash tables keyed by symbols.
   Thus, once a system has an entry in this system, it tends to live
   forever, even when it is uninterned and all other references to it
-  are lost. 
+  are lost.
 
 136:
   (reported by Arnaud Rouanet on cmucl-imp 2001-12-18)
@@ -721,7 +714,7 @@ WORKAROUND:
   T
   * (defclass b () ())
   #<STANDARD-CLASS B>
-   
+
   ;;; And now...
   * (subtypep 'b 'a)
   T
@@ -821,8 +814,14 @@ WORKAROUND:
     debugger invoked on condition of type TYPE-ERROR:
       The value NIL is not of type SB-C::NODE.
   The location of this failure has moved around as various related
-  issues were cleaned up. As of sbcl-0.7.1.9, it occurs in 
+  issues were cleaned up. As of sbcl-0.7.1.9, it occurs in
   NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
+
+  (Python LET-converts KIDIFY1 into KID-FROB, then tries to inline
+  expand KID-FROB into %ZEEP. Having partially done it, it sees a call
+  of KIDIFY1, which already does not exist. So it gives up on
+  expansion, leaving garbage consisting of infinished blocks of the
+  partially converted function.)
 
 157:
   Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
@@ -1125,6 +1124,8 @@ WORKAROUND:
              (print j))))
        (trust-assertion 6) ; prints nothing unless DECLARE is commented out
 
+     (see bug 203)
+
 193: "unhelpful CLOS error reporting when the primary method is missing"
   In sbcl-0.7.7, when
     (defmethod foo :before ((x t)) (print x))
@@ -1223,6 +1224,20 @@ WORKAROUND:
 
   This situation may appear during optimizing away degenerate cases of
   certain functions: see bugs 54, 192b.
+
+204:
+  (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) inside MACROLET evaluates its
+  argument in the null lexical environment. E.g. compiling file with
+
+    (macrolet ((def (x) `(print ,x)))
+      (eval-when (:compile-toplevel)
+        (def 'hello)))
+
+  causes
+
+    debugger invoked on condition of type UNDEFINED-FUNCTION:
+      The function DEF is undefined.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -197,3 +197,9 @@
 ;;; a bug in the MAP deftransform caused non-VECTOR array specifiers
 ;;; to cause errors in the compiler.  Fixed by CSR in 0.7.8.10
 (assert (list (compile nil '(lambda (x) (map 'simple-array 'identity x)))))
+
+;;; bug 129: insufficient syntax checking in MACROLET
+(multiple-value-bind (result error)
+    (ignore-errors (eval '(macrolet ((foo x `',x)) (foo 1 2 3))))
+  (assert (null result))
+  (assert (typep error 'error)))
