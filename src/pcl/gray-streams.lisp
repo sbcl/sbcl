@@ -15,13 +15,19 @@
 ;;; user is responsible for some of the protocol implementation, it's
 ;;; not necessarily a bug in SBCL itself if we fall through to one of
 ;;; these default methods.
+;;;
+;;; FIXME: there's a lot of similarity in these Gray stream
+;;; implementation generic functions.  All of them could (maybe
+;;; should?) have two default methods: one on STREAM calling
+;;; BUG-OR-ERROR, and one on T signalling a TYPE-ERROR.
 (defmacro bug-or-error (stream fun)
-  `(error "~@<The stream ~S has no suitable method for ~S, ~
-           and so has fallen through to this method.  If you think that this is ~
-           a bug, please report it to the applicable authority (bugs in SBCL itself ~
-           should go to the mailing lists referenced from <http://www.sbcl.org/>).~@:>"
-           ,stream ,fun))
-
+  `(error
+    "~@<The stream ~S has no suitable method for ~S, ~
+     and so has fallen through to this method.  If you think that this is ~
+     a bug, please report it to the applicable authority (bugs in SBCL itself ~
+     should go to the mailing lists referenced from ~
+     <http://www.sbcl.org/>).~@:>"
+    ,stream ,fun))
 
 (fmakunbound 'stream-element-type)
 
@@ -218,6 +224,10 @@
 
 (defmethod stream-clear-input ((stream fundamental-character-input-stream))
   nil)
+(defmethod stream-clear-input ((stream stream))
+  (bug-or-error stream 'stream-clear-input))
+(defmethod stream-clear-input ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-read-sequence (stream seq &optional start end)
   (:documentation
@@ -379,6 +389,10 @@
 
 (defmethod stream-finish-output ((stream fundamental-output-stream))
   nil)
+(defmethod stream-finish-output ((stream stream))
+  (bug-or-error stream 'stream-finish-output))
+(defmethod stream-finish-output ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-force-output (stream)
   #+sb-doc
@@ -388,6 +402,10 @@
 
 (defmethod stream-force-output ((stream fundamental-output-stream))
   nil)
+(defmethod stream-force-output ((stream stream))
+  (bug-or-error stream 'stream-force-output))
+(defmethod stream-force-output ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-clear-output (stream)
   #+sb-doc
@@ -397,6 +415,10 @@
 
 (defmethod stream-clear-output ((stream fundamental-output-stream))
   nil)
+(defmethod stream-clear-output ((stream stream))
+  (bug-or-error stream 'stream-clear-output))
+(defmethod stream-clear-output ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-advance-to-column (stream column)
   #+sb-doc

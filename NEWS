@@ -2286,6 +2286,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     ** OPEN :DIRECTION :IO no longer fails to work on non-existent
        files.
     ** DIRECTORY on logical pathnames is more correct.
+    ** CLEAR-INPUT, CLEAR-OUTPUT, FINISH-OUTPUT and FORCE-OUTPUT
+       signal a TYPE-ERROR if their argument is not a stream.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
