@@ -34,6 +34,15 @@
   ;; T if break level is a continuable break
   continuable) 
 
+;;; cmd table entry
+(defstruct cmd-table-entry
+  (name nil) ; name of command
+  (func nil) ; function handler
+  (desc nil) ; short description
+  (parsing nil) ; (:string :case-sensitive nil)
+  (group nil) ; command group (:cmd or :alias)
+  (abbr-len 0)) ; abbreviation length
+  
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *default-prompt* "~:[~2*~;[~:*~D~:[~;i~]~:[~;c~]] ~]~A(~D): "
     "The default prompt."))
@@ -145,15 +154,6 @@
 	     *eof-cmd*
 	     (make-user-cmd :input form :func nil :hnum *cmd-number*))))))))
 
-;;; cmd table entry
-(defstruct cmd-table-entry
-  (name nil) ; name of command
-  (func nil) ; function handler
-  (desc nil) ; short description
-  (parsing nil) ; (:string :case-sensitive nil)
-  (group nil) ; command group (:cmd or :alias)
-  (abbr-len 0)) ; abbreviation length
-  
 (defun make-cte (name-param func desc parsing group abbr-len)
   (let ((name (etypecase name-param
 		(string
@@ -304,6 +304,7 @@
 
 (defun string-to-list-skip-spaces (str)
   "Return a list of strings, delimited by spaces, skipping spaces."
+  (declare (string str)) 
   (when str
     (loop for i = 0 then (1+ j)
 	  as j = (position #\space str :start i)
@@ -469,6 +470,12 @@
 (defun frame-cmd ()
   )
 
+(defun zoom-cmd ()
+  )
+
+(defun local-cmd (&optional var)
+  )
+
 (defun processes-cmd ()
   #+sb-thread
   (let ((pids (thread-pids))
@@ -515,28 +522,31 @@
 	 ("cf" 2 cf-cmd "compile file" :parsing :string)
 	 ("cload" 2 cload-cmd "compile if needed and load file"
 	  :parsing :string)
-;;	 ("current" 3 current-cmd "print the expression for the current stack frame")
-;;	 ("continue" 4 continue-cmd "continue from a continuable error")
+	 #+aclrepl-debugger("current" 3 current-cmd "print the expression for the current stack frame")
+	 #+aclrepl-debugger ("continue" 4 continue-cmd "continue from a continuable error")
 	 ("describe" 2 describe-cmd "describe an object")
 	 ("macroexpand" 2 macroexpand-cmd "macroexpand an expression")
 	 ("package" 2 package-cmd "change current package")
-;;	 ("error" 3 error-cmd "print the last error message")
+	 #+aclrepl-debugger ("error" 3 error-cmd "print the last error message")
 	 ("exit" 2 exit-cmd "exit sbcl")
-;;	 ("frame" 2 frame-cmd "print info about the current frame")
+	 #+aclrepl-debugger("frame" 2 frame-cmd "print info about the current frame")
 	 ("help" 2 help-cmd "print this help")
 	 ("history" 3 history-cmd "print the recent history")
 	 ("inspect" 2 inspect-cmd "inspect an object")
 	 ("istep" 1 istep-cmd "navigate within inspection of a lisp object" :parsing :string)
-	 ("kill" 2 kill-cmd "kill a process")
+	 #+sb-thread ("kill" 2 kill-cmd "kill a process")
+	 #+aclrepl-debugger("local" 3 local-cmd "print the value of a local variable")
 	 ("pwd" 3 pwd-cmd "print current directory")
 	 ("pushd" 2 pushd-cmd "push directory on stack" :parsing :string)
 	 ("pop" 3 pop-cmd "pop up `n' (default 1) break levels")
 	 ("popd" 4 popd-cmd "pop directory from stack")
-	 ("processes" 3 processes-cmd "list all processes")
+	 #+sb-thread ("processes" 3 processes-cmd "list all processes")
 	 ("trace" 2 trace-cmd "trace a function")
 	 ("untrace" 4 untrace-cmd "untrace a function")
 	 ("dirs" 2 dirs-cmd "show directory stack")
-	 ("shell" 2 shell-cmd "execute a shell cmd" :parsing :string))))
+	 ("shell" 2 shell-cmd "execute a shell cmd" :parsing :string)
+	 #+aclrepl-debugger ("zoom" 2 zoom-cmd "print the runtime stack")
+	 )))
   (dolist (cmd cmd-table)
     (destructuring-bind (cmd-string abbr-len func-name desc &key parsing) cmd
       (add-cmd-table-entry cmd-string abbr-len func-name desc parsing))))
@@ -686,7 +696,7 @@
   (loop for user-cmd = (read-cmd input-stream) do
 	(if (process-cmd user-cmd input-stream output-stream)
 	    (progn
-	      (repl-prompt-fun output-stream)
+	      (funcall sb-int:*repl-prompt-fun* output-stream)
 	      (force-output output-stream))
 	    (return (user-cmd-input user-cmd)))))
 

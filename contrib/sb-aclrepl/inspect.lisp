@@ -9,19 +9,24 @@
 
 (cl:in-package :sb-aclrepl)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +default-inspect-length+ 10))
+
 (defstruct inspect
   ;; stack of parents of inspected object
   object-stack 
   ;;  a stack of indices of parent object components
-  parent-stack
-  ;; number of components to display
-  (length 10))
+  parent-stack)
 
 ;; FIXME - raw mode isn't currently used in object display
 (defparameter *current-inspect* nil
   "current inspect") 
 (defparameter *inspect-raw* nil
   "Raw mode for object display.")
+(defparameter *inspect-length* +default-inspect-length+
+  "maximum number of components to print") 
+(defparameter *inspect-skip* 0
+  "number of initial components to skip when displaying an object") 
 
 (defvar *inspect-help*
 ":istep takes between 0 to 3 arguments.
@@ -53,7 +58,9 @@ The commands are:
 
 ;; Setup binding for multithreading
 (let ((*current-inspect* nil)
-      (*inspect-raw* nil))
+      (*inspect-raw* nil)
+      (*inspect-length* +default-inspect-length+)
+      (*inspect-skip* 0))
   
 (defun inspector (object input-stream output-stream)
   (declare (ignore input-stream))
@@ -70,7 +77,7 @@ The commands are:
   (setq *current-inspect* inspect))
 
 (defun istep (arg-string output-stream)
-  (%istep arg-string (string-to-list-skip-spaces arg-string) output-stream))
+  (%istep arg-string output-stream))
 
 (setq sb-impl::*inspect-fun* #'inspector)
 
@@ -78,10 +85,11 @@ The commands are:
   (setf (inspect-object-stack *current-inspect*) nil)
   (setf (inspect-parent-stack *current-inspect*) nil))
 
-(defun %istep (arg-string args output-stream)
+(defun %istep (arg-string output-stream)
   (unless *current-inspect*
     (setq *current-inspect* (make-inspect)))
-  (let* ((option (car args))
+  (let* ((args (when arg-string (string-to-list-skip-spaces arg-string)))
+	 (option (car args))
 	 (option-read (when arg-string
 			(read-from-string arg-string)))
 	 (stack (inspect-object-stack *current-inspect*)))
@@ -185,7 +193,8 @@ The commands are:
       ((string-equal "skip" option)
        (let ((len (read-from-string (second args))))
 	 (if (and (integerp len) (>= len 0))
-	     (%inspect output-stream len)
+	     (let ((*inspect-skip* len)) 
+	       (%inspect output-stream))
 	     (format output-stream "Skip missing or invalid~%"))))
       ;; Print stack tree
       ((string-equal "tree" option)
@@ -210,7 +219,7 @@ The commands are:
       ((string-equal "print" option)
        (let ((len (read-from-string (second args))))
 	 (if (and (integerp len) (plusp len))
-	     (setf (inspect-length *current-inspect*) len)
+	     (setq *inspect-length* len)
 	     (format output-stream "Cannot set print limit to ~A~%" len))))
       ;; Select numbered or named component
       ((or (symbolp option-read)
@@ -274,54 +283,66 @@ POSITION is NIL if the id is invalid or not found."
       (values nil nil nil)))
 
 
-(defun %inspect (s &optional (skip 0))
+(defun %inspect (s)
   (if (inspect-object-stack *current-inspect*)
       (let ((inspected (car (inspect-object-stack *current-inspect*))))
 	(setq cl:* inspected)
 	(multiple-value-bind (description list-type elements)
 	    (inspected-parts inspected)
-	  (display-inspected-parts inspected description
-				   list-type elements s skip)))
+	  (display-inspected-parts inspected description list-type elements s)))
       (format s "No object is being inspected")))
 
 
-(defun display-inspected-parts (object description list-type elements stream &optional (skip 0))
+(defun current-length ()
+  "returns the current LENGTH for component display"
+    *inspect-length*)
+
+(defun current-skip ()
+  "returns the current SKIP for component display"
+    *inspect-skip*)
+
+
+(defun display-inspected-parts (object description list-type elements stream)
   (format stream "~&~A" description)
   (unless (or (characterp object) (typep object 'fixnum))
     (format stream " at #x~X" (sb-kernel:get-lisp-obj-address object)))
   (princ #\newline stream)
   (when elements
-    (do* ((index skip (1+ index))
-	  (nelem (length elements))
-	  (max (min (1- nelem) (+ skip (inspect-length *current-inspect*))))
-	  (suspension (when (plusp (- nelem max))
-			(- nelem max)))
-	  (count (if (typep elements 'sequence)
-		     (length elements)
-		     0))
-	  (element))
-	 ((> index max))
-      (declare (ignore suspension)) ;; FIXME - not yet implemented
-      (setq element (elt elements index))
-      (cond
-	((eq list-type :index-with-tail)
-	 (if (eql index (- count 1))
-	   (format stream "~4,' D ~A~%" "tail" (inspected-parts element :description t))
-	   (format stream "~4,' D ~A~%" index (inspected-parts element :description t))))
-	((eq list-type :named)
-	 (destructuring-bind (name . value) element
-	   (format stream "~4,' D ~16,1,1,'-A> ~A~%" index (format nil "~A "  name)
-		 (if (eq value *inspect-unbound-object-marker*)
-		     "..unbound.."
-		     (inspected-parts value :description t)))))
-	(t
-	 (format stream "~4,' D ~A~%" index (inspected-parts element :description t)))))))
+    (let* ((n-elem (length elements))
+	   (last (1- n-elem))
+	   (max (min last (+ *inspect-skip* *inspect-length*))))
+      (do* ((index *inspect-skip* (1+ index))
+	    (count (if (typep elements 'sequence)
+		       (length elements)
+		       0))
+	    (element))
+	   ((> index max))
+	(setq element (elt elements index))
+	(cond
+	  ((eq list-type :index-with-tail)
+	   (if (eql index (- count 1))
+	       (format stream "~4,' D ~A~%" "tail" (inspected-parts element :description t))
+	       (format stream "~4,' D ~A~%" index (inspected-parts element :description t))))
+	  ((eq list-type :named)
+	   (destructuring-bind (name . value) element
+	     (format stream "~4,' D ~16,1,1,'-A> ~A~%" index (format nil "~A "  name)
+		     (if (eq value *inspect-unbound-object-marker*)
+			 "..unbound.."
+			 (inspected-parts value :description t)))))
+	  (t
+	   (format stream "~4,' D ~A~%" index (inspected-parts element :description t)))))
+      (when (< (+ *inspect-skip* *inspect-length*) last)
+	(format stream "~&   ...~%~4,' D ~A~%" last (elt elements last))))
+    ))
 
 ) ;; end binding for multithreading
 
 
 
 ;;; INSPECTED-PARTS
+;;;
+;;; 20030408 - Reworked by KMR to take a :DESCRIPTION keyword
+;;;            and to return LIST-TYPE rather than NAMED-P
 ;;;
 ;;; Destructure an object for inspection, returning either
 ;;;   DESCRIPTION
@@ -336,7 +357,7 @@ POSITION is NIL if the id is invalid or not found."
 ;;;   of ELEMENTS.
 ;;;      If LIST-TYPE is :named, then each element is (CONS NAME VALUE)
 ;;;      If LIST-TYPE is :index-with-tail, then each element is just value,
-;;;        but the last element is label as "tail"
+;;;        but the last element is labelled as "tail"
 ;;;      If LIST-TYPE is :long, then each element is just value,
 ;;;        and suspension points ('...) are shown before the last element.
 ;;;      Otherwise, each element is just VALUE.
@@ -423,6 +444,7 @@ POSITION is NIL if the id is invalid or not found."
 		(list (cons "arglist" (sb-kernel:%simple-fun-arglist object)))))))
 
 (defmethod inspected-parts ((object vector) &key description)
+  (declare (vector object))
   (let ((desc  (format nil
 		  "a ~:[~;displaced ~]vector (~W)"
 		  (and (sb-kernel:array-header-p object)
@@ -444,6 +466,7 @@ POSITION is NIL if the id is invalid or not found."
 	(format nil "[~W~{,~W~}]" (car list) (cdr list)))))
 
 (defmethod inspected-parts ((object simple-vector) &key description)
+  (declare (simple-vector object))
   (let ((desc (format nil "a simple ~A vector (~D)"
 		      (array-element-type object)
 		      (length object))))
@@ -462,6 +485,7 @@ POSITION is NIL if the id is invalid or not found."
 			    (sb-kernel:%array-displaced-p object))
 		       (array-element-type object)
 		       dimensions)))
+    (declare (array reference-array))
     (if description
 	desc
 	(progn
