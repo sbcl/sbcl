@@ -2327,8 +2327,23 @@
     ;; type.  -- CSR, 2004-10-04
     (when (numeric-type-p type)
       (let* ((lo (numeric-type-low type))
-             (hi (numeric-type-high type)))
-        (specifier-type `(character-set ((,lo . ,hi))))))))
+             (hi (numeric-type-high type))
+             (type (specifier-type `(character-set ((,lo . ,hi))))))
+        (cond
+          ;; KLUDGE: when running on the host, we lose a slight amount
+          ;; of precision so that we don't have to "unparse" types
+          ;; that formally we can't, such as (CHARACTER-SET ((0
+          ;; . 0))).  -- CSR, 2004-10-06
+          #+sb-xc-host
+          ((csubtypep type (specifier-type 'standard-char)) type)
+          #+sb-xc-host
+          ((csubtypep type (specifier-type 'base-char))
+           (specifier-type 'base-char))
+          #+sb-xc-host
+          ((csubtypep type (specifier-type 'extended-char))
+           (specifier-type 'extended-char))
+          (t #+sb-xc-host (specifier-type 'character)
+             #-sb-xc-host type))))))
 
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type :required (mapcar #'lvar-type values)))
