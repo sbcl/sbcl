@@ -15,7 +15,7 @@
 
 ;;; Return a wired TN describing the N'th full call argument passing
 ;;; location.
-(!def-vm-support-routine standard-argument-location (n)
+(!def-vm-support-routine standard-arg-location (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
       (make-wired-tn *backend-t-primitive-type*

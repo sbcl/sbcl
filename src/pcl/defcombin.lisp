@@ -174,15 +174,15 @@
 	(lambda-list (caddr form))
 	(method-group-specifiers (cadddr form))
 	(body (cddddr form))
-	(arguments-option ())
+	(args-option ())
 	(gf-var nil))
     (when (and (consp (car body)) (eq (caar body) :arguments))
-      (setq arguments-option (cdr (pop body))))
+      (setq args-option (cdr (pop body))))
     (when (and (consp (car body)) (eq (caar body) :generic-function))
       (setq gf-var (cadr (pop body))))
     (multiple-value-bind (documentation function)
 	(make-long-method-combination-function
-	  type lambda-list method-group-specifiers arguments-option gf-var
+	  type lambda-list method-group-specifiers args-option gf-var
 	  body)
       `(load-long-defcombin ',type ',documentation #',function))))
 
@@ -225,7 +225,7 @@
 	   applicable-methods))
 
 (defun make-long-method-combination-function
-       (type ll method-group-specifiers arguments-option gf-var body)
+       (type ll method-group-specifiers args-option gf-var body)
   ;;(declare (values documentation function))
   (declare (ignore type))
   (multiple-value-bind (documentation declarations real-body)
@@ -238,9 +238,8 @@
       (when gf-var
 	(push `(,gf-var .generic-function.) (cadr wrapped-body)))
 
-      (when arguments-option
-	(setq wrapped-body (deal-with-arguments-option wrapped-body
-						       arguments-option)))
+      (when args-option
+	(setq wrapped-body (deal-with-args-option wrapped-body args-option)))
 
       (when ll
 	(setq wrapped-body
@@ -365,16 +364,16 @@
 ;;;
 ;;; At compute-effective-method time, the symbols in the :arguments
 ;;; option are bound to the symbols in the intercept lambda list.
-(defun deal-with-arguments-option (wrapped-body arguments-option)
+(defun deal-with-args-option (wrapped-body args-option)
   (let* ((intercept-lambda-list
 	   (let (collect)
-	     (dolist (arg arguments-option)
+	     (dolist (arg args-option)
 	       (if (memq arg lambda-list-keywords)
 		   (push arg collect)
 		   (push (gensym) collect)))
              (nreverse collect)))
 	 (intercept-rebindings
-           (loop for arg in arguments-option
+           (loop for arg in args-option
                  for int in intercept-lambda-list
                  unless (memq arg lambda-list-keywords)
                  collect `(,arg ',int))))

@@ -118,10 +118,10 @@
 			 ,@(if double-p
 			       '((inst stt x offset nfp))
 			       '((inst sts x offset nfp))))))))
-		(define-move-vop ,name :move-argument
+		(define-move-vop ,name :move-arg
 		  (,sc descriptor-reg) (,sc)))))
-  (frob move-single-float-argument single-reg single-stack nil)
-  (frob move-double-float-argument double-reg double-stack t))
+  (frob move-single-float-arg single-reg single-stack nil)
+  (frob move-double-float-arg double-reg double-stack t))
 
 ;;;; complex float move functions
 
@@ -306,9 +306,9 @@
   (descriptor-reg) (complex-double-reg))
 
 ;;;
-;;; complex float move-argument vop
+;;; complex float MOVE-ARG VOP
 ;;;
-(define-vop (move-complex-single-float-argument)
+(define-vop (move-complex-single-float-arg)
   (:args (x :scs (complex-single-reg) :target y)
 	 (nfp :scs (any-reg) :load-if (not (sc-is y complex-single-reg))))
   (:results (y))
@@ -329,10 +329,10 @@
 	   (inst sts real-tn offset nfp))
 	 (let ((imag-tn (complex-single-reg-imag-tn x)))
 	   (inst sts imag-tn (+ offset n-word-bytes) nfp)))))))
-(define-move-vop move-complex-single-float-argument :move-argument
+(define-move-vop move-complex-single-float-arg :move-arg
   (complex-single-reg descriptor-reg) (complex-single-reg))
 
-(define-vop (move-complex-double-float-argument)
+(define-vop (move-complex-double-float-arg)
   (:args (x :scs (complex-double-reg) :target y)
 	 (nfp :scs (any-reg) :load-if (not (sc-is y complex-double-reg))))
   (:results (y))
@@ -353,11 +353,11 @@
 	   (inst stt real-tn offset nfp))
 	 (let ((imag-tn (complex-double-reg-imag-tn x)))
 	   (inst stt imag-tn (+ offset (* 2 n-word-bytes)) nfp)))))))
-(define-move-vop move-complex-double-float-argument :move-argument
+(define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
 
 
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (single-reg double-reg complex-single-reg complex-double-reg)
   (descriptor-reg))
 

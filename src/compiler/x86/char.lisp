@@ -62,7 +62,7 @@
   (base-char-reg) (base-char-reg base-char-stack))
 
 ;;; Move untagged base-char arguments/return-values.
-(define-vop (move-base-char-argument)
+(define-vop (move-base-char-arg)
   (:args (x :target y
 	    :scs (base-char-reg))
 	 (fp :scs (any-reg)
@@ -77,12 +77,12 @@
        (inst mov
 	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
 	     x)))))
-(define-move-vop move-base-char-argument :move-argument
+(define-move-vop move-base-char-arg :move-arg
   (any-reg base-char-reg) (base-char-reg))
 
-;;; Use standard MOVE-ARGUMENT + coercion to move an untagged base-char
+;;; Use standard MOVE-ARG + coercion to move an untagged base-char
 ;;; to a descriptor passing location.
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (base-char-reg) (any-reg descriptor-reg))
 
 ;;;; other operations

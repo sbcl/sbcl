@@ -579,7 +579,7 @@
 ;;;; Note these are also used to stuff fp numbers onto the c-call
 ;;;; stack so the order is different than the lisp-stack.
 
-;;; the general move-argument vop
+;;; the general MOVE-ARG VOP
 (macrolet ((frob (name sc stack-sc format)
 	     `(progn
 		(define-vop (,name)
@@ -624,14 +624,14 @@
 				    (:double '((inst fstd ea)))
 				    #!+long-float
 				    (:long '((store-long-float ea)))))))))))
-		(define-move-vop ,name :move-argument
+		(define-move-vop ,name :move-arg
 		  (,sc descriptor-reg) (,sc)))))
-  (frob move-single-float-argument single-reg single-stack :single)
-  (frob move-double-float-argument double-reg double-stack :double)
+  (frob move-single-float-arg single-reg single-stack :single)
+  (frob move-double-float-arg double-reg double-stack :double)
   #!+long-float
-  (frob move-long-float-argument long-reg long-stack :long))
+  (frob move-long-float-arg long-reg long-stack :long))
 
-;;;; complex float move-argument vop
+;;;; complex float MOVE-ARG VOP
 (macrolet ((frob (name sc stack-sc format)
 	     `(progn
 		(define-vop (,name)
@@ -699,17 +699,17 @@
 			      '((store-long-float
 				 (ea-for-clf-imag-stack y fp)))))
 			 (inst fxch imag-tn))))))
-		(define-move-vop ,name :move-argument
+		(define-move-vop ,name :move-arg
 		  (,sc descriptor-reg) (,sc)))))
-  (frob move-complex-single-float-argument
+  (frob move-complex-single-float-arg
 	complex-single-reg complex-single-stack :single)
-  (frob move-complex-double-float-argument
+  (frob move-complex-double-float-arg
 	complex-double-reg complex-double-stack :double)
   #!+long-float
-  (frob move-complex-long-float-argument
+  (frob move-complex-long-float-arg
 	complex-long-reg complex-long-stack :long))
 
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (single-reg double-reg #!+long-float long-reg
    complex-single-reg complex-double-reg #!+long-float complex-long-reg)
   (descriptor-reg))

@@ -52,7 +52,7 @@
   (sap-reg) (sap-reg))
 
 ;;; Move untagged SAP arguments/return-values.
-(define-vop (move-sap-argument)
+(define-vop (move-sap-arg)
   (:args (x :target y
 	    :scs (sap-reg))
 	 (fp :scs (any-reg)
@@ -64,12 +64,12 @@
        (move x y))
       (sap-stack
        (storeq x fp (tn-offset y))))))
-(define-move-vop move-sap-argument :move-argument
+(define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 
-;;; Use standard MOVE-ARGUMENT + coercion to move an untagged sap to a
+;;; Use standard MOVE-ARG + coercion to move an untagged sap to a
 ;;; descriptor passing location.
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (sap-reg) (descriptor-reg))
 
 ;;;; SAP-INT and INT-SAP

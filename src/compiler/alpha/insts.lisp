@@ -54,7 +54,7 @@
 	       (t (make-symbol (concatenate 'string "$" name)))))
        *register-names*))
 
-(sb!disassem:define-argument-type reg
+(sb!disassem:define-arg-type reg
   :printer (lambda (value stream dstate)
 	     (declare (stream stream) (fixnum value))
 	     (let ((regname (aref reg-symbols value)))
@@ -70,7 +70,7 @@
    (loop for n from 0 to 31 collect (make-symbol (format nil "~D" n)))
    'vector))
 
-(sb!disassem:define-argument-type fp-reg
+(sb!disassem:define-arg-type fp-reg
   :printer (lambda (value stream dstate)
 	     (declare (stream stream) (fixnum value))
 	     (let ((regname (aref float-reg-symbols value)))
@@ -81,7 +81,7 @@
 		regname
 		dstate))))
 
-(sb!disassem:define-argument-type relative-label
+(sb!disassem:define-arg-type relative-label
   :sign-extend t
   :use-label (lambda (value dstate)
 	       (declare (type (signed-byte 21) value)

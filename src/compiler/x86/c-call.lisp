@@ -12,7 +12,7 @@
 
 (in-package "SB!VM")
 
-;; The MOVE-ARGUMENT vop is going to store args on the stack for
+;; The MOVE-ARG vop is going to store args on the stack for
 ;; call-out. These tn's will be used for that. move-arg is normally
 ;; used for things going down the stack but C wants to have args
 ;; indexed in the positive direction.

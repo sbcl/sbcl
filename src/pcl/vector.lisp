@@ -920,11 +920,11 @@
   '(values %method-name %method-lambda-list
     optimize ftype inline notinline))
 
-(defvar *var-declarations-with-argument*
+(defvar *var-declarations-with-arg*
   '(%class
     type))
 
-(defvar *var-declarations-without-argument*
+(defvar *var-declarations-without-arg*
   '(ignore
     ignorable special dynamic-extent
     ;; FIXME: Possibly this entire list and variable could go away.
@@ -956,10 +956,10 @@
 		    (push `(declare ,form) outer-decls)
 		    (let ((arg-p
 			   (member declaration-name
-				   *var-declarations-with-argument*))
+				   *var-declarations-with-arg*))
 			  (non-arg-p
 			   (member declaration-name
-				   *var-declarations-without-argument*))
+				   *var-declarations-without-arg*))
 			  (dname (list (pop form)))
 			  (inners nil) (outers nil))
 		      (unless (or arg-p non-arg-p)
@@ -978,10 +978,9 @@
 			      declaration-name 'split-declarations
 			      declaration-name
 			      '*non-var-declarations*
-			      '*var-declarations-with-argument*
-			      '*var-declarations-without-argument*)
-			(push declaration-name
-			      *var-declarations-without-argument*))
+			      '*var-declarations-with-arg*
+			      '*var-declarations-without-arg*)
+			(push declaration-name *var-declarations-without-arg*))
 		      (when arg-p
 			(setq dname (append dname (list (pop form)))))
 		      (dolist (var form)

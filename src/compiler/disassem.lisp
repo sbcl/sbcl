@@ -298,8 +298,8 @@
 (defvar *disassem-arg-types* nil)
 (defvar *disassem-fun-cache* (make-fun-cache))
 
-(defstruct (argument (:conc-name arg-)
-		     (:copier nil))
+(defstruct (arg (:copier nil)
+		(:predicate nil))
   (name nil :type symbol)
   (fields nil :type list)
 
@@ -584,7 +584,7 @@
       fields, they are all sign-extended.
 
   :TYPE arg-type-name
-      Inherit any properties of the given argument-type.
+      Inherit any properties of the given argument type.
 
   :PREFILTER function
       A function which is called (along with all other prefilters, in the
@@ -666,7 +666,7 @@
   (let* ((arg-pos (position arg-name args :key #'arg-name))
          (arg
           (if (null arg-pos)
-              (let ((arg (make-argument :name arg-name)))
+              (let ((arg (make-arg :name arg-name)))
                 (if (null args)
                     (setf args (list arg))
                     (push arg (cdr (last args))))
@@ -816,39 +816,38 @@
                (car (push (cons kind nil) (cdr this-arg-temps))))))
       (setf (cdr this-kind-temps) (cons vars forms)))))
 
-(defmacro define-argument-type (name &rest args)
-  #!+sb-doc
-  "DEFINE-ARGUMENT-TYPE Name {Key Value}*
-  Define a disassembler argument type NAME (which can then be referenced in
-  another argument definition using the :TYPE argument). &KEY args are:
-
-  :SIGN-EXTEND boolean
-      If non-NIL, the raw value of this argument is sign-extended.
-
-  :TYPE arg-type-name
-      Inherit any properties of given argument-type.
-
-  :PREFILTER function
-      A function which is called (along with all other prefilters, in the
-      order that their arguments appear in the instruction- format) before
-      any printing is done, to filter the raw value. Any uses of READ-SUFFIX
-      must be done inside a prefilter.
-
-  :PRINTER function-string-or-vector
-      A function, string, or vector which is used to print an argument of
-      this type.
-
-  :USE-LABEL
-      If non-NIL, the value of an argument of this type is used as an
-      address, and if that address occurs inside the disassembled code, it is
-      replaced by a label. If this is a function, it is called to filter the
-      value."
+;;; DEFINE-ARG-TYPE Name {Key Value}*
+;;;
+;;; Define a disassembler argument type NAME (which can then be referenced in
+;;; another argument definition using the :TYPE argument). &KEY args are:
+;;;
+;;;  :SIGN-EXTEND boolean
+;;;     If non-NIL, the raw value of this argument is sign-extended.
+;;;
+;;;  :TYPE arg-type-name
+;;;     Inherit any properties of given arg-type.
+;;; 
+;;; :PREFILTER function
+;;;     A function which is called (along with all other prefilters,
+;;;     in the order that their arguments appear in the instruction-
+;;;     format) before any printing is done, to filter the raw value.
+;;;     Any uses of READ-SUFFIX must be done inside a prefilter.
+;;; 
+;;; :PRINTER function-string-or-vector
+;;;     A function, string, or vector which is used to print an argument of
+;;;     this type.
+;;; 
+;;; :USE-LABEL
+;;;     If non-NIL, the value of an argument of this type is used as
+;;;     an address, and if that address occurs inside the disassembled
+;;;     code, it is replaced by a label. If this is a function, it is
+;;;     called to filter the value.
+(defmacro define-arg-type (name &rest args)
   (gen-arg-type-def-form name args))
 
+;;; Generate a form to define a disassembler argument type. See
+;;; DEFINE-ARG-TYPE for more information.
 (defun gen-arg-type-def-form (name args &optional (evalp t))
-  #!+sb-doc
-  "Generate a form to define a disassembler argument type. See
-  DEFINE-ARGUMENT-TYPE for more info."
   (multiple-value-bind (args wrapper-defs)
       (munge-fun-refs args evalp t name)
     `(progn

@@ -189,64 +189,64 @@
 
 ;;;; disassembler argument types
 
-(sb!disassem:define-argument-type displacement
+(sb!disassem:define-arg-type displacement
   :sign-extend t
   :use-label #'offset-next
   :printer (lambda (value stream dstate)
 	     (sb!disassem:maybe-note-assembler-routine value nil dstate)
 	     (print-label value stream dstate)))
 
-(sb!disassem:define-argument-type accum
+(sb!disassem:define-arg-type accum
   :printer (lambda (value stream dstate)
 	     (declare (ignore value)
 		      (type stream stream)
 		      (type sb!disassem:disassem-state dstate))
 	     (print-reg 0 stream dstate)))
 
-(sb!disassem:define-argument-type word-accum
+(sb!disassem:define-arg-type word-accum
   :printer (lambda (value stream dstate)
 	     (declare (ignore value)
 		      (type stream stream)
 		      (type sb!disassem:disassem-state dstate))
 	     (print-word-reg 0 stream dstate)))
 
-(sb!disassem:define-argument-type reg
+(sb!disassem:define-arg-type reg
   :printer #'print-reg)
 
-(sb!disassem:define-argument-type addr-reg
+(sb!disassem:define-arg-type addr-reg
   :printer #'print-addr-reg)
 
-(sb!disassem:define-argument-type word-reg
+(sb!disassem:define-arg-type word-reg
   :printer #'print-word-reg)
 
-(sb!disassem:define-argument-type imm-addr
+(sb!disassem:define-arg-type imm-addr
   :prefilter #'read-address
   :printer #'print-label)
 
-(sb!disassem:define-argument-type imm-data
+(sb!disassem:define-arg-type imm-data
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (sb!disassem:read-suffix
 		(width-bits (sb!disassem:dstate-get-prop dstate 'width))
 		dstate)))
 
-(sb!disassem:define-argument-type signed-imm-data
+(sb!disassem:define-arg-type signed-imm-data
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (let ((width (sb!disassem:dstate-get-prop dstate 'width)))
 		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
 
-(sb!disassem:define-argument-type signed-imm-byte
+(sb!disassem:define-arg-type signed-imm-byte
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (sb!disassem:read-signed-suffix 8 dstate)))
 
-(sb!disassem:define-argument-type signed-imm-dword
+(sb!disassem:define-arg-type signed-imm-dword
   :prefilter (lambda (value dstate)
 	       (declare (ignore value))	; always nil anyway
 	       (sb!disassem:read-signed-suffix 32 dstate)))
 
-(sb!disassem:define-argument-type imm-word
+(sb!disassem:define-arg-type imm-word
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (let ((width
@@ -255,20 +255,20 @@
 		 (sb!disassem:read-suffix (width-bits width) dstate))))
 
 ;;; needed for the ret imm16 instruction
-(sb!disassem:define-argument-type imm-word-16
+(sb!disassem:define-arg-type imm-word-16
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (sb!disassem:read-suffix 16 dstate)))
 
-(sb!disassem:define-argument-type reg/mem
+(sb!disassem:define-arg-type reg/mem
   :prefilter #'prefilter-reg/mem
   :printer #'print-reg/mem)
-(sb!disassem:define-argument-type sized-reg/mem
+(sb!disassem:define-arg-type sized-reg/mem
   ;; Same as reg/mem, but prints an explicit size indicator for
   ;; memory references.
   :prefilter #'prefilter-reg/mem
   :printer #'print-sized-reg/mem)
-(sb!disassem:define-argument-type byte-reg/mem
+(sb!disassem:define-arg-type byte-reg/mem
   :prefilter #'prefilter-reg/mem
   :printer #'print-byte-reg/mem)
 
@@ -282,11 +282,11 @@
   (declare (ignore dstate))
   value)
 ) ; EVAL-WHEN
-(sb!disassem:define-argument-type fp-reg
-				  :prefilter #'prefilter-fp-reg
-				  :printer #'print-fp-reg)
+(sb!disassem:define-arg-type fp-reg
+			     :prefilter #'prefilter-fp-reg
+			     :printer #'print-fp-reg)
 
-(sb!disassem:define-argument-type width
+(sb!disassem:define-arg-type width
   :prefilter #'prefilter-width
   :printer (lambda (value stream dstate)
 	     (if;; (zerop value)
@@ -330,7 +330,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf sb!assem:*assem-scheduler-p* nil))
 
-(sb!disassem:define-argument-type condition-code
+(sb!disassem:define-arg-type condition-code
   :printer *condition-name-vec*)
 
 (defun conditional-opcode (condition)

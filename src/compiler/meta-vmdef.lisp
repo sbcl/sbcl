@@ -226,16 +226,17 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *sc-vop-slots*
     '((:move . sc-move-vops)
-      (:move-argument . sc-move-arg-vops))))
+      (:move-arg . sc-move-arg-vops))))
 
+;;; Make NAME be the VOP used to move values in the specified FROM-SCs
+;;; to the representation of the TO-SCs of each SC pair in SCS.
+;;;
+;;; If KIND is :MOVE-ARG, then the VOP takes an extra argument,
+;;; which is the frame pointer of the frame to move into.
+;;;
 ;;; We record the VOP and costs for all SCs that we can move between
 ;;; (including implicit loading).
 (defmacro define-move-vop (name kind &rest scs)
-  #!+sb-doc
-  "Define-Move-VOP Name {:Move | :Move-Argument} {(From-SC*) (To-SC*)}*
-  Make Name be the VOP used to move values in the specified From-SCs to the
-  representation of the To-SCs. If kind is :Move-Argument, then the VOP takes
-  an extra argument, which is the frame pointer of the frame to move into."
   (when (or (oddp (length scs)) (null scs))
     (error "malformed SCs spec: ~S" scs))
   (let ((accessor (or (cdr (assoc kind *sc-vop-slots*))
@@ -421,7 +422,7 @@
   (ltn-policy :fast :type ltn-policy)
   ;; stuff used by life analysis
   (save-p nil :type (member t nil :compute-only :force-to-stack))
-  ;; info about how to emit move-argument VOPs for the more operand in
+  ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return)))
 (defprinter (vop-parse)

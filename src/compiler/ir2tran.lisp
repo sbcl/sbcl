@@ -396,7 +396,7 @@
   (declare (type unsigned-byte n))
   (collect ((res))
     (dotimes (i n)
-      (res (standard-argument-location i)))
+      (res (standard-arg-location i)))
     (res)))
 
 ;;; Return a list of TNs wired to the standard value passing
@@ -869,7 +869,7 @@
 	(last nil)
 	(first nil))
     (dotimes (num (length args))
-      (let ((loc (standard-argument-location num)))
+      (let ((loc (standard-arg-location num)))
 	(emit-move node block (continuation-tn node block (elt args num)) loc)
 	(let ((ref (reference-tn loc nil)))
 	  (if last
@@ -914,7 +914,7 @@
       (let ((last nil)
 	    (first nil))
 	(dotimes (num nargs)
-	  (locs (standard-argument-location num))
+	  (locs (standard-arg-location num))
 	  (let ((ref (reference-tn (continuation-tn node block (elt args num))
 				   nil)))
 	    (if last
@@ -1086,7 +1086,7 @@
 		     (leaf-info (first vars))))
 	(dolist (arg (rest vars))
 	  (when (leaf-refs arg)
-	    (let ((pass (standard-argument-location n))
+	    (let ((pass (standard-arg-location n))
 		  (home (leaf-info arg)))
 	      (if (lambda-var-indirect arg)
 		  (do-make-value-cell node block pass home)
@@ -1478,7 +1478,7 @@
 		   (length locs))
 	     (move-continuation-result node block locs cont))))
       (:unwind-protect
-       (let ((block-loc (standard-argument-location 0)))
+       (let ((block-loc (standard-arg-location 0)))
 	 (vop uwp-entry node block target block-loc start-loc count-loc)
 	 (move-continuation-result
 	  node block

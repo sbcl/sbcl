@@ -180,7 +180,7 @@
     make-call-out-tns
 
     ;; from call.lisp
-    standard-argument-location
+    standard-arg-location
     make-return-pc-passing-location
     make-old-fp-passing-location
     make-old-fp-save-location

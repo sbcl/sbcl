@@ -1,20 +1,9 @@
 #!/bin/sh
 
-# ("smooth duct tape: the mark of a true craftsman":-)
-
 # a quick and dirty way of partially rebuilding the system after a
 # change
 #
-# This script is not a reliable way to build the system, but it is
-# fast.:-| It can be useful if you are trying to debug a low-level
-# problem, e.g. a problem in src/runtime/*.c or in
-# src/code/cold-init.lisp, and you find yourself wanting to make a
-# small change and test it without going through the entire
-# build-the-system-from-scratch cycle.
-#
-# You probably don't want to be using this script unless you
-# understand the system build process well enough to be able to guess
-# when it won't work.
+# ("smooth duct tape: the mark of a true craftsman":-)
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -24,6 +13,49 @@
 # public domain. The software is in the public domain and is
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
+
+#######################################################################
+# You probably don't want to be using this script unless you
+# understand the ordinary system build process pretty well already.
+#
+# This script is not a reliable way to build the system, but it is
+# fast.:-| It can be useful if you are trying to debug a low-level
+# problem, e.g. a problem in src/runtime/*.c or in
+# src/code/cold-init.lisp. Soon, you'll find yourself wanting to 
+# test a small change in a file compiled into cold-sbcl.core without
+# redoing the entire rebuild-the-system-from-scratch process. You may be
+# able to avoid a complete make-host-2.sh by just letting this script
+# rebuild only files that have changed. On the other hand, it might
+# not work...
+#
+# It's not anywhere rigorously correct for all small changes, much
+# less for all large changes. It can't be, unless we either solve the
+# halting problem or totally rearchitect the SBCL sources to support
+# incremental recompilation. Beyond that fundamental limitation, even
+# an easy special case might not work unless someone's paid attention
+# to making it work. Here are some highlights to help you understand
+# when it will work:
+#  * It will rebuild a .fasl file when the corresponding
+#    .lisp file is out of date.
+#  * It rebuilds the src/runtime/ files completely, since that
+#    doesn't take very long anyway.
+#  * Apparently it will not rebuild assembly-code-in-.lisp files
+#    even when the sources are out of date. This is probably not a
+#    fundamental limitation, it's just that I (WHN 2002-01-16)
+#    have made vanishingly nontrivial changes to assembler files,
+#    so I'm not motivated. If you're motivated, please send a patch.
+#  * It will not notice when you change something in one .lisp file
+#    which should affect the compilation of code in another .lisp
+#    file. E.g.
+#    ** changing the definition of a macro used in another file (or a
+#       function or a variable which is used at macroexpansion time)
+#    ** changing the value of a DEFCONSTANT used in another file
+#    ** changing the layout of a structure used in another file
+#    ** changing the PROCLAIMed type of something used in another
+#       file
+#    Mostly it looks as though such limitations aren't fixable without
+#    the aforementioned rearchitecting or solving the halting problem.
+#######################################################################
 
 if [ "" != "$*" ]; then
     echo no command line arguments supported in this version of slam

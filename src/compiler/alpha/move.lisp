@@ -97,14 +97,14 @@
   (any-reg descriptor-reg zero null)
   (any-reg descriptor-reg))
 
-;;; Make Move the check VOP for T so that type check generation
+;;; Make MOVE the check VOP for T so that type check generation
 ;;; doesn't think it is a hairy type. This also allows checking of a
 ;;; few of the values in a continuation to fall out.
 (primitive-type-vop move (:check) t)
 
-;;; The Move-Argument VOP is used for moving descriptor values into
+;;; The MOVE-ARG VOP is used for moving descriptor values into
 ;;; another frame for argument or known value passing.
-(define-vop (move-argument)
+(define-vop (move-arg)
   (:args (x :target y
 	    :scs (any-reg descriptor-reg null zero))
 	 (fp :scs (any-reg)
@@ -117,7 +117,7 @@
       (control-stack
        (storew x fp (tn-offset y))))))
 ;;;
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (any-reg descriptor-reg null zero)
   (any-reg descriptor-reg))
 
@@ -298,7 +298,7 @@
   (signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
 ;;; Move untagged number arguments/return-values.
-(define-vop (move-word-argument)
+(define-vop (move-word-arg)
   (:args (x :target y
 	    :scs (signed-reg unsigned-reg))
 	 (fp :scs (any-reg)
@@ -312,11 +312,11 @@
       ((signed-stack unsigned-stack)
        (storeq x fp (tn-offset y))))))
 ;;;
-(define-move-vop move-word-argument :move-argument
+(define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
 
-;;; Use standard MOVE-ARGUMENT + coercion to move an untagged number
+;;; Use standard MOVE-ARG + coercion to move an untagged number
 ;;; to a descriptor passing location.
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (signed-reg unsigned-reg) (any-reg descriptor-reg))

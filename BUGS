@@ -1070,25 +1070,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
        (bar x)))
   shouldn't compile without error (because of the extra DEFMACRO symbol).
 
-130:
-  reported by Alexey Dejneka on sbcl-devel 2001-11-03
-   (defun x (x)
-     "Return X if X is a non-negative integer."
-     (let ((step (lambda (%funcall)
-                   (lambda (n)
-                     (cond ((= n 0) 0)
-                           (t (1+ (funcall %funcall (1- n)))))))))
-       (funcall
-        ((lambda (a)
-           (funcall step (lambda (n)
-                           (funcall (funcall a a) n))))
-         (lambda (a)
-           (funcall step (lambda (n)
-                           (funcall (funcall a a) n)))))
-        x)))
-  This function returns its argument. But after removing percents it
-  does not work: "Result of (1- n) is not a function".
-
 131:
   As of sbcl-0.pre7.86.flaky7.3, the cross-compiler, and probably 
   the CL:COMPILE function (which is based on the same %COMPILE 

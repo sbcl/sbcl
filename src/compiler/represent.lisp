@@ -175,7 +175,7 @@
 
 (defun bad-move-arg-error (val pass)
   (declare (type tn val pass))
-  (error "no :MOVE-ARGUMENT VOP defined to move ~S (SC ~S) to ~
+  (error "no :MOVE-ARG VOP defined to move ~S (SC ~S) to ~
 	  ~S (SC ~S)"
 	 val (sc-name (tn-sc val))
 	 pass (sc-name (tn-sc pass))))
@@ -382,7 +382,7 @@
 
 ;;; Find a move VOP to move from the operand OP-TN to some other
 ;;; representation corresponding to OTHER-SC and OTHER-PTYPE. SLOT is
-;;; the SC slot that we grab from (move or move-argument). WRITE-P
+;;; the SC slot that we grab from (move or move-arg). WRITE-P
 ;;; indicates that OP is a VOP result, so OP is the move result and
 ;;; other is the arg, otherwise OP is the arg and other is the result.
 ;;;

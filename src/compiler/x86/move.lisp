@@ -89,18 +89,18 @@
   (any-reg descriptor-reg immediate)
   (any-reg descriptor-reg))
 
-;;; Make Move the check VOP for T so that type check generation
+;;; Make MOVE the check VOP for T so that type check generation
 ;;; doesn't think it is a hairy type. This also allows checking of a
 ;;; few of the values in a continuation to fall out.
 (primitive-type-vop move (:check) t)
 
-;;; The Move-Argument VOP is used for moving descriptor values into
+;;; The MOVE-ARG VOP is used for moving descriptor values into
 ;;; another frame for argument or known value passing.
 ;;;
 ;;; Note: It is not going to be possible to move a constant directly
 ;;; to another frame, except if the destination is a register and in
 ;;; this case the loading works out.
-(define-vop (move-argument)
+(define-vop (move-arg)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
 	    :load-if (not (and (sc-is y any-reg descriptor-reg)
 			       (sc-is x control-stack))))
@@ -155,7 +155,7 @@
 	   ;; Lisp stack
 	   (storew x fp (- (1+ (tn-offset y))))))))))
 
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
   (any-reg descriptor-reg))
 
@@ -400,7 +400,7 @@
   (signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
 ;;; Move untagged number arguments/return-values.
-(define-vop (move-word-argument)
+(define-vop (move-word-arg)
   (:args (x :scs (signed-reg unsigned-reg) :target y)
 	 (fp :scs (any-reg) :load-if (not (sc-is y sap-reg))))
   (:results (y))
@@ -413,10 +413,10 @@
        (if (= (tn-offset fp) esp-offset)
 	   (storew x fp (tn-offset y))	; c-call
 	   (storew x fp (- (1+ (tn-offset y)))))))))
-(define-move-vop move-word-argument :move-argument
+(define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
-;;; Use standard MOVE-ARGUMENT and coercion to move an untagged number
+;;; Use standard MOVE-ARG and coercion to move an untagged number
 ;;; to a descriptor passing location.
-(define-move-vop move-argument :move-argument
+(define-move-vop move-arg :move-arg
   (signed-reg unsigned-reg) (any-reg descriptor-reg))

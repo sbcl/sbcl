@@ -594,10 +594,10 @@
   ;; info for automatic emission of move-arg VOPs by representation
   ;; selection. If NIL, then do nothing special. If non-null, then
   ;; there must be a more arg. Each more arg is moved to its passing
-  ;; location using the appropriate representation-specific
-  ;; move-argument VOP. The first (fixed) argument must be the
-  ;; control-stack frame pointer for the frame to move into. The first
-  ;; info arg is the list of passing locations.
+  ;; location using the appropriate representation-specific MOVE-ARG
+  ;; VOP. The first (fixed) argument must be the control-stack frame
+  ;; pointer for the frame to move into. The first info arg is the
+  ;; list of passing locations.
   ;;
   ;; Additional constraints depend on the value:
   ;;
