@@ -56,12 +56,12 @@
 (defconstant least-negative-short-float least-negative-single-float)
 (defconstant least-positive-double-float (double-from-bits 0 0 1))
 #!-long-float
-(defconstant least-positive-long-float least-positive-double-float)
+(defconstant least-positive-long-float (double-from-bits 0 0 1))
 #!+(and long-float x86)
 (defconstant least-positive-long-float (long-from-bits 0 0 1))
 (defconstant least-negative-double-float (double-from-bits 1 0 1))
 #!-long-float
-(defconstant least-negative-long-float least-negative-double-float)
+(defconstant least-negative-long-float (double-from-bits 1 0 1))
 #!+(and long-float x86)
 (defconstant least-negative-long-float (long-from-bits 1 0 1))
 

@@ -91,11 +91,6 @@
 
 (defoptimizer (aref derive-type) ((array &rest indices) node)
   (assert-array-rank array (length indices))
-  ;; If the node continuation has a single use then assert its type.
-  (let ((cont (node-cont node)))
-    (when (= (length (find-uses cont)) 1)
-      (assert-continuation-type cont (extract-upgraded-element-type array)
-                                (lexenv-policy (node-lexenv node)))))
   (extract-upgraded-element-type array))
 
 (defoptimizer (%aset derive-type) ((array &rest stuff))

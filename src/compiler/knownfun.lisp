@@ -63,6 +63,9 @@
   unsafely-flushable
   ;; may be moved with impunity. Has no side effects except possibly
   ;; consing, and is affected only by its arguments.
+  ;;
+  ;; Since it is not used now, its distribution in fndb.lisp is
+  ;; mere random; use with caution.
   movable
   ;; The function is a true predicate likely to be open-coded. Convert
   ;; any non-conditional uses into (IF <pred> T NIL). Not usually

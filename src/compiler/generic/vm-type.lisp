@@ -43,6 +43,9 @@
   #!-long-float `(integer 0 ,sb!vm:double-float-digits)
   #!+long-float `(integer 0 ,sb!vm:long-float-digits))
 (sb!xc:deftype float-radix () '(integer 2 2))
+(sb!xc:deftype float-int-exponent ()
+  #!-long-float 'double-float-int-exponent
+  #!+long-float 'long-float-int-exponent)
 
 ;;; a code for BOOLE
 (sb!xc:deftype boole-code () '(unsigned-byte 4))

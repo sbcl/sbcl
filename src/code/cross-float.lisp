@@ -214,13 +214,18 @@
     ;; IEEE float special cases
     ((zerop bits) 0.0)
     ((= bits #x-80000000) -0.0)
-    (t (let ((sign (ecase (ldb (byte 1 31) bits)
-		     (0  1.0)
-		     (1 -1.0)))
-	     (expt (- (ldb (byte 8 23) bits) 127))
-	     (mant (* (logior (ldb (byte 23 0) bits)
-			      (ash 1 23))
-		      (expt 0.5 23))))
+    (t (let* ((sign (ecase (ldb (byte 1 31) bits)
+                      (0  1.0)
+                      (1 -1.0)))
+              (iexpt (ldb (byte 8 23) bits))
+              (expt (if (zerop iexpt) ; denormalized
+                        -126
+                        (- iexpt 127)))
+              (mant (* (logior (ldb (byte 23 0) bits)
+                               (if (zerop iexpt)
+                                   0
+                                   (ash 1 23)))
+                       (expt 0.5 23))))
 	 (* sign (kludge-opaque-expt 2.0 expt) mant)))))
 
 (defun make-double-float (hi lo)
@@ -232,9 +237,14 @@
 	      (sign (ecase (ldb (byte 1 63) bits)
 		      (0  1.0d0)
 		      (1 -1.0d0)))
-	      (expt (- (ldb (byte 11 52) bits) 1023))
+              (iexpt (ldb (byte 11 52) bits))
+	      (expt (if (zerop iexpt) ; denormalized
+                        -1022
+                        (- iexpt 1023)))
 	      (mant (* (logior (ldb (byte 52 0) bits)
-			       (ash 1 52))
+			       (if (zerop iexpt)
+                                   0
+                                   (ash 1 52)))
 		       (expt 0.5d0 52))))
 	 (* sign (kludge-opaque-expt 2.0d0 expt) mant)))))
 

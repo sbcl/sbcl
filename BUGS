@@ -1058,6 +1058,9 @@ WORKAROUND:
                (list x y)))
         (funcall (eval #'foo) 1)))
 
+269:
+  SCALE-FLOAT should accept any integer for its second argument.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

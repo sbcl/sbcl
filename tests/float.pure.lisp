@@ -52,3 +52,15 @@
 (assert (typep (nth-value 1 (ignore-errors
                               (funcall (fdefinition 'float-radix) "notfloat")))
                'type-error))
+
+;;; Before 0.8.2.14 the cross compiler failed to work with
+;;; denormalized numbers
+(when (subtypep 'single-float 'short-float)
+  (assert (eql least-positive-single-float least-positive-short-float)))
+
+#+nil ; bug 269
+(let ((f (eval 'least-positive-double-float)))
+  (assert (eql (multiple-value-bind (signif expon sign)
+                   (integer-decode-float f)
+                 (scale-float (float signif f) expon))
+               f)))

@@ -342,7 +342,7 @@
 (defknown decode-float (float) (values float float-exponent float)
   (movable foldable flushable explicit-check))
 (defknown scale-float (float float-exponent) float
-  (movable foldable flushable explicit-check))
+  (movable foldable unsafely-flushable explicit-check))
 (defknown float-radix (float) float-radix
   (movable foldable flushable explicit-check))
 (defknown float-sign (float &optional float) float
@@ -350,7 +350,7 @@
 (defknown (float-digits float-precision) (float) float-digits
   (movable foldable flushable explicit-check))
 (defknown integer-decode-float (float)
-	  (values integer float-exponent (member -1 1))
+	  (values integer float-int-exponent (member -1 1))
 	  (movable foldable flushable explicit-check))
 
 (defknown complex (real &optional real) number
