@@ -968,30 +968,6 @@ bootstrapping.
 		  +slot-unbound+)))))
     (function
      (apply emf args))))
-
-;; KLUDGE: A comment from the original PCL said "This can be improved alot."
-(defun gf-make-function-from-emf (gf emf)
-  (etypecase emf
-    (fast-method-call (let* ((arg-info (gf-arg-info gf))
-			     (nreq (arg-info-number-required arg-info))
-			     (restp (arg-info-applyp arg-info)))
-			(lambda (&rest args)
-			  (trace-emf-call emf t args)
-			  (apply (fast-method-call-function emf)
-				 (fast-method-call-pv-cell emf)
-				 (fast-method-call-next-method-call emf)
-				 (if restp
-				     (let* ((rest-args (nthcdr nreq args))
-					    (req-args (ldiff args
-							     rest-args)))
-				       (nconc req-args rest-args))
-				     args)))))
-    (method-call (lambda (&rest args)
-		   (trace-emf-call emf t args)
-		   (apply (method-call-function emf)
-			  args
-			  (method-call-call-method-args emf))))
-    (function emf)))
 
 (defmacro bind-fast-lexical-method-macros ((args rest-arg next-method-call)
 					   &body body)

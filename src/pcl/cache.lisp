@@ -468,13 +468,6 @@
 		((invalid-wrapper-p nwrapper)
 		 (error "wrapper returned from trap invalid")))
 	  nwrapper))))
-
-(defmacro check-wrapper-validity1 (object)
-  (let ((owrapper (gensym)))
-    `(let ((,owrapper (sb-kernel:layout-of object)))
-       (if (sb-kernel:layout-invalid ,owrapper)
-	   (check-wrapper-validity ,object)
-	   ,owrapper))))
 
 (defvar *free-caches* nil)
 
