@@ -11,6 +11,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
     Euler)
   * optimization: sequence traversal functions use their freedom to
     coerce function designators to functions.
+  * optimization: code with many calls to CLOS methods specialized on
+    CLOS classes has had redundant type checks removed.
   * fixed some bugs related to Unicode integration:
     ** portions of multibyte characters at the end of buffers for
        character-based file input are correctly transferred to the

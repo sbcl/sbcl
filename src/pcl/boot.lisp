@@ -614,23 +614,28 @@ bootstrapping.
 	 ;; Otherwise, we can usually make Python very happy.
 	 (let ((type (info :type :kind specializer)))
 	   (ecase type
-	     ((:primitive :defined :instance :forthcoming-defclass-type)
-	      `(type ,specializer ,parameter))
-	     ((nil)
+	     ((:primitive) `(type ,specializer ,parameter))
+	     ((:instance nil)
 	      (let ((class (find-class specializer nil)))
-		(if class
-		    `(type ,(class-name class) ,parameter)
-		    (progn
-		      ;; we can get here, and still not have a failure
-		      ;; case, by doing MOP programming like (PROGN
-		      ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
-		      ;; ...)).  Best to let the user know we haven't
-		      ;; been able to extract enough information:
-		      (style-warn
-		       "~@<can't find type for presumed class ~S in ~S.~@:>"
-		       specializer
-		       'parameter-specializer-declaration-in-defmethod)
-		      '(ignorable))))))))))
+		(cond
+		  (class
+		   (if (typep class '(or built-in-class structure-class))
+		       `(type ,specializer ,parameter)
+		       ;; don't declare CLOS classes as parameters;
+		       ;; it's too expensive.
+		       '(ignorable)))
+		  (t
+		   ;; we can get here, and still not have a failure
+		   ;; case, by doing MOP programming like (PROGN
+		   ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
+		   ;; ...)).  Best to let the user know we haven't
+		   ;; been able to extract enough information:
+		   (style-warn
+		    "~@<can't find type for presumed class ~S in ~S.~@:>"
+		    specializer
+		    'parameter-specializer-declaration-in-defmethod)
+		   '(ignorable)))))
+	     ((:forthcoming-defclass-type) '(ignorable)))))))
 
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
