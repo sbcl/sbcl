@@ -383,6 +383,20 @@
   (assert (= 1 (length subs)))
   (assert (eq (car subs) (find-class 'bug-331-sub))))
 
+;;; detection of multiple class options in defclass, reported by Bruno Haible
+(defclass option-class (standard-class)
+  ((option :accessor cl-option :initarg :my-option)))
+(defmethod sb-pcl:validate-superclass ((c1 option-class) (c2 standard-class))
+  t)
+(multiple-value-bind (result error)
+    (ignore-errors (eval '(defclass option-class-instance ()
+                           ()
+                           (:my-option bar)
+                           (:my-option baz)
+                           (:metaclass option-class))))
+  (assert (not result))
+  (assert error))
+                         
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

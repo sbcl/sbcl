@@ -10,6 +10,9 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
     (backtraces from throws to unknown catch tags.)
   * bug fix: lambda-list parsing is now stricter vrt. order and number
     of lambda-list keywords.
+  * bug fix: as specified by AMOP, an error is signalled if a
+    class-option appears multiple times in a DEFCLASS form. (reported
+    by Bruno Haible)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** INCF, DECF and REMF evaluate their place form as specified in
        CLtS 5.1.3.

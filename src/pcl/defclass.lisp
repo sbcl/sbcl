@@ -117,21 +117,21 @@
                  ,defclass-form))))))))
 
 (defun canonize-defclass-options (class-name options)
-  (macrolet ((assert-single (option)
-               `(when ,option
-                  (error "Multiple ~A options in DEFCLASS ~S."
-                         ,(intern (string option) :keyword)
-                         class-name))))
-    (let (metaclass 
-          default-initargs
-          documentation
-          canonized-options)
+  (maplist (lambda (sublist)
+             (let ((option-name (first (pop sublist))))
+               (when (member option-name sublist :key #'first)
+                 (error "Multiple ~S options in DEFCLASS ~S." 
+                        option-name class-name))))
+           options)
+  (let (metaclass 
+        default-initargs
+        documentation
+        canonized-options)
       (dolist (option options)
         (unless (listp option)
           (error "~S is not a legal defclass option." option))
         (case (first option)
           (:metaclass 
-           (assert-single metaclass)
            (let ((maybe-metaclass (second option)))
              (unless (and maybe-metaclass (legal-class-name-p maybe-metaclass))
                (error "~@<The value of the :metaclass option (~S) ~
@@ -139,14 +139,13 @@
                       maybe-metaclass))
              (setf metaclass maybe-metaclass)))
           (:default-initargs
-           (assert-single default-initargs)
            (let (initargs arg-names)
              (doplist (key val) (cdr option)
                (when (member key arg-names)
                  (error 'simple-program-error 
                         :format-control "~@<Duplicate initialization argument ~
-                                         name ~S in :DEFAULT-INITARGS of ~
-                                         DEFCLASS ~S.~:>" 
+                                           name ~S in :DEFAULT-INITARGS of ~
+                                           DEFCLASS ~S.~:>" 
                         :format-arguments (list key class-name)))
                (push key arg-names)
                (push ``(,',key ,,(make-initfunction val) ,',val) initargs))
@@ -154,14 +153,13 @@
              (push `(:direct-default-initargs (list ,@(nreverse initargs))) 
                    canonized-options)))
           (:documentation
-           (assert-single documentation)
            (unless (stringp (second option))
              (error "~S is not a legal :documentation value" (second option)))
            (setf documentation t)
            (push `(:documentation ,(second option)) canonized-options))
           (otherwise
            (push `(',(car option) ',(cdr option)) canonized-options))))
-      (values (or metaclass 'standard-class) (nreverse canonized-options)))))
+      (values (or metaclass 'standard-class) (nreverse canonized-options))))
 
 (defun canonize-defclass-slots (class-name slots env)
   (let (canonized-specs)
