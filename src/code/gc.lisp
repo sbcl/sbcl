@@ -52,14 +52,14 @@
 (defun control-stack-usage ()
   #!-stack-grows-downward-not-upward
   (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-     sb!vm:control-stack-start)
+     (sb!vm:fixnumize sb!vm::*control-stack-start*))
   #!+stack-grows-downward-not-upward
-  (- sb!vm:control-stack-end
+  (- (sb!vm:fixnumize sb!vm::*control-stack-end*)
      (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()
   (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
-     sb!vm:binding-stack-start))
+     (sb!vm:fixnumize sb!vm::*binding-stack-start*)))
 
 ;;;; ROOM
 
@@ -69,6 +69,9 @@
   (format t "Static space usage is:    ~10:D bytes.~%" (static-space-usage))
   (format t "Control stack usage is:   ~10:D bytes.~%" (control-stack-usage))
   (format t "Binding stack usage is:   ~10:D bytes.~%" (binding-stack-usage))
+  #!+sb-thread
+  (format t 
+	  "Control and binding stack usage is for the current thread only.~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
 	  (> *gc-inhibit* 0)))
 
