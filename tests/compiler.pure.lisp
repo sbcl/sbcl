@@ -1554,3 +1554,47 @@
 	  tag2)
 	 0)))
    3021871717588 -866608 -2 -17194)))
+
+;;; MISC.436, 438: lost reoptimization
+(assert (zerop (funcall
+   (compile
+    nil
+    '(lambda (a b)
+       (declare (type (integer -2917822 2783884) a))
+       (declare (type (integer 0 160159) b))
+       (declare (ignorable a b))
+       (declare
+	(optimize (compilation-speed 1)
+		  (speed 3)
+		  (safety 3)
+		  (space 0)
+		  ; #+sbcl (sb-c:insert-step-conditions 0)
+		  (debug 0)))
+       (if
+	   (oddp
+	    (loop for
+		  lv1
+		  below
+		  2
+		  count
+		  (logbitp 0
+			   (1-
+			    (ash b
+				 (min 8
+				      (count 0
+					     '(-10197561 486 430631291
+							 9674068))))))))
+	   b
+	 0)))
+   1265797 110757)))
+
+(assert (zerop (funcall
+   (compile
+    nil
+    ' (lambda (a)
+	(declare (type (integer 0 1696) a))
+	; (declare (ignorable a))
+	(declare (optimize (space 2) (debug 0) (safety 1)
+		   (compilation-speed 0) (speed 1)))
+	(if (logbitp 0 (ash (1- a) (min 11 a))) 0 0)))
+   805)))
