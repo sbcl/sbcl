@@ -601,8 +601,8 @@
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-variables definitions 'labels)
-      (let* (;; dummy LABELS function vars, to be used during
-             ;; conversion of real LABELS functions
+      (let* (;; dummy LABELS functions, to be used as placeholders
+             ;; during construction of real LABELS functions
 	     (placeholder-funs (mapcar (lambda (name)
 					 (make-functional
 					  :%source-name name
@@ -610,24 +610,22 @@
 							"LABELS placeholder ~S"
 							name)))
 				       names))
-	     (placeholder-fenv (pairlis names placeholder-funs))
              ;; the real LABELS functions, compiled in a LEXENV which
              ;; includes the dummy LABELS functions
 	     (real-funs
-	      (let ((*lexenv* (make-lexenv :functions placeholder-fenv)))
-		(mapcar (lambda (n d)
-			  (ir1-convert-lambda d
-					      :source-name n
+	      (let ((*lexenv* (make-lexenv
+			       :functions (pairlis names placeholder-funs))))
+		(mapcar (lambda (name def)
+			  (ir1-convert-lambda def
+					      :source-name name
 					      :debug-name (debug-namify
-							   "LABELS ~S" n)))
+							   "LABELS ~S" name)))
 			names defs))))
 
         ;; Modify all the references to the dummy function leaves so
         ;; that they point to the real function leaves.
-	(loop for real-fun in real-funs and envpair in placeholder-fenv do
-	      (let ((placeholder-fun (cdr envpair)))
-		(substitute-leaf real-fun placeholder-fun)
-		(setf (cdr envpair) real-fun)))
+	(loop for real-fun in real-funs and placeholder-fun in placeholder-funs
+	      do (substitute-leaf real-fun placeholder-fun))
 
         ;; Voila.
 	(let ((*lexenv* (make-lexenv
