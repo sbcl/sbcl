@@ -363,8 +363,11 @@
 
 (deftest opendir.1
   (let ((dir (sb-posix:opendir "/")))
-    (sb-alien:null-alien dir))
-  nil)
+    (if (sb-alien:null-alien dir)
+	(progn  (sb-posix:closedir dir)
+		t)
+	nil))
+  t)
 
 (deftest readdir.1
   (let ((dir (sb-posix:opendir "/")))
