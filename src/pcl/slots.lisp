@@ -116,14 +116,11 @@
 	(slot-missing class object slot-name 'slot-value)
 	(slot-value-using-class class object slot-definition))))
 
-(setf (gdefinition 'slot-value-normal) #'slot-value)
-
-(define-compiler-macro slot-value (object-form slot-name-form)
-  (if (and (constantp slot-name-form)
-	   (let ((slot-name (eval slot-name-form)))
-	     (and (symbolp slot-name) (symbol-package slot-name))))
-      `(accessor-slot-value ,object-form ,slot-name-form)
-      `(slot-value-normal ,object-form ,slot-name-form)))
+(define-compiler-macro slot-value (&whole form object slot-name)
+  (if (and (constantp slot-name)
+	   (interned-symbol-p (eval slot-name)))
+      `(accessor-slot-value ,object ,slot-name)
+      form))
 
 (defun set-slot-value (object slot-name new-value)
   (let* ((class (class-of object))
@@ -133,16 +130,11 @@
 	(setf (slot-value-using-class class object slot-definition)
 	      new-value))))
 
-(setf (gdefinition 'set-slot-value-normal) #'set-slot-value)
-
-(define-compiler-macro set-slot-value (object-form
-				       slot-name-form
-				       new-value-form)
-  (if (and (constantp slot-name-form)
-	   (let ((slot-name (eval slot-name-form)))
-	     (and (symbolp slot-name) (symbol-package slot-name))))
-      `(accessor-set-slot-value ,object-form ,slot-name-form ,new-value-form)
-      `(set-slot-value-normal ,object-form ,slot-name-form ,new-value-form)))
+(define-compiler-macro set-slot-value (&whole form object slot-name new-value)
+  (if (and (constantp slot-name)
+	   (interned-symbol-p (eval slot-name)))
+      `(accessor-set-slot-value ,object ,slot-name ,new-value)
+      form))
 
 (defun slot-boundp (object slot-name)
   (let* ((class (class-of object))
@@ -153,12 +145,11 @@
 
 (setf (gdefinition 'slot-boundp-normal) #'slot-boundp)
 
-(define-compiler-macro slot-boundp (object-form slot-name-form)
-  (if (and (constantp slot-name-form)
-	   (let ((slot-name (eval slot-name-form)))
-	     (and (symbolp slot-name) (symbol-package slot-name))))
-      `(accessor-slot-boundp ,object-form ,slot-name-form)
-      `(slot-boundp-normal ,object-form ,slot-name-form)))
+(define-compiler-macro slot-boundp (&whole form object slot-name)
+  (if (and (constantp slot-name)
+	   (interned-symbol-p (eval slot-name)))
+      `(accessor-slot-boundp ,object ,slot-name)
+      form))
 
 (defun slot-makunbound (object slot-name)
   (let* ((class (class-of object))
