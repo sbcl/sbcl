@@ -16,7 +16,7 @@
   "Directory for temporary test files.")
 
 (defparameter *test-file*
-  (merge-pathnames #p"test-data.txt" *test-path*))
+  (merge-pathnames #p"test-data.tmp" *test-path*))
 
 (eval-when (:load-toplevel) (ensure-directories-exist *test-path* :verbose t))
 
