@@ -11,6 +11,41 @@
   (:generator 1
     (move csp-tn ptr)))
 
+;;; sparc version translated to ppc by David Steuber with help from #lisp.
+(define-vop (%%nip-values)
+  (:args (last-nipped-ptr :scs (any-reg) :target dest)
+         (last-preserved-ptr :scs (any-reg) :target src)
+         (moved-ptrs :scs (any-reg) :more t))
+  (:results (r-moved-ptrs :scs (any-reg) :more t))
+  (:temporary (:sc any-reg) src)
+  (:temporary (:sc any-reg) dest)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:ignore r-moved-ptrs)
+  (:generator 1
+    (inst mr dest last-nipped-ptr)
+    (inst mr src last-preserved-ptr)
+    (inst cmplw csp-tn src)
+    (inst ble DONE)
+    LOOP
+    (loadw temp src)
+    (inst addi dest dest n-word-bytes)
+    (inst addi src src n-word-bytes)
+    (storew temp dest -1)
+    (inst cmplw csp-tn src)
+    (inst bgt LOOP)
+    DONE
+    (inst mr csp-tn dest)
+    (inst sub src src dest)
+    (loop for moved = moved-ptrs then (tn-ref-across moved)
+          while moved
+          do (sc-case (tn-ref-tn moved)
+               ((descriptor-reg any-reg)
+                (inst sub (tn-ref-tn moved) (tn-ref-tn moved) src))
+               ((control-stack)
+                (load-stack-tn temp (tn-ref-tn moved))
+                (inst sub temp temp src)
+                (store-stack-tn (tn-ref-tn moved) temp))))))
+
 
 ;;; Push some values onto the stack, returning the start and number of values
 ;;; pushed as results.  It is assumed that the Vals are wired to the standard

@@ -1285,9 +1285,6 @@
 (defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved 
 						      &rest moved)
                                          node block)
-  #!-(or x86 alpha sparc mips)
-  (bug "%NIP-VALUES is not implemented on this platform.")
-  #!+(or x86 alpha sparc mips)
   (let (;; pointer immediately after the nipped block
 	(2after (lvar-info (lvar-value last-nipped)))
 	;; pointer to the first nipped word
