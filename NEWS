@@ -46,6 +46,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
     ** The disassembler understands more x86-64. (thanks to Cheuksan Wang)
     ** The regression tests use SB-ALIEN:INT instead of SB-ALIEN:INTEGER
        for enums. (thanks to Vincent Arkesteijn)
+    ** Multiple small optimizations and bugfixes for floating point
+       operations.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** Space, Tab, Linefeed, Return and Page have the invalid
        secondary constituent character trait.

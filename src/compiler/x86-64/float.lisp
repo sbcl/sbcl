@@ -438,29 +438,36 @@
   (frob single-float-op single-reg single-float)
   (frob double-float-op double-reg double-float))
 
-(macrolet ((frob (op sinst sname scost dinst dname dcost)
+(macrolet ((generate (movinst opinst commutative)
+	     `(progn
+		(cond
+		  ((location= x r)
+		   (inst ,opinst x y))
+		  ((and ,commutative (location= y r))
+		   (inst ,opinst y x))
+		  ((not (location= r y))
+		   (inst ,movinst r x)
+		   (inst ,opinst r y))
+		  (t
+		   (inst ,movinst tmp x)
+		   (inst ,opinst tmp y)
+		   (inst ,movinst r tmp)))))
+	   (frob (op sinst sname scost dinst dname dcost commutative)
 	     `(progn
 		(define-vop (,sname single-float-op)
 		    (:translate ,op)
-		  (:results (r :scs (single-reg)))
 		  (:temporary (:sc single-reg) tmp)
 		  (:generator ,scost
-                    (inst movss tmp x)
-		    (inst ,sinst tmp y)
-		    (inst movss r tmp)))
+  	            (generate movss ,sinst ,commutative)))
 		(define-vop (,dname double-float-op)
 		  (:translate ,op)
-		  (:results (r :scs (double-reg)))
 		  (:temporary (:sc single-reg) tmp)
 		  (:generator ,dcost
-                    (inst movsd tmp x)
-		    (inst ,dinst tmp y)
-		    (inst movsd r tmp))))))
-  (frob + addss +/single-float 2 addsd +/double-float 2)
-  (frob - subss -/single-float 2 subsd -/double-float 2)
-  (frob * mulss */single-float 4 mulsd */double-float 5)
-  (frob / divss //single-float 12 divsd //double-float 19))
-
+                    (generate movsd ,dinst ,commutative))))))
+  (frob + addss +/single-float 2 addsd +/double-float 2 t)
+  (frob - subss -/single-float 2 subsd -/double-float 2 nil)
+  (frob * mulss */single-float 4 mulsd */double-float 5 t)
+  (frob / divss //single-float 12 divsd //double-float 19 nil))
 
 
 (macrolet ((frob ((name translate sc type) &body body)
@@ -857,31 +864,26 @@
 (defknown ((setf floating-point-modes)) (float-modes)
   float-modes)
 
-(def!constant npx-env-size (* 7 n-word-bytes))
-(def!constant npx-cw-offset 0)
-(def!constant npx-sw-offset 4)
-
 (define-vop (floating-point-modes)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate floating-point-modes)
   (:policy :fast-safe)
-  (:temporary (:sc unsigned-reg :offset eax-offset :target res
-		   :to :result) eax)
+  (:temporary (:sc unsigned-stack :from :argument :to :result) temp)
   (:generator 8
-   (inst sub rsp-tn npx-env-size)	; Make space on stack.
-   (inst wait)				; Catch any pending FPE exceptions
-   (inst fstenv (make-ea :dword :base rsp-tn)) ; masks all exceptions
-   (inst fldenv (make-ea :dword :base rsp-tn)) ; Restore previous state.
-   ;; Move current status to high word.
-   (inst movzxd eax (make-ea :dword :base rsp-tn :disp (- npx-sw-offset 2)))
-   ;; Move exception mask to low word.
-   (inst mov ax-tn (make-ea :word :base rsp-tn :disp npx-cw-offset))
-   (inst add rsp-tn npx-env-size)	; Pop stack.
-   (inst xor eax #x3f)		  ; Flip exception mask to trap enable bits.
-   (move res eax)))
+   (inst stmxcsr temp)
+   (move res temp)
+   ;; Extract status from bytes 0-5 to bytes 16-21
+   (inst and temp (1- (expt 2 6)))
+   (inst shl temp 16)
+   ;; Extract mask from bytes 7-12 to bytes 0-5
+   (inst shr res 7)
+   (inst and res (1- (expt 2 6)))
+   ;; Flip the bits to convert from "1 means exception masked" to 
+   ;; "1 means exception enabled".
+   (inst xor res (1- (expt 2 6)))
+   (inst or res temp)))
 
-;;; XXX BROKEN
 (define-vop (set-floating-point-modes)
   (:args (new :scs (unsigned-reg) :to :result :target res))
   (:results (res :scs (unsigned-reg)))
@@ -889,20 +891,26 @@
   (:result-types unsigned-num)
   (:translate (setf floating-point-modes))
   (:policy :fast-safe)
-  (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :eval :to :result) eax)
+  (:temporary (:sc unsigned-reg :from :argument :to :result) temp1)
+  (:temporary (:sc unsigned-stack :from :argument :to :result) temp2)
   (:generator 3
-   (inst sub rsp-tn npx-env-size)	; Make space on stack.
-   (inst wait)				; Catch any pending FPE exceptions.
-   (inst fstenv (make-ea :dword :base rsp-tn))
-   (inst mov eax new)
-   (inst xor eax #x3f)		  ; Turn trap enable bits into exception mask.
-   (inst mov (make-ea :word :base rsp-tn :disp npx-cw-offset) ax-tn)
-   (inst shr eax 16)			; position status word
-   (inst mov (make-ea :word :base rsp-tn :disp npx-sw-offset) ax-tn)
-   (inst fldenv (make-ea :dword :base rsp-tn))
-   (inst add rsp-tn npx-env-size)	; Pop stack.
-   (move res new)))
+   (move res new)	      
+   (inst stmxcsr temp2)
+   ;; Clear status + masks
+   (inst and temp2 (lognot (logior (1- (expt 2 6))
+				   (ash (1- (expt 2 6)) 7))))
+   ;; Replace current status
+   (move temp1 new)
+   (inst shr temp1 16)
+   (inst and temp1 (1- (expt 2 6)))
+   (inst or temp2 temp1)
+   ;; Replace exception masks
+   (move temp1 new)
+   (inst and temp1 (1- (expt 2 6)))
+   (inst xor temp1 (1- (expt 2 6)))
+   (inst shl temp1 7)
+   (inst or temp2 temp1)
+   (inst ldmxcsr temp2)))
 
 
 ;;;; complex float VOPs

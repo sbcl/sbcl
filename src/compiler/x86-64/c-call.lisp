@@ -238,8 +238,6 @@
 	 (args :more t))
   (:results (results :more t))
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
-  (:temporary (:sc unsigned-reg :offset rcx-offset
-		   :from :eval :to :result) rcx)
   (:ignore results)
   (:vop-var vop)
   (:save-p t)
@@ -255,11 +253,10 @@
     ;; To give the debugger a clue. XX not really internal-error?
     (note-this-location vop :internal-error)
     ;; FLOAT15 needs to contain FP zero in Lispland
-    (inst xor rcx rcx)
-    (inst movd (make-random-tn :kind :normal 
+    (let ((float15 (make-random-tn :kind :normal 
 			       :sc (sc-or-lose 'double-reg)
-			       :offset float15-offset)
-	  rcx)))
+			       :offset float15-offset)))
+      (inst xorpd float15 float15))))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
