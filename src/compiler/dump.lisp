@@ -967,27 +967,18 @@
 ;;;  - code object references: don't need a name.
 (defun dump-fixups (fixups fasl-output)
   (declare (list fixups) (type fasl-output fasl-output))
-  (dolist (info fixups)
-    ;; FIXME: Packing data with LIST in NOTE-FIXUP and unpacking them
-    ;; with FIRST, SECOND, and THIRD here is hard to follow and
-    ;; maintain. Perhaps we could define a FIXUP-INFO structure to use
-    ;; instead, and rename *FIXUPS* to *FIXUP-INFO-LIST*?
-    (let* ((kind (first info))
-	   (fixup (second info))
+  (dolist (note fixups)
+    (let* ((kind (fixup-note-kind note))
+	   (fixup (fixup-note-fixup note))
+	   (position (fixup-note-position note))
 	   (name (fixup-name fixup))
-	   (flavor (fixup-flavor fixup))
-	   (offset (third info)))
-      ;; FIXME: This OFFSET is not what's called OFFSET in the FIXUP
-      ;; structure, it's what's called POSN in NOTE-FIXUP. (As far as
-      ;; I can tell, FIXUP-OFFSET is not actually an offset, it's an
-      ;; internal label used instead of NAME for :CODE-OBJECT fixups.
-      ;; Notice that in the :CODE-OBJECT case, NAME is ignored.)
+	   (flavor (fixup-flavor fixup)))
       (dump-fop 'fop-normal-load fasl-output)
       (let ((*cold-load-dump* t))
 	(dump-object kind fasl-output))
       (dump-fop 'fop-maybe-cold-load fasl-output)
       ;; Depending on the flavor, we may have various kinds of
-      ;; noise before the offset.
+      ;; noise before the position.
       (ecase flavor
 	(:assembly-routine
 	 (aver (symbolp name))
@@ -1007,8 +998,8 @@
 	(:code-object
 	 (aver (null name))
 	 (dump-fop 'fop-code-object-fixup fasl-output)))
-      ;; No matter what the flavor, we'll always dump the offset.
-      (dump-unsigned-32 offset fasl-output)))
+      ;; No matter what the flavor, we'll always dump the position
+      (dump-unsigned-32 position fasl-output)))
   (values))
 
 ;;; Dump out the constant pool and code-vector for component, push the

@@ -817,8 +817,8 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigemptyset(&new);
     sigaddset_blockable(&new);
 
-    FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%d\n",
-	   interrupt_low_level_handlers[signal]));
+    FSHOW((stderr, "/data->interrupt_low_level_handlers[signal]=%d\n",
+	   data->interrupt_low_level_handlers[signal]));
     if (data->interrupt_low_level_handlers[signal]==0) {
 	if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
 	    ARE_SAME_HANDLER(handler, SIG_IGN)) {

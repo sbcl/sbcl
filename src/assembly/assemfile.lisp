@@ -40,7 +40,7 @@
 	 (*code-segment* nil)
 	 (*elsewhere* nil)
 	 (*assembly-optimize* nil)
-	 (*fixups* nil))
+	 (*fixup-notes* nil))
     (unwind-protect
 	(let ((*features* (cons :sb-assembling *features*)))
 	  (init-assembler)
@@ -53,7 +53,7 @@
 	  (let ((length (sb!assem:finalize-segment *code-segment*)))
 	    (dump-assembler-routines *code-segment*
 				     length
-				     *fixups*
+				     *fixup-notes*
 				     *entry-points*
 				     lap-fasl-output))
 	  (setq won t))

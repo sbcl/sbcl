@@ -28,11 +28,14 @@
   ;; from the beginning of the current code block.
   offset)
 
-;;; KLUDGE: Despite its name, this is not a list of FIXUP objects, but rather a
-;;; list of `(,KIND ,FIXUP ,POSN). Perhaps this non-mnemonicity could be
-;;; reduced by naming what's currently a FIXUP structure a FIXUP-REQUEST, and
-;;; then renaming *FIXUPS* to *NOTED-FIXUPS*.-- WHN 19990905
-(defvar *fixups*)
+(defstruct (fixup-note
+	     (:constructor make-fixup-note (kind fixup position))
+	     (:copier nil))
+  kind
+  fixup
+  position)
+
+(defvar *fixup-notes*)
 
 ;;; Setting this variable lets you see what's going on as items are
 ;;; being pushed onto *FIXUPS*.
@@ -52,5 +55,8 @@
 			      ;; there's a desire for all fixing up to go
 			      ;; through EMIT-BACK-PATCH whether it needs to or
 			      ;; not? -- WHN 19990905
-			      (push (list kind fixup posn) *fixups*)))
+			      #!+sb-show
+			      (when *show-fixups-being-pushed-p*
+				(/show "PUSHING FIXUP" kind fixup posn))
+			      (push (make-fixup-note kind fixup posn) *fixup-notes*)))
   (values))

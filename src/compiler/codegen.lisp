@@ -123,7 +123,7 @@
 	(*trace-table-info* nil)
 	(*prev-segment* nil)
 	(*prev-vop* nil)
-	(*fixups* nil))
+	(*fixup-notes* nil))
     (let ((label (sb!assem:gen-label)))
       (setf *elsewhere-label* label)
       (sb!assem:assemble (*elsewhere*)
@@ -153,7 +153,7 @@
     (setf *elsewhere* nil)
     (values (sb!assem:finalize-segment *code-segment*)
 	    (nreverse *trace-table-info*)
-	    *fixups*)))
+	    *fixup-notes*)))
 
 (defun emit-label-elsewhere (label)
   (sb!assem:assemble (*elsewhere*)

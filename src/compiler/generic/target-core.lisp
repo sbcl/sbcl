@@ -35,11 +35,11 @@
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
-(defun make-core-component (component segment length trace-table fixups object)
+(defun make-core-component (component segment length trace-table fixup-notes object)
   (declare (type component component)
 	   (type sb!assem:segment segment)
 	   (type index length)
-	   (list trace-table fixups)
+	   (list trace-table fixup-notes)
 	   (type core-object object))
   (without-gcing
     (let* ((2comp (component-info component))
@@ -71,7 +71,7 @@
 	 (copy-byte-vector-to-system-area v fill-ptr)
 	 (setf fill-ptr (sap+ fill-ptr (length v)))))
 
-      (do-core-fixups code-obj fixups)
+      (do-core-fixups code-obj fixup-notes)
 
       (dolist (entry (ir2-component-entries 2comp))
 	(make-fun-entry entry code-obj object))

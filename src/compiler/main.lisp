@@ -442,7 +442,7 @@
 	    (describe-ir2-component component *compiler-trace-output*))
 
 	  (maybe-mumble "code ")
-	  (multiple-value-bind (code-length trace-table fixups)
+	  (multiple-value-bind (code-length trace-table fixup-notes)
 	      (generate-code component)
 
             #-sb-xc-host
@@ -459,7 +459,7 @@
 				    *code-segment*
 				    code-length
 				    trace-table
-				    fixups
+				    fixup-notes
 				    *compile-object*))
 	      (core-object
 	       (maybe-mumble "core")
@@ -467,7 +467,7 @@
 				    *code-segment*
 				    code-length
 				    trace-table
-				    fixups
+				    fixup-notes
 				    *compile-object*))
 	      (null))))))
 

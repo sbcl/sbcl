@@ -42,14 +42,14 @@
   (values))
 
 ;;; Do "load-time" fixups on the code vector.
-(defun do-core-fixups (code fixups)
-  (declare (list fixups))
-  (dolist (info fixups)
-    (let* ((kind (first info))
-	   (fixup (second info))
+(defun do-core-fixups (code fixup-notes)
+  (declare (list fixup-notes))
+  (dolist (note fixup-notes)
+    (let* ((kind (fixup-note-kind note))
+	   (fixup (fixup-note-fixup note))
+	   (position (fixup-note-position note))
 	   (name (fixup-name fixup))
 	   (flavor (fixup-flavor fixup))
-	   (offset (third info))
 	   (value (ecase flavor
 		    (:assembly-routine
 		     (aver (symbolp name))
@@ -63,7 +63,7 @@
 		    (:code-object
 		     (aver (null name))
 		     (values (get-lisp-obj-address code) t)))))
-      (sb!vm:fixup-code-object code offset value kind))))
+      (sb!vm:fixup-code-object code position value kind))))
 
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
 ;;; function hasn't been compiled yet, make a note in the patch table.

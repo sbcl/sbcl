@@ -107,7 +107,7 @@
 (defvar *event-info*)
 (defvar *event-note-threshold*)
 (defvar *failure-p*)
-(defvar *fixups*)
+(defvar *fixup-notes*)
 (defvar *in-pack*)
 (defvar *info-environment*)
 (defvar *lexenv*)
