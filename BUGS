@@ -1190,9 +1190,8 @@ WORKAROUND:
 229:
   (subtypep 'function '(function)) => nil, t.
 
-233:
-  Bug in constraint propagation:
-
+233: bugs in constraint propagation
+  a.
   (defun foo (x)
     (declare (optimize (speed 2) (safety 3)))
     (let ((y 0d0))
@@ -1204,6 +1203,14 @@ WORKAROUND:
   (foo 4) => segmentation violation
 
   (see usage of CONTINUATION-ASSERTED-TYPE in USE-RESULT-CONSTRAINTS)
+
+  b.
+  (declaim (optimize (speed 2) (safety 3)))
+  (defun foo (x y)
+    (if (typep (prog1 x (setq x y)) 'double-float)
+        (+ x 1d0)
+        (+ x 2)))
+  (foo 1d0 5) => segmentation violation
 
 234:
   (fixed in sbcl-0.7.10.36)
