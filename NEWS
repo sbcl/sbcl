@@ -1352,6 +1352,9 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
   * minor incompatible change: TRUENAME now considers the truename of
     a file naming a directory to be the pathname with :DIRECTORY
     component indicating that directory.
+  * minor incompatible change: a NAMED clause in the extended form of
+    LOOP no longer causes a BLOCK named NIL to surround the LOOP.  The
+    reason for the previous behaviour is unclear.
   * more systematization and improvement of CLOS and MOP conformance
     in PCL (thanks to Gerd Moellman and Pierre Mai):
     ** the standard ANSI CL generic function NO-NEXT-METHOD is now

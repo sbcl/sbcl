@@ -1110,7 +1110,7 @@ code to be loaded.
     (when *loop-names*
       (loop-error "You may only use one NAMED clause in your loop: NAMED ~S ... NAMED ~S."
 		  (car *loop-names*) name))
-    (setq *loop-names* (list name nil))))
+    (setq *loop-names* (list name))))
 
 (defun loop-do-return ()
   (loop-pseudo-body (loop-construct-return (loop-get-form))))
@@ -1942,9 +1942,9 @@ code to be loaded.
 
 (defun loop-standard-expansion (keywords-and-forms environment universe)
   (if (and keywords-and-forms (symbolp (car keywords-and-forms)))
-    (loop-translate keywords-and-forms environment universe)
-    (let ((tag (gensym)))
-      `(block nil (tagbody ,tag (progn ,@keywords-and-forms) (go ,tag))))))
+      (loop-translate keywords-and-forms environment universe)
+      (let ((tag (gensym)))
+	`(block nil (tagbody ,tag (progn ,@keywords-and-forms) (go ,tag))))))
 
 (sb!int:defmacro-mundanely loop (&environment env &rest keywords-and-forms)
   (loop-standard-expansion keywords-and-forms env *loop-ansi-universe*))

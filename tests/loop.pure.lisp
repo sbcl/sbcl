@@ -97,9 +97,16 @@
                '(1 2 3 4 5 6 7)))
 
 (multiple-value-bind (result error)
-    (ignore-errors (eval '(loop for i from 1 repeat 7 of-type fixnum collect i)))
+    (ignore-errors
+      (eval '(loop for i from 1 repeat 7 of-type fixnum collect i)))
   (assert (null result))
   (assert (typep error 'program-error)))
 
-(assert (equal (ignore-errors (loop for i from 1 repeat 6.5 collect i))
-               (ignore-errors (loop for i from 1 repeat (eval '6.5) collect i))))
+(assert (equal
+	 (ignore-errors (loop for i from 1 repeat 6.5 collect i))
+	 (ignore-errors (loop for i from 1 repeat (eval '6.5) collect i))))
+
+(assert (eq (block nil
+	      (loop named foo do (loop-finish) finally (return :good))
+	      :bad)
+	    :good))
