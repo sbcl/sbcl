@@ -77,7 +77,8 @@
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
 (deftransform %typep ((object type))
-  (unless (constant-continuation-p type) (give-up-ir1-transform))
+  (unless (constant-continuation-p type)
+    (give-up-ir1-transform))
   (ir1-transform-type-predicate
    object
    (specifier-type (continuation-value type))))
