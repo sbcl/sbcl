@@ -172,7 +172,7 @@
   ;; we're supposed to soldier on bravely, and so we have to deal with
   ;; the unsupplied-MINCOL-and-COLINC case without blowing up.
   (when (and mincol colinc)
-    (do ((chars (+ (length string) minpad) (+ chars colinc)))
+    (do ((chars (+ (length string) (max minpad 0)) (+ chars colinc)))
 	((>= chars mincol))
       (dotimes (i colinc)
 	(write-char padchar stream))))

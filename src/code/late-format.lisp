@@ -140,7 +140,9 @@
 			    :offset posn)
 		     (setf atsignp t)))
 		(t
-		 (when (char= (schar string (1- posn)) #\,)
+		 (when (and (char= (schar string (1- posn)) #\,)
+			    (or (< posn 2)
+				(char/= (schar string (- posn 2)) #\')))
 		   (check-ordering)
 		   (push (cons (1- posn) nil) params))
 		 (return))))

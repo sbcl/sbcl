@@ -35,8 +35,13 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     applying the more sophisticated binary GCD.  (thanks to Juho
     Snellman)
   * fixed some bugs revealed by Paul Dietz' test suite:
-    ** format variable parameters ("~V<char>") are defaulted properly
+    ** FORMAT variable parameters ("~V<char>") are defaulted properly
        if the corresponding argument is NIL.
+    ** FORMAT directives accepting a minpad parameter treat negative
+       values as 0.
+    ** literal commas as character parameters to FORMAT directives are
+       parsed correctly.
+
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of
