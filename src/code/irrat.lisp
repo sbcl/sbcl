@@ -335,7 +335,7 @@
 	 (coerce (%sqrt (coerce number 'double-float)) 'single-float)))
     (((foreach single-float double-float))
      (if (minusp number)
-	 (complex-sqrt number)
+	 (complex-sqrt (complex number))
 	 (coerce (%sqrt (coerce number 'double-float))
 		 '(dispatch-type number))))
      ((complex)
@@ -431,7 +431,7 @@
     (((foreach single-float double-float))
      (if (or (> number (coerce 1 '(dispatch-type number)))
 	     (< number (coerce -1 '(dispatch-type number))))
-	 (complex-asin number)
+	 (complex-asin (complex number))
 	 (coerce (%asin (coerce number 'double-float))
 		 '(dispatch-type number))))
     ((complex)
@@ -448,7 +448,7 @@
     (((foreach single-float double-float))
      (if (or (> number (coerce 1 '(dispatch-type number)))
 	     (< number (coerce -1 '(dispatch-type number))))
-	 (complex-acos number)
+	 (complex-acos (complex number))
 	 (coerce (%acos (coerce number 'double-float))
 		 '(dispatch-type number))))
     ((complex)
@@ -539,7 +539,7 @@
 	 (coerce (%acosh (coerce number 'double-float)) 'single-float)))
     (((foreach single-float double-float))
      (if (< number (coerce 1 '(dispatch-type number)))
-	 (complex-acosh number)
+	 (complex-acosh (complex number))
 	 (coerce (%acosh (coerce number 'double-float))
 		 '(dispatch-type number))))
     ((complex)
@@ -557,7 +557,7 @@
     (((foreach single-float double-float))
      (if (or (> number (coerce 1 '(dispatch-type number)))
 	     (< number (coerce -1 '(dispatch-type number))))
-	 (complex-atanh number)
+	 (complex-atanh (complex number))
 	 (coerce (%atanh (coerce number 'double-float))
 		 '(dispatch-type number))))
     ((complex)
@@ -640,6 +640,19 @@
 ;;; should be used instead?  (KLUDGED 2004-03-08 CSR, by replacing the
 ;;; special variable references with (probably equally slow)
 ;;; constructors)
+;;;
+;;; FIXME: As of 2004-05, when PFD noted that IMAGPART and COMPLEX
+;;; differ in their interpretations of the real line, IMAGPART was
+;;; patch, which without a certain amount of effort would have altered
+;;; all the branch cut treatment.  Clients of these COMPLEX- routines
+;;; were patched to use explicit COMPLEX, rather than implicitly
+;;; passing in real numbers for treatment with IMAGPART, and these
+;;; COMPLEX- functions altered to require arguments of type COMPLEX;
+;;; however, someone needs to go back to Kahan for the definitive
+;;; answer for treatment of negative real floating point numbers and
+;;; branch cuts.  If adjustment is needed, it is probably the removal
+;;; of explicit calls to COMPLEX in the clients of irrational
+;;; functions.  -- a slightly bitter CSR, 2004-05-16
 
 (declaim (inline square))
 (defun square (x)
@@ -756,9 +769,15 @@
 
 ;;; principal square root of Z
 ;;;
-;;; Z may be any NUMBER, but the result is always a COMPLEX.
+;;; Z may be RATIONAL or COMPLEX; the result is always a COMPLEX.
 (defun complex-sqrt (z)
-  (declare (number z))
+  ;; KLUDGE: Here and below, we can't just declare Z to be of type
+  ;; COMPLEX, because one-arg COMPLEX on rationals returns a rational.
+  ;; Since there isn't a rational negative zero, this is OK from the
+  ;; point of view of getting the right answer in the face of branch
+  ;; cuts, but declarations of the form (OR RATIONAL COMPLEX) are
+  ;; still ugly.  -- CSR, 2004-05-16
+  (declare (type (or complex rational) z))
   (multiple-value-bind (rho k)
       (cssqs z)
     (declare (type (or (member 0d0) (double-float 0d0)) rho)
@@ -799,7 +818,7 @@
 ;;;
 ;;; This is for use with J /= 0 only when |z| is huge.
 (defun complex-log-scaled (z j)
-  (declare (number z)
+  (declare (type (or rational complex) z)
 	   (fixnum j))
   ;; The constants t0, t1, t2 should be evaluated to machine
   ;; precision.  In addition, Kahan says the accuracy of log1p
@@ -834,7 +853,7 @@
 ;;;
 ;;; Z may be any number, but the result is always a complex.
 (defun complex-log (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   (complex-log-scaled z 0))
 	       
 ;;; KLUDGE: Let us note the following "strange" behavior. atanh 1.0d0
@@ -843,7 +862,7 @@
 ;;; i*y is never 0 since we have positive and negative zeroes. -- rtoy
 ;;; Compute atanh z = (log(1+z) - log(1-z))/2.
 (defun complex-atanh (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   (let* (;; constants
          (theta (/ (sqrt most-positive-double-float) 4.0d0))
          (rho (/ 4.0d0 (sqrt most-positive-double-float)))
@@ -900,7 +919,7 @@
 
 ;;; Compute tanh z = sinh z / cosh z.
 (defun complex-tanh (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   (let ((x (float (realpart z) 1.0d0))
 	(y (float (imagpart z) 1.0d0)))
     (locally
@@ -959,7 +978,7 @@
   ;;
   ;; and these two expressions are equal if and only if arg conj z =
   ;; -arg z, which is clearly true for all z.
-  (declare (number z))
+  (declare (type (or rational complex) z))
   (let ((sqrt-1+z (complex-sqrt (+ 1 z)))
 	(sqrt-1-z (complex-sqrt (- 1 z))))
     (with-float-traps-masked (:divide-by-zero)
@@ -972,7 +991,7 @@
 ;;;
 ;;; Z may be any NUMBER, but the result is always a COMPLEX.
 (defun complex-acosh (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   (let ((sqrt-z-1 (complex-sqrt (- z 1)))
 	(sqrt-z+1 (complex-sqrt (+ z 1))))
     (with-float-traps-masked (:divide-by-zero)
@@ -985,7 +1004,7 @@
 ;;;
 ;;; Z may be any NUMBER, but the result is always a COMPLEX.
 (defun complex-asin (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   (let ((sqrt-1-z (complex-sqrt (- 1 z)))
 	(sqrt-1+z (complex-sqrt (+ 1 z))))
     (with-float-traps-masked (:divide-by-zero)
@@ -998,7 +1017,7 @@
 ;;;
 ;;; Z may be any number, but the result is always a complex.
 (defun complex-asinh (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   ;; asinh z = -i * asin (i*z)
   (let* ((iz (complex (- (imagpart z)) (realpart z)))
 	 (result (complex-asin iz)))
@@ -1009,7 +1028,7 @@
 ;;;
 ;;; Z may be any number, but the result is always a complex.
 (defun complex-atan (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   ;; atan z = -i * atanh (i*z)
   (let* ((iz (complex (- (imagpart z)) (realpart z)))
 	 (result (complex-atanh iz)))
@@ -1020,7 +1039,7 @@
 ;;;
 ;;; Z may be any number, but the result is always a complex.
 (defun complex-tan (z)
-  (declare (number z))
+  (declare (type (or rational complex) z))
   ;; tan z = -i * tanh(i*z)
   (let* ((iz (complex (- (imagpart z)) (realpart z)))
 	 (result (complex-tanh iz)))

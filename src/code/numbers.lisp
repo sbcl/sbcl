@@ -265,7 +265,7 @@
     ((complex rational)
      (sb!kernel:%imagpart number))
     (float
-     (float 0 number))
+     (* 0 number))
     (t
      0)))
 

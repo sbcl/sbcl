@@ -17,14 +17,15 @@
 ;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
 ;;; order to avoid boxing.
 (deftransform sxhash ((x) (single-float))
-  '(let ((bits (single-float-bits x)))
+  '(let* ((val (+ 0.0f0 x))
+	  (bits (single-float-bits val)))
      (logxor 66194023
 	     (sxhash (the fixnum
 			  (logand most-positive-fixnum
 				  (logxor bits
 					  (ash bits -7))))))))
 (deftransform sxhash ((x) (double-float))
-  '(let* ((val x)
+  '(let* ((val (+ 0.0d0 x))
 	  (hi (double-float-high-bits val))
 	  (lo (double-float-low-bits val))
 	  (hilo (logxor hi lo)))

@@ -2443,6 +2443,11 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
        more likely.  (thanks also to Bruno Haible for a similar report
        and discussions)
     ** removed stack cleaning in the cleanup part of UNWIND-PROTECT.
+    ** IMAGPART is specified (infelicitously) to return (* 0 <thing>)
+       for objects of type REAL.  Make it so.
+    ** SXHASH is specified (infelicitously) to respect similarity,
+       which means that (SXHASH 0.0) must equal (SXHASH -0.0).  Make
+       it so.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
