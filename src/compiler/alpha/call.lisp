@@ -306,7 +306,7 @@ default-value-8
 		    (tn (tn-ref-tn val)))
 		(defaults (cons default-lab tn))
 		
-		(inst blt temp default-lab)
+		(inst ble temp default-lab)
 		(inst ldl move-temp (* i n-word-bytes) ocfp-tn)
 		(inst subq temp (fixnumize 1) temp)
 		(store-stack-tn tn move-temp)))
