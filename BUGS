@@ -844,6 +844,17 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   :ELEMENT-TYPE, but in sbcl-0.6.9 this is not defined for
   WITH-OUTPUT-TO-STRING.
 
+77:
+  As reported by Martin Atzmueller on sbcl-devel 2000-01-09,
+  DEF-ALIEN-VARIABLE doesn't work. With either the example in the
+  old CMU CL docs,
+    (def-alien-variable "errno" integer)
+  or another test avoiding any peculiarities of modern errno-as-macro
+  implementations,
+    (def-alien-variable "from_space" integer)
+  in sbcl-0.6.9 the operation fails with 
+    TYPE-ERROR in SB-KERNEL::OBJECT-NOT-TYPE-ERROR-HANDLER:
+      NIL is not of type SB-KERNEL:LEXENV.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

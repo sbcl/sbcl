@@ -173,14 +173,14 @@
 ;;; we no longer need to make a distinction between this and
 ;;; %PARSE-ALIEN-TYPE.
 (defun parse-alien-type (type env)
-  (declare (type sb!kernel:lexenv env))
+  (declare (type (or sb!kernel:lexenv null) env))
   #!+sb-doc
   "Parse the list structure TYPE as an alien type specifier and return
    the resultant ALIEN-TYPE structure."
   (%parse-alien-type type env))
 
 (defun %parse-alien-type (type env)
-  (declare (type sb!kernel:lexenv env))
+  (declare (type (or sb!kernel:lexenv null) env))
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
 	(unless translator
@@ -199,7 +199,7 @@
 	 (error "unknown alien type: ~S" type)))))
 
 (defun auxiliary-alien-type (kind name env)
-  (declare (type sb!kernel:lexenv env))
+  (declare (type (or sb!kernel:lexenv null) env))
   (flet ((aux-defn-matches (x)
 	   (and (eq (first x) kind) (eq (second x) name))))
     (let ((in-auxiliaries
@@ -216,7 +216,7 @@
 	     (info :alien-type :enum name)))))))
 
 (defun (setf auxiliary-alien-type) (new-value kind name env)
-  (declare (type sb!kernel:lexenv env))
+  (declare (type (or sb!kernel:lexenv null) env))
   (flet ((aux-defn-matches (x)
 	   (and (eq (first x) kind) (eq (second x) name))))
     (when (find-if #'aux-defn-matches *new-auxiliary-types*)
@@ -930,7 +930,7 @@
   (parse-alien-record-type :union name fields env))
 
 (defun parse-alien-record-type (kind name fields env)
-  (declare (type sb!kernel:lexenv env))
+  (declare (type (or sb!kernel:lexenv null) env))
   (cond (fields
 	 (let* ((old (and name (auxiliary-alien-type kind name env)))
 		(old-fields (and old (alien-record-type-fields old))))

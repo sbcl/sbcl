@@ -1274,7 +1274,7 @@
   "Returns the root of the nearest integer less than n which is a perfect
    square."
   (declare (type unsigned-byte n) (values unsigned-byte))
-  ;; theoretically (> n 7), i.e., n-len-quarter > 0
+  ;; Theoretically (> n 7), i.e., n-len-quarter > 0.
   (if (and (fixnump n) (<= n 24))
       (cond ((> n 15) 4)
 	    ((> n  8) 3)

@@ -300,7 +300,7 @@
   (error 'simple-error
 	 :function-name name
 	 :format-control
-	 "invalid array index, ~D for ~S (should have been less than ~D)"
+	 "invalid array index ~D for ~S (should be nonnegative and <~D)"
 	 :format-arguments (list index array bound)))
 
 (deferr object-not-simple-array-error (object)

@@ -46,20 +46,37 @@
 			      (vector
 			       (destructuring-bind (eltype) type-rest
 				 (if (entirely eltype)
-				     (replace (make-array (length base-seq)
-							  :element-type eltype
-							  :adjustable t)
-					      base-seq)
+				     (let ((initial-element
+					    (cond ((subtypep eltype 'character)
+						   #\!)
+						  ((subtypep eltype 'number)
+						   0)
+						  (t #'error))))
+				       (replace (make-array
+						 (+ (length base-seq)
+						    (random 3))
+						 :element-type eltype
+						 :fill-pointer
+						 (length base-seq)
+						 :initial-element
+						 initial-element)
+						base-seq))
 				     (return))))))))
 		 (lambda-expr `(lambda (seq)
 				 ,@(when declaredness
 				     `((declare (type ,seq-type seq))))
 				 (declare (optimize ,@optimization))
 				 ,snippet)))
+	    (format t "~&~S~%" lambda-expr)
 	    (multiple-value-bind (fun warnings-p failure-p)
 		(compile nil lambda-expr)
 	      (when (or warnings-p failure-p)
-		(error "~@<failed compilation:~2I ~_WARNINGS-P=~S ~_FAILURE-P=~S ~_LAMBDA-EXPR=~S~:@>" lambda-expr))
+		(error "~@<failed compilation:~2I ~_LAMBDA-EXPR=~S ~_WARNINGS-P=~S ~_FAILURE-P=~S~:@>"
+		       lambda-expr warnings-p failure-p))
+	      (format t "~&~S ~S ~S ~S ~S~%"
+		      base-seq snippet seq-type declaredness optimization)
+	      (format t "~&(TYPEP SEQ 'SIMPLE-ARRAY)=~S~%"
+		      (typep seq 'simple-array))
 	      (unless (funcall fun seq)
 		(error "~@<failed test:~2I ~_BASE-SEQ=~S ~_SNIPPET=~S ~_SEQ-TYPE=~S ~_DECLAREDNESS=~S ~_OPTIMIZATION=~S~:@>"
 		       base-seq
@@ -70,17 +87,23 @@
 (defun for-every-seq (base-seq snippets)
   (dolist (snippet snippets)
     (for-every-seq-1 base-seq snippet)))
-		
+
+;;; a wrapper to hide declared type information from the compiler, so
+;;; we don't get stopped by compiler warnings about e.g. compiling
+;;; (POSITION 1 #() :KEY #'ABS) when #() has been coerced to a string.
+(defun indiscriminate (fun)
+  (lambda (&rest rest) (apply fun rest)))
+  
 ;;; tests of FIND, POSITION, FIND-IF, and POSITION-IF (and a few for
 ;;; deprecated FIND-IF-NOT and POSITION-IF-NOT too)
 (for-every-seq #()
   '((null (find 1 seq))
     (null (find 1 seq :from-end t))
-    (null (position 1 seq :key #'abs))
+    (null (position 1 seq :key (indiscriminate #'abs)))
     (null (position nil seq :test (constantly t)))
     (null (position nil seq :test nil))
     (null (position nil seq :test-not nil))
-    (null (find-if #'1+ seq :key #'log))
+    (null (find-if #'1+ seq :key (indiscriminate #'log)))
     (null (position-if #'identity seq :from-end t))
     (null (find-if-not #'packagep seq))
     (null (position-if-not #'packagep seq :key nil))))
@@ -88,6 +111,7 @@
   '((null (find 2 seq))
     (find 2 seq :key #'1+)
     (find 1 seq :from-end t)
+    (null (find 1 seq :from-end t :start 1))
     (null (find 0 seq :from-end t))
     (eql 0 (position 1 seq :key #'abs))
     (null (position nil seq :test 'equal))
@@ -103,6 +127,9 @@
     (eql 2 (position 4 seq :key '1+))
     (eql 2 (position 4 seq :key '1+ :from-end t))
     (eql 1 (position 2 seq))
+    (eql 1 (position 2 seq :start 1))
+    (null (find 2 seq :start 1 :end 1))
+    (eql 3 (position 2 seq :start 2))
     (eql 3 (position 2 seq :key nil :from-end t))
     (eql 2 (position 3 seq :test '=))
     (eql 0 (position 3 seq :test-not 'equalp))
@@ -113,6 +140,9 @@
     (eql 3 (position-if #'plusp seq :key #'1- :from-end t))
     (eql 1 (position-if #'evenp seq))
     (eql 3 (position-if #'evenp seq :from-end t))
+    (eql 2 (position-if #'plusp seq :from-end nil :key '1- :start 2))
+    (eql 3 (position-if #'plusp seq :from-end t :key '1- :start 2))
+    (null (position-if #'plusp seq :from-end t :key '1- :start 2 :end 2))
     (null (find-if-not #'plusp seq))
     (eql 0 (position-if-not #'evenp seq))))
 (for-every-seq "string test"
@@ -131,6 +161,6 @@
     (find-if #'characterp seq)
     (find-if #'(lambda (c) (typep c 'base-char)) seq :from-end t)
     (null (find-if 'upper-case-p seq))))
-
+	 
 ;;; success
 (quit :unix-status 104)

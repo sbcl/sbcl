@@ -749,9 +749,8 @@
 		    ,num-descriptors ,read-fds ,write-fds ,exception-fds
 		    (if timeout-secs (alien-sap (addr tv)) (int-sap 0))))))
 
-;;; Unix-select accepts sets of file descriptors and waits for an event
+;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
 ;;; to happen on one of them or to time out.
-
 (defmacro num-to-fd-set (fdset num)
   `(if (fixnump ,num)
        (progn

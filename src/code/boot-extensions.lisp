@@ -155,13 +155,12 @@
 ;;; ONCE-ONLY is a utility useful in writing source transforms and
 ;;; macros. It provides a concise way to wrap a LET around some code
 ;;; to ensure that some forms are only evaluated once.
+;;;
+;;; Create a LET* which evaluates each value expression, binding a
+;;; temporary variable to the result, and wrapping the LET* around the
+;;; result of the evaluation of BODY. Within the body, each VAR is
+;;; bound to the corresponding temporary variable.
 (defmacro once-only (specs &body body)
-  #!+sb-doc
-  "Once-Only ({(Var Value-Expression)}*) Form*
-  Create a Let* which evaluates each Value-Expression, binding a temporary
-  variable to the result, and wrapping the Let* around the result of the
-  evaluation of Body. Within the body, each Var is bound to the corresponding
-  temporary variable."
   (iterate frob
 	   ((specs specs)
 	    (body body))
@@ -174,7 +173,7 @@
 	  (let* ((name (first spec))
 		 (exp-temp (gensym (symbol-name name))))
 	    `(let ((,exp-temp ,(second spec))
-		   (,name (gensym "OO-")))
+		   (,name (gensym "ONCE-ONLY-")))
 	       `(let ((,,name ,,exp-temp))
 		  ,,(frob (rest specs) body))))))))
 

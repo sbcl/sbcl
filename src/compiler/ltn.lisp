@@ -473,7 +473,7 @@
 (defoptimizer (%unwind-protect ltn-annotate) ((escape cleanup)
 					      node
 					      ltn-policy)
-  (declare (ignore ltn-policy))
+  ltn-policy ; a hack to effectively (DECLARE (IGNORE LTN-POLICY))
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil))
 
@@ -904,7 +904,8 @@
 					      recursive)))))
 	  (let ((*compiler-error-context* call))
 	    (compiler-warning "recursion in known function definition~2I ~
-                               ~_arg types=~S"
+                               ~_policy=~S ~_arg types=~S"
+			      (lexenv-policy (node-lexenv call))
 			      (mapcar (lambda (arg)
 					(type-specifier (continuation-type
 							 arg)))
