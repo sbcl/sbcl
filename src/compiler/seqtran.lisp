@@ -704,3 +704,21 @@
 	 (declare (type index start ,@(all-lengths)))
 	 ,@(forms)
 	 res))))
+
+;;;; CONS accessor DERIVE-TYPE optimizers
+
+(defoptimizer (car derive-type) ((cons))
+  (let ((type (continuation-type cons))
+	(null-type (specifier-type 'null)))
+    (cond ((eq type null-type)
+	   null-type)
+	  ((cons-type-p type)
+	   (cons-type-car-type type)))))
+
+(defoptimizer (cdr derive-type) ((cons))
+  (let ((type (continuation-type cons))
+	(null-type (specifier-type 'null)))
+    (cond ((eq type null-type)
+	   null-type)
+	  ((cons-type-p type)
+	   (cons-type-cdr-type type)))))

@@ -142,7 +142,7 @@
 
 ) ; EVAL-WHEN
 
-(defmacro define-type-method ((class method &rest more-methods)
+(defmacro !define-type-method ((class method &rest more-methods)
 			      lambda-list &body body)
   #!+sb-doc
   "DEFINE-TYPE-METHOD (Class-Name Method-Name+) Lambda-List Form*"
@@ -157,7 +157,7 @@
 		   (cons method more-methods)))
        ',name)))
 
-(defmacro define-type-class (name &key inherits)
+(defmacro !define-type-class (name &key inherits)
   `(!cold-init-forms
      ,(once-only ((n-class (if inherits
 			       `(copy-type-class-coldly (type-class-or-lose
@@ -168,13 +168,14 @@
 	   (setf (gethash ',name *type-classes*) ,n-class)
 	   ',name))))
 
-;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the same
-;;; class, invoke the simple method. Otherwise, invoke any complex method. If
-;;; there isn't a distinct COMPLEX-ARG1 method, then swap the arguments when
-;;; calling TYPE1's method. If no applicable method, return DEFAULT.
-(defmacro invoke-type-method (simple complex-arg2 type1 type2 &key
-				     (default '(values nil t))
-				     (complex-arg1 :foo complex-arg1-p))
+;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the
+;;; same class, invoke the simple method. Otherwise, invoke any
+;;; complex method. If there isn't a distinct COMPLEX-ARG1 method,
+;;; then swap the arguments when calling TYPE1's method. If no
+;;; applicable method, return DEFAULT.
+(defmacro !invoke-type-method (simple complex-arg2 type1 type2 &key
+				      (default '(values nil t))
+				      (complex-arg1 :foo complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
   `(multiple-value-bind (result-a result-b valid-p)
        (%invoke-type-method ',(class-function-slot-or-lose simple)
@@ -190,16 +191,17 @@
        (values result-a result-b)
        ,default)))
 
-;;; most of the implementation of INVOKE-TYPE-METHOD
+;;; most of the implementation of !INVOKE-TYPE-METHOD
 ;;;
-;;; KLUDGE: This function must be INLINE in order for cold init to work,
-;;; because the first three arguments are TYPE-CLASS structure accessor
-;;; functions whose calls have to be compiled inline in order to work in calls
-;;; to this function early in cold init. So don't conditionalize this INLINE
-;;; declaration with #!+SB-FLUID or anything, unless you also rearrange things
-;;; to cause the full function definitions of the relevant structure accessors
-;;; to be available sufficiently early in cold init. -- WHN 19991015
-#!-sb-fluid (declaim (inline %invoke-type-method))
+;;; KLUDGE: This function must be INLINE in order for cold init to
+;;; work, because the first three arguments are TYPE-CLASS structure
+;;; accessor functions whose calls have to be compiled inline in order
+;;; to work in calls to this function early in cold init. So don't
+;;; conditionalize this INLINE declaration with #!-SB-FLUID or
+;;; anything, unless you also rearrange things to cause the full
+;;; function definitions of the relevant structure accessors to be
+;;; available sufficiently early in cold init. -- WHN 19991015
+(declaim (inline %invoke-type-method))
 (defun %invoke-type-method (simple cslot1 cslot2 complex-arg1-p type1 type2)
   (declare (type symbol simple cslot1 cslot2))
   (multiple-value-bind (result-a result-b)
@@ -215,11 +217,11 @@
 		  (if complex-arg1-p
 		    (funcall complex1 type1 type2)
 		    (funcall complex1 type2 type1))
-		  ;; No meaningful result was found: the caller should use the
-		  ;; default value instead.
+		  ;; No meaningful result was found: the caller should
+		  ;; use the default value instead.
 		  (return-from %invoke-type-method (values nil nil nil))))))))
-    ;; If we get to here (without breaking out by calling RETURN-FROM) then
-    ;; a meaningful result was found, and we return it.
+    ;; If we get to here (without breaking out by calling RETURN-FROM)
+    ;; then a meaningful result was found, and we return it.
     (values result-a result-b t)))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)

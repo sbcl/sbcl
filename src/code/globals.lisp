@@ -15,17 +15,8 @@
 
 (in-package "SB!IMPL")
 
-;;; FIXME: The COMMON-LISP specials here are already handled in
-;;; cl-specials.lisp.
-(declaim (special *keyword-package* *cl-package* *package* *query-io*
-		  *terminal-io* *error-output* *trace-output* *debug-io*
-		  *standard-input* *standard-output*
-		  *evalhook* *applyhook*
+(declaim (special *keyword-package* *cl-package*
 		  original-lisp-environment
-		  *read-default-float-format*
-		  *read-suppress* *readtable* *print-base* *print-radix*
-		  *print-length* *print-level* *print-pretty* *print-escape*
-		  *print-case* *print-circle* *print-gensym* *print-array*
 		  *standard-readtable*
 		  sb!debug:*in-the-debugger*
 		  sb!debug:*stack-top-hint*
@@ -35,8 +26,7 @@
 		  *software-interrupt-vector* *load-verbose*
 		  *load-print-stuff* *in-compilation-unit*
 		  *aborted-compilation-unit-count* *char-name-alist*
-		  *default-pathname-defaults* *beep-function*
-		  *gc-notify-before* *gc-notify-after*
+		  *beep-function* *gc-notify-before* *gc-notify-after*
 		  *posix-argv*))
 
 (declaim (ftype (function * *)

@@ -660,16 +660,16 @@
 
 ;;;; CLASS type operations
 
-(define-type-class sb!xc:class)
+(!define-type-class sb!xc:class)
 
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those
 ;;; operations.
-(define-type-method (sb!xc:class :simple-=) (type1 type2)
+(!define-type-method (sb!xc:class :simple-=) (type1 type2)
   (assert (not (eq type1 type2)))
   (values nil t))
 
-(define-type-method (sb!xc:class :simple-subtypep) (class1 class2)
+(!define-type-method (sb!xc:class :simple-subtypep) (class1 class2)
   (assert (not (eq class1 class2)))
   (let ((subclasses (class-subclasses class2)))
     (if (and subclasses (gethash class1 subclasses))
@@ -697,7 +697,7 @@
 ;;; they are structure classes, since a subclass of both might be
 ;;; defined. If either class is sealed, we can eliminate this
 ;;; possibility.
-(define-type-method (sb!xc:class :simple-intersection) (class1 class2)
+(!define-type-method (sb!xc:class :simple-intersection) (class1 class2)
   (declare (type sb!xc:class class1 class2))
   (cond ((eq class1 class2) class1)
 	((let ((subclasses (class-subclasses class2)))
@@ -716,7 +716,7 @@
 	(t
 	 (values class1 nil))))
 
-(define-type-method (sb!xc:class :unparse) (type)
+(!define-type-method (sb!xc:class :unparse) (type)
   (class-proper-name type))
 
 ;;;; PCL stuff

@@ -17,27 +17,20 @@
 (defconstant pi 3.14159265358979323846264338327950288419716939937511L0)
 ;(defconstant e 2.71828182845904523536028747135266249775724709369996L0)
 
-;;; Make these INLINE, since the call to C is at least as compact as a Lisp
-;;; call, and saves number consing to boot.
-;;;
-;;; FIXME: This should be (EVAL-WHEN (COMPILE-EVAL) (SB!XC:DEFMACRO ..)),
-;;; I think.
-(defmacro def-math-rtn (name num-args)
-  (let ((function (intern (concatenate 'simple-string
-				       "%"
-				       (string-upcase name)))))
+;;; Make these INLINE, since the call to C is at least as compact as a
+;;; Lisp call, and saves number consing to boot.
+(eval-when (:compile-toplevel :execute)
+
+(sb!xc:defmacro def-math-rtn (name num-args)
+  (let ((function (symbolicate "%" (string-upcase name))))
     `(progn
        (proclaim '(inline ,function))
-       (let ((sb!int::*rogue-export* "DEF-MATH-RTN"))
-         (export ',function))
        (sb!alien:def-alien-routine (,name ,function) double-float
-	 ,@(let ((results nil))
-	     (dotimes (i num-args (nreverse results))
-	       (push (list (intern (format nil "ARG-~D" i))
-			   'double-float)
-		     results)))))))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
+         ,@(let ((results nil))
+             (dotimes (i num-args (nreverse results))
+               (push (list (intern (format nil "ARG-~D" i))
+                           'double-float)
+                     results)))))))
 
 (defun handle-reals (function var)
   `((((foreach fixnum single-float bignum ratio))

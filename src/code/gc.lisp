@@ -352,11 +352,11 @@
 	      (set-auto-gc-trigger *gc-trigger*)
 	      (dolist (hook *after-gc-hooks*)
 		(/show0 "doing a hook from *AFTER-GC--HOOKS*")
-		;; FIXME: This hook should be called with the
-		;; same kind of information as *GC-NOTIFY-AFTER*.
-		;; In particular, it would be nice for the
-		;; hook function to be able to adjust *GC-TRIGGER*
-		;; intelligently to e.g. 108% of total memory usage.
+		;; FIXME: This hook should be called with the same
+		;; kind of information as *GC-NOTIFY-AFTER*. In
+		;; particular, it would be nice for the hook function
+		;; to be able to adjust *GC-TRIGGER* intelligently to
+		;; e.g. 108% of total memory usage.
 		(carefully-funcall hook))
 	      (when *gc-notify-stream*
 		(/show0 "doing the *GC-NOTIFY-AFTER* thing")

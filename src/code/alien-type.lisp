@@ -21,17 +21,17 @@
 	    (:constructor %make-alien-type-type (alien-type)))
   (alien-type nil :type alien-type))
 
-(define-type-class alien)
+(!define-type-class alien)
 
-(define-type-method (alien :unparse) (type)
+(!define-type-method (alien :unparse) (type)
   `(alien ,(unparse-alien-type (alien-type-type-alien-type type))))
 
-(define-type-method (alien :simple-subtypep) (type1 type2)
+(!define-type-method (alien :simple-subtypep) (type1 type2)
   (values (alien-subtype-p (alien-type-type-alien-type type1)
 			   (alien-type-type-alien-type type2))
 	  t))
 
-;;; KLUDGE: This DEFINE-SUPERCLASSES gets executed much later than the
+;;; KLUDGE: This !DEFINE-SUPERCLASSES gets executed much later than the
 ;;; others (toplevel form time instead of cold load init time) because
 ;;; ALIEN-VALUE itself is a structure which isn't defined until fairly
 ;;; late.
@@ -40,16 +40,16 @@
 ;;; It's sufficiently unlike the others that it's a bit of a pain, and
 ;;; it doesn't seem to be put to any good use either in type inference or
 ;;; in type declarations.
-(define-superclasses alien ((alien-value)) progn)
+(!define-superclasses alien ((alien-value)) progn)
 
-(define-type-method (alien :simple-=) (type1 type2)
+(!define-type-method (alien :simple-=) (type1 type2)
   (let ((alien-type-1 (alien-type-type-alien-type type1))
 	(alien-type-2 (alien-type-type-alien-type type2)))
     (values (or (eq alien-type-1 alien-type-2)
 		(alien-type-= alien-type-1 alien-type-2))
 	    t)))
 
-(def-type-translator alien (&optional (alien-type nil))
+(!def-type-translator alien (&optional (alien-type nil))
   (typecase alien-type
     (null
      (make-alien-type-type))

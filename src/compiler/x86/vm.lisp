@@ -137,8 +137,6 @@
 	  (forms `(define-storage-class ,sc-name ,index
 		    ,@(cdr class)))
 	  (forms `(defconstant ,constant-name ,index))
-	  (forms `(let ((sb!int::*rogue-export* "DEFINE-STORAGE-CLASSES"))
-		    (export ',constant-name)))
 	  (incf index))))
     `(progn
        ,@(forms))))
@@ -378,7 +376,7 @@
 ;;;
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
-(def-vm-support-routine immediate-constant-sc (value)
+(!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((or fixnum #-sb-xc-host system-area-pointer character)
      (sc-number-or-lose 'immediate))
@@ -425,7 +423,7 @@
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
-(def-vm-support-routine location-print-name (tn)
+(!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
 	 (sb (sb-name (sc-sb sc)))

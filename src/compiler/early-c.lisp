@@ -15,7 +15,7 @@
 
 (in-package "SB!C")
 
-;;; FIXME: Shouldn't SB-C::&MORE be in this list?
+;;; FIXME: Shouldn't SB!C::&MORE be in this list?
 (defconstant-eqx sb!xc:lambda-list-keywords
   '(&optional &rest &key &aux &body &whole &allow-other-keys &environment)
   #!+sb-doc

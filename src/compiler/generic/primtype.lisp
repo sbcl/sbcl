@@ -133,7 +133,7 @@
 ;;;; PRIMITIVE-TYPE-OF and friends
 
 ;;; Return the most restrictive primitive type that contains Object.
-(def-vm-support-routine primitive-type-of (object)
+(!def-vm-support-routine primitive-type-of (object)
   (let ((type (ctype-of object)))
     (cond ((not (member-type-p type)) (primitive-type type))
 	  ((equal (member-type-members type) '(nil))
@@ -172,9 +172,9 @@
 ;;; In a bootstrapping situation, we should be careful to use the
 ;;; correct values for the system parameters.
 ;;;
-;;; We need an aux function because we need to use both def-vm-support-routine
-;;; and defun-cached.
-(def-vm-support-routine primitive-type (type)
+;;; We need an aux function because we need to use both
+;;; !DEF-VM-SUPPORT-ROUTINE and defun-cached.
+(!def-vm-support-routine primitive-type (type)
   (primitive-type-aux type))
 (defun-cached (primitive-type-aux
 	       :hash-function (lambda (x)
@@ -352,11 +352,7 @@
 	    (part-of function))
 	   (base-char
 	    (exactly base-char))
-           ;; MNA: cons compound-type patch
-           ;; FIXIT: all commented out
-;            (cons-type
-;             (part-of list))
-	   (cons
+	   (cons-type
 	    (part-of list))
 	   (t
 	    (any))))

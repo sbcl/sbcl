@@ -271,9 +271,6 @@
 	 :operands (list this that)))
 
 (deferr object-not-type-error (object type)
-  (/show0 "entering body of DEFERR OBJECT-NOT-TYPE-ERROR, OBJECT,TYPE=..")
-  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr object))
-  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr type))
   (error (if (and (typep object 'instance)
 		  (layout-invalid (%instance-layout object)))
 	     'layout-invalid

@@ -611,8 +611,8 @@
   kind		; Kind of from mapping, :vector or :alist.
   offset)	; Offset to add to value for :vector from mapping.
 
-(def-alien-type-translator enum (&whole type
-				 name
+(def-alien-type-translator enum (&whole
+				 type name
 				 &rest mappings
 				 &environment env)
   (cond (mappings
@@ -769,7 +769,8 @@
   `(sap-ref-double ,sap (/ ,offset sb!vm:byte-bits)))
 
 #!+long-float
-(def-alien-type-class (long-float :include (float (:bits #!+x86 96 #!+sparc 128))
+(def-alien-type-class (long-float :include (float (:bits #!+x86 96
+							  #!+sparc 128))
 				  :include-args (type)))
 
 #!+long-float

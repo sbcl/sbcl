@@ -29,7 +29,8 @@
 ;;;     fasl files would fail, because there are no DEFUNs for these
 ;;;     operations any more.)
 ;;; 5 = sbcl-0.6.8 has rearranged static symbols.
-;;; 6 = sbcl-0.6.9 got rid of non-ANSI %DEFCONSTANT/%%DEFCONSTANT stuff.
+;;; 6 = sbcl-0.6.9, got rid of non-ANSI %DEFCONSTANT/%%DEFCONSTANT stuff
+;;;     and deleted a slot from DEBUG-SOURCE structure.
 
 (setf *backend-register-save-penalty* 3)
 

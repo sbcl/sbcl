@@ -158,25 +158,23 @@
   (let ((info (sb-kernel:%code-debug-info code-obj)))
     (when info
       (let ((sources (sb-c::debug-info-source info)))
-	(format s "~@:_On ~A it was compiled from:"
-		;; FIXME: The FORMAT-UNIVERSAL-TIME calls in the system
-		;; should become more consistent, probably not using
-		;; any nondefault options.
-		(format-universal-time nil
-				       (sb-c::debug-source-compiled
-					(first sources))
-				       :style :abbreviated))
-	(dolist (source sources)
-	  (let ((name (sb-c::debug-source-name source)))
-	    (ecase (sb-c::debug-source-from source)
-	      (:file
-	       (format s "~@:_~A~@:_  Created: " (namestring name))
-	       (sb-int:format-universal-time t (sb-c::debug-source-created
-						source))
-	       (let ((comment (sb-c::debug-source-comment source)))
-		 (when comment
-		   (format s "~@:_  Comment: ~A" comment))))
-	      (:lisp (format s "~@:_~S" name)))))))))
+	(when sources
+	  (format s "~@:_On ~A it was compiled from:"
+		  ;; FIXME: The FORMAT-UNIVERSAL-TIME calls in the system
+		  ;; should become more consistent, probably not using
+		  ;; any nondefault options.
+		  (format-universal-time nil
+					 (sb-c::debug-source-compiled
+					  (first sources))
+					 :style :abbreviated))
+	  (dolist (source sources)
+	    (let ((name (sb-c::debug-source-name source)))
+	      (ecase (sb-c::debug-source-from source)
+		(:file
+		 (format s "~@:_~A~@:_  Created: " (namestring name))
+		 (sb-int:format-universal-time t (sb-c::debug-source-created
+						  source)))
+		(:lisp (format s "~@:_~S" name))))))))))
 
 ;;; Describe a compiled function. The closure case calls us to print
 ;;; the guts.

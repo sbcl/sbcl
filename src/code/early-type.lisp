@@ -93,7 +93,7 @@
   ;; the Common Lisp type-specifier
   (specifier nil :type t))
 
-(define-type-class hairy)
+(!define-type-class hairy)
 
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
@@ -120,7 +120,7 @@
 	    (:include args-type
 		      (class-info (type-class-or-lose 'values)))))
 
-(define-type-class values)
+(!define-type-class values)
 
 (defstruct (function-type
 	    (:include args-type

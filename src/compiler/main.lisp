@@ -662,8 +662,6 @@
   (untruename nil :type (or pathname null))
   ;; The file's write date (if relevant.)
   (write-date nil :type (or unsigned-byte null))
-  ;; This file's FILE-COMMENT, or NIL if none.
-  (comment nil :type (or simple-string null))
   ;; The source path root number of the first form in this file (i.e. the
   ;; total number of forms converted previously in this compilation.)
   (source-root 0 :type unsigned-byte)
@@ -934,26 +932,10 @@
 	   (*default-interface-cookie* (lexenv-interface-cookie *lexenv*)))
       (process-top-level-progn forms path))))
 
-;;; Stash file comment in the FILE-INFO structure.
-(defun process-file-comment (form)
-  (unless (and (proper-list-of-length-p form 2)
-	       (stringp (second form)))
-    (compiler-error "bad FILE-COMMENT form: ~S" form))
-  (let ((file (first (source-info-current-file *source-info*))))
-    (cond ((file-info-comment file)
-            ;; MNA: compiler message patch
-            (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-              (compiler-warning "Ignoring extra file comment:~%  ~S." form)))
-	  (t
-	   (let ((comment (coerce (second form) 'simple-string)))
-	     (setf (file-info-comment file) comment)
-	     (when sb!xc:*compile-verbose*
-               ;; MNA: compiler message patch
-               (compiler-mumble "~&; FILE-COMMENT: ~A~2&" comment)))))))
-
-;;; Force any pending top-level forms to be compiled and dumped so that they
-;;; will be evaluated in the correct package environment. Dump the form to be
-;;; evaled at (cold) load time, and if EVAL is true, eval the form immediately.
+;;; Force any pending top-level forms to be compiled and dumped so
+;;; that they will be evaluated in the correct package environment.
+;;; Dump the form to be evaled at (cold) load time, and if EVAL is
+;;; true, eval the form immediately.
 (defun process-cold-load-form (form path eval)
   (let ((object *compile-object*))
     (etypecase object
@@ -1020,7 +1002,6 @@
 		  (process-top-level-progn (cddr form) path))))
 	    (locally (process-top-level-locally form path))
 	    (progn (process-top-level-progn (cdr form) path))
-	    (file-comment (process-file-comment form))
 	    (t
 	     (let* ((uform (uncross form))
 		    (exp (preprocessor-macroexpand uform)))

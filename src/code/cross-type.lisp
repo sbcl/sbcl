@@ -83,12 +83,12 @@
 	    (t
 	     (error "can't handle TYPE-OF ~S in cross-compilation"))))))
 
-;;; Like TYPEP, but asks whether HOST-OBJECT would be of TARGET-TYPE when
-;;; instantiated on the target SBCL. Since this is hard to decide in some
-;;; cases, and since in other cases we just haven't bothered to try, it
-;;; needs to return two values, just like SUBTYPEP: the first value for
-;;; its conservative opinion (never T unless it's certain) and the second
-;;; value to tell whether it's certain.
+;;; Like TYPEP, but asks whether HOST-OBJECT would be of TARGET-TYPE
+;;; when instantiated on the target SBCL. Since this is hard to decide
+;;; in some cases, and since in other cases we just haven't bothered
+;;; to try, it needs to return two values, just like SUBTYPEP: the
+;;; first value for its conservative opinion (never T unless it's
+;;; certain) and the second value to tell whether it's certain.
 (defun cross-typep (host-object target-type)
   (flet ((warn-and-give-up ()
 	   ;; We don't have to keep track of this as long as system performance
@@ -328,7 +328,9 @@
     (structure!object
      (sb!xc:find-class (uncross (class-name (class-of x)))))
     (t
-     ;; There might be more cases which we could handle with sufficient effort;
-     ;; since all we *need* to handle are enough cases for bootstrapping, we
-     ;; don't try to be complete here. -- WHN 19990512
+     ;; There might be more cases which we could handle with
+     ;; sufficient effort; since all we *need* to handle are enough
+     ;; cases for bootstrapping, we don't try to be complete here,. If
+     ;; future maintainers make the bootstrap code more complicated,
+     ;; they can also add new cases here to handle it. -- WHN 2000-11-11
      (error "can't handle ~S in cross CTYPE-OF" x))))

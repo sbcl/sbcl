@@ -44,7 +44,8 @@
 ;;;
 ;;; 0: inherited from CMU CL
 ;;; 1: rearranged static symbols for sbcl-0.6.8
-;;; 2: eliminated non-ANSI %DEFCONSTANT/%%DEFCONSTANT support
+;;; 2: eliminated non-ANSI %DEFCONSTANT/%%DEFCONSTANT support,
+;;;    deleted a slot from DEBUG-SOURCE structure
 (defconstant sbcl-core-version-integer 2)
 
 (defun round-up (number size)

@@ -125,9 +125,7 @@
        ;; old code which expects the symbol with the same print name as
        ;; our keywords to be a constant with a value equal to the signal
        ;; number.
-       (defconstant ,symbol ,number ,description)
-       (let ((sb!int::*rogue-export* "DEF-MATH-RTN"))
-	 (export ',symbol)))))
+       (defconstant ,symbol ,number ,description))))
 
 (defun unix-signal-or-lose (arg)
   (let ((signal (find arg *unix-signals*

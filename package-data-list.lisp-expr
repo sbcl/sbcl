@@ -1727,8 +1727,12 @@ structure representations"
     :doc "internal: a code walker used by PCL"
     :use ("CL")
     :export ("DEFINE-WALKER-TEMPLATE" "WALK-FORM"
-             "*WALK-FORM-EXPAND-MACROS-P*" "NESTED-WALK-FORM"
+             "*WALK-FORM-EXPAND-MACROS-P*" 
              "VARIABLE-LEXICAL-P" "VARIABLE-SPECIAL-P"
              "VARIABLE-GLOBALLY-SPECIAL-P"
              "*VARIABLE-DECLARATIONS*" "VARIABLE-DECLARATION"
-             "MACROEXPAND-ALL")))
+
+             ;; These were expored from the original PCL version of this 
+             ;; package, but aren't used in SBCL.
+             ;;"NESTED-WALK-FORM" "MACROEXPAND-ALL"
+             )))

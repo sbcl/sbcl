@@ -247,7 +247,6 @@
   (mapcar #'(lambda (x)
 	      (let ((res (make-debug-source
 			  :from :file
-			  :comment (file-info-comment x)
 			  :created (file-info-write-date x)
 			  :compiled (source-info-start-time info)
 			  :source-root (file-info-source-root x)

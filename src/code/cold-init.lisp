@@ -45,29 +45,30 @@
 ;;; a SIMPLE-VECTOR set by genesis
 (defvar *!load-time-values*)
 
+(defun !cold-lose (msg)
+  (%primitive print msg)
+  (%primitive print "too early in cold init to recover from errors")
+  (%halt))
+
 #!+gengc
 (defun do-load-time-value-fixup (object offset index)
   (declare (type index offset))
-  (macrolet ((lose (msg)
-	       `(progn
-		  (%primitive print ,msg)
-		  (%halt))))
-    (let ((value (svref *!load-time-values* index)))
-      (typecase object
-	(list
-	 (case offset
-	   (0 (setf (car object) value))
-	   (1 (setf (cdr object) value))
-	   (t (lose "bogus offset in cons cell"))))
-	(instance
-	 (setf (%instance-ref object (- offset sb!vm:instance-slots-offset))
-	       value))
-	(code-component
-	 (setf (code-header-ref object offset) value))
-	(simple-vector
-	 (setf (svref object (- offset sb!vm:vector-data-offset)) value))
-	(t
-	 (lose "unknown kind of object for load-time-value fixup"))))))
+  (let ((value (svref *!load-time-values* index)))
+    (typecase object
+      (list
+       (case offset
+	 (0 (setf (car object) value))
+	 (1 (setf (cdr object) value))
+	 (t (!cold-lose "bogus offset in cons cell"))))
+      (instance
+       (setf (%instance-ref object (- offset sb!vm:instance-slots-offset))
+	     value))
+      (code-component
+       (setf (code-header-ref object offset) value))
+      (simple-vector
+       (setf (svref object (- offset sb!vm:vector-data-offset)) value))
+      (t
+       (!cold-lose "unknown kind of object for load-time-value fixup")))))
 
 (eval-when (:compile-toplevel :execute)
   ;; FIXME: Perhaps we should make SHOW-AND-CALL-AND-FMAKUNBOUND, too,
@@ -185,12 +186,8 @@
 					    (fourth toplevel-thing)
 					    (fifth  toplevel-thing)))
 	   (t
-	    (%primitive print
-			"bogus fixup code in *!REVERSED-COLD-TOPLEVELS*")
-	    (%halt))))
-	(t
-	 (%primitive print "bogus function in *!REVERSED-COLD-TOPLEVELS*")
-	 (%halt)))))
+	    (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
+	(t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Set sane values again, so that the user sees sane values instead of
@@ -268,7 +265,7 @@
   and so forth) unless RECKLESSLY-P is non-NIL. On UNIX-like systems,
   UNIX-STATUS is used as the status code."
   (declare (type (signed-byte 32) unix-code))
-  ;; TO DO: UNIX-CODE was deprecated in sbcl-0.6.8, after having been
+  ;; FIXME: UNIX-CODE was deprecated in sbcl-0.6.8, after having been
   ;; around for less than a year. It should be safe to remove it after
   ;; a year.
   (when unix-code-p

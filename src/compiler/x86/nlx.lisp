@@ -12,13 +12,13 @@
 (in-package "SB!VM")
 
 ;;; Make an environment-live stack TN for saving the SP for NLX entry.
-(def-vm-support-routine make-nlx-sp-tn (env)
+(!def-vm-support-routine make-nlx-sp-tn (env)
   (environment-live-tn
    (make-representation-tn *fixnum-primitive-type* any-reg-sc-number)
    env))
 
 ;;; Make a TN for the argument count passing location for a non-local entry.
-(def-vm-support-routine make-nlx-entry-argument-start-location ()
+(!def-vm-support-routine make-nlx-entry-argument-start-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ebx-offset))
 
 (defun catch-block-ea (tn)
@@ -41,7 +41,7 @@
 
 ;;; Return a list of TNs that can be used to snapshot the dynamic state for
 ;;; use with the Save/Restore-Dynamic-Environment VOPs.
-(def-vm-support-routine make-dynamic-state-tns ()
+(!def-vm-support-routine make-dynamic-state-tns ()
   (make-n-tns 3 *backend-t-primitive-type*))
 
 (define-vop (save-dynamic-state)

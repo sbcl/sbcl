@@ -154,26 +154,19 @@
     (when (csubtypep subtype (specifier-type type))
       (return type))))
 
-;;; If Type has a CHECK-xxx template, but doesn't have a corresponding
-;;; primitive-type, then return the template's name. Otherwise, return NIL.
+;;; If TYPE has a CHECK-xxx template, but doesn't have a corresponding
+;;; PRIMITIVE-TYPE, then return the template's name. Otherwise, return NIL.
 (defun hairy-type-check-template-name (type)
   (declare (type ctype type))
   (typecase type
-    ;; MNA: cons compound-type
-    ;; FIXIT: all commented out
-;     (cons-type
-;      (if (type= type (specifier-type 'cons))
-; 	 'sb!c:check-cons
-;        nil))
-;     (built-in-class
-;      (if (type= type (specifier-type 'symbol))
-;  	 'sb!c:check-symbol
-;        nil))
-    (named-type
-     (case (named-type-name type)
-       (cons 'sb!c:check-cons)
-       (symbol 'sb!c:check-symbol)
-       (t nil)))
+    (cons-type
+     (if (type= type (specifier-type 'cons))
+	 'sb!c:check-cons
+	 nil))
+    (built-in-class
+     (if (type= type (specifier-type 'symbol))
+	 'sb!c:check-symbol
+	 nil))
     (numeric-type
      (cond ((type= type (specifier-type 'fixnum))
 	    'sb!c:check-fixnum)

@@ -225,7 +225,7 @@
 
 (defprinter (vm-support-routines))
 
-(defmacro def-vm-support-routine (name ll &body body)
+(defmacro !def-vm-support-routine (name ll &body body)
   (unless (member (intern (string name) (find-package "SB!C"))
 		  *vm-support-routines*)
     (warn "unknown VM support routine: ~A" name))

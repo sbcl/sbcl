@@ -262,24 +262,24 @@ function (which would be useful info anyway).
 
 (def!struct (debug-source #-sb-xc-host (:pure t))
   ;; This slot indicates where the definition came from:
-  ;;    :File - from a file (Compile-File)
-  ;;    :Lisp - from Lisp (Compile)
+  ;;    :FILE - from a file (COMPILE-FILE)
+  ;;    :LISP - from Lisp (COMPILE)
   (from (required-argument) :type (member :file :lisp))
-  ;; If :File, the file name, if :Lisp or :Stream, then a vector of the
-  ;; top-level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
+  ;; If :FILE, the file name, if :LISP or :STREAM, then a vector of
+  ;; the top-level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
   (name nil)
-  ;; File comment for this file, if any.
-  (comment nil :type (or simple-string null))
-  ;; The universal time that the source was written, or NIL if unavailable.
+  ;; the universal time that the source was written, or NIL if
+  ;; unavailable
   (created nil :type (or unsigned-byte null))
-  ;; The universal time that the source was compiled.
+  ;; the universal time that the source was compiled
   (compiled (required-argument) :type unsigned-byte)
-  ;; The source path root number of the first form read from this source (i.e.
-  ;; the total number of forms converted previously in this compilation.)
+  ;; the source path root number of the first form read from this
+  ;; source (i.e. the total number of forms converted previously in
+  ;; this compilation)
   (source-root 0 :type index)
-  ;; The file-positions of each truly top-level form read from this file (if
-  ;; applicable). The vector element type will be chosen to hold the largest
-  ;; element. May be null to save space.
+  ;; The FILE-POSITIONs of the truly top-level forms read from this
+  ;; file (if applicable). The vector element type will be chosen to
+  ;; hold the largest element. May be null to save space.
   (start-positions nil :type (or (simple-array * (*)) null))
   ;; If from :LISP, this is the function whose source is form 0.
   (info nil))
@@ -292,21 +292,25 @@ function (which would be useful info anyway).
   ;; A list of DEBUG-SOURCE structures describing where the code for this
   ;; component came from, in the order that they were read.
   ;;
-  ;; *** NOTE: the offset of this slot is wired into the fasl dumper so that it
-  ;; *** can backpatch the source info when compilation is complete.
+  ;; KLUDGE: comment from CMU CL:
+  ;;   *** NOTE: the offset of this slot is wired into the fasl dumper 
+  ;;   *** so that it can backpatch the source info when compilation
+  ;;   *** is complete.
   (source nil :type list))
 
 (def!struct (compiled-debug-info
 	     (:include debug-info)
 	     #-sb-xc-host (:pure t))
-  ;; a simple-vector of alternating DEBUG-FUNCTION objects and fixnum PCs,
-  ;; used to map PCs to functions, so that we can figure out what function we
-  ;; were running in. Each function is valid between the PC before it
-  ;; (inclusive) and the PC after it (exclusive). The PCs are in sorted order,
-  ;; to allow binary search. We omit the first and last PC, since their values
-  ;; are 0 and the length of the code vector.
+  ;; a simple-vector of alternating DEBUG-FUNCTION objects and fixnum
+  ;; PCs, used to map PCs to functions, so that we can figure out what
+  ;; function we were running in. Each function is valid between the
+  ;; PC before it (inclusive) and the PC after it (exclusive). The PCs
+  ;; are in sorted order, to allow binary search. We omit the first
+  ;; and last PC, since their values are 0 and the length of the code
+  ;; vector.
   ;;
-  ;; KLUDGE: PC's can't always be represented by FIXNUMs, unless we're always
-  ;; careful to put our code in low memory. Is that how it works? Would this
-  ;; break if we used a more general memory map? -- WHN 20000120
+  ;; KLUDGE: PC's can't always be represented by FIXNUMs, unless we're
+  ;; always careful to put our code in low memory. Is that how it
+  ;; works? Would this break if we used a more general memory map? --
+  ;; WHN 20000120
   (function-map (required-argument) :type simple-vector :read-only t))

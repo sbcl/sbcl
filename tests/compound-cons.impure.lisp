@@ -5,10 +5,17 @@
 
 (cl:in-package :cl-user)
 
-(declaim (optimize (debug 3) (speed 2) (space 1)))
+;;; This block of eight assertions is taken directly from 
+;;; 'Issue CONS-TYPE-SPECIFIER Writeup' in the ANSI spec.
+(assert (typep '(a b c) '(cons t)))
+(assert (typep '(a b c) '(cons symbol)))
+(assert (not (typep '(a b c) '(cons integer))))
+(assert (typep '(a b c) '(cons t t)))
+(assert (not (typep '(a b c) '(cons symbol symbol))))
+(assert (typep '(a b c) '(cons symbol (cons symbol (cons symbol)))))
+(assert (not (typep '(a b c) '(cons symbol (cons symbol (cons symbol nil))))))
+(assert (typep '(a b c) '(cons symbol (cons symbol (cons symbol null)))))
 
-;;; None of this is going to work until SBCL is patched.
-#|
 (assert (not (typep 11 'cons)))
 (assert (not (typep 11 '(cons *))))
 (assert (not (typep 11 '(cons t t))))
@@ -22,29 +29,28 @@
 (assert (typep '(100) '(cons number null)))
 (assert (not (typep '(100) '(cons number string))))
 
-(assert (typep '("yes" no) '(cons string symbol)))
-(assert (not (typep '(yes no) '(cons string symbol))))
-(assert (not (typep '(yes "no") '(cons string symbol))))
-(assert (typep '(yes "no") '(cons symbol)))
-(assert (typep '(yes "no") '(cons symbol t)))
-(assert (typep '(yes "no") '(cons t string)))
-(assert (not (typep '(yes "no") '(cons t null))))
+(assert (typep '("yes" . no) '(cons string symbol)))
+(assert (not (typep '(yes . no) '(cons string symbol))))
+(assert (not (typep '(yes . "no") '(cons string symbol))))
+(assert (typep '(yes . "no") '(cons symbol)))
+(assert (typep '(yes . "no") '(cons symbol t)))
+(assert (typep '(yes . "no") '(cons t string)))
+(assert (not (typep '(yes . "no") '(cons t null))))
 
 (assert (subtypep '(cons t) 'cons))
-(assert (subtypep 'cons '(cons t) ))
+(assert (subtypep 'cons '(cons t)))
 (assert (subtypep '(cons t *) 'cons))
-(assert (subtypep 'cons '(cons t *) ))
+(assert (subtypep 'cons '(cons t *)))
 (assert (subtypep '(cons * *) 'cons))
-(assert (subtypep 'cons '(cons * *) ))
+(assert (subtypep 'cons '(cons * *)))
 
-(assert (subtypep '(cons number *) 'cons ))
+(assert (subtypep '(cons number *) 'cons))
 (assert (not (subtypep 'cons '(cons number *))))
-(assert (subtypep '(cons * number) 'cons ))
+(assert (subtypep '(cons * number) 'cons))
 (assert (not (subtypep 'cons '(cons * number))))
-(assert (subtypep '(cons structure-object number) 'cons ))
+(assert (subtypep '(cons structure-object number) 'cons))
 (assert (not (subtypep 'cons '(cons structure-object number))))
 
 (assert (subtypep '(cons null fixnum) (type-of '(nil 44))))
-|#
 
 (sb-ext:quit :unix-status 104) ; success

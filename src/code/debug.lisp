@@ -787,9 +787,7 @@ reset to ~S."
     (unless (boundp '*)
       (setq * nil)
       (fresh-line)
-      ;; FIXME: Perhaps this shouldn't be WARN (for fear of complicating
-      ;; the debugging situation?) but at least it should go to *ERROR-OUTPUT*.
-      ;; (And probably it should just be WARN.)
+      ;; FIXME: The way INTERACTIVE-EVAL does this seems better.
       (princ "Setting * to NIL (was unbound marker)."))))
 
 ;;;; debug loop functions
@@ -1212,8 +1210,9 @@ reset to ~S."
 
 ;;;; source location printing
 
-;;; We cache a stream to the last valid file debug source so that we won't have
-;;; to repeatedly open the file.
+;;; We cache a stream to the last valid file debug source so that we
+;;; won't have to repeatedly open the file.
+;;;
 ;;; KLUDGE: This sounds like a bug, not a feature. Opening files is fast
 ;;; in the 1990s, so the benefit is negligible, less important than the
 ;;; potential of extra confusion if someone changes the source during
@@ -1236,16 +1235,17 @@ reset to ~S."
 		   *cached-readtable* nil))
 	 sb!int:*before-save-initializations*)
 
-;;; We also cache the last top-level form that we printed a source for so that
-;;; we don't have to do repeated reads and calls to FORM-NUMBER-TRANSLATIONS.
+;;; We also cache the last top-level form that we printed a source for
+;;; so that we don't have to do repeated reads and calls to
+;;; FORM-NUMBER-TRANSLATIONS.
 (defvar *cached-top-level-form-offset* nil)
 (declaim (type (or index null) *cached-top-level-form-offset*))
 (defvar *cached-top-level-form*)
 (defvar *cached-form-number-translations*)
 
-;;; Given a code location, return the associated form-number translations and
-;;; the actual top-level form. We check our cache --- if there is a miss, we
-;;; dispatch on the kind of the debug source.
+;;; Given a code location, return the associated form-number
+;;; translations and the actual top-level form. We check our cache ---
+;;; if there is a miss, we dispatch on the kind of the debug source.
 (defun get-top-level-form (location)
   (let ((d-source (sb!di:code-location-debug-source location)))
     (if (and (eq d-source *cached-debug-source*)
@@ -1262,9 +1262,9 @@ reset to ~S."
 			(sb!di:form-number-translations res offset))
 		  (setq *cached-top-level-form* res))))))
 
-;;; Locates the source file (if it still exists) and grabs the top-level form.
-;;; If the file is modified, we use the top-level-form offset instead of the
-;;; recorded character offset.
+;;; Locate the source file (if it still exists) and grab the top-level
+;;; form. If the file is modified, we use the top-level-form offset
+;;; instead of the recorded character offset.
 (defun get-file-top-level-form (location)
   (let* ((d-source (sb!di:code-location-debug-source location))
 	 (tlf-offset (sb!di:code-location-top-level-form-offset location))

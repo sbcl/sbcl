@@ -117,8 +117,6 @@
 	(forms `(def-alloc ,alloc-trans ,offset ,variable-length ,header
 			   ,lowtag ',(inits))))
       `(progn
-	 (let ((sb!int::*rogue-export* "DEFINE-PRIMITIVE-OBJECT"))
-	   (export ',(exports)))
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
 	   (%define-primitive-object
 	    ',(make-primitive-object :name name

@@ -320,16 +320,6 @@ returning an array as first value always.
 	Process inferior-lisp exited abnormally with code 1
   I haven't noticed a repeatable case of this yet.
 
-28:
-  The system accepts DECLAIM in most places where DECLARE would be 
-  accepted, without even issuing a warning. ANSI allows this, but since
-  it's fairly easy to mistype DECLAIM instead of DECLARE, and the
-  meaning is rather different, and it's unlikely that the user
-  has a good reason for doing DECLAIM not at top level, it would be 
-  good to issue a STYLE-WARNING when this happens. A possible
-  fix would be to issue STYLE-WARNINGs for DECLAIMs not at top level,
-  or perhaps to issue STYLE-WARNINGs for any EVAL-WHEN not at top level.
-
 29:
   some sort of bug in inlining and RETURN-FROM in sbcl-0.6.5: Compiling
     (DEFUN BAR? (X)
@@ -780,7 +770,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   and GO forms are removed (leaving the SETF in ordinary, non-looping
   code), or if the TAGBODY and GO forms are retained, but the 
   assigned value becomes 0.0 instead of (- (ROW-MAJOR-AREF A I)).
-  
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
@@ -840,3 +830,17 @@ IR1-3a:
              "no!")))
   and while EVAL doesn't print the "right now!" messages, the first
   FUNCALL on the value returned by EVAL causes both of them to be printed.
+
+IR1-4:
+  The system accepts DECLAIM in most places where DECLARE would be 
+  accepted, without even issuing a warning. ANSI allows this, but since
+  it's fairly easy to mistype DECLAIM instead of DECLARE, and the
+  meaning is rather different, and it's unlikely that the user
+  has a good reason for doing DECLAIM not at top level, it would be 
+  good to issue a STYLE-WARNING when this happens. A possible
+  fix would be to issue STYLE-WARNINGs for DECLAIMs not at top level,
+  or perhaps to issue STYLE-WARNINGs for any EVAL-WHEN not at top level.
+  [This is considered an IR1-interpreter-related bug because until
+  EVAL-WHEN is rewritten, which won't happen until after the IR1
+  interpreter is gone, the system's notion of what's a top-level form
+  and what's not will remain too confused to fix this problem.]

@@ -1,7 +1,8 @@
 ;;;; a simple code walker for PCL
 ;;;;
-;;;; The code which implements the macroexpansion environment manipulation
-;;;; mechanisms is in the first part of the file, the real walker follows it.
+;;;; The code which implements the macroexpansion environment
+;;;; manipulation mechanisms is in the first part of the file, the
+;;;; real walker follows it.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -31,40 +32,46 @@
 ;;;; environment frobbing stuff
 
 ;;; Here in the original PCL were implementations of the
-;;; implementation-specific environment hacking functions for each of the
-;;; implementations this walker had been ported to. This functionality was
-;;; originally factored out in order to make PCL portable from one Common Lisp
-;;; to another. As of 19981107, that portability was fairly stale and (because
-;;; of the scarcity of CLTL1 implementations and the strong interdependence of
-;;; the rest of ANSI Common Lisp on the CLOS system) fairly irrelevant. It was
-;;; fairly thoroughly put out of its misery by WHN in his quest to clean up the
-;;; system enough that it can be built from scratch using any ANSI Common Lisp.
+;;; implementation-specific environment hacking functions for each of
+;;; the implementations this walker had been ported to. This
+;;; functionality was originally factored out in order to make PCL
+;;; portable from one Common Lisp to another. As of 19981107, that
+;;; portability was fairly stale and (because of the scarcity of CLTL1
+;;; implementations and the strong interdependence of the rest of ANSI
+;;; Common Lisp on the CLOS system) fairly irrelevant. It was fairly
+;;; thoroughly put out of its misery by WHN in his quest to clean up
+;;; the system enough that it can be built from scratch using any ANSI
+;;; Common Lisp.
 ;;;
-;;; This code just hacks 'macroexpansion environments'. That is, it is only
-;;; concerned with the function binding of symbols in the environment. The
-;;; walker needs to be able to tell if the symbol names a lexical macro or
-;;; function, and it needs to be able to build environments which contain
-;;; lexical macro or function bindings. It must be able, when walking a
-;;; MACROLET, FLET or LABELS form to construct an environment which reflects
-;;; the bindings created by that form. Note that the environment created
-;;; does NOT have to be sufficient to evaluate the body, merely to walk its
-;;; body. This means that definitions do not have to be supplied for lexical
-;;; functions, only the fact that that function is bound is important. For
-;;; macros, the macroexpansion function must be supplied.
+;;; This code just hacks 'macroexpansion environments'. That is, it is
+;;; only concerned with the function binding of symbols in the
+;;; environment. The walker needs to be able to tell if the symbol
+;;; names a lexical macro or function, and it needs to be able to
+;;; build environments which contain lexical macro or function
+;;; bindings. It must be able, when walking a MACROLET, FLET or LABELS
+;;; form to construct an environment which reflects the bindings
+;;; created by that form. Note that the environment created does NOT
+;;; have to be sufficient to evaluate the body, merely to walk its
+;;; body. This means that definitions do not have to be supplied for
+;;; lexical functions, only the fact that that function is bound is
+;;; important. For macros, the macroexpansion function must be
+;;; supplied.
 ;;;
-;;; This code is organized in a way that lets it work in implementations that
-;;; stack cons their environments. That is reflected in the fact that the
-;;; only operation that lets a user build a new environment is a WITH-BODY
-;;; macro which executes its body with the specified symbol bound to the new
-;;; environment. No code in this walker or in PCL will hold a pointer to
-;;; these environments after the body returns. Other user code is free to do
-;;; so in implementations where it works, but that code is not considered
-;;; portable.
+;;; This code is organized in a way that lets it work in
+;;; implementations that stack cons their environments. That is
+;;; reflected in the fact that the only operation that lets a user
+;;; build a new environment is a WITH-BODY macro which executes its
+;;; body with the specified symbol bound to the new environment. No
+;;; code in this walker or in PCL will hold a pointer to these
+;;; environments after the body returns. Other user code is free to do
+;;; so in implementations where it works, but that code is not
+;;; considered portable.
 ;;;
 ;;; There are 3 environment hacking tools. One macro,
-;;; WITH-AUGMENTED-ENVIRONMENT, which is used to create new environments, and
-;;; two functions, ENVIRONMENT-FUNCTION and ENVIRONMENT-MACRO, which are used
-;;; to access the bindings of existing environments
+;;; WITH-AUGMENTED-ENVIRONMENT, which is used to create new
+;;; environments, and two functions, ENVIRONMENT-FUNCTION and
+;;; ENVIRONMENT-MACRO, which are used to access the bindings of
+;;; existing environments
 
 ;;; In SBCL, as in CMU CL before it, the environment is represented
 ;;; with a structure that holds alists for the functional things,
@@ -81,16 +88,16 @@
 							,macros)))
      ,@body))
 
-;;; KLUDGE: In CMU CL, when X was an arbitrary list, even one which did
-;;; not name a function or describe a lambda expression, (EVAL
-;;; `(FUNCTION ,X)) would still return a FUNCTION object, and no error
-;;; would be signalled until/unless you tried to FUNCALL the resulting
-;;; FUNCTION object. (This behavior was also present in (COERCE X
-;;; 'FUNCTION), which was defined in terms of (EVAL `(FUNCTION ,X)).)
-;;; This function provides roughly the same behavior as the old CMU CL
-;;; (COERCE X 'FUNCTION), for the benefit of PCL code which relied
-;;; on being able to coerce bogus things without raising errors
-;;; as long as it never tried to actually call them.
+;;; KLUDGE: In CMU CL, when X was an arbitrary list, even one which
+;;; did not name a function or describe a lambda expression, calling
+;;; (EVAL `(FUNCTION ,X)) would still return a FUNCTION object, and no
+;;; error would be signalled until/unless you tried to FUNCALL the
+;;; resulting FUNCTION object. (This behavior was also present in
+;;; (COERCE X 'FUNCTION), which was defined in terms of (EVAL
+;;; `(FUNCTION ,X)).) This function provides roughly the same behavior
+;;; as the old CMU CL (COERCE X 'FUNCTION), for the benefit of PCL
+;;; code which relied on being able to coerce bogus things without
+;;; raising errors as long as it never tried to actually call them.
 (defun bogo-coerce-to-function (x)
   (or (ignore-errors (coerce x 'function))
       (lambda (&rest rest)
@@ -160,12 +167,13 @@
 
 ;;; Now comes the real walker.
 ;;;
-;;; As the walker walks over the code, it communicates information to itself
-;;; about the walk. This information includes the walk function, variable
-;;; bindings, declarations in effect etc. This information is inherently
-;;; lexical, so the walker passes it around in the actual environment the
-;;; walker passes to macroexpansion functions. This is what makes the
-;;; nested-walk-form facility work properly.
+;;; As the walker walks over the code, it communicates information to
+;;; itself about the walk. This information includes the walk
+;;; function, variable bindings, declarations in effect etc. This
+;;; information is inherently lexical, so the walker passes it around
+;;; in the actual environment the walker passes to macroexpansion
+;;; functions. This is what makes the NESTED-WALK-FORM facility work
+;;; properly.
 (defmacro walker-environment-bind ((var env &rest key-args)
 				      &body body)
   `(with-augmented-environment
@@ -237,11 +245,11 @@
 
 ;;;; handling of special forms
 
-;;; Here are some comments from the original PCL on the difficulty of doing
-;;; this portably across different CLTL1 implementations. This is no longer
-;;; directly relevant because this code now only runs on SBCL, but the comments
-;;; are retained for culture: they might help explain some of the design
-;;; decisions which were made in the code.
+;;; Here are some comments from the original PCL on the difficulty of
+;;; doing this portably across different CLTL1 implementations. This
+;;; is no longer directly relevant because this code now only runs on
+;;; SBCL, but the comments are retained for culture: they might help
+;;; explain some of the design decisions which were made in the code.
 ;;;
 ;;; and I quote...
 ;;;
@@ -251,36 +259,39 @@
 ;;;     program needs no special knowledge about macros...
 ;;;
 ;;; So all we have to do here is a define a way to store and retrieve
-;;; templates which describe how to walk the 24 special forms and we are all
-;;; set...
+;;; templates which describe how to walk the 24 special forms and we
+;;; are all set...
 ;;;
-;;; Well, its a nice concept, and I have to admit to being naive enough that
-;;; I believed it for a while, but not everyone takes having only 24 special
-;;; forms as seriously as might be nice. There are (at least) 3 ways to
-;;; lose:
+;;; Well, its a nice concept, and I have to admit to being naive
+;;; enough that I believed it for a while, but not everyone takes
+;;; having only 24 special forms as seriously as might be nice. There
+;;; are (at least) 3 ways to lose:
 ;;
-;;;   1 - Implementation x implements a Common Lisp special form as a macro
-;;;       which expands into a special form which:
+;;;   1 - Implementation x implements a Common Lisp special form as 
+;;;       a macro which expands into a special form which:
 ;;;	 - Is a common lisp special form (not likely)
 ;;;	 - Is not a common lisp special form (on the 3600 IF --> COND).
 ;;;
-;;;     * We can safe ourselves from this case (second subcase really) by
-;;;       checking to see whether there is a template defined for something
-;;;       before we check to see whether we can macroexpand it.
+;;;     * We can safe ourselves from this case (second subcase really)
+;;;       by checking to see whether there is a template defined for 
+;;;       something before we check to see whether we can macroexpand it.
 ;;;
 ;;;   2 - Implementation x implements a Common Lisp macro as a special form.
 ;;;
 ;;;     * This is a screw, but not so bad, we save ourselves from it by
 ;;;       defining extra templates for the macros which are *likely* to
-;;;       be implemented as special forms. (DO, DO* ...)
+;;;       be implemented as special forms. [Note: As of sbcl-0.6.9, these
+;;;       extra templates have been deleted, since this is not a problem
+;;;       in SBCL and we no longer try to make this walker portable
+;;;       across other possibly-broken CL implementations.]
 ;;;
 ;;;   3 - Implementation x has a special form which is not on the list of
 ;;;       Common Lisp special forms.
 ;;;
-;;;     * This is a bad sort of a screw and happens more than I would like
-;;;       to think, especially in the implementations which provide more
-;;;       than just Common Lisp (3600, Xerox etc.).
-;;;       The fix is not terribly staisfactory, but will have to do for
+;;;     * This is a bad sort of a screw and happens more than I would 
+;;;       like to think, especially in the implementations which provide 
+;;;       more than just Common Lisp (3600, Xerox etc.).
+;;;       The fix is not terribly satisfactory, but will have to do for
 ;;;       now. There is a hook in get walker-template which can get a
 ;;;       template from the implementation's own walker. That template
 ;;;       has to be converted, and so it may be that the right way to do
@@ -288,20 +299,13 @@
 ;;;       interface to its walker which looks like the interface to this
 ;;;       walker.
 
-;;; FIXME: In SBCL, we probably don't need to put DEFMACROs inside EVAL-WHEN.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defmacro get-walker-template-internal (x) ;Has to be inside eval-when because
-  `(get ,x 'walker-template))		   ;Golden Common Lisp doesn't hack
-					   ;compile time definition of macros
-					   ;right for setf.
+(defmacro get-walker-template-internal (x)
+  `(get ,x 'walker-template))
 
 (defmacro define-walker-template (name
 				  &optional (template '(nil repeat (eval))))
   `(eval-when (:load-toplevel :execute)
      (setf (get-walker-template-internal ',name) ',template)))
-
-) ; EVAL-WHEN
 
 (defun get-walker-template (x)
   (cond ((symbolp x)
@@ -320,50 +324,39 @@
 ;;;; the actual templates
 
 ;;; ANSI special forms
-(define-walker-template block		(nil nil repeat (eval)))
-(define-walker-template catch		(nil eval repeat (eval)))
-(define-walker-template declare	      walk-unexpected-declare)
-(define-walker-template eval-when	    (nil quote repeat (eval)))
-(define-walker-template flet		 walk-flet)
-(define-walker-template function	     (nil call))
-(define-walker-template go		   (nil quote))
-(define-walker-template if		   walk-if)
-(define-walker-template labels	       walk-labels)
-(define-walker-template lambda	       walk-lambda)
-(define-walker-template let		  walk-let)
-(define-walker-template let*		 walk-let*)
-(define-walker-template locally	      walk-locally)
-(define-walker-template macrolet	     walk-macrolet)
+(define-walker-template block                (nil nil repeat (eval)))
+(define-walker-template catch                (nil eval repeat (eval)))
+(define-walker-template declare              walk-unexpected-declare)
+(define-walker-template eval-when            (nil quote repeat (eval)))
+(define-walker-template flet                 walk-flet)
+(define-walker-template function             (nil call))
+(define-walker-template go                   (nil quote))
+(define-walker-template if                   walk-if)
+(define-walker-template labels               walk-labels)
+(define-walker-template lambda               walk-lambda)
+(define-walker-template let                  walk-let)
+(define-walker-template let*                 walk-let*)
+(define-walker-template locally              walk-locally)
+(define-walker-template macrolet             walk-macrolet)
 (define-walker-template multiple-value-call  (nil eval repeat (eval)))
 (define-walker-template multiple-value-prog1 (nil return repeat (eval)))
 (define-walker-template multiple-value-setq  walk-multiple-value-setq)
 (define-walker-template multiple-value-bind  walk-multiple-value-bind)
-(define-walker-template progn		(nil repeat (eval)))
-(define-walker-template progv		(nil eval eval repeat (eval)))
-(define-walker-template quote		(nil quote))
-(define-walker-template return-from	  (nil quote repeat (return)))
-(define-walker-template setq		 walk-setq)
+(define-walker-template progn                (nil repeat (eval)))
+(define-walker-template progv                (nil eval eval repeat (eval)))
+(define-walker-template quote                (nil quote))
+(define-walker-template return-from          (nil quote repeat (return)))
+(define-walker-template setq                 walk-setq)
 (define-walker-template symbol-macrolet      walk-symbol-macrolet)
-(define-walker-template tagbody	      walk-tagbody)
-(define-walker-template the		  (nil quote eval))
-(define-walker-template throw		(nil eval eval))
+(define-walker-template tagbody              walk-tagbody)
+(define-walker-template the                  (nil quote eval))
+(define-walker-template throw                (nil eval eval))
 (define-walker-template unwind-protect       (nil return repeat (eval)))
 
 ;;; SBCL-only special forms
-(define-walker-template sb-ext:truly-the       (nil quote eval))
-
-;;; extra templates
-(define-walker-template do      walk-do)
-(define-walker-template do*     walk-do*)
-(define-walker-template prog    walk-prog)
-(define-walker-template prog*   walk-prog*)
-(define-walker-template cond    (nil repeat ((test repeat (eval)))))
+(define-walker-template sb-ext:truly-the     (nil quote eval))
 
 (defvar *walk-form-expand-macros-p* nil)
-
-(defun macroexpand-all (form &optional environment)
-  (let ((*walk-form-expand-macros-p* t))
-    (walk-form form environment)))
 
 (defun walk-form (form
 		  &optional environment
@@ -374,82 +367,18 @@
   (walker-environment-bind (new-env environment :walk-function walk-function)
     (walk-form-internal form :eval new-env)))
 
-;;; NESTED-WALK-FORM provides an interface that allows nested macros, each
-;;; of which must walk their body, to just do one walk of the body of the
-;;; inner macro. That inner walk is done with a walk function which is the
-;;; composition of the two walk functions.
-;;;
-;;; This facility works by having the walker annotate the environment that
-;;; it passes to MACROEXPAND-1 to know which form is being macroexpanded.
-;;; If then the &WHOLE argument to the macroexpansion function is eq to
-;;; the ENV-WALK-FORM of the environment, NESTED-WALK-FORM can be certain
-;;; that there are no intervening layers and that a nested walk is OK.
-;;;
-;;; KLUDGE: There are some semantic problems with this facility. In particular,
-;;; if the outer walk function returns T as its WALK-NO-MORE-P value, this will
-;;; prevent the inner walk function from getting a chance to walk the subforms
-;;; of the form. This is almost never what you want, since it destroys the
-;;; equivalence between this NESTED-WALK-FORM function and two separate
-;;; WALK-FORMs.
-(defun nested-walk-form (whole form
-			 &optional environment
-				   (walk-function
-				     #'(lambda (subform context env)
-					 (declare (ignore context env))
-					 subform)))
-  (if (eq whole (env-walk-form environment))
-      (let ((outer-walk-function (env-walk-function environment)))
-	(throw whole
-	  (walk-form
-	    form
-	    environment
-	    #'(lambda (f c e)
-		;; First loop to make sure the inner walk function
-		;; has done all it wants to do with this form.
-		;; Basically, what we are doing here is providing
-		;; the same contract walk-form-internal normally
-		;; provides to the inner walk function.
-		(let ((inner-result nil)
-		      (inner-no-more-p nil)
-		      (outer-result nil)
-		      (outer-no-more-p nil))
-		  (loop
-		    (multiple-value-setq (inner-result inner-no-more-p)
-					 (funcall walk-function f c e))
-		    (cond (inner-no-more-p (return))
-			  ((not (eq inner-result f)))
-			  ((not (consp inner-result)) (return))
-			  ((get-walker-template (car inner-result)) (return))
-			  (t
-			   (multiple-value-bind (expansion macrop)
-			       (walker-environment-bind
-				     (new-env e :walk-form inner-result)
-				 (macroexpand-1 inner-result new-env))
-			     (if macrop
-				 (setq inner-result expansion)
-				 (return)))))
-		    (setq f inner-result))
-		  (multiple-value-setq (outer-result outer-no-more-p)
-				       (funcall outer-walk-function
-						inner-result
-						c
-						e))
-		  (values outer-result
-			  (and inner-no-more-p outer-no-more-p)))))))
-      (walk-form form environment walk-function)))
-
-;;; WALK-FORM-INTERNAL is the main driving function for the code walker. It
-;;; takes a form and the current context and walks the form calling itself or
-;;; the appropriate template recursively.
+;;; WALK-FORM-INTERNAL is the main driving function for the code
+;;; walker. It takes a form and the current context and walks the form
+;;; calling itself or the appropriate template recursively.
 ;;;
 ;;;   "It is recommended that a program-analyzing-program process a form
 ;;;    that is a list whose car is a symbol as follows:
 ;;;
 ;;;     1. If the program has particular knowledge about the symbol,
-;;;	process the form using special-purpose code. All of the
-;;;	standard special forms should fall into this category.
-;;;     2. Otherwise, if macro-function is true of the symbol apply
-;;;	either macroexpand or macroexpand-1 and start over.
+;;;	   process the form using special-purpose code. All of the
+;;;	   standard special forms should fall into this category.
+;;;     2. Otherwise, if MACRO-FUNCTION is true of the symbol apply
+;;;	   either MACROEXPAND or MACROEXPAND-1 and start over.
 ;;;     3. Otherwise, assume it is a function call. "
 (defun walk-form-internal (form context env)
   ;; First apply the walk-function to perform whatever translation
@@ -496,13 +425,14 @@
 			 (not (fboundp fn))
 			 (special-operator-p fn))
 		    ;; This shouldn't happen, since this walker is now
-		    ;; maintained as part of SBCL, so it should know about all
-		    ;; the special forms that SBCL knows about.
+		    ;; maintained as part of SBCL, so it should know
+		    ;; about all the special forms that SBCL knows
+		    ;; about.
 		    (error "unexpected special form ~S" fn))
 		   (t
-		    ;; Otherwise, walk the form as if it's just a standard
-		    ;; function call using a template for standard function
-		    ;; call.
+		    ;; Otherwise, walk the form as if it's just a
+		    ;; standard function call using a template for
+		    ;; standard function call.
 		    (walk-template
 		     newnewform '(call repeat (eval)) context env))))))))))))
 
@@ -525,9 +455,10 @@
 	(repeat
 	  (walk-template-handle-repeat form
 				       (cdr template)
-				       ;; For the case where nothing happens
-				       ;; after the repeat optimize out the
-				       ;; call to length.
+				       ;; For the case where nothing
+				       ;; happens after the repeat
+				       ;; optimize away the call to
+				       ;; LENGTH.
 				       (if (null (cddr template))
 					   ()
 					   (nthcdr (- (length form)
@@ -628,7 +559,8 @@
 		 form
 		 (walk-declarations (cdr body) fn env t)))
 	((and (listp form) (eq (car form) 'declare))
-	 ;; We got ourselves a real live declaration. Record it, look for more.
+	 ;; We got ourselves a real live declaration. Record it, look
+	 ;; for more.
 	 (dolist (declaration (cdr form))
 	   (let ((type (car declaration))
 		 (name (cadr declaration))
@@ -860,10 +792,10 @@
 							 (if sequentialp
 							     new-env
 							     old-env))
-				     (cddr binding))	; Save cddr for DO/DO*;
-							; it is the next value
-							; form. Don't walk it
-							; now though.
+				     ;; Save cddr for DO/DO*; it is
+				     ;; the next value form. Don't
+				     ;; walk it now, though.
+				     (cddr binding))	
 			    (note-lexical-binding (car binding) new-env)))
 		 (walk-bindings-1 (cdr bindings)
 				  old-env
@@ -1054,23 +986,25 @@
 ;;;; tests tests tests
 
 #|
-;;; Here are some examples of the kinds of things you should be able to do
-;;; with your implementation of the macroexpansion environment hacking
-;;; mechanism.
+;;; Here are some examples of the kinds of things you should be able
+;;; to do with your implementation of the macroexpansion environment
+;;; hacking mechanism.
 ;;;
-;;; WITH-LEXICAL-MACROS is kind of like MACROLET, but it only takes names
-;;; of the macros and actual macroexpansion functions to use to macroexpand
-;;; them. The win about that is that for macros which want to wrap several
-;;; MACROLETs around their body, they can do this but have the macroexpansion
-;;; functions be compiled. See the WITH-RPUSH example.
+;;; WITH-LEXICAL-MACROS is kind of like MACROLET, but it only takes
+;;; names of the macros and actual macroexpansion functions to use to
+;;; macroexpand them. The win about that is that for macros which want
+;;; to wrap several MACROLETs around their body, they can do this but
+;;; have the macroexpansion functions be compiled. See the WITH-RPUSH
+;;; example.
 ;;;
-;;; If the implementation had a special way of communicating the augmented
-;;; environment back to the evaluator that would be totally great. It would
-;;; mean that we could just augment the environment then pass control back
-;;; to the implementations own compiler or interpreter. We wouldn't have
-;;; to call the actual walker. That would make this much faster. Since the
-;;; principal client of this is defmethod it would make compiling defmethods
-;;; faster and that would certainly be a win.
+;;; If the implementation had a special way of communicating the
+;;; augmented environment back to the evaluator that would be totally
+;;; great. It would mean that we could just augment the environment
+;;; then pass control back to the implementations own compiler or
+;;; interpreter. We wouldn't have to call the actual walker. That
+;;; would make this much faster. Since the principal client of this is
+;;; defmethod it would make compiling defmethods faster and that would
+;;; certainly be a win.
 
 (defmacro with-lexical-macros (macros &body body &environment old-env)
   (with-augmented-environment (new-env old-env :macros macros)

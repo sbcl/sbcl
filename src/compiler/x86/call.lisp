@@ -15,7 +15,7 @@
 
 ;;; Return a wired TN describing the N'th full call argument passing
 ;;; location.
-(def-vm-support-routine standard-argument-location (n)
+(!def-vm-support-routine standard-argument-location (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
       (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
@@ -29,7 +29,7 @@
 ;;;
 ;;; No problems.
 ;#+nil
-(def-vm-support-routine make-return-pc-passing-location (standard)
+(!def-vm-support-routine make-return-pc-passing-location (standard)
   (declare (ignore standard))
   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		 sap-stack-sc-number return-pc-save-offset))
@@ -38,7 +38,7 @@
 ;;;
 ;;; No problems.
 #+nil
-(def-vm-support-routine make-return-pc-passing-location (standard)
+(!def-vm-support-routine make-return-pc-passing-location (standard)
   (let ((ptype (primitive-type-or-lose 'system-area-pointer)))
     (if standard
 	(make-wired-tn ptype sap-stack-sc-number return-pc-save-offset)
@@ -54,7 +54,7 @@
 ;;;
 ;;; No problems
 ;#+nil
-(def-vm-support-routine make-old-fp-passing-location (standard)
+(!def-vm-support-routine make-old-fp-passing-location (standard)
   (declare (ignore standard))
   (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
 		 ocfp-save-offset))
@@ -63,7 +63,7 @@
 ;;;
 ;;; No problems.
 #+nil
-(def-vm-support-routine make-old-fp-passing-location (standard)
+(!def-vm-support-routine make-old-fp-passing-location (standard)
   (if standard
       (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
 		     ocfp-save-offset)
@@ -75,14 +75,14 @@
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wire to the stack? No problems.
-(def-vm-support-routine make-old-fp-save-location (env)
+(!def-vm-support-routine make-old-fp-save-location (env)
   (environment-debug-live-tn (make-wired-tn *fixnum-primitive-type*
 					    control-stack-sc-number
 					    ocfp-save-offset)
 			     env))
 ;;; Using a save-tn. No problems.
 #+nil
-(def-vm-support-routine make-old-fp-save-location (env)
+(!def-vm-support-routine make-old-fp-save-location (env)
   (specify-save-tn
    (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
@@ -90,14 +90,14 @@
 
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wire to the stack? No problems.
-(def-vm-support-routine make-return-pc-save-location (env)
+(!def-vm-support-routine make-return-pc-save-location (env)
   (environment-debug-live-tn
    (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		  sap-stack-sc-number return-pc-save-offset)
    env))
 ;;; Using a save-tn. No problems.
 #+nil
-(def-vm-support-routine make-return-pc-save-location (env)
+(!def-vm-support-routine make-return-pc-save-location (env)
   (let ((ptype (primitive-type-or-lose 'system-area-pointer)))
     (specify-save-tn
      (environment-debug-live-tn (make-normal-tn ptype) env)
@@ -106,24 +106,24 @@
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we
 ;;; are using non-standard conventions.
-(def-vm-support-routine make-argument-count-location ()
+(!def-vm-support-routine make-argument-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ecx-offset))
 
 
 ;;; Make a TN to hold the number-stack frame pointer. This is allocated
 ;;; once per component, and is component-live.
-(def-vm-support-routine make-nfp-tn ()
+(!def-vm-support-routine make-nfp-tn ()
   (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
 
-(def-vm-support-routine make-stack-pointer-tn ()
+(!def-vm-support-routine make-stack-pointer-tn ()
   (make-normal-tn *fixnum-primitive-type*))
 
-(def-vm-support-routine make-number-stack-pointer-tn ()
+(!def-vm-support-routine make-number-stack-pointer-tn ()
   (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
 
 ;;; Return a list of TNs that can be used to represent an unknown-values
 ;;; continuation within a function.
-(def-vm-support-routine make-unknown-values-locations ()
+(!def-vm-support-routine make-unknown-values-locations ()
   (list (make-stack-pointer-tn)
 	(make-normal-tn *fixnum-primitive-type*)))
 
@@ -135,7 +135,7 @@
 ;;;
 ;;; For the x86 the first constant is a pointer to a list of fixups,
 ;;; or nil if the code object has none.
-(def-vm-support-routine select-component-format (component)
+(!def-vm-support-routine select-component-format (component)
   (declare (type component component))
   (dotimes (i (1+ code-constants-offset))
     (vector-push-extend nil

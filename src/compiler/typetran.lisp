@@ -298,6 +298,25 @@
 				`(typep ,n-obj ',(type-specifier x)))
 			    types)))))))
 
+;;; If necessary recurse to check the cons type.
+(defun source-transform-cons-typep (object type)
+  (let* ((car-type (cons-type-car-type type))
+	 (cdr-type (cons-type-cdr-type type)))
+    (let ((car-test-p (not (or (type= car-type *wild-type*)
+			       (type= car-type (specifier-type t)))))
+	  (cdr-test-p (not (or (type= cdr-type *wild-type*)
+			       (type= cdr-type (specifier-type t))))))
+      (if (and (not car-test-p) (not cdr-test-p))
+	  `(consp ,object)
+	  (once-only ((n-obj object))
+	    `(and (consp ,n-obj)
+		  ,@(if car-test-p
+			`((typep (car ,n-obj)
+				 ',(type-specifier car-type))))
+		  ,@(if cdr-test-p
+			`((typep (cdr ,n-obj)
+				 ',(type-specifier cdr-type))))))))))
+ 
 ;;; Return the predicate and type from the most specific entry in
 ;;; *TYPE-PREDICATES* that is a supertype of TYPE.
 (defun find-supertype-predicate (type)
@@ -495,6 +514,8 @@
 		    `(%instance-typep ,object ,spec))
 		   (array-type
 		    (source-transform-array-typep object type))
+		   (cons-type
+		    (source-transform-cons-typep object type))
 		   (t nil)))
 	    `(%typep ,object ,spec)))
       (values nil t)))
@@ -520,6 +541,7 @@
 		      (give-up-ir1-transform)))))))
 
 ;;; KLUDGE: new broken version -- 20000504
+;;; FIXME: should be fixed or deleted
 #+nil
 (deftransform coerce ((x type) (* *) * :when :both)
   (unless (constant-continuation-p type)

@@ -118,7 +118,7 @@
     (when values
       (invoke-alien-type-method :result-tn (car values) state))))
 
-(def-vm-support-routine make-call-out-tns (type)
+(!def-vm-support-routine make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
       (dolist #+nil ;; this reversed list seems to cause the alien botches!!

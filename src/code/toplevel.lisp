@@ -394,11 +394,6 @@
 			  possible-init-file-names)
 	       (/show0 "leaving PROBE-INIT-FILES"))))
       (let* ((sbcl-home (posix-getenv "SBCL_HOME"))
-	     #!+sb-show(ignore1 (progn
-				  (/show0 "SBCL-HOME=..")
-				  (if sbcl-home
-				      (%primitive print sbcl-home)
-				      (%primitive print "NIL"))))
 	     (sysinit-truename (if sbcl-home
 				   (probe-init-files sysinit
 						     (concatenate
@@ -411,9 +406,6 @@
 	     (user-home (or (posix-getenv "HOME")
 			    (error "The HOME environment variable is unbound, ~
 				    so user init file can't be found.")))
-	     #!+sb-show(ignore2 (progn
-				  (/show0 "USER-HOME=..")
-				  (%primitive print user-home)))
 	     (userinit-truename (probe-init-files userinit
 						  (concatenate
 						   'string
@@ -421,15 +413,11 @@
 						   "/.sbclrc"))))
 	(/show0 "assigned SYSINIT-TRUENAME and USERINIT-TRUENAME")
 	(when sysinit-truename
-	  (/show0 "SYSINIT-TRUENAME=..")
-	  #!+sb-show (%primitive print sysinit-truename)
 	  (unless (load sysinit-truename)
 	    (error "~S was not successfully loaded." sysinit-truename))
 	  (flush-standard-output-streams))
 	(/show0 "loaded SYSINIT-TRUENAME")
 	(when userinit-truename
-	  (/show0 "USERINIT-TRUENAME=..")
-	  #!+sb-show (%primitive print userinit-truename)
 	  (unless (load userinit-truename)
 	    (error "~S was not successfully loaded." userinit-truename))
 	  (flush-standard-output-streams))

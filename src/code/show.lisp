@@ -11,39 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!INT")
-
-;;; FIXME: Look for any other calls to %PRIMITIVE PRINT and check whether
-;;; any of them need removing too.
-
-;;;; FIXME: Remove this after all in-the-flow-of-control EXPORTs
-;;;; have been cleaned up.
-
-(defvar *rogue-export*)
-
-;;;; FILE-COMMENT
-
-;;;; FILE-COMMENT arguably doesn't belong in this file, even though
-;;;; it's sort of for displaying information about the system.
-;;;; However, it's convenient to put it in this file, since we'd like
-;;;; this file to be the first file in the system, and we'd like to be
-;;;; able to use FILE-COMMENT in this file.
-
-;;; The real implementation of SB!INT:FILE-COMMENT is a special form,
-;;; but this macro expansion for it is still useful for
-;;;   (1) documentation,
-;;;   (2) code walkers, and
-;;;   (3) compiling the cross-compiler itself under the cross-compilation 
-;;;       host ANSI Common Lisp.
-(defmacro file-comment (string)
-  #!+sb-doc
-  "FILE-COMMENT String
-  When COMPILE-FILE sees this form at top-level, it places the constant string
-  in the run-time source location information. DESCRIBE will print the file
-  comment for the file that a function was defined in. The string is also
-  textually present in the FASL, so the RCS \"ident\" command can find it,
-  etc."
-  (declare (ignore string))
-  '(values))
 
 ;;;; various SB-SHOW-dependent forms
 
