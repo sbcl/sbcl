@@ -86,6 +86,11 @@ case "$HOST_TYPE" in
            INIT="-norc"
            CORE="-M"
            ;;
+    openmcl)
+           LISP="openmcl"
+	   INIT="-b"
+	   CORE="-I"
+	   ;;
     *)     echo unknown host type: "$HOST_TYPE"
            echo should be one of "sbcl", "cmucl", or "clisp"
            exit 1

@@ -1709,6 +1709,8 @@ changes in sbcl-0.8alpha.0 relative to sbcl-0.7.14
     ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list.
 
 changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
+  * SBCL now builds using CLISP (version of late April 2003 from CVS)
+    as cross-compilation host.
   * minor incompatible change: the :NEGATIVE-ZERO-IS-NOT-ZERO feature
     no longer has any effect, as the code controlled by this feature
     has been deleted.  (As far as we know, no-one has ever built using

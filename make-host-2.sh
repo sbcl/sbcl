@@ -112,7 +112,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
         ;;; 
 	(let ((filename "output/object-filenames-for-genesis.lisp-expr"))
 	  (ensure-directories-exist filename :verbose t)
-	  (with-open-file (s filename :direction :output)
+	  (with-open-file (s filename :direction :output :if-exists :supersede)
 	    (write *target-object-file-names* :stream s :readably t)))
         ;; Let's check that the type system was reasonably sane. (It's
 	;; easy to spend a long time wandering around confused trying
@@ -127,8 +127,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(when (position :sb-after-xc-core *shebang-features*)
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
-          #+clisp (ext:saveinitmem "output/after-xc.core")
-	  )
+          #+openmcl (ccl::save-application "output/after-xc.core")
+          #+clisp (ext:saveinitmem "output/after-xc.core"))
         #+cmu (ext:quit)
         #+clisp (ext:quit)
 	EOF
