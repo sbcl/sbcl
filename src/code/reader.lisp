@@ -168,9 +168,12 @@
   (!set-secondary-attribute #\d +char-attr-constituent-expt+)
   (!set-secondary-attribute #\s +char-attr-constituent-expt+)
   (!set-secondary-attribute #\l +char-attr-constituent-expt+)
-  (!set-secondary-attribute (code-char 8) +char-attr-invalid+)
-  (!set-secondary-attribute (code-char 127) +char-attr-invalid+))
-
+  (!set-secondary-attribute #\Space +char-attr-invalid+)
+  (!set-secondary-attribute #\Newline +char-attr-invalid+)
+  (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
+		   return-char-code rubout-char-code))
+    (!set-secondary-attribute (code-char c) +char-attr-invalid+)))
+		   
 (defmacro get-secondary-attribute (char)
   `(elt *secondary-attribute-table*
 	(char-code ,char)))
@@ -313,8 +316,8 @@
 	     (set-cmt-entry char nil)
 	     (set-cat-entry char +char-attr-whitespace+)))
       (whitespaceify (code-char tab-char-code))
-      (whitespaceify #\linefeed)
-      (whitespaceify #\space)
+      (whitespaceify #\Newline)
+      (whitespaceify #\Space)
       (whitespaceify (code-char form-feed-char-code))
       (whitespaceify (code-char return-char-code)))
 
