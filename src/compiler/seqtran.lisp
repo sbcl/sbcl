@@ -75,8 +75,8 @@
 ;;; MAP is %MAP plus a check to make sure that any length specified in
 ;;; the result type matches the actual result. We also wrap it in a
 ;;; TRULY-THE for the most specific type we can determine.
-(deftransform map ((result-type-arg fun &rest seqs) * * :node node)
-  (let* ((seq-names (make-gensym-list (length seqs)))
+(deftransform map ((result-type-arg fun seq &rest seqs) * * :node node)
+  (let* ((seq-names (make-gensym-list (1+ (length seqs))))
 	 (bare `(%map result-type-arg fun ,@seq-names))
 	 (constant-result-type-arg-p (constant-continuation-p result-type-arg))
 	 ;; what we know about the type of the result. (Note that the
@@ -180,9 +180,9 @@
 ;;; handle that case more efficiently, but it's left as an exercise to
 ;;; the reader, because the code is complicated enough already and I
 ;;; don't happen to need that functionality right now. -- WHN 20000410
-(deftransform %map ((result-type fun &rest seqs) * * :policy (>= speed space))
+(deftransform %map ((result-type fun seq &rest seqs) * *
+		    :policy (>= speed space))
   "open code"
-  (unless seqs (abort-ir1-transform "no sequence args"))
   (unless (constant-continuation-p result-type)
     (give-up-ir1-transform "RESULT-TYPE argument not constant"))
   (labels ( ;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
@@ -202,24 +202,25 @@
 				   (t
 				    (give-up-ir1-transform
 				     "can't determine result type")))))
-      (cond ((and result-type-value (= 1 (length seqs)))
+      (cond ((and result-type-value (null seqs))
 	     ;; The consing arity-1 cases can be implemented
 	     ;; reasonably efficiently as function calls, and the cost
 	     ;; of consing should be significantly larger than
 	     ;; function call overhead, so we always compile these
 	     ;; cases as full calls regardless of speed-versus-space
 	     ;; optimization policy.
-	     (cond ((subtypep 'list result-type-value)
-		    '(apply #'%map-to-list-arity-1 fun seqs))
+	     (cond ((subtypep result-type-value 'list)
+		    '(%map-to-list-arity-1 fun seq))
 		   ( ;; (This one can be inefficient due to COERCE, but
 		    ;; the current open-coded implementation has the
 		    ;; same problem.)
 		    (subtypep result-type-value 'vector)
-		    `(coerce (apply #'%map-to-simple-vector-arity-1 fun seqs)
+		    `(coerce (%map-to-simple-vector-arity-1 fun seq)
 			     ',result-type-value))
 		   (t (bug "impossible (?) sequence type"))))
 	    (t
-	     (let* ((seq-args (make-gensym-list (length seqs))))
+	     (let* ((seqs (cons seq seqs))
+		    (seq-args (make-gensym-list (length seqs))))
 	       (multiple-value-bind (push-dacc result)
 		   (ecase result-supertype
 		     (null (values nil nil))

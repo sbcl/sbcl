@@ -1708,6 +1708,15 @@ changes in sbcl-0.8alpha.0 relative to sbcl-0.7.14
        MAKE-INSTANCE.
     ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list.
 
+changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
+  * SB-MOP:DIRECT-SLOT-DEFINITION-CLASS and
+    SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
+    specified-by-AMOP lambda list of (CLASS &REST INITARGS).
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** the GENERIC-FUNCTION type is no longer disjoint from FUNCTION
+       types.
+
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, maybe in 0.7.x, maybe later, it might impact TRACE. They both

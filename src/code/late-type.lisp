@@ -265,6 +265,18 @@
   (declare (ignore type1 type2))
   (specifier-type 'function))
 
+;;; The union or intersection of a subclass of FUNCTION with a
+;;; FUNCTION type is somewhat complicated.
+(!define-type-method (function :complex-intersection2) (type1 type2)
+  (cond
+    ((type= type1 (specifier-type 'function)) type2)
+    ((csubtypep type1 (specifier-type 'function)) nil)
+    (t :call-other-method)))
+(!define-type-method (function :complex-union2) (type1 type2)
+  (cond
+    ((type= type1 (specifier-type 'function)) type1)
+    (t nil)))
+
 ;;; ### Not very real, but good enough for redefining transforms
 ;;; according to type:
 (!define-type-method (function :simple-=) (type1 type2)
@@ -280,37 +292,6 @@
 
 (!def-type-translator constant-arg (type)
   (make-constant-type :type (specifier-type type)))
-
-;;; Given a LAMBDA-LIST-like values type specification and an ARGS-TYPE
-;;; structure, fill in the slots in the structure accordingly. This is
-;;; used for both FUNCTION and VALUES types.
-(declaim (ftype (function (list args-type) (values)) parse-args-types))
-(defun parse-args-types (lambda-list result)
-  (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux)
-      (parse-lambda-list-like-thing lambda-list)
-    (declare (ignore aux)) ; since we require AUXP=NIL
-    (when auxp
-      (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list))
-    (setf (args-type-required result)
-          (mapcar #'single-value-specifier-type required))
-    (setf (args-type-optional result)
-          (mapcar #'single-value-specifier-type optional))
-    (setf (args-type-rest result)
-          (if restp (single-value-specifier-type rest) nil))
-    (setf (args-type-keyp result) keyp)
-    (collect ((key-info))
-      (dolist (key keys)
-	(unless (proper-list-of-length-p key 2)
-	  (error "Keyword type description is not a two-list: ~S." key))
-	(let ((kwd (first key)))
-	  (when (find kwd (key-info) :key #'key-info-name)
-	    (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
-		   kwd lambda-list))
-	  (key-info (make-key-info :name kwd
-				   :type (single-value-specifier-type (second key))))))
-      (setf (args-type-keywords result) (key-info)))
-    (setf (args-type-allowp result) allowp)
-    (values)))
 
 ;;; Return the lambda-list-like type specification corresponding
 ;;; to an ARGS-TYPE.
@@ -342,16 +323,10 @@
     (result)))
 
 (!def-type-translator function (&optional (args '*) (result '*))
-  (let ((res (make-fun-type :returns (values-specifier-type result))))
-    (if (eq args '*)
-	(setf (fun-type-wild-args res) t)
-	(parse-args-types args res))
-    res))
+  (make-fun-type :args args :returns (values-specifier-type result)))
 
 (!def-type-translator values (&rest values)
-  (let ((res (%make-values-type)))
-    (parse-args-types values res)
-    res))
+  (make-values-type :args values))
 
 ;;;; VALUES types interfaces
 ;;;;
@@ -381,7 +356,7 @@
 ;;; type, return NIL, NIL.
 (defun fun-type-nargs (type)
   (declare (type ctype type))
-  (if (fun-type-p type)
+  (if (and (fun-type-p type) (not (fun-type-wild-args type)))
       (let ((fixed (length (args-type-required type))))
 	(if (or (args-type-rest type)
 		(args-type-keyp type)
@@ -716,14 +691,14 @@
   (flet ((1way (x y)
 	   (!invoke-type-method :simple-intersection2 :complex-intersection2
 				x y
-				:default :no-type-method-found)))
+				:default :call-other-method)))
     (declare (inline 1way))
     (let ((xy (1way type1 type2)))
-      (or (and (not (eql xy :no-type-method-found)) xy)
+      (or (and (not (eql xy :call-other-method)) xy)
 	  (let ((yx (1way type2 type1)))
-	    (or (and (not (eql yx :no-type-method-found)) yx)
-		(cond ((and (eql xy :no-type-method-found)
-			    (eql yx :no-type-method-found))
+	    (or (and (not (eql yx :call-other-method)) yx)
+		(cond ((and (eql xy :call-other-method)
+			    (eql yx :call-other-method))
 		       *empty-type*)
 		      (t
 		       (aver (and (not xy) (not yx))) ; else handled above

@@ -169,7 +169,6 @@
                 (subtypep '(function)
                           '(function (t &rest t))))
                '(nil t)))
-#+nil
 (assert (and (subtypep 'function '(function))
              (subtypep '(function) 'function)))
 

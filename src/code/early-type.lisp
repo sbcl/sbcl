@@ -67,23 +67,107 @@
   ;; true if other &KEY arguments are allowed
   (allowp nil :type boolean))
 
+(defun canonicalize-args-type-args (required optional rest)
+  (when rest
+    (let ((last-distinct-optional (position rest optional
+					    :from-end t
+					    :test-not #'type=)))
+      (setf optional
+	    (when last-distinct-optional
+	      (subseq optional 0 (1+ last-distinct-optional))))))
+  (values required optional rest))
+
+(defun args-types (lambda-list-like-thing)
+  (multiple-value-bind
+	(required optional restp rest keyp keys allowp auxp aux)
+      (parse-lambda-list-like-thing lambda-list-like-thing)
+    (declare (ignore aux))
+    (when auxp
+      (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list-like-thing))
+    (let ((required (mapcar #'single-value-specifier-type required))
+	  (optional (mapcar #'single-value-specifier-type optional))
+	  (rest (when restp (single-value-specifier-type rest)))
+	  (keywords
+	   (collect ((key-info))
+	     (dolist (key keys)
+	       (unless (proper-list-of-length-p key 2)
+		 (error "Keyword type description is not a two-list: ~S." key))
+	       (let ((kwd (first key)))
+		 (when (find kwd (key-info) :key #'key-info-name)
+		   (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
+			  kwd lambda-list-like-thing))
+		 (key-info
+		  (make-key-info
+		   :name kwd
+		   :type (single-value-specifier-type (second key))))))
+	     (key-info))))
+      (multiple-value-bind (required optional rest)
+	  (canonicalize-args-type-args required optional rest)
+	(values required optional rest keyp keywords allowp)))))
+		    
 (defstruct (values-type
 	    (:include args-type
 		      (class-info (type-class-or-lose 'values)))
             (:constructor %make-values-type)
 	    (:copier nil)))
-(define-cached-synonym make-values-type)
+
+(defun make-values-type (&rest initargs
+			 &key (args nil argsp) &allow-other-keys)
+  (if argsp
+      (if (eq args '*)
+	  *wild-type*
+	  (multiple-value-bind (required optional rest keyp keywords allowp)
+	      (args-types args)
+	    (if (and (null required)
+		     (null optional)
+		     (eq rest *universal-type*)
+		     (not keyp))
+		*wild-type*
+		(%make-values-type :required required
+				   :optional optional
+				   :rest rest
+				   :keyp keyp
+				   :keywords keywords
+				   :allowp allowp))))
+      (apply #'%make-values-type initargs)))
 
 (!define-type-class values)
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type
-			       (class-info (type-class-or-lose 'function))))
+			       (class-info (type-class-or-lose 'function)))
+		     (:constructor %make-fun-type))
   ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean)
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype))
+(defun make-fun-type (&rest initargs
+		      &key (args nil argsp) returns &allow-other-keys)
+  (if argsp
+      (if (eq args '*)
+	  (if (eq returns *wild-type*)
+	      (specifier-type 'function)
+	      (%make-fun-type :wild-args t :returns returns))
+	  (multiple-value-bind (required optional rest keyp keywords allowp)
+	      (args-types args)
+	    (if (and (null required)
+		     (null optional)
+		     (eq rest *universal-type*)
+		     (not keyp))
+		(if (eq returns *wild-type*)
+		    (specifier-type 'function)
+		    (%make-fun-type :wild-args t :returns returns))
+		(%make-fun-type :required required
+				:optional optional
+				:rest rest
+				:keyp keyp
+				:keywords keywords
+				:allowp allowp
+				:returns returns))))
+      ;; FIXME: are we really sure that we won't make something that
+      ;; looks like a completely wild function here?
+      (apply #'%make-fun-type initargs)))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
 ;;; "type specifier", which is only meaningful in function argument
