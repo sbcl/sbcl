@@ -125,14 +125,15 @@
                                      (simple-array t)
                                      *
                                      :important t)
-  (let* ((atype (continuation-type array))
-        (eltype (array-type-specialized-element-type atype)))
-    (when (eq eltype *wild-type*)
-      (give-up-ir1-transform
-       "specialized array element type not known at compile-time"))
-    `(if (array-header-p array)
-         (values (%array-data-vector array) index)
-         (values array index))))
+
+  ;; We do this solely for the -OR-GIVE-UP side effect, since we want
+  ;; to know that the type can be figured out in the end before we
+  ;; proceed, but we don't care yet what the type will turn out to be.
+  (upgraded-element-type-specifier-or-give-up array)
+
+  '(if (array-header-p array)
+       (values (%array-data-vector array) index)
+       (values array index)))
 
 ;;; transforms for getting at simple arrays of (UNSIGNED-BYTE N) when (< N 8)
 ;;;

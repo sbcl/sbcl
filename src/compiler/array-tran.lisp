@@ -28,6 +28,11 @@
 ;;; type is going to be the array upgraded element type.
 (defun extract-upgraded-element-type (array)
   (let ((type (continuation-type array)))
+    ;; Note that this IF mightn't be satisfied even if the runtime
+    ;; value is known to be a subtype of some specialized ARRAY, because
+    ;; we can have values declared e.g. (AND SIMPLE-VECTOR UNKNOWN-TYPE),
+    ;; which are represented in the compiler as INTERSECTION-TYPE, not
+    ;; array type.
     (if (array-type-p type)
 	(array-type-specialized-element-type type)
 	*universal-type*)))
@@ -38,10 +43,11 @@
 (defun assert-new-value-type (new-value array)
   (let ((type (continuation-type array)))
     (when (array-type-p type)
-      (assert-continuation-type new-value (array-type-specialized-element-type type))))
+      (assert-continuation-type new-value
+				(array-type-specialized-element-type type))))
   (continuation-type new-value))
 
-;;; Return true if Arg is NIL, or is a constant-continuation whose
+;;; Return true if ARG is NIL, or is a constant-continuation whose
 ;;; value is NIL, false otherwise.
 (defun unsupplied-or-nil (arg)
   (declare (type (or continuation null) arg))

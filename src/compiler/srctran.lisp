@@ -3301,7 +3301,7 @@
               *universal-type*)))))
 
 (defoptimizer (array-element-type derive-type) ((array))
-  (let* ((array-type (continuation-type array)))
+  (let ((array-type (continuation-type array)))
     (labels ((consify (list)
               (if (endp list)
                   '(eql nil)

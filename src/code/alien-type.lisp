@@ -38,11 +38,6 @@
 ;;; others (toplevel form time instead of cold load init time) because
 ;;; ALIEN-VALUE itself is a structure which isn't defined until fairly
 ;;; late.
-;;;
-;;; FIXME: I'm somewhat tempted to just punt ALIEN from the type system.
-;;; It's sufficiently unlike the others that it's a bit of a pain, and
-;;; it doesn't seem to be put to any good use either in type inference or
-;;; in type declarations.
 (!define-superclasses alien ((alien-value)) progn)
 
 (!define-type-method (alien :simple-=) (type1 type2)

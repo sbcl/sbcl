@@ -103,6 +103,16 @@
 (defun floating-point-pain (x)
   (declare (single-float x))
   (log x))
+
+;;; bug found and fixed ca. sbcl-0.7.5.12: The INTERSECTION-TYPE
+;;; here satisfies "is a subtype of ARRAY-TYPE", but can't be
+;;; accessed with ARRAY-TYPE accessors like
+;;; ARRAY-TYPE-SPECIALIZED-ELEMENT-TYPE, so ARRAY-related
+;;; DEFTRANSFORMs died with TYPE-ERROR at compile time when
+;;; compiling the DEFUN here.
+(defun stupid-input-to-smart-array-deftransforms-0-7-5-12 (v)
+  (declare (type (and simple-vector fwd-type-ref) v))
+  (aref v 0))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
