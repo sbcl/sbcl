@@ -7,8 +7,9 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "runtime.h"
+
 #include "sbcl.h"
+#include "runtime.h"
 
 struct simple_object_file
 {
