@@ -32,8 +32,6 @@ have gone away (typically because they were fixed, but sometimes for
 other reasons, e.g. because they were moved elsewhere).
 
 
-KNOWN BUGS OF NO SPECIAL CLASS:
-
 2:
   DEFSTRUCT almost certainly should overwrite the old LAYOUT information
   instead of just punting when a contradictory structure definition
@@ -190,7 +188,10 @@ WORKAROUND:
   type safety errors reported by Peter Van Eynde July 25, 2000:
 	k: READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
 	   not a binary input stream, but instead cheerfully reads from
-	   character streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
+	   string-input streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
+  [ Bug was reported as "from character streams", but in 0.8.3.10 we
+  get correct behaviour from (WITH-OPEN-FILE (i "/dev/zero") (READ-BYTE i)) ]
+
 
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
@@ -544,6 +545,8 @@ WORKAROUND:
   isn't too surprising since there are many differences in stack
   implementation and GC conservatism between the X86 and other ports.)
 
+  This is probably the same bug as 216
+
 167:
   In sbcl-0.7.3.11, compiling the (illegal) code 
     (in-package :cl-user)
@@ -797,6 +800,8 @@ WORKAROUND:
   It's as though the process of working with the uninitialized slot in
   the bad VECTOR-PUSH-EXTEND frame causes GC problems, though that may
   not be the actual problem. (CMU CL 18c doesn't have problems with this.)
+
+  This is probably the same bug as 162
 
 217: "Bad type operations with FUNCTION types"
   In sbcl.0.7.7:
@@ -1052,10 +1057,6 @@ WORKAROUND:
         (bignum "hip")
         (t "zuz")))
 
-272:
-  All forms of GC hooks (including notifiers and finalisers) are currently
-  (since 0.8.0) broken for gencgc (i.e. x86) users 
-
 273:
   Compilation of the following two forms causes "X is unbound" error:
 
@@ -1192,7 +1193,15 @@ WORKAROUND:
 
     (foo (aref (the (array (unsigned-byte 32)) x)))
 
-DEFUNCT CATEGORIES OF BUGS
-  IR1-#:
-    These labels were used for bugs related to the old IR1 interpreter.
-    The # values reached 6 before the category was closed down.
+283: Thread safety: libc functions
+  There are places that we call unsafe-for-threading libc functions
+  that we should find alternatives for, or put locks around.  Known or
+  strongly suspected problems, as of 0.8.3.10: please update this
+  bug instead of creating new ones
+
+    localtime() - called for timezone calculations in code/time.lisp
+
+284: Thread safety: special variables
+  There are lots of special variables in SBCL, and I feel sure that at
+  least some of them are indicative of potentially thread-unsafe 
+  parts of the system.  See doc/internals/notes/threading-specials
