@@ -58,7 +58,7 @@ rm -r $testdir
 # was removed from UNIX-STAT. Let's make sure that it works now.
 #
 # Set up an empty directory to work with.
-testdir=$TMPDIR/sbcl-mkdir-test-$$
+testdir=${TMPDIR:-/tmp}/sbcl-mkdir-test-$$
 if ! rm -rf $testdir ; then
   echo "$testdir already exists and could not be deleted"
   exit 1;

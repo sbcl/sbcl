@@ -558,6 +558,13 @@
 		  (when (and res (eql (logand mode sb!unix:s-ifmt)
 				      sb!unix:s-ifdir))
 		    (let ((nodes (cons (cons dev ino) nodes)))
+		      ,@body))))
+	     (with-directory-node-removed ((head) &body body)
+	       `(multiple-value-bind (res dev ino mode)
+		    (unix-xstat ,head)
+		  (when (and res (eql (logand mode sb!unix:s-ifmt)
+				      sb!unix:s-ifdir))
+		    (let ((nodes (remove (cons dev ino) nodes :test #'equal)))
 		      ,@body)))))
     (if tail
 	(let ((piece (car tail)))
@@ -605,12 +612,13 @@
 						 verify-existence follow-links
 						 nodes function))))))))
 	  ((member :up)
+	     (with-directory-node-removed (head)
 	     (let ((head (concatenate 'string head "..")))
 	       (with-directory-node-noted (head)
 		 (%enumerate-directories (concatenate 'string head "/")
 					 (rest tail) pathname
 					 verify-existence follow-links
-					 nodes function))))))
+					 nodes function)))))))
 	(%enumerate-files head pathname verify-existence function))))
 
 ;;; Call FUNCTION on files.
@@ -905,15 +913,12 @@
    means this function can sometimes return files which don't have the same
    directory as PATHNAME."
   (let (;; We create one entry in this hash table for each truename,
-	;; as an asymptotically fast way of removing duplicates (which
-	;; can arise when e.g. multiple symlinks map to the same
-	;; truename).
+	;; as an asymptotically efficient way of removing duplicates
+	;; (which can arise when e.g. multiple symlinks map to the
+	;; same truename).
 	(truenames (make-hash-table :test #'equal))
-	;; FIXME: not really right, as per bug 139
         (merged-pathname (merge-pathnames pathname
-					  (make-pathname :name :wild
-							 :type :wild
-							 :version :wild))))
+					  *default-pathname-defaults*)))
     (!enumerate-matches (match merged-pathname)
       (let ((*ignore-wildcards* t)
             (truename (truename (if (eq (sb!unix:unix-file-kind match)

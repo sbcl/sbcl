@@ -143,10 +143,8 @@ Lisp filename syntax idiosyncrasies)."
   ;; "/usr/bin" instead of the CMU-CL-style "/usr/bin/". In that case,
   ;; s:/":": in most or all the NEED-MATCHes here.
   (need-match "./*.*" '("animal/" "dirt" "plant/" "water"))
-  ;; FIXME: (DIRECTORY "*.*") doesn't work (bug 139). And it looks as
-  ;; though the same problem affects (DIRECTORY "animal") too.
-  #+nil (need-match "*.*" '("animal/" "dirt" "plant/" "water"))
-  #+nil (need-match "animal" '("animal/"))
+  (need-match "*.*" '("animal/" "dirt" "plant/" "water"))
+  (need-match "animal" '("animal/"))
   (need-match "./animal" '("animal/"))
   (need-match "animal/*.*" '("animal/invertebrate/" "animal/vertebrate/"))
   (need-match "animal/*/*.*"
@@ -173,16 +171,10 @@ Lisp filename syntax idiosyncrasies)."
 			       "mammal/walrus"
 			       "snake/" "snake/python"))))
     (need-match "animal/vertebrate/**/*.*" vertebrates)
-    ;; FIXME: In sbcl-0.pre7.109, DIRECTORY got confused on (I think...)
-    ;; absolute pathnames containing "../*" stuff. If I understood
-    ;; and remember correctly, CR's patch will fix this.
-    #|
     (need-match "animal/vertebrate/mammal/../**/*.*" vertebrates)
     (need-match "animal/vertebrate/mammal/../**/**/*.*" vertebrates)
     (need-match "animal/vertebrate/mammal/mythical/../**/../**/*.*"
-		vertebrates)
-    |#
-    )
+		vertebrates))
   (need-match "animal/vertebrate/**/robot.*" nil)
   (need-match "animal/vertebrate/mammal/../**/*.robot" nil)
   (need-match "animal/vertebrate/mammal/../**/robot/*.*" nil)

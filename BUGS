@@ -1282,30 +1282,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   still some functions named "hairy arg processor" and
   "SB-INT:&MORE processor".
 
-139:
-  In sbcl-0.pre7.107, (DIRECTORY "*.*") is broken, as reported by 
-  Nathan Froyd sbcl-devel 2001-12-28.
-
-  Christophe Rhodes suggested (sbcl-devel 2001-12-30) converting
-  the MERGED-PATHNAME expression in DEFUN DIRECTORY to
-        (merged-pathname (merge-pathnames pathname
-					  *default-pathname-defaults*))
-  This looks right, and fixes this bug, but it interacts with the NODES
-  logic in %ENUMERATE-PATHNAMES to create a new bug, so that
-  (DIRECTORY "../**/*.*") no longer shows files in the current working
-  directory. Probably %ENUMERATE-PATHNAMES (or related logic like
-  %ENUMERATE-MATCHES) needs to be patched as well.
-
-  Note: The MERGED-PATHNAME change changes behavior incompatibly,
-  making e.g. (DIRECTORY "*") no longer equivalent to (DIRECTORY "*.*"),
-  so deserves a NEWS entry. E.g.
-* minor incompatible change (part of a bug fix by Christophe Rhodes
-  to DIRECTORY behavior): DIRECTORY no longer implicitly promotes
-  NIL slots of its pathname argument to :WILD, and in particular
-  asking for the contents of a directory, which you used to be able
-  to do without explicit wildcards, e.g. (DIRECTORY "/tmp/"), 
-  now needs explicit wildcards, e.g. (DIRECTORY "/tmp/*.*").
-
 140:
   (reported by Alexey Dejneka sbcl-devel 2002-01-03)
 
