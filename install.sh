@@ -41,10 +41,12 @@ SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 
-gnumake=${GNUMAKE:-gmake}
+. ./find-gnumake.sh
+find_gnumake
+
 for i in contrib/*; do
     test -d $i && test -f $i/test-passed || continue;
     INSTALL_DIR=$SBCL_HOME/`basename $i `
     export INSTALL_DIR
-    ensure_dirs $INSTALL_DIR && $gnumake -C $i install
+    ensure_dirs $INSTALL_DIR && $GNUMAKE -C $i install
 done

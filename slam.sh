@@ -96,10 +96,14 @@ case "$HOST_TYPE" in
            exit 1
 esac
 
-export SBCL_XC_HOST="$LISP $INIT"
+SBCL_XC_HOST="$LISP $INIT"
+export SBCL_XC_HOST
 
 # (We don't do make-host-1.sh at all. Hopefully nothing relevant has
 # changed.)
+
+. ./find-gnumake.sh
+find_gnumake
 
 sh make-target-1.sh || exit 1
 
