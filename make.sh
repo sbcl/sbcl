@@ -109,9 +109,9 @@ NCONTRIBS=`find contrib -name Makefile -print | wc -l`
 NPASSED=`find contrib -name test-passed -print | wc -l`
 
 echo
-echo The build seems to have finished successfully, including $NPASSED
-echo (out of $NCONTRIBS) contributed modules.  If you would like to run 
-echo more extensive tests on the new SBCL, you can try 
+echo "The build seems to have finished successfully, including $NPASSED"
+echo "(out of $NCONTRIBS) contributed modules.  If you would like to run" 
+echo "more extensive tests on the new SBCL, you can try"
 echo "  cd tests && sh ./run-tests.sh"
 echo "(but expect some failures on non-x86 platforms)."
 

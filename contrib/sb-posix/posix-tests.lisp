@@ -112,6 +112,7 @@
       (sb-posix:syscall-errno c)))
   #.sb-posix::enotdir)
 
+#-sunos ; Apparently gives EINVAL on SunOS 8, which doesn't make sense
 (deftest rmdir.error.3
   (handler-case
       (sb-posix:rmdir "/")
@@ -132,8 +133,10 @@
       (sb-posix:syscall-error (c)
 	(delete-file file)
 	(sb-posix:rmdir dir)
-	(sb-posix:syscall-errno c))))
-  #.sb-posix::enotempty)
+	(let ((errno (sb-posix:syscall-errno c)))
+	  ;; documented by POSIX
+	  (or (= errno sb-posix::eexist) (= errno sb-posix::enotempty))))))
+  t)
 
 (deftest rmdir.error.5
   (let* ((dir (merge-pathnames
