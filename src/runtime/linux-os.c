@@ -75,7 +75,7 @@ void os_init(void)
 #endif
 #ifdef LISP_FEATURE_SPARC
 	if ((major_version <2) || (major_version==2 && minor_version < 4)) {
-	    FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", minor_version));
+	    FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
 	    linux_sparc_siginfo_bug = 1;
 	}
 #endif
