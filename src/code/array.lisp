@@ -323,69 +323,50 @@
 
 ;;;; accessor/setter functions
 
+(eval-when (:compile-toplevel :execute)
+  (defparameter *specialized-array-element-types*
+    '(t
+      character
+      bit
+      (unsigned-byte 2)
+      (unsigned-byte 4)
+      (unsigned-byte 8)
+      (unsigned-byte 16)
+      (unsigned-byte 32)
+      (signed-byte 8)
+      (signed-byte 16)
+      (signed-byte 30)
+      (signed-byte 32)
+      single-float
+      double-float
+      #!+long-float long-float
+      (complex single-float)
+      (complex double-float)
+      #!+long-float (complex long-float))))
+    
 (defun hairy-data-vector-ref (array index)
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end) (optimize (safety 3)))
-    (macrolet ((dispatch (&rest stuff)
-		 `(etypecase vector
-		    ,@(mapcar #'(lambda (type)
-				  (let ((atype `(simple-array ,type (*))))
-				    `(,atype
-				      (data-vector-ref (the ,atype vector)
-						       index))))
-			      stuff))))
-      (dispatch
-       t
-       bit
-       character
-       (unsigned-byte 2)
-       (unsigned-byte 4)
-       (unsigned-byte 8)
-       (unsigned-byte 16)
-       (unsigned-byte 32)
-       (signed-byte 8)
-       (signed-byte 16)
-       (signed-byte 30)
-       (signed-byte 32)
-       single-float
-       double-float
-       #!+long-float long-float
-       (complex single-float)
-       (complex double-float)
-       #!+long-float (complex long-float)))))
+    (etypecase vector .
+	       #.(mapcar (lambda (type)
+			   (let ((atype `(simple-array ,type (*))))
+			     `(,atype
+			       (data-vector-ref (the ,atype vector)
+						index))))
+			 *specialized-array-element-types*))))
 
 (defun hairy-data-vector-set (array index new-value)
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end) (optimize (safety 3)))
-    (macrolet ((dispatch (&rest stuff)
-		 `(etypecase vector
-		    ,@(mapcar #'(lambda (type)
-				  (let ((atype `(simple-array ,type (*))))
-				    `(,atype
-				      (data-vector-set (the ,atype vector)
-						       index
-						       (the ,type
-							    new-value)))))
-			      stuff))))
-      (dispatch
-       t
-       bit
-       character
-       (unsigned-byte 2)
-       (unsigned-byte 4)
-       (unsigned-byte 8)
-       (unsigned-byte 16)
-       (unsigned-byte 32)
-       (signed-byte 8)
-       (signed-byte 16)
-       (signed-byte 30)
-       (signed-byte 32)
-       single-float
-       double-float
-       #!+long-float long-float
-       (complex single-float)
-       (complex double-float)
-       #!+long-float (complex long-float)))))
+    (etypecase vector .
+	       #.(mapcar (lambda (type)
+			   (let ((atype `(simple-array ,type (*))))
+			     `(,atype
+			       (data-vector-set (the ,atype vector)
+						index
+						(the ,type
+						  new-value)))))
+			 *specialized-array-element-types*))))
 
 (defun %array-row-major-index (array subscripts
 				     &optional (invalid-index-error-p t))
@@ -856,10 +837,10 @@
 	 (error "bogus value for :FILL-POINTER in ADJUST-ARRAY: ~S"
 		fill-pointer))))
 
-(defun shrink-vector (vector new-size)
+(defun shrink-vector (vector new-length)
   #!+sb-doc
-  "Destructively alters the Vector, changing its length to New-Size, which
-   must be less than or equal to its current size."
+  "Destructively alter VECTOR, changing its length to NEW-LENGTH, which
+   must be less than or equal to its current length."
   (declare (vector vector))
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
@@ -868,7 +849,7 @@
 				  `(,(car thing)
 				    (fill (truly-the ,(car thing) ,name)
 					  ,(cadr thing)
-					  :start new-size)))
+					  :start new-length)))
 			      things))))
       (frob vector
 	(simple-vector 0)
@@ -896,7 +877,7 @@
 	 (coerce 0 '(complex long-float))))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
-  (setf (%array-fill-pointer vector) new-size)
+  (setf (%array-fill-pointer vector) new-length)
   vector)
 
 (defun set-array-header (array data length fill-pointer displacement dimensions

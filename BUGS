@@ -24,46 +24,62 @@ but instead
 
 KNOWN PORT-SPECIFIC BUGS
 
-The breakpoint-based TRACE facility doesn't work properly in the
-OpenBSD port of sbcl-0.6.7.
+OpenBSD-1:
+  The breakpoint-based TRACE facility doesn't work properly
+  in the OpenBSD port of sbcl-0.6.7.
 
-KNOWN BUGS
+KNOWN BUGS RELATED TO THE IR1 INTERPRETER
+
+At some point, the pure interpreter (aka the "IR1 interpreter") will
+probably go away (replaced by constructs like
+  (DEFUN EVAL (X) (FUNCALL (COMPILE NIL (LAMBDA ..)))))
+and at that time these bugs should go away automatically. Until then,
+they'll probably remain, since they're not considered urgent.
+
+IR1-1:
+  The FUNCTION special operator doesn't check properly whether its
+  argument is a function name. E.g. (FUNCTION (X Y)) returns a value
+  instead of failing with an error. (Later attempting to funcall the
+  value does cause an error.) 
+
+IR1-2:
+  COMPILED-FUNCTION-P bogusly reports T for interpreted functions:
+	* (DEFUN FOO (X) (- 12 X))
+	FOO
+	* (COMPILED-FUNCTION-P #'FOO)
+	T
+
+OTHER KNOWN BUGS:
 
 (There is also some information on bugs in the manual page and in the
 TODO file. Eventually more such information may move here.)
 
-* The FUNCTION special operator doesn't check properly whether its
-  argument is a function name. E.g. (FUNCTION (X Y)) returns a value
-  instead of failing with an error. (Later attempting to funcall the
-  value does cause an error.)
-
-* Failure in initialization files is not handled gracefully -- it's 
+1:
+  Failure in initialization files is not handled gracefully -- it's 
   a throw to TOP-LEVEL-CATCHER, which is not caught until we enter
   TOPLEVEL-REPL. Code should be added to catch such THROWs even when
   we're not in TOPLEVEL-REPL and do *something* with them (probably
   complaining about an error outside TOPLEVEL-REPL, perhaps printing
   a BACKTRACE, then terminating execution of SBCL).
 
-* COMPILED-FUNCTION-P bogusly reports T for interpreted functions:
-	* (DEFUN FOO (X) (- 12 X))
-	FOO
-	* (COMPILED-FUNCTION-P #'FOO)
-	T
-
-* DEFSTRUCT should almost certainly overwrite the old LAYOUT information
+2:
+  DEFSTRUCT should almost certainly overwrite the old LAYOUT information
   instead of just punting when a contradictory structure definition
   is loaded.
 
-* It should cause a STYLE-WARNING, not a full WARNING, when a structure
+3:
+  It should cause a STYLE-WARNING, not a full WARNING, when a structure
   slot default value does not match the declared structure slot type.
   (The current behavior is consistent with SBCL's behavior elsewhere,
   and would not be a problem, except that the other behavior is 
   specifically required by the ANSI spec.)
 
-* It should cause a STYLE-WARNING, not a WARNING, when the system ignores
+4:
+  It should cause a STYLE-WARNING, not a WARNING, when the system ignores
   an FTYPE proclamation for a slot accessor.
 
-* Error reporting on various stream-requiring operations is not 
+5:
+  Error reporting on various stream-requiring operations is not 
   very good when the stream argument has the wrong type, because
   the operation tries to fall through to Gray stream code, and then
   dies because it's undefined. E.g. 
@@ -77,20 +93,18 @@ TODO file. Eventually more such information may move here.)
   Gray stream functions that the old CMU CL code expects, with
   each stub just raising the appropriate TYPE-ERROR.)
 
-* bogus warnings about undefined functions for magic functions like
+6:
+  bogus warnings about undefined functions for magic functions like
   SB!C::%%DEFUN and SB!C::%DEFCONSTANT when cross-compiling files
   like src/code/float.lisp
 
-* The "byte compiling top-level form:" output ought to be condensed.
+7:
+  The "byte compiling top-level form:" output ought to be condensed.
   Perhaps any number of such consecutive lines ought to turn into a
   single "byte compiling top-level forms:" line.
 
-* The handling of IGNORE declarations on lambda list arguments of DEFMETHOD
-  is at least weird, and in fact seems broken and useless. I should 
-  fix up another layer of binding, declared IGNORABLE, for typed
-  lambda list arguments.
-
-* Compiling a file containing the erroneous program
+8:
+  Compiling a file containing the erroneous program
 	(DEFSTRUCT FOO
 	  A
 	  B)
@@ -104,7 +118,14 @@ TODO file. Eventually more such information may move here.)
   (The specific message which says that the problem was duplicate
   slot names gets lost.)
 
-* The way that the compiler munges types with arguments together
+9:
+  The handling of IGNORE declarations on lambda list arguments of
+  DEFMETHOD is at least weird, and in fact seems broken and useless.
+  I should fix up another layer of binding, declared IGNORABLE, for
+  typed lambda list arguments.
+
+10:
+  The way that the compiler munges types with arguments together
   with types with no arguments (in e.g. TYPE-EXPAND) leads to
   weirdness visible to the user:
 	(DEFTYPE FOO () 'FIXNUM)
@@ -117,7 +138,8 @@ TODO file. Eventually more such information may move here.)
   so I'm not 100% sure that the behavior above is actually illegal.
   But I'm 90+% sure, and someday perhaps I'll be motivated to look it up..
 
-* It would be nice if the
+11:
+  It would be nice if the
 	caught ERROR:
 	  (during macroexpansion)
   said what macroexpansion was at fault, e.g.
@@ -125,7 +147,8 @@ TODO file. Eventually more such information may move here.)
 	  (during macroexpansion of IN-PACKAGE,
 	  during macroexpansion of DEFFOO)
 
-* The type system doesn't understand the KEYWORD type very well:
+12:
+  The type system doesn't understand the KEYWORD type very well:
 	(SUBTYPEP 'KEYWORD 'SYMBOL) => NIL, NIL
   It might be possible to fix this by changing the definition of
   KEYWORD to (AND SYMBOL (SATISFIES KEYWORDP)), but the type system
@@ -136,13 +159,15 @@ TODO file. Eventually more such information may move here.)
 	(SUBTYPEP '(AND INTEGER FIXNUM) 'NUMBER) =>T, T
   so likely this is a small patch.)
 
-* Floating point infinities are screwed up. [When I was converting CMU CL
+13:
+  Floating point infinities are screwed up. [When I was converting CMU CL
   to SBCL, I was looking for complexity to delete, and I thought it was safe
   to just delete support for floating point infinities. It wasn't: they're
   generated by the floating point hardware even when we remove support
   for them in software. -- WHN] Support for them should be restored.
 
-* The ANSI syntax for non-STANDARD method combination types in CLOS is
+14:
+  The ANSI syntax for non-STANDARD method combination types in CLOS is
 	(DEFGENERIC FOO (X) (:METHOD-COMBINATION PROGN))
 	(DEFMETHOD FOO PROGN ((X BAR)) (PRINT 'NUMBER))
   If you mess this up, omitting the PROGN qualifier in in DEFMETHOD,
@@ -168,16 +193,19 @@ TODO file. Eventually more such information may move here.)
 	function COMPUTE-EFFECTIVE-METHOD).
   This is not very helpful..
 
-* (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
+15:
+  (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
   (Also, when this is fixed, we can enable the code in PROCLAIM which 
   checks for incompatible FTYPE redeclarations.)
 
-* The ANSI spec says that CONS can be a compound type spec, e.g.
+16:
+  The ANSI spec says that CONS can be a compound type spec, e.g.
   (CONS FIXNUM REAL). SBCL doesn't support this.
 
-* from Paolo Amoroso on the CMU CL mailing list 27 Feb 2000:
-   I use CMU CL 18b under Linux. When COMPILE-FILE is supplied a physical
+17:
+  from Paolo Amoroso on the CMU CL mailing list 27 Feb 2000:
+I use CMU CL 18b under Linux. When COMPILE-FILE is supplied a physical
 pathname, the type of the corresponding compiled file is X86F:
 	* (compile-file "/home/paolo/lisp/tools/foo")
 	Python version 1.0, VM version Intel x86 on 27 FEB 0 06:00:46 pm.
@@ -204,7 +232,8 @@ becomes FASL:
 	NIL
 	NIL
 
-* from DTC on the CMU CL mailing list 25 Feb 2000:
+18:
+  from DTC on the CMU CL mailing list 25 Feb 2000:
 ;;; Compiler fails when this file is compiled.
 ;;;
 ;;; Problem shows up in delete-block within ir1util.lisp. The assertion
@@ -239,19 +268,22 @@ becomes FASL:
          cccc
            (return-from bbbb nil))))))
 
-* (I *think* this is a bug. It certainly seems like strange behavior. But
+19:
+  (I *think* this is a bug. It certainly seems like strange behavior. But
   the ANSI spec is scary, dark, and deep..)
     (FORMAT NIL  "~,1G" 1.4) => "1.    "
     (FORMAT NIL "~3,1G" 1.4) => "1.    "
 
-* from Marco Antoniotti on cmucl-imp mailing list 1 Mar 2000:
+20:
+  from Marco Antoniotti on cmucl-imp mailing list 1 Mar 2000:
 	(defclass ccc () ())
 	(setf (find-class 'ccc1) (find-class 'ccc))
 	(defmethod zut ((c ccc1)) 123)
   DTC's recommended workaround from the mailing list 3 Mar 2000:
 	(setf (pcl::find-class 'ccc1) (pcl::find-class 'ccc))
 
-* There's probably a bug in the compiler handling of special variables
+21:
+  There's probably a bug in the compiler handling of special variables
   in closures, inherited from the CMU CL code, as reported on the
   CMU CL mailing list. There's a patch for this on the CMU CL
   mailing list too:
@@ -259,7 +291,8 @@ becomes FASL:
     Date: Fri, 10 Mar 2000 22:50:32 +1100
     From: "Douglas T. Crosher" <dtc@jeack.com.au>
 
-* The ANSI spec, in section "22.3.5.2 Tilde Less-Than-Sign: Logical Block",
+22:
+  The ANSI spec, in section "22.3.5.2 Tilde Less-Than-Sign: Logical Block",
   says that an error is signalled if ~W, ~_, ~<...~:>, ~I, or ~:T is used
   inside "~<..~>" (without the colon modifier on the closing syntax).
   However, SBCL doesn't do this:
@@ -267,18 +300,21 @@ becomes FASL:
 	munge12egnum
 	NIL
 
-* When too many files are opened, OPEN will fail with an
+23:
+  When too many files are opened, OPEN will fail with an
   uninformative error message 
 	error in function OPEN: error opening #P"/tmp/foo.lisp": NIL
   instead of saying that too many files are open.
 
-* Right now, when COMPILE-FILE has a read error, it actually pops
+24:
+  Right now, when COMPILE-FILE has a read error, it actually pops
   you into the debugger before giving up on the file. It should
   instead handle the error, perhaps issuing (and handling)
   a secondary error "caught ERROR: unrecoverable error during compilation"
   and then return with FAILURE-P true,
 
-* from CMU CL mailing list 01 May 2000 
+25:
+  from CMU CL mailing list 01 May 2000 
 
 I realize I can take care of this by doing (proclaim (ignore pcl::.slots1.))
 but seeing as .slots0. is not-exported, shouldn't it be ignored within the
@@ -306,18 +342,21 @@ Compilation unit finished.
 
 #<Standard-Method FOO-BAR-BAZ (RESOURCE-TYPE) {480918FD}>
 
-* reported by Sam Steingold on the cmucl-imp mailing list 12 May 2000:
+26:
+  reported by Sam Steingold on the cmucl-imp mailing list 12 May 2000:
 
 Also, there is another bug: `array-displacement' should return an array
 or nil as first value (as per ANSI CL), while CMUCL declares it as
 returning an array as first value always.
 
-* Sometimes (SB-EXT:QUIT) fails with 
+27:
+  Sometimes (SB-EXT:QUIT) fails with 
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting
 	Process inferior-lisp exited abnormally with code 1
   I haven't noticed a repeatable case of this yet.
 
-* The system accepts DECLAIM in most places where DECLARE would be 
+28:
+  The system accepts DECLAIM in most places where DECLARE would be 
   accepted, without even issuing a warning. ANSI allows this, but since
   it's fairly easy to mistype DECLAIM instead of DECLARE, and the
   meaning is rather different, and it's unlikely that the user
@@ -326,40 +365,8 @@ returning an array as first value always.
   fix would be to issue STYLE-WARNINGs for DECLAIMs not at top level,
   or perhaps to issue STYLE-WARNINGs for any EVAL-WHEN not at top level.
 
-* There seems to be some sort of bug in the interaction of the
-  normal compiler, the byte compiler, and type predicates.
-  Compiling and loading this file
-    (IN-PACKAGE :CL-USER)
-    (DEFSTRUCT FOO A B)
-    (PROGN
-     (DECLAIM (FTYPE (FUNCTION (FOO) FOO) FOO-BAR))
-     (DECLAIM (INLINE FOO-BAR))
-     (DEFUN FOO-BAR (FOO)
-       (DECLARE (TYPE FOO FOO))
-       (LET ((RESULT2605 (BLOCK FOO-BAR (PROGN (THE FOO (FOO-A FOO))))))
-         (UNLESS (TYPEP RESULT2605 'FOO)
-           (LOCALLY (ERROR "OOPS")))
-         (THE FOO RESULT2605)))
-     'FOO-BAR)
-    (DEFPARAMETER *FOO* (MAKE-FOO :A (MAKE-FOO)))
-    (UNLESS (EQ *PRINT-LEVEL* 133)
-      (DEFUN CK? ()
-        (LABELS ((FLOOD ()
-    		    (WHEN (TYPEP *X* 'FOO)
-    		      (FOO-BAR *Y*))))))
-      (PRINT 11)
-      (PRINT (FOO-BAR *FOO*))
-      (PRINT 12))
-  in sbcl-0.6.5 (or also in CMU CL 18b for FreeBSD) gives a call
-  to the undefined function SB-C::%INSTANCE-TYPEP. %INSTANCE-TYPEP
-  is not defined as a function because it's supposed to
-  be transformed away. My guess is what's happening is that
-  the mixture of toplevel and non-toplevel stuff and inlining
-  is confusing the system into compiling an %INSTANCE-TYPEP
-  form into byte code, where the DEFTRANSFORM which is supposed
-  to get rid of such forms is not effective.
-
-* some sort of bug in inlining and RETURN-FROM in sbcl-0.6.5: Compiling
+29:
+  some sort of bug in inlining and RETURN-FROM in sbcl-0.6.5: Compiling
     (DEFUN BAR? (X)
       (OR (NAR? X)
           (BLOCK USED-BY-SOME-Y?
@@ -374,12 +381,15 @@ returning an array as first value always.
   gives
    error in function SB-KERNEL:ASSERT-ERROR:
    The assertion (EQ (SB-C::CONTINUATION-KIND SB-C::CONT) :BLOCK-START) failed.
+  This is still present in sbcl-0.6.8.
 
-* The CMU CL reader code takes liberties in binding the standard read table
+30:
+  The CMU CL reader code takes liberties in binding the standard read table
   when reading the names of characters. Tim Moore posted a patch to the 
   CMU CL mailing list Mon, 22 May 2000 21:30:41 -0700.
 
-* In some cases the compiler believes type declarations on array
+31:
+  In some cases the compiler believes type declarations on array
   elements without checking them, e.g.
 	(DECLAIM (OPTIMIZE (SAFETY 3) (SPEED 1) (SPACE 1)))
 	(DEFSTRUCT FOO A B)
@@ -394,7 +404,8 @@ returning an array as first value always.
   all cases, e.g. the type assumption *is* checked if the array
   elements are declared to be of some structure type instead of CONS.
 
-* The printer doesn't report closures very well. This is true in 
+32:
+  The printer doesn't report closures very well. This is true in 
   CMU CL 18b as well:
     (PRINT #'CLASS-NAME)
   gives
@@ -403,10 +414,12 @@ returning an array as first value always.
   and make things like DEFSTRUCT and FLET, which create closures,
   set helpful values into this slot.
 
-* And as long as we're wishing, it would be awfully nice if INSPECT could
+33:
+  And as long as we're wishing, it would be awfully nice if INSPECT could
   also report on closures, telling about the values of the bound variables.
 
-* as reported by Robert Strandh on the CMU CL mailing list 12 Jun 2000:
+34:
+  as reported by Robert Strandh on the CMU CL mailing list 12 Jun 2000:
     $ cat xx.lisp
     (defconstant +a-constant+ (make-instance 'a-class))
     (defconstant +another-constant+ (vector +a-constant+))
@@ -436,7 +449,8 @@ returning an array as first value always.
       #<A-CLASS {4803A5B5}>
     How did this happen?
 
-* The compiler assumes that any time a function of declared FTYPE
+35:
+  The compiler assumes that any time a function of declared FTYPE
   doesn't signal an error, its arguments were of the declared type.
   E.g. compiling and loading
     (DECLAIM (OPTIMIZE (SAFETY 3)))
@@ -465,12 +479,14 @@ returning an array as first value always.
   make sense to add another flag (CHECKED?) to DEFKNOWN to 
   identify functions which *do* check their argument types.)
 
-* As pointed out by Martin Cracauer on the CMU CL mailing list
+36:
+  As pointed out by Martin Cracauer on the CMU CL mailing list
   13 Jun 2000, the :FILE-LENGTH operation for 
   FD-STREAM-MISC-ROUTINE is broken for large files: it says
   (THE INDEX SIZE) even though SIZE can be larger than INDEX.
 
-* In SBCL 0.6.5 (and CMU CL 18b) compiling and loading
+37:
+  In SBCL 0.6.5 (and CMU CL 18b) compiling and loading
 	(in-package :cl-user)
 	(declaim (optimize (safety 3)
 			   (debug 3)
@@ -506,11 +522,13 @@ returning an array as first value always.
   confused and compiles a full call to %INSTANCE-TYPEP (which doesn't exist
   as a function) instead.
 
-* DEFMETHOD doesn't check the syntax of &REST argument lists properly,
+38:
+  DEFMETHOD doesn't check the syntax of &REST argument lists properly,
   accepting &REST even when it's not followed by an argument name:
 	(DEFMETHOD FOO ((X T) &REST) NIL)
 
-* On the CMU CL mailing list 26 June 2000, Douglas Crosher wrote
+39:
+  On the CMU CL mailing list 26 June 2000, Douglas Crosher wrote
 
   Hannu Rummukainen wrote:
   ...
@@ -523,12 +541,14 @@ returning an array as first value always.
 
   Probably the same bug exists in SBCL.
 
-* TYPEP treats the result of UPGRADED-ARRAY-ELEMENT-TYPE as gospel,
+40:
+  TYPEP treats the result of UPGRADED-ARRAY-ELEMENT-TYPE as gospel,
   so that (TYPEP (MAKE-ARRAY 3) '(VECTOR SOMETHING-NOT-DEFINED-YET))
   returns (VALUES T T). Probably it should be an error instead,
   complaining that the type SOMETHING-NOT-DEFINED-YET is not defined.
 
-* TYPEP of VALUES types is sometimes implemented very inefficiently, e.g. in 
+41:
+  TYPEP of VALUES types is sometimes implemented very inefficiently, e.g. in 
 	(DEFTYPE INDEXOID () '(INTEGER 0 1000))
 	(DEFUN FOO (X)
 	  (DECLARE (TYPE INDEXOID X))
@@ -540,134 +560,146 @@ returning an array as first value always.
   from the ANSI CL standard) as discussed on the cmucl-imp@cons.org
   mailing list, e.g. in Robert Maclachlan's post of 21 Jun 2000.
 
-* The definitions of SIGCONTEXT-FLOAT-REGISTER and
+42:
+  The definitions of SIGCONTEXT-FLOAT-REGISTER and
   %SET-SIGCONTEXT-FLOAT-REGISTER in x86-vm.lisp say they're not
   supported on FreeBSD because the floating point state is not saved,
   but at least as of FreeBSD 4.0, the floating point state *is* saved,
   so they could be supported after all. Very likely 
   SIGCONTEXT-FLOATING-POINT-MODES could now be supported, too.
 
-* (as discussed by Douglas Crosher on the cmucl-imp mailing list ca. 
-  Aug. 10, 2000): CMUCL currently interprets 'member as '(member); same issue
-  with 'union, 'and, 'or etc. So even though according to the ANSI spec,
-  bare 'MEMBER, 'AND, and 'OR are not legal types, CMUCL (and now
-  SBCL) interpret them as legal types.
+43:
+  (as discussed by Douglas Crosher on the cmucl-imp mailing list ca. 
+  Aug. 10, 2000): CMUCL currently interprets 'member as '(member); same
+  issue with 'union, 'and, 'or etc. So even though according to the
+  ANSI spec, bare 'MEMBER, 'AND, and 'OR are not legal types, CMUCL
+  (and now SBCL) interpret them as legal types.
 
-* ANSI specifies DEFINE-SYMBOL-MACRO, but it's not defined in SBCL.
+44:
+  ANSI specifies DEFINE-SYMBOL-MACRO, but it's not defined in SBCL.
   CMU CL added it ca. Aug 13, 2000, after some discussion on the mailing
   list, and it is probably possible to use substantially the same 
   patches to add it to SBCL.
 
-* a slew of floating-point-related errors reported by Peter Van Eynde
+45:
+  a slew of floating-point-related errors reported by Peter Van Eynde
   on July 25, 2000:
-	* (SQRT -9.0) fails, because SB-KERNEL::COMPLEX-SQRT is undefined.
-	  Similarly, COMPLEX-ASIN, COMPLEX-ACOS, COMPLEX-ACOSH, and others
-	  aren't found.
-	* SBCL's value for LEAST-POSITIVE-SHORT-FLOAT is bogus, and 
-	  should probably be 1.4012985e-45. In SBCL,
-	  (/ LEAST-POSITIVE-SHORT-FLOAT 2) returns a number smaller
-	  than LEAST-POSITIVE-SHORT-FLOAT. Similar problems 
-	  exist for LEAST-NEGATIVE-SHORT-FLOAT, LEAST-POSITIVE-LONG-FLOAT,
-	  and LEAST-NEGATIVE-LONG-FLOAT.
-	* Many expressions generate floating infinity:
+	a: (SQRT -9.0) fails, because SB-KERNEL::COMPLEX-SQRT is undefined.
+	   Similarly, COMPLEX-ASIN, COMPLEX-ACOS, COMPLEX-ACOSH, and others
+	   aren't found.
+	b: SBCL's value for LEAST-POSITIVE-SHORT-FLOAT is bogus, and 
+	   should probably be 1.4012985e-45. In SBCL,
+	   (/ LEAST-POSITIVE-SHORT-FLOAT 2) returns a number smaller
+	   than LEAST-POSITIVE-SHORT-FLOAT. Similar problems 
+	   exist for LEAST-NEGATIVE-SHORT-FLOAT, LEAST-POSITIVE-LONG-FLOAT,
+	   and LEAST-NEGATIVE-LONG-FLOAT.
+	c: Many expressions generate floating infinity:
 		(/ 1 0.0)
 		(/ 1 0.0d0)
 		(EXPT 10.0 1000)
 		(EXPT 10.0d0 1000)
-	  PVE's regression tests want them to raise errors. SBCL
-	  generates the infinities instead, which may or may not be
-	  conforming behavior, but then blow it by being unable to
-	  output the infinities, since support for infinities is generally
-	  broken, and in particular SB-IMPL::OUTPUT-FLOAT-INFINITY is
-	  undefined.
-	* (in section12.erg) various forms a la 
-	  (FLOAT 1 DOUBLE-FLOAT-EPSILON) don't give the right behavior.
+	   PVE's regression tests want them to raise errors. SBCL
+	   generates the infinities instead, which may or may not be
+	   conforming behavior, but then blow it by being unable to
+	   output the infinities, since support for infinities is generally
+	   broken, and in particular SB-IMPL::OUTPUT-FLOAT-INFINITY is
+	   undefined.
+	d: (in section12.erg) various forms a la 
+		(FLOAT 1 DOUBLE-FLOAT-EPSILON)
+	   don't give the right behavior.
 
-* type safety errors reported by Peter Van Eynde July 25, 2000:
-	* (COERCE (QUOTE (A B C)) (QUOTE (VECTOR * 4)))
-	  => #(A B C)
-	  In general lengths of array type specifications aren't
-	  checked by COERCE, so it fails when the spec is
-	  (VECTOR 4), (STRING 2), (SIMPLE-BIT-VECTOR 3), or whatever.
-	* CONCATENATE has the same problem of not checking the length
-	  of specified output array types. MAKE-SEQUENCE and MAP and
-	  MERGE also have the same problem.
-	* (COERCE 'AND 'FUNCTION) returns something related to
-	  (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
-	* ELT signals SIMPLE-ERROR if its index argument
-	  isn't a valid index for its sequence argument, but should 
-	  signal TYPE-ERROR instead.
-	* FILE-LENGTH is supposed to signal a type error when its
-	  argument is not a stream associated with a file, but doesn't.
-	* (FLOAT-RADIX 2/3) should signal an error instead of 
-	  returning 2.
-	* (LOAD "*.lsp") should signal FILE-ERROR.
-	* (MAKE-CONCATENATED-STREAM (MAKE-STRING-OUTPUT-STREAM))
-	  should signal TYPE-ERROR.
-	* MAKE-TWO-WAY-STREAM doesn't check that its arguments can
-	  be used for input and output as needed. It should fail with
-	  TYPE-ERROR when handed e.g. the results of MAKE-STRING-INPUT-STREAM
-	  or MAKE-STRING-OUTPUT-STREAM in the inappropriate positions,
-	  but doesn't.
-	* (PARSE-NAMESTRING (COERCE (LIST #\f #\o #\o (CODE-CHAR 0) #\4 #\8)
+46:
+  type safety errors reported by Peter Van Eynde July 25, 2000:
+	a: (COERCE (QUOTE (A B C)) (QUOTE (VECTOR * 4)))
+	   => #(A B C)
+	   In general lengths of array type specifications aren't
+	   checked by COERCE, so it fails when the spec is
+	   (VECTOR 4), (STRING 2), (SIMPLE-BIT-VECTOR 3), or whatever.
+	b: CONCATENATE has the same problem of not checking the length
+	   of specified output array types. MAKE-SEQUENCE and MAP and
+	   MERGE also have the same problem.
+	c: (COERCE 'AND 'FUNCTION) returns something related to
+	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
+	d: ELT signals SIMPLE-ERROR if its index argument
+	   isn't a valid index for its sequence argument, but should 
+	   signal TYPE-ERROR instead.
+	e: FILE-LENGTH is supposed to signal a type error when its
+	   argument is not a stream associated with a file, but doesn't.
+	f: (FLOAT-RADIX 2/3) should signal an error instead of 
+	   returning 2.
+	g: (LOAD "*.lsp") should signal FILE-ERROR.
+	h: (MAKE-CONCATENATED-STREAM (MAKE-STRING-OUTPUT-STREAM))
+	   should signal TYPE-ERROR.
+	i: MAKE-TWO-WAY-STREAM doesn't check that its arguments can
+	   be used for input and output as needed. It should fail with
+	   TYPE-ERROR when handed e.g. the results of
+	   MAKE-STRING-INPUT-STREAM or MAKE-STRING-OUTPUT-STREAM in
+	   the inappropriate positions, but doesn't.
+	j: (PARSE-NAMESTRING (COERCE (LIST #\f #\o #\o (CODE-CHAR 0) #\4 #\8)
 			    (QUOTE STRING)))
-	  should probably signal an error instead of making a pathname with
-	  a null byte in it.
-	* READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
-	  not a binary input stream, but instead cheerfully reads from
-	  character streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
+	   should probably signal an error instead of making a pathname with
+	   a null byte in it.
+	k: READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
+	   not a binary input stream, but instead cheerfully reads from
+	   character streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
 
-* DEFCLASS bugs reported by Peter Van Eynde July 25, 2000:
-	* (DEFCLASS FOO () (A B A)) should signal a PROGRAM-ERROR, and doesn't.
-	* (DEFCLASS FOO () (A B A) (:DEFAULT-INITARGS X A X B)) should
-	  signal a PROGRAM-ERROR, and doesn't.
-	* (DEFCLASS FOO07 NIL ((A :ALLOCATION :CLASS :ALLOCATION :CLASS))),
-	  and other DEFCLASS forms with duplicate specifications in their
-	  slots, should signal a PROGRAM-ERROR, and doesn't.
-	* (DEFGENERIC IF (X)) should signal a PROGRAM-ERROR, but instead
-	  causes a COMPILER-ERROR.
+47:
+  DEFCLASS bugs reported by Peter Van Eynde July 25, 2000:
+	a: (DEFCLASS FOO () (A B A)) should signal a PROGRAM-ERROR, and
+	   doesn't.
+	b: (DEFCLASS FOO () (A B A) (:DEFAULT-INITARGS X A X B)) should
+	   signal a PROGRAM-ERROR, and doesn't.
+	c: (DEFCLASS FOO07 NIL ((A :ALLOCATION :CLASS :ALLOCATION :CLASS))),
+	   and other DEFCLASS forms with duplicate specifications in their
+	   slots, should signal a PROGRAM-ERROR, and doesn't.
+	d: (DEFGENERIC IF (X)) should signal a PROGRAM-ERROR, but instead
+	   causes a COMPILER-ERROR.
 
-* SYMBOL-MACROLET bugs reported by Peter Van Eynde July 25, 2000:
-	* (SYMBOL-MACROLET ((T TRUE)) ..) should probably signal
-	  PROGRAM-ERROR, but SBCL accepts it instead.
-	* SYMBOL-MACROLET should refuse to bind something which is
-	  declared as a global variable, signalling PROGRAM-ERROR.
-	* SYMBOL-MACROLET should signal PROGRAM-ERROR if something
-	  it binds is declared SPECIAL inside.
+48:
+  SYMBOL-MACROLET bugs reported by Peter Van Eynde July 25, 2000:
+	a: (SYMBOL-MACROLET ((T TRUE)) ..) should probably signal
+	   PROGRAM-ERROR, but SBCL accepts it instead.
+	b: SYMBOL-MACROLET should refuse to bind something which is
+	   declared as a global variable, signalling PROGRAM-ERROR.
+	c: SYMBOL-MACROLET should signal PROGRAM-ERROR if something
+	   it binds is declared SPECIAL inside.
 
-* LOOP bugs reported by Peter Van Eynde July 25, 2000:
-	* (LOOP WITH (A B) DO (PRINT 1)) is a syntax error according to
-	  the definition of WITH clauses given in the ANSI spec, but
-	  compiles and runs happily in SBCL.
-	* a messy one involving package iteration:
+49:
+  LOOP bugs reported by Peter Van Eynde July 25, 2000:
+	a: (LOOP WITH (A B) DO (PRINT 1)) is a syntax error according to
+	   the definition of WITH clauses given in the ANSI spec, but
+	   compiles and runs happily in SBCL.
+	b: a messy one involving package iteration:
 interpreted Form: (LET ((PACKAGE (MAKE-PACKAGE "LOOP-TEST"))) (INTERN "blah" PACKAGE) (LET ((BLAH2 (INTERN "blah2" PACKAGE))) (EXPORT BLAH2 PACKAGE)) (LIST (SORT (LOOP FOR SYM BEING EACH PRESENT-SYMBOL OF PACKAGE FOR SYM-NAME = (SYMBOL-NAME SYM) COLLECT SYM-NAME) (FUNCTION STRING<)) (SORT (LOOP FOR SYM BEING EACH EXTERNAL-SYMBOL OF PACKAGE FOR SYM-NAME = (SYMBOL-NAME SYM) COLLECT SYM-NAME) (FUNCTION STRING<))))
 Should be: (("blah" "blah2") ("blah2"))
 SBCL: (("blah") ("blah2"))
 	* (LET ((X 1)) (LOOP FOR I BY (INCF X) FROM X TO 10 COLLECT I))
 	  doesn't work -- SBCL's LOOP says BY isn't allowed in a FOR clause.
 
-* type system errors reported by Peter Van Eynde July 25, 2000:
-	* (SUBTYPEP 'BIGNUM 'INTEGER) => NIL, NIL
-	  but should be (VALUES T T) instead.
-	* (SUBTYPEP 'EXTENDED-CHAR 'CHARACTER) => NIL, NIL
-	  but should be (VALUES T T) instead.
-	* (SUBTYPEP '(INTEGER (0) (0)) 'NIL) dies with nested errors.
-	* In general, the system doesn't like '(INTEGER (0) (0)) -- it
-	  blows up at the level of SPECIFIER-TYPE with
-	  "Lower bound (0) is greater than upper bound (0)." Probably
-	  SPECIFIER-TYPE should return NIL instead.
-	* (TYPEP 0 '(COMPLEX (EQL 0)) fails with
-	  "Component type for Complex is not numeric: (EQL 0)."
-	  This might be easy to fix; the type system already knows
-	  that (SUBTYPEP '(EQL 0) 'NUMBER) is true.
-	* The type system doesn't know about the condition system,
-	  so that e.g. (TYPEP 'SIMPLE-ERROR 'ERROR)=>NIL.
-	* The type system isn't all that smart about relationships
-	  between hairy types, as shown in the type.erg test results,
-	  e.g. (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL.
+50:
+  type system errors reported by Peter Van Eynde July 25, 2000:
+	a: (SUBTYPEP 'BIGNUM 'INTEGER) => NIL, NIL
+	   but should be (VALUES T T) instead.
+	b: (SUBTYPEP 'EXTENDED-CHAR 'CHARACTER) => NIL, NIL
+	   but should be (VALUES T T) instead.
+	c: (SUBTYPEP '(INTEGER (0) (0)) 'NIL) dies with nested errors.
+	d: In general, the system doesn't like '(INTEGER (0) (0)) -- it
+	   blows up at the level of SPECIFIER-TYPE with
+	   "Lower bound (0) is greater than upper bound (0)." Probably
+	   SPECIFIER-TYPE should return NIL instead.
+	e: (TYPEP 0 '(COMPLEX (EQL 0)) fails with
+	   "Component type for Complex is not numeric: (EQL 0)."
+	   This might be easy to fix; the type system already knows
+	   that (SUBTYPEP '(EQL 0) 'NUMBER) is true.
+	f: The type system doesn't know about the condition system,
+	   so that e.g. (TYPEP 'SIMPLE-ERROR 'ERROR)=>NIL.
+	g: The type system isn't all that smart about relationships
+	   between hairy types, as shown in the type.erg test results,
+	   e.g. (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL.
 
-* miscellaneous errors reported by Peter Van Eynde July 25, 2000:
-	* (PROGN
+51:
+  miscellaneous errors reported by Peter Van Eynde July 25, 2000:
+	a: (PROGN
 	    (DEFGENERIC FOO02 (X))
 	    (DEFMETHOD FOO02 ((X NUMBER)) T)
 	    (LET ((M (FIND-METHOD (FUNCTION FOO02)
@@ -677,61 +709,45 @@ SBCL: (("blah") ("blah2"))
 	      (DEFGENERIC FOO03 (X))
 	      (ADD-METHOD (FUNCTION FOO03) M)))
 	   should give an error, but SBCL allows it.
-	* READ should probably return READER-ERROR, not the bare 
-	  arithmetic error, when input a la "1/0" or "1e1000" causes
-	  an arithmetic error.
-	* There are several metaobject protocol "errors". (In order to fix
-	  them, we might need to document exactly what metaobject
-	  protocol specification we're following -- the current code is
-	  just inherited from PCL.)
-	* (BUTLAST NIL) should return NIL. (This appears to be a compiler
-	  bug, since the definition of BUTLAST, when interpreted, does
-	  give (BUTLAST NIL)=>NIL.)
+	b: READ should probably return READER-ERROR, not the bare 
+	   arithmetic error, when input a la "1/0" or "1e1000" causes
+	   an arithmetic error.
+	c: (BUTLAST NIL) should return NIL. (This appears to be a compiler
+	   bug, since the definition of BUTLAST, when interpreted, does
+	   give (BUTLAST NIL)=>NIL.)
 
-* another error from Peter Van Eynde 5 September 2000:
+52:
+  It has been reported (e.g. by Peter Van Eynde) that there are 
+  several metaobject protocol "errors". (In order to fix them, we might
+  need to document exactly what metaobject protocol specification
+  we're following -- the current code is just inherited from PCL.)
+
+53:
+  another error from Peter Van Eynde 5 September 2000:
   (FORMAT NIL "~F" "FOO") should work, but instead reports an error.
   PVE submitted a patch to deal with this bug, but it exposes other
   comparably serious bugs, so I didn't apply it. It looks as though
   the FORMAT code needs a fair amount of rewriting in order to comply
   with the various details of the ANSI spec.
 
-* The bug discussed on the cmucl-imp@cons.org mailing list ca. 5 September,
-  simplified by Douglas Crosher down to
-	(defun tickle-bug ()
-	  (labels ((fun1 ()
-	             (fun2))
-        	   (fun2 ()                             
-	             (when nil
-        	       (tagbody
-                	tag
-	                  (fun2)
-        	          (go tag)))
-	             (when nil
-        	       (tagbody
-                	tag
-	                  (fun1)
-        	          (go tag)))))
-	    (fun1)
-	    nil))
-  causes the same problem on SBCL: compiling it fails with 
-	:LET fell through ECASE expression.
-  Very likely the patch discussed there is appropriate for SBCL
-  as well, but I don't understand it, so I didn't apply it.
-
-* The implementation of #'+ returns its single argument without
+54:
+  The implementation of #'+ returns its single argument without
   type checking, e.g. (+ "illegal") => "illegal".
 
-* In sbcl-0.6.7, there is no doc string for CL:PUSH, probably 
+55:
+  In sbcl-0.6.7, there is no doc string for CL:PUSH, probably 
   because it's defined with the DEFMACRO-MUNDANELY macro and something
   is wrong with doc string setting in that macro.
 
-* Attempting to use COMPILE on something defined by DEFMACRO fails:
+56:
+  Attempting to use COMPILE on something defined by DEFMACRO fails:
 	(DEFMACRO FOO (X) (CONS X X))
 	(COMPILE 'FOO)
 Error in function C::GET-LAMBDA-TO-COMPILE:
    #<Closure Over Function "DEFUN (SETF MACRO-FUNCTION)" {480E21B1}> was defined in a non-null environment.
 
-* In sbcl-0.6.7, the compiler accepted a bogus declaration
+57:
+  In sbcl-0.6.7, the compiler accepted a bogus declaration
   (TYPE INDEX LENGTH) in the definition of BUTLAST, and then died
   with infinite regress of errors when the BUTLAST function was
   executed with a LIST=NIL which would cause LENGTH to be -1.
@@ -742,4 +758,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   unrelated infinite-regress-errors problems, many related to 
   revised signal handling, which were fixed around the same time.
 
-* (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH) => NIL, NIL
+58:
+  (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH)
+  => NIL, NIL
