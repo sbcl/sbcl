@@ -460,7 +460,7 @@
 
 
 ;;;; Modular functions:
-(define-modular-fun lognot-mod32 (x) lognot 32)
+(define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
   (:translate lognot-mod32)
   (:args (x :scs (unsigned-reg)))
@@ -491,7 +491,7 @@
 	     (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
 	     (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
 	 `(progn
-	    (define-modular-fun ,mfun-name (x y) ,fun 32)
+	    (define-modular-fun ,mfun-name (x y) ,fun :unsigned 32)
 	    (define-vop (,modvop ,vop)
 	      (:translate ,mfun-name))
 	    ,@(when constantp

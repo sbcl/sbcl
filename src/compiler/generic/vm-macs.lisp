@@ -232,9 +232,9 @@
                    (:unsigned 'unsigned-byte)
                    (:signed 'signed-byte))
                  ,width)
-               (foldable flushable movable))
-     (defoptimizer (,name derive-type) (,lambda-list node)
-       (modular-fun-derive-type node ',prototype ',class ,width))))
+               (foldable flushable movable)
+               :derive-type (make-modular-fun-type-deriver
+                             ',prototype ',class ,width))))
 
 (defun %define-good-modular-fun (name class)
   (setf (gethash name (modular-class-funs (find-modular-class class))) :good)

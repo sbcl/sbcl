@@ -2569,12 +2569,30 @@
 ;;;
 ;;; and similar for other arguments.
 
-(defun modular-fun-derive-type (node prototype class width)
+(defun make-modular-fun-type-deriver (prototype class width)
+  #!-sb-fluid
   (binding* ((info (info :function :info prototype) :exit-if-null)
              (fun (fun-info-derive-type info) :exit-if-null)
-             (res (funcall fun node) :exit-if-null))
-    (if (eq class :unsigned)
-        (logand-derive-type-aux res (specifier-type `(unsigned-byte* ,width))))))
+             (mask-type (specifier-type
+                         (ecase class
+                             (:unsigned `(unsigned-byte* ,width))
+                             (:signed `(signed-byte ,width))))))
+    (lambda (call)
+      (let ((res (funcall fun call)))
+        (when res
+          (if (eq class :unsigned)
+              (logand-derive-type-aux res mask-type))))))
+  #!+sb-fluid
+  (lambda (call)
+    (binding* ((info (info :function :info prototype) :exit-if-null)
+               (fun (fun-info-derive-type info) :exit-if-null)
+               (res (funcall fun call) :exit-if-null)
+               (mask-type (specifier-type
+                           (ecase class
+                             (:unsigned `(unsigned-byte* ,width))
+                             (:signed `(signed-byte ,width))))))
+      (if (eq class :unsigned)
+          (logand-derive-type-aux res mask-type)))))
 
 ;;; Try to recursively cut all uses of LVAR to WIDTH bits.
 ;;;
