@@ -62,7 +62,7 @@ See also bind(2)"))
 (defmethod socket-bind ((socket socket)
                         &rest address)
   (let ((sockaddr (apply #'make-sockaddr-for socket nil address)))
-    (if (= (sb-sys:without-gcing
+    (if (= (sb-sys:with-pinned-objects (sockaddr)
 	    (sockint::bind (socket-file-descriptor socket)
 			   (sockint::array-data-address sockaddr)
 			   (size-of-sockaddr socket)))
@@ -76,28 +76,28 @@ newly-created connected socket and the peer address as multiple
 values"))
   
 (defmethod socket-accept ((socket socket))
-  (let* ((sockaddr (make-sockaddr-for socket))
-         (fd (sb-sys:without-gcing
-	      (sockint::accept (socket-file-descriptor socket)
-			       (sockint::array-data-address sockaddr)
-			       (size-of-sockaddr socket)))))
-    (apply #'values
-	   (if (= fd -1)
-	       (socket-error "accept") 
-	       (let ((s (make-instance (class-of socket)
-				       :type (socket-type socket)
-				       :protocol (socket-protocol socket)
-				       :descriptor fd)))
-		 (sb-ext:finalize s (lambda () (sockint::close fd)))))
-	   (multiple-value-list (bits-of-sockaddr socket sockaddr)))))
-
+  (let ((sockaddr (make-sockaddr-for socket)))
+    (sb-ext::with-pointers-preserved (sockaddr)
+      (let ((fd (sockint::accept (socket-file-descriptor socket)
+				 (sockint::array-data-address sickint)
+				 (size-of-sockaddr socket))))
+	(apply #'values
+	       (if (= fd -1)
+		   (socket-error "accept")
+		   (let ((s (make-instance (class-of socket)
+					   :type (socket-type socket)
+					   :protocol (socket-protocol socket)
+					   :descriptor fd)))
+		     (sb-ext:finalize s (lambda () (sockint::close fd)))))
+	       (multiple-value-list (bits-of-sockaddr socket sockaddr)))))))
+    
 (defgeneric socket-connect (socket &rest address)
   (:documentation "Perform the connect(2) call to connect SOCKET to a
   remote PEER.  No useful return value."))
 
 (defmethod socket-connect ((socket socket) &rest peer)
   (let* ((sockaddr (apply #'make-sockaddr-for socket nil peer)))
-    (if (= (sb-sys:without-gcing
+    (if (= (sb-sys:with-pinned-objects (sockaddr)
 	    (sockint::connect (socket-file-descriptor socket)
 			      (sockint::array-data-address sockaddr)
 			      (size-of-sockaddr socket)))
@@ -110,7 +110,7 @@ values"))
   
 (defmethod socket-peername ((socket socket))
   (let* ((sockaddr (make-sockaddr-for socket)))
-    (when (= (sb-sys:without-gcing
+    (when (= (sb-sys:with-pinned-objects (sockaddr)
 	      (sockint::getpeername (socket-file-descriptor socket)
 				    (sockint::array-data-address sockaddr)
 				    (size-of-sockaddr socket)))
@@ -124,7 +124,7 @@ values"))
 
 (defmethod socket-name ((socket socket))
   (let* ((sockaddr (make-sockaddr-for socket)))
-    (when (= (sb-sys:without-gcing
+    (when (= (sb-sys:with-pinned-objects (sockaddr)
 	      (sockint::getsockname (socket-file-descriptor socket)
 				    (sockint::array-data-address sockaddr)
 				    (size-of-sockaddr socket)))
@@ -169,7 +169,7 @@ small"))
       (setf buffer (make-array length :element-type element-type)))
     (sb-alien:with-alien ((sa-len (array (sb-alien:unsigned 32) 2)))
       (setf (sb-alien:deref sa-len 0) (size-of-sockaddr socket))
-      (sb-sys:without-gcing 
+      (sb-sys:with-pinned-objects (buffer sockaddr) 
        (let ((len
 	      (sockint::recvfrom (socket-file-descriptor socket)
 				 (sockint::array-data-address buffer)
@@ -230,7 +230,9 @@ SB-SYS:MAKE-FD-STREAM."))
 	 (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
     (unless stream
       (setf stream (apply #'sb-sys:make-fd-stream
-			  (socket-file-descriptor socket) args))
+			  (socket-file-descriptor socket)
+			  :name "a constant string"
+			  args))
       (setf (slot-value socket 'stream) stream)
       (sb-ext:cancel-finalization socket))
     stream))

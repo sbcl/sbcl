@@ -50,12 +50,12 @@
 	;;(declaim (inline ,el (setf ,el)))
 	(defun ,el (ptr &optional (index 0))
 	  (declare (optimize (speed 3)))
-	  (sb-sys:without-gcing 
+	  (sb-sys:with-pinned-objects (ptr) 
 	   ,(template 'prog1 nil)))
 	(defconstant ,(intern (format nil "OFFSET-OF-~A" el)) ,offset)
 	(defun (setf ,el) (newval ptr &optional (index 0))
 	  (declare (optimize (speed 3)))
-	  (sb-sys:without-gcing 
+	  (sb-sys:with-pinned-objects (ptr) 
 	   ,(template 'setf 'newval)))))))
 
 

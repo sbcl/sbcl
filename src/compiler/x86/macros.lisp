@@ -131,47 +131,33 @@
 
 ;;;; allocation helpers
 
-;;; Two allocation approaches are implemented. A call into C can be
-;;; used, and in that case special care can be taken to disable
-;;; interrupts. Alternatively with gencgc inline allocation is possible
-;;; although it isn't interrupt safe.
+;;; All allocation is done by calls to assembler routines that
+;;; eventually invoke the C alloc() function.  Once upon a time
+;;; (before threads) allocation within an alloc_region could also be
+;;; done inline, with the aid of two C symbols storing the current
+;;; allocation region boundaries; however, C cymbols are global.
 
-;;; For GENCGC it is possible to inline object allocation, to permit
-;;; this set the following variable to True.
-;;;
-;;; FIXME: The comment above says that this isn't interrupt safe. Is that
-;;; right? If so, do we want to do this? And surely we don't want to do this by
-;;; default? How much time does it save to do this? Is it any different in the
-;;; current CMU CL version instead of the one that I grabbed in 1998?
-;;; (Later observation: In order to be interrupt safe, it'd probably
-;;; have to use PSEUDO-ATOMIC, so it's probably not -- yuck. Try benchmarks
-;;; with and without inline allocation, and unless the inline allocation
-;;; wins by a whole lot, it's not likely to be worth messing with. If
-;;; we want to hack up memory allocation for performance, effort spent
-;;; on DYNAMIC-EXTENT would probably give a better payoff.)
-(defvar *maybe-use-inline-allocation* t)
+;;; C calls for allocation don't /seem/ to make an awful lot of
+;;; difference to speed.  Guessing from historical context, it looks
+;;; like inline allocation was introduced before pseudo-atomic, at
+;;; which time all calls to alloc() would have needed a syscall to
+;;; mask signals for the duration.  Now we have pseudoatomic there's
+;;; no need for that overhead.  Still, inline alloc would be a neat
+;;; addition someday
+
+(defvar *maybe-use-inline-allocation* t) ; FIXME unused
 
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; Size. The size may be an integer of a TN. If Inline is a VOP
 ;;; node-var then it is used to make an appropriate speed vs size
 ;;; decision.
-;;;
-;;; FIXME: We call into C.. except when inline allocation is enabled..?
-;;;
-;;; FIXME: Also, calls to
-;;; ALLOCATION are always wrapped with PSEUDO-ATOMIC -- why? Is it to
-;;; make sure that no GC happens between the time of allocation and the
-;;; time that the allocated memory has its tag bits set correctly?
-;;; If so, then ALLOCATION itself might as well set the PSEUDO-ATOMIC
-;;; bits, so that the caller need only clear them. Check whether it's
-;;; true that every ALLOCATION is surrounded by PSEUDO-ATOMIC, and
-;;; that every PSEUDO-ATOMIC contains a single ALLOCATION, which is
-;;; its first instruction. If so, the connection should probably be
-;;; formalized, in documentation and in macro definition,
-;;; with the macro becoming e.g. PSEUDO-ATOMIC-ALLOCATION.
+
+;;; This macro should only be used inside a pseudo-atomic section,
+;;; which should also cover subsequent initialization of the
+;;; object.
 (defun allocation (alloc-tn size &optional inline)
   ;; FIXME: since it appears that inline allocation is gone, we should
-  ;; remove the INLINE parameter, and all the above comments.
+  ;; remove the INLINE parameter and *MAYBE-USE-INLINE-ALLOCATION*
   (declare (ignore inline))  
   (flet ((load-size (dst-tn size)
 	   (unless (and (tn-p size) (location= alloc-tn size))
@@ -302,13 +288,17 @@
 
 ;;;; PSEUDO-ATOMIC
 
+;;; This is used to wrap operations which leave untagged memory lying
+;;; around.  It's an operation which the AOP weenies would describe as
+;;; having "cross-cutting concerns", meaning it appears all over the
+;;; place and there's no logical single place to attach documentation.
+;;; grep (mostly in src/runtime) is your friend 
+
 ;;; FIXME: *PSEUDO-ATOMIC-FOO* could be made into *PSEUDO-ATOMIC-BITS*,
 ;;; set with a single operation and cleared with SHR *PSEUDO-ATOMIC-BITS*,-2;
 ;;; the ATOMIC bit is bit 0, the INTERRUPTED bit is bit 1, and you check
 ;;; the C flag after the shift to see whether you were interrupted.
 
-;;; FIXME: It appears that PSEUDO-ATOMIC is used to wrap operations which leave
-;;; untagged memory lying around, but some documentation would be nice.
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
@@ -443,3 +433,16 @@
 	       value)
 	 (move result value)))))
 
+;;; helper for alien stuff
+(defmacro sb!sys::with-pinned-objects ((&rest objects) &body body)
+  "Arrange with the garbage collector that the pages occupied by
+OBJECTS will not be moved in memory for the duration of BODY.
+Useful for e.g. foreign calls where another thread may trigger
+garbage collection"
+  `(multiple-value-prog1
+       (progn
+	 ,@(loop for p in objects 
+		 collect `(push-word-on-c-stack
+			   (int-sap (sb!kernel:get-lisp-obj-address ,p))))
+	 ,@body)
+     (pop-words-from-c-stack ,(length objects))))

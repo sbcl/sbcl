@@ -190,8 +190,9 @@ reflected in the current version of the source code.</para>
 <para>Other major changes since the fork from &CMUCL; include
 <itemizedlist>
   <listitem><para>&SBCL; has dropped support for many &CMUCL; extensions,
-    (e.g. remote procedure call, Unix system interface, and X11
-    interface).</para></listitem>
+    (e.g. IP networking, remote procedure call, Unix system interface, and X11
+    interface).  Some of these are now available as contributed or
+    third-party modules.</para></listitem>
   <listitem><para>&SBCL; has deleted or deprecated
     some nonstandard features and code complexity which helped
     efficiency at the price of maintainability. For example, the 

@@ -307,3 +307,26 @@
                                     (ash symbol-value-slot word-shift)
                                     (- other-pointer-lowtag)))
               delta)))))
+
+;;; these are not strictly part of the c-call convention, but are
+;;; needed for the WITH-PRESERVED-POINTERS macro used for "locking
+;;; down" lisp objects so that GC won't move them while foreign
+;;; functions go to work.
+
+(define-vop (push-word-on-c-stack)
+    (:translate push-word-on-c-stack)
+  (:args (val :scs (sap-reg)))
+  (:policy :fast-safe)
+  (:arg-types system-area-pointer)
+  (:generator 2
+    (inst push val)))
+
+(define-vop (pop-words-from-c-stack)
+    (:translate pop-words-from-c-stack)
+  (:args)
+  (:arg-types (:constant (unsigned-byte 29)))
+  (:info number)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst add esp-tn (fixnumize number))))
+

@@ -2698,8 +2698,9 @@ update_page_write_prot(int page)
     gc_assert(page_table[page].allocated != FREE_PAGE);
     gc_assert(page_table[page].bytes_used != 0);
 
-    /* Skip if it's already write-protected or an unboxed page. */
+    /* Skip if it's already write-protected, pinned, or unboxed */
     if (page_table[page].write_protected
+	|| page_table[page].dont_move
 	|| (page_table[page].allocated & UNBOXED_PAGE))
 	return (0);
 
@@ -3595,6 +3596,7 @@ write_protect_generation_pages(int generation)
     for (i = 0; i < last_free_page; i++)
 	if ((page_table[i].allocated == BOXED_PAGE)
 	    && (page_table[i].bytes_used != 0)
+	    && !page_table[i].dont_move
 	    && (page_table[i].gen == generation))  {
 	    void *page_start;
 
@@ -3658,7 +3660,8 @@ garbage_collect_generation(int generation, int raise)
     /* Before any pointers are preserved, the dont_move flags on the
      * pages need to be cleared. */
     for (i = 0; i < last_free_page; i++)
-	page_table[i].dont_move = 0;
+	if(page_table[i].gen==from_space)
+	    page_table[i].dont_move = 0;
 
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space

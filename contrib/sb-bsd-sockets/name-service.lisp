@@ -42,7 +42,7 @@ grisly details."
     (loop for i from 0 to 3 
 	  do (setf (sockint::in-addr-addr packed-addr i) (elt address i)))
     (make-host-ent
-     (sb-sys:without-gcing
+     (sb-sys:with-pinned-objects (packed-addr)
       (sockint::gethostbyaddr (sockint::array-data-address packed-addr)
 			      4
 			      sockint::af-inet)))))

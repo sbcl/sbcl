@@ -142,7 +142,7 @@ current bugs) are:
 
 <sect2><title>Threading (a.k.a Multiprocessing)</>
 
-<para>&SBCL; (as of version 0.x.y, on Linux x86 only) supports a
+<para>&SBCL; (as of version 0.8.3, on Linux x86 only) supports a
 fairly low-level threading interface that maps onto the host operating
 system's concept of threads or lightweight processes.  
 
@@ -214,20 +214,20 @@ and woken with SIGCONT.
 <para>&SBCL; at present will alway have at least two tasks running as
 seen from Linux: when the first process has done startup
 initialization (mapping files in place, installing signal handlers
-etc) it creates a new thread to run the Lisp startup and initial listener.
-The original thread is then used to run GC and to reap dead subthreads
-when they exit.
+etc) it creates a new thread to run the Lisp startup and initial
+listener.  The original thread stays around to reap dead subthreads
+and deallocate their resources (e.g. stacks) when they exit.
 
 <para>Garbage collection is done with the existing Conservative
 Generational GC.  Allocation is done in small (typically 8k) regions :
 each thread has its own region so this involves no stopping. However,
 when a region fills, a lock must be obtained while another is
 allocated, and when a collection is required, all processes are
-stopped.  This is achieved using <function>ptrace()</function>, so you
-should be very careful if you wish to examine an &SBCL; worker thread
-using <command>strace</command>, <command>truss</command>,
-<command>gdb</command> or similar.  It may be prudent to disable GC
-before doing so.
+stopped.  This is achieved by sending them signals, which may make for 
+interesting behaviour if they are interrupted in system calls.  The
+streams interface is believed to handle the required system call
+restarting correctly, but this may be a consideration when making
+other blocking calls e.g. from foreign library code.
 
 <para>Large amounts of the &SBCL; library have not been inspected for
 thread-safety.  Some of the obviously unsafe areas have large locks
@@ -241,7 +241,7 @@ on keyboard interrupt handling: pressing your terminal's intr key
 process group, including Lisp threads that &SBCL; considers to be
 notionally `background'.  This is undesirable, so background threads
 are set to ignore the SIGINT signal.  Arbitration for the input stream
-is managed by locking on sb-thread::*session-lock*
+is managed by locking on <varname>sb-thread::*session-lock*</varname>
 
 <para>A thread can be created in a new Lisp 'session' (new terminal or
 window) using <function>sb-thread:make-listener-thread</function>.

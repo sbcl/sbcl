@@ -1420,6 +1420,13 @@
 (defknown %setnth (unsigned-byte list t) t (unsafe))
 (defknown %set-fill-pointer (vector index) index (unsafe))
 
+;;;; ALIEN and call-out-to-C stuff
+
+;;; 'call' attribute because we store the arg on the stack, which is in
+;;; some sense 'passing it upwards'
+(defknown sb!vm::push-word-on-c-stack (system-area-pointer) (values) (call))
+(defknown sb!vm::pop-words-from-c-stack (index) (values) (call))
+
 ;;;; miscellaneous internal utilities
 
 (defknown %fun-name (function) t (flushable))

@@ -42,13 +42,13 @@ are three common approaches to establishing communication:
     </para></listitem>
 </itemizedlist>
 
-<para>&SBCL;, like &CMUCL; before it,
-relies primarily on the automatic conversion and direct manipulation
-approaches. Foreign values of simple scalar types are automatically
-converted, complex types are directly manipulated in their foreign
-representation. Furthermore, Lisp strings are represented internally 
-with null termination bytes so that they can be passed directly to
-C interfaces without allocating new zero-terminated copies.</para>
+<para>&SBCL;, like &CMUCL; before it, relies primarily on the
+automatic conversion and direct manipulation approaches. The SB-ALIEN
+package provices a facility wherein foreign values of simple scalar
+types are automatically converted and complex types are directly
+manipulated in their foreign representation.  Additionally the
+lower-level System Area Pointers (or SAPs) can be used where 
+necessary to provide untyped access to foreign memory.</para>
 
 <para>Any foreign objects that can't automatically be converted into
 Lisp values are represented by objects of type <type>alien-value</>.
@@ -294,6 +294,9 @@ These are the basic foreign type specifiers:
       null-terminated string, and is automatically converted into a
       Lisp string when accessed; or if the pointer is C <literal>NULL</>
       or <literal>0</>, then accessing it gives Lisp <literal>nil</>.
+      Lisp strings are stored with a trailing NUL termination, so no
+      copying (either by the user or the implementation) is necessary 
+      when passing them to foreign code.
     </para>  
     <para>
       Assigning a Lisp string to a <type>c-string</> structure field or
@@ -363,7 +366,41 @@ a new value. Note that <varname>slot-name</> is evaluated, and need
 not be a compile-time constant (but only constant slot accesses are
 efficiently compiled.)</para>
 
-</sect2>
+<sect3><title>Untyped memory</>
+
+<para>As noted at the beginning of the chapter, the System Area
+Pointer facilities allow untyped access to foreign memory.  SAPs can
+be converted to and from the usual typed foreign values using
+<function>sap-alien</function> and <function>alien-sap</function>
+(described elsewhere), and also to and from integers - raw machine
+addresses.  They should thus be used with caution; corrupting the Lisp
+heap or other memory with SAPs is trivial.</para>
+
+<synopsis>(sb-sys:int-sap machine-address)</>
+
+<para>Creates a SAP pointing at the virtual address
+<varname>machine-address</varname>.  </para>
+
+<synopsis>(sb-sys:sap-ref-32 sap offset)</>
+
+<para>Access the value of the memory location at
+<varname>offset</varname> bytes from <varname>sap</varname>.  This form
+may also be used with <function>setf</function> to alter the memory at
+that location.</para>
+
+<synopsis>(sb-sys:sap= sap1 sap2)</>
+
+<para>Compare <varname>sap1</varname> and <varname>sap2</varname> for
+equality.</para>
+
+<para>Similarly named functions exist for accessing other sizes of
+word, other comparisons, and other conversions.  The reader is invited
+to use <function>apropos</function> and <function>describe</function>
+for more details</para>
+<programlisting>
+(apropos "sap" :sb-sys)
+</programlisting>
+</sect3></sect2>
 
 <sect2><title>Coercing Foreign Values</>
 
@@ -392,8 +429,6 @@ argument, but it does refer to the same foreign data bits.</para>
 <para>The <function>sb-alien:sap-alien</> function converts <varname>sap</>
 (a system area pointer) to a foreign value with the specified
 <varname>type</>. <varname>type</> is not evaluated.
-As of &SBCL; 0.7.6, it looks as though this and other SAP functionality
-may become deprecated, since it shouldn't be needed by user code.
 </para>
 
 <para>The <varname>type</> must be some foreign pointer, array, or
@@ -403,8 +438,6 @@ record type.</para>
 
 <para>The <function>sb-alien:alien-sap</> function
 returns the SAP which points to <varname>alien-value</>'s data.
-As of &SBCL; 0.7.6, it looks as though this and other SAP functionality
-may become deprecated, since it shouldn't be needed by user code.
 </para>
 
 <para>The <varname>foreign-value</> must be of some foreign pointer,
@@ -688,19 +721,23 @@ code when a saved core is loaded.</para></note>
 
 <para>
 The foreign function call interface allows a Lisp program to call
-functions written in other languages using the C calling convention.
+many functions written in languages that use the C calling convention.
 </para>
 
 <para>
-Lisp sets up various interrupt handling routines and other environment
+Lisp sets up various signal handling routines and other environment
 information when it first starts up, and expects these to be in place
-at all times. The C functions called by Lisp should either not change
-the environment, especially the interrupt entry points, or should make
-sure that these entry points are restored when the C function returns
-to Lisp. If a C function makes changes without restoring things to the
-way they were when the C function was entered, there is no telling
-what will happen.
-</para>
+at all times. The C functions called by Lisp should not change the
+environment, especially the signal handlers: the signal handlers
+installed by Lisp typically have interesting flags set (e.g to request
+machine context information, or for signal delivery on an alternate
+stack) which the Lisp runtime relies on for correct operation.
+Precise details of how this works may change without notice between
+versions; the source, or the brain of a friendly &SBCL; developer,
+is the only documentation.  Users of a Lisp built with the :sb-thread
+feature should also read the Threading section 
+<!-- FIXME I'm sure docbook has some syntax for internal links --> 
+of this manual</para>
 
 <sect2><title>The <function>alien-funcall</> Primitive</title>
 
@@ -864,15 +901,30 @@ the runtime system. The
 arguments must be valid &SBCL; object descriptors (so that 
 e.g. fixnums must be
 left-shifted by 2.) As of &SBCL; 0.7.5, the format
-of object descriptors is documented only by the source code and 
+of object descriptors is documented only by the source code and, in parts, 
 by the old &CMUCL; "INTERNALS" documentation.</para>
 
 <para> Note that the garbage collector moves objects, and won't be
-able to fix up any references in C variables, so either turn GC off or
-don't keep Lisp pointers in C data unless they are to statically
-allocated objects. It is possible to use the
-<function>sb-ext:purify</> function to place live data structures in
-static space so that they won't move during GC. </para>
+able to fix up any references in C variables.  There are three
+mechanisms for coping with this: 
+<orderedlist>
+
+<listitem><para>The <function>sb-ext:purify</> moves all live Lisp
+data into static or read-only areas such that it will never be moved
+(or freed) again in the life of the Lisp session</para></listitem>
+
+<listitem><para><function>sb-sys:with-pinned-objects</function> is a
+macro which arranges for some set of objects to be pinned in memory
+for the dynamic extent of its body forms.  On ports which use the
+generational garbage collector (as of &SBCL; 0.8.3, only the x86) this
+has a page granularity - i.e. the entire 4k page or pages containing
+the objects will be locked down. On other ports it is implemented by
+turning off GC for the duration (so could be said to have a
+whole-world granularity).  </para></listitem>
+
+<listitem><para>Disable GC, using the <function>without-gcing</function>
+macro or <function>gc-off</function> call.</para></listitem>
+</orderedlist>
 
 <!-- FIXME: This is a "changebar" section from the CMU CL manual.
      I (WHN 2002-07-14) am not very familiar with this content, so 
@@ -891,6 +943,12 @@ LaTeX limited\footnote{\cmucl{} mmaps a large piece of memory for it's own
 LaTeX   use and this memory is typically about 8 MB above the start of the C
 LaTeX   heap.  Thus, only about 8 MB of memory can be dynamically
 LaTeX   allocated.}.
+
+Empirically determined to be considerably >8Mb on this x86 linux
+machine, but I don't know what the actual values are - dan 2003.09.01
+
+Note that this technique is used in SB-GROVEL in the SBCL contrib
+
 LaTeX 
 LaTeX To overcome this limitation, it is possible to access the content of
 LaTeX Lisp arrays which are limited only by the amount of physical memory
