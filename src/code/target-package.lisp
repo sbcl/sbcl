@@ -985,7 +985,8 @@ error if any of PACKAGES is not a valid package designator."
             :package package
             :format-control
             "~@<These symbols are not accessible in the ~A package:~2I~_~S~@:>"
-            :format-arguments (list (package-%name package) missing)))
+            :format-arguments (list (package-%name package) missing))
+           'import (package-%name package))
 	  (import missing package))
 	(import imports package))
 
