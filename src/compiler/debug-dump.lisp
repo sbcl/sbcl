@@ -100,7 +100,7 @@
 	0)
    *byte-buffer*)
 
-  (let ((loc (if (target-fixnump label) label (label-position label))))
+  (let ((loc (if (fixnump label) label (label-position label))))
     (write-var-integer (- loc *previous-location*) *byte-buffer*)
     (setq *previous-location* loc))
 

@@ -825,12 +825,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   (I haven't tried to investigate this bug enough to guess whether
   there might be any user-level symptoms.)
 
-86:
-  The system doesn't know how to reduce
-    (specifier-type '(intersection (or number vector) real)),
-  it just ends up as a HAIRY-TYPE. Smarter INTERSECTION2 methods for
-  UNION-TYPE might help.
-
 87:
   Despite what the manual says, (DECLAIM (SPEED 0)) doesn't cause
   things to be byte compiled. This seems to be true in cmucl-2.4.19,

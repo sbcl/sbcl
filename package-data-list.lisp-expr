@@ -632,14 +632,6 @@ Lisp extension proposal by David N. Gray"
 the stuff in here originated in CMU CL's EXTENSIONS package and is
 retained, possibly temporariliy, because it might be used internally."
     :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS" "SB!GRAY")
-    ;; FIXME: RATIOP should probably not go through this package but be
-    ;; called directly from SB!KERNEL, unless it's implemented as
-    ;; TYPEP X 'RATIO in which case it doesn't need to be in SB!KERNEL.
-    ;; And BIGNUMP and FIXNUMP should probably just be in this package,
-    ;; even if they have low-level-optimized implementations. (Their
-    ;; *meanings* aren't low-level, even if their implementations are.)
-    :import-from (("SB!KERNEL" "BIGNUMP" "FIXNUMP" "RATIOP"))
-    :reexport ("BIGNUMP" "FIXNUMP" "RATIOP")
     :export ("*AFTER-SAVE-INITIALIZATIONS*" "*BEFORE-SAVE-INITIALIZATIONS*"
 
              "*ALL-MODIFIER-NAMES*"
@@ -708,6 +700,9 @@ retained, possibly temporariliy, because it might be used internally."
              "LONG-FLOATP"
              "SHORT-FLOATP"
              "SINGLE-FLOATP"
+             "FIXNUMP"
+             "BIGNUMP"
+             "RATIOP" 
 
              ;; encapsulation
              "ARGUMENT-LIST"
@@ -1161,12 +1156,12 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "FSET" "RAW-DEFINITION"
              "INVOKE-MACROEXPAND-HOOK"
              "DEFAULT-STRUCTURE-PRINT"
-             "LAYOUT" "LAYOUT-LENGTH" "RATIOP" "FIXNUMP" "TARGET-FIXNUMP"
+             "LAYOUT" "LAYOUT-LENGTH"
              "LAMBDA-WITH-ENVIRONMENT" "LAYOUT-PURE" "DSD-RAW-TYPE"
              "%COMPILER-DEFSTRUCT"
              "%COMPILER-ONLY-DEFSTRUCT" "FUNCTION-%COMPILER-ONLY-DEFSTRUCT"
              "DEFSTRUCT-DESCRIPTION" "UNDEFINE-STRUCTURE"
-             "BIGNUMP" "DD-COPIER" "UNDEFINE-FUNCTION-NAME" "DD-TYPE"
+             "DD-COPIER" "UNDEFINE-FUNCTION-NAME" "DD-TYPE"
              "CLASS-STATE" "INSTANCE"
              "*TYPE-SYSTEM-INITIALIZED*" "WEAK-POINTER-P" "FIND-LAYOUT"
              "DSD-NAME" "%TYPEP" "DD-RAW-INDEX"

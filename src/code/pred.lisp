@@ -31,89 +31,80 @@
   "Return T if X is NIL, otherwise return NIL."
   (not object))
 
-;;; All the primitive type predicates share a parallel form..
-(macrolet
-    ((frob ()
-       `(progn
-	  ,@(mapcar (lambda (pred)
-		      (let* ((name (symbol-name pred))
-			     (stem (string-right-trim name "P-"))
-			     (article (if (find (schar name 0) "AEIOU")
-					"an"
-					"a")))
-			`(defun ,pred (object)
-			   ,(format nil
-				    "Return T if OBJECT is ~A ~A, ~
-				     and NIL otherwise."
-				    article
-				    stem)
-			   (,pred object))))
-		    '(array-header-p
-		      arrayp
-		      atom
-		      base-char-p
-		      bignump
-		      bit-vector-p
-		      characterp
-		      code-component-p
-		      consp
-		      compiled-function-p
-		      complexp
-		      complex-double-float-p
-		      complex-float-p
-		      #!+long-float complex-long-float-p
-		      complex-rational-p
-		      complex-single-float-p
-		      ;; (COMPLEX-VECTOR-P is not included here since
-		      ;; it's awkward to express the type it tests for
-		      ;; in the Common Lisp type system, and since
-		      ;; it's only used in the implementation of a few
-		      ;; specialized things.)
-		      double-float-p
-		      fdefn-p
-		      fixnump
-		      floatp
-		      functionp
-		      integerp
-		      listp
-		      long-float-p
-		      lra-p
-		      null
-		      numberp
-		      rationalp
-		      ratiop
-		      realp
-		      short-float-p
-		      sb!kernel:simple-array-p
-		      simple-bit-vector-p
-		      simple-string-p
-		      simple-vector-p
-		      single-float-p
-		      stringp
-		      %instancep
-		      symbolp
-		      system-area-pointer-p
-		      weak-pointer-p
-		      vectorp
-		      unsigned-byte-32-p
-		      signed-byte-32-p
-		      simple-array-unsigned-byte-2-p
-		      simple-array-unsigned-byte-4-p
-		      simple-array-unsigned-byte-8-p
-		      simple-array-unsigned-byte-16-p
-		      simple-array-unsigned-byte-32-p
-		      simple-array-signed-byte-8-p
-		      simple-array-signed-byte-16-p
-		      simple-array-signed-byte-30-p
-		      simple-array-signed-byte-32-p
-		      simple-array-single-float-p
-		      simple-array-double-float-p
-		      #!+long-float simple-array-long-float-p
-		      simple-array-complex-single-float-p
-		      simple-array-complex-double-float-p
-		      #!+long-float simple-array-complex-long-float-p
-		      )))))
-  (frob))
+;;; All the primitive type predicate wrappers share a parallel form..
+(macrolet ((def-type-predicate-wrapper (pred)
+	     (let* ((name (symbol-name pred))
+		    (stem (string-left-trim "%" (string-right-trim "P-" name)))
+		    (article (if (position (schar name 0) "AEIOU") "an" "a")))
+	       `(defun ,pred (object)
+		  ,(format nil
+			   "Return true if OBJECT is ~A ~A, and NIL otherwise."
+			   article
+			   stem)
+		  ;; (falling through to low-level implementation)
+		  (,pred object)))))
+  (def-type-predicate-wrapper array-header-p)
+  (def-type-predicate-wrapper arrayp)
+  (def-type-predicate-wrapper atom)
+  (def-type-predicate-wrapper base-char-p)
+  (def-type-predicate-wrapper bignump)
+  (def-type-predicate-wrapper bit-vector-p)
+  (def-type-predicate-wrapper characterp)
+  (def-type-predicate-wrapper code-component-p)
+  (def-type-predicate-wrapper consp)
+  (def-type-predicate-wrapper compiled-function-p)
+  (def-type-predicate-wrapper complexp)
+  (def-type-predicate-wrapper complex-double-float-p)
+  (def-type-predicate-wrapper complex-float-p)
+  #!+long-float (def-type-predicate-wrapper complex-long-float-p)
+  (def-type-predicate-wrapper complex-rational-p)
+  (def-type-predicate-wrapper complex-single-float-p)
+  ;; (COMPLEX-VECTOR-P is not included here since it's awkward to express
+  ;; the type it tests for in the Common Lisp type system, and since it's
+  ;; only used in the implementation of a few specialized things.)
+  (def-type-predicate-wrapper double-float-p)
+  (def-type-predicate-wrapper fdefn-p)
+  (def-type-predicate-wrapper fixnump)
+  (def-type-predicate-wrapper floatp)
+  (def-type-predicate-wrapper functionp)
+  (def-type-predicate-wrapper integerp)
+  (def-type-predicate-wrapper listp)
+  (def-type-predicate-wrapper long-float-p)
+  (def-type-predicate-wrapper lra-p)
+  (def-type-predicate-wrapper null)
+  (def-type-predicate-wrapper numberp)
+  (def-type-predicate-wrapper rationalp)
+  (def-type-predicate-wrapper ratiop)
+  (def-type-predicate-wrapper realp)
+  (def-type-predicate-wrapper short-float-p)
+  (def-type-predicate-wrapper sb!kernel:simple-array-p)
+  (def-type-predicate-wrapper simple-bit-vector-p)
+  (def-type-predicate-wrapper simple-string-p)
+  (def-type-predicate-wrapper simple-vector-p)
+  (def-type-predicate-wrapper single-float-p)
+  (def-type-predicate-wrapper stringp)
+  (def-type-predicate-wrapper %instancep)
+  (def-type-predicate-wrapper symbolp)
+  (def-type-predicate-wrapper system-area-pointer-p)
+  (def-type-predicate-wrapper weak-pointer-p)
+  (def-type-predicate-wrapper vectorp)
+  (def-type-predicate-wrapper unsigned-byte-32-p)
+  (def-type-predicate-wrapper signed-byte-32-p)
+  (def-type-predicate-wrapper simple-array-unsigned-byte-2-p)
+  (def-type-predicate-wrapper simple-array-unsigned-byte-4-p)
+  (def-type-predicate-wrapper simple-array-unsigned-byte-8-p)
+  (def-type-predicate-wrapper simple-array-unsigned-byte-16-p)
+  (def-type-predicate-wrapper simple-array-unsigned-byte-32-p)
+  (def-type-predicate-wrapper simple-array-signed-byte-8-p)
+  (def-type-predicate-wrapper simple-array-signed-byte-16-p)
+  (def-type-predicate-wrapper simple-array-signed-byte-30-p)
+  (def-type-predicate-wrapper simple-array-signed-byte-32-p)
+  (def-type-predicate-wrapper simple-array-single-float-p)
+  (def-type-predicate-wrapper simple-array-double-float-p)
+  #!+long-float (def-type-predicate-wrapper simple-array-long-float-p)
+  (def-type-predicate-wrapper simple-array-complex-single-float-p)
+  (def-type-predicate-wrapper simple-array-complex-double-float-p)
+  #!+long-float (def-type-predicate-wrapper simple-array-complex-long-float-p))
 
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different

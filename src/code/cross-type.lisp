@@ -11,6 +11,13 @@
 
 (in-package "SB!IMPL")
 
+;;; Is X a fixnum in the target Lisp?
+(defun fixnump (x)
+  (and (integerp x)
+       (<= sb!vm:*target-most-negative-fixnum*
+	   x
+	   sb!vm:*target-most-positive-fixnum*)))
+
 ;;; (This was a useful warning when trying to get bootstrapping
 ;;; to work, but it's mostly irrelevant noise now that the system
 ;;; works.)
@@ -75,7 +82,7 @@
 	    ((subtypep raw-result 'integer)
 	     (cond ((<= 0 object 1)
 		    'bit)
-		   ((target-fixnump object)
+		   ((fixnump object)
 		    'fixnum)
 		   (t
 		    'integer)))
@@ -235,7 +242,7 @@
 	     ;; Some types require translation between the cross-compilation
 	     ;; host Common Lisp and the target SBCL.
 	     (sb!xc:class (values (typep host-object 'sb!xc:class) t))
-	     (fixnum (values (target-fixnump host-object) t))
+	     (fixnum (values (fixnump host-object) t))
 	     ;; Some types are too hard to handle in the positive case, but at
 	     ;; least we can be confident in a large fraction of the negative
 	     ;; cases..

@@ -316,13 +316,4 @@
     (values-specifier-type-cache-clear))
   (values))
 
-;;; Is X a fixnum in the target Lisp?
-;;;
-;;; KLUDGE: not clear this really belongs in early-type.lisp, but where?
-(defun target-fixnump (x)
-  (and (integerp x)
-       (<= sb!vm:*target-most-negative-fixnum*
-	   x
-	   sb!vm:*target-most-positive-fixnum*)))
-
 (!defun-from-collected-cold-init-forms !early-type-cold-init)

@@ -402,7 +402,7 @@
 	 (if (eq x t)
 	     (dump-fop 'sb!impl::fop-truth file)
 	     (dump-non-immediate-object x file)))
-	((target-fixnump x) (dump-integer x file))
+	((fixnump x) (dump-integer x file))
 	((characterp x) (dump-character x file))
 	(t
 	 (dump-non-immediate-object x file))))

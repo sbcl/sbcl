@@ -709,7 +709,7 @@
 			    (and (eql disp 0)
 				 (not (= (reg-tn-encoding base) #b101))))
 			#b00)
-		       ((and (target-fixnump disp) (<= -128 disp 127))
+		       ((and (fixnump disp) (<= -128 disp 127))
 			#b01)
 		       (t
 			#b10)))

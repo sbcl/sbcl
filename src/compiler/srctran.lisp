@@ -1426,12 +1426,12 @@
 #!-propagate-fun-type
 (defoptimizer (ash derive-type) ((n shift))
    (flet ((ash-outer (n s)
-            (when (and (target-fixnump s)
+            (when (and (fixnump s)
                        (<= s 64)
                        (> s sb!vm:*target-most-negative-fixnum*))
               (ash n s)))
           (ash-inner (n s)
-            (if (and (target-fixnump s)
+            (if (and (fixnump s)
                      (> s sb!vm:*target-most-negative-fixnum*))
               (ash n (min s 64))
               (if (minusp n) -1 0))))
@@ -1493,7 +1493,7 @@
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
   (flet ((ash-outer (n s)
-	   (when (and (target-fixnump s)
+	   (when (and (fixnump s)
 		      (<= s 64)
 		      (> s sb!vm:*target-most-negative-fixnum*))
 	     (ash n s)))
@@ -1501,7 +1501,7 @@
          ;; symbolic machine word size values somehow.
 
 	 (ash-inner (n s)
-	   (if (and (target-fixnump s)
+	   (if (and (fixnump s)
 		    (> s sb!vm:*target-most-negative-fixnum*))
              (ash n (min s 64))
              (if (minusp n) -1 0))))
