@@ -712,9 +712,9 @@
 
 ;;;; converting combinations
 
-;;; Convert a function call where the function (i.e. the FUN argument)
-;;; is a LEAF. We return the COMBINATION node so that the caller can
-;;; poke at it if it wants to.
+;;; Convert a function call where the function FUN is a LEAF. FORM is
+;;; the source for the call. We return the COMBINATION node so that
+;;; the caller can poke at it if it wants to.
 (declaim (ftype (function (continuation continuation list leaf) combination)
 		ir1-convert-combination))
 (defun ir1-convert-combination (start cont form fun)
@@ -722,11 +722,10 @@
     (reference-leaf start fun-cont fun)
     (ir1-convert-combination-args fun-cont cont (cdr form))))
 
-;;; Convert the arguments to a call and make the COMBINATION node.
-;;; FUN-CONT is the continuation which yields the function to call.
-;;; FORM is the source for the call. ARGS is the list of arguments for
-;;; the call, which defaults to the cdr of source. We return the
-;;; COMBINATION node.
+;;; Convert the arguments to a call and make the COMBINATION
+;;; node. FUN-CONT is the continuation which yields the function to
+;;; call. ARGS is the list of arguments for the call, which defaults
+;;; to the cdr of source. We return the COMBINATION node.
 (defun ir1-convert-combination-args (fun-cont cont args)
   (declare (type continuation fun-cont cont) (list args))
   (let ((node (make-combination fun-cont)))
@@ -1126,22 +1125,22 @@
 ;;;; function representation" before you seriously mess with this
 ;;;; stuff.
 
-;;; Verify that a thing is a legal name for a variable and return a
-;;; Var structure for it, filling in info if it is globally special.
-;;; If it is losing, we punt with a Compiler-Error. Names-So-Far is an
-;;; alist of names which have previously been bound. If the name is in
+;;; Verify that the NAME is a legal name for a variable and return a
+;;; VAR structure for it, filling in info if it is globally special.
+;;; If it is losing, we punt with a COMPILER-ERROR. NAMES-SO-FAR is a
+;;; list of names which have previously been bound. If the NAME is in
 ;;; this list, then we error out.
 (declaim (ftype (function (t list) lambda-var) varify-lambda-arg))
 (defun varify-lambda-arg (name names-so-far)
   (declare (inline member))
   (unless (symbolp name)
-    (compiler-error "The lambda-variable ~S is not a symbol." name))
+    (compiler-error "The lambda variable ~S is not a symbol." name))
   (when (member name names-so-far :test #'eq)
     (compiler-error "The variable ~S occurs more than once in the lambda-list."
 		    name))
   (let ((kind (info :variable :kind name)))
     (when (or (keywordp name) (eq kind :constant))
-      (compiler-error "The name of the lambda-variable ~S is a constant."
+      (compiler-error "The name of the lambda variable ~S is already in use to name a constant."
 		      name))
     (cond ((eq kind :special)
 	   (let ((specvar (find-free-var name)))

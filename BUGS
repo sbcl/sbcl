@@ -365,13 +365,6 @@ WORKAROUND:
   The implementation of #'+ returns its single argument without
   type checking, e.g. (+ "illegal") => "illegal".
 
-56:
-  Attempting to use COMPILE on something defined by DEFMACRO fails:
-	(DEFMACRO FOO (X) (CONS X X))
-	(COMPILE 'FOO)
-Error in function C::GET-LAMBDA-TO-COMPILE:
-   #<Closure Over Function "DEFUN (SETF MACRO-FUNCTION)" {480E21B1}> was defined in a non-null environment.
-
 58:
   (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH) => NIL, NIL
   Note: I looked into fixing this in 0.6.11.15, but gave up. The
@@ -804,30 +797,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   (not the SIGBUS reported in the comment) but that's broken too; 
   type declarations are supposed to be treated as assertions unless
   SAFETY 0, so we should be getting a TYPE-ERROR.
-
-112:
-  reported by Martin Atzmueller 2001-06-25; taken from CMU CL bugs
-  collection; apparently originally reported by Bruno Haible
-    (in-package :cl-user)
-    ;;; From: Bruno Haible
-    ;;; Subject: scope of SPECIAL declarations
-    ;;; It seems CMUCL has a bug relating to the scope of SPECIAL
-    ;;; declarations.  I observe this with "CMU Common Lisp 18a x86-linux
-    ;;; 1.4.0 cvs".
-    (let ((x 0))
-      (declare (special x))
-      (let ((x 1))
-        (let ((y x))
-          (declare (special x)) y)))
-    ;;; Gives: 0 (this should return 1 according to CLHS)
-    (let ((x 0))
-      (declare (special x))
-      (let ((x 1))
-        (let ((y x) (x 5))
-          (declare (special x)) y)))
-    ;;; Gives: 1 (correct).
-  The reported results match what we get from the interpreter
-  in sbcl-0.6.12.42.
 
 113:
   reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs

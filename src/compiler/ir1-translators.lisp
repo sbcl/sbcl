@@ -509,14 +509,14 @@
 ;;;; any pervasive declarations also affect the evaluation of the
 ;;;; arguments.)
 
-;;; Given a list of binding specifiers in the style of Let, return:
+;;; Given a list of binding specifiers in the style of LET, return:
 ;;;  1. The list of var structures for the variables bound.
 ;;;  2. The initial value form for each variable.
 ;;;
 ;;; The variable names are checked for legality and globally special
 ;;; variables are marked as such. Context is the name of the form, for
 ;;; error reporting purposes.
-(declaim (ftype (function (list symbol) (values list list list))
+(declaim (ftype (function (list symbol) (values list list))
 		extract-let-vars))
 (defun extract-let-vars (bindings context)
   (collect ((vars)
@@ -531,7 +531,7 @@
 	(cond ((atom spec)
 	       (let ((var (get-var spec)))
 		 (vars var)
-		 (names (cons spec var))
+		 (names spec)
 		 (vals nil)))
 	      (t
 	       (unless (proper-list-of-length-p spec 1 2)
@@ -544,7 +544,7 @@
 		 (names name)
 		 (vals (second spec)))))))
 
-    (values (vars) (vals) (names))))
+    (values (vars) (vals))))
 
 (def-ir1-translator let ((bindings &body body)
 			 start cont)
@@ -555,12 +555,13 @@
   evaluated."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-      (let* ((*lexenv* (process-decls decls vars nil cont))
-	     (fun-cont (make-continuation))
-	     (fun (ir1-convert-lambda-body
-		   forms vars :debug-name (debug-namify "LET ~S" bindings))))
-	(reference-leaf start fun-cont fun)
-	(ir1-convert-combination-args fun-cont cont values)))))
+      (let ((fun-cont (make-continuation)))
+        (let* ((*lexenv* (process-decls decls vars nil cont))
+               (fun (ir1-convert-lambda-body
+                     forms vars
+                     :debug-name (debug-namify "LET ~S" bindings))))
+          (reference-leaf start fun-cont fun))
+        (ir1-convert-combination-args fun-cont cont values)))))
 
 (def-ir1-translator let* ((bindings &body body)
 			  start cont)

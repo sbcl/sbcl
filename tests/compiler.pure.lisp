@@ -56,3 +56,32 @@
 			     (frob (mrstk x)))
 			   nil))))
 	 13)
+
+;;; bug 112, reported by Martin Atzmueller 2001-06-25 (originally
+;;; from Bruno Haible in CMU CL bugs collection), fixed by
+;;; Alexey Dejneka 2002-01-27
+(assert (= 1 ; (used to give 0 under bug 112)
+	   (let ((x 0))
+	     (declare (special x))
+	     (let ((x 1))
+	       (let ((y x))
+		 (declare (special x)) y)))))
+(assert (= 1 ; (used to give 1 even under bug 112, still works after fix)
+	   (let ((x 0))
+	     (declare (special x))
+	     (let ((x 1))
+	       (let ((y x) (x 5))
+		 (declare (special x)) y)))))
+
+;;; another LET-related bug fixed by Alexey Dejneka at the same
+;;; time as bug 112
+(multiple-value-bind (value error)
+    (ignore-errors
+      ;; should complain about duplicate variable names in LET binding
+      (compile nil
+	       '(lambda ()
+		  (let (x
+			(x 1))
+		    (list x)))))
+  (assert (null value))
+  (assert (typep error 'error)))
