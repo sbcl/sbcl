@@ -46,6 +46,8 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
        conditional newlines.
     ** PRINT-UNREADABLE-OBJECT inserts spaces as specified (and only
        as specified: it no longer includes conditional newlines).
+    ** PRINC-TO-STRING binds *PRINT-READABLY* to NIL (as well as
+       *PRINT-ESCAPE*).
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of

@@ -158,7 +158,7 @@
   #!+sb-doc
   "Output a mostly READable printed representation of OBJECT on the specified
   STREAM."
-  (let ((*print-escape* T))
+  (let ((*print-escape* t))
     (output-object object (out-synonym-of stream)))
   object)
 
@@ -166,8 +166,8 @@
   #!+sb-doc
   "Output an aesthetic but not necessarily READable printed representation
   of OBJECT on the specified STREAM."
-  (let ((*print-escape* NIL)
-	(*print-readably* NIL))
+  (let ((*print-escape* nil)
+	(*print-readably* nil))
     (output-object object (out-synonym-of stream)))
   object)
 
@@ -217,18 +217,21 @@
   #!+sb-doc
   "Return the printed representation of OBJECT as a string with
    slashification on."
-  (stringify-object object t))
+  (let ((*print-escape* t))
+    (stringify-object object)))
 
 (defun princ-to-string (object)
   #!+sb-doc
   "Return the printed representation of OBJECT as a string with
   slashification off."
-  (stringify-object object nil))
+  (let ((*print-escape* nil)
+	(*print-readably* nil))
+    (stringify-object object)))
 
 ;;; This produces the printed representation of an object as a string.
 ;;; The few ...-TO-STRING functions above call this.
 (defvar *string-output-streams* ())
-(defun stringify-object (object &optional (*print-escape* *print-escape*))
+(defun stringify-object (object)
   (let ((stream (if *string-output-streams*
 		    (pop *string-output-streams*)
 		    (make-string-output-stream))))

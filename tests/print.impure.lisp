@@ -242,5 +242,10 @@
 ;;; NIL parameters to "interpreted" FORMAT directives
 (assert (string= (format nil "~v%" nil) (string #\Newline)))
 
+;;; PRINC-TO-STRING should bind print-readably
+(let ((*print-readably* t))
+  (assert (string= (princ-to-string #\7)
+		   (write-to-string #\7 :escape nil :readably nil))))
+
 ;;; success
 (quit :unix-status 104)
