@@ -324,99 +324,18 @@
 
 ;;;; HANDLER-CASE
 
-(defmacro handler-case (form &rest clauses)
+(defmacro handler-case (form &rest cases)
   "(HANDLER-CASE form
    { (type ([var]) body) }* )
    Execute FORM in a context with handlers established for the condition
-   types. A peculiar property allows type to be :no-error. If such a clause
+   types. A peculiar property allows type to be :NO-ERROR. If such a clause
    occurs, and form returns normally, all its values are passed to this clause
    as if by MULTIPLE-VALUE-CALL.  The :NO-ERROR clause accepts more than one
    var specification."
 
-  ;; FIXME: This old SBCL code uses multiple nested THROW/CATCH
-  ;; operations, which seems like an ugly way to handle lexical
-  ;; nonlocal exit. MNA sbcl-devel 2001-07-17 provided a patch
-  ;; (included below this form, but #+NIL'ed out) to switch over to
-  ;; RETURN-FROM, which seems like basically a better idea.
-  ;; Unfortunately when using his patch, this reasonable code
-  ;;	(DEFUN FOO1I ()
-  ;;	  (IF (NOT (IGNORE-ERRORS
-  ;;		     (MAKE-PATHNAME :HOST "FOO"
-  ;;				    :DIRECTORY "!BLA"
-  ;;				    :NAME "BAR")))
-  ;;	      (PRINT "OK")
-  ;;	      (ERROR "NOTUNLESSNOT")))
-  ;; fails (doing ERROR "NOTUNLESSNOT" when it should PRINT "OK"
-  ;; instead). I think this may not be a bug in MNA's patch, but 
-  ;; instead in the rest of the compiler (e.g. handling of RETURN-FROM)
-  ;; but whatever the reason. (I noticed this problem in
-  ;; sbcl-0.pre7.14.flaky4.11, and reverted to the old code at that point.
-  ;; The problem also occurs at least in sbcl-0.6.12.59 and
-  ;; sbcl-0.6.13.) -- WHN
-  ;;
-  ;; Note also: I think the old nested THROW/CATCH version became
-  ;; easier to read once I converted it to use DESTRUCTURING-BIND and
-  ;; mnemonic names, and it would probably be a useful to do that to
-  ;; the RETURN-FROM version when/if it's adopted.
-  (let ((no-error-clause (assoc ':no-error clauses)))
-    (if no-error-clause
-        (let ((normal-return (make-symbol "normal-return"))
-              (error-return  (make-symbol "error-return")))
-          `(block ,error-return
-             (multiple-value-call #'(lambda ,@(cdr no-error-clause))
-               (block ,normal-return
-                 (return-from ,error-return
-                   (handler-case (return-from ,normal-return ,form)
-		     ;; FIXME: What if there's more than one :NO-ERROR
-		     ;; clause? The code here and above doesn't seem
-		     ;; either to remove both of them or to signal
-		     ;; a good error, so it's probably wrong.
-                     ,@(remove no-error-clause clauses)))))))
-        (let ((var (gensym "HC-VAR-"))
-              (outer-tag (gensym "OUTER-HC-TAG-"))
-              (inner-tag (gensym "INNER-HC-TAG-"))
-              (tag-var (gensym "HC-TAG-VAR-"))
-              (tagged-clauses (mapcar (lambda (clause)
-					(cons (gensym "HC-TAG-") clause))
-				      clauses)))
-          `(let ((,outer-tag (cons nil nil))
-                 (,inner-tag (cons nil nil))
-                 ,var ,tag-var)
-             ;; FIXME: should be (DECLARE (IGNORABLE ,VAR))
-             ,var                       ;ignoreable
-             (catch ,outer-tag
-               (catch ,inner-tag
-                 (throw ,outer-tag
-                        (handler-bind
-                            ,(mapcar (lambda (tagged-clause)
-				       (destructuring-bind
-					   (tag typespec args &body body)
-					   tagged-clause
-					 (declare (ignore body))
-                                         `(,typespec
-                                           (lambda (temp)
-					     ,(if args
-						  `(setq ,var temp)
-						  '(declare (ignore temp)))
-					     (setf ,tag-var ',tag)
-					     (/show "THROWing INNER-TAG from HANDLER-BIND closure for" ',typespec)
-					     (throw ,inner-tag nil)))))
-                                     tagged-clauses)
-                          ,form)))
-               (case ,tag-var
-                 ,@(mapcar (lambda (tagged-clause)
-			     (destructuring-bind
-				 (tag typespec args &body body)
-				 tagged-clause
-			       (declare (ignore typespec))
-			       `(,tag
-				 ,@(if args
-				       (destructuring-bind (arg) args
-					 `((let ((,arg ,var))
-					     ,@body)))
-				       body))))
-                           tagged-clauses)))))))
-  #+nil ; MNA's patched version -- see FIXME above
+  ;; FIXME: Replacing CADR, CDDDR and friends with DESTRUCTURING-BIND
+  ;; and names for the subexpressions would make it easier to
+  ;; understand the code below.
   (let ((no-error-clause (assoc ':no-error cases)))
     (if no-error-clause
 	(let ((normal-return (make-symbol "normal-return"))

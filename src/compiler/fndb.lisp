@@ -1024,7 +1024,8 @@
 
 ;;; (No pathname functions are FOLDABLE because they all potentially
 ;;; depend on *DEFAULT-PATHNAME-DEFAULTS*, e.g. to provide a default
-;;; host when parsing a namestring.)
+;;; host when parsing a namestring. They are not FLUSHABLE because
+;;; parsing of a PATHNAME-DESIGNATOR might signal an error.)
 
 (defknown wild-pathname-p (pathname-designator
 			   &optional
@@ -1032,21 +1033,21 @@
 				   :directory :name
 				   :type :version))
   boolean
-  (flushable))
+  ())
 (defknown pathname-match-p (pathname-designator pathname-designator) boolean
-  (flushable))
+  ())
 (defknown translate-pathname (pathname-designator
 			      pathname-designator
 			      pathname-designator &key)
   pathname
-  (flushable))
+  ())
 
 (defknown logical-pathname (pathname-designator) logical-pathname ())
 (defknown translate-logical-pathname (pathname-designator &key) pathname ())
 (defknown load-logical-pathname-translations (string) t ())
 (defknown logical-pathname-translations (logical-host-designator) list ())
 
-(defknown pathname (pathname-designator) pathname (flushable))
+(defknown pathname (pathname-designator) pathname ())
 (defknown truename (pathname-designator) pathname ())
 
 (defknown parse-namestring
@@ -1063,7 +1064,7 @@
 (defknown merge-pathnames
   (pathname-designator &optional pathname-designator pathname-version)
   pathname
-  (flushable))
+  ())
 
 (defknown make-pathname
  (&key (:defaults pathname-designator)
@@ -1073,35 +1074,35 @@
        (:name (or pathname-name string (member :wild)))
        (:type (or pathname-type string (member :wild)))
        (:version pathname-version) (:case (member :local :common)))
-  pathname (flushable))
+  pathname ())
 
 (defknown pathnamep (t) boolean (movable flushable))
 
 (defknown pathname-host (pathname-designator
 			 &key (:case (member :local :common)))
-  pathname-host (flushable))
+  pathname-host ())
 (defknown pathname-device (pathname-designator
 			   &key (:case (member :local :common)))
-  pathname-device (flushable))
+  pathname-device ())
 (defknown pathname-directory (pathname-designator
 			      &key (:case (member :local :common)))
-  pathname-directory (flushable))
+  pathname-directory ())
 (defknown pathname-name (pathname-designator
 			 &key (:case (member :local :common)))
-  pathname-name (flushable))
+  pathname-name ())
 (defknown pathname-type (pathname-designator
 			 &key (:case (member :local :common)))
-  pathname-type (flushable))
+  pathname-type ())
 (defknown pathname-version (pathname-designator)
-  pathname-version (flushable))
+  pathname-version ())
 
 (defknown (namestring file-namestring directory-namestring host-namestring)
   (pathname-designator) simple-string
-  (flushable))
+  ())
 
 (defknown enough-namestring (pathname-designator &optional pathname-designator)
   simple-string
-  (flushable))
+  ())
 
 (defknown user-homedir-pathname (&optional t) pathname (flushable))
 
@@ -1119,11 +1120,11 @@
 (defknown rename-file (pathname-designator filename)
   (values pathname pathname pathname))
 (defknown delete-file (pathname-designator) t)
-(defknown probe-file (pathname-designator) (or pathname null) (flushable))
+(defknown probe-file (pathname-designator) (or pathname null) ())
 (defknown file-write-date (pathname-designator) (or unsigned-byte null)
-  (flushable))
+  ())
 (defknown file-author (pathname-designator) (or simple-string null)
-  (flushable))
+  ())
 
 (defknown file-position (stream &optional
 				(or unsigned-byte (member :start :end)))
@@ -1140,7 +1141,7 @@
   t)
 
 (defknown directory (pathname-designator &key)
-  list (flushable))
+  list ())
 
 ;;;; from the "Errors" chapter:
 

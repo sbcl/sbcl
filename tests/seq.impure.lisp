@@ -196,7 +196,7 @@
   ;; physical ARRAY-DIMENSION 0.
   ;;
   ;; fixed in sbcl-0.7.4.22 by WHN
-  (assert (null (ignore-errors (subseq avec 1 5)))))
+  (assert (null (ignore-errors (aref (subseq avec 1 5) 0)))))
 
 ;;; FILL
 (defun test-fill-typecheck (x)
