@@ -2211,6 +2211,8 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
   * bug fix: Pretty printing backquoted forms with unquotations in the
     argument list position of various code constructs such as LAMBDA
     now works correctly.  (reported by Paul Dietz)
+  * bug fix: Pretty printing unquotations no longer loses all
+    stream position information.
   * optimization: performance of string output streams is now less
     poor for multiple small sequence writes.
   * optimization: performance of CSUBTYPEP in the presence of complex

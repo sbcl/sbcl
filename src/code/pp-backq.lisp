@@ -82,6 +82,12 @@
   ;; attributes rather than per-stream actually makes life easier.
   ;; Since all of the attributes are shared in the dynamic state, we
   ;; can do... -- CSR, 2003-09-30
+  ;;
+  ;; [...] above referred to the trick of printing to a string stream,
+  ;; and then simply printing the resulting sequence to the pretty
+  ;; stream, possibly with a space prepended.  However, this doesn't
+  ;; work for pretty streams which need to do margin calculations.  Oh
+  ;; well.  It was good while it lasted.  -- CSR, 2003-12-15
   (let ((output (with-output-to-string (s)
 		  (write (cadr form) :stream s))))
     (unless (= (length output) 0)
@@ -89,7 +95,7 @@
 		 (or (char= (char output 0) #\.)
 		     (char= (char output 0) #\@)))
 	(write-char #\Space stream))
-      (write-sequence output stream))))
+      (write (cadr form) :stream stream))))
 
 ;;; This is called by !PPRINT-COLD-INIT, fairly late, because
 ;;; SET-PPRINT-DISPATCH doesn't work until the compiler works.

@@ -47,6 +47,12 @@ Web:       http://web.metacircles.com/sbcl
 Expertise: Lowlevel issues (threads, GC, runtime support).  Ports to new systems.  Network/web applications.  ASDF, asdf-install, contrib issues.
 Offerings: Custom programming.   Email-based support (per-incident).  
 
+Name:      Christophe Rhodes
+Email:     csr21@cam.ac.uk
+PGP:       1024D/52D68DF2 : B36B 91C5 1835 DB9B FBAB  735B 84C5 E278 52D6 8DF2
+Expertise: Ports to new systems, optimizations of current platforms.  Library bug fixes or enhancements.
+Offerings: Custom programming.
+
 
 [ If you provide SBCL-related services, please add your details to
 this file keeping alphabetical order by surname, following the
