@@ -846,6 +846,26 @@ size_vector(lispobj *where)
 }
 
 static int
+scav_vector_nil(lispobj *where, lispobj object)
+{
+    return 2;
+}
+
+static lispobj
+trans_vector_nil(lispobj object)
+{
+    gc_assert(is_lisp_pointer(object));
+    return copy_unboxed_object(object, 2);
+}
+
+static int
+size_vector_nil(lispobj *where)
+{
+    /* Just the header word and the length word */
+    return 2;
+}
+
+static int
 scav_vector_bit(lispobj *where, lispobj object)
 {
     struct vector *vector;
@@ -1508,6 +1528,7 @@ gc_init_tables(void)
     scavtab[SIMPLE_ARRAY_WIDETAG] = scav_boxed;
     scavtab[SIMPLE_STRING_WIDETAG] = scav_string;
     scavtab[SIMPLE_BIT_VECTOR_WIDETAG] = scav_vector_bit;
+    scavtab[SIMPLE_ARRAY_NIL_WIDETAG] = scav_vector_nil;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
 	scav_vector_unsigned_byte_2;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
@@ -1603,6 +1624,7 @@ gc_init_tables(void)
     transother[SIMPLE_STRING_WIDETAG] = trans_string;
     transother[SIMPLE_BIT_VECTOR_WIDETAG] = trans_vector_bit;
     transother[SIMPLE_VECTOR_WIDETAG] = trans_vector;
+    transother[SIMPLE_ARRAY_NIL_WIDETAG] = trans_vector_nil;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
 	trans_vector_unsigned_byte_2;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
@@ -1702,6 +1724,7 @@ gc_init_tables(void)
     sizetab[SIMPLE_STRING_WIDETAG] = size_string;
     sizetab[SIMPLE_BIT_VECTOR_WIDETAG] = size_vector_bit;
     sizetab[SIMPLE_VECTOR_WIDETAG] = size_vector;
+    sizetab[SIMPLE_ARRAY_NIL_WIDETAG] = size_vector_nil;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
 	size_vector_unsigned_byte_2;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =

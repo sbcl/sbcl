@@ -798,8 +798,8 @@
 
 (defknown vector (&rest t) simple-vector (flushable unsafe))
 
-(defknown aref (array &rest index) t (foldable flushable))
-(defknown row-major-aref (array index) t (foldable flushable))
+(defknown aref (array &rest index) t (foldable))
+(defknown row-major-aref (array index) t (foldable))
 
 (defknown array-element-type (array)
   type-specifier
@@ -1317,10 +1317,10 @@
 (defknown %negate (number) number (movable foldable flushable explicit-check))
 (defknown %check-bound (array index fixnum) index (movable foldable flushable))
 (defknown data-vector-ref (simple-array index) t
-  (foldable flushable explicit-check))
+  (foldable explicit-check))
 (defknown data-vector-set (array index t) t (unsafe explicit-check))
 (defknown hairy-data-vector-ref (array index) t
-  (foldable flushable explicit-check))
+  (foldable explicit-check))
 (defknown hairy-data-vector-set (array index t) t (unsafe explicit-check))
 (defknown %caller-frame-and-pc () (values t t) (flushable))
 (defknown %with-array-data (array index (or index null))

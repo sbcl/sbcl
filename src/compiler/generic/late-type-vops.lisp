@@ -87,6 +87,12 @@
     object-not-simple-vector-error
   (simple-vector-widetag))
 
+(!define-type-vops simple-array-nil-p
+		   check-simple-array-nil
+		   simple-array-nil
+		   object-not-simple-array-nil-error
+  (simple-array-nil-widetag))
+		   
 (!define-type-vops simple-array-unsigned-byte-2-p
       check-simple-array-unsigned-byte-2
       simple-array-unsigned-byte-2
@@ -214,6 +220,7 @@
 
 (!define-type-vops vectorp check-vector nil object-not-vector-error
   (simple-string-widetag
+   simple-array-nil-widetag
    simple-bit-vector-widetag
    simple-vector-widetag
    simple-array-unsigned-byte-2-widetag
@@ -253,6 +260,7 @@
     object-not-simple-array-error
   (simple-array-widetag
    simple-string-widetag
+   simple-array-nil-widetag
    simple-bit-vector-widetag
    simple-vector-widetag
    simple-array-unsigned-byte-2-widetag
@@ -274,6 +282,7 @@
 (!define-type-vops arrayp check-array nil object-not-array-error
   (simple-array-widetag
    simple-string-widetag
+   simple-array-nil-widetag
    simple-bit-vector-widetag
    simple-vector-widetag
    simple-array-unsigned-byte-2-widetag

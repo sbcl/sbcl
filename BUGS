@@ -1270,8 +1270,7 @@ WORKAROUND:
   compiler gets its hands on the code needing compilation from the REPL,
   it has been macroexpanded several times.
 
-241:
-  "DEFCLASS mysteriously remembers uninterned accessor names."
+241: "DEFCLASS mysteriously remembers uninterned accessor names."
   (from tonyms on #lisp IRC 2003-02-25)
   In sbcl-0.7.12.55, typing
     (defclass foo () ((bar :accessor foo-bar)))

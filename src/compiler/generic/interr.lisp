@@ -121,6 +121,8 @@
    "Object is not of type (SIGNED-BYTE 32).")
   (object-not-unsigned-byte-32
    "Object is not of type (UNSIGNED-BYTE 32).")
+  (object-not-simple-array-nil
+   "Object is not of type (SIMPLE-ARRAY NIL (*)).")
   (object-not-simple-array-unsigned-byte-2
    "Object is not of type (SIMPLE-ARRAY (UNSIGNED-BYTE 2) (*)).")
   (object-not-simple-array-unsigned-byte-4
@@ -174,6 +176,8 @@
    "Object is not of type BASE-CHAR.")
   (nil-fun-returned
    "A function with declared result type NIL returned.")
+  (nil-array-accessed
+   "An array with element-type NIL was accessed.")
   (layout-invalid
    "Object layout is invalid. (indicates obsolete instance)")
   (object-not-complex-vector

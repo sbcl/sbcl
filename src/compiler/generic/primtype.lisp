@@ -100,6 +100,8 @@
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
+(!def-primitive-type simple-array-nil (descriptor-reg)
+  :type (simple-array nil (*)))
 (!def-primitive-type simple-string (descriptor-reg)
   :type simple-base-string)
 (!def-primitive-type simple-bit-vector (descriptor-reg))
@@ -160,7 +162,8 @@
 	   *backend-t-primitive-type*))))
 
 (defvar *simple-array-primitive-types*
-  '((base-char . simple-string)
+  '((nil . simple-array-nil)
+    (base-char . simple-string)
     (bit . simple-bit-vector)
     ((unsigned-byte 2) . simple-array-unsigned-byte-2)
     ((unsigned-byte 4) . simple-array-unsigned-byte-4)

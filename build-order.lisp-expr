@@ -528,6 +528,7 @@
   ;; what the problem is and fix it. (See the comments in
   ;; src/compiler/x86/array for a candidate patch.) -- WHN 19990323
   :ignore-failure-p)
+ ("src/compiler/generic/array")
  ("src/compiler/target/pred")
 
  ("src/compiler/target/type-vops")

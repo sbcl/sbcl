@@ -33,6 +33,7 @@
 (define-type-predicate short-float-p short-float)
 (define-type-predicate single-float-p single-float)
 (define-type-predicate simple-array-p simple-array)
+(define-type-predicate simple-array-nil-p (simple-array nil (*)))
 (define-type-predicate simple-array-unsigned-byte-2-p
 		       (simple-array (unsigned-byte 2) (*)))
 (define-type-predicate simple-array-unsigned-byte-4-p
