@@ -18,7 +18,7 @@
 ;;; taken through the source to reach the form. This provides a way to
 ;;; keep track of the location of original source forms, even when
 ;;; macroexpansions and other arbitary permutations of the code
-;;; happen. This table is initialized by calling Find-Source-Paths on
+;;; happen. This table is initialized by calling FIND-SOURCE-PATHS on
 ;;; the original source.
 (declaim (hash-table *source-paths*))
 (defvar *source-paths*)
@@ -40,7 +40,7 @@
 ;;; *CURRENT-PATH* is the source path of the form we are currently
 ;;; translating. See NODE-SOURCE-PATH in the NODE structure.
 (declaim (list *current-path*))
-(defvar *current-path* nil)
+(defvar *current-path*)
 
 (defvar *derive-function-types* nil
   "Should the compiler assume that function types will never change,
@@ -364,7 +364,8 @@
 
 ;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
 ;;; form number to associate with a source path. This should be bound
-;;; to 0 around the processing of each truly top-level form.
+;;; to an initial value of 0 before the processing of each truly
+;;; top-level form.
 (declaim (type index *current-form-number*))
 (defvar *current-form-number*)
 

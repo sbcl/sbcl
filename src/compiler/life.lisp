@@ -394,9 +394,9 @@
 	(return))))
   (values))
 
-;;; Iterate over all the blocks in Env, setting up :LIVE conflicts for TN.
-;;; We make the TN global if it isn't already. The TN must have at least one
-;;; reference.
+;;; Iterate over all the blocks in ENV, setting up :LIVE conflicts for
+;;; TN. We make the TN global if it isn't already. The TN must have at
+;;; least one reference.
 (defun setup-environment-tn-conflicts (component tn env debug-p)
   (declare (type component component) (type tn tn) (type environment env))
   (when (and debug-p
@@ -416,8 +416,8 @@
 	  (setup-environment-tn-conflict tn b debug-p)))))
   (values))
 
-;;; Iterate over all the environment TNs, adding always-live conflicts as
-;;; appropriate.
+;;; Iterate over all the environment TNs, adding always-live conflicts
+;;; as appropriate.
 (defun setup-environment-live-conflicts (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))

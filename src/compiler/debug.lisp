@@ -1091,8 +1091,8 @@
     (print-ir2-block block))
   (values))
 
-;;; Do a Print-Nodes on Block and all blocks reachable from it by successor
-;;; links.
+;;; Do a PRINT-NODES on BLOCK and all blocks reachable from it by
+;;; successor links.
 (defun print-blocks (block)
   (setq block (block-or-lose block))
   (do-blocks (block (block-component block) :both)
@@ -1107,7 +1107,7 @@
     (walk block))
   (values))
 
-;;; Print all blocks in Block's component in DFO.
+;;; Print all blocks in BLOCK's component in DFO.
 (defun print-all-blocks (thing)
   (do-blocks (block (block-component (block-or-lose thing)))
     (handler-case (print-nodes block)
@@ -1117,7 +1117,7 @@
 
 (defvar *list-conflicts-table* (make-hash-table :test 'eq))
 
-;;; Add all Always-Live TNs in Block to the conflicts. TN is ignored when
+;;; Add all ALWAYS-LIVE TNs in Block to the conflicts. TN is ignored when
 ;;; it appears in the global conflicts.
 (defun add-always-live-tns (block tn)
   (declare (type ir2-block block) (type tn tn))

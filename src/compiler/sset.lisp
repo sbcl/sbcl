@@ -15,16 +15,20 @@
 
 (in-package "SB!C")
 
-;;; Each structure that may be placed in a SSet must include the
-;;; SSet-Element structure. We allow an initial value of NIL to mean
+;;; Each structure that may be placed in a SSET must include the
+;;; SSET-ELEMENT structure. We allow an initial value of NIL to mean
 ;;; that no ordering has been assigned yet (although an ordering must
 ;;; be assigned before doing set operations.)
 (defstruct (sset-element (:constructor nil)
 			 (:copier nil))
   (number nil :type (or index null)))
 
-(defstruct (sset (:constructor make-sset ()))
-  (elements (list nil) :type list))
+(defstruct (sset (:copier nil))
+  ;; The element at the head of the list here seems always to be
+  ;; ignored. I think this idea is that the extra level of indirection
+  ;; it provides is handy to allow various destructive operations on
+  ;; SSETs to be expressed more easily. -- WHN
+  (elements (list nil) :type cons))
 (defprinter (sset)
   (elements :prin1 (cdr elements)))
 
@@ -33,7 +37,7 @@
 (defmacro do-sset-elements ((var sset &optional result) &body body)
   `(dolist (,var (cdr (sset-elements ,sset)) ,result) ,@body))
 
-;;; Destructively add Element to Set. If Element was not in the set,
+;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.
 (declaim (ftype (function (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
@@ -51,7 +55,7 @@
 	  (setf (cdr prev) (cons element current))
 	  (return t))))))
 
-;;; Destructively remove Element from Set. If element was in the set,
+;;; Destructively remove ELEMENT from SET. If element was in the set,
 ;;; then return true, otherwise return false.
 (declaim (ftype (function (sset-element sset) boolean) sset-delete))
 (defun sset-delete (element set)
@@ -63,7 +67,7 @@
 	(setf (cdr prev) (cdr current))
 	(return t)))))
 
-;;; Return true if Element is in Set, false otherwise.
+;;; Return true if ELEMENT is in SET, false otherwise.
 (declaim (ftype (function (sset-element sset) boolean) sset-member))
 (defun sset-member (element set)
   (declare (inline member))
@@ -77,12 +81,11 @@
 ;;; Return a new copy of SET.
 (declaim (ftype (function (sset) sset) copy-sset))
 (defun copy-sset (set)
-  (let ((res (make-sset)))
-    (setf (sset-elements res) (copy-list (sset-elements set)))
-    res))
+  (make-sset :elements (copy-list (sset-elements set))))
 
-;;; Perform the appropriate set operation on SET1 and SET2 by destructively
-;;; modifying SET1. We return true if SET1 was modified, false otherwise.
+;;; Perform the appropriate set operation on SET1 and SET2 by
+;;; destructively modifying SET1. We return true if SET1 was modified,
+;;; false otherwise.
 (declaim (ftype (function (sset sset) boolean) sset-union sset-intersection
 		sset-difference))
 (defun sset-union (set1 set2)
@@ -102,7 +105,8 @@
 	      (if (> num1 num2)
 		  (let ((new (cons e el1)))
 		    (setf (cdr prev-el1) new)
-		    (setq prev-el1 new  changed t))
+		    (setq prev-el1 new
+			  changed t))
 		  (shiftf prev-el1 el1 (cdr el1)))
 	      (return))
 	    (shiftf prev-el1 el1 (cdr el1))))))))
@@ -147,8 +151,8 @@
 	      (return))
 	    (shiftf prev-el1 el1 (cdr el1))))))))
 
-;;; Destructively modify Set1 to include its union with the difference
-;;; of Set2 and Set3. We return true if Set1 was modified, false
+;;; Destructively modify SET1 to include its union with the difference
+;;; of SET2 and SET3. We return true if Set1 was modified, false
 ;;; otherwise.
 (declaim (ftype (function (sset sset sset) boolean) sset-union-of-difference))
 (defun sset-union-of-difference (set1 set2 set3)

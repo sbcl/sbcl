@@ -299,7 +299,7 @@
 (defun source-path-forms (path)
   (subseq path 0 (position 'original-source-start path)))
 
-;;; Return the innermost source form for Node.
+;;; Return the innermost source form for NODE.
 (defun node-source-form (node)
   (declare (type node node))
   (let* ((path (node-source-path node))
@@ -1307,21 +1307,21 @@
 	    (:print-object (lambda (x stream)
 			     (print-unreadable-object (x stream :type t))))
 	    (:copier nil))
-  ;; A list of the stringified CARs of the enclosing non-original source forms
-  ;; exceeding the *enclosing-source-cutoff*.
+  ;; a list of the stringified CARs of the enclosing non-original source forms
+  ;; exceeding the *enclosing-source-cutoff*
   (enclosing-source nil :type list)
-  ;; A list of stringified enclosing non-original source forms.
+  ;; a list of stringified enclosing non-original source forms
   (source nil :type list)
-  ;; The stringified form in the original source that expanded into Source.
+  ;; the stringified form in the original source that expanded into SOURCE
   (original-source (required-argument) :type simple-string)
-  ;; A list of prefixes of "interesting" forms that enclose original-source.
+  ;; a list of prefixes of "interesting" forms that enclose original-source
   (context nil :type list)
-  ;; The FILE-INFO-NAME for the relevant FILE-INFO.
+  ;; the FILE-INFO-NAME for the relevant FILE-INFO
   (file-name (required-argument)
 	     :type (or pathname (member :lisp :stream)))
-  ;; The file position at which the top-level form starts, if applicable.
+  ;; the file position at which the top-level form starts, if applicable
   (file-position nil :type (or index null))
-  ;; The original source part of the source path.
+  ;; the original source part of the source path
   (original-source-path nil :type list))
 
 ;;; If true, this is the node which is used as context in compiler warning

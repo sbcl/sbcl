@@ -358,7 +358,7 @@
   ;; from each non-deleted function is linked to the component head
   ;; and tail. Until environment analysis links NLX entry stubs to the
   ;; component head, every successor of the head is a function start
-  ;; (i.e. begins with a Bind node.)
+  ;; (i.e. begins with a BIND node.)
   (head nil :type (or null cblock))
   (tail nil :type (or null cblock))
   ;; a list of the CLAMBDA structures for all functions in this

@@ -311,7 +311,7 @@
 
   (values))
 
-;;; Loop over the blocks in component, calling Emit-Cleanups when we
+;;; Loop over the blocks in COMPONENT, calling EMIT-CLEANUPS when we
 ;;; see a successor in the same environment with a different cleanup.
 ;;; We ignore the cleanup transition if it is to a cleanup enclosed by
 ;;; the current cleanup, since in that case we are just messing up the

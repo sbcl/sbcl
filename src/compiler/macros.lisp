@@ -594,7 +594,7 @@
 			(block-next ,block-var)))
 	   ((eq ,block-var ,n-tail) ,result)
 	 ,@body))))
-;;; like Do-Blocks, only iterating over the blocks in reverse order
+;;; like DO-BLOCKS, only iterating over the blocks in reverse order
 (defmacro do-blocks-backwards ((block-var component &optional ends result) &body body)
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
@@ -629,12 +629,12 @@
 			   ,result)
 	  ,@body)))))
 
-;;; Iterate over the nodes in Block, binding Node-Var to the each node
-;;; and Cont-Var to the node's Cont. The only keyword option is
-;;; Restart-P, which causes iteration to be restarted when a node is
+;;; Iterate over the nodes in BLOCK, binding NODE-VAR to the each node
+;;; and CONT-VAR to the node's CONT. The only keyword option is
+;;; RESTART-P, which causes iteration to be restarted when a node is
 ;;; deleted out from under us. (If not supplied, this is an error.)
 ;;;
-;;; In the forward case, we terminate on Last-Cont so that we don't
+;;; In the forward case, we terminate on LAST-CONT so that we don't
 ;;; have to worry about our termination condition being changed when
 ;;; new code is added during the iteration. In the backward case, we
 ;;; do NODE-PREV before evaluating the body so that we can keep going

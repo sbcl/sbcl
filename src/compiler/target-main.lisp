@@ -82,7 +82,9 @@
 	     (*compile-print* nil))
 	(clear-stuff)
 	(find-source-paths form 0)
-	(%compile form (make-core-object) :name name)))))
+	(%compile form (make-core-object)
+		  :name name
+		  :path '(original-source-start 0 0))))))
 
 (defun compile (name &optional (definition (fdefinition name)))
   #!+sb-doc

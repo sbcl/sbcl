@@ -1240,6 +1240,24 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    but actual specification quoted above says that the actual behavior
    is undefined.
 
+125:
+   (as reported by Gabe Garza on cmucl-help 2001-09-21)
+	(defvar *tmp* 3)
+	(defun test-pred (x y)
+	  (eq x y))
+	(defun test-case ()
+	  (let* ((x *tmp*)
+	         (func (lambda () x)))
+	    (print (eq func func))
+	    (print (test-pred func func))
+	    (delete func (list func))))
+   Now calling (TEST-CASE) gives output
+     NIL
+     NIL
+     (#<FUNCTION {500A9EF9}>)
+   Evidently Python thinks of the lambda as a code transformation so
+   much that it forgets that it's also an object.
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure

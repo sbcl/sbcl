@@ -791,7 +791,6 @@
 				  (file-info-source-root file-info))))
 	     (vector-push-extend form forms)
 	     (vector-push-extend pos (file-info-positions file-info))
-	     (clrhash *source-paths*)
 	     (find-source-paths form current-idx)
 	     (process-top-level-form form
 				     `(original-source-start 0 ,current-idx)
@@ -896,7 +895,14 @@
 			   (maybe-frob (optional-dispatch-more-entry f))
 			   (maybe-frob (optional-dispatch-main-entry f)))))))
 
-(defun make-functional-from-top-level-lambda (definition &key name path)
+(defun make-functional-from-top-level-lambda (definition
+					      &key
+					      name
+					      (path
+					       ;; I'd thought NIL should
+					       ;; work, but it doesn't.
+					       ;; -- WHN 2001-09-20
+					       (required-argument)))
   (let* ((*current-path* path)
          (component (make-empty-component))
          (*current-component* component))
@@ -920,7 +926,17 @@
 ;;;
 ;;; If NAME is provided, then we try to use it as the name of the
 ;;; function for debugging/diagnostic information.
-(defun %compile (lambda-expression *compile-object* &key name path)
+(defun %compile (lambda-expression
+		 *compile-object*
+		 &key
+		 name
+		 (path
+		  ;; This magical idiom seems to be the appropriate
+		  ;; path for compiling standalone LAMBDAs, judging
+		  ;; from the CMU CL code and experiment, so it's a
+		  ;; nice default for things where we don't have a
+		  ;; real source path (as in e.g. inside CL:COMPILE).
+		  '(original-source-start 0 0)))
   (/show "entering %COMPILE" name)
   (unless (or (null name) (legal-function-name-p name))
     (error "not a legal function name: ~S" name))

@@ -453,20 +453,23 @@
 
   ;; REMOVEME
   #+sb-xc
-  (/show "entering FLOW-PROPAGATE-CONSTRAINTS" block)
+  (/noshow "entering FLOW-PROPAGATE-CONSTRAINTS" (block-number block))
 
   (let* ((pred (block-pred block))
 	 (in (cond (pred
 		    (let ((res (copy-sset (block-out (first pred)))))
 		      (dolist (b (rest pred))
 			(sset-intersection res (block-out b)))
+
+		      ;; REMOVEME
+		      #+sb-xc (/noshow "in PRED clause, new IN value is" res)
+
 		      res))
 		   (t
-		    (when *check-consistency*
-		      (let ((*compiler-error-context* (block-last block)))
-			(compiler-warning
-			 "*** Unreachable code in constraint ~
-			  propagation... Bug?")))
+		    (let ((*compiler-error-context* (block-last block)))
+		      (compiler-warning
+		       "unreachable code in constraint ~
+			propagation -- apparent compiler bug"))
 		    (make-sset))))
 	 (kill-list (block-kill-list block))
 	 (out (block-out block)))
@@ -475,16 +478,15 @@
     (cond ((null kill-list)
 
 	   ;; REMOVEME
-	   #+sb-xc
-	   (/show "leaving through NULL KILL-LIST clause" (block-out block) in)
+	   #+sb-xc (/noshow "leaving through NULL KILL-LIST clause")
+	   #+sb-xc (/show "old" (mapcar #'block-number (cdr (sset-elements (block-out block)))))
 
 	   (sset-union (block-out block) in))
 	  ((null (rest kill-list))
 	   (let ((con (lambda-var-constraints (first kill-list))))
 
 	     ;; REMOVEME
-	     #+sb-xc
-	     (/show "leaving through NULL (REST KILL-LIST) clause" out in con)
+	     #+sb-xc (/noshow "leaving through NULL (REST KILL-LIST) clause")
 
 	     (if con
 		 (sset-union-of-difference out in con)
@@ -497,13 +499,19 @@
 		   (sset-union kill-set con))
 
 		 ;; REMOVEME
-		 #+sb-xc
-		 (/show var con "new" kill-set)))
+		 #+sb-xc (/noshow var con "new" kill-set)))
 
 	     ;; REMOVEME
-	     #+sb-xc
-	     (/show "leaving through T clause")
+	     #+sb-xc (/noshow "leaving through T clause")
 	     (sset-union-of-difference (block-out block) in kill-set))))))
+
+;;; How many blocks does COMPONENT have?
+(defun component-n-blocks (component)
+  (let ((result 0))
+    (declare (type index result))
+    (do-blocks (block component :both)
+      (incf result))
+    result))
 
 (defun constraint-propagate (component)
   (declare (type component component))
@@ -524,14 +532,30 @@
 
   ;; REMOVEME
   #+sb-xc
-  (/show "in CONSTRAINT-PROPAGATE" component "before LOOP")
+  (/show "in CONSTRAINT-PROPAGATE" (component-name component) "before LOOP")
 
-  (loop
-   (let ((did-something nil))
-     (do-blocks (block component)
-	(when (flow-propagate-constraints block)
-	  (setq did-something t)))
-      (unless did-something (return))))
+  (let (;; If we have to propagate changes more than this many times,
+	;; something is wrong.
+	(max-n-changes-remaining (component-n-blocks component)))
+    (declare (type fixnum max-n-changes-remaining))
+    (loop (aver (plusp max-n-changes-remaining))
+	  (decf max-n-changes-remaining)
+	  (let ((did-something nil))
+	    (do-blocks (block component)
+		       
+	      ;; REMOVEME
+	      #+sb-xc
+	      (/show "in DO-BLOCKS" (block-number block))
+
+	      (when (flow-propagate-constraints block)
+		;; REMOVEME
+		#+sb-xc (/show "setting DID-SOMETHING")
+		#+sb-xc (/show "new" (mapcar #'block-number (cdr (sset-elements (block-in block)))))
+		#+sb-xc (/show "new" (mapcar #'block-number (cdr (sset-elements (block-out block)))))
+		(setq did-something t)))
+
+	    (unless did-something
+	      (return)))))
 
   ;; REMOVEME
   #+sb-xc
