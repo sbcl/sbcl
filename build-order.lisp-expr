@@ -265,8 +265,6 @@
  ("src/code/weak"  :not-host)
  ("src/code/final" :not-host)
 
- #!+mp ("src/code/multi-proc" :not-host)
-
  ("src/code/setf-funs" :not-host)
 
  ("src/code/stubs" :not-host)

@@ -1381,29 +1381,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
     :use ("CL")
     :export ())
 
- #!+mp
- #s(sb-cold:package-data
-    :name "SB!MP"
-    :doc "public (but unstable): multiprocessing support"
-    :export ("*ALL-PROCESSES*" "*CURRENT-PROCESS*"
-             "*CURRENT-STACK-GROUP*" "*INITIAL-STACK-GROUP*"
-             "*MULTI-PROCESSING*" "ALL-PROCESSES"
-             "ATOMIC-DECF" "ATOMIC-INCF" "ATOMIC-POP"
-             "ATOMIC-PUSH" "CURRENT-PROCESS"
-             "DESTROY-PROCESS" "DISABLE-PROCESS"
-             "ENABLE-PROCESS" "INIT-STACK-GROUPS"
-             "LOCK" "MAKE-STACK-GROUP" "MAKE-LOCK"
-             "MAKE-PROCESS" "PROCESS-ACTIVE-P" "PROCESS-ALIVE-P"
-             "PROCESS-IDLE-TIME" "PROCESS-INTERRUPT"
-             "PROCESS-NAME" "PROCESS-PRESET"
-             "PROCESS-REAL-TIME" "PROCESS-RUN-TIME"
-             "PROCESS-STATE" "PROCESS-WAIT-UNTIL-FD-USABLE"
-             "PROCESS-WAIT" "PROCESS-WAIT-WITH-TIMEOUT"
-             "PROCESS-WHOSTATE" "PROCESS-YIELD" "PROCESSP"
-             "RESTART-PROCESS" "SHOW-PROCESSES"
-             "STACK-GROUP-RESUME" "WITHOUT-SCHEDULING"
-             "WITH-LOCK-HELD"))
-
  #s(sb-cold:package-data
     :name "SB!PCL"
     :doc
