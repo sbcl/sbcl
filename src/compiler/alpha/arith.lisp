@@ -101,58 +101,77 @@
   (:info y)
   (:arg-types tagged-num (:constant integer)))
 
-(defmacro define-binop (translate cost untagged-cost op
-				  tagged-type untagged-type)
+(defmacro define-binop (translate cost untagged-cost op 
+		        tagged-type untagged-type
+			&optional arg-swap restore-fixnum-mask)
   `(progn
      (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
 		  fast-fixnum-binop)
-       (:args (x :target r :scs (any-reg))
-	      (y :target r :scs (any-reg)))
+       ,@(when restore-fixnum-mask
+	   `((:temporary (:sc non-descriptor-reg) temp)))
+       (:args (x ,@(unless restore-fixnum-mask `(:target r)) :scs (any-reg))
+	      (y ,@(unless restore-fixnum-mask `(:target r)) :scs (any-reg)))
        (:translate ,translate)
        (:generator ,(1+ cost)
-	 (inst ,op x y r)))
+	 ,(if arg-swap
+	      `(inst ,op y x ,(if restore-fixnum-mask 'temp 'r))
+	      `(inst ,op x y ,(if restore-fixnum-mask 'temp 'r)))
+	 ,@(when restore-fixnum-mask
+	     `((inst bic temp #.(ash lowtag-mask -1) r)))))
      (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
 		  fast-signed-binop)
        (:args (x :target r :scs (signed-reg))
 	      (y :target r :scs (signed-reg)))
        (:translate ,translate)
        (:generator ,(1+ untagged-cost)
-	 (inst ,op x y r)))
+	 ,(if arg-swap
+	      `(inst ,op y x r)
+	      `(inst ,op x y r))))
      (define-vop (,(symbolicate "FAST-" translate "/UNSIGNED=>UNSIGNED")
 		  fast-unsigned-binop)
        (:args (x :target r :scs (unsigned-reg))
 	      (y :target r :scs (unsigned-reg)))
        (:translate ,translate)
        (:generator ,(1+ untagged-cost)
-	 (inst ,op x y r)))
-     ,@(when tagged-type
+	 ,(if arg-swap
+	      `(inst ,op y x r)
+	      `(inst ,op x y r))))
+     ,@(when (and tagged-type (not arg-swap))
 	 `((define-vop (,(symbolicate "FAST-" translate "-C/FIXNUM=>FIXNUM")
 			fast-fixnum-c-binop)
-		       (:arg-types tagged-num (:constant ,tagged-type))
+	     (:arg-types tagged-num (:constant ,tagged-type))
+	     ,@(when restore-fixnum-mask
+		 `((:temporary (:sc non-descriptor-reg) temp)))
 	     (:translate ,translate)
 	     (:generator ,cost
-			 (inst ,op x (fixnumize y) r)))))
-     ,@(when untagged-type
+	        (inst ,op x (fixnumize y) ,(if restore-fixnum-mask 'temp 'r))
+		,@(when restore-fixnum-mask
+		    `((inst bic temp #.(ash lowtag-mask -1) r)))))))
+     ,@(when (and untagged-type (not arg-swap))
 	 `((define-vop (,(symbolicate "FAST-" translate "-C/SIGNED=>SIGNED")
 			fast-signed-c-binop)
-		       (:arg-types signed-num (:constant ,untagged-type))
+	     (:arg-types signed-num (:constant ,untagged-type))
 	     (:translate ,translate)
 	     (:generator ,untagged-cost
-			 (inst ,op x y r)))
+		(inst ,op x y r)))
 	   (define-vop (,(symbolicate "FAST-" translate
 				      "-C/UNSIGNED=>UNSIGNED")
 			fast-unsigned-c-binop)
-		       (:arg-types unsigned-num (:constant ,untagged-type))
+	     (:arg-types unsigned-num (:constant ,untagged-type))
 	     (:translate ,translate)
 	     (:generator ,untagged-cost
-			 (inst ,op x y r)))))))
+		(inst ,op x y r)))))))
 
 (define-binop + 1 5 addq (unsigned-byte 6) (unsigned-byte 8))
 (define-binop - 1 5 subq (unsigned-byte 6) (unsigned-byte 8))
-(define-binop logior 1 3 bis (unsigned-byte 6) (unsigned-byte 8))
-(define-binop lognor 1 3 ornot (unsigned-byte 6) (unsigned-byte 8))
 (define-binop logand 1 3 and (unsigned-byte 6) (unsigned-byte 8))
+(define-binop logandc1 1 3 bic (unsigned-byte 6) (unsigned-byte 8) t)
+(define-binop logandc2 1 3 bic (unsigned-byte 6) (unsigned-byte 8))
+(define-binop logior 1 3 bis (unsigned-byte 6) (unsigned-byte 8))
+(define-binop logorc1 1 3 ornot (unsigned-byte 6) (unsigned-byte 8) t t)
+(define-binop logorc2 1 3 ornot (unsigned-byte 6) (unsigned-byte 8) nil t)
 (define-binop logxor 1 3 xor (unsigned-byte 6) (unsigned-byte 8))
+(define-binop logeqv 1 3 eqv (unsigned-byte 6) (unsigned-byte 8) nil t)
 
 ;;;; shifting
 
@@ -283,6 +302,45 @@
   (:translate *)
   (:generator 3
     (inst mulq x y r)))
+
+;;;; Modular functions:
+(define-modular-fun lognot-mod64 (x) lognot 64)
+(define-vop (lognot-mod64/unsigned=>unsigned)
+  (:translate lognot-mod64)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst not x res)))
+
+(macrolet
+    ((define-modular-backend (fun &optional constantp)
+       (let ((mfun-name (symbolicate fun '-mod64))
+             (modvop (symbolicate 'fast- fun '-mod64/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun 'mod64-c/unsigned=>unsigned))
+             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
+             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
+         `(progn
+            (define-modular-fun ,mfun-name (x y) ,fun 64)
+            (define-vop (,modvop ,vop)
+              (:translate ,mfun-name))
+            ,@(when constantp
+                `((define-vop (,modcvop ,cvop)
+                    (:translate ,mfun-name))))))))
+  (define-modular-backend + t)
+  (define-modular-backend logxor t)
+  (define-modular-backend logeqv t)
+  (define-modular-backend logandc1)
+  (define-modular-backend logandc2 t)
+  (define-modular-backend logorc1)
+  (define-modular-backend logorc2 t))
+
+(define-source-transform lognand (x y)
+  `(lognot (logand ,x ,y)))
+(define-source-transform lognor (x y)
+  `(lognot (logior ,x ,y)))
 
 ;;;; binary conditional VOPs
 
@@ -776,3 +834,4 @@
 (define-static-fun two-arg-and (x y) :translate logand)
 (define-static-fun two-arg-ior (x y) :translate logior)
 (define-static-fun two-arg-xor (x y) :translate logxor)
+(define-static-fun two-arg-eqv (x y) :translate logeqv)

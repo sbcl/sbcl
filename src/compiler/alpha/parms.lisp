@@ -234,5 +234,6 @@
     sb!kernel:two-arg-and
     sb!kernel:two-arg-ior
     sb!kernel:two-arg-xor
+    sb!kernel:two-arg-eqv
     sb!kernel:two-arg-gcd
     sb!kernel:two-arg-lcm))
