@@ -114,7 +114,7 @@
 			  "+.9" "+.9e9" "+.9e+9" "+.9e-9"
 			  "0.9" "0.9e9" "0.9e+9" "0.9e-9"
 			  "9.09" "9.09e9" "9.09e+9" "9.09e-9"
-			  "9e9" "9e+9" "9e-9"))
+			  #|"9e9" could be integer|# "9e+9" "9e-9"))
     (loop for i from 2 to 36
 	  do (setq *read-base* i)
 	  do (assert (typep (read-from-string float-string)
@@ -142,10 +142,10 @@
 			  (read-from-string (substitute #\D #\e float-string))
 			  'double-float))
 	  and do (assert (typep
-			  (read-from-string (substitute #\d #\e float-string))
+			  (read-from-string (substitute #\l #\e float-string))
 			  'long-float))
 	  and do (assert (typep
-			  (read-from-string (substitute #\D #\e float-string))
+			  (read-from-string (substitute #\L #\e float-string))
 			  'long-float)))))
 
 (let ((*read-base* *read-base*))
@@ -161,10 +161,15 @@
 			   
 			   "0.A" "0.a" "0.Z" "0.z"
 
-			   "9eA" "9ea" "9e+A" "9e+a" "9e-A" "9e-a"
-			   "Ae9" "ae9" "Ae+9" "ae+9" "Ae-9" "ae-9"
-			   
-			   "A.0" "A.0e10" "a.0" "a.0e10"))
+			   #|"9eA" "9ea"|# "9e+A" "9e+a" "9e-A" "9e-a"
+			   #|"Ae9" "ae9"|# "Ae+9" "ae+9" "Ae-9" "ae-9"
+
+			   "ee+9" "Ee+9" "eE+9" "EE+9"
+			   "ee-9" "Ee-9" "eE-9" "EE-9"
+
+			   "A.0" "A.0e10" "a.0" "a.0e10"
+
+			   "1e1e+9"))
     (loop for i from 2 to 36
 	  do (setq *read-base* i)
 	  do (assert (typep (read-from-string symbol-string) 'symbol)))))

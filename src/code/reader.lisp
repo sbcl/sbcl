@@ -658,7 +658,9 @@
 	 +char-attr-delimiter+
 	 (if (digit-char-p ,char (max *read-base* 10))
 	     (if (digit-char-p ,char *read-base*)
-		 +char-attr-constituent-digit+
+		 (if (= att +char-attr-constituent-expt+)
+		     +char-attr-constituent-digit-or-expt+
+		     +char-attr-constituent-digit+)
 		 +char-attr-constituent-decimal-digit+)
 	     att))))
 
@@ -735,7 +737,9 @@
 	(package-designator nil)
 	(colons 0)
 	(possibly-rational t)
+	(seen-digit-or-expt nil)
 	(possibly-float t)
+	(was-possibly-float nil)
 	(escapes ())
 	(seen-multiple-escapes nil))
     (reset-read-buffer)
@@ -743,6 +747,9 @@
       (case (char-class3 char attribute-table)
 	(#.+char-attr-constituent-sign+ (go SIGN))
 	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-digit-or-expt+
+	 (setq seen-digit-or-expt t)
+	 (go LEFTDIGIT))
 	(#.+char-attr-constituent-decimal-digit+ (go LEFTDECIMALDIGIT))
 	(#.+char-attr-constituent-dot+ (go FRONTDOT))
 	(#.+char-attr-escape+ (go ESCAPE))
@@ -758,6 +765,9 @@
 	    possibly-float t)
       (case (char-class3 char attribute-table)
 	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-digit-or-expt+
+	 (setq seen-digit-or-expt t)
+	 (go LEFTDIGIT))
 	(#.+char-attr-constituent-decimal-digit+ (go LEFTDECIMALDIGIT))
 	(#.+char-attr-constituent-dot+ (go SIGNDOT))
 	(#.+char-attr-escape+ (go ESCAPE))
@@ -769,6 +779,7 @@
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-integer)))
+      (setq was-possibly-float possibly-float)
       (case (char-class3 char attribute-table)
 	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
 	(#.+char-attr-constituent-decimal-digit+ (if possibly-float
@@ -777,7 +788,34 @@
 	(#.+char-attr-constituent-dot+ (if possibly-float
 					   (go MIDDLEDOT)
 					   (go SYMBOL)))
-	(#.+char-attr-constituent-expt+ (go EXPONENT))
+	(#.+char-attr-constituent-digit-or-expt+
+	 (if (or seen-digit-or-expt (not was-possibly-float))
+	     (progn (setq seen-digit-or-expt t) (go LEFTDIGIT))
+	     (progn (setq seen-digit-or-expt t) (go LEFTDIGIT-OR-EXPT))))
+	(#.+char-attr-constituent-expt+
+	 (if was-possibly-float
+	     (go EXPONENT)
+	     (go SYMBOL)))
+	(#.+char-attr-constituent-slash+ (if possibly-rational
+					     (go RATIO)
+					     (go SYMBOL)))
+	(#.+char-attr-delimiter+ (unread-char char stream)
+				 (return (make-integer)))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
+	(t (go SYMBOL)))
+     LEFTDIGIT-OR-EXPT
+      (ouch-read-buffer char)
+      (setq char (read-char stream nil nil))
+      (unless char (return (make-integer)))
+      (case (char-class3 char attribute-table)
+	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-decimal-digit+ (bug "impossible!"))
+	(#.+char-attr-constituent-dot+ (go SYMBOL))
+	(#.+char-attr-constituent-digit-or-expt+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-expt+ (go SYMBOL))
+	(#.+char-attr-constituent-sign+ (go EXPTSIGN))
 	(#.+char-attr-constituent-slash+ (if possibly-rational
 					     (go RATIO)
 					     (go SYMBOL)))
@@ -792,11 +830,8 @@
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
-      (case (char-class3 char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go LEFTDECIMALDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go LEFTDECIMALDIGIT))
+      (case (char-class char attribute-table)
+	(#.+char-attr-constituent-digit+ (go LEFTDECIMALDIGIT))
 	(#.+char-attr-constituent-dot+ (go MIDDLEDOT))
 	(#.+char-attr-constituent-expt+ (go EXPONENT))
 	(#.+char-attr-constituent-slash+ (aver (not possibly-rational))
@@ -813,10 +848,7 @@
       (unless char (return (let ((*read-base* 10))
 			     (make-integer))))
       (case (char-class char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go RIGHTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-constituent-expt+ (go EXPONENT))
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
@@ -831,10 +863,7 @@
       (setq char (read-char stream nil nil))
       (unless char (return (make-float stream)))
       (case (char-class char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go RIGHTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-constituent-expt+ (go EXPONENT))
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
@@ -848,10 +877,7 @@
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go RIGHTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
@@ -861,10 +887,7 @@
       (setq char (read-char stream nil nil))
       (unless char (%reader-error stream "dot context error"))
       (case (char-class char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go RIGHTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-constituent-dot+ (go DOTS))
 	(#.+char-attr-delimiter+  (%reader-error stream "dot context error"))
 	(#.+char-attr-escape+ (go ESCAPE))
@@ -878,10 +901,7 @@
       (setq possibly-float t)
       (case (char-class char attribute-table)
 	(#.+char-attr-constituent-sign+ (go EXPTSIGN))
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go EXPTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go EXPTDIGIT))
+	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
@@ -892,10 +912,7 @@
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go EXPTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go EXPTDIGIT))
+	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
@@ -906,10 +923,7 @@
       (setq char (read-char stream nil nil))
       (unless char (return (make-float stream)))
       (case (char-class char attribute-table)
-	(#.+char-attr-constituent-digit+ (if possibly-float
-					     (go EXPTDIGIT)
-					     (go SYMBOL)))
-	(#.+char-attr-constituent-decimal-digit+ (go EXPTDIGIT))
+	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (return (make-float stream)))

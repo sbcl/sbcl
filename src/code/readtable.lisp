@@ -25,13 +25,18 @@
 (def!constant +char-attr-constituent-slash+ 6)
 (def!constant +char-attr-constituent-digit+ 7)
 (def!constant +char-attr-constituent-sign+ 8)
-;; the "9" entry intentionally left blank for some reason -- WHN 19990806
-;;
-;; appropriated by CSR 2004-03-16
+;;; the following two are not static but depend on *READ-BASE*.
+;;; DECIMAL-DIGIT is for characters being digits in base 10 but not in
+;;; base *READ-BASE* (which is therefore perforce smaller than 10);
+;;; DIGIT-OR-EXPT is for characters being both exponent markers and
+;;; digits in base *READ-BASE* (which is therefore perforce larger
+;;; than 10).  -- CSR, 2004-03-16
 (def!constant +char-attr-constituent-decimal-digit+ 9)
-(def!constant +char-attr-multiple-escape+ 10)
-(def!constant +char-attr-package-delimiter+ 11)
-(def!constant +char-attr-delimiter+ 12) ; (a fake for READ-UNQUALIFIED-TOKEN)
+(def!constant +char-attr-constituent-digit-or-expt+ 10)
+
+(def!constant +char-attr-multiple-escape+ 11)
+(def!constant +char-attr-package-delimiter+ 12)
+(def!constant +char-attr-delimiter+ 13) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
 (sb!xc:defstruct (readtable (:conc-name nil)
 			    (:predicate readtablep)
