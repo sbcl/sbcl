@@ -125,24 +125,24 @@
 ;;; Note: Mostly these values are black magic, inherited from CMU CL
 ;;; without any documentation. However, there have been a few changes
 ;;; since the fork:
-;;;   * The FreeBSD *TARGET-STATIC-SPACE-START* value was bumped up
+;;;   * The FreeBSD *STATIC-SPACE-START* value was bumped up
 ;;;     from #x28000000 to #x30000000 when FreeBSD ld.so dynamic linking
 ;;;     support was added for FreeBSD ca. 20000910. This was to keep from
 ;;;     stomping on an address range that the dynamic libraries want to use. 
 ;;;     (They want to use this address range even if we try to reserve it
 ;;;     with a call to validate() as the first operation in main().)
-#!-linux (defparameter *target-read-only-space-start* #x10000000)
-#!-linux (defparameter *target-static-space-start*
+#!-linux (defparameter *read-only-space-start* #x10000000)
+#!-linux (defparameter *static-space-start*
                        #!+freebsd #x30000000
                        #!+openbsd #x28000000)
-#!-linux (defparameter *target-dynamic-space-start*   #x48000000)
-#!+linux (defparameter *target-read-only-space-start* #x01000000)
-#!+linux (defparameter *target-static-space-start*    #x05000000)
-#!+linux (defparameter *target-dynamic-space-start*   #x09000000)
+#!-linux (defparameter *dynamic-space-start*   #x48000000)
+#!+linux (defparameter *read-only-space-start* #x01000000)
+#!+linux (defparameter *static-space-start*    #x05000000)
+#!+linux (defparameter *dynamic-space-start*   #x09000000)
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
-(defparameter *nil-value* (+ *target-static-space-start* #xb))
+(defparameter *nil-value* (+ *static-space-start* #xb))
 
 ;;;; other miscellaneous constants
 

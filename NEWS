@@ -493,9 +493,6 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   have been added.
 * Raymond Wiker's patches to port dynamic loading from Linux to
   FreeBSD have been added.
-?? $Header$ and other CVS tags have been removed from the sources,
-  because they have never saved me trouble and they've been a
-  nuisance working with patches and other diff-related operations.
 ?? The debugger now flushes standard output streams before it begins
   its output ("debugger invoked" and so forth).
 ?? FINISH-OUTPUT now works better than it did before. (It used to 
@@ -514,3 +511,12 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   get confused after a Ctrl-C interrupt under ILISP, has been fixed.
 ?? added enough DEFTRANSFORMs to allow (SXHASH 'FOO) to be optimized
   away by constant folding
+?? The system now defines its address space constants in one place
+  (in the Lisp sources), and propagates them automatically elsewhere
+  (through GENESIS and the sbcl.h file). Therefore, patching the
+  address map is less unnecessarily tedious and error-prone. The
+  Lisp names of address space constants have also been systematized.
+?? dollar-Header-dollar and other CVS magic tags have been removed
+  from the sources, because they have never saved me trouble and
+  they've been a nuisance working with patches and other
+  diff-related operations.
