@@ -1,185 +1,249 @@
-IF YOU HAVE A BINARY DISTRIBUTION:
+INSTALLING SBCL
 
-The two files that SBCL needs to run, at minimum, are sbcl and sbcl.core.
-They are in 
-	src/runtime/sbcl
-and
-	output/sbcl.core
-In addition, there are a number of modules that extend the basic sbcl
-functionality, in
-        contrib/
+  CONTENTS
 
-sbcl is a standard executable, built by compiling and linking an
-ordinary C program. It provides the runtime environment for the
-running Lisp image, but it doesn't know much about high-level Lisp
-stuff (like symbols and printing and objects) so it's pretty useless
-by itself. sbcl.core is a dump file written in a special SBCL format
-which only sbcl understands, and it contains all the high-level Lisp
-stuff.
+    1. BINARY DISTRIBUTION
+    1.1. Quick start
+    1.2. Finding ancilliary files
+    1.3. Anatomy of SBCL
 
-In order to get a usable system, you need to run sbcl in a way that
-it can find sbcl.core. There are three ways for it to find
-sbcl.core:
+    2. SOURCE DISTRIBUTION
+    2.1. Quick start
+    2.2. Customizing SBCL
+    2.3. Troubleshooting
+    2.4. Tracking SBCL sources
+    2.5. Supported platforms
 
-  1. by default, in /usr/lib/sbcl/sbcl.core or /usr/local/lib/sbcl/sbcl.core
-     (depending on the SBCL_HOME C preproccessor #define at compile-time)
-  2. by environment variable: 
-     $ export SBCL_HOME=/foo/bar/lib/sbcl
-     $ sbcl
-  3. by command line option:
-     $ sbcl --core /foo/bar/sbcl.core"
 
-The usual, recommended approach is method #1.  Method #2 is useful if
-you're installing SBCL on a system in a non-standard location (e.g. in
-your user account), instead of installing SBCL on an entire system.
-Method #3 is mostly useful for testing or other special cases.
+1. BINARY DISTRIBUTION
 
-So: the standard installation procedure is
-  1. Copy sbcl.core to /usr/lib or /usr/local/lib.
-  2. Copy sbcl to /usr/bin or /usr/local/bin.
-  3. Copy the contrib modules that you're using (if any) to the same place
-      as sbcl.core
-  4. Optionally copy sbcl.1 to /usr/man/man1 or /usr/local/man/man1.
+1.1. Quick start:
 
-The script install.sh does all of this for you, including compilation
-of all contrib modules it can find, and installation of all those that
-pass their tests.  You should set the INSTALL_ROOT environment
-variable to /usr or /usr/local as appropriate before starting
-install.sh: e.g.
+  The following command installs SBCL and related documentation under
+  the "/usr/local" directory:
+  
+    # INSTALL_ROOT=/usr/local sh install.sh
 
-   # INSTALL_ROOT=/usr/local sh install.sh
-or
-   $ INSTALL_ROOT=/home/me/sbcl sh install.sh
-(if your INSTALL_ROOT is XYZ, SBCL_HOME should be set to
-XYZ/lib/sbcl).
+  You can also install SBCL as a user, under your home directory:
 
-IF YOU HAVE A SOURCE DISTRIBUTION:
+    $ INSTALL_ROOT=/home/me sh install.sh
 
-This software has been built successfully on these systems:
-	cpu = x86 (Intel 386 or higher, or compatibles like the AMD K6)
-		os = Debian GNU/Linux 2.1 with libc >= 2.1
-			host lisp = CMU CL 2.4.17
-			host lisp = SBCL itself
-			host lisp = CLISP CVS as of end of April
-		os = RedHat Linux 6.2
-			host lisp = SBCL itself
-		os = FreeBSD 3.4 or 4.0
-			host lisp = CMU CL
-			host lisp = SBCL itself
-		os = OpenBSD 2.6, 2.7, 2.8, 2.9, and 3.0
-			host lisp = SBCL itself
-	cpu = alpha
-		os = Debian GNU/Linux 2.2 with libc >= 2.1
-			host lisp = SBCL itself
-		os = Tru64 5.1
-			host lisp = SBCL itself
-	cpu = sparc
-		os = Debian GNU/Linux 2.2 with libc >= 2.2
-			host lisp = SBCL itself
-		os = Solaris 8
-			host lisp = SBCL itself
-	cpu = powerpc
-		os = Debian GNU/Linux 2.2 with libc >= 2.1
-			host lisp = OpenMCL 0.12
-			host lisp = SBCL itself
-		os = MacOS X.2
-			host lisp = OpenMCL 0.13.6
-			host lisp = SBCL itself
-	cpu = mips and mipsel
-		os = Debian GNU/Linux 3.0
-			host lisp = SBCL itself
+  In other words, "install.sh" installs SBCL under the directory named
+  by the environment variable "INSTALL_ROOT".
 
-Reports of other systems that it works on (or doesn't work on, for
-that matter), or help in making it run on more systems, would be
-appreciated.
+  If you install SBCL from binary distribution in other location then
+  "/usr/local", see section 1.2, "Finding ancilliary files".
 
-		CAUTION CAUTION CAUTION CAUTION CAUTION
-	    SBCL, like CMU CL, overcommits memory. That is, it
-	asks the OS for more virtual memory address space than
-	it actually intends to use, and the OS is expected to
-	optimistically give it this address space even if the OS
-	doesn't have enough RAM+swap to back it up. This works
-	fine as long as SBCL's memory usage pattern is sparse
-	enough that the OS can actually implement the requested
-	VM usage. Unfortunately, if the OS runs out of RAM+swap to
-	implement the requested VM usage, things get bad. On many
-	systems, including the Linux 2.2.13 kernel that I used for
-	development of SBCL up to version 0.6.0, the kernel kills
-	processes more-or-less randomly when it runs out of
-	resources. You may think your Linux box is very stable, but
-	it is unlikely to be stable if this happens.:-| So be sure
-	to have enough memory available when you build the system.
-	    (This can be considered a bug in SBCL, or a bug in the
-	Unix overcommitment-of-memory architecture, or both. It's
-	not clear what the best fix is. On the SBCL side, Peter Van
-	Eynde has a lazy-allocation patch for CMU CL that lets
-	it run without overcommitting memory, and that could be
-	ported to SBCL, but unfortunately that might introduce
-	new issues, e.g. alien programs allocating memory in the 
-	address space that SBCL thinks of as its own, and later
-	getting trashed when SBCL lazily allocates the memory.
-	On the OS side, there might be some way to address the
-	problem with quotas, I don't know.)
+1.2. Finding ancilliary files
 
-To build the system binaries:
-  0. If you want to be on the bleeding edge, you can update your
-     sources to the latest development snapshot (or any previous
-     development snapshot, for that matter) by using anonymous CVS
-     to SourceForge. (This is not recommended if you're just using SBCL
-     as a tool for other work, but if you're interested in working on 
-     SBCL itself, it's a good idea.) Follow the "CVS Repository" link on
-     <http://sourceforge.net/projects/sbcl> for instructions.
-  1. Make sure that you have enough RAM+swap to build SBCL, as
-     per the CAUTION note above. (As of version 0.6.0, the most
-     memory-intensive operation in make.sh is the second call to
-     GENESIS, which makes the Lisp image grow to around 128 Mb RAM+swap.
-  2. If the GNU make command is not available under the names "gmake"
-     or "make", then define the environment variable GNUMAKE to a name
-     where it can be found.
-  3. If you like, you can tweak the *FEATURES* set for the resulting
-     Lisp system, enabling or disabling features like documentation
-     strings, threads, or extra debugging code (see
-     "base-target-features.lisp-expr" for a list of recognized
-     *FEATURES*).  The preferred way to do this is by creating a file
-     "customize-target-features.lisp", containing a lambda expression
-     which is applied to the default *FEATURES* set and which returns
-     the new *FEATURES* set, e.g.
-	(LAMBDA (LIST)
-	  (ADJOIN :SB-SHOW
-		  (REMOVE :SB-DOC
-			  LIST)))
-     (This is the preferred way because it lets local changes interact
-     cleanly with CVS changes to the main, global source tree.)
-  4. Run "sh make.sh" in the same directory where you unpacked the 
-     tarball. If you don't already have a SBCL binary installed
-     as "sbcl" in your path, you'll need to tell make.sh what Lisp
-     system to use as the cross-compilation host. (To use CMU CL
-     as the cross-compilation host, run "sh make.sh 'lisp -batch'",
-     assuming CMU CL has been installed under its default name "lisp".)
-  5. Wait. This can be a slow process. On my test machines, the
-     wall clock time for a build of sbcl-0.6.7 was approximately
-       1.5 hours on a 450MHz K6/3 with 248Mb RAM, running RH Linux 6.2;
-       4 hours on a 200MHz Pentium (P54C) with 64Mb RAM, running FreeBSD 4.0;
-       13 hours on a 133MHz Pentium (P54C) with 48Mb RAM, running OpenBSD 2.6.
-     Around the 48Mb mark, the build process is starved for RAM:
-     on my 48Mb OpenBSD machine with nothing else running, it
-     spent about 2/3 of its wall clock time swapping. 
+  The SBCL runtime needs to be able to find the ancillary files
+  associated with it: the "sbcl.core" file, and the contrib modules.
 
-Now you should have the same src/runtime/sbcl and output/sbcl.core
-files that come with the binary distribution, and you can install
-them as in the "IF YOU HAVE A BINARY DISTRIBUTION" instructions (above).
+  This can happen in three ways:
 
-To convert the DocBook version of the system documentation (files
-ending in .sgml) to more-readable form (HTML or text):
-  DocBook is an abstract markup system based on SGML. It's intended
-  to be automatically translated to other formats. Tools to do this
-  exist on the web, and are becoming increasingly easy to find as
-  more free software projects move their documentation to DocBook.
-  Any one of these systems should work with the SBCL documentation.
-  If you'd like to have the documentation produced in the same 
-  format as appears in the binary distribution, and you have
-  the jade binary and Norman Walsh's modular DSSSL stylesheets
-  installed, you can try the doc/make-doc.sh script. Otherwise, 
-  your formatted copy of the SBCL documentation should have the
-  same content as in the binary distribution, but details of
-  presentation will probably vary.
+    1. By default, in a location configured when the system was built.
+       For binary distributions this is in "/usr/local/lib/sbcl".
+
+    2. By environment variable, in the directory named by the
+       environment variable "SBCL_HOME". Example:
+
+         $ export SBCL_HOME=/foo/bar/lib/sbcl
+         $ sbcl
+
+       If your "INSTALL_ROOT" was FOO, then your "SBCL_HOME" is
+       "FOO/lib/sbcl".
+
+    3. By command line option:
+
+         $ sbcl --core /foo/bar/sbcl.core
+
+       When using this option contrib modules are looked for in the
+       directory where the designated core resides, and in "SBCL_HOME".
+
+  The usual, recommended approach is method #1. Method #2 is useful if
+  you're installing SBCL on a system in a non-standard location
+  (e.g. in your user account), instead of installing SBCL on an entire
+  system.  Method #3 is mostly useful for testing or other special
+  cases.
+
+1.3. Anatomy of SBCL
+
+  The two files that SBCL needs to run, at minimum, are:
+
+    src/runtime/sbcl
+    output/sbcl.core
+
+  In addition, there are a number of modules that extend the basic
+  sbcl functionality, in
+
+    contrib/
+
+  The "src/runtime/sbcl" is a standard executable, built by compiling
+  and linking an ordinary C program. It provides the runtime
+  environment for the running Lisp image, but it doesn't know much
+  about high-level Lisp stuff (like symbols and printing and objects)
+  so it's pretty useless by itself. The "output/sbcl.core" is a dump
+  file written in a special SBCL format which only sbcl understands,
+  and it contains all the high-level Lisp stuff.
+
+  The standard installation procedure, outlined in section 1.1 "Quick
+  start", is to run the "install.sh", which copies all the files to
+  right places, including documentation and contrib-modules that have
+  passed their tests. If you need to install by hand, see "install.sh"
+  for details.
+
+  Documentation concists of a man-page, the SBCL Manual (in info, pdf
+  and html formats), and a few additional text files.
+
+2. SOURCE DISTRIBUTION
+
+2.1. Quick start
+
+  To build SBCL you need a working toolchain and a Common Lisp system
+  (see section 2.5 "Supported platforms"). You also need approximately
+  128 Mb of free RAM+swap.
+
+  To build SBCL using an already installed SBCL:
+
+    $ sh make.sh
+
+  If you don't already have an SBCL binary installed as "sbcl" on your
+  system, you'll need to tell make.sh what Lisp to use as the
+  cross-compilation host. For example, to use CMU CL (assuming has
+  been installed under its default name "lisp") as the
+  cross-compilation host:
+
+    $ sh make.sh 'lisp -batch'
+
+  The build may take a long time, especially on older hardware. A
+  successful build ends with a message beginning: "The build seems to
+  have finished successfully...".
+
+  To run the regression tests:
+
+    $ cd tests && sh run-tests.sh
+
+  To build documentation:
+
+    $ cd doc/manual && make
+
+  This builds the Info, HTML and PDF documentation from the Texinfo
+  sources. The manual includes documentation string from the build
+  SBCL, but if SBCL itself has not been yet built, but one if found
+  installed documentation strings from the installed version are used.
+
+  Now you should have the same src/runtime/sbcl and output/sbcl.core
+  files that come with the binary distribution, and you can install
+  them as described in the section 1. "BINARY DISTRIBUTION".
+
+2.2. Customizing SBCL
+
+  You can tweak the *FEATURES* set for the resulting Lisp system,
+  enabling or disabling features like documentation strings, threads,
+  or extra debugging code.
+
+  The preferred way to do this is by creating a file
+  "customize-target-features.lisp-expr", containing a lambda
+  expression which is applied to the default *FEATURES* set and which
+  returns the new *FEATURES* set, e.g.
+
+    (lambda (features)
+      (flet ((enable (x)
+               (pushnew x features))
+             (disable (x)
+               (setf features (remove x features))))
+        ;; Threading support, available on x86 Linux only.
+        (enable :sb-thread)
+        ;; Slightly smaller core
+        (disable :sb-doc)))
+
+  This is the preferred way because it lets local changes interact
+  cleanly with CVS changes to the main, global source tree.
+
+  A catalog of available features and their meaning can be found in
+  "base-target-features.lisp-expr".
+
+2.3. Troubleshooting
+
+  "GNU Make not found"
+
+    If the GNU make command is not available under the names "make",
+    "gmake", or "gnumake", then define the environment variable
+    GNUMAKE to a name where it can be found.
+
+  Segfaults on Fedora
+
+    Try disabling exec-shield. The easiest way is to use
+    setarch: "setarch i386 sbcl".
+
+  Build crashes mysteriously, machine becomes unstable, etc
+
+    You may be running out of memory. Try increasing swap, or
+    building SBCL with fewer other programs running simultaneously.
+
+  Other
+
+    * Check that the host lisp you're building with is known to work
+      as an SBCL build host, and the your OS is supported.
+
+    * Some GCC versions are known to have bugs that affect SBCL
+      compilation: if the error you're encountering seems related to
+      files under "src/runtime", down- or upgrading GCC may help.
+
+    * Ask for help on the mailing lists referenced from
+      <http://www.sbcl.org/>.
+
+2.4. Tracking SBCL sources
+
+  If you want to be on the bleeding edge, you can update your sources
+  to the latest development snapshot (or any previous development
+  snapshot, for that matter) by using anonymous CVS to
+  SourceForge. (This is not recommended if you're just using SBCL as a
+  tool for other work, but if you're interested in working on SBCL
+  itself, it's a good idea.) Follow the "CVS Repository" link on
+  <http://sourceforge.net/projects/sbcl> for instructions.
+
+2.5. Supported platforms 
+
+  Last updated for SBCL 0.8.10.61 (2004-05-28).
+
+  All of the following platforms are supported in the sense of "should
+  work", but some things like loading foreign object files may lag
+  behind on less-used OS's.
+
+  Supported toolchains:
+
+    GNU toolchain
+    Sun toolchain with GCC
+
+  Supported build hosts are:
+
+    SBCL
+    CMUCL
+    OpenMCL
+    CLISP (recent versions only)
+
+    Note that every release isn't tested with every possible host
+    compiler.  You're most likely to get a clean build with SBCL itself
+    as host, otherwise OpenMCL on a PPC and CMUCL elsewhere.
+
+  Supported operating systems and architectures:
+
+                           x86 PPC Alpha Sparc HPPA MIPS MIPSel
+    Linux 2.2, 2.4, 2.6     X   X    X     X    X    X     X 
+    FreeBSD                 X
+    OpenBSD 3.4, 3.5            X
+    NetBSD                  X
+    Solaris                                X
+    Tru64                            X
+    Darwin (Mac OS X)           X
+
+    Some OS's are more equal then others: most of the development and
+    testing is done on x86 Linux and *BSD, PPC Linux and Mac OS X.
+
+    If an underprivileged platform is important to you, you can help
+    by eg. testing during the monthly freeze periods, and most
+    importantly by reporting any problems.
+
+    If you need support beyond what is available on the mailing lists,
+    see "Consultants" in the "SUPPORT" file.

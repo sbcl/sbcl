@@ -2409,6 +2409,7 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     SB-EXT:INHIBIT-WARNINGS OPTIMIZE quality.  See the manual for
     documentation on this feature.  The SB-EXT:INHIBIT-WARNINGS
     quality should be considered deprecated.
+  * install.sh now installs the user manual as well
   * (not quite a new documentable feature, but worth considering in
     the light of the new SB-EXT:MUFFLE-CONDITIONS declaration): the
     beginnings of a semantically meaningful condition hierarchy is

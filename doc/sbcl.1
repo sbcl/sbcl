@@ -58,13 +58,10 @@ give you another prompt, and wait for your next input. E.g.
   *
 
 Many people like to run SBCL, like other Lisp systems, as a subprocess
-under Emacs. The Emacs "ilisp" mode provides many convenient features,
-like command line editing, tab completion, and various kinds of
-coupling between Common Lisp source files and the interactive SBCL
-subprocess, but can be somewhat fragile because it tries to be so
-clever and intimate in its interactions with the Lisp subprocess. In
-case of ilisp problems, running SBCL in the Emacs "shell" mode can a
-useful substitute.
+under Emacs. The Emacs "ilisp" and "Slime" modes provide many
+convenient features, like command line editing, tab completion, and
+various kinds of coupling between Common Lisp source files and the
+interactive SBCL subprocess.
 
 .SH OVERVIEW
 
@@ -222,20 +219,6 @@ is generational, while on others simpler stop and copy strategies
 are used.
 
 For more information about the compiler, see the user manual.
-
-.SH DOCUMENTATION
-
-Currently, the documentation for the system is
-.TP 3
-\--
-this man page
-.TP 3
-\--
-the user manual
-.TP 3
-\--
-doc strings and online help built into the SBCL executable
-.PP
 
 .SH COMMAND LINE SYNTAX
 
@@ -477,8 +460,8 @@ Linux 4.5 X86 box, I get an UNBOUND-VARIABLE error."
 .SH SUPPORT
 
 Various information about SBCL is available at
-<http://sbcl.sourceforge.net/>. The mailing lists there are the
-recommended place to look for support.
+<http://ww.sbcl.org/>. The mailing lists there are the recommended
+place to look for support.
 
 .SH ENVIRONMENT
 
@@ -516,3 +499,22 @@ directory, or as specified by  --userinit)
 Dozens of people have made substantial contributions to SBCL and its
 subsystems, and to the CMU CL system on which it was based, over the
 years. See the CREDITS file in the distribution for more information.
+
+.SH SEE ALSO
+
+Full SBCL documentation is maintained as a Texinfo manual. If is has
+been installed, the command
+.IP
+.B info sbcl
+.PP
+should give you access to the complete manual. Depending on your
+installation it may also be available in HTML and PDF formats in eg.
+.IP
+.B /usr/local/share/doc/sbcl/
+.PP
+See the SBCL homepage 
+.IP
+.B http://www.sbcl.org/
+.PP
+for more information, including directions on how to subscribe to the
+sbcl-devel and sbcl-help mailing-lists.
