@@ -18,7 +18,7 @@
 ;;; For one of the interupt-thread tests, we want a foreign function
 ;;; that does not make syscalls
 
-(with-open-file (o "threads-foreign.c" :direction :output)
+(with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
   (format o "void loop_forever() { while(1) ; }~%"))
 (sb-ext:run-program	
  "cc"

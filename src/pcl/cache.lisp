@@ -367,9 +367,8 @@
       ;;    INSTANCE's class.  See also the comment above
       ;;    FORCE-CACHE-FLUSHES.  Paul Dietz has test cases for this.
       ((member t)
-       (let ((class (class-of instance)))
-	 (force-cache-flushes class)
-	 (class-wrapper class)))
+       (force-cache-flushes (class-of instance))
+       (check-wrapper-validity instance))
       (cons
        (ecase (car state)
 	 (:flush

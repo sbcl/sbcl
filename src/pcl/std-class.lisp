@@ -1291,7 +1291,14 @@
 	(with-pcl-lock
 	  (update-lisp-class-layout class nwrapper)
 	  (setf (slot-value class 'wrapper) nwrapper)
-	  (invalidate-wrapper owrapper :flush nwrapper))))))
+	  ;; Use :OBSOLETE instead of :FLUSH if any superclass has
+	  ;; been obsoleted.
+ 	  (if (find-if (lambda (x) 
+ 			 (and (consp x) (eq :obsolete (car x))))
+ 		       (layout-inherits owrapper) 
+ 		       :key #'layout-invalid)
+ 	      (invalidate-wrapper owrapper :obsolete nwrapper)
+	      (invalidate-wrapper owrapper :flush nwrapper)))))))
 
 (defun flush-cache-trap (owrapper nwrapper instance)
   (declare (ignore owrapper))

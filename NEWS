@@ -2401,11 +2401,13 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug 313: source-transform for <fun-name> was erroneously
     applied to a call of a value of a variable with name <fun-name>.
     (reported by Antonio Menezes Leitao)
+  * fixed bug 307: The obsolete instance protocol ensures that
+    subclasses are properly obsoleted.  (thanks to Nikodemus Siivola)
   * on X86 fixed bug 298, revealed by Paul F. Dietz' test suite: SBCL
     can remove dead unknown-values globs from the middle of the stack.
   * added a new restart to *BREAK-ON-SIGNALS* handling to make it
     easier to resume long computations after using *BREAK-ON-SIGNALS*
-    to diagnose and fix failures (thanks to Nikodemus Siivola)
+    to diagnose and fix failures.  (thanks to Nikodemus Siivola)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -740,5 +740,31 @@
     ((size :initarg :size :initform 2 :allocation :class)))
   (assert (= (slot-value i 'size) 1)))
 
+;;; reported by Bruno Haible sbcl-devel 2004-04-15
+(defclass superclass-born-to-be-obsoleted () (a))
+(defclass subclass-born-to-be-obsoleted (superclass-born-to-be-obsoleted) ())
+(defparameter *born-to-be-obsoleted*
+  (make-instance 'subclass-born-to-be-obsoleted))
+(defparameter *born-to-be-obsoleted-obsoleted* nil)
+(defmethod update-instance-for-redefined-class
+    ((o subclass-born-to-be-obsoleted) a d pl &key)
+  (setf *born-to-be-obsoleted-obsoleted* t))
+(make-instances-obsolete 'superclass-born-to-be-obsoleted)
+(slot-boundp *born-to-be-obsoleted* 'a)
+(assert *born-to-be-obsoleted-obsoleted*)
+
+;;; additional test suggested by Bruno Haible sbcl-devel 2004-04-21
+(defclass super-super-obsoleted () (a))
+(defclass super-obsoleted-1 (super-super-obsoleted) ())
+(defclass super-obsoleted-2 (super-super-obsoleted) ())
+(defclass obsoleted (super-obsoleted-1 super-obsoleted-2) ())
+(defparameter *obsoleted* (make-instance 'obsoleted))
+(defparameter *obsoleted-counter* 0)
+(defmethod update-instance-for-redefined-class ((o obsoleted) a d pl &key)
+  (incf *obsoleted-counter*))
+(make-instances-obsolete 'super-super-obsoleted)
+(slot-boundp *obsoleted* 'a)
+(assert (= *obsoleted-counter* 1))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

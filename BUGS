@@ -1283,24 +1283,6 @@ WORKAROUND:
                collect `(array ,(sb-vm:saetp-specifier x)))))
     => NIL, T (when it should be T, T)
 
-307: "Problem in obsolete instance protocol"
-    (reported by Bruno Haible as the fourth problem in sbcl-devel 
-    "installing sbcl" 2004-04-15)
-
-  (progn
-    (defclass foo92b (foo92a) ((s :initarg :s)))
-    (defclass foo92a () ())
-    (let ((x (make-instance 'foo92b :s 5)) (update-counter 0))
-      (defclass foo92b (foo92a) ((s) (s1) (s2))) ; still subclass of foo92a
-      (slot-value x 's)
-      (defmethod update-instance-for-redefined-class 
-          ((object foo92b) added-slots discarded-slots plist &rest initargs)
-        (incf update-counter))
-      (make-instances-obsolete 'foo92a)
-      (slot-value x 's)
-      update-counter))
-  => 0 ; should be 1
-
 308: "Characters without names"
     (reported by Bruno Haible sbcl-devel "character names are missing"
     2004-04-19)
@@ -1356,6 +1338,9 @@ WORKAROUND:
     ;;; attractive to handle exponential notation with the same accuracy
     ;;; as non-exponential notation, using the method described in the
     ;;; Steele and White paper.
+
+  See also CSR sbcl-devel with an implementation of Berger and
+  Dybvig's algorithm for printing and a fix for reading.
 
 311: "Tokeniser not thread-safe"
     (see also Robert Marlow sbcl-help "Multi threaded read chucking a
