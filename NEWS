@@ -892,7 +892,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   ** DEFGENERIC with :METHOD options
   ** bug 126, in (MAKE-STRING N :INITIAL-ELEMENT #\SPACE))
   ** bug in the optimization of ARRAY-ELEMENT-TYPE
-  He also pointed out some bogus old entries in BUGS.
+  He also pointed out some bogus old entries in BUGS, and fixed 
+  a number of bugs which came into existence in the pre7 branch
+  (internal to the CVS repository), so that they never showed
+  up in release versions.
 ?? Old operator names in the style DEF-FOO are now deprecated in favor
   of new corresponding names DEFINE-FOO, for consistency with the
   naming convention used in the ANSI standard). This mostly affects
@@ -902,6 +905,8 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
+?? The value of INTERNAL-TIME-UNITS-PER-SECOND has been increased
+  from 100 to 1000.
 * The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
   doubled, to 4 million. (If your application spends a lot of time
   GCing and you have a lot of RAM, you might want to experiment with
@@ -916,11 +921,12 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
 * The interpreter, EVAL, has been rewritten. Now it calls the
   native compiler for the difficult cases, where it used to call
   the old specialized IR1 interpreter code. 
-* The doc/cmucl/ directory, containing old CMU CL documentation,
-  is no longer part of the base system. SourceForge has shut down
-  its anonymous FTP service, and with it my original plan for
-  distributing them separately. For now, if you need them you can
-  download an old sbcl source release and get them from there.
+* The doc/cmucl/ directory, containing old CMU CL documentation
+  from the time of the fork, is no longer part of the base system.
+  SourceForge has shut down its anonymous FTP service, and with it
+  my original plan for distributing the old CMU CL documentation
+  there. For now, if you need these files you can download an old
+  SBCL source release and extract them from it.
 * lots of other tidying up internally: renaming things so that names
   are more systematic and consistent, converting C macros to inline
   functions, systematizing indentation, making symbol packaging

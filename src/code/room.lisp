@@ -560,9 +560,9 @@
 (defun print-allocated-objects (space &key (percent 0) (pages 5)
 				      type larger smaller count
 				      (stream *standard-output*))
-  (declare (type (integer 0 99) percent) (type sb!c::index pages)
+  (declare (type (integer 0 99) percent) (type index pages)
 	   (type stream stream) (type spaces space)
-	   (type (or sb!c::index null) type larger smaller count))
+	   (type (or index null) type larger smaller count))
   (multiple-value-bind (start-sap end-sap) (space-bounds space)
     (let* ((space-start (sap-int start-sap))
 	   (space-end (sap-int end-sap))
@@ -649,7 +649,7 @@
 (defun list-allocated-objects (space &key type larger smaller count
 				     test)
   (declare (type spaces space)
-	   (type (or sb!c::index null) larger smaller type count)
+	   (type (or index null) larger smaller type count)
 	   (type (or function null) test)
 	   (inline map-allocated-objects))
   (unless *ignore-after* (setq *ignore-after* (cons 1 2)))

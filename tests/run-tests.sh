@@ -124,3 +124,4 @@ done
 # work.)
 
 echo '//apparent success (reached end of run-tests.sh normally)'
+date

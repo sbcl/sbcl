@@ -599,11 +599,11 @@
 	 nil)))
 
 ;;; This function is to be called just before a change which would
-;;; affect that. (We don't absolutely have to call this function
-;;; before such changes, since such changes are given as undefined
-;;; behavior. In particular, we don't if the runtime cost would be
-;;; annoying. But otherwise it's nice to do so.)
-(defun about-to-modify (symbol)
+;;; affect the symbol value. (We don't absolutely have to call this
+;;; function before such changes, since such changes are given as
+;;; undefined behavior. In particular, we don't if the runtime cost
+;;; would be annoying. But otherwise it's nice to do so.)
+(defun about-to-modify-symbol-value (symbol)
   (declare (type symbol symbol))
   (let ((reason (symbol-self-evaluating-p symbol)))
     (when reason

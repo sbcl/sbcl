@@ -17,80 +17,72 @@
 
 (declaim (maybe-inline get %put getf remprop %putf get-properties keywordp))
 
-(defun symbol-value (variable)
+(defun symbol-value (symbol)
   #!+sb-doc
-  "VARIABLE must evaluate to a symbol. This symbol's current special
-  value is returned."
+  "Return SYMBOL's current bound value."
   (declare (optimize (safety 1)))
-  (symbol-value variable))
+  (symbol-value symbol))
 
-(defun boundp (variable)
+(defun boundp (symbol)
   #!+sb-doc
-  "VARIABLE must evaluate to a symbol. Return NIL if this symbol is
-  unbound, T if it has a value."
-  (boundp variable))
+  "Return non-NIL if SYMBOL is bound to a value."
+  (boundp symbol))
 
-(defun set (variable new-value)
+(defun set (symbol new-value)
   #!+sb-doc
-  "VARIABLE must evaluate to a symbol. This symbol's special value cell is
-  set to the specified new value."
-  (declare (type symbol variable))
-  (about-to-modify variable)
-  (%set-symbol-value variable new-value))
+  "Set SYMBOL's value cell to NEW-VALUE."
+  (declare (type symbol symbol))
+  (about-to-modify-symbol-value symbol)
+  (%set-symbol-value symbol new-value))
 
 (defun %set-symbol-value (symbol new-value)
   (%set-symbol-value symbol new-value))
 
-(defun makunbound (variable)
+(defun makunbound (symbol)
   #!+sb-doc
-  "VARIABLE must evaluate to a symbol. This symbol is made unbound,
-  removing any value it may currently have."
-  (set variable
+  "Make SYMBOL unbound, removing any value it may currently have."
+  (set symbol
        (%primitive sb!c:make-other-immediate-type
 		   0
 		   sb!vm:unbound-marker-widetag))
-  variable)
+  symbol)
 
+;;; Return the built-in hash value for SYMBOL.
 #!+(or x86 mips) ;; only backends for which a symbol-hash vop exists
 (defun symbol-hash (symbol)
-  #!+sb-doc
-  "Return the built-in hash value for symbol."
   (symbol-hash symbol))
 
+;;; Compute the hash value for SYMBOL.
 #!-(or x86 mips)
 (defun symbol-hash (symbol)
-  #!+sb-doc
-  "Return the built-in hash value for symbol."
   (%sxhash-simple-string (symbol-name symbol)))
 
-
-(defun symbol-function (variable)
+(defun symbol-function (symbol)
   #!+sb-doc
-  "VARIABLE must evaluate to a symbol. This symbol's current definition
-   is returned. Settable with SETF."
-  (raw-definition variable))
+  "Return SYMBOL's current function definition. Settable with SETF."
+  (raw-definition symbol))
 
 (defun fset (symbol new-value)
   (declare (type symbol symbol) (type function new-value))
   (setf (raw-definition symbol) new-value))
 
-(defun symbol-plist (variable)
+(defun symbol-plist (symbol)
   #!+sb-doc
-  "Return the property list of a symbol."
-  (symbol-plist variable))
+  "Return SYMBOL's property list."
+  (symbol-plist symbol))
 
 (defun %set-symbol-plist (symbol new-value)
   (setf (symbol-plist symbol) new-value))
 
-(defun symbol-name (variable)
+(defun symbol-name (symbol)
   #!+sb-doc
-  "Return the print name of a symbol."
-  (symbol-name variable))
+  "Return SYMBOL's name as a string."
+  (symbol-name symbol))
 
-(defun symbol-package (variable)
+(defun symbol-package (symbol)
   #!+sb-doc
-  "Return the package a symbol is interned in, or NIL if none."
-  (symbol-package variable))
+  "Return the package SYMBOL was interned in, or NIL if none."
+  (symbol-package symbol))
 
 (defun %set-symbol-package (symbol package)
   (declare (type symbol symbol))

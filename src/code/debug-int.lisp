@@ -198,7 +198,7 @@
   (symbol (required-argument) :type symbol)
   ;; a unique integer identification relative to other variables with the same
   ;; symbol
-  (id 0 :type sb!c::index)
+  (id 0 :type index)
   ;; Does the variable always have a valid value?
   (alive-p nil :type boolean))
 (def!method print-object ((debug-var debug-var) stream)
@@ -219,9 +219,9 @@
 			  (symbol id alive-p sc-offset save-sc-offset))
 	    (:copier nil))
   ;; storage class and offset (unexported)
-  (sc-offset nil :type sb!c::sc-offset)
+  (sc-offset nil :type sb!c:sc-offset)
   ;; storage class and offset when saved somewhere
-  (save-sc-offset nil :type (or sb!c::sc-offset null)))
+  (save-sc-offset nil :type (or sb!c:sc-offset null)))
 
 ;;;; frames
 
@@ -380,7 +380,7 @@
   ;; This is the component in which the breakpoint lies.
   component
   ;; This is the byte offset into the component.
-  (offset nil :type sb!c::index)
+  (offset nil :type index)
   ;; The original instruction replaced by the breakpoint.
   (instruction nil :type (or null (unsigned-byte 32)))
   ;; A list of user breakpoints at this location.
@@ -467,10 +467,10 @@
   (%debug-block :unparsed :type (or debug-block (member :unparsed)))
   ;; This is the number of forms processed by the compiler or loader
   ;; before the top-level form containing this code-location.
-  (%tlf-offset :unparsed :type (or sb!c::index (member :unparsed)))
+  (%tlf-offset :unparsed :type (or index (member :unparsed)))
   ;; This is the depth-first number of the node that begins
   ;; code-location within its top-level form.
-  (%form-number :unparsed :type (or sb!c::index (member :unparsed))))
+  (%form-number :unparsed :type (or index (member :unparsed))))
 (def!method print-object ((obj code-location) str)
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-fun-name (code-location-debug-fun obj))
@@ -484,7 +484,7 @@
 	    (:constructor make-compiled-code-location (pc debug-fun))
 	    (:copier nil))
   ;; an index into DEBUG-FUN's component slot
-  (pc nil :type sb!c::index)
+  (pc nil :type index)
   ;; a bit-vector indexed by a variable's position in
   ;; DEBUG-FUN-DEBUG-VARS indicating whether the variable has a
   ;; valid value at this code-location. (unexported).
@@ -730,7 +730,7 @@
 #!-x86
 (defun get-context-value (frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-	   (type sb!c::sc-offset loc))
+	   (type sb!c:sc-offset loc))
   (let ((pointer (frame-pointer frame))
 	(escaped (compiled-frame-escaped frame)))
     (if escaped
@@ -739,7 +739,7 @@
 #!+x86
 (defun get-context-value (frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-	   (type sb!c::sc-offset loc))
+	   (type sb!c:sc-offset loc))
   (let ((pointer (frame-pointer frame))
 	(escaped (compiled-frame-escaped frame)))
     (if escaped
@@ -753,7 +753,7 @@
 #!-x86
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-	   (type sb!c::sc-offset loc))
+	   (type sb!c:sc-offset loc))
   (let ((pointer (frame-pointer frame))
 	(escaped (compiled-frame-escaped frame)))
     (if escaped
@@ -763,7 +763,7 @@
 #!+x86
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-	   (type sb!c::sc-offset loc))
+	   (type sb!c:sc-offset loc))
   (let ((pointer (frame-pointer frame))
 	(escaped (compiled-frame-escaped frame)))
     (if escaped
@@ -1486,16 +1486,17 @@
 
 ;;; This does some of the work of PARSE-DEBUG-BLOCKS.
 (defun parse-compiled-debug-blocks (debug-fun)
-  (let* ((debug-fun (compiled-debug-fun-compiler-debug-fun
-		     debug-fun))
-	 (var-count (length (debug-fun-debug-vars debug-fun)))
-	 (blocks (sb!c::compiled-debug-fun-blocks debug-fun))
+  (let* ((var-count (length (debug-fun-debug-vars debug-fun)))
+	 (compiler-debug-fun (compiled-debug-fun-compiler-debug-fun
+			      debug-fun))
+	 (blocks (sb!c::compiled-debug-fun-blocks compiler-debug-fun))
 	 ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
 	 ;; element size of the packed binary representation of the
 	 ;; blocks data.
 	 (live-set-len (ceiling var-count 8))
-	 (tlf-number (sb!c::compiled-debug-fun-tlf-number debug-fun)))
-    (unless blocks (return-from parse-compiled-debug-blocks nil))
+	 (tlf-number (sb!c::compiled-debug-fun-tlf-number compiler-debug-fun)))
+    (unless blocks
+      (return-from parse-compiled-debug-blocks nil))
     (macrolet ((aref+ (a i) `(prog1 (aref ,a ,i) (incf ,i))))
       (with-parsing-buffer (blocks-buffer locations-buffer)
 	(let ((i 0)
@@ -1710,7 +1711,7 @@
 				  0)))
 		       (svref blocks (1- end)))
 		      (t last))))
-		(declare (type sb!c::index i end))
+		(declare (type index i end))
 		(when (< pc
 			 (compiled-code-location-pc
 			  (svref (compiled-debug-block-code-locations

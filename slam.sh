@@ -60,4 +60,5 @@ sh make-genesis-2.sh || exit 1
 
 sh make-target-2.sh || exit 1
 
-echo /ordinary termination of slam.sh
+echo //ordinary termination of slam.sh
+date
