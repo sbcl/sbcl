@@ -161,29 +161,33 @@
 		`(,operator ,@(mapcar (lambda (m) `(call-method ,m ()))
 				      primary)))))
       (cond ((null primary)
-	     ;; FIXME(?): NO-APPLICABLE-METHOD seems more appropriate
-	     ;; here, but
-	     ;;   (1) discussion with CSR on #lisp reminded me that it's
-	     ;;       a vexed question whether we can validly call
-	     ;;       N-A-M when an :AROUND method exists (and the
-	     ;;       definition of NO-NEXT-METHOD seems to discourage
-	     ;;       us from calling NO-NEXT-METHOD directly in that
-	     ;;       case, since it's supposed to be called from a
-	     ;;       CALL-NEXT-METHOD form), and
-	     ;;   (2) a call to N-A-M would require &REST FUN-ARGS, and
-	     ;;       we don't seem to have FUN-ARGS here.
-	     ;; I think ideally failures in short method combination
-	     ;; would end up either in NO-APPLICABLE-METHOD or
-	     ;; NO-NEXT-METHOD, and I expect that's what ANSI
-	     ;; generally intended, but it's not clear to me whether
-	     ;; the details of what they actually specified let us
-	     ;; make that happen. So for now I've just tried to
-	     ;; clarify the error message text but left the general
-	     ;; logic alone (and raised the question on sbcl-devel).
-	     ;; -- WHN 2003-06-16
-	     `(error "no ~S methods for ~S on these arguments"
-		     ',type
-		     ',generic-function))
+	     ;; As of sbcl-0.8.0.80 we don't seem to need to need
+	     ;; to do anything messy like
+	     ;;        `(APPLY (FUNCTION (IF AROUND
+	     ;;                              'NO-PRIMARY-METHOD
+	     ;;                              'NO-APPLICABLE-METHOD)
+	     ;;                           ',GENERIC-FUNCTION
+	     ;;                           .ARGS.)
+	     ;; here because (for reasons I don't understand at the
+	     ;; moment -- WHN) control will never reach here if there
+	     ;; are no applicable methods, but instead end up
+	     ;; in NO-APPLICABLE-METHODS first.
+	     ;;
+	     ;; FIXME: The way that we arrange for .ARGS. to be bound 
+	     ;; here seems weird. We rely on EXPAND-EFFECTIVE-METHOD-FUNCTION
+	     ;; recognizing any form whose operator is %NO-PRIMARY-METHOD
+	     ;; as magical, and carefully surrounding it with a
+	     ;; LAMBDA form which binds .ARGS. But...
+	     ;;   1. That seems fragile, because the magicalness of
+	     ;;      %NO-PRIMARY-METHOD forms is scattered around
+	     ;;      the system. So it could easily be broken by
+	     ;;      locally-plausible maintenance changes like,
+	     ;;      e.g., using the APPLY expression above.
+	     ;;   2. That seems buggy w.r.t. to MOPpish tricks in
+	     ;;      user code, e.g.
+	     ;;         (DEFMETHOD COMPUTE-EFFECTIVE-METHOD :AROUND (...)
+	     ;;           `(PROGN ,(CALL-NEXT-METHOD) (INCF *MY-CTR*)))
+             `(%no-primary-method ',generic-function .args.))
 	    ((null around) main-method)
 	    (t
 	     `(call-method ,(car around)

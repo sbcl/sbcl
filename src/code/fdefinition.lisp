@@ -83,7 +83,7 @@
 					     (type definition))
 			       (:copier nil))
   ;; This is definition's encapsulation type. The encapsulated
-  ;; definition is in the previous encapsulation-info element or
+  ;; definition is in the previous ENCAPSULATION-INFO element or
   ;; installed as the global definition of some function name.
   type
   ;; the previous, encapsulated definition. This used to be installed
@@ -112,7 +112,7 @@
     ;; an encapsulation that no longer exists.
     (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
       (setf (fdefn-fun fdefn)
-	    (lambda (&rest arg-list)
+	    (named-lambda encapsulate (&rest arg-list)
 	      (declare (special arg-list))
 	      (let ((basic-definition (encapsulation-info-definition info)))
 		(declare (special basic-definition))
@@ -135,7 +135,7 @@
 
 ;;; When removing an encapsulation, we must remember that
 ;;; encapsulating definitions close over a reference to the
-;;; encapsulation-info that describes the encapsulating definition.
+;;; ENCAPSULATION-INFO that describes the encapsulating definition.
 ;;; When you find an info with the target type, the previous info in
 ;;; the chain has the ensulating definition of that type. We take the
 ;;; encapsulated definition from the info with the target type, and we

@@ -697,7 +697,7 @@
 (setq *boot-state* 'braid)
 
 (defmethod no-applicable-method (generic-function &rest args)
-  (error "~@<There is no matching method for the generic function ~2I~_~S~
+  (error "~@<There is no applicable method for the generic function ~2I~_~S~
 	  ~I~_when called with arguments ~2I~_~S.~:>"
 	 generic-function
 	 args))

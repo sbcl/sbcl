@@ -52,9 +52,12 @@
              (if (consp x)
                  (let ((name (car x)))
                    (if (eq name 'declaim)
-                       (progn (style-warn
-                               "DECLAIM is met where DECLARE is expected.")
-                              nil)
+		       ;; technically legal, but rather unlikely to
+		       ;; be what the user intended...
+                       (progn
+			 (style-warn
+			  "DECLAIM where DECLARE was probably intended")
+			 nil)
                        (eq name 'declare))))))
       (tagbody
         :again
