@@ -25,8 +25,11 @@
 	   array-header-p
 	   simple-array-p simple-array-nil-p vector-nil-p
 	   simple-array-unsigned-byte-2-p
-	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-8-p
-	   simple-array-unsigned-byte-16-p simple-array-unsigned-byte-32-p
+	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p
+	   simple-array-unsigned-byte-8-p simple-array-unsigned-byte-15-p
+	   simple-array-unsigned-byte-16-p simple-array-unsigned-byte-29-p
+	   simple-array-unsigned-byte-31-p
+	   simple-array-unsigned-byte-32-p
 	   simple-array-signed-byte-8-p simple-array-signed-byte-16-p
 	   simple-array-signed-byte-30-p simple-array-signed-byte-32-p
 	   simple-array-single-float-p simple-array-double-float-p

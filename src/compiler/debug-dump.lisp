@@ -277,13 +277,7 @@
 ;;; a vector whose element size is an integer multiple of output byte
 ;;; size.
 (defun coerce-to-smallest-eltype (seq)
-  (let ((maxoid ;; It's probably better to avoid (UNSIGNED-BYTE 0).
-	        #-sb-xc-host 1 
-		;; An initial value of 255 prevents us from
-		;; specializing the array to anything smaller than
-		;; (UNSIGNED-BYTE 8), which keeps the cross-compiler's
-		;; portable specialized array output functions happy.
-		#+sb-xc-host 255))
+  (let ((maxoid 0))
     (flet ((frob (x)
 	     (if (typep x 'unsigned-byte)
 		 (when (>= x maxoid)
@@ -295,18 +289,29 @@
 	    (frob i))
 	  (dovector (i seq)
 	    (frob i)))
-      (let ((specializer `(unsigned-byte ,(integer-length maxoid))))
+      (let ((specializer `(unsigned-byte
+			   ,(etypecase maxoid
+			      ((unsigned-byte 8) 8)
+			      ((unsigned-byte 16) 16)
+			      ((unsigned-byte 32) 32)))))
 	;; cross-compilers beware! It would be possible for the
-	;; upgraded-array-element-type of (UNSIGNED-BYTE 15) to be
-	;; (SIGNED-BYTE 16), and this is completely valid by
-	;; ANSI. However, the cross-compiler doesn't know how to dump
-	;; SIGNED-BYTE arrays, so better make it break now if it ever
-	;; will:
+	;; upgraded-array-element-type of (UNSIGNED-BYTE 16) to be
+	;; (SIGNED-BYTE 17) or (UNSIGNED-BYTE 23), and this is
+	;; completely valid by ANSI.  However, the cross-compiler
+	;; doesn't know how to dump (in practice) anything but the
+	;; above three specialized array types, so make it break here
+	;; if this is violated.
 	#+sb-xc-host
-	;; not SB!XC:UPGRADED-ARRAY-ELEMENT-TYPE, because we are
-	;; worried about whether the host's implementation of arrays.
-	(aver (subtypep (upgraded-array-element-type specializer) 
-			'unsigned-byte))
+	(aver
+	 ;; not SB!XC:UPGRADED-ARRAY-ELEMENT-TYPE, because we are
+	 ;; worried about whether the host's implementation of arrays.
+	 (let ((uaet (upgraded-array-element-type specializer)))
+	   (dolist (et '((unsigned-byte 8)
+			 (unsigned-byte 16)
+			 (unsigned-byte 32))
+		    nil)
+	     (when (and (subtypep et uaet) (subtypep uaet et))
+	       (return t)))))
 	(coerce seq `(simple-array ,specializer (*)))))))
 
 ;;;; variables

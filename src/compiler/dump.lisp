@@ -798,9 +798,12 @@
 	       ;; (SIMPLE-ARRAY (UNSIGNED-BYTE 8) *).) The other cases are only
 	       ;; needed in the target SBCL, so we let them be handled with
 	       ;; unportable bit bashing.
-	       (cond ((>= size 8) ; easy cases
+	       (cond ((>= size 7) ; easy cases
 		      (multiple-value-bind (floor rem) (floor size 8)
-			(aver (zerop rem))
+			(aver (or (zerop rem) (= rem 7)))
+			(when (= rem 7)
+			  (setq size (1+ size))
+			  (setq floor (1+ floor)))
 			(dovector (i vec)
 			  (dump-integer-as-n-bytes
 			   (ecase sb!c:*backend-byte-order*
@@ -821,6 +824,9 @@
 		 (dump-byte size file))
 	       (dump-raw-bytes vec bytes file)))
       (etypecase vec
+	#-sb-xc-host
+	((simple-array nil (*))
+	 (dump-unsigned-vector 0 0))
 	;; KLUDGE: What exactly does the (ASH .. -3) stuff do? -- WHN 19990902
 	(simple-bit-vector
 	 (dump-unsigned-vector 1 (ash (+ (the index len) 7) -3)))
@@ -837,16 +843,27 @@
 	#-sb-xc-host
 	((simple-array (unsigned-byte 4) (*))
 	 (dump-unsigned-vector 4 (ash (+ (the index (ash len 2)) 7) -3)))
+	#-sb-xc-host
+	((simple-array (unsigned-byte 7) (*))
+	 (dump-unsigned-vector 7 len))
 	((simple-array (unsigned-byte 8) (*))
 	 (dump-unsigned-vector 8 len))
+	#-sb-xc-host
+	((simple-array (unsigned-byte 15) (*))
+	 (dump-unsigned-vector 15 (* 2 len)))
 	((simple-array (unsigned-byte 16) (*))
 	 (dump-unsigned-vector 16 (* 2 len)))
+	#-sb-xc-host
+	((simple-array (unsigned-byte 31) (*))
+	 (dump-unsigned-vector 31 (* 4 len)))
 	((simple-array (unsigned-byte 32) (*))
 	 (dump-unsigned-vector 32 (* 4 len)))
 	((simple-array (signed-byte 8) (*))
 	 (dump-signed-vector 8 len))
 	((simple-array (signed-byte 16) (*))
 	 (dump-signed-vector 16 (* 2 len)))
+	((simple-array (unsigned-byte 29) (*))
+	 (dump-signed-vector 29 (* 4 len)))
 	((simple-array (signed-byte 30) (*))
 	 (dump-signed-vector 30 (* 4 len)))
 	((simple-array (signed-byte 32) (*))

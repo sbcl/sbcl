@@ -289,8 +289,12 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case SIMPLE_BIT_VECTOR_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
 	case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
@@ -959,21 +963,25 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
 #endif
         return ptrans_vector(thing, 8, 0, 0, constant);
 
       case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 #endif
         return ptrans_vector(thing, 16, 0, 0, constant);
 
       case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 #endif
         return ptrans_vector(thing, 32, 0, 0, constant);
 
@@ -1179,6 +1187,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),4)+2,2);
@@ -1187,6 +1196,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),2)+2,2);
@@ -1195,9 +1205,11 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+  	      case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(fixnum_value(vector->length)+2,2);

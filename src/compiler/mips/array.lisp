@@ -115,12 +115,18 @@
   (def-partial-data-vector-frobs simple-base-string base-char 
     :byte nil base-char-reg)
   
+  (def-partial-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
+    :byte nil unsigned-reg signed-reg)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-8 positive-fixnum
     :byte nil unsigned-reg signed-reg)
 
+  (def-partial-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum
+    :short nil unsigned-reg signed-reg)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum
     :short nil unsigned-reg signed-reg)
 
+  (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num
+    unsigned-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
     unsigned-reg)
 
@@ -130,6 +136,8 @@
   (def-partial-data-vector-frobs simple-array-signed-byte-16 tagged-num
     :short t signed-reg)
 
+  (def-full-data-vector-frobs simple-array-signed-byte-29 positive-fixnum
+    any-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-30 tagged-num
     any-reg)
 

@@ -128,13 +128,21 @@
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)
 
+  (def-data-vector-frobs simple-array-unsigned-byte-7 byte-index
+    positive-fixnum unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-8 byte-index
+    positive-fixnum unsigned-reg)
+  (def-data-vector-frobs simple-array-unsigned-byte-15 halfword-index
     positive-fixnum unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-16 halfword-index
     positive-fixnum unsigned-reg)
+  (def-data-vector-frobs simple-array-unsigned-byte-31 word-index
+    unsigned-num unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-32 word-index
     unsigned-num unsigned-reg)
 
+  (def-data-vector-frobs simple-array-unsigned-byte-29 word-index
+    positive-fixnum any-reg)
   (def-data-vector-frobs simple-array-signed-byte-30 word-index
     tagged-num any-reg)
   (def-data-vector-frobs simple-array-signed-byte-32 word-index

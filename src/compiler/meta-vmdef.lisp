@@ -679,8 +679,16 @@
 				       nil)
 				   t)))
 			   :key #'car))
-	     (oe-type '(mod #.max-vop-tn-refs)) ; :REF-ORDERING element type
-	     (te-type '(mod #.(* max-vop-tn-refs 2))) ; :TARGETS element type
+	     ;; :REF-ORDERING element type
+	     ;;
+	     ;; KLUDGE: was (MOD #.MAX-VOP-TN-REFS), which is still right
+	     (oe-type '(unsigned-byte 8))
+	     ;; :TARGETS element-type
+	     ;;
+	     ;; KLUDGE: was (MOD #.(* MAX-VOP-TN-REFS 2)), which does
+	     ;; not correspond to the definition in
+	     ;; src/compiler/vop.lisp.
+	     (te-type '(unsigned-byte 16))
 	     (ordering (make-specializable-array
 			(length sorted)
 			:element-type oe-type)))

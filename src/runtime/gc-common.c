@@ -1536,10 +1536,18 @@ gc_init_tables(void)
 	scav_vector_unsigned_byte_2;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
 	scav_vector_unsigned_byte_4;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG] =
+	scav_vector_unsigned_byte_8;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG] =
 	scav_vector_unsigned_byte_8;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG] =
+	scav_vector_unsigned_byte_16;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	scav_vector_unsigned_byte_16;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
+	scav_vector_unsigned_byte_32;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
+	scav_vector_unsigned_byte_32;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	scav_vector_unsigned_byte_32;
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -1633,10 +1641,18 @@ gc_init_tables(void)
 	trans_vector_unsigned_byte_2;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
 	trans_vector_unsigned_byte_4;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG] =
+	trans_vector_unsigned_byte_8;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG] =
 	trans_vector_unsigned_byte_8;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG] =
+	trans_vector_unsigned_byte_16;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	trans_vector_unsigned_byte_16;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
+	trans_vector_unsigned_byte_32;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
+	trans_vector_unsigned_byte_32;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	trans_vector_unsigned_byte_32;
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -1734,10 +1750,18 @@ gc_init_tables(void)
 	size_vector_unsigned_byte_2;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
 	size_vector_unsigned_byte_4;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG] =
+	size_vector_unsigned_byte_8;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG] =
 	size_vector_unsigned_byte_8;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG] =
+	size_vector_unsigned_byte_16;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	size_vector_unsigned_byte_16;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
+	size_vector_unsigned_byte_32;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
+	size_vector_unsigned_byte_32;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	size_vector_unsigned_byte_32;
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG

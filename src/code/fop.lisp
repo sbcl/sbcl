@@ -449,11 +449,18 @@
     (let* ((len (fast-read-u-integer 4))
 	   (size (fast-read-byte))
 	   (res (case size
+		  (0 (make-array len :element-type 'nil))
 		  (1 (make-array len :element-type 'bit))
 		  (2 (make-array len :element-type '(unsigned-byte 2)))
 		  (4 (make-array len :element-type '(unsigned-byte 4)))
+		  (7 (prog1 (make-array len :element-type '(unsigned-byte 7))
+		       (setf size 8)))
 		  (8 (make-array len :element-type '(unsigned-byte 8)))
+		  (15 (prog1 (make-array len :element-type '(unsigned-byte 15))
+			(setf size 16)))
 		  (16 (make-array len :element-type '(unsigned-byte 16)))
+		  (31 (prog1 (make-array len :element-type '(unsigned-byte 31))
+			(setf size 32)))
 		  (32 (make-array len :element-type '(unsigned-byte 32)))
 		  (t (bug "losing i-vector element size: ~S" size)))))
       (declare (type index len))
@@ -474,6 +481,7 @@
 	   (res (case size
  		  (8 (make-array len :element-type '(signed-byte 8)))
  		  (16 (make-array len :element-type '(signed-byte 16)))
+		  (29 (make-array len :element-type '(unsigned-byte 29)))
  		  (30 (make-array len :element-type '(signed-byte 30)))
  		  (32 (make-array len :element-type '(signed-byte 32)))
  		  (t (bug "losing si-vector element size: ~S" size)))))
@@ -482,7 +490,7 @@
       (read-n-bytes *fasl-input-stream*
 		    res
 		    0
- 		    (ceiling (the index (* (if (= size 30)
+ 		    (ceiling (the index (* (if (or (= size 30) (= size 29))
 					       32 ; Adjust for (signed-byte 30)
 					       size) len)) sb!vm:n-byte-bits))
       res)))

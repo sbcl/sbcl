@@ -1064,18 +1064,42 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 4)))
+     (simple-array-unsigned-byte-7
+      :translation (simple-array (unsigned-byte 7) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-7-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 7)))
      (simple-array-unsigned-byte-8
       :translation (simple-array (unsigned-byte 8) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-8-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 8)))
+     (simple-array-unsigned-byte-15
+      :translation (simple-array (unsigned-byte 7) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-15-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 15)))
      (simple-array-unsigned-byte-16
       :translation (simple-array (unsigned-byte 16) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-16-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 16)))
+     (simple-array-unsigned-byte-29
+      :translation (simple-array (unsigned-byte 29) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-29-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 29)))
+     (simple-array-unsigned-byte-31
+      :translation (simple-array (unsigned-byte 31) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-31-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 31)))
      (simple-array-unsigned-byte-32
       :translation (simple-array (unsigned-byte 32) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-32-widetag)

@@ -2125,11 +2125,18 @@
   (let* ((len (read-arg 4))
 	 (sizebits (read-arg 1))
 	 (type (case sizebits
+		 (0 sb!vm:simple-array-nil-widetag)
 		 (1 sb!vm:simple-bit-vector-widetag)
 		 (2 sb!vm:simple-array-unsigned-byte-2-widetag)
 		 (4 sb!vm:simple-array-unsigned-byte-4-widetag)
+		 (7 (prog1 sb!vm:simple-array-unsigned-byte-7-widetag
+		      (setf sizebits 8)))
 		 (8 sb!vm:simple-array-unsigned-byte-8-widetag)
+		 (15 (prog1 sb!vm:simple-array-unsigned-byte-15-widetag
+		       (setf sizebits 16)))
 		 (16 sb!vm:simple-array-unsigned-byte-16-widetag)
+		 (31 (prog1 sb!vm:simple-array-unsigned-byte-31-widetag
+		       (setf sizebits 32)))
 		 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
 		 (t (error "losing element size: ~W" sizebits))))
 	 (result (allocate-vector-object *dynamic* sizebits len type))

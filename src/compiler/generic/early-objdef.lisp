@@ -78,8 +78,12 @@
   simple-vector
   simple-array-unsigned-byte-2
   simple-array-unsigned-byte-4
+  simple-array-unsigned-byte-7
   simple-array-unsigned-byte-8
+  simple-array-unsigned-byte-15
   simple-array-unsigned-byte-16
+  simple-array-unsigned-byte-29
+  simple-array-unsigned-byte-31
   simple-array-unsigned-byte-32
   simple-array-signed-byte-8
   simple-array-signed-byte-16

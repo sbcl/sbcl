@@ -39,10 +39,18 @@
 		       (simple-array (unsigned-byte 2) (*)))
 (define-type-predicate simple-array-unsigned-byte-4-p
 		       (simple-array (unsigned-byte 4) (*)))
+(define-type-predicate simple-array-unsigned-byte-7-p
+                       (simple-array (unsigned-byte 7) (*)))
 (define-type-predicate simple-array-unsigned-byte-8-p
 		       (simple-array (unsigned-byte 8) (*)))
+(define-type-predicate simple-array-unsigned-byte-15-p
+                       (simple-array (unsigned-byte 15) (*)))
 (define-type-predicate simple-array-unsigned-byte-16-p
 		       (simple-array (unsigned-byte 16) (*)))
+(define-type-predicate simple-array-unsigned-byte-29-p
+                       (simple-array (unsigned-byte 29) (*)))
+(define-type-predicate simple-array-unsigned-byte-31-p
+                       (simple-array (unsigned-byte 31) (*)))
 (define-type-predicate simple-array-unsigned-byte-32-p
 		       (simple-array (unsigned-byte 32) (*)))
 (define-type-predicate simple-array-signed-byte-8-p

@@ -94,10 +94,18 @@
 	                    :importance 15)
 	 ((unsigned-byte 4) 0 4 simple-array-unsigned-byte-4
 	                    :importance 14)
+	 ((unsigned-byte 7) 0 8 simple-array-unsigned-byte-7
+	                    :importance 13)
 	 ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8
 	  :importance 13)
+	 ((unsigned-byte 15) 0 16 simple-array-unsigned-byte-15
+	  :importance 12)
 	 ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16
 	  :importance 12)
+	 ((unsigned-byte 29) 0 32 simple-array-unsigned-byte-29
+	  :importance 8)
+	 ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31
+	  :importance 11)
 	 ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32
 	  :importance 11)
 	 ((signed-byte 8) 0 8 simple-array-signed-byte-8
