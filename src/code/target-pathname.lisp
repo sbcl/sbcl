@@ -58,27 +58,6 @@
 
 (def!method make-load-form ((pathname pathname) &optional environment)
   (make-load-form-saving-slots pathname :environment environment))
-
-;;; The potential conflict with search lists requires isolating the
-;;; printed representation to use the i/o macro #.(logical-pathname
-;;; <path-designator>).
-;;;
-;;; FIXME: We don't use search lists any more, so that comment is
-;;; stale, right?
-(def!method print-object ((pathname logical-pathname) stream)
-  (let ((namestring (handler-case (namestring pathname)
-		      (error nil))))
-    (if (and namestring (or *read-eval* (not *print-readably*)))
-	(format stream "#.(CL:LOGICAL-PATHNAME ~S)" namestring)
-	(print-unreadable-object (pathname stream :type t)
-	  (format
-	   stream
-	   "~_:HOST ~S ~_:DIRECTORY ~S ~_:NAME ~S ~_:TYPE ~S ~_:VERSION ~S"
-	   (%pathname-host pathname)
-	   (%pathname-directory pathname)
-	   (%pathname-name pathname)
-	   (%pathname-type pathname)
-	   (%pathname-version pathname))))))
 
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type

@@ -21,6 +21,18 @@
 (def!method make-load-form ((random-state random-state) &optional environment) 
   (make-load-form-saving-slots random-state :environment environment))
 
+(def!method print-object ((state random-state) stream)
+  (if (and *print-readably* (not *read-eval*))
+      (error 'print-not-readable :object state)
+      (format stream "#S(~S ~S #.~S)"
+	      'random-state
+	      ':state
+	      `(make-array 627 
+		:element-type 
+		'(unsigned-byte 32)
+		:initial-contents 
+		',(coerce (random-state-state state) 'list)))))
+
 ;;; The state is stored in a (simple-array (unsigned-byte 32) (627))
 ;;; wrapped in a random-state structure:
 ;;;

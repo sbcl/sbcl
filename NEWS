@@ -2490,6 +2490,10 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
        in local calls.
     ** fixed non-pretty printing of arrays with *PRINT-RADIX* being
        true.
+    ** provided a readably-printable representation for RANDOM-STATE
+       objects.
+    ** ensured that pathnames, where they have a namestring, always
+       print using #P"..." syntax.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
