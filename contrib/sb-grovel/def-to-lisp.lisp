@@ -37,6 +37,19 @@ code:
 	   (c-escape formatter)
 	   args)))
 
+(defun c-for-enum (lispname elements export)
+  (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:enum nil" lispname)
+  (dolist (element elements)
+    (destructuring-bind (lisp-element-name c-element-name) element
+      (printf " (~S %d)" lisp-element-name c-element-name)))
+  (printf ")))")
+  (when export
+    (dolist (element elements)
+      (destructuring-bind (lisp-element-name c-element-name) element
+        (declare (ignore c-element-name))
+	(unless (keywordp lisp-element-name)
+	  (printf "(export '~S)" lisp-element-name))))))
+
 (defun c-for-structure (lispname cstruct)
   (destructuring-bind (cname &rest elements) cstruct
     (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-grovel::define-c-struct ~A %d" lispname
@@ -87,6 +100,8 @@ code:
 	   (as-c "#else")
 	   (printf "(sb-int:style-warn \"Couldn't grovel for ~A (unknown to the C compiler).\")" cname)
 	   (as-c "#endif"))
+          (:enum
+           (c-for-enum lispname cname export))
 	  (:type
 	   (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:%ssigned %d)))" lispname
 		   (format nil "SIGNED_(~A)" cname)

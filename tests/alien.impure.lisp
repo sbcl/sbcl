@@ -94,5 +94,26 @@
 ;;; reported on sbcl-help 2004-11-16 by John Morrison
 (define-alien-type enum.1 (enum nil (:val0 0)))
 
+(define-alien-type enum.2 (enum nil (zero 0) (one 1) (two 2) (three 3)
+                                    (four 4) (five 5) (six 6) (seven 7)
+                                    (eight 8) (nine 9)))
+(with-alien ((integer-array (array integer 3)))
+  (let ((enum-array (cast integer-array (array enum.2 3))))
+    (setf (deref enum-array 0) 'three
+          (deref enum-array 1) 'four)
+    (setf (deref integer-array 2) (+ (deref integer-array 0)
+                                     (deref integer-array 1)))
+    (assert (eql (deref enum-array 2) 'seven))))
+;; The code that is used for mapping from integers to symbols depends on the
+;; `density' of the set of used integers, so test with a sparse set as well.
+(define-alien-type enum.3 (enum nil (zero 0) (one 1) (k-one 1001) (k-two 1002)))
+(with-alien ((integer-array (array integer 3)))
+  (let ((enum-array (cast integer-array (array enum.3 3))))
+    (setf (deref enum-array 0) 'one
+          (deref enum-array 1) 'k-one)
+    (setf (deref integer-array 2) (+ (deref integer-array 0)
+                                     (deref integer-array 1)))
+    (assert (eql (deref enum-array 2) 'k-two))))
+
 ;;; success
 (quit :unix-status 104)

@@ -7,6 +7,8 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
     available at runtime.
   * Solaris 10 (aka SunOS 5.10) on the SPARC platform is now
     supported.  (thanks to Dan Debertin)
+  * SB-ALIEN enums can now be represented in Lisp by any symbols, not
+    just keywords.  (thanks to Vincent Arkesteijn)
   * fixed bug #331: structure-class instances corresponding to
     DEFSTRUCT forms are now created eagerly.
   * fixed bug #345: backtraces from calls to undefined functions work

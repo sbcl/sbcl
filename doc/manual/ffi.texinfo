@@ -216,9 +216,9 @@ determine which field is active from context.
 @item
 The foreign type specifier @code{(sb-alien:enum @var{name} &rest
 @var{specs})} describes an enumeration type that maps between integer
-values and keywords. If @var{name} is @code{nil}, then the type is
+values and symbols. If @var{name} is @code{nil}, then the type is
 anonymous.  Each element of the @var{specs} list is either a Lisp
-keyword, or a list @code{(@var{keyword} @var{value})}.  @var{value} is
+symbol, or a list @code{(@var{symbol} @var{value})}.  @var{value} is
 an integer. If @var{value} is not supplied, then it defaults to one
 greater than the value for the preceding spec (or to zero if it is the
 first spec).

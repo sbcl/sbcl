@@ -607,8 +607,8 @@
 (define-alien-type-class (enum :include (integer (bits 32))
 			       :include-args (signed))
   name		; name of this enum (if any)
-  from		; alist from keywords to integers
-  to		; alist or vector from integers to keywords
+  from		; alist from symbols to integers
+  to		; alist or vector from integers to symbols
   kind		; kind of from mapping, :VECTOR or :ALIST
   offset)	; offset to add to value for :VECTOR from mapping
 
@@ -649,8 +649,8 @@
 	      (values (first el) (second el))
 	      (values el (1+ prev)))
 	(setf prev val)
-	(unless (keywordp sym)
-	  (error "The enumeration element ~S is not a keyword." sym))
+	(unless (symbolp sym)
+	  (error "The enumeration element ~S is not a symbol." sym))
 	(unless (integerp val)
 	  (error "The element value ~S is not an integer." val))
 	(unless (and max (> max val)) (setq max val))
@@ -718,7 +718,7 @@
     (:alist
      `(ecase ,alien
 	,@(mapcar (lambda (mapping)
-		    `(,(car mapping) ,(cdr mapping)))
+		    `(,(car mapping) ',(cdr mapping)))
 		  (alien-enum-type-to type))))))
 
 (define-alien-type-method (enum :deport-gen) (type value)

@@ -112,6 +112,16 @@ Here's how to use the grovel clauses:
 other forms are possible.
 
 @item
+@code{:enum}
+@lisp
+ (:enum lisp-type-name ((lisp-enumerated-name c-enumerated-name) ...)))
+@end lisp
+
+An @code{sb-alien:enum} type with name @code{lisp-type-name} will be defined.
+The symbols are the @code{lisp-enumerated-name}s, and the values
+are grovelled from the @code{c-enumerated-name}s.
+
+@item
 @code{:structure} - alien structure definitions look like this:
 @lisp
  (:structure lisp-struct-name ("struct c_structure"
