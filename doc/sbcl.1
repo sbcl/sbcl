@@ -58,10 +58,12 @@ give you another prompt, and wait for your next input. E.g.
   *
 
 Many people like to run SBCL, like other Lisp systems, as a subprocess
-under Emacs. The Emacs "ilisp" and "Slime" modes provide many
+under Emacs. The Emacs "Slime" and "ilisp" modes provide many
 convenient features, like command line editing, tab completion, and
 various kinds of coupling between Common Lisp source files and the
-interactive SBCL subprocess.
+interactive SBCL subprocess, but they can be somewhat fragile wrt.
+packages and readtables, in which case SBCL in the Emacs "shell" mode
+can a useful substitute.
 
 .SH OVERVIEW
 
