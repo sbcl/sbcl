@@ -424,15 +424,16 @@
 	    (and (typep ,argname ',ltype)
 		 ,(cond
 		   ((subtypep ltype 'list)
-		    `(consp (nthcdr ,name-index (the ,ltype ,argname))))
+                     `(do ((head (the ,ltype ,argname) (cdr head))
+			   (i 0 (1+ i)))
+		          ((or (not (consp head)) (= i ,name-index))
+			   (and (consp head) (eq ',name (car head))))))
 		   ((subtypep ltype 'vector)
-		    `(= (length (the ,ltype ,argname))
-		        ,(dd-length defstruct)))
+		    `(and (= (length (the ,ltype ,argname))
+			   ,(dd-length defstruct))
+		          (eq ',name (aref (the ,ltype ,argname) ,name-index))))
 		   (t (bug "Uncatered-for lisp type in typed DEFSTRUCT: ~S."
-			   ltype)))
-		 (eq (elt (the ,ltype ,argname)
-			  ,name-index)
-		     ',name))))))))
+			   ltype))))))))))
 
 ;;; Return a list of forms to create a copier function of a typed DEFSTRUCT.
 (defun typed-copier-definitions (defstruct)

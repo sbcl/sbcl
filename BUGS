@@ -1457,12 +1457,7 @@ WORKAROUND:
       (:method ((p1 t) (p2 t) s) (vector-push-extend (list t p1 p2) s)))
 
 322: "DEFSTRUCT :TYPE LIST predicate and improper lists"
-  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
-  test suite.
-    (defstruct (a (:type list) (:initial-offset 5) :named))
-    (defstruct (b (:type list) (:initial-offset 2) :named (:include a)))
-    (b-p (list* nil nil nil nil nil 'foo73 nil 'tail))
-  gives an error in sbcl-0.8.10
+  (fixed in sbcl-0.8.10.23)
 
 323: "REPLACE, BIT-BASH and large strings"
   The transform for REPLACE on simple-base-strings uses BIT-BASH, which

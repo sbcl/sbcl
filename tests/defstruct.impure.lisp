@@ -521,6 +521,27 @@
   (eval (copy-tree form))
   (eval (copy-tree form)))
 
+;;; 322: "DEFSTRUCT :TYPE LIST predicate and improper lists"
+;;; reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
+;;; test suite.
+(defstruct (bug-332a (:type list) (:initial-offset 5) :named))
+(defstruct (bug-332b (:type list) (:initial-offset 2) :named (:include bug-332a)))
+(assert (not (bug-332b-p (list* nil nil nil nil nil 'foo73 nil 'tail))))
+(assert (not (bug-332b-p 873257)))
+(assert (not (bug-332b-p '(1 2 3 4 5 x 1 2 bug-332a))))
+(assert (bug-332b-p '(1 2 3 4 5 x 1 2 bug-332b)))
+
+;;; Similar test for vectors, just for good measure.
+(defstruct (bug-332a-aux (:type vector) 
+			 (:initial-offset 5) :named))
+(defstruct (bug-332b-aux (:type vector) 
+			 (:initial-offset 2) :named 
+			 (:include bug-332a-aux)))
+(assert (not (bug-332b-aux-p #(1 2 3 4 5 x 1 premature-end))))
+(assert (not (bug-332b-aux-p 873257)))
+(assert (not (bug-332b-aux-p #(1 2 3 4 5 x 1 2 bug-332a-aux))))
+(assert (bug-332b-aux-p #(1 2 3 4 5 x 1 2 bug-332b-aux)))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)
