@@ -214,8 +214,8 @@ comments from CMU CL:
 ;;; Return the DYNCOUNT-INFO for FUNCTION.
 (defun find-info-for (function)
   (declare (type function function))
-  (let* ((function (%primitive closure-function function))
-	 (component (sb!di::function-code-header function)))
+  (let* ((function (%primitive closure-fun function))
+	 (component (sb!di::fun-code-header function)))
     (do ((end (get-header-data component))
 	 (i sb!vm:code-constants-offset (1+ i)))
 	((= end i))

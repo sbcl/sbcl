@@ -108,9 +108,10 @@
   ;;   * SC-offset of primary location, if it has one
   ;;   * SC-offset of save location, if it has one
   (variables nil :type (or simple-vector null))
-  ;; A vector of the packed binary representation of the COMPILED-DEBUG-BLOCKs
-  ;; in this function, in the order that the blocks were emitted. The first
-  ;; block is the start of the function. This slot may be NIL to save space.
+  ;; a vector of the packed binary representation of the
+  ;; COMPILED-DEBUG-BLOCKs in this function, in the order that the
+  ;; blocks were emitted. The first block is the start of the
+  ;; function. This slot may be NIL to save space.
   ;;
   ;; FIXME: The "packed binary representation" description in the comment
   ;; above is the same as the description of the old representation of

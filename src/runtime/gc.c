@@ -594,7 +594,7 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 				printf("Don't know about instances yet!\n");
 				nwords = 1;
 				break;
-			case type_FunctionPointer:
+			case type_FunPointer:
 				nwords = 1;
 				break;
 			case type_OtherPointer:
@@ -620,13 +620,16 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 
 /* code and code-related objects */
 
-#define RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunctionPointer)
+/* FIXME: (1) Shouldn't this be defined in sbcl.h? (2) Shouldn't it
+ * be in the same units as FDEFN_RAW_ADDR_OFFSET? (This is measured
+ * in words, that's measured in bytes. Gotta love CMU CL..) */
+#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunPointer)
 
-static lispobj trans_function_header(lispobj object);
+static lispobj trans_fun_header(lispobj object);
 static lispobj trans_boxed(lispobj object);
 
 static int
-scav_function_pointer(lispobj *where, lispobj object)
+scav_fun_pointer(lispobj *where, lispobj object)
 {
   lispobj  *first_pointer;
   lispobj copy;
@@ -645,9 +648,9 @@ scav_function_pointer(lispobj *where, lispobj object)
   
   type = TypeOf(first);
   switch (type) {
-  case type_FunctionHeader:
-  case type_ClosureFunctionHeader:
-    copy = trans_function_header(object);
+  case type_SimpleFunHeader:
+  case type_ClosureFunHeader:
+    copy = trans_fun_header(object);
     break;
   default:
     copy = trans_boxed(object);
@@ -717,16 +720,16 @@ trans_code(struct code *code)
 	prev_pointer = &new_code->entry_points;
 
 	while (fheaderl != NIL) {
-		struct function *fheaderp, *nfheaderp;
+		struct simple_fun *fheaderp, *nfheaderp;
 		lispobj nfheaderl;
 		
-		fheaderp = (struct function *) native_pointer(fheaderl);
-		gc_assert(TypeOf(fheaderp->header) == type_FunctionHeader);
+		fheaderp = (struct simple_fun *) native_pointer(fheaderl);
+		gc_assert(TypeOf(fheaderp->header) == type_SimpleFunHeader);
 
 		/* calcuate the new function pointer and the new */
 		/* function header */
 		nfheaderl = fheaderl + displacement;
-		nfheaderp = (struct function *) native_pointer(nfheaderl);
+		nfheaderp = (struct simple_fun *) native_pointer(nfheaderl);
 
 		/* set forwarding pointer */
 #ifdef DEBUG_CODE_GC
@@ -757,7 +760,7 @@ scav_code_header(lispobj *where, lispobj object)
 	struct code *code;
 	int nheader_words, ncode_words, nwords;
 	lispobj fheaderl;
-	struct function *fheaderp;
+	struct simple_fun *fheaderp;
 
 	code = (struct code *) where;
 	ncode_words = fixnum_value(code->code_size);
@@ -780,8 +783,8 @@ scav_code_header(lispobj *where, lispobj object)
 	/* code data block */
 	fheaderl = code->entry_points;
 	while (fheaderl != NIL) {
-		fheaderp = (struct function *) native_pointer(fheaderl);
-		gc_assert(TypeOf(fheaderp->header) == type_FunctionHeader);
+		fheaderp = (struct simple_fun *) native_pointer(fheaderl);
+		gc_assert(TypeOf(fheaderp->header) == type_SimpleFunHeader);
 		
 #if defined(DEBUG_CODE_GC)
 		printf("Scavenging boxed section of entry point located at 0x%08x.\n",
@@ -836,11 +839,11 @@ scav_return_pc_header(lispobj *where, lispobj object)
 static lispobj
 trans_return_pc_header(lispobj object)
 {
-	struct function *return_pc;
+	struct simple_fun *return_pc;
 	unsigned long offset;
 	struct code *code, *ncode;
 	lispobj ret;
-	return_pc = (struct function *) native_pointer(object);
+	return_pc = (struct simple_fun *) native_pointer(object);
 	offset = HeaderValue(return_pc->header)  * 4 ;
 
 	/* Transport the whole code object */
@@ -873,7 +876,7 @@ lispobj *where, object;
 	lispobj fun;
 
 	closure = (struct closure *)where;
-	fun = closure->function - RAW_ADDR_OFFSET;
+	fun = closure->fun - FUN_RAW_ADDR_OFFSET;
 	scavenge(&fun, 1);
 
 	return 2;
@@ -881,7 +884,7 @@ lispobj *where, object;
 #endif
 
 static int
-scav_function_header(lispobj *where, lispobj object)
+scav_fun_header(lispobj *where, lispobj object)
 {
     fprintf(stderr, "GC lossage.  Should not be scavenging a ");
     fprintf(stderr, "Function Header.\n");
@@ -892,20 +895,20 @@ scav_function_header(lispobj *where, lispobj object)
 }
 
 static lispobj
-trans_function_header(lispobj object)
+trans_fun_header(lispobj object)
 {
-	struct function *fheader;
+	struct simple_fun *fheader;
 	unsigned long offset;
 	struct code *code, *ncode;
 	
-	fheader = (struct function *) native_pointer(object);
+	fheader = (struct simple_fun *) native_pointer(object);
 	offset = HeaderValue(fheader->header) * 4;
 
 	/* Transport the whole code object */
 	code = (struct code *) ((unsigned long) fheader - offset);
 	ncode = trans_code(code);
 
-	return ((lispobj) LOW_WORD(ncode) + offset) | type_FunctionPointer;
+	return ((lispobj) LOW_WORD(ncode) + offset) | type_FunPointer;
 }
 
 
@@ -1094,10 +1097,11 @@ scav_fdefn(lispobj *where, lispobj object)
 
     fdefn = (struct fdefn *)where;
     
-    if ((char *)(fdefn->function + RAW_ADDR_OFFSET) 
+    if ((char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET) 
 	== (char *)((unsigned long)(fdefn->raw_addr))) {
         scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1);
-        fdefn->raw_addr = (u32)  ((char *) LOW_WORD(fdefn->function)) + RAW_ADDR_OFFSET;
+        fdefn->raw_addr =
+	    (u32)  ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
         return sizeof(struct fdefn) / sizeof(lispobj);
     }
     else
@@ -1898,7 +1902,7 @@ gc_init(void)
 
 	for (i = 0; i < 32; i++) {
 		scavtab[type_EvenFixnum|(i<<3)] = scav_immediate;
-		scavtab[type_FunctionPointer|(i<<3)] = scav_function_pointer;
+		scavtab[type_FunPointer|(i<<3)] = scav_fun_pointer;
 		/* OtherImmediate0 */
 		scavtab[type_ListPointer|(i<<3)] = scav_list_pointer;
 		scavtab[type_OddFixnum|(i<<3)] = scav_immediate;
@@ -1964,8 +1968,8 @@ gc_init(void)
 	scavtab[type_ComplexVector] = scav_boxed;
 	scavtab[type_ComplexArray] = scav_boxed;
 	scavtab[type_CodeHeader] = scav_code_header;
-	scavtab[type_FunctionHeader] = scav_function_header;
-	scavtab[type_ClosureFunctionHeader] = scav_function_header;
+	scavtab[type_SimpleFunHeader] = scav_fun_header;
+	scavtab[type_ClosureFunHeader] = scav_fun_header;
 	scavtab[type_ReturnPcHeader] = scav_return_pc_header;
 #ifdef __i386__
 	scavtab[type_ClosureHeader] = scav_closure_header;
@@ -2048,8 +2052,8 @@ gc_init(void)
 	transother[type_ComplexVector] = trans_boxed;
 	transother[type_ComplexArray] = trans_boxed;
 	transother[type_CodeHeader] = trans_code_header;
-	transother[type_FunctionHeader] = trans_function_header;
-	transother[type_ClosureFunctionHeader] = trans_function_header;
+	transother[type_SimpleFunHeader] = trans_fun_header;
+	transother[type_ClosureFunHeader] = trans_fun_header;
 	transother[type_ReturnPcHeader] = trans_return_pc_header;
 	transother[type_ClosureHeader] = trans_boxed;
 	transother[type_FuncallableInstanceHeader] = trans_boxed;
@@ -2069,7 +2073,7 @@ gc_init(void)
 
 	for (i = 0; i < 32; i++) {
 		sizetab[type_EvenFixnum|(i<<3)] = size_immediate;
-		sizetab[type_FunctionPointer|(i<<3)] = size_pointer;
+		sizetab[type_FunPointer|(i<<3)] = size_pointer;
 		/* OtherImmediate0 */
 		sizetab[type_ListPointer|(i<<3)] = size_pointer;
 		sizetab[type_OddFixnum|(i<<3)] = size_immediate;
@@ -2137,8 +2141,8 @@ gc_init(void)
 	sizetab[type_CodeHeader] = size_code_header;
 #if 0
 	/* Shouldn't see these so just lose if it happens */
-	sizetab[type_FunctionHeader] = size_function_header;
-	sizetab[type_ClosureFunctionHeader] = size_function_header;
+	sizetab[type_SimpleFunHeader] = size_function_header;
+	sizetab[type_ClosureFunHeader] = size_function_header;
 	sizetab[type_ReturnPcHeader] = size_return_pc_header;
 #endif
 	sizetab[type_ClosureHeader] = size_boxed;

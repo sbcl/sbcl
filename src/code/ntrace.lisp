@@ -127,7 +127,7 @@
 	(t (values (fdefinition x) t)))
     (case (sb-kernel:get-type res)
       (#.sb-vm:closure-header-type
-       (values (sb-kernel:%closure-function res)
+       (values (sb-kernel:%closure-fun res)
 	       named-p
 	       :compiled-closure))
       (#.sb-vm:funcallable-instance-header-type

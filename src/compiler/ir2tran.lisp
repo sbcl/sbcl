@@ -140,8 +140,8 @@
 	   (:global-function
 	    (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
 	      (if unsafe
-		  (vop fdefn-function node block fdefn-tn res)
-		  (vop safe-fdefn-function node block fdefn-tn res))))))))
+		  (vop fdefn-fun node block fdefn-tn res)
+		  (vop safe-fdefn-fun node block fdefn-tn res))))))))
     (move-continuation-result node block locs cont))
   (values))
 

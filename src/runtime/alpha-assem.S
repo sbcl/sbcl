@@ -85,8 +85,8 @@ call_into_lisp:
 	lda	reg_LRA,call_into_lisp_LRA_page+type_OtherPointer
 
 	/* Indirect the closure */
-	ldl	reg_CODE,CLOSURE_FUNCTION_OFFSET(reg_LEXENV)
-	addl	reg_CODE,6*4-type_FunctionPointer,reg_LIP
+	ldl	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
+	addl	reg_CODE,6*4-type_FunPointer, reg_LIP
 
 	/* And into lisp we go. */
 	jsr	reg_ZERO,(reg_LIP)
@@ -276,9 +276,9 @@ undefined_tramp_offset:
         .ent    closure_tramp_offset
 closure_tramp = /* ### */ 0x150 + call_into_lisp_LRA_page
 closure_tramp_offset:
-        ldl     reg_LEXENV, FDEFN_FUNCTION_OFFSET(reg_FDEFN)
-        ldl     reg_L0, CLOSURE_FUNCTION_OFFSET(reg_LEXENV)
-        addl    reg_L0, FUNCTION_CODE_OFFSET, reg_LIP
+        ldl     reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
+        ldl     reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
+        addl    reg_L0, FUN_CODE_OFFSET, reg_LIP
         jmp     reg_ZERO,(reg_LIP)
         .end    closure_tramp
 

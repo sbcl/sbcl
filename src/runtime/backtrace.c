@@ -72,8 +72,8 @@ code_pointer(lispobj object)
         case type_CodeHeader:
             break;
         case type_ReturnPcHeader:
-        case type_FunctionHeader:
-        case type_ClosureFunctionHeader:
+        case type_SimpleFunHeader:
+        case type_ClosureFunHeader:
             len = HEADER_LENGTH(header);
             if (len == 0)
                 headerp = NULL;
@@ -114,7 +114,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
 
     info->interrupted = 1;
     if (LowtagOf(*os_context_register_addr(context, reg_CODE))
-	== type_FunctionPointer) {
+	== type_FunPointer) {
         /* We tried to call a function, but crapped out before $CODE could
          * be fixed up. Probably an undefined function. */
         info->frame =
@@ -215,10 +215,10 @@ backtrace(int nframes)
             function = ((struct code *)info.code)->entry_points;
 #endif
             while (function != NIL) {
-                struct function *header;
+                struct simple_fun *header;
                 lispobj name;
 
-                header = (struct function *) native_pointer(function);
+                header = (struct simple_fun *) native_pointer(function);
                 name = header->name;
 
                 if (LowtagOf(name) == type_OtherPointer) {

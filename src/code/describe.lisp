@@ -158,14 +158,14 @@
 ;;; the guts.
 (defun %describe-function-compiled (x s kind name)
   (declare (type stream s))
-  ;; FIXME: The lowercaseness of %FUNCTION-ARGLIST results, and the
+  ;; FIXME: The lowercaseness of %SIMPLE-FUN-ARGLIST results, and the
   ;; non-sentenceness of the "Arguments" label, makes awkward output.
   ;; Better would be "Its arguments are: ~S" (with uppercase argument
   ;; names) when arguments are known, and otherwise "There is no
   ;; information available about its arguments." or "It has no
-  ;; arguments." (And why is %FUNCTION-ARGLIST a string instead of a
+  ;; arguments." (And why is %SIMPLE-FUN-ARGLIST a string instead of a
   ;; list of symbols anyway?)
-  (let ((args (%function-arglist x)))
+  (let ((args (%simple-fun-arglist x)))
     (format s "~@:_~@(~@[~A ~]arguments:~@:_~)" kind)
     (cond ((not args)
 	   (format s "  There is no argument information available."))
@@ -176,11 +176,11 @@
 	   (pprint-logical-block (s nil)
 	     (pprint-indent :current 2)
 	     (write-string args s)))))
-  (let ((name (or name (%function-name x))))
+  (let ((name (or name (%simple-fun-name x))))
     (%describe-doc name s 'function kind)
     (unless (eq kind :macro)
-      (%describe-function-name name s (%fun-type x))))
-  (%describe-compiled-from (sb-kernel:function-code-header x) s))
+      (%describe-function-name name s (%simple-fun-type x))))
+  (%describe-compiled-from (sb-kernel:fun-code-header x) s))
 
 ;;; Describe a function with the specified kind and name. The latter
 ;;; arguments provide some information about where the function came
@@ -196,13 +196,13 @@
     ((nil) (format s "~S is a function." x)))
   (case (get-type x)
     (#.sb-vm:closure-header-type
-     (%describe-function-compiled (%closure-function x) s kind name)
+     (%describe-function-compiled (%closure-fun x) s kind name)
      (format s "~@:_Its closure environment is:")
      (pprint-logical-block (s nil)
        (pprint-indent :current 8)
        (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
 	 (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
-    ((#.sb-vm:function-header-type #.sb-vm:closure-function-header-type)
+    ((#.sb-vm:simple-fun-header-type #.sb-vm:closure-fun-header-type)
      (%describe-function-compiled x s kind name))
     (#.sb-vm:funcallable-instance-header-type
      (typecase x

@@ -104,7 +104,7 @@
 (defun %set-funcallable-instance-info (fin i new-value)
   (%set-funcallable-instance-info fin i new-value))
 
-(defun funcallable-instance-function (fin)
+(defun funcallable-instance-fun (fin)
   (%funcallable-instance-lexenv fin))
 
 ;;; The heart of the magic of funcallable instances ("FINs"). The
@@ -128,13 +128,13 @@
 ;;; think of another example offhand. -- WHN 2001-10-06)
 ;;;
 ;;; The only loss is that if someone accesses the
-;;; FUNCALLABLE-INSTANCE-FUNCTION, then won't get a FIN back. This
-;;; probably doesn't matter, since PCL only sets the FIN function. And
-;;; the only reason that interpreted functions are FINs instead of
-;;; bare closures is for debuggability.
-(defun (setf funcallable-instance-function) (new-value fin)
-  (setf (%funcallable-instance-function fin)
-	(%closure-function new-value))
+;;; FUNCALLABLE-INSTANCE-FUN, then won't get a FIN back. This probably
+;;; doesn't matter, since PCL only sets the FIN function. And the only
+;;; reason that interpreted functions are FINs instead of bare
+;;; closures is for debuggability.
+(defun (setf funcallable-instance-fun) (new-value fin)
+  (setf (%funcallable-instance-fun fin)
+	(%closure-fun new-value))
   (setf (%funcallable-instance-lexenv fin)
 	(if (funcallable-instance-p new-value)
 	    (%funcallable-instance-lexenv new-value)

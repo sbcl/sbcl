@@ -114,8 +114,9 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2
-    ;; The symbol-hash slot of NIL holds NIL because it is also the cdr slot,
-    ;; so we have to strip off the two low bits to make sure it is a fixnum.
+    ;; The symbol-hash slot of NIL holds NIL because it is also the
+    ;; cdr slot, so we have to strip off the two low bits to make sure
+    ;; it is a fixnum.
     ;;
     ;; FIXME: Is this still true? It seems to me from my reading of
     ;; the DEFINE-PRIMITIVE-OBJECT in objdef.lisp that the symbol-hash
@@ -125,18 +126,18 @@
     (loadw res symbol symbol-hash-slot other-pointer-type)
     (inst and res (lognot #b11))))
 
-;;;; fdefinition (fdefn) objects
+;;;; fdefinition (FDEFN) objects
 
-(define-vop (fdefn-function cell-ref)	; /pfw - alpha
-  (:variant fdefn-function-slot other-pointer-type))
+(define-vop (fdefn-fun cell-ref)	; /pfw - alpha
+  (:variant fdefn-fun-slot other-pointer-type))
 
-(define-vop (safe-fdefn-function)
+(define-vop (safe-fdefn-fun)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 10
-    (loadw value object fdefn-function-slot other-pointer-type)
+    (loadw value object fdefn-fun-slot other-pointer-type)
     (inst cmp value nil-value)
     ;; FIXME: UNDEFINED-SYMBOL-ERROR seems to actually be for symbols with no
     ;; function value, not, as the name might suggest, symbols with no ordinary
@@ -144,25 +145,25 @@
     (let ((err-lab (generate-error-code vop undefined-symbol-error object)))
       (inst jmp :e err-lab))))
 
-(define-vop (set-fdefn-function)
+(define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-function))
+  (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
 	 (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
   (:temporary (:sc byte-reg) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (load-type type function (- function-pointer-type))
+    (load-type type function (- fun-pointer-type))
     (inst lea raw
 	  (make-ea :byte :base function
-		   :disp (- (* function-code-offset word-bytes)
-			    function-pointer-type)))
-    (inst cmp type function-header-type)
+		   :disp (- (* simple-fun-code-offset word-bytes)
+			    fun-pointer-type)))
+    (inst cmp type simple-fun-header-type)
     (inst jmp :e normal-fn)
     (inst lea raw (make-fixup (extern-alien-name "closure_tramp") :foreign))
     NORMAL-FN
-    (storew function fdefn fdefn-function-slot other-pointer-type)
+    (storew function fdefn fdefn-fun-slot other-pointer-type)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-type)
     (move result function)))
 
@@ -172,7 +173,7 @@
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (storew nil-value fdefn fdefn-function-slot other-pointer-type)
+    (storew nil-value fdefn fdefn-fun-slot other-pointer-type)
     (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
 	    fdefn fdefn-raw-addr-slot other-pointer-type)
     (move result fdefn)))
@@ -234,25 +235,25 @@
 ;;;; closure indexing
 
 (define-full-reffer closure-index-ref *
-  closure-info-offset function-pointer-type
+  closure-info-offset fun-pointer-type
   (any-reg descriptor-reg) * %closure-index-ref)
 
 (define-full-setter set-funcallable-instance-info *
-  funcallable-instance-info-offset function-pointer-type
+  funcallable-instance-info-offset fun-pointer-type
   (any-reg descriptor-reg) * %set-funcallable-instance-info)
 
 (define-full-reffer funcallable-instance-info *
-  funcallable-instance-info-offset function-pointer-type
+  funcallable-instance-info-offset fun-pointer-type
   (descriptor-reg any-reg) * %funcallable-instance-info)
 
 (define-vop (funcallable-instance-lexenv cell-ref)
-  (:variant funcallable-instance-lexenv-slot function-pointer-type))
+  (:variant funcallable-instance-lexenv-slot fun-pointer-type))
 
 (define-vop (closure-ref slot-ref)
-  (:variant closure-info-offset function-pointer-type))
+  (:variant closure-info-offset fun-pointer-type))
 
 (define-vop (closure-init slot-set)
-  (:variant closure-info-offset function-pointer-type))
+  (:variant closure-info-offset fun-pointer-type))
 
 ;;;; value cell hackery
 

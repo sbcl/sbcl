@@ -251,7 +251,7 @@
     (let ((lowtag (descriptor-lowtag des))
 	  (high (descriptor-high des))
 	  (low (descriptor-low des)))
-      (if (or (eql lowtag sb!vm:function-pointer-type)
+      (if (or (eql lowtag sb!vm:fun-pointer-type)
 	      (eql lowtag sb!vm:instance-pointer-type)
 	      (eql lowtag sb!vm:list-pointer-type)
 	      (eql lowtag sb!vm:other-pointer-type))
@@ -1368,7 +1368,7 @@
 			       (1- sb!vm:fdefn-size) sb!vm:fdefn-type))
 	  (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
 	  (unless leave-fn-raw
-	    (write-wordindexed fdefn sb!vm:fdefn-function-slot
+	    (write-wordindexed fdefn sb!vm:fdefn-fun-slot
 			       *nil-descriptor*)
 	    (write-wordindexed fdefn
 			       sb!vm:fdefn-raw-addr-slot
@@ -1383,18 +1383,18 @@
   (declare (type descriptor cold-name))
   (let ((fdefn (cold-fdefinition-object cold-name t))
 	(type (logand (descriptor-low (read-memory defn)) sb!vm:type-mask)))
-    (write-wordindexed fdefn sb!vm:fdefn-function-slot defn)
+    (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (write-wordindexed fdefn
 		       sb!vm:fdefn-raw-addr-slot
 		       (ecase type
-			 (#.sb!vm:function-header-type
+			 (#.sb!vm:simple-fun-header-type
 			  #!+sparc
 			  defn
 			  #!-sparc
 			  (make-random-descriptor
 			   (+ (logandc2 (descriptor-bits defn)
 					sb!vm:lowtag-mask)
-			      (ash sb!vm:function-code-offset
+			      (ash sb!vm:simple-fun-code-offset
 				   sb!vm:word-shift))))
 			 (#.sb!vm:closure-header-type
 			  (make-random-descriptor
@@ -2330,18 +2330,18 @@
 	 (offset (calc-offset code-object (read-arg 4)))
 	 (fn (descriptor-beyond code-object
 				offset
-				sb!vm:function-pointer-type))
+				sb!vm:fun-pointer-type))
 	 (next (read-wordindexed code-object sb!vm:code-entry-points-slot)))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       ;; FIXME: This should probably become a fatal error.
       (warn "unaligned function entry: ~S at #X~X" name offset))
     (write-wordindexed code-object sb!vm:code-entry-points-slot fn)
     (write-memory fn
-		  (make-other-immediate-descriptor (ash offset
-							(- sb!vm:word-shift))
-						   sb!vm:function-header-type))
+		  (make-other-immediate-descriptor
+		   (ash offset (- sb!vm:word-shift))
+		   sb!vm:simple-fun-header-type))
     (write-wordindexed fn
-		       sb!vm:function-self-slot
+		       sb!vm:simple-fun-self-slot
 		       ;; KLUDGE: Wiring decisions like this in at
 		       ;; this level ("if it's an x86") instead of a
 		       ;; higher level of abstraction ("if it has such
@@ -2372,15 +2372,16 @@
 		       ;; -- WHN 19990907
 		       (make-random-descriptor
 			(+ (descriptor-bits fn)
-			   (- (ash sb!vm:function-code-offset sb!vm:word-shift)
+			   (- (ash sb!vm:simple-fun-code-offset
+				   sb!vm:word-shift)
 			      ;; FIXME: We should mask out the type
 			      ;; bits, not assume we know what they
 			      ;; are and subtract them out this way.
-			      sb!vm:function-pointer-type))))
-    (write-wordindexed fn sb!vm:function-next-slot next)
-    (write-wordindexed fn sb!vm:function-name-slot name)
-    (write-wordindexed fn sb!vm:function-arglist-slot arglist)
-    (write-wordindexed fn sb!vm:function-type-slot type)
+			      sb!vm:fun-pointer-type))))
+    (write-wordindexed fn sb!vm:simple-fun-next-slot next)
+    (write-wordindexed fn sb!vm:simple-fun-name-slot name)
+    (write-wordindexed fn sb!vm:simple-fun-arglist-slot arglist)
+    (write-wordindexed fn sb!vm:simple-fun-type-slot type)
     fn))
 
 (define-cold-fop (fop-foreign-fixup)
@@ -2680,7 +2681,7 @@
 	  (undefs nil))
       (maphash #'(lambda (name fdefn)
 		   (let ((fun (read-wordindexed fdefn
-						sb!vm:fdefn-function-slot)))
+						sb!vm:fdefn-fun-slot)))
 		     (if (= (descriptor-bits fun)
 			    (descriptor-bits *nil-descriptor*))
 			 (push name undefs)
@@ -2850,7 +2851,7 @@ initially undefined function references:~2%")
       (let* ((cold-name (cold-intern '!cold-init))
 	     (cold-fdefn (cold-fdefinition-object cold-name))
 	     (initial-function (read-wordindexed cold-fdefn
-						 sb!vm:fdefn-function-slot)))
+						 sb!vm:fdefn-fun-slot)))
 	(format t
 		"~&/(DESCRIPTOR-BITS INITIAL-FUNCTION)=#X~X~%"
 		(descriptor-bits initial-function))

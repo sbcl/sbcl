@@ -133,14 +133,16 @@
 				:lowtag other-pointer-type
 				:header fdefn-type)
   (name :ref-trans fdefn-name)
-  (function :type (or function null) :ref-trans fdefn-function)
+  (fun :type (or function null) :ref-trans fdefn-fun)
   (raw-addr :c-type #!-alpha "char *" #!+alpha "u32"))
 
-(define-primitive-object (function :type function
-				   :lowtag function-pointer-type
-				   :header function-header-type)
-  #!-x86 (self :ref-trans %function-self
-	       :set-trans (setf %function-self))
+;;; a simple function (as opposed to hairier things like closures
+;;; which are also subtypes of Common Lisp's FUNCTION type)
+(define-primitive-object (simple-fun :type function
+				     :lowtag fun-pointer-type
+				     :header simple-fun-header-type)
+  #!-x86 (self :ref-trans %simple-fun-self
+	       :set-trans (setf %simple-fun-self))
   #!+x86 (self
 	  ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
 	  ;; :REF-TRANS here in this case. Instead, there's separate
@@ -159,47 +161,47 @@
 	  )
   (next :type (or function null)
 	:ref-known (flushable)
-	:ref-trans %function-next
+	:ref-trans %simple-fun-next
 	:set-known (unsafe)
-	:set-trans (setf %function-next))
+	:set-trans (setf %simple-fun-next))
   (name :ref-known (flushable)
-	:ref-trans %function-name
+	:ref-trans %simple-fun-name
 	:set-known (unsafe)
-	:set-trans (setf %function-name))
+	:set-trans (setf %simple-fun-name))
   (arglist :ref-known (flushable)
-	   :ref-trans %function-arglist
+	   :ref-trans %simple-fun-arglist
 	   :set-known (unsafe)
-	   :set-trans (setf %function-arglist))
+	   :set-trans (setf %simple-fun-arglist))
   (type :ref-known (flushable)
-	:ref-trans %fun-type
+	:ref-trans %simple-fun-type
 	:set-known (unsafe)
-	:set-trans (setf %fun-type))
+	:set-trans (setf %simple-fun-type))
   (code :rest-p t :c-type "unsigned char"))
 
 (define-primitive-object (return-pc :lowtag other-pointer-type :header t)
   (return-point :c-type "unsigned char" :rest-p t))
 
-(define-primitive-object (closure :lowtag function-pointer-type
+(define-primitive-object (closure :lowtag fun-pointer-type
 				  :header closure-header-type)
-  (function :init :arg :ref-trans %closure-function)
+  (fun :init :arg :ref-trans %closure-fun)
   (info :rest-p t))
 
 (define-primitive-object (funcallable-instance
-			  :lowtag function-pointer-type
+			  :lowtag fun-pointer-type
 			  :header funcallable-instance-header-type
 			  :alloc-trans %make-funcallable-instance)
   #!-x86
-  (function
-   :ref-known (flushable) :ref-trans %funcallable-instance-function
-   :set-known (unsafe) :set-trans (setf %funcallable-instance-function))
+  (fun
+   :ref-known (flushable) :ref-trans %funcallable-instance-fun
+   :set-known (unsafe) :set-trans (setf %funcallable-instance-fun))
   #!+x86
-  (function
-   :ref-known (flushable) :ref-trans %funcallable-instance-function
+  (fun
+   :ref-known (flushable) :ref-trans %funcallable-instance-fun
    ;; KLUDGE: There's no :SET-KNOWN or :SET-TRANS in this case.
    ;; Instead, later in compiler/x86/system.lisp there's a separate
-   ;; DEFKNOWN for (SETF %FUNCALLABLE-INSTANCE-FUNCTION), and a weird
-   ;; unexplained DEFTRANSFORM from (SETF %FUNCTION-INSTANCE-FUNCTION)
-   ;; into (SETF %FUNCTION-SELF). The #!+X86 wrapped around this case
+   ;; DEFKNOWN for (SETF %FUNCALLABLE-INSTANCE-FUN), and a weird
+   ;; unexplained DEFTRANSFORM from (SETF %SIMPLE-FUN-INSTANCE-FUN)
+   ;; into (SETF %SIMPLE-FUN-SELF). The #!+X86 wrapped around this case
    ;; is a literal translation of the old CMU CL implementation into
    ;; the new world of sbcl-0.6.12.63, where multiple DEFKNOWNs for
    ;; the same operator cause an error (instead of silently deleting

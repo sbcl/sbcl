@@ -928,7 +928,7 @@
 
      (function
       :codes (#.sb!vm:closure-header-type
-	      #.sb!vm:function-header-type)
+	      #.sb!vm:simple-fun-header-type)
       :state :read-only)
      (funcallable-instance
       :inherits (function)

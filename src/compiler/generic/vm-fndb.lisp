@@ -151,10 +151,10 @@
 (defknown stack-ref (system-area-pointer index) t (flushable))
 (defknown %set-stack-ref (system-area-pointer index t) t (unsafe))
 (defknown lra-code-header (t) t (movable flushable))
-(defknown function-code-header (t) t (movable flushable))
+(defknown fun-code-header (t) t (movable flushable))
 (defknown make-lisp-obj ((unsigned-byte 32)) t (movable flushable))
 (defknown get-lisp-obj-address (t) (unsigned-byte 32) (movable flushable))
-(defknown function-word-offset (function) index (movable flushable))
+(defknown fun-word-offset (function) index (movable flushable))
 
 ;;;; 32-bit logical operations
 
@@ -282,16 +282,16 @@
 (defknown make-fdefn (t) fdefn (flushable movable))
 (defknown fdefn-p (t) boolean (movable foldable flushable))
 (defknown fdefn-name (fdefn) t (foldable flushable))
-(defknown fdefn-function (fdefn) (or function null) (flushable))
-(defknown (setf fdefn-function) (function fdefn) t (unsafe))
+(defknown fdefn-fun (fdefn) (or function null) (flushable))
+(defknown (setf fdefn-fun) (function fdefn) t (unsafe))
 (defknown fdefn-makunbound (fdefn) t ())
 
-(defknown %function-self (function) function
+(defknown %simple-fun-self (function) function
   (flushable))
-(defknown (setf %function-self) (function function) function
+(defknown (setf %simple-fun-self) (function function) function
   (unsafe))
 
-(defknown %closure-function (function) function
+(defknown %closure-fun (function) function
   (flushable))
 
 (defknown %closure-index-ref (function index) t

@@ -168,8 +168,8 @@
     (trace-table-entry trace-table-function-prologue)
     (emit-label start-lab)
     ;; Skip space for the function header.
-    (inst function-header-word)
-    (dotimes (i (1- sb!vm:function-code-offset))
+    (inst simple-fun-header-word)
+    (dotimes (i (1- sb!vm:simple-fun-code-offset))
       (inst dword 0))
 
     ;; The start of the actual code.
@@ -912,8 +912,8 @@
 			      :disp ,(if named
 					 '(- (* fdefn-raw-addr-slot word-bytes)
 					     other-pointer-type)
-				       '(- (* closure-function-slot word-bytes)
-					   function-pointer-type))))
+				       '(- (* closure-fun-slot word-bytes)
+					   fun-pointer-type))))
 	       ,@(ecase return
 		   (:fixed
 		    '((default-unknown-values vop values nvals)))

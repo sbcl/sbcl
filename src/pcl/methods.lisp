@@ -1321,7 +1321,7 @@
 ;;; argument <gf1>, and returns a result <df1>, that result must not be
 ;;; passed to apply or funcall directly. Rather, <df1> must be stored as
 ;;; the funcallable instance function of the same generic function <gf1>
-;;; (using set-funcallable-instance-function). Then the generic function
+;;; (using set-funcallable-instance-fun). Then the generic function
 ;;; can be passed to funcall or apply.
 ;;;
 ;;; An important exception is that methods on this generic function are
@@ -1363,7 +1363,7 @@
 ;;;     #'(lambda (arg)
 ;;;	 (cond (<some condition>
 ;;;		<store some info in the generic function>
-;;;		(set-funcallable-instance-function
+;;;		(set-funcallable-instance-fun
 ;;;		  gf
 ;;;		  (compute-discriminating-function gf))
 ;;;		(funcall gf arg))
@@ -1375,7 +1375,7 @@
 ;;;   (defmethod compute-discriminating-function ((gf my-generic-function))
 ;;;     #'(lambda (arg)
 ;;;	 (cond (<some condition>
-;;;		(set-funcallable-instance-function
+;;;		(set-funcallable-instance-fun
 ;;;		  gf
 ;;;		  #'(lambda (a) ..))
 ;;;		(funcall gf arg))

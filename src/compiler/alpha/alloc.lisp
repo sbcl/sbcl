@@ -107,7 +107,7 @@
   (:generator 37
     (with-fixed-allocation (result temp fdefn-type fdefn-size)
       (storew name result fdefn-name-slot other-pointer-type)
-      (storew null-tn result fdefn-function-slot other-pointer-type)
+      (storew null-tn result fdefn-fun-slot other-pointer-type)
       (inst li (make-fixup "undefined_tramp" :foreign) temp)
       (storew temp result fdefn-raw-addr-slot other-pointer-type))))
 
@@ -120,9 +120,9 @@
     (let ((size (+ length closure-info-offset)))
       (inst li (logior (ash (1- size) type-bits) closure-header-type) temp)
       (pseudo-atomic (:extra (pad-data-block size))
-	(inst bis alloc-tn function-pointer-type result)
-	(storew temp result 0 function-pointer-type))
-      (storew function result closure-function-slot function-pointer-type))))
+	(inst bis alloc-tn fun-pointer-type result)
+	(storew temp result 0 fun-pointer-type))
+      (storew function result closure-fun-slot fun-pointer-type))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;; 

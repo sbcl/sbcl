@@ -246,14 +246,16 @@ search_cmd(char **ptr)
         obj = *end;
         addr = end;
         end += 2;
-        if (TypeOf(obj) == type_FunctionHeader)
-            print((long)addr | type_FunctionPointer);
-        else if (LowtagOf(obj) == type_OtherImmediate0 || LowtagOf(obj) == type_OtherImmediate1)
+        if (TypeOf(obj) == type_SimpleFunHeader) {
+            print((long)addr | type_FunPointer);
+        } else if (LowtagOf(obj) == type_OtherImmediate0 ||
+		   LowtagOf(obj) == type_OtherImmediate1) {
             print((lispobj)addr | type_OtherPointer);
-        else
+        } else {
             print((lispobj)addr);
-        if (count == -1)
+        } if (count == -1) {
             return;
+	}
     }
 }
 
@@ -279,7 +281,7 @@ call_cmd(char **ptr)
 
 	  case type_Fdefn:
 	  fdefn:
-	    function = FDEFN(thing)->function;
+	    function = FDEFN(thing)->fun;
 	    if (function == NIL) {
 		printf("Fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
 		return;
@@ -292,7 +294,7 @@ call_cmd(char **ptr)
 	    return;
 	}
     }
-    else if (LowtagOf(thing) != type_FunctionPointer) {
+    else if (LowtagOf(thing) != type_FunPointer) {
         printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
 	       (long unsigned)thing);
         return;

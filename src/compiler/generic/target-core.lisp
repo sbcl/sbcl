@@ -24,12 +24,12 @@
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       (error "Unaligned function object, offset = #X~X." offset))
     (let ((res (%primitive compute-function code-obj offset)))
-      (setf (%function-self res) res)
-      (setf (%function-next res) (%code-entry-points code-obj))
+      (setf (%simple-fun-self res) res)
+      (setf (%simple-fun-next res) (%code-entry-points code-obj))
       (setf (%code-entry-points code-obj) res)
-      (setf (%function-name res) (entry-info-name entry))
-      (setf (%function-arglist res) (entry-info-arguments entry))
-      (setf (%fun-type res) (entry-info-type entry))
+      (setf (%simple-fun-name res) (entry-info-name entry))
+      (setf (%simple-fun-arglist res) (entry-info-arguments entry))
+      (setf (%simple-fun-type res) (entry-info-type entry))
 
       (note-function entry res object))))
 

@@ -128,7 +128,7 @@
 
 ;;; Pull the type specifier out of a function object.
 (defun extract-fun-type (fun)
-  (specifier-type (%fun-type (%closure-function fun))))
+  (specifier-type (%simple-fun-type (%closure-fun fun))))
 
 ;;;; miscellaneous interfaces
 

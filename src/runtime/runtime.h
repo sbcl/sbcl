@@ -109,7 +109,7 @@ typedef int boolean;
 /* This only works for static symbols. */
 /* FIXME: should be called StaticSymbolFunction, right? */
 #define SymbolFunction(sym) \
-    (((struct fdefn *)(SymbolValue(sym)-type_OtherPointer))->function)
+    (((struct fdefn *)(SymbolValue(sym)-type_OtherPointer))->fun)
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it

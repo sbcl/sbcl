@@ -208,7 +208,7 @@ Ldone:
 	mov	%ebx,%ebp	# Switch to new frame.
 
 	/* Indirect the closure. */
-	call	*CLOSURE_FUNCTION_OFFSET(%eax)
+	call	*CLOSURE_FUN_OFFSET(%eax)
 	
 	/* Multi-value return; blow off any extra values. */
 	mov	%ebx, %esp
@@ -279,14 +279,14 @@ GNAME(undefined_tramp):
 	.global GNAME(closure_tramp)
 	.type	GNAME(closure_tramp),@function
 GNAME(closure_tramp):
-	movl	FDEFN_FUNCTION_OFFSET(%eax),%eax
+	movl	FDEFN_FUN_OFFSET(%eax),%eax
 	/* FIXME: The '*' after "jmp" in the next line is from PVE's
 	 * patch posted to the CMU CL mailing list Oct 6, 1999. It looks
 	 * reasonable, and it certainly seems as though if CMU CL needs it,
 	 * SBCL needs it too, but I haven't actually verified that it's
 	 * right. It would be good to find a way to force the flow of
 	 * control through here to test it. */
-	jmp	*CLOSURE_FUNCTION_OFFSET(%eax)
+	jmp	*CLOSURE_FUN_OFFSET(%eax)
 	.size	GNAME(closure_tramp), .-GNAME(closure_tramp)
 
 /*

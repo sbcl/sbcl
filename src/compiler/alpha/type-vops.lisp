@@ -18,10 +18,10 @@
 (defparameter *immediate-types*
   (list unbound-marker-type base-char-type))
 
-(defparameter *function-header-types*
+(defparameter *fun-header-types*
   (list funcallable-instance-header-type
-	function-header-type
-	closure-function-header-type
+	simple-fun-header-type
+	closure-fun-header-type
 	closure-header-type))
 
 (defun canonicalize-headers (headers)
@@ -58,8 +58,8 @@
 	 (extended (remove lowtag-limit type-codes :test #'>))
 	 (immediates (intersection extended *immediate-types* :test #'eql))
 	 (headers (set-difference extended *immediate-types* :test #'eql))
-	 (function-p (if (intersection headers *function-header-types*)
-			 (if (subsetp headers *function-header-types*)
+	 (function-p (if (intersection headers *fun-header-types*)
+			 (if (subsetp headers *fun-header-types*)
 			     t
 			     (error "Can't test for mix of function subtypes ~
 				     and normal header types."))
@@ -141,7 +141,7 @@
 
 (defun %test-headers (value temp target not-p function-p headers
 			    &optional (drop-through (gen-label)))
-  (let ((lowtag (if function-p function-pointer-type other-pointer-type)))
+  (let ((lowtag (if function-p fun-pointer-type other-pointer-type)))
     (multiple-value-bind
 	(when-true when-false)
 	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when
@@ -234,7 +234,7 @@
   even-fixnum-type odd-fixnum-type)
 
 (def-type-vops functionp check-function function
-  object-not-function-error function-pointer-type)
+  object-not-function-error fun-pointer-type)
 
 (def-type-vops listp check-list list object-not-list-error
   list-pointer-type)
@@ -387,10 +387,6 @@
 (def-type-vops array-header-p nil nil nil
   simple-array-type complex-string-type complex-bit-vector-type
   complex-vector-type complex-array-type)
-
-(def-type-vops nil check-function-or-symbol nil
-  object-not-function-or-symbol-error
-  function-pointer-type symbol-header-type)
 
 (def-type-vops stringp check-string nil object-not-string-error
   simple-string-type complex-string-type)

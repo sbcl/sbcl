@@ -36,14 +36,14 @@
     (inst and al-tn lowtag-mask)
     (inst cmp al-tn other-pointer-type)
     (inst jmp :e other-ptr)
-    (inst cmp al-tn function-pointer-type)
+    (inst cmp al-tn fun-pointer-type)
     (inst jmp :e function-ptr)
 
-    ;; pick off structures and list pointers
+    ;; Pick off structures and list pointers.
     (inst test al-tn 1)
     (inst jmp :ne done)
 
-    ;; pick off fixnums
+    ;; Pick off fixnums.
     (inst and al-tn 3)
     (inst jmp :e done)
 
@@ -52,7 +52,7 @@
     (inst jmp done)
 
     FUNCTION-PTR
-    (load-type al-tn object (- sb!vm:function-pointer-type))
+    (load-type al-tn object (- sb!vm:fun-pointer-type))
     (inst jmp done)
 
     OTHER-PTR
@@ -69,7 +69,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type temp function (- sb!vm:function-pointer-type))
+    (load-type temp function (- sb!vm:fun-pointer-type))
     (inst movzx result temp)))
 
 (define-vop (set-function-subtype)
@@ -86,7 +86,7 @@
   (:generator 6
     (move eax type)
     (inst mov
-	  (make-ea :byte :base function :disp (- function-pointer-type))
+	  (make-ea :byte :base function :disp (- fun-pointer-type))
 	  al-tn)
     (move result eax)))
 
@@ -107,7 +107,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 function-pointer-type)
+    (loadw res x 0 fun-pointer-type)
     (inst shr res type-bits)))
 
 (define-vop (set-header-data)
@@ -211,33 +211,33 @@
     (inst shr func type-bits)
     (inst lea func
 	  (make-ea :byte :base offset :index func :scale 4
-		   :disp (- function-pointer-type other-pointer-type)))
+		   :disp (- fun-pointer-type other-pointer-type)))
     (inst add func code)))
 
-(define-vop (%function-self)
+(define-vop (%simple-fun-self)
   (:policy :fast-safe)
-  (:translate %function-self)
+  (:translate %simple-fun-self)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
   (:generator 3
-    (loadw result function function-self-slot function-pointer-type)
+    (loadw result function simple-fun-self-slot fun-pointer-type)
     (inst lea result
 	  (make-ea :byte :base result
-		   :disp (- function-pointer-type
-			    (* function-code-offset word-bytes))))))
+		   :disp (- fun-pointer-type
+			    (* simple-fun-code-offset word-bytes))))))
 
 ;;; The closure function slot is a pointer to raw code on X86 instead
 ;;; of a pointer to the code function object itself. This VOP is used
 ;;; to reference the function object given the closure object.
-(def-source-transform %closure-function (closure)
-  `(%function-self ,closure))
+(def-source-transform %closure-fun (closure)
+  `(%simple-fun-self ,closure))
 
-(def-source-transform %funcallable-instance-function (fin)
-  `(%function-self ,fin))
+(def-source-transform %funcallable-instance-fun (fin)
+  `(%simple-fun-self ,fin))
 
-(define-vop (%set-function-self)
+(define-vop (%set-fun-self)
   (:policy :fast-safe)
-  (:translate (setf %function-self))
+  (:translate (setf %simple-fun-self))
   (:args (new-self :scs (descriptor-reg) :target result :to :result)
 	 (function :scs (descriptor-reg) :to :result))
   (:temporary (:sc any-reg :from (:argument 0) :to :result) temp)
@@ -245,9 +245,9 @@
   (:generator 3
     (inst lea temp
 	  (make-ea :byte :base new-self
-		   :disp (- (ash function-code-offset word-shift)
-			    function-pointer-type)))
-    (storew temp function function-self-slot function-pointer-type)
+		   :disp (- (ash simple-fun-code-offset word-shift)
+			    fun-pointer-type)))
+    (storew temp function simple-fun-self-slot fun-pointer-type)
     (move result new-self)))
 
 ;;; KLUDGE: This seems to be some kind of weird override of the way
@@ -255,14 +255,14 @@
 ;;; accessor. It's inherited from CMU CL, and it works, and naively
 ;;; deleting it seemed to cause problems, but it's not obvious why
 ;;; it's done this way. Any ideas? -- WHN 2001-08-02
-(defknown ((setf %funcallable-instance-function)) (function function) function
+(defknown ((setf %funcallable-instance-fun)) (function function) function
   (unsafe))
 ;;; CMU CL comment:
 ;;;   We would have really liked to use a source-transform for this, but
 ;;;   they don't work with SETF functions.
 ;;; FIXME: Can't we just use DEFSETF or something?
-(deftransform (setf %funcallable-instance-function) ((value fin))
-  '(setf (%function-self fin) value))
+(deftransform (setf %funcallable-instance-fun) ((value fin))
+  '(setf (%simple-fun-self fin) value))
 
 ;;;; other miscellaneous VOPs
 

@@ -324,8 +324,11 @@
 (defstruct (bogus-debug-fun
 	    (:include debug-fun)
 	    (:constructor make-bogus-debug-fun
-			  (%name &aux (%lambda-list nil) (%debug-vars nil)
-				 (blocks nil) (%function nil)))
+			  (%name &aux
+				 (%lambda-list nil)
+				 (%debug-vars nil)
+				 (blocks nil)
+				 (%function nil)))
 	    (:copier nil))
   %name)
 
@@ -515,11 +518,11 @@
 (defun current-fp () (current-fp))
 (defun stack-ref (s n) (stack-ref s n))
 (defun %set-stack-ref (s n value) (%set-stack-ref s n value))
-(defun function-code-header (fun) (function-code-header fun))
+(defun fun-code-header (fun) (fun-code-header fun))
 (defun lra-code-header (lra) (lra-code-header lra))
 (defun make-lisp-obj (value) (make-lisp-obj value))
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
-(defun function-word-offset (fun) (function-word-offset fun))
+(defun fun-word-offset (fun) (fun-word-offset fun))
 
 #!-sb-fluid (declaim (inline cstack-pointer-valid-p))
 (defun cstack-pointer-valid-p (x)
@@ -970,7 +973,7 @@
   (declare (type (unsigned-byte 32) bits))
   (let ((object (make-lisp-obj bits)))
     (if (functionp object)
-	(or (function-code-header object)
+	(or (fun-code-header object)
 	    :undefined-function)
 	(let ((lowtag (get-lowtag object)))
 	  (if (= lowtag sb!vm:other-pointer-type)
@@ -1147,7 +1150,7 @@
 			(sb!c::compiled-debug-fun-start-pc
 			 (compiled-debug-fun-compiler-debug-fun debug-fun))))
 		   (do ((entry (%code-entry-points component)
-			       (%function-next entry)))
+			       (%simple-fun-next entry)))
 		       ((null entry) nil)
 		     (when (= start-pc
 			      (sb!c::compiled-debug-fun-start-pc
@@ -1172,12 +1175,13 @@
   (declare (type function fun))
   (ecase (get-type fun)
     (#.sb!vm:closure-header-type
-     (fun-debug-fun (%closure-function fun)))
+     (fun-debug-fun (%closure-fun fun)))
     (#.sb!vm:funcallable-instance-header-type
-     (fun-debug-fun (funcallable-instance-function fun)))
-    ((#.sb!vm:function-header-type #.sb!vm:closure-function-header-type)
-      (let* ((name (%function-name fun))
-	     (component (function-code-header fun))
+     (fun-debug-fun (funcallable-instance-fun fun)))
+    ((#.sb!vm:simple-fun-header-type
+      #.sb!vm:closure-fun-header-type)
+      (let* ((name (%simple-fun-name fun))
+	     (component (fun-code-header fun))
 	     (res (find-if
 		   (lambda (x)
 		     (and (sb!c::compiled-debug-fun-p x)
@@ -1196,7 +1200,7 @@
 	    ;;   works for all named functions anyway.
 	    ;; -- WHN 20000120
 	    (debug-fun-from-pc component
-			       (* (- (function-word-offset fun)
+			       (* (- (fun-word-offset fun)
 				     (get-header-data component))
 				  sb!vm:word-bytes)))))))
 

@@ -62,20 +62,26 @@
   (setf (function-subtype function) type))
 
 ;;; Extract the arglist from the function header FUNC.
-(defun %function-arglist (func)
-  (%function-arglist func))
+(defun %simple-fun-arglist (func)
+  (%simple-fun-arglist func))
 
 ;;; Extract the name from the function header FUNC.
-(defun %function-name (func)
-  (%function-name func))
+(defun %simple-fun-name (func)
+  (%simple-fun-name func))
 
 ;;; Extract the type from the function header FUNC.
-(defun %fun-type (func)
-  (%fun-type func))
+(defun %simple-fun-type (func)
+  (%simple-fun-type func))
+
+(defun %simple-fun-next (simple-fun)
+  (%simple-fun-next simple-fun))
+
+(defun %simple-fun-self (simple-fun)
+  (%simple-fun-self simple-fun))
 
 ;;; Extract the function from CLOSURE.
-(defun %closure-function (closure)
-  (%closure-function closure))
+(defun %closure-fun (closure)
+  (%closure-fun closure))
 
 ;;; Return the length of VECTOR. There is no reason to use this in
 ;;; ordinary code, 'cause length (the vector foo)) is the same.

@@ -135,8 +135,8 @@
     (trace-table-entry trace-table-function-prologue)
     (emit-label start-lab)
     ;; Allocate function header.
-    (inst function-header-word)
-    (dotimes (i (1- function-code-offset))
+    (inst simple-fun-header-word)
+    (dotimes (i (1- simple-fun-code-offset))
       (inst lword 0))
     ;; The start of the actual code.
     ;; Compute CODE from the address of this entry point.
@@ -779,18 +779,18 @@ default-value-8
 		      (do-next-filler)))
 		   #!-gengc
 		   (inst ldl function
-			 (- (ash closure-function-slot word-shift)
-			    function-pointer-type) lexenv)
+			 (- (ash closure-fun-slot word-shift)
+			    fun-pointer-type) lexenv)
 		   #!-gengc
 		   (do-next-filler)
 		   #!-gengc
 		   (inst addq function
-			 (- (ash function-code-offset word-shift)
-			    function-pointer-type) entry-point)
+			 (- (ash simple-fun-code-offset word-shift)
+			    fun-pointer-type) entry-point)
 		   #!+gengc
 		   (inst ldl entry-point
 			 (- (ash closure-entry-point-slot word-shift)
-			    function-pointer-type) lexenv)
+			    fun-pointer-type) lexenv)
 		   #!+gengc
 		   (do-next-filler)))
 	   (loop

@@ -164,9 +164,9 @@
   might have been enclosed in some non-null lexical environment, and
   NAME is some name (for debugging only) or NIL if there is no name."
     (declare (type function fun))
-    (let* ((fun (%function-self fun))
-	   (name (%function-name fun))
-	   (code (sb!di::function-code-header fun))
+    (let* ((fun (%simple-fun-self fun))
+	   (name (%simple-fun-name fun))
+	   (code (sb!di::fun-code-header fun))
 	   (info (sb!kernel:%code-debug-info code)))
       (if info
         (let ((source (first (sb!c::compiled-debug-info-source info))))

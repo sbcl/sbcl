@@ -25,16 +25,16 @@
   (declare (type fdefn fdefn))
   (fdefn-name fdefn))
 
-(defun fdefn-function (fdefn)
+(defun fdefn-fun (fdefn)
   (declare (type fdefn fdefn)
 	   (values (or function null)))
-  (fdefn-function fdefn))
+  (fdefn-fun fdefn))
 
-(defun (setf fdefn-function) (fun fdefn)
+(defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)
 	   (type fdefn fdefn)
 	   (values function))
-  (setf (fdefn-function fdefn) fun))
+  (setf (fdefn-fun fdefn) fun))
 
 (defun fdefn-makunbound (fdefn)
   (declare (type fdefn fdefn))
@@ -105,8 +105,8 @@
 ;;;   5. Require that the function calling convention be stereotyped
 ;;;      along the lines of
 ;;;		mov %ebx, local_immediate_3	    ; Point to symbol.
-;;;		mov %eax, symbol_function_offset(%eax) ; Point to function.
-;;;		call *function_code_pointer(%eax)      ; Go.
+;;;		mov %eax, symbol_fun_offset(%eax)   ; Point to function.
+;;;		call *function_code_pointer(%eax)   ; Go.
 ;;;      That way, it's guaranteed that on entry to a function, %EBX points
 ;;;      back to the symbol which was used to indirect into the function,
 ;;;      so the undefined function handler can base its complaint on that.
@@ -140,7 +140,7 @@
   "Return the definition for name, including any encapsulations. Settable
    with SETF."
   (let ((fdefn (fdefinition-object name nil)))
-    (or (and fdefn (fdefn-function fdefn))
+    (or (and fdefn (fdefn-fun fdefn))
 	(error 'undefined-function :name name))))
 
 (defun %coerce-callable-to-function (callable)
@@ -156,7 +156,7 @@
   (%coerce-name-to-function name))
 (defun (setf raw-definition) (function name)
   (let ((fdefn (fdefinition-object name t)))
-    (setf (fdefn-function fdefn) function)))
+    (setf (fdefn-fun fdefn) function)))
 
 ;;; FIXME: There seems to be no good reason to have both
 ;;; %COERCE-NAME-TO-FUNCTION and RAW-DEFINITION names for the same
@@ -188,7 +188,7 @@
 ;;; encapsulations of the same name.
 (defun encapsulate (name type body)
   (let ((fdefn (fdefinition-object name nil)))
-    (unless (and fdefn (fdefn-function fdefn))
+    (unless (and fdefn (fdefn-fun fdefn))
       (error 'undefined-function :name name))
     ;; We must bind and close over INFO. Consider the case where we
     ;; encapsulate (the second) an encapsulated (the first)
@@ -199,8 +199,8 @@
     ;; clobber the appropriate INFO structure to allow
     ;; basic-definition to be bound to the next definition instead of
     ;; an encapsulation that no longer exists.
-    (let ((info (make-encapsulation-info type (fdefn-function fdefn))))
-      (setf (fdefn-function fdefn)
+    (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
+      (setf (fdefn-fun fdefn)
 	    (lambda (&rest argument-list)
 	      (declare (special argument-list))
 	      (let ((basic-definition (encapsulation-info-definition info)))
@@ -236,14 +236,14 @@
   #!+sb-doc
   "Removes NAME's most recent encapsulation of the specified TYPE."
   (let* ((fdefn (fdefinition-object name nil))
-	 (encap-info (encapsulation-info (fdefn-function fdefn))))
+	 (encap-info (encapsulation-info (fdefn-fun fdefn))))
     (declare (type (or encapsulation-info null) encap-info))
     (cond ((not encap-info)
 	   ;; It disappeared on us, so don't worry about it.
 	   )
 	  ((eq (encapsulation-info-type encap-info) type)
 	   ;; It's the first one, so change the fdefn object.
-	   (setf (fdefn-function fdefn)
+	   (setf (fdefn-fun fdefn)
 		 (encapsulation-info-definition encap-info)))
 	  (t
 	   ;; It must be an interior one, so find it.
@@ -264,7 +264,7 @@
 ;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
   (let ((fdefn (fdefinition-object name nil)))
-    (do ((encap-info (encapsulation-info (fdefn-function fdefn))
+    (do ((encap-info (encapsulation-info (fdefn-fun fdefn))
 		     (encapsulation-info
 		      (encapsulation-info-definition encap-info))))
 	((null encap-info) nil)
@@ -324,7 +324,7 @@
       (dolist (f *setf-fdefinition-hook*)
 	(funcall f name new-value)))
 
-    (let ((encap-info (encapsulation-info (fdefn-function fdefn))))
+    (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))
       (cond (encap-info
 	     (loop
 	       (let ((more-info
@@ -336,7 +336,7 @@
 		      (setf (encapsulation-info-definition encap-info)
 			    new-value))))))
 	    (t
-	     (setf (fdefn-function fdefn) new-value))))))
+	     (setf (fdefn-fun fdefn) new-value))))))
 
 ;;;; FBOUNDP and FMAKUNBOUND
 
@@ -344,7 +344,7 @@
   #!+sb-doc
   "Return true if name has a global function definition."
   (let ((fdefn (fdefinition-object name nil)))
-    (and fdefn (fdefn-function fdefn) t)))
+    (and fdefn (fdefn-fun fdefn) t)))
 
 (defun fmakunbound (name)
   #!+sb-doc

@@ -1963,10 +1963,10 @@
 
 ;;;; hacking function names
 
-;;; This is like LAMBDA, except the result is tweaked so that
-;;; %FUNCTION-NAME can extract a name. (Also possibly the name could
-;;; also be used at compile time to emit more-informative name-based
-;;; compiler diagnostic messages as well.)
+;;; This is like LAMBDA, except the result is tweaked so that FUN-NAME
+;;; can extract a name. (Also possibly the name could also be used at
+;;; compile time to emit more-informative name-based compiler
+;;; diagnostic messages as well.)
 (defmacro-mundanely named-lambda (name args &body body)
 
   ;; FIXME: For now, in this stub version, we just discard the name. A

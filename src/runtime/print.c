@@ -594,8 +594,8 @@ static void print_otherptr(lispobj obj)
                 print_slots(code_slots, count-1, ptr);
                 break;
 
-            case type_FunctionHeader:
-            case type_ClosureFunctionHeader:
+            case type_SimpleFunHeader:
+            case type_ClosureFunHeader:
                 print_slots(fn_slots, 5, ptr);
                 break;
 
@@ -665,7 +665,9 @@ static void print_obj(char *prefix, lispobj obj)
     if (var != NULL && var_clock(var) == cur_clock)
         dont_descend = 1;
 
-    if (var == NULL && (obj & type_FunctionPointer & type_ListPointer & type_InstancePointer & type_OtherPointer) != 0)
+    if (var == NULL &&
+	/* FIXME: What does this "x & y & z & .." expression mean? */
+	(obj & type_FunPointer & type_ListPointer & type_InstancePointer & type_OtherPointer) != 0)
         var = define_var(NULL, obj, 0);
 
     if (var != NULL)

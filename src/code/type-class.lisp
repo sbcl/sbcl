@@ -110,7 +110,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here
   ;; will have to be tweaked to match. -- WHN 19991021
-  (defparameter *type-class-function-slots*
+  (defparameter *type-class-fun-slots*
     '((:simple-subtypep . type-class-simple-subtypep)
       (:complex-subtypep-arg1 . type-class-complex-subtypep-arg1)
       (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
@@ -150,17 +150,17 @@
 (declaim (ftype (function (type-class) type-class) copy-type-class-coldly))
 (defun copy-type-class-coldly (x)
   ;; KLUDGE: If the slots of TYPE-CLASS ever change in a way not
-  ;; reflected in *TYPE-CLASS-FUNCTION-SLOTS*, the slots here will
+  ;; reflected in *TYPE-CLASS-FUN-SLOTS*, the slots here will
   ;; have to be hand-tweaked to match. -- WHN 2001-03-19
   (make-type-class :name                  (type-class-name x)
-		   . #.(mapcan (lambda (type-class-function-slot)
+		   . #.(mapcan (lambda (type-class-fun-slot)
 				 (destructuring-bind (keyword . slot-accessor)
-				     type-class-function-slot
+				     type-class-fun-slot
 				   `(,keyword (,slot-accessor x))))
-			       *type-class-function-slots*)))
+			       *type-class-fun-slots*)))
 
-(defun class-function-slot-or-lose (name)
-  (or (cdr (assoc name *type-class-function-slots*))
+(defun class-fun-slot-or-lose (name)
+  (or (cdr (assoc name *type-class-fun-slots*))
       (error "~S is not a defined type class method." name)))
 ;;; FIXME: This seems to be called at runtime by cold init code.
 ;;; Make sure that it's not being called at runtime anywhere but
@@ -176,7 +176,7 @@
 	 ,@body)
        (!cold-init-forms
 	,@(mapcar (lambda (method)
-		    `(setf (,(class-function-slot-or-lose method)
+		    `(setf (,(class-fun-slot-or-lose method)
 			    (type-class-or-lose ',class))
 			   #',name))
 		  (cons method more-methods)))
@@ -211,12 +211,12 @@
 				      (complex-arg1 :foo complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
   `(multiple-value-bind (result-a result-b valid-p)
-       (%invoke-type-method ',(class-function-slot-or-lose simple)
-			    ',(class-function-slot-or-lose
+       (%invoke-type-method ',(class-fun-slot-or-lose simple)
+			    ',(class-fun-slot-or-lose
 			       (if complex-arg1-p
 				 complex-arg1
 				 complex-arg2))
-			    ',(class-function-slot-or-lose complex-arg2)
+			    ',(class-fun-slot-or-lose complex-arg2)
 			    ,complex-arg1-p
 			    ,type1
 			    ,type2)

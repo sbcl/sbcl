@@ -26,8 +26,8 @@
   ;; defined in the first DEFENUM. -- AL 20000216
   (defenum (:suffix -type)
     even-fixnum
-    ;; Note: CMU CL, and SBCL < 0.pre7.39, had FUNCTION-POINTER-TYPE
-    ;; here. We swapped FUNCTION-POINTER-TYPE and
+    ;; Note: CMU CL, and SBCL < 0.pre7.39, had FUN-POINTER-TYPE
+    ;; here. We swapped FUN-POINTER-TYPE and
     ;; INSTANCE-POINTER-TYPE in sbcl-0.pre7.39 in order to help with a
     ;; low-level pun in the function call sequence on the PPC port.
     ;; For more information, see the PPC port code. -- WHN 2001-10-03
@@ -35,7 +35,7 @@
     other-immediate-0
     list-pointer
     odd-fixnum
-    function-pointer
+    fun-pointer
     other-immediate-1
     other-pointer))
 
@@ -79,10 +79,10 @@
   complex-array
 
   code-header
-  function-header
+  simple-fun-header
   closure-header
   funcallable-instance-header
-  closure-function-header
+  closure-fun-header
 
   return-pc-header
   value-cell-header

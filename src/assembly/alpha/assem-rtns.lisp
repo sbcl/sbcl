@@ -153,7 +153,7 @@
   DONE
   ;; We are done.  Do the jump.
   (progn
-    (loadw temp lexenv closure-function-slot function-pointer-type)
+    (loadw temp lexenv closure-fun-slot fun-pointer-type)
     (lisp-jump temp lip)))
 
 

@@ -19,12 +19,12 @@
   (let ((name
 	 (case (get-type x)
 	   (#.sb!vm:closure-header-type
-	    (%function-name (%closure-function x)))
-	   ((#.sb!vm:function-header-type #.sb!vm:closure-function-header-type)
-	    (%function-name x))
+	    (%simple-fun-name (%closure-fun x)))
+	   ((#.sb!vm:simple-fun-header-type #.sb!vm:closure-fun-header-type)
+	    (%simple-fun-name x))
 	   (#.sb!vm:funcallable-instance-header-type
-	    (%function-name
-	     (funcallable-instance-function x))))))
+	    (%simple-fun-name
+	     (funcallable-instance-fun x))))))
     (when (and name (typep name '(or symbol cons)))
       (values (info :function :documentation name)))))
 

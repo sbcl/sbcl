@@ -75,10 +75,13 @@ static int later_count = 0;
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
+/* FIXME: (1) Shouldn't this be defined in sbcl.h? (2) Shouldn't it
+ * be in the same units as FDEFN_RAW_ADDR_OFFSET? (This is measured
+ * in words, that's measured in bytes. Gotta love CMU CL..) */
 #ifdef sparc
-#define RAW_ADDR_OFFSET 0
+#define FUN_RAW_ADDR_OFFSET 0
 #else
-#define RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunctionPointer)
+#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunPointer)
 #endif
 
 static boolean
@@ -147,7 +150,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
     /* Check that the object pointed to is consistent with the pointer
      * low tag. */
     switch (LowtagOf((lispobj)pointer)) {
-    case type_FunctionPointer:
+    case type_FunPointer:
 	/* Start_addr should be the enclosing code object, or a closure
 	 * header. */
 	switch (TypeOf(*start_addr)) {
@@ -156,7 +159,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    break;
 	case type_ClosureHeader:
 	case type_FuncallableInstanceHeader:
-	    if ((int)pointer != ((int)start_addr+type_FunctionPointer)) {
+	    if ((int)pointer != ((int)start_addr+type_FunPointer)) {
 		if (pointer_filter_verbose) {
 		    fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
 			    (unsigned int) start_addr, *start_addr);
@@ -544,10 +547,10 @@ ptrans_fdefn(lispobj thing, lispobj header)
 
     /* Scavenge the function. */
     fdefn = (struct fdefn *)new;
-    oldfn = fdefn->function;
-    pscav(&fdefn->function, 1, 0);
-    if ((char *)oldfn + RAW_ADDR_OFFSET == fdefn->raw_addr)
-        fdefn->raw_addr = (char *)fdefn->function + RAW_ADDR_OFFSET;
+    oldfn = fdefn->fun;
+    pscav(&fdefn->fun, 1, 0);
+    if ((char *)oldfn + FUN_RAW_ADDR_OFFSET == fdefn->raw_addr)
+        fdefn->raw_addr = (char *)fdefn->fun + FUN_RAW_ADDR_OFFSET;
 
     return result;
 }
@@ -714,9 +717,9 @@ ptrans_code(lispobj thing)
     /* Put in forwarding pointers for all the functions. */
     for (func = code->entry_points;
          func != NIL;
-         func = ((struct function *)native_pointer(func))->next) {
+         func = ((struct simple_fun *)native_pointer(func))->next) {
 
-        gc_assert(LowtagOf(func) == type_FunctionPointer);
+        gc_assert(LowtagOf(func) == type_FunPointer);
 
         *(lispobj *)native_pointer(func) = result + (func - thing);
     }
@@ -738,20 +741,21 @@ ptrans_code(lispobj thing)
     pscav(&new->entry_points, 1, 1);
     for (func = new->entry_points;
          func != NIL;
-         func = ((struct function *)native_pointer(func))->next) {
-        gc_assert(LowtagOf(func) == type_FunctionPointer);
+         func = ((struct simple_fun *)native_pointer(func))->next) {
+        gc_assert(LowtagOf(func) == type_FunPointer);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
-	/* Temporarly convert the self pointer to a real function
-           pointer. */
-	((struct function *)native_pointer(func))->self -= RAW_ADDR_OFFSET;
+	/* Temporarly convert the self pointer to a real function pointer. */
+	((struct simple_fun *)native_pointer(func))->self
+	    -= FUN_RAW_ADDR_OFFSET;
 #endif
-        pscav(&((struct function *)native_pointer(func))->self, 2, 1);
+        pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
 #ifdef __i386__
-	((struct function *)native_pointer(func))->self += RAW_ADDR_OFFSET;
+	((struct simple_fun *)native_pointer(func))->self
+	    += FUN_RAW_ADDR_OFFSET;
 #endif
-        pscav_later(&((struct function *)native_pointer(func))->name, 3);
+        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 3);
     }
 
     return result;
@@ -762,7 +766,7 @@ ptrans_func(lispobj thing, lispobj header)
 {
     int nwords;
     lispobj code, *new, *old, result;
-    struct function *function;
+    struct simple_fun *function;
 
     /* Thing can either be a function header, a closure function
      * header, a closure, or a funcallable-instance. If it's a closure
@@ -770,14 +774,14 @@ ptrans_func(lispobj thing, lispobj header)
      * Otherwise we have to do something strange, 'cause it is buried
      * inside a code object. */
 
-    if (TypeOf(header) == type_FunctionHeader ||
-        TypeOf(header) == type_ClosureFunctionHeader) {
+    if (TypeOf(header) == type_SimpleFunHeader ||
+        TypeOf(header) == type_ClosureFunHeader) {
 
 	/* We can only end up here if the code object has not been
          * scavenged, because if it had been scavenged, forwarding pointers
          * would have been left behind for all the entry points. */
 
-        function = (struct function *)native_pointer(thing);
+        function = (struct simple_fun *)native_pointer(thing);
         code =
 	    (native_pointer(thing) -
 	     (HeaderValue(function->header)*sizeof(lispobj))) |
@@ -1014,11 +1018,11 @@ pscav_fdefn(struct fdefn *fdefn)
 {
     boolean fix_func;
 
-    fix_func = ((char *)(fdefn->function+RAW_ADDR_OFFSET) == fdefn->raw_addr);
+    fix_func = ((char *)(fdefn->fun+FUN_RAW_ADDR_OFFSET) == fdefn->raw_addr);
     pscav(&fdefn->name, 1, 1);
-    pscav(&fdefn->function, 1, 0);
+    pscav(&fdefn->fun, 1, 0);
     if (fix_func)
-        fdefn->raw_addr = (char *)(fdefn->function + RAW_ADDR_OFFSET);
+        fdefn->raw_addr = (char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET);
     return sizeof(struct fdefn) / sizeof(lispobj);
 }
 
@@ -1041,20 +1045,22 @@ pscav_code(struct code*code)
     pscav(&code->entry_points, 1, 1);
     for (func = code->entry_points;
          func != NIL;
-         func = ((struct function *)native_pointer(func))->next) {
-        gc_assert(LowtagOf(func) == type_FunctionPointer);
+         func = ((struct simple_fun *)native_pointer(func))->next) {
+        gc_assert(LowtagOf(func) == type_FunPointer);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
 	/* Temporarly convert the self pointer to a real function
 	 * pointer. */
-	((struct function *)native_pointer(func))->self -= RAW_ADDR_OFFSET;
+	((struct simple_fun *)native_pointer(func))->self
+	    -= FUN_RAW_ADDR_OFFSET;
 #endif
-        pscav(&((struct function *)native_pointer(func))->self, 2, 1);
+        pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
 #ifdef __i386__
-	((struct function *)native_pointer(func))->self += RAW_ADDR_OFFSET;
+	((struct simple_fun *)native_pointer(func))->self
+	    += FUN_RAW_ADDR_OFFSET;
 #endif
-        pscav_later(&((struct function *)native_pointer(func))->name, 3);
+        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 3);
     }
 
     return CEILING(nwords,2);
@@ -1082,7 +1088,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 else {
                     /* Nope, copy the object. */
                     switch (LowtagOf(thing)) {
-                      case type_FunctionPointer:
+                      case type_FunPointer:
                         thing = ptrans_func(thing, header);
                         break;
 
@@ -1228,8 +1234,8 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #endif
                 break;
 
-              case type_FunctionHeader:
-              case type_ClosureFunctionHeader:
+              case type_SimpleFunHeader:
+              case type_ClosureFunHeader:
               case type_ReturnPcHeader:
                 /* We should never hit any of these, 'cause they occur
                  * buried in the middle of code objects. */
@@ -1242,10 +1248,10 @@ pscav(lispobj *addr, int nwords, boolean constant)
 		/* The function self pointer needs special care on the
 		 * x86 because it is the real entry point. */
 		{
-		  lispobj fun = ((struct closure *)addr)->function
-		    - RAW_ADDR_OFFSET;
+		  lispobj fun = ((struct closure *)addr)->fun
+		    - FUN_RAW_ADDR_OFFSET;
 		  pscav(&fun, 1, constant);
-		  ((struct closure *)addr)->function = fun + RAW_ADDR_OFFSET;
+		  ((struct closure *)addr)->fun = fun + FUN_RAW_ADDR_OFFSET;
 		}
 		count = 2;
 		break;

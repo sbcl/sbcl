@@ -1926,9 +1926,9 @@
 					      (- type-bits
 						 word-shift)))))))
 
-(define-instruction function-header-word (segment)
+(define-instruction simple-fun-header-word (segment)
   (:emitter
-   (emit-header-data segment function-header-type)))
+   (emit-header-data segment simple-fun-header-type)))
 
 (define-instruction lra-header-word (segment)
   (:emitter

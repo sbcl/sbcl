@@ -202,11 +202,11 @@
 	:reader constructor-code-generators))	;could use.
   (:metaclass funcallable-standard-class))
 
-;;; Because the value in the code-type slot should always correspond to the
-;;; funcallable-instance-function of the constructor, this function should
-;;; always be used to set the both at the same time.
+;;; Because the value in the code-type slot should always correspond
+;;; to the FUNCALLABLE-INSTANCE-FUN of the constructor, this function
+;;; should always be used to set them both at the same time.
 (defun set-constructor-code (constructor code type)
-  (set-funcallable-instance-function constructor code)
+  (set-funcallable-instance-fun constructor code)
   (set-function-name constructor (constructor-name constructor))
   (setf (constructor-code-type constructor) type))
 
@@ -221,8 +221,9 @@
 	    (doplist (key val) (constructor-code-generators constructor)
 	      (gather1 key)))))
 
-;;; I am not in a hairy enough mood to make this implementation be metacircular
-;;; enough that it can support a defconstructor for constructor objects.
+;;; I am not in a hairy enough mood to make this implementation be
+;;; metacircular enough that it can support a defconstructor for
+;;; constructor objects.
 (defun make-constructor (class name supplied-initarg-names code-generators)
   (make-instance 'constructor
 		 :class class
@@ -253,9 +254,10 @@
 		 name class)
 	  ())))
 
-;;; This is called to actually load a defconstructor constructor. It must
-;;; install the lazy installer in the function cell of the constructor name,
-;;; and also add this constructor to the list of constructors the class has.
+;;; This is called to actually load a defconstructor constructor. It
+;;; must install the lazy installer in the function cell of the
+;;; constructor name, and also add this constructor to the list of
+;;; constructors the class has.
 (defmethod load-constructor-internal
 	   ((class slot-class) name initargs generators)
   (let ((constructor (make-constructor class name initargs generators))
@@ -275,21 +277,23 @@
 				(apply constructor args)))
 			  'lazy)))
 
-;;; The interface to keeping the constructors updated.
+;;; the interface to keeping the constructors updated
 ;;;
-;;; add-method and remove-method (for standard-generic-function and -method),
-;;; promise to call maybe-update-constructors on the generic function and
-;;; the method.
+;;; add-method and remove-method (for standard-generic-function and
+;;; -method), promise to call maybe-update-constructors on the generic
+;;; function and the method.
 ;;;
-;;; The class update code promises to call update-constructors whenever the
-;;; class is changed. That is, whenever the supers, slots or options change.
-;;; If user defined classes of constructor needs to be updated in more than
-;;; these circumstances, they should use the dependent updating mechanism to
-;;; make sure update-constructors is called.
+;;; The class update code promises to call update-constructors
+;;; whenever the class is changed. That is, whenever the supers, slots
+;;; or options change. If user defined classes of constructor needs to
+;;; be updated in more than these circumstances, they should use the
+;;; dependent updating mechanism to make sure update-constructors is
+;;; called.
 ;;;
-;;; Bootstrapping concerns force the definitions of maybe-update-constructors
-;;; and update-constructors to be in the file std-class. For clarity, they
-;;; also appear below. Be sure to keep the definition here and there in sync.
+;;; Bootstrapping concerns force the definitions of
+;;; maybe-update-constructors and update-constructors to be in the
+;;; file std-class. For clarity, they also appear below. Be sure to
+;;; keep the definition here and there in sync.
 ;(defvar *initialization-generic-functions*
 ;	 (list #'make-instance
 ;	       #'default-initargs

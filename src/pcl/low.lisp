@@ -78,10 +78,10 @@
 ;;; portable to other implementations of Common Lisp, all the
 ;;; funcallable instance wrapper logic here can go away in favor
 ;;; of direct calls to native SBCL funcallable instance operations.
-(defun set-funcallable-instance-function (fin new-value)
+(defun set-funcallable-instance-fun (fin new-value)
   (declare (type function new-value))
   (aver (funcallable-instance-p fin))
-  (setf (sb-kernel:funcallable-instance-function fin) new-value))
+  (setf (sb-kernel:funcallable-instance-fun fin) new-value))
 (defmacro fsc-instance-p (fin)
   `(funcallable-instance-p ,fin))
 (defmacro fsc-instance-class (fin)
@@ -189,8 +189,8 @@
 	 ;; it loses some info of potential hacking value. So,
 	 ;; lets not do this...
 	 #+nil
-	 (let ((header (sb-kernel:%closure-function fcn)))
-	   (setf (sb-kernel:%function-name header) new-name))
+	 (let ((header (sb-kernel:%closure-fun fcn)))
+	   (setf (sb-kernel:%simple-fun-name header) new-name))
 
 	 ;; XXX Maybe add better scheme here someday.
 	 fcn)))

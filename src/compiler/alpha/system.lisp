@@ -34,7 +34,7 @@
     (inst and object lowtag-mask result)
     (inst cmpeq result other-pointer-type ndescr)
     (inst bne ndescr other-ptr)
-    (inst cmpeq result function-pointer-type ndescr)
+    (inst cmpeq result fun-pointer-type ndescr)
     (inst bne ndescr function-ptr)
 
     ;; Pick off structure and list pointers.
@@ -49,7 +49,7 @@
     (inst br zero-tn done)
 
     FUNCTION-PTR
-    (load-type result object (- function-pointer-type))
+    (load-type result object (- fun-pointer-type))
     (inst br zero-tn done)
 
     OTHER-PTR
@@ -64,7 +64,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type result function (- function-pointer-type))))
+    (load-type result function (- fun-pointer-type))))
 
 (define-vop (set-function-subtype)
   (:translate (setf function-subtype))
@@ -76,10 +76,10 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldl temp (- function-pointer-type) function)
+    (inst ldl temp (- fun-pointer-type) function)
     (inst and temp #xff temp)
     (inst bis type temp temp)
-    (inst stl temp (- function-pointer-type) function)
+    (inst stl temp (- fun-pointer-type) function)
     (move type result)))
 
 
@@ -100,7 +100,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 function-pointer-type)
+    (loadw res x 0 fun-pointer-type)
     (inst srl res type-bits res)))
 
 (define-vop (set-header-data)
@@ -210,7 +210,7 @@
     (inst srl ndescr type-bits ndescr)
     (inst sll ndescr word-shift ndescr)
     (inst addq ndescr offset ndescr)
-    (inst subq ndescr (- other-pointer-type function-pointer-type) ndescr)
+    (inst subq ndescr (- other-pointer-type fun-pointer-type) ndescr)
     (inst addq code ndescr func)))
 
 ;;;; other random VOPs.

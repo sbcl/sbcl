@@ -1556,7 +1556,7 @@
 	 ;; pulled out in a function somewhere.
 	 (name (case (function-subtype object)
 		 (#.sb!vm:closure-header-type "CLOSURE")
-		 (#.sb!vm:function-header-type (%function-name object))
+		 (#.sb!vm:simple-fun-header-type (%simple-fun-name object))
 		 (t 'no-name-available)))
 	 (identified-by-name-p (and (symbolp name)
 				    (fboundp name)
@@ -1584,7 +1584,7 @@
 	       (write-string "unknown pointer object, type=" stream)
 	       (let ((*print-base* 16) (*print-radix* t))
 		 (output-integer type stream))))))
-	((#.sb!vm:function-pointer-type
+	((#.sb!vm:fun-pointer-type
 	  #.sb!vm:instance-pointer-type
 	  #.sb!vm:list-pointer-type)
 	 (write-string "unknown pointer object, type=" stream))

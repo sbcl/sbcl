@@ -646,12 +646,12 @@ bug.~:@>")
       (error "internal error: unaligned function object, offset = #X~X"
 	     offset))
     (let ((fun (%primitive sb!c:compute-function code-object offset)))
-      (setf (%function-self fun) fun)
-      (setf (%function-next fun) (%code-entry-points code-object))
+      (setf (%simple-fun-self fun) fun)
+      (setf (%simple-fun-next fun) (%code-entry-points code-object))
       (setf (%code-entry-points code-object) fun)
-      (setf (%function-name fun) name)
-      (setf (%function-arglist fun) arglist)
-      (setf (%fun-type fun) type)
+      (setf (%simple-fun-name fun) name)
+      (setf (%simple-fun-arglist fun) arglist)
+      (setf (%simple-fun-type fun) type)
       ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
       #+nil (when *load-print*
 	      (load-fresh-line)

@@ -117,8 +117,8 @@
   (:variant other-pointer-type))
 
 (define-vop (code-from-function code-from-mumble)
-  (:translate sb!di::function-code-header)
-  (:variant function-pointer-type))
+  (:translate sb!di::fun-code-header)
+  (:variant fun-pointer-type))
 
 (define-vop (make-lisp-obj)
   (:policy :fast-safe)
@@ -143,12 +143,12 @@
     (move result thing)))
 
 
-(define-vop (function-word-offset)
+(define-vop (fun-word-offset)
   (:policy :fast-safe)
-  (:translate sb!di::function-word-offset)
+  (:translate sb!di::fun-word-offset)
   (:args (fun :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 5
-    (loadw res fun 0 function-pointer-type)
+    (loadw res fun 0 fun-pointer-type)
     (inst shr res type-bits)))

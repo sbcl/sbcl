@@ -185,7 +185,7 @@
 		(setq current (sap+ current size))))
 	     ((eql header-type closure-header-type)
 	      (let* ((obj (make-lisp-obj (logior (sap-int current)
-						 function-pointer-type)))
+						 fun-pointer-type)))
 		     (size (round-to-dualword
 			    (* (the fixnum (1+ (get-closure-length obj)))
 			       word-bytes))))

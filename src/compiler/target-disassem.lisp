@@ -339,19 +339,19 @@
 
 (defun fun-self (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:%function-self fun))
+  (sb!kernel:%simple-fun-self fun))
 
 (defun fun-code (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:function-code-header (fun-self fun)))
+  (sb!kernel:fun-code-header (fun-self fun)))
 
 (defun fun-next (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:%function-next fun))
+  (sb!kernel:%simple-fun-next fun))
 
 (defun fun-address (function)
   (declare (type compiled-function function))
-  (- (sb!kernel:get-lisp-obj-address function) sb!vm:function-pointer-type))
+  (- (sb!kernel:get-lisp-obj-address function) sb!vm:fun-pointer-type))
 
 ;;; the offset of FUNCTION from the start of its code-component's
 ;;; instruction area
@@ -448,19 +448,22 @@
 	     (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)))
 	   (name
 	    (sb!kernel:code-header-ref code
-				       (+ woffs sb!vm:function-name-slot)))
+				       (+ woffs
+					  sb!vm:simple-fun-name-slot)))
 	   (args
 	    (sb!kernel:code-header-ref code
-				       (+ woffs sb!vm:function-arglist-slot)))
+				       (+ woffs
+					  sb!vm:simple-fun-arglist-slot)))
 	   (type
 	    (sb!kernel:code-header-ref code
-				       (+ woffs sb!vm:function-type-slot))))
+				       (+ woffs
+					  sb!vm:simple-fun-type-slot))))
       (format stream ".~A ~S~:A" 'entry name args)
       (note (lambda (stream)
 	      (format stream "~:S" type)) ; use format to print NIL as ()
 	    dstate)))
   (incf (dstate-next-offs dstate)
-	(words-to-bytes sb!vm:function-code-offset)))
+	(words-to-bytes sb!vm:simple-fun-code-offset)))
 
 (defun alignment-hook (chunk stream dstate)
   (declare (type dchunk chunk)
@@ -937,7 +940,7 @@
 (defun print-fun-headers (function)
   (declare (type compiled-function function))
   (let* ((self (fun-self function))
-	 (code (sb!kernel:function-code-header self)))
+	 (code (sb!kernel:fun-code-header self)))
     (format t "Code-header ~S: size: ~S, trace-table-offset: ~S~%"
 	    code
 	    (sb!kernel:code-header-ref code
@@ -954,11 +957,11 @@
 		fun
 		fun-offset
 		(sb!kernel:code-header-ref
-		 code (+ fun-offset sb!vm:function-name-slot))
+		 code (+ fun-offset sb!vm:simple-fun-name-slot))
 		(sb!kernel:code-header-ref
-		 code (+ fun-offset sb!vm:function-arglist-slot))
+		 code (+ fun-offset sb!vm:simple-fun-arglist-slot))
 		(sb!kernel:code-header-ref
-		 code (+ fun-offset sb!vm:function-type-slot)))))))
+		 code (+ fun-offset sb!vm:simple-fun-type-slot)))))))
 
 ;;; getting at the source code...
 
@@ -1312,7 +1315,7 @@
   (declare (type compiled-function function))
   (let* ((code (fun-code function))
 	 (fun-map (code-fun-map code))
-	 (fname (sb!kernel:%function-name function))
+	 (fname (sb!kernel:%simple-fun-name function))
 	 (sfcache (make-source-form-cache)))
     (let ((first-block-seen-p nil)
 	  (nil-block-seen-p nil)

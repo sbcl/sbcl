@@ -196,10 +196,10 @@ evaluated expressions.
 (defmethod inspected-parts ((object function))
   (let* ((type (sb-kernel:get-type object))
 	 (object (if (= type sb-vm:closure-header-type)
-		     (sb-kernel:%closure-function object)
+		     (sb-kernel:%closure-fun object)
 		     object)))
     (values (format nil "FUNCTION ~S.~@[~%Argument List: ~A~]." object
-		    (sb-kernel:%function-arglist object)
+		    (sb-kernel:%simple-fun-arglist object)
 		    ;; Defined-from stuff used to be here. Someone took
 		    ;; it out. FIXME: We should make it easy to get
 		    ;; to DESCRIBE from the inspector.

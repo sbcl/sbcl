@@ -165,8 +165,8 @@
   ;; And jump into the function.
     (inst jmp
 	  (make-ea :byte :base eax
-		   :disp (- (* closure-function-slot word-bytes)
-			    function-pointer-type)))
+		   :disp (- (* closure-fun-slot word-bytes)
+			    fun-pointer-type)))
 
   ;; All the arguments fit in registers, so load them.
   REGISTER-ARGS
@@ -183,8 +183,8 @@
 
   ;; And away we go.
   (inst jmp (make-ea :byte :base eax
-		     :disp (- (* closure-function-slot word-bytes)
-			      function-pointer-type))))
+		     :disp (- (* closure-fun-slot word-bytes)
+			      fun-pointer-type))))
 
 (define-assembly-routine (throw
 			  (:return-style :none))

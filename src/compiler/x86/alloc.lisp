@@ -147,7 +147,7 @@
   (:generator 37
     (with-fixed-allocation (result fdefn-type fdefn-size node)
       (storew name result fdefn-name-slot other-pointer-type)
-      (storew nil-value result fdefn-function-slot other-pointer-type)
+      (storew nil-value result fdefn-fun-slot other-pointer-type)
       (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
 	      result fdefn-raw-addr-slot other-pointer-type))))
 
@@ -162,11 +162,11 @@
     (let ((size (+ length closure-info-offset)))
       (allocation result (pad-data-block size) node)
       (inst lea result
-	    (make-ea :byte :base result :disp function-pointer-type))
+	    (make-ea :byte :base result :disp fun-pointer-type))
       (storew (logior (ash (1- size) type-bits) closure-header-type)
-	      result 0 function-pointer-type))
-    (loadw temp function closure-function-slot function-pointer-type)
-    (storew temp result closure-function-slot function-pointer-type))))
+	      result 0 fun-pointer-type))
+    (loadw temp function closure-fun-slot fun-pointer-type)
+    (storew temp result closure-fun-slot fun-pointer-type))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

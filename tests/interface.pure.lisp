@@ -20,22 +20,21 @@
 (defvar *public-package-names*
   '("SB-ALIEN" "SB-C-CALL" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-MP"
     "SB-PROFILE" "SB-PCL" "COMMON-LISP"))
-(defun has-arglist-info-p (function)
-  (declare (type function function))
+(defun has-arglist-info-p (fun)
+  (declare (type function fun))
   ;; The Lisp-level type FUNCTION can conceal a multitude of sins..
-  (case (sb-kernel:get-type function)
-    ((#.sb-vm:function-header-type #.sb-vm:closure-function-header-type)
-      (sb-kernel:%function-arglist function))
+  (case (sb-kernel:get-type fun)
+    ((#.sb-vm:simple-fun-header-type #.sb-vm:closure-fun-header-type)
+      (sb-kernel:%simple-fun-arglist fun))
     (#.sb-vm:closure-header-type (has-arglist-info-p
-                                  (sb-kernel:%closure-function
-                                   function)))
+				  (sb-kernel:%closure-fun fun)))
     ;; In code/describe.lisp, ll. 227 (%describe-function), we use a scheme
     ;; like above, and it seems to work. -- MNA 2001-06-12
     ;;
     ;; (There might be other cases with arglist info also.
-    ;; FUNCTION-HEADER-TYPE and CLOSURE-HEADER-TYPE just
+    ;; SIMPLE-FUN-HEADER-TYPE and CLOSURE-HEADER-TYPE just
     ;; happen to be the two case that I had my nose rubbed in when
-    ;; debugging a GC problem caused by applying %FUNCTION-ARGLIST to
+    ;; debugging a GC problem caused by applying %SIMPLE-FUN-ARGLIST to
     ;; a closure. -- WHN 2001-06-05)
     (t nil)))
 (defun check-ext-symbols-arglist (package)

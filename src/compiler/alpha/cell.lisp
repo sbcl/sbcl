@@ -89,12 +89,12 @@
 
 
 
-;;;; FDEFINITION (fdefn) objects
+;;;; fdefinition (FDEFN) objects
 
-(define-vop (fdefn-function cell-ref)
-  (:variant fdefn-function-slot other-pointer-type))
+(define-vop (fdefn-fun cell-ref)
+  (:variant fdefn-fun-slot other-pointer-type))
 
-(define-vop (safe-fdefn-function)
+(define-vop (safe-fdefn-fun)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -103,14 +103,14 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 10
     (move object obj-temp)
-    (loadw value obj-temp fdefn-function-slot other-pointer-type)
+    (loadw value obj-temp fdefn-fun-slot other-pointer-type)
     (let ((err-lab (generate-error-code vop undefined-symbol-error obj-temp)))
       (inst cmpeq value null-tn temp)
       (inst bne temp err-lab))))
 
-(define-vop (set-fdefn-function)
+(define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-function))
+  (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
 	 (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (interior-reg)) lip)
@@ -118,16 +118,16 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (let ((normal-fn (gen-label)))
-      (load-type type function (- function-pointer-type))
-      (inst xor type function-header-type type)
+      (load-type type function (- fun-pointer-type))
+      (inst xor type simple-fun-header-type type)
       (inst addq function
-	    (- (ash function-code-offset word-shift) function-pointer-type)
+	    (- (ash simple-fun-code-offset word-shift) fun-pointer-type)
 	    lip)
       (inst beq type normal-fn)
       (inst li (make-fixup "closure_tramp" :foreign) lip)
       (emit-label normal-fn)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-type)
-      (storew function fdefn fdefn-function-slot other-pointer-type)
+      (storew function fdefn fdefn-fun-slot other-pointer-type)
       (move function result))))
           
 
@@ -138,7 +138,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (storew null-tn fdefn fdefn-function-slot other-pointer-type)
+    (storew null-tn fdefn fdefn-fun-slot other-pointer-type)
     (inst li (make-fixup "undefined_tramp" :foreign) temp)
     (move fdefn result)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-type)))
@@ -202,25 +202,25 @@
 ;;;; closure indexing
 
 (define-full-reffer closure-index-ref *
-  closure-info-offset function-pointer-type
+  closure-info-offset fun-pointer-type
   (descriptor-reg any-reg) * %closure-index-ref)
 
 (define-full-setter set-funcallable-instance-info *
-  funcallable-instance-info-offset function-pointer-type
+  funcallable-instance-info-offset fun-pointer-type
   (descriptor-reg any-reg null zero) * %set-funcallable-instance-info)
 
 (define-full-reffer funcallable-instance-info *
-  funcallable-instance-info-offset function-pointer-type
+  funcallable-instance-info-offset fun-pointer-type
   (descriptor-reg any-reg) * %funcallable-instance-info)
 
 (define-vop (funcallable-instance-lexenv cell-ref)
-  (:variant funcallable-instance-lexenv-slot function-pointer-type))
+  (:variant funcallable-instance-lexenv-slot fun-pointer-type))
 
 (define-vop (closure-ref slot-ref)
-  (:variant closure-info-offset function-pointer-type))
+  (:variant closure-info-offset fun-pointer-type))
 
 (define-vop (closure-init slot-set)
-  (:variant closure-info-offset function-pointer-type))
+  (:variant closure-info-offset fun-pointer-type))
 
 ;;;; value cell hackery
 

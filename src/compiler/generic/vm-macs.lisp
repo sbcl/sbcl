@@ -107,11 +107,7 @@
 	  (incf offset length)))
       (unless variable-length
 	(let ((size (symbolicate name "-SIZE")))
-	  (constants `(defconstant ,size ,offset
-			,(format nil
-				 "Number of slots used by each ~S~
-				  ~@[~* including the header~]."
-				 name header)))
+	  (constants `(defconstant ,size ,offset))
 	  (exports size)))
       (when alloc-trans
 	(forms `(def-alloc ,alloc-trans ,offset ,variable-length ,header
