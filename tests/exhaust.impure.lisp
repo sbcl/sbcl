@@ -1,4 +1,4 @@
-;;;; tests of the system's ability to catch resource exhaustion errors
+;;;; tests of the system's ability to catch resource exhaustion problems
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -29,8 +29,6 @@
   #!+sb-doc
   "Return the real time in the internal time format. This is useful for
   finding elapsed time. See INTERNAL-TIME-UNITS-PER-SECOND."
-  ;; FIXME: See comment on OPTIMIZE declaration in GET-INTERNAL-RUN-TIME.
-  (declare (optimize (speed 3) (safety 3)))
   (multiple-value-bind (ignore seconds useconds) (sb!unix:unix-gettimeofday)
     (declare (ignore ignore) (type (unsigned-byte 32) seconds useconds))
     (let ((base *internal-real-time-base-seconds*)
@@ -52,12 +50,6 @@
   "Return the run time in the internal time format. This is useful for
   finding CPU usage."
   (declare (values (unsigned-byte 32)))
-  ;; FIXME: In CMU CL this was (SPEED 3) (SAFETY 0), and perhaps
-  ;; someday it should be again, since overhead here is annoying. But
-  ;; it's even more annoying to worry about this function returning
-  ;; out-of-range values, so while debugging the profiling code,
-  ;; I set it to (SAFETY 3) for now.
-  (declare (optimize (speed 3) (safety 3)))
   (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
       (sb!unix:unix-fast-getrusage sb!unix:rusage_self)
     (declare (ignore ignore)
@@ -67,7 +59,6 @@
 	     ;; documented anywhere and the observed behavior is to
 	     ;; sometimes return 1000000 exactly.)
 	     (type (integer 0 1000000) utime-usec stime-usec))
-
     (let ((result (+ (the (unsigned-byte 32)
 			  (* (the (unsigned-byte 32) (+ utime-sec stime-sec))
 			     sb!xc:internal-time-units-per-second))

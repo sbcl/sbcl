@@ -60,7 +60,9 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 				       (sb!ext:inhibit-warnings 2)
 				       ;; SAFETY = SPEED (and < 3) should 
 				       ;; reasonable safety, but might skip 
-				       ;; some unreasonably expensive stuff.
+				       ;; some unreasonably expensive stuff
+				       ;; (e.g. %DETECT-STACK-EXHAUSTION
+				       ;; in sbcl-0.7.2).
                                        (safety 2)
                                        (space 1)
 				       (speed 2)))))

@@ -721,15 +721,14 @@
 ;;; Pick off some constant cases.
 (deftransform array-header-p ((array) (array))
   (let ((type (continuation-type array)))
-    (declare (optimize (safety 3)))
     (unless (array-type-p type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions type)))
       (cond ((csubtypep type (specifier-type '(simple-array * (*))))
-	     ;; No array header.
+	     ;; no array header
 	     nil)
 	    ((and (listp dims) (> (length dims) 1))
-	     ;; Multi-dimensional array, will have a header.
+	     ;; multi-dimensional array, will have a header
 	     t)
 	    (t
 	     (give-up-ir1-transform))))))

@@ -3057,7 +3057,7 @@
   (multi-compare 'char-lessp args t))
 
 ;;; This function does source transformation of N-arg inequality
-;;; functions such as /=. This is similar to Multi-Compare in the <3
+;;; functions such as /=. This is similar to MULTI-COMPARE in the <3
 ;;; arg cases. If there are more than two args, then we expand into
 ;;; the appropriate n^2 comparisons only when speed is important.
 (declaim (ftype (function (symbol list) *) multi-not-equal))

@@ -79,7 +79,12 @@
     (declare (type index start end))
     (declare (type function predicate))
     (declare (type (or function null) key))
-    (declare (optimize (speed 3) (safety 3) (debug 1) (space 1)))
+    ;; This used to be (OPTIMIZE (SPEED 3) (SAFETY 3)), but now
+    ;; (0.7.1.39) that (SAFETY 3) means "absolutely safe (including
+    ;; expensive things like %DETECT-STACK-EXHAUSTION)" we get closer
+    ;; to what we want by using (SPEED 2) (SAFETY 2): "pretty fast,
+    ;; pretty safe, and safety is no more important than speed".
+    (declare (optimize (speed 2) (safety 2) (debug 1) (space 1)))
     (if (typep vector 'simple-vector)
 	;; (VECTOR T) is worth optimizing for, and SIMPLE-VECTOR is
 	;; what we get from (VECTOR T) inside WITH-ARRAY-DATA.

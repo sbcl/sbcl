@@ -16,7 +16,7 @@
 (proclaim '(optimize (compilation-speed 1)
 		     (debug #+sb-show 2 #-sb-show 1)
 		     (inhibit-warnings 2)
-		     (safety 1)
+		     (safety 2)
 		     (space 1)
 		     (speed 2)))
 
@@ -268,7 +268,7 @@
 ;;; easiest thing to do is to read them out of package-data-list.lisp-expr
 ;;; now?
 
-;;;; restoring compilation policy to neutral values in preparation for
+;;;; resetting compilation policy to neutral values in preparation for
 ;;;; SAVE-LISP-AND-DIE as final SBCL core
 
 (sb-int:/show "setting compilation policy to neutral values")

@@ -1008,8 +1008,8 @@
 (defvar *cold-package-symbols*)
 (declaim (type list *cold-package-symbols*))
 
-;;; a map from descriptors to symbols, so that we can back up. The key is the
-;;; address in the target core.
+;;; a map from descriptors to symbols, so that we can back up. The key
+;;; is the address in the target core.
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
 
@@ -1035,7 +1035,12 @@
   ;; need is SB!KERNEL:%BYTE-BLT.
   (let ((package-name (package-name package)))
     (cond ((find package-name '("COMMON-LISP" "KEYWORD") :test #'string=)
-	   ;; That's OK then.
+	   ;; Cold interning things in these standard packages is OK.
+	   ;; (Cold interning things in the other standard package,
+	   ;; CL-USER, isn't OK. We just use CL-USER to expose symbols
+	   ;; whose homes are in other packages. Thus, trying to cold
+	   ;; intern a symbol whose home package is CL-USER probably
+	   ;; means that a coding error has been made somewhere.)
 	   (values))
 	  ((string= package-name "SB!" :end1 3 :end2 3)
 	   ;; That looks OK, too. (All the target-code packages
@@ -1044,9 +1049,10 @@
 	  (t
 	   ;; looks bad: maybe COMMON-LISP-USER? maybe an extension
 	   ;; package in the xc host? something we can't think of
-	   ;; a valid reason to dump, anyway...
-	   (bug "internal error: PACKAGE-NAME=~S looks too much like a typo."
-		package-name))))
+	   ;; a valid reason to cold intern, anyway...
+	   (error ; not #'BUG, because #'BUG isn't defined yet
+	    "internal error: PACKAGE-NAME=~S looks too much like a typo."
+	    package-name))))
 
   (let (;; Information about each cold-interned symbol is stored
 	;; in COLD-INTERN-INFO.
