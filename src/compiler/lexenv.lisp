@@ -28,7 +28,6 @@
 	     (:constructor internal-make-lexenv
 			   (funs vars blocks tags
                                  type-restrictions
-                                 weakend-type-restrictions
 				 lambda cleanup policy)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
@@ -58,7 +57,6 @@
   ;; THING is a continuation, this is used to track the innermost THE
   ;; type declaration.
   (type-restrictions nil :type list)
-  (weakend-type-restrictions nil :type list)
   ;; the lexically enclosing lambda, if any
   ;;
   ;; FIXME: This should be :TYPE (OR CLAMBDA NULL), but it was too hard

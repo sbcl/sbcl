@@ -65,10 +65,10 @@
                  (sb!c::*free-funs* (make-hash-table :test 'equal))
                  (sb!c::*free-vars* (make-hash-table :test 'eq))
                  (sb!c::*undefined-warnings* nil))
+             ;; FIXME: VALUES declaration
              (sb!c::process-decls decls
                                   vars
                                   nil
-                                  (sb!c::make-continuation)
                                   lexenv))))
       (eval-progn-body body lexenv))))
 

@@ -836,8 +836,9 @@
 (defun process-toplevel-locally (body path compile-time-too &key vars funs)
   (declare (list path))
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (let* ((*lexenv*
-	    (process-decls decls vars funs (make-continuation)))
+    (let* ((*lexenv* (process-decls decls vars funs))
+           ;; FIXME: VALUES declaration
+           ;;
 	   ;; Binding *POLICY* is pretty much of a hack, since it
 	   ;; causes LOCALLY to "capture" enclosed proclamations. It
 	   ;; is necessary because CONVERT-AND-MAYBE-COMPILE uses the

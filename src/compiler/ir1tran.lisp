@@ -1084,68 +1084,94 @@
   "If true, processing of the VALUES declaration is inhibited.")
 
 ;;; Process a single declaration spec, augmenting the specified LEXENV
-;;; RES and returning it as a result. VARS and FVARS are as described in
-;;; PROCESS-DECLS.
-(defun process-1-decl (raw-spec res vars fvars cont)
+;;; RES. Return RES and result type. VARS and FVARS are as described
+;;; in PROCESS-DECLS.
+(defun process-1-decl (raw-spec res vars fvars)
   (declare (type list raw-spec vars fvars))
   (declare (type lexenv res))
-  (declare (type continuation cont))
-  (let ((spec (canonized-decl-spec raw-spec)))
-    (case (first spec)
-      (special (process-special-decl spec res vars))
-      (ftype
-       (unless (cdr spec)
-	 (compiler-error "no type specified in FTYPE declaration: ~S" spec))
-       (process-ftype-decl (second spec) res (cddr spec) fvars))
-      ((inline notinline maybe-inline)
-       (process-inline-decl spec res fvars))
-      ((ignore ignorable)
-       (process-ignore-decl spec vars fvars)
-       res)
-      (optimize
-       (make-lexenv
-	:default res
-	:policy (process-optimize-decl spec (lexenv-policy res))))
-      (type
-       (process-type-decl (cdr spec) res vars))
-      (values ;; FIXME -- APD, 2002-01-26
-       (if t ; *suppress-values-declaration*
-	   res
-	   (let ((types (cdr spec)))
-	     (ir1ize-the-or-values (if (eql (length types) 1)
-				       (car types)
-				       `(values ,@types))
-				   cont
-				   res
-				   "in VALUES declaration"))))
-      (dynamic-extent
-       (when (policy *lexenv* (> speed inhibit-warnings))
-	 (compiler-notify
-	  "compiler limitation: ~
-        ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
-       res)
-      (t
-       (unless (info :declaration :recognized (first spec))
-	 (compiler-warn "unrecognized declaration ~S" raw-spec))
-       res))))
+  (let ((spec (canonized-decl-spec raw-spec))
+        (result-type *wild-type*))
+    (values
+     (case (first spec)
+       (special (process-special-decl spec res vars))
+       (ftype
+        (unless (cdr spec)
+          (compiler-error "no type specified in FTYPE declaration: ~S" spec))
+        (process-ftype-decl (second spec) res (cddr spec) fvars))
+       ((inline notinline maybe-inline)
+        (process-inline-decl spec res fvars))
+       ((ignore ignorable)
+        (process-ignore-decl spec vars fvars)
+        res)
+       (optimize
+        (make-lexenv
+         :default res
+         :policy (process-optimize-decl spec (lexenv-policy res))))
+       (type
+        (process-type-decl (cdr spec) res vars))
+       (values
+        (unless *suppress-values-declaration*
+          (let ((types (cdr spec)))
+            (setq result-type
+                  (compiler-values-specifier-type
+                   (if (singleton-p types)
+                       (car types)
+                       `(values ,@types)))))
+          res))
+       (dynamic-extent
+        (when (policy *lexenv* (> speed inhibit-warnings))
+          (compiler-notify
+           "compiler limitation: ~
+          ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
+        res)
+       (t
+        (unless (info :declaration :recognized (first spec))
+          (compiler-warn "unrecognized declaration ~S" raw-spec))
+        res))
+     result-type)))
 
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
 ;;; and FUNCTIONAL structures which are being bound. In addition to
-;;; filling in slots in the leaf structures, we return a new LEXENV
+;;; filling in slots in the leaf structures, we return a new LEXENV,
 ;;; which reflects pervasive special and function type declarations,
-;;; (NOT)INLINE declarations and OPTIMIZE declarations. CONT is the
-;;; continuation affected by VALUES declarations.
+;;; (NOT)INLINE declarations and OPTIMIZE declarations, and type of
+;;; VALUES declarations.
 ;;;
 ;;; This is also called in main.lisp when PROCESS-FORM handles a use
 ;;; of LOCALLY.
-(defun process-decls (decls vars fvars cont &optional (env *lexenv*))
-  (declare (list decls vars fvars) (type continuation cont))
-  (dolist (decl decls)
-    (dolist (spec (rest decl))
-      (unless (consp spec)
-	(compiler-error "malformed declaration specifier ~S in ~S" spec decl))
-      (setq env (process-1-decl spec env vars fvars cont))))
-  env)
+(defun process-decls (decls vars fvars &optional (env *lexenv*))
+  (declare (list decls vars fvars))
+  (let ((result-type *wild-type*))
+    (dolist (decl decls)
+      (dolist (spec (rest decl))
+        (unless (consp spec)
+          (compiler-error "malformed declaration specifier ~S in ~S" spec decl))
+        (multiple-value-bind (new-env new-result-type)
+            (process-1-decl spec env vars fvars)
+          (setq env new-env)
+          (unless (eq new-result-type *wild-type*)
+            (setq result-type
+                  (values-type-intersection result-type new-result-type))))))
+    (values env result-type)))
+
+(defun %processing-decls (decls vars fvars cont fun)
+  (multiple-value-bind (*lexenv* result-type)
+      (process-decls decls vars fvars)
+    (cond ((eq result-type *wild-type*)
+           (funcall fun cont))
+          (t
+           (let ((value-cont (make-continuation)))
+             (multiple-value-prog1
+                 (funcall fun value-cont)
+               (let ((cast (make-cast value-cont result-type
+                                      (lexenv-policy *lexenv*))))
+                 (link-node-to-previous-continuation cast value-cont)
+                 (setf (continuation-dest value-cont) cast)
+                 (use-continuation cast cont))))))))
+(defmacro processing-decls ((decls vars fvars cont) &body forms)
+  (check-type cont symbol)
+  `(%processing-decls ,decls ,vars ,fvars ,cont
+                      (lambda (,cont) ,@forms)))
 
 ;;; Return the SPECVAR for NAME to use when we see a local SPECIAL
 ;;; declaration. If there is a global variable of that name, then

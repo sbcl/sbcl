@@ -522,8 +522,7 @@
 
     (values (vars) (vals))))
 
-(def-ir1-translator let ((bindings &body body)
-			 start cont)
+(def-ir1-translator let ((bindings &body body) start cont)
   #!+sb-doc
   "LET ({(Var [Value]) | Var}*) Declaration* Form*
   During evaluation of the Forms, bind the Vars to the result of evaluating the
@@ -533,12 +532,14 @@
       (ir1-translate-locally  body start cont)
       (multiple-value-bind (forms decls) (parse-body body nil)
         (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-          (let ((fun-cont (make-continuation)))
-            (let* ((*lexenv* (process-decls decls vars nil cont))
-                   (fun (ir1-convert-lambda-body
-                         forms vars
-                         :debug-name (debug-namify "LET ~S" bindings))))
-              (reference-leaf start fun-cont fun))
+          (let* ((fun-cont (make-continuation))
+                 (cont (processing-decls (decls vars nil cont)
+                         (let ((fun (ir1-convert-lambda-body
+                                     forms vars
+                                     :debug-name (debug-namify "LET ~S"
+                                                               bindings))))
+                           (reference-leaf start fun-cont fun))
+                         cont)))
             (ir1-convert-combination-args fun-cont cont values))))))
 
 (def-ir1-translator let* ((bindings &body body)
@@ -549,8 +550,8 @@
   form to reference any of the previous Vars."
   (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
-      (let ((*lexenv* (process-decls decls vars nil cont)))
-	(ir1-convert-aux-bindings start cont forms vars values)))))
+      (processing-decls (decls vars nil cont)
+        (ir1-convert-aux-bindings start cont forms vars values)))))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
@@ -562,7 +563,7 @@
 (defun ir1-translate-locally (body start cont &key vars funs)
   (declare (type list body) (type continuation start cont))
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (let ((*lexenv* (process-decls decls vars funs cont)))
+    (processing-decls (decls vars funs cont)
       (ir1-convert-progn-body start cont forms))))
 
 (def-ir1-translator locally ((&body body) start cont)
@@ -609,17 +610,16 @@
   (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-vars definitions 'flet)
-      (let* ((fvars (mapcar (lambda (n d)
-  			      (ir1-convert-lambda d
-						  :source-name n
-						  :debug-name (debug-namify
-							       "FLET ~S" n)
-						  :allow-debug-catch-tag t))
-			    names defs))
-	     (*lexenv* (make-lexenv
-			:default (process-decls decls nil fvars cont)
-			:funs (pairlis names fvars))))
-	(ir1-convert-progn-body start cont forms)))))
+      (let ((fvars (mapcar (lambda (n d)
+                             (ir1-convert-lambda d
+                                                 :source-name n
+                                                 :debug-name (debug-namify
+                                                              "FLET ~S" n)
+                                                 :allow-debug-catch-tag t))
+                           names defs)))
+        (processing-decls (decls nil fvars cont)
+          (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
+            (ir1-convert-progn-body start cont forms)))))))
 
 (def-ir1-translator labels ((definitions &body body) start cont)
   #!+sb-doc
@@ -630,7 +630,7 @@
   (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-vars definitions 'labels)
-      (let* (;; dummy LABELS functions, to be used as placeholders
+      (let* ( ;; dummy LABELS functions, to be used as placeholders
              ;; during construction of real LABELS functions
 	     (placeholder-funs (mapcar (lambda (name)
 					 (make-functional
@@ -661,14 +661,14 @@
 	      (setf (cdr placeholder-cons) real-fun))
 
         ;; Voila.
-	(let ((*lexenv* (make-lexenv
-			 :default (process-decls decls nil real-funs cont)
-                         ;; Use a proper FENV here (not the
-                         ;; placeholder used earlier) so that if the
-                         ;; lexical environment is used for inline
-                         ;; expansion we'll get the right functions.
-                         :funs (pairlis names real-funs))))
-	  (ir1-convert-progn-body start cont forms))))))
+	(processing-decls (decls nil real-funs cont)
+          (let ((*lexenv* (make-lexenv
+                           ;; Use a proper FENV here (not the
+                           ;; placeholder used earlier) so that if the
+                           ;; lexical environment is used for inline
+                           ;; expansion we'll get the right functions.
+                           :funs (pairlis names real-funs))))
+            (ir1-convert-progn-body start cont forms)))))))
 
 ;;;; the THE special operator, and friends
 

@@ -544,7 +544,7 @@
 ;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
 			 funs vars blocks tags
-                         type-restrictions weakend-type-restrictions
+                         type-restrictions
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
 			 (policy (lexenv-policy default)))
@@ -559,7 +559,6 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     (frob weakend-type-restrictions lexenv-weakend-type-restrictions)
      lambda cleanup policy)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
@@ -587,7 +586,6 @@
      nil
      nil
      (lexenv-type-restrictions lexenv) ; XXX
-     (lexenv-weakend-type-restrictions lexenv)
      nil
      nil
      (lexenv-policy lexenv))))

@@ -273,12 +273,10 @@
 				&key
 				aux-vars
 				aux-vals
-				result
 				(source-name '.anonymous.)
 				debug-name
                                 (note-lexical-bindings t))
-  (declare (list body vars aux-vars aux-vals)
-	   (type (or continuation null) result))
+  (declare (list body vars aux-vars aux-vals))
 
   ;; We're about to try to put new blocks into *CURRENT-COMPONENT*.
   (aver-live-component *current-component*)
@@ -288,7 +286,7 @@
                   :bind bind
                   :%source-name source-name
                   :%debug-name debug-name))
-	 (result (or result (make-continuation))))
+	 (result (make-continuation)))
 
     ;; just to check: This function should fail internal assertions if
     ;; we didn't set up a valid debug name above.
@@ -411,13 +409,12 @@
 (defun generate-optional-default-entry (res default-vars default-vals
                                         entry-vars entry-vals
                                         vars supplied-p-p body
-                                        aux-vars aux-vals cont
+                                        aux-vars aux-vals
                                         source-name debug-name
                                         force)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals vars body
-		 aux-vars aux-vals)
-	   (type (or continuation null) cont))
+		 aux-vars aux-vals))
   (let* ((arg (first vars))
 	 (arg-name (leaf-source-name arg))
 	 (info (lambda-var-arg-info arg))
@@ -432,7 +429,7 @@
 		  (list* (leaf-source-name supplied-p) arg-name default-vals)
 		  (cons arg entry-vars)
 		  (list* t arg-name entry-vals)
-		  (rest vars) t body aux-vars aux-vals cont
+		  (rest vars) t body aux-vars aux-vals
 		  source-name debug-name
                   force)
 		 (ir1-convert-hairy-args
@@ -441,7 +438,7 @@
 		  (cons arg-name default-vals)
 		  (cons arg entry-vars)
 		  (cons arg-name entry-vals)
-		  (rest vars) supplied-p-p body aux-vars aux-vals cont
+		  (rest vars) supplied-p-p body aux-vars aux-vals
 		  source-name debug-name
                   force))))
 
@@ -614,12 +611,11 @@
 ;;; type when computing the type for the main entry's argument.
 (defun ir1-convert-more (res default-vars default-vals entry-vars entry-vals
 			     rest more-context more-count keys supplied-p-p
-			     body aux-vars aux-vals cont
+			     body aux-vars aux-vals
 			     source-name debug-name)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals keys body
-		 aux-vars aux-vals)
-	   (type (or continuation null) cont))
+		 aux-vars aux-vals))
   (collect ((main-vars (reverse default-vars))
 	    (main-vals default-vals cons)
 	    (bind-vars)
@@ -675,7 +671,6 @@
 			body (main-vars)
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
-			:result cont
 			:debug-name (debug-namify "varargs entry for ~A"
 						  (as-debug-name source-name
 								 debug-name))))
@@ -728,25 +723,23 @@
 (defun ir1-convert-hairy-args (res default-vars default-vals
                                entry-vars entry-vals
                                vars supplied-p-p body aux-vars
-                               aux-vals cont
+                               aux-vals
                                source-name debug-name
                                force)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
-                 aux-vars aux-vals)
-           (type (or continuation null) cont))
+                 aux-vars aux-vals))
   (cond ((not vars)
          (if (optional-dispatch-keyp res)
              ;; Handle &KEY with no keys...
              (ir1-convert-more res default-vars default-vals
                                entry-vars entry-vals
                                nil nil nil vars supplied-p-p body aux-vars
-                               aux-vals cont source-name debug-name)
+                               aux-vals source-name debug-name)
              (let ((fun (ir1-convert-lambda-body
 			 body (reverse default-vars)
 			 :aux-vars aux-vars
 			 :aux-vals aux-vals
-			 :result cont
 			 :debug-name (debug-namify
 				      "hairy arg processor for ~A"
 				      (as-debug-name source-name
@@ -766,7 +759,6 @@
                 (nvals (cons (leaf-source-name arg) default-vals)))
            (ir1-convert-hairy-args res nvars nvals nvars nvals
                                    (rest vars) nil body aux-vars aux-vals
-                                   cont
 				   source-name debug-name
                                    nil)))
         (t
@@ -778,7 +770,7 @@
               (let ((ep (generate-optional-default-entry
                          res default-vars default-vals
                          entry-vars entry-vals vars supplied-p-p body
-                         aux-vars aux-vals cont
+                         aux-vars aux-vals
 			 source-name debug-name
                          force)))
                 ;; See GENERATE-OPTIONAL-DEFAULT-ENTRY.
@@ -796,31 +788,31 @@
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 arg nil nil (rest vars) supplied-p-p body
-                                aux-vars aux-vals cont
+                                aux-vars aux-vals
 				source-name debug-name))
              (:more-context
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil arg (second vars) (cddr vars) supplied-p-p
-                                body aux-vars aux-vals cont
+                                body aux-vars aux-vals
 				source-name debug-name))
              (:keyword
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil nil nil vars supplied-p-p body aux-vars
-                                aux-vals cont source-name debug-name)))))))
+                                aux-vals source-name debug-name)))))))
 
 ;;; This function deals with the case where we have to make an
 ;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
 ;;; call IR1-CONVERT-HAIRY-ARGS to do the work. When it is done, we
 ;;; figure out the MIN-ARGS and MAX-ARGS.
-(defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont
+(defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals
 				      &key
 				      (source-name '.anonymous.)
 				      (debug-name (debug-namify
 						   "OPTIONAL-DISPATCH ~S"
 						   vars)))
-  (declare (list body vars aux-vars aux-vals) (type continuation cont))
+  (declare (list body vars aux-vars aux-vals))
   (let ((res (make-optional-dispatch :arglist vars
 				     :allowp allowp
 				     :keyp keyp
@@ -833,7 +825,7 @@
     (aver-live-component *current-component*)
     (push res (component-new-functionals *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
-			    cont source-name debug-name nil)
+			    source-name debug-name nil)
     (setf (optional-dispatch-min-args res) min)
     (setf (optional-dispatch-max-args res)
 	  (+ (1- (length (optional-dispatch-entry-points res))) min))
@@ -842,8 +834,8 @@
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
-			             debug-name
-			             allow-debug-catch-tag)
+                           debug-name
+                           allow-debug-catch-tag)
 
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
@@ -863,27 +855,27 @@
     (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
 	(make-lambda-vars (cadr form))
       (multiple-value-bind (forms decls) (parse-body (cddr form))
-	(let* ((result-cont (make-continuation))
-	       (*lexenv* (process-decls decls
-					(append aux-vars vars)
-					nil result-cont))
-	       (forms (if (and *allow-debug-catch-tag*
-			       (policy *lexenv* (= insert-debug-catch 3)))
-			  `((catch (make-symbol "SB-DEBUG-CATCH-TAG")
-			      ,@forms))
-			  forms))
-	       (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
-			(ir1-convert-hairy-lambda forms vars keyp
-						  allow-other-keys
-						  aux-vars aux-vals result-cont
-						  :source-name source-name
-						  :debug-name debug-name)
-			(ir1-convert-lambda-body forms vars
-						 :aux-vars aux-vars
-						 :aux-vals aux-vals
-						 :result result-cont
-						 :source-name source-name
-						 :debug-name debug-name))))
+	(binding* (((*lexenv* result-type)
+                    (process-decls decls (append aux-vars vars) nil))
+                   (forms (if (and *allow-debug-catch-tag*
+                                   (policy *lexenv* (>= insert-debug-catch 2)))
+                              `((catch (make-symbol "SB-DEBUG-CATCH-TAG")
+                                  ,@forms))
+                              forms))
+                   (forms (if (eq result-type *wild-type*)
+                              forms
+                              `((the ,result-type (progn ,@forms)))))
+                   (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
+                            (ir1-convert-hairy-lambda forms vars keyp
+                                                      allow-other-keys
+                                                      aux-vars aux-vals
+                                                      :source-name source-name
+                                                      :debug-name debug-name)
+                            (ir1-convert-lambda-body forms vars
+                                                     :aux-vars aux-vars
+                                                     :aux-vals aux-vals
+                                                     :source-name source-name
+                                                     :debug-name debug-name))))
 	  (setf (functional-inline-expansion res) form)
 	  (setf (functional-arg-documentation res) (cadr form))
 	  res)))))
@@ -944,7 +936,6 @@
 			  `(() () () . ,(cdr fun)))
     (let ((*lexenv* (make-lexenv
 		     :default (process-decls decls nil nil
-					     (make-continuation)
 					     (make-null-lexenv))
 		     :vars (copy-list symbol-macros)
 		     :funs (mapcar (lambda (x)

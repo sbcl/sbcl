@@ -1980,6 +1980,7 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
   * new optimization on x86: logical functions and + now have
     optimized (UNSIGNED-BYTE 32) versions, which are automatically
     used when the result is truncated to 32 bits.
+  * VALUES declaration is partially enabled.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** The system now obeys the constraint imposed by
        UPGRADED-ARRAY-ELEMENT-TYPE that the upgraded array element
