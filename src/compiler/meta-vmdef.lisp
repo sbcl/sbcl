@@ -1265,7 +1265,7 @@
 		       (error "bad thing to be a operand type: ~S" spec)))))))
     (mapcar #'parse-operand-type specs)))
 
-;;; Check the consistency of Op's Sc restrictions with the specified
+;;; Check the consistency of OP's SC restrictions with the specified
 ;;; primitive-type restriction. :CONSTANT operands have already been
 ;;; filtered out, so only :OR and * restrictions are left.
 ;;;

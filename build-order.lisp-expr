@@ -513,10 +513,24 @@
  ("src/compiler/target/memory")
  ("src/compiler/target/static-fn")
  ("src/compiler/target/arith"
-  ;; KLUDGE: for ppc and sparc this appears to be necessary -- see the
-  ;; comment below regarding src/compiler/target/array -- CSR,
-  ;; 2002-05-05
-  :ignore-failure-p) 
+  ;; KLUDGE: for ppc and sparc this appears to be necessary, as it
+  ;; used to be for array VOPs for X86 until ca. 0.8.5.24 when CSR's
+  ;; patch for that architecture was finally committed
+  ;;
+  ;; old (0.8.5.23) comment on the array-VOP hack for X86:
+  ;; x Compiling this file for X86 raises alarming warnings of
+  ;; x the form
+  ;; x    Argument FOO to VOP CHECK-BOUND has SC restriction
+  ;; x    DESCRIPTOR-REG which is not allowed by the operand type:
+  ;; x      (:OR POSITIVE-FIXNUM)
+  ;; x This seems not to be something that I broke, but rather a "feature"
+  ;; x inherited from classic CMU CL. (Debian cmucl_2.4.8.deb compiling
+  ;; x Debian cmucl_2.4.8.tar.gz raises the same warning). Thus, even though
+  ;; x these warnings are severe enough that they would ordinarily abort
+  ;; x compilation, for now we blithely ignore them and press on to more
+  ;; x pressing problems. Someday, though, it would be nice to figure out
+  ;; x what the problem is and fix it.
+  #!+(or ppc sparc) :ignore-failure-p)
  ("src/compiler/target/subprim")
 
  ("src/compiler/target/debug")
@@ -531,21 +545,7 @@
  ("src/compiler/target/nlx")
  ("src/compiler/generic/late-nlx")
  ("src/compiler/target/show")
- ("src/compiler/target/array"
-  ;; KLUDGE: Compiling this file for X86 raises alarming warnings of
-  ;; the form
-  ;;    Argument FOO to VOP CHECK-BOUND has SC restriction
-  ;;    DESCRIPTOR-REG which is not allowed by the operand type:
-  ;;      (:OR POSITIVE-FIXNUM)
-  ;; This seems not to be something that I broke, but rather a "feature"
-  ;; inherited from classic CMU CL. (Debian cmucl_2.4.8.deb compiling
-  ;; Debian cmucl_2.4.8.tar.gz raises the same warning). Thus, even though
-  ;; these warnings are severe enough that they would ordinarily abort
-  ;; compilation, for now we blithely ignore them and press on to more
-  ;; pressing problems. Someday, though, it would be nice to figure out
-  ;; what the problem is and fix it. (See the comments in
-  ;; src/compiler/x86/array for a candidate patch.) -- WHN 19990323
-  :ignore-failure-p)
+ ("src/compiler/target/array")
  ("src/compiler/generic/array")
  ("src/compiler/target/pred")
 
