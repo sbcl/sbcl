@@ -2328,6 +2328,10 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        element-type NIL.
     ** CLEAR-INPUT accepts NIL and T for its (optional) stream
        argument.
+    ** Ratios can now be printed correctly with *PRINT-BASE* bound to
+       2, 8 or 16.
+    ** ECHO-STREAMs no longer attempt to echo the end of file value to
+       their output stream on EOF from read.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -921,9 +921,12 @@
 		(or (pop (echo-stream-unread-stuff stream))
 		    (let* ((in (echo-stream-input-stream stream))
 			   (out (echo-stream-output-stream stream))
-			   (result (,in-fun in ,@args)))
-		      (,out-fun result out)
-		      result)))))
+			   (result (if eof-error-p
+				       (,in-fun in ,@args)
+				       (,in-fun in nil in))))
+		      (cond
+			((eql result in) eof-value)
+			(t (,out-fun result out) result)))))))
   (in-fun echo-in read-char write-char eof-error-p eof-value)
   (in-fun echo-bin read-byte write-byte eof-error-p eof-value))
 
