@@ -127,5 +127,23 @@
         a)))
    'x 'y)
   'x))
+
+
+;;; other bugs
+
+;;; bug reported by Svein Ove Aas
+(defun svein-2005-ii-07 (x y)
+  (declare (optimize (speed 3) (space 2) (safety 0) (debug 0)))
+  (let ((args (list* y 1 2 x)))
+    (declare (dynamic-extent args))
+    (apply #'aref args)))
+(assert (eql
+         (svein-2005-ii-07
+          '(0)
+          #3A(((1 1 1) (1 1 1) (1 1 1))
+              ((1 1 1) (1 1 1) (4 1 1))
+              ((1 1 1) (1 1 1) (1 1 1))))
+         4))
+
 
 (sb-ext:quit :unix-status 104)

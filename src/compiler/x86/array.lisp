@@ -260,7 +260,8 @@
 		       (mask ,(1- (ash 1 bits)))
 		       (shift (* extra ,bits)))
 		  (unless (= value mask)
-		    (inst and old (ldb (byte 32 0) (lognot (ash mask shift)))))
+		    (inst and old (ldb (byte n-word-bits 0)
+                                       (lognot (ash mask shift)))))
 		  (unless (zerop value)
 		    (inst or old (ash value shift)))))
 	       (unsigned-reg

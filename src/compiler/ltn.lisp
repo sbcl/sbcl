@@ -225,10 +225,14 @@
 ;;; specified primitive TYPES.
 (defun annotate-fixed-values-lvar (lvar types)
   (declare (type lvar lvar) (list types))
-  (aver (not (lvar-dynamic-extent lvar)))   ; XXX
-  (let ((res (make-ir2-lvar nil)))
-    (setf (ir2-lvar-locs res) (mapcar #'make-normal-tn types))
-    (setf (lvar-info lvar) res))
+  (let ((info (make-ir2-lvar nil)))
+    (setf (ir2-lvar-locs info) (mapcar #'make-normal-tn types))
+    (setf (lvar-info lvar) info)
+    (when (lvar-dynamic-extent lvar)
+      (aver (proper-list-of-length-p types 1))
+      #!+stack-grows-downward-not-upward
+      (setf (ir2-lvar-stack-pointer info)
+            (make-stack-pointer-tn))))
   (ltn-annotate-casts lvar)
   (values))
 

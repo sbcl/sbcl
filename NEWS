@@ -9,6 +9,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed bug: COUNT and EQUAL on bit vectors with lengths divisible
     by the wordsize no longer ignore the last word.  (reported by Lutz
     Euler)
+  * fixed bug in type checking of dynamic-extent variables. (reported
+    by Svein Ove Aas)
   * optimization: sequence traversal functions use their freedom to
     coerce function designators to functions.
   * optimization: code with many calls to CLOS methods specialized on
