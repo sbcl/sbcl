@@ -49,10 +49,11 @@
     `(let ((,caught (catch '%end-of-the-world
 		      (/show0 "inside CATCH '%END-OF-THE-WORLD")
 		      ,@body)))
-       (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
-       (flush-standard-output-streams)
-       (/show0 "calling UNIX-EXIT")
-       (sb!unix:unix-exit ,caught))))
+      (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
+      (flush-standard-output-streams)
+      (sb!thread::terminate-session)
+      (/show0 "calling UNIX-EXIT")
+      (sb!unix:unix-exit ,caught))))
 
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 

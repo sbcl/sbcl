@@ -630,6 +630,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	     "DISABLE-DEBUGGER"
 	     "ENABLE-DEBUGGER"
 
+	     ;; the mechanism by which {en,dis}able-debugger works is
+	     ;; also exported for people writing alternative toplevels
+	     ;; (Emacs, CLIM interfaces, etc)
+	     "*INVOKE-DEBUGGER-HOOK*"
+
              ;; miscellaneous useful supported extensions
              "QUIT"
 	     "*MODULE-PROVIDER-FUNCTIONS*"
@@ -1472,7 +1477,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 	     "MUTEX" "MAKE-MUTEX" "GET-MUTEX" "RELEASE-MUTEX" "WITH-MUTEX"
 	     "MUTEX-VALUE" "WAITQUEUE" "MAKE-WAITQUEUE"
 	     "CONDITION-WAIT" "CONDITION-NOTIFY" "CONDITION-BROADCAST"
-	     "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "CURRENT-THREAD-ID"))
+	     "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "WITH-NEW-SESSION"
+	     "CURRENT-THREAD-ID"))
  
  #s(sb-cold:package-data
     :name "SB!LOOP"

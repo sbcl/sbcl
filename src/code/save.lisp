@@ -38,6 +38,7 @@
   This implementation is not as polished and painless as you might like: 
     * It corrupts the current Lisp image enough that the current process
       needs to be killed afterwards.
+    * It will not work if multiple threads are in use.
     * There is absolutely no binary compatibility of core images between
       different runtime support programs. Even runtimes built from the same
       sources at different times are treated as incompatible for this purpose.
@@ -74,8 +75,6 @@
       This is reinitialized to reflect the working directory where the
       saved core is loaded."
 
-  ;; FIXME (sb!mp::shutdown-multi-processing)
-  ;; FIXME: What is this for? Explain.
   (when (fboundp 'cancel-finalization)
     (cancel-finalization sb!sys:*tty*))
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this

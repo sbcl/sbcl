@@ -101,7 +101,9 @@
 	(t 
 	 `(progn ,@body))))
 
-;;; what's the best thing to do with these on unithread?
+;;; what's the best thing to do with these on unithread?  commented
+;;; functions are the thread versions, just to remind me what they do
+;;; there
 #+nil
 (defun condition-wait (queue lock)
   "Atomically release LOCK and enqueue ourselves on QUEUE.  Another
@@ -129,3 +131,4 @@ time we reacquire LOCK and return to the caller."
 (defun debugger-wait-until-foreground-thread (stream) t)
 (defun get-foreground () t)
 (defun release-foreground (&optional next) t)
+(defun terminate-session ())

@@ -12,29 +12,34 @@
     sb!alien:unsigned-int
   (thread-pid sb!alien:unsigned-long))
 
+(defvar *session* nil)
 
 (defun make-thread (function)
-  (let ((real-function (coerce function 'function)))
-    (%create-thread
-     (sb!kernel:get-lisp-obj-address
-      (lambda ()
-	;; in time we'll move some of the binding presently done in C
-	;; here too
-	(let ((sb!kernel::*restart-clusters* nil)
-	      (sb!impl::*descriptor-handlers* nil); serve-event
-	      (sb!impl::*available-buffers* nil)) ;for fd-stream
-	  ;; can't use handling-end-of-the-world, because that flushes
-	  ;; output streams, and we don't necessarily have any (or we
-	  ;; could be sharing them)
-	  (sb!sys:enable-interrupt sb!unix:sigint :ignore)
-	  (sb!unix:unix-exit
-	   (catch 'sb!impl::%end-of-the-world 
-	     (with-simple-restart 
-		 (destroy-thread
-		  (format nil "~~@<Destroy this thread (~A)~~@:>"
-			  (current-thread-id)))
-	       (funcall real-function))
-	     0))))))))
+  (let* ((real-function (coerce function 'function))
+	 (tid
+	  (%create-thread
+	   (sb!kernel:get-lisp-obj-address
+	    (lambda ()
+	      ;; in time we'll move some of the binding presently done in C
+	      ;; here too
+	      (let ((sb!kernel::*restart-clusters* nil)
+		    (sb!impl::*descriptor-handlers* nil) ; serve-event
+		    (sb!impl::*available-buffers* nil)) ;for fd-stream
+		;; can't use handling-end-of-the-world, because that flushes
+		;; output streams, and we don't necessarily have any (or we
+		;; could be sharing them)
+		(sb!sys:enable-interrupt sb!unix:sigint :ignore)
+		(sb!unix:unix-exit
+		 (catch 'sb!impl::%end-of-the-world 
+		   (with-simple-restart 
+		       (destroy-thread
+			(format nil "~~@<Destroy this thread (~A)~~@:>"
+				(current-thread-id)))
+		     (funcall real-function))
+		   0))))))))
+    (with-mutex ((session-lock *session*))
+      (pushnew tid (session-threads *session*)))
+    tid))
 
 ;;; Really, you don't want to use these: they'll get into trouble with
 ;;; garbage collection.  Use a lock or a waitqueue instead
@@ -320,23 +325,103 @@ time we reacquire LOCK and return to the caller."
 	  (fdefinition 'condition-notify) #'condition-notify/futex)
     t))
 
-;;;; multiple independent listeners
+;;;; job control, independent listeners
 
-(defvar *session-lock* nil)
+(defstruct session 
+  (lock (make-mutex))
+  (threads nil)
+  (interactive-threads nil)
+  (interactive-threads-queue (make-waitqueue)))
+
+(defun new-session ()
+  (let ((tid (current-thread-id)))
+    (make-session :threads (list tid)
+		  :interactive-threads (list tid))))
+
+(defun init-job-control ()
+  (setf *session* (new-session)))
+
+(defun call-with-new-session (fn)
+  (let ((tid (current-thread-id)))
+    (with-mutex ((session-lock *session*))
+      (setf (session-threads *session*)
+	    (delete tid (session-threads *session*))
+	    (session-interactive-threads *session*)
+	    (delete tid (session-interactive-threads *session*))))
+    (let ((*session* (new-session)))
+      (funcall fn))))
+
+(defmacro with-new-session (args &body forms)
+  (declare (ignore args))		;for extensibility
+  (sb!int:with-unique-names (fb-name)
+    `(labels ((,fb-name () ,@forms))
+      (call-with-new-session (function ,fb-name)))))
+
+(defun terminate-session ()
+  "Kill all threads in session exept for this one.  Does nothing if current
+thread is not the foreground thread"
+  (let* ((tid (current-thread-id))
+	 (to-kill
+	  (with-mutex ((session-lock *session*))
+	    (and (eql tid (car (session-interactive-threads *session*)))
+		 (session-threads *session*)))))
+    ;; do the kill after dropping the mutex; unwind forms in dying
+    ;; threads may want to do session things
+    (dolist (p to-kill)
+      (unless (eql p tid) (terminate-thread p)))))
+
+;;; called from top of invoke-debugger
+(defun debugger-wait-until-foreground-thread (stream)
+  "Returns T if thread had been running in background, NIL if it was
+interactive."
+  (prog1
+      (with-mutex ((session-lock *session*))
+	(not (member (current-thread-id) 
+		     (session-interactive-threads *session*))))
+    (get-foreground)))
+
+(defun thread-repl-prompt-fun (out-stream)
+  (get-foreground)
+  (let ((stopped-threads (cdr (session-interactive-threads *session*))))
+    (when stopped-threads
+      (format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
+    (sb!impl::repl-prompt-fun out-stream)))
+
+(defun get-foreground ()
+  (loop
+   (with-mutex ((session-lock *session*))
+     (let ((tid (current-thread-id)))
+       (when (eql (car (session-interactive-threads *session*)) tid)
+	 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
+	 (return-from get-foreground t))
+       (unless (member tid *interactive-threads*)
+	 (setf (cdr (last (session-interactive-threads *session*)))
+	       (list tid)))
+       (condition-wait
+	(session-interactive-threads-queue *session*)
+	(session-lock *session*))))))
+
+(defun release-foreground (&optional next)
+  "Background this thread.  If NEXT is supplied, arrange for it to have the foreground next"
+  (with-mutex ((session-lock *session*))
+    (let ((tid (current-thread-id)))
+      (setf (session-interactive-threads *session*)
+	    (delete tid *interactive-threads*))
+      (sb!sys:enable-interrupt sb!unix:sigint :ignore)
+      (when next 
+	(setf (session-interactive-threads *session*)
+	      (list* next 
+		     (delete next (session-interactive-threads *session*)))))
+      (condition-broadcast (session-interactive-threads-queue *session*)))))
 
 (defun make-listener-thread (tty-name)  
   (assert (probe-file tty-name))
-  ;; FIXME probably still need to do some tty stuff to get signals
-  ;; delivered correctly.
-  ;; FIXME 
   (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
 	 (out (sb!unix:unix-dup in))
 	 (err (sb!unix:unix-dup in)))
     (labels ((thread-repl () 
 	       (sb!unix::unix-setsid)
-	       (let* ((*session-lock*
-		       (make-mutex :name (format nil "lock for ~A" tty-name)))
-		      (sb!impl::*stdin* 
+	       (let* ((sb!impl::*stdin* 
 		       (sb!sys:make-fd-stream in :input t :buffering :line))
 		      (sb!impl::*stdout* 
 		       (sb!sys:make-fd-stream out :output t :buffering :line))
@@ -345,61 +430,9 @@ time we reacquire LOCK and return to the caller."
 		      (sb!impl::*tty* 
 		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
 		      (sb!impl::*descriptor-handlers* nil))
-		 (get-mutex *session-lock*)
-		 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
-		 (unwind-protect
-		      (sb!impl::toplevel-repl nil)
-		   (sb!int:flush-standard-output-streams)))))
+		 (with-new-session ()
+		   (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
+		   (unwind-protect
+			(sb!impl::toplevel-repl nil)
+		     (sb!int:flush-standard-output-streams))))))
       (make-thread #'thread-repl))))
-  
-;;;; job control
-
-
-(defvar *interactive-threads-lock* 
-  (make-mutex :name "*interactive-threads* lock"))
-(defvar *interactive-threads* nil)
-(defvar *interactive-threads-queue*
-  (make-waitqueue :name "All threads that need the terminal.  First ID on this list is running, the others are waiting"))
-
-(defun init-job-control ()
-  (with-mutex (*interactive-threads-lock*)
-    (setf *interactive-threads* (list (current-thread-id)))
-    (return-from init-job-control t)))
-
-;;; called from top of invoke-debugger
-(defun debugger-wait-until-foreground-thread (stream)
-  "Returns T if thread had been running in background, NIL if it was
-interactive."
-  (prog1
-      (with-mutex (*interactive-threads-lock*)
-	(not (member (current-thread-id) *interactive-threads*)))
-    (get-foreground)))
-
-(defun thread-repl-prompt-fun (out-stream)
-  (get-foreground)
-  (let ((stopped-threads (cdr *interactive-threads*)))
-    (when stopped-threads
-      (format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
-    (sb!impl::repl-prompt-fun out-stream)))
-
-(defun get-foreground ()
-  (loop
-   (with-mutex (*interactive-threads-lock*)
-     (let ((tid (current-thread-id)))
-       (when (eql (car *interactive-threads*) tid)
-	 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
-	 (return-from get-foreground t))
-       (unless (member tid *interactive-threads*)
-	 (setf (cdr (last *interactive-threads*)) (list tid)))
-       (condition-wait
-	*interactive-threads-queue* *interactive-threads-lock* )))))
-
-(defun release-foreground (&optional next)
-  "Background this thread.  If NEXT is supplied, arrange for it to have the foreground next"
-  (with-mutex (*interactive-threads-lock*)
-    (let ((tid (current-thread-id)))
-      (setf *interactive-threads* (delete tid *interactive-threads*))
-      (sb!sys:enable-interrupt sb!unix:sigint :ignore)
-      (when next (setf *interactive-threads*
-		       (list* next (delete next *interactive-threads*))))
-      (condition-broadcast *interactive-threads-queue*))))
