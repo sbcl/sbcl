@@ -4,6 +4,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed bugs 19 and 317: fixed-format floating point printing is
     more accurate.  This also fixes a bug reported by Adam Warner
     related to the ~@F format directive.
+  * fixed bug: SET-SYNTAX-FROM-CHAR correctly shallow-copies a
+    dispatch table if the from-char is a dispatch macro character.
   * fixed some bugs related to Unicode integration:
     ** portions of multibyte characters at the end of buffers for
        character-based file input are correctly transferred to the
@@ -15,6 +17,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** Space, Tab, Linefeed, Return and Page have the invalid
        secondary constituent character trait.
+    ** SET-SYNTAX-FROM-CHAR correctly copies multiple-escape character
+       syntax.
 
 changes in sbcl-0.8.19 relative to sbcl-0.8.18:
   * new port: SBCL now works in native 64-bit mode on x86-64/Linux

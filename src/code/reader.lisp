@@ -118,13 +118,13 @@
   (test-attribute char +char-attr-whitespace+ rt))
 
 (defmacro constituentp (char &optional (rt '*readtable*))
-  `(>= (get-cat-entry ,char ,rt) +char-attr-constituent+))
+  `(test-attribute ,char +char-attr-constituent+ ,rt))
 
 (defmacro terminating-macrop (char &optional (rt '*readtable*))
   `(test-attribute ,char +char-attr-terminating-macro+ ,rt))
 
-(defmacro escapep (char &optional (rt '*readtable*))
-  `(test-attribute ,char +char-attr-escape+ ,rt))
+(defmacro single-escape-p (char &optional (rt '*readtable*))
+  `(test-attribute ,char +char-attr-single-escape+ ,rt))
 
 (defmacro multiple-escape-p (char &optional (rt '*readtable*))
   `(test-attribute ,char +char-attr-multiple-escape+ ,rt))
@@ -133,50 +133,51 @@
   ;; depends on actual attribute numbering above.
   `(<= (get-cat-entry ,char ,rt) +char-attr-terminating-macro+))
 
-;;;; secondary attribute table
+;;;; constituent traits (see ANSI 2.1.4.2)
 
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
 
-(defvar *secondary-attribute-table*)
-(declaim (type attribute-table *secondary-attribute-table*))
+(defvar *constituent-trait-table*)
+(declaim (type attribute-table *constituent-trait-table*))
 
-(defun !set-secondary-attribute (char attribute)
-  (setf (elt *secondary-attribute-table* (char-code char))
-	attribute))
+(defun !set-constituent-trait (char trait)
+  (aver (typep char 'base-char))
+  (setf (elt *constituent-trait-table* (char-code char))
+	trait))
 
-(defun !cold-init-secondary-attribute-table ()
-  (setq *secondary-attribute-table*
+(defun !cold-init-constituent-trait-table ()
+  (setq *constituent-trait-table*
 	(make-array base-char-code-limit :element-type '(unsigned-byte 8)
 		    :initial-element +char-attr-constituent+))
-  (!set-secondary-attribute #\: +char-attr-package-delimiter+)
-  (!set-secondary-attribute #\| +char-attr-multiple-escape+) ; |) [for EMACS]
-  (!set-secondary-attribute #\. +char-attr-constituent-dot+)
-  (!set-secondary-attribute #\+ +char-attr-constituent-sign+)
-  (!set-secondary-attribute #\- +char-attr-constituent-sign+)
-  (!set-secondary-attribute #\/ +char-attr-constituent-slash+)
+  (!set-constituent-trait #\: +char-attr-package-delimiter+)
+  (!set-constituent-trait #\. +char-attr-constituent-dot+)
+  (!set-constituent-trait #\+ +char-attr-constituent-sign+)
+  (!set-constituent-trait #\- +char-attr-constituent-sign+)
+  (!set-constituent-trait #\/ +char-attr-constituent-slash+)
   (do ((i (char-code #\0) (1+ i)))
       ((> i (char-code #\9)))
-    (!set-secondary-attribute (code-char i) +char-attr-constituent-digit+))
-  (!set-secondary-attribute #\E +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\F +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\D +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\S +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\L +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\e +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\f +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\d +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\s +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\l +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\Space +char-attr-invalid+)
-  (!set-secondary-attribute #\Newline +char-attr-invalid+)
+    (!set-constituent-trait (code-char i) +char-attr-constituent-digit+))
+  (!set-constituent-trait #\E +char-attr-constituent-expt+)
+  (!set-constituent-trait #\F +char-attr-constituent-expt+)
+  (!set-constituent-trait #\D +char-attr-constituent-expt+)
+  (!set-constituent-trait #\S +char-attr-constituent-expt+)
+  (!set-constituent-trait #\L +char-attr-constituent-expt+)
+  (!set-constituent-trait #\e +char-attr-constituent-expt+)
+  (!set-constituent-trait #\f +char-attr-constituent-expt+)
+  (!set-constituent-trait #\d +char-attr-constituent-expt+)
+  (!set-constituent-trait #\s +char-attr-constituent-expt+)
+  (!set-constituent-trait #\l +char-attr-constituent-expt+)
+  (!set-constituent-trait #\Space +char-attr-invalid+)
+  (!set-constituent-trait #\Newline +char-attr-invalid+)
   (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
 		   return-char-code rubout-char-code))
-    (!set-secondary-attribute (code-char c) +char-attr-invalid+)))
+    (!set-constituent-trait (code-char c) +char-attr-invalid+)))
 		   
-(defmacro get-secondary-attribute (char)
-  `(elt *secondary-attribute-table*
-	(char-code ,char)))
+(defmacro get-constituent-trait (char)
+  `(if (typep ,char 'base-char)
+       (elt *constituent-trait-table* (char-code ,char))
+       +char-attr-constituent+))
 
 ;;;; readtable operations
 
@@ -216,17 +217,25 @@
   optional readtable (defaults to the current readtable). The
   FROM-TABLE defaults to the standard Lisp readtable when NIL."
   (let ((really-from-readtable (or from-readtable *standard-readtable*)))
-    ;; Copy FROM-CHAR entries to TO-CHAR entries, but make sure that if
-    ;; FROM-CHAR is a constituent you don't copy non-movable secondary
-    ;; attributes (constituent types), and that said attributes magically
-    ;; appear if you transform a non-constituent to a constituent.
-    (let ((att (get-cat-entry from-char really-from-readtable)))
-      (if (constituentp from-char really-from-readtable)
-	  (setq att (get-secondary-attribute to-char)))
+    (let ((att (get-cat-entry from-char really-from-readtable))
+	  (mac (get-raw-cmt-entry from-char really-from-readtable))
+	  (from-dpair (find from-char (dispatch-tables really-from-readtable)
+			    :test #'char= :key #'car))
+	  (to-dpair (find to-char (dispatch-tables to-readtable)
+			  :test #'char= :key #'car)))
       (set-cat-entry to-char att to-readtable)
-      (set-cmt-entry to-char
-		     (get-raw-cmt-entry from-char really-from-readtable)
-		     to-readtable)))
+      (set-cmt-entry to-char mac to-readtable)
+      (when from-dpair
+	(cond
+	  (to-dpair
+	   (let ((table (cdr to-dpair)))
+	     (clrhash table)
+	     (shallow-replace/eql-hash-table table (cdr from-dpair))))
+	  (t
+	   (let ((pair (cons to-char (make-hash-table))))
+	     (shallow-replace/eql-hash-table (cdr pair) (cdr from-dpair))
+	     (setf (dispatch-tables to-readtable)
+		   (push pair (dispatch-tables to-readtable)))))))))
   t)
 
 (defun set-macro-character (char function &optional
@@ -237,10 +246,9 @@
    by the reader. The NON-TERMINATINGP flag can be used to make the macro
    character non-terminating, i.e. embeddable in a symbol name."
   (let ((designated-readtable (or readtable *standard-readtable*)))
-    (set-cat-entry char
-		   (if non-terminatingp
-		       (get-secondary-attribute char)
-		       +char-attr-terminating-macro+)
+    (set-cat-entry char (if non-terminatingp
+			    +char-attr-constituent+
+			    +char-attr-terminating-macro+)
 		   designated-readtable)
     (set-cmt-entry char function designated-readtable)
     t)) ; (ANSI-specified return value)
@@ -321,8 +329,11 @@
       (whitespaceify (code-char form-feed-char-code))
       (whitespaceify (code-char return-char-code)))
 
-    (set-cat-entry #\\ +char-attr-escape+)
+    (set-cat-entry #\\ +char-attr-single-escape+)
     (set-cmt-entry #\\ nil)
+
+    (set-cat-entry #\| +char-attr-multiple-escape+)
+    (set-cmt-entry #\| nil)
 
     ;; Easy macro-character definitions are in this source file.
     (set-macro-character #\" #'read-string)
@@ -339,7 +350,6 @@
 	((= ichar base-char-code-limit))
       (setq char (code-char ichar))
       (when (constituentp char *standard-readtable*)
-	(set-cat-entry char (get-secondary-attribute char))
 	(set-cmt-entry char nil)))))
 
 ;;;; implementation of the read buffer
@@ -584,14 +594,14 @@
 	  (do ((char (fast-read-char t) (fast-read-char t)))
 	      ((char= char closech)
 	       (done-with-fast-read-char))
-	    (if (escapep char) (setq char (fast-read-char t)))
+	    (if (single-escape-p char) (setq char (fast-read-char t)))
 	    (ouch-read-buffer char)))
 	;; CLOS stream
 	(do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
 	    ((or (eq char :eof) (char= char closech))
 	     (if (eq char :eof)
 		 (error 'end-of-file :stream stream)))
-	  (when (escapep char)
+	  (when (single-escape-p char)
 	    (setq char (read-char stream nil :eof))
 	    (if (eq char :eof)
 		(error 'end-of-file :stream stream)))
@@ -621,7 +631,7 @@
 	      t)
 	     (t nil))
        (values escapes colon))
-    (cond ((escapep char)
+    (cond ((single-escape-p char)
 	   ;; It can't be a number, even if it's 1\23.
 	   ;; Read next char here, so it won't be casified.
 	   (push *ouch-ptr* escapes)
@@ -638,7 +648,7 @@
 		((eofp ch)
 		 (reader-eof-error stream "inside extended token"))
 		((multiple-escape-p ch) (return))
-		((escapep ch)
+		((single-escape-p ch)
 		 (let ((nextchar (read-char stream nil *eof-object*)))
 		   (cond ((eofp nextchar)
 			  (reader-eof-error stream "after escape character"))
@@ -650,8 +660,8 @@
 		 (ouch-read-buffer ch))))))
 	  (t
 	   (when (and (constituentp char)
-			(eql (get-secondary-attribute char)
-                             +char-attr-package-delimiter+)
+		      (eql (get-constituent-trait char)
+			   +char-attr-package-delimiter+)
 		      (not colon))
 	     (setq colon *ouch-ptr*))
 	   (ouch-read-buffer char))))))
@@ -669,9 +679,11 @@
      (declare (fixnum att))
      (cond
        ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
-       ((= att +char-attr-invalid+) 
-	(%reader-error stream "invalid constituent"))
-       (t att))))
+       ((< att +char-attr-constituent+) att)
+       (t (setf att (get-constituent-trait ,char))
+	  (if (= att +char-attr-invalid+) 
+	      (%reader-error stream "invalid constituent")
+	      att)))))
 
 ;;; Return the character class for CHAR, which might be part of a
 ;;; rational number.
@@ -682,11 +694,14 @@
      (declare (fixnum att))
      (cond
        ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
-       ((digit-char-p ,char *read-base*) +char-attr-constituent-digit+)
-       ((= att +char-attr-constituent-digit+) +char-attr-constituent+)
-       ((= att +char-attr-invalid+) 
-	(%reader-error stream "invalid constituent"))
-       (t att))))
+       ((< att +char-attr-constituent+) att)
+       (t (setf att (get-constituent-trait ,char))
+	  (cond
+	    ((digit-char-p ,char *read-base*) +char-attr-constituent-digit+)
+	    ((= att +char-attr-constituent-digit+) +char-attr-constituent+)
+	    ((= att +char-attr-invalid+) 
+	     (%reader-error stream "invalid constituent"))
+	    (t att))))))
 
 ;;; Return the character class for a char which might be part of a
 ;;; rational or floating number. (Assume that it is a digit if it
@@ -696,25 +711,28 @@
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
-     (when possibly-rational
-       (setq possibly-rational
-	     (or (digit-char-p ,char *read-base*)
-		 (= att +char-attr-constituent-slash+))))
-     (when possibly-float
-       (setq possibly-float
-	     (or (digit-char-p ,char 10)
-		 (= att +char-attr-constituent-dot+))))
      (cond
        ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
-       ((digit-char-p ,char (max *read-base* 10))
-	(if (digit-char-p ,char *read-base*)
-	    (if (= att +char-attr-constituent-expt+)
-		+char-attr-constituent-digit-or-expt+
-	        +char-attr-constituent-digit+)
-	    +char-attr-constituent-decimal-digit+))
-       ((= att +char-attr-invalid+)
-	(%reader-error stream "invalid constituent"))
-       (t att))))
+       ((< att +char-attr-constituent+) att)
+       (t (setf att (get-constituent-trait ,char))
+	  (when possibly-rational
+	    (setq possibly-rational
+		  (or (digit-char-p ,char *read-base*)
+		      (= att +char-attr-constituent-slash+))))
+	  (when possibly-float
+	    (setq possibly-float
+		  (or (digit-char-p ,char 10)
+		      (= att +char-attr-constituent-dot+))))
+	  (cond
+	    ((digit-char-p ,char (max *read-base* 10))
+	     (if (digit-char-p ,char *read-base*)
+		 (if (= att +char-attr-constituent-expt+)
+		     +char-attr-constituent-digit-or-expt+
+		     +char-attr-constituent-digit+)
+		 +char-attr-constituent-decimal-digit+))
+	    ((= att +char-attr-invalid+)
+	     (%reader-error stream "invalid constituent"))
+	    (t att))))))
 
 ;;;; token fetching
 
@@ -805,7 +823,7 @@
 	 (go LEFTDIGIT))
 	(#.+char-attr-constituent-decimal-digit+ (go LEFTDECIMALDIGIT))
 	(#.+char-attr-constituent-dot+ (go FRONTDOT))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-invalid+ (%reader-error "invalid constituent"))
@@ -824,7 +842,7 @@
 	 (go LEFTDIGIT))
 	(#.+char-attr-constituent-decimal-digit+ (go LEFTDECIMALDIGIT))
 	(#.+char-attr-constituent-dot+ (go SIGNDOT))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))	
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
@@ -855,7 +873,7 @@
 					     (go SYMBOL)))
 	(#.+char-attr-delimiter+ (unread-char char stream)
 				 (return (make-integer)))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -875,7 +893,7 @@
 					     (go SYMBOL)))
 	(#.+char-attr-delimiter+ (unread-char char stream)
 				 (return (make-integer)))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -892,7 +910,7 @@
 					 (go SYMBOL))
 	(#.+char-attr-delimiter+ (unread-char char stream)
 				 (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -908,7 +926,7 @@
 	 (unread-char char stream)
 	 (return (let ((*read-base* 10))
 		   (make-integer))))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -922,7 +940,7 @@
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (return (make-float stream)))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -933,7 +951,7 @@
       (case (char-class char attribute-array attribute-hash-table)
 	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(t (go SYMBOL)))
      FRONTDOT ; saw "dot"
@@ -944,7 +962,7 @@
 	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-constituent-dot+ (go DOTS))
 	(#.+char-attr-delimiter+  (%reader-error stream "dot context error"))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -957,7 +975,7 @@
 	(#.+char-attr-constituent-sign+ (go EXPTSIGN))
 	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -968,7 +986,7 @@
       (case (char-class char attribute-array attribute-hash-table)
 	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -981,7 +999,7 @@
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (return (make-float stream)))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -992,7 +1010,7 @@
       (case (char-class2 char attribute-array attribute-hash-table)
 	(#.+char-attr-constituent-digit+ (go RATIODIGIT))
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -1005,7 +1023,7 @@
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (return (make-ratio stream)))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -1018,7 +1036,7 @@
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (%reader-error stream "too many dots"))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -1032,8 +1050,8 @@
 	       (setq char (fast-read-char nil nil))
 	       (unless char (go RETURN-SYMBOL))
 	       (case (char-class char attribute-array attribute-hash-table)
-		 (#.+char-attr-escape+ (done-with-fast-read-char)
-				       (go ESCAPE))
+		 (#.+char-attr-single-escape+ (done-with-fast-read-char)
+					      (go SINGLE-ESCAPE))
 		 (#.+char-attr-delimiter+ (done-with-fast-read-char)
 					  (unread-char char stream)
 					  (go RETURN-SYMBOL))
@@ -1049,25 +1067,25 @@
 	     (setq char (read-char stream nil :eof))
 	     (when (eq char :eof) (go RETURN-SYMBOL))
 	     (case (char-class char attribute-array attribute-hash-table)
-	       (#.+char-attr-escape+ (go ESCAPE))
+	       (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	       (#.+char-attr-delimiter+ (unread-char char stream)
 			    (go RETURN-SYMBOL))
 	       (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	       (#.+char-attr-package-delimiter+ (go COLON))
 	       (t (go SYMBOL-LOOP))))))
-     ESCAPE ; saw an escape
-      ;; Don't put the escape in the read buffer.
+     SINGLE-ESCAPE ; saw a single-escape
+      ;; Don't put the escape character in the read buffer.
       ;; READ-NEXT CHAR, put in buffer (no case conversion).
       (let ((nextchar (read-char stream nil nil)))
 	(unless nextchar
-	  (reader-eof-error stream "after escape character"))
+	  (reader-eof-error stream "after single-escape character"))
 	(push *ouch-ptr* escapes)
 	(ouch-read-buffer nextchar))
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -1075,14 +1093,14 @@
       (setq seen-multiple-escapes t)
       (do ((char (read-char stream t) (read-char stream t)))
 	  ((multiple-escape-p char))
-	(if (escapep char) (setq char (read-char stream t)))
+	(if (single-escape-p char) (setq char (read-char stream t)))
 	(push *ouch-ptr* escapes)
 	(ouch-read-buffer char))
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
 	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
@@ -1113,7 +1131,7 @@
 	 (%reader-error stream
 			"illegal terminating character after a colon: ~S"
 			char))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go INTERN))
 	(t (go SYMBOL)))
@@ -1128,7 +1146,7 @@
 	 (%reader-error stream
 			"illegal terminating character after a colon: ~S"
 			char))
-	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+
 	 (%reader-error stream
@@ -1550,7 +1568,7 @@
 
 (defun !reader-cold-init ()
   (!cold-init-read-buffer)
-  (!cold-init-secondary-attribute-table)
+  (!cold-init-constituent-trait-table)
   (!cold-init-standard-readtable)
   ;; FIXME: This was commented out, but should probably be restored.
   #+nil (!cold-init-integer-reader))
