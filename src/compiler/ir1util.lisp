@@ -877,7 +877,14 @@
 	(reoptimize-continuation cont)))
 
   (dolist (b (block-pred block))
-    (unlink-blocks b block))
+    (unlink-blocks b block)
+    ;; In bug 147 the almost-all-blocks-have-a-successor invariant was
+    ;; broken when successors were deleted without setting the
+    ;; BLOCK-DELETE-P flags of their predececessors. Make sure that
+    ;; doesn't happen again.
+    (aver (not (and (null (block-succ b))
+                    (not (block-delete-p b))
+                    (not (eq b (component-head (block-component b))))))))
   (dolist (b (block-succ block))
     (unlink-blocks block b))
 

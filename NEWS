@@ -1102,6 +1102,11 @@ changes in sbcl-0.7.3 relative to sbcl-0.7.2:
     default supplied-p) for &optional and &key arguments. (thanks to
     Martin Atzmueller)
 
+changes in sbcl-0.7.4 relative to sbcl-0.7.3:
+  * bug 147 fixed: The compiler preserves its block link/count
+    invariants more correctly now so that it doesn't crash. (thanks
+    to Alexey Dejneka)
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

@@ -239,15 +239,27 @@
   (do-blocks (block component)
     (cond
      ((or (block-delete-p block)
-	  (null (block-pred block))
-	  (eq (functional-kind (block-home-lambda block)) :deleted))
+	  (null (block-pred block)))
       (delete-block block))
+     ((eq (functional-kind (block-home-lambda block)) :deleted)
+      ;; Preserve the BLOCK-SUCC invariant that almost every block has
+      ;; one successor (and a block with DELETE-P set is an acceptable
+      ;; exception).
+      (labels ((mark-blocks (block)
+                 (dolist (pred (block-pred block))
+                   (when (and (not (block-delete-p pred))
+                              (eq (functional-kind (block-home-lambda pred))
+                                  :deleted))
+                     (setf (block-delete-p pred) t)
+                     (mark-blocks pred)))))
+        (mark-blocks block)
+        (delete-block block)))
      (t
       (loop
 	(let ((succ (block-succ block)))
 	  (unless (and succ (null (rest succ)))
 	    (return)))
-	
+
 	(let ((last (block-last block)))
 	  (typecase last
 	    (cif
@@ -257,8 +269,8 @@
 	    (exit
 	     (when (maybe-delete-exit last)
 	       (return)))))
-	
-	(unless (join-successor-if-possible block)
+
+        (unless (join-successor-if-possible block)
 	  (return)))
 
       (when (and (block-reoptimize block) (block-component block))

@@ -77,6 +77,17 @@
 (defun bug150-test2 ()
   (let ()
     (<)))
+
+;;; bug 147, fixed by APD 2002-04-28
+;;;
+;;; This test case used to crash the compiler, e.g. with
+;;;   failed AVER: "(= (LENGTH (BLOCK-SUCC CALL-BLOCK)) 1)"
+(defun bug147 (string ind)
+  (flet ((digs ()
+           (let (old-index)
+	     (if (and (< ind ind)
+		      (typep (char string ind) '(member #\1)))
+		 nil))))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

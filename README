@@ -27,11 +27,13 @@ system, please send mail to one of the mailing lists:
 SYSTEM-SPECIFIC HINTS
 
 for OpenBSD:
-  It's reported for CMU CL (by Darren Bane on the comp.lang.lisp newsgroup,
-  2002-04-22) that OpenBSD 3.0 has stricter ulimit values, and/or enforces
-  them more strictly, than its predecessors, and so CMU CL's initial mmap()
-  won't work unless you increase the limit on the data segment, e.g. with
-    ulimit -S -d 524288
-  before you run CMU CL. The same is probably true of SBCL, but hasn't been
-  tested yet. (As of sbcl-0.7.3, SBCL has only been tested on OpenBSD 2.9
-  and earlier.)
+  OpenBSD 3.0 has stricter ulimit values, and/or enforces them more
+  strictly, than its predecessors. Therefore SBCL's initial mmap()
+  won't work unless you increase the limit on the data segment from
+  the OpenBSD defaults, e.g. with
+    ulimit -S -d 1000000
+  before you run SBCL. Otherwise SBCL fails with a message like
+  "ensure_space: failed to validate xxxxxxx bytes at yyyyy". (SBCL
+  is just allocating this huge address space, not actually using this
+  huge memory at this point. OpenBSD <3.0 had no problem with this,
+  but OpenBSD 3.0 is less hospitable.)
