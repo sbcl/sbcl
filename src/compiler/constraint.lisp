@@ -110,9 +110,14 @@
 
 ;;; Add complementary constraints to the consequent and alternative
 ;;; blocks of IF. We do nothing if X is NIL.
-#!-sb-fluid (declaim (inline add-complement-constraints))
 (defun add-complement-constraints (if fun x y not-p)
-  (when x
+  (when (and x
+	     ;; Note: Even if we do (IF test exp exp) => (PROGN test exp)
+	     ;; optimization, the *MAX-OPTIMIZE-ITERATIONS* cutoff means
+	     ;; that we can't guarantee that the optimization will be
+	     ;; done, so we still need to avoid barfing on this case.
+             (not (eq (if-consequent if)
+                      (if-alternative if))))
     (add-test-constraint (if-consequent if) fun x y not-p)
     (add-test-constraint (if-alternative if) fun x y (not not-p)))
   (values))

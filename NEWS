@@ -1250,6 +1250,11 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
   * The fasl file version number has changed again. (because of the
     bug fix involving the names of PCL MAKE-INSTANCE functions)
 
+changes in sbcl-0.7.8 relative to sbcl-0.7.7:
+  * fixed bug 120a: The compiler now deals correctly with IFs where
+    the consequent is the same as the alternative, instead of
+    misderiving the return type. (thanks to Alexey Dejneka)
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

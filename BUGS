@@ -659,19 +659,6 @@ WORKAROUND:
    Raymond Toy comments that this is tricky on the X86 since its FPU
    uses 80-bit precision internally.
 
-120a:
-   The compiler incorrectly figures the return type of 
-	(DEFUN FOO (FRAME UP-FRAME)
-	  (IF (OR (NOT FRAME)
-		  T)
-	      FRAME
-	      "BAR"))
-   as NIL.
-
-   This problem exists in CMU CL 18c too. When I reported it on
-   cmucl-imp@cons.org, Raymond Toy replied 23 Aug 2001 with 
-   a partial explanation, but no fix has been found yet.
-
 120b:
    Even in sbcl-0.pre7.x, which is supposed to be free of the old
    non-ANSI behavior of treating the function return type inferred
