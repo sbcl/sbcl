@@ -60,6 +60,8 @@
 
 (sb!xc:deftype atom () '(not cons))
 
+(sb!xc:deftype base-char () 'character)
+
 (sb!xc:deftype extended-char ()
   #!+sb-doc
   "Type of CHARACTERs that aren't BASE-CHARs."

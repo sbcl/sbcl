@@ -1998,7 +1998,7 @@ register."
        (zerop (logand val 3))
        ;; character
        (and (zerop (logand val #xffff0000)) ; Top bits zero
-	    (= (logand val #xff) sb!vm:base-char-widetag)) ; char tag
+	    (= (logand val #xff) sb!vm:character-widetag)) ; char tag
        ;; unbound marker
        (= val sb!vm:unbound-marker-widetag)
        ;; pointer
@@ -2053,7 +2053,7 @@ register."
        (sb!sys:without-gcing
         (with-escaped-value (val) (sb!kernel:make-lisp-obj val))))
                             
-      (#.sb!vm:base-char-reg-sc-number
+      (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
       (#.sb!vm:sap-reg-sc-number
@@ -2143,7 +2143,7 @@ register."
                                       sb!vm:n-word-bytes)))))
       (#.sb!vm:control-stack-sc-number
        (sb!kernel:stack-ref fp (sb!c:sc-offset-offset sc-offset)))
-      (#.sb!vm:base-char-stack-sc-number
+      (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
          (code-char (sb!sys:sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
                                               sb!vm:n-word-bytes)))))
@@ -2188,7 +2188,7 @@ register."
        (without-gcing
 	(with-escaped-value (val)
 	  (make-valid-lisp-obj val))))
-      (#.sb!vm:base-char-reg-sc-number
+      (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
 	 (code-char val)))
       (#.sb!vm:sap-reg-sc-number
@@ -2247,7 +2247,7 @@ register."
 			       sb!vm:n-word-bytes)))))
       (#.sb!vm:control-stack-sc-number
        (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
-      (#.sb!vm:base-char-stack-sc-number
+      (#.sb!vm:character-stack-sc-number
        (code-char
 	(sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 			     sb!vm:n-word-bytes)))))
@@ -2328,7 +2328,7 @@ register."
        (without-gcing
 	(set-escaped-value
 	  (get-lisp-obj-address value))))
-      (#.sb!vm:base-char-reg-sc-number
+      (#.sb!vm:character-reg-sc-number
        (set-escaped-value (char-code value)))
       (#.sb!vm:sap-reg-sc-number
        (set-escaped-value (sap-int value)))
@@ -2427,7 +2427,7 @@ register."
 	       (the long-float (realpart value)))))
       (#.sb!vm:control-stack-sc-number
        (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
-      (#.sb!vm:base-char-stack-sc-number
+      (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
 					 sb!vm:n-word-bytes))
@@ -2462,7 +2462,7 @@ register."
        (without-gcing
 	(set-escaped-value
 	  (get-lisp-obj-address value))))
-      (#.sb!vm:base-char-reg-sc-number
+      (#.sb!vm:character-reg-sc-number
        (set-escaped-value (char-code value)))
       (#.sb!vm:sap-reg-sc-number
        (set-escaped-value (sap-int value)))
@@ -2526,7 +2526,7 @@ register."
 	     (imagpart (the (complex long-float) value))))
       (#.sb!vm:control-stack-sc-number
        (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
-      (#.sb!vm:base-char-stack-sc-number
+      (#.sb!vm:character-stack-sc-number
        (setf (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 					 sb!vm:n-word-bytes)))
 	     (char-code (the character value))))

@@ -64,7 +64,7 @@
 	 (nil #:mu 0 simple-array-nil
 	      :complex-typecode #.sb!vm:complex-vector-nil-widetag
 	      :importance 0)
-	 (base-char ,(code-char 0) 8 simple-base-string
+	 (character ,(code-char 0) 8 simple-base-string
 		    ;; (SIMPLE-BASE-STRINGs are stored with an extra
 		    ;; trailing #\NULL for convenience in calling out
 		    ;; to C.)

@@ -91,7 +91,7 @@
     ;; and for all in any reasonable user programs.)
     ((t)
      (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
-    ((base-char standard-char)
+    ((base-char standard-char character)
      (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
@@ -110,7 +110,7 @@
     ;; Pick off some easy common cases.
     ((t)
      #.sb!vm:complex-vector-widetag)
-    ((base-char)
+    ((base-char character)
      #.sb!vm:complex-base-string-widetag)
     ((nil)
      #.sb!vm:complex-vector-nil-widetag)
@@ -120,7 +120,7 @@
     (t
      (pick-vector-type type
        (nil #.sb!vm:complex-vector-nil-widetag)
-       (base-char #.sb!vm:complex-base-string-widetag)
+       (character #.sb!vm:complex-base-string-widetag)
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
@@ -854,7 +854,7 @@
 	  ,@(map 'list
 		 (lambda (saetp)
 		   `((simple-array ,(sb!vm:saetp-specifier saetp) (*))
-		     ,(if (eq (sb!vm:saetp-specifier saetp) 'base-char)
+		     ,(if (eq (sb!vm:saetp-specifier saetp) 'character)
 			  *default-init-char-form*
 			  (sb!vm:saetp-initial-element-default saetp))))
 		 (remove-if-not

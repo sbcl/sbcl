@@ -198,11 +198,11 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	/* Is it plausible cons? */
 	if ((is_lisp_pointer(start_addr[0])
 	    || ((start_addr[0] & 3) == 0) /* fixnum */
-	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
+	    || (widetag_of(start_addr[0]) == CHARACTER_WIDETAG)
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
 	       || ((start_addr[1] & 3) == 0) /* fixnum */
-	       || (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
+	       || (widetag_of(start_addr[1]) == CHARACTER_WIDETAG)
 	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG))) {
 	    break;
 	} else {
@@ -246,7 +246,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	}
 	switch (widetag_of(start_addr[0])) {
 	case UNBOUND_MARKER_WIDETAG:
-	case BASE_CHAR_WIDETAG:
+	case CHARACTER_WIDETAG:
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);

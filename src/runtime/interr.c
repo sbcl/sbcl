@@ -112,7 +112,7 @@ describe_internal_error(os_context_t *context)
 	    brief_print(*os_context_register_addr(context, offset));
 	    break;
 
-	case sc_BaseCharReg:
+	case sc_CharacterReg:
 	    ch = *os_context_register_addr(context, offset);
 #ifdef LISP_FEATURE_X86
 	    if (offset&1)

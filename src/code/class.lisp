@@ -931,8 +931,10 @@
   (setq
    *built-in-classes*
    '((t :state :read-only :translation t)
-     (character :enumerable t :translation base-char
+     (character :enumerable t 
+                :codes (#.sb!vm:character-widetag)
                 :prototype-form (code-char 42))
+     #+nil
      (base-char :enumerable t
 		:inherits (character)
 		:codes (#.sb!vm:base-char-widetag)

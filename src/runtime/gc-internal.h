@@ -83,7 +83,7 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
 	/* If thing is an immediate then this is a cons. */
 	if (is_lisp_pointer(thing)
 	    || ((thing & 3) == 0) /* fixnum */
-	    || (widetag_of(thing) == BASE_CHAR_WIDETAG)
+	    || (widetag_of(thing) == CHARACTER_WIDETAG)
 	    || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
 	    count = 2;
 	else

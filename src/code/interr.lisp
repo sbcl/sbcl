@@ -190,10 +190,10 @@
 (deferr unbound-symbol-error (symbol)
   (error 'unbound-variable :name symbol))
 
-(deferr object-not-base-char-error (object)
+(deferr object-not-character-error (object)
   (error 'type-error
 	 :datum object
-	 :expected-type 'base-char))
+	 :expected-type 'character))
 
 (deferr object-not-sap-error (object)
   (error 'type-error

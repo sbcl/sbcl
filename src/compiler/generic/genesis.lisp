@@ -444,7 +444,7 @@
 			   type)))
 
 (defun make-character-descriptor (data)
-  (make-other-immediate-descriptor data sb!vm:base-char-widetag))
+  (make-other-immediate-descriptor data sb!vm:character-widetag))
 
 (defun descriptor-beyond (des offset type)
   (let* ((low (logior (+ (logandc2 (descriptor-low des) sb!vm:lowtag-mask)

@@ -24,14 +24,14 @@
        (load-symbol y val))
       (character
        (inst mov y (logior (ash (char-code val) n-widetag-bits)
-			   base-char-widetag))))))
+			   character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
   (inst mov y (tn-value x)))
 
-(define-move-fun (load-base-char 1) (vop x y)
-  ((immediate) (base-char-reg))
+(define-move-fun (load-character 1) (vop x y)
+  ((immediate) (character-reg))
   (inst mov y (char-code (tn-value x))))
 
 (define-move-fun (load-system-area-pointer 1) (vop x y)
@@ -44,7 +44,7 @@
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg)
-   (base-char-stack) (base-char-reg)
+   (character-stack) (character-reg)
    (sap-stack) (sap-reg)
    (signed-stack) (signed-reg)
    (unsigned-stack) (unsigned-reg))
@@ -52,7 +52,7 @@
 
 (define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg) (control-stack)
-   (base-char-reg) (base-char-stack)
+   (character-reg) (character-stack)
    (sap-reg) (sap-stack)
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
@@ -82,7 +82,7 @@
 	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
 	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
-				 base-char-widetag)))))
+				 character-widetag)))))
       (move y x))))
 
 (define-move-vop move :move
@@ -121,7 +121,7 @@
 	       (load-symbol y val))
 	      (character
 	       (inst mov y (logior (ash (char-code val) n-widetag-bits)
-				   base-char-widetag)))))
+				   character-widetag)))))
 	 (move y x)))
       ((control-stack)
        (if (sc-is x immediate)
@@ -136,7 +136,7 @@
 			    fp (tn-offset y)))
 		   (character
 		    (storew (logior (ash (char-code val) n-widetag-bits)
-				    base-char-widetag)
+				    character-widetag)
 			    fp (tn-offset y))))
 	       ;; Lisp stack
 	       (etypecase val
@@ -147,7 +147,7 @@
 			  fp (- (1+ (tn-offset y)))))
 		 (character
 		  (storew (logior (ash (char-code val) n-widetag-bits)
-				  base-char-widetag)
+				  character-widetag)
 			  fp (- (1+ (tn-offset y))))))))
 	 (if (= (tn-offset fp) esp-offset)
 	     ;; C-call

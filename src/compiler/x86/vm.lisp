@@ -182,7 +182,7 @@
   ;; the non-descriptor stacks
   (signed-stack stack)			; (signed-byte 32)
   (unsigned-stack stack)		; (unsigned-byte 32)
-  (base-char-stack stack)		; non-descriptor characters.
+  (character-stack stack)		; non-descriptor characters.
   (sap-stack stack)			; System area pointers.
   (single-stack stack)			; single-floats
   (double-stack stack :element-size 2)	; double-floats.
@@ -228,12 +228,12 @@
 		  :alternate-scs (control-stack))
 
   ;; non-descriptor characters
-  (base-char-reg registers
+  (character-reg registers
 		 :locations #.*byte-regs*
 		 :reserve-locations (#.ah-offset #.al-offset)
 		 :constant-scs (immediate)
 		 :save-p t
-		 :alternate-scs (base-char-stack))
+		 :alternate-scs (character-stack))
 
   ;; non-descriptor SAPs (arbitrary pointers into address space)
   (sap-reg registers
@@ -322,7 +322,7 @@
   (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defparameter *byte-sc-names* '(base-char-reg byte-reg base-char-stack))
+(defparameter *byte-sc-names* '(character-reg byte-reg character-stack))
 (defparameter *word-sc-names* '(word-reg))
 (defparameter *dword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
