@@ -161,7 +161,7 @@
 		"src/pcl/macros"
                 "src/pcl/compiler-support"
 		"src/pcl/low"
-		"src/pcl/fin"
+		;; "src/pcl/fin" merged into "src/pcl/low" in 0.6.11.43
 		"src/pcl/defclass"
 		"src/pcl/defs"
 		"src/pcl/fngen"

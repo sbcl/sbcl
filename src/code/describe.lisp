@@ -11,6 +11,10 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
+
+;; byte-compile this file
+(declaim (optimize (speed 0) (safety 1)))
+
 
 (defvar *describe-indentation-step* 3
   #+sb-doc

@@ -26,6 +26,9 @@
 
 (in-package "SB-PCL")
 
+;; byte-compile this file
+(declaim (optimize (speed 0) (safety 1)))
+
 (defmethod slots-to-inspect ((class slot-class) (object slot-object))
   (class-slots class))
 

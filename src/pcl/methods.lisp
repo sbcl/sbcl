@@ -603,6 +603,12 @@
 		 t)))
 	#'(lambda (&rest args) (funcall mf args nil))))
 
+
+(defun error-need-at-least-n-args (function n)
+  (error "~@<The function ~2I~_~S ~I~_requires at least ~D argument~:P.~:>"
+	 function
+	 n))
+
 (defun types-from-arguments (generic-function arguments
 			     &optional type-modifier)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
@@ -612,9 +618,8 @@
       (dotimes-fixnum (i nreq)
 	i
 	(unless arguments
-	  (error "The function ~S requires at least ~D arguments"
-		 (generic-function-name generic-function)
-		 nreq))
+	  (error-need-at-least-n-args (generic-function-name generic-function)
+				      nreq))
 	(let ((arg (pop arguments)))
 	  (push (if type-modifier `(,type-modifier ,arg) arg) types-rev)))
       (values (nreverse types-rev) arg-info))))

@@ -292,6 +292,13 @@
 (defknown %make-funcallable-instance (index layout) function
   (unsafe))
 
+;;; FIXME/REMOVEME: MNA patched these like this, but I don't
+;;; understand why, so I mutated them back to see what goes wrong.
+;;;-(defknown %funcallable-instance-info (function index) t (flushable))
+;;;-(defknown %set-funcallable-instance-info (function index t) t (unsafe))
+;;;+(defknown %funcallable-instance-info ((or function cons) index) t (flushable))
+;;;+(defknown %set-funcallable-instance-info ((or function cons) index t) t (unsafe))
+;;;
 (defknown %funcallable-instance-info (function index) t (flushable))
 (defknown %set-funcallable-instance-info (function index t) t (unsafe))
 

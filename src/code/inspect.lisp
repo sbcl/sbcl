@@ -11,6 +11,9 @@
 
 (in-package "SB-IMPL")
 
+;; byte-compile this file
+(declaim (optimize (speed 0) (safety 1)))
+
 ;;; The inspector views LISP objects as being composed of parts. A
 ;;; list, for example, would be divided into its members, and a
 ;;; instance into its slots. These parts are stored in a list. The

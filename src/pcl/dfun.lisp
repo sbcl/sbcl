@@ -972,8 +972,7 @@ And so, we are saved.
 	(declare (ignore nreq applyp nkeys))
 	(with-dfun-wrappers (args metatypes)
 	  (dfun-wrappers invalid-wrapper-p wrappers classes types)
-	  (error "The function ~S requires at least ~D arguments"
-		 gf (length metatypes))
+	  (error-need-at-least-n-args gf (length metatypes))
 	  (multiple-value-bind (emf methods accessor-type index)
 	      (cache-miss-values-internal
 	       gf arg-info wrappers classes types state)
@@ -1507,14 +1506,9 @@ And so, we are saved.
 		      (generic-function-name generic-function)))
 	 (ocache (gf-dfun-cache generic-function)))
     (set-dfun generic-function dfun cache info)
-    (let* ((dfun (if early-p
-		     (or dfun (make-initial-dfun generic-function))
-		     (compute-discriminating-function generic-function)))
-	   (info (gf-dfun-info generic-function)))
-      (unless (eq 'default-method-only (type-of info))
-	(setq dfun (doctor-dfun-for-the-debugger
-		    generic-function
-		    dfun)))
+    (let ((dfun (if early-p
+		    (or dfun (make-initial-dfun generic-function))
+		    (compute-discriminating-function generic-function))))
       (set-funcallable-instance-function generic-function dfun)
       (set-function-name generic-function gf-name)
       (when (and ocache (not (eq ocache cache))) (free-cache ocache))

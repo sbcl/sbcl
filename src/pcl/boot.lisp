@@ -806,7 +806,22 @@ bootstrapping.
   (unless (constantp restp)
     (error "The RESTP argument is not constant."))
   (setq restp (eval restp))
-  `(progn
+  `(locally
+
+     ;; In sbcl-0.6.11.43, the compiler would issue bogus warnings
+     ;; about type mismatches in unreachable code when we
+     ;; macroexpanded the GET-SLOTS-OR-NIL expressions here and
+     ;; byte-compiled the code. GET-SLOTS-OR-NIL is now an inline
+     ;; function instead of a macro, which seems sufficient to solve
+     ;; the problem all by itself (probably because of some quirk in
+     ;; the relative order of expansion and type inference) but we
+     ;; also use overkill by NOTINLINEing GET-SLOTS-OR-NIL, because it
+     ;; looks as though (1) inlining isn't that much of a win anyway,
+     ;; and (2a) once you miss the FAST-METHOD-CALL clause you're
+     ;; going to be slow anyway, but (2b) code bloat still hurts even
+     ;; when it's off the critical path.
+     (declare (notinline get-slots-or-nil))
+
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (cond ((typep ,emf 'fast-method-call)
 	     (invoke-fast-method-call ,emf ,@required-args+rest-arg))
@@ -963,8 +978,8 @@ bootstrapping.
 	      (null closurep)
 	      (null applyp))
 	 `(let () ,@body))
-	 ((and (null closurep)
-	       (null applyp))
+	((and (null closurep)
+	      (null applyp))
 	 ;; OK to use MACROLET, and all args are mandatory
 	 ;; (else APPLYP would be true).
 	 `(call-next-method-bind
@@ -1190,7 +1205,6 @@ bootstrapping.
   (let ((method-spec (or (getf initargs ':method-spec)
 			 (make-method-spec name quals specls))))
     (setf (getf initargs ':method-spec) method-spec)
-    (record-definition 'method method-spec)
     (load-defmethod-internal class name quals specls
 			     ll initargs pv-table-symbol)))
 
