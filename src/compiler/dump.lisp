@@ -231,6 +231,18 @@
       (aver (not (gethash x circ)))
       (setf (gethash x circ) x)))
   (values))
+
+;;; Dump FORM to a fasl file so that it evaluated at load time in normal
+;;; load and at cold-load time in cold load. This is used to dump package
+;;; frobbing forms.
+(defun fasl-dump-cold-load-form (form fasl-output)
+  (declare (type fasl-output fasl-output))
+  (dump-fop 'fop-normal-load fasl-output)
+  (let ((*cold-load-dump* t))
+    (dump-object form fasl-output))
+  (dump-fop 'fop-eval-for-effect fasl-output)
+  (dump-fop 'fop-maybe-cold-load fasl-output)
+  (values))
 
 ;;;; opening and closing fasl files
 

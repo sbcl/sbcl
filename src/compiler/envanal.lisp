@@ -56,12 +56,13 @@
 
   (values))
 
-;;; Called on component with top-level lambdas before the compilation of the
-;;; associated non-top-level code to detect closed over top-level variables.
-;;; We just do COMPUTE-CLOSURE on all the lambdas. This will pre-allocate
-;;; environments for all the functions with closed-over top-level variables.
-;;; The post-pass will use the existing structure, rather than allocating a new
-;;; one. We return true if we discover any possible closure vars.
+;;; This is to be called on a COMPONENT with top-level lambdas before
+;;; the compilation of the associated non-top-level code to detect
+;;; closed over top-level variables. We just do COMPUTE-CLOSURE on all
+;;; the lambdas. This will pre-allocate environments for all the
+;;; functions with closed-over top-level variables. The post-pass will
+;;; use the existing structure, rather than allocating a new one. We
+;;; return true if we discover any possible closure vars.
 (defun pre-environment-analyze-top-level (component)
   (declare (type component component))
   (let ((found-it nil))
@@ -73,7 +74,7 @@
 	  (setq found-it t))))
     found-it))
 
-;;; If Fun has an environment, return it, otherwise assign one.
+;;; If FUN has an environment, return it, otherwise assign one.
 (defun get-lambda-environment (fun)
   (declare (type clambda fun))
   (let* ((fun (lambda-home fun))

@@ -590,12 +590,21 @@
 	;; value.)
 	))
 
-;;; COLD-FSET is supposed to be handled specially by the compiler. If
-;;; it's used in the wrong place (not a toplevel form) or in the wrong
-;;; bootstrap phase (not when cross-compiling for cold load) you'll
-;;; fall through to here.
-(defmacro cold-fset (&rest rest)
-  (error "misplaced COLD-FSET"))
+;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
+;;; assignment. That way things like
+;;;   (FLET ((FROB (X) ..))
+;;;     (DEFUN FOO (X Y) (FROB X) ..)
+;;;     (DEFUN BAR (Z) (AND (FROB X) ..)))
+;;; can still "work" for cold init: they don't do magical static
+;;; linking the way that true toplevel DEFUNs do, but at least they do
+;;; the linking eventually, so as long as #'FOO and #'BAR aren't
+;;; needed until "cold toplevel forms" have executed, it's OK.
+(defmacro cold-fset (name lambda)
+  (style-warn 
+   "~@<COLD-FSET ~S not cross-compiled at top level: demoting to ~
+(SETF FDEFINITION)~:@>"
+   name)
+  `(setf (fdefinition ',name) ,lambda))
 
 ;;;; ONCE-ONLY
 ;;;;
@@ -844,9 +853,12 @@
 ;;;
 ;;; The structure being printed is bound to STRUCTURE and the stream
 ;;; is bound to STREAM.
-(defmacro defprinter ((name &key (conc-name (concatenate 'simple-string
-							 (symbol-name name)
-							 "-")))
+(defmacro defprinter ((name
+		       &key
+		       (conc-name (concatenate 'simple-string
+					       (symbol-name name)
+					       "-"))
+		       identity)
 		      &rest slot-descs)
   (let ((first? t)
 	maybe-print-space
@@ -889,7 +901,10 @@
     `(def!method print-object ((structure ,name) ,stream)
        ;; FIXME: should probably be byte-compiled
        (pprint-logical-block (,stream nil)
-	 (print-unreadable-object (structure ,stream :type t)
+	 (print-unreadable-object (structure
+				   ,stream
+				   :type t
+				   :identity ,identity)
 	   ,@(nreverse reversed-prints))))))
 
 ;;;; etc.

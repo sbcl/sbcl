@@ -111,14 +111,6 @@
 	  (invoke-debugger condition)))))
   nil)
 
-;;; FIXME: The compiler barfs on this when I use COLD-FSET on it:
-;;;   (SB!IMPL::%FAILED-AVER "(= (LENGTH (BLOCK-SUCC CALL-BLOCK)) 1)")
-;;; It looks like another code deletion bug: BACKTRACE shows
-;;; LET-CONVERT in MAYBE-LET-CONVERT in DELETE-REF in DELETE-BLOCK in
-;;; IR1-OPTIMIZE. It might be a problem with my COLD-FSET
-;;; implementation, or it might be that the new code just tickles YA
-;;; code deletion bug.
-#|
 ;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that
 ;;; we can use it in system code (e.g. in SIGINT handling) without
 ;;; messing up --noprogrammer mode (which works by setting
@@ -130,7 +122,6 @@
 	(invoke-debugger
 	 (coerce-to-condition datum arguments 'simple-condition what)))))
   nil)
-|#
 
 (defun break (&optional (datum "break") &rest arguments)
   #!+sb-doc

@@ -48,7 +48,7 @@
 
 ;;; Bound by COMPILE-COMPONENT to T when byte-compiling, and NIL when
 ;;; native compiling. During IR1 conversion this can also be :MAYBE,
-;;; in which case we must look at the policy, see (byte-compiling).
+;;; in which case we must look at the policy; see #'BYTE-COMPILING.
 (defvar *byte-compiling* :maybe)
 (declaim (type (member t nil :maybe) *byte-compile* *byte-compiling*
 	       *byte-compile-default*))
@@ -889,31 +889,44 @@
     (error "not a legal function name: ~S" fun-name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
 	 (lambda (ir1-top-level lambda-expression path nil))
-	 (component (block-component (node-block (lambda-bind lambda)))))
-    (/show (byte-compile-this-component-p component))
-    (/show (%coerce-to-policy lambda))
-    (/show (component-lambdas component))
-    (/show (mapcar #'%coerce-to-policy (component-lambdas component)))
-    (/show (%coerce-to-policy *lexenv*))
-    (let (;; FIXME: This binding is a quick hack to solve the problem
-	  ;; of COMPILE-COMPONENT bogusly byte-compiling COMPONENT
-	  ;; even though current *POLICY* should keep that from
-	  ;; happening. I cut-and-pasted it from
-	  ;; SUB-COMPILE-TOP-LEVEL-LAMBDAS. It's especially
-	  ;; inappropriate here, since the function being compiled
-	  ;; isn't a "top level lambda" in the way that that term is
-	  ;; usually used in the compiler, i.e. it's not called
-	  ;; automatically at load time. But it seems like an ugly
-	  ;; hack both here and in SUB-COMPILE-TOP-LEVEL-LAMBDAS. I
-	  ;; think COMPILE-COMPONENT's to-byte-compile-or-not logic
-	  ;; should be fixed so that this kind of weirdness isn't
-	  ;; needed.
-	  (*byte-compile* (if (eq *byte-compile* :maybe)
-			      *byte-compile-top-level*
-			      *byte-compile*)))
-      (compile-component component))
-    (clear-ir1-info component)
-    (fasl-dump-cold-fset fun-name lambda *compile-object*))
+	 (lambdas (list lambda))
+	 (original-component
+	  (block-component (node-block (lambda-bind lambda))))
+	 (*all-components* (list original-component)))
+    (/show original-component (component-lambdas original-component))
+
+    ;; FIXME: The compile-it code here is a degenerate case of the
+    ;; code in COMPILE-TOP-LEVEL. It'd be better to find a way to
+    ;; share the code there.
+    (loop while (component-new-functions original-component) do
+	  (/show "locall" (component-new-functions original-component))
+	  (local-call-analyze original-component))
+    (/show "doing initial DFO")
+    (multiple-value-bind (components-from-dfo top-components hairy-top)
+	(find-initial-dfo lambdas)
+      (/show components-from-dfo top-components hairy-top)
+      (let ((*all-components* (append components-from-dfo top-components)))
+	;; FIXME: I dunno whether we actually need to do
+	;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL for its side-effects like
+	;; this. (In the original SUB-COMPILE-TOP-LEVEL-LAMBDAS it was
+	;; used for its return value.)
+	(mapc #'pre-environment-analyze-top-level
+	      (append hairy-top top-components))
+	(dolist (component-from-dfo components-from-dfo)
+	  (compile-component component-from-dfo)
+	  (replace-top-level-xeps component-from-dfo))))
+
+    ;; Here we diverge from COMPILE-TOP-LEVEL. It does
+    ;; COMPILE-TOP-LEVEL-LAMBDAS, which does
+    ;; OBJECT-CALL-TOP-LEVEL-LAMBDA. We don't want to call
+    ;; our LAMBDA, just emit it with a COLD-FSET, so..
+    (let ((final-lambda-component
+	   (block-component (node-block (lambda-bind lambda)))))
+      (/show "getting ready to dump" final-lambda-component)
+      (compile-component final-lambda-component)
+      (clear-ir1-info final-lambda-component))
+    (fasl-dump-cold-fset fun-name lambda *compile-object*)
+    (clear-stuff))
   (values))
 
 ;;; Process a top-level FORM with the specified source PATH.

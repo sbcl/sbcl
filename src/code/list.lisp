@@ -427,9 +427,9 @@
 	list))))
 
 (defun ldiff (list object)
-  "Returns a new list, whose elements are those of List that appear before
-   Object. If Object is not a tail of List, a copy of List is returned.
-   List must be a proper list or a dotted list."
+  "Return a new list, whose elements are those of LIST that appear before
+   OBJECT. If OBJECT is not a tail of LIST, a copy of LIST is returned.
+   LIST must be a proper list or a dotted list."
   (do* ((list list (cdr list))
 	(result (list ()))
 	(splice result))
@@ -445,12 +445,12 @@
 
 (defun rplaca (x y)
   #!+sb-doc
-  "Changes the car of x to y and returns the new x."
+  "Change the CAR of X to Y and return the new X."
   (rplaca x y))
 
 (defun rplacd (x y)
   #!+sb-doc
-  "Changes the cdr of x to y and returns the new x."
+  "Change the CDR of X to Y and return the new X."
   (rplacd x y))
 
 ;;; The following are for use by SETF.
@@ -459,10 +459,9 @@
 
 (defun %rplacd (x val) (rplacd x val) val)
 
+;;; Set the Nth element of LIST to NEWVAL.
 (defun %setnth (n list newval)
   (declare (type index n))
-  #!+sb-doc
-  "Sets the Nth element of List (zero based) to Newval."
   (do ((count n (1- count))
        (list list (cdr list)))
       ((endp list)
@@ -484,12 +483,12 @@
 
 (defun identity (thing)
   #!+sb-doc
-  "Returns what was passed to it."
+  "This function simply returns what was passed to it."
   thing)
 
 (defun complement (function)
   #!+sb-doc
-  "Builds a new function that returns T whenever FUNCTION returns NIL and
+  "Return a new function that returns T whenever FUNCTION returns NIL and
    NIL whenever FUNCTION returns non-NIL."
   (lambda (&optional (arg0 nil arg0-p) (arg1 nil arg1-p) (arg2 nil arg2-p)
 		     &rest more-args)

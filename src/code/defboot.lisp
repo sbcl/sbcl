@@ -179,8 +179,8 @@
 				     lambda lexenv))))
       `(progn
 
-	 ;; In cross-compilation, we arrange for the LAMBDA to be
-	 ;; statically linked by GENESIS.
+	 ;; In cross-compilation of toplevel COLD-FSETs, we arrange
+	 ;; for the LAMBDA to be statically linked by GENESIS.
 	 #+sb-xc-host
 	 (cold-fset ,name ,lambda)
 

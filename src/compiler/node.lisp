@@ -381,7 +381,7 @@
   ;; expansion. Unlike NEW-FUNCTIONS, this is not disjoint from
   ;; COMPONENT-LAMBDAS.
   (reanalyze-functions nil :type list))
-(defprinter (component)
+(defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))
 
@@ -408,7 +408,7 @@
   ;; A list of all the NLX-Info structures whose NLX-Info-Cleanup is
   ;; this cleanup. This is filled in by environment analysis.
   (nlx-info nil :type list))
-(defprinter (cleanup)
+(defprinter (cleanup :identity t)
   kind
   mess-up
   (nlx-info :test nlx-info))
@@ -427,7 +427,7 @@
   (nlx-info nil :type list)
   ;; some kind of info used by the back end
   (info nil))
-(defprinter (environment)
+(defprinter (environment :identity t)
   function
   (closure :test closure)
   (nlx-info :test nlx-info))
@@ -454,7 +454,7 @@
   (type *wild-type* :type ctype)
   ;; some info used by the back end
   (info nil))
-(defprinter (tail-set)
+(defprinter (tail-set :identity t)
   functions
   type
   (info :test info))
@@ -489,7 +489,7 @@
   (target nil :type (or cblock null))
   ;; some kind of info used by the back end
   info)
-(defprinter (nlx-info)
+(defprinter (nlx-info :identity t)
   continuation
   target
   info)
@@ -534,7 +534,7 @@
 (def!struct (constant (:include leaf))
   ;; the value of the constant
   (value nil :type t))
-(defprinter (constant)
+(defprinter (constant :identity t)
   (name :test name)
   value)
 
@@ -551,7 +551,7 @@
   ;; kind of variable described
   (kind (required-argument)
 	:type (member :special :global-function :constant :global)))
-(defprinter (global-var)
+(defprinter (global-var :identity t)
   name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -567,7 +567,7 @@
   (for (required-argument) :type sb!xc:class)
   ;; The slot description of the slot.
   (slot (required-argument)))
-(defprinter (slot-accessor)
+(defprinter (slot-accessor :identity t)
   name
   for
   slot)
@@ -589,7 +589,7 @@
   ;; this function is not an entry point, then this may be deleted or
   ;; let-converted. Null if we haven't converted the expansion yet.
   (functional nil :type (or functional null)))
-(defprinter (defined-function)
+(defprinter (defined-function :identity t)
   name
   inlinep
   (functional :test functional))
@@ -687,7 +687,7 @@
   (arg-documentation nil :type (or list (member :unspecified)))
   ;; various rare miscellaneous info that drives code generation & stuff
   (plist () :type list))
-(defprinter (functional)
+(defprinter (functional :identity t)
   name)
 
 ;;; The CLAMBDA only deals with required lexical arguments. Special,
@@ -745,7 +745,7 @@
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
   (call-lexenv nil :type (or lexenv null)))
-(defprinter (clambda :conc-name lambda-)
+(defprinter (clambda :conc-name lambda- :identity t)
   name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -804,7 +804,7 @@
   ;; be used by callers that supply at least Max-Args arguments and
   ;; know what they are doing.
   (main-entry nil :type (or clambda null)))
-(defprinter (optional-dispatch)
+(defprinter (optional-dispatch :identity t)
   name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -839,7 +839,7 @@
   ;; the actual key for a &KEY argument. Note that in ANSI CL this is not
   ;; necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ..).
   (key nil :type symbol))
-(defprinter (arg-info)
+(defprinter (arg-info :identity t)
   (specialp :test specialp)
   kind
   (supplied-p :test supplied-p)
@@ -880,7 +880,7 @@
   ;; determine that this is a set closure variable, and is thus not a
   ;; good subject for flow analysis.
   (constraints nil :type (or sset null)))
-(defprinter (lambda-var)
+(defprinter (lambda-var :identity t)
   name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -898,7 +898,7 @@
 		(:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf))
-(defprinter (ref)
+(defprinter (ref :identity t)
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
@@ -915,7 +915,7 @@
   ;; respectively (may be the same)
   (consequent (required-argument) :type cblock)
   (alternative (required-argument) :type cblock))
-(defprinter (cif :conc-name if-)
+(defprinter (cif :conc-name if- :identity t)
   (test :prin1 (continuation-use test))
   consequent
   alternative)
@@ -930,7 +930,7 @@
   (var (required-argument) :type basic-var)
   ;; continuation for the value form
   (value (required-argument) :type continuation))
-(defprinter (cset :conc-name set-)
+(defprinter (cset :conc-name set- :identity t)
   var
   (value :prin1 (continuation-use value)))
 
@@ -967,7 +967,7 @@
 (defstruct (combination (:include basic-combination)
 			(:constructor make-combination (fun))
 			(:copier nil)))
-(defprinter (combination)
+(defprinter (combination :identity t)
   (fun :prin1 (continuation-use fun))
   (args :prin1 (mapcar (lambda (x)
 			 (if x
@@ -1014,7 +1014,7 @@
   ;; asserted-type. If there are no non-call uses, this is
   ;; *EMPTY-TYPE*
   (result-type *wild-type* :type ctype))
-(defprinter (creturn :conc-name return-)
+(defprinter (creturn :conc-name return- :identity t)
   lambda
   result-type)
 
@@ -1032,7 +1032,7 @@
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
   (cleanup nil :type (or cleanup null)))
-(defprinter (entry))
+(defprinter (entry :identity t))
 
 ;;; The EXIT node marks the place at which exit code would be emitted,
 ;;; if necessary. This is interposed between the uses of the exit
@@ -1050,7 +1050,7 @@
   ;; The continuation yeilding the value we are to exit with. If NIL,
   ;; then no value is desired (as in GO).
   (value nil :type (or continuation null)))
-(defprinter (exit)
+(defprinter (exit :identity t)
   (entry :test entry)
   (value :test value))
 
