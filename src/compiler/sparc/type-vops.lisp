@@ -65,27 +65,62 @@
 		(last (null (cdr remaining))))
 	    (cond
 	      ((atom header)
-	       (inst cmp temp header)
-	       (if last
-		   ;; FIXME: Some SPARC-V9 magic might not go amiss
-		   ;; here, too, if I can figure out what it should
-		   ;; be.
-		   (inst b (if not-p :ne :eq) target)
-		   (inst b :eq when-true)))
+	       (cond
+		 ((and (not last) (null (cddr remaining))
+		       (atom (cadr remaining))
+		       (= (logcount (logxor header (cadr remaining))) 1))
+		  (inst and temp temp (ldb (byte 8 0) (logeqv header (cadr remaining))))
+		  (inst cmp temp (ldb (byte 8 0) (logand header (cadr remaining))))
+		  (inst b (if not-p :ne :eq) target)
+		  (return))
+		 (t
+		  (inst cmp temp header)
+		  (if last
+		      ;; FIXME: Some SPARC-V9 magic might not go amiss
+		      ;; here, too, if I can figure out what it should
+		      ;; be.
+		      (inst b (if not-p :ne :eq) target)
+		      (inst b :eq when-true)))))
 	      (t
 	       (let ((start (car header))
 		     (end (cdr header)))
 		 ;; FIXME: BIGNUM-WIDETAG here actually means (MIN
 		 ;; <widetags>).
-		 (unless (= start bignum-widetag)
-		   (inst cmp temp start)
-		   (inst b :lt when-false))
-		 ;; FIXME: conceivably, it might be worth having a
-		 ;; (MAX <widetags>) here too.
-		 (inst cmp temp end)
-		 (if last
-		     (inst b (if not-p :gt :le) target)
-		     (inst b :le when-true)))))))
+		 (cond 
+		   ;; FIXME: this doesn't catch the {0x2 0x6 0xA 0xE}
+		   ;; group
+		   ;;
+		   ;; also FIXME: exuberant cut'n'paste between
+		   ;; backends
+		   ((and last (not (= start bignum-widetag))
+			 (= (+ start 4) end)
+			 (= (logcount (logxor start end)) 1))
+		    (inst and temp temp (ldb (byte 8 0) (logeqv start end)))
+		    (inst cmp temp (ldb (byte 8 0) (logand start end)))
+		    (inst b (if not-p :ne :eq) target))
+		   ((and (not last) (null (cddr remaining))
+			 (= (+ start 4) end) (= (logcount (logxor start end)) 1)
+			 (listp (cadr remaining))
+			 (= (+ (caadr remaining) 4) (cdadr remaining))	
+			 (= (logcount (logxor (caadr remaining) (cdadr remaining))) 1)
+			 (= (logcount (logxor (caadr remaining) start)) 1))
+		    (inst and temp temp (ldb (byte 8 0) (logeqv start (cdadr remaining))))
+		    (inst cmp temp (ldb (byte 8 0) (logand start (cdadr remaining))))
+		    (inst b (if not-p :ne :eq) target)
+		    (return))
+		   (t
+		    (unless (= start bignum-widetag)
+		      (inst cmp temp start)
+		      (if (= end complex-array-widetag)
+			  (progn
+			    (aver last)
+			    (inst b (if not-p :lt :ge) target))
+			  (inst b :lt when-false)))
+		    (unless (= end complex-array-widetag)
+		      (inst cmp temp end)
+		      (if last
+			  (inst b (if not-p :gt :le) target)
+			  (inst b :le when-true))))))))))
 	(inst nop)
 	(emit-label drop-through)))))
 
