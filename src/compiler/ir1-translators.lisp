@@ -724,8 +724,7 @@
 	 (old-type (or (lexenv-find cont type-restrictions)
 		       *wild-type*))
 	 (intersects (values-types-equal-or-intersect old-type ctype))
-	 (int (values-type-intersection old-type ctype))
-	 (new (if intersects int old-type)))
+	 (new (values-type-intersection old-type ctype)))
     (when (null (find-uses cont))
       (setf (continuation-asserted-type cont) new))
     (when (and (not intersects)
@@ -734,8 +733,7 @@
 	       (not (policy *lexenv*
 			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
       (compiler-warn
-       "The type ~S ~A conflicts with an ~
-        enclosing assertion:~%   ~S"
+       "The type ~S ~A conflicts with an enclosing assertion:~%   ~S"
        (type-specifier ctype)
        place
        (type-specifier old-type)))

@@ -1341,40 +1341,6 @@ WORKAROUND:
       works as it should. Perhaps this is another case of VALUES type
       intersections behaving in non-useful ways?
 
-195: "confusing reporting of not-a-REAL TYPE-ERRORs from THE REAL"
-  In sbcl-0.7.7.10, (THE REAL #(1 2 3)) signals a type error which
-  prints as "This is not a (OR SINGLE-FLOAT DOUBLE-FLOAT RATIONAL)".
-  The (OR SINGLE-FLOAT DOUBLE-FLOAT RATIONAL) representation of
-  REAL is unnecessarily confusing, especially since it relies on 
-  internal implementation knowledge that even with SHORT-FLOAT
-  and LONG-FLOAT left out of the union, this type is equal to REAL.
-  So it'd be better just to say "This is not a REAL".
-
-197: "failed AVER on compiling or evaluating function constants"
-  (reported by Antonio Martinez sbcl-devel 2002-09-12)
-    When compiling or evaluating function constants, such as in
-      (EVAL `(LAMBDA () (FUNCALL ,(LAMBDA () NIL))))
-    I get the following error message:
-         debugger invoked on condition of type SB-INT:BUG:
-             failed AVER: "(LEAF-HAS-SOURCE-NAME-P LEAF)"
-
-  Although this seems a dubious use of function constants, it would be
-  good either to make it work or to produce a useful error message.
-
-198: "conflicting THEs are not necessarily all checked"
-  (reported by APD sbcl-devel 2002-09-14)
-    (DEFUN FOO (X)
-      (LET (Y)
-        (SETF Y (THE SINGLE-FLOAT (THE INTEGER X)))
-        (LIST Y Y)))
-
-    (FOO 3) => error "3 is not of type SINGLE-FLOAT"
-    (FOO 3F0) => (3F0 3F0)
-
-  APD also reports that this code has not worked as intended in SBCL
-  since the days of sbcl-0.7.0, while CMUCL correctly detects the type
-  error ("is not of type NIL") for all inputs.
-
 199: "hairy FUNCTION types confuse the compiler"
   (reported by APD sbcl-devel 2002-09-15)
     (DEFUN MUR (F)
@@ -1389,6 +1355,12 @@ WORKAROUND:
       "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
 
   APD further reports that this bug is not present in CMUCL.
+
+200: "TRANSLATE-LOGICAL-PATHNAME fails on physical pathname namestrings"
+  Reported by Kevin Rosenburg on #lisp IRC 2002-09-16
+    (TRANSLATE-LOGICAL-PATHNAME "/")
+  should simply return #P"/", but signals an error in sbcl-0.7.7.28
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

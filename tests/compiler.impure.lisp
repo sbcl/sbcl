@@ -348,6 +348,17 @@ BUG 48c, not yet fixed:
   (assert (null v))
   (assert (typep e 'type-error)))
 (assert (equal (exercise-0-7-7-24-bug -4) '(3f0 3f0)))
+
+;;; non-intersecting type declarations were DWIMing in a confusing
+;;; fashion until sbcl-0.7.7.28, when APD reported and fixed the
+;;; problem.
+(defun non-intersecting-the (x)
+  (let (y)
+    (setf y (the single-float (the integer x)))
+    (list y y)))
+
+(raises-error? (foo 3) type-error)
+(raises-error? (foo 3f0) type-error)
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

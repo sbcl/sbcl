@@ -2173,13 +2173,15 @@
 
 (!define-type-class union)
 
-;;; The LIST type has a special name. Other union types just get
-;;; mechanically unparsed.
+;;; The LIST, FLOAT and REAL types have special names.  Other union
+;;; types just get mechanically unparsed.
 (!define-type-method (union :unparse) (type)
   (declare (type ctype type))
-  (if (type= type (specifier-type 'list))
-      'list
-      `(or ,@(mapcar #'type-specifier (union-type-types type)))))
+  (cond
+    ((type= type (specifier-type 'list)) 'list)
+    ((type= type (specifier-type 'float)) 'float)
+    ((type= type (specifier-type 'real)) 'real)
+    (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each
 ;;; other. We need to be this clever because our complex subtypep

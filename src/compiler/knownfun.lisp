@@ -102,10 +102,7 @@
   (templates nil :type list)
   ;; If non-null, then this function is a unary type predicate for
   ;; this type.
-  (predicate-type nil :type (or ctype null))
-  ;; If non-null, use this function to annotate the known call for the
-  ;; byte compiler. If it returns NIL, then change the call to :full.
-  (byte-annotate nil :type (or function null)))
+  (predicate-type nil :type (or ctype null)))
 
 (defprinter (fun-info)
   (transforms :test transforms)
@@ -114,8 +111,7 @@
   (ltn-annotate :test ltn-annotate)
   (ir2-convert :test ir2-convert)
   (templates :test templates)
-  (predicate-type :test predicate-type)
-  (byte-annotate :test byte-annotate))
+  (predicate-type :test predicate-type))
 
 ;;;; interfaces to defining macros
 
