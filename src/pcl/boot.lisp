@@ -435,7 +435,7 @@ bootstrapping.
 				   specl))
 			       specializers))
 	       (mname `(,(if (eq (cadr initargs-form) :function)
-			     'method 'fast-method)
+			     'slow-method 'fast-method)
 			,name ,@qualifiers ,specls)))
 	  `(progn
 	     (defun ,mname ,(cadr fn-lambda)
@@ -1411,7 +1411,7 @@ bootstrapping.
     method))
 
 (defun make-method-spec (gf-spec qualifiers unparsed-specializers)
-  `(method ,gf-spec ,@qualifiers ,unparsed-specializers))
+  `(slow-method ,gf-spec ,@qualifiers ,unparsed-specializers))
 
 (defun initialize-method-function (initargs &optional return-function-p method)
   (let* ((mf (getf initargs :function))

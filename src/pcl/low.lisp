@@ -189,7 +189,7 @@
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
   ;; comes from CMUCL).  -- CSR, 2004-12-31
   (when (and (consp new-name)
-             (member (car new-name) '(method fast-method slot-accessor)))
+             (member (car new-name) '(slow-method fast-method slot-accessor)))
     (setf (fdefinition new-name) fun))
   fun)
 

@@ -1044,7 +1044,7 @@
 (defun name-method-lambda (method-lambda)
   (let ((method-name (body-method-name (cddr method-lambda))))
     (if method-name
-	`(named-lambda (method ,method-name) ,(rest method-lambda))
+	`(named-lambda (slow-method ,method-name) ,(rest method-lambda))
 	method-lambda)))
 
 (defun make-method-initargs-form-internal (method-lambda initargs env)

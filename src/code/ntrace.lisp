@@ -60,7 +60,9 @@
   (end-breakpoint nil :type (or sb-di:breakpoint null))
   ;; the list of function names for WHEREIN, or NIL if unspecified
   (wherein nil :type list)
-
+  ;; should we trace methods given a generic function to trace?
+  (methods nil)
+  
   ;; The following slots represent the forms that we are supposed to
   ;; evaluate on each iteration. Each form is represented by a cons
   ;; (Form . Function), where the Function is the cached result of
@@ -370,6 +372,7 @@
 		  :named named
 		  :encapsulated encapsulated
 		  :wherein (trace-info-wherein info)
+                  :methods (trace-info-methods info)
 		  :condition (coerce-form (trace-info-condition info) loc)
 		  :break (coerce-form (trace-info-break info) loc)
 		  :print (coerce-form-list (trace-info-print info) loc)
@@ -411,7 +414,24 @@
 	    (sb-di:activate-breakpoint start)
 	    (sb-di:activate-breakpoint end)))))
 
-      (setf (gethash fun *traced-funs*) info)))
+      (setf (gethash fun *traced-funs*) info))
+
+    (when (and (typep fun 'generic-function)
+               (trace-info-methods info))
+      (dolist (method-name (sb-pcl::list-all-maybe-method-names fun))
+        (when (fboundp method-name)
+          ;; NOTE: this direct style of tracing methods -- tracing the
+          ;; pcl-internal method functions -- is only one possible
+          ;; alternative.  It fails (a) when encapulation is
+          ;; requested, because the function objects themselves are
+          ;; stored in the method object; (b) when the method in
+          ;; question is particularly simple, when the method
+          ;; functionality is in the dfun.  There is an alternative
+          ;; technique: to replace any currently active methods with
+          ;; methods which encapsulate the current one.  Steps towards
+          ;; this are currently commented out in src/pcl/env.lisp.  --
+          ;; CSR, 2005-01-03
+          (trace-1 method-name info)))))
 
   function-or-name)
 
@@ -440,6 +460,8 @@
 		 (if (listp (car value)) (car value) value)))
 	  (:encapsulate
 	   (setf (trace-info-encapsulated info) (car value)))
+          (:methods
+           (setf (trace-info-methods info) (car value)))
 	  (:break (setf (trace-info-break info) value))
 	  (:break-after (setf (trace-info-break-after info) value))
 	  (:break-all
@@ -490,6 +512,16 @@
 			   (not (macro-function symbol))
 			   (not (special-operator-p symbol)))
 		  (forms `(trace-1 ',symbol ',options))))))
+           ;; special-case METHOD: it itself is not a general function
+           ;; name symbol, but it (at least here) designates one of a
+           ;; pair of such.
+           ((and (consp name) (eq (car name) 'method))
+            (when (fboundp (list* 'sb-pcl::slow-method (cdr name)))
+              (forms `(trace-1 ',(list* 'sb-pcl::slow-method (cdr name))
+                               ',options)))
+            (when (fboundp (list* 'sb-pcl::fast-method (cdr name)))
+              (forms `(trace-1 ',(list* 'sb-pcl::fast-method (cdr name))
+                               ',options))))
 	   (t
 	    (forms `(trace-1 ',name ',options))))
 	  (setq current (parse-trace-options current options)))))
@@ -576,6 +608,10 @@ The following options are defined:
        instances, breakpoints otherwise. When encapsulation is used, forms are
        *not* evaluated in the function's lexical environment, but SB-DEBUG:ARG
        can still be used.
+
+   :METHODS {T | NIL}
+       If T, any function argument naming a generic function will have its
+       methods traced in addition to the generic function itself.
 
    :FUNCTION Function-Form
        This is a not really an option, but rather another way of specifying

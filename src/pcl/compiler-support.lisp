@@ -82,10 +82,7 @@
 (define-internal-pcl-function-name-syntax sb-pcl::fast-method (list)
   (valid-function-name-p (cadr list)))
 
-;;; FIXME: I don't like this name, because though it looks nice and
-;;; internal, it is in fact CL:METHOD, and as such has a slight
-;;; implication of supportedness.
-(define-internal-pcl-function-name-syntax sb-pcl::method (list)
+(define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
 (defun sb-pcl::random-documentation (name type)

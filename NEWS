@@ -9,6 +9,9 @@ changes in sbcl-0.8.19 relative to sbcl-0.8.18:
     call stack for more meaningful call-graphs and accrued time
     reports (x86/x86-64 only). It also now reports time spent in
     foreign functions.
+  * enhancement: it is now possible to trace most individual methods
+    of a generic function in addition to tracing the generic function
+    itself.
   * bug fix: invalid :DEFAULT-INITARGS are detected in compiled calls
     to MAKE-INSTANCE.
   * bug fix: defaulted initargs are passed to INITIALIZE-INSTANCE and
