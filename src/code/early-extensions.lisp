@@ -714,12 +714,37 @@
 (defmacro aver (expr)
   `(unless ,expr
      (%failed-aver ,(format nil "~A" expr))))
+
 (defun %failed-aver (expr-as-string)
   (bug "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
+
+;;; We need a definition of BUG here for the host compiler to be able
+;;; to deal with BUGs in sbcl. This should never affect an end-user,
+;;; who will pick up the definition that signals a CONDITION of
+;;; condition-class BUG; however, this is not defined on the host
+;;; lisp, but for the target. SBCL developers sometimes trigger BUGs
+;;; in their efforts, and it is useful to get the details of the BUG
+;;; rather than an undefined function error. - CSR, 2002-04-12
+#+sb-xc-host
+(defun bug (format-control &rest format-arguments)
+  (error 'simple-error
+	 :format-control "~@<  ~? ~:@_~?~:>"
+	 :format-arguments `(,format-control
+			     ,format-arguments
+			     "~@<If you see this and are an SBCL ~
+developer, then it is probable that you have made a change to the ~
+system that has broken the ability for SBCL to compile, usually by ~
+removing an assumed invariant of the system, but sometimes by making ~
+an averrance that is violated (check your code!). If you are a user, ~
+please submit a bug report to the developers' mailing list, details of ~
+which can be found at <http://sbcl.sourceforge.net/>.~:@>"
+			     ())))
+
 (defmacro enforce-type (value type)
   (once-only ((value value))
     `(unless (typep ,value ',type)
        (%failed-enforce-type ,value ',type))))
+
 (defun %failed-enforce-type (value type)
   (error 'simple-type-error ; maybe should be TYPE-BUG, subclass of BUG?
 	 :value value

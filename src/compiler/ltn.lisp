@@ -270,7 +270,7 @@
 ;;; we annotate for the number of values indicated by TYPES, but only
 ;;; use proven type information.
 (defun annotate-fixed-values-continuation (cont ltn-policy types)
-  (declare (continuation cont) (ltn-policy ltn-policy) (list types))
+  (declare (type continuation cont) (type ltn-policy ltn-policy) (list types))
   (unless (ltn-policy-safe-p ltn-policy)
     (flush-type-check cont))
   (let ((res (make-ir2-continuation nil)))

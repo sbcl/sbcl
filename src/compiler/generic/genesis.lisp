@@ -996,7 +996,7 @@
 	   ;; looks bad: maybe COMMON-LISP-USER? maybe an extension
 	   ;; package in the xc host? something we can't think of
 	   ;; a valid reason to cold intern, anyway...
-	   (error ; not #'BUG, because #'BUG isn't defined yet
+	   (bug
 	    "internal error: PACKAGE-NAME=~S looks too much like a typo."
 	    package-name))))
 
@@ -2621,6 +2621,7 @@
   ;; written out as #define trap_PseudoAtomic, which is confusing as
   ;; the runtime treats trap_ as the prefix for illegal instruction
   ;; type things. We therefore don't export it, but instead do
+  #!+sparc
   (when (boundp 'sb!vm::pseudo-atomic-trap)
     (format t "#define PSEUDO_ATOMIC_TRAP ~D /* 0x~:*~X */~%" sb!vm::pseudo-atomic-trap)
     (terpri))

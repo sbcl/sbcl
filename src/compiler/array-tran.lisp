@@ -243,7 +243,7 @@
 			 *specialized-array-element-type-properties*)))
     (unless saetp
       (give-up-ir1-transform
-       "cannot open-code creation of ~S" spec))
+       "cannot open-code creation of ~S" result-type-spec))
 
     (let* ((initial-element-default (saetp-initial-element-default saetp))
 	   (n-bits-per-element (saetp-n-bits saetp))

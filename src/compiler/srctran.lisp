@@ -355,11 +355,11 @@
 (defun interval-bounded-p (x how)
   (declare (type interval x))
   (ecase how
-    ('above
+    (above
      (interval-high x))
-    ('below
+    (below
      (interval-low x))
-    ('both
+    (both
      (and (interval-low x) (interval-high x)))))
 
 ;;; signed zero comparison functions. Use these functions if we need
@@ -732,9 +732,9 @@
 (defun interval-abs (x)
   (declare (type interval x))
   (case (interval-range-info x)
-    ('+
+    (+
      (copy-interval x))
-    ('-
+    (-
      (interval-neg x))
     (t
      (destructuring-bind (x- x+) (interval-split 0 x t t)
