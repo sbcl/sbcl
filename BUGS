@@ -1274,7 +1274,6 @@ WORKAROUND:
   b. Compiling of a local call with an unknown key and
      :ALLOW-OTHER-KEYS T should not cause a WARNING.
   c. Compiler should not warn on an unknown key :ALLOW-OTHER-KEYS.
-  d. :ALLOW-OTHER-KEYS should be allowed as an ordinary key parameter.
 
 212: "Sequence functions and circular arguments"
   COERCE, MERGE and CONCATENATE go into an infinite loop when given

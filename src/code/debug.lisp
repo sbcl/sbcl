@@ -557,19 +557,17 @@ Other commands:
 	  (nreverse reversed-result))
       (sb!di:lambda-list-unavailable
        ()
-       :lambda-list-unavailable))))
+       (make-unprintable-object "unavailable lambda list")))))
 
 ;;; Print FRAME with verbosity level 1. If we hit a &REST arg, then
 ;;; print as many of the values as possible, punting the loop over
 ;;; lambda-list variables since any other arguments will be in the
 ;;; &REST arg's list of values.
 (defun print-frame-call-1 (frame)
-  (let ((debug-fun (sb!di:frame-debug-fun frame))
-	(loc (sb!di:frame-code-location frame)))
+  (let ((debug-fun (sb!di:frame-debug-fun frame)))
 
     (pprint-logical-block (*standard-output* nil :prefix "(" :suffix ")")
-      (let ((args (mapcar #'ensure-printable-object
-			  (frame-args-as-list frame))))
+      (let ((args (ensure-printable-object (frame-args-as-list frame))))
 	;; Since we go to some trouble to make nice informative function
 	;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
 	;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
@@ -577,7 +575,9 @@ Other commands:
 	      (*print-level* nil))
 	  (prin1 (ensure-printable-object (sb!di:debug-fun-name debug-fun))))
 	;; For the function arguments, we can just print normally.
-	(format t "~{ ~_~S~}" args)))
+        (if (listp args)
+            (format t "~{ ~_~S~}" args)
+            (format t " ~S" args))))
 
     (when (sb!di:debug-fun-kind debug-fun)
       (write-char #\[)

@@ -1336,6 +1336,8 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     (reported by Paul F. Dietz, fixed by Gerd Moellman)
   * fixed bug: PUSH, PUSHNEW and POP now evaluate a place given by a
     symbol macro only once
+  * fixed printing of call frame when argument list is unavailable
+  * fixed bug: :ALLOW-OTHER-KEYS is an allowed keyword name
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

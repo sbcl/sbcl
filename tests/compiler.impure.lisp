@@ -499,11 +499,23 @@ BUG 48c, not yet fixed:
       (ignore-errors (delete-file obj)))))
 
 (symbol-macrolet-test)
-
+
 ;;; On the x86, this code failed to compile until sbcl-0.7.8.37:
 (defun x86-assembler-failure (x)
   (declare (optimize (speed 3) (safety 0)))
   (eq (setf (car x) 'a) nil))
+
+;;; bug 211: :ALLOW-OTHER-KEYS
+(defun bug211d (&key (x :x x-p) ((:allow-other-keys y) :y y-p))
+  (list x x-p y y-p))
+
+(assert (equal (bug211d) '(:x nil :y nil)))
+(assert (equal (bug211d :x 1) '(1 t :y nil)))
+(assert (raises-error? (bug211d :y 2) program-error))
+(assert (equal (bug211d :y 2 :allow-other-keys t :allow-other-keys nil)
+               '(:x nil t t)))
+(assert (raises-error? (bug211d :y 2 :allow-other-keys nil) program-error))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

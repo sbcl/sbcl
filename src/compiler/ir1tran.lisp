@@ -1204,15 +1204,12 @@
 	   (make-lambda-var :%source-name name)))))
 
 ;;; Make the default keyword for a &KEY arg, checking that the keyword
-;;; isn't already used by one of the VARS. We also check that the
-;;; keyword isn't the magical :ALLOW-OTHER-KEYS.
+;;; isn't already used by one of the VARS.
 (declaim (ftype (function (symbol list t) keyword) make-keyword-for-arg))
 (defun make-keyword-for-arg (symbol vars keywordify)
   (let ((key (if (and keywordify (not (keywordp symbol)))
 		 (keywordicate symbol)
 		 symbol)))
-    (when (eq key :allow-other-keys)
-      (compiler-error "No &KEY arg can be called :ALLOW-OTHER-KEYS."))
     (dolist (var vars)
       (let ((info (lambda-var-arg-info var)))
 	(when (and info
@@ -1639,7 +1636,8 @@
 	      (n-allowp (gensym "N-ALLOWP-"))
 	      (n-losep (gensym "N-LOSEP-"))
 	      (allowp (or (optional-dispatch-allowp res)
-			  (policy *lexenv* (zerop safety)))))
+			  (policy *lexenv* (zerop safety))))
+              (found-allow-p nil))
 
 	  (temps `(,n-index (1- ,n-count)) n-key n-value-temp)
 	  (body `(declare (fixnum ,n-index) (ignorable ,n-key ,n-value-temp)))
@@ -1650,24 +1648,30 @@
 		     (default (arg-info-default info))
 		     (keyword (arg-info-key info))
 		     (supplied-p (arg-info-supplied-p info))
-		     (n-value (gensym "N-VALUE-")))
-		(temps `(,n-value ,default))
-		(cond (supplied-p
-		       (let ((n-supplied (gensym "N-SUPPLIED-")))
-			 (temps n-supplied)
-			 (arg-vals n-value n-supplied)
-			 (tests `((eq ,n-key ',keyword)
-				  (setq ,n-supplied t)
-				  (setq ,n-value ,n-value-temp)))))
-		      (t
-		       (arg-vals n-value)
-		       (tests `((eq ,n-key ',keyword)
-				(setq ,n-value ,n-value-temp)))))))
+		     (n-value (gensym "N-VALUE-"))
+                     (clause (cond (supplied-p
+                                    (let ((n-supplied (gensym "N-SUPPLIED-")))
+                                      (temps n-supplied)
+                                      (arg-vals n-value n-supplied)
+                                      `((eq ,n-key ',keyword)
+                                        (setq ,n-supplied t)
+                                        (setq ,n-value ,n-value-temp))))
+                                   (t
+                                    (arg-vals n-value)
+                                    `((eq ,n-key ',keyword)
+                                      (setq ,n-value ,n-value-temp))))))
+		(when (and (not allowp) (eq keyword :allow-other-keys))
+                  (setq found-allow-p t)
+                  (setq clause (append clause `((setq ,n-allowp ,n-value-temp)))))
+
+                (temps `(,n-value ,default))
+		(tests clause)))
 
 	    (unless allowp
 	      (temps n-allowp n-losep)
-	      (tests `((eq ,n-key :allow-other-keys)
-		       (setq ,n-allowp ,n-value-temp)))
+              (unless found-allow-p
+                (tests `((eq ,n-key :allow-other-keys)
+                         (setq ,n-allowp ,n-value-temp))))
 	      (tests `(t
 		       (setq ,n-losep ,n-key))))
 
