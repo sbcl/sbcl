@@ -2453,6 +2453,8 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bugs 280 and 312: the checking for multiple definitions in a
     file is less likely to become confused by uses of inline
     functions.
+  * fixed bug: the #S reader macro performs the keyword coercion
+    specified for slot names.  (reported by Kalle Niemitalo)
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by

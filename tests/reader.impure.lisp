@@ -62,9 +62,21 @@
 ;;; CSR managed to break the #S reader macro in the process of merging
 ;;; SB-PCL:CLASS and CL:CLASS -- make sure it works
 (defstruct readable-struct a)
-(assert (eq (readable-struct-a
-	     (read-from-string "#S(READABLE-STRUCT :A T)"))
-	    t))
+(macrolet
+    ((frob (string)
+       `(assert (eq (readable-struct-a (read-from-string ,string)) t))))
+  (frob "#S(READABLE-STRUCT :A T)")
+  (frob "#S(READABLE-STRUCT A T)")
+  (frob "#S(READABLE-STRUCT \"A\" T)")
+  (frob "#S(READABLE-STRUCT #\\A T)")
+  (frob "#S(READABLE-STRUCT #\\A T :A NIL)"))
+(macrolet
+    ((frob (string)
+       `(assert (raises-error? (read-from-string ,string) reader-error))))
+  (frob "#S(READABLE-STRUCT . :A)")
+  (frob "#S(READABLE-STRUCT :A . T)")
+  (frob "#S(READABLE-STRUCT :A T . :A)")
+  (frob "#S(READABLE-STRUCT :A T :A . T)"))
 
 ;;; reported by Henrik Motakef
 (defpackage "")

@@ -130,7 +130,40 @@
 	  (%reader-error
 	   stream "The ~S structure does not have a default constructor."
 	   (car body)))
-	(apply (fdefinition def-con) (rest body))))))
+	(when (and (atom (rest body))
+		   (not (null (rest body))))
+	  (%reader-error
+	   stream "improper list for #S: ~S." body))
+	(apply (fdefinition def-con)
+	       (loop for tail on (rest body) by #'cddr
+		     with slot-name = (and (consp tail) (car tail))
+		     do (progn
+			  (when (null (cdr tail))
+			    (%reader-error
+			     stream
+			     "the arglist for the ~S constructor in #S ~
+                              has an odd length: ~S."
+			     (car body) (rest body)))
+			  (when (or (atom (cdr tail))
+				    (and (atom (cddr tail))
+					 (not (null (cddr tail)))))
+			    (%reader-error
+			     stream
+			     "the arglist for the ~S constructor in #S ~
+                              is improper: ~S."
+			     (car body) (rest body)))
+			  (when (not (typep (car tail) 'string-designator))
+			    (%reader-error
+			     stream
+			     "a slot name in #S is not a string ~
+                              designator: ~S."
+			     slot-name))
+			  (when (not (keywordp slot-name))
+			    (style-warn "in #S ~S, the use of non-keywords ~
+                                         as slot specifiers is deprecated: ~S."
+					(car body) slot-name)))
+		     collect (intern (string (car tail)) *keyword-package*)
+		     collect (cadr tail)))))))
 
 ;;;; reading numbers: the #B, #C, #O, #R, and #X readmacros
 
