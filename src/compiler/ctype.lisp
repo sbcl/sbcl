@@ -11,6 +11,11 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
+;;;; FIXME: This is a poor name for this file, since CTYPE is the name
+;;;; of the type used internally to represent Lisp types. It'd
+;;;; probably be good to rename this file to "call-type.lisp" or
+;;;; "ir1-type.lisp" or something.
+
 (in-package "SB!C")
 
 ;;; These are the functions that are to be called when a problem is
@@ -18,6 +23,15 @@
 ;;; anything. The error function is called when something is
 ;;; definitely incorrect. The warning function is called when it is
 ;;; somehow impossible to tell whether the call is correct.
+;;;
+;;; FIXME: *ERROR-FUNCTION* and *WARNING-FUNCTION* are now misnomers.
+;;; As per the KLUDGE note below, what the Python compiler
+;;; considered a "definite incompatibility" could easily be conforming
+;;; ANSI Common Lisp (if the incompatibility is across a compilation
+;;; unit boundary, and we don't keep track of whether it is..), so we
+;;; have to just report STYLE-WARNINGs instead of ERRORs or full
+;;; WARNINGs; and unlike CMU CL, we don't use the condition system
+;;; at all when we're reporting notes.
 (defvar *error-function*)
 (defvar *warning-function*)
 
@@ -30,12 +44,22 @@
 (declaim (type (or function null) *error-function* *warning-function
 	       *test-function*))
 
-;;; *LOSSAGE-DETECTED* is set when a definite incompatibility is
+;;; *LOSSAGE-DETECTED* is set when a "definite incompatibility" is
 ;;; detected. *SLIME-DETECTED* is set when we can't tell whether the
 ;;; call is compatible or not.
+;;;
+;;; KLUDGE: Common Lisp is a dynamic language, even if CMU CL was not.
+;;; As far as I can see, none of the "definite incompatibilities"
+;;; detected in this file are actually definite under the ANSI spec.
+;;; They would be incompatibilites if the use were within the same
+;;; compilation unit as the contradictory definition (as per the spec
+;;; section "3.2.2.3 Semantic Constraints") but the old Python code
+;;; doesn't keep track of whether that's the case. So until/unless we
+;;; upgrade the code to keep track of that, we have to handle all
+;;; these as STYLE-WARNINGs. -- WHN 2001-02-10
 (defvar *lossage-detected*)
 (defvar *slime-detected*)
-;;; FIXME: SLIME is vivid and concise, but "DEFINITE-CALL-LOSSAGE" and
+;;; FIXME: "SLIME" is vivid and concise, but "DEFINITE-CALL-LOSSAGE" and
 ;;; "POSSIBLE-CALL-LOSSAGE" would be more mnemonic.
 
 ;;; Signal a warning if appropriate and set *LOSSAGE-DETECTED*.
@@ -59,7 +83,7 @@
 ;;;; function type inference and declarations.
 
 ;;; A dummy version of SUBTYPEP useful when we want a functional like
-;;; subtypep that always returns true.
+;;; SUBTYPEP that always returns true.
 (defun always-subtypep (type1 type2)
   (declare (ignore type1 type2))
   (values t t))
@@ -70,20 +94,20 @@
 ;;;    NIL, T: the call is definitely invalid.
 ;;;    NIL, NIL: unable to determine whether the call is valid.
 ;;;
-;;; The Argument-Test function is used to determine whether an
+;;; The ARGUMENT-TEST function is used to determine whether an
 ;;; argument type matches the type we are checking against. Similarly,
-;;; the Result-Test is used to determine whether the result type
+;;; the RESULT-TEST is used to determine whether the result type
 ;;; matches the specified result.
 ;;;
 ;;; Unlike the argument test, the result test may be called on values
-;;; or function types. If Strict-Result is true and safety is
-;;; non-zero, then the Node-Derived-Type is always used. Otherwise, if
-;;; Cont's Type-Check is true, then the Node-Derived-Type is
-;;; intersected with the Cont's Asserted-Type.
+;;; or function types. If STRICT-RESULT is true and SAFETY is
+;;; non-zero, then the NODE-DERIVED-TYPE is always used. Otherwise, if
+;;; CONT's TYPE-CHECK is true, then the NODE-DERIVED-TYPE is
+;;; intersected with the CONT's ASSERTED-TYPE.
 ;;;
 ;;; The error and warning functions are functions that are called to
-;;; explain the result. We bind *compiler-error-context* to the
-;;; combination node so that Compiler-Warning and related functions
+;;; explain the result. We bind *COMPILER-ERROR-CONTEXT* to the
+;;; combination node so that COMPILER-WARNING and related functions
 ;;; will do the right thing if they are supplied.
 (defun valid-function-use (call type &key
 				((:argument-test *test-function*) #'csubtypep)
@@ -157,8 +181,8 @@
 	  (*slime-detected* (values nil nil))
 	  (t (values t t)))))
 
-;;; Check that the derived type of the continuation Cont is compatible
-;;; with Type. N is the arg number, for error message purposes. We
+;;; Check that the derived type of the continuation CONT is compatible
+;;; with TYPE. N is the arg number, for error message purposes. We
 ;;; return true if arg is definitely o.k. If the type is a magic
 ;;; CONSTANT-TYPE, then we check for the argument being a constant
 ;;; value of the specified type. If there is a manifest type error
@@ -325,9 +349,9 @@
   ;; :allow-other-keys.
   (allowp nil :type (member t nil)))
 
-;;; Return an Approximate-Function-Type representing the context of
-;;; Call. If Type is supplied and not null, then we merge the
-;;; information into the information already accumulated in Type.
+;;; Return an APPROXIMATE-FUNCTION-TYPE representing the context of
+;;; CALL. If TYPE is supplied and not null, then we merge the
+;;; information into the information already accumulated in TYPE.
 (declaim (ftype (function (combination
 			   &optional (or approximate-function-type null))
 			  approximate-function-type)
@@ -391,15 +415,16 @@
 				:types (list val-type))))))))))))
     type))
 
-;;; Similar to Valid-Function-Use, but checks an
-;;; Approximate-Function-Type against a real function type.
+;;; This is similar to VALID-FUNCTION-USE, but checks an
+;;; APPROXIMATE-FUNCTION-TYPE against a real function type.
 (declaim (ftype (function (approximate-function-type function-type
 			   &optional function function function)
 			  (values boolean boolean))
 		valid-approximate-type))
 (defun valid-approximate-type (call-type type &optional
 					 (*test-function* #'types-intersect)
-					 (*error-function* #'compiler-warning)
+					 (*error-function*
+					  #'compiler-style-warning)
 					 (*warning-function* #'compiler-note))
   (let* ((*lossage-detected* nil)
 	 (*slime-detected* nil)
@@ -416,19 +441,21 @@
     (let ((call-min (approximate-function-type-min-args call-type)))
       (when (< call-min min-args)
 	(note-lossage
-	 "Function previously called with ~R argument~:P, but wants at least ~R."
+	 "~:@<The function was previously called with ~R argument~:P, ~
+          but wants at least ~R.~:>"
 	 call-min min-args)))
 
     (let ((call-max (approximate-function-type-max-args call-type)))
       (cond ((<= call-max max-args))
 	    ((not (or keyp rest))
 	     (note-lossage
-	      "Function previously called with ~R argument~:P, but wants at most ~R."
+	      "~:@<The function was previously called with ~R argument~:P, ~
+                but wants at most ~R.~:>"
 	      call-max max-args))
 	    ((and keyp (oddp (- call-max max-args)))
 	     (note-lossage
-	      "Function previously called with an odd number of arguments in ~
-	      the keyword portion.")))
+	      "~:@<The function was previously called with an odd number of ~
+               arguments in the keyword portion.~:>")))
 
       (when (and keyp (> call-max max-args))
 	(check-approximate-keywords call-type max-args type)))
@@ -455,7 +482,7 @@
       (check-approximate-arg-type (car types) decl-type "~:R" n)))
   (values))
 
-;;; Check that each of the call-types is compatible with Decl-Type,
+;;; Check that each of the call-types is compatible with DECL-TYPE,
 ;;; complaining if not or if we can't tell.
 (declaim (ftype (function (list ctype string &rest t) (values))
 		check-approximate-arg-type))
@@ -479,7 +506,7 @@
 ;;; argument position. Check the validity of all keys that appeared in
 ;;; valid keyword positions.
 ;;;
-;;; ### We could check the Approximate-Function-Type-Types to make
+;;; ### We could check the APPROXIMATE-FUNCTION-TYPE-TYPES to make
 ;;; sure that all arguments in keyword positions were manifest
 ;;; keywords.
 (defun check-approximate-keywords (call-type max-args type)
@@ -510,7 +537,7 @@
 
 ;;;; ASSERT-DEFINITION-TYPE
 
-;;; Intersect Lambda's var types with Types, giving a warning if there
+;;; Intersect LAMBDA's var types with TYPES, giving a warning if there
 ;;; is a mismatch. If all intersections are non-null, we return lists
 ;;; of the variables and intersections, otherwise we return NIL, NIL.
 (defun try-type-intersections (vars types where)
@@ -639,7 +666,7 @@
 				   (when info
 				     (arg-info-keyword info)))))
 	    (note-lossage
-	     "Definition lacks the ~S keyword present in ~A."
+	     "The definition lacks the ~S keyword present in ~A."
 	     (key-info-name key) where))))
 
       (try-type-intersections (vars) (res) where))))
@@ -651,7 +678,7 @@
   (flet ((frob (x what)
 	   (when x
 	     (note-lossage
-	      "Definition has no ~A, but the ~A did."
+	      "The definition has no ~A, but the ~A did."
 	      what where))))
     (frob (function-type-optional type) "optional args")
     (frob (function-type-keyp type) "keyword args")
@@ -661,26 +688,27 @@
 	 (req (function-type-required type))
 	 (nreq (length req)))
     (unless (= nvars nreq)
-      (note-lossage "Definition has ~R arg~:P, but the ~A has ~R."
+      (note-lossage "The definition has ~R arg~:P, but the ~A has ~R."
 		    nvars where nreq))
     (if *lossage-detected*
 	(values nil nil)
 	(try-type-intersections vars req where))))
 
 ;;; Check for syntactic and type conformance between the definition
-;;; Functional and the specified Function-Type. If they are compatible
-;;; and Really-Assert is T, then add type assertions to the definition
-;;; from the Function-Type.
+;;; FUNCTIONAL and the specified FUNCTION-TYPE. If they are compatible
+;;; and REALLY-ASSERT is T, then add type assertions to the definition
+;;; from the FUNCTION-TYPE.
 ;;;
 ;;; If there is a syntactic or type problem, then we call
-;;; Error-Function with an error message using Where as context
-;;; describing where Function-Type came from.
+;;; ERROR-FUNCTION with an error message using WHERE as context
+;;; describing where FUNCTION-TYPE came from.
 ;;;
-;;; If there is no problem, we return T (even if Really-Assert was
+;;; If there is no problem, we return T (even if REALLY-ASSERT was
 ;;; false). If there was a problem, we return NIL.
 (defun assert-definition-type
        (functional type &key (really-assert t)
-		   ((:error-function *error-function*) #'compiler-warning)
+		   ((:error-function *error-function*)
+		    #'compiler-style-warning)
 		   warning-function
 		   (where "previous declaration"))
   (declare (type functional functional)

@@ -190,6 +190,16 @@
 (defun sb!c::%defun (name def doc source)
   (declare (ignore source))
   (setf (sb!eval:interpreted-function-name def) name)
+  (ecase (info :function :where-from name)
+    (:assumed
+      (setf (info :function :where-from name) :defined)
+      (setf (info :function :type name)
+              (extract-function-type def))
+      (when (info :function :assumed-type name)
+        (setf (info :function :assumed-type name) nil)))
+    (:declared)
+    (:defined
+        (setf (info :function :type name) (extract-function-type def))))
   (sb!c::%%defun name def doc))
 
 ;;;; DEFVAR and DEFPARAMETER

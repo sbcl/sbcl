@@ -841,7 +841,23 @@
 	((valid-function-use call type
 			     :argument-test #'always-subtypep
 			     :result-test #'always-subtypep
-			     :error-function #'compiler-warning
+			     ;; KLUDGE: Common Lisp is such a dynamic
+			     ;; language that all we can do here in
+			     ;; general is issue a STYLE-WARNING. It
+			     ;; would be nice to issue a full WARNING
+			     ;; in the special case of of type
+			     ;; mismatches within a compilation unit
+			     ;; (as in section 3.2.2.3 of the spec)
+			     ;; but at least as of sbcl-0.6.11, we
+			     ;; don't keep track of whether the
+			     ;; mismatched data came from the same
+			     ;; compilation unit, so we can't do that.
+			     ;; -- WHN 2001-02-11
+			     ;;
+			     ;; FIXME: Actually, I think we could
+			     ;; issue a full WARNING if the call
+			     ;; violates a DECLAIM FTYPE.
+			     :error-function #'compiler-style-warning
 			     :warning-function #'compiler-note)
 	 (assert-call-type call type)
 	 (maybe-terminate-block call ir1-p)

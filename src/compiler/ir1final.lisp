@@ -65,9 +65,7 @@
       (let* ((where (info :function :where-from name))
 	     (*compiler-error-context* (lambda-bind (main-entry leaf)))
 	     (global-def (gethash name *free-functions*))
-	     (global-p
-	      (and (defined-function-p global-def)
-		   (eq (defined-function-functional global-def) leaf))))
+	     (global-p (defined-function-p global-def)))
 	(note-name-defined name :function)
 	(when global-p
 	  (remhash name *free-functions*))
@@ -81,8 +79,8 @@
 	   (setf (info :function :where-from name) :defined))
 	  (:declared); Just keep declared type.
 	  (:defined
-	   (when global-p
-	     (setf (info :function :type name) dtype)))))))
+           (when global-p
+             (setf (info :function :type name) dtype)))))))
   (values))
 
 ;;; Find all calls in Component to assumed functions and update the assumed

@@ -418,6 +418,12 @@
 	   ;; but as long as we continue to use that policy, that's the
 	   ;; not our biggest problem.:-| When we fix that policy, this
 	   ;; should come back into compliance. (So fix that policy!)
+	   ;;   ..but..
+	   ;; FIXME, continued: Except that section "3.2.2.3 Semantic
+	   ;; Constraints" says that if it's within the same file, it's
+	   ;; wrong. And we're in locall.lisp here, so it's probably
+	   ;; (haven't checked this..) a call to something in the same
+	   ;; file. So maybe it deserves a full warning anyway.
 	   (compiler-warning
 	    "function called with ~R argument~:P, but wants exactly ~R"
 	    call-args nargs)
@@ -436,17 +442,8 @@
 	(max-args (optional-dispatch-max-args fun))
 	(call-args (length (combination-args call))))
     (cond ((< call-args min-args)
-	   ;; FIXME: ANSI requires in "3.2.5 Exceptional Situations in the
-	   ;; Compiler" that calling a function with "the wrong number of
-	   ;; arguments" be only a STYLE-ERROR. I think, though, that this
-	   ;; should only apply when the number of arguments is inferred
-	   ;; from a previous definition. If the number of arguments
-	   ;; is DECLAIMed, surely calling with the wrong number is a
-	   ;; real WARNING. As long as SBCL continues to use CMU CL's
-	   ;; non-ANSI DEFUN-is-a-DECLAIM policy, we're in violation here,
-	   ;; but as long as we continue to use that policy, that's the
-	   ;; not our biggest problem.:-| When we fix that policy, this
-	   ;; should come back into compliance. (So fix that policy!)
+	   ;; FIXME: See FIXME note at the previous
+	   ;; wrong-number-of-arguments warnings in this file.
 	   (compiler-warning
 	    "function called with ~R argument~:P, but wants at least ~R"
 	    call-args min-args)
@@ -458,17 +455,8 @@
 	  ((optional-dispatch-more-entry fun)
 	   (convert-more-call ref call fun))
 	  (t
-	   ;; FIXME: ANSI requires in "3.2.5 Exceptional Situations in the
-	   ;; Compiler" that calling a function with "the wrong number of
-	   ;; arguments" be only a STYLE-ERROR. I think, though, that this
-	   ;; should only apply when the number of arguments is inferred
-	   ;; from a previous definition. If the number of arguments
-	   ;; is DECLAIMed, surely calling with the wrong number is a
-	   ;; real WARNING. As long as SBCL continues to use CMU CL's
-	   ;; non-ANSI DEFUN-is-a-DECLAIM policy, we're in violation here,
-	   ;; but as long as we continue to use that policy, that's the
-	   ;; not our biggest problem.:-| When we fix that policy, this
-	   ;; should come back into compliance. (So fix that policy!)
+	   ;; FIXME: See FIXME note at the previous
+	   ;; wrong-number-of-arguments warnings in this file.
 	   (compiler-warning
 	    "function called with ~R argument~:P, but wants at most ~R"
 	    call-args max-args)

@@ -3083,7 +3083,7 @@
 
 ;;; Check a new global function definition for consistency with
 ;;; previous declaration or definition, and assert argument/result
-;;; types if appropriate. This this assertion is suppressed by the
+;;; types if appropriate. This assertion is suppressed by the
 ;;; EXPLICIT-CHECK attribute, which is specified on functions that
 ;;; check their argument types as a consequence of type dispatching.
 ;;; This avoids redundant checks such as NUMBERP on the args to +,
@@ -3094,8 +3094,18 @@
 	(info (info :function :info (leaf-name var))))
     (assert-definition-type
      fun type
-     :error-function #'compiler-warning
-     :warning-function (cond (info #'compiler-warning)
+     ;; KLUDGE: Common Lisp is such a dynamic language that in general
+     ;; all we can do here in general is issue a STYLE-WARNING. It
+     ;; would be nice to issue a full WARNING in the special case of
+     ;; of type mismatches within a compilation unit (as in section
+     ;; 3.2.2.3 of the spec) but at least as of sbcl-0.6.11, we don't
+     ;; keep track of whether the mismatched data came from the same
+     ;; compilation unit, so we can't do that. -- WHN 2001-02-11
+     ;;
+     ;; FIXME: Actually, I think we could issue a full WARNING if the
+     ;; new definition contradicts a DECLAIM FTYPE.
+     :error-function #'compiler-style-warning
+     :warning-function (cond (info #'compiler-style-warning)
 			     (for-real #'compiler-note)
 			     (t nil))
      :really-assert

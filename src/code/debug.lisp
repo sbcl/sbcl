@@ -1078,20 +1078,20 @@ argument")
 ;;;
 ;;; Two commands are made for each restart: one for the number, and
 ;;; one for the restart name (unless it's been shadowed by an earlier
-;;; restart of the same name).
+;;; restart of the same name, or it is NIL).
 (defun make-restart-commands (&optional (restarts *debug-restarts*))
   (let ((commands)
 	(num 0))			; better be the same as show-restarts!
     (dolist (restart restarts)
       (let ((name (string (restart-name restart))))
-	(unless (find name commands :key #'car :test #'string=)
-	  (let ((restart-fun
-		 #'(lambda ()
-		     (invoke-restart-interactively restart))))
-	    (push (cons name restart-fun) commands)
-	    (push (cons (format nil "~D" num) restart-fun) commands))))
-      (incf num))
-    commands))
+        (let ((restart-fun
+                #'(lambda () (invoke-restart-interactively restart))))
+          (push (cons (format nil "~d" num) restart-fun) commands)
+          (unless (or (null (restart-name restart)) 
+                      (find name commands :key #'car :test #'string=))
+            (push (cons name restart-fun) commands))))
+    (incf num))
+  commands))
 
 ;;;; frame-changing commands
 
@@ -1592,7 +1592,7 @@ argument")
     (if function
 	(describe function)
 	(format t "can't figure out the function for this frame"))))
-
+<
 ;;;; debug loop command utilities
 
 (defun read-prompting-maybe (prompt &optional (in *standard-input*)
