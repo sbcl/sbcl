@@ -134,5 +134,40 @@
 ;;; violations through stack corruption.
 (print 0.0001)
 
+;;; In sbcl-0.8.7, the ~W format directive interpreter implemented the
+;;; sense of the colon and at-sign modifiers exactly backwards.
+;;;
+;;; (Yes, the test for this *is* substantially hairier than the fix;
+;;; wanna make something of it?)
+(cl:in-package :cl-user)
+(defstruct wexerciser-0-8-7)
+(defun wexercise-0-8-7-interpreted (wformat)
+  (format t wformat (make-wexerciser-0-8-7)))
+(defmacro define-compiled-wexercise-0-8-7 (wexercise wformat)
+  `(defun ,wexercise ()
+    (declare (optimize (speed 3) (space 1)))
+    (format t ,wformat (make-wexerciser-0-8-7))
+    (values)))
+(define-compiled-wexercise-0-8-7 wexercise-0-8-7-compiled-without-atsign "~W")
+(define-compiled-wexercise-0-8-7 wexercise-0-8-7-compiled-with-atsign "~@W")
+(defmethod print-object :before ((wexerciser-0-8-7 wexerciser-0-8-7) stream)
+  (unless (and *print-level* *print-length*)
+    (error "gotcha coming")))
+(let ((*print-level* 11)
+      (*print-length* 12))
+  (wexercise-0-8-7-interpreted "~W")
+  (wexercise-0-8-7-compiled-without-atsign))
+(remove-method #'print-object
+	       (find-method #'print-object
+			    '(:before)
+			    (mapcar #'find-class '(wexerciser-0-8-7 t))))
+(defmethod print-object :before ((wexerciser-0-8-7 wexerciser-0-8-7) stream)
+  (when (or *print-level* *print-length*)
+    (error "gotcha going")))
+(let ((*print-level* 11)
+      (*print-length* 12))
+  (wexercise-0-8-7-interpreted "~@W")
+  (wexercise-0-8-7-compiled-with-atsign))
+
 ;;; success
 (quit :unix-status 104)

@@ -235,8 +235,8 @@
 (def-format-interpreter #\W (colonp atsignp params)
   (interpret-bind-defaults () params
     (let ((*print-pretty* (or colonp *print-pretty*))
-	  (*print-level* (and atsignp *print-level*))
-	  (*print-length* (and atsignp *print-length*)))
+	  (*print-level* (unless atsignp *print-level*))
+	  (*print-length* (unless atsignp *print-length*)))
       (output-object (next-arg) stream))))
 
 ;;;; format interpreters and support functions for integer output
