@@ -1031,6 +1031,43 @@ WORKAROUND:
   type required for an array reference of this type is (INTEGER 0 (0))
   which is canonicalized to NIL.
 
+260:
+  (let* ((s (gensym))
+         (t1 (specifier-type s)))
+    (eval `(defstruct ,s))
+    (type= t1 (specifier-type s)))
+  => NIL, NIL
+
+  It causes WARNING when defining a structure, a slot of which
+  contains an instance of the same structure.
+
+261:
+    * (let () (list (the (values &optional fixnum) (eval '(values)))))
+    debugger invoked on condition of type TYPE-ERROR:
+      The value NIL is not of type FIXNUM.
+
+262: "yet another bug in inline expansion of local functions"
+  Compiler fails on
+
+    (defun foo (x y)
+      (declare (integer x y))
+      (+ (block nil
+            (flet ((xyz (u)
+                     (declare (integer u))
+                     (if (> (1+ (the unsigned-byte u)) 0)
+                         (+ 1 u)
+                         (return (+ 38 (cos (/ u 78)))))))
+              (declare (inline xyz))
+              (return-from foo
+                (* (funcall (eval #'xyz) x)
+                   (if (> x 30)
+                       (funcall (if (> x 5) #'xyz #'identity)
+                                (+ x 13))
+                       38)))))
+         (sin (* x y))))
+
+  Urgh... It's time to write IR1-copier.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
