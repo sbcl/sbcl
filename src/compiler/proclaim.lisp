@@ -169,7 +169,7 @@
 	 (when (constantp name)
 	   (error "can't declare a constant as SPECIAL: ~S" name))
 	 (with-single-package-locked-error
-             (:symbol name "globally declaraing ~A special"))
+             (:symbol name "globally declaring ~A special"))
 	 (clear-info :variable :constant-value name)
 	 (setf (info :variable :kind name) :special)))
       (type

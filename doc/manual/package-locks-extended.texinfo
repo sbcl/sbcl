@@ -79,10 +79,10 @@ errors of type @code{sb-ext:symbol-package-locked-error}.
 @subsubsection Lexical bindings and declarations
 
 Compiling lexical binding constructs or lexical declarations that
-violate package locks package cause a compile-time package-lock
-violation. A complete listing of operators affect by this is:
-@code{let}, @code{let*}, @code{flet}, @code{labels}, @code{macrolet},
-and @code{symbol-macrolet}, @code{declare}.
+violate package locks causes a compile-time package-lock violation. A
+complete listing of operators affect by this is: @code{let},
+@code{let*}, @code{flet}, @code{labels}, @code{macrolet}, and
+@code{symbol-macrolet}, @code{declare}.
 
 Package locks affecting both lexical bindings and declarations can be
 disabled at compile-time with @code{sb-ext:disable-package-locks}
