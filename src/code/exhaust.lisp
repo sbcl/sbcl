@@ -30,18 +30,18 @@
   (let (;; initial difference between soft limit and hard limit
 	(initial-slack (expt 2 20)))
     (setf *control-stack-exhaustion-sap*
-	  (int-sap #!+stack-grows-downward (+ sb!vm:control-stack-start
-					      initial-slack)
-		   #!+stack-grows-upward (- sb!vm:control-stack-end
-					    initial-slack)))))
+	  (int-sap #!+stack-grows-downward-not-upward
+		   (+ sb!vm:control-stack-start initial-slack)
+		   #!-stack-grows-downward-not-upward
+		   (- sb!vm:control-stack-end initial-slack)))))
   
 ;;; FIXME: Even though this is only called when (> SAFETY (MAX SPEED SPACE))
 ;;; it's still annoyingly wasteful for it to be a full function call.
 ;;; It should probably be a VOP calling an assembly routine or something
 ;;; like that.
 (defun %detect-stack-exhaustion ()
-  (when (#!+stack-grows-upward sap>=
-	 #!+stack-grows-downward sap<=
+  (when (#!-stack-grows-downward-not-upward sap>=
+	 #!+stack-grows-downward-not-upward sap<=
 	 (current-sp)
 	 *control-stack-exhaustion-sap*)
     (let ((*control-stack-exhaustion-sap*
@@ -60,11 +60,14 @@
 ;;; the (continuing) stack overflow.
 (defun revised-control-stack-exhaustion-sap ()
   (let* ((old-slack
-	  #!+stack-grows-upward (- sb!vm:control-stack-end
-				   (sap-int *control-stack-exhaustion-sap*))
-	  #!+stack-grows-downward (- (sap-int *control-stack-exhaustion-sap*)
-				     sb!vm:control-stack-start))
+	  #!-stack-grows-downward-not-upward
+	  (- sb!vm:control-stack-end
+	     (sap-int *control-stack-exhaustion-sap*))
+	  #!+stack-grows-downward-not-upward
+	  (- (sap-int *control-stack-exhaustion-sap*)
+	     sb!vm:control-stack-start))
 	 (new-slack (ash old-slack -1)))
-    (int-sap
-     #!+stack-grows-upward (- sb!vm:control-stack-end new-slack)
-     #!+stack-grows-downward (+ sb!vm:control-stack-start new-slack))))
+    (int-sap #!-stack-grows-downward-not-upward
+	     (- sb!vm:control-stack-end new-slack)
+	     #!+stack-grows-downward-not-upward
+	     (+ sb!vm:control-stack-start new-slack))))

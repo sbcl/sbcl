@@ -51,17 +51,18 @@ if [ "$sbcl_arch" = "" ] ; then
 fi
 echo -n ":$sbcl_arch" >> $ltf 
 # KLUDGE: currently the x86 only works with the generational garbage
-# collector (indicated by the presence of :gencgc in *features*) and
+# collector (indicated by the presence of :GENCGC in *FEATURES*) and
 # alpha, sparc and ppc with the stop'n'copy collector (indicated by
-# the absence of :gencgc in *features*). This isn't a great
-# separation, but for now, rather than have :gencgc in
+# the absence of :GENCGC in *FEATURES*). This isn't a great
+# separation, but for now, rather than have :GENCGC in
 # base-target-features.lisp-expr, we add it into local-target-features
 # if we're building for x86. -- CSR, 2002-02-21 Then we do something
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ] ; then
-    echo -n ' :gencgc :stack-grows-downward' >> $ltf
+    echo -n ' :gencgc :stack-grows-downward-not-upward' >> $ltf
 else
-    echo -n ' :stack-grows-upward' >> $ltf
+    # Nothing need be done in this case, but sh syntax wants a placeholder.
+    echo > /dev/null
 fi
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target

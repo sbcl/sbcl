@@ -163,7 +163,7 @@
   (declare (optimize (speed 3) (safety 0))
 	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
 
-  #!+stack-grows-upward
+  #!-stack-grows-downward-not-upward
   (labels
       ((scrub (ptr offset count)
          (declare (type system-area-pointer ptr)
@@ -193,7 +193,7 @@
 	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
 	     0)))
 
-  #!+stack-grows-downward
+  #!+stack-grows-downward-not-upward
   (labels
       ((scrub (ptr offset count)
 	 (declare (type system-area-pointer ptr)

@@ -249,11 +249,17 @@
  ;; present but stale in SBCL as of 0.6.12.)
  ;;
  ;; properties derived from the machine architecture
- ;;   :stack-grows-downward, :stack-grows-downward
- ;;     One of these two should be present in the features list of any
- ;;     CPU supported as of sbcl-0.7.1.29. On the X86, the system stack
- ;;     grows downward. On the other supported CPU architectures, the
+ ;;   :control-stack-grows-downward-not-upward
+ ;;     On the X86, the Lisp control stack grows downward. On the
+ ;;     other supported CPU architectures as of sbcl-0.7.1.40, the
  ;;     system stack grows upward. 
+ ;;   Note that there are other stack-related differences between the
+ ;;   X86 port and the other ports. E.g. on the X86, the Lisp control
+ ;;   stack coincides with the C stack, meaning that on the X86 there's
+ ;;   stuff on the control stack that the Lisp-level debugger doesn't
+ ;;   understand very well. As of sbcl-0.7.1.40 things like that are
+ ;;   just parameterized by #!+X86, but it'd probably be better to
+ ;;   use new flags like :CONTROL-STACK-CONTAINS-C-STACK.
  ;;
  ;; operating system features:
  ;;   :linux   = We're intended to run under some version of Linux.
