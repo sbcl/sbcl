@@ -286,7 +286,7 @@
      (if (static-symbol-p value)
 	 (sc-number-or-lose 'immediate)
 	 nil))
-    ((signed-byte 30)
+    ((integer #.sb!xc:most-negative-fixnum sb!xc:most-positive-fixnum)
      (sc-number-or-lose 'immediate))
     (system-area-pointer
      (sc-number-or-lose 'immediate))
