@@ -1042,6 +1042,8 @@
       ;; hardwired to be empty. And SBCL doesn't have GENGC (and as
       ;; far as I know no modern CMU CL does either -- WHN
       ;; 2001-10-05). So might we be able to get rid of trace tables?
+      ;;
+      ;; Note that gencgc also does something with the trace table.
 
       ;; Dump the constants, noting any :ENTRY constants that have to
       ;; be patched.

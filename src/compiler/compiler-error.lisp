@@ -91,7 +91,7 @@
 ;;; (2003-05-27) used in SBCL at all.
 (declaim (ftype (function (string &rest t) nil) compiler-error compiler-abort))
 (declaim (ftype (function (string &rest t) (values))
-		compiler-warning compiler-style-warning))
+		compiler-warn compiler-style-warn))
 (defun compiler-abort (format-string &rest format-args)
   (error 'compiler-error
 	 :format-control format-string
