@@ -344,8 +344,8 @@
 	   `(error "There is no primary method for the generic function ~S."
 		   ',generic-function))
 	  ((and (null before) (null after) (null around))
-	   ;; By returning a single call-method `form' here we enable an
-	   ;; important implementation-specific optimization.
+	   ;; By returning a single call-method `form' here we enable
+	   ;; an important implementation-specific optimization.
 	   `(call-method ,(first primary) ,(rest primary)))
 	  (t
 	   (let ((main-effective-method

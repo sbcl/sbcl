@@ -1441,6 +1441,43 @@ WORKAROUND:
   c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
      lists and &KEY arguments) do not signal errors when they should.
 
+192: "constant-folding DATA-VECTOR-REF"
+  (from Einar Floystad Dorum sbcl-devel 14 Aug 2002)
+  Typing this 
+    (defun test ()
+      (funcall 
+       (LAMBDA (TEXT I L )
+         (LABELS ((G908 (I)
+                    (LET ((INDEX
+                           (OR
+                            (IF (= I L)
+                                NIL
+                                (LET ((S TEXT)
+                                      (E (ELT TEXT I)))
+                                  (DECLARE (IGNORABLE S E))
+                                  (WHEN (EQL #\a E)
+                                    (G909 (1+ I))))))))
+                      INDEX))
+                  (G909 (I)
+                    (OR
+                     (IF (= I L)
+                         NIL
+                         (LET ((S TEXT)
+                               (E (ELT TEXT I)))
+                           (DECLARE (IGNORABLE S E))
+                           (WHEN (EQL #\b E) (G910 (1+ I)))))))
+                  (G910 (I)
+                    (LET ((INDEX
+                           (OR
+                            (IF NIL
+                                NIL
+                                (LET ((S TEXT))
+                                  (DECLARE (IGNORABLE S))
+                                  (WHEN T I))))))
+                      INDEX)))
+           (G908 I))) "abcdefg" 0 (length "abcdefg")))
+  at the command prompt in sbcl-0.7.6.23 gives 
+  (BUG "full call to SB-KERNEL:DATA-VECTOR-REF").
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
