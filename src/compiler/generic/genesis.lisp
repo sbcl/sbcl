@@ -47,13 +47,20 @@
 ;;; way to do this in high level data like this (as opposed to e.g. in
 ;;; IP packets), and in fact the CMU CL version number never ended up
 ;;; being incremented past 0. A better approach might be to use a
-;;; string which is set from CVS data.
+;;; string which is set from CVS data. (Though now as of sbcl-0.7.8 or
+;;; so, we have another problem that the core incompatibility
+;;; detection mechanisms are on such a hair trigger -- with even
+;;; different builds from the same sources being considered
+;;; incompatible -- that any coarser-grained versioning mechanisms
+;;; like this are largely irrelevant as long as the hair-triggering
+;;; persists.)
 ;;;
 ;;; 0: inherited from CMU CL
 ;;; 1: rearranged static symbols for sbcl-0.6.8
 ;;; 2: eliminated non-ANSI %DEFCONSTANT/%%DEFCONSTANT support,
 ;;;    deleted a slot from DEBUG-SOURCE structure
-(defconstant sbcl-core-version-integer 2)
+;;; 3: added build ID to cores to discourage sbcl/.core mismatch
+(defconstant sbcl-core-version-integer 3)
 
 (defun round-up (number size)
   #!+sb-doc
@@ -2922,7 +2929,18 @@ initially undefined function references:~2%")
 (defvar *core-file*)
 (defvar *data-page*)
 
+;;; magic numbers to identify entries in a core file
+;;;
+;;; (In case you were wondering: No, AFAIK there's no special magic about
+;;; these which requires them to be in the 38xx range. They're just
+;;; arbitrary words, tested not for being in a particular range but just
+;;; for equality. However, if you ever need to look at a .core file and
+;;; figure out what's going on, it's slightly convenient that they're
+;;; all in an easily recognizable range, and displacing the range away from
+;;; zero seems likely to reduce the chance that random garbage will be
+;;; misinterpreted as a .core file.)
 (defconstant version-core-entry-type-code 3860)
+(defconstant build-id-core-entry-type-code 3899)
 (defconstant new-directory-core-entry-type-code 3861)
 (defconstant initial-fun-core-entry-type-code 3863)
 (defconstant end-core-entry-type-code 3840)
@@ -3016,6 +3034,22 @@ initially undefined function references:~2%")
       (write-word version-core-entry-type-code)
       (write-word 3)
       (write-word sbcl-core-version-integer)
+
+      ;; Write the build ID.
+      (write-word build-id-core-entry-type-code)
+      (let ((build-id (with-open-file (s "output/build-id.tmp"
+					 :direction :input)
+			(read s))))
+	(declare (type simple-string build-id))
+	(/show build-id (length build-id))
+	;; Write length of build ID record: BUILD-ID-CORE-ENTRY-TYPE-CODE
+	;; word, this length word, and one word for each char of BUILD-ID.
+	(write-word (+ 2 (length build-id)))
+	(dovector (char build-id)
+	  ;; (We write each character as a word in order to avoid
+	  ;; having to think about word alignment issues in the
+	  ;; sbcl-0.7.8 version of coreparse.c.)
+	  (write-word (char-code char))))
 
       ;; Write the New Directory entry header.
       (write-word new-directory-core-entry-type-code)

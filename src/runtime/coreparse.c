@@ -34,6 +34,10 @@
 #include "interr.h"
 #include "sbcl.h"
 
+unsigned char build_id[] =
+#include "../../output/build-id.tmp"
+;
+
 static void
 process_directory(int fd, u32 *ptr, int count)
 {
@@ -171,6 +175,36 @@ load_core_file(char *file)
 		     SBCL_CORE_VERSION_INTEGER);
 	    }
 	    break;
+
+	case BUILD_ID_CORE_ENTRY_TYPE_CODE:
+	    SHOW("BUILD_ID_CORE_ENTRY_TYPE_CODE case");
+	    {
+		int i;
+
+		FSHOW((stderr, "build_id[]=\"%s\"\n", build_id));
+		FSHOW((stderr, "remaining_len = %d\n", remaining_len));
+		if (remaining_len != strlen(build_id))
+		    goto losing_build_id;
+		for (i = 0; i < remaining_len; ++i) {
+		    FSHOW((stderr, "ptr[%d] = char = %d, expected=%d\n",
+			   ptr[i], i, build_id[i]));
+		    if (ptr[i] != build_id[i])
+			goto losing_build_id;
+		}
+		break;
+	    losing_build_id:
+		/* .core files are not binary-compatible between
+		 * builds because we can't easily detect whether the
+		 * sources were patched between the time the
+		 * dumping-the-.core runtime was built and the time
+		 * that the loading-the-.core runtime was built.
+		 *
+		 * (We could easily detect whether version.lisp-expr
+		 * was changed, but people experimenting with patches
+		 * don't necessarily update version.lisp-expr.) */
+
+		lose("can't load .core for different runtime, sorry");
+	    } 
 
 	case NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE:
 	    SHOW("NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE case");

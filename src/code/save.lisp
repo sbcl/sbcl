@@ -32,11 +32,20 @@
 					 (root-structures ())
 					 (environment-name "auxiliary"))
   #!+sb-doc
-  "Saves a CMU Common Lisp core image in the file of the specified name,
-  killing the current Lisp invocation in the process (unless it bails
-  out early because of some argument error or something).
+  "Save a \"core image\", i.e. enough information to restart a Lisp
+  process later in the same state, in the file of the specified name.
 
-  The following &KEY args are defined:
+  This implementation is not as polished and painless as you might like: 
+    * It corrupts the current Lisp image enough that the current process
+      needs to be killed afterwards.
+    * There is absolutely no binary compatibility of core images between
+      different runtime support programs. Even runtimes built from the same
+      sources at different times are treated as incompatible for this purpose.
+  This isn't because we like it this way, but just because there don't
+  seem to be good quick fixes for either limitation and no one has been
+  sufficiently motivated to do lengthy fixes.
+
+  The following &KEY arguments are defined:
     :TOPLEVEL
        The function to run when the created core file is resumed.
        The default function handles command line toplevel option

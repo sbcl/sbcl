@@ -1298,14 +1298,23 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     thing to do.)
 
 changes in sbcl-0.7.9 relative to sbcl-0.7.8:
-  * fixed bug: VALUES-LIST is no longer optimized away
+  * minor incompatible change: The runtime (the Unix executable named
+    "sbcl") is now much pickier about the .core files it will load.
+    Essentially it now requires .core files to descend from the same
+    build (not just the same sources or LISP-IMPLEMENTATION-VERSION)
+    as the runtime does. (The intent is to prevent the crashes which
+    can occur, and which can even be reported as mysterious failures,
+    when people patch the sources or change the build parameters
+    without changing LISP-IMPLEMENTATION-VERSION, then mix and match
+    sbcl and .core files.)
+  * fixed bug: VALUES-LIST is no longer optimized away.
   * fixed bug 142: The FFI conversion of C string values to Lisp
     string values no longer conses excessively. (thanks to Nathan
     Froyd porting Raymond Toy's fix to CMU CL)
   * improved MOP conformance in PCL (thanks to Nathan Froyd porting
     Gerd Moellman's work in CMU CL)
-  * fixed bug 202: the compiler failed on a function, which derived
-    type contradicted declared.
+  * fixed bug 202: The compiler no longer fails on functions whose
+    derived types contradict their declared type.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

@@ -102,8 +102,7 @@ save(char *filename, lispobj init_function)
     printf("done]\n");
     fflush(stdout);
     
-    /* (Now we can actually start copying ourselves into the
-     * output file.) */
+    /* (Now we can actually start copying ourselves into the output file.) */
 
     printf("[saving current Lisp image into %s:\n", filename);
     fflush(stdout);
@@ -114,9 +113,22 @@ save(char *filename, lispobj init_function)
     putw(3, file);
     putw(SBCL_CORE_VERSION_INTEGER, file);
 
-    putw(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
-    putw((5*3)+2, file);
+    putw(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
+    putw(/* (We're writing the word count of the entry here, and the 2
+	  * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE
+	  * word and one word where we store the count itself.) */
+	 2 + strlen(build_id),
+	 file);
+    {
+	char *p;
+	for (p = build_id; *p; ++p)
+	    putw(*p, file);
+    }
 
+    putw(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
+    putw(/* (word count = 3 spaces described by 5 words each, plus the
+	  * entry type code, plus this count itself) */
+	 (5*3)+2, file);
     output_space(file,
 		 READ_ONLY_CORE_SPACE_ID,
 		 (lispobj *)READ_ONLY_SPACE_START,

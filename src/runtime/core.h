@@ -32,4 +32,11 @@ struct ndir_entry {
 
 extern lispobj load_core_file(char *file);
 
+/* arbitrary string identifying this build, embedded in .core files to
+ * prevent people mismatching a runtime built e.g. with :SB-SHOW
+ * against a .core built without :SB-SHOW (or against various grosser
+ * mismatches, e.g. a .core built with an old version of the code
+ * against a runtime with patches which add new C code) */
+extern unsigned char build_id[];
+
 #endif

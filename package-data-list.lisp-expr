@@ -462,6 +462,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
           "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
     :export ("*ASSEMBLER-ROUTINES*"
              "+BACKEND-FASL-FILE-IMPLEMENTATION+"
+	     "BUILD-ID-CORE-ENTRY-TYPE-CODE"
              "*FASL-FILE-TYPE*"
              "CLOSE-FASL-OUTPUT"
              "DUMP-ASSEMBLER-ROUTINES"
