@@ -13,7 +13,7 @@
 
 (macrolet ((ea-for-xf-desc (tn slot)
 	     `(make-ea
-	       :dword :base ,tn
+	       :qword :base ,tn
 	       :disp (- (* ,slot n-word-bytes)
 			other-pointer-lowtag))))
   (defun ea-for-sf-desc (tn)
@@ -32,10 +32,9 @@
 
 (macrolet ((ea-for-xf-stack (tn kind)
 	     `(make-ea
-	       :dword :base rbp-tn
-	       :disp (- (* (+ (tn-offset ,tn)
-			      (ecase ,kind (:single 1) (:double 2) (:long 3)))
-			 n-word-bytes)))))
+	       :qword :base rbp-tn
+	       :disp (- (* (+ (tn-offset ,tn) 1)
+			   n-word-bytes)))))
   (defun ea-for-sf-stack (tn)
     (ea-for-xf-stack tn :single))
   (defun ea-for-df-stack (tn)
@@ -54,19 +53,17 @@
   (when (policy node (or (= debug 3) (> safety speed))))
     (when note-next-instruction
       (note-next-instruction note-next-instruction :internal-error))
+    #+nil
     (inst wait))
 
 ;;; complex float stack EAs
 (macrolet ((ea-for-cxf-stack (tn kind slot &optional base)
+	     (declare (ignore kind))
 	     `(make-ea
-	       :dword :base ,base
+	       :qword :base ,base
 	       :disp (- (* (+ (tn-offset ,tn)
-			      (* (ecase ,kind
-				   (:single 1)
-				   (:double 2)
-				   (:long 3))
-				 (ecase ,slot (:real 1) (:imag 2))))
-			 n-word-bytes)))))
+			      (* 1 (ecase ,slot (:real 1) (:imag 2))))
+			   n-word-bytes)))))
   (defun ea-for-csf-real-stack (tn &optional (base rbp-tn))
     (ea-for-cxf-stack tn :single :real base))
   (defun ea-for-csf-imag-stack (tn &optional (base rbp-tn))
@@ -76,33 +73,15 @@
   (defun ea-for-cdf-imag-stack (tn &optional (base rbp-tn))
     (ea-for-cxf-stack tn :double :imag base)))
 
-;;; Abstract out the copying of a FP register to the FP stack top, and
-;;; provide two alternatives for its implementation. Note: it's not
-;;; necessary to distinguish between a single or double register move
-;;; here.
-;;;
-;;; Using a Pop then load.
-(defun copy-fp-reg-to-fr0 (reg)
-  (aver (not (zerop (tn-offset reg))))
-  (inst fstp fr0-tn)
-  (inst fld (make-random-tn :kind :normal
-			    :sc (sc-or-lose 'double-reg)
-			    :offset (1- (tn-offset reg)))))
-;;; Using Fxch then Fst to restore the original reg contents.
-#+nil
-(defun copy-fp-reg-to-fr0 (reg)
-  (aver (not (zerop (tn-offset reg))))
-  (inst fxch reg)
-  (inst fst  reg))
-
 
 ;;;; move functions
 
 ;;; X is source, Y is destination.
 (define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
-  (with-empty-tn@fp-top(y)
-     (inst fld (ea-for-sf-stack x))))
+  (inst movss y (ea-for-sf-stack x)))
+
+;;; got this far 20040627
 
 (define-move-fun (store-single 2) (vop x y)
   ((single-reg) (single-stack))

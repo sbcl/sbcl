@@ -22,7 +22,7 @@
   (defvar *word-register-names* (make-array 16 :initial-element nil))
   (defvar *dword-register-names* (make-array 16 :initial-element nil))
   (defvar *qword-register-names* (make-array 32 :initial-element nil))
-  (defvar *float-register-names* (make-array 8 :initial-element nil)))
+  (defvar *xmm-register-names* (make-array 16 :initial-element nil)))
 
 (macrolet ((defreg (name offset size)
 	     (let ((offset-sym (symbolicate name "-OFFSET"))
@@ -102,15 +102,24 @@
 	     r8 r9 r10 r11 #+nil r12 #+nil r13 r14 r15)
 
   ;; floating point registers
-  (defreg fr0 0 :float)
-  (defreg fr1 1 :float)
-  (defreg fr2 2 :float)
-  (defreg fr3 3 :float)
-  (defreg fr4 4 :float)
-  (defreg fr5 5 :float)
-  (defreg fr6 6 :float)
-  (defreg fr7 7 :float)
-  (defregset *float-regs* fr0 fr1 fr2 fr3 fr4 fr5 fr6 fr7)
+  (defreg xmm0 0 :float)
+  (defreg xmm1 1 :float)
+  (defreg xmm2 2 :float)
+  (defreg xmm3 3 :float)
+  (defreg xmm4 4 :float)
+  (defreg xmm5 5 :float)
+  (defreg xmm6 6 :float)
+  (defreg xmm7 7 :float)
+  (defreg xmm8 8 :float)
+  (defreg xmm9 9 :float)
+  (defreg xmm10 10 :float)
+  (defreg xmm11 11 :float)
+  (defreg xmm12 12 :float)
+  (defreg xmm13 13 :float)
+  (defreg xmm14 14 :float)
+  (defreg xmm15 15 :float)
+  (defregset *xmm-regs* xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
+	     xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15)
 
   ;; registers used to pass arguments
   ;;
@@ -131,9 +140,7 @@
 ;;; words in a dword register.
 (define-storage-base registers :finite :size 32)
 
-;;; I suspect we should do fp with SSE instead of the old x86 stuff,
-;;; but for the time being -
-(define-storage-base float-registers :finite :size 8)
+(define-storage-base xmm-registers :finite :size 16)
 
 (define-storage-base stack :unbounded :size 8)
 (define-storage-base constant :non-packed)
@@ -184,9 +191,6 @@
   ;; non-immediate constants in the constant pool
   (constant constant)
 
-  ;; some FP constants can be generated in the i387 silicon
-  (fp-constant immediate-constant)
-
   (immediate immediate-constant)
 
   ;;
@@ -203,9 +207,9 @@
   (base-char-stack stack)		; non-descriptor characters.
   (sap-stack stack)			; System area pointers.
   (single-stack stack)			; single-floats
-  (double-stack stack :element-size 2)	; double-floats.
+  (double-stack stack)
   (complex-single-stack stack :element-size 2)	; complex-single-floats
-  (complex-double-stack stack :element-size 4)	; complex-double-floats
+  (complex-double-stack stack :element-size 2)	; complex-double-floats
 
 
   ;;
@@ -289,28 +293,28 @@
   ;; that can go in the floating point registers
 
   ;; non-descriptor SINGLE-FLOATs
-  (single-reg float-registers
-	      :locations (0 1 2 3 4 5 6 7)
+  (single-reg xmm-registers
+	      :locations #.(loop for i from 0 to 15 collect i)
 	      :constant-scs (fp-constant)
 	      :save-p t
 	      :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
-  (double-reg float-registers
-	      :locations (0 1 2 3 4 5 6 7)
+  (double-reg xmm-registers
+	      :locations #.(loop for i from 0 to 15 collect i)
 	      :constant-scs (fp-constant)
 	      :save-p t
 	      :alternate-scs (double-stack))
 
-  (complex-single-reg float-registers
-		      :locations (0 2 4 6)
+  (complex-single-reg xmm-registers
+		      :locations #.(loop for i from 0 to 14 by 2 collect i)
 		      :element-size 2
 		      :constant-scs ()
 		      :save-p t
 		      :alternate-scs (complex-single-stack))
 
-  (complex-double-reg float-registers
-		      :locations (0 2 4 6)
+  (complex-double-reg xmm-registers
+		      :locations #.(loop for i from 0 to 14 by 2 collect i)
 		      :element-size 2
 		      :constant-scs ()
 		      :save-p t
@@ -356,7 +360,9 @@
   (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
   (def-misc-reg-tns byte-reg al ah bl bh cl ch dl dh)
-  (def-misc-reg-tns single-reg fr0 fr1 fr2 fr3 fr4 fr5 fr6 fr7))
+  (def-misc-reg-tns single-reg 
+      xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
+      xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15))
 
 ;;; TNs for registers used to pass arguments
 (defparameter *register-arg-tns*
@@ -364,15 +370,17 @@
 	    (symbol-value (symbolicate register-arg-name "-TN")))
 	  *register-arg-names*))
 
-;;; FIXME: doesn't seem to be used in SBCL
-#|
-;;; added by pw
-(defparameter fp-constant-tn
+
+(defparameter fp-single-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'fp-constant)
-		  :offset 31))		; Offset doesn't get used.
-|#
-
+		  :sc (sc-or-lose 'single-reg)
+		  :offset 15))
+
+(defparameter fp-double-zero-tn
+  (make-random-tn :kind :normal
+		  :sc (sc-or-lose 'double-reg)
+		  :offset 15))
+
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
@@ -384,20 +392,14 @@
      (when (static-symbol-p value)
        (sc-number-or-lose 'immediate)))
     (single-float
-     (when (or (eql value 0f0) (eql value 1f0))
-       (sc-number-or-lose 'fp-constant)))
+     (if (eql value 0f0)
+	 (sc-number-or-lose 'fp-single-zero )
+	 nil))
     (double-float
-     (when (or (eql value 0d0) (eql value 1d0))
-       (sc-number-or-lose 'fp-constant)))
-    #!+long-float
-    (long-float
-     (when (or (eql value 0l0) (eql value 1l0)
-	       (eql value pi)
-	       (eql value (log 10l0 2l0))
-	       (eql value (log 2.718281828459045235360287471352662L0 2l0))
-	       (eql value (log 2l0 10l0))
-	       (eql value (log 2l0 2.718281828459045235360287471352662L0)))
-       (sc-number-or-lose 'fp-constant)))))
+     (if (eql value 0d0)
+	 (sc-number-or-lose 'fp-double-zero )
+	 nil))))
+
 
 ;;;; miscellaneous function call parameters
 
@@ -406,19 +408,10 @@
 (def!constant return-pc-save-offset 1)
 (def!constant code-save-offset 2)
 
-;;; FIXME: This is a bad comment (changed since when?) and there are others
-;;; like it in this file. It'd be nice to clarify them. Failing that deleting
-;;; them or flagging them with KLUDGE might be better than nothing.
-;;;
-;;; names of these things seem to have changed. these aliases by jrd
-(def!constant lra-save-offset return-pc-save-offset)
-
-#+nil
-(def!constant cfp-offset ebp-offset)	; pfw - needed by stuff in /code
-					; related to signal context stuff
+(def!constant lra-save-offset return-pc-save-offset) ; ?
 
 ;;; This is used by the debugger.
-(def!constant single-value-return-byte-offset 2)
+(def!constant single-value-return-byte-offset 3)
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
