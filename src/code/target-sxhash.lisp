@@ -145,6 +145,13 @@
 		    (logxor 422371266
 			    (sxhash ; through DEFTRANSFORM
 			     (class-name (layout-class (%instance-layout x)))))
+		    ;; Nice though it might be to return a nontrivial
+		    ;; hash value for other instances (especially
+		    ;; STANDARD-OBJECTs) there seems to be no good way
+		    ;; to do so. We can't even do the CLASS-NAME trick
+		    ;; (as used above for STRUCTURE-OBJECT) because
+		    ;; then CHANGE-CLASS would cause SXHASH values to
+		    ;; change, ouch! -- WHN recording wisdom of CSR
 		    309518995))
 	       (symbol (sxhash x)) ; through DEFTRANSFORM
 	       (array

@@ -458,14 +458,6 @@ WORKAROUND:
   crashes SBCL. In general tracing anything which is used in the 
   implementation of TRACE is likely to have the same problem.
 
-68: 
-  As reported by Daniel Solaz on cmucl-help@cons.org 2000-11-23,
-  SXHASH returns the same value for all non-STRUCTURE-OBJECT instances,
-  notably including all PCL instances. There's a limit to how much
-  SXHASH can do to return unique values for instances, but at least
-  it should probably look at the class name, the way that it does
-  for STRUCTURE-OBJECTs.
-
 70:
   (probably related to bug #65; maybe related to bug #109)
   The compiler doesn't like &OPTIONAL arguments in LABELS and FLET
@@ -486,12 +478,6 @@ WORKAROUND:
        The assertion (EQ (SB-C::LAMBDA-TAIL-SET SB-C::CALLER)
                          (SB-C::LAMBDA-TAIL-SET
                           (SB-C::LAMBDA-HOME SB-C::CALLEE))) failed.
-
-71: 
-  (DECLAIM (OPTIMIZE ..)) doesn't work. E.g. even after 
-  (DECLAIM (OPTIMIZE (SPEED 3))), things are still optimized with
-  the previous SPEED policy. This bug will probably get fixed in
-  0.6.9.x in a general cleanup of optimization policy.
 
 72:
   (DECLAIM (OPTIMIZE ..)) doesn't work properly inside LOCALLY forms.
@@ -1279,7 +1265,11 @@ WORKAROUND:
     (change-class (make-instance 'foo :a 1) 'bar :b 2)
   should return an instance of class BAR with its A slot-value being 1
   and its B slot-value being 2; at present (sbcl-0.7.4.8), it signals
-  an error.
+  an error. There's some code by Espen S. Johnsen at 
+  <http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/clg/clg/glib/pcl.lisp>
+  to patch around this (and some related things? not sure -- WHN) which 
+  might be usable to fix it in the main SBCL CVS.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
