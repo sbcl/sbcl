@@ -858,6 +858,7 @@ is to slow the program by causing cache misses or even swapping.
 @c      _  In addition to suppressing type checks, \code{0} also suppresses
 @c      _  argument count checking, unbound-symbol checking and array bounds
 @c      _  checks.
+@c      _  ... and checking of tag existence in RETURN-FROM and GO.
 @c      _
 @c      _\item[\code{extensions:inhibit-warnings}] \cindex{inhibit-warnings
 @c      _    optimization quality}This is a CMU extension that determines how

@@ -1667,3 +1667,11 @@
        (type (simple-array (unsigned-byte 32) (*)) v))
       (setf (aref v 0) (* (* x #.(floor (ash 1 32) (* 11 80))) y))
       nil)))
+
+;;; Bug reported by Robert J. Macomber: instrumenting of more-entry
+;;; prevented open coding of %LISTIFY-REST-ARGS.
+(let ((f (compile nil '(lambda ()
+                        (declare (optimize (debug 3)))
+                        (with-simple-restart (blah "blah") (error "blah"))))))
+  (handler-bind ((error (lambda (c) (invoke-restart 'blah))))
+    (assert (equal (multiple-value-list (funcall f)) '(nil t)))))

@@ -569,6 +569,9 @@
   ;; has the original exit destination as its successor. Null only
   ;; temporarily.
   (target nil :type (or cblock null))
+  ;; for a lexical exit it determines whether tag existence check is
+  ;; needed
+  (safe-p nil :type boolean)
   ;; some kind of info used by the back end
   info)
 (defprinter (nlx-info :identity t)

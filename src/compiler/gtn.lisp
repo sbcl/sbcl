@@ -210,6 +210,8 @@
 	    (make-ir2-nlx-info
 	     :home (when (member (cleanup-kind (nlx-info-cleanup nlx))
 				 '(:block :tagbody))
-		     (make-normal-tn *backend-t-primitive-type*))
+                     (if (nlx-info-safe-p nlx)
+                         (make-normal-tn *backend-t-primitive-type*)
+                         (make-stack-pointer-tn)))
 	     :save-sp (make-nlx-sp-tn physenv)))))
   (values))

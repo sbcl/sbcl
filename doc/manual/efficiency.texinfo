@@ -196,7 +196,9 @@ or
 Stack allocation of closures, defined with @code{flet} or
 @code{labels} with a bound declaration @code{dynamic-extent}.
 Closed-over variables, which are assigned (either inside or outside
-the closure), tags and blocks are still allocated on the heap.
+the closure) are still allocated on the heap. Blocks and tags are also
+allocated on the heap, unless all non-local control transfers to them
+are compiled with zero @code{safety}.
 
 @end itemize
 

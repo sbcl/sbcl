@@ -69,41 +69,6 @@
 	(setq found-it t)))
     found-it))
 
-;;; This is like old CMU CL PRE-ENVIRONMENT-ANALYZE-TOPLEVEL, except
-;;;   (1) It's been brought into the post-0.7.0 world where the property
-;;;       HAS-EXTERNAL-REFERENCES-P is orthogonal to the property of
-;;;       being specialized/optimized for locall at top level.
-;;;   (2) There's no return value, since we don't care whether we
-;;;       find any possible closure variables.
-;;;
-;;; I wish I could find an explanation of why
-;;; PRE-ENVIRONMENT-ANALYZE-TOPLEVEL is important. The old CMU CL
-;;; comments said
-;;;     Called on component with top level lambdas before the
-;;;     compilation of the associated non-top-level code to detect
-;;;     closed over top level variables. We just do COMPUTE-CLOSURE on
-;;;     all the lambdas. This will pre-allocate environments for all
-;;;     the functions with closed-over top level variables. The
-;;;     post-pass will use the existing structure, rather than
-;;;     allocating a new one. We return true if we discover any
-;;;     possible closure vars.
-;;; But that doesn't seem to explain either why it's important to do
-;;; this for top level lambdas, or why it's important to do it only
-;;; for top level lambdas instead of just doing it indiscriminately
-;;; for all lambdas. I do observe that when it's not done, compiler
-;;; assertions occasionally fail. My tentative hypothesis for why it's
-;;; important to do it is that other environment analysis expects to
-;;; bottom out on the outermost enclosing thing, and (insert
-;;; mysterious reason here) it's important to set up bottomed-out-here
-;;; environments before anything else. I haven't been able to guess
-;;; why it's important to do it selectively instead of
-;;; indiscriminately. -- WHN 2001-11-10
-(defun preallocate-physenvs-for-toplevelish-lambdas (component)
-  (dolist (clambda (component-lambdas component))
-    (when (lambda-toplevelish-p clambda)
-      (add-lambda-vars-and-let-vars-to-closures clambda)))
-  (values))
-
 ;;; If CLAMBDA has a PHYSENV, return it, otherwise assign an empty one
 ;;; and return that.
 (defun get-lambda-physenv (clambda)
@@ -250,6 +215,11 @@
 
 ;;;; non-local exit
 
+#!-sb-fluid (declaim (inline should-exit-check-tag-p))
+(defun exit-should-check-tag-p (exit)
+  (declare (type exit exit))
+  (not (zerop (policy exit check-tag-existence))))
+
 ;;; Insert the entry stub before the original exit target, and add a
 ;;; new entry to the PHYSENV-NLX-INFO. The %NLX-ENTRY call in the
 ;;; stub is passed the NLX-INFO as an argument so that the back end
@@ -284,6 +254,7 @@
 
     (setf (exit-nlx-info exit) info)
     (setf (nlx-info-target info) new-block)
+    (setf (nlx-info-safe-p info) (exit-should-check-tag-p exit))
     (push info (physenv-nlx-info env))
     (push info (cleanup-nlx-info cleanup))
     (when (member (cleanup-kind cleanup) '(:catch :unwind-protect))
@@ -319,7 +290,10 @@
              (aver (= (length (block-succ block)) 1))
              (unlink-blocks block (first (block-succ block)))
              (link-blocks block (component-tail (block-component block)))
-             (setf (exit-nlx-info exit) info)))
+             (setf (exit-nlx-info exit) info)
+             (unless (nlx-info-safe-p info)
+               (setf (nlx-info-safe-p info)
+                     (exit-should-check-tag-p exit)))))
           (t
            (insert-nlx-entry-stub exit env)
            (setq info (exit-nlx-info exit))

@@ -1489,11 +1489,13 @@
 ;;; IR2 converted.
 (defun ir2-convert-exit (node block)
   (declare (type exit node) (type ir2-block block))
-  (let ((loc (find-in-physenv (exit-nlx-info node)
-			      (node-physenv node)))
-	(temp (make-stack-pointer-tn))
-	(value (exit-value node)))
-    (vop value-cell-ref node block loc temp)
+  (let* ((nlx (exit-nlx-info node))
+         (loc (find-in-physenv nlx (node-physenv node)))
+         (temp (make-stack-pointer-tn))
+         (value (exit-value node)))
+    (if (nlx-info-safe-p nlx)
+        (vop value-cell-ref node block loc temp)
+        (emit-move node block loc temp))
     (if value
 	(let ((locs (ir2-lvar-locs (lvar-info value))))
 	  (vop unwind node block temp (first locs) (second locs)))
@@ -1510,9 +1512,11 @@
 ;;; dynamic extent. This is done by storing 0 into the indirect value
 ;;; cell that holds the closed unwind block.
 (defoptimizer (%lexical-exit-breakup ir2-convert) ((info) node block)
-  (vop value-cell-set node block
-       (find-in-physenv (lvar-value info) (node-physenv node))
-       (emit-constant 0)))
+  (let ((nlx (lvar-value info)))
+    (when (nlx-info-safe-p nlx)
+      (vop value-cell-set node block
+           (find-in-physenv nlx (node-physenv node))
+           (emit-constant 0)))))
 
 ;;; We have to do a spurious move of no values to the result lvar so
 ;;; that lifetime analysis won't get confused.
@@ -1560,7 +1564,9 @@
 
     (ecase kind
       ((:block :tagbody)
-       (do-make-value-cell node block res (ir2-nlx-info-home 2info)))
+       (if (nlx-info-safe-p info)
+           (do-make-value-cell node block res (ir2-nlx-info-home 2info))
+           (emit-move node block res (ir2-nlx-info-home 2info))))
       (:unwind-protect
        (vop set-unwind-protect node block block-tn))
       (:catch)))

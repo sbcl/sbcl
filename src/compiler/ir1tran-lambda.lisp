@@ -505,7 +505,8 @@
 				 :type (leaf-type var)
 				 :where-from (leaf-where-from var))))
 
-    (let* ((n-context (gensym "N-CONTEXT-"))
+    (let* ((*allow-instrumenting* nil)
+           (n-context (gensym "N-CONTEXT-"))
 	   (context-temp (make-lambda-var :%source-name n-context))
 	   (n-count (gensym "N-COUNT-"))
 	   (count-temp (make-lambda-var :%source-name n-count

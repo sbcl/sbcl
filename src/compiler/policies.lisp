@@ -23,6 +23,11 @@
           (t 2))
   ("no" "maybe" "fast" "full"))
 
+(define-optimization-quality check-tag-existence
+    (cond ((= safety 0) 0)
+          (t 3))
+  ("no" "maybe" "yes" "yes"))
+
 (define-optimization-quality let-convertion
     (if (<= debug speed) 3 0)
   ("off" "maybe" "on" "on"))
