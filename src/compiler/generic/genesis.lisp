@@ -2227,10 +2227,22 @@
 
 ;;;; cold fops for loading code objects and functions
 
+;;; the names of things which have had COLD-FSET used on them already
+;;; (used to make sure that we don't try to statically link a name to
+;;; more than one definition)
+(defparameter *cold-fset-warm-names*
+  ;; This can't be an EQL hash table because names can be conses, e.g.
+  ;; (SETF CAR).
+  (make-hash-table :test 'equal))
+
 (define-cold-fop (fop-fset nil)
-  (let ((fn (pop-stack))
-	(name (pop-stack)))
-    (static-fset name fn)))
+  (let* ((fn (pop-stack))
+	 (cold-name (pop-stack))
+	 (warm-name (warm-fun-name cold-name)))
+    (if (gethash warm-name *cold-fset-warm-names*)
+	(error "duplicate COLD-FSET for ~S" warm-name)
+	(setf (gethash warm-name *cold-fset-warm-names*) t))
+    (static-fset cold-name fn)))
 
 (define-cold-fop (fop-fdefinition)
   (cold-fdefinition-object (pop-stack)))

@@ -462,6 +462,7 @@
        ,args-var)))
 
 (defun gen-printer-def-forms-def-form (name def &optional (evalp t))
+  (declare (type symbol name))
   (destructuring-bind
       (format-name
        (&rest field-defs)
@@ -478,14 +479,16 @@
          ;; byte compilation of components of the SBCL system.
          ;;(declare (optimize (speed 0) (safety 0) (debug 0)))
          (multiple-value-bind (printer-fun printer-defun)
-             (find-printer-fun ,(if (eq printer-form :default)
+             (find-printer-fun ',name
+			       ',format-name
+			       ,(if (eq printer-form :default)
                                      `(format-default-printer ,format-var)
                                      (maybe-quote evalp printer-form))
                                args funcache)
            (multiple-value-bind (labeller-fun labeller-defun)
                (find-labeller-fun args funcache)
              (multiple-value-bind (prefilter-fun prefilter-defun)
-                 (find-prefilter-fun args funcache)
+                 (find-prefilter-fun ',name ',format-name args funcache)
                (multiple-value-bind (mask id)
                    (compute-mask-id args)
                  (values
@@ -1000,7 +1003,6 @@
 				  constraint
 				  (stem (required-argument)))
                                  &body defun-maker-forms)
-  (declare (type string stem))
   (let ((cache-var (gensym))
         (constraint-var (gensym)))
     `(let* ((,constraint-var ,constraint)
@@ -1022,15 +1024,19 @@
                              (push ,,cache-var
                                    (,',cache-slot ',,cache)))))))))))
 
-(defun find-printer-fun (printer-source args cache)
+(defun find-printer-fun (%name %format-name printer-source args cache)
   (if (null printer-source)
       (values nil nil)
       (let ((printer-source (preprocess-printer printer-source args)))
-        (!with-cached-function
-            (name funstate cache function-cache-printers args
-		  :constraint printer-source
-		  :stem "PRINTER")
-          (make-printer-defun printer-source funstate name)))))
+	(!with-cached-function
+	   (name funstate cache function-cache-printers args
+		 :constraint printer-source
+		 :stem (concatenate 'string
+				    (symbol-name %name)
+				    "-"
+				    (symbol-name %format-name)
+				    "-PRINTER"))
+	 (make-printer-defun printer-source funstate name)))))
 
 ;;;; Note that these things are compiled byte compiled to save space.
 
@@ -1436,14 +1442,19 @@
                  (let* ,(make-arg-temp-bindings funstate)
                    ,labels-form))))))))
 
-(defun find-prefilter-fun (args cache)
-  (let ((filtered-args
-         (mapcar #'arg-name (remove-if-not #'arg-prefilter args))))
+(defun find-prefilter-fun (%name %format-name args cache)
+  (declare (type symbol %name))
+  (let ((filtered-args (mapcar #'arg-name
+			       (remove-if-not #'arg-prefilter args))))
     (if (null filtered-args)
         (values nil nil)
         (!with-cached-function
             (name funstate cache function-cache-prefilters args
-             :stem "PREFILTER"
+             :stem (concatenate 'string
+				(symbol-name %name)
+				"-"
+				(symbol-name %format-name)
+				"-PREFILTER")
              :constraint filtered-args)
           (collect ((forms))
             (dolist (arg args)
