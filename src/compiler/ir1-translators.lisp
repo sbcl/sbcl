@@ -270,12 +270,16 @@
 		      :format-arguments (list ,@args))))))
     `(lambda (definition)
       (unless (list-of-length-at-least-p definition 2)
-	,(make-error-form "The list ~S is too short to be a legal local macro definition." 'definition))
+	,(make-error-form
+	  "The list ~S is too short to be a legal local macro definition."
+	  'definition))
       (destructuring-bind (name arglist &body body) definition
 	(unless (symbolp name)
 	  ,(make-error-form "The local macro name ~S is not a symbol." 'name))
 	(unless (listp arglist)
-	  ,(make-error-form "The local macro argument list ~S is not a list." 'arglist))
+	  ,(make-error-form
+	    "The local macro argument list ~S is not a list."
+	    'arglist))
 	(with-unique-names (whole environment)
 	  (multiple-value-bind (body local-decls)
 	      (parse-defmacro arglist whole body name 'macrolet
@@ -706,7 +710,9 @@
 ;;; many branches there are going to be.
 (defun ir1ize-the-or-values (type cont lexenv place)
   (declare (type continuation cont) (type lexenv lexenv))
-  (let* ((atype (if (typep type 'ctype) type (compiler-values-specifier-type type)))
+  (let* ((atype (if (typep type 'ctype)
+		    type
+		    (compiler-values-specifier-type type)))
 	 (old-atype (or (lexenv-find cont type-restrictions)
                         *wild-type*))
          (old-ctype (or (lexenv-find cont weakend-type-restrictions)
@@ -714,7 +720,8 @@
 	 (intersects (values-types-equal-or-intersect old-atype atype))
 	 (new-atype (values-type-intersection old-atype atype))
          (new-ctype (values-type-intersection
-                     old-ctype (maybe-weaken-check atype (lexenv-policy lexenv)))))
+                     old-ctype
+		     (maybe-weaken-check atype (lexenv-policy lexenv)))))
     (when (null (find-uses cont))
       (setf (continuation-asserted-type cont) new-atype)
       (setf (continuation-type-to-check cont) new-ctype))

@@ -82,8 +82,12 @@ case "$HOST_TYPE" in
            INIT="--sysinit /dev/null --userinit /dev/null"
            CORE="--core"
            ;;
+    clisp) LISP="clisp"
+           INIT="-norc"
+           CORE="-M"
+           ;;
     *)     echo unknown host type: "$HOST_TYPE"
-           echo should be one of "sbcl" or "cmucl"
+           echo should be one of "sbcl", "cmucl", or "clisp"
            exit 1
 esac
 
