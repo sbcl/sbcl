@@ -617,7 +617,7 @@ bootstrapping.
 	 ;; always.
 	 ;;
 	 ;; --NS 2004-10-14
-	 '(ignoreable))
+	 '(ignorable))
 	(t
 	 ;; Otherwise, we can usually make Python very happy.
 	 (let ((type (info :type :kind specializer)))
