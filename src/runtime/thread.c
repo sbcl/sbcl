@@ -270,7 +270,7 @@ void block_sigcont(void)
      */
     sigset_t newset;
     sigemptyset(&newset);
-    sigaddset(&newset,SIGCONT);
+    sigaddset(&newset,SIG_DEQUEUE);
     sigprocmask(SIG_BLOCK, &newset, 0); 
 }
 
@@ -282,7 +282,7 @@ void unblock_sigcont_and_sleep(void)
 {
     sigset_t set;
     sigemptyset(&set);
-    sigaddset(&set,SIGCONT);
+    sigaddset(&set,SIG_DEQUEUE);
     do {
 	errno=0;
 	sigwaitinfo(&set,0);
@@ -297,6 +297,14 @@ int interrupt_thread(pid_t pid, lispobj function)
 
     return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
 }
+
+/* stopping the world is a two-stage process.  From this thread we signal 
+ * all the others with SIG_STOP_FOR_GC.  The handler for this thread does
+ * the usual pseudo-atomic checks (we don't want to stop a thread while 
+ * it's in the middle of allocation) then kills _itself_ with SIGSTOP.
+ * At any given time, countdown_to_gc should reflect the number of threads
+ * signalled but which haven't yet come to rest
+ */
 
 void gc_stop_the_world()
 {

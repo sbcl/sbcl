@@ -136,6 +136,8 @@ collect_garbage(unsigned ignore)
     gettimeofday(&start_tv, (struct timezone *) 0);
 #endif
 	
+    /* it's possible that signals are blocked already if this was called 
+     * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
     sigemptyset(&tmp);
     sigaddset_blockable(&tmp);
     sigprocmask(SIG_BLOCK, &tmp, &old);

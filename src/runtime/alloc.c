@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "genesis/config.h"
 #include "runtime.h"
 #include "os.h"
 #include "sbcl.h"

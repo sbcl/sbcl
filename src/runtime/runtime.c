@@ -407,7 +407,7 @@ static void /* noreturn */ parent_loop(void)
     while(!all_threads) {
 	sched_yield();
     }
-    while(all_threads && (pid=waitpid(-1,&status,__WALL|WUNTRACED))) {
+    while(all_threads && (pid=waitpid(-1,&status,__WALL))) {
 	struct thread *th;
 	int real_errno=errno;
 	if(pid==-1) {
@@ -418,9 +418,9 @@ static void /* noreturn */ parent_loop(void)
 	    fprintf(stderr,"waitpid: %s\n",strerror(real_errno));
 	    continue;
 	}
-	th=find_thread_by_pid(pid);
-	if(!th) continue;
 	if(WIFEXITED(status) || WIFSIGNALED(status)) {
+	    th=find_thread_by_pid(pid);
+	    if(!th) continue;
 	    fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
 	    destroy_thread(th);
 	    if(!all_threads) break;
