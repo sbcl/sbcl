@@ -518,7 +518,9 @@
     #!+x86 (def sb!vm::ash-left-smod30 :signed 30)
     (def sb!vm::ash-left-mod32 :unsigned 32))
   #!+#.(cl:if (cl:= 64 sb!vm:n-machine-word-bits) '(and) '(or))
-  (def sb!vm::ash-left-mod64 :unsigned 64))
+  (progn
+    #!+x86-64 (def sb!vm::ash-left-smod61 :signed 61)
+    (def sb!vm::ash-left-mod64 :unsigned 64)))
 
 
 ;;;; word-wise logical operations

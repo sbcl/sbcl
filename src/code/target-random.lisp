@@ -164,6 +164,13 @@
 (defun random-chunk (state)
   (declare (type random-state state))
   (sb!vm::random-mt19937 (random-state-state state)))
+
+#!-sb-fluid (declaim (inline big-random-chunk))
+(defun big-random-chunk (state)
+  (declare (type random-state state))
+  (logand (1- (expt 2 64))
+	  (logior (ash (random-chunk state) 32)
+		  (random-chunk state))))
 
 ;;; Handle the single or double float case of RANDOM. We generate a
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0

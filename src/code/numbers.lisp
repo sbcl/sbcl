@@ -1472,3 +1472,9 @@ the first."
   (etypecase integer
     ((signed-byte 30) (sb!c::mask-signed-field 30 (ash integer amount)))
     (integer (sb!c::mask-signed-field 30 (ash (sb!c::mask-signed-field 30 integer) amount)))))
+
+#!+x86-64
+(defun sb!vm::ash-left-smod61 (integer amount)
+  (etypecase integer
+    ((signed-byte 61) (sb!c::mask-signed-field 61 (ash integer amount)))
+    (integer (sb!c::mask-signed-field 61 (ash (sb!c::mask-signed-field 61 integer) amount)))))

@@ -90,6 +90,60 @@
   (the (unsigned-byte 32) (ash x y)))
 (assert (= (one-more-test-case-to-catch-sparc (1- (ash 1 32)) -40) 0))
 
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *n-fixnum-bits* (- sb-vm::n-word-bits sb-vm::n-fixnum-tag-bits))
+  (defvar *shifts* (let ((list (list 0
+				     1
+				     (1- sb-vm::n-word-bits)
+				     sb-vm::n-word-bits
+				     (1+ sb-vm::n-word-bits))))
+		     (append list (mapcar #'- list)))))
+
+(macrolet ((nc-list ()
+	     `(list ,@(loop for i from 0 below (length *shifts*)
+			 collect `(frob (nth ,i *shifts*)))))
+	   (c-list ()
+	     `(list ,@(loop for i from 0 below (length *shifts*)
+			 collect `(frob ,(nth i *shifts*))))))
+  (defun nc-ash (x)
+    (macrolet ((frob (y)
+		 `(list x ,y (ash x ,y))))
+      (nc-list)))
+  (defun c-ash (x)
+    (macrolet ((frob (y)
+		 `(list x ,y (ash x ,y))))
+      (c-list)))
+  (defun nc-modular-ash-ub (x)
+    (macrolet ((frob (y)
+		 `(list x ,y (logand most-positive-fixnum (ash x ,y)))))
+      (nc-list)))
+  (defun c-modular-ash-ub (x)
+    (declare (type (and fixnum unsigned-byte) x)
+	     (optimize speed))
+    (macrolet ((frob (y)
+		 `(list x ,y (logand most-positive-fixnum (ash x ,y)))))
+      (c-list))))
+
+(let* ((values (list 0 1 most-positive-fixnum))
+       (neg-values (cons most-negative-fixnum
+			 (mapcar #'- values))))
+  (labels ((test (value fun1 fun2)
+	     (let ((res1 (funcall fun1 value))
+		   (res2 (funcall fun2 value)))
+	       (mapcar (lambda (a b)
+			 (unless (equalp a b)
+			   (error "ash failure for ~A vs ~A: ~A not EQUALP ~A"
+				  fun1 fun2
+				  a b)))
+		       res1 res2))))
+    (loop for x in values do
+	 (test x 'nc-ash 'c-ash)
+	 (test x 'nc-modular-ash-ub 'c-modular-ash-ub))
+    (loop for x in neg-values do
+	 (test x 'nc-ash 'c-ash))))
+
+
 (defun 64-bit-logcount (x)
   (declare (optimize speed) (type (unsigned-byte 54) x))
   (logcount x))

@@ -601,18 +601,19 @@
 	   (inst lea result (make-ea :qword :index number :scale 8)))
 	  (t
 	   (move result number)
-	   (cond ((plusp amount)
-		  ;; We don't have to worry about overflow because of the
-		  ;; result type restriction.
-		  (inst shl result amount))
-		 ((zerop amount)  )
-		 ((< amount -63)
-		  (inst xor result result))
-		 (t 
-		  ;; shift too far then back again, to zero tag bits
-		  (inst sar result (- 3 amount))
-		  (inst shl result 3)))))))
-
+           (cond ((plusp amount)
+                  ;; We don't have to worry about overflow because of the
+                  ;; result type restriction.
+                  (inst shl result amount))
+                 (t                                    
+                  ;; Since the shift instructions take the shift amount
+                  ;; modulo 64 we must special case amounts of 64 and more.
+                  ;; Because fixnums have only 61 bits, the result is 0 or
+                  ;; -1 for all amounts of 60 or more, so use this as the
+                  ;; limit instead.
+                  (inst sar result (min (- n-word-bits n-fixnum-tag-bits 1)
+                                        (- amount)))
+                  (inst and result (lognot fixnum-tag-mask))))))))
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
   (:translate ash)
@@ -1234,20 +1235,33 @@
 
 ;;;; Modular functions
 
-(define-modular-fun +-mod64 (x y) + :unsigned 64)
-(define-vop (fast-+-mod64/unsigned=>unsigned fast-+/unsigned=>unsigned)
-  (:translate +-mod64))
-(define-vop (fast-+-mod64-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
-  (:translate +-mod64))
-(define-modular-fun --mod64 (x y) - :unsigned 64)
-(define-vop (fast---mod64/unsigned=>unsigned fast--/unsigned=>unsigned)
-  (:translate --mod64))
-(define-vop (fast---mod64-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
-  (:translate --mod64))
+(macrolet ((def (name -c-p)
+             (let ((fun64 (intern (format nil "~S-MOD64" name)))
+                   (vopu (intern (format nil "FAST-~S/UNSIGNED=>UNSIGNED" name)))
+                   (vopcu (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
+                   (vopf (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
+                   (vopcf (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name)))
+                   (vop64u (intern (format nil "FAST-~S-MOD64/UNSIGNED=>UNSIGNED" name)))
+                   (vop64f (intern (format nil "FAST-~S-MOD64/FIXNUM=>FIXNUM" name)))
+                   (vop64cu (intern (format nil "FAST-~S-MOD64-C/UNSIGNED=>UNSIGNED" name)))
+                   (vop64cf (intern (format nil "FAST-~S-MOD64-C/FIXNUM=>FIXNUM" name)))
+                   (sfun61 (intern (format nil "~S-SMOD61" name)))
+                   (svop61f (intern (format nil "FAST-~S-SMOD61/FIXNUM=>FIXNUM" name)))
+                   (svop61cf (intern (format nil "FAST-~S-SMOD61-C/FIXNUM=>FIXNUM" name))))
+               `(progn
+                  (define-modular-fun ,fun64 (x y) ,name :unsigned 64)
+                  (define-modular-fun ,sfun61 (x y) ,name :signed 61)
+                  (define-vop (,vop64u ,vopu) (:translate ,fun64))
+                  (define-vop (,vop64f ,vopf) (:translate ,fun64))
+                  (define-vop (,svop61f ,vopf) (:translate ,sfun61))
+                  ,@(when -c-p
+                      `((define-vop (,vop64cu ,vopcu) (:translate ,fun64))
+                        (define-vop (,svop61cf ,vopcf) (:translate ,sfun61))))))))
+  (def + t)
+  (def - t)
+  ;; (no -C variant as x86 MUL instruction doesn't take an immediate)
+  (def * nil))
 
-(define-modular-fun *-mod64 (x y) * :unsigned 64)
-(define-vop (fast-*-mod64/unsigned=>unsigned fast-*/unsigned=>unsigned)
-  (:translate *-mod64))
 ;;; (no -C variant as x86 MUL instruction doesn't take an immediate)
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
@@ -1261,10 +1275,24 @@
     (sb!c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count))
 
+(define-vop (fast-ash-left-smod61-c/fixnum=>fixnum
+             fast-ash-c/fixnum=>fixnum)
+  (:translate ash-left-smod61))
+(define-vop (fast-ash-left-smod61/fixnum=>fixnum
+             fast-ash-left/fixnum=>fixnum))
+(deftransform ash-left-smod61 ((integer count)
+                               ((signed-byte 61) (unsigned-byte 6)))
+  (when (sb!c::constant-lvar-p count)
+    (sb!c::give-up-ir1-transform))
+  '(%primitive fast-ash-left-smod61/fixnum=>fixnum integer count))
+
 (in-package "SB!C")
 
 (defknown sb!vm::%lea-mod64 (integer integer (member 1 2 4 8) (signed-byte 64))
   (unsigned-byte 64)
+  (foldable flushable movable))
+(defknown sb!vm::%lea-smod61 (integer integer (member 1 2 4 8) (signed-byte 64))
+  (signed-byte 61)
   (foldable flushable movable))
 
 (define-modular-fun-optimizer %lea ((base index scale disp) :unsigned :width width)
@@ -1274,23 +1302,43 @@
     (cut-to-width base :unsigned width)
     (cut-to-width index :unsigned width)
     'sb!vm::%lea-mod64))
+(define-modular-fun-optimizer %lea ((base index scale disp) :signed :width width)
+  (when (and (<= width 61)
+	     (constant-lvar-p scale)
+	     (constant-lvar-p disp))
+    (cut-to-width base :signed width)
+    (cut-to-width index :signed width)
+    'sb!vm::%lea-smod61))
 
 #+sb-xc-host
-(defun sb!vm::%lea-mod64 (base index scale disp)
-  (ldb (byte 64 0) (%lea base index scale disp)))
+(progn
+  (defun sb!vm::%lea-mod64 (base index scale disp)
+    (ldb (byte 64 0) (%lea base index scale disp)))
+  (defun sb!vm::%lea-smod61 (base index scale disp)
+    (mask-signed-field 61 (%lea base index scale disp))))
 #-sb-xc-host
-(defun sb!vm::%lea-mod64 (base index scale disp)
-  (let ((base (logand base #xffffffffffffffff))
-	(index (logand index #xffffffffffffffff)))
-    ;; can't use modular version of %LEA, as we only have VOPs for
-    ;; constant SCALE and DISP.
-    (ldb (byte 64 0) (+ base (* index scale) disp))))
+(progn
+  (defun sb!vm::%lea-mod64 (base index scale disp)
+    (let ((base (logand base #xffffffffffffffff))
+	  (index (logand index #xffffffffffffffff)))
+      ;; can't use modular version of %LEA, as we only have VOPs for
+      ;; constant SCALE and DISP.
+      (ldb (byte 64 0) (+ base (* index scale) disp))))
+  (defun sb!vm::%lea-smod61 (base index scale disp)
+    (let ((base (mask-signed-field 61 base))
+          (index (mask-signed-field 61 index)))
+      ;; can't use modular version of %LEA, as we only have VOPs for
+      ;; constant SCALE and DISP.
+      (mask-signed-field 61 (+ base (* index scale) disp)))))
 
 (in-package "SB!VM")
 
 (define-vop (%lea-mod64/unsigned=>unsigned
 	     %lea/unsigned=>unsigned)
   (:translate %lea-mod64))
+(define-vop (%lea-smod61/fixnum=>fixnum
+	     %lea/fixnum=>fixnum)
+  (:translate %lea-smod61))
 
 ;;; logical operations
 (define-modular-fun lognot-mod64 (x) lognot :unsigned 64)
@@ -1317,6 +1365,12 @@
   (:translate logxor-mod64))
 (define-vop (fast-logxor-mod64-c/unsigned=>unsigned
              fast-logxor-c/unsigned=>unsigned)
+  (:translate logxor-mod64))
+(define-vop (fast-logxor-mod64/fixnum=>fixnum
+             fast-logxor/fixnum=>fixnum)
+  (:translate logxor-mod64))
+(define-vop (fast-logxor-mod64-c/fixnum=>fixnum
+             fast-logxor-c/fixnum=>fixnum)
   (:translate logxor-mod64))
 
 (define-source-transform logeqv (&rest args)
@@ -1572,94 +1626,20 @@
 
 (in-package "SB!C")
 
-;;; This is essentially a straight implementation of the algorithm in
-;;; "Strength Reduction of Multiplications by Integer Constants",
-;;; Youfeng Wu, ACM SIGPLAN Notices, Vol. 30, No.2, February 1995.
-(defun basic-decompose-multiplication (arg num n-bits condensed)
-  (case (aref condensed 0)
-    (0
-     (let ((tmp (min 3 (aref condensed 1))))
-       (decf (aref condensed 1) tmp)
-       `(logand #xffffffff
-	 (%lea ,arg
-	       ,(decompose-multiplication
-		 arg (ash (1- num) (- tmp)) (1- n-bits) (subseq condensed 1))
-	       ,(ash 1 tmp) 0))))
-    ((1 2 3)
-     (let ((r0 (aref condensed 0)))
-       (incf (aref condensed 1) r0)
-       `(logand #xffffffff
-	 (%lea ,(decompose-multiplication
-		 arg (- num (ash 1 r0)) (1- n-bits) (subseq condensed 1))
-	       ,arg
-	       ,(ash 1 r0) 0))))
-    (t (let ((r0 (aref condensed 0)))
-	 (setf (aref condensed 0) 0)
-	 `(logand #xffffffff
-	   (ash ,(decompose-multiplication
-		  arg (ash num (- r0)) n-bits condensed)
-	        ,r0))))))
-
-(defun decompose-multiplication (arg num n-bits condensed)
-  (cond
-    ((= n-bits 0) 0)
-    ((= num 1) arg)
-    ((= n-bits 1)
-     `(logand #xffffffff (ash ,arg ,(1- (integer-length num)))))
-    ((let ((max 0) (end 0))
-       (loop for i from 2 to (length condensed)
-	     for j = (reduce #'+ (subseq condensed 0 i))
-	     when (and (> (- (* 2 i) 3 j) max)
-		       (< (+ (ash 1 (1+ j))
-			     (ash (ldb (byte (- 64 (1+ j)) (1+ j)) num)
-				  (1+ j)))
-			  (ash 1 64)))
-	       do (setq max (- (* 2 i) 3 j)
-			end i))
-       (when (> max 0)
-	 (let ((j (reduce #'+ (subseq condensed 0 end))))
-	   (let ((n2 (+ (ash 1 (1+ j))
-			(ash (ldb (byte (- 64 (1+ j)) (1+ j)) num) (1+ j))))
-		 (n1 (1+ (ldb (byte (1+ j) 0) (lognot num)))))
-	   `(logand #xffffffff
-	     (- ,(optimize-multiply arg n2) ,(optimize-multiply arg n1))))))))
-    ((dolist (i '(9 5 3))
-       (when (integerp (/ num i))
-	 (when (< (logcount (/ num i)) (logcount num))
-	   (let ((x (gensym)))
-	     (return `(let ((,x ,(optimize-multiply arg (/ num i))))
-		       (logand #xffffffff
-			(%lea ,x ,x (1- ,i) 0)))))))))
-    (t (basic-decompose-multiplication arg num n-bits condensed))))
-	   
-(defun optimize-multiply (arg x)
-  (let* ((n-bits (logcount x))
-	 (condensed (make-array n-bits)))
-    (let ((count 0) (bit 0))
-      (dotimes (i 64)
-	(cond ((logbitp i x)
-	       (setf (aref condensed bit) count)
-	       (setf count 1)
-	       (incf bit))
-	      (t (incf count)))))
-    (decompose-multiplication arg x n-bits condensed)))
-
 (defun *-transformer (y)
   (cond
-    (t (give-up-ir1-transform))
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
      (give-up-ir1-transform))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
      `(%lea x x ,(1- y) 0))
-    ((member :pentium4 *backend-subfeatures*)
-     ;; the pentium4's multiply unit is reportedly very good
-     (give-up-ir1-transform))
-    ;; FIXME: should make this more fine-grained.  If nothing else,
-    ;; there should probably be a cutoff of about 9 instructions on
-    ;; pentium-class machines.
-    (t (optimize-multiply 'x y))))
+    (t
+     ;; A normal 64-bit multiplication takes 4 cycles on Athlon 64/Opteron.
+     ;; Optimizing multiplications (other than the above cases) to
+     ;; shifts/adds/leas gives a maximum improvement of 1 cycle, but requires
+     ;; quite a lot of hairy code.
+     (give-up-ir1-transform))))
 
 (deftransform * ((x y)
 		 ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
@@ -1667,7 +1647,6 @@
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))
-
 (deftransform sb!vm::*-mod64
     ((x y) ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
      (unsigned-byte 64))
@@ -1675,5 +1654,15 @@
   (let ((y (lvar-value y)))
     (*-transformer y)))
 
-;;; FIXME: we should also be able to write an optimizer or two to
-;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.
+(deftransform * ((x y)
+		 ((signed-byte 61) (constant-arg (unsigned-byte 64)))
+		 (signed-byte 61))
+  "recode as leas, shifts and adds"
+  (let ((y (lvar-value y)))
+    (*-transformer y)))
+(deftransform sb!vm::*-smod61
+    ((x y) ((signed-byte 61) (constant-arg (unsigned-byte 64)))
+     (signed-byte 61))
+  "recode as leas, shifts and adds"
+  (let ((y (lvar-value y)))
+    (*-transformer y)))

@@ -50,43 +50,48 @@
 ;;; through the code this way. It would be nice to move this into the
 ;;; same file as the other RANDOM definitions.
 (deftransform random ((num &optional state)
-		      ((integer 1 #.(expt 2 32)) &optional *))
+		      ((integer 1 #.(expt 2 sb!vm::n-word-bits)) &optional *))
   ;; FIXME: I almost conditionalized this as #!+sb-doc. Find some way
   ;; of automatically finding #!+sb-doc in proximity to DEFTRANSFORM
   ;; to let me scan for places that I made this mistake and didn't
   ;; catch myself.
   "use inline (UNSIGNED-BYTE 32) operations"
-  (let ((type (lvar-type num)))
+  (let ((type (lvar-type num))
+	(limit (expt 2 sb!vm::n-word-bits))
+	(random-chunk (ecase sb!vm::n-word-bits
+			(32 'random-chunk)
+			(64 'sb!kernel::big-random-chunk))))
     (if (numeric-type-p type)
         (let ((num-high (numeric-type-high (lvar-type num))))
           (aver num-high)
           (cond ((constant-lvar-p num)
                  ;; Check the worst case sum absolute error for the
                  ;; random number expectations.
-                 (let ((rem (rem (expt 2 32) num-high)))
+                 (let ((rem (rem limit num-high)))
                    (unless (< (/ (* 2 rem (- num-high rem))
-                                 num-high (expt 2 32))
+                                 num-high limit)
                               (expt 2 (- sb!kernel::random-integer-extra-bits)))
                      (give-up-ir1-transform
                       "The random number expectations are inaccurate."))
-                   (if (= num-high (expt 2 32))
-                       '(random-chunk (or state *random-state*))
-                       #!-x86 '(rem (random-chunk (or state *random-state*)) num)
-                       #!+x86
+                   (if (= num-high limit)
+                       `(,random-chunk (or state *random-state*))
+                       #!-(or x86 x86-64)
+		       `(rem (,random-chunk (or state *random-state*)) num)
+                       #!+(or x86 x86-64)
                        ;; Use multiplication, which is faster.
-                       '(values (sb!bignum::%multiply
-                                 (random-chunk (or state *random-state*))
+                       `(values (sb!bignum::%multiply
+                                 (,random-chunk (or state *random-state*))
                                  num)))))
                 ((> num-high random-fixnum-max)
                  (give-up-ir1-transform
                   "The range is too large to ensure an accurate result."))
-                #!+x86
-                ((< num-high (expt 2 32))
-                 '(values (sb!bignum::%multiply
-                           (random-chunk (or state *random-state*))
+		#!+(or x86 x86-64)
+                ((< num-high limit)
+                 `(values (sb!bignum::%multiply
+                           (,random-chunk (or state *random-state*))
                            num)))
                 (t
-                 '(rem (random-chunk (or state *random-state*)) num))))
+                 `(rem (,random-chunk (or state *random-state*)) num))))
         ;; KLUDGE: a relatively conservative treatment, but better
         ;; than a bug (reported by PFD sbcl-devel towards the end of
         ;; 2004-11.
