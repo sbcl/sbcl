@@ -47,8 +47,8 @@
            "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
  (:integer so-oobinline "SO_OOBINLINE"
            "Put out-of-band data into the normal input queue when received")
- (:integer so-no-check 11)            
-#+linux (:integer so-priority "SO_PRIORITY")            
+ (:integer so-no-check "SO_NO_CHECK")
+#+linux (:integer so-priority "SO_PRIORITY")
  (:integer so-linger "SO_LINGER"
            "For reliable streams, pause a while on closing when unsent messages are queued")
 #+linux (:integer so-bsdcompat "SO_BSDCOMPAT")

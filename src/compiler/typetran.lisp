@@ -189,7 +189,11 @@
 (defun source-transform-numeric-typep (object type)
   (let* ((class (numeric-type-class type))
 	 (base (ecase class
-		 (integer (containing-integer-type type))
+		 (integer (containing-integer-type
+                           (if (numeric-type-complexp type)
+                               (modified-numeric-type type
+                                                      :complexp :real)
+                               type)))
 		 (rational 'rational)
 		 (float (or (numeric-type-format type) 'float))
 		 ((nil) 'real))))

@@ -2772,7 +2772,19 @@
     ;; multiplication and division for small integral powers.
     (unless (not-more-contagious y x)
       (give-up-ir1-transform))
-    (cond ((zerop val) '(float 1 x))
+    (cond ((zerop val)
+           (let ((x-type (continuation-type x)))
+             (cond ((csubtypep x-type (specifier-type '(or rational
+                                                        (complex rational))))
+                    '1)
+                   ((csubtypep x-type (specifier-type 'real))
+                    `(if (rationalp x)
+                         1
+                         (float 1 x)))
+                   ((csubtypep x-type (specifier-type 'complex))
+                    ;; both parts are float
+                    `(1+ (* x ,val)))
+                   (t (give-up-ir1-transform)))))
 	  ((= val 2) '(* x x))
 	  ((= val -2) '(/ (* x x)))
 	  ((= val 3) '(* x x x))
