@@ -227,3 +227,9 @@
                   '(real #.(ash -1 10000) #.(ash 1 10000))))
 (assert (subtypep '(real (#.(ash -1 1000)) (#.(ash 1 1000)))
                   '(real #.(ash -1 1000) #.(ash 1 1000))))
+
+;;; Bug, found by Paul F. Dietz
+(let* ((x (eval #c(-1 1/2)))
+       (type (type-of x)))
+  (assert (subtypep type '(complex rational)))
+  (assert (typep x type)))

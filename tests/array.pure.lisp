@@ -181,10 +181,14 @@
               (equal (array-dimension v1 0) (array-dimension v2 0))
               (loop for i below (array-dimension v1 0)
                     always (eql (aref v1 i) (aref v2 i))))))
-  (let ((v1 (make-array 4 :element-type 'bit :fill-pointer 0
-                        :initial-contents '(0 0 1 1)))
-        (v2 (make-array 4 :element-type 'bit :fill-pointer 1
-                        :initial-contents '(0 0 1 1))))
+  (let* ((length 1024)
+         (v1 (make-array length :element-type 'bit :fill-pointer 0))
+         (v2 (make-array length :element-type 'bit :fill-pointer 1)))
+    (loop for i from 0 below length
+          for x1 in '#1=(0 0 1 1 . #1#)
+          and x2 in '#2=(0 1 0 1 . #2#)
+          do (setf (aref v1 i) x1)
+          do (setf (aref v2 i) x2))
     (loop for (bf lf) in '((bit-and logand)
                            (bit-andc1 logandc1)
                            (bit-andc2 logandc2)
@@ -201,7 +205,7 @@
                                     (declare (optimize (speed 3) (safety 0)))
                                     (,bf v ,v2)))
           for r1 = (funcall fun v1)
-          and r2 = (coerce (loop for i below 4
+          and r2 = (coerce (loop for i below length
                                  collect (logand 1 (funcall lf (aref v1 i) (aref v2 i))))
                            'bit-vector)
           do (assert (bit-vector-equal r1 r2)))))
