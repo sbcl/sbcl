@@ -1121,8 +1121,8 @@
 			 cont-atype
 			 (continuation-asserted-type arg))
 			*empty-type*))
-	       (eq (lexenv-cookie (node-lexenv dest))
-		   (lexenv-cookie (node-lexenv (continuation-dest arg)))))
+	       (eq (lexenv-policy (node-lexenv dest))
+		   (lexenv-policy (node-lexenv (continuation-dest arg)))))
       (assert (member (continuation-kind arg)
 		      '(:block-start :deleted-block-start :inside-block)))
       (assert-continuation-type arg cont-atype)
@@ -1387,7 +1387,8 @@
 	    (return-from ir1-optimize-mv-call)))
 
 	(let ((count (cond (total-nvals)
-			   ((and (policy node (zerop safety)) (eql min max))
+			   ((and (policy node (zerop safety))
+				 (eql min max))
 			    min)
 			   (t nil))))
 	  (when count

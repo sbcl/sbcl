@@ -40,46 +40,61 @@
 (def!type sb!kernel::layout-depthoid () '(or index (integer -1 -1)))
 
 ;;; a value for an optimization declaration
-(def!type sb!c::cookie-quality () '(or (rational 0 3) null))
+(def!type sb!c::policy-quality () '(or (rational 0 3) null))
 
-;;; A COOKIE holds information about the compilation environment for a
-;;; node. See the LEXENV definition for a description of how it is
-;;; used.
-(def!struct (cookie (:copier nil))
-  (speed   nil :type cookie-quality)
-  (space   nil :type cookie-quality)
-  (safety  nil :type cookie-quality)
-  (cspeed  nil :type cookie-quality)
-  (brevity nil :type cookie-quality)
-  (debug   nil :type cookie-quality))
+;;;; policy stuff
 
-;;; KLUDGE: This needs to be executable in cold init toplevel forms,
+;;; a map from optimization policy quality to corresponding POLICY
+;;; slot name, used to automatically keep POLICY-related definitions
+;;; in sync even if future maintenance changes POLICY slots
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defstruct (policy-quality-slot (:constructor %make-pqs (quality accessor)))
+    ;; the name of the quality
+    (quality (required-argument) :type symbol)
+    ;; the name of the structure slot accessor
+    (accessor (required-argument) :type symbol))
+  (defparameter *policy-quality-slots*
+    (list (%make-pqs 'speed   'policy-speed)
+	  (%make-pqs 'space   'policy-space)
+	  (%make-pqs 'safety  'policy-safety)
+	  (%make-pqs 'cspeed  'policy-cspeed)
+	  (%make-pqs 'brevity 'policy-brevity)
+	  (%make-pqs 'debug   'policy-debug)))
+  (defun named-policy-quality-slot (name)
+    (find name *policy-quality-slots* :key #'policy-quality-slot-quality)))
+
+;;; A POLICY object holds information about the compilation policy for
+;;; a node. See the LEXENV definition for a description of how it is used.
+#.`(def!struct (policy
+		(:copier nil)) ; (but see DEFUN COPY-POLICY)
+     ,@(mapcar (lambda (pqs)
+		 `(,(policy-quality-slot-quality pqs) nil
+		   :type policy-quality))
+	       *policy-quality-slots*))
+
+;;; an annoyingly hairy way of doing COPY-STRUCTURE on POLICY objects
+;;;
+;;; (We need this explicit, separate, hairy DEFUN only because we need
+;;; to be able to copy POLICY objects in cold init toplevel forms,
 ;;; earlier than the default copier closure created by DEFSTRUCT
 ;;; toplevel forms would be available, and earlier than LAYOUT-INFO is
-;;; initialized (which is a prerequisite for COPY-STRUCTURE to work),
-;;; so we define it explicitly using DEFUN, so that it can be
-;;; installed by the cold loader, and using hand-written,
-;;; hand-maintained slot-by-slot copy it doesn't need to call
-;;; COPY-STRUCTURE. -- WHN 19991019
-(defun copy-cookie (cookie)
-  (make-cookie :speed   (cookie-speed   cookie)
-	       :space   (cookie-space   cookie)
-	       :safety  (cookie-safety  cookie)
-	       :cspeed  (cookie-cspeed  cookie)
-	       :brevity (cookie-brevity cookie)
-	       :debug   (cookie-debug   cookie)))
+;;; initialized (which is a prerequisite for COPY-STRUCTURE to work).)
+#.`(defun copy-policy (policy)
+     (make-policy
+      ,@(mapcan (lambda (pqs)
+		  `(,(keywordicate (policy-quality-slot-quality pqs))
+		    (,(policy-quality-slot-accessor pqs) policy)))
+		*policy-quality-slots*)))
 
-;;; *DEFAULT-COOKIE* holds the current global compiler policy
+;;; *DEFAULT-POLICY* holds the current global compiler policy
 ;;; information. Whenever the policy is changed, we copy the structure
 ;;; so that old uses will still get the old values.
-;;; *DEFAULT-INTERFACE-COOKIE* holds any values specified by an
+;;; *DEFAULT-INTERFACE-POLICY* holds any values specified by an
 ;;; OPTIMIZE-INTERFACE declaration.
-;;;
-;;; FIXME: Why isn't COOKIE called POLICY?
-(declaim (type cookie *default-cookie* *default-interface-cookie*))
-(defvar *default-cookie*)	   ; initialized in cold init
-(defvar *default-interface-cookie*) ; initialized in cold init
-
+(declaim (type policy *default-policy* *default-interface-policy*))
+(defvar *default-policy*)	   ; initialized in cold init
+(defvar *default-interface-policy*) ; initialized in cold init
+
 ;;; possible values for the INLINE-ness of a function.
 (deftype inlinep ()
   '(member :inline :maybe-inline :notinline nil))
@@ -118,8 +133,8 @@
 (defvar *count-vop-usages*)
 (defvar *current-path*)
 (defvar *current-component*)
-(defvar *default-cookie*)
-(defvar *default-interface-cookie*)
+(defvar *default-policy*)
+(defvar *default-interface-policy*)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
 (defvar *event-info*)

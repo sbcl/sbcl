@@ -137,7 +137,7 @@
   (show-and-call !package-cold-init)
 
   ;; Set sane values for our toplevel forms.
-  (show-and-call !set-sane-cookie-defaults)
+  (show-and-call !set-sane-policy-defaults)
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
@@ -192,7 +192,7 @@
 
   ;; Set sane values again, so that the user sees sane values instead of
   ;; whatever is left over from the last DECLAIM.
-  (show-and-call !set-sane-cookie-defaults)
+  (show-and-call !set-sane-policy-defaults)
 
   ;; Only do this after top level forms have run, 'cause that's where
   ;; DEFTYPEs are.

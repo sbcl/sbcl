@@ -1198,7 +1198,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "!READER-COLD-INIT"
              "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
              "!PACKAGE-COLD-INIT" "SIGNAL-COLD-INIT-OR-REINIT"
-             "!SET-SANE-COOKIE-DEFAULTS" "!VM-TYPE-COLD-INIT"
+             "!SET-SANE-POLICY-DEFAULTS" "!VM-TYPE-COLD-INIT"
              "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
 	     "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
 

@@ -90,7 +90,9 @@
 (defun maybe-weaken-check (type cont)
   (declare (type ctype type) (type continuation cont))
   (cond ((policy (continuation-dest cont)
-		 (<= speed safety) (<= space safety) (<= cspeed safety))
+		 (and (<= speed safety)
+		      (<= space safety)
+		      (<= cspeed safety)))
 	 type)
 	(t
 	 (let ((min-cost (type-test-cost type))

@@ -3121,43 +3121,47 @@
 			    :code-location loc :form form :frame frame))
 	    (funcall res frame))))))
 
+;;; Evaluate FORM in the lexical context of FRAME's current code
+;;; location, returning the results of the evaluation.
 (defun eval-in-frame (frame form)
   (declare (type frame frame))
-  #!+sb-doc
-  "Evaluate Form in the lexical context of Frame's current code location,
-   returning the results of the evaluation."
   (funcall (preprocess-for-eval form (frame-code-location frame)) frame))
 
 ;;;; breakpoints
 
 ;;;; user-visible interface
 
+;;; Create and return a breakpoint. When program execution encounters
+;;; the breakpoint, the system calls HOOK-FUNCTION. HOOK-FUNCTION takes the
+;;; current frame for the function in which the program is running and the
+;;; breakpoint object.
+;;;
+;;; WHAT and KIND determine where in a function the system invokes
+;;; HOOK-FUNCTION. WHAT is either a code-location or a debug-function.
+;;; KIND is one of :CODE-LOCATION, :FUNCTION-START, or :FUNCTION-END.
+;;; Since the starts and ends of functions may not have code-locations
+;;; representing them, designate these places by supplying WHAT as a
+;;; debug-function and KIND indicating the :FUNCTION-START or
+;;; :FUNCTION-END. When WHAT is a debug-function and kind is
+;;; :FUNCTION-END, then hook-function must take two additional
+;;; arguments, a list of values returned by the function and a
+;;; FUNCTION-END-COOKIE.
+;;;
+;;; INFO is information supplied by and used by the user.
+;;;
+;;; FUNCTION-END-COOKIE is a function. To implement :FUNCTION-END
+;;; breakpoints, the system uses starter breakpoints to establish the
+;;; :FUNCTION-END breakpoint for each invocation of the function. Upon
+;;; each entry, the system creates a unique cookie to identify the
+;;; invocation, and when the user supplies a function for this
+;;; argument, the system invokes it on the frame and the cookie. The
+;;; system later invokes the :FUNCTION-END breakpoint hook on the same
+;;; cookie. The user may save the cookie for comparison in the hook
+;;; function.
+;;;
+;;; Signal an error if WHAT is an unknown code-location.
 (defun make-breakpoint (hook-function what
 			&key (kind :code-location) info function-end-cookie)
-  #!+sb-doc
-  "This creates and returns a breakpoint. When program execution encounters
-   the breakpoint, the system calls hook-function. Hook-function takes the
-   current frame for the function in which the program is running and the
-   breakpoint object.
-      What and kind determine where in a function the system invokes
-   hook-function. What is either a code-location or a debug-function. Kind is
-   one of :code-location, :function-start, or :function-end. Since the starts
-   and ends of functions may not have code-locations representing them,
-   designate these places by supplying what as a debug-function and kind
-   indicating the :function-start or :function-end. When what is a
-   debug-function and kind is :function-end, then hook-function must take two
-   additional arguments, a list of values returned by the function and a
-   function-end-cookie.
-      Info is information supplied by and used by the user.
-      Function-end-cookie is a function. To implement :function-end breakpoints,
-   the system uses starter breakpoints to establish the :function-end breakpoint
-   for each invocation of the function. Upon each entry, the system creates a
-   unique cookie to identify the invocation, and when the user supplies a
-   function for this argument, the system invokes it on the frame and the
-   cookie. The system later invokes the :function-end breakpoint hook on the
-   same cookie. The user may save the cookie for comparison in the hook
-   function.
-      This signals an error if what is an unknown code-location."
   (etypecase what
     (code-location
      (when (code-location-unknown-p what)
@@ -3217,7 +3221,7 @@
   ;; This is the debug-function associated with the cookie.
   debug-fun)
 
-;;; This maps bogus-lra-components to cookies, so
+;;; This maps bogus-lra-components to cookies, so that
 ;;; HANDLE-FUNCTION-END-BREAKPOINT can find the appropriate cookie for the
 ;;; breakpoint hook.
 (defvar *function-end-cookies* (make-hash-table :test 'eq))
@@ -3260,16 +3264,17 @@
 		(let ((fun (breakpoint-cookie-fun bpt)))
 		  (when fun (funcall fun frame cookie))))))))))
 
+;;; This takes a FUNCTION-END-COOKIE and a frame, and it returns
+;;; whether the cookie is still valid. A cookie becomes invalid when
+;;; the frame that established the cookie has exited. Sometimes cookie
+;;; holders are unaware of cookie invalidation because their
+;;; :FUNCTION-END breakpoint hooks didn't run due to THROW'ing.
+;;;
+;;; This takes a frame as an efficiency hack since the user probably
+;;; has a frame object in hand when using this routine, and it saves
+;;; repeated parsing of the stack and consing when asking whether a
+;;; series of cookies is valid.
 (defun function-end-cookie-valid-p (frame cookie)
-  #!+sb-doc
-  "This takes a function-end-cookie and a frame, and it returns whether the
-   cookie is still valid. A cookie becomes invalid when the frame that
-   established the cookie has exited. Sometimes cookie holders are unaware
-   of cookie invalidation because their :function-end breakpoint hooks didn't
-   run due to THROW'ing. This takes a frame as an efficiency hack since the
-   user probably has a frame object in hand when using this routine, and it
-   saves repeated parsing of the stack and consing when asking whether a
-   series of cookies is valid."
   (let ((lra (function-end-cookie-bogus-lra cookie))
 	(lra-sc-offset (sb!c::compiled-debug-function-return-pc
 			(compiled-debug-function-compiler-debug-fun
@@ -3283,14 +3288,14 @@
 					#!+gengc sb!vm::ra-save-offset
 					lra-sc-offset)))
 	(return t)))))
-
+
 ;;;; ACTIVATE-BREAKPOINT
 
+;;; Cause the system to invoke the breakpoint's hook-function until
+;;; the next call to DEACTIVATE-BREAKPOINT or DELETE-BREAKPOINT. The
+;;; system invokes breakpoint hook functions in the opposite order
+;;; that you activate them.
 (defun activate-breakpoint (breakpoint)
-  #!+sb-doc
-  "This causes the system to invoke the breakpoint's hook-function until the
-   next call to DEACTIVATE-BREAKPOINT or DELETE-BREAKPOINT. The system invokes
-   breakpoint hook functions in the opposite order that you activate them."
   (when (eq (breakpoint-status breakpoint) :deleted)
     (error "cannot activate a deleted breakpoint: ~S" breakpoint))
   (unless (eq (breakpoint-status breakpoint) :active)
@@ -3317,7 +3322,7 @@
 	 (compiled-debug-function
 	  (let ((starter (breakpoint-start-helper breakpoint)))
 	    (unless (eq (breakpoint-status starter) :active)
-	      ;; May already be active by some other :function-end breakpoint.
+	      ;; may already be active by some other :FUNCTION-END breakpoint
 	      (activate-compiled-function-start-breakpoint starter)))
 	  (setf (breakpoint-status breakpoint) :active))
 	 (interpreted-debug-function
@@ -3365,7 +3370,7 @@
    (setf (breakpoint-data-breakpoints data)
 	 (append (breakpoint-data-breakpoints data) (list breakpoint)))
    (setf (breakpoint-internal-data breakpoint) data)))
-
+
 ;;;; DEACTIVATE-BREAKPOINT
 
 (defun deactivate-breakpoint (breakpoint)
@@ -3406,7 +3411,7 @@
 	  (delete-breakpoint-data data))))
   (setf (breakpoint-status breakpoint) :inactive)
   breakpoint)
-
+
 ;;;; BREAKPOINT-INFO
 
 (defun breakpoint-info (breakpoint)
@@ -3419,7 +3424,7 @@
   (let ((other (breakpoint-unknown-return-partner breakpoint)))
     (when other
       (setf (breakpoint-%info other) value))))
-
+
 ;;;; BREAKPOINT-ACTIVE-P and DELETE-BREAKPOINT
 
 (defun breakpoint-active-p (breakpoint)
@@ -3453,7 +3458,7 @@
 		   (breakpoint-what breakpoint))
 		  nil))))))
   breakpoint)
-
+
 ;;;; C call out stubs
 
 ;;; This actually installs the break instruction in the component. It
@@ -3632,7 +3637,7 @@
 	       (stack-ref ocfp arg-num))
 	     results)))
     (nreverse results)))
-
+
 ;;;; MAKE-BOGUS-LRA (used for :FUNCTION-END breakpoints)
 
 (defconstant

@@ -52,7 +52,22 @@
   (defun ea-for-lf-stack (tn)
     (ea-for-xf-stack tn :long)))
 
-;;; Complex float stack EAs
+;;; Telling the FPU to wait is required in order to make signals occur
+;;; at the expected place, but naturally slows things down.
+;;;
+;;; NODE is the node whose compilation policy controls the decision
+;;; whether to just blast through carelessly or carefully emit wait
+;;; instructions and whatnot.
+;;;
+;;; NOTE-NEXT-INSTRUCTION, if supplied, is to be passed to
+;;; #'NOTE-NEXT-INSTRUCTION.
+(defun maybe-fp-wait (node &optional note-next-instruction)
+  (when (policy node (or (= debug 3) (> safety speed))))
+    (when note-next-instruction
+      (note-next-instruction note-next-instruction :internal-error))
+    (inst wait))
+
+;;; complex float stack EAs
 (macrolet ((ea-for-cxf-stack (tn kind slot &optional base)
 	     `(make-ea
 	       :dword :base ,base
@@ -155,12 +170,12 @@
 	 ;; This may not be necessary as ST0 is likely invalid now.
 	 (inst fxch x))))
 
-;;; The i387 has instructions to load some useful constants.
-;;; This doesn't save much time but might cut down on memory
-;;; access and reduce the size of the constant vector (CV).
-;;; Intel claims they are stored in a more precise form on chip.
-;;; Anyhow, might as well use the feature. It can be turned
-;;; off by hacking the "immediate-constant-sc" in vm.lisp.
+;;; The i387 has instructions to load some useful constants. This
+;;; doesn't save much time but might cut down on memory access and
+;;; reduce the size of the constant vector (CV). Intel claims they are
+;;; stored in a more precise form on chip. Anyhow, might as well use
+;;; the feature. It can be turned off by hacking the
+;;; "immediate-constant-sc" in vm.lisp.
 (define-move-function (load-fp-constant 2) (vop x y)
   ((fp-constant) (single-reg double-reg #!+long-float long-reg))
   (let ((value (sb!c::constant-value (sb!c::tn-leaf x))))
@@ -179,7 +194,7 @@
 	     (inst fldlg2))
 	    ((= value (log 2l0 2.718281828459045235360287471352662L0))
 	     (inst fldln2))
-	    (t (warn "Ignoring bogus i387 Constant ~A" value))))))
+	    (t (warn "ignoring bogus i387 constant ~A" value))))))
 
 
 ;;;; complex float move functions
@@ -207,7 +222,7 @@
   (make-random-tn :kind :normal :sc (sc-or-lose 'long-reg)
 		  :offset (1+ (tn-offset x))))
 
-;;; x is source, y is destination
+;;; x is source, y is destination.
 (define-move-function (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((real-tn (complex-single-reg-real-tn y)))
@@ -282,7 +297,7 @@
 
 ;;;; move VOPs
 
-;;; Float register to register moves.
+;;; float register to register moves
 (define-vop (float-move)
   (:args (x))
   (:results (y))
@@ -439,7 +454,7 @@
 (define-move-vop move-from-fp-constant :move
   (fp-constant) (descriptor-reg))
 
-;;; Move from a descriptor to a float register
+;;; Move from a descriptor to a float register.
 (define-vop (move-to-single)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (single-reg)))
@@ -468,7 +483,6 @@
        (inst fldl (ea-for-lf-desc x)))))
 #!+long-float
 (define-move-vop move-to-long :move (descriptor-reg) (long-reg))
-
 
 ;;; Move from complex float to a descriptor reg. allocating a new
 ;;; complex float object in the process.
@@ -530,7 +544,7 @@
 (define-move-vop move-from-complex-long :move
   (complex-long-reg) (descriptor-reg))
 
-;;; Move from a descriptor to a complex float register
+;;; Move from a descriptor to a complex float register.
 (macrolet ((frob (name sc format)
 	     `(progn
 		(define-vop (,name)
@@ -557,14 +571,13 @@
 	  (frob move-to-complex-double complex-double-reg :double)
 	  #!+long-float
 	  (frob move-to-complex-double complex-long-reg :long))
-
 
-;;;; The move argument vops.
+;;;; the move argument vops
 ;;;;
-;;;; Note these are also used to stuff fp numbers onto the c-call stack
-;;;; so the order is different than the lisp-stack.
+;;;; Note these are also used to stuff fp numbers onto the c-call
+;;;; stack so the order is different than the lisp-stack.
 
-;;; The general move-argument vop
+;;; the general move-argument vop
 (macrolet ((frob (name sc stack-sc format)
 	     `(progn
 		(define-vop (,name)
@@ -616,7 +629,7 @@
   #!+long-float
   (frob move-long-float-argument long-reg long-stack :long))
 
-;;;; Complex float move-argument vop
+;;;; complex float move-argument vop
 (macrolet ((frob (name sc stack-sc format)
 	     `(progn
 		(define-vop (,name)
@@ -702,7 +715,7 @@
 
 ;;;; arithmetic VOPs
 
-;;; dtc: The floating point arithmetic vops.
+;;; dtc: the floating point arithmetic vops
 ;;;
 ;;; Note: Although these can accept x and y on the stack or pointed to
 ;;; from a descriptor register, they will work with register loading
@@ -792,9 +805,7 @@
 			    (inst fld (ea-for-sf-desc y)))))
 		      ;; ST(i) = ST(i) op ST0
 		      (inst ,fop-sti r)))
-	       (when (policy node (or (= debug 3) (> safety speed)))
-		     (note-next-instruction vop :internal-error)
-		     (inst wait)))
+	       (maybe-fp-wait node vop))
 	      ;; y and r are the same register.
 	      ((and (sc-is y single-reg) (location= y r))
 	       (cond ((zerop (tn-offset r))
@@ -820,10 +831,8 @@
 			   (inst fld (ea-for-sf-desc x)))))
 		      ;; ST(i) = ST(0) op ST(i)
 		      (inst ,fopr-sti r)))
-	       (when (policy node (or (= debug 3) (> safety speed)))
-		     (note-next-instruction vop :internal-error)
-		     (inst wait)))
-	      ;; The default case
+	       (maybe-fp-wait node vop))
+	      ;; the default case
 	      (t
 	       ;; Get the result to ST0.
 
@@ -872,12 +881,11 @@
 
 	       (note-next-instruction vop :internal-error)
 
-	       ;; Finally save the result
+	       ;; Finally save the result.
 	       (sc-case r
 		 (single-reg
 		  (cond ((zerop (tn-offset r))
-			 (when (policy node (or (= debug 3) (> safety speed)))
-			       (inst wait)))
+			 (maybe-fp-wait node))
 			(t
 			 (inst fst r))))
 		 (single-stack
@@ -900,7 +908,7 @@
 	   (:save-p :compute-only)
 	   (:node-var node)
 	   (:generator ,dcost
-	     ;; Handle a few special cases
+	     ;; Handle a few special cases.
 	     (cond
 	      ;; x, y, and r are the same register.
 	      ((and (sc-is x double-reg) (location= x r) (location= y r))
@@ -938,9 +946,7 @@
 			    (inst fldd (ea-for-df-desc y)))))
 		      ;; ST(i) = ST(i) op ST0
 		      (inst ,fop-sti r)))
-	       (when (policy node (or (= debug 3) (> safety speed)))
-		     (note-next-instruction vop :internal-error)
-		     (inst wait)))
+	       (maybe-fp-wait node vop))
 	      ;; y and r are the same register.
 	      ((and (sc-is y double-reg) (location= y r))
 	       (cond ((zerop (tn-offset r))
@@ -966,10 +972,8 @@
 			    (inst fldd (ea-for-df-desc x)))))
 		      ;; ST(i) = ST(0) op ST(i)
 		      (inst ,fopr-sti r)))
-	       (when (policy node (or (= debug 3) (> safety speed)))
-		     (note-next-instruction vop :internal-error)
-		     (inst wait)))
-	      ;; The default case
+	       (maybe-fp-wait node vop))
+	      ;; the default case
 	      (t
 	       ;; Get the result to ST0.
 
@@ -1018,12 +1022,11 @@
 
 	       (note-next-instruction vop :internal-error)
 
-	       ;; Finally save the result
+	       ;; Finally save the result.
 	       (sc-case r
 		 (double-reg
 		  (cond ((zerop (tn-offset r))
-			 (when (policy node (or (= debug 3) (> safety speed)))
-			       (inst wait)))
+			 (maybe-fp-wait node))
 			(t
 			 (inst fst r))))
 		 (double-stack
@@ -1045,7 +1048,7 @@
 	   (:save-p :compute-only)
 	   (:node-var node)
 	   (:generator ,lcost
-	     ;; Handle a few special cases
+	     ;; Handle a few special cases.
 	     (cond
 	      ;; x, y, and r are the same register.
 	      ((and (location= x r) (location= y r))
@@ -1069,9 +1072,7 @@
 			(copy-fp-reg-to-fr0 y))
 		      ;; ST(i) = ST(i) op ST0
 		      (inst ,fop-sti r)))
-	       (when (policy node (or (= debug 3) (> safety speed)))
-		 (note-next-instruction vop :internal-error)
-		 (inst wait)))
+	       (maybe-fp-wait node vop))
 	      ;; y and r are the same register.
 	      ((location= y r)
 	       (cond ((zerop (tn-offset r))
@@ -1083,9 +1084,7 @@
 			(copy-fp-reg-to-fr0 x))
 		      ;; ST(i) = ST(0) op ST(i)
 		      (inst ,fopr-sti r)))
-	       (when (policy node (or (= debug 3) (> safety speed)))
-		 (note-next-instruction vop :internal-error)
-		 (inst wait)))
+	       (maybe-fp-wait node vop))
 	      ;; the default case
 	      (t
 	       ;; Get the result to ST0.
@@ -1111,8 +1110,7 @@
 
 	       ;; Finally save the result.
 	       (cond ((zerop (tn-offset r))
-		      (when (policy node (or (= debug 3) (> safety speed)))
-			(inst wait)))
+		      (maybe-fp-wait node))
 		     (t
 		      (inst fst r))))))))))
 
@@ -1152,8 +1150,8 @@
 		(unless (zerop (tn-offset x))
 		  (inst fxch x)		; x to top of stack
 		  (unless (location= x y)
-		    (inst fst x)))	; maybe save it
-		(inst ,inst)		; clobber st0
+		    (inst fst x)))	; Maybe save it.
+		(inst ,inst)		; Clobber st0.
 		(unless (zerop (tn-offset y))
 		  (inst fst y))))))
 
@@ -1221,7 +1219,6 @@
 	 (y :scs (long-reg)))
   (:arg-types long-float long-float))
 
-
 (define-vop (<single-float)
   (:translate <)
   (:args (x :scs (single-reg single-stack descriptor-reg))
@@ -1235,7 +1232,7 @@
   (:note "inline float comparison")
   (:ignore temp)
   (:generator 3
-    ;; Handle a few special cases
+    ;; Handle a few special cases.
     (cond
      ;; y is ST0.
      ((and (sc-is y single-reg) (zerop (tn-offset y)))
@@ -1249,7 +1246,7 @@
       (inst fnstsw)			; status word to ax
       (inst and ah-tn #x45))
 
-     ;; General case when y is not in ST0.
+     ;; general case when y is not in ST0
      (t
       ;; x to ST0
       (sc-case x
@@ -1372,7 +1369,7 @@
   (:note "inline float comparison")
   (:ignore temp)
   (:generator 3
-    ;; Handle a few special cases
+    ;; Handle a few special cases.
     (cond
      ;; y is ST0.
      ((and (sc-is y single-reg) (zerop (tn-offset y)))
@@ -1387,7 +1384,7 @@
       (inst and ah-tn #x45)
       (inst cmp ah-tn #x01))
 
-     ;; General case when y is not in ST0.
+     ;; general case when y is not in ST0
      (t
       ;; x to ST0
       (sc-case x
@@ -1423,7 +1420,7 @@
   (:note "inline float comparison")
   (:ignore temp)
   (:generator 3
-    ;; Handle a few special cases
+    ;; Handle a few special cases.
     (cond
      ;; y is ST0.
      ((and (sc-is y double-reg) (zerop (tn-offset y)))
@@ -1438,7 +1435,7 @@
       (inst and ah-tn #x45)
       (inst cmp ah-tn #x01))
 
-     ;; General case when y is not in ST0.
+     ;; general case when y is not in ST0
      (t
       ;; x to ST0
       (sc-case x
@@ -1663,8 +1660,8 @@
   #!+long-float
   (frob %long-float/unsigned %long-float long-reg long-float))
 
-;;; These should be no-ops but the compiler might want to move
-;;; some things around
+;;; These should be no-ops but the compiler might want to move some
+;;; things around.
 (macrolet ((frob (name translate from-sc from-type to-sc to-type)
 	     `(define-vop (,name)
 	       (:args (x :scs (,from-sc) :target y))
@@ -1731,10 +1728,10 @@
 		     ;; Catch any pending FPE exceptions.
 		     (inst wait)))
 		(,(if round-p 'progn 'pseudo-atomic)
-		 ;; normal mode (for now) is "round to best"
+		 ;; Normal mode (for now) is "round to best".
 		 (with-tn@fp-top (x)
 		   ,@(unless round-p
-		     '((inst fnstcw scw)	; save current control word
+		     '((inst fnstcw scw) ; save current control word
 		       (move rcw scw)	; into 16-bit register
 		       (inst or rcw (ash #b11 10)) ; CHOP
 		       (move stack-temp rcw)
@@ -1778,7 +1775,7 @@
 		   '((note-this-location vop :internal-error)
 		     ;; Catch any pending FPE exceptions.
 		     (inst wait)))
-		;; normal mode (for now) is "round to best"
+		;; Normal mode (for now) is "round to best".
 		(unless (zerop (tn-offset x))
 		  (copy-fp-reg-to-fr0 x))
 		,@(unless round-p
@@ -2059,16 +2056,16 @@
   (:temporary (:sc unsigned-reg :offset eax-offset :target res
 		   :to :result) eax)
   (:generator 8
-   (inst sub esp-tn npx-env-size)	; make space on stack
-   (inst wait)			  ; Catch any pending FPE exceptions
+   (inst sub esp-tn npx-env-size)	; Make space on stack.
+   (inst wait)				; Catch any pending FPE exceptions
    (inst fstenv (make-ea :dword :base esp-tn)) ; masks all exceptions
-   (inst fldenv (make-ea :dword :base esp-tn)) ; restore previous state
-   ;; Current status to high word
+   (inst fldenv (make-ea :dword :base esp-tn)) ; Restore previous state.
+   ;; Move current status to high word.
    (inst mov eax (make-ea :dword :base esp-tn :disp (- npx-sw-offset 2)))
-   ;; Exception mask to low word
+   ;; Move exception mask to low word.
    (inst mov ax-tn (make-ea :word :base esp-tn :disp npx-cw-offset))
-   (inst add esp-tn npx-env-size)	; Pop stack
-   (inst xor eax #x3f)	; Flip exception mask to trap enable bits
+   (inst add esp-tn npx-env-size)	; Pop stack.
+   (inst xor eax #x3f)		  ; Flip exception mask to trap enable bits.
    (move res eax)))
 
 (define-vop (set-floating-point-modes)
@@ -2081,16 +2078,16 @@
   (:temporary (:sc unsigned-reg :offset eax-offset
 		   :from :eval :to :result) eax)
   (:generator 3
-   (inst sub esp-tn npx-env-size)	; make space on stack
-   (inst wait)			  ; Catch any pending FPE exceptions
+   (inst sub esp-tn npx-env-size)	; Make space on stack.
+   (inst wait)				; Catch any pending FPE exceptions.
    (inst fstenv (make-ea :dword :base esp-tn))
    (inst mov eax new)
-   (inst xor eax #x3f)	    ; turn trap enable bits into exception mask
+   (inst xor eax #x3f)		  ; Turn trap enable bits into exception mask.
    (inst mov (make-ea :word :base esp-tn :disp npx-cw-offset) ax-tn)
    (inst shr eax 16)			; position status word
    (inst mov (make-ea :word :base esp-tn :disp npx-sw-offset) ax-tn)
    (inst fldenv (make-ea :dword :base esp-tn))
-   (inst add esp-tn npx-env-size)	; Pop stack
+   (inst add esp-tn npx-env-size)	; Pop stack.
    (move res new)))
 
 #!-long-float
@@ -2124,8 +2121,7 @@
 		    (inst fst x)))	; maybe save it
 		(inst ,op)		; clobber st0
 		(cond ((zerop (tn-offset y))
-		       (when (policy node (or (= debug 3) (> safety speed)))
-			     (inst wait)))
+		       (maybe-fp-wait node))
 		      (t
 		       (inst fst y)))))))
 
@@ -3229,11 +3225,8 @@
      (case (tn-offset r)
        ((0 1))
        (t (inst fstd r)))))
-
-) ; progn #!-long-float
-
+) ; PROGN #!-LONG-FLOAT
 
-
 #!+long-float
 (progn
 
@@ -3265,12 +3258,11 @@
 		    (inst fst x)))	; maybe save it
 		(inst ,op)		; clobber st0
 		(cond ((zerop (tn-offset y))
-		       (when (policy node (or (= debug 3) (> safety speed)))
-			     (inst wait)))
+		       (maybe-fp-wait node))
 		      (t
 		       (inst fst y)))))))
 
-  ;; Quick versions of fsin and fcos that require the argument to be
+  ;; Quick versions of FSIN and FCOS that require the argument to be
   ;; within range 2^63.
   (frob fsin-quick %sin-quick fsin)
   (frob fcos-quick %cos-quick fcos)
@@ -4317,10 +4309,9 @@
        ((0 1))
        (t (inst fstd r)))))
 
-) ; progn #!+long-float
-
+) ; PROGN #!+LONG-FLOAT
 
-;;;; Complex float VOPs
+;;;; complex float VOPs
 
 (define-vop (make-complex-single-float)
   (:translate complex)
@@ -4514,7 +4505,7 @@
 			  (1 (ea-for-clf-imag-desc x)))))))
 	     (with-empty-tn@fp-top(r)
 	       (inst fldl ea))))
-	  (t (error "Complex-float-value VOP failure")))))
+	  (t (error "COMPLEX-FLOAT-VALUE VOP failure")))))
 
 (define-vop (realpart/complex-single-float complex-float-value)
   (:translate realpart)
@@ -4577,12 +4568,10 @@
   (:result-types long-float)
   (:note "complex float imagpart")
   (:variant 1))
-
 
-;;; A hack dummy VOP to bias the representation selection of its
-;;; argument towards a FP register which can help avoid consing at
-;;; inappropriate locations.
-
+;;; hack dummy VOPs to bias the representation selection of their
+;;; arguments towards a FP register, which can help avoid consing at
+;;; inappropriate locations
 (defknown double-float-reg-bias (double-float) (values))
 (define-vop (double-float-reg-bias)
   (:translate double-float-reg-bias)
@@ -4592,7 +4581,6 @@
   (:note "inline dummy FP register bias")
   (:ignore x)
   (:generator 0))
-
 (defknown single-float-reg-bias (single-float) (values))
 (define-vop (single-float-reg-bias)
   (:translate single-float-reg-bias)

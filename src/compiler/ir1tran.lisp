@@ -1014,13 +1014,13 @@
     (optimize
      (make-lexenv
       :default res
-      :cookie (process-optimize-declaration spec (lexenv-cookie res))))
+      :policy (process-optimize-declaration spec (lexenv-policy res))))
     (optimize-interface
      (make-lexenv
       :default res
-      :interface-cookie (process-optimize-declaration
+      :interface-policy (process-optimize-declaration
 			 spec
-			 (lexenv-interface-cookie res))))
+			 (lexenv-interface-policy res))))
     (type
      (process-type-declaration (cdr spec) res vars))
     (sb!pcl::class
@@ -1298,7 +1298,7 @@
 	(reference-leaf start fun-cont fun)
 	(let ((*lexenv* (if interface
 			    (make-lexenv
-			     :cookie (make-interface-cookie *lexenv*))
+			     :policy (make-interface-policy *lexenv*))
 			    *lexenv*)))
 	  (ir1-convert-combination-args fun-cont cont
 					(list (first aux-vals))))))
@@ -1431,7 +1431,7 @@
 			      :where-from (leaf-where-from var)
 			      :specvar (lambda-var-specvar var)))
 			   fvars))
-	 (*lexenv* (make-lexenv :cookie (make-interface-cookie *lexenv*)))
+	 (*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*)))
 	 (fun
 	  (ir1-convert-lambda-body
 	   `((%funcall ,fun ,@(reverse vals) ,@defaults))
@@ -1524,7 +1524,7 @@
 	   (n-count (gensym "N-COUNT-"))
 	   (count-temp (make-lambda-var :name n-count
 					:type (specifier-type 'index)))
-	   (*lexenv* (make-lexenv :cookie (make-interface-cookie *lexenv*))))
+	   (*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*))))
 
       (arg-vars context-temp count-temp)
 
@@ -3029,8 +3029,8 @@
 				 `(,(car x) .
 				   (macro . ,(coerce (cdr x) 'function))))
 			     macros)
-		     :cookie (lexenv-cookie *lexenv*)
-		     :interface-cookie (lexenv-interface-cookie *lexenv*))))
+		     :policy (lexenv-policy *lexenv*)
+		     :interface-policy (lexenv-interface-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))
 
 ;;; Return a lambda that has been "closed" with respect to ENV,

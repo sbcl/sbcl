@@ -31,7 +31,7 @@ sbcl --noinform --noprint --sysinit /dev/null --userinit /dev/null <<EOF
     (assert (string= compiled-file-name expected-file-name)))
   (sb-ext:quit :unix-status 52)
 EOF
-if [ $? ~= 52 ]; then
+if [ $? != 52 ]; then
     echo test failed: $?
     exit 1
 fi

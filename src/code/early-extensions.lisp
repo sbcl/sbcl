@@ -216,7 +216,6 @@
       (let ((fun-name (symbolicate name "-CACHE-CLEAR")))
 	(forms
 	 `(defun ,fun-name ()
-	    (/show0 ,(concatenate 'string "entering " (string fun-name)))
 	    (do ((,n-index ,(- total-size entry-size) (- ,n-index ,entry-size))
 		 (,n-cache ,var-name))
 		((minusp ,n-index))
@@ -229,7 +228,6 @@
 			    `(setf (svref ,n-cache ,i) ,val))
 			(values-indices)
 			default-values))
-	    (/show0 ,(concatenate 'string "leaving " (string fun-name)))
 	    (values)))
 	(forms `(,fun-name)))
 

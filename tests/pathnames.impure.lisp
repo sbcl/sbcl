@@ -16,10 +16,11 @@
 
 (in-package "CL-USER")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+;;(eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro grab-condition (&body body)
     `(nth-value 1
-      (ignore-errors ,@body))))
+      (ignore-errors ,@body)))
+;;)
 
 (setf (logical-pathname-translations "demo0")
       '(("**;*.*.*" "/tmp/")))
@@ -89,6 +90,10 @@
                   (pathname-host
                    (translate-logical-pathname
                     "FOO:")))
+
+;;; ANSI says PARSE-NAMESTRING returns TYPE-ERROR on host mismatch.
+(let ((cond (grab-condition (parse-namestring "foo:jeamland" "demo2"))))
+  (assert (typep cond 'type-error)))
 
 ;;; ANSI, in its wisdom, specifies that it's an error (specifically a
 ;;; TYPE-ERROR) to query the system about the translations of a string

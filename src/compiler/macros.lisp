@@ -13,62 +13,57 @@
 
 (declaim (special *wild-type* *universal-type* *compiler-error-context*))
 
-;;; An INLINEP value describes how a function is called. The values have these
-;;; meanings:
-;;;	NIL	No declaration seen: do whatever you feel like, but don't dump
-;;;		an inline expansion.
+;;; An INLINEP value describes how a function is called. The values
+;;; have these meanings:
+;;;	NIL	No declaration seen: do whatever you feel like, but don't 
+;;;		dump an inline expansion.
 ;;; :NOTINLINE  NOTINLINE declaration seen: always do full function call.
-;;;    :INLINE	INLINE declaration seen: save expansion, expanding to it if
-;;;		policy favors.
+;;;    :INLINE	INLINE declaration seen: save expansion, expanding to it 
+;;;		if policy favors.
 ;;; :MAYBE-INLINE
 ;;;		Retain expansion, but only use it opportunistically.
 (deftype inlinep () '(member :inline :maybe-inline :notinline nil))
 
 ;;;; the POLICY macro
 
-(defparameter *policy-parameter-slots*
-  '((speed . cookie-speed) (space . cookie-space) (safety . cookie-safety)
-    (cspeed . cookie-cspeed) (brevity . cookie-brevity)
-    (debug . cookie-debug)))
-
-;;; Find all the policy parameters which are actually mentioned in Stuff,
-;;; returning the names in a list. We assume everything is evaluated.
+;;; a helper function for the POLICY macro: Return a list of
+;;; POLICY-QUALITY-SLOT objects corresponding to the qualities which
+;;; appear in EXPR.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun find-used-parameters (stuff)
-  (if (atom stuff)
-      (if (assoc stuff *policy-parameter-slots*) (list stuff) ())
-      (collect ((res () nunion))
-	(dolist (arg (cdr stuff) (res))
-	  (res (find-used-parameters arg))))))
-) ; EVAL-WHEN
+  (defun policy-quality-slots-used-by (expr)
+    (let ((result nil))
+      (labels ((recurse (x)
+	         (if (listp x)
+		     (map nil #'recurse x)
+		     (let ((pqs (named-policy-quality-slot x)))
+		       (when pqs
+			 (pushnew pqs result))))))
+	(recurse expr)
+	result))))
 
-;;; This macro provides some syntactic sugar for querying the settings
-;;; of the compiler policy parameters.
+;;; syntactic sugar for querying optimization policy qualities
 ;;;
-;;; Test whether some conditions apply to the current compiler policy
-;;; for Node. Each condition is a predicate form which accesses the
-;;; policy values by referring to them as the variables SPEED, SPACE,
-;;; SAFETY, CSPEED, BREVITY and DEBUG. The results of all the
-;;; conditions are combined with AND and returned as the result.
+;;; Evaluate EXPR in terms of the current optimization policy for
+;;; NODE, or if NODE is NIL, in terms of the current policy as defined
+;;; by *DEFAULT-POLICY* and *CURRENT-POLICY*. (Using NODE=NIL is only
+;;; well-defined during IR1 conversion.)
 ;;;
-;;; NODE is a form which is evaluated to obtain the node which the
-;;; policy is for. If NODE is NIL, then we use the current policy as
-;;; defined by *DEFAULT-COOKIE* and *CURRENT-COOKIE*. This option is
-;;; only well defined during IR1 conversion.
-(defmacro policy (node &rest conditions)
-  (let* ((form `(and ,@conditions))
-	 (n-cookie (gensym))
+;;; EXPR is a form which accesses the policy values by referring to
+;;; them by name, e.g. SPEED.
+(defmacro policy (node expr)
+  (let* ((n-policy (gensym))
 	 (binds (mapcar
-		 #'(lambda (name)
-		     (let ((slot (cdr (assoc name *policy-parameter-slots*))))
-		       `(,name (,slot ,n-cookie))))
-		 (find-used-parameters form))))
-    `(let* ((,n-cookie (lexenv-cookie
+		 (lambda (pqs)
+		   `(,(policy-quality-slot-quality pqs)
+		     (,(policy-quality-slot-accessor pqs) ,n-policy)))
+		 (policy-quality-slots-used-by expr))))
+    (/show "in POLICY" expr binds)
+    `(let* ((,n-policy (lexenv-policy
 			,(if node
 			     `(node-lexenv ,node)
 			     '*lexenv*)))
 	    ,@binds)
-       ,form)))
+       ,expr)))
 
 ;;;; source-hacking defining forms
 

@@ -323,8 +323,8 @@
 			 options
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
-			 (cookie (lexenv-cookie default))
-			 (interface-cookie (lexenv-interface-cookie default)))
+			 (policy (lexenv-policy default))
+			 (interface-policy (lexenv-interface-policy default)))
   (macrolet ((frob (var slot)
 	       `(let ((old (,slot default)))
 		  (if ,var
@@ -336,26 +336,26 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup cookie interface-cookie
+     lambda cleanup policy interface-policy
      (frob options lexenv-options))))
 
-;;; Return a cookie that defaults any unsupplied optimize qualities in
-;;; the Interface-Cookie with the corresponding ones from the Cookie.
-(defun make-interface-cookie (lexenv)
+;;; Return a POLICY that defaults any unsupplied optimize qualities in
+;;; the INTERFACE-POLICY with the corresponding ones from the POLICY.
+(defun make-interface-policy (lexenv)
   (declare (type lexenv lexenv))
-  (let ((icookie (lexenv-interface-cookie lexenv))
-	(cookie (lexenv-cookie lexenv)))
-    (make-cookie
-     :speed (or (cookie-speed icookie) (cookie-speed cookie))
-     :space (or (cookie-space icookie) (cookie-space cookie))
-     :safety (or (cookie-safety icookie) (cookie-safety cookie))
-     :cspeed (or (cookie-cspeed icookie) (cookie-cspeed cookie))
-     :brevity (or (cookie-brevity icookie) (cookie-brevity cookie))
-     :debug (or (cookie-debug icookie) (cookie-debug cookie)))))
+  (let ((ipolicy (lexenv-interface-policy lexenv))
+	(policy (lexenv-policy lexenv)))
+    (make-policy
+     :speed (or (policy-speed ipolicy) (policy-speed policy))
+     :space (or (policy-space ipolicy) (policy-space policy))
+     :safety (or (policy-safety ipolicy) (policy-safety policy))
+     :cspeed (or (policy-cspeed ipolicy) (policy-cspeed policy))
+     :brevity (or (policy-brevity ipolicy) (policy-brevity policy))
+     :debug (or (policy-debug ipolicy) (policy-debug policy)))))
 
 ;;;; flow/DFO/component hackery
 
-;;; Join Block1 and Block2.
+;;; Join BLOCK1 and BLOCK2.
 #!-sb-fluid (declaim (inline link-blocks))
 (defun link-blocks (block1 block2)
   (declare (type cblock block1 block2))

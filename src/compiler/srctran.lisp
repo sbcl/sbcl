@@ -127,7 +127,7 @@
     (give-up-ir1-transform))
   (let ((n (continuation-value n)))
     (when (> n
-	     (if (policy node (= speed 3) (= space 0))
+	     (if (policy node (and (= speed 3) (= space 0)))
 		 *extreme-nthcdr-open-code-limit*
 		 *default-nthcdr-open-code-limit*))
       (give-up-ir1-transform))
@@ -3262,7 +3262,7 @@
 	  ((= nargs 1) `(progn ,@args t))
 	  ((= nargs 2)
 	   `(if (,predicate ,(first args) ,(second args)) nil t))
-	  ((not (policy nil (>= speed space) (>= speed cspeed)))
+	  ((not (policy nil (and (>= speed space) (>= speed cspeed))))
 	   (values nil t))
 	  (t
 	   (let ((vars (make-gensym-list nargs)))

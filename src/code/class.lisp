@@ -464,9 +464,9 @@
 	 (class-layout (class-layout class))
 	 (subclasses (class-subclasses class)))
 
-    ;; Attempting to register ourselves with a temporary cookie is
-    ;; almost certainly a programmer error. (I should know, I did it.)
-    ;; -- WHN 19990927
+    ;; Attempting to register ourselves with a temporary undefined
+    ;; class placeholder is almost certainly a programmer error. (I
+    ;; should know, I did it.) -- WHN 19990927
     (assert (not (undefined-class-p class)))
 
     ;; This assertion dates from classic CMU CL. The rationale is

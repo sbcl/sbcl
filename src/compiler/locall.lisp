@@ -177,7 +177,7 @@
   (declare (type functional fun))
   (assert (not (functional-entry-function fun)))
   (with-ir1-environment (lambda-bind (main-entry fun))
-    (let* ((*lexenv* (make-lexenv :cookie (make-interface-cookie *lexenv*)))
+    (let* ((*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*)))
 	   (res (ir1-convert-lambda (make-xep-lambda fun))))
       (setf (functional-kind res) :external)
       (setf (leaf-ever-used res) t)
@@ -285,7 +285,8 @@
 ;;; reference a fresh copy. We return whichever function we decide to
 ;;; reference.
 (defun maybe-expand-local-inline (fun ref call)
-  (if (and (policy call (>= speed space) (>= speed cspeed))
+  (if (and (policy call
+		   (and (>= speed space) (>= speed cspeed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
 	   (not *converting-for-interpreter*)
 	   (inline-expansion-ok call))

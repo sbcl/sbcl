@@ -883,6 +883,9 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   the previous SPEED policy. This bug will probably get fixed in
   0.6.9.x in a general cleanup of optimization policy.
 
+72:
+  (DECLAIM (OPTIMIZE ..)) doesn't work inside LOCALLY.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

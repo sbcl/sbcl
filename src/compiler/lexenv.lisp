@@ -22,12 +22,12 @@
 	     (:constructor make-null-lexenv ())
 	     (:constructor internal-make-lexenv
 			   (functions variables blocks tags type-restrictions
-				      lambda cleanup cookie
-				      interface-cookie options)))
-  ;; Alist (name . what), where What is either a Functional (a local function),
+				      lambda cleanup policy
+				      interface-policy options)))
+  ;; Alist (NAME . WHAT), where WHAT is either a Functional (a local function),
   ;; a DEFINED-FUNCTION, representing an INLINE/NOTINLINE declaration, or
   ;; a list (MACRO . <function>) (a local macro, with the specifier
-  ;; expander.)    Note that Name may be a (SETF <name>) function.
+  ;; expander.) Note that NAME may be a (SETF <name>) function.
   (functions nil :type list)
   ;; an alist translating variable names to LEAF structures. A special
   ;; binding is indicated by a :SPECIAL GLOBAL-VAR leaf. Each special
@@ -61,12 +61,12 @@
   ;; FIXME: This should be :TYPE (OR CLEANUP NULL), but it was too hard
   ;; to get CLEANUP defined in time for the cross-compiler.
   (cleanup nil)
-  ;; The representation of the current OPTIMIZE policy.
-  (cookie *default-cookie* :type cookie)
+  ;; the current OPTIMIZE policy
+  (policy *default-policy* :type policy)
   ;; the policy that takes effect in XEPs and related syntax parsing
-  ;; functions. Slots in this cookie may be null to indicate that the
+  ;; functions. Slots in this policy may be null to indicate that the
   ;; normal value in effect.
-  (interface-cookie *default-interface-cookie* :type cookie)
+  (interface-policy *default-interface-policy* :type policy)
   ;; an alist of miscellaneous options that are associated with the
   ;; lexical environment
   (options nil :type list))

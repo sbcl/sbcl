@@ -103,8 +103,8 @@
 
 ;;; the values of *PACKAGE* and policy when compilation started
 (defvar *initial-package*)
-(defvar *initial-cookie*)
-(defvar *initial-interface-cookie*)
+(defvar *initial-policy*)
+(defvar *initial-interface-policy*)
 
 ;;; The source-info structure for the current compilation. This is null
 ;;; globally to indicate that we aren't currently in any identifiable
@@ -463,7 +463,7 @@
 (defun byte-compiling ()
   (if (eq *byte-compiling* :maybe)
       (or (eq *byte-compile* t)
-	  (policy nil (zerop speed) (<= debug 1)))
+	  (policy nil (and (zerop speed) (<= debug 1))))
       (and *byte-compile* *byte-compiling*)))
 
 ;;; Delete components with no external entry points before we try to
@@ -492,7 +492,7 @@
 	    (:maybe
 	     (dolist (fun (component-lambdas component) t)
 	       (unless (policy (lambda-bind fun)
-			       (zerop speed) (<= debug 1))
+			       (and (zerop speed) (<= debug 1)))
 		 (return nil)))))))
 
     (when sb!xc:*compile-print*
@@ -813,9 +813,9 @@
   (cond ((source-info-stream info))
 	(t
 	 (setq *package* *initial-package*)
-	 (setq *default-cookie* (copy-cookie *initial-cookie*))
-	 (setq *default-interface-cookie*
-	       (copy-cookie *initial-interface-cookie*))
+	 (setq *default-policy* (copy-policy *initial-policy*))
+	 (setq *default-interface-policy*
+	       (copy-policy *initial-interface-policy*))
 	 (let* ((finfo (first (source-info-current-file info)))
 		(name (file-info-name finfo)))
 	   (setq sb!xc:*compile-file-truename* name)
@@ -893,8 +893,8 @@
 ;;; *TOP-LEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
-  (let* ((*lexenv* (make-lexenv :cookie *default-cookie*
-				:interface-cookie *default-interface-cookie*))
+  (let* ((*lexenv* (make-lexenv :policy *default-policy*
+				:interface-policy *default-interface-policy*))
 	 (tll (ir1-top-level form path nil)))
     (cond ((eq *block-compile* t) (push tll *top-level-lambdas*))
 	  (t (compile-top-level (list tll) nil)))))
@@ -917,11 +917,11 @@
 ;;; Process a top-level use of LOCALLY. We parse declarations and then
 ;;; recursively process the body.
 ;;;
-;;; Binding *DEFAULT-xxx-COOKIE* is pretty much of a hack, since it
+;;; Binding *DEFAULT-xxx-POLICY* is pretty much of a hack, since it
 ;;; causes LOCALLY to "capture" enclosed proclamations. It is
 ;;; necessary because CONVERT-AND-MAYBE-COMPILE uses the value of
-;;; *DEFAULT-COOKIE* as the policy. The need for this hack is due to
-;;; the quirk that there is no way to represent in a cookie that an
+;;; *DEFAULT-POLICY* as the policy. The need for this hack is due to
+;;; the quirk that there is no way to represent in a POLICY that an
 ;;; optimize quality came from the default.
 ;;; FIXME: Ideally, something should be done so that DECLAIM inside LOCALLY
 ;;; works OK. Failing that, at least we could issue a warning instead
@@ -931,8 +931,8 @@
   (multiple-value-bind (forms decls) (sb!sys:parse-body (cdr form) nil)
     (let* ((*lexenv*
 	    (process-decls decls nil nil (make-continuation)))
-	   (*default-cookie* (lexenv-cookie *lexenv*))
-	   (*default-interface-cookie* (lexenv-interface-cookie *lexenv*)))
+	   (*default-policy* (lexenv-policy *lexenv*))
+	   (*default-interface-policy* (lexenv-interface-policy *lexenv*)))
       (process-top-level-progn forms path))))
 
 ;;; Force any pending top-level forms to be compiled and dumped so
@@ -1358,11 +1358,10 @@
 	 (*block-compile* *block-compile-argument*)
 	 (*package* (sane-package))
 	 (*initial-package* (sane-package))
-	 (*initial-cookie* *default-cookie*)
-	 (*initial-interface-cookie* *default-interface-cookie*)
-	 (*default-cookie* (copy-cookie *initial-cookie*))
-	 (*default-interface-cookie*
-	  (copy-cookie *initial-interface-cookie*))
+	 (*initial-policy* *default-policy*)
+	 (*initial-interface-policy* *default-interface-policy*)
+	 (*default-policy* (copy-policy *initial-policy*))
+	 (*default-interface-policy* (copy-policy *initial-interface-policy*))
 	 (*lexenv* (make-null-lexenv))
 	 (*converting-for-interpreter* nil)
 	 (*source-info* info)

@@ -64,7 +64,7 @@
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
 ;;; from parsed arguments.
-(defun %make-pathname-object (host device directory name type version)
+(defun %make-maybe-logical-pathname (host device directory name type version)
   ;; We canonicalize logical pathname components to uppercase. ANSI
   ;; doesn't strictly require this, leaving it up to the implementor;
   ;; but the arguments given in the X3J13 cleanup issue
@@ -72,10 +72,12 @@
   ;; case, and uppercase is the ordinary way to do that.
   (flet ((upcase-maybe (x) (typecase x (string (string-upcase x)) (t x))))
     (if (typep host 'logical-host)
-	(%make-logical-pathname
-	 host :unspecific
-	 (mapcar #'upcase-maybe directory)
-	 (upcase-maybe name) (upcase-maybe type) version)
+	(%make-logical-pathname host
+				:unspecific
+				(mapcar #'upcase-maybe directory)
+				(upcase-maybe name)
+				(upcase-maybe type)
+				version)
 	(%make-pathname host device directory name type version))))
 
 ;;; Hash table searching maps a logical pathname's host to its
@@ -211,12 +213,12 @@
 	 ;; A pattern is only matched by an identical pattern.
 	 (and (pattern-p wild) (pattern= thing wild)))
 	(integer
-	 ;; an integer (version number) is matched by :WILD or the same
-	 ;; integer. This branch will actually always be NIL as long as the
-	 ;; version is a fixnum.
+	 ;; An integer (version number) is matched by :WILD or the
+	 ;; same integer. This branch will actually always be NIL as
+	 ;; long as the version is a fixnum.
 	 (eql thing wild)))))
 
-;;; A predicate for comparing two pathname slot component sub-entries.
+;;; a predicate for comparing two pathname slot component sub-entries
 (defun compare-component (this that)
   (or (eql this that)
       (typecase this
@@ -264,8 +266,8 @@
 			 (stream (file-name ,pd0)))))
        ,@body)))
 
-;;; Converts the var, a host or string name for a host, into a logical-host
-;;; structure or nil if not defined.
+;;; Convert the var, a host or string name for a host, into a
+;;; LOGICAL-HOST structure or nil if not defined.
 ;;;
 ;;; pw notes 1/12/97 this potentially useful macro is not used anywhere
 ;;; and 'find-host' is not defined. 'find-logical-host' seems to be needed.
@@ -390,7 +392,7 @@
 	      (and default-host pathname-host
 		   (not (eq (host-customary-case default-host)
 			    (host-customary-case pathname-host))))))
-	(%make-pathname-object
+	(%make-maybe-logical-pathname
 	 (or pathname-host default-host)
 	 (or (%pathname-device pathname)
 	     (maybe-diddle-case (%pathname-device defaults)
@@ -466,7 +468,7 @@ a host-structure or string."
 	 ;; toy@rtp.ericsson.se: CLHS says make-pathname can take a
 	 ;; string (as a logical-host) for the host part. We map that
 	 ;; string into the corresponding logical host structure.
-
+	 ;;
 	 ;; pw@snoopy.mv.com:
 	 ;; HyperSpec says for the arg to MAKE-PATHNAME;
 	 ;; "host---a valid physical pathname host. ..."
@@ -479,7 +481,7 @@ a host-structure or string."
 	 ;; that is recognized by the implementation as the name of a host."
 	 ;; "valid logical pathname host n. a string that has been defined
 	 ;; as the name of a logical host. ..."
-	 ;; HS is silent on what happens if the :host arg is NOT one of these.
+	 ;; HS is silent on what happens if the :HOST arg is NOT one of these.
 	 ;; It seems an error message is appropriate.
 	 (host (typecase host
 		 (host host) 		; A valid host, use it.
@@ -516,12 +518,12 @@ a host-structure or string."
 					    diddle-defaults))
 			(t
 			 nil))))
-      (%make-pathname-object host
-			     dev ; forced to :unspecific when logical-host
-			     dir
-			     (pick name namep %pathname-name)
-			     (pick type typep %pathname-type)
-			     ver))))
+      (%make-maybe-logical-pathname host
+				    dev ; forced to :UNSPECIFIC when logical
+				    dir
+				    (pick name namep %pathname-name)
+				    (pick type typep %pathname-type)
+				    ver))))
 
 (defun pathname-host (pathname &key (case :local))
   #!+sb-doc
@@ -615,15 +617,26 @@ a host-structure or string."
 	(multiple-value-bind (new-host device directory file type version)
 	    (funcall (host-parse parse-host) namestr start end)
 	  (when (and host new-host (not (eq new-host host)))
-	    (error "The host in the namestring, ~S,~@
-		    does not match the explicit host argument: ~S"
-		   host))
+	    (error 'simple-type-error
+		   :datum new-host
+		   ;; Note: ANSI requires that this be a TYPE-ERROR,
+		   ;; but there seems to be no completely correct
+		   ;; value to use for TYPE-ERROR-EXPECTED-TYPE.
+		   ;; Instead, we return a sort of "type error allowed
+		   ;; type", trying to say "it would be OK if you
+		   ;; passed NIL as the host value" but not mentioning
+		   ;; that a matching string would be OK too.
+		   :expected-type 'null
+		   :format-control
+		   "The host in the namestring, ~S,~@
+		    does not match the explicit HOST argument, ~S."
+		   :format-arguments (list new-host host)))
 	  (let ((pn-host (or new-host parse-host)))
-	    (values (%make-pathname-object
+	    (values (%make-maybe-logical-pathname
 		     pn-host device directory file type version)
 		    end))))))
 
-;;; If namestr begins with a colon-terminated, defined, logical host,
+;;; If NAMESTR begins with a colon-terminated, defined, logical host,
 ;;; then return that host, otherwise return NIL.
 (defun extract-logical-host-prefix (namestr start end)
   (declare (type simple-base-string namestr)
@@ -1034,7 +1047,7 @@ a host-structure or string."
 			    (if (eq result :error)
 				(error "~S doesn't match ~S." source from)
 				result))))
-	      (%make-pathname-object
+	      (%make-maybe-logical-pathname
 	       (or to-host source-host)
 	       (frob %pathname-device)
 	       (frob %pathname-directory translate-directories)
@@ -1053,8 +1066,9 @@ a host-structure or string."
   (name (required-argument) :type simple-string)
   ;; T if this search-list has been defined. Otherwise NIL.
   (defined nil :type (member t nil))
-  ;; The list of expansions for this search-list. Each expansion is the list
-  ;; of directory components to use in place of this search-list.
+  ;; the list of expansions for this search-list. Each expansion is
+  ;; the list of directory components to use in place of this
+  ;; search-list.
   (expansions nil :type list))
 (def!method print-object ((sl search-list) stream)
   (print-unreadable-object (sl stream :type t)
@@ -1063,10 +1077,10 @@ a host-structure or string."
 ;;; a hash table mapping search-list names to search-list structures
 (defvar *search-lists* (make-hash-table :test 'equal))
 
-;;; When search-lists are encountered in namestrings, they are converted to
-;;; search-list structures right then, instead of waiting until the search
-;;; list used. This allows us to verify ahead of time that there are no
-;;; circularities and makes expansion much quicker.
+;;; When search-lists are encountered in namestrings, they are
+;;; converted to search-list structures right then, instead of waiting
+;;; until the search list used. This allows us to verify ahead of time
+;;; that there are no circularities and makes expansion much quicker.
 (defun intern-search-list (name)
   (let ((name (string-downcase name)))
     (or (gethash name *search-lists*)
@@ -1075,8 +1089,8 @@ a host-structure or string."
 	  new))))
 
 ;;; Clear the definition. Note: we can't remove it from the hash-table
-;;; because there may be pathnames still refering to it. So we just clear
-;;; out the expansions and ste defined to NIL.
+;;; because there may be pathnames still refering to it. So we just
+;;; clear out the expansions and ste defined to NIL.
 (defun clear-search-list (name)
   #!+sb-doc
   "Clear the current definition for the search-list NAME. Returns T if such
@@ -1088,8 +1102,8 @@ a host-structure or string."
       (setf (search-list-expansions search-list) nil)
       t)))
 
-;;; Again, we can't actually remove the entries from the hash-table, so we
-;;; just mark them as being undefined.
+;;; As in CLEAR-SEARCH-LIST, we can't actually remove the entries from
+;;; the hash-table, so we just mark them as being undefined.
 (defun clear-all-search-lists ()
   #!+sb-doc
   "Clear the definition for all search-lists. Only use this if you know
@@ -1102,8 +1116,8 @@ a host-structure or string."
   nil)
 
 ;;; Extract the search-list from PATHNAME and return it. If PATHNAME
-;;; doesn't start with a search-list, then either error (if FLAME-IF-NONE
-;;; is true) or return NIL (if FLAME-IF-NONE is false).
+;;; doesn't start with a search-list, then either error (if
+;;; FLAME-IF-NONE is true) or return NIL (if FLAME-IF-NONE is false).
 (defun extract-search-list (pathname flame-if-none)
   (with-pathname (pathname pathname)
     (let* ((directory (%pathname-directory pathname))
@@ -1115,8 +1129,8 @@ a host-structure or string."
 	    (t
 	     nil)))))
 
-;;; We have to convert the internal form of the search-list back into a
-;;; bunch of pathnames.
+;;; We have to convert the internal form of the search-list back into
+;;; a bunch of pathnames.
 (defun search-list (pathname)
   #!+sb-doc
   "Return the expansions for the search-list starting PATHNAME. If PATHNAME
@@ -1141,9 +1155,9 @@ a host-structure or string."
   (with-pathname (pathname pathname)
     (search-list-defined (extract-search-list pathname t))))
 
-;;; Set the expansion for the search-list in PATHNAME. If this would result
-;;; in any circularities, we flame out. If anything goes wrong, we leave the
-;;; old definition intact.
+;;; Set the expansion for the search list in PATHNAME. If this would
+;;; result in any circularities, we flame out. If anything goes wrong,
+;;; we leave the old definition intact.
 (defun %set-search-list (pathname values)
   (let ((search-list (extract-search-list pathname t)))
     (labels
@@ -1213,8 +1227,10 @@ a host-structure or string."
 				  function)))))))
 
 ;;;;  logical pathname support. ANSI 92-102 specification.
-;;;;  As logical-pathname translations are loaded they are canonicalized as
-;;;;  patterns to enable rapid efficent translation into physical pathnames.
+;;;;
+;;;;  As logical-pathname translations are loaded they are
+;;;;  canonicalized as patterns to enable rapid efficent translation
+;;;;  into physical pathnames.
 
 ;;;; utilities
 
@@ -1298,8 +1314,8 @@ a host-structure or string."
 		  :wild
 		  x))))))
 
-;;; Return a list of conses where the cdr is the start position and the car
-;;; is a string (token) or character (punctuation.)
+;;; Return a list of conses where the CDR is the start position and
+;;; the CAR is a string (token) or character (punctuation.)
 (defun logical-chunkify (namestr start end)
   (collect ((chunks))
     (do ((i start (1+ i))
@@ -1322,7 +1338,8 @@ a host-structure or string."
 	  (chunks (cons ch i)))))
     (chunks)))
 
-;;; Break up a logical-namestring, always a string, into its constituent parts.
+;;; Break up a logical-namestring, always a string, into its
+;;; constituent parts.
 (defun parse-logical-namestring (namestr start end)
   (declare (type simple-base-string namestr)
 	   (type index start end))
@@ -1414,8 +1431,8 @@ a host-structure or string."
 	      (and (not (equal (directory)'(:absolute)))(directory))
 	      name type version))))
 
-;;; can't defvar here because not all host methods are loaded yet
-(declaim (special *logical-pathname-defaults*))
+;;; We can't initialize this yet because not all host methods are loaded yet.
+(defvar *logical-pathname-defaults*)
 
 (defun logical-pathname (pathspec)
   #!+sb-doc
@@ -1439,7 +1456,7 @@ a host-structure or string."
     (let ((directory (%pathname-directory pathname)))
       (when directory
 	(ecase (pop directory)
-	  (:absolute)	 ;; Nothing special.
+	  (:absolute) ; nothing special
 	  (:relative (pieces ";")))
 	(dolist (dir directory)
 	  (cond ((or (stringp dir) (pattern-p dir))
@@ -1478,19 +1495,19 @@ a host-structure or string."
            ;; left is what we want, more or less.
            (cond ((and (eq (first path-dir) (first def-dir))
                        (eq (first path-dir) :absolute))
-                   ;; Both paths are :absolute, so find where the common
-                   ;; parts end and return what's left
+                   ;; Both paths are :ABSOLUTE, so find where the
+                   ;; common parts end and return what's left
                    (do* ((p (rest path-dir) (rest p))
                          (d (rest def-dir) (rest d)))
                         ((or (endp p) (endp d)
                              (not (equal (first p) (first d))))
                          `(:relative ,@p))))
                  (t
-                   ;; At least one path is :relative, so just return the
-                   ;; original path.  If the original path is :relative,
+                   ;; At least one path is :RELATIVE, so just return the
+                   ;; original path.  If the original path is :RELATIVE,
                    ;; then that's the right one.  If PATH-DIR is
-                   ;; :absolute, we want to return that except when
-                   ;; DEF-DIR is :absolute, as handled above. so return
+                   ;; :ABSOLUTE, we want to return that except when
+                   ;; DEF-DIR is :ABSOLUTE, as handled above. so return
                    ;; the original directory.
                    path-dir))))
     (make-pathname :host (pathname-host pathname)

@@ -499,7 +499,7 @@
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
 	 (actual-level
-	  (cookie-debug (lexenv-cookie (node-lexenv (lambda-bind fun)))))
+	  (policy-debug (lexenv-policy (node-lexenv (lambda-bind fun)))))
 	 (level (if #!+sb-dyncount *collect-dynamic-statistics*
 		    #!-sb-dyncount nil
 		    (max actual-level 2)

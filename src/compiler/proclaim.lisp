@@ -14,13 +14,13 @@
 
 (in-package "SB!C")
 
-;;; !COLD-INIT calls this twice to initialize the cookies, once before
+;;; !COLD-INIT calls this twice to initialize policy, once before
 ;;; any toplevel forms are executed, then again to undo any lingering
 ;;; effects of toplevel DECLAIMs.
 (!begin-collecting-cold-init-forms)
 (!cold-init-forms
-  (setf *default-cookie*
-	(make-cookie :safety 1
+  (setf *default-policy*
+	(make-policy :safety 1
 		     :speed 1
 		     :space 1
 		     :cspeed 1
@@ -32,9 +32,9 @@
 		     ;; value", and it seems natural for the neutral value to
 		     ;; be the default.
 		     :debug 1))
-  (setf *default-interface-cookie*
-	(make-cookie)))
-(!defun-from-collected-cold-init-forms !set-sane-cookie-defaults)
+  (setf *default-interface-policy*
+	(make-policy)))
+(!defun-from-collected-cold-init-forms !set-sane-policy-defaults)
 
 ;;; A list of UNDEFINED-WARNING structures representing references to unknown
 ;;; stuff which came up in a compilation unit.
@@ -87,22 +87,22 @@
       (let ((old (gethash name *free-variables*)))
 	(when old (vars old))))))
 
-;;; Return a new cookie containing the policy information represented
+;;; Return a new POLICY containing the policy information represented
 ;;; by the optimize declaration SPEC. Any parameters not specified are
-;;; defaulted from COOKIE.
-(declaim (ftype (function (list cookie) cookie) process-optimize-declaration))
-(defun process-optimize-declaration (spec cookie)
-  (let ((res (copy-cookie cookie)))
+;;; defaulted from the POLICY argument.
+(declaim (ftype (function (list policy) policy) process-optimize-declaration))
+(defun process-optimize-declaration (spec policy)
+  (let ((res (copy-policy policy)))
     (dolist (quality (cdr spec))
       (let ((quality (if (atom quality) (list quality 3) quality)))
 	(if (and (consp (cdr quality)) (null (cddr quality))
 		 (typep (second quality) 'real) (<= 0 (second quality) 3))
 	    (let ((value (rational (second quality))))
 	      (case (first quality)
-		(speed (setf (cookie-speed res) value))
-		(space (setf (cookie-space res) value))
-		(safety (setf (cookie-safety res) value))
-		(compilation-speed (setf (cookie-cspeed res) value))
+		(speed (setf (policy-speed res) value))
+		(space (setf (policy-space res) value))
+		(safety (setf (policy-safety res) value))
+		(compilation-speed (setf (policy-cspeed res) value))
 		;; FIXME: BREVITY is an undocumented name for it,
 		;; should go away. And INHIBIT-WARNINGS is a
 		;; misleading name for it. Perhaps BREVITY would be
@@ -110,8 +110,8 @@
 		;; of suppressing only optimization-related notes,
 		;; which I think is the behavior. Perhaps
 		;; INHIBIT-NOTES?
-		((inhibit-warnings brevity) (setf (cookie-brevity res) value))
-		((debug-info debug) (setf (cookie-debug res) value))
+		((inhibit-warnings brevity) (setf (policy-brevity res) value))
+		((debug-info debug) (setf (policy-debug res) value))
 		(t
 		 (compiler-warning "unknown optimization quality ~S in ~S"
 				   (car quality) spec))))
@@ -223,11 +223,11 @@
 		   (declare (ignore layout))
 		   (setf (class-state subclass) :sealed))))))))
       (optimize
-       (setq *default-cookie*
-	     (process-optimize-declaration form *default-cookie*)))
+       (setq *default-policy*
+	     (process-optimize-declaration form *default-policy*)))
       (optimize-interface
-       (setq *default-interface-cookie*
-	     (process-optimize-declaration form *default-interface-cookie*)))
+       (setq *default-interface-policy*
+	     (process-optimize-declaration form *default-interface-policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
 	 (proclaim-as-function-name name)

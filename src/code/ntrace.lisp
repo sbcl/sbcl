@@ -81,19 +81,18 @@
   ;; list of null environment forms
   (print-after () :type list))
 
-;;; This is a list of conses (function-end-cookie .
-;;; condition-satisfied), which we use to note distinct dynamic
-;;; entries into functions. When we enter a traced function, we add a
-;;; entry to this list holding the new end-cookie and whether the
-;;; trace condition was satisfied. We must save the trace condition so
-;;; that the after breakpoint knows whether to print. The length of
-;;; this list tells us the indentation to use for printing TRACE
-;;; messages.
+;;; This is a list of conses (function-end-cookie . condition-satisfied),
+;;; which we use to note distinct dynamic entries into functions. When
+;;; we enter a traced function, we add a entry to this list holding
+;;; the new end-cookie and whether the trace condition was satisfied.
+;;; We must save the trace condition so that the after breakpoint
+;;; knows whether to print. The length of this list tells us the
+;;; indentation to use for printing TRACE messages.
 ;;;
 ;;; This list also helps us synchronize the TRACE facility dynamically
 ;;; for detecting non-local flow of control. Whenever execution hits a
-;;; :function-end breakpoint used for TRACE'ing, we look for the
-;;; function-end-cookie at the top of *traced-entries*. If it is not
+;;; :FUNCTION-END breakpoint used for TRACE'ing, we look for the
+;;; FUNCTION-END-COOKIE at the top of *TRACED-ENTRIES*. If it is not
 ;;; there, we discard any entries that come before our cookie.
 ;;;
 ;;; When we trace using encapsulation, we bind this variable and add
