@@ -12,10 +12,6 @@
 
 (in-package "SB-IMPL") ;(SB-IMPL, not SB!IMPL, since we're built in warm load.)
 
-(defvar *describe-indentation-step* 3
-  #+sb-doc
-  "the number of spaces that sets off each line of a recursive description")
-
 (declaim (ftype (function (t stream)) describe-object))
 (defgeneric describe-object ((x t) stream))
 
@@ -24,9 +20,9 @@
   "Print a description of the object X."
   (let ((stream (out-synonym-of stream-designator)))
     (pprint-logical-block (stream nil)
-      (fresh-line stream)
+      (pprint-newline :mandatory stream)
       (describe-object x stream)
-      (fresh-line stream)))
+      (pprint-newline :mandatory stream)))
   (values))
 
 ;;;; miscellaneous DESCRIBE-OBJECT methods

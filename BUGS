@@ -1312,6 +1312,7 @@ WORKAROUND:
   FBOUNDP)) raises an error when it should return NIL.
 
 162:
+  (reported by Robert E. Brown 2002-04-16) 
   When a function is called with too few arguments, causing the
   debugger to be entered, the uninitialized slots in the bad call frame 
   seem to cause GCish problems, being interpreted as tagged data even
@@ -1326,7 +1327,9 @@ WORKAROUND:
     0] (room)
     ...
     failed AVER: "(SAP= CURRENT END)"
-  (reported by Robert E. Brown 2002-04-16)
+  (Christophe Rhodes reports that this doesn't occur on the SPARC, which
+  isn't too surprising since there are many differences in stack
+  implementation and GC conservatism between the X86 and other ports.)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

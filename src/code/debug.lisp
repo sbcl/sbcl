@@ -492,12 +492,11 @@ Function and macro commands:
 ) ; EVAL-WHEN
 
 ;;; This is used in constructing arg lists for debugger printing when
-;;; the arg list is unavailable, some arg is unavailable or unused,
-;;; etc.
+;;; the arg list is unavailable, some arg is unavailable or unused, etc.
 (defstruct (unprintable-object
 	    (:constructor make-unprintable-object (string))
 	    (:print-object (lambda (x s)
-			     (print-unreadable-object (x s :type t)
+			     (print-unreadable-object (x s)
 			       (write-string (unprintable-object-string x)
 					     s))))
 	    (:copier nil))

@@ -518,9 +518,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; hairy compiles.
              "*COMPILE-PROGRESS*"
 
-             ;; There is no one right way to do DESCRIBE.
-             "*DESCRIBE-INDENTATION-STEP*"
-
              ;; It can be handy to be able to evaluate expressions involving
              ;; the thing under examination by CL:INSPECT.
              "*INSPECTED*"
