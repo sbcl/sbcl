@@ -562,11 +562,13 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
     else return 0;
 }
 
-#ifndef LISP_FEATURE_X86
+#ifndef LISP_FEATURE_GENCGC
 /* This function gets called from the SIGSEGV (for e.g. Linux or
  * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
  * whether the signal was due to treading on the mprotect()ed zone -
  * and if so, arrange for a GC to happen. */
+extern unsigned long bytes_consed_between_gcs; /* gc-common.c */
+
 boolean
 interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 {
@@ -575,16 +577,8 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     struct interrupt_data *data=
 	th ? th->interrupt_data : global_interrupt_data;
 
-    if (!foreign_function_call_active
-#ifndef LISP_FEATURE_GENCGC 
-	/* nb: GENCGC on non-x86?  I really don't think so.  This
-	 * happens every time */
-	&& gc_trigger_hit(signal, info, context)
-#endif
-	) {
-#ifndef LISP_FEATURE_GENCGC 
+    if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
 	clear_auto_gc_trigger();
-#endif
 
 	if (arch_pseudo_atomic_atomic(context)) {
 	    /* don't GC during an atomic operation.  Instead, copy the 
@@ -604,18 +598,13 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 	    arch_set_pseudo_atomic_interrupted(context);
 	}
 	else {
-	    lispobj *old_free_space=current_dynamic_space;
 	    fake_foreign_function_call(context);
+	    /* SUB-GC may return without GCing if *GC-INHIBIT* is set,
+	     * in which case we will be running with no gc trigger
+	     * barrier thing for a while.  But it shouldn't be long 
+	     * until the end of WITHOUT-GCING. */
 	    funcall0(SymbolFunction(SUB_GC));
 	    undo_fake_foreign_function_call(context);
-	    if(current_dynamic_space==old_free_space) 
-		/* MAYBE-GC (as the name suggest) might not.  If it
-		 * doesn't, it won't reset the GC trigger either, so we
-		 * have to do it ourselves.  Put it near the end of
-		 * dynamic space so we're not running into it continually
-		 */
-		set_auto_gc_trigger(DYNAMIC_SPACE_SIZE
-				    -(u32)os_vm_page_size);
 	}       
 	return 1;
     } else {

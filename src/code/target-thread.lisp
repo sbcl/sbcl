@@ -89,25 +89,29 @@
     ;; the sigcont?  For that matter, can we get interrupted?
     (block-sigcont)
     (when lock (release-mutex lock))
-    (get-spinlock queue 2 pid)
-    (pushnew pid (waitqueue-data queue))
-    (setf (waitqueue-lock queue) 0)
+    (sb!sys:without-interrupts
+     (get-spinlock queue 2 pid)
+     (pushnew pid (waitqueue-data queue))
+     (setf (waitqueue-lock queue) 0))
     (unblock-sigcont-and-sleep)))
 
 (defun dequeue (queue)
   (let ((pid (current-thread-id)))
-    (get-spinlock queue 2 pid)
-    (setf (waitqueue-data queue)
-	  (delete pid (waitqueue-data queue)))
-    (setf (waitqueue-lock queue) 0)))
+    (sb!sys:without-interrupts
+     (get-spinlock queue 2 pid)
+     (setf (waitqueue-data queue)
+	   (delete pid (waitqueue-data queue)))
+     (setf (waitqueue-lock queue) 0))))
 
 (defun signal-queue-head (queue)
-  (let ((pid (current-thread-id)))
-    (get-spinlock queue 2 pid)
-    (let ((h (car (waitqueue-data queue))))
-      (setf (waitqueue-lock queue) 0)
-      (when h
-	(sb!unix:unix-kill h :sigcont)))))
+  (let ((pid (current-thread-id))
+	h)
+    (sb!sys:without-interrupts
+     (get-spinlock queue 2 pid)
+     (setf h (car (waitqueue-data queue)))
+     (setf (waitqueue-lock queue) 0))
+    (when h
+      (sb!unix:unix-kill h :sigcont))))
 
 ;;;; mutex
 
@@ -127,17 +131,10 @@
 
 (defun release-mutex (lock &optional (new-value nil))
   (declare (type mutex lock))
-  (let ((old-value (mutex-value lock))
-	(t1 nil))
-    (loop
-     (unless
-	 ;; args are object slot-num old-value new-value
-	 (eql old-value
-	      (setf t1
-		    (sb!vm::%instance-set-conditional lock 4 old-value new-value)))       
-       (signal-queue-head lock)
-       (return t))
-     (setf old-value t1))))
+  ;; we assume the lock is ours to release
+  (setf (mutex-value lock) new-value)
+  (signal-queue-head lock))
+
 
 (defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
   (with-unique-names (got)

@@ -220,25 +220,9 @@ and submit it as a patch."
 (sb!alien:define-alien-routine collect-garbage sb!alien:int
   (#!+gencgc last-gen #!-gencgc ignore sb!alien:int))
 
-(sb!alien:define-alien-routine set-auto-gc-trigger sb!alien:void
-  (dynamic-usage sb!alien:unsigned-long))
-
-(sb!alien:define-alien-routine clear-auto-gc-trigger sb!alien:void)
-
 #!+sb-thread
 (def-c-var-frob gc-thread-pid "gc_thread_pid")
-#!+sb-thread
-(defun other-thread-collect-garbage (gen)
-  (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
-	(1+ gen))
-  (sb!unix:unix-kill (gc-thread-pid) :SIGALRM))
 
-;;; This variable contains the function that does the real GC. This is
-;;; for low-level GC experimentation. Do not touch it if you do not
-;;; know what you are doing.
-(defvar *internal-gc*
-  #!+sb-thread #'other-thread-collect-garbage
-  #!-sb-thread #'collect-garbage)
 	
 
 ;;;; SUB-GC
@@ -265,46 +249,35 @@ and submit it as a patch."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
-
+#!+sb-thread
 (defun sub-gc (&key (gen 0))
-  (when (sb!thread::mutex-value *gc-mutex*) (return-from sub-gc nil))
-  (sb!thread:with-mutex (*gc-mutex* :wait-p nil)
-    (let* ((start-time (get-internal-run-time)))
-      (setf *need-to-collect-garbage* t)
-      (when (zerop *gc-inhibit*)
-	(without-interrupts
-	 (dolist (hook  *before-gc-hooks*)  (carefully-funcall hook))
-	 (when *gc-trigger*
-	   (clear-auto-gc-trigger))
-	 (let* ((pre-internal-gc-dynamic-usage (dynamic-usage))
-		(ignore-me (funcall *internal-gc* gen))
-		(post-gc-dynamic-usage (dynamic-usage))
-		(n-bytes-freed (- pre-internal-gc-dynamic-usage
-				  post-gc-dynamic-usage))
-		;; the raw N-BYTES-FREED from GENCGC can sometimes be
-		;; substantially negative (e.g. -5872).  This is
-		;; probably due to fluctuating inefficiency in the way
-		;; that the GENCGC packs things into page boundaries.
-		;; We bump the raw result up to 0: the space is
-		;; allocated even if unusable, so should be counted
-		;; for deciding when we've allocated enough to GC
-		;; next.  ("Man isn't a rational animal, he's a
-		;; rationalizing animal.":-) -- WHN 2001-06-23)
-		(eff-n-bytes-freed (max 0 n-bytes-freed)))
-	   (declare (ignore ignore-me))
-	   (incf *n-bytes-freed-or-purified*  eff-n-bytes-freed)
-	   (setf *need-to-collect-garbage* nil)
-	   (setf *gc-trigger*  (+ post-gc-dynamic-usage
-				  *bytes-consed-between-gcs*))
-	   (set-auto-gc-trigger *gc-trigger*)
-	   (dolist (hook *after-gc-hooks*)
-	     (carefully-funcall hook))))
-	(scrub-control-stack))       ;XXX again?  we did this from C ...
-      (incf *gc-run-time* (- (get-internal-run-time) start-time))))
-  nil)
+  (setf *need-to-collect-garbage* t)
+  (when (zerop *gc-inhibit*)
+    (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
+	  (1+ gen))
+    (if (zerop (sb!alien:extern-alien "stop_the_world" (sb!alien:unsigned 32)))
+	(sb!unix:unix-kill (gc-thread-pid) :SIGALRM))
+    (loop
+     (when (zerop
+	    (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32)))
+       (return nil)))
+    (setf *need-to-collect-garbage* nil)
+    (scrub-control-stack))
+  (values))
 
-
+#!-sb-thread
+(defvar *already-in-gc* nil "System is running SUB-GC")
+#!-sb-thread
+(defun sub-gc (&key (gen 0))
+  (when *already-in-gc* (return-from sub-gc nil))
+  (setf *need-to-collect-garbage* t)
+  (when (zerop *gc-inhibit*)
+    (let ((*already-in-gc* t))
+      (without-interrupts (collect-garbage gen))
+      (setf *need-to-collect-garbage* nil))
+    (scrub-control-stack))
+  (values))
+       
 
 
 ;;; This is the user-advertised garbage collection function.
@@ -324,25 +297,14 @@ and submit it as a patch."
   #!+sb-doc
   "Return the amount of memory that will be allocated before the next garbage
    collection is initiated. This can be set with SETF."
-  *bytes-consed-between-gcs*)
+  (sb!alien:extern-alien "bytes_consed_between_gcs"
+			 (sb!alien:unsigned 32)))
+
 (defun (setf bytes-consed-between-gcs) (val)
-  ;; FIXME: Shouldn't this (and the DECLAIM for the underlying variable)
-  ;; be for a strictly positive number type, e.g.
-  ;; (AND (INTEGER 1) FIXNUM)?
   (declare (type index val))
-  (let ((old *bytes-consed-between-gcs*))
-    (setf *bytes-consed-between-gcs* val)
-    (when *gc-trigger*
-      (setf *gc-trigger* (+ *gc-trigger* (- val old)))
-      (cond ((<= (dynamic-usage) *gc-trigger*)
-	     (clear-auto-gc-trigger)
-	     (set-auto-gc-trigger *gc-trigger*))
-	    (t
-	     ;; FIXME: If SCRUB-CONTROL-STACK is required here, why
-	     ;; isn't it built into SUB-GC? And *is* it required here?
-	     (sb!sys:scrub-control-stack)
-	     (sub-gc)))))
-  val)
+  (setf (sb!alien:extern-alien "bytes_consed_between_gcs"
+			       (sb!alien:unsigned 32))
+	val))
 
 (defun gc-on ()
   #!+sb-doc
@@ -357,11 +319,4 @@ and submit it as a patch."
   "Disable the garbage collector."
   (setq *gc-inhibit* 1)
   nil)
-
-;;;; initialization stuff
 
-(defun gc-reinit ()
-  (when *gc-trigger*
-    (if (< *gc-trigger* (dynamic-usage))
-	(sub-gc)
-	(set-auto-gc-trigger *gc-trigger*))))

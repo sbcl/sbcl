@@ -45,6 +45,7 @@
  */
 static lispobj *dynamic_space_free_pointer;
 #endif
+extern unsigned long bytes_consed_between_gcs;
 
 #define gc_abort() \
   lose("GC invariant lost, file \"%s\", line %d", __FILE__, __LINE__)
@@ -132,17 +133,11 @@ dynamic_pointer_p(lispobj ptr)
 
 static unsigned pointer_filter_verbose = 0;
 
-/* FIXME: This is substantially the same code as in gencgc.c. (There
- * are some differences, at least (1) the gencgc.c code needs to worry
- * about return addresses on the stack pinning code objects, (2) the
- * gencgc.c code needs to worry about the GC maybe happening in an
- * interrupt service routine when the main thread of control was
- * interrupted just as it had allocated memory and before it
- * initialized it, while PURIFY needn't worry about that, and (3) the
- * gencgc.c code has mutated more under maintenance since the fork
- * from CMU CL than the code here has.) The two versions should be
- * made to explicitly share common code, instead of just two different
- * cut-and-pasted versions. */
+/* FIXME: This is substantially the same code as
+ * possibly_valid_dynamic_space_pointer in gencgc.c.  The only
+ * relevant difference seems to be that the gencgc code also checks
+ * for raw pointers into Code objects */
+
 static int
 valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 {
@@ -1063,7 +1058,7 @@ pscav_code(struct code*code)
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
-	/* Temporarly convert the self pointer to a real function
+	/* Temporarily convert the self pointer to a real function
 	 * pointer. */
 	((struct simple_fun *)native_pointer(func))->self
 	    -= FUN_RAW_ADDR_OFFSET;
@@ -1488,6 +1483,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
 #if !defined(__i386__)
     dynamic_space_free_pointer = current_dynamic_space;
+    set_auto_gc_trigger(bytes_consed_between_gcs);
 #else
 #if defined LISP_FEATURE_GENCGC
     gc_free_heap();
@@ -1500,6 +1496,5 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" done]\n");
     fflush(stdout);
 #endif
-
     return 0;
 }

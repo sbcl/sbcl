@@ -31,7 +31,7 @@
     n)))
 
 (defun purify (&key root-structures (environment-name "Auxiliary"))
-  #!+sb-doc
+  ;; #!+sb-doc
   "This function optimizes garbage collection by moving all currently live
    objects into non-collected storage. ROOT-STRUCTURES is an optional list of
    objects which should be copied first to maximize locality.
@@ -45,19 +45,5 @@
    supplied, then environment compaction is inhibited."
 
   (when environment-name (compact-environment-aux environment-name 200))
-
-  (let ((*gc-notify-before*
-	 (lambda (notify-stream bytes-in-use)
-	   (declare (ignore bytes-in-use))
-	   (write-string "[doing purification: " notify-stream)
-	   (force-output notify-stream)))
-	(*internal-gc*
-	 (lambda (ignored-generation-arg)
-	   (%purify (get-lisp-obj-address root-structures)
-		    (get-lisp-obj-address nil))))
-	(*gc-notify-after*
-	 (lambda (notify-stream &rest ignore)
-	   (declare (ignore ignore))
-	   (write-line "done]" notify-stream))))
-    (gc))
-  nil)
+  (%purify (get-lisp-obj-address root-structures)
+	   (get-lisp-obj-address nil)))

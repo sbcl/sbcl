@@ -95,7 +95,6 @@
   (setf *gc-notify-stream* nil
         *before-gc-hooks* nil
         *after-gc-hooks* nil
-        *already-maybe-gcing* t
 	*gc-inhibit* 1
 	*need-to-collect-garbage* nil
 	sb!unix::*interrupts-enabled* t
@@ -235,7 +234,6 @@
   (setf *cold-init-complete-p* t)
 
   ;; The system is finally ready for GC.
-  (setf *already-maybe-gcing* nil)
   (/show0 "enabling GC")
   (gc-on)
   (/show0 "doing first GC")
@@ -277,7 +275,6 @@ instead (which is another name for the same thing)."))
       (os-cold-init-or-reinit)
       (stream-reinit)
       (signal-cold-init-or-reinit)
-      (gc-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
       ;; PRINT seems not to like x86 NPX denormal floats like
       ;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
@@ -293,8 +290,9 @@ instead (which is another name for the same thing)."))
       ;; reason.. (Perhaps we should do it anyway in case someone
       ;; manages to save an image from within a pseudo-atomic-atomic
       ;; operation?)
-      #!+x86 (setf *pseudo-atomic-atomic* 0))
-    (gc-on)))
+      #!+x86 (setf *pseudo-atomic-atomic* 0)))
+  (gc-on)
+  (gc))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code
