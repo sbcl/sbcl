@@ -150,7 +150,7 @@ special classes of forms, such as symbols which are
 <function>boundp</>. More complicated forms are evaluated by calling
 <function>compile</> and then calling <function>funcall</> on the
 returned result.
-<para>
+</para>
 
 <para>The direct ancestor of &SBCL; is the X86 port of &CMUCL;. This
 port was in some ways the most cobbled-together of all the &CMUCL;
