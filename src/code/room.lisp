@@ -193,7 +193,7 @@
 		 (ash len shift)))))))
 
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with
-;;; the object, the object's type code, and the objects total size in
+;;; the object, the object's type code, and the object's total size in
 ;;; bytes, including any header and padding.
 #!-sb-fluid (declaim (maybe-inline map-allocated-objects))
 (defun map-allocated-objects (fun space)
@@ -653,9 +653,14 @@
 
 (defvar *ignore-after* nil)
 
+(defun valid-obj (space x)
+  (or (not (eq space :dynamic))
+      ;; this test looks bogus if the allocator doesn't work linearly,
+      ;; which I suspect is the case for GENCGC.  -- CSR, 2004-06-29
+      (< (get-lisp-obj-address x) (get-lisp-obj-address *ignore-after*))))
+
 (defun maybe-cons (space x stuff)
-  (if (or (not (eq space :dynamic))
-	  (< (get-lisp-obj-address x) (get-lisp-obj-address *ignore-after*)))
+  (if (valid-obj space x)
       (cons x stuff)
       stuff))
 
@@ -665,7 +670,8 @@
 	   (type (or index null) larger smaller type count)
 	   (type (or function null) test)
 	   (inline map-allocated-objects))
-  (unless *ignore-after* (setq *ignore-after* (cons 1 2)))
+  (unless *ignore-after*
+    (setq *ignore-after* (cons 1 2)))
   (collect ((counted 0 1+))
     (let ((res ()))
       (map-allocated-objects
@@ -681,34 +687,48 @@
        space)
       res)))
 
-(defun list-referencing-objects (space object)
+(defun map-referencing-objects (fun space object)
   (declare (type spaces space) (inline map-allocated-objects))
-  (unless *ignore-after* (setq *ignore-after* (cons 1 2)))
-  (let ((res ()))
-    (flet ((res (x)
-	     (setq res (maybe-cons space x res))))
-      (map-allocated-objects
-       (lambda (obj obj-type size)
-	 (declare (optimize (safety 0)) (ignore obj-type size))
-	 (typecase obj
-	   (cons
-	    (when (or (eq (car obj) object) (eq (cdr obj) object))
-	      (res obj)))
-	   (instance
-	    (dotimes (i (%instance-length obj))
-	      (when (eq (%instance-ref obj i) object)
-		(res obj)
-		(return))))
-	   (simple-vector
-	    (dotimes (i (length obj))
-	      (when (eq (svref obj i) object)
-		(res obj)
-		(return))))
-	   (symbol
-	    (when (or (eq (symbol-name obj) object)
-		      (eq (symbol-package obj) object)
-		      (eq (symbol-plist obj) object)
-		      (eq (symbol-value obj) object))
-	      (res obj)))))
-       space))
-    res))
+  (unless *ignore-after*
+    (setq *ignore-after* (cons 1 2)))
+  (flet ((maybe-call (fun obj)
+	   (when (valid-obj space obj)
+	     (funcall fun obj))))
+    (map-allocated-objects
+     (lambda (obj obj-type size)
+       (declare (optimize (safety 0)) (ignore obj-type size))
+       (typecase obj
+	 (cons
+	  (when (or (eq (car obj) object)
+		    (eq (cdr obj) object))
+	    (maybe-call fun obj)))
+	 (instance
+	  (dotimes (i (%instance-length obj))
+	    (when (eq (%instance-ref obj i) object)
+	      (maybe-call fun obj)
+	      (return))))
+	 (code-component
+	  (let ((length (get-header-data obj)))
+	    (do ((i code-constants-offset (1+ i)))
+		((= i length))
+	      (when (eq (code-header-ref obj i) object)
+		(maybe-call fun obj)
+		(return)))))
+	 (simple-vector
+	  (dotimes (i (length obj))
+	    (when (eq (svref obj i) object)
+	      (maybe-call fun obj)
+	      (return))))
+	 (symbol
+	  (when (or (eq (symbol-name obj) object)
+		    (eq (symbol-package obj) object)
+		    (eq (symbol-plist obj) object)
+		    (eq (symbol-value obj) object))
+	    (maybe-call fun obj)))))
+     space)))
+
+(defun list-referencing-objects (space object)
+  (collect ((res))
+    (map-referencing-objects
+     (lambda (obj) (res obj)) space object)
+    (res)))
