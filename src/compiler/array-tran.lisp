@@ -58,7 +58,8 @@
    array
    (make-array-type :complexp t
                     :element-type *wild-type*)
-   (lexenv-policy (node-lexenv (continuation-dest array)))))
+   (lexenv-policy (node-lexenv (continuation-dest array))))
+  nil)
 
 ;;; Return true if ARG is NIL, or is a constant-continuation whose
 ;;; value is NIL, false otherwise.

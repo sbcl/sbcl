@@ -45,7 +45,7 @@
   (make-long-float (logior (ash sign 15) exp)
 		   (ldb (byte 32 32) sig)
 		   (ldb (byte 32 0) sig)))
-					
+
 ) ; EVAL-WHEN
 
 ;;;; float parameters
@@ -283,8 +283,8 @@
 (defun float-sign (float1 &optional (float2 (float 1 float1)))
   #!+sb-doc
   "Return a floating-point number that has the same sign as
-   float1 and, if float2 is given, has the same absolute value
-   as float2."
+   FLOAT1 and, if FLOAT2 is given, has the same absolute value
+   as FLOAT2."
   (declare (float float1 float2))
   (* (if (etypecase float1
 	   (single-float (minusp (single-float-bits float1)))
@@ -311,17 +311,10 @@
     #!+long-float
     ((long-float) sb!vm:long-float-digits)))
 
-(setf (fdefinition 'float-radix)
-      ;; FIXME: Python flushes unused variable X in CLAMBDA, then
-      ;; flushes unused reference to X in XEP together with type
-      ;; check. When this is fixed, rewrite this definition in an
-      ;; ordinary form. -- APD, 2002-10-21
-      (lambda (x)
-        #!+sb-doc
-        "Return (as an integer) the radix b of its floating-point argument."
-        (unless (floatp x)
-          (error 'type-error :datum x :expected-type 'float))
-        2))
+(defun float-radix (x)
+  #!+sb-doc
+  "Return (as an integer) the radix b of its floating-point argument."
+  2)
 
 ;;;; INTEGER-DECODE-FLOAT and DECODE-FLOAT
 

@@ -828,6 +828,13 @@
   (assert (eq l nil))
   (assert (eq (sswo-a s) :v)))
 
+(defun bug249 (x)
+  (flet ((bar (y)
+           (declare (fixnum y))
+           (incf x)))
+    (list (bar x) (bar x) (bar x))))
+
+(assert (raises-error? (bug249 1.0) type-error))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -197,26 +197,28 @@
 
 ;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
 ;;; error for CONT's value not to be TYPEP to TYPE. We implement it
-;;; moving uses behind a new CAST node. If we improve the assertion,
+;;; splitting off DEST a new CAST node. If we improve the assertion,
 ;;; we set TYPE-CHECK and TYPE-ASSERTED to guarantee that the new
-;;; assertion will be checked.
+;;; assertion will be checked. We return the new "argument"
+;;; continuation of DEST.
 (defun assert-continuation-type (cont type policy)
   (declare (type continuation cont) (type ctype type))
-  (when (values-subtypep (continuation-derived-type cont) type)
-    (return-from assert-continuation-type))
-  (let* ((dest (continuation-dest cont))
-         (prev-cont (node-prev dest)))
-    (aver dest)
-    (with-ir1-environment-from-node dest
-      (let* ((cast (make-cast cont type policy))
-             (checked-value (make-continuation)))
-        (setf (continuation-next prev-cont) cast
-              (node-prev cast) prev-cont)
-        (use-continuation cast checked-value)
-        (link-node-to-previous-continuation dest checked-value)
-        (substitute-continuation checked-value cont)
-        (setf (continuation-dest cont) cast)
-        (reoptimize-continuation cont)))))
+  (if (values-subtypep (continuation-derived-type cont) type)
+      cont
+      (let* ((dest (continuation-dest cont))
+             (prev-cont (node-prev dest)))
+        (aver dest)
+        (with-ir1-environment-from-node dest
+          (let* ((cast (make-cast cont type policy))
+                 (checked-value (make-continuation)))
+            (setf (continuation-next prev-cont) cast
+                  (node-prev cast) prev-cont)
+            (use-continuation cast checked-value)
+            (link-node-to-previous-continuation dest checked-value)
+            (substitute-continuation checked-value cont)
+            (setf (continuation-dest cont) cast)
+            (reoptimize-continuation cont)
+            checked-value)))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the

@@ -34,17 +34,14 @@
 ;;; continuations.
 (defun propagate-to-args (call fun)
   (declare (type combination call) (type clambda fun))
-  (do ((args (basic-combination-args call) (cdr args))
-       (vars (lambda-vars fun) (cdr vars)))
-      ((null args))
-    (let ((arg (car args))
-	  (var (car vars)))
-      (cond ((leaf-refs var)
-	     (assert-continuation-type arg (leaf-type var)
-                                       (lexenv-policy (node-lexenv call))))
-	    (t
-	     (flush-dest arg)
-	     (setf (car args) nil)))))
+  (loop with policy = (lexenv-policy (node-lexenv call))
+        for args on (basic-combination-args call)
+        and var in (lambda-vars fun)
+        for arg =  (assert-continuation-type (car args)
+                                             (leaf-type var) policy)
+        do (unless (leaf-refs var)
+             (flush-dest (car args))
+             (setf (car args) nil)))
 
   (values))
 

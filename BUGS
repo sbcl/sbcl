@@ -1212,15 +1212,6 @@ WORKAROUND:
   (TYPEP 1 '(SYMBOL NIL)) says something about "unknown type
   specifier".
 
-249:
-  Local functions do not check types of unused arguments:
-    (defun foo (x)
-      (flet ((bar (y)
-               (declare (fixnum y))
-               (incf x)))
-        (list (bar x) (bar x) (bar x))))
-    (foo 1.0) => (2.0 3.0 4.0)
-
 250:
   (make-array nil :initial-element 11) causes a warning.
 
