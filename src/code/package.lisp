@@ -30,12 +30,12 @@
 ;;;   the entry is unused. If it is one, then it is deleted.
 ;;;   Double-hashing is used for collision resolution.
 
-(sb!xc:deftype hash-vector () '(simple-array (unsigned-byte 8) (*)))
+(def!type hash-vector () '(simple-array (unsigned-byte 8) (*)))
 
-(sb!xc:defstruct (package-hashtable
-                   (:constructor %make-package-hashtable
-                                 (table hash size &aux (free size)))
-                   (:copier nil))
+(def!struct (package-hashtable
+	     (:constructor %make-package-hashtable
+			   (table hash size &aux (free size)))
+	     (:copier nil))
   ;; The g-vector of symbols.
   (table (missing-arg) :type simple-vector)
   ;; The i-vector of pname hash values.
