@@ -1494,8 +1494,7 @@ a host-structure or string."
 	   (return (translate-logical-pathname
 		    (translate-pathname pathname from to)))))))
     (pathname pathname)
-    (stream (translate-logical-pathname (pathname pathname)))
-    (t (translate-logical-pathname (logical-pathname pathname)))))
+    (t (translate-logical-pathname (pathname pathname)))))
 
 (defun translate-logical-pathname (pathname &key)
   #!+sb-doc

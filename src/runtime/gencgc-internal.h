@@ -94,6 +94,10 @@ extern struct alloc_region  boxed_region;
 extern struct alloc_region  unboxed_region;
 extern int from_space, new_space;
 extern struct weak_pointer *weak_pointers;
+
+extern void *current_region_free_pointer;
+extern void *current_region_end_addr;
+
 
 void  gencgc_pickup_dynamic(void);
 

@@ -1361,6 +1361,8 @@ WORKAROUND:
     (TRANSLATE-LOGICAL-PATHNAME "/")
   should simply return #P"/", but signals an error in sbcl-0.7.7.28
 
+  Fixed in sbcl-0.7.7.29: bug temporarily left here in BUGS to avoid
+  its number being accidentally reallocated
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

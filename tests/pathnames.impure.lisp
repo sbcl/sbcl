@@ -25,7 +25,7 @@
 ;;; CL:PARSE-ERROR (or more specifically, of type
 ;;; SB-KERNEL:NAMESTRING-PARSE-ERROR).
 (assert
-  (typep (grab-condition (translate-logical-pathname "demo0::bla;file.lisp"))
+  (typep (grab-condition (logical-pathname "demo0::bla;file.lisp"))
          'parse-error))
 
 ;;; some things SBCL-0.6.9 used not to parse correctly:
@@ -274,6 +274,12 @@
 (assert (raises-error?
 	 (setf (logical-pathname-translations "")
 	       (list '("**;*.*.*" "/**/*.*")))))
+
+;;; Bug 200: translate-logical-pathname is according to the spec supposed
+;;; not to give errors if asked to translate a namestring for a valid
+;;; physical pathname.  Failed in 0.7.7.28 and before
+(assert (string= (namestring (translate-logical-pathname "/")) "/"))
+
 
 ;;; Not strictly pathname logic testing, but until sbcl-0.7.6.19 we
 ;;; had difficulty with non-FILE-STREAM stream arguments to pathname
