@@ -121,6 +121,7 @@
 
     (defun get-dynamic-foreign-symbol-address (symbol)
       (ensure-runtime-symbol-table-opened)
+      (setf symbol (coerce symbol 'simple-base-string))
       ;; Find the symbol in any of the loaded object files. Search in
       ;; reverse order of loading, so that later loadings take precedence.
       ;;
@@ -139,7 +140,7 @@
     (defun foreign-symbol-in-address (sap)
       (declare (ignore sap)))
 
-    (when (ignore-errors (foreign-symbol-address #.(coerce "dladdr" 'simple-base-string)))
+    (when (ignore-errors (foreign-symbol-address "dladdr"))
       (setf (symbol-function 'foreign-symbol-in-address)
 	    ;; KLUDGE: This COMPILE trick is to avoid trying to
 	    ;; compile a reference to dladdr on platforms without it.

@@ -295,7 +295,6 @@
 (declaim (ftype (function (string) (unsigned-byte #.sb!vm:n-machine-word-bits))
 		foreign-symbol-address-as-integer))
 
-
 ;;; SB!SYS:GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS is in foreign.lisp, on
 ;;; platforms that have dynamic loading
 (defun foreign-symbol-address-as-integer-or-nil (foreign-symbol)
@@ -306,6 +305,10 @@
   (or (foreign-symbol-address-as-integer-or-nil foreign-symbol)
       (error "unknown foreign symbol: ~S" foreign-symbol)))
 
-(defun foreign-symbol-address (symbol)
+;;; KLUDGE: note that as well as this functional implementation, there
+;;; needs (for cold-init purposes) to be a VOP definition, resolving
+;;; the addresses for FOREIGN-SYMBOL being a constant SIMPLE-STRING.
+;;; -- CSR, 2004-09-06
+(defun foreign-symbol-address (foreign-symbol)
   (int-sap (foreign-symbol-address-as-integer
-	    (sb!vm:extern-alien-name symbol))))
+	    (sb!vm:extern-alien-name foreign-symbol))))

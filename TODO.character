@@ -52,17 +52,19 @@ particularly appealing.)
         eventually be reversed.)
   -- TODO: sparc, mips, hppa, alpha.
 
+** fix FOREIGN-SYMBOL-ADDRESS to work with general constant strings,
+not just (:CONSTANT SIMPLE-BASE-STRING), coercing to base-string
+within the VOP implementation.  (Rationale: less use of #.(coerce
+"foo" 'base-string) throughout the code.)
+  -- done for x86;
+  -- TODO: ppc, sparc, mips, hppa, alpha.
+
 ** fix genesis to dump BASE-STRINGs always, and to use SB!XC:CHAR-CODE
 (which should error on non-STANDARD-CHAR).  (Rationale: SBCL aspires
 to portability, so should not use any non-STANDARD-CHAR in its source
 code.  By definition, therefore, all strings and stringlike objects
 are dumpable as BASE-STRING, which allows for identical cores to be
 generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
-
-** fix FOREIGN-SYMBOL-ADDRESS to work with general constant strings,
-not just (:CONSTANT SIMPLE-BASE-STRING), coercing to base-string
-within the VOP implementation.  (Rationale: less use of #.(coerce
-"foo" 'base-string) throughout the code.)
 
 ** fix the regular dumper to compute similarity properly for strings,
 rather than simply through an EQUAL hash table.  (Rationale: it's just
@@ -88,7 +90,12 @@ representable in those formats should probably error, so it might not
 be terribly useful.
 
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
-(Rationale: for calling out to Pango or similar.)
+(Rationale: for calling out to Pango or similar.  Actually, a valid
+use might be in Unix libc/kernel functions: at least under Linux, I
+believe that the kernel understands utf-8 for directory entries and
+the like.  Someone Who Knows might want to check this.)  This might
+make the #.(coerce "foo" 'base-string) in the filesystem / SB-UNIX
+layer go away.
 
 ** alter the reader and any similar data structures such that they do
 not scale linearly in size with the number of characters in the

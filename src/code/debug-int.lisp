@@ -3265,9 +3265,9 @@ register."
 ;;; instruction.
 (defun make-bogus-lra (real-lra &optional known-return-p)
   (without-gcing
-   (let* ((src-start (foreign-symbol-address #.(coerce "fun_end_breakpoint_guts" 'base-string)))
-	  (src-end (foreign-symbol-address #.(coerce "fun_end_breakpoint_end" 'base-string)))
-	  (trap-loc (foreign-symbol-address #.(coerce "fun_end_breakpoint_trap" 'base-string)))
+   (let* ((src-start (foreign-symbol-address "fun_end_breakpoint_guts"))
+	  (src-end (foreign-symbol-address "fun_end_breakpoint_end"))
+	  (trap-loc (foreign-symbol-address "fun_end_breakpoint_trap"))
 	  (length (sap- src-end src-start))
 	  (code-object
 	   (%primitive sb!c:allocate-code-object (1+ bogus-lra-constants)

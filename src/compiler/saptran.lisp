@@ -13,7 +13,7 @@
 
 ;;;; DEFKNOWNs
 
-(defknown foreign-symbol-address (simple-base-string) system-area-pointer
+(defknown foreign-symbol-address (simple-string) system-area-pointer
   (movable flushable))
 
 (defknown (sap< sap<= sap= sap>= sap>)

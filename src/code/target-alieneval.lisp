@@ -21,8 +21,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun guess-alien-name-from-lisp-name (lisp-name)
     (declare (type symbol lisp-name))
-    (coerce (nsubstitute #\_ #\- (string-downcase (symbol-name lisp-name)))
-	    'simple-base-string)))
+    (nsubstitute #\_ #\- (string-downcase (symbol-name lisp-name)))))
 
 ;;; The opposite of GUESS-ALIEN-NAME-FROM-LISP-NAME. Make a symbol out
 ;;; of the string, converting all lowercase letters to uppercase and
@@ -38,14 +37,13 @@
   (defun pick-lisp-and-alien-names (name)
     (etypecase name
       (string
-       (values (guess-lisp-name-from-alien-name name)
-	       (coerce name 'simple-base-string)))
+       (values (guess-lisp-name-from-alien-name name) name))
       (symbol
        (values name (guess-alien-name-from-lisp-name name)))
       (list
        (unless (proper-list-of-length-p name 2)
 	 (error "badly formed alien name"))
-       (values (cadr name) (coerce (car name) 'simple-base-string))))))
+       (values (cadr name) (car name))))))
 
 (defmacro define-alien-variable (name type &environment env)
   #!+sb-doc
@@ -70,7 +68,6 @@
 ;;; Do the actual work of DEFINE-ALIEN-VARIABLE.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %define-alien-variable (lisp-name alien-name type)
-    (declare (type simple-base-string alien-name))
     (setf (info :variable :kind lisp-name) :alien)
     (setf (info :variable :where-from lisp-name) :defined)
     (clear-info :variable :constant-value lisp-name)
@@ -85,9 +82,7 @@
    is SETFable."
   (let ((alien-name (etypecase name
 		      (symbol (guess-alien-name-from-lisp-name name))
-		      (simple-base-string name)
-		      (string (coerce name 'simple-base-string)))))
-    (declare (type simple-base-string alien-name))
+		      (string name))))
     `(%heap-alien ',(make-heap-alien-info
 		     :type (parse-alien-type type env)
 		     :sap-form `(foreign-symbol-address ',alien-name)))))
@@ -143,14 +138,13 @@
 			    ,@body)))))
 		    (:extern
 		     (/show0 ":EXTERN case")
-		     (let ((initial-value (coerce initial-value 'simple-base-string)))
-		       (let ((info (make-heap-alien-info
-				    :type alien-type
-				    :sap-form `(foreign-symbol-address
-						',initial-value))))
-			 `((symbol-macrolet
-			       ((,symbol (%heap-alien ',info)))
-			     ,@body)))))
+		     (let ((info (make-heap-alien-info
+				  :type alien-type
+				  :sap-form `(foreign-symbol-address
+					      ',initial-value))))
+		       `((symbol-macrolet
+			     ((,symbol (%heap-alien ',info)))
+			   ,@body))))
 		    (:local
 		     (/show0 ":LOCAL case")
 		     (let ((var (gensym))
@@ -633,7 +627,6 @@
         return."
   (multiple-value-bind (lisp-name alien-name)
       (pick-lisp-and-alien-names name)
-    (declare (type simple-base-string alien-name))
     (collect ((docs) (lisp-args) (lisp-arg-types)
               (lisp-result-types
                (cond ((eql result-type 'void)
