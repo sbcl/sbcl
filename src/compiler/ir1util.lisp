@@ -387,7 +387,8 @@
 ;;; slot values. Values for the alist slots are NCONCed to the
 ;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
-			 funs vars blocks tags type-restrictions
+			 funs vars blocks tags
+                         type-restrictions weakend-type-restrictions
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
 			 (policy (lexenv-policy default)))
@@ -402,6 +403,7 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
+     (frob weakend-type-restrictions lexenv-weakend-type-restrictions)
      lambda cleanup policy)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
@@ -429,6 +431,7 @@
      nil
      nil
      (lexenv-type-restrictions lexenv) ; XXX
+     (lexenv-weakend-type-restrictions lexenv)
      nil
      nil
      (lexenv-policy lexenv))))
@@ -883,6 +886,7 @@
   (setf (continuation-next cont) nil)
   (setf (continuation-asserted-type cont) *empty-type*)
   (setf (continuation-%derived-type cont) *empty-type*)
+  (setf (continuation-type-to-check cont) *empty-type*)
   (setf (continuation-use cont) nil)
   (setf (continuation-block cont) nil)
   (setf (continuation-reoptimize cont) nil)
@@ -1219,6 +1223,7 @@
 	  (setf (node-derived-type inside) *wild-type*)
 	  (flush-dest cont)
 	  (setf (continuation-asserted-type cont) *wild-type*)
+          (setf (continuation-type-to-check cont) *wild-type*)
 	  (values))))))
 
 ;;;; leaf hackery

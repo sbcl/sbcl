@@ -47,14 +47,18 @@
 (defun assert-new-value-type (new-value array)
   (let ((type (continuation-type array)))
     (when (array-type-p type)
-      (assert-continuation-type new-value
-				(array-type-specialized-element-type type))))
+      (assert-continuation-type
+       new-value
+       (array-type-specialized-element-type type)
+       (lexenv-policy (node-lexenv (continuation-dest new-value))))))
   (continuation-type new-value))
 
 (defun assert-array-complex (array)
-  (assert-continuation-type array
-			    (make-array-type :complexp t
-					     :element-type *wild-type*)))
+  (assert-continuation-type
+   array
+   (make-array-type :complexp t
+                    :element-type *wild-type*)
+   (lexenv-policy (node-lexenv (continuation-dest array)))))
 
 ;;; Return true if ARG is NIL, or is a constant-continuation whose
 ;;; value is NIL, false otherwise.
@@ -71,7 +75,8 @@
 (defun assert-array-rank (array rank)
   (assert-continuation-type
    array
-   (specifier-type `(array * ,(make-list rank :initial-element '*)))))
+   (specifier-type `(array * ,(make-list rank :initial-element '*)))
+   (lexenv-policy (node-lexenv (continuation-dest array)))))
 
 (defoptimizer (array-in-bounds-p derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
@@ -82,7 +87,8 @@
   ;; If the node continuation has a single use then assert its type.
   (let ((cont (node-cont node)))
     (when (= (length (find-uses cont)) 1)
-      (assert-continuation-type cont (extract-upgraded-element-type array))))
+      (assert-continuation-type cont (extract-upgraded-element-type array)
+                                (lexenv-policy (node-lexenv node)))))
   (extract-upgraded-element-type array))
 
 (defoptimizer (%aset derive-type) ((array &rest stuff))

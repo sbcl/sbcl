@@ -353,7 +353,7 @@
     res))
 
 (!def-type-translator values (&rest values)
-  (let ((res (make-values-type)))
+  (let ((res (%make-values-type)))
     (parse-args-types values res)
     res))
 
@@ -479,6 +479,8 @@
 (defun args-type-op (type1 type2 operation nreq default-type)
   (declare (type ctype type1 type2 default-type)
  	   (type function operation nreq))
+  (when (eq type1 type2)
+    (values type1 t))
   (if (or (values-type-p type1) (values-type-p type2))
       (let ((type1 (coerce-to-values type1))
 	    (type2 (coerce-to-values type2)))
@@ -914,6 +916,11 @@
 	nil)))
 
 (defun type-intersection (&rest input-types)
+  (%type-intersection input-types))
+(defun-cached (%type-intersection :hash-bits 8
+                                  :hash-function (lambda (x)
+                                                   (logand (sxhash x) #xff)))
+    ((input-types equal))
   (let ((simplified-types (simplified-compound-types input-types
 						     #'intersection-type-p
 						     #'type-intersection2)))
@@ -946,10 +953,15 @@
 					 *universal-type*))))
 
 (defun type-union (&rest input-types)
+  (%type-union input-types))
+(defun-cached (%type-union :hash-bits 8
+                           :hash-function (lambda (x)
+                                            (logand (sxhash x) #xff)))
+    ((input-types equal))
   (let ((simplified-types (simplified-compound-types input-types
 						     #'union-type-p
 						     #'type-union2)))
-    (make-compound-type-or-something #'%make-union-type
+    (make-compound-type-or-something #'make-union-type
 				     simplified-types
 				     (every #'type-enumerable simplified-types)
 				     *empty-type*)))
@@ -2106,7 +2118,7 @@
 		 *empty-type*))))))
 
 (!define-type-method (member :complex-intersection2) (type1 type2)
-  (block punt		     
+  (block punt
     (collect ((members))
       (let ((mem2 (member-type-members type2)))
         (dolist (member mem2)
@@ -2496,14 +2508,15 @@
 				       (dimensions '*))
   (specialize-array-type
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
+                    :complexp :maybe
 		    :element-type (specifier-type element-type))))
 
 (!def-type-translator simple-array (&optional (element-type '*)
 					      (dimensions '*))
   (specialize-array-type
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
-		    :element-type (specifier-type element-type)
-		    :complexp nil)))
+                    :complexp nil
+		    :element-type (specifier-type element-type))))
 
 ;;;; utilities shared between cross-compiler and target system
 

@@ -72,6 +72,47 @@
 	    (type-test-cost (cons-type-cdr-type type))))
 	(t
 	 (fun-guessed-cost 'typep)))))
+
+(defun-cached
+    (weaken-type :hash-bits 8
+                 :hash-function (lambda (x)
+                                  (logand (type-hash-value x) #xFF)))
+    ((type eq))
+  (declare (type ctype type))
+  (let ((min-cost (type-test-cost type))
+        (min-type type)
+        (found-super nil))
+    (dolist (x *backend-type-predicates*)
+      (let ((stype (car x)))
+        (when (and (csubtypep type stype)
+                   (not (union-type-p stype)))
+          (let ((stype-cost (type-test-cost stype)))
+            (when (or (< stype-cost min-cost)
+                      (type= stype type))
+              ;; If the supertype is equal in cost to the type, we
+              ;; prefer the supertype. This produces a closer
+              ;; approximation of the right thing in the presence of
+              ;; poor cost info.
+              (setq found-super t
+                    min-type stype
+                    min-cost stype-cost))))))
+    (if found-super
+        min-type
+        *universal-type*)))
+
+(defun weaken-values-type (type)
+  (declare (type ctype type))
+  (cond ((eq type *wild-type*) type)
+        ((values-type-p type)
+         (make-values-type :required (mapcar #'weaken-type
+                                             (values-type-required type))
+                           :optional (mapcar #'weaken-type
+                                             (values-type-optional type))
+                           :rest (acond ((values-type-rest type)
+                                         (weaken-type it))
+                                        ((values-type-keyp type)
+                                         *universal-type*))))
+        (t (weaken-type type))))
 
 ;;;; checking strategy determination
 
@@ -80,34 +121,17 @@
 ;;; than safety, then we return a weaker type if it is easier to
 ;;; check. First we try the defined type weakenings, then look for any
 ;;; predicate that is cheaper.
-;;;
-;;; If the supertype is equal in cost to the type, we prefer the
-;;; supertype. This produces a closer approximation of the right thing
-;;; in the presence of poor cost info.
-(defun maybe-weaken-check (type cont)
-  (declare (type ctype type) (type continuation cont))
-  (cond ((policy (continuation-dest cont)
+(defun maybe-weaken-check (type policy)
+  (declare (type ctype type))
+  (cond ((policy policy (zerop safety))
+         *wild-type*)
+        ((policy policy
 		 (and (<= speed safety)
 		      (<= space safety)
 		      (<= compilation-speed safety)))
 	 type)
 	(t
-	 (let ((min-cost (type-test-cost type))
-	       (min-type type)
-	       (found-super nil))
-	   (dolist (x *backend-type-predicates*)
-	     (let ((stype (car x)))
-	       (when (and (csubtypep type stype)
-			  (not (union-type-p stype)))
-		 (let ((stype-cost (type-test-cost stype)))
-		   (when (or (< stype-cost min-cost)
-			     (type= stype type))
-		     (setq found-super t
-			   min-type stype
-			   min-cost stype-cost))))))
-	   (if found-super
-	       min-type
-	       *universal-type*)))))
+	 (weaken-values-type type))))
 
 ;;; This is like VALUES-TYPES, only we mash any complex function types
 ;;; to FUNCTION.
@@ -143,39 +167,29 @@
 ;;; FIXME: I don't quite understand this, but it looks as though
 ;;; that means type checks are weakened when SPEED=3 regardless of
 ;;; the SAFETY level, which is not the right thing to do.
-(defun maybe-negate-check (cont types force-hairy)
+(defun maybe-negate-check (cont types original-types force-hairy)
   (declare (type continuation cont) (list types))
   (multiple-value-bind (ptypes count)
       (no-fun-values-types (continuation-proven-type cont))
     (if (eq count :unknown)
-	(if (and (every #'type-check-template types) (not force-hairy))
-	    (values :simple types)
-	    (values :hairy
-		    (mapcar (lambda (x)
-			      (list nil (maybe-weaken-check x cont) x))
-			    types)))
-	(let ((res (mapcar (lambda (p c)
-			     (let ((diff (type-difference p c))
-				   (weak (maybe-weaken-check c cont)))
-			       (if (and diff
-					(< (type-test-cost diff)
-					   (type-test-cost weak))
-					*complement-type-checks*)
-				   (list t diff c)
-				   (list nil weak c))))
-			   ptypes types)))
-	  (cond ((or force-hairy (find-if #'first res))
-		 (values :hairy res))
-		((every #'type-check-template types)
-		 (values :simple types))
-		((policy (continuation-dest cont)
-			 (or (<= debug 1) (and (= speed 3) (/= debug 3))))
-		 (let ((weakened (mapcar #'second res)))
-		   (if (every #'type-check-template weakened)
-		       (values :simple weakened)
-		       (values :hairy res))))
-		(t
-		 (values :hairy res)))))))
+        (if (and (every #'type-check-template types) (not force-hairy))
+            (values :simple types)
+            (values :hairy (mapcar (lambda (x) (list nil x x)) types)))
+        (let ((res (mapcar (lambda (p c a)
+                             (let ((diff (type-difference p c)))
+                               (if (and diff
+                                        (< (type-test-cost diff)
+                                           (type-test-cost c))
+                                        *complement-type-checks*)
+                                   (list t diff a)
+                                   (list nil c a))))
+                           ptypes types original-types)))
+          (cond ((or force-hairy (find-if #'first res))
+                 (values :hairy res))
+                ((every #'type-check-template types)
+                 (values :simple types))
+                (t
+                 (values :hairy res)))))))
 
 ;;; Determines whether CONT's assertion is:
 ;;;  -- checkable by the back end (:SIMPLE), or
@@ -211,27 +225,54 @@
 ;;; consideration. If it is cheaper to test for the difference between
 ;;; the derived type and the asserted type, then we check for the
 ;;; negation of this type instead.
-(defun continuation-check-types (cont)
+(defun continuation-check-types (cont force-hairy)
   (declare (type continuation cont))
-  (let ((type (continuation-asserted-type cont))
+  (let ((ctype (continuation-type-to-check cont))
+        (atype (continuation-asserted-type cont))
 	(dest (continuation-dest cont)))
-    (aver (not (eq type *wild-type*)))
-    (multiple-value-bind (types count) (no-fun-values-types type)
-      (cond ((not (eq count :unknown))
-	     (if (or (exit-p dest)
-		     (and (return-p dest)
-			  (multiple-value-bind (ignore count)
-			      (values-types (return-result-type dest))
-			    (declare (ignore ignore))
-			    (eq count :unknown))))
-		 (maybe-negate-check cont types t)
-		 (maybe-negate-check cont types nil)))
-	    ((and (mv-combination-p dest)
-		  (eq (basic-combination-kind dest) :local))
-	     (aver (values-type-p type))
-	     (maybe-negate-check cont (args-type-optional type) nil))
-	    (t
-	     (values :too-hairy nil))))))
+    (aver (not (eq ctype *wild-type*)))
+    (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
+      (multiple-value-bind (atypes acount) (no-fun-values-types ctype)
+        (aver (eq count acount))
+        (cond ((not (eq count :unknown))
+               (if (or (exit-p dest)
+                       (and (return-p dest)
+                            (multiple-value-bind (ignore count)
+                                (values-types (return-result-type dest))
+                              (declare (ignore ignore))
+                              (eq count :unknown))))
+                   (maybe-negate-check cont ctypes atypes t)
+                   (maybe-negate-check cont ctypes atypes force-hairy)))
+              ((and (mv-combination-p dest)
+                    (eq (basic-combination-kind dest) :local))
+               (aver (values-type-p ctype))
+               (maybe-negate-check cont
+                                   (args-type-optional ctype)
+                                   (args-type-optional atype)
+                                   force-hairy))
+              (t
+               (values :too-hairy nil)))))))
+
+;;; Do we want to do a type check?
+(defun worth-type-check-p (cont)
+  (let ((dest (continuation-dest cont)))
+    (not (or (values-subtypep (continuation-proven-type cont)
+                              (continuation-type-to-check cont))
+             (and (combination-p dest)
+                  (eq (combination-kind dest) :full)
+                  ;; The theory is that the type assertion is from a
+                  ;; declaration in (or on) the callee, so the callee
+                  ;; should be able to do the check. We want to let
+                  ;; the callee do the check, because it is possible
+                  ;; that by the time of call that declaration will be
+                  ;; changed and we do not want to make people
+                  ;; recompile all calls to a function when they were
+                  ;; originally compiled with a bad declaration. (See
+                  ;; also bug 35.)
+                  (values-subtypep (continuation-externally-checkable-type cont)
+                                   (continuation-type-to-check cont)))
+             (and (mv-combination-p dest) ; bug 220
+                  (eq (mv-combination-kind dest) :full))))))
 
 ;;; Return true if CONT is a continuation whose type the back end is
 ;;; likely to want to check. Since we don't know what template the
@@ -260,24 +301,11 @@
 	   (let ((kind (basic-combination-kind dest)))
 	     (cond ((eq cont (basic-combination-fun dest)) t)
 		   ((eq kind :local) t)
-                   ((mv-combination-p dest)
-                    ;; See bug 220
-                    nil)
-                   ((not (eq (continuation-asserted-type cont)
-                             (continuation-externally-checkable-type cont)))
-                    ;; There is an explicit assertion.
-                    t)
                    ((eq kind :full)
-                    ;; The theory is that the type assertion is from a
-                    ;; declaration in (or on) the callee, so the
-                    ;; callee should be able to do the check. We want
-                    ;; to let the callee do the check, because it is
-                    ;; possible that by the time of call that
-                    ;; declaration will be changed and we do not want
-                    ;; to make people recompile all calls to a
-                    ;; function when they were originally compiled
-                    ;; with a bad declaration. (See also bug 35.)
-                    nil)
+                    (and (combination-p dest)
+                         (not (values-subtypep ; explicit THE
+                               (continuation-externally-checkable-type cont)
+                               (continuation-type-to-check cont)))))
 
 		   ((eq kind :error) nil)
                    ;; :ERROR means that we have an invalid syntax of
@@ -481,23 +509,27 @@
 		    (unless (policy node (= inhibit-warnings 3))
 		      (emit-type-warning use))))))
 	    (when (eq type-check t)
-	      (cond ((probable-type-check-p cont)
-		     (conts cont))
-		    (t
-		     (setf (continuation-%type-check cont) :no-check))))))
+	      (cond ((worth-type-check-p cont)
+                     (conts (cons cont (not (probable-type-check-p cont)))))
+                    ((probable-type-check-p cont)
+                     (setf (continuation-%type-check cont) :deleted))
+                    (t
+                     (setf (continuation-%type-check cont) :no-check))))))
 	(setf (block-type-check block) nil)))
     (dolist (cont (conts))
-      (multiple-value-bind (check types) (continuation-check-types cont)
-	(ecase check
-	  (:simple)
-	  (:hairy
-	   (convert-type-check cont types))
-	  (:too-hairy
-	   (let* ((context (continuation-dest cont))
-		  (*compiler-error-context* context))
-	     (when (policy context (>= safety inhibit-warnings))
-	       (compiler-note
-		"type assertion too complex to check:~% ~S."
-		(type-specifier (continuation-asserted-type cont)))))
-	   (setf (continuation-%type-check cont) :deleted))))))
+      (destructuring-bind (cont . force-hairy) cont
+        (multiple-value-bind (check types)
+            (continuation-check-types cont force-hairy)
+          (ecase check
+            (:simple)
+            (:hairy
+             (convert-type-check cont types))
+            (:too-hairy
+             (let* ((context (continuation-dest cont))
+                    (*compiler-error-context* context))
+               (when (policy context (>= safety inhibit-warnings))
+                 (compiler-note
+                  "type assertion too complex to check:~% ~S."
+                  (type-specifier (continuation-asserted-type cont)))))
+             (setf (continuation-%type-check cont) :deleted)))))))
   (values))

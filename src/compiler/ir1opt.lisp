@@ -138,8 +138,9 @@
                     ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
                     (fun-type-wild-args fun-type))
                 (progn (dolist (arg args)
-                         (setf (continuation-%externally-checkable-type arg)
-                               *wild-type*))
+                         (when arg
+                           (setf (continuation-%externally-checkable-type arg)
+                                 *wild-type*)))
                        *wild-type*)
                 (let* ((arg-types (append (fun-type-required fun-type)
                                           (fun-type-optional fun-type)
@@ -150,8 +151,9 @@
                   (loop
                      for arg of-type continuation in args
                      and type of-type ctype in arg-types
-                     do (setf (continuation-%externally-checkable-type arg)
-                              type))
+                     do (when arg
+                          (setf (continuation-%externally-checkable-type arg)
+                                type)))
                   (continuation-%externally-checkable-type cont)))))))
 
 ;;;; interface routines used by optimizers
@@ -187,15 +189,15 @@
       (setf (block-type-check (node-block node)) t)))
   (values))
 
-;;; Annotate Node to indicate that its result has been proven to be
-;;; typep to RType. After IR1 conversion has happened, this is the
+;;; Annotate NODE to indicate that its result has been proven to be
+;;; TYPEP to RTYPE. After IR1 conversion has happened, this is the
 ;;; only correct way to supply information discovered about a node's
-;;; type. If you screw with the Node-Derived-Type directly, then
+;;; type. If you screw with the NODE-DERIVED-TYPE directly, then
 ;;; information may be lost and reoptimization may not happen.
 ;;;
-;;; What we do is intersect Rtype with Node's Derived-Type. If the
+;;; What we do is intersect RTYPE with NODE's DERIVED-TYPE. If the
 ;;; intersection is different from the old type, then we do a
-;;; Reoptimize-Continuation on the Node-Cont.
+;;; REOPTIMIZE-CONTINUATION on the NODE-CONT.
 (defun derive-node-type (node rtype)
   (declare (type node node) (type ctype rtype))
   (let ((node-type (node-derived-type node)))
@@ -214,23 +216,34 @@
 	  (reoptimize-continuation (node-cont node))))))
   (values))
 
+(defun set-continuation-type-assertion (cont atype ctype)
+  (declare (type continuation cont) (type ctype atype ctype))
+  (when (eq atype *wild-type*)
+    (return-from set-continuation-type-assertion))
+  (let* ((old-atype (continuation-asserted-type cont))
+         (old-ctype (continuation-type-to-check cont))
+         (new-atype (values-type-intersection old-atype atype))
+         (new-ctype (values-type-intersection old-ctype ctype)))
+    (when (or (type/= old-atype new-atype)
+              (type/= old-ctype new-ctype))
+      (setf (continuation-asserted-type cont) new-atype)
+      (setf (continuation-type-to-check cont) new-ctype)
+      (do-uses (node cont)
+        (setf (block-attributep (block-flags (node-block node))
+                                type-check type-asserted)
+              t))
+      (reoptimize-continuation cont)))
+  (values))
+
 ;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
 ;;; error for CONT's value not to be TYPEP to TYPE. If we improve the
 ;;; assertion, we set TYPE-CHECK and TYPE-ASSERTED to guarantee that
 ;;; the new assertion will be checked.
-(defun assert-continuation-type (cont type)
+(defun assert-continuation-type (cont type policy)
   (declare (type continuation cont) (type ctype type))
-  (let ((cont-type (continuation-asserted-type cont)))
-    (unless (eq cont-type type)
-      (let ((int (values-type-intersection cont-type type)))
-	(when (type/= cont-type int)
-	  (setf (continuation-asserted-type cont) int)
-	  (do-uses (node cont)
-	    (setf (block-attributep (block-flags (node-block node))
-				    type-check type-asserted)
-		  t))
-	  (reoptimize-continuation cont)))))
-  (values))
+  (when (eq type *wild-type*)
+    (return-from assert-continuation-type))
+  (set-continuation-type-assertion cont type (maybe-weaken-check type policy)))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
@@ -238,20 +251,21 @@
 (defun assert-call-type (call type)
   (declare (type combination call) (type fun-type type))
   (derive-node-type call (fun-type-returns type))
-  (let ((args (combination-args call)))
+  (let ((args (combination-args call))
+        (policy (lexenv-policy (node-lexenv call))))
     (dolist (req (fun-type-required type))
       (when (null args) (return-from assert-call-type))
       (let ((arg (pop args)))
-	(assert-continuation-type arg req)))
+	(assert-continuation-type arg req policy)))
     (dolist (opt (fun-type-optional type))
       (when (null args) (return-from assert-call-type))
       (let ((arg (pop args)))
-	(assert-continuation-type arg opt)))
+	(assert-continuation-type arg opt policy)))
 
     (let ((rest (fun-type-rest type)))
       (when rest
 	(dolist (arg args)
-	  (assert-continuation-type arg rest))))
+	  (assert-continuation-type arg rest policy))))
 
     (dolist (key (fun-type-keywords type))
       (let ((name (key-info-name key)))
@@ -259,7 +273,8 @@
 	    ((null arg))
 	  (when (eq (continuation-value (first arg)) name)
 	    (assert-continuation-type
-	     (second arg) (key-info-type key)))))))
+	     (second arg) (key-info-type key)
+             policy))))))
   (values))
 
 ;;;; IR1-OPTIMIZE
@@ -1313,6 +1328,7 @@
   (let* ((ref (first (leaf-refs var)))
 	 (cont (node-cont ref))
 	 (cont-atype (continuation-asserted-type cont))
+         (cont-ctype (continuation-type-to-check cont))
 	 (dest (continuation-dest cont)))
     (when (and (eq (continuation-use cont) ref)
 	       dest
@@ -1329,7 +1345,7 @@
 		   (lexenv-policy (node-lexenv (continuation-dest arg)))))
       (aver (member (continuation-kind arg)
 		    '(:block-start :deleted-block-start :inside-block)))
-      (assert-continuation-type arg cont-atype)
+      (set-continuation-type-assertion arg cont-atype cont-ctype)
       (setf (node-derived-type ref) *wild-type*)
       (change-ref-leaf ref (find-constant nil))
       (substitute-continuation arg cont)

@@ -578,6 +578,42 @@ BUG 48c, not yet fixed:
 ;;; (fix provided by Matthew Danish) on sbcl-devel
 (assert (null (ignore-errors
 		(defmacro bug172 (&rest rest foo) `(list ,rest ,foo)))))
+
+;;; embedded THEs
+(defun check-embedded-thes (policy1 policy2 x y)
+  (handler-case
+      (funcall (compile nil
+                        `(lambda (f)
+                           (declare (optimize (speed 2) (safety ,policy1)))
+                           (multiple-value-list
+                            (the (values (integer 2 3) t)
+                              (locally (declare (optimize (safety ,policy2)))
+                                (the (values t (single-float 2f0 3f0))
+                                  (funcall f)))))))
+               (lambda () (values x y)))
+    (type-error (error)
+      error)))
+
+(assert (equal (check-embedded-thes 0 0  :a :b) '(:a :b)))
+
+(assert (equal (check-embedded-thes 0 3  :a 2.5f0) '(:a 2.5f0)))
+(assert (typep (check-embedded-thes 0 3  2 3.5f0) 'type-error))
+
+(assert (equal (check-embedded-thes 0 1  :a 3.5f0) '(:a 3.5f0)))
+(assert (typep (check-embedded-thes 0 1  2 2.5d0) 'type-error))
+
+#+nil
+(assert (equal (check-embedded-thes 3 0  2 :a) '(2 :a)))
+(assert (typep (check-embedded-thes 3 0  4 2.5f0) 'type-error))
+
+(assert (equal (check-embedded-thes 1 0  4 :b) '(4 :b)))
+(assert (typep (check-embedded-thes 1 0  1.0 2.5f0) 'type-error))
+
+
+(assert (equal (check-embedded-thes 3 3  2 2.5f0) '(2 2.5f0)))
+(assert (typep (check-embedded-thes 3 3  0 2.5f0) 'type-error))
+(assert (typep (check-embedded-thes 3 3  2 3.5f0) 'type-error))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

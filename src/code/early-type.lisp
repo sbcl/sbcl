@@ -58,7 +58,9 @@
 (defstruct (values-type
 	    (:include args-type
 		      (class-info (type-class-or-lose 'values)))
+            (:constructor %make-values-type)
 	    (:copier nil)))
+(define-cached-synonym make-values-type)
 
 (!define-type-class values)
 
@@ -207,6 +209,7 @@
 ;;; things such as SIMPLE-STRING.
 (defstruct (array-type (:include ctype
 				 (class-info (type-class-or-lose 'array)))
+                       (:constructor %make-array-type)
 		       (:copier nil))
   ;; the dimensions of the array, or * if unspecified. If a dimension
   ;; is unspecified, it is *.
@@ -217,6 +220,7 @@
   (element-type (missing-arg) :type ctype)
   ;; the element type as it is specialized in this implementation
   (specialized-element-type *wild-type* :type ctype))
+(define-cached-synonym make-array-type)
 
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
@@ -248,6 +252,7 @@
 				 (class-info (type-class-or-lose 'union)))
 		       (:constructor %make-union-type (enumerable types))
 		       (:copier nil)))
+(define-cached-synonym make-union-type)
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
 ;;; which we couldn't canonicalize to something simpler. Canonical form:
@@ -309,7 +314,7 @@
                                 (logand (sxhash x) #x3FF))
 	       :hash-bits 10
 	       :init-wrapper !cold-init-forms)
-	      ((orig eq))
+	      ((orig equal))
   (let ((u (uncross orig)))
     (or (info :type :builtin u)
 	(let ((spec (type-expand u)))

@@ -40,7 +40,8 @@
     (let ((arg (car args))
 	  (var (car vars)))
       (cond ((leaf-refs var)
-	     (assert-continuation-type arg (leaf-type var)))
+	     (assert-continuation-type arg (leaf-type var)
+                                       (lexenv-policy (node-lexenv call))))
 	    (t
 	     (flush-dest arg)
 	     (setf (car args) nil)))))
@@ -456,7 +457,8 @@
       (assert-continuation-type
        (first (basic-combination-args call))
        (make-values-type :optional (mapcar #'leaf-type (lambda-vars ep))
-			 :rest *universal-type*))))
+			 :rest *universal-type*)
+       (lexenv-policy (node-lexenv call)))))
   (values))
 
 ;;; Attempt to convert a call to a lambda. If the number of args is
@@ -867,7 +869,10 @@
 	  (cont (node-cont call))
 	  (call-type (node-derived-type call)))
       (when (eq (continuation-use cont) call)
-	(assert-continuation-type cont (continuation-asserted-type result)))
+        (set-continuation-type-assertion
+         cont
+         (continuation-asserted-type result)
+         (continuation-type-to-check result)))
       (unless (eq call-type *wild-type*)
 	(do-uses (use result)
 	  (derive-node-type use call-type)))

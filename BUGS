@@ -1014,11 +1014,11 @@ WORKAROUND:
        returns (1 2 3) instead of signalling an error. This was fixed by 
        APD's "more strict type checking patch", but although the fixed
        code (in sbcl-0.7.7.19) works (signals TYPE-ERROR) interactively,
-       it's difficult to write a regression test for it, because 
+       it's difficult to write a regression test for it, because
        (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))
        still returns (1 2 3).
-  still-broken parts:  
-    b. (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))    
+  still-broken parts:
+    b. (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))
        returns (1 2 3). (As above, this shows up when writing regression
        tests for fixed-ness of part a.)
     c. Also in sbcl-0.7.7.9, (IGNORE-ERRORS (THE REAL '(1 2 3))) => (1 2 3).
@@ -1118,7 +1118,7 @@ WORKAROUND:
   29-bit pseudorandom numbers?
 
 208: "package confusion in PCL handling of structure slot handlers"
-  In sbcl-0.7.8 compiling and loading 
+  In sbcl-0.7.8 compiling and loading
 	(in-package :cl)
 	(defstruct foo (slot (error "missing")) :type list :read-only t)
 	(defmethod print-object ((foo foo) stream) (print nil stream))
@@ -1138,7 +1138,7 @@ WORKAROUND:
 
        ; in: LAMBDA NIL
        ;     (FOO :Y 1 :Y 2)
-       ; 
+       ;
        ; caught STYLE-WARNING:
        ;   The variable #:G15 is defined but never used.
 
@@ -1148,14 +1148,14 @@ WORKAROUND:
   given an error instead (ANSI 17.1.1 allows this behaviour on the part
   of the implementation, as conforming code cannot give non-proper
   sequences to these functions.  MAP also has this problem (and
-  solution), though arguably the convenience of being able to do 
-    (MAP 'LIST '+ FOO '#1=(1 . #1#)) 
+  solution), though arguably the convenience of being able to do
+    (MAP 'LIST '+ FOO '#1=(1 . #1#))
   might be classed as more important (though signalling an error when
   all of the arguments are circular is probably desireable).
 
 213: "Sequence functions and type checking"
   a. MAKE-SEQUENCE, COERCE, MERGE and CONCATENATE cannot deal with
-     various complicated, though recognizeable, CONS types [e.g. 
+     various complicated, though recognizeable, CONS types [e.g.
        (CONS * (CONS * NULL))
      which according to ANSI should be recognized] (and, in SAFETY 3
      code, should return a list of LENGTH 2 or signal an error)
@@ -1168,7 +1168,7 @@ WORKAROUND:
        (CONS INTEGER *)
      whether or not the return value is of this type.  This is
      probably permitted by ANSI (see "Exceptional Situations" under
-     ANSI MAKE-SEQUENCE), but the DERIVE-TYPE mechanism does not 
+     ANSI MAKE-SEQUENCE), but the DERIVE-TYPE mechanism does not
      know about this escape clause, so code of the form
        (INTEGERP (CAR (MAKE-SEQUENCE '(CONS INTEGER *) 2)))
      can erroneously return T.
@@ -1246,7 +1246,7 @@ WORKAROUND:
 219: "DEFINE-COMPILER-MACRO in non-toplevel contexts evaluated at compile-time"
   In sbcl-0.7.9:
 
-  * (defun foo (x) 
+  * (defun foo (x)
       (when x
         (define-compiler-macro bar (&whole whole)
           (declare (ignore whole))
@@ -1260,7 +1260,7 @@ WORKAROUND:
   * (baz t)
   1
 
-220: 
+220:
   Sbcl 0.7.9 fails to compile
 
   (multiple-value-call #'list
@@ -1310,8 +1310,18 @@ WORKAROUND:
     	  (apply bar0 rest)
     	  (format t "~&back from BAR~%"))))
     (bar 12)
-  recurses endlessly in sbcl-0.7.9.32. (Or it works if #' and 
+  recurses endlessly in sbcl-0.7.9.32. (Or it works if #' and
   FDEFINITION are replaced by SYMBOL-FUNCTION.)
+
+224:
+  SBCL 0.7.8 fails to compile
+
+  (localy (declare (optimize (safety 3)))
+          (ignore-errors (progn (values-list (car (list '(1 . 2)))) t)))
+
+225:
+  As reported by Gilbert Baumann on free-clim mailing list 2002-11-11,
+  there is no class STRING-STREAM.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

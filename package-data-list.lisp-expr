@@ -748,6 +748,7 @@ retained, possibly temporariliy, because it might be used internally."
              "DEFENUM"
              "DEFPRINTER"
              "AVER" "ENFORCE-TYPE"
+             "AWHEN" "ACOND" "IT"
 
 	     ;; ..and CONDITIONs..
 	     "BUG"
@@ -793,6 +794,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; hash caches
              "DEFINE-HASH-CACHE"
              "DEFUN-CACHED"
+             "DEFINE-CACHED-SYNONYM"
 
              ;; time
              "FORMAT-DECODED-TIME"

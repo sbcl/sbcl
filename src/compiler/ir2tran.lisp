@@ -291,7 +291,7 @@
 
     (cond ((and (eq (continuation-type-check cont) t)
 		(multiple-value-bind (check types)
-		    (continuation-check-types cont)
+		    (continuation-check-types cont nil)
 		  (aver (eq check :simple))
 		  ;; If the proven type is a subtype of the possibly
 		  ;; weakened type check then it's always true and is
@@ -323,7 +323,7 @@
 	 (nlocs (length locs)))
     (aver (= nlocs (length ptypes)))
     (if (eq (continuation-type-check cont) t)
-	(multiple-value-bind (check types) (continuation-check-types cont)
+	(multiple-value-bind (check types) (continuation-check-types cont nil)
 	  (aver (eq check :simple))
 	  (let ((ntypes (length types)))
 	    (mapcar (lambda (from to-type assertion)

@@ -507,7 +507,8 @@
 (def-ir1-translator %funcall ((function &rest args) start cont)
   (let ((fun-cont (make-continuation)))
     (ir1-convert start fun-cont function)
-    (assert-continuation-type fun-cont (specifier-type 'function))
+    (assert-continuation-type fun-cont (specifier-type 'function)
+                              (lexenv-policy *lexenv*))
     (ir1-convert-combination-args fun-cont cont args)))
 
 ;;; This source transform exists to reduce the amount of work for the
@@ -747,13 +748,18 @@
 ;;; many branches there are going to be.
 (defun ir1ize-the-or-values (type cont lexenv place)
   (declare (type continuation cont) (type lexenv lexenv))
-  (let* ((ctype (if (typep type 'ctype) type (compiler-values-specifier-type type)))
-	 (old-type (or (lexenv-find cont type-restrictions)
-		       *wild-type*))
-	 (intersects (values-types-equal-or-intersect old-type ctype))
-	 (new (values-type-intersection old-type ctype)))
+  (let* ((atype (if (typep type 'ctype) type (compiler-values-specifier-type type)))
+	 (old-atype (or (lexenv-find cont type-restrictions)
+                        *wild-type*))
+         (old-ctype (or (lexenv-find cont weakend-type-restrictions)
+                        *wild-type*))
+	 (intersects (values-types-equal-or-intersect old-atype atype))
+	 (new-atype (values-type-intersection old-atype atype))
+         (new-ctype (values-type-intersection
+                     old-ctype (maybe-weaken-check atype (lexenv-policy lexenv)))))
     (when (null (find-uses cont))
-      (setf (continuation-asserted-type cont) new))
+      (setf (continuation-asserted-type cont) new-atype)
+      (setf (continuation-type-to-check cont) new-ctype))
     (when (and (not intersects)
 	       ;; FIXME: Is it really right to look at *LEXENV* here,
 	       ;; instead of looking at the LEXENV argument? Why?
@@ -761,10 +767,11 @@
 			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
       (compiler-warn
        "The type ~S ~A conflicts with an enclosing assertion:~%   ~S"
-       (type-specifier ctype)
+       (type-specifier atype)
        place
-       (type-specifier old-type)))
-    (make-lexenv :type-restrictions `((,cont . ,new))
+       (type-specifier old-atype)))
+    (make-lexenv :type-restrictions `((,cont . ,new-atype))
+                 :weakend-type-restrictions `((,cont . ,new-ctype))
 		 :default lexenv)))
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
@@ -841,7 +848,7 @@
 (defun setq-var (start cont var value)
   (declare (type continuation start cont) (type basic-var var))
   (let ((dest (make-continuation)))
-    (setf (continuation-asserted-type dest) (leaf-type var))
+    (assert-continuation-type dest (leaf-type var) (lexenv-policy *lexenv*))
     (ir1-convert start dest value)
     (let ((res (make-set :var var :value dest)))
       (setf (continuation-dest dest) res)
@@ -988,7 +995,8 @@
 		     `(%coerce-callable-to-fun ,fun)))
     (setf (continuation-dest fun-cont) node)
     (assert-continuation-type fun-cont
-			      (specifier-type '(or function symbol)))
+			      (specifier-type '(or function symbol))
+                              (lexenv-policy *lexenv*))
     (collect ((arg-conts))
       (let ((this-start fun-cont))
 	(dolist (arg args)
@@ -1038,6 +1046,7 @@
     (ir1-convert start dummy-start result)
 
     (with-continuation-type-assertion
+        ;; FIXME: policy
         (cont (continuation-asserted-type dummy-start)
               "of the first form")
       (substitute-continuation-uses cont dummy-start))

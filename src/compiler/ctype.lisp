@@ -742,7 +742,8 @@
 	 ((not really-assert) t)
 	 (t
 	  (when atype
-	    (assert-continuation-type (return-result return) atype))
+	    (assert-continuation-type (return-result return) atype
+                                      (lexenv-policy (functional-lexenv functional))))
 	  (loop for var in vars and type in types do
 	    (cond ((basic-var-sets var)
 		   (when (and unwinnage-fun
@@ -770,7 +771,7 @@
                               :unwinnage-fun #'compiler-note
                               :where "proclamation"))))
 
-;;;;
+;;;; FIXME: Move to some other file.
 (defun check-catch-tag-type (tag)
   (declare (type continuation tag))
   (let ((ctype (continuation-type tag)))

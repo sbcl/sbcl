@@ -560,6 +560,19 @@
 			     ,@(values-names))
 			    (values ,@(values-names)))
 			  (values ,@(values-names))))))))))))
+
+(defmacro define-cached-synonym
+    (name &optional (original (symbolicate "%" name)))
+  (let ((cached-name (symbolicate "%%" name "-cached")))
+    `(progn
+       (defun-cached (,cached-name :hash-bits 8
+                                   :hash-function (lambda (x)
+                                                    (logand (sxhash x) #xff)))
+           ((args equal))
+         (apply #',original args))
+       (defun ,name (&rest args)
+         (,cached-name args)))))
+
 
 ;;;; package idioms
 
@@ -1015,3 +1028,17 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
   (warn "using deprecated ~S~@[, should use ~S instead~]"
 	bad-name
 	good-name))
+
+;;; Anaphoric macros
+(defmacro awhen (test &body body)
+  `(let ((it ,test))
+     (when it ,@body)))
+
+(defmacro acond (&rest clauses)
+  (if (null clauses)
+      `()
+      (destructuring-bind ((test &body body) &rest rest) clauses
+        (once-only ((test test))
+          `(if ,test
+               (let ((it ,test)) (declare (ignorable it)),@body)
+               (acond ,@rest))))))

@@ -127,6 +127,8 @@
   ;; This is computed lazily by CONTINUATION-DERIVED-TYPE, so use
   ;; CONTINUATION-TYPE-CHECK instead of the %'ed slot accessor.
   (%type-check t :type (member t nil :deleted :no-check))
+  ;; Asserted type, weakend according to policies
+  (type-to-check *wild-type* :type ctype)
   ;; Cached type which is checked by DEST. If NIL, then this must be
   ;; recomputed: see CONTINUATION-EXTERNALLY-CHECKABLE-TYPE.
   (%externally-checkable-type nil :type (or null ctype))
