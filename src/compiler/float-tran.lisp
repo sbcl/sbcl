@@ -221,9 +221,7 @@
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
 		       #'scale-double-float t))
 
-;;; toy@rtp.ericsson.se:
-;;;
-;;; Defoptimizers for %single-float and %double-float. This makes the
+;;; DEFOPTIMIZERs for %SINGLE-FLOAT and %DOUBLE-FLOAT. This makes the
 ;;; FLOAT function return the correct ranges if the input has some
 ;;; defined range. Quite useful if we want to convert some type of
 ;;; bounded integer into a float.
@@ -278,9 +276,10 @@
 ;;; float (such as 0).
 (macrolet ((frob (op)
 	     `(deftransform ,op ((x y) (float rational) * :when :both)
+		"open-code FLOAT to RATIONAL comparison"
 		(unless (constant-continuation-p y)
 		  (give-up-ir1-transform
-		   "can't open-code float to rational comparison"))
+		   "The RATIONAL value isn't known at compile time."))
 		(let ((val (continuation-value y)))
 		  (unless (eql (rational (float val)) val)
 		    (give-up-ir1-transform
@@ -304,12 +303,12 @@
   (destructuring-bind (name type) stuff
     (let ((type (specifier-type type)))
       (setf (function-info-derive-type (function-info-or-lose name))
-	    #'(lambda (call)
-		(declare (type combination call))
-		(when (csubtypep (continuation-type
-				  (first (combination-args call)))
-				 type)
-		  (specifier-type 'float)))))))
+	    (lambda (call)
+	      (declare (type combination call))
+	      (when (csubtypep (continuation-type
+				(first (combination-args call)))
+			       type)
+		(specifier-type 'float)))))))
 
 #!-propagate-fun-type
 (defoptimizer (log derive-type) ((x &optional y))
@@ -327,52 +326,52 @@
   (movable foldable flushable))
 
 (defknown (%sin %cos %tanh %sin-quick %cos-quick)
-    (double-float) (double-float -1.0d0 1.0d0)
-    (movable foldable flushable))
+  (double-float) (double-float -1.0d0 1.0d0)
+  (movable foldable flushable))
 
 (defknown (%asin %atan)
-    (double-float) (double-float #.(- (/ pi 2)) #.(/ pi 2))
-    (movable foldable flushable))
+  (double-float) (double-float #.(- (/ pi 2)) #.(/ pi 2))
+  (movable foldable flushable))
 
 (defknown (%acos)
-    (double-float) (double-float 0.0d0 #.pi)
-    (movable foldable flushable))
+  (double-float) (double-float 0.0d0 #.pi)
+  (movable foldable flushable))
 
 (defknown (%cosh)
-    (double-float) (double-float 1.0d0)
-    (movable foldable flushable))
+  (double-float) (double-float 1.0d0)
+  (movable foldable flushable))
 
 (defknown (%acosh %exp %sqrt)
-    (double-float) (double-float 0.0d0)
-    (movable foldable flushable))
+  (double-float) (double-float 0.0d0)
+  (movable foldable flushable))
 
 (defknown %expm1
-    (double-float) (double-float -1d0)
-    (movable foldable flushable))
+  (double-float) (double-float -1d0)
+  (movable foldable flushable))
 
 (defknown (%hypot)
-    (double-float double-float) (double-float 0d0)
+  (double-float double-float) (double-float 0d0)
   (movable foldable flushable))
 
 (defknown (%pow)
-    (double-float double-float) double-float
+  (double-float double-float) double-float
   (movable foldable flushable))
 
 (defknown (%atan2)
-    (double-float double-float) (double-float #.(- pi) #.pi)
+  (double-float double-float) (double-float #.(- pi) #.pi)
   (movable foldable flushable))
 
 (defknown (%scalb)
-    (double-float double-float) double-float
+  (double-float double-float) double-float
   (movable foldable flushable))
 
 (defknown (%scalbn)
-    (double-float (signed-byte 32)) double-float
-    (movable foldable flushable))
+  (double-float (signed-byte 32)) double-float
+  (movable foldable flushable))
 
 (defknown (%log1p)
-    (double-float) double-float
-    (movable foldable flushable))
+  (double-float) double-float
+  (movable foldable flushable))
 
 (dolist (stuff '((exp %exp *)
 		 (log %log float)
@@ -885,7 +884,7 @@
 		;; But a positive real to any power is well-defined.
 		(merged-interval-expt x y))
 	       (t
-		;; A real to some power. The result could be a real
+		;; a real to some power. The result could be a real
 		;; or a complex.
 		(float-or-complex-float-type (numeric-contagion x y)))))))
 
@@ -1171,12 +1170,11 @@
   (frob single-float)
   (frob double-float))
 
-;;; Here are simple optimizers for sin, cos, and tan. They do not
+;;; Here are simple optimizers for SIN, COS, and TAN. They do not
 ;;; produce a minimal range for the result; the result is the widest
 ;;; possible answer. This gets around the problem of doing range
 ;;; reduction correctly but still provides useful results when the
 ;;; inputs are union types.
-
 #!+propagate-fun-type
 (progn
 (defun trig-derive-type-aux (arg domain fcn
@@ -1220,39 +1218,42 @@
 (defoptimizer (sin derive-type) ((num))
   (one-arg-derive-type
    num
-   #'(lambda (arg)
-       ;; Derive the bounds if the arg is in [-pi/2, pi/2].
-       (trig-derive-type-aux
-	arg
-	(specifier-type `(float ,(- (/ pi 2)) ,(/ pi 2)))
-	#'sin
-	-1 1))
+   (lambda (arg)
+     ;; Derive the bounds if the arg is in [-pi/2, pi/2].
+     (trig-derive-type-aux
+      arg
+      (specifier-type `(float ,(- (/ pi 2)) ,(/ pi 2)))
+      #'sin
+      -1 1))
    #'sin))
 
 (defoptimizer (cos derive-type) ((num))
   (one-arg-derive-type
    num
-   #'(lambda (arg)
-       ;; Derive the bounds if the arg is in [0, pi].
-       (trig-derive-type-aux arg
-			     (specifier-type `(float 0d0 ,pi))
-			     #'cos
-			     -1 1
-			     nil))
+   (lambda (arg)
+     ;; Derive the bounds if the arg is in [0, pi].
+     (trig-derive-type-aux arg
+			   (specifier-type `(float 0d0 ,pi))
+			   #'cos
+			   -1 1
+			   nil))
    #'cos))
 
 (defoptimizer (tan derive-type) ((num))
   (one-arg-derive-type
    num
-   #'(lambda (arg)
-       ;; Derive the bounds if the arg is in [-pi/2, pi/2].
-       (trig-derive-type-aux arg
-			     (specifier-type `(float ,(- (/ pi 2)) ,(/ pi 2)))
-			     #'tan
-			     nil nil))
+   (lambda (arg)
+     ;; Derive the bounds if the arg is in [-pi/2, pi/2].
+     (trig-derive-type-aux arg
+			   (specifier-type `(float ,(- (/ pi 2)) ,(/ pi 2)))
+			   #'tan
+			   nil nil))
    #'tan))
 
 ;;; CONJUGATE always returns the same type as the input type.
+;;;
+;;; FIXME: ANSI allows any subtype of REAL for the components of COMPLEX.
+;;; So what if the input type is (COMPLEX (SINGLE-FLOAT 0 1))?
 (defoptimizer (conjugate derive-type) ((num))
   (continuation-type num))
 

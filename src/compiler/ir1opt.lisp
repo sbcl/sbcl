@@ -270,17 +270,17 @@
 ;;; -- With a combination, we call Propagate-Function-Change whenever
 ;;;    the function changes, and call IR1-Optimize-Combination if any
 ;;;    argument changes.
-;;; -- With an Exit, we derive the node's type from the Value's type. We don't
-;;;    propagate Cont's assertion to the Value, since if we did, this would
-;;;    move the checking of Cont's assertion to the exit. This wouldn't work
-;;;    with Catch and UWP, where the Exit node is just a placeholder for the
-;;;    actual unknown exit.
+;;; -- With an Exit, we derive the node's type from the Value's type.
+;;;    We don't propagate Cont's assertion to the Value, since if we
+;;;    did, this would move the checking of Cont's assertion to the
+;;;    exit. This wouldn't work with Catch and UWP, where the Exit
+;;;    node is just a placeholder for the actual unknown exit.
 ;;;
-;;; Note that we clear the node & block reoptimize flags *before* doing the
-;;; optimization. This ensures that the node or block will be reoptimized if
-;;; necessary. We leave the NODE-OPTIMIZE flag set going into
-;;; IR1-OPTIMIZE-RETURN, since IR1-OPTIMIZE-RETURN wants to clear the flag
-;;; itself.
+;;; Note that we clear the node & block reoptimize flags *before*
+;;; doing the optimization. This ensures that the node or block will
+;;; be reoptimized if necessary. We leave the NODE-OPTIMIZE flag set
+;;; going into IR1-OPTIMIZE-RETURN, since IR1-OPTIMIZE-RETURN wants to
+;;; clear the flag itself.
 (defun ir1-optimize-block (block)
   (declare (type cblock block))
   (setf (block-reoptimize block) nil)
@@ -308,20 +308,20 @@
 
 ;;; We cannot combine with a successor block if:
 ;;;  1. The successor has more than one predecessor.
-;;;  2. The last node's Cont is also used somewhere else.
+;;;  2. The last node's CONT is also used somewhere else.
 ;;;  3. The successor is the current block (infinite loop).
-;;;  4. The next block has a different cleanup, and thus we may want to insert
-;;;     cleanup code between the two blocks at some point.
+;;;  4. The next block has a different cleanup, and thus we may want to 
+;;;     insert cleanup code between the two blocks at some point.
 ;;;  5. The next block has a different home lambda, and thus the control
 ;;;     transfer is a non-local exit.
 ;;;
 ;;; If we succeed, we return true, otherwise false.
 ;;;
-;;; Joining is easy when the successor's Start continuation is the same from
-;;; our Last's Cont. If they differ, then we can still join when the last
-;;; continuation has no next and the next continuation has no uses. In this
-;;; case, we replace the next continuation with the last before joining the
-;;; blocks.
+;;; Joining is easy when the successor's Start continuation is the
+;;; same from our Last's Cont. If they differ, then we can still join
+;;; when the last continuation has no next and the next continuation
+;;; has no uses. In this case, we replace the next continuation with
+;;; the last before joining the blocks.
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
   (let ((next (first (block-succ block))))
@@ -343,10 +343,11 @@
 	      ((and (null (block-start-uses next))
 		    (eq (continuation-kind last-cont) :inside-block))
 	       (let ((next-node (continuation-next next-cont)))
-		 ;; If next-cont does have a dest, it must be unreachable,
-		 ;; since there are no uses. DELETE-CONTINUATION will mark the
-		 ;; dest block as delete-p [and also this block, unless it is
-		 ;; no longer backward reachable from the dest block.]
+		 ;; If next-cont does have a dest, it must be
+		 ;; unreachable, since there are no uses.
+		 ;; DELETE-CONTINUATION will mark the dest block as
+		 ;; delete-p [and also this block, unless it is no
+		 ;; longer backward reachable from the dest block.]
 		 (delete-continuation next-cont)
 		 (setf (node-prev next-node) last-cont)
 		 (setf (continuation-next last-cont) next-node)
@@ -357,9 +358,9 @@
 	       nil))))))
 
 ;;; Join together two blocks which have the same ending/starting
-;;; continuation. The code in Block2 is moved into Block1 and Block2 is
-;;; deleted from the DFO. We combine the optimize flags for the two blocks so
-;;; that any indicated optimization gets done.
+;;; continuation. The code in Block2 is moved into Block1 and Block2
+;;; is deleted from the DFO. We combine the optimize flags for the two
+;;; blocks so that any indicated optimization gets done.
 (defun join-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (let* ((last (block-last block2))
@@ -392,13 +393,13 @@
 
   (values))
 
-;;; Delete any nodes in Block whose value is unused and have no
+;;; Delete any nodes in BLOCK whose value is unused and have no
 ;;; side-effects. We can delete sets of lexical variables when the set
 ;;; variable has no references.
 ;;;
-;;; [### For now, don't delete potentially flushable calls when they have the
-;;; Call attribute. Someday we should look at the funcitonal args to determine
-;;; if they have any side-effects.]
+;;; [### For now, don't delete potentially flushable calls when they
+;;; have the CALL attribute. Someday we should look at the funcitonal
+;;; args to determine if they have any side-effects.]
 (defun flush-dead-code (block)
   (declare (type cblock block))
   (do-nodes-backwards (node cont block)
@@ -445,19 +446,21 @@
 
 ;;;; local call return type propagation
 
-;;; This function is called on RETURN nodes that have their REOPTIMIZE flag
-;;; set. It iterates over the uses of the RESULT, looking for interesting
-;;; stuff to update the TAIL-SET. If a use isn't a local call, then we union
-;;; its type together with the types of other such uses. We assign to the
-;;; RETURN-RESULT-TYPE the intersection of this type with the RESULT's asserted
-;;; type. We can make this intersection now (potentially before type checking)
-;;; because this assertion on the result will eventually be checked (if
+;;; This function is called on RETURN nodes that have their REOPTIMIZE
+;;; flag set. It iterates over the uses of the RESULT, looking for
+;;; interesting stuff to update the TAIL-SET. If a use isn't a local
+;;; call, then we union its type together with the types of other such
+;;; uses. We assign to the RETURN-RESULT-TYPE the intersection of this
+;;; type with the RESULT's asserted type. We can make this
+;;; intersection now (potentially before type checking) because this
+;;; assertion on the result will eventually be checked (if
 ;;; appropriate.)
 ;;;
-;;; We call MAYBE-CONVERT-TAIL-LOCAL-CALL on each local non-MV combination,
-;;; which may change the succesor of the call to be the called function, and if
-;;; so, checks if the call can become an assignment. If we convert to an
-;;; assignment, we abort, since the RETURN has been deleted.
+;;; We call MAYBE-CONVERT-TAIL-LOCAL-CALL on each local non-MV
+;;; combination, which may change the succesor of the call to be the
+;;; called function, and if so, checks if the call can become an
+;;; assignment. If we convert to an assignment, we abort, since the
+;;; RETURN has been deleted.
 (defun find-result-type (node)
   (declare (type creturn node))
   (let ((result (return-result node)))
@@ -478,17 +481,18 @@
 	(setf (return-result-type node) int))))
   (values))
 
-;;; Do stuff to realize that something has changed about the value delivered
-;;; to a return node. Since we consider the return values of all functions in
-;;; the tail set to be equivalent, this amounts to bringing the entire tail set
-;;; up to date. We iterate over the returns for all the functions in the tail
-;;; set, reanalyzing them all (not treating Node specially.)
+;;; Do stuff to realize that something has changed about the value
+;;; delivered to a return node. Since we consider the return values of
+;;; all functions in the tail set to be equivalent, this amounts to
+;;; bringing the entire tail set up to date. We iterate over the
+;;; returns for all the functions in the tail set, reanalyzing them
+;;; all (not treating Node specially.)
 ;;;
-;;; When we are done, we check whether the new type is different from the old
-;;; TAIL-SET-TYPE. If so, we set the type and also reoptimize all the
-;;; continuations for references to functions in the tail set. This will cause
-;;; IR1-OPTIMIZE-COMBINATION to derive the new type as the results of the
-;;; calls.
+;;; When we are done, we check whether the new type is different from
+;;; the old TAIL-SET-TYPE. If so, we set the type and also reoptimize
+;;; all the continuations for references to functions in the tail set.
+;;; This will cause IR1-OPTIMIZE-COMBINATION to derive the new type as
+;;; the results of the calls.
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let* ((tails (lambda-tail-set (return-lambda node)))
@@ -756,10 +760,11 @@
 	(add-continuation-use call (make-continuation))
 	t))))
 
-;;; Called both by IR1 conversion and IR1 optimization when they have
-;;; verified the type signature for the call, and are wondering if
-;;; something should be done to special-case the call. If Call is a
-;;; call to a global function, then see whether it defined or known:
+;;; This is called both by IR1 conversion and IR1 optimization when
+;;; they have verified the type signature for the call, and are
+;;; wondering if something should be done to special-case the call. If
+;;; Call is a call to a global function, then see whether it defined
+;;; or known:
 ;;; -- If a DEFINED-FUNCTION should be inline expanded, then convert the
 ;;;    expansion and change the call to call it. Expansion is enabled if
 ;;;    :INLINE or if space=0. If the FUNCTIONAL slot is true, we never expand,

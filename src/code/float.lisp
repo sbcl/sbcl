@@ -117,34 +117,33 @@
   (long-from-bits 1 sb!vm:long-float-normal-exponent-max
 		  (ldb (byte sb!vm:long-float-digits 0) -1)))
 
-#!+sb-infinities
+;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
+;;; because the cross-compilation host might not support floating
+;;; point infinities.
+(eval-when (:load-toplevel :execute)
 (defconstant single-float-positive-infinity
   (single-from-bits 0 (1+ sb!vm:single-float-normal-exponent-max) 0))
-#!+sb-infinities
 (defconstant short-float-positive-infinity single-float-positive-infinity)
-#!+sb-infinities
 (defconstant single-float-negative-infinity
   (single-from-bits 1 (1+ sb!vm:single-float-normal-exponent-max) 0))
-#!+sb-infinities
 (defconstant short-float-negative-infinity single-float-negative-infinity)
-#!+sb-infinities
 (defconstant double-float-positive-infinity
   (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0))
-#!+(and sb-infinities (not long-float))
+#!+(not long-float)
 (defconstant long-float-positive-infinity double-float-positive-infinity)
-#!+(and sb-infinities long-float x86)
+#!+(and long-float x86)
 (defconstant long-float-positive-infinity
   (long-from-bits 0 (1+ sb!vm:long-float-normal-exponent-max)
 		  (ash sb!vm:long-float-hidden-bit 32)))
-#!+sb-infinities
 (defconstant double-float-negative-infinity
   (double-from-bits 1 (1+ sb!vm:double-float-normal-exponent-max) 0))
-#!+(and sb-infinities (not long-float))
+#!+(not long-float)
 (defconstant long-float-negative-infinity double-float-negative-infinity)
-#!+(and sb-infinities long-float x86)
+#!+(and long-float x86)
 (defconstant long-float-negative-infinity
   (long-from-bits 1 (1+ sb!vm:long-float-normal-exponent-max)
 		  (ash sb!vm:long-float-hidden-bit 32)))
+) ; EVAL-WHEN
 
 (defconstant single-float-epsilon
   (single-from-bits 0 (- sb!vm:single-float-bias
@@ -644,9 +643,10 @@
 	  (single-float (single-from-bits sign new-exp sig))
 	  (double-float (double-from-bits sign new-exp sig))))))))
 
-;;; Called when scaling a float overflows, or the original float was a NaN
-;;; or infinity. If overflow errors are trapped, then error, otherwise return
-;;; the appropriate infinity. If a NaN, signal or not as appropriate.
+;;; Called when scaling a float overflows, or the original float was a
+;;; NaN or infinity. If overflow errors are trapped, then error,
+;;; otherwise return the appropriate infinity. If a NaN, signal or not
+;;; as appropriate.
 (defun scale-float-maybe-overflow (x exp)
   (cond
    ((float-infinity-p x)
@@ -665,10 +665,10 @@
     (when (sb!vm:current-float-trap :inexact)
       (error 'floating-point-inexact :operation 'scale-float
 	     :operands (list x exp)))
-    (infinite (* (float-sign x)
-		 (etypecase x
-		   (single-float single-float-positive-infinity)
-		   (double-float double-float-positive-infinity)))))))
+    (* (float-sign x)
+       (etypecase x
+	 (single-float single-float-positive-infinity)
+	 (double-float double-float-positive-infinity))))))
 
 ;;; Scale a single or double float, calling the correct over/underflow
 ;;; functions.

@@ -25,19 +25,6 @@
        (error "unknown operator in feature expression: ~S." x)))
     (not (null (memq x *features*)))))
 
-;;; KLUDGE: This is a wrapper around stale code for working with floating point
-;;; infinities. I believe that I will eventually eliminate floating point
-;;; infinities from the code, since they're a pain to cross-compile, since they
-;;; significantly increase the number of conditions which need to be tested in
-;;; numeric functions, and since the benefits which they provide (which are
-;;; admittedly significant) are unfortunately not portable. I haven't actually
-;;; done the dirty deed yet, though, and until then, I've wrapped various
-;;; infinity-returning forms in this macro. -- WHN 1999
-(defmacro infinite (x)
-  (declare (ignorable x))
-  #!-sb-infinities '(error 'floating-point-overflow)
-  #!+sb-infinities x)
-
 ;;; Given a list of keyword substitutions `(,OLD ,NEW), and a
 ;;; &KEY-argument-list-style list of alternating keywords and
 ;;; arbitrary values, return a new &KEY-argument-list-style list with

@@ -147,13 +147,6 @@
  ; :mp
  ; :mp-i486
 
- ;; KLUDGE: used to suppress stale code related to floating point infinities.
- ;; I intend to delete this code completely some day, since it was a pain
- ;; for me to try to work with and since all benefits it provides are
- ;; non-portable. Until I actually pull the trigger, though, I've left
- ;; various stale code in place protected with #!-SB-INFINITIES.
- ; :sb-infinities
-
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply to.
  ;; It doesn't seem to be needed for X86 systems anyway.

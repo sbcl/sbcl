@@ -190,18 +190,17 @@
 	 (%denominator ,n-num)
 	 1)))
 
-;;;; Interval arithmetic for computing bounds
-;;;; (toy@rtp.ericsson.se)
+;;;; interval arithmetic for computing bounds
 ;;;;
 ;;;; This is a set of routines for operating on intervals. It
 ;;;; implements a simple interval arithmetic package. Although SBCL
-;;;; has an interval type in numeric-type, we choose to use our own
+;;;; has an interval type in NUMERIC-TYPE, we choose to use our own
 ;;;; for two reasons:
 ;;;;
-;;;;   1. This package is simpler than numeric-type
+;;;;   1. This package is simpler than NUMERIC-TYPE.
 ;;;;
 ;;;;   2. It makes debugging much easier because you can just strip
-;;;;   out these routines and test them independently of SBCL. (a
+;;;;   out these routines and test them independently of SBCL. (This is a
 ;;;;   big win!)
 ;;;;
 ;;;; One disadvantage is a probable increase in consing because we
@@ -225,11 +224,11 @@
   (labels ((normalize-bound (val)
 	     (cond ((and (floatp val)
 			 (float-infinity-p val))
-		    ;; Handle infinities
+		    ;; Handle infinities.
 		    nil)
 		   ((or (numberp val)
 			(eq val nil))
-		    ;; Handle any closed bounds
+		    ;; Handle any closed bounds.
 		    val)
 		   ((listp val)
 		    ;; We have an open bound. Normalize the numeric
@@ -238,7 +237,7 @@
 		    ;; bound is really unbounded, so drop the openness.
 		    (let ((new-val (normalize-bound (first val))))
 		      (when new-val
-			;; Bound exists, so keep it open still
+			;; The bound exists, so keep it open still.
 			(list new-val))))
 		   (t
 		    (error "Unknown bound type in make-interval!")))))
@@ -425,9 +424,9 @@
 	   ;; Interval with no bounds
 	   t))))
 
-;;; Determine if two intervals X and Y intersect. Return T if so. If
-;;; CLOSED-INTERVALS-P is T, the treat the intervals as if they were
-;;; closed. Otherwise the intervals are treated as they are.
+;;; Determine whether two intervals X and Y intersect. Return T if so.
+;;; If CLOSED-INTERVALS-P is T, the treat the intervals as if they
+;;; were closed. Otherwise the intervals are treated as they are.
 ;;;
 ;;; Thus if X = [0, 1) and Y = (1, 2), then they do not intersect
 ;;; because no element in X is in Y. However, if CLOSED-INTERVALS-P
@@ -493,7 +492,7 @@
 				      (interval-closure int))
 	     (let ((lo (interval-low int))
 		   (hi (interval-high int)))
-	       ;; Check for endpoints
+	       ;; Check for endpoints.
 	       (cond ((and lo (= (bound-value p) (bound-value lo)))
 		      (not (and (consp p) (numberp lo))))
 		     ((and hi (= (bound-value p) (bound-value hi)))
@@ -505,7 +504,7 @@
 	       (test-number p int)
 	       (not (interval-bounded-p int 'below))))
 	 (test-upper-bound (p int)
-	   ;; P is an upper bound of an interval
+	   ;; P is an upper bound of an interval.
 	   (if p
 	       (test-number p int)
 	       (not (interval-bounded-p int 'above)))))
@@ -546,10 +545,10 @@
 	       (cond ((and x1 x2)
 		      ;; Both bounds are finite. Select the right one.
 		      (cond ((funcall min-op x1-val x2-val)
-			     ;; x1 definitely better
+			     ;; x1 is definitely better.
 			     x1)
 			    ((funcall max-op x1-val x2-val)
-			     ;; x2 definitely better
+			     ;; x2 is definitely better.
 			     x2)
 			    (t
 			     ;; Bounds are equal. Select either
@@ -571,25 +570,25 @@
 ;;; true interval arithmetic here, but it's complicated because we
 ;;; have float and integer types and bounds can be open or closed.
 
-;;; The negative of an interval
+;;; the negative of an interval
 (defun interval-neg (x)
   (declare (type interval x))
   (make-interval :low (bound-func #'- (interval-high x))
 		 :high (bound-func #'- (interval-low x))))
 
-;;; Add two intervals
+;;; Add two intervals.
 (defun interval-add (x y)
   (declare (type interval x y))
   (make-interval :low (bound-binop + (interval-low x) (interval-low y))
 		 :high (bound-binop + (interval-high x) (interval-high y))))
 
-;;; Subtract two intervals
+;;; Subtract two intervals.
 (defun interval-sub (x y)
   (declare (type interval x y))
   (make-interval :low (bound-binop - (interval-low x) (interval-high y))
 		 :high (bound-binop - (interval-high x) (interval-low y))))
 
-;;; Multiply two intervals
+;;; Multiply two intervals.
 (defun interval-mul (x y)
   (declare (type interval x y))
   (flet ((bound-mul (x y)
@@ -746,7 +745,7 @@
 		 (interval-abs x)))
 )) ; end PROGN's
 
-;;;; numeric derive-type methods
+;;;; numeric DERIVE-TYPE methods
 
 ;;; a utility for defining derive-type methods of integer operations. If
 ;;; the types of both X and Y are integer types, then we compute a new
@@ -1253,7 +1252,7 @@
   (if (and (numeric-type-real-p x)
 	   (numeric-type-real-p y))
       (let ((result
-	     ;; (- x x) is always 0.
+	     ;; (- X X) is always 0.
 	     (if same-arg
 		 (make-interval :low 0 :high 0)
 		 (interval-sub (numeric-type->interval x)
@@ -1270,13 +1269,13 @@
 	(make-numeric-type
 	 :class (if (and (eq (numeric-type-class x) 'integer)
 			 (eq (numeric-type-class y) 'integer))
-		    ;; The difference of integers is always an integer
+		    ;; The difference of integers is always an integer.
 		    'integer
 		    (numeric-type-class result-type))
 	 :format (numeric-type-format result-type)
 	 :low (interval-low result)
 	 :high (interval-high result)))
-      ;; General contagion
+      ;; general contagion
       (numeric-contagion x y)))
 
 (defoptimizer (- derive-type) ((x y))

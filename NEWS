@@ -685,8 +685,9 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
 * many patches ported from CMU CL by Martin Atzmueller, with 
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
-* improved support for intersection types, fixing bug 12 (E.g., now
-  (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T.)
+* improved support for type intersection and union, fixing bug 12
+  (e.g., now (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T) and some other
+  smaller bugs as well
 ?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
   are now supported, and enabled by default. Thus, the compiler can
   handle many floating point and complex operations much less

@@ -240,11 +240,8 @@ constructed.
   infinity-data)
 
 (defvar *loop-minimax-type-infinities-alist*
-  ;; Note: In the portable loop.lisp, this had various
-  ;; conditional-on-*FEATURES* cases to support machines which had true
-  ;; floating infinity. Now that we're limited to CMU CL, this is irrelevant.
-  ;; FIXME: Or is it? What if we ever support infinity? Perhaps we should
-  ;; put in something conditional on SB-INFINITY or something?
+  ;; FIXME: Now that SBCL supports floating point infinities again, we
+  ;; should have floating point infinities here, as cmucl-2.4.8 did.
   '((fixnum most-positive-fixnum most-negative-fixnum)))
 
 (defun make-loop-minimax (answer-variable type)

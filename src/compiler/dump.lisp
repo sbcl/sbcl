@@ -493,15 +493,13 @@
 
 ;;;; number dumping
 
-;;; Dump a ratio
-
+;;; Dump a ratio.
 (defun dump-ratio (x file)
   (sub-dump-object (numerator x) file)
   (sub-dump-object (denominator x) file)
   (dump-fop 'sb!impl::fop-ratio file))
 
 ;;; Dump an integer.
-
 (defun dump-integer (n file)
   (typecase n
     ((signed-byte 8)

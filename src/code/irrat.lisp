@@ -44,7 +44,7 @@
 
 ;;; Please refer to the Unix man pages for details about these routines.
 
-;;; Trigonometric.
+;;; trigonometric
 #!-x86 (def-math-rtn "sin" 1)
 #!-x86 (def-math-rtn "cos" 1)
 #!-x86 (def-math-rtn "tan" 1)
@@ -59,7 +59,7 @@
 (def-math-rtn "acosh" 1)
 (def-math-rtn "atanh" 1)
 
-;;; Exponential and Logarithmic.
+;;; exponential and logarithmic
 #!-x86 (def-math-rtn "exp" 1)
 #!-x86 (def-math-rtn "log" 1)
 #!-x86 (def-math-rtn "log10" 1)
@@ -156,16 +156,16 @@
 
 ;;; INTEXP -- Handle the rational base, integer power case.
 
-;;; FIXME: As long as the
-;;; system dies on stack overflow or memory exhaustion, it seems reasonable
-;;; to have this, but its default should be NIL, and when it's NIL,
-;;; anything should be accepted.
+;;; FIXME: As long as the system dies on stack overflow or memory
+;;; exhaustion, it seems reasonable to have this, but its default
+;;; should be NIL, and when it's NIL, anything should be accepted.
 (defparameter *intexp-maximum-exponent* 10000)
 
-;;; This function precisely calculates base raised to an integral power. It
-;;; separates the cases by the sign of power, for efficiency reasons, as powers
-;;; can be calculated more efficiently if power is a positive integer. Values
-;;; of power are calculated as positive integers, and inverted if negative.
+;;; This function precisely calculates base raised to an integral
+;;; power. It separates the cases by the sign of power, for efficiency
+;;; reasons, as powers can be calculated more efficiently if power is
+;;; a positive integer. Values of power are calculated as positive
+;;; integers, and inverted if negative.
 (defun intexp (base power)
   (when (> (abs power) *intexp-maximum-exponent*)
     ;; FIXME: should be ordinary error, not CERROR. (Once we set the
@@ -187,10 +187,11 @@
 	   (setq power nextn)))))
 
 ;;; If an integer power of a rational, use INTEXP above. Otherwise, do
-;;; floating point stuff. If both args are real, we try %POW right off,
-;;; assuming it will return 0 if the result may be complex. If so, we call
-;;; COMPLEX-POW which directly computes the complex result. We also separate
-;;; the complex-real and real-complex cases from the general complex case.
+;;; floating point stuff. If both args are real, we try %POW right
+;;; off, assuming it will return 0 if the result may be complex. If
+;;; so, we call COMPLEX-POW which directly computes the complex
+;;; result. We also separate the complex-real and real-complex cases
+;;; from the general complex case.
 (defun expt (base power)
   #!+sb-doc
   "Returns BASE raised to the POWER."
@@ -302,16 +303,18 @@
 			   (let ((pow (sb!kernel::%pow abs-x y)))
 			     (declare (double-float pow))
 			     (case yisint
-			       (1 ; Odd
+			       (1 ; odd
 				(coerce (* -1d0 pow) rtype))
-			       (2 ; Even
+			       (2 ; even
 				(coerce pow rtype))
-			       (t ; Non-integer
+			       (t ; non-integer
 				(let ((y*pi (* y pi)))
 				  (declare (double-float y*pi))
 				  (complex
-				   (coerce (* pow (%cos y*pi)) rtype)
-				   (coerce (* pow (%sin y*pi)) rtype)))))))))))))
+				   (coerce (* pow (%cos y*pi))
+					   rtype)
+				   (coerce (* pow (%sin y*pi))
+					   rtype)))))))))))))
       (declare (inline real-expt))
       (number-dispatch ((base number) (power number))
 	(((foreach fixnum (or bignum ratio) (complex rational)) integer)
@@ -403,7 +406,7 @@
 
 (defun phase (number)
   #!+sb-doc
-  "Returns the angle part of the polar representation of a complex number.
+  "Return the angle part of the polar representation of a complex number.
   For complex numbers, this is (atan (imagpart number) (realpart number)).
   For non-complex positive numbers, this is 0. For non-complex negative
   numbers this is PI."

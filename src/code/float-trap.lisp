@@ -37,45 +37,43 @@
 		      (or (cdr (assoc x *float-trap-alist*))
 			  (error "unknown float trap kind: ~S" x)))
 		  names)))
-); Eval-When (Compile Load Eval)
+) ; EVAL-WHEN
 
 ;;; interpreter stubs
 (defun floating-point-modes () (floating-point-modes))
 (defun (setf floating-point-modes) (new) (setf (floating-point-modes) new))
 
+;;; This function sets options controlling the floating-point
+;;; hardware. If a keyword is not supplied, then the current value is
+;;; preserved. Possible keywords:
+;;; :TRAPS
+;;;    A list of the exception conditions that should cause traps.
+;;;    Possible exceptions are :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID,
+;;;    :DIVIDE-BY-ZERO, and on the X86 :DENORMALIZED-OPERAND. Initially
+;;;    all traps except :INEXACT are enabled.
+;;;
+;;;:ROUNDING-MODE
+;;;    The rounding mode to use when the result is not exact. Possible
+;;;    values are :NEAREST, :POSITIVE-INFINITY, :NEGATIVE-INFINITY and
+;;;    :ZERO. Initially, the rounding mode is :NEAREST.
+;;;
+;;;:CURRENT-EXCEPTIONS
+;;;:ACCRUED-EXCEPTIONS
+;;;    These arguments allow setting of the exception flags. The main
+;;;    use is setting the accrued exceptions to NIL to clear them.
+;;;
+;;;:FAST-MODE
+;;;    Set the hardware's \"fast mode\" flag, if any. When set, IEEE
+;;;    conformance or debuggability may be impaired. Some machines may not
+;;;    have this feature, in which case the value is always NIL.
+;;;
+;;; GET-FLOATING-POINT-MODES may be used to find the floating point modes
+;;; currently in effect.
 (defun set-floating-point-modes (&key (traps nil traps-p)
 				      (rounding-mode nil round-p)
 				      (current-exceptions nil current-x-p)
 				      (accrued-exceptions nil accrued-x-p)
 				      (fast-mode nil fast-mode-p))
-  #!+sb-doc
-  "This function sets options controlling the floating-point hardware. If a
-  keyword is not supplied, then the current value is preserved. Possible
-  keywords:
-
-   :TRAPS
-       A list of the exception conditions that should cause traps. Possible
-       exceptions are :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID,
-       :DIVIDE-BY-ZERO, and on the X86 :DENORMALIZED-OPERAND. Initially
-       all traps except :INEXACT are enabled.
-
-   :ROUNDING-MODE
-       The rounding mode to use when the result is not exact. Possible values
-       are :NEAREST, :POSITIVE-INFINITY, :NEGATIVE-INFINITY and :ZERO.
-       Initially, the rounding mode is :NEAREST.
-
-   :CURRENT-EXCEPTIONS
-   :ACCRUED-EXCEPTIONS
-       These arguments allow setting of the exception flags. The main use is
-       setting the accrued exceptions to NIL to clear them.
-
-   :FAST-MODE
-       Set the hardware's \"fast mode\" flag, if any. When set, IEEE
-       conformance or debuggability may be impaired. Some machines may not
-       have this feature, in which case the value is always NIL.
-
-   GET-FLOATING-POINT-MODES may be used to find the floating point modes
-   currently in effect."
   (let ((modes (floating-point-modes)))
     (when traps-p
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
@@ -97,14 +95,13 @@
 
   (values))
 
+;;; This function returns a list representing the state of the floating 
+;;; point modes. The list is in the same format as the &KEY arguments to
+;;; SET-FLOATING-POINT-MODES, i.e.
+;;;    (apply #'set-floating-point-modes (get-floating-point-modes))
+;;; sets the floating point modes to their current values (and thus is a
+;;; no-op).
 (defun get-floating-point-modes ()
-  #!+sb-doc
-  "This function returns a list representing the state of the floating 
-  point modes. The list is in the same format as the &KEY arguments to
-  SET-FLOATING-POINT-MODES, i.e.
-      (apply #'set-floating-point-modes (get-floating-point-modes))
-
-  sets the floating point modes to their current values (and thus is a no-op)."
   (flet ((exc-keys (bits)
 	   (macrolet ((frob ()
 			`(collect ((res))
@@ -122,11 +119,9 @@
 	:accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
 	:fast-mode ,(logtest float-fast-bit modes)))))
 
+;;; Return true if any of the named traps are currently trapped, false
+;;; otherwise.
 (defmacro current-float-trap (&rest traps)
-  #!+sb-doc
-  "Current-Float-Trap Trap-Name*
-  Return true if any of the named traps are currently trapped, false
-  otherwise."
   `(not (zerop (logand ,(dpb (float-trap-mask traps) float-traps-byte 0)
 		       (floating-point-modes)))))
 
@@ -167,14 +162,13 @@
   |#
   )
 
+;;; Execute BODY with the floating point exceptions listed in TRAPS
+;;; masked (disabled). TRAPS should be a list of possible exceptions
+;;; which includes :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID and
+;;; :DIVIDE-BY-ZERO and on the X86 :DENORMALIZED-OPERAND. The
+;;; respective accrued exceptions are cleared at the start of the body
+;;; to support their testing within, and restored on exit.
 (defmacro with-float-traps-masked (traps &body body)
-  #!+sb-doc
-  "Execute BODY with the floating point exceptions listed in TRAPS
-  masked (disabled). TRAPS should be a list of possible exceptions
-  which includes :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID and
-  :DIVIDE-BY-ZERO and on the X86 :DENORMALIZED-OPERAND. The respective
-  accrued exceptions are cleared at the start of the body to support
-  their testing within, and restored on exit."
   (let ((traps (dpb (float-trap-mask traps) float-traps-byte 0))
 	(exceptions (dpb (float-trap-mask traps) float-sticky-bits 0))
 	(trap-mask (dpb (lognot (float-trap-mask traps))

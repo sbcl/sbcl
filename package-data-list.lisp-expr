@@ -547,7 +547,7 @@ like *STACK-TOP-HINT*"
 
              ;; weak pointers and finalization
              "FINALIZE" "CANCEL-FINALIZATION"
-             ;; FIXME: "WEAK-POINTER-P" here once it moves from %KERNEL
+             ;; FIXME: "WEAK-POINTER-P" here once it moves from SB!KERNEL
              "HASH-TABLE-WEAK-P" "MAKE-WEAK-POINTER"
              "WEAK-POINTER" "WEAK-POINTER-VALUE"
 
@@ -557,14 +557,14 @@ like *STACK-TOP-HINT*"
              "FLOAT-NAN-P" "FLOAT-TRAPPING-NAN-P"
              "FLOATING-POINT-INVALID"
              "FLOAT-INFINITY-P"
-             #!+sb-infinities "SHORT-FLOAT-NEGATIVE-INFINITY"
-             #!+sb-infinities "SHORT-FLOAT-POSITIVE-INFINITY"
-             #!+sb-infinities "SINGLE-FLOAT-NEGATIVE-INFINITY"
-             #!+sb-infinities "SINGLE-FLOAT-POSITIVE-INFINITY"
-             #!+sb-infinities "DOUBLE-FLOAT-NEGATIVE-INFINITY"
-             #!+sb-infinities "DOUBLE-FLOAT-POSITIVE-INFINITY"
-             #!+sb-infinities "LONG-FLOAT-NEGATIVE-INFINITY"
-             #!+sb-infinities "LONG-FLOAT-POSITIVE-INFINITY"
+             "SHORT-FLOAT-NEGATIVE-INFINITY"
+             "SHORT-FLOAT-POSITIVE-INFINITY"
+             "SINGLE-FLOAT-NEGATIVE-INFINITY"
+             "SINGLE-FLOAT-POSITIVE-INFINITY"
+             "DOUBLE-FLOAT-NEGATIVE-INFINITY"
+             "DOUBLE-FLOAT-POSITIVE-INFINITY"
+             "LONG-FLOAT-NEGATIVE-INFINITY"
+             "LONG-FLOAT-POSITIVE-INFINITY"
 
              ;; hacks to work around system limitations
              "*INTEXP-MAXIMUM-EXPONENT*" ; since we crash hard when
@@ -774,7 +774,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; misc. utilities used internally
              "LEGAL-FUNCTION-NAME-P"
              "FUNCTION-NAME-BLOCK-NAME"
-             #!-sb-infinities "INFINITE"
              "LISTEN-SKIP-WHITESPACE"
              "PACKAGE-INTERNAL-SYMBOL-COUNT" "PACKAGE-EXTERNAL-SYMBOL-COUNT"
              "PROPER-LIST-OF-LENGTH-P"

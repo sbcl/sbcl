@@ -1437,9 +1437,8 @@
 		  (long-float #\L))
 		plusp exp))))
 
-;;;    Write out an infinity using #. notation, or flame out if
-;;; *print-readably* is true and *read-eval* is false.
-#!+sb-infinities
+;;; Write out an infinity using #. notation, or flame out if
+;;; *PRINT-READABLY* is true and *READ-EVAL* is false.
 (defun output-float-infinity (x stream)
   (declare (type float x) (type stream stream))
   (cond (*read-eval*
