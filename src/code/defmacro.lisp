@@ -39,7 +39,7 @@
 		      ,@local-decs
 		      (block ,name 
 			,new-body)))
-	      ;; if we want to move over to list-style names
+	      ;; If we want to move over to list-style names
 	      ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
 	      ;; functionality] here might be a good place to start.
 	      (debug-name (debug-namify "DEFMACRO ~S" name)))
