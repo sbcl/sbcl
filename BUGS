@@ -1235,3 +1235,17 @@ WORKAROUND:
   less error prone to have EXPLICIT-CHECK be a local declaration,
   being put into the definition, instead of an attribute being kept in
   a separate file; maybe also put it into SB-EXT?
+
+301: ARRAY-SIMPLE-=-TYPE-METHOD breaks on corner cases which can arise
+     in NOTE-ASSUMED-TYPES
+  In sbcl-0.8.7.32, compiling the file
+	(defun foo (x y)
+	  (declare (type integer x))
+	  (declare (type (vector (or hash-table bit)) y))
+	  (bletch 2 y))
+	(defun bar (x y)
+	  (declare (type integer x))
+	  (declare (type (simple-array base (2)) y))
+	  (bletch 1 y))
+  gives the error
+    failed AVER: "(NOT (AND (NOT EQUALP) CERTAINP))"
