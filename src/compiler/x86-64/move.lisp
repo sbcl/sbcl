@@ -97,15 +97,21 @@
 (defun move-immediate (target val)
   (multiple-value-bind (lo hi)
       (dwords-for-quad val)
-    (cond ((zerop hi)
+    (cond ((and (zerop hi) (typep lo '(signed-byte 31)))
 	   (inst mov target lo))
-	  ((< lo (expt 2 31))
+	  ((typep lo '(signed-byte 31))
 	   (inst mov target hi)
 	   (inst shl target 32)
 	   (inst or target lo))
 	  ;; High bit set in lower dword, need to set the high and low
-	  ;; words of separately due to sign extension of the immediate
-	  ;; argument to OR.
+	  ;; words of the low dword separately due to sign extension
+	  ;; of immediate arguments.
+	  ((zerop hi)
+	   (multiple-value-bind (lo-lo lo-hi)
+	       (words-for-dword lo)
+	     (inst mov target lo-hi)
+	     (inst shl target 16)
+	     (inst or target lo-lo)))
 	  (t
 	   (multiple-value-bind (lo-lo lo-hi)
 	       (words-for-dword lo)

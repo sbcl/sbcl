@@ -2002,9 +2002,9 @@ register."
 (defun make-valid-lisp-obj (val)
   (if (or
        ;; fixnum
-       (zerop (logand val 3))
+       (zerop (logand val sb!vm::fixnum-tag-mask))
        ;; character
-       (and (zerop (logand val #xffff0000)) ; Top bits zero
+       (and (zerop (logandc2 val #xffff)) ; Top bits zero
 	    (= (logand val #xff) sb!vm:base-char-widetag)) ; char tag
        ;; unbound marker
        (= val sb!vm:unbound-marker-widetag)

@@ -153,17 +153,26 @@ int arch_os_thread_cleanup(struct thread *thread) {
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
+#define RCASE(name) case reg_ ## name: return &context->uc_mcontext.gregs[REG_ ## name];
     switch(offset) {
-    case reg_RAX: return &context->uc_mcontext.gregs[11]; 
-    case reg_RCX: return &context->uc_mcontext.gregs[10]; 
-    case reg_RDX: return &context->uc_mcontext.gregs[9]; 
-    case reg_RBX: return &context->uc_mcontext.gregs[8]; 
-    case reg_RSP: return &context->uc_mcontext.gregs[7]; 
-    case reg_RBP: return &context->uc_mcontext.gregs[6]; 
-    case reg_RSI: return &context->uc_mcontext.gregs[5]; 
-    case reg_RDI: return &context->uc_mcontext.gregs[4]; 
-    default: 
-	if(offset<32) 
+        RCASE(RAX)
+	RCASE(RCX)
+	RCASE(RDX)
+	RCASE(RBX)
+	RCASE(RSP)
+	RCASE(RBP)
+	RCASE(RSI)
+	RCASE(RDI)
+	RCASE(R8)
+	RCASE(R9)
+	RCASE(R10)
+	RCASE(R11)
+	RCASE(R12)
+	RCASE(R13)
+	RCASE(R14)
+	RCASE(R15)
+      default: 
+	if(offset<NGREG) 
 	    return &context->uc_mcontext.gregs[offset/2+4];
 	else return 0;
     }

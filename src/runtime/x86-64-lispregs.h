@@ -34,9 +34,16 @@
 #define reg_RBP REG(10)
 #define reg_RSI REG(12)
 #define reg_RDI REG(14)
-#define reg_R(n) REG((n)*2)
+#define reg_R8  REG(16)
+#define reg_R9  REG(18)
+#define reg_R10 REG(20)
+#define reg_R11 REG(22)
+#define reg_R12 REG(24)
+#define reg_R13 REG(26)
+#define reg_R14 REG(28)
+#define reg_R15 REG(30)
 
-#define REGNAMES "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI"
+#define REGNAMES "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"
 
 /* classification of registers
  *
@@ -48,4 +55,4 @@
 #define reg_FP reg_RBP
 #define BOXED_REGISTERS {\
   reg_RAX, reg_RCX, reg_RDX, reg_RBX, reg_RSI, reg_RDI \
-  }
+}

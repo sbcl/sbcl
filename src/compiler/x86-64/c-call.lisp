@@ -99,13 +99,13 @@
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'double-float 'double-reg (* num-results 2))))
+    (my-make-wired-tn 'double-float 'double-reg num-results)))
 
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'single-float 'single-reg (* num-results 2))))
+    (my-make-wired-tn 'single-float 'single-reg num-results 2)))
 
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
@@ -232,7 +232,7 @@
 	   (move eax function)
 	   (inst call (make-fixup (extern-alien-name "call_into_c") :foreign)))
 	  (t
-	   (inst call function)
+ 	   (inst call function)
 	   ;; To give the debugger a clue. XX not really internal-error?
 	   (note-this-location vop :internal-error)
 	   ;; Sign-extend s-b-32 return values.
@@ -243,7 +243,13 @@
 	       (when (eq (sb!c::tn-primitive-type tn)
 			 (primitive-type-or-lose 'signed-byte-32))
 		 (inst shl tn 32)
-		 (inst sar tn 32))))))))
+		 (inst sar tn 32))))
+           ;; FLOAT15 needs to contain FP zero in Lispland
+           (inst xor ecx ecx)
+           (inst movd (make-random-tn :kind :normal 
+                                      :sc (sc-or-lose 'double-reg)
+                                      :offset float15-offset)
+                      ecx)))))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

@@ -340,7 +340,7 @@
     (let* ((total-bytes (+ string-bytes vec-bytes))
 	   (vec-sap (sb-sys:allocate-system-memory total-bytes))
 	   (string-sap (sap+ vec-sap vec-bytes))
-	   (i sb-vm::n-word-bytes))
+	   (i #.(/ sb-vm::n-machine-word-bits sb-vm::n-byte-bits)))
       (declare (type (and unsigned-byte fixnum) total-bytes i)
 	       (type sb-sys:system-area-pointer vec-sap string-sap))
       (dolist (s string-list)
@@ -355,10 +355,12 @@
 	  ;; Blast the pointer to the string into place.
 	  (setf (sap-ref-sap vec-sap i) string-sap)
 	  (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ n))))
-	  (incf i sb-vm::n-word-bytes)))
+	  (incf i #.(/ sb-vm::n-machine-word-bits sb-vm::n-byte-bits))))
       ;; Blast in the last null pointer.
       (setf (sap-ref-sap vec-sap i) (int-sap 0))
-      (values vec-sap (sap+ vec-sap sb-vm::n-word-bytes) total-bytes))))
+      (values vec-sap (sap+ vec-sap #.(/ sb-vm::n-machine-word-bits
+					 sb-vm::n-byte-bits))
+	      total-bytes))))
 
 (defmacro with-c-strvec ((var str-list) &body body)
   (with-unique-names (sap size)

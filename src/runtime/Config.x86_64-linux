@@ -25,6 +25,7 @@ OS_SRC = linux-os.c x86-64-linux-os.c os-common.c
 # working on one and it would be a nice thing to have.)
 OS_LINK_FLAGS = -Wl,--export-dynamic
 OS_LIBS = -ldl
+CFLAGS =  -g -Wall -O3 -fno-omit-frame-pointer
 
 GC_SRC = gencgc.c
 
