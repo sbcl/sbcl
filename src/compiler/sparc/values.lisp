@@ -16,6 +16,41 @@
   (:generator 1
     (move csp-tn ptr)))
 
+(define-vop (%%nip-values)
+  (:args (last-nipped-ptr :scs (any-reg) :target dest)
+         (last-preserved-ptr :scs (any-reg) :target src)
+         (moved-ptrs :scs (any-reg) :more t))
+  (:results (r-moved-ptrs :scs (any-reg) :more t))
+  (:temporary (:sc any-reg) src)
+  (:temporary (:sc any-reg) dest)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:ignore r-moved-ptrs)
+  (:generator 1
+    (inst move dest last-nipped-ptr)
+    (inst move src last-preserved-ptr)
+    (inst cmp csp-tn src)
+    (inst b :le DONE)
+    (inst nop) ; not strictly necessary
+    LOOP
+    (loadw temp src)
+    (inst add dest dest n-word-bytes)
+    (inst add src src n-word-bytes)
+    (storew temp dest -1)
+    (inst cmp csp-tn src)
+    (inst b :gt LOOP)
+    (inst nop)
+    DONE
+    (inst move csp-tn dest)
+    (inst sub src src dest)
+    (loop for moved = moved-ptrs then (tn-ref-across moved)
+          while moved
+          do (sc-case (tn-ref-tn moved)
+               ((descriptor-reg any-reg)
+                (inst sub (tn-ref-tn moved) (tn-ref-tn moved) src))
+               ((control-stack)
+                (load-stack-tn temp (tn-ref-tn moved))
+                (inst sub temp temp src)
+                (store-stack-tn (tn-ref-tn moved) temp))))))
 
 ;;; Push some values onto the stack, returning the start and number of
 ;;; values pushed as results.  It is assumed that the Vals are wired
