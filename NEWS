@@ -1351,8 +1351,13 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     truename.
   * more systematization and improvement of CLOS and MOP conformance
     in PCL (thanks to Gerd Moellman and Pierre Mai):
-    ** NO-NEXT-METHOD is now implemented;
-
+    ** the standard ANSI CL generic function NO-NEXT-METHOD is now
+       implemented;
+    ** DEFINE-METHOD-COMBINATION no longer signals an error for
+       primary methods with no specializers;
+    ** the MOP generic function GENERIC-FUNCTION-DECLARATIONS is now
+       implemented;
+    
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

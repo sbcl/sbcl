@@ -189,7 +189,7 @@ bootstrapping.
 			:format-control "The declaration specifier ~S ~
                                          is not allowed inside DEFGENERIC."
 			:format-arguments (list (cadr option))))
-	       (push (cdr option) (initarg :declarations)))
+	       (push (cadr option) (initarg :declarations)))
 	      ((:argument-precedence-order :method-combination)
 	       (if (initarg car-option)
 		   (duplicate-option car-option)

@@ -84,6 +84,8 @@
 
 (defgeneric eql-specializer-object (eql-specializer))
 
+(defgeneric generic-function-declarations (standard-generic-function))
+
 (defgeneric generic-function-method-class (standard-generic-function))
 
 (defgeneric generic-function-method-combination (standard-generic-function))
@@ -175,6 +177,9 @@
 
 (defgeneric (setf generic-function-method-combination)
   (new-value standard-generic-function))
+
+(defgeneric (setf generic-function-declarations) (new-value
+						  standard-generic-function))
 
 (defgeneric (setf generic-function-methods) (new-value
 					     standard-generic-function))

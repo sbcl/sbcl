@@ -37,6 +37,16 @@
 	 (sb-pcl:generic-function-argument-precedence-order #'documentation)
 	 (let ((ll (sb-pcl:generic-function-lambda-list #'documentation)))
 	   (list (nth 1 ll) (nth 0 ll)))))
+
+(assert (null
+	 (sb-pcl:generic-function-declarations #'fn-with-odd-arg-precedence)))
+(defgeneric gf-with-declarations (x)
+  (declare (optimize (speed 3)))
+  (declare (optimize (safety 0))))
+(let ((decls (sb-pcl:generic-function-declarations #'gf-with-declarations)))
+  (assert (= (length decls) 2))
+  (assert (member '(optimize (speed 3)) decls :test #'equal))
+  (assert (member '(optimize (safety 0)) decls :test #'equal)))
 
 ;;; Readers for Slot Definition Metaobjects (pp. 221--224 of AMOP)
 

@@ -772,6 +772,10 @@
    (method-combination
     :initarg :method-combination
     :accessor generic-function-method-combination)
+   (declarations
+    :initarg :declarations
+    :initform ()
+    :accessor generic-function-declarations)
    (arg-info
     :initform (make-arg-info)
     :reader gf-arg-info)
