@@ -130,12 +130,29 @@
 (!cold-init-forms
   (setf *!deferred-use-packages* nil))
 
-;;; FIXME: I rewrote this. Test it and the stuff that calls it.
+(define-condition bootstrap-package-not-found (condition)
+  ((name :initarg :name :reader bootstrap-package-name)))
+(defun debootstrap-package (&optional condition)
+  (invoke-restart 
+   (find-restart-or-control-error 'debootstrap-package condition)))
+  
 (defun find-package (package-designator)
   (flet ((find-package-from-string (string)
 	   (declare (type string string))
-	   (values (gethash string *package-names*))))
-    (declare (inline find-package-from-string))
+	   (let ((packageoid (gethash string *package-names*)))
+	     (when (and (null packageoid)
+			(not *in-package-init*) ; KLUDGE
+			(let ((mismatch (mismatch "SB!" string)))
+			  (and mismatch (= mismatch 3))))
+	       (restart-case
+		   (signal 'bootstrap-package-not-found :name string)
+		 (debootstrap-package ()
+		   (return-from find-package
+		     (if (string= string "SB!XC")
+			 (find-package "COMMON-LISP")
+			 (find-package 
+			  (substitute #\- #\! string :count 1)))))))
+	     packageoid)))
     (typecase package-designator
       (package package-designator)
       (symbol (find-package-from-string (symbol-name package-designator)))
