@@ -23,7 +23,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 ;;; The caching algorithm implemented:
 ;;;
@@ -84,7 +84,7 @@
 ;;; assembler.
 (defmacro cache-vector-ref (cache-vector location)
   `(svref (the simple-vector ,cache-vector)
-	  (sb-ext:truly-the fixnum ,location)))
+	  (sb!ext:truly-the index ,location)))
 
 (defmacro cache-vector-size (cache-vector)
   `(array-dimension (the simple-vector ,cache-vector) 0))
@@ -96,13 +96,13 @@
   `(cache-vector-ref ,cache-vector 0))
 
 (defun flush-cache-vector-internal (cache-vector)
-  (sb-sys:without-interrupts
+  (sb!sys:without-interrupts
     (fill (the simple-vector cache-vector) nil)
     (setf (cache-vector-lock-count cache-vector) 0))
   cache-vector)
 
 (defmacro modify-cache (cache-vector &body body)
-  `(sb-sys:without-interrupts
+  `(sb!sys:without-interrupts
      (multiple-value-prog1
        (progn ,@body)
        (let ((old-count (cache-vector-lock-count ,cache-vector)))
@@ -112,7 +112,7 @@
 		   1 (the fixnum (1+ old-count))))))))
 
 (deftype field-type ()
-  '(mod #.sb-kernel:layout-clos-hash-length))
+  '(mod #.sb!kernel:layout-clos-hash-length))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun power-of-two-ceiling (x)
@@ -138,7 +138,7 @@
   (vector #() :type simple-vector)
   (overflow nil :type list))
 
-#-sb-fluid (declaim (sb-ext:freeze-type cache))
+#!-sb-fluid (declaim (sb!ext:freeze-type cache))
 
 (defmacro cache-lock-count (cache)
   `(cache-vector-lock-count (cache-vector ,cache)))
@@ -156,7 +156,7 @@
 ;;; ever return a larger cache.
 (defun get-cache-vector (size)
   (let ((entry (gethash size *free-cache-vectors*)))
-    (sb-sys:without-interrupts
+    (sb!sys:without-interrupts
       (cond ((null entry)
 	     (setf (gethash size *free-cache-vectors*) (cons 0 nil))
 	     (get-cache-vector size))
@@ -170,7 +170,7 @@
 
 (defun free-cache-vector (cache-vector)
   (let ((entry (gethash (cache-vector-size cache-vector) *free-cache-vectors*)))
-    (sb-sys:without-interrupts
+    (sb!sys:without-interrupts
       (if (null entry)
 	  (error
 	   "attempt to free a cache-vector not allocated by GET-CACHE-VECTOR")
@@ -186,7 +186,7 @@
 
 ;;; This is just for debugging and analysis. It shows the state of the
 ;;; free cache resource.
-#+sb-show
+#!+sb-show
 (defun show-free-cache-vectors ()
   (let ((elements ()))
     (maphash (lambda (s e) (push (list s e) elements)) *free-cache-vectors*)
@@ -221,10 +221,10 @@
 ;;; are the forms of this constant which it is more convenient for the
 ;;; runtime code to use.
 (defconstant wrapper-cache-number-length
-  (integer-length sb-kernel:layout-clos-hash-max))
-(defconstant wrapper-cache-number-mask sb-kernel:layout-clos-hash-max)
+  (integer-length sb!kernel:layout-clos-hash-max))
+(defconstant wrapper-cache-number-mask sb!kernel:layout-clos-hash-max)
 (defconstant wrapper-cache-number-adds-ok
-  (truncate most-positive-fixnum sb-kernel:layout-clos-hash-max))
+  (truncate most-positive-fixnum sb!kernel:layout-clos-hash-max))
 
 ;;;; wrappers themselves
 
@@ -251,15 +251,15 @@
 ;;; have a fixed number of cache hash values, and that number must
 ;;; correspond to the number of cache lines we use.
 (defconstant wrapper-cache-number-vector-length
-  sb-kernel:layout-clos-hash-length)
+  sb!kernel:layout-clos-hash-length)
 
 (unless (boundp '*the-class-t*)
   (setq *the-class-t* nil))
 
 (defmacro wrapper-class (wrapper)
-  `(sb-kernel:class-pcl-class (sb-kernel:layout-class ,wrapper)))
+  `(sb!kernel:class-pcl-class (sb!kernel:layout-class ,wrapper)))
 (defmacro wrapper-no-of-instance-slots (wrapper)
-  `(sb-kernel:layout-length ,wrapper))
+  `(sb!kernel:layout-length ,wrapper))
 
 (defmacro wrapper-instance-slots-layout (wrapper)
   `(%wrapper-instance-slots-layout ,wrapper))
@@ -271,19 +271,19 @@
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
 (defun boot-make-wrapper (length name &optional class)
-  (let ((found (cl:find-class name nil)))
+  (let ((found (sb!xc:find-class name nil)))
     (cond
      (found
-      (unless (sb-kernel:class-pcl-class found)
-	(setf (sb-kernel:class-pcl-class found) class))
-      (aver (eq (sb-kernel:class-pcl-class found) class))
-      (let ((layout (sb-kernel:class-layout found)))
+      (unless (sb!kernel:class-pcl-class found)
+	(setf (sb!kernel:class-pcl-class found) class))
+      (aver (eq (sb!kernel:class-pcl-class found) class))
+      (let ((layout (sb!kernel:class-layout found)))
 	(aver layout)
 	layout))
      (t
       (make-wrapper-internal
        :length length
-       :class (sb-kernel:make-standard-class :name name :pcl-class class))))))
+       :class (sb!kernel:make-standard-class :name name :pcl-class class))))))
 
 ;;; The following variable may be set to a STANDARD-CLASS that has
 ;;; already been created by the lisp code and which is to be redefined
@@ -294,7 +294,7 @@
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
 ;;; don't necessarily always make a wrapper. Also, we help maintain
-;;; the mapping between CL:CLASS and PCL::CLASS objects.
+;;; the mapping between SB!XC:CLASS and PCL::CLASS objects.
 (defun make-wrapper (length class)
   (cond
    ((typep class 'std-class)
@@ -303,26 +303,26 @@
      :class
      (let ((owrap (class-wrapper class)))
        (cond (owrap
-	      (sb-kernel:layout-class owrap))
+	      (sb!kernel:layout-class owrap))
 	     ((*subtypep (class-of class)
 			 *the-class-standard-class*)
 	      (cond ((and *pcl-class-boot*
 			  (eq (slot-value class 'name) *pcl-class-boot*))
-		     (let ((found (cl:find-class (slot-value class 'name))))
-		       (unless (sb-kernel:class-pcl-class found)
-			 (setf (sb-kernel:class-pcl-class found) class))
-		       (aver (eq (sb-kernel:class-pcl-class found) class))
+		     (let ((found (sb!xc:find-class (slot-value class 'name))))
+		       (unless (sb!kernel:class-pcl-class found)
+			 (setf (sb!kernel:class-pcl-class found) class))
+		       (aver (eq (sb!kernel:class-pcl-class found) class))
 		       found))
 		    (t
-		     (sb-kernel:make-standard-class :pcl-class class))))
+		     (sb!kernel:make-standard-class :pcl-class class))))
 	     (t
-	      (sb-kernel:make-random-pcl-class :pcl-class class))))))
+	      (sb!kernel:make-random-pcl-class :pcl-class class))))))
    (t
-    (let* ((found (cl:find-class (slot-value class 'name)))
-	   (layout (sb-kernel:class-layout found)))
-      (unless (sb-kernel:class-pcl-class found)
-	(setf (sb-kernel:class-pcl-class found) class))
-      (aver (eq (sb-kernel:class-pcl-class found) class))
+    (let* ((found (sb!xc:find-class (slot-value class 'name)))
+	   (layout (sb!kernel:class-layout found)))
+      (unless (sb!kernel:class-pcl-class found)
+	(setf (sb!kernel:class-pcl-class found) class))
+      (aver (eq (sb!kernel:class-pcl-class found) class))
       (aver layout)
       layout))))
 
@@ -350,13 +350,13 @@
 (defmacro cache-number-vector-ref (cnv n)
   `(wrapper-cache-number-vector-ref ,cnv ,n))
 (defmacro wrapper-cache-number-vector-ref (wrapper n)
-  `(sb-kernel:layout-clos-hash ,wrapper ,n))
+  `(sb!kernel:layout-clos-hash ,wrapper ,n))
 
 (declaim (inline wrapper-class*))
 (defun wrapper-class* (wrapper)
   (or (wrapper-class wrapper)
       (find-structure-class
-       (cl:class-name (sb-kernel:layout-class wrapper)))))
+       (sb!xc:class-name (sb!kernel:layout-class wrapper)))))
 
 ;;; The wrapper cache machinery provides general mechanism for
 ;;; trapping on the next access to any instance of a given class. This
@@ -373,7 +373,7 @@
 
 (declaim (inline invalid-wrapper-p))
 (defun invalid-wrapper-p (wrapper)
-  (not (null (sb-kernel:layout-invalid wrapper))))
+  (not (null (sb!kernel:layout-invalid wrapper))))
 
 (defvar *previous-nwrappers* (make-hash-table))
 
@@ -395,10 +395,10 @@
       (push previous new-previous))
 
     (let ((ocnv (wrapper-cache-number-vector owrapper)))
-      (dotimes (i sb-kernel:layout-clos-hash-length)
+      (dotimes (i sb!kernel:layout-clos-hash-length)
 	(setf (cache-number-vector-ref ocnv i) 0)))
 
-    (push (setf (sb-kernel:layout-invalid owrapper) (list state nwrapper))
+    (push (setf (sb!kernel:layout-invalid owrapper) (list state nwrapper))
 	  new-previous)
 
     (setf (gethash owrapper *previous-nwrappers*) ()
@@ -406,7 +406,7 @@
 
 (defun check-wrapper-validity (instance)
   (let* ((owrapper (wrapper-of instance))
-	 (state (sb-kernel:layout-invalid owrapper)))
+	 (state (sb!kernel:layout-invalid owrapper)))
     (if (null state)
 	owrapper
 	(ecase (car state)
@@ -417,13 +417,13 @@
 
 (declaim (inline check-obsolete-instance))
 (defun check-obsolete-instance (instance)
-  (when (invalid-wrapper-p (sb-kernel:layout-of instance))
+  (when (invalid-wrapper-p (sb!kernel:layout-of instance))
     (check-wrapper-validity instance)))
 
 (defvar *free-caches* nil)
 
 (defun get-cache (nkeys valuep limit-fn nlines)
-  (let ((cache (or (sb-sys:without-interrupts (pop *free-caches*))
+  (let ((cache (or (sb!sys:without-interrupts (pop *free-caches*))
                    (make-cache))))
     (declare (type cache cache))
     (multiple-value-bind (cache-mask actual-size line-size nlines)
@@ -448,7 +448,7 @@
 			     &optional (new-field +first-wrapper-cache-number-index+))
   (let ((nkeys (cache-nkeys old-cache))
 	(valuep (cache-valuep old-cache))
-	(cache (or (sb-sys:without-interrupts (pop *free-caches*))
+	(cache (or (sb!sys:without-interrupts (pop *free-caches*))
                    (make-cache))))
     (declare (type cache cache))
     (multiple-value-bind (cache-mask actual-size line-size nlines)

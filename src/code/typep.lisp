@@ -210,8 +210,3 @@
 	(dotimes (i (length obj-inherits) nil)
 	  (when (eq (svref obj-inherits i) layout)
 	    (return t))))))
-
-;;; This implementation is a placeholder to use until PCL is set up,
-;;; at which time it will be overwritten by a real implementation.
-(defun sb!pcl::check-wrapper-validity (object)
-  object)

@@ -106,7 +106,7 @@
 		#+nil "src/pcl/fngen"
 		#+nil "src/pcl/defclass"
 		#+nil "src/pcl/defs"
-		"src/pcl/cache"
+		#+nil "src/pcl/cache"
 		"src/pcl/dlisp"
 		"src/pcl/dlisp2"
 		"src/pcl/boot"
