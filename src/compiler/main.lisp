@@ -229,19 +229,19 @@
 		   (zerop *compiler-note-count*)))
     (format *error-output* "~&")
     (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-    (compiler-mumble
-                           "compilation unit ~:[finished~;aborted~]~
-      ~[~:;~:*~&  caught ~D fatal ERROR condition~:P~]~
-      ~[~:;~:*~&  caught ~D ERROR condition~:P~]~
-      ~[~:;~:*~&  caught ~D WARNING condition~:P~]~
-      ~[~:;~:*~&  caught ~D STYLE-WARNING condition~:P~]~
-      ~[~:;~:*~&  printed ~D note~:P~]"
-     abort-p
-     *aborted-compilation-unit-count*
-     *compiler-error-count*
-     *compiler-warning-count*
-     *compiler-style-warning-count*
-                           *compiler-note-count*))))
+      (compiler-mumble "compilation unit ~:[finished~;aborted~]~
+                       ~[~:;~:*~&  caught ~D fatal ERROR condition~:P~]~
+                       ~[~:;~:*~&  caught ~D ERROR condition~:P~]~
+                       ~[~:;~:*~&  caught ~D WARNING condition~:P~]~
+                       ~[~:;~:*~&  caught ~D STYLE-WARNING condition~:P~]~
+                       ~[~:;~:*~&  printed ~D note~:P~]"
+		       abort-p
+		       *aborted-compilation-unit-count*
+		       *compiler-error-count*
+		       *compiler-warning-count*
+		       *compiler-style-warning-count*
+		       *compiler-note-count*)))
+  (format *error-output* "~&"))
 
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and

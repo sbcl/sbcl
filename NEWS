@@ -610,6 +610,14 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
 * The C runtime system now builds with better optimization and many
   fewer warnings, thanks to lots of cleanups by Martin Atzmueller.
 
+changes in sbcl-0.6.10 relative to sbcl-0.6.9:
+
+* A patch from Martin Atzmueller seems to have solved the SIGINT
+  problem, and as far as we know, signal-handling now works cleanly.
+  (If you find any new bugs, please report them!)
+* More compiler warnings in src/runtime/ are gone, thanks to 
+  patches from Martin Atzmueller.
+
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
   as you get deeper into recursive calls to the debugger command loop,

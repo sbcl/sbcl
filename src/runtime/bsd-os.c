@@ -26,6 +26,7 @@
 #include "arch.h"
 #include "globals.h"
 #include "interrupt.h"
+#include "interr.h"
 #include "lispregs.h"
 #include "sbcl.h"
 

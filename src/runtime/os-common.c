@@ -13,6 +13,7 @@
 #include <errno.h>
 
 #include "os.h"
+#include "interr.h"
 
 /* Except for os_zero, these routines are only called by Lisp code.
  * These routines may also be replaced by os-dependent versions

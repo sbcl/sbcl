@@ -309,9 +309,22 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
     union interrupt_handler handler;
 
-#ifdef __linux__
-    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
-#endif
+    /* FIXME: The CMU CL we forked off of had this Linux-only
+     * operation here. Newer CMU CLs (e.g. 18c) have hairier
+     * Linux/i386-only logic here. SBCL seems to be more reliable
+     * without anything here. However, if we start supporting code
+     * which sets the rounding mode, then we may want to do something
+     * special to force the rounding mode back to some standard value
+     * here, so that ISRs can have a standard environment. (OTOH, if
+     * rounding modes are under user control, then perhaps we should
+     * leave this up to the user.)
+     *
+     * For now we just suppress this code completely (just like the
+     * parallel code in maybe_now_maybe_later).
+     * #ifdef __linux__
+     *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
+     * #endif
+     */
 
     handler = interrupt_handlers[signal];
 
@@ -385,14 +398,15 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
     /* FIXME: See Debian cmucl 2.4.17, and mail from DTC on the CMU CL
      * mailing list 23 Oct 1999, for changes in FPU handling at
-     * interrupt time which should be ported into SBCL. 
+     * interrupt time which should be ported into SBCL. Also see the
+     * analogous logic at the head of interrupt_handle_now for
+     * more related FIXME stuff. 
      *
-     * (Is this related to the way that it seems that if we do decide
-     * to handle the interrupt later, we've now screwed up the FPU
-     * control word?) */
-#ifdef __linux__
-    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
-#endif
+     * For now, we just suppress this code completely.
+     * #ifdef __linux__
+     *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
+     * #endif
+     */
 
     if (SymbolValue(INTERRUPTS_ENABLED) == NIL) {
 
