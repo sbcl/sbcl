@@ -69,7 +69,8 @@ The commands are:
   (new-break :inspect *current-inspect*)
   (reset-stack)
   (setf (inspect-object-stack *current-inspect*) (list object))
-  (setf (inspect-parent-stack *current-inspect*) (list "(inspect ...)"))
+  (setf (inspect-parent-stack *current-inspect*)
+	(list (format nil "(inspect ~S)" object)))
   (%inspect output-stream))
 
  
@@ -234,7 +235,7 @@ The commands are:
 		  (cond ((eq value *inspect-unbound-object-marker*)
 			 (format output-stream "That slot is unbound~%"))
 			(t
-			 (push value stack)
+			 (push value (inspect-object-stack *current-inspect*))
 			 (push option-read (inspect-parent-stack *current-inspect*))
 			 (%inspect output-stream)))))
 	       ((null elements)
@@ -255,8 +256,10 @@ The commands are:
       ;; Default is to select eval'd form
       (t
        (reset-stack)
-       (setf (inspect-object-stack *current-inspect*) (list (eval option-read)))
-       (setf (inspect-parent-stack *current-inspect*) (list ":i <form>"))
+       (let ((object (eval option-read)))
+	 (setf (inspect-object-stack *current-inspect*) (list object))
+	 (setf (inspect-parent-stack *current-inspect*)
+	       (list (format nil ":i ~S" object))))
        (set-break-inspect *current-inspect*)
        (%inspect output-stream))
       )))
