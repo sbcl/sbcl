@@ -342,8 +342,12 @@
 ;;; Moellmann: CONVERT-MORE-CALL failed on the following call
 (assert (eq (eval '((lambda (&key) 'u) :allow-other-keys nil)) 'u))
 
+;;; Bug relating to confused representation for the wild function
+;;; type:
+(assert (null (funcall (eval '(lambda () (multiple-value-list (values)))))))
+
 ;;; &ENVIRONMENT parameter should be bound first (from Paul Dietz'
-;;; test suit)
+;;; test suite)
 (assert (eql (macrolet ((foo () 1))
                (macrolet ((%f (&optional (x (macroexpand '(foo) env)) &environment env)
                             x))
