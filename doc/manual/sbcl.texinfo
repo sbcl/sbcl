@@ -5,10 +5,9 @@
 @c %**end of header
 
 
+@include variables.texinfo
 @set EDITION 0.1
-@set VERSION 0.8.9
-@set UPDATED 2 April 2004
-@set UPDATE-MONTH April 2004
+@settitle SBCL @value{VERSION} User Manual 
 
 @c for install-info
 @dircategory Software development

@@ -7,6 +7,7 @@ PSFILE=sbcl.ps
 PDFFILE=sbcl.pdf
 DVIFILE=sbcl.dvi
 INFOFILE=sbcl.info
+VARSFILE=variables.template
 HTMLDIR=$(basename $(ROOTFILE))
 # Place where generated documentation ends up. The value of
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
@@ -38,12 +39,14 @@ all: ps pdf info html
 dist: html pdf
 
 
+variables: ${VARSFILE}
+	./extract-values.sh < ${VARSFILE} >variables.texinfo
 
 # html documentation; output in $(HTMLDIR)
 .PHONY: html
 html: html-stamp
 
-html-stamp: $(DOCFILES) docstrings
+html-stamp: variables $(DOCFILES) docstrings
 	@rm -rf $(HTMLDIR)
 	$(MAKEINFO) -I $(DOCSTRINGDIR) --html $(ROOTFILE)
 	touch html-stamp
@@ -55,21 +58,21 @@ ps: $(PSFILE)
 $(PSFILE): $(DVIFILE)
 	dvips -o $@ $<
 
-$(DVIFILE): $(DOCFILES) docstrings
+$(DVIFILE): variables $(DOCFILES) docstrings
 	texi2dvi -I $(DOCSTRINGDIR) $(ROOTFILE)
 
 # PDF documentation
 .PHONY: pdf
 pdf: $(PDFFILE)
 
-$(PDFFILE): $(DOCFILES) docstrings
+$(PDFFILE): variables $(DOCFILES) docstrings
 	texi2pdf -I $(DOCSTRINGDIR) $(ROOTFILE)
 
 # info docfiles
 .PHONY: info
 info: $(INFOFILE)
 
-$(INFOFILE): $(DOCFILES) docstrings
+$(INFOFILE): variables $(DOCFILES) docstrings
 	$(MAKEINFO) -I $(DOCSTRINGDIR) $(ROOTFILE)
 
 # contrib-modules.texinfo includes contrib-doc-list.texi-temp
