@@ -1709,31 +1709,25 @@ changes in sbcl-0.8alpha.0 relative to sbcl-0.7.14
     ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list.
 
 changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
-  * SBCL now builds using CLISP (version of late April 2003 from CVS)
-    as cross-compilation host.
-  * a contributed module containing a partial implementation of the
+  * SBCL now builds using CLISP (version of late April 2003 from CVS) as
+    cross-compilation host. As a consequence, we can now bootstrap our
+    way up to SBCL starting with a bare gcc toolchain and human-readable
+    source code (first the source to CLISP, then the source to SBCL).
+  * A contributed module containing a partial implementation of the
     simple-streams interface has been included.  (thanks to Rudi
     Schlatte)
-  * a contributed module implementing the RFC1321 Message Digest
+  * A contributed module implementing the RFC1321 Message Digest
     Algorithm, known as MD5, has been included.
-  * minor incompatible change: the :NEGATIVE-ZERO-IS-NOT-ZERO feature
+  * minor incompatible change: The :NEGATIVE-ZERO-IS-NOT-ZERO feature
     no longer has any effect, as the code controlled by this feature
     has been deleted.  (As far as we know, no-one has ever built using
     this feature, and its semantics were confused in any case).
-  * minor incompatible change: as a consequence of making
-    SLOT-EXISTS-P work on conditions (as required by the ANSI
-    specification), SLOT-VALUE, (SETF SLOT-VALUE) and SLOT-BOUNDP
-    likewise have the expected behaviour on conditions.  Users should
-    note, however, that such behaviour is not required by the ANSI
-    specification, and so use of this behaviour may render their code
-    unportable.
-  * SB-MOP:DIRECT-SLOT-DEFINITION-CLASS and
-    SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
-    specified-by-AMOP lambda list of (CLASS &REST INITARGS).
-  * compiler checks for duplicated variables in macro lambda lists.
-  * fixed bug 47.d: (DEFGENERIC IF (X)) now signals a PROGRAM-ERROR,
-    not a COMPILER-ERROR (followed by some other strange error on
-    choosing the CONTINUE restart).
+  * minor incompatible change: As a consequence of making SLOT-EXISTS-P
+    work on conditions (as required by the ANSI specification),
+    SLOT-VALUE, (SETF SLOT-VALUE) and SLOT-BOUNDP likewise have the
+    expected behaviour on conditions.  Users should note, however,
+    that such behaviour is not required by the ANSI specification,
+    and so use of this behaviour may render their code unportable.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the GENERIC-FUNCTION type is no longer disjoint from FUNCTION
        types.
@@ -1760,15 +1754,27 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     ** DEFGENERIC now checks that the :ARGUMENT-PRECEDENCE-ORDER
        option is consistent with the required arguments of the generic
        function lambda list.
+  * bug fix: REQUIRE accepts a string designator. (Thanks to 
+    Antonio Martinez.)
+  * bug fix: SB-MOP:DIRECT-SLOT-DEFINITION-CLASS and
+    SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
+    specified-by-AMOP lambda list of (CLASS &REST INITARGS).
+  * bug fix: The compiler now checks for duplicated variables in macro
+    lambda lists.
+  * bug fix: SETQ on globals returns the correct value.
+  * fixed bug 47.d: (DEFGENERIC IF (X)) now signals a PROGRAM-ERROR,
+    not a COMPILER-ERROR (followed by some other strange error on
+    choosing the CONTINUE restart).
+  * bug fix: make.sh and friends are now more consistent in the way that
+    they for GNU "make".
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
-    down, maybe in 0.7.x, maybe later, it might impact TRACE. They both
-    encapsulate functions, and it's not clear yet how e.g. UNPROFILE
-    will interact with TRACE
-    and UNTRACE. (This shouldn't matter, though, unless you are
-    using profiling. If you never profile anything, TRACE should
-    continue to behave as before.)
+    down, it might impact TRACE. They both encapsulate functions, and
+    it's not clear yet how e.g. UNPROFILE will interact with TRACE
+    and UNTRACE. (This shouldn't matter, though, unless you are using
+    profiling. If you never profile anything, TRACE should continue to
+    behave as before.)
   * (not done yet, but planned:) Inlining can now be controlled the
     ANSI way, without MAYBE-INLINE, since the idiom
 	(DECLAIM (INLINE FOO))
