@@ -59,5 +59,12 @@
   (assert (eq (value res) res))
   (assert (= pos 8)))
 
+;;; CSR managed to break the #S reader macro in the process of merging
+;;; SB-PCL:CLASS and CL:CLASS -- make sure it works
+(defstruct readable-struct a)
+(assert (eq (readable-struct-a
+	     (read-from-string "#S(READABLE-STRUCT :A T)"))
+	    t))
+
 ;;; success
 (quit :unix-status 104)

@@ -56,13 +56,20 @@ for late 0.7.x:
 =======================================================================
 for 0.9:
 
+[ note: much of the below refers to preparation for merging SB-PCL:FOO
+  and CL:FOO.  However, it turned out to be surprisingly
+  straightforward to do this notional end goal without doing many of
+  the preparatory operations.  That doesn't mean that plenty of the
+  goals below aren't worthwhile, but the motivation is somewhat
+  different. ]
+
 * refactored in preparation for moving CLOS into cold init and merging
 	SB-PCL:FOO with CL:FOO (for FOO=CLASS, FOO=CLASS-OF, etc.)
-	** systematized support for MOP (new regression tests, maybe
-		new SB-MOP package..) to try to make sure things don't
-		get mislaid in the upcoming CLOS restructuring
-	** extracted type system from SB-KERNEL into new SB-TYPE
-		package
+	** systematized support for MOP (more regression tests, maybe) 
+		to try to make sure things don't get mislaid in the 
+		upcoming CLOS restructuring
+	** extracted type system (and maybe CLASSOIDs) from SB-KERNEL 
+		into new SB-TYPE package
 	** reimplemented GENERIC-FUNCTION as a primitive object (or
 		maybe made SB-MOP:FUNCALLABLE-STANDARD-OBJECT the
 		primitive object, and then let GENERIC-FUNCTIONs
@@ -93,7 +100,6 @@ for 0.9:
 * (maybe) more refactoring in preparation for merging SB-PCL:FOO
 	into CL:FOO: reimplemented type system OO dispatch
 	(!DEFINE-TYPE-METHOD, etc.) in terms of CLOS OO dispatch
-* merged SB-PCL:FOO into CL:FOO (and similarly CLASS-OF, etc.)
 * added some automatic tests for basic binary compatibility, in hopes
 	that it might be practical to maintain binary compatibility
 	between minor maintenance releases on the stable branch (but no
