@@ -1481,3 +1481,17 @@
   (compile nil '(lambda (s x)
                  (pprint-logical-block (s x :suffix ">")
                    (print x s)))))
+
+;;; MISC.427: loop analysis requires complete DFO structure
+(assert (eql 17 (funcall
+  (compile
+   nil
+   '(lambda (a)
+     (declare (notinline list reduce logior))
+     (declare (optimize (safety 2) (compilation-speed 1)
+               (speed 3) (space 2) (debug 2)))
+     (logior
+      (let* ((v5 (reduce #'+ (list 0 a))))
+        (declare (dynamic-extent v5))
+        v5))))
+    17)))

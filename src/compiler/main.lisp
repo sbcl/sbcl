@@ -526,7 +526,8 @@
 
     (ir1-phases component)
 
-    (when *loop-analyze* 
+    (when *loop-analyze*
+      (dfo-as-needed component)
       (find-dominators component)
       (loop-analyze component))
 
