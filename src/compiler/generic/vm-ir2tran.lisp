@@ -82,11 +82,11 @@
     (do-inits node block name result lowtag inits args)
     (move-continuation-result node block locs cont)))
 
-;;; KLUDGE: this is set up automatically in #!-SB-THREAD builds by the
-;;; :SET-TRANS thing in objdef.lisp.  However, for #!+SB-THREAD builds
-;;; we need to use a special VOP, so we have to do this by hand.
-;;; -- CSR, 2003-05-08
-#!+sb-thread
+;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite
+;;; cut it for symbols, where under certain compilation options
+;;; (e.g. #!+SB-THREAD) we have to do something complicated, rather
+;;; than simply set the slot.  So we build the IR2 converting function
+;;; by hand.  -- CSR, 2003-05-08
 (let ((fun-info (fun-info-or-lose '%set-symbol-value)))
   (setf (fun-info-ir2-convert fun-info)
 	(lambda (node block)

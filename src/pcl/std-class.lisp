@@ -499,6 +499,9 @@
       (setq direct-default-initargs
 	    (plist-value class 'direct-default-initargs)))
   (setf (plist-value class 'class-slot-cells)
+	;; The below initializes shared slots from direct initforms,
+	;; but one might inherit initforms from superclasses
+	;; (cf. UPDATE-SHARED-SLOT-VALUES).
 	(let (collect)
 	  (dolist (dslotd direct-slots)
 	    (when (eq :class (slot-definition-allocation dslotd))
@@ -826,13 +829,27 @@
     (update-slots class (compute-slots class))
     (update-gfs-of-class class)
     (update-inits class (compute-default-initargs class))
+    (update-shared-slot-values class)
     (update-ctors 'finalize-inheritance :class class))
   (unless finalizep
     (dolist (sub (class-direct-subclasses class)) (update-class sub nil))))
 
+(defun update-shared-slot-values (class)
+  (dolist (slot (class-slots class))
+    (when (eq (slot-definition-allocation slot) :class)
+      (let ((cell (assq (slot-definition-name slot) (class-slot-cells class))))
+        (when cell
+          (let ((initfn (slot-definition-initfunction slot)))
+            (when initfn
+              (setf (cdr cell) (funcall initfn)))))))))
+
 (defun update-cpl (class cpl)
   (if (class-finalized-p class)
-      (unless (equal (class-precedence-list class) cpl)
+      (unless (and (equal (class-precedence-list class) cpl)
+		   (dolist (c cpl t)
+		     (when (position :class (class-direct-slots c)
+				     :key #'slot-definition-allocation)
+		       (return nil))))
 	;; comment from the old CMU CL sources:
 	;;   Need to have the cpl setup before update-lisp-class-layout
 	;;   is called on CMU CL.
