@@ -18,7 +18,13 @@
 SOMETHING_IN_THE_ENVIRONMENT='yes there is'
 export SOMETHING_IN_THE_ENVIRONMENT
 
+
 ${SBCL:-sbcl} <<EOF
+  ;; test that $PATH is searched
+  (assert (zerop (sb-ext:process-exit-code 
+	          (sb-ext:run-program "true" () :search t :wait t))))
+  (assert (not (zerop (sb-ext:process-exit-code 
+	               (sb-ext:run-program "false" () :search t :wait t)))))
   (let ((string (with-output-to-string (stream)
                   (sb-ext:run-program "/bin/echo"
                                       '("foo" "bar")

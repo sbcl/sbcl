@@ -381,11 +381,26 @@
   (stderr sb-alien:int))
 
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
-;;; XXX does this actually work for symlinks?
 (defun unix-filename-is-executable-p (unix-filename)
   (declare (type simple-string unix-filename))
   (values (and (eq (sb-unix:unix-file-kind unix-filename) :file)
 	       (sb-unix:unix-access unix-filename sb-unix:x_ok))))
+
+(defun find-executable-in-search-path (pathname
+				       &optional
+				       (search-path (posix-getenv "PATH")))
+  "Find the first executable file matching PATHNAME in any of the colon-separated list of pathnames SEARCH-PATH"
+  (loop for end =  (position #\: search-path :start (if end (1+ end) 0))
+	and start = 0 then (and end (1+ end))
+	while start
+	;; <Krystof> the truename of a file naming a directory is the
+	;; directory, at least until pfdietz comes along and says why
+	;; that's noncompliant
+	for fullpath = (merge-pathnames
+			pathname (truename
+				  (subseq search-path start end)))
+	when (unix-filename-is-executable-p (namestring fullpath))
+	return fullpath))
 
 ;;; FIXME: There shouldn't be two semiredundant versions of the
 ;;; documentation. Since this is a public extension function, the
@@ -438,6 +453,7 @@
 				     (posix-environ))
 				 environment-p)
 		    (wait t)
+		    search
 		    pty
 		    input
 		    if-input-does-not-exist
@@ -473,6 +489,10 @@
      :ENV
         an alternative lossy representation of the new Unix environment,
         for compatibility with CMU CL
+     :SEARCH
+        Look for PROGRAM in each of the directories along the $PATH
+        environment variable.  Otherwise an absolute pathname is required.
+        (See also FIND-EXECUTABLE-IN-SEARCH-PATH)
      :WAIT
         If non-NIL (default), wait until the created process finishes.  If
         NIL, continue running Lisp until the program finishes.
@@ -531,17 +551,11 @@
 	;; designator, but internally we'd like SIMPLE-STRINGs.
 	(simple-args (mapcar (lambda (x) (coerce x 'simple-string)) args)))
     (unwind-protect
-	 (let (;; FIXME: The old code here used to do
-	       ;;   (MERGE-PATHNAMES PROGRAM "path:"),
-	       ;; which is the right idea (searching through the Unix
-	       ;; PATH). Unfortunately, there is no logical pathname
-	       ;; "path:" defined in sbcl-0.6.10. It would probably be 
-	       ;; reasonable to restore Unix PATH searching in SBCL, e.g.
-	       ;; with a function FIND-EXECUTABLE-FILE-IN-POSIX-PATH.
-	       ;; CMU CL did it with a "PATH:" search list, but CMU CL
-	       ;; search lists are a non-ANSI extension that SBCL
-	       ;; doesn't support. -- WHN)
-	       (pfile (unix-namestring program t))
+	 (let ((pfile
+		(if search 
+		    (let ((p (find-executable-in-search-path program)))
+		      (and p (unix-namestring p t)))
+		    (unix-namestring program t)))
 	       (cookie (list 0)))
 	   (unless pfile
 	     (error "no such program: ~S" program))

@@ -628,6 +628,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; return a PROCESS object with operations defined on
              ;; that object.
              "RUN-PROGRAM"
+	     "FIND-EXECUTABLE-IN-SEARCH-PATH"
              "PROCESS-ALIVE-P" "PROCESS-CLOSE"
              "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
              "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
