@@ -778,20 +778,43 @@
 
 ;;; shared logic for unions and intersections: Stuff TYPE into the
 ;;; vector TYPES, finding pairs of types which can be simplified by
-;;; SIMPLIFY2 and replacing them by their simplified forms.
-(defun accumulate-compound-type (type types simplify2)
+;;; SIMPLIFY2 (TYPE-UNION2 or TYPE-INTERSECTION2) and replacing them
+;;; by their simplified forms.
+(defun accumulate1-compound-type (type types %compound-type-p simplify2)
   (declare (type ctype type))
   (declare (type (vector ctype) types))
   (declare (type function simplify2))
+  ;; Any input object satisfying %COMPOUND-TYPE-P should've been
+  ;; broken into components before it reached us.
+  (assert (not (funcall %compound-type-p type)))
   (dotimes (i (length types) (vector-push-extend type types))
     (let ((simplified2 (funcall simplify2 type (aref types i))))
       (when simplified2
 	;; Discard the old (AREF TYPES I).
 	(setf (aref types i) (vector-pop types))
-	;; Add the new SIMPLIFIED2 to TYPES, by tail recursing.
+	;; Merge the new SIMPLIFIED2 into TYPES, by tail recursing.
+	;; (Note that the tail recursion is indirect: we go through
+	;; ACCUMULATE, not ACCUMULATE1, so that if SIMPLIFIED2 is
+	;; handled properly if it satisfies %COMPOUND-TYPE-P.)
 	(return (accumulate-compound-type simplified2
 					  types
+					  %compound-type-p
 					  simplify2)))))
+  ;; Voila.
+  (values))
+
+;;; shared logic for unions and intersections: Use
+;;; ACCUMULATE1-COMPOUND-TYPE to merge TYPE into TYPES, either
+;;; all in one step or, if %COMPOUND-TYPE-P is satisfied,
+;;; component by component.
+(defun accumulate-compound-type (type types %compound-type-p simplify2)
+  (declare (type function %compound-type-p simplify2))
+  (flet ((accumulate1 (x)
+	   (accumulate1-compound-type x types %compound-type-p simplify2)))
+    (declare (inline accumulate1))
+    (if (funcall %compound-type-p type)
+	(map nil #'accumulate1 (compound-type-types type))
+	(accumulate1 type)))
   (values))
 
 ;;; shared logic for unions and intersections: Return a vector of
@@ -806,13 +829,11 @@
 				      ;; matter, but helps avoid type
 				      ;; warnings at compile time.)
 				      :initial-element *empty-type*)))
-    (flet ((accumulate (type)
-	     (accumulate-compound-type type simplified-types simplify2)))
-      (declare (inline accumulate))
-      (dolist (type input-types)
-	(if (funcall %compound-type-p type)
-	    (map nil #'accumulate (compound-type-types type))
-	    (accumulate type))))
+    (dolist (input-type input-types)
+      (accumulate-compound-type input-type
+				simplified-types
+				%compound-type-p
+				simplify2))
     simplified-types))
 
 ;;; shared logic for unions and intersections: Make a COMPOUND-TYPE
@@ -843,6 +864,7 @@
   (let ((simplified-types (simplified-compound-types input-types
 						     #'intersection-type-p
 						     #'type-intersection2)))
+    (declare (type (vector ctype) simplified-types))
     ;; We want to have a canonical representation of types (or failing
     ;; that, punt to HAIRY-TYPE). Canonical representation would have
     ;; intersections inside unions but not vice versa, since you can
