@@ -392,7 +392,8 @@ POSITION is NIL if the id is invalid or not found."
   "Helper function for inspected-elements. Conses the
 position with the label is the label is a string."
   (let ((label (label-at parts position)))
-    (if (stringp label)
+    (if (or (stringp label)
+	    (and (symbolp label) (not (eq label :tail))))
 	(cons position label)
 	label)))
 
