@@ -1032,6 +1032,7 @@
 		     (eq (basic-combination-fun dest) ref-lvar)
 		     (eq (basic-combination-kind dest) :local)
                      (not (node-to-be-deleted-p dest))
+                     (not (block-delete-p (lambda-block clambda)))
 		     (cond ((ok-initial-convert-p clambda) t)
 			   (t
 			    (reoptimize-lvar ref-lvar)
@@ -1071,7 +1072,8 @@
 ;;; tail-convert. The second is the value of M-C-T-A.
 (defun maybe-convert-tail-local-call (call)
   (declare (type combination call))
-  (let ((return (lvar-dest (node-lvar call))))
+  (let ((return (lvar-dest (node-lvar call)))
+        (fun (combination-lambda call)))
     (aver (return-p return))
     (when (and (not (node-tail-p call)) ; otherwise already converted
                ;; this is a tail call
@@ -1082,10 +1084,10 @@
                ;; non-tail so that we can use known return inside the
                ;; component.
 	       (not (eq (functional-kind (node-home-lambda call))
-			:external)))
+			:external))
+               (not (block-delete-p (lambda-block fun))))
       (node-ends-block call)
-      (let ((block (node-block call))
-	    (fun (combination-lambda call)))
+      (let ((block (node-block call)))
 	(setf (node-tail-p call) t)
 	(unlink-blocks block (first (block-succ block)))
 	(link-blocks block (lambda-block fun))
