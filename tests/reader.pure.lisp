@@ -16,14 +16,14 @@
 (assert (equal (symbol-name '#:|fd\sA|) "fdsA"))
 
 ;;; Prior to sbcl-0.7.2.10, SBCL disobeyed the ANSI requirements on
-;;; returning NIL for unset dispatch-macro-character functions (bug
+;;; returning NIL for unset dispatch-macro-character functions. (bug
 ;;; 151, fixed by Alexey Dejenka sbcl-devel "bug 151" 2002-04-12)
 (assert (not (get-dispatch-macro-character #\# #\{)))
 (assert (not (get-dispatch-macro-character #\# #\0)))
-;;; and we might as well test that we don't have any cross-compilation
+;;; And we might as well test that we don't have any cross-compilation
 ;;; shebang residues left...
 (assert (not (get-dispatch-macro-character #\# #\!)))
-;;; also test that all the illegal sharp macro characters are
+;;; Also test that all the illegal sharp macro characters are
 ;;; recognized as being illegal.
 (loop for char in '(#\Backspace #\Tab #\Newline #\Linefeed
                     #\Page #\Return #\Space #\) #\<)
@@ -31,3 +31,23 @@
 
 (assert (not (ignore-errors (get-dispatch-macro-character #\! #\0)
                             t)))
+
+;;; In sbcl-0.7.3, GET-MACRO-CHARACTER and SET-MACRO-CHARACTER didn't
+;;; use NIL to represent the no-macro-attached-to-this-character case
+;;; as ANSI says they should. (This problem is parallel to the
+;;; GET-DISPATCH-MACRO misbehavior fixed in sbcl-0.7.2.10, but
+;;; was fixed a little later.)
+(dolist (customizable-char
+	 ;; According to ANSI "2.1.4 Character Syntax Types", these
+	 ;; characters are reserved for the programmer.
+	 '(#\? #\! #\[ #\] #\{ #\}))
+  ;; So they should have no macro-characterness.
+  (multiple-value-bind (macro-fun non-terminating-p)
+      (get-macro-character customizable-char)
+    (assert (null macro-fun))
+    ;; Also, in a bit of ANSI weirdness, NON-TERMINATING-P can be
+    ;; true only when MACRO-FUN is true. (When the character
+    ;; is not a macro character, it can be embedded in a token,
+    ;; so it'd be more logical for NON-TERMINATING-P to be T in
+    ;; this case; but ANSI says it's NIL in this case.
+    (assert (null non-terminating-p))))

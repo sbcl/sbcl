@@ -1302,6 +1302,20 @@ WORKAROUND:
   ;   caught 1 STYLE-WARNING condition
   But the code works as it should. Checked in 0.6.12.43 and later.
 
+170:
+  (reported by Matthias Hoelzl on sbcl-devel 2002-05-13)
+    * (defmacro foo () ''x)
+    FOO
+    * (foo)
+    X
+    * (compile 'foo)
+    FOO
+    NIL
+    NIL
+    * (foo)
+    debugger invoked on condition of type UNDEFINED-FUNCTION:
+      The function FOO is undefined.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

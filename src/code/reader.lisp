@@ -69,16 +69,28 @@
 	     (char-code char))
 	newvalue))
 
-;;; FIXME: could be SB!XC:DEFMACRO inside EVAL-WHEN (COMPILE EVAL)
-(defmacro get-cmt-entry (char rt)
-  `(the function
-	(elt (the simple-vector (character-macro-table ,rt))
-	     (char-code ,char))))
+;;; the value actually stored in the character macro table. As per
+;;; ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER, this can
+;;; be either a function or NIL.
+(eval-when (:compile-toplevel :execute)
+  (sb!xc:defmacro get-raw-cmt-entry (char readtable)
+    `(svref (character-macro-table ,readtable)
+	    (char-code ,char))))
 
-(defun set-cmt-entry (char newvalue &optional (rt *readtable*))
-  (setf (elt (the simple-vector (character-macro-table rt))
-	     (char-code char))
-	(coerce newvalue 'function)))
+;;; the value represented by whatever is stored in the character macro
+;;; table. As per ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER,
+;;; a function value represents itself, and a NIL value represents the
+;;; default behavior.
+(defun get-coerced-cmt-entry (char readtable)
+  (the function 
+    (or (get-raw-cmt-entry char readtable)
+	#'read-token)))
+
+(defun set-cmt-entry (char new-value-designator &optional (rt *readtable*))
+  (setf (svref (character-macro-table rt)
+	       (char-code char))
+	(and new-value-designator
+	     (%coerce-callable-to-fun new-value-designator))))
 
 (defun undefined-macro-char (stream char)
   (unless *read-suppress*
@@ -186,42 +198,51 @@
 	  (setq att (get-secondary-attribute to-char)))
       (set-cat-entry to-char att to-readtable)
       (set-cmt-entry to-char
-		     (get-cmt-entry from-char really-from-readtable)
+		     (get-raw-cmt-entry from-char really-from-readtable)
 		     to-readtable)))
   t)
 
 (defun set-macro-character (char function &optional
-				 (non-terminatingp nil) (rt *readtable*))
+				 (non-terminatingp nil)
+				 (readtable *readtable*))
   #!+sb-doc
-  "Causes CHAR to be a macro character which invokes FUNCTION when
-   seen by the reader. The NON-TERMINATINGP flag can be used to
-   make the macro character non-terminating. The optional readtable
-   argument defaults to the current readtable. SET-MACRO-CHARACTER
-   returns T."
-  (let ((rt (or rt *standard-readtable*)))
-    (if non-terminatingp
-        (set-cat-entry char (get-secondary-attribute char) rt)
-        (set-cat-entry char +char-attr-terminating-macro+ rt))
-    (set-cmt-entry char function rt)
-    t))
+  "Causes CHAR to be a macro character which invokes FUNCTION when seen
+   by the reader. The NON-TERMINATINGP flag can be used to make the macro
+   character non-terminating, i.e. embeddable in a symbol name."
+  (let ((designated-readtable (or readtable *standard-readtable*)))
+    (set-cat-entry char
+		   (if non-terminatingp
+		       (get-secondary-attribute char)
+		       +char-attr-terminating-macro+)
+		   designated-readtable)
+    (set-cmt-entry char function designated-readtable)
+    t)) ; (ANSI-specified return value)
 
-(defun get-macro-character (char &optional (rt *readtable*))
+(defun get-macro-character (char &optional (readtable *readtable*))
   #!+sb-doc
   "Return the function associated with the specified CHAR which is a macro
-  character. The optional readtable argument defaults to the current
-  readtable."
-  (let ((rt (or rt *standard-readtable*)))
-    ;; Check macro syntax, return associated function if it's there.
-    ;; Returns a value for all constituents.
-    (cond ((constituentp char)
-	   (values (get-cmt-entry char rt) t))
-	  ((terminating-macrop char)
-	   (values (get-cmt-entry char rt) nil))
-	  (t nil))))
+  character, or NIL if there is no such function. As a second value, return
+  T if CHAR is a macro character which is non-terminating, i.e. which can
+  be embedded in a symbol name."
+  (let* ((designated-readtable (or readtable *standard-readtable*))
+	 ;; the first return value: a FUNCTION if CHAR is a macro
+	 ;; character, or NIL otherwise
+	 (fun-value (get-raw-cmt-entry char designated-readtable)))
+    (values fun-value
+	    ;; NON-TERMINATING-P return value:
+	    (if fun-value
+		(or (constituentp char)
+		    (not (terminating-macrop char)))
+		;; ANSI's definition of GET-MACRO-CHARACTER says this
+		;; value is NIL when CHAR is not a macro character.
+		;; I.e. this value means not just "non-terminating
+		;; character?" but "non-terminating macro character?".
+		nil))))
 
 ;;;; definitions to support internal programming conventions
 
-(defmacro eofp (char) `(eq ,char *eof-object*))
+(defmacro eofp (char)
+  `(eq ,char *eof-object*))
 
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
@@ -249,27 +270,31 @@
 
 (defun !cold-init-standard-readtable ()
   (setq *standard-readtable* (make-readtable))
-  ;; All characters default to "constituent" in MAKE-READTABLE.
-  ;; *** un-constituent-ize some of these ***
+  ;; All characters get boring defaults in MAKE-READTABLE. Now we
+  ;; override the boring defaults on characters which need more
+  ;; interesting behavior.
   (let ((*readtable* *standard-readtable*))
-    (set-cat-entry (code-char tab-char-code) +char-attr-whitespace+)
-    (set-cat-entry #\linefeed +char-attr-whitespace+)
-    (set-cat-entry #\space +char-attr-whitespace+)
-    (set-cat-entry (code-char form-feed-char-code) +char-attr-whitespace+)
-    (set-cat-entry (code-char return-char-code) +char-attr-whitespace+)
+
+    (flet ((whitespaceify (char)
+	     (set-cat-entry char +char-attr-whitespace+)))
+      (whitespaceify (code-char tab-char-code))
+      (whitespaceify #\linefeed)
+      (whitespaceify #\space)
+      (whitespaceify (code-char form-feed-char-code))
+      (whitespaceify (code-char return-char-code)))
+
     (set-cat-entry #\\ +char-attr-escape+)
     (set-cmt-entry #\\ #'read-token)
-    (set-cat-entry (code-char rubout-char-code) +char-attr-whitespace+)
-    (set-cmt-entry #\: #'read-token)
-    (set-cmt-entry #\| #'read-token)
-    ;; macro definitions
+
+    ;; Easy macro-character definitions are in this source file.
     (set-macro-character #\" #'read-string)
-    ;; * # macro
     (set-macro-character #\' #'read-quote)
     (set-macro-character #\( #'read-list)
     (set-macro-character #\) #'read-right-paren)
     (set-macro-character #\; #'read-comment)
-    ;; * backquote
+    ;; (The hairier macro-character definitions, for #\# and #\`, are
+    ;; defined elsewhere, in their own source files.)
+
     ;; all constituents
     (do ((ichar 0 (1+ ichar))
 	 (char))
@@ -277,7 +302,7 @@
       (setq char (code-char ichar))
       (when (constituentp char *standard-readtable*)
 	    (set-cat-entry char (get-secondary-attribute char))
-	    (set-cmt-entry char #'read-token)))))
+	    (set-cmt-entry char nil)))))
 
 ;;;; implementation of the read buffer
 
@@ -387,7 +412,7 @@
 	(cond ((eofp char) (return eof-value))
 	      ((whitespacep char))
 	      (t
-	       (let* ((macrofun (get-cmt-entry char *readtable*))
+	       (let* ((macrofun (get-coerced-cmt-entry char *readtable*))
 		      (result (multiple-value-list
 			       (funcall macrofun stream char))))
 		 ;; Repeat if macro returned nothing.
@@ -401,7 +426,9 @@
 ;;; past them. We assume CHAR is not whitespace.
 (defun read-maybe-nothing (stream char)
   (let ((retval (multiple-value-list
-		 (funcall (get-cmt-entry char *readtable*) stream char))))
+		 (funcall (get-coerced-cmt-entry char *readtable*)
+			  stream
+			  char))))
     (if retval (rplacd retval nil))))
 
 (defun read (&optional (stream *standard-input*)

@@ -1108,11 +1108,17 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
     to Alexey Dejneka)
   * Dynamic loading of object files in OpenBSD is now supported. (thanks
     to Pierre Mai)
+  * GET-MACRO-CHARACTER and SET-MACRO-CHARACTER now represent
+    no-value-for-this-character as NIL (as specified by ANSI).
+  * HOST-NAMESTRING on physical pathnames now returns a string that is
+    valid as a host argument to MERGE-PATHNAMES and to MAKE-PATHNAME.
   * The fasl file format has changed again, because dynamic loading
     on OpenBSD (which has non-ELF object files) motivated some cleanups
     in the way that foreign symbols are transformed and passed around.
-  * HOST-NAMESTRING on physical pathnames now returns a string that is
-    valid as a host argument to MERGE-PATHNAMES and to MAKE-PATHNAME.
+  * minor incompatible change: The ASCII RUBOUT character, (CHAR-CODE 127),
+    is no longer treated as whitespace by the reader, but instead as
+    an ordinary character. Thus e.g. (READ-FROM-STRING "AB") returns
+    |AB|, instead of A as it used to.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
