@@ -37,6 +37,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** RENAME-PACKAGE allows all package designators as new package
        names.
+    ** constraint propagation and lambda variable substitution are
+       more cautious in dealing with partially deleted code.
 
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now

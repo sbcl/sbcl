@@ -1536,3 +1536,21 @@
      (print (if (< iv1 iv1)
                 (logand (ash iv1 iv1) 1)
                 iv1)))))
+
+;;; MISC.435: lambda var substitution in a deleted code.
+(assert (zerop (funcall
+   (compile
+    nil
+    '(lambda (a b c d)
+       (declare (notinline aref logandc2 gcd make-array))
+       (declare
+	(optimize (space 0) (safety 0) (compilation-speed 3)
+		  (speed 3) (debug 1)))
+       (progn
+	 (tagbody
+	  (let* ((v2 (make-array nil :initial-element (catch 'ct1 (go tag2)))))
+	    (declare (dynamic-extent v2))
+	    (gcd (go tag2) (logandc2 (catch 'ct2 c) (aref v2))))
+	  tag2)
+	 0)))
+   3021871717588 -866608 -2 -17194)))

@@ -1321,6 +1321,7 @@
            ;; LVAR-USEs should not be met on one path. Another problem
            ;; is with dynamic-extent.
            (eq (lvar-uses lvar) ref)
+           (not (block-delete-p (node-block ref)))
            (typecase dest
              ;; we should not change lifetime of unknown values lvars
              (cast
