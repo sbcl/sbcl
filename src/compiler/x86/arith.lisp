@@ -184,6 +184,22 @@
   (define-binop logior 2 or)
   (define-binop logxor 2 xor))
 
+(define-source-transform logeqv (&rest args)
+  (if (oddp (length args))
+      `(logxor ,@args)
+      `(lognot (logxor ,@args))))
+(define-source-transform logandc1 (x y)
+  `(logand (lognot ,x) ,y))
+(define-source-transform logandc2 (x y)
+  `(logand ,x (lognot ,y)))
+(define-source-transform logorc1 (x y)
+  `(logior (lognot ,x) ,y))
+(define-source-transform logorc2 (x y)
+  `(logior ,x (lognot ,y)))
+(define-source-transform lognor (x y)
+  `(lognot (logior ,x ,y)))
+(define-source-transform lognand (x y)
+  `(lognot (logand ,x ,y)))
 
 ;;; Special handling of add on the x86; can use lea to avoid a
 ;;; register load, otherwise it uses add.
