@@ -66,4 +66,10 @@
 				       :fill-pointer 2
 				       :element-type 'character))
 
+;;; SBCL 0.7.8 incorrectly read high bits of (COMPLEX DOUBLE-FLOAT)
+;;; components as unsigned bytes.
+(defparameter *numbers*
+  '(-1s0 -1f0 -1d0 -1l0
+    #c(-1s0 -1s0) #c(-1f0 -1f0) #c(-1d0 -1d0) #c(-1l0 -1l0)))
+
 (sb-ext:quit :unix-status 104) ; success

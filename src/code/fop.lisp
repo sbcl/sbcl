@@ -290,64 +290,41 @@
   (let ((im (pop-stack)))
     (%make-complex (pop-stack) im)))
 
-(define-fop (fop-complex-single-float 72)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-	(complex (make-single-float (fast-read-s-integer 4))
-		 (make-single-float (fast-read-s-integer 4)))
-      (done-with-fast-read-byte))))
+(macrolet ((fast-read-single-float ()
+             '(make-single-float (fast-read-s-integer 4)))
+           (fast-read-double-float ()
+             '(let ((lo (fast-read-u-integer 4)))
+               (make-double-float (fast-read-s-integer 4) lo)))
+           #!+long-float
+           (fast-read-long-float ()
+             '(let ((lo (fast-read-u-integer 4))
+                    #!+sparc (mid (fast-read-u-integer 4))
+                    (hi (fast-read-u-integer 4)) ; XXX
+                    (exp (fast-read-s-integer #!+x86 2 #!+sparc 4)))
+               (make-long-float exp hi #!+sparc mid lo))))
+  (macrolet ((define-complex-fop (name fop-code type)
+               (let ((reader (symbolicate "FAST-READ-" type)))
+                 `(define-fop (,name ,fop-code)
+                      (prepare-for-fast-read-byte *fasl-input-stream*
+                        (prog1
+                            (complex (,reader) (,reader))
+                          (done-with-fast-read-byte))))))
+             (define-float-fop (name fop-code type)
+               (let ((reader (symbolicate "FAST-READ-" type)))
+                 `(define-fop (,name ,fop-code)
+                      (prepare-for-fast-read-byte *fasl-input-stream*
+                        (prog1
+                            (,reader)
+                          (done-with-fast-read-byte)))))))
+    (define-complex-fop fop-complex-single-float 72 single-float)
+    (define-complex-fop fop-complex-double-float 73 double-float)
+    #!+long-float
+    (define-complex-fop fop-complex-long-float 67 long-float)
+    (define-float-fop fop-single-float 46 single-float)
+    (define-float-fop fop-double-float 47 double-float)
+    #!+long-float
+    (define-float-fop fop-long-float 52 long-float)))
 
-(define-fop (fop-complex-double-float 73)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-	(let* ((re-lo (fast-read-u-integer 4))
-	       (re-hi (fast-read-u-integer 4))
-	       (re (make-double-float re-hi re-lo))
-	       (im-lo (fast-read-u-integer 4))
-	       (im-hi (fast-read-u-integer 4))
-	       (im (make-double-float im-hi im-lo)))
-	  (complex re im))
-      (done-with-fast-read-byte))))
-
-#!+long-float
-(define-fop (fop-complex-long-float 67)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-	(let* ((re-lo (fast-read-u-integer 4))
-	       #!+sparc (re-mid (fast-read-u-integer 4))
-	       (re-hi (fast-read-u-integer 4))
-	       (re-exp (fast-read-s-integer #!+x86 2 #!+sparc 4))
-	       (re (make-long-float re-exp re-hi #!+sparc re-mid re-lo))
-	       (im-lo (fast-read-u-integer 4))
-	       #!+sparc (im-mid (fast-read-u-integer 4))
-	       (im-hi (fast-read-u-integer 4))
-	       (im-exp (fast-read-s-integer #!+x86 2 #!+sparc 4))
-	       (im (make-long-float im-exp im-hi #!+sparc im-mid im-lo)))
-	  (complex re im))
-      (done-with-fast-read-byte))))
-
-(define-fop (fop-single-float 46)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1 (make-single-float (fast-read-s-integer 4))
-      (done-with-fast-read-byte))))
-
-(define-fop (fop-double-float 47)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-	(let ((lo (fast-read-u-integer 4)))
-	  (make-double-float (fast-read-s-integer 4) lo))
-      (done-with-fast-read-byte))))
-
-#!+long-float
-(define-fop (fop-long-float 52)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-	(let ((lo (fast-read-u-integer 4))
-	      #!+sparc (mid (fast-read-u-integer 4))
-	      (hi (fast-read-u-integer 4))
-	      (exp (fast-read-s-integer #!+x86 2 #!+sparc 4)))
-	  (make-long-float exp hi #!+sparc mid lo))
-      (done-with-fast-read-byte))))
 
 ;;;; loading lists
 

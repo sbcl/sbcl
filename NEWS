@@ -1321,6 +1321,7 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     functions now check the types of their inputs as required by ANSI.
   * fixed bug 48c: SYMBOL-MACROLET signals PROGRAM-ERROR when an
     introduced symbol is DECLAREd to be SPECIAL.
+  * fixed reading of (COMPLEX DOUBLE-FLOAT) literals from fasl files
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
