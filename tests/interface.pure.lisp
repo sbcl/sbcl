@@ -27,6 +27,14 @@
 (assert (< 0
 	   (length (apropos-list "PRINT" :cl))
 	   (length (apropos-list "PRINT"))))
+;;; Further, it should correctly deal with the external-only flag (bug
+;;; reported by cliini on #lisp IRC 2003-05-30, fixed in sbcl-0.8.0.1x
+;;; by CSR)
+(assert (= (length (apropos-list "" "CL"))
+	   (length (apropos-list "" "CL" t))))
+(assert (< 0
+	   (length (apropos-list "" "SB-VM" t))
+	   (length (apropos-list "" "SB-VM"))))
 
 ;;; DESCRIBE shouldn't fail on rank-0 arrays (bug reported and fixed
 ;;; by Lutz Euler sbcl-devel 2002-12-03)

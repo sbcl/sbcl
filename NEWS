@@ -1783,6 +1783,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * STREAM-READ-SEQUENCE and STREAM-WRITE-SEQUENCE now have methods
     defined on the relevant FUNDAMENTAL-BINARY-{INPUT,OUTPUT}-STREAM
     classes.  (thanks to Antonio Martinez)
+  * bug fix: APROPOS now respects the EXTERNAL-ONLY flag.  (reported
+    by Teemu Kalvas)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

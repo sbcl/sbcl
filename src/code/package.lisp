@@ -301,7 +301,7 @@
 			 `((:internal
 			    (setf ,',counter
 				  (position-if #',',real-symbol-p
-					       ,',hash-vector
+					       (the hash-vector ,',hash-vector)
 					       :start (if ,',counter
 							  (1+ ,',counter)
 							  0)))
@@ -314,7 +314,7 @@
 			 `((:external
 			    (setf ,',counter
 				  (position-if #',',real-symbol-p
-					       ,',hash-vector
+					       (the hash-vector ,',hash-vector)
 					       :start (if ,',counter
 							  (1+ ,',counter)
 							  0)))
@@ -328,7 +328,9 @@
 			    (flet ((,',inherited-symbol-p (number)
 				     (when (,',real-symbol-p number)
 				       (let* ((p (position
-						  number ,',hash-vector
+						  number
+						  (the hash-vector
+						    ,',hash-vector)
 						  :start (if ,',counter
 							     (1+ ,',counter)
 							     0)))
@@ -340,7 +342,8 @@
 					      :inherited)))))
 			      (setf ,',counter
 				    (position-if #',',inherited-symbol-p
-						 ,',hash-vector
+						 (the hash-vector
+						   ,',hash-vector)
 						 :start (if ,',counter
 							    (1+ ,',counter)
 							    0))))
