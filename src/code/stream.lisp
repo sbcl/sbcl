@@ -1015,6 +1015,7 @@
     ;; This is checked by FILE-LENGTH, so no need to do it here either.
     ;; (:file-length (length (string-input-stream-string stream)))
     (:unread (decf (string-input-stream-current stream)))
+    (:close (set-closed-flame stream))
     (:listen (or (/= (the index (string-input-stream-current stream))
 		     (the index (string-input-stream-end stream)))
 		 :eof))
@@ -1126,6 +1127,7 @@
 			      (subseq buffer 0 end))))
 		      arg1))))
 	 (string-output-stream-index stream)))
+    (:close (set-closed-flame stream))
     (:charpos
      (do ((index (1- (the fixnum (string-output-stream-index stream)))
 		 (1- index))
