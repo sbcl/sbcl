@@ -1353,7 +1353,7 @@
 	  (t
 	   (values nil t)))))
 
-(!define-superclasses number ((generic-number)) !cold-init-forms)
+(!define-superclasses number ((number)) !cold-init-forms)
 
 ;;; If the high bound of LOW is adjacent to the low bound of HIGH,
 ;;; then return true, otherwise NIL.
