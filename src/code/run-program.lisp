@@ -289,12 +289,12 @@
 (defun find-a-pty ()
   (dolist (char '(#\p #\q))
     (dotimes (digit 16)
-      (let* ((master-name (format nil "/dev/pty~C~X" char digit))
+      (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit) 'base-string))
 	     (master-fd (sb-unix:unix-open master-name
 					   sb-unix:o_rdwr
 					   #o666)))
 	(when master-fd
-	  (let* ((slave-name (format nil "/dev/tty~C~X" char digit))
+	  (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit) 'base-string))
 		 (slave-fd (sb-unix:unix-open slave-name
 					      sb-unix:o_rdwr
 					      #o666)))

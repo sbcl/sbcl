@@ -123,11 +123,8 @@
   #-sb-xc-host
   (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-widetag))
 
-;;; CMU CL had FOP-CHARACTER as fop 68, but it's not needed in current
-;;; SBCL as we have no extended characters, only 1-byte characters.
-;;; (Ditto for CMU CL, actually: FOP-CHARACTER was speculative generality.)
-(define-fop (fop-short-character 69)
-  (code-char (read-byte-arg)))
+(define-cloned-fops (fop-character 68) (fop-short-character 69)
+  (code-char (clone-arg)))
 
 (define-cloned-fops (fop-struct 48) (fop-small-struct 49)
   (let* ((size (clone-arg))
@@ -344,9 +341,9 @@
 
 ;;;; fops for loading arrays
 
-(define-cloned-fops (fop-string 37) (fop-small-string 38)
+(define-cloned-fops (fop-base-string 37) (fop-small-base-string 38)
   (let* ((arg (clone-arg))
-	 (res (make-string arg)))
+	 (res (make-string arg :element-type 'base-char)))
     (read-string-as-bytes *fasl-input-stream* res)
     res))
 
@@ -639,7 +636,7 @@ bug.~:@>")
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
 	 (len (read-byte-arg))
-	 (sym (make-string len)))
+	 (sym (make-string len :element-type 'base-char)))
     (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
 			     (read-word-arg)

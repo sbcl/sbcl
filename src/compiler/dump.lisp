@@ -600,7 +600,9 @@
 	(t
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-normal-load file))
-	 (dump-simple-string (package-name pkg) file)
+	 (dump-simple-base-string
+          (coerce (package-name pkg) 'simple-base-string)
+          file)
 	 (dump-fop 'fop-package file)
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-maybe-cold-load file))
@@ -733,7 +735,7 @@
     (typecase simple-version
       (simple-base-string
        (unless (equal-check-table x file)
-	 (dump-simple-string simple-version file)
+	 (dump-simple-base-string simple-version file)
 	 (equal-save-object x file)))
       (simple-vector
        (dump-simple-vector simple-version file)
@@ -903,23 +905,31 @@
 
 ;;; Dump characters and string-ish things.
 
-(defun dump-character (ch file)
+(defun dump-character (char file)
+  (let ((code (sb!xc:char-code char)))
+    (cond
+      ((< code 256)
   (dump-fop 'fop-short-character file)
-  (dump-byte (char-code ch) file))
+       (dump-byte code file))
+      (t
+       (dump-fop 'fop-character file)
+       (dump-word code file)))))
 
-;;; a helper function shared by DUMP-SIMPLE-STRING and DUMP-SYMBOL
-(defun dump-characters-of-string (s fasl-output)
-  (declare (type string s) (type fasl-output fasl-output))
+(defun dump-base-chars-of-string (s fasl-output)
+  (declare #+sb-xc-host (type simple-string s)
+           #-sb-xc-host (type simple-base-string s)
+           (type fasl-output fasl-output))
   (dovector (c s)
-    (dump-byte (char-code c) fasl-output))
+    (dump-byte (sb!xc:char-code c) fasl-output))
   (values))
 
+
 ;;; Dump a SIMPLE-BASE-STRING.
-;;; FIXME: should be called DUMP-SIMPLE-BASE-STRING then
-(defun dump-simple-string (s file)
-  (declare (type simple-base-string s))
-  (dump-fop* (length s) fop-small-string fop-string file)
-  (dump-characters-of-string s file)
+(defun dump-simple-base-string (s file)
+  #+sb-xc-host (declare (type simple-string s))
+  #-sb-xc-host (declare (type simple-base-string s))
+  (dump-fop* (length s) fop-small-base-string fop-base-string file)
+  (dump-base-chars-of-string s file)
   (values))
 
 ;;; If we get here, it is assumed that the symbol isn't in the table,
@@ -969,7 +979,7 @@
 		      file)
 	   (dump-word pname-length file)))
 
-    (dump-characters-of-string pname file)
+    (dump-base-chars-of-string pname file)
 
     (unless *cold-load-dump*
       (setf (gethash s (fasl-output-eq-table file))

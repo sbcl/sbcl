@@ -2099,8 +2099,8 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading vectors
 
-(clone-cold-fop (fop-string)
-		(fop-small-string)
+(clone-cold-fop (fop-base-string)
+		(fop-small-base-string)
   (let* ((len (clone-arg))
 	 (string (make-string len)))
     (read-string-as-bytes *fasl-input-stream* string)
