@@ -276,7 +276,7 @@
 									  bits)))
                                                               (* extra
 								 ,bits))))
-                                              (cond ((< value #x10000)
+                                              (cond ((< value #x100)
                                                      (inst bis old value old))
                                                     (t
                                                      (inst li value temp)
