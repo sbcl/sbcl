@@ -845,6 +845,27 @@
   (declare (optimize (speed 0) (safety 3) (space 0)
                      (debug 1) (compilation-speed 0)))
   (adjoin a b))
+
+;;; bug reported by Doug McNaught on sbcl-devel 2003-09-14:
+;;; COMPILE-FILE did not bind *READTABLE*
+(let* ((source "bug-doug-mcnaught-20030914.lisp")
+       (fasl (compile-file-pathname source)))
+  (labels ((check ()
+             (assert (null (get-macro-character #\]))))
+           (full-check ()
+             (check)
+             (assert (typep *bug-doug-mcnaught-20030914*
+                            '(simple-array (unsigned-byte 4) (*))))
+             (assert (equalp *bug-doug-mcnaught-20030914* #(1 2 3)))
+             (makunbound '*bug-doug-mcnaught-20030914*)))
+    (compile-file source)
+    (check)
+    (load fasl)
+    (full-check)
+    (load source)
+    (full-check)
+    (delete-file fasl)))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -2045,6 +2045,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     generic arithmetic in (SPEED 3) policy.
   * bug 145b fix: compiler used wrong type specifier while converting
     MEMBER-types to numeric.
+  * bug fix: COMPILE-FILE must bind *READTABLE*. (reported by Doug
+    McNaught)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very

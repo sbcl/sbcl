@@ -1342,33 +1342,35 @@
 ;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
   (declare (type source-info info))
-  (let* ((*block-compile* *block-compile-arg*)
-	 (*package* (sane-package))
-	 (*policy* *policy*)
-	 (*lexenv* (make-null-lexenv))
-	 (*source-info* info)
-	 (sb!xc:*compile-file-pathname* nil)
-	 (sb!xc:*compile-file-truename* nil)
-	 (*toplevel-lambdas* ())
-	 (*fun-names-in-this-file* ())
-	 (*compiler-error-bailout*
-	  (lambda ()
-	    (compiler-mumble "~2&; fatal error, aborting compilation~%")
-	    (return-from sub-compile-file (values nil t t))))
-	 (*current-path* nil)
-	 (*last-source-context* nil)
-	 (*last-original-source* nil)
-	 (*last-source-form* nil)
-	 (*last-format-string* nil)
-	 (*last-format-args* nil)
-	 (*last-message-count* 0)
-	 ;; FIXME: Do we need this rebinding here? It's a literal
-	 ;; translation of the old CMU CL rebinding to
-	 ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
-	 ;; and it's not obvious whether the rebinding to itself is
-	 ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
-	 (*info-environment* *info-environment*)
-	 (*gensym-counter* 0))
+  (let ((*package* (sane-package))
+        (*readtable* *readtable*)
+        (sb!xc:*compile-file-pathname* nil) ; really bound in
+        (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
+
+        (*policy* *policy*)
+        (*lexenv* (make-null-lexenv))
+        (*block-compile* *block-compile-arg*)
+        (*source-info* info)
+        (*toplevel-lambdas* ())
+        (*fun-names-in-this-file* ())
+        (*compiler-error-bailout*
+         (lambda ()
+           (compiler-mumble "~2&; fatal error, aborting compilation~%")
+           (return-from sub-compile-file (values nil t t))))
+        (*current-path* nil)
+        (*last-source-context* nil)
+        (*last-original-source* nil)
+        (*last-source-form* nil)
+        (*last-format-string* nil)
+        (*last-format-args* nil)
+        (*last-message-count* 0)
+        ;; FIXME: Do we need this rebinding here? It's a literal
+        ;; translation of the old CMU CL rebinding to
+        ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
+        ;; and it's not obvious whether the rebinding to itself is
+        ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
+        (*info-environment* *info-environment*)
+        (*gensym-counter* 0))
     (handler-case
 	(with-compilation-values
 	 (sb!xc:with-compilation-unit ()
