@@ -731,9 +731,9 @@
   (:policy :fast-safe)
   (:args (arg :scs (signed-reg) :target res))
   (:arg-types signed-num)
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:generator 30
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 28
     (move res arg)
     (inst cmp res 0)
     (inst jmp :ge POS)
@@ -742,7 +742,23 @@
     (inst bsr res res)
     (inst jmp :z zero)
     (inst inc res)
-    (inst shl res 2)
+    (inst jmp done)
+    ZERO
+    (inst xor res res)
+    DONE))
+
+(define-vop (unsigned-byte-32-len)
+  (:translate integer-length)
+  (:note "inline (unsigned-byte 32) integer-length")
+  (:policy :fast-safe)
+  (:args (arg :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 26
+    (inst bsr res arg)
+    (inst jmp :z zero)
+    (inst inc res)
     (inst jmp done)
     ZERO
     (inst xor res res)

@@ -1578,6 +1578,7 @@
 ;;;; bit manipulation
 
 (define-instruction bsf (segment dst src)
+  (:printer ext-reg-reg/mem ((op #b1011110) (width 0)))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (when (eq size :byte)
@@ -1588,6 +1589,7 @@
      (emit-ea segment src (reg-tn-encoding dst)))))
 
 (define-instruction bsr (segment dst src)
+  (:printer ext-reg-reg/mem ((op #b1011110) (width 1)))
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (when (eq size :byte)
