@@ -174,7 +174,6 @@
 		      ,@decls
 		      (block ,(fun-name-block-name name)
 			,@forms)))
-	   (want-to-inline )
 	   (inline-lambda
 	    (cond (;; Does the user not even want to inline?
 		   (not (inline-fun-name-p name))

@@ -60,12 +60,12 @@
 		,svar)))))
 
 ;;; WITH-mumble-STREAM calls the function in the given SLOT of the
-;;; STREAM with the ARGS for LISP-STREAMs, or the FUNCTION with the
+;;; STREAM with the ARGS for ANSI-STREAMs, or the FUNCTION with the
 ;;; ARGS for FUNDAMENTAL-STREAMs.
 (defmacro with-in-stream (stream (slot &rest args) &optional stream-dispatch)
   `(let ((stream (in-synonym-of ,stream)))
     ,(if stream-dispatch
-	 `(if (lisp-stream-p stream)
+	 `(if (ansi-stream-p stream)
 	      (funcall (,slot stream) stream ,@args)
 	      ,@(when stream-dispatch
 		  `(,(destructuring-bind (function &rest args) stream-dispatch
@@ -75,7 +75,7 @@
 (defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
   `(let ((stream (out-synonym-of ,stream)))
     ,(if stream-dispatch
-	 `(if (lisp-stream-p stream)
+	 `(if (ansi-stream-p stream)
 	      (funcall (,slot stream) stream ,@args)
 	      ,@(when stream-dispatch
 		  `(,(destructuring-bind (function &rest args) stream-dispatch
@@ -86,20 +86,20 @@
 
 ;;; This macro sets up some local vars for use by the
 ;;; FAST-READ-CHAR macro within the enclosed lexical scope. The stream
-;;; is assumed to be a LISP-STREAM.
+;;; is assumed to be a ANSI-STREAM.
 (defmacro prepare-for-fast-read-char (stream &body forms)
   `(let* ((%frc-stream% ,stream)
-	  (%frc-method% (lisp-stream-in %frc-stream%))
-	  (%frc-buffer% (lisp-stream-in-buffer %frc-stream%))
-	  (%frc-index% (lisp-stream-in-index %frc-stream%)))
+	  (%frc-method% (ansi-stream-in %frc-stream%))
+	  (%frc-buffer% (ansi-stream-in-buffer %frc-stream%))
+	  (%frc-index% (ansi-stream-in-index %frc-stream%)))
      (declare (type index %frc-index%)
-	      (type lisp-stream %frc-stream%))
+	      (type ansi-stream %frc-stream%))
      ,@forms))
 
 ;;; This macro must be called after one is done with FAST-READ-CHAR
-;;; inside its scope to decache the lisp-stream-in-index.
+;;; inside its scope to decache the ANSI-STREAM-IN-INDEX.
 (defmacro done-with-fast-read-char ()
-  `(setf (lisp-stream-in-index %frc-stream%) %frc-index%))
+  `(setf (ansi-stream-in-index %frc-stream%) %frc-index%))
 
 ;;; a macro with the same calling convention as READ-CHAR, to be used
 ;;; within the scope of a PREPARE-FOR-FAST-READ-CHAR
@@ -107,9 +107,9 @@
   `(cond
     ((not %frc-buffer%)
      (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
-    ((= %frc-index% +in-buffer-length+)
+    ((= %frc-index% +ansi-stream-in-buffer-length+)
      (prog1 (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
-	    (setq %frc-index% (lisp-stream-in-index %frc-stream%))))
+	    (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
     (t
      (prog1 (code-char (aref %frc-buffer% %frc-index%))
 	    (incf %frc-index%)))))
@@ -117,7 +117,7 @@
 ;;;; And these for the fasloader...
 
 ;;; Just like PREPARE-FOR-FAST-READ-CHAR except that we get the BIN
-;;; method. The stream is assumed to be a LISP-STREAM.
+;;; method. The stream is assumed to be a ANSI-STREAM.
 ;;;
 ;;; KLUDGE: It seems weird to have to remember to explicitly call
 ;;; DONE-WITH-FAST-READ-BYTE at the end of this, given that we're
@@ -128,11 +128,11 @@
 ;;; for the FAST-READ-CHAR stuff) -- WHN 19990825
 (defmacro prepare-for-fast-read-byte (stream &body forms)
   `(let* ((%frc-stream% ,stream)
-	  (%frc-method% (lisp-stream-bin %frc-stream%))
-	  (%frc-buffer% (lisp-stream-in-buffer %frc-stream%))
-	  (%frc-index% (lisp-stream-in-index %frc-stream%)))
+	  (%frc-method% (ansi-stream-bin %frc-stream%))
+	  (%frc-buffer% (ansi-stream-in-buffer %frc-stream%))
+	  (%frc-index% (ansi-stream-in-index %frc-stream%)))
      (declare (type index %frc-index%)
-	      (type lisp-stream %frc-stream%))
+	      (type ansi-stream %frc-stream%))
      ,@forms))
 
 ;;; Similar to fast-read-char, but we use a different refill routine & don't
@@ -145,9 +145,9 @@
     (cond
      ((not %frc-buffer%)
       (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
-     ((= %frc-index% +in-buffer-length+)
+     ((= %frc-index% +ansi-stream-in-buffer-length+)
       (prog1 (fast-read-byte-refill %frc-stream% ,eof-error-p ,eof-value)
-	(setq %frc-index% (lisp-stream-in-index %frc-stream%))))
+	(setq %frc-index% (ansi-stream-in-index %frc-stream%))))
      (t
       (prog1 (aref %frc-buffer% %frc-index%)
 	(incf %frc-index%))))))

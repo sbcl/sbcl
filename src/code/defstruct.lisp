@@ -1011,8 +1011,8 @@
 	      (class-layout (sb!xc:find-class
 			     (or (first superclass-opt)
 				 'structure-object))))))
-    (if (eq (dd-name info) 'lisp-stream)
-	;; a hack to added the stream class as a mixin for LISP-STREAMs
+    (if (eq (dd-name info) 'ansi-stream)
+	;; a hack to add the CL:STREAM class as a mixin for ANSI-STREAMs
 	(concatenate 'simple-vector
 		     (layout-inherits super)
 		     (vector super
@@ -1306,8 +1306,8 @@
 				(sb!xc:typep x (sb!xc:find-class class))))
 			    (fdefinition constructor)))
     (setf (class-direct-superclasses class)
-	  (if (eq (dd-name info) 'lisp-stream)
-	      ;; a hack to add STREAM as a superclass mixin to LISP-STREAMs
+	  (if (eq (dd-name info) 'ansi-stream)
+	      ;; a hack to add CL:STREAM as a superclass mixin to ANSI-STREAMs
 	      (list (layout-class (svref inherits (1- (length inherits))))
 		    (layout-class (svref inherits (- (length inherits) 2))))
 	      (list (layout-class (svref inherits (1- (length inherits)))))))

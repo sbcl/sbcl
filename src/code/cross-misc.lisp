@@ -41,10 +41,10 @@
 (defvar *after-gc-hooks* nil)
 
 ;;; The GENESIS function works with fasl code which would, in the
-;;; target SBCL, work on LISP-STREAMs. A true LISP-STREAM doesn't seem
-;;; to be a meaningful concept in ANSI Common Lisp, but we can fake it
-;;; acceptably well using a standard STREAM.
-(deftype lisp-stream () 'stream)
+;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
+;;; Gray streams). In ANSI Common Lisp, an ANSI-STREAM is just a
+;;; CL:STREAM.
+(deftype ansi-stream () 'stream)
 
 ;;; In the target SBCL, the INSTANCE type refers to a base
 ;;; implementation for compound types. There's no way to express

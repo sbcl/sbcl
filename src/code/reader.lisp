@@ -225,7 +225,7 @@
   ;; This flushes whitespace chars, returning the last char it read (a
   ;; non-white one). It always gets an error on end-of-file.
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-char stream
 	  (do ((attribute-table (character-attribute-table *readtable*))
 	       (char (fast-read-char t) (fast-read-char t)))
@@ -448,7 +448,7 @@
 (defun read-comment (stream ignore)
   (declare (ignore ignore))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-char stream
 	  (do ((char (fast-read-char nil nil)
 		     (fast-read-char nil nil)))
@@ -511,7 +511,7 @@
   ;; For a very long string, this could end up bloating the read buffer.
   (reset-read-buffer)
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-char stream
 	  (do ((char (fast-read-char t) (fast-read-char t)))
 	      ((char= char closech)
@@ -879,7 +879,7 @@
 	(t (go SYMBOL)))
      SYMBOL ; not a dot, dots, or number
       (let ((stream (in-synonym-of stream)))
-	(if (lisp-stream-p stream)
+	(if (ansi-stream-p stream)
 	    (prepare-for-fast-read-char stream
 	      (prog ()
 	       SYMBOL-LOOP

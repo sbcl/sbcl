@@ -313,7 +313,7 @@
 (defun sharp-vertical-bar (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-char stream
 	  (do ((level 1)
 	       (prev (fast-read-char) char)

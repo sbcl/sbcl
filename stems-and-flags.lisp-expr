@@ -125,7 +125,7 @@
 
  ("src/code/pcounter" :not-host)
 
- ("src/code/lisp-stream" :not-host)
+ ("src/code/ansi-stream" :not-host)
 
  ("src/code/sysmacs" :not-host)
 

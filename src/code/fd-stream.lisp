@@ -43,7 +43,7 @@
 
 (defstruct (fd-stream
 	    (:constructor %make-fd-stream)
-	    (:include lisp-stream
+	    (:include ansi-stream
 		      (misc #'fd-stream-misc-routine))
 	    (:copier nil))
 
@@ -683,8 +683,8 @@
 	(when (eql size 1)
 	  (setf (fd-stream-n-bin fd-stream) #'fd-stream-read-n-bytes)
 	  (when buffer-p
-	    (setf (lisp-stream-in-buffer fd-stream)
-		  (make-array +in-buffer-length+
+	    (setf (ansi-stream-in-buffer fd-stream)
+		  (make-array +ansi-stream-in-buffer-length+
 			      :element-type '(unsigned-byte 8)))))
 	(setf input-size size)
 	(setf input-type type)))

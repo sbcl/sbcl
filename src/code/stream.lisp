@@ -61,80 +61,6 @@
 (defun do-nothing (&rest ignore)
   (declare (ignore ignore)))
 
-;;; HOW THE STREAM STRUCTURE IS USED:
-;;;
-;;; Many of the slots of the stream structure contain functions
-;;; which are called to perform some operation on the stream. Closed
-;;; streams have #'CLOSED-FLAME in all of their function slots. If
-;;; one side of an I/O or echo stream is closed, the whole stream is
-;;; considered closed. The functions in the operation slots take
-;;; arguments as follows:
-;;;
-;;; In:			Stream, Eof-Errorp, Eof-Value
-;;; Bin:		Stream, Eof-Errorp, Eof-Value
-;;; N-Bin:		Stream, Buffer, Start, Numbytes, Eof-Errorp
-;;; Out:		Stream, Character
-;;; Bout:		Stream, Integer
-;;; Sout:		Stream, String, Start, End
-;;; Misc:		Stream, Operation, &Optional Arg1, Arg2
-;;;
-;;; In order to save space, some of the less common stream operations
-;;; are handled by just one function, the MISC method. This function
-;;; is passed a keyword which indicates the operation to perform.
-;;; The following keywords are used:
-;;;  :listen 		- Return the following values:
-;;; 			     t if any input waiting.
-;;; 			     :eof if at eof.
-;;; 			     nil if no input is available and not at eof.
-;;;  :unread		- Unread the character Arg.
-;;;  :close		- Do any stream specific stuff to close the stream.
-;;;			  The methods are set to closed-flame by the close
-;;;			  function, so that need not be done by this
-;;;			  function.
-;;;  :clear-input 	- Clear any unread input
-;;;  :finish-output,
-;;;  :force-output	- Cause output to happen
-;;;  :clear-output	- Clear any undone output
-;;;  :element-type 	- Return the type of element the stream deals with.
-;;;  :line-length	- Return the length of a line of output.
-;;;  :charpos		- Return current output position on the line.
-;;;  :file-length	- Return the file length of a file stream.
-;;;  :file-position	- Return or change the current position of a
-;;;                       file stream.
-;;;  :file-name		- Return the name of an associated file.
-;;;  :interactive-p     - Is this an interactive device?
-;;;
-;;; In order to do almost anything useful, it is necessary to
-;;; define a new type of structure that includes stream, so that the
-;;; stream can have some state information.
-;;;
-;;; THE STREAM IN-BUFFER:
-;;;
-;;; The IN-BUFFER in the stream holds characters or bytes that
-;;; are ready to be read by some input function. If there is any
-;;; stuff in the IN-BUFFER, then the reading function can use it
-;;; without calling any stream method. Any stream may put stuff in
-;;; the IN-BUFFER, and may also assume that any input in the IN-BUFFER
-;;; has been consumed before any in-method is called. If a text
-;;; stream has in IN-BUFFER, then the first character should not be
-;;; used to buffer normal input so that it is free for unreading into.
-;;;
-;;; The IN-BUFFER slot is a vector +IN-BUFFER-LENGTH+ long. The
-;;; IN-INDEX is the index in the IN-BUFFER of the first available
-;;; object. The available objects are thus between IN-INDEX and the
-;;; length of the IN-BUFFER.
-;;;
-;;; When this buffer is only accessed by the normal stream
-;;; functions, the number of function calls is halved, thus
-;;; potentially doubling the speed of simple operations. If the
-;;; FAST-READ-CHAR and FAST-READ-BYTE macros are used, nearly all
-;;; function call overhead is removed, vastly speeding up these
-;;; important operations.
-;;;
-;;; If a stream does not have an IN-BUFFER, then the IN-BUFFER slot
-;;; must be nil, and the IN-INDEX must be +IN-BUFFER-LENGTH+. These are
-;;; the default values for the slots.
-
 ;;; stream manipulation functions
 
 (defun input-stream-p (stream)
@@ -145,14 +71,14 @@
     (setf stream
 	  (symbol-value (synonym-stream-symbol stream))))
 
-  (and (lisp-stream-p stream)
-       (not (eq (lisp-stream-in stream) #'closed-flame))
+  (and (ansi-stream-p stream)
+       (not (eq (ansi-stream-in stream) #'closed-flame))
        ;;; KLUDGE: It's probably not good to have EQ tests on function
        ;;; values like this. What if someone's redefined the function?
        ;;; Is there a better way? (Perhaps just VALID-FOR-INPUT and
        ;;; VALID-FOR-OUTPUT flags? -- WHN 19990902
-       (or (not (eq (lisp-stream-in stream) #'ill-in))
-	   (not (eq (lisp-stream-bin stream) #'ill-bin)))))
+       (or (not (eq (ansi-stream-in stream) #'ill-in))
+	   (not (eq (ansi-stream-bin stream) #'ill-bin)))))
 
 (defun output-stream-p (stream)
   (declare (type stream stream))
@@ -162,38 +88,38 @@
     (setf stream (symbol-value
 		  (synonym-stream-symbol stream))))
 
-  (and (lisp-stream-p stream)
-       (not (eq (lisp-stream-in stream) #'closed-flame))
-       (or (not (eq (lisp-stream-out stream) #'ill-out))
-	   (not (eq (lisp-stream-bout stream) #'ill-bout)))))
+  (and (ansi-stream-p stream)
+       (not (eq (ansi-stream-in stream) #'closed-flame))
+       (or (not (eq (ansi-stream-out stream) #'ill-out))
+	   (not (eq (ansi-stream-bout stream) #'ill-bout)))))
 
 (defun open-stream-p (stream)
   (declare (type stream stream))
-  (not (eq (lisp-stream-in stream) #'closed-flame)))
+  (not (eq (ansi-stream-in stream) #'closed-flame)))
 
 (defun stream-element-type (stream)
   (declare (type stream stream))
-  (funcall (lisp-stream-misc stream) stream :element-type))
+  (funcall (ansi-stream-misc stream) stream :element-type))
 
 (defun interactive-stream-p (stream)
   (declare (type stream stream))
-  (funcall (lisp-stream-misc stream) stream :interactive-p))
+  (funcall (ansi-stream-misc stream) stream :interactive-p))
 
 (defun close (stream &key abort)
   (declare (type stream stream))
   (when (open-stream-p stream)
-    (funcall (lisp-stream-misc stream) stream :close abort))
+    (funcall (ansi-stream-misc stream) stream :close abort))
   t)
 
 (defun set-closed-flame (stream)
-  (setf (lisp-stream-in stream) #'closed-flame)
-  (setf (lisp-stream-bin stream) #'closed-flame)
-  (setf (lisp-stream-n-bin stream) #'closed-flame)
-  (setf (lisp-stream-in stream) #'closed-flame)
-  (setf (lisp-stream-out stream) #'closed-flame)
-  (setf (lisp-stream-bout stream) #'closed-flame)
-  (setf (lisp-stream-sout stream) #'closed-flame)
-  (setf (lisp-stream-misc stream) #'closed-flame))
+  (setf (ansi-stream-in stream) #'closed-flame)
+  (setf (ansi-stream-bin stream) #'closed-flame)
+  (setf (ansi-stream-n-bin stream) #'closed-flame)
+  (setf (ansi-stream-in stream) #'closed-flame)
+  (setf (ansi-stream-out stream) #'closed-flame)
+  (setf (ansi-stream-bout stream) #'closed-flame)
+  (setf (ansi-stream-sout stream) #'closed-flame)
+  (setf (ansi-stream-misc stream) #'closed-flame))
 
 ;;;; file position and file length
 
@@ -203,12 +129,14 @@
   (declare (type (or index (member nil :start :end)) position))
   (cond
    (position
-    (setf (lisp-stream-in-index stream) +in-buffer-length+)
-    (funcall (lisp-stream-misc stream) stream :file-position position))
+    (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+    (funcall (ansi-stream-misc stream) stream :file-position position))
    (t
-    (let ((res (funcall (lisp-stream-misc stream) stream :file-position nil)))
+    (let ((res (funcall (ansi-stream-misc stream) stream :file-position nil)))
       (when res
-	(- res (- +in-buffer-length+ (lisp-stream-in-index stream))))))))
+	(- res
+	   (- +ansi-stream-in-buffer-length+
+	      (ansi-stream-in-index stream))))))))
 
 ;;; This is a literal translation of the ANSI glossary entry "stream
 ;;; associated with a file".
@@ -246,7 +174,7 @@
 (defun file-length (stream)
   (declare (type (or file-stream synonym-stream) stream))
   (stream-must-be-associated-with-file stream)
-  (funcall (lisp-stream-misc stream) stream :file-length))
+  (funcall (ansi-stream-misc stream) stream :file-length))
 
 ;;;; input functions
 
@@ -254,7 +182,7 @@
 			    recursive-p)
   (declare (ignore recursive-p))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-char stream
 	  (let ((res (make-string 80))
 		(len 80)
@@ -299,7 +227,7 @@
 			    recursive-p)
   (declare (ignore recursive-p))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-char stream
 	  (prog1
 	      (fast-read-char eof-error-p eof-value)
@@ -312,16 +240,16 @@
 
 (defun unread-char (character &optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
-	(let ((index (1- (lisp-stream-in-index stream)))
-	      (buffer (lisp-stream-in-buffer stream)))
+    (if (ansi-stream-p stream)
+	(let ((index (1- (ansi-stream-in-index stream)))
+	      (buffer (ansi-stream-in-buffer stream)))
 	  (declare (fixnum index))
 	  (when (minusp index) (error "nothing to unread"))
 	  (cond (buffer
 		 (setf (aref buffer index) (char-code character))
-		 (setf (lisp-stream-in-index stream) index))
+		 (setf (ansi-stream-in-index stream) index))
 		(t
-		 (funcall (lisp-stream-misc stream) stream
+		 (funcall (ansi-stream-misc stream) stream
 			  :unread character))))
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(stream-unread-char stream character)))
@@ -345,7 +273,7 @@
 	   :format-control "~@<bad PEEK-TYPE=~S, ~_expected ~S~:>"
 	   :format-arguments (list peek-type '(or character boolean))))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(let ((char (read-char stream eof-error-p eof-value)))
 	  (cond ((eq char eof-value) char)
 		((characterp peek-type)
@@ -394,10 +322,11 @@
 
 (defun listen (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
-	(or (/= (the fixnum (lisp-stream-in-index stream)) +in-buffer-length+)
+    (if (ansi-stream-p stream)
+	(or (/= (the fixnum (ansi-stream-in-index stream))
+		+ansi-stream-in-buffer-length+)
 	    ;; Test for T explicitly since misc methods return :EOF sometimes.
-	    (eq (funcall (lisp-stream-misc stream) stream :listen) t))
+	    (eq (funcall (ansi-stream-misc stream) stream :listen) t))
 	;; Fall through to Gray streams FUNDAMENTAL-STREAM case.
 	(stream-listen stream))))
 
@@ -407,8 +336,8 @@
 				    recursive-p)
   (declare (ignore recursive-p))
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
-	(if (funcall (lisp-stream-misc stream) stream :listen)
+    (if (ansi-stream-p stream)
+	(if (funcall (ansi-stream-misc stream) stream :listen)
 	    ;; On T or :EOF get READ-CHAR to do the work.
 	    (read-char stream eof-error-p eof-value)
 	    nil)
@@ -420,9 +349,9 @@
 
 (defun clear-input (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
-    (cond ((lisp-stream-p stream)
-	   (setf (lisp-stream-in-index stream) +in-buffer-length+)
-	   (funcall (lisp-stream-misc stream) stream :clear-input))
+    (cond ((ansi-stream-p stream)
+	   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+	   (funcall (ansi-stream-misc stream) stream :clear-input))
 	  (t
 	   (stream-clear-input stream))))
   nil)
@@ -430,7 +359,7 @@
 (declaim (maybe-inline read-byte))
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
   (let ((stream (in-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(prepare-for-fast-read-byte stream
 	  (prog1
 	      (fast-read-byte eof-error-p eof-value t)
@@ -452,17 +381,17 @@
 ;;; If we ever need it, it could be added later as a new variant N-BIN
 ;;; method (perhaps N-BIN-ASAP?) or something.
 (defun read-n-bytes (stream buffer start numbytes &optional (eof-error-p t))
-  (declare (type lisp-stream stream)
+  (declare (type ansi-stream stream)
 	   (type index numbytes start)
 	   (type (or (simple-array * (*)) system-area-pointer) buffer))
-  (let* ((stream (in-synonym-of stream lisp-stream))
-	 (in-buffer (lisp-stream-in-buffer stream))
-	 (index (lisp-stream-in-index stream))
-	 (num-buffered (- +in-buffer-length+ index)))
+  (let* ((stream (in-synonym-of stream ansi-stream))
+	 (in-buffer (ansi-stream-in-buffer stream))
+	 (index (ansi-stream-in-index stream))
+	 (num-buffered (- +ansi-stream-in-buffer-length+ index)))
     (declare (fixnum index num-buffered))
     (cond
      ((not in-buffer)
-      (funcall (lisp-stream-n-bin stream)
+      (funcall (ansi-stream-n-bin stream)
 	       stream
 	       buffer
 	       start
@@ -471,13 +400,13 @@
      ((<= numbytes num-buffered)
       (%byte-blt in-buffer index
 		 buffer start (+ start numbytes))
-      (setf (lisp-stream-in-index stream) (+ index numbytes))
+      (setf (ansi-stream-in-index stream) (+ index numbytes))
       numbytes)
      (t
       (let ((end (+ start num-buffered)))
 	(%byte-blt in-buffer index buffer start end)
-	(setf (lisp-stream-in-index stream) +in-buffer-length+)
-	(+ (funcall (lisp-stream-n-bin stream)
+	(setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+	(+ (funcall (ansi-stream-n-bin stream)
 		    stream
 		    buffer
 		    end
@@ -489,48 +418,51 @@
 ;;; unreading
 ;;;
 ;;; (It's 4 instead of 1 to allow word-aligned copies.)
-(defconstant +in-buffer-extra+ 4) ; FIXME: should be symbolic constant
+(defconstant +ansi-stream-in-buffer-extra+
+  4) ; FIXME: should be symbolic constant
 
 ;;; This function is called by the FAST-READ-CHAR expansion to refill
 ;;; the IN-BUFFER for text streams. There is definitely an IN-BUFFER,
 ;;; and hence must be an N-BIN method.
 (defun fast-read-char-refill (stream eof-error-p eof-value)
-  (let* ((ibuf (lisp-stream-in-buffer stream))
-	 (count (funcall (lisp-stream-n-bin stream)
+  (let* ((ibuf (ansi-stream-in-buffer stream))
+	 (count (funcall (ansi-stream-n-bin stream)
 			 stream
 			 ibuf
-			 +in-buffer-extra+
-			 (- +in-buffer-length+ +in-buffer-extra+)
+			 +ansi-stream-in-buffer-extra+
+			 (- +ansi-stream-in-buffer-length+
+			    +ansi-stream-in-buffer-extra+)
 			 nil))
-	 (start (- +in-buffer-length+ count)))
+	 (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
     (cond ((zerop count)
-	   (setf (lisp-stream-in-index stream) +in-buffer-length+)
-	   (funcall (lisp-stream-in stream) stream eof-error-p eof-value))
+	   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+	   (funcall (ansi-stream-in stream) stream eof-error-p eof-value))
 	  (t
-	   (when (/= start +in-buffer-extra+)
-	     (bit-bash-copy ibuf (+ (* +in-buffer-extra+ sb!vm:n-byte-bits)
+	   (when (/= start +ansi-stream-in-buffer-extra+)
+	     (bit-bash-copy ibuf (+ (* +ansi-stream-in-buffer-extra+
+				       sb!vm:n-byte-bits)
 				    (* sb!vm:vector-data-offset
 				       sb!vm:n-word-bits))
 			    ibuf (+ (the index (* start sb!vm:n-byte-bits))
 				    (* sb!vm:vector-data-offset
 				       sb!vm:n-word-bits))
 			    (* count sb!vm:n-byte-bits)))
-	   (setf (lisp-stream-in-index stream) (1+ start))
+	   (setf (ansi-stream-in-index stream) (1+ start))
 	   (code-char (aref ibuf start))))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
 ;;; leave room for unreading.
 (defun fast-read-byte-refill (stream eof-error-p eof-value)
-  (let* ((ibuf (lisp-stream-in-buffer stream))
-	 (count (funcall (lisp-stream-n-bin stream) stream
-			 ibuf 0 +in-buffer-length+
+  (let* ((ibuf (ansi-stream-in-buffer stream))
+	 (count (funcall (ansi-stream-n-bin stream) stream
+			 ibuf 0 +ansi-stream-in-buffer-length+
 			 nil))
-	 (start (- +in-buffer-length+ count)))
+	 (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
     (cond ((zerop count)
-	   (setf (lisp-stream-in-index stream) +in-buffer-length+)
-	   (funcall (lisp-stream-bin stream) stream eof-error-p eof-value))
+	   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+	   (funcall (ansi-stream-bin stream) stream eof-error-p eof-value))
 	  (t
 	   (unless (zerop start)
 	     (bit-bash-copy ibuf (* sb!vm:vector-data-offset sb!vm:n-word-bits)
@@ -538,25 +470,25 @@
 				    (* sb!vm:vector-data-offset
 				       sb!vm:n-word-bits))
 			    (* count sb!vm:n-byte-bits)))
-	   (setf (lisp-stream-in-index stream) (1+ start))
+	   (setf (ansi-stream-in-index stream) (1+ start))
 	   (aref ibuf start)))))
 
 ;;; output functions
 
 (defun write-char (character &optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-out character)
+  (with-out-stream stream (ansi-stream-out character)
 		   (stream-write-char character))
   character)
 
 (defun terpri (&optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-out #\newline) (stream-terpri))
+  (with-out-stream stream (ansi-stream-out #\newline) (stream-terpri))
   nil)
 
 (defun fresh-line (&optional (stream *standard-output*))
   (let ((stream (out-synonym-of stream)))
-    (if (lisp-stream-p stream)
+    (if (ansi-stream-p stream)
 	(when (/= (or (charpos stream) 1) 0)
-	  (funcall (lisp-stream-out stream) stream #\newline)
+	  (funcall (ansi-stream-out stream) stream #\newline)
 	  t)
 	;; must be Gray streams FUNDAMENTAL-STREAM
 	(stream-fresh-line stream))))
@@ -586,13 +518,13 @@
 	   string))
 
   (let ((stream (out-synonym-of stream)))
-    (cond ((lisp-stream-p stream)
+    (cond ((ansi-stream-p stream)
 	   (if (array-header-p string)
 	       (with-array-data ((data string) (offset-start start)
 				 (offset-end end))
-		 (funcall (lisp-stream-sout stream)
+		 (funcall (ansi-stream-sout stream)
 			  stream data offset-start offset-end))
-	       (funcall (lisp-stream-sout stream) stream string start end))
+	       (funcall (ansi-stream-sout stream) stream string start end))
 	   string)
 	  (t ; must be Gray streams FUNDAMENTAL-STREAM
 	   (stream-write-string stream string start end)))))
@@ -606,33 +538,33 @@
   string)
 
 (defun charpos (&optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-misc :charpos) (stream-line-column)))
+  (with-out-stream stream (ansi-stream-misc :charpos) (stream-line-column)))
 
 (defun line-length (&optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-misc :line-length)
+  (with-out-stream stream (ansi-stream-misc :line-length)
 		   (stream-line-length)))
 
 (defun finish-output (&optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-misc :finish-output)
+  (with-out-stream stream (ansi-stream-misc :finish-output)
 		   (stream-finish-output))
   nil)
 
 (defun force-output (&optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-misc :force-output)
+  (with-out-stream stream (ansi-stream-misc :force-output)
 		   (stream-force-output))
   nil)
 
 (defun clear-output (&optional (stream *standard-output*))
-  (with-out-stream stream (lisp-stream-misc :clear-output)
+  (with-out-stream stream (ansi-stream-misc :clear-output)
 		   (stream-force-output))
   nil)
 
 (defun write-byte (integer stream)
-  (with-out-stream stream (lisp-stream-bout integer)
+  (with-out-stream stream (ansi-stream-bout integer)
 		   (stream-write-byte integer))
   integer)
 
-;;; This is called from LISP-STREAM routines that encapsulate CLOS
+;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
 ;;; appropriate Gray stream functions.
 (defun stream-misc-dispatch (stream operation &optional arg1 arg2)
@@ -670,7 +602,7 @@
 
 ;;;; broadcast streams
 
-(defstruct (broadcast-stream (:include lisp-stream
+(defstruct (broadcast-stream (:include ansi-stream
 				       (out #'broadcast-out)
 				       (bout #'broadcast-bout)
 				       (sout #'broadcast-sout)
@@ -699,12 +631,12 @@
 (macrolet ((out-fun (fun method stream-method &rest args)
 	     `(defun ,fun (stream ,@args)
 		(dolist (stream (broadcast-stream-streams stream))
-		  (if (lisp-stream-p stream)
+		  (if (ansi-stream-p stream)
 		      (funcall (,method stream) stream ,@args)
 		      (,stream-method stream ,@args))))))
-  (out-fun broadcast-out lisp-stream-out stream-write-char char)
-  (out-fun broadcast-bout lisp-stream-bout stream-write-byte byte)
-  (out-fun broadcast-sout lisp-stream-sout stream-write-string
+  (out-fun broadcast-out ansi-stream-out stream-write-char char)
+  (out-fun broadcast-bout ansi-stream-bout stream-write-byte byte)
+  (out-fun broadcast-sout ansi-stream-sout stream-write-string
 	   string start end))
 
 (defun broadcast-misc (stream operation &optional arg1 arg2)
@@ -728,14 +660,14 @@
        (let ((res nil))
 	 (dolist (stream streams res)
 	   (setq res
-		 (if (lisp-stream-p stream)
-		     (funcall (lisp-stream-misc stream) stream operation
+		 (if (ansi-stream-p stream)
+		     (funcall (ansi-stream-misc stream) stream operation
 			      arg1 arg2)
 		     (stream-misc-dispatch stream operation arg1 arg2)))))))))
 
 ;;;; synonym streams
 
-(defstruct (synonym-stream (:include lisp-stream
+(defstruct (synonym-stream (:include ansi-stream
 				     (in #'synonym-in)
 				     (bin #'synonym-bin)
 				     (n-bin #'synonym-n-bin)
@@ -757,12 +689,12 @@
 	     `(defun ,name (stream ,@args)
 		(declare (optimize (safety 1)))
 		(let ((syn (symbol-value (synonym-stream-symbol stream))))
-		  (if (lisp-stream-p syn)
+		  (if (ansi-stream-p syn)
 		      (funcall (,slot syn) syn ,@args)
 		      (,stream-method syn ,@args))))))
-  (out-fun synonym-out lisp-stream-out stream-write-char ch)
-  (out-fun synonym-bout lisp-stream-bout stream-write-byte n)
-  (out-fun synonym-sout lisp-stream-sout stream-write-string string start end))
+  (out-fun synonym-out ansi-stream-out stream-write-char ch)
+  (out-fun synonym-bout ansi-stream-bout stream-write-byte n)
+  (out-fun synonym-sout ansi-stream-sout stream-write-string string start end))
 
 ;;; For the input methods, we just call the corresponding function on the
 ;;; synonymed stream. These functions deal with getting input out of
@@ -779,24 +711,24 @@
 (defun synonym-misc (stream operation &optional arg1 arg2)
   (declare (optimize (safety 1)))
   (let ((syn (symbol-value (synonym-stream-symbol stream))))
-    (if (lisp-stream-p syn)
+    (if (ansi-stream-p syn)
 	;; We have to special-case some operations which interact with
 	;; the in-buffer of the wrapped stream, since just calling
-	;; LISP-STREAM-MISC on them
+	;; ANSI-STREAM-MISC on them
  	(case operation
-	  (:listen (or (/= (the fixnum (lisp-stream-in-index syn))
-			   +in-buffer-length+)
-		       (funcall (lisp-stream-misc syn) syn :listen)))
+	  (:listen (or (/= (the fixnum (ansi-stream-in-index syn))
+			   +ansi-stream-in-buffer-length+)
+		       (funcall (ansi-stream-misc syn) syn :listen)))
           (:clear-input (clear-input syn))
           (:unread (unread-char arg1 syn))
 	  (t
-	   (funcall (lisp-stream-misc syn) syn operation arg1 arg2)))
+	   (funcall (ansi-stream-misc syn) syn operation arg1 arg2)))
 	(stream-misc-dispatch syn operation arg1 arg2))))
 
 ;;;; two-way streams
 
 (defstruct (two-way-stream
-	    (:include lisp-stream
+	    (:include ansi-stream
 		      (in #'two-way-in)
 		      (bin #'two-way-bin)
 		      (n-bin #'two-way-n-bin)
@@ -844,12 +776,12 @@
 (macrolet ((out-fun (name slot stream-method &rest args)
 	     `(defun ,name (stream ,@args)
 		(let ((syn (two-way-stream-output-stream stream)))
-		  (if (lisp-stream-p syn)
+		  (if (ansi-stream-p syn)
 		      (funcall (,slot syn) syn ,@args)
 		      (,stream-method syn ,@args))))))
-  (out-fun two-way-out lisp-stream-out stream-write-char ch)
-  (out-fun two-way-bout lisp-stream-bout stream-write-byte n)
-  (out-fun two-way-sout lisp-stream-sout stream-write-string string start end))
+  (out-fun two-way-out ansi-stream-out stream-write-char ch)
+  (out-fun two-way-bout ansi-stream-bout stream-write-byte n)
+  (out-fun two-way-sout ansi-stream-sout stream-write-string string start end))
 
 (macrolet ((in-fun (name fun &rest args)
 	     `(defun ,name (stream ,@args)
@@ -862,17 +794,18 @@
 (defun two-way-misc (stream operation &optional arg1 arg2)
   (let* ((in (two-way-stream-input-stream stream))
 	 (out (two-way-stream-output-stream stream))
-	 (in-lisp-stream-p (lisp-stream-p in))
-	 (out-lisp-stream-p (lisp-stream-p out)))
+	 (in-ansi-stream-p (ansi-stream-p in))
+	 (out-ansi-stream-p (ansi-stream-p out)))
     (case operation
       (:listen
-       (if in-lisp-stream-p
-	   (or (/= (the fixnum (lisp-stream-in-index in)) +in-buffer-length+)
-	       (funcall (lisp-stream-misc in) in :listen))
+       (if in-ansi-stream-p
+	   (or (/= (the fixnum (ansi-stream-in-index in))
+		   +ansi-stream-in-buffer-length+)
+	       (funcall (ansi-stream-misc in) in :listen))
 	   (stream-listen in)))
       ((:finish-output :force-output :clear-output)
-       (if out-lisp-stream-p
-	   (funcall (lisp-stream-misc out) out operation arg1 arg2)
+       (if out-ansi-stream-p
+	   (funcall (ansi-stream-misc out) out operation arg1 arg2)
 	   (stream-misc-dispatch out operation arg1 arg2)))
       (:clear-input (clear-input in))
       (:unread (unread-char arg1 in))
@@ -884,17 +817,17 @@
       (:close
        (set-closed-flame stream))
       (t
-       (or (if in-lisp-stream-p
-	       (funcall (lisp-stream-misc in) in operation arg1 arg2)
+       (or (if in-ansi-stream-p
+	       (funcall (ansi-stream-misc in) in operation arg1 arg2)
 	       (stream-misc-dispatch in operation arg1 arg2))
-	   (if out-lisp-stream-p
-	       (funcall (lisp-stream-misc out) out operation arg1 arg2)
+	   (if out-ansi-stream-p
+	       (funcall (ansi-stream-misc out) out operation arg1 arg2)
 	       (stream-misc-dispatch out operation arg1 arg2)))))))
 
 ;;;; concatenated streams
 
 (defstruct (concatenated-stream
-	    (:include lisp-stream
+	    (:include ansi-stream
 		      (in #'concatenated-in)
 		      (bin #'concatenated-bin)
 		      (n-bin #'concatenated-n-bin)
@@ -977,8 +910,8 @@
 	(case operation
 	  (:listen
 	   (loop
-	     (let ((stuff (if (lisp-stream-p current)
-			      (funcall (lisp-stream-misc current) current
+	     (let ((stuff (if (ansi-stream-p current)
+			      (funcall (ansi-stream-misc current) current
 				       :listen)
 			      (stream-misc-dispatch current :listen))))
 	       (cond ((eq stuff :eof)
@@ -1000,8 +933,8 @@
           (:close
 	   (set-closed-flame stream))
 	  (t
-	   (if (lisp-stream-p current)
-	       (funcall (lisp-stream-misc current) current operation arg1 arg2)
+	   (if (ansi-stream-p current)
+	       (funcall (ansi-stream-misc current) current operation arg1 arg2)
 	       (stream-misc-dispatch current operation arg1 arg2))))))))
 
 ;;;; echo streams
@@ -1028,13 +961,13 @@
 		    (let* ((in (echo-stream-input-stream stream))
 			   (out (echo-stream-output-stream stream))
 			   (result (,fun in ,@args)))
-		      (if (lisp-stream-p out)
+		      (if (ansi-stream-p out)
 			  (funcall (,out-slot out) out result)
 			  (,stream-method out result))
 		      result)))))
-  (in-fun echo-in read-char lisp-stream-out stream-write-char
+  (in-fun echo-in read-char ansi-stream-out stream-write-char
 	  eof-error-p eof-value)
-  (in-fun echo-bin read-byte lisp-stream-bout stream-write-byte
+  (in-fun echo-bin read-byte ansi-stream-bout stream-write-byte
 	  eof-error-p eof-value))
 
 (defun echo-misc (stream operation &optional arg1 arg2)
@@ -1043,10 +976,10 @@
     (case operation
       (:listen
        (or (not (null (echo-stream-unread-stuff stream)))
-	   (if (lisp-stream-p in)
-	       (or (/= (the fixnum (lisp-stream-in-index in))
-		       +in-buffer-length+)
-		   (funcall (lisp-stream-misc in) in :listen))
+	   (if (ansi-stream-p in)
+	       (or (/= (the fixnum (ansi-stream-in-index in))
+		       +ansi-stream-in-buffer-length+)
+		   (funcall (ansi-stream-misc in) in :listen))
 	       (stream-misc-dispatch in :listen))))
       (:unread (push arg1 (echo-stream-unread-stuff stream)))
       (:element-type
@@ -1057,11 +990,11 @@
       (:close
        (set-closed-flame stream))
       (t
-       (or (if (lisp-stream-p in)
-	       (funcall (lisp-stream-misc in) in operation arg1 arg2)
+       (or (if (ansi-stream-p in)
+	       (funcall (ansi-stream-misc in) in operation arg1 arg2)
 	       (stream-misc-dispatch in operation arg1 arg2))
-	   (if (lisp-stream-p out)
-	       (funcall (lisp-stream-misc out) out operation arg1 arg2)
+	   (if (ansi-stream-p out)
+	       (funcall (ansi-stream-misc out) out operation arg1 arg2)
 	       (stream-misc-dispatch out operation arg1 arg2)))))))
 
 #!+sb-doc
@@ -1073,7 +1006,7 @@
 ;;;; string input streams
 
 (defstruct (string-input-stream
-	     (:include lisp-stream
+	     (:include ansi-stream
 		       (in #'string-inch)
 		       (bin #'string-binch)
 		       (n-bin #'string-stream-read-n-bytes)
@@ -1165,7 +1098,7 @@
 ;;;; string output streams
 
 (defstruct (string-output-stream
-	    (:include lisp-stream
+	    (:include ansi-stream
 		      (out #'string-ouch)
 		      (sout #'string-sout)
 		      (misc #'string-out-misc))
@@ -1257,7 +1190,7 @@
 ;;; WITH-OUTPUT-TO-STRING.
 
 (defstruct (fill-pointer-output-stream
- 	    (:include lisp-stream
+ 	    (:include ansi-stream
 		      (out #'fill-pointer-ouch)
 		      (sout #'fill-pointer-sout)
 		      (misc #'fill-pointer-misc))
@@ -1339,7 +1272,7 @@
 
 ;;;; indenting streams
 
-(defstruct (indenting-stream (:include lisp-stream
+(defstruct (indenting-stream (:include ansi-stream
 				       (out #'indenting-out)
 				       (sout #'indenting-sout)
 				       (misc #'indenting-misc))
@@ -1394,8 +1327,8 @@
 ;;; the base stream minus the stream's indentation.
 (defun indenting-misc (stream operation &optional arg1 arg2)
   (let ((sub-stream (indenting-stream-stream stream)))
-    (if (lisp-stream-p sub-stream)
-	(let ((method (lisp-stream-misc sub-stream)))
+    (if (ansi-stream-p sub-stream)
+	(let ((method (ansi-stream-misc sub-stream)))
 	  (case operation
 	    (:line-length
 	     (let ((line-length (funcall method sub-stream operation)))
@@ -1425,7 +1358,7 @@
 ;;;; case frobbing streams, used by FORMAT ~(...~)
 
 (defstruct (case-frob-stream
-	    (:include lisp-stream
+	    (:include ansi-stream
 		      (:misc #'case-frob-misc))
 	    (:constructor %make-case-frob-stream (target out sout))
 	    (:copier nil))
@@ -1472,8 +1405,8 @@
     (:close)
     (t
      (let ((target (case-frob-stream-target stream)))
-       (if (lisp-stream-p target)
-	   (funcall (lisp-stream-misc target) target op arg1 arg2)
+       (if (ansi-stream-p target)
+	   (funcall (ansi-stream-misc target) target op arg1 arg2)
 	   (stream-misc-dispatch target op arg1 arg2))))))
 
 (defun case-frob-upcase-out (stream char)
@@ -1481,8 +1414,8 @@
 	   (type base-char char))
   (let ((target (case-frob-stream-target stream))
 	(char (char-upcase char)))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-out target) target char)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-out target) target char)
 	(stream-write-char target char))))
 
 (defun case-frob-upcase-sout (stream str start end)
@@ -1497,8 +1430,8 @@
 		     (string-upcase str)
 		     (nstring-upcase (subseq str start end))))
 	 (string-len (- end start)))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-sout target) target string 0 string-len)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-sout target) target string 0 string-len)
 	(stream-write-string target string 0 string-len))))
 
 (defun case-frob-downcase-out (stream char)
@@ -1506,8 +1439,8 @@
 	   (type base-char char))
   (let ((target (case-frob-stream-target stream))
 	(char (char-downcase char)))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-out target) target char)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-out target) target char)
 	(stream-write-char target char))))
 
 (defun case-frob-downcase-sout (stream str start end)
@@ -1522,8 +1455,8 @@
 		     (string-downcase str)
 		     (nstring-downcase (subseq str start end))))
 	 (string-len (- end start)))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-sout target) target string 0 string-len)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-sout target) target string 0 string-len)
 	(stream-write-string target string 0 string-len))))
 
 (defun case-frob-capitalize-out (stream char)
@@ -1532,15 +1465,15 @@
   (let ((target (case-frob-stream-target stream)))
     (cond ((alphanumericp char)
 	   (let ((char (char-upcase char)))
-	     (if (lisp-stream-p target)
-		 (funcall (lisp-stream-out target) target char)
+	     (if (ansi-stream-p target)
+		 (funcall (ansi-stream-out target) target char)
 		 (stream-write-char target char)))
 	   (setf (case-frob-stream-out stream) #'case-frob-capitalize-aux-out)
 	   (setf (case-frob-stream-sout stream)
 		 #'case-frob-capitalize-aux-sout))
 	  (t
-	   (if (lisp-stream-p target)
-	       (funcall (lisp-stream-out target) target char)
+	   (if (ansi-stream-p target)
+	       (funcall (ansi-stream-out target) target char)
 	       (stream-write-char target char))))))
 
 (defun case-frob-capitalize-sout (stream str start end)
@@ -1566,8 +1499,8 @@
 	    #'case-frob-capitalize-aux-out)
       (setf (case-frob-stream-sout stream)
 	    #'case-frob-capitalize-aux-sout))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-sout target) target str 0 len)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-sout target) target str 0 len)
 	(stream-write-string target str 0 len))))
 
 (defun case-frob-capitalize-aux-out (stream char)
@@ -1576,12 +1509,12 @@
   (let ((target (case-frob-stream-target stream)))
     (cond ((alphanumericp char)
 	   (let ((char (char-downcase char)))
-	     (if (lisp-stream-p target)
-		 (funcall (lisp-stream-out target) target char)
+	     (if (ansi-stream-p target)
+		 (funcall (ansi-stream-out target) target char)
 		 (stream-write-char target char))))
 	  (t
-	   (if (lisp-stream-p target)
-	       (funcall (lisp-stream-out target) target char)
+	   (if (ansi-stream-p target)
+	       (funcall (ansi-stream-out target) target char)
 	       (stream-write-char target char))
 	   (setf (case-frob-stream-out stream)
 		 #'case-frob-capitalize-out)
@@ -1611,8 +1544,8 @@
 	    #'case-frob-capitalize-out)
       (setf (case-frob-stream-sout stream)
 	    #'case-frob-capitalize-sout))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-sout target) target str 0 len)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-sout target) target str 0 len)
 	(stream-write-string target str 0 len))))
 
 (defun case-frob-capitalize-first-out (stream char)
@@ -1621,16 +1554,16 @@
   (let ((target (case-frob-stream-target stream)))
     (cond ((alphanumericp char)
 	   (let ((char (char-upcase char)))
-	     (if (lisp-stream-p target)
-		 (funcall (lisp-stream-out target) target char)
+	     (if (ansi-stream-p target)
+		 (funcall (ansi-stream-out target) target char)
 		 (stream-write-char target char)))
 	   (setf (case-frob-stream-out stream)
 		 #'case-frob-downcase-out)
 	   (setf (case-frob-stream-sout stream)
 		 #'case-frob-downcase-sout))
 	  (t
-	   (if (lisp-stream-p target)
-	       (funcall (lisp-stream-out target) target char)
+	   (if (ansi-stream-p target)
+	       (funcall (ansi-stream-out target) target char)
 	       (stream-write-char target char))))))
 
 (defun case-frob-capitalize-first-sout (stream str start end)
@@ -1653,8 +1586,8 @@
 	  (setf (case-frob-stream-sout stream)
 		#'case-frob-downcase-sout)
 	  (return))))
-    (if (lisp-stream-p target)
-	(funcall (lisp-stream-sout target) target str 0 len)
+    (if (ansi-stream-p target)
+	(funcall (ansi-stream-sout target) target str 0 len)
 	(stream-write-string target str 0 len))))
 
 ;;;; stream commands
@@ -1680,7 +1613,7 @@
 ;;; had some input. If the LISTEN fails, then we have some stream we
 ;;; must wait on.
 (defun get-stream-command (stream)
-  (let ((cmdp (funcall (lisp-stream-misc stream) stream :get-command)))
+  (let ((cmdp (funcall (ansi-stream-misc stream) stream :get-command)))
     (cond (cmdp)
 	  ((listen stream)
 	   nil)
@@ -1688,6 +1621,8 @@
 	   ;; This waits for input and returns NIL when it arrives.
 	   (unread-char (read-char stream) stream)))))
 
+;;;; READ-SEQUENCE
+
 (defun read-sequence (seq stream &key (start 0) (end nil))
   #!+sb-doc
   "Destructively modify SEQ by reading elements from STREAM.
@@ -1701,7 +1636,18 @@
 	   (type index start)
 	   (type sequence-end end)
 	   (values index))
-  (let ((end (or end (length seq))))
+  (if (ansi-stream-p stream)
+      (ansi-stream-read-sequence seq stream start end)
+      ;; must be Gray streams FUNDAMENTAL-STREAM
+      (stream-read-sequence stream seq start end)))
+
+(defun ansi-stream-read-sequence (seq stream start %end)
+  (declare (type sequence seq)
+	   (type ansi-stream stream)
+	   (type index start)
+	   (type sequence-end %end)
+	   (values index))
+  (let ((end (or %end (length seq))))
     (declare (type index end))
     (etypecase seq
       (list
@@ -1720,7 +1666,7 @@
 	     (setf (first rem) el)))))
       (vector
        (with-array-data ((data seq) (offset-start start) (offset-end end))
-	 (typecase data
+         (typecase data
 	   ((or (simple-array (unsigned-byte 8) (*))
 		(simple-array (signed-byte 8) (*))
 		simple-string)
@@ -1745,6 +1691,8 @@
 		  (when (eq el :eof)
 		    (return (+ start (- i offset-start))))
 		  (setf (aref data i) el)))))))))))
+
+;;;; WRITE-SEQUENCE
 
 (defun write-sequence (seq stream &key (start 0) (end nil))
   #!+sb-doc
@@ -1754,8 +1702,19 @@
 	   (type index start)
 	   (type sequence-end end)
 	   (values sequence))
-  (let ((end (or end (length seq))))
-    (declare (type index start end))
+  (if (ansi-stream-p stream)
+      (ansi-stream-write-sequence seq stream start end)
+      ;; must be Gray-streams FUNDAMENTAL-STREAM
+      (stream-write-sequence stream seq start end)))
+
+(defun ansi-stream-write-sequence (seq stream start %end)
+  (declare (type sequence seq)
+	   (type ansi-stream stream)
+	   (type index start)
+	   (type sequence-end %end)
+	   (values sequence))
+  (let ((end (or %end (length seq))))
+    (declare (type index end))
     (etypecase seq
       (list
        (let ((write-function
@@ -1779,6 +1738,8 @@
 	     ((>= i end) seq)
 	   (declare (type index i))
 	   (funcall write-function (aref seq i) stream)))))))
+
+;;;; etc.
 
 ;;; (These were inline throughout this file, but that's not appropriate
 ;;; globally.)

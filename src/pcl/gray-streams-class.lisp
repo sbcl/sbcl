@@ -39,11 +39,11 @@
 (defclass fundamental-binary-output-stream
     (fundamental-output-stream fundamental-binary-stream) nil)
 
-#|
-This is not in the gray-stream proposal, so it is left here
-as example code.
+;;; This is not in the Gray stream proposal, so it is left here
+;;; as example code.
+;;;
 ;;; example character input and output streams
-
+#|
 (defclass character-output-stream (fundamental-character-output-stream)
   ((lisp-stream :initarg :lisp-stream
 		:accessor character-output-stream-lisp-stream)))

@@ -323,16 +323,16 @@
        :length length
        :class (sb-kernel:make-standard-class :name name :pcl-class class))))))
 
-;;; The following variable may be set to a standard-class that has
+;;; The following variable may be set to a STANDARD-CLASS that has
 ;;; already been created by the lisp code and which is to be redefined
-;;; by PCL. This allows standard-classes to be defined and used for
+;;; by PCL. This allows STANDARD-CLASSes to be defined and used for
 ;;; type testing and dispatch before PCL is loaded.
 (defvar *pcl-class-boot* nil)
 
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
 ;;; don't necessarily always make a wrapper. Also, we help maintain
-;;; the mapping between cl:class and pcl::class objects.
+;;; the mapping between CL:CLASS and PCL::CLASS objects.
 (defun make-wrapper (length class)
   (cond
    ((typep class 'std-class)

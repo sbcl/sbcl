@@ -20,8 +20,8 @@
   STREAM. The class FUNDAMENTAL-CHARACTER-STREAM provides a default method
   which returns CHARACTER."))
 
-(defmethod stream-element-type ((stream lisp-stream))
-  (funcall (lisp-stream-misc stream) stream :element-type))
+(defmethod stream-element-type ((stream ansi-stream))
+  (funcall (ansi-stream-misc stream) stream :element-type))
 
 (defmethod stream-element-type ((stream fundamental-character-stream))
   'character)
@@ -33,8 +33,8 @@
   by class FUNDAMENTAL-STREAM which returns true if CLOSE has not been
   called on the stream."))
 
-(defmethod pcl-open-stream-p ((stream lisp-stream))
-  (not (eq (lisp-stream-in stream) #'closed-flame)))
+(defmethod pcl-open-stream-p ((stream ansi-stream))
+  (not (eq (ansi-stream-in stream) #'closed-flame)))
 
 (defmethod pcl-open-stream-p ((stream fundamental-stream))
   (stream-open-p stream))
@@ -50,9 +50,9 @@
   inquiries may still be made. If :ABORT is true, an attempt is made
   to clean up the side effects of having created the stream."))
 
-(defmethod pcl-close ((stream lisp-stream) &key abort)
+(defmethod pcl-close ((stream ansi-stream) &key abort)
   (when (open-stream-p stream)
-    (funcall (lisp-stream-misc stream) stream :close abort))
+    (funcall (ansi-stream-misc stream) stream :close abort))
   t)
 
 (defmethod pcl-close ((stream fundamental-stream) &key abort)
@@ -68,10 +68,10 @@
   #+sb-doc
   (:documentation "Can STREAM perform input operations?"))
 
-(defmethod input-stream-p ((stream lisp-stream))
-  (and (not (eq (lisp-stream-in stream) #'closed-flame))
-       (or (not (eq (lisp-stream-in stream) #'ill-in))
-	   (not (eq (lisp-stream-bin stream) #'ill-bin)))))
+(defmethod input-stream-p ((stream ansi-stream))
+  (and (not (eq (ansi-stream-in stream) #'closed-flame))
+       (or (not (eq (ansi-stream-in stream) #'ill-in))
+	   (not (eq (ansi-stream-bin stream) #'ill-bin)))))
 
 (defmethod input-stream-p ((stream fundamental-input-stream))
   t)
@@ -82,10 +82,10 @@
   #+sb-doc
   (:documentation "Can STREAM perform output operations?"))
 
-(defmethod output-stream-p ((stream lisp-stream))
-  (and (not (eq (lisp-stream-in stream) #'closed-flame))
-       (or (not (eq (lisp-stream-out stream) #'ill-out))
-	   (not (eq (lisp-stream-bout stream) #'ill-bout)))))
+(defmethod output-stream-p ((stream ansi-stream))
+  (and (not (eq (ansi-stream-in stream) #'closed-flame))
+       (or (not (eq (ansi-stream-out stream) #'ill-out))
+	   (not (eq (ansi-stream-bout stream) #'ill-bout)))))
 
 (defmethod output-stream-p ((stream fundamental-output-stream))
   t)
@@ -181,11 +181,57 @@
 (defgeneric stream-clear-input (stream)
   #+sb-doc
   (:documentation
-   "Implements CLEAR-INPUT for the stream, returning NIL. The default
-  method does nothing."))
+   "This is like CL:CLEAR-INPUT, but for Gray streams, returning NIL.
+  The default method does nothing."))
 
 (defmethod stream-clear-input ((stream fundamental-character-input-stream))
   nil)
+
+(defgeneric stream-read-sequence (stream seq &optional start end)
+  (:documentation
+   "This is like CL:READ-SEQUENCE, but for Gray streams."))
+
+;;; Destructively modify SEQ by reading elements from STREAM. That
+;;; part of SEQ bounded by START and END is destructively modified by
+;;; copying successive elements into it from STREAM. If the end of
+;;; file for STREAM is reached before copying all elements of the
+;;; subsequence, then the extra elements near the end of sequence are
+;;; not updated, and the index of the next element is returned.
+(defun basic-io-type-stream-read-sequence (stream seq start end read-fun)
+  (declare (type sequence seq)
+	   (type stream stream)
+	   (type index start)
+	   (type sequence-end end)
+           (type function read-fun)
+	   (values index))
+  (let ((end (or end (length seq))))
+    (declare (type index end))
+    (etypecase seq
+      (list
+        (do ((rem (nthcdr start seq) (rest rem))
+             (i start (1+ i)))
+            ((or (endp rem) (>= i end)) i)
+          (declare (type list rem)
+                   (type index i))
+          (let ((el (funcall read-fun stream)))
+            (when (eq el :eof)
+              (return i))
+            (setf (first rem) el))))
+      (vector
+        (with-array-data ((data seq) (offset-start start) (offset-end end))
+          (do ((i offset-start (1+ i)))
+              ((>= i offset-end) end)
+            (declare (type index i))
+            (let ((el (funcall read-fun stream)))
+              (when (eq el :eof)
+                (return (+ start (- i offset-start))))
+              (setf (aref data i) el))))))))
+
+(defmethod stream-read-sequence ((stream fundamental-character-input-stream)
+                                 (seq sequence)
+                                 &optional (start 0) (end nil))
+  (basic-io-type-stream-read-sequence stream seq start end
+                                      #'stream-read-char))
 
 ;;; character output streams
 ;;;
@@ -307,8 +353,8 @@
 (defgeneric stream-clear-output (stream)
   #+sb-doc
   (:documentation
-   "Clears the given output Stream. Implements CLEAR-OUTPUT. The
-  default method does nothing."))
+   "This is like CL:CLEAR-OUTPUT, but for Gray streams: clear the given
+  output STREAM. The default method does nothing."))
 
 (defmethod stream-clear-output ((stream fundamental-output-stream))
   nil)
@@ -316,7 +362,7 @@
 (defgeneric stream-advance-to-column (stream column)
   #+sb-doc
   (:documentation
-   "Writes enough blank space so that the next character will be
+   "Write enough blank space so that the next character will be
   written at the specified column. Returns true if the operation is
   successful, or NIL if it is not supported for this stream. This is
   intended for use by by PPRINT and FORMAT ~T. The default method uses
@@ -331,6 +377,45 @@
 	(dotimes (i fill)
 	  (stream-write-char stream #\Space)))
       T)))
+
+(defgeneric stream-write-sequence (stream seq &optional start end)
+  (:documentation
+   "This is like CL:WRITE-SEQUENCE, but for Gray streams."))
+
+;;; Write the elements of SEQ bounded by START and END to STREAM.
+(defun basic-io-type-stream-write-sequence (stream seq start end write-fun)
+  (declare (type sequence seq)
+	   (type stream stream)
+	   (type index start)
+	   (type sequence-end end)
+           (type function write-fun)
+	   (values sequence))
+  (let ((end (or end (length seq))))
+    (declare (type index start end))
+    (etypecase seq
+      (list
+        (do ((rem (nthcdr start seq) (rest rem))
+             (i start (1+ i)))
+            ((or (endp rem) (>= i end)) seq)
+          (declare (type list rem)
+                   (type index i))
+          (funcall write-fun stream (first rem))))
+      (vector
+        (do ((i start (1+ i)))
+            ((>= i end) seq)
+          (declare (type index i))
+          (funcall write-fun stream (aref seq i)))))))
+
+(defmethod stream-write-sequence ((stream fundamental-character-output-stream)
+                                  (seq sequence)
+                                  &optional (start 0) (end nil))
+  (typecase seq
+    (string
+      (stream-write-string stream seq start end))
+    (t
+      (basic-io-type-stream-write-sequence stream seq start end
+                                           #'stream-write-char))))
+
 
 ;;; binary streams
 ;;;
@@ -352,9 +437,9 @@
    "Implements WRITE-BYTE; writes the integer to the stream and
   returns the integer as the result."))
 
+;;; This is not in the Gray stream proposal, so it is left here
+;;; as example code.
 #|
-This is not in the gray-stream proposal, so it is left here
-as example code.
 ;;; example character output stream encapsulating a lisp-stream
 (defun make-character-output-stream (lisp-stream)
   (declare (type lisp-stream lisp-stream))
@@ -409,7 +494,7 @@ as example code.
   (output-stream-p (character-input-stream-lisp-stream stream)))
 
 (defmethod stream-read-char ((stream character-input-stream))
-  (read-char (character-input-stream-lisp-stream stream)))
+  (read-char (character-input-stream-lisp-stream stream) nil :eof))
 
 (defmethod stream-unread-char ((stream character-input-stream) character)
   (unread-char character (character-input-stream-lisp-stream stream)))

@@ -134,7 +134,7 @@
 
 ;;; the FASL file we're reading from
 (defvar *fasl-input-stream*)
-(declaim (type lisp-stream *fasl-input-stream*))
+(declaim (type ansi-stream *fasl-input-stream*))
 
 (defvar *load-print* nil
   #!+sb-doc

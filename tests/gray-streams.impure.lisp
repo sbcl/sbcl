@@ -73,7 +73,6 @@
 ;;;; example character output stream encapsulating a lisp-stream
 
 (defun make-character-output-stream (lisp-stream)
-  (declare (type sb-kernel:lisp-stream lisp-stream))
   (make-instance 'character-output-stream :lisp-stream lisp-stream))
   
 (defmethod open-stream-p ((stream character-output-stream))
@@ -109,7 +108,6 @@
 ;;;; example character input stream encapsulating a lisp-stream
 
 (defun make-character-input-stream (lisp-stream)
-  (declare (type sb-kernel:lisp-stream lisp-stream))
   (make-instance 'character-input-stream :lisp-stream lisp-stream))
 
 (defmethod open-stream-p ((stream character-input-stream))
@@ -132,14 +130,6 @@
 
 (defmethod stream-read-char-no-hang ((stream character-input-stream))
   (read-char-no-hang (character-input-stream-lisp-stream stream) nil :eof))
-
-#+nil
-(defmethod stream-peek-char ((stream character-input-stream))
-  (peek-char nil (character-input-stream-lisp-stream stream) nil :eof))
-
-#+nil
-(defmethod stream-listen ((stream character-input-stream))
-  (listen (character-input-stream-lisp-stream stream)))
 
 (defmethod stream-clear-input ((stream character-input-stream))
   (clear-input (character-input-stream-lisp-stream stream)))
@@ -196,6 +186,39 @@
 		     "~@<testing: ~@:_pretty Gray line breaks~:>~%")))))
   (assert (= 1 (count #\newline (let ((*print-pretty* nil)) (frob)))))
   (assert (= 2 (count #\newline (let ((*print-pretty* t)) (frob))))))
+
+;;; tests for STREAM-READ-SEQUENCE/STREAM-WRITE-SEQUENCE for
+;;; subclasses of FUNDAMENTAL-CHARACTER-INPUT-/OUTPUT-STREAM (i.e.,
+;;; where the default methods are available)
+(let* ((test-string (format nil
+                            "~% Testing for STREAM-*-SEQUENCE.~
+                             ~& This is the second line.~
+                             ~% This should be the third and last line.~%"))
+       (test-string-len (length test-string))
+       (output-test-string (make-string test-string-len)))
+  ;; test for READ-/WRITE-SEQUENCE on strings/vectors
+  (with-input-from-string (foo test-string)
+    (assert (equal
+             (with-output-to-string (bar)
+               (let ((our-char-input (make-character-input-stream foo))
+                     (our-char-output (make-character-output-stream bar)))
+                 (read-sequence output-test-string our-char-input)
+                 (assert (typep output-test-string 'string))
+                 (write-sequence output-test-string our-char-output)
+                 (assert (null (peek-char nil our-char-input nil nil nil)))))
+             test-string)))
+  ;; test for READ-/WRITE-SEQUENCE on lists
+  (let ((output-test-list (make-list test-string-len)))
+    (with-input-from-string (foo test-string)
+      (assert (equal
+             (with-output-to-string (bar)
+               (let ((our-char-input (make-character-input-stream foo))
+                     (our-char-output (make-character-output-stream bar)))
+                 (read-sequence output-test-list our-char-input)
+                 (assert (typep output-test-list 'list))
+                 (write-sequence output-test-list our-char-output)
+                 (assert (null (peek-char nil our-char-input nil nil nil)))))
+             test-string)))))
 
 ;;;; example classes for binary output
 
@@ -213,12 +236,10 @@
   '(unsigned-byte 8))
 
 (defun make-binary-to-char-input-stream (lisp-stream)
-  (declare (type sb-kernel:lisp-stream lisp-stream))
   (make-instance 'binary-to-char-input-stream
 		 :lisp-stream lisp-stream))
 
 (defun make-binary-to-char-output-stream (lisp-stream)
-  (declare (type sb-kernel:lisp-stream lisp-stream))
   (make-instance 'binary-to-char-output-stream
 		 :lisp-stream lisp-stream))
   
