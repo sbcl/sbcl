@@ -1,4 +1,5 @@
 #include <signal.h>
+#include "sbcl.h"
 #include "runtime.h"
 #include "target-os.h"
 
