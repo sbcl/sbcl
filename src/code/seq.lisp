@@ -2240,14 +2240,14 @@
        ((or (null main) (null sub) (= (the fixnum end1) jndex))
 	t)
      (declare (fixnum jndex))
-     (compare-elements (car main) (car sub))))
+     (compare-elements (car sub) (car main))))
 
 (sb!xc:defmacro search-compare-list-vector (main sub)
   `(do ((main ,main (cdr main))
 	(index start1 (1+ index)))
        ((or (null main) (= index (the fixnum end1))) t)
      (declare (fixnum index))
-     (compare-elements (car main) (aref ,sub index))))
+     (compare-elements (aref ,sub index) (car main))))
 
 (sb!xc:defmacro search-compare-vector-list (main sub index)
   `(do ((sub (nthcdr start1 ,sub) (cdr sub))
@@ -2255,14 +2255,14 @@
 	(index ,index (1+ index)))
        ((or (= (the fixnum end1) jndex) (null sub)) t)
      (declare (fixnum jndex index))
-     (compare-elements (aref ,main index) (car sub))))
+     (compare-elements (car sub) (aref ,main index))))
 
 (sb!xc:defmacro search-compare-vector-vector (main sub index)
   `(do ((index ,index (1+ index))
 	(sub-index start1 (1+ sub-index)))
        ((= sub-index (the fixnum end1)) t)
      (declare (fixnum sub-index index))
-     (compare-elements (aref ,main index) (aref ,sub sub-index))))
+     (compare-elements (aref ,sub sub-index) (aref ,main index))))
 
 (sb!xc:defmacro search-compare (main-type main sub index)
   (if (eq main-type 'list)

@@ -32,3 +32,15 @@
 	     (vector-push-extend #\a complex-t)
 	     (assert (= (length complex-t) 4))
 	     (assert (raises-error? (vector-push-extend #\b simple-t))))))
+
+(multiple-value-bind (fp1 index fp2 bool)
+    (let ((a (make-array '(5) :fill-pointer 5 :adjustable 5
+			 :initial-contents '(a b c d e))))
+      (values (fill-pointer a)
+	      (vector-push-extend 'x a)
+	      (fill-pointer a)
+	      (<= (array-total-size a) 5)))
+  (assert (= fp1 5))
+  (assert (= index 5))
+  (assert (= fp2 6))
+  (assert (not bool)))
