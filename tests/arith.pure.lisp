@@ -103,6 +103,10 @@
 		   (= (funcall fn 3) x3))
 	(error "bad results for ~D" x)))))
 
+;;; Bugs reported by Paul Dietz:
+
 ;;; (GCD 0 x) must return (abs x)
 (dolist (x (list -10 (* 3 most-negative-fixnum)))
   (assert (= (gcd 0 x) (abs x))))
+;;; LCM returns a non-negative number
+(assert (= (lcm 4 -10) 20))

@@ -1263,7 +1263,13 @@
 
 (defun two-arg-lcm (n m)
   (declare (integer n m))
-  (* (truncate (max n m) (gcd n m)) (min n m)))
+  (let ((m (abs m))
+        (n (abs n)))
+    (multiple-value-bind (max min)
+        (if (> m n)
+            (values m n)
+            (values n m))
+      (* (truncate max (gcd n m)) min))))
 
 ;;; Do the GCD of two integer arguments. With fixnum arguments, we use the
 ;;; binary GCD algorithm from Knuth's seminumerical algorithms (slightly

@@ -2038,6 +2038,7 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
        circumstances.
     ** optimizer for (EXPT X 0) did not work for X not of type FLOAT.
     ** (GCD 0 <negative-integer>) returned <negative-integer>.
+    ** LCM should return a non-negative integer.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
