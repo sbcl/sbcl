@@ -1126,6 +1126,13 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
     an ordinary character. Thus e.g. (READ-FROM-STRING "AB") returns
     |AB|, instead of A as it used to.
 
+changes in sbcl-0.7.5 relative to sbcl-0.7.4:
+  * bug 140 fixed: redefinition of classes with different supertypes
+    is now reflected in the type hierarchy. (thanks to Pierre Mai)
+  * minor incompatible change: The LOAD function no longer, when given
+    a wild pathname to load, loads all files matching that pathname;
+    instead, an error of type FILE-ERROR is signalled.
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

@@ -182,6 +182,11 @@
 ;;; thing to want anyway, let's test for it here:
 (assert-t-t (subtypep '(or some-undefined-type (member :no-ir2-yet :dead))
 		      '(or some-undefined-type (member :no-ir2-yet :dead))))
+;;; BUG 158 (failure to compile loops with vector references and
+;;; increments of greater than 1) was a symptom of type system
+;;; uncertainty, to wit:
+(assert-t-t (subtypep '(and (mod 536870911) (or (integer 0 0) (integer 2 536870912)))
+		      '(mod 536870911))) ; aka SB-INT:INDEX.
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and
@@ -337,6 +342,13 @@
   #.*tests-of-inline-type-tests*)
 (tests-of-inline-type-tests)
 (format t "~&/done with compiled (TESTS-OF-INLINE-TYPE-TESTS)~%")
-
+
+;;; Redefinition of classes should alter the type hierarchy (BUG 140):
+(defclass superclass () ())
+(defclass maybe-subclass (superclass) ())
+(assert-t-t (subtypep 'maybe-subclass 'superclass))
+(defclass maybe-subclass () ())
+(assert-nil-t (subtypep 'maybe-subclass 'superclass))
+
 ;;; success
 (quit :unix-status 104)

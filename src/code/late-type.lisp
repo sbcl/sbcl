@@ -849,6 +849,16 @@
 		#+sb-xc-host (coerce types 'list)
 		#-sb-xc-host (coerce-to-list types)))))
 
+(defun maybe-distribute-one-union (union-type types)
+  (let* ((intersection (apply #'type-intersection types))
+	 (union (mapcar (lambda (x) (type-intersection x intersection))
+			(union-type-types union-type))))
+    (if (notany (lambda (x) (or (hairy-type-p x)
+				(intersection-type-p x)))
+		union)
+	union
+	nil)))
+
 (defun type-intersection (&rest input-types)
   (let ((simplified-types (simplified-compound-types input-types
 						     #'intersection-type-p
@@ -860,11 +870,17 @@
     ;; always achieve that by the distributive rule. But we don't want
     ;; to just apply the distributive rule, since it would be too easy
     ;; to end up with unreasonably huge type expressions. So instead
-    ;; we punt to HAIRY-TYPE when this comes up.
+    ;; we try to generate a simple type by distributing the union; if
+    ;; the type can't be made simple, we punt to HAIRY-TYPE.
     (if (and (> (length simplified-types) 1)
 	     (some #'union-type-p simplified-types))
-	(make-hairy-type
-	 :specifier `(and ,@(map 'list #'type-specifier simplified-types)))
+	(let* ((first-union (find-if #'union-type-p simplified-types))
+	       (other-types (coerce (remove first-union simplified-types) 'list))
+	       (distributed (maybe-distribute-one-union first-union other-types)))
+	  (if distributed
+	      (apply #'type-union distributed)
+	      (make-hairy-type
+	       :specifier `(and ,@(map 'list #'type-specifier simplified-types)))))
 	(make-compound-type-or-something #'%make-intersection-type
 					 simplified-types
 					 (some #'type-enumerable

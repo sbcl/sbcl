@@ -49,8 +49,24 @@
   ;; SBCL 0.7.1.2 failed to merge on OPEN
   (with-open-file (i "tests/filesys.pure.lisp")
       (assert i)))
-  
 
+;;; OPEN, LOAD and friends should signal an error of type FILE-ERROR
+;;; if they are fed wild pathname designators; firstly, with wild
+;;; pathnames that don't correspond to any files:
+(assert (typep (nth-value 1 (ignore-errors (open "non-existent*.lisp")))
+	       'file-error))
+(assert (typep (nth-value 1 (ignore-errors (load "non-existent*.lisp")))
+	       'file-error))
+;;; then for pathnames that correspond to precisely one:
+(assert (typep (nth-value 1 (ignore-errors (open "filesys.pur*.lisp")))
+	       'file-error))
+(assert (typep (nth-value 1 (ignore-errors (load "filesys.pur*.lisp")))
+	       'file-error))
+;;; then for pathnames corresponding to many:
+(assert (typep (nth-value 1 (ignore-errors (open "*.lisp")))
+	       'file-error))
+(assert (typep (nth-value 1 (ignore-errors (load "*.lisp")))
+	       'file-error))
 
 ;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
 ;;; STREAM is not a stream associated with a file.

@@ -682,14 +682,16 @@
 (defun unix-namestring (pathname-spec &optional (for-input t))
   (let* ((namestring (physicalize-pathname (merge-pathnames pathname-spec)))
 	 (matches nil)) ; an accumulator for actual matches
+    (when (wild-pathname-p namestring)
+      (error 'simple-file-error
+	     :pathname namestring
+	     :format-control "bad place for a wild pathname"))
     (!enumerate-matches (match namestring nil :verify-existence for-input)
 			(push match matches))
     (case (length matches)
       (0 nil)
       (1 (first matches))
-      (t (error 'simple-file-error
-		:format-control "~S is ambiguous:~{~%  ~A~}"
-		:format-arguments (list pathname-spec matches))))))
+      (t (bug "!ENUMERATE-MATCHES returned more than one match on a non-wild pathname")))))
 
 ;;;; TRUENAME and PROBE-FILE
 
@@ -703,27 +705,19 @@
 
   Under Unix, the TRUENAME of a broken symlink is considered to be
   the name of the broken symlink itself."
-  (if (wild-pathname-p pathname)
+  (let ((result (probe-file pathname)))
+    (unless result
       (error 'simple-file-error
-	     :format-control "can't use a wild pathname here"
-	     :pathname pathname)
-      (let ((result (probe-file pathname)))
-	(unless result
-	  (error 'simple-file-error
-		 :pathname pathname
-		 :format-control "The file ~S does not exist."
-		 :format-arguments (list (namestring pathname))))
-	result)))
+	     :pathname pathname
+	     :format-control "The file ~S does not exist."
+	     :format-arguments (list (namestring pathname))))
+    result))
 
 ;;; If PATHNAME exists, return its truename, otherwise NIL.
 (defun probe-file (pathname)
   #!+sb-doc
   "Return a pathname which is the truename of the file if it exists, or NIL
   otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
-  (when (wild-pathname-p pathname)
-    (error 'simple-file-error
-	   :pathname pathname
-	   :format-control "can't use a wild pathname here"))
   (let* ((defaulted-pathname (merge-pathnames
 			      pathname
 			      (sane-default-pathname-defaults)))
@@ -789,43 +783,30 @@
   #!+sb-doc
   "Return file's creation date, or NIL if it doesn't exist.
  An error of type file-error is signaled if file is a wild pathname"
-  (if (wild-pathname-p file)
-      ;; FIXME: This idiom appears many times in this file. Perhaps it
-      ;; should turn into (CANNOT-BE-WILD-PATHNAME FILE). (C-B-W-P
-      ;; should be a macro, not a function, so that the error message
-      ;; is reported as coming from e.g. FILE-WRITE-DATE instead of
-      ;; from CANNOT-BE-WILD-PATHNAME itself.)
-      (error 'simple-file-error
-	     :pathname file
-	     :format-control "bad place for a wild pathname")
-      (let ((name (unix-namestring file t)))
-	(when name
-	  (multiple-value-bind
-	      (res dev ino mode nlink uid gid rdev size atime mtime)
-	      (sb!unix:unix-stat name)
-	    (declare (ignore dev ino mode nlink uid gid rdev size atime))
-	    (when res
-	      (+ unix-to-universal-time mtime)))))))
+  (let ((name (unix-namestring file t)))
+    (when name
+      (multiple-value-bind
+	    (res dev ino mode nlink uid gid rdev size atime mtime)
+	  (sb!unix:unix-stat name)
+	(declare (ignore dev ino mode nlink uid gid rdev size atime))
+	(when res
+	  (+ unix-to-universal-time mtime))))))
 
 (defun file-author (file)
   #!+sb-doc
   "Return the file author as a string, or NIL if the author cannot be
  determined. Signal an error of type FILE-ERROR if FILE doesn't exist,
  or FILE is a wild pathname."
-  (if (wild-pathname-p file)
+  (let ((name (unix-namestring (pathname file) t)))
+    (unless name
       (error 'simple-file-error
 	     :pathname file
-	     "bad place for a wild pathname")
-      (let ((name (unix-namestring (pathname file) t)))
-	(unless name
-	  (error 'simple-file-error
-		 :pathname file
-		 :format-control "~S doesn't exist."
-		 :format-arguments (list file)))
-	(multiple-value-bind (winp dev ino mode nlink uid)
-	    (sb!unix:unix-stat name)
-	  (declare (ignore dev ino mode nlink))
-	  (and winp (sb!unix:uid-username uid))))))
+	     :format-control "~S doesn't exist."
+	     :format-arguments (list file)))
+    (multiple-value-bind (winp dev ino mode nlink uid)
+	(sb!unix:unix-stat name)
+      (declare (ignore dev ino mode nlink))
+      (and winp (sb!unix:uid-username uid)))))
 
 ;;;; DIRECTORY
 

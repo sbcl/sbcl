@@ -512,12 +512,7 @@
 		  `(if (<= ,n-svalue ,n-end ,n-len)
 		       ;; success
 		       (values ,n-array ,n-svalue ,n-end 0)
-		       ;; failure: Make a NOTINLINE call to
-		       ;; %WITH-ARRAY-DATA with our bad data
-		       ;; to cause the error to be signalled.
-		       (locally
-			 (declare (notinline %with-array-data))
-			 (%with-array-data ,n-array ,n-svalue ,n-evalue)))))
+		       (failed-%with-array-data ,n-array ,n-svalue ,n-evalue))))
 	     (,(if force-inline '%with-array-data-macro '%with-array-data)
 	      ,n-array ,n-svalue ,n-evalue))
        ,@forms)))
@@ -561,16 +556,12 @@
 	 (declare (type index ,cumulative-offset))))))
 
 (deftransform %with-array-data ((array start end)
-				;; Note: This transform is limited to
-				;; VECTOR only because I happened to
-				;; create it in order to get sequence
-				;; function operations to be more
-				;; efficient. It might very well be
-				;; reasonable to allow general ARRAY
-				;; here, I just haven't tried to
-				;; understand the performance issues
-				;; involved. -- WHN
-				(vector index (or index null))
+				;; It might very well be reasonable to
+				;; allow general ARRAY here, I just
+				;; haven't tried to understand the
+				;; performance issues involved. --
+				;; WHN, and also CSR 2002-05-26
+				(simple-array index (or index null))
 				*
 				:important t
 				:node node

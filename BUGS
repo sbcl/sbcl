@@ -260,7 +260,6 @@ WORKAROUND:
 	   MERGE also have the same problem.
 	c: (COERCE 'AND 'FUNCTION) returns something related to
 	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
-	g: (LOAD "*.lsp") should signal FILE-ERROR.
 	h: (MAKE-CONCATENATED-STREAM (MAKE-STRING-OUTPUT-STREAM))
 	   should signal TYPE-ERROR.
 	i: MAKE-TWO-WAY-STREAM doesn't check that its arguments can
@@ -897,9 +896,6 @@ WORKAROUND:
    Evidently Python thinks of the lambda as a code transformation so
    much that it forgets that it's also an object.
 
-126:
-  (fixed in 0.pre7.41)
-
 127:
   The DEFSTRUCT section of the ANSI spec, in the :CONC-NAME section,
   specifies a precedence rule for name collisions between slot accessors of
@@ -1002,36 +998,6 @@ WORKAROUND:
   some screwups left, e.g. as of sbcl-0.pre7.109, there are
   still some functions named "hairy arg processor" and
   "SB-INT:&MORE processor".
-
-140:
-  (reported by Alexey Dejneka sbcl-devel 2002-01-03)
-
-  SUBTYPEP does not work well with redefined classes:
-  ---
-  * (defclass a () ())
-  #<STANDARD-CLASS A>
-  * (defclass b () ())
-  #<STANDARD-CLASS B>
-  * (subtypep 'b 'a)
-  NIL
-  T
-  * (defclass b (a) ())
-  #<STANDARD-CLASS B>
-  * (subtypep 'b 'a)
-  T
-  T
-  * (defclass b () ())
-  #<STANDARD-CLASS B>
-   
-  ;;; And now...
-  * (subtypep 'b 'a)
-  T
-  T
-
-  This is probably due to underzealous clearing of the type caches; a
-  brute-force solution in that case would be to make a defclass expand
-  into something that included a call to SB-KERNEL::CLEAR-TYPE-CACHES,
-  but there may be a better solution.
 
 141: 
   Pretty-printing nested backquotes doesn't work right, as 
@@ -1160,9 +1126,6 @@ WORKAROUND:
   but it has happened in more complicated cases (which I haven't
   figured out how to reproduce).
 
-155:
-  (fixed in sbcl-0.7.2.9)
-
 156:
   FUNCTION-LAMBDA-EXPRESSION doesn't work right in 0.7.0 or 0.7.2.9:
     * (function-lambda-expression #'(lambda (x) x))
@@ -1174,16 +1137,6 @@ WORKAROUND:
   Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
   UPGRADED-COMPLEX-PART-TYPE should have an optional environment argument.
   (reported by Alexey Dejneka sbcl-devel 2002-04-12)
-
-158:
-  Compiling the following code causes SBCL 0.7.2 to bug. This only
-  happens with optimization enabled, and only when the loop variable is
-  being incremented by more than 1.
-    (defun foo (array)
-      (declare (optimize (safety 0) (space 0) (debug 0) (speed 3)))
-      (loop for i from 0 to 10 by 2
-            do (foo (svref array i))) (svref array (1+ i)))
-  (reported by Eric Marsden sbcl-devel 2002-04-15)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 
@@ -1204,12 +1157,6 @@ WORKAROUND:
   (Christophe Rhodes reports that this doesn't occur on the SPARC, which
   isn't too surprising since there are many differences in stack
   implementation and GC conservatism between the X86 and other ports.)
-
-164:
-  The type system still can't quite deal with all useful identities;
-  for instance, as of sbcl-0.7.2.18, the type specifier '(and (real -1
-  7) (real 4 8)) is a HAIRY-TYPE rather than that which would be hoped
-  for, viz: '(real 4 7).
 
 165:
   Array types with element-types of some unknown type are falsely being
@@ -1302,20 +1249,10 @@ WORKAROUND:
   ;   caught 1 STYLE-WARNING condition
   But the code works as it should. Checked in 0.6.12.43 and later.
 
-170:
-  (reported by Matthias Hoelzl on sbcl-devel 2002-05-13)
-    * (defmacro foo () ''x)
-    FOO
-    * (foo)
-    X
-    * (compile 'foo)
-    FOO
-    NIL
-    NIL
-    * (foo)
-    debugger invoked on condition of type UNDEFINED-FUNCTION:
-      The function FOO is undefined.
-
+171:
+  (reported by Pierre Mai while investigating bug 47):
+    (DEFCLASS FOO () ((A :SILLY T))) 
+  signals a SIMPLE-ERROR, not a PROGRAM-ERROR.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
