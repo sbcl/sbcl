@@ -272,31 +272,31 @@ static boolean lookup_symbol(char *name, lispobj *result)
 static int
 parse_regnum(char *s)
 {
-	if ((s[1] == 'R') || (s[1] == 'r')) {
-		int regnum;
+    if ((s[1] == 'R') || (s[1] == 'r')) {
+	int regnum;
 
-		if (s[2] == '\0')
-			return -1;
+	if (s[2] == '\0')
+	    return -1;
 
-		/* skip the $R part and call atoi on the number */
-		regnum = atoi(s + 2);
-		if ((regnum >= 0) && (regnum < NREGS))
-			return regnum;
-		else
-			return -1;
-	} else {
-		int i;
+	/* skip the $R part and call atoi on the number */
+	regnum = atoi(s + 2);
+	if ((regnum >= 0) && (regnum < NREGS))
+	    return regnum;
+	else
+	    return -1;
+    } else {
+	int i;
 
-		for (i = 0; i < NREGS ; i++)
-			if (strcasecmp(s + 1, lisp_register_names[i]) == 0)
+	for (i = 0; i < NREGS ; i++)
+	    if (strcasecmp(s + 1, lisp_register_names[i]) == 0)
 #ifdef __i386__
-				return i*2;
+		return i*2;
 #else
-				return i;
+	return i;
 #endif
 		
-		return -1;
-	}
+	return -1;
+    }
 }
 
 lispobj parse_lispobj(ptr)
@@ -311,26 +311,26 @@ char **ptr;
         throw_to_monitor();
     } else if (token[0] == '$') {
 	if (isalpha(token[1])) {
-		int free;
-		int regnum;
-		os_context_t *context;
+	    int free;
+	    int regnum;
+	    os_context_t *context;
 
-		free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+	    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
 
-		if (free == 0) {
-			printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
-			throw_to_monitor();
-		}
+	    if (free == 0) {
+		printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
+		throw_to_monitor();
+	    }
 
-		context = lisp_interrupt_contexts[free - 1];
+	    context = lisp_interrupt_contexts[free - 1];
 
-		regnum = parse_regnum(token);
-		if (regnum < 0) {
-			printf("bogus register: ``%s''\n", token);
-			throw_to_monitor();
-		}
+	    regnum = parse_regnum(token);
+	    if (regnum < 0) {
+		printf("bogus register: ``%s''\n", token);
+		throw_to_monitor();
+	    }
 
-		result = *os_context_register_addr(context, regnum);
+	    result = *os_context_register_addr(context, regnum);
 	} else if (!lookup_variable(token+1, &result)) {
             printf("unknown variable: ``%s''\n", token);
             throw_to_monitor();

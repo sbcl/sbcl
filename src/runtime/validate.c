@@ -60,29 +60,29 @@ void
 validate(void)
 {
 #ifdef PRINTNOISE
-	printf("validating memory ...");
-	fflush(stdout);
+    printf("validating memory ...");
+    fflush(stdout);
 #endif
-
-	ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
-	ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
+    
+    ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
+    ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
 #ifdef GENCGC
-	ensure_space( (lispobj *)DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
+    ensure_space( (lispobj *)DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #else
-	ensure_space( (lispobj *)DYNAMIC_0_SPACE_START  , DYNAMIC_SPACE_SIZE);
-	ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
+    ensure_space( (lispobj *)DYNAMIC_0_SPACE_START  , DYNAMIC_SPACE_SIZE);
+    ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #endif
-	ensure_space( (lispobj *)CONTROL_STACK_START  , CONTROL_STACK_SIZE);
-	ensure_space( (lispobj *)BINDING_STACK_START  , BINDING_STACK_SIZE);
+    ensure_space( (lispobj *)CONTROL_STACK_START  , CONTROL_STACK_SIZE);
+    ensure_space( (lispobj *)BINDING_STACK_START  , BINDING_STACK_SIZE);
 
 #ifdef HOLES
-	make_holes();
+    make_holes();
 #endif
 #ifndef GENCGC
-        current_dynamic_space = DYNAMIC_0_SPACE_START;
+    current_dynamic_space = DYNAMIC_0_SPACE_START;
 #endif
 
 #ifdef PRINTNOISE
-	printf(" done.\n");
+    printf(" done.\n");
 #endif
 }

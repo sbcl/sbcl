@@ -28,33 +28,33 @@
 
 void bind_variable(lispobj symbol, lispobj value)
 {
-	lispobj old_value;
-	struct binding *binding;
+    lispobj old_value;
+    struct binding *binding;
 
-	old_value = SymbolValue(symbol);
-	binding = GetBSP();
-	SetBSP(binding+1);
+    old_value = SymbolValue(symbol);
+    binding = GetBSP();
+    SetBSP(binding+1);
 
-	binding->value = old_value;
-	binding->symbol = symbol;
-	SetSymbolValue(symbol, value);
+    binding->value = old_value;
+    binding->symbol = symbol;
+    SetSymbolValue(symbol, value);
 }
 
 void
 unbind(void)
 {
-	struct binding *binding;
-	lispobj symbol;
+    struct binding *binding;
+    lispobj symbol;
 	
-	binding = GetBSP() - 1;
+    binding = GetBSP() - 1;
 		
-	symbol = binding->symbol;
+    symbol = binding->symbol;
 
-	SetSymbolValue(symbol, binding->value);
+    SetSymbolValue(symbol, binding->value);
 
-	binding->symbol = 0;
+    binding->symbol = 0;
 
-	SetBSP(binding);
+    SetBSP(binding);
 }
 
 void

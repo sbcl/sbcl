@@ -4,8 +4,8 @@
 typedef struct sigcontext os_context_t;
 
 static inline os_context_t *arch_os_get_context(void **void_context) {
-  asm volatile ("ta 0x03"); /* ta ST_FLUSH_WINDOWS */
-  return (os_context_t *) (void_context + 37);
+    asm volatile ("ta 0x03"); /* ta ST_FLUSH_WINDOWS */
+    return (os_context_t *) (void_context + 37);
 }
 
 unsigned long os_context_fp_control(os_context_t *context);

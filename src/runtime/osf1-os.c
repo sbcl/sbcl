@@ -56,9 +56,7 @@ size_t os_vm_page_size;
 
 void os_init(void)
 {
-
     os_vm_page_size = getpagesize();
-
 }
 
 

@@ -16,17 +16,17 @@
 
 struct ndir_entry {
 #ifndef alpha
-	long identifier;
-	long nwords;
-	long data_page;
-	long address;
-	long page_count;
+    long identifier;
+    long nwords;
+    long data_page;
+    long address;
+    long page_count;
 #else
-	u32 identifier;
-	u32 nwords;
-	u32 data_page;
-	u32 address;
-	u32 page_count;
+    u32 identifier;
+    u32 nwords;
+    u32 data_page;
+    u32 address;
+    u32 page_count;
 #endif
 };
 

@@ -309,50 +309,50 @@ purify_cmd(char **ptr)
 static void
 print_context(os_context_t *context)
 {
-	int i;
+    int i;
 
-	for (i = 0; i < NREGS; i++) {
-		printf("%s:\t", lisp_register_names[i]);
+    for (i = 0; i < NREGS; i++) {
+	printf("%s:\t", lisp_register_names[i]);
 #ifdef __i386__
-		brief_print((lispobj)(*os_context_register_addr(context,
-								i*2)));
+	brief_print((lispobj)(*os_context_register_addr(context,
+							i*2)));
 #else
-		brief_print((lispobj)(*os_context_register_addr(context,i)));
+	brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
-	}
-	printf("PC:\t\t  0x%08lx\n",
-	       (unsigned long)(*os_context_pc_addr(context)));
+    }
+    printf("PC:\t\t  0x%08lx\n",
+	   (unsigned long)(*os_context_pc_addr(context)));
 }
 
 static void
 print_context_cmd(char **ptr)
 {
-	int free;
+    int free;
 
-	free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
 	
-        if (more_p(ptr)) {
-		int index;
+    if (more_p(ptr)) {
+	int index;
 
-		index = parse_number(ptr);
+	index = parse_number(ptr);
 
-		if ((index >= 0) && (index < free)) {
-			printf("There are %d interrupt contexts.\n", free);
-			printf("printing context %d\n", index);
-			print_context(lisp_interrupt_contexts[index]);
-		} else {
-			printf("There aren't that many/few contexts.\n");
-			printf("There are %d interrupt contexts.\n", free);
-		}
+	if ((index >= 0) && (index < free)) {
+	    printf("There are %d interrupt contexts.\n", free);
+	    printf("printing context %d\n", index);
+	    print_context(lisp_interrupt_contexts[index]);
 	} else {
-		if (free == 0)
-			printf("There are no interrupt contexts!\n");
-		else {
-			printf("There are %d interrupt contexts.\n", free);
-			printf("printing context %d\n", free - 1);
-			print_context(lisp_interrupt_contexts[free - 1]);
-		}
+	    printf("There aren't that many/few contexts.\n");
+	    printf("There are %d interrupt contexts.\n", free);
 	}
+    } else {
+	if (free == 0)
+	    printf("There are no interrupt contexts!\n");
+	else {
+	    printf("There are %d interrupt contexts.\n", free);
+	    printf("printing context %d\n", free - 1);
+	    print_context(lisp_interrupt_contexts[free - 1]);
+	}
+    }
 }
 
 static void

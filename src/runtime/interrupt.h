@@ -24,8 +24,8 @@
 extern os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
 
 union interrupt_handler {
-	lispobj lisp;
-	void (*c)(int, siginfo_t*, void*);
+    lispobj lisp;
+    void (*c)(int, siginfo_t*, void*);
 };
 
 extern void interrupt_init(void);
