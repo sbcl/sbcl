@@ -224,6 +224,11 @@
 
 (assert-t-t (subtypep '(not (single-float 0.0 0.0)) '(not (member 0.0))))
 (assert-t-t (subtypep '(not (double-float 0.0d0 0.0d0)) '(not (member 0.0d0))))
+
+(assert-t-t (subtypep '(float -0.0) '(float 0.0)))
+(assert-t-t (subtypep '(float 0.0) '(float -0.0)))
+(assert-t-t (subtypep '(float (0.0)) '(float (-0.0))))
+(assert-t-t (subtypep '(float (-0.0)) '(float (0.0))))
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and

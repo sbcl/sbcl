@@ -1417,8 +1417,8 @@
    (and (eq (numeric-type-class type1) (numeric-type-class type2))
 	(eq (numeric-type-format type1) (numeric-type-format type2))
 	(eq (numeric-type-complexp type1) (numeric-type-complexp type2))
-	(equal (numeric-type-low type1) (numeric-type-low type2))
-	(equal (numeric-type-high type1) (numeric-type-high type2)))
+	(equalp (numeric-type-low type1) (numeric-type-low type2))
+	(equalp (numeric-type-high type1) (numeric-type-high type2)))
    t))
 
 (!define-type-method (number :unparse) (type)
