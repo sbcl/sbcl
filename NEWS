@@ -1727,6 +1727,10 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     ** :ALLOCATION :CLASS slots are better treated; their values are
        updated on class redefinition, and initforms inherited from
        superclasses are applied.
+    ** REMOVE-METHOD returns its generic function argument even when
+       no method was removed.
+    ** SHARED-INITIALIZE now initializes the values of the requested
+       slots, including those with :ALLOCATION :CLASS.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -515,12 +515,11 @@
 	method)))
 
 (defun real-remove-method (generic-function method)
-  ;; Note: Error check prohibited by ANSI spec removed.
   (when  (eq generic-function (method-generic-function method))
-    (let* ((name	 (generic-function-name generic-function))
+    (let* ((name (generic-function-name generic-function))
 	   (specializers (method-specializers method))
-	   (methods      (generic-function-methods generic-function))
-	   (new-methods  (remove method methods)))
+	   (methods (generic-function-methods generic-function))
+	   (new-methods (remove method methods)))
       (setf (method-generic-function method) nil)
       (setf (generic-function-methods generic-function) new-methods)
       (dolist (specializer (method-specializers method))
@@ -529,8 +528,8 @@
       (update-ctors 'remove-method
 		    :generic-function generic-function
 		    :method method)
-      (update-dfun generic-function)
-      generic-function)))
+      (update-dfun generic-function)))
+  generic-function)
 
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types

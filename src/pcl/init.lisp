@@ -132,11 +132,15 @@
             (loop for slotd in (class-slots class)
                   unless (initialize-slot-from-initarg class instance slotd)
                     collect slotd)))
-      (loop for slotd in initfn-slotds
-            when (and (not (eq :class (slot-definition-allocation slotd)))
-                      (or (eq t slot-names)
-                          (memq (slot-definition-name slotd) slot-names))) do
-              (initialize-slot-from-initfunction class instance slotd)))
+      (dolist (slotd initfn-slotds)
+	(if (eq (slot-definition-allocation slotd) :class)
+	    (when (or (eq t slot-names)
+		      (memq (slot-definition-name slotd) slot-names))
+	      (unless (slot-boundp-using-class class instance slotd)
+		(initialize-slot-from-initfunction class instance slotd)))
+	    (when (or (eq t slot-names)
+		      (memq (slot-definition-name slotd) slot-names))
+	      (initialize-slot-from-initfunction class instance slotd)))))
     instance))
 
 ;;; If initargs are valid return nil, otherwise signal an error.
