@@ -687,7 +687,7 @@ add_new_area(int first_page, int offset, int size)
 	max_new_areas = new_areas_index;
 }
 
-/* Update the tables for the alloc_region. The region maybe added to
+/* Update the tables for the alloc_region. The region may be added to
  * the new_areas.
  *
  * When done the alloc_region is set up so that the next quick alloc
@@ -4249,9 +4249,13 @@ alloc(int nbytes)
      */
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
 	/* set things up so that GC happens when we finish the PA
-	 * section.  */
+	 * section.  We only do this if there wasn't a pending handler
+	 * already, in case it was a gc.  If it wasn't a GC, the next
+	 * allocation will get us back to this point anyway, so no harm done
+	 */
 	struct interrupt_data *data=th->interrupt_data;
-	maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0);
+	if(!data->pending_handler) 
+	    maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0);
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);

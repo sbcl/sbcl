@@ -27,8 +27,8 @@
 	       (funcall real-function))
 	     0))))))))
 
-;;; Conventional wisdom says that it's a bad idea to use these unless
-;;; you really need to.  Use a lock or a waitqueue instead
+;;; Really, you don't want to use these: they'll get into trouble with
+;;; garbage collection.  Use a lock or a waitqueue instead
 (defun suspend-thread (thread-id)
   (sb!unix:unix-kill thread-id sb!unix:sigstop))
 (defun resume-thread (thread-id)
@@ -60,10 +60,13 @@
 SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   (interrupt-thread thread-id 'sb!ext:quit))
 
-
+(declaim (inline current-thread-id))
 (defun current-thread-id ()
-  (sb!sys:sap-int
-   (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot)))
+  (logand 
+   (sb!sys:sap-int
+    (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot))
+   ;; KLUDGE pids are 16 bit really.  Avoid boxing the return value
+   (1- (ash 1 16))))
 
 ;;;; iterate over the in-memory threads
 
@@ -78,18 +81,28 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 ;;;; queues, locks 
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
+(declaim (inline get-spinlock release-spinlock))
+
 (defun get-spinlock (lock offset new-value)
   (declare (optimize (speed 3) (safety 0)))
   (loop until
 	(eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
 
+;; this should do nothing if we didn't own the lock, so safe to use in
+;; unwind-protect cleanups when lock acquisition failed for some reason
+(defun release-spinlock (lock offset our-value)
+  (declare (optimize (speed 3) (safety 0)))
+  (sb!vm::%instance-set-conditional lock offset our-value 0))
+
 (defmacro with-spinlock ((queue) &body body)
   (with-unique-names (pid)
-    `(unwind-protect
-      (let ((,pid (current-thread-id)))
-	(get-spinlock ,queue 2 ,pid)
-	,@body)
-      (setf (waitqueue-lock ,queue) 0))))
+    `(let ((,pid (current-thread-id)))
+       (unwind-protect
+	    (progn
+	      (get-spinlock ,queue 2 ,pid)
+	      ,@body)
+	 (release-spinlock ,queue 2 ,pid)))))
+
 
 ;;;; the higher-level locking operations are based on waitqueues
 
@@ -104,12 +117,11 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 (sb!alien:define-alien-routine "block_sigcont"  void)
 (sb!alien:define-alien-routine "unblock_sigcont_and_sleep"  void)
 
+
 ;;; this should only be called while holding the queue spinlock.
 ;;; it releases the spinlock before sleeping
 (defun wait-on-queue (queue &optional lock)
   (let ((pid (current-thread-id)))
-    ;; FIXME what should happen if we get interrupted when we've blocked
-    ;; the sigcont?  For that matter, can we get interrupted?
     (block-sigcont)
     (when lock (release-mutex lock))
     (sb!sys:without-interrupts
@@ -128,12 +140,13 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 ;;; this should only be called while holding the queue spinlock.
 (defun signal-queue-head (queue)
   (let ((p (car (waitqueue-data queue))))
-    (when p (sb!unix:unix-kill p  sb!unix:sigcont))))
+    (when p (sb!unix:unix-kill p  sb!unix::sig-dequeue))))
 
 ;;;; mutex
 
 (defun get-mutex (lock &optional new-value (wait-p t))
-  (declare (type mutex lock))
+  (declare (type mutex lock)
+	   (optimize (speed 3)))
   (let ((pid (current-thread-id)))
     (unless new-value (setf new-value pid))
     (assert (not (eql new-value (mutex-value lock))))
@@ -257,8 +270,7 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
       (sb!impl::repl-prompt-fun out-stream))))
 
 (defun resume-stopped-thread (id)
-  (let ((pid (current-thread-id))
-	(lock *session-lock*)) 
+  (let ((lock *session-lock*)) 
     (with-spinlock (lock)
       (setf (waitqueue-data lock)
 	    (cons id (delete id  (waitqueue-data lock)))))

@@ -125,7 +125,7 @@ implements a subset of the Franz Allegro simple-streams proposal.</para>
 
 <para>&SBCL; supports a MetaObject Protocol which is intended to be
 compatible with &AMOP;; present exceptions to this (as distinct from
-current bugs) are:
+current bugs) are:</para>
 <itemizedlist>
   <listitem><para>the abstract <classname>metaobject</> class is not
     present in the class hierarchy;</para></listitem>
@@ -137,7 +137,8 @@ current bugs) are:
   <listitem><para>the system-supplied <property>:around</> method for
     <function>compute-slots</> specialized on
     <classname>funcallable-standard-class</> does not respect the
-    requested order from a user-supplied primary method.
+    requested order from a user-supplied primary method.</para>
+</listitem>
 </itemizedlist>
 
 </sect2>
@@ -146,7 +147,7 @@ current bugs) are:
 
 <para>&SBCL; (as of version 0.8.3, on Linux x86 only) supports a
 fairly low-level threading interface that maps onto the host operating
-system's concept of threads or lightweight processes.  
+system's concept of threads or lightweight processes.  </para>
 
 <sect3><title>Lisp-level view</title>
 

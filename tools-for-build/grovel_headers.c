@@ -188,6 +188,11 @@ main(int argc, char *argv[])
     DEFSIGNAL(SIGXCPU);
     DEFSIGNAL(SIGXFSZ);
 #endif
-
+#ifdef LISP_FEATURE_SB_THREAD
+    /* FIXME OAOOM alert: this information is duplicated in linux-os.h */
+    defconstant("sig-interrupt-thread",SIGRTMIN);
+    defconstant("sig-stop-for-gc",SIGRTMIN+1);
+    defconstant("sig-dequeue",SIGRTMIN+2);
+#endif
     return 0;
 }

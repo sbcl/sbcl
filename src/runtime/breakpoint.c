@@ -145,7 +145,8 @@ void handle_breakpoint(int signal, siginfo_t *info, os_context_t *context)
     fake_foreign_function_call(context);
 
     code = find_code(context);
-
+    /* FIXME we're calling into Lisp with signals masked here.  Is this
+     * the right thing to do? */
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
 	     compute_offset(context, code),
 	     code,
@@ -187,6 +188,8 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
     code = find_code(context);
     codeptr = (struct code *)native_pointer(code);
 
+    /* FIXME again, calling into Lisp with signals masked.  Is this
+     * sensible? */
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
 	     compute_offset(context, code),
 	     code,

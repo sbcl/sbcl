@@ -103,8 +103,7 @@ void sigaddset_blockable(sigset_t *s)
     sigaddset(s, SIGUSR1);
     sigaddset(s, SIGUSR2);
 #ifdef LISP_FEATURE_SB_THREAD
-    /* don't block STOP_FOR_GC, we need to be able to interrupt threads
-     * for GC purposes even when they are blocked on queues etc */
+    sigaddset(s, SIG_STOP_FOR_GC);
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
 }
@@ -276,7 +275,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 	 * before the Lisp error handling mechanism is set up. */
 	lose("internal error too early in init, can't recover");
     }
-    undo_fake_foreign_function_call(context);
+    undo_fake_foreign_function_call(context); /* blocks signals again */
     if (continuable) {
 	arch_skip_instruction(context);
     }
@@ -290,6 +289,8 @@ interrupt_handle_pending(os_context_t *context)
 
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
+    /* FIXME I'm not altogether sure this is appropriate if we're
+     * here as the result of a pseudo-atomic */
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
     /* restore the saved signal mask from the original signal (the
@@ -407,7 +408,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     if (were_in_lisp)
 #endif
     {
-        undo_fake_foreign_function_call(context);
+        undo_fake_foreign_function_call(context); /* block signals again */
     }
 
 #ifdef QSHOW_SIGNALS
@@ -427,6 +428,7 @@ void
 run_deferred_handler(struct interrupt_data *data, void *v_context) {
     (*(data->pending_handler))
 	(data->pending_signal,&(data->pending_info), v_context);
+    data->pending_handler=0;
 }
 
 boolean
@@ -505,23 +507,19 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
     struct interrupt_data *data=thread->interrupt_data;
-    sigset_t block;
 
+    
     if(maybe_defer_handler(sig_stop_for_gc_handler,data,
 			   signal,info,context)){
 	return;
     }
-    sigemptyset(&block);
-    sigaddset_blockable(&block);
-    sigprocmask(SIG_BLOCK, &block, 0);
-
     /* need the context stored so it can have registers scavenged */
     fake_foreign_function_call(context); 
 
     get_spinlock(&all_threads_lock,thread->pid);
     countdown_to_gc--;
     release_spinlock(&all_threads_lock);
-    kill(getpid(),SIGSTOP);
+    kill(thread->pid,SIGSTOP);
 
     undo_fake_foreign_function_call(context);
 }
@@ -680,16 +678,22 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 
 #endif
 
-/* this is also used by from gencgc.c alloc() */
+/* this is also used by gencgc, in alloc() */
 boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 {
+    sigset_t new;
     os_context_t *context=(os_context_t *) void_context;
     fake_foreign_function_call(context);
     /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
      * which case we will be running with no gc trigger barrier
      * thing for a while.  But it shouldn't be long until the end
      * of WITHOUT-GCING. */
+
+    sigemptyset(&new);
+    sigaddset_blockable(&new);
+    /* enable signals before calling into Lisp */
+    sigprocmask(SIG_UNBLOCK,&new,0);
     funcall0(SymbolFunction(SUB_GC));
     undo_fake_foreign_function_call(context);
     return 1;

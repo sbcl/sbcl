@@ -112,21 +112,6 @@ int arch_os_thread_init(struct thread *thread) {
     return 1;
 }
 
-/* if you can't do something like this (maybe because you're using a 
- * register for thread base that is only available in Lisp code)
- * you'll just have to find_thread_by_pid(getpid())
- */
-struct thread *arch_os_get_current_thread() {
-#ifdef LISP_FEATURE_SB_THREAD
-    register struct thread *me=0;
-    if(all_threads)
-	__asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
-		 : "i" (offsetof (struct thread,this)));
-    return me;
-#else
-    return all_threads;
-#endif
-}
 struct thread *debug_get_fs() {
     register u32 fs;
     __asm__ __volatile__ ("movl %%fs,%0" : "=r" (fs)  : );
