@@ -15,80 +15,7 @@
 ;;; use it?)
 (defvar *type-system-initialized* #+sb-xc-host nil) ; (set in cold load)
 
-;;; Return the type structure corresponding to a type specifier. We
-;;; pick off structure types as a special case.
-;;;
-;;; Note: VALUES-SPECIFIER-TYPE-CACHE-CLEAR must be called whenever a
-;;; type is defined (or redefined).
-(defun-cached (values-specifier-type
-	       :hash-function (lambda (x)
-				;; FIXME: The THE FIXNUM stuff is
-				;; redundant in SBCL (or modern CMU
-				;; CL) because of type inference.
-				(the fixnum
-				     (logand (the fixnum (sxhash x))
-					     #x3FF)))
-	       :hash-bits 10
-	       :init-wrapper !cold-init-forms)
-	      ((orig eq))
-  (let ((u (uncross orig)))
-    (or (info :type :builtin u)
-	(let ((spec (type-expand u)))
-	  (cond
-	   ((and (not (eq spec u))
-		 (info :type :builtin spec)))
-	   ((eq (info :type :kind spec) :instance)
-	    (sb!xc:find-class spec))
-	   ((typep spec 'class)
-	    ;; There doesn't seem to be any way to translate
-	    ;; (TYPEP SPEC 'BUILT-IN-CLASS) into something which can be
-	    ;; executed on the host Common Lisp at cross-compilation time.
-	    #+sb-xc-host (error
-			  "stub: (TYPEP SPEC 'BUILT-IN-CLASS) on xc host")
-	    (if (typep spec 'built-in-class)
-		(or (built-in-class-translation spec) spec)
-		spec))
-	   (t
-	    (let* (;; FIXME: This automatic promotion of FOO-style
-		   ;; specs to (FOO)-style specs violates the ANSI
-		   ;; standard. Unfortunately, we can't fix the
-		   ;; problem just by removing it, since then things
-		   ;; downstream should break. But at some point we
-		   ;; should fix this and the things downstream too.
-		   (lspec (if (atom spec) (list spec) spec))
-		   (fun (info :type :translator (car lspec))))
-	      (cond (fun
-		     (funcall fun lspec))
-		    ((or (and (consp spec) (symbolp (car spec)))
-			 (symbolp spec))
-		     (when *type-system-initialized*
-		       (signal 'parse-unknown-type :specifier spec))
-		     ;; (The RETURN-FROM here inhibits caching.)
-		     (return-from values-specifier-type
-		       (make-unknown-type :specifier spec)))
-		    (t
-		     (error "bad thing to be a type specifier: ~S"
-			    spec))))))))))
-
-;;; Like VALUES-SPECIFIER-TYPE, except that we guarantee to never
-;;; return a VALUES type.
-(defun specifier-type (x)
-  (let ((res (values-specifier-type x)))
-    (when (values-type-p res)
-      (error "VALUES type illegal in this context:~%  ~S" x))
-    res))
-
-;;; Similar to MACROEXPAND, but expands DEFTYPEs. We don't bother
-;;; returning a second value.
-(defun type-expand (form)
-  (let ((def (cond ((symbolp form)
-                    (info :type :expander form))
-                   ((and (consp form) (symbolp (car form)))
-                    (info :type :expander (car form)))
-                   (t nil))))
-    (if def
-        (type-expand (funcall def (if (consp form) form (list form))))
-        form)))
+;;;; representations of types
 
 ;;; A HAIRY-TYPE represents anything too weird to be described
 ;;; reasonably or to be useful, such as NOT, SATISFIES, unknown types,
@@ -155,10 +82,10 @@
   ;; specifier to win.
   (type (missing-arg) :type ctype))
 
-;;; The NAMED-TYPE is used to represent *, T and NIL. These types must be
-;;; super- or sub-types of all types, not just classes and * and NIL aren't
-;;; classes anyway, so it wouldn't make much sense to make them built-in
-;;; classes.
+;;; The NAMED-TYPE is used to represent *, T and NIL. These types must
+;;; be super- or sub-types of all types, not just classes and * and
+;;; NIL aren't classes anyway, so it wouldn't make much sense to make
+;;; them built-in classes.
 (defstruct (named-type (:include ctype
 				 (class-info (type-class-or-lose 'named)))
 		       (:copier nil))
@@ -367,6 +294,83 @@
   ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
+
+;;;; type utilities
+
+;;; Return the type structure corresponding to a type specifier. We
+;;; pick off structure types as a special case.
+;;;
+;;; Note: VALUES-SPECIFIER-TYPE-CACHE-CLEAR must be called whenever a
+;;; type is defined (or redefined).
+(defun-cached (values-specifier-type
+	       :hash-function (lambda (x)
+				;; FIXME: The THE FIXNUM stuff is
+				;; redundant in SBCL (or modern CMU
+				;; CL) because of type inference.
+				(the fixnum
+				     (logand (the fixnum (sxhash x))
+					     #x3FF)))
+	       :hash-bits 10
+	       :init-wrapper !cold-init-forms)
+	      ((orig eq))
+  (let ((u (uncross orig)))
+    (or (info :type :builtin u)
+	(let ((spec (type-expand u)))
+	  (cond
+	   ((and (not (eq spec u))
+		 (info :type :builtin spec)))
+	   ((eq (info :type :kind spec) :instance)
+	    (sb!xc:find-class spec))
+	   ((typep spec 'class)
+	    ;; There doesn't seem to be any way to translate
+	    ;; (TYPEP SPEC 'BUILT-IN-CLASS) into something which can be
+	    ;; executed on the host Common Lisp at cross-compilation time.
+	    #+sb-xc-host (error
+			  "stub: (TYPEP SPEC 'BUILT-IN-CLASS) on xc host")
+	    (if (typep spec 'built-in-class)
+		(or (built-in-class-translation spec) spec)
+		spec))
+	   (t
+	    (let* (;; FIXME: This automatic promotion of FOO-style
+		   ;; specs to (FOO)-style specs violates the ANSI
+		   ;; standard. Unfortunately, we can't fix the
+		   ;; problem just by removing it, since then things
+		   ;; downstream should break. But at some point we
+		   ;; should fix this and the things downstream too.
+		   (lspec (if (atom spec) (list spec) spec))
+		   (fun (info :type :translator (car lspec))))
+	      (cond (fun
+		     (funcall fun lspec))
+		    ((or (and (consp spec) (symbolp (car spec)))
+			 (symbolp spec))
+		     (when *type-system-initialized*
+		       (signal 'parse-unknown-type :specifier spec))
+		     ;; (The RETURN-FROM here inhibits caching.)
+		     (return-from values-specifier-type
+		       (make-unknown-type :specifier spec)))
+		    (t
+		     (error "bad thing to be a type specifier: ~S"
+			    spec))))))))))
+
+;;; Like VALUES-SPECIFIER-TYPE, except that we guarantee to never
+;;; return a VALUES type.
+(defun specifier-type (x)
+  (let ((res (values-specifier-type x)))
+    (when (values-type-p res)
+      (error "VALUES type illegal in this context:~%  ~S" x))
+    res))
+
+;;; Similar to MACROEXPAND, but expands DEFTYPEs. We don't bother
+;;; returning a second value.
+(defun type-expand (form)
+  (let ((def (cond ((symbolp form)
+                    (info :type :expander form))
+                   ((and (consp form) (symbolp (car form)))
+                    (info :type :expander (car form)))
+                   (t nil))))
+    (if def
+        (type-expand (funcall def (if (consp form) form (list form))))
+        form)))
 
 ;;; Note that the type NAME has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.
@@ -376,5 +380,5 @@
   (when (boundp 'sb!kernel::*values-specifier-type-cache-vector*)
     (values-specifier-type-cache-clear))
   (values))
-
+
 (!defun-from-collected-cold-init-forms !early-type-cold-init)

@@ -280,8 +280,7 @@
 		  (%compiler-defstruct ',dd ',inherits))
 		(%defstruct ',dd ',inherits)
 		,@(unless expanding-into-code-for-xc-host-p
-		    (append (predicate-definitions dd)
-			    ;; FIXME: We've inherited from CMU CL nonparallel
+		    (append ;; FIXME: We've inherited from CMU CL nonparallel
 			    ;; code for creating copiers for typed and untyped
 			    ;; structures. This should be fixed.
 					;(copier-definition dd)
@@ -337,20 +336,8 @@
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
-;;; Return a list of forms which create a predicate for an untyped DEFSTRUCT.
-(defun predicate-definitions (dd)
-  (let ((pred (dd-predicate-name dd))
-	(argname (gensym "ARG")))
-    (and pred
-	 `((protect-cl ',pred)
-	   (declaim (inline ,pred))
-	   (defun ,pred (,argname)
-	     (declare (optimize (speed 3) (safety 0)))
-	     (typep-to-layout ,argname
-			      (compile-time-find-layout ,(dd-name dd))))))))
-
-;;; Return a list of forms which create a predicate function for a typed
-;;; DEFSTRUCT.
+;;; Return a list of forms which create a predicate function for a
+;;; typed DEFSTRUCT.
 (defun typed-predicate-definitions (defstruct)
   (let ((name (dd-name defstruct))
 	(predicate-name (dd-predicate-name defstruct))
@@ -880,7 +867,27 @@
 
     (let ((predicate-name (dd-predicate-name dd)))
       (when predicate-name
-	(sb!xc:proclaim `(ftype (function (t) t) ,predicate-name))))
+	(sb!xc:proclaim `(ftype (function (t) t) ,predicate-name))
+	;; Provide inline expansion (or not).
+	(ecase (dd-type dd)
+	  ((structure funcallable-structure)
+	   ;; Let the predicate be inlined. 
+	   (setf (info :function :inline-expansion-designator predicate-name)
+		 (lambda ()
+		   `(lambda (x)
+		      ;; This dead simple definition works because the
+		      ;; type system knows how to generate inline type
+		      ;; tests for instances.
+		      (typep x ',(dd-name dd))))
+		 (info :function :inlinep predicate-name)
+		 :inline))
+	  ((list vector)
+	   ;; Just punt. We could provide inline expansions for :TYPE
+	   ;; LIST and :TYPE VECTOR predicates too, but it'd be a
+	   ;; little messier and we don't bother. (Does anyway use
+	   ;; typed DEFSTRUCTs at all, let alone for high
+	   ;; performance?)
+	   ))))
 
     (dolist (dsd (dd-slots dd))
       (let* ((accessor-name (dsd-accessor-name dsd))
@@ -890,9 +897,7 @@
 	      (accessor-inline-expansion-designators dd dsd)
 	    (sb!xc:proclaim `(ftype (function (,dtype) ,dsd-type)
 				    ,accessor-name))
-	    (setf (info :function
-			:inline-expansion-designator
-			accessor-name)
+	    (setf (info :function :inline-expansion-designator accessor-name)
 		  reader-designator
 		  (info :function :inlinep accessor-name)
 		  :inline)
