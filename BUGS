@@ -1204,31 +1204,6 @@ WORKAROUND:
   least some of them are indicative of potentially thread-unsafe 
   parts of the system.  See doc/internals/notes/threading-specials
 
-285: PPC randomness
-  In SBCL 0.8.3.1x on a powerpc running Linux (dunno if Darwin is
-    similarly affected):
-  * (dotimes (i 100) (random 1663553320000000))
-
-  NIL
-  * (dotimes (i 100) (random 1663553340000000))
-
-  NIL
-  * (dotimes (i 100) (random 1663553350000000))
-
-  debugger invoked on condition of type TYPE-ERROR:
-    The value -30653269094906
-      is not of type
-      (OR (SINGLE-FLOAT 0.0) (DOUBLE-FLOAT 0.0d0) (RATIONAL 0)).
-
-    and, weirdly, the frame is:
-  ("hairy arg processor for top level local call RANDOM"
-   1663553347392000
-   #S(RANDOM-STATE
-      :STATE #(0 2567483615 188 1503590015 2333049409 322761517 ...)))
-
-  (the type error doesn't seem to be terribly deterministic in when it
-  occurs.  Bigger numbers seem better able to trigger the error)
-
 286: "recursive known functions"
   Self-call recognition conflicts with known function
   recognition. Currently cross compiler and target COMPILE do not
