@@ -298,5 +298,16 @@
                                     (princ-to-string r)))))))))
        (write-char #\.)
        (finish-output)))
+
+;;;; Bugs, found by PFD
+;;; NIL parameter for ~^ means `not supplied'
+(loop for (format arg result) in
+      '(("~:{~D~v^~D~}" ((3 1 4) (1 0 2) (7 nil) (5 nil 6)) "341756")
+        ("~:{~1,2,v^~A~}" ((nil 0) (3 1) (0 2)) "02"))
+      do (assert (string= (funcall #'format nil format arg) result))
+      do (assert (string= (with-output-to-string (s)
+                            (funcall (eval `(formatter ,format)) s arg))
+                          result)))
+
 ;;; success
 (quit :unix-status 104)
