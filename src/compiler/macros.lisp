@@ -756,8 +756,8 @@
 	new-value))
 (defsetf event-level %set-event-level)
 
-;;; Define a new kind of event. Name is a symbol which names the event
-;;; and Description is a string which describes the event. Level
+;;; Define a new kind of event. NAME is a symbol which names the event
+;;; and DESCRIPTION is a string which describes the event. Level
 ;;; (default 0) is the level of significance associated with this
 ;;; event; it is used to determine whether to print a Note when the
 ;;; event happens.
@@ -776,7 +776,7 @@
 (declaim (type unsigned-byte *event-note-threshold*))
 (defvar *event-note-threshold* 1)
 
-;;; Note that the event with the specified Name has happened. Node is
+;;; Note that the event with the specified NAME has happened. NODE is
 ;;; evaluated to determine the node to which the event happened.
 (defmacro event (name &optional node)
   ;; Increment the counter and do any action. Mumble about the event if
@@ -813,8 +813,8 @@
 
 #!-sb-fluid (declaim (inline find-in position-in))
 
-;;; Find Element in a null-terminated List linked by the accessor
-;;; function Next. Key, Test and Test-Not are the same as for generic
+;;; Find ELEMENT in a null-terminated LIST linked by the accessor
+;;; function NEXT. KEY, TEST and TEST-NOT are the same as for generic
 ;;; sequence functions.
 (defun find-in (next
 		element
@@ -836,9 +836,9 @@
 	(when (funcall test (funcall key current) element)
 	  (return current)))))
 
-;;; Return the position of Element (or NIL if absent) in a
-;;; null-terminated List linked by the accessor function Next. Key,
-;;; Test and Test-Not are the same as for generic sequence functions.
+;;; Return the position of ELEMENT (or NIL if absent) in a
+;;; null-terminated LIST linked by the accessor function NEXT. KEY,
+;;; TEST and TEST-NOT are the same as for generic sequence functions.
 (defun position-in (next
 		    element
 		    list

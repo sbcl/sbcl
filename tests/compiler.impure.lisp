@@ -669,6 +669,39 @@ BUG 48c, not yet fixed:
   x)
 (assert (= (bug219-b-aux2 1)
 	   (if *bug219-b-expanded-p* 3 1)))
+
+;;; bug 224: failure in unreachable code deletion
+(defmacro do-optimizations (&body body)
+  `(dotimes (.speed. 4)
+     (dotimes (.space. 4)
+       (dotimes (.debug. 4)
+         (dotimes (.compilation-speed. 4)
+           (proclaim `(optimize (speed , .speed.) (space , .space.)
+                                (debug , .debug.)
+                                (compilation-speed , .compilation-speed.)))
+           ,@body)))))
+
+(do-optimizations
+    (compile nil
+             (read-from-string
+              "(lambda () (#:localy (declare (optimize (safety 3)))
+                                    (ignore-errors (progn (values-list (car (list '(1 . 2)))) t))))")))
+
+(do-optimizations
+    (compile nil '(lambda ()
+                   (labels ((ext ()
+                              (tagbody
+                                 (labels ((i1 () (list (i2) (i2)))
+                                          (i2 () (list (int) (i1)))
+                                          (int () (go :exit)))
+                                   (list (i1) (i1) (i1)))
+                               :exit (return-from ext)
+                                 )))
+                     (list (error "nih") (ext) (ext))))))
+
+(do-optimizations
+  (compile nil '(lambda (x) (let ((y (error ""))) (list x y)))))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

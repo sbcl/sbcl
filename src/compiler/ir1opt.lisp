@@ -288,53 +288,47 @@
   (setf (component-reoptimize component) nil)
   (do-blocks (block component)
     (cond
-     ((or (block-delete-p block)
-	  (null (block-pred block)))
-      (delete-block block))
-     ((eq (functional-kind (block-home-lambda block)) :deleted)
-      ;; Preserve the BLOCK-SUCC invariant that almost every block has
-      ;; one successor (and a block with DELETE-P set is an acceptable
-      ;; exception).
-      (labels ((mark-blocks (block)
-                 (dolist (pred (block-pred block))
-                   (unless (or (block-delete-p pred)
-                               (eq (component-head (block-component pred))
-                                   pred))
-                     (setf (block-delete-p pred) t)
-                     (mark-blocks pred)))))
-        (mark-blocks block)
-        (delete-block block)))
-     (t
-      (loop
-	(let ((succ (block-succ block)))
-	  (unless (and succ (null (rest succ)))
-	    (return)))
-
-	(let ((last (block-last block)))
-	  (typecase last
-	    (cif
-	     (flush-dest (if-test last))
-	     (when (unlink-node last)
-	       (return)))
-	    (exit
-	     (when (maybe-delete-exit last)
-	       (return)))))
-
-        (unless (join-successor-if-possible block)
-	  (return)))
-
-      (when (and (block-reoptimize block) (block-component block))
-	(aver (not (block-delete-p block)))
-	(ir1-optimize-block block))
-
       ;; We delete blocks when there is either no predecessor or the
       ;; block is in a lambda that has been deleted. These blocks
       ;; would eventually be deleted by DFO recomputation, but doing
       ;; it here immediately makes the effect available to IR1
       ;; optimization.
-      (when (and (block-flush-p block) (block-component block))
-	(aver (not (block-delete-p block)))
-	(flush-dead-code block)))))
+      ((or (block-delete-p block)
+           (null (block-pred block)))
+       (delete-block block))
+      ((eq (functional-kind (block-home-lambda block)) :deleted)
+       ;; Preserve the BLOCK-SUCC invariant that almost every block has
+       ;; one successor (and a block with DELETE-P set is an acceptable
+       ;; exception).
+       (mark-for-deletion block)
+       (delete-block block))
+      (t
+       (loop
+          (let ((succ (block-succ block)))
+            (unless (and succ (null (rest succ)))
+              (return)))
+
+          (let ((last (block-last block)))
+            (typecase last
+              (cif
+               (flush-dest (if-test last))
+               (when (unlink-node last)
+                 (return)))
+              (exit
+               (when (maybe-delete-exit last)
+                 (return)))))
+
+          (unless (join-successor-if-possible block)
+            (return)))
+
+       (when (and (block-reoptimize block) (block-component block))
+         (aver (not (block-delete-p block)))
+         (ir1-optimize-block block))
+
+       (cond ((block-delete-p block)
+              (delete-block block))
+             ((and (block-flush-p block) (block-component block))
+              (flush-dead-code block))))))
 
   (values))
 

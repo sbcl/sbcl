@@ -187,7 +187,7 @@
 	  (res home))))
     (res)))
 
-;;; If CLAMBDA is not already in COMPONENT, just return that
+;;; If CLAMBDA is already in COMPONENT, just return that
 ;;; component. Otherwise, move the code for CLAMBDA and all lambdas it
 ;;; physically depends on (either because of calls or because of
 ;;; closure relationships) into COMPONENT, or possibly into another

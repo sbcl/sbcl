@@ -589,7 +589,7 @@
 	(link-blocks block new-block)
 	(add-to-dfo new-block block)
 	(setf (component-reanalyze (block-component block)) t)
-	
+
 	(do ((cont start (node-cont (continuation-next cont))))
 	    ((eq cont last-cont)
 	     (when (eq (continuation-kind last-cont) :inside-block)
@@ -603,7 +603,7 @@
 
 ;;;; deleting stuff
 
-;;; Deal with deleting the last (read) reference to a LAMBDA-VAR. 
+;;; Deal with deleting the last (read) reference to a LAMBDA-VAR.
 (defun delete-lambda-var (leaf)
   (declare (type lambda-var leaf))
 
@@ -682,6 +682,12 @@
       (setf (lambda-bind let) nil)
       (setf (functional-kind let) :deleted))
 
+    ;; LET may be deleted if its BIND is unreachable. Autonomous
+    ;; function may be deleted if it has no reachable references.
+    (unless (member original-kind '(:let :mv-let :assignment))
+      (dolist (ref (lambda-refs clambda))
+        (mark-for-deletion (node-block ref))))
+
     ;; (The IF test is (FUNCTIONAL-SOMEWHAT-LETLIKE-P CLAMBDA), except
     ;; that we're using the old value of the KIND slot, not the
     ;; current slot value, which has now been set to :DELETED.)
@@ -696,17 +702,17 @@
 	;; referenced, we give a note.
 	(let* ((bind-block (node-block bind))
 	       (component (block-component bind-block))
-	       (return (lambda-return clambda)))
-          (dolist (ref (lambda-refs clambda))
-            (let ((home (node-home-lambda ref)))
-              (aver (eq home clambda))))
+	       (return (lambda-return clambda))
+               (return-block (and return (node-block return))))
 	  (unless (leaf-ever-used clambda)
 	    (let ((*compiler-error-context* bind))
 	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"
 			     (leaf-debug-name clambda))))
-	  (unlink-blocks (component-head component) bind-block)
-	  (when return
-	    (unlink-blocks (node-block return) (component-tail component)))
+          (unless (block-delete-p bind-block)
+            (unlink-blocks (component-head component) bind-block))
+	  (when (and return-block (not (block-delete-p return-block)))
+            (mark-for-deletion return-block)
+	    (unlink-blocks return-block (component-tail component)))
 	  (setf (component-reanalyze component) t)
 	  (let ((tails (lambda-tail-set clambda)))
 	    (setf (tail-set-funs tails)
@@ -843,11 +849,17 @@
 ;;; blocks with the DELETE-P flag.
 (defun mark-for-deletion (block)
   (declare (type cblock block))
-  (unless (block-delete-p block)
-    (setf (block-delete-p block) t)
-    (setf (component-reanalyze (block-component block)) t)
-    (dolist (pred (block-pred block))
-      (mark-for-deletion pred)))
+  (let* ((component (block-component block))
+         (head (component-head component)))
+    (labels ((helper (block)
+               (setf (block-delete-p block) t)
+               (dolist (pred (block-pred block))
+                 (unless (or (block-delete-p pred)
+                             (eq pred head))
+                   (helper pred)))))
+      (unless (block-delete-p block)
+        (helper block)
+        (setf (component-reanalyze component) t))))
   (values))
 
 ;;; Delete CONT, eliminating both control and value semantics. We set
@@ -954,7 +966,6 @@
       (bind
        (let ((lambda (bind-lambda node)))
 	 (unless (eq (functional-kind lambda) :deleted)
-	   (aver (functional-somewhat-letlike-p lambda))
 	   (delete-lambda lambda))))
       (exit
        (let ((value (exit-value node))
