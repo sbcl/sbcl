@@ -1559,3 +1559,41 @@ WORKAROUND:
     (defmethod foo ((x (eql 4.0))) 3.0)
     (typep 1 (first (sb-pcl:method-specializers *)))
   gives an error.
+
+339: "DEFINE-METHOD-COMBINATION bugs"
+  (reported by Bruno Haible via the clisp test suite)
+
+  a. Syntax checking laxity (should produce errors):
+     i. (define-method-combination foo :documentation :operator)
+    ii. (define-method-combination foo :documentation nil)
+   iii. (define-method-combination foo nil)
+    iv. (define-method-combination foo nil nil
+         (:arguments order &aux &key))
+     v. (define-method-combination foo nil nil (:arguments &whole))
+    vi. (define-method-combination foo nil nil (:generic-function))
+   vii. (define-method-combination foo nil nil (:generic-function bar baz))
+  viii. (define-method-combination foo nil nil (:generic-function (bar)))
+    ix. (define-method-combination foo nil ((3)))
+     x. (define-method-combination foo nil ((a)))
+
+  b. define-method-combination arguments lambda list badness
+     i. &aux args are currently unsupported;
+    ii. default values of &optional and &key arguments are ignored;
+   iii. supplied-p variables for &optional and &key arguments are not
+        bound.
+
+  c. qualifier matching incorrect
+  (progn
+    (define-method-combination mc27 () 
+        ((normal ()) 
+         (ignored (:ignore :unused)))
+      `(list 'result 
+             ,@(mapcar #'(lambda (method) `(call-method ,method)) normal)))
+    (defgeneric test-mc27 (x)
+      (:method-combination mc27)
+      (:method :ignore ((x number)) (/ 0)))
+    (test-mc27 7))
+
+  should signal an invalid-method-error, as the :IGNORE (NUMBER)
+  method is applicable, and yet matches neither of the method group
+  qualifier patterns.

@@ -2553,6 +2553,13 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
     no longer exhibits ridiculously poor performance when constructing
     instances corresponding to C structs.
 
+changes in sbcl-0.8.13 relative to sbcl-0.8.12:
+  * minor incompatible change: as threatened around sbcl-0.8.0, the
+    home package of MOP-related symbols is now SB-MOP, not SB-PCL.
+    The symbols are also exported from SB-PCL for backwards
+    compatibility, but more so than before SB-PCL should be treated as
+    an implementation-internal package.
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and
