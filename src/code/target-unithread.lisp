@@ -1,5 +1,6 @@
 (in-package "SB!THREAD")
 
+;;; used bu debug-int.lisp to access interrupt contexts
 #!-sb-fluid (declaim (inline sb!vm::current-thread-offset-sap))
 (defun sb!vm::current-thread-offset-sap (n) 
   (declare (type (unsigned-byte 27) n))
@@ -7,8 +8,8 @@
 	       (* n 4)))
 
 (defun current-thread-id ()
-  (sb!sys:sap-int
-   (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot)))
+  (sb!sys:sap-ref-32 (alien-sap (extern-alien "all_threads" (* t))) 
+	       (* sb!vm::thread-pid-slot 4)))
 
 ;;;; queues, locks 
 

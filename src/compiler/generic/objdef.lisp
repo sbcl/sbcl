@@ -370,19 +370,19 @@
   ;; unbound_marker is borrowed very briefly at thread startup to 
   ;; pass the address of initial-function into new_thread_trampoline 
   (unbound-marker :init :unbound) ; tls[0] = UNBOUND_MARKER_WIDETAG 
-  (binding-stack-start :c-type "lispobj *")
-  (binding-stack-pointer :c-type "lispobj *")
-  (control-stack-start :c-type "lispobj *")
-  (control-stack-end :c-type "lispobj *")
-  (alien-stack-start :c-type "lispobj *")
-  (alien-stack-pointer :c-type "lispobj *")
-  #!+gencgc
-  (alloc-region :c-type "struct alloc_region" :length 5)
   (pid :c-type "pid_t")
+  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
   (tls-cookie)				;  on x86, the LDT index 
-  (this :c-type "struct thread *")
-  (next :c-type "struct thread *")
-  (pseudo-atomic-atomic)
-  (pseudo-atomic-interrupted)
-  (interrupt-data :c-type "struct interrupt_data *")
+  (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
+  (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
+  #!+x86 (pseudo-atomic-atomic)
+  #!+x86 (pseudo-atomic-interrupted)
+  (interrupt-data :c-type "struct interrupt_data *" 
+		  :length #!+alpha 2 #!-alpha 1)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

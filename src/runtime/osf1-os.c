@@ -132,12 +132,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	/* this is lifted from linux-os.c, so violates OOAO */
 	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
 	interrupt_handle_pending(context);
-    } else if(((addr>=DYNAMIC_0_SPACE_END) && (addr<DYNAMIC_1_SPACE_START)) ||
-	      ((addr>=DYNAMIC_1_SPACE_END) && (addr<CONTROL_STACK_START))){
-	/* there's empty gap between these spaces.  This clause needs
-	   review if the spaces are ever juggled to make this untrue */
-	fprintf(stderr, "bad address 0x%p\n",addr);
-	lose("ran off end of dynamic space");
     } else if (!interrupt_maybe_gc(signal, info, context)) {
 	if(!handle_control_stack_guard_triggered(context,addr))
 	    interrupt_handle_now(signal, info, context);

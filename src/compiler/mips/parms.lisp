@@ -63,12 +63,6 @@
 (def!constant read-only-space-start #x01000000)
 (def!constant read-only-space-end   #x05000000)
 
-(def!constant binding-stack-start   #x05000000)
-(def!constant binding-stack-end     #x05800000)
-
-(def!constant control-stack-start   #x05800000)
-(def!constant control-stack-end     #x06000000)
-
 (def!constant static-space-start    #x06000000)
 (def!constant static-space-end      #x08000000)
 

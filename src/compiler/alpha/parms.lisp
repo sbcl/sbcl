@@ -139,13 +139,6 @@
 (def!constant dynamic-1-space-start   #x40000000)
 (def!constant dynamic-1-space-end     #x4fff0000)
 
-(def!constant control-stack-start   #x50000000)
-(def!constant control-stack-end     #x51000000)
-
-(def!constant binding-stack-start    #x70000000)
-(def!constant binding-stack-end      #x71000000)
-
-
 ;;; FIXME nothing refers to either of these in alpha or x86 cmucl
 ;;; backend, so they could probably be removed.
 
@@ -207,6 +200,10 @@
     ;; things needed for non-local exit
     *current-catch-block*
     *current-unwind-protect-block*
+
+    *binding-stack-start*
+    *control-stack-start*
+    *control-stack-end*
 
     ;; interrupt handling
     *free-interrupt-context-index*

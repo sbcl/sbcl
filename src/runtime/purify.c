@@ -1476,10 +1476,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
      * calling SCRUB-CONTROL-STACK - this zeros the stack on the x86. */
 #ifndef __i386__
     os_zero((os_vm_address_t) current_control_stack_pointer,
-            (os_vm_size_t) (THREAD_CONTROL_STACK_SIZE -
-                            ((current_control_stack_pointer -
-			      all_threads->control_stack_start)
-			     * sizeof(lispobj))));
+            (os_vm_size_t)
+	    ((all_threads->control_stack_end -
+	      current_control_stack_pointer) * sizeof(lispobj)));
 #endif
 
     /* It helps to update the heap free pointers so that free_heap can

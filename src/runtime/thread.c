@@ -120,8 +120,10 @@ pid_t create_thread(lispobj initial_function) {
 	STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
 	STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
 	STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
+#ifdef LISP_FEATURE_X86
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
+#endif
 #undef STATIC_TLS_INIT
 #endif
     }
@@ -141,10 +143,12 @@ pid_t create_thread(lispobj initial_function) {
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
+#ifdef LISP_FEATURE_X86
     th->pseudo_atomic_interrupted=0;
     /* runtime.c used to set PSEUDO_ATOMIC_ATOMIC =1 globally.  I'm not
      * sure why, but it appears to help */
     th->pseudo_atomic_atomic=make_fixnum(1);
+#endif
 #ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
 #endif
@@ -175,7 +179,7 @@ pid_t create_thread(lispobj initial_function) {
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
 
-    th->interrupt_data=malloc(sizeof (struct interrupt_data));
+    th->interrupt_data=os_validate(0,(sizeof (struct interrupt_data)));
     if(all_threads) 
 	memcpy(th->interrupt_data,
 	       arch_os_get_current_thread()->interrupt_data,

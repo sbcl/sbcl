@@ -39,7 +39,7 @@ extern struct thread *find_thread_by_pid(pid_t pid);
 
 static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
-	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
 	lispobj r=
@@ -52,7 +52,7 @@ static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
 }
 static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
-	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
     return ((union per_thread_data *)thread)
 	->dynamic_values[fixnum_value(sym->tls_index)];
@@ -63,7 +63,7 @@ static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
 
 static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
-	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
 	lispobj *pr= &(((union per_thread_data *)thread)
@@ -79,7 +79,7 @@ static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *t
 static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym=	(struct symbol *)
-	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     ((union per_thread_data *)thread)
 	->dynamic_values[fixnum_value(sym->tls_index)]
 	=val;

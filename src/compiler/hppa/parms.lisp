@@ -66,12 +66,6 @@
 (def!constant read-only-space-start #x20000000)
 (def!constant read-only-space-end   #x24000000)
 
-(def!constant binding-stack-start   #x24000000)
-(def!constant binding-stack-end     #x24ff0000)
-
-(def!constant control-stack-start   #x25000000)
-(def!constant control-stack-end     #x25ff0000)
-
 (def!constant static-space-start    #x28000000)
 (def!constant static-space-end      #x2a000000)
 
@@ -142,6 +136,10 @@
     ;; Things needed for non-local-exit.
     *current-catch-block*
     *current-unwind-protect-block*
+
+    *binding-stack-start*
+    *control-stack-start*
+    *control-stack-end*
     
     ;; Interrupt Handling
     *free-interrupt-context-index*

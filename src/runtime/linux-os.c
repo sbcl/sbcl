@@ -90,96 +90,43 @@ void os_init(void)
 #endif
 }
 
-/* In Debian CMU CL ca. 2.4.9, it was possible to get an infinite
- * cascade of errors from do_mmap(..). This variable is a counter to
- * prevent that; when it counts down to zero, an error in do_mmap
- * causes the low-level monitor to be called. */
-int n_do_mmap_ignorable_errors = 3;
 
-/* Return 0 for success. */
-static int
-do_mmap(os_vm_address_t *addr, os_vm_size_t len, int flags)
-{
-    /* We *must* have the memory where we expect it. */
-    os_vm_address_t old_addr = *addr;
+#ifdef LISP_FEATURE_ALPHA
+/* The Alpha is a 64 bit CPU.  SBCL is a 32 bit application.  Due to all
+ * the places that assume we can get a pointer into a fixnum with no 
+ * information loss, we have to make sure it allocates all its ram in the
+ * 0-2Gb region.  */
 
-    *addr = mmap(*addr, len, OS_VM_PROT_ALL, flags, -1, 0);
-    if (*addr == MAP_FAILED ||
-	((old_addr != NULL) && (*addr != old_addr))) {
-        FSHOW((stderr,
-	       "/retryable error in allocating memory from the OS\n"
-	       "(addr=0x%lx, len=0x%lx, flags=0x%lx)\n",
-	       (long) addr,
-	       (long) len,
-	       (long) flags));
-	if (n_do_mmap_ignorable_errors > 0) {
-	    --n_do_mmap_ignorable_errors;
-	} else {
-	    lose("too many errors in allocating memory from the OS");
-	}
-	perror("mmap");
-	return 1;
-    }
-    return 0;
-}
+static void * under_2gb_free_pointer=DYNAMIC_1_SPACE_END;
+#endif
 
 os_vm_address_t
 os_validate(os_vm_address_t addr, os_vm_size_t len)
 {
-    if (addr) {
-	int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED;
-	os_vm_address_t base_addr = addr;
-	do {
-	    /* KLUDGE: It looks as though this code allocates memory
-	     * in chunks of size no larger than 'magic', but why? What
-	     * is the significance of 0x1000000 here? Also, can it be
-	     * right that if the first few 'do_mmap' calls succeed,
-	     * then one fails, we leave the memory allocated by the
-	     * first few in place even while we return a code for
-	     * complete failure? -- WHN 19991020
-	     *
-	     * Peter Van Eynde writes (20000211)
-	     *     This was done because the kernel would only check for
-	     *   overcommit for every allocation seperately. So if you
-	     *   had 16MB of free mem+swap you could allocate 16M. And
-	     *   again, and again, etc. 
-	     *     This in [Linux] 2.X could be bad as they changed the memory
-	     *   system. A side effect was/is (I don't really know) that
-	     *   programs with a lot of memory mappings run slower. But
-	     *   of course for 2.2.2X we now have the NO_RESERVE flag that
-	     *   helps...
-	     *
-	     * FIXME: The logic is also flaky w.r.t. failed
-	     * allocations. If we make one or more successful calls to
-	     * do_mmap(..) before one fails, then we've allocated
-	     * memory, and we should ensure that it gets deallocated
-	     * sometime somehow. If this function's response to any
-	     * failed do_mmap(..) is to give up and return NULL (as in
-	     * sbcl-0.6.7), then any failed do_mmap(..) after any
-	     * successful do_mmap(..) causes a memory leak. */
-	    int magic = 0x1000000;
-	    if (len <= magic) {
-		if (do_mmap(&addr, len, flags)) {
-		    return NULL;
-		}
-		len = 0;
-	    } else {
-		if (do_mmap(&addr, magic, flags)) {
-		    return NULL;
-		}
-		addr += magic;
-		len = len - magic;
-	    }
-	} while (len > 0);
-	return base_addr;
-    } else {
-	int flags = MAP_PRIVATE | MAP_ANONYMOUS;
-	if (do_mmap(&addr, len, flags)) {
-	    return NULL;
-	} else {
-	    return addr;
-	}
+    int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
+    os_vm_address_t actual ;
+
+    if (addr) 
+	flags |= MAP_FIXED;
+#ifdef LISP_FEATURE_ALPHA
+    else {
+	flags |= MAP_FIXED;
+	addr=under_2gb_free_pointer;
     }
+#endif	
+    actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+    if (actual == MAP_FAILED ||	(addr && (addr!=actual))) {
+	perror("mmap");
+	return 0;		/* caller should check this */
+    }
+
+#ifdef LISP_FEATURE_ALPHA
+
+    len=(len+(os_vm_page_size-1))&(~(os_vm_page_size-1));
+    under_2gb_free_pointer+=len;
+#endif
+
+    return addr;
 }
 
 void
