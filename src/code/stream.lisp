@@ -63,7 +63,6 @@
 (defun ansi-stream-input-stream-p (stream)
   (declare (type ansi-stream stream))
 
-  #!+high-security
   (when (synonym-stream-p stream)
     (setf stream
 	  (symbol-value (synonym-stream-symbol stream))))
@@ -85,7 +84,6 @@
 (defun ansi-stream-output-stream-p (stream)
   (declare (type ansi-stream stream))
 
-  #!+high-security
   (when (synonym-stream-p stream)
     (setf stream (symbol-value
 		  (synonym-stream-symbol stream))))
@@ -103,6 +101,7 @@
 (declaim (inline ansi-stream-open-stream-p))
 (defun ansi-stream-open-stream-p (stream)
   (declare (type ansi-stream stream))
+  ;; CLHS 22.1.4 lets us not worry about synonym streams here.
   (not (eq (ansi-stream-in stream) #'closed-flame)))
 
 (defun open-stream-p (stream)
@@ -581,10 +580,7 @@
 
 (defun make-broadcast-stream (&rest streams)
   (dolist (stream streams)
-    (unless (or (and (synonym-stream-p stream)
-		     (output-stream-p (symbol-value
-				       (synonym-stream-symbol stream))))
-		(output-stream-p stream))
+    (unless (output-stream-p stream)
       (error 'type-error
 	     :datum stream
 	     :expected-type '(satisfies output-stream-p))))
@@ -706,17 +702,11 @@
   ;; FIXME: This idiom of the-real-stream-of-a-possibly-synonym-stream
   ;; should be encapsulated in a function, and used here and most of
   ;; the other places that SYNONYM-STREAM-P appears.
-  (unless (or (and (synonym-stream-p output-stream)
-	 	   (output-stream-p (symbol-value
-				     (synonym-stream-symbol output-stream))))
-	      (output-stream-p output-stream))
+  (unless (output-stream-p output-stream)
     (error 'type-error
 	   :datum output-stream
 	   :expected-type '(satisfies output-stream-p)))
-  (unless (or (and (synonym-stream-p input-stream)
-		   (input-stream-p (symbol-value
-				    (synonym-stream-symbol input-stream))))
-	      (input-stream-p input-stream))
+  (unless (input-stream-p input-stream)
     (error 'type-error
 	   :datum input-stream
 	   :expected-type '(satisfies input-stream-p)))
@@ -804,10 +794,7 @@
   "Return a stream which takes its input from each of the streams in turn,
    going on to the next at EOF."
   (dolist (stream streams)
-    (unless (or (and (synonym-stream-p stream)
-		     (input-stream-p (symbol-value
-				      (synonym-stream-symbol stream))))
-		(input-stream-p stream))
+    (unless (input-stream-p stream)
       (error 'type-error
 	     :datum stream
 	     :expected-type '(satisfies input-stream-p))))
@@ -899,17 +886,11 @@
   "Return a bidirectional stream which gets its input from INPUT-STREAM and
    sends its output to OUTPUT-STREAM. In addition, all input is echoed to
    the output stream."
-  (unless (or (and (synonym-stream-p output-stream)
-	 	   (output-stream-p (symbol-value
-				     (synonym-stream-symbol output-stream))))
-	      (output-stream-p output-stream))
+  (unless (output-stream-p output-stream)
     (error 'type-error
 	   :datum output-stream
 	   :expected-type '(satisfies output-stream-p)))
-  (unless (or (and (synonym-stream-p input-stream)
-		   (input-stream-p (symbol-value
-				    (synonym-stream-symbol input-stream))))
-	      (input-stream-p input-stream))
+  (unless (input-stream-p input-stream)
     (error 'type-error
 	   :datum input-stream
 	   :expected-type '(satisfies input-stream-p)))
