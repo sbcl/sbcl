@@ -986,10 +986,10 @@
 
 ;;;; frame utilities
 
-;;; This returns a COMPILED-DEBUG-FUN for code and pc. We fetch the
+;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB!C::DEBUG-INFO and run down its FUN-MAP to get a
-;;; SB!C::COMPILED-DEBUG-FUN from the pc. The result only needs to
-;;; reference the component, for function constants, and the
+;;; SB!C::COMPILED-DEBUG-FUN from the PC. The result only needs to
+;;; reference the COMPONENT, for function constants, and the
 ;;; SB!C::COMPILED-DEBUG-FUN.
 (defun debug-fun-from-pc (component pc)
   (let ((info (%code-debug-info component)))
@@ -999,7 +999,7 @@
      ((eq info :bogus-lra)
       (make-bogus-debug-fun "function end breakpoint"))
      (t
-      (let* ((fun-map (get-debug-info-fun-map info))
+      (let* ((fun-map (sb!c::compiled-debug-info-fun-map info))
 	     (len (length fun-map)))
 	(declare (type simple-vector fun-map))
 	(if (= len 1)
@@ -1188,7 +1188,7 @@
 		     (and (sb!c::compiled-debug-fun-p x)
 			  (eq (sb!c::compiled-debug-fun-name x) name)
 			  (eq (sb!c::compiled-debug-fun-kind x) nil)))
-		   (get-debug-info-fun-map
+		   (sb!c::compiled-debug-info-fun-map
 		    (%code-debug-info component)))))
 	(if res
 	    (make-compiled-debug-fun res component)
@@ -1627,18 +1627,6 @@
 							 sc-offset
 							 save-sc-offset)
 				buffer)))))))
-
-;;;; unpacking minimal debug functions
-
-;;; Return a FUN-MAP for a given COMPILED-DEBUG-INFO object.
-(defun get-debug-info-fun-map (info)
-  (declare (type sb!c::compiled-debug-info info))
-  (let ((map (sb!c::compiled-debug-info-fun-map info)))
-    ;; The old CMU CL had various hairy possibilities here, but in
-    ;; SBCL we only use this one, right? 
-    (aver (simple-vector-p map))
-    ;; So it's easy..
-    map))
 
 ;;;; CODE-LOCATIONs
 

@@ -545,20 +545,21 @@
 ;;; called after assembly so that source map information is available.
 (defun debug-info-for-component (component)
   (declare (type component component))
-  (collect ((dfuns))
-    (let ((var-locs (make-hash-table :test 'eq))
-	  (*byte-buffer* (make-array 10
-				     :element-type '(unsigned-byte 8)
-				     :fill-pointer 0
-				     :adjustable t)))
-      (dolist (fun (component-lambdas component))
-	(clrhash var-locs)
-	(dfuns (cons (label-position (block-label (lambda-block fun)))
-		     (compute-1-debug-fun fun var-locs))))
-      (let* ((sorted (sort (dfuns) #'< :key #'car))
-	     (fun-map (compute-debug-fun-map sorted)))
-	(make-compiled-debug-info :name (component-name component)
-				  :fun-map fun-map)))))
+  (let ((dfuns nil)
+	(var-locs (make-hash-table :test 'eq))
+	(*byte-buffer* (make-array 10
+				   :element-type '(unsigned-byte 8)
+				   :fill-pointer 0
+				   :adjustable t)))
+    (dolist (lambda (component-lambdas component))
+      (clrhash var-locs)
+      (push (cons (label-position (block-label (lambda-block lambda)))
+		  (compute-1-debug-fun lambda var-locs))
+	    dfuns))
+    (let* ((sorted (sort dfuns #'< :key #'car))
+	   (fun-map (compute-debug-fun-map sorted)))
+      (make-compiled-debug-info :name (component-name component)
+				:fun-map fun-map))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.

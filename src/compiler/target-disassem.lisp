@@ -1075,11 +1075,11 @@
       (values nil nil)
       (values (get-source-form loc context cache) t)))
 
-;;;; stuff to use debugging-info to augment the disassembly
+;;;; stuff to use debugging info to augment the disassembly
 
 (defun code-fun-map (code)
   (declare (type sb!kernel:code-component code))
-  (sb!di::get-debug-info-fun-map (sb!kernel:%code-debug-info code)))
+  (sb!c::compiled-debug-info-fun-map (sb!kernel:%code-debug-info code)))
 
 (defstruct (location-group (:copier nil))
   (locations #() :type (vector (or list fixnum))))
@@ -1364,8 +1364,7 @@
 			(when first-block-seen-p
 			  (setf nil-block-seen-p t))))
 		 (setf last-debug-fun
-		       (sb!di::make-compiled-debug-fun fmap-entry code))
-		 )))))
+		       (sb!di::make-compiled-debug-fun fmap-entry code)))))))
 	(let ((max-offset (code-inst-area-length code)))
 	  (when (and first-block-seen-p last-debug-fun)
 	    (add-seg last-offset
