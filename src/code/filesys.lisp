@@ -662,7 +662,7 @@
 	   (/show0 "default case")
 	   (let ((file (concatenate 'string directory name)))
 	     (/show0 "computed basic FILE=..")
-	     #!+sb-show (%primitive print file)
+	     (/primitive-print file)
 	     (unless (or (null type) (eq type :unspecific))
 	       (/show0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
 	       (setf file (concatenate 'string file "." type)))
@@ -671,7 +671,7 @@
 	       (setf file (concatenate 'string file "."
 				       (quick-integer-to-string version))))
 	     (/show0 "finished possibly tweaking FILE=..")
-	     #!+sb-show (%primitive print file)
+	     (/primitive-print file)
 	     (when (or (not verify-existence)
 		       (sb!unix:unix-file-kind file t))
 	       (/show0 "calling FUNCTION on FILE")
@@ -1030,7 +1030,7 @@
   #!+sb-doc
   "Tests whether the directories containing the specified file
   actually exist, and attempts to create them if they do not.
-  Portable programs should avoid using the :MODE keyword argument."
+  Portable programs should avoid using the :MODE argument."
   (let* ((pathname (pathname pathspec))
 	 (pathname (if (typep pathname 'logical-pathname)
 		       (translate-logical-pathname pathname)

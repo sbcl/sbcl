@@ -344,7 +344,7 @@
 ;;; comparing the byte order of *BACKEND* to the byte order of
 ;;; *NATIVE-BACKEND*, a concept which doesn't exist in SBCL. Instead,
 ;;; in SBCL byte order swapping would need to be explicitly requested
-;;; with a keyword argument to GENESIS.
+;;; with a &KEY argument to GENESIS.
 ;;;
 ;;; I'm not sure whether this is a problem or not, and I don't have a
 ;;; machine with different byte order to test to find out for sure.
@@ -726,7 +726,7 @@
 
 ;;;; symbol magic
 
-;;; FIXME: This should be a keyword argument of ALLOCATE-SYMBOL.
+;;; FIXME: This should be a &KEY argument of ALLOCATE-SYMBOL.
 (defvar *cold-symbol-allocation-gspace* nil)
 
 ;;; Allocate (and initialize) a symbol.
@@ -3042,7 +3042,7 @@ initially undefined function references:~2%")
       ;; much. (And the old CMU CL code is still useful for making
       ;; sure that the appropriate keywords and internal symbols end
       ;; up interned in the target Lisp, which is good, e.g. in order
-      ;; to make keyword arguments work right and in order to make
+      ;; to make &KEY arguments work right and in order to make
       ;; BACKTRACEs into target Lisp system code be legible.)
       (dolist (exported-name
 	       (sb-cold:read-from-file "common-lisp-exports.lisp-expr"))

@@ -113,13 +113,15 @@
 			 funcallable-instance
 			 sb!alien-internals:alien-value)))
 	   (values nil t))
-	  ((typep target-type 'sb!xc::structure-class)
+	  (;; special case when TARGET-TYPE isn't a type spec, but instead
+	   ;; a CLASS object
+	   (typep target-type 'sb!xc::structure-class)
 	   ;; SBCL-specific types which have an analogue specially created
 	   ;; on the host system
 	   (if (sb!xc:subtypep (sb!xc:class-name target-type)
 			       'sb!kernel::structure!object)
-	     (values (typep host-object (sb!xc:class-name target-type)) t)
-	     (values nil t)))
+	       (values (typep host-object (sb!xc:class-name target-type)) t)
+	       (values nil t)))
 	  ((and (symbolp target-type)
 		(find-class target-type nil)
 		(subtypep target-type 'sb!kernel::structure!object))
@@ -129,11 +131,22 @@
 		(sb!xc:subtypep target-type 'cl:structure-object)
 		(typep host-object '(or symbol number list character)))
 	   (values nil t))
-	  ((and (not (unknown-type-p (values-specifier-type target-type)))
+	  (;; easy cases of arrays and vectors
+	   (member target-type
+		   '(array simple-string simple-vector string vector))
+	   (values (typep host-object target-type) t))
+	  (;; general cases of vectors
+	   (and (not (unknown-type-p (values-specifier-type target-type)))
+		(sb!xc:subtypep target-type 'cl:vector))
+	   (if (vectorp host-object)
+	       (warn-and-give-up) ; general case of vectors being way too hard
+	       (values nil t))) ; but "obviously not a vector" being easy
+	  (;; general cases of arrays
+	   (and (not (unknown-type-p (values-specifier-type target-type)))
 		(sb!xc:subtypep target-type 'cl:array))
 	   (if (arrayp host-object)
-	     (warn-and-give-up) ; general case of arrays being way too hard
-	     (values nil t))) ; but "obviously not an array" being easy
+	       (warn-and-give-up) ; general case of arrays being way too hard
+	       (values nil t))) ; but "obviously not an array" being easy
 	  ((consp target-type)
 	   (let ((first (first target-type))
 		 (rest (rest target-type)))
@@ -165,23 +178,27 @@
 					    (return))
 			       ((not sub-certain-p) (setf certain-p nil))))
 		       (if certain-p
-			 (values opinion t)
-			 (warn-and-give-up)))))
+			   (values opinion t)
+			   (warn-and-give-up)))))
 	       ;; Some complex types are too hard to handle in the positive
 	       ;; case, but at least we can be confident in a large fraction of
 	       ;; the negative cases..
 	       ((base-string simple-base-string simple-string)
 		(if (stringp host-object)
-		  (warn-and-give-up)
-		  (values nil t)))
-	       ((array simple-array simple-vector vector)
+		    (warn-and-give-up)
+		    (values nil t)))
+	       ((vector simple-vector)
+		(if (vectorp host-object)
+		    (warn-and-give-up)
+		    (values nil t)))
+	       ((array simple-array)
 		(if (arrayp host-object)
-		  (warn-and-give-up)
-		  (values nil t)))
+		    (warn-and-give-up)
+		    (values nil t)))
 	       (function
 		(if (functionp host-object)
-		  (warn-and-give-up)
-		  (values nil t)))
+		    (warn-and-give-up)
+		    (values nil t)))
 	       ;; And the Common Lisp type system is complicated, and we don't
 	       ;; try to implement everything.
 	       (otherwise (warn-and-give-up)))))
@@ -200,11 +217,12 @@
 	      ;; assertion:
 	      (assert (typep (specifier-type '*) 'named-type))
 	      (values t t))
-	     ;; Many simple types are guaranteed to correspond exactly between
-	     ;; any host ANSI Common Lisp and the target Common Lisp.
-	     ((array bit character complex cons float function integer list
-	       nil null number rational real signed-byte string symbol t
-	       unsigned-byte vector)
+	     ;; Many simple types are guaranteed to correspond exactly
+	     ;; between any host ANSI Common Lisp and the target
+	     ;; Common Lisp. (Some array types are too, but they
+	     ;; were picked off earlier.)
+	     ((bit character complex cons float function integer list nil
+	       null number rational real signed-byte symbol t unsigned-byte)
 	      (values (typep host-object target-type) t))
 	     ;; Floating point types are guaranteed to correspond, too, but
 	     ;; less exactly.
@@ -223,8 +241,8 @@
 	     ;; cases..
 	     ((base-string simple-base-string simple-string)
 	      (if (stringp host-object)
-		(warn-and-give-up)
-		(values nil t)))
+		  (warn-and-give-up)
+		  (values nil t)))
 	     ((character base-char)
 	      (cond ((typep host-object 'standard-char)
 		     (values t t))
@@ -242,8 +260,8 @@
 	      ;; questions that the cross-compiler asks that it's well worth
 	      ;; special-casing it here.
 	      (if (symbolp host-object)
-		(values nil t)
-		(warn-and-give-up)))
+		  (values nil t)
+		  (warn-and-give-up)))
 	     ;; And the Common Lisp type system is complicated, and we don't
 	     ;; try to implement everything.
 	     (otherwise (warn-and-give-up)))))))
@@ -261,10 +279,10 @@
     ;; A program that calls TYPEP doesn't want uncertainty and probably
     ;; can't handle it.
     (if certain-p
-      opinion
-      (error "uncertain in SB!XC:TYPEP ~S ~S"
-	     host-object
-	     target-type-spec))))
+	opinion
+	(error "uncertain in SB!XC:TYPEP ~S ~S"
+	       host-object
+	       target-type-spec))))
 
 ;;; This implementation is an incomplete, portable version for use at
 ;;; cross-compile time only.
@@ -283,12 +301,14 @@
   (typecase x
     (function
      (if (typep x 'generic-function)
-       ;; Since at cross-compile time we build a CLOS-free bootstrap version of
-       ;; SBCL, it's unclear how to explain to it what a generic function is.
-       (error "not implemented: cross CTYPE-OF generic function")
-       ;; There's no ANSI way to find out what the function is declared to
-       ;; be, so we just return the CTYPE for the most-general function.
-       *universal-function-type*))
+	 ;; Since at cross-compile time we build a CLOS-free bootstrap
+	 ;; version of SBCL, it's unclear how to explain to it what a
+	 ;; generic function is.
+	 (error "not implemented: cross CTYPE-OF generic function")
+	 ;; There's no ANSI way to find out what the function is
+	 ;; declared to be, so we just return the CTYPE for the
+	 ;; most-general function.
+	 *universal-function-type*))
     (symbol
      (make-member-type :members (list x)))
     (number

@@ -515,7 +515,7 @@
         documentation about this and other security issues in script-like
         programs.)
 
-   The keyword arguments have the following meanings:
+   The &KEY arguments have the following meanings:
      :ENVIRONMENT
         a list of SIMPLE-STRINGs describing the new Unix environment (as
         in \"man environ\"). The default is to copy the environment of

@@ -103,6 +103,10 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  (ensure-directories-exist filename :verbose t)
 	  (with-open-file (s filename :direction :output)
 	    (write *target-object-file-names* :stream s :readably t)))
+        ;; Let's check that the type system was reasonably sane. (It's
+	;; easy to spend a long time wandering around confused trying
+	;; to debug cold init if it wasn't.)
+	(load "tests/type.after-xc.lisp")
 	;; If you're experimenting with the system under a
         ;; cross-compilation host which supports CMU-CL-style SAVE-LISP,
         ;; this can be a good time to run it. The resulting core isn't

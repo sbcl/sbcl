@@ -146,7 +146,7 @@
   ;;    The following two locations are the more arg context and count.
   ;;
   ;; <any other symbol>
-  ;;    The following location is the value of the keyword argument with the
+  ;;    The following location is the value of the &KEY argument with the
   ;;    specified name.
   ;;
   ;; This may be NIL to save space. If no symbols are present, then this will

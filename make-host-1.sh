@@ -37,6 +37,10 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(load "src/cold/set-up-cold-packages.lisp")
 	(load "src/cold/defun-load-or-cload-xcompiler.lisp")
 	(load-or-cload-xcompiler #'host-cload-stem)
+        ;; Let's check that the type system is reasonably sane. (It's
+	;; easy to spend a long time wandering around confused trying
+	;; to debug cross-compilation if it isn't.)
+	(load "tests/type.before-xc.lisp")
         (host-cload-stem "compiler/generic/genesis")
 	(sb!vm:genesis :c-header-file-name "src/runtime/sbcl.h")
 	EOF

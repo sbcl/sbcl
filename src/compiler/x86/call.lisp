@@ -1395,8 +1395,8 @@
     object type)
   (frob layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
     object layout)
-  (frob odd-keyword-arguments-error odd-keyword-arguments-error
-    sb!c::%odd-keyword-arguments-error)
-  (frob unknown-keyword-argument-error unknown-keyword-argument-error
-    sb!c::%unknown-keyword-argument-error key)
+  (frob odd-key-arguments-error odd-key-arguments-error
+    sb!c::%odd-key-arguments-error)
+  (frob unknown-key-argument-error unknown-key-argument-error
+    sb!c::%unknown-key-argument-error key)
   (frob nil-function-returned-error nil-function-returned-error nil fun))

@@ -921,8 +921,8 @@
     (let* ((pkg (apply #'make-package (first spec)))
 	   (internal (package-internal-symbols pkg))
 	   (external (package-external-symbols pkg)))
-      (/show0 "back from MAKE-PACKAGE")
-      #!+sb-show (sb!sys:%primitive print (package-name pkg))
+      (/show0 "back from MAKE-PACKAGE, PACKAGE-NAME=..")
+      (/primitive-print (package-name pkg))
 
       ;; Put internal symbols in the internal hashtable and set package.
       (dolist (symbol (second spec))

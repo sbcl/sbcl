@@ -63,19 +63,19 @@
 		   (:constructor nil)
 		   (:make-load-form-fun make-type-load-form)
 		   #-sb-xc-host (:pure t))
-  ;; The class of this type.
+  ;; the class of this type
   ;;
   ;; FIXME: It's unnecessarily confusing to have a structure accessor
   ;; named TYPE-CLASS-INFO which is an accessor for the CTYPE structure
   ;; even though the TYPE-CLASS structure also exists in the system.
   ;; Rename this slot: TYPE-CLASS or ASSOCIATED-TYPE-CLASS or something.
   (class-info (required-argument) :type type-class)
-  ;; True if this type has a fixed number of members, and as such could
-  ;; possibly be completely specified in a MEMBER type. This is used by the
-  ;; MEMBER type methods.
-  (enumerable nil :type (member t nil) :read-only t)
-  ;; an arbitrary hash code used in EQ-style hashing of identity (since EQ
-  ;; hashing can't be done portably)
+  ;; True if this type has a fixed number of members, and as such
+  ;; could possibly be completely specified in a MEMBER type. This is
+  ;; used by the MEMBER type methods.
+  (enumerable nil :read-only t)
+  ;; an arbitrary hash code used in EQ-style hashing of identity
+  ;; (since EQ hashing can't be done portably)
   (hash-value (random (1+ most-positive-fixnum))
 	      :type (and fixnum unsigned-byte)
 	      :read-only t))
@@ -123,16 +123,15 @@
   (lambda (x y)
     (funcall fun y x)))
 
-;;; Compute the intersection for types that intersect only when one is a
-;;; hierarchical subtype of the other.
-(defun vanilla-intersection (type1 type2)
-  (multiple-value-bind (stp1 win1) (csubtypep type1 type2)
-    (multiple-value-bind (stp2 win2) (csubtypep type2 type1)
-      (cond (stp1 (values type1 t))
-	    (stp2 (values type2 t))
-	    ((and win1 win2) (values *empty-type* t))
-	    (t
-	     (values type1 nil))))))
+;;; Look for a nice intersection for types that intersect only when
+;;; one is a hierarchical subtype of the other.
+(defun hierarchical-intersection2 (type1 type2)
+  (multiple-value-bind (subtypep1 win1) (csubtypep type1 type2)
+    (multiple-value-bind (subtypep2 win2) (csubtypep type2 type1)
+      (cond (subtypep1 type1)
+	    (subtypep2 type2)
+	    ((and win1 win2) *empty-type*)
+	    (t nil)))))
 
 (defun vanilla-union (type1 type2)
   (cond ((csubtypep type1 type2) type2)

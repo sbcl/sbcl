@@ -93,6 +93,14 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *profile-hash-cache* nil))
 
+;;; a flag for whether it's too early in cold init to use caches so
+;;; that we have a better chance of recovering so that we have a
+;;; better chance of getting the system running so that we have a
+;;; better chance of diagnosing the problem which caused us to use the
+;;; caches too early
+#!+sb-show
+(defvar *hash-caches-initialized-p*)
+
 ;;; :INIT-WRAPPER is set to COLD-INIT-FORMS in type system definitions
 ;;; so that caches will be created before top-level forms run.
 (defmacro define-hash-cache (name args &key hash-function hash-bits default
@@ -233,6 +241,7 @@
 
       (inits `(unless (boundp ',var-name)
 		(setq ,var-name (make-array ,total-size))))
+      #!+sb-show (inits `(setq *hash-caches-initialized-p* t))
 
       `(progn
 	 (defvar ,var-name)
@@ -262,17 +271,32 @@
 	   (defun ,name ,arg-names
 	     ,@decls
 	     ,doc
-	     (multiple-value-bind ,(values-names)
-		 (,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
-	       (if (and ,@(mapcar #'(lambda (val def)
-				      `(eq ,val ,def))
-				  (values-names) default-values))
-		   (multiple-value-bind ,(values-names)
-					(progn ,@body)
-		     (,(symbolicate name "-CACHE-ENTER") ,@arg-names
-		      ,@(values-names))
-		     (values ,@(values-names)))
-		   (values ,@(values-names))))))))))
+	     (cond #!+sb-show
+		   ((not (boundp '*hash-caches-initialized-p*))
+		    ;; This shouldn't happen, but it did happen to me
+		    ;; when revising the type system, and it's a lot
+		    ;; easier to figure out what what's going on with
+		    ;; that kind of problem if the system can be kept
+		    ;; alive until cold boot is complete. The recovery
+		    ;; mechanism should definitely be conditional on
+		    ;; some debugging feature (e.g. SB-SHOW) because
+		    ;; it's big, duplicating all the BODY code. -- WHN
+		    (/show0 ,name " too early in cold init, uncached")
+		    (/show0 ,(first arg-names) "=..")
+		    (/hexstr ,(first arg-names))
+		    ,@body)
+		   (t
+		    (multiple-value-bind ,(values-names)
+			(,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
+		      (if (and ,@(mapcar (lambda (val def)
+					   `(eq ,val ,def))
+					 (values-names) default-values))
+			  (multiple-value-bind ,(values-names)
+			      (progn ,@body)
+			    (,(symbolicate name "-CACHE-ENTER") ,@arg-names
+			     ,@(values-names))
+			    (values ,@(values-names)))
+			  (values ,@(values-names))))))))))))
 
 ;;;; package idioms
 

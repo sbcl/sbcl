@@ -171,7 +171,7 @@
 (eval-when (:compile-toplevel :execute)
   (setf *info-classes* (make-hash-table)))
 
-;;; If Name is the name of a type in Class, then return the TYPE-INFO,
+;;; If NAME is the name of a type in CLASS, then return the TYPE-INFO,
 ;;; otherwise NIL.
 (defun find-type-info (name class)
   (declare (type keyword name) (type class-info class))
@@ -183,12 +183,21 @@
 (declaim (ftype (function (keyword) class-info) class-info-or-lose))
 (defun class-info-or-lose (class)
   (declare (type keyword class))
-  (or (gethash class *info-classes*)
-      (error "~S is not a defined info class." class)))
+  #+sb-xc (/noshow0 "entering CLASS-INFO-OR-LOSE, CLASS=..")
+  #+sb-xc (/nohexstr class)
+  (prog1
+      (or (gethash class *info-classes*)
+	  (error "~S is not a defined info class." class))
+    #+sb-xc (/noshow0 "returning from CLASS-INFO-OR-LOSE")))
 (declaim (ftype (function (keyword keyword) type-info) type-info-or-lose))
 (defun type-info-or-lose (class type)
-  (or (find-type-info type (class-info-or-lose class))
-      (error "~S is not a defined info type." type)))
+  #+sb-xc (/noshow0 "entering TYPE-INFO-OR-LOSE, CLASS,TYPE=..")
+  #+sb-xc (/nohexstr class)
+  #+sb-xc (/nohexstr type)
+  (prog1
+      (or (find-type-info type (class-info-or-lose class))
+	  (error "~S is not a defined info type." type))
+    #+sb-xc (/noshow0 "returning from TYPE-INFO-OR-LOSE")))
 
 ) ; EVAL-WHEN
 
@@ -201,16 +210,17 @@
 
 (eval-when (:compile-toplevel :execute)
 
-;;; Set up the data structures to support an info class. We make sure
-;;; that the class exists at compile time so that macros can use it,
-;;; but don't actually store the init function until load time so that
-;;; we don't break the running compiler.
+;;; Set up the data structures to support an info class.
+;;;
+;;; comment from CMU CL:
+;;;   We make sure that the class exists at compile time so that
+;;;   macros can use it, but we don't actually store the init function
+;;;   until load time so that we don't break the running compiler.
+;;; KLUDGE: I don't think that's the way it is any more, but I haven't
+;;; looked into it enough to write a better comment. -- WHN 2001-03-06
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
      define-info-class (class)
-  #!+sb-doc
-  "Define-Info-Class Class
-  Define a new class of global information."
   (declare (type keyword class))
   `(progn
      ;; (We don't need to evaluate this at load time, compile time is
@@ -555,25 +565,27 @@
 ;;; info environment in names/bucket
 (defconstant compact-info-environment-density 65)
 
-;;; Iterate over the environment once to find out how many names and entries
-;;; it has, then build the result. This code assumes that all the entries for
-;;; a name well be iterated over contiguously, which holds true for the
-;;; implementation of iteration over both kinds of environments.
-;;;
-;;; When building the table, we sort the entries by POINTER< in an attempt
-;;; to preserve any VM locality present in the original load order, rather than
-;;; randomizing with the original hash function.
+;;; Return a new compact info environment that holds the same
+;;; information as ENV.
 (defun compact-info-environment (env &key (name (info-env-name env)))
-  #!+sb-doc
-  "Return a new compact info environment that holds the same information as
-  Env."
   (let ((name-count 0)
 	(prev-name 0)
 	(entry-count 0))
+    (/show0 "before COLLECT in COMPACT-INFO-ENVIRONMENT")
+
+    ;; Iterate over the environment once to find out how many names
+    ;; and entries it has, then build the result. This code assumes
+    ;; that all the entries for a name well be iterated over
+    ;; contiguously, which holds true for the implementation of
+    ;; iteration over both kinds of environments.
     (collect ((names))
+
+      (/show0 "at head of COLLECT in COMPACT-INFO-ENVIRONMENT")
       (let ((types ()))
 	(do-info (env :name name :type-number num :value value)
+	  (/noshow0 "at head of DO-INFO in COMPACT-INFO-ENVIRONMENT")
 	  (unless (eq name prev-name)
+            (/noshow0 "not (EQ NAME PREV-NAME) case")
 	    (incf name-count)
 	    (unless (eql prev-name 0)
 	      (names (cons prev-name types)))
@@ -582,8 +594,17 @@
 	  (incf entry-count)
 	  (push (cons num value) types))
 	(unless (eql prev-name 0)
+          (/show0 "not (EQL PREV-NAME 0) case")
 	  (names (cons prev-name types))))
 
+      ;; Now that we know how big the environment is, we can build
+      ;; a table to represent it.
+      ;; 
+      ;; When building the table, we sort the entries by pointer
+      ;; comparison in an attempt to preserve any VM locality present
+      ;; in the original load order, rather than randomizing with the
+      ;; original hash function.
+      (/show0 "about to make/sort vectors in COMPACT-INFO-ENVIRONMENT")
       (let* ((table-size (primify
 			  (+ (truncate (* name-count 100)
 				       compact-info-environment-density)
@@ -596,10 +617,12 @@
 				       :element-type 'compact-info-entry))
 	     (sorted (sort (names)
 			   #+sb-xc-host #'<
+			   ;; (This MAKE-FIXNUM hack implements
+			   ;; pointer comparison, as explained above.)
 			   #-sb-xc-host (lambda (x y)
-					  ;; FIXME: What's going on here?
 					  (< (%primitive make-fixnum x)
 					     (%primitive make-fixnum y))))))
+	(/show0 "done making/sorting vectors in COMPACT-INFO-ENVIRONMENT")
 	(let ((entries-idx 0))
 	  (dolist (types sorted)
 	    (let* ((name (first types))
@@ -625,12 +648,15 @@
 	      (setf (aref entries-info entries-idx) num)
 	      (setf (aref entries entries-idx) value)
 	      (incf entries-idx)))
+	  (/show0 "done w/ DOLIST (TYPES SORTED) in COMPACT-INFO-ENVIRONMENT")
 
 	  (unless (zerop entry-count)
+	    (/show0 "nonZEROP ENTRY-COUNT")
 	    (setf (aref entries-info (1- entry-count))
 		  (logior (aref entries-info (1- entry-count))
 			  compact-info-entry-last)))
 
+	  (/show0 "falling through to MAKE-COMPACT-INFO-ENV")
 	  (make-compact-info-env :name name
 				 :table table
 				 :index index
@@ -1290,12 +1316,15 @@
   (setf *info-types*
 	(map 'vector
 	     (lambda (x)
+	       (/show0 "in LAMBDA (X), X=..")
+	       (/hexstr x)
 	       (when x
 		 (let* ((class-info (class-info-or-lose (second x)))
 			(type-info (make-type-info :name (first x)
 						   :class class-info
 						   :number (third x)
 						   :type (fourth x))))
+		   (/show0 "got CLASS-INFO in LAMBDA (X)")
 		   (push type-info (class-info-types class-info))
 		   type-info)))
 	     '#.(map 'list

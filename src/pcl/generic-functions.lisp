@@ -462,7 +462,7 @@
 			  operation
 			  &optional new-value))
 
-;;;; keyword arguments
+;;;; &KEY arguments
 
 (defgeneric allocate-instance (class &rest initargs))
 

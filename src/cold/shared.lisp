@@ -102,20 +102,20 @@
 ;;; Compile the source file whose basic name is STEM, using some
 ;;; standard-for-the-SBCL-build-process procedures to generate the full
 ;;; pathnames of source file and object file. Return the pathname of the object
-;;; file for STEM. Several keyword arguments are accepted:
-;;;   SRC-PREFIX, SRC-SUFFIX =
-;;; strings to be concatenated to STEM to produce source filename
-;;;   OBJ-PREFIX, OBJ-SUFFIX =
-;;; strings to be concatenated to STEM to produce object filename
-;;;   TMP-OBJ-SUFFIX-SUFFIX
-;;; string to be appended to the name of an object file to produce the
-;;; name of a temporary object file
-;;;   COMPILE-FILE, IGNORE-FAILURE-P =
-;;; COMPILE-FILE is a function to use for compiling the file (with the
-;;; same calling conventions as ANSI CL:COMPILE-FILE). If the third
-;;; return value (FAILURE-P) of this function is true, a continuable
-;;; error will be signalled, unless IGNORE-FAILURE-P is set, in which
-;;; case only a warning will be signalled.
+;;; file for STEM. Several &KEY arguments are accepted:
+;;;   :SRC-PREFIX, :SRC-SUFFIX =
+;;;      strings to be concatenated to STEM to produce source filename
+;;;   :OBJ-PREFIX, :OBJ-SUFFIX =
+;;;      strings to be concatenated to STEM to produce object filename
+;;;   :TMP-OBJ-SUFFIX-SUFFIX =
+;;;      string to be appended to the name of an object file to produce 
+;;;      the name of a temporary object file
+;;;   :COMPILE-FILE, :IGNORE-FAILURE-P =
+;;;     :COMPILE-FILE is a function to use for compiling the file (with the
+;;;     same calling conventions as ANSI CL:COMPILE-FILE). If the third
+;;;     return value (FAILURE-P) of this function is true, a continuable
+;;;     error will be signalled, unless :IGNORE-FAILURE-P is set, in which
+;;;     case only a warning will be signalled.
 (defun compile-stem (stem
 		     &key
 		     (obj-prefix "")
@@ -254,14 +254,13 @@
     ;; :NOT-HOST is also set, since the SBCL assembler doesn't exist
     ;; while the cross-compiler is being built in the host ANSI Lisp.)
     :assem
-    ;; meaning: The COMPILE-STEM keyword argument called
-    ;; IGNORE-FAILURE-P should be true. (This is a KLUDGE: I'd like to
-    ;; get rid of it. For now, it exists so that compilation can
-    ;; proceed through the legacy warnings in
-    ;; src/compiler/x86/array.lisp, which I've never figured out but
-    ;; which were apparently acceptable in CMU CL. Eventually, it
-    ;; would be great to just get rid of all warnings and remove
-    ;; support for this flag. -- WHN 19990323)
+    ;; meaning: The #'COMPILE-STEM argument called :IGNORE-FAILURE-P
+    ;; should be true. (This is a KLUDGE: I'd like to get rid of it.
+    ;; For now, it exists so that compilation can proceed through the
+    ;; legacy warnings in src/compiler/x86/array.lisp, which I've
+    ;; never figured out but which were apparently acceptable in CMU
+    ;; CL. Eventually, it would be great to just get rid of all
+    ;; warnings and remove support for this flag. -- WHN 19990323)
     :ignore-failure-p))
 
 (defparameter *stems-and-flags* (read-from-file "stems-and-flags.lisp-expr"))

@@ -31,7 +31,7 @@
 		    (and (>= (length name) 2)
 			 (string= name "*!" :end1 2 :end2 2)))
 	    (/show0 "uninterning cold-init-only symbol..")
-	    #!+sb-show (%primitive print name)
+	    (/primitive-print name)
 	    (unintern symbol package)
 	    (setf any-changes? t)))))
     (unless any-changes?
@@ -51,7 +51,7 @@
   (%halt))
 
 #!+gengc
-(defun do-load-time-value-fixup (object offset index)
+(defun !do-load-time-value-fixup (object offset index)
   (declare (type index offset))
   (let ((value (svref *!load-time-values* index)))
     (typecase object
@@ -76,7 +76,7 @@
   ;; not to use it for the COLD-INIT-OR-REINIT functions.)
   (sb!xc:defmacro show-and-call (name)
     `(progn
-       #!+sb-show (%primitive print ,(symbol-name name))
+       (/primitive-print ,(symbol-name name))
        (,name))))
 
 ;;; called when a cold system starts up
@@ -145,15 +145,14 @@
   ;; -- WHN 19991204
   (/show0 "doing cold toplevel forms and fixups")
   (/show0 "(LISTP *!REVERSED-COLD-TOPLEVELS*)=..")
-  #!+sb-show (%primitive print
-			 (if (listp *!reversed-cold-toplevels*) "true" "NIL"))
+  (/hexstr (if (listp *!reversed-cold-toplevels*) "true" "NIL"))
   (/show0 "about to calculate (LENGTH *!REVERSED-COLD-TOPLEVELS*)")
   (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
   #!+sb-show (let ((r-c-tl-length (length *!reversed-cold-toplevels*)))
 	       (/show0 "(length calculated..)")
-	       (let ((hexstr (sb!impl::hexstr r-c-tl-length)))
+	       (let ((hexstr (hexstr r-c-tl-length)))
 		 (/show0 "(hexstr calculated..)")
-		 (%primitive print hexstr)))
+		 (/primitive-print hexstr)))
   (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
     (dolist (toplevel-thing (prog1
@@ -165,7 +164,7 @@
       #!+sb-show
       (when (zerop (mod index-in-cold-toplevels 1024))
 	(/show0 "INDEX-IN-COLD-TOPLEVELS=..")
-	(%primitive print (sb!impl::hexstr index-in-cold-toplevels)))
+	(/hexstr index-in-cold-toplevels))
       #!+sb-show
       (setf index-in-cold-toplevels
 	    (the fixnum (1+ index-in-cold-toplevels)))
@@ -183,15 +182,15 @@
 		  (get-lisp-obj-address
 		   (svref *!load-time-values* (third toplevel-thing))))
 	    #!+gengc
-	    (do-load-time-value-fixup (second toplevel-thing)
-				      (third  toplevel-thing)
-				      (fourth toplevel-thing)))
+	    (!do-load-time-value-fixup (second toplevel-thing)
+				       (third  toplevel-thing)
+				       (fourth toplevel-thing)))
 	   #!+(and x86 gencgc)
 	   (:load-time-code-fixup
-	    (sb!vm::do-load-time-code-fixup (second toplevel-thing)
-					    (third  toplevel-thing)
-					    (fourth toplevel-thing)
-					    (fifth  toplevel-thing)))
+	    (sb!vm::!do-load-time-code-fixup (second toplevel-thing)
+					     (third  toplevel-thing)
+					     (fourth toplevel-thing)
+					     (fifth  toplevel-thing)))
 	   (t
 	    (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
 	(t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))

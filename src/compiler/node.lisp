@@ -776,8 +776,8 @@
   (arglist nil :type list)
   ;; true if &ALLOW-OTHER-KEYS was supplied
   (allowp nil :type boolean)
-  ;; true if &KEY was specified (doesn't necessarily mean that there
-  ;; are any keyword arguments...)
+  ;; true if &KEY was specified (which doesn't necessarily mean that
+  ;; there are any &KEY arguments..)
   (keyp nil :type boolean)
   ;; the number of required arguments. This is the smallest legal
   ;; number of arguments.
@@ -830,17 +830,18 @@
   ;; defaults even when there is no user-specified supplied-p var.
   (supplied-p nil :type (or lambda-var null))
   ;; the default for a keyword or optional, represented as the
-  ;; original Lisp code. This is set to NIL in keyword arguments that
-  ;; are defaulted using the SUPPLIED-P arg.
+  ;; original Lisp code. This is set to NIL in &KEY arguments that are
+  ;; defaulted using the SUPPLIED-P arg.
   (default nil :type t)
-  ;; the actual keyword for a keyword argument
-  (keyword nil :type (or keyword null)))
+  ;; the actual key for a &KEY argument. Note that in ANSI CL this is not
+  ;; necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ..).
+  (key nil :type symbol))
 (defprinter (arg-info)
   (specialp :test specialp)
   kind
   (supplied-p :test supplied-p)
   (default :test default)
-  (keyword :test keyword))
+  (key :test key))
 
 ;;; The LAMBDA-VAR structure represents a lexical lambda variable.
 ;;; This structure is also used during IR1 conversion to describe

@@ -84,14 +84,16 @@
 ;;; EVAL-WHEN, which might be easier to understand than the current
 ;;; approach based on IR1 magic. -- WHN 19990811
 (def!macro defmacro-mundanely (name lambda-list &body body)
-  `(setf (sb!xc:macro-function ',name)
-	 ,(let ((whole (gensym "WHOLE-"))
-		(environment (gensym "ENVIRONMENT-")))
-	    (multiple-value-bind (new-body local-decs doc)
-		(parse-defmacro lambda-list whole body name 'defmacro
-				:environment environment)
-	      (declare (ignore doc))
-	      `(lambda (,whole ,environment)
-		 ,@local-decs
-		 (block ,name
-		   ,new-body))))))
+  `(progn
+     (setf (sb!xc:macro-function ',name)
+	   ,(let ((whole (gensym "WHOLE-"))
+		  (environment (gensym "ENVIRONMENT-")))
+	      (multiple-value-bind (new-body local-decs doc)
+		  (parse-defmacro lambda-list whole body name 'defmacro
+				  :environment environment)
+		(declare (ignore doc))
+		`(lambda (,whole ,environment)
+		   ,@local-decs
+		   (block ,name
+		     ,new-body)))))
+     ',name))

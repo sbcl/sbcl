@@ -351,7 +351,7 @@
 	    (typep
 	     (if not-p
 		 (setq not-res (type-union not-res other))
-		 (setq res (type-intersection res other))))
+		 (setq res (type-approx-intersection2 res other))))
 	    (eql
 	     (let ((other-type (leaf-type other)))
 	       (if not-p

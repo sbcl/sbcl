@@ -30,7 +30,8 @@
   ;; stored in the character attribute table by having different
   ;; varieties of constituents.
   (character-attribute-table
-   (make-array char-code-limit :element-type '(unsigned-byte 8)
+   (make-array char-code-limit
+	       :element-type '(unsigned-byte 8)
 	       :initial-element constituent)
    :type attribute-table)
   ;; The CHARACTER-MACRO-TABLE is a vector of CHAR-CODE-LIMIT

@@ -11,6 +11,8 @@
 ;;;; files for more information.
 
 (in-package "SB!ALIEN")
+
+(/show0 "host-alieneval.lisp 15")
 
 ;;;; utility functions
 
@@ -1175,3 +1177,5 @@
 	     (when (eq kind :alien)
 	       `(%heap-alien-addr ',(info :variable :alien-info form))))))
 	(error "~S is not a valid L-value." form))))
+
+(/show0 "host-alieneval.lisp end of file")

@@ -456,9 +456,8 @@
 (defun cis (theta)
   #!+sb-doc
   "Return cos(Theta) + i sin(Theta), AKA exp(i Theta)."
-  (if (complexp theta)
-      (error "Argument to CIS is complex: ~S" theta)
-      (complex (cos theta) (sin theta))))
+  (declare (type real theta))
+  (complex (cos theta) (sin theta)))
 
 (defun asin (number)
   #!+sb-doc

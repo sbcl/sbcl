@@ -117,10 +117,11 @@
      #+sb-xc-host (ctypep object type)
      #-sb-xc-host (class-typep (layout-of object) type object))
     (union-type
-     (some (lambda (typ) (%%typep object typ))
+     (some (lambda (union-type-type) (%%typep object union-type-type))
 	   (union-type-types type)))
     (intersection-type
-     (every (lambda (typ) (%%typep object typ))
+     (every (lambda (intersection-type-type)
+	      (%%typep object intersection-type-type))
 	    (intersection-type-types type)))
     (cons-type
      (and (consp object)

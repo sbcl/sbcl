@@ -17,6 +17,8 @@
 
 ;;;; the CONDITION class
 
+(/show0 "late-target-error.lisp 20")
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (def!struct (condition-class (:include slot-class)
@@ -42,7 +44,7 @@
 
 (defun make-condition-class (&rest rest)
   (apply #'bare-make-condition-class
-	 (rename-keyword-args '((:name :%name)) rest)))
+	 (rename-key-args '((:name :%name)) rest)))
 
 ) ; EVAL-WHEN
 
@@ -796,3 +798,6 @@
   (define-nil-returning-restart use-value (value)
     "Transfer control and VALUE to a restart named USE-VALUE, or return NIL if
    none exists."))
+
+(/show0 "late-target-error.lisp end of file")
+

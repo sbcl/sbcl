@@ -9,6 +9,8 @@
 
 (in-package "SB!C-CALL")
 
+(/show0 "host-c-call.lisp 12")
+
 (def-alien-type-class (c-string :include pointer :include-args (to)))
 
 (def-alien-type-translator c-string ()
@@ -36,3 +38,5 @@
      (null (int-sap 0))
      ((alien (* char)) (alien-sap ,value))
      (simple-base-string (vector-sap ,value))))
+
+(/show0 "host-c-call.lisp end of file")

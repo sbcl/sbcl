@@ -22,10 +22,8 @@
 (dolist (x *built-in-classes*)
   (destructuring-bind (name &key (translation nil trans-p) &allow-other-keys)
       x
-    #+sb-show (progn
-		(/show0 "doing class with name=..")
-		#+sb-xc-host (/show0 name)
-		#-sb-xc-host (%primitive print (symbol-name name)))
+    (/show0 "doing class with NAME=..")
+    (/primitive-print (symbol-name name))
     (when trans-p
       (/show0 "in TRANS-P case")
       (let ((class (class-cell-class (find-class-cell name)))

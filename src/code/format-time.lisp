@@ -70,8 +70,8 @@
    The style keyword can be :SHORT (numeric date), :LONG (months and
    weekdays expressed as words), :ABBREVIATED (like :LONG but words are
    abbreviated), or :GOVERNMENT (of the form \"XX Month XXXX XX:XX:XX\")
-   The keyword argument DATE-FIRST, if nil, will print the time first instead
-   of the date (the default). The PRINT- keywords, if nil, inhibit
+   The &KEY argument :DATE-FIRST, if NIL, will print the time first instead
+   of the date (the default). The PRINT- keywords, if NIL, inhibit
    the printing of the obvious part of the time/date."
   (unless (valid-destination-p destination)
     (error "~A: Not a valid format destination." destination))

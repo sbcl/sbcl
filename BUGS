@@ -118,18 +118,6 @@ WORKAROUND:
 	  (during macroexpansion of IN-PACKAGE,
 	  during macroexpansion of DEFFOO)
 
-12:
-  The type system doesn't understand the KEYWORD type very well:
-	(SUBTYPEP 'KEYWORD 'SYMBOL) => NIL, NIL
-  It might be possible to fix this by changing the definition of
-  KEYWORD to (AND SYMBOL (SATISFIES KEYWORDP)), but the type system
-  would need to be a bit smarter about AND types, too:
-	(SUBTYPEP '(AND SYMBOL KEYWORD) 'SYMBOL) => NIL, NIL
-  (The type system does know something about AND types already,
-	(SUBTYPEP '(AND INTEGER FLOAT) 'NUMBER) => T, T
-	(SUBTYPEP '(AND INTEGER FIXNUM) 'NUMBER) =>T, T
-  so likely this is a small patch.)
-
 13:
   Floating point infinities are screwed up. [When I was converting CMU CL
   to SBCL, I was looking for complexity to delete, and I thought it was safe
@@ -811,6 +799,22 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   Just increasing R-I-E-B is probably not a good solution, since
   it would decrease efficiency more than is probably necessary. Perhaps
   using some sort of accept/reject method would be better.
+
+84:
+  (SUBTYPEP '(SATISFIES SOME-UNDEFINED-FUN) NIL)=>NIL,T (should be NIL,NIL)
+
+85:
+  Internally the compiler sometimes evaluates
+    (sb-kernel:type/= (specifier-type '*) (specifier-type t))
+  (I stumbled across this when I added an
+    (assert (not (eq type1 *wild-type*)))
+  in the NAMED :SIMPLE-= type method.) '* isn't really a type, and
+  in a type context should probably be translated to T, and so it's
+  probably to ask whether it's equal to the T type and then (using the
+  EQ type comparison in the NAMED :SIMPLE-= type method) return NIL.
+  (I haven't tried to investigate this bug enough to guess whether
+  there might be any user-level symptoms.)
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

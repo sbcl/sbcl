@@ -1791,11 +1791,11 @@
 	  (return-from careful-call (values nil nil))))))
    t))
 
-;;;; utilities used at run-time for parsing keyword args in IR1
+;;;; utilities used at run-time for parsing &KEY args in IR1
 
-;;; This function is used by the result of Parse-Deftransform to find
-;;; the continuation for the value of the keyword argument Key in the
-;;; list of continuations Args. It returns the continuation if the
+;;; This function is used by the result of PARSE-DEFTRANSFORM to find
+;;; the continuation for the value of the &KEY argument KEY in the
+;;; list of continuations ARGS. It returns the continuation if the
 ;;; keyword is present, or NIL otherwise. The legality and
 ;;; constantness of the keywords should already have been checked.
 (declaim (ftype (function (list keyword) (or continuation null))
@@ -1806,24 +1806,24 @@
     (when (eq (continuation-value (first arg)) key)
       (return (second arg)))))
 
-;;; This function is used by the result of Parse-Deftransform to
-;;; verify that alternating continuations in Args are constant and
+;;; This function is used by the result of PARSE-DEFTRANSFORM to
+;;; verify that alternating continuations in ARGS are constant and
 ;;; that there is an even number of args.
-(declaim (ftype (function (list) boolean) check-keywords-constant))
-(defun check-keywords-constant (args)
+(declaim (ftype (function (list) boolean) check-key-args-constant))
+(defun check-key-args-constant (args)
   (do ((arg args (cddr arg)))
       ((null arg) t)
     (unless (and (rest arg)
 		 (constant-continuation-p (first arg)))
       (return nil))))
 
-;;; This function is used by the result of Parse-Deftransform to
-;;; verify that the list of continuations Args is a well-formed
-;;; keyword arglist and that only keywords present in the list Keys
-;;; are supplied.
+;;; This function is used by the result of PARSE-DEFTRANSFORM to
+;;; verify that the list of continuations ARGS is a well-formed &KEY
+;;; arglist and that only keywords present in the list KEYS are
+;;; supplied.
 (declaim (ftype (function (list list) boolean) check-transform-keys))
 (defun check-transform-keys (args keys)
-  (and (check-keywords-constant args)
+  (and (check-key-args-constant args)
        (do ((arg args (cddr arg)))
 	   ((null arg) t)
 	 (unless (member (continuation-value (first arg)) keys)

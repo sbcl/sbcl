@@ -109,10 +109,10 @@
    "division by zero")
   (object-not-type
    "Object is of the wrong type.")
-  (odd-keyword-arguments
-   "odd number of keyword arguments")
-  (unknown-keyword-argument
-   "unknown keyword")
+  (odd-key-arguments
+   "odd number of &KEY arguments")
+  (unknown-key-argument
+   "unknown &KEY argument")
   nil
   nil
   (invalid-array-index

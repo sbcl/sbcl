@@ -116,7 +116,7 @@
 ;;; The T primitive-type is kept in this variable so that people who
 ;;; have to special-case it can get at it conveniently. This variable
 ;;; has to be set by the machine-specific VM definition, since the
-;;; DEF-PRIMITIVE-TYPE for T must specify the SCs that boxed objects
+;;; !DEF-PRIMITIVE-TYPE for T must specify the SCs that boxed objects
 ;;; can be allocated in.
 (defvar *backend-t-primitive-type*)
 (declaim (type primitive-type *backend-t-primitive-type*))

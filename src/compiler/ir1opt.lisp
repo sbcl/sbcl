@@ -1056,7 +1056,7 @@
   (declare (type leaf leaf) (type ctype type))
   (let ((var-type (leaf-type leaf)))
     (unless (function-type-p var-type)
-      (let ((int (type-intersection var-type type)))
+      (let ((int (type-approx-intersection2 var-type type)))
 	(when (type/= int var-type)
 	  (setf (leaf-type leaf) int)
 	  (dolist (ref (leaf-refs leaf))

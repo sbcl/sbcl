@@ -155,15 +155,15 @@
      (setf (aref sequence index) newval))))
 
 (defun length (sequence)
-  #!+sb-doc "Returns an integer that is the length of SEQUENCE."
+  #!+sb-doc "Return an integer that is the length of SEQUENCE."
   (etypecase sequence
     (vector (length (truly-the vector sequence)))
     (list (length (truly-the list sequence)))))
 
 (defun make-sequence (type length &key (initial-element NIL iep))
   #!+sb-doc
-  "Returns a sequence of the given Type and Length, with elements initialized
-  to :Initial-Element."
+  "Return a sequence of the given TYPE and LENGTH, with elements initialized
+  to :INITIAL-ELEMENT."
   (declare (fixnum length))
   (let ((type (specifier-type type)))
     (cond ((csubtypep type (specifier-type 'list))
@@ -2304,9 +2304,9 @@
    result is Nil. Otherwise, the result is a non-negative integer, the index
    within Sequence1 of the leftmost position at which they fail to match; or,
    if one is shorter than and a matching prefix of the other, the index within
-   Sequence1 beyond the last position tested is returned. If a non-Nil
-   :From-End keyword argument is given, then one plus the index of the
-   rightmost position in which the sequences differ is returned."
+   Sequence1 beyond the last position tested is returned. If a non-NIL
+   :FROM-END argument is given, then one plus the index of the rightmost
+   position in which the sequences differ is returned."
   (declare (fixnum start1 start2))
   (let* ((length1 (length sequence1))
 	 (end1 (or end1 length1))

@@ -279,24 +279,17 @@
        (or (gethash name *backend-meta-primitive-type-names*)
 	   (error "~S is not a defined primitive type." name))))
 
-;;; If the PRIMITIVE-TYPE structure already exists, we destructively
-;;; modify it so that existing references in templates won't be
-;;; invalidated.
-(defmacro def-primitive-type (name scs &key (type name))
-  #!+sb-doc
-  "Def-Primitive-Type Name (SC*) {Key Value}*
-   Define a primitive type Name. Each SC specifies a Storage Class that values
-   of this type may be allocated in. The following keyword options are
-   defined:
-
-  :Type
-      The type descriptor for the Lisp type that is equivalent to this type
-      (defaults to Name.)"
+;;; Define a primitive type NAME. Each SCS entry specifies a storage
+;;; class that values of this type may be allocated in. TYPE is the
+;;; type descriptor for the Lisp type that is equivalent to this type.
+(defmacro !def-primitive-type (name scs &key (type name))
   (check-type name symbol)
   (check-type scs list)
   (let ((scns (mapcar #'meta-sc-number-or-lose scs))
 	(get-type `(specifier-type ',type)))
     `(progn
+       (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
+       (/primitive-print ,(symbol-name name))
        (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 	 (setf (gethash ',name *backend-meta-primitive-type-names*)
 	       (make-primitive-type :name ',name
@@ -305,21 +298,31 @@
        ,(once-only ((n-old `(gethash ',name *backend-primitive-type-names*))
 		    (n-type get-type))
 	  `(progn
+	     ;; If the PRIMITIVE-TYPE structure already exists, we
+	     ;; destructively modify it so that existing references in
+	     ;; templates won't be invalidated. FIXME: This should no
+	     ;; longer be an issue in SBCL, since we don't try to do
+	     ;; serious surgery on ourselves. Probably this should
+	     ;; just become an assertion that N-OLD is NIL, so that we
+	     ;; don't have to try to maintain the correctness of the
+	     ;; never-ordinarily-used clause.
+	     (/show0 "in !DEF-PRIMITIVE-TYPE, about to COND")
 	     (cond (,n-old
+		    (/show0 "in ,N-OLD clause of COND")
 		    (setf (primitive-type-scs ,n-old) ',scns)
 		    (setf (primitive-type-type ,n-old) ,n-type))
 		   (t
+		    (/show0 "in T clause of COND")
 		    (setf (gethash ',name *backend-primitive-type-names*)
 			  (make-primitive-type :name ',name
 					       :scs ',scns
 					       :type ,n-type))))
+	     (/show0 "done with !DEF-PRIMITIVE-TYPE")
 	     ',name)))))
 
-;;; Just record the translation.
-(defmacro def-primitive-type-alias (name result)
-  #!+sb-doc
-  "DEF-PRIMITIVE-TYPE-ALIAS Name Result
-  Define name to be an alias for Result in VOP operand type restrictions."
+;;; Define NAME to be an alias for RESULT in VOP operand type restrictions.
+(defmacro !def-primitive-type-alias (name result)
+  ;; Just record the translation.
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (setf (gethash ',name *backend-primitive-type-aliases*) ',result)
      ',name))
@@ -1409,9 +1412,9 @@
       (make-list (+ (length ops) (if more-ops 1 0)) :initial-element '*)
       types))
 
-;;; Return a list of forms to use as keyword args to Make-VOP-Info for
+;;; Return a list of forms to use as &KEY args to MAKE-VOP-INFO for
 ;;; setting up the template argument and result types. Here we make an
-;;; initial dummy Template-Type, since it is awkward to compute the
+;;; initial dummy TEMPLATE-TYPE, since it is awkward to compute the
 ;;; type until the template has been made.
 (defun make-vop-info-types (parse)
   (let* ((more-args (vop-parse-more-args parse))
@@ -1495,164 +1498,168 @@
 	    (make-generator-function parse)))
       :variant (list ,@variant))))
 
-;;; Parse the syntax into a VOP-Parse structure, and then expand into
-;;; code that creates the appropriate VOP-Info structure at load time.
-;;; We implement inheritance by copying the VOP-Parse structure for
-;;; the inherited structure.
+;;; Define the symbol NAME to be a Virtual OPeration in the compiler. If
+;;; specified, INHERITS is the name of a VOP that we default unspecified
+;;; information from. Each SPEC is a list beginning with a keyword indicating
+;;; the interpretation of the other forms in the SPEC:
+;;;
+;;; :Args {(Name {Key Value}*)}*
+;;; :Results {(Name {Key Value}*)}*
+;;;     The Args and Results are specifications of the operand TNs passed
+;;;     to the VOP. If there is an inherited VOP, any unspecified options
+;;;     are defaulted from the inherited argument (or result) of the same
+;;;     name. The following operand options are defined:
+;;;
+;;; :SCs (SC*)
+;;;     :SCs specifies good SCs for this operand. Other SCs will be
+;;;	penalized according to move costs. A load TN will be allocated if
+;;;	necessary, guaranteeing that the operand is always one of the
+;;;	specified SCs.
+;;;
+;;;     :Load-TN Load-Name
+;;;         Load-Name is bound to the load TN allocated for this operand, 
+;;;         or to NIL if no load TN was allocated.
+;;;
+;;;     :Load-If EXPRESSION
+;;;         Controls whether automatic operand loading is done.
+;;;         EXPRESSION is evaluated with the fixed operand TNs bound.
+;;;         If EXPRESSION is true,then loading is done and the variable
+;;;         is bound to the load TN in the generator body. Otherwise,
+;;;         loading is not done, and the variable is bound to the actual
+;;;         operand.
+;;;
+;;;     :More T-or-NIL
+;;;         If specified, Name is bound to the TN-Ref for the first
+;;;         argument or result following the fixed arguments or results.
+;;;         A :MORE operand must appear last, and cannot be targeted or
+;;;         restricted.
+;;;
+;;;     :Target Operand
+;;;         This operand is targeted to the named operand, indicating a
+;;;         desire to pack in the same location. Not legal for results.
+;;;
+;;;     :From Time-Spec
+;;;     :To Time-Spec
+;;;         Specify the beginning or end of the operand's lifetime.
+;;;         :FROM can only be used with results, and :TO only with
+;;;         arguments. The default for the N'th argument/result is
+;;;         (:ARGUMENT N)/(:RESULT N). These options are necessary
+;;;         primarily when operands are read or written out of order.
+;;;
+;;; :Conditional
+;;;     This is used in place of :RESULTS with conditional branch VOPs.
+;;;     There are no result values: the result is a transfer of control.
+;;;     The target label is passed as the first :INFO arg. The second
+;;;     :INFO arg is true if the sense of the test should be negated.
+;;;     A side-effect is to set the PREDICATE attribute for functions
+;;;     in the :TRANSLATE option.
+;;;
+;;; :Temporary ({Key Value}*) Name*
+;;;     Allocate a temporary TN for each Name, binding that variable to
+;;;     the TN within the body of the generators. In addition to :TARGET
+;;;     (which is is the same as for operands), the following options are
+;;;     defined:
+;;;
+;;;     :SC SC-Name
+;;;     :Offset SB-Offset
+;;;         Force the temporary to be allocated in the specified SC with the
+;;;         specified offset. Offset is evaluated at macroexpand time. If
+;;;         Offset is emitted, the register allocator chooses a free
+;;;         location in SC. If both SC and Offset are omitted, then the
+;;;         temporary is packed according to its primitive type.
+;;;
+;;;     :From Time-Spec
+;;;     :To Time-Spec
+;;;         Similar to the argument/result option, this specifies the start and
+;;;         end of the temporaries' lives. The defaults are :Load and :Save,
+;;;         i.e. the duration of the VOP. The other intervening phases are
+;;;         :Argument,:Eval and :Result. Non-zero sub-phases can be specified
+;;;         by a list, e.g. by default the second argument's life ends at
+;;;         (:Argument 1).
+;;;
+;;; :Generator Cost Form*
+;;;     Specifies the translation into assembly code. Cost is the
+;;;     estimated cost of the code emitted by this generator. The body
+;;;     is arbitrary Lisp code that emits the assembly language
+;;;     translation of the VOP. An ASSEMBLE form is wrapped around
+;;;     the body, so code may be emitted by using the local INST macro.
+;;;     During the evaluation of the body, the names of the operands
+;;;     and temporaries are bound to the actual TNs.
+;;;
+;;; :Effects Effect*
+;;; :Affected Effect*
+;;;     Specifies the side effects that this VOP has and the side
+;;;     effects that effect its execution. If unspecified, these
+;;;     default to the worst case.
+;;;
+;;; :Info Name*
+;;;     Define some magic arguments that are passed directly to the code
+;;;     generator. The corresponding trailing arguments to VOP or
+;;;     %PRIMITIVE are stored in the VOP structure. Within the body
+;;;     of the generators, the named variables are bound to these
+;;;     values. Except in the case of :Conditional VOPs, :Info arguments
+;;;     cannot be specified for VOPS that are the direct translation
+;;;     for a function (specified by :Translate).
+;;;
+;;; :Ignore Name*
+;;;     Causes the named variables to be declared IGNORE in the
+;;;     generator body.
+;;;
+;;; :Variant Thing*
+;;; :Variant-Vars Name*
+;;;     These options provide a way to parameterize families of VOPs
+;;;     that differ only trivially. :Variant makes the specified
+;;;     evaluated Things be the "variant" associated with this VOP.
+;;;     :VARIANT-VARS causes the named variables to be bound to the
+;;;     corresponding Things within the body of the generator.
+;;;
+;;; :Variant-Cost Cost
+;;;     Specifies the cost of this VOP, overriding the cost of any 
+;;;     inherited generator.
+;;;
+;;; :Note {String | NIL}
+;;;     A short noun-like phrase describing what this VOP "does", i.e.
+;;;     the implementation strategy. If supplied, efficency notes will
+;;;     be generated when type uncertainty prevents :TRANSLATE from
+;;;     working. NIL inhibits any efficency note.
+;;;
+;;; :Arg-Types    {* | PType | (:OR PType*) | (:CONSTANT Type)}*
+;;; :Result-Types {* | PType | (:OR PType*)}*
+;;;     Specify the template type restrictions used for automatic translation.
+;;;     If there is a :More operand, the last type is the more type. :CONSTANT
+;;;     specifies that the argument must be a compile-time constant of the
+;;;     specified Lisp type. The constant values of :CONSTANT arguments are
+;;;     passed as additional :INFO arguments rather than as :ARGS.
+;;;
+;;; :Translate Name*
+;;;     This option causes the VOP template to be entered as an IR2
+;;;     translation for the named functions.
+;;;
+;;; :Policy {:Small | :Fast | :Safe | :Fast-Safe}
+;;;     Specifies the policy under which this VOP is the best translation.
+;;;
+;;; :Guard Form
+;;;     Specifies a Form that is evaluated in the global environment. If
+;;;     form returns NIL, then emission of this VOP is prohibited even when
+;;;     all other restrictions are met.
+;;;
+;;; :VOP-Var Name
+;;; :Node-Var Name
+;;;     In the generator, bind the specified variable to the VOP or
+;;;     the Node that generated this VOP.
+;;;
+;;; :Save-P {NIL | T | :Compute-Only | :Force-To-Stack}
+;;;     Indicates how a VOP wants live registers saved.
+;;;
+;;; :Move-Args {NIL | :Full-Call | :Local-Call | :Known-Return}
+;;;     Indicates if and how the more args should be moved into a
+;;;     different frame.
 (def!macro define-vop ((name &optional inherits) &rest specs)
-  #!+sb-doc
-  "Define-VOP (Name [Inherits]) Spec*
-  Define the symbol Name to be a Virtual OPeration in the compiler. If
-  specified, Inherits is the name of a VOP that we default unspecified
-  information from. Each Spec is a list beginning with a keyword indicating
-  the interpretation of the other forms in the Spec:
-
-  :Args {(Name {Key Value}*)}*
-  :Results {(Name {Key Value}*)}*
-      The Args and Results are specifications of the operand TNs passed to the
-      VOP. If there is an inherited VOP, any unspecified options are defaulted
-      from the inherited argument (or result) of the same name. The following
-      operand options are defined:
-
-      :SCs (SC*)
-	  :SCs specifies good SCs for this operand. Other SCs will be
-	  penalized according to move costs. A load TN will be allocated if
-	  necessary, guaranteeing that the operand is always one of the
-	  specified SCs.
-
-      :Load-TN Load-Name
-	  Load-Name is bound to the load TN allocated for this operand, or to
-	  NIL if no load TN was allocated.
-
-      :Load-If Expression
-	  Controls whether automatic operand loading is done. Expression is
-	  evaluated with the fixed operand TNs bound. If Expression is true,
-	  then loading is done and the variable is bound to the load TN in
-	  the generator body. Otherwise, loading is not done, and the variable
-	  is bound to the actual operand.
-
-      :More T-or-NIL
-	  If specified, Name is bound to the TN-Ref for the first argument or
-	  result following the fixed arguments or results. A more operand must
-	  appear last, and cannot be targeted or restricted.
-
-      :Target Operand
-	  This operand is targeted to the named operand, indicating a desire to
-	  pack in the same location. Not legal for results.
-
-      :From Time-Spec
-      :To Time-Spec
-	  Specify the beginning or end of the operand's lifetime. :From can
-	  only be used with results, and :To only with arguments. The default
-	  for the N'th argument/result is (:ARGUMENT N)/(:RESULT N). These
-	  options are necessary primarily when operands are read or written out
-	  of order.
-
-  :Conditional
-      This is used in place of :RESULTS with conditional branch VOPs. There
-      are no result values: the result is a transfer of control. The target
-      label is passed as the first :INFO arg. The second :INFO arg is true if
-      the sense of the test should be negated. A side-effect is to set the
-      PREDICATE attribute for functions in the :TRANSLATE option.
-
-  :Temporary ({Key Value}*) Name*
-      Allocate a temporary TN for each Name, binding that variable to the TN
-      within the body of the generators. In addition to :Target (which is
-      is the same as for operands), the following options are
-      defined:
-
-      :SC SC-Name
-      :Offset SB-Offset
-	  Force the temporary to be allocated in the specified SC with the
-	  specified offset. Offset is evaluated at macroexpand time. If
-	  Offset is emitted, the register allocator chooses a free location in
-	  SC. If both SC and Offset are omitted, then the temporary is packed
-	  according to its primitive type.
-
-      :From Time-Spec
-      :To Time-Spec
-	  Similar to the argument/result option, this specifies the start and
-	  end of the temporaries' lives. The defaults are :Load and :Save,
-	  i.e. the duration of the VOP. The other intervening phases are
-	  :Argument,:Eval and :Result. Non-zero sub-phases can be specified
-	  by a list, e.g. by default the second argument's life ends at
-	  (:Argument 1).
-
-  :Generator Cost Form*
-      Specifies the translation into assembly code. Cost is the estimated cost
-      of the code emitted by this generator. The body is arbitrary Lisp code
-      that emits the assembly language translation of the VOP. An Assemble
-      form is wrapped around the body, so code may be emitted by using the
-      local Inst macro. During the evaluation of the body, the names of the
-      operands and temporaries are bound to the actual TNs.
-
-  :Effects Effect*
-  :Affected Effect*
-      Specifies the side effects that this VOP has and the side effects that
-      effect its execution. If unspecified, these default to the worst case.
-
-  :Info Name*
-      Define some magic arguments that are passed directly to the code
-      generator. The corresponding trailing arguments to VOP or %Primitive are
-      stored in the VOP structure. Within the body of the generators, the
-      named variables are bound to these values. Except in the case of
-      :Conditional VOPs, :Info arguments cannot be specified for VOPS that are
-      the direct translation for a function (specified by :Translate).
-
-  :Ignore Name*
-      Causes the named variables to be declared IGNORE in the generator body.
-
-  :Variant Thing*
-  :Variant-Vars Name*
-      These options provide a way to parameterize families of VOPs that differ
-      only trivially. :Variant makes the specified evaluated Things be the
-      \"variant\" associated with this VOP. :Variant-Vars causes the named
-      variables to be bound to the corresponding Things within the body of the
-      generator.
-
-  :Variant-Cost Cost
-      Specifies the cost of this VOP, overriding the cost of any inherited
-      generator.
-
-  :Note {String | NIL}
-      A short noun-like phrase describing what this VOP \"does\", i.e. the
-      implementation strategy. If supplied, efficency notes will be generated
-      when type uncertainty prevents :TRANSLATE from working. NIL inhibits any
-      efficency note.
-
-  :Arg-Types    {* | PType | (:OR PType*) | (:CONSTANT Type)}*
-  :Result-Types {* | PType | (:OR PType*)}*
-      Specify the template type restrictions used for automatic translation.
-      If there is a :More operand, the last type is the more type. :CONSTANT
-      specifies that the argument must be a compile-time constant of the
-      specified Lisp type. The constant values of :CONSTANT arguments are
-      passed as additional :INFO arguments rather than as :ARGS.
-
-  :Translate Name*
-      This option causes the VOP template to be entered as an IR2 translation
-      for the named functions.
-
-  :Policy {:Small | :Fast | :Safe | :Fast-Safe}
-      Specifies the policy under which this VOP is the best translation.
-
-  :Guard Form
-      Specifies a Form that is evaluated in the global environment. If
-      form returns NIL, then emission of this VOP is prohibited even when
-      all other restrictions are met.
-
-  :VOP-Var Name
-  :Node-Var Name
-      In the generator, bind the specified variable to the VOP or the Node that
-      generated this VOP.
-
-  :Save-P {NIL | T | :Compute-Only | :Force-To-Stack}
-      Indicates how a VOP wants live registers saved.
-
-  :Move-Args {NIL | :Full-Call | :Local-Call | :Known-Return}
-      Indicates if and how the more args should be moved into a different
-      frame."
+  ;; Parse the syntax into a VOP-PARSE structure, and then expand into
+  ;; code that creates the appropriate VOP-INFO structure at load time.
+  ;; We implement inheritance by copying the VOP-PARSE structure for
+  ;; the inherited structure.
   (check-type name symbol)
-
   (let* ((inherited-parse (when inherits
 			    (vop-parse-or-lose inherits)))
 	 (parse (if inherits

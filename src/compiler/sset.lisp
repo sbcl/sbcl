@@ -81,8 +81,8 @@
     (setf (sset-elements res) (copy-list (sset-elements set)))
     res))
 
-;;; Perform the appropriate set operation on Set1 and Set2 by destructively
-;;; modifying Set1. We return true if Set1 was modified, false otherwise.
+;;; Perform the appropriate set operation on SET1 and SET2 by destructively
+;;; modifying SET1. We return true if SET1 was modified, false otherwise.
 (declaim (ftype (function (sset sset) boolean) sset-union sset-intersection
 		sset-difference))
 (defun sset-union (set1 set2)

@@ -441,7 +441,7 @@
 		(cond (info
 		       (case (arg-info-kind info)
 			 (:keyword
-			  (res (arg-info-keyword info)))
+			  (res (arg-info-key info)))
 			 (:rest
 			  (res 'rest-arg))
 			 (:more-context

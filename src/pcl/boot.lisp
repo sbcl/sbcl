@@ -163,7 +163,7 @@ bootstrapping.
   (let ((initargs ())
 	(methods ()))
     (flet ((duplicate-option (name)
-	     (error 'sb-kernel:simple-program-error
+	     (error 'simple-program-error
 		    :format-control "The option ~S appears more than once."
 		    :format-arguments (list name)))
 	   (expand-method-definition (qab) ; QAB = qualifiers, arglist, body
@@ -199,7 +199,7 @@ bootstrapping.
 	      (t
 	       ;; ANSI requires that unsupported things must get a
 	       ;; PROGRAM-ERROR.
-	       (error 'sb-kernel:simple-program-error
+	       (error 'simple-program-error
 		      :format-control "unsupported option ~S"
 		      :format-arguments (list option))))))
 
@@ -1284,7 +1284,7 @@ bootstrapping.
 
 (defun analyze-lambda-list (lambda-list)
   (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?
-	 (parse-keyword-argument (arg)
+	 (parse-key-argument (arg)
 	   (if (listp arg)
 	       (if (listp (car arg))
 		   (caar arg)
@@ -1314,7 +1314,7 @@ bootstrapping.
 	    (ecase state
 	      (required  (incf nrequired))
 	      (optional  (incf noptional))
-	      (key       (push (parse-keyword-argument x) keywords)
+	      (key       (push (parse-key-argument x) keywords)
 			 (push x keyword-parameters))
 	      (rest      ()))))
       (values nrequired noptional keysp restp allow-other-keys-p
@@ -1382,9 +1382,8 @@ bootstrapping.
 	       existing function-name all-keys))))
 
 (defun generic-clobbers-function (function-name)
-  (error 'sb-kernel:simple-program-error
-	 :format-control
-	 "~S already names an ordinary function or a macro."
+  (error 'simple-program-error
+	 :format-control "~S already names an ordinary function or a macro."
 	 :format-arguments (list function-name)))
 
 (defvar *sgf-wrapper*
@@ -1425,17 +1424,17 @@ bootstrapping.
   (!bootstrap-slot-index 'standard-generic-function 'dfun-state))
 
 (defstruct (arg-info
-	     (:conc-name nil)
-	     (:constructor make-arg-info ())
-	     (:copier nil))
+	    (:conc-name nil)
+	    (:constructor make-arg-info ())
+	    (:copier nil))
   (arg-info-lambda-list :no-lambda-list)
   arg-info-precedence
   arg-info-metatypes
   arg-info-number-optional
   arg-info-key/rest-p
-  arg-info-keywords ;nil	no keyword or rest allowed
-		    ;(k1 k2 ..) each method must accept these keyword arguments
-		    ;T	  must have &key or &rest
+  arg-info-keys   ;nil        no &KEY or &REST allowed
+		  ;(k1 k2 ..) Each method must accept these &KEY arguments.
+		  ;T	      must have &KEY or &REST
 
   gf-info-simple-accessor-type ; nil, reader, writer, boundp
   (gf-precompute-dfun-and-emf-p nil) ; set by set-arg-info
@@ -1503,7 +1502,7 @@ bootstrapping.
 	(esetf (arg-info-metatypes arg-info) (make-list nreq))
 	(esetf (arg-info-number-optional arg-info) nopt)
 	(esetf (arg-info-key/rest-p arg-info) (not (null (or keysp restp))))
-	(esetf (arg-info-keywords arg-info)
+	(esetf (arg-info-keys arg-info)
 	       (if lambda-list-p
 		   (if allow-other-keys-p t keywords)
 		   (arg-info-key/rest-p arg-info)))))
@@ -1529,7 +1528,7 @@ bootstrapping.
       (let ((gf-nreq (arg-info-number-required arg-info))
 	    (gf-nopt (arg-info-number-optional arg-info))
 	    (gf-key/rest-p (arg-info-key/rest-p arg-info))
-	    (gf-keywords (arg-info-keywords arg-info)))
+	    (gf-keywords (arg-info-keys arg-info)))
 	(unless (= nreq gf-nreq)
 	  (lose
 	   "the method has ~A required arguments than the generic function."
@@ -1546,7 +1545,7 @@ bootstrapping.
 	  (unless (or (and restp (not keysp))
 		      allow-other-keys-p
 		      (every #'(lambda (k) (memq k keywords)) gf-keywords))
-	    (lose "the method does not accept each of the keyword arguments~%~
+	    (lose "the method does not accept each of the &KEY arguments~%~
 		   ~S."
 		  gf-keywords)))))))
 

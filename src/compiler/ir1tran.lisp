@@ -820,7 +820,7 @@
 		    (int (if (or (function-type-p type)
 				 (function-type-p old-type))
 			     type
-			     (type-intersection old-type type))))
+			     (type-approx-intersection2 old-type type))))
 	       (cond ((eq int *empty-type*)
 		      (unless (policy nil (= inhibit-warnings 3))
 			(compiler-warning
@@ -992,7 +992,9 @@
 ;;; RES and returning it as a result. VARS and FVARS are as described in
 ;;; PROCESS-DECLS.
 (defun process-1-decl (raw-spec res vars fvars cont)
-  (declare (list spec vars fvars) (type lexenv res) (type continuation cont))
+  (declare (type list raw-spec vars fvars))
+  (declare (type lexenv res))
+  (declare (type continuation cont))
   (let ((spec (canonized-decl-spec raw-spec)))
     (case (first spec)
       (special (process-special-decl spec res vars))
@@ -1111,38 +1113,38 @@
 	   (note-lexical-binding name)
 	   (make-lambda-var :name name)))))
 
-;;; Make the keyword for a keyword arg, checking that the keyword
-;;; isn't already used by one of the Vars. We also check that the
-;;; keyword isn't the magical :allow-other-keys.
+;;; Make the default keyword for a &KEY arg, checking that the keyword
+;;; isn't already used by one of the VARS. We also check that the
+;;; keyword isn't the magical :ALLOW-OTHER-KEYS.
 (declaim (ftype (function (symbol list t) keyword) make-keyword-for-arg))
 (defun make-keyword-for-arg (symbol vars keywordify)
   (let ((key (if (and keywordify (not (keywordp symbol)))
 		 (intern (symbol-name symbol) "KEYWORD")
 		 symbol)))
     (when (eq key :allow-other-keys)
-      (compiler-error "No keyword arg can be called :ALLOW-OTHER-KEYS."))
+      (compiler-error "No &KEY arg can be called :ALLOW-OTHER-KEYS."))
     (dolist (var vars)
       (let ((info (lambda-var-arg-info var)))
 	(when (and info
 		   (eq (arg-info-kind info) :keyword)
-		   (eq (arg-info-keyword info) key))
+		   (eq (arg-info-key info) key))
 	  (compiler-error
 	   "The keyword ~S appears more than once in the lambda-list."
 	   key))))
     key))
 
-;;; Parse a lambda-list into a list of Var structures, stripping off
+;;; Parse a lambda-list into a list of VAR structures, stripping off
 ;;; any aux bindings. Each arg name is checked for legality, and
 ;;; duplicate names are checked for. If an arg is globally special,
-;;; the var is marked as :special instead of :lexical. Keyword,
-;;; optional and rest args are annotated with an arg-info structure
+;;; the var is marked as :SPECIAL instead of :LEXICAL. &KEY,
+;;; &OPTIONAL and &REST args are annotated with an ARG-INFO structure
 ;;; which contains the extra information. If we hit something losing,
-;;; we bug out with Compiler-Error. These values are returned:
-;;;  1. A list of the var structures for each top-level argument.
-;;;  2. A flag indicating whether &key was specified.
-;;;  3. A flag indicating whether other keyword args are allowed.
-;;;  4. A list of the &aux variables.
-;;;  5. A list of the &aux values.
+;;; we bug out with COMPILER-ERROR. These values are returned:
+;;;  1. a list of the var structures for each top-level argument;
+;;;  2. a flag indicating whether &KEY was specified;
+;;;  3. a flag indicating whether other &KEY args are allowed;
+;;;  4. a list of the &AUX variables; and
+;;;  5. a list of the &AUX values.
 (declaim (ftype (function (list) (values list boolean boolean list list))
 		find-lambda-vars))
 (defun find-lambda-vars (list)
@@ -1153,9 +1155,9 @@
 	      (names-so-far)
 	      (aux-vars)
 	      (aux-vals))
-      ;; Parse-Default deals with defaults and supplied-p args for optionals
-      ;; and keywords args.
-      (flet ((parse-default (spec info)
+      (flet (;; PARSE-DEFAULT deals with defaults and supplied-p args
+	     ;; for optionals and keywords args.
+	     (parse-default (spec info)
 	       (when (consp (cdr spec))
 		 (setf (arg-info-default info) (second spec))
 		 (when (consp (cddr spec))
@@ -1212,9 +1214,9 @@
 	    (let ((var (varify-lambda-arg spec (names-so-far))))
 	      (setf (lambda-var-arg-info var)
 		    (make-arg-info :kind :keyword
-				   :keyword (make-keyword-for-arg spec
-								  (vars)
-								  t)))
+				   :key (make-keyword-for-arg spec
+							      (vars)
+							      t)))
 	      (vars var)
 	      (names-so-far spec)))
 	   ((atom (first spec))
@@ -1222,7 +1224,7 @@
 		   (var (varify-lambda-arg name (names-so-far)))
 		   (info (make-arg-info
 			  :kind :keyword
-			  :keyword (make-keyword-for-arg name (vars) t))))
+			  :key (make-keyword-for-arg name (vars) t))))
 	      (setf (lambda-var-arg-info var) info)
 	      (vars var)
 	      (names-so-far name)
@@ -1230,14 +1232,14 @@
 	   (t
 	    (let ((head (first spec)))
 	      (unless (proper-list-of-length-p head 2)
-		(error "malformed keyword arg specifier: ~S" spec))
+		(error "malformed &KEY argument specifier: ~S" spec))
 	      (let* ((name (second head))
 		     (var (varify-lambda-arg name (names-so-far)))
 		     (info (make-arg-info
 			    :kind :keyword
-			    :keyword (make-keyword-for-arg (first head)
-							   (vars)
-							   nil))))
+			    :key (make-keyword-for-arg (first head)
+						       (vars)
+						       nil))))
 		(setf (lambda-var-arg-info var) info)
 		(vars var)
 		(names-so-far name)
@@ -1464,28 +1466,30 @@
 				(list (arg-info-default info) nil)
 				(list (arg-info-default info))))))
 
-;;; Create the More-Entry function for the Optional-Dispatch Res.
-;;; Entry-Vars and Entry-Vals describe the fixed arguments. Rest is the var
-;;; for any Rest arg. Keys is a list of the keyword arg vars.
+;;; Create the MORE-ENTRY function for the OPTIONAL-DISPATCH RES.
+;;; ENTRY-VARS and ENTRY-VALS describe the fixed arguments. REST is
+;;; the var for any &REST arg. KEYS is a list of the &KEY arg vars.
 ;;;
-;;; The most interesting thing that we do is parse keywords. We create a
-;;; bunch of temporary variables to hold the result of the parse, and then loop
-;;; over the supplied arguments, setting the appropriate temps for the supplied
-;;; keyword. Note that it is significant that we iterate over the keywords in
-;;; reverse order --- this implements the CL requirement that (when a keyword
-;;; appears more than once) the first value is used.
+;;; The most interesting thing that we do is parse keywords. We create
+;;; a bunch of temporary variables to hold the result of the parse,
+;;; and then loop over the supplied arguments, setting the appropriate
+;;; temps for the supplied keyword. Note that it is significant that
+;;; we iterate over the keywords in reverse order --- this implements
+;;; the CL requirement that (when a keyword appears more than once)
+;;; the first value is used.
 ;;;
 ;;; If there is no supplied-p var, then we initialize the temp to the
-;;; default and just pass the temp into the main entry. Since non-constant
-;;; keyword args are forcibly given a supplied-p var, we know that the default
-;;; is constant, and thus safe to evaluate out of order.
+;;; default and just pass the temp into the main entry. Since
+;;; non-constant &KEY args are forcibly given a supplied-p var, we
+;;; know that the default is constant, and thus safe to evaluate out
+;;; of order.
 ;;;
-;;; If there is a supplied-p var, then we create temps for both the value
-;;; and the supplied-p, and pass them into the main entry, letting it worry
-;;; about defaulting.
+;;; If there is a supplied-p var, then we create temps for both the
+;;; value and the supplied-p, and pass them into the main entry,
+;;; letting it worry about defaulting.
 ;;;
-;;; We deal with :allow-other-keys by delaying unknown keyword errors until
-;;; we have scanned all the keywords.
+;;; We deal with :ALLOW-OTHER-KEYS by delaying unknown keyword errors
+;;; until we have scanned all the keywords.
 ;;;
 ;;; When converting the function, we bind *LEXENV* to change the
 ;;; compilation policy over to the interface policy, so that keyword
@@ -1533,7 +1537,7 @@
 	    (dolist (key keys)
 	      (let* ((info (lambda-var-arg-info key))
 		     (default (arg-info-default info))
-		     (keyword (arg-info-keyword info))
+		     (keyword (arg-info-key info))
 		     (supplied-p (arg-info-supplied-p info))
 		     (n-value (gensym "N-VALUE-")))
 		(temps `(,n-value ,default))
@@ -1558,7 +1562,7 @@
 
 	    (body
 	     `(when (oddp ,n-count)
-		(%odd-keyword-arguments-error)))
+		(%odd-key-arguments-error)))
 
 	    (body
 	     `(locally
@@ -1573,7 +1577,7 @@
 
 	    (unless allowp
 	      (body `(when (and ,n-losep (not ,n-allowp))
-		       (%unknown-keyword-argument-error ,n-losep)))))))
+		       (%unknown-key-argument-error ,n-losep)))))))
 
       (let ((ep (ir1-convert-lambda-body
 		 `((let ,(temps)
@@ -1585,17 +1589,17 @@
 
   (values))
 
-;;; Called by IR1-Convert-Hairy-Args when we run into a rest or
-;;; keyword arg. The arguments are similar to that function, but we
-;;; split off any rest arg and pass it in separately. Rest is the rest
-;;; arg var, or NIL if there is no rest arg. Keys is a list of the
-;;; keyword argument vars.
+;;; This is called by IR1-Convert-Hairy-Args when we run into a &REST
+;;; or &KEY arg. The arguments are similar to that function, but we
+;;; split off any &REST arg and pass it in separately. REST is the
+;;; &REST arg var, or NIL if there is no &REST arg. KEYS is a list of
+;;; the &KEY argument vars.
 ;;;
-;;; When there are keyword arguments, we introduce temporary gensym
+;;; When there are &KEY arguments, we introduce temporary gensym
 ;;; variables to hold the values while keyword defaulting is in
 ;;; progress to get the required sequential binding semantics.
 ;;;
-;;; This gets interesting mainly when there are keyword arguments with
+;;; This gets interesting mainly when there are &KEY arguments with
 ;;; supplied-p vars or non-constant defaults. In either case, pass in
 ;;; a supplied-p var. If the default is non-constant, we introduce an
 ;;; IF in the main entry that tests the supplied-p var and decides
@@ -1704,8 +1708,8 @@
 ;;; the entry point function will be the same, but when supplied-p args are
 ;;; present they may be different.
 ;;;
-;;; When we run into a rest or keyword arg, we punt out to
-;;; IR1-Convert-More, which finishes for us in this case.
+;;; When we run into a &REST or &KEY arg, we punt out to
+;;; IR1-CONVERT-MORE, which finishes for us in this case.
 (defun ir1-convert-hairy-args (res default-vars default-vals
 				   entry-vars entry-vals
 				   vars supplied-p-p body aux-vars

@@ -910,17 +910,18 @@
   (let ((sap (sb!sys:int-sap address)))
     #'(lambda () sap)))
 
+;;; Return a memory segment located at the system-area-pointer returned by
+;;; SAP-MAKER and LENGTH bytes long in the disassem-state object DSTATE.
+;;;
+;;; &KEY arguments include :VIRTUAL-LOCATION (by default the same as
+;;; the address), :DEBUG-FUNCTION, :SOURCE-FORM-CACHE (a
+;;; SOURCE-FORM-CACHE object), and :HOOKS (a list of OFFS-HOOK
+;;; objects).
 (defun make-segment (sap-maker length
 		     &key
 		     code virtual-location
 		     debug-function source-form-cache
 		     hooks)
-  #!+sb-doc
-  "Return a memory segment located at the system-area-pointer returned by
-  SAP-MAKER and LENGTH bytes long in the disassem-state object DSTATE.
-  Optional keyword arguments include :VIRTUAL-LOCATION (by default the same as
-  the address), :DEBUG-FUNCTION, :SOURCE-FORM-CACHE (a source-form-cache
-  object), and :HOOKS (a list of offs-hook objects)."
   (declare (type (function () sb!sys:system-area-pointer) sap-maker)
 	   (type length length)
 	   (type (or null address) virtual-location)

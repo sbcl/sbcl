@@ -14,6 +14,8 @@
 
 (in-package "SB!C")
 
+(/show0 "knownfun.lisp 17")
+
 ;;; IR1 boolean function attributes
 ;;;
 ;;; There are a number of boolean attributes of known functions which we like
@@ -233,3 +235,5 @@
     (let ((cont (nth (1- n) (combination-args call))))
       (when (and cont (constant-continuation-p cont))
 	(specifier-type (continuation-value cont))))))
+
+(/show0 "knownfun.lisp end of file")

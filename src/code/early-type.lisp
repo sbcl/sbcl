@@ -56,10 +56,16 @@
 		(or (built-in-class-translation spec) spec)
 		spec))
 	   (t
-	    (let* (;; FIXME: This 
+	    (let* (;; FIXME: This automatic promotion of FOO-style
+		   ;; specs to (FOO)-style specs violates the ANSI
+		   ;; standard. Unfortunately, we can't fix the
+		   ;; problem just by removing it, since then things
+		   ;; downstream should break. But at some point we
+		   ;; should fix this and the things downstream too.
 		   (lspec (if (atom spec) (list spec) spec))
 		   (fun (info :type :translator (car lspec))))
-	      (cond (fun (funcall fun lspec))
+	      (cond (fun
+		     (funcall fun lspec))
 		    ((or (and (consp spec) (symbolp (car spec)))
 			 (symbolp spec))
 		     (when *type-system-initialized*
@@ -121,11 +127,11 @@
   (optional nil :type list)
   ;; The type for the rest arg. NIL if there is no rest arg.
   (rest nil :type (or ctype null))
-  ;; True if keyword arguments are specified.
+  ;; true if &KEY arguments are specified
   (keyp nil :type boolean)
-  ;; List of key-info structures describing the keyword arguments.
+  ;; list of KEY-INFO structures describing the &KEY arguments
   (keywords nil :type list)
-  ;; True if other keywords are allowed.
+  ;; true if other &KEY arguments are allowed
   (allowp nil :type boolean))
 
 (defstruct (values-type
@@ -165,6 +171,15 @@
 		       (:copier nil))
   (name nil :type symbol))
 
+;;; a list of all the float "formats" (i.e. internal representations;
+;;; nothing to do with #'FORMAT), in order of decreasing precision
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *float-formats*
+    '(long-float double-float single-float short-float)))
+
+;;; The type of a float format.
+(deftype float-format () `(member ,@*float-formats*))
+
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (defstruct (numeric-type (:include ctype
@@ -172,8 +187,8 @@
 						'number)))
 			 #!+negative-zero-is-not-zero
 			 (:constructor %make-numeric-type))
-  ;; The kind of numeric type we have. NIL if not specified (just NUMBER or
-  ;; COMPLEX).
+  ;; the kind of numeric type we have, or NIL if not specified (just
+  ;; NUMBER or COMPLEX)
   ;;
   ;; KLUDGE: A slot named CLASS for a non-CLASS value is bad.
   ;; Especially when a CLASS value *is* stored in another slot (called
@@ -182,10 +197,16 @@
   ;; all numeric types" but this slot doesn't allow COMPLEX as an
   ;; option.. how does this fall into "not specified" NIL case above?
   (class nil :type (member integer rational float nil))
-  ;; Format for a float type. NIL if not specified or not a float. Formats
-  ;; which don't exist in a given implementation don't appear here.
-  (format nil :type (or float-format null))
-  ;; Is this a complex numeric type?  Null if unknown (only in NUMBER.)
+  ;; "format" for a float type (i.e. type specifier for a CPU
+  ;; representation of floating point, e.g. 'SINGLE-FLOAT -- nothing
+  ;; to do with #'FORMAT), or NIL if not specified or not a float.
+  ;; Formats which don't exist in a given implementation don't appear
+  ;; here.
+  (format nil
+	  ;; FIXME: suppressed because of cold init problems under
+	  ;; hacked type system in sbcl-0.6.11.13, should be restored
+	  #+nil :type #+nil (or float-format null))
+  ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
   ;;
   ;; FIXME: I'm bewildered by FOO-P names for things not intended to
   ;; interpreted as truth values. Perhaps rename this COMPLEXNESS?
@@ -196,7 +217,7 @@
   (low nil :type (or number cons null))
   (high nil :type (or number cons null)))
 
-;;; The Array-Type is used to represent all array types, including
+;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-STRING.
 (defstruct (array-type (:include ctype
 				 (class-info (type-class-or-lose 'array)))
@@ -222,16 +243,24 @@
   ;; the things in the set, with no duplications
   (members nil :type list))
 
-;;; A COMPOUND-TYPE is a type defined out of a set of types, 
-;;; the common parent of UNION-TYPE and INTERSECTION-TYPE.
+;;; A COMPOUND-TYPE is a type defined out of a set of types, the
+;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
 (defstruct (compound-type (:include ctype)
 			  (:constructor nil)
 			  (:copier nil))
-  (types nil :type list :read-only t))
+  (types nil
+	 ;; FIXME: This type declaration was suppresed as a temporary
+	 ;; hack to work around sbcl-0.6.11.13 cold init problems.
+	 ;; Restore it.
+	 #+nil :type #+nil list 
+	 :read-only t))
 
-;;; A UNION-TYPE represents a use of the OR type specifier which can't
-;;; be canonicalized to something simpler. Canonical form:
-;;;   1. There is never more than one MEMBER-TYPE component.
+;;; A UNION-TYPE represents a use of the OR type specifier which we
+;;; couldn't canonicalize to something simpler. Canonical form:
+;;;   1. All possible pairwise simplifications (using the UNION2 type
+;;;      methods) have been performed. Thus e.g. there is never more
+;;;      than one MEMBER-TYPE component. FIXME: As of sbcl-0.6.11.13,
+;;;      this hadn't been fully implemented yet.
 ;;;   2. There are never any UNION-TYPE components.
 (defstruct (union-type (:include compound-type
 				 (class-info (type-class-or-lose 'union)))
@@ -239,9 +268,16 @@
 		       (:copier nil)))
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
-;;; which can't be canonicalized to something simpler. Canonical form:
-;;;   1. There is never more than one MEMBER-TYPE component.
-;;;   2. There are never any INTERSECTION-TYPE or UNION-TYPE components.
+;;; which we couldn't canonicalize to something simpler. Canonical form:
+;;;   1. All possible pairwise simplifications (using the INTERSECTION2
+;;;      type methods) have been performed. Thus e.g. there is never more
+;;;      than one MEMBER-TYPE component.
+;;;   2. There are never any INTERSECTION-TYPE components: we've
+;;;      flattened everything into a single INTERSECTION-TYPE object.
+;;;   3. There are never any UNION-TYPE components. Either we should
+;;;      use the distributive rule to rearrange things so that
+;;;      unions contain intersections and not vice versa, or we
+;;;      should just punt to using a HAIRY-TYPE.
 (defstruct (intersection-type (:include compound-type
 					(class-info (type-class-or-lose
 						     'intersection)))
@@ -259,8 +295,7 @@
       type))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
-(defstruct (cons-type (:include ctype
- 				(:class-info (type-class-or-lose 'cons)))
+(defstruct (cons-type (:include ctype (:class-info (type-class-or-lose 'cons)))
 		      (:constructor
 		       ;; ANSI says that for CAR and CDR subtype
 		       ;; specifiers '* is equivalent to T. In order

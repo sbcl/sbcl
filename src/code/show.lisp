@@ -83,20 +83,47 @@
 
 ;;; a trivial version of /SHOW which only prints a constant string,
 ;;; implemented at a sufficiently low level that it can be used early
-;;; in cold load
+;;; in cold init
 ;;;
 ;;; Unlike the other /SHOW-related functions, this one doesn't test
 ;;; */SHOW* at runtime, because messing with special variables early
 ;;; in cold load is too much trouble to be worth it.
-(defmacro /show0 (s)
-  (declare (type simple-string s))
-  (declare (ignorable s)) ; (for when #!-SB-SHOW)
-  #+sb-xc-host `(/show ,s)
-  #-sb-xc-host `(progn
-		  #!+sb-show
-		  (sb!sys:%primitive print
-				     ,(concatenate 'simple-string "/" s))))
+(defmacro /show0 (&rest string-designators)
+  ;; We can't use inline MAPCAR here because, at least in 0.6.11.x,
+  ;; this code gets compiled before DO-ANONYMOUS is defined.
+  (declare (notinline mapcar))
+  (let ((s (apply #'concatenate
+		  'simple-string
+		  (mapcar #'string string-designators))))
+    (declare (ignorable s)) ; (for when #!-SB-SHOW)
+    #+sb-xc-host `(/show ,s)
+    #-sb-xc-host `(progn
+		    #!+sb-show
+		    (sb!sys:%primitive print
+				       ,(concatenate 'simple-string "/" s)))))
 (defmacro /noshow0 (s)
   (declare (ignore s)))
+
+;;; low-level display of a string, works even early in cold init
+(defmacro /primitive-print (thing)
+  (declare (ignorable thing)) ; (for when #!-SB-SHOW)
+  #!+sb-show
+  (progn
+    #+sb-xc-host `(/show "(/primitive-print)" ,thing)
+    #-sb-xc-host `(sb!sys:%primitive print (the simple-string ,thing))))
+
+(defmacro /nohexstr (thing)
+  (declare (ignore thing)))
+
+;;; low-level display of a system word, works even early in cold init
+(defmacro /hexstr (thing)
+  (declare (ignorable thing)) ; (for when #!-SB-SHOW)
+  #!+sb-show
+  (progn
+    #+sb-xc-host `(/show "(/hexstr)" ,thing)
+    #-sb-xc-host `(sb!sys:%primitive print (hexstr ,thing))))
+
+(defmacro /nohexstr (thing)
+  (declare (ignore thing)))
 
 (/show0 "done with show.lisp")

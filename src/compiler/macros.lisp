@@ -336,7 +336,7 @@
 			    `(<= ,min-args ,n-length))
 		       ,@(when keyp
 			   (if allowp
-			       `((check-keywords-constant ,n-keys))
+			       `((check-key-args-constant ,n-keys))
 			       `((check-transform-keys ,n-keys ',(keywords))))))
 		,error-form)
 	      (let ,(binds)

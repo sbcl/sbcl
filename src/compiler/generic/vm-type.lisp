@@ -14,6 +14,8 @@
 
 (in-package "SB!KERNEL")
 
+(/show0 "vm-type.lisp 17")
+
 (!begin-collecting-cold-init-forms)
 
 ;;;; FIXME: I'm not sure where to put this. -- WHN 19990817
@@ -181,3 +183,5 @@
      nil)))
 
 (!defun-from-collected-cold-init-forms !vm-type-cold-init)
+
+(/show0 "vm-type.lisp end of file")

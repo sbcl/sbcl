@@ -39,24 +39,25 @@
   #!+sb-infinities x)
 
 ;;; Given a list of keyword substitutions `(,OLD ,NEW), and a
-;;; keyword-argument-list-style list of alternating keywords and arbitrary
-;;; values, return a new keyword-argument-list-style list with all
-;;; substitutions applied to it.
+;;; &KEY-argument-list-style list of alternating keywords and
+;;; arbitrary values, return a new &KEY-argument-list-style list with
+;;; all substitutions applied to it.
 ;;;
-;;; Note: If efficiency mattered, we could do less consing. (But if efficiency
-;;; mattered, why would we be using keyword arguments at all, much less
-;;; renaming keyword arguments?)
+;;; Note: If efficiency mattered, we could do less consing. (But if
+;;; efficiency mattered, why would we be using &KEY arguments at
+;;; all, much less renaming &KEY arguments?)
 ;;;
 ;;; KLUDGE: It would probably be good to get rid of this. -- WHN 19991201
-(defun rename-keyword-args (rename-list keyword-args)
-  (declare (type list rename-list keyword-args))
+(defun rename-key-args (rename-list key-args)
+  (declare (type list rename-list key-args))
   ;; Walk through RENAME-LIST modifying RESULT as per each element in
   ;; RENAME-LIST.
-  (do ((result (copy-list keyword-args))) ; may be modified below
+  (do ((result (copy-list key-args))) ; may be modified below
       ((null rename-list) result)
     (destructuring-bind (old new) (pop rename-list)
-      (declare (type keyword old new))
-      ;; Walk through RESULT renaming any OLD keyword argument to NEW.
+      ;; ANSI says &KEY arg names aren't necessarily KEYWORDs.
+      (declare (type symbol old new))
+      ;; Walk through RESULT renaming any OLD key argument to NEW.
       (do ((in-result result (cddr in-result)))
 	  ((null in-result))
 	(declare (type list in-result))

@@ -20,7 +20,7 @@
 (defvar *user-lets* nil) ; LET bindings that the user has explicitly supplied
 (declaim (type list *user-lets*))
 
-;; the default default for unsupplied optional and keyword args
+;; the default default for unsupplied &OPTIONAL and &KEY args
 (defvar *default-default* nil)
 
 ;;; temps that we introduce and might not reference

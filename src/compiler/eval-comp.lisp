@@ -235,7 +235,7 @@
 
 #|
 %listify-rest-args %more-arg %verify-argument-count %argument-count-error
-%odd-keyword-arguments-error %unknown-keyword-argument-error
+%odd-key-arguments-error %unknown-key-argument-error
 |#
 
 (defun %verify-argument-count (supplied-args defined-args)
@@ -266,15 +266,15 @@
 	 :format-control "wrong number of arguments passed: ~S"
 	 :format-arguments (list args-passed-count)))
 
-(defun %odd-keyword-arguments-error ()
+(defun %odd-key-arguments-error ()
   (error 'simple-program-error
-	 :format-control "function called with odd number of keyword arguments"
+	 :format-control "function called with odd number of &KEY arguments"
 	 :format-arguments nil))
 
-(defun %unknown-keyword-argument-error (keyword)
+(defun %unknown-key-argument-error (key-arg-name)
   (error 'simple-program-error
-	 :format-control "unknown keyword argument: ~S"
-	 :format-arguments (list keyword)))
+	 :format-control "unknown &KEY argument: ~S"
+	 :format-arguments (list key-arg-name)))
 
 (defun %cleanup-point ())
 

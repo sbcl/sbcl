@@ -11,6 +11,8 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
+
+(/show0 "code/defstruct.lisp 15")
 
 ;;;; getting LAYOUTs
 
@@ -274,8 +276,8 @@
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
   "DEFSTRUCT {Name | (Name Option*)} {Slot | (Slot [Default] {Key Value}*)}
-   Define the structure type Name. Instances are created by MAKE-<name>, which
-   takes keyword arguments allowing initial slot values to the specified.
+   Define the structure type Name. Instances are created by MAKE-<name>, 
+   which takes &KEY arguments allowing initial slot values to the specified.
    A SETF'able function <name>-<slot> is defined for each slot to read and
    write slot values. <name>-p is a type predicate.
 
@@ -1416,3 +1418,5 @@
 		     (rest args)))
 	 (inherits (inherits-for-structure defstruct)))
     (function-%compiler-only-defstruct defstruct inherits)))
+
+(/show0 "code/defstruct.lisp end of file")

@@ -8,6 +8,8 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
+
+(/show0 "target-defstruct.lisp 12")
 
 ;;;; structure frobbing primitives
 
@@ -384,3 +386,5 @@
 			     (dsd-type dsd)
 			     new-value))))
 	    (setf (%instance-ref structure (dsd-index dsd)) new-value)))))
+
+(/show0 "target-defstruct.lisp end of file")

@@ -431,10 +431,11 @@
 
 ;;;; optional, more and keyword calls
 
-;;; Similar to Convert-Lambda-Call, but deals with Optional-Dispatches. If
-;;; only fixed args are supplied, then convert a call to the correct entry
-;;; point. If keyword args are supplied, then dispatch to a subfunction. We
-;;; don't convert calls to functions that have a more (or rest) arg.
+;;; This is similar to CONVERT-LAMBDA-CALL, but deals with
+;;; OPTIONAL-DISPATCHes. If only fixed args are supplied, then convert
+;;; a call to the correct entry point. If &KEY args are supplied, then
+;;; dispatch to a subfunction. We don't convert calls to functions
+;;; that have a &MORE (or &REST) arg.
 (defun convert-hairy-call (ref call fun)
   (declare (type ref ref) (type combination call)
 	   (type optional-dispatch fun))
@@ -487,20 +488,21 @@
     (dolist (ref (leaf-refs entry))
       (convert-call-if-possible ref (continuation-dest (node-cont ref))))))
 
-;;; Use Convert-Hairy-Fun-Entry to convert a more-arg call to a known
-;;; function into a local call to the Main-Entry.
+;;; Use CONVERT-HAIRY-FUN-ENTRY to convert a &MORE-arg call to a known
+;;; function into a local call to the MAIN-ENTRY.
 ;;;
 ;;; First we verify that all keywords are constant and legal. If there
 ;;; aren't, then we warn the user and don't attempt to convert the call.
 ;;;
-;;; We massage the supplied keyword arguments into the order expected by the
-;;; main entry. This is done by binding all the arguments to the keyword call
-;;; to variables in the introduced lambda, then passing these values variables
-;;; in the correct order when calling the main entry. Unused arguments
-;;; (such as the keywords themselves) are discarded simply by not passing them
-;;; along.
+;;; We massage the supplied &KEY arguments into the order expected
+;;; by the main entry. This is done by binding all the arguments to
+;;; the keyword call to variables in the introduced lambda, then
+;;; passing these values variables in the correct order when calling
+;;; the main entry. Unused arguments (such as the keywords themselves)
+;;; are discarded simply by not passing them along.
 ;;;
-;;; If there is a rest arg, then we bundle up the args and pass them to LIST.
+;;; If there is a &REST arg, then we bundle up the args and pass them
+;;; to LIST.
 (defun convert-more-call (ref call fun)
   (declare (type ref ref) (type combination call) (type optional-dispatch fun))
   (let* ((max (optional-dispatch-max-args fun))
@@ -554,7 +556,7 @@
 			     (ignores dummy val)
 			     (setq loser name)))
 		(let ((info (lambda-var-arg-info var)))
-		  (when (eq (arg-info-keyword info) name)
+		  (when (eq (arg-info-key info) name)
 		    (ignores dummy)
 		    (supplied (cons var val))
 		    (return)))))))

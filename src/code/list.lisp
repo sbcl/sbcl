@@ -512,9 +512,9 @@
 
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 
-;;; Use these with the following keyword args:
+;;; Use these with the following &KEY args:
 (defmacro with-set-keys (funcall)
-  `(cond ((and testp notp) (error "Test and test-not both supplied."))
+  `(cond ((and testp notp) (error ":TEST and :TEST-NOT were both supplied."))
 	 (notp ,(append funcall '(:key key :test-not test-not)))
 	 (t ,(append funcall '(:key key :test test)))))
 

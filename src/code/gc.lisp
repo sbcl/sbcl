@@ -168,8 +168,12 @@
   #!+sb-doc
   "The total CPU time spent doing garbage collection (as reported by
    GET-INTERNAL-RUN-TIME.)")
-
 (declaim (type index *gc-run-time*))
+
+;;; a limit to help catch programs which allocate too much memory,
+;;; since a hard heap overflow is so hard to recover from. 
+(declaim (type (or unsigned-byte null) *soft-heap-limit*))
+(defvar *soft-heap-limit* nil)
 
 ;;; Internal trigger. When the dynamic usage increases beyond this
 ;;; amount, the system notes that a garbage collection needs to occur by
@@ -274,7 +278,21 @@
     (/show0 "not *ALREADY-MAYBE-GCING*")
     (let* ((*already-maybe-gcing* t)
 	   (start-time (get-internal-run-time))
-	   (pre-gc-dyn-usage (dynamic-usage)))
+	   (pre-gc-dyn-usage (dynamic-usage))
+	   ;; Currently we only check *SOFT-HEAP-LIMIT* at GC time,
+	   ;; not for every allocation. That makes it cheap to do,
+	   ;; even if it is a little ugly.
+	   (soft-heap-limit-exceeded? (and *soft-heap-limit*
+					   (> pre-gc-dyn-usage
+					      *soft-heap-limit*)))
+	   (*soft-heap-limit* (if soft-heap-limit-exceeded?
+				  (+ pre-gc-dyn-usage
+				     *bytes-consed-between-gcs*)
+				  *soft-heap-limit*)))
+      (when soft-heap-limit-exceeded?
+	(cerror "Continue with GC."
+		"soft heap limit exceeded (temporary new limit=~D)"
+		*soft-heap-limit*))
       (unless (integerp (symbol-value '*bytes-consed-between-gcs*))
 	;; The noise w/ symbol-value above is to keep the compiler
 	;; from optimizing the test away because of the type declaim
@@ -341,14 +359,21 @@
 	    (/show0 "back from FUNCALL to *INTERNAL-GC*")
 	    (let* ((post-gc-dyn-usage (dynamic-usage))
 		   (bytes-freed (- pre-gc-dyn-usage post-gc-dyn-usage)))
+	      (/show0 "got (DYNAMIC-USAGE) and BYTES-FREED")
 	      (when *last-bytes-in-use*
+		(/show0 "doing *LAST-BYTES-IN-USE* thing")
 		(incf *total-bytes-consed*
 		      (- pre-gc-dyn-usage *last-bytes-in-use*))
+		(/show0 "setting *LAST-BYTES-IN-USE*")
 		(setq *last-bytes-in-use* post-gc-dyn-usage))
+	      (/show0 "clearing *NEED-TO-COLLECT-GARBAGE*")
 	      (setf *need-to-collect-garbage* nil)
+	      (/show0 "calculating NEW-GC-TRIGGER")
 	      (let ((new-gc-trigger (+ post-gc-dyn-usage
 				       *bytes-consed-between-gcs*)))
+		(/show0 "setting *GC-TRIGGER*")
 		(setf *gc-trigger* new-gc-trigger))
+	      (/show0 "calling SET-AUTO-GC-TRIGGER")
 	      (set-auto-gc-trigger *gc-trigger*)
 	      (dolist (hook *after-gc-hooks*)
 		(/show0 "doing a hook from *AFTER-GC--HOOKS*")

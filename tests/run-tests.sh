@@ -93,4 +93,9 @@ EOF
     fi
 done
 
+# (*.before-xc.lisp and *.after-xc.lisp files aren't handled in this
+# script at all. They're tests intended to run in the cross-compiler,
+# so that some functionality can be tested even when cold init doesn't
+# work.)
+
 echo '//apparent success (reached end of run-tests.sh normally)'

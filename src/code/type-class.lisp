@@ -26,9 +26,10 @@
   (/show0 "failing in MUST-SUPPLY-THIS")
   (error "missing type method for ~S" foo))
 
-;;; A TYPE-CLASS object represents the "kind" of a type. It mainly contains
-;;; functions which are methods on that kind of type, but is also used in EQ
-;;; comparisons to determined if two types have the "same kind".
+;;; A TYPE-CLASS object represents the "kind" of a type. It mainly
+;;; contains functions which are methods on that kind of type, but is
+;;; also used in EQ comparisons to determined if two types have the
+;;; "same kind".
 (def!struct (type-class
 	     #-no-ansi-print-object
 	     (:print-object (lambda (x stream)
@@ -53,16 +54,39 @@
   (simple-subtypep #'must-supply-this :type function)
   (complex-subtypep-arg1 nil :type (or function null))
   (complex-subtypep-arg2 nil :type (or function null))
-  ;; SIMPLE-UNION combines two types of the same class into a single
-  ;; type of that class. If the result is a two-type union, then
-  ;; return NIL. VANILLA-UNION returns whichever argument is a
-  ;; supertype of the other, or NIL.
+  ;; SIMPLE-UNION2, COMPLEX-UNION2, SIMPLE-INTERSECTION2, and
+  ;; COMPLEX-INTERSECTION2 methods take pairs of types and try to find
+  ;; a new type which expresses the result nicely, better than could
+  ;; be done by just stuffing the two component types into an
+  ;; UNION-TYPE or INTERSECTION-TYPE object. They return NIL on
+  ;; failure, or a CTYPE for success.
+  ;; 
+  ;; Note: These methods are similar to CMU CL's SIMPLE-UNION,
+  ;; COMPLEX-UNION, SIMPLE-INTERSECTION, and COMPLEX-UNION methods.
+  ;; They were reworked in SBCL because SBCL has INTERSECTION-TYPE
+  ;; objects (where CMU CL just punted to HAIRY-TYPE) and because SBCL
+  ;; wants to simplify unions and intersections by considering all
+  ;; possible pairwise simplifications (where the CMU CL code only
+  ;; considered simplifications between types which happened to appear
+  ;; next to each other the argument sequence).
+  ;;
+  ;; Differences in detail from old CMU CL methods:
+  ;;   * SBCL's methods are more parallel between union and
+  ;;     intersection forms. Each returns one values, (OR NULL CTYPE).
+  ;;   * SBCL doesn't use type methods to deal with unions or
+  ;;     intersections of the COMPOUND-TYPE of the corresponding form.
+  ;;     Instead the wrapper functions TYPE-UNION2, TYPE-INTERSECTION2,
+  ;;     TYPE-UNION, and TYPE-INTERSECTION handle those cases specially
+  ;;     (and deal with canonicalization/simplification issues at the
+  ;;     same time).
+  ;;
+  ;; FIXME: SIMPLE-UNION and COMPLEX-UNION methods haven't been
+  ;; converted to the new scheme yet. (Thus they never return NIL, I
+  ;; think. -- WHN 2001-03-11)
   (simple-union #'vanilla-union :type function)
   (complex-union nil :type (or function null))
-  ;; The default intersection methods assume that if one type is a
-  ;; subtype of the other, then that type is the intersection.
-  (simple-intersection #'vanilla-intersection :type function)
-  (complex-intersection nil :type (or function null))
+  (simple-intersection2 #'hierarchical-intersection2 :type function)
+  (complex-intersection2 nil :type (or function null))
   (simple-= #'must-supply-this :type function)
   (complex-= nil :type (or function null))
   ;; a function which returns a Common Lisp type specifier
@@ -108,17 +132,17 @@
 (defun copy-type-class-coldly (x)
   ;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here will have
   ;; to be hand-tweaked to match. -- WHN 19991021
-  (make-type-class :name (type-class-name x)
+  (make-type-class :name                  (type-class-name x)
 		   :simple-subtypep       (type-class-simple-subtypep x)
 		   :complex-subtypep-arg1 (type-class-complex-subtypep-arg1 x)
 		   :complex-subtypep-arg2 (type-class-complex-subtypep-arg2 x)
 		   :simple-union	  (type-class-simple-union x)
-		   :complex-union	 (type-class-complex-union x)
-		   :simple-intersection   (type-class-simple-intersection x)
-		   :complex-intersection  (type-class-complex-intersection x)
-		   :simple-=	      (type-class-simple-= x)
-		   :complex-=	     (type-class-complex-= x)
-		   :unparse	       (type-class-unparse x)))
+		   :complex-union	  (type-class-complex-union x)
+		   :simple-intersection2  (type-class-simple-intersection2 x)
+		   :complex-intersection2 (type-class-complex-intersection2 x)
+		   :simple-=	          (type-class-simple-= x)
+		   :complex-=	          (type-class-complex-= x)
+		   :unparse	          (type-class-unparse x)))
 
 ;;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here
 ;;; will have to be tweaked to match. -- WHN 19991021
@@ -128,8 +152,8 @@
     (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
     (:simple-union . type-class-simple-union)
     (:complex-union . type-class-complex-union)
-    (:simple-intersection . type-class-simple-intersection)
-    (:complex-intersection . type-class-complex-intersection)
+    (:simple-intersection2 . type-class-simple-intersection2)
+    (:complex-intersection2 . type-class-complex-intersection2)
     (:simple-= . type-class-simple-=)
     (:complex-= . type-class-complex-=)
     (:unparse . type-class-unparse)))
@@ -173,6 +197,14 @@
 ;;; complex method. If there isn't a distinct COMPLEX-ARG1 method,
 ;;; then swap the arguments when calling TYPE1's method. If no
 ;;; applicable method, return DEFAULT.
+;;;
+;;; KLUDGE: It might be a lot easier to understand this and the rest
+;;; of the type system code if we used CLOS to express it instead of
+;;; trying to maintain this squirrely hand-crufted object system.
+;;; Unfortunately that'd require reworking PCL bootstrapping so that
+;;; all the compilation can get done by the cross-compiler, which I
+;;; suspect is hard, so we'll bear with the old system for the time
+;;; being. -- WHN 2001-03-11
 (defmacro !invoke-type-method (simple complex-arg2 type1 type2 &key
 				      (default '(values nil t))
 				      (complex-arg1 :foo complex-arg1-p))

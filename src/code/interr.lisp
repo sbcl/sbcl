@@ -288,16 +288,16 @@
 	 :datum object
 	 :expected-type (layout-class layout)))
 
-(deferr odd-keyword-arguments-error ()
+(deferr odd-key-arguments-error ()
   (error 'simple-program-error
 	 :function-name name
-	 :format-control "odd number of keyword arguments"))
+	 :format-control "odd number of &KEY arguments"))
 
-(deferr unknown-keyword-argument-error (key)
+(deferr unknown-key-argument-error (key-name)
   (error 'simple-program-error
 	 :function-name name
-	 :format-control "unknown keyword: ~S"
-	 :format-arguments (list key)))
+	 :format-control "unknown &KEY argument: ~S"
+	 :format-arguments (list key-name)))
 
 (deferr invalid-array-index-error (array bound index)
   (error 'simple-error
@@ -505,7 +505,7 @@
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context) (ignore continuable))
   (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
-  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr context))
+  (/hexstr context)
   (infinite-error-protect
    (let ((context (locally
 		    (declare (optimize (inhibit-warnings 3)))

@@ -73,7 +73,7 @@
 ;; the "9" entry intentionally left blank for some reason -- WHN 19990806
 (defconstant multiple-escape 10)
 (defconstant package-delimiter 11)
-(defconstant delimiter 12) ; (a fake for use in read-unqualified-token)
+(defconstant delimiter 12) ; (a fake for use in READ-UNQUALIFIED-TOKEN)
 
 ;;;; macros and functions for character tables
 

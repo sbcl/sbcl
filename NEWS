@@ -685,7 +685,7 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
 * many patches ported from CMU CL by Martin Atzmueller, with 
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
-?? improved support for intersection types, fixing bug 12 (E.g., now
+* improved support for intersection types, fixing bug 12 (E.g., now
   (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T.)
 ?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
   are now supported, and enabled by default. Thus, the compiler can
@@ -694,10 +694,6 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   without consing!)
 ?? unscrewed floating point infinities (bug 13) in order to support
   :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
-?? some minor ANSIfication of type specifications: bare 'AND and 'OR
-  are no longer valid type specifiers, so e.g. (TYPEP 11 'AND) now
-  signals an error; and SATISFIES requires its predicate to be a 
-  symbol, not a function object
 * various fixes to make the cross-compiler more portable to
   ANSI-conforming-but-different cross-compilation hosts (notably
   Lispworks for Windows, following bug reports from Arthur Lemmens)

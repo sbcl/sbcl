@@ -298,7 +298,7 @@
 
  ("compiler/late-macros")
 
- ;; for e.g. DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
+ ;; for e.g. !DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
  ("compiler/meta-vmdef")
 
@@ -330,7 +330,7 @@
  ;; host-alieneval.lisp
  ("code/host-c-call")
 
- ;; SB!XC:DEFTYPE is needed in order to compile late-target-type
+ ;; SB!XC:DEFTYPE is needed in order to compile late-type
  ;; in the host Common Lisp, and in order to run, it needs
  ;; %COMPILER-DEFTYPE.
  ("compiler/compiler-deftype")

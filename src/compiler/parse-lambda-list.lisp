@@ -9,23 +9,25 @@
 
 (in-package "SB!C")
 
-;;; Break a lambda-list into its component parts. We return eleven
+(/show0 "parse-lambda-list.lisp 12")
+
+;;; Break a lambda list into its component parts. We return eleven
 ;;; values:
-;;;  1. A list of the required args.
-;;;  2. A list of the optional arg specs.
-;;;  3. True if a rest arg was specified.
-;;;  4. The rest arg.
-;;;  5. A boolean indicating whether keywords args are present.
-;;;  6. A list of the keyword arg specs.
-;;;  7. True if &allow-other-keys was specified.
-;;;  8. A list of the &aux specifiers.
-;;;  9. True if a more arg was specified.
-;;; 10. The &more context var
-;;; 11. The &more count var
+;;;  1. a list of the required args;
+;;;  2. a list of the optional arg specs;
+;;;  3. true if a rest arg was specified;
+;;;  4. the &rest arg;
+;;;  5. true if &KEY args are present;
+;;;  6. a list of the &KEY arg specs;
+;;;  7. true if &ALLOW-OTHER-KEYS was specified.;
+;;;  8. a list of the &AUX specifiers;
+;;;  9. true if a &MORE arg was specified;
+;;; 10. the &MORE context var;
+;;; 11. the &MORE count var.
 ;;;
-;;; The top-level lambda-list syntax is checked for validity, but the
+;;; The top-level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
-;;; wrong, we use Compiler-Error, aborting compilation to the last
+;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.
 (declaim (ftype (function (list)
 			  (values list list boolean t boolean list boolean
@@ -115,3 +117,5 @@
 
       (values (required) (optional) restp rest keyp (keys) allowp (aux)
 	      morep more-context more-count))))
+
+(/show0 "parse-lambda-list.lisp end of file")

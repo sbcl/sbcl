@@ -28,10 +28,10 @@
 ;;; return whether the object is of that type as the first value and
 ;;; second value true. Otherwise return NIL, NIL.
 ;;;
-;;; We give up on unknown types and pick off FUNCTION and UNION types.
-;;; For structure types, we require that the type be defined in both
-;;; the current and compiler environments, and that the INCLUDES be
-;;; the same.
+;;; We give up on unknown types and pick off FUNCTION- and COMPOUND-
+;;; types. For STRUCTURE- types, we require that the type be defined
+;;; in both the current and compiler environments, and that the
+;;; INCLUDES be the same.
 (defun ctypep (obj type)
   (declare (type ctype type))
   (etypecase type
@@ -51,11 +51,30 @@
 	     (values (sb!xc:typep obj type) t)
 	     (values nil nil))
 	 (values nil t)))
-    (union-type
-     (dolist (mem (union-type-types type) (values nil t))
-       (multiple-value-bind (val win) (ctypep obj mem)
-	 (unless win (return (values nil nil)))
-	 (when val (return (values t t))))))
+    (compound-type
+     (let ((certain? t))
+       (etypecase type
+	 ;; FIXME: The cases here are very similar to #'EVERY/TYPE and
+	 ;; #'ANY/TYPE. It would be good to fix them so that they
+	 ;; share the same code. (That will require making sure that
+	 ;; the two-value return convention for CTYPEP really is
+	 ;; exactly compatible with the two-value convention the
+	 ;; quantifier/TYPE functions operate on, and probably also
+	 ;; making sure that things are inlined and defined early
+	 ;; enough that consing can be avoided.)
+	 (union-type
+	  (dolist (mem (union-type-types type) (values nil certain?))
+	    (multiple-value-bind (val win) (ctypep obj mem)
+	      (if win
+		  (when val (return (values t t)))
+		  (setf certain? nil)))))
+	 (intersection-type
+	  (dolist (mem (intersection-type-types type)
+		       (if certain? (values t t) (values nil nil)))
+	    (multiple-value-bind (val win) (ctypep obj mem)
+	      (if win
+		  (unless val (return (values nil t)))
+		  (setf certain? nil))))))))
     (function-type
      (values (functionp obj) t))
     (unknown-type
@@ -151,7 +170,7 @@
 		   type-union-cache-clear
 		   values-subtypep-cache-clear
 		   csubtypep-cache-clear
-		   type-intersection-cache-clear
+		   type-intersection2-cache-clear
 		   values-type-intersection-cache-clear))
       (funcall (symbol-function sym))))
   (values))

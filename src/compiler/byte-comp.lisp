@@ -1817,10 +1817,15 @@
 		    (incf num-more)
 		    (setf rest-arg-p t))
 		   (:keyword
+		    ;; FIXME: Since ANSI specifies that &KEY arguments
+		    ;; needn't actually be keywords, :KEY would be a
+		    ;; better label for this behavior than :KEYWORD is,
+		    ;; and (KEY-ARGS) would be a better name for the
+		    ;; accumulator than (KEYWORDS) is.
 		    (let ((s-p (arg-info-supplied-p arg-info))
 			  (default (arg-info-default arg-info)))
 		      (incf num-more (if s-p 2 1))
-		      (keywords (list (arg-info-keyword arg-info)
+		      (keywords (list (arg-info-key arg-info)
 				      (if (constantp default)
 					  (eval default)
 					  nil)

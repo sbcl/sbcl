@@ -10,6 +10,8 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
+
+(/show0 "deftypes-for-target.lisp 14")
 
 ;;;; Now that DEFTYPE is set up, any pending requests for it can
 ;;;; be honored.
@@ -177,3 +179,5 @@
   `(integer 0 (,(ash 1 sb!vm:single-float-digits))))
 (sb!xc:deftype double-float-significand ()
   `(integer 0 (,(ash 1 sb!vm:double-float-digits))))
+
+(/show0 "deftypes-for-target.lisp end of file")

@@ -14,125 +14,143 @@
 
 ;;;; primitive type definitions
 
-(def-primitive-type t (descriptor-reg))
+(/show0 "primtype.lisp 17")
+
+(!def-primitive-type t (descriptor-reg))
+(/show0 "primtype.lisp 20")
 (setf *backend-t-primitive-type* (primitive-type-or-lose 't))
 
 ;;; primitive integer types that fit in registers
-(def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
+(/show0 "primtype.lisp 24")
+(!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
   :type (unsigned-byte 29))
+(/show0 "primtype.lisp 27")
 #!-alpha
-(def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
+(!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 31))
+(/show0 "primtype.lisp 31")
 #!-alpha
-(def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
+(!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 32))
+(/show0 "primtype.lisp 35")
 #!+alpha
-(def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
+(!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
 #!+alpha
-(def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
+(!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
-(def-primitive-type fixnum (any-reg signed-reg)
+(!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte 30))
 #!-alpha
-(def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
+(!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
 #!+alpha
-(def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
+(!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
 (defvar *fixnum-primitive-type* (primitive-type-or-lose 'fixnum))
 
-(def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
-(def-primitive-type-alias unsigned-num (:or #!-alpha unsigned-byte-32
-					    #!-alpha unsigned-byte-31
-					    #!+alpha unsigned-byte-64
-					    #!+alpha unsigned-byte-63
-					    positive-fixnum))
-(def-primitive-type-alias signed-num (:or #!-alpha signed-byte-32
-					  #!+alpha signed-byte-64
-					  fixnum
-					  #!-alpha unsigned-byte-31
-					  #!+alpha unsigned-byte-63
-					  positive-fixnum))
+(/show0 "primtype.lisp 53")
+(!def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
+(!def-primitive-type-alias unsigned-num (:or #!-alpha unsigned-byte-32
+					     #!-alpha unsigned-byte-31
+					     #!+alpha unsigned-byte-64
+					     #!+alpha unsigned-byte-63
+					     positive-fixnum))
+(!def-primitive-type-alias signed-num (:or #!-alpha signed-byte-32
+					   #!+alpha signed-byte-64
+					   fixnum
+					   #!-alpha unsigned-byte-31
+					   #!+alpha unsigned-byte-63
+					   positive-fixnum))
 
 ;;; other primitive immediate types
-(def-primitive-type base-char (base-char-reg any-reg))
+(/show0 "primtype.lisp 68")
+(!def-primitive-type base-char (base-char-reg any-reg))
 
 ;;; primitive pointer types
-(def-primitive-type function (descriptor-reg))
-(def-primitive-type list (descriptor-reg))
-(def-primitive-type instance (descriptor-reg))
+(/show0 "primtype.lisp 73")
+(!def-primitive-type function (descriptor-reg))
+(!def-primitive-type list (descriptor-reg))
+(!def-primitive-type instance (descriptor-reg))
 
-(def-primitive-type funcallable-instance (descriptor-reg))
+(/show0 "primtype.lisp 77")
+(!def-primitive-type funcallable-instance (descriptor-reg))
 
 ;;; primitive other-pointer number types
-(def-primitive-type bignum (descriptor-reg))
-(def-primitive-type ratio (descriptor-reg))
-(def-primitive-type complex (descriptor-reg))
-(def-primitive-type single-float (single-reg descriptor-reg))
-(def-primitive-type double-float (double-reg descriptor-reg))
+(/show0 "primtype.lisp 81")
+(!def-primitive-type bignum (descriptor-reg))
+(!def-primitive-type ratio (descriptor-reg))
+(!def-primitive-type complex (descriptor-reg))
+(/show0 "about to !DEF-PRIMITIVE-TYPE SINGLE-FLOAT")
+(!def-primitive-type single-float (single-reg descriptor-reg))
+(/show0 "about to !DEF-PRIMITIVE-TYPE DOUBLE-FLOAT")
+(!def-primitive-type double-float (double-reg descriptor-reg))
 #!+long-float
-(def-primitive-type long-float (long-reg descriptor-reg))
-(def-primitive-type complex-single-float (complex-single-reg descriptor-reg)
+(!def-primitive-type long-float (long-reg descriptor-reg))
+(/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-SINGLE-FLOAT")
+(!def-primitive-type complex-single-float (complex-single-reg descriptor-reg)
   :type (complex single-float))
-(def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
+(/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-DOUBLE-FLOAT")
+(!def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
   :type (complex double-float))
 #!+long-float
-(def-primitive-type complex-long-float (complex-long-reg descriptor-reg)
+(!def-primitive-type complex-long-float (complex-long-reg descriptor-reg)
   :type (complex long-float))
 
 ;;; primitive other-pointer array types
-(def-primitive-type simple-string (descriptor-reg)
+(/show0 "primtype.lisp 96")
+(!def-primitive-type simple-string (descriptor-reg)
   :type simple-base-string)
-(def-primitive-type simple-bit-vector (descriptor-reg))
-(def-primitive-type simple-vector (descriptor-reg))
-(def-primitive-type simple-array-unsigned-byte-2 (descriptor-reg)
+(!def-primitive-type simple-bit-vector (descriptor-reg))
+(!def-primitive-type simple-vector (descriptor-reg))
+(!def-primitive-type simple-array-unsigned-byte-2 (descriptor-reg)
   :type (simple-array (unsigned-byte 2) (*)))
-(def-primitive-type simple-array-unsigned-byte-4 (descriptor-reg)
+(!def-primitive-type simple-array-unsigned-byte-4 (descriptor-reg)
   :type (simple-array (unsigned-byte 4) (*)))
-(def-primitive-type simple-array-unsigned-byte-8 (descriptor-reg)
+(!def-primitive-type simple-array-unsigned-byte-8 (descriptor-reg)
   :type (simple-array (unsigned-byte 8) (*)))
-(def-primitive-type simple-array-unsigned-byte-16 (descriptor-reg)
+(!def-primitive-type simple-array-unsigned-byte-16 (descriptor-reg)
   :type (simple-array (unsigned-byte 16) (*)))
-(def-primitive-type simple-array-unsigned-byte-32 (descriptor-reg)
+(!def-primitive-type simple-array-unsigned-byte-32 (descriptor-reg)
   :type (simple-array (unsigned-byte 32) (*)))
-(def-primitive-type simple-array-signed-byte-8 (descriptor-reg)
+(!def-primitive-type simple-array-signed-byte-8 (descriptor-reg)
   :type (simple-array (signed-byte 8) (*)))
-(def-primitive-type simple-array-signed-byte-16 (descriptor-reg)
+(!def-primitive-type simple-array-signed-byte-16 (descriptor-reg)
   :type (simple-array (signed-byte 16) (*)))
-(def-primitive-type simple-array-signed-byte-30 (descriptor-reg)
+(!def-primitive-type simple-array-signed-byte-30 (descriptor-reg)
   :type (simple-array (signed-byte 30) (*)))
-(def-primitive-type simple-array-signed-byte-32 (descriptor-reg)
+(!def-primitive-type simple-array-signed-byte-32 (descriptor-reg)
   :type (simple-array (signed-byte 32) (*)))
-(def-primitive-type simple-array-single-float (descriptor-reg)
+(!def-primitive-type simple-array-single-float (descriptor-reg)
   :type (simple-array single-float (*)))
-(def-primitive-type simple-array-double-float (descriptor-reg)
+(!def-primitive-type simple-array-double-float (descriptor-reg)
   :type (simple-array double-float (*)))
 #!+long-float
-(def-primitive-type simple-array-long-float (descriptor-reg)
+(!def-primitive-type simple-array-long-float (descriptor-reg)
   :type (simple-array long-float (*)))
-(def-primitive-type simple-array-complex-single-float (descriptor-reg)
+(!def-primitive-type simple-array-complex-single-float (descriptor-reg)
   :type (simple-array (complex single-float) (*)))
-(def-primitive-type simple-array-complex-double-float (descriptor-reg)
+(!def-primitive-type simple-array-complex-double-float (descriptor-reg)
   :type (simple-array (complex double-float) (*)))
 #!+long-float
-(def-primitive-type simple-array-complex-long-float (descriptor-reg)
+(!def-primitive-type simple-array-complex-long-float (descriptor-reg)
   :type (simple-array (complex long-float) (*)))
 
 ;;; Note: The complex array types are not included, 'cause it is pointless to
 ;;; restrict VOPs to them.
 
 ;;; other primitive other-pointer types
-(def-primitive-type system-area-pointer (sap-reg descriptor-reg))
-(def-primitive-type weak-pointer (descriptor-reg))
+(!def-primitive-type system-area-pointer (sap-reg descriptor-reg))
+(!def-primitive-type weak-pointer (descriptor-reg))
 
 ;;; miscellaneous primitive types that don't exist at the LISP level
-(def-primitive-type catch-block (catch-block) :type nil)
+(!def-primitive-type catch-block (catch-block) :type nil)
 
 ;;;; PRIMITIVE-TYPE-OF and friends
 
 ;;; Return the most restrictive primitive type that contains Object.
+(/show0 "primtype.lisp 147")
 (!def-vm-support-routine primitive-type-of (object)
   (let ((type (ctype-of object)))
     (cond ((not (member-type-p type)) (primitive-type type))
@@ -173,9 +191,11 @@
 ;;; correct values for the system parameters.
 ;;;
 ;;; We need an aux function because we need to use both
-;;; !DEF-VM-SUPPORT-ROUTINE and defun-cached.
+;;; !DEF-VM-SUPPORT-ROUTINE and DEFUN-CACHED.
+(/show0 "primtype.lisp 188")
 (!def-vm-support-routine primitive-type (type)
   (primitive-type-aux type))
+(/show0 "primtype.lisp 191")
 (defun-cached (primitive-type-aux
 	       :hash-function (lambda (x)
 				(logand (type-hash-value x) #x1FF))
@@ -364,3 +384,5 @@
 	     (part-of instance)))
 	(ctype
 	 (any))))))
+
+(/show0 "primtype.lisp end of file")

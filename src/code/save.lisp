@@ -48,7 +48,7 @@
   killing the current Lisp invocation in the process (unless it bails
   out early because of some argument error or something).
 
-  The following keyword args are defined:
+  The following &KEY args are defined:
 
   :TOPLEVEL
       The function to run when the created core file is resumed.

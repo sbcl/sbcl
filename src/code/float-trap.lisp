@@ -99,8 +99,8 @@
 
 (defun get-floating-point-modes ()
   #!+sb-doc
-  "This function returns a list representing the state of the floating point
-  modes. The list is in the same format as the keyword arguments to
+  "This function returns a list representing the state of the floating 
+  point modes. The list is in the same format as the &KEY arguments to
   SET-FLOATING-POINT-MODES, i.e.
       (apply #'set-floating-point-modes (get-floating-point-modes))
 

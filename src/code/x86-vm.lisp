@@ -127,7 +127,7 @@
 ;;; load time instead of in GENESIS. It's probably simple, I just haven't
 ;;; figured it out, or found it written down anywhere. -- WHN 19990908
 #!+gencgc
-(defun do-load-time-code-fixup (code offset fixup kind)
+(defun !do-load-time-code-fixup (code offset fixup kind)
   (flet ((add-load-time-code-fixup (code offset)
 	   (let ((fixups (code-header-ref code sb!vm:code-constants-offset)))
 	     (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
@@ -138,12 +138,10 @@
 		      (setf (code-header-ref code sb!vm:code-constants-offset)
 			    new-fixups)))
 		   (t
-		    ;; FIXME: This doesn't look like production code, and
-		    ;; should be a fatal error, not just a print.
 		    (unless (or (eq (get-type fixups)
 				    sb!vm:unbound-marker-type)
 				(zerop fixups))
-		      (%primitive print "** Init. code FU"))
+		      (sb!impl::!cold-lose "Argh! can't process fixup"))
 		    (setf (code-header-ref code sb!vm:code-constants-offset)
 			  (make-specializable-array
 			   1
@@ -261,7 +259,7 @@
 (defun internal-error-arguments (context)
   (declare (type (alien (* os-context-t)) context))
   (/show0 "entering INTERNAL-ERROR-ARGUMENTS, CONTEXT=..")
-  #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr context))
+  (/hexstr context)
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))
     ;; using INT3 the pc is .. INT3 <here> code length bytes...
@@ -270,24 +268,24 @@
       (declare (type (unsigned-byte 8) length)
 	       (type (simple-array (unsigned-byte 8) (*)) vector))
       (/show0 "LENGTH,VECTOR,ERROR-NUMBER=..")
-      #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr length))
-      #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr vector))
+      (/hexstr length)
+      (/hexstr vector)
       (copy-from-system-area pc (* sb!vm:byte-bits 2)
 			     vector (* sb!vm:word-bits
 				       sb!vm:vector-data-offset)
 			     (* length sb!vm:byte-bits))
       (let* ((index 0)
 	     (error-number (sb!c::read-var-integer vector index)))
-	#!+sb-show (sb!sys:%primitive print (sb!impl::hexstr error-number))
+	(/hexstr error-number)
 	(collect ((sc-offsets))
 	  (loop
 	   (/show0 "INDEX=..")
-	   #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr index))
+	   (/hexstr index)
 	   (when (>= index length)
 	     (return))
 	   (let ((sc-offset (sb!c::read-var-integer vector index)))
 	     (/show0 "SC-OFFSET=..")
-	     #!+sb-show (sb!sys:%primitive print (sb!impl::hexstr sc-offset))
+	     (/hexstr sc-offset)
 	     (sc-offsets sc-offset)))
 	  (values error-number (sc-offsets)))))))
 

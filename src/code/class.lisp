@@ -440,6 +440,7 @@
 (declaim (ftype (function (symbol index simple-vector layout-depthoid) layout)
 		find-and-init-or-check-layout))
 (defun find-and-init-or-check-layout (name length inherits depthoid)
+  (/show0 "entering FIND-AND-INIT-OR-CHECK-LAYOUT")
   (let ((layout (find-layout name)))
     (init-or-check-layout layout
 			  (or (sb!xc:find-class name nil)
@@ -539,7 +540,7 @@
   (translation nil :type (or ctype (member nil :initializing))))
 (defun make-built-in-class (&rest rest)
   (apply #'bare-make-built-in-class
-	 (rename-keyword-args '((:name :%name)) rest)))
+	 (rename-key-args '((:name :%name)) rest)))
 
 ;;; FIXME: In CMU CL, this was a class with a print function, but not
 ;;; necessarily a structure class (e.g. CONDITIONs). In SBCL,
@@ -560,7 +561,7 @@
   (constructor nil :type (or function null)))
 (defun make-structure-class (&rest rest)
   (apply #'bare-make-structure-class
-	 (rename-keyword-args '((:name :%name)) rest)))
+	 (rename-key-args '((:name :%name)) rest)))
 
 ;;; FUNCALLABLE-STRUCTURE-CLASS is used to represent funcallable
 ;;; structures, which are used to implement generic functions.
@@ -568,7 +569,7 @@
 					 (:constructor bare-make-funcallable-structure-class)))
 (defun make-funcallable-structure-class (&rest rest)
   (apply #'bare-make-funcallable-structure-class
-	 (rename-keyword-args '((:name :%name)) rest)))
+	 (rename-key-args '((:name :%name)) rest)))
 
 ;;;; class namespace
 
@@ -679,7 +680,7 @@
 ;;; When finding the intersection of a sealed class and some other
 ;;; class (not hierarchically related) the intersection is the union
 ;;; of the currently shared subclasses.
-(defun sealed-class-intersection (sealed other)
+(defun sealed-class-intersection2 (sealed other)
   (declare (type sb!xc:class sealed other))
   (let ((s-sub (class-subclasses sealed))
 	(o-sub (class-subclasses other)))
@@ -689,32 +690,37 @@
 	    (declare (ignore layout))
 	    (when (gethash subclass o-sub)
 	      (res (specifier-type subclass))))
-	  (values (res) t))
-	(values *empty-type* t))))
+	  (res))
+	*empty-type*)))
 
-;;; If one is a subclass of the other, then that is the intersection,
-;;; but we can only be sure the intersection is otherwise empty if
-;;; they are structure classes, since a subclass of both might be
-;;; defined. If either class is sealed, we can eliminate this
-;;; possibility.
-(!define-type-method (sb!xc:class :simple-intersection) (class1 class2)
+(!define-type-method (sb!xc:class :simple-intersection2) (class1 class2)
   (declare (type sb!xc:class class1 class2))
-  (cond ((eq class1 class2) class1)
+  (cond ((eq class1 class2)
+	 class1)
+	;; If one is a subclass of the other, then that is the
+	;; intersection.
 	((let ((subclasses (class-subclasses class2)))
 	   (and subclasses (gethash class1 subclasses)))
-	 (values class1 t))
+	 class1)
 	((let ((subclasses (class-subclasses class1)))
 	   (and subclasses (gethash class2 subclasses)))
-	 (values class2 t))
+	 class2)
+	;; Otherwise, we can't in general be sure that the
+	;; intersection is empty, since a subclass of both might be
+	;; defined. But we can eliminate it for some special cases.
 	((or (basic-structure-class-p class1)
 	     (basic-structure-class-p class2))
-	 (values *empty-type* t))
+	 ;; No subclass of both can be defined.
+	 *empty-type*)
 	((eq (class-state class1) :sealed)
-	 (sealed-class-intersection class1 class2))
+	 ;; checking whether a subclass of both can be defined:
+	 (sealed-class-intersection2 class1 class2))
 	((eq (class-state class2) :sealed)
-	 (sealed-class-intersection class2 class1))
+	 ;; checking whether a subclass of both can be defined:
+	 (sealed-class-intersection2 class2 class1))
 	(t
-	 (values class1 nil))))
+	 ;; uncertain, since a subclass of both might be defined
+	 nil)))
 
 (!define-type-method (sb!xc:class :unparse) (type)
   (class-proper-name type))
@@ -729,10 +735,10 @@
 			      (:constructor bare-make-random-pcl-class)))
 (defun make-standard-class (&rest rest)
   (apply #'bare-make-standard-class
-	 (rename-keyword-args '((:name :%name)) rest)))
+	 (rename-key-args '((:name :%name)) rest)))
 (defun make-random-pcl-class (&rest rest)
   (apply #'bare-make-random-pcl-class
-	 (rename-keyword-args '((:name :%name)) rest)))
+	 (rename-key-args '((:name :%name)) rest)))
 
 ;;;; built-in classes
 
@@ -1028,6 +1034,28 @@
     (rational
      :translation rational
      :inherits (real number generic-number))
+
+    ;; FIXME: moved LIST, CONS, and NULL here to help with translation
+    ;; of RATIO now that sbcl-0.6.11.13 has real INTERSECTION-TYPE;
+    ;; but it would be tidier to move them further back, if possible,
+    ;; so that all the numeric types are in an uninterrupted sequence
+    (list
+     :translation (or cons (member nil))
+     :inherits (sequence mutable-sequence mutable-collection
+		generic-sequence collection))
+    (cons
+     :codes (#.sb!vm:list-pointer-type)
+     :translation cons
+     :inherits (list sequence
+		mutable-sequence mutable-collection
+		generic-sequence collection))
+    (null
+     :translation (member nil)
+     :inherits (list sequence
+		mutable-sequence mutable-collection
+		generic-sequence collection symbol)
+     :direct-superclasses (list symbol))
+
     (ratio
      :translation (and rational (not integer))
      :inherits (rational real number generic-number)
@@ -1046,23 +1074,6 @@
      :inherits (integer rational real number
 		generic-number)
      :codes (#.sb!vm:bignum-type))
-
-    (list
-     :translation (or cons (member nil))
-     :inherits (sequence mutable-sequence mutable-collection
-		generic-sequence collection))
-    (cons
-     :codes (#.sb!vm:list-pointer-type)
-     :translation cons
-     :inherits (list sequence
-		mutable-sequence mutable-collection
-		generic-sequence collection))
-    (null
-     :translation (member nil)
-     :inherits (list sequence
-		mutable-sequence mutable-collection
-		generic-sequence collection symbol)
-     :direct-superclasses (list symbol))
     (stream
      :hierarchical-p nil
      :state :read-only
@@ -1072,7 +1083,6 @@
 ;;;   See also type-init.lisp where we finish setting up the
 ;;;   translations for built-in types.
 (!cold-init-forms
-  #-sb-xc-host (/show0 "about to loop over *BUILT-IN-CLASSES*")
   (dolist (x *built-in-classes*)
     #-sb-xc-host (/show0 "at head of loop over *BUILT-IN-CLASSES*")
     (destructuring-bind
@@ -1119,13 +1129,15 @@
 					  inherits-vector
 					  depthoid)
 	   :invalidate nil)))))
-  #-sb-xc-host (/show0 "done with loop over *BUILT-IN-CLASSES*"))
+  (/show0 "done with loop over *BUILT-IN-CLASSES*"))
 
 ;;; Define temporary PCL STANDARD-CLASSes. These will be set up
-;;; correctly and the lisp layout replaced by a PCL wrapper after PCL
+;;; correctly and the Lisp layout replaced by a PCL wrapper after PCL
 ;;; is loaded and the class defined.
 (!cold-init-forms
+  (/show0 "about to define temporary STANDARD-CLASSes")
   (dolist (x '((fundamental-stream (t instance stream))))
+    (/show0 "defining temporary STANDARD-CLASS")
     (let* ((name (first x))
 	   (inherits-list (second x))
 	   (class (make-standard-class :name name))
@@ -1137,8 +1149,10 @@
 			   (lambda (x)
 			     (class-layout (sb!xc:find-class x)))
 			   inherits-list)))
+	#-sb-xc-host (/show0 "INHERITS=..") #-sb-xc-host (/hexstr inherits)
 	(register-layout (find-and-init-or-check-layout name 0 inherits -1)
-			 :invalidate nil)))))
+			 :invalidate nil))))
+  (/show0 "done defining temporary STANDARD-CLASSes"))
 
 ;;; Now that we have set up the class heterarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.

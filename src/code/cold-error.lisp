@@ -72,7 +72,9 @@
   #!+sb-doc
   "Invoke the signal facility on a condition formed from datum and arguments.
    If the condition is not handled, the debugger is invoked."
-  (/show0 "entering ERROR, arguments=..")
+  (/show0 "entering ERROR, argument list=..")
+  (/hexstr arguments)
+  (/show0 "printing ERROR arguments one by one..")
   #!+sb-show (dolist (argument arguments)
 	       (sb!impl::cold-print argument))
   (sb!kernel:infinite-error-protect

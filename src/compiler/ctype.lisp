@@ -157,7 +157,7 @@
      (t
       (check-fixed-and-rest args (append required optional) rest)
       (when keyp
-	(check-keywords args max-args type))))
+	(check-key-args args max-args type))))
 
     (let* ((dtype (node-derived-type call))
 	   (return-type (function-type-returns type))
@@ -242,12 +242,12 @@
     (check-arg-type (car arg) (car type) n))
   (values))
 
-;;; Check that the keyword args are of the correct type. Each keyword
-;;; should be known and the corresponding argument should be of the
-;;; correct type. If the keyword isn't a constant, then we can't tell,
-;;; so we note slime.
-(declaim (ftype (function (list fixnum function-type) (values)) check-keywords))
-(defun check-keywords (args pre-key type)
+;;; Check that the &KEY args are of the correct type. Each key should
+;;; be known and the corresponding argument should be of the correct
+;;; type. If the key isn't a constant, then we can't tell, so we note
+;;; slime.
+(declaim (ftype (function (list fixnum function-type) (values)) check-key-args))
+(defun check-key-args (args pre-key type)
   (do ((key (nthcdr pre-key args) (cddr key))
        (n (1+ pre-key) (+ n 2)))
       ((null key))
@@ -293,7 +293,7 @@
 		    (:required (req type))
 		    (:optional (opt type))
 		    (:keyword
-		     (keys (make-key-info :name (arg-info-keyword info)
+		     (keys (make-key-info :name (arg-info-key info)
 					  :type type)))
 		    ((:rest :more-context)
 		     (setq rest *universal-type*))
@@ -324,21 +324,23 @@
 ;;;; previous uses.
 
 (defstruct (approximate-function-type (:copier nil))
-  ;; The smallest and largest numbers of arguments that this function has been
-  ;; called with.
+  ;; the smallest and largest numbers of arguments that this function
+  ;; has been called with.
   (min-args call-arguments-limit :type fixnum)
   (max-args 0 :type fixnum)
   ;; A list of lists of the all the types that have been used in each argument
   ;; position.
   (types () :type list)
-  ;; A list of the Approximate-Key-Info structures describing all the things
-  ;; that looked like keyword arguments. There are distinct structures
-  ;; describing each argument position in which the keyword appeared.
+  ;; A list of APPROXIMATE-KEY-INFO structures describing all the
+  ;; things that looked like &KEY arguments. There are distinct
+  ;; structures describing each argument position in which the keyword
+  ;; appeared.
   (keys () :type list))
 
 (defstruct (approximate-key-info (:copier nil))
-  ;; The keyword name of this argument. Although keyword names don't have to
-  ;; be keywords, we only match on keywords when figuring an approximate type.
+  ;; The keyword name of this argument. Although keyword names don't
+  ;; have to be keywords, we only match on keywords when figuring an
+  ;; approximate type.
   (name (required-argument) :type keyword)
   ;; The position at which this keyword appeared. 0 if it appeared as the
   ;; first argument, etc.
@@ -543,19 +545,19 @@
 (defun try-type-intersections (vars types where)
   (declare (list vars types) (string where))
   (collect ((res))
-    (mapc #'(lambda (var type)
-	      (let* ((vtype (leaf-type var))
-		     (int (type-intersection vtype type)))
-		(cond
-		 ((eq int *empty-type*)
-		  (note-lossage
-		   "Definition's declared type for variable ~A:~%  ~S~@
+    (mapc (lambda (var type)
+	    (let* ((vtype (leaf-type var))
+		   (int (type-approx-intersection2 vtype type)))
+	      (cond
+	       ((eq int *empty-type*)
+		(note-lossage
+		 "Definition's declared type for variable ~A:~%  ~S~@
 		   conflicts with this type from ~A:~%  ~S"
-		   (leaf-name var) (type-specifier vtype)
-		   where (type-specifier type))
-		  (return-from try-type-intersections (values nil nil)))
-		 (t
-		  (res int)))))
+		 (leaf-name var) (type-specifier vtype)
+		 where (type-specifier type))
+		(return-from try-type-intersections (values nil nil)))
+	       (t
+		(res int)))))
 	  vars types)
     (values vars (res))))
 
@@ -566,7 +568,7 @@
 ;;; Note that the variables in the returned list are the actual
 ;;; original variables (extracted from the optional dispatch arglist),
 ;;; rather than the variables that are arguments to the main entry.
-;;; This difference is significant only for keyword args with hairy
+;;; This difference is significant only for &KEY args with hairy
 ;;; defaults. Returning the actual vars allows us to use the right
 ;;; variable name in warnings.
 ;;;
@@ -593,24 +595,24 @@
     (flet ((frob (x y what)
 	     (unless (= x y)
 	       (note-lossage
-		"Definition has ~R ~A arg~P, but ~A has ~R."
+		"The definition has ~R ~A arg~P, but ~A has ~R."
 		x what x where y))))
       (frob min (length req) "fixed")
       (frob (- (optional-dispatch-max-args od) min) (length opt) "optional"))
     (flet ((frob (x y what)
 	     (unless (eq x y)
 	       (note-lossage
-		"Definition ~:[doesn't have~;has~] ~A, but ~
+		"The definition ~:[doesn't have~;has~] ~A, but ~
 		~A ~:[doesn't~;does~]."
 		x what where y))))
       (frob (optional-dispatch-keyp od) (function-type-keyp type)
-	    "keyword args")
+	    "&KEY arguments")
       (unless (optional-dispatch-keyp od)
 	(frob (not (null (optional-dispatch-more-entry od)))
 	      (not (null (function-type-rest type)))
-	      "rest args"))
+	      "&REST arguments"))
       (frob (optional-dispatch-allowp od) (function-type-allowp type)
-	    "&allow-other-keys"))
+	    "&ALLOW-OTHER-KEYS"))
 
     (when *lossage-detected*
       (return-from find-optional-dispatch-types (values nil nil)))
@@ -628,7 +630,7 @@
 			       (ctype-of (eval default)))))
 	      (ecase (arg-info-kind info)
 		(:keyword
-		 (let* ((key (arg-info-keyword info))
+		 (let* ((key (arg-info-key info))
 			(kinfo (find key keys :key #'key-info-name)))
 		   (cond
 		    (kinfo
@@ -664,9 +666,9 @@
 			:key #'(lambda (x)
 				 (let ((info (lambda-var-arg-info x)))
 				   (when info
-				     (arg-info-keyword info)))))
+				     (arg-info-key info)))))
 	    (note-lossage
-	     "The definition lacks the ~S keyword present in ~A."
+	     "The definition lacks the ~S key present in ~A."
 	     (key-info-name key) where))))
 
       (try-type-intersections (vars) (res) where))))
@@ -680,9 +682,9 @@
 	     (note-lossage
 	      "The definition has no ~A, but the ~A did."
 	      what where))))
-    (frob (function-type-optional type) "optional args")
-    (frob (function-type-keyp type) "keyword args")
-    (frob (function-type-rest type) "rest arg"))
+    (frob (function-type-optional type) "&OPTIONAL arguments")
+    (frob (function-type-keyp type) "&KEY arguments")
+    (frob (function-type-rest type) "&REST argument"))
   (let* ((vars (lambda-vars lambda))
 	 (nvars (length vars))
 	 (req (function-type-required type))

@@ -1204,13 +1204,14 @@
 		  (t
 		   (unless (evenp more-args-supplied)
 		     (with-debugger-info (old-component ret-pc old-fp)
-		       (error "odd number of keyword arguments")))
-		   ;; If there are keyword args, then we need to leave the
-		   ;; defaulted and supplied-p values where the more args
-		   ;; currently are. There might be more or fewer. And also,
-		   ;; we need to flatten the parsed args with the defaults
-		   ;; before we scan the keywords. So we copy all the more
-		   ;; args to a temporary area at the end of the stack.
+		       (error "odd number of &KEY arguments")))
+		   ;; If there are &KEY args, then we need to leave
+		   ;; the defaulted and supplied-p values where the
+		   ;; more args currently are. There might be more or
+		   ;; fewer. And also, we need to flatten the parsed
+		   ;; args with the defaults before we scan the
+		   ;; keywords. So we copy all the more args to a
+		   ;; temporary area at the end of the stack.
 		   (let* ((num-more-args
 			   (hairy-byte-function-num-more-args xep))
 			  (new-sp (+ more-args-start num-more-args))

@@ -1599,7 +1599,7 @@
 				(push (frob final-arg debug-vars) res))
 			       (:keyword
 				(push (list :keyword
-					    (sb!c::arg-info-keyword info)
+					    (sb!c::arg-info-key info)
 					    (frob final-arg debug-vars))
 				      res))
 			       (:rest
@@ -1700,11 +1700,11 @@
 		       res))
 		(sb!c::more-arg
 		 ;; Just ignore the fact that the next two args are
-		 ;; the more arg context and count, and act like they
+		 ;; the &MORE arg context and count, and act like they
 		 ;; are regular arguments.
 		 nil)
 		(t
-		 ;; keyword arg
+		 ;; &KEY arg
 		 (push (list :keyword
 			     ele
 			     (compiled-debug-function-lambda-list-var
@@ -2473,7 +2473,7 @@
 ;;; those variables are invalid.)
 (defun make-valid-lisp-obj (val)
   (/show0 "entering MAKE-VALID-LISP-OBJ, VAL=..")
-  #!+sb-show (%primitive print (sb!impl::hexstr val))
+  #!+sb-show (/hexstr val)
   (if (or
        ;; fixnum
        (zerop (logand val 3))
@@ -2509,16 +2509,14 @@
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
   (declare (type system-area-pointer fp))
   (/show0 "entering SUB-ACCESS-DEBUG-VAR-SLOT, FP,SC-OFFSET,ESCAPED=..")
-  #!+sb-show (%primitive print (sb!impl::hexstr fp))
-  #!+sb-show (%primitive print (sb!impl::hexstr sc-offset))
-  #!+sb-show (%primitive print (sb!impl::hexstr escaped))
+  (/hexstr fp) (/hexstr sc-offset) (/hexstr escaped)
   (macrolet ((with-escaped-value ((var) &body forms)
 	       `(if escaped
 		    (let ((,var (sb!vm:context-register
 				 escaped
 				 (sb!c:sc-offset-offset sc-offset))))
 		      (/show0 "in escaped case, ,VAR value=..")
-		      #!+sb-show (%primitive print (sb!impl::hexstr ,var))
+		      (/hexstr ,var)
 		      ,@forms)
 		    :invalid-value-for-unescaped-register-storage))
 	     (escaped-float-value (format)
@@ -2540,7 +2538,7 @@
        (without-gcing
 	(with-escaped-value (val)
 	  (/show0 "VAL=..")
-	  #!+sb-show (%primitive print (sb!impl::hexstr val))
+	  (/hexstr val)
 	  (make-valid-lisp-obj val))))
       (#.sb!vm:base-char-reg-sc-number
        (/show0 "case of BASE-CHAR-REG-SC-NUMBER")

@@ -128,14 +128,14 @@
 ;;; the compiler to never return, it will avoid any compile-time type
 ;;; warnings that would result from a default value inconsistent with
 ;;; the declared type. When this function is called, it signals an
-;;; error indicating that a required keyword argument was not
-;;; supplied. This function is also useful for DEFSTRUCT slot defaults
+;;; error indicating that a required &KEY argument was not supplied.
+;;; This function is also useful for DEFSTRUCT slot defaults
 ;;; corresponding to required arguments.
 (declaim (ftype (function () nil) required-argument))
 (defun required-argument ()
   #!+sb-doc
   (/show0 "entering REQUIRED-ARGUMENT")
-  (error "A required keyword argument was not supplied."))
+  (error "A required &KEY argument was not supplied."))
 
 ;;; "the ultimate iteration macro" 
 ;;;

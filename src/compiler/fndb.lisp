@@ -1269,8 +1269,8 @@
 (defknown %%primitive (t t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %type-check-error (t t) nil)
-(defknown %odd-keyword-arguments-error () nil)
-(defknown %unknown-keyword-argument-error (t) nil)
+(defknown %odd-key-arguments-error () nil)
+(defknown %unknown-key-argument-error (t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte
   (movable foldable flushable explicit-check))
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer

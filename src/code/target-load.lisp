@@ -142,7 +142,7 @@
 ;;; take effect. If the compiler is loaded, we make the
 ;;; compiler-policy local to LOAD by binding it to itself.
 ;;;
-;;; FIXME: ANSI specifies an EXTERNAL-FORMAT keyword argument.
+;;; FIXME: ANSI specifies a &KEY :EXTERNAL-FORMAT argument.
 ;;;
 ;;; FIXME: Daniel Barlow's ilsb.tar ILISP-for-SBCL patches contain an
 ;;; implementation of "DEFUN SOURCE-FILE" which claims, in a comment, that CMU

@@ -58,7 +58,7 @@
 #|
 (defmacro set-disassem-params (&rest args)
   #!+sb-doc
-  "Specify global disassembler params. Keyword arguments include:
+  "Specify global disassembler params. &KEY arguments include:
 
   :INSTRUCTION-ALIGNMENT number
       Minimum alignment of instructions, in bits.
@@ -805,8 +805,7 @@
   #!+sb-doc
   "DEFINE-ARGUMENT-TYPE Name {Key Value}*
   Define a disassembler argument type NAME (which can then be referenced in
-  another argument definition using the :TYPE keyword argument). Keyword
-  arguments are:
+  another argument definition using the :TYPE argument). &KEY args are:
 
   :SIGN-EXTEND boolean
       If non-NIL, the raw value of this argument is sign-extended.

@@ -101,11 +101,11 @@
   (rest-arg-p nil :type (member t nil))
   ;; True if there are keywords. Note: keywords might still be NIL
   ;; because having &KEY with no keywords is valid and should result
-  ;; in allow-other-keys processing. If :allow-others, then allow
+  ;; in &ALLOW-OTHER-KEYS processing. If :ALLOW-OTHERS, then allow
   ;; other keys.
   (keywords-p nil :type (member t nil :allow-others))
-  ;; List of keyword arguments. Each element is a list of:
-  ;;   key, default, supplied-p.
+  ;; list of &KEY arguments. Each element is a list of:
+  ;; key, default, supplied-p.
   (keywords nil :type list))
 
 #!-sb-fluid (declaim (freeze-type byte-function-or-closure))

@@ -13,6 +13,8 @@
 
 (in-package "SB!KERNEL")
 
+(/show0 "code/alien-type.lisp 16")
+
 (!begin-collecting-cold-init-forms)
 
 (defstruct (alien-type-type
@@ -68,3 +70,5 @@
       *universal-type*))
 
 (!defun-from-collected-cold-init-forms !alien-type-cold-init)
+
+(/show0 "code/alien-type.lisp end of file")

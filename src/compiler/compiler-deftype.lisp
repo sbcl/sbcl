@@ -11,6 +11,8 @@
 
 (in-package "SB!IMPL")
 
+(/show0 "compiler-deftype.lisp 14")
+
 (defun %compiler-deftype (name expander &optional doc)
   (ecase (info :type :kind name)
     (:primitive
@@ -45,3 +47,5 @@
     (sb!c::%note-type-defined name)
     (warn "defining type before %NOTE-TYPE-DEFINED is defined"))
   name)
+
+(/show0 "compiler-deftype.lisp end of file")
