@@ -28,7 +28,7 @@
 ;;;  ([a] means that a should be converted according to the previous table)
 ;;;
 ;;;   \ car  ||    otherwise    |    QUOTE or     |     |`,@|      |     |`,.|
-;;;cdr \     ||		 |    T or NIL     |		|
+;;;cdr \     ||                 |    T or NIL     |                |
 ;;;================================================================================
 ;;;  |`,|    || LIST* ([a] [d]) | LIST* ([a] [d]) | APPEND (a [d]) | NCONC  (a [d])
 ;;;  NIL     || LIST    ([a])   | QUOTE    (a)    | <hair>    a    | <hair>    a
@@ -82,15 +82,22 @@
 
 (/show0 "backq.lisp 83")
 
+;;;
+(defun expandable-backq-expression-p (object)
+  (and (consp object)
+       (let ((flag (car object)))
+         (or (eq flag *bq-at-flag*)
+             (eq flag *bq-dot-flag*)))))
+
 ;;; This does the expansion from table 2.
 (defun backquotify (stream code)
   (cond ((atom code)
 	 (cond ((null code) (values nil nil))
-	       ((or (numberp code)
-		    (eq code t))
+	       ((or (consp code)
+                    (symbolp code))
 		;; Keywords are self-evaluating. Install after packages.
-		(values t code))
-	       (t (values 'quote code))))
+                (values 'quote code))
+	       (t (values t code))))
 	((or (eq (car code) *bq-at-flag*)
 	     (eq (car code) *bq-dot-flag*))
 	 (values (car code) (cdr code)))
@@ -109,14 +116,18 @@
 	       (cond
 		((eq aflag *bq-at-flag*)
 		 (if (null dflag)
-		     (comma a)
+		     (if (expandable-backq-expression-p a)
+                         (values 'append (list a))
+                         (comma a))
 		     (values 'append
 			     (cond ((eq dflag 'append)
 				    (cons a d ))
 				   (t (list a (backquotify-1 dflag d)))))))
 		((eq aflag *bq-dot-flag*)
 		 (if (null dflag)
-		     (comma a)
+		     (if (expandable-backq-expression-p a)
+                         (values 'nconc (list a))
+                         (comma a))
 		     (values 'nconc
 			     (cond ((eq dflag 'nconc)
 				    (cons a d))
@@ -146,8 +157,9 @@
 	       ((or (numberp code) (eq code t))
 		(values t code))
 	       (t (values *bq-comma-flag* code))))
-	((eq (car code) 'quote)
-	 (values (car code) (cadr code)))
+	((and (eq (car code) 'quote)
+              (not (expandable-backq-expression-p (cadr code))))
+         (values (car code) (cadr code)))
 	((member (car code) '(append list list* nconc))
 	 (values (car code) (cdr code)))
 	((eq (car code) 'cons)
@@ -164,9 +176,15 @@
 	((eq flag 'quote)
 	 (list  'quote thing))
 	((eq flag 'list*)
-	 (cond ((null (cddr thing))
+         (cond ((and (null (cddr thing))
+                     (not (expandable-backq-expression-p (cadr thing))))
 		(cons 'backq-cons thing))
-	       (t
+	       ((expandable-backq-expression-p (car (last thing)))
+                (list 'backq-append
+                      (cons 'backq-list (butlast thing))
+                      ;; Can it be optimized further? -- APD, 2001-12-21
+                      (car (last thing))))
+               (t
 		(cons 'backq-list* thing))))
 	((eq flag 'vector)
 	 (list 'backq-vector thing))

@@ -523,7 +523,7 @@ Douglas Crosher:
   many patches which were directly applicable to SBCL. Notable examples
   include fixes for various compiler bugs, and a generalization
   of the type system's handling of the CONS type to allow ANSI-style
-  (CONS FOO BAR) types.
+  (CONS FOO BAR) types. 
 
 Alexey Dejneka:
   He has fixed many bugs in SBCL. There's no single summary theme, but
@@ -531,6 +531,9 @@ Alexey Dejneka:
   that a lot of his fixes there and elsewhere reflect systematic
   public-spiritedness, fixing bugs as they show up in sbcl-devel or as
   archived in the BUGS file.
+
+Nathan Froyd:
+  He has reported bugs and ported fixes from CMU CL.
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
@@ -567,3 +570,15 @@ Raymond Wiker:
   CMU CL support for FreeBSD and updating it for the changes made
   from FreeBSD version 3 to FreeBSD version 4. He also ported the
   CMU CL extension RUN-PROGRAM, and related code, to SBCL.
+
+
+INITIALS GLOSSARY (helpful when reading comments, commit notes, etc.)
+
+MNA  Martin Atzmueller
+DB   Daniel Barlow
+DTC  Douglas Crosher
+APD  Alexey Dejneka
+NJF  Nathan Froyd
+RAM  Robert MacLachlan
+WHN  William Newman
+PVE  Peter Van Eynde

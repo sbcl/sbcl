@@ -899,6 +899,7 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   ** bug in the optimization of ARRAY-ELEMENT-TYPE
   ** argument ordering in FIND with :TEST option
   ** mishandled package designator argument in APROPOS-LIST
+  ** various problems in the backquote readmacro
   He also pointed out some bogus old entries in BUGS, and fixed 
   a number of bugs which came into existence in the pre7 branch
   (internal to the CVS repository), so that they never showed

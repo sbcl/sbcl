@@ -189,7 +189,6 @@
 		"src/pcl/fixup"
 		"src/pcl/defcombin"
 		"src/pcl/ctypes"
-		"src/pcl/construct"
 		"src/pcl/env"
 		"src/pcl/documentation"
 		"src/pcl/print-object"
