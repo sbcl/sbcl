@@ -4,7 +4,7 @@
 
 SBCL comes with a number of modules that are not part of the core
 system.  These are loaded via @code{(require :@var{modulename})}
-(@pxref{fun-common-lisp-require}).  This section contains
+(@pxref{Customization Hooks for Users}).  This section contains
 documentation (or pointers to documentation) for the contributed
 modules.
 

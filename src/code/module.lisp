@@ -22,7 +22,7 @@
   "This is a list of module names that have been loaded into Lisp so far.
    It is used by PROVIDE and REQUIRE.")
 
-(defvar *module-provider-functions* '(module-provide-contrib)
+(defvar *module-provider-functions* (list 'module-provide-contrib)
   "See function documentation for REQUIRE")
 
 ;;;; PROVIDE and REQUIRE
@@ -34,6 +34,17 @@
   (pushnew (string module-name) *modules* :test #'string=)
   t)
 
+(defvar *requiring* nil)
+
+(defun require-error (control &rest arguments)
+  (error 'extension-failure
+	 :format-control control
+	 :format-arguments arguments
+	 :references
+	 (list
+	  '(:sbcl :variable *module-provider-functions*)
+	  '(:sbcl :function require))))
+
 (defun require (module-name &optional pathnames)
   #!+sb-doc
   "Loads a module, unless it already has been loaded. PATHNAMES, if supplied,
@@ -43,24 +54,26 @@
    as an argument, until one of them returns non-NIL.  User code is
    responsible for calling PROVIDE to indicate a successful load of the
    module."
-  (let ((saved-modules (copy-list *modules*)))
-    (unless (member (string module-name) *modules* :test #'string=)
-      (cond (pathnames
-	     (unless (listp pathnames) (setf pathnames (list pathnames)))
-	     ;; ambiguity in standard: should we try all pathnames in the
-	     ;; list, or should we stop as soon as one of them calls PROVIDE?
-	     (dolist (ele pathnames t)
-	       (load ele)))
-	    (t
-	     (unless (some (lambda (p) (funcall p module-name))
-			   *module-provider-functions*)
-	       (error 'extension-failure
-		      :format-control "Don't know how to ~S ~A"
-		      :format-arguments (list 'require module-name)
-		      :references
-		      (list
-		       '(:sbcl :variable *module-provider-functions*)))))))
-    (set-difference *modules* saved-modules)))
+  (let ((name (string module-name)))
+    (when (member name *requiring* :test #'string=)
+      (require-error "~@<Could not ~S ~A: circularity detected. Please check ~
+                     your configuration.~:@>" 'require module-name))
+    (let ((saved-modules (copy-list *modules*))
+	  (*requiring* (cons name *requiring*)))
+      (unless (member name *modules* :test #'string=)
+	(cond (pathnames
+	       (unless (listp pathnames) (setf pathnames (list pathnames)))
+	       ;; ambiguity in standard: should we try all pathnames in the
+	       ;; list, or should we stop as soon as one of them calls PROVIDE?
+	       (dolist (ele pathnames t)
+		 (load ele)))
+	      (t
+	       (unless (some (lambda (p) (funcall p module-name))
+			     *module-provider-functions*)
+		 (require-error "Don't know how to ~S ~A."
+				'require module-name)))))
+      (set-difference *modules* saved-modules))))
+
 
 ;;;; miscellany
 
