@@ -3314,21 +3314,20 @@
 	    "Too many arguments (~D) to ~S ~S: uses at most ~D."
 	    nargs fun string max)))))))
 
-(deftransform format ((dest control &rest args) (t simple-string &rest t) *
-		      :node node)
+(defoptimizer (format optimizer) ((dest control &rest args))
+  (when (constant-continuation-p control)
+    (let ((x (continuation-value control)))
+      (when (stringp x)
+	(check-format-args x args 'format)))))
 
-  (cond
-    ((policy node (> speed space))
-     (unless (constant-continuation-p control)
-       (give-up-ir1-transform "The control string is not a constant."))
-     (check-format-args (continuation-value control) args 'format)
-     (let ((arg-names (make-gensym-list (length args))))
-       `(lambda (dest control ,@arg-names)
-	 (declare (ignore control))
-	 (format dest (formatter ,(continuation-value control)) ,@arg-names))))
-    (t (when (constant-continuation-p control)
-	 (check-format-args (continuation-value control) args 'format))
-       (give-up-ir1-transform))))
+(deftransform format ((dest control &rest args) (t simple-string &rest t) *
+		      :policy (> speed space))
+  (unless (constant-continuation-p control)
+    (give-up-ir1-transform "The control string is not a constant."))
+  (let ((arg-names (make-gensym-list (length args))))
+    `(lambda (dest control ,@arg-names)
+       (declare (ignore control))
+       (format dest (formatter ,(continuation-value control)) ,@arg-names))))
 
 (deftransform format ((stream control &rest args) (stream function &rest t) *
 		      :policy (> speed space))
@@ -3347,11 +3346,11 @@
 
 (macrolet
     ((def (name)
-	 `(deftransform ,name
-	      ((control &rest args) (simple-string &rest t) *)
+	 `(defoptimizer (,name optimizer) ((control &rest args))
 	    (when (constant-continuation-p control)
-	      (check-format-args (continuation-value control) args ',name))
-	   (give-up-ir1-transform))))
+	      (let ((x (continuation-value control)))
+		(when (stringp x)
+		  (check-format-args x args ',name)))))))
   (def error)
   (def warn)
   #+sb-xc-host ; Only we should be using these
@@ -3365,39 +3364,39 @@
     (def maybe-compiler-notify)
     (def bug)))
 
-(deftransform cerror ((report control &rest args)
-		      (simple-string simple-string &rest t) *)
-  (unless (and (constant-continuation-p control)
-	       (constant-continuation-p report))
-    (give-up-ir1-transform))
-  (multiple-value-bind (min1 max1)
-      (handler-case (sb!format:%compiler-walk-format-string
-		     (continuation-value control) args)
-	(sb!format:format-error (c)
-	  (compiler-warn "~A" c)))
-    (when min1
-      (multiple-value-bind (min2 max2)
-	  (handler-case (sb!format:%compiler-walk-format-string
-			 (continuation-value report) args)
-	    (sb!format:format-error (c)
-	      (compiler-warn "~A" c)))
-	(when min2
-	  (let ((nargs (length args)))
-	    (cond
-	      ((< nargs (min min1 min2))
-	       (compiler-warn "Too few arguments (~D) to ~S ~S ~S: ~
-                               requires at least ~D."
-			      nargs 'cerror report control (min min1 min2)))
-	      ((> nargs (max max1 max2))
-	       (;; to get warned about probably bogus code at
-		;; cross-compile time.
-		#+sb-xc-host compiler-warn
-	        ;; ANSI saith that too many arguments doesn't cause a
-	        ;; run-time error.
-		#-sb-xc-host compiler-style-warn
-		"Too many arguments (~D) to ~S ~S ~S: uses at most ~D."
-		nargs 'cerror report control (max max1 max2)))))))))
-  (give-up-ir1-transform))
+(defoptimizer (cerror optimizer) ((report control &rest args))
+  (when (and (constant-continuation-p control)
+	     (constant-continuation-p report))
+    (let ((x (continuation-value control))
+	  (y (continuation-value report)))
+      (when (and (stringp x) (stringp y))
+	(multiple-value-bind (min1 max1)
+	    (handler-case
+		(sb!format:%compiler-walk-format-string x args)
+	      (sb!format:format-error (c)
+		(compiler-warn "~A" c)))
+	  (when min1
+	    (multiple-value-bind (min2 max2)
+		(handler-case
+		    (sb!format:%compiler-walk-format-string y args)
+		  (sb!format:format-error (c)
+		    (compiler-warn "~A" c)))
+	      (when min2
+		(let ((nargs (length args)))
+		  (cond
+		    ((< nargs (min min1 min2))
+		     (compiler-warn "Too few arguments (~D) to ~S ~S ~S: ~
+                                     requires at least ~D."
+				    nargs 'cerror y x (min min1 min2)))
+		    ((> nargs (max max1 max2))
+		     (;; to get warned about probably bogus code at
+		      ;; cross-compile time.
+		      #+sb-xc-host compiler-warn
+		      ;; ANSI saith that too many arguments doesn't cause a
+		      ;; run-time error.
+		      #-sb-xc-host compiler-style-warn
+		      "Too many arguments (~D) to ~S ~S ~S: uses at most ~D."
+		      nargs 'cerror y x (max max1 max2)))))))))))))
 
 (defoptimizer (coerce derive-type) ((value type))
   (cond

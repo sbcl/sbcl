@@ -97,6 +97,19 @@ EOF
     fi
 }
 
+fail_on_compiler_note ()
+{
+    $SBCL <<EOF
+        (handler-bind ((sb-ext:compiler-note #'error))
+          (compile-file "$1")
+          (sb-ext:quit :unix-status 52))
+EOF
+    if [ $? != 52]; then
+        echo compiler-note $1 test failed: $?
+        exit 1
+    fi
+}
+
 base_tmpfilename="compiler-test-$$-tmp"
 tmpfilename="$base_tmpfilename.lisp"
 compiled_tmpfilename="$base_tmpfilename.fasl"
@@ -195,6 +208,24 @@ cat > $tmpfilename <<EOF
       (1+ (list x)))
 EOF
 expect_failed_compile $tmpfilename
+
+# ERROR wants to check its format string for sanity...
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defun foo (x)
+      (when x
+        (error "~S")))
+EOF
+expect_failed_compile $tmpfilename
+
+# ... but it (ERROR) shouldn't complain about being unable to optimize
+# when it's uncertain about its argument's type
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defun foo (x)
+      (error x))
+EOF
+fail_on_compiler_note $tmpfilename
 
 rm $tmpfilename
 rm $compiled_tmpfilename
