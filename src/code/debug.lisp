@@ -125,7 +125,12 @@ Function and macro commands:
  (SB-DEBUG:ARG n)
     Return the n'th argument in the current frame.
  (SB-DEBUG:VAR string-or-symbol [id])
-    Returns the value of the specified variable in the current frame.")
+    Returns the value of the specified variable in the current frame.
+
+Other commands:
+  SLURP   Discard all pending input on *STANDARD-INPUT*. (This can be
+          useful when the debugger was invoked to handle an error in
+          deeply nested input syntax, and now the reader is confused.)")
 
 ;;; This is used to communicate to DEBUG-LOOP that we are at a step breakpoint.
 (define-condition step-condition (simple-condition) ())
@@ -699,15 +704,14 @@ reset to ~S."
        ;; older debugger code which was written to do i/o on whatever
        ;; stream was in fashion at the time, and not all of it has
        ;; been converted to behave this way. -- WHN 2000-11-16)
-       (let (;; FIXME: The first two bindings here seem wrong,
+       (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
 	     ;; violating the principle of least surprise, and making
 	     ;; it impossible for the user to do reasonable things
 	     ;; like using PRINT at the debugger prompt to send output
 	     ;; to the program's ordinary (possibly
-	     ;; redirected-to-a-file) *STANDARD-OUTPUT*, or using
-	     ;; PEEK-CHAR or some such thing on the program's ordinary
-	     ;; (possibly also redirected) *STANDARD-INPUT*.
-	     (*standard-input* *debug-io*)
+	     ;; redirected-to-a-file) *STANDARD-OUTPUT*. (CMU CL
+	     ;; used to rebind *STANDARD-INPUT* here too, but that's
+	     ;; been fixed already.)
 	     (*standard-output* *debug-io*)
 	     ;; This seems reasonable: e.g. if the user has redirected
 	     ;; *ERROR-OUTPUT* to some log file, it's probably wrong
@@ -829,7 +833,7 @@ reset to ~S."
 			     (apply cmd-fun
 				    (sb!int:stream-command-args input))))))
 			(t
-			 (let* ((exp (read))
+			 (let* ((exp (read *debug-io*))
 				(cmd-fun (debug-command-p exp
 							  restart-commands)))
 			   (cond ((not cmd-fun)
@@ -1158,8 +1162,7 @@ argument")
 
 (!def-debug-command-alias "B" "BOTTOM")
 
-(!def-debug-command "FRAME" (&optional
-			     (n (read-prompting-maybe "frame number: ")))
+(!def-debug-command "FRAME" (&optional (n (read-prompting-maybe)))
   (setf *current-frame*
 	(multiple-value-bind (next-frame-fun limit-string)
 	    (if (< n (sb!di:frame-number *current-frame*))
@@ -1206,7 +1209,7 @@ argument")
       (show-restarts *debug-restarts* *debug-io*)
       (write-string "restart: ")
       (force-output)
-      (setf num (read *standard-input*)))
+      (setf num (read *debug-io*)))
     (let ((restart (typecase num
 		     (unsigned-byte
 		      (nth num *debug-restarts*))
@@ -1621,17 +1624,19 @@ argument")
     (if function
 	(describe function)
 	(format t "can't figure out the function for this frame"))))
+
+(!def-debug-command "SLURP" ()
+  (loop while (read-char-no-hang *standard-input*)))
 
 ;;;; debug loop command utilities
 
-(defun read-prompting-maybe (prompt &optional (in *standard-input*)
-				    (out *standard-output*))
-  (unless (sb!int:listen-skip-whitespace in)
-    (princ prompt out)
-    (force-output out))
-  (read in))
+(defun read-prompting-maybe (prompt)
+  (unless (sb!int:listen-skip-whitespace *debug-io*)
+    (princ prompt)
+    (force-output))
+  (read *debug-io*))
 
-(defun read-if-available (default &optional (stream *standard-input*))
-  (if (sb!int:listen-skip-whitespace stream)
-      (read stream)
+(defun read-if-available (default)
+  (if (sb!int:listen-skip-whitespace *debug-io*)
+      (read *debug-io*)
       default))
