@@ -103,26 +103,36 @@
 
     ;; Now that all package-package references exist, we can handle
     ;; REEXPORT operations. (We have to wait until now because they
-    ;; interact with USE operations.) KLUDGE: This code doesn't detect
-    ;; dependencies and do exports in proper order to work around them, so
-    ;; it could break randomly (with build-time errors, not with silent
-    ;; errors or runtime errors) if multiple levels of re-exportation are
-    ;; used, e.g. package A exports X, package B uses A and reexports X,
-    ;; and package C uses B and reexports X. That doesn't seem to be an
-    ;; issue in the current code, and it's hard to see why anyone would
-    ;; want to do it, and it should be straightforward (though tedious) to
-    ;; extend the code here to deal with that if it ever becomes necessary.
-    (dolist (package-data package-data-list)
-      (let ((package (find-package (package-data-name package-data))))
-	(dolist (symbol-name (package-data-reexport package-data))
-	  (multiple-value-bind (symbol status)
-	      (find-symbol symbol-name package)
-	    (unless status
-	      (error "No symbol named ~S is accessible in ~S."
-		     symbol-name
-		     package))
-	    (when (eq (symbol-package symbol) package)
-	      (error "~S is not inherited/imported, but native to ~S."
-		     symbol-name
-		     package))
-	    (export symbol package))))))
+    ;; interact with USE operations.)  This code handles dependencies
+    ;; properly, but is somewhat ugly.
+    (let (done)
+      (labels
+	  ((reexport (package-data)
+	     (let ((package (find-package (package-data-name package-data))))
+	       (cond
+		 ((member package done))
+		 ((null (package-data-reexport package-data))
+		  (push package done))
+		 (t
+		  (mapcar #'reexport
+			  (remove-if-not
+			   (lambda (x)
+			     (member x (package-data-use package-data)
+				     :test #'string=))
+			   package-data-list
+			   :key #'package-data-name))
+		  (dolist (symbol-name (package-data-reexport package-data))
+		    (multiple-value-bind (symbol status)
+			(find-symbol symbol-name package)
+		      (unless status
+			(error "No symbol named ~S is accessible in ~S."
+			       symbol-name package))
+		      (when (eq (symbol-package symbol) package)
+			(error
+			 "~S is not inherited/imported, but native to ~S."
+			 symbol-name package))
+		      (export symbol package)))
+		  (push package done))))))
+	(dolist (x package-data-list)
+	  (reexport x))
+	(assert (= (length done) (length package-data-list))))))
