@@ -690,3 +690,8 @@
 			(* x 24)))
 	    178956970)
 	   4294967280))
+
+;;; bug in modular arithmetic and type specifiers
+(assert (= (funcall (compile nil (lambda (x) (logand x x 0)))
+		    -1)
+	   0))

@@ -2545,7 +2545,7 @@
                             (not (and (eq fun-name 'logand)
                                       (csubtypep
                                        (single-value-type (node-derived-type node))
-                                       (specifier-type `(unsigned-byte ,width))))))
+                                       (specifier-type `(unsigned-byte* ,width))))))
                    (binding* ((name (etypecase modular-fun
                                       ((eql :good) fun-name)
                                       (modular-fun-info

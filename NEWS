@@ -2175,6 +2175,9 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
     SBCL binary built from CLISP)
   * fixed a compiler bug: MV-LET convertion did not check references
     to the "max args" entry point.  (reported by Brian Downing)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** compiler failure in compiling LOGAND expressions including a
+       constant 0.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
