@@ -667,14 +667,19 @@
   (movable flushable unsafe))
 
 ;;; All but last must be of type LIST, but there seems to be no way to
-;;; express that in this syntax..
+;;; express that in this syntax.
 (defknown append (&rest t) t (flushable))
 
 (defknown copy-list (list) list (flushable))
 (defknown copy-alist (list) list (flushable))
 (defknown copy-tree (t) t (flushable recursive))
 (defknown revappend (list t) t (flushable))
-(defknown nconc (&rest list) list ())
+
+;;; All but last must be of type LIST, but there seems to be no way to
+;;; express that in this syntax. The result must be LIST, but we do
+;;; not check it now :-).
+(defknown nconc (&rest t) t ())
+
 (defknown nreconc (list t) list ())
 (defknown butlast (list &optional index) list (flushable))
 (defknown nbutlast (list &optional index) list ())

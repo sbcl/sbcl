@@ -259,34 +259,38 @@
 (defun append (&rest lists)
   #!+sb-doc
   "Construct a new list by concatenating the list arguments"
-  (do ((top lists (cdr top)))	 ;;Cdr to first non-null list.
-      ((atom top) '())
-    (cond ((null (car top)))				; Nil -> Keep looping
-	  ((not (consp (car top)))			; Non cons
-	   (if (cdr top)
-	       (error "~S is not a list." (car top))
-	       (return (car top))))
-	  (t						; Start appending
-	   (return
-	     (if (atom (cdr top))
-		 (car top)    ;;Special case.
-		 (let* ((result (cons (caar top) '()))
-			(splice result))
-		   (do ((x (cdar top) (cdr x)))  ;;Copy first list
-		       ((atom x))
-		     (setq splice
-			   (cdr (rplacd splice (cons (car x) ()) ))) )
-		   (do ((y (cdr top) (cdr y)))	 ;;Copy rest of lists.
-		       ((atom (cdr y))
-			(setq splice (rplacd splice (car y)))
-			result)
-		     (if (listp (car y))
-			 (do ((x (car y) (cdr x)))   ;;Inner copy loop.
-			     ((atom x))
-			   (setq
-			    splice
-			    (cdr (rplacd splice (cons (car x) ())))))
-			 (error "~S is not a list." (car y)))))))))))
+  (flet ((fail (object)
+           (error 'type-error
+                  :datum object
+                  :expected-type 'list)))
+    (do ((top lists (cdr top))) ; CDR to first non-null list.
+        ((atom top) '())
+      (cond ((null (car top)))          ; NIL -> Keep looping
+            ((not (consp (car top)))    ; Non CONS
+             (if (cdr top)
+                 (fail (car top))
+                 (return (car top))))
+            (t                          ; Start appending
+             (return
+               (if (atom (cdr top))
+                   (car top)            ; Special case.
+                   (let* ((result (cons (caar top) '()))
+                          (splice result))
+                     (do ((x (cdar top) (cdr x))) ; Copy first list
+                         ((atom x))
+                       (setq splice
+                             (cdr (rplacd splice (cons (car x) ()) ))) )
+                     (do ((y (cdr top) (cdr y))) ; Copy rest of lists.
+                         ((atom (cdr y))
+                          (setq splice (rplacd splice (car y)))
+                          result)
+                       (if (listp (car y))
+                           (do ((x (car y) (cdr x))) ; Inner copy loop.
+                               ((atom x))
+                             (setq
+                              splice
+                              (cdr (rplacd splice (cons (car x) ())))))
+                           (fail (car y))))))))))))
 
 ;;; list copying functions
 
@@ -361,31 +365,35 @@
 (defun nconc (&rest lists)
   #!+sb-doc
   "Concatenates the lists given as arguments (by changing them)"
-  (do ((top lists (cdr top)))
-      ((null top) nil)
-    (let ((top-of-top (car top)))
-      (typecase top-of-top
-	(cons
-	 (let* ((result top-of-top)
-		(splice result))
-	   (do ((elements (cdr top) (cdr elements)))
-	       ((endp elements))
-	     (let ((ele (car elements)))
-	       (typecase ele
-		 (cons (rplacd (last splice) ele)
-		       (setf splice ele))
-		 (null (rplacd (last splice) nil))
-		 (atom (if (cdr elements)
-			   (error "Argument is not a list -- ~S." ele)
-			   (rplacd (last splice) ele)))
-		 (t (error "Argument is not a list -- ~S." ele)))))
-	   (return result)))
-	(null)
-	(atom
-	 (if (cdr top)
-	     (error "Argument is not a list -- ~S." top-of-top)
-	     (return top-of-top)))
-	(t (error "Argument is not a list -- ~S." top-of-top))))))
+  (flet ((fail (object)
+           (error 'type-error
+                  :datum object
+                  :expected-type 'list)))
+    (do ((top lists (cdr top)))
+        ((null top) nil)
+      (let ((top-of-top (car top)))
+        (typecase top-of-top
+          (cons
+           (let* ((result top-of-top)
+                  (splice result))
+             (do ((elements (cdr top) (cdr elements)))
+                 ((endp elements))
+               (let ((ele (car elements)))
+                 (typecase ele
+                   (cons (rplacd (last splice) ele)
+                         (setf splice ele))
+                   (null (rplacd (last splice) nil))
+                   (atom (if (cdr elements)
+                             (fail ele)
+                             (rplacd (last splice) ele)))
+                   (t (fail ele)))))
+             (return result)))
+          (null)
+          (atom
+           (if (cdr top)
+               (fail top-of-top)
+               (return top-of-top)))
+          (t (fail top-of-top)))))))
 
 (defun nreconc (x y)
   #!+sb-doc

@@ -72,3 +72,36 @@
         (setq i 0)
         (assert (eql (pop s) 't))
         (assert (equalp a #((a) (b) (1 c)))))))
+
+;;; Type checking in NCONC
+(let ((tests '((((1 . 2)) (1 . 2))
+               (((1 . 2) (3 . 4)) (1 3 . 4))
+               (((1 . 2) 3) (1 . 3))
+               ((3) 3))))
+  (loop for (args result) in tests
+     do (assert (equal (apply 'nconc (copy-tree args)) result))
+     do (let ((exp `(nconc ,@ (mapcar (lambda (arg)
+                                        `',(copy-tree arg))
+                                      args))))
+          (assert (equal (funcall (compile nil `(lambda () ,exp))) result)))))
+
+(let ((tests '(((3 (1 . 2)) 3)
+               (((1 . 2) 3 (4 . 5)) 3))))
+  (macrolet ((check-error (form failed-arg)
+               `(multiple-value-bind (.result. .error.)
+                    (ignore-errors ,form)
+                  (assert (null .result.))
+                  (assert (typep .error. 'type-error))
+                  (assert (eq (type-error-expected-type .error.) 'list))
+                  (assert (equal (type-error-datum .error.) ,failed-arg)))))
+    (loop for (args fail) in tests
+       do (check-error (apply #'nconc (copy-tree args)) fail)
+       do (let ((exp `(nconc ,@ (mapcar (lambda (arg)
+                                          `',(copy-tree arg))
+                                        args))))
+            (check-error (funcall (compile nil `(lambda () ,exp))) fail)))))
+
+(multiple-value-bind (result error)
+    (ignore-errors (append 1 2))
+  (assert (null result))
+  (assert (typep error 'type-error)))
