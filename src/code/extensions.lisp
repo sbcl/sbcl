@@ -98,7 +98,7 @@
 	 (do ((y x (safe-cddr y))
 	      (started-p nil t)
 	      (z x (cdr z)))
-	     ((or (not z) (not y)) nil)
+	     ((not (and (consp z) (consp y))) nil)
 	   (when (and started-p (eq y z))
 	     (return t))))))
 

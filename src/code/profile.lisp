@@ -146,6 +146,12 @@
 (defvar *enclosed-profiles* 0)
 (declaim (type (or pcounter fixnum) *enclosed-profiles*))
 
+;;; the encapsulated function we're currently computing profiling data
+;;; for, recorded so that we can detect the problem of
+;;; PROFILE-computing machinery calling a function which has itself
+;;; been PROFILEd
+(defvar *computing-profiling-data-for*)
+
 ;;; the components of profiling overhead
 (defstruct (overhead (:copier nil))
   ;; the number of ticks a bare function call takes. This is
@@ -208,6 +214,13 @@
      ;; ENCAPSULATION-FUN
      (lambda (sb-c:&more arg-context arg-count)
        (declare (optimize speed safety))
+       ;; Make sure that we're not recursing infinitely.
+       (when (boundp '*computing-profiling-data-for*)
+	 (unprofile-all) ; to avoid further recursion
+	 (error "~@<When computing profiling data for ~S, the profiled function ~S was called. To get out of this infinite recursion, all functions have been unprofiled. (Since the profiling system evidently uses ~S in its computations, it looks as though it's a bad idea to profile it.)~:@>"
+		*computing-profiling-data-for*
+		encapsulated-fun
+		encapsulated-fun))
        ;; FIXME: Probably when this is stable, we should optimize (SAFETY 0).
        (fastbig-incf-pcounter-or-fixnum count 1)
        (let ((dticks 0)
@@ -236,29 +249,33 @@
 					(sb-c:%more-arg-values arg-context
 							       0
 							       arg-count))
-		 (setf dticks (fastbig- (get-internal-ticks) start-ticks)
-		       dconsing (fastbig- (the unsigned-byte
-					       (get-bytes-consed))
-					  start-consing))
-		 (setf inner-enclosed-profiles
-		       (pcounter-or-fixnum->integer *enclosed-profiles*))
-		 (when (minusp dticks) ; REMOVEME
-		   (error "huh? (GET-INTERNAL-TICKS)=~S START-TICKS=~S"
-			  (get-internal-ticks) start-ticks))
-		 (aver (not (minusp dconsing))) ; REMOVEME
-		 (aver (not (minusp inner-enclosed-profiles))) ; REMOVEME
-		 (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
-		   (when (minusp net-dticks) ; REMOVEME
-		     (error "huh? DTICKS=~S, *ENCLOSED-TICKS*=~S"
-			    dticks *enclosed-ticks*))
-		   (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
-		 (let ((net-dconsing (fastbig- dconsing *enclosed-consing*)))
-		   (when (minusp net-dconsing) ; REMOVEME
-		     (error "huh? DCONSING=~S, *ENCLOSED-CONSING*=~S"
-			    dticks *enclosed-ticks*))
-		   (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
-		 (fastbig-incf-pcounter-or-fixnum profiles
-						  inner-enclosed-profiles)))
+		 (let ((*computing-profiling-data-for* encapsulated-fun))
+		   (setf dticks (fastbig- (get-internal-ticks) start-ticks)
+			 dconsing (fastbig- (the unsigned-byte
+					      (get-bytes-consed))
+					    start-consing))
+		   (setf inner-enclosed-profiles
+			 (pcounter-or-fixnum->integer *enclosed-profiles*))
+		   (when (minusp dticks) ; REMOVEME
+		     (unprofile-all)
+		     (error "huh? (GET-INTERNAL-TICKS)=~S START-TICKS=~S"
+			    (get-internal-ticks) start-ticks))
+		   (aver (not (minusp dconsing))) ; REMOVEME
+		   (aver (not (minusp inner-enclosed-profiles))) ; REMOVEME
+		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
+		     (when (minusp net-dticks) ; REMOVEME
+		       (unprofile-all)
+		       (error "huh? DTICKS=~S, *ENCLOSED-TICKS*=~S"
+			      dticks *enclosed-ticks*))
+		     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
+		   (let ((net-dconsing (fastbig- dconsing *enclosed-consing*)))
+		     (when (minusp net-dconsing) ; REMOVEME
+		       (unprofile-all)
+		       (error "huh? DCONSING=~S, *ENCLOSED-CONSING*=~S"
+			      dticks *enclosed-ticks*))
+		     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
+		   (fastbig-incf-pcounter-or-fixnum profiles
+						    inner-enclosed-profiles))))
 	   (fastbig-incf-pcounter-or-fixnum *enclosed-ticks* dticks)
 	   (fastbig-incf-pcounter-or-fixnum *enclosed-consing* dconsing)
 	   (fastbig-incf-pcounter-or-fixnum *enclosed-profiles*
@@ -266,14 +283,10 @@
 					     inner-enclosed-profiles)))))
      ;; READ-STATS-FUN
      (lambda ()
-       (format t "/entering READ-STATS-FUN ~S ~S ~S ~S~%"
-	       count ticks consing profiles) ; REMOVEME (and M-V-PROG1 below)
-       (multiple-value-prog1
-	   (values (pcounter-or-fixnum->integer count)
-		   (pcounter-or-fixnum->integer ticks)
-		   (pcounter-or-fixnum->integer consing)
-		   (pcounter-or-fixnum->integer profiles))
-	 (print "/returning from READ-STATS-FUN")))
+       (values (pcounter-or-fixnum->integer count)
+	       (pcounter-or-fixnum->integer ticks)
+	       (pcounter-or-fixnum->integer consing)
+	       (pcounter-or-fixnum->integer profiles)))
      ;; CLEAR-STATS-FUN
      (lambda ()
        (setf count 0
@@ -499,7 +512,10 @@ a very-long-running Lisp process."
 ;;;; overhead estimation
 
 ;;; We average the timing overhead over this many iterations.
-(defconstant +timer-overhead-iterations+ 50000)
+(defconstant +timer-overhead-iterations+
+  50 ; REMOVEME
+  ;;50000
+  )
 
 ;;; a dummy function that we profile to find profiling overhead
 (declaim (notinline compute-overhead-aux))

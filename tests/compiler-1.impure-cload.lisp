@@ -44,10 +44,10 @@
 (assert (= (exercise-valuesify 1.25) 2.25))
 
 ;;; Don Geddis reported this test case 25 December 1999 on a CMU CL
-;;; mailing list: dumping circular lists caused an infinite loop.
-;;; Douglas Crosher reported a patch 27 Dec 1999. The patch was tested
-;;; on SBCL by Martin Atzmueller 2 Nov 2000, and merged in
-;;; sbcl-0.6.8.11.
+;;; mailing list: dumping circular lists caused the compiler to enter
+;;; an infinite loop. Douglas Crosher reported a patch 27 Dec 1999.
+;;; The patch was tested on SBCL by Martin Atzmueller 2 Nov 2000, and
+;;; merged in sbcl-0.6.8.11.
 (defun q-dg1999-1 () (dolist (x '#1=("A" "B" . #1#)) x))
 (defun q-dg1999-2 () (dolist (x '#1=("C" "D" . #1#)) x))
 (defun q-dg1999-3 () (dolist (x '#1=("E" "F" . #1#)) x))
@@ -66,5 +66,15 @@
 ;;; object.
 (declaim (ftype function i-am-just-a-function))
 (defun i-am-just-a-function (x y) (+ x y 1))
+
+;;; Stig E SandPHI (where PHI is some phi-like character not
+;;; representable in ASCII) reported in cclan-Bugs-431263 that SBCL
+;;; couldn't compile this. sbcl-0.6.12.26 died in CIRCULAR-LIST-P with
+;;; "The value \"EST\" is not of type LIST." Dan Barlow fixed it.
+(defvar +time-zones+
+  '((5 "EDT" . "EST") (6 "CDT" . "CST") (7 "MDT" .
+"MST") (8 "PDT" . "PST")
+    (0 "GMT" . "GDT") (-2 "MET" . "MET DST"))
+  "*The string representations of the time zones.")
 
 (sb-ext:quit :unix-status 104) ; success
