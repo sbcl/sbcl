@@ -1,25 +1,3 @@
-;-*- Mode:     Lisp -*-
-;;;; Paul Dietz's version of rt from ansi-tests
-
-(defpackage :regression-test
-  (:use #:cl)
-  (:nicknames :rtest #-lispworks :rt)
-  (:export
-   #:*do-tests-when-defined*
-   #:*test*
-   #:continue-testing
-   #:deftest
-   #:do-test
-   #:do-tests
-   #:get-test
-   #:pending-tests
-   #:rem-all-tests
-   #:rem-test
-   ))
-
-(in-package :regression-test)
-;-*-syntax:COMMON-LISP;Package:(RT :use "COMMON-LISP" :colon-mode :external)-*-
-
 #|----------------------------------------------------------------------------|
  | Copyright 1990 by the Massachusetts Institute of Technology, Cambridge MA. |
  |                                                                            |
@@ -41,23 +19,27 @@
  |  SOFTWARE.                                                                 |
  |----------------------------------------------------------------------------|#
 
-;This is the December 19, 1990 version of the regression tester.
+(defpackage :sb-rt
+  (:use #:cl)
+  (:export #:*do-tests-when-defined* #:*test* #:continue-testing
+	   #:deftest #:do-test #:do-tests #:get-test #:pending-tests
+	   #:rem-all-tests #:rem-test)
+  (:documentation "The MIT regression tester"))
 
-(in-package :regression-test)
+(in-package :sb-rt)
 
 (defvar *test* nil "Current test name")
 (defvar *do-tests-when-defined* nil)
 (defvar *entries* '(nil) "Test database")
 (defvar *in-test* nil "Used by TEST")
 (defvar *debug* nil "For debugging")
-(defvar *catch-errors* t "When true, causes errors in a test to be caught.")
+(defvar *catch-errors* t
+  "When true, causes errors in a test to be caught.")
 (defvar *print-circle-on-failure* nil
   "Failure reports are printed with *PRINT-CIRCLE* bound to this value.")
-
-(defvar *compile-tests* nil "When true, compile the tests before running
-them.")
+(defvar *compile-tests* nil
+  "When true, compile the tests before running them.")
 (defvar *optimization-settings* '((safety 3)))
-
 (defvar *expected-failures* nil
   "A list of test names that are expected to fail.")
 
@@ -131,8 +113,7 @@ them.")
   (do-entry (get-entry name)))
 
 (defun equalp-with-case (x y)
-  "Like EQUALP, but doesn't do case conversion of characters.
-   Currently doesn't work on arrays of dimension > 2."
+  "Like EQUALP, but doesn't do case conversion of characters."
   (cond
    ((eq x y) t)
    ((consp x)
@@ -156,23 +137,12 @@ them.")
 	 (not (equal (array-dimensions x)
 		     (array-dimensions y))))
     nil)
-   #|
-   ((and (typep x 'array)
-	 (= (array-rank x) 2))
-    (let ((dim (array-dimensions x)))
-      (loop for i from 0 below (first dim)
-	    always (loop for j from 0 below (second dim)
-			 always (equalp-with-case (aref x i j)
-						  (aref y i j))))))
-   |#
-
    ((typep x 'array)
     (and (typep y 'array)
 	 (let ((size (array-total-size x)))
 	   (loop for i from 0 below size
 		 always (equalp-with-case (row-major-aref x i)
 					  (row-major-aref y i))))))
-
    (t (eql x y))))
 
 (defun do-entry (entry &optional
@@ -202,12 +172,12 @@ them.")
 			 (eval (form entry))))))
 		(if *catch-errors*
 		    (handler-bind
-		     (#-ecl (style-warning #'muffle-warning)
-			    (error #'(lambda (c)
-				       (setf aborted t)
-				       (setf r (list c))
-				       (return-from aborted nil))))
-		     (%do))
+			((style-warning #'muffle-warning)
+			 (error #'(lambda (c)
+				    (setf aborted t)
+				    (setf r (list c))
+				    (return-from aborted nil))))
+		      (%do))
 		  (%do)))))
 
       (setf (pend entry)

@@ -7,6 +7,7 @@
     :version "0.6"
     :author "Kevin Rosenberg <kevin@rosenberg.net>"
     :description "An AllegroCL compatible REPL"
+    :depends-on (sb-rt)
     :components ((:file "repl")
 		 (:file "inspect" :depends-on ("repl"))
 		 (:file "debug" :depends-on ("repl"))))

@@ -1,5 +1,5 @@
 (defpackage "SB-BSD-SOCKETS-TEST"
-  (:use "CL" "SB-BSD-SOCKETS" "RT"))
+  (:use "CL" "SB-BSD-SOCKETS" "SB-RT"))
 
 #||
 

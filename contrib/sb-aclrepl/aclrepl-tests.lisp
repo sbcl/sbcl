@@ -19,10 +19,11 @@
 	  ))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (unless (find-package 'regression-test)
-    (load (sb-aclrepl::compile-file-as-needed "rt.lisp"))))
-(use-package :regression-test)
-(setf regression-test::*catch-errors* nil)
+  (unless (find-package :sb-rt)
+    (error "SB-RT package not found")))
+
+(use-package :sb-rt)
+(setf sb-rt::*catch-errors* nil)
 
 (rem-all-tests)
 

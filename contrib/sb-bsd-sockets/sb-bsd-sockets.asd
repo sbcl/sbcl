@@ -94,7 +94,8 @@
 
 (defsystem sb-bsd-sockets
     :version "0.58"
-    :components ((:file "defpackage" :depends-on ("rt"))
+    :depends-on (sb-rt)
+    :components ((:file "defpackage")
 		 (:file "split" :depends-on ("defpackage"))
                  (:file "array-data" :depends-on ("defpackage"))
 		 (:unix-dso "alien"
@@ -115,9 +116,8 @@
 		 (:file "name-service" :depends-on ("sockets" "constants" "alien"))
 		 (:file "misc" :depends-on ("sockets" "constants"))
 
-		 (:file "rt")
 		 (:file "def-to-lisp")
-		 (:file "tests" :depends-on ("inet" "sockopt" "rt"))
+		 (:file "tests" :depends-on ("inet" "sockopt"))
 
 		 (:static-file "NEWS")
 		 ;; (:static-file "INSTALL")
@@ -127,6 +127,6 @@
 		 (:static-file "TODO")))
 
 (defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets))))
-  (or (funcall (intern "DO-TESTS" (find-package "RT")))
+  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
       (error "test-op failed")))
 
