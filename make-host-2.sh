@@ -67,8 +67,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
                                        (space 1)
 				       (speed 2)))))
         (compile 'proclaim-target-optimization)
-	(defun in-target-cross-compilation-mode (fn)
-	  "Call FN with everything set up appropriately for cross-compiling
+	(defun in-target-cross-compilation-mode (fun)
+	  "Call FUN with everything set up appropriately for cross-compiling
 	  a target file."
 	  (let (;; In order to increase microefficiency of the target Lisp, 
 		;; enable old CMU CL defined-function-types-never-change
@@ -90,10 +90,10 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
             (proclaim-target-optimization)
             ;; Specify where target machinery lives.
             (with-additional-nickname ("SB-XC" "SB!XC")
-              (funcall fn))))
+              (funcall fun))))
 	(compile 'in-target-cross-compilation-mode)
-	(setf *target-compile-file* 'sb-xc:compile-file)
-	(setf *target-assemble-file* 'sb!c:assemble-file)
+	(setf *target-compile-file* #'sb-xc:compile-file)
+	(setf *target-assemble-file* #'sb!c:assemble-file)
 	(setf *in-target-compilation-mode-fn*
 	      #'in-target-cross-compilation-mode)
 

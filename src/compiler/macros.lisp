@@ -811,7 +811,7 @@
 ;;;; functions on directly-linked lists (linked through specialized
 ;;;; NEXT operations)
 
-#!-sb-fluid (declaim (inline find-in position-in map-in))
+#!-sb-fluid (declaim (inline find-in position-in))
 
 ;;; Find Element in a null-terminated List linked by the accessor
 ;;; function Next. Key, Test and Test-Not are the same as for generic
@@ -822,7 +822,8 @@
 		&key
 		(key #'identity)
 		(test #'eql test-p)
-		(test-not nil not-p))
+		(test-not #'eql not-p))
+  (declare (type function next key test test-not))
   (when (and test-p not-p)
     (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
@@ -844,7 +845,8 @@
 		    &key
 		    (key #'identity)
 		    (test #'eql test-p)
-		    (test-not nil not-p))
+		    (test-not #'eql not-p))
+  (declare (type function next key test test-not))
   (when (and test-p not-p)
     (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
@@ -859,14 +861,6 @@
 	(when (funcall test (funcall key current) element)
 	  (return i)))))
 
-;;; Map FUNCTION over the elements in a null-terminated LIST linked by the
-;;; accessor function NEXT, returning an ordinary list of the results.
-(defun map-in (next function list)
-  (collect ((res))
-    (do ((current list (funcall next current)))
-	((null current))
-      (res (funcall function current)))
-    (res)))
 
 ;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
 ;;;   (DEF!MACRO FOO (..) .. CL:GET-SETF-EXPANSION ..)

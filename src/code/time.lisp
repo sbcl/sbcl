@@ -228,6 +228,7 @@
 ;;; The guts of the TIME macro. Compute overheads, run the (compiled)
 ;;; function, report the times.
 (defun %time (fun)
+  (declare (type function fun))
   (let (old-run-utime
 	new-run-utime
 	old-run-stime

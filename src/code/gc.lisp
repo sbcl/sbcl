@@ -244,7 +244,7 @@ and submit it as a patch."
   (finish-output notify-stream))
 (defparameter *gc-notify-before* #'default-gc-notify-before
   #!+sb-doc
-  "This function bound to this variable is invoked before GC'ing (unless
+  "The function bound to this variable is invoked before GC'ing (unless
   *GC-NOTIFY-STREAM* is NIL) with the value of *GC-NOTIFY-STREAM* and
   current amount of dynamic usage (in bytes). It should notify the
   user that the system is going to GC.")

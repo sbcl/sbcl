@@ -1302,8 +1302,8 @@
 (defknown hairy-data-vector-ref (array index) t
   (foldable flushable explicit-check))
 (defknown hairy-data-vector-set (array index t) t (unsafe explicit-check))
-(defknown sb!kernel:%caller-frame-and-pc () (values t t) (flushable))
-(defknown sb!kernel:%with-array-data (array index (or index null))
+(defknown %caller-frame-and-pc () (values t t) (flushable))
+(defknown %with-array-data (array index (or index null))
   (values (simple-array * (*)) index index index)
   (foldable flushable))
 (defknown %set-symbol-package (symbol t) t (unsafe))
@@ -1326,7 +1326,7 @@
   (flushable foldable))
 
 
-(defknown sb!kernel::arg-count-error (t t t t t t) nil (unsafe))
+(defknown arg-count-error (t t t t t t) nil (unsafe))
 
 ;;;; SETF inverses
 

@@ -836,7 +836,7 @@
 (defun accumulate1-compound-type (type types %compound-type-p simplify2)
   (declare (type ctype type))
   (declare (type (vector ctype) types))
-  (declare (type function simplify2))
+  (declare (type function %compound-type-p simplify2))
   ;; Any input object satisfying %COMPOUND-TYPE-P should've been
   ;; broken into components before it reached us.
   (aver (not (funcall %compound-type-p type)))

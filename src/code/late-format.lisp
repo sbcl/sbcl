@@ -222,6 +222,7 @@
 		  (char-code (format-directive-character directive))))
 	   (*default-format-error-offset*
 	    (1- (format-directive-end directive))))
+       (declare (type (or null function) expander))
        (if expander
 	   (funcall expander directive more-directives)
 	   (error 'format-error

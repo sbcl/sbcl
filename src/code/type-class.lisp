@@ -241,11 +241,13 @@
       (let ((class1 (type-class-info type1))
 	    (class2 (type-class-info type2)))
 	(if (eq class1 class2)
-	    (funcall (funcall simple class1) type1 type2)
+	    (funcall (the function (funcall simple class1)) type1 type2)
 	    (let ((complex2 (funcall cslot2 class2)))
+              (declare (type (or function null) complex2))
 	      (if complex2
 		  (funcall complex2 type1 type2)
 		  (let ((complex1 (funcall cslot1 class1)))
+                    (declare (type (or function null) complex1))
 		    (if complex1
 			(if complex-arg1-p
 			    (funcall complex1 type1 type2)

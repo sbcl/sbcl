@@ -151,7 +151,7 @@
 		   csubtypep-cache-clear
 		   type-intersection2-cache-clear
 		   values-type-intersection-cache-clear))
-      (funcall (symbol-function sym))))
+      (funcall (the function (symbol-function sym)))))
   (values))
 
 ;;; This is like TYPE-OF, only we return a CTYPE structure instead of

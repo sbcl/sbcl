@@ -380,6 +380,7 @@ GET-SETF-EXPANSION directly."
 	 (error "ill-formed DEFSETF for ~S" access-fn))))
 
 (defun %defsetf (orig-access-form num-store-vars expander)
+  (declare (type function expander))
   (let (subforms
 	subform-vars
 	subform-exprs

@@ -258,6 +258,7 @@
 ;;; Apply the function F to a bound X. If X is an open bound, then
 ;;; the result will be open. IF X is NIL, the result is NIL.
 (defun bound-func (f x)
+  (declare (type function f))
   (and x
        (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
 	 ;; With these traps masked, we might get things like infinity
@@ -688,7 +689,8 @@
 ;;; result makes sense. It will if F is monotonic increasing (or
 ;;; non-decreasing).
 (defun interval-func (f x)
-  (declare (type interval x))
+  (declare (type function f)
+           (type interval x))
   (let ((lo (bound-func f (interval-low x)))
 	(hi (bound-func f (interval-high x))))
     (make-interval :low lo :high hi)))
@@ -1072,6 +1074,7 @@
 ;;; positive. If we didn't do this, we wouldn't be able to tell.
 (defun two-arg-derive-type (arg1 arg2 derive-fcn fcn
 				 &optional (convert-type t))
+  (declare (type function derive-fcn fcn))
   #!+negative-zero-is-not-zero
   (declare (ignore convert-type))
   (flet (#!-negative-zero-is-not-zero

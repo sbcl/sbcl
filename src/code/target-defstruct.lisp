@@ -390,7 +390,7 @@
 
 (defun %default-structure-pretty-print (structure stream)
   (let* ((layout (%instance-layout structure))
-	 (name (sb!xc:class-name (layout-class layout)))
+	 (name (class-name (layout-class layout)))
 	 (dd (layout-info layout)))
     (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
       (prin1 name stream)
@@ -416,7 +416,7 @@
 	     (pprint-newline :linear stream))))))))
 (defun %default-structure-ugly-print (structure stream)
   (let* ((layout (%instance-layout structure))
-	 (name (sb!xc:class-name (layout-class layout)))
+	 (name (class-name (layout-class layout)))
 	 (dd (layout-info layout)))
     (descend-into (stream)
       (write-string "#S(" stream)

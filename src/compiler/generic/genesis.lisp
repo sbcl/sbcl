@@ -3209,6 +3209,7 @@ initially undefined function references:~2%")
 	(let ((package (find-package (sb-cold:package-data-name pd))))
 	  (labels (;; Call FN on every node of the TREE.
 		   (mapc-on-tree (fn tree)
+                                 (declare (type function fn))
 				 (typecase tree
 				   (cons (mapc-on-tree fn (car tree))
 					 (mapc-on-tree fn (cdr tree)))

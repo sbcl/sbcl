@@ -129,11 +129,14 @@
 (defun source-form-context (form)
   (cond ((atom form) nil)
 	((>= (length form) 2)
-	 (funcall (gethash (first form) *source-context-methods*
-			   (lambda (x)
-			     (declare (ignore x))
-			     (list (first form) (second form))))
-		  (rest form)))
+         (let* ((context-fun-default (lambda (x)
+				       (declare (ignore x))
+				       (list (first form) (second form))))
+		(context-fun (gethash (first form)
+				      *source-context-methods*
+				      context-fun-default)))
+           (declare (type function context-fun))
+           (funcall context-fun (rest form))))
 	(t
 	 form)))
 

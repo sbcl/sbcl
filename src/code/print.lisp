@@ -97,6 +97,7 @@
   `(%with-standard-io-syntax (lambda () ,@body)))
 
 (defun %with-standard-io-syntax (function)
+  (declare (type function function))
   (let ((*package* (find-package "COMMON-LISP-USER"))
 	(*print-array* t)
 	(*print-base* 10)
@@ -240,6 +241,7 @@
 
 ;;; guts of PRINT-UNREADABLE-OBJECT
 (defun %print-unreadable-object (object stream type identity body)
+  (declare (type (or null function) body))
   (when *print-readably*
     (error 'print-not-readable :object object))
   (flet ((print-description ()

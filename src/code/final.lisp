@@ -14,6 +14,7 @@
 (defvar *objects-pending-finalization* nil)
 
 (defun finalize (object function)
+  (declare (type function function))
   #!+sb-doc
   "Arrange for FUNCTION to be called when there are no more references to
    OBJECT."
@@ -45,7 +46,7 @@
 			 (weak-pointer-value (car pair))
 		       (declare (ignore object))
 		       (unless valid
-			 (funcall (cdr pair))
+			 (funcall (the function (cdr pair)))
 			 t)))
 		   *objects-pending-finalization*))
   nil)

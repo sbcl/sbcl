@@ -13,6 +13,8 @@
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)
 
+  (declare (type function load-or-cload-stem))
+
   ;; The running-in-the-host-Lisp Python cross-compiler defines its
   ;; own versions of a number of functions which should not overwrite
   ;; host-Lisp functions. Instead we put them in a special package.

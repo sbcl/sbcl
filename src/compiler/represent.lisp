@@ -227,6 +227,7 @@
 (defun add-representation-costs (refs scs costs
 				      ops-slot costs-slot more-costs-slot
 				      write-p)
+  (declare (type function ops-slot costs-slot more-costs-slot))
   (do ((ref refs (tn-ref-next ref)))
       ((null ref))
     (flet ((add-costs (cost)

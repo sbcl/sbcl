@@ -112,10 +112,12 @@
    returned. It is an error to supply NIL as a name. If CONDITION is specified
    and not NIL, then only restarts associated with that condition (or with no
    condition) will be returned."
-  (find-if (lambda (x)
-	     (or (eq x name)
-		 (eq (restart-name x) name)))
-	   (compute-restarts condition)))
+  (let ((restarts (compute-restarts condition)))
+    (declare (type list restarts))
+    (find-if (lambda (x)
+               (or (eq x name)
+                   (eq (restart-name x) name)))
+             restarts)))
 
 (defun invoke-restart (restart &rest values)
   #!+sb-doc

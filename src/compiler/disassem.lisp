@@ -1217,6 +1217,7 @@
       (cons car cdr)))
 
 (defun sharing-mapcar (fun list)
+  (declare (type function fun))
   #!+sb-doc
   "A simple (one list arg) mapcar that avoids consing up a new list
   as long as the results of calling FUN on the elements of LIST are

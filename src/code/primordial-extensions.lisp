@@ -272,6 +272,7 @@
      (%defconstant-eqx-value ',symbol ,expr ,eqx)
      ,@(when doc (list doc))))
 (defun %defconstant-eqx-value (symbol expr eqx)
+  (declare (type function eqx))
   (flet ((bummer (explanation)
 	   (error "~@<bad DEFCONSTANT-EQX ~S ~2I~_~S: ~2I~_~A ~S~:>"
 		  symbol

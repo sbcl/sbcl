@@ -96,7 +96,9 @@
 ;;; (end in an error, NLX or tail full call.) This is to discourage
 ;;; making error code the drop-through.
 (defun control-analyze-block (block tail block-info-constructor)
-  (declare (type cblock block) (type block-annotation tail))
+  (declare (type cblock block)
+           (type block-annotation tail)
+           (type function block-info-constructor))
   (unless (block-flag block)
     (let ((block (find-rotated-loop-head block)))
       (setf (block-flag block) t)
@@ -137,7 +139,9 @@
 ;;; course, it will never get a drop-through if either function has
 ;;; NLX code.
 (defun control-analyze-1-fun (fun component block-info-constructor)
-  (declare (type clambda fun) (type component component))
+  (declare (type clambda fun)
+           (type component component)
+           (type function block-info-constructor))
   (let* ((tail-block (block-info (component-tail component)))
 	 (prev-block (block-annotation-prev tail-block))
 	 (bind-block (node-block (lambda-bind fun))))

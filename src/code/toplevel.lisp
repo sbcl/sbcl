@@ -305,6 +305,8 @@
 	(noprint nil)        ; Has a --noprint option been seen?
 	(options (rest *posix-argv*))) ; skipping program name
 
+    (declare (type list options))
+
     (/show0 "done with outer LET in TOPLEVEL-INIT")
   
     ;; FIXME: There are lots of ways for errors to happen around here
@@ -394,6 +396,7 @@
     (flet (;; If any of POSSIBLE-INIT-FILE-NAMES names a real file,
 	   ;; return its truename.
 	   (probe-init-files (&rest possible-init-file-names)
+             (declare (type list possible-init-file-names))
 	     (/show0 "entering PROBE-INIT-FILES")
 	     (prog1
 		 (find-if (lambda (x)

@@ -59,11 +59,12 @@
 ;;; a function of one functional argument, which calls its functional argument
 ;;; in an environment suitable for compiling the target. (This environment
 ;;; includes e.g. a suitable *FEATURES* value.)
+(declaim (type function *in-target-compilation-mode-fn*))
 (defvar *in-target-compilation-mode-fn*)
 
-;;; designator for a function with the same calling convention as
-;;; CL:COMPILE-FILE, to be used to translate ordinary Lisp source files into
-;;; target object files
+;;; a function with the same calling convention as CL:COMPILE-FILE, to be
+;;; used to translate ordinary Lisp source files into target object files
+(declaim (type function *target-compile-file*))
 (defvar *target-compile-file*)
 
 ;;; designator for a function with the same calling convention as
@@ -129,6 +130,8 @@
 		     (src-suffix ".lisp")
 		     (compile-file #'compile-file)
 		     ignore-failure-p)
+
+  (declare (type function compile-file))
 
   (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
 	 ;; Lisp Way, although it works just fine for common UNIX environments.
@@ -327,6 +330,7 @@
 ;;; Execute function FN in an environment appropriate for compiling the
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
+  (declare (type function fn))
   (let ((*features* (cons :sb-xc-host *features*))
 	;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
 	;; base-target-features.lisp-expr:

@@ -121,6 +121,7 @@
 ;;; This is like FIND-IF, except that we do it on a compiled closure's
 ;;; environment.
 (defun find-if-in-closure (test fun)
+  (declare (type function test))
   (dotimes (index (1- (get-closure-length fun)))
     (let ((elt (%closure-index-ref fun index)))
       (when (funcall test elt)
@@ -226,8 +227,8 @@
 
 (defvar *setf-fdefinition-hook* nil
   #!+sb-doc
-  "This holds functions that (SETF FDEFINITION) invokes before storing the
-   new value. These functions take the function name and the new value.")
+  "A list of functions that (SETF FDEFINITION) invokes before storing the
+   new value. The functions take the function name and the new value.")
 
 (defun %set-fdefinition (name new-value)
   #!+sb-doc
@@ -238,6 +239,7 @@
     ;; top level forms in the kernel core startup.
     (when (boundp '*setf-fdefinition-hook*)
       (dolist (f *setf-fdefinition-hook*)
+        (declare (type function f))
 	(funcall f name new-value)))
 
     (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))

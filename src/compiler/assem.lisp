@@ -1332,6 +1332,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; calling FUNCTION once on the entire compacted segment buffer. --
 ;;; WHN 19990322
 (defun on-segment-contents-vectorly (segment function)
+  (declare (type function function))
   (let ((buffer (segment-buffer segment))
 	(i0 0))
     (flet ((frob (i0 i1)

@@ -441,6 +441,7 @@ Lisp process."
   (flet ((frob ()
 	   (let ((start (get-internal-ticks))
 	         (fun (symbol-function 'compute-overhead-aux)))
+             (declare (type function fun))
 	     (dotimes (i *timer-overhead-iterations*)
 	       (funcall fun fun))
 	     (/ (float (- (get-internal-ticks) start))

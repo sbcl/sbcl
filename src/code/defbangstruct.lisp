@@ -118,6 +118,7 @@
 	(if (consp nameoid)
 	    (values (first nameoid) (rest nameoid))
 	    (values nameoid nil))
+      (declare (type list options))
       (let* ((include-clause (find :include options :key #'first))
 	     (def!struct-supertype nil) ; may change below
 	     (mlff-clause (find :make-load-form-fun options :key #'first))

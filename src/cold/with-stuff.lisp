@@ -65,13 +65,17 @@
 
 ;;; helper functions for WITH-ADDITIONAL-NICKNAMES and WITHOUT-GIVEN-NICKNAMES
 (defun %with-additional-nickname (package-designator nickname body-fn)
+  (declare (type function body-fn))
   (with-additional-nickname (package-designator nickname)
     (funcall body-fn)))
 (defun %without-given-nickname (package-designator nickname body-fn)
+  (declare (type function body-fn))
   (without-given-nickname (package-designator nickname)
     (funcall body-fn)))
 (defun %multi-nickname-magic (nd-list single-nn-fn body-fn)
+  (declare (type function single-nn-fn))
   (labels ((multi-nd (nd-list body-fn) ; multiple nickname descriptors
+             (declare (type function body-fn))
 	     (if (null nd-list)
 	       (funcall body-fn)
 	       (single-nd (first nd-list)
@@ -81,6 +85,7 @@
 	     (destructuring-bind (package-descriptor nickname-list) nd
 	       (multi-nn package-descriptor nickname-list body-fn)))
 	   (multi-nn (nn-list package-descriptor body-fn) ; multiple nicknames
+             (declare (type function body-fn))
 	     (if (null nn-list)
 	       (funcall body-fn)
 	       (funcall single-nn-fn

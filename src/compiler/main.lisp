@@ -121,6 +121,7 @@
   `(%with-compilation-unit (lambda () ,@body) ,@options))
 
 (defun %with-compilation-unit (fn &key override)
+  (declare (type function fn))
   (let ((succeeded-p nil))
     (if (and *in-compilation-unit* (not override))
 	;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is

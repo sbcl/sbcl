@@ -38,6 +38,10 @@ for late 0.7.x:
 * miscellaneous simple refactoring
 	* belated renaming:
 		** renamed %PRIMITIVE to %VOP
+		** A few hundred things named FN and FCN should be
+			named FUN (but maybe not while dan_b is 
+			working on a threads branch and drichards is
+			working on a Windows port).
 	* These days ANSI C has inline functions, so..
 		** redid many cpp macros as inline functions: 
 			HeaderValue, Pointerp, CEILING, ALIGNED_SIZE,

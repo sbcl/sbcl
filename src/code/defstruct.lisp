@@ -1289,6 +1289,7 @@
 
 ;;; Create a default (non-BOA) keyword constructor.
 (defun create-keyword-constructor (defstruct creator)
+  (declare (type function creator))
   (collect ((arglist (list '&key))
 	    (types)
 	    (vals))
@@ -1305,6 +1306,7 @@
 ;;; Given a structure and a BOA constructor spec, call CREATOR with
 ;;; the appropriate args to make a constructor.
 (defun create-boa-constructor (defstruct boa creator)
+  (declare (type function creator))
   (multiple-value-bind (req opt restp rest keyp keys allowp auxp aux)
       (parse-lambda-list (second boa))
     (collect ((arglist)

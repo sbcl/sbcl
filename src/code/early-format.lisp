@@ -31,8 +31,9 @@
 ;;; non-NIL, up-up-and-out (~:^) is allowed. Otherwise, ~:^ isn't allowed.
 (defvar *up-up-and-out-allowed* nil)
 
-;;; Used by the interpreter stuff. When it non-NIL, its a function that will
-;;; invoke PPRINT-POP in the right lexical environemnt.
+;;; Used by the interpreter stuff. When it's non-NIL, it's a function
+;;; that will invoke PPRINT-POP in the right lexical environemnt.
+(declaim (type (or null function) *logical-block-popper*))
 (defvar *logical-block-popper* nil)
 
 ;;; Used by the expander stuff. This is bindable so that ~<...~:>

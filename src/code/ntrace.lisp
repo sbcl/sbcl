@@ -154,6 +154,7 @@
     (let ((exp (car form)))
       (if (sb-di:code-location-p loc)
 	  (let ((fun (sb-di:preprocess-for-eval exp loc)))
+            (declare (type function fun))
 	    (cons exp
 		  (lambda (frame)
 		    (let ((*current-frame* frame))
@@ -275,6 +276,7 @@
 ;;; to determine the correct indentation for output. We then check to
 ;;; see whether the function is still traced and that the condition
 ;;; succeeded before printing anything.
+(declaim (ftype (function (trace-info) function) trace-end-breakpoint-fun))
 (defun trace-end-breakpoint-fun (info)
   (lambda (frame bpt *trace-values* cookie)
     (declare (ignore bpt))
@@ -311,6 +313,7 @@
 ;;; which we have cleverly contrived to work for our hook functions.
 (defun trace-call (info)
   (multiple-value-bind (start cookie) (trace-start-breakpoint-fun info)
+    (declare (type function start cookie))
     (let ((frame (sb-di:frame-down (sb-di:top-frame))))
       (funcall start frame nil)
       (let ((*traced-entries* *traced-entries*))
