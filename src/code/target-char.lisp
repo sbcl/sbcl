@@ -33,6 +33,7 @@
   `(integer 0 (,char-code-limit)))
 
 (defvar *character-database*)
+(declaim (type (vector (unsigned-byte 8)) *character-database*))
 
 (macrolet ((frob ()
              (with-open-file (stream (merge-pathnames
