@@ -56,6 +56,34 @@
           :format-control "~S is a bad type specifier for sequences."
           :format-arguments (list ,type-spec)))
 
+(sb!xc:defmacro sequence-type-length-mismatch-error (type length)
+  `(error 'simple-type-error
+          :datum ,length
+          :expected-type (cond ((array-type-p ,type)
+				`(eql ,(car (array-type-dimensions ,type))))
+			       ((type= ,type (specifier-type 'null))
+				'(eql 0))
+			       ((cons-type-p ,type)
+				'(integer 1))
+			       (t (bug "weird type in S-T-L-M-ERROR")))
+          ;; FIXME: this format control causes ugly printing.  There's
+          ;; probably some ~<~@:_~> incantation that would make it
+          ;; nicer. -- CSR, 2002-10-18
+          :format-control "The length requested (~S) does not match the type restriction in ~S."
+          :format-arguments (list ,length (type-specifier ,type))))
+
+(sb!xc:defmacro sequence-type-too-hairy (type-spec)
+  ;; FIXME: Should this be a BUG? I'm inclined to think not; there are
+  ;; words that give some but not total support to this position in
+  ;; ANSI.  Essentially, we are justified in throwing this on
+  ;; e.g. '(OR SIMPLE-VECTOR (VECTOR FIXNUM)), but maybe not (by ANSI)
+  ;; on '(CONS * (CONS * NULL)) -- CSR, 2002-10-18
+  `(error 'simple-type-error
+          :datum ,type-spec
+          ;; FIXME: as in BAD-SEQUENCE-TYPE-ERROR, this is wrong.
+          :expected-type 'sequence
+          :format-control "~S is too hairy for sequence functions."
+          :format-arguments (list ,type-spec)))
 ) ; EVAL-WHEN
 
 ;;; It's possible with some sequence operations to declare the length
@@ -158,7 +186,28 @@
   (declare (fixnum length))
   (let ((type (specifier-type type)))
     (cond ((csubtypep type (specifier-type 'list))
-	   (make-list length :initial-element initial-element))
+	   (cond
+	     ((type= type (specifier-type 'list))
+	      (make-list length :initial-element initial-element))
+	     ((eq type *empty-type*)
+	      (bad-sequence-type-error nil))
+	     ((type= type (specifier-type 'null))
+	      (if (= length 0)
+		  'nil
+		  (sequence-type-length-mismatch-error type length)))
+	     ((csubtypep (specifier-type '(cons nil t)) type)
+	      ;; The above is quite a neat way of finding out if
+	      ;; there's a type restriction on the CDR of the
+	      ;; CONS... if there is, I think it's probably fair to
+	      ;; give up; if there isn't, then the list to be made
+	      ;; must have a length of more than 0.
+	      (if (> length 0)
+		  (make-list length :initial-element initial-element)
+		  (sequence-type-length-mismatch-error type length)))
+	     ;; We'll get here for e.g. (OR NULL (CONS INTEGER *)),
+	     ;; which may seem strange and non-ideal, but then I'd say
+	     ;; it was stranger to feed that type in to MAKE-SEQUENCE.
+	     (t (sequence-type-too-hairy (type-specifier type)))))
 	  ((csubtypep type (specifier-type 'vector))
 	   (if (typep type 'array-type)
 	       ;; KLUDGE: the above test essentially asks "Do we know
@@ -171,13 +220,7 @@
 		       (type-length (car (array-type-dimensions type))))
 		   (unless (or (eq type-length '*)
 			       (= type-length length))
-		     (error 'simple-type-error
-			    :datum length
-			    :expected-type `(eql ,type-length)
-			    :format-control "The length requested (~S) ~
-                            does not match the length type restriction in ~S."
-			    :format-arguments (list length 
-						    (type-specifier type))))
+		     (sequence-type-length-mismatch-error type length))
 		   ;; FIXME: These calls to MAKE-ARRAY can't be
 		   ;; open-coded, as the :ELEMENT-TYPE argument isn't
 		   ;; constant.  Probably we ought to write a
@@ -187,13 +230,7 @@
 		       (make-array length :element-type etype
 				   :initial-element initial-element)
 		       (make-array length :element-type etype))))
-	       ;; We have a subtype of VECTOR, but it isn't an array
-	       ;; type.  Maybe this should be a BUG instead?
-	       (error 'simple-type-error
-		      :datum type
-		      :expected-type 'sequence
-		      :format-control "~S is too hairy for MAKE-SEQUENCE."
-		      :format-arguments (list (type-specifier type)))))
+	       (sequence-type-too-hairy (type-specifier type))))
 	  (t (bad-sequence-type-error (type-specifier type))))))
 
 ;;;; SUBSEQ
@@ -1477,7 +1514,7 @@
    which case the one later in the sequence is discarded. The resulting
    sequence is returned.
 
-   The :TEST-NOT argument is depreciated."
+   The :TEST-NOT argument is deprecated."
   (declare (fixnum start))
   (seq-dispatch sequence
 		(if sequence
@@ -1550,7 +1587,7 @@
    discarded. The resulting sequence, which may be formed by destroying the
    given sequence, is returned.
 
-   The :TEST-NOT argument is depreciated."
+   The :TEST-NOT argument is deprecated."
   (seq-dispatch sequence
     (if sequence
 	(list-delete-duplicates* sequence test test-not key from-end start end))
@@ -1961,12 +1998,8 @@
 ;;;     perhaps it's worth optimizing the -if-not versions in the same
 ;;;     way as the others?
 ;;;
-;;; That sounds reasonable, so if someone wants to submit patches to
-;;; make the -IF-NOT functions compile as efficiently as the
-;;; corresponding -IF variants do, go for it. -- WHN 2001-10-06)
-;;;
-;;; FIXME: Remove uses of these deprecated functions (and of :TEST-NOT
-;;; too) within the implementation of SBCL.
+;;; FIXME: Maybe remove uses of these deprecated functions (and
+;;; definitely of :TEST-NOT) within the implementation of SBCL.
 (declaim (inline find-if-not position-if-not))
 (macrolet ((def-find-position-if-not (fun-name values-index)
 	     `(defun ,fun-name (predicate sequence

@@ -285,6 +285,25 @@
 (assert (equal '(1 2 3 4) (merge 'list-typeoid '(1 3) '(2 4) '<)))
 ;;; and also with types that weren't precicely LIST
 (assert (equal '(1 2 3 4) (merge 'cons '(1 3) '(2 4) '<)))
+
+;;; but wait, there's more! The NULL and CONS types also have implicit
+;;; length requirements:
+(macrolet ((assert-type-error (form)
+	     `(assert (typep (nth-value 1 (ignore-errors ,form)) 
+			     'type-error))))
+  (locally
+      (declare (optimize safety))
+    ;; MAKE-SEQUENCE
+    (assert-type-error (make-sequence 'cons 0))
+    (assert-type-error (make-sequence 'null 1))
+    (assert (null (make-sequence 'null 0)))
+    (assert (= (length (make-sequence 'cons 3)) 3))
+    ;; and NIL is not a valid type for MAKE-SEQUENCE
+    (assert-type-error (make-sequence 'nil 0))
+    ;; tests for MAP/MERGE/CONCATENATE/COERCE to come.
+    ))
+
+	     
 
 ;;; success
 (quit :unix-status 104)
