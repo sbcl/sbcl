@@ -2323,6 +2323,9 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
     ** ADJUST-ARRAY now copies the datum in a zero rank array if
        required.
     ** ADJUST-ARRAY no longer adjusts non-adjustable arrays.
+    ** MAKE-STRING-INPUT-STREAM accepts NIL as a value for :END.
+    ** MAKE-STRING-INPUT-STREAM functions correctly for strings with
+       element-type NIL.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

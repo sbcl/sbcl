@@ -679,8 +679,9 @@
 		  element-type)))
     (let ((array-rank (length (the list dimensions))))
       (declare (fixnum array-rank))
-      (when (and fill-pointer (> array-rank 1))
-	(error "Multidimensional arrays can't have fill pointers."))
+      (unless (= array-rank 1)
+	(when fill-pointer
+	  (error "Only vectors can have fill pointers.")))
       (cond (initial-contents-p
 	     ;; array former contents replaced by INITIAL-CONTENTS
 	     (if (or initial-element-p displaced-to)

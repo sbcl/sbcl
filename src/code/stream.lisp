@@ -1031,7 +1031,8 @@
   (declare (type string string)
 	   (type index start)
 	   (type (or index null) end))
-  (let ((end (%check-vector-sequence-bounds string start end)))
+  (let* ((string (coerce string '(simple-array character (*))))
+	 (end (%check-vector-sequence-bounds string start end)))
     (with-array-data ((string string) (start start) (end end))
       (internal-make-string-input-stream
        string ;; now simple

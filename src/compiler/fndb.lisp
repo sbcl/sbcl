@@ -918,7 +918,8 @@
 (defknown make-concatenated-stream (&rest stream) stream (unsafely-flushable))
 (defknown make-two-way-stream (stream stream) stream (unsafely-flushable))
 (defknown make-echo-stream (stream stream) stream (flushable))
-(defknown make-string-input-stream (string &optional index index) stream
+(defknown make-string-input-stream (string &optional index sequence-end)
+  stream
   (flushable unsafe))
 (defknown make-string-output-stream 
     (&key (:element-type type-specifier)) 
