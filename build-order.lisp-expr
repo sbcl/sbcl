@@ -9,9 +9,15 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; a linear ordering of system sources which works both to compile/load
-;;; the cross-compiler under the host Common Lisp and then to cross-compile
-;;; the complete system into the under-construction target SBCL
+;;; a linear ordering of system sources which works both to
+;;; compile/load the cross-compiler under the host Common Lisp and
+;;; then to cross-compile the complete system into the
+;;; under-construction target SBCL
+;;;
+;;; The keyword flags (:NOT-HOST, :NOT-TARGET, :ASSEM...) are
+;;; documented in the code which implements their effects. (As of
+;;; sbcl-0.7.10, the comments are on DEFPARAMETER *EXPECTED-STEM-FLAGS*
+;;; in src/cold/shared.lisp.)
 ;;;
 ;;; Of course, it'd be very nice to have this be a dependency DAG
 ;;; instead, so that we could do automated incremental recompilation.

@@ -286,10 +286,13 @@
 (defparameter
   *expected-stem-flags*
   '(;; meaning: This file is not to be compiled when building the
-    ;; cross-compiler which runs on the host ANSI Lisp.
+    ;; cross-compiler which runs on the host ANSI Lisp. ("not host
+    ;; code", i.e. does not execute on host -- but may still be
+    ;; cross-compiled by the host, so that it executes on the target)
     :not-host
     ;; meaning: This file is not to be compiled as part of the target
-    ;; SBCL.
+    ;; SBCL. ("not target code" -- but still presumably host code,
+    ;; used to support the cross-compilation process)
     :not-target
     ;; meaning: This file is to be processed with the SBCL assembler,
     ;; not COMPILE-FILE. (Note that this doesn't make sense unless
