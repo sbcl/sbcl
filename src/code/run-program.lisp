@@ -108,10 +108,10 @@
 
 ;;;; Import wait3(2) from Unix.
 
-(sb-alien:define-alien-routine ("wait3" c-wait3) sb-c-call:int
-  (status sb-c-call:int :out)
-  (options sb-c-call:int)
-  (rusage sb-c-call:int))
+(sb-alien:define-alien-routine ("wait3" c-wait3) sb-alien:int
+  (status sb-alien:int :out)
+  (options sb-alien:int)
+  (rusage sb-alien:int))
 
 (defconstant wait-wnohang #-svr4 1 #+svr4 #o100)
 (defconstant wait-wuntraced #-svr4 2 #+svr4 4)
@@ -202,7 +202,7 @@
 #-hpux
 ;;; Find the current foreground process group id.
 (defun find-current-foreground-process (proc)
-  (sb-alien:with-alien ((result sb-c-call:int))
+  (sb-alien:with-alien ((result sb-alien:int))
     (multiple-value-bind
 	  (wonp error)
 	(sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty proc))
@@ -307,17 +307,17 @@
 #+FreeBSD
 (define-alien-type nil
   (struct sgttyb
-	  (sg-ispeed sb-c-call:char)	; input speed
-	  (sg-ospeed sb-c-call:char)	; output speed
-	  (sg-erase sb-c-call:char)	; erase character
-	  (sg-kill sb-c-call:char)	; kill character
-	  (sg-flags sb-c-call:short)))	; mode flags
+	  (sg-ispeed sb-alien:char)	; input speed
+	  (sg-ospeed sb-alien:char)	; output speed
+	  (sg-erase sb-alien:char)	; erase character
+	  (sg-kill sb-alien:char)	; kill character
+	  (sg-flags sb-alien:short)))	; mode flags
 #+OpenBSD
 (define-alien-type nil
   (struct sgttyb
-	  (sg-four sb-c-call:int)
-	  (sg-chars (array sb-c-call:char 4))
-	  (sg-flags sb-c-call:int)))
+	  (sg-four sb-alien:int)
+	  (sg-chars (array sb-alien:char 4))
+	  (sg-flags sb-alien:int)))
 
 ;;; Find an unused pty. Return three values: the file descriptor for
 ;;; the master side of the pty, the file descriptor for the slave side
@@ -435,14 +435,14 @@
 	     ,@body)
 	(sb-sys:deallocate-system-memory ,sap ,size)))))
 
-(sb-alien:define-alien-routine spawn sb-c-call:int
-  (program sb-c-call:c-string)
-  (argv (* sb-c-call:c-string))
-  (envp (* sb-c-call:c-string))
-  (pty-name sb-c-call:c-string)
-  (stdin sb-c-call:int)
-  (stdout sb-c-call:int)
-  (stderr sb-c-call:int))
+(sb-alien:define-alien-routine spawn sb-alien:int
+  (program sb-alien:c-string)
+  (argv (* sb-alien:c-string))
+  (envp (* sb-alien:c-string))
+  (pty-name sb-alien:c-string)
+  (stdin sb-alien:int)
+  (stdout sb-alien:int)
+  (stderr sb-alien:int))
 
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
 (defun unix-filename-is-executable-p (unix-filename)
@@ -686,7 +686,7 @@
 			     ((zerop result)
 			      (return))))
 		     (sb-alien:with-alien ((buf (sb-alien:array
-						 sb-c-call:char
+						 sb-alien:char
 						 256)))
 		       (multiple-value-bind
 			   (count errno)

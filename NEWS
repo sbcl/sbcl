@@ -908,51 +908,62 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
-* minor incompatible change: The debugger prompt sequence now goes
-  "5]", "5[2]", "5[3]", etc. as you get deeper into recursive calls
-  to the debugger command loop, instead of the old "5]", "5]]",
-  "5]]]" sequence. (I was motivated to do this when squabbles between
-  ILISP and SBCL left me very deeply nested in the debugger. In the
-  short term, this change will probably provoke more ILISP/SBCL 
-  squabbles, but hopefully it will be an improvement in the long run.)
-* minor incompatible change: The CHAR-NAME of unprintable ASCII
-  characters which, unlike e.g. #\Newline and #\Tab, don't have names
-  specified in the ANSI Common Lisp standard, is now based on their
-  ASCII symbolic names (#\Nul, #\Soh, #\Stx, etc.) The old CMU CL
-  names (#\Null, #\^a, #\^b, etc.) are still accepted by NAME-CHAR.
-?? Old operator names in the style DEF-FOO are now deprecated in
-  favor of new corresponding names DEFINE-FOO, for consistency with
-  the naming convention used in the ANSI standard (DEFSTRUCT, DEFVAR,
-  DEFINE-CONDITION, DEFINE-MODIFY-MACRO..). This mostly affects
-  internal symbols, but a few supported extensions like
-  SB-ALIEN:DEF-ALIEN-FUNCTION are also affected.
-?? minor incompatible change: SB-C-CALL and SB-ALIEN no longer exist
-  as separate packages. The external symbols of both packages have
-  moved into a new SB-FFI package. Almost all old code should still
-  continue to work without immediate update, as SB-C-CALL and SB-ALIEN
-  names will be retained as nicknames for that package for some time.
-* minor incompatible change (part of a bug fix by Christophe Rhodes
-  to DIRECTORY behavior): DIRECTORY no longer implicitly promotes
-  NIL slots of its pathname argument to :WILD, and in particular
-  asking for the contents of a directory, which you used to be able
-  to do without explicit wildcards, e.g. (DIRECTORY "/tmp/"), 
-  now needs explicit wildcards, e.g. (DIRECTORY "/tmp/*.*").
-* minor incompatible change: DEFINE-ALIEN-FUNCTION (also known by 
-  the old deprecated name DEF-ALIEN-FUNCTION) now does DECLAIM FTYPE
-  for the defined function, since declaiming return types involving
-  aliens is (1) annoyingly messy to do by hand and (2) vital 
-  to efficient compilation of code which calls such functions (and
-  since people writing calls-to-C code aren't likely to be bothered
-  by implicit assumptions of static typing).
+* There are several incompatible changes:
+  ** The old implementation of EVAL, has been largely discarded (as
+     per the discussion of the "IR1 interpreter" above). In its place
+     is code which still interprets a few special cases, but which in 
+     the general case calls COMPILE and then FUNCALLs the result.
+     Besides the obvious changes in performance tradeoffs (that
+     the cost per form passed to EVAL has gone up, and 
+     the cost per form executed by EVAL has gone down), this
+     can be considered an "incompatible" change because there
+     are no longer any interpreted function objects. 
+     COMPILED-FUNCTION-P is now synonymous with FUNCTIONP, and 
+     doing COMPILE on the output of interactive DEFUN is now a no-op.
+  ** The debugger prompt sequence now goes "5]", "5[2]", "5[3]",
+     etc. as you get deeper into recursive calls to the debugger
+     command loop, instead of the old "5]", "5]]", "5]]]"
+     sequence. (I was motivated to do this when squabbles between
+     ILISP and SBCL left me very deeply nested in the debugger. In the
+     short term, this change will probably provoke more ILISP/SBCL 
+     squabbles, but hopefully it will be an improvement in the long run.)
+  ** The CHAR-NAME of unprintable ASCII characters which, unlike
+     e.g. #\Newline and #\Tab, don't have names specified in the
+     ANSI Common Lisp standard, is now based on their ASCII symbolic
+     names (#\Nul, #\Soh, #\Stx, etc.) The old CMU-CL-style names
+     (#\Null, #\^a, #\^b, etc.) are still accepted by NAME-CHAR, but
+     are no longer used for output.
+  ** Old operator names in the style DEF-FOO are now deprecated in
+     favor of new corresponding names DEFINE-FOO, for consistency with
+     the naming convention used in the ANSI standard (DEFSTRUCT, DEFVAR,
+     DEFINE-CONDITION, DEFINE-MODIFY-MACRO..). This mostly affects
+     internal symbols, but a few supported extensions like
+     SB-ALIEN:DEF-ALIEN-FUNCTION are also affected. (So e.g.
+     DEF-ALIEN-FUNCTION becomes DEFINE-ALIEN-FUNCTION.)
+  ** SB-C-CALL has been merged into SB-ALIEN. Almost all old code
+     should still continue to work without immediate update, as
+     SB-C-CALL is now a (deprecated) nickname for SB-ALIEN.
+  ** As part of a bug fix by Christophe Rhodes to DIRECTORY behavior,
+     DIRECTORY no longer implicitly promotes NIL slots of its
+     pathname argument to :WILD. In particular, asking for the
+     contents of a directory, which you used to be able
+     to do without explicit wildcards, e.g. (DIRECTORY "/tmp/"), 
+     now needs explicit wildcards, e.g. (DIRECTORY "/tmp/*.*").
+  ** SB-ALIEN:DEFINE-ALIEN-FUNCTION (also known by the old deprecated
+     name DEF-ALIEN-FUNCTION) now does DECLAIM FTYPE for the defined
+     function, since declaiming return types involving aliens is
+     (1) annoyingly messy to do by hand and (2) vital to efficient
+     compilation of code which calls such functions.
+  ** SB-ALIEN:LOAD-FOREIGN and SB-ALIEN:LOAD-1-FOREIGN are no
+     longer reexported by the SB-EXT package. They're solely useful
+     for alien code, so it seems more logical that you should get
+     them from the SB-ALIEN package, not in SB-EXT.
 * The value of INTERNAL-TIME-UNITS-PER-SECOND has been increased
   from 100 to 1000.
 * The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
   doubled, to 4 million. (If your application spends a lot of time
   GCing and you have a lot of RAM, you might want to experiment with
   increasing it even more.)
-* The interpreter, EVAL, has been rewritten. Now it calls the
-  native compiler for the difficult cases, where it used to call
-  the old specialized IR1 interpreter code. 
 * The doc/cmucl/ directory, containing old CMU CL documentation
   from the time of the fork, is no longer part of the base system.
   SourceForge has shut down its anonymous FTP service, and with it

@@ -3,14 +3,15 @@
 ;;;; the specifications of target packages, except for a few things
 ;;;; which are handled elsewhere by other mechanisms:
 ;;;;   * the creation of the trivial SB-SLOT-ACCESSOR-NAME package
-;;;;   * any SHADOWing hackery
+;;;;   * any SHADOWing and nickname hackery
 ;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
 ;;;;     COMMON-LISP-USER, and KEYWORD
 ;;;;
 ;;;; The packages are named SB!FOO here and elsewhere in
-;;;; cross-compilation, in order to avoid collision with corresponding
-;;;; SB-FOO packages in the cross-compilation host. They're renamed to
-;;;; SB-FOO later, after the danger of collision has passed.
+;;;; cross-compilation, in order to avoid collision with possible
+;;;; corresponding SB-FOO packages in the cross-compilation host.
+;;;; They're renamed to SB-FOO later, after we've departed from the xc
+;;;; mothership and the danger of namespace collision is past.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -23,29 +24,41 @@
 
 (#s(sb-cold:package-data
     :name "SB!ALIEN"
-    :doc "public: the ALIEN foreign function interface"
+    :doc "public: the ALIEN foreign function interface (If you're
+porting CMU CL code, note that this package corresponds roughly to a union
+of the packages ALIEN and C-CALL at the time of the SBCL fork. SB-C-CALL
+is a deprecated nickname to help ease the transition from older versions
+of SBCL which maintained the CMU-CL-style split into two packages.)"
     :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!ALIEN-INTERNALS")
-    :reexport ("ARRAY" "BOOLEAN" "DOUBLE-FLOAT" "LONG-FLOAT" "FUNCTION"
-               "INTEGER" "SINGLE-FLOAT" "UNION"  "SYSTEM-AREA-POINTER"
-               "VALUES" "*")
+    :reexport ("ARRAY" "BOOLEAN" "CHAR" "DOUBLE-FLOAT"
+	       "FLOAT" "FUNCTION" "INTEGER" "LONG-FLOAT"
+	       "SINGLE-FLOAT"
+	       ;; FIXME: Do we really want to reexport
+	       ;; SYSTEM-AREA-POINTER here? Why?
+	       "SYSTEM-AREA-POINTER"
+               "UNION"  "VALUES" "*")
     :export ("ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP" "ALIEN-SIZE" 
-	     "CAST"
+	     "CAST" "C-STRING"
 	     "DEFINE-ALIEN-ROUTINE" "DEFINE-ALIEN-TYPE" "DEFINE-ALIEN-VARIABLE"
 
 	     ;; FIXME: These old names don't match the DEFFOO - vs. -
 	     ;; DEFINE-FOO convention used in the ANSI spec, and so
-	     ;; were deprecated in sbcl-0.pre7, ca. 2001-12-12. After
-	     ;; a year or so they can go away completely.
+	     ;; were deprecated in sbcl-0.7.0. After a year or so
+	     ;; they can go away completely.
 	     "DEF-ALIEN-ROUTINE" "DEF-ALIEN-TYPE" "DEF-ALIEN-VARIABLE"
 
-             "DEREF"
+             "DEREF" "DOUBLE"
 	     "ENUM" "EXTERN-ALIEN"
-	     "FREE-ALIEN" 
-             "LOAD-FOREIGN" "LOAD-1-FOREIGN"
+	     "FREE-ALIEN"
+	     "GET-ERRNO"
+	     "INT" 
+             "LOAD-FOREIGN" "LOAD-1-FOREIGN" "LONG"
 	     "MAKE-ALIEN"
 	     "NULL-ALIEN"
-             "SAP-ALIEN" "SIGNED" "SLOT" "STRUCT"
+             "SAP-ALIEN" "SHORT" "SIGNED" "SLOT" "STRUCT"
              "UNSIGNED"
+	     "UNSIGNED-CHAR" "UNSIGNED-INT" "UNSIGNED-LONG" "UNSIGNED-SHORT"
+	     "VOID"
 	     "WITH-ALIEN"))
 
  #s(sb-cold:package-data
@@ -312,17 +325,6 @@
               "VM-SUPPORT-ROUTINES-LOCATION-NUMBER"))
 
  #s(sb-cold:package-data
-    :name "SB!C-CALL"
-    ;; FIXME: Why not just put this stuff into SB-ALIEN? Or maybe
-    ;; just glom this and SB-ALIEN together into SB-FFI?
-    :doc "public: some types used with ALIENs"
-    :use ("CL" "SB!SYS" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!INT" "SB!EXT")
-    :reexport ("FLOAT" "CHAR")
-    :export ("C-STRING" "DOUBLE" "GET-ERRNO" "INT" "LONG"
-             "SHORT" "UNSIGNED-CHAR" "UNSIGNED-INT"
-             "UNSIGNED-LONG" "UNSIGNED-SHORT" "VOID"))
-
- #s(sb-cold:package-data
     :name "SB!DEBUG"
     :doc
 "sorta public: Eventually this should become the debugger interface, with
@@ -456,7 +458,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
  #s(sb-cold:package-data
     :name "SB!FASL"
     :doc "private: stuff related to FASL load/dump logic (and GENESIS)"
-    :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C" "SB!C-CALL"
+    :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C"
           "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
     :export ("*ASSEMBLER-ROUTINES*"
              "+BACKEND-FASL-FILE-IMPLEMENTATION+"
@@ -493,15 +495,13 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
  #s(sb-cold:package-data
     :name "SB!IMPL"
     :doc "private: a grab bag of implementation details"
-    :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!C-CALL" "SB!DEBUG" "SB!EXT"
+    :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!DEBUG" "SB!EXT"
           "SB!FASL" "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
 
  #s(sb-cold:package-data
     :name "SB!EXT"
     :doc "public: miscellaneous supported extensions to the ANSI Lisp spec"
-    ;; FIXME: Why don't we just USE-PACKAGE %KERNEL here instead of importing?
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!INT" "SB!SYS" "SB!GRAY")
-    :reexport ("LOAD-FOREIGN" "LOAD-1-FOREIGN")
+    :use ("CL" "SB!ALIEN" "SB!INT" "SB!SYS" "SB!GRAY")
     :export (;; Information about how the program was invoked is
              ;; nonstandard but very useful.
              "*POSIX-ARGV*" "POSIX-GETENV" "POSIX-ENVIRON"
@@ -650,7 +650,7 @@ Lisp extension proposal by David N. Gray"
 "private: miscellaneous unsupported extensions to the ANSI spec. Much of
 the stuff in here originated in CMU CL's EXTENSIONS package and is
 retained, possibly temporariliy, because it might be used internally."
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!GRAY" "SB!FASL" "SB!SYS")
+    :use ("CL" "SB!ALIEN" "SB!GRAY" "SB!FASL" "SB!SYS")
     :export ("*AFTER-SAVE-INITIALIZATIONS*" "*BEFORE-SAVE-INITIALIZATIONS*"
 
 	     ;; lambda list keyword extensions
@@ -888,8 +888,7 @@ integration' (said CMU CL architecture.tex) and that probably was and
 is a good idea, but see SB-SYS re. blurring of boundaries."
     :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!BIGNUM"
           "SB!EXT" "SB!FASL" "SB!INT" "SB!SYS" "SB!GRAY")
-    :import-from (("SB!C-CALL" "VOID"))
-    :reexport ("DEF!STRUCT" "DEF!MACRO" "VOID" "WEAK-POINTER-P")
+    :reexport ("DEF!STRUCT" "DEF!MACRO")
     :export ("%ACOS" "%ACOSH" "%ARRAY-AVAILABLE-ELEMENTS"
              "%ARRAY-DATA-VECTOR" "%ARRAY-DIMENSION"
              "%ARRAY-DISPLACED-P"
@@ -1527,7 +1526,7 @@ stable Unix interface suitable for the end user.
 This package only tries to implement what happens to be
 needed by the current implementation of SBCL, and makes
 no guarantees of interface stability."
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!EXT" "SB!INT" "SB!SYS")
+    :use ("CL" "SB!ALIEN" "SB!EXT" "SB!INT" "SB!SYS")
     :export (;; wrappers around Unix stuff to give just what Lisp needs
 	     "UID-USERNAME"
 
@@ -1660,8 +1659,7 @@ no guarantees of interface stability."
 "internal: the default place to hide information about the hardware and data
 structure representations"
     :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!ASSEM" "SB!C"
-          "SB!C-CALL" "SB!EXT" "SB!FASL" "SB!INT" "SB!KERNEL"
-          "SB!SYS" "SB!UNIX")
+          "SB!EXT" "SB!FASL" "SB!INT" "SB!KERNEL" "SB!SYS" "SB!UNIX")
     :export ("*ASSEMBLY-UNIT-LENGTH*" "*PRIMITIVE-OBJECTS*"
              "AFTER-BREAKPOINT-TRAP"
              "ANY-REG-SC-NUMBER" "ARRAY-DATA-SLOT" "ARRAY-DIMENSIONS-OFFSET"

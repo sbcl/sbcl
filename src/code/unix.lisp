@@ -621,9 +621,9 @@
 	    (tm-gmtoff long) ;  Seconds east of UTC.
 	    (tm-zone c-string))) ; Timezone abbreviation.
 
-(define-alien-routine get-timezone sb!c-call:void
-  (when sb!c-call:long :in)
-  (minutes-west sb!c-call:int :out)
+(define-alien-routine get-timezone sb!alien:void
+  (when sb!alien:long :in)
+  (minutes-west sb!alien:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 
 (defun unix-get-minutes-west (secs)

@@ -82,9 +82,9 @@
 ;;; Returns two values:
 ;;;  - the minutes west of GMT.
 ;;;  - T if daylight savings is in effect, NIL if not.
-(sb!alien:define-alien-routine get-timezone sb!c-call:void
-  (when sb!c-call:long :in)
-  (minutes-west sb!c-call:int :out)
+(sb!alien:define-alien-routine get-timezone sb!alien:void
+  (when sb!alien:long :in)
+  (minutes-west sb!alien:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 
 ;;; Subtract from the returned Internal-Time to get the universal

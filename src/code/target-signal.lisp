@@ -18,9 +18,9 @@
 ;;;; system calls that deal with signals
 
 #!-sb-fluid (declaim (inline real-unix-kill))
-(sb!alien:define-alien-routine ("kill" real-unix-kill) sb!c-call:int
-  (pid sb!c-call:int)
-  (signal sb!c-call:int))
+(sb!alien:define-alien-routine ("kill" real-unix-kill) sb!alien:int
+  (pid sb!alien:int)
+  (signal sb!alien:int))
 
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
 ;;; should be a valid signal number or a keyword of the standard UNIX
@@ -29,9 +29,9 @@
   (real-unix-kill pid (unix-signal-number signal)))
 
 #!-sb-fluid (declaim (inline real-unix-killpg))
-(sb!alien:define-alien-routine ("killpg" real-unix-killpg) sb!c-call:int
-  (pgrp sb!c-call:int)
-  (signal sb!c-call:int))
+(sb!alien:define-alien-routine ("killpg" real-unix-killpg) sb!alien:int
+  (pgrp sb!alien:int)
+  (signal sb!alien:int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
 ;;; PGRP. SIGNAL should be a valid signal number or a keyword of the
@@ -48,14 +48,14 @@
 ;;; but you might also consider doing things the SBCL way and moving
 ;;; this kind of C-level work down to C wrapper functions.)
 (sb!alien:define-alien-routine ("sigsetmask" unix-sigsetmask)
-			       sb!c-call:unsigned-long
-  (mask sb!c-call:unsigned-long))
+			       sb!alien:unsigned-long
+  (mask sb!alien:unsigned-long))
 
 ;;;; C routines that actually do all the work of establishing signal handlers
 (sb!alien:define-alien-routine ("install_handler" install-handler)
-			       sb!c-call:unsigned-long
-  (signal sb!c-call:int)
-  (handler sb!c-call:unsigned-long))
+			       sb!alien:unsigned-long
+  (signal sb!alien:int)
+  (handler sb!alien:unsigned-long))
 
 ;;;; interface to enabling and disabling signal handlers
 

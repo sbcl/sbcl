@@ -9,9 +9,9 @@
 
 (in-package "SB!KERNEL")
 
-(sb!alien:define-alien-routine ("purify" %purify) sb!c-call:void
-  (static-roots sb!c-call:unsigned-long)
-  (read-only-roots sb!c-call:unsigned-long))
+(sb!alien:define-alien-routine ("purify" %purify) sb!alien:void
+  (static-roots sb!alien:unsigned-long)
+  (read-only-roots sb!alien:unsigned-long))
 
 ;;; Compact the info environment. This is written with gratuitous
 ;;; recursion to make sure that our (and compact-info-environment's)

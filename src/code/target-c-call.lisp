@@ -1,5 +1,10 @@
-;;;; This file contains some extensions to the Alien facility to
-;;;; simplify importing C interfaces.
+;;;; FIXME: This file and host-c-call.lisp are separate from the
+;;;; rest of the alien source code for historical reasons: CMU CL
+;;;; made a distinction between the stuff in the C-CALL package and
+;;;; stuff in the ALIEN package. There's no obvious boundary
+;;;; there, though, and SBCL doesn't try to make this distinction,
+;;;; so it might make sense to just merge these files in with the
+;;;; rest of the SB-ALIEN code.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -10,7 +15,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C-CALL")
+(in-package "SB!ALIEN")
 
 ;;;; extra types
 
@@ -30,10 +35,6 @@
 (define-alien-type-translator void ()
   (parse-alien-type '(values) (sb!kernel:make-null-lexenv)))
 
-#+nil 
-(define-alien-routine strlen integer
-  (s (* char)))
-
 (defun %naturalize-c-string (sap)
   (declare (type system-area-pointer sap))
   (with-alien ((ptr (* char) sap))

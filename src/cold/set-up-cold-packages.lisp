@@ -16,7 +16,6 @@
 ;;; able to express features which we don't happen to use.
 (export '(package-data
 	  package-data-name
-	  package-data-nicknames
 	  package-data-export
 	  package-data-reexport
 	  package-data-import-from
@@ -26,8 +25,6 @@
   (name (error "missing PACKAGE-DATA-NAME datum"))
   ;; a doc string
   (doc (error "missing PACKAGE-DOC datum"))
-  ;; a list of string designators for package nicknames
-  nicknames
   ;; a tree containing names for exported symbols which'll be set up at package
   ;; creation time, and NILs, which are ignored. (This is a tree in order to
   ;; allow constructs like '("ENOSPC" #!+LINUX ("EDQUOT" "EISNAM" "ENAVAIL"
@@ -54,7 +51,14 @@
     (dolist (package-data package-data-list)
       (let* ((package (make-package
 		       (package-data-name package-data)
-		       :nicknames (package-data-nicknames package-data)
+		       ;; Note: As of 0.7.0, the only nicknames we use
+		       ;; for our implementation packages are hacks
+		       ;; not needed at cross-compile time (e.g. the
+		       ;; deprecated SB-C-CALL nickname for SB-ALIEN).
+		       ;; So support for nicknaming during xc is gone,
+		       ;; since any nicknames are hacked in during
+		       ;; cold init.
+		       :nicknames nil
 		       :use nil)))
 	#-clisp ; As of "2.27 (released 2001-07-17) (built 3215971334)"
 	        ; CLISP didn't support DOCUMENTATION on PACKAGE values.

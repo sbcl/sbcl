@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C-CALL")
+(in-package "SB!ALIEN")
 
 (/show0 "host-c-call.lisp 12")
 

@@ -3035,21 +3035,21 @@
 ;;; returns the overwritten bits. You must call this in a context in
 ;;; which GC is disabled, so that Lisp doesn't move objects around
 ;;; that C is pointing to.
-(sb!alien:define-alien-routine "breakpoint_install" sb!c-call:unsigned-long
-  (code-obj sb!c-call:unsigned-long)
-  (pc-offset sb!c-call:int))
+(sb!alien:define-alien-routine "breakpoint_install" sb!alien:unsigned-long
+  (code-obj sb!alien:unsigned-long)
+  (pc-offset sb!alien:int))
 
 ;;; This removes the break instruction and replaces the original
 ;;; instruction. You must call this in a context in which GC is disabled
 ;;; so Lisp doesn't move objects around that C is pointing to.
-(sb!alien:define-alien-routine "breakpoint_remove" sb!c-call:void
-  (code-obj sb!c-call:unsigned-long)
-  (pc-offset sb!c-call:int)
-  (old-inst sb!c-call:unsigned-long))
+(sb!alien:define-alien-routine "breakpoint_remove" sb!alien:void
+  (code-obj sb!alien:unsigned-long)
+  (pc-offset sb!alien:int)
+  (old-inst sb!alien:unsigned-long))
 
-(sb!alien:define-alien-routine "breakpoint_do_displaced_inst" sb!c-call:void
+(sb!alien:define-alien-routine "breakpoint_do_displaced_inst" sb!alien:void
   (scp (* os-context-t))
-  (orig-inst sb!c-call:unsigned-long))
+  (orig-inst sb!alien:unsigned-long))
 
 ;;;; breakpoint handlers (layer between C and exported interface)
 

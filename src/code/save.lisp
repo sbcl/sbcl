@@ -18,7 +18,7 @@
 ;;;; SAVE-LISP-AND-DIE itself
 
 (sb!alien:define-alien-routine "save" (sb!alien:boolean)
-  (file sb!c-call:c-string)
+  (file sb!alien:c-string)
   (initial-fun (sb!alien:unsigned #.sb!vm:n-word-bits)))
 
 ;;; FIXME: When this is run without the PURIFY option,

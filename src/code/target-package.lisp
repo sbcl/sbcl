@@ -969,7 +969,7 @@
 		:use '("COMMON-LISP"
 		       ;; ANSI encourages us to put extension packages
 		       ;; in the USE list of COMMON-LISP-USER.
-		       "SB!ALIEN" "SB!C-CALL" "SB!DEBUG"
+		       "SB!ALIEN" "SB!ALIEN" "SB!DEBUG"
 		       "SB!EXT" "SB!GRAY" "SB!PROFILE"))
 
   ;; Now do the *!DEFERRED-USE-PACKAGES*.

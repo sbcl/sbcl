@@ -89,6 +89,15 @@
 			  new-package-name
 			  (package-nicknames package)))))))
 
+;;; FIXME: This nickname is a deprecated hack for backwards
+;;; compatibility with code which assumed the CMU-CL-style
+;;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
+;;; in 0.7.0, so we should get rid of this nickname after a while.
+(let ((package (find-package "SB-ALIEN")))
+  (rename-package package
+		  (package-name package)
+		  (cons "SB-C-CALL" (package-nicknames package))))
+
 ;;; KLUDGE: This is created here (instead of in package-data-list.lisp-expr)
 ;;; because it doesn't have any symbols in it, so even if it's
 ;;; present at cold load time, genesis thinks it's unimportant

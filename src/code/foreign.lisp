@@ -109,11 +109,11 @@
 
 
 (sb-alien:define-alien-routine dlopen system-area-pointer
-  (file sb-c-call:c-string) (mode sb-c-call:int))
+  (file sb-alien:c-string) (mode sb-alien:int))
 (sb-alien:define-alien-routine dlsym system-area-pointer
   (lib system-area-pointer)
-  (name sb-c-call:c-string))
-(sb-alien:define-alien-routine dlerror sb-c-call:c-string)
+  (name sb-alien:c-string))
+(sb-alien:define-alien-routine dlerror sb-alien:c-string)
 
 ;;; Ensure that we've opened our own binary so we can dynamically resolve 
 ;;; symbols in the C runtime.  
