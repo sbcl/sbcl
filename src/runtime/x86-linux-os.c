@@ -60,6 +60,8 @@ void debug_get_ldt()
     printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
 }
 
+lispobj modify_ldt_lock;	/* protect all calls to modify_ldt */
+
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
 #ifdef LISP_FEATURE_SB_THREAD
@@ -70,6 +72,8 @@ int arch_os_thread_init(struct thread *thread) {
 	1, 0, 0, /* index, address, length filled in later */
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
+    get_spinlock(&modify_ldt_lock,thread);
+
     /* get next free ldt entry */
     int n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     if(n) {
@@ -81,7 +85,8 @@ int arch_os_thread_init(struct thread *thread) {
     ldt_entry.base_addr=(unsigned long) thread;
     ldt_entry.limit=dynamic_values_bytes;
     ldt_entry.limit_in_pages=0;
-    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
+    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
+	modify_ldt_lock=0;
 	/* modify_ldt call failed: something magical is not happening */
 	return -1;
     __asm__ __volatile__ ("movw %w0, %%fs" : : "q" 
@@ -89,6 +94,8 @@ int arch_os_thread_init(struct thread *thread) {
 			   + (1 << 2) /* TI set = LDT */
 			   + 3)); /* privilege level */
     thread->tls_cookie=n;
+    modify_ldt_lock=0;
+
     if(n<0) return 0;
 #endif
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -130,9 +137,13 @@ int arch_os_thread_cleanup(struct thread *thread) {
     }; 
 
     ldt_entry.entry_number=thread->tls_cookie;
-    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
+    get_spinlock(&modify_ldt_lock,thread);
+    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
+	modify_ldt_lock=0;
 	/* modify_ldt call failed: something magical is not happening */
 	return 0;
+    }
+    modify_ldt_lock=0;
     return 1;
 }
 

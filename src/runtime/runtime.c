@@ -384,7 +384,6 @@ static void parent_do_garbage_collect(void)
 
     for_each_thread(th) {
 	if(ptrace(PTRACE_ATTACH,th->pid,0,0)) {
-	    fprintf(stderr,"attaching to %d ...",th->pid); 
 	    perror("PTRACE_ATTACH");
 	}
 	else waiting_threads++;
@@ -421,7 +420,7 @@ static void parent_do_garbage_collect(void)
 		 * event to wait for */
 		fprintf(stderr, "%d was pseudo-atomic, letting it resume \n",
 			th->pid);
-		SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,1,th) ;
+		SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,make_fixnum(1),th);
 		if(ptrace(PTRACE_CONT,th->pid,0,0))
 		    perror("PTRACE_CONT");
 		waiting_threads++;
