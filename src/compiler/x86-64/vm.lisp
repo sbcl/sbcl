@@ -459,7 +459,12 @@
 
 (defun dwords-for-quad (value)
   (let* ((lo (logand value (1- (ash 1 32))))
-	 (hi (ash (- value lo) -32)))
+	 (hi (ash value -32)))
+    (values lo hi)))
+
+(defun words-for-dword (value)
+  (let* ((lo (logand value (1- (ash 1 16))))
+	 (hi (ash value -16)))
     (values lo hi)))
 
 (def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code

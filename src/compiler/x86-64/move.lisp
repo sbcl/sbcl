@@ -77,13 +77,13 @@
 	    (integer
 	     (if (and (zerop val) (sc-is y any-reg descriptor-reg))
 		 (inst xor y y)
-		 (inst mov y (fixnumize val))))
+		 (move-immediate y (fixnumize val))))
 	    (symbol
 	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
 	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
 				 base-char-widetag)))))
-	(move y x))))
+      (move y x))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg immediate)
@@ -93,6 +93,27 @@
 ;;; doesn't think it is a hairy type. This also allows checking of a
 ;;; few of the values in a continuation to fall out.
 (primitive-type-vop move (:check) t)
+
+(defun move-immediate (target val)
+  (multiple-value-bind (lo hi)
+      (dwords-for-quad val)
+    (cond ((zerop hi)
+	   (inst mov target lo))
+	  ((< lo (expt 2 31))
+	   (inst mov target hi)
+	   (inst shl target 32)
+	   (inst or target lo))
+	  ;; High bit set in lower dword, need to set the high and low
+	  ;; words of separately due to sign extension of the immediate
+	  ;; argument to OR.
+	  (t
+	   (multiple-value-bind (lo-lo lo-hi)
+	       (words-for-dword lo)
+	     (inst mov target hi)
+	     (inst shl target 16)
+	     (inst or target lo-hi)
+	     (inst shl target 16)
+	     (inst or target lo-lo))))))
 
 ;;; The MOVE-ARG VOP is used for moving descriptor values into
 ;;; another frame for argument or known value passing.
@@ -115,8 +136,10 @@
 	     (etypecase val
 	       ((integer 0 0)
 		(inst xor y y))
-	       (integer
+	       ((or (signed-byte 29) (unsigned-byte 29))
 		(inst mov y (fixnumize val)))
+	       (integer
+		(move-immediate y (fixnumize val)))
 	       (symbol
 		(load-symbol y val))
 	       (character

@@ -1035,6 +1035,9 @@ gc_alloc_with_region(int nbytes,int unboxed_p, struct alloc_region *my_region,
     /* Check whether there is room in the current alloc region. */
     new_free_pointer = my_region->free_pointer + nbytes;
 
+    /* fprintf(stderr, "alloc %d bytes from %p to %p\n", nbytes,
+       my_region->free_pointer, new_free_pointer); */
+
     if (new_free_pointer <= my_region->end_addr) {
 	/* If so then allocate from the current alloc region. */
 	void *new_obj = my_region->free_pointer;
@@ -1208,8 +1211,9 @@ copy_large_object(lispobj object, int nwords)
 	    next_page++;
 	}
 
-	generations[from_space].bytes_allocated -= 4*nwords + bytes_freed;
-	generations[new_space].bytes_allocated += 4*nwords;
+	generations[from_space].bytes_allocated -= N_WORD_BYTES*nwords +
+	  bytes_freed;
+	generations[new_space].bytes_allocated += N_WORD_BYTES*nwords;
 	bytes_allocated -= bytes_freed;
 
 	/* Add the region to the new_areas if requested. */
@@ -2646,8 +2650,9 @@ scavenge_generation(int generation)
 		    break;
 	    }
 	    if (!write_protected) {
-		scavenge(page_address(i), (page_table[last_page].bytes_used
-					   + (last_page-i)*PAGE_BYTES)/4);
+		scavenge(page_address(i), 
+			 (page_table[last_page].bytes_used +
+			  (last_page-i)*PAGE_BYTES)/N_WORD_BYTES);
 		
 		/* Now scan the pages and write protect those that
 		 * don't have pointers to younger generations. */
@@ -2765,7 +2770,7 @@ scavenge_newspace_generation_one_scan(int generation)
 		
 		size = (page_table[last_page].bytes_used
 			+ (last_page-i)*PAGE_BYTES
-			- page_table[i].first_object_offset)/4;
+			- page_table[i].first_object_offset)/N_WORD_BYTES;
 		new_areas_ignore_page = last_page;
 		
 		scavenge(page_address(i) +
@@ -3313,7 +3318,7 @@ verify_generation(int  generation)
 		    break;
 
 	    verify_space(page_address(i), (page_table[last_page].bytes_used
-					   + (last_page-i)*PAGE_BYTES)/4);
+					   + (last_page-i)*PAGE_BYTES)/N_WORD_BYTES);
 	    i = last_page;
 	}
     }

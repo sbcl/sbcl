@@ -127,6 +127,7 @@ scavenge(lispobj *start, long n_words)
     lispobj *object_ptr;
     int n_words_scavenged;
     for (object_ptr = start;
+
 	 object_ptr < end;
 	 object_ptr += n_words_scavenged) {
 
@@ -301,7 +302,7 @@ trans_code(struct code *code)
 		
 	/* fix self pointer. */
 	nfheaderp->self =
-#ifdef LISP_FEATURE_X86
+#ifdef LISP_FEATURE_X86 || LISP_FEATURE_X86_64
 	    FUN_RAW_ADDR_OFFSET +
 #endif
 	    nfheaderl; 
@@ -381,7 +382,7 @@ size_code_header(lispobj *where)
     return nwords;
 }
 
-#ifndef LISP_FEATURE_X86
+#ifndef LISP_FEATURE_X86 || LISP_FEATURE_X86_64
 static int
 scav_return_pc_header(lispobj *where, lispobj object)
 {
@@ -416,7 +417,7 @@ trans_return_pc_header(lispobj object)
  * objects don't move, we don't need to update anything, but we do
  * have to figure out that the function is still live. */
 
-#ifdef LISP_FEATURE_X86
+#ifdef LISP_FEATURE_X86 || LISP_FEATURE_X86_64
 static int
 scav_closure_header(lispobj *where, lispobj object)
 {
@@ -436,7 +437,7 @@ scav_closure_header(lispobj *where, lispobj object)
 }
 #endif
 
-#ifndef LISP_FEATURE_X86
+#ifndef LISP_FEATURE_X86 || LISP_FEATURE_X86_64
 static int
 scav_fun_header(lispobj *where, lispobj object)
 {
@@ -1634,7 +1635,7 @@ gc_init_tables(void)
     scavtab[SIMPLE_FUN_HEADER_WIDETAG] = scav_fun_header;
     scavtab[RETURN_PC_HEADER_WIDETAG] = scav_return_pc_header;
 #endif
-#ifdef LISP_FEATURE_X86
+#ifdef LISP_FEATURE_X86 || LISP_FEATURE_X86_64
     scavtab[CLOSURE_HEADER_WIDETAG] = scav_closure_header;
     scavtab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = scav_closure_header;
 #else

@@ -1028,10 +1028,6 @@
 		   (emit-sized-immediate segment 
 					 (case size (:qword :dword) (t size))
 					 src))
-		  ((typep src '(or (signed-byte 64) (unsigned-byte 64)))
-		   (emit-byte segment (+ #xb8
-					 (logand 8 (ash (tn-offset dst) -1))))
-		   (emit-sized-immediate segment :qword src t))
 		  (t
 		   (aver nil))))
 	   ((register-p src)

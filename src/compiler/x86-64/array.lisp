@@ -33,7 +33,7 @@
 			      :disp (fixnumize (1- array-dimensions-offset))))
     (inst shl header n-widetag-bits)
     (inst or  header type)
-    (inst shr header (1- n-widetag-bits)) ;XXX was naked 2, am guessing
+    (inst shr header (1- n-lowtag-bits))
     (pseudo-atomic
      (allocation result bytes node)
      (inst lea result (make-ea :qword :base result :disp other-pointer-lowtag))
@@ -140,14 +140,14 @@
 		  ,element-type data-vector-set)))
 	   )
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
-  (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
+  #+nil (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
     unsigned-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
     unsigned-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-61 tagged-num any-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-60
       positive-fixnum any-reg)
-  (def-full-data-vector-frobs simple-array-signed-byte-32
+  #+nil (def-full-data-vector-frobs simple-array-signed-byte-32
       signed-num signed-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-64
       signed-num signed-reg)
@@ -303,11 +303,10 @@
   (:results (value :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
-   (with-empty-tn@fp-top(value)
-     (inst fld (make-ea	:dword :base object :index index :scale 1
-			:disp (- (* vector-data-offset
-				    n-word-bytes)
-				 other-pointer-lowtag))))))
+   (inst movss value (make-ea :dword :base object :index index :scale 1
+			      :disp (- (* vector-data-offset
+					  n-word-bytes)
+				       other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-array-single-float)
   (:note "inline array access")
@@ -319,12 +318,11 @@
   (:results (value :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
-   (with-empty-tn@fp-top(value)
-     (inst fld (make-ea	:dword :base object
-			:disp (- (+ (* vector-data-offset
-				       n-word-bytes)
-				    (* 4 index))
-				 other-pointer-lowtag))))))
+   (inst movss value (make-ea :dword :base object
+			      :disp (- (+ (* vector-data-offset
+					     n-word-bytes)
+					  (* 4 index))
+				       other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-single-float)
   (:note "inline array store")
@@ -337,30 +335,13 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fst (make-ea :dword :base object :index index :scale 1
-			      :disp (- (* vector-data-offset
-					  n-word-bytes)
-				       other-pointer-lowtag)))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fst result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fst (make-ea :dword :base object :index index :scale 1
-			      :disp (- (* vector-data-offset
-					  n-word-bytes)
-				       other-pointer-lowtag)))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fst value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fst result))
-		  (inst fxch value)))))))
+   (inst movss (make-ea :dword :base object :index index :scale 1
+			:disp (- (* vector-data-offset
+				    n-word-bytes)
+				 other-pointer-lowtag))
+	 value)
+   (unless (location= result value)
+     (inst movss result value))))
 
 (define-vop (data-vector-set-c/simple-array-single-float)
   (:note "inline array store")
@@ -374,32 +355,14 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fst (make-ea :dword :base object
-			      :disp (- (+ (* vector-data-offset
-					     n-word-bytes)
-					  (* 4 index))
-				       other-pointer-lowtag)))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fst result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fst (make-ea :dword :base object
-			      :disp (- (+ (* vector-data-offset
-					     n-word-bytes)
-					  (* 4 index))
-				       other-pointer-lowtag)))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fst value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fst result))
-		  (inst fxch value)))))))
+   (inst movss (make-ea :dword :base object
+			:disp (- (+ (* vector-data-offset
+				       n-word-bytes)
+				    (* 4 index))
+				 other-pointer-lowtag))
+	 value)
+   (unless (location= result value)
+     (inst movss result value))))
 
 (define-vop (data-vector-ref/simple-array-double-float)
   (:note "inline array access")
@@ -411,11 +374,10 @@
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 7
-   (with-empty-tn@fp-top(value)
-     (inst fldd (make-ea :dword :base object :index index :scale 2
-			 :disp (- (* vector-data-offset
-				     n-word-bytes)
-				  other-pointer-lowtag))))))
+   (inst movsd value (make-ea :dword :base object :index index :scale 2
+			      :disp (- (* vector-data-offset
+					  n-word-bytes)
+				       other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-array-double-float)
   (:note "inline array access")
@@ -427,12 +389,11 @@
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 6
-   (with-empty-tn@fp-top(value)
-     (inst fldd (make-ea :dword :base object
-			 :disp (- (+ (* vector-data-offset
-					n-word-bytes)
-				     (* 8 index))
-				  other-pointer-lowtag))))))
+   (inst movsd value (make-ea :dword :base object
+			      :disp (- (+ (* vector-data-offset
+					     n-word-bytes)
+					  (* 8 index))
+				       other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-double-float)
   (:note "inline array store")
@@ -445,30 +406,13 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 20
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fstd (make-ea :dword :base object :index index :scale 2
+   (inst movsd (make-ea :dword :base object :index index :scale 2
 			       :disp (- (* vector-data-offset
 					   n-word-bytes)
-					other-pointer-lowtag)))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fstd (make-ea :dword :base object :index index :scale 2
-			       :disp (- (* vector-data-offset
-					   n-word-bytes)
-					other-pointer-lowtag)))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fstd result))
-		  (inst fxch value)))))))
+					other-pointer-lowtag))
+	 value)
+   (unless (location= result value)
+     (inst movsd result value))))
 
 (define-vop (data-vector-set-c/simple-array-double-float)
   (:note "inline array store")
@@ -482,36 +426,17 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 19
-    (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fstd (make-ea :dword :base object
-			       :disp (- (+ (* vector-data-offset
-					      n-word-bytes)
-					   (* 8 index))
-					other-pointer-lowtag)))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fstd (make-ea :dword :base object
-			       :disp (- (+ (* vector-data-offset
-					      n-word-bytes)
-					   (* 8 index))
-					other-pointer-lowtag)))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fstd result))
-		  (inst fxch value)))))))
+   (inst movsd (make-ea :dword :base object
+		       :disp (- (+ (* vector-data-offset
+				      n-word-bytes)
+				   (* 8 index))
+				other-pointer-lowtag))
+	 value)
+   (unless (location= result value)
+     (inst movsd result value))))
 
 
-
-;;; complex float variants
+;;; complex float variants XXX completely broken
 
 (define-vop (data-vector-ref/simple-array-complex-single-float)
   (:note "inline array access")
@@ -990,7 +915,8 @@
 	(:generator 4
 	  (inst movzxd value
 		(make-ea :dword :base object
-			 :disp (- (+ (* vector-data-offset n-word-bytes) (* 4 index))
+			 :disp (- (+ (* vector-data-offset n-word-bytes)
+				     (* 4 index))
 				  other-pointer-lowtag)))))
       (define-vop (,(symbolicate "DATA-VECTOR-SET/" ptype))
 	(:translate data-vector-set)
