@@ -545,7 +545,7 @@ error if any of PACKAGES is not a valid package designator."
   #!+sb-doc
   "Changes the name and nicknames for a package."
   (let* ((package (find-undeleted-package-or-lose package))
-	 (name (string name))
+	 (name (package-namify name))
 	 (found (find-package name))
 	 (nicks (mapcar #'string nicknames)))
     (unless (or (not found) (eq found package))
