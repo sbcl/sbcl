@@ -2183,6 +2183,9 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
     to the "max args" entry point.  (reported by Brian Downing)
   * tweaked disassembly notes to be less confident about proclaiming
     some instruction as an LRA.  (thanks to Brian Downing)
+  * contrib update: SB-ACLREPL is now threadsafe; multiple listeners
+    now each have their own history, command character, and other
+    characteristics.  (thanks to David Lichteblau)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** compiler failure in compiling LOGAND expressions including a
        constant 0.

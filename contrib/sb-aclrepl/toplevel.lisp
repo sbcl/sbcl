@@ -1,17 +1,28 @@
 (cl:defpackage :sb-aclrepl
-  (:use :cl :sb-ext))
+  (:use "COMMON-LISP" "SB-EXT")
+  (:shadowing-import-from "SB-IMPL" "SCRUB-CONTROL-STACK")
+  (:shadowing-import-from "SB-INT" "*REPL-PROMPT-FUN*" "*REPL-READ-FORM-FUN*")
+  (:export
+   ;; user-level customization of UI
+   "*PROMPT*" "*EXIT-ON-EOF*" "*MAX-HISTORY*"
+   "*USE-SHORT-PACKAGE-NAME*" "*COMMAND-CHAR*"
+   ;; user-level customization of functionality
+   "ALIAS"
+   ;; internalsish, but the documented way to make a new repl "object"
+   ;; such that it inherits the current state of the repl but has its
+   ;; own independent state subsequently.
+   "MAKE-REPL-FUN"))
 
 (cl:in-package :sb-aclrepl)
 
-(defvar *noprint* nil "boolean: T if don't print prompt and output")
-(defvar *break-level* 0 "current break level")
-(defvar *inspect-break* nil "boolean: T if break caused by inspect")
-(defvar *continuable-break* nil "boolean: T if break caused by continuable error")
-
-(shadowing-import '(sb-impl::scrub-control-stack
-		    sb-int:*repl-prompt-fun* sb-int:*repl-read-form-fun*)
-		  :sb-aclrepl)
-	  
+(defvar *noprint* nil
+  "boolean: T if don't print prompt and output")
+(defvar *break-level* 0
+  "current break level")
+(defvar *inspect-break* nil
+  "boolean: T if break caused by inspect")
+(defvar *continuable-break* nil
+  "boolean: T if break caused by continuable error")
 
 (defun repl (&key
 	     (break-level (1+ *break-level*))
@@ -28,6 +39,7 @@
 	 (catch 'repl-catcher
 	   (loop
 	    (rep-one)))
+       (declare (ignore reason-param))
        (cond
 	 ((and (eq reason :inspect)
 	       (plusp *break-level*))
@@ -62,9 +74,3 @@
 	;; reset to the beginning of the line.
 	(fresh-line *standard-output*)
 	(prin1 result *standard-output*)))))
-
-(defun repl-fun (noprint)
-  (repl :noprint noprint :break-level 0))
-
-(when (boundp 'sb-impl::*repl-fun*)
-  (setq sb-impl::*repl-fun* #'repl-fun))

@@ -58,7 +58,6 @@ The commands are:
 
 
 (defun inspector-fun (object input-stream output-stream)
-  (declare (ignore input-stream))
   (let ((*current-inspect* nil)
 	(*inspect-raw* nil)
 	(*inspect-length* *inspect-length*)

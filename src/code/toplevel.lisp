@@ -478,6 +478,23 @@
       ;; (classic CMU CL error message: "You're certainly a clever child.":-)
       (critically-unreachable "after TOPLEVEL-REPL"))))
 
+;;; hooks to support customized toplevels like ACL-style toplevel from
+;;; KMR on sbcl-devel 2002-12-21.  Altered by CSR 2003-11-16 for
+;;; threaded operation: altered *REPL-FUN* to *REPL-FUN-GENERATOR*.
+(defvar *repl-read-form-fun* #'repl-read-form-fun
+  "a function of two stream arguments IN and OUT for the toplevel REPL to
+  call: Return the next Lisp form to evaluate (possibly handling other
+  magic -- like ACL-style keyword commands -- which precede the next
+  Lisp form). The OUT stream is there to support magic which requires
+  issuing new prompts.")
+(defvar *repl-prompt-fun* #'repl-prompt-fun
+  "a function of one argument STREAM for the toplevel REPL to call: Prompt
+  the user for input.")
+(defvar *repl-fun-generator* (constantly #'repl-fun)
+  "a function of no arguments returning a function of one argument
+  NOPRINT that provides the REPL for the system.  Assumes that
+  *STANDARD-INPUT* and *STANDARD-OUTPUT* are set up.")
+
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)
   (/show0 "entering TOPLEVEL-REPL")
@@ -485,34 +502,41 @@
 	(- nil)
 	(+ nil) (++ nil) (+++ nil)
 	(/// nil) (// nil) (/ nil))
-    ;; WITH-SIMPLE-RESTART doesn't actually restart its body as some
-    ;; (like WHN for an embarrassingly long time ca. 2001-12-07) might
-    ;; think, but instead drops control back out at the end. So when a
-    ;; TOPLEVEL or outermost-ABORT restart happens, we need this outer
-    ;; LOOP wrapper to grab control and start over again. (And it also
-    ;; wraps CATCH 'TOPLEVEL-CATCHER for similar reasons.)
-    (loop
-     (/show0 "about to set up restarts in TOPLEVEL-REPL")
-     ;; There should only be one TOPLEVEL restart, and it's here, so
-     ;; restarting at TOPLEVEL always bounces you all the way out here.
-     (with-simple-restart (toplevel
-			   "Restart at toplevel READ/EVAL/PRINT loop.")
-       ;; We add a new ABORT restart for every debugger level, so 
-       ;; restarting at ABORT in a nested debugger gets you out to the
-       ;; innermost enclosing debugger, and only when you're in the
-       ;; outermost, unnested debugger level does restarting at ABORT 
-       ;; get you out to here.
-       (with-simple-restart
-	   (abort
-	    "~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
-	 (catch 'toplevel-catcher
-	   (sb!unix::reset-signal-mask)
-	   ;; in the event of a control-stack-exhausted-error, we should
-	   ;; have unwound enough stack by the time we get here that this
-	   ;; is now possible
-	   (sb!kernel::protect-control-stack-guard-page 1)
-	   (funcall *repl-fun* noprint)
-	   (critically-unreachable "after REPL")))))))
+    (/show0 "about to funcall *REPL-FUN-GENERATOR*")
+    (let ((repl-fun (funcall *repl-fun-generator*)))
+      ;; Each REPL in a multithreaded world should have bindings of
+      ;; most CL specials (most critically *PACKAGE*).
+      (with-rebound-io-syntax
+	;; WITH-SIMPLE-RESTART doesn't actually restart its body as
+	;; some (like WHN for an embarrassingly long time
+	;; ca. 2001-12-07) might think, but instead drops control back
+	;; out at the end. So when a TOPLEVEL or outermost-ABORT
+	;; restart happens, we need this outer LOOP wrapper to grab
+	;; control and start over again. (And it also wraps CATCH
+	;; 'TOPLEVEL-CATCHER for similar reasons.)
+	(loop
+	 (/show0 "about to set up restarts in TOPLEVEL-REPL")
+	 ;; There should only be one TOPLEVEL restart, and it's here,
+	 ;; so restarting at TOPLEVEL always bounces you all the way
+	 ;; out here.
+	 (with-simple-restart (toplevel
+			       "Restart at toplevel READ/EVAL/PRINT loop.")
+	   ;; We add a new ABORT restart for every debugger level, so
+	   ;; restarting at ABORT in a nested debugger gets you out to
+	   ;; the innermost enclosing debugger, and only when you're
+	   ;; in the outermost, unnested debugger level does
+	   ;; restarting at ABORT get you out to here.
+	   (with-simple-restart
+	       (abort
+		"~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
+	     (catch 'toplevel-catcher
+	       (sb!unix::reset-signal-mask)
+	       ;; in the event of a control-stack-exhausted-error, we
+	       ;; should have unwound enough stack by the time we get
+	       ;; here that this is now possible
+	       (sb!kernel::protect-control-stack-guard-page 1)
+	       (funcall repl-fun noprint)
+	       (critically-unreachable "after REPL")))))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
 (defun repl-prompt-fun (stream)
@@ -528,21 +552,6 @@
     (if (eq form eof-marker)
 	(quit)
 	form)))
-
-;;; hooks to support customized toplevels like ACL-style toplevel
-;;; from KMR on sbcl-devel 2002-12-21
-(defvar *repl-read-form-fun* #'repl-read-form-fun
-  "a function of two stream arguments IN and OUT for the toplevel REPL to
-  call: Return the next Lisp form to evaluate (possibly handling other
-  magic -- like ACL-style keyword commands -- which precede the next
-  Lisp form). The OUT stream is there to support magic which requires
-  issuing new prompts.")
-(defvar *repl-prompt-fun* #'repl-prompt-fun
-  "a function of one argument STREAM for the toplevel REPL to call: Prompt
-  the user for input.")
-(defvar *repl-fun* #'repl-fun
-  "a function of one argument NOPRINT that provides the REPL for the system.
-  Assumes that *standard-input* and *standard-output* are setup.")
 
 (defun repl-fun (noprint)
   (/show0 "entering REPL")

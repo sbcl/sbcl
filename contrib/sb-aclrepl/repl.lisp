@@ -52,11 +52,6 @@
 
 (declaim (type list *history*))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (export '(*prompt* *exit-on-eof* *max-history*
-	    *use-short-package-name* *command-char*
-	    alias)))
-
 (defvar *eof-marker* :eof)
 (defvar *eof-cmd* (make-user-cmd :func :eof))
 (defvar *null-cmd* (make-user-cmd :func :null-cmd))
@@ -64,18 +59,6 @@
 (defparameter *cmd-table-hash*
   (make-hash-table :size 30 :test #'equal))
 
-;; Set up binding for multithreading
-
-(let ((*prompt* #.*default-prompt*)
-      (*use-short-package-name* t)
-      (*dir-stack* nil)
-      (*command-char* #\:)
-      (*max-history* 100)
-      (*exit-on-eof* t)
-      (*history* nil)
-      (*cmd-number* 1)
-      )
-      
 (defun prompt-package-name ()
   (if *use-short-package-name*
       (car (sort (append
@@ -639,8 +622,7 @@
   (values))
 
 (defun reset-cmd ()
-  ;; The last restart goes to the toplevel
-  (invoke-restart-interactively (car (last (compute-restarts)))))
+  (invoke-restart-interactively (find-restart 'sb-impl::toplevel)))
 
 (defun dirs-cmd ()
   (dolist (dir *dir-stack*)
@@ -866,5 +848,23 @@
 (setf sb-int:*repl-prompt-fun* #'repl-prompt-fun
       sb-int:*repl-read-form-fun* #'repl-read-form-fun)
 
-) ;; close special variables bindings
+(defmacro with-new-repl-state ((&rest vars) &body forms)
+  (let ((gvars (mapcar (lambda (var) (gensym (symbol-name var))) vars)))
+    `(let (,@(mapcar (lambda (var gvar) `(,gvar ,var)) vars gvars))
+      (lambda (noprint)
+	(let ((*noprint* noprint))
+	  (let (,@(mapcar (lambda (var gvar) `(,var ,gvar)) vars gvars))
+	    (unwind-protect
+		 (progn ,@forms)
+	      ,@(mapcar (lambda (var gvar) `(setf ,gvar ,var))
+			vars gvars))))))))
+	
+(defun make-repl-fun ()
+  (with-new-repl-state (*break-level* *inspect-break* *continuable-break*
+			*dir-stack* *command-char* *prompt*
+			*use-short-package-name* *max-history* *exit-on-eof*
+			*history* *cmd-number*)
+    (repl :noprint noprint :break-level 0)))
 
+(when (boundp 'sb-impl::*repl-fun-generator*)
+  (setq sb-impl::*repl-fun-generator* #'make-repl-fun))

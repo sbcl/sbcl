@@ -779,12 +779,11 @@ retained, possibly temporariliy, because it might be used internally."
              "AWHEN" "ACOND" "IT"
              "BINDING*"
 	     "!DEF-BOOLEAN-ATTRIBUTE"
+	     "WITH-REBOUND-IO-SYNTAX"
 
 	     ;; ..and CONDITIONs..
 	     "BUG"
 	     "UNSUPPORTED-OPERATOR"
-	     "BOOTSTRAP-PACKAGE-NOT-FOUND"
-	     "BOOTSTRAP-PACKAGE-NAME" "DEBOOTSTRAP-PACKAGE"
 
              ;; ..and DEFTYPEs..
              "INDEX" "LOAD/STORE-INDEX"
