@@ -230,6 +230,37 @@
 		    (let ((dacc (funcall really-fun ,@values)))
 		      (declare (ignorable dacc))
 		      ,push-dacc))))))))))
+
+;;; MAP-INTO
+(deftransform map-into ((result fun &rest seqs)
+                        (vector * &rest *)
+                        *)
+  "open code"
+  (let ((seqs-names (mapcar (lambda (x)
+                              (declare (ignore x))
+                              (gensym))
+                            seqs)))
+    `(lambda (result fun ,@seqs-names)
+       (let ((length (array-dimension result 0))
+             (i 0))
+         (declare (type index i))
+         (declare (ignorable i))
+         ,(cond ((null seqs)
+                 `(dotimes (j length (setq i length))
+                    (setf (aref result j) (funcall fun))))
+                (t
+                 `(block nil
+                    (map nil
+                         (lambda (,@seqs-names)
+                           (when (= i length) (return))
+                           (setf (aref result i)
+                                 (funcall fun ,@seqs-names))
+                           (incf i))
+                         ,@seqs-names))))
+         (when (array-has-fill-pointer-p result)
+           (setf (fill-pointer result) i))
+         result))))
+
 
 ;;; FIXME: once the confusion over doing transforms with known-complex
 ;;; arrays is over, we should also transform the calls to (AND (ARRAY

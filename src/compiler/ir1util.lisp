@@ -1300,6 +1300,21 @@
 		     :type (ctype-of object)
 		     :where-from :defined)))
 
+;;; Return true if VAR would have to be closed over if environment
+;;; analysis ran now (i.e. if there are any uses that have a different
+;;; home lambda than VAR's home.)
+(defun closure-var-p (var)
+  (declare (type lambda-var var))
+  (let ((home (lambda-var-home var)))
+    (cond ((eq (functional-kind home) :deleted)
+           nil)
+          (t (let ((home (lambda-home home)))
+               (flet ((frob (l)
+                        (find home l :key #'node-home-lambda
+                              :test-not #'eq)))
+                 (or (frob (leaf-refs var))
+                     (frob (basic-var-sets var)))))))))
+
 ;;; If there is a non-local exit noted in ENTRY's environment that
 ;;; exits to CONT in that entry, then return it, otherwise return NIL.
 (defun find-nlx-info (entry cont)

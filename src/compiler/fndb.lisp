@@ -474,6 +474,11 @@
 (defknown %map-to-nil-on-vector (callable vector) null (flushable call))
 (defknown %map-to-nil-on-sequence (callable sequence) null (flushable call))
 
+(defknown map-into (sequence callable &rest sequence)
+  sequence
+  (call)
+  :derive-type #'result-type-first-arg)
+
 ;;; returns the result from the predicate...
 (defknown some (callable sequence &rest sequence) t
   (foldable unsafely-flushable call))

@@ -540,19 +540,6 @@
                              (when con
                                (constrain-ref-type node con cons))))))))
 
-;;; Return true if VAR would have to be closed over if environment
-;;; analysis ran now (i.e. if there are any uses that have a different
-;;; home lambda than VAR's home.)
-(defun closure-var-p (var)
-  (declare (type lambda-var var))
-  (let ((home (lambda-home (lambda-var-home var))))
-    (flet ((frob (l)
-	     (dolist (node l nil)
-	       (unless (eq (node-home-lambda node) home)
-		 (return t)))))
-      (or (frob (leaf-refs var))
-	  (frob (basic-var-sets var))))))
-
 ;;; Give an empty constraints set to any var that doesn't have one and
 ;;; isn't a set closure var. Since a var that we previously rejected
 ;;; looks identical to one that is new, so we optimistically keep

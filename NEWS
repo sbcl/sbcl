@@ -1635,7 +1635,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     sbcl --eval "(defpackage :foo)" --eval "(print 'foo::bar)" now work
     as the user might reasonably expect.)
   * minor incompatible change: *STANDARD-INPUT* is now only an
-    INPUT-STREAM, not a BIDIRECTIONAL-STREAM.  (thanks to Antonio 
+    INPUT-STREAM, not a BIDIRECTIONAL-STREAM.  (thanks to Antonio
     Martinez)
   * minor incompatible change: Y-OR-N-P is now character-oriented, not
     line oriented.  Also, YES-OR-NO-P now works without errors.
@@ -1664,7 +1664,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     details.
   * Garbage collection refactoring: user-visible change is that a
     call to the GC function during WITHOUT-GCING will not do garbage
-    collection until the end of the WITHOUT-GCING.  If you were doing 
+    collection until the end of the WITHOUT-GCING.  If you were doing
     this you were probably losing anyway.
   * sb-aclrepl module improvements: an integrated inspector, added
     repl features, and a bug fix to :trace command.
@@ -1673,6 +1673,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     TYPEP the latter but not the former.
   * compiler issues a full WARNING on calling of an undefined function
     with a name from the CL package.
+  * MAP-INTO for a vector destination is open coded. (reported by
+    Brian Downing on c.l.l)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;
