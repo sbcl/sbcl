@@ -515,6 +515,13 @@ bootstrapping.
 		 ;; another declaration (e.g. %BLOCK-NAME), so that
 		 ;; our method debug names are free to have any format,
 		 ;; e.g. (:METHOD PRINT-OBJECT :AROUND (CLOWN T)).
+		 ;;
+		 ;; Further, as of sbcl-0.7.9.10, the code to
+		 ;; implement NO-NEXT-METHOD is coupled to the form of
+		 ;; this declaration; see the definition of
+		 ;; CALL-NO-NEXT-METHOD (and the passing of
+		 ;; METHOD-NAME-DECLARATION arguments around the
+		 ;; various CALL-NEXT-METHOD logic).
 		 (declare (%method-name (,name
 					 ,@qualifiers
 					 ,specializers)))
@@ -726,6 +733,14 @@ bootstrapping.
 					:call-next-method-p
 					,call-next-method-p
 					:next-method-p-p ,next-method-p-p
+			                ;; we need to pass this along
+			                ;; so that NO-NEXT-METHOD can
+			                ;; be given a suitable METHOD
+			                ;; argument; we need the
+			                ;; QUALIFIERS and SPECIALIZERS
+			                ;; inside the declaration to
+			                ;; give to FIND-METHOD.
+			                :method-name-declaration ,name-decl
 					:closurep ,closurep
 					:applyp ,applyp)
 			  ,@walked-declarations
@@ -769,17 +784,31 @@ bootstrapping.
 		       (,',next-methods (cdr ,',next-methods)))
 		   .next-method. ,',next-methods
 		   ,@body))
-	      (call-next-method-body (cnm-args)
+	      (call-next-method-body (method-name-declaration cnm-args)
 		`(if .next-method.
 		     (funcall (if (std-instance-p .next-method.)
 				  (method-function .next-method.)
 				  .next-method.) ; for early methods
 			      (or ,cnm-args ,',method-args)
 			      ,',next-methods)
-		     (error "no next method")))
+		     (apply #'call-no-next-method ',method-name-declaration
+		            (or ,cnm-args ,',method-args))))
 	      (next-method-p-body ()
 		`(not (null .next-method.))))
      ,@body))
+
+(defun call-no-next-method (method-name-declaration &rest args)
+  (destructuring-bind (name) method-name-declaration
+    (destructuring-bind (name &rest qualifiers-and-specializers) name
+      ;; KLUDGE: inefficient traversal, but hey.  This should only
+      ;; happen on the slow error path anyway.
+      (let* ((qualifiers (butlast qualifiers-and-specializers))
+	     (specializers (car (last qualifiers-and-specializers)))
+	     (method (find-method (gdefinition name) qualifiers specializers)))
+	(apply #'no-next-method
+	       (method-generic-function method)
+	       method
+	       args)))))
 
 (defstruct (method-call (:copier nil))
   (function #'identity :type function)
@@ -1011,7 +1040,7 @@ bootstrapping.
 		   ,emf))
 	      (call-next-method-bind (&body body)
                `(let () ,@body))
-	      (call-next-method-body (cnm-args)
+	      (call-next-method-body (method-name-declaration cnm-args)
                `(if ,',next-method-call
                  ,(locally
                    ;; This declaration suppresses a "deleting
@@ -1039,13 +1068,22 @@ bootstrapping.
                                        ,cnm-args)
                             ,call)
                            ,call))))
-                 (error "no next method")))
+		 ,(if (and (null ',rest-arg)
+			   (consp cnm-args)
+			   (eq (car cnm-args) 'list))
+		      `(call-no-next-method ',method-name-declaration
+			                    ,@(cdr cnm-args))
+		      `(call-no-next-method ',method-name-declaration
+			                    ,@',args
+			                    ,@',(when rest-arg
+						      `(,rest-arg))))))
 	      (next-method-p-body ()
                `(not (null ,',next-method-call))))
     ,@body))
 
 (defmacro bind-lexical-method-functions
-    ((&key call-next-method-p next-method-p-p closurep applyp)
+    ((&key call-next-method-p next-method-p-p
+	   closurep applyp method-name-declaration)
      &body body)
   (cond ((and (null call-next-method-p) (null next-method-p-p)
 	      (null closurep)
@@ -1057,7 +1095,8 @@ bootstrapping.
 	 ;; (else APPLYP would be true).
 	 `(call-next-method-bind
 	    (macrolet ((call-next-method (&rest cnm-args)
-			 `(call-next-method-body ,(when cnm-args
+			 `(call-next-method-body ,',method-name-declaration
+			                         ,(when cnm-args
 						    `(list ,@cnm-args))))
 		       (next-method-p ()
 			 `(next-method-p-body)))
@@ -1065,8 +1104,10 @@ bootstrapping.
 	(t
 	 `(call-next-method-bind
 	    (flet (,@(and call-next-method-p
-			  '((call-next-method (&rest cnm-args)
-			      (call-next-method-body cnm-args))))
+			  `((call-next-method (&rest cnm-args)
+			     (call-next-method-body
+			      ,method-name-declaration
+			      cnm-args))))
 		   ,@(and next-method-p-p
 			  '((next-method-p ()
 			      (next-method-p-body)))))

@@ -626,3 +626,11 @@
 	  ~I~_when called with arguments ~2I~_~S.~:>"
 	 generic-function
 	 args))
+
+(defmethod no-next-method ((generic-function standard-generic-function)
+			   (method standard-method) &rest args)
+  (error "~@<There is no next method for the generic function ~2I~_~S~
+	  ~I~_when called from method ~2I~_~S~I~_with arguments ~2I~_~S.~:>"
+	 generic-function
+	 method
+	 args))

@@ -1349,6 +1349,9 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
   * minor incompatible change: PCL now records the pathname of a file
     in which methods and the like are defined, rather than its
     truename.
+  * more systematization and improvement of CLOS and MOP conformance
+    in PCL (thanks to Gerd Moellman and Pierre Mai):
+    ** NO-NEXT-METHOD is now implemented;
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

@@ -488,6 +488,8 @@
 
 (defgeneric no-applicable-method (generic-function &rest args))
 
+(defgeneric no-next-method (generic-function method &rest args))
+
 (defgeneric reader-method-class (class direct-slot &rest initargs))
 
 (defgeneric reinitialize-instance (gf &rest args &key &allow-other-keys))

@@ -318,6 +318,14 @@
 			  (declare (special y))))
   (assert-program-error (defgeneric bogus-declaration2 (x)
 			  (declare (notinline concatenate)))))
+;;; CALL-NEXT-METHOD should call NO-NEXT-METHOD if there is no next
+;;; method.
+(defmethod no-next-method-test ((x integer)) (call-next-method))
+(assert (null (ignore-errors (no-next-method-test 1))))
+(defmethod no-next-method ((g (eql #'no-next-method-test)) m &rest args)
+  'success)
+(assert (eq (no-next-method-test 1) 'success))
+(assert (null (ignore-errors (no-next-method-test 'foo))))
 
 ;;;; success
 
