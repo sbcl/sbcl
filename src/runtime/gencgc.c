@@ -43,11 +43,6 @@
 #include "genesis/weak-pointer.h"
 #include "genesis/simple-fun.h"
 
-#ifdef LISP_FEATURE_SB_THREAD
-#include <sys/ptrace.h>
-#include <linux/user.h>		/* threading is presently linux-only */
-#endif
-
 /* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
 

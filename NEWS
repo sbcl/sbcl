@@ -2196,6 +2196,12 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
        in some circumstances.
 
 changes in sbcl-0.8.7 relative to sbcl-0.8.6:
+  * When built with the :SB-FUTEX feature, threaded builds now take 
+    advantage of the "fast userspace mutex" facility in Linux kernel 2.6
+    for faster/more reliable mutex and condition variable support.
+  * Incompatible change (but one you probably shouldn't have been using
+    anyway): the interface and code for arbitrating between multiple
+    threads in the same user session has been redesigned.
   * bug fix: GET-SETF-EXPANSION no longer throws an internal type
     error when called without an explicit environment argument.
     (thanks to Nikodemus Siivola)

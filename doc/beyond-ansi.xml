@@ -167,29 +167,6 @@ their documentation strings.
 are per-thread.
 </para>
 
-<para><function>sb-ext:quit</function> exits the current thread, not
-necessarily the whole environment.  The environment will be shut down
-when the last thread exits.  
-</para>
-
-<para>Threads arbitrate between themselves for the user's attention.
-A thread may be in one of three notional states: foreground,
-background, or stopped.  When a background process attempts to print a
-repl prompt or to enter the debugger, it will stop and print a message
-saying that it has stopped.  The user at his leisure may switch to
-that thread to find out what it needs.  If a background thread enters
-the debugger, selecting any restart will put it back into the
-background before it resumes.
-</para>
-
-<para>If the user has multiple views onto the same Lisp image (for
-example, using multiple terminals, or a windowing system, or network
-access) they are typically set up as multiple `sessions' such that each 
-view has its own collection of foreground/background/stopped threads.
-<function>sb-thread:make-listener-thread</function> can be used to
-start a new thread in its own `session'.
-</para>
-
 <para>Mutexes and condition variables are available for 
 managing access to shared data: see 
 <itemizedlist>
@@ -204,6 +181,35 @@ managing access to shared data: see
   </listitem>
 </itemizedlist>
 and poke around in their documentation strings.</para>
+
+<sect4><title>Sessions</title>
+
+<para>If the user has multiple views onto the same Lisp image (for
+example, using multiple terminals, or a windowing system, or network
+access) they are typically set up as multiple `sessions' such that
+each view has its own collection of foreground/background/stopped
+threads.  A thread which wishes to create a new session can use the
+<function>sb-thread:with-new-session</function> to remove itself from
+the current session (which it shares with its parent and siblings) and
+create a fresh one.  See also
+<function>sb-thread:make-listener-thread</function>.</para>
+
+<para>Within a single session, threads arbitrate between themselves
+for the user's attention.  A thread may be in one of three notional
+states: foreground, background, or stopped.  When a background process
+attempts to print a repl prompt or to enter the debugger, it will stop
+and print a message saying that it has stopped.  The user at his
+leisure may switch to that thread to find out what it needs.  If a
+background thread enters the debugger, selecting any restart will put
+it back into the background before it resumes.  Arbitration for the
+input stream is managed by calls to
+<function>sb-thread:get-foreground</function> (which may block) and
+<function>sb-thread:release-foreground</function>.</para>
+
+<para><function>sb-ext:quit</function> terminates all threads in the 
+current session, but leaves other sessions running</para>
+</sect4>
+
 </sect3>
 
 <sect3><title>Implementation (Linux x86)</title>
@@ -224,18 +230,24 @@ expects threading or creates new threads, and the thread library in
 question uses %fs in an incompatible way.
 </para>
 
-<para>Threads waiting on queues (e.g. for locks or condition
-variables) are put to sleep using <function>sigtimedwait()</function>
-and woken with SIGCONT.
-</para>
+<para>There are two implementation mechanisms for queueing.  If SBCL
+was built on an NPTL-capable Linux system (2.6 or some vendor 2.4
+ports) with the :SB-FUTEX feature, queuing will be doneusing the
+<function>sys_futex()</function> call.  Otherwise it will fall back to
+using <function>sigtimedwait()</function> to sleep and a signal
+(SIG_DEQUEUE, one of the POSIX RT signals) to wake.</para>
 
 <para>&SBCL; at present will alway have at least two tasks running as
 seen from Linux: when the first process has done startup
 initialization (mapping files in place, installing signal handlers
 etc) it creates a new thread to run the Lisp startup and initial
-listener.  The original thread stays around to reap dead subthreads
-and deallocate their resources (e.g. stacks) when they exit.
+listener.  The original thread stays around to reap it when it's dead
+and deallocate its resources (e.g. stacks) when it exits.
 </para>
+
+<para>It should be noted that the initial thread does less and less in
+each new release of SBCL, and one day soon will probably go away
+altogether.</para>
 
 <para>Garbage collection is done with the existing Conservative
 Generational GC.  Allocation is done in small (typically 8k) regions :
@@ -261,15 +273,12 @@ on keyboard interrupt handling: pressing your terminal's intr key
 (typically Control-C) will interrupt all processes in the foreground
 process group, including Lisp threads that &SBCL; considers to be
 notionally `background'.  This is undesirable, so background threads
-are set to ignore the SIGINT signal.  Arbitration for the input stream
-is managed by locking on <varname>sb-thread::*session-lock*</varname>
-</para>
+are set to ignore the SIGINT signal.</para>
 
-<para>A thread can be created in a new Lisp 'session' (new terminal or
-window) using <function>sb-thread:make-listener-thread</function>.
-These sessions map directly onto POSIX sessions, so that pressing
-Control-C in the wrong window will not interrupt them - this has been
-found to be embarrassing.
+<para><function>sb-thread:make-listener-thread</function> in addition
+to creating a new Lisp session makes a new POSIX session, so that
+pressing Control-C in one window will not interrupt another listener -
+this has been found to be embarrassing.
 </para>
 
 </sect3>
@@ -282,10 +291,11 @@ found to be embarrassing.
 <varname>sb-ext:*posix-argv*</varname>. The UNIX environment can be queried with the
 <function>sb-ext:posix-getenv</function> function.</para>
 
-<para>The &SBCL; system can be terminated with <function>sb-ext:quit</function>,
-optionally returning a specified numeric value to the calling Unix
-process. The normal Unix idiom of terminating on end of file on input
-is also supported.</para>
+<para>The &SBCL; system can be terminated with
+<function>sb-ext:quit</function>, (but see notes above about threads
+and sessions) optionally returning a specified numeric value to the
+calling Unix process. The normal Unix idiom of terminating on end of
+file on input is also supported.</para>
 
 </sect2>
 
