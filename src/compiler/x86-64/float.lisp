@@ -813,7 +813,7 @@
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
   (:results (hi-bits :scs (signed-reg)))
-  (:temporary (:sc double-stack) temp)
+  (:temporary (:sc signed-stack :from :argument :to :result) temp)
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-high-bits)
@@ -822,22 +822,20 @@
   (:generator 5
      (sc-case float
        (double-reg
-	(let ((where (make-ea :dword :base rbp-tn
-			      :disp (- (* (+ 2 (tn-offset temp))
-					  n-word-bytes)))))
-	  (inst movsd where float))
-	(loadw hi-bits rbp-tn (- (1+ (tn-offset temp)))))
+	(inst movsd temp float)
+	(move hi-bits temp))
        (double-stack
-	(loadw hi-bits rbp-tn (- (1+ (tn-offset float)))))
+	(loadw hi-bits ebp-tn (- (tn-offset float))))
        (descriptor-reg
-	(loadw hi-bits float (1+ double-float-value-slot)
-	       other-pointer-lowtag)))))
+	(loadw hi-bits float double-float-value-slot
+	       other-pointer-lowtag)))
+     (inst shr hi-bits 32)))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
   (:results (lo-bits :scs (unsigned-reg)))
-  (:temporary (:sc double-stack) temp)
+  (:temporary (:sc signed-stack :from :argument :to :result) temp)
   (:arg-types double-float)
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
@@ -846,16 +844,15 @@
   (:generator 5
      (sc-case float
        (double-reg
-	(let ((where (make-ea :dword :base rbp-tn
-			      :disp (- (* (+ 2 (tn-offset temp))
-					  n-word-bytes)))))
-	  (inst movsd where float))
-	(loadw lo-bits rbp-tn (- (+ 2 (tn-offset temp)))))
+	(inst movsd temp float)
+	(move lo-bits temp))
        (double-stack
-	(loadw lo-bits rbp-tn (- (+ 2 (tn-offset float)))))
+	(loadw lo-bits ebp-tn (- (tn-offset float))))
        (descriptor-reg
 	(loadw lo-bits float double-float-value-slot
-	       other-pointer-lowtag)))))
+	       other-pointer-lowtag)))
+     (inst shl lo-bits 32)
+     (inst shr lo-bits 32)))
 
 
 ;;;; float mode hackery

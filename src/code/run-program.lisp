@@ -331,7 +331,7 @@
   (let ((string-bytes 0)
 	;; We need an extra for the null, and an extra 'cause exect
 	;; clobbers argv[-1].
-	(vec-bytes (* #-alpha 4 #+alpha 8 (+ (length string-list) 2))))
+	(vec-bytes (* sb-vm::n-word-bytes (+ (length string-list) 2))))
     (declare (fixnum string-bytes vec-bytes))
     (dolist (s string-list)
       (enforce-type s simple-string)
@@ -340,7 +340,7 @@
     (let* ((total-bytes (+ string-bytes vec-bytes))
 	   (vec-sap (sb-sys:allocate-system-memory total-bytes))
 	   (string-sap (sap+ vec-sap vec-bytes))
-	   (i #-alpha 4 #+alpha 8))
+	   (i sb-vm::n-word-bytes))
       (declare (type (and unsigned-byte fixnum) total-bytes i)
 	       (type sb-sys:system-area-pointer vec-sap string-sap))
       (dolist (s string-list)
@@ -355,10 +355,10 @@
 	  ;; Blast the pointer to the string into place.
 	  (setf (sap-ref-sap vec-sap i) string-sap)
 	  (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ n))))
-	  (incf i #-alpha 4 #+alpha 8)))
+	  (incf i sb-vm::n-word-bytes)))
       ;; Blast in the last null pointer.
       (setf (sap-ref-sap vec-sap i) (int-sap 0))
-      (values vec-sap (sap+ vec-sap #-alpha 4 #+alpha 8) total-bytes))))
+      (values vec-sap (sap+ vec-sap sb-vm::n-word-bytes) total-bytes))))
 
 (defmacro with-c-strvec ((var str-list) &body body)
   (with-unique-names (sap size)

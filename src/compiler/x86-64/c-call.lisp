@@ -81,7 +81,10 @@
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
 	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-64 'signed-reg)
+	    (values (if (= (sb!alien::alien-integer-type-bits type) 32)
+			'signed-byte-32
+			'signed-byte-64)
+		    'signed-reg)
 	    (values 'unsigned-byte-64 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
@@ -210,31 +213,25 @@
   (:save-p t)
   (:ignore args ecx edx)
   (:generator 0
-    (cond ((policy node (> space speed))
+    (cond ;; This probably doesn't make sense on x86-64 since the space-
+          ;; intensive x87-frobbing doesn't need to be done. Disabled.
+          #+nil 
+	  ((policy node (> space speed))
 	   (move eax function)
 	   (inst call (make-fixup (extern-alien-name "call_into_c") :foreign)))
 	  (t
-	   ;; Setup the NPX for C; all the FP registers need to be
-	   ;; empty; pop them all.
-	   #+nil
-	   (dotimes (i 8) ; FIXME
-	     (inst fstp fr0-tn))
-
 	   (inst call function)
 	   ;; To give the debugger a clue. XX not really internal-error?
 	   (note-this-location vop :internal-error)
-
-	   ;; Restore the NPX for lisp; ensure no regs are empty
-	   #+nil
-	   (dotimes (i 7) ; FIXME
-	     (inst fldz))
-	   #+nil
-	   (if (and results ; ANDME
-		    (location= (tn-ref-tn results) fr0-tn))
-	       ;; The return result is in fr0.
-	       (inst fxch fr7-tn) ; move the result back to fr0
-	       (inst fldz)) ; insure no regs are empty
-	   ))))
+	   ;; Sign-extend s-b-32 return values.
+	   (dolist (res (if (listp results)
+			    results
+			    (list results)))
+	     (let ((tn (tn-ref-tn res)))	       
+	       (when (eq (sb!c::tn-primitive-type tn)
+			 (primitive-type-or-lose 'signed-byte-32))
+		 (inst shl tn 32)
+		 (inst sar tn 32))))))))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

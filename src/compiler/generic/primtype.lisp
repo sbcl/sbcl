@@ -41,7 +41,7 @@
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
-#!-x86-64
+; #!-x86-64
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
 #!+x86-64
