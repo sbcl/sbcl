@@ -68,12 +68,12 @@
 (def!method print-object ((pathname logical-pathname) stream)
   (let ((namestring (handler-case (namestring pathname)
 		      (error nil))))
-    (if namestring
+    (if (and namestring (or *read-eval* (not *print-readably*)))
 	(format stream "#.(CL:LOGICAL-PATHNAME ~S)" namestring)
 	(print-unreadable-object (pathname stream :type t)
 	  (format
 	   stream
-	   "~_:HOST ~S ~_:DIRECTORY ~S ~_:FILE ~S ~_:NAME ~S ~_:VERSION ~S"
+	   "~_:HOST ~S ~_:DIRECTORY ~S ~_:NAME ~S ~_:TYPE ~S ~_:VERSION ~S"
 	   (%pathname-host pathname)
 	   (%pathname-directory pathname)
 	   (%pathname-name pathname)

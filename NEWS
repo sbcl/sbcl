@@ -2285,6 +2285,7 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
        FILE-ERROR.
     ** OPEN :DIRECTION :IO no longer fails to work on non-existent
        files.
+    ** DIRECTORY on logical pathnames is more correct.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

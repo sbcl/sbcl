@@ -805,6 +805,148 @@
 
 (/show0 "filesys.lisp 800")
 
+;;; NOTE: There is a fair amount of hair below that is probably not
+;;; strictly necessary.
+;;;
+;;; The issue is the following: what does (DIRECTORY "SYS:*;") mean?
+;;; Until 2004-01, SBCL's behaviour was unquestionably wrong, as it
+;;; did not translate the logical pathname at all, but instead treated
+;;; it as a physical one.  Other Lisps seem to to treat this call as
+;;; equivalent to (DIRECTORY (TRANSLATE-LOGICAL-PATHNAME "SYS:*;")),
+;;; which is fine as far as it goes, but not very interesting, and
+;;; arguably counterintuitive.  (PATHNAME-MATCH-P "SYS:SRC;" "SYS:*;")
+;;; is true, so why should "SYS:SRC;" not show up in the call to
+;;; DIRECTORY?  (assuming the physical pathname corresponding to it
+;;; exists, of course).
+;;;
+;;; So, the interpretation that I am pushing is for all pathnames
+;;; matching the input pathname to be queried.  This means that we
+;;; need to compute the intersection of the input pathname and the
+;;; logical host FROM translations, and then translate the resulting
+;;; pathname using the host to the TO translation; this treatment is
+;;; recursively invoked until we get a physical pathname, whereupon
+;;; our physical DIRECTORY implementation takes over.
+
+;;; FIXME: this is an incomplete implementation.  It only works when
+;;; both are logical pathnames (which is OK, because that's the only
+;;; case when we call it), but there are other pitfalls as well: see
+;;; the DIRECTORY-HELPER below for some, but others include a lack of
+;;; pattern handling.
+(defun pathname-intersections (one two)
+  (aver (logical-pathname-p one))
+  (aver (logical-pathname-p two))
+  (labels
+      ((intersect-version (one two)
+	 (aver (typep one '(or null (member :newest :wild :unspecific)
+			    integer)))
+	 (aver (typep two '(or null (member :newest :wild :unspecific)
+			    integer)))
+	 (cond
+	   ((eq one :wild) two)
+	   ((eq two :wild) one)
+	   ((or (null one) (eq one :unspecific)) two)
+	   ((or (null two) (eq two :unspecific)) one)
+	   ((eql one two) one)
+	   (t nil)))
+       (intersect-name/type (one two)
+	 (aver (typep one '(or null (member :wild :unspecific) string)))
+	 (aver (typep two '(or null (member :wild :unspecific) string)))
+	 (cond
+	   ((eq one :wild) two)
+	   ((eq two :wild) one)
+	   ((or (null one) (eq one :unspecific)) two)
+	   ((or (null two) (eq two :unspecific)) one)
+	   ((string= one two) one)
+	   (t nil)))
+       (intersect-directory (one two)
+	 (aver (typep one '(or null (member :wild :unspecific) list)))
+	 (aver (typep two '(or null (member :wild :unspecific) list)))
+	 (cond
+	   ((eq one :wild) two)
+	   ((eq two :wild) one)
+	   ((or (null one) (eq one :unspecific)) two)
+	   ((or (null two) (eq two :unspecific)) one)
+	   (t (aver (eq (car one) (car two)))
+	      (mapcar
+	       (lambda (x) (cons (car one) x))
+	       (intersect-directory-helper (cdr one) (cdr two)))))))
+    (let ((version (intersect-version
+		    (pathname-version one) (pathname-version two)))
+	  (name (intersect-name/type
+		 (pathname-name one) (pathname-name two)))
+	  (type (intersect-name/type
+		 (pathname-type one) (pathname-type two)))
+	  (host (pathname-host one)))
+      (mapcar (lambda (d)
+		(make-pathname :host host :name name :type type
+			       :version version :directory d))
+	      (intersect-directory
+	       (pathname-directory one) (pathname-directory two))))))
+
+;;; FIXME: written as its own function because I (CSR) don't
+;;; understand it, so helping both debuggability and modularity.  In
+;;; case anyone is motivated to rewrite it, it returns a list of
+;;; sublists representing the intersection of the two input directory
+;;; paths (excluding the initial :ABSOLUTE or :RELATIVE).
+;;;
+;;; FIXME: Does not work with :UP or :BACK
+;;; FIXME: Does not work with patterns
+;;;
+;;; FIXME: PFD suggests replacing this implementation with a DFA
+;;; conversion of a NDFA.  Find out (a) what this means and (b) if it
+;;; turns out to be worth it.
+(defun intersect-directory-helper (one two)
+  (flet ((simple-intersection (cone ctwo)
+	   (cond
+	     ((eq cone :wild) ctwo)
+	     ((eq ctwo :wild) cone)
+	     (t (aver (typep cone 'string))
+		(aver (typep ctwo 'string))
+		(if (string= cone ctwo) cone nil)))))
+    (macrolet
+	((loop-possible-wild-inferiors-matches
+	     (lower-bound bounding-sequence order)
+	   (let ((index (gensym)) (g2 (gensym)) (g3 (gensym)) (l (gensym)))
+	     `(let ((,l (length ,bounding-sequence)))
+	       (loop for ,index from ,lower-bound to ,l
+		append (mapcar (lambda (,g2)
+				 (append
+				  (butlast ,bounding-sequence (- ,l ,index))
+				  ,g2))
+			(mapcar
+			 (lambda (,g3)
+			   (append
+			    (if (eq (car (nthcdr ,index ,bounding-sequence))
+				    :wild-inferiors)
+				'(:wild-inferiors)
+				nil) ,g3))
+			 (intersect-directory-helper
+			  ,@(if order
+				`((nthcdr ,index one) (cdr two))
+				`((cdr one) (nthcdr ,index two)))))))))))
+      (cond
+	((and (eq (car one) :wild-inferiors)
+	      (eq (car two) :wild-inferiors))
+	 (delete-duplicates
+	  (append (mapcar (lambda (x) (cons :wild-inferiors x))
+			  (intersect-directory-helper (cdr one) (cdr two)))
+		  (loop-possible-wild-inferiors-matches 2 one t)
+		  (loop-possible-wild-inferiors-matches 2 two nil))
+	  :test 'equal))
+	((eq (car one) :wild-inferiors)
+	 (delete-duplicates (loop-possible-wild-inferiors-matches 0 two nil)
+			    :test 'equal))
+	((eq (car two) :wild-inferiors)
+	 (delete-duplicates (loop-possible-wild-inferiors-matches 0 one t)
+			    :test 'equal))
+	((and (null one) (null two)) (list nil))
+	((null one) nil)
+	((null two) nil)
+	(t (and (simple-intersection (car one) (car two))
+		(mapcar (lambda (x) (cons (simple-intersection
+					   (car one) (car two)) x))
+			(intersect-directory-helper (cdr one) (cdr two)))))))))
+
 (defun directory (pathname &key)
   #!+sb-doc
   "Return a list of PATHNAMEs, each the TRUENAME of a file that matched the
@@ -817,19 +959,35 @@
 	;; (which can arise when e.g. multiple symlinks map to the
 	;; same truename).
 	(truenames (make-hash-table :test #'equal))
+	;; FIXME: Possibly this MERGE-PATHNAMES call should only
+	;; happen once we get a physical pathname.
         (merged-pathname (merge-pathnames pathname)))
-    (!enumerate-matches (match merged-pathname)
-      (let* ((*ignore-wildcards* t)
-	     ;; FIXME: Why not TRUENAME?  As reported by Milan Zamazal
-	     ;; sbcl-devel 2003-10-05, using TRUENAME causes a race
-	     ;; condition whereby removal of a file during the
-	     ;; directory operation causes an error.  It's not clear
-	     ;; what the right thing to do is, though.  -- CSR,
-	     ;; 2003-10-13
-	     (truename (probe-file match)))
-	(when truename
-	  (setf (gethash (namestring truename) truenames)
-		truename))))
+    (labels ((do-physical-directory (pathname)
+	       (aver (not (logical-pathname-p pathname)))
+	       (!enumerate-matches (match pathname)
+		 (let* ((*ignore-wildcards* t)
+			;; FIXME: Why not TRUENAME?  As reported by
+			;; Milan Zamazal sbcl-devel 2003-10-05, using
+			;; TRUENAME causes a race condition whereby
+			;; removal of a file during the directory
+			;; operation causes an error.  It's not clear
+			;; what the right thing to do is, though.  --
+			;; CSR, 2003-10-13
+			(truename (probe-file match)))
+		   (when truename
+		     (setf (gethash (namestring truename) truenames)
+			   truename)))))
+	     (do-directory (pathname)
+	       (if (logical-pathname-p pathname)
+		   (let ((host (intern-logical-host (pathname-host pathname))))
+		     (dolist (x (logical-host-canon-transls host))
+		       (destructuring-bind (from to) x
+			 (let ((intersections
+				(pathname-intersections pathname from)))
+			   (dolist (p intersections)
+			     (do-directory (translate-pathname p from to)))))))
+		   (do-physical-directory pathname))))
+      (do-directory merged-pathname))
     (mapcar #'cdr
 	    ;; Sorting isn't required by the ANSI spec, but sorting
 	    ;; into some canonical order seems good just on the
