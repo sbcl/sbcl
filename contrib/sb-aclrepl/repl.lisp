@@ -15,8 +15,27 @@
 
 (cl:in-package :sb-aclrepl)
 
+(defstruct user-cmd
+  (input nil) ; input, maybe a string or form
+  (func nil)  ; cmd func entered, overloaded
+              ; (:eof :null-cmd :cmd-error :history-error)
+  (args nil)  ; args for cmd func
+  (hnum nil)) ; history number
+
+(defstruct break-data
+  ;; numeric break level
+  level
+  ;; inspect data for a break level
+  inspect
+  ;; T when break initiated by an inspect
+  inspect-initiated
+  ;; restarts list for a break level
+  restarts 
+  ;; T if break level is a continuable break
+  continuable) 
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *default-prompt* "~&~A(~d): "
+  (defparameter *default-prompt* "~:[~2*~;[~:*~D~:[~;i~]~:[~;c~]] ~]~A(~D): "
     "The default prompt."))
 (defparameter *prompt* #.*default-prompt*
   "The current prompt string or formatter function.")
@@ -38,15 +57,10 @@
   "The output stream for the repl")
 (defparameter *repl-input* nil
   "The input stream for the repl")
+(defparameter *break-stack*  (list (make-break-data :level 0))
+  "A stack of break data stored as a list of break-level structs")
 
 (declaim (type list *history*))
-
-(defstruct user-cmd
-  (input nil) ; input, maybe a string or form
-  (func nil)  ; cmd func entered, overloaded
-              ; (:eof :null-cmd :cmd-error :history-error)
-  (args nil)  ; args for cmd func
-  (hnum nil)) ; history number
 
 (defvar *eof-marker* (cons :eof nil))
 (defvar *eof-cmd* (make-user-cmd :func :eof))
@@ -67,6 +81,7 @@
       (*cmd-number* 1)
       (*repl-output* nil)
       (*repl-input* nil)
+      (*break-stack* (list (make-break-data :level 0)))
       )
       
 (defun prompt-package-name ()
@@ -136,16 +151,20 @@
   (func nil) ; function handler
   (desc nil) ; short description
   (parsing nil) ; (:string :case-sensitive nil)
-  (group nil)) ; command group (:cmd or :alias)
+  (group nil) ; command group (:cmd or :alias)
+  (abbr-len 0)) ; abbreviation length
   
-(defun make-cte (name-param func desc parsing group)
+(defun make-cte (name-param func desc parsing group abbr-len)
   (let ((name (etypecase name-param
 		(string
 		 name-param)
 		(symbol
 		 (string-downcase (write-to-string name-param))))))
     (make-cmd-table-entry :name name :func func :desc desc
-			  :parsing parsing :group group)))
+			  :parsing parsing :group group
+			  :abbr-len (if abbr-len
+					abbr-len
+					(length name)))))
 
 (defun %add-entry (cmd &optional abbr-len)
   (let* ((name (cmd-table-entry-name cmd))
@@ -159,7 +178,7 @@
 
 (defun add-cmd-table-entry (cmd-string abbr-len func-name desc parsing)
   (%add-entry
-   (make-cte cmd-string (symbol-function func-name) desc parsing :cmd)
+   (make-cte cmd-string (symbol-function func-name) desc parsing :cmd abbr-len)
    abbr-len))
    
 (defun find-cmd (cmdstr)
@@ -189,9 +208,14 @@
   (let ((cmds '()))
     (maphash (lambda (k v)
 	       (when (and
-		      (eql (length k) (length (cmd-table-entry-name v)))
+		      (= (length k) (length (cmd-table-entry-name v)))
 		      (eq (cmd-table-entry-group v) group))
-		 (push (list k (cmd-table-entry-desc v)) cmds)))
+		 (push (list k
+			     (if (= (cmd-table-entry-abbr-len v)
+				    (length k))
+				  ""
+				  (subseq k 0 (cmd-table-entry-abbr-len v)))
+			     (cmd-table-entry-desc v)) cmds)))
 	     *cmd-table-hash*)
     (sort cmds #'string-lessp :key #'car)))
 
@@ -234,30 +258,36 @@
       (format *repl-output* "~A~%" (eval (sb-debug::untrace-all))))
   (values))
 
+#+sb-thread
+(defun thread-pids ()
+  "Return a list of the pids for all threads"
+  (let ((offset (* 4 sb-vm::thread-pid-slot)))
+    (sb-thread::mapcar-threads
+     #'(lambda (sap) (sb-sys:sap-ref-32 sap offset)))))
+
+#+sb-thread
+(defun other-thread-pids ()
+  "Returns a list of pids for all threads except the current process"
+  (delete (sb-thread:current-thread-id) (thread-pids) :test #'eql))
+
 (defun exit-cmd (&optional (status 0))
   #+sb-thread
-  (flet ((other-thread-pids ()
-	   (let* ((offset (* 4 sb-vm::thread-pid-slot))
-		  (pids (sb-thread::mapcar-threads
-			 #'(lambda (sap)
-			     (sb-sys:sap-ref-32 sap offset)))))
-	     (delete (sb-thread:current-thread-id) pids :test #'eql))))
-    (let ((other-pids (other-thread-pids)))
-      (when other-pids
-	  (format *repl-output* "There exists the following processes~%")
-	  (format *repl-output* "~{~5d~%~}" other-pids)
-	  (format *repl-output* "Do you want to exit lisp anyway [n]? ")
-	  (force-output *repl-output*)
-	  (let ((input (string-trim-whitespace (read-line *repl-input*))))
-	    (if (and (plusp (length input))
-		     (or (char= #\y (char input 0))
-			 (char= #\Y (char input 0))))
-		;; loop in case more threads get created while trying to exit
-		(do ((pids other-pids (other-thread-pids)))
-		    ((eq nil pids))
-		  (map nil #'sb-thread:destroy-thread pids)
-		  (sleep 0.2))
-		(return-from exit-cmd))))))
+  (let ((other-pids (other-thread-pids)))
+    (when other-pids
+      (format *repl-output* "There exists the following processes~%")
+      (format *repl-output* "~{~5d~%~}" other-pids)
+      (format *repl-output* "Do you want to exit lisp anyway [n]? ")
+      (force-output *repl-output*)
+      (let ((input (string-trim-whitespace (read-line *repl-input*))))
+	(if (and (plusp (length input))
+		 (or (char= #\y (char input 0))
+		     (char= #\Y (char input 0))))
+	    ;; loop in case more threads get created while trying to exit
+	    (do ((pids other-pids (other-thread-pids)))
+		((eq nil pids))
+	      (map nil #'sb-thread:destroy-thread pids)
+	      (sleep 0.2))
+	    (return-from exit-cmd)))))
   (quit :unix-status status)
   (values))
 
@@ -353,8 +383,10 @@
     (dotimes (i n)
       (declare (fixnum i))
       (let ((hist (nth (- n i 1) *history*)))
-	(format *repl-output* "~3A ~A~%" (user-cmd-hnum hist)
-		(user-cmd-input hist)))))
+	(format *repl-output* "~3A " (user-cmd-hnum hist))
+	(if (stringp (user-cmd-input hist))
+	    (format *repl-output* "~A~%" (user-cmd-input hist))
+	    (format *repl-output* "~W~%" (user-cmd-input hist))))))
   (values))
 
 (defun help-cmd (&optional cmd)
@@ -366,22 +398,21 @@
 		   (cmd-table-entry-name cmd-entry)
 		   (cmd-table-entry-desc cmd-entry)))))
     (t
-     (format *repl-output* "~13A ~a~%" "Command" "Description")
-     (format *repl-output* "------------- -------------~%")
-     (format *repl-output* "~13A ~A~%" "n"
-	     "(for any number n) recall nth command from history list")
+     (format *repl-output* "~11A ~4A ~A~%" "COMMAND" "ABBR" "DESCRIPTION")
+     (format *repl-output* "~11A ~4A ~A~%" "<n>" ""
+	     "re-execute <n>th history command")
      (dolist (doc-entry (get-cmd-doc-list :cmd))
-       (format *repl-output* "~13A ~A~%" (car doc-entry) (cadr doc-entry)))))
+       (format *repl-output* "~11A ~4A ~A~%" (first doc-entry)
+	       (second doc-entry) (third doc-entry)))))
   (values))
 
 (defun alias-cmd ()
   (let ((doc-entries (get-cmd-doc-list :alias)))
     (typecase doc-entries
       (cons
-       (format *repl-output* "~13A ~a~%" "Alias" "Description")
-       (format *repl-output* "------------- -------------~%")
+       (format *repl-output* "~11A ~A ~4A~%" "ALIAS" "ABBR" "DESCRIPTION")
        (dolist (doc-entry doc-entries)
-	 (format *repl-output* "~13A ~A~%" (car doc-entry) (cadr doc-entry))))
+	 (format *repl-output* "~11A ~4A ~A~%" (first doc-entry) (second doc-entry) (third doc-entry))))
       (t
        (format *repl-output* "No aliases are defined~%"))))
   (values))
@@ -403,6 +434,71 @@
       (format *repl-output* "No directory on stack to pop.~%"))
   (values))
 
+(defun pop-cmd (&optional (n 1))
+  (let ((new-level (- (length *break-stack*) n 1)))
+    (when (minusp new-level)
+      (setq new-level 0))
+    (dotimes (i (- (length *break-stack*) new-level 1))
+      (pop *break-stack*)))
+  ;; Find inspector 
+  (do* ((i (1- (length *break-stack*)) (1- i))
+	(found nil))
+       ((or found (minusp i)))
+    (let ((inspect (break-data-inspect (nth i *break-stack*))))
+      (when inspect
+	(set-current-inspect inspect)
+	(setq found t))))
+  (values))
+
+(defun continue-cmd (n)
+  (let ((restarts (break-data-restarts (car *break-stack*))))
+    (if restarts
+	(if (< -1 n (length restarts))
+	    (progn
+	      (invoke-restart-interactively (nth n restarts))
+	      )
+	    (format *repl-output* "~&There is no such restart"))
+	(format *repl-output* "~&There are no restarts"))))
+
+(defun error-cmd ()
+  )
+
+(defun current-cmd ()
+  )
+
+(defun frame-cmd ()
+  )
+
+(defun processes-cmd ()
+  #+sb-thread
+  (let ((pids (thread-pids))
+	(current-pid (sb-thread:current-thread-id)))
+    (dolist (pid pids)
+      (format *repl-output* "~&~D" pid)
+      (when (= pid current-pid)
+	(format *repl-output* " [current listener]"))))
+  #-sb-thread
+  (format *repl-output* "~&Threads are not supported in this version of sbcl")
+  (values))
+
+(defun kill-cmd (selected-pid)
+  #+sb-thread
+  (let ((pids (thread-pids)))
+    (if (find selected-pid pids :test #'eql)
+	(progn
+	  (sb-thread:destroy-thread selected-pid)
+	  (format *repl-output* "Thread ~D destroyed" selected-pid))
+	(format *repl-output* "No thread ~D exists" selected-pid)))
+  #-sb-thread
+  (declare (ignore selected-pid))
+  #-sb-thread
+  (format *repl-output* "~&Threads are not supported in this version of sbcl")
+  (values))
+
+(defun reset-cmd ()
+  (setf *break-stack* (last *break-stack*))
+  (values))
+
 (defun dirs-cmd ()
   (dolist (dir *dir-stack*)
     (format *repl-output* "~a~%" dir))
@@ -419,17 +515,24 @@
 	 ("cf" 2 cf-cmd "compile file" :parsing :string)
 	 ("cload" 2 cload-cmd "compile if needed and load file"
 	  :parsing :string)
+;;	 ("current" 3 current-cmd "print the expression for the current stack frame")
+;;	 ("continue" 4 continue-cmd "continue from a continuable error")
 	 ("describe" 2 describe-cmd "describe an object")
 	 ("macroexpand" 2 macroexpand-cmd "macroexpand an expression")
 	 ("package" 2 package-cmd "change current package")
+;;	 ("error" 3 error-cmd "print the last error message")
 	 ("exit" 2 exit-cmd "exit sbcl")
+;;	 ("frame" 2 frame-cmd "print info about the current frame")
 	 ("help" 2 help-cmd "print this help")
 	 ("history" 3 history-cmd "print the recent history")
 	 ("inspect" 2 inspect-cmd "inspect an object")
 	 ("istep" 1 istep-cmd "navigate within inspection of a lisp object" :parsing :string)
+	 ("kill" 2 kill-cmd "kill a process")
 	 ("pwd" 3 pwd-cmd "print current directory")
 	 ("pushd" 2 pushd-cmd "push directory on stack" :parsing :string)
-	 ("popd" 2 popd-cmd "pop directory from stack")
+	 ("pop" 3 pop-cmd "pop up `n' (default 1) break levels")
+	 ("popd" 4 popd-cmd "pop directory from stack")
+	 ("processes" 3 processes-cmd "list all processes")
 	 ("trace" 2 trace-cmd "trace a function")
 	 ("untrace" 4 untrace-cmd "untrace a function")
 	 ("dirs" 2 dirs-cmd "show directory stack")
@@ -440,10 +543,10 @@
 
 ;;;; machinery for aliases
 
-(defsetf alias (name) (user-func)
+(defsetf alias (name &key abbr-len description) (user-func)
   `(progn
     (%add-entry
-     (make-cte (quote ,name) ,user-func "" nil :alias))
+     (make-cte (quote ,name) ,user-func ,description nil :alias ,abbr-len))
     (quote ,name)))
 
 (defmacro alias (name-param args &rest body)
@@ -466,7 +569,8 @@
 	   (setq abbr-index param)))))
     `(progn
       (%add-entry
-       (make-cte (quote ,name) (lambda ,args ,@body) ,desc ,parsing :alias)
+       (make-cte (quote ,name) (lambda ,args ,@body) ,desc ,parsing :alias (when ,abbr-index
+									       (1+ ,abbr-index)))
        ,abbr-index)
       ,name)))
        
@@ -526,10 +630,25 @@
 ;;;; linking into SBCL hooks
 
 (defun repl-prompt-fun (stream)
-  (if (functionp *prompt*)
-      (write-string (funcall *prompt* (prompt-package-name) *cmd-number*)
-		    stream)
-      (format stream *prompt* (prompt-package-name) *cmd-number*)))
+  (let* ((break-data (car *break-stack*))
+	 (break-level (break-data-level break-data)))
+    (when (zerop break-level)
+      (setq break-level nil))
+    (if (functionp *prompt*)
+	(write-string (funcall *prompt* break-level
+			       (break-data-inspect-initiated break-data)
+			       (break-data-continuable break-data)
+			       (prompt-package-name) *cmd-number*)
+		      stream)
+	(handler-case 
+	    (format nil *prompt* break-level
+		    (break-data-inspect-initiated break-data)
+		    (break-data-continuable break-data)
+		    (prompt-package-name) *cmd-number*)
+	  (error ()
+	    (format stream "~&Prompt error>  "))
+	  (:no-error (prompt)
+	    (format stream "~&~A" prompt))))))
   
 (defun process-cmd (user-cmd input-stream output-stream)
   ;; Processes a user command. Returns t if the user-cmd was a top-level
@@ -574,6 +693,24 @@
 
 (setf sb-int:*repl-prompt-fun* #'repl-prompt-fun
       sb-int:*repl-read-form-fun* #'repl-read-form-fun)
+
+;;; Break level processing
+
+;; use an initial break-level to hold current inspect toplevel at
+;; break-level 0
+
+(defun new-break (&key restarts inspect continuable)
+  (push
+   (make-break-data :level (length *break-stack*)
+		    :restarts restarts
+		    :inspect inspect
+		    :inspect-initiated (when inspect t)
+		    :continuable continuable)
+   *break-stack*))
+
+(defun set-break-inspect (inspect)
+  "sets the inspect data for the current break level"
+  (setf (break-data-inspect (car *break-stack*)) inspect))
 
 ) ;; close special variables bindings
 

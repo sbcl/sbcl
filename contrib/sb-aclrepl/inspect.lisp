@@ -9,22 +9,19 @@
 
 (cl:in-package :sb-aclrepl)
 
-(defparameter *inspect-stack* nil
-  "Stack of the hierarchy of an inspected object.")
-
-(defparameter *parent-select-stack* nil
-  "a stack of the indices of parent object components that brought us to the current object.")
-
-(defparameter *inspect-length* 10
-  "Number of components to display.")
+(defstruct inspect
+  ;; stack of parents of inspected object
+  object-stack 
+  ;;  a stack of indices of parent object components
+  parent-stack
+  ;; number of components to display
+  (length 10))
 
 ;; FIXME - raw mode isn't currently used in object display
+(defparameter *current-inspect* nil
+  "current inspect") 
 (defparameter *inspect-raw* nil
   "Raw mode for object display.")
-
-(defvar *inspected*)
-(setf (documentation '*inspected* 'variable)
-      "the value currently being inspected by CL:INSPECT")
 
 (defvar *inspect-help*
 ":istep takes between 0 to 3 arguments.
@@ -55,21 +52,22 @@ The commands are:
 
 
 ;; Setup binding for multithreading
-(let ((*inspect-stack* nil)
-      (*parent-select-stack* nil)
-      (*inspect-length* 10)
-      (*inspect-raw* nil)
-      (*inspected* nil))
+(let ((*current-inspect* nil)
+      (*inspect-raw* nil))
   
 (defun inspector (object input-stream output-stream)
   (declare (ignore input-stream))
   (setq object (eval object))
+  (setq *current-inspect* (make-inspect))
+  (new-break :inspect *current-inspect*)
   (reset-stack)
-  (setq *inspect-stack* (list object))
-  (setq *parent-select-stack* (list "(inspect ...)"))
+  (setf (inspect-object-stack *current-inspect*) (list object))
+  (setf (inspect-parent-stack *current-inspect*) (list "(inspect ...)"))
   (%inspect output-stream))
 
  
+(defun set-current-inspect (inspect)
+  (setq *current-inspect* inspect))
 
 (defun istep (arg-string output-stream)
   (%istep arg-string (string-to-list-skip-spaces arg-string) output-stream))
@@ -77,14 +75,16 @@ The commands are:
 (setq sb-impl::*inspect-fun* #'inspector)
 
 (defun reset-stack ()
-  (setq *inspect-stack* nil)
-  (setq *parent-select-stack* nil)
-  (makunbound '*inspected*))
+  (setf (inspect-object-stack *current-inspect*) nil)
+  (setf (inspect-parent-stack *current-inspect*) nil))
 
 (defun %istep (arg-string args output-stream)
+  (unless *current-inspect*
+    (setq *current-inspect* (make-inspect)))
   (let* ((option (car args))
 	 (option-read (when arg-string
-			(read-from-string arg-string))))
+			(read-from-string arg-string)))
+	 (stack (inspect-object-stack *current-inspect*)))
     (cond
       ;; Redisplay
       ((or (string= "=" option)
@@ -94,30 +94,31 @@ The commands are:
       ((or (string= "-" option)
 	   (string= "^" option))
        (cond
-	 ((> (length *inspect-stack*) 1)
-	  (pop *inspect-stack*)
+	 ((> (length stack) 1)
+	  (pop stack)
 	  (%inspect output-stream))
-	 (*inspect-stack*
-	   (format output-stream "Object has no parent.~%"))
+	 (stack
+	  (format output-stream "Object has no parent.~%"))
 	 (t
 	  (%inspect output-stream))))
       ;; Select * to inspect
       ((string= "*" option)
        (reset-stack) 
-       (setq *inspect-stack* (list *))
-       (setq *parent-select-stack* (list "(inspect ...)"))
+       (setf (inspect-object-stack *current-inspect*) (list *))
+       (setf (inspect-parent-stack *current-inspect*) (list "(inspect ...)"))
+       (set-break-inspect *current-inspect*)
        (%inspect output-stream))
       ;; Start new inspect level for eval'd form
       ((string= "+" option)
-       (inspector (eval (second args)) nil output-stream))
+       (inspector (eval (read-from-string (second args))) nil output-stream))
       ;; Next or previous parent component
       ((or (string= "<" option)
 	   (string= ">" option))
-       (if *inspect-stack*
-	   (if (eq (length *inspect-stack*) 1)
+       (if stack
+	   (if (eq (length stack) 1)
 	       (format output-stream "Object does not have a parent")
-	       (let ((parent (second *inspect-stack*))
-		     (id (car *parent-select-stack*)))
+	       (let ((parent (second stack))
+		     (id (car (inspect-parent-stack *current-inspect*))))
 		 (multiple-value-bind (position list-type elements)
 		     (find-object-component parent id)
 		   (declare (list elements)
@@ -127,8 +128,8 @@ The commands are:
 					   (1- position))))
 		     (if (< -1 new-position (length elements))
 			 (let ((new-object (elt elements new-position)))
-			   (setf (car *inspect-stack*) new-object)
-			   (setf (car *parent-select-stack*)
+			   (setf (car stack) new-object)
+			   (setf (car (inspect-parent-stack *current-inspect*))
 				 (if (integerp id)
 				     new-position
 				     (read-from-string
@@ -139,11 +140,11 @@ The commands are:
 	   (%inspect output-stream)))
       ;; Set component to eval'd form
       ((string-equal "set" option)
-       (if *inspect-stack*
+       (if stack
 	   (let ((id (when (second args)
 			 (read-from-string (second args)))))
 	     (multiple-value-bind (position list-type elements)
-		 (find-object-component (car *inspect-stack*) id)
+		 (find-object-component (car stack) id)
 	       (declare (ignore list-type))
 	       (if elements
 		   (if position
@@ -151,7 +152,7 @@ The commands are:
 			 (when value-stirng
 			   (let ((new-value (eval (read-from-string (third args)))))
 			     (let ((result 
-				    (set-component-value (car *inspect-stack*)
+				    (set-component-value (car stack)
 							 id
 							 new-value
 							 (nth position elements))))
@@ -167,7 +168,7 @@ The commands are:
 	     (%inspect output-stream)))
       ;; Set/reset raw display mode for components
       ((string-equal "raw" option)
-       (when *inspect-stack*
+       (when stack
 	 (when (and (second args)
 		    (or (null (second args))
 			(eq (read-from-string (second args)) t)))
@@ -175,7 +176,8 @@ The commands are:
 	 (%inspect output-stream)))
       ;; Reset stack
       ((string-equal "q" option)
-       (reset-stack))
+       (reset-stack)
+       (set-break-inspect *current-inspect*))
       ;; Display help
       ((string-equal "?" option)
        (format output-stream *inspect-help*))
@@ -187,13 +189,13 @@ The commands are:
 	     (format output-stream "Skip missing or invalid~%"))))
       ;; Print stack tree
       ((string-equal "tree" option)
-       (if *inspect-stack*
+       (if stack
 	   (progn
 	     (format output-stream "The current object is:~%")
-	     (dotimes (i (length *inspect-stack*))
+	     (dotimes (i (length stack))
 	       (format output-stream "~A, ~A~%"
-		       (inspected-parts (nth i *inspect-stack*) :description t)
-		       (let ((select (nth i *parent-select-stack*)))
+		       (inspected-parts (nth i stack) :description t)
+		       (let ((select (nth i (inspect-parent-stack *current-inspect*))))
 			 (typecase select
 			   (integer
 			    (format nil "which is componenent number ~d of" select))
@@ -208,14 +210,14 @@ The commands are:
       ((string-equal "print" option)
        (let ((len (read-from-string (second args))))
 	 (if (and (integerp len) (plusp len))
-	     (setq *inspect-length* len)
+	     (setf (inspect-length *current-inspect*) len)
 	     (format output-stream "Cannot set print limit to ~A~%" len))))
       ;; Select numbered or named component
       ((or (symbolp option-read)
 	   (integerp option-read))
-       (if *inspect-stack*
+       (if stack
 	   (multiple-value-bind (position list-type elements)
-	       (find-object-component (car *inspect-stack*) option-read)
+	       (find-object-component (car stack) option-read)
 	     (cond
 	       ((integerp position)
 		(let* ((element (elt elements position))
@@ -223,8 +225,8 @@ The commands are:
 		  (cond ((eq value *inspect-unbound-object-marker*)
 			 (format output-stream "That slot is unbound~%"))
 			(t
-			 (push value *inspect-stack*)
-			 (push option-read *parent-select-stack*)
+			 (push value stack)
+			 (push option-read (inspect-parent-stack *current-inspect*))
 			 (%inspect output-stream)))))
 	       ((null elements)
 		(format output-stream "Object does not contain any subobjects~%"))
@@ -244,8 +246,9 @@ The commands are:
       ;; Default is to select eval'd form
       (t
        (reset-stack)
-       (setq *inspect-stack* (list (eval option-read)))
-       (setq *parent-select-stack* (list ":i <form>"))
+       (setf (inspect-object-stack *current-inspect*) (list (eval option-read)))
+       (setf (inspect-parent-stack *current-inspect*) (list ":i <form>"))
+       (set-break-inspect *current-inspect*)
        (%inspect output-stream))
       )))
 
@@ -272,12 +275,13 @@ POSITION is NIL if the id is invalid or not found."
 
 
 (defun %inspect (s &optional (skip 0))
-  (if *inspect-stack*
-      (progn
-	(setq *inspected* (car *inspect-stack*))
-	(setq cl:* *inspected*)
-	(multiple-value-bind (description list-type elements) (inspected-parts *inspected*)
-	  (display-inspected-parts *inspected* description list-type elements s skip)))
+  (if (inspect-object-stack *current-inspect*)
+      (let ((inspected (car (inspect-object-stack *current-inspect*))))
+	(setq cl:* inspected)
+	(multiple-value-bind (description list-type elements)
+	    (inspected-parts inspected)
+	  (display-inspected-parts inspected description
+				   list-type elements s skip)))
       (format s "No object is being inspected")))
 
 
@@ -289,7 +293,7 @@ POSITION is NIL if the id is invalid or not found."
   (when elements
     (do* ((index skip (1+ index))
 	  (nelem (length elements))
-	  (max (min (1- nelem) (+ skip *inspect-length*)))
+	  (max (min (1- nelem) (+ skip (inspect-length *current-inspect*))))
 	  (suspension (when (plusp (- nelem max))
 			(- nelem max)))
 	  (count (if (typep elements 'sequence)
