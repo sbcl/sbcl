@@ -108,7 +108,6 @@ void sigaddset_blockable(sigset_t *s)
 #ifdef LISP_FEATURE_SB_THREAD
     sigaddset(s, SIG_STOP_FOR_GC);
     sigaddset(s, SIG_INTERRUPT_THREAD);
-    sigaddset(s, SIG_THREAD_EXIT);
 #endif
 }
 
@@ -552,16 +551,6 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     sigset_t ss;
     int i;
     
-    /* KLUDGE: at least on Linux, the kernel apparently schedules a
-       thread immediately it is signalled.  However, we signal
-       SIG_STOP_FOR_GC while holding the spinlock, and consequently we
-       can easily end up with a kind of thundering herd of threads all
-       wanting to acquire the lock at the same time so that they can
-       tell the system that they've gone to sleep.  So we yield here.
-       Whether this is the right fix or not is unknown.  -- CSR,
-       2004-07-16 */
-    sched_yield();
-
     if(maybe_defer_handler(sig_stop_for_gc_handler,data,
 			   signal,info,context)) {
 	return;
@@ -573,9 +562,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
     sigprocmask(SIG_BLOCK,&ss,0);
 
-    get_spinlock(&all_threads_lock,thread->pid);
     thread->state=STATE_STOPPED;
-    release_spinlock(&all_threads_lock);
 
     sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
     sigwaitinfo(&ss,0);
@@ -700,26 +687,20 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 
 void thread_exit_handler(int num, siginfo_t *info, void *v_context)
 {   /* called when a child thread exits */
-    os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
-    struct thread *th=arch_os_get_current_thread();
     pid_t kid;
-    int *status;
-    struct interrupt_data *data=
-	th ? th->interrupt_data : global_interrupt_data;
-    if(maybe_defer_handler(thread_exit_handler,data,num,info,context)){
-	return ;
-    }
+    int status;
+    
     while(1) {
 	kid=waitpid(-1,&status,__WALL|WNOHANG);
-	if(kid<1) break;
+	if(kid<=0) break;
 	if(WIFEXITED(status) || WIFSIGNALED(status)) {
 	    struct thread *th=find_thread_by_pid(kid);
-	    if(!th) continue;
-	    funcall1(SymbolFunction(HANDLE_THREAD_EXIT),make_fixnum(kid));
-	    destroy_thread(th);
+	    if(th) th->state=STATE_DEAD;
 	}
     }
 }
+
+	
 #endif
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){

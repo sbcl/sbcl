@@ -4,6 +4,9 @@
  * namespace that we control. */
 #ifndef _X86_ARCH_H
 #define _X86_ARCH_H
+#ifndef SBCL_GENESIS_CONFIG
+#error genesis/config.h (or sbcl.h) must be incuded before this file
+#endif
 
 #define ARCH_HAS_STACK_POINTER
 
@@ -14,10 +17,15 @@
  * 2002-02-15) */
 
 #ifdef LISP_FEATURE_SB_THREAD
+
+extern never_returns lose(char *fmt, ...);
+
 static inline void 
-get_spinlock(lispobj *word,int value)
+get_spinlock(volatile lispobj *word,int value)
 {
     u32 eax=0;
+    if(*word==value) 
+	lose("recursive get_spinlock: 0x%x,%d\n",word,value);
     do {
 	asm ("xor %0,%0\n\
               lock cmpxchg %1,%2" 
@@ -28,7 +36,7 @@ get_spinlock(lispobj *word,int value)
 }
 
 static inline void
-release_spinlock(lispobj *word)
+release_spinlock(volatile lispobj *word)
 {
     *word=0;
 }

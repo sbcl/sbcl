@@ -327,7 +327,7 @@
   ;; first data slot, and if you subtract 7 you get a symbol header.
 
   ;; also the CAR of NIL-as-end-of-list
-  (value :init :unbound)		
+  (value :init :unbound :ref-known (flushable) :ref-trans symbol-global-value)
   ;; also the CDR of NIL-as-end-of-list.  Its reffer needs special
   ;; care for this reason, as hash values must be fixnums.
   (hash :set-trans %set-symbol-hash)
@@ -339,7 +339,7 @@
   (package :ref-trans symbol-package
 	   :set-trans %set-symbol-package
 	   :init :null)
-  #!+sb-thread (tls-index))
+  #!+sb-thread (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
 
 (define-primitive-object (complex-single-float
 			  :lowtag other-pointer-lowtag
@@ -375,7 +375,7 @@
   (tls-cookie)				;  on x86, the LDT index 
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
-  (state)				; running, stopping, stopped
+  (state)				; running, stopping, stopped, dead
   #!+x86 (pseudo-atomic-atomic)
   #!+x86 (pseudo-atomic-interrupted)
   (interrupt-data :c-type "struct interrupt_data *" 

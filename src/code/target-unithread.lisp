@@ -22,6 +22,8 @@
   (sb!sys:sap-ref-32 (alien-sap (extern-alien "all_threads" (* t))) 
 	       (* sb!vm::thread-pid-slot 4)))
 
+(defun reap-dead-threads ())
+
 ;;;; queues, locks 
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL

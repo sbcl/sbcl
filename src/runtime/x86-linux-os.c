@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
 #include "arch.h"
@@ -29,7 +30,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include "sbcl.h"
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
@@ -65,7 +65,7 @@ void debug_get_ldt()
     printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
 }
 
-lispobj modify_ldt_lock;	/* protect all calls to modify_ldt */
+volatile lispobj modify_ldt_lock;	/* protect all calls to modify_ldt */
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;

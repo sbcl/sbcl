@@ -21,6 +21,7 @@ struct alloc_region { };
 #define STATE_RUNNING (make_fixnum(0))
 #define STATE_STOPPING (make_fixnum(1))
 #define STATE_STOPPED (make_fixnum(2))
+#define STATE_DEAD (make_fixnum(3))
 
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))

@@ -5,6 +5,9 @@
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include "runtime.h"
 #include "sbcl.h"
 #include "validate.h"		/* for CONTROL_STACK_SIZE etc */
@@ -15,6 +18,7 @@
 #include "globals.h"
 #include "dynbind.h"
 #include "genesis/cons.h"
+#include "genesis/fdefn.h"
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
@@ -22,7 +26,7 @@ struct thread *all_threads;
 volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
 
-void get_spinlock(lispobj *word,int value);
+void get_spinlock(volatile lispobj *word,int value);
 
 int
 initial_thread_trampoline(struct thread *th)
@@ -195,6 +199,11 @@ struct thread * create_thread_struct(lispobj initial_function) {
 
 void link_thread(struct thread *th,pid_t kid_pid)
 {
+    sigset_t newset,oldset;
+    sigemptyset(&newset);
+    sigaddset_blockable(&newset);
+    sigprocmask(SIG_BLOCK, &newset, &oldset); 
+
     get_spinlock(&all_threads_lock,kid_pid);
     th->next=all_threads;
     all_threads=th;
@@ -203,6 +212,8 @@ void link_thread(struct thread *th,pid_t kid_pid)
      */
     protect_control_stack_guard_page(th->pid,1);
     release_spinlock(&all_threads_lock);
+
+    sigprocmask(SIG_SETMASK,&oldset,0);
     th->pid=kid_pid;		/* child will not start until this is set */
 }
 
@@ -218,30 +229,38 @@ void create_initial_thread(lispobj initial_function) {
 #ifdef LISP_FEATURE_SB_THREAD
 pid_t create_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
-    pid_t kid_pid=clone(new_thread_trampoline,
-			(((void*)th->control_stack_start)+
-			 THREAD_CONTROL_STACK_SIZE-4),
-			CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
+    pid_t kid_pid=0;
 
-    if(th && kid_pid>0) {
+    if(th==0) return 0;
+    kid_pid=clone(new_thread_trampoline,
+		  (((void*)th->control_stack_start)+
+		   THREAD_CONTROL_STACK_SIZE-4),
+		  CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
+    
+    if(kid_pid>0) {
 	link_thread(th,kid_pid);
 	return th->pid;
     } else {
-	destroy_thread(th);
+	os_invalidate((os_vm_address_t) th->control_stack_start,
+		      ((sizeof (lispobj))
+		       * (th->control_stack_end-th->control_stack_start)) +
+		      BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
+		      32*SIGSTKSZ);
 	return 0;
     }
 }
 #endif
 
+/* unused */
 void destroy_thread (struct thread *th)
 {
     /* precondition: the unix task has already been killed and exited.
-     * This is called by the parent */
+     * This is called by the parent or some other thread */
 #ifdef LISP_FEATURE_GENCGC
     gc_alloc_update_page_tables(0, &th->alloc_region);
 #endif
     get_spinlock(&all_threads_lock,th->pid);
-    th->state=STATE_STOPPED;
+    th->unbound_marker=0;	/* for debugging */
     if(th==all_threads) 
 	all_threads=th->next;
     else {
@@ -256,6 +275,33 @@ void destroy_thread (struct thread *th)
 		   * (th->control_stack_end-th->control_stack_start)) +
 		  BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
 		  32*SIGSTKSZ);
+}
+
+void reap_dead_threads() 
+{
+    struct thread *th,*next,*prev=0;
+    th=all_threads;
+    while(th) {
+	next=th->next;
+	if(th->state==STATE_DEAD) {
+	    funcall1(SymbolFunction(HANDLE_THREAD_EXIT),make_fixnum(th->pid));
+#ifdef LISP_FEATURE_GENCGC
+	    gc_alloc_update_page_tables(0, &th->alloc_region);
+#endif
+	    get_spinlock(&all_threads_lock,th->pid);
+	    if(prev) prev->next=next;
+	    else all_threads=next;
+	    release_spinlock(&all_threads_lock);
+	    if(th->tls_cookie>=0) arch_os_thread_cleanup(th); 
+	    os_invalidate((os_vm_address_t) th->control_stack_start,
+			  ((sizeof (lispobj))
+			   * (th->control_stack_end-th->control_stack_start)) +
+			  BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
+			  32*SIGSTKSZ);
+	} else 
+	    prev=th;
+	th=next;
+    }
 }
 
 
@@ -309,7 +355,7 @@ int signal_thread_to_dequeue (pid_t pid)
 
 
 /* stopping the world is a two-stage process.  From this thread we signal 
- * all the others with SIG_STOP_FOR_GC.  The handler for this thread does
+ * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
  * the usual pseudo-atomic checks (we don't want to stop a thread while 
  * it's in the middle of allocation) then kills _itself_ with SIGSTOP.
  */
@@ -319,26 +365,22 @@ void gc_stop_the_world()
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     struct thread *p,*th=arch_os_get_current_thread();
     pid_t old_pid;
-    int finished=0;
+    int finished;
     do {
-	get_spinlock(&all_threads_lock,th->pid);
+	finished=1;
 	for(p=all_threads,old_pid=p->pid; p; p=p->next) {
 	    if(p==th) continue;
-	    if(p->state!=STATE_RUNNING) continue;
-	    p->state=STATE_STOPPING;
-	    kill(p->pid,SIG_STOP_FOR_GC);
+	    if(p->state==STATE_RUNNING) {
+		p->state=STATE_STOPPING;
+		kill(p->pid,SIG_STOP_FOR_GC);
+	    }
+	    if((p->state!=STATE_STOPPED) &&
+	       (p->state!=STATE_DEAD)) {
+		finished=0;
+	    }
 	}
-	release_spinlock(&all_threads_lock);
-	sched_yield();
-	/* if everything has stopped, and there is no possibility that
-	 * a new thread has been created, we're done.  Otherwise go
-	 * round again and signal anything that sprang up since last
-	 * time	 */
-	if(old_pid==all_threads->pid) {
-	    finished=1;
-	    for_each_thread(p) 
-		finished = finished &&
-		((p==th) || (p->state==STATE_STOPPED));
+	if(old_pid!=all_threads->pid) {
+	    finished=0;
 	}
     } while(!finished);
 }
@@ -346,12 +388,14 @@ void gc_stop_the_world()
 void gc_start_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
-    get_spinlock(&all_threads_lock,th->pid);
+    /* if a resumed thread creates a new thread before we're done with
+     * this loop, the new thread will get consed on the front of *
+     * all_threads_lock, but it won't have been stopped so won't need
+     * restarting */
     for(p=all_threads;p;p=p->next) {
-	if(p==th) continue;
+	if((p==th) || (p->state==STATE_DEAD)) continue;
 	p->state=STATE_RUNNING;
 	kill(p->pid,SIG_STOP_FOR_GC);
     }
-    release_spinlock(&all_threads_lock);
 }
 #endif

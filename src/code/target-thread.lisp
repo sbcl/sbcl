@@ -23,6 +23,8 @@
     unsigned-int
   (thread-id unsigned-long))
 
+(define-alien-routine reap-dead-threads void)
+
 (defvar *session* nil)
 
 ;;;; queues, locks 
@@ -121,6 +123,9 @@
 ;;; i suspect there may be a race still in this: the futex version requires
 ;;; the old mutex value before sleeping, so how do we get away without it
 (defun get-mutex (lock &optional new-value (wait-p t))
+  "Acquire LOCK, setting it to NEW-VALUE or some suitable default value 
+if NIL.  If WAIT-P is non-NIL and the lock is in use, sleep until it
+is available"
   (declare (type mutex lock) (optimize (speed 3)))
   (let ((pid (current-thread-id)))
     (unless new-value (setf new-value pid))
@@ -144,7 +149,8 @@
   (let ((pid (current-thread-id))
 	old)
     (unless new-value (setf new-value pid))
-    (assert (not (eql new-value (mutex-value lock))))
+    (when (eql new-value (mutex-value lock))
+      (warn "recursive lock attempt ~S~%" lock))
     (loop
      (unless
 	 (setf old (sb!vm::%instance-set-conditional lock 4 nil new-value))
@@ -333,6 +339,27 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
 	  collect (funcall function thread))))
 
+(defun thread-sap-from-id (id)
+  (let ((thread (alien-sap (extern-alien "all_threads" (* t)))))
+    (loop 
+     (when (sb!sys:sap= thread (sb!sys:int-sap 0)) (return nil))
+     (let ((pid (sb!sys:sap-ref-32 thread (* 4 sb!vm::thread-pid-slot))))
+       (when (= pid id) (return thread))
+       (setf thread (sb!sys:sap-ref-sap thread (* 4 sb!vm::thread-next-slot)))))))
+
+;;; internal use only.  If you think you need to use this, either you
+;;; are an SBCL developer, are doing something that you should discuss
+;;; with an SBCL developer first, or are doing something that you
+;;; should probably discuss with a professional psychiatrist first
+(defun symbol-value-in-thread (symbol thread-id)
+  (let ((thread (thread-sap-from-id thread-id)))
+    (when thread
+      (let* ((index (sb!vm::symbol-tls-index symbol))
+	     (tl-val (sb!sys:sap-ref-32 thread (* 4 index))))
+	(if (eql tl-val sb!vm::unbound-marker-widetag)
+	    (sb!vm::symbol-global-value symbol)
+	    (sb!kernel:make-lisp-obj tl-val))))))
+
 ;;;; job control, independent listeners
 
 (defstruct session 
@@ -349,15 +376,15 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 (defun init-job-control ()
   (setf *session* (new-session)))
 
-(defun %delete-thread-from-session (tid)
-  (with-mutex ((session-lock *session*))
-    (setf (session-threads *session*)
-	  (delete tid (session-threads *session*))
-	  (session-interactive-threads *session*)
-	  (delete tid (session-interactive-threads *session*)))))
+(defun %delete-thread-from-session (tid session)
+  (with-mutex ((session-lock session))
+    (setf (session-threads session)
+	  (delete tid (session-threads session))
+	  (session-interactive-threads session)
+	  (delete tid (session-interactive-threads session)))))
 
 (defun call-with-new-session (fn)
-  (%delete-thread-from-session (current-thread-id))
+  (%delete-thread-from-session (current-thread-id) *session*)
   (let ((*session* (new-session)))  (funcall fn)))
 
 (defmacro with-new-session (args &body forms)
@@ -366,14 +393,18 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
     `(labels ((,fb-name () ,@forms))
       (call-with-new-session (function ,fb-name)))))
 
-;;; this is called from a C signal handler: some signals may be masked
+;;; Remove thread id TID from its session, if it has one.  This is
+;;; called from C reap_dead_threads() so is run in the context of
+;;; whichever thread called that (usually after a GC), which may not have 
+;;; any meaningful parent/child/sibling relationship with the dead thread
 (defun handle-thread-exit (tid)
-  "Remove thread id TID from the session, if it's there"
-  (%delete-thread-from-session tid))
+  (let ((session (symbol-value-in-thread '*session* tid)))
+    (and session (%delete-thread-from-session tid session))))
   
 (defun terminate-session ()
-  "Kill all threads in session exept for this one.  Does nothing if current
+  "Kill all threads in session except for this one.  Does nothing if current
 thread is not the foreground thread"
+  (reap-dead-threads)
   (let* ((tid (current-thread-id))
 	 (to-kill
 	  (with-mutex ((session-lock *session*))

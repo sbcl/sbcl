@@ -244,7 +244,8 @@ and submit it as a patch."
 	  (scrub-control-stack)
 	  (setf *need-to-collect-garbage* nil)
 	  (dolist (h *after-gc-hooks*) (carefully-funcall h))
-	  (gc-start-the-world)))))))
+	  (gc-start-the-world))
+	 (sb!thread::reap-dead-threads))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
