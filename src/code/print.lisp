@@ -378,6 +378,14 @@
 ;;; that there is no pretty printer installed.
 (defvar *pretty-printer* nil)
 
+;;; Objects whose print representation identifies them EQLly don't
+;;; need to be checked for circularity.
+(defun uniquely-identified-by-print-p (x)
+  (or (numberp x)
+      (characterp x)
+      (and (symbolp x)
+	   (symbol-package x))))
+
 ;;; Output OBJECT to STREAM observing all printer control variables.
 (defun output-object (object stream)
   (labels ((print-it (stream)
@@ -401,23 +409,16 @@
 		 (t
 		  (when (handle-circularity marker stream)
 		    (print-it stream)))))))
-    (cond ((or (not *print-circle*)
-	       (numberp object)
-	       (characterp object)
-	       (and (symbolp object)
-		    (symbol-package object)))
-	   ;; If it's a number, character, or interned symbol, we
-	   ;; don't want to check for circularity/sharing.
+    (cond (;; Maybe we don't need to bother with circularity detection.
+	   (or (not *print-circle*)
+	       (uniquely-identified-by-print-p object))
 	   (print-it stream))
-	  ((or *circularity-hash-table*
-	       (consp object)
-	       (typep object 'instance)
-	       (typep object '(array t *)))
-	   ;; If we have already started circularity detection, this
+	  (;; If we have already started circularity detection, this
 	   ;; object might be a shared reference. If we have not, then
-	   ;; if it is a cons, an instance, or an array of element
-	   ;; type T it might contain a circular reference to itself
-	   ;; or multiple shared references.
+	   ;; if it is a compound object it might contain a circular
+	   ;; reference to itself or multiple shared references.
+	   (or *circularity-hash-table*
+	       (compound-object-p x))
 	   (check-it stream))
 	  (t
 	   (print-it stream)))))

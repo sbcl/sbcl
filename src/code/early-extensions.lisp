@@ -110,8 +110,8 @@
 					 (1- max))))
 	  (t nil))))
 
-;;; Is X a circular list?
-(defun circular-list-p (x)
+;;; Is X a list containing a cycle?
+(defun cyclic-list-p (x)
   (and (listp x)
        (labels ((safe-cddr (x) (if (listp (cdr x)) (cddr x)))) 
 	 (do ((y x (safe-cddr y))
@@ -146,6 +146,13 @@
 	       ((or (= r 0) (> d q)) (/= r 0))
 	     (declare (fixnum inc))
 	     (multiple-value-setq (q r) (truncate x d))))))
+
+;;; Could this object contain other objects? (This is important to
+;;; the implementation of things like *PRINT-CIRCLE* and the dumper.)
+(defun compound-object-p (x)
+  (or (consp x)
+      (typep x 'instance)
+      (typep x '(array t *))))
 
 ;;;; the COLLECT macro
 ;;;;

@@ -338,7 +338,7 @@
 	      ;;   take a little more care while dumping these.
 	      ;; So if better list coalescing is needed, start here.
 	      ;; -- WHN 2000-11-07
-              (if (circular-list-p x)
+              (if (cyclic-list-p x)
 		  (progn
 		    (dump-list x file)
 		    (eq-save-object x file))
@@ -431,10 +431,7 @@
 ;;; We peek at the object type so that we only pay the circular
 ;;; detection overhead on types of objects that might be circular.
 (defun dump-object (x file)
-  (if (or (array-header-p x)
-	  (simple-vector-p x)
-	  (consp x)
-	  (typep x 'instance))
+  (if (compound-object-p x)
       (let ((*circularities-detected* ())
 	    (circ (fasl-output-circularity-table file)))
 	(clrhash circ)

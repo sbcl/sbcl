@@ -146,14 +146,13 @@
 ;;;
 ;;; FIXME: This has mutated into a hack which crudely duplicates
 ;;; functionality from the existing mechanism to load files from
-;;; stems-and-flags.lisp-expr, without being quite parallel. (E.g.
-;;; object files end up alongside the source files instead of ending
-;;; up in parallel directory trees.) Maybe we could merge the
-;;; filenames here into stems-and-flags.lisp-expr with some new flag
-;;; (perhaps :WARM) to indicate that the files should be handled not
-;;; in cold load but afterwards. Alternatively, we could call
-(dolist (stem '(
-		;; CLOS, derived from the PCL reference implementation
+;;; build-order.lisp-expr, without being quite parallel. (E.g. object
+;;; files end up alongside the source files instead of ending up in
+;;; parallel directory trees.) Maybe we could merge the filenames here
+;;; into build-order.lisp-expr with some new flag (perhaps :WARM) to
+;;; indicate that the files should be handled not in cold load but
+;;; afterwards. 
+(dolist (stem '(;; CLOS, derived from the PCL reference implementation
 		;;
 		;; This PCL build order is based on a particular
 		;; linearization of the declared build order

@@ -1336,7 +1336,7 @@
 ;;; FIXME: It would be good to arrange for this to be called when the
 ;;; cross-compiler is being built, not just when the target Lisp is
 ;;; being cold loaded. Perhaps this could be moved to its own file
-;;; late in the stems-and-flags.lisp-expr sequence, and be put in
+;;; late in the build-order.lisp-expr sequence, and be put in
 ;;; !COLD-INIT-FORMS there?
 (defun !class-finalize ()
   (dohash (name layout *forward-referenced-layouts*)

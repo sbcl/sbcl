@@ -292,43 +292,6 @@
 
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-set)
-
-(defknown sb!kernel::%instance-set-conditional (instance index t t) t
-  (unsafe))
-
-(define-vop (instance-set-conditional-c slot-set-conditional)
-  (:policy :fast-safe)
-  (:translate sb!kernel::%instance-set-conditional)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:arg-types instance (:constant index) * *))
-
-(define-vop (instance-set-conditional)
-  (:translate sb!kernel::%instance-set-conditional)
-  (:args (object :scs (descriptor-reg) :to :eval)
-	 (slot :scs (any-reg) :to :result)
-	 (old-value :scs (descriptor-reg any-reg) :target eax)
-	 (new-value :scs (descriptor-reg any-reg) :target temp))
-  (:arg-types instance positive-fixnum * *)
-  (:temporary (:sc descriptor-reg :offset eax-offset
-		   :from (:argument 1) :to :result :target result)  eax)
-  (:temporary (:sc descriptor-reg :from (:argument 2) :to :result) temp)
-  (:results (result :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:generator 5
-    (move eax old-value)
-    (move temp new-value)
-    (inst cmpxchg (make-ea :dword :base object :index slot :scale 1
-			   :disp (- (* instance-slots-offset n-word-bytes)
-				    instance-pointer-lowtag))
-	  temp)
-    (move result eax)))
-
-(defknown %instance-xadd (instance index fixnum) fixnum ())
-(define-vop (instance-xadd-c slot-xadd)
-  (:policy :fast-safe)
-  (:translate %instance-xadd)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:arg-types instance (:constant index) tagged-num))
 
 ;;;; code object frobbing
 

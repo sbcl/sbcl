@@ -9,10 +9,9 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; This is a linear ordering of system sources which works both to
-;;; compile/load the cross-compiler under the host Common Lisp and to
-;;; cross-compile the compiler into the under-construction target
-;;; Common Lisp.
+;;; a linear ordering of system sources which works both to compile/load
+;;; the cross-compiler under the host Common Lisp and then to cross-compile
+;;; the complete system into the under-construction target SBCL
 ;;;
 ;;; Of course, it'd be very nice to have this be a dependency DAG
 ;;; instead, so that we could do automated incremental recompilation.
@@ -34,12 +33,13 @@
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
 
- ;; This comes early because the cross-compilation host's backquote logic
- ;; expand into something which can't be executed on the target Lisp (e.g.
- ;; in CMU CL where it expands into internal functions like BACKQ-LIST), and
- ;; by replacing the host backquote logic with our own as early as possible,
- ;; we minimize the chance of any forms referring to host Lisp internal
- ;; functions leaking into target Lisp code.
+ ;; This comes early because the cross-compilation host's backquote
+ ;; logic can expand into something which can't be executed on the
+ ;; target Lisp (e.g. in CMU CL where it expands into internal
+ ;; functions like BACKQ-LIST), and by replacing the host backquote
+ ;; logic with our own as early as possible, we minimize the chance of
+ ;; any forms referring to cross-compilation host internal functions
+ ;; leaking into target SBCL code.
  ("src/code/backq")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -84,7 +84,7 @@
 (eval-when (:compile-toplevel :execute)
   (defmacro-mundanely maybe-find-stack-top-hint ()
     `(or sb!debug:*stack-top-hint*
-	 (nth-value 1 (sb!kernel:find-caller-name-and-frame)))))
+	 (nth-value 1 (find-caller-name-and-frame)))))
 
 (defun error (datum &rest arguments)
   #!+sb-doc
@@ -98,7 +98,7 @@
 	       (sb!impl::cold-print argument))
   (/show0 "done cold-printing ERROR arguments")
 
-  (sb!kernel:infinite-error-protect
+  (infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
 					  'simple-error 'error))
 	  (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
@@ -110,15 +110,13 @@
       (invoke-debugger condition))))
 
 (defun cerror (continue-string datum &rest arguments)
-  (sb!kernel:infinite-error-protect
+  (infinite-error-protect
     (with-simple-restart
 	(continue "~A" (apply #'format nil continue-string arguments))
-      (let ((condition (if (typep datum 'condition)
-			   datum
-			   (coerce-to-condition datum
-						arguments
-						'simple-error
-						'error)))
+      (let ((condition (coerce-to-condition datum
+					    arguments
+					    'simple-error
+					    'error))
 	    (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
 	(with-condition-restarts condition (list (find-restart 'continue))
 	  (let ((sb!debug:*stack-top-hint* nil))
@@ -132,7 +130,7 @@
 ;;; *DEBUGGER-HOOK*); or for that matter, without messing up ordinary
 ;;; applications which try to do similar things with *DEBUGGER-HOOK*
 (defun %break (what &optional (datum "break") &rest arguments)
-  (sb!kernel:infinite-error-protect
+  (infinite-error-protect
     (with-simple-restart (continue "Return from ~S." what)
       (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
 	(invoke-debugger
@@ -162,7 +160,7 @@
 	(/show0 "ignoring WARN in cold init, arguments=..")
 	#!+sb-show (dolist (argument arguments)
 		     (sb!impl::cold-print argument)))
-      (sb!kernel:infinite-error-protect
+      (infinite-error-protect
        (/show0 "doing COERCE-TO-CONDITION")
        (let ((condition (coerce-to-condition datum arguments
 					     'simple-warning 'warn)))

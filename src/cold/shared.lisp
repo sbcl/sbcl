@@ -274,7 +274,7 @@
     ;; warnings and remove support for this flag. -- WHN 19990323)
     :ignore-failure-p))
 
-(defparameter *stems-and-flags* (read-from-file "stems-and-flags.lisp-expr"))
+(defparameter *stems-and-flags* (read-from-file "build-order.lisp-expr"))
 
 (defmacro do-stems-and-flags ((stem flags) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS-")))
@@ -287,7 +287,7 @@
 (let ((stems (make-hash-table :test 'equal)))
   (do-stems-and-flags (stem flags)
     (if (gethash stem stems)
-      (error "duplicate stem ~S in stems-and-flags data" stem)
+      (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
       (setf (gethash stem stems) t))
     (let ((set-difference (set-difference flags *expected-stem-flags*)))
       (when set-difference
