@@ -81,5 +81,17 @@
 (assert (raises-error? (with-open-file (s "/dev/zero")
 			 (read-byte s))
 		       type-error))
+;;; bidirectional streams getting confused about their position
+(let ((p "bidirectional-stream-test"))
+  (with-open-file (s p :direction :output :if-exists :supersede)
+    (with-standard-io-syntax
+      (format s "~S ~S ~S~%" 'these 'are 'symbols)))
+  (with-open-file (s p :direction :io :if-exists :overwrite)
+    (read s)
+    (with-standard-io-syntax
+      (prin1 'insert s)))
+  (with-open-file (s p)
+    (assert (string= (read-line s) "THESE INSERTMBOLS")))
+  (delete-file p))
 ;;; success
 (quit :unix-status 104)

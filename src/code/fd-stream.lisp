@@ -214,6 +214,11 @@
 				  (+ (fd-stream-obuf-tail stream)
 				     ,size))
 			   (flush-output-buffer stream)))
+		     ,(unless (eq (car buffering) :none)
+			`(when (> (fd-stream-ibuf-tail stream)
+				  (fd-stream-ibuf-head stream))
+			   (file-position stream (file-position stream))))
+		     
 		     ,@body
 		     (incf (fd-stream-obuf-tail stream) ,size)
 		     ,(ecase (car buffering)
@@ -305,6 +310,9 @@
   (let ((start (or start 0))
 	(end (or end (length (the (simple-array * (*)) thing)))))
     (declare (type index start end))
+    (when (> (fd-stream-ibuf-tail fd-stream)
+	     (fd-stream-ibuf-head fd-stream))
+      (file-position fd-stream (file-position fd-stream)))
     (let* ((len (fd-stream-obuf-length fd-stream))
 	   (tail (fd-stream-obuf-tail fd-stream))
 	   (space (- len tail))

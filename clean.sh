@@ -23,7 +23,7 @@ rm -rf obj/* output/* doc/user-manual \
 # standard clean.sh file.)
 
 # Ensure we know GNUMAKE
-. find-gnumake.sh
+. ./find-gnumake.sh
 find_gnumake
 
 # Ask some other directories to clean themselves up.
