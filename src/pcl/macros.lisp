@@ -44,42 +44,6 @@
 
 (/show "done with DECLAIM DECLARATION")
 
-;;; FIXME: This looks like SBCL's PARSE-BODY, and should be shared.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defun extract-declarations (body &optional environment)
-  ;;(declare (values documentation declarations body))
-  (let (documentation
-        declarations
-        form)
-    (when (and (stringp (car body))
-               (cdr body))
-      (setq documentation (pop body)))
-    (block outer
-      (loop
-        (when (null body) (return-from outer nil))
-        (setq form (car body))
-        (when (block inner
-                (loop (cond ((not (listp form))
-                             (return-from outer nil))
-                            ((eq (car form) 'declare)
-                             (return-from inner t))
-                            (t
-                             (multiple-value-bind (newform macrop)
-                                  (macroexpand-1 form environment)
-                               (if (or (not (eq newform form)) macrop)
-                                   (setq form newform)
-                                 (return-from outer nil)))))))
-          (pop body)
-          (dolist (declaration (cdr form))
-            (push declaration declarations)))))
-    (values documentation
-            (and declarations `((declare ,.(nreverse declarations))))
-            body)))
-) ; EVAL-WHEN
-
-(/show "done with EVAL-WHEN (..) DEFUN EXTRACT-DECLARATIONS")
-
 (defun get-declaration (name declarations &optional default)
   (dolist (d declarations default)
     (dolist (form (cdr d))
@@ -88,18 +52,14 @@
 
 (/show "pcl/macros.lisp 85")
 
-(defmacro doplist ((key val) plist &body body &environment env)
-  (multiple-value-bind (doc decls bod)
-      (extract-declarations body env)
-    (declare (ignore doc))
-    `(let ((.plist-tail. ,plist) ,key ,val)
-       ,@decls
-       (loop (when (null .plist-tail.) (return nil))
-	     (setq ,key (pop .plist-tail.))
-	     (when (null .plist-tail.)
-	       (error "malformed plist, odd number of elements"))
-	     (setq ,val (pop .plist-tail.))
-	     (progn ,@bod)))))
+(defmacro doplist ((key val) plist &body body)
+  `(let ((.plist-tail. ,plist) ,key ,val)
+     (loop (when (null .plist-tail.) (return nil))
+	   (setq ,key (pop .plist-tail.))
+	   (when (null .plist-tail.)
+	     (error "malformed plist, odd number of elements"))
+	   (setq ,val (pop .plist-tail.))
+	   (progn ,@body))))
 
 (/show "pcl/macros.lisp 101")
 

@@ -1008,8 +1008,8 @@
 ;;; Pull a name out of the %METHOD-NAME declaration in the function
 ;;; body given, or return NIL if no %METHOD-NAME declaration is found.
 (defun body-method-name (body)
-  (multiple-value-bind (documentation declarations real-body)
-      (extract-declarations body nil)
+  (multiple-value-bind (real-body declarations documentation)
+      (parse-body body nil)
     (declare (ignore documentation real-body))
     (let ((name-decl (get-declaration '%method-name declarations)))
       (and name-decl

@@ -547,7 +547,7 @@
   During evaluation of the Forms, bind the Vars to the result of evaluating the
   Value forms. The variables are bound in parallel after all of the Values are
   evaluated."
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
       (let ((fun-cont (make-continuation)))
         (let* ((*lexenv* (process-decls decls vars nil cont))
@@ -563,7 +563,7 @@
   "LET* ({(Var [Value]) | Var}*) Declaration* Form*
   Similar to LET, but the variables are bound sequentially, allowing each Value
   form to reference any of the previous Vars."
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
       (let ((*lexenv* (process-decls decls vars nil cont)))
 	(ir1-convert-aux-bindings start cont forms vars values)))))
@@ -577,7 +577,7 @@
 ;;; forms before we hit the IR1 transform level.
 (defun ir1-translate-locally (body start cont)
   (declare (type list body) (type continuation start cont))
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (let ((*lexenv* (process-decls decls nil nil cont)))
       (ir1-convert-aux-bindings start cont forms nil nil))))
 
@@ -608,7 +608,7 @@
       (let ((name (first def)))
 	(check-fun-name name)
 	(names name)
-	(multiple-value-bind (forms decls) (sb!sys:parse-body (cddr def))
+	(multiple-value-bind (forms decls) (parse-body (cddr def))
 	  (defs `(lambda ,(second def)
 		   ,@decls
 		   (block ,(fun-name-block-name name)
@@ -622,7 +622,7 @@
   Evaluate the Body-Forms with some local function definitions. The bindings
   do not enclose the definitions; any use of Name in the Forms will refer to
   the lexically apparent function definition in the enclosing environment."
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-vars definitions 'flet)
       (let* ((fvars (mapcar (lambda (n d)
@@ -642,7 +642,7 @@
   Evaluate the Body-Forms with some local function definitions. The bindings
   enclose the new definitions, so the defined functions can call themselves or
   each other."
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-vars definitions 'labels)
       (let* (;; dummy LABELS functions, to be used as placeholders

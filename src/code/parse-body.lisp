@@ -26,7 +26,7 @@
 ;;;
 ;;; If DOC-STRING-ALLOWED is NIL, then no forms will be treated as
 ;;; documentation strings.
-(defun sb!sys:parse-body (body &optional (doc-string-allowed t))
+(defun parse-body (body &optional (doc-string-allowed t))
   (let ((reversed-decls nil)
         (forms body)
         (doc nil))

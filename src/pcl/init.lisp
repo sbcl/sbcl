@@ -225,12 +225,12 @@
     ;; Now check the supplied-initarg-names and the default initargs
     ;; against the total set that we know are legal.
     (doplist (key val) initargs
-       (unless (memq key legal)
-	 (if error-p
-	     (error "Invalid initialization argument ~S for class ~S"
-		    key
-		    (class-name class))
-	     (return-from check-initargs-2-plist nil)))))
+      (unless (memq key legal)
+	(if error-p
+	    (error "Invalid initialization argument ~S for class ~S"
+		   key
+		   (class-name class))
+	    (return-from check-initargs-2-plist nil)))))
   t)
 
 (defun check-initargs-2-list (initkeys class legal &optional (error-p t))

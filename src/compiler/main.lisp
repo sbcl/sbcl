@@ -801,7 +801,7 @@
 ;;; We parse declarations and then recursively process the body.
 (defun process-toplevel-locally (body path compile-time-too)
   (declare (list path))
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body nil)
     (let* ((*lexenv*
 	    (process-decls decls nil nil (make-continuation)))
 	   ;; Binding *POLICY* is pretty much of a hack, since it

@@ -1949,7 +1949,7 @@
 
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
-    (multiple-value-bind (forms decls) (sb!sys:parse-body (cddr form))
+    (multiple-value-bind (forms decls) (parse-body (cddr form))
       (let* ((result-cont (make-continuation))
 	     (*lexenv* (process-decls decls
 				      (append aux-vars vars)

@@ -231,10 +231,10 @@
 
 (defun make-long-method-combination-function
        (type ll method-group-specifiers args-option gf-var body)
-  ;;(declare (values documentation function))
   (declare (ignore type))
-  (multiple-value-bind (documentation declarations real-body)
-      (extract-declarations body)
+  (multiple-value-bind (real-body declarations documentation)
+      ;; (Note that PARSE-BODY ignores its second arg ENVIRONMENT.)
+      (parse-body body nil)
 
     (let ((wrapped-body
 	    (wrap-method-group-specifier-bindings method-group-specifiers

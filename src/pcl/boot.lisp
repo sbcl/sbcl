@@ -466,8 +466,8 @@ bootstrapping.
   (multiple-value-bind (parameters unspecialized-lambda-list specializers)
       (parse-specialized-lambda-list lambda-list)
     (declare (ignore parameters))
-    (multiple-value-bind (documentation declarations real-body)
-	(extract-declarations body env)
+    (multiple-value-bind (real-body declarations documentation)
+	(parse-body body env)
       (values `(lambda ,unspecialized-lambda-list
 		 ,@(when documentation `(,documentation))
 		 ;; (Old PCL code used a somewhat different style of
@@ -573,8 +573,8 @@ bootstrapping.
     (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
 	    is not a lambda form."
 	   method-lambda))
-  (multiple-value-bind (documentation declarations real-body)
-      (extract-declarations (cddr method-lambda) env)
+  (multiple-value-bind (real-body declarations documentation)
+      (parse-body (cddr method-lambda) env)
     (let* ((name-decl (get-declaration '%method-name declarations))
 	   (sll-decl (get-declaration '%method-lambda-list declarations))
 	   (method-name (when (consp name-decl) (car name-decl)))
@@ -661,10 +661,11 @@ bootstrapping.
 				  env
 				  slots
 				  calls)
-	    (multiple-value-bind
-		(ignore walked-declarations walked-lambda-body)
-		(extract-declarations (cddr walked-lambda))
-	      (declare (ignore ignore))
+	    (multiple-value-bind (walked-lambda-body
+				  walked-declarations
+				  walked-documentation)
+		(parse-body (cddr walked-lambda) env)
+	      (declare (ignore walked-documentation))
 	      (when (or next-method-p-p call-next-method-p)
 		(setq plist (list* :needs-next-methods-p t plist)))
 	      (when (some #'cdr slots)
