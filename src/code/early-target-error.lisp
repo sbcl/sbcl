@@ -165,8 +165,8 @@
 				    ',name)))
 		`(with-condition-restarts
 		     ,n-cond
-		     (list ,@(mapcar #'(lambda (da)
-					 `(find-restart ',(nth 0 da)))
+		     (list ,@(mapcar (lambda (da)
+				       `(find-restart ',(nth 0 da)))
 				     data))
 		   ,(if (eq name 'cerror)
 			`(cerror ,(second expression) ,n-cond)

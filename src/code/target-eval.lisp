@@ -166,7 +166,7 @@
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to the byte compiler.
 #!-sb-interpreter
-(defun internal-eval (expr)
+(defun sb!eval:internal-eval (expr)
   (let ((name (gensym "EVAL-TMPFUN-")))
     (multiple-value-bind (fun warnings-p failure-p)
         (compile name

@@ -715,7 +715,7 @@
   (current-size 0 :type index)
   ;; The last location packed in, used by pack to scatter TNs to
   ;; prevent a few locations from getting all the TNs, and thus
-  ;; getting overcrowded, reducing the possiblilities for targeting.
+  ;; getting overcrowded, reducing the possibilities for targeting.
   (last-offset 0 :type index)
   ;; A vector containing, for each location in this SB, a vector
   ;; indexed by IR2 block numbers, holding local conflict bit vectors.
@@ -738,25 +738,25 @@
   (last-block-count 0 :type index))
 
 ;;; the SC structure holds the storage base that storage is allocated
-;;; in and information used to select locations within the SB.
+;;; in and information used to select locations within the SB
 (defstruct (sc (:copier nil))
-  ;; Name, for printing and reference.
+  ;; name, for printing and reference
   (name nil :type symbol)
-  ;; The number used to index SC cost vectors.
+  ;; the number used to index SC cost vectors
   (number 0 :type sc-number)
-  ;; The storage base that this SC allocates storage from.
+  ;; the storage base that this SC allocates storage from
   (sb nil :type (or sb null))
-  ;; The size of elements in this SC, in units of locations in the SB.
+  ;; the size of elements in this SC, in units of locations in the SB
   (element-size 0 :type index)
-  ;; If our SB is finite, a list of the locations in this SC.
+  ;; if our SB is finite, a list of the locations in this SC
   (locations nil :type list)
-  ;; A list of the alternate (save) SCs for this SC.
+  ;; a list of the alternate (save) SCs for this SC
   (alternate-scs nil :type list)
-  ;; A list of the constant SCs that can me moved into this SC.
+  ;; a list of the constant SCs that can me moved into this SC
   (constant-scs nil :type list)
-  ;; True if this values in this SC needs to be saved across calls.
+  ;; true if the values in this SC needs to be saved across calls
   (save-p nil :type boolean)
-  ;; Vectors mapping from SC numbers to information about how to load
+  ;; vectors mapping from SC numbers to information about how to load
   ;; from the index SC to this one. Move-Functions holds the names of
   ;; the functions used to do loading, and Load-Costs holds the cost
   ;; of the corresponding Move-Functions. If loading is impossible,
@@ -766,7 +766,7 @@
 		  :type sc-vector)
   (load-costs (make-array sc-number-limit :initial-element nil)
 	      :type sc-vector)
-  ;; A vector mapping from SC numbers to possibly
+  ;; a vector mapping from SC numbers to possibly
   ;; representation-specific move and coerce VOPs. Each entry is a
   ;; list of VOP-INFOs for VOPs that move/coerce an object in the
   ;; index SC's representation into this SC's representation. This
@@ -786,22 +786,22 @@
   ;; that we are setting up for unknown-values return.
   (move-vops (make-array sc-number-limit :initial-element nil)
 	     :type sc-vector)
-  ;; The costs corresponding to the MOVE-VOPS. Separate because this
+  ;; the costs corresponding to the MOVE-VOPS. Separate because this
   ;; info is needed at meta-compile time, while the MOVE-VOPs don't
   ;; exist till load time. If no move is defined, then the entry is
   ;; NIL.
   (move-costs (make-array sc-number-limit :initial-element nil)
 	      :type sc-vector)
-  ;; Similar to Move-VOPs, except that we only ever use the entries
+  ;; similar to Move-VOPs, except that we only ever use the entries
   ;; for this SC and its alternates, since we never combine complex
   ;; representation conversion with argument passing.
   (move-arg-vops (make-array sc-number-limit :initial-element nil)
 		 :type sc-vector)
-  ;; True if this SC or one of its alternates in in the NUMBER-STACK SB.
+  ;; true if this SC or one of its alternates in in the NUMBER-STACK SB.
   (number-stack-p nil :type boolean)
-  ;; Alignment restriction. The offset must be an even multiple of this.
+  ;; alignment restriction. The offset must be an even multiple of this.
   (alignment 1 :type (and index (integer 1)))
-  ;; A list of locations that we avoid packing in during normal
+  ;; a list of locations that we avoid packing in during normal
   ;; register allocation to ensure that these locations will be free
   ;; for operand loading. This prevents load-TN packing from thrashing
   ;; by spilling a lot.

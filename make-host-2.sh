@@ -70,13 +70,8 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 		;; redefine our functions anyway; and developers can
 		;; fend for themselves.)
 		#!-sb-fluid (sb!ext:*derive-function-types* t)
-		;; In order to reduce peak memory usage during GENESIS,
-		;; it helps to stuff several toplevel forms together 
-		;; into the same function. (This can't be the compiler
-		;; default in general since it's non-ANSI in the case
-		;; of e.g. some package-side-effecting forms, but it's
-		;; safe in all the code we cross-compile.)
-		(sb!c::*top-level-lambda-max* 10)
+		;; FIXME: *TOP-LEVEL-LAMBDA-MAX* should go away altogether.
+		(sb!c::*top-level-lambda-max* 1)
 		;; Let the target know that we're the cross-compiler.
 		(*features* (cons :sb-xc *features*))
 		;; We need to tweak the readtable..

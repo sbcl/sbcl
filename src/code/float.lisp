@@ -120,8 +120,10 @@
 
 ;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
 ;;; because the cross-compilation host might not support floating
-;;; point infinities.
-(eval-when (:load-toplevel :execute)
+;;; point infinities. Putting them inside a LET remove
+;;; top-level-formness, so that any EVAL-WHEN trickiness in the
+;;; DEFCONSTANT forms is suppressed.
+(let ()
 (defconstant single-float-positive-infinity
   (single-from-bits 0 (1+ sb!vm:single-float-normal-exponent-max) 0))
 (defconstant short-float-positive-infinity single-float-positive-infinity)
@@ -144,7 +146,7 @@
 (defconstant long-float-negative-infinity
   (long-from-bits 1 (1+ sb!vm:long-float-normal-exponent-max)
 		  (ash sb!vm:long-float-hidden-bit 32)))
-) ; EVAL-WHEN
+) ; LET-to-suppress-possible-EVAL-WHENs
 
 (defconstant single-float-epsilon
   (single-from-bits 0 (- sb!vm:single-float-bias

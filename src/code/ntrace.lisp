@@ -127,8 +127,10 @@
 	(t (values (fdefinition x) t)))
     (if (or #+sb-interpreter (sb-eval:interpreted-function-p res)
 	    nil)
-	(values res named-p (if (sb-eval:interpreted-function-closure res)
-				:interpreted-closure :interpreted))
+	(values res
+		named-p
+		#+sb-interpreter (if (sb-eval:interpreted-function-closure res)
+				     :interpreted-closure :interpreted))
 	(case (sb-kernel:get-type res)
 	  (#.sb-vm:closure-header-type
 	   (values (sb-kernel:%closure-function res)

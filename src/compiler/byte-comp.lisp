@@ -143,7 +143,8 @@
     (def-system-constant 14 '(%fdefinition-marker% . %negate))
     (def-system-constant 15 '(%fdefinition-marker% . %%defun))
     (def-system-constant 16 '(%fdefinition-marker% . %%defmacro))
-    (def-system-constant 17 '(%fdefinition-marker% . %%defconstant))
+    ;; no longer used as of sbcl-0.pre7:
+    #+nil (def-system-constant 17 '(%fdefinition-marker% . %%defconstant))
     (def-system-constant 18 '(%fdefinition-marker% . length))
     (def-system-constant 19 '(%fdefinition-marker% . equal))
     (def-system-constant 20 '(%fdefinition-marker% . append))

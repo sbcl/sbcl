@@ -729,10 +729,11 @@
     (make-source-info :file-info file-info
 		      :stream stream)))
 
-;;; Return a form read from STREAM; or for EOF, use the trick
-;;; popularized by Kent Pitman of returning STREAM itself. If an error
-;;; happens, then convert it to standard abort-the-compilation error
-;;; condition (possibly recording some extra location information).
+;;; Return a form read from STREAM; or for EOF use the trick,
+;;; popularized by Kent Pitman, of returning STREAM itself. If an
+;;; error happens, then convert it to standard abort-the-compilation
+;;; error condition (possibly recording some extra location
+;;; information).
 (defun read-for-compile-file (stream position)
   (handler-case (read stream nil stream)
     (reader-error (condition)
@@ -780,8 +781,8 @@
   (setf (source-info-stream info) nil)
   (values))
 
-;;; Read the source file.
-(defun process-source (info)
+;;; Read and compile the source file.
+(defun sub-sub-compile-file (info)
   (let* ((file-info (source-info-file-info info))
 	 (stream (get-source-stream info)))
     (loop
@@ -797,8 +798,8 @@
 	     (clrhash *source-paths*)
 	     (find-source-paths form current-idx)
 	     (process-top-level-form form
-				     `(original-source-start 0
-							     ,current-idx))))))))
+				     `(original-source-start 0 ,current-idx)
+				     nil)))))))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
@@ -821,14 +822,7 @@
     (cond ((eq *block-compile* t) (push tll *top-level-lambdas*))
 	  (t (compile-top-level (list tll) nil)))))
 
-;;; Process a PROGN-like portion of a top-level form. Forms is a list of
-;;; the forms, and Path is source path of the form they came out of.
-(defun process-top-level-progn (forms path)
-  (declare (list forms) (list path))
-  (dolist (form forms)
-    (process-top-level-form form path)))
-
-;;; Macroexpand form in the current environment with an error handler.
+;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
 ;;; forms in the source path.
 (defun preprocessor-macroexpand (form)
@@ -836,11 +830,20 @@
     (error (condition)
        (compiler-error "(during macroexpansion)~%~A" condition))))
 
-;;; Process a top-level use of LOCALLY. We parse declarations and then
-;;; recursively process the body.
-(defun process-top-level-locally (form path)
+;;; Process a PROGN-like portion of a top-level form. FORMS is a list of
+;;; the forms, and PATH is the source path of the FORM they came out of.
+;;; COMPILE-TIME-TOO is as in ANSI "3.2.3.1 Processing of Top Level Forms".
+(defun process-top-level-progn (forms path compile-time-too)
+  (declare (list forms) (list path))
+  (dolist (form forms)
+    (process-top-level-form form path compile-time-too)))
+
+;;; Process a top-level use of LOCALLY, or anything else (e.g.
+;;; MACROLET) at top-level which has declarations and ordinary forms.
+;;; We parse declarations and then recursively process the body.
+(defun process-top-level-locally (body path compile-time-too)
   (declare (list path))
-  (multiple-value-bind (forms decls) (sb!sys:parse-body (cdr form) nil)
+  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (let* ((*lexenv*
 	    (process-decls decls nil nil (make-continuation)))
 	   ;; Binding *POLICY* is pretty much of a hack, since it
@@ -849,11 +852,12 @@
 	   ;; value of *POLICY* as the policy. The need for this hack
 	   ;; is due to the quirk that there is no way to represent in
 	   ;; a POLICY that an optimize quality came from the default.
+	   ;;
 	   ;; FIXME: Ideally, something should be done so that DECLAIM
 	   ;; inside LOCALLY works OK. Failing that, at least we could
 	   ;; issue a warning instead of silently screwing up.
 	   (*policy* (lexenv-policy *lexenv*)))
-      (process-top-level-progn forms path))))
+      (process-top-level-progn forms path compile-time-too))))
 
 ;;; Force any pending top-level forms to be compiled and dumped so
 ;;; that they will be evaluated in the correct package environment.
@@ -870,65 +874,147 @@
     (when eval
       (eval form))))
 
+;;; Parse an EVAL-WHEN situations list, returning three flags,
+;;; (VALUES COMPILE-TOPLEVEL LOAD-TOPLEVEL EXECUTE), indicating
+;;; the types of situations present in the list.
+(defun parse-eval-when-situations (situations)
+  (when (or (not (listp situations))
+	    (set-difference situations
+			    '(:compile-toplevel
+			      compile
+			      :load-toplevel
+			      load
+			      :execute
+			      eval)))
+    (compiler-error "bad EVAL-WHEN situation list: ~S" situations))
+  (let ((deprecated-names (intersection situations '(compile load eval))))
+    (when deprecated-names
+      (style-warn "using deprecated EVAL-WHEN situation names~{ ~S~}"
+ 		  deprecated-names)))
+  (values (intersection '(:compile-toplevel compile)
+			situations)
+	  (intersection '(:load-toplevel load) situations)
+	  (intersection '(:execute eval) situations)))
+
 ;;; Process a top-level FORM with the specified source PATH.
 ;;;  * If this is a magic top-level form, then do stuff.
 ;;;  * If this is a macro, then expand it.
 ;;;  * Otherwise, just compile it.
-(defun process-top-level-form (form path)
+;;;
+;;; COMPILE-TIME-TOO is as defined in ANSI
+;;; "3.2.3.1 Processing of Top Level Forms".
+(defun process-top-level-form (form path compile-time-too)
 
   (declare (list path))
 
   (catch 'process-top-level-form-error-abort
     (let* ((path (or (gethash form *source-paths*) (cons form path)))
 	   (*compiler-error-bailout*
-	    #'(lambda ()
-		(convert-and-maybe-compile
-		 `(error "execution of a form compiled with errors:~% ~S"
-			 ',form)
-		 path)
-		(throw 'process-top-level-form-error-abort nil))))
+	    (lambda ()
+	      (convert-and-maybe-compile
+	       `(error "execution of a form compiled with errors:~% ~S"
+		       ',form)
+	       path)
+	      (throw 'process-top-level-form-error-abort nil))))
+
       (if (atom form)
+	  ;; (There are no EVAL-WHEN issues in the ATOM case until
+	  ;; SBCL gets smart enough to handle global
+	  ;; DEFINE-SYMBOL-MACRO.)
 	  (convert-and-maybe-compile form path)
-	  (case (car form)
-	    ;; FIXME: It's not clear to me why we would want this
-	    ;; special case; it might have been needed for some
-	    ;; variation of the old GENESIS system, but it certainly
-	    ;; doesn't seem to be needed for ours. Sometime after the
-	    ;; system is running I'd like to remove it tentatively and
-	    ;; see whether anything breaks, and if nothing does break,
-	    ;; remove it permanently. (And if we *do* want special
-	    ;; treatment of all these, we probably want to treat WARN
-	    ;; the same way..)
-	    ((error cerror break signal)
-	     (process-cold-load-form form path nil))
-	    ;; FIXME: ANSI seems to encourage things like DEFSTRUCT to
-	    ;; be done with EVAL-WHEN, without this kind of one-off
-	    ;; compiler magic.
-	    (sb!kernel:%compiler-defstruct
-	     (convert-and-maybe-compile form path)
-	     (compile-top-level-lambdas () t))
-	    ((eval-when)
-	     (unless (>= (length form) 2)
-	       (compiler-error "EVAL-WHEN form is too short: ~S" form))
-	     (do-eval-when-stuff
-	      (cadr form) (cddr form)
-	      #'(lambda (forms)
-		  (process-top-level-progn forms path))))
-	    ((macrolet)
-	     (unless (>= (length form) 2)
-	       (compiler-error "MACROLET form is too short: ~S" form))
-	     (do-macrolet-stuff
-	      (cadr form)
-	      #'(lambda ()
-		  (process-top-level-progn (cddr form) path))))
-	    (locally (process-top-level-locally form path))
-	    (progn (process-top-level-progn (cdr form) path))
-	    (t
-	     (let* ((uform (uncross form))
-		    (exp (preprocessor-macroexpand uform)))
-	       (if (eq exp uform)
-		   (convert-and-maybe-compile uform path)
-		   (process-top-level-form exp path))))))))
+	  (flet ((need-at-least-one-arg (form)
+	           (unless (cdr form)
+		     (compiler-error "~S form is too short: ~S"
+				     (car form)
+				     form))))
+	    (case (car form)
+	      ;; FIXME: It's not clear to me why we would want this
+	      ;; special case; it might have been needed for some
+	      ;; variation of the old GENESIS system, but it certainly
+	      ;; doesn't seem to be needed for ours. Sometime after the
+	      ;; system is running I'd like to remove it tentatively and
+	      ;; see whether anything breaks, and if nothing does break,
+	      ;; remove it permanently. (And if we *do* want special
+	      ;; treatment of all these, we probably want to treat WARN
+	      ;; the same way..)
+	      ((error cerror break signal)
+	       (process-cold-load-form form path nil))
+	      ((eval-when macrolet symbol-macrolet);things w/ 1 arg before body
+	       (need-at-least-one-arg form)
+	       (destructuring-bind (special-operator magic &rest body) form
+		 (ecase special-operator
+		   ((eval-when)
+		    ;; CT, LT, and E here are as in Figure 3-7 of ANSI
+		    ;; "3.2.3.1 Processing of Top Level Forms".
+		    (multiple-value-bind (ct lt e)
+			(parse-eval-when-situations magic)
+		      (let ((new-compile-time-too (or ct
+						      (and compile-time-too
+							   e))))
+			(cond (lt (process-top-level-progn
+				   body path new-compile-time-too))
+			      (new-compile-time-too (eval
+						     `(progn ,@body)))))))
+		   ((macrolet)
+		    (funcall-in-macrolet-lexenv
+		     magic
+		     (lambda ()
+		       (process-top-level-locally body
+						  path
+						  compile-time-too))))
+		   ((symbol-macrolet)
+		    (funcall-in-symbol-macrolet-lexenv
+		     magic
+		     (lambda ()
+		       (process-top-level-locally body
+						  path
+						  compile-time-too)))))))
+	      ((locally)
+	       (process-top-level-locally (rest form) path compile-time-too))
+	      ((progn)
+	       (process-top-level-progn (rest form) path compile-time-too))
+	      #+sb-xc-host
+	      ;; Consider: What should we do when we hit e.g.
+	      ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL)
+	      ;;     (DEFUN FOO (X) (+ 7 X)))?
+	      ;; DEFUN has a macro definition in the cross-compiler,
+	      ;; and a different macro definition in the target
+	      ;; compiler. The only sensible thing is to use the
+	      ;; target compiler's macro definition, since the
+	      ;; cross-compiler's macro is in general into target
+	      ;; functions which can't meaningfully be executed at
+	      ;; cross-compilation time. So make sure we do the EVAL
+	      ;; here, before we macroexpand.
+	      ;;
+	      ;; (Isn't it fun to cross-compile Common Lisp?:-)
+	      (t
+	       (when compile-time-too
+		 (eval form)) ; letting xc host EVAL do its own macroexpansion
+	       (let* ((uncrossed (uncross form))
+		      ;; letting our cross-compiler do its macroexpansion too
+		      (expanded (preprocessor-macroexpand uncrossed)))
+		 (if (eq expanded uncrossed)
+		     (convert-and-maybe-compile expanded path)
+		     ;; Note that we also have to demote
+		     ;; COMPILE-TIME-TOO to NIL, no matter what it was
+		     ;; before, since otherwise we'd tend to EVAL
+		     ;; subforms more than once.
+		     (process-top-level-form expanded path nil))))
+	      ;; When we're not cross-compiling, we only need to
+	      ;; macroexpand once, so we can follow the 1-thru-6
+	      ;; sequence of steps in ANSI's "3.2.3.1 Processing of
+	      ;; Top Level Forms".
+	      #-sb-xc-host
+	      (t
+	       (let ((expanded (preprocessor-macroexpand form)))
+		 (cond ((eq expanded form)
+			(when compile-time-too
+			  (eval form))
+			(convert-and-maybe-compile form path))
+		       (t
+			(process-top-level-form expanded
+						path
+						compile-time-too))))))))))
 
   (values))
 
@@ -936,7 +1022,7 @@
 ;;;;
 ;;;; (See EMIT-MAKE-LOAD-FORM.)
 
-;;; Returns T iff we are currently producing a fasl file and hence
+;;; Returns T if we are currently producing a fasl file and hence
 ;;; constants need to be dumped carefully.
 (defun producing-fasl-file ()
   (unless *converting-for-interpreter*
@@ -1060,12 +1146,12 @@
   (declare (list lambdas))
   (let ((len (length lambdas)))
     (flet ((loser (start)
-	     (or (position-if #'(lambda (x)
-				  (not (eq (component-kind
-					    (block-component
-					     (node-block
-					      (lambda-bind x))))
-					   :top-level)))
+	     (or (position-if (lambda (x)
+				(not (eq (component-kind
+					  (block-component
+					   (node-block
+					    (lambda-bind x))))
+					 :top-level)))
 			      lambdas
 			      :start start)
 		 len)))
@@ -1183,7 +1269,7 @@
 	 (sb!xc:with-compilation-unit ()
 	   (clear-stuff)
 
-	   (process-source info)
+	   (sub-sub-compile-file info)
 
 	   (finish-block-compilation)
 	   (compile-top-level-lambdas () t)

@@ -1186,14 +1186,6 @@ IR1-4:
   interpreter is gone, the system's notion of what's a top-level form
   and what's not will remain too confused to fix this problem.]
 
-IR1-5:
-  (not really a bug, just a wishlist thing which might be easy
-  when EVAL-WHEN is rewritten..) It might be good for the cross-compiler
-  to warn about nested EVAL-WHENs. (In ordinary compilation, they're
-  quite likely to be OK, but in cross-compiled code EVAL-WHENs
-  are a great source of confusion, so a style warning about anything
-  unusual could be helpful.)
-
 IR1-6:
   (another wishlist thing..) Reimplement DEFMACRO to be basically
   like DEFMACRO-MUNDANELY, just using EVAL-WHEN.

@@ -131,11 +131,19 @@
 ;;; a map from type numbers to TYPE-INFO objects. There is one type
 ;;; number for each defined CLASS/TYPE pair.
 ;;;
-;;; We build its value at compile time (with calls to
+;;; We build its value at build-the-cross-compiler time (with calls to
 ;;; DEFINE-INFO-TYPE), then generate code to recreate the compile time
 ;;; value, and arrange for that code to be called in cold load.
+;;; KLUDGE: We don't try to reset its value when cross-compiling the
+;;; compiler, since that creates too many bootstrapping problems,
+;;; instead just reusing the built-in-the-cross-compiler version,
+;;; which is theoretically a little bit ugly but pretty safe in
+;;; practice because the cross-compiler is as close to the target
+;;; compiler as we can make it, i.e. identical in most ways, including
+;;; this one. -- WHN 2001-08-19
 (defvar *info-types*)
 (declaim (type simple-vector *info-types*))
+#-sb-xc ; as per KLUDGE note above
 (eval-when (:compile-toplevel :execute)
   (setf *info-types*
 	(make-array (ash 1 type-number-bits) :initial-element nil)))
@@ -166,8 +174,12 @@
 ;;; We build the value for this at compile time (with calls to
 ;;; DEFINE-INFO-CLASS), then generate code to recreate the compile time
 ;;; value, and arrange for that code to be called in cold load.
+;;; KLUDGE: Just as for *INFO-TYPES*, we don't try to rebuild this
+;;; when cross-compiling, but instead just reuse the cross-compiler's
+;;; version for the target compiler. -- WHN 2001-08-19
 (defvar *info-classes*)
 (declaim (hash-table *info-classes*))
+#-sb-xc ; as per KLUDGE note above
 (eval-when (:compile-toplevel :execute)
   (setf *info-classes* (make-hash-table)))
 
@@ -791,15 +803,15 @@
 ;;; foldable.)
 
 ;;; INFO is the standard way to access the database. It's settable.
+;;;
+;;; Return the information of the specified TYPE and CLASS for NAME.
+;;; The second value returned is true if there is any such information
+;;; recorded. If there is no information, the first value returned is
+;;; the default and the second value returned is NIL.
 (defun info (class type name &optional (env-list nil env-list-p))
-  #!+sb-doc
-  "Return the information of the specified TYPE and CLASS for NAME.
-   The second value returned is true if there is any such information
-   recorded. If there is no information, the first value returned is
-   the default and the second value returned is NIL."
-  ;; FIXME: At some point check systematically to make sure that the system
-  ;; doesn't do any full calls to INFO or (SETF INFO), or at least none in any
-  ;; inner loops.
+  ;; FIXME: At some point check systematically to make sure that the
+  ;; system doesn't do any full calls to INFO or (SETF INFO), or at
+  ;; least none in any inner loops.
   (let ((info (type-info-or-lose class type)))
     (if env-list-p
 	(get-info-value name (type-info-number info) env-list)
@@ -807,8 +819,8 @@
 #!-sb-fluid
 (define-compiler-macro info
   (&whole whole class type name &optional (env-list nil env-list-p))
-  ;; Constant CLASS and TYPE is an overwhelmingly common special case, and we
-  ;; can resolve it much more efficiently than the general case.
+  ;; Constant CLASS and TYPE is an overwhelmingly common special case,
+  ;; and we can resolve it much more efficiently than the general case.
   (if (and (constantp class) (constantp type))
       (let ((info (type-info-or-lose class type)))
 	`(the ,(type-info-type info)
@@ -880,11 +892,11 @@
 			    :table (make-array table-size :initial-element nil)
 			    :threshold size)))
 
+;;; Clear the information of the specified TYPE and CLASS for NAME in
+;;; the current environment, allowing any inherited info to become
+;;; visible. We return true if there was any info.
 (defun clear-info (class type name)
   #!+sb-doc
-  "Clear the information of the specified Type and Class for Name in the
-  current environment, allowing any inherited info to become visible. We
-  return true if there was any info."
   (let ((info (type-info-or-lose class type)))
     (clear-info-value name (type-info-number info))))
 #!-sb-fluid
@@ -925,14 +937,21 @@
 ;;; Check whether the name and type is in our cache, if so return it.
 ;;; Otherwise, search for the value and encache it.
 ;;;
-;;; Return the value from the first environment which has it defined, or
-;;; return the default if none does. We have a cache for the last name looked
-;;; up in each environment. We don't compute the hash until the first time the
-;;; cache misses. When the cache does miss, we invalidate it before calling the
-;;; lookup routine to eliminate the possiblity of the cache being partially
-;;; updated if the lookup is interrupted.
+;;; Return the value from the first environment which has it defined,
+;;; or return the default if none does. We have a cache for the last
+;;; name looked up in each environment. We don't compute the hash
+;;; until the first time the cache misses. When the cache does miss,
+;;; we invalidate it before calling the lookup routine to eliminate
+;;; the possibility of the cache being partially updated if the lookup
+;;; is interrupted.
 (defun get-info-value (name0 type &optional (env-list nil env-list-p))
   (declare (type type-number type))
+  ;; sanity check: If we have screwed up initialization somehow, then
+  ;; *INFO-TYPES* could still be uninitialized at the time we try to
+  ;; get an info value, and then we'd be out of luck. (This happened,
+  ;; and was confusing to debug, when rewriting EVAL-WHEN in
+  ;; sbcl-0.pre7.x.)
+  (aver (aref *info-types* type))
   (let ((name (uncross name0)))
     (flet ((lookup-ignoring-global-cache (env-list)
 	     (let ((hash nil))
@@ -952,11 +971,15 @@
 				 (multiple-value-bind (value winp)
 				     (,cache env type)
 				   (when winp (return (values value t)))))))
-		   (if (typep env 'volatile-info-env)
-		   (frob volatile-info-lookup volatile-info-cache-hit
-			 volatile-info-env-cache-name)
-		   (frob compact-info-lookup compact-info-cache-hit
-			 compact-info-env-cache-name)))))))
+		   (etypecase env
+		     (volatile-info-env (frob
+					 volatile-info-lookup
+					 volatile-info-cache-hit
+					 volatile-info-env-cache-name))
+		     (compact-info-env (frob
+					compact-info-lookup
+					compact-info-cache-hit
+					compact-info-env-cache-name))))))))
       (cond (env-list-p
 	     (lookup-ignoring-global-cache env-list))
 	    (t

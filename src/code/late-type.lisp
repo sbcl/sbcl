@@ -876,7 +876,7 @@
 (defvar *wild-type*)
 (defvar *empty-type*)
 (defvar *universal-type*)
-
+(defvar *universal-function-type*)
 (!cold-init-forms
  (macrolet ((frob (name var)
 	      `(progn
@@ -891,7 +891,10 @@
    ;; Ts and *UNIVERSAL-TYPE*s.
    (frob * *wild-type*)
    (frob nil *empty-type*)
-   (frob t *universal-type*)))
+   (frob t *universal-type*))
+ (setf *universal-function-type*
+       (make-function-type :wild-args t
+			   :returns *wild-type*)))
 
 (!define-type-method (named :simple-=) (type1 type2)
   ;; FIXME: BUG 85: This assertion failed when I added it in

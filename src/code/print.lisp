@@ -371,11 +371,10 @@
 
 ;;;; OUTPUT-OBJECT -- the main entry point
 
-(defvar *pretty-printer* nil
-  #!+sb-doc
-  "The current pretty printer. Should be either a function that takes two
-   arguments (the object and the stream) or NIL to indicate that there is
-   no pretty printer installed.")
+;;; the current pretty printer. This should be either a function that
+;;; takes two arguments (the object and the stream) or NIL to indicate
+;;; that there is no pretty printer installed.
+(defvar *pretty-printer* nil)
 
 ;;; Output OBJECT to STREAM observing all printer control variables.
 (defun output-object (object stream)
@@ -1557,8 +1556,8 @@
 			    #(#.sb!vm:closure-header-type
 			      #.sb!vm:byte-code-closure-type))
 		      "CLOSURE")
-		     (#!+sb-interpreter
-		      (sb!eval::interpreted-function-p object)
+		     #!+sb-interpreter
+		     ((sb!eval::interpreted-function-p object)
 		      (or (sb!eval::interpreted-function-%name object)
 			  (sb!eval:interpreted-function-lambda-expression
 			   object)))

@@ -161,52 +161,68 @@
 					; undefined function warnings
 #+sb-xc-host (/show "after PROCLAIM" (sb!c::info :function :kind 'sb!c::%%defun))
 (defun sb!c::%%defun (name def doc &optional inline-expansion)
-  (when (fboundp name)
-    (style-warn "redefining ~S in DEFUN" name))
-  (setf (sb!xc:fdefinition name) def)
-  (when doc
-    ;; FIXME: This should use shared SETF-name parsing logic.
-    (if (and (consp name) (eq (first name) 'setf))
-	(setf (fdocumentation (second name) 'setf) doc)
-	(setf (fdocumentation name 'function) doc)))
+  ;; When we're built as a cross-compiler, the DEF is a function
+  ;; implemented by the cross-compilation host, which is opaque to us.
+  ;; Similarly, other things like FDEFINITION or DOCUMENTATION either
+  ;; aren't ours to mess with or are meaningless to mess with. Thus,
+  ;; we punt.
+  #+sb-xc-host (declare (ignore def))
+  #-sb-xc-host 
+  (progn
+    (when (fboundp name)
+      (style-warn "redefining ~S in DEFUN" name))
+    (setf (sb!xc:fdefinition name) def)
+    (when doc
+      ;; FIXME: This should use shared SETF-name-parsing logic.
+      (if (and (consp name) (eq (first name) 'setf))
+	  (setf (fdocumentation (second name) 'setf) doc)
+	  (setf (fdocumentation name 'function) doc))))
+  ;; Other stuff remains meaningful whether we're cross-compiling or
+  ;; native compiling.
   (become-defined-function-name name)
   (when (or inline-expansion
 	    (info :function :inline-expansion name))
     (setf (info :function :inline-expansion name)
 	  inline-expansion))
+  ;; Voila.
   name)
-;;; Ordinarily this definition of SB!C:%DEFUN as an ordinary function is not
-;;; used: the parallel (but different) definition as an IR1 transform takes
-;;; precedence. However, it's still good to define this in order to keep the
-;;; interpreter happy. We define it here (instead of alongside the parallel
-;;; IR1 transform) because while the IR1 transform is needed and appropriate
-;;; in the cross-compiler running in the host Common Lisp, this parallel
-;;; ordinary function definition is only appropriate in the target Lisp.
+;;; FIXME: Now that the IR1 interpreter is going away and EVAL-WHEN is
+;;; becoming ANSI-compliant, it should be possible to merge this and
+;;; DEF-IR1-TRANSLATOR %DEFUN into a single DEFUN. (And does %%DEFUN
+;;; merge into that too? dunno..)
 (defun sb!c::%defun (name def doc source)
   (declare (ignore source))
-  #!+sb-interpreter (setf (sb!eval:interpreted-function-name def) name)
-  (ecase (info :function :where-from name)
-    (:assumed
-      (setf (info :function :where-from name) :defined)
-      (setf (info :function :type name)
-              (extract-function-type def))
-      (when (info :function :assumed-type name)
-        (setf (info :function :assumed-type name) nil)))
-    (:declared)
-    (:defined
-     (setf (info :function :type name)
-	   (extract-function-type def))
-     ;; We shouldn't need to clear this here because it should be clear
-     ;; already (cleared when the last definition was processed).
-     (aver (null (info :function :assumed-type name)))))
+  #-sb-xc-host (progn
+		 #!+sb-interpreter
+		 (setf (sb!eval:interpreted-function-name def) name))
+  (flet ((set-type-info-from-def ()
+           (setf (info :function :type name)
+		 #-sb-xc-host (extract-function-type def)
+		 ;; When we're built as a cross-compiler, the DEF is
+		 ;; a function implemented by the cross-compilation
+		 ;; host, which is opaque to us, so we have to punt here.
+		 #+sb-xc-host *universal-function-type*)))
+    (ecase (info :function :where-from name)
+      (:assumed
+       (setf (info :function :where-from name) :defined)
+       (set-type-info-from-def)
+       (when (info :function :assumed-type name)
+	 (setf (info :function :assumed-type name) nil)))
+      (:declared)
+      (:defined
+       (set-type-info-from-def)
+       ;; We shouldn't need to clear this here because it should be
+       ;; clear already (having been cleared when the last definition
+       ;; was processed).
+       (aver (null (info :function :assumed-type name))))))
   (sb!c::%%defun name def doc))
 
 ;;;; DEFVAR and DEFPARAMETER
 
 (defmacro-mundanely defvar (var &optional (val nil valp) (doc nil docp))
   #!+sb-doc
-  "For defining global variables at top level. Declares the variable
-  SPECIAL and, optionally, initializes it. If the variable already has a
+  "Define a global variable at top level. Declare the variable
+  SPECIAL and, optionally, initialize it. If the variable already has a
   value, the old value is not clobbered. The third argument is an optional
   documentation string for the variable."
   `(progn
@@ -220,10 +236,11 @@
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
   #!+sb-doc
-  "Defines a parameter that is not normally changed by the program,
-  but that may be changed without causing an error. Declares the
-  variable special and sets its value to VAL. The third argument is
-  an optional documentation string for the parameter."
+  "Define a parameter that is not normally changed by the program,
+  but that may be changed without causing an error. Declare the
+  variable special and sets its value to VAL, overwriting any
+  previous value. The third argument is an optional documentation
+  string for the parameter."
   `(progn
      (declaim (special ,var))
      (setq ,var ,val)
@@ -236,11 +253,11 @@
 
 ;;;; iteration constructs
 
-;;; (These macros are defined in terms of a function DO-DO-BODY which is also
-;;; used by SB!INT:DO-ANONYMOUS. Since these macros should not be loaded
-;;; on the cross-compilation host, but SB!INT:DO-ANONYMOUS and DO-DO-BODY
-;;; should be, these macros can't conveniently be in the same file as
-;;; DO-DO-BODY.)
+;;; (These macros are defined in terms of a function DO-DO-BODY which
+;;; is also used by SB!INT:DO-ANONYMOUS. Since these macros should not
+;;; be loaded on the cross-compilation host, but SB!INT:DO-ANONYMOUS
+;;; and DO-DO-BODY should be, these macros can't conveniently be in
+;;; the same file as DO-DO-BODY.)
 (defmacro-mundanely do (varlist endlist &body body)
   #!+sb-doc
   "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*

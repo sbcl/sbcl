@@ -29,7 +29,7 @@
 	       *interpreted-function-cache-minimum-size*
 	       *interpreted-function-cache-threshold*))
 
-;;; The list of INTERPRETED-FUNCTIONS that have translated definitions.
+;;; The list of INTERPRETED-FUNCTIONs that have translated definitions.
 (defvar *interpreted-function-cache* nil)
 (declaim (type list *interpreted-function-cache*))
 
@@ -118,7 +118,7 @@
 
 ;;;; interpreted functions
 
-;;; the list of INTERPRETED-FUNCTIONS that have translated definitions
+;;; the list of INTERPRETED-FUNCTIONs that have translated definitions
 (defvar *interpreted-function-cache* nil)
 (declaim (type list *interpreted-function-cache*))
 
@@ -581,7 +581,7 @@
 ;;; NIL around the apply to limit the inhibition to the lexical scope
 ;;; of the EVAL-WHEN.
 #!+sb-interpreter
-(defun internal-eval (form)
+(defun sb!eval:internal-eval (form)
   (let ((res (sb!c:compile-for-eval form)))
     (if *already-evaled-this*
 	(let ((*already-evaled-this* nil))

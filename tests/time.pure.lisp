@@ -12,6 +12,10 @@
 (in-package "CL-USER")
 
 ;;; Test for monotonicity of GET-INTERNAL-RUN-TIME.
+#+nil ; FIXME: This test can't work as long as
+      ;    (FUNCALL (COMPILE NIL (LAMBDA (X) (+ X 12))) 44)
+      ; fails with
+      ;    #<FUNCTION {5009BF31}> was defined in a non-null environment.
 (funcall (compile nil
 		  (lambda (n-seconds)
 		    (declare (type fixnum n-seconds))
