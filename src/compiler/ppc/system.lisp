@@ -213,23 +213,6 @@
   (:generator 1
     (inst unimp pending-interrupt-trap)))
 
-(defknown current-thread-offset-sap ((unsigned-byte 32))  
-  system-area-pointer (flushable))
-
-(define-vop (current-thread-offset-sap)
-  (:results (sap :scs (sap-reg)))
-  (:result-types system-area-pointer)
-  (:translate current-thread-offset-sap)
-  (:args (n :scs (unsigned-reg) ))
-  (:temporary (:sc unsigned-reg :target sap) temp1)
-  (:temporary (:sc unsigned-reg) temp2)
-  (:arg-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 3
-    (inst slwi n temp1 2)
-    (inst lr temp2 (make-fixup (extern-alien-name "all_threads") :foreign))
-    (inst lwzx sap temp1 temp2)))
-
 (define-vop (halt)
   (:generator 1
     (inst unimp halt-trap)))

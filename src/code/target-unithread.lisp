@@ -1,5 +1,11 @@
 (in-package "SB!THREAD")
 
+#-sb-fluid (declaim (inline sb!vm::current-thread-offset-sap))
+(defun sb!vm::current-thread-offset-sap (n) 
+  (declare (type (unsigned-byte 27) n))
+  (sb!sys:sap-ref-sap (alien-sap (extern-alien "all_threads" (* t))) 
+	       (* n 4)))
+
 (defun current-thread-id ()
   (sb!sys:sap-int
    (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot)))
