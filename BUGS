@@ -1314,6 +1314,12 @@ WORKAROUND:
     (flet ((foo (&key (x :vx x-p)) (list x x-p)))
       (foo 1 2)))
 
+  or a more simple example:
+
+  (locally
+      (declare (optimize (inhibit-warnings 0) (compilation-speed 2)))
+    (lambda (x) (declare (fixnum x)) (if (< x 0) 0 (1- x))))
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
