@@ -7,11 +7,12 @@ debugger is planned.
 
 USAGE
 =====
-To start sb-aclrepl as your read-eval-print loop, execute the command
+To start sb-aclrepl as your read-eval-print loop, you must
+put the following command in your ~/.sbclrc.
   (require 'sb-aclrepl)
 
-You can also all this command to your ~/.sbclrc to have sb-aclrepl be the default REPL
-for your SBCL sessions.
+The reason for this is that, currently, sb-aclrepl must loaded before
+SBCL's default REPL starts.
 
 EXAMPLE ~/.sbclrc FILE
 ======================

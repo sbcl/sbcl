@@ -7,10 +7,6 @@
 ;;;; any given time, for this functionality is on the ACL website:
 ;;;;   <http://www.franz.com/support/documentation/6.2/doc/top-level.htm>.
 
-(cl:defpackage :sb-aclrepl
-  (:use :cl :sb-ext))
-
-
 (cl:in-package :sb-aclrepl)
 
 (defstruct user-cmd
@@ -31,7 +27,8 @@
   (abbr-len 0)) ; abbreviation length
   
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *default-prompt* "~:[~2*~;[~:*~D~:[~;i~]~:[~;c~]] ~]~A(~D): "
+  (defparameter *default-prompt*
+    "~:[~3*~;[~:*~D~:[~;~:*:~D~]~:[~;i~]~:[~;c~]] ~]~A(~D): "
     "The default prompt."))
 (defparameter *prompt* #.*default-prompt*
   "The current prompt string or formatter function.")
@@ -363,7 +360,7 @@
     (values)))
 
 (defun inspect-cmd (arg)
-  (inspector arg nil *output*)
+  (inspector-fun arg nil *output*)
   (values))
 
 (defun istep-cmd (&optional arg-string)
@@ -437,9 +434,11 @@
   (values))
 
 (defun pop-cmd (&optional (n 1))
-  ;; Find inspector 
-  (when sb-impl::*inspect-break*
-      (throw 'inspect-quit nil))
+  (cond
+    (*inspect-break*
+     (throw 'repl-catcher (values :inspect n)))
+    ((plusp *break-level*)
+     (throw 'repl-catcher (values :pop n))))
   (values))
 
 (defun bt-cmd (&optional (n most-positive-fixnum))
@@ -474,7 +473,7 @@
 
 (defun continue-cmd (&optional (num 0))
   ;; don't look at first restart
-  (let ((restarts (cdr (compute-restarts))))
+  (let ((restarts (compute-restarts)))
     (if restarts
 	(let ((restart
 	       (typecase num
@@ -491,14 +490,18 @@
 				(string= (symbol-name sym1)
 					 (symbol-name sym2)))))
 		 (t
-		  (format *output* "~S is invalid as a restart name.")
+		  (format *output* "~S is invalid as a restart name" num)
 		  (return-from continue-cmd nil)))))
 	  (when restart
 	    (invoke-restart-interactively restart)))
     (format *output* "~&There are no restarts"))))
 
 (defun error-cmd ()
-  (sb-debug::error-debug-command))
+  (when (plusp *break-level*)
+    (if *inspect-break*
+	(sb-debug::show-restarts (compute-restarts) *output*)
+	(let ((sb-debug::*debug-restarts* (compute-restarts)))
+	  (sb-debug::error-debug-command)))))
 
 (defun frame-cmd ()
   (sb-debug::print-frame-call sb-debug::*current-frame*))
@@ -568,9 +571,8 @@
   (values))
 
 (defun reset-cmd ()
-  #+ignore
-  (setf *break-stack* (last *break-stack*))
-  (values))
+  ;; The last restart goes to the toplevel
+  (invoke-restart-interactively (car (last (compute-restarts)))))
 
 (defun dirs-cmd ()
   (dolist (dir *dir-stack*)
@@ -720,8 +722,11 @@
 
 
 (defun repl-prompt-fun (stream)
-  (let ((break-level (if (zerop sb-impl::*break-level*)
-			 nil sb-impl::*break-level*)))
+  (let ((break-level (when (plusp *break-level*)
+		       *break-level*))
+	(frame-number (when (and (plusp *break-level*)
+				 sb-debug::*current-frame*)
+			(sb-di::frame-number sb-debug::*current-frame*))))
     #+sb-thread
     (let ((lock sb-thread::*session-lock*))
       (sb-thread::get-foreground)
@@ -730,14 +735,18 @@
 	  (format stream "~{~&Thread ~A suspended~}~%" stopped-threads))))
     (if (functionp *prompt*)
 	(write-string (funcall *prompt*
-			       sb-impl::*inspect-break*
-			       sb-impl::*continuable-break*
+			       break-level
+			       frame-number
+			       *inspect-break*
+			       *continuable-break*
 			       (prompt-package-name) *cmd-number*)
 		      stream)
 	(handler-case 
-	    (format nil *prompt* break-level
-		    sb-impl::*inspect-break*
-		    sb-impl::*continuable-break*
+	    (format nil *prompt*
+		    break-level
+		    frame-number
+		    *inspect-break*
+		    *continuable-break*
 		    (prompt-package-name) *cmd-number*)
 	  (error ()
 	    (format stream "~&Prompt error>  "))

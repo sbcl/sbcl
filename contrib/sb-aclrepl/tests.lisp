@@ -356,25 +356,27 @@ tail-> a cyclic list with 1 element+tail")
    1-> the symbol B
 tail-> a cyclic list with 2 elements+tail")
 
-#|
+
 ;;; Inspector traversal tests
-(deftest inspect.0 (istep '(":i" "*simple-struct*"))
-  "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+(deftest inspect.0 (progn (setq * *simple-struct*)
+			  (istep '("*")))
+  "#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>
    0 FIRST ----------> the symbol NIL
    1 SLOT-2 ---------> the symbol A-VALUE
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
 
-(deftest istep.0 (prog1
-		     (progn (do-inspect *simple-struct*) (istep '("=")))
-		   (reset-cmd))
-    "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+(deftest istep.0 (progn (setq * *simple-struct*)
+			  (istep '("*"))
+			  (istep '("=")))
+  "#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>
    0 FIRST ----------> the symbol NIL
    1 SLOT-2 ---------> the symbol A-VALUE
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
 
-(deftest istep.1 (prog1
-		     (progn (do-inspect *simple-struct*) (istep '("first")))
-		   (reset-cmd))
+
+(deftest istep.1 (progn (setq * *simple-struct*)
+			(istep '("*"))
+			(istep '("first")))
 "the symbol NIL
    0 NAME -----------> a simple-string (3) \"NIL\"
    1 PACKAGE --------> the COMMON-LISP package
@@ -382,10 +384,11 @@ tail-> a cyclic list with 2 elements+tail")
    3 FUNCTION -------> ..unbound..
    4 PLIST ----------> the symbol NIL")
 
-(deftest istep.2 (prog1
-		     (progn (do-inspect *simple-struct*) (istep '("first"))
-			    (istep '(">")))
-		   (reset-cmd))
+
+(deftest istep.2  (progn (setq * *simple-struct*)
+			 (istep '("*"))
+			 (istep '("first"))
+			 (istep '(">")))
 "the symbol A-VALUE
    0 NAME -----------> a simple-string (7) \"A-VALUE\"
    1 PACKAGE --------> the ACLREPL-TESTS package
@@ -393,10 +396,11 @@ tail-> a cyclic list with 2 elements+tail")
    3 FUNCTION -------> ..unbound..
    4 PLIST ----------> the symbol NIL")
 
-(deftest istep.3 (prog1
-		     (progn (do-inspect *simple-struct*) (istep '("first"))
-			    (istep '(">")) (istep '("<")))
-		   (reset-cmd))
+(deftest istep.3  (progn (setq * *simple-struct*)
+			 (istep '("*"))
+			 (istep '("first"))
+			 (istep '(">"))
+			 (istep '("<")))
 "the symbol NIL
    0 NAME -----------> a simple-string (3) \"NIL\"
    1 PACKAGE --------> the COMMON-LISP package
@@ -404,44 +408,46 @@ tail-> a cyclic list with 2 elements+tail")
    3 FUNCTION -------> ..unbound..
    4 PLIST ----------> the symbol NIL")
 
-(deftest istep.4 (prog1
-		     (progn (do-inspect *simple-struct*) (istep '("first"))
-			    (istep '(">")) (istep '("<")) (istep '("tree")))
-		   (reset-cmd))
+(deftest istep.4  (progn (setq * *simple-struct*)
+			 (istep '("*"))
+			 (istep '("first"))
+			 (istep '(">"))
+			 (istep '("<"))
+			 (istep '("tree")))
 "The current object is:
 the symbol NIL, which was selected by FIRST
-#<STRUCTURE-CLASS SIMPLE-STRUCT>, which was selected by (inspect ...)
+#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>, which was selected by (inspect *)
 ")
 
-(deftest istep.5 (prog1
-		     (progn (do-inspect *simple-struct*) (istep '("first"))
-			    (istep '(">")) (istep '("<")) (istep '("-")))
-		   (reset-cmd))
-  "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+(deftest istep.5  (progn (setq * *simple-struct*)
+			 (istep '("*"))
+			 (istep '("first"))
+			 (istep '(">"))
+			 (istep '("<"))
+			 (istep '("-")))
+  "#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>
    0 FIRST ----------> the symbol NIL
    1 SLOT-2 ---------> the symbol A-VALUE
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
 
-(deftest istep.6 (prog1
-		     (progn (do-inspect *dotted-list*) (istep '("tail")))
-		   (reset-cmd))
+(deftest istep.6 (progn (setq * *dotted-list*)
+			(istep '("*"))
+			(istep '("tail")))
 "fixnum 3")
 
-(deftest istep.7 (prog1
-		     (progn (do-inspect *dotted-list*) (istep '("2")))
-		   (reset-cmd))
+(deftest istep.7 (progn (setq * *dotted-list*)
+			(istep '("*"))
+			(istep '("2")))
 "fixnum 3")
 
-(deftest istep.8 (prog1 (do-inspect 5.5d0) (reset-cmd))
-  "double-float 5.5d0d")
+(deftest istep.8 (progn (setq * 5.5d0)
+			(istep '("*"))) 
+  "double-float 5.5d0")
 
-(deftest istep.9 (prog1 (progn (do-inspect 5.5d0) (istep '("-")))
-		   (reset-cmd))
-  "double-float 5.5d0d")
+(deftest istep.9 (progn (setq * 5.5d0)
+			(istep '("-")))
+  "Object has no parent
+")
 
-(deftest istep.10 (progn (do-inspect 5.5d0) (istep '("-"))
-			 (istep '("q")))
-  "No object is being inspected")
-|#
 
 

@@ -57,7 +57,7 @@ The commands are:
   (defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-")))
 
 
-(defun inspector (object input-stream output-stream)
+(defun inspector-fun (object input-stream output-stream)
   (declare (ignore input-stream))
   (let ((*current-inspect* nil)
 	(*inspect-raw* nil)
@@ -69,11 +69,10 @@ The commands are:
     (redisplay output-stream)
     (let ((*input* input-stream)
 	  (*output* output-stream))
-      (catch 'inspect-quit
-	(sb-impl::repl :inspect t)))
-    (values)))
+      (repl :inspect t)))
+  (values))
 
-(setq sb-impl::*inspect-fun* #'inspector)
+(setq sb-impl::*inspect-fun* #'inspector-fun)
 
 (defun istep (args stream)
   (unless *current-inspect*
@@ -161,11 +160,11 @@ The commands are:
      (no-object-msg stream))))
 
 (defun istep-cmd-inspect-* (stream)
-  (reset-stack * "(inspect *")
+  (reset-stack * "(inspect *)")
   (redisplay stream))
 
 (defun istep-cmd-inspect-new-form (form stream)
-  (inspector (eval form) nil stream))
+  (inspector-fun (eval form) nil stream))
 
 (defun istep-cmd-select-parent-component (option stream)
   (if (stack)
@@ -203,7 +202,7 @@ The commands are:
 
 (defun istep-cmd-reset ()
   (reset-stack)
-  (throw 'inspect-quit nil))
+  (throw 'repl-catcher (values :inspect nil)))
 
 (defun istep-cmd-help (stream)
   (format stream *inspect-help*))
