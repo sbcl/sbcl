@@ -1,5 +1,5 @@
 # -*- makefile -*-
-CFLAGS = -Dppc -g -Wall -O3 -no-cpp-precomp
+CFLAGS = -Dppc -g -Wall -O2 -no-cpp-precomp
 OS_SRC = bsd-os.c os-common.c ppc-darwin-os.c ppc-darwin-dlshim.c
 OS_LIBS = -lSystem -lc -lm
 
@@ -20,7 +20,7 @@ CPP = cpp -no-cpp-precomp
 # FIXME: "-Wl,-segaddr,SBCLRO,0x1000000" is output from
 # ppc-darwin-mkrospace (it depends on READ_ONLY_SPACE I believe) but it
 # is hard-coded here!
-OS_LINK_FLAGS = -dynamic -L$(HOME)/local/lib -L/sw/lib -L/opt/local/lib -L/usr/local/lib -Wl,-segaddr,SBCLRO,0x1000000 -Wl,-seg1addr,0x5000000 $(if $(AFTER_GROVEL_HEADERS),ppc-darwin-rospace.o)
+OS_LINK_FLAGS = -dynamic -Wl,-segaddr,SBCLRO,0x1000000 -Wl,-seg1addr,0x5000000 $(if $(AFTER_GROVEL_HEADERS),ppc-darwin-rospace.o)
 
 GC_SRC= cheneygc.c
 
