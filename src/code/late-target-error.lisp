@@ -21,20 +21,23 @@
 
 (def!struct (condition-class (:include slot-class)
 			     (:constructor bare-make-condition-class))
-  ;; List of CONDITION-SLOT structures for the direct slots of this class.
+  ;; list of CONDITION-SLOT structures for the direct slots of this
+  ;; class
   (slots nil :type list)
-  ;; List of CONDITION-SLOT structures for all of the effective class slots of
-  ;; this class.
+  ;; list of CONDITION-SLOT structures for all of the effective class
+  ;; slots of this class
   (class-slots nil :type list)
-  ;; Report function or NIL.
+  ;; report function or NIL
   (report nil :type (or function null))
-  ;; List of alternating initargs and initforms.
+  ;; list of alternating initargs and initforms
   (default-initargs () :type list)
-  ;; CPL as a list of class objects, with all non-condition classes removed.
+  ;; class precedence list as a list of class objects, with all
+  ;; non-condition classes removed
   (cpl () :type list)
-  ;; A list of all the effective instance allocation slots of this class that
-  ;; have a non-constant initform or default-initarg. Values for these slots
-  ;; must be computed in the dynamic environment of MAKE-CONDITION.
+  ;; a list of all the effective instance allocation slots of this
+  ;; class that have a non-constant initform or default-initarg.
+  ;; Values for these slots must be computed in the dynamic
+  ;; environment of MAKE-CONDITION.
   (hairy-slots nil :type list))
 
 (defun make-condition-class (&rest rest)
@@ -51,26 +54,27 @@
 	    (:copier nil))
 
   (function-name nil)
-  ;; Actual initargs supplied to MAKE-CONDITION.
+  ;; actual initargs supplied to MAKE-CONDITION
   (actual-initargs (required-argument) :type list)
-  ;; Plist mapping slot names to any values that were assigned or defaulted
-  ;; after creation.
+  ;; plist mapping slot names to any values that were assigned or
+  ;; defaulted after creation
   (assigned-slots () :type list))
 
 (defstruct condition-slot
   (name (required-argument) :type symbol)
-  ;; List of all applicable initargs.
+  ;; list of all applicable initargs
   (initargs (required-argument) :type list)
-  ;; Names of reader and writer functions.
+  ;; names of reader and writer functions
   (readers (required-argument) :type list)
   (writers (required-argument) :type list)
-  ;; True if :INITFORM was specified.
+  ;; true if :INITFORM was specified
   (initform-p (required-argument) :type (member t nil))
-  ;; If a function, call it with no args. Otherwise, the actual value.
+  ;; If this is a function, call it with no args. Otherwise, it's the
+  ;; actual value.
   (initform (required-argument) :type t)
-  ;; Allocation of this slot. Nil only until defaulted.
+  ;; allocation of this slot, or NIL until defaulted
   (allocation nil :type (member :instance :class nil))
-  ;; If :class allocation, a cons whose car holds the value.
+  ;; If ALLOCATION is :CLASS, this is a cons whose car holds the value.
   (cell nil :type (or cons null)))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -86,11 +90,11 @@
 		   (not (typep superclass 'condition-class)))
 		 superset))))
 
-;;; KLUDGE: It's not clear to me why CONDITION-CLASS has itself listed in its
-;;; CPL, while other classes derived from CONDITION-CLASS don't have themselves
-;;; listed in their CPLs. This behavior is inherited from CMU CL, and didn't
-;;; seem to be explained there, and I haven't figured out whether it's right.
-;;; -- WHN 19990612
+;;; KLUDGE: It's not clear to me why CONDITION-CLASS has itself listed
+;;; in its CPL, while other classes derived from CONDITION-CLASS don't
+;;; have themselves listed in their CPLs. This behavior is inherited
+;;; from CMU CL, and didn't seem to be explained there, and I haven't
+;;; figured out whether it's right. -- WHN 19990612
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let ((condition-class (locally
 			   ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for
@@ -141,10 +145,10 @@
 ) ; EVAL-WHEN
 
 ;;; FIXME: ANSI's definition of DEFINE-CONDITION says
-;;;   Condition reporting is mediated through the print-object method for
-;;;   the condition type in question, with *print-escape* always being nil.
-;;;   Specifying (:report report-name) in the definition of a condition
-;;;   type C is equivalent to:
+;;;   Condition reporting is mediated through the PRINT-OBJECT method
+;;;   for the condition type in question, with *PRINT-ESCAPE* always
+;;;   being nil. Specifying (:REPORT REPORT-NAME) in the definition of
+;;;   a condition type C is equivalent to:
 ;;;     (defmethod print-object ((x c) stream)
 ;;;       (if *print-escape* (call-next-method) (report-name x stream)))
 ;;; The current code doesn't seem to quite match that.
@@ -509,9 +513,23 @@
 			    ,report
 			    (list ,@default-initargs))))))
 
+;;;; DESCRIBE on CONDITIONs
+
+;;; a function to be used as the guts of DESCRIBE-OBJECT (CONDITION T)
+;;; eventually (once we get CLOS up and running so that we can define
+;;; methods)
+(defun describe-condition (condition stream)
+  (format stream
+	  "~@<~S ~_is a ~S. ~_Its slot values are ~_~S.~:>"
+	  condition
+	  (type-of condition)
+	  (concatenate 'list
+		       (condition-actual-initargs condition)
+		       (condition-assigned-slots condition))))
+
 ;;;; various CONDITIONs specified by ANSI
 
-(define-condition serious-condition (condition)())
+(define-condition serious-condition (condition) ())
 
 (define-condition error (serious-condition) ())
 

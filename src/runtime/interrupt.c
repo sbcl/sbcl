@@ -76,11 +76,12 @@ os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
  * However, some signals need special handling, e.g. the SIGSEGV (for
  * Linux) or SIGBUS (for FreeBSD) used by the garbage collector to
  * detect violations of write protection, because some cases of such
- * signals are handled at C level and never passed on to Lisp. For
- * such signals, we still store any Lisp-level handler in
- * interrupt_handlers[..], but for the outermost handle we use the
- * value from interrupt_low_level_handlers[..], instead of the
- * ordinary interrupt_handle_now(..) or interrupt_handle_later(..).
+ * signals (e.g. GC-related violations of write protection) are
+ * handled at C level and never passed on to Lisp. For such signals,
+ * we still store any Lisp-level handler in interrupt_handlers[..],
+ * but for the outermost handle we use the value from
+ * interrupt_low_level_handlers[..], instead of the ordinary
+ * interrupt_handle_now(..) or interrupt_handle_later(..).
  *
  * -- WHN 20000728 */
 void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) = {0};
@@ -113,7 +114,7 @@ fake_foreign_function_call(os_context_t *context)
 	(lispobj *)(*os_context_register_addr(context, reg_ALLOC));
 #ifdef alpha
     if ((long)dynamic_space_free_pointer & 1) {
-      lose("dead in fake_foreign_function_call, context = %x", context);
+	lose("dead in fake_foreign_function_call, context = %x", context);
     }
 #endif
 #endif
@@ -148,12 +149,13 @@ fake_foreign_function_call(os_context_t *context)
             oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
         }
     }
-    /* ### We can't tell if we are still in the caller if it had to
-     * reg_ALLOCate the stack frame due to stack arguments. */
+    /* ### We can't tell whether we are still in the caller if it had
+     * to reg_ALLOCate the stack frame due to stack arguments. */
     /* ### Can anything strange happen during return? */
-    else
+    else {
         /* normal case */
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
+    }
 
     current_control_stack_pointer = current_control_frame_pointer + 8;
 

@@ -662,20 +662,20 @@
 	   (setf (%array-fill-pointer array) (1+ fill-pointer))
 	   fill-pointer))))
 
-(defun vector-push-extend (new-el array &optional
-				  (extension (if (zerop (length array))
-						 1
-						 (length array))))
+(defun vector-push-extend (new-element
+			   vector
+			   &optional
+			   (extension (1+ (length vector))))
   #!+sb-doc
   "Like Vector-Push except that if the fill pointer gets too large, the
-   Array is extended rather than Nil being returned."
-  (declare (vector array) (fixnum extension))
-  (let ((fill-pointer (fill-pointer array)))
+   Vector is extended rather than Nil being returned."
+  (declare (vector vector) (fixnum extension))
+  (let ((fill-pointer (fill-pointer vector)))
     (declare (fixnum fill-pointer))
-    (when (= fill-pointer (%array-available-elements array))
-      (adjust-array array (+ fill-pointer extension)))
-    (setf (aref array fill-pointer) new-el)
-    (setf (%array-fill-pointer array) (1+ fill-pointer))
+    (when (= fill-pointer (%array-available-elements vector))
+      (adjust-array vector (+ fill-pointer extension)))
+    (setf (aref vector fill-pointer) new-element)
+    (setf (%array-fill-pointer vector) (1+ fill-pointer))
     fill-pointer))
 
 (defun vector-pop (array)

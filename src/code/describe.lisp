@@ -84,6 +84,9 @@
 	  (format s "~:_...")
 	  (return))
 	(format s "~:_(~S ~S)" k v)))))
+
+(defmethod describe-object ((condition condition) s)
+  (sb-conditions::describe-condition condition s))
 
 ;;;; DESCRIBE-OBJECT methods for symbols and functions, including all
 ;;;; sorts of messy stuff about documentation, type information,

@@ -5,8 +5,8 @@ Bugs can be reported on the help mailing list
 or on the development mailing list
   sbcl-devel@lists.sourceforge.net
 
-Please please please include enough information in a bug report
-that someone reading it can reproduce the problem, i.e. don't write
+Please include enough information in a bug report that someone reading
+it can reproduce the problem, i.e. don't write
      Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
      PRINT-OBJECT doesn't seem to work with *PRINT-LENGTH*. Is this a bug?
 but instead
@@ -70,7 +70,7 @@ TODO file. Eventually more such information may move here.)
   specifically required by the ANSI spec.)
 
 4:
-  It should cause a STYLE-WARNING, not a WARNING, when the system ignores
+  It should cause a note, not a WARNING, when the system ignores
   an FTYPE proclamation for a slot accessor.
 
 5:
@@ -707,9 +707,6 @@ SBCL: (("blah") ("blah2"))
 	b: READ should probably return READER-ERROR, not the bare 
 	   arithmetic error, when input a la "1/0" or "1e1000" causes
 	   an arithmetic error.
-	c: (BUTLAST NIL) should return NIL. (This appears to be a compiler
-	   bug, since the definition of BUTLAST, when interpreted, does
-	   give (BUTLAST NIL)=>NIL.)
 
 52:
   It has been reported (e.g. by Peter Van Eynde) that there are 
@@ -740,18 +737,6 @@ SBCL: (("blah") ("blah2"))
 	(COMPILE 'FOO)
 Error in function C::GET-LAMBDA-TO-COMPILE:
    #<Closure Over Function "DEFUN (SETF MACRO-FUNCTION)" {480E21B1}> was defined in a non-null environment.
-
-57:
-  In sbcl-0.6.7, the compiler accepted a bogus declaration
-  (TYPE INDEX LENGTH) in the definition of BUTLAST, and then died
-  with infinite regress of errors when the BUTLAST function was
-  executed with a LIST=NIL which would cause LENGTH to be -1.
-  I fixed the bogus declaration, but I should come back and see
-  whether the system's inability to recover from the bogus declaration
-  (by signalling a TYPE-ERROR and dropping into the debugger) was 
-  a compiler problem which remains to be fixed, or one of the 
-  unrelated infinite-regress-errors problems, many related to 
-  revised signal handling, which were fixed around the same time.
 
 58:
   (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH)

@@ -579,6 +579,18 @@ Function and macro commands:
 (defvar *debug-restarts*)
 (defvar *debug-condition*)
 
+;;; Print *DEBUG-CONDITION*, taking care to avoid recursive invocation
+;;; of the debugger in case of a problem (e.g. a bug in the PRINT-OBJECT
+;;; method for *DEBUG-CONDITION*).
+(defun princ-debug-condition-carefully (stream)
+  (handler-case (princ *debug-condition* stream)
+    (error (condition)
+	   (format stream
+  		   "  (caught ~S when trying to print ~S)"
+		   (type-of condition)
+		   '*debug-condition*)))
+  *debug-condition*)
+
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
@@ -587,29 +599,31 @@ Function and macro commands:
       (let ((*debugger-hook* nil))
 	(funcall hook condition hook))))
   (sb!unix:unix-sigsetmask 0)
-  (let ((original-package *package*)) ; protect it from WITH-STANDARD-IO-SYNTAX
+  (let ((original-package *package*)) ; protected from WITH-STANDARD-IO-SYNTAX
     (with-standard-io-syntax
      (let* ((*debug-condition* condition)
 	    (*debug-restarts* (compute-restarts condition))
 	    ;; FIXME: The next two bindings seem flaky, violating the
-	    ;; principle of least surprise. But in order to fix them, we'd
-	    ;; need to go through all the i/o statements in the debugger,
-	    ;; since a lot of them do their thing on *STANDARD-INPUT* and
-	    ;; *STANDARD-OUTPUT* instead of *DEBUG-IO*.
+	    ;; principle of least surprise. But in order to fix them,
+	    ;; we'd need to go through all the i/o statements in the
+	    ;; debugger, since a lot of them do their thing on
+	    ;; *STANDARD-INPUT* and *STANDARD-OUTPUT* instead of
+	    ;; *DEBUG-IO*.
 	    (*standard-input* *debug-io*) ; in case of setq
 	    (*standard-output* *debug-io*) ; ''  ''  ''  ''
-	    ;; We also want to set the i/o subsystem into a known, useful 
-	    ;; state, regardless of where in the debugger was invoked in the 
-	    ;; program. WITH-STANDARD-IO-SYNTAX does some of that, but
-	    ;;   1. It doesn't affect our internal special variables like
-	    ;;      *CURRENT-LEVEL*.
+	    ;; We want the i/o subsystem to be in a known, useful
+	    ;; state, regardless of where the debugger was invoked in
+	    ;; the program. WITH-STANDARD-IO-SYNTAX does some of that,
+	    ;; but
+	    ;;   1. It doesn't affect our internal special variables 
+	    ;;      like *CURRENT-LEVEL*.
 	    ;;   2. It isn't customizable.
-	    ;;   3. It doesn't set *PRINT-READABLY* or *PRINT-PRETTY* to the
-	    ;;      same value as the toplevel default.
+	    ;;   3. It doesn't set *PRINT-READABLY* or *PRINT-PRETTY* 
+	    ;;      to the same value as the toplevel default.
 	    ;;   4. It sets *PACKAGE* to COMMON-LISP-USER, which is not
 	    ;;      helpful behavior for a debugger.
-	    ;; We try to remedy all these problems with explicit rebindings
-	    ;; here.
+	    ;; We try to remedy all these problems with explicit 
+	    ;; rebindings here.
 	    (sb!kernel:*current-level* 0)
 	    (*print-length* *debug-print-length*)
 	    (*print-level* *debug-print-level*)
@@ -617,11 +631,14 @@ Function and macro commands:
 	    (*print-readably* nil)
 	    (*print-pretty* t)
 	    (*package* original-package))
+       #!+sb-show (sb!conditions::show-condition *debug-condition*
+						 *error-output*)
        (format *error-output*
-	       "~2&debugger invoked on ~S of type ~S:~%  ~A~%"
+	       "~2&debugger invoked on ~S of type ~S:~%  "
 	       '*debug-condition*
-	       (type-of *debug-condition*)
-	       *debug-condition*)
+	       (type-of *debug-condition*))
+       (princ-debug-condition-carefully *error-output*)
+       (terpri *error-output*)
        (let (;; FIXME: like the bindings of *STANDARD-INPUT* and
 	     ;; *STANDARD-OUTPUT* above..
 	     (*error-output* *debug-io*))

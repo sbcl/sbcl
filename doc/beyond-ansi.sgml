@@ -130,17 +130,12 @@ calling external C code, described
 specified by &ANSI;. Weak pointers allow references to objects to be
 maintained without keeping them from being GCed. And "finalization"
 hooks are available to cause code to be executed when an object is
-GCed.</para>
+GCed.</para> <!-- FIXME: Actually documenting these would be good.:-| -->
 
 <para>&SBCL; does not currently provide Gray streams, but may do so in
 the near future. (It has unmaintained code inherited from &CMUCL; to
 do so.) <!-- FIXME: Add citation to Gray streams.-->
 </para>
-
-<para>&SBCL; does not currently support multithreading (traditionally
-called <wordasword>multiprocessing</> in &Lisp;) but contains unmaintained
-code from &CMUCL; to do so. A sufficiently motivated maintainer
-could probably make it work.</para>
 
 </sect2>
 
