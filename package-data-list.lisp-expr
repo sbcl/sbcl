@@ -499,12 +499,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
  ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
  ;; with explicit SB!IMPL:: prefixes in the code. It would be nice to
  ;; reduce the use of this practice, so if symbols from here which are
- ;; accessed that way are found to belong more appropriately in
- ;; an existing package (e.g. KERNEL or SYS or EXT or FASL), I
- ;; (WHN 19990223) encourage maintainers to move them there..
- ;;
- ;; ..except that it's getting so big and crowded that maybe it should
- ;; be split up, too.
+ ;; accessed that way are found to belong more appropriately in an
+ ;; existing package (e.g. SB!KERNEL or SB!SYS or SB!EXT or SB!FASL),
+ ;; I (WHN 19990223) encourage maintainers to move them there..
  #s(sb-cold:package-data
     :name "SB!IMPL"
     :doc "private: a grab bag of implementation details"
@@ -545,6 +542,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; and for dedicated users who really want to customize
              ;; error reporting, we have
              "DEFINE-SOURCE-CONTEXT"
+
+	     ;; and given how many users dislike strict treatment of
+	     ;; DEFCONSTANT, let's give them enough rope to escape by
+	     "DEFCONSTANT-UNEQL" "DEFCONSTANT-UNEQL-NAME"
+	     "DEFCONSTANT-UNEQL-NEW-VALUE" "DEFCONSTANT-UNEQL-OLD-VALUE"
 
 	     ;; FIXME: This name doesn't match the DEFFOO - vs. -
 	     ;; DEFINE-FOO convention used in the ANSI spec, and so
@@ -703,7 +705,7 @@ retained, possibly temporariliy, because it might be used internally."
              "SIMPLE-STYLE-WARNING"
 	     "SPECIAL-FORM-FUNCTION"
              "STYLE-WARN"
-
+	     
              ;; bootstrapping magic, to make things happen both in
              ;; the cross-compilation host compiler's environment and
              ;; in the cross-compiler's environment
@@ -1371,9 +1373,10 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
              ;; symbols from former SB!CONDITIONS
              "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
+	     "*CONDITION-RESTARTS*"
              "SHOW-CONDITION" "CASE-FAILURE"
              "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
-             "DESCRIBE-CONDITION"
+             "DESCRIBE-CONDITION" "MAKE-RESTART" "COERCE-TO-CONDITION"
 
 	     "CONDITION-READER-FUNCTION" "CONDITION-WRITER-FUNCTION"
 	     

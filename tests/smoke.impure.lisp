@@ -37,5 +37,27 @@
 (loop repeat 100000 do (profiled-fun))
 (report)
 
+;;; DEFCONSTANT should behave as the documentation specifies,
+;;; including documented condition type.
+(defun oidentity (x) x)
+(defconstant +const+ 1)
+(assert (= (oidentity +const+) 1))
+(let ((error (nth-value 1 (ignore-errors (defconstant +const+ 2)))))
+  (assert (typep error 'sb-ext:defconstant-uneql))
+  (assert (= (sb-ext:defconstant-uneql-old-value error) 1))
+  (assert (= (sb-ext:defconstant-uneql-new-value error) 2))
+  (assert (eql (sb-ext:defconstant-uneql-name error) '+const+)))
+(assert (= (oidentity +const+) 1))
+(handler-bind
+    ((sb-ext:defconstant-uneql
+	 (lambda (c) (abort c))))
+  (defconstant +const+ 3))
+(assert (= (oidentity +const+) 1))
+(handler-bind
+    ((sb-ext:defconstant-uneql
+	 (lambda (c) (continue c))))
+  (defconstant +const+ 3))
+(assert (= (oidentity +const+) 3))
+
 ;;; success
 (quit :unix-status 104)

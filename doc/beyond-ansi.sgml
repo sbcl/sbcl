@@ -48,7 +48,7 @@ of the same symbol more than once is undefined unless the new value
 is <function>eql</> to the old value. Conforming to this specification
 is a nuisance when the "constant" value is only constant under some
 weaker test like <function>string=</> or <function>equal</>. It's
-especially annoying because <function>defconstant</> takes effect
+especially annoying because, in &SBCL;, <function>defconstant</> takes effect
 not only at load time but also at compile time, so that just 
 compiling and loading reasonable code like 
 <programlisting>(defconstant +foobyte+ '(1 4))</>
@@ -63,7 +63,11 @@ E.g., the code above can be given an exactly defined meaning by replacing
 <function>defconstant</> either with <function>defparameter</> or 
 with a customized macro which does the right thing, possibly along the
 lines of the <function>defconstant-eqx</> macro used internally in the
-implementation of SBCL itself.</para>
+implementation of &SBCL; itself.  In circumstances where this is not 
+appropriate, the programmer can handle the condition type 
+<errortype>sb-ext:defconstant-uneql</errortype>, and choose either the 
+<action>continue</action> or <action>abort</action> restart as 
+appropriate.</para>
 
 <para>&SBCL; gives style warnings about various kinds of perfectly
 legal code, e.g.

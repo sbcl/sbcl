@@ -790,7 +790,17 @@
 
 (define-condition sb!ext::timeout (serious-condition) ())
 
-
+(define-condition defconstant-uneql (error)
+  ((name :initarg :name :reader defconstant-uneql-name)
+   (old-value :initarg :old-value :reader defconstant-uneql-old-value)
+   (new-value :initarg :new-value :reader defconstant-uneql-new-value))
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "~@<The constant ~S is being redefined (from ~S to ~S)~@:>"
+	     (defconstant-uneql-name condition)
+	     (defconstant-uneql-old-value condition)
+	     (defconstant-uneql-new-value condition)))))
 
 ;;;; special SBCL extension conditions
 

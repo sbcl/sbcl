@@ -1801,6 +1801,10 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * increased compilation speed of long MULTIPLE-VALUES-BIND.
   * a contributed module implementing COMPILER-LET and MACROEXPAND-ALL
     has been included.
+  * DEFCONSTANT now throws a condition of type
+    SB-EXT:DEFCONSTANT-UNEQL if it is being asked to redefine a
+    constant to a non-EQL value; CONTINUE and ABORT restarts
+    respectively change and preserve the value.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

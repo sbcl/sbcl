@@ -40,9 +40,16 @@ the usual naming convention (names like *FOO*) for special variables"
        ;; is occasionally more appropriate). -- WHN 2001-12-21
        (unless (eql value
 		    (info :variable :constant-value name))
-	 (cerror "Go ahead and change the value."
-		 "The constant ~S is being redefined."
-		 name)))
+	 (multiple-value-bind (ignore aborted)
+	     (with-simple-restart (abort "Keep the old value.")
+	       (cerror "Go ahead and change the value."
+		       'defconstant-uneql
+		       :name name
+		       :old-value (info :variable :constant-value name)
+		       :new-value value))
+	   (declare (ignore ignore))
+	   (when aborted
+	     (return-from sb!c::%defconstant name)))))
       (:global
        ;; (This is OK -- undefined variables are of this kind. So we
        ;; don't warn or error or anything, just fall through.)
