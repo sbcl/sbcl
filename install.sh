@@ -10,7 +10,7 @@ ensure_dirs ()
 }
 
 INSTALL_ROOT=${INSTALL_ROOT-/usr/local}
-MAN_DIR=${MAN_DIR-$INSTALL_ROOT/man}
+MAN_DIR=${MAN_DIR-$INSTALL_ROOT/share/man}
 SBCL_SOURCE=`pwd`
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.
@@ -23,7 +23,7 @@ SBCL_HOME=$INSTALL_ROOT/lib/sbcl
 export SBCL_HOME INSTALL_ROOT
 ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
     $BUILD_ROOT$INSTALL_ROOT/lib  \
-    $BUILD_ROOT$INSTALL_ROOT/man $BUILD_ROOT$INSTALL_ROOT/man/man1 \
+    $MAN_DIR $MAN_DIR/man1 \
     $BUILD_ROOT$SBCL_HOME $BUILD_ROOT$SBCL_HOME/systems \
     $BUILD_ROOT$SBCL_HOME/site-systems
 
@@ -36,7 +36,7 @@ test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
 
 cp src/runtime/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/
 cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
-cp doc/sbcl.1 $BUILD_ROOT$INSTALL_ROOT/man/man1/
+cp doc/sbcl.1 $MAN_DIR/man1/
 
 # installing contrib 
 
