@@ -74,7 +74,7 @@ printf(\"(in-package ~S)\\\n\");~%" package-name)
     (format stream "exit(0);~%}~%")))
 
 (defun c-constants-extract  (filename output-file package)
-  (with-open-file (f output-file :direction :output)
+  (with-open-file (f output-file :direction :output :if-exists :supersede)
     (with-open-file (i filename :direction :input)
       (let* ((headers (read i))
              (definitions (read i)))

@@ -338,8 +338,14 @@
       ;; translating logical pathnames to a filesystem without
       ;; versions (like Unix).
       (when name
-	(when (and (null type) (position #\. name :start 1))
+	(when (and (null type)
+		   (typep name 'string)
+		   (> (length name) 0)
+		   (position #\. name :start 1))
 	  (error "too many dots in the name: ~S" pathname))
+	(when (and (typep name 'string)
+		   (string= name ""))
+	  (error "name is of length 0: ~S" pathname))
 	(strings (unparse-unix-piece name)))
       (when type-supplied
 	(unless name

@@ -11,9 +11,9 @@
   (let ((path (pathname name)))
     (if (pathname-name path)
 	(merge-pathnames
-	 (make-pathname :directory `(:relative ,(pathname-name path))
-			:name "")
-	 path)
+	 (make-pathname :directory `(:relative ,(pathname-name path)))
+	 (make-pathname :directory (pathname-directory path)
+			:host (pathname-host path)))
 	path)))
 
 (defvar *sbcl-home* (directorify (posix-getenv "SBCL_HOME")))
@@ -163,7 +163,7 @@
       (restart-case 
 	  (verify-gpg-signature/url url file-name)
 	(skip-gpg-check (&rest rest)
-	  :report "Don't ckeck GPG signature for this package"
+	  :report "Don't check GPG signature for this package"
 	  nil)))))
 
 (defun read-until-eof (stream)
@@ -327,7 +327,7 @@
 	     (one-iter packages)))
       (let ((p (merge-pathnames "trusted-uids.lisp" *dot-sbcl*)))
 	(ensure-directories-exist p)
-	(with-open-file (out p :direction :output)
+	(with-open-file (out p :direction :output :if-exists :supersede)
 	  (with-standard-io-syntax
 	    (prin1 *trusted-uids* out))))
       (dolist (l *temporary-files*)
