@@ -371,6 +371,8 @@
     (cond
       ((and (minusp amount) (< amount -31)) (move result zero-tn))
       ((minusp amount) (inst srwi result number (- amount)))
+      ;; possible because this is used in the modular version too
+      ((> amount 31) (move result zero-tn))
       (t (inst slwi result number amount)))))
 
 (define-vop (fast-ash/signed=>signed)
