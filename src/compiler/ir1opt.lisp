@@ -118,6 +118,41 @@
 (declaim (ftype (function (continuation) ctype) continuation-type))
 (defun continuation-type (cont)
   (single-value-type (continuation-derived-type cont)))
+
+;;; If CONT is an argument of a function, return a type which the
+;;; function checks CONT for.
+#!-sb-fluid (declaim (inline continuation-externally-checkable-type))
+(defun continuation-externally-checkable-type (cont)
+  (or (continuation-%externally-checkable-type cont)
+      (%continuation-%externally-checkable-type cont)))
+(defun %continuation-%externally-checkable-type (cont)
+  (declare (type continuation cont))
+  (let ((dest (continuation-dest cont)))
+      (if (not (and dest (combination-p dest)))
+          ;; TODO: MV-COMBINATION
+          (setf (continuation-%externally-checkable-type cont) *wild-type*)
+          (let* ((fun (combination-fun dest))
+                 (args (combination-args dest))
+                 (fun-type (continuation-type fun)))
+            (if (or (not (fun-type-p fun-type))
+                    ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
+                    (fun-type-wild-args fun-type))
+                (progn (dolist (arg args)
+                         (setf (continuation-%externally-checkable-type arg)
+                               *wild-type*))
+                       *wild-type*)
+                (let* ((arg-types (append (fun-type-required fun-type)
+                                          (fun-type-optional fun-type)
+                                          (let ((rest (list (or (fun-type-rest fun-type)
+                                                                *wild-type*))))
+                                            (setf (cdr rest) rest)))))
+                  ;; TODO: &KEY
+                  (loop
+                     for arg of-type continuation in args
+                     and type of-type ctype in arg-types
+                     do (setf (continuation-%externally-checkable-type arg)
+                              type))
+                  (continuation-%externally-checkable-type cont)))))))
 
 ;;;; interface routines used by optimizers
 
@@ -627,6 +662,7 @@
 	   (new-block (continuation-starts-block new-cont)))
       (link-node-to-previous-continuation new-node new-cont)
       (setf (continuation-dest new-cont) new-node)
+      (setf (continuation-%externally-checkable-type new-cont) nil)
       (add-continuation-use new-node dummy-cont)
       (setf (block-last new-block) new-node)
 
@@ -1615,7 +1651,8 @@
 	(flush-dest (combination-fun use))
 	(let ((fun-cont (basic-combination-fun call)))
 	  (setf (continuation-dest fun-cont) use)
-	  (setf (combination-fun use) fun-cont))
+          (setf (combination-fun use) fun-cont)
+	  (setf (continuation-%externally-checkable-type fun-cont) nil))
 	(setf (combination-kind use) :local)
 	(setf (functional-kind fun) :let)
 	(flush-dest (first (basic-combination-args call)))
@@ -1645,7 +1682,8 @@
       (setf (combination-kind node) :full)
       (let ((args (combination-args use)))
 	(dolist (arg args)
-	  (setf (continuation-dest arg) node))
+	  (setf (continuation-dest arg) node)
+          (setf (continuation-%externally-checkable-type arg) nil))
 	(setf (combination-args use) nil)
 	(flush-dest list)
 	(setf (combination-args node) args))

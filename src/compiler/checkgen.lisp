@@ -260,19 +260,26 @@
 	   (let ((kind (basic-combination-kind dest)))
 	     (cond ((eq cont (basic-combination-fun dest)) t)
 		   ((eq kind :local) t)
-		   ((member kind '(:full :error)) nil)
+                   ((not (eq (continuation-asserted-type cont)
+                             (continuation-externally-checkable-type cont)))
+                    ;; There is an explicit assertion.
+                    t)
+                   ((eq kind :full)
+                    ;; The theory is that the type assertion is from a
+                    ;; declaration in (or on) the callee, so the
+                    ;; callee should be able to do the check. We want
+                    ;; to let the callee do the check, because it is
+                    ;; possible that by the time of call that
+                    ;; declaration will be changed and we do not want
+                    ;; to make people recompile all calls to a
+                    ;; function when they were originally compiled
+                    ;; with a bad declaration. (See also bug 35.)
+                    nil)
+
+		   ((eq kind :error) nil)
                    ;; :ERROR means that we have an invalid syntax of
                    ;; the call and the callee will detect it before
-                   ;; thinking about types. When KIND is :FULL, the
-                   ;; theory is that the type assertion is probably
-                   ;; from a declaration in (or on) the callee, so the
-                   ;; callee should be able to do the check. We want
-                   ;; to let the callee do the check, because it is
-                   ;; possible that by the time of call that
-                   ;; declaration will be changed and we do not want
-                   ;; to make people recompile all calls to a function
-                   ;; when they were originally compiled with a bad
-                   ;; declaration. (See also bug 35.)
+                   ;; thinking about types.
 
 		   ((fun-info-ir2-convert kind) t)
 		   (t

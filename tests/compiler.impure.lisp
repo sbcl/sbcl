@@ -359,6 +359,24 @@ BUG 48c, not yet fixed:
 
 (raises-error? (foo 3) type-error)
 (raises-error? (foo 3f0) type-error)
+
+;;; until 0.8.2 SBCL did not check THEs in arguments
+(defun the-in-arguments-aux (x)
+  x)
+(defun the-in-arguments-1 (x)
+  (list x (the-in-arguments-aux (the (single-float 0s0) x))))
+(defun the-in-arguments-2 (x)
+  (list x (the-in-arguments-aux (the single-float x))))
+
+(multiple-value-bind (result condition)
+    (ignore-errors (the-in-arguments-1 1))
+  (assert (null result))
+  (assert (typep condition 'type-error)))
+#+nil
+(multiple-value-bind (result condition)
+    (ignore-errors (the-in-arguments-2 1))
+  (assert (null result))
+  (assert (typep condition 'type-error)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

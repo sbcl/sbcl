@@ -758,6 +758,7 @@
     (setf (continuation-dest fun-cont) node)
     (assert-continuation-type fun-cont
 			      (specifier-type '(or function symbol)))
+    (setf (continuation-%externally-checkable-type fun-cont) nil)
     (collect ((arg-conts))
       (let ((this-start fun-cont))
 	(dolist (arg args)
@@ -1494,6 +1495,7 @@
 	      (setf (lambda-tail-set lambda) tail-set)
 	      (setf (lambda-return lambda) return)
 	      (setf (continuation-dest result) return)
+              (setf (continuation-%externally-checkable-type result) nil)
 	      (setf (block-last block) return)
 	      (link-node-to-previous-continuation return result)
 	      (use-continuation return dummy))

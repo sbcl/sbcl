@@ -151,7 +151,8 @@
 		 (nsubst new old (basic-combination-args dest))))))
 
     (flush-dest old)
-    (setf (continuation-dest new) dest))
+    (setf (continuation-dest new) dest)
+    (setf (continuation-%externally-checkable-type new) nil))
   (values))
 
 ;;; Replace all uses of OLD with uses of NEW, where NEW has an
@@ -794,6 +795,7 @@
   (unless (eq (continuation-kind cont) :deleted)
     (aver (continuation-dest cont))
     (setf (continuation-dest cont) nil)
+    (setf (continuation-%externally-checkable-type cont) nil)
     (do-uses (use cont)
       (let ((prev (node-prev use)))
 	(unless (eq (continuation-kind prev) :deleted)
@@ -849,6 +851,7 @@
 
   (setf (continuation-kind cont) :deleted)
   (setf (continuation-dest cont) nil)
+  (setf (continuation-%externally-checkable-type cont) nil)
   (setf (continuation-next cont) nil)
   (setf (continuation-asserted-type cont) *empty-type*)
   (setf (continuation-%derived-type cont) *empty-type*)
@@ -1177,7 +1180,8 @@
 	       (before-args (subseq outside-args 0 arg-position))
 	       (after-args (subseq outside-args (1+ arg-position))))
 	  (dolist (arg inside-args)
-	    (setf (continuation-dest arg) outside))
+	    (setf (continuation-dest arg) outside)
+            (setf (continuation-%externally-checkable-type arg) nil))
 	  (setf (combination-args inside) nil)
 	  (setf (combination-args outside)
 		(append before-args inside-args after-args))
