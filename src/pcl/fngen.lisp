@@ -21,7 +21,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 ;;; GET-FUN is the main user interface to this code. It is like
 ;;; COMPILE, only more efficient. It achieves this efficiency by

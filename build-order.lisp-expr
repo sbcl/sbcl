@@ -666,4 +666,5 @@
  ;; I hope this is the right approach...
  ("src/pcl/target-low" :not-host)
  ("src/pcl/slot-name")
+ ("src/pcl/fngen")
  )
