@@ -19,7 +19,7 @@
 (deftype alignment () '(integer 0 64))
 (deftype offset () '(signed-byte 24))
 (deftype address () '(unsigned-byte 32))
-(deftype length () '(unsigned-byte 24))
+(deftype disassem-length () '(unsigned-byte 24))
 (deftype column () '(integer 0 1000))
 
 (def!constant max-filtered-value-index 32)
@@ -232,7 +232,7 @@
   (mask dchunk-zero :type dchunk)       ; bits in the inst that are constant
   (id dchunk-zero :type dchunk)         ; value of those constant bits
 
-  (length 0 :type length)               ; in bytes
+  (length 0 :type disassem-length)               ; in bytes
 
   (print-name nil :type symbol)
 
@@ -322,7 +322,7 @@
   (name nil)
   (args nil :type list)
 
-  (length 0 :type length)               ; in bytes
+  (length 0 :type disassem-length)               ; in bytes
 
   (default-printer nil :type list))
 
@@ -946,7 +946,7 @@
 		    (let ((form (maybe-listify adjusted-forms)))
 		      (if (and (not (eq use-label t))
 			       (not (atom adjusted-forms))
-			       (/= (Length adjusted-forms) 1))
+			       (/= (length adjusted-forms) 1))
 			  (pd-error
 			   "cannot label a multiple-field argument ~
                               unless using a function: ~S" arg)
@@ -1512,11 +1512,11 @@
 (declaim (maybe-inline sign-extend aligned-p align tab tab0))
 
 (defun bytes-to-bits (bytes)
-  (declare (type length bytes))
+  (declare (type disassem-length bytes))
   (* bytes sb!vm:n-byte-bits))
 
 (defun bits-to-bytes (bits)
-  (declare (type length bits))
+  (declare (type disassem-length bits))
   (multiple-value-bind (bytes rbits)
       (truncate bits sb!vm:n-byte-bits)
     (when (not (zerop rbits))

@@ -163,9 +163,11 @@
   (let ((fullname (concatenate 'string stem ".lisp")))
     (sb-int:/show "about to compile" fullname)
     (flet ((report-recompile-restart (stream)
-             (format stream "Recompile file ~S" src))
+             (format stream "Recompile file ~S" fullname))
            (report-continue-restart (stream)
-             (format stream "Continue, using possibly bogus file ~S" obj)))
+             (format stream
+		     "Continue, using possibly bogus file ~S"
+		     (compile-file-pathname fullname))))
       (tagbody
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
@@ -173,12 +175,12 @@
            (declare (ignore warnings-p))
 	   (sb-int:/show "done compiling" fullname)
            (cond ((not output-truename)
-                  (error "COMPILE-FILE of ~S failed." src))
+                  (error "COMPILE-FILE of ~S failed." fullname))
                  (failure-p
 		  (unwind-protect
 		       (restart-case
 			   (error "FAILURE-P was set when creating ~S."
-				  obj)
+				  output-truename)
 			 (recompile ()
 			   :report report-recompile-restart
 			   (go retry-compile-file))

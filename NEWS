@@ -1811,6 +1811,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     respectively change and preserve the value.
   * fixed bug 63: the code walker, part of the implementation of CLOS,
     is better at handling symbol macros.
+  * bug fix: there is no longer a type named LENGTH.  (reported by
+    Raymond Toy)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

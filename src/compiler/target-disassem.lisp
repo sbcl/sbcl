@@ -261,7 +261,7 @@
 		    (:copier nil))
   (sap-maker (missing-arg)
 	     :type (function () sb!sys:system-area-pointer))
-  (length 0 :type length)
+  (length 0 :type disassem-length)
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   (code nil :type (or null sb!kernel:code-component))
@@ -853,7 +853,7 @@
 		     debug-fun source-form-cache
 		     hooks)
   (declare (type (function () sb!sys:system-area-pointer) sap-maker)
-	   (type length length)
+	   (type disassem-length length)
 	   (type (or null address) virtual-location)
 	   (type (or null sb!di:debug-fun) debug-fun)
 	   (type (or null source-form-cache) source-form-cache))
@@ -1331,7 +1331,7 @@
 			  (length (code-inst-area-length code)))
   (declare (type sb!kernel:code-component code)
 	   (type offset start-offset)
-	   (type length length))
+	   (type disassem-length length))
   (let ((segments nil))
     (when code
       (let ((fun-map (code-fun-map code))
@@ -1511,7 +1511,7 @@
 			   code-component
 			   (use-labels t))
   (declare (type (or address sb!sys:system-area-pointer) address)
-	   (type length length)
+	   (type disassem-length length)
 	   (type stream stream)
 	   (type (or null sb!kernel:code-component) code-component)
 	   (type (member t nil) use-labels))
