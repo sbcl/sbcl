@@ -2408,6 +2408,8 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * added a new restart to *BREAK-ON-SIGNALS* handling to make it
     easier to resume long computations after using *BREAK-ON-SIGNALS*
     to diagnose and fix failures.  (thanks to Nikodemus Siivola)
+  * fixed bug reported by PFD in lisppaste #747 (and Bruno Haible from
+    CLISP test suite): WRITE-TO-STRING is not constant-foldable.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

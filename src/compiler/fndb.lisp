@@ -1058,7 +1058,8 @@
   :derive-type #'result-type-first-arg)
 
 ;;; xxx-TO-STRING functions are not foldable because they depend on
-;;; the dynamic environment.
+;;; the dynamic environment, the state of the pretty printer dispatch
+;;; table, and probably other run-time factors.
 (defknown write-to-string
   (t &key (:escape t) (:radix t) (:base (integer 2 36)) (:readably t)
      (:circle t) (:pretty t) (:level (or unsigned-byte null))
@@ -1066,7 +1067,7 @@
      (:lines (or unsigned-byte null)) (:right-margin (or unsigned-byte null))
      (:miser-width (or unsigned-byte null)) (:pprint-dispatch t))
   simple-string
-  (foldable flushable explicit-check))
+  (flushable explicit-check))
 
 (defknown (prin1-to-string princ-to-string) (t) simple-string (flushable))
 

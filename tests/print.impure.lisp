@@ -168,6 +168,43 @@
       (*print-length* 12))
   (wexercise-0-8-7-interpreted "~@W")
   (wexercise-0-8-7-compiled-with-atsign))
+
+;;; WRITE-TO-STRING was erroneously DEFKNOWNed as FOLDABLE
+;;;
+;;; This bug from PFD
+(defpackage "SCRATCH-WRITE-TO-STRING" (:use))
+(with-standard-io-syntax
+  (let* ((*package* (find-package "SCRATCH-WRITE-TO-STRING"))
+	 (answer (write-to-string 'scratch-write-to-string::x :readably nil)))
+    (assert (string= answer "X"))))
+;;; and a couple from Bruno Haible
+(defun my-pprint-reverse (out list)
+  (write-char #\( out)
+  (when (setq list (reverse list))
+    (loop
+     (write (pop list) :stream out)
+     (when (endp list) (return))
+     (write-char #\Space out)))
+  (write-char #\) out))
+(with-standard-io-syntax
+  (let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+    (set-pprint-dispatch '(cons (member foo)) 'my-pprint-reverse 0)
+    (let ((answer (write-to-string '(foo bar :boo 1) :pretty t :escape t)))
+      (assert (string= answer "(1 :BOO BAR FOO)")))))
+(defun my-pprint-logical (out list)
+  (pprint-logical-block (out list :prefix "(" :suffix ")")
+    (when list
+      (loop
+       (write-char #\? out)
+       (write (pprint-pop) :stream out)
+       (write-char #\? out)
+       (pprint-exit-if-list-exhausted)
+       (write-char #\Space out)))))
+(with-standard-io-syntax
+  (let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+    (set-pprint-dispatch '(cons (member bar)) 'my-pprint-logical 0)
+    (let ((answer (write-to-string '(bar foo :boo 1) :pretty t :escape t)))
+      (assert (string= answer "(?BAR? ?FOO? ?:BOO? ?1?)")))))
 
 ;;; success
 (quit :unix-status 104)
