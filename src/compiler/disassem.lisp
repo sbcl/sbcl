@@ -49,7 +49,15 @@
 (defvar *disassem-opcode-column-width* 6)
 (declaim (type text-width *disassem-opcode-column-width*))
 
-(defvar *disassem-note-column* 45
+;;; the width of the column in which instruction-bytes are printed. A
+;;; value of zero disables the printing of instruction bytes.
+(defvar *disassem-inst-column-width* 14
+  #!+sb-doc
+  "The width of instruction bytes.") 
+(declaim (type text-width *disassem-inst-column-width*))
+	 
+
+(defvar *disassem-note-column* (+ 45 *disassem-inst-column-width*)
   #!+sb-doc
   "The column in which end-of-line comments for notes are started.")
 

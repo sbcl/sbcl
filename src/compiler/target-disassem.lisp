@@ -485,6 +485,7 @@
 	(when (> words 0)
 	  (print-words words stream dstate))
 	(when (> bytes 0)
+	  (print-inst bytes stream dstate)
 	  (print-bytes bytes stream dstate))))
     (incf (dstate-next-offs dstate) alignment)))
 
@@ -532,7 +533,7 @@
 			  (setf (dstate-next-offs dstate)
 				(+ (dstate-cur-offs dstate)
 				   (inst-length inst)))
-
+			  (print-inst (inst-length inst) stream dstate)
 			  (let ((prefilter (inst-prefilter inst))
 				(control (inst-control inst)))
 			    (when prefilter
@@ -727,6 +728,17 @@
       (terpri stream))
     (fresh-line stream)
     (setf (dstate-notes dstate) nil)))
+
+;;; Print NUM instruction bytes to STREAM as hex values.
+(defun print-inst (num stream dstate)
+  (let ((width *disassem-inst-column-width*)
+	(sap (dstate-segment-sap dstate))
+	(start-offs (dstate-cur-offs dstate)))
+    (dotimes (offs num)
+      (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs)))
+      (decf width 2))
+    (dotimes (i width)
+      (write-char #\space stream))))
 
 ;;; Disassemble NUM bytes to STREAM as simple `BYTE' instructions.
 (defun print-bytes (num stream dstate)
@@ -2007,6 +2019,7 @@
 	       (let ((num (pop lengths)))
 		 (print-notes-and-newline stream dstate)
 		 (print-current-address stream dstate)
+		 (print-inst num stream dstate)
 		 (print-bytes num stream dstate)
 		 (incf (dstate-cur-offs dstate) num)
 		 (when note
