@@ -282,16 +282,16 @@
 		    bit-array result-bit-array))))
     (let ((length (length result-bit-array)))
       (if (= length 0)
-	  ;; We avoid doing anything to 0-length bit-vectors, or
-	  ;; rather, the memory that follows them. Other
-	  ;; divisible-by-32 cases are handled by the (1- length),
-	  ;; below.  CSR, 2002-04-24
+	  ;; We avoid doing anything to 0-length bit-vectors, or rather,
+	  ;; the memory that follows them. Other divisible-by
+	  ;; n-word-bits cases are handled by the (1- length), below.
+	  ;; CSR, 2002-04-24
 	  result-bit-array
 	  (do ((index sb!vm:vector-data-offset (1+ index))
 	       (end-1 (+ sb!vm:vector-data-offset
-			 ;; bit-vectors of length 1-32 need precisely
-			 ;; one (SETF %RAW-BITS), done here in the
-			 ;; epilogue. - CSR, 2002-04-24
+			 ;; bit-vectors of length 1 to n-word-bits need
+			 ;; precisely one (SETF %RAW-BITS), done here in
+			 ;; the epilogue. - CSR, 2002-04-24
 			 (truncate (truly-the index (1- length))
 				   sb!vm:n-word-bits))))
 	      ((= index end-1)
@@ -329,7 +329,8 @@
 				     (:big-endian
 				      '(- sb!vm:n-word-bits extra))))
 			     (%raw-bits y i))))
-		      (declare (type (integer 0 31) extra)
+		      (declare (type (integer 0 #.(1- sb!vm:n-word-bits))
+                                     extra)
 			       (type sb!vm:word mask numx numy))
 		      (= numx numy)))
 		(declare (type index i end-1))
@@ -358,6 +359,7 @@
 					       (:big-endian
 						'(- sb!vm:n-word-bits extra))))
 				  (%raw-bits sequence index))))
+               (declare (type (mod #.(1- sb!vm:n-word-bits)) extra))
                (declare (type sb!vm:word mask bits))
                ;; could consider LOGNOT for the zero case instead of
                ;; doing the subtraction...
@@ -383,17 +385,17 @@
   (let ((value (if (constant-lvar-p item)
 		   (if (= (lvar-value item) 0)
 		       0
-		       #.(1- (ash 1 32)))
-		   `(if (= item 0) 0 #.(1- (ash 1 32))))))
+		       #.(1- (ash 1 sb!vm:n-word-bits)))
+		   `(if (= item 0) 0 #.(1- (ash 1 sb!vm:n-word-bits))))))
     `(let ((length (length sequence))
 	   (value ,value))
        (if (= length 0)
 	   sequence
 	   (do ((index sb!vm:vector-data-offset (1+ index))
 		(end-1 (+ sb!vm:vector-data-offset
-			  ;; bit-vectors of length 1-32 need precisely
-			  ;; one (SETF %RAW-BITS), done here in the
-			  ;; epilogue. - CSR, 2002-04-24
+			  ;; bit-vectors of length 1 to n-word-bits need
+			  ;; precisely one (SETF %RAW-BITS), done here
+                          ;; in the epilogue. - CSR, 2002-04-24
 			  (truncate (truly-the index (1- length))
 				    sb!vm:n-word-bits))))
 	       ((= index end-1)
@@ -407,18 +409,21 @@
 		    :policy (>= speed space))
   (let ((value (if (constant-lvar-p item)
 		   (let* ((char (lvar-value item))
-			  (code (sb!xc:char-code char)))
-		     (logior code (ash code 8) (ash code 16) (ash code 24)))
+			  (code (sb!xc:char-code char))
+                          (accum 0))
+                     (dotimes (i sb!vm:n-word-bytes)
+                       (setf accum (logior accum (ash code (* 8 i))))))
 		   `(let ((code (sb!xc:char-code item)))
-		     (logior code (ash code 8) (ash code 16) (ash code 24))))))
+                     (logior ,@(loop for i from 0 upto sb!vm:n-word-bytes
+                                     collect `(ash code ,(* 8 i))))))))
     `(let ((length (length sequence))
 	   (value ,value))
       (multiple-value-bind (times rem)
-	  (truncate length 4)
+	  (truncate length sb!vm:n-word-bytes)
 	(do ((index sb!vm:vector-data-offset (1+ index))
 	     (end (+ times sb!vm:vector-data-offset)))
 	    ((= index end)
-	     (let ((place (* times 4)))
+	     (let ((place (* times sb!vm:n-word-bytes)))
 	       (declare (fixnum place))
 	       (dotimes (j rem sequence)
 		 (declare (index j))
