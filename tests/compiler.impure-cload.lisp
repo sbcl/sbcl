@@ -161,5 +161,26 @@
   (declare (type (double-float -0d0) x))
   (declare (optimize speed))
   (+ x (sqrt (log (random 1d0)))))
+
+;;; compiler failures reported by Paul Dietz: inaccurate dealing with
+;;; BLOCK-LAST in CONSTANT-FOLD-CALL and DO-NODES
+(defun #:foo (a b c d)
+  (declare (type (integer -1 1000655) b)
+           (optimize (speed 3) (safety 1) (debug 1)))
+  (- (logior
+      (abs (- (+ b (logandc1 -473949 (max 5165 (abs (logandc1 a 250775)))))))
+      (logcount (logeqv (max (logxor (abs c) -1) 0) -4)))
+     d))
+
+(defun #:foo (a d)
+  (declare (type (integer -8507 26755) a)
+           (type (integer -393314538 2084485) d)
+           (optimize (speed 3) (safety 1) (debug 1)))
+  (gcd
+   (if (= 0 a) 10 (abs -1))
+   (logxor -1
+           (min -7580
+                (max (logand a 31365125) d)))))
+
 
 (sb-ext:quit :unix-status 104)

@@ -1182,6 +1182,9 @@
                  (add-continuation-use call prev)
                  (reference-constant prev cont (first values))
                  (setf (continuation-next cont) next)
+                 (let ((block (node-block call)))
+                   (when (eq (block-last block) call)
+                     (setf (block-last block) (continuation-next prev))))
                  ;; FIXME: type checking?
                  (reoptimize-continuation cont)
                  (reoptimize-continuation prev)

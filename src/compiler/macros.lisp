@@ -624,6 +624,7 @@
 	 ,@body
 	 (when ,(if restart-p
 		    `(or (eq ,node-var (block-last ,n-block))
+                         (eq ,cont-var (node-cont (block-last ,n-block)))
                          (block-delete-p ,n-block))
 		    `(eq ,cont-var ,n-last-cont))
 	   (return nil))))))
