@@ -18,7 +18,7 @@
 (defun software-type ()
   #!+sb-doc
   "Return a string describing the supporting software."
-  (values "Solaris"))
+  (values "SunOS"))
 
 (defvar *software-version* nil)
 
@@ -34,7 +34,7 @@
 					       :output stream))))))
 
 (defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
-  (/show "entering solaris-os.lisp OS-COLD-INIT-OR-REINIT")
+  (/show "entering sunos-os.lisp OS-COLD-INIT-OR-REINIT")
   (setf *software-version* nil)
   (/show "setting *DEFAULT-PATHNAME-DEFAULTS*")
   (setf *default-pathname-defaults*
@@ -44,7 +44,7 @@
 	*default-pathname-defaults*
 	;; (final value, constructed using #'PATHNAME:)
 	(pathname (sb!unix:posix-getcwd/)))
-  (/show "leaving solaris-os.lisp OS-COLD-INIT-OR-REINIT"))
+  (/show "leaving sunos-os.lisp OS-COLD-INIT-OR-REINIT"))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
