@@ -1971,6 +1971,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
   * bug fix in READ-SEQUENCE: READ-SEQUENCE following PEEK-CHAR or
     UNREAD-CHAR now correctly includes the unread character in the
     target sequence.  (thanks to Gerd Moellmann)
+  * bug fix in threaded builds: the system can now be suspended and
+    resumed by shell job control with minimal disruption.
   * new optimization: inside a named function any reference to a
     function with the same name is considered to be a self-reference;
     this behaviour is controlled with SB-C::RECOGNIZE-SELF-CALLS
