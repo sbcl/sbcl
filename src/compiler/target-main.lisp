@@ -76,7 +76,8 @@
 		  :name name
 		  :path '(original-source-start 0 0))))))
 
-(defun compile (name &optional (definition (fdefinition name)))
+(defun compile (name &optional (definition (or (macro-function name)
+					       (fdefinition name))))
   #!+sb-doc
   "Coerce DEFINITION (by default, the function whose name is NAME)
   to a compiled function, returning (VALUES THING WARNINGS-P FAILURE-P),

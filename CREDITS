@@ -572,9 +572,13 @@ Christophe Rhodes:
   it, like *BACKEND-FEATURES*). He's also contributed miscellaneous
   bug fixes.
 
+Stig Erik Sandoe:
+  He showed how to convince the GNU toolchain to build SBCL in a way
+  which supports callbacks from C code into SBCL.
+
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and
-  stream operations.
+  stream types and operations on them.
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on
@@ -582,7 +586,7 @@ Raymond Toy:
   ported to SBCL.
 
 Peter Van Eynde:
-  He wrestled the CLISP test suite into a portable test suite
+  He wrestled the CLISP test suite into a mostly portable test suite
   (clocc ansi-test) which can be used on SBCL, provided a slew of
   of bug reports resulting from that, and submitted many other bug
   reports as well.

@@ -224,10 +224,10 @@
    This is SETF'able."
   (let ((fun (%coerce-name-to-fun name)))
     (loop
-      (let ((encap-info (encapsulation-info fun)))
-	(if encap-info
-	    (setf fun (encapsulation-info-definition encap-info))
-	    (return fun))))))
+     (let ((encap-info (encapsulation-info fun)))
+       (if encap-info
+	   (setf fun (encapsulation-info-definition encap-info))
+	   (return fun))))))
 
 (defvar *setf-fdefinition-hook* nil
   #!+sb-doc

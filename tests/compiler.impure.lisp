@@ -88,6 +88,12 @@
 	     (if (and (< ind ind)
 		      (typep (char string ind) '(member #\1)))
 		 nil))))))
+
+;;; bug reported and fixed by Matthias Hoelzl sbcl-devel 2002-05-13
+(defmacro foo-2002-05-13 () ''x)
+(eval '(foo-2002-05-13))
+(compile 'foo-2002-05-13)
+(foo-2002-05-13) ; (The bug caused UNDEFINED-FUNCTION to be signalled here.)
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
