@@ -99,68 +99,48 @@
 
 ;;;; GET-BYTES-CONSED
 
-;;; internal state
-(defvar *last-bytes-in-use* nil)
-(defvar *total-bytes-consed* 0)
-(declaim (type (or index null) *last-bytes-in-use*))
-(declaim (type unsigned-byte *total-bytes-consed*))
+;;; the total number of bytes freed so far (including any freeing
+;;; which goes on in PURIFY)
+;;;
+;;; (We save this so that we can calculate the total number of bytes
+;;; ever allocated by adding this to the number of bytes currently
+;;; allocated and never freed.)
+(declaim (type pcounter *n-bytes-freed-or-purified-pcounter*))
+(defvar *n-bytes-freed-or-purified-pcounter* (make-pcounter))
 
 (declaim (ftype (function () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
   #!+sb-doc
-  "Return the number of bytes consed since the first time this function
-  was called. The first time it is called, it returns zero."
-  (declare (optimize (speed 3) (safety 0)))
-  (cond ((null *last-bytes-in-use*)
-	 (setq *last-bytes-in-use* (dynamic-usage))
-	 (setq *total-bytes-consed* 0))
-	(t
-	 (let ((bytes (dynamic-usage)))
-	   (incf *total-bytes-consed*
-		 (the index (- bytes *last-bytes-in-use*)))
-	   (setq *last-bytes-in-use* bytes))))
-  ;; FIXME: We should really use something like PCOUNTER to make this
-  ;; hold reliably.
-  (aver (not (minusp *total-bytes-consed*)))
-  *total-bytes-consed*)
+  "Return the number of bytes consed since the program began. Typically
+this result will be a consed bignum, so if you have an application (e.g.
+profiling) which can't tolerate the overhead of consing bignums, you'll
+probably want either to hack in at a lower level (as the code in the
+SB-PROFILE package does), or to design a more microefficient interface
+and submit it as a patch."
+  (+ (dynamic-usage)
+     (pcounter->integer *n-bytes-freed-or-purified-pcounter*)))
 
 ;;;; variables and constants
-
-;;; the default value of *BYTES-CONSED-BETWEEN-GCS* and *GC-TRIGGER*
-(defconstant default-bytes-consed-between-gcs 2000000)
 
 ;;; the minimum amount of dynamic space which must be consed before a
 ;;; GC will be triggered
 ;;;
 ;;; Unlike CMU CL, we don't export this variable. (There's no need to,
-;;; since the BYTES-CONSED-BETWEEN-GCS function is SETFable.)
-(defvar *bytes-consed-between-gcs* default-bytes-consed-between-gcs)
+;;; since our BYTES-CONSED-BETWEEN-GCS function is SETFable.)
+(defvar *bytes-consed-between-gcs* (* 2 (expt 10 6)))
 (declaim (type index *bytes-consed-between-gcs*))
 
 ;;;; GC hooks
 
-;;; These variables are a list of functions which are run before and
-;;; after garbage collection occurs.
 (defvar *before-gc-hooks* nil ; actually initialized in cold init
   #!+sb-doc
   "A list of functions that are called before garbage collection occurs.
   The functions should take no arguments.")
+
 (defvar *after-gc-hooks* nil ; actually initialized in cold init
   #!+sb-doc
   "A list of functions that are called after garbage collection occurs.
   The functions should take no arguments.")
-
-;;; This hook is invoked whenever SUB-GC intends to GC (unless the GC
-;;; was explicitly forced by calling SB!EXT:GC). If the hook function
-;;; returns NIL then the GC procedes; otherwise, the GC is inhibited and
-;;; *GC-INHIBIT* and *NEED-TO-COLLECT-GARBAGE* are left bound to T.
-;;; Presumably someone will call GC-ON later to collect the garbage.
-(defvar *gc-inhibit-hook* nil
-  #!+sb-doc
-  "This should be bound to a function or NIL. If it is a function, this
-  function should take one argument, the current amount of dynamic
-  usage. The function should return NIL if garbage collection should
-  continue and non-NIL if it should be inhibited. Use with caution.")
 
 (defvar *gc-notify-stream* nil ; (actually initialized in cold init)
   #!+sb-doc
@@ -268,9 +248,9 @@ has finished GC'ing.")
 	      (warn "(FUNCALL ~S~{ ~S~}) lost:~%~A" ',function ',args cond)
 	      nil))))
 
-;;; SUB-GC decides when and if to do a garbage collection.
-;;; The FORCE-P flags controls if a GC should occur even if
-;;; the dynamic usage is not greater than *GC-TRIGGER*.
+;;; SUB-GC decides when and if to do a garbage collection. The FORCE-P
+;;; flags controls whether a GC should occur even if the dynamic usage
+;;; is not greater than *GC-TRIGGER*.
 ;;;
 ;;; For GENCGC all generations < GEN will be GC'ed.
 (defun sub-gc (&key  force-p (gen 0))
@@ -278,53 +258,25 @@ has finished GC'ing.")
   (unless *already-maybe-gcing*
     (let* ((*already-maybe-gcing* t)
 	   (start-time (get-internal-run-time))
-	   (pre-gc-dyn-usage (dynamic-usage))
+	   (pre-gc-dynamic-usage (dynamic-usage))
 	   ;; Currently we only check *SOFT-HEAP-LIMIT* at GC time,
 	   ;; not for every allocation. That makes it cheap to do,
 	   ;; even if it is a little ugly.
 	   (soft-heap-limit-exceeded? (and *soft-heap-limit*
-					   (> pre-gc-dyn-usage
+					   (> pre-gc-dynamic-usage
 					      *soft-heap-limit*)))
 	   (*soft-heap-limit* (if soft-heap-limit-exceeded?
-				  (+ pre-gc-dyn-usage
+				  (+ pre-gc-dynamic-usage
 				     *bytes-consed-between-gcs*)
 				  *soft-heap-limit*)))
       (when soft-heap-limit-exceeded?
 	(cerror "Continue with GC."
 		"soft heap limit exceeded (temporary new limit=~D)"
 		*soft-heap-limit*))
-      (unless (integerp (symbol-value '*bytes-consed-between-gcs*))
-	;; The noise w/ symbol-value above is to keep the compiler
-	;; from optimizing the test away because of the type declaim
-	;; for *bytes-consed-between-gcs*.
-	;;
-	;; FIXME: I'm inclined either to get rid of the DECLAIM or to
-	;; trust it, instead of doing this weird hack. It's not
-	;; particularly trustable, since (SETF
-	;; *BYTES-CONSED-BETWEEN-GCS* 'SEVEN) works. But it's also not
-	;; very nice to have the type of the variable specified in two
-	;; places which can (and in CMU CL 2.4.8 did, INTEGER vs.
-	;; INDEX) drift apart. So perhaps we should just add a note to
-	;; the variable documentation for *BYTES-CONSED-BETWEEN-GCS*
-	;; that it must be an INDEX, and remove the DECLAIM. Or we
-	;; could make a SETFable (BYTES-CONSED-BETWEEN-GCS) function
-	;; and enforce the typing that way. And in fact the SETFable
-	;; function already exists, so all we need do is make the
-	;; variable private, and then we can trust the DECLAIM.
-	(warn "The value of *BYTES-CONSED-BETWEEN-GCS*, ~S, is not an ~
-	       integer. Resetting it to ~D."
-	      *bytes-consed-between-gcs*
-	       default-bytes-consed-between-gcs)
-	(setf *bytes-consed-between-gcs* default-bytes-consed-between-gcs))
-      (when (and *gc-trigger* (> pre-gc-dyn-usage *gc-trigger*))
+      (when (and *gc-trigger* (> pre-gc-dynamic-usage *gc-trigger*))
 	(setf *need-to-collect-garbage* t))
       (when (or force-p
 		(and *need-to-collect-garbage* (not *gc-inhibit*)))
-	(when (and (not force-p)
-		   *gc-inhibit-hook*
-		   (carefully-funcall *gc-inhibit-hook* pre-gc-dyn-usage))
-	  (setf *gc-inhibit* t)
-	  (return-from sub-gc nil))
 	;; KLUDGE: Wow, we really mask interrupts all the time we're
 	;; collecting garbage? That seems like a long time.. -- WHN 19991129
 	(without-interrupts
@@ -336,33 +288,58 @@ has finished GC'ing.")
 	      (if (streamp *gc-notify-stream*)
 		  (carefully-funcall *gc-notify-before*
 				     *gc-notify-stream*
-				     pre-gc-dyn-usage)
+				     pre-gc-dynamic-usage)
 	          (warn
 		   "*GC-NOTIFY-STREAM* is set, but not a STREAM -- ignored.")))
 	    (dolist (hook *before-gc-hooks*)
 	      (carefully-funcall hook))
 	    (when *gc-trigger*
 	      (clear-auto-gc-trigger))
-	    #!-gencgc (funcall *internal-gc*)
-	    ;; FIXME: This EQ test is pretty gross. Among its other
-	    ;; nastinesses, it looks as though it could break if we
-	    ;; recompile COLLECT-GARBAGE.
-	    #!+gencgc (if (eq *internal-gc* #'collect-garbage)
-			  (funcall *internal-gc* gen)
-			  (funcall *internal-gc*))
-	    (let* ((post-gc-dyn-usage (dynamic-usage))
-		   (bytes-freed (- pre-gc-dyn-usage post-gc-dyn-usage)))
-	      (/show0 "got (DYNAMIC-USAGE) and BYTES-FREED")
-	      (when *last-bytes-in-use*
-		(/show0 "doing *LAST-BYTES-IN-USE* thing")
-		(incf *total-bytes-consed*
-		      (- pre-gc-dyn-usage *last-bytes-in-use*))
-		(/show0 "setting *LAST-BYTES-IN-USE*")
-		(setq *last-bytes-in-use* post-gc-dyn-usage))
+	    (let* (;; We do DYNAMIC-USAGE once more here in order to
+		   ;; get a more accurate measurement of the space
+		   ;; actually freed, since the messing around, e.g.
+		   ;; GC-notify stuff, since the DYNAMIC-USAGE which
+		   ;; triggered GC could've done a fair amount of
+		   ;; consing.)
+		   (pre-internal-gc-dynamic-usage (dynamic-usage))
+		   (ignore-me
+		    #!-gencgc (funcall *internal-gc*)
+		    ;; FIXME: This EQ test is pretty gross. Among its other
+		    ;; nastinesses, it looks as though it could break if we
+		    ;; recompile COLLECT-GARBAGE. We should probably just
+		    ;; straighten out the interface so that all *INTERNAL-GC*
+		    ;; functions accept a GEN argument (and then the
+		    ;; non-generational ones just ignore it).
+		    #!+gencgc (if (eq *internal-gc* #'collect-garbage)
+				  (funcall *internal-gc* gen)
+				  (funcall *internal-gc*)))
+		   (post-gc-dynamic-usage (dynamic-usage))
+		   (n-bytes-freed (- pre-internal-gc-dynamic-usage
+				     post-gc-dynamic-usage))
+		   ;; In sbcl-0.6.12.39, the raw N-BYTES-FREED from
+		   ;; GENCGC could sometimes be substantially negative
+		   ;; (e.g. -5872). I haven't looked into what causes
+		   ;; that, but I suspect it has to do with
+		   ;; fluctuating inefficiency in the way that the
+		   ;; GENCGC packs things into page boundaries.
+		   ;; Bumping the raw result up to 0 is a little ugly,
+		   ;; but shouldn't be a problem, and it's even
+		   ;; possible to sort of justify it: the packing
+		   ;; inefficiency which has caused (DYNAMIC-USAGE) to
+		   ;; grow is effectively consing, or at least
+		   ;; overhead of consing, so it's sort of correct to
+		   ;; add it to the running total of consing. ("Man
+		   ;; isn't a rational animal, he's a rationalizing
+		   ;; animal.":-) -- WHN 2001-06-23
+		   (eff-n-bytes-freed (max 0 n-bytes-freed)))
+	      (declare (ignore ignore-me))
+	      (/show0 "got (DYNAMIC-USAGE) and EFF-N-BYTES-FREED")
+	      (incf-pcounter *n-bytes-freed-or-purified-pcounter*
+			     eff-n-bytes-freed)
 	      (/show0 "clearing *NEED-TO-COLLECT-GARBAGE*")
 	      (setf *need-to-collect-garbage* nil)
 	      (/show0 "calculating NEW-GC-TRIGGER")
-	      (let ((new-gc-trigger (+ post-gc-dyn-usage
+	      (let ((new-gc-trigger (+ post-gc-dynamic-usage
 				       *bytes-consed-between-gcs*)))
 		(/show0 "setting *GC-TRIGGER*")
 		(setf *gc-trigger* new-gc-trigger))
@@ -380,8 +357,8 @@ has finished GC'ing.")
 		(if (streamp *gc-notify-stream*)
 		    (carefully-funcall *gc-notify-after*
 				       *gc-notify-stream*
-				       post-gc-dyn-usage
-				       bytes-freed
+				       post-gc-dynamic-usage
+				       eff-n-bytes-freed
 				       *gc-trigger*)
 		    (warn
 		     "*GC-NOTIFY-STREAM* is set, but not a stream -- ignored.")))))
@@ -430,6 +407,8 @@ has finished GC'ing.")
 	     (clear-auto-gc-trigger)
 	     (set-auto-gc-trigger *gc-trigger*))
 	    (t
+	     ;; FIXME: If SCRUB-CONTROL-STACK is required here, why
+	     ;; isn't it built into SUB-GC? And *is* it required here?
 	     (sb!sys:scrub-control-stack)
 	     (sub-gc)))))
   val)
@@ -450,7 +429,7 @@ has finished GC'ing.")
 
 ;;;; initialization stuff
 
-(defun gc-cold-init-or-reinit ()
+(defun gc-reinit ()
   (when *gc-trigger*
     (if (< *gc-trigger* (dynamic-usage))
 	(sub-gc)

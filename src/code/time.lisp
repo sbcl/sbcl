@@ -276,14 +276,14 @@
       (declare (ignore def))
       (cond
        (env-p
-	(warn "TIME form in a non-null environment, forced to interpret.~@
-	       Compiling entire form will produce more accurate times.")
+	(warn "non-null environment for TIME form, forced to interpret.~@
+	       Compiling the entire form will produce more accurate times.")
 	fun)
        (t
 	(compile nil fun)))))
    (t fun)))
 
-;;; Return all the files that we want time to report.
+;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()
   (multiple-value-bind (user sys faults) (sb!sys:get-system-info)
     (values user sys faults (get-bytes-consed))))

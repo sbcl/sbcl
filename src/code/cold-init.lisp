@@ -289,7 +289,7 @@ instead (which is another name for the same thing)."))
       (os-cold-init-or-reinit)
       (stream-reinit)
       (signal-cold-init-or-reinit)
-      (gc-cold-init-or-reinit)
+      (gc-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
       (set-floating-point-modes :traps
 				'(:overflow

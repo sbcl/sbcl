@@ -162,13 +162,7 @@
 	 (aver (typep inner-enclosed-profiles 'unsigned-byte))
 	 (multiple-value-prog1
 	     (let ((start-ticks (get-internal-ticks))
-		   ;; KLUDGE: We add (THE UNSIGNED-BYTE ..) wrappers
-		   ;; around GET-BYTES-CONSED because as of
-		   ;; sbcl-0.6.4, at the time that the FTYPE of
-		   ;; GET-BYTES-CONSED is DECLAIMed, the
-		   ;; cross-compiler's type system isn't mature enough
-		   ;; to do anything about it. -- WHN 20000503
-		   (start-consing (the unsigned-byte (get-bytes-consed)))
+		   (start-consing (get-bytes-consed))
 		   (*enclosed-ticks* 0)
 		   (*enclosed-consing* 0)
 		   (*enclosed-profiles* 0))
@@ -180,22 +174,12 @@
 							       arg-count))
 		 (let ((*computing-profiling-data-for* encapsulated-fun))
 		   (setf dticks (fastbig- (get-internal-ticks) start-ticks)
-			 dconsing (fastbig- (the unsigned-byte
-					      (get-bytes-consed))
-					    start-consing))
+			 dconsing (fastbig- (get-bytes-consed) start-consing))
 		   (setf inner-enclosed-profiles
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
-		   (when (minusp dticks) ; REMOVEME
-		     (unprofile-all)
-		     (error "huh? (GET-INTERNAL-TICKS)=~S START-TICKS=~S"
-			    (get-internal-ticks) start-ticks))
 		   (aver (not (minusp dconsing))) ; REMOVEME
 		   (aver (not (minusp inner-enclosed-profiles))) ; REMOVEME
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
-		     (when (minusp net-dticks) ; REMOVEME
-		       (unprofile-all)
-		       (error "huh? DTICKS=~S, *ENCLOSED-TICKS*=~S"
-			      dticks *enclosed-ticks*))
 		     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
 		   (let ((net-dconsing (fastbig- dconsing *enclosed-consing*)))
 		     (when (minusp net-dconsing) ; REMOVEME

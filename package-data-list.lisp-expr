@@ -828,10 +828,10 @@ retained, possibly temporariliy, because it might be used internally."
              ;; compelling reasons, but hopefully we can get by
              ;; without supporting them, at least not as publicly
              ;; accessible things with fixed interfaces.
-             "GET-FLOATING-POINT-MODES" "SET-FLOATING-POINT-MODES"
+             "GET-FLOATING-POINT-MODES"
+             "SET-FLOATING-POINT-MODES"
              "WITH-FLOAT-TRAPS-MASKED"
              "DEFINE-HASH-TABLE-TEST"
-             "*GC-INHIBIT-HOOK*"
 
              ;; compatibility hacks for old-style CMU CL data formats
              "UNIX-ENVIRONMENT-CMUCL-FROM-SBCL"
@@ -1293,7 +1293,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "!PACKAGE-COLD-INIT" "SIGNAL-COLD-INIT-OR-REINIT"
              "!POLICY-COLD-INIT-OR-RESANIFY" "!VM-TYPE-COLD-INIT"
              "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
-             "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
+             "!CLASS-FINALIZE" "GC-REINIT"
 
              ;; Note: These are out of lexicographical order because in CMU CL
              ;; they were defined as internal symbols in package "CL"

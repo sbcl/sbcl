@@ -1239,6 +1239,10 @@
 (defknown constantly (t) function (movable flushable))
 (defknown complement (function) function (movable flushable))
 
+;;;; miscellaneous extensions
+
+(defknown get-bytes-consed () unsigned-byte (flushable))
+
 ;;;; magical compiler frobs
 
 ;;; We can't fold this in general because of SATISFIES. There is a

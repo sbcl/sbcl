@@ -17,10 +17,10 @@
 
 ;;; GC tuning has little effect on the x86 due to the generational
 ;;; collector.  For the older stop & copy collector, it assuredly
-;;; does.  GC time is proportional to the amount of non-grabage
+;;; does.  GC time is proportional to the amount of non-garbage
 ;;; needing collection and copying; when the application involved is
-;;; the SBCL compiler, it doesn't take any longer to collect 20Mb than
-;;; 2              -dan, 20000819
+;;; the SBCL compiler, it doesn't take any longer to collect 20 Mb than
+;;; to collect 2 Mb. -dan, 20000819
 ;;;
 ;;; Actually, tweaking *BYTES-CONSED-BETWEEN-GCS* to 20Mb instead of
 ;;; the default 2 seemed to make SBCL rebuild O(25%) faster on my 256
@@ -32,7 +32,7 @@
 #+(and sbcl alpha) ; SBCL/Alpha uses stop-and-copy, and Alphas have lotso RAM.
 (progn
   (sb-ext:gc-off)
-  (setf sb-kernel::*bytes-consed-between-gcs* (* 20 (expt 10 6)))
+  (setf (bytes-consed-between-gcs) (* 20 (expt 10 6)))
   (sb-ext:gc-on)
   (sb-ext:gc))
 
