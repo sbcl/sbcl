@@ -500,6 +500,11 @@ BUG 48c, not yet fixed:
 
 (symbol-macrolet-test)
 
+;;; On the x86, this code failed to compile until sbcl-0.7.8.37:
+(defun x86-assembler-failure (x)
+  (declare (optimize (speed 3) (safety 0)))
+  (eq (setf (car x) 'a) nil))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 
