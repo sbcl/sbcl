@@ -360,3 +360,25 @@
 
 (defun structure-slotd-init-form (slotd)
   (sb-kernel::dsd-default slotd))
+
+;;; WITH-PCL-LOCK is used around some forms that were previously
+;;; protected by WITHOUT-INTERRUPTS, but in a threaded SBCL we don't
+;;; have a useful WITHOUT-INTERRUPTS.
+;;;
+;;; Users: FORCE-CACHE-FLUSHES, MAKE-INSTANCES-OBSOLETE.  Note that
+;;; it's not all certain this is sufficent for threadsafety: do we
+;;; just have to protect against simultaneous calls to these mutators,
+;;; or actually to stop normal slot access etc at the same time as one
+;;; of them runs
+
+(defstruct spinlock (value 0))
+(defvar *pcl-lock* (make-spinlock))
+
+(defmacro with-pcl-lock (&body body)
+  `(progn
+    (sb-thread::get-spinlock *pcl-lock* 1 (sb-thread::current-thread-id))
+    (unwind-protect
+	 (progn ,@body)
+      (setf (spinlock-value *pcl-lock*) 0))))
+
+    

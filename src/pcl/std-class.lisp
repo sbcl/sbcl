@@ -1152,7 +1152,7 @@
 	      (wrapper-instance-slots-layout owrapper))
 	(setf (wrapper-class-slots nwrapper)
 	      (wrapper-class-slots owrapper))
-	(sb-sys:without-interrupts
+	(with-pcl-lock
 	  (update-lisp-class-layout class nwrapper)
 	  (setf (slot-value class 'wrapper) nwrapper)
 	  (invalidate-wrapper owrapper :flush nwrapper))))))
@@ -1172,7 +1172,7 @@
 	    (wrapper-instance-slots-layout owrapper))
       (setf (wrapper-class-slots nwrapper)
 	    (wrapper-class-slots owrapper))
-      (sb-sys:without-interrupts
+      (with-pcl-lock
 	(update-lisp-class-layout class nwrapper)
 	(setf (slot-value class 'wrapper) nwrapper)
 	(invalidate-wrapper owrapper :obsolete nwrapper)

@@ -628,8 +628,7 @@ And so, we are saved.
     (maphash (lambda (classes value)
 	       (setq cache (fill-cache cache
 				       (class-wrapper classes)
-				       value
-				       t)))
+				       value)))
 	     table)
     cache))
 
@@ -1539,15 +1538,13 @@ And so, we are saved.
   (let* ((early-p (early-gf-p generic-function))
 	 (gf-name (if early-p
 		      (!early-gf-name generic-function)
-		      (generic-function-name generic-function)))
-	 (ocache (gf-dfun-cache generic-function)))
+		      (generic-function-name generic-function))))
     (set-dfun generic-function dfun cache info)
     (let ((dfun (if early-p
 		    (or dfun (make-initial-dfun generic-function))
 		    (compute-discriminating-function generic-function))))
       (set-funcallable-instance-fun generic-function dfun)
       (set-fun-name generic-function gf-name)
-      (when (and ocache (not (eq ocache cache))) (free-cache ocache))
       dfun)))
 
 (defvar *dfun-count* nil)

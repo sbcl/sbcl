@@ -916,7 +916,7 @@
 				      ((eq valuep :constant-value)
 				       (value-for-caching generic-function
 							  classes)))))
-		     (setq cache (fill-cache cache wrappers value t))))))))
+		     (setq cache (fill-cache cache wrappers value))))))))
       (if classes-list
 	  (mapc #'add-class-list classes-list)
 	  (dolist (method (generic-function-methods generic-function))
