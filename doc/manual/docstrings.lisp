@@ -4,11 +4,25 @@
 ;;;; @include-ready documentation from the docstrings of exported
 ;;;; symbols of specified packages.
 
+
 ;;;; This software is part of the SBCL software system. SBCL is in the
 ;;;; public domain and is provided with absolutely no warranty. See
 ;;;; the COPYING file for more information.
-
+;;;;
 ;;;; Written by Rudi Schlatte <rudi@constantly.at>
+
+
+;;;; Formatting heuristics (tweaked to format SAVE-LISP-AND-DIE sanely):
+;;;;
+;;;; Formats SYMBOL as @code{symbol}, or @var{symbol} if symbol is in
+;;;; the argument list of the defun / defmacro.
+;;;;
+;;;; Lines starting with * or - that are followed by intented lines
+;;;; are marked up with @itemize.
+;;;;
+;;;; Lines containing only a SYMBOL that are followed by indented
+;;;; lines are marked up as @table @code, with the SYMBOL as the item.
+
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -69,16 +83,20 @@
 (defvar *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+"
   "List of characters that make up symbols in a docstring.")
 
-(defvar *symbol-delimiters* " ,.!?")
+(defvar *symbol-delimiters* " ,.!?;")
 
 (defun locate-symbols (line)
   "Return a list of index pairs of symbol-like parts of LINE."
+  ;; This would be a good application for a regex ...
   (do ((result nil)
        (begin nil)
        (maybe-begin t)
        (i 0 (1+ i)))
       ((= i (length line))
-       (when begin (push (list begin i) result))
+       ;; symbol at end of line
+       (when (and begin (or (> i (1+ begin))
+                            (not (member (char line begin) '(#\A #\I)))))
+         (push (list begin i) result))
        (nreverse result))
     (cond
       ((and begin (find (char line i) *symbol-delimiters*))
@@ -96,33 +114,190 @@
              maybe-begin nil))
       ((find (char line i) *symbol-delimiters*)
        ;; potential symbol begin after this position
-       (setf maybe-begin t)))))
+       (setf maybe-begin t))
+      (t
+       ;; Not reading a symbol, not at potential start of symbol
+       (setf maybe-begin nil)))))
 
 (defun all-symbols (list)
-  (cond ((or (null list) (numberp list)) nil)
-        ((atom list) (list list))
-        (t (append (all-symbols (car list)) (all-symbols (cdr list))))))
+  (cond ((null list) nil)
+        ((symbolp list) (list list))
+        ((consp list) (append (all-symbols (car list))
+                              (all-symbols (cdr list))))
+        (t nil)))
+
+
+(defun frob-doc-line (line var-symbols)
+  "Format symbols in LINE texinfo-style: either as code or as
+  variables if the symbol in question is contained in
+  var-symbols."
+  (with-output-to-string (result)
+    (let ((last 0))
+      (dolist (symbol-index (locate-symbols line))
+        (write-string (subseq line last (first symbol-index)) result)
+        (let ((symbol-name (apply #'subseq line symbol-index)))
+          (format result (if (member symbol-name var-symbols
+                                     :test #'string=)
+                             "@var{~A}"
+                             "@code{~A}")
+                  (string-downcase symbol-name)))
+        (setf last (second symbol-index)))
+      (write-string (subseq line last) result))))
+
+(defparameter *itemize-start-characters* '(#\* #\-)
+  "Characters that might start an itemization in docstrings when
+  at the start of a line.")
+
+(defun indentation (line)
+  "Position of first non-SPACE character in LINE."
+  (position-if-not (lambda (c) (char= c #\Space)) line))
+
+(defun maybe-itemize-offset (line)
+  "Return NIL or the indentation offset if LINE looks like it
+  starts an item in an itemization."
+  (let ((offset (indentation line)))
+    (when (and offset
+               (member (char line offset) *itemize-start-characters*
+                       :test #'char=))
+      offset)))
+
+(defun collect-maybe-itemized-section (lines starting-line arglist-symbols)
+  ;; Return index of next line to be processed outside
+  (let ((this-offset (maybe-itemize-offset (svref lines starting-line)))
+        (result nil)
+        (lines-consumed 0))
+    (loop for line-number from starting-line below (length lines)
+       for line = (svref lines line-number)
+       for indentation = (indentation line)
+       for offset = (maybe-itemize-offset line)
+       do (cond
+            ((not indentation)
+             ;; empty line -- inserts paragraph.
+             (push "" result)
+             (incf lines-consumed))
+            ((and offset (> indentation this-offset))
+             ;; nested itemization -- handle recursively
+             (multiple-value-bind (sub-lines-consumed sub-itemization)
+                 (collect-maybe-itemized-section lines line-number
+                                                 arglist-symbols)
+               (when sub-lines-consumed
+                 (incf line-number (1- sub-lines-consumed)) ; +1 on next loop
+                 (incf lines-consumed sub-lines-consumed)
+                 (setf result (nconc (nreverse sub-itemization) result)))))
+            ((and offset (= indentation this-offset))
+             ;; start of new item
+             (push (format nil "@item ~A"
+                           (frob-doc-line (subseq line (1+ offset))
+                                          arglist-symbols))
+                   result)
+             (incf lines-consumed))
+            ((and (not offset) (> indentation this-offset))
+             ;; continued item from previous line
+             (push (frob-doc-line line arglist-symbols) result)
+             (incf lines-consumed))
+            (t
+             ;; end of itemization
+             (loop-finish))))
+    (if
+     ;; a single-line itemization isn't.
+     (> (count-if (lambda (line) (> (length line) 0)) result) 1)
+     (values lines-consumed
+             `("@itemize" ,@(reverse result) "@end itemize"))
+     nil)))
+
+
+(defun maybe-table-offset (line)
+  "Return NIL or the indentation offset if LINE looks like it
+  starts an item in a tabulation, i.e., there's only a symbol on the line."
+  (let ((offset (indentation line)))
+    (when (and offset
+               (every (lambda (c)
+                        (or (char= c #\Space)
+                            (find c *symbol-characters* :test #'char=)))
+                      line))
+      offset)))
+
+
+(defun collect-maybe-table-section (lines starting-line arglist-symbols)
+  ;; Return index of next line to be processed outside
+  (let ((this-offset (maybe-table-offset (svref lines starting-line)))
+        (result nil)
+        (lines-consumed 0))
+    (loop for line-number from starting-line below (length lines)
+       for line = (svref lines line-number)
+       for indentation = (indentation line)
+       for offset = (maybe-table-offset line)
+       do (cond
+            ((not indentation)
+             ;; empty line -- inserts paragraph.
+             (push "" result)
+             (incf lines-consumed))
+            ((and offset (= indentation this-offset))
+             ;; start of new item, or continuation of previous item
+             (if (and result (search "@item" (car result) :test #'char=))
+                 (push (format nil "@itemx ~A"
+                               (frob-doc-line line arglist-symbols))
+                       result)
+                 (progn
+                   (push "" result)
+                   (push (format nil "@item ~A"
+                                 (frob-doc-line line arglist-symbols))
+                         result)))
+             (incf lines-consumed))
+            ((> indentation this-offset)
+             ;; continued item from previous line
+             (push (frob-doc-line line arglist-symbols) result)
+             (incf lines-consumed))
+            (t
+             ;; end of itemization
+             (loop-finish))))
+    (if
+     ;; a single-line table isn't.
+     (> (count-if (lambda (line) (> (length line) 0)) result) 1)
+     (values lines-consumed
+             `("" "@table @code" ,@(reverse result) "@end table" ""))
+     nil)))
+
+
+
+
+(defun string-as-lines (string)
+  (coerce (with-input-from-string (s string)
+            (loop for line = (read-line s nil nil)
+               while line collect line))
+          'vector))
 
 (defun frob-docstring (docstring symbol-arglist)
   "Try to guess as much formatting for a raw docstring as possible."
   ;; Per-line processing is not necessary now, but it will be when we
   ;; attempt itemize / table auto-detection in docstrings
   (with-output-to-string (result)
-    (let ((arglist-symbols (all-symbols symbol-arglist)))
-      (with-input-from-string (s (texinfoify docstring nil))
-        (loop for line = (read-line s nil nil)
-           while line
-           do (let ((last 0))
-                (dolist (symbol-index (locate-symbols line))
-                  (write-string (subseq line last (first symbol-index)) result)
-                  (let ((symbol-name (apply #'subseq line symbol-index)))
-                    (format result (if (member symbol-name arglist-symbols
-                                               :test #'string=)
-                                       "@var{~A}"
-                                       "@code{~A}")
-                            (string-downcase symbol-name)))
-                  (setf last (second symbol-index)))
-                (write-line (subseq line last) result)))))))
+    (let ((arglist-symbols (all-symbols symbol-arglist))
+          (doc-lines (string-as-lines (texinfoify docstring nil))))
+      (loop for line-number from 0 below (length doc-lines)
+           for line = (svref doc-lines line-number)
+         do (cond
+              ((maybe-itemize-offset line)
+               (multiple-value-bind (lines-consumed itemized-lines)
+                   (collect-maybe-itemized-section doc-lines line-number
+                                                   arglist-symbols)
+                 (cond (lines-consumed
+                        (dolist (item-line itemized-lines)
+                          (write-line item-line result))
+                        (incf line-number (1- lines-consumed)))
+                       (t (write-line (frob-doc-line line arglist-symbols)
+                             result)))))
+              ((maybe-table-offset line)
+               (multiple-value-bind (lines-consumed itemized-lines)
+                   (collect-maybe-table-section doc-lines line-number
+                                                   arglist-symbols)
+                 (cond (lines-consumed
+                        (dolist (item-line itemized-lines)
+                          (write-line item-line result))
+                        (incf line-number (1- lines-consumed)))
+                       (t (write-line (frob-doc-line line arglist-symbols)
+                             result)))))
+              (t (write-line (frob-doc-line line arglist-symbols) result)))))))
 
 ;;; Begin, rest and end of definition.
 

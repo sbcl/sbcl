@@ -211,10 +211,10 @@ Other major changes since the fork from CMUCL include
 @itemize
 
 @item
-SBCL has dropped support for many CMUCL extensions, (e.g. IP
-networking, remote procedure call, Unix system interface, and X11
-interface).  Most of these are now available as contributed or
-third-party modules.
+SBCL has removed many CMUCL extensions, (e.g. IP networking, remote
+procedure call, Unix system interface, and X11 interface) from the
+core system.  Most of these are available as contributed modules
+(distributed with sbcl) or third-party modules instead.
 
 @item
 SBCL has deleted or deprecated some nonstandard features and code

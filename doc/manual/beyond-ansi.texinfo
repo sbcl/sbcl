@@ -112,7 +112,7 @@ case, but still isn't as of SBCL 0.7.6.)
 
 SBCL is derived from CMUCL, which implements many extensions to the
 ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
-it still has quite a few.
+it still has quite a few.  @xref{Contributed Modules}.
 
 
 @menu
