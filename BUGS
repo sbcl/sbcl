@@ -1150,6 +1150,33 @@ WORKAROUND:
     debugger invoked on condition of type TYPE-ERROR:
       The value NIL is not of type SB-C::NODE.
 
+255: 
+  In sbcl-0.8.0.52, COMPILE-FILE on
+    (cl:in-package :cl-user)
+    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
+    (defvar *1*)
+    (defvar *2*)
+    (defstruct v a b)
+    (defstruct w)
+    (defstruct yam (v nil :type (or v null)))
+    (defstruct un u)
+    (defstruct (bod (:include un)) bo)
+    (defstruct (bad (:include bod)) ba)
+    (declaim (ftype (function ((or w bad) (or w bad)) (values)) %ufm))
+    (defun %ufm (base bound) (froj base bound *1*) (values))
+    (declaim (ftype (function ((vector t)) (or w bad)) %pu))
+    (defun %pu (pds) *2*)
+    (defun uu (yam)
+      (let ((v (yam-v az)))
+        (%ufm v
+              (flet ((project (x) (frob x 0)))
+                (let ((avecname *1*))
+                  (multiple-value-prog1
+                      (progn (%pu avecname))
+                    (frob)))))))
+  fails with 
+    failed AVER:
+      "(AND (EQ (CONTINUATION-KIND START) INSIDE-BLOCK) (NOT (BLOCK-DELETE-P BLOCK)))"
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
