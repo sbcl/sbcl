@@ -25,42 +25,41 @@
 ;;; SKIPPED-CHAR-FORM - the form to execute when skipping a character
 ;;; EOF-DETECTED-FORM - the form to execute when EOF has been detected
 ;;;                     (this will default to CHAR-VAR)
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro generalized-peeking-mechanism
-      (peek-type eof-value char-var read-form unread-form
-       &optional (skipped-char-form nil) (eof-detected-form nil))
-    `(let ((,char-var ,read-form))
-      (cond ((eql ,char-var ,eof-value) 
-             ,(if eof-detected-form
-                  eof-detected-form
-                  char-var))
-            ((characterp ,peek-type)
-             (do ((,char-var ,char-var ,read-form))
-                 ((or (eql ,char-var ,eof-value) 
-                      (char= ,char-var ,peek-type))
-                  (cond ((eql ,char-var ,eof-value)
-                         ,(if eof-detected-form
-                              eof-detected-form
-                              char-var))
-                        (t ,unread-form
-                           ,char-var)))
-               ,skipped-char-form))
-            ((eql ,peek-type t)
-             (do ((,char-var ,char-var ,read-form))
-                 ((or (eql ,char-var ,eof-value)
-                      (not (whitespacep ,char-var)))
-                  (cond ((eql ,char-var ,eof-value)
-                         ,(if eof-detected-form
-                              eof-detected-form
-                              char-var))
-                        (t ,unread-form
-                           ,char-var)))
-               ,skipped-char-form))
-            ((null ,peek-type)
-             ,unread-form
-             ,char-var)
-            (t
-             (bug "Impossible case reached in PEEK-CHAR"))))))
+(sb!xc:defmacro generalized-peeking-mechanism
+    (peek-type eof-value char-var read-form unread-form
+     &optional (skipped-char-form nil) (eof-detected-form nil))
+  `(let ((,char-var ,read-form))
+    (cond ((eql ,char-var ,eof-value) 
+           ,(if eof-detected-form
+                eof-detected-form
+                char-var))
+          ((characterp ,peek-type)
+           (do ((,char-var ,char-var ,read-form))
+               ((or (eql ,char-var ,eof-value) 
+                    (char= ,char-var ,peek-type))
+                (cond ((eql ,char-var ,eof-value)
+                       ,(if eof-detected-form
+                            eof-detected-form
+                            char-var))
+                      (t ,unread-form
+                         ,char-var)))
+             ,skipped-char-form))
+          ((eql ,peek-type t)
+           (do ((,char-var ,char-var ,read-form))
+               ((or (eql ,char-var ,eof-value)
+                    (not (whitespacep ,char-var)))
+                (cond ((eql ,char-var ,eof-value)
+                       ,(if eof-detected-form
+                            eof-detected-form
+                            char-var))
+                      (t ,unread-form
+                         ,char-var)))
+             ,skipped-char-form))
+          ((null ,peek-type)
+           ,unread-form
+           ,char-var)
+          (t
+           (bug "Impossible case reached in PEEK-CHAR")))))
 
 ;;; rudi (2004-08-09): There was an inline declaration for read-char,
 ;;; unread-char, read-byte, listen here that was removed because these

@@ -1019,8 +1019,7 @@ is supported only on simple-streams."
    File-Stream is open to.  If the second argument is supplied, then
    this becomes the new file position.  The second argument may also
    be :start or :end for the start and end of the file, respectively."
-  (declare (type (or index (alien sb!unix:off-t) (member nil :start :end))
-                 position))
+  (declare (type (or sb-int:index (member nil :start :end)) position))
   (etypecase stream
     (simple-stream
      (%file-position stream position))
