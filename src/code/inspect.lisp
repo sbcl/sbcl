@@ -247,7 +247,9 @@ evaluated expressions.
 
 (defmethod inspected-parts ((object array))
   (let* ((length (min (array-total-size object) *inspect-length*))
-	 (reference-array (make-array length :displaced-to object))
+	 (reference-array (make-array length 
+				      :element-type (array-element-type object)
+				      :displaced-to object))
 	 (dimensions (array-dimensions object))
 	 (reversed-elements nil))
     ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what does

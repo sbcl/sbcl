@@ -1,4 +1,5 @@
 changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
+  * fixed inspection of specialized arrays. (thanks to Simon Alexander)
   * fixed disassembly of SHLD and SHRD on x86.  (thanks to David
     Lichteblau)
   * fixed loading of multiply forward-referenced layouts. 

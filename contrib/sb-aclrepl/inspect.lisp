@@ -759,8 +759,12 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defun parts-seq-hint (parts)
   (fourth parts))
 
-(defgeneric inspected-parts (object)
-  )
+;;; FIXME: Most of this should be refactored to share the code
+;;; with the vanilla inspector. Also, we should check what the
+;;; Slime inspector does, and provide a an interface for it to
+;;; use that would propagate any SBCL inspector improvements
+;;; automagically to Slime. -- ns 2005-02-20
+(defgeneric inspected-parts (object))
 
 (defmethod inspected-parts ((object symbol))
   (let ((components
@@ -825,7 +829,9 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 (defmethod inspected-parts ((object array))
   (let ((size (array-total-size object)))
-    (list (make-array size :displaced-to object)
+    (list (make-array size 
+                      :element-type (array-element-type object)
+		      :displaced-to object)
 	    size
 	    :array
 	    (reverse (array-dimensions object)))))
