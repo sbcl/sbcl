@@ -757,7 +757,7 @@
                                    (bit-vector bit-vector &optional null) *
                                    :policy (>= speed space))
                  `(,',fun bit-array-1 bit-array-2
-                   (make-array (length bit-array-1) :element-type 'bit)))
+                   (make-array (array-dimension bit-array-1 0) :element-type 'bit)))
                ;; If result is T, make it the first arg.
                (deftransform ,fun ((bit-array-1 bit-array-2 result-bit-array)
                                    (bit-vector bit-vector (eql t)) *)
@@ -778,7 +778,7 @@
 		       (bit-vector &optional null) *
 		       :policy (>= speed space))
   '(bit-not bit-array-1
-	    (make-array (length bit-array-1) :element-type 'bit)))
+	    (make-array (array-dimension bit-array-1 0) :element-type 'bit)))
 (deftransform bit-not ((bit-array-1 result-bit-array)
 		       (bit-vector (eql t)))
   '(bit-not bit-array-1 bit-array-1))

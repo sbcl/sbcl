@@ -173,3 +173,35 @@
 	  (adjust-array x '(5))
 	  (char y 5))))
   (assert (and (not val) (typep err 'sb-kernel:displaced-to-array-too-small-error))))
+
+;;; MISC.527: bit-vector bitwise operations used LENGTH to get a size
+;;; of a vector
+(flet ((bit-vector-equal (v1 v2)
+         (and (bit-vector-p v1) (bit-vector-p v2)
+              (equal (array-dimension v1 0) (array-dimension v2 0))
+              (loop for i below (array-dimension v1 0)
+                    always (eql (aref v1 i) (aref v2 i))))))
+  (let ((v1 (make-array 4 :element-type 'bit :fill-pointer 0
+                        :initial-contents '(0 0 1 1)))
+        (v2 (make-array 4 :element-type 'bit :fill-pointer 1
+                        :initial-contents '(0 0 1 1))))
+    (loop for (bf lf) in '((bit-and logand)
+                           (bit-andc1 logandc1)
+                           (bit-andc2 logandc2)
+                           (bit-eqv logeqv)
+                           (bit-ior logior)
+                           (bit-nand lognand)
+                           (bit-nor lognor)
+                           (bit-orc1 logorc1)
+                           (bit-orc2 logorc2)
+                           (bit-xor logxor)
+                           ((lambda (x y) (bit-not x)) #.(lambda (x y) (lognot x))))
+          for fun = (compile nil `(lambda (v)
+                                    (declare (type (array bit (*)) v))
+                                    (declare (optimize (speed 3) (safety 0)))
+                                    (,bf v ,v2)))
+          for r1 = (funcall fun v1)
+          and r2 = (coerce (loop for i below 4
+                                 collect (logand 1 (funcall lf (aref v1 i) (aref v2 i))))
+                           'bit-vector)
+          do (assert (bit-vector-equal r1 r2)))))

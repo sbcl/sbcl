@@ -217,3 +217,18 @@ of (and (or (not number) fixnum) (not character))
 
 This sitation where the type is (OR NULL FIXNUM) comes up
 in cl-bench, for example in the value returned by POSITION.
+--------------------------------------------------------------------------------
+#26
+SBCL cannot derive upper bound for I and uses generic arithmetic here:
+
+(defun foo (l)
+  (declare (vector l))
+  (dotimes (i (length l))
+    (if (block nil
+          (map-foo (lambda (x) (if x (return t)))
+                   l))
+        t
+        nil)))
+
+(So the constraint propagator or a possible future SSA-convertor
+should know the connection between an NLE and its CLEANUP.)
