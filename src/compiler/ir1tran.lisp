@@ -172,7 +172,7 @@
 ;;; information from the global environment and enter it in
 ;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
 (defun find-free-var (name)
-  (declare (values (or leaf heap-alien-info)))
+  (declare (values (or leaf cons heap-alien-info))) ; see FIXME comment
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
   (or (gethash name *free-vars*)
@@ -185,6 +185,15 @@
 	      (case kind
 		(:alien
 		 (info :variable :alien-info name))
+                ;; FIXME: The return value in this case should really be
+                ;; of type SB!C::LEAF.  I don't feel too badly about it,
+                ;; because the MACRO idiom is scattered throughout this
+                ;; file, but it should be cleaned up so we're not
+                ;; throwing random conses around.  --njf 2002-03-23
+                (:macro
+                 (let ((expansion (info :variable :macro-expansion name))
+                       (type (type-specifier (info :variable :type name))))
+                   `(MACRO . (the ,type ,expansion))))
 		(:constant
 		 (let ((value (info :variable :constant-value name)))
 		   (make-constant :value value

@@ -248,12 +248,6 @@ WORKAROUND:
   ANSI spec, bare 'MEMBER, 'AND, and 'OR are not legal types, CMUCL
   (and now SBCL) interpret them as legal types.
 
-44:
-  ANSI specifies DEFINE-SYMBOL-MACRO, but it's not defined in SBCL.
-  CMU CL added it ca. Aug 13, 2000, after some discussion on the mailing
-  list, and it is probably possible to use substantially the same 
-  patches to add it to SBCL.
-
 45:
   a slew of floating-point-related errors reported by Peter Van Eynde
   on July 25, 2000:

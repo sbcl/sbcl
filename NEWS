@@ -1061,9 +1061,10 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
 changes in sbcl-0.7.2 relative to sbcl-0.7.1:
   * cleanups on SPARC, both Linux and Solaris, and for gcc>=3 (thanks
     to Christophe Rhodes and Nathan Froyd)
-  * DESCRIBE on a symbol now says something about DEFTYPE-style
-    expansions associated with the symbol (thanks to Eric Marsden's
-    patch for CMU CL).
+  * ANSI's DEFINE-SYMBOL-MACRO is now supported. (thanks to Nathan
+    Froyd porting CMU CL code)
+  * The fasl file format has changed again, to allow the compiler's
+    INFO database to support symbol macros.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

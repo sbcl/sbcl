@@ -1154,7 +1154,7 @@
 (define-info-type
   :class :variable
   :type :kind
-  :type-spec (member :special :constant :global :alien)
+  :type-spec (member :special :constant :macro :global :alien)
   :default (if (symbol-self-evaluating-p name)
 	       :constant
 	       :global))
@@ -1188,6 +1188,13 @@
   :default (if (symbol-self-evaluating-p name)
 	       name
 	       (bug "constant lookup of nonconstant ~S" name)))
+
+;;; the macro-expansion for symbol-macros
+(define-info-type
+  :class :variable
+  :type :macro-expansion
+  :type-spec t
+  :default nil)
 
 (define-info-type
   :class :variable

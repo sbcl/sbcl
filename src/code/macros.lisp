@@ -180,6 +180,32 @@ the usual naming convention (names like *FOO*) for special variables"
 	(info :variable :constant-value name) value)
   name)
 
+;;;; DEFINE-SYMBOL-MACRO
+
+(defmacro-mundanely define-symbol-macro (name expansion)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+    (sb!c::%define-symbol-macro ',name ',expansion)))
+
+(defun sb!c::%define-symbol-macro (name expansion)
+  (unless (symbolp name)
+    (error 'simple-type-error :datum name :expected-type 'symbol
+	   :format-control "Symbol macro name is not a symbol: ~S."
+	   :format-arguments (list name)))
+  (ecase (info :variable :kind name)
+    ((:macro :global nil)
+     (setf (info :variable :kind name) :macro)
+     (setf (info :variable :macro-expansion name) expansion))
+    (:special
+     (error 'simple-program-error
+	    :format-control "Symbol macro name already declared special: ~S."
+	    :format-arguments (list name)))
+    (:constant
+     (error 'simple-program-error
+	    :format-control "Symbol macro name already declared constant: ~S."
+	    :format-arguments (list name))))
+  name)
+
+
 ;;;; DEFINE-COMPILER-MACRO
 
 ;;; FIXME: The logic here for handling compiler macros named (SETF

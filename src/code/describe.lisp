@@ -245,6 +245,7 @@
   (let* ((kind (info :variable :kind x))
 	 (wot (ecase kind
 		(:special "special variable")
+                (:macro "symbol macro")
 		(:constant "constant")
 		(:global "undefined variable")
 		(:alien nil))))
@@ -257,6 +258,9 @@
 		 (sb-alien::heap-alien-info-type info)))
 	(format s "~@<Its current value is ~3I~:_~S.~:>"
 		(eval x))))
+     ((eq kind :macro)
+      (let ((expansion (info :variable :macro-expansion x)))
+        (format s "~@:_It is a ~A with expansion ~S." wot expansion)))
      ((boundp x)
       (format s "~@:_~@<It is a ~A; its ~_value is ~S.~:>"
 	      wot (symbol-value x)))

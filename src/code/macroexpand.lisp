@@ -33,7 +33,7 @@
   #!+sb-doc
   "If form is a macro (or symbol macro), expands it once. Returns two values,
    the expanded form and a T-or-NIL flag indicating whether the form was, in
-   fact, a macro. Env is the lexical environment to expand in, which defaults
+   fact, a macro. ENV is the lexical environment to expand in, which defaults
    to the null environment."
   (cond ((and (consp form) (symbolp (car form)))
 	 (let ((def (sb!xc:macro-function (car form) env)))
@@ -56,10 +56,13 @@
 	((symbolp form)
 	 (let* ((venv (when env (sb!c::lexenv-vars env)))
 		(local-def (cdr (assoc form venv))))
-	   (if (and (consp local-def)
-		    (eq (car local-def) 'macro))
-	       (values (cdr local-def) t)
-	       (values form nil))))
+	   (cond ((and (consp local-def)
+		       (eq (car local-def) 'macro))
+		  (values (cdr local-def) t))
+		 ((eq (info :variable :kind form) :macro)
+		  (values (info :variable :macro-expansion form) t))
+		 (t
+		  (values form nil)))))
 	(t
 	 (values form nil))))
 
