@@ -10,9 +10,13 @@
   "This file was created by simple-stream-tests.lisp. Nothing to see here, move along.")
 
 (defparameter *test-path*
-  (merge-pathnames (make-pathname :name nil :type nil :version nil)
+  (merge-pathnames (make-pathname :name :unspecific :type :unspecific
+                                  :version :unspecific)
                    *load-truename*)
   "Directory for temporary test files.")
+
+(defparameter *test-file*
+  (merge-pathnames #p"test-data.txt" *test-path*))
 
 (eval-when (:load-toplevel) (ensure-directories-exist *test-path* :verbose t))
 
@@ -49,38 +53,36 @@
 
 
 (deftest create-file-1
-  ;; Create a file-simple-stream, write data.
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
+    ;; Create a file-simple-stream, write data.
     (prog1
         (with-open-stream (s (make-instance 'file-simple-stream
-                                            :filename file
+                                            :filename *test-file*
                                             :direction :output
                                             :if-exists :overwrite
                                             :if-does-not-exist :create))
           (string= (write-string *dumb-string* s) *dumb-string*))
-      (delete-file file)))
+      (delete-file *test-file*))
   t)
 
 (deftest create-file-2
-  ;; Create a file-simple-stream via :class argument to open, write data.
-  (let ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'file-simple-stream :direction :output
-                       :if-exists :overwrite :if-does-not-exist :create)
-      (string= (write-string *dumb-string* s) *dumb-string*)))
+    ;; Create a file-simple-stream via :class argument to open, write data.
+    (with-test-file (s *test-file* :class 'file-simple-stream
+                       :direction :output :if-exists :overwrite
+                       :if-does-not-exist :create)
+      (string= (write-string *dumb-string* s) *dumb-string*))
   t)
 
 (deftest create-read-file-1
   ;; Via file-simple-stream objects, write and then re-read data.
-  (let ((result t)
-        (file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'file-simple-stream :direction :output
-                       :if-exists :overwrite :if-does-not-exist :create
-                       :delete-afterwards nil)
+  (let ((result t))
+    (with-test-file (s *test-file* :class 'file-simple-stream
+                       :direction :output :if-exists :overwrite
+                       :if-does-not-exist :create :delete-afterwards nil)
       (write-line *dumb-string* s)
       (setf result (and result (string= (write-string *dumb-string* s)
                                         *dumb-string*))))
 
-    (with-test-file (s file :class 'file-simple-stream
+    (with-test-file (s *test-file* :class 'file-simple-stream
                        :direction :input :if-does-not-exist :error)
       ;; Check first line
       (multiple-value-bind (string missing-newline-p)
@@ -97,9 +99,8 @@
 
 (deftest create-read-mapped-file-1
   ;; Read data via a mapped-file-simple-stream object.
-  (let ((result t)
-        (file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'mapped-file-simple-stream
+  (let ((result t))
+    (with-test-file (s *test-file* :class 'mapped-file-simple-stream
                        :direction :input :if-does-not-exist :error
                        :initial-content *dumb-string*)
       (setf result (and result (string= (read-line s) *dumb-string*))))
@@ -110,7 +111,8 @@
   (handler-case
       (with-open-stream (s (make-instance 'socket-simple-stream
 					  :remote-host #(127 0 0 1)
-					  :remote-port 7))
+					  :remote-port 7
+                                          :direction :io))
 	(string= (prog1 (write-line "Got it!" s) (finish-output s))
 		 (read-line s)))
     (sb-bsd-sockets::connection-refused-error () t))
@@ -119,24 +121,22 @@
 (deftest write-read-large-sc-1
   ;; Do write and read with more data than the buffer will hold
   ;; (single-channel simple-stream)
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*))
-         (stream (make-instance 'file-simple-stream
-                                :filename file :direction :output
+  (let* ((stream (make-instance 'file-simple-stream
+                                :filename *test-file* :direction :output
                                 :if-exists :overwrite
                                 :if-does-not-exist :create))
          (content (make-string (1+ (device-buffer-length stream))
                                :initial-element #\x)))
     (with-open-stream (s stream)
       (write-string content s))
-    (with-test-file (s file :class 'file-simple-stream
+    (with-test-file (s *test-file* :class 'file-simple-stream
                        :direction :input :if-does-not-exist :error)
       (string= content (read-line s))))
   t)
 
 (deftest write-read-large-sc-2
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*))
-         (stream (make-instance 'file-simple-stream
-                                :filename file :direction :output
+  (let* ((stream (make-instance 'file-simple-stream
+                                :filename *test-file* :direction :output
                                 :if-exists :overwrite
                                 :if-does-not-exist :create))
          (length (1+ (* 3 (device-buffer-length stream))))
@@ -145,7 +145,7 @@
       (setf (aref content i) (code-char (random 256))))
     (with-open-stream (s stream)
       (write-string content s))
-    (with-test-file (s file :class 'file-simple-stream
+    (with-test-file (s *test-file* :class 'file-simple-stream
                        :direction :input :if-does-not-exist :error)
       (let ((seq (make-string length)))
         #+nil (read-sequence seq s)
@@ -155,9 +155,8 @@
   t)
 
 (deftest write-read-large-sc-3
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*))
-         (stream (make-instance 'file-simple-stream
-                                :filename file :direction :output
+  (let* ((stream (make-instance 'file-simple-stream
+                                :filename *test-file* :direction :output
                                 :if-exists :overwrite
                                 :if-does-not-exist :create))
          (length (1+ (* 3 (device-buffer-length stream))))
@@ -166,7 +165,7 @@
       (setf (aref content i) (random 256)))
     (with-open-stream (s stream)
       (write-sequence content s))
-    (with-test-file (s file :class 'file-simple-stream
+    (with-test-file (s *test-file* :class 'file-simple-stream
                        :direction :input :if-does-not-exist :error)
       (let ((seq (make-array length :element-type '(unsigned-byte 8))))
         #+nil (read-sequence seq s)
@@ -181,7 +180,8 @@
   (handler-case
    (let* ((stream (make-instance 'socket-simple-stream
                                  :remote-host #(127 0 0 1)
-                                 :remote-port 7))
+                                 :remote-port 7
+                                 :direction :io))
           (content (make-string (1+ (device-buffer-length stream))
                                 :initial-element #\x)))
      (with-open-stream (s stream)
@@ -192,75 +192,79 @@
 
 
 (deftest file-position-1
-  ;; Test reading of file-position
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'file-simple-stream :direction :input
+    ;; Test reading of file-position
+    (with-test-file (s *test-file* :class 'file-simple-stream :direction :input
                        :initial-content *dumb-string*)
-      (file-position s)))
+      (file-position s))
   0)
 
-;;; file-position-2 fails ONLY when called with
-;;; (asdf:oos 'asdf:test-op :sb-simple-streams)
-;;; TODO: Find out why
 (deftest file-position-2
-  ;; Test reading of file-position
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'file-simple-stream :direction :input
+    ;; Test reading of file-position
+    (with-test-file (s *test-file* :class 'file-simple-stream :direction :input
                        :initial-content *dumb-string*)
       (read-byte s)
-      (file-position s)))
+      (file-position s))
   1)
 
 (deftest file-position-3
-  ;; Test reading of file-position in the presence of unsaved data
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'file-simple-stream :direction :output
-                       :if-exists :supersede :if-does-not-exist :create)
+    ;; Test reading of file-position in the presence of unsaved data
+    (with-test-file (s *test-file* :class 'file-simple-stream
+                       :direction :output :if-exists :supersede
+                       :if-does-not-exist :create)
       (write-byte 50 s)
-      (file-position s)))
+      (file-position s))
   1)
 
 (deftest file-position-4
+    ;; Test reading of file-position in the presence of unsaved data and
+    ;; filled buffer
+    (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
+                       :if-exists :overwrite :if-does-not-exist :create
+                       :initial-content *dumb-string*)
+      (read-byte s)                     ; fill buffer
+      (write-byte 50 s)                 ; advance file-position
+      (file-position s))
+  2)
+
+(deftest file-position-5
     ;; Test file position when opening with :if-exists :append
-    (let ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-      (with-test-file (s file :class 'file-simple-stream :direction :io
-                         :if-exists :append :if-does-not-exist :create
-                         :initial-content "Foo")
-        (= (file-length s) (file-position s))))
+    (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
+                       :if-exists :append :if-does-not-exist :create
+                       :initial-content *dumb-string*)
+      (= (file-length s) (file-position s)))
   T)
 
 (deftest write-read-unflushed-sc-1
-  ;; Write something into a single-channel stream and read it back
-  ;; without explicitly flushing the buffer in-between
-  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-    (with-test-file (s file :class 'file-simple-stream :direction :io
+    ;; Write something into a single-channel stream and read it back
+    ;; without explicitly flushing the buffer in-between
+    (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
                        :if-does-not-exist :create :if-exists :supersede)
       (write-char #\x s)
       (file-position s :start)
-      (read-char s)))
+      (read-char s))
   #\x)
 
 (deftest write-read-unflushed-sc-2
-  ;; Write something into a single-channel stream, try to read back too much
-  (handler-case
-   (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-     (with-test-file (s file :class 'file-simple-stream :direction :io
-                        :if-does-not-exist :create :if-exists :supersede)
-       (write-char #\x s)
-       (file-position s :start)
-       (read-char s)
-       (read-char s))
-     nil)
-    (end-of-file () t))
+    ;; Write something into a single-channel stream, try to read back too much
+    (handler-case
+        (with-test-file (s *test-file* :class 'file-simple-stream
+                           :direction :io :if-does-not-exist :create
+                           :if-exists :supersede)
+            (write-char #\x s)
+            (file-position s :start)
+            (read-char s)
+            (read-char s)
+            nil)
+      (end-of-file () t))
   t)
 
 (deftest write-read-unflushed-sc-3
-    (let ((file (merge-pathnames #p"test-data.txt" *test-path*))
-          (result t))
-      (with-test-file (s file :class 'file-simple-stream :direction :io
+    ;; Test writing in a buffer filled with previous file contents
+    (let ((result t))
+      (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
                          :if-exists :overwrite :if-does-not-exist :create
                          :initial-content *dumb-string*)
-        (setq result (and result (char= (read-char s) (char *dumb-string* 0))))
+        (setq result (and result (char= (read-char s) (schar *dumb-string* 0))))
         (setq result (and result (= (file-position s) 1)))
         (let ((pos (file-position s)))
           (write-char #\x s)
@@ -271,8 +275,8 @@
 
 (deftest write-read-unflushed-sc-4
     ;; Test flushing of buffers
-    (let ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-      (with-test-file (s file :class 'file-simple-stream :direction :io
+    (progn
+      (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
                          :if-exists :overwrite :if-does-not-exist :create
                          :initial-content "Foo"
                          :delete-afterwards nil)
@@ -281,16 +285,16 @@
         (write-char #\X s)
         (file-position s :end)          ; Extend file.
         (write-char #\X s))
-      (with-test-file (s file :class 'file-simple-stream :direction :input
-                         :if-does-not-exist :error)
+      (with-test-file (s *test-file* :class 'file-simple-stream
+                         :direction :input :if-does-not-exist :error)
         (read-line s)))
   "XooX"
   T)
 
 (deftest write-read-append-sc-1
     ;; Test writing in the middle of a stream opened in append mode
-    (let ((file (merge-pathnames #p"test-data.txt" *test-path*)))
-      (with-test-file (s file :class 'file-simple-stream :direction :io
+    (progn
+      (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
                          :if-exists :append :if-does-not-exist :create
                          :initial-content "Foo"
                          :delete-afterwards nil)
@@ -298,8 +302,9 @@
         (write-char #\X s)
         (file-position s :end)          ; Extend file.
         (write-char #\X s))
-      (with-test-file (s file :class 'file-simple-stream :direction :input
-                         :if-does-not-exist :error)
+      (with-test-file (s *test-file* :class 'file-simple-stream
+                         :direction :input :if-does-not-exist :error)
         (read-line s)))
   "XooX"
   T)
+

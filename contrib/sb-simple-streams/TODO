@@ -2,6 +2,8 @@
 
 - Implement & test read-sequence, write-sequence for (un)signed-8 vectors
 
+- Eliminate consing in sc-read-chars-ef
+
 - Make reader work with simple-streams
 
 - external format handling: load aliases, load formats, etc.

@@ -13,7 +13,6 @@
 ;;; **********************************************************************
 ;;;
 ;;; Various functions needed by simple-streams
-
 (declaim (inline buffer-sap bref (setf bref) buffer-copy
 		 allocate-buffer free-buffer))
 
@@ -28,13 +27,17 @@
 (defun bref (buffer index)
   (declare (type simple-stream-buffer buffer)
 	   (type (integer 0 #.most-positive-fixnum) index))
-  (sb-sys:sap-ref-8 (buffer-sap buffer) index))
+  (if (vectorp buffer)
+      (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index))
+      (sb-sys:sap-ref-8 buffer index))
 
 (defun (setf bref) (octet buffer index)
   (declare (type (unsigned-byte 8) octet)
 	   (type simple-stream-buffer buffer)
 	   (type (integer 0 #.most-positive-fixnum) index))
-  (setf (sb-sys:sap-ref-8 (buffer-sap buffer) index) octet))
+  (if (vectorp buffer)
+      (setf (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index) octet)
+      (setf (sb-sys:sap-ref-8 buffer index) octet)))
 
 (defun buffer-copy (src soff dst doff length)
   (declare (type simple-stream-buffer src dst)
@@ -303,6 +306,7 @@
 	   (type (or null simple-stream-buffer) buffer)
 	   (type fixnum start)
 	   (type (or null fixnum) end)
+           (type blocking blocking)
 	   (optimize (speed 3) (space 2) (safety 0) (debug 0)))
   (with-stream-class (simple-stream stream)
     (let ((fd (sm input-handle stream))

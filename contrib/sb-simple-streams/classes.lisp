@@ -75,7 +75,7 @@
    (oc-state :initform nil)
    ;; TODO: find out what this one does
    (co-state :initform nil)
-   (external-format :initform :default)
+   (external-format :initform (find-external-format :default))
 
    ;; A fixnum (denoting a valid file descriptor), a stream, or nil if
    ;; the stream is not open for input.
@@ -191,8 +191,8 @@
     (when (any-stream-instance-flags stream :input :output)
       (when (any-stream-instance-flags stream :output)
 	(ignore-errors (if abort
-                           (clear-output stream)
-                           (force-output stream))))
+			   (clear-output stream)
+			   (finish-output stream))))
       (call-next-method)
       (setf (sm input-handle stream) nil
 	    (sm output-handle stream) nil)

@@ -292,7 +292,8 @@
     (if (not (or (eql width 1) (null width)))
 	(funcall-stm-handler j-listen (sm melded-stream stream))
 	(or (< (sm buffpos stream) (sm buffer-ptr stream))
-	    (when (>= (sm mode stream) 0) ;; device-connected @@ single-channel
+	    (when (or (not (any-stream-instance-flags stream :dual :string))
+                      (>= (sm mode stream) 0)) ;; device-connected @@ single-channel
 	      (let ((lcrs (sm last-char-read-size stream)))
 		(unwind-protect
 		     (progn

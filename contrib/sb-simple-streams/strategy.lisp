@@ -17,6 +17,7 @@
 ;;;; Helper functions
 
 (defun refill-buffer (stream blocking)
+  (declare (type blocking blocking))
   (with-stream-class (simple-stream stream)
     (let* ((unread (sm last-char-read-size stream))
            (buffer (sm buffer stream))
@@ -140,7 +141,8 @@
 	   (state (sm oc-state stream)))
       (flet ((input ()
 	       (when (>= buffpos (sm buffer-ptr stream))
-                 (when (sc-dirty-p stream)
+                 (when (and (not (any-stream-instance-flags stream :dual :string))
+                            (sc-dirty-p stream))
                    (flush-buffer stream t))
 		 (let ((bytes (refill-buffer stream blocking)))
 		   (cond ((= bytes 0)
@@ -216,7 +218,8 @@
            (type boolean blocking)
 	   #|(optimize (speed 3) (space 2) (safety 0) (debug 0))|#)
   (with-stream-class (simple-stream stream)
-    (when (sc-dirty-p stream)
+    (when (and (not (any-stream-instance-flags stream :dual :string))
+               (sc-dirty-p stream))
       (flush-buffer stream t))
     (do ((buffer (sm buffer stream))
          (buffpos (sm buffpos stream))
