@@ -298,8 +298,11 @@
 (defun ansi-stream-listen (stream)
   (or (/= (the fixnum (ansi-stream-in-index stream))
           +ansi-stream-in-buffer-length+)
-      ;; Test for T explicitly since misc methods return :EOF sometimes.
-      (eq (funcall (ansi-stream-misc stream) stream :listen) t)))
+      ;; Handle :EOF return from misc methods specially
+      (let ((result (funcall (ansi-stream-misc stream) stream :listen)))
+	(if (eq result :eof)
+	    nil
+	    result))))
 
 (defun listen (&optional (stream *standard-input*))
   (let ((stream (in-synonym-of stream)))
@@ -827,7 +830,7 @@
 	   (or (/= (the fixnum (ansi-stream-in-index in))
 		   +ansi-stream-in-buffer-length+)
 	       (funcall (ansi-stream-misc in) in :listen))
-	   (stream-listen in)))
+	   (listen in)))
       ((:finish-output :force-output :clear-output)
        (if out-ansi-stream-p
 	   (funcall (ansi-stream-misc out) out operation arg1 arg2)

@@ -292,14 +292,13 @@
     (if (not (or (eql width 1) (null width)))
 	(funcall-stm-handler j-listen (sm melded-stream stream))
 	(or (< (sm buffpos stream) (sm buffer-ptr stream))
-	    (when (or (not (any-stream-instance-flags stream :dual :string))
-                      (>= (sm mode stream) 0)) ;; device-connected @@ single-channel
-	      (let ((lcrs (sm last-char-read-size stream)))
-		(unwind-protect
-		     (progn
-		       (setf (sm last-char-read-size stream) (1+ lcrs))
-		       (plusp (refill-buffer stream nil)))
-		  (setf (sm last-char-read-size stream) lcrs))))))))
+	    ;; Attempt buffer refill
+	    (let ((lcrs (sm last-char-read-size stream)))
+	      (when (and (not (any-stream-instance-flags stream :dual :string))
+			 (>= (sm mode stream) 0))
+		;; single-channel stream dirty -> write data before reading
+		(flush-buffer stream nil))
+	      (>= (refill-buffer stream nil) width))))))
 
 (defun %clear-input (stream buffer-only)
   (declare (type simple-stream stream))

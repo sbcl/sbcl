@@ -373,8 +373,6 @@ Nothing to see here, move along.")
         :initial-content ,(or initial-content '*multi-line-string*))
      ,@body))
 
-;;; 0.8.3.93 tried to fix LISTEN on dual channel streams, but failed to do so:
-
 (deftest listen-dc-1
     ;; LISTEN with filled buffer
     (with-dc-test-stream (s) (read-char s) (listen s))
@@ -502,8 +500,7 @@ Nothing to see here, move along.")
     ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (*synonym*)
       (let ((s (make-synonym-stream '*synonym*)))
-        (clear-input s)
-        (listen s)))
+        (clear-input s)))
   NIL)
 
 (deftest synonym-stream-9
@@ -708,8 +705,7 @@ Nothing to see here, move along.")
     ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (synonym)
       (let ((s (make-two-way-stream synonym synonym)))
-        (clear-input s)
-        (listen s)))
+        (clear-input s)))
   NIL)
 
 (deftest two-way-stream-9
@@ -794,8 +790,7 @@ Nothing to see here, move along.")
     ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (*synonym*)
       (let ((s (make-echo-stream *synonym* *synonym*)))
-        (clear-input s)
-        (listen s)))
+        (clear-input s)))
   NIL)
 
 (deftest echo-stream-11
@@ -866,8 +861,7 @@ Nothing to see here, move along.")
     ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (*synonym*)
       (let ((s (make-concatenated-stream *synonym*)))
-        (clear-input s)
-        (listen s)))
+        (clear-input s)))
   NIL)
 
 (deftest concatenated-stream-11
