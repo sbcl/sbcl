@@ -1949,12 +1949,12 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     CERROR and WARN.  (thanks to Gerd Moellmann)
   * New ASDF-INSTALL contrib can be used for automatic download and 
     installation of third-party Lisp code from CCLAN or other sites
-    via CLiki
+    via CLiki.
   * Threaded builds (:SB-THREAD) now support SB-THREAD:INTERRUPT-THREAD,
     which forces another thread to execute a function supplied by the
-    caller
-  * bug 75 fix: WITH-OUTPUT-TO-STRING (and MAKE-STRING-OUTPUT-STREAM) now
-    accept and act upon their :ELEMENT-TYPE keyword argument.
+    caller.
+  * bug 75 fix: WITH-OUTPUT-TO-STRING (and MAKE-STRING-OUTPUT-STREAM)
+    now accept and act upon their :ELEMENT-TYPE keyword argument.
     (reported by Martin Atzmueller, Edi Weitz)
   * bug fix: FILE-POSITION now accepts position designators up to
     ARRAY-DIMENSION-LIMIT or the extreme of the off_t range, whichever
@@ -1973,6 +1973,9 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     target sequence.  (thanks to Gerd Moellmann)
   * bug fix in threaded builds: the system can now be suspended and
     resumed by shell job control with minimal disruption.
+  * bug fixes in times and timezones >2038AD
+  * better handling of "where is GNU make?" problem in build scripts
+    (thanks to Nikodemus Siivola)
   * new optimization: inside a named function any reference to a
     function with the same name is considered to be a self-reference;
     this behaviour is controlled with SB-C::RECOGNIZE-SELF-CALLS
@@ -1981,6 +1984,7 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     optimized (UNSIGNED-BYTE 32) versions, which are automatically
     used when the result is truncated to 32 bits.
   * VALUES declaration is partially enabled.
+  * fixes in SB-GROVEL (thanks to Andreas Fuchs)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** The system now obeys the constraint imposed by
        UPGRADED-ARRAY-ELEMENT-TYPE that the upgraded array element
@@ -1993,6 +1997,9 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
        function does not cause an error to be signalled immediately;
        a warning is signalled, and the error is generated only on
        calling the generic function.
+  * changed .fasl file version number, in part to add type codes for
+    new array subtypes UNSIGNED-BYTE 7, 15, 29, and 31 mandated by 
+    obscure ANSI requirements
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

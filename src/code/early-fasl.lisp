@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 43)
+(def!constant +fasl-file-version+ 44)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -90,6 +90,11 @@
 ;;;     recent maintenance, e.g. from (VECTOR NIL)-as-string support.
 ;;;     (And experimental results suggest that compatibility was broken
 ;;;     between about 0.8.1.29 and 0.8.1.39.)
+;;; 44: (2003-08-25) various changes leading up to 0.8.3
+;;;     <dan`b> what happened this month to stalate the fasls?
+;;;     <Krystof_> I think I renumbered everything again
+;;;     <Krystof_> simple-array-unsigned-byte-7, probably
+;;;     <Krystof_> (thanks to pfdietz)
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
