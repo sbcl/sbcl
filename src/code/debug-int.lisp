@@ -64,8 +64,8 @@
 			 (no-debug-fun-returns-debug-fun condition))))
 	       (format stream
 		       "~&Cannot return values from ~:[frame~;~:*~S~] since ~
-			the debug information lacks details about returning ~
-			values here."
+                        the debug information lacks details about returning ~
+                        values here."
 		       fun)))))
 
 (define-condition no-debug-blocks (debug-condition)
@@ -2816,7 +2816,7 @@ register."
 		     (compiled-debug-fun-compiler-debug-fun what))
 		    :standard)
 	  (error ":FUN-END breakpoints are currently unsupported ~
-		  for the known return convention."))
+                  for the known return convention."))
 
 	(let* ((bpt (%make-breakpoint hook-fun what kind info))
 	       (starter (compiled-debug-fun-end-starter what)))

@@ -309,6 +309,7 @@
 		  (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
 		  (parse-namestring "SCRATCH:FOO.TXT"))))
   (dolist (p pathnames)
+    (print p)
     (handler-case
 	(let ((*print-readably* t))
 	  (assert (equal (read-from-string (format nil "~S" p)) p)))

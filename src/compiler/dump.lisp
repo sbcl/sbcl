@@ -33,7 +33,7 @@
   ;; can get them from the table rather than dumping them again. The
   ;; EQUAL-TABLE is used for lists and strings, and the EQ-TABLE is
   ;; used for everything else. We use a separate EQ table to avoid
-  ;; performance patholigies with objects for which EQUAL degnerates
+  ;; performance pathologies with objects for which EQUAL degenerates
   ;; to EQL. Everything entered in the EQUAL table is also entered in
   ;; the EQ table.
   (equal-table (make-hash-table :test 'equal) :type hash-table)
@@ -280,17 +280,19 @@
     ;; character code.
     (fasl-write-string
      (with-standard-io-syntax
-       (format nil
-	       "~%  ~
-	        compiled from ~S~%  ~
-	        at ~A~%  ~
-	        on ~A~%  ~
-	        using ~A version ~A~%"
-	        where
-	        (format-universal-time nil (get-universal-time))
-	        (machine-instance)
-	        (sb!xc:lisp-implementation-type)
-	        (sb!xc:lisp-implementation-version)))
+       (let ((*print-readably* nil)
+	     (*print-pretty* nil))
+	 (format nil
+		 "~%  ~
+                  compiled from ~S~%  ~
+                  at ~A~%  ~
+                  on ~A~%  ~
+                  using ~A version ~A~%"
+	 where
+		 (format-universal-time nil (get-universal-time))
+		 (machine-instance)
+		 (sb!xc:lisp-implementation-type)
+		 (sb!xc:lisp-implementation-version))))
      stream)
     (dump-byte +fasl-header-string-stop-char-code+ res)
 

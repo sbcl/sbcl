@@ -949,7 +949,7 @@
 				  (file-position f char-offset))
 				 (t
 				  (warn "Source file ~S has been modified; ~@
-					 using form offset instead of ~
+                                         using form offset instead of ~
                                          file index."
 					name)
 				  (let ((*read-suppress* t))
@@ -995,7 +995,7 @@
 	   nil)
 	  ((> form-number (length mapping-table))
 	   (warn "bogus form-number in form!  The source file has probably ~@
-		  been changed too much to cope with.")
+                  been changed too much to cope with.")
 	   (when cache
 	     ;; Disable future warnings.
 	     (setf (sfcache-toplevel-form cache) nil))

@@ -228,7 +228,7 @@
 					  (length bit-array-2)
                                           (length result-bit-array))
                                  (error "Argument and/or result bit arrays are not the same length:~
-			 ~%  ~S~%  ~S  ~%  ~S"
+                         ~%  ~S~%  ~S  ~%  ~S"
                                         bit-array-1
 					bit-array-2
 					result-bit-array))))
@@ -278,7 +278,7 @@
 	 '((unless (= (length bit-array)
 		      (length result-bit-array))
 	     (error "Argument and result bit arrays are not the same length:~
-	     	     ~%  ~S~%  ~S"
+                     ~%  ~S~%  ~S"
 		    bit-array result-bit-array))))
     (let ((length (length result-bit-array)))
       (if (= length 0)

@@ -280,23 +280,23 @@
     (cond ((eq (sb-kind (sc-sb src-sc)) :non-packed)
 	   (unless (member src-sc (sc-constant-scs dest-sc))
 	     (error "loading from an invalid constant SC?~@
-		     VM definition inconsistent, try recompiling."))
+                     VM definition inconsistent, try recompiling."))
 	   (error "no load function defined to load SC ~S ~
-		   from its constant SC ~S"
+                   from its constant SC ~S"
 		  dest-name src-name))
 	  ((member src-sc (sc-alternate-scs dest-sc))
 	   (error "no load function defined to load SC ~S from its ~
-		   alternate SC ~S"
+                   alternate SC ~S"
 		  dest-name src-name))
 	  ((member dest-sc (sc-alternate-scs src-sc))
 	   (error "no load function defined to save SC ~S in its ~
-		   alternate SC ~S"
+                   alternate SC ~S"
 		  src-name dest-name))
 	  (t
 	   ;; FIXME: "VM definition is inconsistent" shouldn't be a
 	   ;; possibility in SBCL.
 	   (error "loading to/from SCs that aren't alternates?~@
-		   VM definition is inconsistent, try recompiling.")))))
+                   VM definition is inconsistent, try recompiling.")))))
 
 ;;; Called when we failed to pack TN. If RESTRICTED is true, then we
 ;;; are restricted to pack TN in its SC.
@@ -316,7 +316,7 @@
 	 (ptype
 	  (aver (member (sc-number sc) (primitive-type-scs ptype)))
 	  (error "SC ~S doesn't have any :UNBOUNDED alternate SCs, but is~@
-		  a SC for primitive-type ~S."
+                  a SC for primitive-type ~S."
 		 (sc-name sc) (primitive-type-name ptype)))
 	 (t
 	  (error "SC ~S doesn't have any :UNBOUNDED alternate SCs."
@@ -388,13 +388,13 @@
       (declare (ignore costs load-scs))
 	(aver (not more-p))
 	(error "unable to pack a Load-TN in SC ~{~A~#[~^~;, or ~:;,~]~} ~
-		for the ~:R ~:[result~;argument~] to~@
-		the ~S VOP,~@
-		~:[since all SC elements are in use:~:{~%~@?~}~%~;~
-		~:*but these SC elements are not in use:~%  ~S~%Bug?~*~]~
-		~:[~;~@
-		Current cost info inconsistent with that in effect at compile ~
-		time. Recompile.~%Compilation order may be incorrect.~]"
+                for the ~:R ~:[result~;argument~] to~@
+                the ~S VOP,~@
+                ~:[since all SC elements are in use:~:{~%~@?~}~%~;~
+                ~:*but these SC elements are not in use:~%  ~S~%Bug?~*~]~
+                ~:[~;~@
+                Current cost info inconsistent with that in effect at compile ~
+                time. Recompile.~%Compilation order may be incorrect.~]"
 	       (mapcar #'sc-name scs)
 	       n arg-p
 	       (vop-info-name (vop-info (tn-ref-vop op)))
@@ -412,12 +412,12 @@
       (declare (ignore costs))
       (aver (not more-p))
       (error "~S is not valid as the ~:R ~:[result~;argument~] to VOP:~
-	      ~%  ~S,~@
-	      since the TN's primitive type ~S doesn't allow any of the SCs~@
-	      allowed by the operand restriction:~%  ~S~
-	      ~:[~;~@
-	      Current cost info inconsistent with that in effect at compile ~
-	      time. Recompile.~%Compilation order may be incorrect.~]"
+              ~%  ~S,~@
+              since the TN's primitive type ~S doesn't allow any of the SCs~@
+              allowed by the operand restriction:~%  ~S~
+              ~:[~;~@
+              Current cost info inconsistent with that in effect at compile ~
+              time. Recompile.~%Compilation order may be incorrect.~]"
 	     tn pos arg-p
 	     (template-name (vop-info (tn-ref-vop ref)))
 	     (primitive-type-name ptype)
@@ -1428,12 +1428,12 @@
     (when (and (not (eq (tn-kind tn) :specified-save))
 	       (conflicts-in-sc original sc offset))
 	  (format t "~&* Pack-wired-tn possible conflict:~%  ~
-		     tn: ~S; tn-kind: ~S~%  ~
-		     sc: ~S~%  ~
-		     sb: ~S; sb-name: ~S; sb-kind: ~S~%  ~
-		     offset: ~S; end: ~S~%  ~
-		     original ~S~%  ~
-		     tn-save-tn: ~S; tn-kind of tn-save-tn: ~S~%"
+                     tn: ~S; tn-kind: ~S~%  ~
+                     sc: ~S~%  ~
+                     sb: ~S; sb-name: ~S; sb-kind: ~S~%  ~
+                     offset: ~S; end: ~S~%  ~
+                     original ~S~%  ~
+                     tn-save-tn: ~S; tn-kind of tn-save-tn: ~S~%"
 		  tn (tn-kind tn) sc
 		  sb (sb-name sb) (sb-kind sb)
 		  offset end

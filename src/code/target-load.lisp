@@ -126,7 +126,7 @@
 	     (> (file-write-date src-tn) (file-write-date obj-tn)))
 	(restart-case
 	 (error "The object file ~A is~@
-		older than the presumed source:~%  ~A."
+                 older than the presumed source:~%  ~A."
 		(namestring obj-tn)
 		(namestring src-tn))
 	 ;; FIXME: In CMU CL one of these was a CONTINUE case.

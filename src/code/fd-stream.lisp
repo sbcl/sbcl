@@ -1197,7 +1197,7 @@
    :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE
    :ELEMENT-TYPE - the type of object to read or write, default BASE-CHAR
    :IF-EXISTS - one of :ERROR, :NEW-VERSION, :RENAME, :RENAME-AND-DELETE,
-		       :OVERWRITE, :APPEND, :SUPERSEDE or NIL
+                       :OVERWRITE, :APPEND, :SUPERSEDE or NIL
    :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
   See the manual for details."
 

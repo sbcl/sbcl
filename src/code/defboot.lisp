@@ -378,7 +378,7 @@
 						 binding
 						 :test #'eq))
 			       (warn "Unnamed restart does not have a ~
-					report function: ~S"
+                                      report function: ~S"
 				     binding))
 			     `(make-restart :name ',(car binding)
 					    :function ,(cadr binding)

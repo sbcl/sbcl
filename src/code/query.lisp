@@ -18,8 +18,7 @@
 
 (defun query-read-line ()
   (force-output *query-io*)
-  (string-trim #.(concatenate 'string '(#\Space #\Tab))
-	       (read-line *query-io*)))
+  (string-trim " " (read-line *query-io*)))
 
 (defun maybe-print-query (hint format-string &rest format-args)
   (fresh-line *query-io*)

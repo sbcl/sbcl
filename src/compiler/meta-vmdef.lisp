@@ -754,13 +754,13 @@
 				(rassoc name (funs)))))
 		(unless name
 		  (error "no move function defined to ~:[save~;load~] SC ~S ~
-			  ~:[to~;from~] from SC ~S"
+                          ~:[to~;from~] from SC ~S"
 			 load-p sc-name load-p (sc-name alt)))
 		
 		(cond (found
 		       (unless (eq (cdr found) name)
 			 (error "can't tell whether to ~:[save~;load~]~@
-				 with ~S or ~S when operand is in SC ~S"
+                                 with ~S or ~S when operand is in SC ~S"
 				load-p name (cdr found) (sc-name alt)))
 		       (pushnew alt (car found)))
 		      (t
@@ -768,7 +768,7 @@
 	 ((member (sb-kind (sc-sb sc)) '(:non-packed :unbounded)))
 	 (t
 	  (error "SC ~S has no alternate~:[~; or constant~] SCs, yet it is~@
-		  mentioned in the restriction for operand ~S"
+                  mentioned in the restriction for operand ~S"
 		 sc-name load-p (operand-parse-name op))))))
     (funs)))
 
@@ -804,7 +804,7 @@
 		 ,form)))
 	`(when ,load-tn
 	   (error "load TN allocated, but no move function?~@
-		   VM definition is inconsistent, recompile and try again.")))))
+                   VM definition is inconsistent, recompile and try again.")))))
 
 ;;; Return the TN that we should bind to the operand's var in the
 ;;; generator body. In general, this involves evaluating the :LOAD-IF
@@ -1172,7 +1172,7 @@
 			   (aref (sc-load-costs op-sc) load-scn))))
 	    (unless load
 	      (error "no move function defined to move ~:[from~;to~] SC ~
-		      ~S~%~:[to~;from~] alternate or constant SC ~S"
+                      ~S~%~:[to~;from~] alternate or constant SC ~S"
 		     load-p sc-name load-p (sc-name op-sc)))
 
 	    (let ((op-cost (svref costs op-scn)))
@@ -1273,7 +1273,7 @@
 				 (let ((alias (parse-operand-type alias)))
 				   (unless (eq (car alias) :or)
 				     (error "can't include primitive-type ~
-					     alias ~S in an :OR restriction: ~S"
+                                             alias ~S in an :OR restriction: ~S"
 					    item spec))
 				   (dolist (x (cdr alias))
 				     (results x)))
@@ -1312,10 +1312,10 @@
 			       nil)
 		    (when (svref load-scs rep) (return t)))
 	    (error "In the ~A ~:[result~;argument~] to VOP ~S,~@
-		    none of the SCs allowed by the operand type ~S can ~
-		    directly be loaded~@
-		    into any of the restriction's SCs:~%  ~S~:[~;~@
-		    [* type operand must allow T's SCs.]~]"
+                    none of the SCs allowed by the operand type ~S can ~
+                    directly be loaded~@
+                    into any of the restriction's SCs:~%  ~S~:[~;~@
+                    [* type operand must allow T's SCs.]~]"
 		   (operand-parse-name op) load-p (vop-parse-name parse)
 		   ptype
 		   scs (eq type '*)))))
@@ -1328,8 +1328,8 @@
 			     (meta-primitive-type-or-lose ptype))
 			(return t))))
 	  (warn "~:[Result~;Argument~] ~A to VOP ~S~@
-		 has SC restriction ~S which is ~
-		 not allowed by the operand type:~%  ~S"
+                 has SC restriction ~S which is ~
+                 not allowed by the operand type:~%  ~S"
 		load-p (operand-parse-name op) (vop-parse-name parse)
 		sc type)))))
 

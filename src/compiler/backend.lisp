@@ -157,7 +157,7 @@
 						  name)
 				    *backend-support-routines*)
 				   (error "machine-specific support ~S ~
-					    routine undefined"
+                                           routine undefined"
 					  ',name))
 			       args)))
 		   routines))))

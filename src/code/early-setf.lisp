@@ -85,7 +85,7 @@ GET-SETF-EXPANSION directly."
       (sb!xc:get-setf-expansion form environment)
     (when (cdr store-vars)
       (error "GET-SETF-METHOD used for a form with multiple store ~
-	      variables:~%  ~S"
+              variables:~%  ~S"
 	     form))
     (values temps value-forms store-vars store-form access-form)))
 
@@ -342,7 +342,7 @@ GET-SETF-EXPANSION directly."
     (cond ((gethash name sb!c:*setf-assumed-fboundp*)
 	   (warn
 	    "defining setf macro for ~S when ~S was previously ~
-	     treated as a function"
+             treated as a function"
 	    name
 	    `(setf ,name)))
 	  ((not (fboundp `(setf ,name)))

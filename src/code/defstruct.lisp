@@ -614,7 +614,7 @@
 	(symbol
 	 (when (keywordp spec)
 	   (style-warn "Keyword slot name indicates probable syntax ~
-		        error in DEFSTRUCT: ~S."
+                        error in DEFSTRUCT: ~S."
 		       spec))
 	 spec)
 	(cons
@@ -1092,10 +1092,10 @@
       (when (or moved retyped deleted)
 	(warn
 	 "incompatibly redefining slots of structure class ~S~@
-	  Make sure any uses of affected accessors are recompiled:~@
-	  ~@[  These slots were moved to new positions:~%    ~S~%~]~
-	  ~@[  These slots have new incompatible types:~%    ~S~%~]~
-	  ~@[  These slots were deleted:~%    ~S~%~]"
+          Make sure any uses of affected accessors are recompiled:~@
+          ~@[  These slots were moved to new positions:~%    ~S~%~]~
+          ~@[  These slots have new incompatible types:~%    ~S~%~]~
+          ~@[  These slots were deleted:~%    ~S~%~]"
 	 name moved retyped deleted)
 	t))))
 

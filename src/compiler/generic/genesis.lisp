@@ -34,10 +34,10 @@
 
 ;;; a magic number used to identify our core files
 (defconstant core-magic
-  (logior (ash (char-code #\S) 24)
-	  (ash (char-code #\B) 16)
-	  (ash (char-code #\C) 8)
-	  (char-code #\L)))
+  (logior (ash (sb!xc:char-code #\S) 24)
+	  (ash (sb!xc:char-code #\B) 16)
+	  (ash (sb!xc:char-code #\C) 8)
+	  (sb!xc:char-code #\L)))
 
 ;;; the current version of SBCL core files
 ;;;
@@ -626,14 +626,7 @@
 		       (make-fixnum-descriptor length))
     (dotimes (i length)
       (setf (bvref bytes (+ offset i))
-	    ;; KLUDGE: There's no guarantee that the character
-	    ;; encoding here will be the same as the character
-	    ;; encoding on the target machine, so using CHAR-CODE as
-	    ;; we do, or a bitwise copy as CMU CL code did, is sleazy.
-	    ;; (To make this more portable, perhaps we could use
-	    ;; indices into the sequence which is used to test whether
-	    ;; a character is a STANDARD-CHAR?) -- WHN 19990817
-	    (char-code (aref string i))))
+	    (sb!xc:char-code (aref string i))))
     (setf (bvref bytes (+ offset length))
 	  0) ; null string-termination character for C
     des))
@@ -1998,21 +1991,21 @@
 	      (depthoid (descriptor-fixnum depthoid-des)))
 	  (unless (= length old-length)
 	    (error "cold loading a reference to class ~S when the compile~%~
-		   time length was ~S and current length is ~S"
+                    time length was ~S and current length is ~S"
 		   name
 		   length
 		   old-length))
 	  (unless (equal inherits-list old-inherits-list)
 	    (error "cold loading a reference to class ~S when the compile~%~
-		   time inherits were ~S~%~
-		   and current inherits are ~S"
+                    time inherits were ~S~%~
+                    and current inherits are ~S"
 		   name
 		   inherits-list
 		   old-inherits-list))
 	  (unless (= depthoid old-depthoid)
 	    (error "cold loading a reference to class ~S when the compile~%~
-		   time inheritance depthoid was ~S and current inheritance~%~
-		   depthoid is ~S"
+                    time inheritance depthoid was ~S and current inheritance~%~
+                    depthoid is ~S"
 		   name
 		   depthoid
 		   old-depthoid)))
@@ -2989,7 +2982,7 @@ initially undefined function references:~2%")
 	  ;; (We write each character as a word in order to avoid
 	  ;; having to think about word alignment issues in the
 	  ;; sbcl-0.7.8 version of coreparse.c.)
-	  (write-word (char-code char))))
+	  (write-word (sb!xc:char-code char))))
 
       ;; Write the New Directory entry header.
       (write-word new-directory-core-entry-type-code)

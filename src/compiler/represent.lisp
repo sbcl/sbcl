@@ -100,14 +100,14 @@
 
 	(unless (losers)
 	  (error "Representation selection flamed out for no obvious reason.~@
-		  Try again after recompiling the VM definition."))
+                  Try again after recompiling the VM definition."))
 	
 	(error "~S is not valid as the ~:R ~:[result~;argument~] to the~@
-		~S VOP, since the TN's primitive type ~S allows SCs:~%  ~S~@
-		~:[which cannot be coerced or loaded into the allowed SCs:~
-		~%  ~S~;~*~]~:[~;~@
-		Current cost info inconsistent with that in effect at compile ~
-		time. Recompile.~%Compilation order may be incorrect.~]"
+                ~S VOP, since the TN's primitive type ~S allows SCs:~%  ~S~@
+                ~:[which cannot be coerced or loaded into the allowed SCs:~
+                ~%  ~S~;~*~]~:[~;~@
+                Current cost info inconsistent with that in effect at compile ~
+                time. Recompile.~%Compilation order may be incorrect.~]"
 	       tn pos arg-p
 	       (template-name (vop-info (tn-ref-vop ref)))
 	       (primitive-type-name ptype)
@@ -147,23 +147,23 @@
 			   (no-move-scs i-sc))))
 		    (t
 		     (error "Representation selection flamed out for no ~
-			     obvious reason."))))))
+                             obvious reason."))))))
 	
 	(unless (or (load-lose) (no-move-scs) (move-lose))
 	  (error "Representation selection flamed out for no obvious reason.~@
-		  Try again after recompiling the VM definition."))
+                  Try again after recompiling the VM definition."))
 
 	(error "~S is not valid as the ~:R ~:[result~;argument~] to VOP:~
-		~%  ~S~%Primitive type: ~S~@
-		SC restrictions:~%  ~S~@
-		~@[The primitive type disallows these loadable SCs:~%  ~S~%~]~
-		~@[No move VOPs are defined to coerce to these allowed SCs:~
-		~%  ~S~%~]~
-		~@[These move VOPs couldn't be used due to operand type ~
-		restrictions:~%  ~S~%~]~
-		~:[~;~@
-		Current cost info inconsistent with that in effect at compile ~
-		time. Recompile.~%Compilation order may be incorrect.~]"
+                ~%  ~S~%Primitive type: ~S~@
+                SC restrictions:~%  ~S~@
+                ~@[The primitive type disallows these loadable SCs:~%  ~S~%~]~
+                ~@[No move VOPs are defined to coerce to these allowed SCs:~
+                ~%  ~S~%~]~
+                ~@[These move VOPs couldn't be used due to operand type ~
+                restrictions:~%  ~S~%~]~
+                ~:[~;~@
+                Current cost info inconsistent with that in effect at compile ~
+                time. Recompile.~%Compilation order may be incorrect.~]"
 	       op-tn pos arg-p
 	       (template-name (vop-info (tn-ref-vop op)))
 	       (primitive-type-name ptype)
@@ -176,7 +176,7 @@
 (defun bad-move-arg-error (val pass)
   (declare (type tn val pass))
   (error "no :MOVE-ARG VOP defined to move ~S (SC ~S) to ~
-	  ~S (SC ~S)"
+          ~S (SC ~S)"
 	 val (sc-name (tn-sc val))
 	 pass (sc-name (tn-sc pass))))
 
@@ -194,17 +194,17 @@
 	  (dolist (const (sc-constant-scs sc))
 	    (unless (svref moves (sc-number const))
 	      (warn "no move function defined to load SC ~S from constant ~
-		     SC ~S"
+                     SC ~S"
 		    (sc-name sc) (sc-name const))))
 
 	  (dolist (alt (sc-alternate-scs sc))
 	    (unless (svref moves (sc-number alt))
 	      (warn "no move function defined to load SC ~S from alternate ~
-		     SC ~S"
+                     SC ~S"
 		    (sc-name sc) (sc-name alt)))
 	    (unless (svref (sc-move-funs alt) i)
 	      (warn "no move function defined to save SC ~S to alternate ~
-		     SC ~S"
+                     SC ~S"
 		    (sc-name sc) (sc-name alt)))))))))
 
 ;;;; representation selection
@@ -372,7 +372,7 @@
 			       (error "couldn't find op? bug!")))))
 	     (compiler-notify
 	      "doing ~A (cost ~W)~:[~2*~; ~:[to~;from~] ~S~], for:~%~6T~
-	       the ~:R ~:[result~;argument~] of ~A"
+               the ~:R ~:[result~;argument~] of ~A"
 	      note cost name arg-p name
 	      pos arg-p op-note)))
 	  (t

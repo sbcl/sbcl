@@ -164,7 +164,7 @@
 	    (let ((*compiler-error-context* node))
 	      (compiler-warn
 	       "New inferred type ~S conflicts with old type:~
-		~%  ~S~%*** possible internal error? Please report this."
+                ~%  ~S~%*** possible internal error? Please report this."
 	       (type-specifier rtype) (type-specifier node-type))))
 	  (setf (node-derived-type node) int)
           ;; If the new type consists of only one object, replace the
@@ -1590,14 +1590,14 @@
 	  (when (and min (< total-nvals min))
 	    (compiler-warn
 	     "MULTIPLE-VALUE-CALL with ~R values when the function expects ~
-	     at least ~R."
+              at least ~R."
 	     total-nvals min)
 	    (setf (basic-combination-kind node) :error)
 	    (return-from ir1-optimize-mv-call))
 	  (when (and max (> total-nvals max))
 	    (compiler-warn
 	     "MULTIPLE-VALUE-CALL with ~R values when the function expects ~
-	     at most ~R."
+              at most ~R."
 	     total-nvals max)
 	    (setf (basic-combination-kind node) :error)
 	    (return-from ir1-optimize-mv-call)))

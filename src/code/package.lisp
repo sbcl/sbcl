@@ -290,7 +290,7 @@
 	      (error 'simple-program-error
 		     :format-control
 		     "At least one of :INTERNAL, :EXTERNAL, or ~
-		      :INHERITED must be supplied."))
+                      :INHERITED must be supplied."))
 	   ,(dolist (symbol symbol-types)
 	      (unless (member symbol '(:internal :external :inherited))
 		(error 'program-error

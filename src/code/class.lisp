@@ -358,8 +358,8 @@
 			      inherits
 			      :key #'layout-proper-name)
 		(warn "change in superclasses of class ~S:~%  ~
-		       ~A superclasses: ~S~%  ~
-		       ~A superclasses: ~S"
+                       ~A superclasses: ~S~%  ~
+                       ~A superclasses: ~S"
 		      name
 		      old-context
 		      (map 'list #'layout-proper-name old-inherits)
@@ -370,8 +370,8 @@
 		(when diff
 		  (warn
 		   "in class ~S:~%  ~
-		    ~:(~A~) definition of superclass ~S is incompatible with~%  ~
-		    ~A definition."
+                    ~:(~A~) definition of superclass ~S is incompatible with~%  ~
+                    ~A definition."
 		   name
 		   old-context
 		   (layout-proper-name (svref old-inherits diff))
@@ -380,15 +380,15 @@
 	(let ((old-length (layout-length old-layout)))
 	  (unless (= old-length length)
 	    (warn "change in instance length of class ~S:~%  ~
-		   ~A length: ~W~%  ~
-		   ~A length: ~W"
+                   ~A length: ~W~%  ~
+                   ~A length: ~W"
 		  name
 		  old-context old-length
 		  context length)
 	    t))
 	(unless (= (layout-depthoid old-layout) depthoid)
 	  (warn "change in the inheritance structure of class ~S~%  ~
-		 between the ~A definition and the ~A definition"
+                 between the ~A definition and the ~A definition"
 		name old-context context)
 	  t))))
 
@@ -415,7 +415,7 @@
     ;; system from scratch, so we no longer need this functionality in
     ;; order to maintain the SBCL system by modifying running images.
     (error "The class ~S was not changed, and there's no guarantee that~@
-	    the loaded code (which expected another layout) will work."
+            the loaded code (which expected another layout) will work."
 	   (layout-proper-name layout)))
   (values))
 

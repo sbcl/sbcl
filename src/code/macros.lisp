@@ -37,7 +37,7 @@
 
 (defun assert-prompt (name value)
   (cond ((y-or-n-p "The old value of ~S is ~S.~
-		  ~%Do you want to supply a new value? "
+                    ~%Do you want to supply a new value? "
 		   name value)
 	 (format *query-io* "~&Type a form to be evaluated:~%")
 	 (flet ((read-it () (eval (read *query-io*))))

@@ -212,7 +212,7 @@
        (multiple-value-bind (res win) (ctypep val type)
 	 (cond ((not win)
 		(note-unwinnage "can't tell whether the ~:R argument is a ~
-			        constant ~S:~%  ~S"
+                                 constant ~S:~%  ~S"
 				n (type-specifier type) val)
 		nil)
 	       ((not res)
@@ -253,7 +253,7 @@
        ((not (check-arg-type k (specifier-type 'symbol) n)))
        ((not (constant-lvar-p k))
 	(note-unwinnage "The ~:R argument (in keyword position) is not a ~
-                        constant."
+                         constant."
 			n))
        (t
 	(let* ((name (lvar-value k))
@@ -554,7 +554,7 @@
 	       ((eq int *empty-type*)
 		(note-lossage
 		 "Definition's declared type for variable ~A:~%  ~S~@
-		  conflicts with this type from ~A:~%  ~S"
+                  conflicts with this type from ~A:~%  ~S"
 		 (leaf-debug-name var) (type-specifier vtype)
 		 where (type-specifier type))
 		(return-from try-type-intersections (values nil nil)))
@@ -606,7 +606,7 @@
 	     (unless (eq x y)
 	       (note-lossage
 		"The definition ~:[doesn't have~;has~] ~A, but ~
-		~A ~:[doesn't~;does~]."
+                 ~A ~:[doesn't~;does~]."
 		x what where y))))
       (frob (optional-dispatch-keyp od) (fun-type-keyp type)
 	    "&KEY arguments")
@@ -739,7 +739,7 @@
                                                             type-returns)))
            (note-lossage
             "The result type from ~A:~%  ~S~@
-	   conflicts with the definition's result type:~%  ~S"
+             conflicts with the definition's result type:~%  ~S"
             where (type-specifier type-returns) (type-specifier dtype))
            nil)
           (*lossage-detected* nil)
@@ -755,8 +755,8 @@
                                    (not (csubtypep (leaf-type var) type)))
                           (funcall unwinnage-fun
                                    "Assignment to argument: ~S~%  ~
-			       prevents use of assertion from function ~
-			       type ~A:~%  ~S~%"
+                                    prevents use of assertion from function ~
+                                    type ~A:~%  ~S~%"
                                    (leaf-debug-name var)
                                    where
                                    (type-specifier type))))

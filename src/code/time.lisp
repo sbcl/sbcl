@@ -357,12 +357,12 @@
       (let ((gc-run-time (max (- *gc-run-time* start-gc-run-time) 0)))
 	(format *trace-output*
 		"~&Evaluation took:~%  ~
-		 ~S second~:P of real time~%  ~
-		 ~S second~:P of user run time~%  ~
-		 ~S second~:P of system run time~%  ~
+                 ~S second~:P of real time~%  ~
+                 ~S second~:P of user run time~%  ~
+                 ~S second~:P of system run time~%  ~
 ~@[                 [Run times include ~S second~:P GC run time.]~%  ~]~
-		 ~S page fault~:P and~%  ~
-		 ~:D bytes consed.~%"
+                 ~S page fault~:P and~%  ~
+                 ~:D bytes consed.~%"
 		(max (/ (- new-real-time old-real-time)
 			(float sb!xc:internal-time-units-per-second))
 		     0.0)

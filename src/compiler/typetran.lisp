@@ -371,7 +371,7 @@
       ;; If not properly named, error.
       ((not (and name (eq (find-classoid name) class)))
        (compiler-error "can't compile TYPEP of anonymous or undefined ~
-			class:~%  ~S"
+                        class:~%  ~S"
 		       class))
       (t
         ;; Delay the type transform to give type propagation a chance.

@@ -699,7 +699,7 @@ reset to ~S."
 				    ;; and output on T seems broken.
 				    (format t
 					    "~&error flushed (because ~
-					     ~S is set)"
+                                             ~S is set)"
 					    '*flush-debug-errors*)
 				    (/show0 "throwing DEBUG-LOOP-CATCHER")
 				    (throw 'debug-loop-catcher nil)))))
@@ -1160,11 +1160,11 @@ reset to ~S."
 	  (cond
 	   ((not any-p)
 	    (format t "There are no local variables ~@[starting with ~A ~]~
-		       in the function."
+                       in the function."
 		    prefix))
 	   ((not any-valid-p)
 	    (format t "All variables ~@[starting with ~A ~]currently ~
-		       have invalid values."
+                       have invalid values."
 		    prefix))))
 	(write-line "There is no variable information available."))))
 
@@ -1264,7 +1264,7 @@ reset to ~S."
       (file-position *cached-source-stream* char-offset))
      (t
       (format t "~%; File has been modified since compilation:~%;   ~A~@
-		 ; Using form offset instead of character position.~%"
+                 ; Using form offset instead of character position.~%"
 	      (namestring name))
       (file-position *cached-source-stream* 0)
       (let ((*read-suppress* t))

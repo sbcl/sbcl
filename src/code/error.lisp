@@ -32,7 +32,7 @@
 		     :datum arguments
 		     :expected-type 'null
 		     :format-control "You may not supply additional arguments ~
-				     when giving ~S to ~S."
+                                      when giving ~S to ~S."
 		     :format-arguments (list datum fun-name)))
 	 datum)
 	((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
@@ -75,8 +75,8 @@
    (source :initarg :source :reader program-error-source))
   (:report (lambda (condition stream)
 	     (format stream "Execution of a form compiled with errors.~%~
-                            Form:~%  ~A~%~
-                            Compile-time-error:~%  ~A"
+                             Form:~%  ~A~%~
+                             Compile-time-error:~%  ~A"
 		       (program-error-source condition)
 		       (program-error-message condition)))))
 

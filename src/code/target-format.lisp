@@ -835,7 +835,7 @@
 		(setf args (nthcdr posn orig-args))
 		(error 'format-error
 		       :complaint "Index ~W is out of bounds. (It should ~
-				   have been between 0 and ~W.)"
+                                   have been between 0 and ~W.)"
 		       :args (list posn (length orig-args))))))
       (if colonp
 	  (interpret-bind-defaults ((n 1)) params
@@ -848,7 +848,7 @@
 		       (error 'format-error
 			      :complaint
 			      "Index ~W is out of bounds. (It should 
-			       have been between 0 and ~W.)"
+                               have been between 0 and ~W.)"
 			      :args
 			      (list new-posn (length orig-args))))))))
 	  (interpret-bind-defaults ((n 1)) params

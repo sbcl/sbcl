@@ -399,7 +399,7 @@
     (if (template-more-args-type template)
 	(when (< nargs min)
 	  (bug "Primitive ~A was called with ~R argument~:P, ~
-	    	but wants at least ~R."
+                but wants at least ~R."
 	       name
 	       nargs
 	       min))
