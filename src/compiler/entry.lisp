@@ -31,24 +31,6 @@
   (select-component-format component)
   (values))
 
-;;; Takes the list representation of the debug arglist and turns it
-;;; into a string.
-;;;
-;;; FIXME: Why don't we just save this as a list instead of converting
-;;; it to a string?
-(defun make-arg-names (x)
-  (declare (type functional x))
-  (let ((args (functional-arg-documentation x)))
-    (aver (not (eq args :unspecified)))
-    (if (null args)
-	"()"
-	(let ((*print-pretty* t)
-	      (*print-escape* t)
-	      (*print-base* 10)
-	      (*print-radix* nil)
-	      (*print-case* :downcase))
-	  (write-to-string args)))))
-
 ;;; Initialize INFO structure to correspond to the XEP LAMBDA FUN.
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
@@ -60,7 +42,9 @@
     (setf (entry-info-name info)
 	  (leaf-debug-name internal-fun))
     (when (policy bind (>= debug 1))
-      (setf (entry-info-arguments info) (make-arg-names internal-fun))
+      (let ((args (functional-arg-documentation internal-fun)))
+        (aver (not (eq args :unspecified)))
+        (setf (entry-info-arguments info) args))
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
   (values))
 

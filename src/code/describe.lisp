@@ -158,42 +158,37 @@
 ;;; the guts.
 (defun %describe-fun-compiled (x s kind name)
   (declare (type stream s))
-  ;; FIXME: The lowercaseness of %SIMPLE-FUN-ARGLIST results, and the
-  ;; non-sentenceness of the "Arguments" label, makes awkward output.
-  ;; Better would be "Its arguments are: ~S" (with uppercase argument
-  ;; names) when arguments are known, and otherwise "There is no
-  ;; information available about its arguments." or "It has no
-  ;; arguments." (And why is %SIMPLE-FUN-ARGLIST a string instead of a
-  ;; list of symbols anyway?)
   (let ((args (%simple-fun-arglist x)))
-    (format s "~@:_~@(~@[~A ~]arguments:~@:_~)" kind)
     (cond ((not args)
-	   (format s "  There is no argument information available."))
-	  ((string= args "()")
 	   (write-string "  There are no arguments." s))
 	  (t
+           (format s "~@:_~@(The ~@[~A's ~]arguments are:~@:_~)" kind)
 	   (write-string "  " s)
-	   (pprint-logical-block (s nil)
-	     (pprint-indent :current 2)
-	     (write-string args s)))))
+            (let ((*print-pretty* t)
+                  (*print-escape* t)
+                  (*print-base* 10)
+                  (*print-radix* nil))
+              (pprint-logical-block (s nil)
+                 (pprint-indent :current 2)
+                 (format s "~A" args))))))
   (let ((name (or name (%simple-fun-name x))))
     (%describe-doc name s 'function kind)
     (unless (eq kind :macro)
       (%describe-fun-name name s (%simple-fun-type x))))
   (%describe-compiled-from (sb-kernel:fun-code-header x) s))
 
-;;; Describe a function with the specified kind and name. The latter
-;;; arguments provide some information about where the function came
-;;; from. KIND=NIL means not from a name.
-(defun %describe-fun (x s &optional (kind nil) name)
+;;; Describe a function object. KIND and NAME provide some information
+;;; about where the function came from.
+(defun %describe-fun (x s &optional (kind :function) (name nil))
   (declare (type function x))
   (declare (type stream s))
-  (declare (type (member :macro :function nil) kind))
+  (declare (type (member :macro :function) kind))
   (fresh-line s)
   (ecase kind
     (:macro (format s "Macro-function: ~S" x))
-    (:function (format s "Function: ~S" x))
-    ((nil) (format s "~S is a function." x)))
+    (:function (if name
+		   (format s "Function: ~S" x)
+		   (format s "~S is a function." x))))
   (format s "~@:_Its associated name (as in ~S) is ~S."
 	  'function-lambda-expression
 	  (%fun-name x))
@@ -208,19 +203,27 @@
     ((#.sb-vm:simple-fun-header-widetag #.sb-vm:closure-fun-header-widetag)
      (%describe-fun-compiled x s kind name))
     (#.sb-vm:funcallable-instance-header-widetag
-     (typecase x
-       (standard-generic-function
-	;; There should be a special method for this case; we'll
-	;; delegate to that.
-	(describe-object x s))
-       (t
-	(format s "~@:_It is an unknown type of funcallable instance."))))
+     ;; Only STANDARD-GENERIC-FUNCTION would be handled here, but
+     ;; since it has its own DESCRIBE-OBJECT method, it should've been
+     ;; picked off before getting here. So hopefully we never get here.
+     (format s "~@:_It is an unknown type of funcallable instance."))
     (t
      (format s "~@:_It is an unknown type of function."))))
 
 (defmethod describe-object ((x function) s)
-  (%describe-fun x s))
-  
+  (%describe-fun x s :function))
+
+(defgeneric describe-symbol-fdefinition (function stream &key (name nil) ))
+
+(defmethod describe-symbol-fdefinition ((fun function) stream &key name)
+  (%describe-fun fun stream :function name))
+
+(defmethod describe-symbol-fdefinition ((fun standard-generic-function) stream
+                                        &key name)
+  (declare (ignore name))
+  ;; just delegate
+  (describe-object fun stream))
+
 (defmethod describe-object ((x symbol) s)
   (declare (type stream s))
 
@@ -272,9 +275,9 @@
   (cond ((macro-function x)
 	 (%describe-fun (macro-function x) s :macro x))
 	((special-operator-p x)
-	 (%describe-doc x s 'function "Special form"))
+	 (%describe-doc x s :function "Special form"))
 	((fboundp x)
-	 (%describe-fun (fdefinition x) s :function x)))
+         (describe-symbol-fdefinition (fdefinition x) s :name x)))
 
   ;; FIXME: Print out other stuff from the INFO database:
   ;;   * Does it name a type?
@@ -296,5 +299,5 @@
   ;; Describe the associated class, if any.
   (let ((symbol-named-class (cl:find-class x nil)))
     (when symbol-named-class
-      (format t "~&It names a class ~A." symbol-named-class)
+      (format s "~&It names a class ~A." symbol-named-class)
       (describe symbol-named-class))))

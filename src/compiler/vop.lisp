@@ -321,9 +321,8 @@
   ;; of the function, a symbol or (SETF <symbol>). Otherwise, this is
   ;; some string that is intended to be informative.
   (name "<not computed>" :type (or simple-string list symbol))
-  ;; a string representing the argument list that the function was
-  ;; defined with
-  (arguments nil :type (or simple-string null))
+  ;; the argument list that the function was defined with.
+  (arguments nil :type list)
   ;; a function type specifier representing the arguments and results
   ;; of this function
   (type 'function :type (or list (member function))))

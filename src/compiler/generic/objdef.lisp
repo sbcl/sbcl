@@ -193,7 +193,8 @@
 	:ref-trans %simple-fun-name
 	:set-known (unsafe)
 	:set-trans (setf %simple-fun-name))
-  (arglist :ref-known (flushable)
+  (arglist :type list
+           :ref-known (flushable)
 	   :ref-trans %simple-fun-arglist
 	   :set-known (unsafe)
 	   :set-trans (setf %simple-fun-arglist))
