@@ -266,7 +266,7 @@ static void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
     fake_foreign_function_call(context);
-    ldb_monitor();
+    monitor_or_something();
 }
 
 void

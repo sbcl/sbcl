@@ -35,7 +35,7 @@ static void *compute_pc(lispobj code_obj, int pc_offset)
 {
     struct code *code;
 
-    code = (struct code *)PTR(code_obj);
+    code = (struct code *)native_pointer(code_obj);
     return (void *)((char *)code + HeaderValue(code->header)*sizeof(lispobj)
 		    + pc_offset);
 }
@@ -102,7 +102,7 @@ static int compute_offset(os_context_t *context, lispobj code)
 	return 0;
     else {
 	unsigned long code_start;
-	struct code *codeptr = (struct code *)PTR(code);
+	struct code *codeptr = (struct code *)native_pointer(code);
 #ifdef parisc
 	unsigned long pc = *os_context_pc_addr(context) & ~3;
 #else
@@ -171,7 +171,7 @@ void *handle_function_end_breakpoint(int signal, siginfo_t *info,
     fake_foreign_function_call(context);
 
     code = find_code(context);
-    codeptr = (struct code *)PTR(code);
+    codeptr = (struct code *)native_pointer(code);
 
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
 	     compute_offset(context, code),
@@ -197,7 +197,7 @@ void *handle_function_end_breakpoint(int signal, siginfo_t *info,
     fake_foreign_function_call(context);
 
     code = find_code(context);
-    codeptr = (struct code *)PTR(code);
+    codeptr = (struct code *)native_pointer(code);
 
     /* Don't disallow recursive breakpoint traps. Otherwise, we can't
      * use debugger breakpoints anywhere in here. */

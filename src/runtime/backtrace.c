@@ -64,7 +64,7 @@ code_pointer(lispobj object)
     lispobj *headerp, header;
     int type, len;
 
-    headerp = (lispobj *) PTR(object);
+    headerp = (lispobj *) native_pointer(object);
     header = *headerp;
     type = TypeOf(header);
 
@@ -122,7 +122,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
 							    reg_OCFP));
         info->lra = (lispobj)(*os_context_register_addr(context, reg_LRA));
         info->code = code_pointer(info->lra);
-        pc = (unsigned long)PTR(info->lra);
+        pc = (unsigned long)native_pointer(info->lra);
     }
     else {
         info->frame =
@@ -179,7 +179,7 @@ previous_info(struct call_info *info)
     else {
         info->code = code_pointer(info->lra);
         if (info->code != NULL)
-            info->pc = (unsigned long)PTR(info->lra) -
+            info->pc = (unsigned long)native_pointer(info->lra) -
                 (unsigned long)info->code -
 #ifndef alpha
                 (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
@@ -218,19 +218,19 @@ backtrace(int nframes)
                 struct function *header;
                 lispobj name;
 
-                header = (struct function *) PTR(function);
+                header = (struct function *) native_pointer(function);
                 name = header->name;
 
                 if (LowtagOf(name) == type_OtherPointer) {
                     lispobj *object;
 
-                    object = (lispobj *) PTR(name);
+                    object = (lispobj *) native_pointer(name);
 
                     if (TypeOf(*object) == type_SymbolHeader) {
                         struct symbol *symbol;
 
                         symbol = (struct symbol *) object;
-                        object = (lispobj *) PTR(symbol->name);
+                        object = (lispobj *) native_pointer(symbol->name);
                     }
                     if (TypeOf(*object) == type_SimpleString) {
                         struct vector *string;

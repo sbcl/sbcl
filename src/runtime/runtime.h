@@ -46,15 +46,12 @@
 #define type_Bits 8
 #define type_Mask ((1<<type_Bits)-1)
 
-/* FIXME: There seems to be no reason that TypeOf, HeaderValue,
- * Pointerp, PTR, CONS, SYMBOL, and FDEFN can't be defined
- * as (possibly inline) functions instead of macros. */
+/* FIXME: There seems to be no reason that TypeOf, HeaderValue, CONS,
+ * SYMBOL, and FDEFN can't be defined as (possibly inline) functions
+ * instead of macros. */
 
 #define TypeOf(obj) ((obj)&type_Mask)
 #define HeaderValue(obj) ((unsigned long) ((obj)>>type_Bits))
-
-#define Pointerp(obj) ((obj) & 0x01)
-#define PTR(obj) ((unsigned long)((obj)&~lowtag_Mask))
 
 #define CONS(obj) ((struct cons *)((obj)-type_ListPointer))
 #define SYMBOL(obj) ((struct symbol *)((obj)-type_OtherPointer))
@@ -75,6 +72,22 @@ typedef signed int s32;
 #endif
 
 typedef u32 lispobj;
+
+/* Is the Lisp object obj something with pointer nature (as opposed to
+ * e.g. a fixnum or character or unbound marker)? */
+static inline int
+is_lisp_pointer(lispobj obj)
+{
+    return obj & 1;
+}
+
+/* Convert from a lispobj with type bits to a native (ordinary
+ * C/assembly) pointer to the beginning of the object. */
+static inline lispobj
+native_pointer(lispobj obj)
+{
+    return obj & ~lowtag_Mask;
+}
 
 /* FIXME: There seems to be no reason that make_fixnum and fixnum_value
  * can't be implemented as (possibly inline) functions. */
@@ -103,7 +116,7 @@ typedef int boolean;
  * in GCC later than version 2.7 or so. If you are using some 
  * compiler that doesn't understand this, you could could just
  * change it to "typedef void never_returns" and nothing would
- * break, you might just get a few more bytes of compiled code or
+ * break, though you might get a few more bytes of compiled code or
  * a few more compiler warnings. -- WHN 2000-10-21 */
 typedef volatile void never_returns;
 

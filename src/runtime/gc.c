@@ -79,9 +79,9 @@ from_space_p(lispobj object)
 
 	/* this can be called for untagged pointers as well as for 
 	   descriptors, so this assertion's not applicable
-	   gc_assert(Pointerp(object));
+	   gc_assert(is_lisp_pointer(object));
 	*/
-	ptr = (lispobj *) PTR(object);
+	ptr = (lispobj *) native_pointer(object);
 
 	return ((from_space <= ptr) &&
 		(ptr < from_space_free_pointer));
@@ -92,9 +92,9 @@ new_space_p(lispobj object)
 {
 	lispobj *ptr;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	ptr = (lispobj *) PTR(object);
+	ptr = (lispobj *) native_pointer(object);
 		
 	return ((new_space <= ptr) &&
 		(ptr < new_space_free_pointer));
@@ -122,7 +122,7 @@ copy_object(lispobj object, int nwords)
 	lispobj *new;
 	lispobj *source, *dest;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 	gc_assert(from_space_p(object));
 	gc_assert((nwords & 0x01) == 0);
 
@@ -134,7 +134,7 @@ copy_object(lispobj object, int nwords)
 	new_space_free_pointer += nwords;
 
 	dest = new;
-	source = (lispobj *) PTR(object);
+	source = (lispobj *) native_pointer(object);
 
 #ifdef DEBUG_COPY_VERBOSE
 	fprintf(stderr,"Copying %d words from %p to %p\n", nwords,source,new);
@@ -388,15 +388,16 @@ scavenge(lispobj *start, u32 nwords)
 		       (unsigned long) start, (unsigned long) object, type);
 #endif
 
-                if (Pointerp(object)) {
+                if (is_lisp_pointer(object)) {
 		    /* It be a pointer. */
 		    if (from_space_p(object)) {
                         /* It currently points to old space.  Check for a */
                         /* forwarding pointer. */
                         lispobj first_word;
 
-                        first_word = *((lispobj *)PTR(object));
-                        if (Pointerp(first_word) && new_space_p(first_word)) {
+                        first_word = *((lispobj *)native_pointer(object));
+                        if (is_lisp_pointer(first_word) &&
+			    new_space_p(first_word)) {
                             /* Yep, there be a forwarding pointer. */
                             *start = first_word;
                             words_scavenged = 1;
@@ -577,7 +578,7 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 		lispobj header;
 
 		object = *start;
-		forwardp = Pointerp(object) && new_space_p(object);
+		forwardp = is_lisp_pointer(object) && new_space_p(object);
 
 		if (forwardp) {
 			int tag;
@@ -597,7 +598,7 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 				nwords = 1;
 				break;
 			case type_OtherPointer:
-				pointer = (lispobj *) PTR(object);
+				pointer = (lispobj *) native_pointer(object);
 				header = *pointer;
 				type = TypeOf(header);
 				nwords = (sizetab[type])(pointer);
@@ -632,10 +633,10 @@ scav_function_pointer(lispobj *where, lispobj object)
   lispobj first;
   int type;
 
-  gc_assert(Pointerp(object));
+  gc_assert(is_lisp_pointer(object));
       
   /* object is a pointer into from space. Not a FP */
-  first_pointer = (lispobj *) PTR(object);
+  first_pointer = (lispobj *) native_pointer(object);
   first = *first_pointer;
 		
   /* must transport object -- object may point */
@@ -655,7 +656,7 @@ scav_function_pointer(lispobj *where, lispobj object)
   
   first = *first_pointer = copy;
 
-  gc_assert(Pointerp(first));
+  gc_assert(is_lisp_pointer(first));
   gc_assert(!from_space_p(first));
 
   *where = first;
@@ -678,11 +679,11 @@ trans_code(struct code *code)
 
 	/* if object has already been transported, just return pointer */
 	first = code->header;
-	if (Pointerp(first) && new_space_p(first)) {
+	if (is_lisp_pointer(first) && new_space_p(first)) {
 #ifdef DEBUG_CODE_GC
 	    printf("Was already transported\n");
 #endif
-	    return (struct code *) PTR(first);
+	    return (struct code *) native_pointer(first);
 	}
 	
 	gc_assert(TypeOf(first) == type_CodeHeader);
@@ -696,7 +697,7 @@ trans_code(struct code *code)
 	nwords = CEILING(nwords, 2);
 
 	l_new_code = copy_object(l_code, nwords);
-	new_code = (struct code *) PTR(l_new_code);
+	new_code = (struct code *) native_pointer(l_new_code);
 
 	displacement = l_new_code - l_code;
 
@@ -719,13 +720,13 @@ trans_code(struct code *code)
 		struct function *fheaderp, *nfheaderp;
 		lispobj nfheaderl;
 		
-		fheaderp = (struct function *) PTR(fheaderl);
+		fheaderp = (struct function *) native_pointer(fheaderl);
 		gc_assert(TypeOf(fheaderp->header) == type_FunctionHeader);
 
 		/* calcuate the new function pointer and the new */
 		/* function header */
 		nfheaderl = fheaderl + displacement;
-		nfheaderp = (struct function *) PTR(nfheaderl);
+		nfheaderp = (struct function *) native_pointer(nfheaderl);
 
 		/* set forwarding pointer */
 #ifdef DEBUG_CODE_GC
@@ -779,12 +780,12 @@ scav_code_header(lispobj *where, lispobj object)
 	/* code data block */
 	fheaderl = code->entry_points;
 	while (fheaderl != NIL) {
-		fheaderp = (struct function *) PTR(fheaderl);
+		fheaderp = (struct function *) native_pointer(fheaderl);
 		gc_assert(TypeOf(fheaderp->header) == type_FunctionHeader);
 		
 #if defined(DEBUG_CODE_GC)
 		printf("Scavenging boxed section of entry point located at 0x%08x.\n",
-		       (unsigned long) PTR(fheaderl));
+		       (unsigned long) native_pointer(fheaderl));
 #endif
 		scavenge(&fheaderp->name, 1);
 		scavenge(&fheaderp->arglist, 1);
@@ -801,7 +802,7 @@ trans_code_header(lispobj object)
 {
 	struct code *ncode;
 
-	ncode = trans_code((struct code *) PTR(object));
+	ncode = trans_code((struct code *) native_pointer(object));
 	return (lispobj) LOW_WORD(ncode) | type_OtherPointer;
 }
 
@@ -839,7 +840,7 @@ trans_return_pc_header(lispobj object)
 	unsigned long offset;
 	struct code *code, *ncode;
 	lispobj ret;
-	return_pc = (struct function *) PTR(object);
+	return_pc = (struct function *) native_pointer(object);
 	offset = HeaderValue(return_pc->header)  * 4 ;
 
 	/* Transport the whole code object */
@@ -849,7 +850,7 @@ trans_return_pc_header(lispobj object)
 #endif
 	ncode = trans_code(code);
 	if(object==0x304748d7) {
-	    /* ldb_monitor(); */
+	    /* monitor_or_something(); */
 	}
 	ret= ((lispobj) LOW_WORD(ncode) + offset) | type_OtherPointer;
 #ifdef DEBUG_CODE_GC
@@ -897,7 +898,7 @@ trans_function_header(lispobj object)
 	unsigned long offset;
 	struct code *code, *ncode;
 	
-	fheader = (struct function *) PTR(object);
+	fheader = (struct function *) native_pointer(object);
 	offset = HeaderValue(fheader->header) * 4;
 
 	/* Transport the whole code object */
@@ -917,7 +918,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
   lispobj  *first_pointer;
   
   /* object is a pointer into from space.  Not a FP */
-  first_pointer = (lispobj *) PTR(object);
+  first_pointer = (lispobj *) native_pointer(object);
   
   *where = *first_pointer = trans_boxed(object);
   return 1;
@@ -933,14 +934,14 @@ scav_list_pointer(lispobj *where, lispobj object)
 {
   lispobj first, *first_pointer;
 
-  gc_assert(Pointerp(object));
+  gc_assert(is_lisp_pointer(object));
 
   /* object is a pointer into from space.  Not a FP. */
-  first_pointer = (lispobj *) PTR(object);
+  first_pointer = (lispobj *) native_pointer(object);
   
   first = *first_pointer = trans_list(object);
   
-  gc_assert(Pointerp(first));
+  gc_assert(is_lisp_pointer(first));
   gc_assert(!from_space_p(first));
   
   *where = first;
@@ -953,11 +954,11 @@ trans_list(lispobj object)
 	lispobj new_list_pointer;
 	struct cons *cons, *new_cons;
 	
-	cons = (struct cons *) PTR(object);
+	cons = (struct cons *) native_pointer(object);
 
 	/* ### Don't use copy_object here. */
 	new_list_pointer = copy_object(object, 2);
-	new_cons = (struct cons *) PTR(new_list_pointer);
+	new_cons = (struct cons *) native_pointer(new_list_pointer);
 
 	/* Set forwarding pointer. */
 	cons->car = new_list_pointer;
@@ -973,15 +974,15 @@ trans_list(lispobj object)
 
                 if (LowtagOf(cdr) != type_ListPointer ||
                     !from_space_p(cdr) ||
-                    (Pointerp(first = *(lispobj *)PTR(cdr)) &&
-                     new_space_p(first)))
+                    (is_lisp_pointer(first = *(lispobj *)native_pointer(cdr))
+		     && new_space_p(first)))
                 	break;
 
-		cdr_cons = (struct cons *) PTR(cdr);
+		cdr_cons = (struct cons *) native_pointer(cdr);
 
 		/* ### Don't use copy_object here */
 		new_cdr = copy_object(cdr, 2);
-		new_cdr_cons = (struct cons *) PTR(new_cdr);
+		new_cdr_cons = (struct cons *) native_pointer(new_cdr);
 
 		/* Set forwarding pointer */
 		cdr_cons->car = new_cdr;
@@ -1006,13 +1007,13 @@ scav_other_pointer(lispobj *where, lispobj object)
 {
   lispobj first, *first_pointer;
 
-  gc_assert(Pointerp(object));
+  gc_assert(is_lisp_pointer(object));
 
   /* Object is a pointer into from space - not a FP */
-  first_pointer = (lispobj *) PTR(object);
+  first_pointer = (lispobj *) native_pointer(object);
   first = *first_pointer = (transother[TypeOf(*first_pointer)])(object);
 
-  gc_assert(Pointerp(first));
+  gc_assert(is_lisp_pointer(first));
   gc_assert(!from_space_p(first));
 
   *where = first;
@@ -1061,9 +1062,9 @@ trans_boxed(lispobj object)
 	lispobj header;
 	unsigned long length;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	header = *((lispobj *) PTR(object));
+	header = *((lispobj *) native_pointer(object));
 	length = HeaderValue(header) + 1;
 	length = CEILING(length, 2);
 
@@ -1122,9 +1123,9 @@ trans_unboxed(lispobj object)
 	unsigned long length;
 
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	header = *((lispobj *) PTR(object));
+	header = *((lispobj *) native_pointer(object));
 	length = HeaderValue(header) + 1;
 	length = CEILING(length, 2);
 
@@ -1171,12 +1172,12 @@ trans_string(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
 	/* NOTE: Strings contain one more byte of data than the length */
 	/* slot indicates. */
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length) + 1;
 	nwords = CEILING(NWORDS(length, 4) + 2, 2);
 
@@ -1215,9 +1216,9 @@ trans_vector(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 
 	length = fixnum_value(vector->length);
 	nwords = CEILING(length + 2, 2);
@@ -1258,9 +1259,9 @@ trans_vector_bit(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
@@ -1300,9 +1301,9 @@ trans_vector_unsigned_byte_2(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(NWORDS(length, 16) + 2, 2);
 
@@ -1342,9 +1343,9 @@ trans_vector_unsigned_byte_4(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
@@ -1384,9 +1385,9 @@ trans_vector_unsigned_byte_8(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(NWORDS(length, 4) + 2, 2);
 
@@ -1426,9 +1427,9 @@ trans_vector_unsigned_byte_16(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(NWORDS(length, 2) + 2, 2);
 
@@ -1468,9 +1469,9 @@ trans_vector_unsigned_byte_32(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(length + 2, 2);
 
@@ -1510,9 +1511,9 @@ trans_vector_single_float(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(length + 2, 2);
 
@@ -1552,9 +1553,9 @@ trans_vector_double_float(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(length * 2 + 2, 2);
 
@@ -1597,9 +1598,9 @@ trans_vector_long_float(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 #ifdef sparc
 	nwords = CEILING(length * 4 + 2, 2);
@@ -1645,9 +1646,9 @@ trans_vector_complex_single_float(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(length * 2 + 2, 2);
 
@@ -1688,9 +1689,9 @@ trans_vector_complex_double_float(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 	nwords = CEILING(length * 4 + 2, 2);
 
@@ -1733,9 +1734,9 @@ trans_vector_complex_long_float(lispobj object)
 	struct vector *vector;
 	int length, nwords;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
-	vector = (struct vector *) PTR(object);
+	vector = (struct vector *) native_pointer(object);
 	length = fixnum_value(vector->length);
 #ifdef sparc
 	nwords = CEILING(length * 8 + 2, 2);
@@ -1782,7 +1783,7 @@ trans_weak_pointer(lispobj object)
 	lispobj copy;
 	struct weak_pointer *wp;
 
-	gc_assert(Pointerp(object));
+	gc_assert(is_lisp_pointer(object));
 
 #if defined(DEBUG_WEAK)
 	printf("Transporting weak pointer from 0x%08x\n", object);
@@ -1792,7 +1793,7 @@ trans_weak_pointer(lispobj object)
 	/* been transported so they can be fixed up in a post-GC pass. */
 
 	copy = copy_object(object, WEAK_POINTER_NWORDS);
-	wp = (struct weak_pointer *) PTR(copy);
+	wp = (struct weak_pointer *) native_pointer(copy);
 	
 
 	/* Push the weak pointer onto the list of weak pointers. */
@@ -1824,7 +1825,7 @@ void scan_weak_pointers(void)
 		printf("Value: 0x%08x\n", (unsigned int) value);
 #endif		
 
-		if (!(Pointerp(value) && from_space_p(value)))
+		if (!(is_lisp_pointer(value) && from_space_p(value)))
 			continue;
 
 		/* Now, we need to check if the object has been */
@@ -1832,14 +1833,14 @@ void scan_weak_pointers(void)
 		/* still good and needs to be updated.  Otherwise, the */
 		/* weak pointer needs to be nil'ed out. */
 
-		first_pointer = (lispobj *) PTR(value);
+		first_pointer = (lispobj *) native_pointer(value);
 		first = *first_pointer;
 		
 #if defined(DEBUG_WEAK)
 		printf("First: 0x%08x\n", (unsigned long) first);
 #endif		
 
-		if (Pointerp(first) && new_space_p(first))
+		if (is_lisp_pointer(first) && new_space_p(first))
 			wp->value = first;
 		else {
 			wp->value = NIL;

@@ -125,12 +125,23 @@ dynamic_pointer_p(lispobj ptr)
 
 static unsigned pointer_filter_verbose = 0;
 
+/* FIXME: This is substantially the same code as in gencgc.c. (There
+ * are some differences, at least (1) the gencgc.c code needs to worry
+ * about return addresses on the stack pinning code objects, (2) the
+ * gencgc.c code needs to worry about the GC maybe happening in an
+ * interrupt service routine when the main thread of control was
+ * interrupted just as it had allocated memory and before it
+ * initialized it, while PURIFY needn't worry about that, and (3) the
+ * gencgc.c code has mutated more under maintenance since the fork
+ * from CMU CL than the code here has.) The two versions should be
+ * made to explicitly share common code, instead of just two different
+ * cut-and-pasted versions. */
 static int
 valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 {
     /* If it's not a return address then it needs to be a valid Lisp
      * pointer. */
-    if (!Pointerp((lispobj)pointer))
+    if (!is_lisp_pointer((lispobj)pointer))
 	return 0;
 
     /* Check that the object pointed to is consistent with the pointer
@@ -171,11 +182,11 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 	}
 	/* Is it plausible cons? */
-	if((Pointerp(start_addr[0])
+	if((is_lisp_pointer(start_addr[0])
 	    || ((start_addr[0] & 3) == 0) /* fixnum */
 	    || (TypeOf(start_addr[0]) == type_BaseChar)
 	    || (TypeOf(start_addr[0]) == type_UnboundMarker))
-	   && (Pointerp(start_addr[1])
+	   && (is_lisp_pointer(start_addr[1])
 	       || ((start_addr[1] & 3) == 0) /* fixnum */
 	       || (TypeOf(start_addr[1]) == type_BaseChar)
 	       || (TypeOf(start_addr[1]) == type_UnboundMarker))) {
@@ -212,7 +223,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 	}
 	/* Is it plausible?  Not a cons. X should check the headers. */
-	if(Pointerp(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
+	if(is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -442,7 +453,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     nwords = 1 + HeaderValue(header);
 
     /* Allocate it */
-    old = (lispobj *)PTR(thing);
+    old = (lispobj *)native_pointer(thing);
     if (constant) {
         new = read_only_free;
         read_only_free += CEILING(nwords, 2);
@@ -471,8 +482,8 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 static lispobj
 ptrans_instance(lispobj thing, lispobj header, boolean constant)
 {
-    lispobj layout = ((struct instance *)PTR(thing))->slots[0];
-    lispobj pure = ((struct instance *)PTR(layout))->slots[15];
+    lispobj layout = ((struct instance *)native_pointer(thing))->slots[0];
+    lispobj pure = ((struct instance *)native_pointer(layout))->slots[15];
 
     switch (pure) {
     case T:
@@ -492,7 +503,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	    nwords = 1 + HeaderValue(header);
 
 	    /* Allocate it */
-	    old = (lispobj *)PTR(thing);
+	    old = (lispobj *)native_pointer(thing);
 	    new = static_free;
 	    static_free += CEILING(nwords, 2);
 
@@ -524,7 +535,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     nwords = 1 + HeaderValue(header);
 
     /* Allocate it */
-    old = (lispobj *)PTR(thing);
+    old = (lispobj *)native_pointer(thing);
     new = static_free;
     static_free += CEILING(nwords, 2);
 
@@ -554,7 +565,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
     nwords = 1 + HeaderValue(header);
 
     /* Allocate it */
-    old = (lispobj *)PTR(thing);
+    old = (lispobj *)native_pointer(thing);
     new = read_only_free;
     read_only_free += CEILING(nwords, 2);
 
@@ -576,7 +587,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
     int nwords;
     lispobj result, *new;
 
-    vector = (struct vector *)PTR(thing);
+    vector = (struct vector *)native_pointer(thing);
     nwords = 2 + (CEILING((fixnum_value(vector->length)+extra)*bits,32)>>5);
 
     if (boxed && !constant) {
@@ -631,7 +642,9 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 
   /* It will be 0 or the unbound-marker if there are no fixups, and
    * will be an other-pointer to a vector if it is valid. */
-  if ((fixups==0) || (fixups==type_UnboundMarker) || !Pointerp(fixups)) {
+  if ((fixups==0) ||
+      (fixups==type_UnboundMarker) ||
+      !is_lisp_pointer(fixups)) {
 #ifdef GENCGC
     /* Check for a possible errors. */
     sniff_code_object(new_code,displacement);
@@ -639,13 +652,13 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     return;
   }
 
-  fixups_vector = (struct vector *)PTR(fixups);
+  fixups_vector = (struct vector *)native_pointer(fixups);
 
   /* Could be pointing to a forwarding pointer. */
-  if (Pointerp(fixups) && (dynamic_pointer_p(fixups))
+  if (is_lisp_pointer(fixups) && (dynamic_pointer_p(fixups))
       && forwarding_pointer_p(*(lispobj *)fixups_vector)) {
     /* If so then follow it. */
-    fixups_vector = (struct vector *)PTR(*(lispobj *)fixups_vector);
+    fixups_vector = (struct vector *)native_pointer(*(lispobj *)fixups_vector);
   }
 
   if (TypeOf(fixups_vector->header) == type_SimpleArrayUnsignedByte32) {
@@ -691,7 +704,7 @@ ptrans_code(lispobj thing)
     int nwords;
     lispobj func, result;
 
-    code = (struct code *)PTR(thing);
+    code = (struct code *)native_pointer(thing);
     nwords = HeaderValue(code->header) + fixnum_value(code->code_size);
 
     new = (struct code *)read_only_free;
@@ -711,11 +724,11 @@ ptrans_code(lispobj thing)
     /* Put in forwarding pointers for all the functions. */
     for (func = code->entry_points;
          func != NIL;
-         func = ((struct function *)PTR(func))->next) {
+         func = ((struct function *)native_pointer(func))->next) {
 
         gc_assert(LowtagOf(func) == type_FunctionPointer);
 
-        *(lispobj *)PTR(func) = result + (func - thing);
+        *(lispobj *)native_pointer(func) = result + (func - thing);
     }
 
     /* Arrange to scavenge the debug info later. */
@@ -735,20 +748,20 @@ ptrans_code(lispobj thing)
     pscav(&new->entry_points, 1, 1);
     for (func = new->entry_points;
          func != NIL;
-         func = ((struct function *)PTR(func))->next) {
+         func = ((struct function *)native_pointer(func))->next) {
         gc_assert(LowtagOf(func) == type_FunctionPointer);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
 	/* Temporarly convert the self pointer to a real function
            pointer. */
-	((struct function *)PTR(func))->self -= RAW_ADDR_OFFSET;
+	((struct function *)native_pointer(func))->self -= RAW_ADDR_OFFSET;
 #endif
-        pscav(&((struct function *)PTR(func))->self, 2, 1);
+        pscav(&((struct function *)native_pointer(func))->self, 2, 1);
 #ifdef __i386__
-	((struct function *)PTR(func))->self += RAW_ADDR_OFFSET;
+	((struct function *)native_pointer(func))->self += RAW_ADDR_OFFSET;
 #endif
-        pscav_later(&((struct function *)PTR(func))->name, 3);
+        pscav_later(&((struct function *)native_pointer(func))->name, 3);
     }
 
     return result;
@@ -774,8 +787,10 @@ ptrans_func(lispobj thing, lispobj header)
          * scavenged, because if it had been scavenged, forwarding pointers
          * would have been left behind for all the entry points. */
 
-        function = (struct function *)PTR(thing);
-        code = (PTR(thing)-(HeaderValue(function->header)*sizeof(lispobj))) |
+        function = (struct function *)native_pointer(thing);
+        code =
+	    (native_pointer(thing) -
+	     (HeaderValue(function->header)*sizeof(lispobj))) |
             type_OtherPointer;
 
         /* This will cause the function's header to be replaced with a 
@@ -788,7 +803,7 @@ ptrans_func(lispobj thing, lispobj header)
     else {
 	/* It's some kind of closure-like thing. */
         nwords = 1 + HeaderValue(header);
-        old = (lispobj *)PTR(thing);
+        old = (lispobj *)native_pointer(thing);
 
 	/* Allocate the new one. */
 	if (TypeOf(header) == type_FuncallableInstanceHeader) {
@@ -826,7 +841,7 @@ ptrans_returnpc(lispobj thing, lispobj header)
     code = thing - HeaderValue(header)*sizeof(lispobj);
 
     /* Make sure it's been transported. */
-    new = *(lispobj *)PTR(code);
+    new = *(lispobj *)native_pointer(code);
     if (!forwarding_pointer_p(new))
         new = ptrans_code(code);
 
@@ -850,7 +865,7 @@ ptrans_list(lispobj thing, boolean constant)
 
     do {
         /* Allocate a new cons cell. */
-        old = (struct cons *)PTR(thing);
+        old = (struct cons *)native_pointer(thing);
         if (constant) {
             new = (struct cons *)read_only_free;
             read_only_free += WORDS_PER_CONS;
@@ -871,7 +886,7 @@ ptrans_list(lispobj thing, boolean constant)
         length++;
     } while (LowtagOf(thing) == type_ListPointer &&
              dynamic_pointer_p(thing) &&
-             !(forwarding_pointer_p(*(lispobj *)PTR(thing))));
+             !(forwarding_pointer_p(*(lispobj *)native_pointer(thing))));
 
     /* Scavenge the list we just copied. */
     pscav((lispobj *)orig, length * WORDS_PER_CONS, constant);
@@ -1049,20 +1064,20 @@ pscav_code(struct code*code)
     pscav(&code->entry_points, 1, 1);
     for (func = code->entry_points;
          func != NIL;
-         func = ((struct function *)PTR(func))->next) {
+         func = ((struct function *)native_pointer(func))->next) {
         gc_assert(LowtagOf(func) == type_FunctionPointer);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
 	/* Temporarly convert the self pointer to a real function
 	 * pointer. */
-	((struct function *)PTR(func))->self -= RAW_ADDR_OFFSET;
+	((struct function *)native_pointer(func))->self -= RAW_ADDR_OFFSET;
 #endif
-        pscav(&((struct function *)PTR(func))->self, 2, 1);
+        pscav(&((struct function *)native_pointer(func))->self, 2, 1);
 #ifdef __i386__
-	((struct function *)PTR(func))->self += RAW_ADDR_OFFSET;
+	((struct function *)native_pointer(func))->self += RAW_ADDR_OFFSET;
 #endif
-        pscav_later(&((struct function *)PTR(func))->name, 3);
+        pscav_later(&((struct function *)native_pointer(func))->name, 3);
     }
 
     return CEILING(nwords,2);
@@ -1078,13 +1093,13 @@ pscav(lispobj *addr, int nwords, boolean constant)
 
     while (nwords > 0) {
         thing = *addr;
-        if (Pointerp(thing)) {
+        if (is_lisp_pointer(thing)) {
             /* It's a pointer. Is it something we might have to move? */
             if (dynamic_pointer_p(thing)) {
                 /* Maybe. Have we already moved it? */
-		thingp = (lispobj *)PTR(thing);
+		thingp = (lispobj *)native_pointer(thing);
                 header = *thingp;
-                if (Pointerp(header) && forwarding_pointer_p(header))
+                if (is_lisp_pointer(header) && forwarding_pointer_p(header))
                     /* Yep, so just copy the forwarding pointer. */
                     thing = header;
                 else {

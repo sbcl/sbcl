@@ -162,6 +162,6 @@ lispobj debug_print(lispobj string)
        the stack before doing anything else here */
     char untouched[32];
     fprintf(stderr, "%s\n", 
-	    (char *)(((struct vector *)PTR(string))->data),untouched);
+	    (char *)(((struct vector *)native_pointer(string))->data),untouched);
     return NIL;
 }

@@ -114,9 +114,9 @@
  :sb-propagate-float-type
  :sb-propagate-fun-type
 
- ;; Setting this makes more debugging information available.
- ;; If you aren't hacking or troubleshooting SBCL itself, you
- ;; probably don't want this set.
+ ;; Make more debugging information available (for debugging SBCL
+ ;; itself). If you aren't hacking or troubleshooting SBCL itself,
+ ;; you probably don't want this set.
  ;;
  ;; At least two varieties of debugging information are enabled by this
  ;; option:
@@ -138,6 +138,11 @@
  ;; therefore, be sure to keep the sources around, and run with the
  ;; readtable configured so that the system sources can be read.
  ; :sb-show
+
+ ;; Build SBCL with the old CMU CL low level debugger, "ldb". If 
+ ;; are aren't messing with CMU CL at a very low level (e.g. 
+ ;; trying to diagnose GC problems) you shouldn't need this.
+ ; :sb-ldb
 
  ;; This isn't really a target Lisp feature at all, but controls
  ;; whether the build process produces an after-xc.core file. This

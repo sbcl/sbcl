@@ -20,13 +20,10 @@
 
 #include "runtime.h"
 #include "sbcl.h"
-#include "globals.h"
-#include "vars.h"
-#include "parse.h"
-#include "os.h"
-#include "interrupt.h"
-#include "lispregs.h"
-#include "monitor.h"
+
+/* Almost all of this file can be skipped if we're not supporting LDB. */
+#if defined(LISP_FEATURE_SB_LDB)
+
 #include "print.h"
 #include "arch.h"
 #include "interr.h"
@@ -216,7 +213,7 @@ search_cmd(char **ptr)
             return;
         }
         if (more_p(ptr)) {
-            addr = (lispobj *)PTR((long)parse_addr(ptr));
+            addr = (lispobj *)native_pointer((long)parse_addr(ptr));
             if (more_p(ptr)) {
                 count = parse_number(ptr);
             }
@@ -556,4 +553,18 @@ void
 throw_to_monitor()
 {
     longjmp(curbuf, 1);
+}
+
+#endif /* defined(LISP_FEATURE_SB_LDB) */
+
+/* what we do when things go badly wrong at a low level */
+void
+monitor_or_something()
+{
+#if defined(LISP_FEATURE_SB_LDB)
+    ldb_monitor();
+#else
+    fprintf(stderr, "There's no LDB in this build; exiting.\n");
+    exit(1);
+#endif
 }

@@ -1,3 +1,5 @@
+/* parsing for LDB monitor */
+
 /*
  * This software is part of the SBCL system. See the README file for
  * more information.
@@ -15,6 +17,9 @@
 
 #include "runtime.h"
 #include "sbcl.h"
+
+#if defined(LISP_FEATURE_SB_LDB)
+
 #include "globals.h"
 #include "vars.h"
 #include "parse.h"
@@ -356,3 +361,5 @@ char **ptr;
 
     return result;
 }
+
+#endif /* defined(LISP_FEATURE_SB_LDB) */

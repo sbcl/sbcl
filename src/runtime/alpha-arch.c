@@ -259,7 +259,7 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
   after_breakpoint=1;
   os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned long));
 
-  ldb_monitor();
+  monitor_or_something();
   sigreturn(context);
 }
 
@@ -268,7 +268,7 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
 static void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
-    ldb_monitor();
+    monitor_or_something();
 }
 
 static void

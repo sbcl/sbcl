@@ -108,7 +108,7 @@ alloc_string(char *str)
 {
     int len = strlen(str);
     lispobj result = alloc_vector(type_SimpleString, len+1, 8);
-    struct vector *vec = (struct vector *)PTR(result);
+    struct vector *vec = (struct vector *)native_pointer(result);
 
     vec->length = make_fixnum(len);
     strcpy((char *)vec->data, str);

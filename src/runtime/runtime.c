@@ -48,13 +48,11 @@
 #endif
 
 /* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
-
 static void
 sigint_handler(int signal, siginfo_t *info, void *void_context)
 {
-    printf("\nSIGINT hit at 0x%08lX\n", 
-	   (unsigned long) *os_context_pc_addr(void_context));
-    ldb_monitor();
+    lose("\nSIGINT hit at 0x%08lX\n", 
+	 (unsigned long) *os_context_pc_addr(void_context));
 }
 
 /* (This is not static, because we want to be able to call it from
@@ -245,7 +243,7 @@ More information on SBCL is available at <http://sbcl.sourceforge.net/>.
     define_var("nil", NIL, 1);
     define_var("t", T, 1);
 
-    set_lossage_handler(ldb_monitor);
+    set_lossage_handler(monitor_or_something);
 
 #if 0
     os_init();

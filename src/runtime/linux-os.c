@@ -281,7 +281,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	while ( ! (CONTROL_STACK_START <= *current_control_frame_pointer &&
 		   *current_control_frame_pointer <= control_stack_top))
 	    ((char*)current_control_frame_pointer) -= sizeof(lispobj);
-	ldb_monitor();
+	monitor_or_something();
     } else if (!interrupt_maybe_gc(signal, info, context)) {
 	interrupt_handle_now(signal, info, context);
     }

@@ -1,4 +1,4 @@
-/* code for low-level debugging output */
+/* code for low-level debugging/diagnostic output */
 
 /*
  * This software is part of the SBCL system. See the README file for
@@ -13,18 +13,19 @@
 
 /*
  * FIXME:
- *   1. Ordinary users won't get much out of this code, so it shouldn't
- *      be compiled into the ordinary build of the system. Probably it
- *      should be made conditional on the SB-SHOW target feature.
- *   2. Some of the code in here (subtype_Names[] and the various
- *      foo_slots[], at least) is deeply broken, depending on fixed
- *      (and already out-of-date) values in sbcl.h.
+ *   Some of the code in here (subtype_Names[] and the various
+ *   foo_slots[], at least) is deeply broken, depending on fixed
+ *   (and already out-of-date) values in sbcl.h.
  */
 
 #include <stdio.h>
 
 #include "print.h"
 #include "runtime.h"
+
+/* This file can be skipped if we're not supporting LDB. */
+#if defined(LISP_FEATURE_SB_LDB)
+
 #include "sbcl.h"
 #include "monitor.h"
 #include "vars.h"
@@ -294,7 +295,7 @@ static void brief_list(lispobj obj)
     else {
         putchar('(');
         while (LowtagOf(obj) == type_ListPointer) {
-            struct cons *cons = (struct cons *)PTR(obj);
+            struct cons *cons = (struct cons *)native_pointer(obj);
 
             if (space)
                 putchar(' ');
@@ -324,7 +325,7 @@ static void print_list(lispobj obj)
     } else if (obj == NIL) {
         printf(" (NIL)");
     } else {
-        struct cons *cons = (struct cons *)PTR(obj);
+        struct cons *cons = (struct cons *)native_pointer(obj);
 
         print_obj("car: ", cons->car);
         print_obj("cdr: ", cons->cdr);
@@ -334,15 +335,15 @@ static void print_list(lispobj obj)
 static void brief_struct(lispobj obj)
 {
     printf("#<ptr to 0x%08lx instance>",
-           (unsigned long) ((struct instance *)PTR(obj))->slots[0]);
+           (unsigned long) ((struct instance *)native_pointer(obj))->slots[0]);
 }
 
 static void print_struct(lispobj obj)
 {
-    struct instance *instance = (struct instance *)PTR(obj);
+    struct instance *instance = (struct instance *)native_pointer(obj);
     int i;
     char buffer[16];
-    print_obj("type: ", ((struct instance *)PTR(obj))->slots[0]);
+    print_obj("type: ", ((struct instance *)native_pointer(obj))->slots[0]);
     for (i = 1; i < HeaderValue(instance->header); i++) {
 	sprintf(buffer, "slot %d: ", i);
 	print_obj(buffer, instance->slots[i]);
@@ -357,7 +358,7 @@ static void brief_otherptr(lispobj obj)
     struct vector *vector;
     char *charptr;
 
-    ptr = (lispobj *) PTR(obj);
+    ptr = (lispobj *) native_pointer(obj);
 
     if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
 	    printf("(invalid address)");
@@ -369,7 +370,7 @@ static void brief_otherptr(lispobj obj)
     switch (type) {
         case type_SymbolHeader:
             symbol = (struct symbol *)ptr;
-            vector = (struct vector *)PTR(symbol->name);
+            vector = (struct vector *)native_pointer(symbol->name);
             for (charptr = (char *)vector->data; *charptr != '\0'; charptr++) {
                 if (*charptr == '"')
                     putchar('\\');
@@ -437,7 +438,7 @@ static void print_otherptr(lispobj obj)
         int count, type, index;
         char *cptr, buffer[16];
 
-	ptr = (lispobj*) PTR(obj);
+	ptr = (lispobj*) native_pointer(obj);
 	if (ptr == NULL) {
 		printf(" (NULL Pointer)");
 		return;
@@ -478,45 +479,45 @@ static void print_otherptr(lispobj obj)
 
             case type_SingleFloat:
                 NEWLINE_OR_RETURN;
-                printf("%g", ((struct single_float *)PTR(obj))->value);
+                printf("%g", ((struct single_float *)native_pointer(obj))->value);
                 break;
 
             case type_DoubleFloat:
                 NEWLINE_OR_RETURN;
-                printf("%g", ((struct double_float *)PTR(obj))->value);
+                printf("%g", ((struct double_float *)native_pointer(obj))->value);
                 break;
 
 #ifdef type_LongFloat
             case type_LongFloat:
                 NEWLINE_OR_RETURN;
-                printf("%Lg", ((struct long_float *)PTR(obj))->value);
+                printf("%Lg", ((struct long_float *)native_pointer(obj))->value);
                 break;
 #endif
 
 #ifdef type_ComplexSingleFloat
             case type_ComplexSingleFloat:
                 NEWLINE_OR_RETURN;
-                printf("%g", ((struct complex_single_float *)PTR(obj))->real);
+                printf("%g", ((struct complex_single_float *)native_pointer(obj))->real);
                 NEWLINE_OR_RETURN;
-                printf("%g", ((struct complex_single_float *)PTR(obj))->imag);
+                printf("%g", ((struct complex_single_float *)native_pointer(obj))->imag);
                 break;
 #endif
 
 #ifdef type_ComplexDoubleFloat
             case type_ComplexDoubleFloat:
                 NEWLINE_OR_RETURN;
-                printf("%g", ((struct complex_double_float *)PTR(obj))->real);
+                printf("%g", ((struct complex_double_float *)native_pointer(obj))->real);
                 NEWLINE_OR_RETURN;
-                printf("%g", ((struct complex_double_float *)PTR(obj))->imag);
+                printf("%g", ((struct complex_double_float *)native_pointer(obj))->imag);
                 break;
 #endif
 
 #ifdef type_ComplexLongFloat
             case type_ComplexLongFloat:
                 NEWLINE_OR_RETURN;
-                printf("%Lg", ((struct complex_long_float *)PTR(obj))->real);
+                printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->real);
                 NEWLINE_OR_RETURN;
-                printf("%Lg", ((struct complex_long_float *)PTR(obj))->imag);
+                printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->imag);
                 break;
 #endif
 
@@ -658,7 +659,6 @@ static void print_obj(char *prefix, lispobj obj)
     char buffer[256];
     boolean verbose = cur_depth < brief_depth;
 
-
     if (!continue_p(verbose))
         return;
 
@@ -729,3 +729,13 @@ void brief_print(lispobj obj)
     print_obj("", obj);
     putchar('\n');
 }
+
+#else
+
+void
+brief_print(lispobj obj)
+{
+    printf("lispobj 0x%lx\n", (unsigned long)obj);
+}
+     
+#endif /* defined(LISP_FEATURE_SB_LDB) */

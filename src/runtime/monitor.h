@@ -9,5 +9,5 @@
  * files for more information.
  */
 
-extern void ldb_monitor(void);
 extern void throw_to_monitor(void);
+extern void monitor_or_something(void);
