@@ -5,8 +5,10 @@
 ;;;;
 ;;;; Note that the recommended way to customize the features of a
 ;;;; local build of SBCL is not to edit this file, but instead to
-;;;; tweak customize-target-features.lisp. E.g. you can use code like
-;;;; this:
+;;;; tweak customize-target-features.lisp. If you define a function
+;;;; in customize-target-features.lisp, it will be used to transform
+;;;; the target features list after it's read and before it's used.
+;;;; E.g. you can use code like this:
 ;;;;    (lambda (list)
 ;;;;      (flet ((enable (x) (pushnew x list))
 ;;;;    	 (disable (x) (setf list (remove x list))))
@@ -14,9 +16,12 @@
 ;;;;        (enable :sb-after-xc-core)
 ;;;;        #+nil (disable :sb-doc)
 ;;;;        list))
-;;;; That way, because customize-target-features.lisp is in
-;;;; .cvsignore, your local changes will remain local even if you use
-;;;; "cvs diff" to submit patches to SBCL.
+;;;; By thus editing a local file (one which is not in the source
+;;;; distribution, and which is in .cvsignore) your customizations
+;;;; will remain local even if you do things like "cvs update",
+;;;; will not show up if you try to submit a patch with "cvs diff",
+;;;; and might even stay out of the way if you use other non-CVS-based
+;;;; methods to upgrade the files or store your configuration.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -328,12 +328,6 @@ code to be loaded.
 
 ;;;; SETQ hackery
 
-(defvar *loop-destructuring-hooks*
-	nil
-  #!+sb-doc
-  "If not NIL, this must be a list of two things:
-a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.")
-
 (defun loop-make-psetq (frobs)
   (and frobs
        (loop-make-desetq
@@ -345,10 +339,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun loop-make-desetq (var-val-pairs)
   (if (null var-val-pairs)
       nil
-      (cons (if *loop-destructuring-hooks*
-		(cadr *loop-destructuring-hooks*)
-		'loop-really-desetq)
-	    var-val-pairs)))
+      (cons 'loop-really-desetq var-val-pairs)))
 
 (defvar *loop-desetq-temporary*
 	(make-symbol "LOOP-DESETQ-TEMP"))
@@ -824,11 +815,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	    (let ((forms (list answer)))
 	      ;;(when crocks (push crocks forms))
 	      (when dcls (push `(declare ,@dcls) forms))
-	      (setq answer `(,(cond ((not vars) 'locally)
-				    (*loop-destructuring-hooks*
-				     (first *loop-destructuring-hooks*))
-				    (t
-				     'let))
+	      (setq answer `(,(if vars 'let 'locally)
 			     ,vars
 			     ,@(loop-build-destructuring-bindings crocks
 								  forms)))))))
@@ -866,16 +853,24 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
       (pop *loop-source-code*)
       (loop-error "LOOP source code ran out when another token was expected.")))
 
-(defun loop-get-progn ()
-  (do ((forms (list (loop-pop-source)) (cons (loop-pop-source) forms))
-       (nextform (car *loop-source-code*) (car *loop-source-code*)))
-      ((atom nextform)
-       (if (null (cdr forms)) (car forms) (cons 'progn (nreverse forms))))))
-
 (defun loop-get-form ()
   (if *loop-source-code*
       (loop-pop-source)
       (loop-error "LOOP code ran out where a form was expected.")))
+
+(defun loop-get-compound-form ()
+  (let ((form (loop-get-form)))
+    (unless (consp form)
+      (loop-error "A compound form was expected, but ~S found." form))
+    form))
+
+(defun loop-get-progn ()
+  (do ((forms (list (loop-get-compound-form))
+              (cons (loop-get-compound-form) forms))
+       (nextform (car *loop-source-code*)
+                 (car *loop-source-code*)))
+      ((atom nextform)
+       (if (null (cdr forms)) (car forms) (cons 'progn (nreverse forms))))))
 
 (defun loop-construct-return (form)
   `(return-from ,(car *loop-names*) ,form))
@@ -1016,14 +1011,12 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	 (push (list name (or initialization (loop-typed-init dtype)))
 	       *loop-variables*))
 	(initialization
-	 (cond (*loop-destructuring-hooks*
-		(loop-declare-variable name dtype)
-		(push (list name initialization) *loop-variables*))
-	       (t (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
-		    (push (list newvar initialization) *loop-variables*)
-		    ;; *LOOP-DESETQ-CROCKS* gathered in reverse order.
-		    (setq *loop-desetq-crocks*
-		      (list* name newvar *loop-desetq-crocks*))))))
+	 (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
+           (loop-declare-variable name dtype)
+           (push (list newvar initialization) *loop-variables*)
+           ;; *LOOP-DESETQ-CROCKS* gathered in reverse order.
+           (setq *loop-desetq-crocks*
+                 (list* name newvar *loop-desetq-crocks*))))
 	(t (let ((tcar nil) (tcdr nil))
 	     (if (atom dtype) (setq tcar (setq tcdr dtype))
 		 (setq tcar (car dtype) tcdr (cdr dtype)))

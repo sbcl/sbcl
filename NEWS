@@ -886,13 +886,13 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   ** removing dead code
 * Alexey Dejneka fixed many bugs:
   ** misbehavior of WRITE-STRING/WRITE-LINE
-  ** LOOP over keys of a hash table
-  ** bogus entries in BUGS
+  ** LOOP over keys of a hash table, LOOP bugs 49b and 81 and 103, and
+     several other LOOP problems as well
   ** DIRECTORY when similar filenames are present
   ** DEFGENERIC with :METHOD options
   ** bug 126, in (MAKE-STRING N :INITIAL-ELEMENT #\SPACE))
   ** bug in the optimization of ARRAY-ELEMENT-TYPE
-  ** LOOP bugs 49b and 81
+  He also pointed out some bogus old entries in BUGS.
 ?? Old operator names in the style DEF-FOO are now deprecated in favor
   of new corresponding names DEFINE-FOO, for consistency with the
   naming convention used in the ANSI standard). This mostly affects

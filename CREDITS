@@ -491,7 +491,8 @@ CREDITS SINCE THE RELEASE OF SBCL
 (Note: (1) This is probably incomplete, since there's no systematic
 procedure for updating it. (2) Some more details are available in the
 NEWS file, in the project's CVS change logs, and in the archives of
-the sbcl-devel mailing list.)
+the sbcl-devel mailing list. (3) In this, as in other parts of 
+SBCL, patches are welcome.)
 
 Martin Atzmueller:
   He reported many bugs, fixed many bugs, ported various fixes
@@ -503,12 +504,13 @@ Daniel Barlow:
   He contributed sblisp.lisp, a set of patches to make SBCL
   play nicely with ILISP. (Those patches have since disappeared from the
   SBCL distribution because ILISP has since been patched to play nicely
-  with SBCL.) He also figured out how to get the CMU CL dynamic object
-  file loading code to work under SBCL. He ported CMU CL's Alpha
-  port to SBCL. He wrote code (e.g. grovel_headers.c and
+  with SBCL.) He figured out how to get the CMU CL dynamic object
+  file loading code to work under SBCL. He ported CMU CL's support for
+  Alpha and PPC CPUs to SBCL. He wrote code (e.g. grovel_headers.c and
   stat_wrapper stuff) to handle machine-dependence and OS-dependence
   automatically, reducing the amount of hand-tweaking required to
-  keep ports synchronized. 
+  keep ports synchronized. He's also provided support for SBCL (as
+  well as for free Common Lisp in general) through his CLiki website.
 
 Cadabra, Inc. (later merged into GoTo.com):
   They hired Bill Newman to do some consulting for them,
@@ -524,9 +526,11 @@ Douglas Crosher:
   (CONS FOO BAR) types.
 
 Alexey Dejneka:
-  He has fixed many bugs in SBCL. I can't find a nice summary theme,
-  though, except that appears that at least some of them come from
-  going over the BUGS file to find outstanding problems to fix.
+  He has fixed many bugs in SBCL. There's no single summary theme, but
+  he's fixed about a dozen different bugs in LOOP alone, and it appears
+  that a lot of his fixes there and elsewhere reflect systematic
+  public-spiritedness, fixing bugs as they show up in sbcl-devel or as
+  archived in the BUGS file.
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
@@ -535,11 +539,12 @@ Robert MacLachlan:
   porting, invaluable to the SBCL project as well.
 
 Bill Newman:
-  He continued to work on SBCL after the fork, increasing ANSI
+  He continued to maintain SBCL after the fork, increasing ANSI
   compliance, fixing bugs, regularizing the internals of the
   system, deleting unused extensions, improving performance in 
   some areas (especially sequence functions and non-simple vectors),
-  and updating documentation.
+  updating documentation, and even, for better or worse, getting
+  rid of various functionality (e.g. the byte interpreter).
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on
