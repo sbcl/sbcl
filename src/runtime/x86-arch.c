@@ -262,12 +262,32 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     }
 }
 
+static void
+sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
+    os_context_t *context = (os_context_t*)void_context;
+    fprintf(stderr, "\n/entering sigill_handler()\n"); /*REMOVEME*/
+    fake_foreign_function_call(context);
+    ldb_monitor();
+}
+
 void
 arch_install_interrupt_handlers()
 {
     SHOW("entering arch_install_interrupt_handlers()");
-    undoably_install_low_level_interrupt_handler(SIGILL , sigtrap_handler);
+
+    /* Note: The old CMU CL code here used sigtrap_handler() to handle
+     * SIGILL as well as SIGTRAP. I couldn't see any reason to do
+     * things that way. So, I changed to separate handlers when
+     * debugging a problem on OpenBSD, where SBCL wasn't catching
+     * SIGILL properly, but was instead letting the process be
+     * terminated with an "Illegal instruction" output. If this change
+     * turns out to break something (maybe breakpoint handling on some
+     * OS I haven't tested on?) and we have to go back to the old CMU
+     * CL way, I hope there will at least be a comment to explain
+     * why.. -- WHN 2001-06-07 */
+    undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+
     SHOW("returning from arch_install_interrupt_handlers()");
 }
 

@@ -28,7 +28,7 @@
 (defun get-internal-real-time ()
   #!+sb-doc
   "Return the real time in the internal time format. This is useful for
-  finding elapsed time. See Internal-Time-Units-Per-Second."
+  finding elapsed time. See INTERNAL-TIME-UNITS-PER-SECOND."
   ;; FIXME: See comment on OPTIMIZE declaration in GET-INTERNAL-RUN-TIME.
   (declare (optimize (speed 3) (safety 3)))
   (multiple-value-bind (ignore seconds useconds) (sb!unix:unix-gettimeofday)
@@ -47,7 +47,16 @@
 	     (setq *internal-real-time-base-seconds* seconds)
 	     uint)))))
 
-#!-(and sparc svr4)
+;;; REMOVEME once runtime nonmonotonicity problem is debugged
+(defvar *last-utime-sec*)
+(defvar *last-utime-usec*)
+(defvar *last-stime-sec*)
+(defvar *last-stime-usec*)
+(defvar *last-internal-run-time*)
+(push (lambda ()
+	(makunbound '*last-internal-run-time*))
+      *before-save-initializations*)
+
 (defun get-internal-run-time ()
   #!+sb-doc
   "Return the run time in the internal time format. This is useful for
@@ -68,26 +77,36 @@
 	     ;; documented anywhere and the observed behavior is to
 	     ;; sometimes return 1000000 exactly.)
 	     (type (integer 0 1000000) utime-usec stime-usec))
-    (+ (the (unsigned-byte 32)
-	    (* (the (unsigned-byte 32) (+ utime-sec stime-sec))
-	       internal-time-units-per-second))
-       (truncate (+ utime-usec stime-usec)
-		 micro-seconds-per-internal-time-unit))))
 
-#!+(and sparc svr4)
-(defun get-internal-run-time ()
-  #!+sb-doc
-  "Return the run time in the internal time format. This is useful for
-  finding CPU usage."
-  (declare (values (unsigned-byte 32)))
-  ;; FIXME: See comment on OPTIMIZE declaration in other
-  ;; version of GET-INTERNAL-RUN-TIME.
-  (declare (optimize (speed 3) (safety 3)))
-  (multiple-value-bind (ignore utime stime cutime cstime)
-      (sb!unix:unix-times)
-    (declare (ignore ignore cutime cstime)
-	     (type (unsigned-byte 31) utime stime))
-    (the (unsigned-byte 32) (+ utime stime))))
+    (let ((result (+ (the (unsigned-byte 32)
+			  (* (the (unsigned-byte 32) (+ utime-sec stime-sec))
+			     internal-time-units-per-second))
+		     (floor (+ utime-usec
+			       stime-usec
+			       (floor micro-seconds-per-internal-time-unit 2))
+			    micro-seconds-per-internal-time-unit))))
+
+      ;; REMOVEME once runtime nonmonotonicity problem is debugged
+      (when (boundp '*last-internal-run-time*)
+	(unless (>= result *last-internal-run-time*)
+	  (error "non-monotonic:~@
+                  UTIME-SEC ~S ~S~@
+                  UTIME-USEC ~S ~S~@
+                  STIME-SEC ~S ~S~@
+                  STIME-USEC ~S ~S~@
+                  RESULT ~S ~S"
+		 *last-utime-sec* utime-sec
+		 *last-utime-usec* utime-usec
+		 *last-stime-sec* stime-sec
+		 *last-stime-usec* stime-usec
+		 *last-internal-run-time* result)))
+      (setf *last-utime-sec* utime-sec
+	    *last-utime-usec* utime-usec
+	    *last-stime-sec* stime-sec
+	    *last-stime-usec* stime-usec
+	    *last-internal-run-time* result)
+      
+      result)))
 
 ;;;; Encode and decode universal times.
 

@@ -635,7 +635,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     }
 
     interrupt_low_level_handlers[signal] =
-	(ARE_SAME_HANDLER(handler,SIG_DFL) ? 0 : handler);
+	(ARE_SAME_HANDLER(handler, SIG_DFL) ? 0 : handler);
 }
 
 /* This is called from Lisp. */

@@ -763,6 +763,11 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   number changes have affected all CPUs equally. Similarly, 
   the byte fasl file version is now equal to the ordinary
   fasl file version.
+?? minor incompatible change: SB-EXT:GET-BYTES-CONSED now
+  returns the number of bytes consed since the system started,
+  rather than the number consed since the first time the function
+  was called. (The new definition parallels ANSI functions like
+  CL:GET-INTERNAL-RUN-TIME.)
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

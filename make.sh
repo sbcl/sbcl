@@ -79,3 +79,4 @@ sh make-host-1.sh   || exit 1
 sh make-target-1.sh || exit 1
 sh make-host-2.sh   || exit 1
 sh make-target-2.sh || exit 1
+date

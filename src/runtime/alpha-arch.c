@@ -29,14 +29,17 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
+#include "monitor.h"
 
 extern char call_into_lisp_LRA[], call_into_lisp_end[];
 extern size_t os_vm_page_size;
 #define BREAKPOINT_INST 0x80
 
-void arch_init(void)
+void
+arch_init(void)
 {
-    /* this must be called _after_ os_init, so we know what the page size is */
+    /* This must be called _after_ os_init, so we know what the page
+     * size is. */
     if(mmap((os_vm_address_t) call_into_lisp_LRA_page,os_vm_page_size,
 	    OS_VM_PROT_ALL,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)
        == (os_vm_address_t) -1)
@@ -44,8 +47,8 @@ void arch_init(void)
     
     /* call_into_lisp_LRA is a collection of trampolines written in asm -
      * see alpha-assem.S.  We copy it to call_into_lisp_LRA_page where
-     * VOPs and things can find it (I don't know why they can't find it 
-     * where it was to start with). */
+     * VOPs and things can find it. (I don't know why they can't find it 
+     * where it was to start with.) */
     bcopy(call_into_lisp_LRA,(void *)call_into_lisp_LRA_page,os_vm_page_size);
 
     os_flush_icache((os_vm_address_t)call_into_lisp_LRA_page,
@@ -56,49 +59,53 @@ void arch_init(void)
 os_vm_address_t 
 arch_get_bad_addr (int sig, siginfo_t *code, os_context_t *context)
 {
-  unsigned int badinst;
+    unsigned int badinst;
 
-  /* instructions are 32 bit quantities */
-  unsigned int *pc ;
-  /*  fprintf(stderr,"arch_get_bad_addr %d %p %p\n",
-      sig, code, context); */
-  pc= (unsigned int *)(*os_context_pc_addr(context));
+    /* Instructions are 32 bit quantities. */
+    unsigned int *pc ;
+    /*  fprintf(stderr,"arch_get_bad_addr %d %p %p\n",
+	sig, code, context); */
+    pc= (unsigned int *)(*os_context_pc_addr(context));
 
-  if(((unsigned long)pc) & 3) 
-      return NULL;		/* in what case would pc be unaligned? */
+    if(((unsigned long)pc) & 3) {
+	return NULL;		/* In what case would pc be unaligned?? */
+    }
 
-  if( (pc < READ_ONLY_SPACE_START ||
-       pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) && 
-      (pc < current_dynamic_space ||
-       pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE))
-    return NULL;
+    if( (pc < READ_ONLY_SPACE_START ||
+	 pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) && 
+	(pc < current_dynamic_space ||
+	 pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE))
+	return NULL;
 
-  badinst = *pc;
+    badinst = *pc;
 
-  if(((badinst>>27)!=0x16)      /* STL or STQ */
-     && ((badinst>>27)!=0x13))  /* STS or STT */
-    return NULL;                /* Otherwise forget about address */
+    if(((badinst>>27)!=0x16)      /* STL or STQ */
+       && ((badinst>>27)!=0x13))  /* STS or STT */
+	return NULL;                /* Otherwise forget about address. */
   
-  return (os_vm_address_t)
-    (*os_context_register_addr(context,((badinst>>16)&0x1f))
-     +(badinst&0xffff));
+    return (os_vm_address_t)
+	(*os_context_register_addr(context,((badinst>>16)&0x1f))
+	 +(badinst&0xffff));
 }
 
-void arch_skip_instruction(os_context_t *context)
+void
+arch_skip_instruction(os_context_t *context)
 {
-    /* this may be complete rubbish, as (at least for traps) pc points
-     * _after_ the instruction that caused us to be here anyway
+    /* This may be complete rubbish, as (at least for traps) pc points
+     * _after_ the instruction that caused us to be here anyway.
      */
     ((char*)*os_context_pc_addr(context)) +=4; }
 
-unsigned char *arch_internal_error_arguments(os_context_t *context)
+unsigned char *
+arch_internal_error_arguments(os_context_t *context)
 {
   return (unsigned char *)(*os_context_pc_addr(context)+4);
 }
 
-boolean arch_pseudo_atomic_atomic(os_context_t *context)
+boolean
+arch_pseudo_atomic_atomic(os_context_t *context)
 {
-  return ((*os_context_register_addr(context,reg_ALLOC)) & 1);
+    return ((*os_context_register_addr(context,reg_ALLOC)) & 1);
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
@@ -139,7 +146,7 @@ unsigned long arch_install_breakpoint(void *pc)
 void arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 {
   /* was (unsigned int) but gcc complains.  Changed to mirror
-     install_breakpoint above */
+   * install_breakpoint() above */
   unsigned long *ptr=(unsigned long *)pc;
   *ptr = orig_inst;
   os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
@@ -149,9 +156,8 @@ static unsigned int *skipped_break_addr, displaced_after_inst,
      after_breakpoint;
 
 
-/* Returns a PC value.  Lisp code is all in the 32-bit-addressable
-   space,so we should be ok with an unsigned int */
-
+/* This returns a PC value.  Lisp code is all in the 32-bit-addressable
+ * space,so we should be ok with an unsigned int. */
 unsigned int
 emulate_branch(os_context_t *context,unsigned long orig_inst)
 {
@@ -235,9 +241,9 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
   orig_sigmask = *os_context_sigmask_addr(context);
   sigaddset_blockable(os_context_sigmask_addr(context));
 
-  /* Figure out where the displaced inst is going */
+  /* Figure out where the displaced inst is going. */
   if(op == 0x1a || (op&0xf) == 0x30) /* branch...ugh */
-    /* the cast to long is just to shut gcc up */
+    /* The cast to long is just to shut gcc up. */
     next_pc = (unsigned int *)((long)emulate_branch(context,orig_inst));
   else
     next_pc = pc+1;
@@ -247,24 +253,26 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
   os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
   skipped_break_addr = pc;
 
-  /* set the after breakpoint */
+  /* Set the after breakpoint. */
   displaced_after_inst = *next_pc;
   *next_pc = BREAKPOINT_INST;
   after_breakpoint=1;
   os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned long));
 
-  ldb_monitor("sigreturn is not implemented and just failed");
+  ldb_monitor();
   sigreturn(context);
 }
 
 #define AfterBreakpoint 100
 
-static void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
+static void
+sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
     ldb_monitor();
 }
 
-static void sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
+static void
+sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     /* Don't disallow recursive breakpoint traps.  Otherwise, we can't */
     /* use debugger breakpoints anywhere in here. */
@@ -388,7 +396,6 @@ lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
 
 /* This is apparently called by emulate_branch, but isn't defined.  So */
 /* just do nothing and hope it works... */
-
 void cacheflush(void)
 {
     /* hoping probably isn't _actually_ enough.  we should call_pal imb,

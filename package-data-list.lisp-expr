@@ -760,7 +760,6 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; indenting
              "MAKE-INDENTING-STREAM"
-             "INDENTING-FURTHER"
 
              ;; stream commands, used by the debugger
              "GET-STREAM-COMMAND" "MAKE-STREAM-COMMAND" "STREAM-COMMAND"
@@ -1554,7 +1553,7 @@ no guarantees of interface stability."
              "UNIX-PIPE" "UNIX-READ" "UNIX-READLINK" "UNIX-RECV" "UNIX-RENAME"
              "UNIX-RMDIR" "UNIX-SELECT" "UNIX-SEND" "UNIX-SETPGRP"
              "UNIX-SOCKET" "UNIX-STAT" "UNIX-SYMLINK" "UNIX-SYNC"
-             "UNIX-TIMES" "UNIX-TRUNCATE" "UNIX-TTYNAME"
+             "UNIX-TRUNCATE" "UNIX-TTYNAME"
              "UNIX-UID" "UNIX-UNLINK" "UNIX-UTIMES" "UNIX-WRITE" "WINSIZE"
              "WRITEGRP" "WRITEOTH" "WRITEOWN" "WS-COL" "WS-ROW" "WS-XPIXEL"
              "WS-YPIXEL" "W_OK" "X_OK" "SIGSYS" "TCSETPGRP" "FD-ZERO"

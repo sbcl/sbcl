@@ -17,19 +17,25 @@
 
 (in-package "SB!IMPL")
 
-;;;; miscellaneous I/O
+;;;; variables related to saving core files
+;;;;
+;;;; (Most of the save-a-core functionality is defined later, in its
+;;;; own file, but we'd like to have these symbols declared special
+;;;; and initialized ASAP.)
 
-;;; INDENTING-FURTHER is a user-level macro which may be used to locally
-;;; increment the indentation of a stream.
-(defmacro indenting-further (stream more &rest body)
+(defvar *before-save-initializations* nil
   #!+sb-doc
-  "Causes the output of the indenting Stream to indent More spaces. More is
-  evaluated twice."
-  `(unwind-protect
-     (progn
-      (incf (sb!impl::indenting-stream-indentation ,stream) ,more)
-      ,@body)
-     (decf (sb!impl::indenting-stream-indentation ,stream) ,more)))
+  "This is a list of functions which are called before creating a saved core
+  image. These functions are executed in the child process which has no ports,
+  so they cannot do anything that tries to talk to the outside world.")
+
+(defvar *after-save-initializations* nil
+  #!+sb-doc
+  "This is a list of functions which are called when a saved core image starts
+  up. The system itself should be initialized at this point, but applications
+  might not be.")
+
+;;;; miscellaneous I/O
 
 (defun skip-whitespace (&optional (stream *standard-input*))
   (loop (let ((char (read-char stream)))

@@ -104,12 +104,12 @@
 (defvar *last-bytes-in-use* nil)
 (defvar *total-bytes-consed* 0)
 (declaim (type (or index null) *last-bytes-in-use*))
-(declaim (type integer *total-bytes-consed*))
+(declaim (type unsigned-byte *total-bytes-consed*))
 
 (declaim (ftype (function () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
   #!+sb-doc
-  "Returns the number of bytes consed since the first time this function
+  "Return the number of bytes consed since the first time this function
   was called. The first time it is called, it returns zero."
   (declare (optimize (speed 3) (safety 0)))
   (cond ((null *last-bytes-in-use*)
@@ -120,6 +120,9 @@
 	   (incf *total-bytes-consed*
 		 (the index (- bytes *last-bytes-in-use*)))
 	   (setq *last-bytes-in-use* bytes))))
+  ;; FIXME: We should really use something like PCOUNTER to make this
+  ;; hold reliably.
+  (aver (not (minusp *total-bytes-consed*)))
   *total-bytes-consed*)
 
 ;;;; variables and constants
@@ -127,16 +130,12 @@
 ;;; the default value of *BYTES-CONSED-BETWEEN-GCS* and *GC-TRIGGER*
 (defconstant default-bytes-consed-between-gcs 2000000)
 
-;;; This variable is the user-settable variable that specifies the
-;;; minimum amount of dynamic space which must be consed before a GC
-;;; will be triggered.
+;;; the minimum amount of dynamic space which must be consed before a
+;;; GC will be triggered
 ;;;
-;;; Unlike CMU CL, we don't export this variable. (There's no need to, since
-;;; the BYTES-CONSED-BETWEEN-GCS function is SETFable.)
-(defvar *bytes-consed-between-gcs* default-bytes-consed-between-gcs
-  #!+sb-doc
-  "This number specifies the minimum number of bytes of dynamic space
-   that must be consed before the next GC will occur.")
+;;; Unlike CMU CL, we don't export this variable. (There's no need to,
+;;; since the BYTES-CONSED-BETWEEN-GCS function is SETFable.)
+(defvar *bytes-consed-between-gcs* default-bytes-consed-between-gcs)
 (declaim (type index *bytes-consed-between-gcs*))
 
 ;;;; GC hooks
@@ -277,7 +276,6 @@ has finished GC'ing.")
 ;;; the dynamic usage is not greater than *GC-TRIGGER*.
 ;;;
 ;;; For GENCGC all generations < GEN will be GC'ed.
-;;;
 (defun sub-gc (&key  force-p (gen 0))
   (/show0 "entering SUB-GC")
   (unless *already-maybe-gcing*

@@ -277,14 +277,14 @@ call_cmd(char **ptr)
 		    goto fdefn;
 		}
 	    }
-	    printf("symbol 0x%08lx is undefined.\n", (long unsigned)thing);
+	    printf("Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
 	    return;
 
 	  case type_Fdefn:
 	  fdefn:
 	    function = FDEFN(thing)->function;
 	    if (function == NIL) {
-		printf("fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
+		printf("Fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
 		return;
 	    }
 	    break;

@@ -30,13 +30,16 @@
 ;;; bytes consed in a profiled function are all examples of such
 ;;; quantities.)
 (defstruct (pcounter (:copier nil))
-  (integer 0 :type unsigned-byte)
-  (fixnum 0 :type (and fixnum unsigned-byte)))
+  (integer 0);; :type unsigned-byte)
+  (fixnum 0));; :type (and fixnum unsigned-byte)))
 
-(declaim (ftype (function (pcounter integer) pcounter) incf-pcounter))
+;;;(declaim (ftype (function (pcounter unsigned-byte) pcounter) incf-pcounter))
 ;;;(declaim (inline incf-pcounter)) ; FIXME: maybe inline when more stable
 (defun incf-pcounter (pcounter delta)
+  (aver (typep delta 'unsigned-byte))
   (let ((sum (+ (pcounter-fixnum pcounter) delta)))
+    (aver (typep sum 'unsigned-byte))
+    ;;(declare (type unsigned-byte sum))
     (cond ((typep sum 'fixnum)
 	   (setf (pcounter-fixnum pcounter) sum))
 	  (t
@@ -74,10 +77,13 @@
 ;;; (TYPEP DELTA 'FIXNUM) case inline and only calling generic
 ;;; arithmetic as a last resort.
 (defmacro fastbig-incf-pcounter-or-fixnum (x delta)
-  (once-only ((delta delta))
-    `(etypecase ,delta
-       (fixnum (incf-pcounter-or-fixnum ,x ,delta))
-       (integer (incf-pcounter-or-fixnum ,x ,delta)))))
+  (let ((delta-sym (gensym "DELTA")))
+    `(let ((,delta-sym ,delta))
+       (aver (typep ,delta-sym 'unsigned-byte))
+       ;;(declare (type unsigned-byte ,delta-sym))
+       (if (typep ,delta-sym 'fixnum)
+	   (incf-pcounter-or-fixnum ,x ,delta)
+	   (incf-pcounter-or-fixnum ,x ,delta)))))
 
 (declaim (ftype (function ((or pcounter fixnum)) integer) pcounter-or-fixnum->integer))
 (declaim (maybe-inline pcounter-or-fixnum->integer))
@@ -207,8 +213,11 @@
        (let ((dticks 0)
 	     (dconsing 0)
 	     (inner-enclosed-profiles 0))
-	 (declare (type unsigned-byte dticks dconsing))
-	 (declare (type unsigned-byte inner-enclosed-profiles))
+	 ;;(declare (type unsigned-byte dticks dconsing))
+	 ;;(declare (type unsigned-byte inner-enclosed-profiles))
+	 (aver (typep dticks 'unsigned-byte))
+	 (aver (typep dconsing 'unsigned-byte))
+	 (aver (typep inner-enclosed-profiles 'unsigned-byte))
 	 (multiple-value-prog1
 	     (let ((start-ticks (get-internal-ticks))
 		   ;; KLUDGE: We add (THE UNSIGNED-BYTE ..) wrappers
@@ -233,13 +242,21 @@
 					  start-consing))
 		 (setf inner-enclosed-profiles
 		       (pcounter-or-fixnum->integer *enclosed-profiles*))
-		 (fastbig-incf-pcounter-or-fixnum ticks (fastbig-
-							 dticks
-							 *enclosed-ticks*))
-		 (fastbig-incf-pcounter-or-fixnum consing
-						  (fastbig-
-						   dconsing
-						   *enclosed-consing*))
+		 (when (minusp dticks) ; REMOVEME
+		   (error "huh? (GET-INTERNAL-TICKS)=~S START-TICKS=~S"
+			  (get-internal-ticks) start-ticks))
+		 (aver (not (minusp dconsing))) ; REMOVEME
+		 (aver (not (minusp inner-enclosed-profiles))) ; REMOVEME
+		 (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
+		   (when (minusp net-dticks) ; REMOVEME
+		     (error "huh? DTICKS=~S, *ENCLOSED-TICKS*=~S"
+			    dticks *enclosed-ticks*))
+		   (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
+		 (let ((net-dconsing (fastbig- dconsing *enclosed-consing*)))
+		   (when (minusp net-dconsing) ; REMOVEME
+		     (error "huh? DCONSING=~S, *ENCLOSED-CONSING*=~S"
+			    dticks *enclosed-ticks*))
+		   (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
 		 (fastbig-incf-pcounter-or-fixnum profiles
 						  inner-enclosed-profiles)))
 	   (fastbig-incf-pcounter-or-fixnum *enclosed-ticks* dticks)
@@ -249,10 +266,14 @@
 					     inner-enclosed-profiles)))))
      ;; READ-STATS-FUN
      (lambda ()
-       (values (pcounter-or-fixnum->integer count)
-	       (pcounter-or-fixnum->integer ticks)
-	       (pcounter-or-fixnum->integer consing)
-	       (pcounter-or-fixnum->integer profiles)))
+       (format t "/entering READ-STATS-FUN ~S ~S ~S ~S~%"
+	       count ticks consing profiles) ; REMOVEME (and M-V-PROG1 below)
+       (multiple-value-prog1
+	   (values (pcounter-or-fixnum->integer count)
+		   (pcounter-or-fixnum->integer ticks)
+		   (pcounter-or-fixnum->integer consing)
+		   (pcounter-or-fixnum->integer profiles))
+	 (print "/returning from READ-STATS-FUN")))
      ;; CLEAR-STATS-FUN
      (lambda ()
        (setf count 0

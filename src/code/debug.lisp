@@ -1288,10 +1288,10 @@ argument")
 (defvar *cached-readtable* nil)
 (declaim (type (or readtable null) *cached-readtable*))
 
-(pushnew #'(lambda ()
-	     (setq *cached-debug-source* nil *cached-source-stream* nil
-		   *cached-readtable* nil))
-	 sb!int:*before-save-initializations*)
+(pushnew (lambda ()
+	   (setq *cached-debug-source* nil *cached-source-stream* nil
+		 *cached-readtable* nil))
+	 *before-save-initializations*)
 
 ;;; We also cache the last top-level form that we printed a source for
 ;;; so that we don't have to do repeated reads and calls to

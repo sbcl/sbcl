@@ -15,18 +15,6 @@
 
 (in-package "SB!IMPL")
 
-(defvar *before-save-initializations* nil
-  #!+sb-doc
-  "This is a list of functions which are called before creating a saved core
-  image. These functions are executed in the child process which has no ports,
-  so they cannot do anything that tries to talk to the outside world.")
-
-(defvar *after-save-initializations* nil
-  #!+sb-doc
-  "This is a list of functions which are called when a saved core image starts
-  up. The system itself should be initialized at this point, but applications
-  might not be.")
-
 ;;;; SAVE-LISP-AND-DIE itself
 
 (sb!alien:def-alien-routine "save" (sb!alien:boolean)

@@ -395,8 +395,8 @@
 #!-sb-fluid (declaim (inline unix-fast-getrusage))
 (defun unix-fast-getrusage (who)
   (declare (values (member t)
-		   (unsigned-byte 31) (mod 1000000)
-		   (unsigned-byte 31) (mod 1000000)))
+		   (unsigned-byte 31) (integer 0 1000000)
+		   (unsigned-byte 31) (integer 0 1000000)))
   (with-alien ((usage (struct rusage)))
     (syscall* ("getrusage" int (* (struct rusage)))
 	      (values t
