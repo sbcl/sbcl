@@ -2358,7 +2358,17 @@
             (high (numeric-type-high int))
             (low (numeric-type-low int)))
         (when (and size-high posn-high high low
-                   (<= (+ size-high posn-high) sb!vm:n-word-bits))
+		   ;; KLUDGE: we need this cutoff here, otherwise we
+		   ;; will merrily derive the type of %DPB as
+		   ;; (UNSIGNED-BYTE 1073741822), and then attempt to
+		   ;; canonicalize this type to (INTEGER 0 (1- (ASH 1
+		   ;; 1073741822))), with hilarious consequences.  We
+		   ;; cutoff at 4*SB!VM:N-WORD-BITS to allow inference
+		   ;; over a reasonable amount of shifting, even on
+		   ;; the alpha/32 port, where N-WORD-BITS is 32 but
+		   ;; machine integers are 64-bits.  -- CSR,
+		   ;; 2003-09-12
+                   (<= (+ size-high posn-high) (* 4 sb!vm:n-word-bits)))
           (let ((raw-bit-count (max (integer-length high)
                                     (integer-length low)
                                     (+ size-high posn-high))))
