@@ -1375,3 +1375,15 @@ WORKAROUND:
   The tokenizer's use of *read-buffer* and *read-buffer-length* causes
   spurious errors should two threads attempt to tokenise at the same
   time.
+
+312:
+  (reported by Jon Dyte)
+  SBCL issues a warning "Duplicate definition of FOO" compiling
+
+    (declaim (inline foo))
+    (defun foo (x)
+      (1+ x))
+    (defun bar (y)
+      (list (foo y) (if (> y 1) (funcall (if (> y 0) #'foo #'identity) y))))
+
+  (probably related to the bug 280.)
