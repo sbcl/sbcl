@@ -446,8 +446,8 @@
                                 (declare (notinline mapcar))
                                 (1+ (mapcar #'print '(1 2 3)))))))
 
-;; bug found by Paul Dietz: (SETF AREF) for bit vectors with constant
-;; index was effectless
+;;; bug found by Paul Dietz: (SETF AREF) for bit vectors with constant
+;;; index was effectless
 (let ((f (compile nil '(lambda (a v)
                         (declare (type simple-bit-vector a) (type bit v))
                         (declare (optimize (speed 3) (safety 0)))
@@ -463,7 +463,7 @@
 		 (declare (type (simple-array (simple-string 3) (5)) x))
 		 (aref (aref x 0) 0))))
 
-;; compiler failure
+;;; compiler failure
 (let ((f (compile nil '(lambda (x) (typep x '(not (member 0d0)))))))
   (assert (funcall f 1d0)))
 
@@ -472,7 +472,7 @@
 	       (let ((y (* x pi)))
 		 (atan y y))))
 
-;; bogus optimization of BIT-NOT
+;;; bogus optimization of BIT-NOT
 (multiple-value-bind (result x)
     (eval '(let ((x (eval #*1001)))
             (declare (optimize (speed 2) (space 3))
@@ -480,3 +480,14 @@
             (values (bit-not x nil) x)))
   (assert (equal x #*1001))
   (assert (equal result #*0110)))
+
+;;; the VECTOR type in CONCATENATE/MERGE/MAKE-SEQUENCE means (VECTOR T).
+(handler-bind ((sb-ext:compiler-note #'error))
+  (assert (equalp (funcall
+		   (compile
+		    nil
+		    '(lambda ()
+		      (let ((x (make-sequence 'vector 10 :initial-element 'a)))
+			(setf (aref x 4) 'b)
+			x))))
+		  #(a a a a b a a a a a))))

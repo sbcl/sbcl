@@ -335,7 +335,7 @@
 		     :enumerable enumerable))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
-;;; things such as SIMPLE-STRING.
+;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype
 				 (class-info (type-class-or-lose 'array)))
                        (:constructor %make-array-type)
