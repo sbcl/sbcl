@@ -1,28 +1,30 @@
 ;;; -*- lisp -*-
+;;;
+;;; **********************************************************************
+;;; This code was written by Paul Foley and has been placed in the public
+;;; domain.
+;;; 
 
-;;; This code is in the public domain.
-
-;;; The cmucl implementation of simple-streams was done by Paul Foley,
-;;; who placed the code in the public domain.  Sbcl port by Rudi
-;;; Schlatte.
+;;; Sbcl port by Rudi Schlatte.
 
 (in-package "SB-SIMPLE-STREAMS")
 
-;;; (pushnew :sb-simple-stream *features*)
-
 ;;;
-;;; TYPES FOR BUFFER AND STRATEGY FUNCTIONS
+;;; **********************************************************************
 ;;;
+;;; Base class and generic function definitions for simple-streams
 
 ;;; See chapter
 ;;; 12.2 Strategy descriptions necessary for encapsulation
 ;;; in the Franz documentation for a description of the j-xxx-fn slots.
 
+;;;; Types for buffer and strategy functions
+
 (deftype simple-stream-buffer ()
   '(or sb-sys:system-area-pointer (sb-kernel:simple-unboxed-array (*))))
 
 (deftype blocking ()
-  `(member t nil :bnb))
+  '(member t nil :bnb))
 
 (deftype j-listen-fn ()
   '(function (simple-stream) boolean))
@@ -38,290 +40,104 @@
   '(function ((or character null) simple-stream) (or character null)))
 
 (deftype j-write-chars-fn ()
-  '(function (string simple-stream fixnum fixnum) t)) ;; return chars-written?
+  '(function (string simple-stream fixnum fixnum) t)) ; return chars-written?
 
 (deftype j-unread-char-fn ()
-  '(function (simple-stream t) t)) ;; "relaxed" arg is boolean?  what return?
+  '(function (simple-stream t) t)) ; "relaxed" arg is boolean?  what return?
 
-;;;
-;;; STREAM CLASSES
-;;;
-
-;;; KLUDGE (sat 2003-01-15): def-stream-class and the
-;;; with-stream-class / sm accessors implement a form of "sealing" of
-;;; classes -- i.e., implementing very fast slot access at the price
-;;; of not being able to change the class definition at runtime.
-;;; Instead of a method call, a slot access for a simple-stream
-;;; subclass is a funcall or (when the def-stream-class form has a
-;;; location argument for the slot) a sb-pcl::clos-slots-ref.  Given a
-;;; sufficiently advanced PCL with (non-standard) sealing
-;;; declarations, this machinery would be superfluous.  For the time
-;;; being, replacing 4 method calls with vector accesses for the fast
-;;; path of read-char seems worthwhile to me.  Besides, it's the
-;;; documented interface to simple-stream internals, and so it's worth
-;;; keeping.
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim (type hash-table *slot-access-functions*))
-  (defvar *slot-access-functions* (make-hash-table))
-  (defvar *automagic-accessors* nil))
-
-;;; Commented out in favor of standard class machinery that does not
-;;; depend on implementation internals.
-#+nil
-(defmacro def-stream-class (name superclasses slots &rest options)
-  (let ((accessors ())
-	(real-slots ()))
-    (dolist (slot slots)
-      ;; Frob the slot arguments, memorizing either the location (an
-      ;; integer) or the accessor of the slot.  Optionally construct
-      ;; an accessor if none is given.
-      (cond ((and (consp slot) (getf (rest slot) 'sb-pcl::location))
-             ;; We have got a location specifier.  Memorize it and
-             ;; extract it until pcl itself can work with these.
-	     (push (cons (first slot)
-			 (cons (getf (rest slot) :type t)
-			       (getf (rest slot) 'sb-pcl::location)))
-		   accessors)
-	     (let ((slot (copy-list slot)))
-	       (remf (rest slot) 'sb-pcl::location) ; until PCL accepts this
-	       (push slot real-slots)))
-	    ((or (not (consp slot)) (not (getf (rest slot) :accessor)))
-	     (if *automagic-accessors*
-                 ;; Add an :accessor argument, and memorize it.  FIXME:
-                 ;; will this work with sbcl?  reader/writers are
-                 ;; named differently there (see
-                 ;; src/pcl/slot-name.lisp)
-		 (let* ((slot (if (consp slot) slot (list slot)))
-			(accessor (or (cdr (gethash (first slot)
-						    *slot-access-functions*))
-				      (intern (format nil "~A ~A slot ACCESSOR"
-						      name (first slot))
-					      "SB-SLOT-ACCESSOR-NAME"))))
-		   (push (cons (first slot)
-			       (cons (getf (rest slot) :type t) accessor))
-			 accessors)
-		   (push (append slot `(:accessor ,accessor)) real-slots))
-		 (push slot real-slots)))
-	    (t
-             ;; No location given, but we have an accessor.  Memorize it.
-	     (push (cons (first slot)
-			 (cons (getf (rest slot) :type t)
-			       (getf (rest slot) :accessor)))
-		   accessors)
-	     (push slot real-slots))))
-    `(prog1
-	 (defclass ,name ,superclasses ,(nreverse real-slots) ,@options)
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-	 ,@(loop for accessor in accessors
-	      do (let ((exists (gethash (car accessor)
-					*slot-access-functions*)))
-		   (when (and exists
-			      (integerp (cdr exists))
-			      (integerp (cddr accessor))
-			      (/= (cdr exists) (cddr accessor)))
-		     (warn "~S slot ~S has moved!  ~
-			    I hope you know what you're doing!"
-			   name (car accessor))))
-	      collect `(setf (gethash ',(car accessor) *slot-access-functions*)
-			     ',(cdr accessor)))))))
-
-
-(defmacro def-stream-class (name superclasses slots &rest options)
-  (let ((slots (copy-tree slots)))
-    (dolist (slot slots) (remf (cdr slot) 'sb-pcl::location))
-    `(defclass ,name ,superclasses ,slots ,@options)))
+;;;; Base simple-stream classes
 
 (def-stream-class simple-stream (standard-object stream)
-  ((plist :initform nil :type list :accessor stream-plist sb-pcl::location 19)
+  (;; instance flags (not a normal slot in Allegro CL)
+   (%flags :initform 0 :type fixnum)
+   (plist :initform nil :type list :accessor stream-plist)
 
    ;; Strategy slots.  See section 12.2 of streams.htm for function
    ;; signatures and possible side-effects.
 
    ;; A function that determines if one character can be successfully
    ;; read from stream.
-   (j-listen :initform #'sb-kernel:ill-in :type j-listen-fn sb-pcl::location 18)
+   (j-listen :initform #'sb-kernel:ill-in :type j-listen-fn)
    ;; A function that reads one character.
-   (j-read-char :initform #'sb-kernel:ill-in :type j-read-char-fn sb-pcl::location 17)
+   (j-read-char :initform #'sb-kernel:ill-in :type j-read-char-fn)
    ;; A function that reads characters into a string.
-   (j-read-chars :initform #'sb-kernel:ill-in :type j-read-chars-fn sb-pcl::location 16)
+   (j-read-chars :initform #'sb-kernel:ill-in :type j-read-chars-fn)
    ;; A function that writes one character.
-   (j-write-char :initform #'sb-kernel:ill-out :type j-write-char-fn sb-pcl::location 15)
+   (j-write-char :initform #'sb-kernel:ill-out :type j-write-char-fn)
    ;; A function that writes characters from a string into the stream.
-   (j-write-chars :initform #'sb-kernel:ill-out :type j-write-chars-fn sb-pcl::location 14)
+   (j-write-chars :initform #'sb-kernel:ill-out :type j-write-chars-fn)
    ;; A function that unreads the last character read.
-   (j-unread-char :initform #'sb-kernel:ill-in :type j-unread-char-fn sb-pcl::location 13)
+   (j-unread-char :initform #'sb-kernel:ill-in :type j-unread-char-fn)
 
    ;; Other slots
 
-   ;; Always a stream, allowing for composing external formats (see
-   ;; streams.htm, section 12.5) TODO: document this better
-   (melded-stream sb-pcl::location 12)
-   ;; Always a stream, allowing for composing external formats (see
-   ;; streams.htm, section 12.5) TODO: document this better
-   (melding-base sb-pcl::location 11)
-   ;; Number of octets the last read-char operation consumed TODO:
-   ;; document this better; what is the difference to
-   ;; last-char-read-size ?
-   (encapsulated-char-read-size :initform 0 :type fixnum sb-pcl::location 10)
-   (mode :initform 0 :type fixnum sb-pcl::location 9)
-   (control-in :initform nil :type (or null simple-vector)
-	       sb-pcl::location 8)
-   (control-out :initform nil :type (or null simple-vector)
-		sb-pcl::location 7)
+   ;; TODO: find out what this one does
+   (oc-state :initform nil)
+   ;; TODO: find out what this one does
+   (co-state :initform nil)
+   (external-format :initform :default)
+
    ;; A fixnum (denoting a valid file descriptor), a stream, or nil if
    ;; the stream is not open for input.
-   (input-handle :initform nil :initarg :input-handle sb-pcl::location 6
-		 :type (or null fixnum stream)
+   (input-handle :initform nil :initarg :input-handle
+                 :type (or null fixnum stream)
 		 :accessor stream-input-handle)
    ;; A fixnum (denoting a valid file descriptor), a stream, or nil if
    ;; the stream is not open for output.
-   (output-handle :initform nil :initarg :output-handle sb-pcl::location 5
+   (output-handle :initform nil :initarg :output-handle
 		  :type (or null fixnum stream)
 		  :accessor stream-output-handle)
-   (external-format :initform :default sb-pcl::location 4)
-   (record-end :initform nil :type (or null fixnum) sb-pcl::location 3)
-   ;; The character position of the stream.
-   (charpos :initform 0 :type (or null integer) sb-pcl::location 2)
+   (control-in :initform nil :type (or null simple-vector))
+   (control-out :initform nil :type (or null simple-vector))
+
+   ;; a stream, allowing for composing external formats (see
+   ;; streams.htm, section 12.5) TODO: document this better
+   (melded-stream :type (or null simple-stream))
+   ;; a stream, allowing for composing external formats (see
+   ;; streams.htm, section 12.5) TODO: document this better
+   (melding-base :type (or null simple-stream))
+   
+   ;; Number of octets the last read-char operation consumed TODO:
+   ;; document this better; what is the difference to
+   ;; last-char-read-size ?
+   (encapsulated-char-read-size :initform 0 :type fixnum)
    ;; Number of octets the last read-char operation consumed
-   (last-char-read-size :initform 0 :type fixnum sb-pcl::location 1)
-   ;; instance flags (not a normal slot in Allegro CL)
-   (%flags :initform 0 :type fixnum sb-pcl::location 0)))
+   (last-char-read-size :initform 0 :type fixnum)
+   (charpos :initform 0 :type (or null integer)
+	    :accessor stream-line-column)
+   (record-end :initform nil :type (or null fixnum))
 
-(def-stream-class probe-simple-stream (simple-stream)
-  ())
-
-;;; A stream with a single buffer, for example a file stream.
-(def-stream-class single-channel-simple-stream (simple-stream)
   ;; Input/output buffer.
-  ((buffer :initform nil :type (or simple-stream-buffer null)
-           sb-pcl::location 23)
+   (buffer :initform nil :type (or simple-stream-buffer null))
    ;; Current position in buffer.
-   (buffpos :initform 0 :type fixnum sb-pcl::location 22)
+   (buffpos :initform 0 :type fixnum)
    ;; Maximum valid position in buffer, or -1 on eof.
-   (buffer-ptr :initform 0 :type fixnum sb-pcl::location 21)
-   (buf-len :initform 0 :type fixnum sb-pcl::location 20)))
+   (buffer-ptr :initform 0 :type fixnum)
+   (buf-len :initform 0 :type fixnum)
 
-(def-stream-class direct-simple-stream (single-channel-simple-stream)
-  ())
+   (pending :initform nil :type list)
+   (handler :initform nil :type (or null sb-impl::handler))))
 
-(def-stream-class buffer-input-simple-stream (direct-simple-stream)
-  ())
+(def-stream-class single-channel-simple-stream (simple-stream)
+  (;; the "dirty" flag -- if this is > 0, write out buffer contents
+   ;; before changing position; see flush-buffer
+   (mode :initform 0 :type fixnum)))
 
-(def-stream-class buffer-output-simple-stream (direct-simple-stream)
-  ((out-buffer :initform nil :type (or simple-stream-buffer null)
-	       sb-pcl::location 26)
-   ;; Current position in output buffer.
-   (outpos :initform 0 :type fixnum sb-pcl::location 25)
-   ;; Buffer length (one greater than maximum output buffer index)
-   (max-out-pos :initform 0 :type fixnum sb-pcl::location 24)))
-
-(def-stream-class null-simple-stream (single-channel-simple-stream)
-  ())
-
-(def-stream-class file-simple-stream (single-channel-simple-stream)
-  ((pathname :initform nil :initarg :pathname sb-pcl::location 27)
-   (filename :initform nil :initarg :filename sb-pcl::location 26)
-   (original :initform nil :initarg :original sb-pcl::location 25)
-   (delete-original :initform nil :initarg :delete-original
-                    sb-pcl::location 24)
-   ))
-
-(def-stream-class mapped-file-simple-stream (file-simple-stream
-					     direct-simple-stream)
-  ())
-
-;;; A stream with two octet buffers, for example a socket or terminal
-;;; stream.
 (def-stream-class dual-channel-simple-stream (simple-stream)
   (;; Output buffer.
-   (out-buffer :initform nil :type (or simple-stream-buffer null)
-	       sb-pcl::location 26)
+   (out-buffer :initform nil :type (or simple-stream-buffer null))
    ;; Current position in output buffer.
-   (outpos :initform 0 :type fixnum sb-pcl::location 25)
+   (outpos :initform 0 :type fixnum)
    ;; Buffer length (one greater than maximum output buffer index)
-   (max-out-pos :initform 0 :type fixnum sb-pcl::location 24)
-   ;; Input buffer (in this case; the 'buffer' slot serves as
-   ;; bidirectional buffer for single-channel-simple-streams).
-   (buffer :initform nil :type (or simple-stream-buffer null)
-           sb-pcl::location 23)
-   ;; Current position in buffer.
-   (buffpos :initform 0 :type fixnum sb-pcl::location 22)
-   ;; Maximum valid position in buffer, or -1 on eof.
-   (buffer-ptr :initform 0 :type fixnum sb-pcl::location 21)
-   (buf-len :initform 0 :type fixnum sb-pcl::location 20)))
-
-(def-stream-class terminal-simple-stream (dual-channel-simple-stream)
-  ())
-
-(def-stream-class socket-simple-stream (dual-channel-simple-stream)
-  ((socket :initform nil :type (or sb-bsd-sockets:socket null)
-           :initarg :socket sb-pcl::location 27)))
-
-(def-stream-class socket-base-simple-stream (dual-channel-simple-stream)
-  ())
-
-(def-stream-class hiper-socket-simple-stream (dual-channel-simple-stream)
-  ())
+   (max-out-pos :initform 0 :type fixnum)))
 
 ;;; A stream with a string as buffer.
 (def-stream-class string-simple-stream (simple-stream)
   ())
 
-(def-stream-class composing-stream (string-simple-stream)
-  ())
 
-(def-stream-class string-input-simple-stream (string-simple-stream)
-  (;; The input buffer.
-   (buffer :initform nil :type (or simple-stream-buffer null)
-           sb-pcl::location 23)
-   ;; Current position in buffer.
-   (buffpos :initform 0 :type fixnum sb-pcl::location 22)
-   ;; Maximum valid position in buffer, or -1 on eof.
-   (buffer-ptr :initform 0 :type fixnum sb-pcl::location 21)
-   (buf-len :initform 0 :type fixnum sb-pcl::location 20)))
+;;; ======================================================
 
-(def-stream-class string-output-simple-stream (string-simple-stream)
-  (;; The input buffer.
-   (buffer :initform nil :type (or simple-stream-buffer null)
-            sb-pcl::location 26)
-   ;; Current position in input buffer.
-   (buffpos :initform 0 :type fixnum  sb-pcl::location 25)
-   ;; Maximum valid position in input buffer, or -1 on eof.
-   (buffer-ptr :initform 0 :type fixnum  sb-pcl::location 24)
-   (buf-len :initform 0 :type fixnum sb-pcl::location 23)
-   ;; The output buffer (slot added so that a class can inherit from
-   ;; both string-input-simple-stream and string-output-simple-stream
-   ;; without the strategies clashing)
-   (out-buffer :initform nil :type (or simple-stream-buffer null)
-                sb-pcl::location 22)
-   ;; Current position in output buffer.
-   (outpos :initform 0 :type fixnum sb-pcl::location 21)
-   ;; Buffer length (one greater than maximum output buffer index)
-   (max-out-pos :initform 0 :type fixnum sb-pcl::location 20)))
-
-(def-stream-class fill-pointer-output-simple-stream
-    (string-output-simple-stream)
-  ())
-
-(def-stream-class limited-string-output-simple-stream
-    (string-output-simple-stream)
-  ())
-
-(def-stream-class xp-simple-stream (string-output-simple-stream)
-  ())
-
-(def-stream-class annotation-output-simple-stream (string-output-simple-stream)
-  ())
-
-
-(defclass default-latin1-base-ef () ())
-(defclass stream-recording-mixin () ())
-(defclass stream-recording-repaint-mixin () ())
-
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf *automagic-accessors* nil))
 
 ;;;
 ;;; DEVICE-LEVEL FUNCTIONS
@@ -348,3 +164,110 @@
 (defgeneric device-clear-output (stream))
 
 (defgeneric device-finish-record (stream blocking action))
+
+
+(defmethod shared-initialize :after ((instance simple-stream) slot-names
+				     &rest initargs &key &allow-other-keys)
+  (declare (ignore slot-names))
+  (unless (slot-boundp instance 'melded-stream)
+    (setf (slot-value instance 'melded-stream) instance)
+    (setf (slot-value instance 'melding-base) instance))
+  (unless (device-open instance initargs)
+    (device-close instance t)))
+
+
+(defmethod print-object ((object simple-stream) stream)
+  (print-unreadable-object (object stream :type nil :identity nil)
+    (cond ((not (any-stream-instance-flags object :simple))
+	   (princ "Invalid " stream))
+	  ((not (any-stream-instance-flags object :input :output))
+	   (princ "Closed " stream)))
+    (format stream "~:(~A~)" (type-of object))))
+
+;;; This takes care of the things all device-close methods have to do,
+;;; regardless of the type of simple-stream
+(defmethod device-close :around ((stream simple-stream) abort)
+  (with-stream-class (simple-stream stream)
+    (when (any-stream-instance-flags stream :input :output)
+      (when (any-stream-instance-flags stream :output)
+	(ignore-errors (if abort
+                           (clear-output stream)
+                           (force-output stream))))
+      (call-next-method)
+      (setf (sm input-handle stream) nil
+	    (sm output-handle stream) nil)
+      (remove-stream-instance-flags stream :input :output)
+      (sb-ext:cancel-finalization stream)
+      ;; This sets all readers and writers to error-raising functions
+      (setf (stream-external-format stream) :void))))
+
+(defmethod device-close ((stream simple-stream) abort)
+  (declare (ignore abort))
+  t)
+
+(defmethod device-buffer-length ((stream simple-stream))
+  4096)
+
+(defmethod device-file-position ((stream simple-stream))
+  (with-stream-class (simple-stream stream)
+    (sm buffpos stream)))
+
+(defmethod (setf device-file-position) (value (stream simple-stream))
+  (with-stream-class (simple-stream stream)
+    (setf (sm buffpos stream) value)))
+
+(defmethod device-file-length ((stream simple-stream))
+  nil)
+
+(defgeneric (setf stream-external-format) (value stream))
+
+(defmethod (setf stream-external-format) :before (value (stream simple-stream))
+  ;; (unless (eq value (sm external-format stream))
+  ;;   flush out the existing external-format
+  )
+
+(defmethod (setf stream-external-format) :after
+    (ef (stream single-channel-simple-stream))
+  (compose-encapsulating-streams stream ef)
+  (install-single-channel-character-strategy (melding-stream stream) ef nil))
+
+(defmethod (setf stream-external-format) :after
+    (ef (stream dual-channel-simple-stream))
+  (compose-encapsulating-streams stream ef)
+  (install-dual-channel-character-strategy (melding-stream stream) ef))
+
+
+(defmethod device-read ((stream single-channel-simple-stream) buffer
+			start end blocking)
+  (read-octets stream buffer start end blocking))
+
+(defmethod device-read ((stream dual-channel-simple-stream) buffer
+			start end blocking)
+  (read-octets stream buffer start end blocking))
+
+(defmethod device-clear-input ((stream simple-stream) buffer-only)
+  (declare (ignore buffer-only))
+  nil)
+
+(defmethod device-write ((stream single-channel-simple-stream) buffer
+                         start end blocking)
+  ;; buffer may be :flush to force/finish-output
+  (when (or (and (null buffer) (not (eql start end)))
+	    (eq buffer :flush))
+    (with-stream-class (single-channel-simple-stream stream)
+      (setf buffer (sm buffer stream))
+      (setf end (sm buffpos stream))))
+  (write-octets stream buffer start end blocking))
+
+(defmethod device-write ((stream dual-channel-simple-stream) buffer
+                         start end blocking)
+  ;; buffer may be :flush to force/finish-output
+  (when (or (and (null buffer) (not (eql start end)))
+	    (eq buffer :flush))
+    (with-stream-class (dual-channel-simple-stream stream)
+      (setf buffer (sm out-buffer stream))
+      (setf end (sm outpos stream))))
+  (write-octets stream buffer start end blocking))
+
+(defmethod device-clear-output ((stream simple-stream))
+  nil)

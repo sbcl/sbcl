@@ -14,7 +14,7 @@
                    *load-truename*)
   "Directory for temporary test files.")
 
-(eval-when (:load-toplevel) (ensure-directories-exist *test-path*))
+(eval-when (:load-toplevel) (ensure-directories-exist *test-path* :verbose t))
 
 ;;; Non-destructive functional analog of REMF
 (defun remove-key (key list)

@@ -1,22 +1,30 @@
 -*- text -*-
 
-- Test writing beyond the end of a mapped-simple-stream
+- Implement & test read-sequence, write-sequence for (un)signed-8 vectors
+
+- Make reader work with simple-streams
+
+- external format handling: load aliases, load formats, etc.
+
+- Handle writing beyond the end of a mapped-simple-stream properly
+
+- handle device-file-position for mapped streams
 
 - Test write-octets / read-octets handling of encapsulated streams
 
-- handle ansi-streams in write-octets / read-octets
+- handle ansi-streams in write-octets / read-octets?
 
 - Implement socket-base-simple-stream and chunked transfer encoding.
 
-- Implement / test string streams.
+- Test string streams.
 
 - Make sure the code examples for stream encapsulation from Franz work
 
 - Test every single output function
 
-- Handle character position (slot charpos)
-
-- make file-position work for non-file streams, where applicable
+- Test character position (slot charpos)
 
 - make pathname work for simple-streams
+
+- test :abort argument to close (should revert to original file)
 

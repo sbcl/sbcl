@@ -9,8 +9,7 @@ Documentation about simple streams is available at
 http://www.franz.com/support/documentation/6.2/doc/streams.htm
 
 This code was originally written by Paul Foley for cmucl; Paul's
-version resides (as of 2003-05-12) at
-http://users.actrix.co.nz/mycroft/cl.html
+version is now in cmucl cvs.
 
 The port to sbcl was done by Rudi Schlatte (rudi@constantly.at).
 
