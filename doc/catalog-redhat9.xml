@@ -11,34 +11,34 @@
     <!-- Resolve DTD URL system ID to local file -->
     <rewriteSystem
         systemIdStartString="http://www.oasis-open.org/docbook/xml/4.1/"
-        rewritePrefix="xml-dtd-4.1/" />
+        rewritePrefix="xml-dtd-4.1.2-1.0-17/" />
 
     <!-- FIXME: Need to verify the location of the XSL files on RedHat -->
     <!-- Resolve stylesheet URL to local file -->
     <rewriteURI
         uriStartString="http://docbook.sourceforge.net/release/xsl/current/"
-        rewritePrefix="stylesheet/xsl/nwalsh/" />
+        rewritePrefix="xsl-stylesheets/" />
 
     <!-- Resolve DTD PUBLIC identifiers -->
-    <nextCatalog  catalog="dtd/xml/4.1/catalog.xml" />
+    <nextCatalog  catalog="xmlcatalog" />
 
     <!-- To resolve simple DTD SYSTEM identifiers. -->
     <!-- Note: this does not work with Java resolver -->
     <!--   classes in Saxon or Xalan -->
     <system
          systemId="docbook.dtd"
-         uri="xml-dtd-4.1/docbookx.dtd" />
+         uri="xml-dtd-4.1.2-1.0-17/docbookx.dtd" />
 
     <!-- To resolve short stylesheet references -->
     <uri
         name="docbook_html.xsl"
-        uri="stylesheet/xsl/nwalsh/xhtml/docbook.xsl" />
+        uri="xsl-stylesheets/xhtml/docbook.xsl" />
     <uri 
         name="docbook_chunk.xsl"
-        uri="stylesheet/xsl/nwalsh/xhtml/chunk.xsl" />
+        uri="xsl-stylesheets/xhtml/chunk.xsl" />
     <uri
         name="docbook_fo.xsl"
-        uri="stylesheet/xsl/nwalsh/fo/docbook.xsl" />
+        uri="xsl-stylesheets/fo/docbook.xsl" />
 
   </group>
 

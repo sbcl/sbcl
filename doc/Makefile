@@ -19,8 +19,8 @@ ifeq ($(SYSTEM),Linux)
     ifneq ($(shell expr "`cat /etc/issue`" : '.*SuSE.*'),0)
       OS=suse
     else   
-      ifneq ($(shell expr "`cat /etc/issue`" : '.*RedHat.*'),0)
-        OS=redhat
+      ifneq ($(shell expr "`cat /etc/issue`" : 'Red Hat Linux release 9'),0)
+        OS=redhat9
       endif
     endif
   endif
