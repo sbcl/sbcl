@@ -185,41 +185,40 @@
 ;;; does 32 bits at a time.
 ;;;
 ;;; FIXME: This is a lot of repeatedly macroexpanded code. It should be a
-;;; function call instead. And do it with DEF-FROB instead of DOLIST.
-(dolist (x '((bit-and 32bit-logical-and)
-	     (bit-ior 32bit-logical-or)
-	     (bit-xor 32bit-logical-xor)
-	     (bit-eqv 32bit-logical-eqv)
-	     (bit-nand 32bit-logical-nand)
-	     (bit-nor 32bit-logical-nor)
-	     (bit-andc1 32bit-logical-andc1)
-	     (bit-andc2 32bit-logical-andc2)
-	     (bit-orc1 32bit-logical-orc1)
-	     (bit-orc2 32bit-logical-orc2)))
-  (destructuring-bind (bitfun wordfun) x
-    (deftransform bitfun
-		  ((bit-array-1 bit-array-2 result-bit-array)
-		   '(simple-bit-vector simple-bit-vector simple-bit-vector) '*
-		   :eval-name t :node node :policy (>= speed space))
-      `(progn
-	 ,@(unless (policy node (zerop safety))
-	     '((unless (= (length bit-array-1) (length bit-array-2)
-			  (length result-bit-array))
-		 (error "Argument and/or result bit arrays are not the same length:~
+;;; function call instead.
+(macrolet ((def-frob (bitfun wordfun)
+             `(deftransform ,bitfun ((bit-array-1 bit-array-2 result-bit-array)
+                                     (simple-bit-vector simple-bit-vector simple-bit-vector) *
+                                     :node node :policy (>= speed space))
+                `(progn
+                   ,@(unless (policy node (zerop safety))
+                             '((unless (= (length bit-array-1) (length bit-array-2)
+                                          (length result-bit-array))
+                                 (error "Argument and/or result bit arrays are not the same length:~
 			 ~%  ~S~%  ~S  ~%  ~S"
-			bit-array-1 bit-array-2 result-bit-array))))
-	 (do ((index sb!vm:vector-data-offset (1+ index))
-	      (end (+ sb!vm:vector-data-offset
-		      (truncate (the index
-				     (+ (length bit-array-1)
-					sb!vm:n-word-bits -1))
-				sb!vm:n-word-bits))))
-	     ((= index end) result-bit-array)
-	   (declare (optimize (speed 3) (safety 0))
-		    (type index index end))
-	   (setf (%raw-bits result-bit-array index)
-		 (,wordfun (%raw-bits bit-array-1 index)
-			   (%raw-bits bit-array-2 index))))))))
+                                        bit-array-1 bit-array-2 result-bit-array))))
+                  (do ((index sb!vm:vector-data-offset (1+ index))
+                       (end (+ sb!vm:vector-data-offset
+                               (truncate (the index
+                                           (+ (length bit-array-1)
+                                              sb!vm:n-word-bits -1))
+                                         sb!vm:n-word-bits))))
+                      ((= index end) result-bit-array)
+                    (declare (optimize (speed 3) (safety 0))
+                             (type index index end))
+                    (setf (%raw-bits result-bit-array index)
+                          (,',wordfun (%raw-bits bit-array-1 index)
+                                      (%raw-bits bit-array-2 index))))))))
+ (def-frob bit-and 32bit-logical-and)
+ (def-frob bit-ior 32bit-logical-or)
+ (def-frob bit-xor 32bit-logical-xor)
+ (def-frob bit-eqv 32bit-logical-eqv)
+ (def-frob bit-nand 32bit-logical-nand)
+ (def-frob bit-nor 32bit-logical-nor)
+ (def-frob bit-andc1 32bit-logical-andc1)
+ (def-frob bit-andc2 32bit-logical-andc2)
+ (def-frob bit-orc1 32bit-logical-orc1)
+ (def-frob bit-orc2 32bit-logical-orc2))
 
 (deftransform bit-not
 	      ((bit-array result-bit-array)

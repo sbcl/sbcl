@@ -682,20 +682,27 @@
 ;;;; and eliminates the need for any VM-dependent transforms to handle
 ;;;; these cases.
 
-(dolist (fun '(bit-and bit-ior bit-xor bit-eqv bit-nand bit-nor bit-andc1
-		       bit-andc2 bit-orc1 bit-orc2))
-  ;; Make a result array if result is NIL or unsupplied.
-  (deftransform fun ((bit-array-1 bit-array-2 &optional result-bit-array)
-		     '(bit-vector bit-vector &optional null) '*
-		     :eval-name t
-		     :policy (>= speed space))
-    `(,fun bit-array-1 bit-array-2
-	   (make-array (length bit-array-1) :element-type 'bit)))
-  ;; If result is T, make it the first arg.
-  (deftransform fun ((bit-array-1 bit-array-2 result-bit-array)
-		     '(bit-vector bit-vector (member t)) '*
-		     :eval-name t)
-    `(,fun bit-array-1 bit-array-2 bit-array-1)))
+(macrolet ((def-frob (fun)
+             `(progn
+               (deftransform ,fun ((bit-array-1 bit-array-2 &optional result-bit-array)
+                                   (bit-vector bit-vector &optional null) *
+                                   :policy (>= speed space))
+                 `(,',fun bit-array-1 bit-array-2
+                   (make-array (length bit-array-1) :element-type 'bit)))
+               ;; If result is T, make it the first arg.
+               (deftransform ,fun ((bit-array-1 bit-array-2 result-bit-array)
+                                   (bit-vector bit-vector (member t)) *)
+                 `(,',fun bit-array-1 bit-array-2 bit-array-1)))))
+  (def-frob bit-and)
+  (def-frob bit-ior)
+  (def-frob bit-xor)
+  (def-frob bit-eqv)
+  (def-frob bit-nand)
+  (def-frob bit-nor)
+  (def-frob bit-andc1)
+  (def-frob bit-andc2)
+  (def-frob bit-orc1)
+  (def-frob bit-orc2))
 
 ;;; Similar for BIT-NOT, but there is only one arg...
 (deftransform bit-not ((bit-array-1 &optional result-bit-array)

@@ -390,59 +390,61 @@
   (double-float) double-float
   (movable foldable flushable))
 
-(dolist (stuff '((exp %exp *)
-		 (log %log float)
-		 (sqrt %sqrt float)
-		 (asin %asin float)
-		 (acos %acos float)
-		 (atan %atan *)
-		 (sinh %sinh *)
-		 (cosh %cosh *)
-		 (tanh %tanh *)
-		 (asinh %asinh *)
-		 (acosh %acosh float)
-		 (atanh %atanh float)))
-  (destructuring-bind (name prim rtype) stuff
-    (deftransform name ((x) '(single-float) rtype :eval-name t)
-      `(coerce (,prim (coerce x 'double-float)) 'single-float))
-    (deftransform name ((x) '(double-float) rtype :eval-name t :when :both)
-      `(,prim x))))
+(macrolet ((def-frob (name prim rtype)
+             `(progn
+               (deftransform ,name ((x) (single-float) ,rtype)
+                 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
+               (deftransform ,name ((x) (double-float) ,rtype :when :both)
+                 `(,',prim x)))))
+  (def-frob exp %exp *)
+  (def-frob log %log float)
+  (def-frob sqrt %sqrt float)
+  (def-frob asin %asin float)
+  (def-frob acos %acos float)
+  (def-frob atan %atan *)
+  (def-frob sinh %sinh *)
+  (def-frob cosh %cosh *)
+  (def-frob tanh %tanh *)
+  (def-frob asinh %asinh *)
+  (def-frob acosh %acosh float)
+  (def-frob atanh %atanh float))
 
 ;;; The argument range is limited on the x86 FP trig. functions. A
 ;;; post-test can detect a failure (and load a suitable result), but
 ;;; this test is avoided if possible.
-(dolist (stuff '((sin %sin %sin-quick)
-		 (cos %cos %cos-quick)
-		 (tan %tan %tan-quick)))
-  (destructuring-bind (name prim prim-quick) stuff
-    (declare (ignorable prim-quick))
-    (deftransform name ((x) '(single-float) '* :eval-name t)
-      #!+x86 (cond ((csubtypep (continuation-type x)
-			       (specifier-type '(single-float
-						 (#.(- (expt 2f0 64)))
-						 (#.(expt 2f0 64)))))
-		    `(coerce (,prim-quick (coerce x 'double-float))
-		    'single-float))
-		   (t
-		    (compiler-note
-		    "unable to avoid inline argument range check~@
-		      because the argument range (~S) was not within 2^64"
-		    (type-specifier (continuation-type x)))
-		    `(coerce (,prim (coerce x 'double-float)) 'single-float)))
-      #!-x86 `(coerce (,prim (coerce x 'double-float)) 'single-float))
-    (deftransform name ((x) '(double-float) '* :eval-name t :when :both)
-      #!+x86 (cond ((csubtypep (continuation-type x)
-			       (specifier-type '(double-float
-						 (#.(- (expt 2d0 64)))
-						 (#.(expt 2d0 64)))))
-		    `(,prim-quick x))
-		   (t
-		    (compiler-note
-		    "unable to avoid inline argument range check~@
-		   because the argument range (~S) was not within 2^64"
-		    (type-specifier (continuation-type x)))
-		    `(,prim x)))
-      #!-x86 `(,prim x))))
+(macrolet ((def-frob (name prim prim-quick)
+             (declare (ignorable prim-quick))
+             `(progn
+                (deftransform ,name ((x) (single-float) *)
+                  #!+x86 (cond ((csubtypep (continuation-type x)
+                                           (specifier-type '(single-float
+                                                             (#.(- (expt 2f0 64)))
+                                                             (#.(expt 2f0 64)))))
+                                `(coerce (,',prim-quick (coerce x 'double-float))
+                                  'single-float))
+                               (t
+                                (compiler-note
+                                 "unable to avoid inline argument range check~@
+                                  because the argument range (~S) was not within 2^64"
+                                 (type-specifier (continuation-type x)))
+                                `(coerce (,',prim (coerce x 'double-float)) 'single-float)))
+                  #!-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
+               (deftransform ,name ((x) (double-float) * :when :both)
+                 #!+x86 (cond ((csubtypep (continuation-type x)
+                                          (specifier-type '(double-float
+                                                            (#.(- (expt 2d0 64)))
+                                                            (#.(expt 2d0 64)))))
+                               `(,',prim-quick x))
+                              (t
+                               (compiler-note
+                                "unable to avoid inline argument range check~@
+                                 because the argument range (~S) was not within 2^64"
+                                (type-specifier (continuation-type x)))
+                               `(,',prim x)))
+                 #!-x86 `(,',prim x)))))
+  (def-frob sin %sin %sin-quick)
+  (def-frob cos %cos %cos-quick)
+  (def-frob tan %tan %tan-quick))
 
 (deftransform atan ((x y) (single-float single-float) *)
   `(coerce (%atan2 (coerce x 'double-float) (coerce y 'double-float))

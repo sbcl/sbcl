@@ -2665,20 +2665,18 @@
 
 ;;; Flush calls to various arith functions that convert to the
 ;;; identity function or a constant.
-;;;
-;;; FIXME: Rewrite as DEF-FROB.
-(dolist (stuff '((ash 0 x)
-		 (logand -1 x)
-		 (logand 0 0)
-		 (logior 0 x)
-		 (logior -1 -1)
-		 (logxor -1 (lognot x))
-		 (logxor 0 x)))
-  (destructuring-bind (name identity result) stuff
-    (deftransform name ((x y) `(* (constant-argument (member ,identity))) '*
-			:eval-name t :when :both)
-      "fold identity operations"
-      result)))
+(macrolet ((def-frob (name identity result)
+             `(deftransform ,name ((x y) (* (constant-argument (member ,identity)))
+                                    * :when :both)
+                "fold identity operations"
+                ',result)))
+  (def-frob ash 0 x)
+  (def-frob logand -1 x)
+  (def-frob logand 0 0)
+  (def-frob logior 0 x)
+  (def-frob logior -1 -1)
+  (def-frob logxor -1 (lognot x))
+  (def-frob logxor 0 x))
 
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.
@@ -2752,18 +2750,18 @@
   'x)
 
 ;;; Fold (OP x +/-1)
-(dolist (stuff '((* x (%negate x))
-		 (/ x (%negate x))
-		 (expt x (/ 1 x))))
-  (destructuring-bind (name result minus-result) stuff
-    (deftransform name ((x y) '(t (constant-argument real)) '* :eval-name t
-			:when :both)
-      "fold identity operations"
-      (let ((val (continuation-value y)))
-	(unless (and (= (abs val) 1)
-		     (not-more-contagious y x))
-	  (give-up-ir1-transform))
-	(if (minusp val) minus-result result)))))
+(macrolet ((def-frob (name result minus-result)
+             `(deftransform ,name ((x y) (t (constant-argument real))
+                                    * :when :both)
+                "fold identity operations"
+                (let ((val (continuation-value y)))
+                  (unless (and (= (abs val) 1)
+                               (not-more-contagious y x))
+                    (give-up-ir1-transform))
+                  (if (minusp val) ',minus-result ',result)))))
+  (def-frob * x (%negate x))
+  (def-frob / x (%negate x))
+  (def-frob expt x (/ 1 x)))
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.
@@ -2788,21 +2786,25 @@
 ;;; KLUDGE: Shouldn't (/ 0.0 0.0), etc. cause exceptions in these
 ;;; transformations?
 ;;; Perhaps we should have to prove that the denominator is nonzero before
-;;; doing them? (Also the DOLIST over macro calls is weird. Perhaps
-;;; just FROB?) -- WHN 19990917
-;;;
-;;; FIXME: What gives with the single quotes in the argument lists
-;;; for DEFTRANSFORMs here? Does that work? Is it needed? Why?
-(dolist (name '(ash /))
-  (deftransform name ((x y) '((constant-argument (integer 0 0)) integer) '*
-		      :eval-name t :when :both)
-    "fold zero arg"
-    0))
-(dolist (name '(truncate round floor ceiling))
-  (deftransform name ((x y) '((constant-argument (integer 0 0)) integer) '*
-		      :eval-name t :when :both)
-    "fold zero arg"
-    '(values 0 0)))
+;;; doing them?  -- WHN 19990917
+(macrolet ((def-frob (name)
+             `(deftransform ,name ((x y) ((constant-argument (integer 0 0)) integer)
+                                   * :when :both)
+                "fold zero arg"
+                0)))
+  (def-frob ash)
+  (def-frob /))
+
+(macrolet ((def-frob (name)
+             `(deftransform ,name ((x y) ((constant-argument (integer 0 0)) integer)
+                                   * :when :both)
+                "fold zero arg"
+                '(values 0 0))))
+  (def-frob truncate)
+  (def-frob round)
+  (def-frob floor)
+  (def-frob ceiling))
+
 
 ;;;; character operations
 
@@ -2860,8 +2862,11 @@
 	(t
 	 (give-up-ir1-transform))))
 
-(dolist (x '(eq char= equal))
-  (%deftransform x '(function * *) #'simple-equality-transform))
+(macrolet ((def-frob (x)
+             `(%deftransform ',x '(function * *) #'simple-equality-transform)))
+  (def-frob eq)
+  (def-frob char=)
+  (def-frob equal))
 
 ;;; This is similar to SIMPLE-EQUALITY-PREDICATE, except that we also
 ;;; try to convert to a type-specific predicate or EQ:

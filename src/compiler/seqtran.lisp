@@ -227,15 +227,8 @@
 (deftransform %setelt ((s i v) (list * *))
   '(setf (car (nthcdr i s)) v))
 
-;;; FIXME: The MACROLET ... DEF-FROB ... DEFTRANSFORM idioms in this
-;;; file are literal translations of old CMU CL DOLIST ... DEFTRANSFORM,
-;;; and so use :EVAL-NAME for historical reasons. It'd be tidier to
-;;; just let macroexpansion substitution take care of everything,
-;;; and remove both :EVAL-NAME and the extra layer of quotes.
-
 (macrolet ((def-frob (name)
-             `(deftransform ',name ((e l &key (test #'eql)) '* '* :node node :when :both
-                                    :eval-name t)
+             `(deftransform ,name ((e l &key (test #'eql)) * * :node node :when :both)
                 (unless (constant-continuation-p l)
                   (give-up-ir1-transform))
 
@@ -261,8 +254,7 @@
 ;;; this was done, a few bytes could be saved by a call to a shared
 ;;; function.  This remains to be done.
 (macrolet ((def-frob (fun eq-fun)
-             `(deftransform ',fun ((item list &key test) '(t list &rest t) '*
-                                   :eval-name t)
+             `(deftransform ,fun ((item list &key test) (t list &rest t) *)
                 "convert to EQ test"
                 ;; FIXME: The scope of this transformation could be
                 ;; widened somewhat, letting it work whenever the test is
@@ -543,9 +535,9 @@
 ;;; version. This is an IR1 transform so that we don't have to worry about
 ;;; changing the order of evaluation.
 (macrolet ((def-frob (fun pred*)
-             `(deftransform ',fun ((string1 string2 &key (start1 0) end1
+             `(deftransform ,fun ((string1 string2 &key (start1 0) end1
                                                          (start2 0) end2)
-                                   '* '* :eval-name t)
+                                   * *)
                 `(,',pred* string1 string2 start1 end1 start2 end2))))
   (def-frob string< string<*)
   (def-frob string> string>*)
@@ -559,9 +551,8 @@
 ;;; start and end are also gotten from the environment. Both strings
 ;;; must be SIMPLE-STRINGs.
 (macrolet ((def-frob (name lessp equalp)
-             `(deftransform ',name ((string1 string2 start1 end1 start2 end2)
-                                    '(simple-string simple-string t t t t) '*
-                                    :eval-name t)
+             `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
+                                    (simple-string simple-string t t t t) *)
                 `(let* ((end1 (if (not end1) (length string1) end1))
                         (end2 (if (not end2) (length string2) end2))
                         (index (sb!impl::%sp-string-compare
@@ -585,9 +576,8 @@
   (def-frob string>=* nil t))
 
 (macrolet ((def-frob (name result-fun)
-             `(deftransform ',name ((string1 string2 start1 end1 start2 end2)
-                                   '(simple-string simple-string t t t t) '*
-                                   :eval-name t)
+             `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
+                                   (simple-string simple-string t t t t) *)
                 `(,',result-fun
                   (sb!impl::%sp-string-compare
                    string1 start1 (or end1 (length string1))

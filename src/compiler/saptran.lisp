@@ -109,10 +109,14 @@
 
 ;;;; transforms for converting sap relation operators
 
-(dolist (info '((sap< <) (sap<= <=) (sap= =) (sap>= >=) (sap> >)))
-  (destructuring-bind (sap-fun int-fun) info
-    (deftransform sap-fun ((x y) '* '* :eval-name t)
-      `(,int-fun (sap-int x) (sap-int y)))))
+(macrolet ((def-frob (sap-fun int-fun)
+             `(deftransform ,sap-fun ((x y) * *)
+                `(,',int-fun (sap-int x) (sap-int y)))))
+  (def-frob sap< <)
+  (def-frob sap<= <=)
+  (def-frob sap= =)
+  (def-frob sap>= >=)
+  (def-frob sap> >))
 
 ;;;; transforms for optimizing SAP+
 
@@ -125,18 +129,32 @@
 	 '(lambda (sap offset1 offset2)
 	    (sap+ sap (+ offset1 offset2))))))
 
-(dolist (fun '(sap-ref-8 %set-sap-ref-8
-	       signed-sap-ref-8 %set-signed-sap-ref-8
-	       sap-ref-16 %set-sap-ref-16
-	       signed-sap-ref-16 %set-signed-sap-ref-16
-	       sap-ref-32 %set-sap-ref-32
-	       signed-sap-ref-32 %set-signed-sap-ref-32
-	       sap-ref-sap %set-sap-ref-sap
-	       sap-ref-single %set-sap-ref-single
-	       sap-ref-double %set-sap-ref-double
-	       #!+(or x86 long-float) sap-ref-long
-	       #!+long-float %set-sap-ref-long))
-  (deftransform fun ((sap offset) '* '* :eval-name t)
-    (extract-function-args sap 'sap+ 2)
-    `(lambda (sap offset1 offset2)
-       (,fun sap (+ offset1 offset2)))))
+(macrolet ((def-frob (fun)
+             `(deftransform ,fun ((sap offset) * *)
+                (extract-function-args sap 'sap+ 2)
+                 `(lambda (sap offset1 offset2)
+                   (,',fun sap (+ offset1 offset2))))))
+  (def-frob sap-ref-8)
+  (def-frob %set-sap-ref-8)
+  (def-frob signed-sap-ref-8)
+  (def-frob %set-signed-sap-ref-8)
+  (def-frob sap-ref-16)
+  (def-frob %set-sap-ref-16)
+  (def-frob signed-sap-ref-16)
+  (def-frob %set-signed-sap-ref-16)
+  (def-frob sap-ref-32)
+  (def-frob %set-sap-ref-32)
+  (def-frob signed-sap-ref-32)
+  (def-frob %set-signed-sap-ref-32)
+  (def-frob sap-ref-sap)
+  (def-frob %set-sap-ref-sap)
+  (def-frob sap-ref-single)
+  (def-frob %set-sap-ref-single)
+  (def-frob sap-ref-double)
+  (def-frob %set-sap-ref-double)
+  ;; The original CMUCL code had #!+(and x86 long-float) for this first one,
+  ;; but only #!+long-float for the second.  This was redundant, since the
+  ;; LONG-FLOAT target feature only exists on X86.  So we removed the
+  ;; redundancy.  --njf 2002-01-08
+  #!+long-float (def-frob sap-ref-long)
+  #!+long-float (def-frob %set-sap-ref-long))
