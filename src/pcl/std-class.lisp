@@ -744,7 +744,7 @@
     (make-class-predicate class predicate-name)
     (add-slot-accessors class direct-slots)))
 
-(defmethod direct-slot-definition-class ((class structure-class) initargs)
+(defmethod direct-slot-definition-class ((class structure-class) &rest initargs)
   (declare (ignore initargs))
   (find-class 'structure-direct-slot-definition))
 
@@ -936,14 +936,14 @@
 
 ;;;; protocols for constructing direct and effective slot definitions
 
-(defmethod direct-slot-definition-class ((class std-class) initargs)
+(defmethod direct-slot-definition-class ((class std-class) &rest initargs)
   (declare (ignore initargs))
   (find-class 'standard-direct-slot-definition))
 
 (defun make-direct-slotd (class initargs)
   (let ((initargs (list* :class class initargs)))
     (apply #'make-instance
-	   (direct-slot-definition-class class initargs)
+	   (apply #'direct-slot-definition-class class initargs)
 	   initargs)))
 
 (defmethod compute-slots ((class std-class))
@@ -1050,14 +1050,14 @@
 (defmethod compute-effective-slot-definition ((class slot-class) name dslotds)
   (declare (ignore name))
   (let* ((initargs (compute-effective-slot-definition-initargs class dslotds))
-	 (class (effective-slot-definition-class class initargs)))
+	 (class (apply #'effective-slot-definition-class class initargs)))
     (apply #'make-instance class initargs)))
 
-(defmethod effective-slot-definition-class ((class std-class) initargs)
+(defmethod effective-slot-definition-class ((class std-class) &rest initargs)
   (declare (ignore initargs))
   (find-class 'standard-effective-slot-definition))
 
-(defmethod effective-slot-definition-class ((class structure-class) initargs)
+(defmethod effective-slot-definition-class ((class structure-class) &rest initargs)
   (declare (ignore initargs))
   (find-class 'structure-effective-slot-definition))
 

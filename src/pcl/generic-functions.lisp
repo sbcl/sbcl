@@ -332,9 +332,9 @@
 
 (defgeneric describe-object (object stream))
 
-(defgeneric direct-slot-definition-class (class initargs))
+(defgeneric direct-slot-definition-class (class &rest initargs))
 
-(defgeneric effective-slot-definition-class (class initargs))
+(defgeneric effective-slot-definition-class (class &rest initargs))
 
 (defgeneric legal-documentation-p (object x))
 
