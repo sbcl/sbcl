@@ -361,7 +361,6 @@
 		     table
 		     nil))
 	  prefixes)))
-
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 

@@ -61,7 +61,10 @@ Many people like to run SBCL, like other Lisp systems, as a subprocess
 under Emacs. The Emacs "ilisp" mode provides many convenient features,
 like command line editing, tab completion, and various kinds of
 coupling between Common Lisp source files and the interactive SBCL
-subprocess.
+subprocess, but can be somewhat fragile because it tries to be so
+clever and intimate in its interactions with the Lisp subprocess. In
+case of ilisp problems, running SBCL in the Emacs "shell" mode can a
+useful substitute.
 
 .SH OVERVIEW
 
