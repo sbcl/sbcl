@@ -245,7 +245,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	arch_skip_instruction(context);
 	sigemptyset(&ss);
 	sigaddset(&ss,SIGTRAP);
-	sigprocmask(SIG_UNBLOCK,&ss,0);
+	pthread_sigmask(SIG_UNBLOCK,&ss,0);
 	interrupt_handle_pending(context);
 	break;
 

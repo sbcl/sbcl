@@ -188,7 +188,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
     /* FIXME: Check that this is necessary -- CSR, 2002-07-15 */
     os_restore_fp_control(context);
 #endif
-    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+    pthread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
     
     if ((siginfo->si_code) == ILL_ILLOPC
 #ifdef LISP_FEATURE_LINUX

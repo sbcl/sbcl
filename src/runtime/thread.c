@@ -47,26 +47,34 @@ initial_thread_trampoline(struct thread *th)
 #endif
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
+void mark_thread_dead(struct thread *th) {
+    /* I hope it's safe for a thread to detach itself inside a 
+     * cancellation cleanup */
+    pthread_detach(th->os_thread);
+    th->state=STATE_DEAD;
+}
+
 /* this is the first thing that clone() runs in the child (which is
  * why the silly calling convention).  Basically it calls the user's
  * requested lisp function after doing arch_os_thread_init and
  * whatever other bookkeeping needs to be done
  */
-
-#ifdef LISP_FEATURE_SB_THREAD
 int
 new_thread_trampoline(struct thread *th)
 {
-    lispobj function;
+    lispobj function,ret;
     function = th->unbound_marker;
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;	
 
     /* wait here until our thread is linked into all_threads: see below */
     while(th->os_thread<1) sched_yield();
-
+    pthread_cleanup_push(mark_thread_dead,th);
     th->state=STATE_RUNNING;
-    return funcall0(function);
+    ret = funcall0(function);
+    pthread_cleanup_pop(1);
+    return ret;
 }
 #endif /* LISP_FEATURE_SB_THREAD */
 
@@ -203,7 +211,7 @@ void link_thread(struct thread *th,os_thread_t kid_pid)
     sigset_t newset,oldset;
     sigemptyset(&newset);
     sigaddset_blockable(&newset);
-    sigprocmask(SIG_BLOCK, &newset, &oldset); 
+    pthread_sigmask(SIG_BLOCK, &newset, &oldset); 
 
     get_spinlock(&all_threads_lock,kid_pid);
     th->next=all_threads;
@@ -215,7 +223,7 @@ void link_thread(struct thread *th,os_thread_t kid_pid)
     protect_control_stack_guard_page(th->os_thread,1);
     release_spinlock(&all_threads_lock);
 
-    sigprocmask(SIG_SETMASK,&oldset,0);
+    pthread_sigmask(SIG_SETMASK,&oldset,0);
     th->os_thread=kid_pid;		/* child will not start until this is set */
 }
 
@@ -228,7 +236,7 @@ void create_initial_thread(lispobj initial_function) {
     } else lose("can't create initial thread");
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
+
 os_thread_t create_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     os_thread_t kid_pid=0;
@@ -261,7 +269,7 @@ os_thread_t create_thread(lispobj initial_function) {
 	return 0;
     }
 }
-#endif
+
 
 struct thread *find_thread_by_os_thread(os_thread_t pid) 
 {
@@ -274,10 +282,9 @@ struct thread *find_thread_by_os_thread(os_thread_t pid)
 #if defined LISP_FEATURE_SB_THREAD
 /* This is not needed unless #+SB-THREAD, as there's a trivial null
  * unithread definition. */
-#ifdef USE_LINUX_CLONE
-
 void mark_dead_threads() 
 {
+#ifdef USE_LINUX_CLONE
     os_thread_t kid;
     int status;
     while(1) {
@@ -288,6 +295,9 @@ void mark_dead_threads()
 	    if(th) th->state=STATE_DEAD;
 	}
     }
+#endif
+    /* no cleanup needed for pthreads: the thread marks itself
+     * dead in a cancellation cleanup handler */
 }
 
 void reap_dead_threads() 
@@ -297,11 +307,11 @@ void reap_dead_threads()
     while(th) {
 	next=th->next;
 	if(th->state==STATE_DEAD) {
-	    funcall1(SymbolFunction(HANDLE_THREAD_EXIT),make_fixnum(th->pid));
+	    funcall1(SymbolFunction(HANDLE_THREAD_EXIT),make_fixnum(th->os_thread));
 #ifdef LISP_FEATURE_GENCGC
 	    gc_alloc_update_page_tables(0, &th->alloc_region);
 #endif
-	    get_spinlock(&all_threads_lock,th->pid);
+	    get_spinlock(&all_threads_lock,th->os_thread);
 	    if(prev) prev->next=next;
 	    else all_threads=next;
 	    release_spinlock(&all_threads_lock);
@@ -316,17 +326,6 @@ void reap_dead_threads()
 	th=next;
     }
 }
-#else
-void mark_dead_threads() 
-{
-    fprintf(stderr,"mark_dead_threads unimplemented\n");
-}
-void reap_dead_threads()
-{
-    fprintf(stderr,"reap_dead_threads unimplemented\n");
-}
-#endif /*  USE_LINUX_CLONE */
-
 /* These are not needed unless #+SB-THREAD, and since sigwaitinfo()
  * doesn't seem to be easily available everywhere (OpenBSD...) it's
  * more trouble than it's worth to compile it when not needed. */
@@ -344,7 +343,7 @@ void block_sigcont(void)
     sigset_t newset;
     sigemptyset(&newset);
     sigaddset(&newset,SIG_DEQUEUE);
-    sigprocmask(SIG_BLOCK, &newset, 0); 
+    pthread_sigmask(SIG_BLOCK, &newset, 0); 
 }
 
 void unblock_sigcont_and_sleep(void)
@@ -356,7 +355,7 @@ void unblock_sigcont_and_sleep(void)
 	errno=0;
 	sigwaitinfo(&set,0);
     }while(errno==EINTR);
-    sigprocmask(SIG_UNBLOCK,&set,0);
+    pthread_sigmask(SIG_UNBLOCK,&set,0);
 }
 
 
@@ -435,4 +434,4 @@ void gc_start_the_world()
 	kill_thread(p->os_thread,SIG_STOP_FOR_GC);
     }
 }
-#endif
+#endif /* sb_thread */

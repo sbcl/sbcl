@@ -124,34 +124,12 @@ struct interrupt_data * global_interrupt_data;
  * mask ought to be clear anyway most of the time, but may be non-zero
  * if we were interrupted e.g. while waiting for a queue.  */
 
-#if 1
 void reset_signal_mask () 
 {
     sigset_t new;
     sigemptyset(&new);
-    sigprocmask(SIG_SETMASK,&new,0);
+    pthread_sigmask(SIG_SETMASK,&new,0);
 }
-#else
-void reset_signal_mask () 
-{
-    sigset_t new,old;
-    int i;
-    int wrong=0;
-    sigemptyset(&new);
-    sigprocmask(SIG_SETMASK,&new,&old);
-    for(i=1; i<NSIG; i++) {
-	if(sigismember(&old,i)) {
-	    fprintf(stderr,
-		    "Warning: signal %d is masked: this is unexpected\n",i);
-	    wrong=1;
-	}
-    }
-    if(wrong) 
-	fprintf(stderr,"If this version of SBCL is less than three months old, please report this.\nOtherwise, please try a newer version first\n.  Reset signal mask.\n");
-}
-#endif
-
-
 
 
 /*
@@ -262,7 +240,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     sigset_t block;
     sigemptyset(&block);
     sigaddset_blockable(&block);
-    sigprocmask(SIG_BLOCK, &block, 0);
+    pthread_sigmask(SIG_BLOCK, &block, 0);
 
     /* going back into Lisp */
     foreign_function_call_active = 0;
@@ -293,7 +271,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 	context_sap = alloc_sap(context);
     }
 
-    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+    pthread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     if (internal_errors_enabled) {
         SHOW("in interrupt_internal_error");
@@ -418,7 +396,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
         /* Allow signals again. */
-        sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        pthread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
 #ifdef QSHOW_SIGNALS
 	SHOW("calling Lisp-level handler");
@@ -435,7 +413,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
 
         /* Allow signals again. */
-        sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        pthread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 	
         (*handler.c)(signal, info, void_context);
     }
@@ -517,7 +495,7 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
 	sigset_t new;
 	sigemptyset(&new);
 	sigaddset_blockable(&new);
-	sigprocmask(SIG_BLOCK,&new,&(data->pending_mask));
+	pthread_sigmask(SIG_BLOCK,&new,&(data->pending_mask));
     }
 }
 
@@ -560,7 +538,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
     sigemptyset(&ss);
     for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
-    sigprocmask(SIG_BLOCK,&ss,0);
+    pthread_sigmask(SIG_BLOCK,&ss,0);
 
     /* The GC can't tell if a thread is a zombie, so this would be a
      * good time to let the kernel reap any of our children in that
@@ -833,7 +811,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     sigemptyset(&new);
     sigaddset_blockable(&new);
     /* enable signals before calling into Lisp */
-    sigprocmask(SIG_UNBLOCK,&new,0);
+    pthread_sigmask(SIG_UNBLOCK,&new,0);
     funcall0(SymbolFunction(SUB_GC));
     undo_fake_foreign_function_call(context);
     return 1;
@@ -892,7 +870,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 
     sigemptyset(&new);
     sigaddset(&new, signal);
-    sigprocmask(SIG_BLOCK, &new, &old);
+    pthread_sigmask(SIG_BLOCK, &new, &old);
 
     sigemptyset(&new);
     sigaddset_blockable(&new);
@@ -918,7 +896,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     oldhandler = data->interrupt_handlers[signal];
     data->interrupt_handlers[signal].c = handler;
 
-    sigprocmask(SIG_SETMASK, &old, 0);
+    pthread_sigmask(SIG_SETMASK, &old, 0);
 
     FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 

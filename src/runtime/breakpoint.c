@@ -165,7 +165,7 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 
     /* Don't disallow recursive breakpoint traps. Otherwise, we can't
      * use debugger breakpoints anywhere in here. */
-    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+    pthread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
 	     compute_offset(context, code),
@@ -218,7 +218,7 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
 
     /* Don't disallow recursive breakpoint traps. Otherwise, we can't
      * use debugger breakpoints anywhere in here. */
-    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+    pthread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
 	     compute_offset(context, code),
