@@ -456,7 +456,7 @@
 	       (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
 		 (if (array-in-bounds-p ps i)
 		     (aref ps i)
-		     (intern (format nil ".D~D." i) *the-pcl-package*)))))
+		     (intern (format nil ".D~D." i) *pcl-package*)))))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr

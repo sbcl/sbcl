@@ -1911,6 +1911,8 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
   * repeated evaluation of the same DEFSTRUCT, a slot of which is
     declared to have a functional type, does not cause an error
     anymore.
+  * fixed bug: sometimes MAKE-INSTANCE did not work with classes with
+    many :DEFAULT-INITARGS. (reported by Istvan Marko)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
 

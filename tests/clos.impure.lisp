@@ -663,5 +663,18 @@
 	   (list x (call-next-method) (call-next-method x))))
 (assert (equal (cnm-assignment 1) '(3 1 3)))
 
+;;; Bug reported by Istvan Marko 2003-07-09
+(let ((class-name (gentemp)))
+  (loop for i from 1 to 9
+        for slot-name = (intern (format nil "X~D" i))
+        for initarg-name = (intern (format nil "X~D" i) :keyword)
+        collect `(,slot-name :initarg ,initarg-name) into slot-descs
+        append `(,initarg-name (list 0)) into default-initargs
+        finally (eval `(defclass ,class-name ()
+                         (,@slot-descs)
+                         (:default-initargs ,@default-initargs))))
+  (let ((f (compile nil `(lambda () (make-instance ',class-name)))))
+    (assert (typep (funcall f) class-name))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
