@@ -2195,6 +2195,11 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
     ** HANDLER-CASE failed to accept declarations in handler clauses
        in some circumstances.
 
+changes in sbcl-0.8.7 relative to sbcl-0.8.6:
+  * bug fix: GET-SETF-EXPANSION no longer throws an internal type
+    error when called without an explicit environment argument.
+    (thanks to Nikodemus Siivola)
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

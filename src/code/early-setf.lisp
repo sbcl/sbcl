@@ -91,7 +91,8 @@ GET-SETF-EXPANSION directly."
 
 ;;; If a macro, expand one level and try again. If not, go for the
 ;;; SETF function.
-(declaim (ftype (function (t sb!c::lexenv)) expand-or-get-setf-inverse))
+(declaim (ftype (function (t (or null sb!c::lexenv)))
+		expand-or-get-setf-inverse))
 (defun expand-or-get-setf-inverse (form environment)
   (multiple-value-bind (expansion expanded)
       (sb!xc:macroexpand-1 form environment)
