@@ -9,7 +9,6 @@
 
 (cl:defpackage :sb-aclrepl
   (:use :cl :sb-ext)
-  ;; FIXME: should we be exporting anything else?
   (:export #:*prompt* #:*exit-on-eof* #:*max-history*
 	   #:*use-short-package-name* #:*command-char*
 	   #:alias))
@@ -17,7 +16,7 @@
 (cl:in-package :sb-aclrepl)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *default-prompt* "~A(~d): "
+  (defparameter *default-prompt* "~&~A(~d): "
     "The default prompt."))
 (defparameter *prompt* #.*default-prompt*
   "The current prompt string or formatter function.")
@@ -33,12 +32,15 @@
   "If T, then exit when the EOF character is entered.")
 (defparameter *history* nil
   "History list")
-(defparameter *cmd-number* 0
-  "Number of the current command")
+(defparameter *cmd-number* 1
+  "Number of the next command")
+
+(declaim (type list *history*))
 
 (defstruct user-cmd
   (input nil) ; input, maybe a string or form
-  (func nil)  ; cmd func entered, overloaded (:eof :null-cmd))
+  (func nil)  ; cmd func entered, overloaded
+              ; (:eof :null-cmd :cmd-error :history-error)
   (args nil)  ; args for cmd func
   (hnum nil)) ; history number
 
@@ -46,6 +48,20 @@
 (defvar *eof-cmd* (make-user-cmd :func :eof))
 (defvar *null-cmd* (make-user-cmd :func :null-cmd))
 
+(defparameter *cmd-table-hash*
+  (make-hash-table :size 30 :test #'equal))
+
+;; Set up binding for multithreading
+
+(let ((*prompt* #.*default-prompt*)
+      (*use-short-package-name* t)
+      (*dir-stack* nil)
+      (*command-char* #\:)
+      (*max-history* 24)
+      (*exit-on-eof* t)
+      (*history* nil)
+      (*cmd-number* 1))
+      
 (defun prompt-package-name ()
   (if *use-short-package-name*
       (car (sort (append
@@ -55,6 +71,7 @@
       (package-name cl:*package*)))
 
 (defun read-cmd (input-stream)
+  ;; Reads a command from the user and returns a user-cmd object
   (flet ((parse-args (parsing args-string)
 	   (case parsing
 	     (:string
@@ -76,13 +93,16 @@
 		 (if first-space-pos
 		     (string-trim-whitespace (subseq line first-space-pos))
 		     "")))
+	   (declare (string line))
 	   (if (numberp (read-from-string cmd-string))
 	       (let ((cmd (get-history (read-from-string cmd-string))))
-		 (when cmd
-		   (make-user-cmd :func (user-cmd-func cmd)
-				  :input (user-cmd-input cmd)
-				  :args (user-cmd-args cmd)
-				  :hnum *cmd-number*)))
+		 (if (eq cmd *null-cmd*)
+		     (make-user-cmd :func :history-error
+				    :input (read-from-string cmd-string))
+		     (make-user-cmd :func (user-cmd-func cmd)
+				    :input (user-cmd-input cmd)
+				    :args (user-cmd-args cmd)
+				    :hnum *cmd-number*)))
 	       (let ((cmd-entry (find-cmd cmd-string)))
 		 (if cmd-entry
 		     (make-user-cmd :func (cmd-table-entry-func cmd-entry)
@@ -91,11 +111,9 @@
 					   (cmd-table-entry-parsing cmd-entry)
 					   cmd-args-string)
 				    :hnum *cmd-number*)
-		     (progn
-		       (format t "Unknown top-level command: ~s.~%" cmd-string)
-		       (format t "Type `:help' for the list of commands.~%")
-		       *null-cmd*
-		       ))))))
+		     (make-user-cmd :func :cmd-error
+				    :input cmd-string)
+		     )))))
 	((eql next-char #\newline)
 	 (read-char input-stream)
 	 *null-cmd*)
@@ -104,9 +122,6 @@
 	 (if (eq form *eof-marker*)
 	     *eof-cmd*
 	     (make-user-cmd :input form :func nil :hnum *cmd-number*))))))))
- 
-(defparameter *cmd-table-hash*
-  (make-hash-table :size 30 :test #'equal))
 
 ;;; cmd table entry
 (defstruct cmd-table-entry
@@ -145,27 +160,22 @@
 
 (defun user-cmd= (c1 c2)
   "Returns T if two user commands are equal"
-  (if (or (not (user-cmd-p c1)) (not (user-cmd-p c2)))
-      (progn
-	(format t "Error: ~s or ~s is not a user-cmd" c1 c2)
-	nil)
-      (and (eq (user-cmd-func c1) (user-cmd-func c2))
-	   (equal (user-cmd-args c1) (user-cmd-args c2))
-	   (equal (user-cmd-input c1) (user-cmd-input c2)))))
+  (and (eq (user-cmd-func c1) (user-cmd-func c2))
+       (equal (user-cmd-args c1) (user-cmd-args c2))
+       (equal (user-cmd-input c1) (user-cmd-input c2))))
 
 (defun add-to-history (cmd)
   (unless (and *history* (user-cmd= cmd (car *history*)))
     (when (>= (length *history*) *max-history*)
       (setq *history* (nbutlast *history* (+ (length *history*) *max-history* 1))))
-    (push cmd *history*)))
+    (push cmd *history*)
+    (incf *cmd-number*)))
 
 (defun get-history (n)
   (let ((cmd (find n *history* :key #'user-cmd-hnum :test #'eql)))
     (if cmd
 	cmd
-	(progn
-	  (format t "Input numbered ~A is not on the history list.." n)
-	  *null-cmd*))))
+	*null-cmd*)))
 
 (defun get-cmd-doc-list (&optional (group :cmd))
   "Return list of all commands"
@@ -178,7 +188,7 @@
 	     *cmd-table-hash*)
     (sort cmds #'string-lessp :key #'car)))
 
-(defun cd-cmd (&optional string-dir)
+(defun cd-cmd (output-stream &optional string-dir)
   (cond
     ((or (zerop (length string-dir))
 	 (string= string-dir "~"))
@@ -187,23 +197,23 @@
      (let ((new (truename string-dir)))
        (when (pathnamep new)
 	 (setf cl:*default-pathname-defaults* new)))))
-  (format t "~A~%" (namestring cl:*default-pathname-defaults*))
+  (format output-stream "~A~%" (namestring cl:*default-pathname-defaults*))
   (values))
 
-(defun pwd-cmd ()
-  (format t "Lisp's current working directory is ~s.~%"
+(defun pwd-cmd (output-stream)
+  (format output-stream "Lisp's current working directory is ~s.~%"
 	  (namestring cl:*default-pathname-defaults*))
   (values))
 
-(defun trace-cmd (&rest args)
+(defun trace-cmd (output-stream &rest args)
   (if args
-      (format t "~A~%" (eval (apply #'sb-debug::expand-trace args)))
-      (format t "~A~%" (sb-debug::%list-traced-funs)))
+      (format output-stream "~A~%" (eval (sb-debug::expand-trace args)))
+      (format output-stream "~A~%" (sb-debug::%list-traced-funs)))
   (values))
 
-(defun untrace-cmd (&rest args)
+(defun untrace-cmd (output-stream &rest args)
   (if args
-      (format t "~A~%"
+      (format output-stream "~A~%"
 	      (eval
 	       (sb-int:collect ((res))
 		(let ((current args))
@@ -214,39 +224,48 @@
 			      `(sb-debug::untrace-1 ,(pop current))
 			      `(sb-debug::untrace-1 ',name))))))
 		`(progn ,@(res) t))))
-      (format t "~A~%" (eval (sb-debug::untrace-all))))
+      (format output-stream "~A~%" (eval (sb-debug::untrace-all))))
   (values))
 
-(defun exit-cmd (&optional (status 0))
+(defun exit-cmd (output-stream &optional (status 0))
+  (declare (ignore output-stream))
   (quit :unix-status status)
   (values))
 
-(defun package-cmd (&optional pkg)
+(defun package-cmd (output-stream &optional pkg)
   (cond
     ((null pkg)
-     (format t "The ~A package is current.~%" (package-name cl:*package*)))
+     (format output-stream "The ~A package is current.~%"
+	     (package-name cl:*package*)))
     ((null (find-package (write-to-string pkg)))
-     (format t "Unknown package: ~A.~%" pkg))
+     (format output-stream "Unknown package: ~A.~%" pkg))
     (t
      (setf cl:*package* (find-package (write-to-string pkg)))))
   (values))
 
 (defun string-to-list-skip-spaces (str)
   "Return a list of strings, delimited by spaces, skipping spaces."
-  (loop for i = 0 then (1+ j)
-	as j = (position #\space str :start i)
-	when (not (char= (char str i) #\space))
-	collect (subseq str i j) while j))
+  (when str
+    (loop for i = 0 then (1+ j)
+	  as j = (position #\space str :start i)
+	  when (not (char= (char str i) #\space))
+	  collect (subseq str i j) while j)))
 
-(defun ld-cmd (string-files)
-  (dolist (arg (string-to-list-skip-spaces string-files))
-    (format t "loading ~a~%" arg)
-    (load arg))
+(let ((last-files-loaded nil))
+  (defun ld-cmd (output-stream &optional string-files)
+    (if string-files
+	(setq last-files-loaded string-files)
+	(setq string-files last-files-loaded))
+    (dolist (arg (string-to-list-skip-spaces string-files))
+      (format output-stream "loading ~a~%" arg)
+      (load arg)))
   (values))
 
-(defun cf-cmd (string-files)
-  (dolist (arg (string-to-list-skip-spaces string-files))
-    (compile-file arg))
+(defun cf-cmd (output-stream string-files)
+  (declare (ignore output-stream))
+  (when string-files
+    (dolist (arg (string-to-list-skip-spaces string-files))
+      (compile-file arg)))
   (values))
 
 (defun >-num (x y)
@@ -269,87 +288,105 @@
 
 ;;;; implementation of commands
 
-(defun cload-cmd (string-files)
-  (dolist (arg (string-to-list-skip-spaces string-files))
-    (load (compile-file-as-needed arg)))
+(defun apropos-cmd (output-stream string)
+  (declare (ignore output-stream))
+  (apropos (string-upcase string))
   (values))
 
-(defun inspect-cmd (arg)
-  (eval `(inspect ,arg))
+(let ((last-files-loaded nil))
+  (defun cload-cmd (output-stream &optional string-files)
+    (if string-files
+	(setq last-files-loaded string-files)
+	(setq string-files last-files-loaded))
+    (dolist (arg (string-to-list-skip-spaces string-files))
+      (format output-stream "loading ~a~%" arg)
+      (load (compile-file-as-needed arg)))
+    (values)))
+
+(defun inspect-cmd (output-stream arg)
+  (inspector arg nil output-stream)
   (values))
 
-(defun describe-cmd (&rest args)
+(defun istep-cmd (output-stream &optional arg-string)
+  (istep arg-string output-stream)
+  (values))
+
+(defun describe-cmd (output-stream &rest args)
+  (declare (ignore output-stream))
   (dolist (arg args)
     (eval `(describe ,arg)))
   (values))
 
-(defun macroexpand-cmd (arg)
-  (pprint (macroexpand arg))
+(defun macroexpand-cmd (output-stream arg)
+  (pprint (macroexpand arg) output-stream)
   (values))
 
-(defun history-cmd ()
+(defun history-cmd (output-stream)
   (let ((n (length *history*)))
     (declare (fixnum n))
     (dotimes (i n)
       (declare (fixnum i))
       (let ((hist (nth (- n i 1) *history*)))
-	(format t "~3A ~A~%" (user-cmd-hnum hist) (user-cmd-input hist)))))
+	(format output-stream "~3A ~A~%" (user-cmd-hnum hist)
+		(user-cmd-input hist)))))
   (values))
 
-(defun help-cmd (&optional cmd)
+(defun help-cmd (output-stream &optional cmd)
   (cond
     (cmd
      (let ((cmd-entry (find-cmd cmd)))
        (if cmd-entry
-	   (format t "Documentation for ~A: ~A~%"
+	   (format output-stream "Documentation for ~A: ~A~%"
 		   (cmd-table-entry-name cmd-entry)
 		   (cmd-table-entry-desc cmd-entry)))))
     (t
-     (format t "~13A ~a~%" "Command" "Description")
-     (format t "------------- -------------~%")
-     (format t "~13A ~A~%" "n" "(for any number n) recall nth command from history list")
+     (format output-stream "~13A ~a~%" "Command" "Description")
+     (format output-stream "------------- -------------~%")
+     (format output-stream "~13A ~A~%" "n"
+	     "(for any number n) recall nth command from history list")
      (dolist (doc-entry (get-cmd-doc-list :cmd))
-       (format t "~13A ~A~%" (car doc-entry) (cadr doc-entry)))))
+       (format output-stream "~13A ~A~%" (car doc-entry) (cadr doc-entry)))))
   (values))
 
-(defun alias-cmd ()
+(defun alias-cmd (output-stream)
   (let ((doc-entries (get-cmd-doc-list :alias)))
     (typecase doc-entries
       (cons
-       (format t "~13A ~a~%" "Alias" "Description")
-       (format t "------------- -------------~%")
+       (format output-stream "~13A ~a~%" "Alias" "Description")
+       (format output-stream "------------- -------------~%")
        (dolist (doc-entry doc-entries)
-	 (format t "~13A ~A~%" (car doc-entry) (cadr doc-entry))))
+	 (format output-stream "~13A ~A~%" (car doc-entry) (cadr doc-entry))))
       (t
-       (format t "No aliases are defined~%"))))
+       (format output-stream "No aliases are defined~%"))))
   (values))
 
-(defun shell-cmd (string-arg)
+(defun shell-cmd (output-stream string-arg)
   (sb-ext:run-program "/bin/sh" (list "-c" string-arg)
-		      :input nil :output *trace-output*)
+		      :input nil :output output-stream)
   (values))
 
-(defun pushd-cmd (string-arg)
+(defun pushd-cmd (output-stream string-arg)
   (push string-arg *dir-stack*)
-  (cd-cmd string-arg)
+  (cd-cmd output-stream string-arg)
   (values))
 
-(defun popd-cmd ()
+(defun popd-cmd (output-stream)
   (if *dir-stack*
       (let ((dir (pop *dir-stack*)))
 	(cd-cmd dir))
-      (format t "No directory on stack to pop.~%"))
+      (format output-stream "No directory on stack to pop.~%"))
   (values))
 
-(defun dirs-cmd ()
+(defun dirs-cmd (output-stream)
   (dolist (dir *dir-stack*)
-    (format t "~a~%" dir))
+    (format output-stream "~a~%" dir))
   (values))
 
 ;;;; dispatch table for commands
 
 (let ((cmd-table
        '(("aliases" 3 alias-cmd "show aliases")
+	 ("apropos" 2 apropos-cmd "show apropos" :parsing :string)
 	 ("cd" 2 cd-cmd "change default diretory" :parsing :string)
 	 ("ld" 2 ld-cmd "load a file" :parsing :string)
 	 ("cf" 2 cf-cmd "compile file" :parsing :string)
@@ -362,6 +399,7 @@
 	 ("help" 2 help-cmd "print this help")
 	 ("history" 3 history-cmd "print the recent history")
 	 ("inspect" 2 inspect-cmd "inspect an object")
+	 ("istep" 1 istep-cmd "navigate within inspection of a lisp object" :parsing :string)
 	 ("pwd" 3 pwd-cmd "print current directory")
 	 ("pushd" 2 pushd-cmd "push directory on stack" :parsing :string)
 	 ("popd" 2 popd-cmd "pop directory from stack")
@@ -407,6 +445,7 @@
        
     
 (defun remove-alias (&rest aliases)
+  (declare (list aliases))
   (let ((keys '())
 	(remove-all (not (null (find :all aliases)))))
     (unless remove-all  ;; ensure all alias are strings
@@ -455,40 +494,40 @@
        (or (char= x #\space)
 	   (char= x #\tab)
 	   (char= x #\return))))
+
 
 ;;;; linking into SBCL hooks
 
 (defun repl-prompt-fun (stream)
-  (incf *cmd-number*)
-  (fresh-line stream)
   (if (functionp *prompt*)
       (write-string (funcall *prompt* (prompt-package-name) *cmd-number*)
 		    stream)
       (format stream *prompt* (prompt-package-name) *cmd-number*)))
   
-;;; If USER-CMD is to be processed as something magical (not an
-;;; ordinary eval-and-print-me form) then do so and return non-NIL.
-(defun execute-as-acl-magic (user-cmd input-stream output-stream)
-  ;; kludgity kludge kludge kludge ("and then a miracle occurs")
-  ;;
-  ;; This is a really sloppy job of smashing KMR's code (what he
-  ;; called DEFUN REP-ONE-CMD) onto DB's hook ideas, not even doing
-  ;; the basics like passing INPUT-STREAM and OUTPUT-STREAM into the
-  ;; KMR code. A real implementation might want to do rather better.
+(defun process-cmd (user-cmd output-stream)
+  ;; Processes a user command. Returns t if the user-cmd was a top-level
+  ;; command
   (cond ((eq user-cmd *eof-cmd*)
-	 (decf *cmd-number*)
 	 (when *exit-on-eof*
 	   (quit))
-	 (format t "EOF~%")
-	 t) ; Yup, we knew how to handle that.
+	 (format output-stream "EOF~%")
+	 t)
 	((eq user-cmd *null-cmd*)
-	 (decf *cmd-number*)
-	 t) ; Yup.
+	 t)
+	((eq (user-cmd-func user-cmd) :cmd-error)
+	 (format output-stream "Unknown top-level command: ~s.~%"
+		 (user-cmd-input user-cmd))
+	 (format output-stream "Type `:help' for the list of commands.~%")
+	 t)
+	((eq (user-cmd-func user-cmd) :history-error)
+	 (format output-stream "Input numbered ~d is not on the history list~%"
+		 (user-cmd-input user-cmd))
+	 t)
 	((functionp (user-cmd-func user-cmd))
-	 (apply (user-cmd-func user-cmd) (user-cmd-args user-cmd))
 	 (add-to-history user-cmd)
+	 (apply (user-cmd-func user-cmd) output-stream (user-cmd-args user-cmd))
 	 (fresh-line)
-	 t) ; Ayup.
+	 t)
 	(t
 	 (add-to-history user-cmd)
 	 nil))) ; nope, not in my job description
@@ -497,11 +536,15 @@
   ;; Pick off all the leading ACL magic commands, then return a normal
   ;; Lisp form.
   (loop for user-cmd = (read-cmd input-stream) do
-	(if (execute-as-acl-magic user-cmd input-stream output-stream)
+	(if (process-cmd user-cmd output-stream)
 	    (progn
 	      (repl-prompt-fun output-stream)
 	      (force-output output-stream))
 	    (return (user-cmd-input user-cmd)))))
 
+
 (setf sb-int:*repl-prompt-fun* #'repl-prompt-fun
       sb-int:*repl-read-form-fun* #'repl-read-form-fun)
+
+) ;; close special variables bindings
+

@@ -1,5 +1,2 @@
 MODULE=sb-aclrepl
-include ../vanilla-module.mk
-
-test::
-	true
+include ../asdf-module.mk

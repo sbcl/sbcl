@@ -1,0 +1,6 @@
+The sb-aclrepl module offers an AllegroCL style Read-Eval-Print Loop for
+SBCL. An AllegroCL style inspector is integrated. Adding an AllegroCL style
+debugger is planned.
+
+Questions, comments, or bug reports should be sent to Kevin Rosenberg
+<kevin@rosenbrg.net>.
