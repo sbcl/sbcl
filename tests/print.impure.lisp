@@ -122,5 +122,8 @@
 	      ;; or else it had better have the same dimensions
 	      (equal (array-dimensions result) '(1 0 1)))))
 
+;;; before 0.8.0.66 it signalled UNBOUND-VARIABLE
+(write #(1 2 3) :pretty nil :readably t)
+
 ;;; success
 (quit :unix-status 104)

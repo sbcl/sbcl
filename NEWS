@@ -1825,6 +1825,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * bug fix: an argument count mismatch for a type specifier in code
     being compiled no longer causes an unhandled error at compile
     time, but signals a compile-time warning.
+  * fixed simple vector readable printing.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

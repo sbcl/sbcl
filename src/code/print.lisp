@@ -976,7 +976,7 @@
 	   (write-char (if (zerop bit) #\0 #\1) stream)))
 	(t
 	 (when (and *print-readably*
-		    (not (array-readably-printable-p array)))
+		    (not (array-readably-printable-p vector)))
 	   (error 'print-not-readable :object vector))
 	 (descend-into (stream)
 		       (write-string "#(" stream)
