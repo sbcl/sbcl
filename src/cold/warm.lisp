@@ -109,7 +109,7 @@
 		#+nil "src/pcl/cache"
 		"src/pcl/dlisp"
 		"src/pcl/dlisp2"
-		"src/pcl/boot"
+		#+nil "src/pcl/boot"
 		"src/pcl/vector"
 		"src/pcl/slots-boot"
 		"src/pcl/combin"

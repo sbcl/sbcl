@@ -123,7 +123,12 @@
 		    "STRUCTURE-CLASS"
 		    "SUBTYPEP"
 		    "TYPE-OF" "TYPEP"
-		    "WITH-COMPILATION-UNIT"))
+		    "WITH-COMPILATION-UNIT"
+
+		    ;; CLOS stuff
+		    "ADD-METHOD" "REMOVE-METHOD"
+		    "ENSURE-GENERIC-FUNCTION"
+		    ))
       (export (intern name package-name) package-name)))
   ;; don't watch:
   (dolist (package-name '("SB!ALIEN"

@@ -21,7 +21,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 #|
 
@@ -72,7 +72,7 @@ bootstrapping.
 ;;; of declaration internally. It would be good to figure out how to
 ;;; get rid of it, or failing that, (1) document why it's needed and
 ;;; (2) use a private symbol with a forbidding name which suggests
-;;; it's not to be messed with by the user (e.g. SB-PCL:%CLASS)
+;;; it's not to be messed with by the user (e.g. SB!PCL:%CLASS)
 ;;; instead of the too-inviting CLASS. (I tried just deleting the
 ;;; declarations in MAKE-METHOD-LAMBDA-INTERNAL ca. sbcl-0.6.9.10, but
 ;;; then things break.)
@@ -81,8 +81,8 @@ bootstrapping.
 (declaim (notinline make-a-method
 		    add-named-method
 		    ensure-generic-function-using-class
-		    add-method
-		    remove-method))
+		    sb!xc:add-method
+		    sb!xc:remove-method))
 
 (defvar *!early-functions*
 	'((make-a-method early-make-a-method
@@ -108,11 +108,11 @@ bootstrapping.
 ;;; to convert the few functions in the bootstrap which are supposed
 ;;; to be generic functions but can't be early on.
 (defvar *!generic-function-fixups*
-  '((add-method
+  '((sb!xc:add-method
      ((generic-function method)	 ;lambda-list
       (standard-generic-function method) ;specializers
       real-add-method))		 ;method-function
-    (remove-method
+    (sb!xc:remove-method
      ((generic-function method)
       (standard-generic-function method)
       real-remove-method))
@@ -146,7 +146,7 @@ bootstrapping.
       (generic-function standard-method-combination t)
       standard-compute-effective-method))))
 
-(defmacro defgeneric (fun-name lambda-list &body options)
+(sb!xc:defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
   (unless (legal-fun-name-p fun-name)
     (error 'simple-program-error
@@ -221,16 +221,16 @@ bootstrapping.
 	 #',fun-name))))
 
 (defun compile-or-load-defgeneric (fun-name)
-  (sb-kernel:proclaim-as-fun-name fun-name)
-  (sb-kernel:note-name-defined fun-name :function)
+  (sb!kernel:proclaim-as-fun-name fun-name)
+  (sb!kernel:note-name-defined fun-name :function)
   (unless (eq (info :function :where-from fun-name) :declared)
     (setf (info :function :where-from fun-name) :defined)
     (setf (info :function :type fun-name)
-	  (sb-kernel:specifier-type 'function))))
+	  (sb!kernel:specifier-type 'function))))
 
 (defun load-defgeneric (fun-name lambda-list &rest initargs)
   (when (fboundp fun-name)
-    (sb-kernel::style-warn "redefining ~S in DEFGENERIC" fun-name)
+    (sb!kernel::style-warn "redefining ~S in DEFGENERIC" fun-name)
     (let ((fun (fdefinition fun-name)))
       (when (generic-function-p fun)
         (loop for method in (generic-function-initial-methods fun)
@@ -286,7 +286,7 @@ bootstrapping.
       ;; belong here!
       (aver (not morep)))))
 
-(defmacro defmethod (&rest args &environment env)
+(sb!xc:defmacro defmethod (&rest args &environment env)
   (multiple-value-bind (name qualifiers lambda-list body)
       (parse-defmethod args)
     (multiple-value-bind (proto-gf proto-method)
@@ -574,7 +574,7 @@ bootstrapping.
 		 ;;   (FOO (MAKE-BAR))
 		 ;; perhaps because of the way that STRUCTURE-OBJECT
 		 ;; inherits both from SLOT-OBJECT and from
-		 ;; SB-KERNEL:INSTANCE. In an effort to sweep such
+		 ;; SB!KERNEL:INSTANCE. In an effort to sweep such
 		 ;; problems under the rug, we exclude these problem
 		 ;; cases by blacklisting them here. -- WHN 2001-01-19
 		 '(slot-object))
@@ -799,7 +799,7 @@ bootstrapping.
   (function #'identity :type function)
   call-method-args)
 
-#-sb-fluid (declaim (sb-ext:freeze-type method-call))
+#!-sb-fluid (declaim (sb!ext:freeze-type method-call))
 
 (defmacro invoke-method-call1 (function args cm-args)
   `(let ((.function. ,function)
@@ -822,7 +822,7 @@ bootstrapping.
   next-method-call
   arg-info)
 
-#-sb-fluid (declaim (sb-ext:freeze-type fast-method-call))
+#!-sb-fluid (declaim (sb!ext:freeze-type fast-method-call))
 
 (defmacro fmc-funcall (fn pv-cell next-method-call &rest args)
   `(funcall ,fn ,pv-cell ,next-method-call ,@args))
@@ -836,11 +836,11 @@ bootstrapping.
 (defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))
 
-#-sb-fluid (declaim (sb-ext:freeze-type fast-instance-boundp))
+#!-sb-fluid (declaim (sb!ext:freeze-type fast-instance-boundp))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *allow-emf-call-tracing-p* nil)
-  (defvar *enable-emf-call-tracing-p* #-sb-show nil #+sb-show t))
+  (defvar *enable-emf-call-tracing-p* #!-sb-show nil #!+sb-show t))
 
 ;;;; effective method functions
 
@@ -853,7 +853,7 @@ bootstrapping.
 ;;; it might be useful someday, so I haven't deleted it.
 ;;; But it isn't documented and isn't used for anything now, so
 ;;; I've conditionalized it out of the base system. -- WHN 19991213
-#+sb-show
+#!+sb-show
 (defun show-emf-call-trace ()
   (when *emf-call-trace*
     (let ((j *emf-call-trace-index*)
@@ -1164,7 +1164,7 @@ bootstrapping.
 	when (null tail) do
 	  ;; FIXME: Do we want to export this symbol? Or maybe use an
 	  ;; (ERROR 'SIMPLE-PROGRAM-ERROR) form?
-	  (sb-c::%odd-key-args-error)
+	  (sb!c::%odd-key-args-error)
 	when (eq key keyword)
 	  return tail))
 
@@ -1232,7 +1232,7 @@ bootstrapping.
        (gboundp name)
        (if (eq *boot-state* 'complete)
 	   (standard-generic-function-p (gdefinition name))
-	   (sb-kernel:funcallable-instance-p (gdefinition name)))))
+	   (sb!kernel:funcallable-instance-p (gdefinition name)))))
 
 (defvar *method-function-plist* (make-hash-table :test 'eq))
 (defvar *mf1* nil)
@@ -1310,7 +1310,7 @@ bootstrapping.
                                      (parse-specializers specializers)
 				     nil))))
       (when method
-	(sb-kernel::style-warn "redefining ~S~{ ~S~} ~S in DEFMETHOD"
+	(sb!kernel::style-warn "redefining ~S~{ ~S~} ~S in DEFMETHOD"
 			       gf-spec qualifiers specializers))))
   (let ((method (apply #'add-named-method
 		       gf-spec qualifiers specializers lambda-list
@@ -1384,7 +1384,7 @@ bootstrapping.
 	  (or mf (method-function-from-fast-function mff)))))))
 
 (defun analyze-lambda-list (lambda-list)
-  (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?
+  (flet (;; FIXME: Is this redundant with SB!C::MAKE-KEYWORD-FOR-ARG?
 	 (parse-key-arg (arg)
 	   (if (listp arg)
 	       (if (listp (car arg))
@@ -1439,15 +1439,15 @@ bootstrapping.
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
     (let* ((old (info :function :type name)) ;FIXME:FDOCUMENTATION instead?
-	   (old-ftype (if (sb-kernel:fun-type-p old) old nil))
-	   (old-restp (and old-ftype (sb-kernel:fun-type-rest old-ftype)))
+	   (old-ftype (if (sb!kernel:fun-type-p old) old nil))
+	   (old-restp (and old-ftype (sb!kernel:fun-type-rest old-ftype)))
 	   (old-keys (and old-ftype
-			  (mapcar #'sb-kernel:key-info-name
-				  (sb-kernel:fun-type-keywords
+			  (mapcar #'sb!kernel:key-info-name
+				  (sb!kernel:fun-type-keywords
 				   old-ftype))))
-	   (old-keysp (and old-ftype (sb-kernel:fun-type-keyp old-ftype)))
+	   (old-keysp (and old-ftype (sb!kernel:fun-type-keyp old-ftype)))
 	   (old-allowp (and old-ftype
-			    (sb-kernel:fun-type-allowp old-ftype)))
+			    (sb!kernel:fun-type-allowp old-ftype)))
 	   (keywords (union old-keys (mapcar #'keyword-spec-name keywords))))
       `(function ,(append (make-list nrequired :initial-element t)
 			  (when (plusp noptional)
@@ -1473,7 +1473,7 @@ bootstrapping.
 
 (defvar *!early-generic-functions* ())
 
-(defun ensure-generic-function (fun-name
+(defun sb!xc:ensure-generic-function (fun-name
 				&rest all-keys
 				&key environment
 				&allow-other-keys)
@@ -1549,7 +1549,7 @@ bootstrapping.
   (gf-info-c-a-m-emf-std-p t)
   gf-info-fast-mf-p)
 
-#-sb-fluid (declaim (sb-ext:freeze-type arg-info))
+#!-sb-fluid (declaim (sb!ext:freeze-type arg-info))
 
 (defun arg-info-valid-p (arg-info)
   (not (null (arg-info-number-optional arg-info))))
@@ -1711,7 +1711,7 @@ bootstrapping.
 	       ;; to prevent precompilation of things on some
 	       ;; PCL-internal automatically-constructed functions
 	       ;; like the old "~A~A standard class ~A reader"
-	       ;; functions.  When the CADR of SB-PCL::SLOT-ACCESSOR
+	       ;; functions.  When the CADR of SB!PCL::SLOT-ACCESSOR
 	       ;; generalized functions was *, this test returned T,
 	       ;; not NIL, and an error was signalled in
 	       ;; MAKE-ACCESSOR-TABLE for (DEFUN FOO (X) (SLOT-VALUE X
@@ -1777,10 +1777,12 @@ bootstrapping.
      fin
      (or function
 	 (if (eq spec 'print-object)
-	     #'(sb-kernel:instance-lambda (instance stream)
+	     #'(#+sb-xc-host lambda #-sb-xc-host sb!kernel:instance-lambda
+			     (instance stream)
 		 (print-unreadable-object (instance stream :identity t)
 		   (format stream "std-instance")))
-	     #'(sb-kernel:instance-lambda (&rest args)
+	     #'(#+sb-xc-host lambda #-sb-xc-host sb!kernel:instance-lambda
+			     (&rest args)
 		 (declare (ignore args))
 		 (error "The function of the funcallable-instance ~S~
 			 has not been set." fin)))))
@@ -2047,7 +2049,7 @@ bootstrapping.
 ;;; This is the early version of ADD-METHOD. Later this will become a
 ;;; generic function. See !FIX-EARLY-GENERIC-FUNCTIONS which has
 ;;; special knowledge about ADD-METHOD.
-(defun add-method (generic-function method)
+(defun sb!xc:add-method (generic-function method)
   (when (not (fsc-instance-p generic-function))
     (error "Early ADD-METHOD didn't get a funcallable instance."))
   (when (not (and (listp method) (eq (car method) :early-method)))
@@ -2061,7 +2063,7 @@ bootstrapping.
 
 ;;; This is the early version of REMOVE-METHOD. See comments on
 ;;; the early version of ADD-METHOD.
-(defun remove-method (generic-function method)
+(defun sb!xc:remove-method (generic-function method)
   (when (not (fsc-instance-p generic-function))
     (error "An early remove-method didn't get a funcallable instance."))
   (when (not (and (listp method) (eq (car method) :early-method)))
@@ -2328,7 +2330,7 @@ bootstrapping.
 ;;; walker stuff was only used for implementing stuff like that; maybe
 ;;; it's not needed any more? Hunt down what it was used for and see.
 
-(defmacro with-slots (slots instance &body body)
+(sb!xc:defmacro with-slots (slots instance &body body)
   (let ((in (gensym)))
     `(let ((,in ,instance))
        (declare (ignorable ,in))
@@ -2352,7 +2354,7 @@ bootstrapping.
 				 slots)
 			,@body))))
 
-(defmacro with-accessors (slots instance &body body)
+(sb!xc:defmacro with-accessors (slots instance &body body)
   (let ((in (gensym)))
     `(let ((,in ,instance))
        (declare (ignorable ,in))

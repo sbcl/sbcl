@@ -670,4 +670,5 @@
  ("src/pcl/defclass")
  ("src/pcl/defs")
  ("src/pcl/cache")
+ ("src/pcl/boot")
  )
