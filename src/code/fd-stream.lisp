@@ -31,16 +31,10 @@
       (pop *available-buffers*)
       (allocate-system-memory bytes-per-buffer)))
 
-;;;; the FILE-STREAM structure
+;;;; the FD-STREAM structure
 
-(defstruct (file-stream
+(defstruct (fd-stream
 	    (:constructor %make-fd-stream)
-	    ;; KLUDGE: in an ideal world, maybe we'd rewrite
-	    ;; everything to use FILE-STREAM rather than simply
-	    ;; providing this hack for compatibility with the old
-	    ;; code.  However, CVS doesn't deal terribly well with
-	    ;; file renaming, so for now we use this
-	    ;; backward-compatibility feature.
 	    (:conc-name fd-stream-)
 	    (:predicate fd-stream-p)
 	    (:include ansi-stream
@@ -89,7 +83,7 @@
   (pathname nil :type (or pathname null))
   (external-format :default)
   (output-bytes #'ill-out :type function))
-(def!method print-object ((fd-stream file-stream) stream)
+(def!method print-object ((fd-stream fd-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
     (format stream "for ~S" (fd-stream-name fd-stream))))
@@ -182,7 +176,7 @@
 ;;; writes. If so, just queue this one. Otherwise, try to write it. If
 ;;; this would block, queue it.
 (defun frob-output (stream base start end reuse-sap)
-  (declare (type file-stream stream)
+  (declare (type fd-stream stream)
 	   (type (or system-area-pointer (simple-array * (*))) base)
 	   (type index start end))
   (if (not (null (fd-stream-output-later stream))) ; something buffered.
@@ -899,7 +893,7 @@
 ;;; isn't too problematical.
 (defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p
 			       &aux (total-copied 0))
-  (declare (type file-stream stream))
+  (declare (type fd-stream stream))
   (declare (type index start requested total-copied))
   (let ((unread (fd-stream-unread stream)))
     (when unread
@@ -1030,7 +1024,7 @@
 	  ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
 			   &aux (total-copied 0))
-	(declare (type file-stream stream))
+	(declare (type fd-stream stream))
 	(declare (type index start requested total-copied))
 	(let ((unread (fd-stream-unread stream)))
 	  (when unread
@@ -1134,7 +1128,7 @@
 	  ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
 			   &aux (total-copied 0))
-	(declare (type file-stream stream))
+	(declare (type fd-stream stream))
 	(declare (type index start requested total-copied))
 	(let ((unread (fd-stream-unread stream)))
 	  (when unread
@@ -1595,7 +1589,7 @@
        ;; appropriate value for the EXPECTED-TYPE slot..
        (error 'simple-type-error
               :datum fd-stream
-              :expected-type 'file-stream
+              :expected-type 'fd-stream
               :format-control "~S is not a stream associated with a file."
               :format-arguments (list fd-stream)))
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
@@ -1612,7 +1606,7 @@
      (fd-stream-file-position fd-stream arg1))))
 
 (defun fd-stream-file-position (stream &optional newpos)
-  (declare (type file-stream stream)
+  (declare (type fd-stream stream)
 	   (type (or (alien sb!unix:off-t) (member nil :start :end)) newpos))
   (if (null newpos)
       (sb!sys:without-interrupts
@@ -2010,7 +2004,7 @@
 ;;;
 ;;; FIXME: misleading name, screwy interface
 (defun file-name (stream &optional new-name)
-  (when (typep stream 'file-stream)
+  (when (typep stream 'fd-stream)
       (cond (new-name
 	     (setf (fd-stream-pathname stream) new-name)
 	     (setf (fd-stream-file stream)
@@ -2027,7 +2021,7 @@
 ;;;; COMMON-LISP.)
 
 (defun file-string-length (stream object)
-  (declare (type (or string character) object) (type file-stream stream))
+  (declare (type (or string character) object) (type fd-stream stream))
   #!+sb-doc
   "Return the delta in STREAM's FILE-POSITION that would be caused by writing
    OBJECT to STREAM. Non-trivial only in implementations that support
@@ -2038,9 +2032,9 @@
     (string (length object))))
 
 (defun stream-external-format (stream)
-  (declare (type file-stream stream))
+  (declare (type fd-stream stream))
   #!+sb-doc
-  "Return the actual external format for file-streams, otherwise :DEFAULT."
-  (if (typep stream 'file-stream)
+  "Return the actual external format for fd-streams, otherwise :DEFAULT."
+  (if (typep stream 'fd-stream)
       (fd-stream-external-format stream)
       :default))

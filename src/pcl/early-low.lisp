@@ -83,7 +83,8 @@
 		  *the-class-integer* *the-class-float* *the-class-cons*
 		  *the-class-complex* *the-class-character*
 		  *the-class-bit-vector* *the-class-array*
-		  *the-class-stream*
+		  *the-class-stream* *the-class-file-stream*
+		  *the-class-string-stream*
 
 		  *the-class-slot-object*
 		  *the-class-structure-object*

@@ -346,3 +346,571 @@
            (equalp uvector result-uvector)
            (equalp svector result-svector)))
   T)
+
+(defparameter *multi-line-string*
+  "This file was created by simple-stream-tests.lisp.
+Nothing to see here, move along.")
+
+(defmacro with-dc-test-stream ((s &key initial-content) &body body)
+  `(with-test-file
+       (.ansi-stream.
+        *test-file*
+        :direction :io
+        :if-exists :overwrite
+        :initial-content ,(or initial-content '*multi-line-string*))
+     (let ((,s (make-instance 'terminal-simple-stream
+                 :input-handle (sb-kernel::fd-stream-fd .ansi-stream.)
+                 :output-handle (sb-kernel::fd-stream-fd .ansi-stream.))))
+       ,@body)))
+
+(defmacro with-sc-test-stream ((s &key initial-content) &body body)
+  `(with-test-file
+       (,s
+        *test-file*
+        :class 'file-simple-stream
+        :direction :io
+        :if-exists :overwrite
+        :initial-content ,(or initial-content '*multi-line-string*))
+     ,@body))
+
+;;; 0.8.3.93 tried to fix LISTEN on dual channel streams, but failed to do so:
+
+(deftest listen-dc-1
+    ;; LISTEN with filled buffer
+    (with-dc-test-stream (s) (read-char s) (listen s))
+  T)
+
+(deftest listen-dc-2
+    ;; LISTEN with empty buffer
+    (with-dc-test-stream (s) (listen s))
+  T)
+
+(deftest listen-dc-3
+    ;; LISTEN at EOF
+    (with-dc-test-stream (s)
+      (read-line s)
+      (read-line s)
+      (listen s))
+  NIL)
+
+;;; the following tests are for problems fixed in SBCL 0.8.6.2:
+
+(deftest charpos-1
+    ;; check for bug involving the -1 vs. 0 oddity in std-dc-newline-in-handler
+    ;;
+    ;; Note: It not not clear to me that input should affect the CHARPOS at
+    ;; all.  (Except for a terminal stream perhaps, which our test stream
+    ;; happens to be.  Hmm.)
+    ;;
+    ;; But CHARPOS must not be -1, so much is sure, hence this test is right
+    ;; in any case.
+    (with-dc-test-stream (s)
+      (read-line s)
+      (sb-simple-streams:charpos s))
+  0)
+
+(deftest charpos-2
+    ;; FIXME: It not not clear to me that input should affect the CHARPOS at
+    ;; all, and indeed it does not.  That is, except for newlines?! (see above)
+    ;;
+    ;; What this test does is (a) check that the CHARPOS works at all without
+    ;; erroring and (b) force anyone changing the CHARPOS behaviour to read
+    ;; this comment and start thinking things through better than I can.
+    (with-dc-test-stream (s)
+      (read-char s)
+      (and (eql (sb-kernel:charpos s) 0)
+           (eql (sb-simple-streams:charpos s) 0)))
+  T)
+
+(deftest reader-1
+    ;; does the reader support simple streams?  Note that, say, "123" instead
+    ;; of "(1 2)" does not trigger the bugs present in SBCL 0.8.6.
+    (with-dc-test-stream (s :initial-content "(1 2)")
+      (equal (read s) '(1 2)))
+  T)
+
+(deftest line-length-dc-1
+    ;; does LINE-LENGTH support simple streams?  
+    (with-dc-test-stream (s)
+      (eql (sb-simple-streams:line-length s)
+           (sb-kernel:line-length s)))
+  T)
+
+(defvar *synonym*)
+
+;; the biggest change in 0.8.6.2:
+;; support composite streams writing to simple streams
+
+;; first, SYNONYM-STREAM:
+
+(deftest synonym-stream-1
+    ;; READ-CHAR
+    (with-dc-test-stream (*synonym*)
+      (read-char (make-synonym-stream '*synonym*)))
+  #\T)
+
+(deftest synonym-stream-2
+    ;; UNREAD-CHAR (via STREAM-MISC-DISPATCH)
+    (with-dc-test-stream (*synonym*)
+      (let ((s (make-synonym-stream '*synonym*)))
+        (unread-char (read-char s) s)
+        (read-char s)))
+  #\T)
+
+(deftest synonym-stream-3
+    ;; READ-BYTE
+    (with-dc-test-stream (*synonym*)
+      (read-byte (make-synonym-stream '*synonym*)))
+  #.(char-code #\T))
+
+(deftest synonym-stream-4
+    ;; WRITE-CHAR
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-synonym-stream '*synonym*)))
+        (write-char #\A s)
+        (file-position s 0)
+        (read-char s)))
+  #\A)
+
+(deftest synonym-stream-5
+    ;; WRITE-BYTE
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-synonym-stream '*synonym*)))
+        (write-byte 65 s)
+        (file-position s 0)
+        (read-char s)))
+  #\A)
+
+(deftest synonym-stream-6
+    ;; WRITE-STRING
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-synonym-stream '*synonym*)))
+        (write-string "ab" s)
+        (file-position s 0)
+        (and (char= (read-char s) #\a)
+             (char= (read-char s) #\b))))
+  T)
+
+(deftest synonym-stream-7
+    ;; LISTEN (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-synonym-stream '*synonym*)))
+        (and (listen s) t)))
+  T)
+
+(deftest synonym-stream-8
+    ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-synonym-stream '*synonym*)))
+        (clear-input s)
+        (listen s)))
+  NIL)
+
+(deftest synonym-stream-9
+    ;; FORCE-OUTPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      ;; could test more here
+      (force-output (make-synonym-stream '*synonym*)))
+  NIL)
+
+(deftest synonym-stream-10
+    ;; FINISH-OUTPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      ;; could test more here
+      (finish-output (make-synonym-stream '*synonym*)))
+  NIL)
+
+(deftest synonym-stream-11
+    ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (stream-element-type (make-synonym-stream '*synonym*))
+           (stream-element-type *synonym*)))
+  T)
+
+(deftest synonym-stream-12
+    ;; INTERACTIVE-STREAM-P (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (interactive-stream-p (make-synonym-stream '*synonym*))
+           (interactive-stream-p *synonym*)))
+  T)
+
+(deftest synonym-stream-13
+    ;; LINE-LENGTH (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (sb-kernel:line-length (make-synonym-stream '*synonym*))
+           (sb-kernel:line-length *synonym*)))
+  T)
+
+(deftest synonym-stream-14
+    ;; CHARPOS (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (sb-kernel:charpos (make-synonym-stream '*synonym*))
+           (sb-kernel:charpos *synonym*)))
+  T)
+
+(deftest synonym-stream-15
+    ;; FILE-LENGTH (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (file-length (make-synonym-stream '*synonym*))
+           (file-length *synonym*)))
+  T)
+
+(deftest synonym-stream-16
+    ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (file-position (make-synonym-stream '*synonym*))
+           (file-position *synonym*)))
+  T)
+
+;; SYNONYM-STREAM tests repeated for BROADCAST-STREAM, where applicable
+
+(deftest broadcast-stream-4
+    ;; WRITE-CHAR
+    (with-sc-test-stream (synonym)
+      (let ((s (make-broadcast-stream synonym)))
+        (write-char #\A s)
+        (force-output s))
+      (file-position synonym 0)
+      (read-char synonym))
+  #\A)
+
+(deftest broadcast-stream-5
+    ;; WRITE-BYTE
+    (with-sc-test-stream (synonym)
+      (let ((s (make-broadcast-stream synonym)))
+        (write-byte 65 s)
+        (force-output s))
+      (file-position synonym 0)
+      (read-char synonym))
+  #\A)
+
+(deftest broadcast-stream-6
+    ;; WRITE-STRING
+    (with-sc-test-stream (synonym)
+      (let ((s (make-broadcast-stream synonym)))
+        (write-string "ab" s)
+        (force-output s))
+      (file-position synonym 0)
+      (and (char= (read-char synonym) #\a)
+           (char= (read-char synonym) #\b)))
+  T)
+
+(deftest broadcast-stream-9
+    ;; FORCE-OUTPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      ;; could test more here
+      (force-output (make-broadcast-stream synonym)))
+  NIL)
+
+(deftest broadcast-stream-10
+    ;; FINISH-OUTPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      ;; could test more here
+      (finish-output (make-broadcast-stream synonym)))
+  NIL)
+
+(deftest broadcast-stream-11
+    ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (stream-element-type (make-broadcast-stream synonym))
+           (stream-element-type synonym)))
+  T)
+
+(deftest broadcast-stream-12
+    ;; INTERACTIVE-STREAM-P (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (interactive-stream-p (make-broadcast-stream synonym))
+           (interactive-stream-p synonym)))
+  T)
+
+(deftest broadcast-stream-13
+    ;; LINE-LENGTH (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (sb-kernel:line-length (make-broadcast-stream synonym))
+           (sb-kernel:line-length synonym)))
+  T)
+
+(deftest broadcast-stream-14
+    ;; CHARPOS (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (sb-kernel:charpos (make-broadcast-stream synonym))
+           (sb-kernel:charpos synonym)))
+  T)
+
+(deftest broadcast-stream-16
+    ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (file-position (make-broadcast-stream synonym))
+           (file-position synonym)))
+  T)
+
+;; SYNONYM-STREAM tests repeated for TWO-WAY-STREAM, where applicable
+
+(deftest two-way-stream-1
+    ;; READ-CHAR
+    (with-dc-test-stream (synonym)
+      (read-char (make-two-way-stream synonym synonym)))
+  #\T)
+
+(deftest two-way-stream-2
+    ;; UNREAD-CHAR (via STREAM-MISC-DISPATCH)
+    (with-dc-test-stream (synonym)
+      (let ((s (make-two-way-stream synonym synonym)))
+        (unread-char (read-char s) s)
+        (read-char s)))
+  #\T)
+
+(deftest two-way-stream-3
+    ;; READ-BYTE
+    (with-dc-test-stream (synonym)
+      (read-byte (make-two-way-stream synonym synonym)))
+  #.(char-code #\T))
+
+(deftest two-way-stream-4
+    ;; WRITE-CHAR
+    (with-sc-test-stream (synonym)
+      (let ((s (make-two-way-stream synonym synonym)))
+        (write-char #\A s)
+        (force-output s))
+      (file-position synonym 0)
+      (read-char synonym))
+  #\A)
+
+(deftest two-way-stream-5
+    ;; WRITE-BYTE
+    (with-sc-test-stream (synonym)
+      (let ((s (make-two-way-stream synonym synonym)))
+        (write-byte 65 s)
+        (force-output s))
+      (file-position synonym 0)
+      (read-char synonym))
+  #\A)
+
+(deftest two-way-stream-6
+    ;; WRITE-STRING
+    (with-sc-test-stream (synonym)
+      (let ((s (make-two-way-stream synonym synonym)))
+        (write-string "ab" s)
+        (force-output s))
+      (file-position synonym 0)
+      (and (char= (read-char synonym) #\a)
+           (char= (read-char synonym) #\b)))
+  T)
+
+(deftest two-way-stream-7
+    ;; LISTEN (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (let ((s (make-two-way-stream synonym synonym)))
+        (and (listen s) t)))
+  T)
+
+(deftest two-way-stream-8
+    ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (let ((s (make-two-way-stream synonym synonym)))
+        (clear-input s)
+        (listen s)))
+  NIL)
+
+(deftest two-way-stream-9
+    ;; FORCE-OUTPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      ;; could test more here
+      (force-output (make-two-way-stream synonym synonym)))
+  NIL)
+
+(deftest two-way-stream-10
+    ;; FINISH-OUTPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      ;; could test more here
+      (finish-output (make-two-way-stream synonym synonym)))
+  NIL)
+
+(deftest two-way-stream-11
+    ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (stream-element-type (make-two-way-stream synonym synonym))
+           (stream-element-type synonym)))
+  T)
+
+(deftest two-way-stream-12
+    ;; INTERACTIVE-STREAM-P (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (interactive-stream-p (make-two-way-stream synonym synonym))
+           (interactive-stream-p synonym)))
+  T)
+
+(deftest two-way-stream-13
+    ;; LINE-LENGTH (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (sb-kernel:line-length (make-two-way-stream synonym synonym))
+           (sb-kernel:line-length synonym)))
+  T)
+
+(deftest two-way-stream-14
+    ;; CHARPOS (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (sb-kernel:charpos (make-two-way-stream synonym synonym))
+           (sb-kernel:charpos synonym)))
+  T)
+
+(deftest two-way-stream-16
+    ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (synonym)
+      (eql (file-position (make-two-way-stream synonym synonym))
+           (file-position synonym)))
+  T)
+
+;; SYNONYM-STREAM tests repeated for ECHO-STREAM, where applicable
+
+(deftest echo-stream-1
+    ;; READ-CHAR
+    (with-dc-test-stream (*synonym*)
+      (read-char (make-echo-stream *synonym* *synonym*)))
+  #\T)
+
+(deftest echo-stream-2
+    ;; UNREAD-CHAR (via STREAM-MISC-DISPATCH)
+    (with-dc-test-stream (*synonym*)
+      (let ((s (make-echo-stream *synonym* *synonym*)))
+        (unread-char (read-char s) s)
+        (read-char s)))
+  #\T)
+
+(deftest echo-stream-3
+    ;; READ-BYTE
+    (with-dc-test-stream (*synonym*)
+      (read-byte (make-echo-stream *synonym* *synonym*)))
+  #.(char-code #\T))
+
+(deftest echo-stream-7
+    ;; LISTEN (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-echo-stream *synonym* *synonym*)))
+        (and (listen s) t)))
+  T)
+
+(deftest echo-stream-8
+    ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-echo-stream *synonym* *synonym*)))
+        (clear-input s)
+        (listen s)))
+  NIL)
+
+(deftest echo-stream-11
+    ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (stream-element-type (make-echo-stream *synonym* *synonym*))
+           (stream-element-type *synonym*)))
+  T)
+
+(deftest echo-stream-12
+    ;; INTERACTIVE-STREAM-P (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (interactive-stream-p (make-echo-stream *synonym* *synonym*))
+           (interactive-stream-p *synonym*)))
+  T)
+
+(deftest echo-stream-13
+    ;; LINE-LENGTH (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (sb-kernel:line-length (make-echo-stream *synonym* *synonym*))
+           (sb-kernel:line-length *synonym*)))
+  T)
+
+(deftest echo-stream-14
+    ;; CHARPOS (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (sb-kernel:charpos (make-echo-stream *synonym* *synonym*))
+           (sb-kernel:charpos *synonym*)))
+  T)
+
+(deftest echo-stream-16
+    ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (file-position (make-echo-stream *synonym* *synonym*))
+           (file-position *synonym*)))
+  T)
+
+;; SYNONYM-STREAM tests repeated for CONCATENATED-STREAM, where applicable
+
+(deftest concatenated-stream-1
+    ;; READ-CHAR
+    (with-dc-test-stream (*synonym*)
+      (read-char (make-concatenated-stream *synonym*)))
+  #\T)
+
+(deftest concatenated-stream-2
+    ;; UNREAD-CHAR (via STREAM-MISC-DISPATCH)
+    (with-dc-test-stream (*synonym*)
+      (let ((s (make-concatenated-stream *synonym*)))
+        (unread-char (read-char s) s)
+        (read-char s)))
+  #\T)
+
+(deftest concatenated-stream-3
+    ;; READ-BYTE
+    (with-dc-test-stream (*synonym*)
+      (read-byte (make-concatenated-stream *synonym*)))
+  #.(char-code #\T))
+
+(deftest concatenated-stream-7
+    ;; LISTEN (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-concatenated-stream *synonym*)))
+        (and (listen s) t)))
+  T)
+
+(deftest concatenated-stream-8
+    ;; CLEAR-INPUT (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (let ((s (make-concatenated-stream *synonym*)))
+        (clear-input s)
+        (listen s)))
+  NIL)
+
+(deftest concatenated-stream-11
+    ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (stream-element-type (make-concatenated-stream *synonym*))
+           (stream-element-type *synonym*)))
+  T)
+
+(deftest concatenated-stream-12
+    ;; INTERACTIVE-STREAM-P (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (interactive-stream-p (make-concatenated-stream *synonym*))
+           (interactive-stream-p *synonym*)))
+  T)
+
+(deftest concatenated-stream-13
+    ;; LINE-LENGTH (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (sb-kernel:line-length (make-concatenated-stream *synonym*))
+           (sb-kernel:line-length *synonym*)))
+  T)
+
+(deftest concatenated-stream-14
+    ;; CHARPOS (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (sb-kernel:charpos (make-concatenated-stream *synonym*))
+           (sb-kernel:charpos *synonym*)))
+  T)
+
+(deftest concatenated-stream-16
+    ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
+    (with-sc-test-stream (*synonym*)
+      (eql (file-position (make-concatenated-stream *synonym*))
+           (file-position *synonym*)))
+  T)
+
+;; uncovered by synonym-stream-15
+
+(deftest file-simple-stream-1
+    (values (subtypep 'file-simple-stream 'file-stream))
+  T)
+
+(deftest string-simple-stream-1
+    (values (subtypep 'string-simple-stream 'string-stream))
+  T)

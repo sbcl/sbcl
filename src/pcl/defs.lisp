@@ -306,7 +306,8 @@
 				 ;; CMU CL code did. -- WHN 20000715
 				 '(t instance
 				     funcallable-instance
-				     function stream)))
+				     function stream 
+				     file-stream string-stream)))
 		       sb-kernel::*built-in-classes*))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
@@ -325,6 +326,12 @@
   (:metaclass built-in-class))
 
 (defclass stream (instance) ()
+  (:metaclass built-in-class))
+
+(defclass file-stream (stream) ()
+  (:metaclass built-in-class))
+
+(defclass string-stream (stream) ()
   (:metaclass built-in-class))
 
 (defclass slot-object (t) ()

@@ -843,15 +843,26 @@
 	      (classoid-layout (find-classoid
 				(or (first superclass-opt)
 				    'structure-object))))))
-    (if (eq (dd-name info) 'ansi-stream)
-	;; a hack to add the CL:STREAM class as a mixin for ANSI-STREAMs
-	(concatenate 'simple-vector
-		     (layout-inherits super)
-		     (vector super
-			     (classoid-layout (find-classoid 'stream))))
-	(concatenate 'simple-vector
-		     (layout-inherits super)
-		     (vector super)))))
+    (case (dd-name info)
+      ((ansi-stream)
+       (concatenate 'simple-vector
+		    (layout-inherits super)
+		    (vector super (classoid-layout (find-classoid 'stream)))))
+      ((fd-stream)
+       (concatenate 'simple-vector
+		    (layout-inherits super)
+		    (vector super 
+			    (classoid-layout (find-classoid 'file-stream)))))
+      ((sb!impl::string-input-stream 
+	sb!impl::string-output-stream
+	sb!impl::fill-pointer-output-stream)
+       (concatenate 'simple-vector
+		    (layout-inherits super)
+		    (vector super
+			    (classoid-layout (find-classoid 'string-stream)))))
+      (t (concatenate 'simple-vector 
+		      (layout-inherits super)
+		      (vector super))))))
 
 ;;; Do miscellaneous (LOAD EVAL) time actions for the structure
 ;;; described by DD. Create the class and LAYOUT, checking for
@@ -1168,12 +1179,16 @@
 				     (sb!xc:typep x (find-classoid class))))
 			       (fdefinition constructor)))
     (setf (classoid-direct-superclasses class)
-	  (if (eq (dd-name info) 'ansi-stream)
-	      ;; a hack to add CL:STREAM as a superclass mixin to ANSI-STREAMs
-	      (list (layout-classoid (svref inherits (1- (length inherits))))
-		    (layout-classoid (svref inherits (- (length inherits) 2))))
-	      (list (layout-classoid
-		     (svref inherits (1- (length inherits)))))))
+	  (case (dd-name info)
+	    ((ansi-stream 
+	      fd-stream 
+	      sb!impl::string-input-stream sb!impl::string-output-stream
+	      sb!impl::fill-pointer-output-stream)
+	     (list (layout-classoid (svref inherits (1- (length inherits))))
+		   (layout-classoid (svref inherits (- (length inherits) 2)))))
+	    (t
+	     (list (layout-classoid
+		    (svref inherits (1- (length inherits))))))))
     (let ((new-layout (make-layout :classoid class
 				   :inherits inherits
 				   :depthoid (length inherits)

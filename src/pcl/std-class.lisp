@@ -1497,8 +1497,12 @@
 (defmethod class-default-initargs	((class built-in-class)) ())
 
 (defmethod validate-superclass ((c class) (s built-in-class))
-  (or (eq s *the-class-t*)
-      (eq s *the-class-stream*)))
+  (or (eq s *the-class-t*) (eq s *the-class-stream*)
+      ;; FIXME: bad things happen if someone tries to mix in both
+      ;; FILE-STREAM and STRING-STREAM (as they have the same
+      ;; layout-depthoid).  Is there any way we can provide a useful
+      ;; error message?  -- CSR, 2005-05-03
+      (eq s *the-class-file-stream*) (eq s *the-class-string-stream*)))
 
 ;;; Some necessary methods for FORWARD-REFERENCED-CLASS
 (defmethod class-direct-slots ((class forward-referenced-class)) ())

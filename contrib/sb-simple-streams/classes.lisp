@@ -132,7 +132,7 @@
    (max-out-pos :initform 0 :type fixnum)))
 
 ;;; A stream with a string as buffer.
-(def-stream-class string-simple-stream (simple-stream)
+(def-stream-class string-simple-stream (simple-stream string-stream)
   ())
 
 

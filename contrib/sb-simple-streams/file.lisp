@@ -14,7 +14,7 @@
 ;;;
 ;;; Definition of File-Simple-Stream and relations
 
-(def-stream-class file-simple-stream (single-channel-simple-stream)
+(def-stream-class file-simple-stream (single-channel-simple-stream file-stream)
   ((pathname :initform nil :initarg :pathname)
    (filename :initform nil :initarg :filename)
    (original :initform nil :initarg :original)

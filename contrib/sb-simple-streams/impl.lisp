@@ -687,10 +687,10 @@
    :output-handle - a stream or Unix file descriptor to write to"
   (declare (ignore element-type external-format input-handle output-handle
                    if-exists if-does-not-exist))
-  (let ((class (or class 'sb-sys::file-stream))
+  (let ((class (or class 'sb-sys:fd-stream))
 	(options (copy-list options))
         (filespec (merge-pathnames filename)))
-    (cond ((eq class 'sb-sys::file-stream)
+    (cond ((eq class 'sb-sys:fd-stream)
 	   (remf options :class)
            (remf options :mapped)
            (remf options :input-handle)
@@ -1082,7 +1082,7 @@ is supported only on simple-streams."
       (synonym-stream
        (wait-for-input-available (symbol-value (synonym-stream-symbol stream))
 				 timeout))
-      (sb-sys::file-stream
+      (sb-sys:fd-stream
        (or (< (sb-impl::fd-stream-in-index stream)
 	      (length (sb-impl::fd-stream-in-buffer stream)))
 	   (wait-for-input-available (sb-sys:fd-stream-fd stream) timeout))))))
@@ -1096,7 +1096,7 @@ is supported only on simple-streams."
               (%file-rename stream new-name))
 	     (t
 	      (%file-name stream)))))
-    (sb-sys::file-stream
+    (sb-sys:fd-stream
      (cond (new-name
 	    (setf (sb-impl::fd-stream-pathname stream) new-name)
 	    (setf (sb-impl::fd-stream-file stream)

@@ -1271,12 +1271,18 @@ NIL is returned when no such class exists."
       :inherits (symbol list sequence)
       :direct-superclasses (symbol list)
       :prototype-form 'nil)
-     
      (stream
       :state :read-only
       :depth 3
-      :inherits (instance)
-      :prototype-form (make-broadcast-stream)))))
+      :inherits (instance))
+     (file-stream
+      :state :read-only
+      :depth 5
+      :inherits (stream))
+     (string-stream
+      :state :read-only
+      :depth 5
+      :inherits (stream)))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.

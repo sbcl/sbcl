@@ -1020,32 +1020,18 @@
 	 (aver (= numbytes (+ new-start bytes-read)))
 	 numbytes)))))
 
-;;;; base STRING-STREAM stuff
-
-(defstruct (string-stream
-             (:include ansi-stream)
-             (:constructor nil)
-             (:copier nil))
-  ;; FIXME: This type declaration is true, and will probably continue
-  ;; to be true.  However, note well the comments in DEFTRANSFORM
-  ;; REPLACE, implying that performance of REPLACE is somewhat
-  ;; critical to performance of string streams.  If (VECTOR CHARACTER)
-  ;; ever becomes different from (VECTOR BASE-CHAR), the transform
-  ;; probably needs to be extended.
-  (string (missing-arg) :type (vector character)))
-
 ;;;; STRING-INPUT-STREAM stuff
 
 (defstruct (string-input-stream
-	     (:include string-stream
+	     (:include ansi-stream
 		       (in #'string-inch)
 		       (bin #'ill-bin)
 		       (n-bin #'ill-bin)
-		       (misc #'string-in-misc)
-                       (string (missing-arg) :type simple-string))
+		       (misc #'string-in-misc))
 	     (:constructor internal-make-string-input-stream
 			   (string current end))
 	     (:copier nil))
+  (string (missing-arg) :type simple-string)
   (current (missing-arg) :type index)
   (end (missing-arg) :type index))
 
@@ -1136,17 +1122,16 @@
 ;;;; STRING-OUTPUT-STREAM stuff
 
 (defstruct (string-output-stream
-	    (:include string-stream
+	    (:include ansi-stream
 		      (out #'string-ouch)
 		      (sout #'string-sout)
-		      (misc #'string-out-misc)
-                      ;; The string we throw stuff in.
-                      (string (missing-arg)
-			      :type (simple-array character (*))))
+		      (misc #'string-out-misc))
 	    (:constructor make-string-output-stream 
 			  (&key (element-type 'character)
 			   &aux (string (make-string 40))))
 	    (:copier nil))
+  ;; The string we throw stuff in.
+  (string (missing-arg) :type (simple-array character (*)))
   ;; Index of the next location to use.
   (index 0 :type fixnum)
   ;; Index cache for string-output-stream-last-index
@@ -1287,17 +1272,14 @@
 	(satisfies array-has-fill-pointer-p)))
 
 (defstruct (fill-pointer-output-stream
- 	    (:include string-stream
+ 	    (:include ansi-stream
 		      (out #'fill-pointer-ouch)
 		      (sout #'fill-pointer-sout)
-		      (misc #'fill-pointer-misc)
-                      ;; a string with a fill pointer where we stuff
-                      ;; the stuff we write
-                      (string (missing-arg)
-                              :type string-with-fill-pointer
-                              :read-only t))
+		      (misc #'fill-pointer-misc))
 	    (:constructor make-fill-pointer-output-stream (string))
-	    (:copier nil)))
+	    (:copier nil))
+  ;; a string with a fill pointer where we stuff the stuff we write
+  (string (missing-arg) :type string-with-fill-pointer :read-only t))
 
 (defun fill-pointer-ouch (stream character)
   (let* ((buffer (fill-pointer-output-stream-string stream))
