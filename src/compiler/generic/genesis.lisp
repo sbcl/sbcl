@@ -1137,18 +1137,16 @@
   ;; the function values for these things?? I.e. why do we need this
   ;; section at all? Is it because all the FDEFINITION stuff gets in
   ;; the way of reading function values and is too hairy to rely on at
-  ;; cold boot? FIXME: 5/6 of these are in *STATIC-SYMBOLS* in
+  ;; cold boot? FIXME: Most of these are in *STATIC-SYMBOLS* in
   ;; parms.lisp, but %HANDLE-FUNCTION-END-BREAKPOINT is not. Why?
   ;; Explain.
   (macrolet ((frob (symbol)
 	       `(cold-set ',symbol
 			  (cold-fdefinition-object (cold-intern ',symbol)))))
-    (frob !cold-init)
     (frob maybe-gc)
     (frob internal-error)
     (frob sb!di::handle-breakpoint)
-    (frob sb!di::handle-function-end-breakpoint)
-    (frob fdefinition-object))
+    (frob sb!di::handle-function-end-breakpoint))
 
   (cold-set '*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set '*current-unwind-protect-block* (make-fixnum-descriptor 0))

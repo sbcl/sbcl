@@ -236,7 +236,6 @@
     sb!impl::*!initial-fdefn-objects*
 
     ;; functions that the C code needs to call
-    sb!impl::!cold-init
     maybe-gc
     sb!kernel::internal-error
     sb!di::handle-breakpoint

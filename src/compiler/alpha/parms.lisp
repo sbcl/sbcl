@@ -173,7 +173,6 @@
     sb!kernel::internal-error
     sb!di::handle-breakpoint
     sb!di::handle-function-end-breakpoint
-    fdefinition-object
 
     ;; free Pointers
     *read-only-space-free-pointer*
