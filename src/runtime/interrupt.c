@@ -67,6 +67,8 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 					 void *handler, int signal,
 					 siginfo_t *info, 
 					 os_context_t *context);
+boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
+
 extern lispobj all_threads_lock;
 extern int countdown_to_gc;
 

@@ -416,11 +416,6 @@ void arch_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIGBUS,sigbus_handler);
 }
 
-void get_spinlock(lispobj *word, int value) {
-    /* FIXME: dummy definition */
-    *word = value;
-}
-
 
 lispobj funcall0(lispobj function)
 {

@@ -369,11 +369,6 @@ void arch_install_interrupt_handlers()
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 }
 
-void get_spinlock(lispobj *word, int value) {
-    /* FIXME: dummy definition */
-    *word = value;
-}
-
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 
 lispobj funcall0(lispobj function)
