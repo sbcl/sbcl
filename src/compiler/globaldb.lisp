@@ -906,7 +906,6 @@
 ;;; the current environment, allowing any inherited info to become
 ;;; visible. We return true if there was any info.
 (defun clear-info (class type name)
-  #!+sb-doc
   (let ((info (type-info-or-lose class type)))
     (clear-info-value name (type-info-number info))))
 #!-sb-fluid
