@@ -139,6 +139,17 @@ is also supported.</para>
 
 </sect2>
 
+<sect2><title>Customization Hooks for Users</title>
+
+<para>The behaviour of <function>require</function> when called with only
+one argument is implementation-defined.  In &SBCL; it calls functions
+on the user-settable list <varname>sb-ext:*module-provider-functions*</varname>
+- see the <function>require</function> documentation string for details.
+
+<para>The toplevel repl prompt may be customized, and the function
+that reads user input may be replaced completely.  <!-- FIXME but I 
+don't currently remember how -->
+
 <sect2><title>Tools To Help Developers</title>
 
 <para>&SBCL; provides a profiler and other extensions to the &ANSI;
