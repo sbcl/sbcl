@@ -431,7 +431,6 @@
 		 (direct-slots nil direct-slots-p)
 		 (direct-default-initargs nil direct-default-initargs-p)
 		 (predicate-name nil predicate-name-p))
-  (declare (ignore slot-names))
   (cond (direct-superclasses-p
 	 (setq direct-superclasses
 	       (or direct-superclasses
@@ -461,18 +460,22 @@
       (setq direct-default-initargs
 	    (plist-value class 'direct-default-initargs)))
   (setf (plist-value class 'class-slot-cells)
-	;; The below initializes shared slots from direct initforms,
-	;; but one might inherit initforms from superclasses
-	;; (cf. UPDATE-SHARED-SLOT-VALUES).
-	(let (collect)
+	(let ((old-class-slot-cells (plist-value class 'class-slot-cells))
+	      (collect '()))
 	  (dolist (dslotd direct-slots)
 	    (when (eq :class (slot-definition-allocation dslotd))
-	      (let ((initfunction (slot-definition-initfunction dslotd)))
-		(push (cons (slot-definition-name dslotd)
-			       (if initfunction
-				   (funcall initfunction)
-				   +slot-unbound+))
-                      collect))))
+	      ;; see CLHS 4.3.6
+	      (let* ((name (slot-definition-name dslotd))
+		     (old (assoc name old-class-slot-cells)))
+		(if (or (not old)
+			(eq t slot-names)
+			(member name slot-names))
+		    (let* ((initfunction (slot-definition-initfunction dslotd))
+			   (value (if initfunction
+				      (funcall initfunction)
+				      +slot-unbound+)))
+		      (push (cons name value) collect))
+		    (push old collect)))))
           (nreverse collect)))
   (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
@@ -867,19 +870,9 @@
     (update-slots class (compute-slots class))
     (update-gfs-of-class class)
     (update-inits class (compute-default-initargs class))
-    (update-shared-slot-values class)
     (update-ctors 'finalize-inheritance :class class))
   (unless finalizep
     (dolist (sub (class-direct-subclasses class)) (update-class sub nil))))
-
-(defun update-shared-slot-values (class)
-  (dolist (slot (class-slots class))
-    (when (eq (slot-definition-allocation slot) :class)
-      (let ((cell (assq (slot-definition-name slot) (class-slot-cells class))))
-        (when cell
-          (let ((initfn (slot-definition-initfunction slot)))
-            (when initfn
-              (setf (cdr cell) (funcall initfn)))))))))
 
 (defun update-cpl (class cpl)
   (if (class-finalized-p class)
@@ -1380,13 +1373,13 @@
 	     (added ())
 	     (discarded ())
 	     (plist ()))
-	;; local  --> local	transfer
-	;; local  --> shared       discard
-	;; local  -->  --	  discard
-	;; shared --> local	transfer
-	;; shared --> shared       discard
-	;; shared -->  --	  discard
-	;;  --    --> local	add
+	;; local  --> local	transfer value
+	;; local  --> shared    discard value, discard slot
+	;; local  -->  --	discard slot
+	;; shared --> local	transfer value
+	;; shared --> shared    -- (cf SHARED-INITIALIZE :AFTER STD-CLASS)
+	;; shared -->  --	discard value
+	;;  --    --> local	add slot
 	;;  --    --> shared	--
 
 	;; Go through all the old local slots.
@@ -1407,11 +1400,8 @@
 	  (let ((name (car oclass-slot-and-val))
 		(val (cdr oclass-slot-and-val)))
 	    (let ((npos (posq name nlayout)))
-	      (if npos
-		  (setf (clos-slots-ref nslots npos) (cdr oclass-slot-and-val))
-		  (progn (push name discarded)
-			 (unless (eq val +slot-unbound+)
-			   (setf (getf plist name) val)))))))
+	      (when npos
+		(setf (clos-slots-ref nslots npos) val)))))
 
 	;; Go through all the new local slots to compute the added slots.
 	(dolist (nlocal nlayout)

@@ -732,5 +732,13 @@
 	 (defclass accessoroid-class () ((slot :accessor accessoroid)))
 	 program-error))
 
+;;; reported by Bruno Haible sbcl-devel 2004-04-15
+(defclass shared-slot-and-redefinition ()
+  ((size :initarg :size :initform 1 :allocation :class)))
+(let ((i (make-instance 'shared-slot-and-redefinition)))
+  (defclass shared-slot-and-redefinition ()
+    ((size :initarg :size :initform 2 :allocation :class)))
+  (assert (= (slot-value i 'size) 1)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -2386,6 +2386,8 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     values.  (thanks to Zach Beane)
   * bug fix: streams with element-type (SIGNED-BYTE <N>) for <N>
     greater than 32 handle EOF correctly.
+  * bug fix: class slots in redefined classes preserve their old
+    values.  (thanks to Bruno Haible and Nikodemus Siivola)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** READ-SEQUENCE now works on ECHO-STREAMs.
     ** RATIONALIZE works more according to its specification.  (thanks
