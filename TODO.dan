@@ -1,0 +1,111 @@
+-*- Text -*- 
+
+
+* design issues
+
+** What API to export?  
+
+Not interested, really, in supporting the full symbolics stack-groups
+crud (whostate, run-reasons, etc).  Basic thread control functions
+would be nice
+
+make-thread, we already have.  {kill,suspend,resume}-thread are simple
+wrappers around corresponding unix-foo functions
+
+Even if we don't provide one, some higher level process glue will want
+to slap extra stuff (thread names, for example) around us.  One
+possible approach is that taken by corman, where the acl-like
+MP package keeps a hash table of thread id -> 'process' 
+
+We're going to use "smallish integer" as thread id from Lisp.  For
+Linux, because we can, it will be the PID.  Note that the tls base
+register already to the current thread, so we have most of the
+usually-relevant details at hand already.
+
+** locking for library functions
+
+Slap this or something like it around each unsafe function.  Watch the
+code size go boom bigga bigga bing
+
+#+stack-grows-downward-not-upward
+(unless (and (sap>= (control-stack-end) (mutex-value *big-library-lock*)) 
+	     (sap>  (mutex-value *big-library-lock*) (sb-vm::current-fp)))
+  (get-mutex *big-library-lock* (sb-vm::current-fp)))
+,@body
+(when (eql (mutex-value *big-library-lock*) (sb-vm::current-fp))
+  (free-mutex *big-library-lock*)))
+  
+it would be nice if we could confine this to fewer entry points than
+there are functions in SBCL
+
+Debugging:
+
+Some threads open a terminal, bind *std{in,out,err}* streams, and start a
+listener.  That's OK, they'll drop into a break loop if anything goes
+wrong in them.  Other threads don't.  They'll end up writing to the
+initial thread's sb!impl::*stderr* instead.
+
+We could do a handler-bind at thread startup, to make an error handler
+that does a pty open, then write to the master and sends sb!impl::*stderr* 
+(assumed to be connected to emacs or something like it) a specially
+formatted message saying "now open /dev/pts/slave because we want to
+run a break loop in it".  We need to sort out the rather crap pty
+handling anyway
+ master = open("/dev/ptmx", O_RDWR);
+ grantpt(master);
+ unlockpt(master);
+ slave=open(ptsname(fd), O_RDWR);
+
+* seriously broken : affecting correct running
+
+10) locking, in general: waiting for locks
+
+we would like some mechanism to sleep and be woken on lock contention.
+sys_futex will be in 2.6, but is not in 2.4 (though there are patches,
+and it may be that the red hat kernel has merged them).  In the
+meantime, we probably have to fake something with signals and maybe
+sigwait() (looks like a good way to sleep for signals without having a
+signal handler be called).  This means we need to manage our own
+queues too
+
+We _could_ do something a bit less sophisticated, and just loop
+calling sched_yield() while we wwait.  Tuning spin retry attempts vs
+scheduler-friendly attempts is not possible without knowing the lock
+contention.  So, we could just pass that decision onto the user.  If
+2.6 is going to be widely used in the next six months or so, this
+could be a win.
+
+14) allocation locking still not completely done: we're not sure what
+happens if two threads simultaneously create a new region, but the
+desired effect is "nothing bad"
+
+
+setup_i386_stack_scav in purify.c needs doing for multiple threads?
+
+
+* broken but uninteresting or cosmetic
+
+2) grow tlv when full
+
+12) fix ROOM
+
+13) fix other runtime stuff that has been temporarily ripped out
+ - control stack scrubbing, chiefly
+
+* code cleanup
+
+23) Some of the static symbols also have static tls offsets and the
+    code that accesses them could be a lot shorter (faster is nice,
+    but avoiding allocating a register is even nicer) if these were
+    known at host-1 compile time
+
+15) we'd like a faster way to find the current thread from C than
+    calling getpid().  For x86, for now, we can write a bit of asm to
+    dereference %gs:(offsetof self), for other ports something more
+    complicated needs doing, unless we can find a register to use for
+    the tls base that C promises not to overwrite.
+
+22) allocate-on-same-page stuff in gc_find_freeish_pages needs
+    re-enabling to avoid massive heap fragmentation
+
+
