@@ -80,9 +80,9 @@ results if the stream is buffered.
 
 A filename is a string.  
 
-A pathname is a designator for a file-descriptor: the filename is
-computed using the same mechanism as the implementation would
-use to map pathnames to OS filenames internally.
+A pathname is a designator for a filename: the filename is computed
+using the same mechanism as the implementation would use to map
+pathnames to OS filenames internally.
 
 In an implementation that supports pathnames to files on other hosts, 
 using mechanisms not available to the underlying OS (for example, 
@@ -166,11 +166,12 @@ is obvious.  For example,
 (read fd buffer &optional (length (length buffer))) => bytes-read
 
 b) where C simulates "out" parameters using pointers (for instance, in
-pipe() or socketpair()) we may use multiple return values instead.
-This doesn't apply to data transfer functions that fill buffers.
+pipe() or socketpair()) these may be optional or omitted in the Lisp
+interface: if not provided, appropriate objects will be allocated and
+returned (using multiple return values if necessary).
 
 c) some functions accept objects such as filenames or file
-descriptors.  Wherver these are specified as such in the C bindings,
+descriptors.  Wherever these are specified as such in the C bindings,
 the Lisp interface accepts designators for them as specified in the
 'Types' section above
 

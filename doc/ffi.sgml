@@ -23,7 +23,7 @@ Because of Lisp's emphasis on dynamic memory allocation and garbage
 collection, Lisp implementations use non-C-like memory representations
 for objects.  This representation mismatch creates friction when a Lisp
 program must share objects with programs which expect C data.  There
-are three common approaches to establishing communication:
+are three common approaches to establishing communication:</para>
 <itemizedlist>
   <listitem><para>The burden can be placed on the foreign program
     (and programmer) by requiring the knowledge and use of the

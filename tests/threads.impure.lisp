@@ -172,6 +172,19 @@
    (sleep 1)))
 (format t "~&gc test done~%")
 
+#|  ;; a cll post from eric marsden
+| (defun crash ()
+|   (setq *debugger-hook*
+|         (lambda (condition old-debugger-hook)
+|           (debug:backtrace 10)
+|           (unix:unix-exit 2)))
+|   #+live-dangerously
+|   (mp::start-sigalrm-yield)
+|   (flet ((roomy () (loop (with-output-to-string (*standard-output*) (room)))))
+|     (mp:make-process #'roomy)
+|     (mp:make-process #'roomy)))
+|#
+
 ;; give the other thread time to die before we leave, otherwise the
 ;; overall exit status is 0, not 104
 (sleep 2) 
