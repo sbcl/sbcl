@@ -1190,8 +1190,20 @@ WORKAROUND:
 229:
   (subtypep 'function '(function)) => nil, t.
 
-230:
-  (fixed in 0.7.10.5)
+231: "extra binding causes type declaration semantics to be lost"
+  (reported by Robert E. Brown sbcl-devel 2002-12-19)
+  in sbcl-0.7.10.19, 
+    (DEFUN FOO (X)
+      (DECLARE (OPTIMIZE SAFETY) (TYPE (INTEGER 0 8) X))
+      (INCF X))
+    (FOO 8)
+  returns 9, rather than (as in CMUCL) signalling an error.  Replacing
+  (INCF X) by (SETQ X (+ X 1)) causes a TYPE-ERROR to be signalled
+  [the difference between the two being that (INCF X) looks like 
+    (LET ((#:G1 (+ X 1))) 
+      (SETQ X #:G1))
+  so suspicion falls on the binding obscuring the type declaration
+  somehow]
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
