@@ -1528,9 +1528,10 @@
 ;;; the character name or the character in the #\char format.
 (defun output-character (char stream)
   (if (or *print-escape* *print-readably*)
-      (let ((name (char-name char)))
+      (let ((graphicp (graphic-char-p char))
+	    (name (char-name char)))
 	(write-string "#\\" stream)
-	(if name
+	(if (and name (not graphicp))
 	    (quote-string name stream)
 	    (write-char char stream)))
       (write-char char stream)))
