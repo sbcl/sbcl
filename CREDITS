@@ -595,6 +595,9 @@ William ("Bill") Newman:
   updating documentation, and even, for better or worse, getting
   rid of various functionality (e.g. the byte interpreter).
 
+Kevin M. Rosenberg:
+  He provided the ACL-style toplevel.
+
 Christophe Rhodes:
   He ported SBCL to SPARC, made various port-related and SPARC-related
   changes (like *BACKEND-SUBFEATURES*), made many fixes and

@@ -896,7 +896,12 @@ retained, possibly temporariliy, because it might be used internally."
              "!BEGIN-COLLECTING-COLD-INIT-FORMS"
 	     "!COLD-INIT-FORMS"
 	     "COLD-FSET"
-             "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"))
+             "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
+
+	     ;; hooks for contrib/ stuff we're insufficiently sure
+	     ;; about to add to SB!EXT
+	     "*REPL-PROMPT-FUN*"
+	     "*REPL-READ-FORM-FUN*"))
 
  ;; FIXME: This package is awfully huge. It'd probably be good to
  ;; split it. There's at least one natural way to split it: the

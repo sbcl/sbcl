@@ -513,26 +513,56 @@
 	   (repl noprint)
 	   (critically-unreachable "after REPL")))))))
 
+;;; Our default REPL prompt is the minimal traditional one.
+(defun repl-prompt-fun (stream)
+  (fresh-line stream)
+  (write-string "* " stream)) ; arbitrary but customary REPL prompt
+
+;;; Our default form reader does relatively little magic, but does
+;;; handle the Unix-style EOF-is-end-of-process convention.
+(defun repl-read-form-fun (in out)
+  (declare (type stream in out) (ignore out))
+  (let* ((eof-marker (cons nil nil))
+	 (form (read in nil eof-marker)))
+    (if (eq form eof-marker)
+	(quit)
+	form)))
+
+;;; hooks to support customized toplevels like ACL-style toplevel
+;;; from KMR on sbcl-devel 2002-12-21
+(defvar *repl-read-form-fun* #'repl-read-form-fun
+  "a function of two stream arguments IN and OUT for the toplevel REPL to
+  call: Return the next Lisp form to evaluate (possibly handling other
+  magic -- like ACL-style keyword commands -- which precede the next
+  Lisp form). The OUT stream is there to support magic which requires
+  issuing new prompts.")
+(defvar *repl-prompt-fun* #'repl-prompt-fun
+  "a function of one argument STREAM for the toplevel REPL to call: Prompt
+  the user for input.")
+
 (defun repl (noprint)
   (/show0 "entering REPL")
   (let ((eof-marker (cons :eof nil)))
     (loop
-     ;; see comment preceding definition of SCRUB-CONTROL-STACK
+     ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
      (scrub-control-stack)
      (unless noprint
-       (fresh-line)
-       (write-string "* ") ; arbitrary but customary REPL prompt
-       (flush-standard-output-streams))
-     (let ((form (read *standard-input* nil eof-marker)))
-       (cond ((eq form eof-marker)
-	      (/show0 "doing QUIT for EOF in REPL")
-	      (quit))
-	     (t
-	      (let ((results (multiple-value-list (interactive-eval form))))
-		(unless noprint
-		  (dolist (result results)
-		    (fresh-line)
-		    (prin1 result))))))))))
+       (funcall *repl-prompt-fun* *standard-output*)
+       ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
+       ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
+       ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
+       ;; odd. But maybe there *is* a valid reason in some
+       ;; circumstances? perhaps some deadlock issue when being driven
+       ;; by another process or something...)
+       (force-output *standard-output*))
+     (let* ((form (funcall *repl-read-form-fun*
+			   *standard-input*
+			   *standard-output*))
+	    (results (multiple-value-list (interactive-eval form))))
+       (unless noprint
+	 (dolist (result results)
+	   (fresh-line)
+	   (prin1 result)))))))
 
 ;;; suitable value for *DEBUGGER-HOOK* for a noninteractive Unix-y program
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
