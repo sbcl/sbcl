@@ -109,8 +109,8 @@ copy_object(lispobj object, int nwords)
     lispobj *new;
     lispobj *source, *dest;
 
-    gc_assert(is_lisp_pointer((lispobj *)object));
-    gc_assert(from_space_p((lispobj *)object));
+    gc_assert(is_lisp_pointer(object));
+    gc_assert(from_space_p(object));
     gc_assert((nwords & 0x01) == 0);
 
     /* Get tag of object. */

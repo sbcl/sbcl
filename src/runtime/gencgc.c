@@ -4185,7 +4185,7 @@ gc_init(void)
  *  The ALLOCATION_POINTER points to the end of the dynamic space.
  *
  *  XX A scan is needed to identify the closest first objects for pages. */
-void
+static void
 gencgc_pickup_dynamic(void)
 {
     int page = 0;
@@ -4210,6 +4210,14 @@ gencgc_pickup_dynamic(void)
     current_region_free_pointer = boxed_region.free_pointer;
     current_region_end_addr = boxed_region.end_addr;
 }
+
+void
+gc_initialize_pointers(void)
+{
+    gencgc_pickup_dynamic();
+}
+
+
 
 /* a counter for how deep we are in alloc(..) calls */
 int alloc_entered = 0;

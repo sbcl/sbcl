@@ -44,9 +44,7 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-#if defined GENCGC
-#include "gencgc.h"
-#endif
+#include "gc.h"
 
 
 #ifdef sparc
@@ -243,7 +241,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
  */
 
 
-#if defined GENCGC
+#if defined LISP_FEATURE_GENCGC
 
 /*
  * The GENCGC needs to be hooked into whatever signal is raised for

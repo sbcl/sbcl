@@ -66,7 +66,7 @@ validate(void)
     
     ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
     ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     ensure_space( (lispobj *)DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #else
     ensure_space( (lispobj *)DYNAMIC_0_SPACE_START  , DYNAMIC_SPACE_SIZE);
@@ -80,9 +80,6 @@ validate(void)
 
 #ifdef HOLES
     make_holes();
-#endif
-#ifndef GENCGC
-    current_dynamic_space = DYNAMIC_0_SPACE_START;
 #endif
     
 #ifdef PRINTNOISE

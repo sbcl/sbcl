@@ -27,4 +27,4 @@ OS_LINK_FLAGS = -Wl,--export-dynamic
 OS_LIBS = -ldl
 
 GC_SRC = gencgc.c
-CFLAGS += -DGENCGC
+

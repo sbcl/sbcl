@@ -38,11 +38,6 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-#if defined GENCGC		/* unlikely ... */
-#error SBCL PPC does not work with the GENCGC
-#include "gencgc.h"
-#endif
-
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {

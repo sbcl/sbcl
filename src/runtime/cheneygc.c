@@ -47,11 +47,6 @@ static struct weak_pointer *weak_pointers;
 
 static void scavenge_newspace(void);
 static void scavenge_interrupt_contexts(void);
-#if 0
-static void scavenge(lispobj *start, u32 nwords);
-static void scan_weak_pointers(void);
-static int scav_lose(lispobj *where, lispobj object);
-#endif
 
 
 /* collecting garbage */
@@ -584,7 +579,8 @@ scav_weak_pointer(lispobj *where, lispobj object)
 }
 
 
-/* initialization */
+/* initialization.  if gc_init can be moved to after core load, we could
+ * combine these two functions */
 
 void
 gc_init(void)
@@ -593,6 +589,14 @@ gc_init(void)
     scavtab[SIMPLE_VECTOR_WIDETAG] = scav_vector;
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 }
+
+void
+gc_initialize_pointers(void)
+{
+    current_dynamic_space = DYNAMIC_0_SPACE_START;
+}
+
+
 
 
 /* noise to manipulate the gc trigger stuff */

@@ -41,9 +41,7 @@
 #define ALLOC_UNBOXED 1
 #define ALLOC_QUICK 1
 
-
 void *gc_general_alloc(int nbytes,int unboxed_p,int quick_p);
-void gc_init(void);
 
 extern int (*scavtab[256])(lispobj *where, lispobj object);
 extern lispobj (*transother[256])(lispobj object);
@@ -51,6 +49,8 @@ extern int (*sizetab[256])(lispobj *where);
 
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 
+extern void scavenge(lispobj *start, long n_words);
+extern void scan_weak_pointers(void);
 
 lispobj  copy_large_unboxed_object(lispobj object, int nwords);
 lispobj  copy_unboxed_object(lispobj object, int nwords);

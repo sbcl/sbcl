@@ -26,9 +26,8 @@
 #include "interrupt.h"
 #include "purify.h"
 #include "interr.h"
-#ifdef GENCGC
-#include "gencgc.h"
-#endif
+#include "gc.h"
+#include "gc-internal.h"
 
 #define PRINTNOISE
 
@@ -1445,7 +1444,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #if !defined(__i386__)
     dynamic_space_free_pointer = current_dynamic_space;
 #else
-#if defined GENCGC
+#if defined LISP_FEATURE_GENCGC
     gc_free_heap();
 #else
 #error unsupported case /* in CMU CL, was "ibmrt using GC" */

@@ -324,11 +324,13 @@ GNAME(do_pending_interrupt):
 	ret
 	.size	GNAME(do_pending_interrupt),.-GNAME(do_pending_interrupt)
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
 /* This is a fast bzero using the FPU. The first argument is the start
  * address which needs to be aligned on an 8 byte boundary, the second
  * argument is the number of bytes, which must be a nonzero multiple
  * of 8 bytes. */
+/* FIXME whether this is still faster than using the OS's bzero or
+ * equivalent, we don't know */
 	.text
 	.globl	GNAME(i586_bzero)
 	.type	GNAME(i586_bzero),@function
@@ -655,7 +657,7 @@ GNAME(alloc_16_to_edi):
 		
 
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
 
 /* These routines are called from Lisp when an inline allocation 
  * overflows. Every register except the result needs to be preserved.

@@ -17,6 +17,7 @@
 #define _GC_H_
 
 extern void gc_init(void);
+extern void gc_initialize_pointers(void);
 extern void collect_garbage(unsigned last_gen);
 
 #include "os.h"

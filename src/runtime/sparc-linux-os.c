@@ -37,9 +37,6 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-#if defined GENCGC              /* unlikely ... */
-#include "gencgc.h"
-#endif
 
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)

@@ -502,7 +502,8 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
  * stuff to detect and handle hitting the GC trigger
  */
 
-#ifndef GENCGC /* since GENCGC has its own way to record trigger */
+#ifndef LISP_FEATURE_GENCGC 
+/* since GENCGC has its own way to record trigger */
 static boolean
 gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 {
@@ -571,7 +572,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
     else return 0;
 }
 
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 /* This function gets called from the SIGSEGV (for e.g. Linux or
  * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
  * whether the signal was due to treading on the mprotect()ed zone -
@@ -582,11 +583,13 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     os_context_t *context=(os_context_t *) void_context;
 
     if (!foreign_function_call_active
-#ifndef GENCGC /* since GENCGC has its own way to record trigger */
+#ifndef LISP_FEATURE_GENCGC 
+	/* nb: GENCGC on non-x86?  I really don't think so.  This
+	 * happens every time */
 	&& gc_trigger_hit(signal, info, context)
 #endif
 	) {
-#ifndef GENCGC /* since GENCGC has its own way to record trigger */
+#ifndef LISP_FEATURE_GENCGC 
 	clear_auto_gc_trigger();
 #endif
 

@@ -40,9 +40,6 @@
 #include "interr.h"
 #include "monitor.h"
 #include "validate.h"
-#if defined GENCGC
-#include "gencgc.h"
-#endif
 #include "core.h"
 #include "save.h"
 #include "lispregs.h"
@@ -263,10 +260,7 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     SHOW("freeing core");
     free(core);
 
-#if defined GENCGC
-    gencgc_pickup_dynamic();
-#else
-#endif
+    gc_initialize_pointers();
 
 #ifdef BINDING_STACK_POINTER
     SetSymbolValue(BINDING_STACK_POINTER, BINDING_STACK_START);
