@@ -166,13 +166,7 @@ void
 print_banner()
 {
     printf(
-"                                  Cl\n\
-                             Cl._ |\n\
-                                _>Sb---Cl\n\
-                             Cl#  |\n\
-                                  Cl\n\
-\n\
-This is SBCL %s, an implementation of ANSI Common Lisp.\n\
+"This is SBCL %s, an implementation of ANSI Common Lisp.\n\
 More information about SBCL is available at <http://www.sbcl.org/>.\n\
 \n\
 SBCL is free software, provided as is, with absolutely no warranty.\n\
