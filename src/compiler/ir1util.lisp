@@ -203,13 +203,14 @@
     (:block-start
      (continuation-block cont))))
 
-;;; Ensure that Cont is the start of a block (or deleted) so that the use
-;;; set can be freely manipulated.
-;;; -- If the continuation is :Unused or is :Inside-Block and the Cont of Last
-;;;    in its block, then we make it the start of a new deleted block.
-;;; -- If the continuation is :Inside-Block inside a block, then we split the
-;;;    block using Node-Ends-Block, which makes the continuation be a
-;;;    :Block-Start.
+;;; Ensure that CONT is the start of a block (or deleted) so that
+;;; the use set can be freely manipulated.
+;;; -- If the continuation is :UNUSED or is :INSIDE-BLOCK and the
+;;;    CONT of LAST in its block, then we make it the start of a new
+;;;    deleted block.
+;;; -- If the continuation is :INSIDE-BLOCK inside a block, then we
+;;;    split the block using Node-Ends-Block, which makes the
+;;;    continuation be a :BLOCK-START.
 (defun ensure-block-start (cont)
   (declare (type continuation cont))
   (let ((kind (continuation-kind cont)))
@@ -275,13 +276,28 @@
 (defun block-home-lambda (block)
   (declare (type cblock block))
   #!-sb-fluid (declare (inline node-home-lambda))
-  (node-home-lambda (block-last block)))
+  (if (node-p (block-last block))
+      ;; This is the old CMU CL way of doing it.
+      (node-home-lambda (block-last block))
+      ;; The CMU CL approach sometimes fails, e.g. in IR1-CONVERT of
+      ;; one of the legs of an IF, now that SBCL uses this operation
+      ;; more aggressively than CMU CL did. 
+      ;;
+      ;; In this case we reason that previous-in-target-execution-order
+      ;; blocks should be in the same lambda, and that they seem in
+      ;; practice to be previous-in-compilation-order blocks too,
+      ;; so we look back to find one which is sufficiently
+      ;; initialized to tell us what the home lambda is. We could
+      ;; get fancy about this, flooding the graph of all the
+      ;; previous blocks, but in practice it seems to work just
+      ;; to grab the first previous block and use it.
+      (node-home-lambda (block-last (first (block-pred block))))))
 
 ;;; Return the IR1 physical environment for BLOCK.
 (defun block-physenv (block)
   (declare (type cblock block))
   #!-sb-fluid (declare (inline node-home-lambda))
-  (lambda-physenv (node-home-lambda (block-last block))))
+  (lambda-physenv (block-home-lambda block)))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
@@ -324,6 +340,23 @@
     (if use
 	(values (node-source-form use) t)
 	(values nil nil))))
+
+;;; Return the LAMBDA that is CONT's home.
+(defun continuation-home-lambda (cont)
+  ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
+  ;; implementation might not be quite right, or might be uglier than
+  ;; necessary. It appears that the original Python never found a need
+  ;; to do this operation. The obvious things based on
+  ;; NODE-HOME-LAMBDA of CONTINUATION-USE usually works; then if that
+  ;; fails, BLOCK-HOME-LAMBDA of CONTINUATION-BLOCK works, given that
+  ;; generalize it enough to grovel harder when the simple CMU CL
+  ;; approach fails. -- WHN 2001-12-02
+  (cond ((continuation-use cont)
+	 (node-home-lambda (continuation-use cont)))
+	((continuation-block cont)
+	 (block-home-lambda (continuation-block cont)))
+	(t
+	 (error "internal error: can't find home lambda for ~S"))))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are NCONCed to the

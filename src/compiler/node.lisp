@@ -84,7 +84,7 @@
   ;; cached type of this continuation's value. If NIL, then this must
   ;; be recomputed: see CONTINUATION-DERIVED-TYPE.
   (%derived-type nil :type (or ctype null))
-  ;; Node where this continuation is used, if unique. This is always
+  ;; the node where this continuation is used, if unique. This is always
   ;; null in :DELETED and :UNUSED continuations, and is never null in
   ;; :INSIDE-BLOCK continuations. In a :BLOCK-START continuation, the
   ;; Block's START-USES indicate whether NIL means no uses or more
@@ -922,6 +922,14 @@
   ;; (or one of its LETs) using a non-LET local call. This may include
   ;; deleted functions because nobody bothers to clear them out.
   (calls () :type list)
+  ;; a list of all the LAMBDA-VARs directly referred to from this
+  ;; function (or one of its LETs). This may include deleted variables
+  ;; because nobody bothers to clean them out.
+  ;;
+  ;; FIXME: This is completely analogous to the CALLS slot, except the
+  ;; elements here are LAMBDA-VARs instead of FUNCTIONALs. Maybe the
+  ;; two lists should be merged into a single list.
+  (refers-to-vars () :type list)
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
   ;;
   ;; In CMU CL, and old SBCL, this was also NILed out when LET

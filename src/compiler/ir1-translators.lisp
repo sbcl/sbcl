@@ -45,15 +45,15 @@
       (continuation-starts-block cont)
 
       (link-blocks start-block then-block)
-      (link-blocks start-block else-block)
+      (link-blocks start-block else-block))
 
-      (ir1-convert then-cont cont then)
-      (ir1-convert else-cont cont else))))
+    (ir1-convert then-cont cont then)
+    (ir1-convert else-cont cont else)))
 
 ;;;; BLOCK and TAGBODY
 
-;;;; We make an Entry node to mark the start and a :Entry cleanup to
-;;;; mark its extent. When doing GO or RETURN-FROM, we emit an Exit
+;;;; We make an ENTRY node to mark the start and a :ENTRY cleanup to
+;;;; mark its extent. When doing GO or RETURN-FROM, we emit an EXIT
 ;;;; node.
 
 ;;; Make a :ENTRY cleanup and emit an ENTRY node, then convert the
@@ -741,13 +741,15 @@
 	    (leaf
 	     (when (constant-p leaf)
 	       (compiler-error "~S is a constant and thus can't be set." name))
-	     (when (and (lambda-var-p leaf)
-			(lambda-var-ignorep leaf))
-	       ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
-	       ;; requires that this be a STYLE-WARNING, not a full warning.
-	       (compiler-style-warning
-		"~S is being set even though it was declared to be ignored."
-		name))
+	     (when (lambda-var-p leaf)
+	       (let ((home-lambda (continuation-home-lambda start)))
+		 (pushnew leaf (lambda-refers-to-vars home-lambda)))
+	       (when (lambda-var-ignorep leaf)
+		 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
+		 ;; requires that this be a STYLE-WARNING, not a full warning.
+		 (compiler-style-warning
+		  "~S is being set even though it was declared to be ignored."
+		  name)))
 	     (set-variable start cont leaf (second things)))
 	    (cons
 	     (aver (eq (car leaf) 'MACRO))

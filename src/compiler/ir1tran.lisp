@@ -523,10 +523,13 @@
   (let ((var (or (lexenv-find name variables) (find-free-variable name))))
     (etypecase var
       (leaf
-       (when (and (lambda-var-p var) (lambda-var-ignorep var))
-	 ;; (ANSI's specification for the IGNORE declaration requires
-	 ;; that this be a STYLE-WARNING, not a full WARNING.)
-	 (compiler-style-warning "reading an ignored variable: ~S" name))
+       (when (lambda-var-p var)
+	 (pushnew var
+		  (lambda-refers-to-vars (continuation-home-lambda start)))
+	 (when (lambda-var-ignorep var)
+	   ;; (ANSI's specification for the IGNORE declaration requires
+	   ;; that this be a STYLE-WARNING, not a full WARNING.)
+	   (compiler-style-warning "reading an ignored variable: ~S" name)))
        (reference-leaf start cont var))
       (cons
        (aver (eq (car var) 'MACRO))
@@ -678,8 +681,8 @@
 ;;;; converting combinations
 
 ;;; Convert a function call where the function (i.e. the FUN argument)
-;;; is a LEAF. We return the COMBINATION node so that we can poke at
-;;; it if we want to.
+;;; is a LEAF. We return the COMBINATION node so that the caller can
+;;; poke at it if it wants to.
 (declaim (ftype (function (continuation continuation list leaf) combination)
 		ir1-convert-combination))
 (defun ir1-convert-combination (start cont form fun)

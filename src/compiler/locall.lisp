@@ -783,9 +783,18 @@
     ;; which calls things.
     (setf (lambda-calls clambda) nil)
 
+    ;; All of CLAMBDA's variable references belong to HOME now.
+    (setf (lambda-refers-to-vars home)
+	  (nunion (lambda-refers-to-vars clambda)
+		  (lambda-refers-to-vars home)))
+    ;; CLAMBDA no longer has an independent existence as an entity
+    ;; which refers to things.
+    (setf (lambda-refers-to-vars clambda) nil)
+
     ;; All of CLAMBDA's ENTRIES belong to HOME now.
     (setf (lambda-entries home)
-	  (nconc (lambda-entries clambda) (lambda-entries home)))
+	  (nconc (lambda-entries clambda)
+		 (lambda-entries home)))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; with ENTRIES.
     (setf (lambda-entries clambda) nil))
