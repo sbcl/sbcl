@@ -478,6 +478,7 @@
 
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
+ ("src/compiler/generic/early-type-vops")
 
  ("src/assembly/target/support")
 
@@ -523,7 +524,6 @@
   :ignore-failure-p)
  ("src/compiler/target/pred")
 
- ("src/compiler/generic/early-type-vops")
  ("src/compiler/target/type-vops")
  ("src/compiler/generic/late-type-vops")
 

@@ -37,11 +37,14 @@
       (inst b :eq done)
       (inst nop)
 
-      (test-type ptr temp not-list t list-pointer-lowtag)
+      ;; FIXME: Maybe rewrite this to remove this TEST-TYPE (and the
+      ;; one below) to put it in line with all other architectures
+      ;; (apart from PPC)?
+      (test-type ptr not-list t (list-pointer-lowtag) :temp temp)
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst add count count (fixnumize 1))
-      (test-type ptr temp loop nil list-pointer-lowtag)
+      (test-type ptr loop nil (list-pointer-lowtag) :temp temp)
 
       (cerror-call vop done object-not-list-error ptr)
 
