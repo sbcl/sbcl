@@ -129,3 +129,28 @@
 (define-vop (fast-char>/base-char base-char-compare)
   (:translate char>)
   (:variant :gtu :leu))
+
+(define-vop (base-char-compare/c)
+  (:args (x :scs (base-char-reg)))
+  (:arg-types base-char (:constant base-char))
+  (:conditional)
+  (:info target not-p y)
+  (:policy :fast-safe)
+  (:note "inline constant comparison")
+  (:variant-vars condition not-condition)
+  (:generator 2
+    (inst cmp x (sb!xc:char-code y))
+    (inst b (if not-p not-condition condition) target)
+    (inst nop)))
+
+(define-vop (fast-char=/base-char/c base-char-compare/c)
+  (:translate char=)
+  (:variant :eq :ne))
+
+(define-vop (fast-char</base-char/c base-char-compare/c)
+  (:translate char<)
+  (:variant :ltu :geu))
+
+(define-vop (fast-char>/base-char/c base-char-compare/c)
+  (:translate char>)
+  (:variant :gtu :leu))
