@@ -436,62 +436,95 @@
 			    :policy (and (> speed safety) (= safety 0)))
   'index)
 
-;;;; array accessors
+;;;; WITH-ARRAY-DATA
 
-;;; FIXME: This was commented out in sbcl-0.6.9.21 since it was
-;;; causing a problem in a CHAR form in HEXSTR. It's still important
-;;; to be able to inline this, so something along these lines
-;;; will probably be back, but it might be different in detail, e.g.
-;;; (DECLAIM (MAYBE-INLINE %WITH-ARRAY-DATA)).
-#|
-;;; Handle the 1-dimensional case of %WITH-ARRAY-DATA specially. It's
-;;; important to do this efficiently if we want people to be able to
-;;; use vectors with fill pointers anywhere near inner loops, and
-;;; hence it's important to do this efficiently if we want people to
-;;; be able to use sequence functions anywhere near inner loops.
-(deftransform %with-array-data ((array start end)
-				(vector index (or index null))
-				*
-				:important t
-				:node node
-				:policy (> speed space))
-  "avoid full call to %WITH-ARRAY-DATA at runtime"
-  (let* ((element-ctype (extract-upgraded-element-type array))
-	 (element-type-specifier (type-specifier element-ctype))
-	 (simple-array-type `(simple-array ,element-type-specifier 1)))
-    (declare (type ctype element-ctype))
-    `(let* (;; FIXME: Instead of doing this hairy expression for SIZE,
-	    ;; it should just be (ARRAY-DIMENSION ARRAY 0), and there
-	    ;; should be a DEFTRANSFORM for ARRAY-DIMENSION which
-	    ;; expands that way.
-	    (size (if (array-header-p array)
-		      (%array-dimension array 0)
-		      (length (the ,simple-array-type array))))
-	    (end (if end
-		     (if (or ,(policy node (= safety 0))
-			     (<= (the index end) size))
-			 end
-			 (vector-data-start-out-of-range))
-		     size)))
-       (declare (type index end))
-       (unless (or ,(policy node (= safety 0))
-		   (<= start end))
-	 (vector-data-end-out-of-range))
-       (do (;; cumulative displacement
-	    (d 0 (truly-the index (+ d (%array-displacement array))))
-	    ;; eventually becomes bare data vector
-	    (v array (%array-data-vector v))) 
-	   ((not (array-header-p v))
-	    (values (the ,simple-array-type v)
-		    (truly-the index (+ d start))
-		    (truly-the index (+ d end))
-		    (the index d)))
-	 (declare (type index d))))))
-(defun vector-data-start-out-of-range ()
-  (error "The start of vector data was out of range."))
-(defun vector-data-end-out-of-range ()
-  (error "The end of vector data was out of range."))
-|#
+;;; This checks to see whether the array is simple and the start and
+;;; end are in bounds. If so, it proceeds with those values.
+;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that %WITH-ARRAY-DATA
+;;; may be further optimized.
+;;;
+;;; Given any ARRAY, bind DATA-VAR to the array's data vector and
+;;; START-VAR and END-VAR to the start and end of the designated
+;;; portion of the data vector. SVALUE and EVALUE are any start and
+;;; end specified to the original operation, and are factored into the
+;;; bindings of START-VAR and END-VAR. OFFSET-VAR is the cumulative
+;;; offset of all displacements encountered, and does not include
+;;; SVALUE.
+;;;
+;;; When FORCE-INLINE is set, the underlying %WITH-ARRAY-DATA form is
+;;; forced to be inline, overriding the ordinary judgment of the
+;;; %WITH-ARRAY-DATA DEFTRANSFORMs. Ordinarily the DEFTRANSFORMs are
+;;; fairly picky about their arguments, figuring that if you haven't
+;;; bothered to get all your ducks in a row, you probably don't care
+;;; that much about speed anyway! But in some cases it makes sense to
+;;; do type testing inside %WITH-ARRAY-DATA instead of outside, and
+;;; the DEFTRANSFORM can't tell that that's going on, so it can make
+;;; sense to use FORCE-INLINE option in that case.
+(def!macro with-array-data (((data-var array &key offset-var)
+			     (start-var &optional (svalue 0))
+			     (end-var &optional (evalue nil))
+			     &key force-inline)
+			    &body forms)
+  (once-only ((n-array array)
+	      (n-svalue `(the index ,svalue))
+	      (n-evalue `(the (or index null) ,evalue)))
+    `(multiple-value-bind (,data-var
+			   ,start-var
+			   ,end-var
+			   ,@(when offset-var `(,offset-var)))
+	 (if (not (array-header-p ,n-array))
+	     (let ((,n-array ,n-array))
+	       (declare (type (simple-array * (*)) ,n-array))
+	       ,(once-only ((n-len `(length ,n-array))
+			    (n-end `(or ,n-evalue ,n-len)))
+		  `(if (<= ,n-svalue ,n-end ,n-len)
+		       ;; success
+		       (values ,n-array ,n-svalue ,n-end 0)
+		       ;; failure: Make a NOTINLINE call to
+		       ;; %WITH-ARRAY-DATA with our bad data
+		       ;; to cause the error to be signalled.
+		       (locally
+			 (declare (notinline %with-array-data))
+			 (%with-array-data ,n-array ,n-svalue ,n-evalue)))))
+	     (,(if force-inline '%with-array-data-macro '%with-array-data)
+	      ,n-array ,n-svalue ,n-evalue))
+       ,@forms)))
+
+;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
+;;; DEFTRANSFORMs and DEFUNs.
+(def!macro %with-array-data-macro (array
+				   start
+				   end
+				   &key
+				   (element-type '*)
+				   unsafe?
+				   fail-inline?)
+  (let ((size (gensym "SIZE-"))
+	(data (gensym "DATA-"))
+	(cumulative-offset (gensym "CUMULATIVE-OFFSET-")))
+    `(let* ((,size (array-total-size ,array))
+	    (,end (cond (,end
+			 (unless (or ,unsafe? (<= ,end ,size))
+			   ,(if fail-inline?
+				`(error "End ~D is greater than total size ~D."
+					,end ,size)
+				`(failed-%with-array-data ,array ,start ,end)))
+			 ,end)
+			(t ,size))))
+       (unless (or ,unsafe? (<= ,start ,end))
+	 ,(if fail-inline?
+	      `(error "Start ~D is greater than end ~D." ,start ,end)
+	      `(failed-%with-array-data ,array ,start ,end)))
+       (do ((,data ,array (%array-data-vector ,data))
+	    (,cumulative-offset 0
+				(+ ,cumulative-offset
+				   (%array-displacement ,data))))
+	   ((not (array-header-p ,data))
+	    (values (the (simple-array ,element-type 1) ,data)
+		    (the index (+ ,cumulative-offset ,start))
+		    (the index (+ ,cumulative-offset ,end))
+		    (the index ,cumulative-offset)))
+	 (declare (type index ,cumulative-offset))))))
 
 (deftransform %with-array-data ((array start end)
 				;; Note: This transform is limited to
@@ -513,6 +546,8 @@
     `(%with-array-data-macro array start end
 			     :unsafe? ,(policy node (= safety 0))
 			     :element-type ,element-type)))
+
+;;;; array accessors
 
 ;;; We convert all typed array accessors into AREF and %ASET with type
 ;;; assertions on the array.
