@@ -1711,6 +1711,9 @@ changes in sbcl-0.8alpha.0 relative to sbcl-0.7.14
 changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
   * SBCL now builds using CLISP (version of late April 2003 from CVS)
     as cross-compilation host.
+  * a contributed module containing a partial implementation of the
+    simple-streams interface has been included.  (thanks to Rudi
+    Schlatte)
   * minor incompatible change: the :NEGATIVE-ZERO-IS-NOT-ZERO feature
     no longer has any effect, as the code controlled by this feature
     has been deleted.  (As far as we know, no-one has ever built using

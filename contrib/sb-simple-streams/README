@@ -1,0 +1,57 @@
+-*- text -*-
+
+An implementation of simple streams for sbcl.
+
+Simple streams are an extensible streams protocol, with similar goals
+but different architecture than Gray streams.  Documentation about
+simple streams is available at
+http://www.franz.com/support/documentation/6.2/doc/streams.htm
+
+This code was originally written by Paul Foley for cmucl; Paul's
+version resides (as of 2003-05-12) at
+http://users.actrix.co.nz/mycroft/cl.html
+
+The port to sbcl was done by Rudi Schlatte (rudi@constantly.at).  Bug
+reports welcome.
+
+==================================================
+
+Some sketchy notes about the simple-streams architecture, at least
+partly for my own benefit
+
+(For all the details, please see Franz' documentation)
+
+Motivation:
+
+If you want to extend a given Gray stream, is it enough to supply a
+method for stream-write-byte, or do you have to overwrite
+stream-write-sequence as well?  How do you extend your Gray socket
+stream to support chunked stream encoding for HTTP/1.1?  Chances are
+that for any seriously interesting stream customization, you will
+implement some kind of buffer, collect data in it and
+
+
+
+Simple streams is a layered architecture.  The device layer at the
+bottom deals with transferring chunks of bytes between a buffer and a
+device (socket, file, printer, what-have-you).  The top layer is the
+familiar CL API (read-line, write-sequence, open, etc).  The strategy
+layer in the middle translates between the buffer-of-bytes and CL
+stream world-view, dealing with byte<->character conversion,
+line-ending and stream-external-format conventions, etc.
+
+Implementing a new type of stream is a matter of extending the right
+stream class and implementing device-read, device-write, device-extend
+& friends.  single-channel-simple-stream is a class where there is one
+buffer for both input and output (this is appropriate e.g. for a file).  The
+dual-channel-simple-stream class deals with devices that require
+separate buffers for input and output (e.g. sockets).
+
+Other character representations (Unicode, other multi-byte encodings)
+are implemented at the strategy level.  The Franz documentation is
+unclear about this, but it seems that encodings take an active part
+("the encoding reads as many bytes as are necessary to compose a
+character", or words to that effect).  This is not implemented in the
+present code (neither is it in Paul Foley's implementation), and will
+not be until sbcl gains Unicode abilities, but it would be nice to
+have it at least stubbed out in the implementation.
