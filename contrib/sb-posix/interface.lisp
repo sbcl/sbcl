@@ -84,7 +84,7 @@
 	     (pid sb-posix::pid-t) (pgid sb-posix::pid-t))
 (define-call "setpgrp" int minusp)
 
-;;; mmap
+;;; mmap, msync
 (define-call "mmap" sb-sys:system-area-pointer
   ;; KLUDGE: #XFFFFFFFF is (void *)-1, which is the charming return
   ;; value of mmap on failure.  Except on 64 bit systems ...
@@ -95,6 +95,9 @@
 
 (define-call "munmap" int minusp
   (start sb-sys:system-area-pointer) (length unsigned))
+
+(define-call "msync" int minusp
+  (addr sb-sys:system-area-pointer) (length unsigned) (flags int))
 
 (define-call "getpagesize" int minusp)
 

@@ -256,14 +256,12 @@
     (sb-unix:unix-close (or (sm input-handle stream) (sm output-handle stream))))
   t)
 
-;; TODO: implement msync in sb-posix; activate this
-#+paul
 (defmethod device-write ((stream mapped-file-simple-stream) buffer
 			 start end blocking)
   (assert (eq buffer :flush) (buffer)) ; finish/force-output
   (with-stream-class (mapped-file-simple-stream stream)
-    (unix:unix-msync (sm buffer stream) (sm buf-len stream)
-		     (if blocking unix:ms_sync unix:ms_async))))
+    (sb-posix:msync (sm buffer stream) (sm buf-len stream)
+                    (if blocking sb-posix::ms-sync sb-posix::ms-async))))
 
 (defmethod device-open ((stream probe-simple-stream) options)
   (let ((pathname (getf options :filename)))

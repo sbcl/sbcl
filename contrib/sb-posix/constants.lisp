@@ -90,6 +90,11 @@
  (:integer map-private "MAP_PRIVATE" "mmap: private mapping")
  (:integer map-fixed "MAP_FIXED" "mmap: map at given location")
 
+ ;; msync()
+ (:integer ms-async "MS_ASYNC" "msync: return immediately")
+ (:integer ms-sync "MS_SYNC" "msync: perform synchronous writes")
+ (:integer ms-invalidate "MS_INVALIDATE" "msync: invalidate all cached data")
+
  ;; opendir()
  (:structure dirent
 	     ("struct dirent"

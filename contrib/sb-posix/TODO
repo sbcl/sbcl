@@ -16,7 +16,7 @@ getpeername getpriority getrlimit getrusage getsockname getsockopt
 gettimeofday gtty idle init_module ioctl ioctl_list ioperm iopl listen
 llseek lock lseek lstat madvise mincore mknod mlock mlockall 
 modify_ldt mount mprotect mpx mremap msgctl msgget msgop msgrcv msgsnd
-msync munlock munlockall nanosleep nice open pause pipe poll
+munlock munlockall nanosleep nice open pause pipe poll
 prctl pread prof profil pselect ptrace pwrite query_module quotactl
 read readlink readv reboot recv recvfrom recvmsg rename rmdir
 sbrk sched_get_priority_max sched_get_priority_min sched_getparam
