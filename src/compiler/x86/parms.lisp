@@ -269,6 +269,7 @@
     sub-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
+    sb!kernel::undefined-alien-error
     sb!di::handle-breakpoint
     fdefinition-object
     #!+sb-thread sb!thread::handle-thread-exit

@@ -306,10 +306,7 @@ steppers to maintain contextual information.")
 
 ;;; the default system top level function
 (defun toplevel-init ()
-
-  (/show0 "entering TOPLEVEL-INIT")
-  (sb!thread::init-job-control)
-  (sb!thread::get-foreground)
+  (/show0 "entering TOPLEVEL-INIT")  
   (let (;; value of --sysinit option
 	(sysinit nil)
 	;; value of --userinit option

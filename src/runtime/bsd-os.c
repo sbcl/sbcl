@@ -187,7 +187,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 
     os_context_t *context = arch_os_get_context(&void_context);
     if (!gencgc_handle_wp_violation(fault_addr)) 
-        if(!handle_control_stack_guard_triggered(context,fault_addr))
+        if(!handle_guard_page_triggered(context,fault_addr))
 	    /* FIXME is this context or void_context?  not that it */
 	    /* makes a difference currently except on linux/sparc */
 	    interrupt_handle_now(signal, siginfo, void_context);
@@ -212,7 +212,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     
     addr = arch_get_bad_addr(signal,info,context);
     if(!interrupt_maybe_gc(signal, info, context))
-	if(!handle_control_stack_guard_triggered(context,addr))
+	if(!handle_guard_page_triggered(context,addr))
 	    interrupt_handle_now(signal, info, context);
     /* Work around G5 bug; fix courtesy gbyers */
     sigreturn(void_context);

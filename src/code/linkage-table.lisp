@@ -49,14 +49,14 @@
 			     sb!vm:linkage-table-entry-size)
 			  sb!vm:linkage-table-space-start))
 	(real-address (get-dynamic-foreign-symbol-address name)))
-    (when real-address
-      (unless (< table-address sb!vm:linkage-table-space-end)
-	(error "Linkage-table full (~D entries): cannot link ~S."
-	       (hash-table-count *linkage-info*)
-	       name))
-      (write-linkage-table-entry table-address real-address datap)
-      (setf (gethash name *linkage-info*)
-	    (make-linkage-info :address table-address :datap datap)))))
+    (aver real-address)
+    (unless (< table-address sb!vm:linkage-table-space-end)
+      (error "Linkage-table full (~D entries): cannot link ~S."
+             (hash-table-count *linkage-info*)
+             name))
+    (write-linkage-table-entry table-address real-address datap)
+    (setf (gethash name *linkage-info*)
+          (make-linkage-info :address table-address :datap datap))))
 
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
@@ -77,15 +77,8 @@
              (let ((datap (linkage-info-datap info))
                    (table-address (linkage-info-address info))
                    (real-address (get-dynamic-foreign-symbol-address name)))
-               (cond (real-address
-                      (write-linkage-table-entry table-address
-                                                 real-address
-                                                 datap))
-                     (t
-                      (/show0 "oops")
-                      (cerror "Ignore. Attempts to access this foreign symbol ~
-                               will lead to badness characterized by ~
-                               segfaults, and potential corruption."
-                              "Could not resolve foreign function ~S for ~
-                               linkage-table." name)))))
+	       (aver (and table-address real-address))
+	       (write-linkage-table-entry table-address
+					  real-address
+					  datap)))
            *linkage-info*))

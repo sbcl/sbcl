@@ -224,7 +224,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     void* fault_addr = (void*)info->si_addr;
     if (!gencgc_handle_wp_violation(fault_addr)) 
-	if(!handle_control_stack_guard_triggered(context,fault_addr))
+	if(!handle_guard_page_triggered(context,fault_addr))
 	    interrupt_handle_now(signal, info, void_context);
 }
 
@@ -254,7 +254,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	interrupt_handle_pending(context);
     } else {
 	if(!interrupt_maybe_gc(signal, info, context))
-	    if(!handle_control_stack_guard_triggered(context,addr))
+	    if(!handle_guard_page_triggered(context,addr))
 		interrupt_handle_now(signal, info, context);
     }
 }

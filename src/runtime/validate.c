@@ -36,6 +36,19 @@ ensure_space(lispobj *start, unsigned long size)
     }
 }
 
+os_vm_address_t undefined_alien_address = 0;
+
+static void
+ensure_undefined_alien(void) {
+    os_vm_address_t start = os_validate(NULL, os_vm_page_size);
+    if (start) {
+	os_protect(start, os_vm_page_size, OS_VM_PROT_NONE);
+	undefined_alien_address = start;
+    } else {
+	lose("could not allocate guard page for undefined alien");
+    }
+}
+
 void
 validate(void)
 {
@@ -56,20 +69,26 @@ validate(void)
 #ifdef LISP_FEATURE_LINKAGE_TABLE
     ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
 #endif
+
+#ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
+    ensure_undefined_alien();
+#endif
  
 #ifdef PRINTNOISE
     printf(" done.\n");
 #endif
 }
 
-void protect_control_stack_guard_page(pid_t t_id, int protect_p) {
+void 
+protect_control_stack_guard_page(pid_t t_id, int protect_p) {
     struct thread *th = find_thread_by_pid(t_id);
     os_protect(CONTROL_STACK_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?
 	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }
 
-void protect_control_stack_return_guard_page(pid_t t_id, int protect_p) {
+void 
+protect_control_stack_return_guard_page(pid_t t_id, int protect_p) {
     struct thread *th = find_thread_by_pid(t_id);
     os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?

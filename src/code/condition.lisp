@@ -936,6 +936,12 @@ symbol that caused the violation is accessed by the function
 SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 ) ; progn
+
+(define-condition undefined-alien-error (error) ()
+  (:report
+   (lambda (condition stream)
+     (declare (ignore condition))
+     (format stream "Attempt to access an undefined alien value."))))
 
 ;;;; various other (not specified by ANSI) CONDITIONs
 ;;;;

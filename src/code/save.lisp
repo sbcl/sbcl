@@ -103,8 +103,8 @@ sufficiently motivated to do lengthy fixes."
       #-gencgc (gc) #+gencgc (gc :full t))
   (flet ((restart-lisp ()
            (handling-end-of-the-world
-	    (reinit)
-	    (funcall toplevel))))
+	     (reinit)
+	     (funcall toplevel))))
     ;; FIXME: Perhaps WITHOUT-GCING should be wrapped around the
     ;; LET as well, to avoid the off chance of an interrupt triggering
     ;; GC and making our saved RESTART-LISP address invalid?
@@ -113,7 +113,9 @@ sufficiently motivated to do lengthy fixes."
 	   (get-lisp-obj-address #'restart-lisp)))))
 
 (defun deinit ()
-  (mapc #'funcall *save-hooks*)
+  (dolist (hook *save-hooks*)
+    (with-simple-restart (continue "Skip this save hook.")
+      (funcall hook)))
   (when (fboundp 'cancel-finalization)    
     (cancel-finalization sb!sys:*tty*))
   (profile-deinit)

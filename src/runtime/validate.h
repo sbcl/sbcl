@@ -36,6 +36,7 @@
 extern void validate(void);
 extern void protect_control_stack_guard_page(pid_t t_id, int protect_p);
 extern void protect_control_stack_return_guard_page(pid_t t_id, int protect_p);
+extern os_vm_address_t undefined_alien_address;
 #endif
 
 /* note for anyone trying to port an architecture's support files

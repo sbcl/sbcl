@@ -720,11 +720,10 @@ void thread_exit_handler(int num, siginfo_t *info, void *v_context)
 {   /* called when a child thread exits */
     mark_dead_threads();
 }
-
 	
 #endif
 
-boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){
+boolean handle_guard_page_triggered(os_context_t *context,void *addr){
     struct thread *th=arch_os_get_current_thread();
     
     /* note the os_context hackery here.  When the signal handler returns, 
@@ -751,6 +750,12 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){
         protect_control_stack_guard_page(th->pid,1);
         protect_control_stack_return_guard_page(th->pid,0);
         return 1;
+    }
+    else if (addr >= undefined_alien_address &&
+	     addr < undefined_alien_address + os_vm_page_size) {
+	arrange_return_to_lisp_function
+          (context, SymbolFunction(UNDEFINED_ALIEN_ERROR));
+	return 1;
     }
     else return 0;
 }

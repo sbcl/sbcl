@@ -71,12 +71,14 @@
   ;; get dynamic symbols thru the runtime as well, so cheking the
   ;; list of *shared-objects* is not enough. Eugh & blech.
   #!+(and os-provides-dlopen (not linkage-table))
-  (warn "~@<Saving cores with alien definitions referring to non-static
-            foreign symbols is unsupported on this platform: references to
-            such foreign symbols from the restarted core will not work. You
-            may be able to work around this limitation by reloading all
-            foreign definitions and code using them in the restarted core,
-            but no guarantees.~%~:@>")
+  (when (dynamic-foreign-symbols)
+    (warn "~@<Saving cores with alien definitions referring to non-static ~
+           foreign symbols is unsupported on this platform: references to ~
+           such foreign symbols from the restarted core will not work. You ~
+           may be able to work around this limitation by reloading all ~
+           foreign definitions and code using them in the restarted core, ~
+           but no guarantees.~%~%Dynamic foreign symbols in this core: ~
+           ~{~A~^, ~}~:@>" (dynamic-foreign-symbols)))
   #!+os-provides-dlopen
   (close-shared-objects))
 

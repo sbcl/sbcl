@@ -133,7 +133,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
 	interrupt_handle_pending(context);
     } else if (!interrupt_maybe_gc(signal, info, context)) {
-	if(!handle_control_stack_guard_triggered(context,addr))
+	if(!handle_guard_page_triggered(context,addr))
 	    interrupt_handle_now(signal, info, context);
     }
 }

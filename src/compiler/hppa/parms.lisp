@@ -124,6 +124,7 @@
     sb!impl::sub-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
+    sb!kernel::undefined-alien-error
     sb!di::handle-breakpoint
     sb!impl::fdefinition-object
 

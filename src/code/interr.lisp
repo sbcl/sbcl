@@ -456,5 +456,5 @@
 	     "Control stack guard page temporarily disabled: proceed with caution~%")
      (error 'control-stack-exhausted))))
 
-
-
+(defun undefined-alien-error ()
+  (error 'undefined-alien-error))

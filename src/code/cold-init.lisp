@@ -259,7 +259,8 @@
   ;; The show is on.
   (terpri)
   (/show0 "going into toplevel loop")
-  (handling-end-of-the-world 
+  (handling-end-of-the-world
+    (thread-init-or-reinit)
     (toplevel-init)
     (critically-unreachable "after TOPLEVEL-INIT")))
 
@@ -277,10 +278,14 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
 
 ;;;; initialization functions
 
+(defun thread-init-or-reinit ()
+  (sb!thread::init-job-control)
+  (sb!thread::get-foreground))
+
 (defun reinit ()
   (without-interrupts
     (without-gcing
-      (os-cold-init-or-reinit)
+	(os-cold-init-or-reinit)
       (stream-reinit)
       (signal-cold-init-or-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
@@ -294,11 +299,14 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
       (set-floating-point-modes
        :traps '(:overflow #!-netbsd :invalid :divide-by-zero))
       (sb!thread::maybe-install-futex-functions)))
-  (foreign-reinit)
+  (thread-init-or-reinit)
   (gc-reinit)
   ;; make sure TIME works correctly from saved cores
   (setf *internal-real-time-base-seconds* nil)
-  (mapc #'funcall *init-hooks*))
+  (foreign-reinit)
+  (dolist (hook *init-hooks*)
+    (with-simple-restart (continue "Skip this initialization hook.")
+      (funcall hook))))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code

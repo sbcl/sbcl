@@ -48,7 +48,7 @@ extern void interrupt_handle_now(int, siginfo_t*, void*);
 extern void interrupt_handle_pending(os_context_t*);
 extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
 				     boolean continuable);
-extern boolean handle_control_stack_guard_triggered(os_context_t *,void *);
+extern boolean handle_guard_page_triggered(os_context_t *,void *);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
 #ifdef LISP_FEATURE_SB_THREAD
 extern void interrupt_thread_handler(int, siginfo_t*, void*);
