@@ -379,67 +379,6 @@ static void parent_sighandler(int signum,siginfo_t *info, void *void_context)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-static void parent_do_garbage_collect(void)
-{    
-    int waiting_threads=0;
-    struct thread *th;
-    int status,p;
-
-    for_each_thread(th) {
-	if(ptrace(PTRACE_ATTACH,th->pid,0,0)) {
-	    perror("PTRACE_ATTACH");
-	}
-	else waiting_threads++;
-    }
-    stop_the_world=1;
-
-    do {
-	/* not sure if we have to wait for PTRACE_ATTACH to finish
-	 * before we can send PTRACE_CONT, so let's play it safe
-	 */
-	while(waiting_threads>0) {
-	    if((p=waitpid(-1,&status, WUNTRACED|__WALL))>0) {
-		if(WIFEXITED(status) || WIFSIGNALED(status)) 
-		    destroy_thread(find_thread_by_pid(p));
-		else {
-#if 0
-		    fprintf(stderr, "wait returned pid %d signal %x\n",
-			    p,WSTOPSIG(status));
-#endif
-		    if(WSTOPSIG(status)==SIGTRAP) {
-			if(ptrace(PTRACE_CONT,p,0,SIGTRAP))
-			    perror("PTRACE_CONT");
-		    }
-		    else waiting_threads--; 
-		}
-	    }
-	}
-	for_each_thread(th) {
-	    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) {
-		/* restart the child, setting *p-a-i* which will cause it 
-		 * to go into interrupt_handle_pending as soon as it's
-		 * finished being pseudo_atomic.  once there it will
-		 * signal itself SIGSTOP, which will give us another 
-		 * event to wait for */
-#if 0
-		fprintf(stderr, "%d was pseudo-atomic, letting it resume \n",
-			th->pid);
-#endif
-		SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,make_fixnum(1),th);
-		if(ptrace(PTRACE_CONT,th->pid,0,0))
-		    perror("PTRACE_CONT");
-		waiting_threads++;
-	    }
-	}
-    } while (waiting_threads>0);
-		
-    collect_garbage(maybe_gc_pending-1);
-    maybe_gc_pending=0;
-    stop_the_world=0;
-    for_each_thread(th) 
-	if(ptrace(PTRACE_DETACH,th->pid,0,0))
-	    perror("PTRACE_DETACH");
-}
 
 static void /* noreturn */ parent_loop(void)
 {
@@ -468,11 +407,9 @@ static void /* noreturn */ parent_loop(void)
     while(!all_threads) {
 	sched_yield();
     }
-    maybe_gc_pending=0;
     while(all_threads && (pid=waitpid(-1,&status,__WALL|WUNTRACED))) {
 	struct thread *th;
 	int real_errno=errno;
-	while(maybe_gc_pending) parent_do_garbage_collect();
 	if(pid==-1) {
 	    if(real_errno == EINTR) {
 		continue;
@@ -485,9 +422,7 @@ static void /* noreturn */ parent_loop(void)
 	if(!th) continue;
 	if(WIFEXITED(status) || WIFSIGNALED(status)) {
 	    fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
-	    destroy_thread(th);		
-	    /* FIXME arrange to call or fake (free-mutex *session-lock*)
-	     * if necessary */
+	    destroy_thread(th);
 	    if(!all_threads) break;
 	}
     }

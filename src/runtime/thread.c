@@ -235,6 +235,7 @@ void destroy_thread (struct thread *th)
     gc_alloc_update_page_tables(0, &th->alloc_region);
 #endif
     get_spinlock(&all_threads_lock,th->pid);
+    if(countdown_to_gc>0) countdown_to_gc--;
     if(th==all_threads) 
 	all_threads=th->next;
     else {
@@ -242,7 +243,7 @@ void destroy_thread (struct thread *th)
 	while(th1->next!=th) th1=th1->next;
 	th1->next=th->next;	/* unlink */
     }
-    all_threads_lock=0;
+    release_spinlock(&all_threads_lock);
     if(th && th->tls_cookie>=0) arch_os_thread_cleanup(th); 
     os_invalidate((os_vm_address_t) th->control_stack_start,
 		  ((sizeof (lispobj))
@@ -291,4 +292,44 @@ int interrupt_thread(pid_t pid, lispobj function)
 
     sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
 }
+
+int gc_stop_the_world()
+{
+    /* stop all other threads by sending them SIG_STOP_FOR_GC */
+    struct thread *th=arch_os_get_current_thread();
+    int countdown_to_gc=0;
+    struct thread *tail=0;
+    int finished=0;
+    do {
+	get_spinlock(&all_threads_lock,th);
+	if(tail!=all_threads) {
+	    /* new threads always get consed onto the front of all_threads,
+	     * and may be created by any thread that we haven't signalled
+	     * yet or hasn't received our signal and stopped yet.  So, check
+	     * for them on each time around */
+	    for(p=all_threads;p!=tail;p=p->next) {
+		if(p==th) continue;
+		countdown_to_gc++;
+		kill(p->pid,SIG_STOP_FOR_GC);
+	    }
+	    tail=all_threads;
+	} else {
+	    finished=(countdown_to_gc==0);
+	}
+	release_spinlock(&all_threads_lock);
+	sched_yield();
+    } while(!finished);
+    return 0;
+}
+
+int gc_start_the_world()
+{
+    struct thread *p,*th=arch_os_get_current_thread();
+    get_spinlock(&all_threads_lock);
+    for(p=all_threads;p;p=p->next) {
+	if(p==th) continue;
+	kill(p->pid,SIGCONT);
+    }
+}
+
 #endif

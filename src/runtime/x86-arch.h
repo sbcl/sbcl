@@ -12,4 +12,23 @@
  * here? (The answer wasn't obvious to me when merging the
  * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
 
+inline void 
+get_spinlock(lispobj *word,int value)
+{
+    u32 eax=0;
+    do {
+	asm ("xor %0,%0\n\
+              lock cmpxchg %1,%2" 
+	     : "=a" (eax)
+	     : "r" (value), "m" (*word)
+	     : "memory", "cc");
+    } while(eax!=0);
+}
+
+inline void
+release_spinlock(lispobj *word)
+{
+    *word=0;
+}
+
 #endif /* _X86_ARCH_H */

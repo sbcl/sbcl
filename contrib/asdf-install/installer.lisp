@@ -195,7 +195,7 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
 (defun install-package (source system packagename)
   "Returns a list of asdf system names for installed asdf systems"
   (ensure-directories-exist source )
-    (ensure-directories-exist system )
+  (ensure-directories-exist system )
   (let* ((tar
 	  (with-output-to-string (o)
 	    (or
