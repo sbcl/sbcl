@@ -1615,15 +1615,11 @@
 ;;; not just 4 on a risc machine!
 (defconstant max-instruction-size 16)
 
-(defun sap-to-vector (sap start end)
-    (let* ((length (- end start))
-	   (result (make-array length :element-type '(unsigned-byte 8)))
-	   (sap (sb!sys:sap+ sap start)))
-      (dotimes (i length)
-	(setf (aref result i) (sb!sys:sap-ref-8 sap i)))
-      result))
-
-(defun add-block-segments (sap amount seglist location connecting-vec dstate)
+(defun add-block-segments (seg-code-block
+			   seglist
+			   location
+			   connecting-vec
+			   dstate)
   (declare (type list seglist)
 	   (type integer location)
 	   (type (or null (vector (unsigned-byte 8))) connecting-vec)
@@ -1634,25 +1630,27 @@
 	       (setf (seg-length seg) length)
 	       (incf location length)
 	       (push seg seglist)))))
-    (let ((connecting-overflow 0))
+    (let ((connecting-overflow 0)
+	  (amount (length seg-code-block)))
       (when connecting-vec
 	;; Tack on some of the new block to the old overflow vector.
 	(let* ((beginning-of-block-amount
-		(if sap (min max-instruction-size amount) 0))
+		(if seg-code-block (min max-instruction-size amount) 0))
 	       (connecting-vec
-		(if sap
+		(if seg-code-block
 		    (concatenate
 		     '(vector (unsigned-byte 8))
 		     connecting-vec
-		     (sap-to-vector sap 0 beginning-of-block-amount))
+		     (subseq seg-code-block 0 beginning-of-block-amount))
 		    connecting-vec)))
 	  (when (and (< (length connecting-vec) max-instruction-size)
-		     (not (null sap)))
+		     (not (null seg-code-block)))
 	    (return-from add-block-segments
 	      ;; We want connecting vectors to be large enough to hold
-	      ;; any instruction, and since the current sap wasn't large
-	      ;; enough to do this (and is now entirely on the end of the
-	      ;; overflow-vector), just save it for next time.
+	      ;; any instruction, and since the current seg-code-block
+	      ;; wasn't large enough to do this (and is now entirely
+	      ;; on the end of the overflow-vector), just save it for
+	      ;; next time.
 	      (values seglist location connecting-vec)))
 	  (when (> (length connecting-vec) 0)
 	    (let ((seg
@@ -1663,7 +1661,7 @@
 					:virtual-location location)))
 	      (setf connecting-overflow (segment-overflow seg dstate))
 	      (addit seg connecting-overflow)))))
-      (cond ((null sap)
+      (cond ((null seg-code-block)
 	     ;; nothing more to add
 	     (values seglist location nil))
 	    ((< (- amount connecting-overflow) max-instruction-size)
@@ -1672,25 +1670,25 @@
 	     ;; in the overflow vector for the time-being.
 	     (values seglist
 		     location
-		     (sap-to-vector sap connecting-overflow amount)))
+		     (subseq seg-code-block connecting-overflow amount)))
 	    (t
 	     ;; Put as much as we can into a new segment, and the rest
 	     ;; into the overflow-vector.
 	     (let* ((initial-length
 		     (- amount connecting-overflow max-instruction-size))
 		    (seg
-		     (make-segment (lambda ()
-				     (sb!sys:sap+ sap connecting-overflow))
-				   initial-length
-				   :virtual-location location))
+		     (make-vector-segment seg-code-block
+					  connecting-overflow
+					  initial-length
+					  :virtual-location location))
 		    (overflow
 		     (segment-overflow seg dstate)))
 	       (addit seg overflow)
 	       (values seglist
 		       location
-		       (sap-to-vector sap
-				      (+ connecting-overflow (seg-length seg))
-				      amount))))))))
+		       (subseq seg-code-block
+			       (+ connecting-overflow (seg-length seg))
+			       amount))))))))
 
 ;;;; code to disassemble assembler segments
 
@@ -1700,31 +1698,26 @@
   (let ((location 0)
 	(disassem-segments nil)
 	(connecting-vec nil))
-    (error "stub: code not converted to new SEGMENT WHN 19990322" ; KLUDGE
-	   assem-segment) ; (to avoid "ASSEM-SEGMENT defined but never used")
-    ;; old code, needs to be converted to use less-SAPpy ASSEM-SEGMENTs:
-    #|(sb!assem:segment-map-output
+    (sb!assem:on-segment-contents-vectorly
      assem-segment
-     (lambda (sap amount)
+     (lambda (seg-code-block)
        (multiple-value-setq (disassem-segments location connecting-vec)
-         (add-block-segments sap amount
-      		             disassem-segments location
+         (add-block-segments seg-code-block
+      		             disassem-segments
+			     location
 			     connecting-vec
-			     dstate))))|#
+			     dstate))))
     (when connecting-vec
       (setf disassem-segments
-	    (add-block-segments nil nil
-				disassem-segments location
+	    (add-block-segments nil
+				disassem-segments
+				location
 				connecting-vec
 				dstate)))
     (sort disassem-segments #'< :key #'seg-virtual-location)))
 
-;;; FIXME: I noticed that this is only called by #!+SB-SHOW code. It would
-;;; be good to see whether this is the only caller of any other functions.
-;;;
 ;;; Disassemble the machine code instructions associated with
 ;;; ASSEM-SEGMENT (of type assem:segment).
-#!+sb-show
 (defun disassemble-assem-segment (assem-segment stream)
   (declare (type sb!assem:segment assem-segment)
 	   (type stream stream))

@@ -1162,6 +1162,8 @@
 (defknown compile-file
   (filename
    &key
+
+   ;; ANSI options
    (:output-file (or filename
 		     null
 		     ;; FIXME: This last case is a non-ANSI hack.
@@ -1169,8 +1171,10 @@
    (:verbose t)
    (:print t)
    (:external-format t)
+
+   ;; extensions
+   (:trace-file t)
    (:block-compile t)
-   (:entry-points list)
    (:byte-compile (member t nil :maybe)))
   (values (or pathname null) boolean boolean))
 

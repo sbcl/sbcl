@@ -69,7 +69,6 @@
 (defvar *prev-segment*)
 (defvar *prev-vop*)
 
-#!+sb-show
 (defun trace-instruction (segment vop inst args)
   (let ((*standard-output* *compiler-trace-output*))
     (unless (eq *prev-segment* segment)
@@ -102,8 +101,8 @@
 		  (block-next (component-head *component-being-compiled*))))
 		(or (> speed compilation-speed) (> space compilation-speed)))))
 (defun default-segment-inst-hook ()
-  #!+sb-show
-  (and *compiler-trace-output* #'trace-instruction))
+  (and *compiler-trace-output*
+       #'trace-instruction))
 
 (defun init-assembler ()
   (setf *code-segment*
@@ -120,7 +119,6 @@
   (values))
 
 (defun generate-code (component)
-  #!+sb-show
   (when *compiler-trace-output*
     (format *compiler-trace-output*
 	    "~|~%assembly code for ~S~2%"

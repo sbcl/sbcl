@@ -667,7 +667,7 @@
 
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE
 ;;; when reconstructing HASH-TABLE.
-(defun hash-table-ctor-args (hash-table)
+(defun %hash-table-ctor-args (hash-table)
   (when (hash-table-weak-p hash-table)
     ;; FIXME: This might actually work with no trouble, but as of
     ;; sbcl-0.6.12.10 when this code was written, weak hash tables
@@ -680,7 +680,7 @@
     :rehash-threshold ',(hash-table-rehash-threshold hash-table)))
 
 ;;; Return an association list representing the same data as HASH-TABLE.
-(defun hash-table-alist (hash-table)
+(defun %hash-table-alist (hash-table)
   (let ((result nil))
     (maphash (lambda (key value)
 	       (push (cons key value) result))
@@ -691,7 +691,7 @@
 ;;; so that we can use this for the *PRINT-READABLY* case in
 ;;; PRINT-OBJECT (HASH-TABLE T) without having to worry about LET
 ;;; forms and readable gensyms and stuff.
-(defun stuff-hash-table (hash-table alist)
+(defun %stuff-hash-table (hash-table alist)
   (dolist (x alist)
     (setf (gethash (car x) hash-table) (cdr x)))
   hash-table)
@@ -710,11 +710,11 @@
 	 (with-standard-io-syntax
 	  (format stream
 		  "#.~W"
-		  `(stuff-hash-table (make-hash-table ,@(hash-table-ctor-args
-							 hash-table))
-				     ',(hash-table-alist hash-table)))))))
+		  `(%stuff-hash-table (make-hash-table ,@(%hash-table-ctor-args
+							  hash-table))
+				     ',(%hash-table-alist hash-table)))))))
 
 (def!method make-load-form ((hash-table hash-table) &optional environment)
   (declare (ignore environment))
-  (values `(make-hash-table ,@(hash-table-ctor-args hash-table))
-	  `(stuff-hash-table ,hash-table ',(hash-table-alist hash-table))))
+  (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
+	  `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))

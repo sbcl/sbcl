@@ -18,7 +18,6 @@
 ;;; (Note: As of sbcl-0.6.7, this is target-only code not because it's
 ;;; logically target-only, but just because it's still implemented in
 ;;; terms of SAPs.)
-#!+sb-show
 (defun describe-byte-component (component xeps segment *standard-output*)
   (format t "~|~%;;;; byte component ~S~2%" (component-name component))
   (format t ";;; functions:~%")
@@ -50,32 +49,35 @@
     ;; -- WHN 19990811
     (sb!assem:on-segment-contents-vectorly segment
 					   (lambda (chunk) (chunks chunk)))
-    (let* ((total-bytes (reduce #'+ (mapcar #'cdr (chunks))))
-	   ;; KLUDGE: It's not clear that BUF has to be a SAP instead
-	   ;; of a nice high-level, safe, friendly vector. Perhaps
-	   ;; this code could be rewritten to use ordinary indices and
-	   ;; vectors instead of SAP references to chunks of raw
-	   ;; system memory? -- WHN 19990811
-	   (buf (allocate-system-memory total-bytes)))
-      (let ((offset 0))
-	(dolist (chunk (chunks))
-	  (declare (type (simple-array (unsigned-byte 8)) chunk))
-	  (copy-byte-vector-to-system-area chunk buf offset)
-	  (incf offset chunk-n-bits)))
-
-      (disassem-byte-sap buf
-			 total-bytes
-			 (map 'vector
-			      #'(lambda (x)
+    (flet ((chunk-n-bytes (chunk) (length chunk)))
+      (let* ((total-bytes (reduce #'+ (chunks) :key #'chunk-n-bytes))
+             ;; FIXME: It's not clear that BUF has to be a SAP instead
+             ;; of a nice high-level, safe, friendly vector. Perhaps
+             ;; this code could be rewritten to use ordinary indices and
+             ;; vectors instead of SAP references to chunks of raw
+             ;; system memory? Failing that, the DEALLOCATE-SYSTEM-MEMORY
+	     ;; operation below should probably be tied to the
+	     ;; allocation here with an UNWIND-PROTECT relationship.
+             (buf (allocate-system-memory total-bytes)))
+        (let ((offset 0))
+          (dolist (chunk (chunks))
+            (let ((chunk-n-bits (* (chunk-n-bytes chunk) sb!vm:byte-bits)))
+              (declare (type (simple-array (unsigned-byte 8)) chunk))
+              (copy-byte-vector-to-system-area chunk buf offset)
+              (incf offset chunk-n-bits))))
+        (disassem-byte-sap buf
+                           total-bytes
+                           (map 'vector
+                                (lambda (x)
 				  (if (constant-p x)
 				      (constant-value x)
 				      x))
-			      (byte-component-info-constants
-			       (component-info component)))
-			 (sort (eps) #'<))
-      (terpri)
-      (deallocate-system-memory buf total-bytes)
-      (values))))
+				(byte-component-info-constants
+				 (component-info component)))
+			   (sort (eps) #'<))
+	(terpri)
+	(deallocate-system-memory buf total-bytes)
+	(values)))))
 
 ;;; Given a byte-compiled function, disassemble it to standard output.
 (defun disassem-byte-fun (xep)

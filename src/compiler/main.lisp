@@ -71,7 +71,6 @@
 (defvar *all-components*)
 
 ;;; Bind this to a stream to capture various internal debugging output.
-#!+sb-show
 (defvar *compiler-trace-output* nil)
 
 ;;; The current block compilation state. These are initialized to the
@@ -447,7 +446,6 @@
 	    (maybe-mumble "check-pack ")
 	    (check-pack-consistency component))
 
-	  #!+sb-show
 	  (when *compiler-trace-output*
 	    (describe-component component *compiler-trace-output*)
 	    (describe-ir2-component component *compiler-trace-output*))
@@ -456,7 +454,6 @@
 	  (multiple-value-bind (code-length trace-table fixups)
 	      (generate-code component)
 
-	    #!+sb-show
 	    (when *compiler-trace-output*
 	      (format *compiler-trace-output*
 		      "~|~%disassembly of code for ~S~2%" component)
@@ -1480,10 +1477,12 @@
 
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
-;;; we don't overwrite it with known garbage.
+;;; that we don't overwrite it with known garbage.
 (defun sb!xc:compile-file
     (input-file
      &key
+
+     ;; ANSI options
      (output-file (cfp-output-file-default input-file))
      ;; FIXME: ANSI doesn't seem to say anything about
      ;; *COMPILE-VERBOSE* and *COMPILE-PRINT* being rebound by this
@@ -1491,28 +1490,42 @@
      ((:verbose sb!xc:*compile-verbose*) sb!xc:*compile-verbose*)
      ((:print sb!xc:*compile-print*) sb!xc:*compile-print*)
      (external-format :default)
+
+     ;; extensions
+     (trace-file nil) 
      ((:block-compile *block-compile-argument*) nil)
-     ((:entry-points *entry-points*) nil)
      ((:byte-compile *byte-compile*) *byte-compile-default*))
+
   #!+sb-doc
-  "Compile INPUT-FILE, producing a corresponding fasl file. 
-   :Output-File
-      The name of the fasl to output.
-   :Block-Compile
-      Determines whether multiple functions are compiled together as a unit,
-      resolving function references at compile time. NIL means that global
-      function names are never resolved at compilation time.
-   :Entry-Points
-      This specifies a list of function names for functions in the file(s) that
-      must be given global definitions. This only applies to block
-      compilation. If the value is NIL (the default) then all functions
-      will be globally defined.
-   :Byte-Compile {T | NIL | :MAYBE}
-      Determines whether to compile into interpreted byte code instead of
-      machine instructions. Byte code is several times smaller, but much
-      slower. If :MAYBE, then only byte-compile when SPEED is 0 and
-      DEBUG <= 1. The default is the value of SB-EXT:*BYTE-COMPILE-DEFAULT*,
-      which is initially :MAYBE."
+  "Compile INPUT-FILE, producing a corresponding fasl file and returning
+   its filename. Besides the ANSI &KEY arguments :OUTPUT-FILE, :VERBOSE,
+   :PRINT, and :EXTERNAL-FORMAT,the following extensions are supported:
+     :TRACE-FILE
+        If given, internal data structures are dumped to the specified
+        file, or if a value of T is given, to a file of *.trace type
+        derived from the input file name.
+     :BYTE-COMPILE {T | NIL | :MAYBE}
+        Determines whether to compile into interpreted byte code instead of
+        machine instructions. Byte code is several times smaller, but much
+        slower. If :MAYBE, then only byte-compile when SPEED is 0 and
+        DEBUG <= 1. The default is the value of SB-EXT:*BYTE-COMPILE-DEFAULT*,
+        which is initially :MAYBE. (This option will probably become
+        formally deprecated starting around sbcl-0.7.0, when various 
+        cleanups related to the byte interpreter are planned.)
+   Also, as a workaround for vaguely-non-ANSI behavior, the :BLOCK-COMPILE
+   argument is quasi-supported, to determine whether multiple
+   functions are compiled together as a unit, resolving function
+   references at compile time. NIL means that global function names
+   are never resolved at compilation time. Currently NIL is the
+   default behavior, because although section 3.2.2.3, \"Semantic
+   Constraints\", of the ANSI spec allows this behavior under all
+   circumstances, the compiler's runtime scales badly when it
+   tries to do this for large files. If/when this performance
+   problem is fixed, the block compilation default behavior will
+   probably be made dependent on the SPEED and COMPILATION-SPEED
+   optimization values, and the :BLOCK-COMPILE argument will probably
+   become deprecated."
+
   (unless (eq external-format :default)
     (error "Non-:DEFAULT EXTERNAL-FORMAT values are not supported."))
   (let* ((fasl-file nil)
@@ -1520,15 +1533,17 @@
 	 (compile-won nil)
 	 (warnings-p nil)
 	 (failure-p t) ; T in case error keeps this from being set later
-	 ;; KLUDGE: The listifying and unlistifying in the next calls
-	 ;; is to interface to old CMU CL code which accepted and
-	 ;; returned lists of multiple source files. It would be
-	 ;; cleaner to redo VERIFY-SOURCE-FILES and as
-	 ;; VERIFY-SOURCE-FILE, accepting a single source file, and
-	 ;; do a similar transformation on MAKE-FILE-SOURCE-INFO too.
-	 ;; -- WHN 20000201
+	 ;; KLUDGE: The listifying and unlistifying in the stuff
+	 ;; related to VERIFY-SOURCE-FILES below is to interface to
+	 ;; old CMU CL code which accepted and returned lists of
+	 ;; multiple source files. It would be cleaner to redo
+	 ;; VERIFY-SOURCE-FILES as VERIFY-SOURCE-FILE, accepting a
+	 ;; single source file, and do a similar transformation on
+	 ;; MAKE-FILE-SOURCE-INFO too. -- WHN 20000201
 	 (input-pathname (first (verify-source-files (list input-file))))
-	 (source-info (make-file-source-info (list input-pathname))))
+	 (source-info (make-file-source-info (list input-pathname)))
+	 (*compiler-trace-output* nil)) ; might be modified below
+				
     (unwind-protect
 	(progn
 	  (when output-file
@@ -1539,6 +1554,18 @@
 		  (open-fasl-file output-file-name
 				  (namestring input-pathname)
 				  (eq *byte-compile* t))))
+	  (when trace-file
+	    (let* ((default-trace-file-pathname
+		     (make-pathname :type "trace" :defaults input-pathname))
+		   (trace-file-pathname
+		    (if (eql trace-file t)
+			default-trace-file-pathname
+			(make-pathname trace-file
+				       default-trace-file-pathname))))
+	      (setf *compiler-trace-output*
+		    (open trace-file-pathname
+			  :if-exists :supersede
+			  :direction :output))))
 
 	  (when sb!xc:*compile-verbose*
 	    (start-error-output source-info))
@@ -1557,7 +1584,10 @@
 	  (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
 
       (when sb!xc:*compile-verbose*
-	(finish-error-output source-info compile-won)))
+	(finish-error-output source-info compile-won))
+
+      (when *compiler-trace-output*
+	(close *compiler-trace-output*)))
 
     (values (if output-file
 		;; Hack around filesystem race condition...

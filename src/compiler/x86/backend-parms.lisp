@@ -20,7 +20,7 @@
 (setf *backend-fasl-file-type* "x86f")
 (setf *backend-fasl-file-implementation* :x86)
 
-(setf *backend-fasl-file-version* 10)
+(setf *backend-fasl-file-version* 11)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -37,6 +37,8 @@
 ;;; 9 = deleted obsolete CONS-UNIQUE-TAG bytecode in sbcl-0.6.11.8
 ;;; (somewhere in here also changes to AND and OR CTYPE layouts) 
 ;;; 10 = new layout for CONDITION in sbcl-0.6.11.38
+;;; 11 = new helper functions for MAKE-LOAD-FORM (HASH-TABLE) in
+;;;      sbcl-0.6.12.11
 
 (setf *backend-register-save-penalty* 3)
 

@@ -1972,7 +1972,6 @@
 		(xeps (generate-xeps component))
 		(constants (byte-component-info-constants
 			    (component-info component))))
-	    #!+sb-show
 	    (when *compiler-trace-output*
 	      (describe-component component *compiler-trace-output*)
 	      (describe-byte-component component xeps segment
