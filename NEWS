@@ -20,6 +20,8 @@ changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
     the specializer is now possible.
   * fixed bug: the MAKE-INSTANCE optimization is now correct in the
     face of package deletion.
+  * fixed bug: LOAD should bind *LOAD-PATHNAME* to the merged
+    pathname. (reported by David Tolpin on c.l.l)
   * contrib improvement: the SB-SIMPLE-STREAMS contrib now defines
     STRING-SIMPLE-STREAM and FILE-SIMPLE-STREAM as subclasses of
     STRING-STREAM and FILE-STREAM, respectively.

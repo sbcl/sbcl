@@ -53,4 +53,19 @@
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
 
+;;; As reported by David Tolpin *LOAD-PATHNAME* was not merged.
+(progn
+  (defvar *saved-load-pathname*)
+  (with-open-file (s *tmp-filename*
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (print '(setq *saved-load-pathname* *load-pathname*) s))
+  (let (tmp-fasl)
+    (unwind-protect
+         (progn
+           (load *tmp-filename*)
+           (assert (equal (merge-pathnames *tmp-filename*) *saved-load-pathname*)))
+      (delete-file *tmp-filename*))))
+
 (quit :unix-status 104)

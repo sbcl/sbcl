@@ -69,7 +69,7 @@
 	(return-from internal-load nil)))
 
   (let ((*load-truename* truename)
-	(*load-pathname* pathname))
+	(*load-pathname* (merge-pathnames pathname)))
     (case contents
       (:source
        (with-open-file (stream truename
