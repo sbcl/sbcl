@@ -250,10 +250,8 @@
 	       :created (file-info-write-date file-info)
 	       :compiled (source-info-start-time info)
 	       :source-root (file-info-source-root file-info)
-	       :start-positions
-	       (unless (eq *byte-compile* t)
-		 (coerce-to-smallest-eltype
-		  (file-info-positions file-info)))))
+	       :start-positions (coerce-to-smallest-eltype
+				 (file-info-positions file-info))))
 	 (name (file-info-name file-info)))
     (etypecase name
       ((member :lisp)

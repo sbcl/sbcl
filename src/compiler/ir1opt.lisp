@@ -788,8 +788,7 @@
   (declare (type combination call))
   (let* ((ref (continuation-use (basic-combination-fun call)))
 	 (leaf (when (ref-p ref) (ref-leaf ref)))
-	 (inlinep (if (and (defined-function-p leaf)
-			   (not (byte-compiling)))
+	 (inlinep (if (defined-function-p leaf)
 		      (defined-function-inlinep leaf)
 		      :no-chance)))
     (cond
@@ -949,9 +948,7 @@
 		    (policy node (> speed inhibit-warnings))))
 	 (*compiler-error-context* node))
     (cond ((not (member (transform-when transform)
-			(if *byte-compiling*
-			    '(:byte   :both)
-			    '(:native :both))))
+			'(:native :both)))
 	   ;; FIXME: Make sure that there's a transform for
 	   ;; (MEMBER SYMBOL ..) into MEMQ.
 	   ;; FIXME: Note that when/if I make SHARE operation to shared
@@ -961,7 +958,7 @@
 	   ;; '(:BOTH) tail sublists.
 	   (let ((when (transform-when transform)))
 	     (not (or (eq when :both)
-		      (eq when (if *byte-compiling* :byte :native)))))
+		      (eq when :native))))
 	   t)
 	  ((or (not constrained)
 	       (valid-function-use node type :strict-result t))
@@ -1276,7 +1273,6 @@
 		   leaf var))
 		t)))))
        ((and (null (rest (leaf-refs var)))
-	     (not *byte-compiling*)
 	     (substitute-single-use-continuation arg var)))
        (t
 	(propagate-to-refs var (continuation-type arg))))))

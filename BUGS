@@ -88,9 +88,9 @@ WORKAROUND:
   to really grok function declarations.
 
 7:
-  The "byte compiling top-level form:" output ought to be condensed.
+  The "compiling top-level form:" output ought to be condensed.
   Perhaps any number of such consecutive lines ought to turn into a
-  single "byte compiling top-level forms:" line.
+  single "compiling top-level forms:" line.
 
 10:
   The way that the compiler munges types with arguments together
@@ -1017,21 +1017,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     ;   (while making load form for #<SB-IMPL::LOGICAL-HOST "XXX">)
     ; A logical host can't be dumped as a constant: #<SB-IMPL::LOGICAL-HOST "XXX">
 
-114:
-  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
-  collection:
-    (in-package :cl-user)
-    ;;; This file causes the byte compiler to fail.
-    (declaim (optimize (speed 0) (safety 1)))
-    (defun tst1 ()
-      (values
-        (multiple-value-list
-         (catch 'a
-          (return-from tst1)))))
-  The error message in sbcl-0.6.12.42 is
-    internal error, failed AVER:
-      "(COMMON-LISP:EQUAL (SB!C::BYTE-BLOCK-INFO-START-STACK SB!INT:INFO) SB!C::STACK)"
-
 115:
   reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
   collection:
@@ -1089,42 +1074,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
    Raymond Toy comments that this is tricky on the X86 since its FPU
    uses 80-bit precision internally.
-
-119:
-   a bug in the byte compiler and/or interpreter: Compile
-	(IN-PACKAGE :CL-USER)
-	(DECLAIM (OPTIMIZE (SPEED 0) (SAFETY 1) (DEBUG 1)))
-	(DEFUN BAR (&REST DIMS)
-	  (IF (EVERY #'INTEGERP DIMS)
-	      1
-	      2))
-   then execute (BAR '(1 2 3 4)). In sbcl-0.pre7.14.flaky4.8
-   this gives a TYPE-ERROR,
-     The value #:UNINITIALIZED-EVAL-STACK-ELEMENT is not
-	of type (MOD 536870911).
-   The same error will probably occur in earlier versions as well, 
-   although the name of the uninitialized-element placeholder will
-   be shorter.
-
-   The same thing happens if the compiler macro expansion of 
-   EVERY into MAP is hand-expanded:
-	(defun bar2 (dims)
-	  (if (block blockname
-		(map nil
-		     (lambda (dim)
-		       (let ((pred-value (funcall #'integerp dim)))
-			 (unless pred-value
-			   (return-from blockname
-			     nil))))
-		     dims)	
-		t)
-	      1
-	      2))
-   CMU CL doesn't have this compiler macro expansion, so it was 
-   immune to the original bug in BAR, but once we hand-expand it
-   into BAR2, CMU CL 18c has the same bug. (Run (BAR '(NIL NIL)).)
-
-   The native compiler handles it fine, both in SBCL and in CMU CL.
 
 120a:
    The compiler incorrectly figures the return type of 

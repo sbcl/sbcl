@@ -30,38 +30,6 @@
 		  *last-source-form* *last-format-string* *last-format-args*
 		  *last-message-count* *lexenv*))
 
-;;; FIXME: byte compiler to be removed completely
-(defvar *byte-compile-default* nil
-  #!+sb-doc
-  "the default value for the :BYTE-COMPILE argument to COMPILE-FILE")
-
-(defvar *byte-compile-top-level*
-  #|
-  #-sb-xc-host t
-  #+sb-xc-host nil ; since the byte compiler isn't supported in cross-compiler
-  |#
-  nil ; FIXME: byte compiler to be removed completely
-  #!+sb-doc
-  "Similar to *BYTE-COMPILE-DEFAULT*, but controls the compilation of top-level
-   forms (evaluated at load-time) when the :BYTE-COMPILE argument is :MAYBE
-   (the default.)  When true, we decide to byte-compile.")
-
-;;; the value of the :BYTE-COMPILE argument which was passed to the
-;;; compiler
-(defvar *byte-compile*
-  nil #|:maybe|#) ; FIXME: byte compiler to be removed completely
-
-;;; Bound by COMPILE-COMPONENT to T when byte-compiling, and NIL when
-;;; native compiling. During IR1 conversion this can also be :MAYBE,
-;;; in which case we must look at the policy; see #'BYTE-COMPILING.
-(defvar *byte-compiling*
-  nil #|:maybe|#) ; FIXME: byte compiler to be removed completely
-
-(declaim (type (member t nil :maybe)
-	       *byte-compile*
-	       *byte-compiling*
-	       *byte-compile-default*))
-
 (defvar *check-consistency* nil)
 (defvar *all-components*)
 
@@ -382,8 +350,8 @@
   (ir1-finalize component)
   (values))
 
-(defun native-compile-component (component)
-  (/show "entering NATIVE-COMPILE-COMPONENT")
+(defun %compile-component (component)
+  (/show "entering %COMPILE-COMPONENT")
   (let ((*code-segment* nil)
 	(*elsewhere* nil))
     (maybe-mumble "GTN ")
@@ -475,33 +443,8 @@
   ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) nil)
 
-  (/show "leaving NATIVE-COMPILE-COMPONENT")
+  (/show "leaving %COMPILE-COMPONENT")
   (values))
-
-(defun policy-byte-compile-p (thing)
-  nil
-  ;; FIXME: byte compiler to be removed completely
-  #|
-  (policy thing
-	  (and (zerop speed)
-	       (<= debug 1)))
-  |#)
-
-;;; Return our best guess for whether we will byte compile code
-;;; currently being IR1 converted. This is only a guess because the
-;;; decision is made on a per-component basis.
-;;;
-;;; FIXME: This should be called something more mnemonic, e.g.
-;;; PROBABLY-BYTE-COMPILING
-(defun byte-compiling ()
-  nil
-  ;; FIXME: byte compiler to be removed completely
-  #|
-  (if (eq *byte-compiling* :maybe)
-      (or (eq *byte-compile* t)
-          (policy-byte-compile-p *lexenv*))
-      (and *byte-compile* *byte-compiling*))
-  |#)
 
 ;;; Delete components with no external entry points before we try to
 ;;; generate code. Unreachable closures can cause IR2 conversion to
@@ -520,24 +463,10 @@
 		      (leaf-refs fun))
 	 (return))))))
 
-(defun byte-compile-this-component-p (component)
-  nil
-  ;; FIXME: byte compiler to be removed completely
-  #|
-  (ecase *byte-compile*
-    ((t) t)
-    ((nil) nil)
-    ((:maybe)
-     (every #'policy-byte-compile-p (component-lambdas component))))
-  |#)
-
 (defun compile-component (component)
-  (let* ((*component-being-compiled* component)
-	 (*byte-compiling* (byte-compile-this-component-p component)))
+  (let* ((*component-being-compiled* component))
     (when sb!xc:*compile-print*
-      (compiler-mumble "~&; ~:[~;byte ~]compiling ~A: "
-		       *byte-compiling*
-		       (component-name component)))
+      (compiler-mumble "~&; compiling ~A: " (component-name component)))
 
     (ir1-phases component)
 
@@ -550,9 +479,7 @@
 
     (unless (eq (block-next (component-head component))
 		(component-tail component))
-      (if *byte-compiling*
-	  (byte-compile-component component)
-	  (native-compile-component component))))
+      (%compile-component component)))
 
   (clear-constant-info)
 
@@ -1276,10 +1203,7 @@
 		   force-p))
       (multiple-value-bind (component tll) (merge-top-level-lambdas pending)
 	(setq *pending-top-level-lambdas* ())
-	(let ((*byte-compile* (if (eq *byte-compile* :maybe)
-				  *byte-compile-top-level*
-				  *byte-compile*)))
-	  (compile-component component))
+	(compile-component component)
 	(clear-ir1-info component)
 	(object-call-top-level-lambda tll))))
   (values))
@@ -1335,22 +1259,18 @@
 	(when (pre-environment-analyze-top-level component)
 	  (setq top-level-closure t)))
 
-      (let ((*byte-compile*
-	     (if (and top-level-closure (eq *byte-compile* :maybe))
-		 nil
-		 *byte-compile*)))
-	(dolist (component components)
-	  (compile-component component)
-	  (when (replace-top-level-xeps component)
-	    (setq top-level-closure t)))
+      (dolist (component components)
+	(compile-component component)
+	(when (replace-top-level-xeps component)
+	  (setq top-level-closure t)))
 	
-	(when *check-consistency*
-	  (maybe-mumble "[check]~%")
-	  (check-ir1-consistency *all-components*))
+      (when *check-consistency*
+	(maybe-mumble "[check]~%")
+	(check-ir1-consistency *all-components*))
 	
-	(if load-time-value-p
-	    (compile-load-time-value-lambda lambdas)
-	    (compile-top-level-lambdas lambdas top-level-closure)))
+      (if load-time-value-p
+	  (compile-load-time-value-lambda lambdas)
+	  (compile-top-level-lambdas lambdas top-level-closure))
 
       (mapc #'clear-ir1-info components)
       (clear-stuff)))
@@ -1483,9 +1403,7 @@
 
      ;; extensions
      (trace-file nil) 
-     ((:block-compile *block-compile-argument*) nil)
-     ;; FIXME: byte compiler to be removed completely
-     #+nil ((:byte-compile *byte-compile*) *byte-compile-default*))
+     ((:block-compile *block-compile-argument*) nil))
 
   #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and returning
@@ -1528,8 +1446,7 @@
 					       :output-file output-file))
 	    (setq fasl-output
 		  (open-fasl-output output-file-name
-				    (namestring input-pathname)
-				    (eq *byte-compile* t))))
+				    (namestring input-pathname))))
 	  (when trace-file
 	    (let* ((default-trace-file-pathname
 		     (make-pathname :type "trace" :defaults input-pathname))

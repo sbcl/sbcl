@@ -338,7 +338,7 @@
 ;;; Support for the MT19937 random number generator. The update
 ;;; function is implemented as an assembly routine. This definition is
 ;;; transformed to a call to the assembly routine allowing its use in
-;;; byte compiled code.
+;;; interpreted code.
 (defun random-mt19937 (state)
   (declare (type (simple-array (unsigned-byte 32) (627)) state))
   (random-mt19937 state))

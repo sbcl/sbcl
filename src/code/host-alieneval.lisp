@@ -847,18 +847,6 @@
 
 (def-alien-type-translator array (ele-type &rest dims &environment env)
 
-  ;; This declaration is a workaround for bug 119, which causes the
-  ;; EVERY #'INTEGERP expression below to be compiled incorrectly
-  ;; by the byte compiler. Since as of sbcl-0.pre7.x we are using
-  ;; the byte compiler to do all the tricky stuff for the 'interpreter',
-  ;; and since we use 'interpreted' definitions of these type translators
-  ;; at cross-compilation time, this means that cross-compilation
-  ;; doesn't work properly unless we force this function to be
-  ;; native compiled instead of byte-compiled.
-  ;;
-  ;; FIXME: So, when bug 119 is fixed, this declaration can go away.
-  (declare (optimize (speed 2))) ; i.e. not byte-compiled
-
   (when dims
     (unless (typep (first dims) '(or index null))
       (error "The first dimension is not a non-negative fixnum or NIL: ~S"

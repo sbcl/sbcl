@@ -144,15 +144,6 @@
              "MULTIPLY-FIXNUMS" "NEGATE-BIGNUM"
              "SUBTRACT-BIGNUM" "SXHASH-BIGNUM"))
 
- ;; FIXME: byte compiler/interpreter to go away completely
- #|
- #s(sb-cold:package-data
-    :name "SB!BYTECODE"
-    :doc "private: stuff related to the bytecode interpreter"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
-    :export ())
- |#
-
  #s(sb-cold:package-data
     :name "SB!C"
     :doc "private: implementation of the compiler"

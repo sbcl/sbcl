@@ -251,7 +251,7 @@
 ;;; the source code is given by the string WHERE. If BYTE-P is true,
 ;;; this file will contain no native code, and is thus largely
 ;;; implementation independent.
-(defun open-fasl-output (name where &optional byte-p)
+(defun open-fasl-output (name where)
   (declare (type pathname name))
   (let* ((stream (open name
 		       :direction :output
@@ -282,9 +282,7 @@
 
     ;; Finish the header by outputting fasl file implementation and
     ;; version in machine-readable form.
-    (let ((implementation (if byte-p
-			      (backend-byte-fasl-file-implementation)
-			      +backend-fasl-file-implementation+)))
+    (let ((implementation +backend-fasl-file-implementation+))
       (dump-unsigned-32 (length (symbol-name implementation)) res)
       (dotimes (i (length (symbol-name implementation)))
 	(dump-byte (char-code (aref (symbol-name implementation) i)) res)))

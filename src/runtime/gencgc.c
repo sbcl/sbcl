@@ -1857,15 +1857,6 @@ sniff_code_object(struct code *code, unsigned displacement)
     if (!check_code_fixups)
 	return;
 
-    /* It's ok if it's byte compiled code. The trace table offset will
-     * be a fixnum if it's x86 compiled code - check. */
-    if (code->trace_table_offset & 0x3) {
-	FSHOW((stderr, "/Sniffing byte compiled code object at %x.\n", code));
-	return;
-    }
-
-    /* Else it's x86 machine code. */
-
     ncode_words = fixnum_value(code->code_size);
     nheader_words = HeaderValue(*(lispobj *)code);
     nwords = ncode_words + nheader_words;
@@ -2034,14 +2025,6 @@ apply_code_fixups(struct code *old_code, struct code *new_code)
     unsigned displacement = (unsigned)new_code - (unsigned)old_code;
     struct vector *fixups_vector;
 
-    /* It's OK if it's byte compiled code. The trace table offset will
-     * be a fixnum if it's x86 compiled code - check. */
-    if (new_code->trace_table_offset & 0x3) {
-/* 	FSHOW((stderr, "/byte compiled code object at %x\n", new_code)); */
-	return;
-    }
-
-    /* Else it's x86 machine code. */
     ncode_words = fixnum_value(new_code->code_size);
     nheader_words = HeaderValue(*(lispobj *)new_code);
     nwords = ncode_words + nheader_words;
@@ -5112,7 +5095,13 @@ verify_space(lispobj *start, size_t words)
 			if (is_in_dynamic_space
 			    /* It's ok if it's byte compiled code. The trace
 			     * table offset will be a fixnum if it's x86
-			     * compiled code - check. */
+			     * compiled code - check.
+			     *
+			     * FIXME: #^#@@! lack of abstraction here..
+			     * This line can probably go away now that
+			     * there's no byte compiler, but I've got
+			     * too much to worry about right now to try
+			     * to make sure. -- WHN 2001-10-06 */
 			    && !(code->trace_table_offset & 0x3)
 			    /* Only when enabled */
 			    && verify_dynamic_code_check) {

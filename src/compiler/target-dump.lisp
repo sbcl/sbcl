@@ -101,24 +101,3 @@
     (dump-unsigned-32 mid-bits file)
     (dump-unsigned-32 high-bits file)
     (dump-integer-as-n-bytes exp-bits 4 file)))
-
-;;;; dumping things which don't exist in portable ANSI Common Lisp
-
-;;; FIXME: byte compiler to go away completely
-#|
-;;; Dump a BYTE-FUNCTION object. We dump the layout and
-;;; funcallable-instance info, but rely on the loader setting up the
-;;; correct funcallable-instance-function.
-(defun dump-byte-function (xep code-handle file)
-  (let ((nslots (- (get-closure-length xep)
-		   ;; 1- for header
-		   (1- sb!vm:funcallable-instance-info-offset))))
-    (dotimes (i nslots)
-      (if (zerop i)
-	  (dump-push code-handle file)
-	  (dump-object (%funcallable-instance-info xep i) file)))
-    (dump-object (%funcallable-instance-layout xep) file)
-    (dump-fop 'fop-make-byte-compiled-function file)
-    (dump-byte nslots file))
-  (values))
-|#

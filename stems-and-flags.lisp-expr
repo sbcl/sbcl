@@ -426,7 +426,23 @@
 
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ;; trace table definitions from compiler/trace-table.lisp.
- ("src/compiler/dump")
+ ("src/compiler/dump"
+  ;; FIXME: When building sbcl-0.pre7.14.flaky4.5 under sbcl-0.6.12.1
+  ;; with :SB-SHOW on the target *FEATURES* list, cross-compilation of
+  ;; this file gives a WARNING in HEXSTR,
+  ;;   Lisp error during constant folding:
+  ;;   Argument X is not a REAL: NIL
+  ;; This seems to come from DEF!MACRO %WITH-ARRAY-DATA-MACRO code
+  ;; which looks like
+  ;;     (cond (,end
+  ;;            (unless (or ,unsafe? (<= ,end ,size))
+  ;;		  ..))
+  ;;           ..)
+  ;; where the system is trying to constant-fold the <= form when the
+  ;; ,END binding is known to be NIL at compile time. Since the <= form 
+  ;; is unreachable in that case, this shouldn't be signalling a WARNING;
+  ;; but as long as it is, we have to ignore it in order to go on.
+  :ignore-failure-p)
 
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/target-main" :not-host)
@@ -565,20 +581,6 @@
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
- ;; stuff for byte compilation
- ;;
- ;; This is mostly :NOT-HOST because even though byte code is
- ;; "portable", it'd be hard to make it work on the cross-compilation
- ;; host, because fundamental BYTE-FUNCTION-OR-CLOSURE types are
- ;; implemented as FUNCALLABLE-INSTANCEs, and it's not obvious how to
- ;; emulate those in a vanilla ANSI Common Lisp.
- #| ; FIXME: byte compiler to go away completely
- ("src/code/byte-types" :not-host)
- ("src/compiler/byte-comp")
- ("src/compiler/target-byte-comp" :not-host)
- ("src/code/byte-interp" :not-host) ; needs byte-comp *SYSTEM-CONSTANT-CODES*
- |#
-
  ;; defines SB!DI:DO-DEBUG-FUNCTION-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
 
@@ -628,9 +630,6 @@
 
  ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
  ;; for them
- ;;
- ;; FIXME: Since a lot of this code is just macros, perhaps it should be
- ;; byte compiled?
  ("src/code/defboot")
  ("src/code/destructuring-bind")
  ("src/code/early-setf")

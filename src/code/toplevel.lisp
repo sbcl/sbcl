@@ -234,8 +234,6 @@
 
 ;;;; the default toplevel function
 
-;;; FIXME: Most stuff below here can probably be byte-compiled.
-
 (defvar / nil
   #!+sb-doc
   "a list of all the values returned by the most recent top-level EVAL")

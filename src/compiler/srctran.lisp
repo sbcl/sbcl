@@ -62,7 +62,7 @@
 
 ;;; Translate CxR into CAR/CDR combos.
 (defun source-transform-cxr (form)
-  (if (or (byte-compiling) (/= (length form) 2))
+  (if (/= (length form) 2)
       (values nil t)
       (let ((name (symbol-name (car form))))
 	(do ((i (- (length name) 2) (1- i))

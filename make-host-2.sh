@@ -61,10 +61,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(defun in-target-cross-compilation-mode (fn)
 	  "Call FN with everything set up appropriately for cross-compiling
 	  a target file."
-	  (let (;; Life is simpler at genesis/cold-load time if we
-		;; needn't worry about byte-compiled code.
-		(sb!ext:*byte-compile-top-level* nil)
-		;; In order to increase microefficiency of the target Lisp, 
+	  (let (;; In order to increase microefficiency of the target Lisp, 
 		;; enable old CMU CL defined-function-types-never-change
 		;; optimizations. (ANSI says users aren't supposed to
 		;; redefine our functions anyway; and developers can

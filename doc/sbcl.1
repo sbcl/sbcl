@@ -257,12 +257,8 @@ Unlike its distinguished ancestor CMU CL, SBCL is currently on X86
 straightforward to port the CMU CL support for SPARC, or to port to
 NetBSD.
 
-As of version 0.6.11, SBCL requires on the order of 16Mb to run. In
-some future version, this number could shrink significantly, since
-large parts of the system are far from execution bottlenecks and could
-reasonably be stored in compact byte compiled form. (CMU CL does this
-routinely; the only reason SBCL doesn't currently do this is a
-combination of bootstrapping technicalities and inertia.)
+As of version 0.6.13, SBCL requires on the order of 16Mb RAM to run
+on X86 systems. 
 
 .SH ENVIRONMENT
 

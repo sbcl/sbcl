@@ -246,9 +246,6 @@
 ;;; all these code objects. After a purify these fixups can be
 ;;; dropped. In CMU CL, this policy was enabled with
 ;;; *ENABLE-DYNAMIC-SPACE-CODE*; in SBCL it's always used.
-;;;
-;;; A little analysis of the header information is used to determine
-;;; if a code object is byte compiled, or native code.
 #!+x86
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
@@ -268,15 +265,6 @@
 
 	(setq stuff (nreverse stuff))
 
-	;; Check that tto is always a list for byte-compiled
-	;; code. Could be used an alternate check.
-	(when (and (typep tto 'list)
-		   (not (and (sb!c::debug-info-p dbi)
-			     (not (sb!c::compiled-debug-info-p dbi)))))
-	  ;; FIXME: What is this for?
-	  (format t "* tto list on non-bc code: ~S~% ~S ~S~%"
-		  stuff dbi tto))
-	
 	;; FIXME: *LOAD-CODE-VERBOSE* should probably be #!+SB-SHOW.
 	(when *load-code-verbose*
 	      (format t "stuff: ~S~%" stuff)

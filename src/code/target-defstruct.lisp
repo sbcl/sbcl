@@ -123,9 +123,9 @@
 ;;; both the code pointer and the lexenv, since that code pointer (for
 ;;; an instance-lambda) is expecting that lexenv to be accessed. This
 ;;; effectively pre-flattens what would otherwise be a chain of
-;;; indirections. Lest this sound like an excessively obscure case,
-;;; note that it happens when PCL dispatch functions are
-;;; byte-compiled.
+;;; indirections. (That used to happen when PCL dispatch functions
+;;; were byte-compiled; now that the byte compiler is gone, I can't
+;;; think of another example offhand. -- WHN 2001-10-06)
 ;;;
 ;;; The only loss is that if someone accesses the
 ;;; FUNCALLABLE-INSTANCE-FUNCTION, then won't get a FIN back. This

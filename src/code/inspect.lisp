@@ -11,8 +11,6 @@
 
 (in-package "SB-IMPL") ;(SB-IMPL, not SB!IMPL, since we're built in warm load.)
 
-(declaim #.*optimize-byte-compilation*)
-
 (defparameter *inspect-length* 10)
 
 ;;; When *INSPECT-UNBOUND-OBJECT-MARKER* occurs in a parts list, it
@@ -20,7 +18,6 @@
 (defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-"))
 
 (defun inspect (object)
-  (declare #.*optimize-external-despite-byte-compilation*)
   (catch 'quit-inspect
     (%inspect object *standard-output*))
   (values))

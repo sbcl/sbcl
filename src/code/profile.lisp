@@ -240,7 +240,6 @@
 ;;; Profile the named function, which should exist and not be profiled
 ;;; already.
 (defun profile-1-unprofiled-function (name)
-  (declare #.*optimize-byte-compilation*)
   (let ((encapsulated-fun (fdefinition name)))
     (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
 	(profile-encapsulation-lambdas encapsulated-fun)
@@ -256,7 +255,6 @@
 
 ;;; Profile the named function. If already profiled, unprofile first.
 (defun profile-1-function (name)
-  (declare #.*optimize-byte-compilation*)
   (cond ((fboundp name)
 	 (when (gethash name *profiled-function-name->info*)
 	   (warn "~S is already profiled, so unprofiling it first." name)
@@ -268,7 +266,6 @@
 
 ;;; Unprofile the named function, if it is profiled.
 (defun unprofile-1-function (name)
-  (declare #.*optimize-byte-compilation*)
   (let ((pinfo (gethash name *profiled-function-name->info*)))
     (cond (pinfo
 	   (remhash name *profiled-function-name->info*)
@@ -293,7 +290,6 @@
    reprofile (useful to notice function redefinition.)  If a name is
    undefined, then we give a warning and ignore it. See also
    UNPROFILE, REPORT and RESET."
-  (declare #.*optimize-byte-compilation*)
   (if (null names)
       `(loop for k being each hash-key in *profiled-function-name->info*
 	     collecting k)
@@ -306,13 +302,11 @@
   a function. A string names all the functions named by symbols in the
   named package. NAMES defaults to the list of names of all currently 
   profiled functions."
-  (declare #.*optimize-byte-compilation*)
   (if names
       `(mapc-on-named-functions #'unprofile-1-function ',names)
       `(unprofile-all)))
 
 (defun unprofile-all ()
-  (declare #.*optimize-byte-compilation*)
   (dohash (name profile-info *profiled-function-name->info*)
     (declare (ignore profile-info))
     (unprofile-1-function name)))
@@ -357,7 +351,6 @@
 for profiling overhead. The compensation may be rather inaccurate when
 bignums are involved in runtime calculation, as in a very-long-running
 Lisp process."
-  (declare #.*optimize-external-despite-byte-compilation*)
   (unless (boundp '*overhead*)
     (setf *overhead*
 	  (compute-overhead)))

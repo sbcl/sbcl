@@ -46,9 +46,9 @@
   ;; (Hopefully this will go away as we move the files above into cold load.)
   ;; -- WHN 19991214
   (let ((fullname (concatenate 'string stem ".lisp")))
-    ;; (Now that we use the byte compiler for interpretation,
-    ;; /SHOW doesn't get compiled properly until the src/assembly
-    ;; files have been loaded.)
+    ;; (Now that we use byte compiler for interpretation, /SHOW
+    ;; doesn't get compiled properly until the src/assembly files have
+    ;; been loaded, so we use PRINT instead.)
     #+sb-show (print "/about to compile src/assembly file")
     #+sb-show (print fullname)
     (multiple-value-bind

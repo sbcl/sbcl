@@ -1170,8 +1170,7 @@
 
    ;; extensions
    (:trace-file t)
-   (:block-compile t)
-   (:byte-compile (member t nil :maybe)))
+   (:block-compile t))
   (values (or pathname null) boolean boolean))
 
 (defknown disassemble (callable &key

@@ -1533,7 +1533,7 @@
 			   (stream *standard-output*)
 			   (use-labels t))
   #!+sb-doc
-  "Disassemble the machine code associated with OBJECT, which can be a
+  "Disassemble the compiled code associated with OBJECT, which can be a
   function, a lambda expression, or a symbol with a function definition. If
   it is not already compiled, the compiler is called to produce something to
   disassemble."
@@ -1541,13 +1541,9 @@
 	   (type (or (member t) stream) stream)
 	   (type (member t nil) use-labels))
   (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
-    (let ((fun (compiled-function-or-lose object)))
-      (if nil #|(typep fun 'sb!kernel:byte-function)|# ; FIXME: byte compile to go away completely
-	  (sb!c:disassem-byte-fun fun)
-	  ;; We can't detect closures, so be careful.
-	  (disassemble-function (fun-self fun)
-				:stream stream
-				:use-labels use-labels)))
+    (disassemble-function (compiled-function-or-lose object)
+			  :stream stream
+			  :use-labels use-labels)
     nil))
 
 ;;; Disassembles the given area of memory starting at ADDRESS and

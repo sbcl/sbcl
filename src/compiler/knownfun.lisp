@@ -99,11 +99,7 @@
   (predicate-type nil :type (or ctype null))
   ;; If non-null, use this function to annotate the known call for the byte
   ;; compiler. If it returns NIL, then change the call to :full.
-  (byte-annotate nil :type (or function null))
-  ;; If non-null, use this function to generate the byte code for this known
-  ;; call. This function can only give up if there is a byte-annotate function
-  ;; that arranged for the functional to be pushed onto the stack.
-  (byte-compile nil :type (or function null)))
+  (byte-annotate nil :type (or function null)))
 
 (defprinter (function-info)
   (transforms :test transforms)
@@ -113,8 +109,7 @@
   (ir2-convert :test ir2-convert)
   (templates :test templates)
   (predicate-type :test predicate-type)
-  (byte-annotate :test byte-annotate)
-  (byte-compile :test byte-compile))
+  (byte-annotate :test byte-annotate))
 
 ;;;; interfaces to defining macros
 

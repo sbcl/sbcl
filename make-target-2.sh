@@ -29,8 +29,8 @@ echo //doing warm init
 --core output/cold-sbcl.core \
 --sysinit /dev/null --userinit /dev/null <<-'EOF' || exit 1
 
-	;; Now that we use the byte compiler for macros,
-	;; interpreted /SHOW doesn't work until later in init.
+	;; Now that we use the compiler for macros, interpreted
+	;; /SHOW doesn't work until later in init.
         #+sb-show (print "/hello, world!")
 
         ;; Until PRINT-OBJECT and other machinery is set up,

@@ -642,9 +642,7 @@
 ;;;      not only parts of the system which are defined after DEFUN MAPHASH.
 ;;;   2. It could be conditional on compilation policy, so that
 ;;;      it could be compiled as a full call instead of an inline
-;;;      expansion when SPACE>SPEED. (Not only would this save space,
-;;;      it might actually be faster when a call is made from byte-compiled
-;;;      code.)
+;;;      expansion when SPACE>SPEED.
 (declaim (inline maphash))
 (defun maphash (function-designator hash-table)
   #!+sb-doc

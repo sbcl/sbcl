@@ -12,9 +12,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; FIXME: Many of the functions in this file could probably be
-;;; byte-compiled, since they're one-pass, cons-heavy code.
-
 (in-package "SB!C")
 
 ;;;; type predicate translation
@@ -387,16 +384,6 @@
 ;;; then we also check whether the layout for the object is invalid
 ;;; and signal an error if so. Otherwise, look up the indirect
 ;;; class-cell and call CLASS-CELL-TYPEP at runtime.
-;;;
-;;; KLUDGE: The :WHEN :BOTH option here is probably a suboptimal
-;;; solution to the problem of %INSTANCE-TYPEP forms in byte compiled
-;;; code; it'd probably be better just to have %INSTANCE-TYPEP forms
-;;; never be generated in byte compiled code, or maybe to have a DEFUN
-;;; %INSTANCE-TYPEP somewhere to handle them if they are. But it's not
-;;; terribly important because mostly, %INSTANCE-TYPEP forms *aren't*
-;;; generated in byte compiled code. (As of sbcl-0.6.5, they could
-;;; sometimes be generated when byte compiling inline functions, but
-;;; it's quite uncommon.) -- WHN 20000523
 (deftransform %instance-typep ((object spec) (* *) * :node node :when :both)
   (aver (constant-continuation-p spec))
   (let* ((spec (continuation-value spec))
@@ -496,10 +483,7 @@
 ;;; If the type is TYPE= to a type that has a predicate, then expand
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
-;;; when, so we ignore policy and always do them. When byte-compiling,
-;;; we only do transforms that have potential for control
-;;; simplification. Instance type tests are converted to
-;;; %INSTANCE-TYPEP to allow type propagation.
+;;; when, so we ignore policy and always do them. 
 (def-source-transform typep (object spec)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
@@ -526,17 +510,16 @@
 				 (cadr spec))
 	       `(%typep ,object ,spec))
 	      (t nil))
-	    (and (not (byte-compiling))
-		 (typecase type
-		   (numeric-type
-		    (source-transform-numeric-typep object type))
-		   (sb!xc:class
-		    `(%instance-typep ,object ,spec))
-		   (array-type
-		    (source-transform-array-typep object type))
-		   (cons-type
-		    (source-transform-cons-typep object type))
-		   (t nil)))
+	    (typecase type
+	      (numeric-type
+	       (source-transform-numeric-typep object type))
+	      (sb!xc:class
+	       `(%instance-typep ,object ,spec))
+	      (array-type
+	       (source-transform-array-typep object type))
+	      (cons-type
+	       (source-transform-cons-typep object type))
+	      (t nil))
 	    `(%typep ,object ,spec)))
       (values nil t)))
 

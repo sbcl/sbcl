@@ -1041,19 +1041,6 @@ pscav_code(struct code*code)
     lispobj func;
     nwords = HeaderValue(code->header) + fixnum_value(code->code_size);
 
-    /* pw--The trace_table_offset slot can contain a list pointer. This
-     * occurs when the code object is a top level form that initializes
-     * a byte-compiled function. The fact that PURIFY was ignoring this
-     * slot may be a bug unrelated to the x86 port, except that TLF's
-     * normally become unreachable after the loader calls them and
-     * won't be seen by PURIFY at all!! */
-    if(code->trace_table_offset & 0x3)
-#if 0
-      pscav(&code->trace_table_offset, 1, 0);
-#else
-      code->trace_table_offset = NIL; /* limit lifetime */
-#endif
-
     /* Arrange to scavenge the debug info later. */
     pscav_later(&code->debug_info, 1);
 

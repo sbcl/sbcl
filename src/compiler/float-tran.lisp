@@ -154,8 +154,7 @@
 (deftransform scale-float ((f ex) (single-float *) * :when :both)
   (if (and #!+x86 t #!-x86 nil
 	   (csubtypep (continuation-type ex)
-		      (specifier-type '(signed-byte 32)))
-	   (not (byte-compiling)))
+		      (specifier-type '(signed-byte 32))))
       '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float)
       '(scale-single-float f ex)))
 

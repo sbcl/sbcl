@@ -26,8 +26,6 @@
 
 (in-package "SB-PCL")
 
-(declaim #.*optimize-byte-compilation*)
-
 (defmethod slots-to-inspect ((class slot-class) (object slot-object))
   (class-slots class))
 

@@ -1273,17 +1273,15 @@
 (def-ir1-translator progv ((vars vals &body body) start cont)
   (ir1-convert
    start cont
-   (if (byte-compiling)
-       `(%progv ,vars ,vals #'(lambda () ,@body))
-       (once-only ((n-save-bs '(%primitive current-binding-pointer)))
-	 `(unwind-protect
-	      (progn
-		(mapc #'(lambda (var val)
-			  (%primitive bind val var))
-		      ,vars
-		      ,vals)
-		,@body)
-	    (%primitive unbind-to-here ,n-save-bs))))))
+   (once-only ((n-save-bs '(%primitive current-binding-pointer)))
+     `(unwind-protect
+	  (progn
+	    (mapc #'(lambda (var val)
+		      (%primitive bind val var))
+		  ,vars
+		  ,vals)
+	    ,@body)
+	(%primitive unbind-to-here ,n-save-bs)))))
 
 ;;;; non-local exit
 

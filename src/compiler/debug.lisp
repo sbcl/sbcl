@@ -903,7 +903,7 @@
   (def-frob *tn-id* *tn-ids* *id-tns* tn-id id-tn)
   (def-frob *label-id* *id-labels* *label-ids* label-id id-label))
 
-;;; Print out a terse one-line description of a leaf.
+;;; Print a terse one-line description of LEAF.
 (defun print-leaf (leaf &optional (stream *standard-output*))
   (declare (type leaf leaf) (type stream stream))
   (etypecase leaf
@@ -919,10 +919,7 @@
     (functional
      (aver (eq (functional-kind leaf) :top-level-xep))
      (format stream "TL-XEP ~S"
-	     (let ((info (leaf-info leaf)))
-	       (etypecase info
-		 (entry-info (entry-info-name info))
-		 (byte-lambda-info :byte-compiled-entry)))))))
+	     (entry-info-name (leaf-info leaf))))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (function (t) cblock) block-or-lose))

@@ -1949,6 +1949,26 @@
 ;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We don't
 ;;; bother to worry about optimizing them.
 ;;;
+;;; (Except note that on Sat, Oct 06, 2001 at 04:22:38PM +0100,
+;;; Christophe Rhodes wrote on sbcl-devel
+;;;
+;;;     My understanding is that while the :test-not argument is
+;;;     deprecated in favour of :test (complement #'foo) because of
+;;;     semantic difficulties (what happens if both :test and :test-not
+;;;     are supplied, etc) the -if-not variants, while officially
+;;;     deprecated, would be undeprecated were X3J13 actually to produce
+;;;     a revised standard, as there are perfectly legitimate idiomatic
+;;;     reasons for allowing the -if-not versions equal status,
+;;;     particularly remove-if-not (== filter).
+;;;   
+;;;     This is only an informal understanding, I grant you, but
+;;;     perhaps it's worth optimizing the -if-not versions in the same
+;;;     way as the others?
+;;;
+;;; That sounds reasonable, so if someone wants to submit patches to
+;;; make the -IF-NOT functions compile as efficiently as the
+;;; corresponding -IF variants do, go for it. -- WHN 2001-10-06)
+;;;
 ;;; FIXME: Remove uses of these deprecated functions (and of :TEST-NOT
 ;;; too) within the implementation of SBCL.
 (macrolet ((def-find-position-if-not (fun-name values-index)

@@ -658,25 +658,6 @@ bug.~:@>")
 	      (load-fresh-line)
 	      (format t "~S defined~%" fun))
       fun)))
-
-;;; FIXME: byte compiler to be completely deleted
-#|
-(define-fop (fop-make-byte-compiled-function 143)
-  (let* ((size (read-arg 1))
-	 (layout (pop-stack))
-	 (res (%make-funcallable-instance size layout)))
-    (declare (type index size))
-    (do ((n (1- size) (1- n)))
-	((minusp n))
-      (declare (type (integer -1 #.most-positive-fixnum) n))
-      (setf (%funcallable-instance-info res n) (pop-stack)))
-    (initialize-byte-compiled-function res)
-    ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
-    #+nil (when *load-print*
-	    (load-fresh-line)
-	    (format t "~S defined~%" res))
-    res))
-|#
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
 ;;;; was sufficiently stale that the functions it called were no

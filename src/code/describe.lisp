@@ -11,9 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL") ;(SB-IMPL, not SB!IMPL, since we're built in warm load.)
-
-(declaim #.*optimize-byte-compilation*)
-
 
 (defvar *describe-indentation-step* 3
   #+sb-doc
@@ -25,7 +22,6 @@
 (defun describe (x &optional (stream-designator *standard-output*))
   #+sb-doc
   "Print a description of the object X."
-  (declare #.*optimize-external-despite-byte-compilation*)
   (let ((stream (out-synonym-of stream-designator)))
     (pprint-logical-block (stream nil)
       (fresh-line stream)
@@ -186,20 +182,9 @@
       (%describe-function-name name s (%function-type x))))
   (%describe-compiled-from (sb-kernel:function-code-header x) s))
 
-;;; FIXME: byte compiler to go away completely
-#|
-(defun %describe-function-byte-compiled (x s kind name)
-  (declare (type stream s))
-  (let ((name (or name (sb-c::byte-function-name x))))
-    (%describe-doc name s 'function kind)
-    (unless (eq kind :macro)
-      (%describe-function-name name s 'function)))
-  (%describe-compiled-from (sb-c::byte-function-component x) s))
-|#
-
 ;;; Describe a function with the specified kind and name. The latter
 ;;; arguments provide some information about where the function came
-;;; from. Kind NIL means not from a name.
+;;; from. KIND=NIL means not from a name.
 (defun %describe-function (x s &optional (kind nil) name)
   (declare (type function x))
   (declare (type stream s))
@@ -221,20 +206,6 @@
      (%describe-function-compiled x s kind name))
     (#.sb-vm:funcallable-instance-header-type
      (typecase x
-       ;; FIXME: byte compiler to go away completely
-       #|
-       (sb-kernel:byte-function
-	(%describe-function-byte-compiled x s kind name))
-       (sb-kernel:byte-closure
-	(%describe-function-byte-compiled (byte-closure-function x)
-					  s kind name)
-	(format s "~@:_Its closure environment is:")
-	(pprint-logical-block (s nil)
-	  (pprint-indent :current 8)
-	  (let ((data (byte-closure-data x)))
-	    (dotimes (i (length data))
-	      (format s "~@:_~S: ~S" i (svref data i))))))
-       |#
        (standard-generic-function
 	;; There should be a special method for this case; we'll
 	;; delegate to that.

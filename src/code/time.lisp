@@ -234,18 +234,8 @@
 
 (defmacro time (form)
   #!+sb-doc
-  "Evaluates the Form and prints timing information on *Trace-Output*."
+  "Execute FORM and print timing information on *TRACE-OUTPUT*."
   `(%time #'(lambda () ,form)))
-
-;;; Try to compile the closure arg to %TIME if it is interpreted.
-(defun massage-time-function (fun)
-  ;; This is just a placeholder as of the switch from IR1 interpreter
-  ;; to bytecode interpreter. Someday it might make sense to complain
-  ;; about bytecoded FUN and/or compile it to native code, so I've
-  ;; left the placeholder in place, but as of sbcl-0.7.0 it's not
-  ;; obvious how to do the right thing easily, so I haven't actually 
-  ;; done it. -- WHN
-  fun)
 
 ;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()
@@ -255,8 +245,7 @@
 ;;; The guts of the TIME macro. Compute overheads, run the (compiled)
 ;;; function, report the times.
 (defun %time (fun)
-  (let ((fun (massage-time-function fun))
-	old-run-utime
+  (let (old-run-utime
 	new-run-utime
 	old-run-stime
 	new-run-stime

@@ -480,9 +480,6 @@
               (,format-var (format-or-lose ',format-name))
               (args ,(gen-args-def-form field-defs format-var evalp))
               (funcache *disassem-function-cache*))
-         ;; FIXME: This should be SPEED 0 but can't be until we support
-         ;; byte compilation of components of the SBCL system.
-         ;;(declare (optimize (speed 0) (safety 0) (debug 0)))
          (multiple-value-bind (printer-fun printer-defun)
              (find-printer-fun ',uniquified-name
 			       ',format-name
@@ -1047,8 +1044,6 @@
 				    "-PRINTER"))
 	 (make-printer-defun printer-source funstate name)))))
 
-;;;; Note that these things are compiled byte compiled to save space.
-
 (defun make-printer-defun (source funstate function-name)
   (let ((printer-form (compile-printer-list source funstate))
         (bindings (make-arg-temp-bindings funstate)))
@@ -1056,10 +1051,7 @@
        (declare (type dchunk chunk)
                 (type instruction inst)
                 (type stream stream)
-                (type disassem-state dstate)
-                ;; FIXME: This should be SPEED 0 but can't be until we support
-                ;; byte compilation of components of the SBCL system.
-                #+nil (optimize (speed 0) (safety 0) (debug 0)))
+                (type disassem-state dstate))
        (macrolet ((local-format-arg (arg fmt)
                     `(funcall (formatter ,fmt) stream ,arg)))
          (flet ((local-tab-to-arg-column ()
@@ -1432,11 +1424,7 @@
             `(defun ,name (chunk labels dstate)
                (declare (type list labels)
                         (type dchunk chunk)
-                        (type disassem-state dstate)
-                        ;; FIXME: This should be SPEED 0 but can't be
-                        ;; until we support byte compilation of
-                        ;; components of the SBCL system.
-                        #+nil (optimize (speed 0) (safety 0) (debug 0)))
+                        (type disassem-state dstate))
                (flet ((local-filtered-value (offset)
                         (declare (type filtered-value-index offset))
                         (aref (dstate-filtered-values dstate) offset))
@@ -1476,11 +1464,7 @@
                 ))
             `(defun ,name (chunk dstate)
                (declare (type dchunk chunk)
-                        (type disassem-state dstate)
-                        ;; FIXME: This should be SPEED 0 but can't be
-                        ;; until we support byte compilation of
-                        ;; components of the SBCL system.
-                        #+nil (optimize (speed 0) (safety 0) (debug 0)))
+                        (type disassem-state dstate))
                (flet (((setf local-filtered-value) (value offset)
                        (declare (type filtered-value-index offset))
                        (setf (aref (dstate-filtered-values dstate) offset)

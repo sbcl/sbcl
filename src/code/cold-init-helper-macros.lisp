@@ -52,8 +52,6 @@
 		    (makunbound '*cold-init-forms*)))
   #+sb-xc-host (declare (ignore name)))
 
-;;; FIXME: These macros should be byte-compiled.
-
 ;;; FIXME: Consider renaming this file asap.lisp,
 ;;; and the renaming the various things
 ;;;   *ASAP-FORMS* or *REVERSED-ASAP-FORMS*

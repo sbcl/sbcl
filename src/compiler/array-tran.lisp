@@ -142,30 +142,26 @@
 ;;; Convert VECTOR into a MAKE-ARRAY followed by SETFs of all the
 ;;; elements.
 (def-source-transform vector (&rest elements)
-  (if (byte-compiling)
-      (values nil t)
-      (let ((len (length elements))
-	    (n -1))
-	(once-only ((n-vec `(make-array ,len)))
-	  `(progn
-	     ,@(mapcar #'(lambda (el)
-			   (once-only ((n-val el))
-			     `(locally (declare (optimize (safety 0)))
-				       (setf (svref ,n-vec ,(incf n))
-					     ,n-val))))
-		       elements)
-	     ,n-vec)))))
+  (let ((len (length elements))
+	(n -1))
+    (once-only ((n-vec `(make-array ,len)))
+      `(progn
+	 ,@(mapcar #'(lambda (el)
+		       (once-only ((n-val el))
+			 `(locally (declare (optimize (safety 0)))
+				   (setf (svref ,n-vec ,(incf n))
+					 ,n-val))))
+		   elements)
+	 ,n-vec))))
 
 ;;; Just convert it into a MAKE-ARRAY.
 (def-source-transform make-string (length &key
 					  (element-type ''base-char)
 					  (initial-element
 					   '#.*default-init-char-form*))
-  (if (byte-compiling)
-      (values nil t)
-      `(make-array (the index ,length)
-		   :element-type ,element-type
-		   :initial-element ,initial-element)))
+  `(make-array (the index ,length)
+	       :element-type ,element-type
+	       :initial-element ,initial-element))
 
 (defstruct (specialized-array-element-type-properties
 	    (:conc-name saetp-)
@@ -600,13 +596,9 @@
 (macrolet ((define-frob (reffer setter type)
 	     `(progn
 		(def-source-transform ,reffer (a &rest i)
-		  (if (byte-compiling)
-		      (values nil t)
-		      `(aref (the ,',type ,a) ,@i)))
+		  `(aref (the ,',type ,a) ,@i))
 		(def-source-transform ,setter (a &rest i)
-		  (if (byte-compiling)
-		      (values nil t)
-		      `(%aset (the ,',type ,a) ,@i))))))
+		  `(%aset (the ,',type ,a) ,@i)))))
   (define-frob svref %svset simple-vector)
   (define-frob schar %scharset simple-string)
   (define-frob char %charset string)

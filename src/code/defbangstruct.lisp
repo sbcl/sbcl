@@ -28,9 +28,6 @@
 ;;; information for DEF!STRUCT-defined types
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
-  ;; FIXME: All this could be byte compiled. (Perhaps most of the rest
-  ;; of the file could be, too.)
-
   ;; (DEF!STRUCT-SUPERTYPE TYPE) is the DEF!STRUCT-defined type that
   ;; TYPE inherits from, or NIL if none.
   (defvar *def!struct-supertype* (make-hash-table))

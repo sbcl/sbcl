@@ -23,17 +23,8 @@
 	   ((#.sb!vm:function-header-type #.sb!vm:closure-function-header-type)
 	    (%function-name x))
 	   (#.sb!vm:funcallable-instance-header-type
-	    (typecase x
-	      ;; FIXME: byte compiler to go away completely
-	      #|
-	      (byte-function
-	       (sb!c::byte-function-name x))
-	      (byte-closure
-	       (sb!c::byte-function-name (byte-closure-function x)))
-              |#
-	      (t ;; funcallable-instance
-	       (%function-name
-		(funcallable-instance-function x))))))))
+	    (%function-name
+	     (funcallable-instance-function x))))))
     (when (and name (typep name '(or symbol cons)))
       (values (info :function :documentation name)))))
 

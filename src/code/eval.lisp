@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 ;;; general case of EVAL (except in that it can't handle toplevel
-;;; EVAL-WHEN magic properly): Delegate to the byte compiler.
+;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
 (defun %eval (expr)
   (funcall (compile (gensym "EVAL-TMPFUN-")
 		    `(lambda ()

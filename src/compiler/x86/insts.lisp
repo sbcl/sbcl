@@ -15,14 +15,6 @@
 ;;; I wonder whether the separation of the disassembler from the
 ;;; virtual machine is valid or adds value.
 
-;;; FIXME: In CMU CL, the code in this file seems to be fully
-;;; compiled, not byte compiled. I'm not sure that's reasonable:
-;;; there's a lot of code in this file, and considering the overall
-;;; speed of the compiler, having some byte-interpretation overhead
-;;; for every few bytes emitted doesn't seem likely to be noticeable.
-;;; I'd like to see what happens if I come back and byte-compile this
-;;; file.
-
 ;;; Note: In CMU CL, this used to be a call to SET-DISASSEM-PARAMS.
 (setf sb!disassem:*disassem-inst-alignment-bytes* 1)
 

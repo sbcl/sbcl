@@ -170,17 +170,7 @@
 	     (error 'simple-type-error
 		    :datum fcn
 		    :expected-type 'generic-function
-		    :format-control "internal error: unexpected function type")
-	     ;; FIXME: byte compiler to go away completely
-	     #|
-	     (etypecase fcn
-	       (sb-kernel:byte-closure
-		(set-function-name (sb-kernel:byte-closure-function fcn)
-				   new-name))
-	       (sb-kernel:byte-function
-		(setf (sb-kernel:byte-function-name fcn) new-name)))
-             |#
-	   )
+		    :format-control "internal error: bad function type"))
 	 fcn)
 	(t
 	 ;; pw-- This seems wrong and causes trouble. Tests show

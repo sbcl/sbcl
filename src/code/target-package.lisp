@@ -860,9 +860,6 @@
 
 ;;;; APROPOS and APROPOS-LIST
 
-;;; KLUDGE: All the APROPOS stuff should probably be byte-compiled, since it's
-;;; only likely to be used interactively. -- WHN 19990827
-
 (defun briefly-describe-symbol (symbol)
   (fresh-line)
   (prin1 symbol)

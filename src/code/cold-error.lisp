@@ -1,5 +1,4 @@
-;;;; miscellaneous stuff that needs to be in the cold load which would
-;;;; otherwise be byte-compiled
+;;;; miscellaneous error stuff that needs to be in the cold load
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

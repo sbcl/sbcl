@@ -489,8 +489,7 @@
 		    (mark-error-continuation cont)
 		    (unless (policy node (= inhibit-warnings 3))
 		      (do-type-warning use))))))
-	    (when (and (eq type-check t)
-		       (not *byte-compiling*))
+	    (when (eq type-check t)
 	      (cond ((probable-type-check-p cont)
 		     (conts cont))
 		    (t

@@ -913,7 +913,6 @@
 		       (t
 			(error "bad option: ~S" (first option)))))))))))
     `(def!method print-object ((structure ,name) ,stream)
-       ;; FIXME: should probably be byte-compiled
        (pprint-logical-block (,stream nil)
 	 (print-unreadable-object (structure
 				   ,stream
