@@ -1698,7 +1698,7 @@
 	(a (make-array (length types) :fill-pointer 0)))
     (dolist (%type types (coerce a 'list))
       ;; Merge TYPE into RESULT.
-      (iterate again ((type %type))
+      (named-let again ((type %type))
 	(dotimes (i (length a) (vector-push-extend type a))
 	  (let ((ai (aref a i)))
 	    (multiple-value-bind (simplified win?)

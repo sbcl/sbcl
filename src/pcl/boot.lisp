@@ -189,7 +189,7 @@ bootstrapping.
 		   (setf (initarg car-option)
 			 `',(cdr option))))
 	      ((:documentation :generic-function-class :method-class)
-	       (unless (sb-int:proper-list-of-length-p option 2)
+	       (unless (proper-list-of-length-p option 2)
 		 (error "bad list length for ~S" option))
 	       (if (initarg car-option)
 		   (duplicate-option car-option)
@@ -216,9 +216,9 @@ bootstrapping.
 (defun compile-or-load-defgeneric (function-name)
   (sb-kernel:proclaim-as-function-name function-name)
   (sb-kernel:note-name-defined function-name :function)
-  (unless (eq (sb-int:info :function :where-from function-name) :declared)
-    (setf (sb-int:info :function :where-from function-name) :defined)
-    (setf (sb-int:info :function :type function-name)
+  (unless (eq (info :function :where-from function-name) :declared)
+    (setf (info :function :where-from function-name) :defined)
+    (setf (info :function :type function-name)
 	  (sb-kernel:specifier-type 'function))))
 
 (defun load-defgeneric (function-name lambda-list &rest initargs)
@@ -348,7 +348,7 @@ bootstrapping.
 				 initargs-form &optional pv-table-symbol)
   (let (fn
 	fn-lambda)
-    (if (and (interned-symbol-p (sb-int:function-name-block-name name))
+    (if (and (interned-symbol-p (function-name-block-name name))
 	     (every #'interned-symbol-p qualifiers)
 	     (every #'(lambda (s)
 			(if (consp s)
@@ -382,7 +382,7 @@ bootstrapping.
 					;; force symbols to be printed
 					;; with explicit package
 					;; prefixes.)
-					(*package* sb-int:*keyword-package*))
+					(*package* *keyword-package*))
 				    (format nil "~S" mname)))))
 	  `(progn
 	     (defun ,mname-sym ,(cadr fn-lambda)
@@ -593,7 +593,7 @@ bootstrapping.
 		   (declare (ignorable ,@required-parameters))
 		   ,class-declarations
 		   ,@declarations
-		   (block ,(sb-int:function-name-block-name
+		   (block ,(function-name-block-name
 			    generic-function-name)
 		     ,@real-body)))
 	       (constant-value-p (and (null (cdr real-body))
@@ -1018,14 +1018,14 @@ bootstrapping.
 						      ,(cadr var)))))))
 		   (rest `((,var ,args-tail)))
 		   (key (cond ((not (consp var))
-			       `((,var (get-key-arg ,(sb-int:keywordicate var)
+			       `((,var (get-key-arg ,(keywordicate var)
 						    ,args-tail))))
 			      ((null (cddr var))
 			       (multiple-value-bind (keyword variable)
 				   (if (consp (car var))
 				       (values (caar var)
 					       (cadar var))
-				       (values (sb-int:keywordicate (car var))
+				       (values (keywordicate (car var))
 					       (car var)))
 				 `((,key (get-key-arg1 ',keyword ,args-tail))
 				   (,variable (if (consp ,key)
@@ -1036,7 +1036,7 @@ bootstrapping.
 				   (if (consp (car var))
 				       (values (caar var)
 					       (cadar var))
-				       (values (sb-int:keywordicate (car var))
+				       (values (keywordicate (car var))
 					       (car var)))
 				 `((,key (get-key-arg1 ',keyword ,args-tail))
 				   (,(caddr var) ,key)
@@ -1126,7 +1126,7 @@ bootstrapping.
 		next-method-p-p)))))
 
 (defun generic-function-name-p (name)
-  (and (sb-int:legal-function-name-p name)
+  (and (legal-function-name-p name)
        (gboundp name)
        (if (eq *boot-state* 'complete)
 	   (standard-generic-function-p (gdefinition name))
@@ -1288,8 +1288,8 @@ bootstrapping.
 	   (if (listp arg)
 	       (if (listp (car arg))
 		   (caar arg)
-		   (sb-int:keywordicate (car arg)))
-	       (sb-int:keywordicate arg))))
+		   (keywordicate (car arg)))
+	       (keywordicate arg))))
     (let ((nrequired 0)
 	  (noptional 0)
 	  (keysp nil)
@@ -1324,7 +1324,7 @@ bootstrapping.
 (defun keyword-spec-name (x)
   (let ((key (if (atom x) x (car x))))
     (if (atom key)
-	(intern (symbol-name key) sb-int:*keyword-package*)
+	(keywordicate key)
 	(car key))))
 
 (defun ftype-declaration-from-lambda-list (lambda-list name)
@@ -1332,7 +1332,7 @@ bootstrapping.
 				  keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
-    (let* ((old (sb-int:info :function :type name)) ;FIXME:FDOCUMENTATION instead?
+    (let* ((old (info :function :type name)) ;FIXME:FDOCUMENTATION instead?
 	   (old-ftype (if (sb-kernel:function-type-p old) old nil))
 	   (old-restp (and old-ftype (sb-kernel:function-type-rest old-ftype)))
 	   (old-keys (and old-ftype
@@ -1629,7 +1629,8 @@ bootstrapping.
 ;;;    CAR    -   a list of the early methods on this early gf
 ;;;    CADR   -   the early discriminator code for this method
 (defun ensure-generic-function-using-class (existing spec &rest keys
-					    &key (lambda-list nil lambda-list-p)
+					    &key (lambda-list nil
+							      lambda-list-p)
 					    &allow-other-keys)
   (declare (ignore keys))
   (cond ((and existing (early-gf-p existing))
@@ -1959,12 +1960,10 @@ bootstrapping.
       (real-get-method generic-function qualifiers specializers errorp)))
 
 (defun !fix-early-generic-functions ()
-  (sb-int:/show "entering !FIX-EARLY-GENERIC-FUNCTIONS")
   (let ((accessors nil))
     ;; Rearrange *!EARLY-GENERIC-FUNCTIONS* to speed up
     ;; FIX-EARLY-GENERIC-FUNCTIONS.
     (dolist (early-gf-spec *!early-generic-functions*)
-      (sb-int:/show early-gf-spec)
       (when (every #'early-method-standard-accessor-p
 		   (early-gf-methods (gdefinition early-gf-spec)))
 	(push early-gf-spec accessors)))
@@ -1987,13 +1986,13 @@ bootstrapping.
 			   standard-class-p
 			   funcallable-standard-class-p
 			   specializerp)))
-      (sb-int:/show spec)
+      (/show spec)
       (setq *!early-generic-functions*
 	    (cons spec
 		  (delete spec *!early-generic-functions* :test #'equal))))
 
     (dolist (early-gf-spec *!early-generic-functions*)
-      (sb-int:/show early-gf-spec)
+      (/show early-gf-spec)
       (let* ((gf (gdefinition early-gf-spec))
 	     (methods (mapcar #'(lambda (early-method)
 				  (let ((args (copy-list (fifth
@@ -2009,11 +2008,11 @@ bootstrapping.
 	(set-methods gf methods)))
 
     (dolist (fn *!early-functions*)
-      (sb-int:/show fn)
+      (/show fn)
       (setf (gdefinition (car fn)) (fdefinition (caddr fn))))
 
     (dolist (fixup *!generic-function-fixups*)
-      (sb-int:/show fixup)
+      (/show fixup)
       (let* ((fspec (car fixup))
 	     (gf (gdefinition fspec))
 	     (methods (mapcar #'(lambda (method)
@@ -2042,7 +2041,7 @@ bootstrapping.
 	(setf (generic-function-method-combination gf)
 	      *standard-method-combination*)
 	(set-methods gf methods))))
-  (sb-int:/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
+  (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
 ;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument
 ;;; into the 'real' arguments. This is where the syntax of DEFMETHOD

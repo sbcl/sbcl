@@ -29,16 +29,16 @@
 
 ;;;; the PRINT-OBJECT generic function
 
-;;; Blow away the old non-generic function placeholder which was used by the
-;;; printer doing bootstrapping, and immediately replace it with some new
-;;; printing logic, so that the Lisp printer stays crippled only for the
-;;; shortest necessary time.
+;;; Blow away the old non-generic function placeholder which was used
+;;; by the printer doing bootstrapping, and immediately replace it
+;;; with some new printing logic, so that the Lisp printer stays
+;;; crippled only for the shortest necessary time.
 (let (;; (If we don't suppress /SHOW printing while the printer is
       ;; crippled here, it becomes really easy to crash the bootstrap
       ;; sequence by adding /SHOW statements e.g. to the compiler,
       ;; which kinda defeats the purpose of /SHOW being a harmless
       ;; tracing-style statement.)
-      #+sb-show (sb-int:*/show* nil))
+      #+sb-show (*/show* nil))
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
   (defmethod print-object ((x t) stream)

@@ -206,7 +206,7 @@
 (defmacro built-in-or-structure-wrapper (x) `(sb-kernel:layout-of ,x))
 
 (defmacro get-wrapper (inst)
-  (sb-int:once-only ((wrapper `(wrapper-of ,inst)))
+  (once-only ((wrapper `(wrapper-of ,inst)))
     `(progn
        (assert (typep ,wrapper 'wrapper) () "What kind of instance is this?")
        ,wrapper)))
@@ -214,13 +214,13 @@
 ;;; FIXME: could be an inline function (like many other things around
 ;;; here)
 (defmacro get-instance-wrapper-or-nil (inst)
-  (sb-int:once-only ((wrapper `(wrapper-of ,inst)))
+  (once-only ((wrapper `(wrapper-of ,inst)))
     `(if (typep ,wrapper 'wrapper)
 	 ,wrapper
 	 nil)))
 
 (defmacro get-slots-or-nil (inst)
-  (sb-int:once-only ((n-inst inst))
+  (once-only ((n-inst inst))
     `(when (pcl-instance-p ,n-inst)
        (if (std-instance-p ,n-inst)
 	   (std-instance-slots ,n-inst)

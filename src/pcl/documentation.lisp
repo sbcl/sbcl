@@ -34,28 +34,28 @@
   ;; FIXME: could test harder to see whether it's a SETF function name,
   ;; then call WARN
   (when (eq (first x) 'setf)	; Give up if not a setf function name.
-    (or (values (sb-int:info :setf :documentation (second x)))
+    (or (values (info :setf :documentation (second x)))
 	;; Try the pcl function documentation.
 	(and (fboundp x) (documentation (fdefinition x) t)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
-  (or (values (sb-int:info :function :documentation x))
+  (or (values (info :function :documentation x))
       ;; Try the pcl function documentation.
       (and (fboundp x) (documentation (fdefinition x) t))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
-  (values (sb-int:info :setf :documentation x)))
+  (values (info :setf :documentation x)))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (setf (sb-int:info :setf :documentation (cadr x)) new-value))
+  (setf (info :setf :documentation (cadr x)) new-value))
 
 (defmethod (setf documentation) (new-value
 				 (x symbol)
 				 (doc-type (eql 'function)))
-  (setf (sb-int:info :function :documentation x) new-value))
+  (setf (info :function :documentation x) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
-  (setf (sb-int:info :setf :documentation x) new-value))
+  (setf (info :setf :documentation x) new-value))
 
 ;;; packages
 (defmethod documentation ((x package) (doc-type (eql 't)))
@@ -72,93 +72,93 @@
 
 ;;; types, classes, and structure names
 (defmethod documentation ((x cl:structure-class) (doc-type (eql 't)))
-  (values (sb-int:info :type :documentation (cl:class-name x))))
+  (values (info :type :documentation (cl:class-name x))))
 
 (defmethod documentation ((x structure-class) (doc-type (eql 't)))
-  (values (sb-int:info :type :documentation (class-name x))))
+  (values (info :type :documentation (class-name x))))
 
 (defmethod documentation ((x cl:standard-class) (doc-type (eql 't)))
-  (or (values (sb-int:info :type :documentation (cl:class-name x)))
+  (or (values (info :type :documentation (cl:class-name x)))
       (let ((pcl-class (sb-kernel:class-pcl-class x)))
 	(and pcl-class (plist-value pcl-class 'documentation)))))
 
 (defmethod documentation ((x cl:structure-class) (doc-type (eql 'type)))
-  (values (sb-int:info :type :documentation (cl:class-name x))))
+  (values (info :type :documentation (cl:class-name x))))
 
 (defmethod documentation ((x structure-class) (doc-type (eql 'type)))
-  (values (sb-int:info :type :documentation (class-name x))))
+  (values (info :type :documentation (class-name x))))
 
 (defmethod documentation ((x cl:standard-class) (doc-type (eql 'type)))
-  (or (values (sb-int:info :type :documentation (cl:class-name x)))
+  (or (values (info :type :documentation (cl:class-name x)))
       (let ((pcl-class (sb-kernel:class-pcl-class x)))
 	(and pcl-class (plist-value pcl-class 'documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
-  (or (values (sb-int:info :type :documentation x))
+  (or (values (info :type :documentation x))
       (let ((class (find-class x nil)))
 	(when class
 	  (plist-value class 'documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
-  (when (eq (sb-int:info :type :kind x) :instance)
-    (values (sb-int:info :type :documentation x))))
+  (when (eq (info :type :kind x) :instance)
+    (values (info :type :documentation x))))
 
 (defmethod (setf documentation) (new-value
 				 (x cl:structure-class)
 				 (doc-type (eql 't)))
-  (setf (sb-int:info :type :documentation (cl:class-name x)) new-value))
+  (setf (info :type :documentation (cl:class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value
 				 (x structure-class)
 				 (doc-type (eql 't)))
-  (setf (sb-int:info :type :documentation (class-name x)) new-value))
+  (setf (info :type :documentation (class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value
 				 (x cl:structure-class)
 				 (doc-type (eql 'type)))
-  (setf (sb-int:info :type :documentation (cl:class-name x)) new-value))
+  (setf (info :type :documentation (cl:class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value
 				 (x structure-class)
 				 (doc-type (eql 'type)))
-  (setf (sb-int:info :type :documentation (class-name x)) new-value))
+  (setf (info :type :documentation (class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
   (if (structure-type-p x)	; Catch structures first.
-      (setf (sb-int:info :type :documentation x) new-value)
+      (setf (info :type :documentation x) new-value)
       (let ((class (find-class x nil)))
 	(if class
 	    (setf (plist-value class 'documentation) new-value)
-	    (setf (sb-int:info :type :documentation x) new-value)))))
+	    (setf (info :type :documentation x) new-value)))))
 
 (defmethod (setf documentation) (new-value
 				 (x symbol)
 				 (doc-type (eql 'structure)))
-  (unless (eq (sb-int:info :type :kind x) :instance)
+  (unless (eq (info :type :kind x) :instance)
     (error "~S is not the name of a structure type." x))
-  (setf (sb-int:info :type :documentation x) new-value))
+  (setf (info :type :documentation x) new-value))
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
-  (values (sb-int:info :variable :documentation x)))
+  (values (info :variable :documentation x)))
 
 (defmethod (setf documentation) (new-value
 				 (x symbol)
 				 (doc-type (eql 'variable)))
-  (setf (sb-int:info :variable :documentation x) new-value))
+  (setf (info :variable :documentation x) new-value))
 
 ;;; miscellaneous documentation. Compiler-macro documentation is stored
 ;;; as random-documentation and handled here.
 (defmethod documentation ((x symbol) (doc-type symbol))
   (cdr (assoc doc-type
-	      (values (sb-int:info :random-documentation :stuff x)))))
+	      (values (info :random-documentation :stuff x)))))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type symbol))
-  (let ((pair (assoc doc-type (sb-int:info :random-documentation :stuff x))))
+  (let ((pair (assoc doc-type (info :random-documentation :stuff x))))
     (if pair
 	(setf (cdr pair) new-value)
 	(push (cons doc-type new-value)
-	      (sb-int:info :random-documentation :stuff x))))
+	      (info :random-documentation :stuff x))))
   new-value)
 
 ;;; FIXME: The ((X SYMBOL) (DOC-TYPE SYMBOL)) method and its setf method should

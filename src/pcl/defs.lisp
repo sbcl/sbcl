@@ -456,25 +456,25 @@
 
 ;;; Grovel over SB-KERNEL::*BUILT-IN-CLASSES* in order to set
 ;;; SB-PCL:*BUILT-IN-CLASSES*.
-(sb-int:/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
+(/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (defvar *built-in-classes*
   (labels ((direct-supers (class)
-	     (sb-int:/show "entering DIRECT-SUPERS" (sb-kernel::class-name class))
+	     (/show "entering DIRECT-SUPERS" (sb-kernel::class-name class))
 	     (if (typep class 'cl:built-in-class)
 		 (sb-kernel:built-in-class-direct-superclasses class)
 		 (let ((inherits (sb-kernel:layout-inherits
 				  (sb-kernel:class-layout class))))
-		   (sb-int:/show inherits)
+		   (/show inherits)
 		   (list (svref inherits (1- (length inherits)))))))
 	   (direct-subs (class)
-	     (sb-int:/show "entering DIRECT-SUBS" (sb-kernel::class-name class))
-	     (sb-int:collect ((res))
+	     (/show "entering DIRECT-SUBS" (sb-kernel::class-name class))
+	     (collect ((res))
 	       (let ((subs (sb-kernel:class-subclasses class)))
-		 (sb-int:/show subs)
+		 (/show subs)
 		 (when subs
-		   (sb-int:dohash (sub v subs)
+		   (dohash (sub v subs)
 		     (declare (ignore v))
-		     (sb-int:/show sub)
+		     (/show sub)
 		     (when (member class (direct-supers sub))
 		       (res sub)))))
 	       (res)))
@@ -502,10 +502,10 @@
 		   ;; relevant cases.
 		   42))))
     (mapcar (lambda (kernel-bic-entry)
-	      (sb-int:/show "setting up" kernel-bic-entry)
+	      (/show "setting up" kernel-bic-entry)
 	      (let* ((name (car kernel-bic-entry))
 		     (class (cl:find-class name)))
-		(sb-int:/show name class)
+		(/show name class)
 		`(,name
 		  ,(mapcar #'cl:class-name (direct-supers class))
 		  ,(mapcar #'cl:class-name (direct-subs class))
@@ -525,7 +525,7 @@
 				     sb-kernel:funcallable-instance
 				     function stream)))
 		       sb-kernel::*built-in-classes*))))
-(sb-int:/show "done setting up SB-PCL::*BUILT-IN-CLASSES*")
+(/show "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
 ;;;; the classes that define the kernel of the metabraid
 

@@ -44,7 +44,7 @@
 			(i 0 (1+ i)))
 		       ((>= i no-of-slots)) ;endp rem-slots))
 		     (declare (list rem-slots)
-			      (type sb-int:index i))
+			      (type index i))
 		     (setf (aref slots i) (first rem-slots)))
 		   slots))
 		(t
@@ -628,7 +628,7 @@
   (!bootstrap-class-predicates nil)
   (!bootstrap-built-in-classes)
 
-  (sb-int:dohash (name x *find-class*)
+  (dohash (name x *find-class*)
     (let* ((class (find-class-from-cell name x))
 	   (layout (class-wrapper class))
 	   (lclass (sb-kernel:layout-class layout))

@@ -241,7 +241,7 @@
       (variable-globally-special-p var)))
 
 (defun variable-globally-special-p (symbol)
-  (eq (sb-int:info :variable :kind symbol) :special))
+  (eq (info :variable :kind symbol) :special))
 
 ;;;; handling of special forms
 

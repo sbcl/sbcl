@@ -682,7 +682,7 @@ retained, possibly temporariliy, because it might be used internally."
 	     ;; ..and macros..
              "COLLECT"
              "DO-ANONYMOUS" "DOHASH" "DOVECTOR"
-             "ITERATE"
+             "NAMED-LET"
              "LETF" "LETF*"
              "ONCE-ONLY"
              "DEFENUM"
@@ -722,11 +722,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; certainly doesn't belong in public extensions
              ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
              "CONSTANT-ARGUMENT"
-
-             ;; FIXME: Maybe this isn't used any more? And if it is,
-             ;; it probably needs a better name, since SPECIAL things
-             ;; are such a nice source of sneaky bugs.
-             "E"
 
              ;; various internal defaults
              "*DEFAULT-PACKAGE-USE-LIST*"
@@ -818,8 +813,8 @@ retained, possibly temporariliy, because it might be used internally."
 
  #s(sb-cold:package-data
     :name "SB!ITERATE"
-    :doc "private: implementation of an iteration facility used by PCL"
-    :use ("CL" "SB!WALKER")
+    :doc "private: an iteration facility used to implement PCL"
+    :use ("CL" "SB!WALKER" "SB!INT" "SB!EXT")
     :export ("ITERATE" "ITERATE*" "GATHERING" "GATHER"
              "WITH-GATHERING" "INTERVAL" "ELEMENTS"
              "LIST-ELEMENTS" "LIST-TAILS" "PLIST-ELEMENTS"
@@ -1287,13 +1282,18 @@ is a good idea, but see SB-SYS for blurring of boundaries."
 extensions, but even they are not guaranteed to be present in
 later versions of SBCL, and the other stuff in here is
 definitely not guaranteed to be present in later versions of SBCL."
-    :use ("CL" "SB!ITERATE" "SB!WALKER")
+    ;; FIXME: SB-PCL should probably USE-PACKAGE SB-KERNEL, since SB-PCL
+    ;; is built on SB-KERNEL, and in the absence of USE-PACKAGE, it ends
+    ;; up using a thundering herd of explicit prefixes to get to
+    ;; SB-KERNEL symbols. However, it'll probably be too messy to do
+    ;; this until the duplicate SB-PCL:CLASS/CL:CLASS hierarchy kludge
+    ;; is unscrewed, since until it is there are too many things which
+    ;; conflict between the two packages.
+    :use ("CL" "SB!ITERATE" "SB!WALKER" "SB!INT" "SB!EXT")
     :import-from (("SB!KERNEL" "FUNCALLABLE-INSTANCE-P" "FUNCTION-DOC"
                    "PACKAGE-DOC-STRING"
                    "PACKAGE-HASHTABLE-SIZE" "PACKAGE-HASHTABLE-FREE"
-                   "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"
-                   "SB!INT" "SB!EXT")
-                   ("SB!INT" "MEMQ" "ASSQ" "DELQ" "POSQ" "NEQ"))
+                   "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"))
     :reexport ("ADD-METHOD" "ALLOCATE-INSTANCE"
                "COMPUTE-APPLICABLE-METHODS"
                "ENSURE-GENERIC-FUNCTION"
@@ -1764,7 +1764,7 @@ structure representations"
  #s(sb-cold:package-data
     :name "SB!WALKER"
     :doc "internal: a code walker used by PCL"
-    :use ("CL")
+    :use ("CL" "SB!INT" "SB!EXT")
     :export ("DEFINE-WALKER-TEMPLATE" "WALK-FORM"
              "*WALK-FORM-EXPAND-MACROS-P*" 
              "VARIABLE-LEXICAL-P" "VARIABLE-SPECIAL-P"

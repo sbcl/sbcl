@@ -123,35 +123,31 @@
 		macros))))
     `(macrolet ,macros (let* ,(nreverse binds) ,@body))))
 
+;;; This function can be used as the default value for keyword
+;;; arguments that must be always be supplied. Since it is known by
+;;; the compiler to never return, it will avoid any compile-time type
+;;; warnings that would result from a default value inconsistent with
+;;; the declared type. When this function is called, it signals an
+;;; error indicating that a required keyword argument was not
+;;; supplied. This function is also useful for DEFSTRUCT slot defaults
+;;; corresponding to required arguments.
 (declaim (ftype (function () nil) required-argument))
 (defun required-argument ()
   #!+sb-doc
-  "This function can be used as the default value for keyword arguments that
-  must be always be supplied. Since it is known by the compiler to never
-  return, it will avoid any compile-time type warnings that would result from a
-  default value inconsistent with the declared type. When this function is
-  called, it signals an error indicating that a required keyword argument was
-  not supplied. This function is also useful for DEFSTRUCT slot defaults
-  corresponding to required arguments."
   (/show0 "entering REQUIRED-ARGUMENT")
   (error "A required keyword argument was not supplied."))
 
-;;; "the ultimate iteration macro"
+;;; "the ultimate iteration macro" 
 ;;;
 ;;; note for Schemers: This seems to be identical to Scheme's "named LET".
-(defmacro iterate (name binds &body body)
+(defmacro named-let (name binds &body body)
   #!+sb-doc
-  "Iterate Name ({(Var Initial-Value)}*) Declaration* Form*
-  This is syntactic sugar for Labels. It creates a local function Name with
-  the specified Vars as its arguments and the Declarations and Forms as its
-  body. This function is then called with the Initial-Values, and the result
-  of the call is returned from the macro."
   (dolist (x binds)
     (unless (proper-list-of-length-p x 2)
       (error "Malformed ITERATE variable spec: ~S." x)))
   `(labels ((,name ,(mapcar #'first binds) ,@body))
      (,name ,@(mapcar #'second binds))))
-
+
 ;;; ONCE-ONLY is a utility useful in writing source transforms and
 ;;; macros. It provides a concise way to wrap a LET around some code
 ;;; to ensure that some forms are only evaluated once.
@@ -161,9 +157,8 @@
 ;;; result of the evaluation of BODY. Within the body, each VAR is
 ;;; bound to the corresponding temporary variable.
 (defmacro once-only (specs &body body)
-  (iterate frob
-	   ((specs specs)
-	    (body body))
+  (named-let frob ((specs specs)
+		   (body body))
     (if (null specs)
 	`(progn ,@body)
 	(let ((spec (first specs)))

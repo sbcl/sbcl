@@ -25,25 +25,6 @@
 
 (in-package "SB-PCL")
 
-;;; FIXME: SB-PCL should probably USE-PACKAGE SB-KERNEL, since SB-PCL
-;;; is built on SB-KERNEL, and in the absence of USE-PACKAGE, it ends
-;;; up using a thundering herd of explicit prefixes to get to
-;;; SB-KERNEL symbols. Using the SB-INT and SB-EXT packages as well
-;;; would help reduce prefixing and make it more natural to reuse
-;;; things (ONCE-ONLY, *KEYWORD-PACKAGE*..) used in the main body of
-;;; the system. However, that would cause a conflict between the
-;;; SB-ITERATE:ITERATE macro and the SB-INT:ITERATE macro. (This could
-;;; be resolved by renaming SB-INT:ITERATE to SB-INT:NAMED-LET, or
-;;; with more gruntwork by punting the SB-ITERATE package and
-;;; replacing calls to SB-ITERATE:ITERATE with calls to CL:LOOP.
-;;; So perhaps:
-;;;   * Do some sort of automated check for overlap of symbols to make
-;;;     sure there wouldn't be any other clashes.
-;;;   * Rename SB-INT:ITERATE to SB-INT:NAMED-LET.
-;;;   * Make SB-PCL use SB-INT and SB-EXT.
-;;;   * Grep for SB-INT: and SB-EXT: prefixes in the pcl/ directory
-;;;     and delete them.
-
 ;;; The caching algorithm implemented:
 ;;;
 ;;; << put a paper here >>

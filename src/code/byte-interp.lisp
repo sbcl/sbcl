@@ -299,9 +299,8 @@
 ;;; implement suitable code as jump tables.
 (defmacro expand-into-inlines ()
   #+nil (declare (optimize (inhibit-warnings 3)))
-  (iterate build-dispatch
-	   ((bit 4)
-	    (base 0))
+  (named-let build-dispatch ((bit 4)
+			     (base 0))
     (if (minusp bit)
 	(let ((info (svref *inline-functions* base)))
 	  (if info
@@ -503,7 +502,7 @@
 	 (closure-vars (make-array num-closure-vars)))
     (declare (type index num-closure-vars)
 	     (type simple-vector closure-vars))
-    (iterate frob ((index (1- num-closure-vars)))
+    (named-let frob ((index (1- num-closure-vars)))
       (unless (minusp index)
 	(setf (svref closure-vars index) (pop-eval-stack))
 	(frob (1- index))))
@@ -992,7 +991,7 @@
 	   (type stack-pointer old-sp old-fp)
 	   (type (or null simple-vector) closure-vars))
   (when closure-vars
-    (iterate more ((index (1- (length closure-vars))))
+    (named-let more ((index (1- (length closure-vars))))
       (unless (minusp index)
 	(push-eval-stack (svref closure-vars index))
 	(more (1- index)))))
