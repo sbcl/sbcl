@@ -1513,11 +1513,10 @@
 	  t))
 
 (!define-type-method (member :complex-subtypep-arg1) (type1 type2)
-  (values (every-type-op ctypep
-			 type2
-			 (member-type-members type1)
-			 :list-first t)
-	  t))
+  (every/type #'ctypep
+	      type2
+	      (member-type-members type1)
+	      :list-first t))
 
 ;;; We punt if the odd type is enumerable and intersects with the
 ;;; MEMBER type. If not enumerable, then it is definitely not a
@@ -1541,19 +1540,20 @@
 	    t)))
 
 (!define-type-method (member :complex-intersection) (type1 type2)
-  (collect ((members))
-    (let ((mem2 (member-type-members type2)))
-      (dolist (member mem2)
-	(multiple-value-bind (val win) (ctypep member type1)
-	  (unless win
-	    (return-from punt-type-method (values type2 nil)))
-	  (when val (members member))))
+  (block punt		     
+    (collect ((members))
+      (let ((mem2 (member-type-members type2)))
+        (dolist (member mem2)
+	  (multiple-value-bind (val win) (ctypep member type1)
+	    (unless win
+	      (return-from punt (values type2 nil)))
+	    (when val (members member))))
 
-      (values (cond ((subsetp mem2 (members)) type2)
-		    ((null (members)) *empty-type*)
-		    (t
-		     (make-member-type :members (members))))
-	      t))))
+	(values (cond ((subsetp mem2 (members)) type2)
+		      ((null (members)) *empty-type*)
+		      (t
+		       (make-member-type :members (members))))
+		t)))))
 
 ;;; We don't need a :COMPLEX-UNION, since the only interesting case is
 ;;; a union type, and the member/union interaction is handled by the
@@ -1669,28 +1669,31 @@
 (!define-type-method (intersection :simple-subtypep) (type1 type2)
   (declare (type list type1 type2))
   (/show0 "entering INTERSECTION :SIMPLE-SUBTYPEP")
-  (some (lambda (t1)
-	  (every (lambda (t2)
-		   (csubtypep t1 t2))
-		 type2))
-	type1))
+  (let ((certain? t))
+    (dolist (t1 (intersection-type-types type1) (values nil certain?))
+      (multiple-value-bind (subtypep validp)
+	  (intersection-complex-subtypep-arg2 t1 type2)
+	(cond ((not validp)
+	       (setf certain? nil))
+	      (subtypep
+	       (return (values t t))))))))
 
 (!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
   (/show0 "entering INTERSECTION :COMPLEX-SUBTYPEP-ARG1")
-  (values (any-type-op csubtypep
-		       type2
-		       (intersection-type-types type1)
-		       :list-first t)
-	  t))
+  (any/type #'csubtypep
+	    type2
+	    (intersection-type-types type1)
+	    :list-first t))
 
+(defun intersection-complex-subtypep-arg2 (type1 type2)
+  (every/type #'csubtypep type1 (intersection-type-types type2)))
 (!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
   (/show0 "entering INTERSECTION :COMPLEX-SUBTYPEP-ARG2")
-  (values (every-type-op csubtypep type1 (intersection-type-types type2))
-	  t))
+  (intersection-complex-subtypep-arg2 type1 type2))
 
 ;;; Return a new type list where pairs of types whose intersections
-;;; can be represented simply have been replaced by the simple
-;;; representation.
+;;; can be represented simply have been replaced by their simple
+;;; representations.
 (defun simplify-intersection-type-types (%types)
   (/show0 "entering SIMPLE-INTERSECTION-TYPE-TYPES")
   (do* ((types (copy-list %types)) ; (to undestructivize the algorithm below)
@@ -1779,25 +1782,27 @@
 ;;; don't grok the system well enough to tell whether it's simple to
 ;;; arrange this. -- WHN 2000-02-03
 (!define-type-method (union :simple-subtypep) (type1 type2)
-  (let ((types2 (union-type-types type2)))
-    (values (dolist (type1 (union-type-types type1) t)
-	      (unless (any-type-op csubtypep type1 types2)
-		(return nil)))
-	    t)))
+  (dolist (t1 (union-type-types type1) (values t t))
+    (multiple-value-bind (subtypep validp)
+	(union-complex-subtypep-arg2 t1 type2)
+      (cond ((not validp)
+	     (return (values nil nil)))
+	    ((not subtypep)
+	     (return (values nil t)))))))
 
 (!define-type-method (union :complex-subtypep-arg1) (type1 type2)
-  (values (every-type-op csubtypep
-			 type2
-			 (union-type-types type1)
-			 :list-first t)
-	  t))
+  (every/type #'csubtypep
+	      type2
+	      (union-type-types type1)
+	      :list-first t))
 
+(defun union-complex-subtypep-arg2 (type1 type2)
+  (any/type #'csubtypep type1 (union-type-types type2)))
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
-  (values (any-type-op csubtypep type1 (union-type-types type2))
-	  t))
+  (union-complex-subtypep-arg2 type1 type2))
 
 (!define-type-method (union :complex-union) (type1 type2)
-  (let* ((class1 (type-class-info type1)))
+  (let ((class1 (type-class-info type1)))
     (collect ((res))
       (let ((this-type type1))
 	(dolist (type (union-type-types type2)

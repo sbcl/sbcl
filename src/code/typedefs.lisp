@@ -91,50 +91,38 @@
 
 ;;;; utilities
 
-;;; Like ANY and EVERY, except that we handle two-arg uncertain
-;;; predicates. If the result is uncertain, then we return DEFAULT
-;;; from the block PUNT-TYPE-METHOD. If LIST-FIRST is true, then the
-;;; list element is the first arg, otherwise the second.
+;;; Like ANY and EVERY, except that we handle two-VALUES predicate
+;;; functions like SUBTYPEP. If the result is uncertain, then we
+;;; return (VALUES NIL NIL).
 ;;;
-;;; FIXME: The way that we return from PUNT-TYPE-METHOD rather ruins
-;;; the analogy with SOME and EVERY, and completely surprised me (WHN)
-;;; when I was trying to maintain code which uses these macros. I
-;;; think it would be a good idea to redo these so that they really
-;;; are analogous to EVERY and SOME. And then, while we're at it, we
-;;; could also make them functions (perhaps inline) instead of macros.
-(defmacro any-type-op (op thing list &key (default '(values nil nil))
-			  list-first)
-  (let ((n-this (gensym))
-	(n-thing (gensym))
-	(n-val (gensym))
-	(n-win (gensym))
-	(n-uncertain (gensym)))
-    `(let ((,n-thing ,thing)
-	   (,n-uncertain nil))
-       (dolist (,n-this ,list
-			(if ,n-uncertain
-			    (return-from punt-type-method ,default)
-			    nil))
-	 (multiple-value-bind (,n-val ,n-win)
-	     ,(if list-first
-		  `(,op ,n-this ,n-thing)
-		`(,op ,n-thing ,n-this))
-	   (unless ,n-win (setq ,n-uncertain t))
-	   (when ,n-val (return t)))))))
-(defmacro every-type-op (op thing list &key (default '(values nil nil))
-			    list-first)
-  (let ((n-this (gensym))
-	(n-thing (gensym))
-	(n-val (gensym))
-	(n-win (gensym)))
-    `(let ((,n-thing ,thing))
-       (dolist (,n-this ,list t)
-	 (multiple-value-bind (,n-val ,n-win)
-	     ,(if list-first
-		  `(,op ,n-this ,n-thing)
-		`(,op ,n-thing ,n-this))
-	   (unless ,n-win (return-from punt-type-method ,default))
-	   (unless ,n-val (return nil)))))))
+;;; If LIST-FIRST is true, then the list element is the first arg,
+;;; otherwise the second.
+(defun any/type (op thing list &key list-first)
+  (declare (type function op))
+  (let ((certain? t))
+    (dolist (i list (values nil certain?))
+      (multiple-value-bind (sub-value sub-certain?)
+	  (if list-first
+	      (funcall op i thing)
+	      (funcall op thing i))
+	(unless sub-certain? (setf certain? nil))
+	(when sub-value (return (values t t)))))))
+(defun every/type (op thing list &key list-first)
+  (declare (type function op))
+  (dolist (i list (values t t))
+    (multiple-value-bind (sub-value sub-certain?)
+	(if list-first
+	    (funcall op i thing)
+	    (funcall op thing i))
+      (unless sub-certain? (return (values nil nil)))
+      (unless sub-value (return (values nil t))))))
+
+;;; Reverse the order of arguments of a SUBTYPEP-like function.
+(declaim (inline swapped/type))
+(defun swapped/type (op)
+  (declare (type function op))
+  (lambda (x y)
+    (funcall op y x)))
 
 ;;; Compute the intersection for types that intersect only when one is a
 ;;; hierarchical subtype of the other.

@@ -144,21 +144,18 @@
 ) ; EVAL-WHEN
 
 (defmacro !define-type-method ((class method &rest more-methods)
-			      lambda-list &body forms-and-decls)
+			      lambda-list &body body)
   (let ((name (symbolicate CLASS "-" method "-TYPE-METHOD")))
-    (multiple-value-bind (forms decls) (parse-body forms-and-decls)
-      `(progn
-	 (defun ,name ,lambda-list
-	   ,@decls
-	   (block punt-type-method
-	     ,@forms))
-	 (!cold-init-forms
-	  ,@(mapcar #'(lambda (method)
-			`(setf (,(class-function-slot-or-lose method)
-				(type-class-or-lose ',class))
-			       #',name))
-		    (cons method more-methods)))
-	 ',name))))
+    `(progn
+       (defun ,name ,lambda-list
+	 ,@body)
+       (!cold-init-forms
+	,@(mapcar (lambda (method)
+		    `(setf (,(class-function-slot-or-lose method)
+			    (type-class-or-lose ',class))
+			   #',name))
+		  (cons method more-methods)))
+       ',name)))
 
 (defmacro !define-type-class (name &key inherits)
   `(!cold-init-forms

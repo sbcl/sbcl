@@ -2,6 +2,13 @@
 
 (load "assertoid.lisp")
 
+(defmacro assert-nil-nil (expr)
+  `(assert (equal '(nil nil) (multiple-value-list ,expr))))
+(defmacro assert-nil-t (expr)
+  `(assert (equal '(nil t) (multiple-value-list ,expr))))
+(defmacro assert-t-t (expr)
+  `(assert (equal '(t t) (multiple-value-list ,expr))))
+
 (let ((types '(character
 	       integer fixnum (integer 0 10)
 	       single-float (single-float -1.0 1.0) (single-float 0.1)
@@ -14,7 +21,29 @@
       (assert (subtypep i `(or ,i ,j)))
       (assert (subtypep i `(or ,j ,i)))
       (assert (subtypep i `(or ,i ,i ,j)))
-      (assert (subtypep i `(or ,j ,i))))))
+      (assert (subtypep i `(or ,j ,i)))
+      (dolist (k types)
+	(format t "    type K=~S~%" k)
+	(assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
+	;; FIXME: The old code (including original CMU CL code)
+	;; fails this test. When this is fixed, we can re-enable it.
+	#+nil (assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
+
+;;; gotchas that can come up in handling subtypeness as "X is a
+;;; subtype of Y if each of the elements of X is a subtype of Y"
+#+nil ; FIXME: suppressed until we can fix old CMU CL big
+(let ((subtypep-values (multiple-value-list
+			(subtypep '(single-float -1.0 1.0)
+				  '(or (real -100.0 0.0)
+				       (single-float 0.0 100.0))))))
+  (assert (member subtypep-values
+		  '(;; The system isn't expected to
+		    ;; understand the subtype relationship.
+		    (nil nil)
+		    ;; But if it does, that'd be neat.
+		    (t t)
+		    ;; (And any other return would be wrong.)
+		    ))))
 
 (defun type-evidently-= (x y)
   (and (subtypep x y)
@@ -42,12 +71,10 @@
 ;;; part II: SUBTYPEP
 (assert (subtypep '(vector some-undef-type) 'vector))
 (assert (not (subtypep '(vector some-undef-type) 'integer)))
-(macrolet ((nilnil (expr)
-	     `(assert (equal '(nil nil) (multiple-value-list ,expr)))))
-  (nilnil (subtypep 'utype-1 'utype-2))
-  (nilnil (subtypep '(vector utype-1) '(vector utype-2)))
-  (nilnil (subtypep '(vector utype-1) '(vector t)))
-  (nilnil (subtypep '(vector t) '(vector utype-2))))
+(assert-nil-nil (subtypep 'utype-1 'utype-2))
+(assert-nil-nil (subtypep '(vector utype-1) '(vector utype-2)))
+(assert-nil-nil (subtypep '(vector utype-1) '(vector t)))
+(assert-nil-nil (subtypep '(vector t) '(vector utype-2)))
 
 ;;; success
 (quit :unix-status 104)
