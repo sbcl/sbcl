@@ -92,21 +92,6 @@ WORKAROUND:
   Perhaps any number of such consecutive lines ought to turn into a
   single "byte compiling top-level forms:" line.
 
-8:
-  Compiling a file containing the erroneous program
-	(DEFSTRUCT FOO
-	  A
-	  B)
-	(DEFSTRUCT (BAR (:INCLUDE FOO))
-	  A
-	  B)
-  gives only the not-very-useful message
-	caught ERROR:
-	  (during macroexpansion)
-	Condition PROGRAM-ERROR was signalled.
-  (The specific message which says that the problem was duplicate
-  slot names gets lost.)
-
 9:
   The handling of IGNORE declarations on lambda list arguments of
   DEFMETHOD is at least weird, and in fact seems broken and useless.
@@ -875,12 +860,32 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     (DEFTYPE BAR () 'SIMPLE-VECTOR)
     (CONCATENATE 'BAR #(1 2) '(3)) => #(1 2 3)
 
-
 67:
   As reported by Winton Davies on a CMU CL mailing list 2000-01-10,
   and reported for SBCL by Martin Atzmueller 2000-10-20: (TRACE GETHASH)
   crashes SBCL. In general tracing anything which is used in the 
   implementation of TRACE is likely to have the same problem.
+
+68: 
+  As reported by Daniel Solaz on cmucl-help@cons.org 2000-11-23,
+  SXHASH returns the same value for all non-STRUCTURE-OBJECT instances,
+  notably including all PCL instances. There's a limit to how much
+  SXHASH can do to return unique values for instances, but at least
+  it should probably look at the class name, the way that it does
+  for STRUCTURE-OBJECTs.
+
+69:
+  As reported by Martin Atzmueller on the sbcl-devel list 2000-11-22,
+  > There remains one issue, that is a bug in SBCL:
+  > According to my interpretation of the spec, the ":" and "@" modifiers
+  > should appear _after_ the comma-seperated arguments.
+  > Well, SBCL (and CMUCL for that matter) accept 
+  > (ASSERT (STRING= (FORMAT NIL "~:8D" 1) "   1"))
+  > where the correct way (IMHO) should be
+  > (ASSERT (STRING= (FORMAT NIL "~8:D" 1) "   1"))
+  Probably SBCL should stop accepting the "~:8D"-style format arguments,
+  or at least issue a warning.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

@@ -602,6 +602,9 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
 * fixed bug 5: added stubs for various Gray stream functions called
   in the not-a-CL:STREAM case, so that even when Gray streams aren't
   installed, at least appropriate type errors are generated
+* fixed bug 8: better reporting of various PROGRAM-ERRORs
+?? fixed bug 9: IGNORE and IGNORABLE now work reasonably in DEFMETHOD
+  forms. 
 * removed bug 21 from BUGS, since Martin Atzmueller points out that 
   it doesn't seem to affect SBCL after all
 

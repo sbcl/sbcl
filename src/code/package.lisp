@@ -279,15 +279,15 @@
 				  (,',init-macro ,(car ',ordered-types)))))))
 	 (when ,packages
 	   ,(when (null symbol-types)
-	      (error 'program-error
+	      (error 'simple-program-error
 		     :format-control
-		     "Must supply at least one of :internal, :external, or ~
-		      :inherited."))
+		     "At least one of :INTERNAL, :EXTERNAL, or ~
+		      :INHERITED must be supplied."))
 	   ,(dolist (symbol symbol-types)
 	      (unless (member symbol '(:internal :external :inherited))
 		(error 'program-error
 		       :format-control
-		       "~S is not one of :internal, :external, or :inherited."
+		       "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
 		       :format-argument symbol)))
 	   (,init-macro ,(car ordered-types))
 	   (flet ((,real-symbol-p (number)

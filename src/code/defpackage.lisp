@@ -37,7 +37,7 @@
 	(doc nil))
     (dolist (option options)
       (unless (consp option)
-	(error 'program-error
+	(error 'simple-program-error
 	       :format-control "bogus DEFPACKAGE option: ~S"
 	       :format-arguments (list option)))
       (case (car option)
@@ -45,14 +45,14 @@
 	 (setf nicknames (stringify-names (cdr option) "package")))
 	(:size
 	 (cond (size
-		(error 'program-error
+		(error 'simple-program-error
 		       :format-control "can't specify :SIZE twice."))
 	       ((and (consp (cdr option))
 		     (typep (second option) 'unsigned-byte))
 		(setf size (second option)))
 	       (t
 		(error
-		 'program-error
+		 'simple-program-error
 		 :format-control ":SIZE is not a positive integer: ~S"
 		 :format-arguments (list (second option))))))
 	(:shadow
@@ -86,11 +86,11 @@
 	   (setf exports (append exports new))))
 	(:documentation
 	 (when doc
-	   (error 'program-error
+	   (error 'simple-program-error
 		  :format-control "multiple :DOCUMENTATION options"))
 	 (setf doc (coerce (second option) 'simple-string)))
 	(t
-	 (error 'program-error
+	 (error 'simple-program-error
 		:format-control "bogus DEFPACKAGE option: ~S"
 		:format-arguments (list option)))))
     (check-disjoint `(:intern ,@interns) `(:export  ,@exports))
@@ -113,7 +113,7 @@
       with x = (car list)
       for y in (rest list)
       for z = (remove-duplicates (intersection (cdr x)(cdr y) :test #'string=))
-      when z do (error 'program-error
+      when z do (error 'simple-program-error
 		       :format-control "Parameters ~S and ~S must be disjoint ~
 					but have common elements ~%   ~S"
 		       :format-arguments (list (car x)(car y) z)))))

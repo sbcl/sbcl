@@ -270,15 +270,15 @@ bootstrapping.
 		    (class-prototype (or (generic-function-method-class gf?)
 					 (find-class 'standard-method))))))))
 
-;;; takes a name which is either a generic function name or a list specifying
-;;; a setf generic function (like: (SETF <generic-function-name>)). Returns
+;;; Take a name which is either a generic function name or a list specifying
+;;; a SETF generic function (like: (SETF <generic-function-name>)). Return
 ;;; the prototype instance of the method-class for that generic function.
 ;;;
-;;; If there is no generic function by that name, this returns the default
-;;; value, the prototype instance of the class STANDARD-METHOD. This default
-;;; value is also returned if the spec names an ordinary function or even a
-;;; macro. In effect, this leaves the signalling of the appropriate error
-;;; until load time.
+;;; If there is no generic function by that name, this returns the
+;;; default value, the prototype instance of the class
+;;; STANDARD-METHOD. This default value is also returned if the spec
+;;; names an ordinary function or even a macro. In effect, this leaves
+;;; the signalling of the appropriate error until load time.
 ;;;
 ;;; Note: During bootstrapping, this function is allowed to return NIL.
 (defun method-prototype-for-gf (name)
@@ -321,7 +321,7 @@ bootstrapping.
 							initargs
 							env)))
 	  `(progn
-	     ;; Note: We could DECLAIM the type of the generic
+	     ;; Note: We could DECLAIM the ftype of the generic
 	     ;; function here, since ANSI specifies that we create it
 	     ;; if it does not exist. However, I chose not to, because
 	     ;; I think it's more useful to support a style of
@@ -391,7 +391,13 @@ bootstrapping.
 	       (mname `(,(if (eq (cadr initargs-form) ':function)
 			     'method 'fast-method)
 			,name ,@qualifiers ,specls))
-	       (mname-sym (intern (let ((*print-pretty* nil))
+	       (mname-sym (intern (let ((*print-pretty* nil)
+					;; (We bind *PACKAGE* to
+					;; KEYWORD here as a way to
+					;; force symbols to be printed
+					;; with explicit package
+					;; prefixes.)
+					(*package* sb-int:*keyword-package*))
 				    (format nil "~S" mname)))))
 	  `(eval-when ,*defmethod-times*
 	    (defun ,mname-sym ,(cadr fn-lambda)
@@ -428,8 +434,10 @@ bootstrapping.
     ,specializers-form
     ',unspecialized-lambda-list
     ,initargs-form
-    ;; Paper over a bug in KCL by passing the cache-symbol here in addition to
-    ;; in the list. FIXME: We should no longer need to do this.
+    ;; Paper over a bug in KCL by passing the cache-symbol here in
+    ;; addition to in the list. FIXME: We should no longer need to do
+    ;; this, since the CLOS code is now SBCL-specific, and doesn't
+    ;; need to be ported to every buggy compiler in existence.
     ',pv-table-symbol))
 
 (defmacro make-method-function (method-lambda &environment env)

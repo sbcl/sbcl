@@ -590,7 +590,7 @@
 	spec))
 
     (when (find name (dd-slots defstruct) :test #'string= :key #'dsd-%name)
-      (error 'program-error
+      (error 'simple-program-error
 	     :format-control "duplicate slot name ~S"
 	     :format-arguments (list name)))
     (setf (dsd-%name islot) (string name))
