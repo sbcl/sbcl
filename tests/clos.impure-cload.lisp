@@ -54,5 +54,14 @@
 (class-allocation-writer 4)
 (assert (= (class-allocation-reader) 4))
 
+;;; from James Anderson via Gerd Moellmann: defining methods with
+;;; forward-referenced specializers used not to work (FIXME: and also
+;;; calling said method with an instance of something else
+;;; [SPECIALIZER1, here] should work -- patch forthcoming)
+(defclass specializer1 () ())
+(defclass specializer2 (forward-ref1) ())
+(defmethod baz ((x specializer2)) x)
+(defmethod baz ((x specializer1)) x)
+
 ;;; success
 (sb-ext:quit :unix-status 104)

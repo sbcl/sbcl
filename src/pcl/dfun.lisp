@@ -686,38 +686,54 @@ And so, we are saved.
 (defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
 
+(defun finalize-specializers (gf)
+  (let ((all-finalized t))
+    (dolist (method (generic-function-methods gf))
+      (dolist (specializer (method-specializers method))
+	(when (and (classp specializer)
+		   (not (class-finalized-p specializer)))
+	  (if (class-has-a-forward-referenced-superclass-p specializer)
+	      (setq all-finalized nil)
+	      (finalize-inheritance specializer)))))
+    all-finalized))
+
 (defun make-initial-dfun (gf)
   (let ((initial-dfun
 	 #'(instance-lambda (&rest args)
 	     (initial-dfun gf args))))
     (multiple-value-bind (dfun cache info)
-	(if (and (eq *boot-state* 'complete)
-		 (compute-applicable-methods-emf-std-p gf))
-	    (let* ((caching-p (use-caching-dfun-p gf))
-		   (classes-list (precompute-effective-methods
-				  gf caching-p
-				  (not *lazy-dfun-compute-p*))))
-	      (if *lazy-dfun-compute-p*
-		  (cond ((use-dispatch-dfun-p gf caching-p)
-			 (values initial-dfun
-				 nil
-				 (initial-dispatch-dfun-info)))
-			(caching-p
-			 (insure-caching-dfun gf)
-			 (values initial-dfun nil (initial-dfun-info)))
-			(t
-			 (values initial-dfun nil (initial-dfun-info))))
-		  (make-final-dfun-internal gf classes-list)))
-	    (let ((arg-info (if (early-gf-p gf)
-				(early-gf-arg-info gf)
-				(gf-arg-info gf)))
-		  (type nil))
-	      (if (and (gf-precompute-dfun-and-emf-p arg-info)
-		       (setq type (final-accessor-dfun-type gf)))
-		  (if *early-p*
-		      (values (make-early-accessor gf type) nil nil)
-		      (make-final-accessor-dfun gf type))
-		  (values initial-dfun nil (initial-dfun-info)))))
+	(cond
+	  ((and (eq *boot-state* 'complete)
+		(not (finalize-specializers gf)))
+	   (values initial-dfun nil (initial-dfun-info)))
+	  ((and (eq *boot-state* 'complete)
+		(compute-applicable-methods-emf-std-p gf))
+	   (let* ((caching-p (use-caching-dfun-p gf))
+		  (classes-list (precompute-effective-methods
+				 gf caching-p
+				 (not *lazy-dfun-compute-p*))))
+	     (if *lazy-dfun-compute-p*
+		 (cond ((use-dispatch-dfun-p gf caching-p)
+			(values initial-dfun
+				nil
+				(initial-dispatch-dfun-info)))
+		       (caching-p
+			(insure-caching-dfun gf)
+			(values initial-dfun nil (initial-dfun-info)))
+		       (t
+			(values initial-dfun nil (initial-dfun-info))))
+		 (make-final-dfun-internal gf classes-list))))
+	  (t
+	   (let ((arg-info (if (early-gf-p gf)
+			       (early-gf-arg-info gf)
+			       (gf-arg-info gf)))
+		 (type nil))
+	     (if (and (gf-precompute-dfun-and-emf-p arg-info)
+		      (setq type (final-accessor-dfun-type gf)))
+		 (if *early-p*
+		     (values (make-early-accessor gf type) nil nil)
+		     (make-final-accessor-dfun gf type))
+		 (values initial-dfun nil (initial-dfun-info))))))
       (set-dfun gf dfun cache info))))
 
 (defun make-early-accessor (gf type)
