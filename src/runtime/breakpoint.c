@@ -26,7 +26,7 @@
 #include "genesis/fdefn.h"
 
 #define REAL_LRA_SLOT 0
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 #define KNOWN_RETURN_P_SLOT 1
 #define BOGUS_LRA_CONSTANTS 2
 #else
@@ -71,7 +71,7 @@ void breakpoint_do_displaced_inst(os_context_t* context,
     arch_do_displaced_inst(context, orig_inst);
 }
 
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 static lispobj find_code(os_context_t *context)
 {
 #ifdef reg_CODE
@@ -93,7 +93,7 @@ static lispobj find_code(os_context_t *context)
 }
 #endif
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 static lispobj find_code(os_context_t *context)
 {
     lispobj codeptr =
@@ -137,7 +137,7 @@ static int compute_offset(os_context_t *context, lispobj code)
  * tried.  The sigprocmask() call would work just as well on alpha as it
  * presumably does on x86   -dan 2001.08.10
  */
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 void handle_breakpoint(int signal, siginfo_t *info, os_context_t *context)
 {
     lispobj code;
@@ -175,7 +175,7 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 }
 #endif
 
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
 				os_context_t *context)
 {

@@ -84,7 +84,7 @@ void os_init(void)
 
     os_vm_page_size = getpagesize();
     /* This could just as well be in arch_init(), but it's not. */
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
     /* FIXME: This used to be here.  However, I have just removed it
        with no apparent ill effects (it may be that earlier kernels
        started up a process with a different set of traps, or

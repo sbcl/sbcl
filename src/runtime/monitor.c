@@ -176,17 +176,17 @@ regs_cmd(char **ptr)
 {
     printf("CSP\t=\t0x%08lX\n", (unsigned long)current_control_stack_pointer);
     printf("FP\t=\t0x%08lX\n", (unsigned long)current_control_frame_pointer);
-#if !defined(__i386__)
+#if !defined(LISP_FEATURE_X86)
     printf("BSP\t=\t0x%08X\n", (unsigned long)current_binding_stack_pointer);
 #endif
 #if 0
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
     printf("BSP\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(BINDING_STACK_POINTER));
 #endif
 
     printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)DYNAMIC_SPACE_START);
-#if defined(__i386__)
+#if defined(LISP_FEATURE_X86)
     printf("ALLOC\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(ALLOCATION_POINTER));
 #else
@@ -319,7 +319,7 @@ print_context(os_context_t *context)
 
     for (i = 0; i < NREGS; i++) {
 	printf("%s:\t", lisp_register_names[i]);
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	brief_print((lispobj)(*os_context_register_addr(context,
 							i*2)));
 #else
@@ -393,7 +393,7 @@ catchers_cmd(char **ptr)
         printf("There are no active catchers!\n");
     else {
         while (catch != NULL) {
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
 		   (unsigned long)catch, (unsigned long)(catch->current_uwp),
 		   (unsigned long)(catch->current_cont),

@@ -39,7 +39,7 @@
 
 #define PRINTNOISE
 
-#if defined(__i386__)
+#if defined(LISP_FEATURE_X86)
 /* again, what's so special about the x86 that this is differently
  * visible there than on other platforms? -dan 20010125 
  */
@@ -105,7 +105,7 @@ forwarding_pointer_p(lispobj obj)
 static boolean
 dynamic_pointer_p(lispobj ptr)
 {
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
     return (ptr >= (lispobj)current_dynamic_space
 	    &&
 	    ptr < (lispobj)dynamic_space_free_pointer);
@@ -118,7 +118,7 @@ dynamic_pointer_p(lispobj ptr)
 }
 
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 
 #ifdef LISP_FEATURE_GENCGC
 /*
@@ -619,7 +619,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
     return result;
 }
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 static void
 apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 {
@@ -758,13 +758,13 @@ ptrans_code(lispobj thing)
         gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	/* Temporarly convert the self pointer to a real function pointer. */
 	((struct simple_fun *)native_pointer(func))->self
 	    -= FUN_RAW_ADDR_OFFSET;
 #endif
         pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	((struct simple_fun *)native_pointer(func))->self
 	    += FUN_RAW_ADDR_OFFSET;
 #endif
@@ -993,7 +993,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
       case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
         return ptrans_vector(thing, 96, 0, 0, constant);
 #endif
 #ifdef sparc
@@ -1013,7 +1013,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
       case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
         return ptrans_vector(thing, 192, 0, 0, constant);
 #endif
 #ifdef sparc
@@ -1050,7 +1050,7 @@ pscav_fdefn(struct fdefn *fdefn)
     return sizeof(struct fdefn) / sizeof(lispobj);
 }
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 /* now putting code objects in static space */
 static int
 pscav_code(struct code*code)
@@ -1073,14 +1073,14 @@ pscav_code(struct code*code)
         gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	/* Temporarily convert the self pointer to a real function
 	 * pointer. */
 	((struct simple_fun *)native_pointer(func))->self
 	    -= FUN_RAW_ADDR_OFFSET;
 #endif
         pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	((struct simple_fun *)native_pointer(func))->self
 	    += FUN_RAW_ADDR_OFFSET;
 #endif
@@ -1231,7 +1231,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
               case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
                 count = fixnum_value(vector->length)*3+2;
 #endif
 #ifdef sparc
@@ -1250,7 +1250,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
               case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
                 count = fixnum_value(vector->length)*6+2;
 #endif
 #ifdef sparc
@@ -1260,7 +1260,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #endif
 
               case CODE_HEADER_WIDETAG:
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
                 gc_abort(); /* no code headers in static space */
 #else
 		count = pscav_code((struct code*)addr);
@@ -1275,7 +1275,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 gc_abort();
 		break;
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	      case CLOSURE_HEADER_WIDETAG:
 	      case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 		/* The function self pointer needs special care on the
@@ -1345,7 +1345,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
         return 0;
     }
 
-#if defined(__i386__)
+#if defined(LISP_FEATURE_X86)
     dynamic_space_free_pointer =
       (lispobj*)SymbolValue(ALLOCATION_POINTER,0);
 #endif
@@ -1398,7 +1398,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" stack");
     fflush(stdout);
 #endif
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
     pscav((lispobj *)all_threads->control_stack_start,
 	  current_control_stack_pointer - 
 	  all_threads->control_stack_start,
@@ -1413,7 +1413,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" bindings");
     fflush(stdout);
 #endif
-#if !defined(__i386__)
+#if !defined(LISP_FEATURE_X86)
     pscav( (lispobj *)all_threads->binding_stack_start,
 	  (lispobj *)current_binding_stack_pointer -
 	   all_threads->binding_stack_start,
@@ -1493,7 +1493,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
     /* Zero the stack. Note that the stack is also zeroed by SUB-GC
      * calling SCRUB-CONTROL-STACK - this zeros the stack on the x86. */
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
     os_zero((os_vm_address_t) current_control_stack_pointer,
             (os_vm_size_t)
 	    ((all_threads->control_stack_end -
@@ -1505,7 +1505,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free,0);
     SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free,0);
 
-#if !defined(__i386__)
+#if !defined(LISP_FEATURE_X86)
     dynamic_space_free_pointer = current_dynamic_space;
     set_auto_gc_trigger(bytes_consed_between_gcs);
 #else

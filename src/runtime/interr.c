@@ -114,7 +114,7 @@ describe_internal_error(os_context_t *context)
 
 	case sc_BaseCharReg:
 	    ch = *os_context_register_addr(context, offset);
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 	    if (offset&1)
 		ch = ch>>8;
 	    ch = ch & 0xff;

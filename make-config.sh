@@ -30,7 +30,7 @@ printf '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in 
-    *86) guessed_sbcl_arch=x86 ;; 
+    *86|x86_64) guessed_sbcl_arch=x86 ;; 
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
@@ -95,7 +95,11 @@ ln -s $sbcl_arch-lispregs.h target-lispregs.h
 case `uname` in 
     Linux)
 	printf ' :linux' >> $ltf
-	ln -s Config.$sbcl_arch-linux Config
+	if [ "`uname -m`" = "x86_64" ]; then
+	    ln -s Config.x86_64-linux Config
+	else
+	    ln -s Config.$sbcl_arch-linux Config
+	fi
 	ln -s $sbcl_arch-linux-os.h target-arch-os.h
 	ln -s linux-os.h target-os.h
 	;;

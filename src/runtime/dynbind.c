@@ -22,7 +22,7 @@
 #include "genesis/binding.h"
 #include "genesis/thread.h"
 
-#if defined(__i386__)
+#if defined(LISP_FEATURE_X86)
 #define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER,thread))
 #define SetBSP(value) SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value),thread)
 #else

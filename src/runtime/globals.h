@@ -23,11 +23,11 @@ extern boolean stop_the_world;
 
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
-#if !defined(__i386__)
+#if !defined(LISP_FEATURE_X86)
 extern lispobj *current_binding_stack_pointer;
 #endif
 
-#if !defined(__i386__)
+#if !defined(LISP_FEATURE_X86)
 /* FIXME: Why doesn't the x86 need this? */
 extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;
@@ -65,7 +65,7 @@ extern void globals_init(void);
 #define EXTERN(name,bytes) .globl name 
 #endif
 #endif
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 #ifdef __linux__
 /* I'm very dubious about this.  Linux hasn't used _ on external names
  * since ELF became prevalent - i.e. about 1996, on x86    -dan 20010125 */

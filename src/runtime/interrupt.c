@@ -327,7 +327,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
     struct thread *thread=arch_os_get_current_thread();
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
@@ -344,7 +344,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	return;
     }
     
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
     were_in_lisp = !foreign_function_call_active;
     if (were_in_lisp)
 #endif
@@ -403,7 +403,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         (*handler.c)(signal, info, void_context);
     }
 
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
     if (were_in_lisp)
 #endif
     {
@@ -445,7 +445,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
     if (
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 	(!foreign_function_call_active) &&
 #endif
 	arch_pseudo_atomic_atomic(context)) {

@@ -37,7 +37,7 @@ extern void protect_control_stack_guard_page(pid_t t_id, int protect_p);
  *
  * CMU CL had architecture-dependent header files included here to
  * define memory map data:
- *   #ifdef __i386__
+ *   #ifdef LISP_FEATURE_X86
  *   #include "x86-validate.h"
  *   #endif
  * and so forth. In SBCL, the memory map data are defined at the Lisp

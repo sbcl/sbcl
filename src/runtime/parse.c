@@ -258,7 +258,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
 
     /* Search dynamic space. */
     headerptr = (lispobj *)DYNAMIC_SPACE_START;
-#if !defined(__i386__)
+#if !defined(LISP_FEATURE_X86)
     count =
 	dynamic_space_free_pointer -
 	(lispobj *)DYNAMIC_SPACE_START;
@@ -295,7 +295,7 @@ parse_regnum(char *s)
 
 	for (i = 0; i < NREGS ; i++)
 	    if (strcasecmp(s + 1, lisp_register_names[i]) == 0)
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
 		return i*2;
 #else
 	return i;

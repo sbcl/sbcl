@@ -90,7 +90,7 @@ process_directory(int fd, u32 *ptr, int count)
 	    }
 #endif
 /* FIXME: Should the conditional here be reg_ALLOC instead of
- *   defined(__i386__)
+ *   defined(LISP_FEATURE_X86)
  * ? */
 #if defined(LISP_FEATURE_X86)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);

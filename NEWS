@@ -2084,6 +2084,7 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
        an error during type derivation.
     ** bignum multiplication on the Alpha platform now returns the
        right answer.
+  * builds on SuSE AMD64, although still generates a 32-bit binary.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -28,7 +28,7 @@
 #include "genesis/primitive-objects.h"
 #include "thread.h"
 
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 
 /* KLUDGE: Sigh ... I know what the call frame looks like and it had
  * better not change. */

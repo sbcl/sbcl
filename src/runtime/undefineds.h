@@ -146,7 +146,7 @@ F(setrlimit)
 F(setsockopt)
 F(settimeofday)
 F(shutdown)
-#if !defined(hpux) && !defined(SVR4) && !defined(__i386__)
+#if !defined(hpux) && !defined(SVR4) && !defined(LISP_FEATURE_X86)
 F(sigreturn)
 #endif
 #if !defined(SVR4)
@@ -241,7 +241,7 @@ F(pow)
 #ifndef hpux
 F(cbrt)
 #endif
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 F(sqrt)
 #endif
 F(hypot)

@@ -220,7 +220,7 @@ ldso_stub__ ## fct: ;                           \
  * Note: There might be some other functions in this category as well.
  * E.g. I notice tanh() and acos() in the list above.. -- WHN 2001-06-07
  */
-#if !defined __i386__
+#if !defined LISP_FEATURE_X86
  LDSO_STUBIFY(sin)
  LDSO_STUBIFY(cos) 
  LDSO_STUBIFY(tan)      
