@@ -1593,40 +1593,5 @@ WORKAROUND:
   pprinter and only truncated at output?  (So that indenting by 1/2
   then 3/2 would indent by two spaces, not one?)
 
-350: heap overflow when printing bignums
-  (reported by Bruno Haible 2004-10-08)
-  In sbcl-0.8.15.18,
-    * (DEFPARAMETER *BIG* (ASH 1 1000000))
-    *BIG*
-    * (PRINT *BIG*)
-    Argh! gc_find_freeish_pages failed (restart_page), nbytes=110152.
-  It should be straightforward to push the heap overflow threshold
-  up to much larger bignums; Paul Dietz pointed out it would help to 
-  use a bignum-printing algorithm which bisected the printed number,
-  rather than stripping off digits one by one, and CSR suggested using
-  iteration rather than recursion to encourage intermediate results
-  to be GCed.
-
 351: suboptimal error handling/reporting when compiling (PUSH (LET ...)) 
-  In sbcl-0.8.15.18,
-    * (defvar *b*)
-    *B*
-    * (defun oops ()
-        (push *b*
-              (let ((b *b*))
-                (aref b 1))))
-  causes the compiler to die with a TYPE-ERROR in SB-C::EXTRACT-LET-VARS,
-    The value #:G4 is not of type LIST.
-  Since the (LET ...) expression is being misused in PUSH as a 
-  SETFable place, it would be more helpful to fail as in 
-    * (defun oops2 () (setf (let ((b *b*)) (aref b 1)) *b*))
-  with compilation errors and warnings like 
-    ; in: LAMBDA NIL
-    ;     ((B *B*))
-    ; caught ERROR:
-    ;   illegal function call
-  and
-    ; caught WARNING:
-    ;   The function (SETF LET) is undefined, and its name is reserved 
-    ;   by ANSI CL so that even if it were defined later, the code 
-    ;   doing so would not be portable.
+  (fixed in 0.8.16.37)

@@ -543,23 +543,26 @@
   During evaluation of the Forms, bind the Vars to the result of evaluating the
   Value forms. The variables are bound in parallel after all of the Values are
   evaluated."
-  (if (null bindings)
-      (ir1-translate-locally body start next result)
-      (multiple-value-bind (forms decls)
-          (parse-body body :doc-string-allowed nil)
-        (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-          (binding* ((ctran (make-ctran))
-                     (fun-lvar (make-lvar))
-                     ((next result)
-                      (processing-decls (decls vars nil next result)
-                        (let ((fun (ir1-convert-lambda-body
-                                    forms
-                                    vars
-                                    :debug-name (debug-namify "LET S"
-                                                              bindings))))
-                          (reference-leaf start ctran fun-lvar fun))
-                        (values next result))))
-            (ir1-convert-combination-args fun-lvar ctran next result values))))))
+  (cond ((null bindings)
+         (ir1-translate-locally body start next result))
+        ((listp bindings)
+         (multiple-value-bind (forms decls)
+             (parse-body body :doc-string-allowed nil)
+           (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
+             (binding* ((ctran (make-ctran))
+                        (fun-lvar (make-lvar))
+                        ((next result)
+                         (processing-decls (decls vars nil next result)
+                                           (let ((fun (ir1-convert-lambda-body
+                                                       forms
+                                                       vars
+                                                       :debug-name (debug-namify "LET S"
+                                                                                 bindings))))
+                                             (reference-leaf start ctran fun-lvar fun))
+                                           (values next result))))
+                       (ir1-convert-combination-args fun-lvar ctran next result values)))))
+        (t
+         (compiler-error "Malformed LET bindings: ~S." bindings))))
 
 (def-ir1-translator let* ((bindings &body body)
 			  start next result)
@@ -567,17 +570,19 @@
   "LET* ({(Var [Value]) | Var}*) Declaration* Form*
   Similar to LET, but the variables are bound sequentially, allowing each Value
   form to reference any of the previous Vars."
-  (multiple-value-bind (forms decls)
-      (parse-body body :doc-string-allowed nil)
-    (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
-      (processing-decls (decls vars nil start next)
-        (ir1-convert-aux-bindings start 
-                                  next 
-                                  result
-                                  forms
-                                  vars 
-                                  values)))))
-
+  (if (listp bindings)
+      (multiple-value-bind (forms decls)
+          (parse-body body :doc-string-allowed nil)
+        (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
+          (processing-decls (decls vars nil start next)
+                            (ir1-convert-aux-bindings start 
+                                                      next 
+                                                      result
+                                                      forms
+                                                      vars 
+                                                      values))))
+      (compiler-error "Malformed LET* bindings: ~S." bindings)))
+  
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
 ;;;

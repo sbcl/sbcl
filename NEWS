@@ -16,6 +16,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * minor incompatible change: SB-C::*COMPILER-ERROR-PRINT-FOO* variables
     are no longer supported: use SB-EXT:*COMPILER-PRINT-VARIABLE-ALIST*
     instead. 
+  * fixed bug #351: better error-handlind and reporting for malformed
+    LET and LET* forms.
   * fixed bug #350: bignum-printing is now more memory-efficient,
     allowing printing of very large bignums, eg. (expt 2 10000000).
     (reported by Bruno Haible)

@@ -1638,3 +1638,13 @@
               (if (or (eql 0 0) t) 0 (if f10-1 0 0))))
        (complex (multiple-value-call #'%f10 (values a c b 0 0)) 0))))
    80043 74953652306 33658947 -63099937105 -27842393)))
+
+;;; bug #351 -- program-error for malformed LET and LET*, including those
+;;; resulting from SETF of LET.
+(dolist (fun (list (compile nil '(lambda () (let :bogus-let :oops)))
+                   (compile nil '(lambda () (let* :bogus-let* :oops)))
+                   (compile nil '(lambda (x) (push x (let ((y 0)) y))))))
+  (assert (functionp fun))
+  (multiple-value-bind (res err) (ignore-errors (funcall fun))
+    (assert (not res))
+    (assert (typep err 'program-error))))
