@@ -11,12 +11,13 @@
 
 (in-package "SB!VM")
 
-;;; FIXME: It's clever using :SUFFIX -TYPE for these things, but it's
-;;; a pain for people just learning to find their way around the code
-;;; who want to use lexical search to figure out where things like
-;;; EVEN-FIXNUM-LOWTAG are defined. Remove the :SUFFIXes and just expand
-;;; out the full names. Or even define them in DEF EVEN-FIXNUM-LOWTAG
-;;; style so searches like 'def.*even-fixnum-lowtag' can find them.
+;;; FIXME: It's clever using :SUFFIX -LOWTAG for these things, but
+;;; it's a pain for people just learning to find their way around the
+;;; code who want to use lexical search to figure out where things
+;;; like EVEN-FIXNUM-LOWTAG are defined. Remove the :SUFFIXes and just
+;;; expand out the full names. Or even define them in DEF
+;;; EVEN-FIXNUM-LOWTAG style so searches like
+;;; 'def.*even-fixnum-lowtag' can find them.
 
 ;;; Tags for the main low-level types are stored in the low n (usually three)
 ;;; bits to identify the type of a machine word.  Certain constraints 
@@ -111,70 +112,75 @@
 (defenum (:suffix -widetag
 	  :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
 	  :step 4)
-  bignum
-  ratio
-  single-float
-  double-float
-  complex
-  complex-single-float
-  complex-double-float
+  bignum                            ; 00001010
+  ratio                             ; 00001110
+  single-float                      ; 00010010
+  double-float                      ; 00010110
+  complex                           ; 00011010
+  complex-single-float              ; 00011110
+  complex-double-float              ; 00100010
 
-  code-header
-  simple-fun-header
-  closure-header
-  funcallable-instance-header
+  code-header                       ; 00100110
 
-  return-pc-header
-  value-cell-header
-  symbol-header
-  base-char
-  sap
-  unbound-marker
-  weak-pointer
-  instance-header
-  fdefn
+  simple-fun-header                 ; 00101010
+  closure-header                    ; 00101110
+  funcallable-instance-header       ; 00110010
 
-  unused00
-  unused01
-  unused02
-  unused03
-  unused04
-  unused05
-  unused06
-  unused07
-  unused08
-  unused09
+  return-pc-header                  ; 00110110
+  value-cell-header                 ; 00111010
+  symbol-header                     ; 00111110
+  base-char                         ; 01000010
+  sap                               ; 01000110
+  unbound-marker                    ; 01001010
+  weak-pointer                      ; 01001110
+  instance-header                   ; 01010010
+  fdefn                             ; 01010110
+
+  unused00                          ; 01011010
+  unused01                          ; 01011110
+  unused02                          ; 01100010
+  unused03                          ; 01100110
+  unused04                          ; 01101010
+  unused05                          ; 01101110
+  unused06                          ; 01110010
+  unused07                          ; 01110110
+  unused08                          ; 01111010
+  unused09                          ; 01111110
   
-  unused10
-  unused11
+  unused10                          ; 10000010
+  unused11                          ; 10000110
 
-  simple-array-unsigned-byte-2
-  simple-array-unsigned-byte-4
-  simple-array-unsigned-byte-7
-  simple-array-unsigned-byte-8
-  simple-array-unsigned-byte-15
-  simple-array-unsigned-byte-16
-  simple-array-nil
-  simple-base-string
-  simple-bit-vector
-  simple-vector
-  simple-array-unsigned-byte-29
-  simple-array-unsigned-byte-31
-  simple-array-unsigned-byte-32
-  simple-array-signed-byte-8
-  simple-array-signed-byte-16
-  simple-array-signed-byte-30
-  simple-array-signed-byte-32
-  simple-array-single-float
-  simple-array-double-float
-  simple-array-complex-single-float
-  simple-array-complex-double-float
-  simple-array
-  complex-vector-nil
-  complex-base-string
-  complex-bit-vector
-  complex-vector
-  complex-array
+  simple-array-unsigned-byte-2      ; 10001010
+  simple-array-unsigned-byte-4      ; 10001110
+  simple-array-unsigned-byte-7      ; 10010010
+  simple-array-unsigned-byte-8      ; 10010110
+  simple-array-unsigned-byte-15     ; 10011010
+  simple-array-unsigned-byte-16     ; 10011110
+  simple-array-nil                  ; 10100010
+  simple-base-string                ; 10100110
+  simple-bit-vector                 ; 10101010
+  simple-vector                     ; 10101110
+  simple-array-unsigned-byte-29     ; 10110010
+  simple-array-unsigned-byte-31     ; 10110110
+  simple-array-unsigned-byte-32     ; 10111010
+  simple-array-signed-byte-8        ; 10111110
+  simple-array-signed-byte-16       ; 11000010
+  simple-array-signed-byte-30       ; 11000110
+  simple-array-signed-byte-32       ; 11001010
+  simple-array-single-float         ; 11001110
+  simple-array-double-float         ; 11010010
+  simple-array-complex-single-float ; 11010110
+  simple-array-complex-double-float ; 11011010
+  simple-array                      ; 11011110
+  complex-vector-nil                ; 11100010
+  complex-base-string               ; 11100110
+  complex-bit-vector                ; 11101010
+  complex-vector                    ; 11101110
+  complex-array                     ; 11110010
+
+  unused12                          ; 11110110
+  unused13                          ; 11111010
+  unused14                          ; 11111110
 )
 
 ;;; the different vector subtypes
