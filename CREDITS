@@ -610,7 +610,8 @@ Eric Marsden:
   Some of his fixes to CMU CL since the SBCL fork have been ported
   to SBCL.  He also maintains the cl-benchmark package, which gives
   us some idea of how our performance changes compared to earlier
-  releases and to other implementations.
+  releases and to other implementations.  He assisted in development
+  of Unicode support for SBCL.
 
 Antonio Martinez-Shotton:
   He has contributed a number of bug fixes and bug reports to SBCL.
@@ -682,6 +683,9 @@ Rudi Schlatte:
   string extractor that keeps function documentation in the manual
   current.
 
+Julian Squires:
+  He worked on Unicode support for the PowerPC platform.
+
 Nikodemus Siivola:
   He provided build fixes, in particular to tame the SunOS toolchain,
   implemented package locks, ported the linkage-table code from CMUCL,
@@ -697,7 +701,9 @@ Juho Snellman:
 
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and
-  stream types and operations on them.
+  stream types and operations on them.  (These versions did not end up
+  in the system, but did to a large extent influence the support which
+  finally did get merged.)
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on

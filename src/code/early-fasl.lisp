@@ -35,7 +35,7 @@
 
 (macrolet ((define-fasl-format-features ()
              (let (;; master value for *F-P-A-F-F*
-		   (fpaff '(:sb-thread :sb-package-locks)))
+		   (fpaff '(:sb-thread :sb-package-locks :sb-unicode)))
 	       `(progn
 		  ;; a list of *(SHEBANG-)FEATURES* flags which affect
 		  ;; binary compatibility, i.e. which must be the same
@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 51)
+(def!constant +fasl-file-version+ 52)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -110,6 +110,7 @@
 ;;; 50: (2004-05-20) Changed %COMPILER-DEFUN signature again.
 ;;; 51: (2004-07-24) Package locks (SBCL 0.8.12.7) changed signature of
 ;;;     %DEFPACKAGE.
+;;; 52: (2004-11-02) Merge of SB-UNICODE.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

@@ -2939,9 +2939,7 @@
 
 ;;;; character operations
 
-(deftransform char-equal ((a b)
-                          ((character-set ((0 . 255)))
-                           (character-set ((0 . 255)))))
+(deftransform char-equal ((a b) (base-char base-char))
   "open code"
   '(let* ((ac (char-code a))
 	  (bc (char-code b))
@@ -2953,7 +2951,7 @@
                  (and (> sum 415) (< sum 461))
                  (and (> sum 463) (< sum 477))))))))
 
-(deftransform char-upcase ((x) ((character-set ((0 . 255)))))
+(deftransform char-upcase ((x) (base-char))
   "open code"
   '(let ((n-code (char-code x)))
      (if (or (and (> n-code #o140)	; Octal 141 is #\a.
@@ -2965,7 +2963,7 @@
 	 (code-char (logxor #x20 n-code))
 	 x)))
 
-(deftransform char-downcase ((x) ((character-set ((0 . 255)))))
+(deftransform char-downcase ((x) (base-char))
   "open code"
   '(let ((n-code (char-code x)))
      (if (or (and (> n-code 64)	        ; 65 is #\A.
