@@ -230,9 +230,9 @@
 ;;;; hook functions
 
 ;;; Return a closure that can be used for a function start breakpoint
-;;; hook function and a closure that can be used as the
-;;; FUN-END-COOKIE function. The first communicates the sense of
-;;; the Condition to the second via a closure variable.
+;;; hook function and a closure that can be used as the FUN-END-COOKIE
+;;; function. The first communicates the sense of the
+;;; TRACE-INFO-CONDITION to the second via a closure variable.
 (defun trace-start-breakpoint-fun (info)
   (let (conditionp)
     (values
@@ -342,7 +342,7 @@
 		  (nth-value 2 (trace-fdefinition definition)))
 	  (trace-fdefinition function-or-name))
     (when (gethash fun *traced-funs*)
-      (warn "~S is already TRACE'd, untracing it." function-or-name)
+      (warn "~S is already TRACE'd, untracing it first." function-or-name)
       (untrace-1 fun))
 
     (let* ((debug-fun (sb-di:fun-debug-fun fun))

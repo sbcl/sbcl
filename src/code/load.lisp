@@ -146,64 +146,47 @@
 
 ;;;; the fop stack
 
-;;; (This is in a SIMPLE-VECTOR, but it grows down, since it is
-;;; somewhat cheaper to test for overflow that way.)
-(defvar *fop-stack* (make-array 100))
-(declaim (simple-vector *fop-stack*))
-
-;;; the index of the most recently pushed item on the fop stack
-(defvar *fop-stack-pointer* 100)
-
-;;; the current index into the fop stack when we last recursively
-;;; entered LOAD
-(defvar *fop-stack-pointer-on-entry*)
-(declaim (type index *fop-stack-pointer* *fop-stack-pointer-on-entry*))
-
-(defun grow-fop-stack ()
-  (let* ((size (length (the simple-vector *fop-stack*)))
-	 (new-size (* size 2))
-	 (new-stack (make-array new-size)))
-    (declare (fixnum size new-size) (simple-vector new-stack))
-    (replace new-stack (the simple-vector *fop-stack*) :start1 size)
-    (incf *fop-stack-pointer-on-entry* size)
-    (setq *fop-stack-pointer* size)
-    (setq *fop-stack* new-stack)))
+;;; (This is to be bound by LOAD to an adjustable (VECTOR T) with
+;;; FILL-POINTER, for use as a stack with VECTOR-PUSH-EXTEND.)
+(defvar *fop-stack*)
+(declaim (type (vector t) *fop-stack*))
 
 ;;; Cache information about the fop stack in local variables. Define a
 ;;; local macro to pop from the stack. Push the result of evaluation
-;;; if specified.
+;;; if PUSHP.
 (defmacro with-fop-stack (pushp &body forms)
   (aver (member pushp '(nil t :nope)))
-  (let ((n-stack (gensym))
-	(n-index (gensym))
-	(n-res (gensym)))
-    `(let ((,n-stack *fop-stack*)
-	   (,n-index *fop-stack-pointer*))
-       (declare (simple-vector ,n-stack) (type index ,n-index))
+  (with-unique-names (fop-stack)
+    `(let ((,fop-stack *fop-stack*))
+       (declare (type (vector t) ,fop-stack))
        (macrolet ((pop-stack ()
-		    `(prog1
-		      (svref ,',n-stack ,',n-index)
-		      (incf ,',n-index)))
-		  (call-with-popped-things (fun n)
-		    (let ((n-start (gensym)))
-		      `(let ((,n-start (+ ,',n-index ,n)))
-			 (declare (type index ,n-start))
-			 (setq ,',n-index ,n-start)
-			 (,fun ,@(make-list n :initial-element
-					    `(svref ,',n-stack
-						    (decf ,n-start))))))))
+		    `(vector-pop ,',fop-stack))
+		  (call-with-popped-args (fun n)
+		    `(%call-with-popped-args ,fun ,n ,',fop-stack)))
 	 ,(if pushp
-	      `(let ((,n-res (progn ,@forms)))
-		 (when (zerop ,n-index)
-		   (grow-fop-stack)
-		   (setq ,n-index *fop-stack-pointer*
-			 ,n-stack *fop-stack*))
-		 (decf ,n-index)
-		 (setq *fop-stack-pointer* ,n-index)
-		 (setf (svref ,n-stack ,n-index) ,n-res))
-	      `(prog1
-		(progn ,@forms)
-		(setq *fop-stack-pointer* ,n-index)))))))
+	      `(vector-push-extend (progn ,@forms) ,fop-stack)
+	      `(progn ,@forms))))))
+
+;;; Call FUN with N arguments popped from STACK.
+(defmacro %call-with-popped-args (fun n stack)
+  ;; N's integer value must be known at macroexpansion time.
+  (declare (type index n))
+  (with-unique-names (n-stack old-length new-length)
+    (let ((argtmps (make-gensym-list n)))
+      `(let* ((,n-stack ,stack)
+	      (,old-length (fill-pointer ,n-stack))
+	      (,new-length (- ,old-length ,n))
+	      ,@(loop for i from 0 below n collecting
+		      `(,(nth i argtmps)
+			(aref ,n-stack (+ ,new-length ,i)))))
+	(declare (type (vector t) ,n-stack))
+	(setf (fill-pointer ,n-stack) ,new-length)
+	;; (For some applications it might be appropriate to FILL the
+	;; popped area with NIL here, to avoid holding onto garbage. For
+	;; sbcl-0.8.7.something, though, it shouldn't matter, because
+	;; we're using this only to pop stuff off *FOP-STACK*, and the
+	;; entire *FOP-STACK* can be GCed as soon as LOAD returns.)
+	(,fun ,@argtmps)))))
 
 ;;;; Conditions signalled on invalid fasls (wrong fasl version, etc),
 ;;;; so that user code (esp. ASDF) can reasonably handle attempts to
@@ -357,8 +340,7 @@
 ;;;
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
-;;; Dispatch to the right function for each fop. Special-case
-;;; FOP-BYTE-PUSH since it is real common.
+;;; Dispatch to the right function for each fop. 
 (defun load-fasl-group (stream)
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
@@ -366,6 +348,10 @@
 	(loop
 	  (let ((byte (read-byte stream)))
 
+	    ;; stale code from before rewrite of *FOP-STACK* as
+	    ;; adjustable vector (probably worth rewriting when next
+	    ;; anyone needs to debug FASL stuff)
+	    #|
 	    ;; Do some debugging output.
 	    #!+sb-show
 	    (when *show-fops-p*
@@ -386,26 +372,10 @@
 			byte
 			(1- (file-position stream))
 			(svref *fop-funs* byte))))
+            |#
 
 	    ;; Actually execute the fop.
-	    (if (eql byte 3)
-	      ;; FIXME: This is the special case for FOP-BYTE-PUSH.
-	      ;; Benchmark to see whether it's really worth special
-	      ;; casing it. If it is, at least express the test in
-	      ;; terms of a symbolic name for the FOP-BYTE-PUSH code,
-	      ;; not a bare '3' (!). Failing that, remove the special
-	      ;; case (and the comment at the head of this function
-	      ;; which mentions it).
-	      (let ((index *fop-stack-pointer*))
-		(declare (type index index))
-		(when (zerop index)
-		  (grow-fop-stack)
-		  (setq index *fop-stack-pointer*))
-		(decf index)
-		(setq *fop-stack-pointer* index)
-		(setf (svref *fop-stack* index)
-		      (svref *current-fop-table* (read-byte stream))))
-	      (funcall (the function (svref *fop-funs* byte))))))))))
+	    (funcall (the function (svref *fop-funs* byte)))))))))
 
 (defun load-as-fasl (stream verbose print)
   ;; KLUDGE: ANSI says it's good to do something with the :PRINT
@@ -420,16 +390,14 @@
     (let* ((*fasl-input-stream* stream)
 	   (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
 	   (*current-fop-table-size* (length *current-fop-table*))
-	   (*fop-stack-pointer-on-entry* *fop-stack-pointer*))
+	   (*fop-stack* (make-array 100 :fill-pointer 0 :adjustable t)))
       (unwind-protect
 	   (loop while (load-fasl-group stream))
-	(setq *fop-stack-pointer* *fop-stack-pointer-on-entry*)
 	(push *current-fop-table* *free-fop-tables*)
-	;; NIL out the stack and table, so that we don't hold onto garbage.
+	;; NIL out the table, so that we don't hold onto garbage.
 	;;
-	;; FIXME: Couldn't we just get rid of the free fop table pool so
-	;; that some of this NILing out would go away?
-	(fill *fop-stack* nil :end *fop-stack-pointer-on-entry*)
+	;; FIXME: Could we just get rid of the free fop table pool so
+	;; that this would go away?
 	(fill *current-fop-table* nil))))
   t)
 

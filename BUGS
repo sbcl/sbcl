@@ -1249,3 +1249,11 @@ WORKAROUND:
 	  (bletch 1 y))
   gives the error
     failed AVER: "(NOT (AND (NOT EQUALP) CERTAINP))"
+
+302: Undefined type messes up DATA-VECTOR-REF expansion.
+  Compiling this file
+    (defun dis (s ei x y)
+      (declare (type (simple-array function (2)) s) (type ei ei))
+      (funcall (aref s ei) x y))
+  on sbcl-0.8.7.36/X86/Linux causes a BUG to be signalled:
+    full call to SB-KERNEL:DATA-VECTOR-REF
