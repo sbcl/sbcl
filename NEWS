@@ -34,6 +34,9 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     to approximately the same size (using Euclid's algorithm) before
     applying the more sophisticated binary GCD.  (thanks to Juho
     Snellman)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** format variable parameters ("~V<char>") are defaulted properly
+       if the corresponding argument is NIL.
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of

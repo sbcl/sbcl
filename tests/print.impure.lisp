@@ -239,5 +239,8 @@
 		  (write #2a((t t) (nil nil)) :stream s))))
     (assert (equalp (read-from-string output) #2a((t t) (nil nil))))))
 
+;;; NIL parameters to "interpreted" FORMAT directives
+(assert (string= (format nil "~v%" nil) (string #\Newline)))
+
 ;;; success
 (quit :unix-status 104)

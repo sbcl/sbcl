@@ -145,7 +145,7 @@
 				  (offset (car param-and-offset))
 				  (param (cdr param-and-offset)))
 			     (case param
-			       (:arg (next-arg offset))
+			       (:arg (or (next-arg offset) ,default))
 			       (:remaining (length args))
 			       ((nil) ,default)
 			       (t param)))))))
