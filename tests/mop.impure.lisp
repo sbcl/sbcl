@@ -104,5 +104,12 @@
   (assert (member (find-class x)
 		  (sb-pcl:class-direct-subclasses (find-class t)))))
 
+;;; the class-prototype of the NULL class used to be some weird
+;;; standard-instance-like thing.  Make sure it's actually NIL.
+;;;
+;;; (and FIXME: eventually turn this into asserting that the prototype
+;;; of all built-in-classes is of the relevant type)
+(assert (null (sb-pcl:class-prototype (find-class 'null))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

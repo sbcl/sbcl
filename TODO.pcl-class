@@ -8,12 +8,8 @@ CONDITION-CLASS analogously to STRUCTURE-CLASS.
 
 ** CLASS-PROTOTYPE
 
-(sb-pcl:class-prototype (find-class 'null)) yields something decidedly
-weird -- it has allocated a NULL thingy.  This is easy to solve
-[&optional (proto nil protop)]; probably harder are the issues for
-e.g. BIGNUM, some strange array classes, and so on, particularly in
-their interaction with the cross-compiler dumper, should PCL ever be
-moved to the main build.
+[ fixed the (CLASS-PROTOTYPE (FIND-CLASS 'NULL)) issue; more general
+  fix for other built-in-classes can be done in mainline post-merge ]
 
 ** SB-MOP
 

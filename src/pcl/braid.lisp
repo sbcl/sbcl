@@ -255,7 +255,8 @@
        (metaclass-name class name
 	class-eq-wrapper source direct-supers direct-subclasses cpl wrapper
 	&optional
-	proto direct-slots slots direct-default-initargs default-initargs)
+	(proto nil proto-p)
+	direct-slots slots direct-default-initargs default-initargs)
   (flet ((classes (names) (mapcar #'find-class names))
 	 (set-slot (slot-name value)
 	   (!bootstrap-set-slot metaclass-name class slot-name value)))
@@ -323,7 +324,8 @@
 	  (set-slot 'from-defclass-p t)
 	  (set-slot 'plist nil)
 	  (set-slot 'prototype (funcall constructor-sym)))
-	(set-slot 'prototype (or proto (allocate-standard-instance wrapper))))
+	(set-slot 'prototype
+		  (if proto-p proto (allocate-standard-instance wrapper))))
     class))
 
 (defun !bootstrap-make-slot-definitions (name class slots wrapper effective-p)
