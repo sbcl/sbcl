@@ -274,6 +274,56 @@
 (test-variant vector-struct :colontype vector)
 (test-variant list-struct :colontype list)
 
+;;;; testing raw slots harder
+;;;;
+;;;; The offsets of raw slots need to be rescaled during the punning
+;;;; process which is used to access them. That seems like a good
+;;;; place for errors to lurk, so we'll try hunting for them by
+;;;; verifying that all the raw slot data gets written successfully
+;;;; into the object, can be copied with the object, and can then be
+;;;; read back out (with none of it ending up bogusly outside the
+;;;; object, so that it couldn't be copied, or bogusly overwriting
+;;;; some other raw slot).
+
+(defstruct manyraw
+  (a (expt 2 30) :type (unsigned-byte 32))
+  (b 0.1 :type single-float)
+  (c 0.2d0 :type double-float)
+  (d #c(0.3 0.3) :type (complex single-float))
+  unraw-slot-just-for-variety
+  (e #c(0.4d0 0.4d0) :type (complex double-float))
+  (aa (expt 2 30) :type (unsigned-byte 32))
+  (bb 0.1 :type single-float)
+  (cc 0.2d0 :type double-float)
+  (dd #c(0.3 0.3) :type (complex single-float))
+  (ee #c(0.4d0 0.4d0) :type (complex double-float)))
+
+(defvar *manyraw* (make-manyraw))
+
+(assert (eql (manyraw-a *manyraw*) (expt 2 30)))
+(assert (eql (manyraw-b *manyraw*) 0.1))
+(assert (eql (manyraw-c *manyraw*) 0.2d0))
+(assert (eql (manyraw-d *manyraw*) #c(0.3 0.3)))
+(assert (eql (manyraw-e *manyraw*) #c(0.4d0 0.4d0)))
+(assert (eql (manyraw-aa *manyraw*) (expt 2 30)))
+(assert (eql (manyraw-bb *manyraw*) 0.1))
+(assert (eql (manyraw-cc *manyraw*) 0.2d0))
+(assert (eql (manyraw-dd *manyraw*) #c(0.3 0.3)))
+(assert (eql (manyraw-ee *manyraw*) #c(0.4d0 0.4d0)))
+
+(setf (manyraw-aa *manyraw*) (expt 2 31)
+      (manyraw-bb *manyraw*) 0.11
+      (manyraw-cc *manyraw*) 0.22d0
+      (manyraw-dd *manyraw*) #c(0.33 0.33)
+      (manyraw-ee *manyraw*) #c(0.44d0 0.44d0))
+
+(let ((copy (copy-manyraw *manyraw*)))
+  (assert (eql (manyraw-aa copy) (expt 2 31)))
+  (assert (eql (manyraw-bb copy) 0.11))
+  (assert (eql (manyraw-cc copy) 0.22d0))
+  (assert (eql (manyraw-dd copy) #c(0.33 0.33)))
+  (assert (eql (manyraw-ee copy) #c(0.44d0 0.44d0))))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)

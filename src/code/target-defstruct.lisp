@@ -267,20 +267,25 @@
 		       (,dd-ref-fun-name instance dsd-index)
 		       ,instance-type-check-form))
 		     ;; raw slot cases
-		     ,@(mapcar (lambda (raw-type-and-rawref-fun-name)
-				 (destructuring-bind (raw-type
-						      . rawref-fun-name)
-				     raw-type-and-rawref-fun-name
+		     ,@(mapcar (lambda (rtd)
+				 (let ((raw-type (raw-slot-data-raw-type rtd))
+				       (accessor-name
+					(raw-slot-data-accessor-name rtd))
+				       (n-words (raw-slot-data-n-words rtd)))
 				   `((equal dsd-raw-type ',raw-type)
 				     #+sb-xc (/show0 "in raw slot case")
 				     (let ((raw-index (dd-raw-index dd)))
-				       (%slotplace-accessor-funs
-					(,rawref-fun-name (,dd-ref-fun-name
+				       (multiple-value-bind (scaled-dsd-index
+							     misalignment)
+					   (floor dsd-index ,n-words)
+					 (aver (zerop misalignment))
+					 (%slotplace-accessor-funs
+					  (,accessor-name (,dd-ref-fun-name
 							   instance
 							   raw-index)
-							  dsd-index)
-					,instance-type-check-form)))))
-			       *raw-type->rawref-fun-name*)
+							  scaled-dsd-index)
+					  ,instance-type-check-form))))))
+			       *raw-slot-data-list*)
 		     ;; oops
 		     (t
 		      (error "internal error: unexpected DSD-RAW-TYPE ~S"

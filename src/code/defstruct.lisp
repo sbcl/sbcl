@@ -189,27 +189,59 @@
 
 ;;;; shared machinery for inline and out-of-line slot accessor functions
 
-;;; an alist mapping from raw slot type to the operator used to access
-;;; the raw slot
-;;;
-;;; FIXME: should be shared with other src/code/*defstruct*.lisp code
-;;; which refers to e.g. %RAW-REF-SINGLE, but as of sbcl-0.pre7.78
-;;; is only used by out-of-line versions
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *raw-type->rawref-fun-name*
-    '(;; The compiler thinks that the raw data vector is a vector of
-      ;; unsigned bytes, so if the slot we want to access actually *is*
-      ;; an unsigned byte, it'll access the slot for us even if we don't
-      ;; lie to it at all.
-      (unsigned-byte . aref)
-      ;; "A lie can travel halfway round the world while the truth is
-      ;; putting on its shoes." -- Mark Twain
-      (single-float . %raw-ref-single)
-      (double-float . %raw-ref-double)
-      #!+long-float (long-float . %raw-ref-long)
-      (complex-single-float . %raw-ref-complex-single)
-      (complex-double-float . %raw-ref-complex-double)
-      #!+long-float (complex-long-float . %raw-ref-complex-long))))
+
+  ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
+  (defstruct raw-slot-data
+    ;; the raw slot type, or T for a non-raw slot
+    ;;
+    ;; (Raw slots are allocated in the raw slots array in a vector which
+    ;; the GC doesn't need to scavenge. Non-raw slots are in the
+    ;; ordinary place you'd expect, directly indexed off the instance
+    ;; pointer.)
+    (raw-type (missing-arg) :type (or symbol cons) :read-only t)
+    ;; What operator is used (on the raw data vector) to access a slot
+    ;; of this type?
+    (accessor-name (missing-arg) :type symbol :read-only t)
+    ;; How many words are each value of this type? (This is used to 
+    ;; rescale the offset into the raw data vector.)
+    (n-words (missing-arg) :type (and index (integer 1)) :read-only t))
+
+  (defvar *raw-slot-data-list* 
+    (list
+     ;; The compiler thinks that the raw data vector is a vector of
+     ;; word-sized unsigned bytes, so if the slot we want to access
+     ;; actually *is* an unsigned byte, it'll access the slot for us
+     ;; even if we don't lie to it at all, just let it use normal AREF.
+     (make-raw-slot-data :raw-type 'unsigned-byte
+			 :accessor-name 'aref
+			 :n-words 1)
+     ;; In the other cases, we lie to the compiler, making it use
+     ;; some low-level AREFish access in order to pun the hapless
+     ;; bits into some other-than-unsigned-byte meaning.
+     ;;
+     ;; "A lie can travel halfway round the world while the truth is
+     ;; putting on its shoes." -- Mark Twain
+     (make-raw-slot-data :raw-type 'single-float
+			 :accessor-name '%raw-ref-single
+			 :n-words 1)
+     (make-raw-slot-data :raw-type 'double-float
+			 :accessor-name '%raw-ref-double
+			 :n-words 2)
+     (make-raw-slot-data :raw-type 'complex-single-float
+			 :accessor-name '%raw-ref-complex-single
+			 :n-words 2)
+     (make-raw-slot-data :raw-type 'complex-double-float
+			 :accessor-name '%raw-ref-complex-double
+			 :n-words 4)
+     #!+long-float
+     (make-raw-slot-data :raw-type long-float
+			 :accessor-name '%raw-ref-long
+			 :n-words #!+x86 3 #!+sparc 4)
+     #!+long-float
+     (make-raw-slot-data :raw-type complex-long-float
+			 :accessor-name '%raw-ref-complex-long
+			 :n-words #!+x86 6 #!+sparc 8))))
 
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB!XC:DEFSTRUCT)
@@ -719,7 +751,7 @@
 		     (vector super)))))
 
 ;;; Do miscellaneous (LOAD EVAL) time actions for the structure
-;;; described by DD. Create the class & LAYOUT, checking for
+;;; described by DD. Create the class and LAYOUT, checking for
 ;;; incompatible redefinition. Define those functions which are
 ;;; sufficiently stereotyped that we can implement them as standard
 ;;; closures.
@@ -743,7 +775,7 @@
 	   (setq layout (class-layout class))))
     (setf (sb!xc:find-class (dd-name dd)) class)
 
-    ;; It doesn't make sense to do these in the cross-compilation host.
+    ;; Various other operations only make sense on the target SBCL.
     #-sb-xc-host
     (progn
       (remhash (dd-name dd) *typecheckfuns*)
@@ -766,41 +798,33 @@
 	(raw-type (dsd-raw-type dsd)))
     (if (eq raw-type t) ; if not raw slot
 	`(,ref ,instance-name ,(dsd-index dsd))
-	(let (;; the operator that we'll use to access one value in
-	      ;; the raw data vector
-	      (rawref (ecase raw-type
-			;; The compiler thinks that the raw data
-			;; vector is a vector of unsigned bytes, so if
-			;; the slot we want to access actually *is* an
-			;; unsigned byte, it'll access the slot for
-			;; us even if we don't lie to it at all.
-			(unsigned-byte 'aref)
-			;; "A lie can travel halfway round the world while
-			;; the truth is putting on its shoes." -- Mark Twain
-			(single-float '%raw-ref-single)
-			(double-float '%raw-ref-double)
-			#!+long-float (long-float '%raw-ref-long)
-			(complex-single-float '%raw-ref-complex-single)
-			(complex-double-float '%raw-ref-complex-double)
-			#!+long-float (complex-long-float
-				       '%raw-ref-complex-long))))
-	  `(,rawref (,ref ,instance-name ,(dd-raw-index dd))
-		    ,(dsd-index dsd))))))
+	(let* ((raw-slot-data (find raw-type *raw-slot-data-list*
+				    :key #'raw-slot-data-raw-type
+				    :test #'equal))
+	       (raw-slot-accessor (raw-slot-data-accessor-name raw-slot-data))
+	       (raw-n-words (raw-slot-data-n-words raw-slot-data)))
+	  (multiple-value-bind (scaled-dsd-index misalignment)
+	      (floor (dsd-index dsd) raw-n-words)
+	    (aver (zerop misalignment))
+	    `(,raw-slot-accessor (,ref ,instance-name ,(dd-raw-index dd))
+				 ,scaled-dsd-index))))))
 
 ;;; Return inline expansion designators (i.e. values suitable for
-;;; (INFO :FUNCTION :INLINE-EXPANSSION-DESIGNATOR ..)) for the reader
+;;; (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR ..)) for the reader
 ;;; and writer functions of the slot described by DSD.
-(defun accessor-inline-expansion-designators (dd dsd)
-  (values (lambda ()
-	    `(lambda (instance)
-	       (declare (type ,(dd-name dd) instance))
-	       (truly-the ,(dsd-type dsd)
-			  ,(%accessor-place-form dd dsd 'instance))))
-	  (lambda ()
-	    `(lambda (new-value instance)
-	       (declare (type ,(dsd-type dsd) new-value))
-	       (declare (type ,(dd-name dd) structure-object))
-	       (setf ,(%accessor-place-form dd dsd 'instance) new-value)))))
+(defun slot-accessor-inline-expansion-designators (dd dsd)
+  (let ((instance-type-decl `(declare (type ,(dd-name dd) instance)))
+	(accessor-place-form (%accessor-place-form dd dsd 'instance))
+	(dsd-type (dsd-type dsd)))
+    (values (lambda ()
+	      `(lambda (instance)
+		 ,instance-type-decl
+		 (truly-the ,dsd-type ,accessor-place-form)))
+	    (lambda ()
+	      `(lambda (new-value instance)
+		 (declare (type ,dsd-type new-value))
+		 ,instance-type-decl
+		 (setf ,accessor-place-form new-value))))))
 
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
@@ -894,7 +918,7 @@
 	     (dsd-type (dsd-type dsd)))
 	(when accessor-name
 	  (multiple-value-bind (reader-designator writer-designator)
-	      (accessor-inline-expansion-designators dd dsd)
+	      (slot-accessor-inline-expansion-designators dd dsd)
 	    (sb!xc:proclaim `(ftype (function (,dtype) ,dsd-type)
 				    ,accessor-name))
 	    (setf (info :function :inline-expansion-designator accessor-name)
