@@ -70,6 +70,9 @@ FIX:
 	?? Replace it with a system where fasl output files live in the 
 	  same directories as the sources and have names a la
 	  "foo.fasl-from-host and "foo.fasl-from-xc".
+	?? (Perhaps something else will be required in order to port
+	to Microsoft Windows, since its filesystem doesn't have
+	symbolic links.)
 -------------------------------------------------------------------------------
 PROBLEM:
 	    It might be good to use the syntax (DEBUGGER-SPECIAL *PRINT-LEVEL*)
@@ -120,21 +123,6 @@ Search for unused external symbols (ones which are not bound, fbound,
 types, or whatever, and also have no other uses as e.g. flags) and
 delete them. This should make the system core a little smaller, but
 is mostly useful just to make the source code smaller and simpler.
-
-The eventual plan is for SBCL to bootstrap itself in two phases. In
-the first phase, the cross-compilation host is any old ANSI Common
-Lisp (not necessarily SBCL) and the cross-compiler won't handle some
-optimizations because the code it uses to implement them is not
-portable. In the second phase, the cross-compilation host will be
-required to be a compatible version of SBCL, and the cross-compiler
-will take advantage of that to implement all optimizations. The
-current version of SBCL only knows how to do the first of those two
-phases, with a fully-portable cross-compiler, so some optimizations
-are not done. Probably the most important consequence of this is that
-because the fully-portable cross-compiler isn't very smart about
-dealing with immediate values which are of specialized array type
-(e.g. (SIMPLE-ARRAY (UNSIGNED-BYTE 4) 1)) the system sometimes has to
-use unnecessarily-general array types internally.
 
 adding new FOPs to provide something like CMU CL's FOP-SYMBOL-SAVE and
 FOP-SMALL-SYMBOL-SAVE functionality, so that fasl files will be more
