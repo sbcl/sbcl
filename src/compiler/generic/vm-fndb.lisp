@@ -51,7 +51,15 @@
 	   simple-array-complex-single-float-p
 	   simple-array-complex-double-float-p
 	   #!+long-float simple-array-complex-long-float-p
-	   system-area-pointer-p realp unsigned-byte-32-p signed-byte-32-p
+	   system-area-pointer-p realp
+           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+           unsigned-byte-32-p
+           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+           signed-byte-32-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           unsigned-byte-64-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           signed-byte-64-p
 	   vector-t-p weak-pointer-p code-component-p lra-p
 	   funcallable-instance-p)
   (t) boolean (movable foldable flushable))
@@ -113,6 +121,16 @@
 
 
 (sb!xc:deftype raw-vector () '(simple-array sb!vm:word (*)))
+
+;;; %RAW-{REF,SET}-FOO VOPs should be declared as taking a RAW-VECTOR
+;;; as their first argument (clarity and to match these DEFKNOWNs).
+;;; We declare RAW-VECTOR as a primitive type so the VOP machinery
+;;; will accept our VOPs as legitimate.  --njf, 2004-08-10
+(sb!vm::!def-primitive-type-alias raw-vector
+                                  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+                                  sb!vm::simple-array-unsigned-byte-32
+                                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                  sb!vm::simple-array-unsigned-byte-64)
 
 (defknown %raw-ref-single (raw-vector index) single-float
   (foldable flushable))
@@ -258,7 +276,7 @@
   (foldable flushable movable))
 
 (defknown (%ashl %ashr %digit-logical-shift-right)
-	  (bignum-element-type (mod 32)) bignum-element-type
+	  (bignum-element-type (mod #.sb!vm:n-word-bits)) bignum-element-type
   (foldable flushable movable))
 
 ;;;; bit-bashing routines
