@@ -496,7 +496,7 @@
 	      (intersection-type
 	       (source-transform-intersection-typep object type))
 	      (member-type
-	       `(member ,object ',(member-type-members type)))
+	       `(if (member ,object ',(member-type-members type)) t))
 	      (args-type
 	       (compiler-warn "illegal type specifier for TYPEP: ~S"
 			      (cadr spec))
